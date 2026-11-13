@@ -12,7 +12,7 @@ use super::menu::options::{ACTIONS, CHORD_ROWS, DIRECTIONS, SITUATIONS, SWAP_GRO
 use super::catalog::ITEMS;
 use super::menu::grid::{GridKind, GridLayout, RosterUse};
 use super::menu::table::{Control, Editor, Row, GROUPS, ROWS};
-use super::menu::{ChordCapture, ChordTarget, Grey, Menu, Screen, SliderState, DELAY_ROWS, OVERRIDE_COLUMN};
+use super::menu::{ChordCapture, ChordTarget, Grey, Menu, Screen, SliderState, DELAY_ROWS, LOOP_ROW, OVERRIDE_COLUMN};
 use super::panes::ROWS as ROW_LINES;
 
 const HINT_LIST: &str = "Up/Down choose   ZL+Up/Down jump   A set   B back";
@@ -133,10 +133,13 @@ fn list_frame(menu: &Menu, screen: &Screen, row: usize, cursor: usize, frame: &m
         _ => (0, 1),
     };
     let yes_no = matches!(r.control, Control::YesNoRandom);
+    let loop_at = (r.id == LOOP_ROW).then(|| menu.recording().loop_row_index());
     lines_window(frame, cursor, total, |i, line| {
         let label = option_label(r, i, first, step);
         line.label = label;
-        let chosen = if yes_no {
+        let chosen = if let Some(at) = loop_at {
+            i == at
+        } else if yes_no {
             // Yes = [1,0], No = [0,1], Random = [1,1].
             matches!((i, current.first().copied().unwrap_or(0) != 0, current.get(1).copied().unwrap_or(0) != 0), (0, true, false) | (1, false, true) | (2, true, true))
         } else {

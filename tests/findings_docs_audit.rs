@@ -4,6 +4,8 @@
 //! - #23: B closed the Recording pop-up and the same press reached the fighter (Mario's fireball), held or tapped for one
 //!   frame. The pop-up now closes through the menu's close window (`flow::popup_closed`, `flow::close_done`), which also
 //!   waits for the closing press to be released.
+//! - #15: the Loop row's A list wrote the old two-value setting, so the count Play reads did not change, and Reset page to
+//!   defaults left the count alone. The list and the reset now use the recording menu's per-role counts.
 
 // rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
 macro_rules! lib_unit_tests {
@@ -369,4 +371,171 @@ fn the_runtime_uses_the_close_window_rules() {
     assert!(tick.contains("flow::close_done(count, state::CLOSE_HELD.load("), "the tick ends the window by flow::close_done");
     assert!(tick.contains("count < CLOSE_FRAMES && state::CLOSE_FADES.load("), "the fade runs 15 frames, for the menu only");
     assert!(!tick.contains("if count >= CLOSE_FRAMES {"), "the tick ends the window at 15 frames regardless again");
+}
+
+// ---- #15: the Loop row's list and reset --------------------------------------------------------------------------------
+
+use model::frame::{self, Frame, Text};
+use model::menu::options::LOOP_COUNTS;
+use model::menu::table::{Control, ROWS};
+use model::menu::{Entry, Screen, LOOP_ROW};
+use model::recording_menu::{LoopMark, ViewRole};
+use model::screens::frame_of;
+
+fn row_of(key: &str) -> usize {
+    ROWS.iter().position(|row| row.id == key).unwrap_or_else(|| panic!("no row {key}"))
+}
+
+fn goto_entry(m: &mut Menu, entry: Entry) {
+    for _ in 0..=m.entry_count(m.page()) {
+        if m.focus() == Some(entry) {
+            return;
+        }
+        m.press(Button::Down);
+    }
+    panic!("could not focus {entry:?}");
+}
+
+/// A menu on the factory settings with the Loop row focused (`tests/findings_menu_close.rs`'s `goto`).
+fn loop_menu() -> Menu {
+    let mut m = Menu::new(Settings::factory(), Env::default());
+    let row = row_of(LOOP_ROW);
+    let page = ROWS[row].page();
+    for _ in 0..6 {
+        if m.page() == page {
+            break;
+        }
+        m.press(Button::R);
+    }
+    assert_eq!(m.page(), page);
+    let group = usize::from(ROWS[row].group);
+    if !m.group_is_open(group) {
+        goto_entry(&mut m, Entry::Group(group));
+        m.press(Button::A);
+    }
+    goto_entry(&mut m, Entry::Row(row));
+    m
+}
+
+/// ZR: the Recording page's CPU view. Its rows differ, so the cursor (an entry index) is put back on the Loop row.
+fn cpu_view(m: &mut Menu) {
+    m.press(Button::ZR);
+    assert_eq!(m.recording().page_role(), ViewRole::Cpu);
+    goto_entry(m, Entry::Row(row_of(LOOP_ROW)));
+}
+
+fn list_cursor(m: &Menu) -> usize {
+    match m.screen() {
+        Some(Screen::List { cursor, .. }) => *cursor,
+        other => panic!("not the list: {other:?}, focus {:?}, depth {}, page role {:?}", m.focus(), m.depth(), m.recording().page_role()),
+    }
+}
+
+/// A on the Loop row, the cursor to `index`, A.
+fn pick(m: &mut Menu, index: usize) {
+    m.press(Button::A);
+    for _ in 0..LOOP_COUNTS.len() {
+        if list_cursor(m) == index {
+            break;
+        }
+        m.press(Button::Down);
+    }
+    assert_eq!(list_cursor(m), index);
+    m.press(Button::A);
+    assert!(m.screen().is_none(), "A sets and closes the list");
+}
+
+fn loop_of_selection(m: &Menu, role: ViewRole) -> LoopMark {
+    let selection = m.recording().selection();
+    match role {
+        ViewRole::Player => selection.loop_player,
+        ViewRole::Cpu => selection.loop_cpu,
+    }
+}
+
+fn row_value(m: &Menu) -> String {
+    let mut value = Text::new();
+    frame::write_value(m, row_of(LOOP_ROW), &mut value);
+    value.string_lossy()
+}
+
+/// The open list's lines: (label, value).
+fn list_lines(m: &Menu) -> Vec<(String, String)> {
+    let mut f = Box::new(Frame::new());
+    frame_of(m, &mut f, |_| "Stage");
+    f.rows.iter().map(|line| (line.label.string_lossy(), line.value.string_lossy())).filter(|(label, _)| !label.is_empty()).collect()
+}
+
+/// Every pick from the list is the page role's count: what the row shows and what the worker publishes to the index that
+/// Play reads (`selection()` → `rr_host::publish_selection`). The other role keeps its count.
+#[test]
+fn the_loop_list_sets_the_count_play_reads() {
+    for role in [ViewRole::Player, ViewRole::Cpu] {
+        let mut m = loop_menu();
+        if role == ViewRole::Cpu {
+            cpu_view(&mut m);
+        }
+        assert_eq!(m.recording().page_role(), role);
+        for (index, mark) in LoopMark::CYCLE.into_iter().enumerate() {
+            pick(&mut m, index);
+            assert_eq!(m.recording().loop_of(role), mark, "{role:?}: pick {index}");
+            assert_eq!(loop_of_selection(&m, role), mark, "{role:?}: the count Play reads, pick {index}");
+            assert_eq!(row_value(&m), format!("<  {}  >", mark.label()), "{role:?}: the row shows the pick");
+            assert_eq!(m.recording().loop_of(role.other()), LoopMark::default(), "{role:?}: the other role's count");
+        }
+    }
+}
+
+/// The list opens on the page role's count and marks it "(current)".
+#[test]
+fn the_loop_list_opens_on_and_marks_the_current_count() {
+    let mut m = loop_menu();
+    m.recording_mut().adopt(None, [None, None], [LoopMark::Finite(3), LoopMark::Infinite], None);
+    for (role, at) in [(ViewRole::Player, 3), (ViewRole::Cpu, 0)] {
+        if role == ViewRole::Cpu {
+            cpu_view(&mut m);
+        }
+        assert_eq!(m.recording().page_role(), role);
+        m.press(Button::A);
+        assert_eq!(list_cursor(&m), at, "{role:?}: the list opens on the count");
+        let lines = list_lines(&m);
+        let labels: Vec<&str> = lines.iter().map(|(label, _)| label.as_str()).collect();
+        assert_eq!(labels, LOOP_COUNTS, "{role:?}");
+        let current: Vec<&str> = lines.iter().filter(|(_, value)| value == "(current)").map(|(label, _)| label.as_str()).collect();
+        assert_eq!(current, [LOOP_COUNTS[at]], "{role:?}: (current) marks the count");
+        m.press(Button::B);
+        assert!(m.screen().is_none());
+    }
+}
+
+/// Reset page to defaults on the Recording page puts both roles' counts back to 1, the count of a new index.
+#[test]
+fn reset_page_restores_both_loop_counts() {
+    let mut m = loop_menu();
+    m.recording_mut().adopt(None, [None, None], [LoopMark::Finite(3), LoopMark::Infinite], None);
+    let last = m.entry(m.page(), m.entry_count(m.page()) - 1).expect("the page's last line");
+    assert!(matches!(last, Entry::ResetPage(_)), "{last:?}");
+    goto_entry(&mut m, last);
+    m.press(Button::A);
+    m.press(Button::A);
+    assert!(m.screen().is_none());
+    assert_eq!(m.recording().loop_of(ViewRole::Player), LoopMark::Finite(1));
+    assert_eq!(m.recording().loop_of(ViewRole::Cpu), LoopMark::Finite(1));
+    assert_eq!(m.recording().selection().loop_player, LoopMark::Finite(1));
+    assert_eq!(m.recording().selection().loop_cpu, LoopMark::Finite(1));
+    let (_, changed) = m.take_page_reset().expect("the reset ran");
+    assert!(changed.contains(&LOOP_ROW), "the reset reports the Loop row: {changed:?}");
+}
+
+/// The list's labels and the counts it sets line up one to one (`LOOP_COUNTS[i]` is `LoopMark::CYCLE[i]`).
+#[test]
+fn the_loop_list_labels_are_the_loop_counts() {
+    let Control::Dropdown(labels) = ROWS[row_of(LOOP_ROW)].control else { panic!("the Loop row is a dropdown") };
+    assert_eq!(labels, &LOOP_COUNTS);
+    assert_eq!(LOOP_COUNTS.len(), LoopMark::CYCLE.len());
+    for (label, mark) in LOOP_COUNTS.iter().zip(LoopMark::CYCLE) {
+        assert_eq!(*label, mark.label());
+    }
+    let m = loop_menu();
+    assert_eq!(m.option_count(row_of(LOOP_ROW)), LOOP_COUNTS.len());
 }

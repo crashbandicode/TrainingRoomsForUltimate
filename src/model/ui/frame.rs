@@ -7,7 +7,7 @@
 use core::fmt::{self, Write};
 
 use super::menu::table::{Control, Editor, Info, Row, GROUPS, ROWS};
-use super::menu::{Entry, Grey, Menu, RowValue};
+use super::menu::{Entry, Grey, Menu, RowValue, LOOP_ROW};
 use super::panes::{GROUPS as GROUP_LINES, ROWS as ROW_LINES, TABS};
 
 /// Fixed-capacity UTF-16 text: what a text pane's buffer holds. Writing past the capacity cuts the text.
@@ -422,7 +422,7 @@ fn named(out: &mut Text<72>, name: &str) -> fmt::Result {
 /// How a row's value reads on the page (the mockups' right-hand column).
 pub fn write_value(menu: &Menu, row: usize, out: &mut Text<72>) {
     let r = &ROWS[row];
-    if r.id == "playback_loop" {
+    if r.id == LOOP_ROW {
         let _ = write!(out, "<  {}  >", menu.recording().loop_label(menu.recording().page_role()));
         return;
     }

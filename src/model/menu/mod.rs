@@ -27,6 +27,10 @@ use table::{Control, Editor, Page, Row, GROUPS, ROWS};
 
 use super::settings::{self, Settings};
 
+/// The id of Recording › Options › Loop. The row shows, cycles, lists and resets the page role's loop count, the count Play
+/// reads (`RecordingScreens::loops`), not the old two-value setting stored under this id.
+pub const LOOP_ROW: &str = "playback_loop";
+
 /// Everything the menu needs to know about the install and the console.
 #[derive(Clone, Copy, Debug)]
 pub struct Env {
@@ -1157,6 +1161,7 @@ impl Menu {
             }
             Control::Dropdown(_) | Control::YesNoRandom | Control::Number { .. } => {
                 let cursor = match r.control {
+                    _ if r.id == LOOP_ROW => Some(self.recording.loop_row_index()),
                     Control::YesNoRandom => yes_no_random(self.get(r.id)),
                     _ => self.get(r.id).iter().position(|v| *v != 0),
                 }
@@ -1201,7 +1206,7 @@ impl Menu {
             return;
         }
         let r = &ROWS[row];
-        if r.id == "playback_loop" {
+        if r.id == LOOP_ROW {
             self.recording.cycle_loop_row(forward);
             return;
         }
@@ -1280,6 +1285,10 @@ impl Menu {
         if matches!(row.control, Control::Editor(Editor::KirbyHats)) {
             changed |= self.reset_row("cpu_kirby_hats");
         }
+        // One row, both roles' loop counts: the counts are the recording index's, not in the settings snapshots.
+        if row.id == LOOP_ROW {
+            changed |= self.recording.reset_loops();
+        }
         changed |= self.reset_row(row.id);
         if let Control::MultiSelectRange { range_id, .. } = row.control {
             changed |= self.reset_row(range_id);
@@ -1351,6 +1360,7 @@ impl Menu {
             }
             Button::A => {
                 match ROWS[row].control {
+                    _ if ROWS[row].id == LOOP_ROW => self.recording.set_loop_row(cursor),
                     Control::YesNoRandom => self.put_yes_no_random(ROWS[row].id, cursor),
                     _ => self.put_one_hot(ROWS[row].id, cursor),
                 }

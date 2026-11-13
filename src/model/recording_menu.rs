@@ -549,11 +549,24 @@ impl RecordingScreens {
 
     /// The Options row's Left / Right. X does not call this.
     pub fn cycle_loop_row(&mut self, forward: bool) {
-        let role = self.page_role.index();
-        let marks = LoopMark::CYCLE;
-        let at = marks.iter().position(|mark| *mark == self.loops[role]).unwrap_or(1);
-        let next = if forward { (at + 1) % marks.len() } else { (at + marks.len() - 1) % marks.len() };
-        self.loops[role] = marks[next];
+        let (at, len) = (self.loop_row_index(), LoopMark::CYCLE.len());
+        self.set_loop_row(if forward { (at + 1) % len } else { (at + len - 1) % len });
+    }
+
+    /// Where the page role's count is in `LoopMark::CYCLE`, the order of the row's list (`LOOP_COUNTS`).
+    pub fn loop_row_index(&self) -> usize {
+        LoopMark::CYCLE.iter().position(|mark| *mark == self.loops[self.page_role.index()]).unwrap_or(1)
+    }
+
+    /// The row's list pick (and Left / Right): the page role's count becomes `LoopMark::CYCLE[index]`.
+    pub fn set_loop_row(&mut self, index: usize) {
+        self.loops[self.page_role.index()] = LoopMark::CYCLE.get(index).copied().unwrap_or_default();
+    }
+
+    /// The row's reset (Reset page to defaults): both roles' counts go back to 1, the count of a new index. True when one changed.
+    pub fn reset_loops(&mut self) -> bool {
+        let was = core::mem::take(&mut self.loops);
+        was != self.loops
     }
 
     pub fn tab_names(&self) -> &'static [&'static str] {
