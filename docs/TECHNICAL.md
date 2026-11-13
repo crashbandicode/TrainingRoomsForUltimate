@@ -394,11 +394,12 @@ Menu shortcuts are changed in the menu and work at once.
 Switch reloads the CPU as the capture's Mii Gunner ("Saved Mii applied"). The capture is a test fixture, made before
 the clip. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-**Clip** [`rc7-replay-capture.gif`](media/rc7-replay-capture.gif): Replay capture turned On in the menu, then the same setting On in the Online Deluxe overlay
+**Clip** [`rc11-replay-capture.gif`](media/rc11-replay-capture.gif): Replay capture turned On in the menu, then the same setting On in the Online Deluxe overlay (zoomed)
 
-*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only), with Online Deluxe 0.10.1: Recording
-› Replays › Replay capture from [OFF] to [ON]; back in Training, L + R + Down opens the Online Deluxe overlay at the
-top right, and its plugins page reads "Training Rooms › Replay capture On". Cuts inside are listed in
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), with the card's Online Deluxe: Recording ›
+Replays › Replay capture from [OFF] to [ON]; back in Training, L + R + Down opens the Online Deluxe overlay at the top
+right (shown enlarged in the middle of the clip), and its Player Info page reads "Training Rooms › Replay capture On".
+The card's Deluxe config hides that page; the take showed it for the clip and hid it again. Cuts inside are listed in
 [MEDIA.md](MEDIA.md).*
 
 The *Replay capture* row and the Online Deluxe overlay show the same setting.

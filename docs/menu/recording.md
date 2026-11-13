@@ -190,8 +190,7 @@ closes. X, Y and *Reset page to defaults* don't change it. If you have Online De
 - **Default:** Off
 - **How:** A flips it.
 
-<!-- reshoot: rc7-replay-capture.gif -->
-![Replay capture turned on in the menu, then shown on in Online Deluxe](../media/rc7-replay-capture.gif)<br>
+![Replay capture turned on in the menu, then shown on in Online Deluxe](../media/rc11-replay-capture.gif)<br>
 *Turning replay capture on*
 
 ## Options
