@@ -562,13 +562,6 @@ fn live_gate(kind: u32) -> Option<u32> {
 /// which `plan_groups` plans as that window's first group once it is Ready. `u64::MAX`: none.
 static NEIGHBOURS: [AtomicU64; 2] = [AtomicU64::new(u64::MAX), AtomicU64::new(u64::MAX)];
 
-/// rc.12 (a′): per role, the target of the last window plan when it was target-first (`proposed`), `u32::MAX` otherwise.
-static TARGET_FIRST: [AtomicU32; 2] = [AtomicU32::new(u32::MAX), AtomicU32::new(u32::MAX)];
-
-/// rc.12 (a′): while `submit` issues a role's target-first Reload, its target (`u32::MAX` otherwise): `retire_groups`
-/// keeps the detached groups `body_bank::kept_across_reload` admits and `build` carries them into the new bank.
-static KEEPING: [AtomicU32; 2] = [AtomicU32::new(u32::MAX), AtomicU32::new(u32::MAX)];
-
 /// Special groups the planner may form: native groups when group swap, the
 /// `native_groups` switch and their fingerprints are on; the pair group
 /// additionally needs the pair seams, the `pair_groups` switch and the shipped
@@ -1035,10 +1028,8 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
                     + usize::from(GROUP_BODIES[1 - role].load(Ordering::Acquire));
                 let held = bank.groups.iter().any(|g| g.state != GroupState::Released
                     && seed.kinds()[..seed.count()].iter().any(|kind| g.members.index_of(*kind).is_some()));
-                // rc.12 (a′): the groups this role's Reload kept are charged first.
-                let own = bank.groups.iter().filter(|g| g.state.counts_bodies()).map(|g| g.members.count()).sum::<usize>();
-                if !held && bank.groups.next_slot().is_some()
-                    && crate::engine::swap::body_bank::neighbours_fit(seed.count(), own, other, pool_free, group_pool(settings)) {
+                if !held && bank.groups.next_slot().is_some() && seed.count() <= pool_free
+                    && seed.count() + other <= group_pool(settings) {
                     let slot = bank.groups.plan(seed, None);
                     trace!("[GroupSwap] plan owner={} group={} kinds={:x?} special={:?} bodies={}: the target-first window's neighbours, first",
                         owner, slot, &seed.kinds()[..seed.count()], seed.special(), seed.count());
@@ -1272,14 +1263,11 @@ static WINDOW_WAITING: [AtomicU64; 2] = [AtomicU64::new(0), AtomicU64::new(0)];
 
 pub(super) fn proposed(owner: u32, target: Forms, upcoming: &[u32]) -> Option<Members> {
     let role = role(owner)?;
-    TARGET_FIRST[role].store(u32::MAX, Ordering::Release);
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if !ENABLED.load(Ordering::Acquire) || !settings.fighters || settings.bank_members < 2 { return None; }
     let other = usize::from(EXTRAS[1 - role].load(Ordering::Acquire));
     // A new window bank for this role replaces its own extra groups (torn down
-    // before the Reload), so only the other role's groups are charged. A
-    // target-first window charges nothing; the groups its Reload keeps (rc.12
-    // (a′)) are charged by the planner once it is Ready.
+    // before the Reload), so only the other role's groups are charged.
     let (pool, other_total) = if groups_enabled(&settings) {
         (usize::from(settings.ready_fighters).saturating_sub(2),
             other + usize::from(GROUP_BODIES[1 - role].load(Ordering::Acquire)))
@@ -1306,7 +1294,6 @@ pub(super) fn proposed(owner: u32, target: Forms, upcoming: &[u32]) -> Option<Me
             WINDOW_WAITING[role].store(0, Ordering::Release);
             let seed = neighbour_group(full, target.kinds[0], group_policy(&settings), excluded_original(&settings, &menu, role));
             NEIGHBOURS[role].store(pack_neighbours(target.kinds[0], seed), Ordering::Release);
-            TARGET_FIRST[role].store(target.kinds[0], Ordering::Release);
             trace!("[BodyBank] target first owner={} target={:#x} lane={:x?} neighbours={:x?}; they build as groups",
                 owner, target.kinds[0], &lane[..count], seed.map(|m| m.kinds()));
             return Some(members);
@@ -1878,22 +1865,13 @@ pub(super) unsafe fn submit(entry: *mut u8, owner: u32, plan: Plan,
         pose.stage();
         return switch(entry, owner, plan.target, plan.forms);
     }
-    // A Reload replaces the window; every detached group goes first (§6.5 iii), except, at a target-first Reload, the
-    // Built groups it does not displace (rc.12 (a′), `body_bank::kept_across_reload`).
-    let Some(role) = role(owner) else { return false; };
-    let keeping = plan.members.filter(|m| m.count() == 1 && m.special() == Special::None
-        && TARGET_FIRST[role].load(Ordering::Acquire) == m.kinds()[0]).map_or(u32::MAX, |m| m.kinds()[0]);
-    KEEPING[role].store(keeping, Ordering::Release);
+    // A Reload replaces the window; every detached group goes first (§6.5 iii).
     before_reload(entry);
     if let Some(members) = plan.members {
-        if !build(entry, owner, members) {
-            KEEPING[role].store(u32::MAX, Ordering::Release);
-            return false;
-        }
+        if !build(entry, owner, members) { return false; }
     }
     let descriptor = super::native_fighter_install::Descriptor::from_bytes(&plan.descriptor);
     super::reload_at_pose(BASE.load(Ordering::Acquire), entry, &descriptor, pose);
-    KEEPING[role].store(u32::MAX, Ordering::Release);
     true
 }
 
@@ -2403,31 +2381,25 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
     if state.as_ref().is_some_and(|bank| matches!(bank.phase, Phase::Building | Phase::Changing)) {
         return false;
     }
-    // rc.12 (a′): the groups `retire_groups` kept for this target-first Reload move into the new bank with their
-    // activation receipts; any other build starts with none.
-    let keeping = KEEPING[role].load(Ordering::Acquire) == members.kinds()[0] && members.count() == 1
-        && state.as_ref().is_some_and(|bank| bank.entry == entry as usize && bank.owner == owner);
-    let (mut storage, activated) = match state.take() {
-        Some(bank) => (BankStorage { members: bank.members, groups: bank.groups }, bank.activated),
-        None => (BANK_STORAGE[role].lock().take().expect("boot-reserved bank storage"), Default::default()),
+    let mut storage = match state.take() {
+        Some(bank) => BankStorage { members: bank.members, groups: bank.groups },
+        None => BANK_STORAGE[role].lock().take().expect("boot-reserved bank storage"),
     };
     *storage.members = members;
-    if !keeping { storage.groups.clear(); }
-    let kept = storage.groups.iter().filter(|g| g.state.counts_bodies()).map(|g| g.members.count()).sum::<usize>();
+    storage.groups.clear();
     *state = Some(Bank {
         entry: entry as usize, owner, epoch: super::mii_saved_alpha::current_generation(role as u32),
         members: storage.members, phase: Phase::Building,
         bodies: [Body::default(); NATIVE_MEMBERS], observed: None, from: 0, target: 0,
         acknowledged: false, departed: false, failed: false,
         groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
-        pair_logged: false, identity: None, configuration: None, ordinary_identity: None,
-        activated: if keeping { activated } else { Default::default() },
+        pair_logged: false, identity: None, configuration: None, ordinary_identity: None, activated: Default::default(),
         construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene: None,
         object_fetch: None, retiring: None, preparing: None,
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
-    GROUP_BODIES[role].store(kept.min(usize::from(u8::MAX)) as u8, Ordering::Release);
-    trace!("[BodyBank] build owner={} entry={:p} members={:?} kept_group_bodies={}", owner, entry, members, kept);
+    GROUP_BODIES[role].store(0, Ordering::Release);
+    trace!("[BodyBank] build owner={} entry={:p} members={:?}", owner, entry, members);
     if members.is_pair_lead() {
         trace!("[IcPair] build owner={} entry={:p} kinds={:x?} actor_count=2 extra={:#x}",
             owner, entry, members.kinds(), members.kinds()[2]);
@@ -6236,38 +6208,19 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     let copy = window.and_then(|members| live_kirby_copy_kind(entry, owner, members));
     // U18: each detached body's group, for the per-group header during the destroys.
     let mut owners = FixedVec::<(u32, Members), { MAX_EXTRA_GROUPS * NATIVE_MEMBERS }>::new();
-    let (mut bundles, identities, token, alias, groups, mii_sets, kept) = {
+    let (mut bundles, identities, token, alias, groups, mii_sets) = {
         let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) else { return; };
-        // rc.12 (a′): at a target-first Reload from an ordinary window, the Built groups it does not displace stay
-        // detached as they are (`body_bank::kept_across_reload`); `build` moves them into the new bank.
-        let target = Some(KEEPING[role].load(Ordering::Acquire)).filter(|t| *t != u32::MAX && bank.identity.is_none());
-        let mut kept = 0u32;
-        let mut kept_sets = FixedList::<Members, MAX_EXTRA_GROUPS>::new(Members::pair_group());
-        for (index, g) in bank.groups.iter().enumerate() {
-            if g.saved.is_some() && bank.object_fetch.is_none_or(|f| f.0 != index)
-                && crate::engine::swap::body_bank::kept_across_reload(g.state, *g.members, g.leaving || g.release_now, g.object_held, target) {
-                kept |= 1 << index;
-                kept_sets.push(*g.members);
-            }
-        }
-        if kept != 0 {
-            trace!("[GroupSwap] kept across reload owner={} reason={} target={:#x} groups={:x?}", owner, reason,
-                target.unwrap_or(u32::MAX), MemberSets(&kept_sets));
-        }
-        let only_kept = kept != 0
-            && bank.groups.iter().enumerate().all(|(i, g)| kept & (1 << i) != 0 || g.state == GroupState::Released);
-        if (bank.groups.is_empty() || only_kept) && bank.prefetch.is_none() { return; }
+        if bank.groups.is_empty() && bank.prefetch.is_none() { return; }
         let token = bank.prefetch.take().map(|p| p.1);
         // Inbox 00:18Z: an object re-acquisition in flight ends here; its token goes with every other below.
         let rearm = bank.object_fetch.take().map(|f| f.1);
         if let Some(token) = rearm { super::finish_install(token, "object re-acquire retired"); }
-        let (alias, groups, activated) = (bank.alias, bank.groups.len() - kept.count_ones() as usize, bank.activated);
+        let (alias, groups, activated) = (bank.alias, bank.groups.len(), bank.activated);
         let mut bundles = FixedList::<DetachedSnapshot, MAX_EXTRA_GROUPS>::new(DetachedSnapshot::new(owner));
-        // SPECIAL-GROUPS §1 (c): each detached window's own Mii set, released after its bodies (a kept group keeps its own).
+        // SPECIAL-GROUPS §1 (c): each detached window's own Mii set, released after its bodies.
         let mut mii_sets = FixedList::<MiiR, MAX_EXTRA_GROUPS>::new(MiiR::default());
-        for set in bank.groups.iter().enumerate().filter(|(i, g)| kept & (1 << i) == 0 && g.state == GroupState::Built)
-            .filter_map(|(_, g)| g.saved.and_then(|w| w.mii_r)) {
+        for set in bank.groups.iter().filter(|g| g.state == GroupState::Built).filter_map(|g| g.saved.and_then(|w| w.mii_r)) {
             if set != MiiR::default() { mii_sets.push(set); }
         }
         // A group's keys are released with its own words in `R` (the release selector
@@ -6277,7 +6230,6 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
         let mut identities = FixedVec::<(usize, Members, Option<MiiIdentity>), MAX_EXTRA_GROUPS>::new();
         let live_mii = (bank.identity.is_some(), bank.ordinary_identity.map(|(words, _)| words));
         for (index, group) in bank.groups.iter().enumerate() {
-            if kept & (1 << index) != 0 { continue; }
             if (group.object_held || group.state.holds_keys()) && (group.identity.is_some() || live_mii.0) {
                 identities.push((index, *group.members, group.identity));
             }
@@ -6317,24 +6269,11 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
             }
             bundles.push(detached);
         }
-        if kept == 0 {
-            bank.groups.clear();
-        } else {
-            // The released slots take later planned groups (`Groups::next_slot`); the kept ones keep their index.
-            for (_, g) in bank.groups.iter_mut().enumerate().filter(|(i, _)| kept & (1 << i) == 0) {
-                g.state = GroupState::Released;
-                g.leaving = false;
-                g.release_now = false;
-                g.object_held = false;
-                g.saved = None;
-                g.bodies = [Body::default(); NATIVE_MEMBERS];
-            }
-        }
+        bank.groups.clear();
         bank.swap = None;
         bank.swap_started = None;
-        GROUP_BODIES[role].store(bank.groups.iter().filter(|g| g.state.counts_bodies())
-            .map(|g| g.members.count()).sum::<usize>().min(usize::from(u8::MAX)) as u8, Ordering::Release);
-        (bundles, (identities, live_mii), token, alias, groups, mii_sets, kept)
+        GROUP_BODIES[role].store(0, Ordering::Release);
+        (bundles, (identities, live_mii), token, alias, groups, mii_sets)
     };
     // Without the alias R (`0x3aeb50` and every key release read it) bodies and keys
     // are not touched: they are reported as skipped, as before.
@@ -6433,10 +6372,6 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     // Every record is gone: the role's real ledger against the owner's map (WP2's `teardown end`
     // line; U13: `r_handle::reconcile` supersedes the mirror-based `observe::reconcile`).
     if alias_ok { r_handle::reconcile(ledger_role(role), reason); }
-    // rc.12 (a′): a released slot beside kept groups takes the next planned group, which starts its own batch.
-    for index in (0..MAX_EXTRA_GROUPS).filter(|i| kept != 0 && kept & (1 << i) == 0) {
-        r_handle::forget_group(ledger_role(role), index);
-    }
 }
 
 /// Operator rule 2026-11-09 (inbox 13:21Z): a prefetch refused for process memory or fighter-pool bodies while groups are
