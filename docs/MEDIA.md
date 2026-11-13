@@ -32,6 +32,10 @@ file in the README and the docs; the old file stays in `media/` with a note in i
   lines in the receipts): `rs11-f10-record.gif` (#10), `rs11-f12-active-after-record.gif` (#12),
   `rs11-f13-play-cpu.gif` (#13), `rs11-f15-playback.gif` (#15, the strip zoomed), `rs11-f17-both-play.gif` (#17),
   `rs11-f22-mash-interrupt.gif` (#22) and `rs11-f29-bind-load.gif` (#29). The ledger lists each one's frames.
+- **Cycle and hot-slot evidence** (`docs-rs3b-0c628724`, slot 1, 05:29–05:45Z): `rs11-f55-cpu-cycle.gif` (#55, the
+  CPU list zoomed, then Captain Falcon, the Mii Gunner and Peach in order; a greyed Mii class can't be shown on this
+  card, whose Smash save holds a Mii of every class) and `rs11-f57-hot-slots.gif` (#57, "Fighters · Loading 4/10" to
+  "Ready 10/10" on entering Training, zoomed; Mario to Kirby on the same frame; Falco's hat).
 
 | File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
 | --- | --- | --- | --- | --- | --- |
