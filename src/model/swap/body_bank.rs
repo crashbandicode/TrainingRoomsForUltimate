@@ -1144,10 +1144,11 @@ pub fn neighbour_group(full: Members, target: u32, policy: GroupPolicy, exclude:
 /// target) when it is Built, holds no key (a Built group's tails ran; a re-acquired Pokémon Trainer object kind is a key),
 /// is not leaving its cycle and does not hold the target. Loader state 6 needs only `R+0x18 == 0`, which such a group
 /// leaves true, and the native Reload destroys the attached window alone. Every other group is released first, as
-/// before, and a canonical or full-window Reload (`None`) keeps nothing.
+/// before, and a canonical or full-window Reload (`None`) keeps nothing. A Mii group is released first too: Eden
+/// rc12-int2-f44fac2f-1 crashed on the kept `[4a]`'s warm attach after the Reload (rc.13 item).
 pub fn kept_across_reload(state: GroupState, members: Members, leaving: bool, holds_object: bool, target_first: Option<u32>) -> bool {
     let Some(target) = target_first else { return false; };
-    state == GroupState::Built && !leaving && !holds_object && members.index_of(target).is_none()
+    state == GroupState::Built && !leaving && !holds_object && members.special() != Special::Mii && members.index_of(target).is_none()
 }
 
 /// The target-first neighbours' admission (`native_body_bank::plan_groups`): the seed fits in the free pool and beside
@@ -2692,8 +2693,10 @@ mod tests {
         const KROOL: u32 = 0x45;
         // Boot 3 #163–#169: the CPU's lane [18, 13, 27, 45] and Mii Gunner, the window [18, 13, 27] attached, the Mii
         // group [4a] Built and detached, a cycle onto 0x45. Before rc.12 the Mii group was torn down and built again.
+        // Eden rc12-int2-f44fac2f-1 (#797, #1000): the kept Mii group's warm attach after the Reload crashed the guest
+        // (Unmapped Read64 in the Mii's fighter module): a Mii group is released first and built again, as before.
         let mii = Members::mii_group(0x4a).unwrap();
-        assert!(kept_across_reload(GroupState::Built, mii, false, false, Some(KROOL)), "the Mii group survives the Reload");
+        assert!(!kept_across_reload(GroupState::Built, mii, false, false, Some(KROOL)), "a Mii group is released first");
         // The next lap (#242, target 0x27): the one-member groups the cycle left behind survive too.
         assert!(kept_across_reload(GroupState::Built, members(&[KROOL]), false, false, Some(DIDDY)));
         assert!(kept_across_reload(GroupState::Built, members(&[GANONDORF, PICHU]), false, false, Some(DIDDY)));
@@ -2705,9 +2708,9 @@ mod tests {
         }
         assert!(!kept_across_reload(GroupState::Built, members(&[KROOL]), true, false, Some(DIDDY)));
         assert!(!kept_across_reload(GroupState::Built, members(&[KROOL]), false, true, Some(DIDDY)));
-        assert!(!kept_across_reload(GroupState::Built, mii, false, false, None));
+        assert!(!kept_across_reload(GroupState::Built, members(&[KROOL]), false, false, None));
         // Ready Fighters 8: a pool of 6, P1 holding 3. The first lap's neighbours [18, 13] (the bodies the native Reload
-        // destroyed) fit beside the kept [4a]; the next lap's two kept groups leave no room for a seed of two, which the
+        // destroyed) fit beside a kept one-member group; the next lap's two kept groups leave no room for a seed of two, which the
         // planner then places as far as the budget goes.
         assert!(neighbours_fit(2, 1, 3, 16, 6));
         assert!(!neighbours_fit(2, 2, 3, 16, 6), "the kept groups are charged first");
