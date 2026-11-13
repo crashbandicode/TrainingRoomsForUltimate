@@ -57,6 +57,19 @@ impl Speed {
         }
     }
 
+    /// Input Delay's queue length in P1 reads for `frames` game frames at this speed (rc.13): the game reads P1 once
+    /// per 60 Hz update, so a slowed game frame is several reads (1/4: 4, 1/2: 2, 2/3: 1.5, rounded up). x1.5 raises
+    /// the update rate and 1 Frame steps one update at a time: one read per frame, as at x1.
+    pub const fn reads(self, frames: u8) -> u8 {
+        let frames = if frames > super::input_delay::MAX_DELAY { super::input_delay::MAX_DELAY } else { frames };
+        match self {
+            Speed::Quarter => frames * 4,
+            Speed::Half => frames * 2,
+            Speed::TwoThirds => (frames * 3).div_ceil(2),
+            Speed::X1 | Speed::OneFrame | Speed::OneAndHalf => frames,
+        }
+    }
+
     /// The slow divisor the game's apply requests for this speed with the update rate left at 60: 1/2 and 1/4. 2/3 and
     /// x1.5 also change the update rate, so the slot alone cannot give them.
     #[cfg(test)]

@@ -78,10 +78,39 @@ mod delay {
             }
             assert_eq!(q.len(), usize::from(d));
         }
-        // Past the maximum behaves as the maximum.
+        // Past the maximum (30 frames at 1/4: 120 reads) behaves as the maximum.
         let mut q = DelayQueue::new();
-        let out = run(&mut q, 200, 1, 40);
-        assert_eq!(out[39], rec(10));
+        let out = run(&mut q, 200, 1, 130);
+        assert_eq!(out[129], rec(10));
+    }
+
+    /// rc.13 (gif-nav-author 11-13: delay 18 at 1/4 came about 4-5 game frames late, not 18): the delay counts game
+    /// frames. The game reads P1 once per 60 Hz update, so at a slower speed one game frame is several reads: the
+    /// queue is the delay times the reads per game frame (1/4: 4, 1/2: 2, 2/3: 1.5, x1: 1).
+    #[test]
+    fn game_frames_at_each_speed() {
+        use super::model::game_speed::Speed;
+        let reads = |frames: u8, speed: Speed| speed.reads(frames);
+        assert_eq!([Speed::X1, Speed::Quarter, Speed::Half, Speed::TwoThirds].map(|s| reads(18, s)), [18, 72, 36, 27]);
+        assert_eq!([reads(30, Speed::Quarter), reads(0, Speed::Quarter), reads(1, Speed::TwoThirds)], [120, 0, 2]);
+        // x1.5 raises the update rate and 1 Frame steps one update at a time: one read per game frame, as at x1.
+        assert_eq!([reads(18, Speed::OneAndHalf), reads(18, Speed::OneFrame)], [18, 18]);
+        // 18 frames at 1/4: the output is 72 reads late.
+        let mut q = DelayQueue::new();
+        let out = run(&mut q, reads(18, Speed::Quarter), 1, 100);
+        assert_eq!((out[71], out[72], out[99]), (MappedInputs::NEUTRAL, rec(1), rec(28)));
+        // The speed drops from x1 to 1/4: the queue grows from 18 to 72 reads and keeps every read it holds; they come
+        // out in order once it has refilled, none skipped.
+        let mut q = DelayQueue::new();
+        run(&mut q, reads(18, Speed::X1), 1, 40);
+        let out = run(&mut q, reads(18, Speed::Quarter), 41, 80);
+        assert!(out[..54].iter().all(|r| *r == MappedInputs::NEUTRAL), "the queue refills");
+        for (i, got) in out[54..].iter().enumerate() {
+            assert_eq!(*got, rec(23 + i as u32), "read {i} after the refill");
+        }
+        // Back to x1: the queue shrinks to 18 reads (SPEC-input-03 §5, a lower delay).
+        q.step(reads(18, Speed::X1), rec(121));
+        assert_eq!(q.len(), 18);
     }
 
     #[test]

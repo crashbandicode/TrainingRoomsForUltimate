@@ -23,6 +23,13 @@ use crate::runtime::features::{chords, input_display, recorder};
 use crate::runtime::{published, scene, ui};
 
 static ADAPTER: Mutex<InputAdapter> = Mutex::new(InputAdapter::new());
+/// The queue length P1's last poll used, in reads (`Speed::reads`): the pause edges, sampled off the input
+/// thread, check against it.
+static READS: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+fn reads() -> u8 {
+    READS.load(std::sync::atomic::Ordering::Relaxed)
+}
 
 // Switch std uses OS TLS boxes even for const/no-destructor thread_local!
 // values. nn::os scalar slots instead live inside each SDK ThreadType. The
@@ -116,9 +123,12 @@ fn apply() {
     let raw = pending.controller(&NativeTls);
     // SAFETY: `raw` is the live Controller of this mapping call or 0; `out` is the record the game just wrote.
     let sticks = unsafe { raw_sticks(raw) }.unwrap_or(Sticks::of_record(unsafe { *out }));
+    // Input Delay counts game frames: the queue is that many frames of reads at the game's speed now.
+    let delay = crate::runtime::features::game_speed::current().reads(published::input_delay());
+    READS.store(delay, std::sync::atomic::Ordering::Relaxed);
     let mut adapter = ADAPTER.lock();
     // SAFETY: `out` is the 8-byte record the game just wrote through the call.
-    let (record, sticks, check) = adapter.poll_with(&published::INPUT_OWNERS, published::input_delay(), unsafe { *out }, sticks);
+    let (record, sticks, check) = adapter.poll_with(&published::INPUT_OWNERS, delay, unsafe { *out }, sticks);
     // SAFETY: as above.
     unsafe { *out = record };
     drop(adapter);
@@ -194,7 +204,7 @@ pub fn native_pause_epoch() -> u32 { ADAPTER.lock().pause_epoch() }
 
 pub fn native_pause_sample(epoch: u32, layout: usize, registration: bool, active: Option<bool>) -> bool {
     let mut adapter = ADAPTER.lock();
-    let Some(edges) = adapter.native_pause_sample(&published::INPUT_OWNERS, epoch, layout, registration, active, published::input_delay()) else { return false; };
+    let Some(edges) = adapter.native_pause_sample(&published::INPUT_OWNERS, epoch, layout, registration, active, reads()) else { return false; };
     ui::state::PAUSE_ACTIVE.store(published::input_owners().contains(Owners::VANILLA_PAUSE), std::sync::atomic::Ordering::Release);
     drop(adapter);
     for edge in edges { log_pause_edge(edge); }
@@ -203,7 +213,7 @@ pub fn native_pause_sample(epoch: u32, layout: usize, registration: bool, active
 
 pub fn retire_native_pause() {
     let mut adapter = ADAPTER.lock();
-    let edge = adapter.retire_native_pause(&published::INPUT_OWNERS, published::input_delay());
+    let edge = adapter.retire_native_pause(&published::INPUT_OWNERS, reads());
     ui::state::PAUSE_ACTIVE.store(false, std::sync::atomic::Ordering::Release);
     drop(adapter);
     log_pause_edge(edge);
@@ -211,7 +221,7 @@ pub fn retire_native_pause() {
 
 pub fn retire_pause_layout(epoch: u32, layout: usize) {
     let mut adapter = ADAPTER.lock();
-    if adapter.retire_pause_layout(&published::INPUT_OWNERS, epoch, layout, published::input_delay()) {
+    if adapter.retire_pause_layout(&published::INPUT_OWNERS, epoch, layout, reads()) {
         ui::state::PAUSE_ACTIVE.store(false, std::sync::atomic::Ordering::Release);
     }
 }

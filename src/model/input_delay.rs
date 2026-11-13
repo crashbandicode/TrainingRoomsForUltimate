@@ -7,8 +7,10 @@
 
 /// The largest delay in frames (the menu row has 31 options, `0..=30`).
 pub const MAX_DELAY: u8 = 30;
-/// Slots in the ring: a poll pushes one record before the oldest are dropped, so `MAX_DELAY + 1`.
-const SLOTS: usize = MAX_DELAY as usize + 1;
+/// The longest queue in reads: `MAX_DELAY` game frames at 1/4 (`game_speed::Speed::reads`).
+const MAX_READS: u8 = MAX_DELAY * 4;
+/// Slots in the ring: a poll pushes one record before the oldest are dropped, so `MAX_READS + 1`.
+const SLOTS: usize = MAX_READS as usize + 1;
 
 /// The game's final mapped input record (SPEC-input-01 §3.1, 8 bytes). The all-zero record is
 /// neutral: no buttons, both sticks centred.
@@ -209,7 +211,8 @@ impl DelayQueue {
         self.len -= 1;
     }
 
-    /// One P1 poll with delay `delay` (clamped to `MAX_DELAY`) and the record the game just mapped.
+    /// One P1 poll with a queue of `delay` reads (`Speed::reads`, clamped to `MAX_READS`) and the record the game just mapped.
+    /// A speed change changes the length like a changed delay (steps 2 and 4).
     /// Returns the record the game should see (SPEC-input-03 §5).
     ///
     /// 0. Delay 0 empties the queue and passes `actual` through at once: whatever was queued at a
@@ -232,7 +235,7 @@ impl DelayQueue {
 
     /// `step`, with the poll's physical sticks carried beside the record and returned with it.
     pub fn step_with(&mut self, delay: u8, actual: MappedInputs, sticks: Sticks) -> (MappedInputs, Sticks) {
-        let delay = usize::from(delay.min(MAX_DELAY));
+        let delay = usize::from(delay.min(MAX_READS));
         if delay == 0 {
             self.head = 0;
             self.len = 0;

@@ -68,6 +68,8 @@ Chord detection (SPEC-input-04) reads the raw controller, so chords are never de
 
 The queue advances once per poll, not once per game frame. If the game polls P1 more than once per frame in some situations (SPEC-input-01 open question 16), the effective delay in frames is shorter than the setting. Open question 1.
 
+rc.13: the setting counts game frames at every Game speed. The game polls P1 once per 60 Hz update, so a slowed game frame is several polls: the queue holds the delay times the polls per game frame (`game_speed::Speed::reads`: 1/4 four, 1/2 two, 2/3 one and a half rounded up, x1, x1.5 and 1 Frame one), read from the speed at each P1 poll; 18 frames is 72 reads at 1/4. A speed change changes the length the way a changed delay does (§5): a longer queue keeps every queued read and refills, a shorter one drops the oldest. Every read is queued, none merged (gif-nav-author 11-13: delay 18 at 1/4 had been about 4–5 game frames).
+
 ## 6. Edge cases and interactions
 
 1. **Recording** (SPEC-input-01): recordings capture delayed input; playback is not delayed again (the CPU injection path does not pass through this stage).

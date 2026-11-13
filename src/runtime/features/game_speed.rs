@@ -83,6 +83,20 @@ fn place() -> Option<Place> {
     }
 }
 
+/// The game's speed now (Input Delay counts game frames): Training's menu value, the waiting room's practice speed,
+/// else x1. P1's poll, the game's input thread.
+pub(crate) fn current() -> Speed {
+    match (base(), place()) {
+        // SAFETY: native Training on the game's input thread (`place`), as `on_hold` reads it.
+        (Some(base), Some(Place::Training)) => unsafe { pause_menu(base) }
+            .and_then(|menu| unsafe { field::read::<u32>(menu, rules::SPEED_FIELD) })
+            .and_then(Speed::from_value),
+        (Some(_), Some(Place::Lobby)) => Speed::from_value(LOBBY_WANTED.load(Ordering::Acquire)),
+        _ => None,
+    }
+    .unwrap_or(Speed::X1)
+}
+
 fn show(speed: Speed, style: u32) {
     notices::show_now(rules::POPUP_ID, rules::POPUP_HEADER, rules::popup_body(speed, style).as_str(), rules::POPUP_FRAMES, DEFAULT_COLOR);
 }
