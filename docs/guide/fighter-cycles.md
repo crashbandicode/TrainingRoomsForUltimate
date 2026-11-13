@@ -4,8 +4,7 @@ Switch fighters without leaving Training: a chord steps Player 1 or the CPU thro
 stick click gives Kirby the next hat. This page covers the two cycle chords, the Character Cycles editor, Solo Popo,
 Kirby hats, and the Loading rows that make a switch instant.
 
-<!-- reshoot: rc6-cycle-switch.gif -->
-![The cycle order on the grid, then each chord press loads the next fighter](../media/rc6-cycle-switch.gif)
+![The cycle order on the grid, then each chord press loads the next fighter](../media/rc11-cycle-switch.gif)
 
 ## The cycle chords
 

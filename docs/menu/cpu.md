@@ -101,8 +101,7 @@ The direction the CPU holds to change its launch angle (DI) when you hit it. In 
 
 A new direction is picked for every hit and held for the whole hitstun.
 
-<!-- reshoot: rc7-di-up.gif -->
-![No DI, then DI Up: the same smash sends the CPU higher](../media/rc7-di-up.gif)<br>*No DI, then DI Up*
+![DI Down, then DI Up: the same smash at the same damage sends the CPU low, then high](../media/rc11-di.gif)<br>*DI Down, then DI Up*
 
 More: [Direction chips](../guide/cpu-behaviour.md#direction-chips)
 

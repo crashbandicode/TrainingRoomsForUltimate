@@ -3,8 +3,7 @@
 Go to any stage from the menu, in Training or in a waiting room, or let Training and the waiting rooms move through a
 list of stages you choose. All the rows are in Fighters & Stages › Stages.
 
-<!-- reshoot: rc7-change-stage.gif -->
-![Change Stage: Battlefield, Y for its Ω form, and Training reloads there](../media/rc7-change-stage.gif)
+![Change Stage: Battlefield, Y for its Ω form, and Training reloads there](../media/rc11-change-stage.gif)
 
 ## Change Stage
 

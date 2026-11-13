@@ -63,8 +63,7 @@ The fighter each role started with is its 0. Each press of the cycle chord loads
 goes back to 0. A Mii tile is numbered only while that role has a Mii of the class it can load; which Mii is set by
 the [Mii rows](#mii-brawler). A change made in Training starts loading the new fighters at once.
 
-<!-- reshoot: rc6-cycle-switch.gif -->
-![The cycle order on the grid, then each chord press loads the next fighter](../media/rc6-cycle-switch.gif)
+![The cycle order on the grid, then each chord press loads the next fighter](../media/rc11-cycle-switch.gif)
 
 More: [Fighter cycles › The Character Cycles editor](../guide/fighter-cycles.md#the-character-cycles-editor)
 
@@ -154,8 +153,7 @@ requested", then "Stage ready". It works in Training and in waiting-room practic
 - **How:** A opens the grid. The D-pad moves, L / R turn its page, Y picks the focused stage's form first (the tile
   shows [N], [Ω] or [BF]), A goes there, B goes back.
 
-<!-- reshoot: rc7-change-stage.gif -->
-![Change Stage: Battlefield, Y for its Ω form, and Training reloads there](../media/rc7-change-stage.gif)
+![Change Stage: Battlefield, Y for its Ω form, and Training reloads there](../media/rc11-change-stage.gif)
 
 More: [Stages › Change Stage](../guide/stages.md#change-stage)
 

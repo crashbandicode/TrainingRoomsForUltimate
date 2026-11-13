@@ -154,12 +154,12 @@ below.
 
 ### CPU reactions
 
-**Clip** [`rc7-di-up.gif`](media/rc7-di-up.gif): No DI, then DI Up from the menu: the same forward smash launches the CPU higher
+**Clip** [`rc11-di.gif`](media/rc11-di.gif): DI Down, then DI Up from the menu: the same forward smash launches the CPU low, then high
 
-*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): the CPU loads at 80% (CPU damage
-on load, Random Value 80–80) and takes Player 1's forward smash with no DI; CPU › Defence › DI Direction gets Up; the
-same load and forward smash launch the CPU on a steeper line, higher at the same moment after the hit. Cuts inside
-are listed in [MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Mario vs Donkey Kong; the CPU loads at 80% (CPU damage on load, 80–80) with DI
+Direction Down and takes Mario's forward smash (the C-stick, 18.7%) on a low line, landing near the 10 mark; CPU ›
+Defence › DI Direction: Y clears Down, A picks Up; the same load and smash (18.8%) launch it on a steep line, still in
+the air past the 15 mark. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 DI, SDI, air dodge, shield tilt, mash, ledge, tech and throw options on the CPU page. Above: the same hit with no DI
 and with DI Up.
@@ -249,12 +249,11 @@ starts, then a wrong move (up tilt) drops the sequence back to combo 1.* See [ME
 
 ### Fighters, cycles and Kirby hats
 
-**Clip** [`rc6-cycle-switch.gif`](media/rc6-cycle-switch.gif): Character Cycles: the order badges, then each press of the cycle chord switches Player 1 in that order
+**Clip** [`rc11-cycle-switch.gif`](media/rc11-cycle-switch.gif): Character Cycles: the order badges, then each press of the cycle chord switches Player 1 in that order
 
-*Eden, 2026-11-10, rc.6 `e6501ac6` (diag NRO `c1b9f694`, log lines only): the grid's red badges number Player 1's
-order (Mario 0, Mii Brawler 1, Mii Swordfighter 2, Mii Gunner 3, Link 4). In Training, each press of the cycle chord
-switches Player 1 from Mii Gunner to Link, back to Mario, then to Mii Brawler. Cuts inside are listed in
-[MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Player Swapping On; the grid's red badges number Player 1's order (Mario 0, Donkey
+Kong 1, Link 2, Ness 3) and the blue ones the CPU's; in Training against Ryu (outside the cycle), each press of
+ZL + D-pad Right switches Player 1 to Donkey Kong, Link, then Ness, each standing clear of the notice. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 Cycle chords step through your own order of fighters per role (red for Player 1, blue for the CPU), drawn with the
 game's stock icons. The CPU's chord always works; Player 1's works only while Fighters & Stages › Player Swapping is On
@@ -299,11 +298,11 @@ Mii file was written. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 ### Stages
 
-**Clip** [`rc7-change-stage.gif`](media/rc7-change-stage.gif): Change Stage: Battlefield, Y for its Ω form, and Training reloads there
+**Clip** [`rc11-change-stage.gif`](media/rc11-change-stage.gif): Change Stage: Battlefield, Y for its Ω form, and Training reloads there
 
-*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): Training; Fighters & Stages ›
-Change Stage, the cursor from Waiting Room to Battlefield [N], Y gives [Ω], A; "Practice Stage · Stage requested"; and
-Training reloads on Battlefield Ω. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Mario vs Ryu on the training stage; Fighters & Stages › Change Stage, the cursor
+from Waiting Room to Battlefield [N], Y gives [Ω], A; "Practice Stage · Stage requested"; Training reloads on
+Battlefield Ω (`[PracticeStageRequest] native_complete`), held 3 s after its "Stage ready" notice. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 *Change Stage* (Fighters & Stages › Stages) goes to the stage you pick when the menu closes, in Training and in
 waiting-room practice; Y picks its form first.

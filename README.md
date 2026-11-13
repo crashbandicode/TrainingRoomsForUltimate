@@ -57,7 +57,7 @@ Changes apply when it closes. More: [using the menu](docs/guide/using-the-menu.m
 
 Teach the CPU to DI, tech, shield, mash and follow up, and set its level.
 
-![CPU Level set to Lv 7; Training's card says Lv 3; the notice names both; the CPU fights at Lv 7](docs/media/rc11-cpu-level.gif)<br>*CPU Level at Lv 7: the notice, then the CPU fights*
+![DI Down, then DI Up: the same smash at the same damage sends the CPU low, then high](docs/media/rc11-di.gif)<br>*DI Down, then DI Up from the menu*
 
 All the options: [the CPU page](docs/menu/cpu.md).
 
