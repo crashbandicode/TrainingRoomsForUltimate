@@ -1,7 +1,7 @@
 //! Frame advantage (SPEC-cpu-07 §5): after an exchange, how many frames earlier or later than the CPU the
 //! player can act again. Pure: the runtime reads whether each fighter is actionable (the five transition
 //! terms or a cancel) once per frame on the player entry's callback and calls `step`; the elapsed clock is
-//! one in-game counter that ticks once per simulation frame with the others (`Cpu::tick_clock`).
+//! one in-game counter that ticks once per game frame with the others (`Cpu::tick_update`).
 
 use super::counter::Counter;
 

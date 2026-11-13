@@ -110,6 +110,8 @@ pub struct Cpu {
     pub advantage: FrameAdvantage,
     /// The fixed-camera centre the game set at the last setup (SPEC-cpu-04 section 5 "Camera").
     pub stage_default: Option<[f32; 3]>,
+    /// The share of the current game frame the updates so far ran (`tick_update`, twelfths).
+    pub clock_phase: u8,
 }
 
 impl Cpu {
@@ -128,6 +130,7 @@ impl Cpu {
             shield_damage_cache: None,
             advantage: FrameAdvantage::new(),
             stage_default: None,
+            clock_phase: 0,
         }
     }
 
@@ -211,6 +214,9 @@ impl Cpu {
         if step == HubStep::Combo {
             self.advantage.reset();
         }
+        if step == HubStep::FrameCounters {
+            self.clock_phase = 0;
+        }
         let Self { fighters, settings, rng, .. } = self;
         for fighter in fighters.iter_mut() {
             match step {
@@ -267,16 +273,28 @@ impl Cpu {
         // A replacement body must not inherit a stale "hidden" record.
         self.hidden = None;
         self.advantage.reset();
+        self.clock_phase = 0;
     }
 
-    /// One simulation frame passed: every counter advances once. The runtime calls this from the
-    /// primary CPU body's frame only (SPEC-cpu-07 §5), so the clock ticks once per frame whatever the
-    /// number of bodies.
+    /// One game frame passed: every counter advances once. The runtime reaches it through `tick_update`
+    /// from the primary CPU body's frame only (SPEC-cpu-07 §5), so the clock ticks once per game frame
+    /// whatever the number of bodies.
     pub fn tick_clock(&mut self) {
         for fighter in &mut self.fighters {
             fighter.counters.tick();
         }
         self.advantage.elapsed.tick();
+    }
+
+    /// One 60 Hz update of the primary CPU body's frame at `speed` (rc.13): the clock ticks once per game frame, so at
+    /// 1/4 every fourth update. The part of a frame already run carries over a speed change.
+    pub fn tick_update(&mut self, speed: crate::model::game_speed::Speed) {
+        use crate::model::game_speed::FRAME;
+        self.clock_phase += speed.frame_share();
+        if self.clock_phase >= FRAME {
+            self.clock_phase -= FRAME;
+            self.tick_clock();
+        }
     }
 
     // ---- one body's frame ----------------------------------------------------------------------

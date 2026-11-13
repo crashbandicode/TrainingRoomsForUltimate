@@ -425,6 +425,40 @@ fn cpu07_single_tick_per_frame() {
     assert_eq!(cpu.fighters[nana.index()].counters.count(CounterId::Ledge), 10);
 }
 
+#[test]
+fn cpu07_counters_count_game_frames_at_each_speed() {
+    // rc.13 (gif-nav-author 11-13: Fast Fall Delay 30 at 1/4 came 498 ms after Delay 0, 30 updates): the CPU's frame
+    // runs once per 60 Hz update, and at a slowed speed one game frame is several updates.
+    use model::game_speed::Speed;
+    let key = FighterKey::new(1, false).unwrap();
+    let counts = |speed: Speed| {
+        let mut cpu = Cpu::factory(1);
+        cpu.fighters[key.index()].counters.get(CounterId::FastFall).should_delay(30);
+        cpu.advantage.elapsed.counting = true;
+        for _ in 0..12 {
+            cpu.tick_update(speed);
+        }
+        (cpu.fighters[key.index()].counters.count(CounterId::FastFall), cpu.advantage.elapsed.frames)
+    };
+    let speeds = [Speed::X1, Speed::Quarter, Speed::Half, Speed::TwoThirds, Speed::OneFrame, Speed::OneAndHalf];
+    assert_eq!(speeds.map(counts), [(12, 12), (3, 3), (6, 6), (8, 8), (12, 12), (12, 12)]);
+    // Fast Fall Delay 30 at 1/4 waits 120 updates (2 s), not 30.
+    let mut cpu = Cpu::factory(1);
+    let mut updates = 0;
+    while cpu.fighters[key.index()].counters.get(CounterId::FastFall).should_delay(30) {
+        cpu.tick_update(Speed::Quarter);
+        updates += 1;
+    }
+    assert_eq!(updates, 120);
+    // The part of a game frame already run carries over a speed change: 2 updates at 1/4, then 1 at 1/2, is one frame.
+    let mut cpu = Cpu::factory(1);
+    cpu.fighters[key.index()].counters.get(CounterId::Ledge).should_delay(10);
+    cpu.tick_update(Speed::Quarter);
+    cpu.tick_update(Speed::Quarter);
+    cpu.tick_update(Speed::Half);
+    assert_eq!(cpu.fighters[key.index()].counters.count(CounterId::Ledge), 1);
+}
+
 // ---- the mash queue and its buffer entry ------------------------------------------------------------
 
 fn settings_with(rows: &[(&str, &[u8])]) -> CpuSettings {

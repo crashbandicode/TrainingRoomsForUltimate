@@ -613,6 +613,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
     let (falling, reserve_dive) = mash_facts(accessor);
     let primary = !key.partner && key.entry == primary_entry(lobby);
     let tech = tech_facts(accessor, status, primary);
+    let speed = crate::runtime::features::game_speed::current();
 
     let out = with(|cpu| {
         if !cpu.roles.set(receipt, accessor, key) { return None; }
@@ -638,7 +639,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
             cpu_event!("save_loading={save_loading}");
         }
         if primary {
-            cpu.tick_clock();
+            cpu.tick_update(speed);
             #[cfg(feature = "diag")]
             {
                 counts::bump(counts::FRAME);

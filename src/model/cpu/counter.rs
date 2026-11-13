@@ -2,8 +2,9 @@
 //! simulation frame and that a Training reset or save-state load clears. Every delay of the CPU specs
 //! (aerial, fast fall, throw, pummel, reaction time, ledge, lay-down lockout) counts on one of them.
 //! Decision B6 gives each fighter body its own set, so Popo's delay never runs on Nana's clock; the
-//! clock itself still ticks exactly once per simulation frame, from the primary CPU body
-//! (`Cpu::tick_clock`), whatever the number of bodies.
+//! clock itself still ticks exactly once per game frame, from the primary CPU body
+//! (`Cpu::tick_update`), whatever the number of bodies. At a slowed Speed one game frame is several of
+//! that body's 60 Hz updates (rc.13: 1/4 is four), so a delay lasts the same number of game frames.
 
 /// One counter.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
