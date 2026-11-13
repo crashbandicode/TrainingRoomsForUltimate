@@ -1138,6 +1138,25 @@ pub fn neighbour_group(full: Members, target: u32, policy: GroupPolicy, exclude:
     if count == 0 { None } else { Members::laid_out(&kinds[..count]) }
 }
 
+/// rc.12, the CPU-cycle thrash, option (a′) (primary 2026-11-13 17:05Z; boot 3 `practice-diagnostics.previous.log`
+/// #163–#199: each lap's target-first Reload tore down the role's Mii group `[4a]` and built it again, a 0.46 s prefetch
+/// and a 0.22 s build): a detached group survives its role's target-first Reload (`target_first` is that Reload's
+/// target) when it is Built, holds no key (a Built group's tails ran; a re-acquired Pokémon Trainer object kind is a key),
+/// is not leaving its cycle and does not hold the target. Loader state 6 needs only `R+0x18 == 0`, which such a group
+/// leaves true, and the native Reload destroys the attached window alone. Every other group is released first, as
+/// before, and a canonical or full-window Reload (`None`) keeps nothing.
+pub fn kept_across_reload(state: GroupState, members: Members, leaving: bool, holds_object: bool, target_first: Option<u32>) -> bool {
+    let Some(target) = target_first else { return false; };
+    state == GroupState::Built && !leaving && !holds_object && members.index_of(target).is_none()
+}
+
+/// The target-first neighbours' admission (`native_body_bank::plan_groups`): the seed fits in the free pool and beside
+/// the bodies already charged, the other role's and this role's own groups kept across the Reload
+/// ([`kept_across_reload`]).
+pub fn neighbours_fit(seed: usize, own: usize, other: usize, pool_free: usize, group_pool: usize) -> bool {
+    seed <= pool_free && seed + own + other <= group_pool
+}
+
 /// A [`neighbour_group`] seed with its window's target as one word, which the planner reads without a lock
 /// (`native_body_bank::NEIGHBOURS`): 16 bits each for the target and up to two kinds, the count above. `u64::MAX`: none.
 pub fn pack_neighbours(target: u32, seed: Option<Members>) -> u64 {
@@ -2666,6 +2685,35 @@ mod tests {
         assert_eq!(unpack_neighbours(u64::MAX, window), None);
     }
 
+    fn a_target_first_reload_keeps_the_built_groups_it_does_not_displace() {
+        const GANONDORF: u32 = 0x18;
+        const PICHU: u32 = 0x13;
+        const DIDDY: u32 = 0x27;
+        const KROOL: u32 = 0x45;
+        // Boot 3 #163–#169: the CPU's lane [18, 13, 27, 45] and Mii Gunner, the window [18, 13, 27] attached, the Mii
+        // group [4a] Built and detached, a cycle onto 0x45. Before rc.12 the Mii group was torn down and built again.
+        let mii = Members::mii_group(0x4a).unwrap();
+        assert!(kept_across_reload(GroupState::Built, mii, false, false, Some(KROOL)), "the Mii group survives the Reload");
+        // The next lap (#242, target 0x27): the one-member groups the cycle left behind survive too.
+        assert!(kept_across_reload(GroupState::Built, members(&[KROOL]), false, false, Some(DIDDY)));
+        assert!(kept_across_reload(GroupState::Built, members(&[GANONDORF, PICHU]), false, false, Some(DIDDY)));
+        // Released first, as before: a group holding the target, one holding keys, one leaving its cycle, one holding the
+        // trainer's object kind, and every group at a canonical or full-window Reload.
+        assert!(!kept_across_reload(GroupState::Built, members(&[DIDDY, PICHU]), false, false, Some(DIDDY)));
+        for state in [GroupState::Prefetching, GroupState::Prefetched, GroupState::Planned] {
+            assert!(!kept_across_reload(state, members(&[KROOL]), false, false, Some(DIDDY)), "{state:?}");
+        }
+        assert!(!kept_across_reload(GroupState::Built, members(&[KROOL]), true, false, Some(DIDDY)));
+        assert!(!kept_across_reload(GroupState::Built, members(&[KROOL]), false, true, Some(DIDDY)));
+        assert!(!kept_across_reload(GroupState::Built, mii, false, false, None));
+        // Ready Fighters 8: a pool of 6, P1 holding 3. The first lap's neighbours [18, 13] (the bodies the native Reload
+        // destroyed) fit beside the kept [4a]; the next lap's two kept groups leave no room for a seed of two, which the
+        // planner then places as far as the budget goes.
+        assert!(neighbours_fit(2, 1, 3, 16, 6));
+        assert!(!neighbours_fit(2, 2, 3, 16, 6), "the kept groups are charged first");
+        assert!(neighbours_fit(1, 2, 3, 16, 6));
+    }
+
     fn a_role_without_a_bank_still_counts_the_window_its_next_swap_prepares() {
         use crate::engine::preload::cycle_preload_policy::{BuiltFighters, CacheStatus, Progress, Readiness};
         use crate::engine::preload::hat_slots::with_seats;
@@ -3362,6 +3410,7 @@ mod tests {
             ("a_pinned_window_reload_settles_on_its_target_cell_not_cell_0", a_pinned_window_reload_settles_on_its_target_cell_not_cell_0 as fn()),
             ("the_rest_of_the_lane_is_planned_as_groups_beside_the_target", the_rest_of_the_lane_is_planned_as_groups_beside_the_target as fn()),
             ("the_neighbours_reach_the_planner_only_for_their_own_window", the_neighbours_reach_the_planner_only_for_their_own_window as fn()),
+            ("a_target_first_reload_keeps_the_built_groups_it_does_not_displace", a_target_first_reload_keeps_the_built_groups_it_does_not_displace as fn()),
             ("a_role_without_a_bank_still_counts_the_window_its_next_swap_prepares", a_role_without_a_bank_still_counts_the_window_its_next_swap_prepares as fn()),
             ("a_switch_with_no_window_to_rebuild_keeps_its_canonical_reload", a_switch_with_no_window_to_rebuild_keeps_its_canonical_reload as fn()),
             ("both_banks_with_a_deferred_group_build_then_admit_it", both_banks_with_a_deferred_group_build_then_admit_it as fn()),
