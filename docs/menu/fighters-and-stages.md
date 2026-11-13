@@ -23,6 +23,9 @@ CPU is not affected: its chord and [CPU Character](#cpu-character) always work.
 With it Off, Cycle Player does nothing and shows no notice. A Player Character pick made while it is Off is kept, and
 loads when you turn Player Swapping On.
 
+![Player Swapping Off; A turns it On; Player Character, Captain Falcon, A; Player 1 loads Captain Falcon](../media/rc11-player-swapping.gif)<br>
+*B + Up opens the menu on Player Swapping (Off); A turns it On; then Player Character, Captain Falcon, A, and B closes the menu: Player 1 loads Captain Falcon. The 8 s load is cut. Eden, rc.11.*
+
 More: [Fighter cycles › Player Swapping](../guide/fighter-cycles.md#player-swapping)
 
 ### Player Character
@@ -45,6 +48,9 @@ changes the first training partner.
 
 - **Values:** any fighter on the grid
 - **How:** as [Player Character](#player-character).
+
+![CPU Character grid: Right to Donkey Kong, A; the CPU loads Donkey Kong](../media/rc11-cpu-character.gif)<br>
+*CPU Character: A opens the grid, Right and A pick Donkey Kong, B closes the menu, and the CPU loads it ("CPU fighter applied"). The 3.6 s load is cut. Eden, rc.11.*
 
 ### Character Cycles
 
@@ -111,6 +117,9 @@ reads "Character Item" and the item's name.
 Most items need their fighter's data, which the plugin loads for you. If it can't, the notice says "Load ‹fighter› as
 Player or CPU first". Daisy's and Peach's Bob-omb and Mr. Saturn, and Diddy Kong's Banana Peel, need nothing. Nothing
 is given during a fighter swap, a save-state load, a recording or a playback.
+
+![Give item grid: Daisy Bob-omb, A; Player 1 gets the Bob-omb](../media/rc11-give-item.gif)<br>
+*Give item: A opens the grid, Down, Right, Right to Daisy: Bob-omb, A, B closes the menu: Player 1 gets the Bob-omb (the notice names it). Eden, rc.11.*
 
 ### Mii Brawler
 
