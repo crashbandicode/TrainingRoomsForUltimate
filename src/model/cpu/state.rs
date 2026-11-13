@@ -158,7 +158,15 @@ impl Cpu {
         let disabled = settings.mash_state.is_empty()
             && settings.mash_triggers == 0
             && (self.settings.mash_state != settings.mash_state || self.settings.mash_triggers != settings.mash_triggers);
+        // A changed OoS Offset applies from the next hit: a CPU holding its shield across the commit has no frame out
+        // of it to roll the count again (gna-p2-cpu-1).
+        let offset_changed = self.settings.oos_offset != settings.oos_offset;
         self.settings = settings;
+        if offset_changed {
+            for fighter in &mut self.fighters {
+                fighter.shield.roll_offset(&self.settings, &mut self.rng);
+            }
+        }
         if disabled {
             for fighter in &mut self.fighters {
                 fighter.mash.full_reset();

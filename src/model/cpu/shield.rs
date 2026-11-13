@@ -128,13 +128,18 @@ impl Shield {
         self.tilt = s.shield_tilt;
     }
 
+    /// The hit count before an out-of-shield action: the row's pick, plus the hit that is taken off as it lands.
+    pub fn roll_offset(&mut self, s: &CpuSettings, rng: &mut Rng) {
+        self.offset = s.oos_offset.pick(rng).saturating_add(1);
+    }
+
     /// The per-frame part (SPEC-cpu-05 §5): the hit offset resets whenever the body is out of its shield (idle,
     /// hitstun, or straight back from an out-of-shield action: a held shield goes up on the same frame as `WAIT`);
     /// the first frame of each shieldstun rolls the reaction delay and takes one hit off the offset; the
     /// Hold decay flag drops whenever the status is not `GUARD`.
     pub fn frame(&mut self, s: &CpuSettings, rng: &mut Rng, out_of_shield: bool, in_shieldstun: bool, status_is_guard: bool) {
         if out_of_shield {
-            self.offset = s.oos_offset.pick(rng).saturating_add(1);
+            self.roll_offset(s, rng);
         }
         if in_shieldstun {
             if !self.was_in_shieldstun {

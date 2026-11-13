@@ -226,6 +226,25 @@ fn cpu05_oos_offset_count() {
             frame(&mut cpu, key, GUARD, GUARD);
         }
     }
+    // OoS Offset changed in the menu while the CPU holds its shield (gna-p2-cpu-1: `27 prev=0`, `28`, then the first hit
+    // `30` and `oos_escape`, with no frame out of the shield between): the commit re-rolls the held count, so the new
+    // value applies from the next hit; an unchanged row leaves a count in progress alone.
+    let (mut cpu, key) = cpu_with(&[mode(2), ("mash_state", actions(&[3])), ("mash_triggers", shieldstun_triggers())]);
+    frame(&mut cpu, key, WAIT, WAIT);
+    frame(&mut cpu, key, 49, WAIT);
+    frame(&mut cpu, key, GUARD, 49);
+    let two = settings(&[mode(2), ("oos_offset", delay(&[2])), ("mash_state", actions(&[3])), ("mash_triggers", shieldstun_triggers())]);
+    cpu.publish(two, 0);
+    for hit in 1..=3 {
+        hit_and_decide(&mut cpu, key, OosFacts { cont_escape: false, ..OosFacts::default() });
+        let acted = !cpu.fighters[key.index()].mash.queue.is_empty();
+        assert_eq!(acted, hit == 3, "after the commit, hit {hit}");
+        cpu.fighters[key.index()].mash.queue.clear();
+        frame(&mut cpu, key, GUARD, GUARD);
+        if hit == 1 {
+            cpu.publish(settings(&[mode(2), ("oos_offset", delay(&[2])), ("mash_state", actions(&[3])), ("mash_triggers", shieldstun_triggers())]), 0);
+        }
+    }
     // An empty row means 0: the first hit acts.
     let (mut cpu, key) = cpu_with(&[mode(2), ("mash_state", actions(&[3])), ("mash_triggers", shieldstun_triggers())]);
     frame(&mut cpu, key, WAIT, WAIT);
