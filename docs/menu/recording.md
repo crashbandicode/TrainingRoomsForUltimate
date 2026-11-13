@@ -299,6 +299,9 @@ exchange is over, the bound save loads, as the Load chord does, so you retry fro
 - **Default:** Keep playing
 - **How:** Left/Right cycle through the values; A opens the list.
 
+![After an attempt set to Load save state; a jab > jab attempt on the drill, and the save loads by itself](../media/rc11-after-an-attempt.gif)<br>
+*With Combo 1 as the drill: B + Up, Right sets After an attempt to Load save state, B. Then jab > jab (it drops); once the exchange is over, the bound save loads on its own and both fighters are back on the spot at 0%. The 5.4 s between (the menu closing, the Load chord) is cut. Eden, rc.11.*
+
 More: [Save states](../guide/save-states.md)
 
 ## Reset page to defaults
