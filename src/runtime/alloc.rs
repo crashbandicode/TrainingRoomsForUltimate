@@ -10,7 +10,7 @@
 //! recorder's `TraceAllocator`, which forwards to this plugin's `CountingAllocator` (so the hook counter and the byte meter keep
 //! counting).
 //!
-//! NOT YET SWITCH-COMPILED.
+//! Part of the Switch build.
 
 pub use crate::model::hook_stats::{hook_allocations, HookId, HookScope};
 

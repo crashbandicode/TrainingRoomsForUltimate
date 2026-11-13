@@ -269,7 +269,7 @@ impl Ui {
         if self.active == Some(Editor::SetupLibrary) {
             if self.library_count == 0 {
                 view.labels = vec!["No setups saved".into()];
-                view.footer = "Save a setup from a numbered slot first. B Return".into();
+                view.footer = "Save one with Save setup to library first. B Return".into();
             } else {
                 view.footer = format!(
                     "{}

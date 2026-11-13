@@ -1,5 +1,5 @@
 //! L+R+A Reset gate (SPEC-state-06 §4): inside the game's Training reset check, clear register x8
-//! when the setting is Off so the check fails. NOT YET SWITCH-COMPILED.
+//! when the setting is Off so the check fails.
 
 use skyline::hooks::InlineCtx;
 

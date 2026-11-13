@@ -1,7 +1,7 @@
 //! The settings every hook reads, as atomics: replaced as a whole at load and at every commit
 //! (SPEC-core-04 §5, SPEC-core-01 question 10), read without a lock.
 //!
-//! NOT YET SWITCH-COMPILED.
+//! Part of the Switch build.
 
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 

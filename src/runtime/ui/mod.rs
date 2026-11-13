@@ -6,7 +6,7 @@
 //! the menu worker (`worker`), which owns the model. `hud` lets the other packages draw their panels from
 //! the same tick.
 //!
-//! NOT YET SWITCH-COMPILED.
+//! Part of the Switch build.
 
 pub mod anchors;
 pub mod archive;

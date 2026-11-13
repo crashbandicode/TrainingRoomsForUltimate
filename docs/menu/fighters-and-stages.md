@@ -213,7 +213,7 @@ Training, or go to a stage with Change Stage.
 - **How:** A flips it.
 
 With [Lobby Practice](#lobby-practice) On it also sets the hazards of the waiting room's stage, when you enter the
-room. The row's help line mentions Training only.
+room.
 
 ### Lobby Items
 

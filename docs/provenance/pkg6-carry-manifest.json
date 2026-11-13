@@ -9419,7 +9419,7 @@
    "dest": "src/model/preload/cycle_preload_config.rs",
    "crate": "consts",
    "src_sha256": "49c8a777d9e7c728aa8ecc7a51df2f7990f3edf458fdf7163be3b82fa9e3bf01",
-   "dest_sha256": "ba7a8c3a9ca2237581af50f7ba5295980649487ca30cd3a0f87de7b05b45e79a",
+   "dest_sha256": "696667b91ea764f00a71e1793b4591641a4093b7a1625497266cae753467f717",
    "edits": [
     {
      "delete_from": "// The exported menu macro resolves these names at its use site.\nmod bank_submenu {",
@@ -9695,6 +9695,16 @@
       ]
      ],
      "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+    },
+    {
+     "old": "    /// The count is the shared maximum. Sources are both. Measurements start on.\n",
+     "new": "    /// The count is the shared maximum. Sources are both. Measurements start off.\n",
+     "reason": "docs audit 2026-11-13 (artifacts/phase23/docs-audit-1113/CODE-FINDINGS.md) row 22: the comments say the defaults the code has (measurements start off; Ready Fighters is READY_FIGHTERS_DEFAULT, 10)"
+    },
+    {
+     "old": "/// Built-in menu selection: the operator's eight.\n",
+     "new": "/// Built-in menu selection: `READY_FIGHTERS_DEFAULT` (10).\n",
+     "reason": "docs audit 2026-11-13 (artifacts/phase23/docs-audit-1113/CODE-FINDINGS.md) row 22: the comments say the defaults the code has (measurements start off; Ready Fighters is READY_FIGHTERS_DEFAULT, 10)"
     }
    ]
   },

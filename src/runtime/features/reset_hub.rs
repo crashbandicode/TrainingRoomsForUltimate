@@ -1,6 +1,6 @@
 //! The fighter on-init wrapper (SPEC-state-06 §5.1): the fighter vtable's `on_init` slot is replaced
 //! by a wrapper that calls the game's own on-init and then, for the CPU-operated fighter in native
-//! Training and not during a hot swap, runs the reset hub. NOT YET SWITCH-COMPILED.
+//! Training and not during a hot swap, runs the reset hub.
 //!
 //! Facts (read from the owned 13.0.5 main; the `on_init` site's guard covers the words): the
 //! function takes the fighter object in x0 and one more argument in x1; the fighter's entry id is

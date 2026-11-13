@@ -799,7 +799,7 @@ pub fn open_external_library(
     assign(&menu::MENU_RECEIVED_INPUT, true);
 }
 
-/// Edit placement edits the page role's active macro, the file Play plays (primary 2026-11-08 #70 (a)); the anchor
+/// Edit placement edits the Recording pop-up role's active macro, the file Play plays (primary 2026-11-08 #70 (a)); the anchor
 /// is where that macro's start save puts the role (`rr_host::placement_target`).
 pub fn open_editor() {
     if !practice_ready() {

@@ -140,9 +140,6 @@ question a macro recorded on another fighter asks ([RECORDING.md](recording.md),
   Off the plugin still never changes Player 1 on its own.
 - B: nothing changes.
 
-The question is skipped in these cases:
-
-- **No question at all** when the combo has no `recorded_on` or when the fighter already matches.
-- **The current fighter is kept, without asking:**
-  - when **Ask before switching fighter** (Recording › Replays) is Off;
-  - when `recorded_on` is not a fighter name the plugin knows; the notice says so.
+The question is skipped only when the combo has no `recorded_on` or when the fighter already matches.
+**Ask before switching fighter** (Recording › Replays) doesn't skip it: a drilled combo asks whatever that row says
+(`rr_host::ask_drill`).

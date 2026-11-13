@@ -1,7 +1,7 @@
 //! Reads of the running game: the text base, the version, the 64 bytes at a site, and the one game
 //! function every feature calls (the Training-mode predicate).
 //!
-//! NOT YET SWITCH-COMPILED.
+//! Part of the Switch build.
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::OnceLock;

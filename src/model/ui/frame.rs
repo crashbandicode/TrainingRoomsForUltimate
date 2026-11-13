@@ -594,7 +594,7 @@ pub fn page_frame(menu: &Menu, frame: &mut Frame) {
         }
         None if matches!(menu.focus(), Some(Entry::ResetPage(_))) => {
             let _ = frame.help[0].write_str("Puts every setting of this page back to your saved defaults (X saves them).");
-            let _ = frame.help[1].write_str("A asks to confirm first.");
+            let _ = frame.help[1].write_str("A asks first. On Fighters & Stages, both fighter picks reset and load on close.");
         }
         None => {
             let _ = frame.help[0].write_str("A opens or closes this section.");

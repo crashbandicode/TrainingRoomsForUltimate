@@ -130,8 +130,7 @@ Whether to ask before the CPU switches to the fighter a replay capture was recor
 [Replay window](#replay-window) reads this row. On: opening a capture recorded on another fighter asks Fighter
 Mismatch first (Keep current fighter, or Switch to recorded fighter). Off: the CPU you have stays, without asking.
 
-A macro, a chain or a drilled combo recorded on another fighter asks Fighter Mismatch whatever this row says. The
-row's help line says they follow it too; in this build they don't.
+A macro, a chain or a drilled combo recorded on another fighter asks Fighter Mismatch whatever this row says.
 
 - **Values:** On, Off
 - **Default:** On

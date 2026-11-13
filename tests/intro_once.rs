@@ -46,7 +46,7 @@ fn save_and_other_notices_still_post() {
     assert!(!notices.post_once(true, Some(ChordSet::factory()), &mut queue));
     boot_notices::saved(&mut queue, 0);
     let draw = queue.tick(true, false).draw.unwrap();
-    assert_eq!((draw.header, draw.body.as_str()), ("Save State", "Saved Slot 1"));
+    assert_eq!((draw.header, draw.body.as_str()), ("Save State", "Saved"));
     queue.clear();
     let (body, color) = Phase::Recording.notice().unwrap();
     queue.post_static(NOTICE_HEADER, body, 60, color);

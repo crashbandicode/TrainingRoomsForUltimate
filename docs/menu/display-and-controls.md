@@ -16,9 +16,6 @@ either way.
 - **Default:** On
 - **How:** A flips it.
 
-The row's help line on screen says Off leaves "the game's own HUD only". In this build Off hides the game's HUD, as
-described above.
-
 ### Hitbox Visualization
 
 On draws the fighters' boxes as coloured discs: hitboxes (the attacks; each hitbox of a move gets its own colour, the
@@ -28,8 +25,6 @@ the two practice fighters in a waiting room. A fighter's boxes are not drawn whi
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A flips it.
-
-The row's help line still says hurtboxes are not available. They are drawn in this build.
 
 ![Hitbox Visualization turned on: the yellow hurtboxes, then at 1/4 speed a neutral air's red hitbox](../media/rc11-hitbox.gif)
 

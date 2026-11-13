@@ -1,8 +1,8 @@
 //! Everything that touches the game. Compiled only for the Switch (`cfg(target_os = "switch")`), so
 //! `cargo test` on the host never builds it; the Switch build is `cargo skyline build --release`.
 //!
-//! NOT YET SWITCH-COMPILED: written against Skyline 0.6.0's API from its sources. The first
-//! `cargo skyline build` may need small fixes.
+//! Written against Skyline 0.6.0's API from its sources (`Cargo.toml` pins `skyline = "=0.6.0"`);
+//! `cargo skyline build --release` builds it.
 
 mod alloc;
 mod boot;

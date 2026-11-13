@@ -1,6 +1,6 @@
 //! Boot (SPEC-core-01 §5.1), package 1: version guard, panic hook, data folder, `developer.ini`,
 //! settings, a comparison of every site window, then the features whose sites passed, then the one
-//! install line. NOT YET SWITCH-COMPILED.
+//! install line.
 //!
 //! Not in package 1: the first-boot import runtime (SPEC-core-08; its plan is in `model::migration`),
 //! the provider plugins, the menu, the notifications.

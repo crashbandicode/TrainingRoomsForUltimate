@@ -17,15 +17,16 @@ pub enum DeathParam {
     ChangeFlyFrame,
 }
 
-/// Whether a death is instant: every death in Training is, unless Respawn on platform is On (N2),
+/// Whether a death is instant: every death in practice is, unless Respawn on platform is On (N2),
 /// in which case only a load's deaths are. The toggle is greyed while Auto Save States is On, because a
 /// death then loads a state: the stored value is kept and ignored.
 pub fn instant_respawn(settings: &StateSettings, loading: bool) -> bool {
     loading || settings.autoload || !settings.respawn_invincibility
 }
 
-/// The value a parameter read is answered with, or `None` for the game's own. `training` is native
-/// Training (the hook is inert elsewhere).
+/// The value a parameter read is answered with, or `None` for the game's own. `training` is the widened
+/// practice predicate (`runtime::scene::is_training`: native Training or an active waiting-room practice;
+/// the hook is inert elsewhere). With Save States Off every read gets the game's own value.
 pub fn param_override(param: DeathParam, settings: &StateSettings, loading: bool, training: bool) -> Option<i32> {
     if !training || !settings.enable {
         return None;

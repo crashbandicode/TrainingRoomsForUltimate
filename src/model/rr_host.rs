@@ -689,8 +689,9 @@ pub fn setup_bound(restore: bool) {
     }
 }
 
-/// What Edit placement edits (primary 2026-11-08 #70 (a)): the page role's active macro, the file Play plays, and the
-/// position its start save gives that role. Play warps there and adds the offset (`warp_pair`).
+/// What Edit placement edits (primary 2026-11-08 #70 (a)): the active macro of the Recording pop-up's role (`RECORD_ROLE`,
+/// not the page's ZR view), the file Play plays, and the position its start save gives that role. Play warps there and
+/// adds the offset (`warp_pair`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlacementTarget {
     pub role: Role,
@@ -2927,7 +2928,7 @@ mod tests {
         assert_eq!(saves.load(&made).unwrap().player.x, 1.0);
     }
 
-    /// Primary 2026-11-08 #70 (a): Edit placement edits the page role's active macro, the file Play plays. Eden
+    /// Primary 2026-11-08 #70 (a): Edit placement edits the Recording pop-up role's active macro, the file Play plays. Eden
     /// rc6-covrec-diag2 cov-edit-placement refused with a macro active, and Play never read a placement. The anchor is
     /// where the start save puts the role; Play's warp adds the file's offset (or a kept one) to that role only.
     fn edit_placement_targets_the_active_macro_and_play_warps_with_its_offset() {

@@ -2,7 +2,7 @@
 //! line's worst case (`install_capacity::INSTALL_LINE_CAPACITY`), taken from the boot heap outside every hook scope and freed after the
 //! write, so nothing of it stays resident. A line that would not fit ends `result=line_overflow` (`install_line::render_into`).
 //!
-//! NOT YET SWITCH-COMPILED.
+//! Part of the Switch build.
 
 use std::fs::OpenOptions;
 use std::io::Write as _;

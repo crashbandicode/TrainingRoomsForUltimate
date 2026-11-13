@@ -119,7 +119,7 @@ pub const fn valid_ready_fighters(total: u8) -> bool {
 impl Settings {
     /// Missing file and the menu's built-in selection for Training and lobby waiting.
     ///
-    /// The count is the shared maximum. Sources are both. Measurements start on.
+    /// The count is the shared maximum. Sources are both. Measurements start off.
     /// Slot 0 remains an explicit Off. Bank members are the native maximum.
     pub const DEFAULT: Self = Self {
         slots: default_slot_count(),
@@ -333,7 +333,7 @@ fn ready_fighters_at(index: usize) -> Option<u8> {
         .filter(|total| valid_ready_fighters(*total))
 }
 
-/// Built-in menu selection: the operator's eight.
+/// Built-in menu selection: `READY_FIGHTERS_DEFAULT` (10).
 pub const fn default_ready_fighters() -> CyclePreloadReadyFighters {
     CyclePreloadReadyFighters::ALL_CONSTS[(READY_FIGHTERS_DEFAULT - READY_FIGHTERS_MIN) as usize]
 }

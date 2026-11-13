@@ -11,8 +11,8 @@ setup library. The options are on the [Saves](../menu/saves.md) page.
 | Save State Save | ZL + D-pad Down | Saves both fighters as they are now. |
 | Save State Load | ZL + D-pad Up | Puts both fighters back where you saved. |
 
-- **Save:** both fighters flash and the notice "Save State · Saved Slot 1" appears. The notice keeps the old slot
-  wording; what was written is the [bound save](#the-bound-save).
+- **Save:** both fighters flash and the notice "Save State · Saved" appears. What was written is the
+  [bound save](#the-bound-save).
 - **Load:** both fighters vanish in a short burst and are back at the saved spots. There is no notice.
 - Load only warps. It doesn't start a recording, and it stops one that is playing. A Load pressed while a load is still
   under way is ignored.

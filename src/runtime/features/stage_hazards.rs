@@ -1,5 +1,5 @@
 //! Stage Hazards (SPEC-state-07): inline hook at the `cbz` of the stage-loading routine; writes the
-//! game's hazard rule byte just before the game reads it. NOT YET SWITCH-COMPILED.
+//! game's hazard rule byte just before the game reads it.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 

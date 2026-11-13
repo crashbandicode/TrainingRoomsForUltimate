@@ -145,7 +145,7 @@ fn kept_or<T: serde::de::DeserializeOwned>(snapshot: &Snapshot, id: &str, fallba
 /// The settings the carried engines read (grows with each carried layer).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TrainingModpackMenu {
-    /// Ice Climbers' Solo Popo preference for Player slot 0 (`solo_popo_original`; factory default On).
+    /// Ice Climbers' Solo Popo preference for Player slot 0 (`solo_popo_original`; factory default Off).
     #[serde(default = "solo_popo_original_default")]
     pub solo_popo_original: OnOff,
     /// Solo Popo for the Player's numbered cycle slots (`solo_popo_player_cycle`).

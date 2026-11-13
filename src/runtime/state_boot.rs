@@ -1,6 +1,6 @@
 //! Boot's share of package 3: compare the save-state site windows with everything else, install the
 //! hooks when every site is usable and the CPU core's per-frame wrapper (which calls the save-state step)
-//! is installed, and report the rows. NOT YET SWITCH-COMPILED.
+//! is installed, and report the rows.
 
 use crate::model::guard::GuardOutcome;
 use crate::model::install_line::{SiteReport, Written};

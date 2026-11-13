@@ -102,10 +102,11 @@ impl BootNotices {
     }
 }
 
-/// Replace a previous save notice; the slot is zero-based internally.
+/// Replace a previous save notice. Save writes the bound save (`rr_host::write_saved`), whatever its name, so the
+/// notice names no slot; `slot` is the state writer's internal one, zero-based and below 5.
 pub fn saved(queue: &mut Queue, slot: usize) {
-    const BODIES: [&str; 5] = ["Saved Slot 1", "Saved Slot 2", "Saved Slot 3", "Saved Slot 4", "Saved Slot 5"];
-    let Some(body) = BODIES.get(slot) else { return };
-    queue.clear_header("Save State");
-    queue.post_static("Save State", body, 120, DEFAULT_COLOR);
+    if slot < 5 {
+        queue.clear_header("Save State");
+        queue.post_static("Save State", "Saved", 120, DEFAULT_COLOR);
+    }
 }
