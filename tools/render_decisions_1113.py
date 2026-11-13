@@ -18,8 +18,10 @@ TILE, TILE_HI, PANEL, DARK, P1, CPU = d.TILE, d.TILE_HI, d.PANEL, d.DARK, d.P1, 
 W = d.WIDE
 MID = W // 2
 
-# TR2: what option (b) frees, in sloc4 lines, once integration has measured it (None: still measuring).
-B_FREES = None
+# TR2, sloc4 lines (integration's 10:40Z post): how far c49681c9 plus integration's #23, #15 and #25 go over the
+# ceiling, and what option (b) frees: the smallest cut of the old numbered-slot recorder that touches no carried file.
+OVER = 35
+B_FREES = 258
 
 
 # ---------------------------------------------------------------------------------------------------
@@ -133,40 +135,43 @@ def tr1_slots():
 def tr2_size_gate():
     c = d.DCanvas(W, 460)
     y = frame(c, 12, 12, W - 12, 236, "TrainingRooms' size gate", "sloc4, tools/size_gate.py; ceiling in size-budget.toml")
-    lo, hi, x0, x1 = 147700, 148000, 420, W - 240
+    ceiling = 147921
+    over = ceiling + OVER
+    after_b = None if B_FREES is None else over - B_FREES
+    lo = min(147700, (after_b if after_b is not None else over) - 120)
+    hi, x0, x1 = max(148000, over + 30), 420, W - 240
 
     def X(v):
         return x0 + (v - lo) / (hi - lo) * (x1 - x0)
 
-    ceiling = 147921
     bars = [("main today", ceiling, LINE, "147,921 (headroom 0)"),
-            ("+ integration's #23 and #15 fixes", ceiling + 46, BAD, "147,967 (+46 over)")]
+            ("+ the three fixes (#23 #15 #25)", over, BAD, f"{over:,} (+{OVER} over)")]
     yy = y + 10
     for label, v, col, note in bars:
         c.text(40, yy + 6, label, "xs", FG)
         c.rect(X(lo), yy, X(v), yy + 28, fill=TILE_HI, outline=col, width=2, radius=3)
         c.text(X(v) + 8, yy + 6, note, "xxs", col)
         yy += 44
-    c.text(40, yy + 6, "(b) minus the dead slot code", "xs", FG)
-    if B_FREES is None:
-        c.rect(X(lo), yy, X(ceiling + 46), yy + 28, outline=MUTED, width=1, radius=3)
-        c.text(X(ceiling + 46) + 8, yy + 6, "integration is measuring", "xxs", MUTED)
+    c.text(40, yy + 6, "(b) minus the old slot recorder", "xs", FG)
+    if after_b is None:
+        c.rect(X(lo), yy, X(over), yy + 28, outline=MUTED, width=1, radius=3)
+        c.text(X(over) + 8, yy + 6, "integration is measuring", "xxs", MUTED)
     else:
-        v = ceiling + 46 - B_FREES
-        c.rect(X(lo), yy, X(v), yy + 28, fill=TILE_HI, outline=OURS, width=2, radius=3)
-        c.text(X(v) + 8, yy + 6, f"{v:,} ({B_FREES} lines freed)", "xxs", OURS if v <= ceiling else BAD)
+        col = OURS if after_b <= ceiling else BAD
+        c.rect(X(lo), yy, X(after_b), yy + 28, fill=TILE_HI, outline=col, width=2, radius=3)
+        c.text(X(after_b) + 8, yy + 6, f"{after_b:,} ({B_FREES} freed)", "xxs", col)
     c.line([(X(ceiling), y), (X(ceiling), yy + 36)], ADV, 2, dash=(6, 4))
     c.text(X(ceiling), yy + 40, "ceiling 147,921", "xxs", ADV, "m")
     options(c, 248, 448,
-            ("a · raise the ceiling by 46", ["A new [[budget]] entry at 147,967, with the",
+            (f"a · raise the ceiling by {OVER}", [f"A new [[budget]] entry at {over:,}, with the",
                                             "lead's approval in approved_by.",
                                             "Cost to the player: none. The limit grows",
-                                            "by exactly what the two fixes need."]),
-            ("b · delete the unreachable code", ["The old slot recorder and named capture",
-                                                "(#14) can't be reached; deleting them",
-                                                "makes room. It goes with TR1 A (hide).",
-                                                "Cost to the player: none. With TR1 C the",
-                                                ("slot code is needed: then take (a).", ADV)]),
+                                            "by exactly what the fixes need."]),
+            ("b · delete the old slot recorder", ["Nothing reaches it. Its smallest cut that",
+                                                 f"touches no carried file frees {B_FREES} lines",
+                                                 "(all of it: 1,096). Goes with TR1 A.",
+                                                 "Cost to the player: none. With TR1 C the",
+                                                 ("slot code is needed: then take (a).", ADV)]),
             "b")
     c.save("TR2-size-gate")
 
@@ -288,15 +293,15 @@ def tr7_crop():
         lane(c, y + 48, "Upstream's Recording Crop", [(330, 760, "inputs", LINE)])
         c.line([(766, y + 48), (1060, y + 48), (1060, y + 84), (766, y + 84), (766, y + 48)], MUTED, 1, dash=(5, 5))
         c.text(913, y + 58, "idle frames: trimmed", "xxs", OURS, "m")
-        c.text(40, y + 96, "Record never reads the row (rr_runtime::finish_recording); its only readers, the old "
-               "slot recorder and named capture, can't be reached.", "xxs", MUTED)
+        c.text(40, y + 96, "Record never reads the row. Its old readers: the slot recorder can't be reached; the "
+               "named capture starts only from settings of v0.2.0-rc.3.1 or older.", "xxs", MUTED)
     bug("TR7-crop", "Crop trailing neutral", "toggle", "ON",
         ["On: idle frames at the end of a recording are dropped.",
          "Off: the recording keeps its full length."],
         "Has no effect on Record: a recording keeps every frame up to the stop.",
         draw,
-        ("A · remove the row", ["A row that does nothing goes; Crop on a",
-                                "macro's screen stays. Pairs with TR2 (b).",
+        ("A · remove the row", ["The row goes; it does nothing on Record.",
+                                "Crop on a macro's screen stays.",
                                 ("Cost: upstream's trim is gone for good.", BAD)]),
         ("B · make Record trim", ["Record drops trailing neutral frames when",
                                   "On, as upstream's Recording Crop did.",

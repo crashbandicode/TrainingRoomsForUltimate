@@ -609,7 +609,7 @@ recommended option has a **green outline**. The pictures are drawn by `tools/ren
 | # | Decision | Recommendation |
 | --- | --- | --- |
 | TR1 | Playback Slot 1–5 and Hitstun timing (#8) | A: hide them |
-| TR2 | Size gate after integration's #23 and #15 fixes | (b): delete the unreachable slot code, with TR1 A |
+| TR2 | Size gate after integration's #23, #15 and #25 fixes | (b): delete the old slot recorder (258 lines), with TR1 A |
 | TR3 | HUD Off (#2) | A: keep it |
 | TR4 | Pummel Delay without a Throw (#4) | A: keep it |
 | TR5 | Respawn on platform with Save States Off (#9) | B: make it work |
@@ -647,15 +647,20 @@ delete the slot code.
 
 ![TR1 playback slots](decisions/TR1-playback-slots.png)
 
-#### TR2 · The size gate after integration's #23 and #15 fixes
+#### TR2 · The size gate after integration's #23, #15 and #25 fixes
 
-How to make room for integration's two bug fixes: the pop-up's B close and the Loop list. They put the code 46 lines
-over `size-budget.toml` (147,967 against a ceiling of 147,921).
+How to make room for integration's three bug fixes: the pop-up's B close, the Loop list, and the Setup library's
+restore after a live swap. On top of the held fix they put the code 35 lines over `size-budget.toml`: 147,956 against
+a ceiling of 147,921 (integration, 10:40Z).
 
-- **(a) · raise the ceiling by 46:** a new `[[budget]]` entry with the lead's approval. Cost to the player: none.
-- **(b) · delete the unreachable code:** the old slot recorder and named capture can't be reached (#14). Deleting them
-  makes room. Cost to the player: none. Integration is measuring how much it frees (asked 09:35Z); the number will be
-  added here.
+- **(a) · raise the ceiling by 35:** a new `[[budget]]` entry with the lead's approval. Cost to the player: none.
+- **(b) · delete the old numbered-slot recorder:** nothing reaches it (#14). Its smallest cut that touches no carried
+  file frees 258 lines, which covers the 35; all of it is 1,096 lines. Cost to the player: none. To build: a rebase
+  and re-measure, and an Eden check of the settings migration it touches.
+- **Not part of (b):** the old named capture (354 lines). Settings files written by v0.1.0 to v0.2.0-rc.3.1 (Source
+  Named Library plus Trigger Save State Load) still start it on every load.
+
+Integration's measurement: `artifacts/phase23/tr-fix-23-15/SIZE-OPTION-B.md`, in the workspace.
 
 **Recommendation: (b), together with TR1 A.** Code that can't run costs nothing to delete, and the budget stays a real
 limit. If TR1 is C, the slot code is needed: then (a).
@@ -720,7 +725,8 @@ or a chain, and combo drills, ask Fighter Mismatch whatever it says.
 #### TR7 · Crop trailing neutral (#14)
 
 Whether Record should drop the idle frames at the end of a recording when this row is On. Today Record never reads the
-row, so it does nothing.
+row. Of its two old readers, the slot recorder can't be reached, and the named capture starts only from settings of
+v0.2.0-rc.3.1 or older.
 
 - **A · remove the row:** Crop on a macro's screen stays. Cost to the player: upstream's automatic trim is gone.
 - **B · make Record trim:** as upstream's Recording Crop did (default On). Cost: a few lines and a test, and one Eden
