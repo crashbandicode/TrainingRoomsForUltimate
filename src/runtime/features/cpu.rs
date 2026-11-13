@@ -123,16 +123,7 @@ mod counts {
     use std::sync::atomic::{AtomicU32, Ordering};
 
     pub const FRAME: usize = 0;
-    pub const SDI: usize = 1;
-    pub const STICK_X: usize = 2;
-    pub const STICK_Y: usize = 3;
-    pub const CLATTER_START: usize = 4;
-    pub const TRANSITION_TERM: usize = 5;
-    pub const MOTION_CHANGE: usize = 6;
-    pub const QUAKE_POS: usize = 7;
-    pub const COMMAND_FLAG: usize = 8;
-    pub const AIR_KIND: usize = 9;
-    pub const STICK_DIR: usize = 10;
+    pub use super::counts_index::*;
     static COUNTS: [AtomicU32; 11] = [const { AtomicU32::new(0) }; 11];
     /// One line per this many primary-body frames.
     const REPORT_EVERY: u32 = 600;

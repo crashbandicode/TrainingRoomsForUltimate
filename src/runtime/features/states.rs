@@ -196,20 +196,7 @@ mod counts {
     use std::sync::atomic::{AtomicU32, Ordering};
 
     pub const FRAME: usize = 0;
-    pub const PARAM: usize = 1;
-    pub const QUAKE: usize = 2;
-    pub const SOUND: usize = 3;
-    pub const EFFECT: usize = 4;
-    pub const FOLLOW: usize = 5;
-    pub const RUMBLE: usize = 6;
-    pub const STAR_KO: usize = 7;
-    /// Trainer, Kirby and Sora sounds silenced while loading / matching sounds that passed while loading.
-    pub const SE_SILENCED: usize = 8;
-    pub const SE_PASSED: usize = 9;
-    /// Switch effects made size 0, decide hook rewrites, Kirby copy hook writes.
-    pub const SWITCH_FX: usize = 10;
-    pub const DECIDE: usize = 11;
-    pub const COPY_HOOK: usize = 12;
+    pub use super::counts_index::*;
     static COUNTS: [AtomicU32; 13] = [const { AtomicU32::new(0) }; 13];
     const REPORT_EVERY: u32 = 600;
 
@@ -259,8 +246,10 @@ mod counts_index {
     pub const FOLLOW: usize = 5;
     pub const RUMBLE: usize = 6;
     pub const STAR_KO: usize = 7;
+    /// Trainer, Kirby and Sora sounds silenced while loading / matching sounds that passed while loading.
     pub const SE_SILENCED: usize = 8;
     pub const SE_PASSED: usize = 9;
+    /// Switch effects made size 0, decide hook rewrites, Kirby copy hook writes.
     pub const SWITCH_FX: usize = 10;
     pub const DECIDE: usize = 11;
     pub const COPY_HOOK: usize = 12;
