@@ -347,7 +347,7 @@ impl Grade {
 
 /// Grade `attempt` against `reference`. A presses-only reference matches the next unused press with the same button
 /// and the old aim. Any other reference matches the next event of the same kind; a different direction is
-/// [`Mark::WrongDir`] and is not skipped.
+/// [`Mark::WrongDir`] and is not skipped. A reference release the attempt has no match for is not graded (rc.12).
 pub fn grade(reference: &LinkRec, attempt: &LinkRec) -> Grade {
     let mut used = [false; STEPS];
     let mut marks = [None; STEPS];
@@ -359,6 +359,11 @@ pub fn grade(reference: &LinkRec, attempt: &LinkRec) -> Grade {
                 && attempt.events[i]
                     .is_some_and(|got| event_matches(*want, got, reference.presses_only))
         });
+        // rc.12: the follow-up's events end at its hit, so a button still held when the hit lands has no release here.
+        // Holding it longer does not change the move that came out: a release with no counterpart is not graded.
+        if found.is_none() && matches!(want.kind, Kind::Release(_)) {
+            continue;
+        }
         *mark = Some(match found {
             Some(i) => {
                 used[i] = true;

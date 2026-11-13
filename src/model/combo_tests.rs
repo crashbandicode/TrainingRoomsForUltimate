@@ -382,6 +382,26 @@ fn play_true_then_gap(helper: Helper, gap: u32) -> Run {
     run
 }
 
+/// rc.12 (operator 2026-11-13, "yeah fix it"; docs lane boot docs-op3-0c628724, `out/op-combo-root`): the follow-up's events end at
+/// its hit, so a button still held when the hit lands has no release in the attempt. The same jab > jab with A let go 1-2
+/// frames after the hit was graded "L1 Attack release missing", not clean. Holding a button past the hit does not change
+/// the move that came out: a reference release with no counterpart is not graded; the presses decide.
+fn a_release_after_the_hit_is_not_missing() {
+    let dir = Dir::from_aim(Aim::Neutral);
+    let press = Event { kind: Kind::Press(Button::Attack), dir, offset: 0 };
+    let release = Event { kind: Kind::Release(Button::Attack), dir, offset: 2 };
+    let reference = LinkRec { events: retain([press, release]), presses_only: false, ..link_with(Verdict::True(Some(0)), Move::Jab, 0) };
+    let held = LinkRec { events: retain([press]), ..reference };
+    let graded = grade(&reference, &held);
+    assert_eq!(graded.marks[0], Some(Mark::At(0)));
+    assert_ne!(graded.marks[1], Some(Mark::Missing), "a release after the hit is not missing");
+    assert!(graded.clean(1));
+    assert_eq!(summarized(&reference, &held, Outcome::Completed).fault, None);
+    // A missing press still is.
+    let no_press = LinkRec { events: retain([release]), ..reference };
+    assert_eq!(grade(&reference, &no_press).marks[0], Some(Mark::Missing));
+}
+
 fn a_step_drops_on_a_missing_press_a_late_press_or_the_exchange_end() {
     let reference = link_with(Verdict::True(None), Move::Jab, 0);
     let missing = LinkRec {
@@ -782,6 +802,7 @@ fn case_table() {
         ("aims_merge_left_and_right", aims_merge_left_and_right as fn()),
         ("settings_read_the_three_rows", settings_read_the_three_rows as fn()),
         ("a_step_drops_on_a_missing_press_a_late_press_or_the_exchange_end", a_step_drops_on_a_missing_press_a_late_press_or_the_exchange_end as fn()),
+        ("a_release_after_the_hit_is_not_missing", a_release_after_the_hit_is_not_missing as fn()),
         ("a_short_hop_link_drops_on_a_full_hop", a_short_hop_link_drops_on_a_full_hop as fn()),
         ("a_dash_flick_and_a_tap_jump_are_graded", a_dash_flick_and_a_tap_jump_are_graded as fn()),
         ("a_c_stick_event_is_graded_with_its_direction", a_c_stick_event_is_graded_with_its_direction as fn()),
