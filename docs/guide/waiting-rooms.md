@@ -37,8 +37,7 @@ With it On, the practice starts as soon as the waiting room's own screen is read
   [Respawn on platform](../menu/fighters-and-stages.md#respawn-on-platform) is On.
 - **Game speed:** see [below](#game-speed).
 
-<!-- reshoot: rc6-lobby-combos.gif -->
-![Saving a combo in a waiting room, then drilling it](../media/rc6-lobby-combos.gif)
+![Saving a combo in a waiting room, then drilling it: a try graded TRUE](../media/rc11-lobby-combos.gif)
 
 ## Training Partners and Behavior
 
@@ -52,8 +51,7 @@ last Training Partners and Behavior and sets them again in the next waiting room
 
 ![The game's Training Partners goes from 1 to 2, and a second partner drops in](../media/rc6-waiting-partners.gif)
 
-<!-- reshoot: rc6-waiting-reentry.gif -->
-![The next room keeps two partners, standing still](../media/rc6-waiting-reentry.gif)
+![Training Partners 2 and Stop; leave; the next room starts with two partners standing still](../media/rc11-waiting-reentry.gif)
 
 ## Lobby Items
 

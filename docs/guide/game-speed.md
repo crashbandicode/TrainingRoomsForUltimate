@@ -40,8 +40,7 @@ There is no stopwatch there; the pop-up shows the speed while you hold the chord
 
 Each new practice starts at x1. The speed ends with the practice, so a match always starts at x1.
 
-<!-- reshoot: rc11-lobby-speed.gif -->
-![The game speed in an online waiting room](../media/rc11-lobby-speed.gif)
+![In a waiting room: Sheik's forward smash at x1; the pop-up steps to 2/3, then 1/2; the same smash, slower](../media/rc11-lobby-speed.gif)
 
 More: [Waiting rooms](waiting-rooms.md)
 

@@ -326,9 +326,11 @@ back through the character select (the same two fighters), Training opens on Big
 standing; the game's own waiting-room menu, Training Partners 1, Right to 2; a second partner drops in, and both stand
 (Training Partner Behavior: Stop).*
 
-**Clip** [`rc6-waiting-reentry.gif`](media/rc6-waiting-reentry.gif): The next room starts with the two partners and Stop
+**Clip** [`rc11-waiting-reentry.gif`](media/rc11-waiting-reentry.gif): Training Partners 2 and Stop in one room; leave; the next room starts with two partners, standing still
 
-*The same run, the next room: it fades in with the two remembered partners, standing still.*
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), the guest of a Local Wireless room hosted in Eden (`docs-ldn2-0c628724`), Lobby Practice On: in the room, Plus opens the game's panel: Training Partners 1 → 2, Behavior Stop; the
+guest leaves the room (Yes) and rejoins the host's next room (the host's approval); it opens with two partners
+standing still. The log: `[LobbyPersist] entry saved=Saved { partners: Some(2), behavior: Some(1) }` on entry. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 The same menu works while you wait in an online or local room, once Fighters & Stages › Lobby Practice is On (it's Off
 at first). The Training partners and CPU action you set in the
@@ -343,11 +345,11 @@ To leave a Quickplay room before the match starts (the game's Pause › Leave Ba
 plugin keeps open for a few seconds after you join), close the TrainingRooms menu first: while it is open, Plus
 doesn't reach the game.
 
-**Clip** [`rc6-lobby-combos.gif`](media/rc6-lobby-combos.gif): Save last combo in a Local Wireless waiting room, then the helper bar drills it there
+**Clip** [`rc11-lobby-combos.gif`](media/rc11-lobby-combos.gif): Save last combo in a Local Wireless waiting room, then the helper bar drills it and grades a try
 
-*Eden, 2026-11-10, rc.6 `e6501ac6`, the guest of a Local Wireless room hosted in Eden: jab into jab in the waiting
-room; Recording › Combos & Sequences, *+ Save last combo…*; COMBOS lists "Lobby jabs, recorded on Sheik"; back in the
-room, the helper bar drills it. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), the guest of a Local Wireless room hosted in Eden (`docs-ldn2-0c628724`), Lobby Practice On: Sheik's jab > jab on the Mario partner (the strip's LAST: DROP +3); Recording ›
+Combos & Sequences, *+ Save last combo…* adds Combo 1 (recorded on Sheik); A drills it; back in the room the helper
+bar shows Combo 1; the next jab > jab links: TRUE −1, "1 of 1 true", held (the strip zoomed along the bottom). Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 **Clip** [`rc11-waiting-menu.gif`](media/rc11-waiting-menu.gif): In a Local Wireless waiting room, B + D-pad Up opens the menu, Hitbox Visualization goes On, and the boxes show in the room
 
