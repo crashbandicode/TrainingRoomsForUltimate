@@ -664,7 +664,7 @@ const fn iv_name(local: usize) -> Name {
 
 /// A hidden text box of the frame strip.
 const fn iv_text(name: Name, [x, y, w]: [f32; 3], align: Align, font: (f32, f32)) -> Spec {
-    Spec { visible: false, ..under(text(name, [x, y, w, 30.0], align, font, iv::TEXT_UNITS, TEXT), Name::new("TrIv")) }
+    hidden(under(text(name, [x, y, w, 30.0], align, font, iv::TEXT_UNITS, TEXT), Name::new("TrIv")))
 }
 
 /// The frame strip's panes: kind, place and size, all hidden until the input package draws them.
@@ -685,7 +685,7 @@ const fn iv_spec(local: usize, name: Name) -> Spec {
         i if i < RUN_LABEL => under(rect(name, [0.0, 0.0, CELL_W, LANE_H], TEXT, false), parent),
         i if i < CHIP_BOX => iv_text(name, [0.0, 0.0, 60.0], Align::Center, FONT_TAG),
         i if i < CHIP_GLYPH => under(rect(name, [0.0, IN_Y, CHIP, CHIP], TEXT, false), parent),
-        i if i < CHIP_SHAFT => Spec { visible: false, ..under(text(name, [0.0, IN_Y, CHIP, CHIP], Align::Center, FONT_SUB, 2, TEXT), parent) },
+        i if i < CHIP_SHAFT => hidden(under(text(name, [0.0, IN_Y, CHIP, CHIP], Align::Center, FONT_SUB, 2, TEXT), parent)),
         i if i < CHIP_HEAD => under(rect(name, [0.0, IN_Y, 4.5, 14.0], TEXT, false), parent),
         i if i < CHIP_TICK => under(rect(name, [0.0, IN_Y, 9.0, 9.0], TEXT, false), parent),
         i if i < WINDOW_BAR => under(rect(name, [0.0, TICK_Y, 1.5, TICK_H], TEXT, false), parent),
@@ -697,16 +697,13 @@ const fn iv_spec(local: usize, name: Name) -> Spec {
         NOW => under(rect(name, [NOW_X, 32.25, 1.5, 121.5], TEXT, false), parent),
         NOW_TEXT => iv_text(name, [NOW_X - 24.0, 84.0, 48.0], Align::Center, FONT_TAG),
         i if i < READ_VALUE => iv_text(name, [READ_X + 60.0, 0.0, 120.0], Align::Left, FONT_TAG),
-        i if i < READ_SUB => Spec { visible: false, ..under(text(name, [READ_X + 30.0, 0.0, 60.0, 40.0], Align::Left, FONT_VALUE, TEXT_UNITS, TEXT), parent) },
+        i if i < READ_SUB => hidden(under(text(name, [READ_X + 30.0, 0.0, 60.0, 40.0], Align::Left, FONT_VALUE, TEXT_UNITS, TEXT), parent)),
         i if i < LAST_TEXT => iv_text(name, [READ_SUB_X + 90.0, 0.0, 180.0], Align::Left, FONT_SUB),
         LAST_TEXT => iv_text(name, [LABEL_X, LAST_Y, 60.0], Align::Center, FONT_TAG),
         i if i < PILL_TEXT => under(rect(name, [0.0, LAST_Y, PILL_W, 24.0], TEXT, false), parent),
         i if i < MOVE_TEXT => iv_text(name, [0.0, LAST_Y, PILL_W], Align::Center, FONT_TAG),
         i if i < STICK => iv_text(name, [0.0, LAST_Y, 200.0], Align::Left, FONT_TAG),
-        i if i < COUNT => Spec {
-            visible: false,
-            ..under(text(name, [0.0, STICK_Y, 16.0, 18.0], Align::Center, FONT_TAG, 2, TEXT), parent)
-        },
+        i if i < COUNT => hidden(under(text(name, [0.0, STICK_Y, 16.0, 18.0], Align::Center, FONT_TAG, 2, TEXT), parent)),
         _ => {
             let _ = TEXT_UNITS;
             panic!("no such frame strip pane")
@@ -768,7 +765,7 @@ const fn cb_name(local: usize) -> Name {
 
 /// A hidden text box of the combo bar; `x` is the box's centre.
 const fn cb_text(name: Name, [x, y, w]: [f32; 3], align: Align, font: (f32, f32)) -> Spec {
-    Spec { visible: false, ..under(text(name, [x, y, w, 26.0], align, font, cb::TEXT_UNITS, TEXT), Name::new("TrCb")) }
+    hidden(under(text(name, [x, y, w, 26.0], align, font, cb::TEXT_UNITS, TEXT), Name::new("TrCb")))
 }
 
 /// The combo bar's panes: kind, place and size, all hidden until the helper draws them.
@@ -784,7 +781,7 @@ const fn cb_spec(local: usize, name: Name) -> Spec {
     let parent = Name::new("TrCb");
     match local {
         CONTAINER => Spec { name, parent: Name::new("TrIv"), kind: Kind::Null, x: 0.0, y: BAR_Y, w: BAR_W, h: BAR_H, visible: false },
-        BACKDROP => Spec { visible: false, ..under(rect(name, [0.0, 0.0, BAR_W, BAR_H], cb::BACKDROP_COLOR, true), parent) },
+        BACKDROP => hidden(under(rect(name, [0.0, 0.0, BAR_W, BAR_H], cb::BACKDROP_COLOR, true), parent)),
         HEADER => cb_text(name, [LEFT + 180.0, HEADER_Y, 360.0], Align::Left, FONT_SUB),
         STREAK => cb_text(name, [STREAK_X, HEADER_Y, 120.0], Align::Center, FONT_TAG),
         RESULT => cb_text(name, [LEFT + 120.0, FOOTER_Y, 240.0], Align::Left, FONT_SUB),
@@ -800,10 +797,7 @@ const fn cb_spec(local: usize, name: Name) -> Spec {
         i if i < SEQ_BACKDROP => under(rect(name, [0.0, CELL_Y + RULER_DY, 6.0, 12.0], TEXT, false), parent),
         SEQ_BACKDROP => under(rect(name, [0.0, SEQ_BAND_Y, SEQ_W, SEQ_EXTRA], cb::BACKDROP_COLOR, false), parent),
         SEQ_PILL => under(rect(name, [SEQ_LEFT + SEQ_PILL_W / 2.0, SEQ_HEADER_Y, SEQ_PILL_W, SEQ_PILL_H], SEQ_PILL_COLOR, false), parent),
-        SEQ_PILL_TEXT => Spec {
-            visible: false,
-            ..under(text(name, [SEQ_LEFT + SEQ_PILL_W / 2.0, SEQ_HEADER_Y, SEQ_PILL_W, 26.0], Align::Center, FONT_TAG, cb::TEXT_UNITS, SEQ_PILL_TEXT_COLOR), parent)
-        },
+        SEQ_PILL_TEXT => hidden(under(text(name, [SEQ_LEFT + SEQ_PILL_W / 2.0, SEQ_HEADER_Y, SEQ_PILL_W, 26.0], Align::Center, FONT_TAG, cb::TEXT_UNITS, SEQ_PILL_TEXT_COLOR), parent)),
         SEQ_NAME => cb_text(name, [0.0, SEQ_HEADER_Y, SEQ_NAME_BOX], Align::Left, FONT_SUB),
         SEQ_STEP | SEQ_COMBO | SEQ_LINKS | SEQ_TOLERANCE => cb_text(name, [0.0, SEQ_HEADER_Y, SEQ_TAG_BOX], Align::Left, FONT_TAG),
         SEQ_STREAK | SEQ_BEST => cb_text(name, [0.0, SEQ_HEADER_Y, SEQ_TAG_BOX], Align::Right, FONT_SUB),
@@ -991,6 +985,10 @@ const fn under(mut spec: Spec, parent: Name) -> Spec {
     spec
 }
 
+const fn hidden(spec: Spec) -> Spec {
+    Spec { visible: false, ..spec }
+}
+
 /// Centre of `TrModDisp0`, below the combo bar. The header box is the highest notice text
 /// (local y 445, height 50). Sixteen units are the plate padding `p23/notice-plates` draws
 /// around that text. The combo bar's lowest bottom is a drilled sequence's, `STRIP_Y + SEQ_BAR_Y - BAR_H / 2` (the
@@ -1017,8 +1015,7 @@ pub const fn spec(index: usize) -> Spec {
         IDX_NOTICE_TEXT_PLATE => under(rect(name, padded(NOTICE_TEXT_BOX), NOTICE_PLATE, true), name_of(IDX_NOTICE)),
         IDX_NOTICE_TEXT => under(text(name, NOTICE_TEXT_BOX, Align::Center, FONT, 48, TEXT), name_of(IDX_NOTICE)),
         IDX_NOTICE_LONG_PLATE => under(rect(name, padded(NOTICE_LONG_BOX), NOTICE_PLATE, false), name_of(IDX_NOTICE)),
-        IDX_NOTICE_LONG => under(Spec { visible: false, ..text(name, NOTICE_LONG_BOX, Align::Center, (14.0, 24.0),
-            NOTICE_LONG_UNITS, TEXT) }, name_of(IDX_NOTICE)),
+        IDX_NOTICE_LONG => under(hidden(text(name, NOTICE_LONG_BOX, Align::Center, (14.0, 24.0), NOTICE_LONG_UNITS, TEXT)), name_of(IDX_NOTICE)),
         IDX_BG => rect(name, [0.0, 0.0, PANEL_W, PANEL_H], PANEL, true),
         i if i >= IDX_IV && i < IDX_CB => iv_spec(i - IDX_IV, name),
         i if i >= IDX_CB && i < IDX_ORBS => cb_spec(i - IDX_CB, name),
@@ -1026,59 +1023,37 @@ pub const fn spec(index: usize) -> Spec {
         IDX_TILE_HI => rect(name, [0.0, 0.0, 100.0, 60.0], ACCENT, false),
         i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => rect(name, [0.0, 0.0, CHIP_SIZE, CHIP_SIZE], HIGHLIGHT, false),
         i if i >= IDX_CHIP_NEEDLE && i < IDX_CHIP_NEEDLE + CHIPS => rect(name, [0.0, 0.0, 10.0, 84.0], TEXT, false),
-        i if i >= IDX_CHIP_LABEL && i < IDX_CHIP_LABEL + CHIPS => Spec { visible: false, ..text(name, [0.0, 0.0, CHIP_SIZE, 44.0], Align::Center, FONT_SMALL, 16, TEXT) },
-        i if i >= IDX_CHIP_BADGE && i < IDX_CHIP_BADGE + CHIPS => Spec { visible: false, ..text(name, [0.0, 0.0, 60.0, 44.0], Align::Center, FONT, 4, TEXT) },
+        i if i >= IDX_CHIP_LABEL && i < IDX_CHIP_LABEL + CHIPS => hidden(text(name, [0.0, 0.0, CHIP_SIZE, 44.0], Align::Center, FONT_SMALL, 16, TEXT)),
+        i if i >= IDX_CHIP_BADGE && i < IDX_CHIP_BADGE + CHIPS => hidden(text(name, [0.0, 0.0, 60.0, 44.0], Align::Center, FONT, 4, TEXT)),
         i if i >= IDX_TILE && i < IDX_TILE + TILES => rect(name, [0.0, 0.0, 100.0, 60.0], HIGHLIGHT, false),
-        i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => Spec { visible: false, ..text(name, [0.0, 0.0, 100.0, TILE_LABEL_H], Align::Center, FONT_SMALL, 28, TEXT) },
-        i if i >= IDX_TILE_STRIPE && i < IDX_TILE_SOLO => Spec { visible: false, ..rect(name, [0.0, 0.0, 4.0, 86.0], TEXT, false) },
-        i if i >= IDX_FLOPPY && i < IDX_SUB => Spec { visible: false, ..rect(name, [0.0, 0.0, 28.0, 28.0], [255, 255, 255, 255], false) },
-        i if i >= IDX_SUB && i < IDX_CONN_DIV => Spec {
-            visible: false,
-            ..text(name, [row_label_left(true) + row_label_w(true) / 2.0, row_y(i - IDX_SUB) - SUB_DROP, row_label_w(true), SUB_H],
-                Align::Left, FONT_SUBLINE, 64, TEXT_DIM)
-        },
-        IDX_CONN_DIV => Spec { visible: false, ..rect(name, [CONN_DIVIDER_X, 15.0, 3.0, 640.0], RULE, false) },
-        IDX_CONN_HEAD => Spec {
-            visible: false,
-            ..text(name, [(CONN_LEFT + CONN_RIGHT) / 2.0, ROW_FIRST_Y, CONN_RIGHT - CONN_LEFT, CONN_LINE_H], Align::Left, FONT_SMALL, 48, TEXT_DIM)
-        },
-        i if i >= IDX_CONN && i < IDX_CONN_BOX => Spec {
-            visible: false,
-            ..text(name, [(CONN_LEFT + CONN_RIGHT) / 2.0, conn_y(i - IDX_CONN), CONN_RIGHT - CONN_LEFT, CONN_LINE_H], Align::Left, FONT_SMALL, 72, TEXT)
-        },
+        i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => hidden(text(name, [0.0, 0.0, 100.0, TILE_LABEL_H], Align::Center, FONT_SMALL, 28, TEXT)),
+        i if i >= IDX_TILE_STRIPE && i < IDX_TILE_SOLO => hidden(rect(name, [0.0, 0.0, 4.0, 86.0], TEXT, false)),
+        i if i >= IDX_FLOPPY && i < IDX_SUB => hidden(rect(name, [0.0, 0.0, 28.0, 28.0], [255, 255, 255, 255], false)),
+        i if i >= IDX_SUB && i < IDX_CONN_DIV => hidden(text(name, [row_label_left(true) + row_label_w(true) / 2.0, row_y(i - IDX_SUB) - SUB_DROP, row_label_w(true), SUB_H], Align::Left, FONT_SUBLINE, 64, TEXT_DIM)),
+        IDX_CONN_DIV => hidden(rect(name, [CONN_DIVIDER_X, 15.0, 3.0, 640.0], RULE, false)),
+        IDX_CONN_HEAD => hidden(text(name, [(CONN_LEFT + CONN_RIGHT) / 2.0, ROW_FIRST_Y, CONN_RIGHT - CONN_LEFT, CONN_LINE_H], Align::Left, FONT_SMALL, 48, TEXT_DIM)),
+        i if i >= IDX_CONN && i < IDX_CONN_BOX => hidden(text(name, [(CONN_LEFT + CONN_RIGHT) / 2.0, conn_y(i - IDX_CONN), CONN_RIGHT - CONN_LEFT, CONN_LINE_H], Align::Left, FONT_SMALL, 72, TEXT)),
         i if i >= IDX_CONN_BOX && i < IDX_CONN_PILL_TEXT => {
-            Spec { visible: false, ..rect(name, [(CONN_LEFT + CONN_RIGHT) / 2.0, conn_y(0), 8.0, 8.0], TEXT, false) }
+            hidden(rect(name, [(CONN_LEFT + CONN_RIGHT) / 2.0, conn_y(0), 8.0, 8.0], TEXT, false))
         }
-        i if i >= IDX_CONN_PILL_TEXT && i < IDX_CONN_TREE => Spec {
-            visible: false,
-            ..text(name, [CONN_LEFT + 80.0, conn_y(0), 160.0, PILL_H + 4.0], Align::Center, FONT_PILL, 12, PANEL)
-        },
-        i if i >= IDX_CONN_TREE && i < IDX_ROLE_BG => Spec { visible: false, ..rect(name, [CONN_STEM_X, conn_y(1), 2.0, 2.0], RULE, false) },
-        IDX_ROLE_BG => Spec { visible: false, ..rect(name, [ROLE_X, TAB_Y, 2.0 * ROLE_TAB_W + 8.0, ROLE_H + 8.0], HIGHLIGHT, false) },
-        IDX_ROLE_HI => Spec { visible: false, ..rect(name, [role_tab_x(0), TAB_Y, ROLE_TAB_W, ROLE_H], ACCENT, false) },
-        i if i >= IDX_ROLE && i < IDX_ROLE_CAP => Spec {
-            visible: false,
-            ..text(name, [role_tab_x(i - IDX_ROLE), TAB_Y, ROLE_TAB_W, ROLE_H], Align::Center, FONT, 8, TEXT)
-        },
+        i if i >= IDX_CONN_PILL_TEXT && i < IDX_CONN_TREE => hidden(text(name, [CONN_LEFT + 80.0, conn_y(0), 160.0, PILL_H + 4.0], Align::Center, FONT_PILL, 12, PANEL)),
+        i if i >= IDX_CONN_TREE && i < IDX_ROLE_BG => hidden(rect(name, [CONN_STEM_X, conn_y(1), 2.0, 2.0], RULE, false)),
+        IDX_ROLE_BG => hidden(rect(name, [ROLE_X, TAB_Y, 2.0 * ROLE_TAB_W + 8.0, ROLE_H + 8.0], HIGHLIGHT, false)),
+        IDX_ROLE_HI => hidden(rect(name, [role_tab_x(0), TAB_Y, ROLE_TAB_W, ROLE_H], ACCENT, false)),
+        i if i >= IDX_ROLE && i < IDX_ROLE_CAP => hidden(text(name, [role_tab_x(i - IDX_ROLE), TAB_Y, ROLE_TAB_W, ROLE_H], Align::Center, FONT, 8, TEXT)),
         i if i >= IDX_ROLE_CAP && i < IDX_ROLE_KEY => {
-            Spec { visible: false, ..rect(name, [ROLE_CAP_X[i - IDX_ROLE_CAP], TAB_Y, ROLE_CAP, ROLE_CAP], RULE, false) }
+            hidden(rect(name, [ROLE_CAP_X[i - IDX_ROLE_CAP], TAB_Y, ROLE_CAP, ROLE_CAP], RULE, false))
         }
-        i if i >= IDX_ROLE_KEY && i < IDX_HEAD_SQ => Spec {
-            visible: false,
-            ..text(name, [ROLE_CAP_X[i - IDX_ROLE_KEY], TAB_Y, ROLE_CAP, ROLE_CAP], Align::Center, FONT_SMALL, 2, TEXT)
-        },
+        i if i >= IDX_ROLE_KEY && i < IDX_HEAD_SQ => hidden(text(name, [ROLE_CAP_X[i - IDX_ROLE_KEY], TAB_Y, ROLE_CAP, ROLE_CAP], Align::Center, FONT_SMALL, 2, TEXT)),
         i if i >= IDX_HEAD_SQ && i < IDX_BADGE => {
-            Spec { visible: false, ..rect(name, [HEAD_MARK_X, row_y(0), HEAD_SQ, HEAD_SQ], KIND_SEQUENCE, false) }
+            hidden(rect(name, [HEAD_MARK_X, row_y(0), HEAD_SQ, HEAD_SQ], KIND_SEQUENCE, false))
         }
         i if i >= IDX_BADGE && i < IDX_BADGE_NUM => {
-            Spec { visible: false, ..rect(name, [BADGE_X, row_y(1), BADGE_W, BADGE_W], ACCENT, false) }
+            hidden(rect(name, [BADGE_X, row_y(1), BADGE_W, BADGE_W], ACCENT, false))
         }
-        i if i >= IDX_BADGE_NUM && i < IDX_TAB_BOX => Spec {
-            visible: false,
-            ..text(name, [BADGE_X, row_y(1), BADGE_W + 8.0, BADGE_W + 6.0], Align::Center, FONT_PILL, 2, TEXT)
-        },
-        i if i >= IDX_TAB_BOX && i < MENU_COUNT => Spec { visible: false, ..rect(name, [0.0, POP_TAB_Y, 2.0, 2.0], RULE, false) },
-        i if i >= IDX_TILE_BADGE && i < IDX_FLOPPY => Spec { visible: false, ..text(name, [0.0, 0.0, 52.0, MARK_H], Align::Center, FONT_SMALL, 4, TEXT) },
+        i if i >= IDX_BADGE_NUM && i < IDX_TAB_BOX => hidden(text(name, [BADGE_X, row_y(1), BADGE_W + 8.0, BADGE_W + 6.0], Align::Center, FONT_PILL, 2, TEXT)),
+        i if i >= IDX_TAB_BOX && i < MENU_COUNT => hidden(rect(name, [0.0, POP_TAB_Y, 2.0, 2.0], RULE, false)),
+        i if i >= IDX_TILE_BADGE && i < IDX_FLOPPY => hidden(text(name, [0.0, 0.0, 52.0, MARK_H], Align::Center, FONT_SMALL, 4, TEXT)),
         IDX_TAB_HI => rect(name, [-740.0, TAB_Y, 200.0, TAB_H], ACCENT, true),
         IDX_TITLE => text(name, [600.0, TAB_Y, 560.0, TAB_H], Align::Right, FONT_SMALL, 40, TEXT_DIM),
         IDX_SEP => rect(name, [0.0, TAB_Y - 52.0, 1760.0, 3.0], RULE, true),
