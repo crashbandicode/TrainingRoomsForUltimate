@@ -312,6 +312,8 @@ throws nor pummels. After the throw, the CPU does its Mash action at once, whate
 
 If you change the row while the CPU holds you, it picks again at once.
 
+![Mash Grab out of Mario's jab: with Throw None the CPU grabs and lets go; with Backward Throw it throws Mario behind it](../media/rc11-cpu-throw.gif)<br>*Throw: None, then Backward Throw*
+
 ### Throw Delay
 
 Frames the CPU holds you before throwing, counted from when it can throw.
@@ -320,6 +322,8 @@ Frames the CPU holds you before throwing, counted from when it can throw.
 - **Default:** none ticked: it throws at once.
 - **How:** A opens the delay pop-up: tick values with A, or pick up Min or Max with A and move it with Left/Right
   (Up/Down ten at a time). Y clears whichever is set. B goes back.
+
+![Forward Throw: with no Throw Delay the CPU throws at once; with 60 frames it holds Mario a second first](../media/rc11-cpu-throw-delay.gif)<br>*Throw Delay: none, then 60 frames*
 
 More: [Delay rows](../guide/cpu-behaviour.md#delay-rows)
 
