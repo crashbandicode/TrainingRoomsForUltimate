@@ -31,7 +31,11 @@ file in the README and the docs; the old file stays in `media/` with a note in i
   match; rc.11 posts no notice for Record, Play or Load, so those presses are named in the ledger, with their log
   lines in the receipts): `rs11-f10-record.gif` (#10), `rs11-f12-active-after-record.gif` (#12),
   `rs11-f13-play-cpu.gif` (#13), `rs11-f15-playback.gif` (#15, the strip zoomed), `rs11-f17-both-play.gif` (#17),
-  `rs11-f22-mash-interrupt.gif` (#22) and `rs11-f29-bind-load.gif` (#29). The ledger lists each one's frames.
+  `rs11-f22-mash-interrupt.gif` (#22) and `rs11-f29-bind-load.gif` (#29); from `docs-rs4c-0c628724` (slot 1,
+  06:12–06:28Z; the pop-up closed with a one-frame B tap) `rs11-f14-play-stop.gif` (#14), `rs11-f18-loop.gif` (#18),
+  `rs11-f20-chain.gif` (#20), `rs11-f26-popup.gif` (#26: its B close throws Mario's fireball, a product defect),
+  `rs11-f30-hot-five.gif` (#30), `rs11-f35-no-start-save.gif` (#35) and `rs11-f36-chord-once.gif` (#36), the
+  pop-up's list or the notice zoomed. The ledger lists each one's frames.
 - **Cycle and hot-slot evidence** (`docs-rs3b-0c628724`, slot 1, 05:29–05:45Z): `rs11-f55-cpu-cycle.gif` (#55, the
   CPU list zoomed, then Captain Falcon, the Mii Gunner and Peach in order; a greyed Mii class can't be shown on this
   card, whose Smash save holds a Mii of every class) and `rs11-f57-hot-slots.gif` (#57, "Fighters · Loading 4/10" to
