@@ -42,6 +42,8 @@ the CPU can act first. The notice stays down while the frame strip is on screen,
 shows the same number, so you see it only with Input Display set to Off. Nothing is measured while the CPU has Mash
 actions ticked.
 
+![With Input Display Off, a jab into the CPU's shield shows nothing; Frame Advantage turned On, the same jab shows the notice with the frame advantage (-14)](../media/rc11-frame-advantage.gif)
+
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A flips it.
