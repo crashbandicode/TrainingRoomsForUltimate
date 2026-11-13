@@ -604,7 +604,7 @@ recommended option has a **green outline**. The pictures are drawn by `tools/ren
 
 "The held fix" means `c49681c9`: worker A's in-game text fixes, a local commit not yet on `main`
 (`artifacts/phase23/docs-audit-1113/WORKER-A-TEXT-FIXES.md`). TR1–TR8 come from the docs lane's audit of in-game text
-(`CODE-FINDINGS.md`; its row numbers are given as #n). TR9 comes from integration's report of 10:40Z.
+(`CODE-FINDINGS.md`; its row numbers are given as #n). TR9 comes from integration's reports of 10:40Z and 10:49Z.
 
 | # | Decision | Recommendation |
 | --- | --- | --- |
@@ -616,7 +616,7 @@ recommended option has a **green outline**. The pictures are drawn by `tools/ren
 | TR6 | Ask before switching fighter (#13) | B: every question follows the row |
 | TR7 | Crop trailing neutral (#14) | B: make Record trim |
 | TR8 | Player Character with Player Swapping Off (#17) | B: a pick loads now |
-| TR9 | An old Record trigger setting turns off the Record chord | A: ignore the retired row |
+| TR9 | Retire the old Record trigger row (V2), or keep its legacy start | A: V2, retire the row |
 | OP1 | Push the held doc fixes | A: push the docs now, `c49681c9` after TR5 and TR8 |
 | OP2 | The standalone `libimgui_smash.nro` on the card | A: remove it |
 | OP3 | Deluxe's hidden Stages + Counterpick page | A: show it |
@@ -653,15 +653,16 @@ delete the slot code.
 
 How to make room for integration's three bug fixes: the pop-up's B close, the Loop list, and the Setup library's
 restore after a live swap. On top of the held fix they put the code 35 lines over `size-budget.toml`: 147,956 against
-a ceiling of 147,921 (integration, 10:40Z).
+a ceiling of 147,921 (integration, 10:40Z). TR9's V1, approved and being built, takes 4 off, so about +31 (147,952);
+integration reports the exact number on its commit.
 
-- **(a) · raise the ceiling by 35:** a new `[[budget]]` entry with the lead's approval. Cost to the player: none.
+- **(a) · raise the ceiling by 31:** a new `[[budget]]` entry with the lead's approval. Cost to the player: none.
 - **(b) · delete the old numbered-slot recorder:** nothing reaches it (#14). Its smallest cut that touches no carried
-  file frees 258 lines, which covers the 35; all of it is 1,096 lines. Cost to the player: none. To build: a rebase
+  file frees 258 lines, which covers the 31; all of it is 1,096 lines. Cost to the player: none. To build: a rebase
   and re-measure, and an Eden check of the settings migration it touches.
-- **Not part of (b):** the old named capture (354 lines). Settings files written by v0.1.0 to v0.2.0-rc.3.1 (Source
-  Named Library plus Trigger Save State Load) still start it on every load. If TR9 is A, that last route ends, and
-  those 354 lines can go too.
+- **Not part of (b):** the old named capture (354 lines), the (b)(ii) path. Settings files written by v0.1.0 to
+  v0.2.0-rc.3.1 (Source Named Library plus Trigger Save State Load) still start it on every load. If TR9 is V2, that
+  last route ends, and those 354 lines can go too.
 - **More, only with TR1 A done by removal:** removing the #8 entries outright frees 268 more on top of (i), (ii) and a
   24-line flag nothing sets. It changes the saved rows' lengths; hiding them while keeping the lengths was not
   measured.
@@ -758,25 +759,34 @@ fix's other flagged compliance line.
 
 ![TR8 player character](decisions/TR8-player-character.png)
 
-#### TR9 · An old Record trigger setting turns off the Record chord
+#### TR9 · Retire the old Record trigger row (V2), or keep its legacy start
 
-Whether today's build should keep obeying a retired setting that can silently turn Record off. Builds v0.1.0 to
-v0.2.0-rc.3.1 had a Record trigger row. A settings file that still holds "Save State Load only" (`record_trigger`
-`[0, 1]`) makes today's Record chord (ZR + D-pad Down) do nothing, with no notice (`recorder.rs:674`). No menu row
-shows the value any more, so the player can't change it back.
+Whether to retire the whole obsolete `record_trigger` row, as `migrate.rs` intends ("become nothing").
 
-- **A · ignore the retired row:** the build stops reading both bits of `record_trigger`. Record always records, and
-  nothing starts the old capture on a load. The row was retired with its value kept, so that old settings still load,
-  but `recording.rs` still acts on it. Cost to the player: none. The old named capture loses its last route, so TR2
-  can delete its 354 lines too. To build: a few lines in `recording.rs`, a test with an old file, one Eden Record.
-- **B · migrate the value:** rewrite `record_trigger` to the factory value once, when an old file loads. The result for
-  the player is the same. Cost: the settings file is rewritten, a migration step has to be ordered, and it is more code
-  than A.
-- **C · leave it:** a player with an old file presses Record and nothing happens. There is no notice and no row to fix
-  it; only deleting `settings.json` helps.
+All 5 Forgejo releases (v0.1.0 to v0.2.0-rc.3.1) had a Recording-page "Trigger" dropdown, and picking "Save State
+Load" stored `[0, 1]`. `d502615d` took the row off the page, but no tag contains that commit, and the value stays in
+`settings.json` for good. No page shows it, so Reset page and Save defaults never touch it.
 
-**Recommendation: A.** The row is retired, so reading it is the bug. A is the smallest root fix, needs no file rewrite,
-and ends the old capture's last route.
+It has two effects today:
+- It silently disables the Record chord (`recorder.rs:674`). **V1, the root fix for that, is approved and being
+  built:** the chord ignores the hidden row (−4 sloc4, `recording.rs` and `recorder.rs`).
+- If the old file also holds Source = Named Library, every save-state load starts the old named capture. That is TR2's
+  (b)(ii) path. This second effect is what remains to decide.
+
+The options:
+- **A · V2, retire the row:** nothing reads `record_trigger` any more (−10 sloc4 in all, so −6 beyond V1).
+  `begin_restore` loses its `trigger_save_state` branch. Cost to the player: a player whose old file holds both values
+  no longer gets the named capture started on every save-state load. To build: an edit to carried `named_macros.rs`
+  (a manifest transform and a regenerated ledger), and a test. It ends (b)(ii)'s last route, so TR2 can then delete the
+  named capture's 354 lines.
+- **B · keep the legacy start:** V1 only. Cost: a behaviour that no menu row shows or turns off stays for those
+  players, and the named capture's 354 lines stay with it.
+
+Migrating the stored value instead (rewriting `[0, 1]` to `[1, 0]` on load) adds code and writes the player's file.
+Integration doesn't recommend it.
+
+**Recommendation: A.** The row has been invisible since `d502615d`, so the legacy start is behaviour nobody can see or
+switch off. V2 matches the design in `migrate.rs`, and it lets TR2 take (b)(ii)'s 354 lines.
 
 ![TR9 record trigger](decisions/TR9-record-trigger.png)
 

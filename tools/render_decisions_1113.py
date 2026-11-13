@@ -18,9 +18,10 @@ TILE, TILE_HI, PANEL, DARK, P1, CPU = d.TILE, d.TILE_HI, d.PANEL, d.DARK, d.P1, 
 W = d.WIDE
 MID = W // 2
 
-# TR2, sloc4 lines (integration's 10:40Z post): how far c49681c9 plus integration's #23, #15 and #25 go over the
-# ceiling, and what option (b) frees: the smallest cut of the old numbered-slot recorder that touches no carried file.
-OVER = 35
+# TR2, sloc4 lines (integration's 10:40Z and 10:49Z posts): how far c49681c9 plus integration's #23, #15 and #25 and
+# TR9's V1 go over the ceiling (35 - 4), and what option (b) frees: the smallest cut of the old numbered-slot recorder
+# that touches no carried file.
+OVER = 31
 B_FREES = 258
 
 
@@ -145,7 +146,7 @@ def tr2_size_gate():
         return x0 + (v - lo) / (hi - lo) * (x1 - x0)
 
     bars = [("main today", ceiling, LINE, "147,921 (headroom 0)"),
-            ("+ the three fixes (#23 #15 #25)", over, BAD, f"{over:,} (+{OVER} over)")]
+            ("+ #23 #15 #25 and TR9's V1", over, BAD, f"{over:,} (+{OVER} over)")]
     yy = y + 10
     for label, v, col, note in bars:
         c.text(40, yy + 6, label, "xs", FG)
@@ -162,7 +163,7 @@ def tr2_size_gate():
         c.text(X(after_b) + 8, yy + 6, f"{after_b:,} ({B_FREES} freed)", "xxs", col)
     c.line([(X(ceiling), y), (X(ceiling), yy + 36)], ADV, 2, dash=(6, 4))
     c.text(X(ceiling), yy + 40, "ceiling 147,921", "xxs", ADV, "m")
-    c.text(40, yy + 40, "more later: the named capture's 354 once TR9 A ends its route; 268 if the #8 entries go",
+    c.text(40, yy + 40, "more later: the named capture's 354 once TR9's V2 ends its route; 268 if the #8 entries go",
            "xxs", MUTED)
     options(c, 248, 448,
             (f"a · raise the ceiling by {OVER}", [f"A new [[budget]] entry at {over:,}, with the",
@@ -338,42 +339,36 @@ def tr8_player_character():
 
 
 def tr9_record_trigger():
-    c = d.DCanvas(W, 614)
-    y = frame(c, 12, 12, W - 12, 168, "The settings file", "as v0.1.0 to v0.2.0-rc.3.1 could write it")
+    c = d.DCanvas(W, 600)
+    y = frame(c, 12, 12, W - 12, 168, "The settings file", "any of the 5 releases, v0.1.0 to v0.2.0-rc.3.1")
     c.rect(26, y, 520, y + 72, fill=TILE, outline=BAD, width=2, radius=6)
     d.lines(c, 40, y + 10, ['"menu": {', ('  "record_trigger": [0, 1],', BAD), "  ..."], font="xs", step=20)
-    d.lines(c, 560, y + 4, ["Record trigger: chord off, Save State Load on.",
-                             "Today's menu has no row for it (retired), so",
-                             "nothing in the menu can change it back."], font="xs", step=22)
-    y = frame(c, 12, 180, W - 12, 346, "What happens")
-    lane(c, y, "ZR + D-pad Down (Record)", [(330, 640, "record && trigger_chord", LINE),
-                                             (640, W - 40, "false: nothing records, no notice", BAD)])
-    lane(c, y + 48, "Every save-state load", [(330, 640, "with Source = Named Library", LINE),
-                                               (640, W - 40, "the old named capture starts", ADV)])
-    c.text(40, y + 96, "recorder.rs:674 drops the chord; recording.rs still reads the retired row. "
-           "Found by integration (2026-11-13).", "xxs", MUTED)
-    w = (W - 48) / 3
-    opts = [("A · ignore the retired row", ["Stop reading both bits: Record always",
-                                            "records. The row was retired, its value",
-                                            "kept only so old settings still load.",
-                                            "Cost to the player: none. The old",
-                                            "named capture loses its last route,",
-                                            "so TR2 can delete its 354 lines too.",
-                                            "To build: a few lines, a test, one Eden."]),
-            ("B · migrate the value", ["Rewrite record_trigger to the factory",
-                                       "value once, when an old file loads.",
-                                       "Same result for the player.",
-                                       ("Cost: the file is rewritten; a", ADV),
-                                       ("migration step and its order; more", ADV),
-                                       ("code than A.", ADV)]),
-            ("C · leave it", [("A player with an old file presses", BAD),
-                              ("Record and nothing happens: no notice,", BAD),
-                              ("no row to fix it. Only deleting", BAD),
-                              ("settings.json helps.", BAD)])]
-    for i, (title, text) in enumerate(opts):
-        x0 = 12 + i * (w + 12)
-        yi = d.panel(c, x0, 358, x0 + w, 602, title, i == 0, tag_below=True)
-        d.lines(c, x0 + 16, yi + 4, text, font="xs", step=21)
+    d.lines(c, 560, y + 4, ["Trigger: Save State Load wrote [0, 1].",
+                             "The row left the page in d502615d (no tag has",
+                             "it); the value stays in the file for good."], font="xs", step=22)
+    y = frame(c, 12, 180, W - 12, 346, "With V1", "approved and being built: the Record chord ignores the row")
+    lane(c, y, "ZR + D-pad Down (Record)", [(330, 640, "ignores the hidden row", OURS),
+                                             (640, W - 40, "records again (before V1: nothing, no notice)", OURS)])
+    lane(c, y + 48, "Every save-state load", [(330, 640, "old file: Source = Named Library", LINE),
+                                               (640, W - 40, "the old named capture starts: TR2 (b)(ii)", ADV)])
+    c.text(40, y + 96, "V1: -4 sloc4 in recording.rs and recorder.rs. V2 also drops trigger_save_state and the "
+           "row's read: -10 in all, plus carried named_macros.rs.", "xxs", MUTED)
+    options(c, 358, 588,
+            ("A · V2: retire the row", ["Nothing reads record_trigger any more,",
+                                        "as migrate.rs intends. The legacy start",
+                                        "goes, so TR2 can delete the named",
+                                        "capture's 354 lines.",
+                                        ("Cost to the player: a file holding both", ADV),
+                                        ("old values stops starting the capture", ADV),
+                                        ("on every save-state load.", ADV),
+                                        "To build: -6 more, a manifest edit, a test."]),
+            ("B · keep the legacy start", ["V1 only. A file holding Source = Named",
+                                           "Library and Save State Load keeps",
+                                           "starting the capture on every load.",
+                                           ("Cost: a behaviour no menu row shows or", BAD),
+                                           ("turns off stays, and so do the named", BAD),
+                                           ("capture's 354 lines (TR2).", BAD)]),
+            "a")
     c.save("TR9-record-trigger")
 
 
