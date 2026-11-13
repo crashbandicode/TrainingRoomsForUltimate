@@ -57,6 +57,10 @@ file in the README and the docs; the old file stays in `media/` with a note in i
   `rs11-f61-p2-lra-mii.gif` (#61: Player 2's L + R + A resets, then a Mii Brawler) and
   `rs11-f69-setup-restore.gif` (#69: a setup saved, both fighters moved, the library puts them back). Player 2's
   presses have no on-screen mark; the ledger names them.
+- **VS through sudden death** (`docs-rs9d-0c628724`, slot 2, 11:26–11:38Z, Player 2's controller connected):
+  `rs11-f71-vs-capture.gif` (#71: TIME!, sudden death, GAME!; then in Training the Replay window lists the capture
+  at 5325 frames, past the timer's 3600, zoomed; then the Vault's Replay Data with the new replay first). Three takes
+  joined.
 - **Quickplay** (`docs-qp77-0c628724`, the XPS pair, 11:10–11:26Z, one search group, `qp-check` passed; both
   pilots fight): `rs11-f77-qp-pilot.gif` (#77: Online Deluxe's CPU Pilot page goes from P1 "Player" to "CPU (L7)" in
   b's waiting room, zoomed; in the match b's fighter fights with no input, its HUD tag "CPU Lv7") and
