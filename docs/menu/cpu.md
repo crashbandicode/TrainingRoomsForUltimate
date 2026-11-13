@@ -44,6 +44,8 @@ override, or the mash after a ledge getup, a tech or a throw. The follow-up is p
 - **Default:** none ticked: no follow-up.
 - **How:** A opens the checklist; A ticks, ZL ticks all or none, B goes back.
 
+![Mash Jump: out of the jab the CPU jumps; with Followup Neutral Air it jumps, then does a neutral air](../media/rc11-cpu-followup.gif)<br>*Followup: none, then Neutral Air*
+
 More: [Mash and Followup](../guide/cpu-behaviour.md#mash-and-followup)
 
 ### Mash Triggers
@@ -144,6 +146,8 @@ every 2.
 - **Default:** None: it doesn't mash out.
 - **How:** Left/Right cycle through the values; A opens the list.
 
+![Mario grabs the CPU at 100%: with Clatter Strength None it stays held; with High it breaks free at once](../media/rc11-cpu-clatter-strength.gif)<br>*Clatter Strength: None, then High*
+
 ### Dodge Staling
 
 On: the CPU's dodges go stale like a player's, so repeated dodges get worse. Off: every dodge is fresh.
@@ -194,6 +198,8 @@ random each time.
 On a wall, Tech In Place is a wall tech and Roll Forwards a wall jump; Roll Backwards and No Tech miss the tech. On a
 ceiling, anything but No Tech techs. With nothing ticked, the game decides.
 
+![Up smash at 50%: with No Tech the CPU lands flat and gets up; with Roll Forwards it tech-rolls past Mario](../media/rc11-cpu-tech-options.gif)<br>*Tech Options: No Tech, then Roll Forwards*
+
 ### Mistech Options
 
 What the CPU does when it lies on the ground after a missed tech, or after it trips. With several ticked, it picks
@@ -204,6 +210,8 @@ one at random each time.
 - **How:** A opens the checklist; A ticks, ZL ticks all or none, B goes back.
 
 With nothing ticked, the game decides. Tick Mistech Option in Mash Triggers to make the CPU mash after it gets up.
+
+![No Tech: with Neutral Getup the CPU gets up from the floor; with Getup Attack it attacks as it gets up](../media/rc11-cpu-mistech-options.gif)<br>*Mistech Options: Neutral Getup, then Getup Attack*
 
 ### Hide Tech Animations
 
@@ -392,6 +400,8 @@ you set it on its own page (Online Deluxe's CPU Pilot page), not here.
 
 - **Values:** none: the row is read-only.
 - **How:** nothing to change here; it tells you the pilot is in charge of Player 1.
+
+![With the CPU pilot plugin installed, the P1 control row reads CPU pilot plugin](../media/rc11-cpu-p1-control.png)<br>*P1 control with the CPU pilot plugin (a still: the row is read-only)*
 
 ### P1 CPU Control
 
