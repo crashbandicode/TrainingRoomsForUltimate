@@ -57,6 +57,11 @@ file in the README and the docs; the old file stays in `media/` with a note in i
   `rs11-f61-p2-lra-mii.gif` (#61: Player 2's L + R + A resets, then a Mii Brawler) and
   `rs11-f69-setup-restore.gif` (#69: a setup saved, both fighters moved, the library puts them back). Player 2's
   presses have no on-screen mark; the ledger names them.
+- **Quickplay** (`docs-qp77-0c628724`, the XPS pair, 11:10–11:26Z, one search group, `qp-check` passed; both
+  pilots fight): `rs11-f77-qp-pilot.gif` (#77: Online Deluxe's CPU Pilot page goes from P1 "Player" to "CPU (L7)" in
+  b's waiting room, zoomed; in the match b's fighter fights with no input, its HUD tag "CPU Lv7") and
+  `rs11-f67-qp-practice-flag.gif` (#67: the frame strip in b's waiting room, then the match with none; the match
+  ended on both with `desync_seen=0`).
 - **Cycle and hot-slot evidence** (`docs-rs3b-0c628724`, slot 1, 05:29–05:45Z): `rs11-f55-cpu-cycle.gif` (#55, the
   CPU list zoomed, then Captain Falcon, the Mii Gunner and Peach in order; a greyed Mii class can't be shown on this
   card, whose Smash save holds a Mii of every class) and `rs11-f57-hot-slots.gif` (#57, "Fighters · Loading 4/10" to
