@@ -24,7 +24,7 @@ Every option is documented in the [docs](docs/README.md), one page per menu page
 | ZL + D-pad Down / Up | Save / load a state |
 | ZR + D-pad Down | Record |
 | ZR + D-pad Up / Left | Play the recording on the CPU / on yourself |
-| ZR + D-pad Right | Recording pop-up |
+| ZR + D-pad Right | Recording pop-up (tap B to close it) |
 | ZL + D-pad Left / Right | Switch the CPU's / your fighter |
 | R + D-pad Down | Input display on / off |
 | Hold R + D-pad Up, then Left / Right | Game speed |
