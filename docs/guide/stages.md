@@ -61,13 +61,16 @@ place in the list.
 
 ## Training Stage Rotation
 
-With Fighters & Stages › [Training Stage Rotation](../menu/fighters-and-stages.md#training-stage-rotation) On, each
-time you enter Training from the character select, Training opens on the next stage of the Lobby Stages list. It is
-Off by default: Training then opens on the stage you chose, as usual.
+With Fighters & Stages › [Training Stage Rotation](../menu/fighters-and-stages.md#training-stage-rotation) On,
+Training first opens on the stage you pick before the character select. Each time you go back to the character select
+and enter again, it opens on the next stage of the Lobby Stages list. It is Off by default: Training then always opens
+on the stage you chose, as usual.
 
+- Going back to the stage select and picking another stage opens Training on that stage. Your place in the list
+  doesn't move.
 - It always follows the Rotation list, even while Lobby Stages is on Direct.
 - Training keeps its own place in the list, apart from the waiting rooms, until you close the game.
-- With the default list (the Waiting Room only), Training opens on the Waiting Room. Add stages first.
+- With the default list (the Waiting Room only), each return opens on the Waiting Room. Add stages first.
 - A Change Stage in Training goes to that stage without moving your place in the list.
 
 ![Training Stage Rotation turned on; the next Training, the same fighters, opens on Big Battlefield](../media/rc11-stage-rotation.gif)

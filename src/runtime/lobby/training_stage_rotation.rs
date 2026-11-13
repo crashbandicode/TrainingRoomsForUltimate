@@ -78,7 +78,7 @@ pub(crate) unsafe fn resource_request(ctx: &InlineCtx, mode: crate::runtime::lob
     // Snapshot the setting before taking ROTATION: never nest the menu lock
     // inside the policy lock or retain it across a native callback decision.
     let enabled = enabled();
-    let result = ROTATION.lock().apply(enabled, |native| {
+    let result = ROTATION.lock().apply(enabled, previous, |native| {
         // Same catalog row the waiting preload reads: 40-bit package hash at +0x18.
         let record = base + 0x454a7e8 + native as usize * 72;
         Some(crate::engine::seams::native_fields::read_unchecked::<u64>(record, 24) & 0xffffffffff)

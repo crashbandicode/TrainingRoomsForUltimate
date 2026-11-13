@@ -9228,7 +9228,7 @@
    "dest": "src/model/stages/training_stage_rotation_policy.rs",
    "crate": "root",
    "src_sha256": "7c87c293b95021b738e748aad978d7e90399781320f8a1cfa1b7b2fde7a81981",
-   "dest_sha256": "6b676a714a1a1890f5b5a44370318791cea0204610df38e5429e17170f1c9d99",
+   "dest_sha256": "704183244f0fd736366213e623d69c3e3ff2b68dbceef082f474d4cbc9fe2c00",
    "widen": true,
    "edits": [
     {
@@ -9279,6 +9279,81 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "old": "    current: Option<Applied>,\n}\n",
+     "new": "    current: Option<Applied>,\n    /// The stage select's pick the sequence's last loader call carried (the descriptor's id before any write).\n    picked: Option<u32>,\n}\n",
+     "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
+    },
+    {
+     "old": "    pub const fn new() -> Self {\n        Self { owner: None, suppress: None, cycle: StageCycle::new(), current: None }\n    }\n",
+     "new": "    pub const fn new() -> Self {\n        Self { owner: None, suppress: None, cycle: StageCycle::new(), current: None, picked: None }\n    }\n",
+     "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
+    },
+    {
+     "old": "        self.cycle.cancel_preload();\n        self.current = None;\n    }\n\n",
+     "new": "        self.cycle.cancel_preload();\n        self.current = None;\n        self.picked = None;\n    }\n\n",
+     "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
+    },
+    {
+     "old": "\n    /// Qualified Training loader call. `hash_of` reads the catalog row of a\n    /// native id. A pending reservation is consumed once; later calls reapply.\n    pub fn apply(\n",
+     "new": "\n    /// Qualified Training loader call. `previous` is the descriptor's stage id\n    /// before any write: the stage select's pick, which the native sets again at\n    /// every entry. `hash_of` reads the catalog row of a native id. A pending\n    /// reservation is consumed once; later calls reapply. A pick the sequence has\n    /// not carried before (its first entry, or a new pick) opens Training instead,\n    /// and the cursor stays.\n    pub fn apply(\n",
+     "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
+    },
+    {
+     "old": "    pub fn apply(\n        &mut self, enabled: bool, hash_of: impl FnOnce(u32) -> Option<u64>,\n    ) -> Result<Option<Applied>, &'static str> {\n",
+     "new": "    pub fn apply(\n        &mut self, enabled: bool, previous: u32, hash_of: impl FnOnce(u32) -> Option<u64>,\n    ) -> Result<Option<Applied>, &'static str> {\n",
+     "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
+    },
+    {
+     "old": "            self.current = None;\n            return Ok(None);\n",
+     "new": "            self.current = None;\n            if self.owner.is_some() { self.picked = Some(previous); }\n            return Ok(None);\n",
+     "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
+    },
+    {
+     "old": "        let Some(selection) = self.cycle.pending() else { return Ok(self.current); };\n        let native = native_stage(selection)?;\n",
+     "new": "        let Some(selection) = self.cycle.pending() else { return Ok(self.current); };\n        if self.picked.replace(previous) != Some(previous) {\n            self.cycle.cancel_preload();\n            return Ok(None);\n        }\n        let native = native_stage(selection)?;\n",
+     "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
+    },
+    {
+     "old": "    const OWNER: usize = 0x2a00_1000;\n\n",
+     "new": "    const OWNER: usize = 0x2a00_1000;\n    /// The stage the player picked at Training's stage select (Training, 308): the native descriptor's id at every\n    /// entry of the visit (docs-rc7b-7d720c68 `apply previous=308` on both entries).\n    const PICK: u32 = 308;\n\n",
+     "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
+    },
+    {
+     "old": "        assert_eq!(rotation.entry(OWNER, false, order(), &prefs), Entry::Disabled);\n        assert_eq!(rotation.apply(false, hash_of), Ok(None));\n        assert_eq!(rotation.apply(true, hash_of), Ok(None)); // No reservation, no snapshot.\n        // Enabling later starts at the first stage: nothing was consumed while Off.\n",
+     "new": "        assert_eq!(rotation.entry(OWNER, false, order(), &prefs), Entry::Disabled);\n        assert_eq!(rotation.apply(false, PICK, hash_of), Ok(None));\n        assert_eq!(rotation.apply(true, PICK, hash_of), Ok(None)); // No reservation, no snapshot.\n        // Enabling later starts at the first stage: nothing was consumed while Off.\n",
+     "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
+    },
+    {
+     "old": "        let mut rotation = TrainingRotation::new();\n        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));\n",
+     "new": "        let mut rotation = TrainingRotation::new();\n        // The visit's first entry opens on the stage select's pick; the return after it rotates.\n        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));\n",
+     "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
+    },
+    {
+     "old": "        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));\n        assert_eq!(rotation.apply(true, hash_of), Ok(Some(applied(BF, 0))));\n        // Live direct change to Smashville Omega completed natively.\n",
+     "new": "        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));\n        assert_eq!(rotation.apply(true, PICK, hash_of), Ok(None));\n        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));\n        assert_eq!(rotation.apply(true, PICK, hash_of), Ok(Some(applied(BF, 0))));\n        // Live direct change to Smashville Omega completed natively.\n",
+     "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
+    },
+    {
+     "old": "        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Suppressed);\n        assert_eq!(rotation.apply(true, hash_of),\n            Ok(Some(Applied { selection: None, native: 96, hash: 0x1b9fc8fb46 })));\n",
+     "new": "        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Suppressed);\n        assert_eq!(rotation.apply(true, PICK, hash_of),\n            Ok(Some(Applied { selection: None, native: 96, hash: 0x1b9fc8fb46 })));\n",
+     "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
+    },
+    {
+     "old": "        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Suppressed);\n        assert_eq!(rotation.apply(true, hash_of), Ok(None));\n        // Neither direct event moved the rotation cursor.\n",
+     "new": "        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Suppressed);\n        assert_eq!(rotation.apply(true, PICK, hash_of), Ok(None));\n        // Neither direct event moved the rotation cursor.\n",
+     "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
+    },
+    {
+     "old": "        fresh.direct_completed(96, 0x1b9fc8fb46);\n        assert_eq!(fresh.apply(true, hash_of), Ok(None));\n    }\n",
+     "new": "        fresh.direct_completed(96, 0x1b9fc8fb46);\n        assert_eq!(fresh.apply(true, PICK, hash_of), Ok(None));\n    }\n\n    fn the_stage_select_pick_opens_training_and_a_return_through_the_character_select_rotates() {\n        // rc.13 (the operator, 11-13): \"when picking the stage initially before character select for training it\n        // doesn't honor that stage\".\n        let prefs = Preferences::default();\n        let mut rotation = TrainingRotation::new();\n        // The visit's first entry comes from the stage select: the pick stands and the cursor stays.\n        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));\n        assert_eq!(rotation.apply(true, PICK, hash_of), Ok(None), \"the stage select pick opens Training\");\n        // Returns through the character select carry the same pick and rotate from the first stage.\n        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));\n        assert_eq!(rotation.apply(true, PICK, hash_of), Ok(Some(applied(BF, 0))));\n        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(FD, 3));\n        // B back to the stage select and a new pick (Smashville): that entry opens on it.\n        assert_eq!(rotation.apply(true, 96, hash_of), Ok(None), \"a new pick opens Training\");\n        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(FD, 3));\n        assert_eq!(rotation.apply(true, 96, hash_of), Ok(Some(applied(FD, 3))));\n        // A new visit starts from its own pick again.\n        rotation.sequence_initialized();\n        assert!(matches!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(..)));\n        assert_eq!(rotation.apply(true, PICK, hash_of), Ok(None), \"a new visit's pick opens Training\");\n        // Rotation turned On mid-visit: the pick was seen while Off, so the next return rotates (rc.11 GIF).\n        let mut later = TrainingRotation::new();\n        assert_eq!(later.entry(OWNER, false, order(), &prefs), Entry::Disabled);\n        assert_eq!(later.apply(false, PICK, hash_of), Ok(None));\n        assert_eq!(later.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));\n        assert_eq!(later.apply(true, PICK, hash_of), Ok(Some(applied(BF, 0))));\n    }\n",
+     "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
+    },
+    {
+     "old": "            (\"direct_completion_replaces_the_reapplied_stage_and_uncertainty_clears_it\", direct_completion_replaces_the_reapplied_stage_and_uncertainty_clears_it as fn()),\n            (\"qualified_loader_rejects_other_callers_slots_descriptors_and_scenes\", qualified_loader_rejects_other_callers_slots_descriptors_and_scenes as fn()),\n",
+     "new": "            (\"direct_completion_replaces_the_reapplied_stage_and_uncertainty_clears_it\", direct_completion_replaces_the_reapplied_stage_and_uncertainty_clears_it as fn()),\n            (\"the_stage_select_pick_opens_training_and_a_return_through_the_character_select_rotates\", the_stage_select_pick_opens_training_and_a_return_through_the_character_select_rotates as fn()),\n            (\"qualified_loader_rejects_other_callers_slots_descriptors_and_scenes\", qualified_loader_rejects_other_callers_slots_descriptors_and_scenes as fn()),\n",
+     "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
     }
    ]
   },
@@ -19984,7 +20059,7 @@
    "dest": "src/runtime/lobby/training_stage_rotation.rs",
    "crate": "root",
    "src_sha256": "28da0ade48dbe422fe6adbe67c5412d803410ccdc0e70a0d3f374398b670c739",
-   "dest_sha256": "585d6b08a2ecab1379f66bc8f0e0fa5c71b288f6bd0820acf390aeaa927c6a89",
+   "dest_sha256": "cd00f094da6f94abfa43cb257509123946a4755d3838c09041f39077851fc872",
    "edits": [
     {
      "old": "//! the native setter itself stores.\n\nuse crate::engine::stages::training_stage_rotation_policy as policy;\n\nuse std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};\nuse std::sync::Mutex;\n\nuse skyline::hooks::{getRegionAddress, InlineCtx, Region};\nuse {crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};\nuse crate::runtime::compat::sync::read;\n\n",
@@ -20005,6 +20080,11 @@
      "old": "/// A direct practice change completed natively in ordinary Training.\npub(crate) fn direct_completed(mode: u32, melee: u8, native: u32, hash: u64) {\n    if mode != policy::TRAINING_MODE || melee != policy::TRAINING_MELEE {\n        return;\n    }\n    ROTATION.lock().unwrap().direct_completed(native, hash);\n}\n\n/// A published direct change departed before completion in ordinary Training.\npub(crate) fn direct_uncertain(mode: u32, melee: u8) {\n    if mode != policy::TRAINING_MODE || melee != policy::TRAINING_MELEE {\n        return;\n    }\n    ROTATION.lock().unwrap().direct_uncertain();\n}\n\n// Training sequence installer: the store that clears the reenter byte of a\n// freshly constructed state context (x20). Only owner-bound rotation values\n// are reset here; the native instruction and every register stay untouched.\n#[skyline::hook(offset = 0x23ecb18, inline)]\nunsafe fn sequence_initialized(ctx: &mut InlineCtx) {\n    let context = ctx.registers[20].x() as usize;\n    ROTATION.lock().unwrap().sequence_initialized();\n    log(format_args!(\"[TrainingRotation] sequence_initialized context=0x{context:x}\"));\n}\n\npub(crate) fn init(base: usize, loader_verified: bool) {\n    // Own 13.0.5 words for the setter's descriptor stores (id +0, 40-bit hash\n",
      "new": "/// A direct practice change completed natively in ordinary Training.\npub(crate) fn direct_completed(mode: u32, melee: u8, native: u32, hash: u64) {\n    if mode != policy::TRAINING_MODE || melee != policy::TRAINING_MELEE {\n        return;\n    }\n    ROTATION.lock().direct_completed(native, hash);\n}\n\n/// A published direct change departed before completion in ordinary Training.\npub(crate) fn direct_uncertain(mode: u32, melee: u8) {\n    if mode != policy::TRAINING_MODE || melee != policy::TRAINING_MELEE {\n        return;\n    }\n    ROTATION.lock().direct_uncertain();\n}\n\n// Training sequence installer: the store that clears the reenter byte of a\n// freshly constructed state context (x20). Only owner-bound rotation values\n// are reset here; the native instruction and every register stay untouched.\n#[skyline::hook(offset = 0x23ecb18, inline)]\nunsafe fn sequence_initialized(ctx: &mut InlineCtx) {\n    let context = ctx.registers[20].x() as usize;\n    ROTATION.lock().sequence_initialized();\n    log(format_args!(\"[TrainingRotation] sequence_initialized context=0x{context:x}\"));\n}\n\npub(crate) fn init(base: usize, loader_verified: bool) {\n    // Own 13.0.5 words for the setter's descriptor stores (id +0, 40-bit hash\n",
      "reason": "R5 cold scene owner locks use existing const hos_lock mutex instead of lazy heap-backed Switch pthread mutex. Audited owner/entry contracts in pkg6-owner-locks.md; same guard extents, exclusion, non-reentrancy and try_lock refusal. Probe readers only adapt parent guard API. Release panic=abort; no boot warming or counter exemption."
+    },
+    {
+     "old": "    let enabled = enabled();\n    let result = ROTATION.lock().apply(enabled, |native| {\n        // Same catalog row the waiting preload reads: 40-bit package hash at +0x18.\n",
+     "new": "    let enabled = enabled();\n    let result = ROTATION.lock().apply(enabled, previous, |native| {\n        // Same catalog row the waiting preload reads: 40-bit package hash at +0x18.\n",
+     "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
     }
    ]
   },

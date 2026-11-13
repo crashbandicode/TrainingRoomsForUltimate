@@ -213,15 +213,15 @@ More: [Stages › Lobby Stages](../guide/stages.md#lobby-stages)
 
 ### Training Stage Rotation
 
-On: each time you enter Training from the character select, Training opens on the next stage of the
-[Lobby Stages](#lobby-stages) list. Off: Training opens on the stage you chose, as usual.
+On: Training opens on the stage you pick, then on each return through the character select on the next
+stage of the [Lobby Stages](#lobby-stages) list. Off: Training opens on the stage you chose, as usual.
 
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A flips it.
 
 It always uses the Rotation list, even while Lobby Stages is on Direct. With the default list (the Waiting Room only),
-Training opens on the Waiting Room.
+each return opens on the Waiting Room.
 
 ![Training Stage Rotation turned on; the next Training, the same fighters, opens on Big Battlefield](../media/rc11-stage-rotation.gif)
 

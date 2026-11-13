@@ -47,6 +47,8 @@ pub struct TrainingRotation {
     cycle: StageCycle<Selection>,
     /// Last confirmed Training stage: this entry's resolution or a completed direct change.
     current: Option<Applied>,
+    /// The stage select's pick the sequence's last loader call carried (the descriptor's id before any write).
+    picked: Option<u32>,
 }
 
 impl Default for TrainingRotation {
@@ -55,7 +57,7 @@ impl Default for TrainingRotation {
 
 impl TrainingRotation {
     pub const fn new() -> Self {
-        Self { owner: None, suppress: None, cycle: StageCycle::new(), current: None }
+        Self { owner: None, suppress: None, cycle: StageCycle::new(), current: None, picked: None }
     }
 
     /// A Training sequence context was constructed. Every owner-bound value
@@ -66,6 +68,7 @@ impl TrainingRotation {
         self.suppress = None;
         self.cycle.cancel_preload();
         self.current = None;
+        self.picked = None;
     }
 
     /// Age-zero state-5 call of a structurally verified Training sequence.
@@ -110,20 +113,29 @@ impl TrainingRotation {
         }
     }
 
-    /// Qualified Training loader call. `hash_of` reads the catalog row of a
-    /// native id. A pending reservation is consumed once; later calls reapply.
+    /// Qualified Training loader call. `previous` is the descriptor's stage id
+    /// before any write: the stage select's pick, which the native sets again at
+    /// every entry. `hash_of` reads the catalog row of a native id. A pending
+    /// reservation is consumed once; later calls reapply. A pick the sequence has
+    /// not carried before (its first entry, or a new pick) opens Training instead,
+    /// and the cursor stays.
     pub fn apply(
-        &mut self, enabled: bool, hash_of: impl FnOnce(u32) -> Option<u64>,
+        &mut self, enabled: bool, previous: u32, hash_of: impl FnOnce(u32) -> Option<u64>,
     ) -> Result<Option<Applied>, &'static str> {
         if !enabled {
             self.cycle.cancel_preload();
             self.current = None;
+            if self.owner.is_some() { self.picked = Some(previous); }
             return Ok(None);
         }
         if self.owner.is_none() {
             return Ok(None);
         }
         let Some(selection) = self.cycle.pending() else { return Ok(self.current); };
+        if self.picked.replace(previous) != Some(previous) {
+            self.cycle.cancel_preload();
+            return Ok(None);
+        }
         let native = native_stage(selection)?;
         let hash = hash_of(native).ok_or("stage catalog row unavailable")?;
         let _ = self.cycle.enter_resolved()?;
@@ -155,6 +167,9 @@ mod tests {
     const BF: Selection = Selection::normal(0);
     const FD: Selection = Selection::normal(3);
     const OWNER: usize = 0x2a00_1000;
+    /// The stage the player picked at Training's stage select (Training, 308): the native descriptor's id at every
+    /// entry of the visit (docs-rc7b-7d720c68 `apply previous=308` on both entries).
+    const PICK: u32 = 308;
 
     /// Independently recorded 40-bit package hashes (catalog rows and retained logs).
     fn hash_of(native: u32) -> Option<u64> {
@@ -178,8 +193,8 @@ mod tests {
         let prefs = Preferences::default();
         let mut rotation = TrainingRotation::new();
         assert_eq!(rotation.entry(OWNER, false, order(), &prefs), Entry::Disabled);
-        assert_eq!(rotation.apply(false, hash_of), Ok(None));
-        assert_eq!(rotation.apply(true, hash_of), Ok(None)); // No reservation, no snapshot.
+        assert_eq!(rotation.apply(false, PICK, hash_of), Ok(None));
+        assert_eq!(rotation.apply(true, PICK, hash_of), Ok(None)); // No reservation, no snapshot.
         // Enabling later starts at the first stage: nothing was consumed while Off.
         assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
     }
@@ -187,25 +202,56 @@ mod tests {
     fn direct_completion_replaces_the_reapplied_stage_and_uncertainty_clears_it() {
         let prefs = Preferences::default();
         let mut rotation = TrainingRotation::new();
+        // The visit's first entry opens on the stage select's pick; the return after it rotates.
         assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
-        assert_eq!(rotation.apply(true, hash_of), Ok(Some(applied(BF, 0))));
+        assert_eq!(rotation.apply(true, PICK, hash_of), Ok(None));
+        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
+        assert_eq!(rotation.apply(true, PICK, hash_of), Ok(Some(applied(BF, 0))));
         // Live direct change to Smashville Omega completed natively.
         rotation.direct_completed(96, hash_of(96).unwrap());
         rotation.reenter_requested(OWNER);
         assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Suppressed);
-        assert_eq!(rotation.apply(true, hash_of),
+        assert_eq!(rotation.apply(true, PICK, hash_of),
             Ok(Some(Applied { selection: None, native: 96, hash: 0x1b9fc8fb46 })));
         // A published direct change that departed unfinished leaves the stage unknown.
         rotation.direct_uncertain();
         rotation.reenter_requested(OWNER);
         assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Suppressed);
-        assert_eq!(rotation.apply(true, hash_of), Ok(None));
+        assert_eq!(rotation.apply(true, PICK, hash_of), Ok(None));
         // Neither direct event moved the rotation cursor.
         assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(FD, 3));
         // Direct completion before any entry of a sequence is not adopted.
         let mut fresh = TrainingRotation::new();
         fresh.direct_completed(96, 0x1b9fc8fb46);
-        assert_eq!(fresh.apply(true, hash_of), Ok(None));
+        assert_eq!(fresh.apply(true, PICK, hash_of), Ok(None));
+    }
+
+    fn the_stage_select_pick_opens_training_and_a_return_through_the_character_select_rotates() {
+        // rc.13 (the operator, 11-13): "when picking the stage initially before character select for training it
+        // doesn't honor that stage".
+        let prefs = Preferences::default();
+        let mut rotation = TrainingRotation::new();
+        // The visit's first entry comes from the stage select: the pick stands and the cursor stays.
+        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
+        assert_eq!(rotation.apply(true, PICK, hash_of), Ok(None), "the stage select pick opens Training");
+        // Returns through the character select carry the same pick and rotate from the first stage.
+        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
+        assert_eq!(rotation.apply(true, PICK, hash_of), Ok(Some(applied(BF, 0))));
+        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(FD, 3));
+        // B back to the stage select and a new pick (Smashville): that entry opens on it.
+        assert_eq!(rotation.apply(true, 96, hash_of), Ok(None), "a new pick opens Training");
+        assert_eq!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(FD, 3));
+        assert_eq!(rotation.apply(true, 96, hash_of), Ok(Some(applied(FD, 3))));
+        // A new visit starts from its own pick again.
+        rotation.sequence_initialized();
+        assert!(matches!(rotation.entry(OWNER, true, order(), &prefs), Entry::Prepared(..)));
+        assert_eq!(rotation.apply(true, PICK, hash_of), Ok(None), "a new visit's pick opens Training");
+        // Rotation turned On mid-visit: the pick was seen while Off, so the next return rotates (rc.11 GIF).
+        let mut later = TrainingRotation::new();
+        assert_eq!(later.entry(OWNER, false, order(), &prefs), Entry::Disabled);
+        assert_eq!(later.apply(false, PICK, hash_of), Ok(None));
+        assert_eq!(later.entry(OWNER, true, order(), &prefs), Entry::Prepared(BF, 0));
+        assert_eq!(later.apply(true, PICK, hash_of), Ok(Some(applied(BF, 0))));
     }
 
     fn qualified_loader_rejects_other_callers_slots_descriptors_and_scenes() {
@@ -231,6 +277,7 @@ mod tests {
         crate::test_table::run(&[
             ("disabled_setting_prepares_nothing_writes_nothing_and_keeps_the_cursor", disabled_setting_prepares_nothing_writes_nothing_and_keeps_the_cursor as fn()),
             ("direct_completion_replaces_the_reapplied_stage_and_uncertainty_clears_it", direct_completion_replaces_the_reapplied_stage_and_uncertainty_clears_it as fn()),
+            ("the_stage_select_pick_opens_training_and_a_return_through_the_character_select_rotates", the_stage_select_pick_opens_training_and_a_return_through_the_character_select_rotates as fn()),
             ("qualified_loader_rejects_other_callers_slots_descriptors_and_scenes", qualified_loader_rejects_other_callers_slots_descriptors_and_scenes as fn()),
         ]);
     }
