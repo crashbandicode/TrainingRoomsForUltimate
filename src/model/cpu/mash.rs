@@ -116,6 +116,9 @@ impl Queue {
 pub struct Rolled {
     /// Held Attack Angle: `None` (neutral or an empty row), or the angle option index (1 up, 2 down).
     pub attack_angle: Option<u8>,
+    /// The status the angled action completed in: the angle holds while the body stays in it (the attack's status
+    /// reads the angle after the command query that completed the action).
+    pub angle_status: Option<i32>,
     pub aerial_delay: u16,
     pub full_hop: bool,
     pub fast_fall: bool,
@@ -170,7 +173,7 @@ impl Mash {
     pub const fn new() -> Self {
         Self {
             queue: Queue::new(),
-            rolled: Rolled { attack_angle: None, aerial_delay: 0, full_hop: false, fast_fall: false, falling_aerial: false, fast_fall_delay: 0 },
+            rolled: Rolled { attack_angle: None, angle_status: None, aerial_delay: 0, full_hop: false, fast_fall: false, falling_aerial: false, fast_fall_delay: 0 },
             transitioning_dash: false,
             queued_aerial: None,
             latch: None,
@@ -194,6 +197,7 @@ impl Mash {
 
     fn roll_for_action(&mut self, s: &CpuSettings, rng: &mut Rng, action: Action) {
         self.rolled.attack_angle = s.attack_angle.pick(rng).filter(|i| *i != 0).map(|i| i as u8);
+        self.rolled.angle_status = None;
         if action.is_aerial() {
             self.rolled.aerial_delay = s.aerial_delay.pick(rng);
         }

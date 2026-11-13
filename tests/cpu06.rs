@@ -220,6 +220,30 @@ fn cpu06_attack_angle() {
     // The queue is empty on the next command query: the angle goes.
     cpu.command_flags(key, false, &ground(C::StatusWait));
     assert_eq!(cpu.fighters[key.index()].mash.rolled.attack_angle, None);
+    // A mashed forward tilt with the angle Up: the game queries the commands more than once a frame, and the tilt's
+    // status reads the angle after the query that completed the action. The angle holds while the body is in the
+    // status the action completed in, and goes once the body leaves it (wa-menu7: the hook answered no angle).
+    let (mut cpu, key) = cpu_with(&[]);
+    cpu.fighters[key.index()].mash.queue.push(Action::F_TILT);
+    cpu.fighters[key.index()].mash.rolled.attack_angle = Some(1);
+    cpu.tick_clock();
+    cpu.command_flags(key, false, &ground(C::StatusWait));
+    cpu.tick_clock();
+    cpu.command_flags(key, false, &ground(C::StatusAttackS3));
+    assert!(cpu.fighters[key.index()].mash.queue.is_empty(), "the tilt's status completes the action");
+    cpu.command_flags(key, false, &ground(C::StatusAttackS3));
+    assert_eq!(cpu.attack_angle(key), Some(1.0), "the second query of the frame keeps the angle");
+    for _ in 0..10 {
+        cpu.tick_clock();
+        cpu.command_flags(key, false, &ground(C::StatusAttackS3));
+    }
+    assert_eq!(cpu.attack_angle(key), Some(1.0), "held through the tilt");
+    cpu.tick_clock();
+    cpu.command_flags(key, false, &ground(C::StatusWait));
+    assert_eq!(cpu.attack_angle(key), None, "gone once the body leaves the tilt");
+    // A later native tilt, not from the mash, gets no angle (decision B8).
+    cpu.command_flags(key, false, &ground(C::StatusAttackS3));
+    assert_eq!(cpu.attack_angle(key), None, "a native tilt after the mash's");
 }
 
 fn cpu06_crouch_statuses() {

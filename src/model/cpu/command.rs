@@ -216,8 +216,12 @@ impl Mash {
             self.transitioning_dash = false;
         }
         let Some(action) = self.queue.current() else {
-            // The angle only applies to mash-driven attacks (decision B8).
-            self.rolled.attack_angle = None;
+            // The angle only applies to mash-driven attacks (decision B8): it holds while the body is still in the
+            // status the attack completed in (the status reads it after this query), and goes once it leaves.
+            if self.rolled.angle_status != Some(f.status) {
+                self.rolled.attack_angle = None;
+                self.rolled.angle_status = None;
+            }
             return out;
         };
         let grounded = f.situation == Situation::Ground;
@@ -302,6 +306,7 @@ impl Mash {
         if let Some(expected) = expected {
             if t.is(expected, f.status) || character_completes(t, f, expected) {
                 self.complete();
+                self.rolled.angle_status = self.rolled.attack_angle.map(|_| f.status);
                 let _ = s;
             }
         }
