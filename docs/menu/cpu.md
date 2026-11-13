@@ -118,8 +118,7 @@ The direction the CPU nudges itself in during hitlag (smash DI). It does nothing
 One direction is picked at each reset (L+R+A or loading a save state) and right after you change the row. The CPU
 uses it for every hit until the next pick. Neutral means no SDI.
 
-<!-- reshoot: di-sdi-chips.gif -->
-![The DI and SDI direction grids](../media/di-sdi-chips.gif)<br>*The DI and SDI direction grids*
+![DI Direction from nothing picked to Up x1, then SDI Direction the same](../media/rc11-di-sdi-chips.gif)<br>*The DI and SDI direction grids*
 
 More: [Direction chips](../guide/cpu-behaviour.md#direction-chips)
 
@@ -422,8 +421,7 @@ When it differs from the level in Training's own menu, a notice says so each tim
 - **Default:** Off.
 - **How:** Left/Right cycle through the values (wrapping); A opens the list.
 
-<!-- reshoot: rc7-cpu-level-notice.gif -->
-![The CPU level notice](../media/rc7-cpu-level-notice.gif)<br>*The notice when Training's own level differs*
+![CPU Level set to Lv 7; Training's card says Lv 3; the notice names both; the CPU fights at Lv 7](../media/rc11-cpu-level.gif)<br>*The notice when Training's own level differs*
 
 ## Reset page to defaults
 

@@ -3,8 +3,7 @@
 Every TrainingRooms setting is in one menu with five pages. This page explains how to open it, move around it and
 change a row. What each row does is on the page's own doc, linked below.
 
-<!-- reshoot: rc7-menu-tour.gif -->
-![The five pages of the menu, then Hitbox Visualization turned on](../media/rc7-menu-tour.gif)
+![The five pages of the menu, then Hitbox Visualization turned on and a neutral air's red hitbox](../media/rc11-menu-tour.gif)
 
 ## Opening and closing
 

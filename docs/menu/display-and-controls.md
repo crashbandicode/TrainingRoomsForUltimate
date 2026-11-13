@@ -31,8 +31,7 @@ the two practice fighters in a waiting room. A fighter's boxes are not drawn whi
 
 The row's help line still says hurtboxes are not available. They are drawn in this build.
 
-<!-- reshoot: rc7-hitbox.gif -->
-![Hitbox Visualization turned on, then a forward smash](../media/rc7-hitbox.gif)
+![Hitbox Visualization turned on: the yellow hurtboxes, then at 1/4 speed a neutral air's red hitbox](../media/rc11-hitbox.gif)
 
 ### Frame Advantage
 

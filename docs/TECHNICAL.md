@@ -6,11 +6,11 @@ where every clip in the README was recorded (build, commit and what the run chec
 
 Practice tools for Training mode and the online waiting rooms of Super Smash Bros. Ultimate 13.0.5, as a Skyline plugin.
 
-**Clip** [`rc7-menu-tour.gif`](media/rc7-menu-tour.gif): The TrainingRooms menu: the five pages, then Hitbox Visualization turned On
+**Clip** [`rc11-menu-tour.gif`](media/rc11-menu-tour.gif): The TrainingRooms menu: the five pages, then Hitbox Visualization turned On and a neutral air's hitbox
 
-*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only; release NRO `b6e60bb9`): Training,
-the menu on CPU, then Saves, Recording, Fighters & Stages and Display & Controls; Hitbox Visualization is turned On, and
-back in Training yellow shapes cover both fighters. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Training, Mario vs Palutena with nothing drawn; the menu on CPU, then Saves,
+Recording, Fighters & Stages and Display & Controls; Hitbox Visualization from Off to On; back in Training yellow
+hurtboxes cover both fighters; at 1/4 speed Mario's neutral air shows its red hitbox. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 ## Install
 
@@ -75,11 +75,11 @@ their own build; see [MEDIA.md](MEDIA.md).
 
 ### Hitboxes and grab boxes
 
-**Clip** [`rc7-hitbox.gif`](media/rc7-hitbox.gif): Hitbox Visualization turned On, then a forward smash
+**Clip** [`rc11-hitbox.gif`](media/rc11-hitbox.gif): Hitbox Visualization turned On; the hurtboxes; at 1/4 speed a neutral air's red hitbox, held
 
-*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): Training with nothing drawn;
-Display & Controls › Hitbox Visualization from Off to On; back in Training yellow shapes cover both fighters, and
-Player 1's forward smash sends the CPU from 6.3% to 24.8%.*
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Training with nothing drawn; Display & Controls › Hitbox Visualization from Off to On;
+back in Training the yellow hurtboxes cover both fighters; R + D-pad Up steps the speed to 1/4, and Mario's short-hop
+neutral air keeps its red hitbox on screen for over a second (the frame strip's lane turns red with it). Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 Hitbox Visualization (Display & Controls) draws the fighters' hurtboxes (yellow), hitboxes and grab boxes. Since rc.3
 every fighter sphere is the plugin's own disc, so none is ever missing, even with two large fighters; projectiles keep
@@ -164,7 +164,10 @@ are listed in [MEDIA.md](MEDIA.md).*
 DI, SDI, air dodge, shield tilt, mash, ledge, tech and throw options on the CPU page. Above: the same hit with no DI
 and with DI Up.
 
-**Clip** [`di-sdi-chips.gif`](media/di-sdi-chips.gif): The DI and SDI direction grids
+**Clip** [`rc11-di-sdi-chips.gif`](media/rc11-di-sdi-chips.gif): DI Direction from nothing picked to Up ×1, then SDI Direction the same
+
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), the CPU page's Defence section: DI Direction reads 0 selected; A opens the grid on
+Neutral; Up, A, and "Up x1" under Selected; back, the row reads 1 selected; then SDI Direction the same way. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 The direction chips show the game's own DI line and SDI streak; each A adds weight to a chip. *In* and *Out* are
 relative to you, on either side of the CPU.
@@ -172,11 +175,12 @@ relative to you, on either side of the CPU.
 *CPU Level* (CPU › Level: Off, or Lv 1–9) replaces Training's own CPU level. When the two differ as Training starts, a
 notice says so once.
 
-**Clip** [`rc7-cpu-level-notice.gif`](media/rc7-cpu-level-notice.gif): Training's CPU card at Lv. 3; in Training, the notice names both levels
+**Clip** [`rc11-cpu-level.gif`](media/rc11-cpu-level.gif): CPU Level set from Off to Lv 7; the CPU card at Lv. 3; the notice names both levels; the CPU fights at Lv 7
 
-*Eden, 2026-11-11, rc.7 `b3678dfe` (diag NRO `9dfc784c`, log lines only): CPU Level is Lv 7. The character select's CPU
-card reads CPU Lv. 3; in Training the notice reads "Lv 7 from TrainingRooms (Training menu: Lv 3)". Cuts inside are
-listed in [MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), CPU › Level › CPU Level from Off to 7 in the menu; the character select's CPU card
+(Donkey Kong) reads CPU Lv. 3; in Training the notice reads "Lv 7 from TrainingRooms (Training menu: Lv 3)" (one
+judged line and one notice in the log); Training's CPU Behavior goes from Stop to CPU (Lv. 3), and Donkey Kong fights
+Mario from 0% to 28%. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 ### Save states and respawn
 
@@ -304,16 +308,16 @@ Training reloads on Battlefield Ω. Cuts inside are listed in [MEDIA.md](MEDIA.m
 *Change Stage* (Fighters & Stages › Stages) goes to the stage you pick when the menu closes, in Training and in
 waiting-room practice; Y picks its form first.
 
-**Clip** [`menu-stages.gif`](media/menu-stages.gif): Stage grid
+**Clip** [`rc11-lobby-stages.gif`](media/rc11-lobby-stages.gif): Lobby Stages: A on Battlefield adds it as number 2
 
-Pick the stages and their order for Training rotation and waiting-room practice. *RC10, 2026-11-04, NRO
-`50d95130`: the grid only.*
+Pick the stages and their order for Training rotation and waiting-room practice. *Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Fighters & Stages ›
+Lobby Stages; the grid with 1. Big Battlefield; the cursor to Battlefield, A, and the tile reads "2. Battlefield". Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-**Clip** [`rc7-lobby-stages-rotation.gif`](media/rc7-lobby-stages-rotation.gif): Lobby Stages ranks two stages; with Training Stage Rotation On, the next Training entry goes to Big Battlefield
+**Clip** [`rc11-stage-rotation.gif`](media/rc11-stage-rotation.gif): Training Stage Rotation from Off to On; the next Training entry, the same fighters, opens on Big Battlefield
 
-*Eden, 2026-11-10, rc.7 `7d720c68` (diag NRO `a45ba951`, log lines only): Lobby Stages ranks 1. Waiting Room and
-2. Big Battlefield, and Training Stage Rotation is On. From Training on the training stage, back through the character
-select, Training opens on Big Battlefield. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Mario vs Donkey Kong (the CPU's character-select coin pinned) on the training stage;
+Lobby Stages ranks 1. Big Battlefield and 2. Battlefield; Fighters & Stages › Training Stage Rotation from Off to On;
+back through the character select (the same two fighters), Training opens on Big Battlefield, held with no notice. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 ### Waiting rooms
 

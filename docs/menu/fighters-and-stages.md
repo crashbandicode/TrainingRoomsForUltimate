@@ -185,8 +185,7 @@ The stage list: each new waiting room opens on the next stage of it, and Trainin
 
 The waiting rooms follow the list only while [Lobby Practice](#lobby-practice) is On.
 
-<!-- reshoot: menu-stages.gif -->
-![The Lobby Stages grid](../media/menu-stages.gif)
+![Lobby Stages: A on Battlefield adds it as number 2](../media/rc11-lobby-stages.gif)
 
 More: [Stages › Lobby Stages](../guide/stages.md#lobby-stages)
 
@@ -202,8 +201,7 @@ On: each time you enter Training from the character select, Training opens on th
 It always uses the Rotation list, even while Lobby Stages is on Direct. With the default list (the Waiting Room only),
 Training opens on the Waiting Room.
 
-<!-- reshoot: rc7-lobby-stages-rotation.gif -->
-![With rotation On, the next Training opens on Big Battlefield](../media/rc7-lobby-stages-rotation.gif)
+![Training Stage Rotation turned on; the next Training, the same fighters, opens on Big Battlefield](../media/rc11-stage-rotation.gif)
 
 More: [Stages › Training Stage Rotation](../guide/stages.md#training-stage-rotation)
 

@@ -40,8 +40,7 @@ changes it for both.
 Fighters & Stages › [Lobby Stages](../menu/fighters-and-stages.md#lobby-stages) is the list the waiting rooms, and
 Training with rotation On, move through. It has two modes; X switches between them.
 
-<!-- reshoot: menu-stages.gif -->
-![The Lobby Stages grid](../media/menu-stages.gif)
+![Lobby Stages: A on Battlefield adds it as number 2](../media/rc11-lobby-stages.gif)
 
 **Rotation** (the default):
 
@@ -70,8 +69,7 @@ Off by default: Training then opens on the stage you chose, as usual.
 - With the default list (the Waiting Room only), Training opens on the Waiting Room. Add stages first.
 - A Change Stage in Training goes to that stage without moving your place in the list.
 
-<!-- reshoot: rc7-lobby-stages-rotation.gif -->
-![With rotation On, the next Training opens on Big Battlefield](../media/rc7-lobby-stages-rotation.gif)
+![Training Stage Rotation turned on; the next Training, the same fighters, opens on Big Battlefield](../media/rc11-stage-rotation.gif)
 
 ## Stage Hazards
 
