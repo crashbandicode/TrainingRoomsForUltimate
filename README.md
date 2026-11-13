@@ -3,7 +3,9 @@
 TrainingRooms adds practice tools to Super Smash Bros. Ultimate's Training mode and to the waiting rooms of online and
 local play: hitboxes, save states, recordings, combo drills, game speed and more, all from one menu.
 
-![The menu's five pages, then hitboxes turned on](docs/media/rc7-menu-tour.gif)<br>*The menu, then hitboxes on*
+![The menu's five pages, then Hitbox Visualization turned on and a neutral air's red hitbox](docs/media/rc11-menu-tour.gif)<br>*The menu, then hitboxes on*
+
+Every option is documented in the [docs](docs/README.md), one page per menu page.
 
 ## Install
 
@@ -26,7 +28,7 @@ local play: hitboxes, save states, recordings, combo drills, game speed and more
 | ZL + D-pad Left / Right | Switch the CPU's / your fighter |
 | R + D-pad Down | Input display on / off |
 | Hold R + D-pad Up, then Left / Right | Game speed |
-| B + click the left / right stick | Kirby hat: yours / the CPU's |
+| Hold B, click the left / right stick | Kirby hat: yours / the CPU's (left stick at rest) |
 | L + R + A | Reset positions |
 
 You can change the save, load, recording, fighter-cycle, input-display and game-speed buttons, and add up to two menu
@@ -36,98 +38,72 @@ your own fighter needs Fighters & Stages › Player Swapping On (it's Off at fir
 On a GameCube controller, ZL is L, ZR is R and R is Z; it has no Minus, so open the menu with B + D-pad Up. With Online
 Deluxe, buttons that use the D-pad do nothing while its window shows a settings page; B + D-pad Up still opens this
 menu. While the CPU pilot plays for you, Record, Play on yourself and the waiting-room reset are off.
-
-## Features
-
-### Hitboxes
-See every hitbox, hurtbox and grab box. Display & Controls › Hitbox Visualization.
-
-![Hitbox Visualization turned on, then a forward smash](docs/media/rc7-hitbox.gif)<br>*Hitboxes on, then a forward smash*
-
-### Input display
-A strip at the top shows your inputs, your frames and the CPU's, and who can act first. R + D-pad Down turns it on and
-off.
-
-![R + D-pad Down hides the strip, then shows it again](docs/media/rc8-input-display-chord.gif)<br>*Turning the input display off and on*<br>
-![In the online waiting room, Plus opens the game's menu and the strip steps aside until it closes](docs/media/rc11-strip-under-menu.gif)<br>*It steps aside for the waiting room's menu*
-
-How to read it: [the frame strip guide](docs/guide/frame-strip.md)
+More: [the controls guide](docs/guide/controls.md).
 
 ### Game speed
-Slow the game down or speed it up. Hold R + D-pad Up and press Left or Right.
 
-![A forward smash at x1; R + D-pad Up steps the speed to 1/4; the same smash, four times slower](docs/media/rc11-game-speed.gif)<br>*The same smash at x1, then at 1/4*<br>
-![The stopwatch shows x1.5, then goes away at x1](docs/media/rc8-speed-hud-fixed.gif)<br>*The stopwatch follows the speed*<br>
-![In the online waiting room: a forward smash at x1, the speed steps to 1/2, and the next smash is slower](docs/media/rc11-lobby-speed.gif)<br>*It works in the online waiting rooms too*
+Hold R + D-pad Up and press Left or Right: 1/4, 1/2, 2/3, x1 or x1.5. A stopwatch on the HUD shows any speed but x1.
 
-### CPU reactions
-Teach the CPU to DI, tech, shield, mash and more, on the CPU page.
+![A forward smash at x1; R + D-pad Up steps the speed to 1/4; the same smash, four times slower](docs/media/rc11-game-speed.gif)<br>*The same smash at x1, then at 1/4*
 
-![No DI, then DI Up: the same smash sends the CPU higher](docs/media/rc7-di-up.gif)<br>*No DI, then DI Up*<br>
-![The DI and SDI direction grids](docs/media/di-sdi-chips.gif)<br>*Picking DI directions*<br>
-![The CPU level notice](docs/media/rc7-cpu-level-notice.gif)<br>*Setting the CPU's level*
+More: [the game speed guide](docs/guide/game-speed.md).
 
-### Save states and respawn
-Save where you stand with ZL + D-pad Down, and go back with ZL + D-pad Up.
+## The menu
 
-![Save, a smash sends the CPU away, then Load puts both fighters back](docs/media/rc10-save-load.gif)<br>*Save, move, load: back where you saved*<br>
-![Respawn on platform turned on, then a fall](docs/media/rc7-respawn-on.gif)<br>*Respawning on the platform*
+L and R turn the pages, ZL + Up/Down jumps between sections, A changes a row, Y resets it, and B closes the menu.
+Changes apply when it closes. More: [using the menu](docs/guide/using-the-menu.md).
+
+### CPU
+
+Teach the CPU to DI, tech, shield, mash and follow up, and set its level.
+
+![CPU Level set to Lv 7; Training's card says Lv 3; the notice names both; the CPU fights at Lv 7](docs/media/rc11-cpu-level.gif)<br>*CPU Level at Lv 7: the notice, then the CPU fights*
+
+All the options: [the CPU page](docs/menu/cpu.md).
+
+### Saves
+
+Save where you stand with ZL + D-pad Down and go back with ZL + D-pad Up. Choose the damage, mirroring and buffs on
+load, and keep whole setups in a library.
+
+![Save, a smash sends the CPU away, then Load puts both fighters back](docs/media/rc10-save-load.gif)<br>*Save, move, load: back where you saved*
+
+All the options: [the Saves page](docs/menu/saves.md).
 
 ### Recording
-Record yourself, then let the CPU play it back. ZR + D-pad Down records, ZR + D-pad Up plays; the recording pop-up
-(ZR + D-pad Right) picks which recording the CPU plays.
 
-![Mario records a jab and a smash, then the CPU does the same moves](docs/media/rc10-record-play-cpu.gif)<br>*Record, then the CPU plays it back*
+Record yourself with ZR + D-pad Down and let the CPU play it back with ZR + D-pad Up. Save a combo you landed and
+drill it: a bar grades each try.
 
-### Combos
-Save a combo you landed and practise it: a bar grades each try. Recording › Combos & Sequences.
+![Mario records a jab and a smash, then the CPU does the same moves](docs/media/rc10-record-play-cpu.gif)<br>*Record, then the CPU plays it back*<br>
+![The combo helper grading a combo](docs/media/rc7-combo-helper.gif)<br>*Grading a combo*
 
-![The combo helper grading a combo](docs/media/rc7-combo-helper.gif)<br>*Grading a combo*<br>
-![Drilling two combos in a row](docs/media/rc7-sequence-drill.gif)<br>*Drilling a sequence*
+All the options: [the Recording page](docs/menu/recording.md).
 
-### Fighter cycles
-Switch fighters without leaving Training. ZL + D-pad Right for yours, ZL + D-pad Left for the CPU's.
+### Fighters & Stages
 
-![Each press switches to the next fighter](docs/media/rc6-cycle-switch.gif)<br>*Cycling through your fighters*
-
-### Kirby hats
-Change Kirby's copy ability. B + click a stick.
+Switch fighters without leaving Training, give Kirby any hat, make Mii fighters, and change the stage.
 
 ![Kirby gets Falco's hat, then Sheik's](docs/media/rc7-kirby-hats.gif)<br>*Changing Kirby's hat*
 
-### Mii fighters
-Make and pick Mii fighters from Training. Fighters & Stages › Mii Brawler, Swordfighter or Gunner.
+All the options: [the Fighters & Stages page](docs/menu/fighters-and-stages.md).
 
-![Saving an unchanged Mii saves nothing new](docs/media/rc6-mii-same.gif)<br>*No duplicate Miis*<br>
-![A new Mii with new specials, then played](docs/media/rc7-mii-editor.gif)<br>*Making a new Mii*
+### Display & Controls
 
-### Stages
-Go to any stage from the menu, or rotate through your favourites. Fighters & Stages › Stages.
+Hitboxes, hurtboxes and grab boxes; the input display and frame advantage; your own buttons.
 
-![Change Stage to Battlefield Ω](docs/media/rc7-change-stage.gif)<br>*Changing the stage*<br>
-![The stage grid](docs/media/menu-stages.gif)<br>*Picking stages*<br>
-![The next Training opens on Big Battlefield](docs/media/rc7-lobby-stages-rotation.gif)<br>*Stage rotation*
+![Hitbox Visualization turned on: the yellow hurtboxes, then at 1/4 speed a neutral air's red hitbox](docs/media/rc11-hitbox.gif)<br>*Hitboxes and hurtboxes on*
 
-### Waiting rooms
+All the options: [the Display & Controls page](docs/menu/display-and-controls.md).
+
+## Waiting rooms
+
 Practise while you wait for an online or local match, with the same menu. Turn on Fighters & Stages › Lobby Practice
 first (it's Off at first).
 
-![A second training partner drops in](docs/media/rc6-waiting-partners.gif)<br>*Adding a training partner*<br>
-![The next room remembers the partners](docs/media/rc6-waiting-reentry.gif)<br>*Partners remembered*<br>
-![Saving a combo in a waiting room, then drilling it](docs/media/rc6-lobby-combos.gif)<br>*Combos in a waiting room*<br>
 ![In a local waiting room, B + D-pad Up opens the menu, Hitbox Visualization goes On, and the boxes show in the room](docs/media/rc11-waiting-menu.gif)<br>*The menu in a waiting room (B + D-pad Up)*
 
-### Menu
-Jump between sections with ZL + Up/Down, and set your own menu button.
-
-![ZL + Down jumps through the sections](docs/media/menu-section-jump.gif)<br>*Jumping between sections*<br>
-![Menu shortcut 1 set from Minus to ZL + D-pad Up, then ZL + D-pad Up opens the menu](docs/media/rc11-menu-shortcut.gif)<br>*Setting your own menu button*
-
-### Replays
-Capture moments from your replays and open them in Training.
-
-![A replay moment opened against the CPU](docs/media/rc6-replay-window.gif)<br>*Opening a replay moment*<br>
-![Replay capture on, in the menu and in Online Deluxe](docs/media/rc7-replay-capture.gif)<br>*Turning replay capture on*
+More: [the waiting rooms guide](docs/guide/waiting-rooms.md).
 
 ## Build
 
@@ -145,5 +121,5 @@ endorsed by Nintendo.
 
 ## More
 
-Release notes: [rc.9](docs/RELEASE-NOTES-rc9.md) is the newest written; this build is rc.11 (see
-[Status](docs/TECHNICAL.md#status)). [Technical notes](docs/TECHNICAL.md).
+[The docs](docs/README.md): every menu page and guide. Release notes: [rc.9](docs/RELEASE-NOTES-rc9.md) is the newest
+written; this build is rc.11 (see [Status](docs/TECHNICAL.md#status)). [Technical notes](docs/TECHNICAL.md).
