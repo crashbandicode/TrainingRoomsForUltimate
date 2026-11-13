@@ -287,6 +287,8 @@ Frames the CPU waits after shieldstun before it acts out of shield. A new value 
 - **How:** A opens the delay pop-up: tick values with A, or pick up Min or Max with A and move it with Left/Right
   (Up/Down ten at a time). Y clears whichever is set. B goes back.
 
+![The CPU holds its shield against Mario's jab and spot dodges out of it: with no Reaction Time it dodges right after the shieldstun; with 30 frames it stays in its shield about half a second longer first](../media/rc11-cpu-reaction-time.gif)<br>*Reaction Time: none, then 30 frames*
+
 More: [Delay rows](../guide/cpu-behaviour.md#delay-rows)
 
 ## Attacks & Movement
