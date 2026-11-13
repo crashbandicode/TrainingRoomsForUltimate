@@ -7,6 +7,24 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
 Since 2026-11-13 the README shows one GIF per menu page; the [menu docs](menu/) and [guides](guide/) embed the rest.
 The "Embedded in" column of the older sections records where a clip was placed when it was made.
 
+## CPU option clips (2026-11-13)
+
+One clip per CPU option of [menu/cpu](menu/cpu.md): the option at its starting value, the menu change made with the menu itself, then the same action again. The ledger of the 2026-11-13 GIF pass is outside git (`artifacts/phase23/option-gifs-20261113/LEDGER.md`).
+
+- **Build:** rc.11 `0c628724`, its diag NRO `bd0bc61b…`; Player 1 Mario.
+- **Runs:** the XPS, one instance, Training only, muted, Eden `2f315fc4b7d9` with its GDB stub on, at 1x; recorded at 15 fps, 1280 wide. The host ran two instances, so the game ran below full speed; the clips keep the game's own frame times. Cut with every recorded frame kept (no frame dropped for size), then `gifsicle -O3`; nothing cropped.
+
+| File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
+|---|---|---|---|---|---|
+| `media/rc11-cpu-mash.gif` | `wa-menu1-0c628724`, `wa-mash` | menu/cpu (Mash) | 9.8 s, 13.7 MB, 108 frames | 3.2–7.0, 13.0–15.2, 23.1–26.9 s | CPU Chrom. Before: Mario walks in and his three-hit jab lands (9.9%). The Mash checklist, Jump ticked. After: the same jab; the CPU jumps out after the second hit (4.9%). |
+| `media/rc11-cpu-mash-triggers.gif` | `wa-menu1-0c628724`, `wa-triggers` | menu/cpu (Mash Triggers) | 9.6 s, 8.7 MB, 103 frames | 1.3–4.7, 11.5–14.3, 17.4–20.8 s | Mash Jump. Before: the default triggers, nothing hits the CPU, it stands. Mash Triggers, Always ticked. After: the CPU jumps again and again. |
+| `media/rc11-cpu-situation-overrides.gif` | `wa-menu1-0c628724`, `wa-overrides` | menu/cpu (Situation overrides) | 9.8 s, 13.0 MB, 118 frames | 3.2–7.0, 18.4–20.6, 27.9–31.6 s | Mash Jump. Before: the jab, the CPU jumps out. The overrides editor: Hitstun, Shield ticked. After: the same jab, the CPU's shield comes up. |
+| `media/rc11-cpu-shield.gif` | `wa-menu1-0c628724`, `wa-shield` | menu/cpu (Shield) | 9.8 s, 12.1 MB, 107 frames | 3.1–6.9, 9.0–11.2, 19.2–23.0 s | Before: the jab lands (9.9%). Shield, Right to Infinite. After: the CPU shields; the jabs hit the shield, 0%. |
+| `media/rc11-cpu-full-hop.gif` | `wa-menu1-0c628724`, `wa-fullhop` | menu/cpu (Full Hop) | 9.6 s, 10.5 MB, 105 frames | 1.5–4.9, 9.5–12.3, 15.5–18.9 s | Mash Jump, Always. Before: full hops, near the top of the frame. Full Hop, Right to No. After: short hops. |
+| `media/rc11-cpu-crouch.gif` | `wa-menu1-0c628724`, `wa-crouch` | menu/cpu (Crouch) | 9.6 s, 4.2 MB, 89 frames | 1.4–4.8, 8.5–11.3, 15.4–18.8 s | Before: the CPU stands. Crouch, A to On. After: it crouches. |
+| `media/rc11-cpu-p1-cpu-control.gif` | `wa-menu1-0c628724`, `wa-p1cpu` | menu/cpu (P1 CPU Control) | 9.8 s, 7.2 MB, 103 frames | 1.4–4.9, 9.7–12.5, 17.0–20.5 s | No input from Player 1. Before: Mario stands. P1 CPU Control, A to On. After: Mario moves and jumps on his own. |
+| `media/rc11-cpu-p1-cpu-level.gif` | `wa-menu1-0c628724`, `wa-p1level` | menu/cpu (P1 CPU Level) | 9.8 s, 12.0 MB, 113 frames | 1.5–5.0, 13.2–16.0, 19.3–22.8 s | P1 CPU Control On, no input. Before: level 1, Mario hops about. The list, 9. After: Mario attacks the CPU (its damage climbs). |
+
 ## rc.11 reshoots (2026-11-13)
 
 The GIF audit of 2026-11-13 (the operator's bar: the input visible, the same setup before and after, the effect held

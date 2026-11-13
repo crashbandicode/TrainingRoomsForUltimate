@@ -31,6 +31,8 @@ ticked, it picks one at random each time.
 The Playback Slot actions don't play your saved macros: see
 [The Playback Slot actions](../guide/cpu-behaviour.md#the-playback-slot-actions).
 
+![Mash none: Mario's three-hit jab lands in full; Mash Jump: the CPU jumps away after the second hit](../media/rc11-cpu-mash.gif)<br>*Mash: none, then Jump*
+
 More: [Mash and Followup](../guide/cpu-behaviour.md#mash-and-followup)
 
 ### Followup
@@ -55,6 +57,8 @@ The situations that make the CPU do its Mash action. Nothing happens here until 
 
 Hitstun doesn't cover tumble (a hard launch): tick Tumble too to mash out of both.
 
+![Mash Jump with the default triggers: the CPU stands still; with Always ticked it jumps on its own](../media/rc11-cpu-mash-triggers.gif)<br>*Mash Triggers: Always ticked*
+
 More: [Mash Triggers](../guide/cpu-behaviour.md#mash-triggers)
 
 ### Situation overrides
@@ -68,6 +72,8 @@ and Ledge Trump. With several actions ticked, the CPU picks one at random.
 - **How:** A opens the editor. On its top line, Left/Right pick the situation. Down moves into that situation's
   actions, drawn in columns: Up/Down move, Left/Right step a column, A ticks, ZL ticks all or none. B goes back. Y on
   the row clears every situation back to your default.
+
+![Mash Jump: the CPU jumps out of the jab's hitstun; with Hitstun overridden to Shield it shields instead](../media/rc11-cpu-situation-overrides.gif)<br>*Hitstun overridden with Shield*
 
 More: [Situation overrides](../guide/cpu-behaviour.md#situation-overrides)
 
@@ -227,6 +233,8 @@ The CPU lowers its shield while a recording plays on it or a save state loads.
 - **Default:** None.
 - **How:** Left/Right cycle through the values; A opens the list.
 
+![Shield None: the three-hit jab lands; Shield Infinite: the CPU holds its shield and the jabs hit it](../media/rc11-cpu-shield.gif)<br>*Shield: None, then Infinite*
+
 ### Shield Tilt
 
 Where the CPU tilts its shield. In and Out are relative to you.
@@ -341,6 +349,8 @@ Whether the CPU's jumps are full hops (Yes) or short hops (No), including the ju
 - **Default:** Yes.
 - **How:** Left/Right cycle Yes, No, Random; A opens the list.
 
+![The CPU jumps over and over: full hops with Full Hop Yes, short hops with No](../media/rc11-cpu-full-hop.gif)<br>*Full Hop: Yes, then No*
+
 ### Fast Fall
 
 Whether the CPU fast falls once it starts falling after a jump or an aerial.
@@ -368,6 +378,8 @@ On: the CPU crouches in place instead of standing. Off: it stands.
 - **Default:** Off.
 - **How:** A switches it.
 
+![Crouch Off: the CPU stands; Crouch On: it crouches in place](../media/rc11-cpu-crouch.gif)<br>*Crouch: Off, then On*
+
 ## Player 1 control
 
 Lets the game's CPU play Player 1 for you. This group shows one of two things. If the separate CPU pilot plugin is
@@ -391,6 +403,8 @@ Player 1 are refused.
 - **Default:** Off: you play Player 1.
 - **How:** A switches it.
 
+![P1 CPU Control Off: Player 1 stands still; On: the game's AI plays Player 1](../media/rc11-cpu-p1-cpu-control.gif)<br>*P1 CPU Control: Off, then On*
+
 More: [Controls](../guide/controls.md)
 
 ### P1 CPU Level
@@ -401,6 +415,8 @@ the strongest.
 - **Values:** 1 to 9.
 - **Default:** 3.
 - **How:** Left/Right cycle through the levels; A opens the list.
+
+![P1 CPU Control On: at level 1 the AI hops about; at level 9 it goes after the CPU](../media/rc11-cpu-p1-cpu-level.gif)<br>*P1 CPU Level: 1, then 9*
 
 ## Level
 
