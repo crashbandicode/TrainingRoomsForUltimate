@@ -126,11 +126,10 @@ Turning saved match replays into macros, and moving where a macro starts.
 
 ### Ask before switching fighter
 
-Whether to ask before the CPU switches to the fighter a replay capture was recorded on. In this build only the
-[Replay window](#replay-window) reads this row. On: opening a capture recorded on another fighter asks Fighter
-Mismatch first (Keep current fighter, or Switch to recorded fighter). Off: the CPU you have stays, without asking.
-
-A macro, a chain or a drilled combo recorded on another fighter asks Fighter Mismatch whatever this row says.
+Whether to ask before switching to the fighter a recording was made on. It covers every Fighter Mismatch question: a
+capture opened in the [Replay window](#replay-window), Play on a macro or a chain, and a drilled combo. On: a recording
+made on another fighter asks first (Keep current fighter, or Switch to recorded fighter). Off: the fighter you have
+stays, without asking, as if you had picked Keep.
 
 - **Values:** On, Off
 - **Default:** On
@@ -345,7 +344,8 @@ macro of the side you're on, replacing the one before, and its row turns green. 
 Play on Player 1 (ZR + D-pad Left) or Play on CPU (ZR + D-pad Up). The same chord again stops it.
 
 Stopping Record makes the new macro the active one too, so you can record and play straight away. If the active
-macro was recorded on another fighter, Play asks Fighter Mismatch first. To clear an active macro, set Set active Off
+macro was recorded on another fighter, Play asks Fighter Mismatch first, unless
+[Ask before switching fighter](#ask-before-switching-fighter) is Off. To clear an active macro, set Set active Off
 on its screen on the page.
 
 ![Mario records three moves; Play on CPU warps back and the CPU does them](../media/rc10-record-play-cpu.gif)<br>

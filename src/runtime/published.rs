@@ -100,6 +100,7 @@ pub fn publish(snapshot: &Snapshot, rerolls: u8) {
     LRA_RESET.store(snapshot.lra_reset(), Ordering::Release);
     STAGE_HAZARDS.store(snapshot.stage_hazards(), Ordering::Release);
     HUD.store(snapshot.hud(), Ordering::Release);
+    crate::engine::rr_host::publish_fighter_prompt(snapshot.fighter_prompt());
     LOBBY_ITEMS.store(snapshot.lobby_items(), Ordering::Release);
     let cpu_level = crate::model::cpu::level::CpuLevel::from_row(snapshot.get(crate::model::cpu::level::ROW_ID).unwrap_or(&[]));
     CPU_LEVEL.store(match cpu_level { crate::model::cpu::level::CpuLevel::Lv(level) => level, _ => 0 }, Ordering::Release);

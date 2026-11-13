@@ -220,6 +220,11 @@ impl Snapshot {
         self.get("hud").is_none_or(|row| row.first().copied().unwrap_or(0) != 0 || row.iter().all(|v| *v == 0))
     }
 
+    /// Ask before switching fighter (Recording, default On): the first option (`On`) set, or neither set.
+    pub fn fighter_prompt(&self) -> bool {
+        self.get("fighter_prompt").is_none_or(|row| row.first().copied().unwrap_or(0) != 0 || row.iter().all(|v| *v == 0))
+    }
+
     /// Stage Hazards: On when the first option (`On`) is set.
     pub fn stage_hazards(&self) -> bool {
         self.rows[STAGE_HAZARDS][0] != 0

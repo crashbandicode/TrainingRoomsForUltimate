@@ -315,7 +315,7 @@ pub static ROWS: [Row; 92] = [
       "The saved setups. A binds a setup to the slot and\nrestores it; Y binds it without restoring."),
     // Recording > Replays. The library groups above have no rows (revision 8.2).
     r(REPLAYS, "Ask before switching fighter", "fighter_prompt", TOGGLE,
-      "Replay window: On asks before switching the CPU, Off keeps it.\nA macro, a chain or a combo drill asks either way."),
+      "On: a replay, macro, chain or combo drill on another fighter\nasks first. Off: the fighter you have stays, without asking."),
     r(REPLAYS, "Edit placement", "", Control::Editor(Editor::EditPlacement),
       "Moves where the active macro starts after its warp,\nfor the side the Recording pop-up is set to."),
     r(REPLAYS, "Replay window", "", Control::Editor(Editor::ReplayWindow),

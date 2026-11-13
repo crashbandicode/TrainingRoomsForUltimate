@@ -33,6 +33,8 @@ const ROLE_PLAYER: u8 = 1;
 const ROLE_CPU: u8 = 2;
 
 static RECORD_ROLE: AtomicU8 = AtomicU8::new(ROLE_PLAYER);
+/// Ask before switching fighter (published with the settings): Off keeps the current fighter for every question here.
+static ASK_FIGHTER: AtomicBool = AtomicBool::new(true);
 static LAST_ROLE: AtomicU8 = AtomicU8::new(ROLE_PLAYER);
 static CAP_ROLE: AtomicU8 = AtomicU8::new(0);
 static CAP_LEN: AtomicUsize = AtomicUsize::new(0);
@@ -211,6 +213,10 @@ pub fn set_record_role(role: Role) {
 }
 
 /// The pop-up's role, posted by the menu worker before the record chord.
+pub fn publish_fighter_prompt(on: bool) {
+    ASK_FIGHTER.store(on, Ordering::Release);
+}
+
 pub fn publish_menu_role(role: ViewRole) {
     set_record_role(match role {
         ViewRole::Cpu => Role::Cpu,
@@ -1015,7 +1021,10 @@ fn release_held(play_player: &mut bool, play_cpu: &mut bool) {
 fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick: &mut Tick) {
     show_chord_notice(root, tick);
     if let Some(ask) = mismatch_for(book, role) {
-        match lock(&ANSWER).take() {
+        // Ask before switching fighter Off (operator 2026-11-13, TR6): the current fighter stays, as Keep, unasked.
+        let asking = ASK_FIGHTER.load(Ordering::Acquire);
+        let answer = lock(&ANSWER).take().filter(|_| asking);
+        match answer.or((!asking).then_some(MismatchChoice::Keep)) {
             None => {
                 tick.diags.push(format!(
                     "screen=mismatch ask={} rows=Keep current fighter|Switch to recorded fighter",
@@ -1031,7 +1040,9 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
                 return;
             }
             Some(MismatchChoice::Keep) => {
-                tick.diags.push(format!("screen=mismatch ask={} answer=keep", ask.origin));
+                let off = if asking { "" } else { " prompt=off" };
+                let line = format!("screen=mismatch ask={}{off} answer=keep", ask.origin);
+                tick.diags.push(line);
             }
             Some(MismatchChoice::Switch) => {
                 tick.diags.push(format!("screen=mismatch ask={} answer=switch", ask.origin));
@@ -1225,6 +1236,11 @@ fn ask_drill(root: &Path, tick: &mut Tick) {
     };
     let current = lock(&PLAYER_LABEL).clone();
     if current.is_empty() || current == recorded {
+        return;
+    }
+    if !ASK_FIGHTER.load(Ordering::Acquire) {
+        // TR6: with Ask before switching fighter Off the drill stays on Player 1's fighter, unasked.
+        tick.diags.push("screen=mismatch ask=combo prompt=off answer=keep".to_string());
         return;
     }
     tick.diags.push(
@@ -1641,6 +1657,7 @@ fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 #[cfg(test)]
 fn reset_host() {
     RECORD_ROLE.store(ROLE_PLAYER, Ordering::Release);
+    ASK_FIGHTER.store(true, Ordering::Release);
     LAST_ROLE.store(ROLE_PLAYER, Ordering::Release);
     CAP_ROLE.store(0, Ordering::Release);
     CAP_LEN.store(0, Ordering::Release);
@@ -2654,6 +2671,52 @@ mod tests {
         }
     }
 
+    fn with_ask_before_switching_off_a_play_chord_keeps_the_fighter() {
+        // Operator 2026-11-13 (TR6): every fighter question follows Ask before switching fighter. Off: a Play chord on a
+        // macro or a chain recorded on another fighter plays on the current one, as the Keep answer does, unasked.
+        let _hold = hold();
+        reset_host();
+        let root = scratch("ask-off");
+        let first = one_macro(&root, "Recorded", 15, 13, None);
+        let later = one_macro(&root, "Later", 16, 0, None);
+        let chain = Chain::new("Mix", vec![first.clone(), later]).unwrap();
+        let chain_id = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&chain).unwrap();
+        for (id, origin) in [(&first, "macro"), (&chain_id, "macro1")] {
+            reset_host();
+            publish_fighter_prompt(false);
+            let mut index = RecordingIndex::load(&root).unwrap();
+            index.set_active(Role::Player, Some(id), 1).unwrap();
+            index.save(&root).unwrap();
+            set_role_fighter(Role::Player, 8);
+            on_chords(false, true, false);
+            let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+            assert!(tick.mismatch.is_none(), "{origin}: nothing asks");
+            let kept = format!("screen=mismatch ask={origin} prompt=off answer=keep");
+            assert!(tick.diags.contains(&kept), "{origin}: {:?}", tick.diags);
+            assert!(tick.switch_kind.is_none(), "{origin}");
+            assert_eq!(take_player_frame().expect("plays on the current fighter").buttons, 15, "{origin}");
+        }
+        reset_host();
+    }
+
+    fn with_ask_before_switching_off_a_changed_drill_keeps_the_fighter() {
+        // TR6: a combo drill recorded on another fighter stays on Player 1's fighter, unasked, with the row Off.
+        let _hold = hold();
+        reset_host();
+        publish_fighter_prompt(false);
+        let root = scratch("drill-ask-off");
+        let record = crate::model::combo_record::ComboRecord::new("Drill".into(), sample_combo(), Some("Ryu".into()));
+        let id = crate::model::combo_record::ComboLibrary::new(root.join("combos")).save_new(&record).unwrap();
+        note_drill(Some("seed".into()));
+        note_drill(Some(id));
+        set_fighter_label("Mario");
+        let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        assert!(tick.mismatch.is_none(), "nothing asks");
+        assert!(tick.diags.iter().any(|line| line == "screen=mismatch ask=combo prompt=off answer=keep"), "{:?}", tick.diags);
+        assert!(tick.switch_name.is_none());
+        reset_host();
+    }
+
     fn a_changed_combo_drill_asks_and_switch_names_the_recorded_fighter() {
         let _hold = hold();
         reset_host();
@@ -3250,6 +3313,8 @@ mod tests {
             ("an_answered_mismatch_wakes_the_service_gate_and_plays", an_answered_mismatch_wakes_the_service_gate_and_plays as fn()),
             ("the_mismatch_ask_names_the_side_that_plays", the_mismatch_ask_names_the_side_that_plays as fn()),
             ("a_changed_combo_drill_asks_and_switch_names_the_recorded_fighter", a_changed_combo_drill_asks_and_switch_names_the_recorded_fighter as fn()),
+            ("with_ask_before_switching_off_a_play_chord_keeps_the_fighter", with_ask_before_switching_off_a_play_chord_keeps_the_fighter as fn()),
+            ("with_ask_before_switching_off_a_changed_drill_keeps_the_fighter", with_ask_before_switching_off_a_changed_drill_keeps_the_fighter as fn()),
             ("rc5wire_publish_selection_writes_the_loop", rc5wire_publish_selection_writes_the_loop as fn()),
             ("a_changed_drill_installs_the_grade_target_once", a_changed_drill_installs_the_grade_target_once as fn()),
             ("a_sequence_plan_stages_its_combos_in_order_and_skips_a_deleted_one", a_sequence_plan_stages_its_combos_in_order_and_skips_a_deleted_one as fn()),
