@@ -600,7 +600,8 @@ This records the decision only; the implementation, host tests and Eden proofs a
 
 Opened by the primary for the operator from the lanes' reports of 2026-11-13. Nothing here is decided yet. Each item
 says what is being decided, the options with their cost to the player, and a recommendation. In each picture the
-recommended option has a **green outline**. The pictures are drawn by `tools/render_decisions_1113.py`.
+recommended option has a **green outline**. The pictures are drawn by `tools/render_decisions_1113.py`
+(rc13-DI-lines: `tools/render_rc13_di_lines.py`).
 
 "The held fix" means `c49681c9`: worker A's in-game text fixes, a local commit not yet on `main`
 (`artifacts/phase23/docs-audit-1113/WORKER-A-TEXT-FIXES.md`). TR1–TR8 come from the docs lane's audit of in-game text
@@ -617,6 +618,7 @@ recommended option has a **green outline**. The pictures are drawn by `tools/ren
 | TR7 | Crop trailing neutral (#14) | B: make Record trim |
 | TR8 | Player Character with Player Swapping Off (#17) | B: a pick loads now |
 | TR9 | Retire the old Record trigger row (V2), or keep its legacy start | A: V2, retire the row |
+| rc13-DI-lines | Wider DI lines on the DI Direction chips | D (fight-like) if its texture is resident in Training, with brighter unselected chips; otherwise C |
 | OP1 | Push the held doc fixes | A: push the docs now, `c49681c9` after TR5 and TR8 |
 | OP2 | The standalone `libimgui_smash.nro` on the card | A: remove it |
 | OP3 | Deluxe's hidden Stages + Counterpick page | A: show it |
@@ -792,6 +794,42 @@ switch off. V2 matches the design in `migrate.rs`, and it lets TR2 take (b)(ii)'
 
 Not listed: #19 (Give item's item arrives when the menu closes). The code's comment gives the reason: a short-fuse item
 must not expire while the picker still has the inputs.
+
+#### rc13-DI-lines · Wider DI lines (rc.13 item 2)
+
+How wide and bright the DI lines should be. These lines are the pointers on the **CPU › Defence › DI Direction** chips,
+and the operator said they are "super skinny". Each pointer is one picture pane with the game's own streak texture
+(`ef_cmn_line09`), rotated to the chip's direction. The streak inside it is narrow, so about 3 px shows at 1280 × 720.
+Unweighted chips draw at half tint, so their lines are also faint. In a fight, the thick pink-white band is the launch
+smoke trail, a different effect.
+
+- **A · today (rc.12):** no change. Cost to the player: the lines stay about 3 px wide, and the unselected ones stay
+  faint.
+- **B · 2× width:** `DI_WIDTH_RATIO` × 2, one constant. Cost: none at run time (the same pane, texture and draw). The
+  texture is stretched across, so its soft edge widens too.
+- **C · 3× width, a little longer:** `DI_WIDTH_RATIO` × 3 and `REACH` 0.46 → 0.50. Cost: as B. Above about 0.5 the
+  tip reaches the chip's label.
+- **D · fight-like:** a pink band with a white core and a glow, thicker at the tip. It uses a different texture, the
+  launch trail's, picked in `effect_chips::pick_layer` / `chips.rs`, with its own tint, plus B's or C's width. Cost:
+  first a short check of which effect and sampler carry the trail texture, and that it is resident in Training. After
+  that, it is still one pane per chip. The mockup's taper and glow are drawn with PIL, so the real texture decides the
+  actual shape.
+
+Options that combine with any of these:
+- **Brighter unselected chips:** half tint → about 70 %, one line in `view.rs`. Cost: less contrast between selected and
+  unselected chips, so the tile colour stays the main cue.
+- **Alpha:** free, but it can only make the lines softer, not bolder.
+- **Outline:** a second, darker pane under each pointer. Cost: 10 more panes, new pane indices in the menu layout and
+  one more draw per chip; feasible, but not one line.
+
+**Recommendation: D, if the launch-trail texture is resident in Training, plus brighter unselected chips; otherwise
+C.** D looks like what DI does in a fight, which is what the operator asked for. C is the widest change that needs only
+constants.
+
+The picture is author-2's mockup (`artifacts/rc13-di-lines/MOCKUP.png` and `NOTE.md`, in the workspace). It is drawn
+with PIL over the frame of `media/rc11-di.gif`, not the game's render. `tools/render_rc13_di_lines.py` outlines D.
+
+![rc13-DI-lines wider DI lines](decisions/rc13-DI-lines.png)
 
 ### Other projects
 
