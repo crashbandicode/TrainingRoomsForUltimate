@@ -601,7 +601,7 @@ This records the decision only; the implementation, host tests and Eden proofs a
 Opened by the primary for the operator from the lanes' reports of 2026-11-13. Nothing here is decided yet. Each item
 says what is being decided, the options with their cost to the player, and a recommendation. In each picture the
 recommended option has a **green outline**. The pictures are drawn by `tools/render_decisions_1113.py`
-(rc13-DI-lines: `tools/render_rc13_di_lines.py`; rc13-memory: `tools/render_rc13_memory.py`).
+(rc13-DI-lines: author-2's mockup as drawn; rc13-memory: `tools/render_rc13_memory.py`).
 
 "The held fix" means `c49681c9`: worker A's in-game text fixes, a local commit not yet on `main`
 (`artifacts/phase23/docs-audit-1113/WORKER-A-TEXT-FIXES.md`). TR1–TR8 come from the docs lane's audit of in-game text
@@ -618,7 +618,7 @@ recommended option has a **green outline**. The pictures are drawn by `tools/ren
 | TR7 | Crop trailing neutral (#14) | B: make Record trim |
 | TR8 | Player Character with Player Swapping Off (#17) | B: a pick loads now |
 | TR9 | Retire the old Record trigger row (V2), or keep its legacy start | A: V2, retire the row |
-| rc13-DI-lines | Wider DI lines on the DI Direction chips | D (fight-like) if its texture is resident in Training, with brighter unselected chips; otherwise C |
+| rc13-DI-lines | DI chips like the game's blue DI indicator (A–D rejected) | E2 x3 (glow plus streaks); E1 x2 is the closest to the native look |
 | rc13-memory | Memory levers for TrainingRooms' share | L5 + L6 as the core, plus L4; L1–L3 offered |
 | OP1 | Push the held doc fixes | A: push the docs now, `c49681c9` after TR5 and TR8 |
 | OP2 | The standalone `libimgui_smash.nro` on the card | A: remove it |
@@ -796,41 +796,45 @@ switch off. V2 matches the design in `migrate.rs`, and it lets TR2 take (b)(ii)'
 Not listed: #19 (Give item's item arrives when the menu closes). The code's comment gives the reason: a short-fuse item
 must not expire while the picker still has the inputs.
 
-#### rc13-DI-lines · Wider DI lines (rc.13 item 2)
+#### rc13-DI-lines · DI chips like the game's blue DI indicator (rc.13 item 2)
 
-How wide and bright the DI lines should be. These lines are the pointers on the **CPU › Defence › DI Direction** chips,
-and the operator said they are "super skinny". Each pointer is one picture pane with the game's own streak texture
-(`ef_cmn_line09`), rotated to the chip's direction. The streak inside it is narrow, so about 3 px shows at 1280 × 720.
-Unweighted chips draw at half tint, so their lines are also faint. In a fight, the thick pink-white band is the launch
-smoke trail, a different effect.
+How the pointers on the **CPU › Defence › DI Direction** chips should look. The operator said today's lines are "super
+skinny". Of the first mockup's options, the operator said "none of those options seem right for di", so A–D (wider or
+fight-trail-like streaks) are rejected. The target is "the di trajectory indicator when someone gets hit in a match":
+the blue DI indicator.
 
-- **A · today (rc.12):** no change. Cost to the player: the lines stay about 3 px wide, and the unselected ones stay
-  faint.
-- **B · 2× width:** `DI_WIDTH_RATIO` × 2, one constant. Cost: none at run time (the same pane, texture and draw). The
-  texture is stretched across, so its soft edge widens too.
-- **C · 3× width, a little longer:** `DI_WIDTH_RATIO` × 3 and `REACH` 0.46 → 0.50. Cost: as B. Above about 0.5 the
-  tip reaches the chip's label.
-- **D · fight-like:** a pink band with a white core and a glow, thicker at the tip. It uses a different texture, the
-  launch trail's, picked in `effect_chips::pick_layer` / `chips.rs`, with its own tint, plus B's or C's width. Cost:
-  first a short check of which effect and sampler carry the trail texture, and that it is resident in Training. After
-  that, it is still one pane per chip. The mockup's taper and glow are drawn with PIL, so the real texture decides the
-  actual shape.
+Today (rc.12) each pointer is one picture pane with the streak texture `line09`, in its pale tint, and unweighted chips
+draw at half tint. The game's blue indicator is the effect `P_CmnVector` (`ef_common.eff`), with four picture layers:
 
-Options that combine with any of these:
-- **Brighter unselected chips:** half tint → about 70 %, one line in `view.rs`. Cost: less contrast between selected and
-  unselected chips, so the tile colour stays the main cue.
-- **Alpha:** free, but it can only make the lines softer, not bolder.
-- **Outline:** a second, darker pane under each pointer. Cost: 10 more panes, new pane indices in the menu layout and
-  one more draw per chip; feasible, but not one line.
+| Layer | Picture | Role | Tint |
+| --- | --- | --- | --- |
+| emitter 4 | `flare01` | the glow | (12, 119, 255) |
+| emitter 0 | `tri00` | the body | (0, 177, 255) |
+| emitter 1 | `line09` | the streaks (today's only layer) | (200, 244, 255) |
+| emitter 2 | `line11` | the white core | (255, 255, 255) |
 
-**Recommendation: D, if the launch-trail texture is resident in Training, plus brighter unselected chips; otherwise
-C.** D looks like what DI does in a fight, which is what the operator asked for. C is the widest change that needs only
-constants.
+The options, each at x2 or x3 of today's width (`DI_WIDTH_RATIO` 1.2/3.5):
+- **Today (rc.12):** `line09` alone. Cost to the player: the hairline stays.
+- **E1 · all 4 layers** (flare01 glow + tri00 body + line09 streaks + line11 white core). Cost: **+33 panes** (3 more
+  layers × 11 chips) in the menu layout (`tools/layout-builder`).
+- **E2 · glow plus streaks** (flare01 + line09). Cost: **+11 panes** (1 more layer × 11 chips).
 
-The picture is author-2's mockup (`artifacts/rc13-di-lines/MOCKUP.png` and `NOTE.md`, in the workspace). It is drawn
-with PIL over the frame of `media/rc11-di.gif`, not the game's render. `tools/render_rc13_di_lines.py` outlines D.
+For both: **no new textures.** `ef_common.eff` is resident in Training, and TrainingRooms' loader already finds all
+four pictures (`describe Di ... pictures=4`). E1 and E2 only reference them, so nothing new is loaded.
 
-![rc13-DI-lines wider DI lines](decisions/rc13-DI-lines.png)
+**Caveat:** the game blends these layers additively. TrainingRooms' panes draw with the layout material's normal alpha,
+because its UI code has no blend control. On the dark navy tiles that is close to the mockup. True additive blending
+would need a BFLYT material change in `tools/layout-builder`, which hasn't been checked.
+
+**Recommendation: E2 x3,** for the cost (+11 panes). **E1 x2 is the closest to the native look,** because it has the
+white core, if 33 more panes are acceptable.
+
+The picture is author-2's mockup (`artifacts/rc13-di-lines/MOCKUP-blue.png` and `NOTE-blue.md`, in the workspace),
+with its own green outline on E2 x3. It is a mockup, not the game's render: the colours and gains come from
+`P_CmnVector`'s emitters (TrainingRooms' diagnostics), and the layer shapes are approximated. The "Native" panel is an
+Eden crop of the real indicator: Mario's forward smash, CPU at 120 %, DI Up, Game speed 1/4.
+
+![rc13-DI-lines: today, the native blue DI indicator, and E1 / E2 at x2 and x3, with E2 x3 recommended](decisions/rc13-DI-lines-blue.png)
 
 #### rc13-memory · Memory levers (rc.13)
 
