@@ -2,6 +2,8 @@
 //! opened from a Recording row, or the clip editor that took Player 1 from the menu). Pure, so the transitions are host-tested; the
 //! menu worker (`runtime::ui::worker`) asks it after every press and every poll and does what it answers.
 
+use super::frame::CLOSE_FRAMES;
+
 /// Who owns the buttons.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Phase {
@@ -55,6 +57,24 @@ pub enum Step {
 /// match and let the frame strip draw over it (rc.5 XPS proof).
 pub fn menu_owns_input(open: bool, popup: bool, closing: bool, prompt: bool) -> bool {
     open || popup || closing || prompt
+}
+
+/// What a close window starts waiting for (SPEC-core-03 §2.3): every action button (A, B, X, Y, L, R, ZL, ZR, the adapter's
+/// logical bits 0–7). Each P1 poll then keeps only the ones still held (`held & poll`), so the window waits for the buttons
+/// held at its first poll, the press that closed it among them. Directions are movement and are not waited for.
+pub const CLOSE_HELD_START: u32 = 0x00ff;
+
+/// The close window of the menu or the pop-up ends after its `CLOSE_FRAMES` real frames once nothing it waits for is still
+/// held, so a B held through the close never reaches the fighter as a fresh press (CODE-FINDINGS #23).
+pub fn close_done(count: u32, held: u32) -> bool {
+    count >= CLOSE_FRAMES && held == 0
+}
+
+/// The pop-up just closed over the closed menu (`was` is the state the worker last published): the worker starts the close
+/// window before `POPUP` falls, so the owner bit never drops on the press that closed it (`menu_owns_input` keeps it while
+/// closing). Releasing on that press handed the B to the fighter (CODE-FINDINGS #23, Mario's fireball).
+pub fn popup_closed(menu_open: bool, was: bool, now: bool) -> bool {
+    was && !now && !menu_open
 }
 
 /// Whether the frame of `phase` is built from the menu's model. The clip editor's is not: the hand-over closed the menu,
@@ -122,12 +142,38 @@ mod tests {
         assert_eq!(next(Phase::Prompt, in_menu), (Phase::Menu, Step::HidePrompt));
     }
 
+    /// CODE-FINDINGS #23: the pop-up's close starts the close window; over the open menu the menu's own close does.
+    fn the_pop_ups_close_starts_the_close_window() {
+        assert!(popup_closed(false, true, false));
+        assert!(!popup_closed(true, true, false));
+        assert!(!popup_closed(false, false, true));
+        assert!(!popup_closed(false, true, true));
+        assert!(!popup_closed(false, false, false));
+        // The window keeps the owner bit the pop-up took.
+        assert!(menu_owns_input(false, false, true, false));
+    }
+
+    /// The window waits for the action buttons held at its first poll, and 15 frames stay the minimum.
+    fn the_close_window_waits_for_the_buttons_held_when_it_began() {
+        const A: u32 = 1 << 0;
+        const B: u32 = 1 << 1;
+        const DPAD_UP: u32 = 1 << 8;
+        let first = CLOSE_HELD_START & (A | B | DPAD_UP);
+        assert_eq!(first, A | B, "a held direction is movement");
+        assert!(!close_done(CLOSE_FRAMES * 10, first & B));
+        assert!(!close_done(CLOSE_FRAMES - 1, 0));
+        assert!(close_done(CLOSE_FRAMES, first & !(A | B)));
+        assert!(!close_done(CLOSE_FRAMES, CLOSE_HELD_START), "a window waits for its first poll");
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("the_hand_over_close_keeps_the_clip_editor_drawn", the_hand_over_close_keeps_the_clip_editor_drawn as fn()),
             ("a_fighter_question_inside_the_open_menu_stays_the_menu_panels", a_fighter_question_inside_the_open_menu_stays_the_menu_panels as fn()),
+            ("the_pop_ups_close_starts_the_close_window", the_pop_ups_close_starts_the_close_window as fn()),
+            ("the_close_window_waits_for_the_buttons_held_when_it_began", the_close_window_waits_for_the_buttons_held_when_it_began as fn()),
         ]);
     }
     }

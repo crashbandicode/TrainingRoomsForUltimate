@@ -13,10 +13,15 @@ pub static OPEN: AtomicBool = AtomicBool::new(false);
 pub static POPUP: AtomicBool = AtomicBool::new(false);
 /// The input hook saw RecordingPopup. The worker toggles the pop-up and clears this.
 pub static POPUP_REQ: AtomicBool = AtomicBool::new(false);
-/// The menu closed and the 15 real frames of discarded input and fade are running (SPEC-core-03 §2.3).
+/// The menu or the pop-up closed and the close window runs (SPEC-core-03 §2.3, `flow::close_done`): 15 real frames of
+/// discarded input (and the menu's fade), then until the action buttons held at its first poll are released.
 pub static CLOSING: AtomicBool = AtomicBool::new(false);
 /// Real frames since the close, counted by the layout tick.
 pub static CLOSE_COUNT: AtomicU32 = AtomicU32::new(0);
+/// The buttons the close window still waits for: `flow::CLOSE_HELD_START`, then what each P1 poll shows still held.
+pub static CLOSE_HELD: AtomicU32 = AtomicU32::new(0);
+/// The close window fades the panel out (the menu's close). The pop-up's close does not: it vanishes on the press.
+pub static CLOSE_FADES: AtomicBool = AtomicBool::new(true);
 /// The menu is on screen this frame (the HUD layouts hide while it is, SPEC-core-05 §2).
 pub static MENU_SHOWN: AtomicBool = AtomicBool::new(false);
 /// A panel the menu does not own is on screen with the menu closed (the replay window's clip editor): the tick draws the frame.

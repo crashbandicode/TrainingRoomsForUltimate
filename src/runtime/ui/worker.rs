@@ -24,7 +24,7 @@ use crate::runtime::published;
 use crate::runtime::macros::{named_macros, replay_capture};
 use crate::runtime::ui::{combos, external, requests};
 use crate::model::input_delay::Owners;
-use crate::runtime::ui::state::{CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, JUMPS, LAYOUT_READY, OPEN, POPUP, POPUP_REQ, PROMPT};
+use crate::runtime::ui::state::{CLOSE_COUNT, CLOSE_FADES, CLOSE_HELD, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, JUMPS, LAYOUT_READY, OPEN, POPUP, POPUP_REQ, PROMPT};
 
 static INPUT: Ring<64> = Ring::new();
 /// What wakes the menu worker (`wake`, any thread, game hooks included). A `hos_lock::Event`, not `std::thread::park`/`unpark`:
@@ -319,8 +319,7 @@ fn handle(event: Event, s: &mut Session) {
         press(button, s);
     }
     if let Some(menu) = s.menu.as_ref() {
-        POPUP.store(menu.recording().popup_open(), Ordering::Release);
-        sync_popup_owner();
+        publish_popup(menu.recording().popup_open());
     }
     // Release-only packets also advance capture and update its hint/preview.
     if OPEN.load(Ordering::Acquire) {
@@ -340,12 +339,21 @@ fn toggle_popup(s: &mut Session) {
     refresh_recording(s);
     if let Some(menu) = s.menu.as_mut() {
         menu.on_request(crate::model::chords::Request::RecordingPopup);
-        POPUP.store(menu.recording().popup_open(), Ordering::Release);
+        publish_popup(menu.recording().popup_open());
         post_recording_effect(menu);
     }
-    sync_popup_owner();
     publish_frame(s);
     publish_jumps(s);
+}
+
+/// Publish the pop-up's state. A close starts the close window before `POPUP` falls (`flow::popup_closed`), so
+/// `sync_popup_owner` keeps the owner bit through it (CODE-FINDINGS #23).
+fn publish_popup(now: bool) {
+    if flow::popup_closed(OPEN.load(Ordering::Acquire), POPUP.load(Ordering::Acquire), now) {
+        start_close_window(false);
+    }
+    POPUP.store(now, Ordering::Release);
+    sync_popup_owner();
 }
 
 fn sync_popup_owner() {
@@ -356,6 +364,15 @@ fn sync_popup_owner() {
     } else if !flow::menu_owns_input(open, popup, CLOSING.load(Ordering::Acquire), PROMPT.load(Ordering::Acquire)) {
         crate::runtime::published::INPUT_OWNERS.fetch_and(!Owners::MENU.bits(), Ordering::AcqRel);
     }
+}
+
+/// The close window of the menu (`fades`) or the pop-up (SPEC-core-03 §2.3): the owner bit stays until the layout tick ends
+/// it (`flow::close_done`). The input hook drops from `CLOSE_HELD` every button a poll shows released.
+fn start_close_window(fades: bool) {
+    CLOSE_HELD.store(flow::CLOSE_HELD_START, Ordering::Release);
+    CLOSE_COUNT.store(0, Ordering::Release);
+    CLOSE_FADES.store(fades, Ordering::Release);
+    CLOSING.store(true, Ordering::Release);
 }
 
 /// Tell the input hook whether ZL + Up / Down are jumps on what shows now (`Menu::takes_jumps`): only the menu's own
@@ -1097,7 +1114,7 @@ fn retry_close(s: &mut Session) {
     }
 }
 
-/// B on the page: commit (SPEC-core-03 §2.3), then the 15 frames of discarded input and fade run.
+/// B on the page: commit (SPEC-core-03 §2.3), then the close window runs: discarded input and the fade.
 fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(6);
@@ -1135,8 +1152,7 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     }
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(12);
-    CLOSE_COUNT.store(0, Ordering::Release);
-    CLOSING.store(true, Ordering::Release);
+    start_close_window(true);
     INPUT.reset();
     OPEN.store(false, Ordering::Release);
     crate::runtime::ui::menu_app::note_open();

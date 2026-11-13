@@ -1,7 +1,7 @@
 //! The per-layout tick (SPEC-core-05 §4.1, §5): called for every live layout every frame on the UI job
 //! thread, and once for a newly registered layout on the main thread. For the Training HUD it resolves the
-//! menu's panes once per layout registration, detects the game's pause menu, closes the 15-frame window
-//! after the menu closes, and draws the worker's frame when it changed.
+//! menu's panes once per layout registration, detects the game's pause menu, ends the close window after the
+//! menu or the pop-up closes (`flow::close_done`), and draws the worker's frame when it changed.
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
@@ -9,6 +9,7 @@ use hos_lock::Mutex;
 use skyline::nn::ui2d::{Layout, Pane};
 
 use crate::model::input_delay::Owners;
+use crate::model::flow;
 use crate::model::frame::{fade_alpha, CLOSE_FRAMES};
 use crate::model::panes as p;
 use crate::runtime::diag_log::diagnostic;
@@ -120,13 +121,13 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     let mut alpha = 255;
     let mut showing = open || ext || popup;
     if CLOSING.load(Ordering::Acquire) {
-        let count = CLOSE_COUNT.fetch_add(1, Ordering::AcqRel) + 1;
-        if count >= CLOSE_FRAMES {
+        let count = CLOSE_COUNT.fetch_add(1, Ordering::AcqRel).saturating_add(1);
+        if flow::close_done(count, state::CLOSE_HELD.load(Ordering::Acquire)) {
             CLOSING.store(false, Ordering::Release);
             if !state::PROMPT.load(Ordering::Acquire) {
                 INPUT_OWNERS.fetch_and(!Owners::MENU.bits(), Ordering::AcqRel);
             }
-        } else {
+        } else if count < CLOSE_FRAMES && state::CLOSE_FADES.load(Ordering::Acquire) {
             showing = true;
             alpha = if ext || popup { 255 } else { fade_alpha(count) };
         }

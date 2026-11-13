@@ -3,7 +3,8 @@
 //! raw buttons (`current_buttons` at +0x8) and the controller style (+0x9c, the field the game's own mapping reads at `main+0x1750e0c`: `ldr w2, [x20, #0x9c]` after `ldr x20, [x3, #0x10]`; the same `Controller` package 4's chords read, `chords::field`). The adapter (`model::ui::
 //! adapter`) turns them into the open chord and logical presses, which go to the menu worker through a
 //! lock-free ring; while the menu is open or closing the `Owners::MENU` bit empties P1's mapped output
-//! (the delay stage of `features::input_delay` already neutralises a poll whose owners are set).
+//! (the delay stage of `features::input_delay` already neutralises a poll whose owners are set). While a close window
+//! runs, each poll drops the released buttons from what it waits for (`state::CLOSE_HELD`).
 //!
 //! The hook allocates nothing and takes no blocking lock.
 
@@ -85,6 +86,10 @@ pub fn on_p1_poll(holder: usize) {
     // ZL + Up / Down are jumps only where the screen showing takes them (the worker publishes it, review MN-1).
     adapter.set_jumps(state::JUMPS.load(Ordering::Acquire));
     let step = adapter.poll(buttons, style, open || popup, allowed, shortcuts);
+    if state::CLOSING.load(Ordering::Acquire) {
+        // The close window waits for the buttons held at its first poll (the press that closed it) to be released.
+        state::CLOSE_HELD.fetch_and(u32::from(step.held), Ordering::AcqRel);
+    }
     if allowed && chords::consume(crate::model::chords::Request::RecordingPopup) {
         state::POPUP_REQ.store(true, Ordering::Release);
         worker::wake();
