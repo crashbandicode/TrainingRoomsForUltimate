@@ -598,8 +598,8 @@ This records the decision only; the implementation, host tests and Eden proofs a
 
 ## Open (2026-11-13)
 
-Opened by the primary for the operator from the lanes' reports of 2026-11-13. Nothing here is decided yet. Each item
-says what is being decided, the options with their cost to the player, and a recommendation. In each picture the
+Opened by the primary for the operator from the lanes' reports of 2026-11-13. An item the operator has answered says
+**Decided** under its heading (rc13-memory); the rest are still open. Each item says what is being decided, the options with their cost to the player, and a recommendation. In each picture the
 recommended option has a **green outline**. The pictures are drawn by `tools/render_decisions_1113.py`
 (rc13-DI-lines: author-2's mockup as drawn; rc13-memory: `tools/render_rc13_memory.py`).
 
@@ -619,7 +619,7 @@ recommended option has a **green outline**. The pictures are drawn by `tools/ren
 | TR8 | Player Character with Player Swapping Off (#17) | B: a pick loads now |
 | TR9 | Retire the old Record trigger row (V2), or keep its legacy start | A: V2, retire the row |
 | rc13-DI-lines | DI chips like the game's blue DI indicator (A–D rejected) | E2 x3 (glow plus streaks); E1 x2 is the closest to the native look |
-| rc13-memory | Memory levers for TrainingRooms' share | L5 + L6 as the core, plus L4; L1–L3 offered |
+| rc13-memory | Memory levers for TrainingRooms' share | **Decided 11-13: dropped**, no lever implemented |
 | OP1 | Push the held doc fixes | A: push the docs now, `c49681c9` after TR5 and TR8 |
 | OP2 | The standalone `libimgui_smash.nro` on the card | A: remove it |
 | OP3 | Deluxe's hidden Stages + Counterpick page | A: show it |
@@ -836,7 +836,16 @@ Eden crop of the real indicator: Mario's forward smash, CPU at 120 %, DI Up, Gam
 
 ![rc13-DI-lines: today, the native blue DI indicator, and E1 / E2 at x2 and x3, with E2 x3 recommended](decisions/rc13-DI-lines-blue.png)
 
-#### rc13-memory · Memory levers (rc.13)
+E1 x1, as the operator asked: all four layers of P_CmnVector at today's width (DI_WIDTH_RATIO 1.2/3.5). Cost: +33
+panes, no new textures.
+
+![rc13-DI-lines E1 x1: today, the native blue DI indicator, and all four layers at today's width, with a 3x close-up](decisions/rc13-DI-lines-e1-x1.png)
+
+#### rc13-memory · Memory levers (rc.13): dropped
+
+**Decided 2026-11-13 (~22:55Z): dropped; no lever will be implemented.** The operator: "drop the memory optimization.
+Seems it's already fine. I don't want to sacrifice perforance." The measurements below stay as the record:
+TrainingRooms' share is 398 MiB on the card settings and about 582 MiB at a cycle-lap peak.
 
 Which levers to build to lower TrainingRooms' memory and widen Training's headroom. No feature is dropped by any of
 them. The numbers come from worker B-2's measurements (`artifacts/rc13-memory/MEASURE.md`, in the workspace). They are
@@ -882,7 +891,7 @@ says otherwise.
 B-2's combined estimates: L1 + L3 + L4 brings Training entry to about 2,620–2,700 MiB (585–665 MiB free); L2 on top
 gives about 2,500–2,600 MiB. L5 + L6 lower the peaks, not the settled figure.
 
-**Recommendation: L5 + L6 as the core, plus L4.**
+**Recommendation (not taken; the item is dropped): L5 + L6 as the core, plus L4.**
 - **L5 + L6:** they are peak-safety levers aimed at the 11-13 console abort. Neither changes the settled figure or any
   default.
 - **L4:** hats and helper seats load on first use. It saves 40–50 MiB, and only the first hat per fighter is slower.
