@@ -58,7 +58,6 @@ const HOOK_LOCKS: &[(&str, &str)] = &[
     ("compat/menu.rs", "EDITED"),
     ("ui/input.rs", "ADAPTER"),
     ("ui/menu_app.rs", "QUICK_MENU_APP"),
-    ("macros/named_macros.rs", "CAPTURE_ORIGIN"),
     ("macros/named_macros.rs", "RESTORE_ANCHOR"),
     ("macros/named_macros.rs", "RESTORE_POSE"),
     ("macros/named_macros.rs", "PANEL_STOPS"),

@@ -6,8 +6,6 @@
 //! * `PlayBuffers<T>`: two frame buffers for named playback. The worker fills the one the hooks are not reading and publishes it; a
 //!   hook reads one frame by value per call and never waits. The worker, which may sleep, waits for the readers of the old buffer to
 //!   leave before it writes that buffer again.
-//! * `CaptureBuffer<T>`: one frame buffer the hook owns between the start of a named capture and its end, and the worker owns
-//!   otherwise (it prepares it before a capture and reads the frames after one). Ownership moves through one atomic; neither side waits.
 //! * `LayerEvent`: what a game thread tells the worker (posted to a mailbox, drained by the worker in order).
 //!
 //! The buffers allocate only on the worker (`prepare`, `fill`); a hook's `push`/`frame_at` stay within the prepared capacity.
@@ -335,131 +333,6 @@ impl<T: Copy> Default for PlayBuffers<T> {
     }
 }
 
-/// Who owns the capture buffer.
-const WORKER_READY: u8 = 0;
-const HOOK: u8 = 1;
-const WORKER_FULL: u8 = 2;
-const WORKER_BUSY: u8 = 3;
-const HOOK_BUSY: u8 = 4;
-
-/// The named capture's frame buffer: the hook's from `begin` to `finish`, the worker's otherwise.
-pub struct CaptureBuffer<T> {
-    frames: UnsafeCell<Vec<T>>,
-    owner: AtomicU8,
-    /// Frames stored by the hook (published at `finish`).
-    len: AtomicUsize,
-}
-
-// SAFETY: every frame access holds WORKER_BUSY or HOOK_BUSY exclusively. Ownership
-// transitions use compare-exchange; competing hook calls fail immediately instead of aliasing.
-unsafe impl<T: Send> Sync for CaptureBuffer<T> {}
-
-impl<T: Copy + Default> CaptureBuffer<T> {
-    pub const fn new() -> Self {
-        Self { frames: UnsafeCell::new(Vec::new()), owner: AtomicU8::new(WORKER_READY), len: AtomicUsize::new(0) }
-    }
-
-    /// Worker: reserve `capacity` frames (only while the worker owns an empty buffer). False when the hook or a pending result holds it.
-    pub fn prepare(&self, capacity: usize) -> bool {
-        if self.owner.compare_exchange(WORKER_READY, WORKER_BUSY, SeqCst, SeqCst).is_err() {
-            return false;
-        }
-        // SAFETY: WORKER_BUSY: only this worker call touches the buffer.
-        let frames = unsafe { &mut *self.frames.get() };
-        if frames.capacity() < capacity {
-            frames.reserve_exact(capacity - frames.len());
-        }
-        self.owner.store(WORKER_READY, SeqCst);
-        true
-    }
-
-    /// Hook: take the buffer for a capture (empty, prepared). False when the worker has not taken the last result yet.
-    pub fn begin(&self) -> bool {
-        if self.owner.compare_exchange(WORKER_READY, HOOK_BUSY, SeqCst, SeqCst).is_err() {
-            return false;
-        }
-        // SAFETY: HOOK_BUSY excludes every other accessor while clearing the buffer.
-        unsafe { (*self.frames.get()).clear() };
-        self.len.store(0, SeqCst);
-        self.owner.store(HOOK, SeqCst);
-        true
-    }
-
-    /// Hook: store frame `index` (frames in between are default-filled). False when not capturing or past the prepared capacity
-    /// (the hook never grows the buffer).
-    pub fn store(&self, index: usize, frame: T) -> bool {
-        if self.owner.compare_exchange(HOOK, HOOK_BUSY, SeqCst, SeqCst).is_err() {
-            return false;
-        }
-        // SAFETY: HOOK_BUSY is held exclusively for this bounded write.
-        let frames = unsafe { &mut *self.frames.get() };
-        if index >= frames.capacity() {
-            self.owner.store(HOOK, SeqCst);
-            return false;
-        }
-        if frames.len() <= index {
-            frames.resize(index + 1, T::default());
-        }
-        frames[index] = frame;
-        self.len.store(frames.len(), SeqCst);
-        self.owner.store(HOOK, SeqCst);
-        true
-    }
-
-    /// Hook: frame `index` was stored.
-    #[cfg(test)]
-    pub fn has_frame(&self, index: usize) -> bool {
-        self.owner.load(SeqCst) == HOOK && index < self.len.load(SeqCst)
-    }
-
-    /// Hook: frame `index` of the running capture.
-    pub fn frame_at(&self, index: usize) -> Option<T> {
-        if self.owner.compare_exchange(HOOK, HOOK_BUSY, SeqCst, SeqCst).is_err() {
-            return None;
-        }
-        // SAFETY: HOOK_BUSY excludes writes and ownership transitions until the copy completes.
-        let frame = unsafe { (&*self.frames.get()).get(index).copied() };
-        self.owner.store(HOOK, SeqCst);
-        frame
-    }
-
-    /// Hook: the capture ended; the buffer goes to the worker with its frames. Returns the frame count (None: not capturing).
-    pub fn finish(&self) -> Option<usize> {
-        self.owner.compare_exchange(HOOK, HOOK_BUSY, SeqCst, SeqCst).ok()?;
-        let len = self.len.load(SeqCst);
-        self.owner.store(WORKER_FULL, SeqCst);
-        Some(len)
-    }
-
-    /// Hook: the capture was cancelled (a load request, a stop): the buffer goes back to the worker empty.
-    pub fn cancel(&self) {
-        if self.owner.compare_exchange(HOOK, WORKER_BUSY, SeqCst, SeqCst).is_ok() {
-            self.len.store(0, SeqCst);
-            self.owner.store(WORKER_READY, SeqCst);
-        }
-    }
-
-    /// Worker: read the finished capture's frames, then the buffer is ready for the next capture. None when no result is waiting.
-    pub fn take<R>(&self, read: impl FnOnce(&[T]) -> R) -> Option<R> {
-        if self.owner.compare_exchange(WORKER_FULL, WORKER_BUSY, SeqCst, SeqCst).is_err() {
-            return None;
-        }
-        // SAFETY: WORKER_BUSY: only this worker call touches the buffer.
-        let frames = unsafe { &mut *self.frames.get() };
-        let out = read(&frames[..self.len.load(SeqCst).min(frames.len())]);
-        frames.clear();
-        self.len.store(0, SeqCst);
-        self.owner.store(WORKER_READY, SeqCst);
-        Some(out)
-    }
-}
-
-impl<T: Copy + Default> Default for CaptureBuffer<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
@@ -506,43 +379,7 @@ mod tests {
         assert!(retirement.finish(), "crop/export stop retains the same anchor");
     }
 
-    fn capture_access_is_exclusive_even_when_hook_calls_overlap() {
-        use std::sync::atomic::{AtomicBool, Ordering};
-        use std::sync::Arc;
-        static ENTERED: AtomicBool = AtomicBool::new(false);
-        static RELEASE: AtomicBool = AtomicBool::new(false);
-        #[derive(Clone, Copy, Debug, PartialEq)]
-        struct Frame(u32);
-        impl Default for Frame {
-            fn default() -> Self {
-                ENTERED.store(true, Ordering::Release);
-                while !RELEASE.load(Ordering::Acquire) { std::thread::yield_now(); }
-                Self(0)
-            }
-        }
-        let buffer = Arc::new(super::CaptureBuffer::<Frame>::new());
-        assert!(buffer.prepare(2));
-        assert!(buffer.begin());
-        let writer = Arc::clone(&buffer);
-        let thread = std::thread::spawn(move || writer.store(0, Frame(7)));
-        while !ENTERED.load(Ordering::Acquire) { std::thread::yield_now(); }
-        // A callback retiring or reading the capture cannot alias the active write.
-        let begin = buffer.begin();
-        let finish = buffer.finish();
-        let read = buffer.frame_at(0);
-        let write = buffer.store(1, Frame(9));
-        buffer.cancel();
-        RELEASE.store(true, Ordering::Release);
-        assert!(thread.join().unwrap());
-        assert!(!begin);
-        assert_eq!(finish, None);
-        assert_eq!(read, None);
-        assert!(!write);
-        assert_eq!(buffer.finish(), Some(1));
-        assert_eq!(buffer.take(|frames| frames.to_vec()), Some(vec![Frame(7)]));
-    }
-
-    use super::{CaptureBuffer, MacroQueries, PlayBuffers};
+    use super::{MacroQueries, PlayBuffers};
 
     fn numbered_slot_transfer_preserves_frames_origin_and_refusals() {
         use super::{SlotTransfer, SlotResult};
@@ -671,57 +508,6 @@ mod tests {
         }
     }
 
-    fn a_slow_worker_keeps_its_capture_until_it_has_copied_the_result() {
-        use std::sync::{Arc, Barrier};
-        let capture = Arc::new(CaptureBuffer::<u16>::new());
-        assert!(capture.prepare(4));
-        assert!(capture.begin());
-        assert!(capture.store(0, 42));
-        assert_eq!(capture.finish(), Some(1));
-        let entered = Arc::new(Barrier::new(2));
-        let leave = Arc::new(Barrier::new(2));
-        let worker = {
-            let (capture, entered, leave) = (capture.clone(), entered.clone(), leave.clone());
-            std::thread::spawn(move || capture.take(|frames| {
-                entered.wait();
-                leave.wait();
-                frames.to_vec()
-            }))
-        };
-        entered.wait();
-        // The game continues while the worker is delayed: it cannot overwrite
-        // the finished recording or mistake it for a running capture.
-        assert!(!capture.begin());
-        assert!(!capture.store(0, 99));
-        assert_eq!(capture.frame_at(0), None);
-        capture.cancel();
-        leave.wait();
-        assert_eq!(worker.join().unwrap(), Some(vec![42]));
-        assert!(capture.begin());
-        assert!(capture.store(0, 7));
-        assert_eq!(capture.finish(), Some(1));
-        assert_eq!(capture.take(<[u16]>::to_vec), Some(vec![7]));
-    }
-
-    fn the_capture_buffer_moves_hook_to_worker_and_back_without_growing_in_the_hook() {
-        let capture = CaptureBuffer::<u16>::new();
-        assert!(!capture.store(0, 1), "not capturing yet");
-        assert!(capture.prepare(4));
-        assert!(capture.begin());
-        assert!(!capture.prepare(8), "the hook owns it");
-        assert!(capture.store(0, 5) && capture.store(2, 7));
-        assert!(!capture.store(4, 9), "past the prepared capacity: refused, never grown in the hook");
-        assert_eq!((capture.has_frame(1), capture.frame_at(1), capture.frame_at(2)), (true, Some(0), Some(7)));
-        assert_eq!(capture.finish(), Some(3));
-        assert!(!capture.begin(), "the worker has not taken the result");
-        assert_eq!(capture.take(<[u16]>::to_vec), Some(vec![5, 0, 7]));
-        assert_eq!(capture.take(<[u16]>::to_vec), None);
-        assert!(capture.begin());
-        capture.cancel();
-        assert_eq!(capture.finish(), None);
-        assert!(capture.begin(), "a cancelled capture returns the buffer ready");
-    }
-
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
@@ -730,14 +516,11 @@ mod tests {
             ("preview_active_close_survives_coalesced_stops_until_cleanup_finishes", preview_active_close_survives_coalesced_stops_until_cleanup_finishes as fn()),
             ("preview_close_cancelling_queued_play_retires_when_drain_becomes_idle", preview_close_cancelling_queued_play_retires_when_drain_becomes_idle as fn()),
             ("preview_parked_editor_and_crop_stop_retain_the_anchor_without_focus", preview_parked_editor_and_crop_stop_retain_the_anchor_without_focus as fn()),
-            ("capture_access_is_exclusive_even_when_hook_calls_overlap", capture_access_is_exclusive_even_when_hook_calls_overlap as fn()),
             ("numbered_slot_transfer_preserves_frames_origin_and_refusals", numbered_slot_transfer_preserves_frames_origin_and_refusals as fn()),
             ("in_place_slot_import_is_atomic_on_refusal_and_preserves_full_length", in_place_slot_import_is_atomic_on_refusal_and_preserves_full_length as fn()),
             ("the_idle_snapshot_has_nothing_loaded_or_visible", the_idle_snapshot_has_nothing_loaded_or_visible as fn()),
             ("a_published_macro_is_read_by_value_and_a_new_one_replaces_it", a_published_macro_is_read_by_value_and_a_new_one_replaces_it as fn()),
             ("readers_never_see_a_torn_buffer_while_the_worker_republishes", readers_never_see_a_torn_buffer_while_the_worker_republishes as fn()),
-            ("a_slow_worker_keeps_its_capture_until_it_has_copied_the_result", a_slow_worker_keeps_its_capture_until_it_has_copied_the_result as fn()),
-            ("the_capture_buffer_moves_hook_to_worker_and_back_without_growing_in_the_hook", the_capture_buffer_moves_hook_to_worker_and_back_without_growing_in_the_hook as fn()),
         ]);
     }
     }

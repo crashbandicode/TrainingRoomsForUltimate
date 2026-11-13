@@ -1274,7 +1274,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "edd1dc1a07e9fe7f4dafa3e0aef8e8bf5d54f1e2cc7f26f07d142415ab50bb5e",
+   "dest_sha256": "9bd50f80c3e7291522099a01499c315820f6139bf5df1f813e1ae65cf296a604",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -1807,6 +1807,31 @@
       ]
      ],
      "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+    },
+    {
+     "old": "\n    /// Opens the save dialog. An empty or fighter-less take is refused.\n    pub fn offer_save(\n        &mut self,\n        mut frames: Vec<InputFrame>,\n        start: StartState,\n        crop: bool,\n        version: &str,\n    ) -> Effect {\n        if crop {\n            crop_neutral_tail(&mut frames);\n        }\n        if frames.is_empty() || start.fighter_kind < 0 {\n            return Effect::Notify(\"Recording was empty\".to_owned());\n        }\n        self.offer_save_with_mii(frames, start, false, version, None)\n    }\n\n    /// Same dialog as [`Self::offer_save`], retaining an exact Mii captured with the take.\n    pub fn offer_save_with_mii(\n",
+     "new": "\n    /// Opens the save dialog, retaining an exact Mii captured with the take. An empty or fighter-less take is refused.\n    pub fn offer_save_with_mii(\n",
+     "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
+    },
+    {
+     "old": "        let mut ui = MacroUi::new();\n        ui.offer_save(frames(), start(), false, \"13.0.5\");\n        assert_eq!(ui.name_prompt(), Some(\"Recording\"));\n",
+     "new": "        let mut ui = MacroUi::new();\n        ui.offer_save_with_mii(frames(), start(), false, \"13.0.5\", None);\n        assert_eq!(ui.name_prompt(), Some(\"Recording\"));\n",
+     "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
+    },
+    {
+     "old": "        let mut ui = MacroUi::new();\n        ui.offer_save(frames(), start(), false, \"13.0.5\");\n        for _ in 0..9 {\n",
+     "new": "        let mut ui = MacroUi::new();\n        ui.offer_save_with_mii(frames(), start(), false, \"13.0.5\", None);\n        for _ in 0..9 {\n",
+     "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
+    },
+    {
+     "old": "        });\n        ui.offer_save(recorded, start(), true, \"13.0.5\");\n        let Effect::Save(recording) = ui.on_pad(Pad::Confirm) else {\n",
+     "new": "        });\n        ui.offer_save_with_mii(recorded, start(), true, \"13.0.5\", None);\n        let Effect::Save(recording) = ui.on_pad(Pad::Confirm) else {\n",
+     "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
+    },
+    {
+     "old": "        assert!(ui.restored_target(1, (4.0, 8.0)).is_none());\n        ui.offer_save(frames(), start(), false, \"13.0.5\");\n        ui.on_pad(Pad::Left);\n",
+     "new": "        assert!(ui.restored_target(1, (4.0, 8.0)).is_none());\n        ui.offer_save_with_mii(frames(), start(), false, \"13.0.5\", None);\n        ui.on_pad(Pad::Left);\n",
+     "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
     }
    ]
   },
@@ -2092,7 +2117,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "1d570271b3fc3cff70168c0b43080d6da4e71eea863b0398d6dce6a031a627c8",
+   "dest_sha256": "2ea503a161d72e93e750df72559e46849239a0061705371a8517f1092ca22f7f",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -2788,6 +2813,56 @@
      "old": "/// Edit placement edits the page role's active macro, the file Play plays (primary 2026-11-08 #70 (a)); the anchor\n",
      "new": "/// Edit placement edits the Recording pop-up role's active macro, the file Play plays (primary 2026-11-08 #70 (a)); the anchor\n",
      "reason": "docs audit 2026-11-13 (artifacts/phase23/docs-audit-1113/CODE-FINDINGS.md) row 16: Edit placement edits the active macro of the Recording pop-up's role (rr_host::placement_target reads RECORD_ROLE), not the page's ZR view; the comment says so"
+    },
+    {
+     "old": "\n// Capture origin is game-owned. Only copied values leave it at completion.\nstatic CAPTURE_ORIGIN: hos_lock::Mutex<StartState> = hos_lock::Mutex::new(StartState {\n    fighter_kind: -1, costume: 0, facing: 1.0, situation: 0, status: 0, speed_x: 0.0, speed_y: 0.0,\n});\nstatic PLAY_FRAMES: crate::model::macro_handoff::PlayBuffers<InputFrame> = crate::model::macro_handoff::PlayBuffers::new();\n",
+     "new": "\nstatic PLAY_FRAMES: crate::model::macro_handoff::PlayBuffers<InputFrame> = crate::model::macro_handoff::PlayBuffers::new();\n",
+     "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
+    },
+    {
+     "old": "static RESTORE_ANCHORS: hos_lock::Mailbox<(u64, f32, f32), 8> = hos_lock::Mailbox::new();\n\nstatic CAPTURE: crate::model::macro_handoff::CaptureBuffer<InputFrame> =\n    crate::model::macro_handoff::CaptureBuffer::new();\n\n#[derive(Clone, Copy)]\nstruct CaptureCompleted { start: StartState, crop: bool, session: u64 }\n// Only one completed capture can exist: CAPTURE stays worker-owned until this\n// event is consumed. A keyboard may take arbitrarily long without blocking hooks.\nstatic CAPTURE_COMPLETED: hos_lock::Mailbox<CaptureCompleted, 1> = hos_lock::Mailbox::new();\n\n",
+     "new": "static RESTORE_ANCHORS: hos_lock::Mailbox<(u64, f32, f32), 8> = hos_lock::Mailbox::new();\n\n",
+     "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
+    },
+    {
+     "old": "\npub fn begin_capture(start: StartState) -> bool {\n    if !CAPTURE.begin() { return false; }\n    PLAYING.store(0, Ordering::Release);\n    *CAPTURE_ORIGIN.lock() = start;\n    true\n}\n\npub unsafe fn capture_start(module_accessor: &mut BattleObjectModuleAccessor) -> StartState {\n    let start = snapshot_start(module_accessor);\n    *CAPTURE_ORIGIN.lock() = start;\n    start\n}\n\npub fn store_frame(index: usize, input: &MappedInputs) {\n    if index >= crate::engine::macros::MAX_FRAMES {\n        return;\n    }\n    let frame = InputFrame {\n        buttons: input.buttons,\n        lstick_x: input.lstick_x,\n        lstick_y: input.lstick_y,\n        rstick_x: input.rstick_x,\n        rstick_y: input.rstick_y,\n    };\n    let _ = CAPTURE.store(index, frame);\n}\n\npub fn finish_capture(crop: bool) {\n    let start = *CAPTURE_ORIGIN.lock();\n    if CAPTURE.finish().is_none() { return; }\n    // No second completion can be posted until the worker takes CAPTURE.\n    let accepted = CAPTURE_COMPLETED.post(CaptureCompleted {\n        start, crop, session: SESSION_GENERATION.load(Ordering::Acquire),\n    });\n    debug_assert!(accepted);\n    crate::runtime::ui::worker::wake();\n}\n\n/// Worker only: copy the completed recording before releasing its capture buffer,\n/// then let the panel own the draft and request the native keyboard.\npub fn consume_capture() {\n    CAPTURE_COMPLETED.drain(|done| {\n        let current = done.session == SESSION_GENERATION.load(Ordering::Acquire);\n        let frames = CAPTURE.take(|frames| current.then(|| frames.to_vec())).flatten();\n        let Some(frames) = frames else { return; };\n        let version = game_version();\n        crate::runtime::diag_log::diagnostic(format_args!(\n            \"[PracticeRecording] named_recording_complete captured_frames={} crop={}\", frames.len(), done.crop\n        ));\n        let effect = lock_write(&UI).offer_save(frames, done.start, done.crop, &version);\n        apply_effect(effect);\n        request_native_name();\n        if panel_visible() { assign(&menu::MENU_RECEIVED_INPUT, true); }\n    });\n}\n\npub fn begin_playback() -> Option<PlaybackStart> {\n",
+     "new": "\npub fn begin_playback() -> Option<PlaybackStart> {\n",
+     "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
+    },
+    {
+     "old": "    if !q.playback_allowed || q.playback_len == 0 || PLAY_FRAMES.generation() != q.playback_generation { return None; }\n    CAPTURE.cancel();\n    PLAY_GENERATION.store(q.playback_generation, Ordering::Release);\n",
+     "new": "    if !q.playback_allowed || q.playback_len == 0 || PLAY_FRAMES.generation() != q.playback_generation { return None; }\n    PLAY_GENERATION.store(q.playback_generation, Ordering::Release);\n",
+     "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
+    },
+    {
+     "old": "    if PREVIEW_FRAMES.generation() != info.generation { return false; }\n    CAPTURE.cancel();\n    PLAY_GENERATION.store(info.generation, Ordering::Release);\n",
+     "new": "    if PREVIEW_FRAMES.generation() != info.generation { return false; }\n    PLAY_GENERATION.store(info.generation, Ordering::Release);\n",
+     "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
+    },
+    {
+     "old": "pub fn cancel_motion() {\n    CAPTURE.cancel();\n    PLAYBACK_START_PENDING.store(false, Ordering::Relaxed);\n",
+     "new": "pub fn cancel_motion() {\n    PLAYBACK_START_PENDING.store(false, Ordering::Relaxed);\n",
+     "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
+    },
+    {
+     "old": "        let settings = crate::runtime::features::recorder::settings();\n        let action = if settings.trigger_save_state {\n            1\n        } else if !settings.save_state_slots.is_empty() {\n            2\n        } else { 0 };\n        RESTORE_ACTION.store(action, Ordering::Relaxed);\n",
+     "new": "        let settings = crate::runtime::features::recorder::settings();\n        let action = if !settings.save_state_slots.is_empty() { 2 } else { 0 };\n        RESTORE_ACTION.store(action, Ordering::Relaxed);\n",
+     "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
+    },
+    {
+     "old": "    match RESTORE_ACTION.swap(0, Ordering::Relaxed) {\n        1 => super::input_record::start_named_lockout(),\n        2 => {\n",
+     "new": "    match RESTORE_ACTION.swap(0, Ordering::Relaxed) {\n        2 => {\n",
+     "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
+    },
+    {
+     "old": "    let frame = if source == 0 {\n        CAPTURE.frame_at(index)\n    } else {\n",
+     "new": "    let frame = if source == 0 {\n        None\n    } else {\n",
+     "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
+    },
+    {
+     "old": "        rstick_x: frame.rstick_x, rstick_y: frame.rstick_y })\n}\n\n/// Publishing/boot reservation only; the capture owner atomically excludes an\n/// active capture. Playback buffers are filled exclusively by the menu worker.\npub fn prepare_buffers() {\n    CAPTURE.prepare(crate::engine::macros::MAX_FRAMES);\n}\n",
+     "new": "        rstick_x: frame.rstick_x, rstick_y: frame.rstick_y })\n}\n",
+     "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
     }
    ]
   },

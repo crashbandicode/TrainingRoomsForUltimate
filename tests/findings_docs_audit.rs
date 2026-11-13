@@ -645,6 +645,12 @@ fn an_old_record_trigger_value_does_not_change_what_the_recorder_reads() {
     assert_eq!(recorder_with_trigger([0, 1]), recorder_with_trigger([1, 1]), "Save State Load only");
     assert_eq!(recorder_with_trigger([0, 0]), recorder_with_trigger([1, 0]), "neither entry");
     assert_eq!(recorder_with_trigger([1, 0]), RecorderSettings::factory());
+    // rc.12 TR9 V2 (operator 2026-11-13): the row is retired, so its Save State Load entry starts nothing either: an old
+    // `[0,1]` builds exactly the factory recorder, and no load starts the old named capture (deleted with it).
+    assert_eq!(recorder_with_trigger([0, 1]), RecorderSettings::factory(), "Save State Load is read again");
+    let named = include_str!("../src/runtime/macros/named_macros.rs");
+    let restore = body(named, "begin_restore");
+    assert!(!restore.contains("trigger_save_state") && !named.contains("fn begin_capture"), "the record-on-load start is back:\n{restore}");
 }
 
 /// The runtime half (Switch-only, a source check): the chord step hands the consumed Record chord straight to

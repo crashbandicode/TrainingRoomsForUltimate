@@ -569,24 +569,7 @@ impl MacroUi {
         })
     }
 
-    /// Opens the save dialog. An empty or fighter-less take is refused.
-    pub fn offer_save(
-        &mut self,
-        mut frames: Vec<InputFrame>,
-        start: StartState,
-        crop: bool,
-        version: &str,
-    ) -> Effect {
-        if crop {
-            crop_neutral_tail(&mut frames);
-        }
-        if frames.is_empty() || start.fighter_kind < 0 {
-            return Effect::Notify("Recording was empty".to_owned());
-        }
-        self.offer_save_with_mii(frames, start, false, version, None)
-    }
-
-    /// Same dialog as [`Self::offer_save`], retaining an exact Mii captured with the take.
+    /// Opens the save dialog, retaining an exact Mii captured with the take. An empty or fighter-less take is refused.
     pub fn offer_save_with_mii(
         &mut self,
         mut frames: Vec<InputFrame>,
@@ -1812,7 +1795,7 @@ mod tests {
 
     fn native_keyboard_validation_preserves_draft_and_inputs() {
         let mut ui = MacroUi::new();
-        ui.offer_save(frames(), start(), false, "13.0.5");
+        ui.offer_save_with_mii(frames(), start(), false, "13.0.5", None);
         assert_eq!(ui.name_prompt(), Some("Recording"));
         assert_eq!(ui.native_name_view().unwrap().labels, ["Name and save"]);
         assert!(matches!(ui.confirm_native_name("   ".into()), Effect::Notify(_)));
@@ -1827,7 +1810,7 @@ mod tests {
 
     fn empty_name_stays_on_the_dialog_and_typed_name_pages() {
         let mut ui = MacroUi::new();
-        ui.offer_save(frames(), start(), false, "13.0.5");
+        ui.offer_save_with_mii(frames(), start(), false, "13.0.5", None);
         for _ in 0..9 {
             ui.on_pad(Pad::Extra);
         }
@@ -1856,7 +1839,7 @@ mod tests {
             buttons: FLICK_JUMP,
             ..InputFrame::default()
         });
-        ui.offer_save(recorded, start(), true, "13.0.5");
+        ui.offer_save_with_mii(recorded, start(), true, "13.0.5", None);
         let Effect::Save(recording) = ui.on_pad(Pad::Confirm) else {
             panic!("expected save");
         };
@@ -1999,7 +1982,7 @@ mod tests {
         let mut ui = MacroUi::new();
         // A restored reference exists even before the first macro is saved.
         assert!(ui.restored_target(1, (4.0, 8.0)).is_none());
-        ui.offer_save(frames(), start(), false, "13.0.5");
+        ui.offer_save_with_mii(frames(), start(), false, "13.0.5", None);
         ui.on_pad(Pad::Left);
         ui.on_pad(Pad::Confirm);
         goto(&mut ui, 18);

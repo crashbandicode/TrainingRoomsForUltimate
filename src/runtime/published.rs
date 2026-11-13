@@ -88,8 +88,6 @@ pub fn publish(snapshot: &Snapshot, rerolls: u8) {
         menu,
     };
     crate::runtime::features::states::set_flags(&live.states);
-    // Macro Source = Named Library: the layer's frame buffers are reserved on this thread, never in a hook.
-    crate::runtime::features::recorder::prepare_named_buffers(snapshot);
     REROLLS.fetch_or(rerolls, Ordering::AcqRel);
     LIVE.publish(Some(live));
     crate::runtime::compat::menu::after_publish(published_menu, menu, previous_menu);

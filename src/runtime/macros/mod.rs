@@ -70,7 +70,7 @@ pub(crate) fn named_active() -> bool {
 
 /// Boot: the replay-capture preference and writer, the named library's selected macro, the capture adapter's guards and hooks (the seam
 /// installer decides; the guarded adapter remains resident regardless of the initial preference). Returns `(named layer ready, live capture adapter ready)`.
-pub(crate) fn install(named_source: bool, rows_ok: bool) -> (bool, bool) {
+pub(crate) fn install(rows_ok: bool) -> (bool, bool) {
     // R2-1: every game call the layer makes is a guarded row (NamedMacros, plus the recorder's own); a rejected row leaves the whole layer off.
     if !rows_ok {
         return (false, false);
@@ -78,9 +78,6 @@ pub(crate) fn install(named_source: bool, rows_ok: bool) -> (bool, bool) {
     replay_store::init();
     named_macros::init();
     replay_capture::init();
-    if named_source {
-        named_macros::prepare_buffers();
-    }
     // The Deluxe Plugins-page row (Q7, deluxe stream): after the INI seeded the preference, before the adapter decides
     // whether to install (a registered row keeps it resident even while the INI says off).
     crate::runtime::deluxe_row::register();

@@ -402,10 +402,6 @@ struct RestorePose {
     air: Option<bool>,
 }
 
-// Capture origin is game-owned. Only copied values leave it at completion.
-static CAPTURE_ORIGIN: hos_lock::Mutex<StartState> = hos_lock::Mutex::new(StartState {
-    fighter_kind: -1, costume: 0, facing: 1.0, situation: 0, status: 0, speed_x: 0.0, speed_y: 0.0,
-});
 static PLAY_FRAMES: crate::model::macro_handoff::PlayBuffers<InputFrame> = crate::model::macro_handoff::PlayBuffers::new();
 static PREVIEW_FRAMES: crate::model::macro_handoff::PlayBuffers<InputFrame> = crate::model::macro_handoff::PlayBuffers::new();
 // 0 idle, 1 named, 2 transient preview. Only game callbacks change this.
@@ -414,15 +410,6 @@ static PLAY_GENERATION: AtomicU32 = AtomicU32::new(0);
 static PREPARED_REVISION: AtomicU64 = AtomicU64::new(u64::MAX);
 static RESTORE_ANCHOR: RwLock<Option<(u64, f32, f32)>> = RwLock::new(None);
 static RESTORE_ANCHORS: hos_lock::Mailbox<(u64, f32, f32), 8> = hos_lock::Mailbox::new();
-
-static CAPTURE: crate::model::macro_handoff::CaptureBuffer<InputFrame> =
-    crate::model::macro_handoff::CaptureBuffer::new();
-
-#[derive(Clone, Copy)]
-struct CaptureCompleted { start: StartState, crop: bool, session: u64 }
-// Only one completed capture can exist: CAPTURE stays worker-owned until this
-// event is consumed. A keyboard may take arbitrarily long without blocking hooks.
-static CAPTURE_COMPLETED: hos_lock::Mailbox<CaptureCompleted, 1> = hos_lock::Mailbox::new();
 
 #[derive(Clone, Copy)]
 pub struct PlaybackStart {
@@ -852,66 +839,9 @@ pub unsafe fn snapshot_start(module_accessor: &mut BattleObjectModuleAccessor) -
     }
 }
 
-pub fn begin_capture(start: StartState) -> bool {
-    if !CAPTURE.begin() { return false; }
-    PLAYING.store(0, Ordering::Release);
-    *CAPTURE_ORIGIN.lock() = start;
-    true
-}
-
-pub unsafe fn capture_start(module_accessor: &mut BattleObjectModuleAccessor) -> StartState {
-    let start = snapshot_start(module_accessor);
-    *CAPTURE_ORIGIN.lock() = start;
-    start
-}
-
-pub fn store_frame(index: usize, input: &MappedInputs) {
-    if index >= crate::engine::macros::MAX_FRAMES {
-        return;
-    }
-    let frame = InputFrame {
-        buttons: input.buttons,
-        lstick_x: input.lstick_x,
-        lstick_y: input.lstick_y,
-        rstick_x: input.rstick_x,
-        rstick_y: input.rstick_y,
-    };
-    let _ = CAPTURE.store(index, frame);
-}
-
-pub fn finish_capture(crop: bool) {
-    let start = *CAPTURE_ORIGIN.lock();
-    if CAPTURE.finish().is_none() { return; }
-    // No second completion can be posted until the worker takes CAPTURE.
-    let accepted = CAPTURE_COMPLETED.post(CaptureCompleted {
-        start, crop, session: SESSION_GENERATION.load(Ordering::Acquire),
-    });
-    debug_assert!(accepted);
-    crate::runtime::ui::worker::wake();
-}
-
-/// Worker only: copy the completed recording before releasing its capture buffer,
-/// then let the panel own the draft and request the native keyboard.
-pub fn consume_capture() {
-    CAPTURE_COMPLETED.drain(|done| {
-        let current = done.session == SESSION_GENERATION.load(Ordering::Acquire);
-        let frames = CAPTURE.take(|frames| current.then(|| frames.to_vec())).flatten();
-        let Some(frames) = frames else { return; };
-        let version = game_version();
-        crate::runtime::diag_log::diagnostic(format_args!(
-            "[PracticeRecording] named_recording_complete captured_frames={} crop={}", frames.len(), done.crop
-        ));
-        let effect = lock_write(&UI).offer_save(frames, done.start, done.crop, &version);
-        apply_effect(effect);
-        request_native_name();
-        if panel_visible() { assign(&menu::MENU_RECEIVED_INPUT, true); }
-    });
-}
-
 pub fn begin_playback() -> Option<PlaybackStart> {
     let q = hook_queries();
     if !q.playback_allowed || q.playback_len == 0 || PLAY_FRAMES.generation() != q.playback_generation { return None; }
-    CAPTURE.cancel();
     PLAY_GENERATION.store(q.playback_generation, Ordering::Release);
     PLAYING.store(1, Ordering::Release);
     let info = PlaybackStart { facing: q.playback_facing, status: q.playback_status,
@@ -931,7 +861,6 @@ pub fn prepare_preview(recording: &MacroRecording) -> PlaybackStart {
 /// Game callback only: the requested preview is still the prepared one.
 pub fn begin_preview(info: PlaybackStart) -> bool {
     if PREVIEW_FRAMES.generation() != info.generation { return false; }
-    CAPTURE.cancel();
     PLAY_GENERATION.store(info.generation, Ordering::Release);
     PLAYING.store(2, Ordering::Release);
     PLAYBACK_START_WAITS.store(0, Ordering::Relaxed);
@@ -971,7 +900,6 @@ pub fn end_playback() {
 }
 
 pub fn cancel_motion() {
-    CAPTURE.cancel();
     PLAYBACK_START_PENDING.store(false, Ordering::Relaxed);
     PLAYBACK_START_WAITS.store(0, Ordering::Relaxed);
     RESTORE_POSITION_WAITS.store(0, Ordering::Relaxed);
@@ -1005,11 +933,7 @@ pub fn begin_restore() {
         RESTORE_ACTION.store(0, Ordering::Relaxed);
     } else if source_is_named() && RESTORE_ACTION.load(Ordering::Relaxed) == 0 {
         let settings = crate::runtime::features::recorder::settings();
-        let action = if settings.trigger_save_state {
-            1
-        } else if !settings.save_state_slots.is_empty() {
-            2
-        } else { 0 };
+        let action = if !settings.save_state_slots.is_empty() { 2 } else { 0 };
         RESTORE_ACTION.store(action, Ordering::Relaxed);
     }
 }
@@ -1028,7 +952,6 @@ pub unsafe fn service_restore() {
         return;
     }
     match RESTORE_ACTION.swap(0, Ordering::Relaxed) {
-        1 => super::input_record::start_named_lockout(),
         2 => {
             if super::input_record::playback_named() {
                 // The CPU may have finished restoring before the player. Reapply
@@ -1527,7 +1450,7 @@ pub(crate) fn fighter_label(kind: i32) -> String {
 pub fn frame_for(index: usize) -> Option<MappedInputs> {
     let source = PLAYING.load(Ordering::Acquire);
     let frame = if source == 0 {
-        CAPTURE.frame_at(index)
+        None
     } else {
         let buffers = if source == 1 { &PLAY_FRAMES } else { &PREVIEW_FRAMES };
         let generation = PLAY_GENERATION.load(Ordering::Acquire);
@@ -1538,12 +1461,6 @@ pub fn frame_for(index: usize) -> Option<MappedInputs> {
     }?;
     Some(MappedInputs { buttons: frame.buttons, lstick_x: frame.lstick_x, lstick_y: frame.lstick_y,
         rstick_x: frame.rstick_x, rstick_y: frame.rstick_y })
-}
-
-/// Publishing/boot reservation only; the capture owner atomically excludes an
-/// active capture. Playback buffers are filled exclusively by the menu worker.
-pub fn prepare_buffers() {
-    CAPTURE.prepare(crate::engine::macros::MAX_FRAMES);
 }
 
 /// Diag build only: the keyboard's confirmed-name path without the applet (`service_keyboard` does exactly this with the typed text).

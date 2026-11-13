@@ -99,11 +99,6 @@ pub(crate) mod input_record {
         }
     }
 
-    /// The named record chord's start (after a restore, the record-on-load action).
-    pub(crate) fn start_named_lockout() {
-        recorder::start_named_lockout();
-    }
-
 
 }
 
@@ -140,7 +135,6 @@ pub(crate) fn worker_tick() {
     if dropped != 0 {
         crate::runtime::diag_log::diagnostic(format_args!("[MacroHandoff] clip_events_dropped={dropped}"));
     }
-    super::named_macros::consume_capture();
     super::named_macros::service_character();
     let frame = crate::runtime::ui::facts::fact_frame_number();
     if RELOAD_FRAME.swap(frame, std::sync::atomic::Ordering::AcqRel) != frame {

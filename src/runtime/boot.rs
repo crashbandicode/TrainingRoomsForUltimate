@@ -347,10 +347,9 @@ fn run_inner() {
     let (p1_on, p1_reason, written6) = p1::install(&found6, p1_prerequisites);
     // Package 4, S4-4: the named-macro layer and the live replay capture (its guards and hooks are the seam installer's: hooks only when
     // replay_capture.ini says on). The roster cycle and the menu's panel screens are behind the layer's port, named in the install line.
-    let named_source = loaded.menu.get("macro_source").is_some_and(|row| row.get(1).is_some_and(|v| *v != 0));
     // R2-1: the layer's whole closure (its own rows and the cross-feature rows its code calls) must have passed.
     let macros_rows_ok = recording_on && capabilities::unit_usable(Feature::NamedMacros, &usable);
-    let (macros_on, capture_on) = crate::runtime::macros::install(named_source, macros_rows_ok);
+    let (macros_on, capture_on) = crate::runtime::macros::install(macros_rows_ok);
     // F9: the No. of CPUs field the cycle's Training sources depend on is read only when the game's own root load, reader and pause
     // menu writer are the 13.0.5 instructions (the rows name it in the install line otherwise; then Training admits no source: the
     // shipped preload-off path).

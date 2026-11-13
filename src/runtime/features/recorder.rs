@@ -39,7 +39,6 @@ use crate::model::recording::{
     record_chord, ControlCtx, ControlOut, Ended, Inject, LoadAction, MashCtx, Mode, Phase, PollFacts, PostCtx, RecordRefusal,
     Recorder, RecorderSettings, StartSnapshot,
 };
-use crate::model::settings::Snapshot;
 use crate::model::sites_pkg4;
 use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::features::{chords, cpu, input_display, notices, states};
@@ -326,14 +325,6 @@ pub fn settings() -> RecorderSettings {
     crate::runtime::published::live().map_or(RecorderSettings::factory(), |live| live.recorder)
 }
 
-/// A menu commit or the first publish (the publishing thread, never a hook): Macro Source = Named Library reserves the layer's
-/// frame buffers here. The recorder rows themselves reach the hooks through `published::Live`.
-pub fn prepare_named_buffers(snapshot: &Snapshot) {
-    if snapshot.get("macro_source").is_some_and(|row| row.get(1).is_some_and(|v| *v != 0)) {
-        named_macros::prepare_buffers();
-    }
-}
-
 /// The CPU runtime's constants (ready once the game's table answers).
 fn load_consts() -> bool {
     if CONSTS_READY.load(Ordering::Acquire) != 0 {
@@ -429,7 +420,6 @@ pub unsafe fn on_p1_poll(out: *mut MappedInputs) {
         return;
     }
     if named {
-        on_named_poll(out);
         return;
     }
     let wants = rec().wants_cpu_status();
@@ -439,25 +429,6 @@ pub unsafe fn on_p1_poll(out: *mut MappedInputs) {
         0
     };
     rec().poll(&mut *out, PollFacts { cpu_status });
-}
-
-/// The poll stage of a named run (SPEC-input-01 section 9). The record chord while a named capture records is the stop chord: it is
-/// consumed here, before this poll's frame is stored, so the stop press is not part of the recording.
-unsafe fn on_named_poll(out: *mut MappedInputs) {
-    if rec().is_recording() && chords::consume(Request::InputRecord) {
-        *out = MappedInputs::NEUTRAL;
-        finish_named_capture();
-        return;
-    }
-    let stored = rec().poll_named(&mut *out);
-    if let Some((index, frame)) = stored {
-        if index == 0 {
-            if let Some(body) = cpu_body() {
-                named_macros::capture_start(&mut *(body.accessor as *mut smash::app::BattleObjectModuleAccessor));
-            }
-        }
-        named_macros::store_frame(usize::from(index), &frame);
-    }
 }
 
 // ---- the CPU control stage ----------------------------------------------------------------------------
@@ -560,10 +531,6 @@ unsafe fn on_ai_frame(ai: usize) {
     match post.ended {
         Some(Ended::Recorded { slot, frames }) => event("recording_complete", "slot", i64::from(slot), "frames", i64::from(frames)),
         Some(Ended::Played { slot }) => event("playback_complete", "slot", i64::from(slot), "restarted", i64::from(post.restarted.is_some())),
-        Some(Ended::NamedCaptured { frames }) => {
-            event("named_capture_complete", "frames", i64::from(frames), "", 0);
-            named_macros::finish_capture(settings.crop);
-        }
         Some(Ended::NamedPlayed) => {
             event("named_playback_complete", "", 0, "", 0);
             named_macros::end_playback();
@@ -736,39 +703,6 @@ pub(crate) fn is_playback() -> bool { PLAYBACK.load(Ordering::Acquire) }
 /// Game callback only: numbered-slot transfer executes without heap work.
 pub(crate) fn transfer_slot(transfer: &mut crate::model::macro_handoff::SlotTransfer) {
     transfer.execute(&mut rec());
-}
-
-/// The record chord of the named layer: the lockout, then the capture (the layer's buffer takes the frames).
-pub(crate) fn start_named_lockout() {
-    // SAFETY: called from the CPU control frame on a live CPU body.
-    unsafe {
-        if !load_consts() {
-            return;
-        }
-        if let Some(refusal) = record_refusal() {
-            notices::refuse(refusal.text());
-            return;
-        }
-        let Some(body) = cpu_body() else { return };
-        let facing = facing_of(natives::lr(body.accessor));
-        if !named_macros::begin_capture(crate::engine::macros::StartState::default()) {
-            notices::refuse("Finish saving the previous named capture first");
-            return;
-        }
-        rec().start_named_lockout(facing);
-        event("named_record_lockout", "facing", i64::from(facing), "", 0);
-    }
-}
-
-/// The named stop chord: the capture ends and the layer offers the recording for saving.
-fn finish_named_capture() {
-    let frames = rec().finish_named_capture();
-    if let Some(frames) = frames {
-        LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);
-        notices::post_phase(Phase::Idle, 0);
-        event("named_capture_stop", "frames", i64::from(frames), "", 0);
-        named_macros::finish_capture(settings().crop);
-    }
 }
 
 /// The layer's playback (`playback_named`, `playback_preview`): `frames` frames of its buffer, started on the CPU now.

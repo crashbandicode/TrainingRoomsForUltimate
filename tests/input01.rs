@@ -54,7 +54,6 @@ fn menu_defaults_match_spec() {
     let s = RecorderSettings::from_snapshot(&Snapshot::factory());
     assert_eq!(s, RecorderSettings::factory());
     assert_eq!((s.slot, s.duration, s.crop, s.mash_interrupt, s.looping, s.override_playback), (0, 150, true, true, false, false));
-    assert!(!s.trigger_save_state);
     assert_eq!(s.hitstun, HitstunTiming::HitstunEnds);
     assert_eq!(s.playback_slots.0, [1, 0, 0, 0, 0]);
     assert!(s.save_state_slots.is_empty());
@@ -71,12 +70,11 @@ fn settings_rows_are_read() {
     snap.set("hitstun_playback", &[0, 0, 1]).unwrap();
     snap.set("playback_loop", &[1, 0]).unwrap();
     snap.set("settings_override_playback", &[1, 0]).unwrap();
-    snap.set("record_trigger", &[0, 1]).unwrap();
     snap.set("save_state_playback", &[0, 3, 0, 0, 2]).unwrap();
     let s = RecorderSettings::from_snapshot(&snap);
     assert_eq!((s.slot, s.duration), (2, 600));
     assert_eq!(s.hitstun, HitstunTiming::HitstopBegins);
-    assert!(s.looping && s.override_playback && s.trigger_save_state);
+    assert!(s.looping && s.override_playback);
     assert_eq!(s.save_state_slots.0, [0, 3, 0, 0, 2]);
 }
 
@@ -443,8 +441,6 @@ fn save_state_triggers_once() {
     assert_eq!(Recorder::on_state_restored(&s, false, &mut rng), LoadAction::None);
     s.save_state_slots = model::cpu::settings::Weights([0, 0, 2, 0, 0]);
     assert_eq!(Recorder::on_state_restored(&s, false, &mut rng), LoadAction::None);
-    assert_eq!(Recorder::on_state_restored(&s, true, &mut rng), LoadAction::None);
-    s.trigger_save_state = true;
     assert_eq!(Recorder::on_state_restored(&s, true, &mut rng), LoadAction::None);
 }
 
