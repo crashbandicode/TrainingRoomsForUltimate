@@ -254,7 +254,7 @@ pub static ROWS: [Row; 92] = [
     r(LEDGE, "Mistech Options", "miss_tech_state", Control::MultiSelect(&o::MISTECH),
       "What the CPU does after it fails to tech.\nWith several ticked it picks one at random."),
     r(LEDGE, "Hide Tech Animations", "tech_hide", TOGGLE,
-      "Hides the CPU during a tech, a tech roll and a missed tech,\nso its choice cannot be read. Getups stay visible."),
+      "Hides the CPU during a tech, a tech roll and a missed tech,\nso its choice stays hidden. Getups stay visible."),
     // CPU > Shield
     r(SHIELD, "Shield", "shield_state", Control::Dropdown(&o::SHIELD),
       "How the CPU shields. Infinite never breaks, Hold keeps it up,\nConstant keeps shielding without end."),

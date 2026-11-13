@@ -24,7 +24,7 @@ setup library. The options are on the [Saves](../menu/saves.md) page.
   | Nothing is saved here yet: Save first, or bind a save | Load with nothing [bound](#the-bound-save). |
   | A load is already being placed | Load pressed while a load is still under way. |
   | A setup is being placed: save (load) again after it | A setup, a preview or a Play warp is being placed. |
-  | A CPU drives Player 1: take Player 1 back to load | The CPU pilot or CPU control plays Player 1. |
+  | A CPU drives Player 1: take Player 1 back to load | The game's own CPU control plays Player 1. With the CPU pilot on Player 1 the Load works, because the pilot only presses Player 1's buttons. |
   | Online Deluxe's open page uses this button: close it to save (load) | A chord you moved onto a D-pad button Online Deluxe's open page uses. The default chords work beside it. |
   | Both triggers are Online Deluxe's L + R: hold one of them | A GameCube controller with both triggers held. |
   | Save states have not started in this match yet | The first moments of a match, before save states are ready. |
