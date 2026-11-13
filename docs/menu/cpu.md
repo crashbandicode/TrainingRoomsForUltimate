@@ -97,6 +97,8 @@ relative to you. Other air dodges keep the game's direction.
 
 One direction is picked for each hit and kept until the next.
 
+![Mash Air Dodge, an up smash at 40%: with no direction the CPU tumbles down and lands; with Up it air dodges upward and stays high](../media/rc11-cpu-airdodge-direction.gif)<br>*Airdodge Direction: none, then Up*
+
 More: [Direction chips](../guide/cpu-behaviour.md#direction-chips)
 
 ### DI Direction
@@ -224,6 +226,8 @@ camera's centre on Battlefield, Final Destination and some other stages.
 - **Default:** Off.
 - **How:** A switches it.
 
+![The CPU tech-rolls after an up smash: with Hide Tech Animations Off the roll is in plain sight; with On the CPU disappears during it](../media/rc11-cpu-hide-tech-animations.gif)<br>*Hide Tech Animations: Off, then On*
+
 ## Shield
 
 ### Shield
@@ -253,6 +257,8 @@ Where the CPU tilts its shield. In and Out are relative to you.
   B goes back.
 
 A change applies from the CPU's next frame. A reset (L+R+A or loading a save state) reads the row again.
+
+![Shield Infinite: with no tilt the shield sits on the CPU down to the floor; with Up it rides higher and the CPU's feet show under it](../media/rc11-cpu-shield-tilt.gif)<br>*Shield Tilt: none, then Up*
 
 ### OoS Offset
 
