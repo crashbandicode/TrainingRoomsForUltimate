@@ -70,6 +70,8 @@ More: [Frame strip](../guide/frame-strip.md)
 Holds Player 1's inputs back by a number of frames, for example to practise as if playing online. Chords are not
 delayed. The frame strip and recordings see the inputs as delayed.
 
+![The same jab from the same spot: with Input Delay 0 (left) Mario jabs as A lights on the pad; with Input Delay 18 (right) A lights at the same moment and the jab comes 18 frames (0.3 s) later](../media/rc11-input-delay-sbs.gif)
+
 - **Values:** 0 to 30 frames
 - **Default:** 0
 - **How:** Left or Right steps one frame (it stops at 0 and 30); A opens the list.
@@ -94,6 +96,8 @@ A chord is "hold one button and press the others".
 | Input display | R + D-pad Down | Turns the frame strip on or off. |
 | Game speed | R + D-pad Up | Hold it, then D-pad Left or Right changes the speed. |
 
+![L + D-pad Down (lit on the pad) first saves nothing; in the chord editor Save State Save is changed from ZL + D-pad Down to L + D-pad Down, which then saves. A caption names the chord](../media/rc11-button-chords.gif)
+
 - **Values:** any button, or several, for each row; or disabled (an empty chord does nothing)
 - **Default:** as in the table
 - **How:** A opens the editor, and A on a row opens that chord. Press X, let go of every button, then hold the new
@@ -107,6 +111,8 @@ More: [Controls › Changing a chord](../guide/controls.md#changing-a-chord), [G
 On: holding L, R and A resets. In Training that is the game's own reset. In a waiting room with Lobby Practice on, both
 practice fighters go back to where they first stood. Off: the chord does nothing (in Training, the game's reset is
 blocked).
+
+![On: after a forward smash, holding L, R and A (lit on the pad) puts both fighters back at 0%; turned Off, the same buttons do nothing. A caption names the chord](../media/rc11-lra-reset.gif)
 
 - **Values:** On, Off
 - **Default:** On
@@ -133,6 +139,8 @@ More: [Controls › Opening the menu](../guide/controls.md#opening-the-menu)
 
 A second button or chord that opens this menu. It works like Menu shortcut 1 and is kept in the same file.
 
+![L + D-pad Up does nothing while Menu shortcut 2 is disabled; set to L + D-pad Up in its editor, the same chord opens the menu. A caption names the chord; the last frame before the menu is held 0.4 s](../media/rc11-menu-shortcut-2.gif)
+
 - **Values:** any button, or several; or disabled
 - **Default:** disabled
 - **How:** as Menu shortcut 1.
@@ -140,6 +148,8 @@ A second button or chord that opens this menu. It works like Menu shortcut 1 and
 ### Permanent shortcut
 
 B + D-pad Up always opens this menu. This row only shows it; it cannot be changed.
+
+![B + D-pad Up (named in a caption; B lit on the pad) opens the menu on the Permanent shortcut row, which cannot be changed. The last frame before the menu is held 0.4 s](../media/rc11-permanent-shortcut.gif)
 
 - **Values:** B + D-pad Up (read-only)
 - **How:** nothing to change.
