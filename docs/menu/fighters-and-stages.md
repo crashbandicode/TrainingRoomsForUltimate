@@ -187,6 +187,9 @@ the game, and the menu doesn't open there. Turn it On in Training before you go.
 - **Default:** Off
 - **How:** A flips it.
 
+![In a local wireless waiting room: Lobby Practice turned Off in the menu; then B + Up reaches the fighter instead](../media/rc11-lobby-practice.gif)<br>
+*In a local wireless waiting room with Lobby Practice On: B + Up opens the menu, A turns Lobby Practice Off, B closes it, and the frame strip goes. B + Up again opens no menu: Byleth does its up special. Eden, rc.11.*
+
 More: [Waiting rooms](../guide/waiting-rooms.md)
 
 ### Lobby Stages
