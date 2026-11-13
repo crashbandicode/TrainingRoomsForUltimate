@@ -157,6 +157,9 @@ writing.
   why, such as "Make a macro active for this role first" or "Link a start save to the macro first" (the macro has no
   start save, or its Start save switch is Off).
 
+![Play on Player 1: the jab hits; Edit placement, X- forty times, Write; the same Play starts 40 units left and misses](../media/rc11-edit-placement.gif)<br>
+*Play on Player 1, then Edit placement moves its start 40 units left (X- forty times) and Write; the same Play now starts at the new spot and the jab misses. Cut at the menu steps. Eden, rc.11.*
+
 More: [Edit placement and the Replay window](../guide/recording.md#replays-edit-placement-and-the-replay-window)
 
 ### Replay window
@@ -229,6 +232,9 @@ the mash action. Player 1's macro keeps playing. Off: the macro plays to its end
 - **Values:** On, Off
 - **Default:** On
 - **How:** A flips it.
+
+![CPU Mash set; Play on CPU starts its taunt loop; a jab hits, the CPU mashes out and the macro stops](../media/rc11-mash-interrupts.gif)<br>
+*Mash interrupts playback On (the default), CPU › Reactions › Mash set: Play on CPU starts its taunt loop; Mario's jab hits, the CPU does its mash action and the macro stops. Eden, rc.11.*
 
 More: [Recordings and the CPU settings](../guide/cpu-behaviour.md#recordings-and-the-cpu-settings)
 
@@ -323,6 +329,9 @@ Under the title are the pop-up's own tabs:
 - **Player:** Save states & Macros, and Combos & Sequences. ZL or ZR switches between them.
 - **CPU:** Save states & Macros only. ZL and ZR do nothing.
 
+![ZR + Right opens the Recording pop-up on Player; R lights the CPU tab; B closes it](../media/rc11-popup-player-cpu.gif)<br>
+*ZR + Right opens the pop-up over the match on the Player tab; R switches to the CPU tab and its list; B closes it. Eden, rc.11.*
+
 ### The lists and the hot five
 
 Each tab shows the same two lists as the page's section, four rows of each. Up/Down move inside a list, Left/Right
@@ -340,6 +349,9 @@ MACROS, "A drill" in COMBOS and SEQUENCES.
 - A on a combo or a sequence makes it the drill.
 - A on *+ New chain*, *+ New sequence* or *+ Save last combo…* works as on the page.
 - Y does nothing.
+
+![MACROS: the hot five, then A on Macro D below the line; Macro D moves to the top; Y changes nothing](../media/rc11-popup-hot-five.gif)<br>
+*MACROS shows the five used last first, inside the green outline. A on Macro D, below the line, makes it active; it moves to the top of the hot five. Y changes nothing. Eden, rc.11.*
 
 ### Setting the active macro
 
@@ -361,5 +373,8 @@ More: [Set active, and the Play chords](../guide/recording.md#set-active-and-the
 
 X, with the cursor in MACROS, steps the loop count of the side you're on: ∞, 1, 2, 3, 5, 10, then ∞ again. The
 MACROS header shows it. It is the same count as the page's [Loop](#loop) row.
+
+![X sets the CPU macro's loop count to 2; Play on CPU plays it twice without warping back](../media/rc11-popup-loop-count.gif)<br>
+*On the CPU tab, X steps Walk + jab's loop count to 2; Play on CPU: the CPU walks and jabs, then again from where it stands. Eden, rc.11.*
 
 More: [The pop-up](../guide/recording.md#the-pop-up), [The loop](../guide/recording.md#the-loop)
