@@ -144,12 +144,18 @@ The same list for the Mii Swordfighter.
 - **Values:** a saved Mii, a replay Mii, or a new one
 - **How:** as [Mii Brawler](#mii-brawler).
 
+![Mii Swordfighter list: ZR to the CPU, Down, A; the CPU's Swordfighter reloads as that Mii](../media/rc11-mii-swordfighter.gif)<br>
+*With the CPU a Mii Swordfighter: A opens the list (Player 1's), ZR switches to the CPU's, Down and A pick the second saved Swordfighter, and B closes the menu; the CPU reloads it ("Saved Mii applied"). The two saved Miis on this profile look alike. The 6.6 s load is cut. Eden, rc.11.*
+
 ### Mii Gunner
 
 The same list for the Mii Gunner.
 
 - **Values:** a saved Mii, a replay Mii, or a new one
 - **How:** as [Mii Brawler](#mii-brawler).
+
+![Mii Gunner list: Player 1's list, then ZR to the CPU's list](../media/rc11-mii-gunner.gif)<br>
+*A opens Player 1's Mii Gunner list; ZR switches to the CPU's. This profile has one saved Gunner, then Add New…, which opens Smash's Mii editor (as for the Brawler). Eden, rc.11.*
 
 ## Stages
 
