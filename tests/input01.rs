@@ -54,7 +54,7 @@ fn menu_defaults_match_spec() {
     let s = RecorderSettings::from_snapshot(&Snapshot::factory());
     assert_eq!(s, RecorderSettings::factory());
     assert_eq!((s.slot, s.duration, s.crop, s.mash_interrupt, s.looping, s.override_playback), (0, 150, true, true, false, false));
-    assert!(s.trigger_chord && !s.trigger_save_state);
+    assert!(!s.trigger_save_state);
     assert_eq!(s.hitstun, HitstunTiming::HitstunEnds);
     assert_eq!(s.playback_slots.0, [1, 0, 0, 0, 0]);
     assert!(s.save_state_slots.is_empty());
@@ -76,7 +76,7 @@ fn settings_rows_are_read() {
     let s = RecorderSettings::from_snapshot(&snap);
     assert_eq!((s.slot, s.duration), (2, 600));
     assert_eq!(s.hitstun, HitstunTiming::HitstopBegins);
-    assert!(s.looping && s.override_playback && !s.trigger_chord && s.trigger_save_state);
+    assert!(s.looping && s.override_playback && s.trigger_save_state);
     assert_eq!(s.save_state_slots.0, [0, 3, 0, 0, 2]);
 }
 

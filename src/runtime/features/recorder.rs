@@ -573,7 +573,7 @@ unsafe fn on_ai_frame(ai: usize) {
         }
         None => {}
     }
-    chord_step(&settings, body, facing);
+    chord_step(body, facing);
 
     // The phase: tint every frame it lasts, the notice once per change.
     let (phase, length) = if let Some(phase) = recording_host::cpu_role_phase() {
@@ -650,7 +650,7 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
 }
 
 /// Record, Play on Player 1, and Play on CPU. The hook only posts the flags.
-unsafe fn chord_step(settings: &RecorderSettings, _body: Body, facing: i8) {
+unsafe fn chord_step(_body: Body, facing: i8) {
     let play_player = chords::consume(Request::PlayPlayer);
     let playback = chords::consume(Request::InputPlayback);
     let record = chords::consume(Request::InputRecord);
@@ -671,7 +671,6 @@ unsafe fn chord_step(settings: &RecorderSettings, _body: Body, facing: i8) {
             false
         }
     };
-    let record = record && settings.trigger_chord;
     // A Record that would start the worker's capture asks the same refusals as every other record start (B4).
     let record = match record_chord(record, recording_host::capturing(), || record_refusal()) {
         Ok(record) => record,

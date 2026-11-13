@@ -8,6 +8,8 @@
 //!   defaults left the count alone. The list and the reset now use the recording menu's per-role counts.
 //! - #25: after a live fighter swap the Setup library refused a setup of exactly the fighters on screen: its fighter check
 //!   read each entry's first body, the setup was saved from the running body. The check now reads the running body.
+//! - #26: an old Recording Trigger value (`[0,1]`, Save State Load only, offered by v0.1.0 to v0.2.0-rc.3.1) silently
+//!   turned off today's Record chord, though no page shows that row. The chord no longer reads it.
 
 // rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
 macro_rules! lib_unit_tests {
@@ -621,4 +623,37 @@ fn the_setup_restore_and_the_replay_preview_read_the_running_body() {
     let setups = include_str!("../src/runtime/features/states/setups.rs");
     assert!(body(setups, "service").contains("preview::observe()"), "the restore's facts come from observe");
     assert!(body(preview, "request").contains("observe()"), "the replay preview's checkpoint comes from observe");
+}
+
+// ---- #26: an old Record trigger value no longer turns off the Record chord ---------------------------------------------
+
+use model::recording::{record_chord, RecorderSettings};
+use model::settings::Snapshot;
+
+fn recorder_with_trigger(trigger: [u8; 2]) -> RecorderSettings {
+    let mut snapshot = Snapshot::factory();
+    snapshot.set("record_trigger", &trigger).unwrap();
+    RecorderSettings::from_snapshot(&snapshot)
+}
+
+/// v0.1.0 to v0.2.0-rc.3.1 offered Recording > Trigger, Button Combination / Save State Load (`[1,0]` / `[0,1]`). The row left
+/// the page and the value stayed in settings.json, so an old `[0,1]` (or a hand-edited `[0,0]`) turned off the Record chord
+/// for good, with no notice. The recorder's settings no longer carry the Button Combination entry: built from `[0,1]` or
+/// `[0,0]` they are the ones `[1,1]` or `[1,0]` build.
+#[test]
+fn an_old_record_trigger_value_does_not_change_what_the_recorder_reads() {
+    assert_eq!(recorder_with_trigger([0, 1]), recorder_with_trigger([1, 1]), "Save State Load only");
+    assert_eq!(recorder_with_trigger([0, 0]), recorder_with_trigger([1, 0]), "neither entry");
+    assert_eq!(recorder_with_trigger([1, 0]), RecorderSettings::factory());
+}
+
+/// The runtime half (Switch-only, a source check): the chord step hands the consumed Record chord straight to
+/// `record_chord`, which takes no settings and starts a capture whenever nothing refuses it.
+#[test]
+fn the_record_chord_starts_a_recording_whatever_the_old_trigger_row_holds() {
+    let recorder = include_str!("../src/runtime/features/recorder.rs");
+    let step = body(recorder, "chord_step");
+    assert!(!step.contains("trigger_chord"), "the Record chord reads the old Trigger row again:\n{step}");
+    ordered(step, &["let record = chords::consume(Request::InputRecord);", "record_chord(record, recording_host::capturing()"]);
+    assert_eq!(record_chord(true, false, || None), Ok(true), "a Record chord with nothing refusing it starts a capture");
 }

@@ -70,8 +70,8 @@ pub enum HitstunTiming {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RecorderSettings {
     pub slot: u8,
-    /// Recording Trigger contains Button Combination / Save State Load.
-    pub trigger_chord: bool,
+    /// The old Recording Trigger row's Save State Load entry (offered by v0.1.0 to v0.2.0-rc.3.1; no page shows the row now).
+    /// Its Button Combination entry is not read: the Record chord does not depend on a row no page shows (CODE-FINDINGS #26).
     pub trigger_save_state: bool,
     pub duration: u16,
     pub crop: bool,
@@ -88,7 +88,6 @@ impl RecorderSettings {
     pub const fn factory() -> Self {
         Self {
             slot: 0,
-            trigger_chord: true,
             trigger_save_state: false,
             duration: 150,
             crop: true,
@@ -108,7 +107,6 @@ impl RecorderSettings {
         let trigger = row("record_trigger");
         Self {
             slot: first("recording_slot").map_or(0, |i| i.min(SLOTS - 1) as u8),
-            trigger_chord: trigger.first().is_some_and(|v| *v != 0),
             trigger_save_state: trigger.get(1).is_some_and(|v| *v != 0),
             // 60, 90 .. 600 frames (19 options, step 30).
             duration: first("recording_duration").map_or(150, |i| (60 + 30 * i.min(18)) as u16),
@@ -1203,7 +1201,7 @@ mod cpu_role_parity {
 
     #[test]
     fn cpu_role_drive_matches_the_slot_recorder_through_the_first_stored_frame() {
-        let settings = RecorderSettings { duration: 60, trigger_chord: true, ..RecorderSettings::factory() };
+        let settings = RecorderSettings { duration: 60, ..RecorderSettings::factory() };
         let mut slot = Recorder::new();
         slot.start_recording(&settings, 1, StartSnapshot::NONE);
         let mut drive = CpuRoleDrive::idle();
