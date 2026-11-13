@@ -16,6 +16,8 @@ either way.
 - **Default:** On
 - **How:** A flips it.
 
+![HUD turned Off: the damage and stock panels and the player pointers go, and the frame strip and the plugin's own panels stay](../media/rc11-hud.gif)
+
 The row's help line on screen says Off leaves "the game's own HUD only". In this build Off hides the game's HUD, as
 described above.
 
