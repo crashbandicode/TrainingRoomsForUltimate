@@ -15694,7 +15694,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "e13a034d45872fb1d3880931a93ca32a7ebb136927599eaef5a932c0b969dfa4",
+   "dest_sha256": "fe7efe99494cb969f48969585a954b7d8ebe572fe832cb9082b3bfca13664cd1",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -18148,6 +18148,31 @@
      "old": "        bank.background.take().unwrap()\n    };\n    let mut background = background;\n",
      "new": "        // The same for the bodies, the shadow and Pok\u00e9mon Trainer's pool, read after every count settled.\n        std::sync::atomic::fence(Ordering::Acquire);\n        bank.background.take().unwrap()\n    };\n    let mut background = background;\n",
      "reason": "thread-safety audit 2026-11-12 section 3 (pre-existing, approved 15:14Z): the background build reads the game worker's results after a plain read of each task's pending count; fence(Acquire) after the settled decision orders those reads on ARM (bodies: the shadow, each task's body, the trainer pool)"
+    },
+    {
+     "old": "    trace!(\"[BodyBank] start-up window owner={} R={:p} kinds={:x?} (scene header)\", facts.owner, r, &kinds[..members.count()]);\n}\n",
+     "new": "    trace!(\"[BodyBank] start-up window owner={} R={:p} kinds={:x?} (scene header) headroom={}\", facts.owner, r,\n        &kinds[..members.count()], headroom_now());\n}\n\n/// The process headroom and the page-table slab's charge for the start-up window's and the banks' lines (svcGetInfo\n/// 6 \u2212 7 and 17/16: register-only SVCs, no lock, no allocation; 0 when unreadable). The console hang of 2026-11-13\n/// aborted in the game's page commit 64 ms after H3 with no reading from inside the Training load; a refused commit\n/// runs out of either.\nfn headroom_now() -> Headroom {\n    Headroom(MemorySample::capture())\n}\n\nstruct Headroom(MemorySample);\n\nimpl core::fmt::Display for Headroom {\n    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {\n        let sample = &self.0;\n        write!(f, \"{} slab={}/{}\", sample.headroom().unwrap_or(0), sample.slab_committed.get().unwrap_or(0),\n            sample.slab_budget.get().unwrap_or(0))\n    }\n}\n",
+     "reason": "P0 console hang 2026-11-13 (primary 12:00Z; integration lane): the game aborted in its heap page commit (main+0x37ca688) 64 ms after the start-up window rewrote both creations, with no memory reading from inside the Training load. The start-up window lines (scene header, creation, bound) and the bank ready line add the process headroom and the page-table slab charge (svcGetInfo 6 - 7, 17/16; register-only SVCs, no lock or allocation; 0 when unreadable). Log text only."
+    },
+    {
+     "old": "        trace!(\"[BodyBank] start-up window owner={} creation {:x?} kept (native group lead)\", owner, native);\n",
+     "new": "        trace!(\"[BodyBank] start-up window owner={} creation {:x?} kept (native group lead) headroom={}\", owner, native,\n            headroom_now());\n",
+     "reason": "P0 console hang 2026-11-13 (primary 12:00Z; integration lane): the game aborted in its heap page commit (main+0x37ca688) 64 ms after the start-up window rewrote both creations, with no memory reading from inside the Training load. The start-up window lines (scene header, creation, bound) and the bank ready line add the process headroom and the page-table slab charge (svcGetInfo 6 - 7, 17/16; register-only SVCs, no lock or allocation; 0 when unreadable). Log text only."
+    },
+    {
+     "old": "    trace!(\"[BodyBank] start-up window owner={} creation {:x?}\", owner, window);\n",
+     "new": "    trace!(\"[BodyBank] start-up window owner={} creation {:x?} headroom={}\", owner, window, headroom_now());\n",
+     "reason": "P0 console hang 2026-11-13 (primary 12:00Z; integration lane): the game aborted in its heap page commit (main+0x37ca688) 64 ms after the start-up window rewrote both creations, with no memory reading from inside the Training load. The start-up window lines (scene header, creation, bound) and the bank ready line add the process headroom and the page-table slab charge (svcGetInfo 6 - 7, 17/16; register-only SVCs, no lock or allocation; 0 when unreadable). Log text only."
+    },
+    {
+     "old": "    trace!(\"[BodyBank] start-up window owner={} bound entry={:p}\", bank.owner, entry);\n",
+     "new": "    trace!(\"[BodyBank] start-up window owner={} bound entry={:p} headroom={}\", bank.owner, entry, headroom_now());\n",
+     "reason": "P0 console hang 2026-11-13 (primary 12:00Z; integration lane): the game aborted in its heap page commit (main+0x37ca688) 64 ms after the start-up window rewrote both creations, with no memory reading from inside the Training load. The start-up window lines (scene header, creation, bound) and the bank ready line add the process headroom and the page-table slab charge (svcGetInfo 6 - 7, 17/16; register-only SVCs, no lock or allocation; 0 when unreadable). Log text only."
+    },
+    {
+     "old": "                trace!(\"[BodyBank] ready owner={} index={} kind=0x{:x} previous={:?} bodies={:?}\",\n                    owner, index, members.kinds()[index as usize], bank.phase, now);\n",
+     "new": "                trace!(\"[BodyBank] ready owner={} index={} kind=0x{:x} previous={:?} bodies={:?} headroom={}\",\n                    owner, index, members.kinds()[index as usize], bank.phase, now, headroom_now());\n",
+     "reason": "P0 console hang 2026-11-13 (primary 12:00Z; integration lane): the game aborted in its heap page commit (main+0x37ca688) 64 ms after the start-up window rewrote both creations, with no memory reading from inside the Training load. The start-up window lines (scene header, creation, bound) and the bank ready line add the process headroom and the page-table slab charge (svcGetInfo 6 - 7, 17/16; register-only SVCs, no lock or allocation; 0 when unreadable). Log text only."
     }
    ]
   },

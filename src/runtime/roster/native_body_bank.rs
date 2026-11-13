@@ -2449,7 +2449,26 @@ unsafe fn scene_header(ctx: &mut InlineCtx) {
     let kinds = members.kinds();
     fields::write_unchecked(r as usize, 0x5c, if members.count() > 1 { kinds[1] } else { u32::MAX });
     fields::write_unchecked(r as usize, 0x60, if members.count() > 2 { kinds[2] } else { u32::MAX });
-    trace!("[BodyBank] start-up window owner={} R={:p} kinds={:x?} (scene header)", facts.owner, r, &kinds[..members.count()]);
+    trace!("[BodyBank] start-up window owner={} R={:p} kinds={:x?} (scene header) headroom={}", facts.owner, r,
+        &kinds[..members.count()], headroom_now());
+}
+
+/// The process headroom and the page-table slab's charge for the start-up window's and the banks' lines (svcGetInfo
+/// 6 − 7 and 17/16: register-only SVCs, no lock, no allocation; 0 when unreadable). The console hang of 2026-11-13
+/// aborted in the game's page commit 64 ms after H3 with no reading from inside the Training load; a refused commit
+/// runs out of either.
+fn headroom_now() -> Headroom {
+    Headroom(MemorySample::capture())
+}
+
+struct Headroom(MemorySample);
+
+impl core::fmt::Display for Headroom {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let sample = &self.0;
+        write!(f, "{} slab={}/{}", sample.headroom().unwrap_or(0), sample.slab_committed.get().unwrap_or(0),
+            sample.slab_budget.get().unwrap_or(0))
+    }
 }
 
 /// H1's bank record: entry unknown (0) until H4 binds it, Building, stamped with the scene it was made in.
@@ -2500,14 +2519,15 @@ pub(crate) unsafe fn creation(owner: u32, descriptor: *mut u8) {
     }
     // rc.6 item 3: a native-group lead is native's own creation, its starting form included; nothing is written.
     if keeps_native_creation(window) {
-        trace!("[BodyBank] start-up window owner={} creation {:x?} kept (native group lead)", owner, native);
+        trace!("[BodyBank] start-up window owner={} creation {:x?} kept (native group lead) headroom={}", owner, native,
+            headroom_now());
         return;
     }
     fields::write_unchecked(descriptor as usize, 0x14, window.count);
     for (i, kind) in window.kinds.iter().enumerate() { fields::write_unchecked(descriptor as usize, 0x18 + i * 4, *kind); }
     fields::write_unchecked(descriptor as usize, 0x28, window.actor_count);
     fields::write_unchecked(descriptor as usize, 0x43, window.active);
-    trace!("[BodyBank] start-up window owner={} creation {:x?}", owner, window);
+    trace!("[BodyBank] start-up window owner={} creation {:x?} headroom={}", owner, window, headroom_now());
 }
 
 /// P-HOT B H4: the first constructed entry of a pending window's owner whose descriptor shows the window binds it.
@@ -2520,7 +2540,7 @@ unsafe fn bind_pending(entry: *mut u8, role: usize) {
         && (0..count).all(|i| read::<u32>(entry, 0x18 + i * 4) == bank.members.kinds()[i]);
     if !words_match { return; }
     bank.entry = entry as usize;
-    trace!("[BodyBank] start-up window owner={} bound entry={:p}", bank.owner, entry);
+    trace!("[BodyBank] start-up window owner={} bound entry={:p} headroom={}", bank.owner, entry, headroom_now());
 }
 
 /// INSTALL and outgoing pose are already owned by the ordinary roster request.
@@ -2822,8 +2842,8 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
                 return Action::None;
             }
             if bank.phase != Phase::Ready || bank.bodies != now {
-                trace!("[BodyBank] ready owner={} index={} kind=0x{:x} previous={:?} bodies={:?}",
-                    owner, index, members.kinds()[index as usize], bank.phase, now);
+                trace!("[BodyBank] ready owner={} index={} kind=0x{:x} previous={:?} bodies={:?} headroom={}",
+                    owner, index, members.kinds()[index as usize], bank.phase, now, headroom_now());
                 #[cfg(feature = "diag")]
                 crate::runtime::roster::identity_view::report(owner, resource(BASE.load(Ordering::Acquire), owner).unwrap_or(0), "ready");
                 if members.is_pair_lead() {
