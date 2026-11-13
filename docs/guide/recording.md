@@ -59,7 +59,7 @@ Each role has one active macro. It is either a recording or a chain. Set active 
 | Record | ZR + D-pad Down | Records the pop-up's role. Player 1 until that role is CPU. |
 | Play on Player 1 | ZR + D-pad Left | Plays Player 1's active macro, or stops it if it is already playing. |
 | Play on CPU | ZR + D-pad Up | Plays the CPU's active macro, or stops it. This chord was Input Playback. |
-| Recording pop-up | ZR + D-pad Right | Opens the pop-up. The same chord closes it. |
+| Recording pop-up | ZR + D-pad Right | Opens the pop-up. B closes it (the chord does nothing while it is open). |
 
 The same editor (Display & Controls › Button chords) also has the cycle chords (ZL + D-pad Left / Right) and two
 chords that aren't about recording: Input display (R + D-pad Down) turns the frame strip on and off, and Game speed
@@ -156,7 +156,7 @@ The picker is the same numbered picker as a chain, including R removing the last
 
 ## The pop-up
 
-The pop-up is one window over the match. While it is open it takes the menu's buttons. B closes it and leaves the bound save, the active macros, and the cursor as they were.
+The pop-up is one window over the match. While it is open it takes the menu's buttons. B closes it and leaves the bound save, the active macros, and the cursor as they were. Tap B: in this build a B still held after the close reaches your fighter as a special.
 
 The title reads `Recording`, with the role tabs beside it: L Player, CPU R; the role in view is lit. L sets Player 1.
 R sets the CPU.

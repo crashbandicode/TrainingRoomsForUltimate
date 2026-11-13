@@ -307,8 +307,10 @@ files, the bound save, the active macros, the drill, the [Loop](#loop) counts an
 ## The Recording pop-up
 
 ZR + D-pad Right opens the pop-up over the match, wherever the menu opens
-([Using the menu › Opening and closing](../guide/using-the-menu.md#opening-and-closing)). The same chord, or B,
-closes it and leaves everything as it is. While it is open your buttons go to it, not to your fighter. Unlike the
+([Using the menu › Opening and closing](../guide/using-the-menu.md#opening-and-closing)). B closes it and leaves
+everything as it is; the chord doesn't, because while the pop-up is open your buttons go to it, not to your fighter
+or the chords. Tap B rather than hold it: in this build a B still held after the pop-up closes reaches your fighter
+(Mario throws a fireball). Unlike the
 page, A in the pop-up acts at once: there are no file screens, so renaming, cropping and deleting are done on the
 page.
 

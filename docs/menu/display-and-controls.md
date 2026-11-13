@@ -84,7 +84,7 @@ A chord is "hold one button and press the others".
 | Record | ZR + D-pad Down | Starts or stops a recording. |
 | Play on CPU | ZR + D-pad Up | Plays the CPU's active recording, or stops it. |
 | Play on Player 1 | ZR + D-pad Left | Plays Player 1's active recording, or stops it. |
-| Recording pop-up | ZR + D-pad Right | Opens or closes the recording pop-up. |
+| Recording pop-up | ZR + D-pad Right | Opens the recording pop-up (B closes it). |
 | Cycle Player | ZL + D-pad Right | Your next fighter (needs Player Swapping On). |
 | Cycle CPU | ZL + D-pad Left | The CPU's next fighter. |
 | Input display | R + D-pad Down | Turns the frame strip on or off. |

@@ -24,7 +24,7 @@ chord is held back.
 | ZR + D-pad Down | Record: starts or stops a recording. | [Recording](recording.md) |
 | ZR + D-pad Up | Play on CPU: plays the CPU's active recording, or stops it. | [Recording](recording.md) |
 | ZR + D-pad Left | Play on Player 1: plays your active recording, or stops it. | [Recording](recording.md) |
-| ZR + D-pad Right | Recording pop-up: opens or closes it. | [The pop-up](recording.md#the-pop-up) |
+| ZR + D-pad Right | Recording pop-up: opens it; B closes it (chords do nothing while it is open). | [The pop-up](recording.md#the-pop-up) |
 | ZL + D-pad Right | Cycle Player: your next fighter. | [Fighter cycles](fighter-cycles.md) |
 | ZL + D-pad Left | Cycle CPU: the CPU's next fighter. | [Fighter cycles](fighter-cycles.md) |
 | R + D-pad Down | Input display: turns the frame strip on or off. | [Frame strip](frame-strip.md) |
