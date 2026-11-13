@@ -272,7 +272,7 @@ pub static ROWS: [Row; 92] = [
     delay(ATTACKS, "Throw Delay", "throw_delay", 5, "throw_delay_range",
           "Frames the CPU holds you before throwing.\nTick values, or set a minimum and a maximum."),
     delay(ATTACKS, "Pummel Delay", "pummel_delay", 5, "pummel_delay_range",
-          "Frames after a grab before the CPU pummels. Tick values or a range.\nIt pummels only during Throw Delay, with a Throw other than None."),
+          "Frames after a grab before the CPU pummels. Tick values or a range.\nIt pummels until its throw, or with Throw None until the grab ends."),
     r(ATTACKS, "Falling Aerials", "falling_aerials", Control::YesNoRandom,
       "Whether the CPU's aerials come while it is falling.\nRandom picks either way each time."),
     delay(ATTACKS, "Aerial Delay", "aerial_delay", 1, "aerial_delay_range",

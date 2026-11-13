@@ -254,8 +254,8 @@ fn cpu06_throw_state_machine() {
     // Not holding anyone: everything is forgotten.
     cpu.command_flags(key, true, &ground(C::StatusWait));
     assert_eq!(cpu.fighters[key.index()].throw, model::cpu::throw::Throw::new());
-    // Case None: neither throws nor pummels; a missing CONT_THROW_HI: nothing.
-    let (mut cpu, key) = cpu_with(&[("pummel_delay", delay(&[0]))]);
+    // Case None with no Pummel Delay: the CPU just holds; a missing CONT_THROW_HI: nothing.
+    let (mut cpu, key) = cpu_with(&[]);
     let hold = holding();
     for _ in 0..40 {
         cpu.tick_clock();
@@ -272,6 +272,31 @@ fn cpu06_throw_state_machine() {
         cpu.tick_clock();
         assert_eq!(cpu.command_flags(key, true, &hold).request_status, None);
     }
+}
+
+fn cpu06_throw_none_pummels_until_the_grab_ends() {
+    // Operator 2026-11-13 (TR4): with Throw None (the default) a Pummel Delay still pummels. The CPU never throws, so
+    // it pummels every Pummel Delay frames, as it does while waiting out a Throw Delay, until the game ends the grab
+    // (the held fighter breaks free).
+    let (mut cpu, key) = cpu_with(&[("pummel_delay", delay(&[2]))]); // 10 frames
+    let hold = holding();
+    let catch_attack = st(C::StatusCatchAttack);
+    let (mut first, mut last, mut pummels) = (None, 0, 0);
+    for n in 0..200 {
+        cpu.tick_clock();
+        let out = cpu.command_flags(key, true, &hold);
+        assert_eq!(out.bits, 0, "Throw None never throws");
+        if out.request_status == Some(catch_attack) {
+            assert!(n >= 10, "no pummel before its delay");
+            first.get_or_insert(n);
+            (last, pummels) = (n, pummels + 1);
+        }
+    }
+    assert!(first.is_some(), "Throw None with a Pummel Delay pummels");
+    assert!(pummels >= 15 && last >= 180, "it keeps pummelling while it holds: {pummels}, the last at {last}");
+    // The grab ended: the next one starts over.
+    cpu.command_flags(key, true, &ground(C::StatusWait));
+    assert_eq!(cpu.fighters[key.index()].throw, model::cpu::throw::Throw::new());
 }
 
 fn cpu06_throw_options_change_rerolls_held_case() {
@@ -348,6 +373,7 @@ fn case_table() {
         ("cpu06_attack_angle", cpu06_attack_angle as fn()),
         ("cpu06_crouch_statuses", cpu06_crouch_statuses as fn()),
         ("cpu06_throw_state_machine", cpu06_throw_state_machine as fn()),
+        ("cpu06_throw_none_pummels_until_the_grab_ends", cpu06_throw_none_pummels_until_the_grab_ends as fn()),
         ("cpu06_throw_options_change_rerolls_held_case", cpu06_throw_options_change_rerolls_held_case as fn()),
         ("cpu06_throw_yields_to_playback", cpu06_throw_yields_to_playback as fn()),
         ("cpu06_range_picks_and_exclusive_rows", cpu06_range_picks_and_exclusive_rows as fn()),

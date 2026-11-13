@@ -281,8 +281,9 @@ random each time. It is not used on the ledge.
 
 ### Throw
 
-What the CPU does after it grabs you. With several ticked, it picks one at random for each grab. None: it neither
-throws nor pummels. After the throw, the CPU does its Mash action at once, whatever Mash Triggers says.
+What the CPU does after it grabs you. With several ticked, it picks one at random for each grab. None: it never
+throws; it holds you, pummelling if [Pummel Delay](#pummel-delay) is set, until the grab ends when you break free.
+After a throw, the CPU does its Mash action at once, whatever Mash Triggers says.
 
 - **Values:** None, Forward Throw, Backward Throw, Up Throw, Down Throw.
 - **Default:** None.
@@ -303,9 +304,10 @@ More: [Delay rows](../guide/cpu-behaviour.md#delay-rows)
 
 ### Pummel Delay
 
-Frames after the grab before the CPU starts pummelling. Any value (or a range) turns pummels on; nothing ticked
-means no pummels. The CPU pummels while it waits out the [Throw Delay](#throw-delay), so it needs a throw ticked in
-[Throw](#throw) and a Throw Delay longer than this one.
+Frames after the grab before the CPU pummels, and again between pummels. Any value (or a range) turns pummels on;
+nothing ticked means no pummels. With a throw ticked in [Throw](#throw), the CPU pummels while it waits out the
+[Throw Delay](#throw-delay), so that one needs to be longer. With Throw None it never throws, and it keeps pummelling
+until the grab ends, when you break free.
 
 - **Values:** 0 to 150 frames, in steps of 5. Tick values, or set a minimum and a maximum.
 - **Default:** none ticked: no pummels.

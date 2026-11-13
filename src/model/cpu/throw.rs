@@ -72,12 +72,9 @@ impl Throw {
         };
         let pummel_on = s.pummel_delay.is_set();
         let pummel = if pummel_on { Some(*self.pummel.get_or_insert_with(|| s.pummel_delay.pick(rng))) } else { None };
-        // 4. None: neither throws nor pummels.
-        if case == throw_option::NONE {
-            return out;
-        }
+        // 4. None never throws: it pummels as below until the game ends the grab (the held fighter breaks free).
         // 5. Waiting out the throw delay: maybe pummel.
-        if counters.get(CounterId::Throw).should_delay(delay) {
+        if case == throw_option::NONE || counters.get(CounterId::Throw).should_delay(delay) {
             let pummel_waits = pummel.is_some_and(|p| counters.get(CounterId::Pummel).should_delay(p));
             if pummel_waits || pummel.is_none() {
                 return out;
