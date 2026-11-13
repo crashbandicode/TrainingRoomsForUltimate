@@ -28,7 +28,7 @@ static CATEGORY_NATIVES_USABLE: AtomicBool = AtomicBool::new(false);
 /// A group of `natives` that boot enables once its rows are usable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NativeGroup {
-    /// `fighter_entry`, `entry_body`, `module_accessor`: row `fighter_manager_get_entry`.
+    /// `fighter_entry`, `entry_active_body`, `module_accessor`: row `fighter_manager_get_entry`.
     Entry,
     /// `is_operation_cpu`: rows `fighter_information` and `is_operation_cpu`.
     Operator,
@@ -141,8 +141,6 @@ pub mod natives {
     use crate::model::cpu::ids::UNRESOLVED;
     use crate::runtime::features::cpu;
 
-    /// `FighterEntry` (the entry object): its first body (the fighter object) pointer.
-    pub const ENTRY_BODY_FIELD: usize = crate::model::entry_cells::BODY_FIELD;
     /// The fighter object: its `BattleObjectModuleAccessor` pointer.
     pub const FIGHTER_ACCESSOR_FIELD: usize = 0x20;
     /// The accessor: its battle object id (`utility::get_kind`'s `ldr w0, [x0, #8]`, guarded by the
@@ -360,18 +358,11 @@ pub mod natives {
         at::<extern "C" fn(usize, i32) -> usize>(sites_pkg4::FIGHTER_MANAGER_GET_ENTRY_OFFSET).map_or_else(Default::default, |f| f(manager, entry))
     }
 
-    /// The entry object's first body (the fighter object), or 0.
-    pub unsafe fn entry_body(entry_ptr: usize) -> usize {
-        if entry_ptr == 0 {
-            return 0;
-        }
-        ((entry_ptr + ENTRY_BODY_FIELD) as *const usize).read()
-    }
-
     /// F11: the entry's running body (the fighter object), or 0: the window cell the game marks active (`+0x5918`, counted by
     /// `+0x4150`; `model::entry_cells::active_cell`), which a body-bank group swap or a native Pokemon Trainer switch changes, so it
     /// is the body the fighter actually is. Without the guarded layout (`sites_pkg6::entry_active_cell`, checked at boot) it is the
-    /// first body, as `entry_body`. Game thread only: it reads the live entry; worker and menu threads read published facts.
+    /// first body (window cell 0). Every fighter identity reads this one: the first body is not the fighter on screen after a
+    /// live swap (CODE-FINDINGS #25). Game thread only: it reads the live entry; worker and menu threads read published facts.
     pub(crate) unsafe fn entry_active_body(entry_ptr: usize) -> usize {
         crate::model::entry_cells::read_active_body(
             entry_ptr,

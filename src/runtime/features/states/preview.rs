@@ -61,7 +61,9 @@ pub(super) unsafe fn observe() -> Result<(Identity, [Raw; 2]), &'static str> {
     let mut raws = [None, None];
     let mut miis = [None; 2];
     for (index, role) in [Role::Player, Role::Cpu].into_iter().enumerate() {
-        let fighter = natives::entry_body(entries[index]);
+        // The running body, the one the Save chord records: after a live swap the entry's first body is not the fighter on
+        // screen, and a setup of the fighters on screen was refused (CODE-FINDINGS #25).
+        let fighter = natives::entry_active_body(entries[index]);
         let accessor = natives::fighter_accessor(fighter);
         if fighter == 0 || accessor == 0 {
             return Err(NOT_READY);

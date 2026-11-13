@@ -6,6 +6,8 @@
 //!   waits for the closing press to be released.
 //! - #15: the Loop row's A list wrote the old two-value setting, so the count Play reads did not change, and Reset page to
 //!   defaults left the count alone. The list and the reset now use the recording menu's per-role counts.
+//! - #25: after a live fighter swap the Setup library refused a setup of exactly the fighters on screen: its fighter check
+//!   read each entry's first body, the setup was saved from the running body. The check now reads the running body.
 
 // rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
 macro_rules! lib_unit_tests {
@@ -538,4 +540,85 @@ fn the_loop_list_labels_are_the_loop_counts() {
     }
     let m = loop_menu();
     assert_eq!(m.option_count(row_of(LOOP_ROW)), LOOP_COUNTS.len());
+}
+
+// ---- #25: the Setup library's restore after a live swap ----------------------------------------------------------------
+
+use model::entry_cells;
+use model::state::machine::SituationIds;
+use model::state::record::SavedState;
+use model::state::setup_transaction::{export, Facts, Prepared, Refusal, Target};
+
+const MARIO: i32 = 0x0;
+const LUIGI: i32 = 0x9;
+
+/// The CPU's entry after a live swap (CPU Character, a cycle chord, Fighter Mismatch's Switch), as the game lays it out
+/// (`model::entry_cells`): the body bank put Mario in window cell 1 and made it the active cell (`+0x5918`, count `+0x4150`);
+/// cell 0, the entry's first body, is still the Luigi the entry was built with. Returns the word and byte readers over that
+/// memory and the two bodies.
+fn swapped_cpu_entry(entry: usize) -> (impl Fn(usize) -> u64, impl Fn(usize) -> u8, usize, usize) {
+    let (first, running) = (0x20000usize, 0x30000usize);
+    let word = move |address: usize| match address - entry {
+        0x4150 => 2,
+        offset if offset == entry_cells::BODY_FIELD => first as u64,
+        offset if offset == entry_cells::BODY_FIELD + 8 => running as u64,
+        offset => panic!("unexpected entry word +{offset:#x}"),
+    };
+    let byte = move |address: usize| {
+        assert_eq!(address - entry, 0x5918, "only the active-cell byte is read");
+        1
+    };
+    (word, byte, first, running)
+}
+
+/// A setup saved by the Save chord after the swap is restored with the same fighters on screen. The chord records the body the
+/// game runs a frame of (`states::on_fighter_frame`): Mario. The restore's fighter check is fed by `preview::observe`: read from
+/// the running body (`entry_active_body`) it matches; read from the entry's first body (`entry_body`, before the fix) it saw
+/// Luigi and refused with "Restore this setup with its saved fighters".
+#[test]
+fn a_setup_saved_after_a_live_swap_restores_with_the_fighters_on_screen() {
+    const ENTRY: usize = 0x10000;
+    let (word, byte, first, running) = swapped_cpu_entry(ENTRY);
+    let kind_of = |body: usize| if body == running { MARIO } else { LUIGI };
+    let pair: [SavedState; 2] = std::array::from_fn(|role| SavedState {
+        fighter_kind: if role == 0 { MARIO } else { kind_of(running) },
+        x: if role == 0 { -20.0 } else { 20.0 },
+        saved_stage: Some(17),
+        situation_kind: 0,
+        ..SavedState::never_saved()
+    });
+    let prepared = Prepared::new(&export("Setup", &pair).unwrap(), [None::<u64>; 2]).unwrap();
+    let target = Target { session: 4, slot: 0, enabled: true };
+    let facts = |cpu_body: usize| Facts {
+        session: 4,
+        owned: true,
+        busy: false,
+        enabled: true,
+        stage: 17,
+        kinds: [MARIO, kind_of(cpu_body)],
+        miis: [None::<u64>; 2],
+        situations: SituationIds { ground: 0, air: 2, cliff: 5 },
+    };
+
+    let active = entry_cells::read_active_body(ENTRY, true, &word, &byte);
+    assert_eq!(active, running, "the running body is the swapped-in Mario");
+    assert_eq!(prepared.validate(target, &facts(active), true), Ok(()), "restored with Mario and Mario on screen");
+
+    let first_body = word(ENTRY + entry_cells::BODY_FIELD) as usize;
+    assert_eq!(first_body, first);
+    assert_eq!(prepared.validate(target, &facts(first_body), true), Err(Refusal::Fighter), "the first-body read refused it");
+    assert_eq!(prepared.validate(target, &facts(first_body), false), Ok(()), "Y binds without the fighter check");
+}
+
+/// The runtime half (Switch-only, so a source check like `tests/lockfree_wiring.rs`): the identity the Setup library's restore
+/// and the replay preview both check reads each entry's running body.
+#[test]
+fn the_setup_restore_and_the_replay_preview_read_the_running_body() {
+    let preview = include_str!("../src/runtime/features/states/preview.rs");
+    let observe = body(preview, "observe");
+    assert!(observe.contains("natives::entry_active_body(entries[index])"), "observe reads the running body:\n{observe}");
+    assert!(!observe.contains("natives::entry_body("), "observe reads the entry's first body again");
+    let setups = include_str!("../src/runtime/features/states/setups.rs");
+    assert!(body(setups, "service").contains("preview::observe()"), "the restore's facts come from observe");
+    assert!(body(preview, "request").contains("observe()"), "the replay preview's checkpoint comes from observe");
 }
