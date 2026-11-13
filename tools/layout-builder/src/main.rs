@@ -256,12 +256,16 @@ fn add_recording_icon_materials(layout: &mut BFLYT, waiting: bool) -> Result<()>
     Ok(())
 }
 
-/// rc.13 E1 x1: the material of the DI chips' body, streak and core layers (`panes::CHIP_LAYERS` blocks after the first).
+/// rc.13 E1 x1: the material of the chips' layer panes (`panes::CHIP_LAYERS` blocks of `CHIPS`).
 const CHIP_ADD_MATERIAL: &str = "tr_chip_add";
+/// Neutral's first-block pane: its square keeps the rect template's normal alpha (`options::DIRECTIONS` index 8).
+const NEUTRAL_CHIP: usize = 8;
 
-/// Those layers blend additively, as the game draws `P_CmnVector`: the rect template's material with the blend the stock
+/// The layers blend additively, as the game draws its particles: the rect template's material with the blend the stock
 /// cursor highlights' `_add` materials carry (`com_csr_lct0_01.bflyt`: Add, source alpha, one). The runtime binds each
-/// layer's effect texture over it. The first block (the glow, the SDI burst, the arrows) keeps the template's normal alpha.
+/// layer's effect texture over it. Every layer, the glow too: rc13-di-1 drew flare01 at normal alpha as an opaque dark
+/// box (its texels are dark where the game's additive blend leaves the scene as it was). The SDI burst and the arrows
+/// share the first block, so they blend additively as well; only Neutral's square keeps normal alpha.
 fn add_chip_blend(layout: &mut BFLYT, waiting: bool) -> Result<()> {
     let template_pane = if waiting { "pic_bg_main_00" } else { RECT_TEMPLATE };
     let index = layout.find_pane(template_pane).and_then(|pane| pane.picture.as_ref())
@@ -274,7 +278,7 @@ fn add_chip_blend(layout: &mut BFLYT, waiting: bool) -> Result<()> {
     material.blend_mode = Some(BlendMode { blend_op: 1, src_factor: 4, dst_factor: 1, logic_op: 0 });
     material.flags_raw |= 1 << 10;
     layout.materials.push(material);
-    for i in panes::CHIPS..panes::CHIP_LAYERS * panes::CHIPS {
+    for i in (0..panes::CHIP_LAYERS * panes::CHIPS).filter(|i| *i != NEUTRAL_CHIP) {
         let name = panes::name_of(panes::IDX_CHIP_NEEDLE + i);
         layout.set_pane(name.as_str(), &PaneEdit { bind_material: Some(CHIP_ADD_MATERIAL.into()), ..Default::default() })
             .map_err(err("chip blend material"))?;
@@ -515,11 +519,10 @@ mod tests {
         }
     }
 
-    /// rc.13 E1 x1: the DI chips' body, streak and core layers blend additively, as the game draws `P_CmnVector`, with the
-    /// blend the stock cursor highlight's `_add` materials carry (Add, source alpha, one). The glow layer, which also carries
-    /// the SDI burst and the arrows, keeps the rect template's normal alpha.
+    /// rc.13 E1 x1: every chip layer pane blends additively, as the game draws `P_CmnVector`, with the blend the stock
+    /// cursor highlight's `_add` materials carry (Add, source alpha, one); Neutral's square keeps normal alpha.
     #[test]
-    fn the_upper_chip_layers_bind_the_stock_additive_blend() {
+    fn the_chip_layers_bind_the_stock_additive_blend() {
         let dir = std::env::var("UI_STOCK_FIXTURE").unwrap_or_else(|_| "/home/intpa/smash-training-lobby/pkg5-scratch/stock".into());
         let arc = read_arc(&std::fs::read(format!("{dir}/info_training.arc")).unwrap()).unwrap();
         let cursor = read_bflyt(&arc.files[arc.position("blyt/com_csr_lct0_01.bflyt").unwrap()].data).unwrap();
@@ -538,8 +541,8 @@ mod tests {
                 let name = name.as_str();
                 let index = layout.find_pane(name).unwrap().picture.as_ref().unwrap().material_index;
                 let material = &layout.materials[usize::from(index)];
-                if k == 0 {
-                    assert_eq!(index, template, "{name}: the glow layer keeps normal alpha");
+                if k == 0 && i == NEUTRAL_CHIP {
+                    assert_eq!(index, template, "{name}: Neutral's square keeps normal alpha");
                 } else {
                     assert_eq!(material.name, CHIP_ADD_MATERIAL);
                     assert_eq!(format!("{:?}", material.blend_mode), format!("{:?}", Some(stock_add.clone())), "{name}");
