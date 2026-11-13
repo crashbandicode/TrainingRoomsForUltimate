@@ -196,7 +196,9 @@ impl Mash {
             self.latch = None;
             return out;
         };
-        if self.latch == Some(situ) {
+        // One roll per situation (B8), but a generic trigger (Always, Grounded, Airborne, Distance) lasts as long as it
+        // is ticked: it rolls again once the last action is done.
+        if self.latch == Some(situ) && !(situ == Situ::Generic && self.queue.is_empty()) {
             return out;
         }
         self.latch = Some(situ);

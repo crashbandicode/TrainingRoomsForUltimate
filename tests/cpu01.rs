@@ -170,6 +170,22 @@ fn cpu01_one_roll_per_situation() {
         seen.insert(cpu.fighters[key.index()].mash.queue.current().unwrap().0);
     }
     assert_eq!(seen.len(), 4);
+    // A trigger that lasts as long as it is ticked (Always, Grounded, Airborne, Distance) is the CPU's whole time
+    // standing there: it mashes again each time the last action is done, as upstream does (gna-p2-rta-1, Mash Grab and
+    // Always: one grab, then 4 s standing in WAIT with `queued=false latched=true`).
+    let (mut cpu, key) = cpu_with(base(), &[("mash_state", actions(&[22])), ("mash_triggers", triggers(&[16]))]);
+    let (catch, catching) = (cpu.ids.get(C::FlagCatch) as u32, cpu.ids.get(C::StatusCatch));
+    for grab in 1..=3 {
+        assert_eq!(cpu.command_flags(key, false, &facts(WAIT)).bits, catch, "grab {grab}");
+        cpu.command_flags(key, false, &facts(catching));
+        assert!(cpu.fighters[key.index()].mash.queue.is_empty(), "grab {grab} done");
+    }
+    // A situation that ends on its own (hitstun) still rolls once, however soon its action is done.
+    let (mut cpu, key) = cpu_with(base(), &[("mash_state", actions(&[18])), ("mash_triggers", triggers(&[0]))]);
+    cpu.command_flags(key, false, &facts(DAMAGE));
+    cpu.fighters[key.index()].mash.queue.clear();
+    cpu.command_flags(key, false, &facts(DAMAGE));
+    assert!(cpu.fighters[key.index()].mash.queue.is_empty(), "one roll per hitstun");
 }
 
 /// (action, flag, expected status) for the straightforward actions of the table.
