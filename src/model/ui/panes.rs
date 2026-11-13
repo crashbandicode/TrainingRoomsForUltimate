@@ -286,8 +286,11 @@ pub const IDX_HINT: usize = IDX_HELP + 2;
 pub const CHIPS: usize = 11;
 pub const IDX_CHIP_HI: usize = IDX_HINT + 1;
 pub const IDX_CHIP: usize = IDX_CHIP_HI + 1;
+/// rc.13 E1 x1: a needle per layer of the game's DI effect, one block of `CHIPS` each, back to front glow, body,
+/// streaks, core. The first block also carries the SDI burst and the arrows.
+pub const CHIP_LAYERS: usize = 4;
 pub const IDX_CHIP_NEEDLE: usize = IDX_CHIP + CHIPS;
-pub const IDX_CHIP_LABEL: usize = IDX_CHIP_NEEDLE + CHIPS;
+pub const IDX_CHIP_LABEL: usize = IDX_CHIP_NEEDLE + CHIP_LAYERS * CHIPS;
 pub const IDX_CHIP_BADGE: usize = IDX_CHIP_LABEL + CHIPS;
 /// The item and stage grids' tiles (up to 5 x 8): a tile and a label each, and the focus ring. Their size and place
 /// are set when a grid opens (the layout follows the console mode).
@@ -875,7 +878,7 @@ pub const fn name_of(index: usize) -> Name {
         i if i == IDX_HELP + 1 => Name::new("tr_help_1"),
         IDX_HINT => Name::new("tr_hint"),
         i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => Name::indexed("tr_ch_", i - IDX_CHIP),
-        i if i >= IDX_CHIP_NEEDLE && i < IDX_CHIP_NEEDLE + CHIPS => Name::indexed("tr_cn_", i - IDX_CHIP_NEEDLE),
+        i if i >= IDX_CHIP_NEEDLE && i < IDX_CHIP_LABEL => Name::indexed("tr_cn_", i - IDX_CHIP_NEEDLE),
         i if i >= IDX_CHIP_LABEL && i < IDX_CHIP_LABEL + CHIPS => Name::indexed("tr_cl_", i - IDX_CHIP_LABEL),
         i if i >= IDX_CHIP_BADGE && i < IDX_CHIP_BADGE + CHIPS => Name::indexed("tr_cb_", i - IDX_CHIP_BADGE),
         i if i >= IDX_TILE && i < IDX_TILE + TILES => Name::indexed("tr_ti_", i - IDX_TILE),
@@ -1022,7 +1025,7 @@ pub const fn spec(index: usize) -> Spec {
         IDX_CHIP_HI => rect(name, [0.0, 0.0, CHIP_SIZE + 16.0, CHIP_SIZE + 16.0], ACCENT, false),
         IDX_TILE_HI => rect(name, [0.0, 0.0, 100.0, 60.0], ACCENT, false),
         i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => rect(name, [0.0, 0.0, CHIP_SIZE, CHIP_SIZE], HIGHLIGHT, false),
-        i if i >= IDX_CHIP_NEEDLE && i < IDX_CHIP_NEEDLE + CHIPS => rect(name, [0.0, 0.0, 10.0, 84.0], TEXT, false),
+        i if i >= IDX_CHIP_NEEDLE && i < IDX_CHIP_LABEL => rect(name, [0.0, 0.0, 10.0, 84.0], TEXT, false),
         i if i >= IDX_CHIP_LABEL && i < IDX_CHIP_LABEL + CHIPS => hidden(text(name, [0.0, 0.0, CHIP_SIZE, 44.0], Align::Center, FONT_SMALL, 16, TEXT)),
         i if i >= IDX_CHIP_BADGE && i < IDX_CHIP_BADGE + CHIPS => hidden(text(name, [0.0, 0.0, 60.0, 44.0], Align::Center, FONT, 4, TEXT)),
         i if i >= IDX_TILE && i < IDX_TILE + TILES => rect(name, [0.0, 0.0, 100.0, 60.0], HIGHLIGHT, false),

@@ -11,7 +11,7 @@
 
 use std::sync::atomic::{AtomicU64, AtomicU8, AtomicUsize, Ordering};
 
-use crate::model::effect_chips::{self as m, Candidate, Held, LayerWord, Step};
+use crate::model::effect_chips::{self as m, Candidate, Held, LayerWord, Step, LAYERS};
 use crate::model::effect_texture::Visual;
 use crate::model::frame::{ChipVisual, Frame, View};
 use crate::model::panes as p;
@@ -27,19 +27,19 @@ pub const NEUTRAL: usize = 8;
 static WANTED: AtomicU8 = AtomicU8::new(0);
 /// What the page holds (`effect_chips::held_code`).
 static HELD: AtomicU8 = AtomicU8::new(0);
-/// The bound texture's shared-pointer words (0, 0 when none).
-static TEXTURE_HOLDER: AtomicUsize = AtomicUsize::new(0);
-static TEXTURE_CONTROL: AtomicUsize = AtomicUsize::new(0);
-/// What the view draws on the pointers (`effect_chips::pack_layer`; 0 when nothing is bound).
-static LAYER: AtomicU64 = AtomicU64::new(0);
+/// Each layer's bound texture, as shared-pointer words (0, 0 when none).
+static TEXTURE_HOLDER: [AtomicUsize; LAYERS] = [const { AtomicUsize::new(0) }; LAYERS];
+static TEXTURE_CONTROL: [AtomicUsize; LAYERS] = [const { AtomicUsize::new(0) }; LAYERS];
+/// What the view draws on each layer's pointers (`effect_chips::pack_layer`; 0 when nothing is bound).
+static LAYER: [AtomicU64; LAYERS] = [const { AtomicU64::new(0) }; LAYERS];
 
 fn log(args: core::fmt::Arguments<'_>) {
     crate::model::hook_stats::per_load(|| diagnostic(args));
 }
 
-/// The layer the pointers carry, if any (one atomic load).
-pub fn layer() -> Option<LayerWord> {
-    m::unpack_layer(LAYER.load(Ordering::Acquire))
+/// What layer `k`'s pointers carry, if anything (one atomic load).
+pub fn layer(k: usize) -> Option<LayerWord> {
+    m::unpack_layer(LAYER[k].load(Ordering::Acquire))
 }
 
 /// The frame the menu drew: the DI / SDI grid wants its visual, anything else none.
@@ -103,68 +103,66 @@ unsafe fn request(panes: &Panes, visual: ChipVisual) {
             *slot = Candidate { sampler: pic.sampler, width: pic.texture.width, height: pic.texture.height };
         }
     }
-    let Some(picture) = m::pick_layer(visual, &candidates[..pictures.count]).and_then(|i| pictures.pictures[i]) else {
+    let mut layers = 0;
+    for (k, pick) in m::pick_layers(visual, &candidates[..pictures.count]).into_iter().enumerate() {
+        let Some(picture) = pick.and_then(|i| pictures.pictures[i]) else { continue };
+        let Some(built) = effect_texture::texture_of(&picture) else {
+            log(format_args!("[Chips] visual={visual:?} layer={k} texture not built"));
+            continue;
+        };
+        let mut bound = 0;
+        for i in (0..p::CHIPS).filter(|i| *i != NEUTRAL) {
+            let pane = panes.all[p::IDX_CHIP_NEEDLE + k * p::CHIPS + i];
+            if !pane.is_null() && texture::bind(pane, &built) {
+                bound += 1;
+            }
+        }
+        if bound == 0 {
+            texture::release(built);
+            log(format_args!("[Chips] visual={visual:?} layer={k} nothing bound"));
+            continue;
+        }
+        let (holder, control) = built.to_words();
+        TEXTURE_HOLDER[k].store(holder, Ordering::Release);
+        TEXTURE_CONTROL[k].store(control, Ordering::Release);
+        let (width, height, tint) = (picture.texture.width, picture.texture.height, picture.tint);
+        LAYER[k].store(m::pack_layer(LayerWord { visual, width, height, tint }), Ordering::Release);
+        layers += 1;
+        log(format_args!(
+            "[Chips] visual={visual:?} layer={k} bound={bound} texture={width}x{height} tint={tint:?} allocations={}",
+            crate::runtime::alloc::hook_allocations()
+        ));
+    }
+    if layers == 0 {
         log(format_args!("[Chips] visual={visual:?} no layer among {} pictures (arrows kept)", pictures.count));
         return;
-    };
-    let Some(built) = effect_texture::texture_of(&picture) else {
-        log(format_args!("[Chips] visual={visual:?} texture not built (arrows kept)"));
-        return;
-    };
-    let mut bound = 0;
-    for i in (0..p::CHIPS).filter(|i| *i != NEUTRAL) {
-        let pane = panes.all[p::IDX_CHIP_NEEDLE + i];
-        if !pane.is_null() && texture::bind(pane, &built) {
-            bound += 1;
-        }
     }
-    if bound == 0 {
-        texture::release(built);
-        log(format_args!("[Chips] visual={visual:?} nothing bound (arrows kept)"));
-        return;
-    }
-    let (holder, control) = built.to_words();
-    TEXTURE_HOLDER.store(holder, Ordering::Release);
-    TEXTURE_CONTROL.store(control, Ordering::Release);
-    LAYER.store(
-        m::pack_layer(LayerWord { visual, width: picture.texture.width, height: picture.texture.height, tint: picture.tint }),
-        Ordering::Release,
-    );
     HELD.store(m::held_code(Held::Bound(visual)), Ordering::Release);
-    log(format_args!(
-        "[Chips] visual={visual:?} bound={bound} texture={}x{} tint={:?} allocations={}",
-        picture.texture.width,
-        picture.texture.height,
-        picture.tint,
-        crate::runtime::alloc::hook_allocations()
-    ));
 }
 
 /// Unbind the pointers when the panes still exist; layout loss retains the same GPU retirement grace.
 unsafe fn drop_layer(panes: Option<&Panes>) {
-    LAYER.store(0, Ordering::Release);
     HELD.store(m::held_code(Held::Nothing), Ordering::Release);
-    let (holder, control) = (TEXTURE_HOLDER.swap(0, Ordering::AcqRel), TEXTURE_CONTROL.swap(0, Ordering::AcqRel));
-    let Some(t) = Texture::from_words(holder, control) else { return };
-    match panes {
-        Some(panes) => {
-            for i in (0..p::CHIPS).filter(|i| *i != NEUTRAL) {
-                let pane = panes.all[p::IDX_CHIP_NEEDLE + i];
-                if !pane.is_null() {
-                    texture::unbind(pane);
-                }
+    let mut dropped = false;
+    for k in 0..LAYERS {
+        LAYER[k].store(0, Ordering::Release);
+        let (holder, control) = (TEXTURE_HOLDER[k].swap(0, Ordering::AcqRel), TEXTURE_CONTROL[k].swap(0, Ordering::AcqRel));
+        let Some(t) = Texture::from_words(holder, control) else { continue };
+        for i in (0..p::CHIPS).filter(|i| panes.is_some() && *i != NEUTRAL) {
+            let pane = panes.map_or(core::ptr::null_mut(), |panes| panes.all[p::IDX_CHIP_NEEDLE + k * p::CHIPS + i]);
+            if !pane.is_null() {
+                texture::unbind(pane);
             }
-            if !texture::retire(t) {
-                texture::release(t);
-            }
-            log(format_args!("[Chips] dropped (retired) waiting={}", texture::retired_waiting()));
         }
-        None => {
-            if !texture::retire(t) {
-                texture::release(t);
-            }
-            log(format_args!("[Chips] dropped with the layout (retired)"));
+        if !texture::retire(t) {
+            texture::release(t);
         }
+        dropped = true;
+    }
+    if dropped && panes.is_some() {
+        log(format_args!("[Chips] dropped (retired) waiting={}", texture::retired_waiting()));
+    } else if dropped {
+        log(format_args!("[Chips] dropped with the layout (retired)"));
     }
 }
 

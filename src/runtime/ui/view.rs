@@ -3,6 +3,7 @@
 
 use skyline::nn::ui2d::Pane;
 
+use crate::model::effect_chips::Placement;
 use crate::model::frame::{Frame, Tone, View};
 use crate::model::menu::options::DIRECTIONS;
 use crate::model::menu::CHIP_POS;
@@ -484,9 +485,10 @@ impl Panes {
     unsafe fn draw_chips(&self, frame: &Frame) {
         let shown = frame.view == View::Chips;
         for i in 0..p::CHIPS {
+            let layers = (0..p::CHIP_LAYERS).map(move |k| p::IDX_CHIP_NEEDLE + k * p::CHIPS + i);
             if !shown {
-                for base in [p::IDX_CHIP, p::IDX_CHIP_NEEDLE, p::IDX_CHIP_LABEL, p::IDX_CHIP_BADGE] {
-                    self.hide(base + i);
+                for index in [p::IDX_CHIP, p::IDX_CHIP_LABEL, p::IDX_CHIP_BADGE].map(|base| base + i).into_iter().chain(layers) {
+                    self.hide(index);
                 }
                 continue;
             }
@@ -495,25 +497,25 @@ impl Panes {
             let weight = frame.chip_weights[i];
             let tile = if weight != 0 { [58, 66, 84, 255] } else { p::HIGHLIGHT };
             self.rect_at(p::IDX_CHIP + i, x, y, p::CHIP_SIZE, p::CHIP_SIZE, tile);
-            // DI / SDI: the pointer carries the game's own effect texture (`chips`), turned to the chip's direction.
-            let layer = if i == crate::runtime::ui::chips::NEUTRAL { None } else { crate::runtime::ui::chips::layer() };
-            match (CHIP_ANGLE[i], layer) {
-                (Some(angle), Some(layer)) => {
-                    let at = crate::model::effect_chips::place(layer.visual, angle, x, y, p::CHIP_SIZE, layer.width, layer.height);
-                    let tint = if weight != 0 { layer.tint } else { [layer.tint[0] / 2, layer.tint[1] / 2, layer.tint[2] / 2, 255] };
-                    self.rect_at(p::IDX_CHIP_NEEDLE + i, at.x, at.y, at.w, at.h, tint);
-                    pane::set_rot_z(self.all[p::IDX_CHIP_NEEDLE + i], at.rot);
-                }
-                (Some(angle), None) => {
-                    let radians = angle.to_radians();
-                    let (dx, dy) = (radians.cos(), radians.sin());
-                    self.rect_at(p::IDX_CHIP_NEEDLE + i, x + dx * 34.0, y + 12.0 + dy * 34.0, 12.0, 52.0, if weight != 0 { p::TEXT } else { p::TEXT_DIM });
-                    pane::set_rot_z(self.all[p::IDX_CHIP_NEEDLE + i], angle - 90.0);
-                }
-                (None, _) => {
-                    self.rect_at(p::IDX_CHIP_NEEDLE + i, x, y + 12.0, 30.0, 30.0, if weight != 0 { p::TEXT } else { p::TEXT_DIM });
-                    pane::set_rot_z(self.all[p::IDX_CHIP_NEEDLE + i], 0.0);
-                }
+            // DI / SDI: each layer's pointer carries one of the game's own effect textures (`chips`), turned to the chip's
+            // direction; without a texture the first layer draws the arrow (Neutral: the square) and the others hide.
+            for (k, needle) in layers.enumerate() {
+                let layer = if i == crate::runtime::ui::chips::NEUTRAL { None } else { crate::runtime::ui::chips::layer(k) };
+                let (at, tint) = match (CHIP_ANGLE[i], layer) {
+                    (Some(angle), Some(layer)) => crate::model::effect_chips::look(layer, angle, x, y, p::CHIP_SIZE, weight != 0),
+                    _ if k > 0 => {
+                        self.hide(needle);
+                        continue;
+                    }
+                    (Some(angle), None) => {
+                        let (dx, dy) = (angle.to_radians().cos(), angle.to_radians().sin());
+                        let at = Placement { x: x + dx * 34.0, y: y + 12.0 + dy * 34.0, w: 12.0, h: 52.0, rot: angle - 90.0 };
+                        (at, if weight != 0 { p::TEXT } else { p::TEXT_DIM })
+                    }
+                    (None, _) => (Placement { x, y: y + 12.0, w: 30.0, h: 30.0, rot: 0.0 }, if weight != 0 { p::TEXT } else { p::TEXT_DIM }),
+                };
+                self.rect_at(needle, at.x, at.y, at.w, at.h, tint);
+                pane::set_rot_z(self.all[needle], at.rot);
             }
             let mut name = crate::model::frame::Text::<16>::new();
             let _ = core::fmt::Write::write_str(&mut name, DIRECTIONS[i]);

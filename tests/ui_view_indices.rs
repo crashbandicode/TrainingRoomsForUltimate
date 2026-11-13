@@ -36,7 +36,7 @@ mod runtime { pub mod ui {
     pub(crate) use crate::{pane, view};
     pub mod chips {
         pub const NEUTRAL: usize = 8;
-        pub fn layer() -> Option<crate::model::effect_chips::LayerWord> { None }
+        pub fn layer(_: usize) -> Option<crate::model::effect_chips::LayerWord> { None }
     }
     pub mod thumbs { pub fn is_bound(_: usize) -> bool { false } }
 } }
@@ -59,7 +59,7 @@ fn every_index_the_renderer_can_write_is_inside_the_resolved_array() {
         ("tile labels", p::IDX_TILE_LABEL, p::TILES),
         ("item icons", p::IDX_ITEM_ICON, p::ITEM_ICONS),
         ("chips", p::IDX_CHIP, p::CHIPS),
-        ("chip needles", p::IDX_CHIP_NEEDLE, p::CHIPS),
+        ("chip layers (glow, body, streaks, core)", p::IDX_CHIP_NEEDLE, p::CHIP_LAYERS * p::CHIPS),
         ("chip labels", p::IDX_CHIP_LABEL, p::CHIPS),
         ("chip badges", p::IDX_CHIP_BADGE, p::CHIPS),
         ("roster badges (Player, CPU)", p::IDX_TILE_BADGE, 2 * p::TILES),
@@ -78,6 +78,23 @@ fn every_index_the_renderer_can_write_is_inside_the_resolved_array() {
         assert!(single < all.len());
     }
     const { assert!(p::IDX_NOTICE >= p::MENU_COUNT && p::IDX_IV >= p::MENU_COUNT, "the input package's panes stay outside") };
+}
+
+/// rc.13 E1 x1: each chip has four layer panes (glow, body, streaks, core, back to front), one block of `CHIPS` per
+/// layer, between the chip tiles and the labels; every one is a hidden rect at the chip block's place, as the one
+/// pointer was.
+#[test]
+fn the_four_chip_layers_lie_between_the_tiles_and_the_labels() {
+    assert_eq!(p::CHIP_LAYERS, 4);
+    assert_eq!(p::IDX_CHIP_NEEDLE, p::IDX_CHIP + p::CHIPS);
+    assert_eq!(p::IDX_CHIP_LABEL, p::IDX_CHIP_NEEDLE + p::CHIP_LAYERS * p::CHIPS);
+    let first = p::spec(p::IDX_CHIP_NEEDLE);
+    for index in p::IDX_CHIP_NEEDLE..p::IDX_CHIP_LABEL {
+        let spec = p::spec(index);
+        assert!(matches!(spec.kind, p::Kind::Rect { .. }) && !spec.visible, "{index}: {spec:?}");
+        assert_eq!((spec.x, spec.y, spec.w, spec.h, spec.parent), (first.x, first.y, first.w, first.h, first.parent));
+        assert!((0..p::COUNT).all(|other| other == index || p::name_of(other) != spec.name), "{index}: name taken twice");
+    }
 }
 
 /// The renderer itself, over a `Panes` of the real length: the hide-all path (no roster grid), the roster grid

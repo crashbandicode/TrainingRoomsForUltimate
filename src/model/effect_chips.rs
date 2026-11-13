@@ -7,6 +7,8 @@
 //! turns the effect (one picture, rotated about Z, never mirrored). DI draws the visual's streak (the emitter texture of the first
 //! sampler that is tallest for its width: `ef_cmn_line09` in 13.0.5), SDI the burst (the first-sampler texture that is widest:
 //! `ef_cmn_impact13`), stretched x2.0 along the SDI vector (N10). Neutral keeps the ring; Left / Right are In / Out.
+//! rc.13 (E1 x1, operator 2026-11-13): DI draws all four of `P_CmnVector`'s pictures instead, one pointer pane per layer
+//! (`panes::CHIP_LAYERS`), each at the streak's place and size with its own emitter tint (`pick_layers`, `look`).
 
 use super::frame::ChipVisual;
 
@@ -42,6 +44,32 @@ pub fn pick_layer(visual: ChipVisual, candidates: &[Candidate]) -> Option<usize>
         }),
     }
     .map(|(i, _)| i)
+}
+
+pub use super::panes::CHIP_LAYERS as LAYERS;
+
+/// rc.13 E1 x1: the pictures a chip draws, back to front, one per layer pane block. DI draws every first-sampler picture of
+/// `P_CmnVector`, the square glow (flare01) first, then the others in emitter order (tri00 body, line09 streaks, line11 core);
+/// SDI its one burst.
+pub fn pick_layers(visual: ChipVisual, candidates: &[Candidate]) -> [Option<usize>; LAYERS] {
+    let mut out = [None; LAYERS];
+    if visual != ChipVisual::Di {
+        out[0] = pick_layer(visual, candidates);
+        return out;
+    }
+    let firsts = || (0..candidates.len()).filter(|i| candidates[*i].sampler == 0 && candidates[*i].width > 0 && candidates[*i].height > 0);
+    let square = |i: &usize| candidates[*i].width == candidates[*i].height;
+    for (slot, i) in out.iter_mut().zip(firsts().filter(square).chain(firsts().filter(|i| !square(i)))) {
+        *slot = Some(i);
+    }
+    out
+}
+
+/// A layer's place on a chip (`place`: every DI layer at today's length and width) and its tint, halved on an unselected chip.
+pub fn look(layer: LayerWord, angle: f32, cx: f32, cy: f32, chip: f32, selected: bool) -> (Placement, [u8; 4]) {
+    let [r, g, b, _] = layer.tint;
+    let tint = if selected { layer.tint } else { [r / 2, g / 2, b / 2, 255] };
+    (place(layer.visual, angle, cx, cy, chip, layer.width, layer.height), tint)
 }
 
 /// Where the pointer pane goes for a chip: centre, size and the pane's Z rotation (degrees).
@@ -214,6 +242,30 @@ mod tests {
         assert!((di.w / di.h - DI_WIDTH_RATIO).abs() < 1e-6, "the DI streak keeps the emitter's proportions");
     }
 
+    /// rc.13 E1 x1 (operator 11-13 ~22:57Z): DI draws all four of `P_CmnVector`'s pictures, back to front the flare01 glow,
+    /// the tri00 body, the line09 streaks and the line11 core; SDI keeps its one burst.
+    fn di_draws_all_four_layers_glow_first_and_sdi_its_burst() {
+        assert_eq!(pick_layers(ChipVisual::Di, &DI), [Some(3), Some(0), Some(1), Some(2)], "flare01, tri00, line09, line11");
+        assert_eq!(pick_layers(ChipVisual::Sdi, &SDI), [Some(1), None, None, None], "impact13 alone");
+        assert_eq!(pick_layers(ChipVisual::None, &DI), [None; LAYERS]);
+        assert_eq!(pick_layers(ChipVisual::Di, &DI[..2]), [Some(0), Some(1), None, None], "no glow: the others in order");
+        let later = [Candidate { sampler: 1, ..DI[3] }, DI[1]];
+        assert_eq!(pick_layers(ChipVisual::Di, &later), [Some(1), None, None, None], "only first-sampler pictures");
+    }
+
+    /// Every DI layer keeps today's place, length and width (`DI_WIDTH_RATIO`, x1) whatever its picture's size, carries its
+    /// emitter's tint (colour times gain) and draws at half tint on an unselected chip, as today's one layer did.
+    fn every_di_layer_keeps_todays_place_and_its_tint_halved_when_unselected() {
+        let today = place(ChipVisual::Di, 45.0, 10.0, 20.0, 184.0, 64, 256);
+        for (width, height, tint) in [(64, 128, [0, 177, 255, 255]), (64, 256, [200, 244, 255, 255]), (64, 128, [255; 4]), (32, 32, [12, 119, 255, 255])] {
+            let layer = LayerWord { visual: ChipVisual::Di, width, height, tint };
+            assert_eq!(look(layer, 45.0, 10.0, 20.0, 184.0, true), (today, tint));
+            assert_eq!(look(layer, 45.0, 10.0, 20.0, 184.0, false), (today, [tint[0] / 2, tint[1] / 2, tint[2] / 2, 255]));
+        }
+        let sdi = LayerWord { visual: ChipVisual::Sdi, width: 256, height: 128, tint: [255; 4] };
+        assert_eq!(look(sdi, 90.0, 0.0, 0.0, 184.0, true).0, place(ChipVisual::Sdi, 90.0, 0.0, 0.0, 184.0, 256, 128));
+    }
+
     fn the_page_requests_on_open_releases_on_close_and_swaps_between_grids() {
         assert_eq!(plan(Held::Nothing, ChipVisual::None), Step::Keep);
         assert_eq!(plan(Held::Nothing, ChipVisual::Di), Step::Request(ChipVisual::Di));
@@ -229,6 +281,8 @@ mod tests {
             ("the_state_words_round_trip", the_state_words_round_trip as fn()),
             ("di_draws_the_streak_and_sdi_the_burst", di_draws_the_streak_and_sdi_the_burst as fn()),
             ("the_sdi_burst_is_stretched_two_times_along_the_vector", the_sdi_burst_is_stretched_two_times_along_the_vector as fn()),
+            ("di_draws_all_four_layers_glow_first_and_sdi_its_burst", di_draws_all_four_layers_glow_first_and_sdi_its_burst as fn()),
+            ("every_di_layer_keeps_todays_place_and_its_tint_halved_when_unselected", every_di_layer_keeps_todays_place_and_its_tint_halved_when_unselected as fn()),
             ("the_page_requests_on_open_releases_on_close_and_swaps_between_grids", the_page_requests_on_open_releases_on_close_and_swaps_between_grids as fn()),
         ]);
     }
