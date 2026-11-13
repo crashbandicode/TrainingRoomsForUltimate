@@ -181,7 +181,8 @@ pub(crate) mod slots {
     use crate::model::input_delay::MappedInputs;
     use crate::engine::macros::{InputFrame, MacroRecording, StartState};
 
-    enum Completion { Export { diagnostic: bool }, Import { name: String, slot: usize } }
+    /// `playback`: rc.12 TR1's Playback Slot copy (`copy`), with whether to say so; `None` is the old library path.
+    enum Completion { Export { diagnostic: bool }, Import { name: String, slot: usize, playback: Option<bool> } }
     struct Job { request: Message, completion: Completion }
     struct Worker { queue: VecDeque<Job>, pending: Option<(u64, Completion)> }
     static WORKER: Mutex<Worker> = Mutex::new(Worker { queue: VecDeque::new(), pending: None });
@@ -203,6 +204,23 @@ pub(crate) mod slots {
     // Keep fixed transport construction out of the caller's file/JSON stack frame.
     #[inline(never)]
     pub fn import(slot: usize, recording: &MacroRecording) -> Result<(), String> {
+        fill(slot, Some(recording), None)
+    }
+
+    /// rc.12 TR1: copy a library macro into Playback Slot `slot` (`None` empties it). `announce`: say so when done.
+    #[inline(never)]
+    pub fn copy(slot: usize, recording: Option<&MacroRecording>, announce: bool) -> Result<(), String> {
+        fill(slot, recording, Some(announce))
+    }
+
+    #[inline(never)]
+    fn fill(slot: usize, recording: Option<&MacroRecording>, playback: Option<bool>) -> Result<(), String> {
+        let Some(recording) = recording else {
+            let mut transfer = SlotTransfer::export(slot);
+            transfer.fill_import(slot, &[], Origin::NONE).map_err(|error| error.message())?;
+            enqueue(transfer, Completion::Import { name: String::new(), slot, playback });
+            return Ok(());
+        };
         let start = recording.start;
         let origin = Origin {
             facing: if start.facing < 0.0 { -1 } else { 1 }, status: start.status,
@@ -215,7 +233,7 @@ pub(crate) mod slots {
         }).collect();
         let mut transfer = SlotTransfer::export(slot);
         transfer.fill_import(slot, &frames, origin).map_err(|error| error.message())?;
-        enqueue(transfer, Completion::Import { name: recording.name.clone(), slot });
+        enqueue(transfer, Completion::Import { name: recording.name.clone(), slot, playback });
         Ok(())
     }
 
@@ -235,7 +253,7 @@ pub(crate) mod slots {
 
     enum Finished {
         Export { diagnostic: bool, result: Result<(Vec<InputFrame>, StartState), crate::model::recording::ExportRefusal> },
-        Import { name: String, slot: usize, result: Result<(), crate::model::recording::ImportRefusal> },
+        Import { name: String, slot: usize, playback: Option<bool>, result: Result<(), crate::model::recording::ImportRefusal> },
     }
 
     // Finish all fixed-array transport work before callbacks can load/import another
@@ -266,13 +284,13 @@ pub(crate) mod slots {
                         _ => unreachable!("export reply"),
                     }
                 }
-                Completion::Import { name, slot } => {
+                Completion::Import { name, slot, playback } => {
                     let result = match message.transfer.result {
                         SlotResult::Imported => Ok(()),
                         SlotResult::ImportFailed(error) => Err(error),
                         _ => unreachable!("import reply"),
                     };
-                    finished = Some(Finished::Import { name, slot, result });
+                    finished = Some(Finished::Import { name, slot, playback, result });
                 }
             }
         });
@@ -295,8 +313,10 @@ pub(crate) mod slots {
                     #[cfg(not(feature = "diag"))]
                     let _ = success;
                 }
-                Finished::Import { name, slot, result } =>
+                Finished::Import { name, slot, playback: None, result } =>
                     super::super::named_macros::slot_imported(&name, slot, result),
+                Finished::Import { name, slot, playback: Some(announce), result } =>
+                    crate::runtime::features::recording_host::slot_copied(&name, slot, announce, result),
             }
         }
         send_next();

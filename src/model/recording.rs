@@ -76,7 +76,6 @@ pub struct RecorderSettings {
     pub hitstun: HitstunTiming,
     pub save_state_slots: Weights<5>,
     pub mash_interrupt: bool,
-    pub looping: bool,
     /// N4: the CPU settings override a playing recording (default Off).
     pub override_playback: bool,
 }
@@ -91,7 +90,6 @@ impl RecorderSettings {
             hitstun: HitstunTiming::HitstunEnds,
             save_state_slots: Weights([0; 5]),
             mash_interrupt: true,
-            looping: false,
             override_playback: false,
         }
     }
@@ -113,7 +111,6 @@ impl RecorderSettings {
             },
             save_state_slots: Weights::from_row(row("save_state_playback")),
             mash_interrupt: on("playback_mash"),
-            looping: on("playback_loop"),
             override_playback: on("settings_override_playback"),
         }
     }
@@ -329,6 +326,8 @@ pub enum PlayRefusal {
     SlotOutOfRange,
     /// Nothing recorded in that slot, or its length is 0 (question 11, B8).
     SlotEmpty,
+    /// A named playback of no frames (or too many).
+    NothingLoaded,
     FightersMissing,
 }
 
@@ -338,7 +337,9 @@ impl PlayRefusal {
             PlayRefusal::Lockout => "Wait for the lockout to end",
             PlayRefusal::Recording => "Finish the recording first",
             PlayRefusal::SlotOutOfRange => "No such slot",
-            PlayRefusal::SlotEmpty => "Record into this slot first",
+            // restriction: playback-slot-empty
+            PlayRefusal::SlotEmpty => "This Playback Slot is empty: pick its macro on the Recording page",
+            PlayRefusal::NothingLoaded => "Nothing to play",
             PlayRefusal::FightersMissing => "Both fighters must be present",
         }
     }
@@ -514,9 +515,6 @@ pub struct PostOut {
     pub ended: Option<Ended>,
     /// The mash queue head is a Playback Slot: pop it (mash `reset`), the playback it asked for is over.
     pub pop_mash: bool,
-    /// Loop: a new playback of this slot started (the runtime re-reads facing; it was read from
-    /// `PostCtx::facing`).
-    pub restarted: Option<u8>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -732,7 +730,7 @@ impl Recorder {
             _ => {}
         }
         if frames == 0 || frames > NAMED_FRAMES {
-            return Err(PlayRefusal::SlotEmpty);
+            return Err(PlayRefusal::NothingLoaded);
         }
         self.length = frames;
         self.mode = Mode::Playback;
@@ -926,12 +924,6 @@ impl Recorder {
         }
         self.frame = 0;
         self.mode = Mode::None;
-        if was == Mode::Playback && s.looping {
-            let slot = self.play_slot;
-            if self.start_playback(slot, c.facing).is_ok() {
-                out.restarted = Some(slot);
-            }
-        }
         out
     }
 
@@ -1050,16 +1042,14 @@ impl Recorder {
         if i >= SLOTS {
             return Err(ImportRefusal::SlotOutOfRange);
         }
-        if frames.is_empty() {
-            return Err(ImportRefusal::Empty);
-        }
         if frames.len() > SLOT_FRAMES {
             return Err(ImportRefusal::TooLong(frames.len()));
         }
+        // rc.12 TR1: no frames empties the slot (its macro left it).
         self.slots[i] = [MappedInputs::NEUTRAL; SLOT_FRAMES];
         self.slots[i][..frames.len()].copy_from_slice(frames);
         self.len[i] = frames.len() as u16;
-        self.recorded[i] = true;
+        self.recorded[i] = !frames.is_empty();
         self.origin[i] = origin;
         Ok(())
     }
@@ -1101,16 +1091,14 @@ pub enum LoadAction {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ImportRefusal {
     SlotOutOfRange,
-    Empty,
     TooLong(usize),
 }
 
 impl ImportRefusal {
     pub fn message(self) -> String {
         match self {
-            ImportRefusal::SlotOutOfRange => "Record Slot is out of range. Nothing was changed.".to_owned(),
-            ImportRefusal::Empty => "Recording is empty. Nothing was changed.".to_owned(),
-            ImportRefusal::TooLong(n) => format!("Recording is {n} frames; a Record Slot holds {SLOT_FRAMES}. Nothing was changed."),
+            ImportRefusal::SlotOutOfRange => "No such Playback Slot. Nothing was changed.".to_owned(),
+            ImportRefusal::TooLong(n) => format!("This macro is {n} frames; a Playback Slot holds {SLOT_FRAMES}. Crop it first."),
         }
     }
 }

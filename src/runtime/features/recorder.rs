@@ -530,7 +530,7 @@ unsafe fn on_ai_frame(ai: usize) {
     }
     match post.ended {
         Some(Ended::Recorded { slot, frames }) => event("recording_complete", "slot", i64::from(slot), "frames", i64::from(frames)),
-        Some(Ended::Played { slot }) => event("playback_complete", "slot", i64::from(slot), "restarted", i64::from(post.restarted.is_some())),
+        Some(Ended::Played { slot }) => event("playback_complete", "slot", i64::from(slot), "", 0),
         Some(Ended::NamedPlayed) => {
             event("named_playback_complete", "", 0, "", 0);
             named_macros::end_playback();
@@ -554,7 +554,7 @@ unsafe fn on_ai_frame(ai: usize) {
             natives::set_color_rgb(body.accessor, r, g, b, blend);
         }
     }
-    if post.restarted.is_some() || LAST_PHASE.swap(phase as u8, Ordering::AcqRel) != phase as u8 {
+    if LAST_PHASE.swap(phase as u8, Ordering::AcqRel) != phase as u8 {
         notices::post_phase(phase, length);
     }
     let state = recording_host::cpu_playback(rec().playback_state(queue_head.is_some()));

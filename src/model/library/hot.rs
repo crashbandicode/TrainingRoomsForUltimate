@@ -107,6 +107,14 @@ pub struct RecordingIndex {
     /// The one-time chord notice. Omitted when it has not been shown, so older indexes still load.
     #[serde(default, skip_serializing_if = "bool_is_false")]
     chord_notice_seen: bool,
+    /// rc.12 TR1: the macro each Playback Slot 1-5 plays (Mash, Followup, the overrides, Ledge Options). Omitted while
+    /// all five are empty, so older indexes still load.
+    #[serde(default, skip_serializing_if = "no_slots")]
+    slots: [Option<String>; 5],
+}
+
+fn no_slots(slots: &[Option<String>; 5]) -> bool {
+    slots.iter().all(Option::is_none)
 }
 
 impl RecordingIndex {
@@ -122,7 +130,37 @@ impl RecordingIndex {
             drill: None,
             migration: None,
             chord_notice_seen: false,
+            slots: [None, None, None, None, None],
         }
+    }
+
+    /// The macro ids of Playback Slots 1-5.
+    pub fn slots(&self) -> &[Option<String>; 5] {
+        &self.slots
+    }
+
+    /// The menu's slots as a whole: a macro holds at most one slot (the last one named keeps it).
+    pub fn set_slots(&mut self, slots: &[Option<String>; 5]) -> Result<(), Error> {
+        let mut next: [Option<String>; 5] = Default::default();
+        for (i, id) in slots.iter().enumerate() {
+            if let Some(id) = id {
+                check_ids(std::slice::from_ref(id))?;
+                next.iter_mut().filter(|held| held.as_deref() == Some(id.as_str())).for_each(|held| *held = None);
+                next[i] = Some(id.clone());
+            }
+        }
+        self.slots = next;
+        Ok(())
+    }
+
+    /// A deleted macro leaves its slot; whether one changed.
+    pub fn clear_slot_of(&mut self, id: &str) -> bool {
+        let mut changed = false;
+        for slot in self.slots.iter_mut().filter(|held| held.as_deref() == Some(id)) {
+            *slot = None;
+            changed = true;
+        }
+        changed
     }
 
     /// Reads the index. A missing file is a fresh index and is not created here.

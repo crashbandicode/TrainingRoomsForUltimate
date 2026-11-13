@@ -163,7 +163,6 @@ impl SlotTransfer {
     {
         use crate::model::recording::{ImportRefusal, SLOTS, SLOT_FRAMES};
         if slot >= SLOTS { return Err(ImportRefusal::SlotOutOfRange); }
-        if frames.is_empty() { return Err(ImportRefusal::Empty); }
         if frames.len() > SLOT_FRAMES { return Err(ImportRefusal::TooLong(frames.len())); }
         self.slot = slot as u8;
         self.frames.fill(crate::model::input_delay::MappedInputs::NEUTRAL);
@@ -416,13 +415,8 @@ mod tests {
         let mut transfer = SlotTransfer::export(0);
         transfer.fill_import(SLOTS - 1, &frames, origin).unwrap();
         let before = transfer;
-        for (slot, input, error) in [
-            (SLOTS, &frames[..], ImportRefusal::SlotOutOfRange),
-            (0, &[][..], ImportRefusal::Empty),
-        ] {
-            assert_eq!(transfer.fill_import(slot, input, Origin::NONE), Err(error));
-            assert_eq!(transfer, before, "rejection must preserve the queued value");
-        }
+        assert_eq!(transfer.fill_import(SLOTS, &frames, Origin::NONE), Err(ImportRefusal::SlotOutOfRange));
+        assert_eq!(transfer, before, "rejection must preserve the queued value");
         assert_eq!(transfer.fill_import(0, &vec![frame; SLOT_FRAMES + 1], Origin::NONE),
             Err(ImportRefusal::TooLong(SLOT_FRAMES + 1)));
         assert_eq!(transfer, before);
@@ -438,6 +432,11 @@ mod tests {
         let mut short = SlotTransfer::export(0);
         short.execute(&mut recorder);
         assert_eq!(short.exported(), Some((&[MappedInputs::NEUTRAL][..], Origin::NONE)));
+        // rc.12 TR1: no frames empties the slot (its macro left it): playback then refuses it.
+        transfer.fill_import(0, &[], Origin::NONE).unwrap();
+        transfer.execute(&mut recorder);
+        assert_eq!(transfer.result, SlotResult::Imported);
+        assert_eq!(recorder.start_playback(0, 1).map(|_| ()), Err(crate::model::recording::PlayRefusal::SlotEmpty));
     }
 
     fn the_idle_snapshot_has_nothing_loaded_or_visible() {

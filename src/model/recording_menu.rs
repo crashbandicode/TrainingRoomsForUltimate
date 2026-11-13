@@ -231,6 +231,8 @@ pub struct Selection {
     pub loop_cpu: LoopMark,
     pub drill: Option<String>,
     pub record_role: ViewRole,
+    /// rc.12 TR1: the macro each Playback Slot 1-5 plays.
+    pub slots: [Option<String>; 5],
 }
 
 /// One library row.
@@ -398,6 +400,7 @@ struct Keyboard {
 enum Act {
     StartSave,
     SetActive,
+    PlaybackSlot,
     Bind,
     Duplicate,
     Rename,
@@ -447,6 +450,7 @@ pub struct RecordingScreens {
     active: [Option<String>; 2],
     loops: [LoopMark; 2],
     drill: Option<String>,
+    slots: [Option<String>; 5],
     last_effect: Effect,
     serial: u32,
     crop: Option<CropDraft>,
@@ -478,6 +482,7 @@ impl RecordingScreens {
             active: [None, None],
             loops: [LoopMark::default(), LoopMark::default()],
             drill: None,
+            slots: Default::default(),
             last_effect: Effect::None,
             serial: 0,
             crop: None,
@@ -526,6 +531,7 @@ impl RecordingScreens {
             loop_cpu: self.loops[1],
             drill: self.drill.clone(),
             record_role: self.popup_role,
+            slots: self.slots.clone(),
         }
     }
 
@@ -815,7 +821,7 @@ impl RecordingScreens {
             return "A add number   R remove   B done";
         }
         if self.file.is_some() && face == Face::Page {
-            return "Up/Down move   Left/Right On/Off   A do it   B back";
+            return "Up/Down move   Left/Right change   A do it   B back";
         }
         if face == Face::Popup {
             // The r8 footer: what A does in the section under the cursor, then the pop-up's keys. The CPU has one tab.
@@ -853,6 +859,27 @@ impl RecordingScreens {
         self.active = active;
         self.loops = loops;
         self.drill = drill;
+    }
+
+    /// The index's Playback Slots, with every catalog load (as `adopt`).
+    pub fn adopt_slots(&mut self, slots: [Option<String>; 5]) {
+        self.slots = slots;
+    }
+
+    /// The Playback Slot (0-4) that plays `id`, if any.
+    fn slot_of(&self, id: &str) -> Option<usize> {
+        self.slots.iter().position(|held| held.as_deref() == Some(id))
+    }
+
+    /// Left/Right (and A) on a macro's Playback slot row: None, 1 .. 5 and round. The slot a macro moves to is taken from
+    /// the macro that held it.
+    fn step_slot(&mut self, id: &str, forward: bool) {
+        let now = self.slot_of(id).map_or(0, |i| i + 1);
+        let next = if forward { (now + 1) % 6 } else { (now + 5) % 6 };
+        self.slots.iter_mut().filter(|held| held.as_deref() == Some(id)).for_each(|held| *held = None);
+        if next > 0 {
+            self.slots[next - 1] = Some(id.to_string());
+        }
     }
 
     pub fn focused_file_title(&self) -> Option<String> {
@@ -1209,6 +1236,7 @@ impl RecordingScreens {
             Act::Bind => self.set_bound(&id, on),
             Act::SetActive => self.set_active(self.page_role, &id, on),
             Act::StartSave => self.set_start(kind, &id, on),
+            Act::PlaybackSlot => self.step_slot(&id, on),
             _ => {}
         }
     }
@@ -1235,6 +1263,7 @@ impl RecordingScreens {
                 let on = !self.start_is_on(kind, &id);
                 self.set_start(kind, &id, on);
             }
+            Act::PlaybackSlot => self.step_slot(&id, true),
             Act::Duplicate => {
                 self.duplicate_save(&id);
                 if kind == ItemKind::Save {
@@ -1385,6 +1414,7 @@ impl RecordingScreens {
         if self.drill.as_deref() == Some(id) {
             self.drill = None;
         }
+        self.slots.iter_mut().filter(|held| held.as_deref() == Some(id)).for_each(|held| *held = None);
         self.file = None;
     }
 
@@ -1944,6 +1974,9 @@ impl RecordingScreens {
             }
         }
         rows.push(self.active_row(id));
+        // rc.12 TR1: the Playback Slot (Mash, Followup, the overrides, Ledge Options) this macro plays as.
+        let slot = self.slot_of(id).map_or_else(|| "None".to_string(), |i| format!("Slot {}", i + 1));
+        rows.push(BuiltRow { title: "Playback slot".to_string(), value: slot, act: Act::PlaybackSlot, drill: None });
         rows.push(row_rename());
         rows.push(BuiltRow { title: "Crop".to_string(), value: String::new(), act: Act::Crop, drill: None });
         rows.push(BuiltRow { title: "Make combo".to_string(), value: String::new(), act: Act::MakeCombo, drill: None });
@@ -2428,6 +2461,52 @@ mod tests {
         assert_eq!(menu.settings().defaults.get("playback_mash").unwrap(), changed.as_slice());
     }
 
+    /// rc.12 TR1 (operator 2026-11-13, "Fix them, it should work"): a macro's page has a Playback slot row (not a
+    /// chain's). Left/Right step None, Slot 1 .. 5 and round, A steps on; a macro moved onto a slot takes it from the
+    /// macro that held it; Delete empties the deleted macro's slot. The selection carries the slots to the index.
+    fn a_macro_plays_as_a_playback_slot() {
+        fn open(screens: &mut RecordingScreens, name: &str) {
+            screens.file = None;
+            let at = screens.section(Face::Page, SAVES_MACROS, 1).rows.iter().position(|row| row.name == name).unwrap();
+            screens.set_cursor(Face::Page, SAVES_MACROS, 1, at);
+            screens.handle_page(Button::A, true, SAVES_MACROS);
+        }
+        fn slot_row(screens: &mut RecordingScreens) -> String {
+            let row = screens.file_rows().iter().position(|row| row.title == "Playback slot").expect("a Playback slot row");
+            screens.set_file_cursor(row);
+            screens.file_rows()[row].value.clone()
+        }
+        let mut screens = screens();
+        open(&mut screens, "Dash grab");
+        assert_eq!(slot_row(&mut screens), "None");
+        screens.handle_page(Button::Right, true, SAVES_MACROS);
+        screens.handle_page(Button::Right, true, SAVES_MACROS);
+        assert_eq!(slot_row(&mut screens), "Slot 2");
+        screens.handle_page(Button::Left, true, SAVES_MACROS);
+        assert_eq!(slot_row(&mut screens), "Slot 1");
+        screens.handle_page(Button::Left, true, SAVES_MACROS);
+        screens.handle_page(Button::Left, true, SAVES_MACROS);
+        assert_eq!(slot_row(&mut screens), "Slot 5", "Left from None goes round to Slot 5");
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert_eq!(slot_row(&mut screens), "None", "A steps on, round to None");
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert_eq!(screens.selection().slots, [Some("dash".to_string()), None, None, None, None]);
+        open(&mut screens, "Nair loop");
+        slot_row(&mut screens);
+        screens.handle_page(Button::Right, true, SAVES_MACROS);
+        assert_eq!(screens.selection().slots[0].as_deref(), Some("nair"), "Nair loop takes Slot 1 from Dash grab");
+        assert!(!screens.selection().slots.iter().any(|held| held.as_deref() == Some("dash")));
+        screens.handle_page(Button::Right, true, SAVES_MACROS);
+        open(&mut screens, "Dash grab");
+        slot_row(&mut screens);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert_eq!(screens.selection().slots, [Some("dash".to_string()), Some("nair".to_string()), None, None, None]);
+        screens.delete_file(ItemKind::Recording, "nair");
+        assert_eq!(screens.selection().slots, [Some("dash".to_string()), None, None, None, None], "Delete empties its slot");
+        open(&mut screens, "Corner pressure");
+        assert!(!screens.file_rows().iter().any(|row| row.title == "Playback slot"), "a chain has no slot");
+    }
+
     fn set_active_is_one_row_for_the_role_in_view() {
         let mut screens = screens();
         let dash = screens.section(Face::Page, SAVES_MACROS, 1).rows.iter().position(|row| row.name == "Dash grab").unwrap();
@@ -2774,6 +2853,7 @@ mod tests {
             ("paging_moves_one_section_by_twelve", paging_moves_one_section_by_twelve as fn()),
             ("x_cycles_the_loop_only_in_macros", x_cycles_the_loop_only_in_macros as fn()),
             ("set_active_is_one_row_for_the_role_in_view", set_active_is_one_row_for_the_role_in_view as fn()),
+            ("a_macro_plays_as_a_playback_slot", a_macro_plays_as_a_playback_slot as fn()),
             ("retired_rows_leave_the_menu_and_old_settings_still_load", retired_rows_leave_the_menu_and_old_settings_still_load as fn()),
             ("the_combo_panel_lists_each_links_events_and_drift", the_combo_panel_lists_each_links_events_and_drift as fn()),
             ("the_floppy_is_grey_when_the_switch_is_off", the_floppy_is_grey_when_the_switch_is_off as fn()),

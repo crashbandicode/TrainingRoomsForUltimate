@@ -245,6 +245,7 @@ pub fn service() {
         }
     }
     sync_bound(root);
+    sync_slots(root);
     if !rr_host::pending() {
         return;
     }
@@ -259,6 +260,51 @@ fn sync_bound(root: &Path) {
     if let Some(pair) = rr_host::bound_sync(root) {
         super::states::post_bound(pair);
     }
+}
+
+/// rc.12 TR1: the macro each Playback Slot was last given (the worker's own record).
+static HELD: std::sync::Mutex<[Option<String>; 5]> = std::sync::Mutex::new([None, None, None, None, None]);
+/// The named layer's session the slots were copied in (a new session drops queued copies: `port::slots`).
+static SLOT_SESSION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(u64::MAX);
+
+/// rc.12 TR1: copy the index's Playback Slots into the game thread's slots, once migration has read the old ones: at
+/// boot, in each new session and after a change (the menu's announced). A slot whose macro is gone is emptied.
+fn sync_slots(root: &Path) {
+    use std::sync::atomic::Ordering;
+    if !rr_host::migrated() {
+        return;
+    }
+    let session = crate::runtime::macros::named_macros::session_revision();
+    if SLOT_SESSION.swap(session, Ordering::AcqRel) != session {
+        *HELD.lock().unwrap() = Default::default();
+        rr_host::note_slots_changed(false);
+    }
+    let Some(announce) = rr_host::take_slots_dirty() else { return };
+    let Ok(index) = crate::engine::library::RecordingIndex::load(root) else { return };
+    let library = crate::engine::macros::Library::new(root.join(crate::engine::library::MACROS_DIR));
+    let mut held = HELD.lock().unwrap();
+    for (slot, wanted) in rr_host::slot_changes(index.slots(), &held) {
+        let recording = wanted.as_deref().and_then(|id| library.load(id).ok());
+        if let Err(text) = crate::runtime::macros::port::slots::copy(slot, recording.as_ref(), announce) {
+            if announce {
+                super::notices::upsert(NOTICE_ID, "Recording", &text, 240, NOTICE_COLOR);
+            }
+        }
+        held[slot] = wanted;
+    }
+}
+
+/// rc.12 TR1: a Playback Slot copy finished (the worker's `port::slots` reply). Said only for the menu's change.
+pub(crate) fn slot_copied(name: &str, slot: usize, announce: bool, result: Result<(), crate::model::recording::ImportRefusal>) {
+    if !announce {
+        return;
+    }
+    let text = match result {
+        Ok(()) if name.is_empty() => format!("Playback Slot {} is empty now", slot + 1),
+        Ok(()) => format!("{name} plays as Playback Slot {}", slot + 1),
+        Err(error) => error.message(),
+    };
+    super::notices::upsert(NOTICE_ID, "Recording", &text, 240, NOTICE_COLOR);
 }
 
 fn take_mismatch_answer() {

@@ -56,8 +56,8 @@ fn a_named_playback_is_mirrored_by_the_recorded_facing_and_refused_while_busy() 
     let (_, control, _) = frame(&mut r, &layer, MappedInputs::NEUTRAL);
     assert_eq!(control.write.map(|w| w.stick_x), Some(-1.0), "recorded facing -1 against the CPU's +1 mirrors");
 
-    assert_eq!(Recorder::new().start_named_playback(0, 1, 0, 1), Err(PlayRefusal::SlotEmpty));
-    assert_eq!(Recorder::new().start_named_playback(NAMED_FRAMES + 1, 1, 0, 1), Err(PlayRefusal::SlotEmpty));
+    assert_eq!(Recorder::new().start_named_playback(0, 1, 0, 1), Err(PlayRefusal::NothingLoaded));
+    assert_eq!(Recorder::new().start_named_playback(NAMED_FRAMES + 1, 1, 0, 1), Err(PlayRefusal::NothingLoaded));
 }
 
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.

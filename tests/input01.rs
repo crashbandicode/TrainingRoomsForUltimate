@@ -53,7 +53,7 @@ fn locked_out(r: &mut Recorder, s: &RecorderSettings) {
 fn menu_defaults_match_spec() {
     let s = RecorderSettings::from_snapshot(&Snapshot::factory());
     assert_eq!(s, RecorderSettings::factory());
-    assert_eq!((s.slot, s.duration, s.crop, s.mash_interrupt, s.looping, s.override_playback), (0, 150, true, true, false, false));
+    assert_eq!((s.slot, s.duration, s.crop, s.mash_interrupt, s.override_playback), (0, 150, true, true, false));
     assert_eq!(s.hitstun, HitstunTiming::HitstunEnds);
     assert_eq!(s.playback_slots.0, [1, 0, 0, 0, 0]);
     assert!(s.save_state_slots.is_empty());
@@ -68,13 +68,12 @@ fn settings_rows_are_read() {
     dur[18] = 1;
     snap.set("recording_duration", &dur).unwrap();
     snap.set("hitstun_playback", &[0, 0, 1]).unwrap();
-    snap.set("playback_loop", &[1, 0]).unwrap();
     snap.set("settings_override_playback", &[1, 0]).unwrap();
     snap.set("save_state_playback", &[0, 3, 0, 0, 2]).unwrap();
     let s = RecorderSettings::from_snapshot(&snap);
     assert_eq!((s.slot, s.duration), (2, 600));
     assert_eq!(s.hitstun, HitstunTiming::HitstopBegins);
-    assert!(s.looping && s.override_playback);
+    assert!(s.override_playback);
     assert_eq!(s.save_state_slots.0, [0, 3, 0, 0, 2]);
 }
 
@@ -378,30 +377,27 @@ fn hitstun_timing_modes() {
     assert!(!r.mash_needs_term(&s, None, true));
 }
 
+/// rc.12 TR1: a Playback Slot (copied from a library macro) plays once per trigger. The old loop read `playback_loop`,
+/// a row the Loop list no longer writes (#15), so an old On replayed every mash and ledge playback for ever.
 #[test]
-fn loop_restarts_playback() {
-    let mut s = settings(60, true);
+fn a_playback_slot_plays_once() {
+    let mut snap = Snapshot::factory();
+    snap.set("playback_loop", &[1, 0]).unwrap();
+    let s = RecorderSettings::from_snapshot(&snap);
     let mut r = Recorder::new();
-    locked_out(&mut r, &s);
-    for k in 0..60 {
-        frame(&mut r, &s, if k < 3 { press(1) } else { MappedInputs::NEUTRAL });
-    }
-    assert_eq!(r.slot_len(0), 3);
-    s.looping = true;
+    r.import_slot(0, &[press(1); 3], model::recording::Origin::NONE).unwrap();
     r.start_playback(0, 1).unwrap();
-    let mut restarts = 0;
-    for _ in 0..9 {
-        let (_, _, post) = frame(&mut r, &s, MappedInputs::NEUTRAL);
-        restarts += u32::from(post.restarted.is_some());
-        assert_eq!(r.mode(), Mode::Playback);
-    }
-    assert_eq!(restarts, 3);
-    // Turning the loop off ends it at the current pass.
-    s.looping = false;
     for _ in 0..3 {
+        assert_eq!(r.mode(), Mode::Playback);
         frame(&mut r, &s, MappedInputs::NEUTRAL);
     }
-    assert_eq!(r.mode(), Mode::None);
+    for _ in 0..6 {
+        frame(&mut r, &s, MappedInputs::NEUTRAL);
+        assert_eq!(r.mode(), Mode::None, "played once");
+    }
+    // An empty copy (its macro left the slot) empties it.
+    r.import_slot(0, &[], model::recording::Origin::NONE).unwrap();
+    assert_eq!(r.start_playback(0, 1), Err(PlayRefusal::SlotEmpty));
 }
 
 #[test]
@@ -504,12 +500,11 @@ fn named_contract_export_import_refusals() {
     let mut r = Recorder::new();
     assert_eq!(r.export_slot(0).unwrap_err().message(), "Record into this slot first");
     assert_eq!(r.export_slot(9).unwrap_err().message(), "Record Slot is out of range");
-    assert_eq!(r.import_slot(9, &[press(1)], Origin::NONE).unwrap_err().message(), "Record Slot is out of range. Nothing was changed.");
-    assert_eq!(r.import_slot(0, &[], Origin::NONE).unwrap_err().message(), "Recording is empty. Nothing was changed.");
+    assert_eq!(r.import_slot(9, &[press(1)], Origin::NONE).unwrap_err().message(), "No such Playback Slot. Nothing was changed.");
     let long = vec![press(1); 601];
     assert_eq!(
         r.import_slot(0, &long, Origin::NONE).unwrap_err().message(),
-        "Recording is 601 frames; a Record Slot holds 600. Nothing was changed."
+        "This macro is 601 frames; a Playback Slot holds 600. Crop it first."
     );
     assert!(!r.is_recorded(0), "nothing changed");
     r.import_slot(2, &[press(1), press(2)], Origin { facing: -1, status: 3, start: StartSnapshot::NONE }).unwrap();

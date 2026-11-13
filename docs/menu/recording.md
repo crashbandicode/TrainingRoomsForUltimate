@@ -62,7 +62,7 @@ Left/Right turn a switch Off or On, B goes back. L and R don't turn the page whi
 | File | Rows |
 | --- | --- |
 | Save state | Bind to Save / Load, Duplicate (a copy named Save N), Rename, Delete |
-| Macro | Start save (only if it has one), Set active, Rename, Crop, Make combo, Delete |
+| Macro | Start save (only if it has one), Set active, Playback slot, Rename, Crop, Make combo, Delete |
 | Chain | Start save (only if its first macro has one), Set active, Edit chain, Rename, Make combo, Delete |
 
 - **Bind to Save / Load:** On makes this the save the Save and Load chords use. Load only warps there; it never
@@ -70,6 +70,10 @@ Left/Right turn a switch Off or On, B goes back. L and R don't turn the page whi
 - **Start save:** On warps both fighters to the macro's start save once, before it plays. Off plays it from where the
   fighters are.
 - **Set active:** On makes this the active macro of the view you're in, replacing the one before. Off clears it.
+- **Playback slot:** None or Slot 1 to 5 (Left/Right, or A to step on). The CPU plays this macro when it picks that
+  Playback Slot in Mash, Followup, the overrides or Ledge Options. One macro per slot: choosing a slot another macro
+  holds takes it from that macro. A slot holds up to 600 frames (10 s); crop a longer macro first. The slots are kept
+  with the library and come back after a restart; deleting the macro empties its slot.
 - **Rename** opens the Switch keyboard (up to 48 characters). B, or an empty name, keeps the old name.
 - **Crop** opens two handles, In and Out: Up/Down pick one, L and R move it, A saves the cut as a new file (the
   original stays), B leaves without saving.
@@ -209,9 +213,8 @@ screen (see [Save states & Macros](#save-states--macros)).
 When a Playback Slot action starts after the CPU is hit: As Hitstun Ends (when the CPU can act again), As Hitstop
 Ends (when the freeze of the hit ends) or As Hitstop Begins (at the hit).
 
-It has no effect in this build. The row is read only when the CPU starts one of its Playback Slot actions (in Mash,
-Followup, the overrides or Ledge Options), and those five slots are never filled: Record saves a macro, not a slot,
-and nothing copies a macro into one. See
+It is read when the CPU starts one of its Playback Slot actions in Mash, Followup or the overrides (Ledge Options start
+their own way). A slot plays the macro you gave it on the macro's page (Playback slot). See
 [The Playback Slot actions](../guide/cpu-behaviour.md#the-playback-slot-actions).
 
 - **Values:** As Hitstun Ends, As Hitstop Ends, As Hitstop Begins

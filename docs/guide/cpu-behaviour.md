@@ -121,12 +121,14 @@ Mash, Followup and every override offer the same 30 actions.
 Playback Slot 1 to 5 are in Mash, Followup, the overrides and [Ledge Options](../menu/cpu.md#ledge-options). Each one
 plays the recording held in one of five numbered recording slots, starting from where the CPU is.
 
-Those slots belong to the older recording system. Recordings are now named macros in the library: Record
-(ZR + D-pad Down) saves a macro, not a slot, and nothing in the menu copies a macro into a slot. The slots also start
-empty at every boot. So at this build, when the CPU picks a Playback Slot it shows "Record into this slot first" and
-skips that action; its follow-up still comes. On the ledge, it then gets up the way the game's CPU would.
+You fill a slot from the library: on a macro's page (Recording page, MACROS, A), set **Playback slot** to Slot 1 to
+5. One macro per slot; the slots are kept with the library, so they are back after a restart. A slot holds up to 600
+frames (10 s): crop a longer macro first. The CPU plays the macro once, mirrored to the way it faces. In Mash, Followup
+and the overrides, Recording › Options › [Hitstun timing](../menu/recording.md#hitstun-timing) decides when a
+slot starts after the CPU is hit. A slot with no macro shows "This Playback Slot is empty: pick its macro on the
+Recording page" and the CPU skips that action; its follow-up still comes.
 
-To have the CPU play a recording, set a macro active for the CPU and press Play on CPU (ZR + D-pad Up): see
+To play a macro on demand instead, set it active for the CPU and press Play on CPU (ZR + D-pad Up): see
 [Set active, and the Play chords](recording.md#set-active-and-the-play-chords).
 
 ## Direction chips

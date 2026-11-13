@@ -551,6 +551,8 @@ pub struct CatalogLoad {
     pub active: [Option<String>; 2],
     pub loops: [crate::model::recording_menu::LoopMark; 2],
     pub drill: Option<String>,
+    /// rc.12 TR1: the macro of each Playback Slot 1-5.
+    pub slots: [Option<String>; 5],
 }
 
 pub fn load_catalog(root: &Path) -> Result<CatalogLoad, Error> {
@@ -654,6 +656,7 @@ pub fn load_catalog(root: &Path) -> Result<CatalogLoad, Error> {
         ],
         loops: [mark(index.loop_count(Role::Player)), mark(index.loop_count(Role::Cpu))],
         drill: index.drill().map(|drill| drill.id.clone()),
+        slots: index.slots().clone(),
     })
 }
 

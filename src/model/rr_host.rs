@@ -806,8 +806,35 @@ pub fn publish_selection(root: &Path, selection: &Selection, drill_kind: Option<
     if let (Some(id), Some(kind)) = (selection.drill.as_deref(), drill_kind) {
         let _ = index.set_drill(Some(Drill { kind, id: id.to_string() }), at.saturating_add(3));
     }
+    let held = index.slots().clone();
+    if index.set_slots(&selection.slots).is_ok() && index.slots() != &held {
+        note_slots_changed(true);
+    }
     let _ = index.save(root);
     BOUND_DIRTY.store(true, Ordering::Release);
+}
+
+/// rc.12 TR1: the index's Playback Slots changed (or must be copied again): the worker copies them into the game
+/// thread's slots (`recording_host::sync_slots`). 1: copy quietly (boot, a new session, a delete); 2: say what was
+/// copied (the menu's change). Starts at 1: the first service after migration copies them.
+static SLOTS_DIRTY: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(1);
+
+pub fn note_slots_changed(announce: bool) {
+    SLOTS_DIRTY.fetch_max(if announce { 2 } else { 1 }, Ordering::AcqRel);
+}
+
+/// Whether the slots are to be copied, and whether to say so; once.
+pub fn take_slots_dirty() -> Option<bool> {
+    match SLOTS_DIRTY.swap(0, Ordering::AcqRel) {
+        0 => None,
+        n => Some(n == 2),
+    }
+}
+
+/// What the worker copies into the game thread's Playback Slots: each slot whose wanted macro is not the one it holds,
+/// and the wanted macro (`None` empties the slot).
+pub fn slot_changes(wanted: &[Option<String>; 5], held: &[Option<String>; 5]) -> Vec<(usize, Option<String>)> {
+    wanted.iter().zip(held).enumerate().filter(|(_, (w, h))| w != h).map(|(i, (w, _))| (i, w.clone())).collect()
 }
 
 /// What the grade helper should do when the recording drill id changes.
@@ -1377,6 +1404,10 @@ pub fn delete_file(root: &Path, kind: crate::model::recording_menu::FileKind, id
         if index.drill().is_some_and(|drill| drill.id == id) {
             changed |= index.set_drill(None, at).is_ok();
         }
+        if index.clear_slot_of(id) {
+            changed = true;
+            note_slots_changed(false);
+        }
         if changed {
             let _ = index.save(root);
         }
@@ -1656,6 +1687,7 @@ fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 
 #[cfg(test)]
 fn reset_host() {
+    SLOTS_DIRTY.store(1, Ordering::Release);
     RECORD_ROLE.store(ROLE_PLAYER, Ordering::Release);
     ASK_FIGHTER.store(true, Ordering::Release);
     LAST_ROLE.store(ROLE_PLAYER, Ordering::Release);
@@ -2181,6 +2213,7 @@ mod tests {
                 loop_cpu: LoopMark::Finite(1),
                 drill: None,
                 record_role: ViewRole::Cpu,
+                slots: Default::default(),
             },
             None,
         );
@@ -2747,6 +2780,7 @@ mod tests {
             loop_cpu: LoopMark::Infinite,
             drill: None,
             record_role: crate::model::recording_menu::ViewRole::Player,
+            slots: Default::default(),
         };
         publish_selection(&root, &selection, None);
         let index = RecordingIndex::load(&root).unwrap();
@@ -2889,6 +2923,7 @@ mod tests {
             loop_cpu: LoopMark::Finite(1),
             drill: Some(nair.clone()),
             record_role: crate::model::recording_menu::ViewRole::Player,
+            slots: Default::default(),
         };
         publish_selection(&root, &selection, Some(DrillKind::Combo));
         assert_eq!(
@@ -2936,10 +2971,35 @@ mod tests {
         let mut index = RecordingIndex::load(&root).unwrap();
         index.set_active(Role::Player, Some(&chain_macro), 2).unwrap();
         index.save(&root).unwrap();
+        // rc.12 TR1: the menu's Playback Slots reach the index (a macro holds one slot), the worker is told to copy them,
+        // and copies only the slots that differ from what it gave them; a deleted macro empties its slot.
+        let other = one_macro(&root, "Dash", 1, 8, None);
+        let _ = take_slots_dirty();
+        let selection = Selection {
+            bound: None,
+            active_player: Some(chain_macro.clone()),
+            active_cpu: None,
+            loop_player: LoopMark::Finite(1),
+            loop_cpu: LoopMark::Finite(1),
+            drill: None,
+            record_role: ViewRole::Player,
+            slots: [Some(chain_macro.clone()), None, Some(other.clone()), None, Some(chain_macro.clone())],
+        };
+        publish_selection(&root, &selection, None);
+        let wanted = RecordingIndex::load(&root).unwrap().slots().clone();
+        assert_eq!(wanted, [None, None, Some(other.clone()), None, Some(chain_macro.clone())], "one slot per macro: the last");
+        assert_eq!(take_slots_dirty(), Some(true), "the menu's change is announced");
+        assert_eq!(take_slots_dirty(), None);
+        let held = [Some(other.clone()), None, Some(other.clone()), None, None];
+        assert_eq!(slot_changes(&wanted, &held), [(0, None), (4, Some(chain_macro.clone()))]);
+        publish_selection(&root, &selection, None);
+        assert_eq!(take_slots_dirty(), None, "the same slots again copy nothing");
         post_effect(Effect::DeleteFile { kind: FileKind::Macro, id: chain_macro.clone() });
         let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
         assert!(Library::new(root.join(MACROS_DIR)).load(&chain_macro).is_err(), "the macro is gone");
         assert!(RecordingIndex::load(&root).unwrap().active(Role::Player).is_none(), "and is no longer active");
+        assert_eq!(RecordingIndex::load(&root).unwrap().slots(), &[None, None, Some(other), None, None], "nor in a slot");
+        assert_eq!(take_slots_dirty(), Some(false), "copied again, quietly");
     }
 
     fn at_x(x: f32) -> SavedState {
@@ -2974,6 +3034,7 @@ mod tests {
             loop_cpu: LoopMark::Finite(1),
             drill: None,
             record_role: ViewRole::Player,
+            slots: Default::default(),
         };
         publish_selection(&root, &selection, None);
         assert_eq!(bound_sync(&root).unwrap().unwrap()[0].x, 40.0, "A on Right binds Right for Load");
@@ -3140,6 +3201,7 @@ mod tests {
             loop_cpu: LoopMark::Finite(1),
             drill: None,
             record_role: ViewRole::Player,
+            slots: Default::default(),
         }, None);
         assert_eq!(bound_sync(&root), Some(None), "nothing bound");
         setup_restored();
@@ -3181,6 +3243,7 @@ mod tests {
             loop_cpu: LoopMark::Finite(1),
             drill: None,
             record_role: ViewRole::Player,
+            slots: Default::default(),
         };
         publish_selection(&root, &selection, None);
         let next = bound_sync(&root).expect("binding another save is a bound-save change").expect("Other is bound");

@@ -28,7 +28,7 @@ ticked, it picks one at random each time.
 - **How:** A opens the checklist. Up/Down move, A ticks or unticks, ZL ticks all (or clears all), B goes back. The
   row shows how many are ticked, such as "2 of 30".
 
-The Playback Slot actions don't play your saved macros: see
+The Playback Slot actions play the macro you gave that slot on its page in the Recording page: see
 [The Playback Slot actions](../guide/cpu-behaviour.md#the-playback-slot-actions).
 
 More: [Mash and Followup](../guide/cpu-behaviour.md#mash-and-followup)
