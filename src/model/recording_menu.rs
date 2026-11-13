@@ -667,7 +667,7 @@ impl RecordingScreens {
         let mut out = Vec::new();
         match item.kind {
             ItemKind::Save => {
-                let Some(save) = self.catalog.saves.iter().find(|file| file.id == item.id) else { return out };
+                let Some(save) = self.save_by_id(&item.id) else { return out };
                 out.push(line(ConnKind::Head(FileTag::Save), save.name.clone()));
                 let users: Vec<&MacroFile> = self
                     .catalog
@@ -728,7 +728,7 @@ impl RecordingScreens {
                 }
             }
             ItemKind::Combo => {
-                let Some(combo) = self.catalog.combos.iter().find(|file| file.id == item.id) else { return out };
+                let Some(combo) = self.combo_by_id(&item.id) else { return out };
                 out.push(line(ConnKind::Head(FileTag::Combo), combo.name.clone()));
                 if let Some(source) = combo.made_from.as_deref().and_then(|id| self.macro_by_id(id)) {
                     out.push(line(ConnKind::Heading, "made from".to_string()));
@@ -758,12 +758,12 @@ impl RecordingScreens {
                 }
             }
             ItemKind::Sequence => {
-                let Some(sequence) = self.catalog.sequences.iter().find(|file| file.id == item.id) else { return out };
+                let Some(sequence) = self.sequence_by_id(&item.id) else { return out };
                 out.push(line(ConnKind::Head(FileTag::Sequence), sequence.name.clone()));
                 if !sequence.combos.is_empty() {
                     out.push(line(ConnKind::Heading, "combos".to_string()));
                     for (index, step) in sequence.combos.iter().enumerate() {
-                        let name = self.catalog.combos.iter().find(|combo| combo.id == *step).map_or(step.as_str(), |combo| combo.name.as_str());
+                        let name = self.combo_by_id(step).map_or(step.as_str(), |combo| combo.name.as_str());
                         out.push(line(ConnKind::Child(FileTag::Combo), format!("{} {name}", index + 1)));
                     }
                 }
@@ -1306,7 +1306,7 @@ impl RecordingScreens {
     fn open_crop(&mut self, kind: ItemKind, id: String) {
         let combo = kind == ItemKind::Combo;
         let span = match kind {
-            ItemKind::Combo => self.catalog.combos.iter().find(|file| file.id == id).map(|file| file.span).unwrap_or(0),
+            ItemKind::Combo => self.combo_by_id(&id).map(|file| file.span).unwrap_or(0),
             ItemKind::Recording => self.macro_by_id(&id).map(|file| file.span).unwrap_or(0),
             _ => 0,
         };
@@ -1393,7 +1393,7 @@ impl RecordingScreens {
     }
 
     fn duplicate_save(&mut self, id: &str) {
-        let Some(source) = self.catalog.saves.iter().find(|file| file.id == id).cloned() else { return };
+        let Some(source) = self.save_by_id(id).cloned() else { return };
         let n = unused_n("Save", &self.catalog.saves.iter().map(|file| file.name.clone()).collect::<Vec<_>>());
         self.serial += 1;
         let copy_id = format!("save-{}", self.serial);
@@ -1466,7 +1466,7 @@ impl RecordingScreens {
     fn existing_order(&self, kind: PickerKind, id: &str) -> Vec<String> {
         match kind {
             PickerKind::EditChain => self.macro_by_id(id).map(|file| file.steps.clone()).unwrap_or_default(),
-            PickerKind::EditSequence => self.catalog.sequences.iter().find(|file| file.id == id).map(|file| file.combos.clone()).unwrap_or_default(),
+            PickerKind::EditSequence => self.sequence_by_id(id).map(|file| file.combos.clone()).unwrap_or_default(),
             PickerKind::NewChain | PickerKind::NewSequence => Vec::new(),
         }
     }
@@ -1697,7 +1697,7 @@ impl RecordingScreens {
     fn row_sub(&self, item: &Item) -> String {
         let recorded = |on: &str| if on.is_empty() { String::new() } else { format!("Recorded on {on}") };
         match item.kind {
-            ItemKind::Save => self.catalog.saves.iter().find(|file| file.id == item.id).map(|file| file.fighters.clone()).unwrap_or_default(),
+            ItemKind::Save => self.save_by_id(&item.id).map(|file| file.fighters.clone()).unwrap_or_default(),
             ItemKind::Recording => match self.macro_by_id(&item.id) {
                 Some(file) if file.chain => {
                     file.steps.iter().filter_map(|id| self.macro_by_id(id).map(|step| step.name.as_str())).collect::<Vec<_>>().join(" → ")
@@ -1705,7 +1705,7 @@ impl RecordingScreens {
                 Some(file) => recorded(&file.recorded_on),
                 None => String::new(),
             },
-            ItemKind::Combo => self.catalog.combos.iter().find(|file| file.id == item.id).map(|file| recorded(&file.recorded_on)).unwrap_or_default(),
+            ItemKind::Combo => self.combo_by_id(&item.id).map(|file| recorded(&file.recorded_on)).unwrap_or_default(),
             ItemKind::Sequence => self
                 .catalog
                 .sequences
@@ -1714,7 +1714,7 @@ impl RecordingScreens {
                 .map(|file| {
                     file.combos
                         .iter()
-                        .filter_map(|id| self.catalog.combos.iter().find(|combo| &combo.id == id).map(|combo| combo.name.as_str()))
+                        .filter_map(|id| self.combo_by_id(id).map(|combo| combo.name.as_str()))
                         .collect::<Vec<_>>()
                         .join(" → ")
                 })
@@ -1765,11 +1765,11 @@ impl RecordingScreens {
             return None;
         }
         if focus.kind == ItemKind::Sequence && item.kind == ItemKind::Combo {
-            let sequence = self.catalog.sequences.iter().find(|file| file.id == focus.id)?;
+            let sequence = self.sequence_by_id(&focus.id)?;
             return ordered_ids::order_of(&sequence.combos, &item.id);
         }
         if focus.kind == ItemKind::Combo && item.kind == ItemKind::Sequence {
-            let sequence = self.catalog.sequences.iter().find(|file| file.id == item.id)?;
+            let sequence = self.sequence_by_id(&item.id)?;
             return ordered_ids::order_of(&sequence.combos, &focus.id);
         }
         None
@@ -1786,10 +1786,10 @@ impl RecordingScreens {
 
     fn slot_name(&self, kind: ItemKind, id: &str) -> Option<String> {
         match kind {
-            ItemKind::Save => self.catalog.saves.iter().find(|file| file.id == id).map(|file| file.name.clone()),
+            ItemKind::Save => self.save_by_id(id).map(|file| file.name.clone()),
             ItemKind::Recording => self.macro_by_id(id).map(|file| file.name.clone()),
-            ItemKind::Combo => self.catalog.combos.iter().find(|file| file.id == id).map(|file| file.name.clone()),
-            ItemKind::Sequence => self.catalog.sequences.iter().find(|file| file.id == id).map(|file| file.name.clone()),
+            ItemKind::Combo => self.combo_by_id(id).map(|file| file.name.clone()),
+            ItemKind::Sequence => self.sequence_by_id(id).map(|file| file.name.clone()),
             ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => None,
         }
     }
@@ -1847,7 +1847,7 @@ impl RecordingScreens {
     }
 
     fn save_lines(&self, id: &str) -> Vec<ConnLine> {
-        let Some(save) = self.catalog.saves.iter().find(|file| file.id == id) else { return Vec::new() };
+        let Some(save) = self.save_by_id(id) else { return Vec::new() };
         let bound = self.bound.as_deref() == Some(id);
         let mut lines = vec![ConnLine { text: save.name.clone(), floppy: None }];
         if !save.fighters.is_empty() {
@@ -1906,7 +1906,7 @@ impl RecordingScreens {
     }
 
     fn combo_lines(&self, id: &str) -> Vec<ConnLine> {
-        let Some(combo) = self.catalog.combos.iter().find(|file| file.id == id) else { return Vec::new() };
+        let Some(combo) = self.combo_by_id(id) else { return Vec::new() };
         let mut lines = Vec::new();
         // First: the help joins these lines into one, and a long list of links must not push the fighter out (#49).
         if !combo.recorded_on.is_empty() {
@@ -1927,10 +1927,10 @@ impl RecordingScreens {
     }
 
     fn sequence_lines(&self, id: &str) -> Vec<ConnLine> {
-        let Some(sequence) = self.catalog.sequences.iter().find(|file| file.id == id) else { return Vec::new() };
+        let Some(sequence) = self.sequence_by_id(id) else { return Vec::new() };
         let mut lines = Vec::new();
         for (index, step) in sequence.combos.iter().enumerate() {
-            let name = self.catalog.combos.iter().find(|file| file.id == step.as_str()).map(|file| file.name.clone()).unwrap_or_else(|| step.clone());
+            let name = self.combo_by_id(step).map(|file| file.name.clone()).unwrap_or_else(|| step.clone());
             lines.push(ConnLine { text: ordered_ids::step_line(index, &name), floppy: None });
         }
         lines.push(ConnLine { text: format!("streak {} · best {}", sequence.streak, sequence.best), floppy: None });
@@ -2006,7 +2006,7 @@ impl RecordingScreens {
 
     fn combo_file_rows(&self, id: &str) -> Vec<BuiltRow> {
         let mut rows = vec![BuiltRow { title: "Drill".to_string(), value: "This becomes the drill".to_string(), act: Act::Drill, drill: None }];
-        if let Some(combo) = self.catalog.combos.iter().find(|file| file.id == id) {
+        if let Some(combo) = self.combo_by_id(id) {
             if let Some(source) = combo.made_from.as_ref().and_then(|id| self.macro_by_id(id).map(|file| file.name.clone())) {
                 rows.push(BuiltRow { title: "Made from".to_string(), value: format!("from {source}"), act: Act::Info, drill: None });
             }
@@ -2019,9 +2019,9 @@ impl RecordingScreens {
 
     fn sequence_file_rows(&self, id: &str) -> Vec<BuiltRow> {
         let mut rows = vec![BuiltRow { title: "Drill sequence".to_string(), value: "This becomes the drill".to_string(), act: Act::Drill, drill: None }];
-        if let Some(sequence) = self.catalog.sequences.iter().find(|file| file.id == id) {
+        if let Some(sequence) = self.sequence_by_id(id) {
             for (index, step) in sequence.combos.iter().enumerate() {
-                let name = self.catalog.combos.iter().find(|file| file.id == step.as_str()).map(|file| file.name.clone()).unwrap_or_else(|| step.clone());
+                let name = self.combo_by_id(step).map(|file| file.name.clone()).unwrap_or_else(|| step.clone());
                 rows.push(BuiltRow {
                     title: ordered_ids::step_line(index, &name),
                     value: "A drills this combo".to_string(),
@@ -2046,8 +2046,20 @@ impl RecordingScreens {
         self.catalog.macros.iter().find(|file| file.id == id)
     }
 
+    fn save_by_id(&self, id: &str) -> Option<&SaveFile> {
+        self.catalog.saves.iter().find(|file| file.id == id)
+    }
+
+    fn combo_by_id(&self, id: &str) -> Option<&ComboFile> {
+        self.catalog.combos.iter().find(|file| file.id == id)
+    }
+
+    fn sequence_by_id(&self, id: &str) -> Option<&SequenceFile> {
+        self.catalog.sequences.iter().find(|file| file.id == id)
+    }
+
     fn save_name(&self, id: &str) -> Option<String> {
-        self.catalog.saves.iter().find(|file| file.id == id).map(|file| file.name.clone())
+        self.save_by_id(id).map(|file| file.name.clone())
     }
 
     fn chain_start_id(&self, chain: &MacroFile) -> Option<&str> {
