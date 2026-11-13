@@ -595,3 +595,295 @@ This records the decision only; the implementation, host tests and Eden proofs a
   `training-stage-rotation-alpha`, `lobby-stage`, `practice-stage`, `training-stage-rotation`, `mii-saved-alpha`,
   `mii-ordinary-player-alpha`, `mii-managed-source-coexist-alpha`, `managed-sources`,
   `managed-grouped-source-alpha`, `managed-ldn-third-source-alpha`.
+
+## Open (2026-11-13)
+
+Opened by the primary for the operator from the lanes' reports of 2026-11-13. Nothing here is decided yet. Each item
+says what is being decided, the options with their cost to the player, and a recommendation. In each picture the
+recommended option has a **green outline**. The pictures are drawn by `tools/render_decisions_1113.py`.
+
+"The held fix" means `c49681c9`: worker A's in-game text fixes, a local commit not yet on `main`
+(`artifacts/phase23/docs-audit-1113/WORKER-A-TEXT-FIXES.md`). TR1–TR8 come from the docs lane's audit of in-game text
+(`CODE-FINDINGS.md`; its row numbers are given as #n).
+
+| # | Decision | Recommendation |
+| --- | --- | --- |
+| TR1 | Playback Slot 1–5 and Hitstun timing (#8) | A: hide them |
+| TR2 | Size gate after integration's #23 and #15 fixes | (b): delete the unreachable slot code, with TR1 A |
+| TR3 | HUD Off (#2) | A: keep it |
+| TR4 | Pummel Delay without a Throw (#4) | A: keep it |
+| TR5 | Respawn on platform with Save States Off (#9) | B: make it work |
+| TR6 | Ask before switching fighter (#13) | B: every question follows the row |
+| TR7 | Crop trailing neutral (#14) | B: make Record trim |
+| TR8 | Player Character with Player Swapping Off (#17) | B: a pick loads now |
+| OP1 | Push the held doc fixes | A: push the docs now, `c49681c9` after TR5 and TR8 |
+| OP2 | The standalone `libimgui_smash.nro` on the card | A: remove it |
+| OP3 | Deluxe's hidden Stages + Counterpick page | A: show it |
+| OP4 | elite-stages-counterpick and ssbu-cpu-pilot are private | A: make both public |
+| OP5 | The old Deluxe in Elite's release ZIP | A: drop it |
+| OP6 | Releases and tags that lag the card | A: tag and release what runs |
+| OP7 | LICENSE for six repos | A: MIT |
+| OP8 | Operator quotes in instant_back's design files | A: paraphrase them |
+
+### TrainingRooms
+
+#### TR1 · Playback Slot 1–5 and Hitstun timing (#8)
+
+What to do with entries that are offered but can never work. Mash, Followup and the Situation overrides offer Playback
+Slot 1–5 among their 30 actions, and Ledge Options among its 10. Nothing ever fills a slot: Load never starts a slot
+recording, and no row opens the slot copy. So a ticked slot refuses "Record into this slot first", and Recording ›
+Options › Hitstun timing does nothing.
+
+- **A · hide them:** the four lists skip the five entries, and Hitstun timing is hidden. Saved settings keep their
+  shape. Cost to the player: none. To build: 30–60 code lines, tests, one Eden pass.
+- **B · label them:** five help lines and the refusal say the slots do nothing. Cost to the player: the dead options
+  stay, and those help lines lose what they say now. Changing the refusal needs an approved restriction.
+- **C · implement:** a new row copies a library macro into a slot for the session. Cost to the player: none. To build:
+  about a day, Eden re-validation of slot playback (unused since rc.5), a size-budget raise, and two playback systems
+  to explain.
+
+**Recommendation: A.** Players stop meeting options that can't work, at a fraction of C's cost, and it lets TR2 (b)
+delete the slot code.
+
+![TR1 playback slots](decisions/TR1-playback-slots.png)
+
+#### TR2 · The size gate after integration's #23 and #15 fixes
+
+How to make room for integration's two bug fixes: the pop-up's B close and the Loop list. They put the code 46 lines
+over `size-budget.toml` (147,967 against a ceiling of 147,921).
+
+- **(a) · raise the ceiling by 46:** a new `[[budget]]` entry with the lead's approval. Cost to the player: none.
+- **(b) · delete the unreachable code:** the old slot recorder and named capture can't be reached (#14). Deleting them
+  makes room. Cost to the player: none. Integration is measuring how much it frees (asked 09:35Z); the number will be
+  added here.
+
+**Recommendation: (b), together with TR1 A.** Code that can't run costs nothing to delete, and the budget stays a real
+limit. If TR1 is C, the slot code is needed: then (a).
+
+![TR2 size gate](decisions/TR2-size-gate.png)
+
+#### TR3 · HUD Off (#2)
+
+Whether HUD Off should keep hiding the game's own HUD. That is what it does, not what rc.11's help line says.
+
+- **A · keep it:** Off hides the damage and stock panels, item pointers and off-screen bubbles, as Training Modpack's
+  HUD row did ("Show/hide elements of the UI"). The held fix says so. Cost to the player: none.
+- **B · build what rc.11 described:** a plugin HUD for On to draw. Cost: new design and code, and Off would no longer
+  give a clean screen.
+
+**Recommendation: A.** It is upstream's behaviour and the useful one; only the text was wrong.
+
+![TR3 HUD](decisions/TR3-hud.png)
+
+#### TR4 · Pummel Delay without a Throw (#4)
+
+Whether Pummel Delay should pummel when Throw is None, the default. Today the CPU pummels only while it waits out
+Throw Delay, with a Throw set.
+
+- **A · keep it:** as Training Modpack does; the held help line says to set a Throw. Cost to the player: Pummel Delay
+  alone does nothing.
+- **B · pummel with Throw None too:** the CPU holds and pummels until the grab ends. Cost: behaviour upstream never had,
+  a choice of what ends the hold, and an Eden check.
+
+**Recommendation: A.** It matches upstream, and the help line now explains it.
+
+![TR4 pummel](decisions/TR4-pummel.png)
+
+#### TR5 · Respawn on platform with Save States Off (#9)
+
+Whether Respawn on platform Off should give an instant respawn with Save States Off. Today the row is ignored then, and
+the revival platform appears.
+
+- **A · keep it, and approve a restriction:** the held help line says "only while Save States is On". That line needs
+  an approved restriction ID. Cost to the player: Off does nothing with Save States Off.
+- **B · make it work:** answer the respawn parameters in practice whatever Save States says, as Training Modpack does.
+  Cost: a small change in `state/hooks.rs`, a test, one Eden KO.
+
+**Recommendation: B.** The row sits on another page from Save States, and nothing tells the player they're linked.
+Upstream doesn't link them. B also settles one of the held fix's two flagged compliance lines.
+
+![TR5 respawn](decisions/TR5-respawn.png)
+
+#### TR6 · Ask before switching fighter (#13)
+
+Whether this row should govern every fighter question. Today only the Replay window reads it. Play chords on a macro
+or a chain, and combo drills, ask Fighter Mismatch whatever it says.
+
+- **A · keep it:** Off affects the Replay window only. Cost to the player: the other three still ask with the row Off.
+- **B · every question follows the row:** Off keeps the current fighter everywhere. Cost: a small change in `rr_host`,
+  tests, one Eden check.
+
+**Recommendation: B.** A player who turns the question Off expects it gone everywhere: one row, one meaning.
+
+![TR6 ask before switching](decisions/TR6-ask-fighter.png)
+
+#### TR7 · Crop trailing neutral (#14)
+
+Whether Record should drop the idle frames at the end of a recording when this row is On. Today Record never reads the
+row, so it does nothing.
+
+- **A · remove the row:** Crop on a macro's screen stays. Cost to the player: upstream's automatic trim is gone.
+- **B · make Record trim:** as upstream's Recording Crop did (default On). Cost: a few lines and a test, and one Eden
+  take. A recording meant to end idle needs the row Off.
+
+**Recommendation: B.** It is what the row promises and what upstream did, for little code.
+
+![TR7 crop](decisions/TR7-crop.png)
+
+#### TR8 · Player Character with Player Swapping Off (#17)
+
+Whether a portrait pick should load Player 1's fighter with Player Swapping Off. Today the pick is dropped with no
+notice and loads only when Player Swapping goes On.
+
+- **A · keep it, and approve a restriction:** the held help line says so. That line needs an approved restriction ID.
+  Cost to the player: the pick looks broken.
+- **B · a pick loads now:** like a combo's Switch, which already loads with Player Swapping Off. Player Swapping keeps
+  governing the cycle chord, and its help line ("Off: only a combo's Switch changes Player 1") gains the pick. Cost:
+  one argument in `character_roster.rs`, a test, one Eden pick.
+
+**Recommendation: B.** A pick is an explicit request, and the Switch already works this way. B also settles the held
+fix's other flagged compliance line.
+
+![TR8 player character](decisions/TR8-player-character.png)
+
+Not listed: #19 (Give item's item arrives when the menu closes). The code's comment gives the reason: a short-fuse item
+must not expire while the picker still has the inputs.
+
+### Other projects
+
+#### OP1 · Push the held doc fixes
+
+Whether to push 23 docs-only commits that wait for an order, and when to push TrainingRooms' `c49681c9`. All 23 are
+fast-forwards on their Forgejo `main` (checked 09:40Z).
+
+- **Worker A:** 17 commits in 13 repos:
+  - smash-replay-to-mp4 `1cec08a`;
+  - ssbu-fx-control `4a23f6e` `0b1723c` `1ece8fb`;
+  - smash-gamepad-overlay `98bd483`;
+  - ssbu-memory-guard `e6f4e0b` `73f0f94`;
+  - ssbu-quiet-elite-switch `51023c6`;
+  - ssbu-desync-detector `b7f39a9`;
+  - quickplay-cancel-fix `ad957f9`;
+  - instant_back `063fbf9`;
+  - ssbu-cpu-pilot `6275fe0`;
+  - gsp-visualizer `f635098`;
+  - ssbu-refresh-clock `d8ac3f9`;
+  - ssbu-tile-cursor `8ce7b6e`;
+  - elite-rematch `fcd9a38`.
+- **Worker A, TrainingRooms:** `c49681c9`, the in-game text. It needs a rebase, and two of its help lines follow TR5 and
+  TR8.
+- **Integration:** ssbu-mod-playbook `cab8d43` `84bf626` `292f6c1` `13b2e83`.
+- **Deluxe lane:** ssbu-online-deluxe-rewrite `5f9759f`.
+- **Worker B:** ssbu-stall-press-carry `71dcb0f`.
+- **Reconcile first:**
+  - the Surface's `~/smash-replay-to-mp4` has uncommitted 10-15 edits in 6 of the same files;
+  - the Yoga's `~/instant_back` has 3 commits that aren't on Forgejo;
+  - the Yoga's `~/elite-rematch` and `~/ssbu-fx-control` have uncommitted work.
+
+The options:
+- **A · push the docs now:** the 23 commits, once the four copies are reconciled; `c49681c9` after TR5 and TR8. Cost to
+  the player: none.
+- **B · hold everything:** cost: wrong docs stay published, about 300 stale claims in worker A's repos alone. Among them
+  are the wrong Switch status in 7 repos, a dead install link, and a config example that breaks `enabled=false`.
+
+**Recommendation: A.** The fixes are checked, docs only, and fast-forwards.
+
+![OP1 push](decisions/OP1-push.png)
+
+#### OP2 · The standalone `libimgui_smash.nro` on the card
+
+Whether to remove it from the card. A read-only card scan found that nothing imports it and only Deluxe looks it up.
+While it is there, Deluxe 0.10.4 draws with its ASCII-only font (the 1.0.2 build `f72a6b8d`), so names outside ASCII
+show `?`.
+
+- **A · remove it:** without it, Deluxe draws with its own font. Cost to the player: none found.
+- **B · keep it:** names show `?` until an imgui build with a wider font ships (OP6).
+
+**Recommendation: A.** Nothing needs it, and it is the cause of the `?` names.
+
+![OP2 imgui NRO](decisions/OP2-imgui-nro.png)
+
+#### OP3 · Deluxe's hidden Stages + Counterpick page
+
+Whether to show elite-stages-counterpick's page. The card's Deluxe `config.ini` has had
+`hide_plugin_pages=stages_counterpick` since the 0.10.0 install (2026-11-01). Only CPU Pilot was set to Shown then.
+
+- **A · show it:** on the console, Window Options › Stages + Counterpick › Shown. No card access is needed. Cost to the
+  player: one more page in the cycle.
+- **B · keep it hidden:** the plugin runs with no visible page, and every console check must unhide it first.
+
+**Recommendation: A.** It was hidden as a side effect of the 0.10.0 install, not by choice.
+
+![OP3 Elite page](decisions/OP3-elite-page.png)
+
+#### OP4 · elite-stages-counterpick and ssbu-cpu-pilot are private
+
+Whether to make both public. Both return 404 when signed out. Deluxe's README and INSTALL.md link elite, and Deluxe's
+README lists the pilot as a page plugin.
+
+- **A · make both public:** after a history check for identities, as imgui-smash had. Cost to the player: none; the
+  links start working.
+- **B · keep them private:** drop the links from Deluxe's docs. Cost: players can't get either plugin.
+
+**Recommendation: A.** Public docs already point players at them.
+
+![OP4 public repos](decisions/OP4-public-repos.png)
+
+#### OP5 · The old Deluxe in Elite's release ZIP
+
+Whether to drop the bundled older Deluxe from the ZIP of elite-stages-counterpick v0.1.0 (Forgejo release 473). The
+bundled build is commit `0d28adc`, from before 0.8.0, 1,445,888 bytes.
+
+- **A · drop it:** re-upload the ZIP with the plugin NRO only, and link Deluxe's own release. Cost to the player: none.
+- **B · keep it:** unzipping the whole archive over Deluxe 0.10.4 puts the old build back. Only the README warns.
+
+**Recommendation: A.** A plugin ZIP shouldn't be able to downgrade Deluxe.
+
+![OP5 Elite ZIP](decisions/OP5-elite-zip.png)
+
+#### OP6 · Releases and tags that lag the card
+
+Which builds to tag and release:
+- ARCropolis: the card's `ac3e05a3` (main plus the `reject.log` cap) has no release.
+- ssbu-desync-detector: 0.5.0 and 0.5.1 have no tag, though 0.5.1 is on the card.
+- ssbu-cpu-pilot: 0.2.3 and 0.2.4 have no tag; 0.2.4 is on the card.
+- ssbu-quiet-elite-switch: 0.2.0 has no release.
+- quickplay-cancel-fix: 0.3.0 is still a pre-release.
+- imgui-smash: `main` pins 1.0.2's archive from before the font merge, so it needs a re-pin, then a release.
+- GitHub "Latest" is stale: the overlay shows v0.1.2 (Forgejo has v0.3.1), and smash-replay-to-mp4 shows v0.1.0.
+
+The options:
+- **A · tag and release what runs:** each from the commit that rebuilds the card's bytes exactly (checked). The
+  detector waits for its console confirmation, and imgui for its re-pin. Fix GitHub "Latest". Cost to the player:
+  none; downloads match the card.
+- **B · leave them:** the card runs builds nobody can download or rebuild from a tag.
+
+**Recommendation: A.**
+
+![OP6 releases](decisions/OP6-releases.png)
+
+#### OP7 · LICENSE for six repos
+
+Which licence for the six repos with no LICENSE file: smash-replay-to-mp4, instant_back, ssbu-fx-control,
+ssbu-quiet-elite-switch, elite-rematch and ssbu-refresh-clock. The other seven of worker A's 13 repos, and
+TrainingRooms, are MIT; Deluxe is AGPL.
+
+- **A · MIT, like the others:** after checking that none carries GPL-family code. Cost to the player: none.
+- **B · leave them unlicensed:** all rights reserved, so nobody may reuse or redistribute the code.
+
+**Recommendation: A.** It matches the rest of the set.
+
+![OP7 licence](decisions/OP7-license.png)
+
+#### OP8 · Operator quotes in instant_back's design files
+
+Whether to paraphrase the operator's quoted words in `DESIGN-v031.md` and `BRIEF-0.3.1.md`. The playbook allows
+quotes in design working files. The detector's were paraphrased, and so were B's in `71dcb0f`. The repo is private
+today.
+
+- **A · paraphrase them:** cost: none; one docs-only commit.
+- **B · keep them:** they'd be published if the repo goes public.
+
+**Recommendation: A.** It is consistent with the other repos and safe if the repo goes public.
+
+![OP8 quotes](decisions/OP8-quotes.png)
