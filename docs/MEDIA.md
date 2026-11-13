@@ -38,6 +38,11 @@ file in the README and the docs; the old file stays in `media/` with a note in i
   `rs11-f30-hot-five.gif` (#30), `rs11-f35-no-start-save.gif` (#35) and `rs11-f36-chord-once.gif` (#36), the
   pop-up's list or the notice zoomed; `rs11-f68-replay-window.gif` (#68, `docs-rs5b`, the README take at 640). The
   ledger lists each one's frames.
+- **Frame strip and Fighter Mismatch evidence** (`docs-rs6-0c628724`, slot 2, 07:46–07:57Z; Mario vs Mario from a
+  bound save; the strip zoomed along the bottom of each clip, the colours kept with a 255-colour palette):
+  `rs11-f02-lanes.gif` (#2), `rs11-f03-stick-row.gif` (#3), `rs11-f04-cstick.gif` (#4), `rs11-f07-adv-frames.gif`
+  (#7: jab −14, forward tilt −13, forward smash −21, neutral air −6 on shield), `rs11-f08-readouts.gif` (#8) and
+  `rs11-f23-mismatch.gif` (#23, #24, #25: Keep plays, the strip hidden under the prompt, B plays nothing).
 - **Cycle and hot-slot evidence** (`docs-rs3b-0c628724`, slot 1, 05:29–05:45Z): `rs11-f55-cpu-cycle.gif` (#55, the
   CPU list zoomed, then Captain Falcon, the Mii Gunner and Peach in order; a greyed Mii class can't be shown on this
   card, whose Smash save holds a Mii of every class) and `rs11-f57-hot-slots.gif` (#57, "Fighters · Loading 4/10" to
