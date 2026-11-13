@@ -33,6 +33,8 @@ More: [Save states › Saving and loading](../guide/save-states.md#saving-and-lo
 Flips a load left to right: each fighter lands at the mirror image of its saved spot, across the middle of the stage,
 and faces the other way. Use it to practise the same situation from both sides.
 
+![Mirroring None: Load puts Mario left and the CPU right; set to Alternate, the next Load puts each fighter at the mirror image of its saved spot, facing the other way](../media/rc11-mirroring.gif)
+
 - **Values:** None, Alternate, Random
 - **Default:** None
 - **How:** Left or Right switches it; A opens the list.
@@ -47,6 +49,8 @@ More: [Save states › Mirroring](../guide/save-states.md#mirroring)
 On: when Player 1 or the CPU is KO'd, the save state loads at once instead of a respawn. Off: you load it yourself with
 the Load chord.
 
+![Auto-load on death turned On, then Mario runs off the stage: at the KO the save state loads at once instead of a respawn](../media/rc11-auto-load-on-death.gif)
+
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A flips it.
@@ -60,6 +64,8 @@ More: [Save states › Auto-load on death](../guide/save-states.md#auto-load-on-
 ### Player damage on load
 
 Player 1's damage after a load.
+
+![The save holds Player 1 at 42% and the CPU at 80%: with Default a Load gives 0%; with Save State for Player 1 and the CPU it gives 42% and 80%](../media/rc11-damage-on-load.gif)
 
 - **Values:** Default (0%, as after a respawn), Save State (the damage Player 1 had when you saved), Random Value (a
   random damage within [Player damage range](#player-damage-range))
@@ -83,6 +89,8 @@ The lowest and the highest damage Random Value can give Player 1.
 ### CPU damage on load
 
 The CPU's damage after a load. It works like [Player damage on load](#player-damage-on-load), for the CPU.
+
+![The save holds Player 1 at 42% and the CPU at 80%: with Default a Load gives 0%; with Save State for Player 1 and the CPU it gives 42% and 80%](../media/rc11-damage-on-load.gif)
 
 - **Values:** Default (0%), Save State (the CPU's saved damage), Random Value (a random damage within
   [CPU damage range](#cpu-damage-range))
@@ -115,6 +123,8 @@ other fighter gets nothing.
 | Shulk | Jump, Speed, Shield, Buster, Smash | One of the ticked Monado Arts, picked at random on each load. |
 | Min Min | Power Dragon | Her left arm is the powered-up Dragon. |
 | Wario | Mini Waft, Half Waft, Full Waft | The waft is charged to one of the ticked levels, picked at random. |
+
+![The CPU Joker loads without Arsene; with Arsene ticked in Buffs on load, the next load fills the rebellion gauge and Arsene comes out](../media/rc11-buffs-on-load.gif)
 
 - **Values:** the 18 buffs above
 - **Default:** none ticked
@@ -162,5 +172,7 @@ closes".
 A needs Save States On, the stage the setup was saved on, and the same fighters on both sides (for a Mii, the same
 Mii). If one of them doesn't match, a notice says which, and that Y can bind the setup without moving. Y needs none of
 them. With no setups saved, the list reads "No setups saved".
+
+![Setup library: A on a setup binds and restores it; when the menu closes both fighters stand where the setup was saved](../media/rc11-setup-library.gif)
 
 More: [Save states › The setup library](../guide/save-states.md#the-setup-library)
