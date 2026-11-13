@@ -34,7 +34,7 @@ Player 1 walks away; Load; both are back at the save, and the CPU stands: nothin
 
 ## Recording a macro, and its start save
 
-Record is ZR + D-pad Down. Stopping the recording keeps the inputs as a named macro. The recording also writes a save state named with the macro, "`name` · start", and the macro stores that file's id. That save holds both fighters where they were when Record started, and the macro keeps the recorded fighter's facing and speed at that moment (`note_record_start`, `src/model/rr_host.rs:389` on `p23/rc6-open-fixes`). The Start save switch defaults to On.
+Record is ZR + D-pad Down. Stopping the recording keeps the inputs as a named macro. With Recording › Options › [Crop trailing neutral](../menu/recording.md#crop-trailing-neutral) On (the default), the idle frames at the end are dropped first, and a take that is idle throughout saves nothing. The recording also writes a save state named with the macro, "`name` · start", and the macro stores that file's id. That save holds both fighters where they were when Record started, and the macro keeps the recorded fighter's facing and speed at that moment (`note_record_start`, `src/model/rr_host.rs:389` on `p23/rc6-open-fixes`). The Start save switch defaults to On.
 
 On means the role's Play chord warps to that save once, before the first pass, then plays. Off plays from where the fighters are and keeps the connection, so turning it On again warps there the next time you play. A macro that never had a start save has no switch. Replays and migrated slots are like that: Play starts where the fighters already are.
 

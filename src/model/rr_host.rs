@@ -553,7 +553,7 @@ pub fn service_at(
             Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
             None => (player.clone(), cpu.clone(), [(0.0, 0.0); 2]),
         };
-        if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now())
+        if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), RECORD_TRIM.load(Ordering::Acquire))
         {
             bump_catalog();
             if let Some(text) = stop.notice() {
@@ -620,6 +620,13 @@ pub fn set_role_fighter(role: Role, kind: i32) {
 }
 
 /// The strip's last combo and its count of links captured (`combo::Helper::seen`), from the recording worker's tick.
+/// rc.12 TR7: Recording › Options › Crop trailing neutral, as the last publish left it (factory On).
+static RECORD_TRIM: AtomicBool = AtomicBool::new(true);
+
+pub fn set_record_trim(on: bool) {
+    RECORD_TRIM.store(on, Ordering::Release);
+}
+
 pub fn set_strip_sample((seen, combo): (u32, Option<Combo>)) {
     *lock(&STRIP) = (seen, combo);
 }
@@ -1688,6 +1695,7 @@ fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 #[cfg(test)]
 fn reset_host() {
     SLOTS_DIRTY.store(1, Ordering::Release);
+    RECORD_TRIM.store(true, Ordering::Release);
     RECORD_ROLE.store(ROLE_PLAYER, Ordering::Release);
     ASK_FIGHTER.store(true, Ordering::Release);
     LAST_ROLE.store(ROLE_PLAYER, Ordering::Release);

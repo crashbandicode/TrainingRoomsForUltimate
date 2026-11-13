@@ -200,9 +200,10 @@ How macros play, and how the combo helper grades.
 
 ### Crop trailing neutral
 
-Meant to drop the idle frames at the end of a recording. In this build it has no effect: a macro made with Record
-(ZR + D-pad Down) keeps every frame up to the stop, whatever this row says. To cut a macro, use Crop on its own
-screen (see [Save states & Macros](#save-states--macros)).
+On: a macro made with Record (ZR + D-pad Down) drops the idle frames at its end, where no button is held and both
+sticks rest in the middle. Off: it keeps every frame up to the stop; use this for a macro meant to end standing
+still. A take that is idle throughout saves nothing ("Recording was empty"). To cut a macro anywhere, use Crop on
+its own screen (see [Save states & Macros](#save-states--macros)).
 
 - **Values:** On, Off
 - **Default:** On

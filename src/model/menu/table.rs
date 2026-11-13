@@ -324,7 +324,7 @@ pub static ROWS: [Row; 92] = [
       "On: capture match inputs when saving a replay.\nThis choice is saved automatically."),
     // Recording > Options. The loop row shows the six counts; the factory value stays length 2.
     r(OPTIONS, "Crop trailing neutral", "recording_crop", TOGGLE,
-      "Has no effect on Record: a recording keeps every frame\nup to the stop. Use Crop on a macro's screen to cut it."),
+      "On: Record drops the idle frames at the end of a take.\nOff: it keeps every frame up to the stop."),
     r(OPTIONS, "Hitstun timing", "hitstun_playback", Control::Dropdown(&o::HITSTUN_PLAYBACK),
       "When playback starts after the CPU is hit."),
     r(OPTIONS, "Mash interrupts playback", "playback_mash", TOGGLE,

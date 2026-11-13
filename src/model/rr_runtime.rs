@@ -170,7 +170,8 @@ impl RecordStop {
     }
 }
 
-/// Stop. An empty buffer writes nothing. A recording writes `"<name> · start"` from `player` and `cpu` (where Record
+/// Stop. With `trim` (Recording › Options › Crop trailing neutral, rc.12 TR7) the idle frames at the end go first. An
+/// empty buffer writes nothing. A recording writes `"<name> · start"` from `player` and `cpu` (where Record
 /// started), stores that id, becomes most recently used, and becomes that role's active macro. A CPU-role recording names
 /// the CPU's fighter, so Play on CPU compares the fighter who was being recorded. The macro's start state keeps the
 /// recorded role's facing and its `speed` when Record started (x, y), which Play applies with "Keep recorded speed"
@@ -182,8 +183,13 @@ pub fn finish_recording(
     cpu: SavedState,
     speed: (f32, f32),
     at: u64,
+    trim: bool,
 ) -> Result<RecordStop, Error> {
-    if capture.frames.is_empty() {
+    let mut frames = capture.frames.clone();
+    if trim {
+        super::macro_ui::macro_panel::crop_neutral_tail(&mut frames);
+    }
+    if frames.is_empty() {
         return Ok(RecordStop::Empty);
     }
     let macros = Library::new(root.join(MACROS_DIR));
@@ -209,7 +215,7 @@ pub fn finish_recording(
     };
     let start = NamedSave::new(start_name, player, cpu)?;
     let start_id = saves.save_new(&start)?;
-    let mut recording = MacroRecording::new(&name, "13.0.5", start_state, capture.frames.clone()).map_err(record)?;
+    let mut recording = MacroRecording::new(&name, "13.0.5", start_state, frames).map_err(record)?;
     recording.set_start_save(Some(&start_id)).map_err(record)?;
     let id = macros.save_new(&recording).map_err(record)?;
     let mut index = RecordingIndex::load(root)?;
@@ -979,10 +985,34 @@ mod tests {
     fn the_empty_recording_notice_stays() {
         let root = scratch("empty");
         let capture = Capture::idle();
-        let stop = finish_recording(&root, &capture, state(1), state(2), (0.0, 0.0), 1).unwrap();
+        let stop = finish_recording(&root, &capture, state(1), state(2), (0.0, 0.0), 1, true).unwrap();
         assert_eq!(stop.notice(), Some("Recording was empty"));
         assert!(stop.cursor().is_none());
         assert!(!root.join(MACROS_DIR).exists());
+    }
+
+    /// rc.12 TR7 (operator 2026-11-13, B "make Record trim"): with Recording › Options › Crop trailing neutral On, Record
+    /// drops the idle frames at the end (no button but a flick-jump bit, sticks inside the dead zone); Off keeps every
+    /// frame; a take that is all idle is empty.
+    fn record_trims_the_neutral_tail() {
+        let root = scratch("trim");
+        let take = |frames: &[InputFrame]| {
+            let mut capture = Capture::idle();
+            toggle_record(&mut capture, Role::Player);
+            frames.iter().for_each(|frame| push_frame(&mut capture, Role::Player, *frame));
+            capture
+        };
+        let idle = [frame(0x8000), InputFrame { lstick_x: 20, rstick_y: -23, ..frame(0) }, frame(0)];
+        let mut frames = vec![frame(5), InputFrame { lstick_x: 90, ..frame(0) }];
+        frames.extend_from_slice(&idle);
+        let saved = |stop: RecordStop| match stop {
+            RecordStop::Saved { id, .. } => Library::new(root.join(MACROS_DIR)).load(&id).unwrap().frames.len(),
+            RecordStop::Empty => 0,
+        };
+        assert_eq!(saved(finish_recording(&root, &take(&frames), state(1), state(2), (0.0, 0.0), 1, true).unwrap()), 2);
+        assert_eq!(saved(finish_recording(&root, &take(&frames), state(1), state(2), (0.0, 0.0), 5, false).unwrap()), 5);
+        let stop = finish_recording(&root, &take(&idle), state(1), state(2), (0.0, 0.0), 9, true).unwrap();
+        assert_eq!(stop.notice(), Some("Recording was empty"));
     }
 
     fn migration_runs_once_at_boot() {
@@ -1168,6 +1198,7 @@ mod tests {
             ("make_combo_on_a_chain_plays_one_pass_on_player_1", make_combo_on_a_chain_plays_one_pass_on_player_1 as fn()),
             ("the_chord_notice_shows_once", the_chord_notice_shows_once as fn()),
             ("the_empty_recording_notice_stays", the_empty_recording_notice_stays as fn()),
+            ("record_trims_the_neutral_tail", record_trims_the_neutral_tail as fn()),
             ("migration_runs_once_at_boot", migration_runs_once_at_boot as fn()),
             ("a_menu_close_after_record_on_cpu_keeps_the_new_active_file", a_menu_close_after_record_on_cpu_keeps_the_new_active_file as fn()),
         ]);
