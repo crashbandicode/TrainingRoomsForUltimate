@@ -1059,7 +1059,7 @@ mod tests {
     /// 8 are ambiguous), `-dirty` with uncommitted changes, or `unknown` without git.
     fn the_build_tag_reads_version_name_and_short_sha() {
         let rest = BUILD_TAG.strip_prefix(env!("CARGO_PKG_VERSION")).expect(BUILD_TAG);
-        let sha = rest.strip_prefix(" · rc11 ").expect(BUILD_TAG);
+        let sha = rest.strip_prefix(" · rc12 ").expect(BUILD_TAG);
         let hex = sha.strip_suffix("-dirty").unwrap_or(sha);
         assert!(sha == "unknown" || (hex.len() >= 8 && hex.bytes().all(|b| b.is_ascii_hexdigit())), "{BUILD_TAG}");
     }
