@@ -83,6 +83,9 @@ Player 1's 0 in the cycle too. The Ice Climbers in a cycle list have their own S
 - **Default:** Off
 - **How:** A flips it.
 
+![Ice Climbers in Training; Solo Popo turned On; Player 1 reloads as Popo alone](../media/rc11-solo-popo.gif)<br>
+*Player 1 picked Ice Climbers at the character select: Popo and Nana. B + Up, A turns Solo Popo On, B closes the menu; Player 1 reloads as Popo alone ("Player Character · 0. Ice Climbers"). The 3.3 s reload is cut. Eden, rc.11.*
+
 More: [Fighter cycles › Solo Popo](../guide/fighter-cycles.md#solo-popo)
 
 ## Extras
