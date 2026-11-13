@@ -3,7 +3,9 @@
 Go to any stage from the menu, in Training or in a waiting room, or let Training and the waiting rooms move through a
 list of stages you choose. All the rows are in Fighters & Stages › Stages.
 
-![Change Stage: Battlefield, Y for its Ω form, and Training reloads there](../media/rc11-change-stage.gif)
+![Change Stage: A on Battlefield (Ω), then the stage morph from the training stage to Battlefield Ω](../media/rc11-change-stage.gif)
+
+*A on Battlefield (Ω) closes the menu ("Stage requested"); then the whole morph to Battlefield Ω and "Stage ready". The 3 s wait between them, where nothing moves, is cut. Eden, rc.11.*
 
 ## Change Stage
 

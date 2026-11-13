@@ -298,11 +298,11 @@ Mii file was written. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 ### Stages
 
-**Clip** [`rc11-change-stage.gif`](media/rc11-change-stage.gif): Change Stage: Battlefield, Y for its Ω form, and Training reloads there
+**Clip** [`rc11-change-stage.gif`](media/rc11-change-stage.gif): Change Stage: A on Battlefield (Ω), then the stage morph to Battlefield Ω
 
-*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Mario vs Ryu on the training stage; Fighters & Stages › Change Stage, the cursor
-from Waiting Room to Battlefield [N], Y gives [Ω], A; "Practice Stage · Stage requested"; Training reloads on
-Battlefield Ω (`[PracticeStageRequest] native_complete`), held 3 s after its "Stage ready" notice. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Mario vs Ryu on the training stage; the Change Stage grid with Battlefield (Ω) picked,
+A; "Practice Stage · Stage requested"; the static 2.8 s wait before the morph is cut; then the whole morph to
+Battlefield Ω (`[PracticeStageRequest] native_complete`) and its "Stage ready" notice. Cuts are listed in [MEDIA.md](MEDIA.md).*
 
 *Change Stage* (Fighters & Stages › Stages) goes to the stage you pick when the menu closes, in Training and in
 waiting-room practice; Y picks its form first.

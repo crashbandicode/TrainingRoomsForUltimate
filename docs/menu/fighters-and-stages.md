@@ -153,7 +153,9 @@ requested", then "Stage ready". It works in Training and in waiting-room practic
 - **How:** A opens the grid. The D-pad moves, L / R turn its page, Y picks the focused stage's form first (the tile
   shows [N], [Ω] or [BF]), A goes there, B goes back.
 
-![Change Stage: Battlefield, Y for its Ω form, and Training reloads there](../media/rc11-change-stage.gif)
+![Change Stage: A on Battlefield (Ω), then the stage morph from the training stage to Battlefield Ω](../media/rc11-change-stage.gif)
+
+*A on Battlefield (Ω) closes the menu ("Stage requested"); then the whole morph to Battlefield Ω and "Stage ready". The 3 s wait between them, where nothing moves, is cut. Eden, rc.11.*
 
 More: [Stages › Change Stage](../guide/stages.md#change-stage)
 
