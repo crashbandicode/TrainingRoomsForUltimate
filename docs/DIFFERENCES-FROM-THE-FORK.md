@@ -35,7 +35,7 @@ This page lists only the changes, each checked against the code of 0.2.0-rc.3 (`
 
 ![Fighter grid with cycle badges, then the cycle chord switching Player 1 in that order](media/rc6-cycle-switch.gif)
 
-![A new menu shortcut applies at once](media/rc7-menu-shortcut.gif)
+![A new menu shortcut applies at once](media/rc11-menu-shortcut.gif)
 
 ![Replay capture, menu and Deluxe overlay](media/rc7-replay-capture.gif)
 

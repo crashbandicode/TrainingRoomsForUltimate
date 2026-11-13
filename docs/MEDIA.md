@@ -4,6 +4,23 @@ Every GIF in [`media/`](media) is actual Eden footage: whole screen, 1280×720, 
 game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
+## rc.11 reshoots (2026-11-13)
+
+The GIF audit of 2026-11-13 (the operator's bar: the input visible, the same setup before and after, the effect held
+≥ 1 s with nothing covering it, readable text) marked 17 README GIFs for a reshoot. Each one retaken replaces its old
+file in the README and the docs; the old file stays in `media/` with a note in its row below.
+
+- **Build:** rc.11 `0c628724`, its diag NRO `bd0bc61b…`.
+- **Runs:** the Surface, one instance, Training only, muted, Eden `2f315fc4b7d9` with its GDB stub on, no gamepad
+  overlay; the menu closed with its close chord only. `docs-rs1-0c628724` (03:21–03:32Z) and `docs-rs1b-0c628724`
+  (03:44–03:53Z).
+
+| File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
+| --- | --- | --- | --- | --- | --- |
+| `media/rc11-game-speed.gif` | `docs-rs1-0c628724`, `rs-speed` | README, Game speed; TECHNICAL; guide/game-speed | 9.4 s, 5.7 MB | 3.7–6.3, 12.6–14.4, 16.5–21.5 s | Mario vs Ridley in Training, the frame strip on. From the reset spot Mario walks in and forward-smashes Ridley to 18.5% at x1. After a reset, R + D-pad Up's pop-up steps x1 → 2/3 → 1/2 → 1/4 and the HUD's stopwatch reads 1/4; the same walk-in and smash take about four times as long and hit for 18.5% again. The log: `[GameSpeed] … speed=1/4`. Replaces `rc8-game-speed-chord.gif` (the x1 jab under a notice; the 1/2 jab looked as fast as x1). |
+| `media/rc11-menu-shortcut.gif` | `docs-rs1b-0c628724`, `rs-menu-shortcut` | README, Menu; TECHNICAL; DIFFERENCES-FROM-THE-FORK; menu/display-and-controls | 7.8 s, 7.6 MB | 0.0–0.8, 8.4–9.4, 9.5–10.4, 11.9–13.4, 14.3–15.3, 23.4–26.0 s | Mario vs Ken on Battlefield Ω. Display & Controls › Menu shortcut 1 reads Minus; the chord editor goes from Minus to "ZL + D-pad Up"; the row reads ZL + D-pad Up (`button_config.ini written by the writer thread`). Back in Training (a cut over Minus being pressed: no `[Ui] menu opened`), ZL held shows as Mario's shield, D-pad Up, and the menu opens (`[Ui] menu opened page=display_controls`). Replaces `rc7-menu-shortcut.gif` (the new chord was never shown opening the menu). |
+| `media/rc11-waiting-menu.gif` | `docs-ldn66d-0c628724`, `fx-waiting-hitboxes` (2026-11-12, the Surface LDN pair, the guest) | README, Waiting rooms; TECHNICAL | 8.9 s, 5.1 MB | 0.6–2.0, 3.3–4.3, 11.8–18.3 s | A Local Wireless waiting room, the guest's first practice. B + D-pad Up opens the menu on Display & Controls; Hitbox Visualization goes from Off to On; the menu closes and both practice fighters show their boxes in the room. Replaces `waiting-menu.gif` (an older menu, and it never returned to the room). |
+
 ## rc.11 docs clips (2026-11-12)
 
 - **Build:** rc.11 `0c628724` as shipped, its diag NRO `bd0bc61b…`.
@@ -65,7 +82,7 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
 
 | File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
 | --- | --- | --- | --- | --- | --- |
-| `media/rc8-game-speed-chord.gif` | `docs-rd8b-d3eeac81`, `fx-speed-bind` (the 1280 capture) | README, Game speed; RELEASE-NOTES-rc8.md | 9.1 s, 7.7 MB | 4.9–5.7, 9.5–11.7, 12.3–13.8, 17.5–18.7, 19.3–21.8, 35.7–36.6 s | Mario vs Samus in Training. A jab at x1; the "Game speed" pop-up x1, 2/3, 1/2; a jab at 1/2; the pop-up at 1/4; a jab at 1/4; the pause menu's Other Settings: Speed 1/4 ("Play in slowest motion"), the HUD stopwatch 1/4. The log: `popup open place=Training speed=x1`, `step … speed=2/3`, `speed=1/2`, `training write value=4`, `popup close speed=1/2`, then `speed=1/4`, `training write value=5`, `popup close speed=1/4`. |
+| `media/rc8-game-speed-chord.gif` | `docs-rd8b-d3eeac81`, `fx-speed-bind` (the 1280 capture) | RELEASE-NOTES-rc8.md (the README and TECHNICAL use `rc11-game-speed.gif` since 2026-11-13) | 9.1 s, 7.7 MB | 4.9–5.7, 9.5–11.7, 12.3–13.8, 17.5–18.7, 19.3–21.8, 35.7–36.6 s | Mario vs Samus in Training. A jab at x1; the "Game speed" pop-up x1, 2/3, 1/2; a jab at 1/2; the pop-up at 1/4; a jab at 1/4; the pause menu's Other Settings: Speed 1/4 ("Play in slowest motion"), the HUD stopwatch 1/4. The log: `popup open place=Training speed=x1`, `step … speed=2/3`, `speed=1/2`, `training write value=4`, `popup close speed=1/2`, then `speed=1/4`, `training write value=5`, `popup close speed=1/4`. |
 | `media/rc8-input-display-chord.gif` | `docs-rd8-d3eeac81`, `fx-display-bind` | README, Frame strip; RELEASE-NOTES-rc8.md | 7.8 s, 5.6 MB | 3.2–4.6, 8.0–10.9, 13.4–16.9 s | A jab on the frame strip; R + D-pad Down: "Input display · Off", the strip gone, a jab with no strip; again: "Input display · On", the strip back, the jab drawn. The log: `input_display bind on=false`, then `on=true`. |
 | `media/rc8-speed-hud-fixed.gif` | `docs-r1gif-3f9d61dd`, `r1-hud-gif1280` (the rc.8 head `3f9d61dd`, diag `61533917`) | README, Game speed; RELEASE-NOTES-rc8.md | 9.1 s, 5.1 MB | 2.3–11.4 s | Mario vs Marth in Training. x1 with no stopwatch; the "Game speed" pop-up, Right to x1.5, and the HUD stopwatch reads x1.5; the pop-up again, Left to x1, and the stopwatch goes away. |
 | `media/rc8-footer-tag.gif` | `docs-r1gif-3f9d61dd`, `fx-footer-tag` (the same build) | RELEASE-NOTES-rc8.md, the build in the menu footer | 9.0 s, 3.7 MB | 3.0–12.0 s | The TrainingRooms menu opens; two pages whose key hints end with `0.2.0-rc.6 · rc8 3f9d61dd`; the menu closes. |
@@ -96,7 +113,7 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
 | `media/rc7-combo-helper.gif` | `docs-rd2-722525a5`, `fx-make-combo-drill` | README, Combos | 5.4 s, 6.1 MB | 42.8–44.0, 50.8–55.0 s | The pop-up's COMBOS with Combo 1 (made from Macro 1, jab → jab) drilled; back in Training the jabs; the bar under the frame strip: "Combo 1 · 1 Jab>Jab · TRUE −5 · on time". |
 
 | `media/rc7-di-up.gif` | `docs-rd5-722525a5`, `fx-di-up` (Surface, 07:42–07:48Z) | README, CPU reactions | 9.0 s, 7.9 MB | 7.9–8.6, 9.3–12.3, 21.9–22.5, 23.7–24.9, 31.6–32.1, 32.8–35.8 s | 0–0.7 s Toon Link loaded at 80% (CPU damage on load Random Value 80–80, DI and SDI empty); 0.7–3.7 s Player 1's forward smash, the CPU launched on a shallow line, landing at the right; 3.7–5.5 s CPU › Defence › DI Direction, "none selected", then "Up x1"; 5.5–9.0 s the same load at 80% and forward smash, a steeper line, the CPU near the top right 1.5 s after the hit (mid-height with no DI). |
-| `media/rc7-menu-shortcut.gif` | `docs-rd5-722525a5`, `fx-menu-shortcut` | README, Menu shortcuts; DIFFERENCES-FROM-THE-FORK.md | 6.2 s, 1.5 MB | 0.0–0.3, 5.0–5.6, 6.7–7.5, 8.0–9.4, 10.2–10.9, 13.8–14.6, 15.4–17.0 s | Training; Display & Controls › Menu shortcut 1 "Minus"; the chord editor; the capture reads "ZL", then "ZL + D-pad Up"; A, and the row reads "ZL + D-pad Up" (`button_config.ini written by the writer thread`); Training; the menu open again (`[Ui] menu opened`), from ZL + D-pad Up. |
+| `media/rc7-menu-shortcut.gif` | `docs-rd5-722525a5`, `fx-menu-shortcut` | none (replaced by `rc11-menu-shortcut.gif`, 2026-11-13) | 6.2 s, 1.5 MB | 0.0–0.3, 5.0–5.6, 6.7–7.5, 8.0–9.4, 10.2–10.9, 13.8–14.6, 15.4–17.0 s | Training; Display & Controls › Menu shortcut 1 "Minus"; the chord editor; the capture reads "ZL", then "ZL + D-pad Up"; A, and the row reads "ZL + D-pad Up" (`button_config.ini written by the writer thread`); Training; the menu open again (`[Ui] menu opened`), from ZL + D-pad Up. |
 | `media/rc7-respawn-off.gif` | `docs-rd5-722525a5`, `fx-respawn-off` | DIFFERENCES-FROM-THE-FORK.md | 7.5 s, 6.3 MB | 3.8–4.4, 9.75–10.8, 15.6–17.2, 18.2–22.4 s | Training; Fighters & Stages › Stages › Respawn on platform [ON], then [OFF]; Player 1 runs off the left side, KO; 0.5 s after the blast Player 1 is back at the top, falling, with no platform (the plugin's `dead_rebirth_wait_frame` returned 1). |
 
 The takes' frames were read on each row's timeline; the machine checks are in each row's JSON (`di_state` Up alone,
@@ -468,7 +485,7 @@ stay under 10 MB.
 | `replay-capture.gif` | Recording page: A turns *Replay capture* On; the menu closes; L + R + Down opens the Online Deluxe overlay, whose Player Info page shows *Training Rooms › Replay capture: On*. 9.5 s. |
 | `menu-shortcut.gif` | Display & Controls › Menu shortcut 1: X captures ZL + D-pad Up in place of Minus, A confirms, the menu closes, and the new chord opens it at once. 9.5 s. |
 | `record-refused.gif` | With the CPU pilot driving P1 (armed on the Deluxe overlay), ZR + D-pad Down shows "P1 is controlled by an AI: recording is off". 4.7 s. |
-| `waiting-menu.gif` | A Local Wireless room hosted in Eden, Solo waiting practice: B + D-pad Up opens the menu on its last page (Display & Controls); R steps to CPU and Saves. 8.0 s. |
+| `waiting-menu.gif` | A Local Wireless room hosted in Eden, Solo waiting practice: B + D-pad Up opens the menu on its last page (Display & Controls); R steps to CPU and Saves. 8.0 s. Replaced on 2026-11-13 by `rc11-waiting-menu.gif`. |
 
 Not captured in this session: a visible grab box (the 10%-speed take shows a forward smash into the CPU's shield, not a
 grab), the air dodge Out / shield tilt In clips (at 0% the forward smash barely lifts the CPU, so neither shows),

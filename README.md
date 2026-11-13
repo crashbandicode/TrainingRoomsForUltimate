@@ -56,7 +56,7 @@ How to read it: [the frame strip guide](docs/guide/frame-strip.md)
 ### Game speed
 Slow the game down or speed it up. Hold R + D-pad Up and press Left or Right.
 
-![The speed steps to 1/2, then 1/4, and the jabs slow down](docs/media/rc8-game-speed-chord.gif)<br>*Stepping down to 1/4*<br>
+![A forward smash at x1; R + D-pad Up steps the speed to 1/4; the same smash, four times slower](docs/media/rc11-game-speed.gif)<br>*The same smash at x1, then at 1/4*<br>
 ![The stopwatch shows x1.5, then goes away at x1](docs/media/rc8-speed-hud-fixed.gif)<br>*The stopwatch follows the speed*<br>
 ![In the online waiting room: a forward smash at x1, the speed steps to 1/2, and the next smash is slower](docs/media/rc11-lobby-speed.gif)<br>*It works in the online waiting rooms too*
 
@@ -115,13 +115,13 @@ first (it's Off at first).
 ![A second training partner drops in](docs/media/rc6-waiting-partners.gif)<br>*Adding a training partner*<br>
 ![The next room remembers the partners](docs/media/rc6-waiting-reentry.gif)<br>*Partners remembered*<br>
 ![Saving a combo in a waiting room, then drilling it](docs/media/rc6-lobby-combos.gif)<br>*Combos in a waiting room*<br>
-![The menu in a waiting room](docs/media/waiting-menu.gif)<br>*The menu in a waiting room*
+![In a local waiting room, B + D-pad Up opens the menu, Hitbox Visualization goes On, and the boxes show in the room](docs/media/rc11-waiting-menu.gif)<br>*The menu in a waiting room (B + D-pad Up)*
 
 ### Menu
 Jump between sections with ZL + Up/Down, and set your own menu button.
 
 ![ZL + Down jumps through the sections](docs/media/menu-section-jump.gif)<br>*Jumping between sections*<br>
-![Changing the menu button to ZL + D-pad Up](docs/media/rc7-menu-shortcut.gif)<br>*Setting your own menu button*
+![Menu shortcut 1 set from Minus to ZL + D-pad Up, then ZL + D-pad Up opens the menu](docs/media/rc11-menu-shortcut.gif)<br>*Setting your own menu button*
 
 ### Replays
 Capture moments from your replays and open them in Training.

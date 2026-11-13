@@ -105,12 +105,12 @@ choice is saved.
 
 ### Game speed
 
-**Clip** [`rc8-game-speed-chord.gif`](media/rc8-game-speed-chord.gif): Hold R + D-pad Up: the Game speed pop-up steps to 1/2, then 1/4; the jabs slow down; the pause menu shows Speed 1/4
+**Clip** [`rc11-game-speed.gif`](media/rc11-game-speed.gif): The same forward smash at x1, then, after R + D-pad Up steps the speed to 1/4, about four times slower
 
-*Eden, 2026-11-11, the rc.8 integration head `d3eeac81` (diag NRO `9f8afc66`, log lines only), in Training: a jab at
-x1; R + D-pad Up held, the pop-up reads x1, then 2/3 and 1/2 with D-pad Left; a jab at 1/2; held again, 1/4; a jab at
-1/4; the pause menu's Other Settings shows Speed 1/4, and the HUD's stopwatch reads 1/4. Cuts inside are listed in
-[MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), in Training: from the same reset spot Mario
+walks in and forward-smashes Ridley at x1; R + D-pad Up held, the pop-up steps x1 → 2/3 → 1/2 → 1/4 with D-pad Left;
+the HUD's stopwatch reads 1/4; the same walk-in and smash play about four times slower. The log has
+`[GameSpeed] … speed=1/4`. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 Hold R + D-pad Up and a small "Game speed" pop-up shows the current speed between two D-pad arrows. While you hold
 it, D-pad Left and Right step one speed at a time; the steps stop at the slowest and fastest speeds instead of wrapping
@@ -346,10 +346,12 @@ doesn't reach the game.
 room; Recording › Combos & Sequences, *+ Save last combo…*; COMBOS lists "Lobby jabs, recorded on Sheik"; back in the
 room, the helper bar drills it. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-**Clip** [`waiting-menu.gif`](media/waiting-menu.gif): The menu in a Local Wireless waiting room
+**Clip** [`rc11-waiting-menu.gif`](media/rc11-waiting-menu.gif): In a Local Wireless waiting room, B + D-pad Up opens the menu, Hitbox Visualization goes On, and the boxes show in the room
 
-*Eden, 2026-11-05, 0.2.0-rc.1 (release NRO `706c993f…`), a Local Wireless room hosted in Eden: the menu opens on its
-last page and R steps to CPU and Saves. The menu only.*
+*Eden, 2026-11-12, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), the guest of a Local Wireless room hosted
+in Eden (`docs-ldn66d-0c628724`, `fx-waiting-hitboxes`), the waiting room as the boot's first practice: the room; the
+menu on Display & Controls; Hitbox Visualization from Off to On; the menu closes and both practice fighters show their
+boxes. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 ### Menu navigation
 
@@ -373,11 +375,12 @@ else keeps it hidden, decision N1). While it's hidden its rows do nothing. All t
 
 ### Menu shortcuts and replay capture
 
-**Clip** [`rc7-menu-shortcut.gif`](media/rc7-menu-shortcut.gif): Menu shortcut 1 changed from Minus to ZL + D-pad Up, which then opens the menu
+**Clip** [`rc11-menu-shortcut.gif`](media/rc11-menu-shortcut.gif): Menu shortcut 1 changed from Minus to ZL + D-pad Up, which then opens the menu
 
-*Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): Display & Controls › Menu
-shortcut 1 reads Minus; A opens the chord editor, X starts the capture, ZL held with D-pad Up gives "ZL + D-pad Up", A
-confirms; back in Training, ZL + D-pad Up opens the menu. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only): Display & Controls › Menu shortcut 1 reads
+Minus; A opens the chord editor, X starts the capture, ZL held with D-pad Up gives "ZL + D-pad Up", A confirms
+(`button_config.ini written`); back in Training, Minus opens nothing (no `[Ui] menu opened`), and ZL held (Mario
+shields) with D-pad Up opens the menu. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 Menu shortcuts are changed in the menu and work at once.
 
