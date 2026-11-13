@@ -174,8 +174,7 @@ faster), X previews it on the CPU, A saves the part between the two as a new mac
 - **How:** A opens it. It opens only while nothing else is going on: not during a recording, a playback, a load or a
   fighter change. With no capture, it says "Save a replay with match capture on, or play one in Vault first".
 
-<!-- reshoot: rc6-replay-window.gif -->
-![A capture opened from the Replay window: the CPU becomes the recorded Mii Gunner](../media/rc6-replay-window.gif)<br>
+![A capture cropped in the Replay window and saved, then played: the CPU becomes the recorded Mii Gunner](../media/rc11-replay-window.gif)<br>
 *Opening a replay moment*
 
 More: [Edit placement and the Replay window](../guide/recording.md#replays-edit-placement-and-the-replay-window)

@@ -387,12 +387,13 @@ shields) with D-pad Up opens the menu. Cuts inside are listed in [MEDIA.md](MEDI
 
 Menu shortcuts are changed in the menu and work at once.
 
-**Clip** [`rc6-replay-window.gif`](media/rc6-replay-window.gif): A capture opened in the Replay window: its Mii goes to the CPU
+**Clip** [`rc11-replay-window.gif`](media/rc11-replay-window.gif): A capture cropped in the Replay window and saved; played on the CPU, which becomes the recorded Mii Gunner and replays the moves
 
-*Eden, 2026-11-10, rc.6 `e6501ac6` (diag NRO `c1b9f694`, log lines only): Recording › Replays › Replay window lists a capture
-(Mario vs Mii Gunner, 180 frames), A opens it in the Replay window, Fighter Mismatch offers the recorded fighter, and
-Switch reloads the CPU as the capture's Mii Gunner ("Saved Mii applied"). The capture is a test fixture, made before
-the clip. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only): Recording › Replays › Replay window opens a
+capture (Mario vs Mii Gunner, 180 frames; a test fixture made before the clip) on the Mario track; the Mii Gunner
+track; L/R crop it to 13–170; A saves it as a macro ("Named Macro · Saved Gunner jabs"); Play on CPU asks Fighter
+Mismatch, Switch to recorded fighter reloads the CPU as the capture's Mii Gunner ("Saved Mii applied"), and the
+Gunner plays the cropped inputs (the CPU lane fills). Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 **Clip** [`rc11-replay-capture.gif`](media/rc11-replay-capture.gif): Replay capture turned On in the menu, then the same setting On in the Online Deluxe overlay (zoomed)
 
