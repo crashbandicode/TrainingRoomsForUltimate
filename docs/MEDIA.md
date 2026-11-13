@@ -51,6 +51,12 @@ file in the README and the docs; the old file stays in `media/` with a note in i
   then the Recording page after the first Training entry), `rs11-f70-edit-placement.gif` (#70: Offset X −40, the
   same jab whiffs) and `rs11-f84-pilot-refusals.gif` (#84, #87 and #89's Play half: Record and Play on Player 1
   refused, R + D-pad Down inert while Online Deluxe shows a page with rows, B + D-pad Up still opening the menu).
+- **Player 2 and the setup library** (`docs-rs9-0c628724`, slot 1, 09:54–10:12Z, Player 2's controller connected;
+  `docs-rs8c-0c628724`, slot 2, 09:58–10:11Z): `rs11-f60-p2-control.gif` (#60: under Control, Player 2 walks and
+  taunts the CPU, cycles it to Kirby and gives it Mario's hat; Player 1 saves and loads),
+  `rs11-f61-p2-lra-mii.gif` (#61: Player 2's L + R + A resets, then a Mii Brawler) and
+  `rs11-f69-setup-restore.gif` (#69: a setup saved, both fighters moved, the library puts them back). Player 2's
+  presses have no on-screen mark; the ledger names them.
 - **Cycle and hot-slot evidence** (`docs-rs3b-0c628724`, slot 1, 05:29–05:45Z): `rs11-f55-cpu-cycle.gif` (#55, the
   CPU list zoomed, then Captain Falcon, the Mii Gunner and Peach in order; a greyed Mii class can't be shown on this
   card, whose Smash save holds a Mii of every class) and `rs11-f57-hot-slots.gif` (#57, "Fighters · Loading 4/10" to
