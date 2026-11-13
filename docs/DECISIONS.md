@@ -604,7 +604,7 @@ recommended option has a **green outline**. The pictures are drawn by `tools/ren
 
 "The held fix" means `c49681c9`: worker A's in-game text fixes, a local commit not yet on `main`
 (`artifacts/phase23/docs-audit-1113/WORKER-A-TEXT-FIXES.md`). TR1–TR8 come from the docs lane's audit of in-game text
-(`CODE-FINDINGS.md`; its row numbers are given as #n).
+(`CODE-FINDINGS.md`; its row numbers are given as #n). TR9 comes from integration's report of 10:40Z.
 
 | # | Decision | Recommendation |
 | --- | --- | --- |
@@ -616,6 +616,7 @@ recommended option has a **green outline**. The pictures are drawn by `tools/ren
 | TR6 | Ask before switching fighter (#13) | B: every question follows the row |
 | TR7 | Crop trailing neutral (#14) | B: make Record trim |
 | TR8 | Player Character with Player Swapping Off (#17) | B: a pick loads now |
+| TR9 | An old Record trigger setting turns off the Record chord | A: ignore the retired row |
 | OP1 | Push the held doc fixes | A: push the docs now, `c49681c9` after TR5 and TR8 |
 | OP2 | The standalone `libimgui_smash.nro` on the card | A: remove it |
 | OP3 | Deluxe's hidden Stages + Counterpick page | A: show it |
@@ -635,7 +636,8 @@ recording, and no row opens the slot copy. So a ticked slot refuses "Record into
 Options › Hitstun timing does nothing.
 
 - **A · hide them:** the four lists skip the five entries, and Hitstun timing is hidden. Saved settings keep their
-  shape. Cost to the player: none. To build: 30–60 code lines, tests, one Eden pass.
+  shape. Cost to the player: none. To build: 30–60 code lines, tests, one Eden pass. Removing the entries outright,
+  instead of hiding them, frees lines (TR2) but changes the saved rows' lengths.
 - **B · label them:** five help lines and the refusal say the slots do nothing. Cost to the player: the dead options
   stay, and those help lines lose what they say now. Changing the refusal needs an approved restriction.
 - **C · implement:** a new row copies a library macro into a slot for the session. Cost to the player: none. To build:
@@ -658,7 +660,11 @@ a ceiling of 147,921 (integration, 10:40Z).
   file frees 258 lines, which covers the 35; all of it is 1,096 lines. Cost to the player: none. To build: a rebase
   and re-measure, and an Eden check of the settings migration it touches.
 - **Not part of (b):** the old named capture (354 lines). Settings files written by v0.1.0 to v0.2.0-rc.3.1 (Source
-  Named Library plus Trigger Save State Load) still start it on every load.
+  Named Library plus Trigger Save State Load) still start it on every load. If TR9 is A, that last route ends, and
+  those 354 lines can go too.
+- **More, only with TR1 A done by removal:** removing the #8 entries outright frees 268 more on top of (i), (ii) and a
+  24-line flag nothing sets. It changes the saved rows' lengths; hiding them while keeping the lengths was not
+  measured.
 
 Integration's measurement: `artifacts/phase23/tr-fix-23-15/SIZE-OPTION-B.md`, in the workspace.
 
@@ -751,6 +757,28 @@ notice and loads only when Player Swapping goes On.
 fix's other flagged compliance line.
 
 ![TR8 player character](decisions/TR8-player-character.png)
+
+#### TR9 · An old Record trigger setting turns off the Record chord
+
+Whether today's build should keep obeying a retired setting that can silently turn Record off. Builds v0.1.0 to
+v0.2.0-rc.3.1 had a Record trigger row. A settings file that still holds "Save State Load only" (`record_trigger`
+`[0, 1]`) makes today's Record chord (ZR + D-pad Down) do nothing, with no notice (`recorder.rs:674`). No menu row
+shows the value any more, so the player can't change it back.
+
+- **A · ignore the retired row:** the build stops reading both bits of `record_trigger`. Record always records, and
+  nothing starts the old capture on a load. The row was retired with its value kept, so that old settings still load,
+  but `recording.rs` still acts on it. Cost to the player: none. The old named capture loses its last route, so TR2
+  can delete its 354 lines too. To build: a few lines in `recording.rs`, a test with an old file, one Eden Record.
+- **B · migrate the value:** rewrite `record_trigger` to the factory value once, when an old file loads. The result for
+  the player is the same. Cost: the settings file is rewritten, a migration step has to be ordered, and it is more code
+  than A.
+- **C · leave it:** a player with an old file presses Record and nothing happens. There is no notice and no row to fix
+  it; only deleting `settings.json` helps.
+
+**Recommendation: A.** The row is retired, so reading it is the bug. A is the smallest root fix, needs no file rewrite,
+and ends the old capture's last route.
+
+![TR9 record trigger](decisions/TR9-record-trigger.png)
 
 Not listed: #19 (Give item's item arrives when the menu closes). The code's comment gives the reason: a short-fuse item
 must not expire while the picker still has the inputs.
