@@ -11308,7 +11308,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "4a889f8d34e85f19aac2d56ee8eda5a3fbc8b4888ca50db478474f05ddae7433",
+   "dest_sha256": "8e52211aba5f9e25589b3c019ad237ef13ba547e158f326a5ae2263705efc93a",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -12531,6 +12531,31 @@
       ]
      ],
      "reason": "rc.10 S4 (docs/CODE-REDUCTION-rc10.md): the probes nothing used are deleted (operator 2026-11-12): mii-ldn-qualification-probe, native-unlink-probe, texture-probe, console-swap-trace, automation-results-native"
+    },
+    {
+     "old": "use crate::engine::swap::character_memory::WaitingSession;\n",
+     "new": "use crate::engine::swap::character_memory::WaitingSession;\nuse crate::engine::swap::cycle_members::{admitted, menu_request};\n",
+     "reason": "rc.12 TR8 (operator 2026-11-13, docs/DECISIONS.md TR8 B): a Player Character pick is one load the user chose (once), so it loads with Player Swapping Off like a combo Switch; both admission checks use cycle_members::admitted"
+    },
+    {
+     "old": "    /// `request_player_kind`): admitted even while the role's cycle is off.\n",
+     "new": "    /// `request_player_kind`, or a portrait pick): admitted even while the role's cycle is off.\n",
+     "reason": "rc.12 TR8 (operator 2026-11-13, docs/DECISIONS.md TR8 B): a Player Character pick is one load the user chose (once), so it loads with Player Swapping Off like a combo Switch; both admission checks use cycle_members::admitted"
+    },
+    {
+     "old": "        if explicit || role.selected(previous) != role.selected(&current) || player_just_enabled {\n            queue(role, Selection::Direct(role.selected(&current)));\n",
+     "new": "        // A pick is one load the user chose (`once`): it loads whatever Player Swapping says (operator 2026-11-13, TR8).\n        let selected = role.selected(&current);\n        let changed = role.selected(previous) != selected;\n        if let Some(once) = menu_request(explicit, changed, player_just_enabled) {\n            queue_admitted(role, Selection::Direct(selected), false, once);\n",
+     "reason": "rc.12 TR8 (operator 2026-11-13, docs/DECISIONS.md TR8 B): a Player Character pick is one load the user chose (once), so it loads with Player Swapping Off like a combo Switch; both admission checks use cycle_members::admitted"
+    },
+    {
+     "old": "    let user = !restoring && !matches!(selection, Selection::RefreshPartners);\n    if !role.enabled() && !once && !matches!(selection, Selection::RefreshPartners) {\n",
+     "new": "    let refresh = matches!(selection, Selection::RefreshPartners);\n    let user = !restoring && !refresh;\n    if !admitted(role.enabled(), once, refresh) {\n",
+     "reason": "rc.12 TR8 (operator 2026-11-13, docs/DECISIONS.md TR8 B): a Player Character pick is one load the user chose (once), so it loads with Player Swapping Off like a combo Switch; both admission checks use cycle_members::admitted"
+    },
+    {
+     "old": "    if request.epoch != state.epoch\n        || scope(role) != Some(request.scope)\n        || (!role.enabled() && !request.once && !matches!(request.selection, Selection::RefreshPartners))\n    {\n",
+     "new": "    let refresh = matches!(request.selection, Selection::RefreshPartners);\n    if request.epoch != state.epoch || scope(role) != Some(request.scope) || !admitted(role.enabled(), request.once, refresh) {\n",
+     "reason": "rc.12 TR8 (operator 2026-11-13, docs/DECISIONS.md TR8 B): a Player Character pick is one load the user chose (once), so it loads with Player Swapping Off like a combo Switch; both admission checks use cycle_members::admitted"
     }
    ]
   },

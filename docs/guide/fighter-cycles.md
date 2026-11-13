@@ -33,8 +33,7 @@ Fighters & Stages › [Player Swapping](../menu/fighters-and-stages.md#player-sw
 stays the fighter you picked at the character select. While it is Off:
 
 - Cycle Player does nothing, with no notice.
-- A pick in [Player Character](../menu/fighters-and-stages.md#player-character) is kept but doesn't load. Turning
-  Player Swapping On loads it.
+- A pick in [Player Character](../menu/fighters-and-stages.md#player-character) still loads, when you close the menu.
 - A combo's Switch still changes Player 1 to the combo's fighter (see [Recording › Combos](recording.md#combos)).
 
 The CPU has no such switch: Cycle CPU and CPU Character always work.

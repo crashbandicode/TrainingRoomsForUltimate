@@ -28,7 +28,7 @@ With it On, the practice starts as soon as the waiting room's own screen is read
   [Recording › Combos](recording.md#combos).
 - **Stages:** [Change Stage](stages.md#change-stage) goes to another stage now, and each new room opens on the next
   stage of [Lobby Stages](stages.md#lobby-stages). [Stage Hazards](stages.md#stage-hazards) counts there too.
-- **Fighters and items:** Player Character (with Player Swapping On), CPU Character, Give item and the Mii rows. Your
+- **Fighters and items:** Player Character, CPU Character, Give item and the Mii rows. Your
   practice fighter changes; the match still uses the fighter you picked for it. *Add New…* opens Smash's Mii editor: see
   [Mii fighters › In a waiting room](mii.md#in-a-waiting-room).
 - **L + R + A** puts both practice fighters back where they first stood (Display & Controls ›

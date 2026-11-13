@@ -10,6 +10,7 @@ use {crate::engine::compat::menu::OnOff, crate::engine::compat::menu::TrainingMo
 use {crate::runtime::compat::sync::lock_write, crate::runtime::compat::sync::read as setting};
 
 use crate::engine::swap::character_memory::WaitingSession;
+use crate::engine::swap::cycle_members::{admitted, menu_request};
 use crate::runtime::compat::common::{
     button_config, game_mode,
     input::{Buttons, MappedInputs},
@@ -219,7 +220,7 @@ struct Request {
     age: usize,
     restoring: bool,
     /// One explicit Direct load the user chose outside the cycle (a combo's Switch,
-    /// `request_player_kind`): admitted even while the role's cycle is off.
+    /// `request_player_kind`, or a portrait pick): admitted even while the role's cycle is off.
     once: bool,
 }
 
@@ -616,8 +617,11 @@ pub fn settings_changed(previous: &TrainingModpackMenu,
         let explicit = manual.is_some_and(|(picked_role, kind)|
             (picked_role == crate::engine::swap::roster_grid::Role::Player) == (role == Role::Player)
                 && kind == role.selected(&current).kind());
-        if explicit || role.selected(previous) != role.selected(&current) || player_just_enabled {
-            queue(role, Selection::Direct(role.selected(&current)));
+        // A pick is one load the user chose (`once`): it loads whatever Player Swapping says (operator 2026-11-13, TR8).
+        let selected = role.selected(&current);
+        let changed = role.selected(previous) != selected;
+        if let Some(once) = menu_request(explicit, changed, player_just_enabled) {
+            queue_admitted(role, Selection::Direct(selected), false, once);
         }
     }
 }
@@ -634,8 +638,9 @@ fn queue_request(role: Role, selection: Selection, restoring: bool) {
 /// (Player Swapping) does not refuse it and is not changed by it.
 fn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool) {
     // FAIL 2: a user's request leaves one line on every path, including the ones that drop it.
-    let user = !restoring && !matches!(selection, Selection::RefreshPartners);
-    if !role.enabled() && !once && !matches!(selection, Selection::RefreshPartners) {
+    let refresh = matches!(selection, Selection::RefreshPartners);
+    let user = !restoring && !refresh;
+    if !admitted(role.enabled(), once, refresh) {
         if user {
             trace!("[CharacterRoster] request ignored role={:?} selection={:?}: this role's roster cycle is off", role, selection);
         }
@@ -1290,10 +1295,8 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
         return;
     }
     let mut state = state_for(role).lock();
-    if request.epoch != state.epoch
-        || scope(role) != Some(request.scope)
-        || (!role.enabled() && !request.once && !matches!(request.selection, Selection::RefreshPartners))
-    {
+    let refresh = matches!(request.selection, Selection::RefreshPartners);
+    if request.epoch != state.epoch || scope(role) != Some(request.scope) || !admitted(role.enabled(), request.once, refresh) {
         state.pending = None;
         trace!("[CharacterRoster] dropped stale request at native boundary");
         return;

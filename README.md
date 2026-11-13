@@ -33,7 +33,7 @@ Every option is documented in the [docs](docs/README.md), one page per menu page
 
 You can change the save, load, recording, fighter-cycle, input-display and game-speed buttons, and add up to two menu
 shortcuts, in Display & Controls › Controls. B + D-pad Up, the Kirby hat clicks and L + R + A stay fixed. Switching
-your own fighter needs Fighters & Stages › Player Swapping On (it's Off at first).
+your own fighter with its cycle chord needs Fighters & Stages › Player Swapping On (it's Off at first).
 
 On a GameCube controller, ZL is L, ZR is R and R is Z; it has no Minus, so open the menu with B + D-pad Up. With Online
 Deluxe, buttons that use the D-pad do nothing while its window shows a settings page; B + D-pad Up still opens this

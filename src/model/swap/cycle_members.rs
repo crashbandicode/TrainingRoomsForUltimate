@@ -116,3 +116,47 @@ pub fn player_admission(catalog: &Snapshot, origin: PlayerOrigin) -> MiiAdmissio
     admitted
 }
 
+/// What a committed menu change asks of one role's loader (`character_roster::settings_changed`): `None`, or a Direct
+/// load of the role's selected fighter. `pressed`: a portrait press for the role; `changed`: its selected fighter
+/// changed; `cycle_turned_on`: Player Swapping just went On. `Some(once)`: `once` marks one load the user chose, a
+/// pick, which loads whatever Player Swapping says, like a combo's Switch (operator 2026-11-13, TR8).
+pub fn menu_request(pressed: bool, changed: bool, cycle_turned_on: bool) -> Option<bool> {
+    let pick = pressed || changed;
+    (pick || cycle_turned_on).then_some(pick)
+}
+
+/// Whether a role's loader takes a request: the role's cycle is on (Player Swapping for Player 1; the CPU's always is),
+/// the request is one load the user chose (`once`), or it only refreshes the partners.
+pub fn admitted(cycle_on: bool, once: bool, refresh: bool) -> bool {
+    cycle_on || once || refresh
+}
+
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn a_player_character_pick_loads_with_player_swapping_off() {
+        // Operator 2026-11-13 (TR8): a Player Character pick is one load the user chose, like a combo's Switch. It loads
+        // whatever Player Swapping says; that setting governs the cycle chord only.
+        for (pressed, changed) in [(true, true), (true, false), (false, true)] {
+            let once = menu_request(pressed, changed, false).expect("a pick asks for a load");
+            assert!(admitted(false, once, false), "pressed={pressed} changed={changed}: loads with Player Swapping Off");
+        }
+        assert_eq!(menu_request(false, false, false), None, "an unrelated edit asks for nothing");
+        let on = menu_request(false, false, true).expect("turning Player Swapping On loads the pick");
+        assert!(admitted(true, on, false));
+        assert!(!admitted(false, false, false), "a cycle step stays refused with Player Swapping Off");
+        assert!(admitted(false, false, true), "a partner refresh is always taken");
+    }
+
+    /// This module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("a_player_character_pick_loads_with_player_swapping_off", a_player_character_pick_loads_with_player_swapping_off as fn()),
+        ]);
+    }
+    }
+}
+

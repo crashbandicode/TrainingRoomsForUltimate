@@ -12,23 +12,22 @@ The guides: [Fighter cycles](../guide/fighter-cycles.md), [Mii fighters](../guid
 
 ### Player Swapping
 
-On: the Cycle Player chord (ZL + D-pad Right) and a pick in [Player Character](#player-character) change your fighter.
-Off: Player 1 stays the fighter you picked at the character select; only a combo's Switch (Recording) changes it. The
-CPU is not affected: its chord and [CPU Character](#cpu-character) always work.
+On: the Cycle Player chord (ZL + D-pad Right) changes your fighter. Off: the chord doesn't, so Player 1 stays the
+fighter you picked; a pick in [Player Character](#player-character) and a combo's Switch (Recording) still change it.
+The CPU is not affected: its chord and [CPU Character](#cpu-character) always work.
 
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A flips it.
 
-With it Off, Cycle Player does nothing and shows no notice. A Player Character pick made while it is Off is kept, and
-loads when you turn Player Swapping On.
+With it Off, Cycle Player does nothing and shows no notice.
 
 More: [Fighter cycles › Player Swapping](../guide/fighter-cycles.md#player-swapping)
 
 ### Player Character
 
 Opens a portrait grid of every fighter. A picks Player 1's fighter, and "> " marks the pick. The new fighter loads
-when you close the menu, if [Player Swapping](#player-swapping) is On.
+when you close the menu, with [Player Swapping](#player-swapping) On or Off.
 
 - **Values:** any fighter on the grid
 - **How:** A opens the grid. The D-pad moves, A picks, B goes back. X on a shared slot (Pokémon Trainer, Pyra / Mythra)
@@ -340,5 +339,5 @@ list doesn't grey them for that.
 The last row of the page. It asks first, then puts every row of Fighters & Stages back to your saved defaults (the
 factory values above, until you save your own with X): the switches, the Loading rows, both cycle lists, both Kirby
 hat lists, the Lobby Stages list, and Player Character and CPU Character. If a pick changes, that fighter loads when
-the menu closes (Player 1's only with Player Swapping On). Your Mii choices, the stage forms, the Lobby Stages mode
+the menu closes. Your Mii choices, the stage forms, the Lobby Stages mode
 (Rotation or Direct) and the Solo Popo marks of Character Cycles stay as they are.
