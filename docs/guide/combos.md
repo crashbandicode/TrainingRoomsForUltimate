@@ -61,7 +61,7 @@ One JSON object, at most 64 KiB:
 | --- | --- | --- |
 | `schema_version` | no (1 when left out) | The format's version. This document is version 1. A file with a larger number was made by a newer TrainingRooms and is skipped with a notice. |
 | `name` | no | Shown in the list, 1 to 48 characters. Left out or blank: the file name is used. A longer name is shortened in the list; the file is not changed. |
-| `recorded_on` | no | The fighter Player 1 was when the combo was saved, for example `"Ryu"`, written as the menu names fighters (case does not matter). The list shows "recorded on Ryu". When you choose the combo while P1 is another fighter, the plugin can ask whether to switch P1 to it (see below). The helper grades any fighter either way. |
+| `recorded_on` | no | The fighter Player 1 was when the combo was saved, for example `"Ryu"`, written as the menu names fighters (case does not matter). The list shows "Recorded on Ryu". When you choose the combo while P1 is another fighter, the plugin can ask whether to switch P1 to it (see below). The helper grades any fighter either way. |
 | `links` | yes, 1 to 16 | The combo, link by link, in order. |
 
 Each link:

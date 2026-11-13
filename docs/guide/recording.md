@@ -158,7 +158,8 @@ The picker is the same numbered picker as a chain, including R removing the last
 
 The pop-up is one window over the match. While it is open it takes the menu's buttons. B closes it and leaves the bound save, the active macros, and the cursor as they were.
 
-The title reads `Recording (Player 1)` or `Recording (CPU)`. L sets Player 1. R sets the CPU.
+The title reads `Recording`, with the role tabs beside it: L Player, CPU R; the role in view is lit. L sets Player 1.
+R sets the CPU.
 
 Player 1 has two tabs, Save states & Macros and Combos & Sequences. ZL and ZR switch those tabs. The CPU view has only Save states & Macros, and ZL and ZR do not change it.
 

@@ -32,7 +32,8 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
 | --- | --- | --- | --- | --- | --- |
 | `media/rc11-footer-tag.gif` | `docs-rd18-0c628724`, `fx-footer-tag` (the Surface, 17:51–17:58Z) | TECHNICAL.md, the build tag | 9.1 s, 1.7 MB | 0.0–9.1 s | Mario vs Chrom in Training; the menu opens on Fighters & Stages, R to Display & Controls; both pages' key hints end with `0.2.0-rc.6 · rc11 0c628724`; the menu closes. |
 | `media/rc11-strip-under-menu.gif` | `docs-strip92b-0c628724`, `lp-q2-change` (the XPS, 20:28–20:43Z; b alone in the Quickplay waiting room, after `qp-check` found no pop-up) | README, Input display | 9.8 s, 9.0 MB | 0.0–9.8 s | The waiting room with the frame strip at the top; Plus opens the game's menu (Training Partners, Training Partner Behavior) and the strip is gone; Right adds a second partner, Down and Left set Behavior to Attack; the menu closes and the strip is back while the partners attack. The log: `[LobbyPersist] saved … change=Partners(2)`, then `change=Behavior(7)`. |
-| `media/rc11-lobby-speed.gif` | `docs-lb4-0c628724`, `fx-lobby-speed` (the XPS, 17:51–18:12Z; the same-boot retry) | README, Game speed | 9.1 s, 5.0 MB | 0.2–3.0, 66.6–68.4, 69.4–73.9 s | The Quickplay waiting room, Sephiroth and a CPU partner. A forward smash at x1; the "Game speed" pop-up steps to 2/3, then 1/2; the same forward smash at 1/2 is slower and knocks the partner off. The log: `[GameSpeed] step place=Lobby dir=Left speed=1/2`, `lobby Taken(… divisor: 2 …) in_practice=true`; ms per motion frame ×1.946 at 1/2. |
+| `media/rc11-lobby-speed.gif` | `docs-lb4-0c628724`, `fx-lobby-speed` (the XPS, 17:51–18:12Z; the same-boot retry) | README, Game speed | 9.1 s, 5.0 MB | 0.2–3.0, 66.6–68.4, 69.4–73.9 s | The Quickplay waiting room, Sephiroth and a CPU partner. A forward smash at x1; the "Game speed" pop-up steps to 2/3, then 1/2; at 1/2 Player 1's forward smash goes the other way and misses, and Player 1 falls off the stage (the audit of
+2026-11-13 corrected this line, which said it knocks the partner off: **reshoot**). The log: `[GameSpeed] step place=Lobby dir=Left speed=1/2`, `lobby Taken(… divisor: 2 …) in_practice=true`; ms per motion frame ×1.946 at 1/2. |
 
 ## rc.10 docs clips (2026-11-12)
 
@@ -59,7 +60,8 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
 - **Runs:** the Surface, one instance, display :71, untimed:
   - `docs-rd8-d3eeac81` (15:12–15:17Z);
   - `docs-rd8b-d3eeac81` (15:27–15:34Z).
-- **The lobby clip** waits for R2 (the lobby's 2/3 and x1.5). Integration's LDN pair pass runs it (`fx.py:fx_lobby_speed`).
+- **The lobby clip** waited for R2 (the lobby's 2/3 and x1.5); R2 is in since rc.8, and the clip is
+  `media/rc11-lobby-speed.gif` (rc.11 section above).
 
 | File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
 | --- | --- | --- | --- | --- | --- |
@@ -153,7 +155,8 @@ gamepad overlay left out: `docs-rd6-722525a5` (Surface, 2026-11-11 09:28–09:33
 | --- | --- | --- | --- | --- | --- |
 | `media/rc7-replay-capture.gif` | `docs-rd6-722525a5`, `fx-replay-capture` | README, Menu shortcuts and replay capture; DIFFERENCES-FROM-THE-FORK.md | 5.4 s, 3.4 MB | 0.0–0.6, 10.3–11.9, 27.3–28.4, 29.3–31.4 s | Training (a leftover "Saved Slot 1" notice); Recording › Replays › Replay capture [OFF], then [ON]; Training, the Online Deluxe overlay at the top right (its network page); its plugins page, "Training Rooms › Replay capture On". The log has `[ReplayCapture] menu preference enabled=true result=Applied` and `replay_capture.ini written by the writer thread enabled=true` at the menu's close. (The row's own check looked before the close and failed; the take is complete.) |
 
-`record-refused.gif` (2026-11-05, the bar and the old input log) is removed and **not retaken**: on this build Record
+`record-refused.gif` (2026-11-05, the bar and the old input log) is no longer embedded (the file stays in `media/`) and
+was **not retaken**: on this build Record
 was not refused. In `docs-rd6b-722525a5` `fx-record-refused`:
 - the overlay's CPU Pilot page turned P1 from Player to "CPU (L3)", and the HUD read "CPU Lv3";
 - the pilot moved Player 1;
@@ -168,7 +171,8 @@ Lockout", then "Recording".
 
 rc.8 fixes it (`p23/rc8-pilot-refusal` `8607526b`, merged into the rc.8 head `eca14e4b`): the Record chord now asks the
 same refusal as every other record start, so the README and DIFFERENCES-FROM-THE-FORK.md describe the refusal instead
-of a known issue. The clip is retaken on `eca14e4b` in the staged boot `docs-rd10-eca14e4b` (`fx-record-refused`).
+of a known issue. No retaken clip is in `media/`: the refusal's proof is the evidence clip `rc10-pilot-refusals.gif`
+(rc.10 section above; outside git).
 
 Retired from the README (each carried the bar):
 - `mii-editor.gif` and `mii-editor-list.gif` (2026-11-05): `rc7-mii-editor.gif` shows the editor, the new row and the

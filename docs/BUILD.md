@@ -90,7 +90,7 @@ Current recipes (rebuilt 2026-11-08 at the rc.6 integration from the merged pane
 Both recipes are embedded in every NRO (`runtime/ui/archive.rs`), so their size is resident size too (the 354 roster
 mark panes added about 33 KB to each).
 
-Its menu, notification and input-log roots live beneath `TrModPort`. The runtime
+Its menu, notification and frame-strip roots live beneath `TrModPort` (the frame strip replaced the input log in rc.3). The runtime
 recognizes each archive by its directory member and applies that layout's recipe.
 The two boot buffers each fit the larger recipe's stock/output size; both layouts
 share the pool and retain the five-second hand-out grace. A vanilla fallback uses

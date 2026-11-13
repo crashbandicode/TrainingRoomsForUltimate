@@ -1,8 +1,8 @@
 # Technical notes
 
 The detail behind the [README](../README.md): how TrainingRooms is installed and built, how each feature behaves, and
-where every clip in the README was recorded (build, commit and what the run checked). Release notes for each build are
-the `RELEASE-NOTES-rc*.md` files in this folder.
+where every clip in the README was recorded (build, commit and what the run checked). Release notes are the
+`RELEASE-NOTES-rc*.md` files in this folder: rc.5, rc.6, rc.8 and rc.9 (rc.7, rc.10 and rc.11 have none).
 
 Practice tools for Training mode and the online waiting rooms of Super Smash Bros. Ultimate 13.0.5, as a Skyline plugin.
 
@@ -15,7 +15,8 @@ back in Training yellow shapes cover both fighters. Cuts inside are listed in [M
 ## Install
 
 Put the NRO at `atmosphere/contents/01006A800016E000/romfs/skyline/plugins/libtraining_rooms.nro`, next to
-`libnro_hook.nro` and `libparam_hook.nro`, which it needs. **Never install it together with `libtraining_modpack.nro`.**
+`libnro_hook.nro`, which it needs (`libparam_hook.nro` is the usual companion; this build doesn't call it). **Never
+install it together with `libtraining_modpack.nro`.**
 Settings and saves live in `sd:/ultimate/TrainingRooms/`. On first boot, settings, save states and recordings from the
 Training Modpack fork's `sd:/ultimate/TrainingModpack/` are imported once by copying.
 
@@ -252,7 +253,8 @@ switches Player 1 from Mii Gunner to Link, back to Mario, then to Mii Brawler. C
 [MEDIA.md](MEDIA.md).*
 
 Cycle chords step through your own order of fighters per role (red for Player 1, blue for the CPU), drawn with the
-game's stock icons.
+game's stock icons. The CPU's chord always works; Player 1's works only while Fighters & Stages › Player Swapping is On
+(it's Off at first).
 
 The fighters of your cycles load hot. Each role's first window of fighters is ready when Training starts, and the
 other groups are built in the background while you play; once the notice reads Ready or All loaded, a switch into a
@@ -325,7 +327,8 @@ standing; the game's own waiting-room menu, Training Partners 1, Right to 2; a s
 
 *The same run, the next room: it fades in with the two remembered partners, standing still.*
 
-The same menu works while you wait in an online or local room. The Training partners and CPU action you set in the
+The same menu works while you wait in an online or local room, once Fighters & Stages › Lobby Practice is On (it's Off
+at first). The Training partners and CPU action you set in the
 game's own waiting-room menu are remembered for the next room, and CPU › Level › CPU Level sets the partners' level.
 
 With the CPU pilot plugin 0.2.3 (`libssbu_cpu_pilot.nro`), the pilot can also drive Player 1 in Quickplay's
@@ -368,7 +371,7 @@ Menu shortcuts are changed in the menu and work at once.
 
 **Clip** [`rc6-replay-window.gif`](media/rc6-replay-window.gif): A capture opened in the Replay window: its Mii goes to the CPU
 
-*Eden, 2026-11-10, rc.6 `e6501ac6` (diag NRO `c1b9f694`, log lines only): Recording › Replay Captures lists a capture
+*Eden, 2026-11-10, rc.6 `e6501ac6` (diag NRO `c1b9f694`, log lines only): Recording › Replays › Replay window lists a capture
 (Mario vs Mii Gunner, 180 frames), A opens it in the Replay window, Fighter Mismatch offers the recorded fighter, and
 Switch reloads the CPU as the capture's Mii Gunner ("Saved Mii applied"). The capture is a test fixture, made before
 the clip. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
@@ -384,9 +387,13 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Status
 
-**[0.2.0-rc.6](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.6)** is the
-newest build (the release link resolves once it is published: TODO-FINAL-PASS). It follows 0.2.0-rc.3.1: 0.2.0-rc.5
-was withdrawn before players ran it, and there is no separate 0.2.0-rc.4. What it changes is
+The newest build is **rc.11** (`0c628724`): the menu footer reads `0.2.0-rc.6 · rc11 0c628724`. The version number
+has stayed `0.2.0-rc.6` since rc.6; the build name after it (rc8, rc9, rc10, rc11) tells the builds apart. rc.11 moves
+TrainingRooms' own threads off core 0 and hides the frame strip while a waiting room's own menu is open; rc.10 is a code
+reduction with no change in behaviour.
+
+[0.2.0-rc.6](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.6) follows
+0.2.0-rc.3.1: 0.2.0-rc.5 was withdrawn before players ran it, and there is no separate 0.2.0-rc.4. What it changes is
 [RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md), on top of [RELEASE-NOTES-rc5.md](RELEASE-NOTES-rc5.md).
 The builds after it, rc.8 and rc.9, are in [RELEASE-NOTES-rc8.md](RELEASE-NOTES-rc8.md) and
 [RELEASE-NOTES-rc9.md](RELEASE-NOTES-rc9.md): rc.9 fixes the shortcut conflicts with Online Deluxe, the CPU

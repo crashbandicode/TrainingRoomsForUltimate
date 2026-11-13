@@ -29,9 +29,13 @@ local play: hitboxes, save states, recordings, combo drills, game speed and more
 | B + click the left / right stick | Kirby hat: yours / the CPU's |
 | L + R + A | Reset positions |
 
-You can change every button in the menu. On a GameCube controller, R is Z. With Online Deluxe, the D-pad buttons wait
-while its settings window is open. While the CPU pilot plays for you, Record, Play on yourself and the waiting-room
-reset are off.
+You can change the save, load, recording, fighter-cycle, input-display and game-speed buttons, and add up to two menu
+shortcuts, in Display & Controls › Controls. B + D-pad Up, the Kirby hat clicks and L + R + A stay fixed. Switching
+your own fighter needs Fighters & Stages › Player Swapping On (it's Off at first).
+
+On a GameCube controller, ZL is L, ZR is R and R is Z; it has no Minus, so open the menu with B + D-pad Up. With Online
+Deluxe, buttons that use the D-pad do nothing while its window shows a settings page; B + D-pad Up still opens this
+menu. While the CPU pilot plays for you, Record, Play on yourself and the waiting-room reset are off.
 
 ## Features
 
@@ -41,7 +45,8 @@ See every hitbox, hurtbox and grab box. Display & Controls › Hitbox Visualizat
 ![Hitbox Visualization turned on, then a forward smash](docs/media/rc7-hitbox.gif)<br>*Hitboxes on, then a forward smash*
 
 ### Input display
-A strip at the top shows your inputs and the CPU's, and who can act first. R + D-pad Down turns it on and off.
+A strip at the top shows your inputs, your frames and the CPU's, and who can act first. R + D-pad Down turns it on and
+off.
 
 ![R + D-pad Down hides the strip, then shows it again](docs/media/rc8-input-display-chord.gif)<br>*Turning the input display off and on*<br>
 ![In the online waiting room, Plus opens the game's menu and the strip steps aside until it closes](docs/media/rc11-strip-under-menu.gif)<br>*It steps aside for the waiting room's menu*
@@ -104,7 +109,8 @@ Go to any stage from the menu, or rotate through your favourites. Fighters & Sta
 ![The next Training opens on Big Battlefield](docs/media/rc7-lobby-stages-rotation.gif)<br>*Stage rotation*
 
 ### Waiting rooms
-Practise while you wait for an online or local match, with the same menu.
+Practise while you wait for an online or local match, with the same menu. Turn on Fighters & Stages › Lobby Practice
+first (it's Off at first).
 
 ![A second training partner drops in](docs/media/rc6-waiting-partners.gif)<br>*Adding a training partner*<br>
 ![The next room remembers the partners](docs/media/rc6-waiting-reentry.gif)<br>*Partners remembered*<br>
@@ -139,4 +145,5 @@ endorsed by Nintendo.
 
 ## More
 
-What's new: [rc.9](docs/RELEASE-NOTES-rc9.md). [Technical notes](docs/TECHNICAL.md).
+Release notes: [rc.9](docs/RELEASE-NOTES-rc9.md) is the newest written; this build is rc.11 (see
+[Status](docs/TECHNICAL.md#status)). [Technical notes](docs/TECHNICAL.md).
