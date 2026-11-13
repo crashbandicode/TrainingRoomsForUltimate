@@ -287,7 +287,7 @@ Frames the CPU waits after shieldstun before it acts out of shield. A new value 
 - **How:** A opens the delay pop-up: tick values with A, or pick up Min or Max with A and move it with Left/Right
   (Up/Down ten at a time). Y clears whichever is set. B goes back.
 
-![The CPU holds its shield against Mario's jab and spot dodges out of it: with no Reaction Time it dodges right after the shieldstun; with 30 frames it stays in its shield about half a second longer first](../media/rc11-cpu-reaction-time.gif)<br>*Reaction Time: none, then 30 frames*
+![Side by side, the CPU shields Mario's jab with Reaction Time at none and at 30: with none it drops its shield and escapes at about 0.7 s, with 30 it holds its shield until about 1.3 s](../media/rc12-reaction-time.gif)
 
 More: [Delay rows](../guide/cpu-behaviour.md#delay-rows)
 
@@ -340,6 +340,8 @@ More: [Delay rows](../guide/cpu-behaviour.md#delay-rows)
 Frames after the grab before the CPU starts pummelling. Any value (or a range) turns pummels on; nothing ticked
 means no pummels. The CPU pummels while it waits out the [Throw Delay](#throw-delay), so it needs a throw ticked in
 [Throw](#throw) and a Throw Delay longer than this one.
+
+![With Throw None and no Pummel Delay the CPU grabs Mario and only holds him (0%); after 10 is ticked in Pummel Delay, the same grab pummels him to 3%](../media/rc12-pummel-delay.gif)
 
 - **Values:** 0 to 150 frames, in steps of 5. Tick values, or set a minimum and a maximum.
 - **Default:** none ticked: no pummels.

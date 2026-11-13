@@ -223,6 +223,8 @@ Followup, the overrides or Ledge Options), and those five slots are never filled
 and nothing copies a macro into one. See
 [The Playback Slot actions](../guide/cpu-behaviour.md#the-playback-slot-actions).
 
+![Side by side at game speed 1/2, lined up on the hit: with As Hitstop Begins the CPU's macro starts at the hit, with As Hitstun Ends about 1.3 s later](../media/rc12-hitstun-timing.gif)
+
 - **Values:** As Hitstun Ends, As Hitstop Ends, As Hitstop Begins
 - **Default:** As Hitstun Ends
 - **How:** Left/Right cycle through the values; A opens the list.

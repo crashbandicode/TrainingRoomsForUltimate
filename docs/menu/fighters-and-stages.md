@@ -247,6 +247,8 @@ room. The row's help line mentions Training only.
 On: items appear in the waiting room as usual. Off: no items appear there, and the ones on the floor are removed when
 you turn it Off. Training is not affected.
 
+![Side by side in the Quickplay waiting room: with Lobby Items On there are items on the floor; after it is set Off, there are none](../media/rc12-lobby-items.gif)
+
 - **Values:** On, Off
 - **Default:** On
 - **How:** A flips it.
@@ -294,6 +296,8 @@ which takes longer.
 What is kept ready: the fighters of your cycles, Kirby's hats, or both. The banks and groups below need Fighters or
 Both.
 
+![Side by side, the same Donkey Kong to Link swap with Preload at Hats and at Both: with Hats the spot stays empty for about 0.9 s, with Both Link appears at once](../media/rc12-preload.gif)
+
 - **Values:** Fighters, Hats, Both
 - **Default:** Both
 - **How:** Left or Right switches it; A opens the list.
@@ -321,6 +325,8 @@ fighter, and takes no place of its own.
 
 How many fighters each role keeps loaded in its own slot, the one on screen included. Switching among them is
 instant. Off: only the fighter on screen, and no groups.
+
+![Side by side, the same Donkey Kong to Link swap with Ready Fighter Bodies Off and at 3: Off leaves the spot empty for about 0.35 s, 3 swaps at once](../media/rc12-ready-fighter-bodies.gif)
 
 - **Values:** Off, 2, 3
 - **Default:** 3
