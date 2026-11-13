@@ -15,7 +15,7 @@
 //! The recording floppy and loop (`tr_icon_save`, `tr_icon_repeat`) are white glyphs appended the same way.
 //! rr-6 binds those material names and tints them with the pane's vertex colour.
 
-use nx_layout_toolbox::bflyt::{read_bflyt, write_bflyt, ClonePaneSpec, Color8, PaneEdit, BFLYT};
+use nx_layout_toolbox::bflyt::{read_bflyt, write_bflyt, BlendMode, ClonePaneSpec, Color8, PaneEdit, BFLYT};
 use nx_layout_toolbox::sarc::{read_arc, write_arc};
 use nx_layout_toolbox::bntx::{read_bntx, write_bntx, BntxFile, TextureFormat, pipeline::{import_dds, import_png_file, ImportOptions, ImportTextureFormat}};
 use nx_layout_toolbox::dds::Dds;
@@ -256,6 +256,32 @@ fn add_recording_icon_materials(layout: &mut BFLYT, waiting: bool) -> Result<()>
     Ok(())
 }
 
+/// rc.13 E1 x1: the material of the DI chips' body, streak and core layers (`panes::CHIP_LAYERS` blocks after the first).
+const CHIP_ADD_MATERIAL: &str = "tr_chip_add";
+
+/// Those layers blend additively, as the game draws `P_CmnVector`: the rect template's material with the blend the stock
+/// cursor highlights' `_add` materials carry (`com_csr_lct0_01.bflyt`: Add, source alpha, one). The runtime binds each
+/// layer's effect texture over it. The first block (the glow, the SDI burst, the arrows) keeps the template's normal alpha.
+fn add_chip_blend(layout: &mut BFLYT, waiting: bool) -> Result<()> {
+    let template_pane = if waiting { "pic_bg_main_00" } else { RECT_TEMPLATE };
+    let index = layout.find_pane(template_pane).and_then(|pane| pane.picture.as_ref())
+        .ok_or("chip blend template missing")?.material_index;
+    let mut material = layout.materials.get(usize::from(index)).ok_or("chip blend template material missing")?.clone();
+    if material.blend_mode.is_some() || layout.materials.iter().any(|m| m.name == CHIP_ADD_MATERIAL) {
+        return Err("chip blend template already blends, or the material exists".into());
+    }
+    material.name = CHIP_ADD_MATERIAL.into();
+    material.blend_mode = Some(BlendMode { blend_op: 1, src_factor: 4, dst_factor: 1, logic_op: 0 });
+    material.flags_raw |= 1 << 10;
+    layout.materials.push(material);
+    for i in panes::CHIPS..panes::CHIP_LAYERS * panes::CHIPS {
+        let name = panes::name_of(panes::IDX_CHIP_NEEDLE + i);
+        layout.set_pane(name.as_str(), &PaneEdit { bind_material: Some(CHIP_ADD_MATERIAL.into()), ..Default::default() })
+            .map_err(err("chip blend material"))?;
+    }
+    Ok(())
+}
+
 fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
     let stock = std::fs::read(stock_path).map_err(err("read stock"))?;
     let mut arc = read_arc(&stock).map_err(err("read arc"))?;
@@ -281,6 +307,7 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
         add_pane(&mut layout, spec, waiting)?;
     }
     orbs_first(&mut layout)?;
+    add_chip_blend(&mut layout, waiting)?;
     // These are the approved owned-game item renders, not baked fighter/stage portraits.
     // Keep the stock archive private; the distributed recipe contains only the delta.
     let textures = arc.position("timg/__Combined.bntx").ok_or("stock combined texture missing")?;
@@ -485,6 +512,39 @@ mod tests {
             assert_eq!(materials,format!("{:?}",&layout.materials[..stock_count]));
             layout.fonts.clear();
             assert_eq!(add_pane(&mut layout,&spec,waiting),Err("qualified text font missing".into()));
+        }
+    }
+
+    /// rc.13 E1 x1: the DI chips' body, streak and core layers blend additively, as the game draws `P_CmnVector`, with the
+    /// blend the stock cursor highlight's `_add` materials carry (Add, source alpha, one). The glow layer, which also carries
+    /// the SDI burst and the arrows, keeps the rect template's normal alpha.
+    #[test]
+    fn the_upper_chip_layers_bind_the_stock_additive_blend() {
+        let dir = std::env::var("UI_STOCK_FIXTURE").unwrap_or_else(|_| "/home/intpa/smash-training-lobby/pkg5-scratch/stock".into());
+        let arc = read_arc(&std::fs::read(format!("{dir}/info_training.arc")).unwrap()).unwrap();
+        let cursor = read_bflyt(&arc.files[arc.position("blyt/com_csr_lct0_01.bflyt").unwrap()].data).unwrap();
+        let stock_add = cursor.materials.iter().find(|m| m.name.ends_with("_addLT")).and_then(|m| m.blend_mode.clone()).unwrap();
+        assert_eq!((stock_add.blend_op, stock_add.src_factor, stock_add.dst_factor, stock_add.logic_op), (1, 4, 1, 0));
+        let mut layout = read_bflyt(&arc.files[arc.position(BFLYT_MEMBER).unwrap()].data).unwrap();
+        for spec in &layout_specs(false) {
+            add_pane(&mut layout, spec, false).unwrap();
+        }
+        add_chip_blend(&mut layout, false).unwrap();
+        let layout = read_bflyt(&write_bflyt(&layout).unwrap()).unwrap();
+        let template = layout.find_pane(RECT_TEMPLATE).unwrap().picture.as_ref().unwrap().material_index;
+        for k in 0..panes::CHIP_LAYERS {
+            for i in 0..panes::CHIPS {
+                let name = panes::name_of(panes::IDX_CHIP_NEEDLE + k * panes::CHIPS + i);
+                let name = name.as_str();
+                let index = layout.find_pane(name).unwrap().picture.as_ref().unwrap().material_index;
+                let material = &layout.materials[usize::from(index)];
+                if k == 0 {
+                    assert_eq!(index, template, "{name}: the glow layer keeps normal alpha");
+                } else {
+                    assert_eq!(material.name, CHIP_ADD_MATERIAL);
+                    assert_eq!(format!("{:?}", material.blend_mode), format!("{:?}", Some(stock_add.clone())), "{name}");
+                }
+            }
         }
     }
 
