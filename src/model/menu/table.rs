@@ -376,7 +376,7 @@ pub static ROWS: [Row; 92] = [
     r(STAGES, "Lobby Items", "lobby_items", TOGGLE,
       "On: items appear in the waiting room as usual.\nOff: no items appear there."),
     r(STAGES, "Respawn on platform", "respawn_invincibility", TOGGLE,
-      "On: respawn on the revival platform, invincible as usual.\nOff: instant respawn, only while Save States is On (Saves)."),
+      "On: respawn on the revival platform, invincible as usual.\nOff: instant respawn. Greyed while a death loads a save state."),
     // Fighters & Stages > Loading (advanced)
     r(LOADING, "Cycle Preload", "cycle_preload_slots", Control::Dropdown(&o::CYCLE_SLOTS),
       "How many fighters per role are kept ready for swaps.\nOff loads each fighter when you swap."),

@@ -18,17 +18,18 @@ pub enum DeathParam {
 }
 
 /// Whether a death is instant: every death in practice is, unless Respawn on platform is On (N2),
-/// in which case only a load's deaths are. The toggle is greyed while Auto Save States is On, because a
-/// death then loads a state: the stored value is kept and ignored.
+/// in which case only a load's deaths are. With Save States and Auto-load on death both On a death loads a
+/// state, so it is instant whatever the toggle says (the row is greyed then). With Save States Off nothing
+/// loads, and the toggle decides (operator 2026-11-13, TR5).
 pub fn instant_respawn(settings: &StateSettings, loading: bool) -> bool {
-    loading || settings.autoload || !settings.respawn_invincibility
+    loading || (settings.enable && settings.autoload) || !settings.respawn_invincibility
 }
 
 /// The value a parameter read is answered with, or `None` for the game's own. `training` is the widened
 /// practice predicate (`runtime::scene::is_training`: native Training or an active waiting-room practice;
-/// the hook is inert elsewhere). With Save States Off every read gets the game's own value.
+/// the hook is inert elsewhere). Save States Off leaves the load's parameters alone, not the respawn row's.
 pub fn param_override(param: DeathParam, settings: &StateSettings, loading: bool, training: bool) -> Option<i32> {
-    if !training || !settings.enable {
+    if !training {
         return None;
     }
     match param {

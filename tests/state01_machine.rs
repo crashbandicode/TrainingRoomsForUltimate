@@ -519,6 +519,20 @@ fn state01_param_overrides() {
 }
 
 #[test]
+fn respawn_on_platform_works_with_save_states_off() {
+    // Operator 2026-11-13 (TR5): Respawn on platform works with Save States Off. Off is an instant respawn, On the game's
+    // platform. Auto-load on death makes a death instant only while Save States is On: Off loads nothing.
+    let off = StateSettings { enable: false, ..settings() };
+    assert_eq!(hooks::param_override(DeathParam::DeadRebirthWaitFrame, &off, false, true), Some(1), "Respawn Off");
+    assert_eq!(hooks::param_override(DeathParam::RebirthMoveFrame, &off, false, true), Some(0), "Respawn Off");
+    let on = StateSettings { enable: false, respawn_invincibility: true, ..settings() };
+    assert_eq!(hooks::param_override(DeathParam::DeadRebirthWaitFrame, &on, false, true), None, "Respawn On");
+    let auto = StateSettings { enable: false, autoload: true, respawn_invincibility: true, ..settings() };
+    assert_eq!(hooks::param_override(DeathParam::DeadRebirthWaitFrame, &auto, false, true), None, "nothing loads");
+    assert_eq!(hooks::param_override(DeathParam::DeadRebirthWaitFrame, &off, false, false), None, "inert outside Training");
+}
+
+#[test]
 fn respawn_on_reaches_state_get_param_int() {
     // Site: WorkModule::get_param_int at STATE_GET_PARAM_INT_OFFSET, hooked as
     // state_get_param_int_hook in src/runtime/features/states.rs. That hook calls

@@ -399,6 +399,18 @@ fn core02_slider_clamp_steps() {
 
 // ---- greyed rows ---------------------------------------------------------------------------------
 
+fn respawn_greys_only_while_a_death_loads_a_state() {
+    // Operator 2026-11-13 (TR5): Respawn on platform works with Save States Off. It greys only while a death loads a
+    // save state: Save States On and Auto-load on death On. With Save States Off nothing loads, so the row applies.
+    let mut m = menu();
+    let r = row_of("respawn_invincibility");
+    assert_eq!(m.grey(r), None, "factory: Auto-load on death Off");
+    set(&mut m, "save_state_autoload", &[1, 0]);
+    assert_eq!(m.grey(r), Some(Grey::AutoLoadOn));
+    set(&mut m, "save_state_enable", &[0, 1]);
+    assert_eq!(m.grey(r), None, "Save States Off: nothing loads, the row applies");
+}
+
 fn swap_group_entries_grey_with_the_reason() {
     let mut m = menu();
     let r = goto(&mut m, "Swap groups");
@@ -952,6 +964,7 @@ fn case_table() {
         ("situation_overrides_editor_picks_a_situation_then_actions", situation_overrides_editor_picks_a_situation_then_actions as fn()),
         ("core02_slider_states", core02_slider_states as fn()),
         ("core02_slider_clamp_steps", core02_slider_clamp_steps as fn()),
+        ("respawn_greys_only_while_a_death_loads_a_state", respawn_greys_only_while_a_death_loads_a_state as fn()),
         ("swap_group_entries_grey_with_the_reason", swap_group_entries_grey_with_the_reason as fn()),
         ("direction_grid_navigation_follows_the_chip_layout", direction_grid_navigation_follows_the_chip_layout as fn()),
         ("shield_tilt_grid_holds_exactly_one_chip", shield_tilt_grid_holds_exactly_one_chip as fn()),

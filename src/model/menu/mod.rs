@@ -120,7 +120,7 @@ pub struct Outbox {
 /// Why a row or entry is greyed (it shows dimmed with this reason and ignores A).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Grey {
-    /// Respawn on platform while Auto-load on death is On (N2): a save state loads instead.
+    /// Respawn on platform while Save States and Auto-load on death are On (N2): a save state loads instead.
     AutoLoadOn,
     /// A damage range while its damage setting is not Random Value.
     DamageNotRandom,
@@ -813,7 +813,9 @@ impl Menu {
     /// Why the row is greyed, if it is.
     pub fn grey(&self, row: usize) -> Option<Grey> {
         match ROWS[row].id {
-            "respawn_invincibility" if self.toggle_by_id("save_state_autoload") => Some(Grey::AutoLoadOn),
+            "respawn_invincibility" if self.toggle_by_id("save_state_enable") && self.toggle_by_id("save_state_autoload") => {
+                Some(Grey::AutoLoadOn)
+            }
             "save_damage_limits_player" if self.get("save_damage_player").get(2).copied().unwrap_or(0) == 0 => {
                 Some(Grey::DamageNotRandom)
             }

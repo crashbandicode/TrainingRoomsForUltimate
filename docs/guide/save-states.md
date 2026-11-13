@@ -134,10 +134,11 @@ What happens after a KO depends on three rows: Saves › Save States, Saves › 
 | On | Off | Off (the default) | The fighter respawns at once. |
 | On | Off | On | The fighter comes down on the revival platform, with the game's invincibility. |
 | On | On | greyed | The bound save loads. With nothing bound, the fighter respawns at once. |
-| Off | any | any | The game's own respawn: in Training, the revival platform. |
+| Off | any | Off | The fighter respawns at once. Nothing loads. |
+| Off | any | On | The fighter comes down on the revival platform, with the game's invincibility. |
 
-While Auto-load on death is On, Respawn on platform is greyed with the reason "Auto-load on death is On: a save state
-loads instead". Its value is kept, and counts again when you turn Auto-load off.
+While Save States and Auto-load on death are both On, Respawn on platform is greyed with the reason "Auto-load on
+death is On: a save state loads instead". Its value is kept, and counts again when either goes Off.
 
 ![Respawn on platform turned on, then a fall](../media/rc7-respawn-on.gif)
 

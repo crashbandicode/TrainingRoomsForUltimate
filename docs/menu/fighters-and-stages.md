@@ -234,10 +234,9 @@ at once, with no invincibility. It works in Training and in waiting-room practic
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A flips it. The row is greyed ("Auto-load on death is On: a save state loads instead") while Saves ›
-  [Auto-load on death](saves.md#auto-load-on-death) is On.
+  [Save States](saves.md#save-states) and [Auto-load on death](saves.md#auto-load-on-death) are both On.
 
-With Saves › [Save States](saves.md#save-states) Off, the plugin leaves KOs to the game, so the revival platform comes
-back even with this row Off.
+It works with Save States On or Off.
 
 ![Respawn on platform turned on, then a fall: Mario comes back on the platform](../media/rc7-respawn-on.gif)
 

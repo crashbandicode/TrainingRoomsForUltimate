@@ -16,8 +16,8 @@ The save states themselves (the files you bind, rename and delete) are listed on
 On: the Save chord (ZL + D-pad Down) saves where both fighters are, and the Load chord (ZL + D-pad Up) puts them both
 back there. Off: the two chords do nothing, Auto-load on death stops, and a load already under way is cancelled.
 
-With it Off, the plugin also leaves KOs to the game: in Training a KO'd fighter comes back on the revival platform, even
-with Fighters & Stages › [Respawn on platform](fighters-and-stages.md#respawn-on-platform) Off.
+With it Off, a KO follows Fighters & Stages › [Respawn on platform](fighters-and-stages.md#respawn-on-platform): back
+at once, or on the revival platform.
 
 - **Values:** On, Off
 - **Default:** On
@@ -52,8 +52,9 @@ the Load chord.
 - **How:** A flips it.
 
 It loads the bound save, the one the Load chord uses. With nothing bound, nothing loads and the fighter respawns at
-once. While this row is On, Fighters & Stages › [Respawn on platform](fighters-and-stages.md#respawn-on-platform) is
-greyed with the reason "Auto-load on death is On: a save state loads instead".
+once. While this row and Save States are On, Fighters & Stages ›
+[Respawn on platform](fighters-and-stages.md#respawn-on-platform) is greyed with the reason "Auto-load on death is On:
+a save state loads instead".
 
 More: [Save states › Auto-load on death](../guide/save-states.md#auto-load-on-death)
 
