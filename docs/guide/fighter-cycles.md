@@ -110,6 +110,10 @@ Loading a fighter from scratch takes a moment and stops the game while it happen
 fighters of your cycles, and Kirby's hats, ahead of time in the background. Then a chord or a click only swaps in a
 fighter that is already there.
 
+If a cycle has more fighters than Ready Fighters leaves room for, one of them can't stay loaded. A swap to that
+fighter loads it alone. The groups already loaded beside it stay loaded, and only the fighters that were on screen
+with the one you swapped from load again in the background.
+
 The notice "Fighters" counts them while they load:
 
 - "Loading 6/10", then "Ready 10/10" (or "All loaded") when they are all there.
