@@ -348,6 +348,8 @@ Whether the CPU waits until it is falling before its aerial.
 - **Default:** No.
 - **How:** Left/Right cycle Yes, No, Random; A opens the list.
 
+![The CPU jumps out of Mario's jab and does a neutral air, three times: Falling Aerials No (on the way up), Falling Aerials Yes (on the way down), then Aerial Delay 30 frames (later still); a zoomed view of the CPU at the right](../media/rc11-cpu-falling-aerials-aerial-delay.gif)<br>*Falling Aerials No, then Yes, then Aerial Delay 30 (shared with Aerial Delay)*
+
 ### Aerial Delay
 
 Frames the CPU waits, once it can, before its aerial.
@@ -356,6 +358,8 @@ Frames the CPU waits, once it can, before its aerial.
 - **Default:** none ticked: no wait.
 - **How:** A opens the delay pop-up: tick values with A, or pick up Min or Max with A and move it with Left/Right
   (Up/Down ten at a time). Y clears whichever is set. B goes back.
+
+![The CPU jumps out of Mario's jab and does a neutral air, three times: Falling Aerials No, Falling Aerials Yes, then Aerial Delay 30 frames (the kick comes later); a zoomed view of the CPU at the right](../media/rc11-cpu-falling-aerials-aerial-delay.gif)<br>*Falling Aerials No, then Yes, then Aerial Delay 30 (shared with Falling Aerials)*
 
 More: [Delay rows](../guide/cpu-behaviour.md#delay-rows)
 
