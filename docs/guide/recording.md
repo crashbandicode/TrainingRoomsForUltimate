@@ -156,7 +156,7 @@ The picker is the same numbered picker as a chain, including R removing the last
 
 ## The pop-up
 
-The pop-up is one window over the match. While it is open it takes the menu's buttons. B closes it and leaves the bound save, the active macros, and the cursor as they were. Tap B: in this build a B still held after the close reaches your fighter as a special.
+The pop-up is one window over the match. While it is open it takes the menu's buttons. B closes it and leaves the bound save, the active macros, and the cursor as they were. That B never reaches your fighter, tapped or held: your buttons stay with the pop-up until you let go of it.
 
 The title reads `Recording`, with the role tabs beside it: L Player, CPU R; the role in view is lit. L sets Player 1.
 R sets the CPU.
