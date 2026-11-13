@@ -80,6 +80,8 @@ More: [Save states › Damage on load](../guide/save-states.md#damage-on-load)
 
 The lowest and the highest damage Random Value can give Player 1.
 
+![Random Value with both ranges 0-150 gives any damage (104% and 46%, then 113% and 31%); with Player damage range and CPU damage range set to 140-150, every load gives 140-150% (144% and 149%, then 149% and 141%)](../media/rc11-damage-range.gif)
+
 - **Values:** 0 to 150 for each end; the lower end stays at or below the upper
 - **Default:** 0 to 150
 - **How:** A opens the slider. Left or Right chooses the lower or the upper handle, A picks it up, Left / Right move it
@@ -102,6 +104,8 @@ More: [Save states › Damage on load](../guide/save-states.md#damage-on-load)
 ### CPU damage range
 
 The lowest and the highest damage Random Value can give the CPU.
+
+![Random Value with both ranges 0-150 gives any damage (104% and 46%, then 113% and 31%); with Player damage range and CPU damage range set to 140-150, every load gives 140-150% (144% and 149%, then 149% and 141%)](../media/rc11-damage-range.gif)
 
 - **Values:** 0 to 150 for each end; the lower end stays at or below the upper
 - **Default:** 0 to 150
@@ -144,6 +148,8 @@ A setup is a named copy of a save state, with the stage it was saved on. Setups 
 ### Save setup to library...
 
 Keeps what the Load chord would load now (normally your bound save) as a new setup, under a name you type.
+
+![The Setup library is empty ("No setups saved"); Save setup to library... keeps the saved spot as the setup Corner trap, and the Setup library then lists it (Corner trap · Mario / Mario)](../media/rc11-save-setup.gif)
 
 - **How:** A reads the save ("Reading the selected saved setup…"; B cancels), then the keyboard opens with the name
   "Setup". Type a name of up to 48 characters and confirm. The notice reads "Saved setup" and the name. Each setup is

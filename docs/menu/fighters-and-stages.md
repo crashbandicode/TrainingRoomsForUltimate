@@ -33,6 +33,8 @@ More: [Fighter cycles › Player Swapping](../guide/fighter-cycles.md#player-swa
 Opens a portrait grid of every fighter. A picks Player 1's fighter, and "> " marks the pick. The new fighter loads
 when you close the menu, if [Player Swapping](#player-swapping) is On.
 
+![With Player Swapping Off, picking Link as Player Character shows "Player fighter applied" and Player 1 becomes Link at once](../media/rc12-player-character.gif)
+
 - **Values:** any fighter on the grid
 - **How:** A opens the grid. The D-pad moves, A picks, B goes back. X on a shared slot (Pokémon Trainer, Pyra / Mythra)
   shows its next form, so A picks that form.
@@ -231,6 +233,8 @@ More: [Stages › Training Stage Rotation](../guide/stages.md#training-stage-rot
 On: stage hazards are active in Training. Off: they are not. It takes effect when a stage loads: when you enter
 Training, or go to a stage with Change Stage.
 
+![On Mario Bros. with Stage Hazards Off there are no POW blocks and no enemies; after it is set On, the stage reloads with POW blocks and Shellcreepers](../media/rc12-stage-hazards.gif)
+
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A flips it.
@@ -306,6 +310,8 @@ The total number of fighters kept loaded, for Player 1 and the CPU together, the
 
 How many Kirby hats are kept ready, apart from Ready Fighters. A hat whose fighter is already kept ready uses that
 fighter, and takes no place of its own.
+
+![Kirby copies a fighter whose hat is not ready yet, and the hat comes only after "Fighters · Loading"; with Ready Hats raised to 5, the next copy (Sheik) gets its hat at once](../media/rc12-preload-hats.gif)
 
 - **Values:** 0 to 5
 - **Default:** 5

@@ -133,6 +133,8 @@ Mismatch first (Keep current fighter, or Switch to recorded fighter). Off: the C
 A macro, a chain or a drilled combo recorded on another fighter asks Fighter Mismatch whatever this row says. The
 row's help line says they follow it too; in this build they don't.
 
+![With Ask before switching fighter On, playing a macro recorded as Luigi while Player 1 is Mario opens the Fighter Mismatch prompt; turned Off, the same macro plays at once without asking](../media/rc12-ask-before-switching-fighter.gif)
+
 - **Values:** On, Off
 - **Default:** On
 - **How:** A flips it.
@@ -205,6 +207,8 @@ Meant to drop the idle frames at the end of a recording. In this build it has no
 (ZR + D-pad Down) keeps every frame up to the stop, whatever this row says. To cut a macro, use Crop on its own
 screen (see [Save states & Macros](#save-states--macros)).
 
+![Side by side, the same macro on Loop 2 with Crop trailing neutral Off and On: On starts again every 1.22 s, while Off waits out the recorded idle and starts again every 4.07 s](../media/rc12-crop-trailing-neutral.gif)
+
 - **Values:** On, Off
 - **Default:** On
 - **How:** A flips it.
@@ -244,6 +248,8 @@ How many times the active macro plays each time you press its Play chord. Player
 count, and the row shows the count of the view you're in (ZR). ∞ plays until you press the Play chord again. Only
 the first pass warps to the start save (when its Start save switch is On); later passes play on from where the
 fighters are. A chain repeats as a whole.
+
+![Loop is set from 1 to 3 in the menu, and the macro then plays again and again on its own](../media/rc12-loop.gif)
 
 - **Values:** ∞, 1, 2, 3, 5, 10
 - **Default:** 1, for Player 1 and for the CPU

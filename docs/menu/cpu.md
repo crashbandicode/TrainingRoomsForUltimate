@@ -303,6 +303,8 @@ the CPU, these rows wait; Throw acts anyway if
 The angle of the CPU's angled attacks, such as forward tilt and forward smash. With several ticked, it picks one at
 random each time. It is not used on the ledge.
 
+![Side by side at 1/4 speed, the CPU's forward tilt with Attack Angle at none and at Up: the Up tilt is angled upward](../media/rc12-attack-angle.gif)
+
 - **Values:** Neutral, Up, Down.
 - **Default:** none ticked: the game's own angle.
 - **How:** A opens the checklist; A ticks, ZL ticks all or none, B goes back.
@@ -383,6 +385,8 @@ Whether the CPU's jumps are full hops (Yes) or short hops (No), including the ju
 
 Whether the CPU fast falls once it starts falling after a jump or an aerial.
 
+![Side by side at 1/4 speed, the CPU's jump with Fast Fall at No and at Yes: with Yes it falls faster and lands at about 2.0 s, against 3.4 s with No](../media/rc12-fast-fall.gif)
+
 - **Values:** Yes, No, Random (either way each time).
 - **Default:** No.
 - **How:** Left/Right cycle Yes, No, Random; A opens the list.
@@ -390,6 +394,8 @@ Whether the CPU fast falls once it starts falling after a jump or an aerial.
 ### Fast Fall Delay
 
 Frames after the CPU starts falling before it fast falls. Used only when [Fast Fall](#fast-fall) says Yes.
+
+![Side by side at 1/4 speed, the CPU's fast fall with Fast Fall Delay at 0 and at 30: at 0 it sparks at the top of the jump and lands first](../media/rc12-fast-fall-delay.gif)
 
 - **Values:** 0 to 30 frames. Tick values, or set a minimum and a maximum.
 - **Default:** none ticked: it fast falls at once.
