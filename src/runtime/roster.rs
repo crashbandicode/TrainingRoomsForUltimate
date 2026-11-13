@@ -58,6 +58,8 @@ pub(crate) mod g68_step;
 pub(crate) mod identity_view;
 pub(crate) mod mii_setup;
 pub(crate) mod observe;
+/// rc.13, (a′) proper: a kept group's fighter module pinned across its owner's Reload.
+pub(crate) mod module_pins;
 pub(crate) mod r_handle;
 /// Operator option C (2026-11-09 17:57Z): the release watch's read of the game's resource unload (own code).
 pub(crate) mod res_unload;

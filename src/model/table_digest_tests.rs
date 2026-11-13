@@ -5,6 +5,9 @@
 //!
 //! rc.10 S4 took the 15 seam rows of the deleted probes out (`native-unlink-probe` 8, `automation-results-native` 7): 690
 //! rows to 675, and the seam digest with them. The other three digests are still the ones of `f5146184`.
+//!
+//! rc.13 (a′) proper added `rows_module_pins` (6 rows: a kept group's fighter module pinned across its owner's Reload):
+//! 675 seam rows to 681, a 24th data file, and the seam digest with them.
 
 use crate::model::sha256::sha256_hex;
 use std::fmt::Write;
@@ -24,10 +27,10 @@ fn digest<T: std::fmt::Debug>(tables: &[&[T]]) -> (usize, String) {
 #[test]
 fn every_seam_row_is_the_row_it_was() {
     use crate::engine::seams::native_seams as s;
-    let tables: [&[s::Seam]; 13] = [
+    let tables: [&[s::Seam]; 14] = [
         s::rows_a1::ROWS, s::rows_a2::ROWS, s::rows_a3::ROWS, s::rows_a4::ROWS, s::rows_a5::ROWS, s::rows_identity::ROWS,
         s::rows_q15::ROWS, s::rows_lobby_items::ROWS, s::rows_lobby_persist::ROWS, s::rows_cpu_level::ROWS,
-        s::rows_res_unload::ROWS, s::rows_game_speed::ROWS, s::rows_lobby_speed::ROWS,
+        s::rows_res_unload::ROWS, s::rows_game_speed::ROWS, s::rows_lobby_speed::ROWS, s::rows_module_pins::ROWS,
     ];
     assert_eq!(digest(&tables), (SEAM_ROWS, SEAM_DIGEST.to_owned()));
 }
@@ -66,11 +69,11 @@ fn every_data_row_has_a_64_byte_guard() {
         }
         files += 1;
     }
-    assert_eq!((files, rows), (23, SEAM_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS));
+    assert_eq!((files, rows), (24, SEAM_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS));
 }
 
-const SEAM_ROWS: usize = 675;
-const SEAM_DIGEST: &str = "f2b776f8c611c629be133337e17428f0ae29dc5fd0621a022c4795210dcaccaa";
+const SEAM_ROWS: usize = 681;
+const SEAM_DIGEST: &str = "294a22cba2a69b1a95099e526c7a4d1328a2ccf2d4706bed3e961ca282cd67c6";
 const SITE_ROWS: usize = 258;
 const SITE_DIGEST: &str = "f86958e64401e05a6acac006e94b5be53b062f03a5da5bdbf027197436f2ea4d";
 const UI_ROWS: usize = 6;

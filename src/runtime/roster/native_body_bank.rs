@@ -86,7 +86,11 @@
 //!
 //! Every detached group is destroyed before any native destroyer: the loader
 //! pre-dispatch when `+0x591c == 0` (before state 0), a function hook at
-//! finalize `0x6524e0`, and `before_reload` on every mod-initiated Reload.
+//! finalize `0x6524e0`, and `before_reload` on every mod-initiated Reload. The
+//! one exception (rc.12 (a′), rc.13): at a target-first Reload the Built groups
+//! `body_bank::kept_across_reload` admits stay, each with its fighter modules
+//! pinned (`module_pins`) because loader state 3 releases R's NRO tree, until
+//! the new bank is Ready and R requests their kinds again.
 //!
 //! # Phase B′: asynchronous build (operator decision 2026-11-02, W20 FINDINGS §2b′)
 //!
@@ -189,6 +193,7 @@ use crate::engine::swap::swap_model::occupancy::{KindOccupancy, Occupancy, Rules
 use crate::runtime::roster::body_graph::{self as graph, DESTROY_BODY, DISPATCHER_DESTROY, HEAP_FREE, SPECIAL_OBJECT_RELEASE};
 use crate::runtime::roster::r_handle;
 use crate::runtime::roster::res_unload;
+use crate::runtime::roster::module_pins;
 use crate::runtime::roster::special_articles as articles;
 use crate::engine::swap::swap_model::special_articles::{attachable, prepare_due, RetireStage};
 use crate::runtime::roster::build_split as split;
@@ -2724,6 +2729,18 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
         // A Reload begins at loader state 0 right after this pre-dispatch (§4.2):
         // every detached group must already be gone.
         if observed.loader == 0 { retire_groups(entry, owner, "reload"); }
+    }
+    // rc.13 (a′) proper: the kept groups' module pins go once the new bank is Ready (R has their nodes again).
+    if module_pins::held(role) {
+        let phase = match BANKS[role].lock().as_ref() {
+            Some(b) if b.entry == entry as usize && b.owner == owner && !b.departed => b.phase,
+            _ => Phase::Retired,
+        };
+        match phase {
+            Phase::Building | Phase::Changing => {}
+            Phase::Ready => module_pins::settle(role, resource(BASE.load(Ordering::Acquire), owner)),
+            _ => module_pins::settle(role, None),
+        }
     }
     if PAIR_ENABLED.load(Ordering::Acquire) && observed.loader == 0 { pair_teardown(entry, "reload"); }
     // A native-initiated Reload (`0x653240` wrote loader 0 and outer 3 over an installed
@@ -6219,6 +6236,23 @@ fn fail_group(role: usize, group: usize, _reason: &str) {
 /// for the kind a live Kirby copies (D-KIRBY1). Must run in an entry callback strictly
 /// before the destroyer. Objects that fail validation are skipped and reported; they
 /// leak rather than corrupt.
+/// rc.12 (a′): at a target-first Reload from an ordinary window, the Built groups it does not displace stay detached as
+/// they are (`body_bank::kept_across_reload`; `build` moves them into the new bank): their index bits and members. rc.13:
+/// only those whose modules are `pinned` (`None`: the groups that would be kept once pinned).
+fn kept_groups(bank: &Bank, role: usize, pinned: Option<&[Members]>) -> (u32, FixedList<Members, MAX_EXTRA_GROUPS>) {
+    let target = Some(KEEPING[role].load(Ordering::Acquire)).filter(|t| *t != u32::MAX && bank.identity.is_none());
+    let mut kept = (0, FixedList::new(Members::pair_group()));
+    for (index, g) in bank.groups.iter().enumerate() {
+        if g.saved.is_some() && bank.object_fetch.is_none_or(|f| f.0 != index)
+            && crate::engine::swap::body_bank::kept_across_reload(g.state, *g.members, g.leaving || g.release_now, g.object_held, target,
+                pinned.is_none_or(|pinned| pinned.contains(&*g.members))) {
+            kept.0 |= 1 << index;
+            kept.1.push(*g.members);
+        }
+    }
+    kept
+}
+
 unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     let Some(role) = role(owner) else { return; };
     let base = BASE.load(Ordering::Acquire);
@@ -6230,30 +6264,23 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     finish_retirement(base, role, owner, reason);
     // Inbox 02:42Z: a prepared pool build in flight finishes before its holder is destroyed below.
     finish_preparation(base, role, owner, reason);
-    // D-KIRBY1: the kind a live Kirby copies keeps its key (read before the lock).
-    let window = BANKS[role].lock().as_ref()
-        .filter(|bank| bank.entry == entry as usize && bank.owner == owner).map(|bank| *bank.members);
+    // D-KIRBY1: the kind a live Kirby copies keeps its key (read before the lock). rc.13 (a′) proper: the groups the
+    // Reload may keep first pin their fighter modules, outside the bank lock (`module_pins`).
+    let (window, mut pinned) = match BANKS[role].lock().as_ref() {
+        Some(b) if b.entry == entry as usize && b.owner == owner => (Some(*b.members), kept_groups(b, role, None).1.to_vec()),
+        _ => (None, Vec::new()),
+    };
     let copy = window.and_then(|members| live_kirby_copy_kind(entry, owner, members));
+    pinned.retain(|members| module_pins::pin(resource(base, owner), role, *members));
     // U18: each detached body's group, for the per-group header during the destroys.
     let mut owners = FixedVec::<(u32, Members), { MAX_EXTRA_GROUPS * NATIVE_MEMBERS }>::new();
     let (mut bundles, identities, token, alias, groups, mii_sets, kept) = {
         let mut state = BANKS[role].lock();
         let Some(bank) = state.as_mut().filter(|bank| bank.entry == entry as usize && bank.owner == owner) else { return; };
-        // rc.12 (a′): at a target-first Reload from an ordinary window, the Built groups it does not displace stay
-        // detached as they are (`body_bank::kept_across_reload`); `build` moves them into the new bank.
-        let target = Some(KEEPING[role].load(Ordering::Acquire)).filter(|t| *t != u32::MAX && bank.identity.is_none());
-        let mut kept = 0u32;
-        let mut kept_sets = FixedList::<Members, MAX_EXTRA_GROUPS>::new(Members::pair_group());
-        for (index, g) in bank.groups.iter().enumerate() {
-            if g.saved.is_some() && bank.object_fetch.is_none_or(|f| f.0 != index)
-                && crate::engine::swap::body_bank::kept_across_reload(g.state, *g.members, g.leaving || g.release_now, g.object_held, target) {
-                kept |= 1 << index;
-                kept_sets.push(*g.members);
-            }
-        }
+        let (kept, kept_sets) = kept_groups(bank, role, Some(&pinned[..]));
         if kept != 0 {
             trace!("[GroupSwap] kept across reload owner={} reason={} target={:#x} groups={:x?}", owner, reason,
-                target.unwrap_or(u32::MAX), MemberSets(&kept_sets));
+                KEEPING[role].load(Ordering::Acquire), MemberSets(&kept_sets));
         }
         let only_kept = kept != 0
             && bank.groups.iter().enumerate().all(|(i, g)| kept & (1 << i) != 0 || g.state == GroupState::Released);
@@ -6769,6 +6796,10 @@ pub(super) fn adopt_scene_generation() {
 
 pub(super) fn on_destroy(entry: *const u8) {
     for (role, state) in BANKS.iter().enumerate() {
+        // rc.13 (a′) proper: the entry's kept groups are gone with it; their module pins go too (no bank lock held).
+        if matches!(state.lock().as_ref(), Some(bank) if bank.entry == entry as usize) {
+            unsafe { module_pins::settle(role, None) };
+        }
         if let Some(bank) = state.lock().as_mut() {
             if bank.entry == entry as usize {
                 bank.phase = Phase::Retired; bank.departed = true;
@@ -7324,6 +7355,8 @@ pub(super) unsafe fn install(base: usize) {
         GROUPS_ENABLED.store(true, Ordering::Release);
         // Operator option C: the release watch's rows (`res_unload`); without them a free never holds the planner.
         res_unload::install(base, gate("res_unload", res_unload::SEAMS, false));
+        // rc.13 (a′) proper: without these rows no group is kept across its owner's Reload (`module_pins`).
+        module_pins::install(base, gate(SEAM_GROUP, module_pins::SEAMS, false));
     } else {
         trace!("[GroupSwap] disabled by fingerprint; window bank active");
     }

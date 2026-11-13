@@ -1146,9 +1146,14 @@ pub fn neighbour_group(full: Members, target: u32, policy: GroupPolicy, exclude:
 /// leaves true, and the native Reload destroys the attached window alone. Every other group is released first, as
 /// before, and a canonical or full-window Reload (`None`) keeps nothing. A Mii group is released first too: Eden
 /// rc12-int2-f44fac2f-1 crashed on the kept `[4a]`'s warm attach after the Reload (rc.13 item).
-pub fn kept_across_reload(state: GroupState, members: Members, leaving: bool, holds_object: bool, target_first: Option<u32>) -> bool {
+/// rc.13: loader state 3 releases R's NRO-tree node of every kind, so a kept group's fighter module would live only on a
+/// helper seat's reference (probe wa-aprime-probe-9ad09558-2 #1459–#1648). It is kept only when every kind's module
+/// was `pinned` (one reference of ours, `runtime::roster::module_pins`) until the new bank re-requests it on R at Ready.
+pub fn kept_across_reload(state: GroupState, members: Members, leaving: bool, holds_object: bool, target_first: Option<u32>,
+    pinned: bool) -> bool {
     let Some(target) = target_first else { return false; };
-    state == GroupState::Built && !leaving && !holds_object && members.special() != Special::Mii && members.index_of(target).is_none()
+    pinned && state == GroupState::Built && !leaving && !holds_object && members.special() != Special::Mii
+        && members.index_of(target).is_none()
 }
 
 /// The target-first neighbours' admission (`native_body_bank::plan_groups`): the seed fits in the free pool and beside
@@ -2696,25 +2701,87 @@ mod tests {
         // Eden rc12-int2-f44fac2f-1 (#797, #1000): the kept Mii group's warm attach after the Reload crashed the guest
         // (Unmapped Read64 in the Mii's fighter module): a Mii group is released first and built again, as before.
         let mii = Members::mii_group(0x4a).unwrap();
-        assert!(!kept_across_reload(GroupState::Built, mii, false, false, Some(KROOL)), "a Mii group is released first");
+        assert!(!kept_across_reload(GroupState::Built, mii, false, false, Some(KROOL), true), "a Mii group is released first");
         // The next lap (#242, target 0x27): the one-member groups the cycle left behind survive too.
-        assert!(kept_across_reload(GroupState::Built, members(&[KROOL]), false, false, Some(DIDDY)));
-        assert!(kept_across_reload(GroupState::Built, members(&[GANONDORF, PICHU]), false, false, Some(DIDDY)));
+        assert!(kept_across_reload(GroupState::Built, members(&[KROOL]), false, false, Some(DIDDY), true));
+        assert!(kept_across_reload(GroupState::Built, members(&[GANONDORF, PICHU]), false, false, Some(DIDDY), true));
         // Released first, as before: a group holding the target, one holding keys, one leaving its cycle, one holding the
         // trainer's object kind, and every group at a canonical or full-window Reload.
-        assert!(!kept_across_reload(GroupState::Built, members(&[DIDDY, PICHU]), false, false, Some(DIDDY)));
+        assert!(!kept_across_reload(GroupState::Built, members(&[DIDDY, PICHU]), false, false, Some(DIDDY), true));
         for state in [GroupState::Prefetching, GroupState::Prefetched, GroupState::Planned] {
-            assert!(!kept_across_reload(state, members(&[KROOL]), false, false, Some(DIDDY)), "{state:?}");
+            assert!(!kept_across_reload(state, members(&[KROOL]), false, false, Some(DIDDY), true), "{state:?}");
         }
-        assert!(!kept_across_reload(GroupState::Built, members(&[KROOL]), true, false, Some(DIDDY)));
-        assert!(!kept_across_reload(GroupState::Built, members(&[KROOL]), false, true, Some(DIDDY)));
-        assert!(!kept_across_reload(GroupState::Built, members(&[KROOL]), false, false, None));
+        assert!(!kept_across_reload(GroupState::Built, members(&[KROOL]), true, false, Some(DIDDY), true));
+        assert!(!kept_across_reload(GroupState::Built, members(&[KROOL]), false, true, Some(DIDDY), true));
+        assert!(!kept_across_reload(GroupState::Built, members(&[KROOL]), false, false, None, true));
         // Ready Fighters 8: a pool of 6, P1 holding 3. The first lap's neighbours [18, 13] (the bodies the native Reload
         // destroyed) fit beside a kept one-member group; the next lap's two kept groups leave no room for a seed of two, which the
         // planner then places as far as the budget goes.
         assert!(neighbours_fit(2, 1, 3, 16, 6));
         assert!(!neighbours_fit(2, 2, 3, 16, 6), "the kept groups are charged first");
         assert!(neighbours_fit(1, 2, 3, 16, 6));
+    }
+
+    /// The module manager as `0x17e4900` / `0x17e48a0` / `0x22b6f60` keep it (wa-fixes-logs/a-prime-re.md): one
+    /// reference per owner tree holding a kind, plus pins; at zero the module is unloaded.
+    struct Modules { trees: [Vec<u32>; 4], refs: std::collections::BTreeMap<u32, u32>, unloaded: Vec<u32> }
+
+    impl Modules {
+        fn request(&mut self, owner: usize, kind: u32) {
+            if self.trees[owner].contains(&kind) { return; }
+            self.trees[owner].push(kind);
+            *self.refs.entry(kind).or_default() += 1;
+        }
+        fn release(&mut self, kind: u32) {
+            let refs = self.refs.get_mut(&kind).unwrap();
+            *refs -= 1;
+            if *refs == 0 { self.refs.remove(&kind); self.unloaded.push(kind); }
+        }
+        /// Loader state 3 of `owner`'s Reload.
+        fn clear(&mut self, owner: usize) {
+            for kind in std::mem::take(&mut self.trees[owner]) { self.release(kind); }
+        }
+        fn pin(&mut self, kind: u32) -> bool {
+            self.refs.get_mut(&kind).map(|refs| *refs += 1).is_some()
+        }
+    }
+
+    fn a_kept_group_holds_its_module_across_its_owners_reload() {
+        const GANONDORF: u32 = 0x18;
+        const PICHU: u32 = 0x13;
+        const DIDDY: u32 = 0x27;
+        const KROOL: u32 = 0x45;
+        // rc.13 probe wa-aprime-probe-9ad09558-2 (XPS): CPU owner 1 kept [45] across its Reload onto 0x27 (#1459,
+        // r1=[13, 18, 45, 4a], 45:2 with helper r3). After the Reload (#1493) r1=[27] and only a helper held 0x45; the
+        // helpers moved it r3 -> r2 (#1547, #1550); the kept [45] attached warm (#1587); helper 2's Reload 45 -> 18
+        // (#1642) dropped the last reference under the live body and the guest stalled (#1648).
+        let lap = |pinned: bool| {
+            let mut m = Modules { trees: Default::default(), refs: Default::default(), unloaded: Vec::new() };
+            for kind in [PICHU, GANONDORF, KROOL] { m.request(1, kind); }
+            m.request(3, KROOL);
+            assert_eq!(pinned, pinned && m.pin(KROOL));
+            let kept = kept_across_reload(GroupState::Built, members(&[KROOL]), false, false, Some(DIDDY), pinned);
+            m.clear(1);
+            m.request(1, DIDDY);
+            // The new bank is Ready: R's own node again, then the pin goes.
+            if kept {
+                m.request(1, KROOL);
+                m.release(KROOL);
+            }
+            m.request(2, KROOL);
+            m.clear(3);
+            m.request(3, GANONDORF);
+            // The kept group is attached; helper 2's Reload onto 0x18.
+            m.clear(2);
+            m.request(2, GANONDORF);
+            (kept, m.unloaded.contains(&KROOL), m.refs.get(&KROOL).copied())
+        };
+        let (kept, unloaded, refs) = lap(true);
+        assert!(kept && !unloaded, "a pinned kept group's module outlives every helper Reload");
+        assert_eq!(refs, Some(1), "the pin is released at Ready: R's own node is the one reference left");
+        let (kept, unloaded, _) = lap(false);
+        assert!(!kept, "a group whose module could not be pinned is released first, as in rc.11");
+        assert!(unloaded, "without R's node the helpers' Reloads unload the module");
     }
 
     fn a_role_without_a_bank_still_counts_the_window_its_next_swap_prepares() {
@@ -3414,6 +3481,7 @@ mod tests {
             ("the_rest_of_the_lane_is_planned_as_groups_beside_the_target", the_rest_of_the_lane_is_planned_as_groups_beside_the_target as fn()),
             ("the_neighbours_reach_the_planner_only_for_their_own_window", the_neighbours_reach_the_planner_only_for_their_own_window as fn()),
             ("a_target_first_reload_keeps_the_built_groups_it_does_not_displace", a_target_first_reload_keeps_the_built_groups_it_does_not_displace as fn()),
+            ("a_kept_group_holds_its_module_across_its_owners_reload", a_kept_group_holds_its_module_across_its_owners_reload as fn()),
             ("a_role_without_a_bank_still_counts_the_window_its_next_swap_prepares", a_role_without_a_bank_still_counts_the_window_its_next_swap_prepares as fn()),
             ("a_switch_with_no_window_to_rebuild_keeps_its_canonical_reload", a_switch_with_no_window_to_rebuild_keeps_its_canonical_reload as fn()),
             ("both_banks_with_a_deferred_group_build_then_admit_it", both_banks_with_a_deferred_group_build_then_admit_it as fn()),
