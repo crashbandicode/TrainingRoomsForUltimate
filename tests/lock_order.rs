@@ -107,7 +107,7 @@ const FOREIGN_RECEIVERS: &[(&str, &[&str], &str)] = &[
     ("target", &["active", "cycle", "editor", "proof"], "combos::Ui::target is private to ui/combos.rs"),
     (
         "poll",
-        &["?", "JOBS", "adapter", "clock", "detector", "gate", "guard", "model", "queue", "replies", "t"],
+        &["JOBS", "adapter", "clock", "detector", "gate", "guard", "model", "queue", "replies", "t"],
         "inline_keyboard::Keyboard is held only as `keyboard`, mii_catalog_request's private Broker only as `broker` \
          (RECEIVER_MODULES); these are engine exchanges and queues, input adapters",
     ),

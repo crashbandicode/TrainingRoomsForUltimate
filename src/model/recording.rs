@@ -20,7 +20,6 @@
 
 use super::cpu::ids::{Table, C, UNRESOLVED};
 use super::cpu::playback::PlaybackState;
-use super::cpu::rng::Rng;
 use super::cpu::settings::Weights;
 use super::input_delay::MappedInputs;
 use super::settings::Snapshot;
@@ -69,28 +68,19 @@ pub enum HitstunTiming {
 /// The recording rows of the settings, as one `Copy` value the hooks read without allocating.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RecorderSettings {
-    pub slot: u8,
-    pub duration: u16,
     pub crop: bool,
-    pub playback_slots: Weights<5>,
     pub hitstun: HitstunTiming,
     pub save_state_slots: Weights<5>,
     pub mash_interrupt: bool,
-    /// N4: the CPU settings override a playing recording (default Off).
-    pub override_playback: bool,
 }
 
 impl RecorderSettings {
     pub const fn factory() -> Self {
         Self {
-            slot: 0,
-            duration: 150,
             crop: true,
-            playback_slots: Weights([1, 0, 0, 0, 0]),
             hitstun: HitstunTiming::HitstunEnds,
             save_state_slots: Weights([0; 5]),
             mash_interrupt: true,
-            override_playback: false,
         }
     }
 
@@ -99,11 +89,7 @@ impl RecorderSettings {
         let first = |id: &str| row(id).iter().position(|v| *v != 0);
         let on = |id: &str| row(id).first().is_some_and(|v| *v != 0);
         Self {
-            slot: first("recording_slot").map_or(0, |i| i.min(SLOTS - 1) as u8),
-            // 60, 90 .. 600 frames (19 options, step 30).
-            duration: first("recording_duration").map_or(150, |i| (60 + 30 * i.min(18)) as u16),
             crop: on("recording_crop"),
-            playback_slots: Weights::from_row(row("playback_button_slots")),
             hitstun: match first("hitstun_playback") {
                 Some(1) => HitstunTiming::HitstopEnds,
                 Some(2) => HitstunTiming::HitstopBegins,
@@ -111,7 +97,6 @@ impl RecorderSettings {
             },
             save_state_slots: Weights::from_row(row("save_state_playback")),
             mash_interrupt: on("playback_mash"),
-            override_playback: on("settings_override_playback"),
         }
     }
 }
@@ -345,13 +330,6 @@ impl PlayRefusal {
     }
 }
 
-/// The CPU facts the poll stage needs.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PollFacts {
-    /// The CPU's current status kind (read only when `wants_cpu_status`).
-    pub cpu_status: i32,
-}
-
 /// The values the CPU's controller gets for one frame (SPEC-input-01 §4): the buttons, the raw sticks
 /// and the clamped sticks. The right stick and the rumble bytes are never part of it (rule R6).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -519,8 +497,6 @@ pub struct PostOut {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Ended {
-    /// The recording into `slot` finished; its stored length is `frames` (after the crop).
-    Recorded { slot: u8, frames: u16 },
     Played { slot: u8 },
     /// A named playback (or a clip preview) played to its end.
     NamedPlayed,
@@ -573,8 +549,6 @@ pub struct Recorder {
     recorded_facing: i8,
     current_facing: i8,
     starting_status: i32,
-    /// The slot's status was taken after frame 0.
-    status_captured: bool,
     /// Latched at the lockout: crop is read at the end, the duration was latched with `length`.
     mash_started: bool,
     /// The frame source is the named layer's buffer (SPEC-input-01 section 9), not a numbered slot.
@@ -605,7 +579,6 @@ impl Recorder {
             recorded_facing: 1,
             current_facing: 1,
             starting_status: UNRESOLVED,
-            status_captured: false,
             mash_started: false,
             named: false,
         }
@@ -689,37 +662,7 @@ impl Recorder {
         }
     }
 
-    /// The poll stage reads the CPU's status only on the poll after frame 0.
-    pub const fn wants_cpu_status(&self) -> bool {
-        matches!(self.mode, Mode::Record) && matches!(self.possession, Possession::Cpu) && self.frame == 1 && !self.status_captured
-    }
-
     // ---- starting and stopping -----------------------------------------------------------------
-
-    /// The record chord or the save-state trigger. `facing` is the CPU's `lr`. The slot and duration
-    /// are latched here (question 4).
-    pub fn start_recording(&mut self, s: &RecorderSettings, facing: i8, start: StartSnapshot) {
-        let slot = s.slot.min(SLOTS as u8 - 1);
-        let i = usize::from(slot);
-        self.slots[i] = [MappedInputs::NEUTRAL; SLOT_FRAMES];
-        let duration = s.duration.clamp(1, SLOT_FRAMES as u16);
-        self.len[i] = duration;
-        self.recorded[i] = false;
-        self.origin[i] = Origin { facing, status: UNRESOLVED, start };
-        self.record_slot = slot;
-        self.length = duration;
-        self.mode = Mode::Pause;
-        self.possession = Possession::Lockout;
-        self.frame = 0;
-        self.lockout = LOCKOUT_FRAMES;
-        self.buffer = 0;
-        self.recorded_facing = facing;
-        self.current_facing = facing;
-        self.starting_status = UNRESOLVED;
-        self.status_captured = false;
-        self.mash_started = false;
-        self.named = false;
-    }
 
     /// The named layer's playback (`playback_named`, `playback_preview`): `frames` frames from the layer's buffer, mirrored by the
     /// recorded `facing` against the CPU's current_facing now. Refused during the lockout and a recording like any playback.
@@ -791,38 +734,6 @@ impl Recorder {
         self.named = false;
     }
 
-    // ---- the poll stage ------------------------------------------------------------------------
-
-    /// P1's mapped input for this poll (after input delay). Stores the frame when recording; makes
-    /// P1's output neutral while the recorder owns P1.
-    pub fn poll(&mut self, out: &mut MappedInputs, facts: PollFacts) {
-        match (self.mode, self.possession) {
-            (Mode::Pause, _) => *out = MappedInputs::NEUTRAL,
-            (Mode::Record, Possession::Standby) => {
-                let i = usize::from(self.record_slot);
-                self.slots[i][0] = *out;
-                if !is_neutral(*out) {
-                    self.possession = Possession::Cpu;
-                    self.recorded[i] = true;
-                }
-                *out = MappedInputs::NEUTRAL;
-            }
-            (Mode::Record, Possession::Cpu) => {
-                let i = usize::from(self.record_slot);
-                if self.frame == 1 && !self.status_captured {
-                    // The status the first frame led to: the CPU has performed frame 0 since.
-                    self.origin[i].status = facts.cpu_status;
-                    self.status_captured = true;
-                }
-                if self.frame < self.length {
-                    self.slots[i][usize::from(self.frame)] = *out;
-                }
-                *out = MappedInputs::NEUTRAL;
-            }
-            _ => {}
-        }
-    }
-
     // ---- the control stage ---------------------------------------------------------------------
 
     /// One CPU control frame, after the AI wrote its controls.
@@ -891,14 +802,13 @@ impl Recorder {
     // ---- the post-frame stage ------------------------------------------------------------------
 
     /// The end-of-run check, the crop, the loop (SPEC-input-01 §5.3 "End detection").
-    pub fn post_frame(&mut self, s: &RecorderSettings, c: &PostCtx) -> PostOut {
+    pub fn post_frame(&mut self, c: &PostCtx) -> PostOut {
         let mut out = PostOut::default();
         if !matches!(self.mode, Mode::Record | Mode::Playback) || self.frame < self.length || self.buffer > 0 {
             return out;
         }
         self.possession = Possession::Player;
         out.pop_mash = c.queue_head_is_playback;
-        let was = self.mode;
         if self.named {
             // The layer owns the frames; a capture that reached its maximum ends here like a stop chord.
             out.ended = Some(Ended::NamedPlayed);
@@ -907,33 +817,13 @@ impl Recorder {
             self.named = false;
             return out;
         }
-        if was == Mode::Record {
-            let i = usize::from(self.record_slot);
-            let mut n = self.frame;
-            if s.crop && n > 0 {
-                while n > 0 && is_neutral(self.slots[i][usize::from(n) - 1]) {
-                    n -= 1;
-                }
-            }
-            self.len[i] = n;
-            self.length = n;
-            self.recorded[i] = n > 0;
-            out.ended = Some(Ended::Recorded { slot: self.record_slot, frames: n });
-        } else {
-            out.ended = Some(Ended::Played { slot: self.play_slot });
-        }
+        out.ended = Some(Ended::Played { slot: self.play_slot });
         self.frame = 0;
         self.mode = Mode::None;
         out
     }
 
     // ---- triggers ------------------------------------------------------------------------------
-
-    /// A weighted random slot of Playback Button Slots (the plugin's own generator, question 12).
-    #[cfg(test)]
-    pub fn pick_chord_slot(s: &RecorderSettings, rng: &mut Rng) -> Option<u8> {
-        s.playback_slots.pick(rng).map(|i| i as u8)
-    }
 
     /// Both chords passed in one poll: playback wins and the record request is dropped (§2.2).
     #[cfg(test)]
@@ -945,17 +835,6 @@ impl Recorder {
         } else {
             ChordAction::None
         }
-    }
-
-    /// Both fighters finished restoring after a save-state load. Revision 8.2 of the recording
-    /// redesign: the restore starts neither a recording nor a playback. Load only warps. The
-    /// arguments stay so the runtime call site does not change; rr-7 wires the playback machine.
-    pub fn on_state_restored(
-        _settings: &RecorderSettings,
-        _saved_on_ledge: bool,
-        _rng: &mut Rng,
-    ) -> LoadAction {
-        LoadAction::None
     }
 
     // ---- the mash trigger (§5.4) ---------------------------------------------------------------
@@ -1082,13 +961,6 @@ pub enum ChordAction {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum LoadAction {
-    None,
-    Record,
-    Play(u8),
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ImportRefusal {
     SlotOutOfRange,
     TooLong(usize),
@@ -1115,45 +987,5 @@ impl ExportRefusal {
             ExportRefusal::SlotOutOfRange => "Record Slot is out of range",
             ExportRefusal::NotRecorded => "Record into this slot first",
         }
-    }
-}
-
-#[cfg(test)]
-mod cpu_role_parity {
-    lib_unit_tests! {
-    use super::*;
-
-    #[test]
-    fn cpu_role_drive_matches_the_slot_recorder_through_the_first_stored_frame() {
-        let settings = RecorderSettings { duration: 60, ..RecorderSettings::factory() };
-        let mut slot = Recorder::new();
-        slot.start_recording(&settings, 1, StartSnapshot::NONE);
-        let mut drive = CpuRoleDrive::idle();
-        drive.begin(1);
-        let ctx = ControlCtx { facing: 1, shulk_dial: false };
-        let facts = PollFacts { cpu_status: 0 };
-        let mut inputs = vec![MappedInputs { buttons: 1, ..MappedInputs::NEUTRAL }; usize::from(LOCKOUT_FRAMES)];
-        inputs.extend(std::iter::repeat_n(MappedInputs { buttons: FLICK_JUMP, ..MappedInputs::NEUTRAL }, 4));
-        inputs.push(MappedInputs { buttons: 36_872, ..MappedInputs::NEUTRAL });
-        inputs.push(MappedInputs { buttons: 33_281, ..MappedInputs::NEUTRAL });
-        for input in inputs {
-            let mut left = input;
-            let mut right = input;
-            slot.poll(&mut left, facts);
-            let stored = drive.poll(&mut right);
-            assert_eq!(left, right, "p1 output");
-            assert_eq!(slot.phase(), drive.phase());
-            assert_eq!(slot.possession(), drive.possession());
-            let slot_write = slot.control(&ctx).write.map(|write| write.buttons);
-            let drive_write = drive.control(&ctx).write.map(|write| write.buttons);
-            assert_eq!(slot_write, drive_write, "cpu inject");
-            let _ = slot.post_frame(&settings, &PostCtx { facing: 1, queue_head_is_playback: false });
-            if slot.possession() == Possession::Cpu {
-                assert_eq!(stored.map(|frame| frame.buttons), Some(input.buttons));
-            } else {
-                assert!(stored.is_none(), "lockout and standby are not stored");
-            }
-        }
-    }
     }
 }

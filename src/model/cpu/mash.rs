@@ -135,11 +135,9 @@ pub enum Buffered {
     StopPlayback,
 }
 
-/// Where the buffer request comes from, for the fork's lobby filter and the playback rule.
+/// Where the buffer request comes from, for the playback rule.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct BufferContext {
-    /// A waiting scene with practice not enabled: `PLAYBACK_n` are removed from every Action row.
-    pub lobby_without_practice: bool,
     pub playback: PlaybackState,
 }
 
@@ -166,17 +164,6 @@ pub struct Mash {
     pub queued_aerial: Option<Action>,
     /// The trigger situation that last buffered a mash (decision B8: one roll per situation entry).
     pub latch: Option<super::command::Situ>,
-}
-
-/// The Action row with the fork's effective-action filter applied.
-pub fn effective(row: &Weights<30>, lobby_without_practice: bool) -> Weights<30> {
-    let mut out = *row;
-    if lobby_without_practice {
-        for w in &mut out.0[Action::PLAYBACK_FIRST as usize..] {
-            *w = 0;
-        }
-    }
-    out
 }
 
 impl Mash {
@@ -228,8 +215,7 @@ impl Mash {
         }
         self.roll_for_action(s, rng, action);
         self.queue.push(action);
-        let row = effective(&s.follow_up, ctx.lobby_without_practice);
-        let follow_up = row.pick(rng).map(|i| Action(i as u8));
+        let follow_up = s.follow_up.pick(rng).map(|i| Action(i as u8));
         if let Some(next) = follow_up {
             if next.is_aerial() {
                 self.rolled.aerial_delay = s.aerial_delay.pick(rng);
@@ -246,7 +232,7 @@ impl Mash {
     /// with `row` the weighted row the caller picks from (an override row, or `mash_state`).
     pub fn external_buffer(&mut self, s: &CpuSettings, rng: &mut Rng, ctx: BufferContext, row: &Weights<30>) -> Buffered {
         self.full_reset();
-        let action = effective(row, ctx.lobby_without_practice).pick(rng).map(|i| Action(i as u8));
+        let action = row.pick(rng).map(|i| Action(i as u8));
         self.buffer_menu_mash(s, rng, ctx, action)
     }
 }

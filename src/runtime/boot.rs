@@ -146,11 +146,10 @@ fn run_inner() {
     states::start_writer();
     #[cfg(feature = "diag")]
     states::start_diag_triggers();
-    // Package 4: the shortcuts file (fail-closed, created when absent) and the recorder's generator.
+    // Package 4: the shortcuts file (fail-closed, created when absent).
     chords::load_ini();
     writer::load_replay_capture();
     writer::start();
-    recorder::init(Rng::seed_from(clock::uptime_ms().wrapping_add(1), (run as fn() as usize) as u64));
     published::publish(&loaded.menu, 0);
     // Package 6: the typed view the carried engines read (decision D1); the settings are loaded and published first.
     crate::runtime::compat::menu::apply_kept(&*loaded);

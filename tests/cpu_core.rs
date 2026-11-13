@@ -19,7 +19,7 @@ use model::cpu::facts::FrameFacts;
 use model::cpu::hash::{hash40, lua_bind_hash, xxh64, SEED};
 use model::hash40::crc32;
 use model::cpu::ids::{self, Table, C, UNRESOLVED};
-use model::cpu::mash::{effective, Action, BufferContext, Buffered, Mash};
+use model::cpu::mash::{Action, BufferContext, Buffered, Mash};
 use model::cpu::playback::{covered_setting_applies, PlaybackState};
 use model::cpu::rng::Rng;
 use model::cpu::role::{is_cpu_role, FighterKey, RoleTable, Scene, LOBBY_CPU_ENTRY};
@@ -468,7 +468,7 @@ fn cpu01_playback_interrupt() {
     let s = settings_with(&[("mash_state", &row30(&[18]))]);
     let mut r = rng();
     let playing = PlaybackState { running: true, ..PlaybackState::default() };
-    let ctx = BufferContext { playback: playing, ..BufferContext::default() };
+    let ctx = BufferContext { playback: playing };
     let mut mash = Mash::new();
     // Playback Mash Interrupt On (the default): a mash while a playback runs stops it and buffers
     // nothing.
@@ -478,31 +478,12 @@ fn cpu01_playback_interrupt() {
     // the interrupt.
     assert_eq!(mash.buffer_menu_mash(&s, &mut r, ctx, Some(Action(25))), Buffered::Queued { follow_up: false });
     mash.full_reset();
-    let queued = BufferContext { playback: PlaybackState { running: true, queued: true, ..Default::default() }, ..ctx };
+    let queued = BufferContext { playback: PlaybackState { running: true, queued: true, ..Default::default() } };
     assert_eq!(mash.buffer_menu_mash(&s, &mut r, queued, Some(Action::JAB)), Buffered::Queued { follow_up: false });
     // Playback Mash Interrupt Off: the mash buffers normally.
     mash.full_reset();
     let off = settings_with(&[("playback_mash", &[0, 1])]);
     assert_eq!(mash.buffer_menu_mash(&off, &mut r, ctx, Some(Action::JAB)), Buffered::Queued { follow_up: false });
-}
-
-#[test]
-fn cpu01_lobby_effective_actions() {
-    let mut w = Weights::<30>::default();
-    w.0[2] = 1;
-    w.0[26] = 3;
-    let kept = effective(&w, false);
-    assert_eq!(kept.0[26], 3);
-    let filtered = effective(&w, true);
-    assert_eq!((filtered.0[2], filtered.0[26]), (1, 0), "Playback actions are removed in a waiting scene without practice");
-    // A row of playback actions only resolves to nothing in the lobby filter.
-    let mut only = Weights::<30>::default();
-    only.0[27] = 1;
-    assert!(effective(&only, true).is_empty());
-    let s = settings_with(&[("mash_state", &row30(&[27]))]);
-    let mut mash = Mash::new();
-    let ctx = BufferContext { lobby_without_practice: true, ..BufferContext::default() };
-    assert_eq!(mash.external_buffer(&s, &mut rng(), ctx, &s.mash_state), Buffered::Refused);
 }
 
 #[test]

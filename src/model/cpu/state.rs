@@ -96,8 +96,6 @@ pub struct Cpu {
     pub scene: Scene,
     pub roles: RoleTable,
     pub playback: PlaybackState,
-    /// A waiting scene with practice not enabled (the fork's lobby filter).
-    pub lobby_without_practice: bool,
     pub fighters: [Fighter; FighterKey::COUNT],
     /// The animation hashes the motion hook substitutes.
     pub motion: MotionHashes,
@@ -123,7 +121,6 @@ impl Cpu {
             scene: Scene::Training,
             roles: RoleTable::new(),
             playback: PlaybackState::default(),
-            lobby_without_practice: false,
             fighters: [Fighter::new(); FighterKey::COUNT],
             motion: MotionHashes::new(),
             hidden: None,
@@ -141,7 +138,7 @@ impl Cpu {
     }
 
     fn context(&self) -> BufferContext {
-        BufferContext { lobby_without_practice: self.lobby_without_practice, playback: self.playback }
+        BufferContext { playback: self.playback }
     }
 
     /// Whether a setting covered by decisions B5 / N4 may act now.

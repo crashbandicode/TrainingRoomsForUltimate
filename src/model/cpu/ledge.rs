@@ -8,7 +8,7 @@ use super::counter::{CounterId, Counters};
 use super::facts::{FrameFacts, FrameOut, PlaybackStart};
 use super::ids::{Table, C};
 use super::mash::Step;
-use super::settings::{situation, trigger, CpuSettings, Weights};
+use super::settings::{situation, trigger, CpuSettings};
 use super::status::Situation;
 
 /// Indices of the Ledge Options row.
@@ -29,18 +29,6 @@ pub const BUFFER_TETHER_FRAME: i32 = 18;
 
 fn is_playback(case: u8) -> bool {
     case >= option::PLAYBACK_FIRST
-}
-
-/// The row with the lobby filter applied: Playback options are removed in a waiting scene while
-/// practice is not enabled.
-pub fn effective(row: &Weights<10>, lobby_without_practice: bool) -> Weights<10> {
-    let mut out = *row;
-    if lobby_without_practice {
-        for w in &mut out.0[option::PLAYBACK_FIRST as usize..] {
-            *w = 0;
-        }
-    }
-    out
 }
 
 /// The transition-term hook's question: the body's status, the term asked about and the game's own answer.
@@ -119,8 +107,7 @@ impl Ledge {
         // 2. Hanging: hold a delay and a case for this grab.
         let delay = *self.delay.get_or_insert_with(|| s.ledge_delay.pick(rng));
         if self.case.is_none() {
-            let row = effective(&s.ledge_state, ctx.lobby_without_practice);
-            self.case = row.pick(rng).map(|i| i as u8);
+            self.case = s.ledge_state.pick(rng).map(|i| i as u8);
             if self.case.is_none() {
                 // An empty effective set: the CPU behaves natively this grab, the climb is not denied.
                 return out;

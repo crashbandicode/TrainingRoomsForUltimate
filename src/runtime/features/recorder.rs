@@ -21,7 +21,7 @@
 //!
 //! NOT YET SWITCH-RUN.
 
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
 
 use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
@@ -31,13 +31,12 @@ use super::recording_host;
 use crate::model::chords::Request;
 use crate::model::cpu::facts::PlaybackStart;
 use crate::model::cpu::ids::{C, UNRESOLVED};
-use crate::model::cpu::rng::Rng;
 use crate::model::cpu::role::FighterKey;
 use crate::model::cpu::status;
 use crate::model::input_delay::{MappedInputs, Owners};
 use crate::model::recording::{
-    record_chord, ControlCtx, ControlOut, Ended, Inject, LoadAction, MashCtx, Mode, Phase, PollFacts, PostCtx, RecordRefusal,
-    Recorder, RecorderSettings, StartSnapshot,
+    record_chord, ControlCtx, ControlOut, Ended, Inject, MashCtx, Mode, Phase, PostCtx, RecordRefusal, Recorder,
+    RecorderSettings,
 };
 use crate::model::sites_pkg4;
 use crate::runtime::alloc::{HookId, HookScope};
@@ -88,127 +87,7 @@ fn rec() -> RecGuard {
     RecGuard(REC.lock())
 }
 
-const SLOT_EMPTY: u8 = 0;
-const SLOT_OFFERED: u8 = 1;
-const SLOT_FILLING: u8 = 2;
-const SLOT_READY: u8 = 3;
-const SLOT_DONE: u8 = 4;
-
-struct SlotImage {
-    present: [bool; 5],
-    counts: [u32; 5],
-    kinds: [i32; 5],
-    costumes: [u32; 5],
-    facing: [f32; 5],
-    frames: Vec<crate::engine::macros::InputFrame>,
-}
-
-static SLOT_IMAGE: AtomicPtr<SlotImage> = AtomicPtr::new(std::ptr::null_mut());
-static SLOT_STAGE: AtomicU8 = AtomicU8::new(SLOT_EMPTY);
-
-/// The worker's copy of the five slots. The worker allocates the buffer and reads it; a hook fills it.
-/// `None` means the hook has not filled the buffer yet, so migration must wait.
-pub(crate) fn copied_slots() -> Option<[Option<crate::engine::library::LegacySlot>; 5]> {
-    match SLOT_STAGE.load(Ordering::Acquire) {
-        SLOT_EMPTY => {
-            offer_slot_image();
-            None
-        }
-        SLOT_READY => {
-            let ptr = SLOT_IMAGE.load(Ordering::Acquire);
-            if ptr.is_null() { None } else { Some(slots_from_image(unsafe { &*ptr })) }
-        }
-        _ => None,
-    }
-}
-
-pub(crate) fn release_slot_image() {
-    if SLOT_STAGE.swap(SLOT_DONE, Ordering::AcqRel) == SLOT_READY {
-        let ptr = SLOT_IMAGE.swap(std::ptr::null_mut(), Ordering::AcqRel);
-        if !ptr.is_null() {
-            unsafe { drop(Box::from_raw(ptr)) }
-        }
-    }
-}
-
-fn offer_slot_image() {
-    let image = Box::new(SlotImage {
-        present: [false; 5],
-        counts: [0; 5],
-        kinds: [0; 5],
-        costumes: [0; 5],
-        facing: [1.0; 5],
-        frames: vec![crate::engine::macros::InputFrame::default(); 5 * crate::engine::macros::MAX_FRAMES],
-    });
-    let ptr = Box::into_raw(image);
-    if SLOT_IMAGE.compare_exchange(std::ptr::null_mut(), ptr, Ordering::Release, Ordering::Acquire).is_err() {
-        unsafe { drop(Box::from_raw(ptr)) }
-        return;
-    }
-    SLOT_STAGE.store(SLOT_OFFERED, Ordering::Release);
-}
-
-/// Copy the live slots into the worker's buffer. Called from a hook: no allocation, and the lock ends before the worker reads.
-pub(crate) fn fill_slot_image() {
-    if SLOT_STAGE.compare_exchange(SLOT_OFFERED, SLOT_FILLING, Ordering::AcqRel, Ordering::Acquire).is_err() {
-        return;
-    }
-    let ptr = SLOT_IMAGE.load(Ordering::Acquire);
-    if ptr.is_null() {
-        SLOT_STAGE.store(SLOT_EMPTY, Ordering::Release);
-        return;
-    }
-    let image = unsafe { &mut *ptr };
-    {
-        let rec = rec();
-        let cap = crate::engine::macros::MAX_FRAMES;
-        for index in 0..5u8 {
-            let i = usize::from(index);
-            image.present[i] = false;
-            if !rec.is_recorded(index) {
-                continue;
-            }
-            let Some(frames) = rec.frames(index) else { continue };
-            if frames.is_empty() {
-                continue;
-            }
-            let n = frames.len().min(cap);
-            let origin = rec.origin(index);
-            image.present[i] = true;
-            image.counts[i] = n as u32;
-            image.kinds[i] = origin.map(|item| item.start.fighter_kind).unwrap_or(0);
-            image.costumes[i] = origin.map(|item| item.start.costume).unwrap_or(0);
-            image.facing[i] = f32::from(origin.map(|item| item.facing).unwrap_or(1));
-            for (k, frame) in frames.iter().take(n).enumerate() {
-                image.frames[i * cap + k] = crate::engine::macros::InputFrame {
-                    buttons: frame.buttons,
-                    lstick_x: frame.lstick_x,
-                    lstick_y: frame.lstick_y,
-                    rstick_x: frame.rstick_x,
-                    rstick_y: frame.rstick_y,
-                };
-            }
-        }
-    }
-    SLOT_STAGE.store(SLOT_READY, Ordering::Release);
-}
-
-fn slots_from_image(image: &SlotImage) -> [Option<crate::engine::library::LegacySlot>; 5] {
-    let mut slots: [Option<crate::engine::library::LegacySlot>; 5] = [None, None, None, None, None];
-    let cap = crate::engine::macros::MAX_FRAMES;
-    for i in 0..5 {
-        if !image.present[i] || image.counts[i] == 0 {
-            continue;
-        }
-        let n = image.counts[i] as usize;
-        let start = crate::engine::macros::StartState::neutral(image.kinds[i], image.costumes[i], image.facing[i]);
-        slots[i] = Some(crate::engine::library::LegacySlot {
-            frames: image.frames[i * cap..i * cap + n].to_vec(),
-            start,
-        });
-    }
-    slots
-}/// The recorder's hook was installed with every row of its closure (`model::capabilities`, review R2-1): until
+/// The recorder's hook was installed with every row of its closure (`model::capabilities`, review R2-1): until
 /// boot says so, the entry points the other features call (`on_p1_poll`, `request_playback`,
 /// `on_state_restored`) do nothing and read no native.
 static ENABLED: AtomicBool = AtomicBool::new(false);
@@ -217,7 +96,6 @@ static ENABLED: AtomicBool = AtomicBool::new(false);
 pub fn set_enabled(on: bool) {
     ENABLED.store(on, Ordering::Release);
 }
-static RNG: Mutex<Rng> = Mutex::new(Rng::new(0x5EED));
 
 // The constants the recorder needs, taken from the CPU runtime's table once it exists.
 static CONSTS_READY: AtomicU8 = AtomicU8::new(0);
@@ -314,11 +192,6 @@ fn event(name: &str, key_a: &str, a: i64, key_b: &str, b: i64) {
 #[inline(always)]
 fn event(_name: &str, _key_a: &str, _a: i64, _key_b: &str, _b: i64) {}
 
-/// Boot: the generator's seed (the plugin's own, never the game's, SPEC-input-01 question 12).
-pub fn init(seed: u64) {
-    *RNG.lock() = Rng::new(seed);
-}
-
 /// The recorder rows as the last publish left them (the named layer reads Recording Trigger and Save State Playback).
 /// Read wait-free from `published::Live` (stream/sync); the factory rows before the first publish.
 pub fn settings() -> RecorderSettings {
@@ -399,7 +272,6 @@ pub unsafe fn on_p1_poll(out: *mut MappedInputs) {
     if !ENABLED.load(Ordering::Acquire) {
         return;
     }
-    fill_slot_image();
     // Nested in the input hook that calls it, so an allocation of the poll stage is charged here (R5 attribution).
     let _scope = HookScope::enter_hook(HookId::RecorderPoll);
     bump(COUNT_POLL);
@@ -411,24 +283,9 @@ pub unsafe fn on_p1_poll(out: *mut MappedInputs) {
     if recording_host::cpu_role_poll(out) {
         return;
     }
-    let (mode, named) = {
-        let rec = rec();
-        (rec.mode(), rec.is_named())
-    };
-    if mode == Mode::None {
+    if rec().mode() == Mode::None {
         recording_host::on_player_poll(out);
-        return;
     }
-    if named {
-        return;
-    }
-    let wants = rec().wants_cpu_status();
-    let cpu_status = if wants && load_consts() {
-        cpu_body().map_or(0, |b| game::natives::status_kind(b.accessor))
-    } else {
-        0
-    };
-    rec().poll(&mut *out, PollFacts { cpu_status });
 }
 
 // ---- the CPU control stage ----------------------------------------------------------------------------
@@ -442,7 +299,6 @@ pub unsafe fn ai_epilogue(ctx: &mut InlineCtx) {
 }
 
 unsafe fn on_ai_frame(ai: usize) {
-    fill_slot_image();
     // Native Training or an active lobby practice (the hot swap check below stops the recorder).
     if ai == 0 || !(scene::is_native_training() || scene::lobby_term()) {
         return;
@@ -522,14 +378,13 @@ unsafe fn on_ai_frame(ai: usize) {
     }
 
     let queue_head = key.and_then(cpu::mash_head);
-    let post = rec().post_frame(&settings, &PostCtx { facing, queue_head_is_playback: queue_head.is_some() });
+    let post = rec().post_frame(&PostCtx { facing, queue_head_is_playback: queue_head.is_some() });
     if post.pop_mash {
         if let Some(key) = key {
             cpu::mash_pop(key);
         }
     }
     match post.ended {
-        Some(Ended::Recorded { slot, frames }) => event("recording_complete", "slot", i64::from(slot), "frames", i64::from(frames)),
         Some(Ended::Played { slot }) => event("playback_complete", "slot", i64::from(slot), "", 0),
         Some(Ended::NamedPlayed) => {
             event("named_playback_complete", "", 0, "", 0);
@@ -676,25 +531,6 @@ unsafe fn record_refusal() -> Option<RecordRefusal> {
     )
 }
 
-unsafe fn begin_recording(settings: &RecorderSettings, body: Body, facing: i8) {
-    if let Some(refusal) = record_refusal() {
-        notices::refuse(refusal.text());
-        return;
-    }
-    let kind = ((body.fighter + FIGHTER_KIND_FIELD) as *const i32).read();
-    let color = INT_COLOR.load(Ordering::Acquire);
-    let costume = if color == UNRESOLVED { 0 } else { natives::get_int(body.accessor, color) as u32 };
-    let start = StartSnapshot {
-        fighter_kind: kind,
-        costume,
-        situation: game::natives::situation_kind(body.accessor),
-        speed_x: 0.0,
-        speed_y: 0.0,
-    };
-    rec().start_recording(settings, facing, start);
-    event("record_lockout", "cpu_kind", i64::from(kind), "frames", i64::from(settings.duration));
-}
-
 // ---- the named layer's core entry points (SPEC-input-01 section 9) -----------------------------------------
 
 /// Published alongside ACTIVE when the game releases its recorder guard.
@@ -778,9 +614,9 @@ pub fn request_playback(start: PlaybackStart) {
     }
 }
 
-/// Both fighters finished restoring after a save-state load (SPEC-input-01 §6.4): record or play per the
-/// settings. `saved_on_ledge` is the saved situation. Package 3 calls it once per restore.
-pub fn on_state_restored(saved_on_ledge: bool) {
+/// Both fighters finished restoring after a save-state load (SPEC-input-01 §6.4). A load starts neither a recording nor a slot
+/// playback (revision 8.2): only the named layer and a clip preview follow up. Package 3 calls it once per restore.
+pub fn on_state_restored() {
     if !ENABLED.load(Ordering::Acquire) {
         return;
     }
@@ -793,32 +629,6 @@ pub fn on_state_restored(saved_on_ledge: bool) {
             named_macros::service_restore();
         }
         return;
-    }
-    let settings = settings();
-    let action = Recorder::on_state_restored(&settings, saved_on_ledge, &mut RNG.lock());
-    event(
-        "state_restored",
-        "ledge",
-        i64::from(saved_on_ledge),
-        "action",
-        match action {
-            LoadAction::None => 0,
-            LoadAction::Record => 1,
-            LoadAction::Play(slot) => 2 + i64::from(slot),
-        },
-    );
-    // SAFETY: the fighters were just restored.
-    unsafe {
-        let Some(body) = cpu_body() else { return };
-        if !load_consts() {
-            return;
-        }
-        let facing = facing_of(natives::lr(body.accessor));
-        match action {
-            LoadAction::None => {}
-            LoadAction::Record => begin_recording(&settings, body, facing),
-            LoadAction::Play(slot) => begin_playback(slot, facing, false),
-        }
     }
 }
 

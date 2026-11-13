@@ -300,18 +300,10 @@ fn cpu03_post_getup_mash() {
     assert!(cpu.fighters[key.index()].mash.queue.is_empty());
 }
 
-fn cpu03_empty_effective_set() {
-    // A waiting scene without practice removes playback options; when nothing else is selected the
-    // CPU gets up natively this grab and the climb is not denied.
+/// rc.12 TR2: the fork's lobby filter is gone (nothing set it); a Playback Slot option is held like any other case.
+fn cpu03_a_playback_case_is_held() {
     let playback_only = settings(&[("ledge_state", ledge_row(&[option::PLAYBACK_FIRST as usize]))]);
     let (mut cpu, key) = cpu_with(playback_only);
-    cpu.lobby_without_practice = true;
-    let out = cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 13, false, false));
-    assert_eq!(out, Default::default());
-    assert_eq!(cpu.fighters[key.index()].ledge.case, None, "nothing held");
-    assert!(cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true), "the climb is not denied");
-    // Without the filter the same row holds its playback case.
-    cpu.lobby_without_practice = false;
     cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 14, false, false));
     assert_eq!(cpu.fighters[key.index()].ledge.case, Some(option::PLAYBACK_FIRST));
 }
@@ -466,7 +458,7 @@ fn case_table() {
         ("cpu03_playback_paths", cpu03_playback_paths as fn()),
         ("cpu03_ledge_playback_frame_asks_for_the_slot_on_the_ledge", cpu03_ledge_playback_frame_asks_for_the_slot_on_the_ledge as fn()),
         ("cpu03_post_getup_mash", cpu03_post_getup_mash as fn()),
-        ("cpu03_empty_effective_set", cpu03_empty_effective_set as fn()),
+        ("cpu03_a_playback_case_is_held", cpu03_a_playback_case_is_held as fn()),
         ("cpu03_per_fighter_state", cpu03_per_fighter_state as fn()),
         ("cpu03_ledge_delay_range_pick", cpu03_ledge_delay_range_pick as fn()),
         ("cpu03_range_counts_as_nonempty_row", cpu03_range_counts_as_nonempty_row as fn()),

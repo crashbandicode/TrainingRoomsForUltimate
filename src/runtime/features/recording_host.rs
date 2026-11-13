@@ -233,17 +233,12 @@ pub fn service() {
         rr_host::set_fighter_label(&crate::runtime::macros::named_macros::fighter_label(player.fighter_kind));
     }
     let online = keyboard_closed();
-    // Migration waits for the old slot image. A record, a play, or a menu effect does not.
+    // Migration first. Nothing records into the old numbered slots any more (rc.12 TR2), so it finds them empty.
     if !rr_host::migrated() {
-        if let Some(slots) = super::recorder::copied_slots() {
-            let tick = rr_host::service_at(root, &slots, &rr_host::today(), player, cpu, online);
-            if rr_host::migrated() {
-                super::recorder::release_slot_image();
-            }
-            apply(&tick);
-            sync_bound(root);
-            return;
-        }
+        let tick = rr_host::service_at(root, &Default::default(), &rr_host::today(), player, cpu, online);
+        apply(&tick);
+        sync_bound(root);
+        return;
     }
     sync_bound(root);
     sync_slots(root);

@@ -44,7 +44,7 @@ impl Layer {
 fn frame(r: &mut Recorder, layer: &Layer, input: MappedInputs) -> (MappedInputs, ControlOut, PostOut) {
     let out = input;
     let control = r.control_named(&CTX, &|i| layer.at(i));
-    let post = r.post_frame(&RecorderSettings::factory(), &POST);
+    let post = r.post_frame(&POST);
     (out, control, post)
 }
 
