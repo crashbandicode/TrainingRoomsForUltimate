@@ -88,7 +88,7 @@ the game's effect spheres, and the discs trail the camera by one to two frames w
 
 The input display (Display & Controls › Input Display) is a strip at the top of the screen: the last second of
 Player 1 and the CPU, a chip for each new button, and ADVANTAGE, LINK, and INPUT for the last exchange. ADVANTAGE is
-the CPU's first actionable frame minus yours. Plus means you act first. [FRAME-STRIP.md](FRAME-STRIP.md)
+the CPU's first actionable frame minus yours. Plus means you act first. [FRAME-STRIP.md](guide/frame-strip.md)
 is how to read the lanes, the stick row, and the readouts. The rc.5 clips are listed in
 [MEDIA.md](MEDIA.md).
 
@@ -148,7 +148,7 @@ two chords above don't fire while both triggers are held, and one trigger works 
 *+ Save last combo…* (Recording › Combos & Sequences) saves a combo you landed, and the combo helper grades your next
 attempts against it, link by link. A sequence of combos is drilled the same way, one combo after another. Each saved
 combo is a small JSON file in `sd:/ultimate/TrainingRooms/combos/`. You can edit it, copy it to another card or share
-it, and any fighter can practise it; [COMBOS.md](COMBOS.md) describes the format. The clip is under Combos
+it, and any fighter can practise it; [COMBOS.md](guide/combos.md) describes the format. The clip is under Combos
 below.
 
 ### CPU reactions
@@ -200,7 +200,7 @@ Stages) chooses between the game's respawn platform (above) and the instant resp
 A save state only warps, and Load starts nothing. Each role has one active macro, a recording or a chain, and
 that role's Play chord plays it without warping back on later loops. On the Recording page, Y does nothing and
 X cycles the loop only while the cursor is in Macros.
-[RECORDING.md](RECORDING.md) is how to use it. The pop-up and the Recording page are in that doc.
+[RECORDING.md](guide/recording.md) is how to use it. The pop-up and the Recording page are in that doc.
 What rc.6 changes is [RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md).
 
 **Clip** [`rc10-record-play-cpu.gif`](media/rc10-record-play-cpu.gif): Record on Player 1, then Play on CPU: the CPU does the recorded moves
@@ -217,7 +217,7 @@ start_observed slot=1`, then the CPU's status changes. The windows are listed in
 
 *Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): the pop-up lists no saves and no macros; Record
 on Player 1 and two jabs; the pop-up then lists "Macro 1" (Recorded on Mario) and its start save "Macro 1 · start".
-Playback is shown in [RECORDING.md](RECORDING.md). Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+Playback is shown in [RECORDING.md](guide/recording.md). Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 While an AI drives Player 1, for example the standalone CPU pilot, Record is refused, from the chord and from the
 pop-up: the notice reads "P1 is controlled by an AI: recording is off", and nothing is recorded. A recording that is

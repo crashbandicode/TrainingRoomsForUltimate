@@ -3,7 +3,7 @@
 Notes for players. rc.8 is the internal name; the release's version name is set when it ships. Until then the menu's
 footer shows this build as `0.2.0-rc.6 · rc8` and the commit it was built from (below). This draft lists what the rc.8
 head `3f9d61dd` contains for players, plus the CPU pilot plugin's 0.2.3, which ships beside it. How to use recording is
-[RECORDING.md](RECORDING.md), the frame strip is [FRAME-STRIP.md](FRAME-STRIP.md), and the pictures are the list in
+[RECORDING.md](guide/recording.md), the frame strip is [FRAME-STRIP.md](guide/frame-strip.md), and the pictures are the list in
 [MEDIA.md](MEDIA.md).
 
 ## New

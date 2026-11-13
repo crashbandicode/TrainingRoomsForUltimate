@@ -46,7 +46,7 @@ that ran them are listed under [Eden, rc.6](#eden-rc6).
     `engine::macro_ui::replay_target::clip_target`), then Switch loads that exact Mii on the CPU. An ordinary track's
     Switch loads its fighter. rc.6: the capture's import runs while the window waits for it (`Owners::REPLAY_LOADING`,
     `src/model/input_delay.rs`); the window's own Fighter Mismatch question is drawn (cov-rest `66a9a53`, `2891eaa`).
-  - **Recorded macros:** since rc.5 every macro is a named file ([RECORDING.md](RECORDING.md)). A CPU macro recorded on
+  - **Recorded macros:** since rc.5 every macro is a named file ([RECORDING.md](guide/recording.md)). A CPU macro recorded on
     an exact Mii asks Fighter Mismatch, and Switch loads that exact Mii (cov-rest `cbe961a`); one recorded on another
     ordinary fighter loads that fighter. Keep plays on the current CPU.
   - **A Mii without its own ID and name** (one from a replay keeps CharInfo bytes `0x00..0x26` zero): the CPU install
@@ -54,7 +54,7 @@ that ran them are listed under [Eden, rc.6](#eden-rc6).
     "New Mii". The game's own Mii setup binds no Mii resource for a CharInfo without them, and the body then read null
     memory (cov-rest `f2298ee`, `src/model/mii_install.rs` `installable`).
   - **Edit placement** and the **Setup library** (Saves › Setup library) are back. Edit placement edits the active
-    macro of the role in view ([RECORDING.md](RECORDING.md), Replays).
+    macro of the role in view ([RECORDING.md](guide/recording.md), Replays).
 - **Editor trace file** (`mii-editor-last.json`): diagnostic builds only; the fork wrote it in every build.
 - **Menu input gate:** the editor also waits while the game's pause or the native waiting-room menu is open (the
   shared `captures_input`), not only for the plugin menu.

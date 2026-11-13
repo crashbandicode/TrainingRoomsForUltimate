@@ -1,6 +1,6 @@
 # Media
 
-Every GIF in [`media/`](media/) is actual Eden footage: whole screen, 1280×720, one clip per behaviour, under 10 s,
+Every GIF in [`media/`](media) is actual Eden footage: whole screen, 1280×720, one clip per behaviour, under 10 s,
 game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
@@ -257,7 +257,7 @@ evidence clips stay outside git, in `artifacts/phase23/feature-gifs/evidence/`.
 
 ## rc.5 clips
 
-23 of the rows below are in [`media/`](media/), and the player docs embed them. Three more were there until
+23 of the rows below are in [`media/`](media), and the player docs embed them. Three more were there until
 2026-11-10, when clips that show the result replaced them (rc.6 docs clips above); they remain in the history up to
 `da26d632`. They are Eden footage of
 `p23/rc5-wire-fix` diag builds, and for the last three of `p23/rc6-hot-slots` diag builds, which add log lines only (the
@@ -349,7 +349,7 @@ Recording page. A row that says `rr-6` is not a capture of the old slot page. Re
 | `media/rc5-migration.gif` | `gif-migration` (`artifacts/phase23/rc6-combined/rows-docs-gifs`) | xps | RECORDING.md, Migration | first boot of a card from before the library | 8 s | Before boot, the card holds the old `save_states.json` with saves in indexes 1 and 2, the Save and Load chords on index 2, and `macros/selected.txt` naming `oldjab` (cov-rec's `boot/` card). Boot into Training. ZR+Right for the pop-up, Right to MACROS, B. ZR+Left. | SAVE STATES lists `Slot 2 (YYYY-MM-DD)` and `Slot 1 (YYYY-MM-DD)`, and Slot 2 is the bound save. MACROS lists `Old jab` as Player 1's active macro. Play runs it from where Player 1 stands; there is no warp. | yes |
 
 rc.5 has no sequence-drill row because rc.5 did not drill sequences. rc.6 drills them, and the clip is under rc.6
-clips above ([RECORDING.md](RECORDING.md), Sequences and the one drill). The migration clip shows what a card updated
+clips above ([RECORDING.md](guide/recording.md), Sequences and the one drill). The migration clip shows what a card updated
 from an earlier build carries over: its save indexes and its selected macro. Recording slots were never kept between
 boots (`src/model/library/migrate.rs`), so no card reaches the library with a recording slot that becomes
 `Slot N (date)`.

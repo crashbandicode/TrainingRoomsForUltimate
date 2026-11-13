@@ -3,7 +3,7 @@
 0.2.0-rc.5 was withdrawn before players ran it. Its contents ship in 0.2.0-rc.6, with the changes and corrections in
 [RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md).
 
-Notes for players. This is the build after `0.2.0-rc.3.1`. There is no separate `0.2.0-rc.4`. How to read the frame strip is [FRAME-STRIP.md](FRAME-STRIP.md). How to use recording is [RECORDING.md](RECORDING.md). The pictures for those pages are the list in [MEDIA.md](MEDIA.md).
+Notes for players. This is the build after `0.2.0-rc.3.1`. There is no separate `0.2.0-rc.4`. How to read the frame strip is [FRAME-STRIP.md](guide/frame-strip.md). How to use recording is [RECORDING.md](guide/recording.md). The pictures for those pages are the list in [MEDIA.md](MEDIA.md).
 
 ## Frame strip
 
@@ -26,7 +26,7 @@ Holding one direction long enough can freeze the strip. A new binned direction, 
 - The loop never warps back. Later passes continue from where the fighters are.
 - A chain starts at its first macro's start save, plays its recordings in order, and cannot contain a chain.
 - Save last combo still saves the combo you landed. A drilled combo counts without having to be a true combo. A different move drops.
-- Make combo plays the file under the cursor once on Player 1, from that file's own start save, and saves the links as a new combo named Combo N. Crop opens a handle screen and saves a new file. The original stays. Both rows are on the file's screen; what they do is in [RECORDING.md](RECORDING.md).
+- Make combo plays the file under the cursor once on Player 1, from that file's own start save, and saves the links as a new combo named Combo N. Crop opens a handle screen and saves a new file. The original stays. Both rows are on the file's screen; what they do is in [RECORDING.md](guide/recording.md).
 - A sequence is an ordered list of combos. You can build and edit sequences in this build; drilling a sequence comes in the next build. The helper drills one combo.
 - Play on a macro or a chain whose first macro was recorded on another fighter asks Fighter Mismatch first: Keep, Switch, or B to cancel. The frame strip is hidden while it is up.
 - The pop-up and the Recording page are how you bind a save, set a macro active, and drill.

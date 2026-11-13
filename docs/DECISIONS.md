@@ -1,7 +1,7 @@
 # Decisions for the operator
 
 2026-11-01. This page lists every operator decision of the menu proposal, one illustration per decision. In each
-picture the recommended option has a **green outline**. The images are in [`decisions/`](decisions/) and are drawn
+picture the recommended option has a **green outline**. The images are in [`decisions/`](decisions) and are drawn
 by `tools/render_decisions.py` in the menu mockup's style. Sources: `MENU-DRAFT.md` §4 (the menu questions keep
 their numbers), the specs' *Open questions* sections, `PROVENANCE.md` *Open questions* and `specs/SPEC-core-08` §10.
 

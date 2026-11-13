@@ -2,7 +2,7 @@
 
 Notes for players. 0.2.0-rc.5 was withdrawn before it ran on players' consoles, so this is the build after
 `0.2.0-rc.3.1`. Everything [RELEASE-NOTES-rc5.md](RELEASE-NOTES-rc5.md) lists is in it, with the changes below. How to
-use recording is [RECORDING.md](RECORDING.md), the Mii pages are [MII.md](MII.md), and the pictures are the list in
+use recording is [RECORDING.md](guide/recording.md), the Mii pages are [MII.md](MII.md), and the pictures are the list in
 [MEDIA.md](MEDIA.md).
 
 ## New
