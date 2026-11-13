@@ -173,6 +173,8 @@ again at once. After its getup, roll, jump or attack, the CPU can mash: the matc
 Getup, Ledge Roll, Ledge Jump or Ledge Attack) if one is set, otherwise Mash when Ledge Option is ticked in Mash
 Triggers.
 
+![The CPU hangs on the ledge: with Ledge Options Neutral Getup it climbs onto the stage; with Jump it jumps up from the ledge](../media/rc11-cpu-ledge-options.gif)<br>*Ledge Options: Neutral Getup, then Jump*
+
 More: [Situation overrides](../guide/cpu-behaviour.md#situation-overrides)
 
 ### Ledge Delay
@@ -185,6 +187,8 @@ How long the CPU waits on the ledge before its ledge option, counted from when i
 - **How:** A opens the delay pop-up. Tick values with A, or move down to Min or Max: A picks the handle up,
   Left/Right move it one step, Up/Down ten steps, A puts it down. While values are ticked the range is greyed, and the
   other way round; Y clears whichever is set. ZL ticks every value. B goes back.
+
+![Neutral Getup from the ledge: with no Ledge Delay the CPU climbs up at once; with 60 frames it hangs about a second first](../media/rc11-cpu-ledge-delay.gif)<br>*Ledge Delay: none, then 60 frames*
 
 More: [Delay rows](../guide/cpu-behaviour.md#delay-rows)
 
