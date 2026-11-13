@@ -293,7 +293,7 @@ pub static ROWS: [Row; 92] = [
       "The level of the AI that plays Player 1.\nHigher is stronger.") },
     // Saves > Save states
     r(STATES, "Save States", "save_state_enable", TOGGLE,
-      "On: the save and load chords work.\nOff: they do nothing."),
+      "On: the save and load chords work.\nOff: they show that Save States is Off."),
     r(STATES, "Mirroring", "save_state_mirroring", Control::Dropdown(&o::MIRRORING),
       "Flips the loaded state left to right.\nAlternate flips every load; Random flips by chance."),
     r(STATES, "Auto-load on death", "save_state_autoload", TOGGLE,

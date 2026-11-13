@@ -16,6 +16,7 @@ use model::state::hooks::{self, DeathParam};
 use model::state::machine::{FrameIn, Machine, Out, Placing, Request, Role, SituationIds, StatusNow};
 use model::state::place;
 use model::state::record::{Marker, SavedState};
+use model::state::refused::{Action, Refused};
 use model::state::settings::{DamageMode, Mirroring, StateSettings};
 
 const SITUATIONS: SituationIds = SituationIds { ground: 0, air: 2, cliff: 1 };
@@ -123,7 +124,7 @@ fn temporary_pair_uses_death_restore_without_mutating_any_numbered_record() {
     ]));
     assert_eq!(machine.record(Role::Player, 0), &persisted.player[0]);
     assert_eq!(machine.restoring_record(Role::Player, &settings).x, 10.0);
-    assert!(!machine.begin_load(&settings, &mut random));
+    assert_eq!(machine.begin_load(&settings, &mut random), Err(Refused::Temporary));
     for entry in [1, 0] {
         let out = machine.frame(
             &FrameIn {
@@ -136,6 +137,8 @@ fn temporary_pair_uses_death_restore_without_mutating_any_numbered_record() {
         );
         assert!(out.force_dead);
         assert!(out.capture.is_none() && out.saved_notice.is_none());
+        // rc.12: neither press is silent while the setup is placed.
+        assert!(matches!(out.refused, Some((_, Refused::Temporary))), "{:?}", out.refused);
         assert_eq!(machine.file, persisted);
     }
     for entry in [1, 0] {
@@ -370,6 +373,7 @@ fn state01_autoload_on_death() {
     assert!(!machine.is_loading(), "alive: nothing");
     let out = machine.frame(&FrameIn { dead: true, ..input(1) }, &on, &mut rng);
     assert!(out.stop_playback && machine.is_loading(), "a dead CPU loads");
+    assert_eq!(out.refused, None);
     let mut off = loaded();
     off.frame(&FrameIn { dead: true, ..input(0) }, &settings(), &mut rng);
     assert!(!off.is_loading(), "Auto Save States Off never loads on death");
@@ -388,6 +392,7 @@ fn state01_ignore_request_mid_load() {
     let sign = machine.mirror_sign;
     let again = request(&mut machine, &s, &mut rng);
     assert!(!again.stop_playback, "ignored");
+    assert_eq!(again.refused, Some((Action::Load, Refused::Loading)), "and it says so (rc.12)");
     assert_eq!(machine.mirror_sign, sign, "the sign is fixed at the request");
 }
 
@@ -640,9 +645,12 @@ fn an_empty_slot_loads_nothing_on_the_chord_or_a_death() {
     let mut random = rng();
     let chord = request(&mut machine, &settings, &mut random);
     assert!(!chord.stop_playback, "the Load chord started a load of an empty slot");
+    // rc.12 (no silent Load): the chord says the slot is empty; a death is not a press and says nothing.
+    assert_eq!(chord.refused, Some((Action::Load, Refused::Empty)));
     assert!(!machine.is_loading());
     let death = machine.frame(&FrameIn { dead: true, ..input(0) }, &settings, &mut random);
     assert!(!death.stop_playback && !death.force_dead, "a death started a load of an empty slot");
+    assert_eq!(death.refused, None, "Auto Save States on a death is not a press");
     assert!(!machine.is_loading());
     // One saved record is a save: the chord loads it.
     let mut machine = machine_with(saved(4.0, 0.0, 1.0, GROUND, 7), SavedState::never_saved(), 0);

@@ -15,6 +15,7 @@ use super::file::{SaveFile, SLOTS};
 use super::held_item::HeldItem;
 use super::place;
 use super::record::{Charge, Marker, SavedState, Steve};
+use super::refused::{Action, Refused};
 use super::settings::StateSettings;
 
 /// Which half of a slot.
@@ -193,6 +194,8 @@ pub struct Out {
     pub restored: Option<bool>,
     /// The Ice Climbers hand-off happened: Nana is placed next.
     pub nana_next: bool,
+    /// rc.12: the Save or Load chord this frame asked for and did not get, and why (the runtime logs it and shows it).
+    pub refused: Option<(Action, Refused)>,
 }
 
 /// The machine: both roles' slots and the load bookkeeping.
@@ -357,10 +360,13 @@ impl Machine {
 
     /// Accept a load request if none is in progress (OQ 5): pick the slot (a weighted random one when
     /// Randomize Slots has any, remembered), set both records to `KillPlayer`, choose the mirror sign.
-    /// Returns whether the request was accepted.
-    pub fn begin_load(&mut self, settings: &StateSettings, rng: &mut Rng) -> bool {
-        if self.is_loading() || self.temporary.is_some() {
-            return false;
+    /// `Err` says why the request was not accepted.
+    pub fn begin_load(&mut self, settings: &StateSettings, rng: &mut Rng) -> Result<(), Refused> {
+        if self.temporary.is_some() {
+            return Err(Refused::Temporary);
+        }
+        if self.is_loading() {
+            return Err(Refused::Loading);
         }
         let slot = match settings.randomize.pick(rng) {
             Some(slot) => {
@@ -372,10 +378,10 @@ impl Machine {
         // The active slot is the bound save: nothing bound leaves it empty, and an empty slot loads nothing
         // (RECORDING.md: "If none is bound, it does nothing").
         if !self.record(Role::Player, slot).is_saved() && !self.record(Role::Cpu, slot).is_saved() {
-            return false;
+            return Err(Refused::Empty);
         }
         self.start_load(slot, settings, rng);
-        true
+        Ok(())
     }
 
     fn start_load(&mut self, slot: usize, settings: &StateSettings, rng: &mut Rng) {
@@ -437,8 +443,16 @@ impl Machine {
         // 5.1 Load request.
         let auto = settings.autoload && marker == Marker::NoAction && input.dead;
         if (auto || input.load_chord) && !input.nana && !self.temporary_active() {
-            out.stop_playback = self.begin_load(settings, rng);
+            match self.begin_load(settings, rng) {
+                Ok(()) => out.stop_playback = true,
+                // rc.12: a refused Load chord says why; Auto Save States on a death is not a press.
+                Err(why) if input.load_chord => out.refused = Some((Action::Load, why)),
+                Err(_) => {}
+            }
             return out;
+        }
+        if input.load_chord && !input.nana && self.temporary_active() {
+            out.refused = Some((Action::Load, Refused::Temporary));
         }
 
         let slot = self.current_slot(settings);
@@ -473,6 +487,9 @@ impl Machine {
         }
 
         // 5.5 Save, at the end of every callback.
+        if input.save_chord && self.temporary_active() {
+            out.refused = Some((Action::Save, Refused::Temporary));
+        }
         if input.save_chord && !self.temporary_active() {
             self.mirror_sign = 1.0;
             let save_slot = usize::from(settings.slot).min(SLOTS - 1);

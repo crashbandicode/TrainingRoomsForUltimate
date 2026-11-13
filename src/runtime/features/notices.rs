@@ -173,6 +173,20 @@ pub fn take_delivered() -> Option<u8> {
     QUEUE.lock().take_delivered()
 }
 
+/// rc.12 (the console's Save and Load of 2026-11-13; "no silent no-ops"): a Save or Load that was asked for and not
+/// done logs one release line, and shows its notice unless the press visibly acted elsewhere. Any thread.
+pub fn save_state_refused(action: crate::model::state::refused::Action, why: crate::model::state::refused::Refused) {
+    crate::runtime::diag_log::diagnostic(format_args!(
+        "[TrainingRooms] save_state refused action={} reason={} owners={:#x}",
+        action.key(),
+        why.key(),
+        published::input_owners().bits()
+    ));
+    if let Some(text) = why.notice(action) {
+        post("Save State", text, 150, DEFAULT_COLOR);
+    }
+}
+
 /// A refusal text, shown for two seconds in the default colour.
 pub fn refuse(text: &'static str) {
     post("Input Recording", text, 120, DEFAULT_COLOR);

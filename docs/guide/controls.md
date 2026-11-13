@@ -103,8 +103,11 @@ On a GameCube controller the plugin reads ZL as L, ZR as R and R as Z. It has no
 
 With the Online Deluxe plugin installed:
 
-- While its window shows a settings page, chords that use the D-pad do nothing; the press goes to Online Deluxe. Its
-  Performance and Debug views don't hold them back.
+- While its window shows a settings page, a chord whose D-pad button Online Deluxe uses there does nothing; the press
+  goes to Online Deluxe. That is D-pad Up or Down with none of ZL, ZR, R and L held, or D-pad Left or Right with ZR
+  held (and not ZL). Of the default chords, only ZR + Left (Play on Player 1) and ZR + Right (Recording pop-up) wait;
+  Save and Load, Record, Playback, the cycles and Input display work beside the open page. Its Performance and Debug
+  views don't hold any back.
 - B + D-pad Up and your menu shortcuts still open this menu.
 - The Input display and Game speed chords don't fire while L is held, because Online Deluxe's L + R + D-pad Down
   contains R + D-pad Down. A chord of yours that uses L itself is not affected.

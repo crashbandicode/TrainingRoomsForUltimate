@@ -36,6 +36,7 @@ use crate::model::state::machine::{Done, FrameIn, Machine, Out, Placing, Request
 use crate::model::state::persist;
 use crate::model::state::pokemon::{self, Descriptor, Kinds, KirbyKinds, PtWait, Sound, SwitchEffect};
 use crate::model::state::record::{Marker, SavedState};
+use crate::model::state::refused::{Action, Refused};
 use crate::model::state::settings::StateSettings;
 use crate::model::storage::{self, FixedPath};
 use crate::runtime::alloc::HookScope;
@@ -584,7 +585,12 @@ struct Raw {
 /// # Safety
 /// `fighter` is the fighter object pointer the game passed to its on-frame function.
 pub unsafe fn on_fighter_frame(fighter: usize) {
-    if fighter == 0 || !CONSTS_READY.load(Ordering::Acquire) {
+    if fighter == 0 {
+        return;
+    }
+    if !CONSTS_READY.load(Ordering::Acquire) {
+        // rc.12: a Save or Load pressed before the step can run is answered now (requests arise only in Training).
+        refuse_pending(true, Refused::NotReady);
         return;
     }
     let entry = ((fighter + FIGHTER_ENTRY_FIELD) as *const i32).read();
@@ -625,7 +631,15 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     quick_reset::observe(&raw, nana);
     if role == Role::Player && !nana { setups::service(); }
     if !ENABLE.load(Ordering::Acquire) && !TEMPORARY.load(Ordering::Acquire) {
+        // rc.12: with Save States Off a Save or Load press is refused once, not kept for when it goes On.
+        refuse_pending(!nana && !reset_hub::cpu_operated(fighter), Refused::Off);
         return;
+    }
+    // rc.12: a CPU drives Player 1 (the CPU's body is the CPU's own), so no body takes the Load: say so.
+    if role == Role::Player && !nana && reset_hub::cpu_operated(fighter)
+        && chords::consume(crate::model::chords::Request::LoadState)
+    {
+        crate::runtime::features::notices::save_state_refused(Action::Load, Refused::PlayerIsCpu);
     }
 
     #[cfg(feature = "diag")]
@@ -810,6 +824,16 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     counts::report_if_due();
 }
 
+/// rc.12: the pending Save (and the Load, when this body may take it) are consumed and refused for `why`.
+fn refuse_pending(load_here: bool, why: Refused) {
+    if chords::consume(crate::model::chords::Request::SaveState) {
+        crate::runtime::features::notices::save_state_refused(Action::Save, why);
+    }
+    if load_here && chords::consume(crate::model::chords::Request::LoadState) {
+        crate::runtime::features::notices::save_state_refused(Action::Load, why);
+    }
+}
+
 /// Solo Popo (the roster cycle's feature) has removed Nana from this role: there is no second body to hand the record to, so a load
 /// must not wait for her (SPEC-state-01 §5.3 step 9: the fork skips the hand-off then; `character_roster::solo_popo_active` is the
 /// fact it published for exactly this). Lock-free reads, safe inside the machine's lock.
@@ -873,6 +897,9 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
     }
     if let Some(slot) = out.capture {
         capture(raw, nana, slot);
+    }
+    if let Some((action, why)) = out.refused {
+        crate::runtime::features::notices::save_state_refused(action, why);
     }
     if let Some(slot) = out.saved_notice {
         state_diag!("[TrainingRooms] state saved_notice slot={}", slot + 1);

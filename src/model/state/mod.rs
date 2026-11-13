@@ -30,6 +30,8 @@ pub mod pokemon;
 pub mod place;
 #[path = "record.rs"]
 pub mod record;
+#[path = "refused.rs"]
+pub mod refused;
 pub mod quick_reset;
 pub mod preview;
 #[path = "settings.rs"]

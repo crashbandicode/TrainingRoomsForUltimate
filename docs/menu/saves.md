@@ -14,7 +14,11 @@ The save states themselves (the files you bind, rename and delete) are listed on
 ### Save States
 
 On: the Save chord (ZL + D-pad Down) saves where both fighters are, and the Load chord (ZL + D-pad Up) puts them both
-back there. Off: the two chords do nothing, Auto-load on death stops, and a load already under way is cancelled.
+back there. Off: the two chords show "Save States is Off (Saves page)" instead, Auto-load on death stops, and a load
+already under way is cancelled. A Save or Load that doesn't happen for another reason (nothing bound, a load under way,
+the CPU playing Player 1) also says why in a notice; the list is in
+[Save states › Saving and loading](../guide/save-states.md#saving-and-loading). Both chords work while Online Deluxe's
+window is open.
 
 With it Off, a KO follows Fighters & Stages › [Respawn on platform](fighters-and-stages.md#respawn-on-platform): back
 at once, or on the revival platform.

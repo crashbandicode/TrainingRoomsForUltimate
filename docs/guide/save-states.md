@@ -14,9 +14,22 @@ setup library. The options are on the [Saves](../menu/saves.md) page.
 - **Save:** both fighters flash and the notice "Save State · Saved" appears. What was written is the
   [bound save](#the-bound-save).
 - **Load:** both fighters vanish in a short burst and are back at the saved spots. There is no notice.
-- Load only warps. It doesn't start a recording, and it stops one that is playing. A Load pressed while a load is still
-  under way is ignored.
+- Load only warps. It doesn't start a recording, and it stops one that is playing.
 - Both need Saves › [Save States](../menu/saves.md#save-states) On. It is On by default.
+- A Save or Load that doesn't happen says why in a "Save State" notice (rc.12):
+
+  | Notice | Why |
+  | --- | --- |
+  | Save States is Off (Saves page) | The Save States row is Off. |
+  | Nothing is saved here yet: Save first, or bind a save | Load with nothing [bound](#the-bound-save). |
+  | A load is already being placed | Load pressed while a load is still under way. |
+  | A setup is being placed: save (load) again after it | A setup, a preview or a Play warp is being placed. |
+  | A CPU drives Player 1: take Player 1 back to load | The CPU pilot or CPU control plays Player 1. |
+  | Online Deluxe's open page uses this button: close it to save (load) | A chord you moved onto a D-pad button Online Deluxe's open page uses. The default chords work beside it. |
+  | Both triggers are Online Deluxe's L + R: hold one of them | A GameCube controller with both triggers held. |
+  | Save states have not started in this match yet | The first moments of a match, before save states are ready. |
+
+  A press the open menu or the game speed pop-up uses there (ZL + D-pad Up pages the menu) shows no notice.
 - They work in Training, and in a waiting room while Fighters & Stages ›
   [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) is On.
 - To change the buttons, see [Controls › Changing a chord](controls.md#changing-a-chord).

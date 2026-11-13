@@ -83,6 +83,7 @@ pub unsafe fn on_poll(controller: usize) {
         // rc.8: the game speed hold's event and the input display toggle are acted on once `STATE` is released.
         let hold = detector.hold_event();
         let display = detector.consume(Request::InputDisplay);
+        let refused = detector.take_refused();
         PENDING.store(detector.has_pending_request(), Ordering::Release);
         #[cfg(feature = "diag")]
         {
@@ -92,9 +93,13 @@ pub unsafe fn on_poll(controller: usize) {
         }
         #[cfg(not(feature = "diag"))]
         let _ = passed;
-        (!block && chords::plus_shortcut_accepted(set, sample), chords::physical_mask(style, detector.hidden()), hold, display)
+        (!block && chords::plus_shortcut_accepted(set, sample), chords::physical_mask(style, detector.hidden()), hold, display, refused)
     };
-    let (accepted, chord_bits, hold, display) = accepted;
+    let (accepted, chord_bits, hold, display, refused) = accepted;
+    // rc.12: a Save or Load press the chords stood down says why (an owner or the speed hold: logged only).
+    if let Some((action, why)) = refused {
+        crate::runtime::features::notices::save_state_refused(action, why);
+    }
     crate::runtime::features::game_speed::on_hold(hold, style);
     crate::runtime::features::game_speed::training_apply();
     if display {

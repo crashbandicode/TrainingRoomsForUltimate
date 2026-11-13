@@ -18,7 +18,7 @@
 
 use core::fmt::Write;
 
-use super::chords::{deluxe_shoulders, glyph, logical, passes_without_l, Sample};
+use super::chords::{deluxe_rows_take, deluxe_shoulders, glyph, logical, passes_without_l, Sample};
 use super::menu::chord::Chord;
 use super::storage::FixedPath;
 
@@ -153,8 +153,10 @@ impl Hold {
                 return HoldEvent::Closed;
             }
             // A Left/Right is not a step while Online Deluxe has it: its L + R chords are held (L, or both triggers on a
-            // GameCube pad, and not in the chord; rc.8 and rc.9 C3), or it shows a page with rows (rc.9 C4).
-            let deluxe = deluxe_shoulders(Chord(self.open), sample) || sample.overlay;
+            // GameCube pad, and not in the chord; rc.8 and rc.9 C3), or its open page changes a value with it (rc.9 C4,
+            // narrowed in rc.12: only under its edit hold, ZR without ZL).
+            let lr = Chord((1 << logical::DPAD_LEFT) | (1 << logical::DPAD_RIGHT) | self.open);
+            let deluxe = deluxe_shoulders(Chord(self.open), sample) || (sample.overlay && deluxe_rows_take(lr, sample));
             let left = !deluxe && sample.pressed & (1 << logical::DPAD_LEFT) != 0;
             let right = !deluxe && sample.pressed & (1 << logical::DPAD_RIGHT) != 0;
             return match (left, right) {

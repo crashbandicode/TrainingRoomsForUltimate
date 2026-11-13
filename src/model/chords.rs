@@ -10,6 +10,7 @@
 use super::game_speed::{Hold, HoldEvent};
 use super::menu::chord::{Chord, BUTTONS};
 use super::menu_shortcuts::MenuShortcuts;
+use super::state::refused::{Action, Refused};
 
 /// The logical buttons, in the order of `Chord` and the chord settings' arrays.
 pub mod logical {
@@ -213,8 +214,6 @@ impl Sample {
     }
 }
 
-/// The four D-pad buttons.
-const DPAD: u16 = (1 << logical::DPAD_UP) | (1 << logical::DPAD_DOWN) | (1 << logical::DPAD_LEFT) | (1 << logical::DPAD_RIGHT);
 /// Both triggers: Online Deluxe's L + R on a GameCube pad.
 const TRIGGERS: u16 = (1 << logical::ZL) | (1 << logical::ZR);
 
@@ -227,12 +226,37 @@ pub fn deluxe_shoulders(chord: Chord, sample: Sample) -> bool {
     l_held || triggers
 }
 
+/// rc.12: whether this poll's press is the Save or the Load chord (it would raise the request if nothing stood it down).
+fn save_or_load_press(chords: &ChordSet, sample: Sample) -> Option<Action> {
+    [(Action::Save, chords.save_state), (Action::Load, chords.load_state)]
+        .into_iter()
+        .find(|(_, chord)| passes(*chord, sample))
+        .map(|(action, _)| action)
+}
+
+/// Online Deluxe 0.10.5's `selection_held`: while one of these is held, D-pad Up/Down move none of its rows (a GameCube
+/// pad's triggers arrive as this plugin's ZL and ZR, its Z as R).
+const DELUXE_SHOULDERS: u16 = (1 << logical::ZL) | (1 << logical::ZR) | (1 << logical::R) | (1 << logical::L);
+
+/// rc.12 (the console's Save and Load, 2026-11-13): whether an Online Deluxe page with rows acts on this chord's D-pad,
+/// by Deluxe 0.10.5's own rules (`overlay.rs`): Up/Down move its row only while none of ZL, ZR, R and L is held;
+/// Left/Right change its value only under its edit hold, ZR without ZL (on a GameCube pad its Z, this plugin's R). The
+/// chord's own buttons count as held.
+pub fn deluxe_rows_take(chord: Chord, sample: Sample) -> bool {
+    let held = chord.0 | sample.held;
+    let has = |button: u8| held & (1 << button) != 0;
+    let up_down = (1u16 << logical::DPAD_UP) | (1 << logical::DPAD_DOWN);
+    let left_right = (1u16 << logical::DPAD_LEFT) | (1 << logical::DPAD_RIGHT);
+    let edit_hold = if sample.gamecube { has(logical::R) } else { has(logical::ZR) && !has(logical::ZL) };
+    (chord.0 & up_down != 0 && held & DELUXE_SHOULDERS == 0) || (chord.0 & left_right != 0 && edit_hold)
+}
+
 /// Whether a chord row passes beside Online Deluxe (rc.8 and rc.9, `PLUGIN-SHORTCUT-CONFLICTS.md`):
-/// - C4: no row with a D-pad button while Deluxe shows a page with rows (they take D-pad Up/Down and ZR + Left/Right);
+/// - C4 (narrowed in rc.12): no row whose D-pad Deluxe acts on while it shows a page with rows (`deluxe_rows_take`);
 /// - C3: on a GameCube pad, no row with ZL or ZR, and no rc.8 row, while both triggers are held (Deluxe's L + R there);
 /// - rc.8 (`rc8_row`, Input display and Game speed): not while L is held (Deluxe's L + R + D-pad Down holds R + Down).
 pub fn passes_row(chord: Chord, sample: Sample, rc8_row: bool) -> bool {
-    if !passes(chord, sample) || (sample.overlay && chord.0 & DPAD != 0) {
+    if !passes(chord, sample) || (sample.overlay && deluxe_rows_take(chord, sample)) {
         return false;
     }
     let l = 1u16 << logical::L;
@@ -365,11 +389,18 @@ pub struct Detector {
     /// rc.8: the game speed hold and what the last poll did to it.
     hold: Hold,
     hold_event: HoldEvent,
+    /// rc.12: the Save or Load press this poll did not raise, and why (`take_refused`).
+    refused: Option<(Action, Refused)>,
 }
 
 impl Detector {
     pub const fn new() -> Self {
-        Self { pending: 0, swallow: 0, hidden: 0, hold: Hold::new(), hold_event: HoldEvent::Idle }
+        Self { pending: 0, swallow: 0, hidden: 0, hold: Hold::new(), hold_event: HoldEvent::Idle, refused: None }
+    }
+
+    /// The Save or Load press the last poll did not raise, and why; once (rc.12, "no silent no-ops").
+    pub fn take_refused(&mut self) -> Option<(Action, Refused)> {
+        self.refused.take()
     }
 
     /// What the last poll did to the game speed hold (the runtime opens, steps and closes the pop-up from it).
@@ -397,7 +428,9 @@ impl Detector {
     pub fn poll(&mut self, chords: &ChordSet, sample: Sample, blocked: bool) -> u16 {
         let was_open = self.hold.is_open();
         self.hold_event = self.hold.poll(chords.game_speed, sample, blocked);
+        self.refused = None;
         if blocked {
+            self.refused = save_or_load_press(chords, sample).map(|action| (action, Refused::Owner));
             self.hold_back(0, sample);
             return 0;
         }
@@ -405,6 +438,7 @@ impl Detector {
         // other chord fires then (ZL + D-pad Left would cycle the CPU), and its chord's buttons and D-pad Left/Right stay
         // from the game until each is released.
         if was_open || self.hold.is_open() {
+            self.refused = save_or_load_press(chords, sample).map(|action| (action, Refused::SpeedHold));
             self.hold_back(self.hold.hidden(), sample);
             return 0;
         }
@@ -423,6 +457,15 @@ impl Detector {
         ] {
             let pass = passes_row(chord, sample, request == Request::InputDisplay);
             if !pass {
+                let action = match request {
+                    Request::SaveState => Some(Action::Save),
+                    Request::LoadState => Some(Action::Load),
+                    _ => None,
+                };
+                if let Some(action) = action.filter(|_| passes(chord, sample)) {
+                    let deluxe = sample.overlay && deluxe_rows_take(chord, sample);
+                    self.refused = Some((action, if deluxe { Refused::DeluxeRows } else { Refused::GameCubeTriggers }));
+                }
                 continue;
             }
             fired |= chord.0;
@@ -770,13 +813,16 @@ mod tests {
         }
     }
 
-    /// rc.9 C4 (`PLUGIN-SHORTCUT-CONFLICTS.md`): while Online Deluxe shows a page with rows, they take D-pad Up/Down and
-    /// ZR + Left/Right (ZR + Right on its CPU Pilot page handed P1 to the CPU as TR opened the Recording pop-up). No row
-    /// with a D-pad button fires then, and none of its buttons is hidden from the game; the menu shortcuts and a row
-    /// without the D-pad are unchanged. Its Performance view is drawn without rows (the primary 2026-11-12 00:14Z): the
-    /// rows fire under it.
+    /// rc.9 C4 (`PLUGIN-SHORTCUT-CONFLICTS.md`), narrowed in rc.12: while Online Deluxe shows a page with rows, a row
+    /// stands down only where Deluxe acts on its D-pad (Deluxe 0.10.5 `overlay.rs`): Up/Down with none of ZL, ZR, R, L
+    /// held, and Left/Right under its edit hold, ZR without ZL (ZR + Right on its CPU Pilot page handed P1 to the CPU as
+    /// TR opened the Recording pop-up). The console of 2026-11-13 kept Deluxe's Settings page open through Training and
+    /// a waiting room, and Save and Load (ZL + D-pad Down/Up, which Deluxe ignores) did nothing, silently. A row that
+    /// stands down hides none of its buttons; a Save or Load press that does says why (`take_refused`). The menu
+    /// shortcuts and a row without the D-pad are unchanged; the Performance view has no rows.
     #[test]
-    fn deluxe_window_stands_the_dpad_rows_down() {
+    fn deluxe_window_stands_down_only_the_rows_it_takes() {
+        use crate::model::state::refused::{Action, Refused};
         use crate::model::deluxe_overlay::{
             rows_page_visible, DeluxeOverlayStateV1, DELUXE_ROWS_PAGE, DELUXE_WINDOW_VISIBLE,
         };
@@ -791,7 +837,11 @@ mod tests {
         let set = ChordSet::factory();
         let save = sample(&[logical::ZL, logical::DPAD_DOWN], &[logical::DPAD_DOWN]);
         let on_rows = save.with_overlay(unsafe { rows_page_visible(Some(rows_page)) });
-        assert_eq!(Detector::new().poll(&set, on_rows, false), 0, "a rows page: Save state stands down");
+        let mut detector = Detector::new();
+        assert_eq!(detector.poll(&set, on_rows, false), Request::SaveState.bit(), "a rows page: Save state fires");
+        assert_eq!(detector.take_refused(), None);
+        let load = sample(&[logical::ZL, logical::DPAD_UP], &[logical::DPAD_UP]).with_overlay(true);
+        assert_eq!(Detector::new().poll(&set, load, false), Request::LoadState.bit(), "a rows page: Load state fires");
         let on_performance = save.with_overlay(unsafe { rows_page_visible(Some(performance)) });
         assert_eq!(Detector::new().poll(&set, on_performance, false), Request::SaveState.bit(), "Performance: it fires");
         let rows = [
@@ -807,14 +857,46 @@ mod tests {
         ];
         for (request, chord) in rows {
             let press = Sample { held: chord.0, pressed: chord.0, ..Sample::default() };
+            // ZR + Left/Right are Deluxe's value edits; every other factory row's D-pad is left alone by it.
+            let taken = matches!(request, Request::PlayPlayer | Request::RecordingPopup);
             let mut detector = Detector::new();
-            assert_eq!(detector.poll(&set, press.with_overlay(true), false), 0, "{request:?} on a rows page");
-            assert_eq!(detector.hidden(), 0, "{request:?}: the game and Deluxe see the press");
+            let fired = detector.poll(&set, press.with_overlay(true), false);
+            if taken {
+                assert_eq!(fired, 0, "{request:?} on a rows page");
+                assert_eq!(detector.hidden(), 0, "{request:?}: the game and Deluxe see the press");
+            } else {
+                assert_eq!(fired & request.bit(), request.bit(), "{request:?} fires on a rows page");
+            }
             assert_eq!(Detector::new().poll(&set, press, false) & request.bit(), request.bit(), "{request:?} without it");
         }
+        // A Save rebound onto a D-pad Deluxe moves its rows with stands down there, and says so.
+        let mut menu = Snapshot::factory();
+        menu.set("save_state_save", &row(&[logical::X as usize, DPAD_UP as usize])).unwrap();
+        let rebound = ChordSet::factory().with_rows(&menu);
+        let mut detector = Detector::new();
+        assert_eq!(detector.poll(&rebound, sample(&[logical::X, DPAD_UP], &[DPAD_UP]).with_overlay(true), false), 0);
+        assert_eq!(detector.take_refused(), Some((Action::Save, Refused::DeluxeRows)));
+        assert_eq!(detector.take_refused(), None, "once");
+        // The other refusals of a Save or Load press: an input owner, both GameCube triggers, the speed hold.
+        let mut detector = Detector::new();
+        assert_eq!(detector.poll(&set, sample(&[logical::ZL, DPAD_UP], &[DPAD_UP]), true), 0);
+        assert_eq!(detector.take_refused(), Some((Action::Load, Refused::Owner)));
+        let gc = Sample { gamecube: true, ..sample(&[logical::ZL, logical::ZR, logical::DPAD_DOWN], &[logical::DPAD_DOWN]) };
+        let mut detector = Detector::new();
+        assert_eq!(detector.poll(&set, gc, false) & Request::SaveState.bit(), 0);
+        assert_eq!(detector.take_refused(), Some((Action::Save, Refused::GameCubeTriggers)));
+        let mut detector = Detector::new();
+        detector.poll(&set, sample(&[logical::R, DPAD_UP], &[DPAD_UP]), false);
+        assert_eq!(detector.poll(&set, sample(&[logical::R, logical::ZL, DPAD_UP], &[logical::ZL]), false), 0);
+        assert_eq!(detector.take_refused(), Some((Action::Load, Refused::SpeedHold)));
+        // A press that is not the chord (ZL held, nothing new) is no refusal.
+        let mut detector = Detector::new();
+        detector.poll(&set, sample(&[logical::ZL], &[]), true);
+        assert_eq!(detector.take_refused(), None);
         let mut detector = Detector::new();
         detector.poll(&set, sample(&[logical::R, DPAD_UP], &[DPAD_UP]).with_overlay(true), false);
-        assert_eq!(detector.hold_event(), crate::model::game_speed::HoldEvent::Idle, "the speed hold stays closed");
+        // R + D-pad Up holds a shoulder, so Deluxe moves no row: the speed hold opens beside the page (rc.12).
+        assert_eq!(detector.hold_event(), crate::model::game_speed::HoldEvent::Opened, "the speed hold opens");
         let mut detector = Detector::new();
         detector.poll(&set, sample(&[B, DPAD_UP], &[DPAD_UP]).with_overlay(true), false);
         assert!(detector.consume(Request::OpenMenu), "B + D-pad Up still opens the menu");

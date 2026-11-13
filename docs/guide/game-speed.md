@@ -46,6 +46,8 @@ More: [Waiting rooms](waiting-rooms.md)
 
 ## With Online Deluxe
 
-While Online Deluxe's window shows a settings page, or while L is held (its L + R chords), the chord doesn't open and
-D-pad Left and Right don't change the speed. A Game speed chord of yours that uses L itself isn't held back by L.
+While L is held (Online Deluxe's L + R chords), the chord doesn't open and D-pad Left and Right don't change the speed.
+A Game speed chord of yours that uses L itself isn't held back by L. With Online Deluxe's window open on a settings
+page, the default chord (R + D-pad Up) still opens and steps the speed, because Online Deluxe ignores the D-pad while R
+is held; a chord of yours on a D-pad button that page uses waits.
 [Controls › Online Deluxe](controls.md#online-deluxe) has the details.
