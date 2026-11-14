@@ -408,8 +408,8 @@ pub fn hot_list_frame(menu: &Menu, title: &str, footer: &str, rows: &[(String, S
         });
         let first = window_start(cursor, rows.len());
         let shown = hot.min(first + ROW_LINES).saturating_sub(first);
-        let _ = shown; // stub
-        // stub
+        frame.outline[0] = (shown > 0).then_some((0, shown as u8));
+        frame.hairline = (rows.len() > 5 && (first..first + ROW_LINES).contains(&4)).then(|| (4 - first) as u8);
     }
     for (line, text) in footer.split('\n').take(2).enumerate() {
         let _ = frame.help[line].write_str(text);

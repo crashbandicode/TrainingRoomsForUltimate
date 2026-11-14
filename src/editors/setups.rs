@@ -68,8 +68,7 @@ pub struct Screens {
 }
 
 pub const SETUP: Screens = Screens { own: &OWN, ask: &ASK };
-pub const LAYOUT: Screens = Screens { own: &OWN, ask: &ASK }; // stub
-const _: [&[Row]; 2] = [&LAYOUT_OWN, &LAYOUT_ASK];
+pub const LAYOUT: Screens = Screens { own: &LAYOUT_OWN, ask: &LAYOUT_ASK };
 
 const OWN: [Row; 4] = [
     ("restore", "Restore here", "Both fighters move there when you close the menu."),
@@ -116,7 +115,7 @@ impl Pane {
             (Self::Own(id), "restore") => Step::Choose(id.clone(), true),
             (Self::Own(id), "load") => Step::Choose(id.clone(), false),
             (Self::Own(id), "rename") => Step::Rename(id.clone()),
-            // stub
+            (Self::Own(id), "duplicate") => Step::Duplicate(id.clone()),
             (Self::Own(id), _) => Step::Open(Self::Delete(id.clone())),
             (Self::Delete(id), "delete") => Step::Remove(id.clone()),
             (Self::Delete(id), _) => Step::Open(Self::Own(id.clone())),

@@ -166,14 +166,13 @@ pub fn all(root: &Path) -> (Vec<(String, Layout)>, usize) {
 pub fn listed(all: &[(String, Layout)], stage: i32) -> (Vec<(String, Layout)>, usize) {
     let mine: Vec<(String, Layout)> = all.iter().filter(|e| e.1.stage == stage).cloned().collect();
     let hot = hot_five(mine.iter().map(|e| (e.0.as_str(), e.1.used)));
-    let _ = hot;
-    (mine, 0) // stub
+    (ordered(&mine, &hot, |e| &e.0, |e| &e.1.name).into_iter().cloned().collect(), hot.len())
 }
 
 /// The game thread's copy of the hot five (the first `hot` of `listed`), in fixed storage.
 pub fn five(listed: &[(String, Layout)], hot: usize) -> Five {
     let mut out = [None; HOT];
-    for (slot, (id, layout)) in out.iter_mut().zip(listed.iter().take(hot * 0)) {
+    for (slot, (id, layout)) in out.iter_mut().zip(listed.iter().take(hot)) {
         let mut h = Hot { id: FixedPath::new(), name: FixedPath::new(), n: layout.targets.len().min(MAX) as u8, at: [[0.0; 2]; MAX] };
         let _ = (h.id.write_str(cut(id, 48)), h.name.write_str(cut(&layout.name, 64)));
         for (d, t) in h.at.iter_mut().zip(&layout.targets) {
@@ -203,8 +202,7 @@ pub fn save_new(root: &Path, stage: i32, stage_name: &str, targets: &[[f32; 2]])
     let (all, _) = all(root);
     let names = all.iter().filter(|e| e.1.stage == stage).map(|e| e.1.name.as_str());
     let name = lowest_free(|n| format!("Layout {n} · {stage_name}"), names);
-    let _ = (name, next_use(&all), targets);
-    Err(StoreError::NoFreeId) // stub
+    library(root).save_new(&Layout { schema_version: 1, name, stage, used: next_use(&all), targets: targets.to_vec() })
 }
 
 /// A use of the file `id` (a load, or a rename to `name`): it becomes the newest of its stage's hot five, in its own file.
@@ -214,15 +212,14 @@ pub fn use_file(root: &Path, id: &str, name: Option<&str>) -> Result<(), StoreEr
     if let Some(name) = name {
         layout.name = name.trim().to_owned();
     }
-    let _ = (next_use(&all), layout);
-    Ok(()) // stub
+    layout.used = next_use(&all);
+    lib.overwrite(id, &layout)
 }
 
 /// Duplicate: a copy of `id` as a new file, `Layout N · <stage>`, used last. The copy's id.
 pub fn duplicate(root: &Path, id: &str, stage_name: &str) -> Result<String, StoreError> {
     let layout = library(root).load(id)?;
-    let _ = (layout, stage_name);
-    Err(StoreError::NoFreeId) // stub
+    save_new(root, layout.stage, stage_name, &layout.targets)
 }
 
 /// A count of targets: `1 target`, `6 targets`.
@@ -237,8 +234,7 @@ pub fn list_footer(rows: &[(String, Layout)], cursor: usize, skipped: usize) -> 
         |(_, l)| format!("{} · {}", l.name, targets_label(l.targets.len())),
     );
     let note = if skipped > 0 { format!("   {skipped} files skipped") } else { String::new() };
-    let _ = (first, note);
-    String::new() // stub
+    format!("{first}\nA open   B back{note}")
 }
 
 /// Whether `[Eggs-ercise, Break the Targets]` are On (any option but Off). The two cannot run together: the menu turns Off the
@@ -522,7 +518,7 @@ impl Btt {
                 _ if !zl || !pressed(k) => {}
                 0 => self.none(),
                 // The first step shows the newest; then one along, round the five.
-                _ => {} // stub
+                _ => (self.pick, self.msg.1) = (Some(self.pick.map_or(0, |p| (p + d) % count)), 0),
             }
         }
         if p.save {
@@ -559,7 +555,7 @@ impl Btt {
             for (d, t) in at.iter_mut().zip(self.layout()) {
                 *d = t.map(|v| (v * 10.0).round() / 10.0);
             }
-            let _ = at; // stub
+            self.ask = Some(Ask::Save(self.stage, self.n as u8, at));
         }
     }
 
@@ -567,7 +563,8 @@ impl Btt {
     fn load(&mut self, pick: usize) {
         match self.five[pick] {
             Some(h) => {
-                let _ = h; // stub
+                self.apply(h);
+                self.ask = Some(Ask::Use(h.id));
             }
             None => self.none(),
         }
@@ -585,7 +582,7 @@ impl Btt {
         self.five = core::array::from_fn(|_| rest.next());
         let count = self.count();
         self.pick = self.pick.filter(|p| *p < count);
-        // stub
+        self.ask = Some(Ask::Delete(h.id));
         self.say(false, format_args!("Deleted: {}", h.name.as_str()));
     }
 
