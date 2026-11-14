@@ -550,15 +550,14 @@ pub fn parse(text: &str) -> Loaded {
     for key in &top.others.duplicates {
         issues.push(Issue { at: key.clone(), reason: Reason::DuplicateKey });
     }
-    let [menu, defaults] = [("menu", top.menu), ("defaults_menu", top.defaults)].map(|(label, rows)| {
-        let mut snapshot = snapshot_from(label, rows, &mut issues);
-        // The two practice games exclude each other (tt::exclusive): a file with both On keeps Eggs-ercise.
-        let eggs = snapshot.get("eggsercise").is_some_and(|r| r.iter().skip(1).any(|v| *v != 0));
-        if eggs && snapshot.get("btt").is_some_and(|r| r.get(1).is_some_and(|v| *v != 0)) {
-            let _ = snapshot.set("btt", &[1, 0]);
+    let mut menu = snapshot_from("menu", top.menu, &mut issues);
+    let mut defaults = snapshot_from("defaults_menu", top.defaults, &mut issues);
+    // The two practice games exclude each other (`btt::on`): a file with both On keeps Eggs-ercise.
+    for rows in [&mut menu, &mut defaults] {
+        if super::btt::on(rows) == [true; 2] {
+            let _ = rows.set("btt", &[1, 0]);
         }
-        snapshot
-    });
+    }
     let mut extra = Map::new();
     for (key, value) in top.others.items {
         if !RETIRED.contains(&key.as_str()) {

@@ -2,7 +2,6 @@
 
 pub mod btt;
 pub mod btt_camera;
-pub mod btt_files;
 pub mod chords;
 pub mod combo;
 pub mod cpu;

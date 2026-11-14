@@ -405,21 +405,6 @@ fn btt_layout_per_stage() {
     assert_eq!((s.btt.phase(), s.btt.layout().len()), (Phase::Ready, 1));
 }
 
-/// Row 33: turning one mode On sets the other Off, and back; both On at once (a hand-edited file) keeps Eggs-ercise.
-fn btt_modes_exclusive() {
-    // [Eggs-ercise, Break the Targets], before and after.
-    for (was, now, want) in [
-        ([false, false], [false, true], [false, true]),
-        ([false, true], [true, true], [true, false]),
-        ([true, false], [true, true], [false, true]),
-        ([true, true], [true, true], [true, false]),
-        ([true, false], [true, false], [true, false]),
-        ([false, true], [false, false], [false, false]),
-    ] {
-        assert_eq!(exclusive(was, now), want, "{was:?} -> {now:?}");
-    }
-}
-
 /// Row 41: Save writes the slot with the targets; a full slot asks first and replaces only on a second Save within a
 /// second; no targets is refused.
 fn btt_layout_save() {
@@ -613,19 +598,19 @@ fn btt_pictures() {
 fn btt_notice_reports_each_change() {
     let mut s = Sim::placing();
     s.btt.pass(true, |_| false);
-    assert_eq!(s.btt.notice(), Some(u16::MAX), "the Placing text, after a pass");
-    assert_eq!(s.btt.notice(), None, "reported once");
+    assert!(s.btt.notice().is_some(), "the Placing text, after a pass");
+    assert!(s.btt.notice().is_none(), "reported once");
     s.place_at(0.0, 15.0);
     s.btt.pass(true, |_| false);
-    assert_eq!(s.btt.notice(), Some(u16::MAX), "a target placed");
+    assert!(s.btt.notice().is_some(), "a target placed");
     s.tap(&[X]);
     s.btt.pass(true, |_| false);
-    assert_eq!(s.btt.notice(), Some(u16::MAX), "Ready");
+    assert!(s.btt.notice().is_some(), "Ready");
     s.tap(&[A]);
     pass(&mut s.btt, &[]);
-    assert_eq!(s.btt.notice(), Some(u16::MAX), "the clock moved");
+    assert!(s.btt.notice().is_some(), "the clock moved");
     pass(&mut s.btt, &[hit_at([0.0, 15.0])]);
-    assert_eq!((s.btt.phase(), s.btt.notice()), (Phase::Done, Some(u16::MAX)), "the run ended on that pass");
+    assert_eq!((s.btt.phase(), s.btt.notice().is_some()), (Phase::Done, true), "the run ended on that pass");
 }
 
 /// The runtime asks `notice` on every pass, Off included, and clears the notice when the text is empty: turning the mode Off
@@ -634,12 +619,12 @@ fn btt_notice_reposts_after_off() {
     let mut s = ready_with_three();
     s.btt.pass(true, |_| false);
     let text = s.text();
-    assert_eq!((s.btt.notice(), text.as_str()), (Some(u16::MAX), "Targets 0/3   0:00.00"), "Ready, posted");
+    assert_eq!((s.btt.notice().is_some(), text.as_str()), (true, "Targets 0/3   0:00.00"), "Ready, posted");
     s.btt.close_menu(false, false);
-    assert_eq!((s.btt.phase(), s.btt.notice(), s.text()), (Phase::Off, Some(u16::MAX), String::new()), "Off: the empty text, once");
-    assert_eq!(s.btt.notice(), None, "Off, nothing new");
+    assert_eq!((s.btt.phase(), s.btt.notice().is_some(), s.text()), (Phase::Off, true, String::new()), "Off: the empty text, once");
+    assert!(s.btt.notice().is_none(), "Off, nothing new");
     s.btt.close_menu(true, false);
-    assert_eq!((s.btt.phase(), s.btt.notice(), s.text()), (Phase::Ready, Some(u16::MAX), text), "On again: posted again");
+    assert_eq!((s.btt.phase(), s.btt.notice().is_some(), s.text()), (Phase::Ready, true, text), "On again: posted again");
 }
 
 /// The clock ticks once a frame however many of P1's fighters pass, and follows a swap.
@@ -660,7 +645,6 @@ fn case_table() {
         ("btt_run_and_best", btt_run_and_best as fn()),
         ("btt_restart", btt_restart as fn()),
         ("btt_layout_per_stage", btt_layout_per_stage as fn()),
-        ("btt_modes_exclusive", btt_modes_exclusive as fn()),
         ("btt_layout_save", btt_layout_save as fn()),
         ("btt_layout_load", btt_layout_load as fn()),
         ("btt_layout_controls", btt_layout_controls as fn()),

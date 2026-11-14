@@ -218,10 +218,12 @@ pub mod natives {
         if !super::granted(sites_pkg2::CHANGE_ACTIVE_CAMERA_OFFSET) {
             return None;
         }
-        let (vtable, text_end) = (text_base() + sites_pkg2::CAMERA_FUNCTOR_VTABLE, skyline::hooks::getRegionAddress(skyline::hooks::Region::Rodata) as usize);
+        let vtable = text_base() + sites_pkg2::CAMERA_FUNCTOR_VTABLE;
+        let text_end = skyline::hooks::getRegionAddress(skyline::hooks::Region::Rodata) as usize;
+        let read = |p: usize| (p as *const usize).read_volatile();
         // A pointer into `.text`, 4-aligned: what a function slot holds.
         let code = |p: usize| p >= text_base() && p < text_end && p & 3 == 0;
-        if !(code(((vtable + 0x20) as *const usize).read_volatile()) && code(((vtable + 0x28) as *const usize).read_volatile())) {
+        if !(code(read(vtable + 0x20)) && code(read(vtable + 0x28))) {
             return None;
         }
         #[repr(C, align(16))]
@@ -233,8 +235,7 @@ pub mod natives {
         // As every game caller does: destroy the callable the call left (in place through slot 0x20, on the heap through 0x28).
         let live = std::ptr::read_volatile(&functor.0[4]);
         if live != 0 && live & 7 == 0 {
-            let table = (live as *const usize).read_volatile();
-            let slot = ((table + if live == this { 0x20 } else { 0x28 }) as *const usize).read_volatile();
+            let slot = read(read(live) + [0x28, 0x20][usize::from(live == this)]);
             if code(slot) {
                 let destroy: extern "C" fn(usize) = std::mem::transmute(slot);
                 destroy(live);

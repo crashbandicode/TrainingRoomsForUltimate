@@ -111,7 +111,6 @@ pub unsafe fn on_poll(controller: usize) {
     if display {
         crate::runtime::ui::worker::request_input_display_toggle();
     }
-    const FIELDS: [usize; 4] = [field::CURRENT_BUTTONS, field::PREVIOUS_BUTTONS, field::JUST_DOWN, field::JUST_RELEASE];
     if chords::clear_plus_bits(modal, accepted) {
         for offset in FIELDS {
             let at = (controller + offset) as *mut u32;
@@ -135,8 +134,13 @@ pub unsafe fn on_poll(controller: usize) {
 /// The controller fields `on_poll` changed for the mapping call, to put back when it returns.
 static HIDDEN: Mutex<Option<(usize, [u32; 8])>> = Mutex::new(None);
 
+/// The controller's four button sets.
+const FIELDS: [usize; 4] = [field::CURRENT_BUTTONS, field::PREVIOUS_BUTTONS, field::JUST_DOWN, field::JUST_RELEASE];
 /// The button sets and the four stick axes on_poll may change for the mapping call.
-const HIDDEN_FIELDS: [usize; 8] = [field::CURRENT_BUTTONS, field::PREVIOUS_BUTTONS, field::JUST_DOWN, field::JUST_RELEASE, field::STICKS[0], field::STICKS[1], field::STICKS[2], field::STICKS[3]];
+const HIDDEN_FIELDS: [usize; 8] = {
+    let [b, s] = [FIELDS, field::STICKS];
+    [b[0], b[1], b[2], b[3], s[0], s[1], s[2], s[3]]
+};
 
 /// The mapping call returned (the apply hook): the chord's buttons go back into the controller.
 ///

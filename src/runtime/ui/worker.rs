@@ -735,17 +735,10 @@ fn sync_panels(s: &mut Session) {
             }
         } else if let Some(editor) = entered.filter(|e| layouts::is_layouts(*e)) {
             // Break the Targets' Saved layouts (SPEC V2.5): a list panel, like the saved combos.
-            match s.layouts.open() {
-                Ok(()) => {
-                    s.phase = Phase::Panel;
-                    s.panel = Some(editor);
-                }
-                Err(note) => {
-                    layouts::note(&note);
-                    if let Some(m) = s.menu.as_mut() {
-                        m.press(Button::B);
-                    }
-                }
+            if s.layouts.open() {
+                (s.phase, s.panel) = (Phase::Panel, Some(editor));
+            } else if let Some(m) = s.menu.as_mut() {
+                m.press(Button::B);
             }
         } else if let Some(editor) = entered {
             let slot = s.menu.as_ref().and_then(record_slot);
@@ -1158,10 +1151,7 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     // rc.14: every close with Eggs-ercise on starts a fresh run.
     crate::runtime::features::hitbox::eggs_start();
     // rc.14 Break the Targets: Place targets asks for the placing view; every close tells the mode (after the publish above).
-    if outbox.place_targets {
-        crate::runtime::features::btt::request_place();
-    }
-    crate::runtime::features::btt::menu_closed();
+    crate::runtime::features::btt::menu_closed(outbox.place_targets);
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(10);
     // The carried engines read the typed view of the committed settings (decision D1).

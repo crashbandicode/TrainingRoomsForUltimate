@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use hos_lock::Mutex;
 
-use crate::model::btt_camera::{self as model, Camera};
+use crate::model::btt::{self as model, Camera};
 use crate::model::sites_pkg2;
 use crate::runtime::game::{self, natives};
 use crate::runtime::scene;

@@ -106,7 +106,7 @@ fn run() {
         #[cfg(feature = "diag")]
         diag_requests();
         // rc.14 Break the Targets: the saved layouts' reads and writes (tt_files).
-        super::btt_files::service();
+        super::btt::service();
         let shortcuts = SHORTCUTS.lock().take();
         if let Some(shortcuts) = shortcuts {
             write_shortcuts(shortcuts);

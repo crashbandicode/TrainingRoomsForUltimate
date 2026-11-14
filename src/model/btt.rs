@@ -124,14 +124,10 @@ pub fn write(root: &Path, stage: i32, slots: &Slots) -> std::io::Result<()> {
     super::store::write_replace(&path(root, stage), render(slots, stage).as_bytes())
 }
 
-/// Break the Targets and Eggs-ercise cannot run together: of `[Eggs-ercise, Break the Targets]` the one turned On last wins;
-/// both On with neither new (a hand-edited file) keeps Eggs-ercise.
-pub fn exclusive(was: [bool; 2], now: [bool; 2]) -> [bool; 2] {
-    match now {
-        [true, true] if was[1] => [true, false],
-        [true, true] => [false, true],
-        _ => now,
-    }
+/// Whether `[Eggs-ercise, Break the Targets]` are On (any option but Off). The two cannot run together: the menu turns Off the
+/// one not turned On last, and a settings file with both On (hand-edited) keeps Eggs-ercise.
+pub fn on(rows: &super::settings::Snapshot) -> [bool; 2] {
+    ["eggsercise", ROW].map(|id| rows.get(id).is_some_and(|r| r.iter().skip(1).any(|v| *v != 0)))
 }
 
 /// The layout's identity for the session's best: its target positions to half a unit, in no order.
@@ -257,7 +253,7 @@ impl Btt {
         let mut text = FixedPath::<64>::new();
         let _ = text.write_fmt(args);
         let yes = ask && self.msg.1 > 0 && self.msg.0.as_str() == text.as_str();
-        self.msg = if yes { (FixedPath::new(), 0) } else { (text, if ask { ASK } else { SHOW }) };
+        self.msg = [(text, [SHOW, ASK][usize::from(ask)]), (FixedPath::new(), 0)][usize::from(yes)];
         yes
     }
 
@@ -296,12 +292,14 @@ impl Btt {
         if stage == self.stage {
             return false;
         }
-        let i = self.kept.iter().position(|k| k.0 == self.stage).unwrap_or_else(|| {
+        let old = self.kept.iter().position(|k| k.0 == self.stage);
+        let i = old.unwrap_or_else(|| {
             self.kept.rotate_left(1);
             KEPT - 1
         });
         self.kept[i] = (self.stage, self.at, self.n);
-        let (_, at, n) = self.kept.iter().find(|k| k.0 == stage).copied().unwrap_or((stage, [[0.0; 2]; MAX], 0));
+        let kept = self.kept.iter().find(|k| k.0 == stage).copied();
+        let (_, at, n) = kept.unwrap_or((stage, [[0.0; 2]; MAX], 0));
         (self.stage, self.at, self.n, self.slots) = (stage, at, n, [None; SLOTS]);
         (self.bad, self.pick) = (false, None);
         match self.phase {
@@ -332,7 +330,8 @@ impl Btt {
     /// One P1 poll, before the game maps it: true while the game must not see the controller (Placing). In Ready the first
     /// input starts the clock: a button, or the stick leaving its dead zone after it had been inside it.
     pub fn feed(&mut self, p: Pad) -> bool {
-        let (was, hide) = (core::mem::replace(&mut self.was, p.held), self.phase == Phase::Placing);
+        let was = core::mem::replace(&mut self.was, p.held);
+        let hide = self.phase == Phase::Placing;
         match self.phase {
             Phase::Placing => self.placing(p, was),
             Phase::Ready => {
@@ -349,16 +348,18 @@ impl Btt {
 
     fn placing(&mut self, p: Pad, was: u16) {
         let b = bounds(self.range, self.view, self.ground);
-        let (down, pressed) = (|k: u8| p.held & bit(k) != 0, |k: u8| p.pressed & bit(k) != 0);
+        let down = |k: u8| p.held & bit(k) != 0;
+        let pressed = |k: u8| p.pressed & bit(k) != 0;
         let (zl, held_b, slot) = (down(ZL), down(B), self.pick.unwrap_or(0));
         self.msg.1 = self.msg.1.saturating_sub(1);
         // The cursor: the stick, and the D-pad a unit a press, repeating from the 15th frame held (not with ZL or B: chords).
         let pad = p.held & DPAD;
-        self.rep = if pad == 0 || pad != was & DPAD { 0 } else { self.rep.saturating_add(1) };
-        let step = f32::from(pad != 0 && !zl && !held_b && (self.rep == 0 || self.rep >= 15 && self.rep % 2 == 1));
+        self.rep = self.rep.saturating_add(1) * u8::from(pad != 0 && pad == was & DPAD);
+        let repeat = self.rep == 0 || self.rep >= 15 && self.rep % 2 == 1;
+        let step = f32::from(pad != 0 && !zl && !held_b && repeat);
         let unit = [[DPAD_RIGHT, DPAD_LEFT], [DPAD_UP, DPAD_DOWN]].map(|[hi, lo]| step * (f32::from(down(hi)) - f32::from(down(lo))));
         for (i, range) in b.into_iter().enumerate() {
-            let tilt = if p.stick[i].abs() < DEAD { 0.0 } else { p.stick[i] * SPEED };
+            let tilt = p.stick[i] * SPEED * f32::from(p.stick[i].abs() >= DEAD);
             self.cursor[i] = (self.cursor[i] + tilt + unit[i]).clamp(range[0], range[1]);
         }
         // B removes the last target on release, if nothing else was pressed while it was held.
@@ -399,9 +400,10 @@ impl Btt {
     /// A places a target at the cursor: not an 11th, not on another.
     fn put(&mut self) {
         let c = self.cursor;
+        let near = |t: &[f32; 2]| (t[0] - c[0]).hypot(t[1] - c[1]) < APART;
         if self.n == MAX {
             self.say(false, format_args!("{MAX} targets: B removes the last"));
-        } else if self.layout().iter().any(|t| (t[0] - c[0]).hypot(t[1] - c[1]) < APART) {
+        } else if self.layout().iter().any(near) {
             self.say(false, format_args!("Too close to another target"));
         } else {
             (self.at[self.n], self.n, self.msg.1) = (c, self.n + 1, 0);
@@ -410,13 +412,19 @@ impl Btt {
 
     /// The layout to slot `s`; a full slot asks first.
     fn save(&mut self, s: usize) {
+        let k = s + 1;
         if self.n == 0 {
             self.say(false, format_args!("Place at least one target"));
-        } else if self.slots[s].is_none_or(|old| self.say(true, format_args!("Slot {} has {} targets: save again to replace", s + 1, old.n))) {
-            let mut slot = Slot { n: self.n as u8, at: [[0.0; 2]; MAX] };
-            slot.at.iter_mut().zip(self.layout()).for_each(|(d, t)| *d = t.map(|v| (v * 10.0).round() / 10.0));
-            (self.slots[s], self.bad, self.write) = (Some(slot), false, true);
-            self.say(false, format_args!("Slot {} · Saved", s + 1));
+        } else if self.slots[s].is_none_or(|old| {
+            self.say(true, format_args!("Slot {k} has {} targets: save again to replace", old.n))
+        }) {
+            let mut at = [[0.0; 2]; MAX];
+            for (d, t) in at.iter_mut().zip(self.layout()) {
+                *d = t.map(|v| (v * 10.0).round() / 10.0);
+            }
+            let n = self.n as u8;
+            (self.slots[s], self.bad, self.write) = (Some(Slot { n, at }), false, true);
+            self.say(false, format_args!("Slot {k} · Saved"));
         }
     }
 
@@ -442,8 +450,9 @@ impl Btt {
 
     /// One pass of Player 1 (`tick`: the clock's frame): the clock runs while Running, and `hit(spot)` says whether a live hit of P1's
     /// breaks the unbroken target there (`eggs::breaks`; the caller also owns the hitlag and the break animation). The last target
-    /// ends the run on that frame. The notice's change is `notice`'s, asked by the caller after the pass: the pass does not use it up.
-    pub fn pass(&mut self, tick: bool, mut hit: impl FnMut([f32; 2]) -> bool) {
+    /// ends the run on that frame. The number of targets broken; the notice is the caller's to take (`notice`), after the pass.
+    pub fn pass(&mut self, tick: bool, mut hit: impl FnMut([f32; 2]) -> bool) -> u8 {
+        let was = self.broken;
         eggs::age(&mut self.bursts, tick);
         match self.phase {
             Phase::Running => {
@@ -465,6 +474,7 @@ impl Btt {
             }
             _ => {}
         }
+        (self.broken & !was).count_ones() as u8
     }
 
     /// The run is over: the clock stops, and the session's best for this layout.
@@ -480,13 +490,13 @@ impl Btt {
         self.best[i].1 = self.top;
     }
 
-    /// The notice's length when its text changed since the last call (a standing notice: until the next change).
-    pub fn notice(&mut self) -> Option<u16> {
+    /// The notice's text when it changed since the last call (a standing notice: until the next change).
+    pub fn notice(&mut self) -> Option<FixedPath<96>> {
         let mut text = FixedPath::<96>::new();
         let _ = self.write_notice(&mut text);
         let changed = text.as_str() != self.shown.as_str();
         self.shown = text;
-        changed.then_some(u16::MAX)
+        changed.then_some(text)
     }
 
     /// The notice (SPEC V2.5): `Place targets 3/10   A place  B undo  X start`, `Targets 4/10   0:07.12`, `Done! 10 in
@@ -514,6 +524,76 @@ impl Btt {
     }
 }
 
+/// A line of the Saved layouts list: `Slot 2 · 6 targets` or `Slot 3 · empty`. The plugin has no calendar date to show.
+pub fn slot_label(index: usize, slot: Option<&Slot>) -> String {
+    match slot {
+        None => format!("Slot {} · empty", index + 1),
+        Some(s) => format!("Slot {} · {} target{}", index + 1, s.n, if s.n == 1 { "" } else { "s" }),
+    }
+}
+
+/// The list's footer: its first line (the focused row) and this screen's buttons.
+pub fn layouts_footer(library_footer: &str) -> String {
+    format!("{}\nA Load · Y Delete · B Return", library_footer.lines().next().unwrap_or(""))
+}
+
+/// The camera mode that is Training's Fixed camera (`cpu::tech::CAMERA_MODE_FIXED`).
+pub const FIXED: i32 = super::cpu::tech::CAMERA_MODE_FIXED;
+/// Frames between two asks while the game keeps taking the camera back (its own Training Camera option, a reset).
+pub const RETRY: u32 = 10;
+
+/// A game object's address as the plugin may dereference it: aligned, and not in the first pages.
+pub const fn pointer_ok(p: usize) -> bool {
+    p >= 0x1_0000 && p & 7 == 0
+}
+
+/// The camera's state (`runtime::features::btt_camera`: the stage is shown by the game's own Training Fixed camera, mode 4, in
+/// Placing, Ready and Running): the mode the game was in when this mode first took the camera (`saved`, while it holds it) and
+/// the frames left before it may ask again.
+#[derive(Clone, Copy, Debug)]
+pub struct Camera {
+    saved: Option<i32>,
+    cool: u32,
+}
+
+impl Camera {
+    pub const IDLE: Camera = Camera { saved: None, cool: 0 };
+
+    /// The mode took the camera from the game and has not given it back: the Hide Tech camera hooks stand down.
+    pub fn holding(&self) -> bool {
+        self.saved.is_some()
+    }
+
+    /// One pass of Player 1: `want` the Fixed camera, `mode` the game's now (`None`: no camera manager, the scene is over). It
+    /// asks (`Some(mode)`) for the Fixed camera at most once in `RETRY` frames while the game is in another mode, and gives the camera back
+    /// at once, to the mode first seen, when it is not wanted. A mode the game was already in (the Fixed camera) is not held.
+    pub fn step(&mut self, want: bool, mode: Option<i32>) -> Option<i32> {
+        self.cool = self.cool.saturating_sub(1);
+        let Some(now) = mode else {
+            self.saved = None;
+            return None;
+        };
+        match (want, self.saved) {
+            (true, _) if now != FIXED && self.cool == 0 => {
+                self.saved.get_or_insert(now);
+                self.cool = RETRY;
+                Some(FIXED)
+            }
+            (false, Some(back)) => {
+                self.saved = None;
+                (now == FIXED).then_some(back)
+            }
+            _ => None,
+        }
+    }
+}
+
 #[cfg(test)]
 #[path = "btt_tests.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "btt_files_tests.rs"]
+mod files_tests;
+#[cfg(test)]
+#[path = "btt_camera_tests.rs"]
+mod camera_tests;

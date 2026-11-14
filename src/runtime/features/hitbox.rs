@@ -143,7 +143,7 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
             crate::runtime::diag_log::diagnostic(format_args!("[Eggs] held={held} owners={:#x}", owners.bits()));
         }
     }
-    let P1 { top, hits, n, aerial, kind } = p1_read(at);
+    let (top, hits, n, aerial, kind) = p1_read(at);
     let hits = &hits[..n];
     let score = run.score;
     #[cfg(feature = "diag")]
@@ -207,15 +207,9 @@ unsafe fn eggs_cpu(run: &mut eggs::Run, fighter: usize, entry: i32) -> Option<()
     Some(())
 }
 
-/// What a practice game reads of Player 1: its top joint, its live attack pills, whether it is in an aerial and its kind.
-#[derive(Default)]
-struct P1 {
-    top: [f32; 3],
-    hits: [eggs::Hit; hitbox::SLOTS as usize],
-    n: usize,
-    aerial: bool,
-    kind: i32,
-}
+/// What a practice game reads of Player 1: its top joint, its live attack pills and their number, whether it is in an aerial
+/// and its kind.
+type P1 = ([f32; 3], [eggs::Hit; hitbox::SLOTS as usize], usize, bool, i32);
 
 /// # Safety
 /// `at` is a live fighter's accessor.
@@ -227,23 +221,23 @@ unsafe fn p1_read(at: usize) -> P1 {
     let place = |s: &Sphere| natives::joint_position(at, s.joint, &s.pos);
     let power = |slot| GameAttacks(at).read_f32(GameAttacks(at).data(slot) + layout::POWER);
     let n = eggs::pills(&wants[..len], place, power, &mut hits);
-    P1 { top, hits, n, aerial: natives::status_kind(at) == eggs::ATTACK_AIR, kind: natives::fighter_kind(at).unwrap_or(-1) }
+    let (aerial, kind) = (natives::status_kind(at) == eggs::ATTACK_AIR, natives::fighter_kind(at));
+    (top, hits, n, aerial, kind.unwrap_or(-1))
 }
 
 /// Break the Targets' pass (`runtime::features::btt`): Player 1's entry-0 fighters read the same pills Eggs-ercise does, while the mode
 /// needs them. Idle (the mode Off, no menu open) it does nothing; with a menu open and the row Off it only keeps the stage's layouts current.
-unsafe fn btt_pass(fighter: usize) {
-    if btt::idle() || ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read() != 0 {
-        return;
-    }
-    let Some(at) = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0) else { return };
-    let p = if btt::reading() { p1_read(at) } else { P1::default() };
+unsafe fn btt_pass(fighter: usize) -> Option<()> {
+    let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
+    (entry == 0 && !btt::idle()).then_some(())?;
+    let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
+    let (top, hits, n, aerial, _) = btt::reading().then(|| p1_read(at)).unwrap_or_default();
     let rule = EGG_ROWS.load(Ordering::Acquire).to_le_bytes()[1];
-    let broke = btt::pass(at, p.top, |spot| p.hits[..p.n].iter().any(|h| eggs::breaks(rule, p.aerial, h, spot)));
+    let broke = btt::pass(at, top, |spot| hits[..n].iter().any(|h| eggs::breaks(rule, aerial, h, spot)));
     // V2.1: the fighter whose attack broke a target freezes, as on a hit.
-    if let Some(frames) = (broke > 0).then(scene::facts).and_then(eggs::hitlag) {
-        natives::set_hit_stop_frame(at, frames);
-    }
+    let frames = (broke > 0).then(scene::facts).and_then(eggs::hitlag)?;
+    natives::set_hit_stop_frame(at, frames);
+    Some(())
 }
 
 /// The status ids and effect attributes, resolved once through the game's constant table (`None` until it answers; it may not be

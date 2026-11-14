@@ -866,7 +866,7 @@ impl Menu {
 
     /// Replace a row; notes the change, and the re-rolls it causes (Q18 A, B11).
     fn put(&mut self, id: &str, elements: &[u8]) {
-        let (unchanged, was) = (self.get(id) == elements, self.practice_on());
+        let unchanged = self.get(id) == elements;
         if unchanged || self.settings.menu.set(id, elements).is_err() {
             return;
         }
@@ -878,19 +878,9 @@ impl Menu {
             }
         }
         // The two practice games exclude each other: the one turned On last wins (tt::exclusive).
-        if matches!(id, "eggsercise" | "btt") {
-            let [eggs, btt] = super::btt::exclusive(was, self.practice_on());
-            for (id, on) in [("eggsercise", eggs), ("btt", btt)] {
-                if !on {
-                    self.put_one_hot(id, 0);
-                }
-            }
+        if matches!(id, "eggsercise" | "btt") && super::btt::on(&self.settings.menu) == [true; 2] {
+            self.put_one_hot(if id == "btt" { "eggsercise" } else { "btt" }, 0);
         }
-    }
-
-    /// Whether [Eggs-ercise, Break the Targets] are On.
-    fn practice_on(&self) -> [bool; 2] {
-        [self.get("eggsercise").iter().skip(1).any(|v| *v != 0), self.get("btt").get(1).is_some_and(|v| *v != 0)]
     }
 
     fn put_one_hot(&mut self, id: &str, index: usize) {
