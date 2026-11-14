@@ -20,7 +20,7 @@ pub struct FixedVec<T: Copy, const N: usize> {
 }
 
 impl<T: Copy, const N: usize> FixedVec<T, N> {
-    pub const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self { items: [None; N], len: 0 }
     }
 
@@ -48,12 +48,6 @@ impl<T: Copy, const N: usize> FixedVec<T, N> {
 
     pub fn iter(&self) -> impl Iterator<Item = &T> {
         self.items[..self.len].iter().flatten()
-    }
-}
-
-impl<T: Copy, const N: usize> Default for FixedVec<T, N> {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

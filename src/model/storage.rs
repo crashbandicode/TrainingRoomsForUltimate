@@ -51,7 +51,7 @@ pub struct FixedPath<const N: usize> {
 }
 
 impl<const N: usize> FixedPath<N> {
-    pub const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self { buf: [0; N], len: 0 }
     }
 
@@ -70,12 +70,6 @@ impl<const N: usize> FixedPath<N> {
     pub fn as_str(&self) -> &str {
         // Only `write_str` fills the buffer, and it copies whole `&str`s, so this is valid UTF-8.
         core::str::from_utf8(&self.buf[..self.len]).unwrap_or("")
-    }
-}
-
-impl<const N: usize> Default for FixedPath<N> {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

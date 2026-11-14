@@ -19,7 +19,7 @@ pub struct FrameQueue {
 }
 
 impl FrameQueue {
-    pub const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self { words: [0; AHEAD], head: 0, len: 0 }
     }
 
@@ -56,12 +56,6 @@ impl FrameQueue {
         self.head = (self.head + 1) % AHEAD;
         self.len -= 1;
         Some(word)
-    }
-}
-
-impl Default for FrameQueue {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

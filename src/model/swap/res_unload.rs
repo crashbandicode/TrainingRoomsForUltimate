@@ -102,7 +102,7 @@ pub struct Capture {
 }
 
 impl Capture {
-    pub const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Capture { directories: [0; MAX_DIRECTORIES], directory_count: 0, files: [0; MAX_FILES], file_count: 0, complete: true }
     }
     pub fn clear(&mut self) {
@@ -127,12 +127,6 @@ impl Capture {
         if self.file_count == MAX_FILES { self.complete = false; return; }
         self.files[self.file_count] = index;
         self.file_count += 1;
-    }
-}
-
-impl Default for Capture {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

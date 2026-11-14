@@ -458,14 +458,8 @@ pub struct RecordingScreens {
     keyboard_blocked: bool,
 }
 
-impl Default for RecordingScreens {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl RecordingScreens {
-    pub fn new() -> RecordingScreens {
+    pub(crate) fn new() -> RecordingScreens {
         RecordingScreens {
             popup_open: false,
             popup_role: ViewRole::Player,

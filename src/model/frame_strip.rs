@@ -391,14 +391,8 @@ pub struct Tracker {
     snap_len: usize,
 }
 
-impl Default for Tracker {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Tracker {
-    pub const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self {
             columns: [Column {
                 frame: 0,

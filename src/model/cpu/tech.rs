@@ -45,7 +45,7 @@ pub struct MotionHashes {
 }
 
 impl MotionHashes {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             passive_stand_f: hash40("passive_stand_f"),
             passive_stand_b: hash40("passive_stand_b"),
@@ -54,12 +54,6 @@ impl MotionHashes {
             down_forward_d: hash40("down_forward_d"),
             down_back_d: hash40("down_back_d"),
         }
-    }
-}
-
-impl Default for MotionHashes {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

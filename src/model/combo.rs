@@ -551,14 +551,8 @@ pub struct Helper {
     settings: Settings,
 }
 
-impl Default for Helper {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Helper {
-    pub const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self {
             capture: Capture {
                 exchange: 0,

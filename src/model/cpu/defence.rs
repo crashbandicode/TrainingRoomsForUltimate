@@ -123,7 +123,7 @@ pub struct Defence {
 }
 
 impl Defence {
-    pub const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self {
             di_case: None,
             sdi_dir: None,
@@ -238,8 +238,3 @@ impl Defence {
     }
 }
 
-impl Default for Defence {
-    fn default() -> Self {
-        Self::new()
-    }
-}

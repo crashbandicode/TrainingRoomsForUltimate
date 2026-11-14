@@ -79,14 +79,8 @@ pub struct RoleTable {
     entry_generations: [Option<u64>; 8],
 }
 
-impl Default for RoleTable {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl RoleTable {
-    pub const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self {
             slots: [None; FighterKey::COUNT],
             scene: None,
