@@ -130,7 +130,10 @@ plays the recording held in one of five numbered recording slots, starting from 
 - **An empty slot** shows "This Playback Slot is empty: pick its macro on the Recording page" and the CPU skips that
   action; its follow-up still comes.
 
-<!-- CAPTURE-REQUEST v10-playback-slot: a GIF of a Playback Slot: an empty slot (the notice), a named macro assigned with Playback slot, the CPU's Mash trigger on that slot, and the CPU visibly replaying the macro after a hit. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![A macro's own screen: Playback slot Right sets Slot 1; then Mario's forward smash hits the CPU and the CPU plays the macro](../media/rc14-playback-slot.gif)<br>
+*Macro 1's own screen: Playback slot reads None, Right sets Slot 1, and the menu closes. With the CPU's Mash on Playback Slot 1 (set beforehand), Mario's forward smash hits the CPU (Richter, 22.4%) and the CPU plays the macro, "Input Recording: Playback" on screen. Eden, rc.14 (untested on hardware).*
+
+<!-- CAPTURE-REQUEST v10-playback-slot: the clip above shows a named macro assigned with Playback slot and the CPU replaying it after a hit; still to shoot is the empty slot's notice ("This Playback Slot is empty: pick its macro on the Recording page"). See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 To play a macro on demand instead, set it active for the CPU and press Play on CPU (ZR + D-pad Up): see
 [Set active, and the Play chords](recording.md#set-active-and-the-play-chords).
 

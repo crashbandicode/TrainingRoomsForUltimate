@@ -60,7 +60,8 @@ rename it on its own screen). The Record presses themselves are not in the recor
 
 *The pop-up lists nothing; Record, two jabs, stop; it then lists Macro 1 (recorded on Mario) and "Macro 1 · start".*
 
-<!-- CAPTURE-REQUEST rec-start-save-onoff: a side-by-side GIF of the Start save switch: the same macro played with it On (warps to the start save first) and Off (plays from where the fighters stand). See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![Side by side, the same macro played from the same far-left spot with Start save On (left) and Off (right): On warps both fighters back and the jab lands; Off plays from where Mario stands and hits nothing](../media/rc14-start-save-onoff.gif)<br>
+*The Start save switch: Player 1 walked away to the left, then Play on Player 1 (ZR + D-pad Left) with the switch On (left) and Off (right). On, both fighters warp back to where Record started and the macro's jab hits the CPU (Richter, 2.7%). Off, Mario plays it from where he stands, away from the CPU, and nothing is hit. Eden, rc.14 (untested on hardware).*
 
 ## Set active, and the Play chords
 
