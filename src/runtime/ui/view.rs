@@ -74,17 +74,14 @@ impl Panes {
         // Tabs: the active one on the accent bar. In the r8 pop-up the title line ("Recording" and the role tabs) is on
         // top and the tabs sit under it.
         let tab_y = if frame.popup { POP_TAB_Y } else { TAB_Y };
-        let mut left = -840.0;
-        for i in 0..TABS {
+        let slots = frame.tab_slots();
+        for (i, slot) in slots.iter().enumerate() {
             let index = p::tab_index(i);
-            if i >= usize::from(frame.tab_count) {
+            let Some(crate::model::frame::TabSlot { left, width, active }) = *slot else {
                 self.text(index, &[], TEXT_DIM);
                 continue;
-            }
-            let units = frame.tabs[i].units();
-            let width = p::text_width(units.len());
-            let active = i == usize::from(frame.tab_active);
-            self.text(index, units, if active { TEXT } else { TEXT_DIM });
+            };
+            self.text(index, frame.tabs[i].units(), if active { TEXT } else { TEXT_DIM });
             self.at(index, left + TAB_BOX_W / 2.0, tab_y);
             if frame.tab_boxes {
                 // r8: each page tab is an outlined box, the active one green on a lighter fill. `width` is an estimate
@@ -99,7 +96,10 @@ impl Panes {
             } else if active {
                 self.rect_at(IDX_TAB_HI, left + width / 2.0, tab_y, width + 36.0, TAB_H, ACCENT);
             }
-            left += width + if frame.tab_boxes { 84.0 } else { 64.0 };
+        }
+        // A frame with no active tab (the clip editor is drawn alone) leaves no box where the last frame's tab was.
+        if !slots.iter().flatten().any(|slot| slot.active) {
+            self.hide(IDX_TAB_HI);
         }
         for i in 0..TAB_BOXES {
             if !frame.tab_boxes || i >= usize::from(frame.tab_count) {

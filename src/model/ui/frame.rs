@@ -9,7 +9,7 @@ use super::recording_menu::{Face, Floppy, RecordingScreens};
 
 use super::menu::table::{Control, Editor, Info, Row, GROUPS, ROWS};
 use super::menu::{group_of, Entry, Grey, Menu, RowValue, LOOP_ROW};
-use super::panes::{GROUPS as GROUP_LINES, ROWS as ROW_LINES, TABS};
+use super::panes::{text_width, GROUPS as GROUP_LINES, ROWS as ROW_LINES, TABS};
 
 /// Fixed-capacity UTF-16 text: what a text pane's buffer holds. Writing past the capacity cuts the text.
 #[derive(Clone, Copy)]
@@ -472,6 +472,30 @@ fn value_tone(menu: &Menu, row: usize) -> Tone {
         RowValue::Toggle(true) => Tone::On,
         RowValue::Toggle(false) => Tone::Off,
         _ => Tone::Normal,
+    }
+}
+
+/// One tab of the tab row as the renderer places it: where its text starts (layout units), its estimated text width, and
+/// whether it is the active one.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TabSlot {
+    pub left: f32,
+    pub width: f32,
+    pub active: bool,
+}
+
+impl Frame {
+    /// The tab row: a slot for each tab the frame names. A frame that names none (the clip editor is drawn alone, with no
+    /// menu chrome) has none, so the renderer draws no label and no active tab's box.
+    pub fn tab_slots(&self) -> [Option<TabSlot>; TABS] {
+        let mut slots = [None; TABS];
+        let mut left = -840.0;
+        for (i, slot) in slots.iter_mut().enumerate().take(usize::from(self.tab_count)) {
+            let width = text_width(self.tabs[i].units().len());
+            *slot = Some(TabSlot { left, width, active: i == usize::from(self.tab_active) });
+            left += width + if self.tab_boxes { 84.0 } else { 64.0 };
+        }
+        slots
     }
 }
 
@@ -1090,10 +1114,26 @@ mod tests {
         }
     }
 
+    /// rc.14 recfix (Eden rc.13 still `p2-replay-editor`): the renderer draws the active tab's box from the frame's tab
+    /// slots, one slot per tab the frame names and exactly one active, the pop-up's box tabs spaced wider than the page's.
+    fn the_tab_row_has_a_slot_per_named_tab_and_one_active() {
+        let mut f = Frame::new();
+        page_frame(&menu(), &mut f);
+        let (slots, named) = (f.tab_slots(), usize::from(f.tab_count));
+        assert!(named >= 5);
+        assert!(slots[..named].iter().all(Option::is_some) && slots[named..].iter().all(Option::is_none));
+        assert_eq!(slots.iter().flatten().filter(|slot| slot.active).count(), 1);
+        let (a, b) = (slots[0].unwrap(), slots[1].unwrap());
+        assert_eq!(b.left, a.left + a.width + 64.0);
+        f.tab_boxes = true;
+        assert_eq!(f.tab_slots()[1].unwrap().left, a.left + a.width + 84.0);
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("the_tab_row_has_a_slot_per_named_tab_and_one_active", the_tab_row_has_a_slot_per_named_tab_and_one_active as fn()),
             ("recording_paint_uses_a_green_plate_a_white_cursor_and_the_visible_hot_rows", recording_paint_uses_a_green_plate_a_white_cursor_and_the_visible_hot_rows as fn()),
             ("a_macro_screen_draws_the_floppy_before_the_start_save_name", a_macro_screen_draws_the_floppy_before_the_start_save_name as fn()),
             ("the_popup_has_the_r8_title_counts_boxes_and_footer", the_popup_has_the_r8_title_counts_boxes_and_footer as fn()),

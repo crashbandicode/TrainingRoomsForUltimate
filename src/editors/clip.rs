@@ -124,10 +124,24 @@ mod tests {
         assert!(f.help[1].string_lossy().contains("45 frames per tick"), "{:?}", f.help[1]);
     }
 
+    /// rc.14 recfix (Eden rc.13 still `p2-replay-editor`): the editor is drawn alone, with no tab row ("the title and breadcrumb,
+    /// a few lines, the help texts, the timeline"). It builds on the page's frame, so it must give back its tab slots: the
+    /// renderer drew the red active-tab box with no names when a frame still named a tab, or left the last one's box up.
+    fn the_clip_editor_names_no_tab_so_no_active_tab_box_is_drawn() {
+        use crate::model::menu::{Env, Menu};
+        use crate::model::settings::Settings;
+        let mut f = Frame::new();
+        crate::model::frame::page_frame(&Menu::new(Settings::factory(), Env::default()), &mut f);
+        assert!(f.tab_slots().iter().flatten().any(|slot| slot.active), "the page it follows has an active tab");
+        clip_frame(&view(), "Pikachu", 0, &mut f);
+        assert!(f.tab_slots().iter().all(Option::is_none), "{:?}", f.tab_slots());
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("the_clip_editor_names_no_tab_so_no_active_tab_box_is_drawn", the_clip_editor_names_no_tab_so_no_active_tab_box_is_drawn as fn()),
             ("a_playing_preview_and_a_refusal_show_in_the_frame", a_playing_preview_and_a_refusal_show_in_the_frame as fn()),
             ("a_held_scrub_names_its_speed", a_held_scrub_names_its_speed as fn()),
         ]);
