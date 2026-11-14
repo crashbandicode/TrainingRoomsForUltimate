@@ -1047,6 +1047,14 @@ counts are rough, in the size gate's normalised lines; the size gate is not rais
 
 **Decided: (a) with hitlag, and (c) as an option.** "D1, add hitlag to the target, make the CPU an option to enable". The disc becomes TR's own bullseye target. P1 freezes on a break, using the game's own hitlag, or 6 frames as seen in Melee. A short break animation of our own plays (13:13Z). A row "Target: Disc / CPU" makes the CPU the target, held still and reset after each hit.
 
+D1 target look (B-2, `ab35f8f8`): our own bullseye, plus a cracked frame for the break animation. Eden stills, 2026-11-14 (run `rc14-egg-target-2`, 6/6 PASS):
+
+![rc14-eggs D1 target look: the bullseye and its cracked break frame, on a light and a dark background, at 2x](decisions/rc14-eggs-target-textures.png)
+
+![rc14-eggs D1 target look: the bullseye on Final Destination with Hitbox Visualization on](decisions/rc14-eggs-target-fd.png)
+
+![rc14-eggs D1 target look: the bullseye on the Training stage with Hitbox Visualization off](decisions/rc14-eggs-target-training.png)
+
 What the player hits.
 - **(a) A TR-drawn egg:** a white disc TR draws itself, like the hitbox orbs, tested against Player 1's attack spheres
   that TR already reads. Nothing changes in the game, so it is safe in a waiting room. There's no hitlag on a break.
