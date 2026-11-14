@@ -190,11 +190,11 @@ def a1_regress(ctx):
         out['status_after_back'] = _status(ctx)
     # Three laps of the lane's members (cycle-fix's judge: no Reload, teardown, canonical replacement or declined press).
     laps = []
+    live = fs._live_kinds(ctx).get(1)
+    order = LAP_PICKS[LAP_PICKS.index(live) + 1:] + LAP_PICKS[:LAP_PICKS.index(live) + 1] if live in LAP_PICKS else LAP_PICKS
     for lap in range(3):
-        for kind in LAP_PICKS:
+        for kind in order:
             ctx.check_stop()
-            if fs._live_kinds(ctx).get(1) == kind:
-                continue
             fs._settled(ctx, hs.diag_mark(ctx), 20)
             laps.append(_pick_rec(ctx, kind, len(laps)))
     out['a1_laps'] = laps

@@ -3,7 +3,7 @@
 the boot rows, gates and segment pins (make_packages.py), the helpers, cycle-fix's cyclefix.py, a-full's afull.py and a1.py
 from this folder.
 
-    /usr/bin/python3 -I mk-rows.py <out folder>        # writes <out>/rows/"""
+    /usr/bin/python3 -I mk-rows.py <out folder> [row,ids,to,skip]        # writes <out>/rows/"""
 import hashlib
 import json
 import shutil
@@ -39,7 +39,7 @@ def row(rid, module, fn, budget, expect):
             'expect': expect}
 
 
-def plan():
+def plan(skip=()):
     segs = mp.lib_segments()
     for name in SEGMENTS:
         path = LIB / 'segments' / (name + '.edenmacro.json')
@@ -57,10 +57,10 @@ def plan():
                      'through prep_run --tr-nro.',
             'setup': setup, 'segments': segs, 'gates': mp.gates(),
             'recover': [{'run': 'steps.py:recover_training', 'check': True}], 'gif_presets': {},
-            'rows': mp.boot_rows() + [row(*r) for r in ROWS] + [mp.end_row()]}
+            'rows': mp.boot_rows() + [row(*r) for r in ROWS if r[0] not in skip] + [mp.end_row()]}
 
 
-def main(out):
+def main(out, skip=()):
     rows = Path(out) / 'rows'
     if rows.exists():
         shutil.rmtree(rows)
@@ -72,9 +72,9 @@ def main(out):
     shutil.copyfile(HERE / M, rows / M)
     for name in SEGMENTS:
         shutil.copyfile(LIB / 'segments' / (name + '.edenmacro.json'), rows / 'segments' / (name + '.edenmacro.json'))
-    (rows / 'rows.json').write_text(json.dumps(plan(), indent=1) + '\n')
+    (rows / 'rows.json').write_text(json.dumps(plan(skip), indent=1) + '\n')
     print(rows, sorted(p.name for p in rows.iterdir()))
 
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    main(sys.argv[1], tuple(sys.argv[2].split(',')) if len(sys.argv) > 2 else ())
