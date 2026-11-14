@@ -45,6 +45,13 @@ ROWS3 = [('cf-boot', 'cf_boot', 4, 'The fixture values live from the first frame
          ('cf-exit', 'cf_exit', 6, 'Gap 3: out of the live Mii Gunner onto Bowser: his own group, built in the background, '
                                  'then the warm exit; no Reload.'),
          BY_ID['cf-restore']]
+# Phase 4 (2026-11-14 ~23:50Z): the cold lifecycle fix (cf-p4-y1's k = 1 and shrink rows again) and the a1-enable crash
+# row (a Reload out of a Pyra window keeping `[4a]`, then its warm attach), from the same fixture.
+BY3 = {r[0]: r for r in ROWS3}
+ROWS4 = [BY3['cf-boot'], BY_ID['cf-k1-laps'], BY_ID['cf-k1-fits'], BY3['cf-shrink'],
+         ('cf-pyra-keep', 'cf_pyra_keep', 9, 'The a1 crash: a Reload out of a Pyra window keeps [4a]; its module pins go only '
+                                            'after Ready; the warm attach is clean.'),
+         BY_ID['cf-restore']]
 
 
 def row(rid, fn, budget, expect):
@@ -63,7 +70,7 @@ def plan(rows, phase='1'):
         {'state': 'Training, Ready Fighters 6, P1 Mario > Pikachu, CPU original > Mii Gunner > Pichu > Diddy Kong > King '
                   'K. Rool, every Loading row at the card value, from the scene\'s first frame',
          'via': 'fixture', 'ref': 'files: settings.json (cf_fixture.py applies fixture.json to the pinned copy before Up)'}]
-        if phase == '3' else [
+        if phase in ('3', '4') else [
         {'state': 'Training, Ready Fighters 8, P1 original > Pikachu > Kirby > Palutena, CPU original > Mii Gunner > '
                   'Pichu > Diddy Kong > King K. Rool, every Loading row at the card value (its live values)',
          'via': 'hook', 'ref': 'cyclefix.py:cf_setup'}])
@@ -86,9 +93,9 @@ def main(out, phase='1'):
     shutil.copyfile(HERE / M, rows / M)
     for name in SEGMENTS:
         shutil.copyfile(LIB / 'segments' / (name + '.edenmacro.json'), rows / 'segments' / (name + '.edenmacro.json'))
-    chosen = {'2': ROWS2, '3': ROWS3}.get(phase, ROWS)
+    chosen = {'2': ROWS2, '3': ROWS3, '4': ROWS4}.get(phase, ROWS)
     (rows / 'rows.json').write_text(json.dumps(plan(chosen, phase), indent=1) + '\n')
-    if phase == '3':
+    if phase in ('3', '4'):
         # The boot's settings.json fixture (cf_fixture.py), from the rows' own k = 1 values.
         sys.path.insert(0, str(rows))
         import cyclefix  # noqa: E402

@@ -484,3 +484,82 @@ def cf_exit(ctx):
         if out[key]:
             problems.append('%s: %s' % (key, out[key][0][:160]))
     return _finish(ctx, 'cf-exit', out, problems)
+
+
+# --- The a1-enable crash (Eden a1-be759456-y2, 2026-11-14 ~23:27Z) ---------------------------------------------------------
+# A target-first Reload out of a Pyra window (a native group) kept `[4a]` with `reload mii`; the kept groups' module pins
+# went 9 ms into the Reload with no re-request (#4348 `re_requested=false`), and the warm attach of `[4a]` called into
+# the unloaded Mii module (Unmapped Read64 via lua2cpp_common +0x148c, then a jump to 0). Pyra/Mythra's kind 0x5a is the
+# one a1's log names (`cpu_original: 0x5a`) and hotslots.py's NO_ENTRY_WINDOW lists.
+PYRA = 0x5a
+PINS = re.compile(r'\[GroupSwap\] module pins (released|held) role=1 ')
+READY_ON = re.compile(r'\[BodyBank\] ready owner=1 index=\d+ kind=0xf ')
+
+
+def cf_pyra_keep(ctx):
+    """The CPU on its Pyra window (a cycle Mii Gunner > Pyra/Mythra > Diddy Kong at Ready Fighters 8), today's Reload
+    forced with the Mii group kept (`diag-cycle.req` `reload mii`) by a direct pick of Bowser, then presses back to Mii
+    Gunner: the kept `[4a]` attaches warm. Pass: the pins go with `re_requested=true` only after Bowser's bank is Ready
+    (a1's crash dropped them first), the Mii group is kept and attached warm, no StallWatch line (z-boot scans the console
+    for Unmapped)."""
+    global CPU_LANE
+    t0, out = _begin(ctx)
+    lane = CPU_LANE
+    CPU_LANE = [fs.GUNNER, PYRA, fs.DIDDY]
+    try:
+        seq = hs.diag_mark(ctx)
+        fx._live_set(ctx, cpu_roster=fs._roster(CPU_LANE), cycle_preload_ready_fighters=fs.RF(8))
+        time.sleep(1.0)
+        steps.press(ctx, 'plus', 2.0)
+        steps.press(ctx, 'plus', 2.0)
+        out['settle'] = fs._settled(ctx, seq, 150)
+        _lap(ctx, out, 'warm', 1, 1.5, 20)
+        out['to_pyra'] = _to(ctx, PYRA)
+        out['on_pyra'] = fs._live_kinds(ctx).get(1)
+        out['settle_pyra'] = fs._settled(ctx, hs.diag_mark(ctx), 60)
+        out['knob'] = _diag_cycle(ctx, 'reload mii')
+        seq = hs.diag_mark(ctx)
+        menu = fs._menu(ctx)
+        fx._live_set(ctx, cpu_character=fs._onehot(menu, 'cpu_character', fs.CHOICES.index(fs.BOWSER)))
+        out['picked'] = fs._line(ctx, seq, fs._kind_line(1, fs.BOWSER), 60)
+        time.sleep(3.0)
+        lines = [(s, t) for s, _, t in hs.diag_since(ctx, seq)]
+        out['target_first'] = [t[:240] for _, t in lines if PATTERNS['target_first'].search(t)][:2]
+        out['reload'] = [t[:240] for _, t in lines if PATTERNS['reload'].search(t)][:2]
+        out['kept'] = [t[:300] for _, t in lines if '[GroupSwap] kept across reload owner=1' in t][:2]
+        out['window'] = [t[:240] for _, t in lines if '[GroupSwap] window across reload owner=1' in t][:2]
+        out['pins'] = [(s, t[:300]) for s, t in lines if PINS.search(t)][:4]
+        out['ready'] = [(s, t[:200]) for s, t in lines if READY_ON.search(t)][:1]
+        out['knob_off'] = _diag_cycle(ctx, 'off')
+        out['settle_after'] = fs._settled(ctx, hs.diag_mark(ctx), 60)
+        presses = []
+        for _ in range(len(CPU_LANE) + 1):
+            rec = _press(ctx, 2.0)
+            presses.append(rec)
+            if rec.get('kind') == hex(fs.GUNNER):
+                break
+        out['presses'] = presses
+        time.sleep(3.0)
+        out['stalls'] = [t[:200] for _, _, t in hs.diag_lines(ctx) if 'StallWatch' in t][-3:]
+    finally:
+        CPU_LANE = lane
+        fx._live_set(ctx, cpu_roster=fs._roster(CPU_LANE))
+    _mark(t0, out, 'done')
+    problems = []
+    if out['on_pyra'] != PYRA:
+        problems.append('the CPU never reached Pyra: %s' % out['on_pyra'])
+    if not out['picked'] or not out['reload']:
+        problems.append('no Reload for the pick: %s %s' % (out['picked'], out['reload']))
+    if not any('4a' in t.split('groups=')[-1] for t in out['kept']):
+        problems.append('the Mii group was not kept: %s' % out['kept'])
+    released = [(s, t) for s, t in out['pins'] if ' released ' in t]
+    if any('re_requested=false' in t for _, t in released):
+        problems.append('pins dropped with no re-request: %s' % released)
+    if not released or not out['ready'] or released[0][0] < out['ready'][0][0]:
+        problems.append('pins not released after the new bank was Ready: pins %s ready %s' % (released, out['ready']))
+    gunner = [p for p in presses if p.get('kind') == hex(fs.GUNNER)]
+    if not gunner or gunner[0].get('route') != 'group-warm':
+        problems.append('no warm attach of the kept Mii group: %s' % [(p.get('kind'), p.get('route')) for p in presses])
+    if out['stalls']:
+        problems.append('StallWatch: %s' % out['stalls'][-1])
+    return _finish(ctx, 'cf-pyra-keep', out, problems)
