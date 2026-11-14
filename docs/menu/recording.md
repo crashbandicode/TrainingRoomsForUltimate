@@ -238,6 +238,9 @@ closes. X, Y and *Reset page to defaults* don't change it. If you have Online De
 ![Replay capture turned on in the menu, then shown on in Online Deluxe](../media/rc11-replay-capture.gif)<br>
 *Turning replay capture on*
 
+![Replay capture flips On; after a 1-stock match the Save Replay question is answered Yes and "Replay saved" shows; the Replay window then lists the capture](../media/rc13-replay-capture.gif)<br>
+*With Replay capture On, a 1-stock match is played and its replay saved: A, A, Y on the results opens "Save a replay of this battle?", Right and A answer Yes ("Replay saved"), and Recording > Replays > Replay window then lists the capture with its name and length. The loads, the match and the menus between the clips are cut. Eden, rc.13 (untested on hardware).*
+
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A, Left or Right flips it.
