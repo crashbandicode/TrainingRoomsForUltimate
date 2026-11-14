@@ -215,6 +215,28 @@ X cycles the loop only while the cursor is in Macros.
 [RECORDING.md](guide/recording.md) is how to use it. The pop-up and the Recording page are in that doc.
 What rc.6 changes is [RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md).
 
+Where the recording code is (moved here from the Recording guide; line numbers are as they were on `p23/rc6-open-fixes`):
+
+- The playback machine, the files, the grades, the chords and the migration: `src/model/playback.rs`,
+  `src/model/library/`, `src/model/combo.rs`, `src/model/drill.rs`, `src/model/chords.rs` and
+  `src/model/library/migrate.rs`. The pop-up, the Recording page and the file screens: `src/model/recording_menu.rs`
+  and `src/model/ui/frame.rs`. Record, Play and the pop-up chord are applied in `src/model/rr_host.rs`.
+- The start save keeps the recorded fighter's facing and speed in `note_record_start` (`rr_host.rs:389`). Momentum is
+  `play_start_speed` (`rr_host.rs:420`) and `apply_start_speed` (`src/runtime/features/recording_host.rs:62`).
+- Mash interrupts playback stops the CPU's macro at `rr_host.rs:573`.
+- Edit placement: the target macro is `placement_target` (`rr_host.rs:709`), the key steps are at
+  `src/model/macro_ui/macro_panel.rs:1698`, and the warp plus offset is `warp_pair` (`rr_host.rs:764`).
+- Replay window: a capture's load no longer waits on the window (`Owners::REPLAY_LOADING`,
+  `src/model/input_delay.rs`). The Fighter Mismatch question and the exact Mii install came with cov-rest `66a9a53`,
+  `2891eaa` and `f2298ee`; final pass on `646a5f0d`: `yoga-cov` `cov-replay-window` PASS. A Mii from a replay is
+  installed through `installable` in `src/model/mii_install.rs` (cov-rest `cbe961a` and `f2298ee`; `cov-named-mii` and
+  `int-named-mii-twice` PASS). A chain's mismatch line is `screen=mismatch ask=macro1`.
+- A setup restored from the Saves page's Setup library only moves the fighters (`setup_restored`, `rr_host.rs:674`);
+  binding one without restoring is `setup_bound` (`rr_host.rs:683`).
+- The pop-up layout is the agreed r8 mockup (`docs/decisions/RECORDING-REDESIGN-r8-popup-*.png` on
+  `review/menu-proposal`). Its status line reads `hairline=5` even when the fifth row is scrolled out of the four-row
+  window.
+
 **Clip** [`rc10-record-play-cpu.gif`](media/rc10-record-play-cpu.gif): Record on Player 1, then Play on CPU: the CPU does the recorded moves
 
 *Eden, 2026-11-12, rc.10 `32ee7595` (diag NRO `79922abe`), `docs-rd12-32ee7595` `fx-record-play-cpu` (take 3): ZR + D-pad
