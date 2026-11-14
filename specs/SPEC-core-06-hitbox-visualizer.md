@@ -17,7 +17,8 @@ With the setting on, every active hitbox of a fighter in Training is drawn as a 
 - Button chords: none.
 - Visible output when On, in Training only:
   - For each fighter, each frame, each of the fighter's eight attack slots that is active is drawn with the game's `sys_shield` effect (a translucent sphere) attached to the hitbox's bone at the hitbox position, scaled to `size × 19/200`, tinted with the colour for `id mod 8`, playing at 8× rate so the effect does not pulse. Hitboxes with a second centre (extended/capsule) are drawn as `n` spheres evenly spaced along the segment, `n = ceil(distance / (size × 1.75)) + 1` clamped to 2..16.
-  - Grab boxes (`CATCH` animation commands) are drawn when they are created, with the colour for `(id + 3) mod 8`.
+  - Grab boxes (`CATCH` animation commands) are drawn when they are created, all in one colour no hitbox uses: magenta
+    `1.0, 0.0, 1.0` (rc.13, operator: "grabs being a different color"; before it was the colour for `(id + 3) mod 8`).
   - The frame a hitbox is created by the attack animation command, it is drawn immediately from the command's parameters (so the first active frame is visible even before the per-frame pass).
   - When a grab ends (rebound cleared) and the fighter is not shielding, the spheres are hidden and killed.
   - While On and the fighter is not in a grab status range and not shielding, the fighter's animation-command effects are put to sleep (no hit sparks, dust, etc.), except that effects stay on in the grab/capture statuses, the tread (footstool) statuses, and the `DOWN` knockdown status (so missed-tech and footstool effects remain). Turning the setting Off restores effects the next frame.
@@ -30,9 +31,12 @@ With the setting on, every active hitbox of a fighter in Training is drawn as a 
 | 2 | 0.8, 1.0, 0.0 | yellow-green `#ccff00` |
 | 3 | 0.2, 1.0, 0.2 | green `#33ff33` |
 | 4 | 0.0, 0.8, 1.0 | sky blue `#00ccff` |
-| 5 | 0.4, 0.4, 1.0 | blue `#6666ff` |
-| 6 | 0.8, 0.0, 1.0 | purple `#cc00ff` |
-| 7 | 1.0, 0.2, 0.8 | pink `#ff33cc` |
+| 5 | 0.0, 0.4, 1.0 | blue `#0066ff` (rc.13; was `0.4, 0.4, 1.0`) |
+| 6 | 0.0, 1.0, 0.6 | spring green `#00ff99` (rc.13; was purple `0.8, 0.0, 1.0`) |
+| 7 | 1.0, 1.0, 1.0 | white `#ffffff` (rc.13; was pink `1.0, 0.2, 0.8`) |
+
+rc.13 took purple and pink out of the hitbox table so the grab boxes' magenta is theirs alone (every hitbox tint is at
+least 1.0 from it in RGB, `every_grab_box_is_magenta_a_colour_no_hitbox_uses`).
 
 ### 2a. Rendering: own orbs for fighters (decision HB-OWN-ORBS, option 1, operator 2026-11-05)
 
@@ -141,7 +145,7 @@ lines record the HitModule read's cost and the pass's own cost on the integrated
 | Requirement | Host test (planned name) | Eden row (planned label) | Evidence file |
 | --- | --- | --- | --- |
 | Sphere count and spacing for capsules (`n = ceil(d/(1.75 s))+1` clamped 2..16; t = i/(n−1)); single sphere for a point hitbox | `core06_capsule_sampling` | `core06-E1` screenshot of an extended hitbox (e.g. a sword tilt) | `docs/EDEN-RESULTS.md` |
-| Colour table by `id mod 8`; grab boxes `(id+3) mod 8` | `core06_colour_table` | `core06-E2` multi-hitbox move screenshot | `docs/EDEN-RESULTS.md` |
+| Colour table by `id mod 8`; grab boxes magenta, a colour no hitbox uses | `core06_colour_table`, `every_grab_box_is_magenta_a_colour_no_hitbox_uses` | `core06-E2` multi-hitbox move screenshot | `docs/EDEN-RESULTS.md` |
 | Per-frame step order and status exemptions (grab range, shield, tread, DOWN) | `core06_frame_rules_table` | `core06-E3` grab, shield, missed tech cases | — |
 | First-frame draw from the `ATTACK`/`CATCH` parameters (indices as §3) | `core06_command_param_indices` (model: parameter extraction) | `core06-E4` frame-step the first active frame | — |
 | Rebound cleared → spheres killed unless shielding | `core06_rebound_rule` | `core06-E5` | — |

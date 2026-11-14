@@ -37,8 +37,8 @@ fn int(v: i64) -> Cell {
 
 #[test]
 fn core06_colour_table() {
-    // The spec's table, by `id mod 8`.
-    let spec: [[f32; 3]; 8] = [[1.0, 0.0, 0.0], [1.0, 0.4, 0.0], [0.8, 1.0, 0.0], [0.2, 1.0, 0.2], [0.0, 0.8, 1.0], [0.4, 0.4, 1.0], [0.8, 0.0, 1.0], [1.0, 0.2, 0.8]];
+    // The spec's table, by `id mod 8` (rc.13: no purple or pink in it, that colour is the grab boxes').
+    let spec: [[f32; 3]; 8] = [[1.0, 0.0, 0.0], [1.0, 0.4, 0.0], [0.8, 1.0, 0.0], [0.2, 1.0, 0.2], [0.0, 0.8, 1.0], [0.0, 0.4, 1.0], [0.0, 1.0, 0.6], [1.0, 1.0, 1.0]];
     for (id, tint) in spec.iter().enumerate() {
         assert_eq!(hitbox::hitbox_tint(id as i32), *tint, "id {id}");
         assert_eq!(hitbox::hitbox_tint(id as i32 + 8), *tint, "id {} wraps", id + 8);
@@ -46,12 +46,18 @@ fn core06_colour_table() {
     }
     // A negative id wraps the same way.
     assert_eq!(hitbox::hitbox_tint(-1), spec[7]);
-    // Grab boxes use `(id + 3) mod 8`.
-    for id in 0..16 {
-        assert_eq!(hitbox::grab_tint(id), spec[((id + 3) % 8) as usize], "grab id {id}");
+}
+
+#[test]
+fn every_grab_box_is_magenta_a_colour_no_hitbox_uses() {
+    // One colour for every grab id: the command's tint is `GRAB_TINT` whatever its id (`animation_command`).
+    assert_eq!(hitbox::GRAB_TINT, [1.0, 0.0, 1.0]);
+    let distance = |a: [f32; 3], b: [f32; 3]| ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt();
+    for id in 0..8 {
+        let hit = hitbox::hitbox_tint(id);
+        assert!(distance(hit, hitbox::GRAB_TINT) >= 1.0, "hitbox id {id} {hit:?} is near the grab colour");
     }
-    assert_eq!(hitbox::grab_tint(5), spec[0]);
-    assert_ne!(hitbox::grab_tint(0), hitbox::hitbox_tint(0));
+    assert!(distance(hitbox::HURTBOX_TINT, hitbox::GRAB_TINT) >= 1.0);
 }
 
 #[test]

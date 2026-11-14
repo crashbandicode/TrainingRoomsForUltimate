@@ -32,7 +32,7 @@ Stream `hitbox` (branch `stream/hitbox`), 2026-11-02. Spec: `specs/SPEC-core-06-
 | Requirement | Host test | Eden row (`eden/EDEN-HITBOX.md`) | Evidence |
 | --- | --- | --- | --- |
 | Sphere count and spacing for capsules; single sphere for a point hitbox | `core06_capsule_sampling` | hb-E1 extended hitbox | `eden/runs/hb-*` |
-| Colour table by `id mod 8`; grab boxes `(id + 3) mod 8` | `core06_colour_table` | hb-E2 multi-hitbox move | |
+| Colour table by `id mod 8`; grab boxes magenta, a colour no hitbox uses | `core06_colour_table`, `every_grab_box_is_magenta_a_colour_no_hitbox_uses` | hb-E2 multi-hitbox move | |
 | Per-frame step order and status exemptions (grab range, shield, tread, DOWN) | `core06_frame_rules_table` | hb-E3 grab, shield, missed tech | |
 | First-frame draw from the `ATTACK` / `CATCH` parameters (indices as spec section 3) | `core06_command_param_indices` | hb-E4 first active frame | |
 | Rebound cleared kills the spheres unless shielding | `core06_rebound_rule` | hb-E5 | |

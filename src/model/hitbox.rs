@@ -65,17 +65,21 @@ pub mod layout {
     pub const TAG_FIELD: usize = 0x8;
 }
 
-/// The eight tints (RGB multipliers; at least one component is 1.0), by `id mod 8`.
+/// The eight hitbox tints (RGB multipliers; at least one component is 1.0), by `id mod 8`. None is purple or pink: that
+/// colour is the grab boxes' (`GRAB_TINT`).
 pub const TINTS: [[f32; 3]; 8] = [
     [1.0, 0.0, 0.0],
     [1.0, 0.4, 0.0],
     [0.8, 1.0, 0.0],
     [0.2, 1.0, 0.2],
     [0.0, 0.8, 1.0],
-    [0.4, 0.4, 1.0],
-    [0.8, 0.0, 1.0],
-    [1.0, 0.2, 0.8],
+    [0.0, 0.4, 1.0],
+    [0.0, 1.0, 0.6],
+    [1.0, 1.0, 1.0],
 ];
+
+/// Every grab box is magenta, whatever its id (operator, rc.13: "grabs being a different color").
+pub const GRAB_TINT: [f32; 3] = [1.0, 0.0, 1.0];
 
 /// The tint of colour index `index` (taken modulo 8, negatives wrap).
 pub fn tint(index: i32) -> [f32; 3] {
@@ -85,11 +89,6 @@ pub fn tint(index: i32) -> [f32; 3] {
 /// A hitbox of id `id`.
 pub fn hitbox_tint(id: i32) -> [f32; 3] {
     tint(id)
-}
-
-/// A grab box of id `id`: the same table shifted by three, so a grab box next to a hitbox of the same id reads differently.
-pub fn grab_tint(id: i32) -> [f32; 3] {
-    tint(id.wrapping_add(3))
 }
 
 /// The sphere scale for a hitbox size.

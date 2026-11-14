@@ -538,7 +538,7 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
         return;
     }
     let Some(shape) = hitbox::parse(indices, |i| lua_cell(lua, i)) else { return };
-    let tint = if grab { hitbox::grab_tint(shape.id) } else { hitbox::hitbox_tint(shape.id) };
+    let tint = if grab { hitbox::GRAB_TINT } else { hitbox::hitbox_tint(shape.id) };
     let made = if fighter {
         let mut wants = [Sphere::NONE; hitbox::SPHERE_MAX];
         let mut len = 0;

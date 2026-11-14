@@ -21,8 +21,9 @@ either way.
 ### Hitbox Visualization
 
 On draws the fighters' boxes as coloured discs: hitboxes (the attacks; each hitbox of a move gets its own colour, the
-first is red), grab boxes, and hurtboxes (the yellow bubbles: where a fighter can be hit). It works in Training, and on
-the two practice fighters in a waiting room. A fighter's boxes are not drawn while it shields or while it is grabbing.
+first is red), grab boxes (always magenta, a colour no hitbox uses), and hurtboxes (the yellow bubbles: where a fighter
+can be hit). It works in Training, and on the two practice fighters in a waiting room. While a fighter shields nothing
+of it is drawn; while it is grabbing only its grab box is.
 
 - **Values:** On, Off
 - **Default:** Off
