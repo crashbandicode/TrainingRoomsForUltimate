@@ -257,7 +257,7 @@ def _accent_pixels(path):
 
 
 def clip_setup(ctx):
-    return {'live': gna._base(ctx, input_display_strip=gna.STRIP_OFF)}    # the strip draws over the editor's breadcrumb
+    return {}
 
 
 def clip_run(ctx):
@@ -265,6 +265,8 @@ def clip_run(ctx):
     tab row shows neither names nor the red active-tab box that the menu's last frame left (rc.13 still p2-replay-editor)."""
     t0, out = _begin(ctx)
     problems = []
+    # The strip would draw over the tab band: Off for the row (not in the setup step, whose screen check wants the strip).
+    out['live'] = gna._base(ctx, input_display_strip=gna.STRIP_OFF)
     cov.prep(ctx, 'cov-replay')
     out['captures'] = cov._named_req(ctx, 'list_captures', r'\[NamedMacroDiag\] captures [^\n]*')
     cov._page_row(ctx, 'recording', 'Replay window')
