@@ -1151,10 +1151,20 @@ pub fn neighbour_group(full: Members, target: u32, policy: GroupPolicy, exclude:
 /// was `pinned` (one reference of ours, `runtime::roster::module_pins`) until the new bank re-requests it on R at Ready.
 pub fn kept_across_reload(state: GroupState, members: Members, leaving: bool, holds_object: bool, target_first: Option<u32>,
     pinned: bool) -> bool {
+    kept_across_reload_with(KEEP_MII_ACROSS_RELOAD, state, members, leaving, holds_object, target_first, pinned)
+}
+
+/// rc.14 phase 2d: [`kept_across_reload`], a Mii group kept too when `mii` ([`KEEP_MII_ACROSS_RELOAD`], or the diag
+/// build's fail-first row of the rc.12 crash: Eden rc12-int2-f44fac2f-1, a kept `[4a]`'s warm attach after the Reload).
+pub fn kept_across_reload_with(mii: bool, state: GroupState, members: Members, leaving: bool, holds_object: bool,
+    target_first: Option<u32>, pinned: bool) -> bool {
     let Some(target) = target_first else { return false; };
-    pinned && state == GroupState::Built && !leaving && !holds_object && members.special() != Special::Mii
+    pinned && state == GroupState::Built && !leaving && !holds_object && (mii || members.special() != Special::Mii)
         && members.index_of(target).is_none()
 }
+
+/// rc.14 phase 2d: whether a target-first Reload keeps a Built Mii group. Off until the fail-first row passes with it.
+pub const KEEP_MII_ACROSS_RELOAD: bool = false;
 
 /// The target-first neighbours' admission (`native_body_bank::plan_groups`): the seed fits in the free pool and beside
 /// the bodies already charged, the other role's and this role's own groups kept across the Reload
@@ -3649,10 +3659,24 @@ mod tests {
         assert_eq!(cold_left(&mut two, GANONDORF), Some(KROOL));
     }
 
+    /// rc.14 phase 2d: a target-first Reload keeps a Built Mii group only with the switch on (the diag build's fail-first
+    /// row of the rc.12 crash turns it on); every other rule of (a′) holds either way.
+    fn a_mii_group_is_kept_across_a_reload_only_with_its_switch() {
+        let mii = Members::mii_group(GUNNER).unwrap();
+        assert!(!kept_across_reload_with(false, GroupState::Built, mii, false, false, Some(KROOL), true));
+        assert!(kept_across_reload_with(true, GroupState::Built, mii, false, false, Some(KROOL), true));
+        assert!(!kept_across_reload_with(true, GroupState::Built, mii, false, false, Some(KROOL), false), "modules pinned");
+        assert!(!kept_across_reload_with(true, GroupState::Prefetched, mii, false, false, Some(KROOL), true));
+        assert!(!kept_across_reload_with(true, GroupState::Built, mii, false, false, None, true), "target-first only");
+        assert_eq!(kept_across_reload(GroupState::Built, mii, false, false, Some(KROOL), true),
+            kept_across_reload_with(KEEP_MII_ACROSS_RELOAD, GroupState::Built, mii, false, false, Some(KROOL), true));
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_mii_group_is_kept_across_a_reload_only_with_its_switch", a_mii_group_is_kept_across_a_reload_only_with_its_switch as fn()),
             ("five_laps_of_the_operator_cycle_keep_what_fits_hot", five_laps_of_the_operator_cycle_keep_what_fits_hot as fn()),
             ("two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot", two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot as fn()),
             ("a_lap_that_fits_is_all_warm", a_lap_that_fits_is_all_warm as fn()),

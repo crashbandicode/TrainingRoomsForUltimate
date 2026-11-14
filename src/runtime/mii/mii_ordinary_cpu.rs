@@ -1137,7 +1137,8 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
         |p|(p.descriptor,!p.reuse && p.is_bank(),p.reuse));
     // rc.14 cycle fix (Design A): a cycle press onto a fighter no reachable group serves waits for its own group
     // (`body_bank::demand`), served like any group swap, instead of the Reload that tore down every resident fighter.
-    if !reuse && restore.is_none() && request==Request::CYCLE && same_class.is_none() && !hat_change && !exit {
+    // Phase 2a: a direct pick, a menu choice and a restore too; a replay's recorded fighter keeps its own path.
+    if !reuse && request.replay().is_none() && !request.refresh_partners() && same_class.is_none() && !hat_change && !exit {
         let kind=descriptor_kind(&descriptor);
         let configuration=match destination.target.kind() {
             TargetKind::Fighter(_)=>Some(None),

@@ -1178,6 +1178,25 @@ fn releasing(role: usize) -> bool {
     BANKS[role].lock().as_ref().is_some_and(|bank| !bank.departed && bank.groups.iter().any(|g| g.leaving && g.release_now))
 }
 
+/// rc.14 phase 2 rows (diag build only, `diag_reload`'s `diag-cycle.req`): bit 0 sends a cold press down today's Reload
+/// path (`demand` declines), bit 1 lets that target-first Reload keep a Built Mii group (`kept_across_reload_with`), the
+/// fail-first row of the rc.12 crash (a kept `[4a]`'s warm attach after the Reload).
+#[cfg(feature = "diag")]
+static DIAG_CYCLE: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
+
+#[cfg(feature = "diag")]
+pub(crate) fn set_diag_cycle(bits: u8) {
+    DIAG_CYCLE.store(bits, Ordering::Release);
+    trace!("[GroupSwap] diag cycle force_reload={} keep_mii={}", bits & 1 != 0, bits & 2 != 0);
+}
+
+fn diag_cycle(bit: u8) -> bool {
+    #[cfg(feature = "diag")]
+    { DIAG_CYCLE.load(Ordering::Acquire) & bit != 0 }
+    #[cfg(not(feature = "diag"))]
+    { let _ = bit; false }
+}
+
 /// A bank's bodies besides the one on screen: its window's other members and every group that counts, a group being
 /// freed now excepted.
 fn extra_bodies(bank: &Bank) -> usize {
@@ -1209,12 +1228,18 @@ fn bodies_with(bank: &Bank, other: usize) -> usize {
 pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>) -> bool {
     let Some(role) = role(owner) else { return false; };
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
-    if !ENABLED.load(Ordering::Acquire) || !settings.fighters || settings.bank_members < 2 || !groups_enabled(&settings) {
+    if !ENABLED.load(Ordering::Acquire) || !settings.fighters || settings.bank_members < 2 || !groups_enabled(&settings)
+        || diag_cycle(1) {
         return false;
     }
     let (special, policy) = (special_policy(&settings), group_policy(&settings));
     let other = role_extra_bodies(1 - role);
     let mut state = BANKS[role].lock();
+    // Phase 2b: a bank still Building (the scene's start-up window, about 2.6 s after Training loads, console #42-#46) or
+    // Changing is waited for, not Reloaded: `build` would refuse the Reload and drop the press.
+    if state.as_ref().is_some_and(|b| b.owner == owner && !b.departed && matches!(b.phase, Phase::Building | Phase::Changing)) {
+        return true;
+    }
     let Some(bank) = state.as_mut().filter(|b| b.owner == owner && b.phase == Phase::Ready && !b.departed && b.swap.is_none())
         else { return false; };
     if bank.members.index_of(kind).is_some() { return false; }
@@ -1428,7 +1453,18 @@ pub(super) fn proposed(owner: u32, target: Forms, upcoming: &[u32]) -> Option<Me
     NEIGHBOURS[role].store(u64::MAX, Ordering::Release);
     let Some(members) = full else {
         WINDOW_WAITING[role].store(0, Ordering::Release);
-        return None;
+        // rc.14 phase 2c: a Reload that stays (no window to rebuild beside the target) would be canonical, which keeps
+        // no group. With groups Built it is the target's one-member bank Reload instead, so (a′) keeps the groups it
+        // admits (`kept_across_reload`, their modules pinned) and `build` carries them.
+        let built = BANKS[role].lock().as_ref().is_some_and(|bank| !bank.departed && bank.owner == owner
+            && bank.groups.iter().any(|g| g.state == GroupState::Built && !g.leaving));
+        let one = Members::target_only(target).filter(|_| built && groups_enabled(&settings) && group_pool(&settings) > 0);
+        if one.is_some() {
+            TARGET_FIRST[role].store(target.kinds[0], Ordering::Release);
+            trace!("[BodyBank] target first owner={} target={:#x} lane={:x?} neighbours=None; one-member Reload, the Built groups stay (rc.14 2c)",
+                owner, target.kinds[0], &lane[..count]);
+        }
+        return one;
     };
     // rc.6 window admission (primary 2026-11-09 13:28Z; Eden final-e39-xps-hot hs08b: the window `[42, 44, 1c]` was
     // planned at 27.6 MB of headroom, `prepare_resources` acquired both supplements and the game's page commit aborted in
@@ -6360,7 +6396,9 @@ fn kept_groups(bank: &Bank, role: usize, pinned: Option<&[Members]>) -> (u32, Fi
     let mut kept = (0, FixedList::new(Members::pair_group()));
     for (index, g) in bank.groups.iter().enumerate() {
         if g.saved.is_some() && bank.object_fetch.is_none_or(|f| f.0 != index)
-            && crate::engine::swap::body_bank::kept_across_reload(g.state, *g.members, g.leaving || g.release_now, g.object_held, target,
+            && crate::engine::swap::body_bank::kept_across_reload_with(
+                crate::engine::swap::body_bank::KEEP_MII_ACROSS_RELOAD || diag_cycle(2),
+                g.state, *g.members, g.leaving || g.release_now, g.object_held, target,
                 pinned.is_none_or(|pinned| pinned.contains(&*g.members))) {
             kept.0 |= 1 << index;
             kept.1.push(*g.members);

@@ -109,10 +109,20 @@ fn poll_pause_dump() {
     diagnostic(format_args!("[TrainingRooms] diag_pause_dump tag={tag} object=0x{menu:x} written={written}"));
 }
 
+/// rc.14 cycle fix, phase 2 rows: `diag-cycle.req` is `reload` (a cold press takes today's Reload), `reload mii` (that
+/// Reload keeps a Built Mii group too: the rc.12 crash's fail-first row) or `off`.
+fn poll_cycle() {
+    let Some(text) = request("diag-cycle.req") else { return };
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let bits = u8::from(words.contains(&"reload")) | (u8::from(words.contains(&"mii")) << 1);
+    crate::runtime::roster::character_roster::body_bank::set_diag_cycle(bits);
+}
+
 fn poll() {
     poll_item_request();
     poll_egg_request();
     poll_pause_dump();
+    poll_cycle();
     let Some(path) = FixedPath::<128>::in_root(NAME) else { return };
     let Ok(bytes) = fs::read(path.as_str()) else { return };
     let _ = fs::remove_file(path.as_str());
