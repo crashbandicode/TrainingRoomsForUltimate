@@ -1837,33 +1837,27 @@ impl RecordingScreens {
             ItemKind::Recording => self.macro_lines(&item.id, role),
             ItemKind::Combo => self.combo_lines(&item.id),
             ItemKind::Sequence => self.sequence_lines(&item.id),
-            ItemKind::NewChain => vec![ConnLine { text: "A new chain".to_string(), floppy: None }],
-            ItemKind::NewSequence => vec![ConnLine { text: "A new sequence".to_string(), floppy: None }],
-            ItemKind::SaveLastCombo => vec![ConnLine {
-                text: "Saves the strip's latest exchange as a combo and drills it. A names it.".to_string(),
-                floppy: None,
-            }],
+            ItemKind::NewChain => vec![line("A new chain")],
+            ItemKind::NewSequence => vec![line("A new sequence")],
+            ItemKind::SaveLastCombo => vec![line("Saves the strip's latest exchange as a combo and drills it. A names it.")],
         }
     }
 
     fn save_lines(&self, id: &str) -> Vec<ConnLine> {
         let Some(save) = self.save_by_id(id) else { return Vec::new() };
         let bound = self.bound.as_deref() == Some(id);
-        let mut lines = vec![ConnLine { text: save.name.clone(), floppy: None }];
+        let mut lines = vec![line(save.name.clone())];
         if !save.fighters.is_empty() {
-            lines.push(ConnLine { text: format!("Fighters: {}", save.fighters), floppy: None });
+            lines.push(line(format!("Fighters: {}", save.fighters)));
         }
-        lines.push(ConnLine {
-            text: format!("Bound to Save / Load: {}", if bound { "yes" } else { "no" }),
-            floppy: None,
-        });
+        lines.push(line(format!("Bound to Save / Load: {}", if bound { "yes" } else { "no" })));
         if bound {
-            lines.push(ConnLine { text: "Load warps here".to_string(), floppy: None });
+            lines.push(line("Load warps here"));
         }
         for file in &self.catalog.macros {
             let uses = if file.chain { self.chain_start_id(file).is_some_and(|save_id| save_id == id) } else { file.start_save.as_deref() == Some(id) };
             if uses {
-                lines.push(ConnLine { text: format!("Start save of {}", file.name), floppy: self.row_floppy(&Item { kind: ItemKind::Recording, id: file.id.clone() }) });
+                lines.push(self.recording_line(format!("Start save of {}", file.name), &file.id));
             }
         }
         lines
@@ -1874,33 +1868,33 @@ impl RecordingScreens {
         let mut lines = Vec::new();
         if file.chain {
             match self.chain_start_name(&file) {
-                Some(name) => lines.push(ConnLine { text: format!("Starts from {name}"), floppy: self.row_floppy(&Item { kind: ItemKind::Recording, id: id.to_string() }) }),
-                None => lines.push(ConnLine { text: "No start save · plays from where the fighters are".to_string(), floppy: None }),
+                Some(name) => lines.push(self.recording_line(format!("Starts from {name}"), id)),
+                None => lines.push(line("No start save · plays from where the fighters are")),
             }
-            lines.push(ConnLine { text: format!("Plays {} steps", file.steps.len()), floppy: None });
+            lines.push(line(format!("Plays {} steps", file.steps.len())));
             for (index, step) in file.steps.iter().enumerate() {
                 let name = self.macro_by_id(step).map(|file| file.name.clone()).unwrap_or_else(|| step.clone());
-                lines.push(ConnLine { text: ordered_ids::step_line(index, &name), floppy: None });
+                lines.push(line(ordered_ids::step_line(index, &name)));
             }
             if self.active[role.index()].as_deref() == Some(id) {
-                lines.push(ConnLine { text: format!("Loop {}", self.loop_of(role).label()), floppy: None });
+                lines.push(line(format!("Loop {}", self.loop_of(role).label())));
             }
             return lines;
         }
         match file.start_save.as_ref().and_then(|save| self.save_name(save)) {
-            Some(name) => lines.push(ConnLine { text: format!("Starts from {name}"), floppy: self.row_floppy(&Item { kind: ItemKind::Recording, id: id.to_string() }) }),
-            None => lines.push(ConnLine { text: "No start save · plays from where the fighters are".to_string(), floppy: None }),
+            Some(name) => lines.push(self.recording_line(format!("Starts from {name}"), id)),
+            None => lines.push(line("No start save · plays from where the fighters are")),
         }
         for chain in self.catalog.macros.iter().filter(|chain| chain.chain) {
             if let Some(index) = chain.steps.iter().position(|step| step == id) {
-                lines.push(ConnLine { text: format!("{} · step {}", chain.name, index + 1), floppy: None });
+                lines.push(line(format!("{} · step {}", chain.name, index + 1)));
             }
         }
         for combo in self.catalog.combos.iter().filter(|combo| combo.made_from.as_deref() == Some(id)) {
-            lines.push(ConnLine { text: format!("Combo {}", combo.name), floppy: None });
+            lines.push(line(format!("Combo {}", combo.name)));
         }
         if !file.recorded_on.is_empty() {
-            lines.push(ConnLine { text: format!("Recorded on {}", file.recorded_on), floppy: None });
+            lines.push(line(format!("Recorded on {}", file.recorded_on)));
         }
         lines
     }
@@ -1910,17 +1904,17 @@ impl RecordingScreens {
         let mut lines = Vec::new();
         // First: the help joins these lines into one, and a long list of links must not push the fighter out (#49).
         if !combo.recorded_on.is_empty() {
-            lines.push(ConnLine { text: format!("Recorded on {}", combo.recorded_on), floppy: None });
+            lines.push(line(format!("Recorded on {}", combo.recorded_on)));
         }
         if let Some(source) = combo.made_from.as_ref().and_then(|id| self.macro_by_id(id).map(|file| file.name.clone())) {
-            lines.push(ConnLine { text: format!("from {source}"), floppy: None });
+            lines.push(line(format!("from {source}")));
         }
         for link in &combo.links {
-            lines.push(ConnLine { text: link.clone(), floppy: None });
+            lines.push(line(link.clone()));
         }
         for sequence in &self.catalog.sequences {
             if sequence.combos.iter().any(|step| step == id) {
-                lines.push(ConnLine { text: format!("In sequence {}", sequence.name), floppy: None });
+                lines.push(line(format!("In sequence {}", sequence.name)));
             }
         }
         lines
@@ -1931,9 +1925,9 @@ impl RecordingScreens {
         let mut lines = Vec::new();
         for (index, step) in sequence.combos.iter().enumerate() {
             let name = self.combo_by_id(step).map(|file| file.name.clone()).unwrap_or_else(|| step.clone());
-            lines.push(ConnLine { text: ordered_ids::step_line(index, &name), floppy: None });
+            lines.push(line(ordered_ids::step_line(index, &name)));
         }
-        lines.push(ConnLine { text: format!("streak {} · best {}", sequence.streak, sequence.best), floppy: None });
+        lines.push(line(format!("streak {} · best {}", sequence.streak, sequence.best)));
         lines
     }
 
@@ -1953,8 +1947,8 @@ impl RecordingScreens {
     fn save_file_rows(&self, id: &str) -> Vec<BuiltRow> {
         let on = self.bound.as_deref() == Some(id);
         vec![
-            BuiltRow { title: "Bind to Save / Load".to_string(), value: if on { "On" } else { "Off" }.to_string(), act: Act::Bind, drill: None },
-            BuiltRow { title: "Duplicate".to_string(), value: String::new(), act: Act::Duplicate, drill: None },
+            row("Bind to Save / Load", if on { "On" } else { "Off" }, Act::Bind),
+            row("Duplicate", "", Act::Duplicate),
             row_rename(),
             row_delete(),
         ]
@@ -1965,21 +1959,16 @@ impl RecordingScreens {
         if let Some(file) = self.macro_by_id(id) {
             if let Some(save) = file.start_save.as_ref() {
                 let name = self.save_name(save).unwrap_or_else(|| save.clone());
-                rows.push(BuiltRow {
-                    title: "Start save".to_string(),
-                    value: if file.start_save_on { format!("{name} · On") } else { "Off".to_string() },
-                    act: Act::StartSave,
-                    drill: None,
-                });
+                rows.push(row("Start save", if file.start_save_on { format!("{name} · On") } else { "Off".into() }, Act::StartSave));
             }
         }
         rows.push(self.active_row(id));
         // rc.12 TR1: the Playback Slot (Mash, Followup, the overrides, Ledge Options) this macro plays as.
         let slot = self.slot_of(id).map_or_else(|| "None".to_string(), |i| format!("Slot {}", i + 1));
-        rows.push(BuiltRow { title: "Playback slot".to_string(), value: slot, act: Act::PlaybackSlot, drill: None });
+        rows.push(row("Playback slot", slot, Act::PlaybackSlot));
         rows.push(row_rename());
-        rows.push(BuiltRow { title: "Crop".to_string(), value: String::new(), act: Act::Crop, drill: None });
-        rows.push(BuiltRow { title: "Make combo".to_string(), value: String::new(), act: Act::MakeCombo, drill: None });
+        rows.push(row("Crop", "", Act::Crop));
+        rows.push(row("Make combo", "", Act::MakeCombo));
         rows.push(row_delete());
         rows
     }
@@ -1988,37 +1977,32 @@ impl RecordingScreens {
         let mut rows = Vec::new();
         if let Some(file) = self.macro_by_id(id) {
             if let Some(name) = self.chain_start_name(file) {
-                rows.push(BuiltRow {
-                    title: "Start save".to_string(),
-                    value: if file.start_save_on { format!("{name} · On") } else { "Off".to_string() },
-                    act: Act::StartSave,
-                    drill: None,
-                });
+                rows.push(row("Start save", if file.start_save_on { format!("{name} · On") } else { "Off".into() }, Act::StartSave));
             }
         }
         rows.push(self.active_row(id));
-        rows.push(BuiltRow { title: "Edit chain".to_string(), value: String::new(), act: Act::EditChain, drill: None });
+        rows.push(row("Edit chain", "", Act::EditChain));
         rows.push(row_rename());
-        rows.push(BuiltRow { title: "Make combo".to_string(), value: String::new(), act: Act::MakeCombo, drill: None });
+        rows.push(row("Make combo", "", Act::MakeCombo));
         rows.push(row_delete());
         rows
     }
 
     fn combo_file_rows(&self, id: &str) -> Vec<BuiltRow> {
-        let mut rows = vec![BuiltRow { title: "Drill".to_string(), value: "This becomes the drill".to_string(), act: Act::Drill, drill: None }];
+        let mut rows = vec![row("Drill", "This becomes the drill", Act::Drill)];
         if let Some(combo) = self.combo_by_id(id) {
             if let Some(source) = combo.made_from.as_ref().and_then(|id| self.macro_by_id(id).map(|file| file.name.clone())) {
-                rows.push(BuiltRow { title: "Made from".to_string(), value: format!("from {source}"), act: Act::Info, drill: None });
+                rows.push(row("Made from", format!("from {source}"), Act::Info));
             }
         }
         rows.push(row_rename());
-        rows.push(BuiltRow { title: "Crop".to_string(), value: String::new(), act: Act::Crop, drill: None });
+        rows.push(row("Crop", "", Act::Crop));
         rows.push(row_delete());
         rows
     }
 
     fn sequence_file_rows(&self, id: &str) -> Vec<BuiltRow> {
-        let mut rows = vec![BuiltRow { title: "Drill sequence".to_string(), value: "This becomes the drill".to_string(), act: Act::Drill, drill: None }];
+        let mut rows = vec![row("Drill sequence", "This becomes the drill", Act::Drill)];
         if let Some(sequence) = self.sequence_by_id(id) {
             for (index, step) in sequence.combos.iter().enumerate() {
                 let name = self.combo_by_id(step).map(|file| file.name.clone()).unwrap_or_else(|| step.clone());
@@ -2030,7 +2014,7 @@ impl RecordingScreens {
                 });
             }
         }
-        rows.push(BuiltRow { title: "Edit combos".to_string(), value: String::new(), act: Act::EditCombos, drill: None });
+        rows.push(row("Edit combos", "", Act::EditCombos));
         rows.push(row_rename());
         rows.push(row_delete());
         rows
@@ -2039,7 +2023,12 @@ impl RecordingScreens {
     fn active_row(&self, id: &str) -> BuiltRow {
         let on = self.active[self.page_role.index()].as_deref() == Some(id);
         let value = if on { format!("On · {}", self.page_role.label()) } else { "Off".to_string() };
-        BuiltRow { title: "Set active".to_string(), value, act: Act::SetActive, drill: None }
+        row("Set active", value, Act::SetActive)
+    }
+
+    /// A Connections line naming a recording, with that recording's floppy.
+    fn recording_line(&self, text: String, id: &str) -> ConnLine {
+        ConnLine { text, floppy: self.row_floppy(&Item { kind: ItemKind::Recording, id: id.to_string() }) }
     }
 
     fn macro_by_id(&self, id: &str) -> Option<&MacroFile> {
@@ -2100,12 +2089,22 @@ fn fill_ranks(ids: &[String], order: &[String]) -> Vec<u8> {
     values
 }
 
+/// A Connections line with no floppy.
+fn line(text: impl Into<String>) -> ConnLine {
+    ConnLine { text: text.into(), floppy: None }
+}
+
+/// A file row that drills nothing.
+fn row(title: impl Into<String>, value: impl Into<String>, act: Act) -> BuiltRow {
+    BuiltRow { title: title.into(), value: value.into(), act, drill: None }
+}
+
 fn row_rename() -> BuiltRow {
-    BuiltRow { title: "Rename".to_string(), value: String::new(), act: Act::Rename, drill: None }
+    row("Rename", "", Act::Rename)
 }
 
 fn row_delete() -> BuiltRow {
-    BuiltRow { title: "Delete".to_string(), value: String::new(), act: Act::Delete, drill: None }
+    row("Delete", "", Act::Delete)
 }
 
 fn item_kind_of(kind: KeyKind) -> Option<ItemKind> {
