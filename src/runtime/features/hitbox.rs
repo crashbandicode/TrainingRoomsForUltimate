@@ -26,7 +26,7 @@
 //! fighter per frame as the hurt census (`[Hitbox] hurt census`: the parts, the first pass and the read cost).
 //! No allocation: the spheres and the handle sets are fixed storage, the Lua stack and attack data are read in place, and
 //! every entry point counts under a `HookScope`. The pass and the hooks run on the game thread.
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 
 use hos_lock::Mutex;
 
