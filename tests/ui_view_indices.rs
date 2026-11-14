@@ -128,6 +128,17 @@ fn the_renderer_runs_every_view_over_the_real_pane_array() {
     unsafe { panes.draw(&frame) };
 }
 
+/// rc.13: every give-item tile has its picture (Wario's bike, tile 38, included): one icon pane per tile, and the
+/// layout builder's `assets/item-icons/icon-NN.png` for each.
+#[test]
+fn every_item_tile_has_an_icon() {
+    assert_eq!(p::ITEM_ICONS, model::menu::grid::ITEM_TILES);
+    for i in 0..p::ITEM_ICONS {
+        let png = format!("{}/assets/item-icons/icon-{i:02}.png", env!("CARGO_MANIFEST_DIR"));
+        assert!(std::path::Path::new(&png).is_file(), "{png}");
+    }
+}
+
 /// SOLO-S-PLACEMENT (operator 2026-11-05): on every layout the roster grid uses, the Player and CPU "S" marks never
 /// intersect the tile's name label. With the portrait drawn they sit on its lower corners (covering it partly), clear
 /// of the order badges above; without it the centred name stays clear too.

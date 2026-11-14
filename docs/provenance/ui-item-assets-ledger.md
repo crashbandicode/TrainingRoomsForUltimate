@@ -1,6 +1,8 @@
 # UI item asset carry ledger
 
 Stage m5q; identity copies, no image edits. All sources are `ours-new`.
+rc.13 adds `icon-38.png` (Wario: Bike), an Eden capture cut out by background subtraction, and appends its
+entry to `sources.json` (the stage file's digest is kept as `stage_sha256`).
 
 | Source | Destination | SHA256 | Transform |
 | --- | --- | --- | --- |
@@ -42,4 +44,5 @@ Stage m5q; identity copies, no image edits. All sources are `ours-new`.
 | `scripts/item-icons/assets/icon-35.png` | `assets/item-icons/icon-35.png` | `bcf3878cebb06ba72fa31b9357d9ecf67d35eb40ebb1ffba3e5cf0984b560d7b` | identity |
 | `scripts/item-icons/assets/icon-36.png` | `assets/item-icons/icon-36.png` | `0af3312adee081227d9300119e649d886371a075e5b6f648768b7e8a6bfbe2db` | identity |
 | `scripts/item-icons/assets/icon-37.png` | `assets/item-icons/icon-37.png` | `9bf26f635d1ff93720cbe7d3b06c808c909d62363780ab51113ec9fe72bf1bef` | identity |
-| `scripts/item-icons/assets/sources.json` | `assets/item-icons/sources.json` | `8fbed7ab430130d87bf6761994f6b06e911e038148d2d9e9378033ce6f870887` | identity |
+| `rc.13 Eden capture` | `assets/item-icons/icon-38.png` | `16a29d86e9f1c7d88e72468b6ed2ca7bebab1c2510bb5c0c5da9e33a90e6bc03` | rc.13 Eden capture |
+| `scripts/item-icons/assets/sources.json` | `assets/item-icons/sources.json` | `cbb528d2fb431efa50f981184a39eb074c3a1617ec6bc8e31f48e4188a475b67` | stage file + rc.13 append (icon 38, Wario: Bike) |

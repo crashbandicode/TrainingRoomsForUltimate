@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify or carry the 38 approved binary item assets and their source receipt.
+"""Verify or carry the 38 approved binary item assets and their source receipt, plus rc.13's Wario bike icon.
 
 The Rust carry tools rewrite text; this identity-only binary carry checks the
 same provenance boundary before reading any stage asset. Never writes a stage.
@@ -23,15 +23,28 @@ def main():
     if args.carry and args.stage is None:
         parser.error("--carry requires --stage")
     rows = manifest["files"]
-    assert len(rows) == 39
-    ledger = ["# UI item asset carry ledger", "", "Stage m5q; identity copies, no image edits. All sources are `ours-new`.", "",
+    # 39 stage files, plus rc.13's Wario bike icon (an Eden capture, not a stage file; its sources.json entry appended)
+    assert len(rows) == 40
+    ledger = ["# UI item asset carry ledger", "", "Stage m5q; identity copies, no image edits. All sources are `ours-new`.",
+              "rc.13 adds `icon-38.png` (Wario: Bike), an Eden capture cut out by background subtraction, and appends its",
+              "entry to `sources.json` (the stage file's digest is kept as `stage_sha256`).", "",
               "| Source | Destination | SHA256 | Transform |", "| --- | --- | --- | --- |"]
     for row in rows:
         source, destination = row["source"], row["destination"]
-        proof = provenance[source]
-        assert proof["origin"] == "ours-new" and row["transform"] == "identity"
-        assert row["sha256"].startswith(proof["stage_sha256"])
         target = root / destination
+        if row["transform"] != "identity":
+            assert row["origin"].startswith("rc.13, ours-new"), destination
+            if source is not None:
+                proof = provenance[source]
+                assert proof["origin"] == "ours-new" and row["stage_sha256"].startswith(proof["stage_sha256"])
+                if args.stage is not None:
+                    assert hashlib.sha256((args.stage / source).read_bytes()).hexdigest() == row["stage_sha256"], source
+            assert hashlib.sha256(target.read_bytes()).hexdigest() == row["sha256"], destination
+            ledger.append(f"| `{source or 'rc.13 Eden capture'}` | `{destination}` | `{row['sha256']}` | {row['transform']} |")
+            continue
+        proof = provenance[source]
+        assert proof["origin"] == "ours-new"
+        assert row["sha256"].startswith(proof["stage_sha256"])
         if args.stage is not None:
             data = (args.stage / source).read_bytes()
             assert hashlib.sha256(data).hexdigest() == row["sha256"], source
@@ -46,7 +59,7 @@ def main():
         target.write_text(content)
     else:
         assert target.read_text() == content, "stale asset ledger"
-    print("39 UI item asset files and ledger verified")
+    print("40 UI item asset files and ledger verified")
 
 
 if __name__ == "__main__":

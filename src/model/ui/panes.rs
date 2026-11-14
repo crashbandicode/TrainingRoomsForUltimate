@@ -335,7 +335,8 @@ pub fn roster_tile(cell_w: f32, cell_h: f32, pictured: bool) -> (Area, Area, [Ar
 pub const IDX_TILE_HI: usize = IDX_CHIP_BADGE + CHIPS;
 pub const IDX_TILE: usize = IDX_TILE_HI + 1;
 pub const IDX_TILE_LABEL: usize = IDX_TILE + TILES;
-pub const ITEM_ICONS: usize = 38;
+/// One picture pane per give-item tile (`tr_item_NN`), rc.13's Wario bike (38) included.
+pub const ITEM_ICONS: usize = 39;
 pub const IDX_ITEM_ICON: usize = IDX_TILE_LABEL + TILES;
 /// The roster grid's per-role marks, Player block then CPU block (`Frame::tile_badges` etc.): the fork's corner
 /// badges (`roster_p_NN` / `roster_c_NN`), All-stripes and the Solo Popo "S" markers. Menu panes: the renderer

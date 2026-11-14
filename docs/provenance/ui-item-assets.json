@@ -231,10 +231,19 @@
       "transform": "identity"
     },
     {
+      "source": null,
+      "destination": "assets/item-icons/icon-38.png",
+      "sha256": "16a29d86e9f1c7d88e72468b6ed2ca7bebab1c2510bb5c0c5da9e33a90e6bc03",
+      "transform": "rc.13 Eden capture",
+      "origin": "rc.13, ours-new, Eden capture d2-bikeicon-1 + background subtraction (the primary 05:24Z 11-14: the render_item.py work dir no longer exists)"
+    },
+    {
       "source": "scripts/item-icons/assets/sources.json",
       "destination": "assets/item-icons/sources.json",
-      "sha256": "8fbed7ab430130d87bf6761994f6b06e911e038148d2d9e9378033ce6f870887",
-      "transform": "identity"
+      "sha256": "cbb528d2fb431efa50f981184a39eb074c3a1617ec6bc8e31f48e4188a475b67",
+      "transform": "stage file + rc.13 append (icon 38, Wario: Bike)",
+      "stage_sha256": "8fbed7ab430130d87bf6761994f6b06e911e038148d2d9e9378033ce6f870887",
+      "origin": "rc.13, ours-new, Eden capture d2-bikeicon-1 + background subtraction (the primary 05:24Z 11-14: the render_item.py work dir no longer exists)"
     }
   ]
 }

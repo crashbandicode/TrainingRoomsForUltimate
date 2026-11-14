@@ -2117,6 +2117,41 @@
       ],
       "frame_status": "default",
       "note": null
+    },
+    {
+      "index": 38,
+      "label": "Wario: Bike",
+      "filename": "icon-38.png",
+      "sha256": "16a29d86e9f1c7d88e72468b6ed2ca7bebab1c2510bb5c0c5da9e33a90e6bc03",
+      "method": "rc.13, ours-new: Eden capture (the game's own render, ITEM_KIND_WARIOBIKE thrown by P1 Wario on the Training stage, TrainingRooms diag d2-bike ae37be6a, run d2-bikeicon-1 on the Yoga, Eden speed 10 %) + background subtraction against a clean plate of the same camera: mask = max channel |frame - plate| > 18, 9 px close, interior holes filled, 5 px open, largest piece; 1.2 px Gaussian feather; the plate un-mixed from the edge pixels; mirrored to face left like the Mechakoopa and the Bob-omb; long side Lanczos to 64; transparent letterbox.",
+      "source_files": [
+        {
+          "eden_capture": "d2-bikeicon-1/out/t-bikeicon/diag-055542Z-903865-icon2-drive-21.png",
+          "sha256": "17db57861d27eddcea711951334afc5b72f609b50f810424ecf69ce59304f52b",
+          "role": "frame"
+        },
+        {
+          "eden_capture": "d2-bikeicon-1/out/t-bikeicon/diag-055539Z-634337-icon2-plate-2.png",
+          "sha256": "037e45f7bf7924301a8f2747bff5916138797440dad53572350f6a54241cd043",
+          "role": "clean plate"
+        }
+      ],
+      "render_args": [
+        "icon_cut2.py",
+        "<t-bikeicon>",
+        "2",
+        "21",
+        "190,60,560,320",
+        "icon-38.png",
+        "--exclude=150,298,360,450",
+        "--mirror"
+      ],
+      "tool_sha256": {
+        "icon_cut2.py": "77437dd14249a216dc7f80c42e791a2738e43e1a7596571b666acc238e3b9f2c"
+      },
+      "archive": "smash-training-lobby/artifacts/rc13-wario-bike/icon-source/ (frame, plate, tool, 1x/4x check)",
+      "frame_status": "eden-capture",
+      "note": "rc.13, ours-new, Eden capture d2-bikeicon-1 + background subtraction (the primary 05:24Z 11-14: the render_item.py work dir no longer exists)"
     }
   ]
 }
