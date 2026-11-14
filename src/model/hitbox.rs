@@ -559,27 +559,31 @@ pub const WEAK_TINT: [f32; 3] = [1.0, 0.56, 0.78];
 
 /// The one place the *Frame data colours* row chooses a sphere's tint: `kind` is `KIND_HIT`, `KIND_HURT` or `KIND_GRAB`, `spot` the hitbox's
 /// spot (`None` for any other kind and for a hitbox that cannot be ranked), `usual` today's tint. Off is `usual`. On, a hitbox is red unless
-/// it is Sour or Late, which are pink (Ultimate Frame Data draws a lone hitbox as strong and has no late colour).
-pub fn legend_colour(kind: u32, spot: Option<super::spots::Spot>, usual: [f32; 3], on: bool) -> [f32; 3] {
-    use super::spots::Spot;
+/// it is Sour or Late, which are pink (Ultimate Frame Data draws a lone hitbox as strong and has no late colour). The rest of the legend
+/// (`legend`): a hurtbox by its `status` (white, green invincible, sky blue intangible), a grab box purple.
+pub fn legend_colour(kind: u32, spot: Option<super::spots::Spot>, status: i32, usual: [f32; 3], on: bool) -> [f32; 3] {
+    use super::{legend, spots::Spot};
     match (on, kind, spot) {
         (true, KIND_HIT, Some(Spot::Sour | Spot::Late)) => WEAK_TINT,
         (true, KIND_HIT, _) => STRONG_TINT,
+        (true, KIND_HURT, _) => legend::hurt_tint(status),
+        (true, KIND_GRAB, _) => legend::GRAB,
         _ => usual,
     }
 }
 
-/// Apply `legend_colour` (On) to every sphere of `wants`; `peak` is the fighter's strongest damage so far this action, and `status` starts a new
-/// action when it changes. Reads the active slots' damage again, only while the row is On.
+/// Apply `legend_colour` (On) to every hit sphere of `wants` (a hurt sphere took its colour from its status in `want_hurt`); `peak` is the
+/// fighter's strongest damage so far this action, and `status` starts a new action when it changes. Reads the active slots' damage again,
+/// only while the row is On.
 fn tint_legend(reader: &mut impl AttackReader, wants: &mut [Sphere], peak: &mut super::spots::Peak, status: i32) {
     use super::spots;
     let (_, damage) = powers(reader);
     let earlier = peak.earlier(status, reader.motion());
-    for sphere in wants.iter_mut() {
+    for sphere in wants.iter_mut().filter(|s| s.key >> 24 != KIND_HURT) {
         let kind = sphere.key >> 24;
         let slot = ((sphere.key >> 8) & 0xffff) as usize % spots::SLOTS;
         let spot = if kind == KIND_HIT { spots::classify(damage[slot], &damage, earlier) } else { None };
-        sphere.tint = legend_colour(kind, spot, sphere.tint, true);
+        sphere.tint = legend_colour(kind, spot, 0, sphere.tint, true);
     }
     peak.fold(&damage);
 }
@@ -607,15 +611,24 @@ pub trait HurtboxReader {
 /// rule as a hitbox. The tables are read in place (layout `layout::HIT_*`); a table that does not look like one gives nothing.
 /// Appends to `out[..*len]`; returns how many were left out for lack of room.
 pub fn want_hurtboxes(reader: &mut (impl HurtboxReader + ?Sized), out: &mut [Sphere], len: &mut usize) -> u32 {
+    want_hurt(reader, out, len, false)
+}
+
+/// `want_hurtboxes`, each part tinted by `legend_colour` with its status (`legend`: *Frame data colours* On).
+pub fn want_hurt(reader: &mut (impl HurtboxReader + ?Sized), out: &mut [Sphere], len: &mut usize, legend: bool) -> u32 {
     let mut left_out = 0;
-    hurt_parts(reader, |index, shape| left_out += push_shape(out, len, KIND_HURT, index, shape, HURTBOX_TINT) as usize);
+    hurt_parts(reader, legend, |index, shape, status| {
+        let tint = legend_colour(KIND_HURT, None, status, HURTBOX_TINT, legend);
+        left_out += push_shape(out, len, KIND_HURT, index, shape, tint) as usize
+    });
     left_out as u32
 }
 
-/// Walks the enabled parts of group `HURTBOX_GROUP` once, in part order: `each(index, shape)` for every part that is not
-/// switched off — all of them, whatever `each` keeps (the draw appends spheres, the diag census only counts). Returns the
+/// Walks the enabled parts of group `HURTBOX_GROUP` once, in part order: `each(index, shape, status)` for every part that is not
+/// switched off — all of them, whatever `each` keeps (the draw appends spheres, the diag census only counts). With `status` the
+/// group's whole and global words are read too and `status` is the game's own (`legend::part_status`), else 0. Returns the
 /// enabled parts seen; a module or table pointer that is missing or does not look like one is 0 parts.
-pub fn hurt_parts(reader: &mut (impl HurtboxReader + ?Sized), mut each: impl FnMut(usize, &Shape)) -> usize {
+pub fn hurt_parts(reader: &mut (impl HurtboxReader + ?Sized), status: bool, mut each: impl FnMut(usize, &Shape, i32)) -> usize {
     let module = reader.module();
     if module == 0 {
         return 0;
@@ -630,13 +643,15 @@ pub fn hurt_parts(reader: &mut (impl HurtboxReader + ?Sized), mut each: impl FnM
     let first = reader.read_i16(group + layout::HIT_GROUP_FIRST);
     let count = reader.read_i16(group + layout::HIT_GROUP_COUNT);
     let Some(range) = group_parts(first, count, total) else { return 0 };
+    let group_words = status.then(|| [super::legend::GROUP_WHOLE, super::legend::GROUP_GLOBAL].map(|at| reader.read_i32(group + at)));
     let mut seen = 0;
     for index in range {
         let mut record = [0u8; layout::HIT_PART_STRIDE];
         reader.read_part(parts + index * layout::HIT_PART_STRIDE, &mut record);
         if let Some(shape) = hurtbox_shape(&record) {
             seen += 1;
-            each(index, &shape);
+            let word = i32::from_le_bytes([record[0], record[1], record[2], record[3]]);
+            each(index, &shape, group_words.map_or(0, |[whole, global]| super::legend::part_status(word, whole, global)));
         }
     }
     seen
@@ -801,14 +816,14 @@ pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphe
     let mut len = 0;
     if facts.ids.in_grab(facts.status) {
         // The grabber stays hittable through a grab: its hurt spheres stay, its hit spheres go (upstream's grab rule).
-        let left_out = hurt.map_or(0, |hurt| want_hurtboxes(hurt, wants, &mut len));
+        let left_out = hurt.map_or(0, |hurt| want_hurt(hurt, wants, &mut len, set.frame_data));
         let mut counts = set.reconcile(&wants[..len], true, fx);
         counts.dropped += left_out;
         return (counts, len);
     }
     let mut left_out = want_hitboxes(reader, wants, &mut len);
     if let Some(hurt) = hurt {
-        left_out += want_hurtboxes(hurt, wants, &mut len);
+        left_out += want_hurt(hurt, wants, &mut len, set.frame_data);
     }
     set.tint(reader, &mut wants[..len], facts.status);
     let mut counts = set.reconcile(&wants[..len], true, fx);

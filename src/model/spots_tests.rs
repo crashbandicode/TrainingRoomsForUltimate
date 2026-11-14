@@ -177,16 +177,14 @@ fn one_function_chooses_every_tint() {
     let usual = [0.1, 0.2, 0.3];
     for kind in [hitbox::KIND_HIT, hitbox::KIND_HURT, hitbox::KIND_GRAB] {
         for spot in [None, Some(Spot::Sweet), Some(Spot::Sour), Some(Spot::Late)] {
-            assert_eq!(hitbox::legend_colour(kind, spot, usual, false), usual, "Off is today's tint");
+            assert_eq!(hitbox::legend_colour(kind, spot, 0, usual, false), usual, "Off is today's tint");
         }
     }
-    let on = |spot| hitbox::legend_colour(hitbox::KIND_HIT, spot, usual, true);
+    let on = |spot| hitbox::legend_colour(hitbox::KIND_HIT, spot, 0, usual, true);
     assert_eq!([None, Some(Spot::Sweet)].map(on), [hitbox::STRONG_TINT; 2]);
     assert_eq!([Some(Spot::Sour), Some(Spot::Late)].map(on), [hitbox::WEAK_TINT; 2]);
     assert_ne!(hitbox::WEAK_TINT, hitbox::GRAB_TINT, "pink is not the grab boxes' magenta");
-    for kind in [hitbox::KIND_HURT, hitbox::KIND_GRAB] {
-        assert_eq!(hitbox::legend_colour(kind, None, usual, true), usual, "hurt and grab boxes keep theirs until the legend has them");
-    }
+    // The rest of the legend (hb-legend): `model::legend`'s tests.
 }
 
 fn the_spot_words_and_rows() {

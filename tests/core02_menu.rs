@@ -110,6 +110,17 @@ fn the_spot_rows_sit_next_to_their_features() {
     }
 }
 
+/// rc.14 hb-legend: Launch angles is a toggle with a two-line help under Frame data colours, Off by default.
+fn legend_launch_angles_row_is_off_by_default() {
+    let ids: Vec<&str> = ROWS.iter().map(|r| r.id).collect();
+    let at = ids.iter().position(|x| *x == "launch_angles").expect("the row");
+    assert_eq!(ids[at - 1], "frame_data_colours");
+    let row = &ROWS[at];
+    assert!(matches!(row.control, Control::Toggle) && row.help.lines().count() == 2 && row.title == "Launch angles");
+    let def = model::factory::DEFS.iter().find(|d| d.id == "launch_angles").expect("a factory row");
+    assert_eq!(def.default, [0u8, 1], "Off ([On, Off]: the second option set)");
+}
+
 fn layout_row_counts_match_the_rc_freeze() {
     let counts = |pilot| {
         [Page::Cpu, Page::Saves, Page::Recording, Page::FightersStages, Page::DisplayControls, Page::Developer]
@@ -133,11 +144,11 @@ fn layout_row_counts_match_the_rc_freeze() {
     // 2026-11-14 13:03Z; SPEC 2.3b, V2.5, V2.6; 24 → 32).
     // rc.14 SL4: the Setup library group gained Save setup here (10 → 11).
     // rc.14: Display & Controls gained Frame data colours and Spot labels, Recording gained Match sweet/sour spot (the operator, 2026-11-14,
-    // SP1 to SP5; 11 → 13 and 12 → 13).
-    assert_eq!(counts(false), [34, 11, 13, 32, 13, 3]);
-    assert_eq!(counts(true), [33, 11, 13, 32, 13, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 103);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 102);
+    // SP1 to SP5; 11 → 13 and 12 → 13). rc.14 hb-legend: Display & Controls gained Launch angles (13 → 14).
+    assert_eq!(counts(false), [34, 11, 13, 32, 14, 3]);
+    assert_eq!(counts(true), [33, 11, 13, 32, 14, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 104);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 103);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 4);
@@ -147,8 +158,8 @@ fn layout_row_counts_match_the_rc_freeze() {
     assert_eq!(n(&|c| matches!(c, Control::Slider)), 2);
     // Nothing is deferred any more (operator 2026-11-05): every editor has its row, and every group has rows.
     // (104: Lobby Items, Phase 2 N11; 105: Ready Hats, P-HOT; rc.6: CPU Level; rc.13: Aerial Drift, Taunts; rc.14: Hide CPU and the
-    // seven Practice games rows; Save setup here; the three spots rows.)
-    assert_eq!(ROWS.len(), 107);
+    // seven Practice games rows; Save setup here; the three spots rows and Launch angles.)
+    assert_eq!(ROWS.len(), 108);
     for editor in [Editor::SetupSave, Editor::SetupSaveHere, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }
@@ -995,6 +1006,7 @@ fn case_table() {
     crate::test_table::run(&[
         ("layout_row_counts_match_the_rc_freeze", layout_row_counts_match_the_rc_freeze as fn()),
         ("the_spot_rows_sit_next_to_their_features", the_spot_rows_sit_next_to_their_features as fn()),
+        ("legend_launch_angles_row_is_off_by_default", legend_launch_angles_row_is_off_by_default as fn()),
         ("core02_table_carriage_return", core02_table_carriage_return as fn()),
         ("core02_page_machine", core02_page_machine as fn()),
         ("core02_y_clears_weighted_only", core02_y_clears_weighted_only as fn()),

@@ -165,8 +165,9 @@ fn the_board_keeps_each_fighters_last_pass_and_ages_out_the_gone() {
     // Republishing replaces, never appends.
     board.publish(0xa0, (0..10).map(|i| orb(i as f32)));
     assert_eq!(board.live().count(), 29);
-    // At most MAX_HELD per fighter.
-    assert_eq!(board.publish(0xc0, (0..MAX_HELD + 5).map(|i| orb(i as f32))), MAX_HELD);
+    // At most BOARD_ORBS per fighter (its MAX_HELD spheres and the launch-angle marks, rc.14).
+    assert_eq!(board.publish(0xc0, (0..orbs::BOARD_ORBS + 5).map(|i| orb(i as f32))), orbs::BOARD_ORBS);
+    assert!(orbs::BOARD_ORBS > MAX_HELD);
     board.clear(0xc0);
     assert_eq!(board.live().count(), 29);
     // A fighter that stops publishing ages out while others go on, counted in publishes, not in time: a paused game
@@ -230,26 +231,26 @@ fn an_articles_hitboxes_are_own_orbs_while_its_attack_lasts() {
     articles.track(id, key, &mut board);
     assert_eq!(articles.tracked().iter().filter(|t| t.0 != 0).count(), 1, "one article, however many ATTACKs");
     let on_bone = |s: &Sphere| (s.joint == 0x3_1ed9_1fca).then_some([40.0 + s.pos[0], 12.0, 0.0]);
-    assert!(orbs::article_pass(&mut board, &mut set, key, 7, &mut Shot(true), on_bone));
+    assert!(orbs::article_pass(&mut board, &mut set, key, 7, &mut Shot(true), on_bone, None));
     let hit: Vec<Orb> = board.in_draw_order().copied().collect();
     assert_eq!(hit.len(), 2, "the shot's orb (a hitbox, drawn first), then Player 1's hurtbox");
     assert_eq!(hit[0].centre, [40.0, 12.0, 0.0]);
     assert!((hit[0].radius - 1.9).abs() < 1e-5);
     assert_eq!((hit[0].kind(), &hit[0].color[..3]), (hitbox::KIND_HIT, &model::panes::linear([255, 0, 0, 255])[..3]));
     // Its attack ended: its orbs go and the pass says to forget it; Player 1's stay.
-    assert!(!orbs::article_pass(&mut board, &mut set, key, 7, &mut Shot(false), on_bone));
+    assert!(!orbs::article_pass(&mut board, &mut set, key, 7, &mut Shot(false), on_bone, None));
     assert_eq!(board.live().count(), 1);
     // A thrown item (a bomb, a turnip) sets its hitbox without `ATTACK`: the pass tracks an active item while a slot is live.
     assert_eq!((hitbox::live_slot(&mut Shot(true)), hitbox::live_slot(&mut Shot(false))), (Some(0), None));
     articles.track(id, key, &mut board);
-    orbs::article_pass(&mut board, &mut set, key, 7, &mut Shot(true), on_bone);
+    orbs::article_pass(&mut board, &mut set, key, 7, &mut Shot(true), on_bone, None);
     articles.forget(id, &mut board);
     assert_eq!((board.live().count(), articles.tracked().iter().filter(|t| t.0 != 0).count()), (1, 0), "gone article");
     // Fighters and articles share the board's slots; a fifth article replaces the oldest, whose orbs go.
     assert_eq!(orbs::ORB_FIGHTERS + orbs::ARTICLES, FIGHTER_SETS);
     for k in 1..=orbs::ARTICLES {
         articles.track(k as u32, k << 4, &mut board);
-        orbs::article_pass(&mut board, &mut HandleSet::new(), k << 4, 7, &mut Shot(true), on_bone);
+        orbs::article_pass(&mut board, &mut HandleSet::new(), k << 4, 7, &mut Shot(true), on_bone, None);
     }
     assert_eq!(board.live().count(), 1 + orbs::ARTICLES);
     articles.track(99, 99 << 4, &mut board);
@@ -276,23 +277,23 @@ fn an_articles_grab_box_is_an_own_orb_while_its_status_lasts() {
     let set = articles.track(id, key, &mut board);
     assert!(set.push_grab(pikmin, Some(40)));
     for pass in 0..3 {
-        assert!(orbs::article_pass(&mut board, set, key, 40, &mut Shot(false), on_bone), "pass {pass}: no hitbox, still tracked");
+        assert!(orbs::article_pass(&mut board, set, key, 40, &mut Shot(false), on_bone, None), "pass {pass}: no hitbox, still tracked");
         let grab: Vec<Orb> = board.live().copied().collect();
         assert_eq!(grab.len(), 1, "pass {pass}: the Pikmin's grab box");
         assert_eq!((grab[0].kind(), grab[0].centre), (hitbox::KIND_GRAB, [25.0, 4.0, 0.0]));
         assert_eq!(&grab[0].color[..3], &model::panes::linear([255, 0, 255, 255])[..3], "magenta, as the fighters'");
         assert!((grab[0].radius - 3.0).abs() < 1e-5);
     }
-    assert!(!orbs::article_pass(&mut board, set, key, 41, &mut Shot(false), on_bone), "its status ended: forgotten");
+    assert!(!orbs::article_pass(&mut board, set, key, 41, &mut Shot(false), on_bone, None), "its status ended: forgotten");
     assert_eq!(board.live().count(), 0);
     // Set the frame the grab connected (the pass already sees the next status): drawn that pass, gone at the next.
     assert!(set.push_grab(pikmin, Some(40)));
-    assert!(orbs::article_pass(&mut board, set, key, 41, &mut Shot(false), on_bone));
+    assert!(orbs::article_pass(&mut board, set, key, 41, &mut Shot(false), on_bone, None));
     assert_eq!(board.live().count(), 1);
-    assert!(!orbs::article_pass(&mut board, set, key, 41, &mut Shot(false), on_bone));
+    assert!(!orbs::article_pass(&mut board, set, key, 41, &mut Shot(false), on_bone, None));
     // A grab box beside a hitbox: both drawn, the hitbox's colour unchanged.
     assert!(set.push_grab(pikmin, Some(40)));
-    assert!(orbs::article_pass(&mut board, set, key, 40, &mut Shot(true), on_bone));
+    assert!(orbs::article_pass(&mut board, set, key, 40, &mut Shot(true), on_bone, None));
     let mut kinds: Vec<u32> = board.live().map(|o| o.kind()).collect();
     kinds.sort();
     assert_eq!(kinds, [hitbox::KIND_HIT, hitbox::KIND_GRAB]);

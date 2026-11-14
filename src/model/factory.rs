@@ -222,4 +222,6 @@ pub static DEFS: [Def; COUNT] = [
     row!("frame_data_colours", Single, 2, [1]),
     row!("spots_strip", Single, 2, [1]),
     row!("spots_combo", Single, 2, [1]),
+    // rc.14 hb-legend: the hitbox visualizer's Launch angles, Off by default, appended the same way.
+    row!("launch_angles", Single, 2, [1]),
 ];

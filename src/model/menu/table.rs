@@ -230,7 +230,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 107] = [
+pub static ROWS: [Row; 108] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -411,7 +411,9 @@ pub static ROWS: [Row; 107] = [
     r(SCREEN, "HUD", "hud", TOGGLE, "On: the game's HUD shows as usual.\nOff: Training hides damage, pointers and off-screen bubbles."),
     r(SCREEN, "Hitbox Visualization", "hitbox_vis", TOGGLE, "On: hitboxes, grab boxes and hurtboxes (yellow) are drawn.\nOff: nothing is drawn."),
     r(SCREEN, "Frame data colours", "frame_data_colours", TOGGLE,
-      "On: strong hitboxes are red, weak ones pink, as on Ultimate\nFrame Data. Off: every hitbox keeps its own colour."),
+      "On: hits red (strong) or pink (weak), grabs purple, hurtboxes\nwhite, blue when intangible, green when invincible."),
+    r(SCREEN, "Launch angles", "launch_angles", TOGGLE,
+      "On: a white line in each hitbox points where it sends.\nDashes: the game picks the angle. A dot: it carries along."),
     r(SCREEN, "Frame Advantage", "frame_advantage", TOGGLE,
       "On: the frame advantage after each exchange is shown."),
     r(SCREEN, "Input Display", "input_display_strip", Control::Dropdown(&o::INPUT_DISPLAY),

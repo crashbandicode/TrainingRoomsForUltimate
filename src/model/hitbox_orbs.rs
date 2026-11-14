@@ -13,7 +13,11 @@
 //! fighter's orbs on the `Board`; the layout tick projects them with the game's own `world_to_screen` and plans each
 //! orb's pill (`plan_pill`). Pure and host-tested (`tests/core06_orbs.rs`).
 
-use super::hitbox::{want_hitboxes, AttackReader, Effects, HandleSet, Sphere, FIGHTER_SETS, KIND_HURT, MAX_HELD, SCALE};
+use super::hitbox::{want_hitboxes, AttackReader, Effects, HandleSet, Sphere, FIGHTER_SETS, KIND_HIT, KIND_HURT, MAX_HELD, SCALE, SLOTS};
+use super::legend::{self, KIND_MARK};
+
+/// One fighter's orbs on the board: its spheres' and, with *Launch angles* On, up to two marks per hitbox.
+pub const BOARD_ORBS: usize = MAX_HELD + 2 * SLOTS as usize;
 
 /// The most fighter objects Training (and the waiting room's practice) draws at once: Player 1 and the CPU, each of them
 /// possibly Ice Climbers, whose Nana is a fighter object of her own. No other fighter adds a fighter object (Pokémon
@@ -84,7 +88,7 @@ pub struct Board {
     keys: [usize; FIGHTER_SETS],
     stamps: [u32; FIGHTER_SETS],
     lens: [usize; FIGHTER_SETS],
-    orbs: [[Orb; MAX_HELD]; FIGHTER_SETS],
+    orbs: [[Orb; BOARD_ORBS]; FIGHTER_SETS],
     clock: u32,
 }
 
@@ -96,10 +100,10 @@ impl Default for Board {
 
 impl Board {
     pub const fn new() -> Board {
-        Board { keys: [0; FIGHTER_SETS], stamps: [0; FIGHTER_SETS], lens: [0; FIGHTER_SETS], orbs: [[Orb::NONE; MAX_HELD]; FIGHTER_SETS], clock: 0 }
+        Board { keys: [0; FIGHTER_SETS], stamps: [0; FIGHTER_SETS], lens: [0; FIGHTER_SETS], orbs: [[Orb::NONE; BOARD_ORBS]; FIGHTER_SETS], clock: 0 }
     }
 
-    /// Replace `key`'s orbs (at most `MAX_HELD`; a new key takes a free or the stalest slot). A capsule's second end
+    /// Replace `key`'s orbs (at most `BOARD_ORBS`; a new key takes a free or the stalest slot). A capsule's second end
     /// (sphere 1 of its shape) becomes the tail of its first (sphere 0). Returns how many were kept.
     pub fn publish(&mut self, key: usize, orbs: impl Iterator<Item = Orb>) -> usize {
         if key == 0 {
@@ -115,7 +119,7 @@ impl Board {
         self.keys[i] = key;
         self.stamps[i] = self.clock;
         let mut len = 0;
-        for orb in orbs.take(MAX_HELD) {
+        for orb in orbs.take(BOARD_ORBS) {
             self.orbs[i][len] = orb;
             len += 1;
         }
@@ -158,12 +162,42 @@ impl Board {
             .flat_map(move |i| self.orbs[i][..self.lens[i]].iter())
     }
 
-    /// The live orbs in the order the panes take them: every hitbox and grab box first, then every hurtbox, each in slot
-    /// order. When the panes run out the cut is deterministic and takes hurtboxes first (review HB-2).
+    /// The live orbs in the order the panes take them: every hitbox and grab box first, then every hurtbox, then the launch-angle
+    /// marks, each in slot order. When the panes run out the cut is deterministic and takes the marks, then hurtboxes first (review HB-2).
     pub fn in_draw_order(&self) -> impl Iterator<Item = &Orb> + '_ {
-        let first = self.live().filter(|o| o.kind() != KIND_HURT);
-        first.chain(self.live().filter(|o| o.kind() == KIND_HURT))
+        let of = move |kind: fn(u32) -> bool| self.live().filter(move |o| kind(o.kind()));
+        of(|k| k != KIND_HURT && k != KIND_MARK).chain(of(|k| k == KIND_HURT)).chain(of(|k| k == KIND_MARK))
     }
+}
+
+/// `set`'s spheres as orbs on their bones (`place`) into `out`, then, while *Launch angles* is On (`lr`: the owner's facing), each
+/// hitbox's marks (`legend::marks`) at its slot's angle (`angle(slot)`, `None` when the slot has no data). How many were written.
+pub fn place_orbs(set: &HandleSet, mut place: impl FnMut(&Sphere) -> Option<[f32; 3]>, lr: Option<f32>, mut angle: impl FnMut(i32) -> Option<i32>, out: &mut [Orb]) -> usize {
+    let mut n = 0;
+    for (sphere, centre) in set.spheres().filter_map(|s| place(s).map(|c| (s, c))) {
+        if n < out.len() {
+            out[n] = orb_of(sphere, centre);
+            n += 1;
+        }
+    }
+    let Some(lr) = lr else { return n };
+    for i in 0..n {
+        let hit = out[i];
+        let Some(angle) = (hit.kind() == KIND_HIT && hit.key & 0xff == 0).then(|| angle(((hit.key >> 8) & 0xffff) as i32)).flatten() else { continue };
+        for mark in legend::marks(&hit, angle, lr).into_iter().flatten() {
+            if n < out.len() {
+                out[n] = mark;
+                n += 1;
+            }
+        }
+    }
+    n
+}
+
+/// A slot's launch angle (`legend::ANGLE`, an i32 read through the reader's 4-byte read), or `None` when it has no data.
+pub fn slot_angle(attacks: &mut impl AttackReader, slot: i32) -> Option<i32> {
+    let data = attacks.data(slot);
+    (data != 0).then(|| attacks.read_f32(data + legend::ANGLE).to_bits() as i32)
 }
 
 
@@ -219,13 +253,15 @@ impl Articles {
 /// One article's pass in `status`: its live attack slots' spheres and its grab spheres (held as a fighter's), placed on its
 /// bones by `place`, become its orbs on `board`. False when it holds none: its attack and grab ended, its orbs went, and it
 /// is forgotten.
-pub fn article_pass(board: &mut Board, set: &mut HandleSet, key: usize, status: i32, attacks: &mut impl AttackReader, mut place: impl FnMut(&Sphere) -> Option<[f32; 3]>) -> bool {
+pub fn article_pass(board: &mut Board, set: &mut HandleSet, key: usize, status: i32, attacks: &mut impl AttackReader, place: impl FnMut(&Sphere) -> Option<[f32; 3]>, lr: Option<f32>) -> bool {
     let mut wants = [Sphere::NONE; MAX_HELD];
     let mut len = 0;
     want_hitboxes(attacks, &mut wants, &mut len);
     set.tint(attacks, &mut wants[..len], status);
     set.reconcile(&wants[..len], true, &mut OrbSink { status });
-    board.publish(key, set.spheres().filter_map(|s| place(s).map(|centre| orb_of(s, centre))));
+    let mut orbs = [Orb::NONE; BOARD_ORBS];
+    let n = place_orbs(set, place, lr, |slot| slot_angle(attacks, slot), &mut orbs);
+    board.publish(key, orbs[..n].iter().copied());
     !set.is_empty()
 }
 

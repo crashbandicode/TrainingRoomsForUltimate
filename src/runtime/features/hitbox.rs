@@ -54,6 +54,8 @@ static INSTALLED: AtomicBool = AtomicBool::new(false);
 static SETTING: AtomicBool = AtomicBool::new(false);
 /// *Frame data colours* On (rc.14, `hitbox::legend_colour`).
 static FRAME_DATA: AtomicBool = AtomicBool::new(false);
+/// *Launch angles* On (rc.14, `legend::marks`).
+static LAUNCH: AtomicBool = AtomicBool::new(false);
 /// The game's status ids were resolved through its constant table.
 static READY: AtomicBool = AtomicBool::new(false);
 static IDS: [AtomicI32; 6] = [const { AtomicI32::new(0) }; 6];
@@ -75,6 +77,7 @@ pub fn set_installed(on: bool) {
 pub fn publish(snapshot: &Snapshot) {
     SETTING.store(hitbox::enabled(snapshot), Ordering::Release);
     FRAME_DATA.store(crate::model::spots::row_on(snapshot, crate::model::spots::ROW_FRAME_DATA), Ordering::Release);
+    LAUNCH.store(crate::model::spots::row_on(snapshot, crate::model::legend::ROW_LAUNCH), Ordering::Release);
     let rows = u32::from_le_bytes(eggs::choices(snapshot));
     EGG_ROWS.store(rows, Ordering::Release);
     let hide = eggs::choice(snapshot, eggs::ROW_PRACTICE_CPU) == 0;
@@ -338,16 +341,12 @@ fn clear_set(store: &mut Store, i: usize, accessor: usize) -> Counts {
     store.table.sets[i].clear(&mut OrbSink { status: i32::MIN })
 }
 
-/// Place every sphere `set` holds on its bone and publish them as `accessor`'s orbs.
+/// Place every sphere `set` holds on its bone and publish them as `accessor`'s orbs, with the launch-angle marks while that row is On.
 unsafe fn publish_orbs(accessor: usize, set: &hitbox::HandleSet) -> usize {
-    let mut placed = [Orb::NONE; hitbox::MAX_HELD];
-    let mut len = 0;
-    for sphere in set.spheres() {
-        if let Some(centre) = natives::joint_position(accessor, sphere.joint, &sphere.pos) {
-            placed[len] = orbs::orb_of(sphere, centre);
-            len += 1;
-        }
-    }
+    let mut placed = [Orb::NONE; orbs::BOARD_ORBS];
+    let lr = LAUNCH.load(Ordering::Acquire).then(|| natives::lr(accessor));
+    let place = |s: &Sphere| natives::joint_position(accessor, s.joint, &s.pos);
+    let len = orbs::place_orbs(set, place, lr, |slot| orbs::slot_angle(&mut GameAttacks(accessor), slot), &mut placed);
     BOARD.lock().publish(accessor, placed[..len].iter().copied())
 }
 
@@ -658,7 +657,8 @@ unsafe fn draw_articles() {
         // `key` is the live article's accessor (checked above); the natives check their own grants. Tracked: its set.
         let set = articles.track(id, key, &mut board);
         set.frame_data = FRAME_DATA.load(Ordering::Acquire);
-        if !live || !orbs::article_pass(&mut board, set, key, natives::status_kind(key), &mut GameAttacks(key), |s| natives::joint_position(key, s.joint, &s.pos)) {
+        let place = |s: &Sphere| natives::joint_position(key, s.joint, &s.pos);
+        if !live || !orbs::article_pass(&mut board, set, key, natives::status_kind(key), &mut GameAttacks(key), place, LAUNCH.load(Ordering::Acquire).then(|| natives::lr(key))) {
             articles.forget(id, &mut board);
         }
     }
@@ -815,7 +815,8 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     let Some(shape) = hitbox::parse(indices, |i| lua_cell(lua, i)) else { return };
     let mut wants = [Sphere::NONE; hitbox::SHAPE_SPHERES];
     let mut len = 0;
-    hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_GRAB, shape.id as usize, &shape, hitbox::GRAB_TINT);
+    let tint = hitbox::legend_colour(hitbox::KIND_GRAB, None, 0, hitbox::GRAB_TINT, FRAME_DATA.load(Ordering::Acquire));
+    hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_GRAB, shape.id as usize, &shape, tint);
     let status = Some(natives::status_kind(accessor));
     let (mut store, mut articles);
     let set = if fighter {
@@ -1118,7 +1119,7 @@ mod stats {
             let mut reader = hitbox::GameHurt { accessor, load: super::mem_load };
             let start = now();
             let mut spheres = 0usize;
-            let parts = hitbox::hurt_parts(&mut reader, |_, shape| spheres += 1 + usize::from(shape.b.is_some()));
+            let parts = hitbox::hurt_parts(&mut reader, false, |_, shape, _| spheres += 1 + usize::from(shape.b.is_some()));
             slot.observe(parts, spheres, now().wrapping_sub(start));
             slot.window(REPORT_EVERY)
         };

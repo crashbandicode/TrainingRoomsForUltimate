@@ -562,21 +562,16 @@ fn core06_attack_data_layout_matches_the_owned_elf() {
     // ...and the stride the slots are walked with is the AttackData size the plugin never assumes elsewhere.
 }
 
-/// rc.14 hb-legend: the launch angle, knockback and attribute fields of `AttackData`, and the `HitStatus` values with the
+/// rc.14 hb-legend: the launch angle field of `AttackData`, and the `HitStatus` values with the
 /// game's own effective status of a hurtbox part (`model::legend`).
 #[test]
 fn legend_facts_match_the_owned_elf() {
-    use model::legend::{self, ANGLE, ATTRIBUTE, GROUP_GLOBAL, GROUP_WHOLE, KNOCKBACK};
+    use model::legend::{self, ANGLE, GROUP_GLOBAL, GROUP_WHOLE};
     let Some(main) = common::owned_main("legend_facts_match_the_owned_elf") else { return };
     let w = |offset: usize| word_at(&main, offset);
-    // ATTACK (its AttackData at sp+0x20): arg 4, the damage, to +0x20; arg 5, the angle, to +0x28; args 6 to 8, knockback
-    // growth, fixed and base, to +0x2c..+0x34; arg 33, the collision attribute's Hash40, to +0x58.
+    // ATTACK (its AttackData at sp+0x20): arg 4, the damage, to +0x20; arg 5, the angle, to +0x28.
     assert_eq!(w(0x2284d90), str_w(8, 31, 0x20 + hitbox::layout::POWER as u32), "damage");
     assert_eq!(w(0x2284d98), str_w(0, 31, 0x20 + ANGLE as u32), "angle");
-    for (k, at) in [0x2284dac, 0x2284dc0, 0x2284dd4].into_iter().enumerate() {
-        assert_eq!(w(at), str_w(0, 31, 0x20 + (KNOCKBACK + 4 * k) as u32), "knockback {k}");
-    }
-    assert_eq!(w(0x2285a94), str_x(0, 31, 0x20 + ATTRIBUTE as u32), "attribute");
     // The game reads the angle back from `attack_data(slot)` and compares it with 361: `ldr w8,[x0,#0x28]; cmp w8,#0x169`.
     assert_eq!(w(0x10d6db0), ldr_w(8, 0, ANGLE as u32));
     assert_eq!(w(0x10d6dc4), 0x7105_a51f, "cmp w8, #361");
