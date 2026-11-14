@@ -958,6 +958,10 @@ const MODEL_CALLBACKS: &[(&str, &str)] = &[
     ("hitbox::frame", "hitbox::data"),
     ("hitbox::frame", "hitbox::read_u64"),
     ("hitbox::frame", "hitbox::read_f32"),
+    // rc.14 spots: the frame strip reads both fighters' attack slots through the same reader (hitbox::powers).
+    ("input_display::sample", "hitbox::active"),
+    ("input_display::sample", "hitbox::data"),
+    ("input_display::sample", "hitbox::read_f32"),
 ];
 
 const KEYBOARD_CALLBACK: &str = "the inline keyboard's SDK callback: the SDK runs it synchronously on the thread that calls into \

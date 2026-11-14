@@ -157,6 +157,10 @@ impl Analysis {
         for to in ["hitbox::active", "hitbox::data", "hitbox::read_u64", "hitbox::read_f32"] {
             graph.dynamic.push(("hitbox::frame".to_owned(), to.to_owned()));
         }
+        // rc.14 spots: the frame strip reads each fighter's attack slots through the same reader (hitbox::powers).
+        for to in ["hitbox::active", "hitbox::data", "hitbox::read_f32"] {
+            graph.dynamic.push(("input_display::sample".to_owned(), to.to_owned()));
+        }
         for (from, to) in &graph.dynamic {
             assert_eq!(graph.find(from).len(), 1, "dynamic edge source {from}");
             assert_eq!(graph.find(to).len(), 1, "dynamic edge target {to}");

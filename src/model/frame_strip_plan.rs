@@ -20,6 +20,8 @@ pub const RULE: [u8; 4] = [60, 66, 78, 255];
 pub const CHIP_BACK: [u8; 4] = [30, 36, 48, 255];
 pub const P1_TAG: [u8; 4] = [228, 64, 64, 255];
 pub const CPU_TAG: [u8; 4] = [150, 150, 158, 255];
+/// Dark text for a label that sits on a light block (the LAST pills' text, a hit block's spot label).
+pub const INK: [u8; 4] = [10, 14, 20, 255];
 
 /// A text box's content: UTF-16 units of the game's font (ASCII, or one glyph unit).
 pub const TEXT_UNITS: usize = 24;
@@ -139,10 +141,12 @@ struct Layout<'a> {
     sticks: [Option<u8>; WINDOW],
     first_slot: usize,
     runs: [[Option<Run>; RUNS]; 2],
+    /// Spot labels on the hit blocks (rc.14, SP3).
+    spots: bool,
 }
 
 impl<'a> Layout<'a> {
-    fn new(tracker: &'a Tracker) -> Self {
+    fn new(tracker: &'a Tracker, spots: bool) -> Self {
         let mut frames = [0u32; WINDOW];
         let mut sticks = [None; WINDOW];
         let first_slot = WINDOW - tracker.len();
@@ -187,7 +191,7 @@ impl<'a> Layout<'a> {
                 }
             }
         }
-        Self { tracker, frames, sticks, first_slot, runs }
+        Self { tracker, frames, sticks, first_slot, runs, spots }
     }
 
     /// The slot a frame is drawn in; a frame after the newest counts on past the right edge (a predicted free frame).
@@ -227,14 +231,8 @@ impl<'a> Layout<'a> {
             }
             i if (RUN_LABEL..RUN_LABEL + 2 * RUN_LABELS).contains(&i) => {
                 let (lane, n) = ((i - RUN_LABEL) / RUN_LABELS, (i - RUN_LABEL) % RUN_LABELS);
-                let run = self.runs[lane].iter().flatten().filter(|r| r.cell.counted() && r.len >= 7).nth(n);
-                match run {
-                    Some(run) => {
-                        let x = FIRST_X + (run.slot as f32 + run.len as f32 / 2.0) * PITCH;
-                        let mut text = Text::EMPTY;
-                        let _ = write!(text, "{}", run.len);
-                        Look::text(x, if lane == 0 { P1_Y } else { CPU_Y }, text, TEXT)
-                    }
+                match self.runs[lane].iter().flatten().filter_map(|run| self.run_label(lane, run)).nth(n) {
+                    Some((x, text, color)) => Look::text(x, if lane == 0 { P1_Y } else { CPU_Y }, text, color),
                     None => Look::HIDDEN,
                 }
             }
@@ -254,6 +252,20 @@ impl<'a> Layout<'a> {
             i if (STICK..STICK + WINDOW).contains(&i) => self.stick_mark(i - STICK),
             _ => Look::HIDDEN,
         }
+    }
+
+    /// A run's label, centred on it: its length (a long hitstun, recovery or shieldstun) or, with the spot labels on, the spot of the hit that
+    /// began a hitlag block of this lane (rc.14, SP3): the lane of the fighter that was hit.
+    fn run_label(&self, lane: usize, run: &Run) -> Option<(f32, Text, [u8; 4])> {
+        let x = FIRST_X + (run.slot as f32 + run.len as f32 / 2.0) * PITCH;
+        if run.cell.counted() && run.len >= 7 {
+            let mut text = Text::EMPTY;
+            let _ = write!(text, "{}", run.len);
+            return Some((x, text, TEXT));
+        }
+        let frames = self.frames[run.slot]..=self.frames[run.slot + run.len - 1];
+        let mark = self.tracker.marks().find(|m| usize::from(m.lane) == lane && frames.contains(&m.frame));
+        mark.filter(|_| self.spots && run.cell == Cell::Hitlag).map(|m| (x, Text::new(m.spot.name()), INK))
     }
 
     /// One `>` for this slot, rotated so rot 0 points right and each bin is 45 degrees counter-clockwise.
@@ -478,11 +490,11 @@ impl Renderer {
     }
 
     /// `draw`, with the spot labels on the hit blocks when `spots` (rc.14, SP3).
-    pub fn draw_spots(&mut self, tracker: &Tracker, shown: bool, _spots: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
+    pub fn draw_spots(&mut self, tracker: &Tracker, shown: bool, spots: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
         if !shown {
             return self.hide(at::CONTAINER, Look { visible: false, ..Look::HIDDEN }, apply);
         }
-        let layout = Layout::new(tracker);
+        let layout = Layout::new(tracker, spots);
         self.show(|i| layout.look(i), apply)
     }
 }

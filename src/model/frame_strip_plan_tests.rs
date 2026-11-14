@@ -131,7 +131,7 @@ fn the_stick_row_scrolls_and_freezes_with_the_strip() {
     assert_eq!(look.rot, 90.0);
 }
 
-/// Decision SP3: with the labels On, a hit block carries its spot, on the lane of whoever hit; Off, nothing is written for it.
+/// Decision SP3: with the labels On, a hit block carries its spot, on the lane of the fighter that was hit; Off, nothing is written for it.
 fn a_hit_block_carries_its_spot_label_when_the_row_is_on() {
     let calm = |damage| Sample { actionable: true, damage, ..Sample::default() };
     let mut powers = [0.0; crate::model::spots::SLOTS];
@@ -149,7 +149,7 @@ fn a_hit_block_carries_its_spot_label_when_the_row_is_on() {
             let (p1, cpu) = if attacker_is_p1 { (attacker, victim) } else { (victim, attacker) };
             t.step(p1, cpu, NONE);
         }
-        let lane = usize::from(!attacker_is_p1);
+        let lane = usize::from(attacker_is_p1);
         let mut on = Renderer::new();
         let mut seen = Vec::new();
         on.draw_spots(&t, true, true, |i, look, changed| seen.push((i, *look, changed)));

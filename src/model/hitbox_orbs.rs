@@ -223,6 +223,7 @@ pub fn article_pass(board: &mut Board, set: &mut HandleSet, key: usize, status: 
     let mut wants = [Sphere::NONE; MAX_HELD];
     let mut len = 0;
     want_hitboxes(attacks, &mut wants, &mut len);
+    set.tint(attacks, &mut wants[..len], status);
     set.reconcile(&wants[..len], true, &mut OrbSink { status });
     board.publish(key, set.spheres().filter_map(|s| place(s).map(|centre| orb_of(s, centre))));
     !set.is_empty()

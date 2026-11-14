@@ -531,8 +531,21 @@ pub fn want_hitboxes(reader: &mut impl AttackReader, out: &mut [Sphere], len: &m
 
 /// The damage of each attack slot that is active (0.0 for one that is not, or that deals none), and whether any slot is active
 /// (decision SP1: the spots are ranked by it). Reads only active slots' `AttackData`.
-pub fn powers(_reader: &mut impl AttackReader) -> (bool, super::spots::Powers) {
-    (false, [0.0; super::spots::SLOTS])
+pub fn powers(reader: &mut impl AttackReader) -> (bool, super::spots::Powers) {
+    let mut out = [0.0; super::spots::SLOTS];
+    let mut any = false;
+    for slot in 0..SLOTS {
+        if !reader.active(slot) {
+            continue;
+        }
+        any = true;
+        let data = reader.data(slot);
+        if data != 0 {
+            // `max` also drops a NaN.
+            out[slot as usize] = reader.read_f32(data + layout::POWER).max(0.0);
+        }
+    }
+    (any, out)
 }
 
 /// Frame data colours (operator 2026-11-14, from Ultimate Frame Data's legend): a strong hitbox is red, a weak one pink. Pink is #ff8fc8,
@@ -552,9 +565,20 @@ pub fn legend_colour(kind: u32, spot: Option<super::spots::Spot>, usual: [f32; 3
     }
 }
 
-/// Apply `legend_colour` (On) to every sphere of `wants`; `peak` is the fighter's strongest damage so far this action, and `status`starts a new
-/// action when it changes.
-pub fn tint_legend(_reader: &mut impl AttackReader, _wants: &mut [Sphere], _peak: &mut super::spots::Peak, _status: i32) {}
+/// Apply `legend_colour` (On) to every sphere of `wants`; `peak` is the fighter's strongest damage so far this action, and `status` starts a new
+/// action when it changes. Reads the active slots' damage again, only while the row is On.
+fn tint_legend(reader: &mut impl AttackReader, wants: &mut [Sphere], peak: &mut super::spots::Peak, status: i32) {
+    use super::spots;
+    let (_, damage) = powers(reader);
+    let earlier = peak.earlier(status);
+    for sphere in wants.iter_mut() {
+        let kind = sphere.key >> 24;
+        let slot = ((sphere.key >> 8) & 0xffff) as usize % spots::SLOTS;
+        let spot = if kind == KIND_HIT { spots::classify(damage[slot], &damage, earlier) } else { None };
+        sphere.tint = legend_colour(kind, spot, sphere.tint, true);
+    }
+    peak.fold(&damage);
+}
 
 /// The first live attack slot with data: an active item with one is drawn as an article (a thrown bomb runs no `ATTACK`).
 pub fn live_slot(reader: &mut impl AttackReader) -> Option<i32> {
@@ -782,9 +806,7 @@ pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphe
     if let Some(hurt) = hurt {
         left_out += want_hurtboxes(hurt, wants, &mut len);
     }
-    if set.frame_data {
-        tint_legend(reader, &mut wants[..len], &mut set.peak, facts.status);
-    }
+    set.tint(reader, &mut wants[..len], facts.status);
     let mut counts = set.reconcile(&wants[..len], true, fx);
     counts.dropped += left_out;
     (counts, len)
@@ -972,6 +994,14 @@ impl HandleSet {
     pub fn forget(&mut self) {
         self.len = 0;
         self.pending_len = 0;
+        self.peak = super::spots::Peak::new();
+    }
+
+    /// *Frame data colours* (`legend_colour`): the spheres of `wants` take their tints when the row is On, else nothing changes.
+    pub fn tint(&mut self, reader: &mut impl AttackReader, wants: &mut [Sphere], status: i32) {
+        if self.frame_data {
+            tint_legend(reader, wants, &mut self.peak, status);
+        }
     }
 }
 

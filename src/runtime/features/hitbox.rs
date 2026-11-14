@@ -52,6 +52,8 @@ use crate::runtime::{scene, state_natives};
 static INSTALLED: AtomicBool = AtomicBool::new(false);
 /// `hitbox_vis` On.
 static SETTING: AtomicBool = AtomicBool::new(false);
+/// *Frame data colours* On (rc.14, `hitbox::legend_colour`).
+static FRAME_DATA: AtomicBool = AtomicBool::new(false);
 /// The game's status ids were resolved through its constant table.
 static READY: AtomicBool = AtomicBool::new(false);
 static IDS: [AtomicI32; 6] = [const { AtomicI32::new(0) }; 6];
@@ -72,6 +74,7 @@ pub fn set_installed(on: bool) {
 /// Every settings publish.
 pub fn publish(snapshot: &Snapshot) {
     SETTING.store(hitbox::enabled(snapshot), Ordering::Release);
+    FRAME_DATA.store(crate::model::spots::row_on(snapshot, crate::model::spots::ROW_FRAME_DATA), Ordering::Release);
     let rows = u32::from_le_bytes(eggs::choices(snapshot));
     EGG_ROWS.store(rows, Ordering::Release);
     let hide = eggs::choice(snapshot, eggs::ROW_PRACTICE_CPU) == 0;
@@ -596,7 +599,7 @@ fn mem_load(at: usize, out: &mut [u8]) {
     unsafe { std::ptr::copy_nonoverlapping(at as *const u8, out.as_mut_ptr(), out.len()) };
 }
 
-struct GameAttacks(usize);
+pub(crate) struct GameAttacks(pub(crate) usize);
 
 impl hitbox::AttackReader for GameAttacks {
     fn active(&mut self, slot: i32) -> bool {
@@ -649,6 +652,7 @@ unsafe fn draw_articles() {
         let live = smash::app::sv_battle_object::is_active(id) && smash::app::sv_battle_object::module_accessor(id) as usize == key;
         // `key` is the live article's accessor (checked above); the natives check their own grants. Tracked: its set.
         let set = articles.track(id, key, &mut board);
+        set.frame_data = FRAME_DATA.load(Ordering::Acquire);
         if !live || !orbs::article_pass(&mut board, set, key, natives::status_kind(key), &mut GameAttacks(key), |s| natives::joint_position(key, s.joint, &s.pos)) {
             articles.forget(id, &mut board);
         }
@@ -715,6 +719,7 @@ pub unsafe fn frame(fighter: usize) {
     }
     let Store { table, wants, .. } = &mut *store;
     let set = &mut table.sets[i];
+    set.frame_data = FRAME_DATA.load(Ordering::Acquire);
     // Own orbs (decision HB-OWN-ORBS): while the setting is On the pass reads the HitModule (the relied `hurtbox_*` rows) and
     // plans the enabled parts' hurt spheres into the same wants as the hit spheres; `OrbSink` holds every one (never
     // refused). The reader is constructed only here, behind `enabled`: Off — and the stop paths the dispatch takes first —

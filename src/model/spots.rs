@@ -2,7 +2,7 @@
 //! damage, read from the game's own `AttackData` (`hitbox::layout::POWER`), never from a per-fighter table:
 //!
 //! * among the hitboxes active on one frame the strongest is **Sweet** (ties at the top are all Sweet) and a weaker one is **Sour**;
-//! * a hitbox weaker than the strongest hitbox seen earlier in the same action is **Late**;
+//! * when the frame's strongest hitbox is weaker than the strongest seen earlier in the same action (the sweet phase is over), its hitboxes are **Late**;
 //! * when every active hitbox has the same damage and nothing stronger came earlier there is no label.
 //!
 //! The game does not say which slot connected (the only native is `AttackModule::is_infliction_status`, one flag for the whole
@@ -55,22 +55,26 @@ impl Spot {
 
     /// The word a combo file stores (`"spot"`); anything else reads as no spot.
     pub fn from_key(key: &str) -> Option<Spot> {
-        [Spot::Sweet, Spot::Sour, Spot::Late].into_iter().find(|s| s.key() == key)
-    }
-
-    pub const fn key(self) -> &'static str {
-        match self {
-            Spot::Sweet => "sweet",
-            Spot::Sour => "sour",
-            Spot::Late => "late",
-        }
+        [Spot::Sweet, Spot::Sour, Spot::Late].into_iter().find(|s| s.name().eq_ignore_ascii_case(key))
     }
 }
 
 /// The class of a hitbox of damage `p` among the `active` ones, `earlier` being the strongest damage seen before this frame in the
 /// same action (0.0 when none). `None`: no label.
-pub fn classify(_p: f32, _active: &Powers, _earlier: f32) -> Option<Spot> {
-    None
+pub fn classify(p: f32, active: &Powers, earlier: f32) -> Option<Spot> {
+    if p.is_nan() || p <= 0.0 {
+        return None;
+    }
+    let strongest = active.iter().copied().fold(0.0, f32::max);
+    if strongest < earlier - EPS {
+        Some(Spot::Late)
+    } else if p < strongest - EPS {
+        Some(Spot::Sour)
+    } else if active.iter().any(|&q| q > 0.0 && q < p - EPS) {
+        Some(Spot::Sweet)
+    } else {
+        None
+    }
 }
 
 /// The strongest damage of one fighter's current action: what `classify` takes as `earlier`.
@@ -87,18 +91,43 @@ impl Peak {
     }
 
     /// The strongest damage seen earlier in this action, for a frame in `status`: a new status is a new action.
-    pub fn earlier(&mut self, _status: i32) -> f32 {
-        0.0
+    pub fn earlier(&mut self, status: i32) -> f32 {
+        if status != self.status {
+            *self = Peak { status, value: 0.0, idle: 0 };
+        }
+        self.value
     }
 
     /// Fold this frame's active damages in, after the frame was classified.
-    pub fn fold(&mut self, _active: &Powers) {}
+    pub fn fold(&mut self, active: &Powers) {
+        let top = active.iter().copied().fold(0.0, f32::max);
+        if top > 0.0 {
+            self.value = self.value.max(top);
+            self.idle = 0;
+        } else {
+            self.idle = self.idle.saturating_add(1);
+            if self.idle >= GAP {
+                self.value = 0.0;
+            }
+        }
+    }
 }
 
 /// The spot of the hit that added `gained` damage to the defender, from the attacker's `active` hitboxes and the action's
 /// `earlier` peak. `None` when it cannot be told.
-pub fn attribute(_gained: f32, _active: &Powers, _earlier: f32) -> Option<Spot> {
-    None
+pub fn attribute(gained: f32, active: &Powers, earlier: f32) -> Option<Spot> {
+    if !gained.is_finite() || gained <= 0.0 {
+        return None;
+    }
+    let mut found: Option<Option<Spot>> = None;
+    for &p in active.iter().filter(|&&p| p > 0.0 && (K_LOW..=K_HIGH).contains(&(gained / p))) {
+        let class = classify(p, active, earlier);
+        match found {
+            Some(other) if other != class => return None,
+            _ => found = Some(class),
+        }
+    }
+    found.flatten()
 }
 
 #[cfg(test)]

@@ -11,6 +11,7 @@ use serde_json::{json, Map, Value};
 
 use super::combo::{Aim, Combo, Dir, Event, Flick, Kind, LinkRec, LEGACY_STEPS, LINKS, STEPS};
 use super::frame_strip::{Button, Move, Verdict};
+use super::spots::Spot;
 use super::store::{default_id, Record, SkippedFile, Store, StoreError};
 
 /// The format's version. Fields added since are optional, so rc.4 (the first writer) reads every file written now.
@@ -170,6 +171,9 @@ impl ComboRecord {
                         _ => None,
                     }).collect::<Vec<_>>(),
                 });
+                if let Some(spot) = l.spot {
+                    link["spot"] = json!(spot.name().to_ascii_lowercase());
+                }
                 if !l.presses_only {
                     link["events"] = Value::Array(l.events().map(event_value).collect());
                     if let Some(dir) = l.drift {
@@ -316,7 +320,7 @@ fn link_of(value: &Value) -> Result<LinkRec, &'static str> {
         events,
         presses_only,
         drift,
-        spot: None,
+        spot: o.get("spot").and_then(Value::as_str).and_then(Spot::from_key),
     })
 }
 

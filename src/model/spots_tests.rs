@@ -38,8 +38,9 @@ fn a_hitbox_weaker_than_an_earlier_one_of_the_action_is_late() {
     // Late wins over Sour: both are weaker than the earlier tip.
     let active = p(&[13.0, 9.0]);
     assert_eq!([13.0, 9.0].map(|d| classify(d, &active, 16.0)), [Some(Spot::Late); 2]);
-    // Weaker than the frame's strongest, but not than the earlier peak: Sour.
-    assert_eq!(classify(9.0, &p(&[13.0, 9.0]), 13.0), Some(Spot::Sour));
+    // The sweet phase is not over while the tip is still active: the blade is Sour, whatever the earlier peak.
+    assert_eq!(classify(13.0, &p(&[16.0, 13.0]), 16.0), Some(Spot::Sour));
+    assert_eq!(classify(9.0, &p(&[13.0, 9.0]), 8.0), Some(Spot::Sour), "weaker than the frame's strongest, not than the earlier peak");
 }
 
 fn the_peak_starts_over_with_a_new_status_or_after_a_quiet_gap() {
@@ -170,7 +171,7 @@ fn one_function_chooses_every_tint() {
 
 fn the_spot_words_and_rows() {
     for spot in [Spot::Sweet, Spot::Sour, Spot::Late] {
-        assert_eq!(Spot::from_key(spot.key()), Some(spot));
+        assert_eq!(Spot::from_key(&spot.name().to_ascii_lowercase()), Some(spot));
     }
     assert_eq!(Spot::from_key("tip"), None);
     assert_eq!((Spot::Sweet.name(), Spot::Sour.name(), Spot::Late.name()), ("Sweet", "Sour", "Late"));

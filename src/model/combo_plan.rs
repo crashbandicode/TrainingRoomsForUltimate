@@ -154,7 +154,8 @@ pub fn reason_text(s: &Summary) -> Text {
             if d > 0 { "late" } else { "early" }
         ),
         Reason::WrongDir(kind) => write!(t, "L{n} {} wrong direction", event_label(kind)),
-        Reason::WrongSpot(..) => Ok(()),
+        Reason::WrongSpot(Some(got), saved) => write!(t, "L{n} {}, saved {}", got.name(), saved.name()),
+        Reason::WrongSpot(None, saved) => write!(t, "L{n} no spot, saved {}", saved.name()),
     };
     t
 }
@@ -591,6 +592,9 @@ impl Plan<'_> {
             2 => match grade {
                 Some(g) if g.wrong_move => {
                     Look::text(cx - 48.0, CELL_Y + VERDICT_DY, Text::new("WRONG MOVE"), BAD)
+                }
+                Some(g) if g.wrong_spot && self.helper.settings().match_spot => {
+                    Look::text(cx - 48.0, CELL_Y + VERDICT_DY, Text::new("WRONG SPOT"), BAD)
                 }
                 Some(g) => Look::text(
                     cx - 48.0,

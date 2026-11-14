@@ -394,7 +394,7 @@ pub fn grade(reference: &LinkRec, attempt: &LinkRec) -> Grade {
         wrong_move: attempt.to != reference.to,
         marks,
         extra,
-        wrong_spot: false,
+        wrong_spot: reference.spot.is_some_and(|saved| attempt.spot != Some(saved)),
     }
 }
 
@@ -822,7 +822,7 @@ fn off_reason(event: Event, delta: i32) -> Reason {
     }
 }
 
-fn summarize(attempt: &Attempt, total: usize, outcome: Outcome, tolerance: u8, _match_spot: bool) -> Summary {
+fn summarize(attempt: &Attempt, total: usize, outcome: Outcome, tolerance: u8, match_spot: bool) -> Summary {
     let grades = || attempt.grades().enumerate();
     let event = |g: &Grade, step: usize| g.reference.events[step];
     let wrong_move = grades()
@@ -840,15 +840,22 @@ fn summarize(attempt: &Attempt, total: usize, outcome: Outcome, tolerance: u8, _
             Some((i as u8, off_reason(event(g, step)?, delta)))
         })
     };
+    let wrong_spot = || {
+        grades().find_map(|(i, g)| {
+            let saved = g.reference.spot.filter(|_| match_spot && g.wrong_spot)?;
+            Some((i as u8, Reason::WrongSpot(g.link.spot, saved)))
+        })
+    };
     let true_links = grades().filter(|(_, g)| g.is_true()).count() as u8;
-    let clean = outcome == Outcome::Completed && grades().all(|(_, g)| g.clean(tolerance));
+    let clean = outcome == Outcome::Completed
+        && grades().all(|(_, g)| g.clean(tolerance) && !(match_spot && g.wrong_spot));
     Summary {
         outcome,
         graded: attempt.len() as u8,
         true_links,
         total: total as u8,
         clean,
-        fault: wrong_move.or_else(missing).or_else(wrong_dir).or_else(off),
+        fault: wrong_move.or_else(wrong_spot).or_else(missing).or_else(wrong_dir).or_else(off),
     }
 }
 

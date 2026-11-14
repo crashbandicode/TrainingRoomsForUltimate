@@ -132,14 +132,14 @@ fn marks_of(attacker_is_p1: bool, powers: &[f32], gained: f32) -> Vec<Mark> {
     t.marks().collect()
 }
 
-/// Decision SP3: a connecting hit is labelled with the spot it landed, on the lane of whoever hit, P1 or the CPU.
-fn a_hit_is_labelled_with_its_spot_on_the_lane_of_who_hit() {
+/// Decision SP3: a connecting hit is labelled with the spot it landed, on the lane of the fighter it hit, the CPU or P1.
+fn a_hit_is_labelled_with_its_spot_on_the_lane_of_the_fighter_it_hit() {
     let tip_and_blade = [16.0, 13.0, 13.0, 13.0];
     let mark = |lane, spot| vec![Mark { frame: 3, lane, spot }];
-    assert_eq!(marks_of(true, &tip_and_blade, 16.0), mark(0, Spot::Sweet));
-    assert_eq!(marks_of(true, &tip_and_blade, 13.0), mark(0, Spot::Sour));
-    assert_eq!(marks_of(false, &tip_and_blade, 13.0), mark(1, Spot::Sour), "the CPU's hit is on the CPU lane");
-    assert_eq!(marks_of(true, &tip_and_blade, 16.0 * 0.93), mark(0, Spot::Sweet), "a staled hit");
+    assert_eq!(marks_of(true, &tip_and_blade, 16.0), mark(1, Spot::Sweet), "P1's hit is on the lane of the CPU it hit");
+    assert_eq!(marks_of(true, &tip_and_blade, 13.0), mark(1, Spot::Sour));
+    assert_eq!(marks_of(false, &tip_and_blade, 13.0), mark(0, Spot::Sour), "the CPU's hit is on P1's lane");
+    assert_eq!(marks_of(true, &tip_and_blade, 16.0 * 0.93), mark(1, Spot::Sweet), "a staled hit");
 }
 
 /// Never a guess: equal hitboxes, a hit two hitboxes could have made, a hit that added no damage (a shield), a trade.
@@ -213,7 +213,7 @@ fn case_table() {
         ("bin_stick_eight_directions_and_the_dead_zone", bin_stick_eight_directions_and_the_dead_zone as fn()),
         ("the_status_predicates_use_the_resolved_constants", the_status_predicates_use_the_resolved_constants as fn()),
         ("display_toggle_flips_the_strip_row", display_toggle_flips_the_strip_row as fn()),
-        ("a_hit_is_labelled_with_its_spot_on_the_lane_of_who_hit", a_hit_is_labelled_with_its_spot_on_the_lane_of_who_hit as fn()),
+        ("a_hit_is_labelled_with_its_spot_on_the_lane_of_the_fighter_it_hit", a_hit_is_labelled_with_its_spot_on_the_lane_of_the_fighter_it_hit as fn()),
         ("a_hit_that_cannot_be_told_is_not_labelled", a_hit_that_cannot_be_told_is_not_labelled as fn()),
         ("a_weaker_hit_later_in_the_same_action_is_late", a_weaker_hit_later_in_the_same_action_is_late as fn()),
         ("a_link_remembers_the_spot_of_its_follow_up_hit", a_link_remembers_the_spot_of_its_follow_up_hit as fn()),

@@ -316,10 +316,11 @@ pub struct Link {
     pub spot: Option<Spot>,
 }
 
+
 /// Hits whose spot the strip keeps (the label panes show the newest few of them).
 pub const MARKS: usize = 8;
 
-/// One labelled hit (rc.14, SP3): the frame it connected, whose hit it was (0 P1, 1 the CPU) and its spot.
+/// One labelled hit (rc.14, SP3): the frame it connected, the lane of the fighter it hit (0 P1, 1 the CPU; that lane's hitlag block is where it is\n/// labelled, since the fighter that was hit is always in hitstop and the attacker is not always painted) and its spot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Mark {
     pub frame: u32,
@@ -414,6 +415,9 @@ pub struct Tracker {
     p1_was_stop: bool,
     marks: [Option<Mark>; MARKS],
     mark_head: usize,
+    #[cfg(feature = "diag")]
+    /// Diag build: the frame, the damage gained and the attacker's hitboxes of the last hitstop that began (the `[Spots]` line).
+    pub spot_read: Option<(u32, f32, Powers)>,
 }
 
 impl Tracker {
@@ -456,6 +460,8 @@ impl Tracker {
             p1_was_stop: false,
             marks: [None; MARKS],
             mark_head: 0,
+            #[cfg(feature = "diag")]
+            spot_read: None,
         }
     }
 
@@ -592,8 +598,9 @@ impl Tracker {
         // A hit on the CPU: its hitstop starts while P1 is not the one being hit (SPEC-input-06 §2). On shield when the
         // CPU is shielding or in shieldstun.
         let p1_hit = p1.hitstun || p1.shieldstun || p1.shielding;
+        let spot = self.spots(&p1, &cpu);
         if cpu.stop && !self.cpu_was_stop && !p1_hit {
-            self.on_hit(frame, (cpu.shieldstun || cpu.shielding) && !cpu.hitstun, None);
+            self.on_hit(frame, (cpu.shieldstun || cpu.shielding) && !cpu.hitstun, spot);
         }
         self.cpu_was_stop = cpu.stop;
         // Both fighters' first actionable frames after the last hit.
@@ -652,6 +659,36 @@ impl Tracker {
             self.head = (self.head + 1) % WINDOW;
             self.len = (self.len + 1).min(WINDOW);
         }
+    }
+
+    /// The spots of this frame (rc.14, SP1 and SP3): the hit that began on it, if one did, is attributed by the damage it added (`spots::attribute`) and,
+    /// when its spot can be told, kept as a mark on the lane of the fighter that was hit; the frame's hitboxes join each fighter's action peak. Returns P1's spot
+    /// when P1 hit the CPU. A frame where both fighters were struck is a trade: nobody's hit is labelled.
+    fn spots(&mut self, p1: &Sample, cpu: &Sample) -> Option<Spot> {
+        let gained = |old: Option<f32>, now: f32| old.map_or(0.0, |old| now - old);
+        let (p1_gain, cpu_gain) = (gained(self.damage[0], p1.damage), gained(self.damage[1], cpu.damage));
+        self.damage = [Some(p1.damage), Some(cpu.damage)];
+        let (cpu_rise, p1_rise) = (cpu.stop && !self.cpu_was_stop, p1.stop && !self.p1_was_stop);
+        let (on_cpu, on_p1) = (cpu_rise && cpu_gain > 0.0, p1_rise && p1_gain > 0.0);
+        self.p1_was_stop = p1.stop;
+        let earlier = [self.peaks[0].earlier(p1.status), self.peaks[1].earlier(cpu.status)];
+        #[cfg(feature = "diag")]
+        if cpu_rise || p1_rise {
+            let attacker = usize::from(p1_gain > cpu_gain);
+            let (gained, powers) = ([cpu_gain, p1_gain][attacker], [p1.powers, cpu.powers][attacker]);
+            self.spot_read = Some((self.frame, gained, powers));
+        }
+        let hit = match (on_cpu, on_p1) {
+            (true, false) => Some((1, spots::attribute(cpu_gain, &p1.powers, earlier[0]))),
+            (false, true) => Some((0, spots::attribute(p1_gain, &cpu.powers, earlier[1]))),
+            _ => None,
+        };
+        self.peaks[0].fold(&p1.powers);
+        self.peaks[1].fold(&cpu.powers);
+        let (lane, spot) = hit.and_then(|(lane, spot)| Some((lane, spot?)))?;
+        self.marks[self.mark_head] = Some(Mark { frame: self.frame, lane, spot });
+        self.mark_head = (self.mark_head + 1) % MARKS;
+        (lane == 1).then_some(spot)
     }
 
     fn on_hit(&mut self, frame: u32, on_shield: bool, spot: Option<Spot>) {

@@ -35,9 +35,6 @@ static IDS: Mutex<Option<Table>> = Mutex::new(None);
 static TRACKER: Mutex<Tracker> = Mutex::new(Tracker::new());
 static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
 
-/// AttackModule slots read for P1's active frames (`model::hitbox::SLOTS`).
-const ATTACK_SLOTS: i32 = crate::model::hitbox::SLOTS;
-
 /// Boot: the display's closure passed its guards.
 pub fn set_enabled(on: bool) {
     ENABLED.store(on, Ordering::Release);
@@ -153,12 +150,16 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool) -> Sample {
     // display off. A default here would record every combo as right-facing and grounded.
     let lr = natives::lr(accessor);
     let situation = natives::situation_kind(accessor);
+    // The attack slots' damage, for the spot of a hit (rc.14, SP1): both fighters', read from the game's own `AttackData`.
+    let (active, powers) = crate::model::hitbox::powers(&mut super::hitbox::GameAttacks(accessor));
     Sample {
         stop: natives::is_stop(accessor),
         hitstun,
         shieldstun: ids.shieldstun(status, prev),
         actionable: crate::runtime::features::cpu::actionable(accessor),
-        active: p1 && (0..ATTACK_SLOTS).any(|slot| natives::attack_is_attack(accessor, slot)),
+        active: p1 && active,
+        damage: natives::damage(accessor, 0),
+        powers,
         attack: if p1 { ids.attack(status) } else { None },
         reaction,
         shielding: ids.shielding(status),
@@ -217,7 +218,11 @@ pub unsafe fn sample_frame(player: usize) {
     #[cfg(feature = "diag")]
     {
         let (check_now, link, advantage_now) = (tracker.stun_check, tracker.latest_link(), tracker.advantage());
+        let (read, mark) = (tracker.spot_read.take(), tracker.marks().next());
         drop(tracker);
+        if let Some((frame, gained, powers)) = read {
+            crate::runtime::diag_log::diagnostic(format_args!("[Spots] stop frame={frame} gained={gained:.3} powers={powers:?} newest_mark={mark:?}"));
+        }
         if advantage_now != advantage {
             if let Some(a) = advantage_now {
                 crate::runtime::diag_log::diagnostic(format_args!(
@@ -282,7 +287,7 @@ pub fn on_layout_registered() {
 pub fn hud_tick(menu_open: bool, mut apply: impl FnMut(usize, &Look, Changed)) -> usize {
     let shown = !menu_open && sampling();
     let tracker = *TRACKER.lock();
-    RENDERER.lock().draw(&tracker, shown, |local, look, changed| {
+    RENDERER.lock().draw_spots(&tracker, shown, settings().spots, |local, look, changed| {
         // Diag build: every show or hide of the strip, with why (the menu, the vanilla pause, the row Off).
         #[cfg(feature = "diag")]
         if local == crate::model::frame_strip_plan::at::CONTAINER && changed.visible {
