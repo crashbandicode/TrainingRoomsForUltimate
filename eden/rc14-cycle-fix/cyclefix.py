@@ -27,6 +27,7 @@ sys.path.insert(0, str(HERE))
 
 import hotslots as hs  # noqa: E402
 import gna_p2_fs as fs  # noqa: E402
+import steps  # noqa: E402
 import fx  # noqa: E402
 from gna import _begin, _mark, _shot, _finish, _reset, MARIO  # noqa: E402
 
@@ -375,3 +376,111 @@ def cf_mii_failfirst(ctx):
     if out['stalls']:
         problems.append('StallWatch: %s' % out['stalls'][-1])
     return _finish(ctx, 'cf-mii-failfirst', out, problems)
+
+
+# --- rc.14 Gaps 1 and 3 (Eden cf-p3-y2), and k = 1 from the boot --------------------------------------------------------
+# The boot's settings.json fixture (mk-rows.py phase 3, cf_fixture.py) already holds the k = 1 values, Ready Fighters 6,
+# Player 1 Mario > Pikachu, the CPU cycle above: the scene builds with them, so no lowered value is resident (Gap 1).
+
+def k1_fixture():
+    """The menu values the phase 3 boot's settings.json fixture holds (mk-rows.py)."""
+    return _k1_values(6)
+
+
+def cf_boot(ctx):
+    """The fixture's values are live from the scene's first frame; the CPU short (the notice at Ready Fighters 6)."""
+    fs._remember_original(ctx)
+    t0, out = _begin(ctx)
+    menu = fs._menu(ctx)
+    want = k1_fixture()
+    out['mismatch'] = sorted(k for k, v in want.items() if menu.get(k) != v)
+    out['settle'] = fs._settled(ctx, 0, 150)
+    observed = [m.group(2) for _, _, t in hs.diag_lines(ctx) for m in [fs.OBSERVED.search(t)] if m and m.group(1) == '1']
+    out['cpu_original'] = '0x' + observed[0] if observed else None
+    _shot(ctx, out, 'shot_settled', 'cf-boot-settled')
+    _mark(t0, out, 'done')
+    problems = ['live values differ from the fixture: %s' % out['mismatch']] if out['mismatch'] else []
+    if not out['settle'] or (out['settle'].get('planned') or 99) > 6:
+        problems.append('the scene did not settle within Ready Fighters 6: %s' % out['settle'])
+    return _finish(ctx, 'cf-boot', out, problems)
+
+
+def cf_shrink(ctx):
+    """Gap 1: Ready Fighters back from 7 (everything resident, cf-k1-fits) to 6: the farthest group leaves at once
+    (`[GroupSwap] shrink`), the notice settles within 6, and the next two laps each load the same one cold fighter."""
+    t0, out = _begin(ctx)
+    seq = hs.diag_mark(ctx)
+    fx._live_set(ctx, cycle_preload_ready_fighters=fs.RF(6))
+    out['shrink'] = fs._line(ctx, seq, r'\[GroupSwap\] shrink owner=', 30)
+    out['settle'] = fs._settled(ctx, seq, 120)
+    presses = _lap(ctx, out, 'shrunk', 3, 1.5, 20)
+    out['shrunk_cold'], problems = _judge(presses, len(CPU_LANE) + 1)
+    _mark(t0, out, 'done')
+    if not out['shrink']:
+        problems.append('no shrink line after Ready Fighters dropped to 6')
+    if not out['settle'] or (out['settle'].get('planned') or 99) > 6:
+        problems.append('not settled within Ready Fighters 6: %s' % out['settle'])
+    if any(len(c) != 1 for c in out['shrunk_cold']):
+        problems.append('not one cold load per lap: %s' % out['shrunk_cold'])
+    return _finish(ctx, 'cf-shrink', out, problems)
+
+
+EXIT = {
+    'demand': re.compile(r'\[GroupSwap\] demand owner=1 .*kinds=\[f\]'),
+    'declined': re.compile(r'\[GroupSwap\] demand declined owner=1 '),
+    'background': re.compile(r'\[GroupSwap\] background built owner=1 '),
+    'warm_exit': re.compile(r'\[GroupSwap\] warm exit owner=1 kind=0xf'),
+    'reload': PATTERNS['reload'],
+    'teardown': PATTERNS['teardown'],
+    'canonical': PATTERNS['canonical'],
+    'stall': PATTERNS['stall'],
+}
+
+
+def cf_exit(ctx):
+    """Gap 3: out of the live Mii Gunner onto a fighter no Built group holds (a direct CPU Character pick of Bowser,
+    outside a small cycle): the press waits for Bowser's own group through its prefetch and its background build beside
+    the Mii window, then exits warm. No Reload, no teardown, no canonical replacement. The groups the smaller cycle
+    leaves are parked until a pause (operator decision 2026-11-08 23:42Z), so Training's pause opens and closes first:
+    their slots are free for Bowser's group (the slot limit itself is Gap 2, a-full-2's)."""
+    global CPU_LANE
+    t0, out = _begin(ctx)
+    lane = CPU_LANE
+    CPU_LANE = [fs.GUNNER, fs.PICHU]
+    try:
+        seq = hs.diag_mark(ctx)
+        fx._live_set(ctx, cpu_roster=fs._roster(CPU_LANE), cycle_preload_ready_fighters=fs.RF(8))
+        time.sleep(1.0)
+        steps.press(ctx, 'plus', 2.0)
+        steps.press(ctx, 'plus', 2.0)
+        out['pause_frees'] = [t[:200] for _, _, t in hs.diag_since(ctx, seq) if '[GroupSwap] pause frees owner=1' in t][:4]
+        out['settle'] = fs._settled(ctx, seq, 120)
+        out['to_gunner'] = _to(ctx, fs.GUNNER)
+        out['gunner'] = fs._live_kinds(ctx).get(1)
+        out['settle_gunner'] = fs._settled(ctx, hs.diag_mark(ctx), 60)
+        seq = hs.diag_mark(ctx)
+        menu = fs._menu(ctx)
+        fx._live_set(ctx, cpu_character=fs._onehot(menu, 'cpu_character', fs.CHOICES.index(fs.BOWSER)))
+        out['picked'] = fs._line(ctx, seq, fs._kind_line(1, fs.BOWSER), 60)
+        time.sleep(1.5)
+        lines = [t for _, _, t in hs.diag_since(ctx, seq)]
+        for key, regex in EXIT.items():
+            out[key] = [t[:300] for t in lines if regex.search(t)][:4]
+        _shot(ctx, out, 'shot_bowser', 'cf-exit-bowser')
+        out['after'] = _press(ctx, 1.5)
+    finally:
+        CPU_LANE = lane
+        fx._live_set(ctx, cpu_roster=fs._roster(CPU_LANE))
+    _mark(t0, out, 'done')
+    problems = []
+    if out['gunner'] != fs.GUNNER:
+        problems.append('the CPU never reached Mii Gunner: %s' % out['gunner'])
+    if not out['picked']:
+        problems.append('the pick of Bowser did not apply')
+    for key in ('demand', 'background', 'warm_exit'):
+        if not out[key]:
+            problems.append('no %s line' % key)
+    for key in ('declined', 'reload', 'teardown', 'canonical', 'stall'):
+        if out[key]:
+            problems.append('%s: %s' % (key, out[key][0][:160]))
+    return _finish(ctx, 'cf-exit', out, problems)

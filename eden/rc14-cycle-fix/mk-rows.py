@@ -2,7 +2,7 @@
 """Build the rc.14 cycle-fix rows package (2026-11-14) from the option-GIF takes framework, read-only: its boot rows,
 gates and segment pins (make_packages.py), the helpers beside rows.json, and cyclefix.py from this folder.
 
-    /usr/bin/python3 -I mk-rows.py <out folder>        # writes <out>/rows/"""
+    /usr/bin/python3 -I mk-rows.py <out folder> [1|2|3]   # writes <out>/rows/; 3 adds fixture.json + cf_fixture.py"""
 import hashlib
 import json
 import shutil
@@ -36,6 +36,15 @@ ROWS2 = [BY_ID['cf-setup'], BY_ID['cf-k1-setup'], BY_ID['cf-k1-laps'], BY_ID['cf
          ('cf-forced-reload', 'cf_forced_reload', 4, 'A forced target-first Reload keeps the Built ordinary groups.'),
          ('cf-mii-failfirst', 'cf_mii_failfirst', 4, 'The rc.12 crash: a kept Mii group warm-attached after the Reload.'),
          BY_ID['cf-restore']]
+# Phase 3 (Gaps 1 and 3, 2026-11-14 ~23:12Z): the k = 1 values from the boot's settings.json fixture, so the scene builds
+# with the CPU short; then Ready Fighters 7 (fits), back to 6 (Gap 1's shrink), and the warm Mii exit (Gap 3).
+ROWS3 = [('cf-boot', 'cf_boot', 4, 'The fixture values live from the first frame (Ready Fighters 6, P1 Mario > Pikachu, '
+                                  'the CPU cycle); settled within 6.'),
+         BY_ID['cf-k1-laps'], BY_ID['cf-k1-fits'],
+         ('cf-shrink', 'cf_shrink', 7, 'Gap 1: Ready Fighters 7 to 6 frees the farthest group at once; one cold load per lap.'),
+         ('cf-exit', 'cf_exit', 6, 'Gap 3: out of the live Mii Gunner onto Bowser: his own group, built in the background, '
+                                 'then the warm exit; no Reload.'),
+         BY_ID['cf-restore']]
 
 
 def row(rid, fn, budget, expect):
@@ -44,16 +53,20 @@ def row(rid, fn, budget, expect):
             'expect': expect}
 
 
-def plan(rows):
+def plan(rows, phase='1'):
     segs = mp.lib_segments()
     for name in SEGMENTS:
         path = LIB / 'segments' / (name + '.edenmacro.json')
         segs[name] = {'file': 'segments/%s.edenmacro.json' % name,
                       'sha256': hashlib.sha256(path.read_bytes()).hexdigest(), 'cap': 90 if name.startswith('p2-fs-') else 30}
-    setup = list(mp.BOOT_SETUP) + [
+    setup = list(mp.BOOT_SETUP) + ([
+        {'state': 'Training, Ready Fighters 6, P1 Mario > Pikachu, CPU original > Mii Gunner > Pichu > Diddy Kong > King '
+                  'K. Rool, every Loading row at the card value, from the scene\'s first frame',
+         'via': 'fixture', 'ref': 'files: settings.json (cf_fixture.py applies fixture.json to the pinned copy before Up)'}]
+        if phase == '3' else [
         {'state': 'Training, Ready Fighters 8, P1 original > Pikachu > Kirby > Palutena, CPU original > Mii Gunner > '
                   'Pichu > Diddy Kong > King K. Rool, every Loading row at the card value (its live values)',
-         'via': 'hook', 'ref': 'cyclefix.py:cf_setup'}]
+         'via': 'hook', 'ref': 'cyclefix.py:cf_setup'}])
     setup[0] = dict(setup[0], state=setup[0]['state'] + '; TrainingRooms NRO swapped in by prep_run.py --tr-nro')
     return {'game_id': '01006A800016E000', 'start': 'frontend-ready', 'early_stop': False, 'on_failure': 'continue',
             'scope': 'rc.14 cycle fix (Design A): one boot, the boot rows, the cf-* rows, z-boot; the fix diag through '
@@ -73,7 +86,14 @@ def main(out, phase='1'):
     shutil.copyfile(HERE / M, rows / M)
     for name in SEGMENTS:
         shutil.copyfile(LIB / 'segments' / (name + '.edenmacro.json'), rows / 'segments' / (name + '.edenmacro.json'))
-    (rows / 'rows.json').write_text(json.dumps(plan(ROWS2 if phase == '2' else ROWS), indent=1) + '\n')
+    chosen = {'2': ROWS2, '3': ROWS3}.get(phase, ROWS)
+    (rows / 'rows.json').write_text(json.dumps(plan(chosen, phase), indent=1) + '\n')
+    if phase == '3':
+        # The boot's settings.json fixture (cf_fixture.py), from the rows' own k = 1 values.
+        sys.path.insert(0, str(rows))
+        import cyclefix  # noqa: E402
+        (rows / 'fixture.json').write_text(json.dumps(cyclefix.k1_fixture(), indent=1) + '\n')
+        shutil.copyfile(HERE / 'cf_fixture.py', rows / 'cf_fixture.py')
     print(rows, sorted(p.name for p in rows.iterdir()))
 
 
