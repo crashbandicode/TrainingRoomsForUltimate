@@ -1231,10 +1231,12 @@ fn bodies_with(bank: &Bank, other: usize) -> usize {
 pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>) -> bool {
     let Some(role) = role(owner) else { return false; };
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
-    if !ENABLED.load(Ordering::Acquire) || !settings.fighters || settings.bank_members < 2 || !groups_enabled(&settings)
-        || diag_cycle(1) {
+    if !ENABLED.load(Ordering::Acquire) || !settings.fighters || settings.bank_members < 2 || !groups_enabled(&settings) {
         return false;
     }
+    // One line per press sent down today's path (Eden cf-p2-x2 #1806 went canonical without one).
+    let declined = |why: core::fmt::Arguments| { trace!("[GroupSwap] demand declined owner={} kind={:#x}: {}", owner, kind, why); false };
+    if diag_cycle(1) { return declined(format_args!("today's Reload forced (diag)")); }
     let (special, policy) = (special_policy(&settings), group_policy(&settings));
     let other = role_extra_bodies(1 - role);
     let mut state = BANKS[role].lock();
@@ -1244,7 +1246,7 @@ pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>
         return true;
     }
     let Some(bank) = state.as_mut().filter(|b| b.owner == owner && b.phase == Phase::Ready && !b.departed && b.swap.is_none())
-        else { return false; };
+        else { return declined(format_args!("no Ready bank")); };
     if bank.members.index_of(kind).is_some() { return false; }
     // A group of this kind being freed now (a cold release a moment ago) goes first; its slot and bodies come back.
     if bank.groups.iter().any(|g| g.leaving && g.release_now && g.state != GroupState::Released && g.members.index_of(kind).is_some()) {
@@ -1253,11 +1255,14 @@ pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>
     let mii = configuration.is_some();
     if let Some(g) = bank.groups.iter().find(|g| g.state != GroupState::Released && !g.leaving && g.members.index_of(kind).is_some()) {
         let same = if mii { g.configuration == configuration } else { g.identity.is_none() };
-        return same && matches!(g.state, GroupState::Planned | GroupState::Prefetching);
+        if same && matches!(g.state, GroupState::Planned | GroupState::Prefetching) { return true; }
+        // A reachable group serves the press as any group swap; a held, failed or other identity's one does not.
+        return if g.state.reachable() && same { false } else { declined(format_args!("its group is {:?}", g.state)) };
     }
     let members = if mii {
-        if !special.mii || bank.groups.iter().any(|g| g.state != GroupState::Released && g.members.special() == Special::Mii) {
-            return false;
+        if !special.mii { return declined(format_args!("Mii groups off")); }
+        if let Some(g) = bank.groups.iter().find(|g| g.state != GroupState::Released && g.members.special() == Special::Mii) {
+            return declined(format_args!("the role's Mii group {:x?} is {:?} leaving={}", &g.members.kinds()[..g.members.count()], g.state, g.leaving));
         }
         Members::mii_group(kind)
     } else if Members::special_group(kind, special).is_none() && crate::engine::swap::body_bank::group_member_kind(kind, policy) {
@@ -1265,13 +1270,15 @@ pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>
     } else {
         None
     };
-    let Some(members) = members else { return false; };
-    let Some(live) = bank.observed.map(|(_, live)| live) else { return false; };
-    if bank.groups.next_slot().is_none() { return false; }
+    let Some(members) = members else { return declined(format_args!("no one-member group holds it")); };
+    let Some(live) = bank.observed.map(|(_, live)| live) else { return declined(format_args!("nothing observed live")); };
+    if bank.groups.next_slot().is_none() { return declined(format_args!("no free group slot")); }
     let (bodies, ready) = (bodies_with(bank, other) + members.count(), usize::from(settings.ready_fighters));
-    if !crate::engine::swap::body_bank::cold_admitted(bodies, ready, members.count(), &bank.over, live) { return false; }
+    if !crate::engine::swap::body_bank::cold_admitted(bodies, ready, members.count(), &bank.over, live) {
+        return declined(format_args!("no room: {} bodies, Ready Fighters {}, over {:x?}", bodies, ready, &bank.over[..]));
+    }
     let identity = match configuration {
-        Some(c) => match mii_identity_of(bank, c) { Some(identity) => Some((identity, c)), None => return false },
+        Some(c) => match mii_identity_of(bank, c) { Some(identity) => Some((identity, c)), None => return declined(format_args!("no Mii identity")) },
         None => None,
     };
     let slot = bank.groups.plan(members, identity);
