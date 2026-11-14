@@ -334,8 +334,7 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
     }
     // The hitbox visualizer's own orbs, pills (decision HB-PILLS): two textures drawn here (`orb_texture`, the plugin's own
     // artwork, no picture file), the half-disc cap for the first `CAPS` pictures and the band for the rest, each its own
-    // material; vertex colours tint them. The materials keep the template's wrap modes: with both set to 0 the game never
-    // drew its first frame at boot (Eden 2026-11-14, rc13-pill-3/-4; the bisect rc13-pill-6v1/-7v2).
+    // material with the template's wrap modes; vertex colours tint them.
     let first_orb = panes::name_of(panes::IDX_ORB);
     let orb_template_index = layout.find_pane(first_orb.as_str()).and_then(|p| p.picture.as_ref())
         .ok_or("orb picture missing")?.material_index;
