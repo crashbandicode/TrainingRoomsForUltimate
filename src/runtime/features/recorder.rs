@@ -158,23 +158,16 @@ mod counts {
     }
 }
 
-#[cfg(feature = "diag")]
-fn bump(which: usize) {
-    counts::bump(which);
+/// The diag build counts the hook; the shipped build's body is empty.
+fn bump(_which: usize) {
+    #[cfg(feature = "diag")]
+    counts::bump(_which);
 }
 
-#[cfg(not(feature = "diag"))]
-#[inline(always)]
-fn bump(_which: usize) {}
-
-#[cfg(feature = "diag")]
 fn report_counts() {
+    #[cfg(feature = "diag")]
     counts::report_if_due();
 }
-
-#[cfg(not(feature = "diag"))]
-#[inline(always)]
-fn report_counts() {}
 
 const COUNT_POLL: usize = 0;
 const COUNT_AI_FRAME: usize = 1;
@@ -182,14 +175,10 @@ const COUNT_INJECT: usize = 2;
 const COUNT_NOTICE: usize = 3;
 
 /// One recorder event line (diag build only: the shipped build writes nothing per event, playbook).
-#[cfg(feature = "diag")]
-fn event(name: &str, key_a: &str, a: i64, key_b: &str, b: i64) {
-    crate::runtime::diag_log::diagnostic(format_args!("[PracticeRecording] {name} {key_a}={a} {key_b}={b}"));
+fn event(_name: &str, _key_a: &str, _a: i64, _key_b: &str, _b: i64) {
+    #[cfg(feature = "diag")]
+    crate::runtime::diag_log::diagnostic(format_args!("[PracticeRecording] {_name} {_key_a}={_a} {_key_b}={_b}"));
 }
-
-#[cfg(not(feature = "diag"))]
-#[inline(always)]
-fn event(_name: &str, _key_a: &str, _a: i64, _key_b: &str, _b: i64) {}
 
 /// The recorder rows as the last publish left them (the named layer reads Recording Trigger and Save State Playback).
 /// Read wait-free from `published::Live` (stream/sync); the factory rows before the first publish.

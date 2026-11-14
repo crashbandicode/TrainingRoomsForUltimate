@@ -248,14 +248,11 @@ fn seen(hook: usize, body: usize, value: Option<u64>) -> bool {
     value.is_some() && old != new
 }
 
-#[cfg(feature = "diag")]
-fn bump(which: usize) {
-    counts::bump(which);
+/// The diag build counts the hook; the shipped build's body is empty.
+fn bump(_which: usize) {
+    #[cfg(feature = "diag")]
+    counts::bump(_which);
 }
-
-#[cfg(not(feature = "diag"))]
-#[inline(always)]
-fn bump(_which: usize) {}
 
 /// The last published settings generation the CPU adopted (only read and written under `CPU`).
 static ADOPTED: AtomicU32 = AtomicU32::new(0);

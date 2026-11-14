@@ -225,14 +225,11 @@ mod counts {
     }
 }
 
-#[cfg(feature = "diag")]
-fn bump(which: usize) {
-    counts::bump(which);
+/// The diag build counts the hook; the shipped build's body is empty.
+fn bump(_which: usize) {
+    #[cfg(feature = "diag")]
+    counts::bump(_which);
 }
-
-#[cfg(not(feature = "diag"))]
-#[inline(always)]
-fn bump(_which: usize) {}
 
 mod counts_index {
     pub const PARAM: usize = 1;
