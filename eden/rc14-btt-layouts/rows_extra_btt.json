@@ -1,0 +1,73 @@
+{
+  "plan": "btt",
+  "rows": [
+    {
+      "after": "btt-E43",
+      "id": "btt-X-saves",
+      "start": "training",
+      "end": "training",
+      "start_gate": "training-hud-unpaused",
+      "group": "rc14-btt",
+      "on_failure": "continue",
+      "budget_min": 4,
+      "steps": [
+        {
+          "run": "btt_extra.py:saves",
+          "on": "diag",
+          "check": true,
+          "args": {
+            "key": "bf"
+          }
+        }
+      ],
+      "expect": "The chords on the hot five (btt-5): saves until Battlefield has 7 layout files (each a new one); ZL + Right steps 2/5 .. 5/5, 1/5, 2/5 through the five newest, ZL + Left back to 1/5; the two oldest stay files; ZL + Up on 3/5 loads it and it becomes 1/5; ZL + Y twice deletes it and the five refill (6 files, 5 hot); no temporary file is left."
+    },
+    {
+      "after": "btt-E31b",
+      "id": "btt-X-ice",
+      "start": "training",
+      "end": "training",
+      "start_gate": "training-hud-unpaused",
+      "group": "rc14-btt",
+      "on_failure": "continue",
+      "budget_min": 6,
+      "steps": [
+        {
+          "run": "btt_extra.py:ice",
+          "on": "diag",
+          "check": true
+        }
+      ],
+      "expect": "Ice Climbers as Player 1 (the pair, Solo Popo mark Off): Placing, three targets placed, X, a run that breaks all three and ends with Done! 3 in ...; the sampled Running clock never advances by more than one sampling interval between two lines (Nana's pass does not tick it twice), the count never goes backwards."
+    },
+    {
+      "after": "btt-X-ice",
+      "id": "btt-X-stages",
+      "start": "training",
+      "end": "training",
+      "start_gate": "training-hud-unpaused",
+      "group": "rc14-btt",
+      "on_failure": "continue",
+      "budget_min": 6,
+      "steps": [
+        {
+          "on": "diag",
+          "run": "btt_extra.py:stages",
+          "args": {
+            "second": "bbf",
+            "first": "bf"
+          },
+          "check": true
+        }
+      ],
+      "expect": "Two stages (btt-5): on Big Battlefield the list and the chords show only its own layouts; a Save there makes Layout 1 · Big Battlefield and no Battlefield file changes; back on Battlefield ZL + Right steps to the older layout (2/2) and ZL + Up loads it, which lists it first; no Big Battlefield file changes."
+    }
+  ],
+  "setup": [
+    {
+      "state": "Ice Climbers as Player 1 with the pair (the Player cycle's Solo Popo mark Off)",
+      "via": "hook",
+      "ref": "btt_extra.py:ice (fx._live_set solo_popo_player_cycle=[0, 1], eggsrows._fighter ICS)"
+    }
+  ]
+}

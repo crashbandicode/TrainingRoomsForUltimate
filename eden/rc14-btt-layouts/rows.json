@@ -1,0 +1,1451 @@
+{
+ "game_id": "01006A800016E000",
+ "start": "frontend-ready",
+ "early_stop": false,
+ "on_failure": "continue",
+ "scope": "rc.14 Break the Targets (SPEC V2.5, acceptance rows 26-31 and 41-43) on the primary lane's DIAG build: B-2's card set and boot chain (rc14-egg-target-2, d2-btt-cam-1), P1 Ridley vs the CPU on Battlefield and Big Battlefield. Muted, the GDB stub on before game.load, one boot, the layouts file for Big Battlefield seeded. No card; nothing pushed.",
+ "setup": [
+  {
+   "state": "Training, P1 Ridley vs the CPU, after the GDB-stub boot chain",
+   "via": "hook",
+   "ref": "gdb_rc11.py:gdb_on, gdb_kick; mem.py:m_main; pillrows.py:p_route (the d2-btt-cam-1 chain that passed)"
+  },
+  {
+   "state": "Battlefield or Big Battlefield in Training, the mode Off",
+   "via": "hook",
+   "ref": "btt_rows.py:change_stage (Change Stage grid, tiles 1 and 3 right of Waiting Room), stage id checked against [PracticeStageRequest]"
+  },
+  {
+   "state": "Break the Targets On and Placing",
+   "via": "hook",
+   "ref": "btt_rows.py:to_placing (the Place targets row; the live setting plus a menu close if the row path fails)"
+  },
+  {
+   "state": "the placing cursor, the chords and the attacks",
+   "via": "segment",
+   "ref": "segments/btt-*.edenmacro.json (make_btt_segments.py, frame-exact stick moves and same-frame chords, sha256 pinned); chord-save, chord-load, menu-open, x-press, jab, ftilt, sh-nair, fsmash, reset-center from the base"
+  },
+  {
+   "state": "a saved layout file the boot did not write: Big Battlefield, three targets (btt-5)",
+   "via": "fixture",
+   "ref": "config files: fixtures/btt/seeded-big-battlefield.json -> user/sdmc/ultimate/TrainingRooms/layouts/seeded-big-battlefield.json (stage_btt.ps1)"
+  }
+ ],
+ "segments": {
+  "attract-cancel": {
+   "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/attract-cancel.edenmacro.json",
+   "sha256": "1b506dbfc689e79e8bfca69b74274ab674b91ac8359219a1a4c95faa81aae70f",
+   "cap": 30,
+   "start_gate": null,
+   "end_gate": "main",
+   "from_run": "p4r-shared",
+   "row": "nav00-attract-cancel",
+   "library": "attract-cancel"
+  },
+  "main-stage": {
+   "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/main-stage.edenmacro.json",
+   "sha256": "ce6714b44f34f04cacd0d17454e4773c8906d289e5a37e34c606c604e6e4acfb",
+   "cap": 60,
+   "start_gate": "main",
+   "end_gate": "stage",
+   "from_run": "lr-03",
+   "row": "02-stage",
+   "library": "main-stage"
+  },
+  "stage-css": {
+   "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/stage-css.edenmacro.json",
+   "sha256": "240249606f15207106e4cc654cc3ee173efa97d51ea276586c82e6c7c438db74",
+   "cap": 30,
+   "start_gate": "stage",
+   "end_gate": "css",
+   "from_run": "lr-03",
+   "row": "03-css",
+   "library": "stage-css"
+  },
+  "enter-training": {
+   "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/enter-training.edenmacro.json",
+   "sha256": "7cdd035473160fec1a0e8c601c05f599f5b21556ac1cb4479b358c629e05b5c1",
+   "cap": 30,
+   "start_gate": "ready",
+   "end_gate": "p1-original",
+   "from_run": "lr-03",
+   "row": "06-training",
+   "library": "enter-training"
+  },
+  "reset-center": {
+   "file": "segments/reset-center.edenmacro.json",
+   "sha256": "54e917aa28b0af97505e73a53fa991d3f79ed597b79ae8bc07f364c5fc6dbdd7",
+   "cap": 30
+  },
+  "p1-cycle": {
+   "file": "segments/p1-cycle.edenmacro.json",
+   "sha256": "17bc57c1b2a568edb0d66a8b02e3026383f48c2cacda725e6d1427420f07d5d8",
+   "cap": 20
+  },
+  "cpu-cycle": {
+   "file": "segments/cpu-cycle.edenmacro.json",
+   "sha256": "6b91e87d53a6faae0b4acf15e60b526d00aff01e2f5054d9d473f04ea4682ce6",
+   "cap": 20
+  },
+  "quit-focus": {
+   "file": "segments/quit-focus.edenmacro.json",
+   "sha256": "281999e46939ca06c960cef0108b28672c611435d33260ddeddfc6c9dd475b46",
+   "cap": 20
+  },
+  "quit-confirm": {
+   "file": "segments/quit-confirm.edenmacro.json",
+   "sha256": "6fc21293dea72efe1bfb888735d8a62d8a6754d8a1855e8bbcde9af08e24080b",
+   "cap": 20
+  },
+  "p1-hat": {
+   "file": "segments/p1-hat.edenmacro.json",
+   "sha256": "83b189729f74fb1a2f0a546f12c32deed6ef26854fe343b392cfb4aa5d56f746",
+   "cap": 20
+  },
+  "chord-save": {
+   "file": "segments/chord-save.edenmacro.json",
+   "sha256": "fd05baa42ae7353f6be4ef1fa861d55b958ad1de31e05229286ad18b52bbe56c",
+   "cap": 30
+  },
+  "chord-load": {
+   "file": "segments/chord-load.edenmacro.json",
+   "sha256": "1f1f8ca9d99c990e8fa6ae9348fc31f6ae36e7f2fa09c88d84485abfd2f0cb74",
+   "cap": 30
+  },
+  "chord-record": {
+   "file": "segments/chord-record.edenmacro.json",
+   "sha256": "f2fa1848d9988aea562b142421767175b60a3b836770c3f537b7473e9dd18e04",
+   "cap": 30
+  },
+  "chord-play-cpu": {
+   "file": "segments/chord-play-cpu.edenmacro.json",
+   "sha256": "56b9f03c84a8521c261b7cdee25702d379ecf4eabc556ccef98e7097fc3bb8f9",
+   "cap": 30
+  },
+  "chord-play-p1": {
+   "file": "segments/chord-play-p1.edenmacro.json",
+   "sha256": "0cde25d7bb1a6f68194603d41c2f0f6f125f33c15b73af117bc7440c0803fc6e",
+   "cap": 30
+  },
+  "chord-popup": {
+   "file": "segments/chord-popup.edenmacro.json",
+   "sha256": "d4f4376b8f2fc8821b8dbe795f2f0ca46902bb47ae6bc132ad0e117937433b97",
+   "cap": 30
+  },
+  "menu-open": {
+   "file": "segments/menu-open.edenmacro.json",
+   "sha256": "1185704f7b97f2981a8bae42fbe42166d5bc37aa2e9cba197bdf585a616f78ce",
+   "cap": 30
+  },
+  "menu-close": {
+   "file": "segments/menu-close.edenmacro.json",
+   "sha256": "b45ca532f18b9a3a7938a04b4a6b0513b7288ed584705fd042e40125bd5c4a89",
+   "cap": 30
+  },
+  "x-press": {
+   "file": "segments/x-press.edenmacro.json",
+   "sha256": "923b754c8578d4f76ca41874d7c0cb379cdb8107bd28031dcac90277183139dc",
+   "cap": 30
+  },
+  "jab": {
+   "file": "segments/jab.edenmacro.json",
+   "sha256": "12769777ca262a7e3515f8f81a72c7470e7dffa98d9bdfb56e1887dfc702f278",
+   "cap": 30
+  },
+  "jab-link": {
+   "file": "segments/jab-link.edenmacro.json",
+   "sha256": "21ca94ee0dcd158a2e6cf023a1c01e33ead9d5cdc275d837aefdde49c4c83567",
+   "cap": 30
+  },
+  "jab-link-3": {
+   "file": "segments/jab-link-3.edenmacro.json",
+   "cap": 30,
+   "recipe": [
+    {
+     "buttons": "a",
+     "frames": 2,
+     "gap_frames": 14
+    },
+    {
+     "buttons": "a",
+     "frames": 2,
+     "gap_frames": 14
+    },
+    {
+     "buttons": "a",
+     "frames": 2,
+     "gap_frames": 40
+    }
+   ],
+   "note": "timing to be checked when recorded",
+   "sha256": "f98d36dbaaf88230c032d0abbd78d4162fa163d20490ed5cc6d9b052a4795693",
+   "recorded": "2026-11-08T00:38:58Z"
+  },
+  "jab-drop": {
+   "file": "segments/jab-drop.edenmacro.json",
+   "sha256": "2fc00b3082547b40890db5a81dd92176d82a0ba5a1f0d7a5c34d5353c5102ea8",
+   "cap": 30
+  },
+  "exchange-jabs": {
+   "file": "segments/exchange-jabs.edenmacro.json",
+   "sha256": "8f963497aaee09e267b727055ee7ada6c2fc9fcd0d9fac37b8efd02c7a55739b",
+   "cap": 30
+  },
+  "chips-attack": {
+   "file": "segments/chips-attack.edenmacro.json",
+   "cap": 30,
+   "recipe": [
+    {
+     "stick": [
+      0.95,
+      0.95,
+      0
+     ],
+     "frames": 6,
+     "gap_frames": 0
+    },
+    {
+     "buttons": "a",
+     "with_stick": [
+      0.95,
+      0.95
+     ],
+     "hold": 80,
+     "gap": 0.5
+    }
+   ],
+   "note": "timing to be checked when recorded",
+   "sha256": "959042160d6147d9c6d95e383f7be865eeb565e40f03b5d978e36145503dac3c",
+   "recorded": "2026-11-08T00:36:04Z"
+  },
+  "lanes-smash": {
+   "file": "segments/lanes-smash.edenmacro.json",
+   "cap": 30,
+   "recipe": [
+    {
+     "stick": [
+      1,
+      0,
+      0
+     ],
+     "frames": 8,
+     "gap_frames": 0
+    },
+    {
+     "buttons": "a",
+     "with_stick": [
+      1,
+      0
+     ],
+     "hold": 80,
+     "gap": 1.2
+    }
+   ],
+   "note": "timing to be checked when recorded",
+   "sha256": "48c0b699a49fd5579ebbadcaf6e8008c9202374470d7ded4264f59ff3de77f93",
+   "recorded": "2026-11-08T00:35:44Z"
+  },
+  "dash-dance": {
+   "file": "segments/dash-dance.edenmacro.json",
+   "cap": 30,
+   "recipe": [
+    {
+     "stick": [
+      1,
+      0,
+      0
+     ],
+     "frames": 12,
+     "gap_frames": 0
+    },
+    {
+     "stick": [
+      -1,
+      0,
+      0
+     ],
+     "frames": 12,
+     "gap_frames": 0
+    },
+    {
+     "stick": [
+      1,
+      0,
+      0
+     ],
+     "frames": 12,
+     "gap_frames": 0
+    },
+    {
+     "stick": [
+      -1,
+      0,
+      0
+     ],
+     "frames": 12,
+     "gap_frames": 0
+    },
+    {
+     "stick": [
+      1,
+      0,
+      0
+     ],
+     "frames": 12,
+     "gap_frames": 0
+    },
+    {
+     "stick": [
+      -1,
+      0,
+      0
+     ],
+     "frames": 12,
+     "gap_frames": 0
+    },
+    {
+     "stick": [
+      1,
+      0,
+      0
+     ],
+     "frames": 12,
+     "gap_frames": 0
+    },
+    {
+     "stick": [
+      -1,
+      0,
+      0
+     ],
+     "frames": 12,
+     "gap_frames": 0
+    },
+    {
+     "stick": [
+      0,
+      0,
+      0
+     ],
+     "frames": 2,
+     "gap_frames": 10
+    }
+   ],
+   "note": "timing to be checked when recorded",
+   "sha256": "70dbfe051325a78518535fcd2feff20d9e1183698a43dc88ff6b05dc733b0241",
+   "recorded": "2026-11-08T00:36:44Z"
+  },
+  "fsmash": {
+   "file": "segments/fsmash.edenmacro.json",
+   "sha256": "2a6f61ae325478ba8a005edef0012064069fde9c0a88d93ff242c8c736d2452f",
+   "cap": 30
+  },
+  "tilted-a": {
+   "file": "segments/tilted-a.edenmacro.json",
+   "sha256": "451a6d9b165adef78b74bd795700e6b8cb0ed0d67cf7efd4e2be091456195350",
+   "cap": 30
+  },
+  "jab-drop2": {
+   "file": "segments/jab-drop2.edenmacro.json",
+   "cap": 30,
+   "recipe": [
+    {
+     "buttons": "a",
+     "frames": 2,
+     "gap_frames": 32
+    },
+    {
+     "buttons": "a",
+     "frames": 2,
+     "gap_frames": 40
+    }
+   ],
+   "note": "the second jab after the CPU is free and inside the 20-frame exchange (jab-drop was 42 frames)",
+   "sha256": "075ea43b3823c4c3d6301751786f59db2569fc456324ac603d0b82d1e6debd8a",
+   "recorded": "2026-11-08T00:48:54Z"
+  },
+  "gnt-alt-ftilt-d31": {
+   "file": "segments/gnt-alt-ftilt-d31.edenmacro.json",
+   "sha256": "30cb8b991edf23f690ce279b116703dac2c3a114b6f036e39331f4a988e224ce",
+   "cap": 20
+  },
+  "gnt-alt-ftilt-d32": {
+   "file": "segments/gnt-alt-ftilt-d32.edenmacro.json",
+   "sha256": "a09e3119eab9b95fdd5235076c83a62dd1bbbbd8c807f2f0eb5f2772b5fdb1b4",
+   "cap": 20
+  },
+  "gnt-alt-ftilt-d33": {
+   "file": "segments/gnt-alt-ftilt-d33.edenmacro.json",
+   "sha256": "7bbd6b73e7a519f119617e6dfe6a8ea3b6483b6d32e35dc660d67db0324ab9cd",
+   "cap": 20
+  },
+  "gnt-alt-ftilt-d34": {
+   "file": "segments/gnt-alt-ftilt-d34.edenmacro.json",
+   "sha256": "5d91b6046c206c6fd022541103a409436c79bf89b71b5079d8d51d6e994fcd35",
+   "cap": 20
+  },
+  "gnt-alt-ftilt-d35": {
+   "file": "segments/gnt-alt-ftilt-d35.edenmacro.json",
+   "sha256": "b4ed21ce7f6ca5f688fa88d00e5eddd0ef27640195bb55e26513dffa10ba4555",
+   "cap": 20
+  },
+  "gnt-alt-ftilt-d36": {
+   "file": "segments/gnt-alt-ftilt-d36.edenmacro.json",
+   "sha256": "621ac0653a534fe6c3fe751d46078e379327fde8f19e1e1719336d59c6a09181",
+   "cap": 20
+  },
+  "gnt-alt-ftilt-d37": {
+   "file": "segments/gnt-alt-ftilt-d37.edenmacro.json",
+   "sha256": "69152377e56ad07283def5d4378b333c52c0473a5b96fac1fd8c7e656e25fdc5",
+   "cap": 20
+  },
+  "gnt-alt-ftilt-d38": {
+   "file": "segments/gnt-alt-ftilt-d38.edenmacro.json",
+   "sha256": "0349655235ae41ac2bf68082ce090337a6cdb5decc31270757d9d67874c838d3",
+   "cap": 20
+  },
+  "gnt-alt-ftilt-d39": {
+   "file": "segments/gnt-alt-ftilt-d39.edenmacro.json",
+   "sha256": "d889f8ead938470e2ffdf9450523db8e4a20112d1aa38b45e350d8200be06436",
+   "cap": 20
+  },
+  "gnt-alt-ftilt-d40": {
+   "file": "segments/gnt-alt-ftilt-d40.edenmacro.json",
+   "sha256": "94edf8ad2b64cb6b858a1ce7e84653c80eec1b002ba328431d7824131bced3bc",
+   "cap": 20
+  },
+  "gnt-alt-ftilt-d41": {
+   "file": "segments/gnt-alt-ftilt-d41.edenmacro.json",
+   "sha256": "2afadde84007c646105ca3ae3fe2f8b07d8ef19b3649dbd4004f1688b7ce563a",
+   "cap": 20
+  },
+  "gnt-alt-ftilt-d42": {
+   "file": "segments/gnt-alt-ftilt-d42.edenmacro.json",
+   "sha256": "7b24c178f94f5b242ae84e9cc7567c3a5d57918c45757d740048c32122ee1cab",
+   "cap": 20
+  },
+  "gnt-alt-ftilt-d43": {
+   "file": "segments/gnt-alt-ftilt-d43.edenmacro.json",
+   "sha256": "eac8f7a7edabc7cacd3403c58a62ae902b4978dec1cddc0d3c5d719ab9d68d26",
+   "cap": 20
+  },
+  "gnt-alt-jab-d31": {
+   "file": "segments/gnt-alt-jab-d31.edenmacro.json",
+   "sha256": "7ac3f50521450ee84df99bd6591bc9245b7e5ad2fd30311918912c67bc520202",
+   "cap": 20
+  },
+  "gnt-alt-jab-d32": {
+   "file": "segments/gnt-alt-jab-d32.edenmacro.json",
+   "sha256": "0e85e633cfd7953279926a50677399b96b8479b71ecaa86ba9dc4c4c1f6fe3dd",
+   "cap": 20
+  },
+  "gnt-alt-jab-d33": {
+   "file": "segments/gnt-alt-jab-d33.edenmacro.json",
+   "sha256": "2db93a1d42d1c15755a8e60ecb48010698d04949cbf421282ca8b53cf49268e4",
+   "cap": 20
+  },
+  "gnt-alt-jab-d34": {
+   "file": "segments/gnt-alt-jab-d34.edenmacro.json",
+   "sha256": "74d1d9ff6678c2c7e02c6ee99b6166fcf0d13335d396d80ababcdf1d47fe5495",
+   "cap": 20
+  },
+  "gnt-alt-jab-d35": {
+   "file": "segments/gnt-alt-jab-d35.edenmacro.json",
+   "sha256": "a87a1a50e4e26df2158839e86922e90f04d5c20ba19827a7ec906b20e08194e5",
+   "cap": 20
+  },
+  "gnt-alt-jab-d36": {
+   "file": "segments/gnt-alt-jab-d36.edenmacro.json",
+   "sha256": "74fbfb42c88819bb9a3789d71d166b7bd2f57a28450a26d711164ed9fb09e411",
+   "cap": 20
+  },
+  "gnt-alt-jab-d37": {
+   "file": "segments/gnt-alt-jab-d37.edenmacro.json",
+   "sha256": "4c9820de2389472bd4d213df4e37b1bec498f72b096b88db02793104b8308f3d",
+   "cap": 20
+  },
+  "gnt-alt-jab-d38": {
+   "file": "segments/gnt-alt-jab-d38.edenmacro.json",
+   "sha256": "dc1e523b57f8871635179d14f47f22e7f897d87a91a5510a62018bc90b033ac3",
+   "cap": 20
+  },
+  "gnt-alt-jab-d39": {
+   "file": "segments/gnt-alt-jab-d39.edenmacro.json",
+   "sha256": "78a445a32faceec772877615893af40eeebbd0107d006c1eaa630a495deedbbc",
+   "cap": 20
+  },
+  "gnt-alt-jab-d40": {
+   "file": "segments/gnt-alt-jab-d40.edenmacro.json",
+   "sha256": "e9cc2bc710cc66a3b35261d66cd4cb5025bd8077eaa76cfa9993c2f0601ab4a2",
+   "cap": 20
+  },
+  "gnt-alt-jab-d41": {
+   "file": "segments/gnt-alt-jab-d41.edenmacro.json",
+   "sha256": "dafeae6a571ffcd262102b24fd0df06452248b44694d8ade3ba88ed4ee3aab2d",
+   "cap": 20
+  },
+  "gnt-alt-jab-d42": {
+   "file": "segments/gnt-alt-jab-d42.edenmacro.json",
+   "sha256": "d2423aa8f98cc1eb104a0bdb2c63a240782cbe73c80920fa7940efb93afad614",
+   "cap": 20
+  },
+  "gnt-alt-jab-d43": {
+   "file": "segments/gnt-alt-jab-d43.edenmacro.json",
+   "sha256": "6198120708bd6b4ee26288b97abc3c2c7050808de9e424edec42afe86bf1e24f",
+   "cap": 20
+  },
+  "gnt-alt-upb-d31": {
+   "file": "segments/gnt-alt-upb-d31.edenmacro.json",
+   "sha256": "8f20a5d74e71c4cc025b1a2241c7102797e792a5f835390ff09d3c54ef3ba50c",
+   "cap": 20
+  },
+  "gnt-alt-upb-d32": {
+   "file": "segments/gnt-alt-upb-d32.edenmacro.json",
+   "sha256": "350f8f3018e4a9e592a326bc7433590b8db575f21bc9411a053ebf31661d90cd",
+   "cap": 20
+  },
+  "gnt-alt-upb-d33": {
+   "file": "segments/gnt-alt-upb-d33.edenmacro.json",
+   "sha256": "3b2be16b40556556e2768d7556861fa4205d6493a6fd65fd3a492d7053a996db",
+   "cap": 20
+  },
+  "gnt-alt-upb-d34": {
+   "file": "segments/gnt-alt-upb-d34.edenmacro.json",
+   "sha256": "18c11b97b42703fd37cae43aa77f4af9c9492e1e8581a0990dadceb1f9a525bd",
+   "cap": 20
+  },
+  "gnt-alt-upb-d35": {
+   "file": "segments/gnt-alt-upb-d35.edenmacro.json",
+   "sha256": "d758235ccbbf0b506e8e1bbf3426d330274c5bc132ef94ae2533f2cc9bcebdf5",
+   "cap": 20
+  },
+  "gnt-alt-upb-d36": {
+   "file": "segments/gnt-alt-upb-d36.edenmacro.json",
+   "sha256": "470b25fda31c0dbb40a47b1bffcb4ca71558e9de2be8985abbd4b19ec362d018",
+   "cap": 20
+  },
+  "gnt-alt-upb-d37": {
+   "file": "segments/gnt-alt-upb-d37.edenmacro.json",
+   "sha256": "53192ed3e5102b1cd5be5031110ffee1b10a481b311738bd4770fa0ebeac4325",
+   "cap": 20
+  },
+  "gnt-alt-upb-d38": {
+   "file": "segments/gnt-alt-upb-d38.edenmacro.json",
+   "sha256": "6ef84ef60a872dc77cfbd6d1123669c5f074c778ba6a67387bbdd9df7eedc754",
+   "cap": 20
+  },
+  "gnt-alt-upb-d39": {
+   "file": "segments/gnt-alt-upb-d39.edenmacro.json",
+   "sha256": "67b43d714b48e7f27cd17c87d362d818b0ea0f2a76aa7c203950e0db5cdac332",
+   "cap": 20
+  },
+  "gnt-alt-upb-d40": {
+   "file": "segments/gnt-alt-upb-d40.edenmacro.json",
+   "sha256": "a26a4e0437ee1ef5222e9c37372cb6212d0bf06ba6a3f5783885df01fac8aa6e",
+   "cap": 20
+  },
+  "gnt-alt-upb-d41": {
+   "file": "segments/gnt-alt-upb-d41.edenmacro.json",
+   "sha256": "3538fa653aab80d0a89b9d994c30defa1617e4733543981292ab059a346ea423",
+   "cap": 20
+  },
+  "gnt-alt-upb-d42": {
+   "file": "segments/gnt-alt-upb-d42.edenmacro.json",
+   "sha256": "27d485423068425114c39c55a430d0987066454866c7b3ec6126b2852efc1307",
+   "cap": 20
+  },
+  "gnt-alt-upb-d43": {
+   "file": "segments/gnt-alt-upb-d43.edenmacro.json",
+   "sha256": "2a9bfd3a571df51de087c51aa30d4dd786e8cb193039e7126754876f37894bd2",
+   "cap": 20
+  },
+  "gnt-alt-usmash-d31": {
+   "file": "segments/gnt-alt-usmash-d31.edenmacro.json",
+   "sha256": "7110029e0e9da485eff6f07f9dced257a9060875737d3b46e902ae8afd5bf0b9",
+   "cap": 20
+  },
+  "gnt-alt-usmash-d32": {
+   "file": "segments/gnt-alt-usmash-d32.edenmacro.json",
+   "sha256": "44d6aeae13682c8ffb4742b6a570fb8887a2d36fde879d51c7abfe5e82a6d3dd",
+   "cap": 20
+  },
+  "gnt-alt-usmash-d33": {
+   "file": "segments/gnt-alt-usmash-d33.edenmacro.json",
+   "sha256": "a1b527635a158801f423212f8788d2099afb84de4789c42dd961c7df7b3f33d1",
+   "cap": 20
+  },
+  "gnt-alt-usmash-d34": {
+   "file": "segments/gnt-alt-usmash-d34.edenmacro.json",
+   "sha256": "8e8719e6cf0594016c6a25db76dbf0eb15ab95df74983853482333a852e0f59e",
+   "cap": 20
+  },
+  "gnt-alt-usmash-d35": {
+   "file": "segments/gnt-alt-usmash-d35.edenmacro.json",
+   "sha256": "45c7a0f1e16ffe9ebb3af09193bcd7f79213dccaff45b7bfc464a447a7e0ba81",
+   "cap": 20
+  },
+  "gnt-alt-usmash-d36": {
+   "file": "segments/gnt-alt-usmash-d36.edenmacro.json",
+   "sha256": "c0ce32e6f26b5794788e65cf6eba5db0649670af960980ef89aa59260ed50418",
+   "cap": 20
+  },
+  "gnt-alt-usmash-d37": {
+   "file": "segments/gnt-alt-usmash-d37.edenmacro.json",
+   "sha256": "137d65798567371361b243a52e4c526778248d62e5fcf7ee34391c13723a144e",
+   "cap": 20
+  },
+  "gnt-alt-usmash-d38": {
+   "file": "segments/gnt-alt-usmash-d38.edenmacro.json",
+   "sha256": "820c9a60b5ea285e28028c02abe76e00e5b26fd4d8bb4dda46ecc08029c24e9a",
+   "cap": 20
+  },
+  "gnt-alt-usmash-d39": {
+   "file": "segments/gnt-alt-usmash-d39.edenmacro.json",
+   "sha256": "72c3c613314af0ed2bec5f54cc3c991c00c99a5f8194034b116652a5e3358cfe",
+   "cap": 20
+  },
+  "gnt-alt-usmash-d40": {
+   "file": "segments/gnt-alt-usmash-d40.edenmacro.json",
+   "sha256": "9a88e9d14b3055a3b2d4b9c5362b04f09517f1d47803e9d2077435ad7a039ac4",
+   "cap": 20
+  },
+  "gnt-alt-usmash-d41": {
+   "file": "segments/gnt-alt-usmash-d41.edenmacro.json",
+   "sha256": "205ff6ace83ba949374a41065762b21f956141cbbc99807530c7b724f24e08ac",
+   "cap": 20
+  },
+  "gnt-alt-usmash-d42": {
+   "file": "segments/gnt-alt-usmash-d42.edenmacro.json",
+   "sha256": "6bd51ecc56333c56468a5e6d6643c6f292d694c2c0a5128317f76a29fcf5ed28",
+   "cap": 20
+  },
+  "gnt-alt-usmash-d43": {
+   "file": "segments/gnt-alt-usmash-d43.edenmacro.json",
+   "sha256": "90649d230d62c0243268b11148cdd6ff483b1e4be19b32186637de9816f7953a",
+   "cap": 20
+  },
+  "jab-then-up-tilt-26": {
+   "file": "segments/jab-then-up-tilt-26.edenmacro.json",
+   "sha256": "775a589372aa95665aa05f91769807af1785b2ce96a4d28e2bf5c82940fd7d09",
+   "cap": 30
+  },
+  "jab-then-up-tilt-30": {
+   "file": "segments/jab-then-up-tilt-30.edenmacro.json",
+   "sha256": "ce8488e613f413fb54d7b808b4d156e2a505df9691961576ac90e1fd0e2dff73",
+   "cap": 30
+  },
+  "jab-then-up-tilt-34": {
+   "file": "segments/jab-then-up-tilt-34.edenmacro.json",
+   "sha256": "5848d360aebcf551415fd7484d748f17db5fb2672f2c163a6d5d9f5fdad312d5",
+   "cap": 30
+  },
+  "jab-up-tilt": {
+   "file": "segments/jab-up-tilt.edenmacro.json",
+   "sha256": "34aa4459aa7b87e64a07b784f564937b2d0935412ef98245f13ae65f9e95b606",
+   "cap": 30
+  },
+  "jabs-14x6": {
+   "file": "segments/jabs-14x6.edenmacro.json",
+   "sha256": "a1c8a863ccf6bcbe6c879130f47eb1b507dc9984f862c7a277743040f43eb6d9",
+   "cap": 30
+  },
+  "jabs-16x4": {
+   "file": "segments/jabs-16x4.edenmacro.json",
+   "sha256": "0c503e31cc5afbb324d0bf975dd3d48e9d83d45333b30abe4d2d30ebadf038c3",
+   "cap": 30
+  },
+  "jabs-16x6": {
+   "file": "segments/jabs-16x6.edenmacro.json",
+   "sha256": "a44099c2af021d0a2100ec164584b6457baefa9ee2688f760ed1aec6927f6093",
+   "cap": 30
+  },
+  "native-pause-open": {
+   "file": "segments/native-pause-open.edenmacro.json",
+   "sha256": "64dd73ecc545a194de80411cddb3b8cbd5e37be8e7a4e077a39a5dedee23fe24",
+   "cap": 30
+  },
+  "native-quit-confirm": {
+   "file": "segments/native-quit-confirm.edenmacro.json",
+   "sha256": "6fc21293dea72efe1bfb888735d8a62d8a6754d8a1855e8bbcde9af08e24080b",
+   "cap": 30
+  },
+  "native-quit-focus": {
+   "file": "segments/native-quit-focus.edenmacro.json",
+   "sha256": "281999e46939ca06c960cef0108b28672c611435d33260ddeddfc6c9dd475b46",
+   "cap": 30
+  },
+  "native-ready-plus": {
+   "file": "segments/native-ready-plus.edenmacro.json",
+   "sha256": "7cdd035473160fec1a0e8c601c05f599f5b21556ac1cb4479b358c629e05b5c1",
+   "cap": 30
+  },
+  "one-pair-late": {
+   "file": "segments/one-pair-late.edenmacro.json",
+   "sha256": "8e57b5854d08408710be0cb2914f66807cdd39a2eeecce1b7bf063bf86388e39",
+   "cap": 30
+  },
+  "one-pair": {
+   "file": "segments/one-pair.edenmacro.json",
+   "sha256": "01ab1e28ea15d3189c1a07c6a1a95e6f5be97c20710cef952c58ee97ce0d9aa9",
+   "cap": 30
+  },
+  "pair-jab-up-tilt-70": {
+   "file": "segments/pair-jab-up-tilt-70.edenmacro.json",
+   "sha256": "d4129e19496f977de6fe5fcd699eddbcb42f54a3c50b803cf901327c820b0237",
+   "cap": 30
+  },
+  "pair-then-up-tilt-47": {
+   "file": "segments/pair-then-up-tilt-47.edenmacro.json",
+   "sha256": "c1dbcaa5807a23d5900778952e02b22f7819c2e3ec7b6e9df84093b50f911ccc",
+   "cap": 30
+  },
+  "pair-then-up-tilt-50": {
+   "file": "segments/pair-then-up-tilt-50.edenmacro.json",
+   "sha256": "3bd975ccf6b23884b3e6a156492e0f590362374ada4aa21fdffdd16ec12c2217",
+   "cap": 30
+  },
+  "pairs-walk-2": {
+   "file": "segments/pairs-walk-2.edenmacro.json",
+   "sha256": "638f7d203cec69d969d5ea68367437e6b3ca9242b20b1a7135245cfac92363ca",
+   "cap": 30
+  },
+  "pairs-walk-3": {
+   "file": "segments/pairs-walk-3.edenmacro.json",
+   "sha256": "018ab441c25ef59abf698f6f8dcddc59edd9f794422389716cb65d99bcbb83ec",
+   "cap": 30
+  },
+  "three-pairs-48": {
+   "file": "segments/three-pairs-48.edenmacro.json",
+   "sha256": "7355c99b50b86cc8bf38bfbd933237988cb028c3a7da5655cc0d8613756ca920",
+   "cap": 30
+  },
+  "three-pairs-50": {
+   "file": "segments/three-pairs-50.edenmacro.json",
+   "sha256": "703fad41bad59d031d698e568d1c6e7bd1299cc8502af82d5ad58a98ac50b68c",
+   "cap": 30
+  },
+  "three-pairs-52": {
+   "file": "segments/three-pairs-52.edenmacro.json",
+   "sha256": "e90a08552d1914dd9247436eb6867047e4b34203c5f5e1bb187123576c51ecca",
+   "cap": 30
+  },
+  "three-pairs-54": {
+   "file": "segments/three-pairs-54.edenmacro.json",
+   "sha256": "1f21d62879cd7485f2ba080c89f4cd90835d902dccfff3ac2f8bb24bfe44030f",
+   "cap": 30
+  },
+  "three-pairs-late": {
+   "file": "segments/three-pairs-late.edenmacro.json",
+   "sha256": "c59aed729a87bb331563e0e9c32e19cd07db352b5104c781814b3b9a6c3ef36e",
+   "cap": 30
+  },
+  "three-pairs": {
+   "file": "segments/three-pairs.edenmacro.json",
+   "sha256": "a4d14eea8e2dfad5cd1db830955f832452865ccd5f9bdcd5a8a41e43d2adeddd",
+   "cap": 30
+  },
+  "two-pairs-late": {
+   "file": "segments/two-pairs-late.edenmacro.json",
+   "sha256": "d17e46f7868b13ea95fb2be7079ca3f874270a3c5e5d14c6a5b6284e097a1b93",
+   "cap": 30
+  },
+  "two-pairs": {
+   "file": "segments/two-pairs.edenmacro.json",
+   "sha256": "a01966b585f2b50cf32e257d0dfe2f0bf8d3860c39c358673933dd015b6acf63",
+   "cap": 30
+  },
+  "multi-input": {
+   "file": "segments/multi-input.edenmacro.json",
+   "sha256": "7c1682fa38fec4b26e25fda6c35c7074f2b30a69050a506f9f83595204a7907b",
+   "cap": 30
+  },
+  "chord-play-both": {
+   "file": "segments/chord-play-both.edenmacro.json",
+   "cap": 30,
+   "recipe": [
+    {
+     "buttons": "zr,left,up",
+     "frames": 2,
+     "gap_frames": 10
+    }
+   ],
+   "sha256": "11a0982b9ba14b1717f9e9e05cb2ddda8913fbd9a4df55499cd4c917e32ce66f"
+  },
+  "sh-nair": {
+   "file": "segments/sh-nair.edenmacro.json",
+   "cap": 30,
+   "recipe": [
+    {
+     "buttons": "x,a",
+     "frames": 2,
+     "gap_frames": 50
+    }
+   ],
+   "sha256": "9c7ec003391870e86710f97cf97583070cbfcdb6525f88ad241f9811d10d4a01"
+  },
+  "jab-late": {
+   "file": "segments/jab-late.edenmacro.json",
+   "cap": 30,
+   "recipe": [
+    {
+     "buttons": "a",
+     "frames": 2,
+     "gap_frames": 24
+    },
+    {
+     "buttons": "a",
+     "frames": 2,
+     "gap_frames": 30
+    }
+   ],
+   "sha256": "d09cd4f6ac627d5754086422b8a3c1c2fd4f2905cad7433023cbabfdb7799b82"
+  },
+  "ftilt": {
+   "file": "segments/ftilt.edenmacro.json",
+   "cap": 30,
+   "recipe": [
+    {
+     "buttons": "a",
+     "with_stick": [
+      0.5,
+      0
+     ],
+     "frames": 2,
+     "gap_frames": 40
+    }
+   ],
+   "sha256": "c72a2ce07fa86e471600c1ba268ef7dd73eb322aa8023f19dea47fc145a6f59c"
+  },
+  "nair-land": {
+   "file": "segments/nair-land.edenmacro.json",
+   "cap": 30,
+   "recipe": [
+    {
+     "buttons": "x",
+     "frames": 2,
+     "gap_frames": 35
+    },
+    {
+     "buttons": "a",
+     "frames": 2,
+     "gap_frames": 40
+    }
+   ],
+   "sha256": "754a64d3d321cc5ee067692a238cb4515d5d32c926b7ceab82518d643b79b301"
+  },
+  "cycle-cpu": {
+   "file": "segments/cycle-cpu.edenmacro.json",
+   "sha256": "909b56f32a85d3cbd85910d00ef6bd4fa3362d2dcaad94d34ac33fda160b5c16",
+   "cap": 15
+  },
+  "cycle-player": {
+   "file": "segments/cycle-player.edenmacro.json",
+   "sha256": "d991478c7a965507183e722f25bb28421f4c0f3c9ec81cc8a937f2b30b91040e",
+   "cap": 15
+  },
+  "lra": {
+   "file": "segments/lra.edenmacro.json",
+   "sha256": "5555fddade21ef95dacbbeff6837fd909f6e51b183973cb35bbc9a59e547d2b0",
+   "cap": 15
+  },
+  "jump-off-left": {
+   "file": "segments/jump-off-left.edenmacro.json",
+   "sha256": "a486819f8195acb8ca7d5bfe7f82e497cbb552d90e6f46bbed9920a8c6c0bfd9",
+   "cap": 30
+  },
+  "run-off-left": {
+   "file": "segments/run-off-left.edenmacro.json",
+   "sha256": "0be2efe593aedc582301f22767f8f131bae3d17c5dd2b6d64e1d173499dfc16c",
+   "cap": 30
+  },
+  "b-tap-1f": {
+   "file": "segments/b-tap-1f.edenmacro.json",
+   "sha256": "0fdf0099cdb8bdb3e54559d4586a9903706876be39d83edc31b058a1cb2be1d1",
+   "cap": 10,
+   "note": "B for one frame: closes the Recording pop-up with no B on any poll after its owner releases (fx_rs4._popup_close)"
+  },
+  "lr04-cpu-approach": {
+   "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/lr04-cpu-approach.edenmacro.json",
+   "sha256": "27b8846bc5f9aa21d7c3746d1cef7894369f7479f29f937c248ca5f23d580396",
+   "cap": 20,
+   "library": "lr04-cpu-approach"
+  },
+  "lr04-cpu-pick": {
+   "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/lr04-cpu-pick.edenmacro.json",
+   "sha256": "fc6319148f476318cbd86fb5a2d3d63e4b135808aa34a21cada687b6dbddc1f9",
+   "cap": 20,
+   "library": "lr04-cpu-pick"
+  },
+  "btt-a": {
+   "cap": 30,
+   "file": "segments/btt-a.edenmacro.json",
+   "sha256": "a956946bc63eb56f1e43b3549b4843de9b88444a62d2bb466f04316d85bd1a5b"
+  },
+  "btt-b": {
+   "cap": 30,
+   "file": "segments/btt-b.edenmacro.json",
+   "sha256": "d6ed74325ffa59b487c905f960fa5f5a8589caaffa88eebe612e426e46fe5e2d"
+  },
+  "btt-d1": {
+   "cap": 30,
+   "file": "segments/btt-d1.edenmacro.json",
+   "sha256": "2c5df85849e4ca936379e502480bbe1d3ed850a24a0b8a7ee1b155019c4c6210"
+  },
+  "btt-d10": {
+   "cap": 30,
+   "file": "segments/btt-d10.edenmacro.json",
+   "sha256": "65139cf2b5b2708eefbc5c31fda6370144d34e9a9c7aa1b631a745053e36c1c5"
+  },
+  "btt-d2": {
+   "cap": 30,
+   "file": "segments/btt-d2.edenmacro.json",
+   "sha256": "1d9c6adfd8a9b67f198efd9cea24855cbc58aea090a112c1c11abd1354f88de8"
+  },
+  "btt-d20": {
+   "cap": 30,
+   "file": "segments/btt-d20.edenmacro.json",
+   "sha256": "d2f085774d98e30c0d3d8c67391faba3757ea84da79cf5e7cfe10c367d5755a9"
+  },
+  "btt-d40": {
+   "cap": 30,
+   "file": "segments/btt-d40.edenmacro.json",
+   "sha256": "4bad0c5ecfdeee0395f98b43a3605c3d959c6874989fd234a8b09d30377e69ec"
+  },
+  "btt-d5": {
+   "cap": 30,
+   "file": "segments/btt-d5.edenmacro.json",
+   "sha256": "afc382b1aebe185f6ff714a0d6aec16fcca5683e71f7f05ea04e70f7e461f89a"
+  },
+  "btt-l1": {
+   "cap": 30,
+   "file": "segments/btt-l1.edenmacro.json",
+   "sha256": "d21dafd43ebb8c02953796732b3c0ccb7c6f714eb9a0f70377a36e861314ca4c"
+  },
+  "btt-l10": {
+   "cap": 30,
+   "file": "segments/btt-l10.edenmacro.json",
+   "sha256": "e08741acded3392903608cdda979d3df4948b33bf5b634e44a174113b0b28a7b"
+  },
+  "btt-l2": {
+   "cap": 30,
+   "file": "segments/btt-l2.edenmacro.json",
+   "sha256": "b498faafafdbba1a72287d80022c68e2583a3044a1946e69c83266a049c68a43"
+  },
+  "btt-l20": {
+   "cap": 30,
+   "file": "segments/btt-l20.edenmacro.json",
+   "sha256": "2703a76b38ad43f36a5840e61d165583bc14ad6fbe2c07b96bd474fd79dc851c"
+  },
+  "btt-l40": {
+   "cap": 30,
+   "file": "segments/btt-l40.edenmacro.json",
+   "sha256": "4b7081585ebacec54e708320eb4ae1b826498e14ffba20cae3f465bbf2803e5c"
+  },
+  "btt-l5": {
+   "cap": 30,
+   "file": "segments/btt-l5.edenmacro.json",
+   "sha256": "9441fd3cc80fc5d2546efac3d068d836e08cf449b7abccbd1ede811d75584341"
+  },
+  "btt-r1": {
+   "cap": 30,
+   "file": "segments/btt-r1.edenmacro.json",
+   "sha256": "eae120bad0078a33ef42bb7346f7665cea8f15d0d6a22b4526a2a452d50e69ff"
+  },
+  "btt-r10": {
+   "cap": 30,
+   "file": "segments/btt-r10.edenmacro.json",
+   "sha256": "156d31f77a4ff7c850918ac27aad71e8a12435ed1568839890eb778b76512269"
+  },
+  "btt-r2": {
+   "cap": 30,
+   "file": "segments/btt-r2.edenmacro.json",
+   "sha256": "6ddb99bdf36f99eecf256fd89895ae83364a26754268a00d5b0cc986dff0ca71"
+  },
+  "btt-r20": {
+   "cap": 30,
+   "file": "segments/btt-r20.edenmacro.json",
+   "sha256": "af506351a6692b42e89a8a95350b2e28329dc8d7161390e88a2c8ab89456a3c6"
+  },
+  "btt-r40": {
+   "cap": 30,
+   "file": "segments/btt-r40.edenmacro.json",
+   "sha256": "fc483f691247cc7f8c63c52177d4aedce8e688b5f29e32fb6ccf7e201047aff1"
+  },
+  "btt-r5": {
+   "cap": 30,
+   "file": "segments/btt-r5.edenmacro.json",
+   "sha256": "6513b54c2536b7d413a6dc7ffb9e2d0225c068bbb2b1e1a9177eade5415b8c3f"
+  },
+  "btt-save2": {
+   "cap": 30,
+   "file": "segments/btt-save2.edenmacro.json",
+   "sha256": "560ab6adc0cbd67412873bebb20aa880d45c23b7f99e005532dd9c1a5a48dff7"
+  },
+  "btt-u1": {
+   "cap": 30,
+   "file": "segments/btt-u1.edenmacro.json",
+   "sha256": "c77807d9e60dfa6f34866c1fb1997dadb65556f645602adaca059e5034513226"
+  },
+  "btt-u10": {
+   "cap": 30,
+   "file": "segments/btt-u10.edenmacro.json",
+   "sha256": "390f681bd0aecf2edfe01d3121083f2fa853431f384f65a8e3c33d83e1058e40"
+  },
+  "btt-u2": {
+   "cap": 30,
+   "file": "segments/btt-u2.edenmacro.json",
+   "sha256": "f0a40ac0af8ee9365717735dc9d3041457e980212628c3b343e2ef96599ad2d6"
+  },
+  "btt-u20": {
+   "cap": 30,
+   "file": "segments/btt-u20.edenmacro.json",
+   "sha256": "5530a34aaf5923b7f1bd537d24ec5b50ba6c6d5ee023e3eec70601f13be406ba"
+  },
+  "btt-u40": {
+   "cap": 30,
+   "file": "segments/btt-u40.edenmacro.json",
+   "sha256": "29e1a1602ba0a410c9925bc0abf899cc99e4f40b111b4763be40d086d13c9dd5"
+  },
+  "btt-u5": {
+   "cap": 30,
+   "file": "segments/btt-u5.edenmacro.json",
+   "sha256": "e4d8a7431bac7fa666d6477059a7634c570668616d25542b9c5bb73ee07cb10a"
+  },
+  "btt-walk-l8": {
+   "cap": 30,
+   "file": "segments/btt-walk-l8.edenmacro.json",
+   "sha256": "dfdb01d536b498db2a5995a5a95a6b8ac505ee3b012f7621263e49eed507a395"
+  },
+  "btt-walk-r8": {
+   "cap": 30,
+   "file": "segments/btt-walk-r8.edenmacro.json",
+   "sha256": "36c7955a68ce841e8621eceaf7478958464844041a82432e9e21537439d1f966"
+  },
+  "btt-y": {
+   "cap": 30,
+   "file": "segments/btt-y.edenmacro.json",
+   "sha256": "ab20d6f3cc45b1137dc9716d99aaaf870fa3f190dd78e4a6e387abd2f41e536f"
+  },
+  "btt-y2": {
+   "cap": 30,
+   "file": "segments/btt-y2.edenmacro.json",
+   "sha256": "5744ed0630c262db2cecf9ef657e7273fb78cec7e5e3d279fcd1df879f677cca"
+  },
+  "btt-zl-left": {
+   "cap": 30,
+   "file": "segments/btt-zl-left.edenmacro.json",
+   "sha256": "01b685766a055acb979b33cf8a6deecca753b06786d4e498ec0aa78626b9a59c"
+  },
+  "btt-zl-right": {
+   "cap": 30,
+   "file": "segments/btt-zl-right.edenmacro.json",
+   "sha256": "5531618a358523589b505d552439ee96d95309f6a78d82306226c891d99608e4"
+  },
+  "btt-zl-y": {
+   "cap": 30,
+   "file": "segments/btt-zl-y.edenmacro.json",
+   "sha256": "b6a4e8cd2e2d76f8e5b5a363658ddf32a8490aac7960d62c72736d824833ea88"
+  },
+  "btt-zl-y2": {
+   "cap": 30,
+   "file": "segments/btt-zl-y2.edenmacro.json",
+   "sha256": "d554577dfa9835653eb335578e0a684b34f4c0b301bc1b4cb0cc9276bd7d49c4"
+  }
+ },
+ "gates": {
+  "main": {
+   "kind": "image",
+   "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/main.png",
+   "sha256": "902628cebd8620847be44e41a826046740f495ca0dfa7e78d8482c43c0da1bdc",
+   "roi": [
+    150,
+    265,
+    450,
+    335
+   ],
+   "tolerance": 8,
+   "cap": 45,
+   "reference_is_roi": true,
+   "from_run": "lr-03",
+   "library": "main",
+   "recover": "attract-cancel",
+   "recover_times": 4,
+   "scale": "fit",
+   "frame": [
+    1280,
+    720
+   ]
+  },
+  "stage": {
+   "kind": "image",
+   "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/stage.png",
+   "sha256": "99e7013e2be97b8173498e36a9b0e3b849c4e403bd239f1febda185470617033",
+   "roi": [
+    110,
+    445,
+    290,
+    495
+   ],
+   "tolerance": 8,
+   "cap": 45,
+   "reference_is_roi": true,
+   "from_run": "lr-03",
+   "library": "stage",
+   "scale": "fit",
+   "frame": [
+    1280,
+    720
+   ]
+  },
+  "css": {
+   "kind": "image",
+   "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/css.png",
+   "sha256": "a7a15642548952e4e263e42d467542b2877576cac4785061c21988e6cd7c0b76",
+   "roi": [
+    55,
+    55,
+    675,
+    155
+   ],
+   "tolerance": 8,
+   "cap": 60,
+   "reference_is_roi": true,
+   "from_run": "lr-03",
+   "library": "css",
+   "scale": "fit",
+   "frame": [
+    1280,
+    720
+   ]
+  },
+  "training-hud-unpaused": {
+   "kind": "image",
+   "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/training-hud-unpaused.png",
+   "sha256": "7ecf9a4258ace218ad179e2fe14dcaf9d3dd906c594dec2ec8216cb5e02a8d2c",
+   "roi": [
+    280,
+    580,
+    302,
+    615
+   ],
+   "tolerance": 8,
+   "cap": 10,
+   "scope": "Undimmed native zero digit, excluding changing faction emblem; applies only to this no-damage cycle lane.",
+   "reference_is_roi": true,
+   "from_run": "lr-03",
+   "library": "training-hud-unpaused",
+   "scale": "fit",
+   "frame": [
+    1280,
+    720
+   ]
+  },
+  "diag-record-player": {
+   "kind": "log",
+   "source": "gates",
+   "pattern": "screen=recording role=player recording=1",
+   "cap": 15
+  },
+  "loaded": {
+   "library": "loaded"
+  }
+ },
+ "recover": [
+  {
+   "run": "btt_rows.py:btt_recover",
+   "check": true
+  }
+ ],
+ "gif_presets": {},
+ "rows": [
+  {
+   "id": "g-gdb-on",
+   "start": "frontend-ready",
+   "end": "frontend-ready",
+   "group": "feature-gifs/gdb",
+   "on_failure": "stop",
+   "steps": [
+    {
+     "run": "gdb_rc11.py:gdb_on",
+     "on": "diag",
+     "check": true
+    }
+   ],
+   "expect": "Eden's GDB stub on (core.use_gdbstub, core.gdbstub_port from gdb-port.txt) before game.load, and the holding helper (gdbdump.py hold) started.",
+   "budget_min": 1
+  },
+  {
+   "id": "q00-load",
+   "start": "frontend-ready",
+   "end": "boot",
+   "group": "feature-gifs/gdb",
+   "on_failure": "stop",
+   "steps": [
+    {
+     "call": "game.load",
+     "on": "diag",
+     "params": {
+      "path": "@game"
+     },
+     "job_cap": 240
+    },
+    {
+     "run": "gdb_rc11.py:gdb_kick",
+     "on": "diag",
+     "check": true
+    },
+    {
+     "gate": "loaded",
+     "on": "diag"
+    },
+    {
+     "reason": "other plugins finish booting",
+     "wait_ms": 15000
+    },
+    {
+     "shot": "boot",
+     "on": "diag"
+    }
+   ],
+   "expect": "The game loads with the stub on and the helper attached; the plugins boot.",
+   "budget_min": 5
+  },
+  {
+   "id": "g-gdb-attached",
+   "start": "boot",
+   "end": "boot",
+   "group": "feature-gifs/gdb",
+   "on_failure": "stop",
+   "budget_min": 1,
+   "steps": [
+    {
+     "run": "mem.py:m_drawing",
+     "on": "diag",
+     "check": true
+    }
+   ],
+   "expect": "The guest draws after the direct kick (status game_fps > 1)."
+  },
+  {
+   "id": "m-main",
+   "start": "boot",
+   "end": "main",
+   "group": "rc14-egg-target",
+   "budget_min": 3,
+   "on_failure": "stop",
+   "steps": [
+    {
+     "run": "mem.py:m_main",
+     "check": true,
+     "on": "diag"
+    }
+   ],
+   "expect": "Main menu reached."
+  },
+  {
+   "id": "p-route",
+   "start": "main",
+   "end": "training",
+   "group": "rc14-egg-target",
+   "budget_min": 8,
+   "on_failure": "stop",
+   "steps": [
+    {
+     "run": "pillrows.py:p_route",
+     "check": true,
+     "on": "diag"
+    }
+   ],
+   "expect": "Training, P1 Ridley vs the CPU."
+  },
+  {
+   "id": "btt-st-bf",
+   "start": "training",
+   "end": "training",
+   "start_gate": "training-hud-unpaused",
+   "group": "rc14-btt",
+   "on_failure": "stop",
+   "budget_min": 5,
+   "steps": [
+    {
+     "run": "btt_rows.py:change_stage",
+     "on": "diag",
+     "check": true,
+     "args": {
+      "key": "bf"
+     }
+    }
+   ],
+   "expect": "Change Stage to Battlefield with the mode Off; the game's own [PracticeStageRequest] says the stage id is the table's 0."
+  },
+  {
+   "id": "btt-E41",
+   "start": "training",
+   "end": "training",
+   "start_gate": "training-hud-unpaused",
+   "group": "rc14-btt",
+   "on_failure": "continue",
+   "budget_min": 4,
+   "steps": [
+    {
+     "run": "btt_rows.py:e41",
+     "on": "diag",
+     "check": true,
+     "args": {
+      "key": "bf"
+     }
+    }
+   ],
+   "expect": "Save (row 41, btt-5): ZL + Down twice on Battlefield makes two NEW files in layouts/ (Layout 1 and 2 \u00b7 Battlefield), each with the 3 targets; no other file changes; the newer is chosen 1/2; the Saved layouts list shows this stage's files newest first."
+  },
+  {
+   "id": "btt-E43",
+   "start": "training",
+   "end": "training",
+   "start_gate": "training-hud-unpaused",
+   "group": "rc14-btt",
+   "on_failure": "continue",
+   "budget_min": 5,
+   "steps": [
+    {
+     "run": "btt_rows.py:e43",
+     "on": "diag",
+     "check": true,
+     "args": {
+      "key": "bf"
+     }
+    }
+   ],
+   "expect": "The Saved layouts screen (rows 43, btt-5): A on the newest opens Load, Rename, Duplicate, Delete; Rename (the keyboard, \"Ledge trap\") keeps the same file and puts it on top; Duplicate makes Layout N \u00b7 Battlefield with the same targets at the top; Delete asks once (Keep it, Delete it) and then removes only that file."
+  },
+  {
+   "id": "btt-G3",
+   "start": "training",
+   "end": "training",
+   "start_gate": "training-hud-unpaused",
+   "group": "rc14-btt",
+   "on_failure": "continue",
+   "budget_min": 3,
+   "steps": [
+    {
+     "run": "btt_rows.py:g3_prep",
+     "on": "diag",
+     "check": true
+    },
+    {
+     "gif": {
+      "name": "btt-save-load.gif",
+      "preset": "docs",
+      "steps": [
+       {
+        "run": "btt_rows.py:g3_action",
+        "on": "diag",
+        "check": true
+       }
+      ]
+     },
+     "on": "diag"
+    }
+   ],
+   "expect": "GIF: ZL + Down saves a new layout file (Saved: Layout N \u00b7 Battlefield), Y twice clears, ZL + Up loads it back (1280 wide, under 10 s)."
+  },
+  {
+   "id": "btt-st-bbf",
+   "start": "training",
+   "end": "training",
+   "start_gate": "training-hud-unpaused",
+   "group": "rc14-btt",
+   "on_failure": "continue",
+   "budget_min": 5,
+   "steps": [
+    {
+     "run": "btt_rows.py:change_stage",
+     "on": "diag",
+     "check": true,
+     "args": {
+      "key": "bbf"
+     }
+    }
+   ],
+   "expect": "Change Stage to Big Battlefield (a wide stage) with the mode Off; the stage id is the table's 2, which is the seeded layouts file's name."
+  },
+  {
+   "id": "btt-E42",
+   "start": "training",
+   "end": "training",
+   "start_gate": "training-hud-unpaused",
+   "group": "rc14-btt",
+   "on_failure": "continue",
+   "budget_min": 3,
+   "steps": [
+    {
+     "run": "btt_rows.py:e42",
+     "on": "diag",
+     "check": true,
+     "args": {
+      "key": "bbf"
+     }
+    }
+   ],
+   "expect": "Load (row 42, btt-5): the seeded layouts/seeded-big-battlefield.json (not written by this boot) is read when the stage opens: ZL + Right names it 1/1 with 3 targets, ZL + Up loads the 3 into Placing (a use: its used number rises), X opens Ready."
+  },
+  {
+   "id": "btt-X-stages",
+   "start": "training",
+   "end": "training",
+   "start_gate": "training-hud-unpaused",
+   "group": "rc14-btt",
+   "on_failure": "continue",
+   "budget_min": 7,
+   "steps": [
+    {
+     "run": "btt_rows.py:x_stages",
+     "on": "diag",
+     "check": true,
+     "args": {
+      "first": "bf",
+      "second": "bbf"
+     }
+    }
+   ],
+   "expect": "Two stages (btt-5): on Big Battlefield the list and the chords show only its own layouts; a Save there makes Layout 1 \u00b7 Big Battlefield and no Battlefield file changes; back on Battlefield ZL + Right steps to the older layout (2/2) and ZL + Up loads it, which lists it first; no Big Battlefield file changes."
+  },
+  {
+   "id": "btt-X-saves",
+   "start": "training",
+   "end": "training",
+   "start_gate": "training-hud-unpaused",
+   "group": "rc14-btt",
+   "on_failure": "continue",
+   "budget_min": 5,
+   "steps": [
+    {
+     "run": "btt_rows.py:x_saves",
+     "on": "diag",
+     "check": true,
+     "args": {
+      "key": "bf"
+     }
+    }
+   ],
+   "expect": "The chords on the hot five (btt-5): saves until Battlefield has 7 files (each a new one); ZL + Right steps 2/5 .. 5/5, 1/5, 2/5 through the five newest, ZL + Left back to 1/5; the two oldest stay files; ZL + Up on 3/5 loads it and it becomes 1/5; ZL + Y twice deletes it and the five refill (6 files, 5 hot); no temporary file is left."
+  },
+  {
+   "id": "btt-off",
+   "start": "training",
+   "end": "training",
+   "start_gate": "training-hud-unpaused",
+   "group": "rc14-btt",
+   "on_failure": "continue",
+   "budget_min": 1,
+   "steps": [
+    {
+     "run": "btt_rows.py:btt_off",
+     "on": "diag",
+     "check": true
+    }
+   ],
+   "expect": "The mode Off, the menu closed, the fighters reset: the boot ends as the others do."
+  }
+ ]
+}
