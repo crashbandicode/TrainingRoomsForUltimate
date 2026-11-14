@@ -178,7 +178,7 @@ pub(crate) mod slots {
     use std::sync::Mutex;
     use crate::model::macro_handoff::{SlotTransfer, SlotResult};
     use crate::model::recording::{Origin, StartSnapshot};
-    use crate::model::input_delay::MappedInputs;
+    use crate::engine::rr_host::{to_frame, to_mapped};
     use crate::engine::macros::{InputFrame, MacroRecording, StartState};
 
     /// `playback`: rc.12 TR1's Playback Slot copy (`copy`), with whether to say so; `None` is the old library path.
@@ -227,10 +227,7 @@ pub(crate) mod slots {
             start: StartSnapshot { fighter_kind: start.fighter_kind, costume: start.costume,
                 situation: start.situation, speed_x: start.speed_x, speed_y: start.speed_y },
         };
-        let frames: Vec<_> = recording.frames.iter().map(|frame| MappedInputs {
-            buttons: frame.buttons, lstick_x: frame.lstick_x, lstick_y: frame.lstick_y,
-            rstick_x: frame.rstick_x, rstick_y: frame.rstick_y,
-        }).collect();
+        let frames: Vec<_> = recording.frames.iter().copied().map(to_mapped).collect();
         let mut transfer = SlotTransfer::export(slot);
         transfer.fill_import(slot, &frames, origin).map_err(|error| error.message())?;
         enqueue(transfer, Completion::Import { name: recording.name.clone(), slot, playback });
@@ -274,9 +271,7 @@ pub(crate) mod slots {
                             let start = StartState { fighter_kind: origin.start.fighter_kind, costume: origin.start.costume,
                                 facing: f32::from(origin.facing), situation: origin.start.situation, status: origin.status,
                                 speed_x: origin.start.speed_x, speed_y: origin.start.speed_y };
-                            let frames = frames.iter().map(|frame| InputFrame { buttons: frame.buttons,
-                                lstick_x: frame.lstick_x, lstick_y: frame.lstick_y,
-                                rstick_x: frame.rstick_x, rstick_y: frame.rstick_y }).collect();
+                            let frames = frames.iter().copied().map(to_frame).collect();
                             finished = Some(Finished::Export { diagnostic, result: Ok((frames, start)) });
                         }
                         _ => unreachable!("export reply"),

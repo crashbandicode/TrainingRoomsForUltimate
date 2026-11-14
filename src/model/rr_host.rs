@@ -251,18 +251,19 @@ pub fn cpu_role_poll(out: &mut MappedInputs) -> bool {
         drive.poll(out)
     };
     if let Some(frame) = stored {
-        push_capture(
-            ROLE_CPU,
-            InputFrame {
-                buttons: frame.buttons,
-                lstick_x: frame.lstick_x,
-                lstick_y: frame.lstick_y,
-                rstick_x: frame.rstick_x,
-                rstick_y: frame.rstick_y,
-            },
-        );
+        push_capture(ROLE_CPU, to_frame(frame));
     }
     true
+}
+
+/// A controller record as a recorded frame: the same five fields, field for field.
+pub fn to_frame(m: MappedInputs) -> InputFrame {
+    InputFrame { buttons: m.buttons, lstick_x: m.lstick_x, lstick_y: m.lstick_y, rstick_x: m.rstick_x, rstick_y: m.rstick_y }
+}
+
+/// A recorded frame as a controller record (the inverse of [`to_frame`]).
+pub fn to_mapped(f: InputFrame) -> MappedInputs {
+    MappedInputs { buttons: f.buttons, lstick_x: f.lstick_x, lstick_y: f.lstick_y, rstick_x: f.rstick_x, rstick_y: f.rstick_y }
 }
 
 /// The CPU control frame of a CPU-role recording. `write` is what replaces the AI's controls.
@@ -283,16 +284,7 @@ pub fn cpu_role_phase() -> Option<Phase> {
 
 /// Play on CPU: the posted frame as the CPU controller word (`inject_values`, mirror +1).
 pub fn playback_controller(frame: InputFrame) -> Inject {
-    inject_values(
-        MappedInputs {
-            buttons: frame.buttons,
-            lstick_x: frame.lstick_x,
-            lstick_y: frame.lstick_y,
-            rstick_x: frame.rstick_x,
-            rstick_y: frame.rstick_y,
-        },
-        1,
-    )
+    inject_values(to_mapped(frame), 1)
 }
 
 /// The menu worker posts one effect. The recording worker applies it. A `None` does not clear a pending effect.
@@ -472,24 +464,10 @@ pub unsafe fn on_player_poll(out: *mut MappedInputs) -> bool {
     }
     let injected = take_player_frame();
     if let Some(frame) = injected {
-        (*out).buttons = frame.buttons;
-        (*out).lstick_x = frame.lstick_x;
-        (*out).lstick_y = frame.lstick_y;
-        (*out).rstick_x = frame.rstick_x;
-        (*out).rstick_y = frame.rstick_y;
+        *out = to_mapped(frame);
     }
     if CAP_ROLE.load(Ordering::Acquire) == ROLE_PLAYER {
-        let mapped = *out;
-        push_capture(
-            ROLE_PLAYER,
-            InputFrame {
-                buttons: mapped.buttons,
-                lstick_x: mapped.lstick_x,
-                lstick_y: mapped.lstick_y,
-                rstick_x: mapped.rstick_x,
-                rstick_y: mapped.rstick_y,
-            },
-        );
+        push_capture(ROLE_PLAYER, to_frame(*out));
     }
     injected.is_some()
 }
