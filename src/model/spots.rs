@@ -7,10 +7,12 @@
 //!
 //! The game does not say which slot connected (the only native is `AttackModule::is_infliction_status`, one flag for the whole
 //! module), so a hit is attributed by the damage it added to the defender (`attribute`): the game scales every slot's damage by the
-//! same number (Eden, 2026-11-14: a fresh hit adds 1.26 times the slot's damage, two fighters' 1.2 times the 1.05 of a fresh move;
-//! staling lowers it to about 1.07; a charged smash raises it up to 1.4 times), so a slot is a candidate when the added damage
-//! divided by its own damage lies in that window, and a slot outside it cannot have connected. The label shows only when every
-//! candidate gets the same class; no candidate, or candidates of different classes, is no label.
+//! same numbers. The attacker's own is `AttackModule::power_mul_status` (module `+0xe0`: 1.0, or the smash charge, which the common
+//! fighter script sets with `set_power_mul_status` and `get_power` multiplies every slot by; the strip reads it through the game's
+//! getter and `attribute` divides it out), and the defender's side adds the rest (Eden, 2026-11-14: a fresh hit adds 1.26 times the
+//! slot's damage, two fighters' 1.2 times the 1.05 of a fresh move; staling lowers it to about 1.07). So a slot is a candidate when
+//! the added damage divided by its own damage and the charge lies in that window, and a slot outside it cannot have connected. The
+//! label shows only when every candidate gets the same class; no candidate, or candidates of different classes, is no label.
 
 /// The rows (decision SP5): the strip's labels and the combo's match, toggles Off by default. The hitbox visualizer's *Frame data colours*
 /// (`hitbox::legend_colour`) is an item of its checklist (`legend::COLOURS`).
@@ -30,8 +32,8 @@ pub type Powers = [f32; SLOTS];
 
 /// Damages closer than this are equal.
 pub const EPS: f32 = 0.05;
-/// The window of added damage over the hitbox's own damage (decision SP1's attribution), set from the `[Spots]` lines of Eden
-/// (the module notes): the multiplier is 1.26 for a fresh hit, about 1.07 stalest, up to 1.76 for a fully charged smash.
+/// The window of added damage over the hitbox's own damage times the attacker's charge (decision SP1's attribution), set from the
+/// `[Spots]` lines of Eden (the module notes): the remaining multiplier is 1.26 for a fresh hit and about 1.07 stalest.
 pub const K_LOW: f32 = 1.0;
 pub const K_HIGH: f32 = 1.6;
 
@@ -104,14 +106,15 @@ impl Peak {
         self.value = self.value.max(active.iter().copied().fold(0.0, f32::max));
     }
 }
-/// The spot of the hit that added `gained` damage to the defender, from the attacker's `active` hitboxes and the action's
-/// `earlier` peak. `None` when it cannot be told.
-pub fn attribute(gained: f32, active: &Powers, _mul: f32, earlier: f32) -> Option<Spot> {
-    if !gained.is_finite() || gained <= 0.0 {
+/// The spot of the hit that added `gained` damage to the defender, from the attacker's `active` hitboxes, the attacker's damage multiplier
+/// `mul` (`AttackModule::power_mul_status`: 1.0, or the smash charge; 0.0 is a read that was not made) and the action's `earlier` peak.
+/// `None` when it cannot be told, which includes a multiplier that is not a positive number.
+pub fn attribute(gained: f32, active: &Powers, mul: f32, earlier: f32) -> Option<Spot> {
+    if !gained.is_finite() || gained <= 0.0 || !mul.is_finite() || mul <= 0.0 {
         return None;
     }
     let mut found: Option<Option<Spot>> = None;
-    for &p in active.iter().filter(|&&p| p > 0.0 && (K_LOW..=K_HIGH).contains(&(gained / p))) {
+    for &p in active.iter().filter(|&&p| p > 0.0 && (K_LOW..=K_HIGH).contains(&(gained / (p * mul)))) {
         let class = classify(p, active, earlier);
         match found {
             Some(other) if other != class => return None,

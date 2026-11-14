@@ -3,7 +3,7 @@
 //! read from the owned 13.0.5 ELF by `tools/gen_hitbox_sites.py` and `tests/core06_hitbox.rs` re-checks every row against
 //! it. Offsets are from the start of `.text`.
 //!
-//! Three hooks (the `ATTACK` and `CATCH` animation commands and `GrabModule::set_rebound`), nine called natives of the
+//! Three hooks (the `ATTACK` and `CATCH` animation commands and `GrabModule::set_rebound`), ten called natives of the
 //! attack, effect and motion modules, the Lua state's accessor getter, two relied-on windows (the Lua stack reads the plugin
 //! repeats from the game's own command code), three relied-on windows of HitModule (the hurtbox tables, decision HB1) and,
 //! for the own orbs (decision HB-OWN-ORBS), the joint-position thunk, the camera projection and its screen-size window. The
@@ -20,6 +20,8 @@ pub const HITBOX_CATCH_OFFSET: usize = 0x22a_c290;
 pub const HITBOX_REBOUND_OFFSET: usize = 0x202_7bb0;
 pub const HITBOX_IS_ATTACK_OFFSET: usize = 0x1fd_01c0;
 pub const HITBOX_ATTACK_DATA_OFFSET: usize = 0x1fd_0520;
+/// `AttackModule::power_mul_status(accessor)`: the module's status-scoped damage multiplier (the smash charge; module `+0xe0`).
+pub const HITBOX_POWER_MUL_OFFSET: usize = 0x1fd_0550;
 pub const HITBOX_REQ_FOLLOW_OFFSET: usize = 0x201_7730;
 pub const HITBOX_KILL_OFFSET: usize = 0x201_7840;
 pub const HITBOX_IS_EXIST_OFFSET: usize = 0x201_7a20;
@@ -54,4 +56,4 @@ pub const CAMERA_LIMIT_FIELD: usize = 0xc20;
 /// The three hooks' rows (the other rows are called or relied on, never written).
 pub const HOOK_ROWS: [&str; 3] = ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound"];
 
-pub static SITES: [Site; 26] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));
+pub static SITES: [Site; 27] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));

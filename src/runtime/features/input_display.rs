@@ -160,7 +160,7 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool) -> Sample {
         active: p1 && active,
         damage: natives::damage(accessor, 0),
         powers,
-        power_mul: 1.0,
+        power_mul: natives::attack_power_mul(accessor),
         attack: if p1 { ids.attack(status) } else { None },
         reaction,
         shielding: ids.shielding(status),
@@ -229,8 +229,8 @@ pub unsafe fn sample_frame(player: usize) {
         let (check_now, link, advantage_now) = (tracker.stun_check, tracker.latest_link(), tracker.advantage());
         let (read, mark) = (tracker.spot_read.take(), tracker.marks().next());
         drop(tracker);
-        if let Some((frame, gained, powers)) = read {
-            crate::runtime::diag_log::diagnostic(format_args!("[Spots] stop frame={frame} gained={gained:.3} powers={powers:?} newest_mark={mark:?}"));
+        if let Some((frame, gained, mul, powers)) = read {
+            crate::runtime::diag_log::diagnostic(format_args!("[Spots] stop frame={frame} gained={gained:.3} mul={mul:.4} powers={powers:?} newest_mark={mark:?}"));
         }
         if advantage_now != advantage {
             if let Some(a) = advantage_now {

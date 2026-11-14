@@ -388,12 +388,13 @@ fn core06_off_restores() {
 
 #[test]
 fn core06_site_guards() {
-    // Three hooks, twelve called natives (the last one Eggs-ercise's hitlag, `StopModule::set_hit_stop_frame`) and eleven relied
+    // Three hooks, thirteen called natives (the last one Eggs-ercise's hitlag, `StopModule::set_hit_stop_frame`; one is the attack module's
+    // damage multiplier, rc.14 spots-2) and eleven relied
     // windows (the Lua stack reads, HB1's three HitModule windows, for the own orbs (decision HB-OWN-ORBS) the bone transform,
     // the projection and its screen size words and, for Eggs-ercise's spawn range, the camera limit accessor).
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 12);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 13);
     assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 11);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
@@ -440,6 +441,7 @@ fn core06_site_guards() {
         (sites_hitbox::HITBOX_REBOUND_OFFSET, "hitbox_set_rebound"),
         (sites_hitbox::HITBOX_IS_ATTACK_OFFSET, "attack_is_attack"),
         (sites_hitbox::HITBOX_ATTACK_DATA_OFFSET, "attack_data"),
+        (sites_hitbox::HITBOX_POWER_MUL_OFFSET, "attack_power_mul_status"),
         (sites_hitbox::HITBOX_REQ_FOLLOW_OFFSET, "effect_req_follow"),
         (sites_hitbox::HITBOX_KILL_OFFSET, "sphere_effect_kill"),
         (sites_hitbox::HITBOX_IS_EXIST_OFFSET, "sphere_effect_is_exist"),
@@ -473,6 +475,7 @@ fn core06_rows_match_the_owned_elf() {
         ("hitbox_set_rebound", "_ZN3app8lua_bind28GrabModule__set_rebound_implEPNS_26BattleObjectModuleAccessorEb"),
         ("attack_is_attack", "_ZN3app8lua_bind28AttackModule__is_attack_implEPNS_26BattleObjectModuleAccessorEib"),
         ("attack_data", "_ZN3app8lua_bind30AttackModule__attack_data_implEPNS_26BattleObjectModuleAccessorEib"),
+        ("attack_power_mul_status", "_ZN3app8lua_bind35AttackModule__power_mul_status_implEPNS_26BattleObjectModuleAccessorE"),
         ("effect_req_follow", "_ZN3app8lua_bind29EffectModule__req_follow_implEPNS_26BattleObjectModuleAccessorEN3phx6Hash40ES4_RKNS3_8Vector3fES7_fbjiiiibb"),
         ("sphere_effect_kill", "_ZN3app8lua_bind23EffectModule__kill_implEPNS_26BattleObjectModuleAccessorEjbb"),
         ("sphere_effect_is_exist", "_ZN3app8lua_bind34EffectModule__is_exist_effect_implEPNS_26BattleObjectModuleAccessorEj"),
@@ -510,6 +513,12 @@ const fn str_w(rt: u32, rn: u32, off: u32) -> u32 {
 }
 const fn str_s(rt: u32, rn: u32, off: u32) -> u32 {
     0xbd00_0000 | ((off / 4) << 10) | (rn << 5) | rt
+}
+const fn ldr_s(rt: u32, rn: u32, off: u32) -> u32 {
+    0xbd40_0000 | ((off / 4) << 10) | (rn << 5) | rt
+}
+const fn ldp_s(rt: u32, rt2: u32, rn: u32, off: u32) -> u32 {
+    0x2d40_0000 | ((off / 4) << 15) | (rt2 << 10) | (rn << 5) | rt
 }
 const fn str_q(rt: u32, rn: u32, off: u32) -> u32 {
     0x3d80_0000 | ((off / 16) << 10) | (rn << 5) | rt
@@ -560,6 +569,86 @@ fn core06_attack_data_layout_matches_the_owned_elf() {
     assert_eq!(w(0x2285ba4), add_x(3, 31, 0x20));
     assert_eq!(w(0x2285bb0), 0xd63f_0100, "blr x8");
     // ...and the stride the slots are walked with is the AttackData size the plugin never assumes elsewhere.
+}
+
+/// rc.14 spots-2: the smash charge is the `AttackModule`'s status-scoped damage multiplier (module `+0xe0`), read here through the game's own
+/// getter. Proven from the owned game, nothing recalled: the getter and setter thunks and their vtable slots, `get_power` multiplying every slot's damage
+/// by the field, and the common fighter script `sub_set_attack_s4_power_mul` (the owned `lua2cpp_common.nro`) ending with a call of the setter.
+#[test]
+fn smash_charge_multiplier_matches_the_owned_game() {
+    const MUL: u32 = 0xe0;
+    let Some(main) = common::owned_main("smash_charge_multiplier_matches_the_owned_game") else { return };
+    let w = |offset: usize| word_at(&main, offset);
+    // The lua_bind thunks: `ldr x0,[x0,#0xa0]; ldr x8,[x0]; ldr x1,[x8,#slot]; br x1`.
+    for (thunk, slot) in [(0x1fd0540_usize, 0x1f0_u32), (sites_hitbox::HITBOX_POWER_MUL_OFFSET, 0x1f8)] {
+        assert_eq!([w(thunk), w(thunk + 4), w(thunk + 8), w(thunk + 12)], [ldr_x(0, 0, 0xa0), ldr_x(8, 0, 0), ldr_x(1, 8, slot), 0xd61f_0020], "thunk {thunk:#x}");
+    }
+    assert_eq!(main.symbols.iter().find(|(n, _)| n.contains("AttackModule__set_power_mul_status_impl")).map(|(_, a)| *a), Some(0x1fd0540));
+    // The setter (slot 0x1f0) stores s0 at `+0xe0`, the getter (slot 0x1f8) loads it, and `get_power` (slot 0x158) multiplies the slot's damage (`+0x20` of its
+    // AttackData, loaded into s0) by the module's `+0xf0`, `+0xf4` and `+0xe0`.
+    assert_eq!(w(0x3ddab0), str_s(0, 0, MUL), "set_power_mul_status");
+    assert_eq!(w(0x3ddac0), ldr_s(0, 0, MUL), "power_mul_status");
+    assert_eq!([w(0x3dd5b0), w(0x3dd5b4), w(0x3dd5b8), w(0x3dd5bc), w(0x3dd5c4), w(0x3dd5c8)], [
+        ldp_s(1, 2, 19, 0xf0),
+        0x1e22_0821,
+        ldr_s(2, 19, MUL),
+        ldr_s(0, 0, hitbox::layout::POWER as u32),
+        0x1e22_0821,
+        0x1e21_0800,
+    ], "get_power: power x [+0xf0] x [+0xf4] x [+0xe0]");
+    // Those are AttackModule's vtable slots (address point main+0x4f6a5b8, by its relocations).
+    let reloc = |slot: usize, target: u64| {
+        let mut entry = [0u8; 24];
+        entry[..8].copy_from_slice(&((0x4f6a5b8 + slot) as u64).to_le_bytes());
+        entry[8..16].copy_from_slice(&0x403u64.to_le_bytes());
+        entry[16..].copy_from_slice(&target.to_le_bytes());
+        let ro = &main.bytes[main.rodata.offset..main.rodata.offset + main.rodata.size];
+        (0..ro.len() / 8).any(|i| ro.get(i * 8..i * 8 + 24) == Some(&entry[..]))
+    };
+    assert!(reloc(0x1f0, 0x3ddab0) && reloc(0x1f8, 0x3ddac0) && reloc(0x158, 0x3dd580), "AttackModule vtable slots");
+
+    // The charge writes it: `L2CFighterCommon::sub_set_attack_s4_power_mul` ends with `bl <plt>` (main's `AttackModule::set_power_mul_status` import).
+    let Some(common_nro) = common::owned_common_nro("smash_charge_multiplier_matches_the_owned_game") else { return };
+    let setter = common_nro.symbols.iter().find(|(n, _)| n == "_ZN7lua2cpp16L2CFighterCommon27sub_set_attack_s4_power_mulEv").map(|(_, a)| *a);
+    assert_eq!(setter, Some(0x8dd90));
+    let b = &common_nro.bytes;
+    let u32_at = |o: usize| u32::from_le_bytes([b[o], b[o + 1], b[o + 2], b[o + 3]]);
+    let u64_at = |o: usize| u64::from_le_bytes(b[o..o + 8].try_into().unwrap()) as usize;
+    let mod0 = u32_at(4) as usize;
+    let dynamic = (mod0 as i64 + i64::from(u32_at(mod0 + 4) as i32)) as usize;
+    let (mut jmprel, mut pltrelsz, mut symtab, mut strtab) = (0, 0, 0, 0);
+    let mut at = dynamic;
+    loop {
+        let (tag, value) = (u64_at(at), u64_at(at + 8));
+        at += 16;
+        match tag {
+            0 => break,
+            2 => pltrelsz = value,
+            5 => strtab = value,
+            6 => symtab = value,
+            23 => jmprel = value,
+            _ => {}
+        }
+    }
+    let call = 0x8e1d4_usize;
+    let bl = u32_at(call);
+    assert_eq!(bl >> 26, 0x25, "bl");
+    let stub = (call as i64 + i64::from(((bl & 0x03ff_ffff) << 6) as i32 >> 6) * 4) as usize;
+    let (adrp, ldr) = (u32_at(stub), u32_at(stub + 4));
+    assert_eq!((adrp & 0x9f00_001f, ldr & 0xffc0_03ff, u32_at(stub + 12)), (0x9000_0010, 0xf940_0211, 0xd61f_0220), "PLT stub");
+    let imm21 = ((((adrp >> 5) & 0x7_ffff) << 2) | ((adrp >> 29) & 3)) as i32;
+    let slot = (stub as i64 & !0xfff) + i64::from(imm21 << 11 >> 11) * 4096 + i64::from(((ldr >> 10) & 0xfff) * 8);
+    let imported = (0..pltrelsz / 24)
+        .find_map(|i| {
+            let entry = jmprel + i * 24;
+            (u64_at(entry) as i64 == slot).then(|| {
+                let name_at = strtab + u32_at(symtab + (u64_at(entry + 8) >> 32) * 24) as usize;
+                let len = b[name_at..].iter().position(|c| *c == 0).unwrap();
+                String::from_utf8_lossy(&b[name_at..name_at + len]).into_owned()
+            })
+        })
+        .expect("a relocation for the stub's GOT slot");
+    assert!(imported.contains("AttackModule__set_power_mul_status_impl"), "the script's last call imports {imported}");
 }
 
 /// rc.14 hb-legend: the launch angle field of `AttackData`, and the `HitStatus` values with the

@@ -14,6 +14,9 @@
 //!
 //! rc.14 Eggs-ercise added `stop_set_hit_stop_frame` to `sites_hitbox` (the hitlag native, V2.1): 258 site rows to 259,
 //! and the site digest with them. V2.2 added camera_limit_range (the stage's camera range): 260.
+//!
+//! rc.14 spots-2 added `attack_power_mul_status` to `sites_hitbox` (the getter of the module's damage multiplier, the smash charge): 261 site rows
+//! to 262 (the count the lane's base held was 261), and the site digest with them.
 
 use crate::model::sha256::sha256_hex;
 use std::fmt::Write;
@@ -80,8 +83,8 @@ fn every_data_row_has_a_64_byte_guard() {
 
 const SEAM_ROWS: usize = 688;
 const SEAM_DIGEST: &str = "77138f9ec6999107ad65a7ba8a734b6583f9f107059331ca4d371b38bffbe67e";
-const SITE_ROWS: usize = 261;
-const SITE_DIGEST: &str = "ccef2f6a28a3f65cded36268ca97d63b70a4f65572ca7ef1d23be7088ef1b9c1";
+const SITE_ROWS: usize = 262;
+const SITE_DIGEST: &str = "b31ae467adef3ab06554baa4eca330cbe87c5a780ba1d66c2d26a4c31f67b836";
 const UI_ROWS: usize = 6;
 const UI_DIGEST: &str = "35ddb9f164a3ac26ba2e5c45c35066ee738e796589d58e2c697c82e486567b15";
 const COMMON_ROWS: usize = 4;

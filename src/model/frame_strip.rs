@@ -420,8 +420,8 @@ pub struct Tracker {
     marks: [Option<Mark>; MARKS],
     mark_head: usize,
     #[cfg(feature = "diag")]
-    /// Diag build: the frame, the damage gained and the attacker's hitboxes of the last hitstop that began (the `[Spots]` line).
-    pub spot_read: Option<(u32, f32, Powers)>,
+    /// Diag build: the frame, the damage gained, the attacker's damage multiplier and hitboxes of the last hitstop that began (the `[Spots]` line).
+    pub spot_read: Option<(u32, f32, f32, Powers)>,
 }
 
 impl Tracker {
@@ -679,8 +679,8 @@ impl Tracker {
         #[cfg(feature = "diag")]
         if cpu_rise || p1_rise {
             let attacker = usize::from(p1_gain > cpu_gain);
-            let (gained, powers) = ([cpu_gain, p1_gain][attacker], [p1.powers, cpu.powers][attacker]);
-            self.spot_read = Some((self.frame, gained, powers));
+            let (gained, mul, powers) = ([cpu_gain, p1_gain][attacker], [p1.power_mul, cpu.power_mul][attacker], [p1.powers, cpu.powers][attacker]);
+            self.spot_read = Some((self.frame, gained, mul, powers));
         }
         let hit = match (on_cpu, on_p1) {
             (true, false) => Some((1, spots::attribute(cpu_gain, &p1.powers, p1.power_mul, earlier[0]))),

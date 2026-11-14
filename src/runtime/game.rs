@@ -485,6 +485,13 @@ pub mod natives {
         at::<extern "C" fn(usize, i32, bool) -> usize>(crate::model::sites_hitbox::HITBOX_ATTACK_DATA_OFFSET).map_or_else(Default::default, |f| f(accessor, slot, false))
     }
 
+    /// `AttackModule::power_mul_status(accessor)`: the module's status-scoped damage multiplier (module `+0xe0`): 1.0, or the smash charge the game's
+    /// common script set (`sub_set_attack_s4_power_mul`); `get_power` multiplies every slot's damage by it. 0.0 until the row was granted, which the
+    /// strip reads as a hit it cannot attribute.
+    pub unsafe fn attack_power_mul(accessor: usize) -> f32 {
+        at::<extern "C" fn(usize) -> f32>(crate::model::sites_hitbox::HITBOX_POWER_MUL_OFFSET).map_or_else(Default::default, |f| f(accessor))
+    }
+
     /// `EffectModule::req_follow(accessor, effect, joint, pos, rot, scale, tail.0, ..., tail.7)`: `tail` is the native's last eight
     /// arguments in the symbol's order (`bool, u32, i32, i32, i32, i32, bool, bool`; the second is the effect attribute, the fourth the
     /// lifetime). The effect's handle (an `unsigned int`, as `kill` and `is_exist_effect` take it), 0 when the game made none or the

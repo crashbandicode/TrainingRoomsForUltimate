@@ -34,6 +34,8 @@ ROWS = [
      "`AttackModule::is_attack(accessor, slot, bool)` (lua_bind thunk to vtable slot 0xc8): whether an attack slot is active (the slot's `+0x108` word is non-zero)."),
     ("attack_data", 0x1FD0520, CALLED,
      "`AttackModule::attack_data(accessor, slot, bool)` (lua_bind thunk to vtable slot 0x1e8): the slot's `AttackData` (stride 0x130 from the pointer at module `+0x68`). Layout in `model::hitbox::layout`, derived in `docs/test-provenance/core-06.md`."),
+    ("attack_power_mul_status", 0x1FD0550, CALLED,
+     "`AttackModule::power_mul_status(accessor)` (lua_bind thunk `ldr x0,[x0,#0xa0]; ldr x8,[x0]; ldr x1,[x8,#0x1f8]; br x1`; slot 0x1f8 is `ldr s0,[x0,#0xe0]`): the status-scoped damage multiplier of the module, which `L2CFighterCommon::sub_set_attack_s4_power_mul` sets from the smash charge (`AttackModule::set_power_mul_status`, slot 0x1f0 = `str s0,[x0,#0xe0]`) and `AttackModule::get_power` multiplies every slot's damage by. 1.0 uncharged. Read for the sweet/sour attribution."),
     ("effect_req_follow", 0x2017730, CALLED,
      "`EffectModule::req_follow(accessor, Hash40 effect, Hash40 joint, pos&, rot&, scale, follow, attribute, 0, 0, 0, 0, bool, bool)`: spawns the sphere (the game's `sys_shield` effect) attached to the hitbox's bone."),
     ("sphere_effect_kill", 0x2017840, CALLED,
