@@ -2,6 +2,7 @@
 z-boot) with t-hbprobe replaced by t-recfix (recfix.py). Same shape as eden/rc14-setup-here/mk-rows.py.
 Usage: python3 mk-rows.py <stage rows.json> <diag nro tag> <commit>"""
 import copy
+import hashlib
 import json
 import os
 import sys
@@ -40,6 +41,14 @@ d['setup'] = [s for s in d['setup'] if 'p2-staling-sbs' not in s['state']] + [
     {'state': '[t-recfix-slot] a macro in Playback Slot 1 and Mash = Playback Slot 1', 'via': 'record',
      'ref': 'recfix.py:slot_setup (gna_p2_rec.hitstun_setup: one bounded recording, the menu, fx._live_set)'}]
 base = os.path.dirname(os.path.abspath(dst))
+# gna_p2_rec's RECORD, PLAY_P1 and POPUP chords are segments of the stage's segments/ folder that a plan must declare
+# (the Yoga probe failed on KeyError('p2-rec-chord-popup') with the files present but undeclared, 2026-11-14 21:10Z).
+for name in ('p2-rec-chord-record', 'p2-rec-chord-play-p1', 'p2-rec-chord-popup'):
+    path = os.path.join(base, 'segments', name + '.edenmacro.json')
+    if not os.path.exists(path):
+        raise SystemExit('segment file missing from the stage: ' + path)
+    d['segments'].setdefault(name, {'file': 'segments/%s.edenmacro.json' % name,
+                                    'sha256': hashlib.sha256(open(path, 'rb').read()).hexdigest(), 'cap': 30})
 missing = [k for k, v in d['segments'].items() if not os.path.exists(os.path.join(base, v['file']))]
 for need in ('menu-open', 'menu-close', 'reset-center'):
     if need not in d['segments'] or need in missing:
