@@ -1603,16 +1603,23 @@ pub fn capacity_release<K: Copy>(settled: bool, parked: impl Iterator<Item = (K,
 /// fighter's body over Ready Fighters. Off: a cold press with no room takes today's Reload.
 pub const COLD_OVER_ONE: bool = true;
 
+/// rc.14 cycle fix (the primary's default 2026-11-14 ~21:05Z, told to the operator): when two fighters that don't fit
+/// come one after the other, the second loads while the first is still on screen, so two bodies over Ready Fighters for
+/// that load, one once the switch settled. Off: that press takes today's Reload.
+pub const COLD_TO_COLD_TWO: bool = true;
+
 /// rc.14 cycle fix: whether a cycle press onto a fighter no group holds may plan that fighter's own group
 /// (`target_bodies` bodies; `bodies_after`: every body of both roles with it). Within Ready Fighters, always. Past it,
-/// with [`COLD_OVER_ONE`], only a one-body target, one body over Ready Fighters plus the cold fighter on screen when it
-/// is one of `over` (the fighters already loaded over Ready Fighters; every one of them must be the one on screen,
-/// `live`). So the members that fit keep their bodies, and a fighter that doesn't fit is loaded while it is on screen;
-/// [`cold_left`] frees it after.
+/// with [`COLD_OVER_ONE`], only a one-body target, one body over Ready Fighters, plus (with [`COLD_TO_COLD_TWO`]) the
+/// cold fighter on screen when it is one of `over` (the fighters already loaded over Ready Fighters; every one of them
+/// must be the one on screen, `live`). So the members that fit keep their bodies, and a fighter that doesn't fit is
+/// loaded while it is on screen; [`cold_left`] frees it after.
 pub fn cold_admitted(bodies_after: usize, ready_fighters: usize, target_bodies: usize, over: &[u32], live: u32) -> bool {
+    let cold_on_screen = over.contains(&live);
     bodies_after <= ready_fighters
         || (COLD_OVER_ONE && target_bodies == 1 && over.iter().all(|kind| *kind == live)
-            && bodies_after <= ready_fighters + 1 + usize::from(over.contains(&live)))
+            && (!cold_on_screen || COLD_TO_COLD_TWO)
+            && bodies_after <= ready_fighters + 1 + usize::from(cold_on_screen))
 }
 
 /// rc.14 cycle fix: after a switch, a fighter loaded over Ready Fighters ([`cold_admitted`]) that is no longer on screen
