@@ -612,7 +612,26 @@ the orbs are still the plugin's own panes, articles' hitboxes included.
   pills are cut, hitboxes and grab boxes first and hurtboxes last (review HB-2), with the same once-only log line.
 - SPEC-core-06 §2a and §9 carry the rule; `core06_capsule_is_two_ends` replaces `core06_capsule_sampling`.
 
-## rc.14 previews (2026-11-14): Break the Targets
+## rc.14 previews (2026-11-14): Eggs-ercise and Break the Targets
+
+### Eggs-ercise
+
+Three clips from the GIF lane's Eden run on the rc.14 core `3084a4ad` (approved for content). They still show the
+notice mid-screen: it now sits in a band at the top. They are reshot on the final rc.14 build. Untested on hardware.
+
+![Eggs-ercise, 1 minute: the targets launch, Fox breaks them with aerials, and the count and clock run](decisions/rc14-preview-eggs-1-minute.gif)
+
+*1 minute: break as many as you can before the clock runs out.*
+
+![Eggs-ercise, 10 targets: Fox breaks ten in a row; Done! 10 in 0:17.25 (best 0:17.25)](decisions/rc14-preview-eggs-n-targets.gif)
+
+*10 targets: a timed run to ten breaks, with your best kept.*
+
+![Eggs-ercise with the CPU as the target: Fox hits the CPU, the count goes up and the CPU moves to a new spot](decisions/rc14-preview-eggs-cpu-target.gif)
+
+*Target: CPU. The CPU is the target; each hit counts, and it resets to 0 % at a new spot.*
+
+### Break the Targets
 
 Two clips from the Eden test runs of Break the Targets (`btt-4-2`, `btt-4-3`; builds `d2/btt-4` on the rc.14 core).
 These are test-run footage, not the final docs GIFs. The notice band moves once more (below the frame strip when Input
