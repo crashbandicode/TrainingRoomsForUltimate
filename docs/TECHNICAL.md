@@ -104,6 +104,8 @@ R + D-pad Down turns the input display on and off without opening the menu, in T
 practice. A notice says "Input display" and On or Off. The menu's Input Display row shows the same value, and the
 choice is saved.
 
+Where the frame strip code is (moved here from the [Frame strip](guide/frame-strip.md) guide): the lanes, chips, freeze, readouts, the stick row, the C-stick arrow and the 20-frame rule are what `src/model/frame_strip.rs` draws, as specified in `specs/SPEC-input-06-frame-strip.md`.
+
 ### Game speed
 
 **Clip** [`rc11-game-speed.gif`](media/rc11-game-speed.gif): The same forward smash at x1, then, after R + D-pad Up steps the speed to 1/4, about four times slower
