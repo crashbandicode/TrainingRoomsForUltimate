@@ -7,8 +7,8 @@
 //! repository (not carried). The choice types are the carried files' own `byteflags!` groups (`CyclePreloadSlots`, ...); `OnOff`
 //! is the fork's on/off pair in the fork's order, `[On, Off]` (the factory table's order too, `model::factory`).
 //!
-//! The serde attributes are the ones the fork's struct carries on the same fields: a menu file written by the fork (or an older
-//! one) is read key by key, a missing key takes the built-in value and a malformed choice list the carried deserializer's value.
+//! A menu file written by the fork (or an older one) is read key by key: a missing key takes its `BASE_MENU` value (the
+//! values the fork's per-field serde defaults give) and a malformed choice list the carried deserializer's value.
 //! The carried tests exercise exactly that through [`super::menu_json::parse_menu_file`].
 
 use serde::{Deserialize, Serialize};
@@ -69,47 +69,6 @@ where
     }
 }
 
-const fn solo_popo_player_cycle_default() -> OnOff {
-    OnOff::OFF
-}
-const fn solo_popo_cpu_default() -> OnOff {
-    OnOff::OFF
-}
-const fn solo_popo_original_default() -> OnOff {
-    OnOff::OFF
-}
-const fn fighter_prompt_default() -> OnOff {
-    OnOff::ON
-}
-const fn macro_source_default() -> MacroSource {
-    MacroSource::NUMBERED
-}
-const fn lobby_practice_default() -> OnOff {
-    OnOff::OFF
-}
-const fn training_stage_rotation_default() -> OnOff {
-    OnOff::OFF
-}
-const fn trio_practice_default() -> OnOff {
-    OnOff::OFF
-}
-const fn character_default() -> TrioFighter {
-    TrioFighter::MARIO
-}
-/// A missing `player_roster` key is All. That is the portrait grid's factory (`RosterEditor::values` writes a leading
-/// 1), so the typed view and the grid read one roster. `DEFAULT_PLAYER_ROSTER` is the named explicit list, not this
-/// fallback (P1-CYCLE).
-const fn player_roster_default() -> OrderedFighterRoster {
-    OrderedFighterRoster::all()
-}
-/// A missing `cpu_roster` key is All, the same factory as `player_roster_default`.
-const fn cpu_roster_default() -> OrderedFighterRoster {
-    OrderedFighterRoster::all()
-}
-const fn kirby_hats_default() -> OrderedFighterRoster {
-    DEFAULT_KIRBY_HATS
-}
-
 /// A top-level kept key of the settings file as a typed value; a missing or malformed one is the type's default (the fork's rule for
 /// `stage_preferences` and `mii_preferences`: a bad stored preference never blocks the menu).
 pub fn kept_or_default<T: serde::de::DeserializeOwned + Default>(extra: &serde_json::Map<String, serde_json::Value>, key: &str) -> T {
@@ -144,90 +103,66 @@ fn kept_or<T: serde::de::DeserializeOwned>(snapshot: &Snapshot, id: &str, fallba
 
 /// The settings the carried engines read (grows with each carried layer).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct TrainingModpackMenu {
     /// Ice Climbers' Solo Popo preference for Player slot 0 (`solo_popo_original`; factory default Off).
-    #[serde(default = "solo_popo_original_default")]
     pub solo_popo_original: OnOff,
     /// Solo Popo for the Player's numbered cycle slots (`solo_popo_player_cycle`).
-    #[serde(default = "solo_popo_player_cycle_default")]
     pub solo_popo_player_cycle: OnOff,
     /// Solo Popo for the CPU (`solo_popo_cpu`).
-    #[serde(default = "solo_popo_cpu_default")]
     pub solo_popo_cpu: OnOff,
     /// Cycle Preload: Off, 1..=5 (`cycle_preload_slots`).
-    #[serde(default = "preload::default_slots", deserialize_with = "preload::deserialize_slots")]
+    #[serde(deserialize_with = "preload::deserialize_slots")]
     pub cycle_preload_slots: preload::CyclePreloadSlots,
     /// Cycle Preload sources: Fighters, Hats, Both.
-    #[serde(default = "preload::default_sources")]
     pub cycle_preload_sources: preload::CyclePreloadSources,
     /// Preload Samples (the Developer page row, N1).
-    #[serde(default = "preload::default_measurements")]
     pub cycle_preload_measurements: OnOff,
     /// Ready Fighter Bodies: Off, 2, 3.
-    #[serde(default = "preload::default_bank_members", deserialize_with = "preload::deserialize_bank_members")]
+    #[serde(deserialize_with = "preload::deserialize_bank_members")]
     pub cycle_preload_bank_members: preload::CyclePreloadBankMembers,
     /// Group Swap (the master switch of every detached group).
-    #[serde(default = "preload::default_group_swap")]
     pub cycle_preload_group_swap: OnOff,
     /// Ready Fighters: 2..=12.
-    #[serde(default = "preload::default_ready_fighters", deserialize_with = "preload::deserialize_ready_fighters")]
+    #[serde(deserialize_with = "preload::deserialize_ready_fighters")]
     pub cycle_preload_ready_fighters: preload::CyclePreloadReadyFighters,
     /// Ready Hats: 0..=5, the hat budget apart from Ready Fighters (P-HOT).
-    #[serde(default = "hats::default_ready_hats", deserialize_with = "hats::deserialize_ready_hats")]
+    #[serde(deserialize_with = "hats::deserialize_ready_hats")]
     pub cycle_preload_ready_hats: hats::CyclePreloadReadyHats,
     /// Ice Climbers Pair Bank.
-    #[serde(default = "preload::default_ic_pair_bank")]
     pub cycle_preload_ic_pair_bank: OnOff,
     /// Original Fighter Bank.
-    #[serde(default = "preload::default_original_bank")]
     pub cycle_preload_original_bank: OnOff,
     /// Solo Popo Groups.
-    #[serde(default = "preload::default_solo_popo_groups")]
     pub cycle_preload_solo_popo_groups: OnOff,
     /// Ice Climbers Pair Groups.
-    #[serde(default = "preload::default_ic_pair_groups")]
     pub cycle_preload_ic_pair_groups: OnOff,
     /// PT/Aegis Groups.
-    #[serde(default = "preload::default_native_groups")]
     pub cycle_preload_native_groups: OnOff,
     /// Ice Climbers Pair Group.
-    #[serde(default = "preload::default_pair_groups")]
     pub cycle_preload_pair_groups: OnOff,
     /// Mii Groups.
-    #[serde(default = "preload::default_mii_groups")]
     pub cycle_preload_mii_groups: OnOff,
     /// Ask before a replay or a named recording switches the CPU's fighter (`fighter_prompt`, package 4).
-    #[serde(default = "fighter_prompt_default")]
     pub fighter_prompt: OnOff,
     /// Where the CPU's recordings come from (macro_source, package 4).
-    #[serde(default = "macro_source_default")]
     pub macro_source: MacroSource,
     /// Lobby Practice (the waiting room runs the practice session).
-    #[serde(default = "lobby_practice_default")]
     pub lobby_practice: OnOff,
     /// Training Stage Rotation (ordinary Training starts on the next stage of the Lobby Stages order).
-    #[serde(default = "training_stage_rotation_default")]
     pub training_stage_rotation: OnOff,
     /// The ordered stage list (`lobby_stages`: a kept key of the settings file, not a setting row).
-    #[serde(default)]
     pub lobby_stages: LobbyStageOrder,
     /// Player Swapping (`trio_practice`): the Player 1 cycle chord changes the fighter.
-    #[serde(default = "trio_practice_default")]
     pub trio_practice: OnOff,
     /// The fighter picked for Player 1 / the CPU (`player_character`, `cpu_character`: kept keys, one-hot over the roster catalog).
-    #[serde(default = "character_default")]
     pub player_character: TrioFighter,
-    #[serde(default = "character_default")]
     pub cpu_character: TrioFighter,
     /// The cycle orders (`player_roster`, `cpu_roster`: kept keys, `[all, ranks...]`).
-    #[serde(default = "player_roster_default")]
     pub player_roster: OrderedFighterRoster,
-    #[serde(default = "cpu_roster_default")]
     pub cpu_roster: OrderedFighterRoster,
     /// The Kirby hat orders (`player_kirby_hats`, `cpu_kirby_hats`: kept keys).
-    #[serde(default = "kirby_hats_default")]
     pub player_kirby_hats: OrderedFighterRoster,
-    #[serde(default = "kirby_hats_default")]
     pub cpu_kirby_hats: OrderedFighterRoster,
 }
 
@@ -263,6 +198,13 @@ pub const BASE_MENU: TrainingModpackMenu = TrainingModpackMenu {
     player_kirby_hats: DEFAULT_KIRBY_HATS,
     cpu_kirby_hats: DEFAULT_KIRBY_HATS,
 };
+
+/// A missing key takes its factory value.
+impl Default for TrainingModpackMenu {
+    fn default() -> Self {
+        BASE_MENU
+    }
+}
 
 impl TrainingModpackMenu {
     /// The view of one snapshot (`menu` or `defaults_menu` of the settings file). A row the snapshot does not know (the Solo
