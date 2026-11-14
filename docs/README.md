@@ -36,8 +36,8 @@ Open the menu with B + D-pad Up (or Minus). L and R turn the pages.
 
 - [Technical notes](TECHNICAL.md): how it's installed and built, how each feature works inside,
   [the hidden Developer page](TECHNICAL.md#the-developer-page), the build status.
-- [Feature ledger](FEATURE-LEDGER.md): every feature with the test runs and clips that show it working, as of rc.11
-  (rc.12 and rc.13 have no rows in it).
+- [Feature ledger](FEATURE-LEDGER.md): every feature with the test runs and clips that show it working: rc.11, and
+  a section for rc.13 (Eden-tested, untested on hardware); rc.12 has no rows in it.
 - [Media](MEDIA.md): where each GIF was recorded.
 - [Restrictions](RESTRICTIONS.md): every message that refuses something, and the approval behind it.
 - [Building](BUILD.md) and [differences from the Training Modpack](DIFFERENCES-FROM-THE-FORK.md).
