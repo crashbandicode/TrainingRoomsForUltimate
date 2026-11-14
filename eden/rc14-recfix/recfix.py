@@ -1,6 +1,7 @@
 """rc.14 recfix Eden rows (recfix lane, 2026-11-14): `t-recfix` (setup, run, restore: the Start save switch and the P1 CPU
 Control refusal of `rc14/recfix`) and `t-recfix-slot` (slot_setup, slot_run, slot_restore: Playback Slot 1 on Mash).
-NOT RUN: written for integration's final pass; the lane booted no Eden. Start: Training, P1 Mario and CPU Mario (g-training).
+And `t-recfix-clip` (clip_setup, clip_run, clip_restore: D4, the Replay window's clip editor draws no red tab box).
+`t-recfix` and `t-recfix-clip` are NOT RUN; `t-recfix-slot` PASSED on Yoga (recfix-slot-rc13-4, rc.13 diag 2a667381). Start: Training, P1 Mario and CPU Mario (g-training).
 Steps follow gna_p2_rec / gna_p2_l4b (their helpers, same package folder).
 
   R1 Start save On (the default): Record a walk and a jab from the reset spot (Record writes the start save), walk P1
@@ -239,3 +240,54 @@ def slot_run(ctx):
 def slot_restore(ctx):
     fx._live_set(ctx, mash_state=[0] * 30)
     return {'mash_state': 'cleared'}
+
+
+def _accent_pixels(path):
+    """Accent-red pixels (the active tab's box, ACCENT 176/48/40) in the top band of a 1280x720-proportioned frame, where the
+    tab row sits; None when PIL is not on the host."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+    with Image.open(str(path)) as image:
+        rgb = image.convert('RGB')
+        w, h = rgb.size
+        box = (int(w * 0.02), int(h * 0.03), int(w * 0.60), int(h * 0.16))
+        return sum(1 for r, g, b in rgb.crop(box).getdata() if r > 140 and g < 100 and b < 90)
+
+
+def clip_setup(ctx):
+    return {'live': gna._base(ctx, input_display_strip=gna.STRIP_OFF)}    # the strip draws over the editor's breadcrumb
+
+
+def clip_run(ctx):
+    """Row t-recfix-clip (D4): Recording > Replays > Replay window, A on the capture: the clip editor is drawn alone, so the top
+    tab row shows neither names nor the red active-tab box that the menu's last frame left (rc.13 still p2-replay-editor)."""
+    t0, out = _begin(ctx)
+    problems = []
+    cov.prep(ctx, 'cov-replay')
+    out['captures'] = cov._named_req(ctx, 'list_captures', r'\[NamedMacroDiag\] captures [^\n]*')
+    cov._page_row(ctx, 'recording', 'Replay window')
+    steps.press(ctx, 'a', 1.0)
+    out['browser_shot'] = str(ctx.shot('recfix-clip-browser'))
+    out['browser_red'] = _accent_pixels(out['browser_shot'])          # the menu is up: its active tab box is the control
+    steps.press(ctx, 'a', 2.5)
+    time.sleep(1.0)
+    out['editor_status'] = cov._named_req(ctx, 'status', r'\[NamedMacroDiag\] status [^\n]*')
+    out['editor_shot'] = str(ctx.shot('recfix-clip-editor'))
+    out['editor_red'] = _accent_pixels(out['editor_shot'])
+    steps.press(ctx, 'b', 0.8)
+    _close(ctx)
+    _mark(t0, out, 'done')
+    if 'editor=true' not in (out['editor_status'] or ''):
+        problems.append('A did not open the clip editor: %s' % out['editor_status'])
+    if out['editor_red'] is not None and out['editor_red'] > 150:
+        problems.append('the clip editor still draws a red tab box (%s accent pixels in the tab band)' % out['editor_red'])
+    if out['browser_red'] is not None and out['browser_red'] < 400:
+        problems.append("harness: the menu's own active tab box is not seen in the band (%s px): the check cannot tell" % out['browser_red'])
+    return _finish(ctx, 'rc14-recfix-clip', out, problems)
+
+
+def clip_restore(ctx):
+    fx._live_set(ctx, input_display_strip=gna.STRIP_ON)
+    return {'input_display_strip': 'on'}

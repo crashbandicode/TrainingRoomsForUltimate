@@ -31,7 +31,16 @@ for r in d['rows']:
                       'Playback slot Right on its screen, Mash = Playback Slot 1 (live, after the menu); the forward smash: '
                       '`playback_mash slot=0` follows, and the cpu_event command_query lines are kept either way.')
     rows.append(slot)
-if [r['id'] for r in rows] != ['g-gdb-on', 'g-load', 'g-gdb-attached', 'g-training', 't-recfix', 't-recfix-slot', 'z-boot']:
+    clip = copy.deepcopy(r)
+    clip['id'], clip['group'], clip['budget_min'] = 't-recfix-clip', 'rc14-recfix', 4
+    clip['steps'] = [{'run': 'recfix.py:clip_setup', 'check': True}, {'run': 'recfix.py:clip_run', 'check': True},
+                     {'run': 'recfix.py:clip_restore', 'check': True}]
+    clip['expect'] = ('rc.14 recfix, D4: fixture cov-replay (the saved capture, Mario vs a Mii Gunner), Recording > Replay window, '
+                      'A on the capture: the clip editor opens (`editor=true`) and the top tab band shows no accent-red box '
+                      '(the menu\'s own box in the browser is the control). Screenshots kept.')
+    rows.append(clip)
+if [r['id'] for r in rows] != ['g-gdb-on', 'g-load', 'g-gdb-attached', 'g-training', 't-recfix', 't-recfix-slot', 't-recfix-clip',
+                               'z-boot']:
     raise SystemExit('unexpected rows: %s' % [r['id'] for r in rows])
 d['rows'] = rows
 d['setup'] = [s for s in d['setup'] if 'p2-staling-sbs' not in s['state']] + [
@@ -39,7 +48,8 @@ d['setup'] = [s for s in d['setup'] if 'p2-staling-sbs' not in s['state']] + [
      'ref': 'recfix.py:setup (gna_p2_rec._record, one bounded recording)'},
     {'state': '[t-recfix] P1 CPU Control On, then Off', 'via': 'hook', 'ref': 'recfix.py:run (cov._page_row, A on the row)'},
     {'state': '[t-recfix-slot] a macro in Playback Slot 1 and Mash = Playback Slot 1', 'via': 'record',
-     'ref': 'recfix.py:slot_setup (gna_p2_rec.hitstun_setup: one bounded recording, the menu, fx._live_set)'}]
+     'ref': 'recfix.py:slot_setup (gna_p2_rec.hitstun_setup: one bounded recording, the menu, fx._live_set)'},
+    {'state': '[t-recfix-clip] the saved replay capture on the card', 'via': 'fixture', 'ref': 'fixtures/cov-replay (cov.prep)'}]
 base = os.path.dirname(os.path.abspath(dst))
 # gna_p2_rec's RECORD, PLAY_P1 and POPUP chords are segments of the stage's segments/ folder that a plan must declare
 # (the Yoga probe failed on KeyError('p2-rec-chord-popup') with the files present but undeclared, 2026-11-14 21:10Z).
