@@ -1,11 +1,11 @@
 //! Eggs-ercise (rc.14, `artifacts/rc14-eggsercise/SPEC.md` §V2): break as many targets as you can in a minute, 10 or 20
-//! as fast as you can, or without a timer in free practice. The egg is one of the plugin's own orbs (D1 a),
-//! drawn whether Hitbox Visualization is On or Off (`hitbox_orbs::drawn`) and broken when one of Player 1's live attack
-//! pills overlaps it; nothing is written to the game. The runtime half is `runtime::features::hitbox::eggs_pass`.
+//! as fast as you can, or without a timer in free practice. The target is one of the plugin's own pictures (D1 a), drawn
+//! whether Hitbox Visualization is On or Off (`Run::look`) and broken when one of Player 1's live attack pills overlaps it;
+//! nothing is written to the game. The runtime half is `runtime::features::hitbox::eggs_pass`.
 
 use super::hitbox::{Sphere, KIND_HIT, SCALE};
-use super::hitbox_orbs::{Orb, CANVAS_HALF};
-use super::panes::NOTICE_PLATES;
+use super::hitbox_orbs::CANVAS_HALF;
+use super::panes::{EggLook, EggPicture, EGG_WHOLE, NOTICE_PLATES};
 use super::scene::{scene, Facts};
 
 pub const ROW: &str = "eggsercise";
@@ -74,9 +74,6 @@ pub fn hitlag(facts: Facts) -> Option<i32> {
     facts.native_training.then_some(HITLAG)
 }
 
-/// The egg's colour (sRGB): a brown egg's shell. Not white (hitbox id 7), pink (grab boxes) or yellow (hurtboxes); a pale
-/// egg did not show on Training's white stage (Eden wa-eggs-07bae4c1-1).
-pub const EGG: [u8; 4] = [196, 132, 72, 255];
 
 /// The camera's map from the fighters' plane to the layout canvas (`hitbox_orbs::to_canvas`): per axis, canvas = world *
 /// `.0` + `.1`; and `.2`, the x range the stage allows (`range`). The orb draw publishes it each tick of a live run; an egg
@@ -220,21 +217,20 @@ impl Run {
     }
 
     /// The draw's tick on the practice's layout (`active`): a run that wants eggs takes the camera `look` reads (nothing
-    /// is read otherwise); the target, then the break animations, to draw.
-    pub fn look(&mut self, active: bool, look: impl FnOnce() -> Option<View>) -> [Option<Orb>; 3] {
+    /// is read otherwise); the pictures to draw, each at its spot of the fighters' plane: the target, then the break
+    /// animations.
+    pub fn look(&mut self, active: bool, look: impl FnOnce() -> Option<View>) -> [Option<([f32; 2], EggLook)>; 3] {
         if active && self.rows[0] != OFF && !self.ended() {
             let seen = look();
             self.still = if seen == self.view { self.still + 1 } else { 0 };
             self.view = seen;
         }
         let burst = |b: Option<([f32; 2], u32)>| {
-            let ([x, y], t) = b?;
+            let (at, t) = b?;
             let fade = t as f32 / BURST_TICKS as f32;
-            let mut orb = Orb { centre: [x, y, 0.0], tail: [x, y, 0.0], radius: RADIUS * (1.0 + BURST_GROW * fade), ..Orb::NONE };
-            orb.color = super::panes::linear([EGG[0], EGG[1], EGG[2], (255.0 * (1.0 - fade)) as u8]);
-            Some(orb)
+            Some((at, EggLook { scale: 1.0 + BURST_GROW * fade, alpha: (255.0 * (1.0 - fade)) as u8, picture: EggPicture::Cracked }))
         };
-        [self.egg_orb(), burst(self.bursts[0]), burst(self.bursts[1])]
+        [self.egg_at().filter(|_| self.rows[3] == DISC).map(|at| (at, EGG_WHOLE)), burst(self.bursts[0]), burst(self.bursts[1])]
     }
 
     /// A fresh run (the menu closed with the row on, or a reset): score 0, a full clock, the first egg once the camera has held
@@ -349,13 +345,6 @@ impl Run {
         Some([x + vx * 2.0 * (1.0 + BOUNCE) * v / g, y])
     }
 
-    /// The egg as an own orb.
-    pub fn egg_orb(&self) -> Option<Orb> {
-        let ([x, y], mut orb) = (self.egg_at().filter(|_| self.rows[3] == DISC)?, Orb::NONE);
-        (orb.centre, orb.tail, orb.radius) = ([x, y, 0.0], [x, y, 0.0], RADIUS);
-        orb.color = super::panes::linear(EGG);
-        Some(orb)
-    }
 
     /// One pass of an entry-0 fighter (`plan` said `Read`): `tick` (the clock keeper's pass, menu closed), `y` (its height:
     /// the ground of a run's first egg), its pills, whether it is in an aerial (`air`) and its kind (the session's best when the

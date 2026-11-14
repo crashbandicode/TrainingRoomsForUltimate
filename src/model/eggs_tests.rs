@@ -3,7 +3,7 @@
 lib_unit_tests! {
 use super::*;
 use crate::model::hitbox::{self, sphere_key, Sphere, KIND_GRAB, KIND_HIT, KIND_HURT};
-use crate::model::hitbox_orbs::{drawn, Board, Orb};
+use crate::model::panes::{EggLook, EggPicture, EGG_WHOLE};
 use crate::model::menu::table::{Control, Page, GROUPS, ROWS};
 use crate::model::scene::Facts;
 
@@ -130,7 +130,7 @@ fn eggs_count_mode() {
     };
     assert_eq!(go(&mut run, 30, 7), 300);
     assert_eq!((run.score, notice(&run)), (10, "Done! 10 in 0:06.00 (best 0:06.00)".to_owned()), "60 + 300 frames");
-    assert!(run.egg_orb().is_none(), "the targets stop");
+    assert!(target(&mut run).is_none(), "the targets stop");
     assert!(run.look(true, || panic!("an ended run: no projection"))[0].is_none());
     for _ in 0..BURST_TICKS {
         pass(&mut run, &[], false);
@@ -164,19 +164,19 @@ fn eggs_run_start() {
     let mut blind = Run::IDLE;
     blind.plan([TIMED, AERIALS, NORMAL, DISC], Some(7), 0, || TRAINING);
     assert_eq!(blind.step(true, 0.0, &[], false, 7), None);
-    assert!(blind.egg_orb().is_none(), "no egg before the draw published the camera");
+    assert!(target(&mut blind).is_none(), "no egg before the draw published the camera");
     assert!(blind.look(false, || panic!("another layout's tick reads nothing"))[0].is_none());
     assert!(blind.look(true, || Some(RESET_CENTRE))[0].is_none(), "the draw's tick takes the camera");
     settle(&mut blind, RESET_CENTRE);
     assert_eq!(blind.step(true, 0.0, &[], false, 7), Some(u16::MAX));
-    assert!(blind.egg_orb().is_some(), "the next pass spawns the egg");
+    assert!(target(&mut blind).is_some(), "the next pass spawns the egg");
     let mut run = started(TIMED, AERIALS, 7);
-    assert!(run.egg_orb().is_none(), "the first pass reads the ground before the egg spawns");
+    assert!(target(&mut run).is_none(), "the first pass reads the ground before the egg spawns");
     assert_eq!(pass(&mut run, &[], false), Some(u16::MAX), "the standing notice is shown");
     assert_eq!(notice(&run), "Eggs 0   1:00");
-    let egg = run.egg_orb().expect("one egg");
-    assert!(egg.centre[0].abs() <= HALF_WIDTH && (RADIUS..=RADIUS + 2.0).contains(&egg.centre[1]), "on the ground, launched: {egg:?}");
-    assert_eq!(egg.radius, RADIUS);
+    let egg = target(&mut run).expect("one egg");
+    assert!(egg[0].abs() <= HALF_WIDTH && (RADIUS..=RADIUS + 2.0).contains(&egg[1]), "on the ground, launched: {egg:?}");
+    assert_eq!(run.look(false, || None)[0], Some((egg, EGG_WHOLE)), "the whole target, full size");
     let changes = (0..60).filter(|_| pass(&mut run, &[], false).is_some()).count();
     assert_eq!((changes, notice(&run)), (1, "Eggs 0   0:59".to_owned()), "counts down, written once a second");
 }
@@ -303,9 +303,14 @@ fn eggs_speed_scales_time() {
     assert!(slow[150][0] > 1.0 && slow[192][0].abs() < 1e-3 && fast[64][0].abs() < 1e-3, "at rest by 192 / 64");
 }
 
-/// The orbs a draw tick shows: the target, then the break animations.
-fn own(run: &mut Run) -> Vec<Orb> {
+/// The pictures a draw tick shows: the target, then the break animations.
+fn own(run: &mut Run) -> Vec<([f32; 2], EggLook)> {
     run.look(false, || panic!("not the practice's layout")).into_iter().flatten().collect()
+}
+
+/// Where the target picture is.
+fn target(run: &mut Run) -> Option<[f32; 2]> {
+    run.look(false, || None)[0].map(|(at, _)| at)
 }
 
 /// V2.6: "a practice game is running" from the menu close that starts a mode until Off or the scene is left; the end
@@ -372,7 +377,7 @@ fn eggs_target_cpu() {
     let mut run = started_cpu(FREE, ANY, 7);
     assert_eq!(run.cpu_pass(0.0, false), None, "nothing to place before the first target");
     pass(&mut run, &[], false);
-    assert!(run.egg_orb().is_none() && run.look(false, || None).iter().all(Option::is_none), "the CPU is the target: no disc");
+    assert!(target(&mut run).is_none() && run.look(false, || None).iter().all(Option::is_none), "the CPU is the target: no disc");
     let (spot, fresh) = run.cpu_pass(0.0, false).expect("placed");
     assert!(fresh && spot[1] == 0.0 && spot[0].abs() <= HALF_WIDTH, "on the ground, in the box: {spot:?}");
     for _ in 0..30 {
@@ -448,7 +453,7 @@ fn eggs_restart_waits_for_camera() {
             settle(&mut run, panned);
             restart(&mut run);
             assert_eq!(pass(&mut run, &[], false), None, "seed {seed}: no target before the draw published the new camera");
-            assert!(run.egg_orb().is_none());
+            assert!(target(&mut run).is_none());
             // The camera still shows the panned view for a draw, then glides to the default over a few more.
             for k in 0..7u8 {
                 let at = View([27.09; 2], [-900.0 + 1308.7 * f32::from(k) / 7.0, -264.4], BOX);
@@ -494,16 +499,17 @@ fn eggs_break_anim_timing() {
     pass(&mut run, &[], false);
     let spot = run.egg_at().unwrap();
     pass(&mut run, &[hit(spot, 0.0)], false);
-    let orbs = own(&mut run);
-    assert_eq!(orbs.len(), 2, "the next target and one animation");
-    assert_eq!((orbs[1].centre, orbs[1].radius, orbs[1].color[3]), ([spot[0], spot[1], 0.0], RADIUS, 255), "starts at the spot");
-    let mut last = orbs[1];
+    let looks = own(&mut run);
+    assert_eq!(looks.len(), 2, "the next target and one animation");
+    let cracked = EggLook { scale: 1.0, alpha: 255, picture: EggPicture::Cracked };
+    assert_eq!(looks[1], (spot, cracked), "starts at the spot, the cracked picture at full size");
+    let mut last = looks[1].1;
     for tick in 1..BURST_TICKS {
         pass(&mut run, &[], false);
-        let orbs = own(&mut run);
-        assert_eq!(orbs.len(), 2, "tick {tick}");
-        assert!(orbs[1].radius > last.radius && orbs[1].color[3] < last.color[3] && orbs[1].color[3] > 0, "grows and fades");
-        last = orbs[1];
+        let looks = own(&mut run);
+        assert_eq!(looks.len(), 2, "tick {tick}");
+        assert!(looks[1].1.scale > last.scale && looks[1].1.alpha < last.alpha && looks[1].1.alpha > 0, "grows and fades");
+        last = looks[1].1;
     }
     pass(&mut run, &[], false);
     assert_eq!(own(&mut run).len(), 1, "gone after {BURST_TICKS} ticks, nothing left behind");
@@ -533,15 +539,15 @@ fn eggs_break_anim_overlap() {
     let mut spots = vec![];
     for _ in 0..3 {
         let egg = run.egg_at().unwrap();
-        spots.push([egg[0], egg[1], 0.0]);
+        spots.push(egg);
         pass(&mut run, &[hit(egg, 0.0)], false);
     }
-    let orbs = own(&mut run);
-    assert_eq!(orbs.iter().skip(1).map(|o| o.centre).collect::<Vec<_>>(), vec![spots[2], spots[1]], "the newest two");
+    let looks = own(&mut run);
+    assert_eq!(looks.iter().skip(1).map(|l| l.0).collect::<Vec<_>>(), vec![spots[2], spots[1]], "the newest two");
     for _ in 0..100 {
         run.step(false, 0.0, &[], false, 7);
     }
-    assert_eq!(own(&mut run), orbs, "paused: frozen");
+    assert_eq!(own(&mut run), looks, "paused: frozen");
 }
 
 /// §2.3b row 23: a resting target stays until hit; pause holds it mid-flight.
@@ -578,7 +584,7 @@ fn eggs_timer_end() {
     }
     assert_eq!(end, Some(3600), "the run lasts 3,600 ticks");
     assert_eq!((run.score, notice(&run)), (2, "Time! 2 eggs (best 2)".to_owned()), "the first pass only spawns");
-    assert!(run.egg_orb().is_none(), "the eggs stop");
+    assert!(target(&mut run).is_none(), "the eggs stop");
     assert!(run.look(true, || panic!("an ended run: no projection"))[0].is_none());
     assert_eq!(run.plan([TIMED, AERIALS, NORMAL, DISC], None, 0, || TRAINING), Plan::Idle, "it waits for a restart");
     restart(&mut run, 5);
@@ -667,7 +673,7 @@ fn eggs_lra_restart() {
     }
     assert!(run.score > 0);
     restart(&mut run, 11);
-    assert!(run.egg_orb().is_none(), "a new egg comes with the next pass");
+    assert!(target(&mut run).is_none(), "a new egg comes with the next pass");
     assert_eq!(pass(&mut run, &[], false), Some(u16::MAX));
     assert_eq!((run.score, notice(&run)), (0, "Eggs 0   1:00".to_owned()));
     let mut idle = Run::IDLE;
@@ -687,19 +693,18 @@ fn eggs_pause_frames() {
     assert_ne!(run.egg_at(), egg, "it moves again once the clock runs");
 }
 
-fn eggs_independent_of_hitbox_vis() {
+/// The target and its break animations are pictures of their own, drawn whether Hitbox Visualization is On or Off
+/// (the runtime draws `Run::look`'s items whatever `on` says): the target is the whole picture and nothing else shows
+/// before a break, a break the cracked one.
+fn eggs_look_pictures() {
     let mut run = started(TIMED, ANY, 7);
     pass(&mut run, &[], false);
-    let egg = run.egg_orb();
-    let mut board = Board::new();
-    let orb = Orb { centre: [1.0; 3], tail: [1.0; 3], radius: 2.0, color: [1; 4], key: sphere_key(KIND_HIT, 0, 0) };
-    board.publish(0x10, [orb].into_iter());
-    assert_eq!(drawn(&[egg], false, &board).copied().collect::<Vec<_>>(), vec![egg.unwrap()], "Off: only the egg");
-    assert_eq!(drawn(&[egg], true, &board).count(), 2, "On: the egg and the hitboxes");
-    assert_eq!(drawn(&[None], false, &board).count(), 0);
-    assert_eq!(drawn(&[None], true, &board).count(), 1);
+    let looks = run.look(false, || None);
+    assert_eq!(looks.map(|l| l.map(|l| l.1)), [Some(EGG_WHOLE), None, None], "the whole target alone");
+    let egg = target(&mut run).unwrap();
+    pass(&mut run, &[hit(egg, 0.0)], false);
+    assert_eq!(run.look(false, || None).map(|l| l.map(|l| l.1.picture)), [Some(EggPicture::Whole), Some(EggPicture::Cracked), None]);
 }
-
 fn eggs_state_load() {
     let mut run = started(TIMED, ANY, 7);
     pass(&mut run, &[], false);
@@ -748,7 +753,7 @@ fn eggs_training_gate() {
     assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC], None, 0, || LOBBY), Plan::Read, "the waiting room's practice");
     assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC], None, 0, || MATCH), Plan::Clear, "a match: the run stops, its notice goes");
     assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC], None, 0, || panic!("stopped: nothing is read")), Plan::Idle);
-    assert!(run.egg_orb().is_none());
+    assert!(target(&mut run).is_none());
 }
 
 fn eggs_off_no_calls() {
@@ -759,7 +764,7 @@ fn eggs_off_no_calls() {
     let mut run = started(TIMED, ANY, 7);
     pass(&mut run, &[], false);
     assert_eq!(run.plan([OFF, ANY, NORMAL, DISC], None, 0, || panic!("Off reads nothing")), Plan::Clear, "the notice goes the next pass");
-    assert!(run.egg_orb().is_none(), "and the egg");
+    assert!(target(&mut run).is_none(), "and the egg");
     assert_eq!(run.plan([OFF, ANY, NORMAL, DISC], None, 0, || panic!("Off reads nothing")), Plan::Idle);
 }
 
@@ -791,7 +796,7 @@ fn case_table() {
         ("eggs_free", eggs_free as fn()),
         ("eggs_lra_restart", eggs_lra_restart as fn()),
         ("eggs_pause_frames", eggs_pause_frames as fn()),
-        ("eggs_independent_of_hitbox_vis", eggs_independent_of_hitbox_vis as fn()),
+        ("eggs_look_pictures", eggs_look_pictures as fn()),
         ("eggs_state_load", eggs_state_load as fn()),
         ("eggs_swap_and_stage", eggs_swap_and_stage as fn()),
         ("eggs_nana", eggs_nana as fn()),

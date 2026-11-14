@@ -412,13 +412,10 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             orbs::plan_pill([a, b], [ea, eb], half, color)
         };
         // The target and its break animations are pictures whatever Hitbox Visualization says (rc.14): each is planned at the
-        // target's size in the texture's colours, then scaled and faded by its own radius and alpha (a break grows and
-        // fades). Slot 0 is the whole target, the others its cracked breaks.
-        looks = std::array::from_fn(|k| {
-            let orb = own[k]?;
-            let pill = plan(&Orb { radius: eggs::RADIUS, ..orb }, [255; 4])?;
-            let picture = if k == 0 { p::EggPicture::Whole } else { p::EggPicture::Cracked };
-            Some((pill, p::EggLook { scale: orb.radius / eggs::RADIUS, alpha: orb.color[3], picture }))
+        // target's size in the texture's colours; its look scales and fades it (a break grows and fades).
+        looks = own.map(|look| {
+            let ([x, y], look) = look?;
+            Some((plan(&Orb { centre: [x, y, 0.0], tail: [x, y, 0.0], radius: eggs::RADIUS, ..Orb::NONE }, [255; 4])?, look))
         });
         let board = BOARD.lock();
         // Hitboxes and grab boxes take the panes first; when they run out whole pills are cut, hurtboxes first (review HB-2).

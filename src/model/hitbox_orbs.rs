@@ -166,11 +166,6 @@ impl Board {
     }
 }
 
-/// The orbs a layout tick draws: the plugin's own (Eggs-ercise's target and break animations, rc.14) whatever Hitbox
-/// Visualization says, then the board's while it is `on`.
-pub fn drawn<'a>(own: &'a [Option<Orb>], on: bool, board: &'a Board) -> impl Iterator<Item = &'a Orb> + 'a {
-    own.iter().flatten().chain(board.in_draw_order().filter(move |_| on))
-}
 
 /// Articles drawn at once: the board's slots past Training's fighter objects.
 pub const ARTICLES: usize = 4;
