@@ -24,10 +24,10 @@ Draws the fighters' boxes in colour. It is a checklist: tick what you want to se
 any mix works, such as hurtboxes alone, or hitboxes with their launch angles. It works in Training, and on the two
 practice fighters in a waiting room.
 
-- **Values:** Hitboxes, Grab boxes, Hurtboxes, Frame data colours, Launch angles.
+- **Values:** Hitboxes, Grab boxes, Hurtboxes, Frame data colours, Launch angles, Windboxes.
 - **Default:** none ticked: nothing is drawn.
 - **How:** A opens the checklist; A ticks, ZL ticks all or none, B goes back. The row shows how many are ticked, such
-  as "3 of 5".
+  as "3 of 6".
 
 A settings file from before this checklist keeps what it showed: On ticks Hitboxes, Grab boxes and Hurtboxes, and Off
 ticks none.
@@ -37,6 +37,7 @@ ticks none.
 | Hitbox | Each hitbox of a move gets its own colour; the first is red | Red when strong, pink when weak | The attack |
 | Grab box | Always magenta, a colour no hitbox uses | Purple | The grab |
 | Hurtbox | Yellow | White; blue while nothing can hit it; green while hits do no damage | Where a fighter can be hit |
+| Windbox | Its hitbox colour; deep blue with Windboxes ticked | Deep blue | A hitbox that pushes or pulls without hitstun |
 
 **Frame data colours** recolours whatever is ticked in the colours of Ultimate Frame Data. A hitbox is strong when it
 is the strongest one out on that frame, such as a sword's tip, and weak when another hitbox out on the same frame is
@@ -45,8 +46,13 @@ A hitbox that cannot be ranked, such as a jab's single hitbox, is red. A hurtbox
 and on the revival platform; it is green for the moments after leaving the platform. The plugin reads all of this from
 the game every frame, so no list of fighters is needed. Ticked alone, it draws nothing.
 
-A windbox, a hitbox that pushes without doing damage, keeps the hit colours. The game does not mark windboxes, and no
-rule from its attack data tells them apart from other hits that do no damage, such as Jigglypuff's Sing.
+**Windboxes** draws the windboxes in deep blue. A windbox pushes or pulls without hitstun: the fighter it lands on is
+moved but can still act. Most deal no damage, such as F.L.U.D.D.'s water, and some do, such as one of the two flames
+of Bowser's Fire Breath. The game marks them itself, and the plugin uses that mark. A windbox is a hitbox, so Hitboxes
+draws it too; with both ticked it is drawn once, in deep blue, and with Windboxes alone only the windboxes are drawn.
+
+Some pushes are not hitboxes but wind areas, such as the Gust Bellows item and some fighters' wind effects. These are
+not drawn.
 
 **Launch angles** draws a white line inside each hitbox, pointing where the hit sends the fighter it lands on. The line
 mirrors when the attacker turns around. Two dashes mean the game picks the angle when the hit lands, from how hard it
@@ -54,6 +60,7 @@ hits and whether the target is on the ground; they point at 38 degrees, where su
 A dot means the hit carries the fighter along with the attack. With Hitboxes not ticked, the lines are drawn alone.
 
 <!-- CAPTURE-REQUEST hb-legend-v01: Hitbox Visualization with Hitboxes, Grab boxes, Hurtboxes and Frame data colours ticked, 1/4 speed. The CPU spot-dodging next to a standing Player 1: the CPU's hurtboxes blue while it dodges, white otherwise. Player 1 walks off the stage with Respawn on platform On: blue on the platform, green for the moments after it. Mario's grab: a purple grab box. Marth's forward smash: the tip red, the blade pink. See artifacts/rc14-hb-legend/. -->
+<!-- CAPTURE-REQUEST hb-legend-v03: Windboxes alone, 1/4 speed: Mario's F.L.U.D.D. (the water deep blue, nothing else drawn), then Bowser's Fire Breath (only the flame that does not cause hitstun, deep blue). Then Hitboxes alone on F.L.U.D.D. (the water in its hitbox colour). See artifacts/rc14-hb-legend/. -->
 <!-- CAPTURE-REQUEST hb-legend-v02: Hitboxes and Launch angles ticked, 1/4 speed: Ganondorf's up tilt (the windbox lines, then the kick's dashes and its 70-degree line) facing right then left; Mario's jab (dashes). Then Hurtboxes alone: only the hurtboxes. See artifacts/rc14-hb-legend/. -->
 
 A round box is a disc; a long one, such as a sword's hitbox or an arm's hurtbox, is one pill. The shapes are flat and
