@@ -315,6 +315,11 @@ game_constants! {
     WorkFlagShulkDial = "FIGHTER_SHULK_INSTANCE_WORK_ID_FLAG_SPECIAL_N_CIRCLE_MENU",
     WorkIntCliffRestTime = "FIGHTER_STATUS_CLIFF_WORK_INT_CATCH_REST_TIME",
     ModelColorBlend = "MODEL_COLOR_TYPE_COLOR_BLEND",
+    // rc.13 Taunts (`model::taunts`): Player 1's three appeal terms, and Kirby's copy hat.
+    TermContAppealU = "FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_APPEAL_U",
+    TermContAppealS = "FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_APPEAL_S",
+    TermContAppealLw = "FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_APPEAL_LW",
+    KirbyFlagCopy = "FIGHTER_KIRBY_INSTANCE_WORK_ID_FLAG_COPY",
 }
 
 /// The statuses of the clatter list, in the spec's order.

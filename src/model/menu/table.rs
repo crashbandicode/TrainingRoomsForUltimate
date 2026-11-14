@@ -221,7 +221,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 93] = [
+pub static ROWS: [Row; 94] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -408,6 +408,8 @@ pub static ROWS: [Row; 93] = [
       "The chords for save, load, record, playback and the\ncycles. Hold one button and press the others."),
     r(CONTROLS, "L+R+A Reset", "lra_reset", TOGGLE,
       "On: holding L, R and A resets the training room.\nOff: the chord does nothing."),
+    r(CONTROLS, "Taunts", "taunts", TOGGLE,
+      "On: Player 1's D-pad taunts work as usual.\nOff: none in practice; Kirby keeps Up to drop a hat."),
     r(CONTROLS, "Menu shortcut 1", "", Control::Editor(Editor::ShortcutSlot(0)),
       "A chord that opens this menu. Hold one button and press\nthe others. The change applies at once."),
     r(CONTROLS, "Menu shortcut 2", "", Control::Editor(Editor::ShortcutSlot(1)),

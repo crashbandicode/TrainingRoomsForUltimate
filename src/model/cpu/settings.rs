@@ -243,6 +243,8 @@ pub struct CpuSettings {
     pub playback_mash: bool,
     /// Decision N4: Settings override playback (default Off: the recording wins).
     pub override_playback: bool,
+    /// Taunts (rc.13, `model::taunts`): On, Player 1's D-pad taunts are the game's own.
+    pub taunts: bool,
 }
 
 impl CpuSettings {
@@ -290,6 +292,7 @@ impl CpuSettings {
             frame_advantage: on("frame_advantage"),
             playback_mash: on("playback_mash"),
             override_playback: on("settings_override_playback"),
+            taunts: on("taunts"),
         }
     }
 

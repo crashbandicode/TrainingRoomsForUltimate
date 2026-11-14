@@ -114,10 +114,11 @@ fn layout_row_counts_match_the_rc_freeze() {
     // rows leave the menu (24 → 12). The two library groups have no setting rows.
     // rc.6: the CPU page gained CPU Level in its own group, Level (31 → 32).
     // rc.13: Attacks & Movement gained Aerial Drift (32 → 33).
-    assert_eq!(counts(false), [33, 10, 12, 24, 10, 3]);
-    assert_eq!(counts(true), [32, 10, 12, 24, 10, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 89);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 88);
+    // rc.13: Display & Controls gained Taunts after L+R+A Reset (the operator's order via the primary, 2026-11-14 03:44Z; 10 → 11).
+    assert_eq!(counts(false), [33, 10, 12, 24, 11, 3]);
+    assert_eq!(counts(true), [32, 10, 12, 24, 11, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 90);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 89);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 4);
@@ -126,8 +127,8 @@ fn layout_row_counts_match_the_rc_freeze() {
     assert_eq!(n(&|c| matches!(c, Control::MultiSelect(_) | Control::SwapGroups)), 11, "the checklists that stayed, and Swap groups");
     assert_eq!(n(&|c| matches!(c, Control::Slider)), 2);
     // Nothing is deferred any more (operator 2026-11-05): every editor has its row, and every group has rows.
-    // (104: Lobby Items, Phase 2 N11; 105: Ready Hats, P-HOT; rc.6: CPU Level.)
-    assert_eq!(ROWS.len(), 93);
+    // (104: Lobby Items, Phase 2 N11; 105: Ready Hats, P-HOT; rc.6: CPU Level; rc.13: Aerial Drift, Taunts.)
+    assert_eq!(ROWS.len(), 94);
     for editor in [Editor::SetupSave, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }

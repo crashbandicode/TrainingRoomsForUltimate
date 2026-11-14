@@ -115,6 +115,16 @@ blocked).
 
 More: [Controls › Fixed buttons](../guide/controls.md#fixed-buttons)
 
+### Taunts
+
+Off stops Player 1's D-pad taunts in Training and in waiting-room practice, so a D-pad press meant for a chord never
+starts one. Kirby holding a copy ability keeps D-pad Up, which drops the hat. The chords and the menu shortcuts work
+either way, and online matches are not changed.
+
+- **Values:** On, Off
+- **Default:** On
+- **How:** A flips it.
+
 ### Menu shortcut 1
 
 A button or chord that opens this menu, as well as B + D-pad Up. It is kept in `button_config.ini` in

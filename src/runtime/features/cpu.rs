@@ -16,7 +16,7 @@
 //!
 //! NOT YET SWITCH-RUN: compiled for the Switch, not run on Eden or the console.
 
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicU8, AtomicUsize, Ordering};
 
 use hos_lock::Mutex;
 
@@ -89,6 +89,13 @@ static FLASH_EFFECT: AtomicU64 = AtomicU64::new(0);
 static TERM_ESCAPE_AIR: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static TERM_GUARD_ON: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static TERM_DOWN_STAND: AtomicI32 = AtomicI32::new(UNRESOLVED);
+/// rc.13 Taunts (`model::taunts`): the appeal terms (Up, Side, Down), Kirby's kind and copy flag, and Player 1's bodies
+/// (slot 0, and slot 1 for Nana) with their denied appeals, published by `taunt_frame` for the transition-term hook.
+static TERM_APPEAL: [AtomicI32; 3] = [const { AtomicI32::new(UNRESOLVED) }; 3];
+static KIRBY_KIND: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static KIRBY_FLAG_COPY: AtomicI32 = AtomicI32::new(UNRESOLVED);
+static TAUNT_BODY: [AtomicUsize; 2] = [const { AtomicUsize::new(0) }; 2];
+static TAUNT_MASK: [AtomicU8; 2] = [const { AtomicU8::new(0) }; 2];
 static MASH_ON: AtomicBool = AtomicBool::new(false);
 static BUTTON_GUARD: AtomicI32 = AtomicI32::new(UNRESOLVED);
 static BUTTON_GUARD_HOLD: AtomicI32 = AtomicI32::new(UNRESOLVED);
@@ -226,7 +233,8 @@ mod ev {
     pub const DI_CALL: usize = 17;
     pub const TECH_CALL: usize = 18;
     pub const OOS_CALL: usize = 19;
-    pub const COUNT: usize = 20;
+    pub const TAUNT: usize = 20;
+    pub const COUNT: usize = 21;
 }
 
 #[cfg(feature = "diag")]
@@ -287,13 +295,15 @@ pub fn forget_hidden_scene() {
 /// Numeric native owner id, captured BEFORE any nested entry/body destruction.
 pub fn entry_departed(owner: u32) {
     with(|cpu| role_adapter::entry_departed(cpu, owner));
-    if owner == 0 { forget_player_position(); }
+    if owner == 0 { forget_player_position(); unsafe { taunt_frame(0, 0, false) }; }
 }
 
 /// Unconditional scene retirement, including when no save/record lease exists.
 pub fn scene_departed() {
     with(role_adapter::scene_departed);
     forget_player_position();
+    // SAFETY: fighter 0 and accessor 0 read nothing; they clear Player 1's taunt slots.
+    unsafe { taunt_frame(0, 0, false) };
 }
 
 fn forget_player_position() {
@@ -420,6 +430,11 @@ fn ensure_consts() -> bool {
     TERM_ESCAPE_AIR.store(table.get(C::TermContEscapeAir), Ordering::Release);
     TERM_GUARD_ON.store(table.get(C::TermContGuardOn), Ordering::Release);
     TERM_DOWN_STAND.store(table.get(C::TermDownStand), Ordering::Release);
+    for (slot, c) in TERM_APPEAL.iter().zip([C::TermContAppealU, C::TermContAppealS, C::TermContAppealLw]) {
+        slot.store(table.get(c), Ordering::Release);
+    }
+    KIRBY_KIND.store(table.get(C::KindKirby), Ordering::Release);
+    KIRBY_FLAG_COPY.store(table.get(C::KirbyFlagCopy), Ordering::Release);
     CAT1.store(table.get(C::CatCommand1), Ordering::Release);
     CAT2.store(table.get(C::CatCommand2), Ordering::Release);
     BUTTON_JUMP.store(table.get(C::ButtonJump), Ordering::Release);
@@ -562,6 +577,8 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
     if entry == 0 {
         // Also outside Training: leaving it restores the game's multiplier.
         damage_multiplier_frame(training);
+        // rc.13 Taunts: also outside Training, where it publishes "deny nothing".
+        taunt_frame(fighter, accessor, training && current_frame);
         // The player entry: remember where it stands (a body's In / Out is relative to it).
         if training && current_frame {
             frame_advantage(accessor);
@@ -941,14 +958,18 @@ pub unsafe fn cpu_clatter_start_hook(
 // ---- SPEC-cpu-03 hook -----------------------------------------------------------------------------------
 
 /// `WorkModule::is_enable_transition_term(accessor, term)`: the native automatic ledge climb is denied
-/// while a CPU body waits, delays or waits for its playback. Every other query is the original's.
+/// while a CPU body waits, delays or waits for its playback; Player 1's taunts are denied while Taunts is Off in
+/// practice (rc.13, `model::taunts`). Every other query is the original's.
 #[skyline::hook(offset = sites_pkg2::TRANSITION_TERM_HOOK_OFFSET)]
 pub unsafe fn cpu_transition_term_hook(accessor: usize, term: i32) -> bool {
     let _scope = HookScope::enter_hook(HookId::CpuTransitionTerm);
     bump(counts_index::TRANSITION_TERM);
     let original = call_original!(accessor, term);
-    if !original || term != TERM_CLIMB.load(Ordering::Acquire) {
+    if !original {
         return original;
+    }
+    if term != TERM_CLIMB.load(Ordering::Acquire) {
+        return !taunt_denied(accessor, term);
     }
     let Some(key) = role_of(accessor) else { return original };
     let status = natives::status_kind(accessor);
@@ -959,6 +980,32 @@ pub unsafe fn cpu_transition_term_hook(accessor: usize, term: i32) -> bool {
         cpu_event_on_change!(ev::CLIMB_DENIED, key.index(), Some(1), "climb_denied entry={} status={status}", key.entry);
     }
     answer
+}
+
+/// rc.13 Taunts: `term` is an appeal this Player 1 body may not start now (the table `taunt_frame` published). No lock,
+/// no native call: the hook answers every body's every query.
+fn taunt_denied(accessor: usize, term: i32) -> bool {
+    let terms = TERM_APPEAL.each_ref().map(|t| t.load(Ordering::Acquire));
+    (0..2).any(|slot| {
+        TAUNT_BODY[slot].load(Ordering::Acquire) == accessor
+            && crate::model::taunts::denies(terms, TAUNT_MASK[slot].load(Ordering::Acquire), term)
+    })
+}
+
+/// rc.13 Taunts: publish this Player 1 body (slot 1 for Nana) and its denied appeals for the transition-term hook, once per
+/// frame; `accessor` 0 forgets both bodies. `practice` is the frame wrapper's own scene test: anywhere else the mask is 0.
+unsafe fn taunt_frame(fighter: usize, accessor: usize, practice: bool) {
+    let kind = if fighter == 0 { UNRESOLVED } else { ((fighter + FIGHTER_KIND_FIELD) as *const i32).read() };
+    let flag = KIRBY_FLAG_COPY.load(Ordering::Acquire);
+    let hat = practice && kind == KIRBY_KIND.load(Ordering::Acquire) && flag != UNRESOLVED && natives::is_flag(accessor, flag);
+    let on = !practice || with(|cpu| cpu.settings.taunts).unwrap_or(true);
+    let mask = crate::model::taunts::denied_mask(on, practice, hat);
+    let slots = if accessor == 0 { 0..2 } else { let s = usize::from(kind == NANA_KIND.load(Ordering::Acquire)); s..s + 1 };
+    for slot in slots {
+        TAUNT_BODY[slot].store(accessor, Ordering::Release);
+        TAUNT_MASK[slot].store(mask, Ordering::Release);
+        cpu_event_on_change!(ev::TAUNT, slot, Some(u64::from(mask)), "taunts entry=0 slot={slot} kind={kind} mask={mask} practice={practice}");
+    }
 }
 
 // ---- SPEC-cpu-04 hooks ----------------------------------------------------------------------------------
