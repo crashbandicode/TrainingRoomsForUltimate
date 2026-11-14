@@ -83,24 +83,30 @@ pub fn hitlag(facts: Facts) -> Option<i32> {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct View(pub [f32; 2], pub [f32; 2], pub [f32; 2]);
 
+/// One picture of the draw: its spot in the fighters' plane and its look.
+pub type Look = Option<([f32; 2], EggLook)>;
+
 /// The x range a target may spawn in (V2.2): the stage's own camera range, the game's camera limit rect `[left, right, ..]`;
 /// the draft's `HALF_WIDTH` box when it is missing or not a range at least as wide.
 pub fn range(limit: Option<[f32; 4]>) -> [f32; 2] {
-    let wide = |[l, r]: &[f32; 2]| (r - l).is_finite() && r - l >= 2.0 * HALF_WIDTH;
-    limit.map(|[l, r, ..]| [l, r]).filter(wide).unwrap_or([-HALF_WIDTH, HALF_WIDTH])
+    let [l, r, ..] = limit.unwrap_or_default();
+    let wide = (r - l).is_finite() && r - l >= 2.0 * HALF_WIDTH;
+    [[-HALF_WIDTH, HALF_WIDTH], [l, r]][usize::from(wide)]
 }
 
 /// The rows' option indices (the first option when a row is missing).
 pub fn choices(snapshot: &super::settings::Snapshot) -> [u8; 4] {
-    let [mode, rule, speed, target] = [ROW, ROW_BREAK, ROW_SPEED, ROW_TARGET].map(|id| choice(snapshot, id));
-    // Hide CPU wins over the CPU as the target: the disc is used (V2.1).
-    let hidden = snapshot.get(ROW_HIDE_CPU).is_some_and(|row| row.first().is_some_and(|on| *on != 0));
-    [mode, rule, speed, if hidden { DISC } else { target }]
+    let mut rows = [ROW, ROW_BREAK, ROW_SPEED, ROW_TARGET].map(|id| choice(snapshot, id));
+    // Hide CPU wins over the CPU as the target: the disc is used (V2.1; `DISC` is 0).
+    let hide = snapshot.get(ROW_HIDE_CPU).unwrap_or_default();
+    rows[3] *= u8::from(!hide.first().is_some_and(|on| *on != 0));
+    rows
 }
 
 /// One row's option index (the first when the row is missing).
 pub fn choice(snapshot: &super::settings::Snapshot, id: &str) -> u8 {
-    snapshot.get(id).unwrap_or_default().iter().position(|v| *v != 0).unwrap_or(0) as u8
+    let row = snapshot.get(id).unwrap_or_default();
+    row.iter().position(|v| *v != 0).unwrap_or(0) as u8
 }
 
 /// One live attack of the fighter in world space: a pill from `.0` to `.1` (the same point for a point hitbox), its radius
@@ -226,18 +232,23 @@ impl Run {
     /// The draw's tick on the practice's layout (`active`): a run that wants eggs takes the camera `look` reads (nothing
     /// is read otherwise); the pictures to draw, each at its spot of the fighters' plane: the target, then the break
     /// animations.
-    pub fn look(&mut self, active: bool, look: impl FnOnce() -> Option<View>) -> [Option<([f32; 2], EggLook)>; 3] {
+    pub fn look(&mut self, active: bool, look: impl FnOnce() -> Option<View>) -> [Look; 3] {
         if active && self.rows[0] != OFF && !self.ended() {
             let seen = look();
             self.still = if seen == self.view { self.still + 1 } else { 0 };
             self.view = seen;
         }
-        let burst = |b: Option<([f32; 2], u32)>| {
-            let (at, t) = b?;
+        let [a, b] = self.bursts.map(|burst| {
+            let (at, t) = burst?;
             let fade = t as f32 / BURST_TICKS as f32;
-            Some((at, EggLook { scale: 1.0 + BURST_GROW * fade, alpha: (255.0 * (1.0 - fade)) as u8, picture: EggPicture::Cracked }))
-        };
-        [self.egg_at().filter(|_| self.rows[3] == DISC).map(|at| (at, EGG_WHOLE)), burst(self.bursts[0]), burst(self.bursts[1])]
+            let mut pic = EGG_WHOLE;
+            pic.scale = 1.0 + BURST_GROW * fade;
+            pic.alpha = (255.0 * (1.0 - fade)) as u8;
+            pic.picture = EggPicture::Cracked;
+            Some((at, pic))
+        });
+        let whole = self.egg_at().filter(|_| self.rows[3] == DISC);
+        [whole.map(|at| (at, EGG_WHOLE)), a, b]
     }
 
     /// A fresh run (the menu closed with the row on, or a reset): score 0, a full clock, the first egg once the camera has held
@@ -299,7 +310,8 @@ impl Run {
     /// `MIN_GAP` from `last`; none before the draw published the camera (a run's first one, with no `last`, waits for it to
     /// hold still).
     fn spawn(&mut self, last: Option<[f32; 2]>) -> Option<()> {
-        let View(s, o, range) = self.view.filter(|_| last.is_some() || self.still >= SETTLE)?;
+        let ready = last.is_some() || self.still >= SETTLE;
+        let View(s, o, range) = self.view.filter(|_| ready)?;
         let edge = |i: usize, c: f32| (c * CANVAS_HALF[i] - o[i]) / s[i] - c * RADIUS;
         let [x0, x1] = range.map(|v| v.max(edge(0, -1.0)).min(edge(0, 1.0)));
         // The CPU target stands on the ground, still: no launch, no drift, and the notice's plates don't matter to a body.
@@ -320,11 +332,15 @@ impl Run {
             self.rng = 1_013_904_223u32.wrapping_add(self.rng.wrapping_mul(1_664_525));
             (self.rng >> 8) as f32 / (1u32 << 24) as f32
         };
-        let tries = [(); 16].map(|_| (x0 + random() * (x1 - x0), disc * (2.0 * random() - 1.0) * DRIFT_SPEED * speed));
+        let mut pick = || {
+            let x = x0 + random() * (x1 - x0);
+            (x, disc * (2.0 * random() - 1.0) * DRIFT_SPEED * speed)
+        };
+        let tries = [(); 16].map(|_| pick());
         // Sixteen misses in a row: the end farther from the broken target, straight up.
         let far = last.map_or(x0, |[x, _]| if x - x0 > x1 - x { x0 } else { x1 });
-        let at = tries.into_iter().find(|&(x, vx)| gap([x, y]) && clear([x + vx * flight, y]));
-        let (x, vx) = at.unwrap_or((far, 0.0));
+        let fits = |&(x, vx): &(f32, f32)| gap([x, y]) && clear([x + vx * flight, y]);
+        let (x, vx) = tries.into_iter().find(fits).unwrap_or((far, 0.0));
         (self.egg, self.age, self.fly) = (Some([x, y]), 0, [launch, vx, g]);
         Some(())
     }
@@ -340,7 +356,7 @@ impl Run {
     pub fn egg_at(&self) -> Option<[f32; 2]> {
         let ([x, y], [v, vx, g], t) = (self.egg?, self.fly, self.age as f32);
         let up = 2.0 * v / g;
-        let (v, t) = if t <= up { (v, t) } else { (v * BOUNCE, (t - up).min(up * BOUNCE)) };
+        let (v, t) = [(v * BOUNCE, (t - up).min(up * BOUNCE)), (v, t)][usize::from(t <= up)];
         let flown = (self.age as f32).min(up * (1.0 + BOUNCE));
         Some([x + vx * flown, y + (v * t - g * t * t / 2.0).max(0.0)])
     }
@@ -358,8 +374,9 @@ impl Run {
     /// minute ends). The notice's length when its text changed (`write_notice`).
     pub fn step(&mut self, tick: bool, y: f32, hits: &[Hit], air: bool, kind: i32) -> Option<u16> {
         // The break animations run on the clock's ticks (pause freezes them); an ended run only finishes them.
+        let dt = u32::from(tick);
         for b in &mut self.bursts {
-            *b = b.map(|(at, t)| (at, t + u32::from(tick))).filter(|b| b.1 < BURST_TICKS);
+            *b = b.map(|(at, t)| (at, t + dt)).filter(|b| b.1 < BURST_TICKS);
         }
         self.air = air;
         // A run the CPU target's last hit ended still holds its target until this pass closes it.
@@ -375,10 +392,10 @@ impl Run {
             (self.score, self.bursts) = (self.score + 1, [Some((egg, 0)), self.bursts[0]]);
             self.spawn(Some(egg));
         }
-        self.age += u32::from(tick);
+        self.age += dt;
         match self.rows[0] {
-            TIMED => self.frames -= u32::from(tick),
-            _ => self.frames += u32::from(tick && self.goal() > 0),
+            TIMED => self.frames -= dt,
+            _ => self.frames += dt * u32::from(self.goal() > 0),
         }
         if self.ended() {
             let (k, m) = (kind as usize & 127, usize::from(self.rows[0] - TIMED));
@@ -387,7 +404,8 @@ impl Run {
             return Some(END_FRAMES);
         }
         // The 1-minute notice changes once a second, the N-target one every tick (hundredths).
-        let shown = (self.score, [self.frames, self.frames.div_ceil(60)][usize::from(self.rows[0] == TIMED)]);
+        let time = [self.frames, self.frames.div_ceil(60)][usize::from(self.rows[0] == TIMED)];
+        let shown = (self.score, time);
         (self.shown.replace(shown) != Some(shown)).then_some(u16::MAX)
     }
 
@@ -427,7 +445,8 @@ impl Run {
     /// The notice (SPEC V2.4): `Eggs N   m:ss` (1 minute), `Eggs N/10   m:ss.cc` (10 or 20 targets), `Eggs N` (free
     /// practice); at the end `Time! N eggs (best M)` or `Done! 10 in m:ss.cc (best m:ss.cc)`.
     pub fn write_notice(&self, out: &mut impl core::fmt::Write) -> core::fmt::Result {
-        let (score, goal, left, best) = (self.score, self.goal(), self.frames.div_ceil(60), self.best[128]);
+        let (score, goal, best) = (self.score, self.goal(), self.best[128]);
+        let left = self.frames.div_ceil(60);
         // m:ss.cc of a frame count.
         let clock = |f: u32| (f * 5 / 3 / 6000, f * 5 / 3 / 100 % 60, f * 5 / 3 % 100);
         let (m, s, c) = clock(self.frames);
@@ -435,7 +454,8 @@ impl Run {
             TIMED if self.ended() => write!(out, "Time! {score} eggs (best {})", best[0]),
             _ if self.ended() => {
                 let (bm, bs, bc) = clock(!best[usize::from(self.rows[0] - TIMED)]);
-                write!(out, "Done! {goal} in {m}:{s:02}.{c:02} (best {bm}:{bs:02}.{bc:02})")
+                write!(out, "Done! {goal} in {m}:{s:02}.{c:02} ")?;
+                write!(out, "(best {bm}:{bs:02}.{bc:02})")
             }
             TIMED => write!(out, "Eggs {score}   {}:{:02}", left / 60, left % 60),
             _ if goal > 0 => write!(out, "Eggs {score}/{goal}   {m}:{s:02}.{c:02}"),

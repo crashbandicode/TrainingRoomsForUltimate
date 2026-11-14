@@ -31,11 +31,12 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize
 use hos_lock::Mutex;
 
 use crate::model::cpu::hash::{hash40, lua_bind_hash};
+use crate::model::cpu::role::LOBBY_CPU_ENTRY;
 use crate::model::eggs::{self, HEADER, NOTICE_ID};
-use crate::model::hitbox::AttackReader;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::guard::GuardOutcome;
-use crate::model::hitbox::{self, layout, Cell, Counts, Effects, FrameFacts, Indices, SetTable, Shape, SleepBook, Sphere, StatusIds};
+use crate::model::hitbox::{self, layout, AttackReader, Cell, Counts, Effects, FrameFacts, Indices, SetTable, Shape, SleepBook, Sphere, StatusIds};
+use crate::model::panes::EggLook;
 use crate::model::hitbox_orbs::{self as orbs, Board, Orb, OrbSink};
 use crate::model::install_line::{SiteReport, Written};
 use crate::model::scene::Scene;
@@ -70,8 +71,10 @@ pub fn set_installed(on: bool) {
 /// Every settings publish.
 pub fn publish(snapshot: &Snapshot) {
     SETTING.store(hitbox::enabled(snapshot), Ordering::Release);
-    EGG_ROWS.store(u32::from_le_bytes(eggs::choices(snapshot)), Ordering::Release);
-    PRACTICE_HIDE.store(eggs::choice(snapshot, eggs::ROW_PRACTICE_CPU) == 0, Ordering::Release);
+    let rows = u32::from_le_bytes(eggs::choices(snapshot));
+    EGG_ROWS.store(rows, Ordering::Release);
+    let hide = eggs::choice(snapshot, eggs::ROW_PRACTICE_CPU) == 0;
+    PRACTICE_HIDE.store(hide, Ordering::Release);
 }
 
 // ---- Eggs-ercise (rc.14, `model::eggs`) -------------------------------------------------------------------------------
@@ -113,7 +116,8 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     let mut run = RUN.lock();
     let plan = run.plan(rows, seed, entry, scene::facts);
     // V2.6: the CPU is hidden while a practice game runs and `CPU during a game` says Hide, unless it is the target.
-    super::hide_cpu::hide(run.running() && PRACTICE_HIDE.load(Ordering::Acquire) && !run.cpu_target());
+    let hide = PRACTICE_HIDE.load(Ordering::Acquire) && !run.cpu_target();
+    super::hide_cpu::hide(run.running() && hide);
     if plan == eggs::Plan::Clear {
         super::notices::clear(NOTICE_ID);
     }
@@ -125,11 +129,11 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     // Any menu over the game holds the clock: the plugin's, the game's own pause menu (the fighters' frames run on under
     // it: Eden wa-eggs-07bae4c1-1, E11) and the waiting room's busy native UI.
     let owners = crate::runtime::published::input_owners();
-    let tick = run.keeper(at) && !owners.covers_strip();
+    let held = owners.covers_strip();
+    let tick = run.keeper(at) && !held;
     #[cfg(feature = "diag")]
     {
         static SAID: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(2);
-        let held = owners.covers_strip();
         if SAID.swap(u8::from(held), Ordering::Relaxed) != u8::from(held) {
             crate::runtime::diag_log::diagnostic(format_args!("[Eggs] held={held} owners={:#x}", owners.bits()));
         }
@@ -141,8 +145,10 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     let place = |s: &Sphere| natives::joint_position(at, s.joint, &s.pos);
     let power = |slot| GameAttacks(at).read_f32(GameAttacks(at).data(slot) + layout::POWER);
     let n = eggs::pills(&wants[..len], place, power, &mut hits);
+    let hits = &hits[..n];
     let aerial = natives::status_kind(at) == eggs::ATTACK_AIR;
     let kind = natives::fighter_kind(at).unwrap_or(-1);
+    let score = run.score;
     #[cfg(feature = "diag")]
     if let Some([dx, dy]) = crate::runtime::diag_reload::take_egg_request() {
         run.place([top[0] + dx, top[1] + dy]);
@@ -150,17 +156,16 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     #[cfg(feature = "diag")]
     if n != 0 {
         let egg = run.egg_at();
-        let overlap = egg.is_some_and(|e| hits[..n].iter().any(|h| eggs::breaks(eggs::ANY, true, h, e)));
+        let breaks = |e| hits.iter().any(|h| eggs::breaks(eggs::ANY, true, h, e));
+        let overlap = egg.is_some_and(breaks);
         crate::runtime::diag_log::diagnostic(format_args!(
-            "[Eggs] pass at={at:#x} p1={top:?} egg={egg:?} overlap={overlap} air={aerial} score={} hits={:?}",
-            run.score,
-            &hits[..n]
+            "[Eggs] pass at={at:#x} p1={top:?} egg={egg:?} overlap={overlap} air={aerial} score={score} hits={hits:?}"
         ));
     }
-    let score = run.score;
-    let length = run.step(tick, top[1], &hits[..n], aerial, kind);
+    let length = run.step(tick, top[1], hits, aerial, kind);
     // V2.1: the fighter whose attack broke it (Ice Climbers: that climber) freezes, as on a hit.
-    if let Some(frames) = (run.score > score).then(scene::facts).and_then(eggs::hitlag) {
+    let broke = run.score > score;
+    if let Some(frames) = broke.then(scene::facts).and_then(eggs::hitlag) {
         natives::set_hit_stop_frame(at, frames);
     }
     let length = length?;
@@ -182,7 +187,7 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
 /// run asks for, and when it says so put it back afresh, at 0% and standing, as a save state's load places a fighter.
 unsafe fn eggs_cpu(run: &mut eggs::Run, fighter: usize, entry: i32) -> Option<()> {
     run.cpu_target().then_some(())?;
-    let primary = if scene::current()? == Scene::Lobby { crate::model::cpu::role::LOBBY_CPU_ENTRY } else { 1 };
+    let primary = [1, LOBBY_CPU_ENTRY][usize::from(scene::current()? == Scene::Lobby)];
     (entry == primary).then_some(())?;
     let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
     let damage = natives::damage(at, 0);
@@ -193,8 +198,8 @@ unsafe fn eggs_cpu(run: &mut eggs::Run, fighter: usize, entry: i32) -> Option<()
     if run.score > score || moved.is_some_and(|m| m.1) {
         crate::runtime::diag_log::diagnostic(format_args!("[Eggs] cpu damage={damage} score={} move={moved:?}", run.score));
     }
-    let (spot, fresh) = moved?;
-    state_natives::set_pos(at, &state_natives::Vector3f { x: spot[0], y: spot[1], z: 0.0 });
+    let ([x, y], fresh) = moved?;
+    state_natives::set_pos(at, &state_natives::Vector3f { x, y, z: 0.0 });
     state_natives::clear_speed_all(at);
     if fresh {
         state_natives::heal(at, -natives::damage(at, 0));
@@ -378,8 +383,9 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         cache.registrations = registrations;
         cache.container = container as usize;
         cache.shown = [p::CAPS, p::BANDS];
+        let root = (*layout).root_pane;
         for k in 0..p::EGG_PANES {
-            cache.egg.0[k] = pane::find_child((*layout).root_pane, p::name_of(p::IDX_EGG + k).as_bytes()) as usize;
+            cache.egg.0[k] = pane::find_child(root, p::name_of(p::IDX_EGG + k).as_bytes()) as usize;
         }
         for k in 0..p::ORBS {
             cache.panes[k] = if container.is_null() { 0 } else { pane::find_child(container, p::name_of(p::IDX_ORB + k).as_bytes()) as usize };
@@ -410,9 +416,12 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         };
         // The target and its break animations are pictures whatever Hitbox Visualization says (rc.14): each is planned at the
         // target's size in the texture's colours; its look scales and fades it (a break grows and fades).
+        let mut dot = Orb::NONE;
+        dot.radius = eggs::RADIUS;
         looks = own.map(|look| {
             let ([x, y], look) = look?;
-            Some((plan(&Orb { centre: [x, y, 0.0], tail: [x, y, 0.0], radius: eggs::RADIUS, ..Orb::NONE }, [255; 4])?, look))
+            [dot.centre, dot.tail] = [[x, y, 0.0]; 2];
+            Some((plan(&dot, [255; 4])?, look))
         });
         let board = BOARD.lock();
         // Hitboxes and grab boxes take the panes first; when they run out whole pills are cut, hurtboxes first (review HB-2).
@@ -473,14 +482,16 @@ unsafe fn write_pane(target: usize, at: [f32; 2], size: [f32; 2], rot: f32, colo
 /// spot): centred on it, `size × look.scale` across, unturned, in the texture's own colours at pane alpha `look.alpha`,
 /// on the next free pane of `look.picture`'s pool (a pool's extra pictures are not drawn). The panes that showed last
 /// frame and not this one hide.
-unsafe fn write_eggs(cache: &mut OrbPanes, eggs: &[Option<(orbs::Pill, crate::model::panes::EggLook)>]) {
+unsafe fn write_eggs(cache: &mut OrbPanes, eggs: &[Option<(orbs::Pill, EggLook)>]) {
     use crate::model::panes::EGG_POOLS;
     use crate::runtime::ui::pane;
     let mut used = [0; 3];
     for (pill, look) in eggs.iter().flatten().copied() {
-        let (pool, (first, count)) = (look.picture as usize, EGG_POOLS[look.picture as usize]);
-        if used[pool] < count && cache.egg.0[first + used[pool]] != 0 {
-            let (target, size) = (cache.egg.0[first + used[pool]], [pill.size * look.scale; 2]);
+        let pool = look.picture as usize;
+        let (first, count) = EGG_POOLS[pool];
+        let slot = first + used[pool];
+        if used[pool] < count && cache.egg.0[slot] != 0 {
+            let (target, size) = (cache.egg.0[slot], [pill.size * look.scale; 2]);
             write_pane(target, pill.band, size, 0.0, [255; 4]);
             pane::set_alpha(target as *mut _, look.alpha);
             used[pool] += 1;

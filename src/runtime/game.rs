@@ -331,7 +331,7 @@ pub mod natives {
 
     /// `StopModule::set_hit_stop_frame(accessor, frames, false)`: the body is in hitstop for `frames` ticks, as after a hit.
     pub unsafe fn set_hit_stop_frame(accessor: usize, frames: i32) {
-        at::<extern "C" fn(usize, i32, bool)>(crate::model::sites_hitbox::HITBOX_SET_HIT_STOP_FRAME_OFFSET).map_or_else(Default::default, |f| f(accessor, frames, false))
+        at::<extern "C" fn(usize, i32, bool)>(crate::model::sites_hitbox::HITBOX_HIT_STOP_OFFSET).map_or_else(Default::default, |f| f(accessor, frames, false))
     }
 
     /// `WorkModule::set_int(accessor, value, id)`.

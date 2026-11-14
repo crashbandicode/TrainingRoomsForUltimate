@@ -72,13 +72,14 @@ pub fn take_egg_request() -> Option<[f32; 2]> {
     (bits != u64::MAX).then(|| [bits as u32, (bits >> 32) as u32].map(f32::from_bits))
 }
 
-fn poll_egg_request() {
-    let Some(text) = request("diag-egg.req") else { return };
-    let mut words = text.split_whitespace().map(|w| w.parse::<f32>().unwrap_or(0.0));
-    let [dx, dy] = [words.next(), words.next()].map(Option::unwrap_or_default);
+fn poll_egg_request() -> Option<()> {
+    let text = request("diag-egg.req")?;
+    let mut words = text.split_whitespace().map(|w| w.parse().unwrap_or(0.0));
+    let [dx, dy]: [f32; 2] = [words.next(), words.next()].map(Option::unwrap_or_default);
     diagnostic(format_args!("[TrainingRooms] diag_egg_request dx={dx} dy={dy}"));
     let bits = u64::from(dx.to_bits()) | u64::from(dy.to_bits()) << 32;
     EGG_REQUEST.store(bits, std::sync::atomic::Ordering::Release);
+    Some(())
 }
 
 /// F9 research (package 6): the native pause menu object (`x22` of package 4's stale-moves site), and `diag-pausedump.req` (one
