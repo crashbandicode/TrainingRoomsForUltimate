@@ -116,15 +116,18 @@ impl StageEditor {
                     if changed { Effect::Changed } else { Effect::Nothing }
                 }
                 (Mode::Direct, None) => Effect::Nothing,
-                (Mode::Direct, Some(index)) => {
-                    let selection = Selection { stage: STAGES[index].0, form: self.form_of(index) };
-                    self.preferences.direct_stage = selection.stage;
-                    self.preferences.direct_form = selection.form;
-                    Effect::Request(selection)
-                }
+                (Mode::Direct, Some(index)) => self.request(index),
             },
             _ => Effect::Nothing,
         }
+    }
+
+    /// Go to stage index with its form: the Direct choice is remembered and the stage requested.
+    fn request(&mut self, index: usize) -> Effect {
+        let selection = Selection { stage: STAGES[index].0, form: self.form_of(index) };
+        self.preferences.direct_stage = selection.stage;
+        self.preferences.direct_form = selection.form;
+        Effect::Request(selection)
     }
 
     /// One press on the Change Stage grid (`GridKind::StageChange`, tiles numbered as here): always Direct. Y cycles the stage's
@@ -132,12 +135,7 @@ impl StageEditor {
     pub fn change(&mut self, tile: usize, button: Button) -> Effect {
         match (button, Self::stage_of(tile)) {
             (Button::Y, Some(_)) => self.press(tile, button),
-            (Button::A, Some(index)) => {
-                let selection = Selection { stage: STAGES[index].0, form: self.form_of(index) };
-                self.preferences.direct_stage = selection.stage;
-                self.preferences.direct_form = selection.form;
-                Effect::Request(selection)
-            }
+            (Button::A, Some(index)) => self.request(index),
             _ => Effect::Nothing,
         }
     }
