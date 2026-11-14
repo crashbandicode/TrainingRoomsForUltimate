@@ -1157,7 +1157,69 @@ pub fn neighbour_group(full: Members, target: u32, policy: GroupPolicy, exclude:
             count += 1;
         }
     }
+    // rc.14 2e: a gated member ([`gated_alone`]) is no seed partner; the planner gives it its own group.
+    if count > 1 {
+        let mut kept = 0;
+        for i in 0..count {
+            if !gated_alone(kinds[i]) { kinds[kept] = kinds[i]; kept += 1; }
+        }
+        for kind in kinds.iter_mut().skip(kept) { *kind = u32::MAX; }
+        count = kept;
+    }
     if count == 0 { None } else { Members::laid_out(&kinds[..count]) }
+}
+
+/// rc.14 2e (a-full; the primary 2026-11-14 ~21:25Z, decision 1): a member whose departure a live gate may refuse is
+/// laid out alone, never in a group with others. A live Kirby that holds a copy may not park (`kirby_park_gate`,
+/// EXCLUSIONS-AUDIT §2), so leaving him takes a Reload, and that Reload destroys the attached window. With Kirby alone,
+/// that window is Kirby's own, and every other member stays in a detached group that the target-first Reload keeps
+/// ([`kept_across_reload`]). The Ice Climbers pair is already a whole group of its own (`Members::pair_group`, never
+/// merged with ordinary kinds).
+pub fn gated_alone(kind: u32) -> bool {
+    kind == KIRBY
+}
+
+/// rc.14 2e (a-full, A1): whether a mod Reload keeps the attached window as a detached Built group. Off until the Eden
+/// rows pass with it (the diag build's `diag-cycle.req` `window` turns it on for them).
+pub const KEEP_WINDOW_ACROSS_RELOAD: bool = false;
+
+/// rc.14 2e (a-full, A1; AFULL-RESEARCH.md §2): why the attached window `window` cannot be kept across its role's
+/// target-first Reload onto `target` (`Ok`: it can). The Reload start (`0x653240` → `0x653490`) deactivates every window
+/// body with the commit's own call, so a window whose live member could park is kept by detaching it before loader state
+/// 0, as a Prefetched build detaches a window. Not kept:
+/// - a native (PT/Aegis) window: the Reload start zeroes its object record `+0x5a90` and state 2 destroys `+0x5a88`;
+/// - a Mii window unless `keep_mii` ([`KEEP_MII_ACROSS_RELOAD`], 2d's switch): R's identity is rewritten at state 6;
+/// - a window holding the target (a second body of one kind);
+/// - a live member that may not park (`live_parks` false: the Kirby copy gate, the pair's gate), the reason the Reload
+///   exists;
+/// - a live member Design A loaded over Ready Fighters (`live_cold`): it is the one fighter that doesn't fit, freed when
+///   left ([`cold_left`]).
+pub fn window_kept_across_reload(window: Members, keep_mii: bool, target: u32, live_parks: bool, live_cold: bool)
+    -> Result<(), &'static str> {
+    if matches!(window.special(), Special::Native(_)) { return Err("a native group's window"); }
+    if window.special() == Special::Mii && !keep_mii { return Err("a Mii window (2d's switch is off)"); }
+    if window.index_of(target).is_some() { return Err("the window holds the Reload's target"); }
+    if !live_parks { return Err("the live member may not park"); }
+    if live_cold { return Err("the live member is a cold fighter"); }
+    Ok(())
+}
+
+/// rc.14 2e (the primary 2026-11-14 ~21:25Z, decision 3, Design A's rule): the unit to free when what stays resident
+/// across a Reload exceeds Ready Fighters. `units` are the role's resident units (the kept window and its Built groups),
+/// `lap` the role's cycle in order and `from` the fighter on screen after the Reload. Each unit's next turn is its nearest
+/// member's distance forward in the lap (a kind the lap lacks never comes: farthest). The unit with the farthest next turn
+/// goes, never one holding the fighter on screen or the next one; equal turns free the later unit. `None`: nothing may go.
+pub fn farthest_unit(units: &[Members], lap: &[u32], from: u32) -> Option<usize> {
+    let at = lap.iter().position(|kind| *kind == from);
+    let turn = |kind: u32| match (at, lap.iter().position(|k| *k == kind)) {
+        (Some(at), Some(pos)) => (pos + lap.len() - at) % lap.len(),
+        _ => usize::MAX,
+    };
+    units.iter().enumerate()
+        .map(|(i, unit)| (i, unit.kinds()[..unit.count()].iter().map(|kind| turn(*kind)).min().unwrap_or(usize::MAX)))
+        .filter(|(_, next)| *next > 1)
+        .max_by_key(|(i, next)| (*next, *i))
+        .map(|(i, _)| i)
 }
 
 /// rc.12, the CPU-cycle thrash, option (a′) (primary 2026-11-13 17:05Z; boot 3 `practice-diagnostics.previous.log`
@@ -1446,6 +1508,11 @@ pub fn plan_extra_groups_with(
             let mut deferred = None;
             let mut pinned = false;
             for &kind in &chosen[role][start..start + size] {
+                // rc.14 2e: a gated member (Kirby) takes its own one-member group in the next slot (`gated_alone`).
+                if *size > 1 && gated_alone(kind) {
+                    deferred = Some(kind);
+                    continue;
+                }
                 if pins_cell0(kind) {
                     if pinned {
                         deferred = Some(kind);
@@ -2627,11 +2694,12 @@ mod tests {
         // The pair is never an upcoming member: a pair-lead window never takes Popo as its extra.
         assert!(!pair_lead_extra(POPO));
         assert_eq!(Members::from_pair(&[POPO, LINK], 2).unwrap().kinds(), [POPO, NANA, LINK]);
-        // Groups: the first pinned kind in lane order takes cell 0, the later one its own group.
+        // Groups: the first pinned kind in lane order takes cell 0, the later one its own group. Since rc.14 2e Kirby is
+        // always alone (`gated_alone`), so Solo Popo leads the shared group whichever comes first.
         let solo_policy = GroupPolicy { solo_popo_groups: true, ..GroupPolicy::DEFAULT };
         let window = members(&[MARIO, LINK, SAMUS]);
         let plan = plan_extra_groups_with(solo_policy, [Some(window), None], [&[], &[]], [&[KIRBY, POPO, FOX], &[]], [None, None], budget(8));
-        assert_eq!(kinds_of(&plan[0]), vec![vec![KIRBY, FOX], vec![POPO]]);
+        assert_eq!(kinds_of(&plan[0]), vec![vec![POPO, FOX], vec![KIRBY]]);
         let plan = plan_extra_groups_with(solo_policy, [Some(window), None], [&[], &[]], [&[POPO, KIRBY, FOX], &[]], [None, None], budget(8));
         assert_eq!(kinds_of(&plan[0]), vec![vec![POPO, FOX], vec![KIRBY]]);
     }
@@ -2723,16 +2791,16 @@ mod tests {
     fn the_rest_of_the_lane_is_planned_as_groups_beside_the_target() {
         let window = target_first(Forms::starting(GAME_WATCH), true, 6).unwrap();
         let lane: &[u32] = &[PIKACHU, KIRBY, PALUTENA];
-        // The members today's window held are the first group (Kirby laid out at cell 0)...
+        // The members today's window held are the first group (since rc.14 2e without Kirby, who is laid out alone)...
         let full = Members::from_forms(Forms::starting(GAME_WATCH), lane, 2).unwrap();
         let seed = neighbour_group(full, GAME_WATCH, GroupPolicy::DEFAULT, None).unwrap();
-        assert_eq!(seed.kinds(), [KIRBY, PIKACHU, NONE]);
-        // ...and the planner takes the rest of the lane beside it: with the console's Ready Fighters (8), Palutena alone.
-        // Without the seed it would have made one triple, whose admission needs more than the pair the window charged.
+        assert_eq!(seed.kinds(), [PIKACHU, NONE, NONE]);
+        // ...and the planner takes the rest of the lane beside it: with the console's Ready Fighters (8), Kirby's own group
+        // and Palutena, the leftover pair split around Kirby.
         let plan = plan_extra_groups([Some(window), None], [&[seed], &[]], [lane, &[]], [None, None], budget(8));
-        assert_eq!(kinds_of(&plan[0]), vec![vec![PALUTENA]]);
+        assert_eq!(kinds_of(&plan[0]), vec![vec![PALUTENA], vec![KIRBY]]);
         let unseeded = plan_extra_groups([Some(window), None], [&[], &[]], [lane, &[]], [None, None], budget(8));
-        assert_eq!(kinds_of(&unseeded[0]), vec![vec![KIRBY, PIKACHU, PALUTENA]]);
+        assert_eq!(kinds_of(&unseeded[0]), vec![vec![PIKACHU, PALUTENA], vec![KIRBY]]);
         // Both build in the background beside the one-member window, the neighbours first.
         let palutena = plan[0][0].unwrap();
         for group in [seed, palutena] {
@@ -3822,10 +3890,71 @@ mod tests {
             kept_across_reload_with(KEEP_MII_ACROSS_RELOAD, GroupState::Built, mii, false, false, Some(KROOL), true));
     }
 
+    /// rc.14 2e (the primary 2026-11-14 ~21:25Z, decision 1): Kirby, whose departure the copy gate may refuse, is laid out
+    /// alone. The planner gives him his own one-member group and keeps the others of his chunk together; the target-first
+    /// seed leaves him out. The operator's P1 lane (Mr. Game & Watch > Pikachu > Kirby > Palutena) is the console's shape.
+    fn a_gated_member_is_laid_out_alone_and_the_rest_stay_together() {
+        assert!(gated_alone(KIRBY));
+        for kind in [MARIO, PIKACHU, PALUTENA, POPO, NANA, GUNNER] { assert!(!gated_alone(kind), "{kind:#x}"); }
+        let window = target_first(Forms::starting(GAME_WATCH), true, 6).unwrap();
+        let lane: &[u32] = &[PIKACHU, KIRBY, PALUTENA];
+        let plan = plan_extra_groups([Some(window), None], [&[], &[]], [lane, &[]], [None, None], budget(8));
+        assert_eq!(kinds_of(&plan[0]), vec![vec![PIKACHU, PALUTENA], vec![KIRBY]]);
+        let full = Members::from_forms(Forms::starting(GAME_WATCH), lane, 2).unwrap();
+        assert_eq!(neighbour_group(full, GAME_WATCH, GroupPolicy::DEFAULT, None).map(Members::kinds), Some([PIKACHU, NONE, NONE]));
+        // Kirby alone is his own group; a lane of Kirby and one other gives two one-member groups.
+        assert_eq!(neighbour_group(members(&[KIRBY, GAME_WATCH]), GAME_WATCH, GroupPolicy::DEFAULT, None).map(Members::kinds),
+            Some([KIRBY, NONE, NONE]));
+        let plan = plan_extra_groups([Some(window), None], [&[], &[]], [&[KIRBY, PIKACHU], &[]], [None, None], budget(8));
+        assert_eq!(kinds_of(&plan[0]), vec![vec![PIKACHU], vec![KIRBY]]);
+        // Beside Solo Popo (who also takes cell 0) the two never share a group either.
+        let solo_policy = GroupPolicy { solo_popo_groups: true, ..GroupPolicy::DEFAULT };
+        let plan = plan_extra_groups_with(solo_policy, [Some(members(&[MARIO, LINK, SAMUS])), None], [&[], &[]],
+            [&[KIRBY, POPO, FOX], &[]], [None, None], budget(8));
+        assert_eq!(kinds_of(&plan[0]), vec![vec![POPO, FOX], vec![KIRBY]]);
+    }
+
+    /// rc.14 2e (a-full, A1): a mod Reload keeps the attached window when its live member parks, unless the window is a
+    /// native group, a Mii without 2d's switch, holds the target, or its live member is the cold fighter Design A frees.
+    fn a_reload_keeps_the_window_whose_live_member_parks() {
+        let window = members(&[FALCO, PICHU, DIDDY]);
+        assert_eq!(window_kept_across_reload(window, false, KROOL, true, false), Ok(()));
+        assert_eq!(window_kept_across_reload(Members::new(&[KIRBY, PIKACHU]).unwrap(), false, PALUTENA, true, false), Ok(()),
+            "a copy-free Kirby parks, so his window stays");
+        assert_eq!(window_kept_across_reload(Members::pair_lead(LINK).unwrap(), false, MARIO, true, false), Ok(()));
+        assert!(window_kept_across_reload(window, false, KROOL, false, false).is_err(), "the live member may not park");
+        assert!(window_kept_across_reload(window, false, PICHU, true, false).is_err(), "the window holds the target");
+        assert!(window_kept_across_reload(members(&[KROOL]), false, FALCO, true, true).is_err(), "the cold fighter goes");
+        assert!(window_kept_across_reload(Members::native_group(0x24).unwrap(), false, MARIO, true, false).is_err());
+        let mii = Members::mii_group(GUNNER).unwrap();
+        assert!(window_kept_across_reload(mii, false, KROOL, true, false).is_err());
+        assert_eq!(window_kept_across_reload(mii, true, KROOL, true, false), Ok(()));
+        assert!(!KEEP_WINDOW_ACROSS_RELOAD, "off until the Eden rows pass");
+    }
+
+    /// rc.14 2e (decision 3, Design A's rule): over Ready Fighters after a kept Reload, the unit whose next turn is farthest
+    /// goes; never the one on screen, never the next one. The operator's CPU lap, King K. Rool on screen after the Reload.
+    fn the_farthest_unit_goes_never_the_next_or_the_one_on_screen() {
+        let lap = [FALCO, GUNNER, PICHU, DIDDY, KROOL];
+        let units = [members(&[FALCO, PICHU]), members(&[DIDDY]), Members::mii_group(GUNNER).unwrap()];
+        // From King K. Rool: Falco is next (1), Mii Gunner 2, Pichu 3, Diddy Kong 4: Diddy Kong's unit is farthest.
+        assert_eq!(farthest_unit(&units, &lap, KROOL), Some(1));
+        // From Pichu: Falco's unit holds Pichu on screen, Diddy Kong is next, the Mii Gunner is farthest (4).
+        assert_eq!(farthest_unit(&units, &lap, PICHU), Some(2));
+        // A unit whose kinds left the lap never comes back: it goes first.
+        assert_eq!(farthest_unit(&[members(&[FALCO]), members(&[MARIO])], &lap, KROOL), Some(1));
+        // Only the next member and the one on screen: nothing may go.
+        assert_eq!(farthest_unit(&[members(&[FALCO]), members(&[KROOL])], &lap, KROOL), None);
+        assert_eq!(farthest_unit(&[], &lap, KROOL), None);
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_gated_member_is_laid_out_alone_and_the_rest_stay_together", a_gated_member_is_laid_out_alone_and_the_rest_stay_together as fn()),
+            ("a_reload_keeps_the_window_whose_live_member_parks", a_reload_keeps_the_window_whose_live_member_parks as fn()),
+            ("the_farthest_unit_goes_never_the_next_or_the_one_on_screen", the_farthest_unit_goes_never_the_next_or_the_one_on_screen as fn()),
             ("a_mii_group_is_kept_across_a_reload_only_with_its_switch", a_mii_group_is_kept_across_a_reload_only_with_its_switch as fn()),
             ("five_laps_of_the_operator_cycle_keep_what_fits_hot", five_laps_of_the_operator_cycle_keep_what_fits_hot as fn()),
             ("two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot", two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot as fn()),
