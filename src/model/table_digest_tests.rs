@@ -8,6 +8,9 @@
 //!
 //! rc.13 (a′) proper added `rows_module_pins` (6 rows: a kept group's fighter module pinned across its owner's Reload):
 //! 675 seam rows to 681, a 24th data file, and the seam digest with them.
+//!
+//! rc.14 Eggs-ercise added `stop_set_hit_stop_frame` to `sites_hitbox` (the hitlag native, V2.1): 258 site rows to 259,
+//! and the site digest with them. V2.2 added camera_limit_range (the stage's camera range): 260.
 
 use crate::model::sha256::sha256_hex;
 use std::fmt::Write;
@@ -74,8 +77,8 @@ fn every_data_row_has_a_64_byte_guard() {
 
 const SEAM_ROWS: usize = 681;
 const SEAM_DIGEST: &str = "294a22cba2a69b1a95099e526c7a4d1328a2ccf2d4706bed3e961ca282cd67c6";
-const SITE_ROWS: usize = 258;
-const SITE_DIGEST: &str = "f86958e64401e05a6acac006e94b5be53b062f03a5da5bdbf027197436f2ea4d";
+const SITE_ROWS: usize = 260;
+const SITE_DIGEST: &str = "3207c6c0129416db033197573665e8c1790286b32e691ca82694583e94ce57bf";
 const UI_ROWS: usize = 6;
 const UI_DIGEST: &str = "35ddb9f164a3ac26ba2e5c45c35066ee738e796589d58e2c697c82e486567b15";
 const COMMON_ROWS: usize = 4;

@@ -34,6 +34,8 @@ pub mod layout {
     pub const OFFSET: usize = 0x00;
     /// The second offset vector of an extended hitbox (zero otherwise).
     pub const OFFSET2: usize = 0x10;
+    /// The hitbox's damage (the `ATTACK` command's damage parameter): Eggs-ercise's `Hits of 12%+`.
+    pub const POWER: usize = 0x20;
     pub const SIZE: usize = 0x24;
     /// The node's `Hash40`, the bone the hitbox follows.
     pub const NODE: usize = 0x48;

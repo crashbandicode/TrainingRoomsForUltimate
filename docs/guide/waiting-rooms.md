@@ -31,6 +31,8 @@ With it On, the practice starts as soon as the waiting room's own screen is read
 - **Fighters and items:** Player Character, CPU Character, Give item and the Mii rows. Your
   practice fighter changes; the match still uses the fighter you picked for it. *Add New…* opens Smash's Mii editor: see
   [Mii fighters › In a waiting room](mii.md#in-a-waiting-room).
+- **[Eggs-ercise](../menu/fighters-and-stages.md#eggs-ercise):** the targets show on your screen only. To start a new run
+  here, open and close the menu.
 - **L + R + A** puts both practice fighters back where they first stood (Display & Controls ›
   [L+R+A Reset](../menu/display-and-controls.md#lra-reset)).
 - **Respawn:** as in Training, a KO'd practice fighter is back at once unless Fighters & Stages ›

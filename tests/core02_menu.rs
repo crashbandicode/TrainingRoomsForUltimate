@@ -115,10 +115,13 @@ fn layout_row_counts_match_the_rc_freeze() {
     // rc.6: the CPU page gained CPU Level in its own group, Level (31 → 32).
     // rc.13: Attacks & Movement gained Aerial Drift (32 → 33).
     // rc.13: Display & Controls gained Taunts after L+R+A Reset (the operator's order via the primary, 2026-11-14 03:44Z; 10 → 11).
-    assert_eq!(counts(false), [33, 10, 12, 24, 11, 3]);
-    assert_eq!(counts(true), [32, 10, 12, 24, 11, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 90);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 89);
+    // rc.14: Fighters & Stages gained Eggs-ercise, Breaks on, Target speed and CPU during a game in their own group,
+    // Practice games, appended to GROUPS so no group index moves (the operator's D7 (b), 2026-11-14 13:03Z; SPEC 2.3b,
+    // V2.6; 24 → 29, with Target).
+    assert_eq!(counts(false), [33, 10, 12, 29, 11, 3]);
+    assert_eq!(counts(true), [32, 10, 12, 29, 11, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 95);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 94);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 4);
@@ -127,8 +130,9 @@ fn layout_row_counts_match_the_rc_freeze() {
     assert_eq!(n(&|c| matches!(c, Control::MultiSelect(_) | Control::SwapGroups)), 11, "the checklists that stayed, and Swap groups");
     assert_eq!(n(&|c| matches!(c, Control::Slider)), 2);
     // Nothing is deferred any more (operator 2026-11-05): every editor has its row, and every group has rows.
-    // (104: Lobby Items, Phase 2 N11; 105: Ready Hats, P-HOT; rc.6: CPU Level; rc.13: Aerial Drift, Taunts.)
-    assert_eq!(ROWS.len(), 94);
+    // (104: Lobby Items, Phase 2 N11; 105: Ready Hats, P-HOT; rc.6: CPU Level; rc.13: Aerial Drift, Taunts; rc.14: the
+    // four Practice games rows.)
+    assert_eq!(ROWS.len(), 99);
     for editor in [Editor::SetupSave, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }
@@ -146,6 +150,9 @@ fn layout_row_counts_match_the_rc_freeze() {
         assert!(ROWS.iter().any(|r| usize::from(r.group) == g), "{}", group.title);
     }
     assert!(ROWS.iter().all(|r| usize::from(r.group) < GROUPS.len()));
+    // Appended groups (rc.6 Level, rc.14 Practice games): the earlier indices hold.
+    let titles: Vec<&str> = GROUPS.iter().map(|g| g.title).collect();
+    assert_eq!((titles.len(), titles[13], titles[19], titles[20]), (21, "Extras", "Level", "Practice games"));
     for pilot_present in [false, true] {
         let m = menu_with(Env { pilot_present, ..Env::default() });
         assert!((0..m.entry_count(Page::Saves)).any(|i| m.entry(Page::Saves, i) == Some(Entry::Group(7))), "the Setup library section shows");

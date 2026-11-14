@@ -390,6 +390,75 @@ The seven entries:
 Every entry also needs Cycle Preload above Off, Preload on Fighters or Both and Ready Fighter Bodies above Off; the
 list doesn't grey them for that.
 
+## Practice games
+
+### Eggs-ercise
+
+A practice game for your attacks. A target pops up from the ground. Hit it and it breaks, and the next one pops up
+somewhere else on screen, at least a few character widths away. Each target flies straight up for about half a second,
+falls back, bounces once and then rests on the ground until you hit it; it may drift a little sideways. It passes
+through platforms. Break as many as you can in one minute, break 10 or 20 as fast as you can, or practise without a
+timer.
+
+- **Values:** Off, 1 minute, 10 targets, 20 targets, Free practice
+- **Default:** Off
+- **How:** pick a mode and close the menu: the first target appears and the notice shows the count. The clock runs
+  while the game runs; pausing or opening the menu stops it.
+  - **1 minute:** the notice reads "Eggs 0   1:00" and the clock counts down. At 0:00 the targets stop and the notice
+    reads "Time! 12 eggs (best 15)" for three seconds.
+  - **10 targets, 20 targets:** the notice reads "Eggs 0/10   0:00.00" and the clock counts up in hundredths. The last
+    target stops it, and the notice reads "Done! 10 in 0:18.27 (best 0:16.90)" for three seconds.
+  - **Free practice:** only the count.
+  - The best is per fighter and per mode, and lasts until the game closes.
+
+To go again, press L+R+A in Training (with **L+R+A Reset** On), or open and close the menu: either one starts a new run
+from 0.
+Changing the stage starts a new run too. A fighter cycle or a save-state load keeps the run going. Off removes the
+target and the notice.
+
+The target is drawn by the plugin, so Hitbox Visualization can be On or Off: with it On you see your hitboxes meet the
+target. Nothing changes in the game. In the waiting room's practice only your own screen shows the target. The CPU keeps
+doing what the CPU page says; hitting it doesn't count, unless the CPU is the target (see **Target**).
+
+### Breaks on
+
+Which of Player 1's hits break a target. Projectiles (lasers, arrows, thrown items) never do. Ice Climbers' Nana counts
+as Player 1.
+
+- **Values:** Any attack, Aerials, Hits of 12%+
+- **Default:** Any attack
+- **How:** Any attack: any hitbox of Player 1. Aerials: only while Player 1 is in an aerial. Hits of 12%+: only hitboxes
+  that deal 12% or more, so most jabs and tilts don't. The rule applies from the next time the menu closes.
+
+### Target
+
+What the target is. Disc: the plugin's target, as above. CPU: the CPU itself is the target.
+
+- **Values:** Disc, CPU
+- **Default:** Disc
+- **How:** CPU: the CPU is put on the ground at the spot where the next target would appear, with 0%, and held there. A
+  hit that the game registers on it and that **Breaks on** lets count breaks the target: the game plays its own hitlag and
+  knockback, then the CPU goes back to 0% at the next spot. The CPU stays still, so **Target speed** does nothing. It
+  applies from the next time the menu closes. In the waiting room's practice the CPU is moved too.
+### Target speed
+
+How fast the targets fly. Every speed traces the same path: the same height and the same landing spot.
+
+- **Values:** Normal, Slow, Fast
+- **Default:** Normal
+- **How:** Normal: up for half a second, at rest after about 1.6 s. Slow: half as fast (at rest after about 3.2 s).
+  Fast: one and a half times as fast (at rest after about 1.1 s). It applies from the next time the menu closes.
+
+### CPU during a game
+
+Whether the CPU is hidden for as long as a practice game runs (a game runs from the menu close that starts a mode until
+the mode is Off; "Time!", the end notice and the wait between runs count as running).
+
+- **Values:** Hide, Show
+- **Default:** Hide
+- **How:** Hide: the CPU is hidden while a game runs, and afterwards it is as **Hide CPU** says. Show: the CPU stays as
+  it is. It applies when the menu closes.
+
 ## Reset page to defaults
 
 The last row of the page. It asks first, then puts every row of Fighters & Stages back to your saved defaults (the

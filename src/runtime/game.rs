@@ -329,6 +329,11 @@ pub mod natives {
         at::<extern "C" fn(usize) -> bool>(sites_pkg4::STOP_IS_STOP_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
+    /// `StopModule::set_hit_stop_frame(accessor, frames, false)`: the body is in hitstop for `frames` ticks, as after a hit.
+    pub unsafe fn set_hit_stop_frame(accessor: usize, frames: i32) {
+        at::<extern "C" fn(usize, i32, bool)>(crate::model::sites_hitbox::HITBOX_SET_HIT_STOP_FRAME_OFFSET).map_or_else(Default::default, |f| f(accessor, frames, false))
+    }
+
     /// `WorkModule::set_int(accessor, value, id)`.
     pub unsafe fn set_int(accessor: usize, value: i32, id: i32) {
         at::<extern "C" fn(usize, i32, i32)>(sites_pkg4::WORK_SET_INT_OFFSET).map_or_else(Default::default, |f| f(accessor, value, id))
@@ -511,6 +516,16 @@ pub mod natives {
         super::granted(ORB_SCREEN_SIZE_OFFSET).then(|| {
             [((text_base() + ORB_SCREEN_W_WORD) as *const f32).read_volatile(), ((text_base() + ORB_SCREEN_H_WORD) as *const f32).read_volatile()]
         })
+    }
+
+    /// The stage's camera limit range (left, right, top, bottom): the four floats `app::camera::get_camera_limit_range` returns from
+    /// the camera manager (`**(main+0x52b8f00)`); `None` when its relied row was not granted or the manager is not built yet.
+    pub unsafe fn camera_limit_range() -> Option<[f32; 4]> {
+        use crate::model::sites_hitbox::{CAMERA_LIMIT_FIELD, CAMERA_LIMIT_RANGE_OFFSET};
+        let holder = (text_base() + sites_pkg2::CAMERA_MANAGER_SLOT_OFFSET) as *const *const usize;
+        let holder = super::granted(CAMERA_LIMIT_RANGE_OFFSET).then(|| holder.read_volatile())?;
+        let manager = (!holder.is_null()).then(|| holder.read_volatile())?;
+        (manager != 0).then(|| ((manager + CAMERA_LIMIT_FIELD) as *const [f32; 4]).read_unaligned())
     }
 
     /// A `phx::Vector3f` as the game reads it (16 bytes, 16-aligned).

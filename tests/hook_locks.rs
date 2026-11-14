@@ -55,6 +55,9 @@ const HOOK_LOCKS: &[(&str, &str)] = &[
     ("features/hitbox.rs", "STORE"),
     ("features/hitbox.rs", "BOARD"),
     ("features/hitbox.rs", "ORB_PANES"),
+    // rc.14 Eggs-ercise: the run is stepped by the fighter pass and reset by the on-init wrapper (game thread); the layout
+    // tick reads its egg. The menu worker reaches it only through atomics (`eggs_start`, `publish`).
+    ("features/hitbox.rs", "RUN"),
     ("compat/menu.rs", "EDITED"),
     ("ui/input.rs", "ADAPTER"),
     ("ui/menu_app.rs", "QUICK_MENU_APP"),

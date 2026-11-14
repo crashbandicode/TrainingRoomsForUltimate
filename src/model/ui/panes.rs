@@ -1008,6 +1008,13 @@ pub const NOTICE_ORIGIN_Y: f32 = {
     bar_bottom - gap - (header_top + plate_pad)
 };
 
+/// A short notice's two plates (header and text, padded) on the canvas: `[left, bottom, right, top]`.
+pub const NOTICE_PLATES: [f32; 4] = {
+    let ([_, hy, w, hh], [_, ty, _, th]) = (padded(NOTICE_HEADER_BOX), padded(NOTICE_TEXT_BOX));
+    let o = NOTICE_ORIGIN_Y;
+    [-w / 2.0, o + ty - th / 2.0, w / 2.0, o + hy + hh / 2.0]
+};
+
 /// Pane `index`'s kind and place.
 pub const fn spec(index: usize) -> Spec {
     let name = name_of(index);

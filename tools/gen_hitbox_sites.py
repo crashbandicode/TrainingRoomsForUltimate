@@ -64,6 +64,10 @@ ROWS = [
      "The projection behind `app::sv_camera_manager::world_to_screen` (`main+0x22832c0` calls it as `(out_x*, out_y*, pos&, bool)`): with `false`, the render camera's view (`[[main+0x5337ce8]+0x490]+0xe0`) and projection, divided by w, mapped to pixels; writes only its two outputs. Projects the own orbs (decision HB-OWN-ORBS)."),
     ("orb_screen_size", 0x13415F0, RELIED,
      "Inside that projection: the screen size words `main+0x744701c` / `+0x7447020` (`fcvtzu`, `ucvtf`, `* 0.5`, else the defaults at `main+0x44728b8` / `+0x44724c4`): the half extent the orbs map pixels back to the layout canvas with. Relied on, never written."),
+    ("stop_set_hit_stop_frame", 0X2089260, CALLED,
+     "`StopModule::set_hit_stop_frame(accessor, frames, bool)` (lua_bind thunk `ldr x0,[x0,#0x90]; ldr x8,[x0]; ldr x3,[x8,#0xd0]; and w2,w2,#1; br x3`): freezes the fighter that broke an Eggs-ercise target for the hitlag frames, as a hit does (SPEC V2.1); called with false only."),
+    ("camera_limit_range", 0X15CB9B0, RELIED,
+     "`app::camera::get_camera_limit_range` (`main+0x15cb9b0`): loads the camera manager `**(main+0x52b8f00)` and returns the four floats at `+0xc20`, the stage"),
 ]
 
 

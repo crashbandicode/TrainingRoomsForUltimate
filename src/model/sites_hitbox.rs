@@ -45,7 +45,13 @@ pub const ORB_SCREEN_SIZE_OFFSET: usize = 0x134_15f0;
 /// The screen size words that projection reads (`.bss`, offsets from `.text`).
 pub const ORB_SCREEN_W_WORD: usize = 0x744_701c;
 pub const ORB_SCREEN_H_WORD: usize = 0x744_7020;
+/// Eggs-ercise's hitlag (SPEC V2.1): `StopModule::set_hit_stop_frame`, a lua_bind thunk.
+pub const HITBOX_SET_HIT_STOP_FRAME_OFFSET: usize = 0x208_9260;
+/// Eggs-ercise's stage range (V2.2): the accessor `app::camera::get_camera_limit_range` returns the camera manager's
+/// (`sites_pkg2::CAMERA_MANAGER_SLOT_OFFSET`) four floats at `CAMERA_LIMIT_FIELD`; the plugin reads them, never calls it.
+pub const CAMERA_LIMIT_RANGE_OFFSET: usize = 0x15c_b9b0;
+pub const CAMERA_LIMIT_FIELD: usize = 0xc20;
 /// The three hooks' rows (the other rows are called or relied on, never written).
 pub const HOOK_ROWS: [&str; 3] = ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound"];
 
-pub static SITES: [Site; 24] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));
+pub static SITES: [Site; 26] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));

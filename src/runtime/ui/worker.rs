@@ -1128,6 +1128,8 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(7);
     published::publish(&settings.menu, outbox.rerolls);
+    // rc.14: every close with Eggs-ercise on starts a fresh run.
+    crate::runtime::features::hitbox::eggs_start();
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(10);
     // The carried engines read the typed view of the committed settings (decision D1).

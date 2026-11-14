@@ -117,6 +117,8 @@ pub mod sha256;
 pub mod hitbox;
 #[path = "model/hitbox_orbs.rs"]
 pub mod hitbox_orbs;
+#[path = "model/eggs.rs"]
+pub mod eggs;
 #[path = "model/sites_hitbox.rs"]
 pub mod sites_hitbox;
 #[path = "model/sites_u4.rs"]

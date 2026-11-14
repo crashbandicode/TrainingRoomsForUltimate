@@ -65,7 +65,7 @@ const fn g(page: Page, title: &'static str) -> Group {
     Group { page, title, advanced: false }
 }
 
-pub static GROUPS: [Group; 20] = [
+pub static GROUPS: [Group; 21] = [
     g(Page::Cpu, "Reactions"),
     g(Page::Cpu, "Defence"),
     g(Page::Cpu, "Ledge & Tech"),
@@ -88,6 +88,8 @@ pub static GROUPS: [Group; 20] = [
     g(Page::Developer, "Developer"),
     // rc.6: appended so no group index moves; the menu shows a page's groups in index order, so it follows "Player 1 control".
     g(Page::Cpu, "Level"),
+    // rc.14, appended the same way: it follows Loading on Fighters & Stages.
+    g(Page::FightersStages, "Practice games"),
 ];
 
 // Group indices, for the rows below.
@@ -113,6 +115,7 @@ const SCREEN: u8 = 16;
 const CONTROLS: u8 = 17;
 const DEV: u8 = 18;
 const LEVEL: u8 = 19;
+const GAMES: u8 = 20;
 
 /// The sub-screens that edit something the model does not own the content of (the fork's grids,
 /// lists and panels arrive with package 6; the libraries and the replay window with package 4).
@@ -221,7 +224,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 94] = [
+pub static ROWS: [Row; 99] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -423,9 +426,20 @@ pub static ROWS: [Row; 94] = [
       "While on, holding L+R+A on Player 1 re-reads the\ndeveloper config file every frame."),
     r(DEV, "Debug hooks", "dev_debug_hooks", TOGGLE,
       "Turns on the debug watch on the Kirby backshield\nwork float."),
-    // CPU > Level (rc.6; its group is the last in `GROUPS`, so its row is the last here)
+    // CPU > Level (rc.6; its group was appended to `GROUPS`, so its row follows the others here)
     r(LEVEL, "CPU Level", "cpu_level", Control::Dropdown(&o::CPU_LEVELS),
       "The level of the CPUs in Training and the lobby.\nOff: the game's own level."),
+    // Fighters & Stages > Practice games (rc.14, appended like Level)
+    r(GAMES, "Eggs-ercise", "eggsercise", Control::Dropdown(&o::EGGSERCISE),
+      "Break the targets that appear. Starts when the menu closes.\nTimed: 60 s, or break 10 or 20 fastest. Free practice: no timer."),
+    r(GAMES, "Breaks on", "eggsercise_break", Control::Dropdown(&o::EGGS_BREAK),
+      "Which of your hits break a target. Projectiles never do.\n12%+: only attacks that deal 12% or more."),
+    r(GAMES, "Target", "eggsercise_target", Control::Dropdown(&o::EGGS_TARGET),
+      "Disc: a target appears. CPU: the CPU is the target.\nThe CPU target stays still and is reset after each hit."),
+    r(GAMES, "Target speed", "eggsercise_speed", Control::Dropdown(&o::EGGS_SPEED),
+      "How fast targets fly. Normal is Melee's Eggs-ercise speed.\nSlow: half speed. Fast: one and a half times as fast."),
+    r(GAMES, "CPU during a game", "practice_cpu", Control::Dropdown(&o::PRACTICE_CPU),
+      "Hide: the CPU is hidden while a practice game runs.\nAfterwards it's as Hide CPU says. Show: it stays."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

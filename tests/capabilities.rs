@@ -368,6 +368,8 @@ fn every_native_the_runtime_names_is_a_guarded_row() {
         "TOOL_DURABILITY_OFFSET",
         "TOOL_MATERIAL_OFFSET",
         "UI_TEX_SERVICE_SLOT_WORDS_OFFSET",
+        // Eggs-ercise's stage range (V2.2): read behind the `camera_limit_range` relied row, which is that accessor's own words.
+        "CAMERA_MANAGER_SLOT_OFFSET",
     ]
     .into();
     let mut unguarded = BTreeSet::new();

@@ -1,0 +1,453 @@
+//! Eggs-ercise (rc.14, `artifacts/rc14-eggsercise/SPEC.md` §V2): break as many targets as you can in a minute, 10 or 20
+//! as fast as you can, or without a timer in free practice. The egg is one of the plugin's own orbs (D1 a),
+//! drawn whether Hitbox Visualization is On or Off (`hitbox_orbs::drawn`) and broken when one of Player 1's live attack
+//! pills overlaps it; nothing is written to the game. The runtime half is `runtime::features::hitbox::eggs_pass`.
+
+use super::hitbox::{Sphere, KIND_HIT, SCALE};
+use super::hitbox_orbs::{Orb, CANVAS_HALF};
+use super::panes::NOTICE_PLATES;
+use super::scene::{scene, Facts};
+
+pub const ROW: &str = "eggsercise";
+pub const ROW_BREAK: &str = "eggsercise_break";
+pub const ROW_SPEED: &str = "eggsercise_speed";
+pub const ROW_TARGET: &str = "eggsercise_target";
+/// V2.6: `Hide` (the first option) hides the CPU while a practice game runs (`Run::running`); Hide CPU's rule reads it.
+pub const ROW_PRACTICE_CPU: &str = "practice_cpu";
+/// The standing notice (D5).
+pub const NOTICE_ID: u8 = 0x2E;
+pub const HEADER: &str = "Eggs-ercise";
+/// The `eggsercise` row's options: the mode.
+pub const OFF: u8 = 0;
+pub const TIMED: u8 = 1;
+/// `10 targets`, `20 targets` (SPEC V2.4): the clock counts up and stops at the Nth target (`goal`).
+pub const TEN: u8 = 2;
+pub const TWENTY: u8 = 3;
+pub const FREE: u8 = 4;
+/// The `eggsercise_break` row's options: what breaks an egg (D3 b: any attack by default; projectiles never).
+pub const ANY: u8 = 0;
+pub const AERIALS: u8 = 1;
+pub const STRONG: u8 = 2;
+/// `Hits of 12%+`.
+pub const STRONG_DAMAGE: f32 = 12.0;
+/// The `eggsercise_target` row's options (V2.1): the plugin's disc, or the CPU, standing still.
+pub const DISC: u8 = 0;
+pub const CPU: u8 = 1;
+/// `Aerials`: the fighter's status is `FIGHTER_STATUS_KIND_ATTACK_AIR` (13.0.5; the pilot's move observer's value).
+pub const ATTACK_AIR: i32 = 0x36;
+/// `1 minute`, in clock ticks (D4: Player 1's game frames, so pause, menus and Game speed stretch it alike).
+pub const RUN_FRAMES: u32 = 3600;
+/// How long "Time!" shows.
+pub const END_FRAMES: u16 = 180;
+/// The `eggsercise_speed` row's options (§2.3b): time runs `SPEEDS[option]` times as fast; the path stays the same.
+pub const NORMAL: u8 = 0;
+pub const SLOW: u8 = 1;
+pub const FAST: u8 = 2;
+pub const SPEEDS: [f32; 3] = [1.0, 0.5, 1.5];
+/// The spawn (§2.3b, V2.2): on the run's ground, x within the stage's camera range (`range`; `HALF_WIDTH` either side of the
+/// centre without it) and on screen, `DRIFT` in from its edges, at least `MIN_GAP` from the target just broken.
+pub const HALF_WIDTH: f32 = 60.0;
+pub const MIN_GAP: f32 = 30.0;
+pub const RADIUS: f32 = 4.0;
+/// The flight at Normal (§2.3b): straight up at `LAUNCH` a tick under `GRAVITY` (21.6 up at tick 30, back down at 60), one
+/// bounce at `BOUNCE` times that speed, then rest; sideways up to `DRIFT_SPEED` a tick either way, so at most `DRIFT` in
+/// all.
+pub const LAUNCH: f32 = 1.44;
+pub const GRAVITY: f32 = 0.048;
+pub const BOUNCE: f32 = 0.6;
+pub const DRIFT_SPEED: f32 = 0.1;
+pub const DRIFT: f32 = 10.0;
+/// A break freezes the fighter that broke it for `HITLAG` ticks (V2.1: no native gives an attack's own hitlag, so the
+/// spec's fixed 6).
+pub const HITLAG: i32 = 6;
+/// Draw ticks the camera must hold still before a run's first target spawns: L+R+A sends it gliding to the new spot for a
+/// moment, and the target must land in the view it keeps (Eden wa-eggsfly-a6266ac1-1: a target spawned at x 70 by the view
+/// before the glide was off screen for 92 of its 93 ticks).
+pub const SETTLE: u32 = 10;
+/// The break animation (V2.1 ii, our own): the broken target grows by `BURST_GROW` of its size and fades out over
+/// `BURST_TICKS`; at most two at once, a third replaces the older.
+pub const BURST_TICKS: u32 = 12;
+pub const BURST_GROW: f32 = 0.6;
+
+/// The hitlag of a break: native Training only, until the waiting room's LDN check (V2.1).
+pub fn hitlag(facts: Facts) -> Option<i32> {
+    facts.native_training.then_some(HITLAG)
+}
+
+/// The egg's colour (sRGB): a brown egg's shell. Not white (hitbox id 7), pink (grab boxes) or yellow (hurtboxes); a pale
+/// egg did not show on Training's white stage (Eden wa-eggs-07bae4c1-1).
+pub const EGG: [u8; 4] = [196, 132, 72, 255];
+
+/// The camera's map from the fighters' plane to the layout canvas (`hitbox_orbs::to_canvas`): per axis, canvas = world *
+/// `.0` + `.1`; and `.2`, the x range the stage allows (`range`). The orb draw publishes it each tick of a live run; an egg
+/// spawns only on screen, clear of the notice.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct View(pub [f32; 2], pub [f32; 2], pub [f32; 2]);
+
+/// The x range a target may spawn in (V2.2): the stage's own camera range, the game's camera limit rect `[left, right, ..]`;
+/// the draft's `HALF_WIDTH` box when it is missing or not a range at least as wide.
+pub fn range(limit: Option<[f32; 4]>) -> [f32; 2] {
+    let wide = |[l, r]: &[f32; 2]| (r - l).is_finite() && r - l >= 2.0 * HALF_WIDTH;
+    limit.map(|[l, r, ..]| [l, r]).filter(wide).unwrap_or([-HALF_WIDTH, HALF_WIDTH])
+}
+
+/// The rows' option indices (the first option when a row is missing).
+pub fn choices(snapshot: &super::settings::Snapshot) -> [u8; 4] {
+    [ROW, ROW_BREAK, ROW_SPEED, ROW_TARGET].map(|id| {
+        let row = snapshot.get(id).unwrap_or_default();
+        row.iter().position(|v| *v != 0).unwrap_or(0) as u8
+    })
+}
+
+/// One live attack of the fighter in world space: a pill from `.0` to `.1` (the same point for a point hitbox), its radius
+/// and its damage.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Hit(pub [f32; 3], pub [f32; 3], pub f32, pub f32);
+
+/// Whether a hit of `power` counts under `rule`, `aerial` being whether the fighter is in an aerial.
+fn counts(rule: u8, aerial: bool, power: f32) -> bool {
+    [true, aerial, power >= STRONG_DAMAGE][usize::from(rule.min(STRONG))]
+}
+
+/// Whether `hit` breaks the egg at `egg` (the fighters' plane): `rule` lets it count and the pill overlaps the egg.
+pub fn breaks(rule: u8, aerial: bool, hit: &Hit, egg: [f32; 2]) -> bool {
+    let Hit(a, b, radius, power) = *hit;
+    let counts = counts(rule, aerial, power);
+    let (dx, dy, px, py) = (b[0] - a[0], b[1] - a[1], egg[0] - a[0], egg[1] - a[1]);
+    // A point hitbox: 0 / epsilon is 0.
+    let t = ((px * dx + py * dy) / (dx * dx + dy * dy).max(1e-9)).clamp(0.0, 1.0);
+    counts && (px - t * dx).hypot(py - t * dy) <= radius + RADIUS
+}
+
+/// The pills of a fighter's live attack spheres (`hitbox::want_hitboxes`), each end placed by `place`, a capsule's two ends
+/// one pill; `power(slot)` is the slot's damage. Only attack slots: an article's or an item's hitbox never reaches here.
+pub fn pills<P, D>(spheres: &[Sphere], mut place: P, mut power: D, out: &mut [Hit]) -> usize
+where
+    P: FnMut(&Sphere) -> Option<[f32; 3]>,
+    D: FnMut(i32) -> f32,
+{
+    let first = |s: &&Sphere| s.key >> 24 == KIND_HIT && s.key & 0xff == 0;
+    let mut n = 0;
+    for s in spheres.iter().filter(first).take(out.len()) {
+        let Some(a) = place(s) else { continue };
+        let b = spheres.iter().find(|e| e.key == s.key + 1);
+        let b = b.and_then(&mut place).unwrap_or(a);
+        out[n] = Hit(a, b, s.scale / SCALE, power((s.key >> 8 & 0xffff) as i32));
+        n += 1;
+    }
+    n
+}
+
+/// What one fighter's pass does: nothing, clear the notice (the run stopped), or read the fighter and step the run.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Plan {
+    Idle,
+    Clear,
+    Read,
+}
+
+/// The run: armed by a menu close with the row on, until Off or the end of practice.
+#[derive(Clone, Copy, Debug)]
+pub struct Run {
+    /// The mode, the rule, the speed and the target (`choices`) of the menu close that started it.
+    rows: [u8; 4],
+    /// Eggs broken this run.
+    pub score: u32,
+    frames: u32,
+    ground: f32,
+    /// The target's spawn point, its ticks since, and its flight: launch speed, sideways speed, gravity.
+    egg: Option<[f32; 2]>,
+    age: u32,
+    fly: [f32; 3],
+    /// The break animations' spots and ticks, the newest first.
+    bursts: [Option<([f32; 2], u32)>; 2],
+    rng: u32,
+    /// The clock keeper (`keeper`) and its rivals' passes since its last.
+    owner: (usize, u8),
+    shown: Option<(u32, u32)>,
+    pub view: Option<View>,
+    /// Draw ticks the camera has held the same `view`.
+    still: u32,
+    /// Whether Player 1 was in an aerial on its last pass, and the CPU target's state (`cpu_pass`).
+    air: bool,
+    cpu: u8,
+    /// The session's bests per fighter kind (`& 127`), and the last run's at 128, per mode (`TIMED` to `TWENTY`, from 0):
+    /// the 1-minute score, and the fastest 10 and 20 as `!frames`, so the larger is the better in all three.
+    best: [[u32; 3]; 129],
+}
+
+impl Run {
+    pub const IDLE: Run = Run {
+        rows: [OFF, ANY, NORMAL, DISC],
+        score: 0,
+        frames: 0,
+        ground: 0.0,
+        egg: None,
+        age: 0,
+        fly: [0.0; 3],
+        bursts: [None; 2],
+        rng: 1,
+        owner: (0, 2),
+        shown: None,
+        view: None,
+        still: 0,
+        air: false,
+        cpu: 0,
+        best: [[0; 3]; 129],
+    };
+
+    /// The N of `10 targets` and `20 targets`, 0 in the other modes.
+    fn goal(&self) -> u32 {
+        [0, 0, 10, 20, 0][usize::from(self.rows[0].min(FREE))]
+    }
+
+    /// V2.6: a practice game is running, from the menu close that starts a mode until Off or the scene is left (Time!, the
+    /// end notice and the wait for a restart count).
+    pub fn running(&self) -> bool {
+        self.rows[0] != OFF
+    }
+
+    /// A run has the CPU as its target.
+    pub fn cpu_target(&self) -> bool {
+        self.rows[3] == CPU && self.running()
+    }
+
+    fn ended(&self) -> bool {
+        match self.rows[0] {
+            TIMED => self.frames == 0,
+            _ => self.goal() > 0 && self.score >= self.goal(),
+        }
+    }
+
+    /// The draw's tick on the practice's layout (`active`): a run that wants eggs takes the camera `look` reads (nothing
+    /// is read otherwise); the target, then the break animations, to draw.
+    pub fn look(&mut self, active: bool, look: impl FnOnce() -> Option<View>) -> [Option<Orb>; 3] {
+        if active && self.rows[0] != OFF && !self.ended() {
+            let seen = look();
+            self.still = if seen == self.view { self.still + 1 } else { 0 };
+            self.view = seen;
+        }
+        let burst = |b: Option<([f32; 2], u32)>| {
+            let ([x, y], t) = b?;
+            let fade = t as f32 / BURST_TICKS as f32;
+            let mut orb = Orb { centre: [x, y, 0.0], tail: [x, y, 0.0], radius: RADIUS * (1.0 + BURST_GROW * fade), ..Orb::NONE };
+            orb.color = super::panes::linear([EGG[0], EGG[1], EGG[2], (255.0 * (1.0 - fade)) as u8]);
+            Some(orb)
+        };
+        [self.egg_orb(), burst(self.bursts[0]), burst(self.bursts[1])]
+    }
+
+    /// A fresh run (the menu closed with the row on, or a reset): score 0, a full clock, the first egg once the camera has held
+    /// still for `SETTLE` draws (a reset moves it, so the view from before is dropped, and the one right after is still on its
+    /// way).
+    pub fn start(&mut self, rows: [u8; 4], seed: u32) {
+        let (rng, best) = ((self.rng ^ seed) | 1, self.best);
+        *self = Run::IDLE;
+        let frames = RUN_FRAMES * u32::from(rows[0] == TIMED);
+        (self.rows, self.frames, self.rng, self.best) = (rows, frames, rng, best);
+    }
+
+    /// The game initialised the fighters again (L+R+A, Change Stage; the reset hub): an armed run starts over.
+    pub fn reset(&mut self, seed: u32) {
+        if self.rows[0] != OFF {
+            self.start(self.rows, seed);
+        }
+    }
+
+    fn stop(&mut self) -> Plan {
+        let (armed, rng, best) = (self.rows[0] != OFF, self.rng, self.best);
+        (*self, self.rng, self.best) = (Run::IDLE, rng, best);
+        [Plan::Idle, Plan::Clear][usize::from(armed)]
+    }
+
+    /// One fighter's pass: `rows` are the two rows, `go` a menu close's seed, `entry` the fighter's entry; `f` (the scene
+    /// facts, a game read) only for an entry-0 pass of a live run (or an ended one with a break animation to finish). Off,
+    /// an unarmed or ended run and every other entry read nothing; outside practice the run stops, and a hot swap (busy)
+    /// only idles it.
+    pub fn plan(&mut self, rows: [u8; 4], go: Option<u32>, entry: i32, f: fn() -> Facts) -> Plan {
+        match go {
+            _ if rows[0] == OFF => return self.stop(),
+            Some(seed) => self.start(rows, seed),
+            None => {}
+        }
+        if self.rows[0] == OFF || self.ended() && self.bursts == [None; 2] || entry != 0 {
+            return Plan::Idle;
+        }
+        let facts = f();
+        match scene(facts) {
+            _ if facts.busy => Plan::Idle,
+            None => self.stop(),
+            Some(_) => Plan::Read,
+        }
+    }
+
+    /// Whether `fighter`'s pass ticks the clock: the first to pass keeps it, and another takes it after the keeper missed
+    /// two passes in a row (a swap replaced it); Ice Climbers' Nana passes too and does not tick it twice.
+    pub fn keeper(&mut self, fighter: usize) -> bool {
+        self.owner.1 += 1;
+        if self.owner.0 == fighter || self.owner.1 > 2 {
+            self.owner = (fighter, 0);
+        }
+        self.owner.1 == 0
+    }
+
+    /// A new target on the ground, launched (§2.3b): x in the stage's range cut to the screen (its radius and `DRIFT` in from the
+    /// edges), the apex under the screen's top (a lower launch otherwise), at rest clear of the notice's plates, and
+    /// `MIN_GAP` from `last`; none before the draw published the camera (a run's first one, with no `last`, waits for it to
+    /// hold still).
+    fn spawn(&mut self, last: Option<[f32; 2]>) -> Option<()> {
+        let View(s, o, range) = self.view.filter(|_| last.is_some() || self.still >= SETTLE)?;
+        let edge = |i: usize, c: f32| (c * CANVAS_HALF[i] - o[i]) / s[i] - c * RADIUS;
+        let [x0, x1] = range.map(|v| v.max(edge(0, -1.0)).min(edge(0, 1.0)));
+        // The CPU target stands on the ground, still: no launch, no drift, and the notice's plates don't matter to a body.
+        let (cpu, disc) = (self.rows[3] == CPU, f32::from(self.rows[3] != CPU));
+        let (x0, x1, y) = (x0 + DRIFT, x1 - DRIFT, self.ground + RADIUS * disc);
+        let speed = SPEEDS[usize::from(self.rows[2].min(FAST))];
+        let g = GRAVITY * speed * speed;
+        let launch = disc * (LAUNCH * speed).min((2.0 * g * (edge(1, 1.0) - y).max(0.0)).sqrt());
+        // Ticks in the air: up and down, then the bounce.
+        let flight = 2.0 * (1.0 + BOUNCE) * launch / g;
+        let ([l, b, r, t], pad) = (NOTICE_PLATES, RADIUS * s[0]);
+        let clear = |[x, y]: [f32; 2]| {
+            let (cx, cy) = (x * s[0] + o[0], y * s[1] + o[1]);
+            cpu || cx + pad <= l || cx - pad >= r || cy + pad <= b || cy - pad >= t
+        };
+        let gap = |at: [f32; 2]| last.is_none_or(|[x, y]| (at[0] - x).hypot(at[1] - y) >= MIN_GAP);
+        let mut random = || {
+            self.rng = 1_013_904_223u32.wrapping_add(self.rng.wrapping_mul(1_664_525));
+            (self.rng >> 8) as f32 / (1u32 << 24) as f32
+        };
+        let tries = [(); 16].map(|_| (x0 + random() * (x1 - x0), disc * (2.0 * random() - 1.0) * DRIFT_SPEED * speed));
+        // Sixteen misses in a row: the end farther from the broken target, straight up.
+        let far = last.map_or(x0, |[x, _]| if x - x0 > x1 - x { x0 } else { x1 });
+        let at = tries.into_iter().find(|&(x, vx)| gap([x, y]) && clear([x + vx * flight, y]));
+        let (x, vx) = at.unwrap_or((far, 0.0));
+        (self.egg, self.age, self.fly) = (Some([x, y]), 0, [launch, vx, g]);
+        Some(())
+    }
+
+    /// Diag only (Eden's `diag-egg.req`): the target at `at`, at rest.
+    #[cfg(feature = "diag")]
+    pub fn place(&mut self, at: [f32; 2]) {
+        (self.egg, self.age, self.fly) = (Some(at), 0, [0.0, 0.0, GRAVITY]);
+    }
+
+    /// Where the target is now (the fighters' plane): up and back down in `2 v / g` ticks, one bounce at `BOUNCE` times the
+    /// speed, then at rest on its spawn height.
+    pub fn egg_at(&self) -> Option<[f32; 2]> {
+        let ([x, y], [v, vx, g], t) = (self.egg?, self.fly, self.age as f32);
+        let up = 2.0 * v / g;
+        let (v, t) = if t <= up { (v, t) } else { (v * BOUNCE, (t - up).min(up * BOUNCE)) };
+        let flown = (self.age as f32).min(up * (1.0 + BOUNCE));
+        Some([x + vx * flown, y + (v * t - g * t * t / 2.0).max(0.0)])
+    }
+
+    /// Diag only: where the target comes to rest (Eden's check that it is clear of the notice there).
+    #[cfg(feature = "diag")]
+    pub fn rest(&self) -> Option<[f32; 2]> {
+        let ([x, y], [v, vx, g]) = (self.egg?, self.fly);
+        Some([x + vx * 2.0 * (1.0 + BOUNCE) * v / g, y])
+    }
+
+    /// The egg as an own orb.
+    pub fn egg_orb(&self) -> Option<Orb> {
+        let ([x, y], mut orb) = (self.egg_at().filter(|_| self.rows[3] == DISC)?, Orb::NONE);
+        (orb.centre, orb.tail, orb.radius) = ([x, y, 0.0], [x, y, 0.0], RADIUS);
+        orb.color = super::panes::linear(EGG);
+        Some(orb)
+    }
+
+    /// One pass of an entry-0 fighter (`plan` said `Read`): `tick` (the clock keeper's pass, menu closed), `y` (its height:
+    /// the ground of a run's first egg), its pills, whether it is in an aerial (`air`) and its kind (the session's best when the
+    /// minute ends). The notice's length when its text changed (`write_notice`).
+    pub fn step(&mut self, tick: bool, y: f32, hits: &[Hit], air: bool, kind: i32) -> Option<u16> {
+        // The break animations run on the clock's ticks (pause freezes them); an ended run only finishes them.
+        for b in &mut self.bursts {
+            *b = b.map(|(at, t)| (at, t + u32::from(tick))).filter(|b| b.1 < BURST_TICKS);
+        }
+        self.air = air;
+        // A run the CPU target's last hit ended still holds its target until this pass closes it.
+        if self.ended() && self.egg.is_none() {
+            return None;
+        }
+        if self.egg.is_none() {
+            self.ground = y;
+            self.spawn(None);
+        }
+        let egg = self.egg_at()?;
+        if self.rows[3] == DISC && hits.iter().any(|h| breaks(self.rows[1], air, h, egg)) {
+            (self.score, self.bursts) = (self.score + 1, [Some((egg, 0)), self.bursts[0]]);
+            self.spawn(Some(egg));
+        }
+        self.age += u32::from(tick);
+        match self.rows[0] {
+            TIMED => self.frames -= u32::from(tick),
+            _ => self.frames += u32::from(tick && self.goal() > 0),
+        }
+        if self.ended() {
+            let (k, m) = (kind as usize & 127, usize::from(self.rows[0] - TIMED));
+            self.best[k][m] = self.best[k][m].max(if m == 0 { self.score } else { !self.frames });
+            (self.best[128][m], self.egg) = (self.best[k][m], None);
+            return Some(END_FRAMES);
+        }
+        // The 1-minute notice changes once a second, the N-target one every tick (hundredths).
+        let shown = (self.score, [self.frames, self.frames.div_ceil(60)][usize::from(self.rows[0] == TIMED)]);
+        (self.shown.replace(shown) != Some(shown)).then_some(u16::MAX)
+    }
+
+    /// The CPU target's pass (V2.1; the CPU's own fighter pass): where to hold the CPU, and whether to put it there afresh (its
+    /// position, damage and status) this tick; `None` leaves it to the game (no CPU target, a run that ended, the hitlag and
+    /// knockback after a hit). `damage` is its damage, `stopped` whether it is in hitlag. The first damage after a placement
+    /// has read 0% is a hit; it breaks the target when the rule lets it count, and then the next spot comes once the hitlag is
+    /// over (a hit that does not count puts the CPU back where it was). `cpu`: 0 place, 1 wait for 0%, 2 armed, 3 counted hit
+    /// in hitlag, 4 uncounted.
+    pub fn cpu_pass(&mut self, damage: f32, stopped: bool) -> Option<([f32; 2], bool)> {
+        let spot = self.egg.filter(|_| self.cpu_target() && !self.ended())?;
+        match (self.cpu, damage > 0.0) {
+            (2, true) => {
+                let counts = counts(self.rows[1], self.air, damage);
+                (self.cpu, self.score) = (3 + u8::from(!counts), self.score + u32::from(counts));
+                None
+            }
+            (3 | 4, _) if stopped => None,
+            (3 | 4, _) => {
+                if self.cpu == 3 {
+                    self.spawn(Some(spot));
+                }
+                self.cpu = 1;
+                Some((self.egg.unwrap_or(spot), true))
+            }
+            (0, _) | (1, true) => {
+                self.cpu = 1;
+                Some((spot, true))
+            }
+            _ => {
+                self.cpu = 2;
+                Some((spot, false))
+            }
+        }
+    }
+
+    /// The notice (SPEC V2.4): `Eggs N   m:ss` (1 minute), `Eggs N/10   m:ss.cc` (10 or 20 targets), `Eggs N` (free
+    /// practice); at the end `Time! N eggs (best M)` or `Done! 10 in m:ss.cc (best m:ss.cc)`.
+    pub fn write_notice(&self, out: &mut impl core::fmt::Write) -> core::fmt::Result {
+        let (score, goal, left, best) = (self.score, self.goal(), self.frames.div_ceil(60), self.best[128]);
+        // m:ss.cc of a frame count.
+        let clock = |f: u32| (f * 5 / 3 / 6000, f * 5 / 3 / 100 % 60, f * 5 / 3 % 100);
+        let (m, s, c) = clock(self.frames);
+        match self.rows[0] {
+            TIMED if self.ended() => write!(out, "Time! {score} eggs (best {})", best[0]),
+            _ if self.ended() => {
+                let (bm, bs, bc) = clock(!best[usize::from(self.rows[0] - TIMED)]);
+                write!(out, "Done! {goal} in {m}:{s:02}.{c:02} (best {bm}:{bs:02}.{bc:02})")
+            }
+            TIMED => write!(out, "Eggs {score}   {}:{:02}", left / 60, left % 60),
+            _ if goal > 0 => write!(out, "Eggs {score}/{goal}   {m}:{s:02}.{c:02}"),
+            _ => write!(out, "Eggs {score}"),
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "eggs_tests.rs"]
+mod tests;

@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 117;
+pub const COUNT: usize = 122;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -203,4 +203,14 @@ pub static DEFS: [Def; COUNT] = [
     row!("aerial_drift", Weighted, 5, []),
     // rc.13 Taunts: On (the game's own taunts) until the player turns them off. Appended like lobby_items.
     row!("taunts", Single, 2, [0]),
+    // rc.14 Eggs-ercise: Off / 1 minute / 10 targets / 20 targets / Free practice, and Any attack / Aerials / Hits of
+    // 12%+; appended like lobby_items.
+    row!("eggsercise", Single, 5, [0]),
+    row!("eggsercise_break", Single, 3, [0]),
+    // §2.3b: Normal / Slow / Fast.
+    row!("eggsercise_speed", Single, 3, [0]),
+    // V2.6: Hide the CPU for the length of a practice game (Hide / Show).
+    row!("practice_cpu", Single, 2, [0]),
+    // V2.1: Disc / CPU.
+    row!("eggsercise_target", Single, 2, [0]),
 ];

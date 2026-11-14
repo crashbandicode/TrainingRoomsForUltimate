@@ -38,6 +38,11 @@ pub static INPUT_DISPLAY: [&str; 2] = ["Off", "Frame strip"];
 /// SPEC-input-07 §6: frames from the recorded press that still count as on time, and what follows an attempt.
 pub static COMBO_TOLERANCE: [&str; 3] = ["Exact", "1 frame", "2 frames"];
 pub static COMBO_AFTER: [&str; 2] = ["Keep playing", "Load save state"];
+pub static EGGSERCISE: [&str; 5] = ["Off", "1 minute", "10 targets", "20 targets", "Free practice"];
+pub static EGGS_BREAK: [&str; 3] = ["Any attack", "Aerials", "Hits of 12%+"];
+pub static EGGS_SPEED: [&str; 3] = ["Normal", "Slow", "Fast"];
+pub static EGGS_TARGET: [&str; 2] = ["Disc", "CPU"];
+pub static PRACTICE_CPU: [&str; 2] = ["Hide", "Show"];
 pub static CYCLE_SLOTS: [&str; 6] = ["Off", "1", "2", "3", "4", "5"];
 pub static SOURCES: [&str; 3] = ["Fighters", "Hats", "Both"];
 pub static BODIES: [&str; 3] = ["Off", "2", "3"];

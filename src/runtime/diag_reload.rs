@@ -47,13 +47,38 @@ pub fn take_item_request() -> Option<usize> {
     usize::try_from(ITEM_REQUEST.swap(-1, std::sync::atomic::Ordering::AcqRel)).ok()
 }
 
-fn poll_item_request() {
-    let Some(path) = FixedPath::<128>::in_root(ITEM_NAME) else { return };
-    let Ok(bytes) = fs::read(path.as_str()) else { return };
+/// A request file's text, once: read, then removed.
+fn request(name: &str) -> Option<String> {
+    let path = FixedPath::<128>::in_root(name)?;
+    let bytes = fs::read(path.as_str()).ok()?;
     let _ = fs::remove_file(path.as_str());
-    let choice = String::from_utf8_lossy(&bytes).trim().parse::<i32>().unwrap_or(-1);
+    Some(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+fn poll_item_request() {
+    let Some(text) = request(ITEM_NAME) else { return };
+    let choice = text.trim().parse::<i32>().unwrap_or(-1);
     diagnostic(format_args!("[TrainingRooms] diag_item_request choice={choice}"));
     ITEM_REQUEST.store(choice, std::sync::atomic::Ordering::Release);
+}
+
+/// `diag-egg.req`: two numbers, `dx dy`. The game thread moves the current Eggs-ercise egg to Player 1's position plus
+/// that offset, floating (`hitbox::eggs_pass`), so an Eden row can put it where a move's hitbox will be.
+static EGG_REQUEST: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(u64::MAX);
+
+/// The egg offset Eden asked for, once.
+pub fn take_egg_request() -> Option<[f32; 2]> {
+    let bits = EGG_REQUEST.swap(u64::MAX, std::sync::atomic::Ordering::AcqRel);
+    (bits != u64::MAX).then(|| [bits as u32, (bits >> 32) as u32].map(f32::from_bits))
+}
+
+fn poll_egg_request() {
+    let Some(text) = request("diag-egg.req") else { return };
+    let mut words = text.split_whitespace().map(|w| w.parse::<f32>().unwrap_or(0.0));
+    let [dx, dy] = [words.next(), words.next()].map(Option::unwrap_or_default);
+    diagnostic(format_args!("[TrainingRooms] diag_egg_request dx={dx} dy={dy}"));
+    let bits = u64::from(dx.to_bits()) | u64::from(dy.to_bits()) << 32;
+    EGG_REQUEST.store(bits, std::sync::atomic::Ordering::Release);
 }
 
 /// F9 research (package 6): the native pause menu object (`x22` of package 4's stale-moves site), and `diag-pausedump.req` (one
@@ -69,10 +94,8 @@ pub fn note_pause_menu(menu: usize) {
 }
 
 fn poll_pause_dump() {
-    let Some(path) = FixedPath::<128>::in_root("diag-pausedump.req") else { return };
-    let Ok(bytes) = fs::read(path.as_str()) else { return };
-    let _ = fs::remove_file(path.as_str());
-    let tag: String = String::from_utf8_lossy(&bytes).chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-').take(24).collect();
+    let Some(text) = request("diag-pausedump.req") else { return };
+    let tag: String = text.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-').take(24).collect();
     let menu = PAUSE_MENU.load(std::sync::atomic::Ordering::Relaxed);
     if menu == 0 {
         diagnostic(format_args!("[TrainingRooms] diag_pause_dump tag={tag} object=none"));
@@ -87,6 +110,7 @@ fn poll_pause_dump() {
 
 fn poll() {
     poll_item_request();
+    poll_egg_request();
     poll_pause_dump();
     let Some(path) = FixedPath::<128>::in_root(NAME) else { return };
     let Ok(bytes) = fs::read(path.as_str()) else { return };

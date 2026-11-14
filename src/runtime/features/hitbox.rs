@@ -31,6 +31,9 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize
 use hos_lock::Mutex;
 
 use crate::model::cpu::hash::{hash40, lua_bind_hash};
+use crate::model::eggs::{self, HEADER, NOTICE_ID};
+use crate::model::hitbox::AttackReader;
+use crate::model::notify::DEFAULT_COLOR;
 use crate::model::guard::GuardOutcome;
 use crate::model::hitbox::{self, layout, Cell, Counts, Effects, FrameFacts, Indices, SetTable, Shape, SleepBook, Sphere, StatusIds};
 use crate::model::hitbox_orbs::{self as orbs, Board, Orb, OrbSink};
@@ -67,6 +70,142 @@ pub fn set_installed(on: bool) {
 /// Every settings publish.
 pub fn publish(snapshot: &Snapshot) {
     SETTING.store(hitbox::enabled(snapshot), Ordering::Release);
+    EGG_ROWS.store(u32::from_le_bytes(eggs::choices(snapshot)), Ordering::Release);
+}
+
+// ---- Eggs-ercise (rc.14, `model::eggs`) -------------------------------------------------------------------------------
+//
+// The rows reach the game thread as atomics (a publish runs on a plugin thread); the run is game-thread state, read by the
+// layout tick for the egg's orb like `BOARD`.
+
+/// The rows (`eggs::choices`, little-endian).
+static EGG_ROWS: AtomicU32 = AtomicU32::new(0);
+/// The menu closed: the next pass starts a run if the row is on (D9: reopening the menu restarts it).
+static EGG_START: AtomicBool = AtomicBool::new(false);
+static RUN: Mutex<eggs::Run> = Mutex::new(eggs::Run::IDLE);
+/// `Run::running` as of the last pass (the CPU's hide rule reads it from other threads).
+static EGG_RUNNING: AtomicBool = AtomicBool::new(false);
+
+/// Whether a practice game (Eggs-ercise) is running (V2.6).
+pub fn eggs_running() -> bool {
+    EGG_RUNNING.load(Ordering::Acquire)
+}
+
+fn seed() -> u32 {
+    // SAFETY: `GetSystemTick` has no preconditions.
+    unsafe { skyline::nn::os::GetSystemTick() as u32 }
+}
+
+/// The menu closed (the menu worker; an atomic only).
+pub fn eggs_start() {
+    EGG_START.store(true, Ordering::Release);
+}
+
+/// The reset hub ran (L+R+A, Change Stage): an armed run starts over. Game thread.
+pub fn eggs_reset() {
+    RUN.lock().reset(seed());
+}
+
+/// Player 1's pass (entry 0, Ice Climbers' Nana too) steps the run: the clock, the egg, its pills against the egg. It runs
+/// ahead of the visualizer's Off return, so it does not depend on Hitbox Visualization. Off, no run, an ended run and every
+/// other fighter make no game call.
+unsafe fn eggs_pass(fighter: usize) -> Option<()> {
+    let seed = EGG_START.swap(false, Ordering::AcqRel).then(seed);
+    let rows = EGG_ROWS.load(Ordering::Acquire).to_le_bytes();
+    // The fighter object's own entry field, as the reset hub reads it: not a game call.
+    let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
+    let mut run = RUN.lock();
+    let plan = run.plan(rows, seed, entry, scene::facts);
+    EGG_RUNNING.store(run.running(), Ordering::Release);
+    if plan == eggs::Plan::Clear {
+        super::notices::clear(NOTICE_ID);
+    }
+    if entry != 0 {
+        return eggs_cpu(&mut run, fighter, entry);
+    }
+    (plan == eggs::Plan::Read).then_some(())?;
+    let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
+    // Any menu over the game holds the clock: the plugin's, the game's own pause menu (the fighters' frames run on under
+    // it: Eden wa-eggs-07bae4c1-1, E11) and the waiting room's busy native UI.
+    let owners = crate::runtime::published::input_owners();
+    let tick = run.keeper(at) && !owners.covers_strip();
+    #[cfg(feature = "diag")]
+    {
+        static SAID: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(2);
+        let held = owners.covers_strip();
+        if SAID.swap(u8::from(held), Ordering::Relaxed) != u8::from(held) {
+            crate::runtime::diag_log::diagnostic(format_args!("[Eggs] held={held} owners={:#x}", owners.bits()));
+        }
+    }
+    let top = natives::joint_position(at, hash40("top"), &[0.0; 3]).unwrap_or_default();
+    let (mut wants, mut len) = ([Sphere::NONE; 2 * hitbox::SLOTS as usize], 0);
+    hitbox::want_hitboxes(&mut GameAttacks(at), &mut wants, &mut len);
+    let mut hits = [eggs::Hit::default(); hitbox::SLOTS as usize];
+    let place = |s: &Sphere| natives::joint_position(at, s.joint, &s.pos);
+    let power = |slot| GameAttacks(at).read_f32(GameAttacks(at).data(slot) + layout::POWER);
+    let n = eggs::pills(&wants[..len], place, power, &mut hits);
+    let aerial = natives::status_kind(at) == eggs::ATTACK_AIR;
+    let kind = natives::fighter_kind(at).unwrap_or(-1);
+    #[cfg(feature = "diag")]
+    if let Some([dx, dy]) = crate::runtime::diag_reload::take_egg_request() {
+        run.place([top[0] + dx, top[1] + dy]);
+    }
+    #[cfg(feature = "diag")]
+    if n != 0 {
+        let egg = run.egg_at();
+        let overlap = egg.is_some_and(|e| hits[..n].iter().any(|h| eggs::breaks(eggs::ANY, true, h, e)));
+        crate::runtime::diag_log::diagnostic(format_args!(
+            "[Eggs] pass at={at:#x} p1={top:?} egg={egg:?} overlap={overlap} air={aerial} score={} hits={:?}",
+            run.score,
+            &hits[..n]
+        ));
+    }
+    let score = run.score;
+    let length = run.step(tick, top[1], &hits[..n], aerial, kind);
+    // V2.1: the fighter whose attack broke it (Ice Climbers: that climber) freezes, as on a hit.
+    if let Some(frames) = (run.score > score).then(scene::facts).and_then(eggs::hitlag) {
+        natives::set_hit_stop_frame(at, frames);
+    }
+    let length = length?;
+    let mut text = crate::model::storage::FixedPath::<48>::new();
+    let _ = run.write_notice(&mut text);
+    super::notices::upsert(NOTICE_ID, HEADER, text.as_str(), length, DEFAULT_COLOR);
+    #[cfg(feature = "diag")]
+    crate::runtime::diag_log::diagnostic(format_args!(
+        "[Eggs] notice=\"{}\" at={at:#x} p1={top:?} egg={:?} rest={:?} tick={tick} view={:?}",
+        text.as_str(),
+        run.egg_at(),
+        run.rest(),
+        run.view
+    ));
+    Some(())
+}
+
+/// The CPU target's pass (V2.1; the practice CPU's own frame, only while a run has it as the target): hold it on the spot the
+/// run asks for, and when it says so put it back afresh, at 0% and standing, as a save state's load places a fighter.
+unsafe fn eggs_cpu(run: &mut eggs::Run, fighter: usize, entry: i32) -> Option<()> {
+    run.cpu_target().then_some(())?;
+    let primary = if scene::current()? == Scene::Lobby { crate::model::cpu::role::LOBBY_CPU_ENTRY } else { 1 };
+    (entry == primary).then_some(())?;
+    let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
+    let damage = natives::damage(at, 0);
+    #[cfg(feature = "diag")]
+    let score = run.score;
+    let moved = run.cpu_pass(damage, natives::is_stop(at));
+    #[cfg(feature = "diag")]
+    if run.score > score || moved.is_some_and(|m| m.1) {
+        crate::runtime::diag_log::diagnostic(format_args!("[Eggs] cpu damage={damage} score={} move={moved:?}", run.score));
+    }
+    let (spot, fresh) = moved?;
+    state_natives::set_pos(at, &state_natives::Vector3f { x: spot[0], y: spot[1], z: 0.0 });
+    state_natives::clear_speed_all(at);
+    if fresh {
+        state_natives::heal(at, -natives::damage(at, 0));
+        if let Some(wait) = game::lua_const(lua_bind_hash("FIGHTER_STATUS_KIND_WAIT")) {
+            state_natives::status_request(at, wait);
+        }
+    }
+    Some(())
 }
 
 /// The status ids and effect attributes, resolved once through the game's constant table (`None` until it answers; it may not be
@@ -209,6 +348,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         return;
     }
     let _scope = HookScope::enter_hook(HookId::HitboxOrbs);
+    let own = RUN.lock().look(active, || view());
     let mut cache = ORB_PANES.lock();
     let registrations = tick::REGISTRATIONS.load(Ordering::Acquire);
     if !active {
@@ -222,7 +362,8 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         return;
     }
     let on = SETTING.load(Ordering::Acquire);
-    if !on && cache.shown == [0; 2] && cache.layout == layout as usize {
+    let any = on || own.iter().any(Option::is_some);
+    if !any && cache.shown == [0; 2] && cache.layout == layout as usize {
         return;
     }
     if cache.layout != layout as usize || cache.registrations != registrations {
@@ -238,21 +379,22 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     if cache.container == 0 {
         // The layout has no orb panes (the plugin's archive did not load): nothing is drawn; said once.
         static MISSING_SAID: AtomicBool = AtomicBool::new(false);
-        if on && !MISSING_SAID.swap(true, Ordering::Relaxed) {
+        if any && !MISSING_SAID.swap(true, Ordering::Relaxed) {
             crate::runtime::diag_log::diagnostic(format_args!("[Hitbox] orb panes missing in the layout: fighter spheres are not drawn"));
         }
         return;
     }
     let mut used = orbs::PaneUse::default();
     let mut over = 0;
-    if on {
+    if any {
         let half = match natives::screen_size_words() {
             Some([w, h]) => [orbs::screen_half(w, orbs::SCREEN_HALF_DEFAULT[0]), orbs::screen_half(h, orbs::SCREEN_HALF_DEFAULT[1])],
             None => [0.0; 2],
         };
         let board = BOARD.lock();
-        // Hitboxes and grab boxes take the panes first; when they run out whole pills are cut, hurtboxes first (review HB-2).
-        for orb in board.in_draw_order() {
+        // The target and its break animations, then hitboxes and grab boxes take the panes first; when they run out whole
+        // pills are cut, hurtboxes first (review HB-2).
+        for orb in orbs::drawn(&own, on, &board) {
             let end = |at: [f32; 3]| -> Option<([f32; 2], [[f32; 2]; 2])> {
                 let [x, y] = orbs::edge_points(at, orb.radius);
                 Some((natives::world_to_screen(&at)?, [natives::world_to_screen(&x)?, natives::world_to_screen(&y)?]))
@@ -283,6 +425,16 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     }
     #[cfg(feature = "diag")]
     stats::orbs_drawn(n as u32, over);
+}
+
+/// The camera this tick (`eggs::View`): two points of the fighters' plane projected on the canvas.
+unsafe fn view() -> Option<eggs::View> {
+    let words = natives::screen_size_words()?;
+    let half = [0, 1].map(|i| orbs::screen_half(words[i], orbs::SCREEN_HALF_DEFAULT[i]));
+    let canvas = |p: [f32; 3]| Some(orbs::to_canvas(natives::world_to_screen(&p)?, half));
+    let (a, b) = (canvas([0.0; 3])?, canvas([10.0, 10.0, 0.0])?);
+    let scale = [(b[0] - a[0]) / 10.0, (b[1] - a[1]) / 10.0];
+    (scale[0] > 0.0 && scale[1] > 0.0).then(|| eggs::View(scale, a, eggs::range(natives::camera_limit_range())))
 }
 
 /// Show one cap or band picture (`target`, 0 when the layout lacks it) at `at`, `size` (width, height), turned by `rot`.
@@ -428,6 +580,7 @@ pub unsafe fn frame(fighter: usize) {
         return;
     }
     let _scope = HookScope::enter_hook(HookId::HitboxFrame);
+    eggs_pass(fighter);
     #[cfg(feature = "diag")]
     stats::frame_begin();
     let enabled = SETTING.load(Ordering::Acquire);

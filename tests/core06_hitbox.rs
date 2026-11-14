@@ -388,12 +388,13 @@ fn core06_off_restores() {
 
 #[test]
 fn core06_site_guards() {
-    // Three hooks, eleven called natives and ten relied windows (the Lua stack reads, HB1's three HitModule windows and, for
-    // the own orbs (decision HB-OWN-ORBS), the bone transform, the projection and its screen size words).
+    // Three hooks, twelve called natives (the last one Eggs-ercise's hitlag, `StopModule::set_hit_stop_frame`) and eleven relied
+    // windows (the Lua stack reads, HB1's three HitModule windows, for the own orbs (decision HB-OWN-ORBS) the bone transform,
+    // the projection and its screen size words and, for Eggs-ercise's spawn range, the camera limit accessor).
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 11);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 10);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 12);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 11);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
         assert_eq!(site.feature, Feature::Hitbox);
@@ -479,6 +480,8 @@ fn core06_rows_match_the_owned_elf() {
         ("effect_set_rate_last", "_ZN3app8lua_bind32EffectModule__set_rate_last_implEPNS_26BattleObjectModuleAccessorEf"),
         ("motion_animcmd_set_sleep_effect", "_ZN3app8lua_bind42MotionAnimcmdModule__set_sleep_effect_implEPNS_26BattleObjectModuleAccessorEb"),
         ("sv_battle_object_module_accessor", "_ZN3app9sv_system29battle_object_module_accessorEP9lua_State"),
+        ("stop_set_hit_stop_frame", "_ZN3app8lua_bind35StopModule__set_hit_stop_frame_implEPNS_26BattleObjectModuleAccessorEib"),
+        ("camera_limit_range", "_ZN3app6camera22get_camera_limit_rangeEv"),
     ] {
         let site = SITES.iter().find(|s| s.name == name).unwrap();
         assert_eq!(main.symbol(symbol), Some(site.offset), "{name}");
@@ -557,6 +560,24 @@ fn core06_attack_data_layout_matches_the_owned_elf() {
     assert_eq!(w(0x2285ba4), add_x(3, 31, 0x20));
     assert_eq!(w(0x2285bb0), 0xd63f_0100, "blr x8");
     // ...and the stride the slots are walked with is the AttackData size the plugin never assumes elsewhere.
+}
+
+/// Eggs-ercise V2.2: the stage's camera range is the camera manager's four floats (left, right, top, bottom) at `+0xc20`, read
+/// the way the game's own accessor reads them: the slot `main+0x52b8f00` (the one the camera setup hook reads), the pointer in
+/// it, the manager that points at, then the floats.
+#[test]
+fn core06_camera_limit_range_is_the_manager_field() {
+    let Some(main) = common::owned_main("core06_camera_limit_range_is_the_manager_field") else { return };
+    let (at, field) = (sites_hitbox::CAMERA_LIMIT_RANGE_OFFSET, sites_hitbox::CAMERA_LIMIT_FIELD as u32);
+    let w = |offset: usize| word_at(&main, offset);
+    let (adrp, ldr) = (w(at), w(at + 4));
+    assert_eq!(adrp & 0x9f00_001f, 0x9000_0008, "adrp x8");
+    let page = (at & !0xfff) + ((((adrp >> 5) & 0x7ffff) << 2 | (adrp >> 29) & 3) as usize) * 0x1000;
+    assert_eq!(ldr & 0xffc0_03ff, ldr_x(8, 8, 0) & 0xffc0_03ff, "ldr x8,[x8,#slot]");
+    assert_eq!(page + ((ldr >> 10) & 0xfff) as usize * 8, model::sites_pkg2::CAMERA_MANAGER_SLOT_OFFSET);
+    assert_eq!(w(at + 8), ldr_x(8, 8, 0), "the manager");
+    assert_eq!(w(at + 12), 0xbd40_0000 | (field / 4) << 10 | 8 << 5, "ldr s0,[x8,#0xc20]");
+    assert_eq!([w(at + 16), w(at + 20), w(at + 28)], [add_x(9, 8, field + 4), add_x(10, 8, field + 8), add_x(8, 8, field + 12)]);
 }
 
 #[test]
