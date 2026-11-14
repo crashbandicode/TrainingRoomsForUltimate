@@ -9,6 +9,9 @@
 //! rc.13 (a′) proper added `rows_module_pins` (6 rows: a kept group's fighter module pinned across its owner's Reload):
 //! 675 seam rows to 681, a 24th data file, and the seam digest with them.
 //!
+//! rc.14 Hide CPU added 7 rows (the natives that hide a CPU body, group `hide_cpu`) to `rows_cpu_level`: 681 seam rows to 688
+//! and the seam digest with them.
+//!
 //! rc.14 Eggs-ercise added `stop_set_hit_stop_frame` to `sites_hitbox` (the hitlag native, V2.1): 258 site rows to 259,
 //! and the site digest with them. V2.2 added camera_limit_range (the stage's camera range): 260.
 
@@ -75,8 +78,8 @@ fn every_data_row_has_a_64_byte_guard() {
     assert_eq!((files, rows), (24, SEAM_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS));
 }
 
-const SEAM_ROWS: usize = 681;
-const SEAM_DIGEST: &str = "294a22cba2a69b1a95099e526c7a4d1328a2ccf2d4706bed3e961ca282cd67c6";
+const SEAM_ROWS: usize = 688;
+const SEAM_DIGEST: &str = "77138f9ec6999107ad65a7ba8a734b6583f9f107059331ca4d371b38bffbe67e";
 const SITE_ROWS: usize = 260;
 const SITE_DIGEST: &str = "3207c6c0129416db033197573665e8c1790286b32e691ca82694583e94ce57bf";
 const UI_ROWS: usize = 6;

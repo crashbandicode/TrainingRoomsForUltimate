@@ -224,7 +224,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 99] = [
+pub static ROWS: [Row; 100] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -429,6 +429,9 @@ pub static ROWS: [Row; 99] = [
     // CPU > Level (rc.6; its group was appended to `GROUPS`, so its row follows the others here)
     r(LEVEL, "CPU Level", "cpu_level", Control::Dropdown(&o::CPU_LEVELS),
       "The level of the CPUs in Training and the lobby.\nOff: the game's own level."),
+    // rc.14 Hide CPU (SPEC-eggsercise V2.6): after CPU Level, the last row of the last group of GROUPS.
+    r(LEVEL, "Hide CPU", "hide_cpu", TOGGLE,
+      "On: the CPU is invisible, takes no hits and doesn't move.\nIts damage still shows. Off: it's back where it was."),
     // Fighters & Stages > Practice games (rc.14, appended like Level)
     r(GAMES, "Eggs-ercise", "eggsercise", Control::Dropdown(&o::EGGSERCISE),
       "Break the targets that appear. Starts when the menu closes.\nTimed: 60 s, or break 10 or 20 fastest. Free practice: no timer."),

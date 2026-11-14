@@ -38,6 +38,8 @@ pub(crate) fn init() {
     lobby_stage::init();
     // rc.6 CPU level: no hook, only its rows (the clock rides `update`, the step rides `frame`).
     crate::runtime::features::cpu_level::init();
+    // rc.14 Hide CPU: no hook, only its rows (the step rides the CPU frame).
+    crate::runtime::features::hide_cpu::init();
     // rc.8 game speed: no hook, only its rows (the lobby's slot rides `frame`).
     crate::runtime::features::game_speed::init();
     // rc.8 R2: the lobby's 2/3 pace and x1.5 pass ride one hook on the waiting area's update (after game speed's rows).

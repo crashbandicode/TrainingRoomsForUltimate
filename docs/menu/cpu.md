@@ -495,6 +495,21 @@ When it differs from the level in Training's own menu, a notice says so each tim
 
 ![CPU Level set to Lv 7; Training's card says Lv 3; the notice names both; the CPU fights at Lv 7](../media/rc11-cpu-level.gif)<br>*The notice when Training's own level differs*
 
+### Hide CPU
+
+Takes the CPU out of the fight without changing any of its settings.
+
+- On: the CPU is invisible and has no shadow or effects. Your attacks, grabs and projectiles pass through it, it
+  doesn't push you, and it takes no action: it doesn't move, fall or attack. Its damage still shows at the bottom of
+  the screen.
+- Off: the CPU is shown again where it stood, and the CPU page applies from that frame.
+- It stays hidden through L+R+A, a loaded save state and a changed CPU fighter.
+- Play on CPU is refused while the CPU is hidden ("The CPU is hidden: turn Hide CPU Off first").
+- Training only: in a waiting room the row is greyed ("Not in a waiting room yet") and does nothing.
+
+- **Values:** On, Off.
+- **Default:** Off.
+- **How:** Left/Right or A.
 ## Reset page to defaults
 
 The last row of the page. It asks first, then puts every row of the CPU page back to your saved defaults (the factory

@@ -1,5 +1,5 @@
 {
- "stage": "m5q",
+ "stage": "m5o",
  "comment": "Package 6 carry manifest (tools/carry_pkg6.py). Do not edit carried files by hand: change this manifest and re-run `carry`.",
  "modules": {
   "root": {
@@ -10135,7 +10135,7 @@
    "dest": "src/runtime/seams/seam_install.rs",
    "crate": "root",
    "src_sha256": "8c81d985258c0189ec1161fdc60efe573952596c55325cce07fbe9dc8c7503cd",
-   "dest_sha256": "b75422f580d56462fd7c9d20ec5ede7d5cd25b0449336e23b702b7d17d3a8ba7",
+   "dest_sha256": "cb7b76eec0d3ae6f4c85f70ddfbba30201e1299612e0de19cf15fbf76b70e19a",
    "edits": [
     {
      "old": "use crate::model;\n",
@@ -10236,6 +10236,11 @@
      "old": "    \"cpu_level\",\n    \"native_body_bank\",\n",
      "new": "    \"cpu_level\",\n    \"game_speed\",\n    \"native_body_bank\",\n",
      "reason": "rc.8 binds (p23/rc8-binds, primary 2026-11-11 04:02Z, docs/design/rc8-binds.md): the game speed bind's seam rows (rows_game_speed, authoritative group game_speed) join beside rows_res_unload"
+    },
+    {
+     "old": "    \"cpu_level\",\n",
+     "new": "    \"cpu_level\",\n    \"hide_cpu\",\n",
+     "reason": "rc.14 Hide CPU (SPEC-eggsercise V2.6; the operator 2026-11-14): the new seam group hide_cpu joins the authoritative groups (its rows are in rows_cpu_level.ROWS.tsv)"
     }
    ]
   },

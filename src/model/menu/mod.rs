@@ -49,6 +49,8 @@ pub struct Env {
     pub combo_draft: super::combo::Label,
     /// The build tag the page's key hints end with (R13): `frame::BUILD_TAG` on the console; empty adds nothing.
     pub build_tag: &'static str,
+    /// The menu opened in a waiting room's practice, where Hide CPU does nothing yet (SPEC-eggsercise V2.6).
+    pub waiting_room: bool,
 }
 
 impl Default for Env {
@@ -64,6 +66,7 @@ impl Default for Env {
             combo_target: super::combo::Label::EMPTY,
             combo_draft: super::combo::Label::EMPTY,
             build_tag: "",
+            waiting_room: false,
         }
     }
 }
@@ -134,6 +137,8 @@ pub enum Grey {
     RangeSet,
     /// The range of a delay row while the checklist holds a value.
     ChecklistSet,
+    /// Hide CPU in a waiting room (until the LDN check has passed).
+    WaitingRoom,
 }
 
 impl Grey {
@@ -146,6 +151,7 @@ impl Grey {
             Grey::NeedsThreeBodies => "Needs Ready Fighter Bodies set to 3",
             Grey::RangeSet => "A range is set: clear it first (Y)",
             Grey::ChecklistSet => "Values are ticked: clear them first (Y)",
+            Grey::WaitingRoom => "Not in a waiting room yet",
         }
     }
 }
@@ -822,6 +828,7 @@ impl Menu {
             "save_damage_limits_cpu" if self.get("save_damage_cpu").get(2).copied().unwrap_or(0) == 0 => {
                 Some(Grey::DamageNotRandom)
             }
+            "hide_cpu" if self.env.waiting_room => Some(Grey::WaitingRoom),
             _ => None,
         }
     }

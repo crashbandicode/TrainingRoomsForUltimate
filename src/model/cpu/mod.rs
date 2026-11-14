@@ -15,6 +15,7 @@ pub mod counter;
 pub mod defence;
 pub mod facts;
 pub mod hash;
+pub mod hide;
 pub mod ids;
 pub mod ledge;
 pub mod level;

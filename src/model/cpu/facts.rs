@@ -46,6 +46,8 @@ pub struct FrameFacts {
     pub reserve_dive: bool,
     /// The work flag `FIGHTER_INSTANCE_WORK_ID_FLAG_DISABLE_ESCAPE_PENALTY` as the game has it now.
     pub penalty_disabled: bool,
+    /// A practice game asked for the CPU to be hidden (`runtime::features::hide_cpu::hide`).
+    pub request: bool,
 }
 
 /// A playback the CPU behaviours ask the recording spec to start.
@@ -74,4 +76,6 @@ pub struct FrameOut {
     pub hide: HideOut,
     /// Set `RESERVE_DIVE` and show the fast-fall flash (SPEC-cpu-06).
     pub fast_fall: bool,
+    /// Hide CPU: hide or show this body (every other field is `None` while it stays hidden).
+    pub vanish: Option<bool>,
 }

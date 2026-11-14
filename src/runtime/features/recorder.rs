@@ -40,7 +40,7 @@ use crate::model::recording::{
 };
 use crate::model::sites_pkg4;
 use crate::runtime::alloc::{HookId, HookScope};
-use crate::runtime::features::{chords, cpu, input_display, notices, states};
+use crate::runtime::features::{chords, cpu, hide_cpu, input_display, notices, states};
 use crate::runtime::game::{self, natives};
 use crate::runtime::macros::{named_macros, replay_preview};
 use crate::runtime::{published, scene};
@@ -469,7 +469,7 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
 /// Record, Play on Player 1, and Play on CPU. The hook only posts the flags.
 unsafe fn chord_step(_body: Body, facing: i8) {
     let play_player = chords::consume(Request::PlayPlayer);
-    let playback = chords::consume(Request::InputPlayback);
+    let playback = chords::consume(Request::InputPlayback) && !hide_cpu::refuses_play();
     let record = chords::consume(Request::InputRecord);
     if states::is_loading() {
         if record || playback || play_player {

@@ -7,6 +7,7 @@
 use super::counter::{CounterId, Counters};
 use super::defence::{Defence, SdiAnswer};
 use super::facts::{FrameFacts, FrameOut};
+use super::hide;
 use super::ids::Table;
 use super::ledge::{Ledge, TermQuery};
 use super::mash::{BufferContext, Mash, Step};
@@ -62,6 +63,8 @@ pub struct Fighter {
     /// `reroll::*` bits a menu change left for this body's next CPU frame (decision Q18 A). A fresh
     /// body starts with the SDI roll pending, so its first frame rolls the direction.
     pub pending: u8,
+    /// Hide CPU: this body was hidden on its last frame.
+    pub away: bool,
 }
 
 impl Fighter {
@@ -77,6 +80,7 @@ impl Fighter {
             seen: Seen::new(),
             kind: super::ids::UNRESOLVED,
             pending: reroll::SDI_DIRECTION | reroll::SHIELD_TILT,
+            away: false,
         }
     }
 }
@@ -312,6 +316,11 @@ impl Cpu {
         if fighter.pending & reroll::SDI_DIRECTION != 0 {
             fighter.defence.sdi_roll(settings, rng);
             fighter.pending &= !reroll::SDI_DIRECTION;
+        }
+        // Hide CPU: while hidden no behaviour runs (nothing below is asked of the game).
+        out.vanish = hide::step(&mut fighter.away, self.scene, settings.hide_cpu, f.request);
+        if out.vanish == Some(true) {
+            return out;
         }
         out.stale_flag = Defence::stale_write(settings, f.penalty_disabled);
         if primary {

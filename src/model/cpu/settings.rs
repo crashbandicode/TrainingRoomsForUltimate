@@ -220,6 +220,8 @@ pub struct CpuSettings {
     pub tech_state: Weights<4>,
     pub miss_tech_state: Weights<4>,
     pub tech_hide: bool,
+    /// Hide CPU (rc.14): the CPU is invisible, cannot be hit and does not act.
+    pub hide_cpu: bool,
     pub shield_state: ShieldMode,
     /// The one selected direction of the Shield Tilt row, as an index of the Direction list.
     pub shield_tilt: Option<u8>,
@@ -273,6 +275,7 @@ impl CpuSettings {
             tech_state: Weights::from_row(row("tech_state")),
             miss_tech_state: Weights::from_row(row("miss_tech_state")),
             tech_hide: on("tech_hide"),
+            hide_cpu: on("hide_cpu"),
             shield_state: ShieldMode::from_row(row("shield_state")),
             shield_tilt: row("shield_tilt").iter().position(|v| *v != 0).map(|i| i as u8),
             oos_offset: delay("oos_offset", "oos_offset_range", 1),

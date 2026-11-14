@@ -38,7 +38,7 @@ use crate::model::sites_pkg2;
 use crate::model::storage::FixedPath;
 use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::diag_log::diagnostic;
-use crate::runtime::features::{notices, recorder, reset_hub, states};
+use crate::runtime::features::{hide_cpu, notices, recorder, reset_hub, states};
 use crate::runtime::game::{self, natives};
 
 #[path = "cpu_role_adapter.rs"]
@@ -264,6 +264,7 @@ pub fn entry_departed(owner: u32) {
 /// Unconditional scene retirement, including when no save/record lease exists.
 pub fn scene_departed() {
     with(role_adapter::scene_departed);
+    hide_cpu::restore();
     forget_player_position();
     // SAFETY: fighter 0 and accessor 0 read nothing; they clear Player 1's taunt slots.
     unsafe { taunt_frame(0, 0, false) };
@@ -574,6 +575,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
             falling,
             reserve_dive,
             penalty_disabled,
+            request: hide_cpu::REQUEST.load(Ordering::Acquire),
         };
         cpu.fighters[key.index()].kind = kind;
         // A save state loading is package 3's fact (`states::is_loading`, the load machine's own flag).
@@ -694,6 +696,7 @@ unsafe fn tech_facts(accessor: usize, status: i32, primary: bool) -> TechFacts {
 /// Do what the frame asked, with no lock held: the core's own requests, then each feature's, each behind its
 /// own install flag.
 unsafe fn apply(accessor: usize, out: FrameOut) {
+    hide_cpu::apply(accessor, out.vanish);
     if let Some(value) = out.stale_flag {
         let flag = konst(C::WorkFlagDisableEscapePenalty);
         if flag != UNRESOLVED {

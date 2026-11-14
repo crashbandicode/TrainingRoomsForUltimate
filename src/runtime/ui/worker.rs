@@ -155,6 +155,7 @@ fn env() -> Env {
         combo_target: crate::runtime::features::combo::labels().0,
         combo_draft: crate::runtime::features::combo::labels().1,
         build_tag: crate::model::frame::BUILD_TAG,
+        waiting_room: crate::runtime::scene::lobby_active(),
         ..Env::default()
     }
 }
