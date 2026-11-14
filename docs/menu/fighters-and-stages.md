@@ -406,7 +406,16 @@ list doesn't grey them for that.
 ![Fighters & Stages, Loading: the Swap groups row is focused and its help line reads: PT / Aegis groups need 3 free Ready Fighters](../media/rc13-swap-groups-help.png)<br>
 *The Swap groups row on the Loading section, with Ready Fighters at 2: the help line reads "PT / Aegis groups need 3 free Ready Fighters." Eden, rc.13 (untested on hardware).*
 
-<!-- CAPTURE-REQUEST v05-swap-groups: a short group Off then On clip for each Swap groups entry not yet shown (the Ice Climbers pair bank, pair groups and pair group look alike: label each). See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![Side by side, the same Player 1 swap from Pikachu back to Mario with Original fighter bank On (left) and Off (right): On has Mario there at once, Off leaves the spot empty a little longer](../media/rc14-swap-groups-orig-bank.gif)<br>
+*Original fighter bank On (left) and Off (right): the same cycle chord, lined up on the press, with the CPU Captain Falcon in both. Player 1 goes from Pikachu back to its starting fighter, Mario. On, Mario is there at once with "Original fighter restored"; Off, the spot stays empty a little longer while Mario loads. A timer runs bottom left. Eden, rc.14 (untested on hardware).*
+
+![Side by side, the same swap from Mario to Pokémon Trainer with PT / Aegis groups On (left) and Off (right): On has Squirtle and the Trainer there at once, Off leaves the spot empty a little longer](../media/rc14-swap-groups-pt-groups.gif)<br>
+*PT / Aegis groups On (left) and Off (right): the same cycle chord from Mario to Pokémon Trainer, the CPU Captain Falcon in both. On, Squirtle and the Trainer are there at once; Off, the spot stays empty a little longer while the three load. A timer runs bottom left. Eden, rc.14 (untested on hardware).*
+
+![Side by side, the same swap from Mario to Pyra with PT / Aegis groups On (left) and Off (right): On has Pyra there at once, Off leaves the spot empty a little longer](../media/rc14-swap-groups-aegis-groups.gif)<br>
+*The same switch with Pyra / Mythra: from Mario to Pyra, On (left) and Off (right). On, Pyra is there at once; Off, the spot stays empty a little longer while Pyra and Mythra load. Eden, rc.14 (untested on hardware).*
+
+<!-- CAPTURE-REQUEST v05-swap-groups: a short group Off then On clip for each Swap groups entry not yet shown: the Ice Climbers pair bank, pair groups, pair group and Solo Popo groups (they look alike and serve each other, so each needs its own setup: label each). Original fighter bank and PT / Aegis groups are shown above. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
 ## Practice games
 

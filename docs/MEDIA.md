@@ -755,3 +755,15 @@ Docs stills shot by gif-lane-5 on rc.13 `ed0d7a35` (diag `2a667381…`), Eden `2
 | `media/rc13-bound-save.png` | `gl4-ally-5`, `t-p2-bound-save` | guide/save-states | still, 1280 wide, labelled | recording frame at the take's mark, callouts drawn with `annotate.py` | SAVE STATES: Save 1 bound (green), "Macro 1 · start" the start save of Macro 1, Save 2; CONNECTIONS names the macro. |
 | `media/rc13-mii-list.png` | `gl4-ally-5`, `t-p2-mii-gunner` | guide/mii | still, 1280 wide, labelled | recording frame at the take's mark, callouts drawn with `annotate.py` | The Mii Gunner list for Player: role in the title, three Miis with their four special-move choices, ">" on the pick, Add New. |
 | `media/rc13-menu-control-toggle-list.png` | `gl4-ally-5`, `t-p2-controls` | guide/using-the-menu | still, 1280 wide, labelled | recording frame at the take's mark, callouts drawn with `annotate.py` | CPU > Defence: SDI Strength (a list, focused) and Dodge Staling (a toggle); help line and footer keys marked. |
+
+## rc.14 clips (2026-11-14, diag `aa336fc7`, untested on hardware)
+
+Shot by gif-lane-5 on integration-3's green diag `aa336fc7` (`libtraining_rooms-aa336fc7-diag.nro`, sha256 `4fd3a5df00bbef5db0699e8e2ce9c4f7d7955f0e68a4ad2cd5b7f4772f7937ae`), Eden 2f315fc4, muted, GDB stub on, 1x. These show rc.14 behaviour (the
+PT / Aegis group in a Mario + one-group cycle needs the rc.14 pt-groups fix), so they belong to rc.14's docs, not to rc.13's. The takes check
+their own claim: each half is read on the diag log, and both halves run against the same CPU.
+
+| File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
+| --- | --- | --- | --- | --- | --- |
+| `media/rc14-swap-groups-orig-bank.gif` | `g5-rc14-yoga-1`, `t-p2-g5-orig-bank` (gif-lane-5) | menu/fighters-and-stages (Swap groups) | 3.6 s, 8.4 MB | 47.29-50.89 s (On) and 23.21-26.81 s (Off), side by side | Original fighter bank On and Off, the same Player 1 swap from Pikachu back to Mario, the CPU Captain Falcon in both: On has Mario in at once ("Original fighter restored"); Off leaves the spot empty a little longer. Timer bottom left. |
+| `media/rc14-swap-groups-pt-groups.gif` | `g5-rc14-yoga-1`, `t-p2-g5-pt-groups` (gif-lane-5) | menu/fighters-and-stages (Swap groups) | 2.8 s, 7.8 MB | 46.62-49.42 s (On) and 20.01-22.81 s (Off), side by side | PT / Aegis groups On and Off, the same swap from Mario to Pokémon Trainer, the CPU Captain Falcon in both: On has Squirtle and the Trainer there at once (HUD Squirtle); Off leaves the spot empty a little longer. Log: On has the one-member Mario bank, the group planned and two presses served by it (79-119 ms); Off has no bank and every press a Reload. |
+| `media/rc14-swap-groups-aegis-groups.gif` | `g5-rc14-yoga-1`, `t-p2-g5-aegis-groups` (gif-lane-5) | menu/fighters-and-stages (Swap groups) | 2.8 s, 7.2 MB | 47.05-49.85 s (On) and 18.04-20.84 s (Off), side by side | The same switch with Pyra / Mythra: from Mario to Pyra, On (Pyra at once) and Off (the spot empty a little longer). Same log checks as the PT clip. |
