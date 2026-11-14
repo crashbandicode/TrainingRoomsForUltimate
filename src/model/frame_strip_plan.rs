@@ -419,44 +419,42 @@ pub fn input_line(link: &Link) -> Text {
     t
 }
 
-/// What was last written to each of the strip's panes.
-pub struct Renderer {
-    written: [Option<Look>; COUNT],
+/// What was last written to each of a bar's `N` panes (the strip here, the combo bar in `combo_plan`).
+pub struct Panes<const N: usize> {
+    written: [Option<Look>; N],
 }
 
-impl Default for Renderer {
+impl<const N: usize> Default for Panes<N> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Renderer {
+impl<const N: usize> Panes<N> {
     pub const fn new() -> Self {
-        Self { written: [None; COUNT] }
+        Self { written: [None; N] }
     }
 
     /// The layout was registered again: nothing the plugin wrote is there any more.
     pub fn invalidate(&mut self) {
-        self.written = [None; COUNT];
+        self.written = [None; N];
     }
 
-    /// One UI tick. Hidden: only the container is written (and only when it was shown). Shown: every pane whose look
-    /// changed, with what changed. Returns how many panes were written.
-    pub fn draw(&mut self, tracker: &Tracker, shown: bool, mut apply: impl FnMut(usize, &Look, Changed)) -> usize {
-        let mut writes = 0;
-        if !shown {
-            let hidden = Look { visible: false, ..Look::HIDDEN };
-            let changed = Changed::between(self.written[at::CONTAINER].as_ref(), &hidden);
-            if changed.any() {
-                apply(at::CONTAINER, &hidden, Changed { visible: true, ..Changed::default() });
-                self.written[at::CONTAINER] = Some(hidden);
-                writes += 1;
-            }
-            return writes;
+    /// Hidden: only the container is written as `hidden` (and only when it was shown). Returns the writes.
+    pub fn hide(&mut self, container: usize, hidden: Look, mut apply: impl FnMut(usize, &Look, Changed)) -> usize {
+        if !Changed::between(self.written[container].as_ref(), &hidden).any() {
+            return 0;
         }
-        let layout = Layout::new(tracker);
-        for i in 0..COUNT {
-            let look = layout.look(i);
+        apply(container, &hidden, Changed { visible: true, ..Changed::default() });
+        self.written[container] = Some(hidden);
+        1
+    }
+
+    /// Shown: every pane whose look changed, with what changed. Returns the writes.
+    pub fn show(&mut self, look: impl Fn(usize) -> Look, mut apply: impl FnMut(usize, &Look, Changed)) -> usize {
+        let mut writes = 0;
+        for i in 0..N {
+            let look = look(i);
             let changed = Changed::between(self.written[i].as_ref(), &look);
             if changed.any() {
                 apply(i, &look, changed);
@@ -466,6 +464,21 @@ impl Renderer {
             self.written[i] = Some(if look.visible { look } else { Look { visible: false, ..self.written[i].unwrap_or(look) } });
         }
         writes
+    }
+}
+
+/// What was last written to each of the strip's panes.
+pub type Renderer = Panes<COUNT>;
+
+impl Renderer {
+    /// One UI tick. Hidden: only the container is written (and only when it was shown). Shown: every pane whose look
+    /// changed, with what changed. Returns how many panes were written.
+    pub fn draw(&mut self, tracker: &Tracker, shown: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
+        if !shown {
+            return self.hide(at::CONTAINER, Look { visible: false, ..Look::HIDDEN }, apply);
+        }
+        let layout = Layout::new(tracker);
+        self.show(|i| layout.look(i), apply)
     }
 }
 

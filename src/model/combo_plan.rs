@@ -641,28 +641,10 @@ impl Plan<'_> {
     }
 }
 
-/// What was last written to each of the bar's panes.
-pub struct Renderer {
-    written: [Option<Look>; COUNT],
-}
-
-impl Default for Renderer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+/// What was last written to each of the bar's panes (`frame_strip_plan::Panes`).
+pub type Renderer = super::frame_strip_plan::Panes<COUNT>;
 
 impl Renderer {
-    pub const fn new() -> Self {
-        Self {
-            written: [None; COUNT],
-        }
-    }
-
-    pub fn invalidate(&mut self) {
-        self.written = [None; COUNT];
-    }
-
     /// One UI tick (the strip's rule): hidden writes only the container, once; shown writes every pane that changed.
     /// Shown needs the strip shown, the helper On and a target. `name` is the target's name. A drilled sequence
     /// (`seq`) draws the sequence bar. Returns the writes.
@@ -672,44 +654,13 @@ impl Renderer {
         name: &Text,
         seq: Option<&SeqView>,
         strip_shown: bool,
-        mut apply: impl FnMut(usize, &Look, Changed),
+        apply: impl FnMut(usize, &Look, Changed),
     ) -> usize {
-        let shown = strip_shown && helper.settings().on && helper.target().is_some();
-        let mut writes = 0;
-        if !shown {
-            let hidden = Look::HIDDEN;
-            if Changed::between(self.written[at::CONTAINER].as_ref(), &hidden).any() {
-                apply(
-                    at::CONTAINER,
-                    &hidden,
-                    Changed {
-                        visible: true,
-                        ..Changed::default()
-                    },
-                );
-                self.written[at::CONTAINER] = Some(hidden);
-                writes += 1;
-            }
-            return writes;
+        if !(strip_shown && helper.settings().on && helper.target().is_some()) {
+            return self.hide(at::CONTAINER, Look::HIDDEN, apply);
         }
         let plan = Plan { helper, name, seq };
-        for i in 0..COUNT {
-            let look = plan.look(i);
-            let changed = Changed::between(self.written[i].as_ref(), &look);
-            if changed.any() {
-                apply(i, &look, changed);
-                writes += 1;
-            }
-            self.written[i] = Some(if look.visible {
-                look
-            } else {
-                Look {
-                    visible: false,
-                    ..self.written[i].unwrap_or(look)
-                }
-            });
-        }
-        writes
+        self.show(|i| plan.look(i), apply)
     }
 }
 
