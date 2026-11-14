@@ -843,6 +843,21 @@ fn chord_text_and_row_conversion() {
     assert_eq!(Chord(0).count(), 0);
 }
 
+fn left_right_flip_a_toggle_row_as_a_does() {
+    // The page footer says "Left/Right change"; rc.13 (gna-r13c-yoga-1): Right on Training Stage Rotation left it Off.
+    let mut m = menu();
+    let r = goto(&mut m, "training_stage_rotation");
+    assert_eq!(m.value(r), RowValue::Toggle(false));
+    m.press(Button::Right);
+    assert_eq!(m.value(r), RowValue::Toggle(true), "Right turns it On");
+    m.press(Button::Left);
+    assert_eq!(m.value(r), RowValue::Toggle(false), "Left turns it Off");
+    let r = goto(&mut m, "Replay capture");
+    m.press(Button::Right);
+    assert_eq!(m.value(r), RowValue::Toggle(true));
+    assert_eq!(m.take_outbox().replay_capture, Some(true));
+}
+
 fn replay_capture_toggle_writes_its_ini() {
     // The INI is the file of record and defaults to off (lead ruling 2026-11-02): so does the env.
     let mut m = menu();
@@ -983,6 +998,7 @@ fn case_table() {
         ("chords_ini_written_only_on_confirmed_change", chords_ini_written_only_on_confirmed_change as fn()),
         ("button_chords_editor_writes_the_chord_setting", button_chords_editor_writes_the_chord_setting as fn()),
         ("chord_text_and_row_conversion", chord_text_and_row_conversion as fn()),
+        ("left_right_flip_a_toggle_row_as_a_does", left_right_flip_a_toggle_row_as_a_does as fn()),
         ("replay_capture_toggle_writes_its_ini", replay_capture_toggle_writes_its_ini as fn()),
         ("change_stage_comes_before_the_rotation_rows_and_opens_the_stages_without_all", change_stage_comes_before_the_rotation_rows_and_opens_the_stages_without_all as fn()),
         ("grid_screen_pages_with_l_r_and_keeps_the_cursor_on_a_tile", grid_screen_pages_with_l_r_and_keeps_the_cursor_on_a_tile as fn()),

@@ -1202,7 +1202,7 @@ impl Menu {
     }
 
     /// Left / Right on a row of the page: a dropdown cycles in place and wraps (Q2); a number steps
-    /// and stops at its ends.
+    /// and stops at its ends; a toggle flips, as A does.
     fn cycle(&mut self, row: usize, forward: bool) {
         if self.grey(row).is_some() {
             return;
@@ -1237,6 +1237,7 @@ impl Menu {
                 let next = if forward { (at + 1).min(len - 1) } else { at.saturating_sub(1) };
                 self.put_one_hot(r.id, next);
             }
+            Control::Toggle | Control::ReplayCapture => self.activate(row),
             _ => {}
         }
     }
