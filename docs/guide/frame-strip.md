@@ -1,17 +1,32 @@
 # Frame strip
 
-The frame strip is the input display. Turn it on at Display & Controls › Input Display. The choices are Off and Frame strip. Frame strip is the default. It sits at the top of the screen in Training and in waiting-room practice, and it replaces the old 15-row input log.
+The frame strip shows the last 60 game frames, about one second, for you and the CPU: inputs, action states and the
+timing of your follow-up. It sits at the top of the screen in Training and in waiting-room practice. It replaces the old
+15-row input log.
 
-The Input display chord, R + D-pad Down by default (R is Z on a GameCube controller), turns it on and off without opening the menu, in Training and in waiting-room practice. A notice says "Input display" and On or Off. The menu's Input Display row then shows the same value, and the choice is saved like a change made in the menu. The chord is the "Input display" row of Display & Controls › Button chords.
+<!-- CAPTURE-REQUEST v09-strip-labelled: an annotated still of one real strip that labels the two fighter lanes, an input chip, ADVANTAGE, LINK, INPUT and LAST. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
-It keeps the last 60 game frames, about one second. The newest frame is on the right. Player 1 and the CPU each have a lane. Player 1's button presses are chips above the lanes. On the right, three readouts say who could act first after the last hit, whether the last follow-up was a true combo, and how the press was timed. A LAST row under the lanes keeps the last four follow-ups.
+## Turning it on and off
 
-The strip hides while the TrainingRooms menu, the recording pop-up, the Fighter Mismatch question, the game's pause menu, or the waiting room's own menu is open, while Input Display is Off, and outside Training and lobby practice. It clears when the scene changes, when you hot-swap, when a save state loads, and when Training resets or replaces a fighter. The frames from before that did not happen. While the strip is on screen, the separate Frame Advantage notice stays down, because the ADVANTAGE readout is that number.
+| How | What it does |
+| --- | --- |
+| Display & Controls › Input Display | Off or Frame strip. Frame strip is the default. |
+| The Input display chord, R + D-pad Down by default (R is Z on a GameCube controller) | Turns it on and off without opening the menu, in Training and in waiting-room practice. A notice says "Input display" and On or Off. The menu's Input Display row then shows the same value, and the choice is saved like a change made in the menu. It is the "Input display" row of Display & Controls › Button chords. |
 
-An older settings file that still says Smash Inputs, Raw Inputs, or Status Only becomes Frame strip. Off stays Off.
+An older settings file that still says Smash Inputs, Raw Inputs or Status Only becomes Frame strip. Off stays Off.
 
-The pictures for this page are listed in [MEDIA.md](../MEDIA.md). Each one is a full-screen capture, 1280 wide, under 10 seconds, and one behaviour, of rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only), taken on 2026-11-11. On 2026-11-12 they were checked against rc.10 `32ee7595`'s strip (the `docs-rd12-32ee7595` takes): the rows, colours, chips, stick glyphs, brackets and readouts draw the same, so they stand.
+## What is on it
 
+The newest frame is on the right. Player 1 and the CPU each have a lane, and Player 1's button presses are chips above
+the lanes. On the right, three readouts say who could act first after the last hit (ADVANTAGE), whether the last
+follow-up was a true combo (LINK), and how the press was timed (INPUT). A LAST row under the lanes keeps the last four
+follow-ups. The clips on this page are listed in [MEDIA.md](../MEDIA.md).
+
+- **It hides** while the TrainingRooms menu, the recording pop-up, the Fighter Mismatch question, the game's pause menu
+  or the waiting room's own menu is open, while Input Display is Off, and outside Training and lobby practice.
+- **It clears** when the scene changes, when you hot-swap, when a save state loads, and when Training resets or
+  replaces a fighter. The frames from before that did not happen.
+- **The Frame Advantage notice** stays down while the strip is on screen, because the ADVANTAGE readout is that number.
 ![Both lanes after a forward smash: startup, active, recovery, hitlag and hitstun](../media/rc7-frame-strip-lanes.gif)
 
 ## Lanes and colours
@@ -90,31 +105,40 @@ The line under the number says **on hit** or **on shield**. Plus is green, minus
 
 ### LINK
 
-A follow-up is a later hit from a different action, on hit, while the CPU has been free for at most 20 frames. Hits of one action, such as the hits inside one multi-hit move, are not follow-ups. A hit on shield is not a follow-up.
+A follow-up is a later hit from a different action, on hit, while the CPU has been free for at most 20 frames. Hits of
+one action, such as the hits inside one multi-hit move, are not follow-ups, and neither is a hit on shield.
+
+![An example exchange: the last hit, when you and the CPU can act, and the three kinds of follow-up: true, drop and a new exchange](../diagrams/frame-strip-timeline.png)
 
 LINK is that follow-up:
 
-- **True by N.** The CPU never got an actionable frame before the hit. The readout is a number of zero or below and the words TRUE combo, in green. N is how many frames it had to spare: the on-screen number is minus that N, so true by 4 is shown as -4. If the hitstun left could not be read, the readout says TRUE with no number.
-- **Dropped by N.** The CPU did have an actionable frame before the hit. The readout is +N and the word DROP, in red. N is how many frames after the CPU could act the hit landed.
+| Readout | Meaning |
+| --- | --- |
+| **True by N** (green, TRUE combo, a number of zero or below) | The CPU never got an actionable frame before the hit. N is how many frames it had to spare: the on-screen number is minus that N, so true by 4 is shown as -4. If the hitstun left could not be read, the readout says TRUE with no number. |
+| **Dropped by N** (red, +N and DROP) | The CPU did have an actionable frame before the hit. N is how many frames after the CPU could act the hit landed. |
+| **window Nf** (a green bar above Player 1's lane) | N is how many frames wide the presses are that would still have made a true combo, assuming the same startup. |
 
-The combo window is the green bar above Player 1's lane, labelled `window Nf`. N is how many frames wide the presses are that would still have made a true combo, assuming the same startup. The window starts on your first actionable frame after the previous hit. It is missing when even a frame-perfect press would drop, or when the true-combo number could not be read.
-
+The window starts on your first actionable frame after the previous hit. It is missing when even a frame-perfect press
+would drop, or when the true-combo number could not be read.
 ![LINK after jab into jab: TRUE combo, and the green window bar](../media/rc7-frame-strip-link.gif)
 
 ![LINK after a late jab: DROP, with a positive number](../media/rc7-frame-strip-drop.gif)
 
 ### INPUT
 
-INPUT is how the follow-up's press was timed against the first frame you could act. The press it uses is the latest attack, special, grab, jump, or shield that went down, looked for up to 15 frames before the follow-up started. If there is no such press, it uses the frame the follow-up started.
+INPUT is how the follow-up's press was timed against the first frame you could act. The press it uses is the latest
+attack, special, grab, jump, or shield that went down, looked for up to 15 frames before the follow-up started. If
+there is no such press, it uses the frame the follow-up started. The number is that press minus your first actionable
+frame:
 
-The number is that press minus your first actionable frame. The words next to it are:
+| Reads | Meaning |
+| --- | --- |
+| `0` and **on time** | You pressed on your first actionable frame. |
+| `+N` and **Nf late** | You pressed N frames after it. |
+| `-N` and **buffered Nf** | You pressed before you could act; the move still starts on the first frame you could act. |
 
-- `0` and **on time**
-- `+N` and **Nf late**
-- `-N` and **buffered Nf** (you pressed before you could act; the move still starts on the first frame you could act)
-
-Then the spare frames. A true combo adds `, N spare`: how many frames later the same press could have been. A drop adds `, Nf past`: how far past the window the hit was. A true combo with no number omits that half.
-
+Then the spare frames. A true combo adds `, N spare`: how many frames later the same press could have been. A drop adds
+`, Nf past`: how far past the window the hit was. A true combo with no number omits that half.
 ![INPUT on a late follow-up: the late count and the spare or past frames](../media/rc7-frame-strip-input.gif)
 
 ### LAST
@@ -127,10 +151,13 @@ The LAST row is the last four follow-ups, newest first. Each one is a pill and t
 
 The 20-frame rule is how a new hit either continues the exchange or starts another one.
 
-If the previous hit was on hit, this hit is on hit, it comes from a different action, and the CPU has been able to act for 20 frames or fewer, it is a follow-up. Inside those 20 frames it is a true combo or a drop, as LINK says. A drop can be a large number, up to 20, and it is still the same exchange.
-
-If the CPU has been able to act for more than 20 frames, the next hit is not a drop. It opens a new exchange. ADVANTAGE then waits until both fighters can act again after that new hit. A shielded hit also does not link. It can still set ADVANTAGE to on shield.
-
-The same 20 frames are what the combo helper uses when it decides that an exchange ended before the next step. A gap of 20 still belongs to the exchange. A gap of 21 does not. The helper grades the follow-up's input events from these samples: presses, releases, the C-stick, and the fast-fall, dash, and tap-jump flicks, facing-relative. Drift is shown and is not graded. An older combo file that stored only presses is still graded on those presses.
-
+- **Within 20 frames:** the previous hit was on hit, this hit is on hit, it comes from a different action, and the CPU
+  has been able to act for 20 frames or fewer. It is a follow-up, a true combo or a drop as LINK says. A drop can be a
+  large number, up to 20, and it is still the same exchange.
+- **More than 20 frames:** the next hit is not a drop. It opens a new exchange, and ADVANTAGE waits until both
+  fighters can act again after that new hit.
+- **A shielded hit** does not link. It can still set ADVANTAGE to on shield.
+- **The combo helper** uses the same 20 frames when it decides that an exchange ended before the next step: a gap of 20
+  still belongs to the exchange, and a gap of 21 does not. How it grades the follow-up is in
+  [How a combo is graded](recording.md#how-a-combo-is-graded).
 ![A hit more than 20 frames after the CPU can act, which does not become a DROP](../media/rc7-frame-strip-exchange.gif)

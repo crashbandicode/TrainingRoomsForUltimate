@@ -14,38 +14,34 @@ The guides: [Fighter cycles](../guide/fighter-cycles.md), [Mii fighters](../guid
 
 On: the Cycle Player chord (ZL + D-pad Right) changes your fighter. Off: the chord doesn't, so Player 1 stays the
 fighter you picked; a pick in [Player Character](#player-character) and a combo's Switch (Recording) still change it.
-The CPU is not affected: its chord and [CPU Character](#cpu-character) always work.
+The CPU is not affected: its chord and [CPU Character](#cpu-character) always work. With it Off, Cycle Player does nothing and shows no notice.
 
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A, Left or Right flips it.
 
-With it Off, Cycle Player does nothing and shows no notice.
-
 ![Player Swapping Off; A turns it On; Player Character, Captain Falcon, A; Player 1 loads Captain Falcon](../media/rc11-player-swapping.gif)<br>
 *B + Up opens the menu on Player Swapping (Off); A turns it On; then Player Character, Captain Falcon, A, and B closes the menu: Player 1 loads Captain Falcon. The 8 s load is cut. Eden, rc.11.*
+
+<!-- CAPTURE-REQUEST v02-player-swapping: a GIF that shows the row's own effect: the same Cycle Player chord (ZL + D-pad Right) with Player Swapping Off changes nothing, then On changes the fighter. This clip picks a fighter with Player Character, which works either way. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
 More: [Fighter cycles › Player Swapping](../guide/fighter-cycles.md#player-swapping)
 
 ### Player Character
 
-Opens a portrait grid of every fighter. A picks Player 1's fighter, and "> " marks the pick. The new fighter loads
-when you close the menu, with [Player Swapping](#player-swapping) On or Off.
+Opens a portrait grid of every fighter and picks Player 1's. The new fighter loads when you close the menu, with
+[Player Swapping](#player-swapping) On or Off.
 
 ![With Player Swapping Off, picking Link as Player Character shows "Player fighter applied" and Player 1 becomes Link at once](../media/rc12-player-character.gif)
 
 - **Values:** any fighter on the grid
-- **How:** A opens the grid. The D-pad moves, A picks, B goes back. X on a shared slot (Pokémon Trainer, Pyra / Mythra)
-  shows its next form, so A picks that form.
+- **How:** A opens the grid. The D-pad moves, A picks ("> " marks the pick), B goes back. X on a shared slot (Pokémon
+  Trainer, Pyra / Mythra) shows its next form, so A picks that form.
 
 The pick follows the fighter on screen: when you enter Training, or a cycle chord switches you, it becomes that
 fighter. A greyed Mii tile has no Mii that Player 1 can load (the help line reads "… - unavailable"). In a waiting room
-this changes only your practice fighter; the match uses the fighter you picked for it.
-
-Ice Climbers picked here are Popo alone when the "S" mark on Ice Climbers in the Player list of
-[Character Cycles](#character-cycles) is On. [Solo Popo (original Ice Climbers)](#solo-popo-original-ice-climbers) does
-not apply to this pick: it applies only to the Ice Climbers picked at the character select. (If Player 1 picked Ice
-Climbers there, picking them here again is going back to that fighter, so that row still decides.)
+this changes only your practice fighter; the match uses the fighter you picked for it. For Ice Climbers picked here, see
+[Solo Popo](#solo-popo-original-ice-climbers).
 
 ### CPU Character
 
@@ -65,11 +61,17 @@ second help line says which list you are editing.
 
 - **Values:** All, or your own order
 - **Default:** All, for both
-- **How:** A opens the grid. ZR switches between the Player and the CPU list. A on a fighter adds it at the end (from
-  All, it starts a new list with just that fighter); A on All takes every fighter in character-select order. R removes
-  a fighter (the last one stays). X on Pokémon Trainer or Pyra / Mythra shows its next form; A then makes the cycle
-  load that form. Y on Ice Climbers marks Solo Popo ("S") for that list. B goes back. Y on this row (on the page)
-  resets both lists.
+- **How:** A opens the grid. Y on this row (on the page) resets both lists.
+
+| In the grid | What it does |
+| --- | --- |
+| ZR | Switches between the Player and the CPU list. |
+| A on a fighter | Adds it at the end. From All, it starts a new list with just that fighter. |
+| A on All | Takes every fighter, in character-select order. |
+| R | Removes a fighter. The last one stays. |
+| X on Pokémon Trainer or Pyra / Mythra | Shows its next form; A then makes the cycle load that form. |
+| Y on Ice Climbers | Marks Solo Popo ("S") for that list. |
+| B | Goes back. |
 
 The fighter each role started with is its 0. Each press of the cycle chord loads the next number; after the last it
 goes back to 0. A Mii tile is numbered only while that role has a Mii of the class it can load; which Mii is set by
@@ -82,15 +84,22 @@ More: [Fighter cycles › The Character Cycles editor](../guide/fighter-cycles.m
 ### Solo Popo (original Ice Climbers)
 
 On: when Player 1 picked Ice Climbers at the character select, Player 1 is Popo alone, without Nana. That counts for
-Player 1's 0 in the cycle too. The Ice Climbers in a cycle list have their own Solo Popo mark (Y in
-[Character Cycles](#character-cycles)); the CPU's mark covers both its cycle and the CPU's own pick. This row applies
-only to the Ice Climbers picked at the character select. Ice Climbers picked in [Player Character](#player-character)
-after starting as another fighter follow the Player list's "S" mark, like the cycle, so with this row Off Player 1 can
-still be Popo alone.
+Player 1's 0 in the cycle too.
 
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A, Left or Right flips it.
+
+Three controls decide when Ice Climbers load as Popo alone. All start Off:
+
+| Which Ice Climbers? | Control |
+| --- | --- |
+| Player 1's, picked at the character select (picking them again in [Player Character](#player-character) counts too) | This row |
+| Player 1's cycle, or picked in Player Character after starting as another fighter | Y on Ice Climbers in the Player list of [Character Cycles](#character-cycles) (the "S" mark) |
+| The CPU's pick and its cycle | Y on Ice Climbers in the CPU list (the "S" mark) |
+
+With this row Off, Player 1 can still be Popo alone through the "S" mark. If Player 1's two controls differ, Ice
+Climbers can be in Player 1's cycle twice: as 0 one way and as a number the other.
 
 ![Ice Climbers in Training; Solo Popo turned On; Player 1 reloads as Popo alone](../media/rc11-solo-popo.gif)<br>
 *Player 1 picked Ice Climbers at the character select: Popo and Nana. B + Up, A turns Solo Popo On, B closes the menu; Player 1 reloads as Popo alone ("Player Character · 0. Ice Climbers"). The 3.3 s reload is cut. Eden, rc.11.*
@@ -120,18 +129,16 @@ More: [Fighter cycles › Kirby hats](../guide/fighter-cycles.md#kirby-hats)
 
 Opens a grid of 39 fighter items: turnips (each face), bombs, Pac-Man's bonus fruit, Robin's tome and Levin Sword,
 Wario's bike (the last tile), and more. A puts the item in Player 1's hand as soon as the menu closes, in place of
-anything Player 1 holds. The notice reads "Character Item" and the item's name.
-
-Wario's bike works for any fighter: Player 1 carries it, and A throws it. It drives forward and hits whoever it meets,
-then stays on the floor.
+anything Player 1 holds; the notice reads "Character Item" and the item's name. Wario's bike works for any fighter:
+A throws it, and it drives forward, hits whoever it meets, then stays on the floor.
 
 - **Values:** the 39 items
 - **How:** A opens the grid. The D-pad moves, L / R turn its page, A gives, B goes back. Every A asks again, the same
   item included; if you press A on several, the last one is given.
 
-Most items need their fighter's data, which the plugin loads for you. If it can't, the notice says "Load ‹fighter› as
-Player or CPU first". Daisy's and Peach's Bob-omb and Mr. Saturn, and Diddy Kong's Banana Peel, need nothing. Nothing
-is given during a fighter swap, a save-state load, a recording or a playback.
+Most items need their fighter's data, which the plugin loads for you; if it can't, the notice says "Load ‹fighter› as
+Player or CPU first". Daisy's and Peach's Bob-omb and Mr. Saturn, and Diddy Kong's Banana Peel, need nothing. Nothing is
+given during a fighter swap, a save-state load, a recording or a playback.
 
 ![Give item grid: Daisy Bob-omb, A; Player 1 gets the Bob-omb](../media/rc11-give-item.gif)<br>
 *Give item: A opens the grid, Down, Right, Right to Daisy: Bob-omb, A, B closes the menu: Player 1 gets the Bob-omb (the notice names it). Eden, rc.11.*
@@ -175,6 +182,8 @@ The same list for the Mii Gunner.
 ![Mii Gunner list: Player 1's list, then ZR to the CPU's list](../media/rc11-mii-gunner.gif)<br>
 *A opens Player 1's Mii Gunner list; ZR switches to the CPU's. This profile has one saved Gunner, then Add New…, which opens Smash's Mii editor (as for the Brawler). Eden, rc.11.*
 
+<!-- CAPTURE-REQUEST v03-mii-rows: a clip for the Mii Gunner and Swordfighter rows that shows a change: a clearly different saved Mii picked, the menu closed, and the changed outfit and a distinctive special on screen (not two lookalike Miis). See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+
 ## Stages
 
 ### Change Stage
@@ -214,14 +223,19 @@ The stage list: each new waiting room opens on the next stage of it, and Trainin
 
 - **Values:** All, or your own order; Rotation or Direct
 - **Default:** the Waiting Room only, Rotation
-- **How:** A opens the grid. In Rotation, A adds a stage at the end or takes it out (the number is its place; the last
-  one stays), and A on All takes every stage. Y changes the focused stage's form. X switches to Direct: there A goes
-  to the stage now and closes the menu, as Change Stage does, and new waiting rooms open on that stage instead of the
-  list. X switches back. L / R turn the page, B goes back.
+- **How:** A opens the grid. X switches between the two modes. Y changes the focused stage's form. L / R turn the page,
+  B goes back.
+
+| Mode | What A does |
+| --- | --- |
+| Rotation | Adds a stage at the end of the list or takes it out (the number is its place; the last one stays). A on All takes every stage. |
+| Direct | Goes to the stage now and closes the menu, as Change Stage does. New waiting rooms open on that stage instead of the list. |
 
 The waiting rooms follow the list only while [Lobby Practice](#lobby-practice) is On.
 
 ![Lobby Stages: A on Battlefield adds it as number 2](../media/rc11-lobby-stages.gif)
+
+<!-- CAPTURE-REQUEST v06-lobby-stages-modes: a clip of Rotation versus Direct in a waiting room: Rotation with two stages ordered, the next practice opens on the next stage; Direct, pick stage B, close the menu, the room becomes B. Do not reuse the Training Stage Rotation clip. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
 More: [Stages › Lobby Stages](../guide/stages.md#lobby-stages)
 
@@ -374,26 +388,23 @@ such as "7 of 7".
 - **How:** A opens the list. Up / Down move, A flips the entry, B goes back. A greyed entry shows why and ignores A.
   Y on this row (on the page) puts all seven back to your saved defaults.
 
-The seven entries:
+| Entry | What it does | Greyed when |
+| --- | --- | --- |
+| Ice Climbers pair bank | Popo and Nana share a role's slot with one other fighter, so switching between them is instant. | Ready Fighter Bodies is not 3 |
+| Original fighter bank | Keeps the role's starting fighter (its 0) ready. Miis and Solo Popo still reload. | Never |
+| Solo Popo groups | Keeps Solo Popo ready as a group. | Group Swap is Off |
+| Ice Climbers pair groups | Keeps the role's groups ready while the pair is in its slot. | Group Swap or the pair bank is Off |
+| PT / Aegis groups | Keeps Pokémon Trainer and Pyra / Mythra ready as whole groups, or not at all. | Group Swap is Off |
+| Ice Climbers pair group | Keeps the pair ready as a group of its own. | Group Swap or the pair bank is Off |
+| Mii groups | Keeps one Mii group per role ready. | Group Swap is Off |
 
-- **Ice Climbers pair bank:** Popo and Nana share a role's slot with one other fighter, so switching between the pair
-  and that fighter is instant. Greyed unless Ready Fighter Bodies is 3.
-- **Original fighter bank:** the fighter a role started with (its 0) stays loaded, so going back to it is instant
-  instead of a reload. Miis and Solo Popo still reload. Never greyed.
-- **Solo Popo groups:** Solo Popo can be kept ready as a group. Greyed while Group Swap is Off.
-- **Ice Climbers pair groups:** while the Ice Climbers pair is in a role's slot, that role's groups stay ready. Greyed
-  while Group Swap or the pair bank is Off.
-- **PT / Aegis groups:** Pokémon Trainer and Pyra / Mythra are kept ready as groups of their own. Greyed while Group
-  Swap is Off. Each group is kept ready whole or not at all, and it needs 3 free Ready Fighters: Ready Fighters is
-  shared with the other ready fighters, and with fewer than 3 left the group isn't made ready (it loads on the swap
-  instead), with no message on screen. The row's help line says so: "PT / Aegis groups need 3 free Ready Fighters."
-- **Ice Climbers pair group:** the Ice Climbers pair is kept ready as a group of its own. Greyed while Group Swap or
-  the pair bank is Off.
-- **Mii groups:** a Mii is kept ready as a group of its own, one Mii per role at a time. Greyed while Group Swap is
-  Off.
-
+PT / Aegis groups need **3 free Ready Fighters** (the total is shared with the other ready fighters). With fewer, the
+group loads on the swap instead, with no message on screen. The row's help line says "PT / Aegis groups need 3 free
+Ready Fighters."
 Every entry also needs Cycle Preload above Off, Preload on Fighters or Both and Ready Fighter Bodies above Off; the
 list doesn't grey them for that.
+
+<!-- CAPTURE-REQUEST v05-swap-groups: a still of the PT / Aegis groups row with its "3 free Ready Fighters" help line, and a short group Off then On clip for each Swap groups entry not yet shown (the Ice Climbers pair bank, pair groups and pair group look alike: label each). See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
 ## Reset page to defaults
 
