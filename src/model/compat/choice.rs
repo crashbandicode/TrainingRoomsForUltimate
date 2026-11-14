@@ -8,7 +8,9 @@
 //! macro the carried file needs, over a plain `[u8; N]`: the same constants (`ALL_CONSTS`, `ALL_NAMES`, one constant per choice),
 //! the same saturating arithmetic (`+`, `-`, `*`), `to_byte_vec`, `contains`, `empty`, `all`, `Display`, and the same JSON shape
 //! (an array of N small integers, one per choice). `tools/carry_pkg6.py` rewrites the carried file's `use byteflags::{byteflags,
-//! count}` to this module (the manifest's `modules.byteflags`), so the carried text is unchanged.
+//! count}` to this module (the manifest's `modules.byteflags`), so the carried text is unchanged. Outside the tests the plugin
+//! uses only the constants, `==`, `+`, `* u8` (the menu's `row_or`), `to_byte_vec` and serde, so the rest of that surface is
+//! `#[cfg(test)]`.
 
 /// Number of token trees: `count!(A B C)` is 3.
 macro_rules! count {
@@ -55,8 +57,6 @@ macro_rules! byteflags {
 
             /// The constant names, in declaration order.
             pub const ALL_FIELDS: [&'static str; $crate::engine::compat::choice::count!($($Choice)*)] = [$(stringify!($Choice),)*];
-            /// The labels, in declaration order.
-            pub const ALL_NAMES: [&'static str; $crate::engine::compat::choice::count!($($Choice)*)] = [$($label,)*];
 
             const fn unit(index: usize) -> Self {
                 let mut elements = [0u8; $crate::engine::compat::choice::count!($($Choice)*)];
@@ -72,16 +72,31 @@ macro_rules! byteflags {
             /// One constant per choice, to compare by index.
             pub const ALL_CONSTS: [Self; $crate::engine::compat::choice::count!($($Choice)*)] = [$(Self::$Choice,)*];
 
+            pub fn to_byte_vec(self) -> Vec<u8> {
+                self.0.to_vec()
+            }
+
+            fn zip_with(self, other: Self, op: impl Fn(u8, u8) -> u8) -> Self {
+                let mut out = self;
+                for (value, rhs) in out.0.iter_mut().zip(other.0.iter()) {
+                    *value = op(*value, *rhs);
+                }
+                out
+            }
+        }
+
+        /// The rest of the crate's surface (labels, set operations, `Display`, the other operators): only the tests use it.
+        #[cfg(test)]
+        impl $Group {
+            /// The labels, in declaration order.
+            pub const ALL_NAMES: [&'static str; $crate::engine::compat::choice::count!($($Choice)*)] = [$($label,)*];
+
             pub const fn empty() -> Self {
                 Self([0u8; $crate::engine::compat::choice::count!($($Choice)*)])
             }
 
             pub const fn all() -> Self {
                 Self([1u8; $crate::engine::compat::choice::count!($($Choice)*)])
-            }
-
-            pub fn to_byte_vec(self) -> Vec<u8> {
-                self.0.to_vec()
             }
 
             pub fn to_vec(self) -> Vec<Self> {
@@ -107,16 +122,9 @@ macro_rules! byteflags {
                 }
                 out
             }
-
-            fn zip_with(self, other: Self, op: impl Fn(u8, u8) -> u8) -> Self {
-                let mut out = self;
-                for (value, rhs) in out.0.iter_mut().zip(other.0.iter()) {
-                    *value = op(*value, *rhs);
-                }
-                out
-            }
         }
 
+        #[cfg(test)]
         impl ::std::fmt::Display for $Group {
             fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
                 let mut first = true;
@@ -140,12 +148,14 @@ macro_rules! byteflags {
             }
         }
 
+        #[cfg(test)]
         impl ::std::ops::AddAssign for $Group {
             fn add_assign(&mut self, rhs: Self) {
                 *self = *self + rhs;
             }
         }
 
+        #[cfg(test)]
         impl ::std::ops::Sub for $Group {
             type Output = Self;
             fn sub(self, rhs: Self) -> Self {
@@ -153,6 +163,7 @@ macro_rules! byteflags {
             }
         }
 
+        #[cfg(test)]
         impl ::std::ops::SubAssign for $Group {
             fn sub_assign(&mut self, rhs: Self) {
                 *self = *self - rhs;
@@ -170,12 +181,14 @@ macro_rules! byteflags {
             }
         }
 
+        #[cfg(test)]
         impl ::std::ops::MulAssign<u8> for $Group {
             fn mul_assign(&mut self, rhs: u8) {
                 *self = *self * rhs;
             }
         }
 
+        #[cfg(test)]
         impl ::std::ops::Mul for $Group {
             type Output = Self;
             fn mul(self, rhs: Self) -> Self {
@@ -183,6 +196,7 @@ macro_rules! byteflags {
             }
         }
 
+        #[cfg(test)]
         impl ::std::ops::MulAssign for $Group {
             fn mul_assign(&mut self, rhs: Self) {
                 *self = *self * rhs;
