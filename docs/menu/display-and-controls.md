@@ -39,6 +39,18 @@ hurtboxes and grab box are, since a missed grab can be punished.
 
 ![Hitbox Visualization turned on: the yellow hurtboxes, then at 1/4 speed a neutral air's red hitbox](../media/rc11-hitbox.gif)
 
+![At 1/4 speed, Ridley's hurtboxes as yellow pills, and his tail attacks' hitbox as one red pill along the tail](../media/rc13-pills.gif)
+
+*Pills: at 1/4 speed, Ridley standing shows his hurtboxes as yellow pills; his forward tilt and down tilt draw their hitbox as one red pill along the tail. Eden, rc.13 (untested on hardware).*
+
+![At 1/4 speed, a red disc rides on Ridley's fireball, Link's arrow and Link's thrown bomb while each is in flight](../media/rc13-projectile-hitboxes.gif)
+
+*Projectiles and thrown items: at 1/4 speed, a red disc rides on Ridley's fireball, Link's arrow and Link's thrown bomb while each is in flight. Eden, rc.13 (untested on hardware).*
+
+![At 1/4 speed, the magenta grab boxes of Mario's grab, Samus's tether and Olimar's Pikmin; each grabber keeps its yellow hurtboxes](../media/rc13-grab-boxes.gif)
+
+*Grab boxes: at 1/4 speed, Mario's standing grab, Samus's tether (a pill along the beam) and the Pikmin Olimar throws, each grab box in magenta; the grabber keeps its yellow hurtboxes through the grab. Eden, rc.13 (untested on hardware).*
+
 ### Frame Advantage
 
 On shows a notice after each exchange with your frame advantage: plus means you can act before the CPU, minus means
@@ -76,6 +88,8 @@ delayed. The frame strip and recordings see the inputs as delayed. The frames ar
 [game speed](../guide/game-speed.md): 18 is 18 game frames at 1/4 too, four times as long in seconds.
 
 ![The same jab from the same spot: with Input Delay 0 (left) Mario jabs as A lights on the pad; with Input Delay 18 (right) A lights at the same moment and the jab comes 18 frames (0.3 s) later](../media/rc11-input-delay-sbs.gif)
+
+![Side by side at Game speed 1/4, the same jab: with Input Delay 0 (left) Mario jabs as A lights; with Input Delay 18 (right) the jab comes 18 game frames later, about 1.2 s at 1/4](../media/rc13-input-delay-sbs.gif)<br>*At Game speed 1/4, the same A from the same spot: Input Delay 0 (left) jabs at once; Input Delay 18 (right) jabs 18 game frames later, four times as long in seconds as at x1. Eden, rc.13 (untested on hardware).*
 
 - **Values:** 0 to 30 frames
 - **Default:** 0
@@ -134,6 +148,16 @@ either way, and online matches are not changed.
 - **Values:** On, Off
 - **Default:** On
 - **How:** A, Left or Right flips it.
+
+![The menu on Taunts [ON]: D-pad Right flips it to [OFF], D-pad Left flips it back to [ON], with no A](../media/rc13-left-right-toggle.gif)<br>*Left or Right flips any On/Off row, as A does: on Taunts, Right turns it Off and Left turns it On again. Eden, rc.13 (untested on hardware).*
+
+![Side by side from the same reset, the same D-pad Up, Side and Down: with Taunts Off (left) Mario stands; with Taunts On (right) each press is a taunt](../media/rc13-taunts-off.gif)
+
+*The same D-pad Up, Side and Down from the same reset, lit on the pad: with Taunts Off (left) Mario does not taunt; with Taunts On (right) each press is a taunt. Eden, rc.13 (untested on hardware).*
+
+![Taunts Off, Kirby: D-pad Up does nothing without a hat; with Falco's copy hat, Side and Down still do nothing and Up drops the hat](../media/rc13-taunts-kirby-hat.gif)
+
+*Taunts Off, Player 1 Kirby: D-pad Up does nothing; with a copy hat, Side and Down still do nothing and Up drops the hat. Eden, rc.13 (untested on hardware).*
 
 ### Menu shortcut 1
 

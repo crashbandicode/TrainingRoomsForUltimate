@@ -136,6 +136,9 @@ is given during a fighter swap, a save-state load, a recording or a playback.
 ![Give item grid: Daisy Bob-omb, A; Player 1 gets the Bob-omb](../media/rc11-give-item.gif)<br>
 *Give item: A opens the grid, Down, Right, Right to Daisy: Bob-omb, A, B closes the menu: Player 1 gets the Bob-omb (the notice names it). Eden, rc.11.*
 
+![Give item: the cursor on the last tile, Wario's bike with its own icon; A gives it, Mario throws it and it drives into the CPU](../media/rc13-wario-bike.gif)<br>
+*Give item, the last tile: Wario's bike with its own icon. A gives it; Mario holds the bike, and A throws it: it drives into the CPU and stays on the floor. Eden, rc.13 (untested on hardware).*
+
 ### Mii Brawler
 
 Opens the list of Mii Brawlers for Player 1; ZR switches to the CPU's list. It lists your saved Miis, then the Miis
@@ -235,6 +238,8 @@ It always uses the Rotation list, even while Lobby Stages is on Direct. With the
 each return opens on the Waiting Room.
 
 ![Training Stage Rotation turned on; the next Training, the same fighters, opens on Big Battlefield](../media/rc11-stage-rotation.gif)
+
+![Training Stage Rotation On: a stage picked at the stage select opens Training; back through the character select, Training opens on the next stage of the list](../media/rc13-stage-pick.gif)<br>*Training Stage Rotation On: the stage you pick before the character select opens Training; going back through the character select opens the next stage of the list. Eden, rc.13 (untested on hardware).*
 
 More: [Stages › Training Stage Rotation](../guide/stages.md#training-stage-rotation)
 

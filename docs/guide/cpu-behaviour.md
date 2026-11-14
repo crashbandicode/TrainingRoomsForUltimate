@@ -163,7 +163,7 @@ takes one chip only: A selects it and clears the others.
 
 SDI also needs [SDI Strength](../menu/cpu.md#sdi-strength), which is None at first.
 
-![DI Direction from nothing picked to Up x1, then SDI Direction the same](../media/rc11-di-sdi-chips.gif)<br>*The DI and SDI direction grids*
+![DI Direction from nothing picked to Up x1, then SDI Direction the same: the picked chip lights at full strength, the others stay dim](../media/rc13-di-sdi-chips.gif)<br>*The DI and SDI direction grids. Eden, rc.13 (untested on hardware).*
 
 ## Delay rows
 

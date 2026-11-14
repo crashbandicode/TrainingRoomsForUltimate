@@ -61,6 +61,8 @@ Hitstun doesn't cover tumble (a hard launch): tick Tumble too to mash out of bot
 
 ![Mash Jump with the default triggers: the CPU stands still; with Always ticked it jumps on its own](../media/rc11-cpu-mash-triggers.gif)<br>*Mash Triggers: Always ticked*
 
+![Side by side with Always ticked: Mash Spot Dodge (left) and Mash Roll Forwards (right); the CPU dodges, stands a moment, and dodges again](../media/rc13-mash-dodge-always.gif)<br>*Always with a dodge: the CPU spot-dodges (left) or rolls forward (right) from standing, again and again. Eden, rc.13 (untested on hardware).*
+
 More: [Mash Triggers](../guide/cpu-behaviour.md#mash-triggers)
 
 ### Situation overrides
@@ -111,7 +113,7 @@ The direction the CPU holds to change its launch angle (DI) when you hit it. In 
 
 A new direction is picked for every hit and held for the whole hitstun.
 
-![DI Down, then DI Up: the same smash at the same damage sends the CPU low, then high](../media/rc11-di.gif)<br>*DI Down, then DI Up*
+![DI Down, then DI Up: the same smash at the same damage sends Donkey Kong low, then high; the grid shows the picked chip in blue](../media/rc13-di.gif)<br>*DI Down, then DI Up from the grid: the same forward smash at the same damage sends the CPU low, then high. Eden, rc.13 (untested on hardware).*
 
 More: [Direction chips](../guide/cpu-behaviour.md#direction-chips)
 
@@ -127,7 +129,7 @@ The direction the CPU nudges itself in during hitlag (smash DI). It does nothing
 One direction is picked at each reset (L+R+A or loading a save state) and right after you change the row. The CPU
 uses it for every hit until the next pick. Neutral means no SDI.
 
-![DI Direction from nothing picked to Up x1, then SDI Direction the same](../media/rc11-di-sdi-chips.gif)<br>*The DI and SDI direction grids*
+![DI Direction from nothing picked to Up x1, then SDI Direction the same: the picked chip lights at full strength, the others stay dim](../media/rc13-di-sdi-chips.gif)<br>*The DI and SDI direction grids: A on Up, and Up x1 lights at full strength while the others stay dim. Eden, rc.13 (untested on hardware).*
 
 More: [Direction chips](../guide/cpu-behaviour.md#direction-chips)
 
@@ -160,6 +162,8 @@ L+R+A reset.
 - **Values:** On, Off.
 - **Default:** On.
 - **How:** A, Left or Right switches it.
+
+![Side by side from the same reset, the CPU spot-dodging again and again (Mash Spot Dodge, Always): Dodge Staling Off (left) dodges more often than On (right)](../media/rc13-dodge-staling.gif)<br>*The CPU spot-dodges over and over: with Dodge Staling Off (left) every dodge is fresh; with On (right) they go stale and slow down, so it fits fewer in. Eden, rc.13 (untested on hardware).*
 
 ## Ledge & Tech
 
@@ -378,6 +382,10 @@ The jump before the aerial, the landing and a playback are left alone, and Fast 
 - **Default:** none ticked: no drift.
 - **How:** A opens the checklist; A ticks, ZL ticks all or none, B goes back.
 
+![Side by side at 1/4 speed, the CPU's mashed forward air from the same reset: with Aerial Drift None (left) it lands in place; with In (right) it drifts toward Player 1](../media/rc13-aerial-drift.gif)
+
+*At 1/4 speed, the CPU mashes forward air from the same reset: with Aerial Drift None (left) it rises and lands in place; with In (right) it drifts toward you during the aerial. Eden, rc.13 (untested on hardware).*
+
 ### Aerial Delay
 
 Frames the CPU waits, once it can, before its aerial.
@@ -416,7 +424,7 @@ or an aerial.
 
 Frames after the peak of the jump (the CPU starts falling) before it fast falls. Used only when [Fast Fall](#fast-fall) says Yes.
 
-![Side by side at 1/4 speed, the CPU's fast fall with Fast Fall Delay at 0 and at 30: at 0 it sparks at the top of the jump and lands first](../media/rc12-fast-fall-delay.gif)
+![Side by side at 1/4 speed, the same CPU full hop with Fast Fall Delay 0 and 20: at 0 it sparks at the top and drops; at 20 it falls normally first, then sparks](../media/rc13-fast-fall-delay-quarter.gif)<br>*Game speed 1/4, the same full hop: with Fast Fall Delay 0 (left) the CPU fast falls from the top; with 20 (right) it falls normally for 20 game frames first. The delay counts game frames at any speed. Eden, rc.13 (untested on hardware).*
 
 - **Values:** 0 to 30 frames. Tick values, or set a minimum and a maximum.
 - **Default:** none ticked: it fast falls at once.

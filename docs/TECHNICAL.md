@@ -158,20 +158,22 @@ below.
 
 ### CPU reactions
 
-**Clip** [`rc11-di.gif`](media/rc11-di.gif): DI Down, then DI Up from the menu: the same forward smash launches the CPU low, then high
+**Clip** [`rc13-di.gif`](media/rc13-di.gif): DI Down, then DI Up from the menu (the blue chips): the same forward smash launches the CPU low, then high. Eden, rc.13 (untested on hardware)
 
-*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Mario vs Donkey Kong; the CPU loads at 80% (CPU damage on load, 80–80) with DI
-Direction Down and takes Mario's forward smash (the C-stick, 18.7%) on a low line, landing near the 10 mark; CPU ›
-Defence › DI Direction: Y clears Down, A picks Up; the same load and smash (18.8%) launch it on a steep line, still in
-the air past the 15 mark. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-14, rc.13 candidate `7d7b74c9` (diag NRO `134636ef…`, log lines only; rc.13 is untested on hardware), run
+`gna-r13b-yoga-1`, Mario vs Donkey Kong; the CPU loads at 80% with DI Direction Down and takes Mario's forward smash
+(19.0%) on a low line; CPU › Defence › DI Direction: the grid shows Down x1 at full tint and the other chips dim, Y clears
+Down, A picks Up; the same load and smash (19.2%) launch it high. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-DI, SDI, air dodge, shield tilt, mash, ledge, tech and throw options on the CPU page. Above: the same hit with no DI
+DI, SDI, air dodge, shield tilt, mash, ledge, tech and throw options on the CPU page. Above: the same hit with DI Down
 and with DI Up.
 
-**Clip** [`rc11-di-sdi-chips.gif`](media/rc11-di-sdi-chips.gif): DI Direction from nothing picked to Up ×1, then SDI Direction the same
+**Clip** [`rc13-di-sdi-chips.gif`](media/rc13-di-sdi-chips.gif): DI Direction from nothing picked to Up ×1, then SDI Direction the same. Eden, rc.13 (untested on hardware)
 
-*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), the CPU page's Defence section: DI Direction reads 0 selected; A opens the grid on
-Neutral; Up, A, and "Up x1" under Selected; back, the row reads 1 selected; then SDI Direction the same way. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-14, rc.13 candidate `7d7b74c9` (diag NRO `134636ef…`, log lines only; rc.13 is untested on hardware), run
+`gna-r13b-yoga-1`, the CPU page's Defence section: DI Direction reads 0 selected; A opens the grid on Neutral, every chip
+dim; the cursor to Up, A, and "Up x1" under Selected with the Up chip at full tint; then SDI Direction the same way. Cuts
+inside are listed in [MEDIA.md](MEDIA.md).*
 
 The direction chips show the game's own DI line and SDI streak; each A adds weight to a chip. *In* and *Out* are
 relative to you, on either side of the CPU.

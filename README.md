@@ -51,13 +51,16 @@ More: [the game speed guide](docs/guide/game-speed.md).
 ## The menu
 
 L and R turn the pages, ZL + Up/Down jumps between sections, A changes a row, Y resets it, and B closes the menu.
-Changes apply when it closes. More: [using the menu](docs/guide/using-the-menu.md).
+Left or Right flips an On/Off row too. Changes apply when it closes. More: [using the menu](docs/guide/using-the-menu.md).
+
+![The menu on Taunts: D-pad Right flips it Off, D-pad Left flips it On again, with no A](docs/media/rc13-left-right-toggle.gif)<br>*Left / Right flip an On/Off row. Eden, rc.13 (untested on hardware).*
 
 ### CPU
 
 Teach the CPU to DI, tech, shield, mash and follow up, and set its level.
 
-![DI Down, then DI Up: the same smash at the same damage sends the CPU low, then high](docs/media/rc11-di.gif)<br>*DI Down, then DI Up from the menu*
+![DI Down, then DI Up: the same smash at the same damage sends the CPU low, then high](docs/media/rc13-di.gif)<br>*DI Down, then DI Up from the menu. Eden, rc.13 (untested on hardware).*<br>
+![Mash with Always ticked: the CPU spot-dodges (left) or rolls forward (right) again and again](docs/media/rc13-mash-dodge-always.gif)<br>*Mash a dodge, Always. Eden, rc.13 (untested on hardware).*
 
 All the options: [the CPU page](docs/menu/cpu.md).
 
@@ -84,7 +87,8 @@ All the options: [the Recording page](docs/menu/recording.md).
 
 Switch fighters without leaving Training, give Kirby any hat, make Mii fighters, and change the stage.
 
-![Kirby gets Falco's hat, then Sheik's](docs/media/rc7-kirby-hats.gif)<br>*Changing Kirby's hat*
+![Kirby gets Falco's hat, then Sheik's](docs/media/rc7-kirby-hats.gif)<br>*Changing Kirby's hat*<br>
+![Training Stage Rotation On: the picked stage opens Training, and each return through the character select opens the next](docs/media/rc13-stage-pick.gif)<br>*Training Stage Rotation. Eden, rc.13 (untested on hardware).*
 
 All the options: [the Fighters & Stages page](docs/menu/fighters-and-stages.md).
 
@@ -92,7 +96,8 @@ All the options: [the Fighters & Stages page](docs/menu/fighters-and-stages.md).
 
 Hitboxes, hurtboxes and grab boxes; the input display and frame advantage; your own buttons.
 
-![Hitbox Visualization turned on: the yellow hurtboxes, then at 1/4 speed a neutral air's red hitbox](docs/media/rc11-hitbox.gif)<br>*Hitboxes and hurtboxes on*
+![Hitbox Visualization turned on: the yellow hurtboxes, then at 1/4 speed a neutral air's red hitbox](docs/media/rc11-hitbox.gif)<br>*Hitboxes and hurtboxes on*<br>
+![At 1/4 speed, the magenta grab boxes of Mario's grab, Samus's tether and Olimar's Pikmin; each grabber keeps its yellow hurtboxes](docs/media/rc13-grab-boxes.gif)<br>*Grab boxes in magenta. Eden, rc.13 (untested on hardware).*
 
 All the options: [the Display & Controls page](docs/menu/display-and-controls.md).
 

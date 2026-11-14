@@ -75,6 +75,8 @@ on the stage you chose, as usual.
 
 ![Training Stage Rotation turned on; the next Training, the same fighters, opens on Big Battlefield](../media/rc11-stage-rotation.gif)
 
+![Training Stage Rotation On: a stage picked at the stage select opens Training; back through the character select, Training opens on the next stage of the list](../media/rc13-stage-pick.gif)<br>*The stage you pick opens Training first; each return through the character select rotates. Eden, rc.13 (untested on hardware).*
+
 ## Stage Hazards
 
 Training loads stages with their hazards on, as it has no rules screen.

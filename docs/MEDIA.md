@@ -7,6 +7,47 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
 Since 2026-11-13 the README shows one GIF per menu page; the [menu docs](menu/) and [guides](guide/) embed the rest.
 The "Embedded in" column of the older sections records where a clip was placed when it was made.
 
+## rc.13 clips (2026-11-14, untested on hardware)
+
+The rc.13 options and drawing changes, shot by gif-nav-author-2. rc.13 is Eden-tested and **untested on hardware**.
+
+- **Builds:** each clip's diag build is the integration build that first had its change; that code is unchanged in
+  rc.13 `ed0d7a35`:
+  - Taunts and Aerial Drift: integration group 10 `f4f058e2` (diag `b731641d…`);
+  - pills and projectiles: group 12 `40446661` (diag `ad522d4d…`);
+  - Wario's bike: `7a6ba197` (diag `38623f23…`);
+  - grab boxes and Left / Right on toggles: rc.13 `ed0d7a35` itself (diag `2a667381…`), with the grabber's hurtboxes
+    kept through the grab.
+- **The earlier rc.13 final:** DI, the DI and SDI chips, Dodge Staling, Mash a dodge on Always, Fast Fall Delay, Input
+  Delay and the stage pick were shot on `7d7b74c9` (diag `134636ef…`), the rc.13 final before the re-roll. The rc.13
+  commits after it add Taunts, Aerial Drift, the hitbox drawing changes, Wario's bike and Left / Right on toggles.
+- **Runs:** the Yoga, one instance, Training only, muted, Eden `2f315fc4b7d9` with its GDB stub on; recorded at 15 fps,
+  1280 wide. Hitbox clips and Aerial Drift run at Eden speed 25 % (the game's frames, four times as long); the Input
+  Delay and Fast Fall Delay clips at the game's own speed 1/4. Every frame is a captured frame; holds are on real
+  frames. Side-by-side clips line two takes up on the same input.
+- **Replaced:** `rc13-di.gif` and `rc13-di-sdi-chips.gif` replace `rc11-di.gif` and `rc11-di-sdi-chips.gif` in the
+  README, TECHNICAL, menu/cpu and guide/cpu-behaviour; `rc13-fast-fall-delay-quarter.gif` replaces
+  `rc12-fast-fall-delay.gif` in menu/cpu (rc.12 counted the delay in 60 Hz reads, not game frames, so its 1/4 clip is
+  out of date). The old files stay in `media/`.
+
+| File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
+| --- | --- | --- | --- | --- | --- |
+| `media/rc13-taunts-off.gif` | `gna-g10-1`, `t-p2-taunts` | menu/display-and-controls (Taunts) | 8.4 s, 4.7 MB | 4.22–12.62 and 22.33–30.73 s, side by side | The same D-pad Up, Side and Down from the same L+R+A, lit on the pad. Left, Taunts Off: Mario stands through all three. Right, On: three taunts. |
+| `media/rc13-taunts-kirby-hat.gif` | `gna-g10-1`, `t-p2-taunts-kirby` | menu/display-and-controls (Taunts) | 9.9 s, 3.8 MB | 3.71–5.71, 6.67–10.28, 15.01–19.29 s | Taunts Off, Player 1 Kirby. No hat: D-pad Up lights, Kirby stands. Falco's hat; Side and Down: nothing; Up: Kirby takes the hat off. |
+| `media/rc13-aerial-drift.gif` | `gna-g10-1`, `t-p2-aerial-drift` | menu/cpu (Aerial Drift) | 6.1 s, 9.3 MB | 5.33–11.43 and 24.37–30.47 s, side by side | At 25 %, Mario vs CPU Mario (Mash Fair, Always), from the same L+R+A. Left, None: the CPU full hops, fairs and lands on its spot. Right, In: the same fair carries it toward Player 1. |
+| `media/rc13-pills.gif` | `gna-hb-2`, `t-p2-hb-pills` | menu/display-and-controls (Hitbox Visualization) | 7.7 s, 7.5 MB | 3.31–5.61, 10.54–13.24, 20.51–23.21 s | At 25 %: Ridley standing, his hurtboxes as yellow pills; his forward tilt, a red pill along the tail; his down tilt, the tail sweep. |
+| `media/rc13-projectile-hitboxes.gif` | `gna-hb-2`, `t-p2-hb-projectiles` and `t-p2-hb-proj-link` | menu/display-and-controls (Hitbox Visualization) | 6.4 s, 5.3 MB | 8.41–10.61 s (Ridley); 9.52–10.82 and 26.70–28.10 s (Link) | At 25 %: a red disc follows Ridley's fireball; the disc on Link's arrow; Link throws a bomb, the disc on the bomb. |
+| `media/rc13-grab-boxes.gif` | `gna-final-2`, `t-p2-hb-grab-boxes` and `t-p2-hb-grab-olimar`; `gna-samus-2`, `t-p2-hb-grab-samus` | README (Display & Controls); menu/display-and-controls (Hitbox Visualization) | 9.6 s, 8.3 MB | 4.17–6.87 s (Mario); 14.73–17.43 s (Samus); 3.01–5.71 s (Olimar) | At 25 %: Mario's standing grab box in magenta in front of him as the CPU is caught; Samus's tether as a magenta pill along the beam; the magenta disc on the Pikmin Olimar throws. Each grabber keeps its yellow hurtboxes through the grab. Each grab is held 0.5 s on its captured frame with the most magenta. |
+| `media/rc13-wario-bike.gif` | `gna-bike-2`, `t-p2-bike` | menu/fighters-and-stages (Give item) | 9.7 s, 5.0 MB | 18.39–22.52, 23.87–29.41 s | Give item's grid with the cursor on the last tile, the bike's own icon; A gives it and the menu closes. Mario holds the bike; A throws it: it drives forward into the CPU, then stays on the floor (`[CharacterItem] granted choice=38`). |
+| `media/rc13-left-right-toggle.gif` | `gna-lr-1`, `t-p2-left-right` | README (The menu); menu/display-and-controls (Taunts) | 7.5 s, 1.0 MB | 3.38–10.83 s | The menu on Display & Controls with the cursor on Taunts [ON]. D-pad Right: the row reads [OFF]. D-pad Left: [ON] again. No A. The menu closes. The open menu covers the gamepad overlay, so each press is named in the menu for 1.4 s from its logged time (`[Ui] press Right` / `Left`, row Taunts, depth 0). Checked outside the cut: Right then close, and Left then close, each log `menu closed changed=true`, and the setting reads Off, then On. |
+| `media/rc13-di.gif` | `gna-r13b-yoga-1`, `t-p2-r13-di` | README (CPU); TECHNICAL; menu/cpu (DI Direction) | 9.4 s, 9.8 MB | 1.82–4.22, 10.54–11.54, 12.03–13.03, 14.44–16.84, 21.12–23.72 s | DI Down: Mario's forward smash launches Donkey Kong low. The DI grid: Down selected (full tint), the rest dim; Y clears Down; Up picked. DI Up: the same load and smash launch him high. |
+| `media/rc13-di-sdi-chips.gif` | `gna-r13b-yoga-1`, `t-p2-r13-di-chips` | TECHNICAL; menu/cpu (SDI Direction); guide/cpu-behaviour | 9.2 s, 0.2 MB | 2.18–2.98, 4.18–6.39, 6.99–9.09, 12.54–14.52, 15.12–17.22 s | CPU › DI Direction with nothing picked; the grid, every chip dim; the cursor to Up; A: Up x1 at full tint beside the dim chips, held. SDI Direction the same. |
+| `media/rc13-dodge-staling.gif` | `gna-r13a-yoga-2`, `t-p2-r13-staling` | menu/cpu (Dodge Staling) | 6.0 s, 6.5 MB | from 12.02 and 32.21 s, side by side | Standing CPU, Mash Spot Dodge on Always, from the same L+R+A. Left, Dodge Staling Off: a dodge every 546 ms. Right, On: every 704 ms, so the right side falls behind. |
+| `media/rc13-mash-dodge-always.gif` | `gna-r13a-yoga-2`, `t-p2-r13-mash-dodge` | README (CPU); menu/cpu (Mash Triggers) | 5.0 s, 11.7 MB | from 8.13 and 21.93 s, side by side | Mash Triggers Always. Left, Mash Spot Dodge; right, Mash Roll Forwards: the CPU dodges, stands (Wait), dodges again, at least 3 times (rc.12 stayed in the first dodge). |
+| `media/rc13-fast-fall-delay-quarter.gif` | `gna-r13d-yoga-1`, `t-p2-r13-ffd-speed` | menu/cpu (Fast Fall Delay) | 3.2 s, 12.0 MB | from 2.23 and 8.27 s, side by side | Fast Fall Yes, Game speed 1/4, the same CPU full hop. Left, Delay 0: the spark at the top and the fast drop. Right, Delay 20: the normal fall, then the spark 1.25 s later (18.8 game frames), then the drop. |
+| `media/rc13-input-delay-sbs.gif` | `gna-r13a-yoga-1`, `t-p2-r13-input-delay` | menu/display-and-controls (Input Delay) | 3.0 s, 4.7 MB | from 3.79 and 12.80 s, side by side | Game speed 1/4, the gamepad overlay. A lights at the same moment on both. Left, Input Delay 0: Mario jabs at 0.9 s. Right, 18: he jabs at about 2.0 s (rc.12: 0.28 s later at any speed). |
+| `media/rc13-stage-pick.gif` | `gna-r13c-yoga-3`, `t-p2-r13-stage-pick` | README (Fighters & Stages); menu/fighters-and-stages, guide/stages (Training Stage Rotation) | 9.9 s, 5.3 MB | 8.65–10.65, 29.26–30.46, 31.01–32.61, 50.88–52.68, 65.07–65.77, 77.73–80.33 s | Training Stage Rotation On. The stage select (B held from the character select); the cursor off Training to Small Battlefield; A; Training opens on it. Back to the character select, Mario, Training again: the next stage of the list, Big Battlefield. |
+
 ## CPU option clips (2026-11-13)
 
 One clip per CPU option of [menu/cpu](menu/cpu.md): the option at its starting value, the menu change made with the menu itself, then the same action again. The ledger of the 2026-11-13 GIF pass is outside git (`artifacts/phase23/option-gifs-20261113/LEDGER.md`).
