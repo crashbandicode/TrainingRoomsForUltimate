@@ -845,6 +845,11 @@ panes, no new textures.
 
 ![rc13-DI-lines E1 x1, the decided look: today, the native blue DI indicator, and all four layers at today's width, with a 3x close-up](decisions/rc13-DI-lines-e1-x1.png)
 
+Eden capture of E1 x1 (additive, as the game draws it): the real textures are thinner and dimmer than the mockup.
+Brightening is a follow-up option (layer gain/width, or a texture swizzle).
+
+![rc13-DI-lines E1 x1 in Eden: the render, Eden unselected, Eden Down x1, the SDI grid, and Down at 5x](decisions/rc13-DI-lines-eden.png)
+
 #### rc13-memory · Memory levers (rc.13): dropped
 
 **Decided 2026-11-13 (~22:55Z): dropped; no lever will be implemented.** The operator: "drop the memory optimization.
