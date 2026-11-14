@@ -758,6 +758,12 @@ pub(crate) fn installed() -> bool {
     BASE.load(Ordering::Acquire) != 0
 }
 
+/// The fallback is emitting P1's input now (B4's `p1_driven_by_ai`): lock-free, readable from a game hook. False while it
+/// is off, not installed, or paused for a menu, a recording or a playback.
+pub(crate) fn emitting() -> bool {
+    installed() && EMITTING.load(Ordering::Acquire)
+}
+
 fn clear_output() {
     EMITTING.store(false, Ordering::Release);
     PENDING.store(0, Ordering::Release);

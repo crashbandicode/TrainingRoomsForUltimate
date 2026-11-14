@@ -91,7 +91,11 @@ pub(crate) unsafe fn on_input(controller: usize, out: *mut MappedInputs) -> bool
     // and only while the chord is held where it counts; the model uses the answer of the chord's first poll.
     let p1_ai = eligible
         && QuickReset::chord_held(raw)
-        && crate::model::recording::p1_driven_by_ai(natives::is_operation_cpu(0), crate::runtime::ui::pilot_export());
+        && crate::model::recording::p1_driven_by_ai(
+            natives::is_operation_cpu(0),
+            crate::runtime::p1::cpu_pilot::emitting(),
+            crate::runtime::ui::pilot_export(),
+        );
     let quick = QUICK.lock().input(raw, eligible, || p1_ai);
     if quick.refused {
         notices::refuse(crate::model::state::quick_reset::AI_REFUSAL);

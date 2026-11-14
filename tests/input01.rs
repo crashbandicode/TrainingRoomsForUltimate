@@ -404,14 +404,14 @@ unsafe extern "C" fn pilot_inactive(_: *mut PilotStateV1) -> bool {
 /// absent: P1 records.
 #[test]
 fn record_refused_while_the_standalone_pilot_drives_p1() {
-    let refusal = |export: Option<PilotStateExport>| record_refusal(unsafe { p1_driven_by_ai(false, export) }, true, false);
+    let refusal = |export: Option<PilotStateExport>| record_refusal(unsafe { p1_driven_by_ai(false, false, export) }, true, false);
     assert_eq!(refusal(Some(pilot_armed_l3)), Some(RecordRefusal::P1DrivenByAi));
     assert_eq!(refusal(Some(pilot_armed_l3)).map(RecordRefusal::text), Some("P1 is controlled by an AI: recording is off"));
     assert_eq!(refusal(Some(pilot_unarmed)), None, "an unarmed pilot leaves P1 to the player: it records");
     assert_eq!(refusal(Some(pilot_inactive)), None, "an inactive export (false) is not an AI");
     assert_eq!(refusal(None), None, "no pilot on the card: it records");
-    // The game's own operator flag still refuses on its own (the fallback / a CPU-operated entry 0).
-    assert!(unsafe { p1_driven_by_ai(true, None) });
+    // The game's own operator flag still refuses on its own (a CPU-operated entry 0).
+    assert!(unsafe { p1_driven_by_ai(true, false, None) });
     // The declared ABI: 24 bytes, `armed_level` at offset 8, `last_input` at 16 (the pilot's #[repr(C)] struct).
     assert_eq!(std::mem::size_of::<PilotStateV1>(), 24);
     assert_eq!(std::mem::offset_of!(PilotStateV1, armed_level), 8);
@@ -423,7 +423,7 @@ fn record_refused_while_the_standalone_pilot_drives_p1() {
 /// running capture (started before the pilot armed) still stops it, without asking.
 #[test]
 fn a_record_chord_that_starts_a_capture_is_refused_while_an_ai_drives_p1() {
-    let pilot = |export: PilotStateExport| move || record_refusal(unsafe { p1_driven_by_ai(false, Some(export)) }, true, false);
+    let pilot = |export: PilotStateExport| move || record_refusal(unsafe { p1_driven_by_ai(false, false, Some(export)) }, true, false);
     assert_eq!(record_chord(true, false, pilot(pilot_armed_l3)), Err(RecordRefusal::P1DrivenByAi));
     assert_eq!(
         record_chord(true, false, pilot(pilot_armed_l3)).map_err(RecordRefusal::text),
@@ -440,13 +440,34 @@ fn a_record_chord_that_starts_a_capture_is_refused_while_an_ai_drives_p1() {
 /// drives P1, so its chord is refused then, with R7's check and notice style. Unarmed, inactive or absent: it plays.
 #[test]
 fn play_on_player_1_is_refused_while_an_ai_drives_p1() {
-    let pilot = |export: PilotStateExport| move || unsafe { p1_driven_by_ai(false, Some(export)) };
+    let pilot = |export: PilotStateExport| move || unsafe { p1_driven_by_ai(false, false, Some(export)) };
     assert_eq!(play_player_chord(true, pilot(pilot_armed_l3)), Err("P1 is controlled by an AI: Play on Player 1 is off"));
     assert_eq!(play_player_chord(true, pilot(pilot_unarmed)), Ok(true));
     assert_eq!(play_player_chord(true, pilot(pilot_inactive)), Ok(true));
-    assert_eq!(play_player_chord(true, || unsafe { p1_driven_by_ai(false, None) }), Ok(true), "no pilot: it plays");
-    assert!(play_player_chord(true, || unsafe { p1_driven_by_ai(true, None) }).is_err(), "the operator flag too");
+    assert_eq!(play_player_chord(true, || unsafe { p1_driven_by_ai(false, false, None) }), Ok(true), "no pilot: it plays");
+    assert!(play_player_chord(true, || unsafe { p1_driven_by_ai(true, false, None) }).is_err(), "the operator flag too");
     assert_eq!(play_player_chord(false, || panic!("no chord asks nothing")), Ok(false));
+}
+
+/// rc.14 recfix (Eden rc.13 `g5-rc13-xps-1`, gif-lane-5): TR's own P1 CPU Control (the fallback pilot) arms the AI and hands
+/// back its decision as P1's mapped input, leaving `is_operation_cpu(0)` false ("No operation-CPU change persists",
+/// `cpu_pilot.rs`), so B4 never saw it: Record started and Play on Player 1 played while it drove P1. The fallback's own
+/// answer (it is emitting P1's input now) refuses both, with the standalone pilot's notices. Paused for a menu or a recording,
+/// or Off, it is not emitting: P1 records and plays. A running capture still stops without asking.
+#[test]
+fn record_and_play_on_player_1_are_refused_while_the_fallback_drives_p1() {
+    let driven = |fallback: bool| move || unsafe { p1_driven_by_ai(false, fallback, None) };
+    let record = |fallback: bool| record_chord(true, false, || record_refusal(driven(fallback)(), true, false));
+    assert_eq!(record(true), Err(RecordRefusal::P1DrivenByAi));
+    assert_eq!(record(true).map_err(RecordRefusal::text), Err("P1 is controlled by an AI: recording is off"));
+    assert_eq!(record(false), Ok(true), "the fallback Off or paused: P1 records");
+    assert_eq!(play_player_chord(true, driven(true)), Err("P1 is controlled by an AI: Play on Player 1 is off"));
+    assert_eq!(play_player_chord(true, driven(false)), Ok(true), "the fallback Off or paused: Play on Player 1 plays");
+    assert_eq!(record_chord(true, true, || panic!("a stop asks no refusal")), Ok(true), "a running capture stops");
+    // The other two answers still refuse on their own, whatever the fallback says.
+    assert!(unsafe { p1_driven_by_ai(true, false, None) });
+    assert!(unsafe { p1_driven_by_ai(false, false, Some(pilot_armed_l3)) });
+    assert!(!unsafe { p1_driven_by_ai(false, false, Some(pilot_unarmed)) });
 }
 
 /// R7: a starting Record chord answers exactly as `record_refusal` does, over every combination of its live facts (the

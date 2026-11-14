@@ -846,7 +846,7 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
         // rc.12 smoke row e: a placed Load says so in the release log, as a refused one does. The records follow the entry,
         // not its operator (SPEC-state-01 §8), so a Load while CPU Pilot drives Player 1 is placed; `p1_pilot` names it.
         crate::runtime::diag_log::diagnostic(format_args!("[TrainingRooms] save_state loaded ledge={ledge} p1_pilot={}",
-            crate::model::recording::p1_driven_by_ai(false, crate::runtime::ui::pilot_export())));
+            crate::model::recording::p1_driven_by_ai(false, false, crate::runtime::ui::pilot_export())));
     }
 }
 

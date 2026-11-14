@@ -287,17 +287,18 @@ pub struct PilotStateV1 {
     pub last_input: u64,
 }
 
-/// B4's `p1_driven_by_ai` for `record_refusal`: the game's operator flag on entry 0, or the standalone
-/// pilot's own answer. That pilot drives P1 without flipping the flag (it arms the AI and returns its
-/// decision as P1's mapped input, `core/src/native.rs:242`), so its export must answer and say
-/// `armed_level != 0`.
+/// B4's `p1_driven_by_ai` for `record_refusal`: the game's operator flag on entry 0, TR's own fallback pilot (P1 CPU
+/// Control), or the standalone pilot's own answer. Neither pilot drives P1 by flipping the flag (each arms the AI and
+/// returns its decision as P1's mapped input, `core/src/native.rs:242`; the fallback leaves no operation-CPU change
+/// behind), so the fallback says whether it is emitting P1's input now (`fallback`), and the standalone pilot's export
+/// must answer and say `armed_level != 0`.
 ///
 /// # Safety
 /// `export` is the pilot's `ssbu_cpu_pilot_state_v1`, or another function with that ABI.
-pub unsafe fn p1_driven_by_ai(operation_cpu: bool, export: Option<PilotStateExport>) -> bool {
+pub unsafe fn p1_driven_by_ai(operation_cpu: bool, fallback: bool, export: Option<PilotStateExport>) -> bool {
     let mut s = PilotStateV1::default();
     let answered = export.is_some_and(|f| unsafe { f(&mut s) });
-    operation_cpu || (answered && s.abi_version >= 1 && s.armed_level != 0)
+    operation_cpu || fallback || (answered && s.abi_version >= 1 && s.armed_level != 0)
 }
 
 /// Why a playback was not started (decision B8: an unrecorded slot, or playback while recording).
