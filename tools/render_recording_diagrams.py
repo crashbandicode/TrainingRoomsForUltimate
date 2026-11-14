@@ -1,5 +1,6 @@
 #!/usr/bin/python3 -I
-"""Draw the diagrams in docs/diagrams/recording-*.png for docs/guide/recording.md and docs/menu/recording.md.
+"""Draw the diagrams in docs/diagrams/recording-*.png for docs/guide/recording.md and docs/menu/recording.md, and
+docs/diagrams/setup-a-versus-y.png for docs/guide/save-states.md and docs/menu/saves.md.
 
 Same look as tools/render_decisions.py (its canvas, colours and helpers are reused). Every picture is drawn from the
 facts in the two Recording docs; no game-derived file is used, so these are drawings, not Eden footage (the GIFs in
@@ -397,7 +398,66 @@ def page_popup():
     c.save("recording-page-popup")
 
 
-ALL = {"pieces": pieces, "record_flow": record_flow, "passes": passes, "placement": placement, "grading": grading,
+def spot(c, x, ground, col, text):
+    c.ellipse(x - 16, ground - 4, x + 16, ground + 5, outline=col, width=2)
+    c.text(x, ground + 9, text, "xxs", col, "m")
+
+
+def mini_stage(c, x0, x1, y0, caption, p1, cpu, note):
+    """A strip of stage: the bound save's two spots (grey rings), the setup's two spots (gold rings) and the
+    fighters at p1 / cpu (fractions of the strip's width)."""
+    w = x1 - x0
+    ground = y0 + 62
+    c.text(x0, y0, caption, "s", FG)
+    c.text(x1, y0 + 3, note, "xxs", MUTED, "r")
+    c.rect(x0, y0 + 22, x1, ground + 28, fill=PANEL, outline=LINE, radius=6)
+    c.line([(x0 + 10, ground), (x1 - 10, ground)], LINE, 3)
+    for f, label in ((0.42, "bound save"), (0.58, "")):
+        spot(c, x0 + w * f, ground, MUTED, label)
+    for f, label in ((0.10, "setup"), (0.90, "setup")):
+        spot(c, x0 + w * f, ground, ADV, label)
+    stage_fighter(c, x0 + w * p1, ground, P1, "")
+    stage_fighter(c, x0 + w * cpu, ground, CPU, "")
+
+
+def a_versus_y():
+    c = Canvas(W, 556)
+    title(c, "A or Y on a setup", "you choose in the Setup library, then close the menu")
+    panels = [
+        (12, "A", "go there once", SEL,
+         [("Both fighters move to the setup", "needs Save States On, the same stage and the same fighters"),
+          ("The next Load goes to your bound save", "as before: A moves you once")],
+         (0.10, 0.90), (0.42, 0.58)),
+        (606, "Y", "make Load go there", CPU,
+         [("Nobody moves", "works with any stage or fighters"),
+          ("Load, and Auto-load on death, go to the setup", "until you Save or bind another save")],
+         (0.30, 0.70), (0.10, 0.90)),
+    ]
+    for x0, key, head, col, steps, after_menu, after_load in panels:
+        x1 = x0 + 582
+        c.rect(x0, 52, x1, 540, fill=PANEL, outline=LINE, radius=8)
+        c.rect(x0, 52, x1, 96, fill=col, radius=8)
+        c.text(x0 + 16, 62, key, "hh", FG)
+        c.text(x0 + 52, 66, head, "h", FG)
+        y = 112
+        c.circle(x0 + 26, y + 9, 11, outline=FG, width=2)
+        c.text(x0 + 26, y + 1, "1", "s", FG, "m")
+        c.text(x0 + 50, y, "Close the menu (nothing moves until you do)", "s", FG)
+        y += 46
+        for i, (main, sub) in enumerate(steps, 2):
+            c.circle(x0 + 26, y + 9, 11, outline=FG, width=2)
+            c.text(x0 + 26, y + 1, str(i), "s", FG, "m")
+            c.text(x0 + 50, y, main, "s", FG)
+            c.text(x0 + 50, y + 22, sub, "xxs", MUTED)
+            y += 58
+        mini_stage(c, x0 + 20, x1 - 20, 300, "after the menu closes", *after_menu,
+                   "both at the setup" if key == "A" else "no one has moved")
+        mini_stage(c, x0 + 20, x1 - 20, 420, "the next Load", *after_load,
+                   "back at your bound save" if key == "A" else "both at the setup")
+    c.save("setup-a-versus-y")
+
+
+ALL = {"a_versus_y": a_versus_y, "pieces": pieces, "record_flow": record_flow, "passes": passes, "placement": placement, "grading": grading,
        "mismatch": mismatch, "page_popup": page_popup}
 
 if __name__ == "__main__":

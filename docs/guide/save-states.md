@@ -157,40 +157,61 @@ death is On: a save state loads instead". Its value is kept, and counts again wh
 
 ## The setup library
 
-A setup is a named copy of a save state, together with the stage it was saved on. Setups live in their own library,
-`sd:/ultimate/TrainingRooms/setups/`, apart from the save states: using one never changes a save file. Both rows are in
-Saves › [Setup library](../menu/saves.md#setup-library).
+A setup is a spot you practise from, kept under a name: where both fighters stand, which fighters they are, and the
+stage. Setups live in their own library, `sd:/ultimate/TrainingRooms/setups/`, apart from your save states, and using
+one never changes a save file. Both rows are in Saves › [Setup library](../menu/saves.md#setup-library).
 
-### Naming a setup
+![A on a setup moves both fighters there once, and the next Load goes back to your bound save; Y moves nobody, and the next Load, and Auto-load on death, go to the setup](../diagrams/setup-a-versus-y.png)
 
-1. Bind the save you want to keep, or press Save where you want it.
-2. Open Saves › Save setup to library... and press A.
+### Making a setup
+
+1. Put both fighters where you want to practise and press Save (ZL + D-pad Down). This replaces the spot in your bound
+   save. To keep that spot too, bind another save first (Recording ›
+   [Save states & Macros](../menu/recording.md#save-states--macros)). If your bound save is already the spot you
+   want, skip this step.
+2. Open Saves › Save setup to library... and press A. It reads the bound save; B cancels.
 3. The keyboard opens with the name "Setup". Type a name of up to 48 characters and confirm.
 4. The notice reads "Saved setup" and the name.
 
-The setup holds what the Load chord would load at that moment: both fighters as saved, and the stage. Both fighters
-must have been saved on the same stage, or the notice reads "Save both fighters in this slot on the same stage before
-exporting" and nothing is kept. Each setup is a new file; one never overwrites another.
+A setup is a copy of your bound save, the one Load goes to, not of where the fighters stand now. That is why step 1
+matters: without it you keep the old spot.
+
+Both fighters must have been saved on the same stage. If not, or if nothing is saved yet, the notice reads "Save both
+fighters in this slot on the same stage before exporting" and nothing is kept. Each setup is a new file; one never
+overwrites another.
 
 ### Using a setup
 
-Saves › Setup library lists each setup as "name · Player 1's fighter / the CPU's fighter". Choose one with Up / Down,
-then:
+Saves › Setup library lists each setup, A to Z, as "name · Player 1's fighter / the CPU's fighter". A row is cut off at
+16 characters and doesn't show the stage. Choose one with Up / Down, then press A or Y. Nothing moves until you close
+the menu. A notice says so: "Setup will bind and restore when the menu closes", or "Setup will bind when the menu
+closes".
 
-- **A: bind and restore.** When you close the menu, both fighters go to the setup through an ordinary load, so damage
-  on load, mirroring and buffs apply (with Default damage, both are at 0%; choose Save State to get the setup's
-  damage). Afterwards the chords go back to your bound save: the next Load returns there.
-- **Y: bind without restoring.** Nobody moves. The Load chord, and Auto-load on death, go to the setup until you press
-  Save or bind another save.
+| Key | What it does | When the menu closes | The next Load |
+| --- | --- | --- | --- |
+| A | Go there once | Both fighters go to the setup through an ordinary load, so damage on load, mirroring and buffs apply (with Default damage, both are at 0%; choose Save State to get the setup's damage). | Goes to your bound save, as before. |
+| Y | Make Load use it | Nobody moves. | Goes to the setup, and so does Auto-load on death, until you press Save or bind another save. |
 
-Neither writes a save file. The choice waits for the menu to close, and a notice says so: "Setup will bind and restore
-when the menu closes", or "Setup will bind when the menu closes".
+**To drill a setup again and again: Y, then Load.** A is for putting yourself there once. Neither key writes a save
+file.
 
-A works only:
+<!-- CAPTURE-REQUEST setup-load-target: a new clip, rc14-setup-load-target.gif (Y on Corner trap, close the menu, nobody moves; Load goes to the setup, and again after a smash). The same clip goes in docs/menu/saves.md. Plan: artifacts/setup-library-review/PROPOSAL.md section 2.3 and storyboard-load-target.png. -->
 
-- with Save States On;
-- on the stage the setup was saved on;
-- with the same fighters on both sides, and for a Mii, the same Mii.
+### When A says no
 
-Otherwise a notice names the problem, for example "Restore this setup on its saved stage; Y can bind it without
-moving". Y has none of these limits.
+A is refused unless every row below is true. The notice gives the reason, but it doesn't name the stage or the
+fighters.
+
+| What is wrong | What to do |
+| --- | --- |
+| Save States is Off. | Turn Saves › Save States On. |
+| You are on another stage. The notice reads "Restore this setup on its saved stage; Y can bind it without moving". | Go to the setup's stage first: A never changes the stage. Put the stage in the setup's name so you remember it. |
+| A side has a different fighter. | Choose the setup's fighters (Fighters & Stages). |
+| A side has a different Mii. | Choose the same Mii. |
+
+Y has none of these limits and always works, but a setup's spots only make sense on the stage it was saved on.
+
+### Renaming and deleting
+
+There is no rename or delete in the game yet. To remove or replace a setup, delete or overwrite its file in the setups
+folder on a computer. The file is named after the setup, such as `corner-trap.json`.
