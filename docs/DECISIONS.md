@@ -614,8 +614,10 @@ the orbs are still the plugin's own panes, articles' hitboxes included.
 
 ## Open (2026-11-13/14)
 
-Opened by the primary for the operator from the lanes' reports of 2026-11-13 (rc13-hitbox-pills and rc14-eggs: 2026-11-14). An item the operator has answered says
-**Decided** under its heading (rc13-DI-lines, rc13-memory, rc13-hitbox-pills); the rest are still open. Each item says what is being decided, the options with their cost to the player, and a recommendation. In each picture the
+Opened by the primary for the operator from the lanes' reports of 2026-11-13 (rc13-hitbox-pills and rc14-eggs: 2026-11-14). **Every item
+is now decided**, and each says **Decided** under its heading: TR1–TR9 and OP1–OP8 on 2026-11-13 (~11:50Z, OP3 changed on
+11-14), rc13-DI-lines, rc13-memory and rc13-hitbox-pills as dated, and rc14-eggs on 2026-11-14 (~13:00Z). The options and
+recommendations below stay as the record. Each item says what is being decided, the options with their cost to the player, and a recommendation. In each picture the
 recommended option has a **green outline**. The pictures are drawn by `tools/render_decisions_1113.py`
 (rc13-DI-lines: author-2's mockup as drawn; rc13-memory: `tools/render_rc13_memory.py`).
 
@@ -625,39 +627,45 @@ recommended option has a **green outline**. The pictures are drawn by `tools/ren
 
 | # | Decision | Recommendation |
 | --- | --- | --- |
-| TR1 | Playback Slot 1–5 and Hitstun timing (#8) | A: hide them |
-| TR2 | Size gate after integration's #23, #15 and #25 fixes | (b): delete the old slot recorder (258 lines), with TR1 A |
-| TR3 | HUD Off (#2) | A: keep it |
-| TR4 | Pummel Delay without a Throw (#4) | A: keep it |
-| TR5 | Respawn on platform with Save States Off (#9) | B: make it work |
-| TR6 | Ask before switching fighter (#13) | B: every question follows the row |
-| TR7 | Crop trailing neutral (#14) | B: make Record trim |
-| TR8 | Player Character with Player Swapping Off (#17) | B: a pick loads now |
-| TR9 | Retire the old Record trigger row (V2), or keep its legacy start | A: V2, retire the row |
+| TR1 | Playback Slot 1–5 and Hitstun timing (#8) | **Decided 11-13: C, implement** ("TR1 Fix them, it should work"): a macro plays as Playback Slot 1–5, rc.12 `582c9831` |
+| TR2 | Size gate after integration's #23, #15 and #25 fixes | **Decided 11-13: (b), no raise**: dead code deleted, rc.12 `972f4e02` and `f37a3699` |
+| TR3 | HUD Off (#2) | **Decided 11-13: A, keep it**; the help line was fixed |
+| TR4 | Pummel Delay without a Throw (#4) | **Decided 11-13: B, pummel with Throw None** ("wrong behavior fix it"), rc.12 |
+| TR5 | Respawn on platform with Save States Off (#9) | **Decided 11-13: B, make it work**, rc.12 |
+| TR6 | Ask before switching fighter (#13) | **Decided 11-13: B, every question follows the row**, rc.12 |
+| TR7 | Crop trailing neutral (#14) | **Decided 11-13: B, make Record trim**, rc.12 `33f9ccc8` |
+| TR8 | Player Character with Player Swapping Off (#17) | **Decided 11-13: B, a pick loads now**, rc.12 |
+| TR9 | Retire the old Record trigger row (V2), or keep its legacy start | **Decided 11-13: A, V2, retire the row**, rc.12 `f37a3699` |
 | rc13-DI-lines | DI chips like the game's blue DI indicator (A–D rejected) | **Decided 11-13: E1 x1**, all 4 layers at today's width |
 | rc13-memory | Memory levers for TrainingRooms' share | **Decided 11-13: dropped**, no lever implemented |
 | rc13-hitbox-pills | Hitbox Visualization draws capsules as pills, not rows of discs | **Decided 11-14: pills in rc.13**, with grab boxes in their own colour |
-| rc14-eggs-D1 | Eggs-ercise: the object | (a): a TR-drawn egg; open until rc.13 ships |
-| rc14-eggs-D2 | Eggs-ercise: where eggs appear | (a): a box at the stage centre, a minimum distance from the last egg, rise-and-fall on; open |
-| rc14-eggs-D3 | Eggs-ercise: what breaks an egg | one row, default Aerials, also Any attack and 12 %+; projectiles never; open |
-| rc14-eggs-D4 | Eggs-ercise: end and scoring | (a): 1 minute and Free practice, timed in game frames, a best per fighter for the session; open |
-| rc14-eggs-D5 | Eggs-ercise: the HUD | (a): TR's standing notice; open |
-| rc14-eggs-D6 | Eggs-ercise: the CPU | (a): leave it; open |
-| rc14-eggs-D7 | Eggs-ercise: the menu place | (a): Fighters & Stages › Extras; open |
-| rc14-eggs-D8 | Eggs-ercise: where it works | (a): Training and waiting-room practice; open |
-| rc14-eggs-D9 | Eggs-ercise: restart | (a): L+R+A, and reopening the menu always works; open |
-| OP1 | Push the held doc fixes | A: push the docs now, `c49681c9` after TR5 and TR8 |
-| OP2 | The standalone `libimgui_smash.nro` on the card | A: remove it |
-| OP3 | Deluxe's hidden Stages + Counterpick page | A: show it |
-| OP4 | elite-stages-counterpick and ssbu-cpu-pilot are private | A: make both public |
-| OP5 | The old Deluxe in Elite's release ZIP | A: drop it |
-| OP6 | Releases and tags that lag the card | A: tag and release what runs |
-| OP7 | LICENSE for six repos | A: MIT |
-| OP8 | Operator quotes in instant_back's design files | A: paraphrase them |
+| rc14-eggs-D1 | Eggs-ercise: the object | **Decided 11-14: (a) with hitlag, and (c) as an option**; a break animation (13:13Z) |
+| rc14-eggs-D2 | Eggs-ercise: where eggs appear | **Decided 11-14: (c)**, the stage's camera range, on screen; Melee-like physics with a speed row |
+| rc14-eggs-D3 | Eggs-ercise: what breaks an egg | **Decided 11-14: (b)**, Any attack by default; Aerials and 12 %+ stay as values |
+| rc14-eggs-D4 | Eggs-ercise: end and scoring | **Decided 11-14: (a) and (c)**: 1 minute, 10 and 20 targets, Free practice |
+| rc14-eggs-D4.5 | (new) Break the Targets | **Decided 11-14: a new mode**: place targets on a zoomed-out stage, then break them |
+| rc14-eggs-D5 | Eggs-ercise: the HUD | **Decided 11-14: (a)**, TR's standing notice |
+| rc14-eggs-D6 | Eggs-ercise: the CPU | **Decided 11-14: (a)**, with Hide CPU (D6.5) |
+| rc14-eggs-D6.5 | (new) Hide CPU | **Decided 11-14: a general Hide CPU**, plus a setting that hides it during a practice game (13:19Z) |
+| rc14-eggs-D7 | Eggs-ercise: the menu place | **Decided 11-14: (b)**, a new group "Practice games" |
+| rc14-eggs-D8 | Eggs-ercise: where it works | **Decided 11-14: (a)**, Training and waiting-room practice |
+| rc14-eggs-D9 | Eggs-ercise: restart | **Decided 11-14: (a) and (c)**, L+R+A and reopening the menu |
+| OP1 | Push the held doc fixes | **Decided 11-13: A, done 11-13**: Deluxe `5f9759f`, worker A's 17 commits, the four copies reconciled |
+| OP2 | The standalone `libimgui_smash.nro` on the card | **Decided 11-13: A, removed 11-13** (`removed_verified` 11:55:06Z); the standalone updated as imgui-smash 1.2.0 |
+| OP3 | Deluxe's hidden Stages + Counterpick page | **Decided 11-14: B, keep it hidden** (11-13 had said A); the card already has it hidden |
+| OP4 | elite-stages-counterpick and ssbu-cpu-pilot are private | **Decided 11-13: A, both public 11-13** |
+| OP5 | The old Deluxe in Elite's release ZIP | **Decided 11-13: A, dropped 11-13** (release 473) |
+| OP6 | Releases and tags that lag the card | **Decided 11-13: A, released 11-13** |
+| OP7 | LICENSE for six repos | **Decided 11-13: A, MIT, pushed 11-13** |
+| OP8 | Operator quotes in instant_back's design files | **Decided 11-13: A, paraphrased 11-13** (`32135ef`) |
 
 ### TrainingRooms
 
+The operator, 2026-11-13 ~11:50Z, verbatim: "TR1 Fix them, it should work... TR2 agreed TR3 agreed TR4 wrong behavior fix it. TR5 Fix it TR6 agreed TR7 agreed TR8 agreed TR9 Agreed".
+
 #### TR1 · Playback Slot 1–5 and Hitstun timing (#8)
+
+**Decided 2026-11-13 (~11:50Z): C, implement.** The operator: "TR1 Fix them, it should work...". Integration built it for rc.12: a macro's page has "Playback slot" (None, Slot 1–5), and the CPU's Playback Slot actions play that macro once (`582c9831`; INBOX 11-13 15:45Z). Hitstun timing uses a Playback Slot.
 
 What to do with entries that are offered but can never work. Mash, Followup and the Situation overrides offer Playback
 Slot 1–5 among their 30 actions, and Ledge Options among its 10. Nothing ever fills a slot: Load never starts a slot
@@ -679,6 +687,8 @@ delete the slot code.
 ![TR1 playback slots](decisions/TR1-playback-slots.png)
 
 #### TR2 · The size gate after integration's #23, #15 and #25 fixes
+
+**Decided 2026-11-13 (~11:50Z): (b), no raise.** The operator: "TR2 agreed". With TR1 at C the slot playback stayed, so integration deleted the code nothing reaches instead: TR9 V2's retired trigger and the old named capture (`f37a3699`, −355 lines; INBOX 11-13 15:25Z), then the old numbered recorder (`972f4e02`; INBOX 11-13 16:35Z). The ceiling was not raised.
 
 How to make room for integration's three bug fixes: the pop-up's B close, the Loop list, and the Setup library's
 restore after a live swap. On top of the held fix they put the code 35 lines over `size-budget.toml`: 147,956 against
@@ -705,6 +715,8 @@ limit. If TR1 is C, the slot code is needed: then (a).
 
 #### TR3 · HUD Off (#2)
 
+**Decided 2026-11-13 (~11:50Z): A, keep it.** The operator: "TR3 agreed". Only the help line changed, in worker A's text fix (`c49681c9`, landed in rc.12 as `900a1f48`).
+
 Whether HUD Off should keep hiding the game's own HUD. That is what it does, not what rc.11's help line says.
 
 - **A · keep it:** Off hides the damage and stock panels, item pointers and off-screen bubbles, as Training Modpack's
@@ -717,6 +729,8 @@ Whether HUD Off should keep hiding the game's own HUD. That is what it does, not
 ![TR3 HUD](decisions/TR3-hud.png)
 
 #### TR4 · Pummel Delay without a Throw (#4)
+
+**Decided 2026-11-13 (~11:50Z): B, pummel with Throw None.** The operator: "TR4 wrong behavior fix it". Worker A, for rc.12: with Throw None a Pummel Delay pummels on the same cadence, and the hold ends when the held fighter breaks free (`c1905941` as posted; INBOX 11-13 12:28Z).
 
 Whether Pummel Delay should pummel when Throw is None, the default. Today the CPU pummels only while it waits out
 Throw Delay, with a Throw set.
@@ -731,6 +745,8 @@ Throw Delay, with a Throw set.
 ![TR4 pummel](decisions/TR4-pummel.png)
 
 #### TR5 · Respawn on platform with Save States Off (#9)
+
+**Decided 2026-11-13 (~11:50Z): B, make it work.** The operator: "TR5 Fix it". Worker A, for rc.12: Respawn on platform works with Save States Off (`f0fb22f7` as posted; INBOX 11-13 12:28Z).
 
 Whether Respawn on platform Off should give an instant respawn with Save States Off. Today the row is ignored then, and
 the revival platform appears.
@@ -747,6 +763,8 @@ Upstream doesn't link them. B also settles one of the held fix's two flagged com
 
 #### TR6 · Ask before switching fighter (#13)
 
+**Decided 2026-11-13 (~11:50Z): B, every question follows the row.** The operator: "TR6 agreed". Worker A, for rc.12 (`58e07de0` as posted; INBOX 11-13 12:28Z).
+
 Whether this row should govern every fighter question. Today only the Replay window reads it. Play chords on a macro
 or a chain, and combo drills, ask Fighter Mismatch whatever it says.
 
@@ -759,6 +777,8 @@ or a chain, and combo drills, ask Fighter Mismatch whatever it says.
 ![TR6 ask before switching](decisions/TR6-ask-fighter.png)
 
 #### TR7 · Crop trailing neutral (#14)
+
+**Decided 2026-11-13 (~11:50Z): B, make Record trim.** The operator: "TR7 agreed". Integration, rc.12 `33f9ccc8` (INBOX 11-13 16:11Z).
 
 Whether Record should drop the idle frames at the end of a recording when this row is On. Today Record never reads the
 row. Of its two old readers, the slot recorder can't be reached, and the named capture starts only from settings of
@@ -773,6 +793,8 @@ v0.2.0-rc.3.1 or older.
 ![TR7 crop](decisions/TR7-crop.png)
 
 #### TR8 · Player Character with Player Swapping Off (#17)
+
+**Decided 2026-11-13 (~11:50Z): B, a pick loads now.** The operator: "TR8 agreed". Worker A, for rc.12 (`b4eb42be` as posted; INBOX 11-13 12:28Z).
 
 Whether a portrait pick should load Player 1's fighter with Player Swapping Off. Today the pick is dropped with no
 notice and loads only when Player Swapping goes On.
@@ -789,6 +811,8 @@ fix's other flagged compliance line.
 ![TR8 player character](decisions/TR8-player-character.png)
 
 #### TR9 · Retire the old Record trigger row (V2), or keep its legacy start
+
+**Decided 2026-11-13 (~11:50Z): A, V2, retire the row.** The operator: "TR9 Agreed". Integration, rc.12 `f37a3699` (INBOX 11-13 15:25Z).
 
 Whether to retire the whole obsolete `record_trigger` row, as `migrate.rs` intends ("become nothing").
 
@@ -989,7 +1013,25 @@ Draft built at the recommended defaults; watch for the egg's look (D1), the noti
 
 ![rc14-eggs preview: the draft's egg, close up](decisions/rc14-eggs-demo-egg.png)
 
-**Open: the operator decides after rc.13 ships.** Nothing of it is built; rc.13 takes no Eggs-ercise code.
+**Decided 2026-11-14 (~13:00Z).** The operator, verbatim:
+
+> D1, add hitlag to the target, make the CPU an option to enable
+> D2, c
+> D3, b
+> D4, a, and c
+> D4.5, I also want a break the targets mode where the stage is zoomed out, the player can pick where the targets go
+> and then break them.
+> D5, a
+> D6.5. The ability to hide the CPU in general would be nice. If we just add that ability we can leave D6 as (a)
+> D7. B, practice games
+> D8. (a)
+> D9. A and c
+
+Before that (~12:45Z): "I want the disc to look like a target and have the physics closer to eggsercise with a
+configurable speed for difficulty". After it: "if possible I'd like a break target animation when it's hit as well"
+(13:13Z) and "hide CPU option + a setting to change that when starting a training game" (13:19Z). The decided design is
+§V2 of the spec (`artifacts/rc14-eggsercise/SPEC.md`, v2, in the workspace). It is built for rc.14; rc.13 takes no
+Eggs-ercise code.
 
 Opened 2026-11-14. The operator: "rc14 add an eggsercise mode that let's the user practice hitting an object to
 practice their aerial. It would be a clean room port of uncle punch's eggsercise tool in training." In UnclePunch's
@@ -1002,6 +1044,8 @@ pictures are integration-2's mockups from the spec; the recommended option has a
 counts are rough, in the size gate's normalised lines; the size gate is not raised for this feature (the spec's D10).
 
 ##### D1 · The object
+
+**Decided: (a) with hitlag, and (c) as an option.** "D1, add hitlag to the target, make the CPU an option to enable". The disc becomes TR's own bullseye target. P1 freezes on a break, using the game's own hitlag, or 6 frames as seen in Melee. A short break animation of our own plays (13:13Z). A row "Target: Disc / CPU" makes the CPU the target, held still and reset after each hit.
 
 What the player hits.
 - **(a) A TR-drawn egg:** a white disc TR draws itself, like the hitbox orbs, tested against Player 1's attack spheres
@@ -1019,6 +1063,8 @@ What the player hits.
 
 ##### D2 · Where eggs appear
 
+**Decided: (c).** "D2, c". The spawn box is the stage's camera range, kept on screen. Targets launch straight up, fall, bounce once and rest, as in Melee, and a "Target speed" row (Normal, Slow, Fast) sets the difficulty (~12:45Z).
+
 - **(a) A box around the stage centre:** random in a fixed width and height above the ground. The smallest; wrong on
   very wide or off-centre stages.
 - **(b) A ring around Player 1:** always reachable, but never makes you cross the stage, as Melee does. About +10
@@ -1035,6 +1081,8 @@ rises and falls back to its height, as in Melee.
 
 ##### D3 · What breaks an egg
 
+**Decided: (b).** "D3, b". Any attack is the default; the row stays, as "Breaks on", with Aerials and Hits of 12%+.
+
 - **(a) Aerials only:** what the operator asked for. About +5–10 lines.
 - **(b) Any attack.** No extra lines.
 - **(c) Hits of 12 % or more,** Melee's default rule. About +15–25 lines. Ultimate's damage differs from Melee's, so
@@ -1048,6 +1096,8 @@ Projectiles never break an egg.
 
 ##### D4 · End and scoring
 
+**Decided: (a) and (c).** "D4, a, and c". The modes are 1 minute, 10 targets, 20 targets and Free practice. The N-target modes count up and keep the fastest time per fighter.
+
 - **(a) 1 minute, and Free practice** (no timer, the count goes up).
 - **(b) 1 minute only.**
 - **(c) N eggs against the clock.**
@@ -1058,7 +1108,18 @@ it isn't saved.
 
 ![rc14-eggs D4: the end-of-run notice, "Time! 23 eggs (best 31)"](decisions/rc14-eggs-D4-end-of-run.png)
 
+##### D4.5 · Break the Targets (new)
+
+**Decided: a new mode.** "D4.5, I also want a break the targets mode where the stage is zoomed out, the player can pick
+where the targets go and then break them." TR's own design, with nothing taken from Nintendo's stages or art:
+- The camera shows the whole stage.
+- A cursor places up to 10 targets: A places, B removes the last, X starts.
+- The clock starts on the first input and stops at the last break. The best time is kept per fighter and per layout.
+- Layouts are kept per stage for the session.
+
 ##### D5 · The HUD
+
+**Decided: (a).** "D5, a".
 
 - **(a) TR's standing notice,** updated in place: `Eggs 12   0:43`.
 - **(b) New panes at the top left like Melee** (a counter and a timer). Changes the layout archive; costs more.
@@ -1069,6 +1130,8 @@ it isn't saved.
 
 ##### D6 · The CPU
 
+**Decided: (a)**, with Hide CPU as its own feature (D6.5): "If we just add that ability we can leave D6 as (a)".
+
 - **(a) Leave it:** the CPU follows the CPU page as usual; hits on it don't count. No extra lines.
 - **(b) Park it** in a corner while a run is live. About +30–50 lines.
 - **(c) Hide it** as well. About +40–60 lines.
@@ -1078,7 +1141,16 @@ the way.
 
 ![rc14-eggs D6: the CPU left, parked, hidden](decisions/rc14-eggs-D6-cpu-role.png)
 
+##### D6.5 · Hide CPU (new)
+
+**Decided: a general Hide CPU.** "The ability to hide the CPU in general would be nice." On, the CPU is invisible, can't
+be hit, doesn't collide and doesn't act. Off puts it back where it was. A second setting, "CPU during a game"
+(Hide or Show), hides it while a practice game runs (13:19Z: "hide CPU option + a setting to change that when starting
+a training game"). When the CPU is the target (D1), a practice game never hides it.
+
 ##### D7 · The menu place
+
+**Decided: (b).** "D7. B, practice games". A new group, "Practice games", is appended to the menu, so no group index moves.
 
 - **(a) Fighters & Stages › Extras,** after Give item: two rows, "Eggs-ercise" (Off, 1 minute, Free practice) and
   "Eggs break on" (D3). No new editor or chord.
@@ -1090,6 +1162,8 @@ the way.
 
 ##### D8 · Where it works
 
+**Decided: (a).** "D8. (a)". What changes game state (hitlag, Hide CPU, the zoomed camera) is used in a waiting room only after an LDN check.
+
 - **(a) Training and waiting-room practice,** like every other TR practice feature. The egg is drawn on this console
   only; the others in the room see nothing.
 - **(b) Training only.**
@@ -1099,6 +1173,8 @@ the way.
 ![rc14-eggs D8: the same waiting room on two consoles, the egg on one only](decisions/rc14-eggs-D8-lobby.png)
 
 ##### D9 · Restart
+
+**Decided: (a) and (c).** "D9. A and c".
 
 - **(a) L+R+A:** the reset also starts a new run (score 0, 1:00, a new egg).
 - **(b) Loading a save state.**
@@ -1110,7 +1186,15 @@ the way.
 
 ### Other projects
 
+The operator decided all eight on 2026-11-13 (~11:50Z), verbatim: "OP1 agreed OP2 remove from card and also make sure the
+standalone one in our fork is up to date with what we bake into deluxe OP3 agreed OP4 agreed OP5 agreed OP6 agreed OP7
+agreed OP8 agreed." The lanes carried them out the same day. On 2026-11-14 the operator answered them again, because
+this section still read as open: "Op1: push / Op2: remove it / Op3: b / Op4: yes / Op5: a / Op6: a / Op7: a / Op8: a".
+That confirms every item except OP3, which is now B.
+
 #### OP1 · Push the held doc fixes
+
+**Decided 2026-11-13: A, done 11-13** (confirmed 11-14: "Op1: push"). Worker A pushed its 17 commits in 13 repos (INBOX 11-13 11:39Z) and reconciled the four copies with nothing lost (11:43Z). The Deluxe lane pushed `5f9759f` (11:43Z). `c49681c9` went into rc.12 as `900a1f48`.
 
 Whether to push 23 docs-only commits that wait for an order, and when to push TrainingRooms' `c49681c9`. All 23 are
 fast-forwards on their Forgejo `main` (checked 09:40Z).
@@ -1151,6 +1235,8 @@ The options:
 
 #### OP2 · The standalone `libimgui_smash.nro` on the card
 
+**Decided 2026-11-13: A, removed 11-13** (confirmed 11-14: "Op2: remove it"). `libimgui_smash.nro` `f72a6b8d` was removed from the card, `removed_verified` 11:55:06Z. The second half ("make sure the standalone one in our fork is up to date with what we bake into deluxe") is imgui-smash 1.2.0, published on Forgejo and GitHub and kept off the card (deluxe-2, INBOX 11-13 19:20Z).
+
 Whether to remove it from the card. A read-only card scan found that nothing imports it and only Deluxe looks it up.
 While it is there, Deluxe 0.10.4 draws with its ASCII-only font (the 1.0.2 build `f72a6b8d`), so names outside ASCII
 show `?`.
@@ -1163,6 +1249,8 @@ show `?`.
 ![OP2 imgui NRO](decisions/OP2-imgui-nro.png)
 
 #### OP3 · Deluxe's hidden Stages + Counterpick page
+
+**Decided 2026-11-14: B, keep it hidden** ("Op3: b"). On 11-13 the operator had said "OP3 agreed" (A). The card's Deluxe `config.ini` already has `hide_plugin_pages=stages_counterpick` (read 2026-11-14 13:07Z), so nothing changes.
 
 Whether to show elite-stages-counterpick's page. The card's Deluxe `config.ini` has had
 `hide_plugin_pages=stages_counterpick` since the 0.10.0 install (2026-11-01). Only CPU Pilot was set to Shown then.
@@ -1177,6 +1265,8 @@ Whether to show elite-stages-counterpick's page. The card's Deluxe `config.ini` 
 
 #### OP4 · elite-stages-counterpick and ssbu-cpu-pilot are private
 
+**Decided 2026-11-13: A, done 11-13** (confirmed 11-14: "Op4: yes"). Both repos are public: the history holds crashbandicode only, and an anonymous HTTP request returns 200 (the primary, 11-13 ~11:50Z, `artifacts/card-inventory-20261113/make-public-receipt.json`).
+
 Whether to make both public. Both return 404 when signed out. Deluxe's README and INSTALL.md link elite, and Deluxe's
 README lists the pilot as a page plugin.
 
@@ -1190,6 +1280,8 @@ README lists the pilot as a page plugin.
 
 #### OP5 · The old Deluxe in Elite's release ZIP
 
+**Decided 2026-11-13: A, done 11-13** (confirmed 11-14: "Op5: a"). Release 473 (`v0.1.0-alpha.3`) now holds the plugin NRO only (the Deluxe lane, INBOX 11-13 11:43Z), and elite's README says so (`98e0c3c`, 11:44Z).
+
 Whether to drop the bundled older Deluxe from the ZIP of elite-stages-counterpick v0.1.0 (Forgejo release 473). The
 bundled build is commit `0d28adc`, from before 0.8.0, 1,445,888 bytes.
 
@@ -1201,6 +1293,8 @@ bundled build is commit `0d28adc`, from before 0.8.0, 1,445,888 bytes.
 ![OP5 Elite ZIP](decisions/OP5-elite-zip.png)
 
 #### OP6 · Releases and tags that lag the card
+
+**Decided 2026-11-13: A, done 11-13** (confirmed 11-14: "Op6: a"). Each release comes from a commit whose clean rebuild is byte-identical to the card's NRO, and GitHub "Latest" was fixed (worker B, INBOX 11-13 16:34Z).
 
 Which builds to tag and release:
 - ARCropolis: the card's `ac3e05a3` (main plus the `reject.log` cap) has no release.
@@ -1223,6 +1317,8 @@ The options:
 
 #### OP7 · LICENSE for six repos
 
+**Decided 2026-11-13: A, done 11-13** (confirmed 11-14: "Op7: a"). The MIT LICENSE was pushed to all six repos, one docs commit each (worker B, INBOX 11-13 14:06Z).
+
 Which licence for the six repos with no LICENSE file: smash-replay-to-mp4, instant_back, ssbu-fx-control,
 ssbu-quiet-elite-switch, elite-rematch and ssbu-refresh-clock. The other seven of worker A's 13 repos, and
 TrainingRooms, are MIT; Deluxe is AGPL.
@@ -1235,6 +1331,8 @@ TrainingRooms, are MIT; Deluxe is AGPL.
 ![OP7 licence](decisions/OP7-license.png)
 
 #### OP8 · Operator quotes in instant_back's design files
+
+**Decided 2026-11-13: A, done 11-13** (confirmed 11-14: "Op8: a"). instant_back `32135ef` paraphrases the quotes (worker B, INBOX 11-13 13:56Z).
 
 Whether to paraphrase the operator's quoted words in `DESIGN-v031.md` and `BRIEF-0.3.1.md`. The playbook allows
 quotes in design working files. The detector's were paraphrased, and so were B's in `71dcb0f`. The repo is private
