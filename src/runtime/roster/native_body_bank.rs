@@ -2089,6 +2089,8 @@ struct Outgoing {
     alias: usize,
     /// The bodies that stay exceed Ready Fighters: the target is loaded as Design A's cold fighter (`bank.over`).
     cold: bool,
+    /// The bank's cold marks before `build`: those of the window's members go with the kept window.
+    marks: FixedList<crate::engine::swap::body_bank::Cold, 2>,
 }
 
 /// rc.14 2e (a-full, A1; AFULL-RESEARCH.md §2): before a target-first Reload onto `target`, whether its role's attached
@@ -2157,7 +2159,7 @@ unsafe fn outgoing_window(entry: *mut u8, owner: u32, role: usize, target: u32) 
         }
     }
     Some(Outgoing { members, bodies: bank.bodies, identity: bank.identity, configuration: bank.configuration, alias: bank.alias,
-        cold: bodies > ready })
+        cold: bodies > ready, marks: bank.over })
 }
 
 /// rc.14 2e (a-full, A1; AFULL-RESEARCH.md §1-§2): right after the Reload start (`0x653240`, inside the same pre-service
@@ -2227,7 +2229,12 @@ unsafe fn keep_window(entry: *mut u8, owner: u32, role: usize, target: u32, out:
                 g.bodies = out.bodies;
                 g.identity = out.identity;
                 g.configuration = out.configuration;
-                if out.cold && !bank.over.iter().any(|(kind, _)| *kind == target) { bank.over.push((target, false)); }
+                // The Reload puts the target on screen itself, so its mark is seen at once (`Cold`): the switch away frees
+                // it. Unseen, it was never freed (af-49c90e9c-x1 af-attach: `over [(f, false)]`, 10 bodies at Ready Fighters 8).
+                for mark in out.marks.iter().filter(|(kind, _)| out.members.index_of(*kind).is_some()) {
+                    if !bank.over.iter().any(|(kind, _)| *kind == mark.0) { bank.over.push(*mark); }
+                }
+                if out.cold && !bank.over.iter().any(|(kind, _)| *kind == target) { bank.over.push((target, true)); }
                 GROUP_BODIES[role].store(bank.groups.iter().filter(|g| g.state.counts_bodies())
                     .map(|g| g.members.count()).sum::<usize>().min(usize::from(u8::MAX)) as u8, Ordering::Release);
                 Some((slot, saved))
@@ -2759,12 +2766,17 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
     // activation receipts; any other build starts with none.
     let keeping = KEEPING[role].load(Ordering::Acquire) == members.kinds()[0] && members.count() == 1
         && state.as_ref().is_some_and(|bank| bank.entry == entry as usize && bank.owner == owner);
-    let (mut storage, activated) = match state.take() {
-        Some(bank) => (BankStorage { members: bank.members, groups: bank.groups }, bank.activated),
-        None => (BANK_STORAGE[role].lock().take().expect("boot-reserved bank storage"), Default::default()),
+    let (mut storage, activated, marks) = match state.take() {
+        Some(bank) => (BankStorage { members: bank.members, groups: bank.groups }, bank.activated, bank.over),
+        None => (BANK_STORAGE[role].lock().take().expect("boot-reserved bank storage"), Default::default(), FixedList::new((0, false))),
     };
     *storage.members = members;
     if !keeping { storage.groups.clear(); }
+    // rc.14 2e: a cold fighter's mark (Design A, `Cold`) stays with the group (a′) keeps it in, so the switch away from it
+    // still frees it (af-49c90e9c-x1: a kept cold fighter lost its mark here and stayed over Ready Fighters).
+    let mut over = FixedList::new((0, false));
+    for mark in marks.iter().filter(|(kind, _)| keeping && storage.groups.iter()
+        .any(|g| g.state.counts_bodies() && !g.leaving && g.members.index_of(*kind).is_some())) { over.push(*mark); }
     let kept = storage.groups.iter().filter(|g| g.state.counts_bodies()).map(|g| g.members.count()).sum::<usize>();
     *state = Some(Bank {
         entry: entry as usize, owner, epoch: super::mii_saved_alpha::current_generation(role as u32),
@@ -2775,7 +2787,7 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
         pair_logged: false, identity: None, configuration: None, ordinary_identity: None,
         activated: if keeping { activated } else { Default::default() },
         construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene: None,
-        object_fetch: None, retiring: None, preparing: None, over: FixedList::new((0, false)),
+        object_fetch: None, retiring: None, preparing: None, over,
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
     GROUP_BODIES[role].store(kept.min(usize::from(u8::MAX)) as u8, Ordering::Release);

@@ -16069,7 +16069,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "2e5e90f9783f53b4861e4d363552d3955e52b81d961e595d56e2b86dc1d77276",
+   "dest_sha256": "d490c3885bf5f276c78161df08e0bc2f76f0cb730f2eae39506f03fec87edb0e",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -18843,6 +18843,36 @@
      "old": "    let Some(members) = members else { return false; };\n    let Some(live) = bank.observed.map(|(_, live)| live) else { return false; };\n    if bank.groups.next_slot().is_none() { return false; }\n    let (bodies, ready) = (bodies_with(bank, other) + members.count(), usize::from(settings.ready_fighters));\n    if !crate::engine::swap::body_bank::cold_admitted(bodies, ready, members.count(), &bank.over, live) { return false; }\n    let identity = match configuration {\n        Some(c) => match mii_identity_of(bank, c) { Some(identity) => Some((identity, c)), None => return false },\n",
      "new": "    let Some(members) = members else { return declined(format_args!(\"no one-member group holds it\")); };\n    let Some(live) = bank.observed.map(|(_, live)| live) else { return declined(format_args!(\"nothing observed live\")); };\n    if bank.groups.next_slot().is_none() { return declined(format_args!(\"no free group slot\")); }\n    let (bodies, ready) = (bodies_with(bank, other) + members.count(), usize::from(settings.ready_fighters));\n    if !crate::engine::swap::body_bank::cold_admitted(bodies, ready, members.count(), &bank.over, live) {\n        return declined(format_args!(\"no room: {} bodies, Ready Fighters {}, over {:x?}\", bodies, ready, &bank.over[..]));\n    }\n    let identity = match configuration {\n        Some(c) => match mii_identity_of(bank, c) { Some(identity) => Some((identity, c)), None => return declined(format_args!(\"no Mii identity\")) },\n",
      "reason": "rc.14 cycle fix 5: demand names the reason it sends a press down today's path (Eden cf-p2-x2 #1806 went canonical with no line)"
+    },
+    {
+     "old": "    cold: bool,\n}\n",
+     "new": "    cold: bool,\n    /// The bank's cold marks before `build`: those of the window's members go with the kept window.\n    marks: FixedList<crate::engine::swap::body_bank::Cold, 2>,\n}\n",
+     "reason": "rc.14 2e a-full (marks): Design A cold marks survive A1 and (a\u2032): the kept window keeps its members marks, build carries the marks of the groups it keeps, and the A1 Reload target is marked seen (af-49c90e9c-x1: unseen and dropped marks were never freed, 10 bodies at Ready Fighters 8)"
+    },
+    {
+     "old": "        cold: bodies > ready })\n",
+     "new": "        cold: bodies > ready, marks: bank.over })\n",
+     "reason": "rc.14 2e a-full (marks): Design A cold marks survive A1 and (a\u2032): the kept window keeps its members marks, build carries the marks of the groups it keeps, and the A1 Reload target is marked seen (af-49c90e9c-x1: unseen and dropped marks were never freed, 10 bodies at Ready Fighters 8)"
+    },
+    {
+     "old": "                if out.cold && !bank.over.iter().any(|(kind, _)| *kind == target) { bank.over.push((target, false)); }\n",
+     "new": "                // The Reload puts the target on screen itself, so its mark is seen at once (`Cold`): the switch away frees\n                // it. Unseen, it was never freed (af-49c90e9c-x1 af-attach: `over [(f, false)]`, 10 bodies at Ready Fighters 8).\n                for mark in out.marks.iter().filter(|(kind, _)| out.members.index_of(*kind).is_some()) {\n                    if !bank.over.iter().any(|(kind, _)| *kind == mark.0) { bank.over.push(*mark); }\n                }\n                if out.cold && !bank.over.iter().any(|(kind, _)| *kind == target) { bank.over.push((target, true)); }\n",
+     "reason": "rc.14 2e a-full (marks): Design A cold marks survive A1 and (a\u2032): the kept window keeps its members marks, build carries the marks of the groups it keeps, and the A1 Reload target is marked seen (af-49c90e9c-x1: unseen and dropped marks were never freed, 10 bodies at Ready Fighters 8)"
+    },
+    {
+     "old": "    let (mut storage, activated) = match state.take() {\n        Some(bank) => (BankStorage { members: bank.members, groups: bank.groups }, bank.activated),\n        None => (BANK_STORAGE[role].lock().take().expect(\"boot-reserved bank storage\"), Default::default()),\n",
+     "new": "    let (mut storage, activated, marks) = match state.take() {\n        Some(bank) => (BankStorage { members: bank.members, groups: bank.groups }, bank.activated, bank.over),\n        None => (BANK_STORAGE[role].lock().take().expect(\"boot-reserved bank storage\"), Default::default(), FixedList::new((0, false))),\n",
+     "reason": "rc.14 2e a-full (marks): Design A cold marks survive A1 and (a\u2032): the kept window keeps its members marks, build carries the marks of the groups it keeps, and the A1 Reload target is marked seen (af-49c90e9c-x1: unseen and dropped marks were never freed, 10 bodies at Ready Fighters 8)"
+    },
+    {
+     "old": "    if !keeping { storage.groups.clear(); }\n    let kept = storage.groups.iter().filter(|g| g.state.counts_bodies()).map(|g| g.members.count()).sum::<usize>();\n",
+     "new": "    if !keeping { storage.groups.clear(); }\n    // rc.14 2e: a cold fighter's mark (Design A, `Cold`) stays with the group (a\u2032) keeps it in, so the switch away from it\n    // still frees it (af-49c90e9c-x1: a kept cold fighter lost its mark here and stayed over Ready Fighters).\n    let mut over = FixedList::new((0, false));\n    for mark in marks.iter().filter(|(kind, _)| keeping && storage.groups.iter()\n        .any(|g| g.state.counts_bodies() && !g.leaving && g.members.index_of(*kind).is_some())) { over.push(*mark); }\n    let kept = storage.groups.iter().filter(|g| g.state.counts_bodies()).map(|g| g.members.count()).sum::<usize>();\n",
+     "reason": "rc.14 2e a-full (marks): Design A cold marks survive A1 and (a\u2032): the kept window keeps its members marks, build carries the marks of the groups it keeps, and the A1 Reload target is marked seen (af-49c90e9c-x1: unseen and dropped marks were never freed, 10 bodies at Ready Fighters 8)"
+    },
+    {
+     "old": "        construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene: None,\n        object_fetch: None, retiring: None, preparing: None, over: FixedList::new((0, false)),\n    });\n",
+     "new": "        construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene: None,\n        object_fetch: None, retiring: None, preparing: None, over,\n    });\n",
+     "reason": "rc.14 2e a-full (marks): Design A cold marks survive A1 and (a\u2032): the kept window keeps its members marks, build carries the marks of the groups it keeps, and the A1 Reload target is marked seen (af-49c90e9c-x1: unseen and dropped marks were never freed, 10 bodies at Ready Fighters 8)"
     }
    ]
   },
