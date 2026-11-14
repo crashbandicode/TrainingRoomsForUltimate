@@ -599,7 +599,7 @@ This records the decision only; the implementation, host tests and Eden proofs a
 ## Open (2026-11-13/14)
 
 Opened by the primary for the operator from the lanes' reports of 2026-11-13 (rc13-hitbox-pills: 2026-11-14). An item the operator has answered says
-**Decided** under its heading (rc13-DI-lines, rc13-memory); the rest are still open. Each item says what is being decided, the options with their cost to the player, and a recommendation. In each picture the
+**Decided** under its heading (rc13-DI-lines, rc13-memory, rc13-hitbox-pills); the rest are still open. Each item says what is being decided, the options with their cost to the player, and a recommendation. In each picture the
 recommended option has a **green outline**. The pictures are drawn by `tools/render_decisions_1113.py`
 (rc13-DI-lines: author-2's mockup as drawn; rc13-memory: `tools/render_rc13_memory.py`).
 
@@ -620,7 +620,7 @@ recommended option has a **green outline**. The pictures are drawn by `tools/ren
 | TR9 | Retire the old Record trigger row (V2), or keep its legacy start | A: V2, retire the row |
 | rc13-DI-lines | DI chips like the game's blue DI indicator (A–D rejected) | **Decided 11-13: E1 x1**, all 4 layers at today's width |
 | rc13-memory | Memory levers for TrainingRooms' share | **Decided 11-13: dropped**, no lever implemented |
-| rc13-hitbox-pills | Hitbox Visualization draws capsules as pills, not rows of discs | Adopt the pills in rc.13 |
+| rc13-hitbox-pills | Hitbox Visualization draws capsules as pills, not rows of discs | **Decided 11-14: pills in rc.13**, with grab boxes in their own colour |
 | OP1 | Push the held doc fixes | A: push the docs now, `c49681c9` after TR5 and TR8 |
 | OP2 | The standalone `libimgui_smash.nro` on the card | A: remove it |
 | OP3 | Deluxe's hidden Stages + Counterpick page | A: show it |
@@ -921,7 +921,10 @@ charts are `lever-1..7.svg` in the same folder.
 
 ![rc13-memory levers](decisions/rc13-memory.png)
 
-#### rc13-hitbox-pills · Hitbox Visualization draws capsules as pills (rc.13)
+#### rc13-hitbox-pills · Hitbox Visualization draws capsules as pills (rc.13): pills in rc.13
+
+**Decided 2026-11-14 (~03:49Z): pills in rc.13, and grab boxes in their own colour alongside.** The operator, on the
+mockup: "much cleaner. Yes put it in rc13 along with grabs being a different color".
 
 Opened 2026-11-14. The operator: "Do we use pill shapes where we're supposed to?" Today, no.
 
