@@ -456,7 +456,7 @@ fn replace_via_backup(tmp: &Path, dest: &Path) -> io::Result<()> {
     Ok(())
 }
 
-fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
+pub(crate) fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
     let mut os: OsString = path.as_os_str().to_owned();
     os.push(suffix);
     PathBuf::from(os)

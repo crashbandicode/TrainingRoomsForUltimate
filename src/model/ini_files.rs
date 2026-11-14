@@ -13,12 +13,12 @@
 //! files that are not store entries and is to be replaced by the storage transaction of the review's
 //! fix stream (r1fix) when that lands on the integration branch.
 
-use std::ffi::OsString;
 use std::fs;
 use std::io::{self, Read};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::menu::chord::Chord;
+use super::store::with_suffix;
 use super::menu_shortcuts::{self, MenuShortcuts, DEFAULT_INI, DEFAULT_SHORTCUTS};
 
 /// What reading a small file gave.
@@ -121,12 +121,6 @@ pub fn check_edit(current: MenuShortcuts, slot: usize, chord: Chord) -> Result<M
         }
     }
     Ok(current.with_slot(slot & 1, chord))
-}
-
-fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
-    let mut os: OsString = path.as_os_str().to_owned();
-    os.push(suffix);
-    PathBuf::from(os)
 }
 
 /// Write `bytes` to `path` as a transaction (see the module doc): the Store's one write, `store::write_replace`.
