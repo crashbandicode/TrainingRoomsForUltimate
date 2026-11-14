@@ -51,7 +51,8 @@ moved but can still act. Most deal no damage, such as F.L.U.D.D.'s water, and so
 of Bowser's Fire Breath. The game marks them itself, and the plugin uses that mark. A windbox is a hitbox, so Hitboxes
 draws it too; with both ticked it is drawn once, in deep blue, and with Windboxes alone only the windboxes are drawn.
 
-Some pushes are not hitboxes but wind areas, such as the Gust Bellows item and some fighters' wind effects. These are
+Some moves push through a wind area instead of a hitbox. Windboxes draws those too: a see-through deep blue box or
+circle where the wind blows, with a white line pointing the way it pushes. Items' wind, such as the Gust Bellows, is
 not drawn.
 
 **Launch angles** draws a white line inside each hitbox, pointing where the hit sends the fighter it lands on. The line
