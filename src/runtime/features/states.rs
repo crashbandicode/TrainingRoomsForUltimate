@@ -101,11 +101,6 @@ pub fn set_active(on: bool) {
 
 static CONSTS_READY: AtomicBool = AtomicBool::new(false);
 static CONST_ATTEMPTS: AtomicU32 = AtomicU32::new(0);
-static NANA_KIND: AtomicI32 = AtomicI32::new(UNRESOLVED);
-static QUAKE_NONE: AtomicI32 = AtomicI32::new(UNRESOLVED);
-static QUAKE_MAX: AtomicI32 = AtomicI32::new(UNRESOLVED);
-static JOSTLE_ID: AtomicI32 = AtomicI32::new(UNRESOLVED);
-static SHULK_FLASH_ID: AtomicI32 = AtomicI32::new(UNRESOLVED);
 /// The accessor of the fighter each record is buffing right now (0 when none), and whether it is Wii Fit:
 /// the effect, sound, heal and wing hooks read these without the lock.
 static BUFF_ACC: [AtomicUsize; 2] = [const { AtomicUsize::new(0) }; 2];
@@ -113,7 +108,6 @@ static BUFF_WIIFIT: [AtomicBool; 2] = [const { AtomicBool::new(false) }; 2];
 /// A Little Mac is in the match, and KO Punch is selected (the meter hook).
 static MAC_PRESENT: AtomicBool = AtomicBool::new(false);
 static KO_SELECTED: AtomicBool = AtomicBool::new(false);
-static JOKER_SUMMON: AtomicI32 = AtomicI32::new(UNRESOLVED);
 /// `phx::Hash40` of the names the hooks compare (set once at `init`).
 static HASHES: [AtomicU64; 15] = [const { AtomicU64::new(0) }; 15];
 const H_FLYING_PLATE: usize = 10;
@@ -124,35 +118,14 @@ const H_SE_BALL_SWING: usize = 14;
 
 /// The game constants the Pokemon Trainer, Kirby and Sora rules need without the lock (hooks and the
 /// per-frame dead test read these; set once by `ensure_consts`).
-static KIDS: [AtomicI32; K_COUNT] = [const { AtomicI32::new(UNRESOLVED) }; K_COUNT];
-const K_SQUIRTLE: usize = 0;
-const K_IVYSAUR: usize = 1;
-const K_CHARIZARD: usize = 2;
-const K_WEAPON_PTRAINER: usize = 3;
-const K_WEAPON_MBALL: usize = 4;
-const K_TRAIL_N1: usize = 5;
-const K_KIRBY_DRINK: usize = 6;
-const K_PT_RUN: usize = 7;
-const K_PT_RESTART: usize = 8;
-const K_STATUS_WAIT: usize = 9;
-const K_LINK_TRAINER: usize = 10;
-const K_PT_FLAG: usize = 11;
-const K_PT_MBALL: usize = 12;
-const K_ALL_TARGET: usize = 13;
-const K_SIT_GROUND: usize = 14;
-const K_SIT_AIR: usize = 15;
-const K_COPY_ON_START: usize = 16;
-const K_COPY_FLAG: usize = 17;
-const K_COPY_CHARA: usize = 18;
-const K_STATUS_NONE: usize = 19;
-const K_COUNT: usize = 20;
+static CONSTS: [AtomicI32; ids::COUNT] = [const { AtomicI32::new(UNRESOLVED) }; ids::COUNT];
 
-fn kid(index: usize) -> i32 {
-    KIDS[index].load(Ordering::Acquire)
+fn konst(c: C) -> i32 {
+    CONSTS[c as usize].load(Ordering::Acquire)
 }
 
 fn is_pokemon_kind(kind: i32) -> bool {
-    [K_SQUIRTLE, K_IVYSAUR, K_CHARIZARD].iter().any(|k| kid(*k) == kind && kid(*k) != UNRESOLVED)
+    [C::KindPokemonSquirtle, C::KindPokemonIvysaur, C::KindPokemonCharizard].iter().any(|k| konst(*k) == kind && konst(*k) != UNRESOLVED)
 }
 
 /// The fighter objects of the two records (accessor and entry id), refreshed every frame: Kirby's hat
@@ -520,36 +493,9 @@ fn ensure_consts() -> bool {
     if missing == ids::COUNT {
         return false; // the game's table is not built yet; ask again next frame
     }
-    NANA_KIND.store(table.get(C::KindNana), Ordering::Release);
-    QUAKE_NONE.store(table.get(C::QuakeKindNone), Ordering::Release);
-    QUAKE_MAX.store(table.get(C::QuakeKindMax), Ordering::Release);
-    JOSTLE_ID.store(table.get(C::WorkIntJostle), Ordering::Release);
-    SHULK_FLASH_ID.store(table.get(C::WorkIntShulkFlash), Ordering::Release);
-    JOKER_SUMMON.store(table.get(C::JokerStatusSummon), Ordering::Release);
     state_restore::set_pikmin_statuses(table.get(C::PikminStatusAttackAir), table.get(C::PikminStatusAttackHi4Landing));
-    for (slot, c) in [
-        (K_SQUIRTLE, C::KindPokemonSquirtle),
-        (K_IVYSAUR, C::KindPokemonIvysaur),
-        (K_CHARIZARD, C::KindPokemonCharizard),
-        (K_WEAPON_PTRAINER, C::WeaponPtrainer),
-        (K_WEAPON_MBALL, C::WeaponMball),
-        (K_TRAIL_N1, C::TrailStatusSpecialN1),
-        (K_KIRBY_DRINK, C::KirbyStatusDrink),
-        (K_PT_RUN, C::PtStatusRun),
-        (K_PT_RESTART, C::PtStatusRestartChange),
-        (K_STATUS_WAIT, C::StatusWait),
-        (K_LINK_TRAINER, C::LinkNoPtrainer),
-        (K_PT_FLAG, C::PtFlagEnableChange),
-        (K_PT_MBALL, C::PtArticleMball),
-        (K_ALL_TARGET, C::ArticleAllTarget),
-        (K_SIT_GROUND, C::SituationGround),
-        (K_SIT_AIR, C::SituationAir),
-        (K_COPY_ON_START, C::KirbyFlagCopyOnStart),
-        (K_COPY_FLAG, C::KirbyFlagCopy),
-        (K_COPY_CHARA, C::KirbyIntCopyChara),
-        (K_STATUS_NONE, C::StatusNone),
-    ] {
-        KIDS[slot].store(table.get(c), Ordering::Release);
+    for (slot, value) in CONSTS.iter().zip(table.values()) {
+        slot.store(*value, Ordering::Release);
     }
     if missing > 0 {
         let mut names = FixedPath::<400>::new();
@@ -611,11 +557,11 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     let Some(role) = role_of_entry(entry) else { return };
     SESSION_ACTIVE.store(true, Ordering::Release);
     #[cfg(feature = "diag")]
-    if entry == 0 && ((fighter + FIGHTER_KIND_FIELD) as *const i32).read() != NANA_KIND.load(Ordering::Acquire) {
+    if entry == 0 && ((fighter + FIGHTER_KIND_FIELD) as *const i32).read() != konst(C::KindNana) {
         counts::bump(counts::FRAME);
     }
     let kind = ((fighter + FIGHTER_KIND_FIELD) as *const i32).read();
-    let nana = kind == NANA_KIND.load(Ordering::Acquire);
+    let nana = kind == konst(C::KindNana);
     let raw = Raw {
         entry,
         role,
@@ -681,7 +627,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
                     natives::get_int(accessor, ids.get(C::KirbyIntCopyChara))));
             }
             if is_pokemon_kind(raw.kind) {
-                let trainer = state_restore::trainer_of(accessor, kid(K_LINK_TRAINER));
+                let trainer = state_restore::trainer_of(accessor, konst(C::LinkNoPtrainer));
                 diagnostic(format_args!(
                     "[TrainingRooms] state pokemon entry={} kind={} trainer={} trainer_status={} trainer_situation={}",
                     raw.entry,
@@ -728,11 +674,11 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     // The Pokemon dead test (SPEC-state-01 §3): the one switching frame the plain test misses.
     let switching = is_pokemon_kind(kind)
         && pokemon::switching_frame_is_dead(
-            raw.status == kid(K_STATUS_WAIT),
-            raw.prev_status == kid(K_STATUS_NONE),
-            raw.status == kid(K_STATUS_WAIT) && raw.prev_status == kid(K_STATUS_NONE) && {
-                let trainer = state_restore::trainer_of(accessor, kid(K_LINK_TRAINER));
-                trainer != 0 && natives::status_kind(trainer) == kid(K_PT_RESTART)
+            raw.status == konst(C::StatusWait),
+            raw.prev_status == konst(C::StatusNone),
+            raw.status == konst(C::StatusWait) && raw.prev_status == konst(C::StatusNone) && {
+                let trainer = state_restore::trainer_of(accessor, konst(C::LinkNoPtrainer));
+                trainer != 0 && natives::status_kind(trainer) == konst(C::PtStatusRestartChange)
             },
         );
     // The chord engine is pull-based (SPEC-input-04 §2): this per-fighter step consumes the Save and Load chords
@@ -943,7 +889,7 @@ unsafe fn respawn_cleanup(accessor: usize, kind: i32) {
     n::camera_zoom_out(accessor, 0);
     n::effect_kill_kind(accessor, hash40("sys_bg_criticalhit"));
     n::effect_remove_screen(accessor, hash40("bg_criticalhit"));
-    let (first, last) = (QUAKE_NONE.load(Ordering::Acquire), QUAKE_MAX.load(Ordering::Acquire));
+    let (first, last) = (konst(C::QuakeKindNone), konst(C::QuakeKindMax));
     if first != UNRESOLVED && last != UNRESOLVED {
         for kind in first..=last {
             n::camera_stop_quake(accessor, kind);
@@ -1057,13 +1003,13 @@ impl charge::Work for Fields<'_> {
 /// The game constants of the Pokemon Trainer rules, as `state_restore` takes them.
 fn pt_ids() -> state_restore::PtIds {
     state_restore::PtIds {
-        link: kid(K_LINK_TRAINER),
-        enable_flag: kid(K_PT_FLAG),
-        mball: kid(K_PT_MBALL),
-        all_target: kid(K_ALL_TARGET),
-        run: kid(K_PT_RUN),
-        ground: kid(K_SIT_GROUND),
-        air: kid(K_SIT_AIR),
+        link: konst(C::LinkNoPtrainer),
+        enable_flag: konst(C::PtFlagEnableChange),
+        mball: konst(C::PtArticleMball),
+        all_target: konst(C::ArticleAllTarget),
+        run: konst(C::PtStatusRun),
+        ground: konst(C::SituationGround),
+        air: konst(C::SituationAir),
     }
 }
 
@@ -1076,7 +1022,7 @@ unsafe fn run_wait(raw: &Raw, marker: Marker) {
         Marker::ApplyBuff => apply_buff(raw, role),
         Marker::WaitForPokemonSwitch => pt_wait(raw, role),
         Marker::WaitForCopyAbility => {
-            let flag = kid(K_COPY_ON_START);
+            let flag = konst(C::KirbyFlagCopyOnStart);
             if flag == UNRESOLVED || !natives::is_flag(raw.accessor, flag) {
                 with(|s| s.machine.finish_wait(role));
             }
@@ -1123,7 +1069,7 @@ unsafe fn kirby_copy(accessor: usize, role: Role, copied: i32) {
     }
     let opponent_entry = FIGHTER_ENTRY[opponent].load(Ordering::Acquire);
     let Some((opponent_kind, kinds)) = with(|s| (s.last_kinds[opponent], kirby_kinds(&s.ids))) else { return };
-    let trainer_valid = opponent_kind == kinds.none && state_restore::trainer_of(opponent_accessor, kid(K_LINK_TRAINER)) != 0;
+    let trainer_valid = opponent_kind == kinds.none && state_restore::trainer_of(opponent_accessor, konst(C::LinkNoPtrainer)) != 0;
     let accepted = pokemon::kirby_accepts(copied, opponent_kind, trainer_valid, &kinds);
     state_diag!("[TrainingRooms] state kirby_copy copied={} opponent_kind={} entry={} accepted={}", copied, opponent_kind, opponent_entry, accepted);
     if accepted {
@@ -1320,11 +1266,11 @@ pub unsafe fn state_get_param_int_hook(accessor: usize, kind: u64, name: u64) ->
         if let Some(value) = hooks::param_override(param, &hook_settings(), LOADING.load(Ordering::Acquire), scene::is_training()) {
             if param == DeathParam::DeadRebirthWaitFrame {
                 // The jostle and Shulk cleanups that ride on this override (SPEC-state-01 §4).
-                let jostle = JOSTLE_ID.load(Ordering::Acquire);
+                let jostle = konst(C::WorkIntJostle);
                 if jostle != UNRESOLVED && natives::get_int(accessor, jostle) > 1 {
                     natives::set_int(accessor, 1, jostle);
                 }
-                let flash = SHULK_FLASH_ID.load(Ordering::Acquire);
+                let flash = konst(C::WorkIntShulkFlash);
                 if flash != UNRESOLVED {
                     natives::set_int(accessor, 0, flash);
                     n::effect_remove_common(accessor, hash40("monad_arts_damage_buster"));
@@ -1353,7 +1299,7 @@ pub unsafe fn state_set_dead_rumble_hook(lua_state: usize) -> u64 {
 pub unsafe fn state_req_quake_hook(accessor: usize, kind: i32) -> u64 {
     let _scope = HookScope::enter();
     bump(counts_index::QUAKE);
-    let none = QUAKE_NONE.load(Ordering::Acquire);
+    let none = konst(C::QuakeKindNone);
     if none != UNRESOLVED && hooks::quake_suppressed(KILLING.load(Ordering::Acquire)) && scene::is_training() {
         return call_original!(accessor, none);
     }
@@ -1411,7 +1357,7 @@ unsafe fn switch_effect_hidden(accessor: usize, effect: u64) -> bool {
         return false;
     }
     let kind = n::object_kind(accessor);
-    let hidden = kind == -1 || [K_SQUIRTLE, K_IVYSAUR, K_CHARIZARD, K_WEAPON_PTRAINER, K_WEAPON_MBALL].iter().any(|k| kid(*k) == kind);
+    let hidden = kind == -1 || [C::KindPokemonSquirtle, C::KindPokemonIvysaur, C::KindPokemonCharizard, C::WeaponPtrainer, C::WeaponMball].iter().any(|k| konst(*k) == kind);
     if hidden {
         bump(counts_index::SWITCH_FX);
     }
@@ -1487,7 +1433,7 @@ pub unsafe fn state_no_star_ko_hook(a0: usize, a1: usize, a2: usize, a3: usize, 
 pub unsafe fn state_joker_summon_hook(accessor: usize, a: bool, b: bool) -> u32 {
     let _scope = HookScope::enter();
     let result = call_original!(accessor, a, b);
-    let summon = JOKER_SUMMON.load(Ordering::Acquire);
+    let summon = konst(C::JokerStatusSummon);
     if summon != UNRESOLVED && result == summon as u32 && fighter_buffing(accessor) && scene::is_training() {
         return 0xFFFF_FFFF;
     }
@@ -1565,9 +1511,9 @@ unsafe fn fighter_sound_silenced(module: usize, hash: u64) -> bool {
     let owner = if module == 0 { 0 } else { ((module + 8) as *const usize).read() };
     let status = if owner == 0 { UNRESOLVED } else { natives::status_kind(owner) };
     let (drinking, above) = match sound {
-        Sound::KirbyCopy => (status == kid(K_KIRBY_DRINK), false),
+        Sound::KirbyCopy => (status == konst(C::KirbyStatusDrink), false),
         Sound::SoraSpell => {
-            let n1 = kid(K_TRAIL_N1);
+            let n1 = konst(C::TrailStatusSpecialN1);
             (false, n1 != UNRESOLVED && status != UNRESOLVED && status >= n1)
         }
         _ => (false, false),
@@ -1619,7 +1565,7 @@ pub unsafe fn state_pokemon_decide_hook(ctx: &mut InlineCtx) {
 pub unsafe fn state_kirby_opff_hook(param: usize, fighter: usize) -> u64 {
     let _scope = HookScope::enter();
     let started = fighter != 0 && LOADING.load(Ordering::Acquire) && scene::is_training() && {
-        let flag = kid(K_COPY_ON_START);
+        let flag = konst(C::KirbyFlagCopyOnStart);
         let accessor = ((fighter + FIGHTER_ACCESSOR_FIELD) as *const usize).read();
         flag != UNRESOLVED && accessor != 0 && natives::is_flag(accessor, flag)
     };
