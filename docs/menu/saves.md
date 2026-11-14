@@ -148,9 +148,10 @@ More: [Save states › Buffs](../guide/save-states.md#buffs)
 
 A setup is a spot you practise from, kept under a name: where both fighters stand, which fighters they are, and the
 stage. Keep as many as you like, then put both fighters on any of them in one step. Setups are separate from your save
-states (they are files in `sd:/ultimate/TrainingRooms/setups/`): Load uses a setup only if you choose Y below.
+states (they are files in `sd:/ultimate/TrainingRooms/setups/`): Load uses a setup only if you pick Make Load use it
+below.
 
-![A on a setup moves both fighters there once, and the next Load goes back to your bound save; Y moves nobody, and the next Load, and Auto-load on death, go to the setup](../diagrams/setup-a-versus-y.png)
+<!-- CAPTURE-REQUEST setup-own-screen: a new clip, rc14-setup-own-screen.gif (Setup library, A on Corner trap: the screen with Restore here, Make Load use it, Rename, Delete; Right moves the cursor and the line under the rows changes; B goes back to the list). Replaces the A-versus-Y picture. Plan: artifacts/setup-library-review/PROPOSAL.md section 2 and storyboard-setup-library.png. -->
 
 ### Save setup to library...
 
@@ -158,54 +159,67 @@ Keeps the spot your Load chord goes to now, your bound save, as a new setup unde
 
 ![The Setup library is empty ("No setups saved"); Save setup to library... keeps the saved spot as the setup Corner trap, and the Setup library then lists it (Corner trap · Mario / Mario)](../media/rc11-save-setup.gif)
 
-<!-- CAPTURE-REQUEST setup-save-setup: reshoot this clip as rc14-save-setup.gif after the list-screen fixes (Mario vs Little Mac on far-apart spots: Save, Save setup to library..., the keyboard, the notice, the list with the new row). Plan: artifacts/setup-library-review/PROPOSAL.md section 2.1 and storyboard-save-setup.png. -->
+<!-- CAPTURE-REQUEST setup-save-setup: reshoot this clip as rc14-save-setup.gif after the list-screen fixes (Mario vs Little Mac on far-apart spots: Save, Save setup to library..., the keyboard, the notice, the list with the new row, its footer naming the stage and the spots). Plan: artifacts/setup-library-review/PROPOSAL.md section 2.1 and storyboard-save-setup.png. -->
 
 - **Values:** a name of up to 48 characters
 - **Default:** the name "Setup"
-- **How:** A reads the save ("Reading the selected saved setup…"; B cancels), then the keyboard opens. Type a name and
-  confirm. The notice reads "Saved setup" and the name.
+- **How:** A reads your save ("Reading your save…"; B cancels), then the keyboard opens, with "From your bound save" and
+  the two fighters under the name box. Type a name and confirm. The notice reads "Saved setup" and the name.
 
 It copies your bound save, not where the fighters stand now. To keep a new spot, press Save (ZL + D-pad Down) there
 first. Save replaces the spot in your bound save (with nothing bound, it makes a new save), so to keep the old spot too,
 bind another save first ([Save states & Macros](recording.md#save-states--macros)).
 
-Both fighters must have been saved on the same stage. If not, or if nothing is saved yet, the notice reads "Save both
-fighters in this slot on the same stage before exporting" and nothing is kept. Each setup is a new file: saving never
-overwrites one.
+Both fighters must have been saved on the same stage. With nothing saved yet, the notice reads "Nothing is saved here
+yet: Save first, or bind a save"; with the two saved on different stages, "Both fighters must be saved on the same
+stage". Either way nothing is kept. Each setup is a new file: saving never overwrites one.
 
 More: [Save states › Making a setup](../guide/save-states.md#making-a-setup)
 
 ### Setup library
 
-Lists your setups, A to Z, so you can put both fighters on one. A row reads "name · Player 1's fighter / the CPU's
-fighter", cut off at 16 characters, and doesn't show the stage. With no setups, the list reads "No setups saved".
+Lists your setups, A to Z, so you can open one. A row reads "name · Player 1's fighter / the CPU's fighter · stage ·
+spots", such as "Corner trap · Mario / Little Mac · Training · spots -40 / 35". The spots are where the two fighters
+stand, in the units of the floor markers; a minus is left of the middle. The grid cuts a row off at 16 characters, so the
+full row shows under the grid for the setup under the cursor. With no setups, the list reads "No setups saved".
 
-![Setup library: A on a setup binds and restores it; when the menu closes both fighters stand where the setup was saved](../media/rc11-setup-library.gif)
+![Setup library, rc.11 clip (before the setup's own screen): a setup chosen from the list puts both fighters where it was saved when the menu closes](../media/rc11-setup-library.gif)
 
-<!-- CAPTURE-REQUEST setup-library: reshoot this clip as rc14-setup-library.gif after the list-screen fixes (Load puts both in the middle; Setup library, A on Corner trap; the menu closes and both jump to the far spots; Load goes back to the middle). Plan: artifacts/setup-library-review/PROPOSAL.md section 2.2 and storyboard-setup-library.png. -->
+<!-- CAPTURE-REQUEST setup-library: reshoot this clip as rc14-setup-library.gif after the list-screen fixes (Load puts both in the middle; Setup library, A on Corner trap, A on Restore here; the menu closes and both jump to the far spots; Load goes back to the middle). Plan: artifacts/setup-library-review/PROPOSAL.md section 2.2 and storyboard-setup-library.png. -->
 
-<!-- CAPTURE-REQUEST setup-load-target: a new clip, rc14-setup-load-target.gif (Y on Corner trap, close the menu, nobody moves; Load goes to the setup, and again after a smash). Plan: artifacts/setup-library-review/PROPOSAL.md section 2.3 and storyboard-load-target.png. -->
+<!-- CAPTURE-REQUEST setup-load-target: a new clip, rc14-setup-load-target.gif (A on Corner trap, Make Load use it, close the menu, nobody moves; Load goes to the setup, and again after a smash). Plan: artifacts/setup-library-review/PROPOSAL.md section 2.3 and storyboard-load-target.png. -->
 
-- **How:** A opens the list. Up / Down choose, then:
-  - **A: go there once.** When you close the menu, both fighters move to the setup. The next Load goes back to your
-    bound save, as before.
-  - **Y: make Load use it.** Nobody moves. Load, and Auto-load on death, go to the setup until you Save or bind another
-    save. To drill a setup again and again, use Y, then Load.
-  - **B** goes back without choosing.
+- **How:** A opens the list. Up / Down / Left / Right choose a setup, then:
+  - **A** opens the setup's own screen (below).
+  - **X** renames it. The keyboard opens with the name, and "Renaming" and the two fighters under the name box. Confirm
+    to keep the new name; the setup stays in the same file. The notice reads "Renamed to" and the name.
+  - **Y** makes Load use it, in one press: the same as Make Load use it below.
+  - **B** goes back to the Saves page.
 
-Nothing moves until you close the menu. A notice confirms the choice: "Setup will bind and restore when the menu
-closes" (A) or "Setup will bind when the menu closes" (Y).
+### A setup's own screen
 
-**When A says no.** A is refused unless Save States is On, you are on the stage the setup was saved on, and the same
-fighters are on both sides (for a Mii, the same Mii). A never changes the stage, so go to it first. The notice gives the
-reason, such as "Restore this setup on its saved stage; Y can bind it without moving", but it doesn't name the stage, so
-put the stage in the setup's name. Y has none of these limits, but a setup's spots only make sense on the stage it was
-saved on.
+A on a setup opens its screen: four rows, and the line under them says what the row under the cursor does. The title
+is the setup's name.
+
+| Row | What it does |
+| --- | --- |
+| Restore here | When you close the menu, both fighters go to the setup. The next Load goes back to your bound save, as before. The notice reads "Setup chosen: both fighters move there when you close the menu". |
+| Make Load use it | Nobody moves. Load, and Auto-load on death, go to the setup until you Save or bind another save. To drill a setup again and again, use this, then Load. The notice reads "Setup chosen: Load will go there once you close the menu. Nobody moves". |
+| Rename | The keyboard opens with the name, as X does. |
+| Delete | Asks once: "Keep it" (where the cursor starts) or "Delete it". Delete it removes the setup's file, and the notice reads "Setup deleted". Your saves are not touched. |
+
+B goes back one step: from the question to the screen, from the screen to the list, from the list to the Saves page.
+After you restore, make Load use it, rename or delete, the menu returns to the Saves page and the notice confirms it.
+Nothing moves until you close the menu.
+
+**When Restore here says no.** Restore here is refused unless Save States is On, you are on the stage the setup was saved
+on, and the same fighters are on both sides (for a Mii, the same Mii). Restore here never changes the stage, so go to it
+first; the row names it. The screen comes back with the reason on its second line, such as "This setup is for another
+stage. Make Load use it works anywhere". Make Load use it has none of these limits, but a setup's spots only make sense
+on the stage it was saved on.
 
 A restored setup follows Player damage on load, Mirroring and Buffs on load like any Load.
 
-There is no rename or delete in the game yet. To remove or replace a setup, delete or overwrite its file in the setups
-folder on a computer; the file is named after the setup, such as `corner-trap.json`. The number beside "Setup library"
-in the left column counts that group's rows, not your setups.
+The number beside "Setup library" in the left column counts that group's rows, not your setups.
 
 More: [Save states › Using a setup](../guide/save-states.md#using-a-setup)
