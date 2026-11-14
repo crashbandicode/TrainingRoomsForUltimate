@@ -36,12 +36,15 @@ Open the menu with B + D-pad Up (or Minus). L and R turn the pages.
 
 - [Technical notes](TECHNICAL.md): how it's installed and built, how each feature works inside,
   [the hidden Developer page](TECHNICAL.md#the-developer-page), the build status.
-- [Feature ledger](FEATURE-LEDGER.md): every feature with the test runs and clips that show it working.
+- [Feature ledger](FEATURE-LEDGER.md): every feature with the test runs and clips that show it working: rc.11, and
+  a section for rc.13 (Eden-tested, untested on hardware); rc.12 has no rows in it.
 - [Media](MEDIA.md): where each GIF was recorded.
 - [Restrictions](RESTRICTIONS.md): every message that refuses something, and the approval behind it.
 - [Building](BUILD.md) and [differences from the Training Modpack](DIFFERENCES-FROM-THE-FORK.md).
 - Release notes: [rc.5](RELEASE-NOTES-rc5.md), [rc.6](RELEASE-NOTES-rc6.md), [rc.8](RELEASE-NOTES-rc8.md),
-  [rc.9](RELEASE-NOTES-rc9.md). rc.7, rc.10 and rc.11 have none; see [Status](TECHNICAL.md#status).
+  [rc.9](RELEASE-NOTES-rc9.md) in this folder; rc.12's and rc.13's are on their
+  [release pages](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases). rc.7, rc.10 and rc.11 have
+  none; see [Status](TECHNICAL.md#status).
 
 ## Project records
 

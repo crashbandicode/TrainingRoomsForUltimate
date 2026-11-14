@@ -8,20 +8,17 @@ waiting-room practice.
 ## Changing the speed
 
 1. Hold R and press D-pad Up. A "Game speed" pop-up shows the current speed.
-2. Keep holding R. D-pad Left goes slower, D-pad Right faster:
-
-   1/4 · 1/2 · 2/3 · x1 · x1.5
-
-   It stops at both ends.
+2. Keep holding R. D-pad Left goes slower, D-pad Right faster. It stops at both ends.
 3. Let go. The pop-up goes away and the speed stays.
 
-While you hold the chord, D-pad Left and Right don't reach the game and no other chord fires, so ZL + D-pad Left
-can't cycle the CPU by accident. The chord doesn't work while a menu is open (this one or the game's pause menu).
+![The five speeds, 1/4, 1/2, 2/3, x1 and x1.5, on one scale: D-pad Left steps slower, D-pad Right faster](../diagrams/game-speed-scale.png)
 
-On a GameCube controller the chord is Z + D-pad Up. To use another chord, change the Game speed row of Display &
-Controls › [Button chords](../menu/display-and-controls.md#button-chords). Any chord you set works the same way: hold
-it, then D-pad Left or Right.
+While you hold the chord, D-pad Left and Right don't reach the game and no other chord fires, so ZL + D-pad Left can't
+cycle the CPU by accident. The chord doesn't work while a menu is open (this one or the game's pause menu).
 
+On a GameCube controller the chord is Z + D-pad Up ([Controls](controls.md#gamecube-controller)). To use another chord,
+change the Game speed row of Display & Controls › [Button chords](../menu/display-and-controls.md#button-chords). Any
+chord you set works the same way: hold it, then D-pad Left or Right.
 ## In Training
 
 The chord sets Training's own Speed, so the game's pause menu (Other Settings › Speed) shows the same value. Training's

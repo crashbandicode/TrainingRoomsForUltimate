@@ -50,14 +50,17 @@ The chords use one save at a time, the *bound* save:
 
 Every save state is a file in `sd:/ultimate/TrainingRooms/saves/`. They are listed under SAVE STATES on the Recording
 page (Recording › [Save states & Macros](../menu/recording.md#save-states--macros)) and in the recording pop-up
-(ZR + D-pad Right). The bound save is the green row, and the five you used last come first. The names you'll see:
+(ZR + D-pad Right). The bound save is the green row, and the five you used last come first.
 
-- **Save N:** made by the Save chord when nothing was bound, or by Duplicate.
-- **name · start:** the start save a recording writes for its macro, such as "Macro 1 · start". See
-  [Recording › Recording a macro, and its start save](recording.md#recording-a-macro-and-its-start-save).
-- **Slot N (YYYY-MM-DD):** a save from an older version's numbered slots. The first time this version started, each
-  filled slot became a file named with its number and that day's date, and the slot the chords were using became the
-  bound save. See [Recording › Migration of the old slots](recording.md#migration-of-the-old-slots).
+<!-- CAPTURE-REQUEST v13-bound-save: a still of the SAVE STATES list with the bound save highlighted green, next to a macro's "name · start" save, so the two are not confused. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+
+The names you'll see:
+
+| Name | Where it comes from |
+| --- | --- |
+| Save N | The Save chord when nothing was bound, or Duplicate. |
+| name · start | The start save a recording writes for its macro, such as "Macro 1 · start". See [Recording › Recording a macro, and its start save](recording.md#recording-a-macro-and-its-start-save). |
+| Slot N (YYYY-MM-DD) | A save from an older version's numbered slots. The first time this version started, each filled slot became a file with its number and that day's date, and the slot the chords were using became the bound save. See [Recording › Migration of the old slots](recording.md#migration-of-the-old-slots). |
 
 To bind another save:
 
@@ -90,6 +93,8 @@ only when the fighter is the one that was saved.
 Each fighter has its own row: Saves › [Player damage on load](../menu/saves.md#player-damage-on-load) and
 [CPU damage on load](../menu/saves.md#cpu-damage-on-load).
 
+![The save holds Player 1 at 42% and the CPU at 80%: with Default a Load gives 0%; with Save State for Player 1 and the CPU it gives 42% and 80%](../media/rc11-damage-on-load.gif)
+
 | Value | Damage after a load |
 | --- | --- |
 | Default | 0%, as after a respawn. |
@@ -110,6 +115,8 @@ For example, to practise a kill confirm at around 100%, set CPU damage on load t
 Saves › [Mirroring](../menu/saves.md#mirroring) flips a load left to right: each fighter lands at the mirror image of
 its saved spot, across the middle of the stage, and faces the other way.
 
+![Mirroring None: Load puts Mario left and the CPU right; set to Alternate, the next Load puts each fighter at the mirror image of its saved spot, facing the other way](../media/rc11-mirroring.gif)
+
 - **None** (the default): never flips.
 - **Alternate:** flips every other load, starting with the first load after a Save.
 - **Random:** flips each load by chance, one in two.
@@ -123,6 +130,8 @@ the CPU alike: Hero's spells, Joker's Arsene, Wii Fit Trainer's Deep Breathing, 
 Sephiroth's wing, Shulk's Monado Arts, Min Min's Power Dragon and Wario's waft. The menu doc's table lists what each one
 does.
 
+![The CPU Joker loads without Arsene; with Arsene ticked in Buffs on load, the next load fills the rebellion gauge and Arsene comes out](../media/rc11-buffs-on-load.gif)
+
 - Every ticked buff is given, except for Shulk and Wario: a fighter has one art or one waft at a time, so one of the
   ticked ones is picked at random on each load.
 - A fighter that isn't in the list gets nothing.
@@ -134,6 +143,8 @@ does.
 With Saves › [Auto-load on death](../menu/saves.md#auto-load-on-death) On, when Player 1 or the CPU is KO'd, the bound
 save loads at once, as if you had pressed Load: same spots, with the damage, mirroring and buffs options. Nobody
 respawns. It is Off by default.
+
+![Auto-load on death turned On, then Mario runs off the stage: at the KO the save state loads at once instead of a respawn](../media/rc11-auto-load-on-death.gif)
 
 With nothing bound, Auto-load loads nothing, and the fighter respawns at once.
 
@@ -157,40 +168,61 @@ death is On: a save state loads instead". Its value is kept, and counts again wh
 
 ## The setup library
 
-A setup is a named copy of a save state, together with the stage it was saved on. Setups live in their own library,
-`sd:/ultimate/TrainingRooms/setups/`, apart from the save states: using one never changes a save file. Both rows are in
-Saves › [Setup library](../menu/saves.md#setup-library).
+A setup is a spot you practise from, kept under a name: where both fighters stand, which fighters they are, and the
+stage. Setups live in their own library, `sd:/ultimate/TrainingRooms/setups/`, apart from your save states, and using
+one never changes a save file. Both rows are in Saves › [Setup library](../menu/saves.md#setup-library).
 
-### Naming a setup
+![A on a setup moves both fighters there once, and the next Load goes back to your bound save; Y moves nobody, and the next Load, and Auto-load on death, go to the setup](../diagrams/setup-a-versus-y.png)
 
-1. Bind the save you want to keep, or press Save where you want it.
-2. Open Saves › Save setup to library... and press A.
+### Making a setup
+
+1. Put both fighters where you want to practise and press Save (ZL + D-pad Down). This replaces the spot in your bound
+   save. To keep that spot too, bind another save first (Recording ›
+   [Save states & Macros](../menu/recording.md#save-states--macros)). If your bound save is already the spot you
+   want, skip this step.
+2. Open Saves › Save setup to library... and press A. It reads the bound save; B cancels.
 3. The keyboard opens with the name "Setup". Type a name of up to 48 characters and confirm.
 4. The notice reads "Saved setup" and the name.
 
-The setup holds what the Load chord would load at that moment: both fighters as saved, and the stage. Both fighters
-must have been saved on the same stage, or the notice reads "Save both fighters in this slot on the same stage before
-exporting" and nothing is kept. Each setup is a new file; one never overwrites another.
+A setup is a copy of your bound save, the one Load goes to, not of where the fighters stand now. That is why step 1
+matters: without it you keep the old spot.
+
+Both fighters must have been saved on the same stage. If not, or if nothing is saved yet, the notice reads "Save both
+fighters in this slot on the same stage before exporting" and nothing is kept. Each setup is a new file; one never
+overwrites another.
 
 ### Using a setup
 
-Saves › Setup library lists each setup as "name · Player 1's fighter / the CPU's fighter". Choose one with Up / Down,
-then:
+Saves › Setup library lists each setup, A to Z, as "name · Player 1's fighter / the CPU's fighter". A row is cut off at
+16 characters and doesn't show the stage. Choose one with Up / Down, then press A or Y. Nothing moves until you close
+the menu. A notice says so: "Setup will bind and restore when the menu closes", or "Setup will bind when the menu
+closes".
 
-- **A: bind and restore.** When you close the menu, both fighters go to the setup through an ordinary load, so damage
-  on load, mirroring and buffs apply (with Default damage, both are at 0%; choose Save State to get the setup's
-  damage). Afterwards the chords go back to your bound save: the next Load returns there.
-- **Y: bind without restoring.** Nobody moves. The Load chord, and Auto-load on death, go to the setup until you press
-  Save or bind another save.
+| Key | What it does | When the menu closes | The next Load |
+| --- | --- | --- | --- |
+| A | Go there once | Both fighters go to the setup through an ordinary load, so damage on load, mirroring and buffs apply (with Default damage, both are at 0%; choose Save State to get the setup's damage). | Goes to your bound save, as before. |
+| Y | Make Load use it | Nobody moves. | Goes to the setup, and so does Auto-load on death, until you press Save or bind another save. |
 
-Neither writes a save file. The choice waits for the menu to close, and a notice says so: "Setup will bind and restore
-when the menu closes", or "Setup will bind when the menu closes".
+**To drill a setup again and again: Y, then Load.** A is for putting yourself there once. Neither key writes a save
+file.
 
-A works only:
+<!-- CAPTURE-REQUEST setup-load-target: a new clip, rc14-setup-load-target.gif (Y on Corner trap, close the menu, nobody moves; Load goes to the setup, and again after a smash). The same clip goes in docs/menu/saves.md. Plan: artifacts/setup-library-review/PROPOSAL.md section 2.3 and storyboard-load-target.png. -->
 
-- with Save States On;
-- on the stage the setup was saved on;
-- with the same fighters on both sides, and for a Mii, the same Mii.
+### When A says no
 
-Otherwise a notice names the problem, for example "Restore this setup on its saved stage; Y can bind it without
-moving". Y has none of these limits.
+A is refused unless every row below is true. The notice gives the reason, but it doesn't name the stage or the
+fighters.
+
+| What is wrong | What to do |
+| --- | --- |
+| Save States is Off. | Turn Saves › Save States On. |
+| You are on another stage. The notice reads "Restore this setup on its saved stage; Y can bind it without moving". | Go to the setup's stage first: A never changes the stage. Put the stage in the setup's name so you remember it. |
+| A side has a different fighter. | Choose the setup's fighters (Fighters & Stages). |
+| A side has a different Mii. | Choose the same Mii. |
+
+Y has none of these limits and always works, but a setup's spots only make sense on the stage it was saved on.
+
+### Renaming and deleting
+
+There is no rename or delete in the game yet. To remove or replace a setup, delete or overwrite its file in the setups
+folder on a computer. The file is named after the setup, such as `corner-trap.json`.

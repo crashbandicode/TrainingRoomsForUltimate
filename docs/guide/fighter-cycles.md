@@ -22,10 +22,13 @@ Kirby hats, and the Loading rows that make a switch instant.
 - With Training's No. of CPUs above 1, the extra CPUs take the next fighters of the CPU's list.
 - To change the buttons, see [Controls › Changing a chord](controls.md#changing-a-chord).
 
-A press is refused, with a notice that says why, while a fighter swap is still running ("Wait for the character swap
-to finish"), during a recording or a playback, during a save-state load, while the game's own menu is open, or before
-the practice fighter has loaded. If both chords come in at once, the notice reads "Use different mappings for player
-and CPU".
+A press that can't happen shows a notice that says why:
+
+| Notice or case | Why |
+| --- | --- |
+| "Wait for the character swap to finish" | A fighter swap is still running. |
+| A notice | During a recording or a playback, during a save-state load, while the game's own menu is open, or before the practice fighter has loaded. |
+| "Use different mappings for player and CPU" | Both chords came in at once. |
 
 ## Player Swapping
 
@@ -37,6 +40,8 @@ stays the fighter you picked at the character select. While it is Off:
 - A combo's Switch still changes Player 1 to the combo's fighter (see [Recording › Combos](recording.md#combos)).
 
 The CPU has no such switch: Cycle CPU and CPU Character always work.
+
+<!-- CAPTURE-REQUEST v02-player-swapping: see Fighters & Stages › Player Swapping; the same clip goes here. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
 ## The Character Cycles editor
 
@@ -51,6 +56,11 @@ The CPU has no such switch: Cycle CPU and CPU Character always work.
 7. Y on Ice Climbers marks [Solo Popo](#solo-popo) for that list.
 8. B goes back. The new order counts once you close the menu.
 
+Both lists start as All. Y on the Character Cycles row (on the page, not in the grid) puts both back to your saved
+defaults.
+
+![The numbers in Character Cycles: 0 is the fighter the role started with, each press loads the next number, and after the last it goes back to 0; a Mii tile with no Mii to load is greyed and has no number](../diagrams/cycle-numbers.png)
+
 The numbers are exactly what the chord loads:
 
 - **0** is the fighter the role started with: the one picked at the character select, for the CPU too. The list
@@ -60,28 +70,22 @@ The numbers are exactly what the chord loads:
   Otherwise its tile is greyed and the help line reads "… - unavailable". Which Mii loads is set in the Mii rows: see
   [Mii fighters](mii.md).
 
-Both lists start as All. Y on the Character Cycles row (on the page, not in the grid) puts both back to your saved
-defaults.
-
 A change made in Training starts loading the new fighters at once. The fighter on screen stays until you switch away,
 and the fighters that left the list are freed the next time you open the pause menu (or at once, if the new ones need
 their room).
 
 ## Solo Popo
 
-Ice Climbers can be loaded as the pair (Popo and Nana) or as Popo alone. Three settings decide which:
+Ice Climbers can be loaded as the pair (Popo and Nana) or as Popo alone. Three controls decide which. All start Off:
 
-- **Fighters & Stages ›
-  [Solo Popo (original Ice Climbers)](../menu/fighters-and-stages.md#solo-popo-original-ice-climbers):** Player 1
-  picked Ice Climbers at the character select. It applies only to them: Player 1's 0 (picking them again in Player
-  Character counts too).
-- **The "S" mark on Ice Climbers in the Player list** (Y in Character Cycles): the Ice Climbers in Player 1's cycle,
-  and Ice Climbers picked in Player Character when Player 1 started as another fighter.
-- **The "S" mark on Ice Climbers in the CPU list** (Y in Character Cycles, CPU list): the CPU's Ice Climbers, its 0
-  and its cycle alike.
+| Which Ice Climbers? | Control |
+| --- | --- |
+| Player 1's, picked at the character select (picking them again in Player Character counts too) | Fighters & Stages › [Solo Popo (original Ice Climbers)](../menu/fighters-and-stages.md#solo-popo-original-ice-climbers) |
+| Player 1's cycle, and Player Character when Player 1 started as another fighter | The "S" mark on Ice Climbers in the Player list (Y in Character Cycles) |
+| The CPU's: its 0 and its cycle | The "S" mark on Ice Climbers in the CPU list (Y in Character Cycles, CPU list) |
 
-All three are Off by default. If Player 1's two settings differ, Ice Climbers can be in Player 1's cycle twice: as 0
-(one way) and as a number (the other way).
+If Player 1's two controls differ, Ice Climbers can be in Player 1's cycle twice: as 0 one way and as a number the
+other.
 
 ## Kirby hats
 
@@ -96,49 +100,49 @@ click, from a list you choose.
 - **The list:** Fighters & Stages › [Kirby Hats](../menu/fighters-and-stages.md#kirby-hats), one list per role (ZR
   switches). A adds a hat at the end, All takes everyone, R removes one, X previews a shared slot's form. It starts as
   Mario only.
-- The hat changes once Kirby stands or falls (not in the middle of a move). The notice reads "Kirby Hats" (or "CPU
-  Kirby Hats") and the fighter's name.
-- If Kirby lost its hat, the next click gives the same hat back before moving on.
-- With an empty list the notice reads "Select a Kirby hat first". If a hat can't load within about 15 seconds, it
-  reads "Kirby hat could not be loaded".
-- Nothing happens during a fighter swap, a save-state load, a recording or a playback, or while a menu is open.
-- With Training's CPU Behavior set to Control, the controller that drives the CPU changes the CPU's hat with B and a
+- **When it changes:** once Kirby stands or falls (not in the middle of a move). If Kirby lost its hat, the next click
+  gives the same hat back before moving on.
+- **With Training's CPU Behavior set to Control,** the controller that drives the CPU changes the CPU's hat with B and a
   click of either stick.
-- In a waiting room, the hat comes back when you return to the same room after a match.
+- **In a waiting room,** the hat comes back when you return to the same room after a match.
+- **Nothing happens** during a fighter swap, a save-state load, a recording or a playback, or while a menu is open.
+
+| Notice | When |
+| --- | --- |
+| "Kirby Hats" (or "CPU Kirby Hats") and the fighter's name | The hat changed. |
+| "Select a Kirby hat first" | The list is empty. |
+| "Kirby hat could not be loaded" | A hat couldn't load within about 15 seconds. |
 
 ## What the Loading rows do
 
-Loading a fighter from scratch takes a moment and stops the game while it happens. So TrainingRooms loads the
-fighters of your cycles, and Kirby's hats, ahead of time in the background. Then a chord or a click only swaps in a
-fighter that is already there.
+Loading a fighter from scratch takes a moment and stops the game. So TrainingRooms loads your cycle fighters and Kirby's
+hats ahead of time in the background, and a chord or a click only swaps in a fighter that is already there. The defaults
+suit most players; change them only to use less memory.
 
-If a cycle has more fighters than Ready Fighters leaves room for, one of them can't stay loaded. A swap to that
-fighter loads it alone. The groups already loaded beside it stay loaded, and only the fighters that were on screen
-with the one you swapped from load again in the background.
+If a cycle has more fighters than Ready Fighters leaves room for, one can't stay loaded. A swap to it loads it alone.
+The groups already loaded beside it stay, and only the fighters that were on screen with the one you swapped from load
+again in the background.
 
 The notice "Fighters" counts them while they load:
 
-- "Loading 6/10", then "Ready 10/10" (or "All loaded") when they are all there.
-- "Swap once to load", "Swap P1 once to load", "Swap the CPU once to load" or "Swap both once to load": that role's
-  first swap starts the loading.
-- "Loaded 7/10 · swap to load 3 more": the rest load after the next swap.
-- "(2 waiting for memory)" or "(… waiting for pool space)": some wait until there is room, then load.
-- "Paused": loading waits while something else needs the game, such as a swap or a save-state load.
+| Notice | Meaning |
+| --- | --- |
+| "Loading 6/10", then "Ready 10/10" (or "All loaded") | Loading, then all there. |
+| "Swap once to load", "Swap P1 once to load", "Swap the CPU once to load", "Swap both once to load" | That role's first swap starts the loading. |
+| "Loaded 7/10 · swap to load 3 more" | The rest load after the next swap. |
+| "(2 waiting for memory)" or "(… waiting for pool space)" | Some wait for room, then load. If it keeps saying so, lower Ready Fighters or Ready Hats. |
+| "Paused" | Loading waits while something else, such as a swap or a save-state load, needs the game. |
 
-The rows are in the Loading section of Fighters & Stages, collapsed until you open it. The defaults suit most players.
+The rows are in the Loading section of Fighters & Stages, collapsed until you open it:
 
-- [Cycle Preload](../menu/fighters-and-stages.md#cycle-preload) (5): how many of each role's next fighters are kept
-  ready. Off: each swap loads its fighter then, more slowly.
-- [Preload](../menu/fighters-and-stages.md#preload) (Both): keep the fighters ready, Kirby's hats, or both.
-- [Ready Fighters](../menu/fighters-and-stages.md#ready-fighters) (10): how many fighters are loaded at most, both
-  roles and the two on screen together.
-- [Ready Hats](../menu/fighters-and-stages.md#ready-hats) (5): how many Kirby hats are kept ready on top of that.
-- [Ready Fighter Bodies](../menu/fighters-and-stages.md#ready-fighter-bodies) (3): how many fighters each role keeps
-  in its own slot, the one on screen included.
-- [Group Swap](../menu/fighters-and-stages.md#group-swap) (On): lets each role keep more groups of fighters ready
-  besides its own slot.
-- [Swap groups](../menu/fighters-and-stages.md#swap-groups) (all On): seven switches for the fighters that need
-  special care: Ice Climbers, Pokémon Trainer, Pyra / Mythra, Solo Popo, Miis, and the fighter a role started with.
+| Row | Default | What it sets |
+| --- | --- | --- |
+| [Cycle Preload](../menu/fighters-and-stages.md#cycle-preload) | 5 | How many of each role's next fighters are kept ready. Off: each swap loads, more slowly. |
+| [Preload](../menu/fighters-and-stages.md#preload) | Both | Keep the fighters ready, Kirby's hats, or both. |
+| [Ready Fighters](../menu/fighters-and-stages.md#ready-fighters) | 10 | The most fighters loaded, both roles and the two on screen together. |
+| [Ready Hats](../menu/fighters-and-stages.md#ready-hats) | 5 | Kirby hats kept ready on top of that. |
+| [Ready Fighter Bodies](../menu/fighters-and-stages.md#ready-fighter-bodies) | 3 | Fighters each role keeps in its own slot, the one on screen included. |
+| [Group Swap](../menu/fighters-and-stages.md#group-swap) | On | Lets each role keep more groups ready besides its own slot. |
+| [Swap groups](../menu/fighters-and-stages.md#swap-groups) | all On | Seven switches for the fighters that need special care: Ice Climbers, Pokémon Trainer, Pyra / Mythra, Solo Popo, Miis, and a role's starting fighter. |
 
-If the notice often says "waiting for memory", lower Ready Fighters or Ready Hats. Cycle Preload Off uses the least
-memory, and every swap is a full reload.
+Cycle Preload Off uses the least memory, and every swap is a full reload.

@@ -14,14 +14,13 @@ The save states themselves (the files you bind, rename and delete) are listed on
 ### Save States
 
 On: the Save chord (ZL + D-pad Down) saves where both fighters are, and the Load chord (ZL + D-pad Up) puts them both
-back there. Off: the two chords show "Save States is Off (Saves page)" instead, Auto-load on death stops, and a load
-already under way is cancelled. A Save or Load that doesn't happen for another reason (nothing bound, a load under way,
-the CPU playing Player 1) also says why in a notice; the list is in
-[Save states › Saving and loading](../guide/save-states.md#saving-and-loading). Both chords work while Online Deluxe's
-window is open.
+back there. Off: both chords show "Save States is Off (Saves page)", Auto-load on death stops, and a load already under
+way is cancelled. A KO then follows Fighters & Stages › [Respawn on platform](fighters-and-stages.md#respawn-on-platform):
+back at once, or on the revival platform.
 
-With it Off, a KO follows Fighters & Stages › [Respawn on platform](fighters-and-stages.md#respawn-on-platform): back
-at once, or on the revival platform.
+A Save or Load that doesn't happen for another reason (nothing bound, a load under way, the CPU playing Player 1) says
+why in a notice: the list is in [Save states › Saving and loading](../guide/save-states.md#saving-and-loading). Both
+chords work while Online Deluxe's window is open.
 
 - **Values:** On, Off
 - **Default:** On
@@ -147,43 +146,66 @@ More: [Save states › Buffs](../guide/save-states.md#buffs)
 
 ## Setup library
 
-A setup is a named copy of a save state, with the stage it was saved on. Setups are kept in a library of their own
-(`sd:/ultimate/TrainingRooms/setups/`), apart from the save states on the Recording page.
+A setup is a spot you practise from, kept under a name: where both fighters stand, which fighters they are, and the
+stage. Keep as many as you like, then put both fighters on any of them in one step. Setups are separate from your save
+states (they are files in `sd:/ultimate/TrainingRooms/setups/`): Load uses a setup only if you choose Y below.
+
+![A on a setup moves both fighters there once, and the next Load goes back to your bound save; Y moves nobody, and the next Load, and Auto-load on death, go to the setup](../diagrams/setup-a-versus-y.png)
 
 ### Save setup to library...
 
-Keeps what the Load chord would load now (normally your bound save) as a new setup, under a name you type.
+Keeps the spot your Load chord goes to now, your bound save, as a new setup under a name you type.
 
 ![The Setup library is empty ("No setups saved"); Save setup to library... keeps the saved spot as the setup Corner trap, and the Setup library then lists it (Corner trap · Mario / Mario)](../media/rc11-save-setup.gif)
 
-- **How:** A reads the save ("Reading the selected saved setup…"; B cancels), then the keyboard opens with the name
-  "Setup". Type a name of up to 48 characters and confirm. The notice reads "Saved setup" and the name. Each setup is
-  a new file: saving never overwrites one.
+<!-- CAPTURE-REQUEST setup-save-setup: reshoot this clip as rc14-save-setup.gif after the list-screen fixes (Mario vs Little Mac on far-apart spots: Save, Save setup to library..., the keyboard, the notice, the list with the new row). Plan: artifacts/setup-library-review/PROPOSAL.md section 2.1 and storyboard-save-setup.png. -->
 
-Both fighters must have been saved on the same stage. If not, or if nothing is bound, the notice reads "Save both
-fighters in this slot on the same stage before exporting" and nothing is kept.
+- **Values:** a name of up to 48 characters
+- **Default:** the name "Setup"
+- **How:** A reads the save ("Reading the selected saved setup…"; B cancels), then the keyboard opens. Type a name and
+  confirm. The notice reads "Saved setup" and the name.
 
-More: [Save states › The setup library](../guide/save-states.md#the-setup-library)
+It copies your bound save, not where the fighters stand now. To keep a new spot, press Save (ZL + D-pad Down) there
+first. Save replaces the spot in your bound save (with nothing bound, it makes a new save), so to keep the old spot too,
+bind another save first ([Save states & Macros](recording.md#save-states--macros)).
+
+Both fighters must have been saved on the same stage. If not, or if nothing is saved yet, the notice reads "Save both
+fighters in this slot on the same stage before exporting" and nothing is kept. Each setup is a new file: saving never
+overwrites one.
+
+More: [Save states › Making a setup](../guide/save-states.md#making-a-setup)
 
 ### Setup library
 
-The list of your setups, each with its name and its two fighters ("name · Player 1's fighter / the CPU's fighter"). A
-setup you choose here is applied when you close the menu.
-
-- **How:** A opens the list. Up / Down choose, then:
-  - **A** binds and restores: when the menu closes, the fighters go to the setup. The next Load goes back to your
-    bound save.
-  - **Y** binds only: nobody moves, and the Load chord (and Auto-load on death) goes to the setup until you Save or
-    bind another save.
-  - **B** goes back without choosing.
-
-A notice confirms the choice: "Setup will bind and restore when the menu closes", or "Setup will bind when the menu
-closes".
-
-A needs Save States On, the stage the setup was saved on, and the same fighters on both sides (for a Mii, the same
-Mii). If one of them doesn't match, a notice says which, and that Y can bind the setup without moving. Y needs none of
-them. With no setups saved, the list reads "No setups saved".
+Lists your setups, A to Z, so you can put both fighters on one. A row reads "name · Player 1's fighter / the CPU's
+fighter", cut off at 16 characters, and doesn't show the stage. With no setups, the list reads "No setups saved".
 
 ![Setup library: A on a setup binds and restores it; when the menu closes both fighters stand where the setup was saved](../media/rc11-setup-library.gif)
 
-More: [Save states › The setup library](../guide/save-states.md#the-setup-library)
+<!-- CAPTURE-REQUEST setup-library: reshoot this clip as rc14-setup-library.gif after the list-screen fixes (Load puts both in the middle; Setup library, A on Corner trap; the menu closes and both jump to the far spots; Load goes back to the middle). Plan: artifacts/setup-library-review/PROPOSAL.md section 2.2 and storyboard-setup-library.png. -->
+
+<!-- CAPTURE-REQUEST setup-load-target: a new clip, rc14-setup-load-target.gif (Y on Corner trap, close the menu, nobody moves; Load goes to the setup, and again after a smash). Plan: artifacts/setup-library-review/PROPOSAL.md section 2.3 and storyboard-load-target.png. -->
+
+- **How:** A opens the list. Up / Down choose, then:
+  - **A: go there once.** When you close the menu, both fighters move to the setup. The next Load goes back to your
+    bound save, as before.
+  - **Y: make Load use it.** Nobody moves. Load, and Auto-load on death, go to the setup until you Save or bind another
+    save. To drill a setup again and again, use Y, then Load.
+  - **B** goes back without choosing.
+
+Nothing moves until you close the menu. A notice confirms the choice: "Setup will bind and restore when the menu
+closes" (A) or "Setup will bind when the menu closes" (Y).
+
+**When A says no.** A is refused unless Save States is On, you are on the stage the setup was saved on, and the same
+fighters are on both sides (for a Mii, the same Mii). A never changes the stage, so go to it first. The notice gives the
+reason, such as "Restore this setup on its saved stage; Y can bind it without moving", but it doesn't name the stage, so
+put the stage in the setup's name. Y has none of these limits, but a setup's spots only make sense on the stage it was
+saved on.
+
+A restored setup follows Player damage on load, Mirroring and Buffs on load like any Load.
+
+There is no rename or delete in the game yet. To remove or replace a setup, delete or overwrite its file in the setups
+folder on a computer; the file is named after the setup, such as `corner-trap.json`. The number beside "Setup library"
+in the left column counts that group's rows, not your setups.
+
+More: [Save states › Using a setup](../guide/save-states.md#using-a-setup)

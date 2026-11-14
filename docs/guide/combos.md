@@ -1,8 +1,7 @@
 # Combo files: keep, edit and share combos
 
-The combo helper (Recording › Combos & Sequences, on the Recording page and in the pop-up;
-[SPEC-input-07](../../specs/SPEC-input-07-combo-helper.md); [RECORDING.md](recording.md), Combos) saves every combo
-as a small text file on the SD card. You can copy these files to another card, send them to a friend, or write one by
+The combo helper (Recording › Combos & Sequences, on the Recording page and in the pop-up; see the
+[Recording guide](recording.md#combos)) saves every combo as a small text file on the SD card. You can copy these files to another card, send them to a friend, or write one by
 hand. A combo is not tied to a fighter: the fighter it was recorded on is a note, and the helper grades whatever
 fighter Player 1 is.
 
@@ -16,10 +15,10 @@ sd:/ultimate/TrainingRooms/combos/
 ```
 
 The drill, the one combo or sequence the helper grades, is kept in `sd:/ultimate/TrainingRooms/recording-index.json`
-with the rest of the recording index (`src/model/library/hot.rs:1`), not in this folder.
+with the rest of the recording index, not in this folder.
 
-- **Add a combo:** copy its `.json` file into this folder. It is listed under COMBOS the next time the menu opens; the
-  menu reads the card at every open (`src/model/recording_menu.rs:2152`). No restart is needed.
+- **Add a combo:** copy its `.json` file into this folder. It is listed under COMBOS the next time the menu opens,
+  because the menu reads the card at every open. No restart is needed.
 - **File names:** any name works, up to 64 characters before `.json`, except that it must not:
   - contain `/ \ : * ? " < > |` or control characters;
   - start with a dot (hidden files, such as the `._` files a Mac writes, are never combos);
@@ -33,7 +32,36 @@ with the rest of the recording index (`src/model/library/hot.rs:1`), not in this
 - **Writes are atomic:** a `.tmp` file is written, then renamed over the old one. A card pulled out mid-write keeps the
   old file.
 
-## The format
+## Sharing a combo
+
+![A combo file copied from one card to the same folder of another, then listed under COMBOS](../diagrams/combo-sharing.png)
+
+1. Open Recording › Combos & Sequences to check the name: COMBOS lists each file's name, with "Recorded on" and the
+   fighter under it.
+2. Take the card out (or use FTP), and copy `sd:/ultimate/TrainingRooms/combos/<file>.json`.
+3. On the other card, put the file in the same folder and open the menu. The combo is listed under COMBOS. Drill it
+   (A in the pop-up, or Drill on its own screen), then do the combo on any fighter. A shared file keeps its own file
+   name, and it stays the drill like any other combo.
+
+## Practising on the recorded fighter
+
+When you drill a combo whose `recorded_on` is not Player 1's fighter, the plugin asks Fighter Mismatch, the same
+question a macro recorded on another fighter asks ([Recording guide](recording.md#fighter-mismatch)):
+
+- *Keep current fighter* (the default): the combo becomes the drill, and you practise it on the fighter you have.
+- *Switch to recorded fighter*: the combo becomes the drill, and Player 1 changes to that fighter when you close the
+  menu. This works with **Player Swapping** (Fighters & Stages) On or Off. Player Swapping stays as it is, and with it
+  Off the plugin still never changes Player 1 on its own.
+- B: nothing changes.
+
+The question is skipped when the combo has no `recorded_on`, when the fighter already matches, or when
+**Ask before switching fighter** (Recording › Replays) is Off. Off keeps the fighter you have, as Keep does.
+
+## Writing a file by hand
+
+The rest of this page is for writing or fixing a combo file yourself.
+
+### The format
 
 One JSON object, at most 64 KiB:
 
@@ -102,7 +130,7 @@ on which Player 1 could act. Every link starts again at its own A₁.
 move, not one fighter's moves, so a combo recorded on one fighter can be practised on any other. All aerials are
 `aerial`; a newer file's event direction tells a forward air from a neutral air, relative to the facing. An older file's `aim` still uses `side` for both left and right.
 
-## Reading rules
+### Reading rules
 
 - **Unknown fields are ignored**, at the top and inside links, steps, and events, so you can add your own notes. A rename keeps
   them.
@@ -120,26 +148,4 @@ move, not one fighter's moves, so a combo recorded on one fighter can be practis
 - **Versions:** files written by 0.2.0-rc.4 and later all have `schema_version` 1. Later fields are optional, so an
   older build reads a newer file and ignores what it does not know.
 
-## Sharing a combo
-
-1. Open Recording › Combos & Sequences to check the name: COMBOS lists each file's name, with "Recorded on" and the
-   fighter under it.
-2. Take the card out (or use FTP), and copy `sd:/ultimate/TrainingRooms/combos/<file>.json`.
-3. On the other card, put the file in the same folder and open the menu. The combo is listed under COMBOS. Drill it
-   (A in the pop-up, or Drill on its own screen), then do the combo on any fighter. A shared file keeps its own file
-   name, and it stays the drill like any other combo.
-
-## Practising on the recorded fighter
-
-When you drill a combo whose `recorded_on` is not Player 1's fighter, the plugin asks Fighter Mismatch, the same
-question a macro recorded on another fighter asks ([RECORDING.md](recording.md), Fighter Mismatch):
-
-- *Keep current fighter* (the default): the combo becomes the drill, and you practise it on the fighter you have.
-- *Switch to recorded fighter*: the combo becomes the drill, and Player 1 changes to that fighter when you close the
-  menu. This works with **Player Swapping** (Fighters & Stages) On or Off. Player Swapping stays as it is, and with it
-  Off the plugin still never changes Player 1 on its own.
-- B: nothing changes.
-
-The question is skipped when the combo has no `recorded_on`, when the fighter already matches, or when
-**Ask before switching fighter** (Recording › Replays) is Off. Off keeps the fighter you have, as Keep does
-(`rr_host::ask_drill`).
+<!-- CAPTURE-REQUEST v20-combo-library: a still of the COMBOS list after a combo file was copied in, showing its name and "Recorded on" fighter. See artifacts/docs4/CAPTURE-REQUESTS.md. -->

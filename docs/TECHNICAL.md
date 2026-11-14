@@ -2,7 +2,8 @@
 
 The detail behind the [README](../README.md): how TrainingRooms is installed and built, how each feature behaves, and
 where every clip in the README was recorded (build, commit and what the run checked). Release notes are the
-`RELEASE-NOTES-rc*.md` files in this folder: rc.5, rc.6, rc.8 and rc.9 (rc.7, rc.10 and rc.11 have none).
+`RELEASE-NOTES-rc*.md` files in this folder: rc.5, rc.6, rc.8 and rc.9 (rc.7, rc.10 and rc.11 have none); rc.12's and
+rc.13's are on their Forgejo release pages, linked under [Status](#status).
 
 Practice tools for Training mode and the online waiting rooms of Super Smash Bros. Ultimate 13.0.5, as a Skyline plugin.
 
@@ -59,8 +60,8 @@ current values as defaults, B goes back. Each page ends with *Reset page to defa
 where you left it. The chords are edited on Display & Controls › Button chords.
 
 The key hints at the foot of every page end with the build tag: the version, then the build name and the commit the NRO
-was built from, for example `0.2.0-rc.6 · rc11 0c628724` (rc.8 to rc.10 builds read `rc8` to `rc10`). A build from
-uncommitted changes adds `-dirty`.
+was built from, for example `0.2.0-rc.6 · rc13 ed0d7a35` (rc.8 to rc.12 builds read `rc8` to `rc12`; the clip below is
+rc.11's). A build from uncommitted changes adds `-dirty`.
 
 **Clip** [`rc11-footer-tag.gif`](media/rc11-footer-tag.gif): the menu opens on two pages whose key hints end with `0.2.0-rc.6 · rc11 0c628724`
 
@@ -102,6 +103,8 @@ On", and the jab draws on it. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 R + D-pad Down turns the input display on and off without opening the menu, in Training and in the waiting-room
 practice. A notice says "Input display" and On or Off. The menu's Input Display row shows the same value, and the
 choice is saved.
+
+Where the frame strip code is (moved here from the [Frame strip](guide/frame-strip.md) guide): the lanes, chips, freeze, readouts, the stick row, the C-stick arrow and the 20-frame rule are what `src/model/frame_strip.rs` draws, as specified in `specs/SPEC-input-06-frame-strip.md`.
 
 ### Game speed
 
@@ -158,20 +161,22 @@ below.
 
 ### CPU reactions
 
-**Clip** [`rc11-di.gif`](media/rc11-di.gif): DI Down, then DI Up from the menu: the same forward smash launches the CPU low, then high
+**Clip** [`rc13-di.gif`](media/rc13-di.gif): DI Down, then DI Up from the menu (the blue chips): the same forward smash launches the CPU low, then high. Eden, rc.13 (untested on hardware)
 
-*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Mario vs Donkey Kong; the CPU loads at 80% (CPU damage on load, 80–80) with DI
-Direction Down and takes Mario's forward smash (the C-stick, 18.7%) on a low line, landing near the 10 mark; CPU ›
-Defence › DI Direction: Y clears Down, A picks Up; the same load and smash (18.8%) launch it on a steep line, still in
-the air past the 15 mark. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-14, rc.13 candidate `7d7b74c9` (diag NRO `134636ef…`, log lines only; rc.13 is untested on hardware), run
+`gna-r13b-yoga-1`, Mario vs Donkey Kong; the CPU loads at 80% with DI Direction Down and takes Mario's forward smash
+(19.0%) on a low line; CPU › Defence › DI Direction: the grid shows Down x1 at full tint and the other chips dim, Y clears
+Down, A picks Up; the same load and smash (19.2%) launch it high. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-DI, SDI, air dodge, shield tilt, mash, ledge, tech and throw options on the CPU page. Above: the same hit with no DI
+DI, SDI, air dodge, shield tilt, mash, ledge, tech and throw options on the CPU page. Above: the same hit with DI Down
 and with DI Up.
 
-**Clip** [`rc11-di-sdi-chips.gif`](media/rc11-di-sdi-chips.gif): DI Direction from nothing picked to Up ×1, then SDI Direction the same
+**Clip** [`rc13-di-sdi-chips.gif`](media/rc13-di-sdi-chips.gif): DI Direction from nothing picked to Up ×1, then SDI Direction the same. Eden, rc.13 (untested on hardware)
 
-*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), the CPU page's Defence section: DI Direction reads 0 selected; A opens the grid on
-Neutral; Up, A, and "Up x1" under Selected; back, the row reads 1 selected; then SDI Direction the same way. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-14, rc.13 candidate `7d7b74c9` (diag NRO `134636ef…`, log lines only; rc.13 is untested on hardware), run
+`gna-r13b-yoga-1`, the CPU page's Defence section: DI Direction reads 0 selected; A opens the grid on Neutral, every chip
+dim; the cursor to Up, A, and "Up x1" under Selected with the Up chip at full tint; then SDI Direction the same way. Cuts
+inside are listed in [MEDIA.md](MEDIA.md).*
 
 The direction chips show the game's own DI line and SDI streak; each A adds weight to a chip. *In* and *Out* are
 relative to you, on either side of the CPU.
@@ -209,8 +214,34 @@ Stages) chooses between the game's respawn platform (above) and the instant resp
 A save state only warps, and Load starts nothing. Each role has one active macro, a recording or a chain, and
 that role's Play chord plays it without warping back on later loops. On the Recording page, Y does nothing and
 X cycles the loop only while the cursor is in Macros.
-[RECORDING.md](guide/recording.md) is how to use it. The pop-up and the Recording page are in that doc.
+The [Recording guide](guide/recording.md) is how to use it. The pop-up and the Recording page are in that doc.
 What rc.6 changes is [RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md).
+
+Where the recording code is (moved here from the Recording guide; named by function, not line, because the lines move):
+
+- The playback machine, the files, the grades, the chords and the migration: `src/model/playback.rs`,
+  `src/model/library/`, `src/model/combo.rs`, `src/model/drill.rs`, `src/model/chords.rs` and
+  `src/model/library/migrate.rs`. The pop-up, the Recording page and the file screens: `src/model/recording_menu.rs`
+  and `src/model/ui/frame.rs`. Record, Play and the pop-up chord are applied in `src/model/rr_host.rs`.
+- The start save keeps the recorded fighter's facing and speed in `note_record_start` (`rr_host.rs`). Momentum is
+  `play_start_speed` (`rr_host.rs`) and `apply_start_speed` (`src/runtime/features/recording_host.rs`).
+- Mash interrupts playback stops the CPU's macro through `note_mash` and the `MASH` flag in `rr_host.rs`.
+- Edit placement: the target macro is `placement_target` (`rr_host.rs`), the screen is `open_placement` in
+  `src/model/macro_ui/macro_panel.rs`, and the warp plus offset is `warp_pair` (`rr_host.rs`).
+- Replay window: a capture's load no longer waits on the window (`Owners::REPLAY_LOADING`,
+  `src/model/input_delay.rs`). The Fighter Mismatch question and the exact Mii install came with cov-rest `66a9a53`,
+  `2891eaa` and `f2298ee`; final pass on `646a5f0d`: `yoga-cov` `cov-replay-window` PASS. A Mii from a replay is
+  installed through `installable` in `src/model/mii_install.rs` (cov-rest `cbe961a` and `f2298ee`; `cov-named-mii` and
+  `int-named-mii-twice` PASS). A chain's mismatch line is `screen=mismatch ask=macro1`.
+- The Saves page's Setup library: a setup restored with A only moves the fighters (`setup_restored` in `rr_host.rs`),
+  and binding one without restoring is `setup_bound` (same file). The checks A makes (Save States On, the stage, the
+  fighters) are in `src/model/state/setup_transaction.rs`; the file format is `src/model/state/setup.rs`; the two menu
+  rows are `src/runtime/ui/setups.rs` and `src/editors/setups.rs`, with the copy from the bound save in
+  `src/runtime/features/states/setups.rs`. Setup files are named from the setup's name (`corner-trap.json`) and never
+  overwritten.
+- The pop-up layout is the agreed r8 mockup (`docs/decisions/RECORDING-REDESIGN-r8-popup-*.png` on
+  `review/menu-proposal`). Its status line reads `hairline=5` even when the fifth row is scrolled out of the four-row
+  window.
 
 **Clip** [`rc10-record-play-cpu.gif`](media/rc10-record-play-cpu.gif): Record on Player 1, then Play on CPU: the CPU does the recorded moves
 
@@ -226,7 +257,7 @@ start_observed slot=1`, then the CPU's status changes. The windows are listed in
 
 *Eden, 2026-11-11, rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only): the pop-up lists no saves and no macros; Record
 on Player 1 and two jabs; the pop-up then lists "Macro 1" (Recorded on Mario) and its start save "Macro 1 · start".
-Playback is shown in [RECORDING.md](guide/recording.md). Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+Playback is shown in the [Recording guide](guide/recording.md). Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 While an AI drives Player 1, for example the standalone CPU pilot, Record is refused, from the chord and from the
 pop-up: the notice reads "P1 is controlled by an AI: recording is off", and nothing is recorded. A recording that is
@@ -245,6 +276,12 @@ listed in [MEDIA.md](MEDIA.md).*
 as a file and makes it the drill. With *Combo helper* On, a bar under the frame strip grades each attempt link by link:
 whether the recorded inputs came, in order and on time, and whether the same move came out. A true combo is shown,
 not required. Drilling a sequence adds a header and a row of its combos to that bar.
+
+Where the combo code is (moved here from the [Combo files](guide/combos.md) guide): the spec is
+[SPEC-input-07](../specs/SPEC-input-07-combo-helper.md). The drill is kept in `recording-index.json`, the recording
+index (`src/model/library/hot.rs`). The menu re-reads the combo folder each time it opens, so a copied-in file needs no
+restart (`src/model/recording_menu.rs`). A combo drill's Fighter Mismatch question is `ask_drill` in
+`src/model/rr_host.rs`.
 
 **Clip** [`rc7-sequence-drill.gif`](media/rc7-sequence-drill.gif): Drill a sequence: combo 1, then combo 2, then a drop back at combo 1
 
@@ -413,13 +450,19 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Status
 
-The newest build is **rc.11** (`0c628724`): the menu footer reads `0.2.0-rc.6 · rc11 0c628724`. The version number
-has stayed `0.2.0-rc.6` since rc.6; the build name after it (rc8, rc9, rc10, rc11) tells the builds apart. rc.11 moves
-TrainingRooms' own threads off core 0 and hides the frame strip while a waiting room's own menu is open; rc.10 is a code
-reduction with no change in behaviour.
+The newest build is **rc.13** (`ed0d7a35`, 2026-11-14,
+[release and notes](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13)),
+Eden-tested and **untested on hardware**: the menu footer reads `0.2.0-rc.6 · rc13 ed0d7a35`. The version number has
+stayed `0.2.0-rc.6` since rc.6; the build name after it (rc8 to rc13) tells the builds apart. rc.13 adds Aerial Drift,
+Taunts, Wario's bike in Give item, Training opening on the stage you pick, and Left / Right on On/Off rows; its delay
+rows and Input Delay count game frames at every Game speed; Hitbox Visualization draws long boxes as pills, gives
+projectiles and thrown items their own orbs and shows grab boxes in magenta; and a CPU on Mash Triggers Always no longer
+gets stuck in its first dodge. [rc.12](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.12)
+(`83b72d7d`, 2026-11-13, also Eden-tested and untested on hardware) changes CPU options, Saves and Recording; its
+release notes list them. rc.11 (`0c628724`) moves TrainingRooms' own threads off core 0 and hides the frame strip while
+a waiting room's own menu is open; rc.10 is a code reduction with no change in behaviour.
 
-[0.2.0-rc.6](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.6) follows
-0.2.0-rc.3.1: 0.2.0-rc.5 was withdrawn before players ran it, and there is no separate 0.2.0-rc.4. What it changes is
+0.2.0-rc.6 follows 0.2.0-rc.3.1: 0.2.0-rc.5 was withdrawn before players ran it, and there is no separate 0.2.0-rc.4. What it changes is
 [RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md), on top of [RELEASE-NOTES-rc5.md](RELEASE-NOTES-rc5.md).
 The builds after it, rc.8 and rc.9, are in [RELEASE-NOTES-rc8.md](RELEASE-NOTES-rc8.md) and
 [RELEASE-NOTES-rc9.md](RELEASE-NOTES-rc9.md): rc.9 fixes the shortcut conflicts with Online Deluxe, the CPU
@@ -435,7 +478,7 @@ pilot and imgui_smash.
 
 rc.2 added the pause-helper fix, the Solo Popo mark placement and the Kirby hat-request endings. Limitations kept from
 the fork are listed in [Differences from the fork](DIFFERENCES-FROM-THE-FORK.md); planned work is in the
-[ROADMAP](ROADMAP.md). 0.1.0 crashes at console boot; use the newest build, [0.2.0-rc.6](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.6).
+[ROADMAP](ROADMAP.md). 0.1.0 crashes at console boot; use a newer build, the newest being [0.2.0-rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13) (Eden-tested, untested on hardware).
 
 ## Build
 

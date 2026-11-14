@@ -1,17 +1,15 @@
 # CPU
 
 The CPU page sets what the training CPU does: how it gets out of your combos, gets up from the ledge, techs, shields
-and attacks, and how strong it is. It is the first page of the menu: open the menu with B + D-pad Up (or Minus, or
-your own menu shortcut) and press L or R until the title reads CPU. The menu reopens where you left it.
+and attacks, and how strong it is. Open the menu with B + D-pad Up (or Minus, or your own menu shortcut) and press L or
+R until the title reads CPU. The menu reopens where you left it.
 
 The settings drive the CPU in Training, and the first training partner in a waiting room when
 [Lobby Practice](fighters-and-stages.md#lobby-practice) is On. They never move Player 1, even when an AI plays
-Player 1. How the rows work together is in [CPU behaviour](../guide/cpu-behaviour.md); the menu's keys are in
-[Using the menu](../guide/using-the-menu.md). All pages are listed in [the docs index](../README.md).
-
-Keys on every page: L/R page, Up/Down move, ZL + Up/Down jump a section, Left/Right change, A open, X save your
-current settings as your defaults, Y reset the focused row to your default, B close.
-
+Player 1. [CPU behaviour](../guide/cpu-behaviour.md) shows how the rows work together, and
+[Using the menu](../guide/using-the-menu.md) the keys (L/R page, Up/Down move, ZL + Up/Down jump a section, Left/Right
+change, A open, X save your current settings as your defaults, Y reset the focused row, B close). All pages are listed
+in [the docs index](../README.md).
 ## Reactions
 
 What the CPU does as soon as it can act again.
@@ -60,6 +58,8 @@ The situations that make the CPU do its Mash action. Nothing happens here until 
 Hitstun doesn't cover tumble (a hard launch): tick Tumble too to mash out of both.
 
 ![Mash Jump with the default triggers: the CPU stands still; with Always ticked it jumps on its own](../media/rc11-cpu-mash-triggers.gif)<br>*Mash Triggers: Always ticked*
+
+![Side by side with Always ticked: Mash Spot Dodge (left) and Mash Roll Forwards (right); the CPU dodges, stands a moment, and dodges again](../media/rc13-mash-dodge-always.gif)<br>*Always with a dodge: the CPU spot-dodges (left) or rolls forward (right) from standing, again and again. Eden, rc.13 (untested on hardware).*
 
 More: [Mash Triggers](../guide/cpu-behaviour.md#mash-triggers)
 
@@ -111,7 +111,7 @@ The direction the CPU holds to change its launch angle (DI) when you hit it. In 
 
 A new direction is picked for every hit and held for the whole hitstun.
 
-![DI Down, then DI Up: the same smash at the same damage sends the CPU low, then high](../media/rc11-di.gif)<br>*DI Down, then DI Up*
+![DI Down, then DI Up: the same smash at the same damage sends Donkey Kong low, then high; the grid shows the picked chip in blue](../media/rc13-di.gif)<br>*DI Down, then DI Up from the grid: the same forward smash at the same damage sends the CPU low, then high. Eden, rc.13 (untested on hardware).*
 
 More: [Direction chips](../guide/cpu-behaviour.md#direction-chips)
 
@@ -127,7 +127,9 @@ The direction the CPU nudges itself in during hitlag (smash DI). It does nothing
 One direction is picked at each reset (L+R+A or loading a save state) and right after you change the row. The CPU
 uses it for every hit until the next pick. Neutral means no SDI.
 
-![DI Direction from nothing picked to Up x1, then SDI Direction the same](../media/rc11-di-sdi-chips.gif)<br>*The DI and SDI direction grids*
+<!-- CAPTURE-REQUEST v01-sdi-clatter: already owned by the GIF lane (audit V01): SDI Direction with the same multihit, damage and strength so only the direction changes the displacement during hitlag; Clatter Strength with the same grab at the same damage, None then High, the whole hold and escape. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+
+![DI Direction from nothing picked to Up x1, then SDI Direction the same: the picked chip lights at full strength, the others stay dim](../media/rc13-di-sdi-chips.gif)<br>*The DI and SDI direction grids: A on Up, and Up x1 lights at full strength while the others stay dim. Eden, rc.13 (untested on hardware).*
 
 More: [Direction chips](../guide/cpu-behaviour.md#direction-chips)
 
@@ -160,6 +162,8 @@ L+R+A reset.
 - **Values:** On, Off.
 - **Default:** On.
 - **How:** A, Left or Right switches it.
+
+![Side by side from the same reset, the CPU spot-dodging again and again (Mash Spot Dodge, Always): Dodge Staling Off (left) dodges more often than On (right)](../media/rc13-dodge-staling.gif)<br>*The CPU spot-dodges over and over: with Dodge Staling Off (left) every dodge is fresh; with On (right) they go stale and slow down, so it fits fewer in. Eden, rc.13 (untested on hardware).*
 
 ## Ledge & Tech
 
@@ -241,10 +245,12 @@ camera's centre on Battlefield, Final Destination and some other stages.
 
 How the CPU shields.
 
-- **None:** it shields only when an action asks (Shield, or Air Dodge on the ground).
-- **Infinite:** it holds its shield, and in Training hits don't damage the shield, so it never breaks.
-- **Hold:** it holds its shield. The shield doesn't shrink until the first hit, then shrinks as normal.
-- **Constant:** it holds its shield, and the shield never shrinks on its own (hits still damage it).
+| Value | What the CPU does |
+| --- | --- |
+| None | Shields only when an action asks (Shield, or Air Dodge on the ground). |
+| Infinite | Holds its shield, and in Training hits don't damage the shield, so it never breaks. |
+| Hold | Holds its shield. The shield doesn't shrink until the first hit, then shrinks as normal. |
+| Constant | Holds its shield, and the shield never shrinks on its own (hits still damage it). |
 
 The CPU lowers its shield while a recording plays on it or a save state loads.
 
@@ -277,8 +283,7 @@ is hit, or has acted out of shield.
 
 - **Values:** 0 to 30 hits. Tick values, or set a minimum and a maximum.
 - **Default:** none ticked: it acts after the first hit.
-- **How:** A opens the delay pop-up: tick values with A, or pick up Min or Max with A and move it with Left/Right
-  (Up/Down ten at a time). Y clears whichever is set. B goes back.
+- **How:** as [Ledge Delay](#ledge-delay): A opens the delay pop-up.
 
 What it does out of shield is its Mash action (Shieldstun ticked in Mash Triggers) or the Shieldstun override.
 
@@ -290,8 +295,7 @@ Frames the CPU waits after shieldstun before it acts out of shield. A new value 
 
 - **Values:** 0 to 30 frames. Tick values, or set a minimum and a maximum.
 - **Default:** none ticked: no wait.
-- **How:** A opens the delay pop-up: tick values with A, or pick up Min or Max with A and move it with Left/Right
-  (Up/Down ten at a time). Y clears whichever is set. B goes back.
+- **How:** as [Ledge Delay](#ledge-delay): A opens the delay pop-up.
 
 ![Side by side, the CPU shields Mario's jab with Reaction Time at none and at 30: with none it drops its shield and escapes at about 0.7 s, with 30 it holds its shield until about 1.3 s](../media/rc12-reaction-time.gif)
 
@@ -335,8 +339,7 @@ Frames the CPU holds you before throwing, counted from when it can throw.
 
 - **Values:** 0 to 150 frames, in steps of 5. Tick values, or set a minimum and a maximum.
 - **Default:** none ticked: it throws at once.
-- **How:** A opens the delay pop-up: tick values with A, or pick up Min or Max with A and move it with Left/Right
-  (Up/Down ten at a time). Y clears whichever is set. B goes back.
+- **How:** as [Ledge Delay](#ledge-delay): A opens the delay pop-up.
 
 ![Forward Throw: with no Throw Delay the CPU throws at once; with 60 frames it holds Mario a second first](../media/rc11-cpu-throw-delay.gif)<br>*Throw Delay: none, then 60 frames*
 
@@ -353,8 +356,7 @@ until the grab ends, when you break free.
 
 - **Values:** 0 to 150 frames, in steps of 5. Tick values, or set a minimum and a maximum.
 - **Default:** none ticked: no pummels.
-- **How:** A opens the delay pop-up: tick values with A, or pick up Min or Max with A and move it with Left/Right
-  (Up/Down ten at a time). Y clears whichever is set. B goes back.
+- **How:** as [Ledge Delay](#ledge-delay): A opens the delay pop-up.
 
 More: [Delay rows](../guide/cpu-behaviour.md#delay-rows)
 
@@ -378,14 +380,17 @@ The jump before the aerial, the landing and a playback are left alone, and Fast 
 - **Default:** none ticked: no drift.
 - **How:** A opens the checklist; A ticks, ZL ticks all or none, B goes back.
 
+![Side by side at 1/4 speed, the CPU's mashed forward air from the same reset: with Aerial Drift None (left) it lands in place; with In (right) it drifts toward Player 1](../media/rc13-aerial-drift.gif)
+
+*At 1/4 speed, the CPU mashes forward air from the same reset: with Aerial Drift None (left) it rises and lands in place; with In (right) it drifts toward you during the aerial. Eden, rc.13 (untested on hardware).*
+
 ### Aerial Delay
 
 Frames the CPU waits, once it can, before its aerial.
 
 - **Values:** 0 to 30 frames. Tick values, or set a minimum and a maximum.
 - **Default:** none ticked: no wait.
-- **How:** A opens the delay pop-up: tick values with A, or pick up Min or Max with A and move it with Left/Right
-  (Up/Down ten at a time). Y clears whichever is set. B goes back.
+- **How:** as [Ledge Delay](#ledge-delay): A opens the delay pop-up.
 
 ![The CPU jumps out of Mario's jab and does a neutral air, three times: Falling Aerials No, Falling Aerials Yes, then Aerial Delay 30 frames (the kick comes later); a zoomed view of the CPU at the right](../media/rc11-cpu-falling-aerials-aerial-delay.gif)<br>*Falling Aerials No, then Yes, then Aerial Delay 30 (shared with Falling Aerials)*
 
@@ -416,12 +421,11 @@ or an aerial.
 
 Frames after the peak of the jump (the CPU starts falling) before it fast falls. Used only when [Fast Fall](#fast-fall) says Yes.
 
-![Side by side at 1/4 speed, the CPU's fast fall with Fast Fall Delay at 0 and at 30: at 0 it sparks at the top of the jump and lands first](../media/rc12-fast-fall-delay.gif)
+![Side by side at 1/4 speed, the same CPU full hop with Fast Fall Delay 0 and 20: at 0 it sparks at the top and drops; at 20 it falls normally first, then sparks](../media/rc13-fast-fall-delay-quarter.gif)<br>*Game speed 1/4, the same full hop: with Fast Fall Delay 0 (left) the CPU fast falls from the top; with 20 (right) it falls normally for 20 game frames first. The delay counts game frames at any speed. Eden, rc.13 (untested on hardware).*
 
 - **Values:** 0 to 30 frames. Tick values, or set a minimum and a maximum.
 - **Default:** none ticked: it fast falls at once.
-- **How:** A opens the delay pop-up: tick values with A, or pick up Min or Max with A and move it with Left/Right
-  (Up/Down ten at a time). Y clears whichever is set. B goes back.
+- **How:** as [Ledge Delay](#ledge-delay): A opens the delay pop-up.
 
 More: [Delay rows](../guide/cpu-behaviour.md#delay-rows)
 

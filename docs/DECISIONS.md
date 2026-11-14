@@ -612,6 +612,79 @@ the orbs are still the plugin's own panes, articles' hitboxes included.
   pills are cut, hitboxes and grab boxes first and hurtboxes last (review HB-2), with the same once-only log line.
 - SPEC-core-06 §2a and §9 carry the rule; `core06_capsule_is_two_ends` replaces `core06_capsule_sampling`.
 
+## rc.14 previews (2026-11-14): Break the Targets
+
+Two clips from the Eden test runs of Break the Targets (`btt-4-2`, `btt-4-3`; builds `d2/btt-4` on the rc.14 core).
+These are test-run footage, not the final docs GIFs. The notice band moves once more (below the frame strip when Input
+Display is On), and the docs GIFs are shot on the final rc.14 build. Untested on hardware.
+
+![Break the Targets: Practice games › Place targets; the zoomed-out view; three targets placed with A (Place targets 3/10)](decisions/rc14-preview-btt-place.gif)
+
+*Placing: Practice games › Place targets, then A places a target where the cursor is (three placed).*
+
+![Break the Targets: a run of three targets; the clock starts on the first input, and Done shows the time and the best](decisions/rc14-preview-btt-run.gif)
+
+*A run: Targets 0/3 0:00.00 → 2/3 → "Done! 3 in 0:04.08 (best 0:04.06)".*
+
+## rc.14 sweet and sour spots (2026-11-14): decided
+
+The operator, ~17:55Z: "Can we add a sour spot and sweet spot visualization in the hitbox visualizer as a togglable
+option? Also to the input visualizer as well as a togglable option so it says if you landed the sour spot or sweet spot.
+That can be added as an option to the combo "landing" or not as well. This should go in the build you're working on."
+Then, ~18:07Z: "sp recommendations sound good".
+
+| # | Decided |
+| --- | --- |
+| SP1 | Automatic from the game's hitbox data: the strongest hitbox out on that frame is **Sweet**, weaker ones **Sour**; a hit weaker than the same move's earlier strongest hit is **Late**. Equal hitboxes, or a hit TR can't attribute, get no label |
+| SP2 | Hitbox colours with the option On: Sweet keeps today's red, Sour light blue, Late grey; grab boxes and hurtboxes unchanged |
+| SP3 | Input Display: a Sweet / Sour / Late label on each hit marker, Player 1 and CPU rows |
+| SP4 | Combos: each link remembers the spot it landed; with "Match sweet/sour spot" On a link counts only on the same spot |
+| SP5 | Three rows, all Off by default: under Hitbox Visualization, under Input Display, and in Recording › Options |
+
+The spots lane's mockups (drawn, not captured):
+
+![SP1/SP2: hitbox colours, Off (today) and On: Sweet, Sour, Late](decisions/rc14-spots-SP1-hitbox-colours.png)
+
+![SP3: Sweet / Sour / Late labels on the frame strip's hitlag blocks](decisions/rc14-spots-SP2-frame-strip.png)
+
+![SP4: Match sweet/sour spot, the row and a graded link that failed on the spot](decisions/rc14-spots-SP3-combo.png)
+
+## Decided (2026-11-14, evening): the setup library
+
+**Decided 2026-11-14 (~18:07Z).** The operator, verbatim: "Sl1, yes / Sl2, full fix now / Sl3 add to rc14 / Sl4 add to
+rc14". All four go into rc.14: the stage and spots on the list, a full rename with X, a setup's own screen with Delete,
+and "Save setup here". The options and recommendations below stay as the record.
+
+The operator, 2026-11-14 ~17:28Z: "the setup library and gifs could use some improvement". A review read the code and
+the two shipped GIFs and drew one mockup per change (`artifacts/setup-library-review/PROPOSAL.md`, not in this repo).
+Line counts are the review's estimates; the size gate measures the real ones.
+
+**Defaults the primary took (17:42Z); the operator may override them.**
+
+| # | Change | Where it lands |
+| --- | --- | --- |
+| SL-A | Rewrite the docs in plain words: **A moves both fighters to the setup once, Y makes Load go there**; Save setup copies your bound save. Reshoot both GIFs, and add a Y-then-Load GIF, after SL-B | docs now; GIFs after SL-B |
+| SL-B | **S1** show the real key legend (today the hint says "Y delete", which is wrong, and the A / Y line is never drawn); **S2** plain notices; **S4** a true "nothing saved" message; **X minimum** (X no longer leaves a stale id) | rc.14, net about −5 to −1 lines |
+
+![S1: the list's key legend, now and proposed](decisions/rc14-setup-S1-key-legend.png)
+
+**Open: answer by number.** Each one costs lines in rc.14, which already carries a temporary size raise.
+
+| # | Decision | Cost | Recommendation |
+| --- | --- | --- | --- |
+| SL1 | **S3** show the setup's stage (and the two fighters' spots) on the list | +6 (+6 more for the spots) | **In if the measured total stays ≤ 0**; otherwise the stage goes in the docs only |
+| SL2 | **S5** rename a setup with X | +25 (the minimum fix is +3) | **The minimum now**, rename later |
+| SL3 | **S6** a setup's own screen: Restore here, Make Load use it, Rename, **Delete** (today a setup can't be deleted in the game) | +60 to +100 | not in rc.14 |
+| SL4 | **S7** "Save setup here": keep where the fighters are **now**, without overwriting your bound save (today you must press Save first, and that replaces the bound save) | +40 to +70, medium-high risk | not in rc.14; it also makes setups more like the Recording page's saves |
+
+![SL1 / S3: the stage and spots on the list's detail line](decisions/rc14-setup-S3-stage.png)
+
+![SL2 / S5: rename with X](decisions/rc14-setup-S5-rename.png)
+
+![SL3 / S6: a setup's own screen with Delete](decisions/rc14-setup-S6-own-screen.png)
+
+![SL4 / S7: Save setup here keeps the live spot](decisions/rc14-setup-S7-save-here.png)
+
 ## Open (2026-11-13/14)
 
 Opened by the primary for the operator from the lanes' reports of 2026-11-13 (rc13-hitbox-pills and rc14-eggs: 2026-11-14). **Every item

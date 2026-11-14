@@ -31,18 +31,14 @@ Every option is documented in the [docs](docs/README.md), one page per menu page
 | Hold B, click the left / right stick | Kirby hat: yours / the CPU's (left stick at rest) |
 | L + R + A | Reset positions |
 
-You can change the save, load, recording, fighter-cycle, input-display and game-speed buttons, and add up to two menu
-shortcuts, in Display & Controls › Controls. B + D-pad Up, the Kirby hat clicks and L + R + A stay fixed. Switching
-your own fighter with its cycle chord needs Fighters & Stages › Player Swapping On (it's Off at first).
-
-On a GameCube controller, ZL is L, ZR is R and R is Z; it has no Minus, so open the menu with B + D-pad Up. With Online
-Deluxe, buttons that use the D-pad do nothing while its window shows a settings page; B + D-pad Up still opens this
-menu. While the CPU pilot plays for you, Record, Play on yourself and the waiting-room reset are off.
-More: [the controls guide](docs/guide/controls.md).
+Change the chords and the menu shortcuts at Display & Controls › Button chords. B + D-pad Up, the Kirby hat clicks and
+L + R + A stay fixed. Switching your own fighter needs Fighters & Stages › Player Swapping On (it's Off at first).
+GameCube controllers, Online Deluxe and the CPU pilot change some chords: see [the controls guide](docs/guide/controls.md).
 
 ### Game speed
 
-Hold R + D-pad Up and press Left or Right: 1/4, 1/2, 2/3, x1 or x1.5. A stopwatch on the HUD shows any speed but x1.
+Slow a move down: hold R + D-pad Up, then press Left to step slower or Right to step quicker (1/4, 1/2, 2/3, x1, x1.5).
+A stopwatch on the HUD shows any speed but x1.
 
 ![A forward smash at x1; R + D-pad Up steps the speed to 1/4; the same smash, four times slower](docs/media/rc11-game-speed.gif)<br>*The same smash at x1, then at 1/4*
 
@@ -50,14 +46,22 @@ More: [the game speed guide](docs/guide/game-speed.md).
 
 ## The menu
 
-L and R turn the pages, ZL + Up/Down jumps between sections, A changes a row, Y resets it, and B closes the menu.
-Changes apply when it closes. More: [using the menu](docs/guide/using-the-menu.md).
+L and R turn the pages, ZL + Up/Down jumps between sections, A changes a row, Y resets it, and B closes the menu. Left or
+Right flips an On/Off row too. Changes apply when it closes. More: [using the menu](docs/guide/using-the-menu.md).
+
+![The menu on Taunts: D-pad Right flips it Off, D-pad Left flips it On again, with no A](docs/media/rc13-left-right-toggle.gif)<br>*Left / Right flip an On/Off row. Eden, rc.13 (untested on hardware).*
 
 ### CPU
 
-Teach the CPU to DI, tech, shield, mash and follow up, and set its level.
+Teach the CPU to DI, tech, shield, mash and follow up, and set its level. Choose how it escapes your attacks: **B +
+D-pad Up → CPU → DI Direction**, then **A** to pick a direction.
 
-![DI Down, then DI Up: the same smash at the same damage sends the CPU low, then high](docs/media/rc11-di.gif)<br>*DI Down, then DI Up from the menu*
+![DI Down, then DI Up: the same smash at the same damage sends the CPU low, then high](docs/media/rc13-di.gif)<br>*DI Down, then DI Up from the menu. Eden, rc.13 (untested on hardware).*
+
+Make it dodge again and again: in **CPU → Mash** tick Spot Dodge or Roll Forwards, and in **Mash Triggers** tick
+**Always**.
+
+![Mash with Always ticked: the CPU spot-dodges (left) or rolls forward (right) again and again](docs/media/rc13-mash-dodge-always.gif)<br>*Mash a dodge, Always. Eden, rc.13 (untested on hardware).*
 
 All the options: [the CPU page](docs/menu/cpu.md).
 
@@ -72,34 +76,52 @@ All the options: [the Saves page](docs/menu/saves.md).
 
 ### Recording
 
-Record yourself with ZR + D-pad Down and let the CPU play it back with ZR + D-pad Up. Save a combo you landed and
-drill it: a bar grades each try.
+Record yourself with ZR + D-pad Down and let the CPU play it back with ZR + D-pad Up.
 
-![Mario records a jab and a smash, then the CPU does the same moves](docs/media/rc10-record-play-cpu.gif)<br>*Record, then the CPU plays it back*<br>
+![Mario records a jab and a smash, then the CPU does the same moves](docs/media/rc10-record-play-cpu.gif)<br>*Record, then the CPU plays it back*
+
+Save a combo you landed and drill it: **B + D-pad Up → Recording → Combos & Sequences → + Save last combo…**, and a bar
+grades each try.
+
 ![The combo helper grading a combo](docs/media/rc7-combo-helper.gif)<br>*Grading a combo*
 
 All the options: [the Recording page](docs/menu/recording.md).
 
 ### Fighters & Stages
 
-Switch fighters without leaving Training, give Kirby any hat, make Mii fighters, and change the stage.
+Give Kirby the next hat: hold **B** with the left stick at rest, then click the left stick.
 
 ![Kirby gets Falco's hat, then Sheik's](docs/media/rc7-kirby-hats.gif)<br>*Changing Kirby's hat*
+
+Rotate the practice stage: set **Fighters & Stages → Training Stage Rotation → On**, then go back through the character
+select for the next stage.
+
+![Training Stage Rotation On: the picked stage opens Training, and each return through the character select opens the next](docs/media/rc13-stage-pick.gif)<br>*Training Stage Rotation. Eden, rc.13 (untested on hardware).*
+
+The page also switches fighters without leaving Training, makes Mii fighters and changes the stage right now.
+
+<!-- CAPTURE-REQUEST v02-player-swapping: a GIF (README and Fighters & Stages › Player Swapping): the same Cycle Player chord (ZL + D-pad Right) with Player Swapping Off changes nothing, then On changes the fighter. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
 All the options: [the Fighters & Stages page](docs/menu/fighters-and-stages.md).
 
 ### Display & Controls
 
-Hitboxes, hurtboxes and grab boxes; the input display and frame advantage; your own buttons.
+See attack, hurt and grab boxes: set **Display & Controls → Hitbox Visualization → On**.
 
 ![Hitbox Visualization turned on: the yellow hurtboxes, then at 1/4 speed a neutral air's red hitbox](docs/media/rc11-hitbox.gif)<br>*Hitboxes and hurtboxes on*
+
+The grab boxes are magenta:
+
+![At 1/4 speed, the magenta grab boxes of Mario's grab, Samus's tether and Olimar's Pikmin; each grabber keeps its yellow hurtboxes](docs/media/rc13-grab-boxes.gif)<br>*Grab boxes in magenta. Eden, rc.13 (untested on hardware).*
+
+The page also has the input display, frame advantage and your own buttons.
 
 All the options: [the Display & Controls page](docs/menu/display-and-controls.md).
 
 ## Waiting rooms
 
-Practise while you wait for an online or local match, with the same menu. Turn on Fighters & Stages › Lobby Practice
-first (it's Off at first).
+Practise while you wait for an online or local match: turn on **Fighters & Stages → Lobby Practice** first (it's Off at
+first), then open the room menu with **B + D-pad Up**.
 
 ![In a local waiting room, B + D-pad Up opens the menu, Hitbox Visualization goes On, and the boxes show in the room](docs/media/rc11-waiting-menu.gif)<br>*The menu in a waiting room (B + D-pad Up)*
 
@@ -107,10 +129,7 @@ More: [the waiting rooms guide](docs/guide/waiting-rooms.md).
 
 ## Build
 
-```powershell
-cargo test --all-targets
-cargo skyline build --release
-```
+Build instructions and toolchain requirements are in [Building TrainingRooms](docs/BUILD.md).
 
 ## License
 
@@ -121,5 +140,8 @@ endorsed by Nintendo.
 
 ## More
 
-[The docs](docs/README.md): every menu page and guide. Release notes: [rc.9](docs/RELEASE-NOTES-rc9.md) is the newest
-written; this build is rc.11 (see [Status](docs/TECHNICAL.md#status)). [Technical notes](docs/TECHNICAL.md).
+[The docs](docs/README.md): every menu page and guide. The newest build is
+[rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13), Eden-tested and
+**untested on hardware** (see [Status](docs/TECHNICAL.md#status)). Release notes: rc.12's and rc.13's are on their
+[release pages](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases); [rc.9](docs/RELEASE-NOTES-rc9.md)
+is the newest written in this folder. [Technical notes](docs/TECHNICAL.md).

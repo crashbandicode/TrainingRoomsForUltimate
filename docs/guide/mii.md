@@ -27,24 +27,27 @@ Add New…
   with, its 0 in the cycle.
 - Up / Down move, L / R move a page, A picks, ZR switches Player / CPU, B goes back.
 
-With no saved Mii of the class, the footer says "No saved configurations in this class." While the Miis are being
-read, the help line says "Reading saved and replay Miis…"; if they can't be read in this scene, it says "Mii lists
-open in Training and in waiting practice."
+| Message | When |
+| --- | --- |
+| "No saved configurations in this class." (the footer) | There is no saved Mii of the class. |
+| "Reading saved and replay Miis…" (the help line) | The Miis are being read. |
+| "Mii lists open in Training and in waiting practice." | They can't be read in this scene. |
+
+<!-- CAPTURE-REQUEST v12-mii-list: an annotated still of a Mii list that labels the role (title), the selected "> " marker, a name, the four specials and Add New. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
 ## Picking a saved Mii
 
 A on a Mii makes it the role's choice, and the "> " moves to it. The choice is kept with your settings, one per class
 and per role. When you close the menu:
 
-- If that role is a fighter of this class on screen right now, it changes to the Mii you picked. The list's footer
-  says so: "The active Player class updates on menu close."
-- Otherwise the choice waits, and loads the next time a cycle chord or a Player / CPU Character pick brings in that
-  class.
+| Is that role a fighter of this class on screen? | What happens |
+| --- | --- |
+| Yes | It changes to the Mii you picked. The list's footer says so: "The active Player class updates on menu close." |
+| No | The choice waits, and loads the next time a cycle chord or a Player / CPU Character pick brings in that class. |
 
 The Mii you picked stays through L + R + A, save-state loads, fighter swaps and stage changes. A class is in a role's
 [Character Cycles](fighter-cycles.md#the-character-cycles-editor) only while that role has a Mii of the class it can
 load; otherwise its tile is greyed.
-
 ## A replay Mii
 
 With Recording › [Replay capture](../menu/recording.md#replay-capture) On, saving a replay also keeps the Miis that
@@ -84,10 +87,13 @@ The lists and *Add New…* work in waiting-room practice too, in local wireless 
 Stages › [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) is On. Anywhere else, the notice reads "Enter
 Training, Quickplay, or Local Wireless waiting practice to edit a Mii".
 
+![In the Mii editor in a waiting room, a match starts: the unfinished Mii is kept, not saved, and the editor comes back when you return to the room](../diagrams/mii-waiting-room.png)
+
 - In a local wireless room, Headgear, Outfit, Colour, Voice and Random are greyed in the editor.
 - If a match starts while you are in the editor, your unfinished Mii is kept (not saved). Back in the same room after
   the match, the editor comes back as you left it.
 - Your practice Mii changes; the match uses the fighter you picked for it.
 
+<!-- CAPTURE-REQUEST v12-mii-waiting: an annotated still of the Mii editor in a local wireless room that labels the greyed appearance rows (Headgear, Outfit, Colour, Voice, Random) and the specials that can be changed. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 More on the waiting rooms: [Waiting rooms](waiting-rooms.md). The plugin's own checklist of how the Mii code works is
 in the [developer notes](../MII.md).

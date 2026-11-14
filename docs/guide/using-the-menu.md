@@ -54,29 +54,20 @@ L/R page   Up/Down move   ZL+Up/Down section   Left/Right change   A open   X sa
 
 Each row has one kind of control. A list, checklist or editor has its own footer with its buttons.
 
-- **Toggle** (On or Off): A, Left or Right flips it.
-- **List** (one value): Left / Right step through the values and wrap around. A opens the list: Up / Down choose,
-  A sets, B goes back.
-- **Yes / No / Random**: works like a list. Random picks Yes or No again each time.
-- **Number**: Left / Right step it and stop at the ends. A opens the list.
-- **Checklist** (shows how many are ticked): A opens it. A ticks or unticks, ZL ticks all (or none when all are
-  ticked), B goes back. On most CPU rows, with several ticked the CPU picks one at random each time. The help line
-  says when every ticked entry counts instead (Mash Triggers, Buffs on load).
-- **Checklist and range** (the delay rows): A opens it. Tick values, or move past them to the Min and Max handles
-  instead: A picks a handle up, Up / Down move it ten values, Left / Right one, A puts it down. While one of the two
-  holds a value the other is greyed. Y clears the one in use.
-- **Slider** (the damage ranges): Left / Right choose the lower or the upper handle, A picks it up, Up / Down move it
-  by 10, Left / Right by 1, A puts it down. The lower stays at or below the upper. The slider is greyed unless the list
-  above it reads Random Value.
-- **Direction chips**: a 3 × 3 grid around the opponent, plus Left and Right. The D-pad moves. Each A adds one to a
-  chip's weight (up to 5, then it clears), Y clears a chip, ZL selects all or none. A heavier chip is picked more
-  often. In and Out are relative to you. Shield Tilt takes one chip only.
-- **Editor** (a summary and `>`): A opens a screen of its own, such as a portrait grid, a stage list, a library or the
-  chord editor.
-- **Info**: read-only text.
+| Control | Buttons |
+| --- | --- |
+| Toggle (On or Off) | A, Left or Right flips it. |
+| List (one value) | Left / Right step through the values and wrap around. A opens the list: Up / Down choose, A sets, B goes back. |
+| Yes / No / Random | Works like a list. Random picks Yes or No again each time. |
+| Number | Left / Right step it and stop at the ends. A opens the list. |
+| Checklist (shows how many are ticked) | A opens it. A ticks or unticks, ZL ticks all (or none when all are ticked), B goes back. On most CPU rows, with several ticked the CPU picks one at random each time; the help line says when every ticked entry counts instead (Mash Triggers, Buffs on load). |
+| Checklist and range (the delay rows) | A opens it. Tick values, or move past them to the Min and Max handles instead. Only one of the two can hold a value (the other is greyed); Y clears the one in use. Handles: [Delay rows](cpu-behaviour.md#delay-rows). |
+| Slider (the damage ranges) | Left / Right choose the lower or the upper handle, A picks it up, Up / Down move it by 10, Left / Right by 1, A puts it down. The lower stays at or below the upper. Greyed unless the list above reads Random Value. |
+| Direction chips | A grid of directions around the opponent. The D-pad moves, each A adds one to a chip's weight (up to 5, then it clears), Y clears a chip, ZL selects all or none. A heavier chip is picked more often. Shield Tilt takes one chip only. [Direction chips](cpu-behaviour.md#direction-chips) explains the grid. |
+| Editor (a summary and `>`) | A opens a screen of its own, such as a portrait grid, a stage list, a library or the chord editor. |
+| Info | Read-only text. |
 
-More on how the CPU uses checklists, ranges and chips: [CPU behaviour](cpu-behaviour.md).
-
+<!-- CAPTURE-REQUEST v07-control-stills: three annotated real stills of the menu: a toggle and a list, the weighted direction chips (Up x3, In x1), and a checklist/range with its disabled half. Label the focus, the value, the help line and the footer. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 ## Your defaults
 
 - **X** saves every current setting, on every page, as your defaults.
@@ -84,6 +75,8 @@ More on how the CPU uses checklists, ranges and chips: [CPU behaviour](cpu-behav
   On a row that opens an editor (Button chords, Situation overrides, Character Cycles…), Y resets everything in it.
 - **Reset page to defaults** is the last line of every page. A on it asks "Reset this page to your saved defaults?":
   A resets, B cancels. Only that page changes. The menu shortcuts stay as they are.
+
+<!-- CAPTURE-REQUEST v08-defaults: a GIF of the defaults workflow: a setting at A, X saves your defaults, change it to B, Y restores A; then change two rows and Reset page to defaults restores them while another page stays unchanged. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
 The Recording page uses some of these buttons for its own lists: there X and Y don't save or reset, and ZR switches
 between the Player and CPU views. See [Recording](../menu/recording.md).
