@@ -48,6 +48,8 @@ named as in the table. Some need a setting first:
 5. A keeps it. B cancels. Y empties it, which turns that action off (the row reads "disabled").
 6. Close the menu. The new chord works from then on.
 
+![L + D-pad Down first saves nothing; in the chord editor Save State Save is changed from ZL + D-pad Down to L + D-pad Down, which then saves](../media/rc11-button-chords.gif)
+
 The editor doesn't stop two rows from sharing a chord. If they do, both actions happen. Y on the Button chords row
 (on the page, not inside the editor) puts all ten back to your saved defaults.
 
@@ -60,6 +62,70 @@ The editor doesn't stop two rows from sharing a chord. If they do, both actions 
   once.
 - A shortcut can't be B + D-pad Up, or the chord the other shortcut already has.
 - If a shortcut includes Plus, that press doesn't also open the game's pause menu.
+
+The shortcuts are kept in a small file you can also edit by hand: see [Editing the shortcuts file](#editing-the-shortcuts-file).
+
+## Fixed buttons
+
+These can't be changed in the chord editor.
+
+- **B + D-pad Up** opens the menu.
+- **Kirby hats:** hold Special (B) with the left stick at rest and click the left stick: your Kirby takes the next hat
+  in Fighters & Stages › [Kirby Hats](../menu/fighters-and-stages.md#kirby-hats). Click the right stick instead for
+  the CPU's Kirby. More: [Fighter cycles](fighter-cycles.md).
+- **L + R + A** resets. In Training it is the game's own reset. In a waiting room it puts both practice fighters back
+  where they first stood. It can only be turned on or off, at Display & Controls ›
+  [L+R+A Reset](../menu/display-and-controls.md#lra-reset) (On by default).
+
+## GameCube controller
+
+On a GameCube controller the plugin reads these buttons in place of the Switch ones:
+
+| Switch button | GameCube |
+| --- | --- |
+| ZL | L |
+| ZR | R |
+| R | Z |
+| L, Minus | none: it has no L button and no Minus |
+
+| Default chord | On a GameCube controller |
+| --- | --- |
+| Save, Load | L + D-pad Down / Up |
+| Record, Play, Recording pop-up | R + D-pad |
+| Cycle Player, Cycle CPU | L + D-pad Left / Right |
+| Input display | Z + D-pad Down |
+| Game speed | Z + D-pad Up |
+
+- Minus doesn't exist, so open the menu with B + D-pad Up. A chord that uses the L button or Minus can't be pressed.
+- In the menu, Z turns the page. There is no button to turn back, but the pages wrap around. L + Up / Down jumps
+  between sections.
+## Online Deluxe
+
+With the Online Deluxe plugin installed, some chords are held back so its own buttons work:
+
+| While | These chords wait |
+| --- | --- |
+| Its window shows a settings page that uses a D-pad button | A chord on that button: D-pad Up or Down with none of ZL, ZR, R and L held, or D-pad Left or Right with ZR held (and not ZL). The press goes to Online Deluxe. |
+| L is held | The Input display and Game speed chords, because Online Deluxe's L + R + D-pad Down contains R + D-pad Down. A chord of yours that uses L itself is not affected. |
+| Both triggers are held on a GameCube controller (Online Deluxe's L + R there) | Chords with ZL or ZR, Input display and Game speed. |
+
+- Of the default chords, only ZR + Left (Play on Player 1) and ZR + Right (Recording pop-up) wait on a settings page.
+  Save and Load, Record, Playback, the cycles and Input display work beside the open page. Its Performance and Debug
+  views don't hold any back.
+- B + D-pad Up and your menu shortcuts still open this menu.
+## When the CPU pilot plays Player 1
+
+While an AI plays Player 1 (the CPU pilot), these are refused with a notice:
+
+- Record: "P1 is controlled by an AI: recording is off".
+- Play on Player 1: "P1 is controlled by an AI: Play on Player 1 is off".
+- L + R + A in a waiting room: "P1 is controlled by an AI: Quick Reset is off".
+
+More: CPU › [Player 1 control](../menu/cpu.md#player-1-control).
+
+<!-- CAPTURE-REQUEST v17-pilot-refusal: one still of a refusal notice while the CPU pilot plays Player 1, for example "P1 is controlled by an AI: recording is off". See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+
+## Editing the shortcuts file
 
 The two shortcuts are kept in `sd:/ultimate/TrainingRooms/button_config.ini`, not with the other settings. The menu
 writes it, so *Reset page to defaults* leaves them alone. If the file can't be written, a notice says "Could not save
@@ -76,50 +142,3 @@ shortcut_2=disabled
 Join buttons with `+`, as in `shortcut_2=ZL + DPAD_UP`. The names are A, B, X, Y, L, R, ZL, ZR, DPAD_UP, DPAD_DOWN,
 DPAD_LEFT, DPAD_RIGHT, Plus, Minus, Left Stick Press and Right Stick Press. `disabled` (or `none`) turns a shortcut off.
 A value that can't be read falls back to that shortcut's default.
-
-## Fixed buttons
-
-These can't be changed in the chord editor.
-
-- **B + D-pad Up** opens the menu.
-- **Kirby hats:** hold Special (B) with the left stick at rest and click the left stick: your Kirby takes the next hat
-  in Fighters & Stages › [Kirby Hats](../menu/fighters-and-stages.md#kirby-hats). Click the right stick instead for
-  the CPU's Kirby. More: [Fighter cycles](fighter-cycles.md).
-- **L + R + A** resets. In Training it is the game's own reset. In a waiting room it puts both practice fighters back
-  where they first stood. It can only be turned on or off, at Display & Controls ›
-  [L+R+A Reset](../menu/display-and-controls.md#lra-reset) (On by default).
-
-## GameCube controller
-
-On a GameCube controller the plugin reads ZL as L, ZR as R and R as Z. It has no L button and no Minus.
-
-- The defaults become L + D-pad Down / Up (save, load), R + D-pad (record, play, pop-up), L + D-pad Left / Right
-  (cycles), Z + D-pad Down (input display) and Z + D-pad Up (game speed).
-- Minus doesn't exist, so open the menu with B + D-pad Up. A chord that uses the L button or Minus can't be pressed.
-- In the menu, Z turns the page. There is no button to turn back, but the pages wrap around. L + Up / Down jumps
-  between sections.
-
-## Online Deluxe
-
-With the Online Deluxe plugin installed:
-
-- While its window shows a settings page, a chord whose D-pad button Online Deluxe uses there does nothing; the press
-  goes to Online Deluxe. That is D-pad Up or Down with none of ZL, ZR, R and L held, or D-pad Left or Right with ZR
-  held (and not ZL). Of the default chords, only ZR + Left (Play on Player 1) and ZR + Right (Recording pop-up) wait;
-  Save and Load, Record, Playback, the cycles and Input display work beside the open page. Its Performance and Debug
-  views don't hold any back.
-- B + D-pad Up and your menu shortcuts still open this menu.
-- The Input display and Game speed chords don't fire while L is held, because Online Deluxe's L + R + D-pad Down
-  contains R + D-pad Down. A chord of yours that uses L itself is not affected.
-- On a GameCube controller, while both triggers are held (Online Deluxe's L + R there), chords with ZL or ZR, Input
-  display and Game speed don't fire.
-
-## When the CPU pilot plays Player 1
-
-While an AI plays Player 1 (the CPU pilot), these are refused with a notice:
-
-- Record: "P1 is controlled by an AI: recording is off".
-- Play on Player 1: "P1 is controlled by an AI: Play on Player 1 is off".
-- L + R + A in a waiting room: "P1 is controlled by an AI: Quick Reset is off".
-
-More: CPU › [Player 1 control](../menu/cpu.md#player-1-control).

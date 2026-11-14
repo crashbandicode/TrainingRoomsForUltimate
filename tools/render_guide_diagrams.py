@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import render_decisions as d  # noqa: E402
 from render_recording_diagrams import (  # noqa: E402,F401
-    ADV, BAD, CPU, FG, GREEN, LINE, MUTED, P1, PANEL, TILE, TILE_HI, W, Canvas, bracket, title,
+    ADV, BAD, CPU, FG, GREEN, LINE, MACRO_C, MUTED, P1, PANEL, TILE, TILE_HI, W, Canvas, bracket, title,
 )
 
 
@@ -94,7 +94,84 @@ def strip_timeline():
     c.text(24, y + 30, "Hits inside one multi-hit move are not follow-ups, and neither is a hit on shield.", "xs", MUTED)
     c.save("frame-strip-timeline")
 
-ALL = {"cycle_numbers": cycle_numbers, "strip_timeline": strip_timeline}
+def cpu_action_flow():
+    c = Canvas(W, 416)
+    title(c, "How the CPU picks its action", "when a situation starts")
+    d.box(c, 24, 70, 220, 140, ["A situation starts", "(a hit, a tech,", "a landing ...)"], col=LINE, font="xs")
+    d.box(c, 270, 70, 480, 140, ["Does it have an", "override with", "actions?"], col=ADV, font="xs")
+    d.box(c, 540, 70, 800, 140, ["Pick one from the override", "(it works even with its", "trigger unticked)"], col=GREEN, font="xs")
+    d.box(c, 270, 210, 480, 280, ["Is its trigger ticked", "in Mash Triggers?"], col=ADV, font="xs")
+    d.box(c, 540, 210, 800, 280, ["Pick one from Mash"], col=GREEN, font="xs")
+    d.box(c, 270, 330, 480, 380, ["Nothing: no reaction"], col=LINE, font="xs")
+    d.box(c, 880, 70, 1176, 140, ["The first action", "pressed as soon as", "the game lets it"], col=MACRO_C, font="xs")
+    d.box(c, 880, 210, 1176, 280, ["The Followup", "picked at the same moment;", "comes next, as soon as it can"], col=MACRO_C, font="xs")
+    d.arrow(c, (220, 105), (270, 105), MUTED)
+    d.arrow(c, (480, 105), (540, 105), GREEN)
+    c.text(510, 82, "yes", "xxs", GREEN, "m")
+    d.arrow(c, (375, 140), (375, 210), MUTED)
+    c.text(388, 168, "no", "xxs", BAD)
+    d.arrow(c, (480, 245), (540, 245), GREEN)
+    c.text(510, 222, "yes", "xxs", GREEN, "m")
+    d.arrow(c, (375, 280), (375, 330), MUTED)
+    c.text(388, 300, "no", "xxs", BAD)
+    d.arrow(c, (800, 105), (880, 105), MUTED)
+    c.line([(800, 245), (840, 245), (840, 118)], MUTED, 2)
+    d.arrow(c, (840, 118), (880, 118), MUTED)
+    d.arrow(c, (1028, 140), (1028, 210), MUTED)
+    c.text(520, 310, "With several actions ticked, the pick is random and each has the same chance.", "xs", MUTED)
+    c.text(520, 334, "A new situation replaces anything still waiting.", "xs", MUTED)
+    c.text(520, 358, "After a throw the CPU always does its Mash action.", "xs", MUTED)
+    c.text(520, 382, "Shieldstun is the one override that needs its trigger ticked.", "xs", MUTED)
+    c.save("cpu-action-flow")
+
+
+def chip_weights():
+    c = Canvas(W, 250)
+    title(c, "Weights on the direction chips", "each A adds one weight, from x1 to x5; a sixth press clears the chip")
+    c.text(24, 62, "Up x3, In x1", "h", FG)
+    x = 24
+    for i, (name, col) in enumerate((("Up", (232, 120, 96)), ("Up", (232, 120, 96)), ("Up", (232, 120, 96)), ("In", CPU))):
+        c.rect(x, 100, x + 130, 150, fill=TILE, outline=col, width=3, radius=6)
+        c.text(x + 65, 114, name, "h", col, "m")
+        x += 140
+    c.text(600, 108, "The CPU picks Up three times out of four,", "s", FG)
+    c.text(600, 132, "In once out of four.", "s", FG)
+    c.text(24, 176, "Y clears the focused chip. ZL selects every chip or clears them all.", "xs", MUTED)
+    c.text(24, 198, "The help line lists the picks, such as \"Selected: Up x3, In x1\". Shield Tilt takes one chip only.", "xs", MUTED)
+    c.save("chip-weights")
+
+def mii_waiting_room():
+    c = Canvas(W, 250)
+    title(c, "A Mii edit and a match in a waiting room")
+    d.box(c, 24, 70, 360, 170, ["In the Mii editor", "(Add New...) in a", "waiting room"], col=MACRO_C, font="xs")
+    d.box(c, 430, 70, 790, 170, ["A match starts", "The editor closes. Your", "unfinished Mii is kept, not saved."], col=ADV, font="xs")
+    d.box(c, 860, 70, 1176, 170, ["Back in the same room", "The editor comes back", "as you left it."], col=GREEN, font="xs")
+    d.arrow(c, (360, 120), (430, 120), MUTED)
+    d.arrow(c, (790, 120), (860, 120), MUTED)
+    c.text(24, 196, "Your practice Mii changes in the room. The match uses the fighter you picked for it.", "xs", MUTED)
+    c.save("mii-waiting-room")
+
+def waiting_room_match():
+    c = Canvas(W, 330)
+    title(c, "Practice in a waiting room, and the match", "nothing of the practice is carried into the match")
+    cols = [("Before", MUTED, ["You pick a fighter", "for the match."]),
+            ("In the room", MACRO_C, ["Practice: the two practice", "fighters, your tools,", "game speed, the CPU's level."]),
+            ("The match starts", ADV, ["Speed is back to x1.", "The level isn't applied.", "You play the fighter you", "picked for it. An open", "menu closes; its changes", "are not kept."]),
+            ("Same room again", GREEN, ["Your practice fighters are", "put back (Player 1's only", "with Player Swapping On),", "and Kirby's hat."])]
+    x = 24
+    w = 276
+    for i, (head, col, lines) in enumerate(cols):
+        c.rect(x, 64, x + w, 250, fill=TILE, outline=col, width=2, radius=8)
+        c.text(x + 14, 76, head, "h", col)
+        for j, ln in enumerate(lines):
+            c.text(x + 14, 116 + j * 22, ln, "xs", FG)
+        if i < len(cols) - 1:
+            d.arrow(c, (x + w + 2, 157), (x + w + 18, 157), MUTED)
+        x += w + 20
+    c.text(24, 280, "A new room starts from the fighters you picked for the match.", "xs", MUTED)
+    c.save("waiting-room-match")
+
+ALL = {"waiting_room_match": waiting_room_match, "mii_waiting_room": mii_waiting_room, "cpu_action_flow": cpu_action_flow, "chip_weights": chip_weights, "cycle_numbers": cycle_numbers, "strip_timeline": strip_timeline}
 
 if __name__ == "__main__":
     for name in (sys.argv[1:] or list(ALL)):

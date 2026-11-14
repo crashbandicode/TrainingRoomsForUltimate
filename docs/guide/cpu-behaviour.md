@@ -16,13 +16,14 @@ actions does.
 [Mash](../menu/cpu.md#mash) is the CPU's main reaction, and [Followup](../menu/cpu.md#followup) is what comes right
 after it.
 
+![A situation starts: an override with actions is used, otherwise Mash if its trigger is ticked; the first action and the Followup are picked together](../diagrams/cpu-action-flow.png)
+
 - The CPU holds at most two actions: the first one and its follow-up. Both are picked at the same moment, when a
   situation starts: the first from Mash (or from an override), the follow-up from Followup.
 - It presses the first action as soon as the game lets it, for example the first frame after hitstun. Once that
   action has started, the follow-up comes next, again as soon as it can.
-- With several actions ticked in a row, the pick is random, and each ticked action has the same chance.
-- The CPU picks once when a situation starts, not on every frame of it. A new situation replaces anything still
-  waiting.
+- With several actions ticked, the pick is random and each has the same chance. The CPU picks once when a situation
+  starts, not on every frame of it, and a new situation replaces anything still waiting.
 - The rows under Attacks & Movement are picked along with the action: [Attack Angle](../menu/cpu.md#attack-angle) for
   an angled attack; [Full Hop](../menu/cpu.md#full-hop), [Falling Aerials](../menu/cpu.md#falling-aerials) and
   [Aerial Delay](../menu/cpu.md#aerial-delay) for an aerial; [Fast Fall](../menu/cpu.md#fast-fall) for the fall
@@ -31,7 +32,6 @@ after it.
 
 Example: Mash has Jump and Neutral Air, Followup has Air Dodge, and Mash Triggers has Hitstun. You jab the CPU. On
 the first frame it can act, it jumps or does a neutral air (one of the two at random), then air dodges.
-
 ## Mash Triggers
 
 [Mash Triggers](../menu/cpu.md#mash-triggers) are the situations in which the CPU uses Mash. Each one:
@@ -121,13 +121,16 @@ Mash, Followup and every override offer the same 30 actions.
 Playback Slot 1 to 5 are in Mash, Followup, the overrides and [Ledge Options](../menu/cpu.md#ledge-options). Each one
 plays the recording held in one of five numbered recording slots, starting from where the CPU is.
 
-You fill a slot from the library: on a macro's page (Recording page, MACROS, A), set **Playback slot** to Slot 1 to
-5. One macro per slot; the slots are kept with the library, so they are back after a restart. A slot holds up to 600
-frames (10 s): crop a longer macro first. The CPU plays the macro once, mirrored to the way it faces. In Mash, Followup
-and the overrides, Recording › Options › [Hitstun timing](../menu/recording.md#hitstun-timing) decides when a
-slot starts after the CPU is hit. A slot with no macro shows "This Playback Slot is empty: pick its macro on the
-Recording page" and the CPU skips that action; its follow-up still comes.
+- **Fill a slot** from the library: on a macro's page (Recording page, MACROS, A), set **Playback slot** to Slot 1 to
+  5. One macro per slot; the slots are kept with the library, so they are back after a restart.
+- **Length:** a slot holds up to 600 frames (10 s). Crop a longer macro first.
+- **Playing:** the CPU plays the macro once, mirrored to the way it faces. In Mash, Followup and the overrides,
+  Recording › Options › [Hitstun timing](../menu/recording.md#hitstun-timing) decides when a slot starts after the CPU
+  is hit.
+- **An empty slot** shows "This Playback Slot is empty: pick its macro on the Recording page" and the CPU skips that
+  action; its follow-up still comes.
 
+<!-- CAPTURE-REQUEST v10-playback-slot: a GIF of a Playback Slot: an empty slot (the notice), a named macro assigned with Playback slot, the CPU's Mash trigger on that slot, and the CPU visibly replaying the macro after a hit. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 To play a macro on demand instead, set it active for the CPU and press Play on CPU (ZR + D-pad Up): see
 [Set active, and the Play chords](recording.md#set-active-and-the-play-chords).
 
@@ -150,10 +153,10 @@ Down In   Down      Down Out
 - The DI grid shows the game's DI line on each chip, and the SDI grid the game's SDI streak.
 
 Weights: each A on a chip adds one weight, from x1 to x5, and a sixth press clears it. The CPU picks between the
-selected chips by weight: with Up x3 and In x1 it picks Up three times out of four. Y clears the focused chip; ZL
-selects every chip or clears them all. The help line lists the picks, such as "Selected: Up x3, In x1". Shield Tilt
-takes one chip only: A selects it and clears the others.
+selected chips by weight. Y clears the focused chip; ZL selects every chip or clears them all. The help line lists the
+picks, such as "Selected: Up x3, In x1". Shield Tilt takes one chip only: A selects it and clears the others.
 
+![With Up x3 and In x1 the CPU picks Up three times out of four](../diagrams/chip-weights.png)
 | Row | When the direction is picked |
 | --- | --- |
 | DI Direction | for each hit, held for that hitstun |
@@ -162,6 +165,8 @@ takes one chip only: A selects it and clears the others.
 | Shield Tilt | read at each reset and right after you change the row |
 
 SDI also needs [SDI Strength](../menu/cpu.md#sdi-strength), which is None at first.
+
+<!-- CAPTURE-REQUEST v11-delay-stills: annotated stills of a delay row: the tick values screen, and the Min/Max handles with the ticked half greyed. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
 ![DI Direction from nothing picked to Up x1, then SDI Direction the same: the picked chip lights at full strength, the others stay dim](../media/rc13-di-sdi-chips.gif)<br>*The DI and SDI direction grids. Eden, rc.13 (untested on hardware).*
 

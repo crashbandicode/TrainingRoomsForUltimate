@@ -50,14 +50,17 @@ The chords use one save at a time, the *bound* save:
 
 Every save state is a file in `sd:/ultimate/TrainingRooms/saves/`. They are listed under SAVE STATES on the Recording
 page (Recording › [Save states & Macros](../menu/recording.md#save-states--macros)) and in the recording pop-up
-(ZR + D-pad Right). The bound save is the green row, and the five you used last come first. The names you'll see:
+(ZR + D-pad Right). The bound save is the green row, and the five you used last come first.
 
-- **Save N:** made by the Save chord when nothing was bound, or by Duplicate.
-- **name · start:** the start save a recording writes for its macro, such as "Macro 1 · start". See
-  [Recording › Recording a macro, and its start save](recording.md#recording-a-macro-and-its-start-save).
-- **Slot N (YYYY-MM-DD):** a save from an older version's numbered slots. The first time this version started, each
-  filled slot became a file named with its number and that day's date, and the slot the chords were using became the
-  bound save. See [Recording › Migration of the old slots](recording.md#migration-of-the-old-slots).
+<!-- CAPTURE-REQUEST v13-bound-save: a still of the SAVE STATES list with the bound save highlighted green, next to a macro's "name · start" save, so the two are not confused. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+
+The names you'll see:
+
+| Name | Where it comes from |
+| --- | --- |
+| Save N | The Save chord when nothing was bound, or Duplicate. |
+| name · start | The start save a recording writes for its macro, such as "Macro 1 · start". See [Recording › Recording a macro, and its start save](recording.md#recording-a-macro-and-its-start-save). |
+| Slot N (YYYY-MM-DD) | A save from an older version's numbered slots. The first time this version started, each filled slot became a file with its number and that day's date, and the slot the chords were using became the bound save. See [Recording › Migration of the old slots](recording.md#migration-of-the-old-slots). |
 
 To bind another save:
 
@@ -90,6 +93,8 @@ only when the fighter is the one that was saved.
 Each fighter has its own row: Saves › [Player damage on load](../menu/saves.md#player-damage-on-load) and
 [CPU damage on load](../menu/saves.md#cpu-damage-on-load).
 
+![The save holds Player 1 at 42% and the CPU at 80%: with Default a Load gives 0%; with Save State for Player 1 and the CPU it gives 42% and 80%](../media/rc11-damage-on-load.gif)
+
 | Value | Damage after a load |
 | --- | --- |
 | Default | 0%, as after a respawn. |
@@ -110,6 +115,8 @@ For example, to practise a kill confirm at around 100%, set CPU damage on load t
 Saves › [Mirroring](../menu/saves.md#mirroring) flips a load left to right: each fighter lands at the mirror image of
 its saved spot, across the middle of the stage, and faces the other way.
 
+![Mirroring None: Load puts Mario left and the CPU right; set to Alternate, the next Load puts each fighter at the mirror image of its saved spot, facing the other way](../media/rc11-mirroring.gif)
+
 - **None** (the default): never flips.
 - **Alternate:** flips every other load, starting with the first load after a Save.
 - **Random:** flips each load by chance, one in two.
@@ -123,6 +130,8 @@ the CPU alike: Hero's spells, Joker's Arsene, Wii Fit Trainer's Deep Breathing, 
 Sephiroth's wing, Shulk's Monado Arts, Min Min's Power Dragon and Wario's waft. The menu doc's table lists what each one
 does.
 
+![The CPU Joker loads without Arsene; with Arsene ticked in Buffs on load, the next load fills the rebellion gauge and Arsene comes out](../media/rc11-buffs-on-load.gif)
+
 - Every ticked buff is given, except for Shulk and Wario: a fighter has one art or one waft at a time, so one of the
   ticked ones is picked at random on each load.
 - A fighter that isn't in the list gets nothing.
@@ -134,6 +143,8 @@ does.
 With Saves › [Auto-load on death](../menu/saves.md#auto-load-on-death) On, when Player 1 or the CPU is KO'd, the bound
 save loads at once, as if you had pressed Load: same spots, with the damage, mirroring and buffs options. Nobody
 respawns. It is Off by default.
+
+![Auto-load on death turned On, then Mario runs off the stage: at the KO the save state loads at once instead of a respawn](../media/rc11-auto-load-on-death.gif)
 
 With nothing bound, Auto-load loads nothing, and the fighter respawns at once.
 
