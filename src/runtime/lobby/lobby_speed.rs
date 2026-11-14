@@ -151,6 +151,7 @@ pub(crate) unsafe fn extra_pass(base: usize, s: usize, live: &AtomicBool) -> Opt
 }
 
 /// Extra passes run since boot (the diag build's lines).
+#[cfg(feature = "diag")]
 pub(crate) fn passes() -> u32 {
     PASSES.load(Ordering::Relaxed)
 }
