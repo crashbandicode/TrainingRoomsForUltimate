@@ -14,21 +14,28 @@ either way.
 
 - **Values:** On, Off
 - **Default:** On
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 ![HUD turned Off: the damage and stock panels and the player pointers go, and the frame strip and the plugin's own panels stay](../media/rc11-hud.gif)
 
 ### Hitbox Visualization
 
-On draws the fighters' boxes as coloured discs: hitboxes (the attacks; each hitbox of a move gets its own colour, the
-first is red), grab boxes (always magenta, a colour no hitbox uses), and hurtboxes (the yellow bubbles: where a fighter
-can be hit). It works in Training, and on the two practice fighters in a waiting room. While a fighter shields nothing
-of it is drawn; while it is grabbing only its grab box is. Projectiles and thrown items show their hitboxes too, and
-Olimar's Pikmin their grab box.
+On draws the fighters' boxes in colour: hitboxes (the attacks; each hitbox of a move gets its own colour, the first is
+red), grab boxes (always magenta, a colour no hitbox uses), and hurtboxes (yellow: where a fighter can be hit). A round
+box is a disc; a long one, such as a sword's hitbox or an arm's hurtbox, is one pill. It works in Training, and on the
+two practice fighters in a waiting room. While a fighter shields nothing of it is drawn; while it is grabbing only its
+grab box is.
+
+- **Projectiles and thrown items:** a projectile, or a thrown item such as Link's bomb, Peach's turnip or Diddy Kong's
+  banana, has its hitboxes drawn while its attack lasts. Up to four at a time; a fifth replaces the oldest. Olimar's
+  Pikmin show their grab box.
+- **Grab boxes** show only in the grab's active frames. A grab that catches on the frame its box appears, as Samus's
+  tether does, shows its box for that frame only, not through the pull.
+- The shapes are flat and drawn over the stage and the fighters. While the camera pans they trail by a frame or two.
 
 - **Values:** On, Off
 - **Default:** Off
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 ![Hitbox Visualization turned on: the yellow hurtboxes, then at 1/4 speed a neutral air's red hitbox](../media/rc11-hitbox.gif)
 
@@ -43,7 +50,7 @@ actions ticked.
 
 - **Values:** On, Off
 - **Default:** Off
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 More: [Frame strip › ADVANTAGE](../guide/frame-strip.md#advantage)
 
@@ -65,7 +72,8 @@ More: [Frame strip](../guide/frame-strip.md)
 ### Input Delay
 
 Holds Player 1's inputs back by a number of frames, for example to practise as if playing online. Chords are not
-delayed. The frame strip and recordings see the inputs as delayed.
+delayed. The frame strip and recordings see the inputs as delayed. The frames are game frames at every
+[game speed](../guide/game-speed.md): 18 is 18 game frames at 1/4 too, four times as long in seconds.
 
 ![The same jab from the same spot: with Input Delay 0 (left) Mario jabs as A lights on the pad; with Input Delay 18 (right) A lights at the same moment and the jab comes 18 frames (0.3 s) later](../media/rc11-input-delay-sbs.gif)
 
@@ -113,7 +121,7 @@ blocked).
 
 - **Values:** On, Off
 - **Default:** On
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 More: [Controls › Fixed buttons](../guide/controls.md#fixed-buttons)
 
@@ -125,7 +133,7 @@ either way, and online matches are not changed.
 
 - **Values:** On, Off
 - **Default:** On
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 ### Menu shortcut 1
 

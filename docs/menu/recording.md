@@ -139,7 +139,7 @@ stays, without asking, as if you had picked Keep.
 
 - **Values:** On, Off
 - **Default:** On
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 More: [Fighter Mismatch](../guide/recording.md#fighter-mismatch)
 
@@ -194,7 +194,7 @@ closes. X, Y and *Reset page to defaults* don't change it. If you have Online De
 
 - **Values:** On, Off
 - **Default:** Off
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 ![Replay capture turned on in the menu, then shown on in Online Deluxe](../media/rc11-replay-capture.gif)<br>
 *Turning replay capture on*
@@ -214,7 +214,7 @@ its own screen (see [Save states & Macros](#save-states--macros)).
 
 - **Values:** On, Off
 - **Default:** On
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 ### Hitstun timing
 
@@ -239,7 +239,7 @@ the mash action. Player 1's macro keeps playing. Off: the macro plays to its end
 
 - **Values:** On, Off
 - **Default:** On
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 ![CPU Mash set; Play on CPU starts its taunt loop; a jab hits, the CPU mashes out and the macro stops](../media/rc11-mash-interrupts.gif)<br>
 *Mash interrupts playback On (the default), CPU › Reactions › Mash set: Play on CPU starts its taunt loop; Mario's jab hits, the CPU does its mash action and the macro stops. Eden, rc.11.*
@@ -275,7 +275,7 @@ it ends. On: those settings act during the macro too.
 
 - **Values:** On, Off
 - **Default:** Off
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 More: [Recordings and the CPU settings](../guide/cpu-behaviour.md#recordings-and-the-cpu-settings)
 
@@ -287,7 +287,7 @@ grading. The drill stays chosen either way.
 
 - **Values:** On, Off
 - **Default:** On
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 ![The combo helper grading a jab into a jab: TRUE −5, on time](../media/rc7-combo-helper.gif)<br>*Grading a combo*
 

@@ -154,11 +154,12 @@ every 2.
 
 ### Dodge Staling
 
-On: the CPU's dodges go stale like a player's, so repeated dodges get worse. Off: every dodge is fresh.
+On: the CPU's dodges go stale like a player's, so repeated dodges get worse. Off: every dodge is fresh, also after an
+L+R+A reset.
 
 - **Values:** On, Off.
 - **Default:** On.
-- **How:** A switches it.
+- **How:** A, Left or Right switches it.
 
 ## Ledge & Tech
 
@@ -230,7 +231,7 @@ camera's centre on Battlefield, Final Destination and some other stages.
 
 - **Values:** On, Off.
 - **Default:** Off.
-- **How:** A switches it.
+- **How:** A, Left or Right switches it.
 
 ![The CPU tech-rolls after an up smash: with Hide Tech Animations Off the roll is in plain sight; with On the CPU disappears during it](../media/rc11-cpu-hide-tech-animations.gif)<br>*Hide Tech Animations: Off, then On*
 
@@ -430,7 +431,7 @@ On: the CPU crouches in place instead of standing. Off: it stands.
 
 - **Values:** On, Off.
 - **Default:** Off.
-- **How:** A switches it.
+- **How:** A, Left or Right switches it.
 
 ![Crouch Off: the CPU stands; Crouch On: it crouches in place](../media/rc11-cpu-crouch.gif)<br>*Crouch: Off, then On*
 
@@ -457,7 +458,7 @@ Player 1 are refused.
 
 - **Values:** On, Off.
 - **Default:** Off: you play Player 1.
-- **How:** A switches it.
+- **How:** A, Left or Right switches it.
 
 ![P1 CPU Control Off: Player 1 stands still; On: the game's AI plays Player 1](../media/rc11-cpu-p1-cpu-control.gif)<br>*P1 CPU Control: Off, then On*
 

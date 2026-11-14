@@ -179,6 +179,9 @@ Seven rows take a delay. Each holds either ticked values or a range.
 | [OoS Offset](../menu/cpu.md#oos-offset) | 0 to 30 hits | it acts after the first hit | when it stands or is hit |
 | [Reaction Time](../menu/cpu.md#reaction-time) | 0 to 30 frames | no wait | at each hit on its shield |
 
+The frames are game frames at every [game speed](game-speed.md): Fast Fall Delay 30 waits 30 game frames at 1/4 too,
+2 seconds instead of half a second. OoS Offset counts hits, so the speed doesn't change it.
+
 A on the row opens the delay pop-up. It has two ways to set the delay:
 
 - **Tick values.** A ticks or unticks the value under the cursor; Left/Right step a column; ZL ticks every value. The

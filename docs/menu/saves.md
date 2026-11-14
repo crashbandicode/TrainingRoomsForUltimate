@@ -25,7 +25,7 @@ at once, or on the revival platform.
 
 - **Values:** On, Off
 - **Default:** On
-- **How:** A flips it. The chords themselves are changed at Display & Controls ›
+- **How:** A, Left or Right flips it. The chords themselves are changed at Display & Controls ›
   [Button chords](display-and-controls.md#button-chords).
 
 ![Save, a smash sends the CPU away, then Load puts both fighters back](../media/rc10-save-load.gif)
@@ -57,7 +57,7 @@ the Load chord.
 
 - **Values:** On, Off
 - **Default:** Off
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 It loads the bound save, the one the Load chord uses. With nothing bound, nothing loads and the fighter respawns at
 once. While this row and Save States are On, Fighters & Stages ›

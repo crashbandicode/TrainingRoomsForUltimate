@@ -18,7 +18,7 @@ The CPU is not affected: its chord and [CPU Character](#cpu-character) always wo
 
 - **Values:** On, Off
 - **Default:** Off
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 With it Off, Cycle Player does nothing and shows no notice.
 
@@ -82,7 +82,7 @@ Player 1's 0 in the cycle too. The Ice Climbers in a cycle list have their own S
 
 - **Values:** On, Off
 - **Default:** Off
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 ![Ice Climbers in Training; Solo Popo turned On; Player 1 reloads as Popo alone](../media/rc11-solo-popo.gif)<br>
 *Player 1 picked Ice Climbers at the character select: Popo and Nana. B + Up, A turns Solo Popo On, B closes the menu; Player 1 reloads as Popo alone ("Player Character · 0. Ice Climbers"). The 3.3 s reload is cut. Eden, rc.11.*
@@ -189,7 +189,7 @@ the game, and the menu doesn't open there. Turn it On in Training before you go.
 
 - **Values:** On, Off
 - **Default:** Off
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 ![In a local wireless waiting room: Lobby Practice turned Off in the menu; then B + Up reaches the fighter instead](../media/rc11-lobby-practice.gif)<br>
 *In a local wireless waiting room with Lobby Practice On: B + Up opens the menu, A turns Lobby Practice Off, B closes it, and the frame strip goes. B + Up again opens no menu: Byleth does its up special. Eden, rc.11.*
@@ -221,7 +221,7 @@ stage of the [Lobby Stages](#lobby-stages) list. Off: Training opens on the stag
 
 - **Values:** On, Off
 - **Default:** Off
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 It always uses the Rotation list, even while Lobby Stages is on Direct. With the default list (the Waiting Room only),
 each return opens on the Waiting Room.
@@ -239,7 +239,7 @@ Training, or go to a stage with Change Stage. The stage you are on keeps its haz
 
 - **Values:** On, Off
 - **Default:** Off
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 With [Lobby Practice](#lobby-practice) On it also sets the hazards of the waiting room's stage, when you enter the
 room.
@@ -253,7 +253,7 @@ you turn it Off. Training is not affected.
 
 - **Values:** On, Off
 - **Default:** On
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 It works in local wireless rooms and in Quickplay's waiting room, whether Lobby Practice is On or not.
 
@@ -264,8 +264,8 @@ at once, with no invincibility. It works in Training and in waiting-room practic
 
 - **Values:** On, Off
 - **Default:** Off
-- **How:** A flips it. The row is greyed ("Auto-load on death is On: a save state loads instead") while Saves ›
-  [Save States](saves.md#save-states) and [Auto-load on death](saves.md#auto-load-on-death) are both On.
+- **How:** A, Left or Right flips it. The row is greyed ("Auto-load on death is On: a save state loads instead")
+  while Saves › [Save States](saves.md#save-states) and [Auto-load on death](saves.md#auto-load-on-death) are both On.
 
 It works with Save States On or Off.
 
@@ -347,7 +347,7 @@ role's own slot; the group entries of [Swap groups](#swap-groups) are greyed ("G
 
 - **Values:** On, Off
 - **Default:** On
-- **How:** A flips it.
+- **How:** A, Left or Right flips it.
 
 ### Swap groups
 

@@ -54,7 +54,7 @@ L/R page   Up/Down move   ZL+Up/Down section   Left/Right change   A open   X sa
 
 Each row has one kind of control. A list, checklist or editor has its own footer with its buttons.
 
-- **Toggle** (On or Off): A flips it.
+- **Toggle** (On or Off): A, Left or Right flips it.
 - **List** (one value): Left / Right step through the values and wrap around. A opens the list: Up / Down choose,
   A sets, B goes back.
 - **Yes / No / Random**: works like a list. Random picks Yes or No again each time.
