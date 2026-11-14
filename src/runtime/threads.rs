@@ -39,9 +39,7 @@ where
 /// Whether the calling thread is one this module started (a plugin thread), not a game thread or Skyline's boot thread. A plugin
 /// thread must never take a lock game-thread hooks take (stream/sync): the game's MainThread can starve it while it holds one, and a
 /// hook in a game task then waits for it (rc.6 QP freeze, `rc6-qpf3`). No allocation, no lock: hooks may call it.
-pub fn on_plugin_thread() -> bool {
-    imp::on_plugin_thread()
-}
+pub use imp::on_plugin_thread;
 
 #[cfg(target_os = "switch")]
 mod imp {

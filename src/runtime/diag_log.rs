@@ -231,9 +231,7 @@ pub fn writer_started() {
 pub(crate) fn async_writer_ready() -> bool { WRITER.load(Ordering::Acquire) }
 
 /// Write everything buffered (version guard and panic hook use it before they return).
-pub fn flush() {
-    drain();
-}
+pub use drain as flush;
 
 /// Move buffered lines to the card and the kernel debug output. Called every 50 ms by the drain
 /// thread, and by callers until it runs. Concurrent calls skip: one drainer at a time.

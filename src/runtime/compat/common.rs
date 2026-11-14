@@ -51,9 +51,7 @@ pub unsafe fn is_training_mode() -> bool {
 }
 
 /// The game's ready-go state (the guarded `ui_is_ready_go` call).
-pub fn is_ready_go() -> bool {
-    game::is_ready_go()
-}
+pub use game::is_ready_go;
 
 /// Whether the accessor belongs to a fighter (not an article, an item or an effect owner).
 ///

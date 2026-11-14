@@ -124,9 +124,7 @@ pub fn check_edit(current: MenuShortcuts, slot: usize, chord: Chord) -> Result<M
 }
 
 /// Write `bytes` to `path` as a transaction (see the module doc): the Store's one write, `store::write_replace`.
-pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    super::store::write_replace(path, bytes)
-}
+pub use super::store::write_replace as write_atomic;
 
 /// A `.bak` without its file means a crash inside the swap above: put it back.
 pub fn restore_orphaned_backup(path: &Path) {

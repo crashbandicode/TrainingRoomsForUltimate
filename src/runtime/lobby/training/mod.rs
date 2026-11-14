@@ -63,9 +63,7 @@ pub(crate) fn clear_session_state() {
 }
 
 /// A recording or a playback is running (package 4's recorder).
-pub(crate) fn recording_or_playback() -> bool {
-    crate::runtime::features::recorder::recording_or_playback()
-}
+pub(crate) use crate::runtime::features::recorder::recording_or_playback;
 
 /// The fork's `save_states` module, as far as the lobby reads it.
 pub(crate) mod save_states {

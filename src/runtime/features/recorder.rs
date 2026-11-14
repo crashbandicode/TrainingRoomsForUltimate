@@ -706,9 +706,7 @@ pub fn on_load_request() {
 }
 
 /// The Training reset hub's step: the L+R+A reset stops the recorder (decision B8).
-pub fn on_reset() {
-    stop();
-}
+pub use stop as on_reset;
 
 /// Session clear: leaving Training, a hot swap, a lobby change.
 pub fn session_clear() {

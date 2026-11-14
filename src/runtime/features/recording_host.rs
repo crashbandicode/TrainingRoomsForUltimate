@@ -151,9 +151,7 @@ unsafe fn set_normal_speed(module: *mut smash::app::BattleObjectModuleAccessor, 
     }
 }
 
-pub fn cpu_role_after_chord(facing: i8) {
-    rr_host::cpu_role_after_chord(facing);
-}
+pub use rr_host::{cpu_playback, cpu_role_after_chord, cpu_role_control, cpu_role_phase, note_mash, playback_controller};
 
 /// # Safety
 /// `out` is null or the live mapped-input record for this poll.
@@ -162,28 +160,6 @@ pub unsafe fn cpu_role_poll(out: *mut MappedInputs) -> bool {
         return false;
     }
     rr_host::cpu_role_poll(unsafe { &mut *out })
-}
-
-pub fn cpu_role_control(ctx: &crate::model::recording::ControlCtx) -> crate::model::recording::ControlOut {
-    rr_host::cpu_role_control(ctx)
-}
-
-pub fn cpu_role_phase() -> Option<crate::model::recording::Phase> {
-    rr_host::cpu_role_phase()
-}
-
-pub fn playback_controller(frame: InputFrame) -> crate::model::recording::Inject {
-    rr_host::playback_controller(frame)
-}
-
-pub fn note_mash() {
-    rr_host::note_mash();
-}
-
-pub fn cpu_playback(
-    recorder: crate::model::cpu::playback::PlaybackState,
-) -> crate::model::cpu::playback::PlaybackState {
-    rr_host::cpu_playback(recorder)
 }
 
 /// The CPU run's frame for this game frame (the AI epilogue, game thread); its first one after a warp gets the start speed.
