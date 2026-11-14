@@ -850,6 +850,9 @@ Brightening is a follow-up option (layer gain/width, or a texture swizzle).
 
 ![rc13-DI-lines E1 x1 in Eden: the render, Eden unselected, Eden Down x1, the SDI grid, and Down at 5x](decisions/rc13-DI-lines-eden.png)
 
+**Final look (11-14):** E1 x1 as captured in Eden, not brightened. The operator, on the Eden capture: "leave as is.
+Looks good".
+
 #### rc13-memory · Memory levers (rc.13): dropped
 
 **Decided 2026-11-13 (~22:55Z): dropped; no lever will be implemented.** The operator: "drop the memory optimization.
