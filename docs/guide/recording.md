@@ -220,7 +220,8 @@ Drilling a sequence adds a header and a row of its combos to the helper's bar.
 - **Under the row:** the current combo's own link cells. The footer names the combo that just landed and the current
   one.
 
-<!-- CAPTURE-REQUEST rec-sequence-bar: a still of the sequence bar mid-drill (a done combo green with a check, the current white, a later one grey, the streak and best), rc.13. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![The sequence bar mid-drill: the strip above, then SEQUENCE, Jab pressure, combo 2 of 3, streak 0 and best 2; combo 1 green with a check, combo 2 white, combo 3 grey, the current combo's link cell and the footer](../media/rc13-sequence-bar.png)<br>
+*The sequence bar mid-drill: combo 1 done (green, with a check), combo 2 current (white), combo 3 later (grey), with the streak and the best. Eden, rc.13 (untested on hardware).*
 
 ### Passing and dropping
 
@@ -297,7 +298,17 @@ On the Recording page, A on a file opens its own screen. The rows each kind of f
 
 ![A macro's own screen: Set active On for Player 1, then Play on Player 1 warps to its start save and plays it](../media/rc6-macro-set-active.gif)
 
-<!-- CAPTURE-REQUEST rec-file-screens: stills of a macro's, a chain's, a combo's and a save's own screen, with every row visible, rc.13. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![A macro's own screen: Start save, Set active, Playback slot, Rename, Crop, Make combo, Delete](../media/rc13-file-screen-macro.png)<br>
+*A macro (Walk and jab, with a start save): Start save reads "Jab start · On" beside the orange floppy. Eden, rc.13 (untested on hardware).*
+
+![A chain's own screen: Start save, Set active, Edit chain, Rename, Make combo, Delete](../media/rc13-file-screen-chain.png)<br>
+*A chain (Chain 1, P1 jab then Walk and jab): its Start save is the first macro's. Eden, rc.13 (untested on hardware).*
+
+![A combo's own screen: Drill, Made from, Rename, Crop, Delete](../media/rc13-file-screen-combo.png)<br>
+*A combo (Jab jab, made from the macro P1 jab). Eden, rc.13 (untested on hardware).*
+
+![A save state's own screen: Bind to Save / Load, Duplicate, Rename, Delete](../media/rc13-file-screen-save.png)<br>
+*A save state (Jab start, bound: Bind to Save / Load reads On). Eden, rc.13 (untested on hardware).*
 
 ## Replays: Edit placement and the Replay window
 
