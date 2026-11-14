@@ -490,6 +490,14 @@ impl Detector {
         was
     }
 
+    /// Break the Targets' Placing: the Save and Load chords (as configured) are the layout's, `(save, load)`; every other
+    /// request but the menu's is dropped (ZL + Left / Right choose a slot there, they do not cycle).
+    pub fn take_placing(&mut self) -> (bool, bool) {
+        let taken = (self.consume(Request::SaveState), self.consume(Request::LoadState));
+        self.pending &= Request::OpenMenu.bit();
+        taken
+    }
+
     /// Observe without consuming (the character loader asks whether P1 is mid-request).
     /// The CPU cycle chord passes in `sample`: the controller that operates the CPU (native CPU Behavior = Control) reads its own
     /// sample. Stateless: no pending flag is touched, so this never mixes with Player 1's chord detection.
@@ -970,6 +978,24 @@ mod tests {
         assert_eq!(detector.hold_event(), HoldEvent::Idle);
         assert_eq!(detector.poll(&set, sample(&[R, DPAD_UP], &[]), false), 0);
         assert_eq!(detector.hold_event(), HoldEvent::Idle, "held, not newly pressed: it does not reopen");
+    }
+
+    #[test]
+    fn placing_takes_the_save_and_load_chords_and_drops_the_rest() {
+        use logical::{DPAD_DOWN, DPAD_LEFT, DPAD_UP, ZL};
+        let set = ChordSet::factory();
+        let mut detector = Detector::new();
+        detector.poll(&set, sample(&[ZL, DPAD_DOWN], &[ZL, DPAD_DOWN]), false);
+        assert_eq!(detector.take_placing(), (true, false));
+        assert!(!detector.has_pending_request(), "taken");
+        detector.poll(&set, sample(&[ZL, DPAD_UP], &[DPAD_UP]), false);
+        assert_eq!(detector.take_placing(), (false, true));
+        // ZL + Left would cycle the CPU: dropped, so nothing acts on it; the menu's request stays.
+        detector.poll(&set, sample(&[ZL, DPAD_LEFT], &[DPAD_LEFT]), false);
+        detector.poll(&set, sample(&[B, DPAD_UP], &[B]), false);
+        assert_eq!(detector.take_placing(), (false, false));
+        assert!(!detector.is_pending(Request::CpuCycle));
+        assert!(detector.consume(Request::OpenMenu));
     }
 
     #[test]

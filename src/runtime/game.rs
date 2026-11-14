@@ -210,6 +210,39 @@ pub mod natives {
         Some(((record + sites_pkg2::STAGE_RECORD_FORM) as *const u64).read() as u32)
     }
 
+    /// The camera manager's `change_active_camera(manager, mode, 0, &functor, 0)`, called as the game's own callers call it
+    /// (priority 0, flag 0, an in-place no-op functor: word 0 its vtable, word 4 itself, destroyed through the vtable after the call):
+    /// whether the game changed its mode. `None` when the row was not granted, or the vtable's destroy slots do not point into `.text`
+    /// (the vtable is relocated at load and is zero in the owned ELF, so only the running game can show it).
+    pub unsafe fn change_active_camera(manager: usize, mode: i32) -> Option<bool> {
+        if !super::granted(sites_pkg2::CHANGE_ACTIVE_CAMERA_OFFSET) {
+            return None;
+        }
+        let (vtable, text_end) = (text_base() + sites_pkg2::CAMERA_FUNCTOR_VTABLE, skyline::hooks::getRegionAddress(skyline::hooks::Region::Rodata) as usize);
+        // A pointer into `.text`, 4-aligned: what a function slot holds.
+        let code = |p: usize| p >= text_base() && p < text_end && p & 3 == 0;
+        if !(code(((vtable + 0x20) as *const usize).read_volatile()) && code(((vtable + 0x28) as *const usize).read_volatile())) {
+            return None;
+        }
+        #[repr(C, align(16))]
+        struct Functor([usize; 6]);
+        let mut functor = Functor([0; 6]);
+        let this = std::ptr::addr_of_mut!(functor) as usize;
+        (functor.0[0], functor.0[4]) = (vtable, this);
+        let changed = at::<extern "C" fn(usize, u32, i32, usize, u32) -> bool>(sites_pkg2::CHANGE_ACTIVE_CAMERA_OFFSET)?(manager, mode as u32, 0, this, 0);
+        // As every game caller does: destroy the callable the call left (in place through slot 0x20, on the heap through 0x28).
+        let live = std::ptr::read_volatile(&functor.0[4]);
+        if live != 0 && live & 7 == 0 {
+            let table = (live as *const usize).read_volatile();
+            let slot = ((table + if live == this { 0x20 } else { 0x28 }) as *const usize).read_volatile();
+            if code(slot) {
+                let destroy: extern "C" fn(usize) = std::mem::transmute(slot);
+                destroy(live);
+            }
+        }
+        Some(changed)
+    }
+
     pub unsafe fn pos_y(accessor: usize) -> f32 {
         at::<extern "C" fn(usize) -> f32>(sites_pkg2::POS_Y_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }

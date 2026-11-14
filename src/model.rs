@@ -119,6 +119,12 @@ pub mod hitbox;
 pub mod hitbox_orbs;
 #[path = "model/eggs.rs"]
 pub mod eggs;
+#[path = "model/btt.rs"]
+pub mod btt;
+#[path = "model/btt_files.rs"]
+pub mod btt_files;
+#[path = "model/btt_camera.rs"]
+pub mod btt_camera;
 #[path = "model/sites_hitbox.rs"]
 pub mod sites_hitbox;
 #[path = "model/sites_u4.rs"]

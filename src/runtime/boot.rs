@@ -267,6 +267,8 @@ fn run_inner() {
     }
     let hazards_on = install_hazards(&usable, &mut mark);
     let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on, cpu_common_reason, cpu_shield_damage_on, cpu_camera_on) = install_cpu(&usable, &mut mark);
+    // Break the Targets' camera asks the game through the camera unit's change_active_camera row: behind the unit's closure, apart from the other features.
+    crate::runtime::features::btt_camera::set_usable(cpu_camera_on);
     let cpu_mash_on = cpu_core_on && install_cpu_mash(&usable, &mut mark);
     // SPEC-core-06: the hitbox visualizer rides on the CPU core's per-fighter frame wrapper; its closure (own rows, the Training
     // predicate, the shared natives' rows) must have passed as a whole.

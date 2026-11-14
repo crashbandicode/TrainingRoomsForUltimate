@@ -70,6 +70,26 @@ pub const SETTLE: u32 = 10;
 /// `BURST_TICKS`; at most two at once, a third replaces the older.
 pub const BURST_TICKS: u32 = 12;
 pub const BURST_GROW: f32 = 0.6;
+/// The animations' spots and ticks, the newest first (Break the Targets keeps the same).
+pub type Bursts = [Option<([f32; 2], u32)>; 2];
+
+/// One animation's picture, `t` ticks in.
+pub fn burst((at, t): ([f32; 2], u32)) -> ([f32; 2], EggLook) {
+    let fade = t as f32 / BURST_TICKS as f32;
+    let mut pic = EGG_WHOLE;
+    pic.scale = 1.0 + BURST_GROW * fade;
+    pic.alpha = (255.0 * (1.0 - fade)) as u8;
+    pic.picture = EggPicture::Cracked;
+    (at, pic)
+}
+
+/// Age the animations by `tick`; those past `BURST_TICKS` are gone.
+pub fn age(bursts: &mut Bursts, tick: bool) {
+    let dt = u32::from(tick);
+    for b in bursts {
+        *b = b.map(|(at, t)| (at, t + dt)).filter(|b| b.1 < BURST_TICKS);
+    }
+}
 
 /// The hitlag of a break: native Training only, until the waiting room's LDN check (V2.1).
 pub fn hitlag(facts: Facts) -> Option<i32> {
@@ -169,8 +189,8 @@ pub struct Run {
     egg: Option<[f32; 2]>,
     age: u32,
     fly: [f32; 3],
-    /// The break animations' spots and ticks, the newest first.
-    bursts: [Option<([f32; 2], u32)>; 2],
+    /// The break animations.
+    bursts: Bursts,
     rng: u32,
     /// The clock keeper (`keeper`) and its rivals' passes since its last.
     owner: (usize, u8),
@@ -238,15 +258,7 @@ impl Run {
             self.still = if seen == self.view { self.still + 1 } else { 0 };
             self.view = seen;
         }
-        let [a, b] = self.bursts.map(|burst| {
-            let (at, t) = burst?;
-            let fade = t as f32 / BURST_TICKS as f32;
-            let mut pic = EGG_WHOLE;
-            pic.scale = 1.0 + BURST_GROW * fade;
-            pic.alpha = (255.0 * (1.0 - fade)) as u8;
-            pic.picture = EggPicture::Cracked;
-            Some((at, pic))
-        });
+        let [a, b] = self.bursts.map(|b| b.map(burst));
         let whole = self.egg_at().filter(|_| self.rows[3] == DISC);
         [whole.map(|at| (at, EGG_WHOLE)), a, b]
     }
@@ -367,10 +379,7 @@ impl Run {
     /// minute ends). The notice's length when its text changed (`write_notice`).
     pub fn step(&mut self, tick: bool, y: f32, hits: &[Hit], air: bool, kind: i32) -> Option<u16> {
         // The break animations run on the clock's ticks (pause freezes them); an ended run only finishes them.
-        let dt = u32::from(tick);
-        for b in &mut self.bursts {
-            *b = b.map(|(at, t)| (at, t + dt)).filter(|b| b.1 < BURST_TICKS);
-        }
+        age(&mut self.bursts, tick);
         self.air = air;
         // A run the CPU target's last hit ended still holds its target until this pass closes it.
         if self.ended() && self.egg.is_none() {

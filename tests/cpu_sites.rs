@@ -133,6 +133,7 @@ fn cpu_sites_are_the_symbols_they_name() {
         ("stick_y_no_clamp_hook", sites_pkg2::STICK_Y_NO_CLAMP_HOOK_OFFSET),
         ("utility_get_category", sites_pkg2::UTILITY_GET_CATEGORY_OFFSET),
         ("utility_get_kind", sites_pkg2::UTILITY_GET_KIND_OFFSET),
+        ("change_active_camera", sites_pkg2::CHANGE_ACTIVE_CAMERA_OFFSET),
     ] {
         assert_eq!(sites::find(name).map(|s| s.offset), Some(offset), "{name}");
     }
@@ -235,6 +236,23 @@ fn cpu_sites_overlapping_windows_are_all_our_own() {
     assert!(pairs > 0, "the stick, clatter and term thunks do overlap each other");
 }
 
+/// rc.14 Break the Targets (SPEC V2.5 `camera`): the camera manager's change-active-camera function is a guarded called row of the
+/// camera unit. Our mode hook sits 0x18 into it, so the two windows overlap by design (a called row tolerates the hook): the
+/// call's bytes from +0x18 are the hook's, and only the prologue is new. `ldr w8, [x0, #4]` is the manager's current mode.
+#[test]
+fn cpu_sites_change_active_camera_is_the_function_the_camera_mode_hook_sits_in() {
+    let call = sites::find("change_active_camera").expect("the change_active_camera row");
+    let hook = sites::find("camera_mode_hook").expect("the camera_mode_hook row");
+    assert_eq!((call.offset, call.feature), (sites_pkg2::CHANGE_ACTIVE_CAMERA_OFFSET, Feature::CpuCamera));
+    assert!(matches!(call.kind, SeamKind::Called), "called, never hooked: our mode hook is the only write");
+    assert_eq!(hook.offset - call.offset, 0x18, "the hook is right after the prologue");
+    assert_eq!(call.guard[0x18..], hook.guard[..0x28], "from +0x18 the call's bytes are the hook's window");
+    let (chunks, _) = call.guard.as_chunks::<4>();
+    let words: Vec<u32> = chunks.iter().map(|w| u32::from_le_bytes(*w)).collect();
+    assert_eq!(words[0], 0xd102_03ff, "sub sp, sp, #0x80");
+    assert_eq!(words[6], 0xb940_0408, "ldr w8, [x0, #4]: the manager's current mode");
+    assert_eq!(words[7], 0x6b01_011f, "cmp w8, w1: against the requested mode");
+}
 /// `ldr`/`str` words of SIMD&FP 32-bit with an unsigned offset.
 const fn str_s0(base: u32, offset: u32) -> u32 {
     0xbd00_0000 | (offset / 4) << 10 | base << 5

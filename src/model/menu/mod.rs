@@ -118,6 +118,8 @@ pub struct Outbox {
     /// A, X, Y, ZR on the portrait roster grid: the tile and the button; the roster editor (package 6's roster rules) applies it.
     /// Taken at once with Menu::take_roster_press.
     pub roster_press: Option<(u16, Button)>,
+    /// Place targets (Break the Targets): the menu closes into the placing view.
+    pub place_targets: bool,
 }
 
 /// Why a row or entry is greyed (it shows dimmed with this reason and ignores A).
@@ -139,6 +141,8 @@ pub enum Grey {
     ChecklistSet,
     /// Hide CPU in a waiting room (until the LDN check has passed).
     WaitingRoom,
+    /// Target speed while Break the Targets is On (SPEC V2.5): the targets do not move.
+    TargetsStill,
 }
 
 impl Grey {
@@ -152,6 +156,7 @@ impl Grey {
             Grey::RangeSet => "A range is set: clear it first (Y)",
             Grey::ChecklistSet => "Values are ticked: clear them first (Y)",
             Grey::WaitingRoom => "Not in a waiting room yet",
+            Grey::TargetsStill => "Targets stay still",
         }
     }
 }
@@ -829,6 +834,7 @@ impl Menu {
                 Some(Grey::DamageNotRandom)
             }
             "hide_cpu" if self.env.waiting_room => Some(Grey::WaitingRoom),
+            "eggsercise_speed" if self.get("btt").get(1).is_some_and(|v| *v != 0) => Some(Grey::TargetsStill),
             _ => None,
         }
     }
@@ -860,7 +866,7 @@ impl Menu {
 
     /// Replace a row; notes the change, and the re-rolls it causes (Q18 A, B11).
     fn put(&mut self, id: &str, elements: &[u8]) {
-        let unchanged = self.get(id) == elements;
+        let (unchanged, was) = (self.get(id) == elements, self.practice_on());
         if unchanged || self.settings.menu.set(id, elements).is_err() {
             return;
         }
@@ -871,6 +877,20 @@ impl Menu {
                 self.outbox.rerolls |= bit;
             }
         }
+        // The two practice games exclude each other: the one turned On last wins (tt::exclusive).
+        if matches!(id, "eggsercise" | "btt") {
+            let [eggs, btt] = super::btt::exclusive(was, self.practice_on());
+            for (id, on) in [("eggsercise", eggs), ("btt", btt)] {
+                if !on {
+                    self.put_one_hot(id, 0);
+                }
+            }
+        }
+    }
+
+    /// Whether [Eggs-ercise, Break the Targets] are On.
+    fn practice_on(&self) -> [bool; 2] {
+        [self.get("eggsercise").iter().skip(1).any(|v| *v != 0), self.get("btt").get(1).is_some_and(|v| *v != 0)]
     }
 
     fn put_one_hot(&mut self, id: &str, index: usize) {
@@ -1201,6 +1221,13 @@ impl Menu {
             Editor::PortraitCpu => self.roster_screen(RosterUse::CpuPick),
             Editor::CharacterCycles => self.roster_screen(RosterUse::Cycles),
             Editor::KirbyHats => self.roster_screen(RosterUse::Hats),
+            // Place targets is an action: it turns Break the Targets On (so Eggs-ercise goes Off), the menu closes and the
+            // runtime opens the placing view.
+            Editor::PlaceTargets => {
+                self.put("btt", &[0, 1]);
+                (self.outbox.place_targets, self.closed) = (true, true);
+                return;
+            }
             other => Screen::External(other),
         };
         self.stack.push(screen);
@@ -1774,6 +1801,12 @@ impl Menu {
         }
     }
 
+    /// Break the Targets On, as a row change (so Eggs-ercise goes Off): a layout loaded from the Saved layouts screen opens its
+    /// Ready view when the menu closes.
+    pub fn btt_on(&mut self) {
+        self.put("btt", &[0, 1]);
+    }
+
     /// The item the player chose on the Give item grid since the last call, if any.
     pub fn take_give_item(&mut self) -> Option<u8> {
         self.outbox.give_item.take()
@@ -1871,3 +1904,7 @@ fn yes_no_random(array: &[u8]) -> Option<usize> {
         (false, false) => None,
     }
 }
+
+#[cfg(test)]
+#[path = "btt_menu_tests.rs"]
+mod btt_menu_tests;

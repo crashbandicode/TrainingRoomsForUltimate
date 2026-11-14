@@ -456,21 +456,34 @@ fn cpu04_camera_setup_and_mode_apply_the_stage_value_and_restore_the_default() {
     let game = [0.0, 40.0, 200.0];
     // Hide Tech Animations On: the stage's value goes in, at the setup and at the mode change.
     let (mut cpu, _) = cpu_with(&[("tech_hide", vec![1, 0])]);
-    assert_eq!(cpu.camera_setup(StageClass::Smashville, game), Some([0.0, 35.0, 350.0]));
+    assert_eq!(cpu.camera_setup(StageClass::Smashville, game, false), Some([0.0, 35.0, 350.0]));
     assert_eq!(cpu.stage_default, Some(game), "the game's value is remembered as the stage default");
-    assert_eq!(cpu.camera_mode(StageClass::Smashville, 4), Some([0.0, 35.0, 350.0]));
-    assert_eq!(cpu.camera_mode(StageClass::Smashville, 3), None, "only the fixed mode");
-    assert_eq!(cpu.camera_mode(StageClass::Other, 4), None, "no value for this stage: the game's stays");
-    assert_eq!(cpu.camera_setup(StageClass::Other, game), None);
+    assert_eq!(cpu.camera_mode(StageClass::Smashville, 4, false), Some([0.0, 35.0, 350.0]));
+    assert_eq!(cpu.camera_mode(StageClass::Smashville, 3, false), None, "only the fixed mode");
+    assert_eq!(cpu.camera_mode(StageClass::Other, 4, false), None, "no value for this stage: the game's stays");
+    assert_eq!(cpu.camera_setup(StageClass::Other, game, false), None);
     // A game centre that already is the stage's value is not rewritten.
-    assert_eq!(cpu.camera_setup(StageClass::Standard, [0.0, 50.0, 230.0]), None);
+    assert_eq!(cpu.camera_setup(StageClass::Standard, [0.0, 50.0, 230.0], false), None);
     // Off: the default captured at the last setup comes back at the next fixed-mode change.
     let (mut cpu, _) = cpu_with(&[]);
-    assert_eq!(cpu.camera_mode(StageClass::Smashville, 4), None, "nothing captured yet");
-    assert_eq!(cpu.camera_setup(StageClass::Smashville, game), None, "Off: the setup passes through");
-    assert_eq!(cpu.camera_mode(StageClass::Smashville, 4), Some(game));
+    assert_eq!(cpu.camera_mode(StageClass::Smashville, 4, false), None, "nothing captured yet");
+    assert_eq!(cpu.camera_setup(StageClass::Smashville, game, false), None, "Off: the setup passes through");
+    assert_eq!(cpu.camera_mode(StageClass::Smashville, 4, false), Some(game));
 }
 
+/// rc.14 Break the Targets (SPEC V2.5 `camera`): while the mode holds the Fixed camera, the game's own centre goes in (the
+/// stage default the last setup passed), even with Hide Tech Animations On, which zooms in instead.
+fn cpu04_camera_held_by_break_the_targets_puts_the_games_value_in_with_hide_tech_on() {
+    let game = [0.0, 40.0, 200.0];
+    let (mut cpu, _) = cpu_with(&[("tech_hide", vec![1, 0])]);
+    assert_eq!(cpu.camera_setup(StageClass::Smashville, game, true), None, "held: the game's value stays at the setup");
+    assert_eq!(cpu.camera_mode(StageClass::Smashville, 4, true), Some(game), "held: the game's value, whatever a setup wrote before");
+    assert_eq!(cpu.camera_mode(StageClass::Smashville, 3, true), None, "only the fixed mode");
+    assert_eq!(cpu.camera_mode(StageClass::Other, 4, true), Some(game), "every stage class");
+    assert_eq!(cpu.camera_mode(StageClass::Smashville, 4, false), Some([0.0, 35.0, 350.0]), "not held: Hide Tech's, as before");
+    let (cpu, _) = cpu_with(&[("tech_hide", vec![1, 0])]);
+    assert_eq!(cpu.camera_mode(StageClass::Smashville, 4, true), None, "no setup yet: the game's value stays");
+}
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -493,5 +506,6 @@ fn case_table() {
         ("cpu04_playback_override_on", cpu04_playback_override_on as fn()),
         ("cpu04_stage_class_follows_the_native_ids_and_the_record_form", cpu04_stage_class_follows_the_native_ids_and_the_record_form as fn()),
         ("cpu04_camera_setup_and_mode_apply_the_stage_value_and_restore_the_default", cpu04_camera_setup_and_mode_apply_the_stage_value_and_restore_the_default as fn()),
+        ("cpu04_camera_held_by_break_the_targets_puts_the_games_value_in_with_hide_tech_on", cpu04_camera_held_by_break_the_targets_puts_the_games_value_in_with_hide_tech_on as fn()),
     ]);
 }

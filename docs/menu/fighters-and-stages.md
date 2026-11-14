@@ -450,6 +450,51 @@ How fast the targets fly. Every speed traces the same path: the same height and 
 - **How:** Normal: up for half a second, at rest after about 1.6 s. Slow: half as fast (at rest after about 3.2 s).
   Fast: one and a half times as fast (at rest after about 1.1 s). It applies from the next time the menu closes.
 
+### Break the Targets
+
+A practice game where you choose where the targets go. The stage zooms out so all of it is on screen, you place up to 10
+targets wherever you like, and then you break them all against the clock. It can't run together with Eggs-ercise:
+turning one On turns the other Off.
+
+- **Values:** Off, On
+- **Default:** Off
+- **How:** turn it On and close the menu. With no targets placed yet the placing view opens; with a layout it opens at
+  Ready. The Place targets row below goes straight to the placing view.
+  - **Placing:** the left stick moves a crosshair (up to 2 units a frame), the D-pad moves it one unit a press (held, it
+    repeats). **A** places a target at the crosshair, and the notice shows "Place targets 3/10". A target can't go on top of
+    another, and 10 is the most. **B** removes the last target when you let go of it: B + D-pad Up still opens the menu and
+    removes nothing. **Y** twice clears them all. **X** starts, once at least one target is placed. The game doesn't see
+    these buttons while you place.
+  - **Ready:** every target is up and the clock reads 0:00.00. It starts with your first input: a button, or the stick
+    leaving its dead zone.
+  - **Running:** the notice reads "Targets 4/10   0:07.12". Breaking the last target stops the clock and the notice reads
+    "Done! 10 in 0:18.27 (best 0:16.90)" for three seconds, then Ready again with every target back.
+  - The best time is per fighter and per layout, and lasts until the game closes.
+  - Targets stay where you put them: **Target speed** is greyed ("Targets stay still"). **Breaks on** applies, and a
+    break freezes your fighter for a moment and plays the same break animation as Eggs-ercise.
+  - To go again, press L+R+A in Training (with **L+R+A Reset** On), or open and close the menu. Each stage keeps its own
+    layout until the game closes.
+
+### Place targets
+
+Closes the menu into the placing view and turns Break the Targets On (and Eggs-ercise Off), without a visit to the
+Break the Targets row. Your layout stays: place more, remove some, or press X to start.
+
+### Saved layouts
+
+Keeps up to 5 layouts for each stage on the card, in `ultimate/TrainingRooms/targets/`, so you can place a course once
+and come back to it.
+
+- **While placing:** the Save State chords work on the layout, and **ZL + D-pad Left / Right** chooses the slot (the notice
+  shows "Slot 2: 6 saved" or "Slot 2: empty"). **Save State Save** (ZL + D-pad Down by default) saves to the slot; a slot
+  that already holds a layout asks first: save again within a second to replace it. **Save State Load** (ZL + D-pad Up)
+  loads the slot, still in Placing, so you can edit it or start it with X. **ZL + Y** twice deletes the slot. Outside
+  placing, the chords are the normal save states.
+- **In the menu:** this row lists the stage's five slots as "Slot 2 · 6 targets" (or "empty"). **A** loads a slot, turns
+  Break the Targets On and leaves the menu open: close it to start at Ready. **Y** deletes a slot.
+- Editing the layout makes it a new, unsaved one until you save it.
+- If a stage's file can't be read the notice says so, and the file is left alone until you save a layout on that stage.
+
 ### CPU during a game
 
 Whether the CPU is hidden for as long as a practice game runs (a game runs from the menu close that starts a mode until

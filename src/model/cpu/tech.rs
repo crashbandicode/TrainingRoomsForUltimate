@@ -345,9 +345,10 @@ pub const fn stage_class(stage_id: i32, form: Option<u32>) -> StageClass {
 pub const CAMERA_MODE_FIXED: i32 = 4;
 
 /// The centre to put in the fixed camera: the stage's value while Hide Tech Animations is On, the stage default the
-/// game set last when it is Off (`None`: the game's value stays).
-pub fn fixed_camera_centre(s: &CpuSettings, class: StageClass, stage_default: Option<[f32; 3]>) -> Option<[f32; 3]> {
-    if s.tech_hide {
+/// game set last when it is Off or while Break the Targets holds the camera (`held`: its view is the game's own, never the
+/// zoomed-in one) (`None`: the game's value stays).
+pub fn fixed_camera_centre(s: &CpuSettings, class: StageClass, stage_default: Option<[f32; 3]>, held: bool) -> Option<[f32; 3]> {
+    if s.tech_hide && !held {
         camera_centre(class)
     } else {
         stage_default

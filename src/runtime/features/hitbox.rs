@@ -33,6 +33,7 @@ use hos_lock::Mutex;
 use crate::model::cpu::hash::{hash40, lua_bind_hash};
 use crate::model::cpu::role::LOBBY_CPU_ENTRY;
 use crate::model::eggs::{self, HEADER, NOTICE_ID};
+use crate::runtime::features::btt;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::guard::GuardOutcome;
 use crate::model::hitbox::{self, layout, AttackReader, Cell, Counts, FrameFacts, Indices, SetTable, SleepBook, Sphere, StatusIds};
@@ -75,6 +76,7 @@ pub fn publish(snapshot: &Snapshot) {
     EGG_ROWS.store(rows, Ordering::Release);
     let hide = eggs::choice(snapshot, eggs::ROW_PRACTICE_CPU) == 0;
     PRACTICE_HIDE.store(hide, Ordering::Release);
+    btt::publish(snapshot);
 }
 
 // ---- Eggs-ercise (rc.14, `model::eggs`) -------------------------------------------------------------------------------
@@ -116,9 +118,9 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     let mut run = RUN.lock();
     let plan = run.plan(rows, seed, entry, scene::facts);
     // V2.6: the CPU is hidden while a practice game runs and `CPU during a game` says Hide, unless it is the target.
-    let hide = PRACTICE_HIDE.load(Ordering::Acquire) && !run.cpu_target();
     let running = run.running();
-    super::hide_cpu::hide(running && hide);
+    let game = running && !run.cpu_target() || btt::running();
+    super::hide_cpu::hide(PRACTICE_HIDE.load(Ordering::Acquire) && game);
     // The standing notice sits in the top band while the game runs (the operator, 11-14).
     super::notices::raise(super::notices::RAISE_EGGS, running);
     if plan == eggs::Plan::Clear {
@@ -141,16 +143,8 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
             crate::runtime::diag_log::diagnostic(format_args!("[Eggs] held={held} owners={:#x}", owners.bits()));
         }
     }
-    let top = natives::joint_position(at, hash40("top"), &[0.0; 3]).unwrap_or_default();
-    let (mut wants, mut len) = ([Sphere::NONE; 2 * hitbox::SLOTS as usize], 0);
-    hitbox::want_hitboxes(&mut GameAttacks(at), &mut wants, &mut len);
-    let mut hits = [eggs::Hit::default(); hitbox::SLOTS as usize];
-    let place = |s: &Sphere| natives::joint_position(at, s.joint, &s.pos);
-    let power = |slot| GameAttacks(at).read_f32(GameAttacks(at).data(slot) + layout::POWER);
-    let n = eggs::pills(&wants[..len], place, power, &mut hits);
+    let P1 { top, hits, n, aerial, kind } = p1_read(at);
     let hits = &hits[..n];
-    let aerial = natives::status_kind(at) == eggs::ATTACK_AIR;
-    let kind = natives::fighter_kind(at).unwrap_or(-1);
     let score = run.score;
     #[cfg(feature = "diag")]
     if let Some([dx, dy]) = crate::runtime::diag_reload::take_egg_request() {
@@ -211,6 +205,45 @@ unsafe fn eggs_cpu(run: &mut eggs::Run, fighter: usize, entry: i32) -> Option<()
         }
     }
     Some(())
+}
+
+/// What a practice game reads of Player 1: its top joint, its live attack pills, whether it is in an aerial and its kind.
+#[derive(Default)]
+struct P1 {
+    top: [f32; 3],
+    hits: [eggs::Hit; hitbox::SLOTS as usize],
+    n: usize,
+    aerial: bool,
+    kind: i32,
+}
+
+/// # Safety
+/// `at` is a live fighter's accessor.
+unsafe fn p1_read(at: usize) -> P1 {
+    let top = natives::joint_position(at, hash40("top"), &[0.0; 3]).unwrap_or_default();
+    let (mut wants, mut len) = ([Sphere::NONE; 2 * hitbox::SLOTS as usize], 0);
+    hitbox::want_hitboxes(&mut GameAttacks(at), &mut wants, &mut len);
+    let mut hits = [eggs::Hit::default(); hitbox::SLOTS as usize];
+    let place = |s: &Sphere| natives::joint_position(at, s.joint, &s.pos);
+    let power = |slot| GameAttacks(at).read_f32(GameAttacks(at).data(slot) + layout::POWER);
+    let n = eggs::pills(&wants[..len], place, power, &mut hits);
+    P1 { top, hits, n, aerial: natives::status_kind(at) == eggs::ATTACK_AIR, kind: natives::fighter_kind(at).unwrap_or(-1) }
+}
+
+/// Break the Targets' pass (`runtime::features::btt`): Player 1's entry-0 fighters read the same pills Eggs-ercise does, while the mode
+/// needs them. Idle (the mode Off, no menu open) it does nothing; with a menu open and the row Off it only keeps the stage's layouts current.
+unsafe fn btt_pass(fighter: usize) {
+    if btt::idle() || ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read() != 0 {
+        return;
+    }
+    let Some(at) = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0) else { return };
+    let p = if btt::reading() { p1_read(at) } else { P1::default() };
+    let rule = EGG_ROWS.load(Ordering::Acquire).to_le_bytes()[1];
+    let broke = btt::pass(at, p.top, |spot| p.hits[..p.n].iter().any(|h| eggs::breaks(rule, p.aerial, h, spot)));
+    // V2.1: the fighter whose attack broke a target freezes, as on a hit.
+    if let Some(frames) = (broke > 0).then(scene::facts).and_then(eggs::hitlag) {
+        natives::set_hit_stop_frame(at, frames);
+    }
 }
 
 /// The status ids and effect attributes, resolved once through the game's constant table (`None` until it answers; it may not be
@@ -361,7 +394,10 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         return;
     }
     let _scope = HookScope::enter_hook(HookId::HitboxOrbs);
-    let own = RUN.lock().look(active, || view());
+    let (eggs_orbs, marks) = (RUN.lock().look(active, || view()), btt::look(active, || view()));
+    let mut own = [None; 3 + btt::LOOKS];
+    own[..3].copy_from_slice(&eggs_orbs);
+    own[3..].copy_from_slice(&marks);
     let mut cache = ORB_PANES.lock();
     let registrations = tick::REGISTRATIONS.load(Ordering::Acquire);
     if !active {
@@ -403,7 +439,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         return;
     }
     let mut used = orbs::PaneUse::default();
-    let (mut over, mut looks) = (0, [None; 3]);
+    let (mut over, mut looks) = (0, [None; 3 + btt::LOOKS]);
     if any {
         let half = match natives::screen_size_words() {
             Some([w, h]) => [orbs::screen_half(w, orbs::SCREEN_HALF_DEFAULT[0]), orbs::screen_half(h, orbs::SCREEN_HALF_DEFAULT[1])],
@@ -638,6 +674,7 @@ pub unsafe fn frame(fighter: usize) {
     }
     let _scope = HookScope::enter_hook(HookId::HitboxFrame);
     eggs_pass(fighter);
+    btt_pass(fighter);
     #[cfg(feature = "diag")]
     stats::frame_begin();
     let enabled = SETTING.load(Ordering::Acquire);

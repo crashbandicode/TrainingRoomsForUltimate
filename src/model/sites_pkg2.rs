@@ -76,8 +76,16 @@ pub const FIXED_CAMERA_SETUP_HOOK_OFFSET: usize = 0x315_8e00;
 /// (`str q0, [manager, #0xbd0]`). The mode hook gets the manager as x0.
 pub const CAMERA_MANAGER_SLOT_OFFSET: usize = 0x52b_8f00;
 pub const CAMERA_CENTRE_FIELD: usize = 0xbd0;
+/// The manager's change-active-camera function (`bool (manager, mode, priority, &functor, flag)`; no symbol in the owned ELF, like
+/// `camera_mode_hook` 0x18 into it): Break the Targets calls it as the game's five callers do (priority 0, flag 0, an in-place no-op
+/// functor). The manager's `+0x4` is its current mode (the stage's camera limit rect at `+0xc20` is read by
+/// `game::natives::camera_limit_range`, not here). The no-op functor's vtable is in `.data` (relocated at load, zero in the ELF): the runtime checks its
+/// destroy slots point into `.text` before the call.
+pub const CHANGE_ACTIVE_CAMERA_OFFSET: usize = 0x4e_e480;
+pub const CAMERA_FUNCTOR_VTABLE: usize = 0x4f7_4ca0;
+pub const CAMERA_MODE_FIELD: usize = 0x4;
 
-pub static SITES_PKG2: [Site; 51] = include!(concat!(env!("OUT_DIR"), "/tables/sites_pkg2.SITES_PKG2.rs"));
+pub static SITES_PKG2: [Site; 52] = include!(concat!(env!("OUT_DIR"), "/tables/sites_pkg2.SITES_PKG2.rs"));
 
 /// A site in the `common` script module (`lua2cpp_common.nro`), found by symbol when that module loads and
 /// guarded against the 64 bytes of the owned 13.0.5 module (`tests/cpu_common.rs` reads them from

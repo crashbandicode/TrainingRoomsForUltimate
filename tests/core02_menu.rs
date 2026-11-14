@@ -116,13 +116,13 @@ fn layout_row_counts_match_the_rc_freeze() {
     // rc.13: Attacks & Movement gained Aerial Drift (32 → 33).
     // rc.13: Display & Controls gained Taunts after L+R+A Reset (the operator's order via the primary, 2026-11-14 03:44Z; 10 → 11).
     // rc.14: the CPU page gained Hide CPU after CPU Level (33 → 34).
-    // rc.14: Fighters & Stages gained Eggs-ercise, Breaks on, Target speed and CPU during a game in their own group,
-    // Practice games, appended to GROUPS so no group index moves (the operator's D7 (b), 2026-11-14 13:03Z; SPEC 2.3b,
-    // V2.6; 24 → 29, with Target).
-    assert_eq!(counts(false), [34, 10, 12, 29, 11, 3]);
-    assert_eq!(counts(true), [33, 10, 12, 29, 11, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 96);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 95);
+    // rc.14: Fighters & Stages gained Eggs-ercise, Breaks on, Target, Target speed, CPU during a game and Break the Targets
+    // (three rows) in their own group, Practice games, appended to GROUPS so no group index moves (the operator's D7 (b),
+    // 2026-11-14 13:03Z; SPEC 2.3b, V2.5, V2.6; 24 → 32).
+    assert_eq!(counts(false), [34, 10, 12, 32, 11, 3]);
+    assert_eq!(counts(true), [33, 10, 12, 32, 11, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 99);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 98);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 4);
@@ -132,8 +132,8 @@ fn layout_row_counts_match_the_rc_freeze() {
     assert_eq!(n(&|c| matches!(c, Control::Slider)), 2);
     // Nothing is deferred any more (operator 2026-11-05): every editor has its row, and every group has rows.
     // (104: Lobby Items, Phase 2 N11; 105: Ready Hats, P-HOT; rc.6: CPU Level; rc.13: Aerial Drift, Taunts; rc.14: Hide CPU and the
-    // four Practice games rows.)
-    assert_eq!(ROWS.len(), 100);
+    // seven Practice games rows.)
+    assert_eq!(ROWS.len(), 103);
     for editor in [Editor::SetupSave, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }

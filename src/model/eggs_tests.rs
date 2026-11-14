@@ -68,7 +68,7 @@ fn eggs_rows_and_help() {
     let g = usize::from(rows[0].group);
     assert_eq!(g, GROUPS.len() - 1, "the last group");
     assert_eq!((GROUPS[g].title, GROUPS[g].page, GROUPS[g].advanced), ("Practice games", Page::FightersStages, false));
-    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).map(|r| r.id).eq([ROW, ROW_BREAK, ROW_TARGET, ROW_SPEED, ROW_PRACTICE_CPU]), "the rows, in order");
+    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).map(|r| r.id).take(5).eq([ROW, ROW_BREAK, ROW_TARGET, ROW_SPEED, ROW_PRACTICE_CPU]), "the five rows come first, in order");
     let values = |r: &crate::model::menu::table::Row| match r.control {
         Control::Dropdown(v) => v.to_vec(),
         _ => panic!("{} is not a dropdown", r.title),

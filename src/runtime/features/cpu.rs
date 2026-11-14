@@ -1021,7 +1021,9 @@ pub unsafe fn cpu_camera_mode_hook(ctx: &mut skyline::hooks::InlineCtx) {
     }
     let manager = ctx.registers[0].x() as usize;
     let class = stage_class_now();
-    let centre = with(|cpu| cpu.camera_mode(class, mode)).flatten();
+    // Break the Targets holds the Fixed camera: the game's own centre goes in, not Hide Tech's (an atomic, read before the lock).
+    let held = super::btt_camera::holding();
+    let centre = with(|cpu| cpu.camera_mode(class, mode, held)).flatten();
     cpu_event!("camera_mode mode={mode} class={class:?} stage={} write={centre:?}", natives::stage_id());
     if let (Some(centre), true) = (centre, manager != 0) {
         write_camera_centre(manager, centre);
@@ -1040,7 +1042,8 @@ pub unsafe fn cpu_camera_setup_hook(unused: usize, values: *const [f32; 3]) {
     }
     let game = values.read();
     let class = stage_class_now();
-    let centre = with(|cpu| cpu.camera_setup(class, game)).flatten();
+    let held = super::btt_camera::holding();
+    let centre = with(|cpu| cpu.camera_setup(class, game, held)).flatten();
     cpu_event!("camera_setup game={game:?} class={class:?} stage={} write={centre:?}", natives::stage_id());
     let slot = (game::text_base() + sites_pkg2::CAMERA_MANAGER_SLOT_OFFSET) as *const *const usize;
     let manager = if slot.read().is_null() { 0 } else { slot.read().read() };

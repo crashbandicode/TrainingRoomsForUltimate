@@ -44,6 +44,7 @@ pub static EGGS_BREAK: [&str; 3] = ["Any attack", "Aerials", "Hits of 12%+"];
 pub static EGGS_SPEED: [&str; 3] = ["Normal", "Slow", "Fast"];
 pub static EGGS_TARGET: [&str; 2] = ["Disc", "CPU"];
 pub static PRACTICE_CPU: [&str; 2] = ["Hide", "Show"];
+pub static BTT: [&str; 2] = ["Off", "On"];
 pub static CYCLE_SLOTS: [&str; 6] = ["Off", "1", "2", "3", "4", "5"];
 pub static SOURCES: [&str; 3] = ["Fighters", "Hats", "Both"];
 pub static BODIES: [&str; 3] = ["Off", "2", "3"];

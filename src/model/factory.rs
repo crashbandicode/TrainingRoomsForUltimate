@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 123;
+pub const COUNT: usize = 124;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -215,4 +215,6 @@ pub static DEFS: [Def; COUNT] = [
     row!("practice_cpu", Single, 2, [0]),
     // V2.1: Disc / CPU.
     row!("eggsercise_target", Single, 2, [0]),
+    // §V2.5 Break the Targets: Off / On.
+    row!("btt", Single, 2, [0]),
 ];

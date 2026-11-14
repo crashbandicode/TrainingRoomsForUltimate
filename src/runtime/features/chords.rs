@@ -20,7 +20,7 @@ use crate::model::menu::chord::Chord;
 use crate::model::menu_shortcuts::{self, MenuShortcuts};
 use crate::model::storage::FixedPath;
 use crate::runtime::diag_log::diagnostic;
-use crate::runtime::features::recorder;
+use crate::runtime::features::{btt, recorder};
 use crate::runtime::published;
 
 struct State {
@@ -80,6 +80,8 @@ pub unsafe fn on_poll(controller: usize) {
         let block = blocked();
         let State { chords: set, detector, .. } = &mut *state;
         let passed = detector.poll(set, sample, block);
+        // Break the Targets: while Placing the Save and Load chords are the layout's and the other chords stand down.
+        let keys = (!block && btt::placing()).then(|| detector.take_placing());
         // rc.8: the game speed hold's event and the input display toggle are acted on once `STATE` is released.
         let hold = detector.hold_event();
         let display = detector.consume(Request::InputDisplay);
@@ -93,9 +95,13 @@ pub unsafe fn on_poll(controller: usize) {
         }
         #[cfg(not(feature = "diag"))]
         let _ = passed;
-        (!block && chords::plus_shortcut_accepted(set, sample), chords::physical_mask(style, detector.hidden()), hold, display, refused)
+        (!block && chords::plus_shortcut_accepted(set, sample), chords::physical_mask(style, detector.hidden()), hold, display, refused, keys, block)
     };
-    let (accepted, chord_bits, hold, display, refused) = accepted;
+    let (accepted, chord_bits, hold, display, refused, keys, block) = accepted;
+    // Placing keeps all of P1's controller from the game (the cursor has it); Ready waits for its first input.
+    // SAFETY: controller is the live Controller of this poll.
+    let hide = !block && unsafe { btt::poll(controller, sample, keys) };
+    let chord_bits = if hide { !chords::bit::PLUS_MASK } else { chord_bits };
     // rc.12: a Save or Load press the chords stood down says why (an owner or the speed hold: logged only).
     if let Some((action, why)) = refused {
         crate::runtime::features::notices::save_state_refused(action, why);
@@ -116,16 +122,21 @@ pub unsafe fn on_poll(controller: usize) {
     // cleared for this mapping call only and put back when it returns (`after_mapping`), so the controller's own
     // previous/just-down bookkeeping, which the menu and the next poll read, is not changed.
     if chord_bits != 0 {
-        let kept = FIELDS.map(|offset| ((controller + offset) as *const u32).read_volatile());
-        for (offset, value) in FIELDS.into_iter().zip(kept) {
-            ((controller + offset) as *mut u32).write_volatile(value & !chord_bits);
+        let kept = HIDDEN_FIELDS.map(|offset| ((controller + offset) as *const u32).read_volatile());
+        for (i, (offset, value)) in HIDDEN_FIELDS.into_iter().zip(kept).enumerate() {
+            // The four button sets lose the hidden buttons; the sticks go to 0.0 (centred) only when all of it is hidden.
+            let hidden = if i < FIELDS.len() { value & !chord_bits } else if hide { 0 } else { value };
+            ((controller + offset) as *mut u32).write_volatile(hidden);
         }
         *HIDDEN.lock() = Some((controller, kept));
     }
 }
 
 /// The controller fields `on_poll` changed for the mapping call, to put back when it returns.
-static HIDDEN: Mutex<Option<(usize, [u32; 4])>> = Mutex::new(None);
+static HIDDEN: Mutex<Option<(usize, [u32; 8])>> = Mutex::new(None);
+
+/// The button sets and the four stick axes on_poll may change for the mapping call.
+const HIDDEN_FIELDS: [usize; 8] = [field::CURRENT_BUTTONS, field::PREVIOUS_BUTTONS, field::JUST_DOWN, field::JUST_RELEASE, field::STICKS[0], field::STICKS[1], field::STICKS[2], field::STICKS[3]];
 
 /// The mapping call returned (the apply hook): the chord's buttons go back into the controller.
 ///
@@ -133,7 +144,7 @@ static HIDDEN: Mutex<Option<(usize, [u32; 4])>> = Mutex::new(None);
 /// Runs right after the mapping call whose note ran `on_poll`, while that `Controller` is live.
 pub unsafe fn after_mapping() {
     let Some((controller, kept)) = HIDDEN.lock().take() else { return };
-    for (offset, value) in [field::CURRENT_BUTTONS, field::PREVIOUS_BUTTONS, field::JUST_DOWN, field::JUST_RELEASE].into_iter().zip(kept) {
+    for (offset, value) in HIDDEN_FIELDS.into_iter().zip(kept) {
         ((controller + offset) as *mut u32).write_volatile(value);
     }
 }

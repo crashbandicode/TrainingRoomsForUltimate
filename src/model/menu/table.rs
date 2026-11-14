@@ -148,6 +148,10 @@ pub enum Editor {
     ComboSave,
     ComboLibrary,
     ComboTarget,
+    /// Break the Targets: close the menu into the placing view (SPEC V2.5).
+    PlaceTargets,
+    /// Break the Targets: this stage's five saved layouts.
+    Layouts,
 }
 
 /// A read-only row.
@@ -224,7 +228,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 100] = [
+pub static ROWS: [Row; 103] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -443,6 +447,12 @@ pub static ROWS: [Row; 100] = [
       "How fast targets fly. Normal is Melee's Eggs-ercise speed.\nSlow: half speed. Fast: one and a half times as fast."),
     r(GAMES, "CPU during a game", "practice_cpu", Control::Dropdown(&o::PRACTICE_CPU),
       "Hide: the CPU is hidden while a practice game runs.\nAfterwards it's as Hide CPU says. Show: it stays."),
+    r(GAMES, "Break the Targets", "btt", Control::Dropdown(&o::BTT),
+      "Place targets, then break them all against the clock.\nClosing the menu with no targets opens the placing view."),
+    r(GAMES, "Place targets", "btt_place", Control::Editor(Editor::PlaceTargets),
+      "Close the menu into the placing view, stage zoomed out.\nStick moves, A places, B removes the last, X starts."),
+    r(GAMES, "Saved layouts", "btt_layouts", Control::Editor(Editor::Layouts),
+      "This stage's 5 saved target layouts: load or delete.\nWhile placing: ZL + Down saves, ZL + Up loads the slot."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

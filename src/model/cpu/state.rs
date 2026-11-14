@@ -504,17 +504,17 @@ impl Cpu {
     /// The multiplier to write this frame (SPEC-cpu-05 §4): the first call caches what the game has.
     /// The game is setting the Training fixed-camera values (game_centre is the centre it passes): remember it as the
     /// stage default and answer the centre to use instead, if any (SPEC-cpu-04 section 5 "Camera").
-    pub fn camera_setup(&mut self, class: tech::StageClass, game_centre: [f32; 3]) -> Option<[f32; 3]> {
+    pub fn camera_setup(&mut self, class: tech::StageClass, game_centre: [f32; 3], held: bool) -> Option<[f32; 3]> {
         self.stage_default = Some(game_centre);
-        tech::fixed_camera_centre(&self.settings, class, self.stage_default).filter(|centre| *centre != game_centre)
+        tech::fixed_camera_centre(&self.settings, class, self.stage_default, held).filter(|centre| *centre != game_centre)
     }
 
     /// The camera mode changes: the centre to write into the camera manager first, if any (only the fixed mode).
-    pub fn camera_mode(&self, class: tech::StageClass, mode: i32) -> Option<[f32; 3]> {
+    pub fn camera_mode(&self, class: tech::StageClass, mode: i32, held: bool) -> Option<[f32; 3]> {
         if mode != tech::CAMERA_MODE_FIXED {
             return None;
         }
-        tech::fixed_camera_centre(&self.settings, class, self.stage_default)
+        tech::fixed_camera_centre(&self.settings, class, self.stage_default, held)
     }
 
     pub fn damage_multiplier(&mut self, in_training: bool, observed: f32) -> Option<f32> {

@@ -58,6 +58,9 @@ const HOOK_LOCKS: &[(&str, &str)] = &[
     // rc.14 Eggs-ercise: the run is stepped by the fighter pass and reset by the on-init wrapper (game thread); the layout
     // tick reads its egg. The menu worker reaches it only through atomics (`eggs_start`, `publish`).
     ("features/hitbox.rs", "RUN"),
+    // rc.14 Break the Targets: P1's poll (the input thread), P1's pass (the game thread) and the layout tick take it; the menu worker
+    // reaches it only through atomics and a mailbox.
+    ("features/btt.rs", "BTT"),
     ("compat/menu.rs", "EDITED"),
     ("ui/input.rs", "ADAPTER"),
     ("ui/menu_app.rs", "QUICK_MENU_APP"),

@@ -22,7 +22,7 @@ use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::{chords, notices, writer};
 use crate::runtime::published;
 use crate::runtime::macros::{named_macros, replay_capture};
-use crate::runtime::ui::{combos, external, requests};
+use crate::runtime::ui::{combos, external, layouts, requests};
 use crate::model::input_delay::Owners;
 use crate::runtime::ui::state::{CLOSE_COUNT, CLOSE_FADES, CLOSE_HELD, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, JUMPS, LAYOUT_READY, OPEN, POPUP, POPUP_REQ, PROMPT};
 use crate::model::storage::ROOT;
@@ -187,6 +187,7 @@ struct Session {
     setups: super::setups::Ui,
     setup_note: Option<String>,
     combos: combos::Ui,
+    layouts: layouts::Ui,
     stage_context: Option<crate::runtime::lobby::practice_stage_request::MenuContext>,
     /// The stage picked to go to: requested when the menu has closed (`close_session`).
     stage_close: Option<Selection>,
@@ -302,6 +303,7 @@ fn handle(event: Event, s: &mut Session) {
             s.phase = Phase::Menu;
         }
         CLOSING.store(false, Ordering::Release);
+        crate::runtime::features::btt::menu_opened();
         crate::runtime::ui::menu_app::note_open();
         { s.opening = crate::runtime::ui::menu_app::sequence(); }
         publish_frame(s);
@@ -686,6 +688,10 @@ fn sync_panels(s: &mut Session) {
     if let Some(note) = s.combos.tick() {
         combo_note(s, &note);
     }
+    // rc.14 Break the Targets: the Saved layouts list's A and Y.
+    if let Some(note) = s.layouts.tick(s.menu.as_mut()) {
+        layouts::note(&note);
+    }
     // A keyboard name the frame wrapper confirmed: its library write is file I/O, done here.
     // Drawn only where a renderer exists, so Player 1 is never held by a question nobody can see (R2-2).
     let prompt_visible = named_macros::fighter_prompt_up() && LAYOUT_READY.load(Ordering::Acquire);
@@ -710,7 +716,7 @@ fn sync_panels(s: &mut Session) {
     if open && s.phase == Phase::Menu {
         let entered = s.menu.as_ref().and_then(|m| match m.screen() {
             Some(Screen::External(editor))
-                if external::is_layer_panel(*editor) || is_setup(*editor) || combos::is_combo(*editor) => Some(*editor),
+                if external::is_layer_panel(*editor) || is_setup(*editor) || combos::is_combo(*editor) || layouts::is_layouts(*editor) => Some(*editor),
             _ => None,
         });
         if let Some(editor) = entered.filter(|e| combos::is_combo(*e)) {
@@ -722,6 +728,20 @@ fn sync_panels(s: &mut Session) {
                 }
                 Ok(combos::Opened::Done(note)) | Err(note) => {
                     combo_note(s, &note);
+                    if let Some(m) = s.menu.as_mut() {
+                        m.press(Button::B);
+                    }
+                }
+            }
+        } else if let Some(editor) = entered.filter(|e| layouts::is_layouts(*e)) {
+            // Break the Targets' Saved layouts (SPEC V2.5): a list panel, like the saved combos.
+            match s.layouts.open() {
+                Ok(()) => {
+                    s.phase = Phase::Panel;
+                    s.panel = Some(editor);
+                }
+                Err(note) => {
+                    layouts::note(&note);
                     if let Some(m) = s.menu.as_mut() {
                         m.press(Button::B);
                     }
@@ -763,11 +783,13 @@ fn sync_panels(s: &mut Session) {
             external::close_panel();
             s.setups.leave_panel();
             s.combos.leave_panel();
+            s.layouts.leave_panel();
             s.panel = None;
         }
         Step::PopRow => {
             s.setups.leave_panel();
             s.combos.leave_panel();
+            s.layouts.leave_panel();
             s.panel = None;
             if let Some(m) = s.menu.as_mut() {
                 // A resumed external name can overlay the reopened page.
@@ -936,6 +958,8 @@ fn publish_frame(s: &Session) {
             s.setups.view()
         } else if s.panel.is_some_and(combos::is_combo) {
             s.combos.view()
+        } else if s.panel.is_some_and(layouts::is_layouts) {
+            s.layouts.view()
         } else { external::panel_view_now() }) else { return };
         if named_macros::fighter_prompt_up() {
             fighter_question_frame(menu, &view.title, &view.footer, &view.labels, view.selected, &mut next);
@@ -1133,6 +1157,11 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     published::publish(&settings.menu, outbox.rerolls);
     // rc.14: every close with Eggs-ercise on starts a fresh run.
     crate::runtime::features::hitbox::eggs_start();
+    // rc.14 Break the Targets: Place targets asks for the placing view; every close tells the mode (after the publish above).
+    if outbox.place_targets {
+        crate::runtime::features::btt::request_place();
+    }
+    crate::runtime::features::btt::menu_closed();
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(10);
     // The carried engines read the typed view of the committed settings (decision D1).
