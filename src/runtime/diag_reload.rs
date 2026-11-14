@@ -111,12 +111,15 @@ fn poll_pause_dump() {
 
 /// rc.14 cycle fix, phase 2 rows: `diag-cycle.req` is `reload` (a cold press takes today's Reload), `reload mii` (that
 /// Reload keeps a Built Mii group too: the rc.12 crash's fail-first row) or `off`. rc.14 2e (a-full) rows: `window`
-/// (with `reload`) keeps the attached window across that Reload (`KEEP_WINDOW_ACROSS_RELOAD`'s rows).
+/// (with `reload`) keeps the attached window across that Reload (`KEEP_WINDOW_ACROSS_RELOAD`'s rows). rc.14 a-full-2 rows:
+/// `strip` (a live Kirby's copy goes before he parks, `KIRBY_STRIP_BEFORE_PARK`) and `pt` (with `window`, a Pokémon
+/// Trainer window is kept too, `KEEP_PT_WINDOW_ACROSS_RELOAD`).
 fn poll_cycle() {
     let Some(text) = request("diag-cycle.req") else { return };
     let words: Vec<&str> = text.split_whitespace().collect();
     let bits = u8::from(words.contains(&"reload")) | (u8::from(words.contains(&"mii")) << 1)
-        | (u8::from(words.contains(&"window")) << 2);
+        | (u8::from(words.contains(&"window")) << 2) | (u8::from(words.contains(&"strip")) << 3)
+        | (u8::from(words.contains(&"pt")) << 4);
     crate::runtime::roster::character_roster::body_bank::set_diag_cycle(bits);
 }
 

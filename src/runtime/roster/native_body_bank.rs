@@ -1673,9 +1673,10 @@ unsafe fn plan_in(entry: *const u8, owner: u32, descriptor: [u8; 0x70], upcoming
             };
         // A live Kirby parks only copy-free (EXCLUSIONS §2); a refusal is today's
         // Reload, which destroys this window and its groups as it always did.
+        // rc.14 a-full-2 (K-strip): a copy he holds goes first (`kirby_departure_gate`).
         let gated = gated || ((in_window || in_group) && target != KIRBY
             && members.ready_index(snapshot(entry)).is_some_and(|from|
-                match kirby_park_gate(entry, owner, members, from) {
+                match kirby_departure_gate(entry, owner, members, from, target) {
                     Ok(()) => false,
                     Err(reason) => {
                         trace!("[KirbyPark] fallback owner={} target={:#x} reason={}; canonical Reload", owner, target, reason);
@@ -1781,9 +1782,17 @@ unsafe fn pair_parkable(entry: *const u8, owner: u32) -> Result<(), &'static str
 /// remembered pointer; the decision itself is `body_bank::kirby_parkable`.
 /// Never called under the bank lock (the source lock is taken inside).
 unsafe fn kirby_park_gate(entry: *const u8, owner: u32, members: Members, from: u8) -> Result<(), &'static str> {
+    if members.kinds()[usize::from(from)] != KIRBY { return Ok(()); }
+    let (copy, retained, leased, _, _) = live_kirby_copy_state(entry, owner, from)?;
+    crate::engine::swap::body_bank::kirby_parkable(copy, retained, leased)
+}
+
+/// The live Kirby at cell `from`, proven as `kirby_park_gate` proves it, and what its gate reads: `(FLAG_COPY, retained copy
+/// object groups, hat lease, module accessor, body id)`.
+unsafe fn live_kirby_copy_state(entry: *const u8, owner: u32, from: u8)
+    -> Result<(bool, Option<u128>, bool, *mut smash::app::BattleObjectModuleAccessor, u32), &'static str> {
     use smash::app::{lua_bind::WorkModule, BattleObjectModuleAccessor};
     use smash::lib::lua_const::FIGHTER_KIRBY_INSTANCE_WORK_ID_FLAG_COPY;
-    if members.kinds()[usize::from(from)] != KIRBY { return Ok(()); }
     let base = BASE.load(Ordering::Acquire);
     let Some(body) = fields::child(entry as usize, 0x4160 + usize::from(from) * 8) else { return Err("Kirby body missing"); };
     if fields::read::<usize>(body, 0) != Some(base + FIGHTER_VTABLE)
@@ -1796,7 +1805,38 @@ unsafe fn kirby_park_gate(entry: *const u8, owner: u32, members: Members, from: 
     let copy = WorkModule::is_flag(module, *FIGHTER_KIRBY_INSTANCE_WORK_ID_FLAG_COPY);
     let retained = super::sources::retained_copy_kinds(module);
     let leased = super::sources::hat_lease_on_body(id);
-    crate::engine::swap::body_bank::kirby_parkable(copy, retained, leased)
+    Ok((copy, retained, leased, module, id))
+}
+
+/// rc.14 a-full-2 (K-strip): [`body_bank::KIRBY_STRIP_BEFORE_PARK`], or the diag build's `diag-cycle.req` `strip`.
+fn kirby_strip_on() -> bool {
+    crate::engine::swap::body_bank::KIRBY_STRIP_BEFORE_PARK || diag_cycle(8)
+}
+
+/// rc.14 a-full-2 (K-strip; AFULL2-RESEARCH.md "Limit 1", the primary 2026-11-14 ~23:24Z): [`kirby_park_gate`] for a live
+/// Kirby leaving for a warm member or group. When the gate refuses only because he holds a copy or a hat lease
+/// (`body_bank::kirby_departure` → `Strip`), his copy goes first through native copy loss, Kirby Hats' route
+/// (`sources::clear_hat_for_switch`, `0xb96770` behind seam `sources.kirby_copy_clear`), and his hat leases are released
+/// (`sources::finish_hat_clear`). Then the gate runs again. A Reloaded Kirby is hatless too, so nothing is lost against
+/// the copy gate's Reload, and the target's Built group stays warm instead of being rebuilt. Every other refusal, a
+/// strip that fails, and the switch off keep the refusal: today's Reload, logged with its reason (`[KirbyPark] strip`
+/// with `gate=Err`; a counted failure in the Eden rows). Same callback as the gate; no bank lock is held, and the source
+/// lock is taken and dropped inside `clear_hat_for_switch` before its native call.
+unsafe fn kirby_departure_gate(entry: *const u8, owner: u32, members: Members, from: u8, target: u32)
+    -> Result<(), &'static str> {
+    use crate::engine::swap::body_bank::{kirby_departure, KirbyDeparture};
+    let first = kirby_park_gate(entry, owner, members, from);
+    if first.is_ok() || members.kinds()[usize::from(from)] != KIRBY || !kirby_strip_on() { return first; }
+    let Ok((copy, retained, leased, module, id)) = live_kirby_copy_state(entry, owner, from) else { return first; };
+    if kirby_departure(copy, retained, leased, true) != KirbyDeparture::Strip { return first; }
+    let cleared = super::sources::clear_hat_for_switch(module)
+        .and_then(|()| super::sources::finish_hat_clear(module, false));
+    let after = kirby_park_gate(entry, owner, members, from);
+    let now = live_kirby_copy_state(entry, owner, from).ok();
+    trace!("[KirbyPark] strip owner={} target={:#x} body={:#x} copy={} retained={:?} lease={} cleared={:?} after={:?} gate={:?}{}",
+        owner, target, id, copy, retained, leased, cleared, now.map(|(c, r, l, _, _)| (c, r, l)), after,
+        if after.is_ok() { "; parks copy-free" } else { "; today's Reload" });
+    after
 }
 
 /// D-KIRBY1 (D-KIRBY1-ROB1-RCA.md §3): the kind the window's live Kirby copies
@@ -2170,7 +2210,8 @@ unsafe fn outgoing_window(entry: *mut u8, owner: u32, role: usize, target: u32) 
         .map(|b| *b.members)?;
     // The gates read the live body and the sources: outside the bank lock, as `plan_in` calls them.
     let from = members.ready_index(snapshot(entry))?;
-    let parks = kirby_park_gate(entry, owner, members, from)
+    // rc.14 a-full-2 (K-strip): a copy the live Kirby holds goes first, so his window can stay.
+    let parks = kirby_departure_gate(entry, owner, members, from, target)
         .and_then(|()| if members.is_pair() && from == 0 { pair_parkable(entry, owner) } else { Ok(()) });
     let mut state = BANKS[role].lock();
     let bank = state.as_mut().filter(|b| b.entry == entry as usize && b.owner == owner && b.phase == Phase::Ready
@@ -3010,7 +3051,7 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
         }
     }
     if kind != KIRBY {
-        if let Err(reason) = kirby_park_gate(entry, owner, members, from) {
+        if let Err(reason) = kirby_departure_gate(entry, owner, members, from, kind) {
             trace!("[KirbyPark] fallback owner={} target={:#x} reason={}; switch refused", owner, kind, reason);
             return false;
         }

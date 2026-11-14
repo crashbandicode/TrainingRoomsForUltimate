@@ -23,7 +23,7 @@ pub const KIRBY: u32 = 0x06;
 // WORKPLAN §2.2): one capability row per fighter form, each gate a one-liner over the table, and
 // the FACT every row encodes documented there. The names and signatures are unchanged for every
 // caller (`body_bank::member_forms_in`, `body_bank::prefetch_admitted`, …).
-pub use crate::engine::swap::swap_model::capabilities::{d_kirby1_applies, d_kirby1_live, group_member_kind, kirby_parkable, member_forms, member_forms_in, native_group_request, object_rearm_admitted, original_bankable, original_form_bankable, pair_lead_extra, pair_request, prefetch_admitted, single_member_request, swap_commit_index, swap_commit_index_in, window_swappable_with};
+pub use crate::engine::swap::swap_model::capabilities::{d_kirby1_applies, d_kirby1_live, group_member_kind, kirby_departure, kirby_parkable, KirbyDeparture, member_forms, member_forms_in, native_group_request, object_rearm_admitted, original_bankable, original_form_bankable, pair_lead_extra, pair_request, prefetch_admitted, single_member_request, swap_commit_index, swap_commit_index_in, window_swappable_with};
 #[cfg(test)]
 pub use crate::engine::swap::swap_model::capabilities::{key_release_admitted, special_group_kind, swappable_kind, window_swappable};
 use crate::engine::swap::swap_model::capabilities::{bankable_kind, pins_cell0};
@@ -1212,6 +1212,11 @@ pub fn gated_alone(kind: u32) -> bool {
 /// rc.14 2e (a-full, A1): whether a mod Reload keeps the attached window as a detached Built group. Off until the Eden
 /// rows pass with it (the diag build's `diag-cycle.req` `window` turns it on for them).
 pub const KEEP_WINDOW_ACROSS_RELOAD: bool = false;
+
+/// rc.14 a-full-2 (K-strip; AFULL2-RESEARCH.md "Limit 1"): a live Kirby that holds a copy loses it natively and parks
+/// ([`KirbyDeparture::Strip`]) instead of taking the copy gate's Reload, which also rebuilt the target's own group. Off
+/// until its Eden rows pass (the diag build's `diag-cycle.req` `strip` turns it on for them).
+pub const KIRBY_STRIP_BEFORE_PARK: bool = false;
 
 /// rc.14 2e (a-full, A1; AFULL-RESEARCH.md §2): why the attached window `window` cannot be kept across its role's
 /// target-first Reload onto `target` (`Ok`: it can). The Reload start (`0x653240` → `0x653490`) deactivates every window
@@ -4187,6 +4192,24 @@ mod tests {
         assert_eq!(window_kept_across_reload(mii, true, KROOL, true, false), Ok(()));
     }
 
+    /// rc.14 a-full-2 (K-strip; the primary 2026-11-14 ~23:24Z): leaving a Kirby that holds a copy is no Reload any more.
+    /// His copy goes natively first (a Reloaded Kirby is hatless too), then he parks like any member, and the target's
+    /// Built group attaches warm. Only an unreadable copy state, an earlier copy still being cleared, or the switch off
+    /// keeps today's Reload.
+    fn a_kirby_with_a_copy_loses_it_and_parks_instead_of_the_reload() {
+        let copied = Some(1u128 << 3);
+        assert_eq!(kirby_departure(false, Some(0), false, true), KirbyDeparture::Park);
+        assert_eq!(kirby_departure(false, Some(0), false, false), KirbyDeparture::Park, "copy-free parks either way");
+        assert_eq!(kirby_departure(true, copied, false, true), KirbyDeparture::Strip, "a copy from an inhale");
+        assert_eq!(kirby_departure(true, copied, true, true), KirbyDeparture::Strip, "a Kirby Hats copy and its lease");
+        assert_eq!(kirby_departure(true, Some(0), false, true), KirbyDeparture::Strip, "the copy flag alone");
+        assert_eq!(kirby_departure(false, Some(0), true, true), KirbyDeparture::Strip, "a hat lease alone");
+        assert!(matches!(kirby_departure(false, copied, false, true), KirbyDeparture::Reload(_)),
+            "an earlier copy's objects still being cleared: no copy for the native loss");
+        assert!(matches!(kirby_departure(true, None, false, true), KirbyDeparture::Reload(_)), "unreadable: today's Reload");
+        assert!(matches!(kirby_departure(true, copied, false, false), KirbyDeparture::Reload(_)), "the switch off");
+    }
+
     /// rc.14 2e (decision 3, Design A's rule): over Ready Fighters after a kept Reload, the unit whose next turn is farthest
     /// goes; never the one on screen, never the next one. The operator's CPU lap, King K. Rool on screen after the Reload.
     fn the_farthest_unit_goes_never_the_next_or_the_one_on_screen() {
@@ -4209,6 +4232,7 @@ mod tests {
         crate::test_table::run(&[
             ("a_gated_member_is_laid_out_alone_and_the_rest_stay_together", a_gated_member_is_laid_out_alone_and_the_rest_stay_together as fn()),
             ("a_reload_keeps_the_window_whose_live_member_parks", a_reload_keeps_the_window_whose_live_member_parks as fn()),
+            ("a_kirby_with_a_copy_loses_it_and_parks_instead_of_the_reload", a_kirby_with_a_copy_loses_it_and_parks_instead_of_the_reload as fn()),
             ("the_farthest_unit_goes_never_the_next_or_the_one_on_screen", the_farthest_unit_goes_never_the_next_or_the_one_on_screen as fn()),
             ("a_mii_group_is_kept_across_a_reload_only_with_its_switch", a_mii_group_is_kept_across_a_reload_only_with_its_switch as fn()),
             ("five_laps_of_the_operator_cycle_keep_what_fits_hot", five_laps_of_the_operator_cycle_keep_what_fits_hot as fn()),
