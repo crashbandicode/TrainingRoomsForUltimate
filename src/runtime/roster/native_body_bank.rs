@@ -701,11 +701,16 @@ unsafe fn write_identity(entry: usize, r: usize, identity: MiiIdentity) -> MiiEn
 /// leaves the Mii canonical (no layout, no configuration, an unstageable owner).
 fn mii_identity_for(bank: &Bank, lane: &[Option<crate::runtime::roster::cycle_preload::Target>; crate::runtime::roster::cycle_preload::MAX_TARGETS],
     kind: u32) -> Option<(MiiIdentity, Configuration)> {
+    let configuration = lane.iter().flatten().find(|t| t.kind == kind)?.configuration?;
+    Some((mii_identity_of(bank, configuration)?, configuration))
+}
+
+/// [`mii_identity_for`] of one configuration (rc.14 cycle fix: a press's own Mii, `demand`).
+fn mii_identity_of(bank: &Bank, configuration: Configuration) -> Option<MiiIdentity> {
     let layout = super::mii_backend::current()?;
     let (observed, _) = bank.observed?;
-    let configuration = lane.iter().flatten().find(|t| t.kind == kind)?.configuration?;
     let staged = crate::engine::mii::ordinary_cpu::staged_descriptor_for_owner(layout, bank.owner as usize, observed, Some(configuration))?;
-    Some((MiiIdentity::from_descriptor(&staged)?, configuration))
+    MiiIdentity::from_descriptor(&staged)
 }
 
 /// The identity and configuration of the reachable Mii group holding `kind`: the
@@ -1171,6 +1176,101 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
 /// Whether a parked group of `role` is marked to go now (a release in progress, `room_coming`).
 fn releasing(role: usize) -> bool {
     BANKS[role].lock().as_ref().is_some_and(|bank| !bank.departed && bank.groups.iter().any(|g| g.leaving && g.release_now))
+}
+
+/// A bank's bodies besides the one on screen: its window's other members and every group that counts, a group being
+/// freed now excepted.
+fn extra_bodies(bank: &Bank) -> usize {
+    bank.members.count() - 1 + bank.groups.iter()
+        .filter(|g| g.state.counts_bodies() && !(g.leaving && g.release_now)).map(|g| g.members.count()).sum::<usize>()
+}
+
+/// [`extra_bodies`] of `role`'s live bank, 0 without one. Read under that bank's lock alone: callers take it before their
+/// own role's, never inside it. (`EXTRAS` keeps the window a Reload built, not the group a swap attached.)
+fn role_extra_bodies(role: usize) -> usize {
+    BANKS[role].lock().as_ref().filter(|b| !b.departed && b.phase != Phase::Retired).map_or(0, extra_bodies)
+}
+
+/// Both roles' bodies: the two on screen, this bank's extras and the other role's (`other`, [`role_extra_bodies`]).
+fn bodies_with(bank: &Bank, other: usize) -> usize {
+    2 + other + extra_bodies(bank)
+}
+
+/// rc.14 cycle fix (Design A; the primary 2026-11-14 ~20:25Z on the operator's rc.13 report "it still loads the fighters
+/// for cpu again after cycling through", console #160-#216; the operator ~20:44Z: what doesn't fit stays cold and what
+/// does stays hot): a cycle press onto `kind` that no reachable group serves is served by its own group instead of a
+/// Reload, which destroyed the window and every group of the role. The group (one body, or the role's Mii group for a
+/// saved Mii `configuration`) is planned now beside everything resident, within Ready Fighters or as a cold fighter one
+/// body over it (`body_bank::cold_admitted`; the switch away frees it, `cold_release`). The press waits while it
+/// prefetches (`group_lifecycle` runs its serving step first) and its first switch builds it, as for any prefetched
+/// group. True while the press waits for that group. False is today's path (the Reload): Group Swap off, no Ready bank,
+/// a kind no one-member group holds, no free slot, no room, or a group the admissions held (process memory, the pool
+/// reserve), that failed, or that is reachable already.
+pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>) -> bool {
+    let Some(role) = role(owner) else { return false; };
+    let settings = crate::runtime::roster::cycle_preload_config::snapshot();
+    if !ENABLED.load(Ordering::Acquire) || !settings.fighters || settings.bank_members < 2 || !groups_enabled(&settings) {
+        return false;
+    }
+    let (special, policy) = (special_policy(&settings), group_policy(&settings));
+    let other = role_extra_bodies(1 - role);
+    let mut state = BANKS[role].lock();
+    let Some(bank) = state.as_mut().filter(|b| b.owner == owner && b.phase == Phase::Ready && !b.departed && b.swap.is_none())
+        else { return false; };
+    if bank.members.index_of(kind).is_some() { return false; }
+    let mii = configuration.is_some();
+    if let Some(g) = bank.groups.iter().find(|g| g.state != GroupState::Released && !g.leaving && g.members.index_of(kind).is_some()) {
+        let same = if mii { g.configuration == configuration } else { g.identity.is_none() };
+        return same && matches!(g.state, GroupState::Planned | GroupState::Prefetching);
+    }
+    let members = if mii {
+        if !special.mii || bank.groups.iter().any(|g| g.state != GroupState::Released && g.members.special() == Special::Mii) {
+            return false;
+        }
+        Members::mii_group(kind)
+    } else if Members::special_group(kind, special).is_none() && crate::engine::swap::body_bank::group_member_kind(kind, policy) {
+        Members::new(&[kind])
+    } else {
+        None
+    };
+    let Some(members) = members else { return false; };
+    let Some(live) = bank.observed.map(|(_, live)| live) else { return false; };
+    if bank.groups.next_slot().is_none() { return false; }
+    let (bodies, ready) = (bodies_with(bank, other) + members.count(), usize::from(settings.ready_fighters));
+    if !crate::engine::swap::body_bank::cold_admitted(bodies, ready, members.count(), &bank.over, live) { return false; }
+    let identity = match configuration {
+        Some(c) => match mii_identity_of(bank, c) { Some(identity) => Some((identity, c)), None => return false },
+        None => None,
+    };
+    let slot = bank.groups.plan(members, identity);
+    let over = bodies > ready;
+    if over { bank.over.push(kind); }
+    GROUP_BODIES[role].store(bank.groups.iter().filter(|g| g.state.counts_bodies())
+        .map(|g| g.members.count()).sum::<usize>().min(usize::from(u8::MAX)) as u8, Ordering::Release);
+    trace!("[GroupSwap] demand owner={} group={} kinds={:x?} special={:?} bodies={} ready_fighters={} cold={}: the press waits for its own group; no Reload",
+        owner, slot, &members.kinds()[..members.count()], members.special(), bodies, ready, over);
+    true
+}
+
+/// rc.14 cycle fix: after a switch, the cold fighter loaded over Ready Fighters that is no longer on screen
+/// (`body_bank::cold_left`) goes while the bodies still exceed Ready Fighters; else only its mark goes. A Planned, held or
+/// failed group is released here (nothing native), a Prefetching one leaves after its poll, any other is marked to leave
+/// now and returned for the entry tick's teardown (`leave_group`).
+fn cold_release(bank: &mut Bank, other: usize, live: Option<u32>) -> Option<usize> {
+    let kind = crate::engine::swap::body_bank::cold_left(&bank.over, live?)?;
+    if let Some(at) = bank.over.iter().position(|k| *k == kind) { bank.over.remove(at); }
+    let ready = usize::from(crate::runtime::roster::cycle_preload_config::snapshot().ready_fighters);
+    let bodies = bodies_with(bank, other);
+    let group = bank.groups.iter().position(|g| g.state != GroupState::Released && !g.leaving && g.members.index_of(kind).is_some());
+    let (owner, Some(group)) = (bank.owner, group.filter(|_| bodies > ready)) else { return None; };
+    let g = &mut bank.groups[group];
+    trace!("[GroupSwap] cold release owner={} group={} kinds={:x?} state={:?} bodies={} ready_fighters={}: the switch away from a fighter that doesn't fit frees it",
+        owner, group, &g.members.kinds()[..g.members.count()], g.state, bodies, ready);
+    match g.state {
+        GroupState::Planned | GroupState::Held(_) | GroupState::Failed => { g.state = GroupState::Released; None }
+        GroupState::Prefetching => { g.leaving = true; g.release_now = true; None }
+        _ => { g.leaving = true; g.release_now = true; Some(group) }
+    }
 }
 
 /// The members of `group` the notice and the planner count: a group that left the cycle (parked until the pause, or a
@@ -2189,6 +2289,9 @@ struct Bank {
     retiring: Option<Retiring>,
     /// Inbox 02:42Z: a detached PT group's pool being built on the task worker (`Preparing`).
     preparing: Option<Preparing>,
+    /// rc.14 cycle fix: the fighters that don't fit, loaded over Ready Fighters while on screen (`demand`); the switch
+    /// away from one frees it (`cold_release`). The one on screen and the next one while it loads, at most.
+    over: FixedList<u32, 2>,
 }
 
 fn role(owner: u32) -> Option<usize> {
@@ -2428,7 +2531,7 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
         pair_logged: false, identity: None, configuration: None, ordinary_identity: None,
         activated: if keeping { activated } else { Default::default() },
         construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene: None,
-        object_fetch: None, retiring: None, preparing: None,
+        object_fetch: None, retiring: None, preparing: None, over: FixedList::new(0),
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
     GROUP_BODIES[role].store(kept.min(usize::from(u8::MAX)) as u8, Ordering::Release);
@@ -2523,7 +2626,7 @@ unsafe fn publish_pending(owner: u32, members: Members, scene: Option<(u32, u32)
         groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
         pair_logged: false, identity: None, configuration: None, ordinary_identity: None, activated: Default::default(),
         construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene,
-        object_fetch: None, retiring: None, preparing: None,
+        object_fetch: None, retiring: None, preparing: None, over: FixedList::new(0),
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
     GROUP_BODIES[role].store(0, Ordering::Release);
@@ -5752,6 +5855,8 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
     // Read before the bank lock (the roster's and the owners' state): a foreground request waiting for INSTALL alone.
     let foreground = super::foreground(role, entry, owner);
     note_foreground(owner, foreground);
+    // rc.14 cycle fix: the other role's bodies for `cold_release`, read before this role's lock (never inside it).
+    let other_bodies = role_extra_bodies(1 - role);
     // D-KIRBY1: no bank prefetch key rests on this R while its live member is
     // Kirby (a copy of a group kind would share R's G68 mirror with the key, and
     // the key's later `0x17e8610` release corrupts the registry the Reload walks;
@@ -5810,6 +5915,9 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
         // the capacity of this tick.
         // Inbox 00:18Z: a detached PT group with a retired pool takes its object kind again before anything new starts
         // (right after its detach, so it is resident by its next attach).
+        } else if let Some(group) = cold_release(bank, other_bodies, live) {
+            // rc.14 cycle fix: the switch away from a fighter that doesn't fit frees it before anything new starts.
+            Step::Leave(group)
         } else if let Some(group) = rearm_candidate(base, bank) {
             Step::Rearm(group, *bank.groups[group].members, bank.alias)
         // rc.6 mid-session cycle change: a group whose member left the cycle is released before anything new starts.

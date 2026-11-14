@@ -1598,6 +1598,30 @@ pub fn capacity_release<K: Copy>(settled: bool, parked: impl Iterator<Item = (K,
     parked.min_by_key(|(_, members, kept)| (*kept, members.count())).map(|(key, _, _)| key)
 }
 
+/// rc.14 cycle fix (Design A, the primary 2026-11-14 ~20:25Z; the operator ~20:42Z "+1 is fine, keep it" and ~20:44Z
+/// "what doesn't fit stays cold and what dos stays hot so it's not rebuilding constantly"): the one switch for a cold
+/// fighter's body over Ready Fighters. Off: a cold press with no room takes today's Reload.
+pub const COLD_OVER_ONE: bool = true;
+
+/// rc.14 cycle fix: whether a cycle press onto a fighter no group holds may plan that fighter's own group
+/// (`target_bodies` bodies; `bodies_after`: every body of both roles with it). Within Ready Fighters, always. Past it,
+/// with [`COLD_OVER_ONE`], only a one-body target, one body over Ready Fighters plus the cold fighter on screen when it
+/// is one of `over` (the fighters already loaded over Ready Fighters; every one of them must be the one on screen,
+/// `live`). So the members that fit keep their bodies, and a fighter that doesn't fit is loaded while it is on screen;
+/// [`cold_left`] frees it after.
+pub fn cold_admitted(bodies_after: usize, ready_fighters: usize, target_bodies: usize, over: &[u32], live: u32) -> bool {
+    bodies_after <= ready_fighters
+        || (COLD_OVER_ONE && target_bodies == 1 && over.iter().all(|kind| *kind == live)
+            && bodies_after <= ready_fighters + 1 + usize::from(over.contains(&live)))
+}
+
+/// rc.14 cycle fix: after a switch, a fighter loaded over Ready Fighters ([`cold_admitted`]) that is no longer on screen
+/// (`live`). Its unit is freed while the bodies still exceed Ready Fighters; otherwise only its mark goes (a larger Ready
+/// Fighters made room, so it now fits).
+pub fn cold_left(over: &[u32], live: u32) -> Option<u32> {
+    over.iter().copied().find(|kind| *kind != live)
+}
+
 /// Operator rule 2026-11-09 16:06Z (Eden `final-surface-i3-pf-1261f56c` `x6-cc`): a parked group freed now gives its
 /// memory back over the next second or two (Eden `final-surface-i3-pf-b04856b2`: about 113 MB 2 s after
 /// `[Samus, Yoshi]`'s free). F6: the game's resource service unloads the files within 0.5 s, and jemalloc returns their
@@ -3459,10 +3483,158 @@ mod tests {
         }
     }
 
+    /// rc.14 cycle fix: the operator's rc.13 console lanes (practice-diagnostics #31-#52), kinds from `trio.rs`.
+    const FALCO: u32 = 0x14;
+    const GUNNER: u32 = 0x4a;
+    const PICHU: u32 = 0x13;
+    const DIDDY: u32 = 0x27;
+    const KROOL: u32 = 0x45;
+    const GANONDORF: u32 = 0x18;
+
+    /// What [`run_laps`] saw over five laps of CPU presses.
+    #[derive(Debug)]
+    struct Laps {
+        /// Cold presses (the target in no unit) per lap.
+        loads: Vec<usize>,
+        /// The cold fighters of each lap, in press order.
+        cold: Vec<Vec<u32>>,
+        /// The members resident at the end of each lap, besides the cold fighters loaded over Ready Fighters.
+        hot: Vec<Vec<u32>>,
+        /// The most bodies over Ready Fighters after a switch settled, and while a cold fighter loaded.
+        over_settled: usize,
+        over_loading: usize,
+    }
+
+    /// Five laps of CPU cycle presses through the bank model of Design A. P1 stays put with its window `[1c, 8, 36]` and
+    /// group `[6]` (the console's). The CPU starts on `lap[0]` with the start-up window the scene header builds
+    /// (`Members::from_cycle`), the planner fills the rest. A press onto a member of the window is a reuse, onto a group an
+    /// exchange; a cold press plans the target's own group when [`cold_admitted`] lets it (no Reload) and is otherwise a
+    /// failure here. After every switch [`cold_left`]'s fighter goes while the bodies exceed Ready Fighters, and the
+    /// planner (`plan_extra_groups_with`) refills.
+    fn run_laps(lap: &[u32], ready_fighters: usize) -> Laps {
+        let policy = GroupPolicy { solo_popo_groups: true, ic_pair_groups: true };
+        let budget = GroupBudget { ready_fighters, pool_free: 16, special: SpecialPolicy::MII };
+        let (p1_window, p1_groups, p1_lane) = (Members::new(&[GAME_WATCH, PIKACHU, PALUTENA]).unwrap(), [Members::new(&[KIRBY]).unwrap()],
+            [PIKACHU, KIRBY, PALUTENA]);
+        let after = |at: usize| -> Vec<u32> { (1..lap.len()).map(|step| lap[(at + step) % lap.len()]).collect() };
+        let ordinary: Vec<u32> = after(0).into_iter().filter(|kind| Members::special_group(*kind, budget.special).is_none()).collect();
+        let mut window = Members::from_cycle(lap[0], &ordinary, 2).unwrap_or(Members::new(&[lap[0]]).unwrap());
+        let mut groups: Vec<Members> = Vec::new();
+        let bodies = |window: Members, groups: &[Members]| 2 + p1_window.count() - 1 + p1_groups.len() + window.count() - 1
+            + groups.iter().map(|m| m.count()).sum::<usize>();
+        let refill = |window: Members, groups: &mut Vec<Members>, live: usize| {
+            let lane = after(live);
+            let plan = plan_extra_groups_with(policy, [Some(p1_window), Some(window)], [&p1_groups[..], &groups[..]],
+                [&p1_lane[..], &lane[..]], [None, None], budget);
+            groups.extend(plan[1].iter().flatten().copied());
+        };
+        refill(window, &mut groups, 0);
+        let (mut live, mut over) = (0usize, Vec::<u32>::new());
+        let mut out = Laps { loads: vec![], cold: vec![], hot: vec![], over_settled: 0, over_loading: 0 };
+        for _ in 0..5 {
+            let mut cold = Vec::new();
+            for _ in 0..lap.len() {
+                let next = (live + 1) % lap.len();
+                let target = lap[next];
+                if window.index_of(target).is_none() {
+                    match groups.iter().position(|m| m.index_of(target).is_some()) {
+                        Some(g) => {
+                            let attached = groups.remove(g);
+                            groups.push(window);
+                            window = attached;
+                        }
+                        None => {
+                            let unit = Members::special_group(target, budget.special).unwrap_or(Members::new(&[target]).unwrap());
+                            let loading = bodies(window, &groups) + unit.count();
+                            assert!(cold_admitted(loading, ready_fighters, unit.count(), &over, lap[live]),
+                                "the cold press onto {target:#x} would Reload: {loading} bodies, over {over:x?}");
+                            out.over_loading = out.over_loading.max(loading.saturating_sub(ready_fighters));
+                            if loading > ready_fighters { over.push(target); }
+                            cold.push(target);
+                            groups.push(window);
+                            window = unit;
+                        }
+                    }
+                }
+                live = next;
+                while let Some(kind) = cold_left(&over, lap[live]) {
+                    over.retain(|k| *k != kind);
+                    if bodies(window, &groups) > ready_fighters {
+                        let g = groups.iter().position(|m| m.index_of(kind).is_some()).expect("the cold fighter's unit");
+                        groups.remove(g);
+                    }
+                }
+                out.over_settled = out.over_settled.max(bodies(window, &groups).saturating_sub(ready_fighters));
+                refill(window, &mut groups, live);
+            }
+            let mut hot: Vec<u32> = std::iter::once(window).chain(groups.iter().copied())
+                .flat_map(|m| m.kinds()[..m.count()].to_vec()).filter(|kind| !over.contains(kind)).collect();
+            hot.sort_unstable();
+            out.loads.push(cold.len());
+            out.cold.push(cold);
+            out.hot.push(hot);
+        }
+        out
+    }
+
+    fn steady(laps: &Laps, k: usize) {
+        assert!(laps.loads[1..].iter().all(|n| *n == k), "{k} cold loads per lap after the first: {laps:x?}");
+        assert!(laps.hot[1..].iter().all(|hot| *hot == laps.hot[0]), "the fitting members never change: {laps:x?}");
+        assert!(laps.cold[1..].iter().all(|cold| *cold == laps.cold[1]), "the same fighters stay cold: {laps:x?}");
+    }
+
+    /// The operator's rc.13 report, Ready Fighters 8 (k = 1): the CPU lap Falco > Mii Gunner > Pichu > Diddy Kong > King
+    /// K. Rool needs 4 bodies beside the one on screen and has 3. Only King K. Rool is loaded, while he is on screen, one
+    /// body over; every lap costs that one load, and nothing that fits is ever freed or rebuilt. rc.13 Reloaded two or
+    /// three times a lap (console #160-#216: a target-first and a canonical Mii Reload, each tearing down the role).
+    fn five_laps_of_the_operator_cycle_keep_what_fits_hot() {
+        let laps = run_laps(&[FALCO, GUNNER, PICHU, DIDDY, KROOL], 8);
+        steady(&laps, 1);
+        assert_eq!(laps.cold[1], vec![KROOL]);
+        assert_eq!((laps.over_settled, laps.over_loading), (1, 1), "one body over, only while King K. Rool is on screen");
+    }
+
+    /// k = 2: a six-member CPU lap with room for four. The two that don't fit (King K. Rool, Ganondorf, next to each
+    /// other) are each loaded while on screen; the second loads while the first is still on screen, so two bodies over
+    /// only during that load, one once the switch settled.
+    fn two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot() {
+        let laps = run_laps(&[FALCO, GUNNER, PICHU, DIDDY, KROOL, GANONDORF], 8);
+        steady(&laps, 2);
+        assert_eq!(laps.cold[1], vec![KROOL, GANONDORF]);
+        assert_eq!((laps.over_settled, laps.over_loading), (1, 2));
+    }
+
+    /// k = 0: the same lap at Ready Fighters 10 fits whole: every press is warm and nothing is loaded or freed.
+    fn a_lap_that_fits_is_all_warm() {
+        let laps = run_laps(&[FALCO, GUNNER, PICHU, DIDDY, KROOL], 10);
+        assert_eq!(laps.loads, vec![0; 5]);
+        steady(&laps, 0);
+        assert_eq!((laps.over_settled, laps.over_loading), (0, 0));
+    }
+
+    /// The admission's rule: within Ready Fighters always; one body over for a one-body cold fighter, and one more only
+    /// while the fighter on screen is itself a cold one; never a multi-body group, never with the switch off.
+    fn a_cold_fighter_takes_one_body_over_only_while_it_is_on_screen() {
+        assert!(cold_admitted(8, 8, 3, &[], FALCO));
+        assert!(cold_admitted(9, 8, 1, &[], DIDDY));
+        assert!(!cold_admitted(9, 8, 2, &[], DIDDY), "a multi-body group is no cold fighter");
+        assert!(!cold_admitted(10, 8, 1, &[], DIDDY));
+        assert!(cold_admitted(10, 8, 1, &[KROOL], KROOL), "the next cold one loads while King K. Rool is on screen");
+        assert!(!cold_admitted(10, 8, 1, &[KROOL], DIDDY), "a cold fighter off screen is freed first");
+        assert!(!cold_admitted(11, 8, 1, &[KROOL], KROOL));
+        assert_eq!(cold_left(&[KROOL], KROOL), None);
+        assert_eq!(cold_left(&[KROOL], FALCO), Some(KROOL));
+        assert_eq!(cold_left(&[KROOL, GANONDORF], GANONDORF), Some(KROOL));
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("five_laps_of_the_operator_cycle_keep_what_fits_hot", five_laps_of_the_operator_cycle_keep_what_fits_hot as fn()),
+            ("two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot", two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot as fn()),
+            ("a_lap_that_fits_is_all_warm", a_lap_that_fits_is_all_warm as fn()),
+            ("a_cold_fighter_takes_one_body_over_only_while_it_is_on_screen", a_cold_fighter_takes_one_body_over_only_while_it_is_on_screen as fn()),
             ("a_group_leaves_when_a_member_left_the_cycle_and_its_slot_is_reused", a_group_leaves_when_a_member_left_the_cycle_and_its_slot_is_reused as fn()),
             ("an_identity_moves_only_into_or_out_of_a_mii_window", an_identity_moves_only_into_or_out_of_a_mii_window as fn()),
             ("a_parked_group_counts_only_the_members_its_cycle_keeps", a_parked_group_counts_only_the_members_its_cycle_keeps as fn()),

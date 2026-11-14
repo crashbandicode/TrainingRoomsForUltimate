@@ -1135,6 +1135,18 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
     };
     let (physical,bank_build,reuse)=plan.map_or((descriptor,false,false),
         |p|(p.descriptor,!p.reuse && p.is_bank(),p.reuse));
+    // rc.14 cycle fix (Design A): a cycle press onto a fighter no reachable group serves waits for its own group
+    // (`body_bank::demand`), served like any group swap, instead of the Reload that tore down every resident fighter.
+    if !reuse && restore.is_none() && request==Request::CYCLE && same_class.is_none() && !hat_change && !exit {
+        let kind=descriptor_kind(&descriptor);
+        let configuration=match destination.target.kind() {
+            TargetKind::Fighter(_)=>Some(None),
+            TargetKind::Original if origin_saved.is_none()=>Some(None),
+            TargetKind::Saved=>publish.filter(|_|MiiClass::from_kind(kind).is_some()).map(Some),
+            _=>None,
+        };
+        if configuration.is_some_and(|c|super::body_bank::demand(current.binding.owner,kind,c)) {return false;}
+    }
     if !permitted(){return false;}
     let Some(pose)=capture_reload_pose(entry,current.binding.owner) else {
         refuse_request(request,"CPU position not ready before reload");return false;
