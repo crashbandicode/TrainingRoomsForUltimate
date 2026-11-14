@@ -12,6 +12,8 @@ pub const ROW: &str = "eggsercise";
 pub const ROW_BREAK: &str = "eggsercise_break";
 pub const ROW_SPEED: &str = "eggsercise_speed";
 pub const ROW_TARGET: &str = "eggsercise_target";
+/// Hide CPU's row (CPU page): with it On the CPU cannot be the target.
+pub const ROW_HIDE_CPU: &str = "hide_cpu";
 /// V2.6: `Hide` (the first option) hides the CPU while a practice game runs (`Run::running`); Hide CPU's rule reads it.
 pub const ROW_PRACTICE_CPU: &str = "practice_cpu";
 /// The standing notice (D5).
@@ -90,10 +92,15 @@ pub fn range(limit: Option<[f32; 4]>) -> [f32; 2] {
 
 /// The rows' option indices (the first option when a row is missing).
 pub fn choices(snapshot: &super::settings::Snapshot) -> [u8; 4] {
-    [ROW, ROW_BREAK, ROW_SPEED, ROW_TARGET].map(|id| {
-        let row = snapshot.get(id).unwrap_or_default();
-        row.iter().position(|v| *v != 0).unwrap_or(0) as u8
-    })
+    let [mode, rule, speed, target] = [ROW, ROW_BREAK, ROW_SPEED, ROW_TARGET].map(|id| choice(snapshot, id));
+    // Hide CPU wins over the CPU as the target: the disc is used (V2.1).
+    let hidden = snapshot.get(ROW_HIDE_CPU).is_some_and(|row| row.first().is_some_and(|on| *on != 0));
+    [mode, rule, speed, if hidden { DISC } else { target }]
+}
+
+/// One row's option index (the first when the row is missing).
+pub fn choice(snapshot: &super::settings::Snapshot, id: &str) -> u8 {
+    snapshot.get(id).unwrap_or_default().iter().position(|v| *v != 0).unwrap_or(0) as u8
 }
 
 /// One live attack of the fighter in world space: a pill from `.0` to `.1` (the same point for a point hitbox), its radius

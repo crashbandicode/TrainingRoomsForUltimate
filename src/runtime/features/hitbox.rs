@@ -71,6 +71,7 @@ pub fn set_installed(on: bool) {
 pub fn publish(snapshot: &Snapshot) {
     SETTING.store(hitbox::enabled(snapshot), Ordering::Release);
     EGG_ROWS.store(u32::from_le_bytes(eggs::choices(snapshot)), Ordering::Release);
+    PRACTICE_HIDE.store(eggs::choice(snapshot, eggs::ROW_PRACTICE_CPU) == 0, Ordering::Release);
 }
 
 // ---- Eggs-ercise (rc.14, `model::eggs`) -------------------------------------------------------------------------------
@@ -80,16 +81,11 @@ pub fn publish(snapshot: &Snapshot) {
 
 /// The rows (`eggs::choices`, little-endian).
 static EGG_ROWS: AtomicU32 = AtomicU32::new(0);
+/// CPU during a game: Hide (the first option).
+static PRACTICE_HIDE: AtomicBool = AtomicBool::new(true);
 /// The menu closed: the next pass starts a run if the row is on (D9: reopening the menu restarts it).
 static EGG_START: AtomicBool = AtomicBool::new(false);
 static RUN: Mutex<eggs::Run> = Mutex::new(eggs::Run::IDLE);
-/// `Run::running` as of the last pass (the CPU's hide rule reads it from other threads).
-static EGG_RUNNING: AtomicBool = AtomicBool::new(false);
-
-/// Whether a practice game (Eggs-ercise) is running (V2.6).
-pub fn eggs_running() -> bool {
-    EGG_RUNNING.load(Ordering::Acquire)
-}
 
 fn seed() -> u32 {
     // SAFETY: `GetSystemTick` has no preconditions.
@@ -116,7 +112,8 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
     let mut run = RUN.lock();
     let plan = run.plan(rows, seed, entry, scene::facts);
-    EGG_RUNNING.store(run.running(), Ordering::Release);
+    // V2.6: the CPU is hidden while a practice game runs and `CPU during a game` says Hide, unless it is the target.
+    super::hide_cpu::hide(run.running() && PRACTICE_HIDE.load(Ordering::Acquire) && !run.cpu_target());
     if plan == eggs::Plan::Clear {
         super::notices::clear(NOTICE_ID);
     }

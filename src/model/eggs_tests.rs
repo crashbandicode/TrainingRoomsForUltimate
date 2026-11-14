@@ -483,6 +483,20 @@ fn eggs_restart_waits_for_camera() {
     assert_eq!(run.score, 1);
     assert!(run.egg_at().is_some_and(|next| next != egg), "the next target spawned on the break's pass");
 }
+/// V2.1: with Hide CPU On the CPU cannot be the target: Hide CPU wins and the disc is used (SPEC V2.6 row 38).
+fn eggs_target_cpu_hidden() {
+    use crate::model::settings::Snapshot;
+    let mut snapshot = Snapshot::factory();
+    assert_eq!(choices(&snapshot), [OFF, ANY, NORMAL, DISC]);
+    snapshot.set(ROW_TARGET, &[0, 1]).unwrap();
+    assert_eq!(choices(&snapshot)[3], CPU);
+    snapshot.set(ROW_HIDE_CPU, &[1, 0]).unwrap();
+    assert_eq!(choices(&snapshot)[3], DISC, "Hide CPU wins");
+    snapshot.set(ROW_HIDE_CPU, &[0, 1]).unwrap();
+    assert_eq!(choices(&snapshot)[3], CPU, "Off: the CPU is the target again");
+    assert_eq!(choice(&snapshot, ROW_PRACTICE_CPU), 0, "CPU during a game: Hide first");
+}
+
 /// V2.1: a break freezes the breaker for `HITLAG` ticks in native Training only (the waiting room waits for the LDN
 /// check).
 fn eggs_hitlag() {
@@ -785,6 +799,7 @@ fn case_table() {
         ("eggs_restart_waits_for_camera", eggs_restart_waits_for_camera as fn()),
         ("eggs_stage_range", eggs_stage_range as fn()),
         ("eggs_target_cpu", eggs_target_cpu as fn()),
+        ("eggs_target_cpu_hidden", eggs_target_cpu_hidden as fn()),
         ("eggs_break_anim_timing", eggs_break_anim_timing as fn()),
         ("eggs_break_anim_overlap", eggs_break_anim_overlap as fn()),
         ("eggs_timer_end", eggs_timer_end as fn()),
