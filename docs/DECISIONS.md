@@ -958,6 +958,21 @@ the dump.
 
 #### rc14-eggs · Eggs-ercise mode (rc.14): nine decisions
 
+![rc14-eggs preview: the menu set to 1 minute, an egg with the counting notice, a jab that doesn't break it, and a neutral air that does, with the next egg in view (hits at 25 % speed)](decisions/rc14-eggs-demo.gif)
+
+Draft built at the recommended defaults; watch for the egg's look (D1), the notice size (D5) and the rise (D2).
+- **One Eden run, no splice** (Training, P1 Fox, CPU Mario, draft `5b8c3fd0`). The egg before each hit was placed by
+  a test hook so the hit can land; the egg after the break is the draft's own random spawn.
+- **Spawns stay on screen in this draft.** On the earlier draft 4 of 6 random spawns were out of view; `5b8c3fd0`
+  keeps them on screen and clear of the notice. The jab's egg is half behind the notice because the test hook put it
+  at jab reach.
+- **A new egg rises after it spawns**, and the arc can still pass the top of the screen briefly. Whether to keep the
+  movement is D2's sub-choice.
+
+![rc14-eggs preview: Fighters & Stages › Extras with Eggs-ercise set to 1 minute and Eggs break on set to Aerials](decisions/rc14-eggs-demo-menu.png)
+
+![rc14-eggs preview: the draft's egg, close up](decisions/rc14-eggs-demo-egg.png)
+
 **Open: the operator decides after rc.13 ships.** Nothing of it is built; rc.13 takes no Eggs-ercise code.
 
 Opened 2026-11-14. The operator: "rc14 add an eggsercise mode that let's the user practice hitting an object to
