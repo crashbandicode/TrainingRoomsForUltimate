@@ -596,9 +596,9 @@ This records the decision only; the implementation, host tests and Eden proofs a
   `mii-ordinary-player-alpha`, `mii-managed-source-coexist-alpha`, `managed-sources`,
   `managed-grouped-source-alpha`, `managed-ldn-third-source-alpha`.
 
-## Open (2026-11-13)
+## Open (2026-11-13/14)
 
-Opened by the primary for the operator from the lanes' reports of 2026-11-13. An item the operator has answered says
+Opened by the primary for the operator from the lanes' reports of 2026-11-13 (rc13-hitbox-pills: 2026-11-14). An item the operator has answered says
 **Decided** under its heading (rc13-DI-lines, rc13-memory); the rest are still open. Each item says what is being decided, the options with their cost to the player, and a recommendation. In each picture the
 recommended option has a **green outline**. The pictures are drawn by `tools/render_decisions_1113.py`
 (rc13-DI-lines: author-2's mockup as drawn; rc13-memory: `tools/render_rc13_memory.py`).
@@ -620,6 +620,7 @@ recommended option has a **green outline**. The pictures are drawn by `tools/ren
 | TR9 | Retire the old Record trigger row (V2), or keep its legacy start | A: V2, retire the row |
 | rc13-DI-lines | DI chips like the game's blue DI indicator (A–D rejected) | **Decided 11-13: E1 x1**, all 4 layers at today's width |
 | rc13-memory | Memory levers for TrainingRooms' share | **Decided 11-13: dropped**, no lever implemented |
+| rc13-hitbox-pills | Hitbox Visualization draws capsules as pills, not rows of discs | Adopt the pills in rc.13 |
 | OP1 | Push the held doc fixes | A: push the docs now, `c49681c9` after TR5 and TR8 |
 | OP2 | The standalone `libimgui_smash.nro` on the card | A: remove it |
 | OP3 | Deluxe's hidden Stages + Counterpick page | A: show it |
@@ -919,6 +920,29 @@ The picture is redrawn from B-2's `01-baseline.svg` and `03-levers.svg` by `tool
 charts are `lever-1..7.svg` in the same folder.
 
 ![rc13-memory levers](decisions/rc13-memory.png)
+
+#### rc13-hitbox-pills · Hitbox Visualization draws capsules as pills (rc.13)
+
+Opened 2026-11-14. The operator: "Do we use pill shapes where we're supposed to?" Today, no.
+
+- **Today:** each capsule hitbox or hurtbox (a shape with two centres) is drawn as a row of overlapping discs (2–16).
+  Its edges are scalloped, and the discs show darker lenses where they overlap.
+- **The proposal:** each capsule is drawn as one pill: two half-disc caps plus a band between them, in the same colour
+  and alpha. A one-centre hitbox stays a disc. The pane count is a wash: 110 → 112 on Ridley vs Ridley, standing.
+- **Cost:** about +70 lines. Worker B-2's parked feature-neutral size cuts (−172) cover it.
+- **The rule change:** SPEC-core-06's `sphere_count` rule (ceil(distance / (size x 1.75)) + 1, clamped 2..=16) is
+  retired.
+
+**Recommendation: adopt the pills in rc.13.**
+
+The pictures are worker B-2's mockup from an Eden run (`artifacts/rc13-pills/`, with `PILL-DESIGN.md`, in the
+workspace). Ridley vs CPU Ridley, Hitbox Visualization On. Panel 1 is the real Eden frame with today's orbs. Panel 2 is
+today's discs redrawn from the dumped panes. Panel 3 is the same capsules as pills. Every position and size comes from
+the dump.
+
+![rc13-hitbox-pills, P1 zoomed: the real Eden frame, today's discs redrawn from the dump, and the same capsules as pills](decisions/rc13-hitbox-pills.png)
+
+![rc13-hitbox-pills, both fighters: the same three panels](decisions/rc13-hitbox-pills-both.png)
 
 ### Other projects
 
