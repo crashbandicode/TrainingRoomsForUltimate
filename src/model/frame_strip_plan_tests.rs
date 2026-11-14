@@ -135,9 +135,9 @@ fn the_stick_row_scrolls_and_freezes_with_the_strip() {
 fn a_hit_block_carries_its_spot_label_when_the_row_is_on() {
     let calm = |damage| Sample { actionable: true, damage, ..Sample::default() };
     let mut powers = [0.0; crate::model::spots::SLOTS];
-    powers[..2].copy_from_slice(&[16.0, 13.0]);
+    powers[..2].copy_from_slice(&[13.0, 18.0]);
     let swing = |stop| Sample { attack: Some(Move::Jab), status: 0x27, active: true, stop, powers, ..Sample::default() };
-    for (attacker_is_p1, gained, label) in [(true, 16.0, "Sweet"), (true, 13.0, "Sour"), (false, 13.0, "Sour")] {
+    for (attacker_is_p1, gained, label) in [(true, 18.0 * 1.26, "Sweet"), (true, 13.0 * 1.26, "Sour"), (false, 13.0 * 1.26, "Sour")] {
         let mut t = Tracker::new();
         for f in 1..=8u32 {
             let victim = match f {

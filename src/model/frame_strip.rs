@@ -117,7 +117,7 @@ pub struct Sample {
     /// The fighter's damage (percent) and the damage of each attack slot that is active, for the spot of a hit (rc.14, SP1).
     pub damage: f32,
     pub powers: Powers,
-    /// P1 only: the status kind and the motion frame (a new move starts when either goes back).
+    /// The status kind and the motion frame (a new move starts when either goes back).
     pub status: i32,
     pub motion_frame: f32,
     /// `PostureModule::lr`: negative faces left, anything else faces right. `0` (the default, and an ungranted
@@ -671,7 +671,7 @@ impl Tracker {
         let (cpu_rise, p1_rise) = (cpu.stop && !self.cpu_was_stop, p1.stop && !self.p1_was_stop);
         let (on_cpu, on_p1) = (cpu_rise && cpu_gain > 0.0, p1_rise && p1_gain > 0.0);
         self.p1_was_stop = p1.stop;
-        let earlier = [self.peaks[0].earlier(p1.status), self.peaks[1].earlier(cpu.status)];
+        let earlier = [self.peaks[0].earlier(p1.status, p1.motion_frame), self.peaks[1].earlier(cpu.status, cpu.motion_frame)];
         #[cfg(feature = "diag")]
         if cpu_rise || p1_rise {
             let attacker = usize::from(p1_gain > cpu_gain);

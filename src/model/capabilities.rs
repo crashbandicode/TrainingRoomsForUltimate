@@ -128,7 +128,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 10] = [
     (Feature::DeveloperDebug, &["lua_const_lookup", "utility_get_category", "utility_get_kind"]),
     (Feature::CpuMash, &["fighter_manager_get_entry", "motion_kind", "transition_term_hook"]),
     (Feature::Hitbox, &[
-        "damage_of", "lua_const_lookup", "stage_id_call", "state_clear_speed_all", "state_heal", "state_item_active_count",
+        "damage_of", "lua_const_lookup", "motion_frame", "stage_id_call", "state_clear_speed_all", "state_heal", "state_item_active_count",
         "state_item_active_item", "state_item_object_id", "state_set_pos", "state_status_request", "status_kind", "stop_is_stop",
         "utility_get_category", "utility_get_kind", "work_get_int",
     ]),

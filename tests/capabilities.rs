@@ -154,7 +154,7 @@ impl Analysis {
         graph.dynamic.push(("hud::run".to_owned(), "hud_draw::draw".to_owned()));
         graph.dynamic.push(("hud::run".to_owned(), "hitbox::draw_orbs".to_owned()));
         // The shared production planner calls the runtime's AttackReader too (a fighter's pass and its articles').
-        for to in ["hitbox::active", "hitbox::data", "hitbox::read_u64", "hitbox::read_f32"] {
+        for to in ["hitbox::active", "hitbox::data", "hitbox::read_u64", "hitbox::read_f32", "hitbox::motion"] {
             graph.dynamic.push(("hitbox::frame".to_owned(), to.to_owned()));
         }
         // rc.14 spots: the frame strip reads each fighter's attack slots through the same reader (hitbox::powers).

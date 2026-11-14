@@ -6,10 +6,11 @@
 //! * when every active hitbox has the same damage and nothing stronger came earlier there is no label.
 //!
 //! The game does not say which slot connected (the only native is `AttackModule::is_infliction_status`, one flag for the whole
-//! module), so a hit is attributed by the damage it added to the defender (`attribute`): a slot is a candidate when the added
-//! damage divided by the slot's own damage lies in the multiplier window (staling and the Training multiplier scale every slot
-//! alike, so the ratio to one slot is the same number, and a slot whose ratio is outside the window cannot have connected). The
-//! label shows only when every candidate gets the same class; no candidate, or candidates of different classes, is no label.
+//! module), so a hit is attributed by the damage it added to the defender (`attribute`): the game scales every slot's damage by the
+//! same number (Eden, 2026-11-14: a fresh hit adds 1.26 times the slot's damage, two fighters' 1.2 times the 1.05 of a fresh move;
+//! staling lowers it to about 1.07; a charged smash raises it up to 1.4 times), so a slot is a candidate when the added damage
+//! divided by its own damage lies in that window, and a slot outside it cannot have connected. The label shows only when every
+//! candidate gets the same class; no candidate, or candidates of different classes, is no label.
 
 /// The rows (decision SP5, colours reworded 2026-11-14): the hitbox visualizer's *Frame data colours* (hitbox::legend_colour), the strip's labels, and the combo's match. Each is a toggle, Off by default.
 pub const ROW_FRAME_DATA: &str = "frame_data_colours";
@@ -29,12 +30,10 @@ pub type Powers = [f32; SLOTS];
 
 /// Damages closer than this are equal.
 pub const EPS: f32 = 0.05;
-/// The window of added damage over the hitbox's own damage (decision SP1's attribution). Fresh hits measure 1.0; staling only
-/// lowers it. The window is the one tuned number here: set from the ratios the diag build logs on Eden.
-pub const K_LOW: f32 = 0.9;
-pub const K_HIGH: f32 = 1.1;
-/// Frames with no active hitbox after which the next hitbox starts a new action (a repeated jab, a second move).
-pub const GAP: u8 = 10;
+/// The window of added damage over the hitbox's own damage (decision SP1's attribution), set from the `[Spots]` lines of Eden
+/// (the module notes): the multiplier is 1.26 for a fresh hit, about 1.07 stalest, up to 1.76 for a fully charged smash.
+pub const K_LOW: f32 = 1.0;
+pub const K_HIGH: f32 = 1.6;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Spot {
@@ -77,42 +76,34 @@ pub fn classify(p: f32, active: &Powers, earlier: f32) -> Option<Spot> {
     }
 }
 
-/// The strongest damage of one fighter's current action: what `classify` takes as `earlier`.
+/// The strongest damage of one fighter's current action: what `classify` takes as `earlier`. An action is one status; a new one
+/// starts when the status changes or the motion goes back (the same status entered again, as a jab's next hit does).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Peak {
     status: i32,
+    frame: f32,
     value: f32,
-    idle: u8,
 }
 
 impl Peak {
     pub const fn new() -> Peak {
-        Peak { status: i32::MIN, value: 0.0, idle: 0 }
+        Peak { status: i32::MIN, frame: 0.0, value: 0.0 }
     }
 
-    /// The strongest damage seen earlier in this action, for a frame in `status`: a new status is a new action.
-    pub fn earlier(&mut self, status: i32) -> f32 {
-        if status != self.status {
-            *self = Peak { status, value: 0.0, idle: 0 };
+    /// The strongest damage seen earlier in this action, for a frame in `status` at motion frame `frame`.
+    pub fn earlier(&mut self, status: i32, frame: f32) -> f32 {
+        if status != self.status || frame < self.frame {
+            self.value = 0.0;
         }
+        (self.status, self.frame) = (status, frame);
         self.value
     }
 
     /// Fold this frame's active damages in, after the frame was classified.
     pub fn fold(&mut self, active: &Powers) {
-        let top = active.iter().copied().fold(0.0, f32::max);
-        if top > 0.0 {
-            self.value = self.value.max(top);
-            self.idle = 0;
-        } else {
-            self.idle = self.idle.saturating_add(1);
-            if self.idle >= GAP {
-                self.value = 0.0;
-            }
-        }
+        self.value = self.value.max(active.iter().copied().fold(0.0, f32::max));
     }
 }
-
 /// The spot of the hit that added `gained` damage to the defender, from the attacker's `active` hitboxes and the action's
 /// `earlier` peak. `None` when it cannot be told.
 pub fn attribute(gained: f32, active: &Powers, earlier: f32) -> Option<Spot> {

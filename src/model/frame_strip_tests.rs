@@ -133,19 +133,22 @@ fn marks_of(attacker_is_p1: bool, powers: &[f32], gained: f32) -> Vec<Mark> {
 }
 
 /// Decision SP3: a connecting hit is labelled with the spot it landed, on the lane of the fighter it hit, the CPU or P1.
+/// A fresh hit adds 1.26 times its hitbox's damage (Eden, 2026-11-14).
+const M: f32 = 1.26;
+
 fn a_hit_is_labelled_with_its_spot_on_the_lane_of_the_fighter_it_hit() {
-    let tip_and_blade = [16.0, 13.0, 13.0, 13.0];
+    let tip_and_blade = [13.0, 13.0, 13.0, 18.0];
     let mark = |lane, spot| vec![Mark { frame: 3, lane, spot }];
-    assert_eq!(marks_of(true, &tip_and_blade, 16.0), mark(1, Spot::Sweet), "P1's hit is on the lane of the CPU it hit");
-    assert_eq!(marks_of(true, &tip_and_blade, 13.0), mark(1, Spot::Sour));
-    assert_eq!(marks_of(false, &tip_and_blade, 13.0), mark(0, Spot::Sour), "the CPU's hit is on P1's lane");
-    assert_eq!(marks_of(true, &tip_and_blade, 16.0 * 0.93), mark(1, Spot::Sweet), "a staled hit");
+    assert_eq!(marks_of(true, &tip_and_blade, 18.0 * M), mark(1, Spot::Sweet), "P1's hit is on the lane of the CPU it hit");
+    assert_eq!(marks_of(true, &tip_and_blade, 13.0 * M), mark(1, Spot::Sour));
+    assert_eq!(marks_of(false, &tip_and_blade, 13.0 * M), mark(0, Spot::Sour), "the CPU's hit is on P1's lane");
+    assert_eq!(marks_of(true, &tip_and_blade, 13.0 * 1.15), mark(1, Spot::Sour), "a staled hit");
 }
 
 /// Never a guess: equal hitboxes, a hit two hitboxes could have made, a hit that added no damage (a shield), a trade.
 fn a_hit_that_cannot_be_told_is_not_labelled() {
-    assert!(marks_of(true, &[12.0, 12.0, 12.0], 12.0).is_empty(), "equal hitboxes");
-    assert!(marks_of(true, &[16.0, 15.0], 15.5).is_empty(), "two candidates of different classes");
+    assert!(marks_of(true, &[12.0, 12.0, 12.0], 12.0 * M).is_empty(), "equal hitboxes");
+    assert!(marks_of(true, &[16.0, 15.0], 15.5 * M).is_empty(), "two candidates of different classes");
     assert!(marks_of(true, &[16.0, 13.0], 0.0).is_empty(), "no damage: a shield");
     let calm = Sample { actionable: true, damage: 20.0, ..Sample::default() };
     let hit = Sample { stop: true, hitstun: true, active: true, powers: p(&[16.0, 13.0]), damage: 36.0, ..Sample::default() };
@@ -160,7 +163,7 @@ fn a_weaker_hit_later_in_the_same_action_is_late() {
     for (status, expected) in [(ATTACK, Some(Spot::Late)), (ATTACK + 1, None)] {
         let calm = Sample { actionable: true, damage: 20.0, ..Sample::default() };
         let swing = |status, stop, powers: &[f32]| Sample { attack: Some(Move::Jab), status, active: true, stop, powers: p(powers), ..calm };
-        let hurt = Sample { stop: true, hitstun: true, damage: 33.0, ..Sample::default() };
+        let hurt = Sample { stop: true, hitstun: true, damage: 20.0 + 13.0 * M, ..Sample::default() };
         let mut t = Tracker::new();
         t.step(calm, calm, NONE);
         t.step(swing(ATTACK, false, &[16.0]), calm, NONE);
@@ -172,7 +175,7 @@ fn a_weaker_hit_later_in_the_same_action_is_late() {
 
 /// SP4: the follow-up hit's spot is on its link, and a saved link keeps it.
 fn a_link_remembers_the_spot_of_its_follow_up_hit() {
-    for (second, gained, expected) in [(&[12.0, 8.0][..], 12.0, Some(Spot::Sweet)), (&[12.0, 8.0], 8.0, Some(Spot::Sour)), (&[8.0], 8.0, None)] {
+    for (second, gained, expected) in [(&[13.0, 18.0][..], 18.0 * M, Some(Spot::Sweet)), (&[13.0, 18.0], 13.0 * M, Some(Spot::Sour)), (&[13.0], 13.0 * M, None)] {
         let mut t = Tracker::new();
         for f in 1..=26u32 {
             let (p1, inputs) = match f {

@@ -164,7 +164,7 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool) -> Sample {
         reaction,
         shielding: ids.shielding(status),
         status,
-        motion_frame: if p1 { natives::motion_frame(accessor) } else { 0.0 },
+        motion_frame: natives::motion_frame(accessor),
         facing: if lr < 0.0 { -1 } else { 1 },
         airborne: ids.resolved(C::SituationAir) && situation == ids.get(C::SituationAir),
     }

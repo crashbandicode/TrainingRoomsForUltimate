@@ -43,51 +43,58 @@ fn a_hitbox_weaker_than_an_earlier_one_of_the_action_is_late() {
     assert_eq!(classify(9.0, &p(&[13.0, 9.0]), 8.0), Some(Spot::Sour), "weaker than the frame's strongest, not than the earlier peak");
 }
 
-fn the_peak_starts_over_with_a_new_status_or_after_a_quiet_gap() {
+fn the_peak_starts_over_with_a_new_status_or_when_the_motion_goes_back() {
     let mut peak = Peak::new();
-    assert_eq!(peak.earlier(10), 0.0);
+    assert_eq!(peak.earlier(10, 0.0), 0.0);
     peak.fold(&p(&[16.0]));
-    assert_eq!(peak.earlier(10), 16.0, "the same action");
+    assert_eq!(peak.earlier(10, 1.0), 16.0, "the same action");
     peak.fold(&p(&[13.0]));
-    assert_eq!(peak.earlier(10), 16.0, "a weaker frame keeps the peak");
-    assert_eq!(peak.earlier(11), 0.0, "a new status is a new action");
+    assert_eq!(peak.earlier(10, 1.0), 16.0, "a weaker frame keeps the peak, and hitlag holds the motion frame");
+    assert_eq!(peak.earlier(10, 9.0), 16.0);
+    assert_eq!(peak.earlier(10, 0.0), 0.0, "the same status entered again (the next jab): the motion went back");
     peak.fold(&p(&[8.0]));
-    for _ in 0..GAP - 1 {
-        peak.fold(&p(&[]));
-    }
-    assert_eq!(peak.earlier(11), 8.0, "a short gap inside one move keeps it");
-    peak.fold(&p(&[]));
-    assert_eq!(peak.earlier(11), 0.0, "{GAP} quiet frames end the action");
+    assert_eq!(peak.earlier(11, 1.0), 0.0, "a new status is a new action");
+}
+
+/// The measured multiplier: a fresh hit adds 1.26 times its hitbox's damage (Eden, 2026-11-14).
+const M: f32 = 1.26;
+
+/// Marth's forward smash as the game reports it: three blade hitboxes of 13 and a tip of 18.
+fn marth() -> Powers {
+    p(&[13.0, 13.0, 13.0, 18.0])
 }
 
 fn a_hit_is_attributed_by_the_damage_it_added() {
-    let active = p(&[16.0, 13.0, 13.0, 13.0]);
-    assert_eq!(attribute(16.0, &active, 0.0), Some(Spot::Sweet));
-    assert_eq!(attribute(13.0, &active, 0.0), Some(Spot::Sour));
-    assert_eq!(attribute(13.0, &p(&[13.0]), 16.0), Some(Spot::Late));
+    assert_eq!(attribute(18.0 * M, &marth(), 0.0), Some(Spot::Sweet));
+    assert_eq!(attribute(13.0 * M, &marth(), 0.0), Some(Spot::Sour));
+    // The hit Eden logged: 16.926 added. The blade's ratio is 1.30; the tip's would be 0.94, below any multiplier the game uses.
+    assert_eq!(attribute(16.926, &marth(), 0.0), Some(Spot::Sour));
+    assert_eq!(attribute(13.0 * M, &p(&[13.0]), 16.0), Some(Spot::Late));
 }
 
 fn staling_and_multipliers_cancel_in_the_ratio() {
-    let active = p(&[16.0, 13.0]);
-    for k in [0.92, 0.95, 1.0, 1.05] {
-        assert_eq!(attribute(16.0 * k, &active, 0.0), Some(Spot::Sweet), "k {k}");
-        assert_eq!(attribute(13.0 * k, &active, 0.0), Some(Spot::Sour), "k {k}");
+    for m in [1.07, 1.15, M, 1.35] {
+        assert_eq!(attribute(13.0 * m, &marth(), 0.0), Some(Spot::Sour), "a blade hit at {m}");
+    }
+    assert_eq!(attribute(18.0 * M, &marth(), 0.0), Some(Spot::Sweet), "a fresh tip hit");
+    assert_eq!(attribute(18.0 * 1.35, &marth(), 0.0), Some(Spot::Sweet), "a slightly charged tip hit");
+    // A stale tip hit could also be a blade hit: 20.7 is 1.59 times 13. No label.
+    for m in [1.07, 1.15] {
+        assert_eq!(attribute(18.0 * m, &marth(), 0.0), None, "a tip hit at {m}");
     }
 }
 
 fn a_hit_that_cannot_be_told_has_no_label() {
-    // 15.5 could be 16 x 0.97 (Sweet) or 15 x 1.03 (Sour).
-    assert_eq!(attribute(15.5, &p(&[16.0, 15.0]), 0.0), None, "two candidates of different classes");
-    assert_eq!(attribute(12.0, &p(&[12.0, 12.0, 12.0]), 0.0), None, "equal hitboxes");
-    assert_eq!(attribute(30.0, &p(&[16.0, 13.0]), 0.0), None, "no hitbox could have dealt it");
+    assert_eq!(attribute(15.5 * M, &p(&[16.0, 15.0]), 0.0), None, "two candidates of different classes");
+    assert_eq!(attribute(12.0 * M, &p(&[12.0, 12.0, 12.0]), 0.0), None, "equal hitboxes");
+    assert_eq!(attribute(30.0 * M, &p(&[16.0, 13.0]), 0.0), None, "no hitbox could have dealt it");
     for gained in [0.0, -3.0, f32::NAN, f32::INFINITY] {
-        assert_eq!(attribute(gained, &p(&[16.0, 13.0]), 0.0), None, "{gained}");
+        assert_eq!(attribute(gained, &marth(), 0.0), None, "{gained}");
     }
     assert_eq!(attribute(16.0, &p(&[]), 0.0), None, "nothing active");
-    // Candidates that agree are still a label: 13 and 12.8 are both Sour.
-    assert_eq!(attribute(12.9, &p(&[16.0, 13.0, 12.8]), 0.0), Some(Spot::Sour));
+    // Candidates that agree are still a label: 13 and 12.8 are both Sour, and the tip's ratio (0.91) is below the window.
+    assert_eq!(attribute(13.0 * M, &p(&[18.0, 13.0, 12.8]), 0.0), Some(Spot::Sour));
 }
-
 /// Slot `i` is active when `0[i]` is `Some(damage)`; its `AttackData` is at `0x1000 * (i + 1)`. Reading an inactive slot panics.
 struct Slots([Option<f32>; SLOTS]);
 
@@ -190,7 +197,7 @@ fn case_table() {
         ("ties_at_the_top_are_all_sweet", ties_at_the_top_are_all_sweet as fn()),
         ("equal_hitboxes_and_a_lone_hitbox_have_no_label", equal_hitboxes_and_a_lone_hitbox_have_no_label as fn()),
         ("a_hitbox_weaker_than_an_earlier_one_of_the_action_is_late", a_hitbox_weaker_than_an_earlier_one_of_the_action_is_late as fn()),
-        ("the_peak_starts_over_with_a_new_status_or_after_a_quiet_gap", the_peak_starts_over_with_a_new_status_or_after_a_quiet_gap as fn()),
+        ("the_peak_starts_over_with_a_new_status_or_when_the_motion_goes_back", the_peak_starts_over_with_a_new_status_or_when_the_motion_goes_back as fn()),
         ("a_hit_is_attributed_by_the_damage_it_added", a_hit_is_attributed_by_the_damage_it_added as fn()),
         ("staling_and_multipliers_cancel_in_the_ratio", staling_and_multipliers_cancel_in_the_ratio as fn()),
         ("a_hit_that_cannot_be_told_has_no_label", a_hit_that_cannot_be_told_has_no_label as fn()),

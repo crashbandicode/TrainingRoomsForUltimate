@@ -958,6 +958,7 @@ const MODEL_CALLBACKS: &[(&str, &str)] = &[
     ("hitbox::frame", "hitbox::data"),
     ("hitbox::frame", "hitbox::read_u64"),
     ("hitbox::frame", "hitbox::read_f32"),
+    ("hitbox::frame", "hitbox::motion"),
     // rc.14 spots: the frame strip reads both fighters' attack slots through the same reader (hitbox::powers).
     ("input_display::sample", "hitbox::active"),
     ("input_display::sample", "hitbox::data"),

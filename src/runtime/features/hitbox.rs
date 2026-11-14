@@ -612,6 +612,11 @@ impl hitbox::AttackReader for GameAttacks {
         unsafe { natives::attack_data(self.0, slot) }
     }
 
+    fn motion(&mut self) -> f32 {
+        // SAFETY: as above.
+        unsafe { natives::motion_frame(self.0) }
+    }
+
     fn read_u64(&mut self, at: usize) -> u64 {
         // SAFETY: the planner reads only the guarded AttackData node field.
         unsafe { (at as *const u64).read() }

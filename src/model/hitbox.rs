@@ -500,6 +500,10 @@ pub trait AttackReader {
     fn data(&mut self, slot: i32) -> usize;
     fn read_u64(&mut self, at: usize) -> u64;
     fn read_f32(&mut self, at: usize) -> f32;
+    /// The fighter's motion frame (a new action starts when it goes back, `spots::Peak`); 0 when the reader has none.
+    fn motion(&mut self) -> f32 {
+        0.0
+    }
 }
 
 fn attack_vec3(reader: &mut impl AttackReader, at: usize) -> [f32; 3] {
@@ -570,7 +574,7 @@ pub fn legend_colour(kind: u32, spot: Option<super::spots::Spot>, usual: [f32; 3
 fn tint_legend(reader: &mut impl AttackReader, wants: &mut [Sphere], peak: &mut super::spots::Peak, status: i32) {
     use super::spots;
     let (_, damage) = powers(reader);
-    let earlier = peak.earlier(status);
+    let earlier = peak.earlier(status, reader.motion());
     for sphere in wants.iter_mut() {
         let kind = sphere.key >> 24;
         let slot = ((sphere.key >> 8) & 0xffff) as usize % spots::SLOTS;
