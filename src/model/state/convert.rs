@@ -14,32 +14,29 @@ use serde_json::Value;
 use super::file::SaveFile;
 use super::held_item::HeldItem;
 
-/// One row of §2.1: the `(choice, variation)` of each variation index, for a fighter kind.
-struct Entry {
-    kind: i32,
-    items: &'static [(u8, i32)],
-}
+/// One row of §2.1: a fighter kind and the `(choice, variation)` of each variation index.
+type Entry = (i32, &'static [(u8, i32)]);
 
 /// SPEC-state-04 §2.1. Kinds are the game's `FIGHTER_KIND_*` values.
 static TABLE: [Entry; 18] = [
-    Entry { kind: 0x54, items: &[(0, 0)] },                                                   // Banjo & Kazooie
-    Entry { kind: 0x3a, items: &[(1, 0)] },                                                   // Bowser Jr.
-    Entry { kind: 0x0e, items: &[(2, 0), (3, 5), (4, 6), (5, 7), (6, 0), (7, 0)] },           // Daisy
-    Entry { kind: 0x27, items: &[(8, 0), (9, 0)] },                                           // Diddy Kong
-    Entry { kind: 0x45, items: &[(10, 0)] },                                                  // King K. Rool
-    Entry { kind: 0x02, items: &[(11, 0), (12, 0)] },                                         // Link
-    Entry { kind: 0x31, items: &[(13, 0)] },                                                  // Mega Man
-    Entry { kind: 0x37, items: &[(14, 0), (15, 0), (16, 0), (17, 0), (18, 0), (19, 0), (20, 0), (21, 0)] }, // Pac-Man
-    Entry { kind: 0x0d, items: &[(22, 0), (23, 5), (24, 6), (25, 7), (26, 0), (27, 0)] },     // Peach
-    Entry { kind: 0x44, items: &[(28, 0)] },                                                  // Richter
-    Entry { kind: 0x2d, items: &[(29, 0), (29, 1), (29, 2), (29, 3), (29, 4), (29, 5), (29, 6), (29, 7)] }, // R.O.B.
-    Entry { kind: 0x38, items: &[(30, 0), (31, 0)] },                                         // Robin
-    Entry { kind: 0x10, items: &[(32, 0)] },                                                  // Sheik
-    Entry { kind: 0x43, items: &[(33, 0)] },                                                  // Simon
-    Entry { kind: 0x22, items: &[(34, 0)] },                                                  // Snake
-    Entry { kind: 0x2e, items: &[(35, 0)] },                                                  // Toon Link
-    Entry { kind: 0x30, items: &[(36, 0)] },                                                  // Villager
-    Entry { kind: 0x17, items: &[(37, 0)] },                                                  // Young Link
+    (0x54, &[(0, 0)]),                                                                // Banjo & Kazooie
+    (0x3a, &[(1, 0)]),                                                                // Bowser Jr.
+    (0x0e, &[(2, 0), (3, 5), (4, 6), (5, 7), (6, 0), (7, 0)]),                        // Daisy
+    (0x27, &[(8, 0), (9, 0)]),                                                        // Diddy Kong
+    (0x45, &[(10, 0)]),                                                               // King K. Rool
+    (0x02, &[(11, 0), (12, 0)]),                                                      // Link
+    (0x31, &[(13, 0)]),                                                               // Mega Man
+    (0x37, &[(14, 0), (15, 0), (16, 0), (17, 0), (18, 0), (19, 0), (20, 0), (21, 0)]), // Pac-Man
+    (0x0d, &[(22, 0), (23, 5), (24, 6), (25, 7), (26, 0), (27, 0)]),                  // Peach
+    (0x44, &[(28, 0)]),                                                               // Richter
+    (0x2d, &[(29, 0), (29, 1), (29, 2), (29, 3), (29, 4), (29, 5), (29, 6), (29, 7)]), // R.O.B.
+    (0x38, &[(30, 0), (31, 0)]),                                                      // Robin
+    (0x10, &[(32, 0)]),                                                               // Sheik
+    (0x43, &[(33, 0)]),                                                               // Simon
+    (0x22, &[(34, 0)]),                                                               // Snake
+    (0x2e, &[(35, 0)]),                                                               // Toon Link
+    (0x30, &[(36, 0)]),                                                               // Villager
+    (0x17, &[(37, 0)]),                                                               // Young Link
 ];
 
 /// Options of the old setting.
@@ -54,7 +51,7 @@ pub fn setting_index(value: &Value) -> Option<usize> {
 
 /// The entry a fighter kind has for a variation, if any.
 pub fn item_for(kind: i32, variation: usize) -> Option<(u8, i32)> {
-    TABLE.iter().find(|e| e.kind == kind).and_then(|e| e.items.get(variation)).copied()
+    TABLE.iter().find(|e| e.0 == kind).and_then(|e| e.1.get(variation)).copied()
 }
 
 /// The snapshot the old setting means for one slot: `index` is the option (1..=16), the kinds are the
