@@ -394,6 +394,17 @@ pub struct CpuRoleDrive {
     live: MappedInputs,
 }
 
+/// The phase a mode and possession show.
+const fn phase_of(mode: Mode, possession: Possession) -> Phase {
+    match (mode, possession) {
+        (Mode::Pause, _) => Phase::Lockout,
+        (Mode::Record, Possession::Standby) => Phase::Standby,
+        (Mode::Record, _) => Phase::Recording,
+        (Mode::Playback, _) => Phase::Playback,
+        (Mode::None, _) => Phase::Idle,
+    }
+}
+
 impl CpuRoleDrive {
     pub const fn idle() -> Self {
         Self { mode: Mode::None, possession: Possession::Player, lockout: 0, recorded_facing: 1, live: MappedInputs::NEUTRAL }
@@ -404,13 +415,7 @@ impl CpuRoleDrive {
     }
 
     pub const fn phase(&self) -> Phase {
-        match (self.mode, self.possession) {
-            (Mode::Pause, _) => Phase::Lockout,
-            (Mode::Record, Possession::Standby) => Phase::Standby,
-            (Mode::Record, _) => Phase::Recording,
-            (Mode::Playback, _) => Phase::Playback,
-            (Mode::None, _) => Phase::Idle,
-        }
+        phase_of(self.mode, self.possession)
     }
 
     #[cfg(test)]
@@ -611,15 +616,13 @@ impl Recorder {
         self.len.get(usize::from(slot)).copied().unwrap_or(0)
     }
 
+    #[cfg(test)]
     pub fn is_recorded(&self, slot: u8) -> bool {
         self.recorded.get(usize::from(slot)).copied().unwrap_or(false)
     }
 
-    pub fn origin(&self, slot: u8) -> Option<Origin> {
-        self.origin.get(usize::from(slot)).copied()
-    }
-
     /// The stored frames of `slot` (its length), for export and the clip layer.
+    #[cfg(test)]
     pub fn frames(&self, slot: u8) -> Option<&[MappedInputs]> {
         let i = usize::from(slot);
         self.slots.get(i).map(|s| &s[..usize::from(self.len[i]).min(SLOT_FRAMES)])
@@ -651,13 +654,7 @@ impl Recorder {
 
     /// The phase for the tint and the notice.
     pub const fn phase(&self) -> Phase {
-        match (self.mode, self.possession) {
-            (Mode::Pause, _) => Phase::Lockout,
-            (Mode::Record, Possession::Standby) => Phase::Standby,
-            (Mode::Record, _) => Phase::Recording,
-            (Mode::Playback, _) => Phase::Playback,
-            (Mode::None, _) => Phase::Idle,
-        }
+        phase_of(self.mode, self.possession)
     }
 
     // ---- starting and stopping -----------------------------------------------------------------
