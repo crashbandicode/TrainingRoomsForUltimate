@@ -160,6 +160,7 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool) -> Sample {
         active: p1 && active,
         damage: natives::damage(accessor, 0),
         powers,
+        power_mul: 1.0,
         attack: if p1 { ids.attack(status) } else { None },
         reaction,
         shielding: ids.shielding(status),

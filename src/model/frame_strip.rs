@@ -117,6 +117,9 @@ pub struct Sample {
     /// The fighter's damage (percent) and the damage of each attack slot that is active, for the spot of a hit (rc.14, SP1).
     pub damage: f32,
     pub powers: Powers,
+    /// The fighter's status-scoped damage multiplier (`AttackModule::power_mul_status`: 1.0, or the smash charge); 0.0 is a read that was not
+    /// made, which leaves a hit unlabelled.
+    pub power_mul: f32,
     /// The status kind and the motion frame (a new move starts when either goes back).
     pub status: i32,
     pub motion_frame: f32,
@@ -680,8 +683,8 @@ impl Tracker {
             self.spot_read = Some((self.frame, gained, powers));
         }
         let hit = match (on_cpu, on_p1) {
-            (true, false) => Some((1, spots::attribute(cpu_gain, &p1.powers, earlier[0]))),
-            (false, true) => Some((0, spots::attribute(p1_gain, &cpu.powers, earlier[1]))),
+            (true, false) => Some((1, spots::attribute(cpu_gain, &p1.powers, p1.power_mul, earlier[0]))),
+            (false, true) => Some((0, spots::attribute(p1_gain, &cpu.powers, cpu.power_mul, earlier[1]))),
             _ => None,
         };
         self.peaks[0].fold(&p1.powers);

@@ -106,7 +106,7 @@ impl Peak {
 }
 /// The spot of the hit that added `gained` damage to the defender, from the attacker's `active` hitboxes and the action's
 /// `earlier` peak. `None` when it cannot be told.
-pub fn attribute(gained: f32, active: &Powers, earlier: f32) -> Option<Spot> {
+pub fn attribute(gained: f32, active: &Powers, _mul: f32, earlier: f32) -> Option<Spot> {
     if !gained.is_finite() || gained <= 0.0 {
         return None;
     }

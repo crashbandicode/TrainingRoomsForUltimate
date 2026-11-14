@@ -65,48 +65,74 @@ fn marth() -> Powers {
 }
 
 fn a_hit_is_attributed_by_the_damage_it_added() {
-    assert_eq!(attribute(18.0 * M, &marth(), 0.0), Some(Spot::Sweet));
-    assert_eq!(attribute(13.0 * M, &marth(), 0.0), Some(Spot::Sour));
+    assert_eq!(attribute(18.0 * M, &marth(), 1.0, 0.0), Some(Spot::Sweet));
+    assert_eq!(attribute(13.0 * M, &marth(), 1.0, 0.0), Some(Spot::Sour));
     // The hit Eden logged: 16.926 added. The blade's ratio is 1.30; the tip's would be 0.94, below any multiplier the game uses.
-    assert_eq!(attribute(16.926, &marth(), 0.0), Some(Spot::Sour));
-    assert_eq!(attribute(13.0 * M, &p(&[13.0]), 16.0), Some(Spot::Late));
+    assert_eq!(attribute(16.926, &marth(), 1.0, 0.0), Some(Spot::Sour));
+    assert_eq!(attribute(13.0 * M, &p(&[13.0]), 1.0, 16.0), Some(Spot::Late));
 }
 
 fn staling_and_multipliers_cancel_in_the_ratio() {
     for m in [1.07, 1.15, M, 1.35] {
-        assert_eq!(attribute(13.0 * m, &marth(), 0.0), Some(Spot::Sour), "a blade hit at {m}");
+        assert_eq!(attribute(13.0 * m, &marth(), 1.0, 0.0), Some(Spot::Sour), "a blade hit at {m}");
     }
-    assert_eq!(attribute(18.0 * M, &marth(), 0.0), Some(Spot::Sweet), "a fresh tip hit");
-    assert_eq!(attribute(18.0 * 1.35, &marth(), 0.0), Some(Spot::Sweet), "a slightly charged tip hit");
+    assert_eq!(attribute(18.0 * M, &marth(), 1.0, 0.0), Some(Spot::Sweet), "a fresh tip hit");
+    assert_eq!(attribute(18.0 * 1.35, &marth(), 1.0, 0.0), Some(Spot::Sweet), "a slightly charged tip hit");
     // A stale tip hit could also be a blade hit: 20.7 is 1.59 times 13. No label.
     for m in [1.07, 1.15] {
-        assert_eq!(attribute(18.0 * m, &marth(), 0.0), None, "a tip hit at {m}");
+        assert_eq!(attribute(18.0 * m, &marth(), 1.0, 0.0), None, "a tip hit at {m}");
     }
 }
 
 fn a_hit_that_cannot_be_told_has_no_label() {
-    assert_eq!(attribute(15.5 * M, &p(&[16.0, 15.0]), 0.0), None, "two candidates of different classes");
-    assert_eq!(attribute(12.0 * M, &p(&[12.0, 12.0, 12.0]), 0.0), None, "equal hitboxes");
-    assert_eq!(attribute(30.0 * M, &p(&[16.0, 13.0]), 0.0), None, "no hitbox could have dealt it");
+    assert_eq!(attribute(15.5 * M, &p(&[16.0, 15.0]), 1.0, 0.0), None, "two candidates of different classes");
+    assert_eq!(attribute(12.0 * M, &p(&[12.0, 12.0, 12.0]), 1.0, 0.0), None, "equal hitboxes");
+    assert_eq!(attribute(30.0 * M, &p(&[16.0, 13.0]), 1.0, 0.0), None, "no hitbox could have dealt it");
     for gained in [0.0, -3.0, f32::NAN, f32::INFINITY] {
-        assert_eq!(attribute(gained, &marth(), 0.0), None, "{gained}");
+        assert_eq!(attribute(gained, &marth(), 1.0, 0.0), None, "{gained}");
     }
-    assert_eq!(attribute(16.0, &p(&[]), 0.0), None, "nothing active");
+    assert_eq!(attribute(16.0, &p(&[]), 1.0, 0.0), None, "nothing active");
     // Candidates that agree are still a label: 13 and 12.8 are both Sour, and the tip's ratio (0.91) is below the window.
-    assert_eq!(attribute(13.0 * M, &p(&[18.0, 13.0, 12.8]), 0.0), Some(Spot::Sour));
+    assert_eq!(attribute(13.0 * M, &p(&[18.0, 13.0, 12.8]), 1.0, 0.0), Some(Spot::Sour));
 }
 /// Captain Falcon's forward air as the first Eden boot logged it (spots-4e9f91b5-1): the knee's three phases, damages 14 and 18, then 8 and 9,
 /// then 3. The final build's window reads each hit the way the game made it (a fresh hit is 1.26 times the damage).
 fn the_falcon_knee_hits_eden_logged() {
     let knee = p(&[14.0, 18.0, 18.0]);
-    assert_eq!(attribute(22.68, &knee, 0.0), Some(Spot::Sweet), "18 x 1.26");
-    assert_eq!(attribute(17.64, &knee, 0.0), Some(Spot::Sour), "14 x 1.26; the 18s' ratio is 0.98");
+    assert_eq!(attribute(22.68, &knee, 1.0, 0.0), Some(Spot::Sweet), "18 x 1.26");
+    assert_eq!(attribute(17.64, &knee, 1.0, 0.0), Some(Spot::Sour), "14 x 1.26; the 18s' ratio is 0.98");
     let middle = p(&[8.0, 9.0, 8.0, 9.0]);
-    assert_eq!(attribute(8.736, &middle, 0.0), Some(Spot::Sour), "8 x 1.092 (stale); the 9s' ratio is 0.97");
-    assert_eq!(attribute(10.08, &middle, 0.0), None, "8 x 1.26 or 9 x 1.12: no label");
+    assert_eq!(attribute(8.736, &middle, 1.0, 0.0), Some(Spot::Sour), "8 x 1.092 (stale); the 9s' ratio is 0.97");
+    assert_eq!(attribute(10.08, &middle, 1.0, 0.0), None, "8 x 1.26 or 9 x 1.12: no label");
     // The last frames: 3 and 3 after the 18 of the same action are Late; a lone 3 on its own has no label.
-    assert_eq!(attribute(3.213, &p(&[3.0, 3.0]), 18.0), Some(Spot::Late));
-    assert_eq!(attribute(3.213, &p(&[3.0, 3.0]), 0.0), None);
+    assert_eq!(attribute(3.213, &p(&[3.0, 3.0]), 1.0, 18.0), Some(Spot::Late));
+    assert_eq!(attribute(3.213, &p(&[3.0, 3.0]), 1.0, 0.0), None);
+}
+/// A smash charged to `mul` (the game's `AttackModule::power_mul_status`, 1.0 uncharged): every slot's damage is multiplied by it, so a hit adds
+/// the slot's damage x `mul` x 1.26 and the label follows the hitbox, not the charge (spots-2, 2026-11-14; the lane's known limit was a blade hit of a
+/// nearly full charge read as the tip's).
+fn a_charged_smash_is_attributed_by_the_hitbox_that_dealt_it() {
+    for mul in [1.0, 1.1, 1.2, 1.3, 1.4] {
+        assert_eq!(attribute(13.0 * mul * M, &marth(), mul, 0.0), Some(Spot::Sour), "a blade hit at charge {mul}");
+        assert_eq!(attribute(18.0 * mul * M, &marth(), mul, 0.0), Some(Spot::Sweet), "a tip hit at charge {mul}");
+    }
+    // The hit that read as the tip's before: a blade of a full charge adds 22.9, 1.27 times the tip's 18.
+    assert_eq!(attribute(13.0 * 1.4 * M, &marth(), 1.4, 0.0), Some(Spot::Sour));
+    // Late follows the same rule: a weaker hitbox after the action's strongest, charged.
+    assert_eq!(attribute(3.0 * 1.4 * M, &p(&[3.0, 3.0]), 1.4, 18.0), Some(Spot::Late));
+}
+
+/// A charge does not make a hit tellable: a stale tip hit that a blade could also have made is still no label, charged or not.
+fn a_charged_hit_that_cannot_be_told_has_no_label() {
+    assert_eq!(attribute(18.0 * 1.4 * 1.07, &marth(), 1.4, 0.0), None, "a stale full-charge tip hit: the blade's ratio is 1.48");
+}
+
+/// The multiplier is the game's own number; one that was not read (0.0) or is not a usable number labels nothing.
+fn an_unusable_multiplier_gives_no_label() {
+    for mul in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+        assert_eq!(attribute(18.0 * M, &marth(), mul, 0.0), None, "multiplier {mul}");
+        assert_eq!(attribute(13.0 * M, &marth(), mul, 0.0), None, "multiplier {mul}");
+    }
 }
 /// Slot `i` is active when `0[i]` is `Some(damage)`; its `AttackData` is at `0x1000 * (i + 1)`. Reading an inactive slot panics.
 struct Slots([Option<f32>; SLOTS]);
@@ -213,6 +239,9 @@ fn case_table() {
         ("staling_and_multipliers_cancel_in_the_ratio", staling_and_multipliers_cancel_in_the_ratio as fn()),
         ("a_hit_that_cannot_be_told_has_no_label", a_hit_that_cannot_be_told_has_no_label as fn()),
         ("the_falcon_knee_hits_eden_logged", the_falcon_knee_hits_eden_logged as fn()),
+        ("a_charged_smash_is_attributed_by_the_hitbox_that_dealt_it", a_charged_smash_is_attributed_by_the_hitbox_that_dealt_it as fn()),
+        ("a_charged_hit_that_cannot_be_told_has_no_label", a_charged_hit_that_cannot_be_told_has_no_label as fn()),
+        ("an_unusable_multiplier_gives_no_label", an_unusable_multiplier_gives_no_label as fn()),
         ("the_powers_of_a_fighter_are_read_from_its_active_slots_only", the_powers_of_a_fighter_are_read_from_its_active_slots_only as fn()),
         ("the_hit_spheres_take_the_frame_data_colours", the_hit_spheres_take_the_frame_data_colours as fn()),
         ("one_function_chooses_every_tint", one_function_chooses_every_tint as fn()),

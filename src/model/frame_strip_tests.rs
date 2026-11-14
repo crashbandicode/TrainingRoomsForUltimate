@@ -13,7 +13,7 @@ fn idle() -> Sample {
 }
 
 fn attack(mv: Move, status: i32, motion_frame: f32) -> Sample {
-    Sample { attack: Some(mv), status, motion_frame, ..Sample::default() }
+    Sample { attack: Some(mv), status, motion_frame, power_mul: 1.0, ..Sample::default() }
 }
 
 /// A script: P1, the CPU and P1's inputs for each frame, from frame 1.
@@ -116,7 +116,12 @@ fn p(values: &[f32]) -> Powers {
 /// Three frames: both calm (the victim at 20%), the attacker swings, the attacker hits (hitlag) and the victim, hurt, has
 /// `gained` more damage. The labelled hits.
 fn marks_of(attacker_is_p1: bool, powers: &[f32], gained: f32) -> Vec<Mark> {
-    let calm = Sample { actionable: true, damage: 20.0, ..Sample::default() };
+    marks_charged(attacker_is_p1, powers, 1.0, gained)
+}
+
+/// marks_of with the attacker's AttackModule::power_mul_status at mul (a smash charged to that multiplier).
+fn marks_charged(attacker_is_p1: bool, powers: &[f32], mul: f32, gained: f32) -> Vec<Mark> {
+    let calm = Sample { actionable: true, damage: 20.0, power_mul: mul, ..Sample::default() };
     let swing = |stop| Sample { attack: Some(Move::Jab), status: ATTACK, active: true, stop, powers: p(powers), ..calm };
     let hurt = Sample { stop: true, hitstun: true, damage: 20.0 + gained, ..Sample::default() };
     let mut t = Tracker::new();
@@ -145,6 +150,17 @@ fn a_hit_is_labelled_with_its_spot_on_the_lane_of_the_fighter_it_hit() {
     assert_eq!(marks_of(true, &tip_and_blade, 13.0 * 1.15), mark(1, Spot::Sour), "a staled hit");
 }
 
+/// A smash charged by the game's own multiplier (`AttackModule::power_mul_status`): the label follows the hitbox that dealt the hit, not the charge.
+fn a_charged_hit_is_labelled_by_the_hitbox_that_dealt_it() {
+    let tip_and_blade = [13.0, 13.0, 13.0, 18.0];
+    let mark = |lane, spot| vec![Mark { frame: 3, lane, spot }];
+    for charge in [1.0, 1.2, 1.4] {
+        assert_eq!(marks_charged(true, &tip_and_blade, charge, 13.0 * charge * M), mark(1, Spot::Sour), "a blade hit at charge {charge}");
+        assert_eq!(marks_charged(true, &tip_and_blade, charge, 18.0 * charge * M), mark(1, Spot::Sweet), "a tip hit at charge {charge}");
+    }
+    assert_eq!(marks_charged(false, &tip_and_blade, 1.4, 13.0 * 1.4 * M), mark(0, Spot::Sour), "the CPU's charged hit is on P1's lane");
+    assert!(marks_charged(true, &tip_and_blade, 0.0, 13.0 * 1.4 * M).is_empty(), "a multiplier that was not read: no label");
+}
 /// Never a guess: equal hitboxes, a hit two hitboxes could have made, a hit that added no damage (a shield), a trade.
 fn a_hit_that_cannot_be_told_is_not_labelled() {
     assert!(marks_of(true, &[12.0, 12.0, 12.0], 12.0 * M).is_empty(), "equal hitboxes");
@@ -161,7 +177,7 @@ fn a_hit_that_cannot_be_told_is_not_labelled() {
 /// SP1: a weaker hitbox than the strongest of the same action is Late; a new action starts over.
 fn a_weaker_hit_later_in_the_same_action_is_late() {
     for (status, expected) in [(ATTACK, Some(Spot::Late)), (ATTACK + 1, None)] {
-        let calm = Sample { actionable: true, damage: 20.0, ..Sample::default() };
+        let calm = Sample { actionable: true, damage: 20.0, power_mul: 1.0, ..Sample::default() };
         let swing = |status, stop, powers: &[f32]| Sample { attack: Some(Move::Jab), status, active: true, stop, powers: p(powers), ..calm };
         let hurt = Sample { stop: true, hitstun: true, damage: 20.0 + 13.0 * M, ..Sample::default() };
         let mut t = Tracker::new();
@@ -218,6 +234,7 @@ fn case_table() {
         ("display_toggle_flips_the_strip_row", display_toggle_flips_the_strip_row as fn()),
         ("a_hit_is_labelled_with_its_spot_on_the_lane_of_the_fighter_it_hit", a_hit_is_labelled_with_its_spot_on_the_lane_of_the_fighter_it_hit as fn()),
         ("a_hit_that_cannot_be_told_is_not_labelled", a_hit_that_cannot_be_told_is_not_labelled as fn()),
+        ("a_charged_hit_is_labelled_by_the_hitbox_that_dealt_it", a_charged_hit_is_labelled_by_the_hitbox_that_dealt_it as fn()),
         ("a_weaker_hit_later_in_the_same_action_is_late", a_weaker_hit_later_in_the_same_action_is_late as fn()),
         ("a_link_remembers_the_spot_of_its_follow_up_hit", a_link_remembers_the_spot_of_its_follow_up_hit as fn()),
         ("the_spot_labels_row_reads_its_setting", the_spot_labels_row_reads_its_setting as fn()),
