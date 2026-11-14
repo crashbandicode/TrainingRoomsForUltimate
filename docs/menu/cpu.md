@@ -503,3 +503,6 @@ When it differs from the level in Training's own menu, a notice says so each tim
 
 The last row of the page. It asks first, then puts every row of the CPU page back to your saved defaults (the factory
 values above, until you save your own with X).
+
+![CPU > Defence with SDI Strength High, Clatter Strength High and Dodge Staling Off: Reset page to defaults, A asks, A resets; the rows read None, None and On](../media/rc13-reset-page-cpu.gif)<br>
+*ZL + Up and Up reach the last row, Reset page to defaults. A asks, A resets: back on Defence, SDI Strength and Clatter Strength read None and Dodge Staling reads On again. Every press is named in the menu. Eden, rc.13 (untested on hardware).*

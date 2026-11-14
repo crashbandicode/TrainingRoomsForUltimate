@@ -20,10 +20,8 @@ The CPU is not affected: its chord and [CPU Character](#cpu-character) always wo
 - **Default:** Off
 - **How:** A, Left or Right flips it.
 
-![Player Swapping Off; A turns it On; Player Character, Captain Falcon, A; Player 1 loads Captain Falcon](../media/rc11-player-swapping.gif)<br>
-*B + Up opens the menu on Player Swapping (Off); A turns it On; then Player Character, Captain Falcon, A, and B closes the menu: Player 1 loads Captain Falcon. The 8 s load is cut. Eden, rc.11.*
-
-<!-- CAPTURE-REQUEST v02-player-swapping: a GIF that shows the row's own effect: the same Cycle Player chord (ZL + D-pad Right) with Player Swapping Off changes nothing, then On changes the fighter. This clip picks a fighter with Player Character, which works either way. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![Player Swapping Off: the Cycle Player chord changes nothing; A turns the row On; the same chord replaces Mario with Donkey Kong](../media/rc13-player-swapping-gate.gif)<br>
+*With Player Swapping Off the Cycle Player chord (ZL + D-pad Right, named in a box) does nothing and shows no notice. B + Up opens the menu on Player Swapping, A turns it On, B closes it, and the same chord loads Donkey Kong as Player 1 (the load is cut). Eden, rc.13 (untested on hardware).*
 
 More: [Fighter cycles › Player Swapping](../guide/fighter-cycles.md#player-swapping)
 
@@ -413,3 +411,6 @@ factory values above, until you save your own with X): the switches, the Loading
 hat lists, the Lobby Stages list, and Player Character and CPU Character. If a pick changes, that fighter loads when
 the menu closes. Your Mii choices, the stage forms, the Lobby Stages mode
 (Rotation or Direct) and the Solo Popo marks of Character Cycles stay as they are.
+
+![Fighters & Stages with Player Swapping and Solo Popo On and the CPU a Donkey Kong: Up to Reset page to defaults, A asks, A resets; both switches read Off and the CPU loads Mario again](../media/rc13-reset-page-fighters-stages.gif)<br>
+*Up wraps to the last row, Reset page to defaults. A asks, A resets: Player Swapping and Solo Popo read Off, and when B closes the menu the CPU reloads as Mario (the load is cut). Eden, rc.13 (untested on hardware).*

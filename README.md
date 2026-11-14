@@ -100,7 +100,7 @@ select for the next stage.
 
 The page also switches fighters without leaving Training, makes Mii fighters and changes the stage right now.
 
-<!-- CAPTURE-REQUEST v02-player-swapping: a GIF (README and Fighters & Stages › Player Swapping): the same Cycle Player chord (ZL + D-pad Right) with Player Swapping Off changes nothing, then On changes the fighter. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![Player Swapping Off: the Cycle Player chord changes nothing; A turns the row On; the same chord replaces Mario with Donkey Kong](docs/media/rc13-player-swapping-gate.gif)<br>*Player Swapping gates the Cycle Player chord. Eden, rc.13 (untested on hardware).*
 
 All the options: [the Fighters & Stages page](docs/menu/fighters-and-stages.md).
 
