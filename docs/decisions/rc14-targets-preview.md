@@ -4,8 +4,14 @@ Test-run footage from Eden, 2026-11-14. Untested on hardware.
 
 ## Newest takes (the rc.14 build, footer "rc14 8199c696", shot about 23:50Z)
 
-The practice-game notice now sits in a band at the top. The Break the Targets takes on this build are being shot now,
-and they will be added here.
+The practice-game notice now sits in a band at the top. More takes on this build (the layout list, the CPU as the
+target) will be added here.
+
+**Break the Targets, saved layouts (new):** on Battlefield, three targets are placed, and ZL + Down saves them as
+Layout 1. Y twice clears the stage. A second course is placed higher and saved as Layout 2. ZL + Right steps to the
+other layout, and ZL + Up loads Layout 1: its three targets are back where the first course was.
+
+![Break the Targets: save two layouts, then load the first one back](rc14-preview-btt-layouts.gif)
 
 **Eggs-ercise, 1 minute:** the menu sets Eggs-ercise to 1 minute. A neutral air breaks the target, and the count goes
 from 0 to 1.
