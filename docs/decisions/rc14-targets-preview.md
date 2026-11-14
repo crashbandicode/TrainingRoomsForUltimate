@@ -1,8 +1,25 @@
 # rc.14 preview: targets (Eggs-ercise and Break the Targets)
 
-Test-run footage from Eden, 2026-11-14. These are not the final docs GIFs: they still show the practice-game notice in
-the middle of the screen, and in rc.14 it sits in a band at the top. The final GIFs are shot on the finished rc.14
-build. Untested on hardware.
+Test-run footage from Eden, 2026-11-14. Untested on hardware.
+
+## Newest takes (the rc.14 build, footer "rc14 8199c696", shot about 23:50Z)
+
+The practice-game notice now sits in a band at the top. The Break the Targets takes on this build are being shot now,
+and they will be added here.
+
+**Eggs-ercise, 1 minute:** the menu sets Eggs-ercise to 1 minute. A neutral air breaks the target, and the count goes
+from 0 to 1.
+
+![Eggs-ercise, 1 minute, on the rc.14 build](rc14-preview-eggs-1-minute-v2.gif)
+
+**Target speed (new):** the same run side by side, with Target speed set to Slow and to Fast. A Slow target drifts down
+for about three seconds. A Fast one settles in about half a second.
+
+![Eggs-ercise target speed, Slow beside Fast](rc14-preview-eggs-speed.gif)
+
+## Earlier takes (the draft build)
+
+These show the practice-game notice in the middle of the screen. In rc.14 it sits in the band at the top.
 
 ## Break the Targets
 
