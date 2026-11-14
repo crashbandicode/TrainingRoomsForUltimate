@@ -122,6 +122,24 @@ fn a_charged_smash_is_attributed_by_the_hitbox_that_dealt_it() {
     assert_eq!(attribute(3.0 * 1.4 * M, &p(&[3.0, 3.0]), 1.4, 18.0), Some(Spot::Late));
 }
 
+/// Marth's forward smash held to different charges, as Eden logged it (spots2-d37c0734-1, Yoga, 2026-11-14, `sp-charge`): the game's multiplier
+/// is 1 + frames held / 150 up to 1.4 at 60 frames, and each hit added the slot's damage x the multiplier x 1.26. A tip at the first spacing, the blades
+/// at the second. Without the multiplier the full-charge blade hit (22.932, 1.27 times the tip's 18) read as the tip's.
+fn the_charged_marth_hits_eden_logged() {
+    for (gained, mul, expected) in [
+        (23.436, 1.0333, Spot::Sweet),
+        (16.817, 1.0267, Spot::Sour),
+        (27.821, 1.2267, Spot::Sweet),
+        (20.311, 1.2400, Spot::Sour),
+        (28.123, 1.2400, Spot::Sweet),
+        (20.093, 1.2267, Spot::Sour),
+        (31.752, 1.4000, Spot::Sweet),
+        (22.932, 1.4000, Spot::Sour),
+    ] {
+        assert_eq!(attribute(gained, &marth(), mul, 0.0), Some(expected), "{gained} added at charge {mul}");
+    }
+}
+
 /// A charge does not make a hit tellable: a stale tip hit that a blade could also have made is still no label, charged or not.
 fn a_charged_hit_that_cannot_be_told_has_no_label() {
     assert_eq!(attribute(18.0 * 1.4 * 1.07, &marth(), 1.4, 0.0), None, "a stale full-charge tip hit: the blade's ratio is 1.48");
@@ -241,6 +259,7 @@ fn case_table() {
         ("a_hit_that_cannot_be_told_has_no_label", a_hit_that_cannot_be_told_has_no_label as fn()),
         ("the_falcon_knee_hits_eden_logged", the_falcon_knee_hits_eden_logged as fn()),
         ("a_charged_smash_is_attributed_by_the_hitbox_that_dealt_it", a_charged_smash_is_attributed_by_the_hitbox_that_dealt_it as fn()),
+        ("the_charged_marth_hits_eden_logged", the_charged_marth_hits_eden_logged as fn()),
         ("a_charged_hit_that_cannot_be_told_has_no_label", a_charged_hit_that_cannot_be_told_has_no_label as fn()),
         ("an_unusable_multiplier_gives_no_label", an_unusable_multiplier_gives_no_label as fn()),
         ("the_powers_of_a_fighter_are_read_from_its_active_slots_only", the_powers_of_a_fighter_are_read_from_its_active_slots_only as fn()),
