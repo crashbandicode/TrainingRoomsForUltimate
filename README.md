@@ -114,6 +114,10 @@ The grab boxes are magenta:
 
 ![At 1/4 speed, the magenta grab boxes of Mario's grab, Samus's tether and Olimar's Pikmin; each grabber keeps its yellow hurtboxes](docs/media/rc13-grab-boxes.gif)<br>*Grab boxes in magenta. Eden, rc.13 (untested on hardware).*
 
+Tick **Windboxes** to see the pushes that cause no hitstun, such as F.L.U.D.D.'s water, in deep blue.
+
+<!-- CAPTURE-REQUEST hb-legend-v03 (README clip): the windbox clip described under hb-legend-v03 in docs/menu/display-and-controls.md, F.L.U.D.D. then Ganondorf's up tilt, one short clip with a one-line caption. -->
+
 The page also has the input display, frame advantage and your own buttons.
 
 All the options: [the Display & Controls page](docs/menu/display-and-controls.md).

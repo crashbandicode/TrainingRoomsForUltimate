@@ -55,13 +55,46 @@ Some moves push through a wind area instead of a hitbox. Windboxes draws those t
 circle where the wind blows, with a white line pointing the way it pushes. Items' wind, such as the Gust Bellows, is
 not drawn.
 
+These fighters have moves with a wind area. Eden tried the special moves and smashes of every fighter whose moves can
+make one, and Ganondorf's up tilt; aerials, throws and the other tilts were not tried, so a move missing here may still
+have one.
+
+| Fighter | Moves with a wind area |
+| --- | --- |
+| Bayonetta | neutral special |
+| Bowser Jr. | neutral special |
+| Chrom | neutral special (Flare Blade), down special, up smash, down smash |
+| Cloud | neutral special, down special |
+| Corrin | neutral special |
+| Dr. Mario | side special |
+| Falco | up special |
+| Fox | up special |
+| Ganondorf | neutral special, up special, down special, up tilt |
+| Greninja | side special, up smash |
+| Ike | neutral special, side special, down special, forward smash, down smash |
+| Ken | every special, forward smash, up smash, down smash |
+| King Dedede | neutral special, up special |
+| Kirby | neutral special |
+| Lucas | neutral special, side special, down special, forward smash, down smash |
+| Lucina | neutral special (when held), down special, forward smash, up smash, down smash |
+| Mario | side special |
+| Marth | neutral special (when held), down special, forward smash, up smash, down smash |
+| Meta Knight | neutral special |
+| Mewtwo | neutral special, down special, forward smash, up smash, down smash |
+| Palutena | every special, forward smash, up smash, down smash |
+| Robin | up smash, down smash |
+| Roy | neutral special, down special, up smash, down smash |
+| Ryu | every special, forward smash, up smash, down smash |
+| Shulk | forward smash, up smash |
+| Wario | down special |
+
 **Launch angles** draws a white line inside each hitbox, pointing where the hit sends the fighter it lands on. The line
 mirrors when the attacker turns around. Two dashes mean the game picks the angle when the hit lands, from how hard it
 hits and whether the target is on the ground; they point at 38 degrees, where such a hit sends a fighter in the air.
 A dot means the hit carries the fighter along with the attack. With Hitboxes not ticked, the lines are drawn alone.
 
 <!-- CAPTURE-REQUEST hb-legend-v01: Hitbox Visualization with Hitboxes, Grab boxes, Hurtboxes and Frame data colours ticked, 1/4 speed. The CPU spot-dodging next to a standing Player 1: the CPU's hurtboxes blue while it dodges, white otherwise. Player 1 walks off the stage with Respawn on platform On: blue on the platform, green for the moments after it. Mario's grab: a purple grab box. Marth's forward smash: the tip red, the blade pink. See artifacts/rc14-hb-legend/. -->
-<!-- CAPTURE-REQUEST hb-legend-v03: Windboxes alone, 1/4 speed: Mario's F.L.U.D.D. (the water deep blue, nothing else drawn), then Bowser's Fire Breath (only the flame that does not cause hitstun, deep blue). Then Hitboxes alone on F.L.U.D.D. (the water in its hitbox colour). See artifacts/rc14-hb-legend/. -->
+<!-- CAPTURE-REQUEST hb-legend-v03: Windboxes alone, 1/4 speed: Mario's F.L.U.D.D. (the water deep blue, nothing else drawn), then Bowser's Fire Breath (only the flame that does not cause hitstun, deep blue), then Ganondorf's up tilt (its deep blue windbox discs and the see-through blue box with its white line, which shows where the wind blows), then Chrom's Flare Blade held to charge (the see-through blue box on him with its white line pointing up and to the left). Then Hitboxes alone on F.L.U.D.D. (the water in its hitbox colour). Shoot it over the white Training grid on the build with the stronger wind-area colour. See artifacts/rc14-hb-legend/. -->
 <!-- CAPTURE-REQUEST hb-legend-v02: Hitboxes and Launch angles ticked, 1/4 speed: Ganondorf's up tilt (the windbox lines, then the kick's dashes and its 70-degree line) facing right then left; Mario's jab (dashes). Then Hurtboxes alone: only the hurtboxes. See artifacts/rc14-hb-legend/. -->
 
 A round box is a disc; a long one, such as a sword's hitbox or an arm's hurtbox, is one pill. The shapes are flat and
