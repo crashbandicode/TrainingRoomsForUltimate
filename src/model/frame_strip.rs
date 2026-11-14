@@ -4,6 +4,7 @@
 //! pane looks (`frame_strip_plan`). Fixed arrays only, so nothing here allocates.
 
 use super::input_delay::MappedInputs;
+use super::spots::{self, Peak, Powers, Spot};
 
 /// Frames on screen and links kept for the LAST row (the pane table's numbers).
 pub const WINDOW: usize = super::panes::iv::WINDOW;
@@ -113,6 +114,9 @@ pub struct Sample {
     pub reaction: Option<f32>,
     /// Holding or raising a shield (`GUARD_ON ..= GUARD_DAMAGE`).
     pub shielding: bool,
+    /// The fighter's damage (percent) and the damage of each attack slot that is active, for the spot of a hit (rc.14, SP1).
+    pub damage: f32,
+    pub powers: Powers,
     /// P1 only: the status kind and the motion frame (a new move starts when either goes back).
     pub status: i32,
     pub motion_frame: f32,
@@ -308,6 +312,19 @@ pub struct Link {
     pub window: Option<(u32, u32)>,
     pub from: Move,
     pub to: Move,
+    /// The spot the follow-up hit landed (rc.14, SP4), `None` when it could not be told.
+    pub spot: Option<Spot>,
+}
+
+/// Hits whose spot the strip keeps (the label panes show the newest few of them).
+pub const MARKS: usize = 8;
+
+/// One labelled hit (rc.14, SP3): the frame it connected, whose hit it was (0 P1, 1 the CPU) and its spot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Mark {
+    pub frame: u32,
+    pub lane: u8,
+    pub spot: Spot,
 }
 
 impl Link {
@@ -348,6 +365,7 @@ struct Hit {
     on_shield: bool,
     action: u32,
     mv: Move,
+    spot: Option<Spot>,
     /// P1's and the CPU's first actionable frames after it.
     p1_free: Option<u32>,
     cpu_free: Option<u32>,
@@ -389,6 +407,13 @@ pub struct Tracker {
     snaps: [Snap; SNAP_RING],
     snap_head: usize,
     snap_len: usize,
+    /// Spots (rc.14, SP1): each fighter's damage on the frame before (`None` right after a clear), its action's strongest
+    /// hitbox, whether P1 was in hitstop, and the labelled hits, oldest overwritten first.
+    damage: [Option<f32>; 2],
+    peaks: [Peak; 2],
+    p1_was_stop: bool,
+    marks: [Option<Mark>; MARKS],
+    mark_head: usize,
 }
 
 impl Tracker {
@@ -426,7 +451,17 @@ impl Tracker {
             snaps: [Snap::empty(0); SNAP_RING],
             snap_head: 0,
             snap_len: 0,
+            damage: [None; 2],
+            peaks: [Peak::new(); 2],
+            p1_was_stop: false,
+            marks: [None; MARKS],
+            mark_head: 0,
         }
+    }
+
+    /// The labelled hits (rc.14, SP3), newest first.
+    pub fn marks(&self) -> impl Iterator<Item = Mark> + '_ {
+        (0..MARKS).filter_map(move |i| self.marks[(self.mark_head + MARKS - 1 - i) % MARKS])
     }
 
     /// The frames stepped since the last clear.
@@ -558,7 +593,7 @@ impl Tracker {
         // CPU is shielding or in shieldstun.
         let p1_hit = p1.hitstun || p1.shieldstun || p1.shielding;
         if cpu.stop && !self.cpu_was_stop && !p1_hit {
-            self.on_hit(frame, (cpu.shieldstun || cpu.shielding) && !cpu.hitstun);
+            self.on_hit(frame, (cpu.shieldstun || cpu.shielding) && !cpu.hitstun, None);
         }
         self.cpu_was_stop = cpu.stop;
         // Both fighters' first actionable frames after the last hit.
@@ -619,7 +654,7 @@ impl Tracker {
         }
     }
 
-    fn on_hit(&mut self, frame: u32, on_shield: bool) {
+    fn on_hit(&mut self, frame: u32, on_shield: bool, spot: Option<Spot>) {
         // A hit long after the CPU could act again opens a new exchange instead of dropping a link.
         let follow_up = self.last_hit.filter(|prev| {
             !prev.on_shield
@@ -672,6 +707,7 @@ impl Tracker {
                 window,
                 from: prev.mv,
                 to: self.action_move,
+                spot,
             };
             self.history.copy_within(0..HISTORY - 1, 1);
             self.history[0] = Some(item);
@@ -682,6 +718,7 @@ impl Tracker {
             on_shield,
             action: self.action,
             mv: self.action_move,
+            spot,
             p1_free: None,
             cpu_free: None,
         });
@@ -809,6 +846,8 @@ pub mod ids {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Settings {
     pub on: bool,
+    /// Sweet/sour spot labels on the hit blocks (rc.14, SP3), Off by default.
+    pub spots: bool,
 }
 
 /// The new row's id, and the old rows it replaces (SPEC-input-06 §3.1).
@@ -817,7 +856,7 @@ pub const OLD_ROW: &str = "input_display";
 
 impl Settings {
     pub const fn factory() -> Self {
-        Self { on: true }
+        Self { on: true, spots: false }
     }
 
     pub fn from_snapshot(snapshot: &super::settings::Snapshot) -> Self {
@@ -825,7 +864,7 @@ impl Settings {
             .get(ROW)
             .and_then(|r| r.iter().position(|v| *v != 0))
             .is_none_or(|i| i == 1);
-        Self { on }
+        Self { on, spots: spots::row_on(snapshot, spots::ROW_STRIP) }
     }
 }
 

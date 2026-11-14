@@ -154,6 +154,7 @@ pub fn reason_text(s: &Summary) -> Text {
             if d > 0 { "late" } else { "early" }
         ),
         Reason::WrongDir(kind) => write!(t, "L{n} {} wrong direction", event_label(kind)),
+        Reason::WrongSpot(..) => Ok(()),
     };
     t
 }

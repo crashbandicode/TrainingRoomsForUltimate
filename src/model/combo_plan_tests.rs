@@ -79,6 +79,9 @@ fn texts_name_verdicts_marks_results_and_reasons() {
     assert_eq!(reason_text(&s(Outcome::Completed, 3, false, Some((2, Reason::Drop(1))))), Text::new("L3 DROP +1"));
     assert_eq!(reason_text(&s(Outcome::Completed, 3, false, Some((0, Reason::Off(Button::Jump, -2))))), Text::new("L1 Jump 2f early"));
     assert_eq!(reason_text(&s(Outcome::Completed, 3, false, Some((1, Reason::WrongMove(Move::Aerial))))), Text::new("L2 wrong move: Aerial"));
+    use crate::model::spots::Spot;
+    assert_eq!(reason_text(&s(Outcome::Completed, 2, false, Some((0, Reason::WrongSpot(Some(Spot::Sour), Spot::Sweet))))), Text::new("L1 Sour, saved Sweet"));
+    assert_eq!(reason_text(&s(Outcome::Completed, 2, false, Some((1, Reason::WrongSpot(None, Spot::Late))))), Text::new("L2 no spot, saved Late"));
 }
 
 // ---- the sequence bar (mockup `r8-sequence-bar`, Q8 A) ---------------------------------------------------------------

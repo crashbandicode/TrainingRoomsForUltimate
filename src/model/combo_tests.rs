@@ -278,6 +278,7 @@ const ON: Settings = Settings {
     on: true,
     tolerance: 1,
     load_after: false,
+    match_spot: false,
 };
 
 /// The reference: a jab and three up tilts, each pressed one frame after P1 could act.
@@ -334,9 +335,12 @@ fn settings_read_the_three_rows() {
         Settings {
             on: true,
             tolerance: 2,
-            load_after: true
+            load_after: true,
+            match_spot: false
         }
     );
+    snapshot.set(crate::model::spots::ROW_COMBO, &[1, 0]).unwrap();
+    assert!(Settings::from_snapshot(&snapshot).match_spot);
 }
 
 fn link_with(verdict: Verdict, to: Move, offset: i32) -> LinkRec {
@@ -350,6 +354,10 @@ fn link_with(verdict: Verdict, to: Move, offset: i32) -> LinkRec {
 }
 
 fn summarized(reference: &LinkRec, attempt_link: &LinkRec, outcome: Outcome) -> Summary {
+    summarized_with(reference, attempt_link, outcome, false)
+}
+
+fn summarized_with(reference: &LinkRec, attempt_link: &LinkRec, outcome: Outcome, match_spot: bool) -> Summary {
     let g = grade(reference, attempt_link);
     let mut grades = [None; LINKS];
     grades[0] = Some(g);
@@ -360,7 +368,7 @@ fn summarized(reference: &LinkRec, attempt_link: &LinkRec, outcome: Outcome) -> 
         summary: None,
         junction: false,
     };
-    summarize(&attempt, 1, outcome, 1)
+    summarize(&attempt, 1, outcome, 1, match_spot)
 }
 
 /// The second hit of `gap` frames after the CPU can act. `gap` 20 still links; 21 is a new exchange.
@@ -528,6 +536,7 @@ fn snap_link(frames: &[(MappedInputs, Sample)]) -> LinkRec {
         events,
         presses_only: false,
         drift,
+        spot: None,
     }
 }
 
@@ -794,13 +803,42 @@ fn a_cleared_strip_between_the_combos_is_a_drop() {
     assert_eq!((run.walk().streak(), run.walk().best()), (0, 3));
 }
 
+/// Decision SP4: with Match sweet/sour spot On a link counts only if it lands the saved link's spot; a link saved with no spot
+/// always matches; Off compares nothing.
+fn match_sweet_sour_spot_grades_the_spot_a_link_landed() {
+    use crate::model::spots::Spot::{Sour, Sweet};
+    let link = |spot| LinkRec { spot, ..link_with(Verdict::True(Some(0)), Move::Aerial, 0) };
+    for (saved, got, passes) in [
+        (Some(Sweet), Some(Sweet), true),
+        (Some(Sweet), Some(Sour), false),
+        (Some(Sour), Some(Sour), true),
+        (Some(Sour), Some(Sweet), false),
+        (None, Some(Sweet), true),
+        (None, None, true),
+        (Some(Sweet), None, false),
+    ] {
+        let (reference, attempt) = (link(saved), link(got));
+        assert_eq!(grade(&reference, &attempt).wrong_spot, !passes, "{saved:?} / {got:?}");
+        let on = summarized_with(&reference, &attempt, Outcome::Completed, true);
+        assert_eq!(on.clean, passes, "{saved:?} / {got:?}");
+        assert_eq!(on.fault, saved.filter(|_| !passes).map(|s| (0, Reason::WrongSpot(got, s))));
+        let off = summarized_with(&reference, &attempt, Outcome::Completed, false);
+        assert!(off.clean && off.fault.is_none(), "Off compares no spot");
+    }
+    // The wrong move is still named first.
+    let wrong_move = LinkRec { to: Move::Jab, ..link(Some(Sour)) };
+    assert_eq!(summarized_with(&link(Some(Sweet)), &wrong_move, Outcome::Completed, true).fault, Some((0, Reason::WrongMove(Move::Jab))));
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+
 #[test]
 fn case_table() {
     crate::test_table::run(&[
         ("a_save_state_load_clears_the_attempt_and_the_next_one_starts_fresh", a_save_state_load_clears_the_attempt_and_the_next_one_starts_fresh as fn()),
         ("aims_merge_left_and_right", aims_merge_left_and_right as fn()),
         ("settings_read_the_three_rows", settings_read_the_three_rows as fn()),
+        ("match_sweet_sour_spot_grades_the_spot_a_link_landed", match_sweet_sour_spot_grades_the_spot_a_link_landed as fn()),
         ("a_step_drops_on_a_missing_press_a_late_press_or_the_exchange_end", a_step_drops_on_a_missing_press_a_late_press_or_the_exchange_end as fn()),
         ("a_release_after_the_hit_is_not_missing", a_release_after_the_hit_is_not_missing as fn()),
         ("a_short_hop_link_drops_on_a_full_hop", a_short_hop_link_drops_on_a_full_hop as fn()),

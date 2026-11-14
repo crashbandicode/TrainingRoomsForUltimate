@@ -44,6 +44,30 @@ fn a_record_round_trips_through_its_json() {
     assert_eq!(back, rec);
 }
 
+/// Decision SP4: a link's spot is one optional field; an older file, and a word this build does not know, read as no spot.
+fn a_links_spot_is_saved_and_an_older_file_reads_as_none() {
+    use crate::model::spots::Spot;
+    let plain = record("Nair loop");
+    let mut links: Vec<LinkRec> = plain.combo.links().copied().collect();
+    links[0].spot = Some(Spot::Sweet);
+    links[1].spot = Some(Spot::Late);
+    let rec = ComboRecord::new("Nair loop".to_owned(), Combo::from_links(links).unwrap(), None);
+    let text = serde_json::to_string(&rec).unwrap();
+    let value: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!((&value["links"][0]["spot"], &value["links"][1]["spot"]), (&json!("sweet"), &json!("late")));
+    assert!(value["links"][2].get("spot").is_none(), "no spot, no field");
+    let back: ComboRecord = serde_json::from_str(&text).unwrap();
+    assert_eq!(back.combo.links().map(|l| l.spot).collect::<Vec<_>>(), [Some(Spot::Sweet), Some(Spot::Late), None]);
+    let old: Value = serde_json::from_str(&serde_json::to_string(&plain).unwrap()).unwrap();
+    assert!(old["links"].as_array().unwrap().iter().all(|l| l.get("spot").is_none()), "a combo saved without spots writes none");
+    let back: ComboRecord = serde_json::from_value(old).unwrap();
+    assert!(back.combo.links().all(|l| l.spot.is_none()), "an older file has none");
+    let mut odd = value;
+    odd["links"][0]["spot"] = json!("tip");
+    let back: ComboRecord = serde_json::from_value(odd).unwrap();
+    assert_eq!(back.combo.get(0).unwrap().spot, None, "an unknown word reads as none");
+}
+
 fn the_library_saves_lists_renames_deletes_and_selects() {
     let dir = scratch("library");
     let library = ComboLibrary::new(&dir);
@@ -78,6 +102,7 @@ fn the_library_saves_lists_renames_deletes_and_selects() {
 fn case_table() {
     crate::test_table::run(&[
         ("a_record_round_trips_through_its_json", a_record_round_trips_through_its_json as fn()),
+        ("a_links_spot_is_saved_and_an_older_file_reads_as_none", a_links_spot_is_saved_and_an_older_file_reads_as_none as fn()),
         ("the_library_saves_lists_renames_deletes_and_selects", the_library_saves_lists_renames_deletes_and_selects as fn()),
     ]);
 }

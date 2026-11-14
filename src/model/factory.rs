@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 124;
+pub const COUNT: usize = 127;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -217,4 +217,9 @@ pub static DEFS: [Def; COUNT] = [
     row!("eggsercise_target", Single, 2, [0]),
     // §V2.5 Break the Targets: Off / On.
     row!("btt", Single, 2, [0]),
+    // rc.14 sweet/sour spots (SP1 to SP5): the hitbox visualizer's Frame data colours, the strip's spot labels and the combo's match, all
+    // Off by default ([On, Off], stored [0, 1]); appended like lobby_items.
+    row!("frame_data_colours", Single, 2, [1]),
+    row!("spots_strip", Single, 2, [1]),
+    row!("spots_combo", Single, 2, [1]),
 ];

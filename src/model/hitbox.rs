@@ -529,6 +529,33 @@ pub fn want_hitboxes(reader: &mut impl AttackReader, out: &mut [Sphere], len: &m
     left_out
 }
 
+/// The damage of each attack slot that is active (0.0 for one that is not, or that deals none), and whether any slot is active
+/// (decision SP1: the spots are ranked by it). Reads only active slots' `AttackData`.
+pub fn powers(_reader: &mut impl AttackReader) -> (bool, super::spots::Powers) {
+    (false, [0.0; super::spots::SLOTS])
+}
+
+/// Frame data colours (operator 2026-11-14, from Ultimate Frame Data's legend): a strong hitbox is red, a weak one pink. Pink is #ff8fc8,
+/// clearly apart from the grab boxes' magenta.
+pub const STRONG_TINT: [f32; 3] = [1.0, 0.0, 0.0];
+pub const WEAK_TINT: [f32; 3] = [1.0, 0.56, 0.78];
+
+/// The one place the *Frame data colours* row chooses a sphere's tint: `kind` is `KIND_HIT`, `KIND_HURT` or `KIND_GRAB`, `spot` the hitbox's
+/// spot (`None` for any other kind and for a hitbox that cannot be ranked), `usual` today's tint. Off is `usual`. On, a hitbox is red unless
+/// it is Sour or Late, which are pink (Ultimate Frame Data draws a lone hitbox as strong and has no late colour).
+pub fn legend_colour(kind: u32, spot: Option<super::spots::Spot>, usual: [f32; 3], on: bool) -> [f32; 3] {
+    use super::spots::Spot;
+    match (on, kind, spot) {
+        (true, KIND_HIT, Some(Spot::Sour | Spot::Late)) => WEAK_TINT,
+        (true, KIND_HIT, _) => STRONG_TINT,
+        _ => usual,
+    }
+}
+
+/// Apply `legend_colour` (On) to every sphere of `wants`; `peak` is the fighter's strongest damage so far this action, and `status`starts a new
+/// action when it changes.
+pub fn tint_legend(_reader: &mut impl AttackReader, _wants: &mut [Sphere], _peak: &mut super::spots::Peak, _status: i32) {}
+
 /// The first live attack slot with data: an active item with one is drawn as an article (a thrown bomb runs no `ATTACK`).
 pub fn live_slot(reader: &mut impl AttackReader) -> Option<i32> {
     (0..SLOTS).find(|&slot| reader.active(slot) && reader.data(slot) != 0)
@@ -755,6 +782,9 @@ pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphe
     if let Some(hurt) = hurt {
         left_out += want_hurtboxes(hurt, wants, &mut len);
     }
+    if set.frame_data {
+        tint_legend(reader, &mut wants[..len], &mut set.peak, facts.status);
+    }
     let mut counts = set.reconcile(&wants[..len], true, fx);
     counts.dropped += left_out;
     (counts, len)
@@ -803,6 +833,9 @@ pub struct HandleSet {
     /// Waiting grab spheres and the status their command ran in.
     pending: [(Sphere, Option<i32>); MAX_PENDING],
     pending_len: usize,
+    /// *Frame data colours* On: the spheres take `legend_colour`'s tints, `peak` being this fighter's action's strongest damage.
+    pub frame_data: bool,
+    peak: super::spots::Peak,
 }
 
 impl Default for HandleSet {
@@ -818,6 +851,8 @@ impl HandleSet {
             len: 0,
             pending: [(Sphere::NONE, None); MAX_PENDING],
             pending_len: 0,
+            frame_data: false,
+            peak: super::spots::Peak::new(),
         }
     }
 

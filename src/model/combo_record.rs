@@ -316,6 +316,7 @@ fn link_of(value: &Value) -> Result<LinkRec, &'static str> {
         events,
         presses_only,
         drift,
+        spot: None,
     })
 }
 

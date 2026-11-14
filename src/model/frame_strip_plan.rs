@@ -474,6 +474,11 @@ impl Renderer {
     /// One UI tick. Hidden: only the container is written (and only when it was shown). Shown: every pane whose look
     /// changed, with what changed. Returns how many panes were written.
     pub fn draw(&mut self, tracker: &Tracker, shown: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
+        self.draw_spots(tracker, shown, false, apply)
+    }
+
+    /// `draw`, with the spot labels on the hit blocks when `spots` (rc.14, SP3).
+    pub fn draw_spots(&mut self, tracker: &Tracker, shown: bool, _spots: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
         if !shown {
             return self.hide(at::CONTAINER, Look { visible: false, ..Look::HIDDEN }, apply);
         }

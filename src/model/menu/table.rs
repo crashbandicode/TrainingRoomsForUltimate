@@ -230,7 +230,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 104] = [
+pub static ROWS: [Row; 107] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -348,6 +348,8 @@ pub static ROWS: [Row; 104] = [
       "Off: a playing recording wins over the DI, SDI, air-dodge,\ntech and throw settings. On: the settings override it.") },
     r(OPTIONS, "Combo helper", "combo_helper", TOGGLE,
       "On: each attempt at the target is graded under the\nframe strip, link by link."),
+    r(OPTIONS, "Match sweet/sour spot", "spots_combo", TOGGLE,
+      "On: a link counts only if it lands the same spot as the\nsaved link. Off: the spot is not compared."),
     r(OPTIONS, "On-time tolerance", "combo_tolerance", Control::Dropdown(&o::COMBO_TOLERANCE),
       "How many frames from the recorded press\nstill count as on time."),
     r(OPTIONS, "After an attempt", "combo_after", Control::Dropdown(&o::COMBO_AFTER),
@@ -408,10 +410,14 @@ pub static ROWS: [Row; 104] = [
     // Display & Controls > On screen
     r(SCREEN, "HUD", "hud", TOGGLE, "On: the game's HUD shows as usual.\nOff: Training hides damage, pointers and off-screen bubbles."),
     r(SCREEN, "Hitbox Visualization", "hitbox_vis", TOGGLE, "On: hitboxes, grab boxes and hurtboxes (yellow) are drawn.\nOff: nothing is drawn."),
+    r(SCREEN, "Frame data colours", "frame_data_colours", TOGGLE,
+      "On: strong hitboxes are red, weak ones pink, as on Ultimate\nFrame Data. Off: every hitbox keeps its own colour."),
     r(SCREEN, "Frame Advantage", "frame_advantage", TOGGLE,
       "On: the frame advantage after each exchange is shown."),
     r(SCREEN, "Input Display", "input_display_strip", Control::Dropdown(&o::INPUT_DISPLAY),
       "Frame strip: the last second of P1 and CPU frames,\nhow each follow-up linked and the frame advantage."),
+    r(SCREEN, "Spot labels", "spots_strip", TOGGLE,
+      "On: each hit on the frame strip says Sweet, Sour or Late.\nOff: no labels."),
     r(SCREEN, "Input Delay", "input_delay", Control::Number { first: 0, step: 1 },
       "Frames Player 1's inputs are held back, 0 to 30.\nChords are not delayed."),
     // Display & Controls > Controls

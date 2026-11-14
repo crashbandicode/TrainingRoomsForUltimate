@@ -106,6 +106,105 @@ fn display_toggle_flips_the_strip_row() {
     }
 }
 
+/// The damages of hitboxes 0.. (the rest inactive).
+fn p(values: &[f32]) -> Powers {
+    let mut out = [0.0; spots::SLOTS];
+    out[..values.len()].copy_from_slice(values);
+    out
+}
+
+/// Three frames: both calm (the victim at 20%), the attacker swings, the attacker hits (hitlag) and the victim, hurt, has
+/// `gained` more damage. The labelled hits.
+fn marks_of(attacker_is_p1: bool, powers: &[f32], gained: f32) -> Vec<Mark> {
+    let calm = Sample { actionable: true, damage: 20.0, ..Sample::default() };
+    let swing = |stop| Sample { attack: Some(Move::Jab), status: ATTACK, active: true, stop, powers: p(powers), ..calm };
+    let hurt = Sample { stop: true, hitstun: true, damage: 20.0 + gained, ..Sample::default() };
+    let mut t = Tracker::new();
+    for frame in 1..=3 {
+        let (attacker, victim) = match frame {
+            1 => (calm, calm),
+            2 => (swing(false), calm),
+            _ => (swing(true), hurt),
+        };
+        let (p1, cpu) = if attacker_is_p1 { (attacker, victim) } else { (victim, attacker) };
+        t.step(p1, cpu, NONE);
+    }
+    t.marks().collect()
+}
+
+/// Decision SP3: a connecting hit is labelled with the spot it landed, on the lane of whoever hit, P1 or the CPU.
+fn a_hit_is_labelled_with_its_spot_on_the_lane_of_who_hit() {
+    let tip_and_blade = [16.0, 13.0, 13.0, 13.0];
+    let mark = |lane, spot| vec![Mark { frame: 3, lane, spot }];
+    assert_eq!(marks_of(true, &tip_and_blade, 16.0), mark(0, Spot::Sweet));
+    assert_eq!(marks_of(true, &tip_and_blade, 13.0), mark(0, Spot::Sour));
+    assert_eq!(marks_of(false, &tip_and_blade, 13.0), mark(1, Spot::Sour), "the CPU's hit is on the CPU lane");
+    assert_eq!(marks_of(true, &tip_and_blade, 16.0 * 0.93), mark(0, Spot::Sweet), "a staled hit");
+}
+
+/// Never a guess: equal hitboxes, a hit two hitboxes could have made, a hit that added no damage (a shield), a trade.
+fn a_hit_that_cannot_be_told_is_not_labelled() {
+    assert!(marks_of(true, &[12.0, 12.0, 12.0], 12.0).is_empty(), "equal hitboxes");
+    assert!(marks_of(true, &[16.0, 15.0], 15.5).is_empty(), "two candidates of different classes");
+    assert!(marks_of(true, &[16.0, 13.0], 0.0).is_empty(), "no damage: a shield");
+    let calm = Sample { actionable: true, damage: 20.0, ..Sample::default() };
+    let hit = Sample { stop: true, hitstun: true, active: true, powers: p(&[16.0, 13.0]), damage: 36.0, ..Sample::default() };
+    let mut t = Tracker::new();
+    t.step(calm, calm, NONE);
+    t.step(hit, hit, NONE);
+    assert!(t.marks().next().is_none(), "both fighters hurt on one frame: whose hit?");
+}
+
+/// SP1: a weaker hitbox than the strongest of the same action is Late; a new action starts over.
+fn a_weaker_hit_later_in_the_same_action_is_late() {
+    for (status, expected) in [(ATTACK, Some(Spot::Late)), (ATTACK + 1, None)] {
+        let calm = Sample { actionable: true, damage: 20.0, ..Sample::default() };
+        let swing = |status, stop, powers: &[f32]| Sample { attack: Some(Move::Jab), status, active: true, stop, powers: p(powers), ..calm };
+        let hurt = Sample { stop: true, hitstun: true, damage: 33.0, ..Sample::default() };
+        let mut t = Tracker::new();
+        t.step(calm, calm, NONE);
+        t.step(swing(ATTACK, false, &[16.0]), calm, NONE);
+        t.step(swing(status, false, &[13.0]), calm, NONE);
+        t.step(swing(status, true, &[13.0]), hurt, NONE);
+        assert_eq!(t.marks().next().map(|m| m.spot), expected, "status {status:#x}");
+    }
+}
+
+/// SP4: the follow-up hit's spot is on its link, and a saved link keeps it.
+fn a_link_remembers_the_spot_of_its_follow_up_hit() {
+    for (second, gained, expected) in [(&[12.0, 8.0][..], 12.0, Some(Spot::Sweet)), (&[12.0, 8.0], 8.0, Some(Spot::Sour)), (&[8.0], 8.0, None)] {
+        let mut t = Tracker::new();
+        for f in 1..=26u32 {
+            let (p1, inputs) = match f {
+                1 | 2 | 20 => (idle(), NONE),
+                3..=6 => (attack(Move::Jab, 0x27, (f - 3) as f32), if f == 3 { A } else { NONE }),
+                7..=10 => (Sample { stop: true, active: true, powers: p(&[3.0]), ..attack(Move::Jab, 0x27, 4.0) }, NONE),
+                11..=19 => (Sample { active: f == 11, ..attack(Move::Jab, 0x27, (f - 6) as f32) }, NONE),
+                21..=25 => (attack(Move::UpTilt, 0x2b, (f - 21) as f32), if f == 21 { A } else { NONE }),
+                _ => (Sample { stop: true, active: true, powers: p(second), ..attack(Move::UpTilt, 0x2b, 5.0) }, NONE),
+            };
+            let cpu = match f {
+                1..=6 => idle(),
+                7..=10 => Sample { stop: true, hitstun: true, damage: 3.0, reaction: Some(18.0), ..Sample::default() },
+                11..=25 => Sample { hitstun: true, damage: 3.0, reaction: Some(18.0 - (f - 11) as f32), ..Sample::default() },
+                _ => Sample { stop: true, hitstun: true, damage: 3.0 + gained, reaction: Some(30.0), ..Sample::default() },
+            };
+            t.step(p1, cpu, inputs);
+        }
+        let link = t.latest_link().expect("the up tilt linked");
+        assert_eq!(link.spot, expected, "gained {gained}");
+        assert_eq!(crate::model::combo::LinkRec::of(&link, &t, 0).spot, expected, "the saved link keeps it");
+    }
+}
+
+fn the_spot_labels_row_reads_its_setting() {
+    let mut snapshot = crate::model::settings::Snapshot::factory();
+    assert!(!Settings::from_snapshot(&snapshot).spots, "Off by default");
+    snapshot.set(spots::ROW_STRIP, &[1, 0]).unwrap();
+    assert!(Settings::from_snapshot(&snapshot).spots);
+    assert!(Settings::from_snapshot(&snapshot).on, "the strip itself is unchanged");
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -114,6 +213,11 @@ fn case_table() {
         ("bin_stick_eight_directions_and_the_dead_zone", bin_stick_eight_directions_and_the_dead_zone as fn()),
         ("the_status_predicates_use_the_resolved_constants", the_status_predicates_use_the_resolved_constants as fn()),
         ("display_toggle_flips_the_strip_row", display_toggle_flips_the_strip_row as fn()),
+        ("a_hit_is_labelled_with_its_spot_on_the_lane_of_who_hit", a_hit_is_labelled_with_its_spot_on_the_lane_of_who_hit as fn()),
+        ("a_hit_that_cannot_be_told_is_not_labelled", a_hit_that_cannot_be_told_is_not_labelled as fn()),
+        ("a_weaker_hit_later_in_the_same_action_is_late", a_weaker_hit_later_in_the_same_action_is_late as fn()),
+        ("a_link_remembers_the_spot_of_its_follow_up_hit", a_link_remembers_the_spot_of_its_follow_up_hit as fn()),
+        ("the_spot_labels_row_reads_its_setting", the_spot_labels_row_reads_its_setting as fn()),
     ]);
 }
 }

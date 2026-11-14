@@ -1,0 +1,203 @@
+//! Decisions SP1 and SP2 (rc.14): which hitbox is sweet, sour or late, which one a hit connected, and the *Frame data colours*.
+//! Damages are drawn for the cases (a tip of 16 over blades of 13); the plugin reads them from the game.
+
+lib_unit_tests! {
+use super::*;
+use crate::model::hitbox::{self, AttackReader, FrameFacts, HandleSet, Sphere, StatusIds};
+use crate::model::hitbox_orbs::OrbSink;
+
+/// The damages of slots 0.. (the rest inactive).
+fn p(values: &[f32]) -> Powers {
+    let mut out = [0.0; SLOTS];
+    out[..values.len()].copy_from_slice(values);
+    out
+}
+
+fn the_strongest_hitbox_of_a_frame_is_sweet_and_a_weaker_one_sour() {
+    let active = p(&[16.0, 13.0, 13.0, 13.0]);
+    assert_eq!(classify(16.0, &active, 0.0), Some(Spot::Sweet));
+    assert_eq!(classify(13.0, &active, 0.0), Some(Spot::Sour));
+}
+
+fn ties_at_the_top_are_all_sweet() {
+    let active = p(&[16.0, 16.0, 13.0]);
+    assert_eq!([16.0, 16.0, 13.0].map(|d| classify(d, &active, 0.0)), [Some(Spot::Sweet), Some(Spot::Sweet), Some(Spot::Sour)]);
+}
+
+fn equal_hitboxes_and_a_lone_hitbox_have_no_label() {
+    for active in [p(&[12.0, 12.0, 12.0]), p(&[12.0]), p(&[12.0, 12.02])] {
+        assert_eq!(classify(12.0, &active, 0.0), None, "{active:?}");
+    }
+    assert_eq!(classify(12.0, &p(&[12.0]), 12.0), None, "an earlier hit as strong is not stronger");
+    assert_eq!(classify(16.0, &p(&[16.0]), 13.0), None, "a stronger hit than the earlier ones, with nothing weaker beside it");
+    assert_eq!(classify(0.0, &p(&[16.0, 0.0]), 0.0), None, "a slot with no damage has no label");
+}
+
+fn a_hitbox_weaker_than_an_earlier_one_of_the_action_is_late() {
+    assert_eq!(classify(13.0, &p(&[13.0]), 16.0), Some(Spot::Late));
+    // Late wins over Sour: both are weaker than the earlier tip.
+    let active = p(&[13.0, 9.0]);
+    assert_eq!([13.0, 9.0].map(|d| classify(d, &active, 16.0)), [Some(Spot::Late); 2]);
+    // Weaker than the frame's strongest, but not than the earlier peak: Sour.
+    assert_eq!(classify(9.0, &p(&[13.0, 9.0]), 13.0), Some(Spot::Sour));
+}
+
+fn the_peak_starts_over_with_a_new_status_or_after_a_quiet_gap() {
+    let mut peak = Peak::new();
+    assert_eq!(peak.earlier(10), 0.0);
+    peak.fold(&p(&[16.0]));
+    assert_eq!(peak.earlier(10), 16.0, "the same action");
+    peak.fold(&p(&[13.0]));
+    assert_eq!(peak.earlier(10), 16.0, "a weaker frame keeps the peak");
+    assert_eq!(peak.earlier(11), 0.0, "a new status is a new action");
+    peak.fold(&p(&[8.0]));
+    for _ in 0..GAP - 1 {
+        peak.fold(&p(&[]));
+    }
+    assert_eq!(peak.earlier(11), 8.0, "a short gap inside one move keeps it");
+    peak.fold(&p(&[]));
+    assert_eq!(peak.earlier(11), 0.0, "{GAP} quiet frames end the action");
+}
+
+fn a_hit_is_attributed_by_the_damage_it_added() {
+    let active = p(&[16.0, 13.0, 13.0, 13.0]);
+    assert_eq!(attribute(16.0, &active, 0.0), Some(Spot::Sweet));
+    assert_eq!(attribute(13.0, &active, 0.0), Some(Spot::Sour));
+    assert_eq!(attribute(13.0, &p(&[13.0]), 16.0), Some(Spot::Late));
+}
+
+fn staling_and_multipliers_cancel_in_the_ratio() {
+    let active = p(&[16.0, 13.0]);
+    for k in [0.92, 0.95, 1.0, 1.05] {
+        assert_eq!(attribute(16.0 * k, &active, 0.0), Some(Spot::Sweet), "k {k}");
+        assert_eq!(attribute(13.0 * k, &active, 0.0), Some(Spot::Sour), "k {k}");
+    }
+}
+
+fn a_hit_that_cannot_be_told_has_no_label() {
+    // 15.5 could be 16 x 0.97 (Sweet) or 15 x 1.03 (Sour).
+    assert_eq!(attribute(15.5, &p(&[16.0, 15.0]), 0.0), None, "two candidates of different classes");
+    assert_eq!(attribute(12.0, &p(&[12.0, 12.0, 12.0]), 0.0), None, "equal hitboxes");
+    assert_eq!(attribute(30.0, &p(&[16.0, 13.0]), 0.0), None, "no hitbox could have dealt it");
+    for gained in [0.0, -3.0, f32::NAN, f32::INFINITY] {
+        assert_eq!(attribute(gained, &p(&[16.0, 13.0]), 0.0), None, "{gained}");
+    }
+    assert_eq!(attribute(16.0, &p(&[]), 0.0), None, "nothing active");
+    // Candidates that agree are still a label: 13 and 12.8 are both Sour.
+    assert_eq!(attribute(12.9, &p(&[16.0, 13.0, 12.8]), 0.0), Some(Spot::Sour));
+}
+
+/// Slot `i` is active when `0[i]` is `Some(damage)`; its `AttackData` is at `0x1000 * (i + 1)`. Reading an inactive slot panics.
+struct Slots([Option<f32>; SLOTS]);
+
+impl AttackReader for Slots {
+    fn active(&mut self, slot: i32) -> bool {
+        self.0[slot as usize].is_some()
+    }
+
+    fn data(&mut self, slot: i32) -> usize {
+        0x1000 * (slot as usize + 1)
+    }
+
+    fn read_u64(&mut self, _at: usize) -> u64 {
+        7
+    }
+
+    fn read_f32(&mut self, at: usize) -> f32 {
+        match at % 0x1000 {
+            0x20 => self.0[at / 0x1000 - 1].expect("an active slot"),
+            0x24 => 2.0,
+            _ => 0.0,
+        }
+    }
+}
+
+fn the_powers_of_a_fighter_are_read_from_its_active_slots_only() {
+    let mut reader = Slots([None, Some(16.0), None, None, None, Some(13.0), None, None]);
+    assert_eq!(hitbox::powers(&mut reader), (true, p(&[0.0, 16.0, 0.0, 0.0, 0.0, 13.0])));
+    assert_eq!(hitbox::powers(&mut Slots([None; SLOTS])), (false, p(&[])));
+}
+
+fn frame(set: &mut HandleSet, slots: [Option<f32>; SLOTS], status: i32) {
+    let mut wants = [Sphere::NONE; hitbox::WANT_SCRATCH];
+    let ids = StatusIds::from_values([100, 101, 102, 103, 104, 105]);
+    let facts = FrameFacts { visualizes: true, enabled: true, slept: false, status, ids };
+    hitbox::reconcile_frame(set, facts, &mut wants, &mut Slots(slots), None, &mut OrbSink { status });
+}
+
+fn tints(set: &HandleSet, slots: &[u32]) -> Vec<[f32; 3]> {
+    let mut by_key: Vec<_> = set.spheres().map(|s| (s.key, s.tint)).collect();
+    by_key.sort_by_key(|(key, _)| *key);
+    slots.iter().filter_map(|slot| by_key.iter().find(|(key, _)| (key >> 8) & 0xffff == *slot).map(|(_, t)| *t)).collect()
+}
+
+fn the_hit_spheres_take_the_frame_data_colours() {
+    let (strong, weak) = (hitbox::STRONG_TINT, hitbox::WEAK_TINT);
+    let mut set = HandleSet::new();
+    set.frame_data = true;
+    // The swing's early frame: the tip (slot 0) is sweet, red; the blade (slots 1 and 2) is sour, pink.
+    frame(&mut set, [Some(16.0), Some(13.0), Some(13.0), None, None, None, None, None], 20);
+    assert_eq!(tints(&set, &[0, 1, 2]), [strong, weak, weak]);
+    // A later frame of the same action: only the blade, weaker than the tip seen earlier: late, pink too.
+    frame(&mut set, [None, Some(13.0), Some(13.0), None, None, None, None, None], 20);
+    assert_eq!(tints(&set, &[1, 2]), [weak, weak]);
+    // A new action, the blade alone: it cannot be ranked, and Ultimate Frame Data draws a lone hitbox as strong.
+    frame(&mut set, [None, Some(13.0), Some(13.0), None, None, None, None, None], 21);
+    assert_eq!(tints(&set, &[1, 2]), [strong, strong]);
+}
+
+fn off_is_exactly_the_old_drawing() {
+    let mut set = HandleSet::new();
+    frame(&mut set, [Some(16.0), Some(13.0), Some(13.0), None, None, None, None, None], 20);
+    assert_eq!(tints(&set, &[0, 1, 2]), [0, 1, 2].map(hitbox::hitbox_tint));
+}
+
+fn one_function_chooses_every_tint() {
+    let usual = [0.1, 0.2, 0.3];
+    for kind in [hitbox::KIND_HIT, hitbox::KIND_HURT, hitbox::KIND_GRAB] {
+        for spot in [None, Some(Spot::Sweet), Some(Spot::Sour), Some(Spot::Late)] {
+            assert_eq!(hitbox::legend_colour(kind, spot, usual, false), usual, "Off is today's tint");
+        }
+    }
+    let on = |spot| hitbox::legend_colour(hitbox::KIND_HIT, spot, usual, true);
+    assert_eq!([None, Some(Spot::Sweet)].map(on), [hitbox::STRONG_TINT; 2]);
+    assert_eq!([Some(Spot::Sour), Some(Spot::Late)].map(on), [hitbox::WEAK_TINT; 2]);
+    assert_ne!(hitbox::WEAK_TINT, hitbox::GRAB_TINT, "pink is not the grab boxes' magenta");
+    for kind in [hitbox::KIND_HURT, hitbox::KIND_GRAB] {
+        assert_eq!(hitbox::legend_colour(kind, None, usual, true), usual, "hurt and grab boxes keep theirs until the legend has them");
+    }
+}
+
+fn the_spot_words_and_rows() {
+    for spot in [Spot::Sweet, Spot::Sour, Spot::Late] {
+        assert_eq!(Spot::from_key(spot.key()), Some(spot));
+    }
+    assert_eq!(Spot::from_key("tip"), None);
+    assert_eq!((Spot::Sweet.name(), Spot::Sour.name(), Spot::Late.name()), ("Sweet", "Sour", "Late"));
+    let mut snapshot = crate::model::settings::Snapshot::factory();
+    for row in [ROW_FRAME_DATA, ROW_STRIP, ROW_COMBO] {
+        assert!(!row_on(&snapshot, row), "{row}: Off by default");
+        snapshot.set(row, &[1, 0]).unwrap();
+        assert!(row_on(&snapshot, row));
+    }
+}
+
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("the_strongest_hitbox_of_a_frame_is_sweet_and_a_weaker_one_sour", the_strongest_hitbox_of_a_frame_is_sweet_and_a_weaker_one_sour as fn()),
+        ("ties_at_the_top_are_all_sweet", ties_at_the_top_are_all_sweet as fn()),
+        ("equal_hitboxes_and_a_lone_hitbox_have_no_label", equal_hitboxes_and_a_lone_hitbox_have_no_label as fn()),
+        ("a_hitbox_weaker_than_an_earlier_one_of_the_action_is_late", a_hitbox_weaker_than_an_earlier_one_of_the_action_is_late as fn()),
+        ("the_peak_starts_over_with_a_new_status_or_after_a_quiet_gap", the_peak_starts_over_with_a_new_status_or_after_a_quiet_gap as fn()),
+        ("a_hit_is_attributed_by_the_damage_it_added", a_hit_is_attributed_by_the_damage_it_added as fn()),
+        ("staling_and_multipliers_cancel_in_the_ratio", staling_and_multipliers_cancel_in_the_ratio as fn()),
+        ("a_hit_that_cannot_be_told_has_no_label", a_hit_that_cannot_be_told_has_no_label as fn()),
+        ("the_powers_of_a_fighter_are_read_from_its_active_slots_only", the_powers_of_a_fighter_are_read_from_its_active_slots_only as fn()),
+        ("the_hit_spheres_take_the_frame_data_colours", the_hit_spheres_take_the_frame_data_colours as fn()),
+        ("one_function_chooses_every_tint", one_function_chooses_every_tint as fn()),
+        ("off_is_exactly_the_old_drawing", off_is_exactly_the_old_drawing as fn()),
+        ("the_spot_words_and_rows", the_spot_words_and_rows as fn()),
+    ]);
+}
+}

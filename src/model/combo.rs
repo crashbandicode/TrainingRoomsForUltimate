@@ -2,6 +2,7 @@
 //! strip links, kept as combos; a saved reference; and each attempt graded link by link against it. Pure and
 //! allocation-free: it steps once per frame right after the strip's tracker (`model::frame_strip`), on fixed arrays.
 
+use super::spots::Spot;
 use super::frame_strip::{
     bin_stick, stick_axis, Button, Link, Move, Snap, Tracker, Verdict, CSTICK_ON, DASH_FLICK_X,
     DASH_STICK_X, DIVE_CONT, DIVE_FLICK, FLICK_JUMP, JUMP_FLICK_Y, JUMP_STICK_Y, PRESS_BITS,
@@ -170,6 +171,8 @@ pub struct LinkRec {
     pub presses_only: bool,
     /// Held direction between the events. Shown, never graded.
     pub drift: Option<Dir>,
+    /// The spot the follow-up hit landed (rc.14, SP4); None for an older file or a hit whose spot could not be told.
+    pub spot: Option<Spot>,
 }
 
 impl LinkRec {
@@ -187,6 +190,7 @@ impl LinkRec {
             events,
             presses_only: false,
             drift,
+            spot: link.spot,
         }
     }
 
@@ -207,6 +211,7 @@ impl LinkRec {
             events: retain(presses.iter().copied()),
             presses_only: true,
             drift: None,
+            spot: None,
         }
     }
 
@@ -303,6 +308,8 @@ pub struct Grade {
     pub marks: [Option<Mark>; STEPS],
     /// The attempt's steps no reference step matched.
     pub extra: u8,
+    /// The reference link saved a spot and the attempt did not land that one (decision SP4; read only with Match sweet/sour spot On).
+    pub wrong_spot: bool,
 }
 
 impl Grade {
@@ -387,6 +394,7 @@ pub fn grade(reference: &LinkRec, attempt: &LinkRec) -> Grade {
         wrong_move: attempt.to != reference.to,
         marks,
         extra,
+        wrong_spot: false,
     }
 }
 
@@ -416,6 +424,8 @@ pub enum Outcome {
 pub enum Reason {
     Drop(i32),
     WrongMove(Move),
+    /// The spot the attempt landed (None: none read) and the one the saved link landed.
+    WrongSpot(Option<Spot>, Spot),
     Missing(Button),
     Off(Button, i32),
     MissingRelease(Button),
@@ -481,6 +491,8 @@ pub struct Settings {
     pub on: bool,
     pub tolerance: u8,
     pub load_after: bool,
+    /// *Match sweet/sour spot* (decision SP4, `spots::ROW_COMBO`): a link counts only when it lands the saved link's spot.
+    pub match_spot: bool,
 }
 
 impl Default for Settings {
@@ -496,6 +508,7 @@ impl Settings {
             on: true,
             tolerance: 1,
             load_after: false,
+            match_spot: false,
         }
     }
 
@@ -510,6 +523,7 @@ impl Settings {
             on: choice(ROW_ON).map_or(factory.on, |i| i == 0),
             tolerance: choice(ROW_TOLERANCE).map_or(factory.tolerance, |i| i.min(2) as u8),
             load_after: choice(ROW_AFTER).map_or(factory.load_after, |i| i == 1),
+            match_spot: super::spots::row_on(snapshot, super::spots::ROW_COMBO),
         }
     }
 }
@@ -763,7 +777,7 @@ impl Helper {
         let Some(attempt) = self.attempt.as_ref().filter(|a| a.open()) else {
             return;
         };
-        let summary = summarize(attempt, total, outcome, tolerance);
+        let summary = summarize(attempt, total, outcome, tolerance, self.settings.match_spot);
         self.record(summary, out);
     }
 
@@ -808,7 +822,7 @@ fn off_reason(event: Event, delta: i32) -> Reason {
     }
 }
 
-fn summarize(attempt: &Attempt, total: usize, outcome: Outcome, tolerance: u8) -> Summary {
+fn summarize(attempt: &Attempt, total: usize, outcome: Outcome, tolerance: u8, _match_spot: bool) -> Summary {
     let grades = || attempt.grades().enumerate();
     let event = |g: &Grade, step: usize| g.reference.events[step];
     let wrong_move = grades()

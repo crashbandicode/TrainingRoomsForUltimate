@@ -117,6 +117,9 @@ pub mod sha256;
 pub mod hitbox;
 #[path = "model/hitbox_orbs.rs"]
 pub mod hitbox_orbs;
+/// rc.14 SP1 to SP5: sweet, sour and late spots by hitbox damage.
+#[path = "model/spots.rs"]
+pub mod spots;
 #[path = "model/eggs.rs"]
 pub mod eggs;
 #[path = "model/btt.rs"]

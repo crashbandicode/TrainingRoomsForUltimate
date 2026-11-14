@@ -131,13 +131,49 @@ fn the_stick_row_scrolls_and_freezes_with_the_strip() {
     assert_eq!(look.rot, 90.0);
 }
 
+/// Decision SP3: with the labels On, a hit block carries its spot, on the lane of whoever hit; Off, nothing is written for it.
+fn a_hit_block_carries_its_spot_label_when_the_row_is_on() {
+    let calm = |damage| Sample { actionable: true, damage, ..Sample::default() };
+    let mut powers = [0.0; crate::model::spots::SLOTS];
+    powers[..2].copy_from_slice(&[16.0, 13.0]);
+    let swing = |stop| Sample { attack: Some(Move::Jab), status: 0x27, active: true, stop, powers, ..Sample::default() };
+    for (attacker_is_p1, gained, label) in [(true, 16.0, "Sweet"), (true, 13.0, "Sour"), (false, 13.0, "Sour")] {
+        let mut t = Tracker::new();
+        for f in 1..=8u32 {
+            let victim = match f {
+                1..=3 => calm(20.0),
+                4..=7 => Sample { stop: true, hitstun: true, damage: 20.0 + gained, ..Sample::default() },
+                _ => Sample { hitstun: true, damage: 20.0 + gained, ..Sample::default() },
+            };
+            let attacker = if f == 1 || f == 2 { calm(0.0) } else { swing((4..=7).contains(&f)) };
+            let (p1, cpu) = if attacker_is_p1 { (attacker, victim) } else { (victim, attacker) };
+            t.step(p1, cpu, NONE);
+        }
+        let lane = usize::from(!attacker_is_p1);
+        let mut on = Renderer::new();
+        let mut seen = Vec::new();
+        on.draw_spots(&t, true, true, |i, look, changed| seen.push((i, *look, changed)));
+        let shown = look_at(&seen, at::RUN_LABEL + lane * RUN_LABELS);
+        assert!(shown.visible, "lane {lane}");
+        assert_eq!(String::from_utf16(shown.text.units()).unwrap(), label);
+        assert_eq!(shown.x, FIRST_X + (f32::from(WINDOW as u8) - 8.0 + 3.0 + 2.0) * PITCH, "centred on the 4-frame hit block");
+        assert!(!look_at(&seen, at::RUN_LABEL + (1 - lane) * RUN_LABELS).visible, "the other lane has no label");
+        let mut off = Renderer::new();
+        let mut seen = Vec::new();
+        off.draw_spots(&t, true, false, |i, look, changed| seen.push((i, *look, changed)));
+        assert!(!look_at(&seen, at::RUN_LABEL + lane * RUN_LABELS).visible, "Off draws today's strip");
+    }
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+
 #[test]
 fn case_table() {
     crate::test_table::run(&[
         ("hidden_writes_only_the_container_once_and_showing_again_writes_only_it", hidden_writes_only_the_container_once_and_showing_again_writes_only_it as fn()),
         ("input_lines", input_lines as fn()),
         ("the_stick_row_scrolls_and_freezes_with_the_strip", the_stick_row_scrolls_and_freezes_with_the_strip as fn()),
+        ("a_hit_block_carries_its_spot_label_when_the_row_is_on", a_hit_block_carries_its_spot_label_when_the_row_is_on as fn()),
     ]);
 }
 }
