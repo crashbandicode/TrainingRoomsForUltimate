@@ -465,9 +465,7 @@ impl CpuRoleDrive {
         match self.mode {
             Mode::Pause => {
                 out.hold_cliff_timer = true;
-                if self.lockout > 0 {
-                    self.lockout -= 1;
-                }
+                self.lockout = self.lockout.saturating_sub(1);
                 if self.lockout == 0 {
                     self.mode = Mode::Record;
                     self.possession = Possession::Standby;
@@ -752,9 +750,7 @@ impl Recorder {
         match self.mode {
             Mode::Pause => {
                 out.hold_cliff_timer = true;
-                if self.lockout > 0 {
-                    self.lockout -= 1;
-                }
+                self.lockout = self.lockout.saturating_sub(1);
                 if self.lockout == 0 {
                     self.mode = Mode::Record;
                     self.possession = Possession::Standby;

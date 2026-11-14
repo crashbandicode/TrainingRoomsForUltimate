@@ -1199,9 +1199,7 @@ impl RecordingScreens {
             Button::B => self.file = None,
             Button::Up => {
                 if let Some(file) = self.file.as_mut() {
-                    if file.cursor > 0 {
-                        file.cursor -= 1;
-                    }
+                    file.cursor = file.cursor.saturating_sub(1);
                 }
             }
             Button::Down => {
@@ -1497,9 +1495,7 @@ impl RecordingScreens {
             }
             Button::Up => {
                 if let Some(picker) = self.picker.as_mut() {
-                    if picker.cursor > 0 {
-                        picker.cursor -= 1;
-                    }
+                    picker.cursor = picker.cursor.saturating_sub(1);
                 }
             }
             Button::Down => {
