@@ -120,6 +120,9 @@ pub mod hitbox_orbs;
 /// rc.14 SP1 to SP5: sweet, sour and late spots by hitbox damage.
 #[path = "model/spots.rs"]
 pub mod spots;
+/// rc.14 hb-legend: the rest of the frame data legend and the launch-angle marks.
+#[path = "model/legend.rs"]
+pub mod legend;
 #[path = "model/eggs.rs"]
 pub mod eggs;
 #[path = "model/btt.rs"]

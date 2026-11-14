@@ -562,6 +562,49 @@ fn core06_attack_data_layout_matches_the_owned_elf() {
     // ...and the stride the slots are walked with is the AttackData size the plugin never assumes elsewhere.
 }
 
+/// rc.14 hb-legend: the launch angle, knockback and attribute fields of `AttackData`, and the `HitStatus` values with the
+/// game's own effective status of a hurtbox part (`model::legend`).
+#[test]
+fn legend_facts_match_the_owned_elf() {
+    use model::legend::{self, ANGLE, ATTRIBUTE, GROUP_GLOBAL, GROUP_WHOLE, KNOCKBACK};
+    let Some(main) = common::owned_main("legend_facts_match_the_owned_elf") else { return };
+    let w = |offset: usize| word_at(&main, offset);
+    // ATTACK (its AttackData at sp+0x20): arg 4, the damage, to +0x20; arg 5, the angle, to +0x28; args 6 to 8, knockback
+    // growth, fixed and base, to +0x2c..+0x34; arg 33, the collision attribute's Hash40, to +0x58.
+    assert_eq!(w(0x2284d90), str_w(8, 31, 0x20 + hitbox::layout::POWER as u32), "damage");
+    assert_eq!(w(0x2284d98), str_w(0, 31, 0x20 + ANGLE as u32), "angle");
+    for (k, at) in [0x2284dac, 0x2284dc0, 0x2284dd4].into_iter().enumerate() {
+        assert_eq!(w(at), str_w(0, 31, 0x20 + (KNOCKBACK + 4 * k) as u32), "knockback {k}");
+    }
+    assert_eq!(w(0x2285a94), str_x(0, 31, 0x20 + ATTRIBUTE as u32), "attribute");
+    // The game reads the angle back from `attack_data(slot)` and compares it with 361: `ldr w8,[x0,#0x28]; cmp w8,#0x169`.
+    assert_eq!(w(0x10d6db0), ldr_w(8, 0, ANGLE as u32));
+    assert_eq!(w(0x10d6dc4), 0x7105_a51f, "cmp w8, #361");
+    // HitModule's vtable (address point main+0x4f6e1d0 by its relocations): slot 0x108 set_xlu_global main+0x46a030, slot
+    // 0x148 get_status main+0x46a800 (the lua_bind thunks load those slots).
+    let reloc = |slot: usize, target: u64| {
+        let mut entry = [0u8; 24];
+        entry[..8].copy_from_slice(&((0x4f6e1d0 + slot) as u64).to_le_bytes());
+        entry[8..16].copy_from_slice(&0x403u64.to_le_bytes());
+        entry[16..].copy_from_slice(&target.to_le_bytes());
+        let ro = &main.bytes[main.rodata.offset..main.rodata.offset + main.rodata.size];
+        ro.chunks_exact(8).enumerate().any(|(i, _)| ro.get(i * 8..i * 8 + 24) == Some(&entry[..]))
+    };
+    assert!(reloc(0x108, 0x46a030) && reloc(0x148, 0x46a800), "HitModule vtable slots");
+    assert_eq!(w(0x203db68), ldr_x(2, 8, 0x108), "HitModule::set_xlu_global thunk");
+    assert_eq!(w(0x203dbb8), ldr_x(3, 8, 0x148), "HitModule::get_status thunk");
+    // set_xlu_global writes 2 to the group's global status; cancel_xlu_global writes 2 (xlu frames left) or 1 (invincible).
+    assert_eq!((w(0x46a05c), w(0x46a060)), (0x321f_03e9, str_w(9, 8, GROUP_GLOBAL as u32)), "orr w9,wzr,#2");
+    assert_eq!((w(0x46a168), w(0x46a180), w(0x46a1a4)), (0x321f_03ea, 0x3200_03ea, str_w(10, 8, GROUP_GLOBAL as u32)));
+    assert_eq!((legend::INTANGIBLE, legend::INVINCIBLE), (2, 1));
+    // get_status: `ldp w10,w8,[x8,#0x1c]` (whole, global), `bic w10,w10,w10,asr #31` (whole at least 0), then two signed
+    // maxima with the part's word (`csel ... gt`): `legend::part_status`.
+    assert_eq!(GROUP_GLOBAL, GROUP_WHOLE + 4);
+    assert_eq!(w(0x46a824), 0x2943_a10a, "ldp w10, w8, [x8, #0x1c]");
+    assert_eq!(w(0x46a828), 0x0aaa_7d4a, "bic w10, w10, w10, asr #31");
+    assert_eq!((w(0x46a830), w(0x46a838)), (0x1a8a_c108, 0x1a88_c120), "csel gt, csel gt");
+}
+
 /// Eggs-ercise V2.2: the stage's camera range is the camera manager's four floats (left, right, top, bottom) at `+0xc20`, read
 /// the way the game's own accessor reads them: the slot `main+0x52b8f00` (the one the camera setup hook reads), the pointer in
 /// it, the manager that points at, then the floats.
