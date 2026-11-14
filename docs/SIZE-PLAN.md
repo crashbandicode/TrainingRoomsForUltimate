@@ -346,3 +346,10 @@ unchanged: with no diag code the count is the same as before. The gate exits 2 w
 parses or a dropped item does not own whole lines. Measured (`tools/sloc.py`, before → after): rc.13 `ed0d7a35`
 147,835 → 141,975; `c5191271` 147,798 → 141,917; rc.14 integration `8d129d20` 149,316 → 143,399. The ceiling stays
 147,921. Tests: `tools/test_size_gate.py` `DiagOnly`.
+
+Later the same day (the primary's reading of the operator's rc.14 scope order) the test and simulator rules went into
+the same evaluator: sloc4 matched three attribute spellings and ended an item at its first `;` or `{`, so test code
+such as `const X: [T; N] = …`, `-> [T; N] {` and `use a::{b};` was partly counted. A `macro_rules!` template is now
+read like other code (a macro call's body stays opaque). 648 lines in 44 files left the count on each measured tree:
+`ed0d7a35` 141,975 → 141,327; `c5191271` 141,917 → 141,269; rc.14 integration `12dee86d` 143,828 → 143,180. Tests:
+`tools/test_size_gate.py` `TestAndSimulator`.

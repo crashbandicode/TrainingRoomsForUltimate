@@ -10,25 +10,25 @@ Changes: vendored code under third_party/ is excluded and reported on its own li
 tree's tracked and untracked-not-ignored files (what tools/size_gate.py gates); depth 0 lists single files; the
 counting is a function (`measure`) that size_gate.py imports.
 
-Rules (sloc4): a file reached only through a test-gated `mod name;` (`#[cfg(test)]` or `#[cfg(all(test, ...))]`) is a
-test file; items gated by those attributes are dropped; items and files gated by `#[cfg(any(test, feature =
-"simulator"))]` are host-only simulator code, reported apart and not counted. Excluded as before: files under tests/,
-benches/, examples/; // and /* */ comments; blank lines. These rules are unchanged, so a tree without diag code counts
-exactly as before.
-
-Diag-only code (operator 2026-11-14: diagnostic code that won't ship is not counted): `cfg_scan` reads every
-`#[cfg(...)]` predicate (`all`, `any`, `not`, `name`, `name = "value"`) with one parser and evaluates it in three values
-against what is known of the release build (cargo skyline build --release, default features): `test` is off,
-feature `simulator` is off, and the diag features are off (`diag`, every root feature that turns it on, and the path
-crates' features only those turn on, read from the Cargo.toml files). Every other name or value (target_os,
-deluxe-sdk, ...) is unknown, and an unknown predicate is counted. An item, statement, field, variant, match arm or
-parameter is diag-only when its predicate is false only once the diag features are off; it is dropped from its
-attributes to its end (token trees and Rust's end rules, not a text scan). A file reached only through diag-only
-`mod name;` declarations is dropped whole with its child modules, and so is a file whose inner `#![cfg(...)]` is
-diag-only. A diag-only item inside a test or simulator item is left to the rules above. `#[cfg_attr]` and
-`cfg!(...)` drop nothing; code inside macro bodies is opaque and stays counted. measure_normalized checks every file
-that lost diag-only code: what is left still parses (pinned rustfmt), and each dropped item owns whole lines in
-rustfmt's layout; otherwise it raises (size_gate exit 2).
+Rules (2026-11-14; operator: diagnostic code that won't ship is not counted, then everything in rc.14, which the
+primary read as the yes for test and simulator code through the same rule): `cfg_scan` reads every `#[cfg(...)]`
+predicate (`all`, `any`, `not`, `name`, `name = "value"`) with one parser and evaluates it in three values against
+what is known of the release build (cargo skyline build --release, default features): `test` is off, feature
+`simulator` is off, and the diag features are off (`diag`, every root feature that turns it on, and the path crates'
+features only those turn on, read from the Cargo.toml files). Every other name or value (target_os, deluxe-sdk, ...)
+is unknown, and an unknown predicate is counted. An item, statement, field, variant, match arm or parameter whose
+predicate is false is dropped from its attributes to its end (token trees and Rust's end rules, not a text scan), and
+reported by why it is off: test (false once `test` is off), host-only simulator (false once `simulator` is off too) or
+diag (false once the diag features are off too). A file reached only through such `mod name;` declarations is dropped
+whole with its child modules, and so is a file whose inner `#![cfg(...)]` is false. `#[cfg_attr]` and `cfg!(...)`
+drop nothing. A `macro_rules!` template (after each `=>`) is read as items and statements, since every expansion
+carries its cfgs (sloc4's text match dropped test items there too); a macro call's body is opaque and stays
+counted. Excluded as before: files under tests/, benches/,
+examples/; // and /* */ comments; blank lines. sloc4 matched only `#[cfg(test)]`, `#[cfg(all(test, ...))]` and
+`#[cfg(any(test, feature = "simulator"))]` and ended an item at its first ';' or '{' (so `const X: [T; N] = ...`,
+`-> [T; N] {` and `use a::{b};` were partly counted). measure_normalized checks every file that lost code: what is
+left still parses (pinned rustfmt), and each dropped item owns whole lines in rustfmt's layout; otherwise it raises
+(size_gate exit 2).
 usage: python3 -I sloc.py git <repo> <rev> [depth]  |  python3 -I sloc.py dir <path> [depth]  |  python3 -I sloc.py tree <repo> [depth]"""
 import collections
 import pathlib
@@ -44,10 +44,6 @@ except ImportError:  # Python < 3.11; size_gate.py reports it
 
 TEST_DIRS = ('tests/', 'benches/', 'examples/')
 VENDORED_DIRS = ('third_party/',)
-TEST_ONLY_CFG = re.compile(r'#\[cfg\(\s*(test|all\(\s*test\b[^\]]*)\s*\)\]')
-SIM_CFG = re.compile(r'#\[cfg\(\s*any\(\s*test\s*,\s*feature\s*=\s*"simulator"\s*\)\s*\)\]')
-MOD_DECL = re.compile(r'((?:#\[[^\]]*\]\s*)*)(?:pub(?:\([^)]*\))?\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*;')
-PATH_ATTR = re.compile(r'#\[path\s*=\s*"([^"]+)"\]')
 CATEGORIES = ('test', 'sim', 'diag')  # most excluded first: a file reached from several categories takes the last
 
 
@@ -591,9 +587,27 @@ class Walker:
             self.group(nodes[-1], body, inherited)
             return
         if head == 'macro':
-            self.opaque(nodes)
+            if nodes and _is(nodes[0], 'macro_rules'):
+                self.macro_rules(nodes, inherited)
+            else:
+                self.opaque(nodes)
             return
         self.walk_nodes(nodes, inherited)
+
+    def macro_rules(self, nodes, inherited):
+        """A `macro_rules!` template (the group after each `=>`) is items and statements that every expansion
+        carries, cfg attributes included; the matchers stay opaque."""
+        body = next((node for node in nodes[2:] if isinstance(node, Group)), None)
+        if body is None:
+            return
+        children = body.children
+        for idx, node in enumerate(children):
+            if not isinstance(node, Group):
+                continue
+            if idx and _is(children[idx - 1], '=>'):
+                self.group(node, 'stmts', inherited)
+            else:
+                self.opaque([node])
 
     def walk_nodes(self, nodes, inherited):
         """Expression context: classify each group by what precedes it."""
@@ -689,50 +703,9 @@ def cut(text, regions):
 
 # --- files ----------------------------------------------------------------------------------------------------------
 
-def drop_gated(text, pattern):
-    """Remove items gated by `pattern`: from the attribute to the end of the brace block or ';'. Returns (kept, dropped)."""
-    out, dropped, pos = [], [], 0
-    for m in pattern.finditer(text):
-        if m.start() < pos:
-            continue
-        out.append(text[pos:m.start()])
-        i, n = m.end(), len(text)
-        while i < n and text[i] not in '{;':
-            i += 1
-        if i < n and text[i] == ';':
-            dropped.append(text[m.start():i + 1]); pos = i + 1; continue
-        depth = 0
-        while i < n:
-            if text[i] == '{':
-                depth += 1
-            elif text[i] == '}':
-                depth -= 1
-                if depth == 0:
-                    i += 1
-                    break
-            i += 1
-        dropped.append(text[m.start():i]); pos = i
-    out.append(text[pos:])
-    return ''.join(out), ''.join(dropped)
-
-
 def _own_dir(path):
     d, base = posixpath.dirname(path), posixpath.basename(path)
     return d, (d if base in ('mod.rs', 'lib.rs', 'main.rs') else posixpath.join(d, base[:-3]))
-
-
-def mod_children(path, text):
-    """Yield (child_path, test_only) for `mod x;` declarations in a file (sloc4's test and simulator rule)."""
-    d, own_dir = _own_dir(path)
-    for m in MOD_DECL.finditer(text):
-        attrs, name = m.group(1), m.group(2)
-        test_only = 'test' if TEST_ONLY_CFG.search(attrs) else ('sim' if SIM_CFG.search(attrs) else None)
-        p = PATH_ATTR.search(attrs)
-        if p:
-            yield posixpath.normpath(posixpath.join(d, p.group(1))), test_only
-        else:
-            yield posixpath.join(own_dir, name + '.rs'), test_only
-            yield posixpath.join(own_dir, name, 'mod.rs'), test_only
 
 
 def declared_children(path, mods):
@@ -795,7 +768,7 @@ def files_tree(repo):
 
 Measure = collections.namedtuple('Measure', 'impl sim tests vendored diag excluded')
 Measure.__doc__ = """impl: implementation lines per group; sim, tests, diag: lines left out of the count; vendored:
-third_party/ lines; excluded: {path: diag-only lines} for every file that lost some."""
+third_party/ lines; excluded: {path: {category: lines}} for every file that lost some."""
 
 
 def cfg_status(sources, scans):
@@ -826,27 +799,12 @@ def cfg_status(sources, scans):
 def measure(files, depth, check=None, release=None):
     """Count the Rust files of `files` ({repo path: text}; Cargo.toml manifests in it say which features are diag).
 
-    Test and host-only simulator code: sloc4's rules below, unchanged, so a tree without diag code counts exactly as
-    before. Diag-only code: the evaluator (cfg_scan); a diag region inside a test or simulator item is left to those
-    rules. check(path, kept_text, regions), when given, is called for each file that lost diag-only code."""
+    Every cfg goes through the evaluator (cfg_scan): a file whose category is test, sim or diag is left out whole; in
+    the other files each outermost gated region is cut, and its lines go to the region's category (counted in that
+    order, so the three numbers add up to what left the count). check(path, kept_text, regions), when given, is called
+    for each file that lost part of its code."""
     release = release or Release({k: v for k, v in files.items() if k.endswith('Cargo.toml')})
     sources = {k: v for k, v in files.items() if k.endswith('.rs')}
-    stripped = {k: strip_comments(v) for k, v in sources.items()}
-    # A file is test-only if every `mod` declaration that reaches it is test-gated (and at least one reaches it).
-    reached = collections.defaultdict(list)
-    for path, text in stripped.items():
-        for child, test_only in mod_children(path, text):
-            if child in stripped:
-                reached[child].append(test_only)
-    test_files = {p for p, flags in reached.items() if flags and all(f == 'test' for f in flags)}
-    sim_files = {p for p, flags in reached.items() if flags and all(f in ('test', 'sim') for f in flags) and p not in test_files}
-    changed = True
-    while changed:  # children of a test file are test-only
-        changed = False
-        for path in list(test_files):
-            for child, _ in mod_children(path, stripped[path]):
-                if child in stripped and child not in test_files:
-                    test_files.add(child); changed = True
     scans = {}
     for path, text in sources.items():
         try:
@@ -854,36 +812,30 @@ def measure(files, depth, check=None, release=None):
         except ValueError as error:
             raise ValueError(f'{path}: {error}') from error
     status = cfg_status(sources, scans)
-    impl, sim, tests, vendored, diag, excluded = collections.Counter(), 0, 0, 0, 0, {}
+    impl, lost, excluded, vendored = collections.Counter(), collections.Counter(), {}, 0
     for path, text in sources.items():
-        if path in test_files:
-            tests += nonblank(stripped[path])
+        kept = nonblank(strip_comments(text))
+        if status[path] is not None:
+            lost[status[path]] += kept
+            excluded[path] = {status[path]: kept}
             continue
-        if path in sim_files:
-            sim += nonblank(stripped[path])
-            continue
-        kept = stripped[path]
-        if status[path] == 'diag':
-            diag += nonblank(kept)
-            excluded[path] = nonblank(kept)
-            continue
-        regions = [r for r in scans[path][0] if r[2] == 'diag']
-        if regions:
-            kept = strip_comments(cut(text, regions))
-            lost = nonblank(stripped[path]) - nonblank(kept)
-            diag += lost
-            excluded[path] = lost
-            if check is not None:
-                check(path, cut(text, regions), regions)
-        kept, dropped_sim = drop_gated(kept, SIM_CFG)
-        kept, dropped_test = drop_gated(kept, TEST_ONLY_CFG)
-        sim += nonblank(dropped_sim)
-        tests += nonblank(dropped_test)
+        regions, per = scans[path][0], {}
+        for i, category in enumerate(CATEGORIES):
+            inside = [r for r in regions if r[2] in CATEGORIES[:i + 1]]
+            now = nonblank(strip_comments(cut(text, inside))) if inside else kept
+            if kept - now:
+                per[category] = kept - now
+                lost[category] += kept - now
+            kept = now
+        if per:
+            excluded[path] = per
+        if regions and check is not None:
+            check(path, cut(text, regions), regions)
         if in_dirs(path, VENDORED_DIRS):
-            vendored += nonblank(kept)
+            vendored += kept
         else:
-            impl[group(path, depth)] += nonblank(kept)
-    return Measure(impl, sim, tests, vendored, diag, excluded)
+            impl[group(path, depth)] += kept
+    return Measure(impl, lost['sim'], lost['test'], vendored, lost['diag'], excluded)
 
 
 # Operator's sloc-fmt.ps1, 2026-11-02: edition 2021 and stable formatter.

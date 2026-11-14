@@ -179,12 +179,6 @@ class DiagOnly(unittest.TestCase):
                 '#[cfg(not(feature = "deluxe-sdk"))]\nfn fallback() {}\n#[cfg($cfg)]\nfn odd() {}\n')
         self.assertEqual(counted({'src/a.rs': text}), {'src/a.rs': 8})
 
-    def test_test_items_keep_sloc4s_rules_exactly(self):
-        # sloc4 ends a gated item at its first ';' or '{'; the rest of this test const is counted, as before (the
-        # primary 2026-11-14: changing that is a separate decision). Only diag-only code changed.
-        text = '#[cfg(test)]\nconst X: [u8; 2] = [1, 2];\n#[cfg(test)]\nuse a::{b, c};\nfn a() {}\n'
-        self.assertEqual(counted({'src/a.rs': text}), {'src/a.rs': 3})
-
     def test_a_diag_item_inside_a_test_item_is_left_to_the_test_rule(self):
         text = '#[cfg(test)]\nmod tests {\n    #[cfg(feature = "diag")]\n    fn d() {}\n}\nfn a() {}\n'
         m = sloc.measure({'src/a.rs': text}, 0)
@@ -225,6 +219,42 @@ class DiagOnly(unittest.TestCase):
                 '#[cfg(feature = "diag")] fn d() { x(); }\n')
         m = sloc.measure_normalized({'src/a.rs': text}, 0)
         self.assertEqual((dict(m[0]), m[4]), ({'src/a.rs': 4}, 2 + 4))
+
+
+class TestAndSimulator(unittest.TestCase):
+    """Test-only and host-only simulator code go through the same evaluator (the primary 2026-11-14 ~21:00Z, on the
+    operator's ~20:58Z order). sloc4 ended a gated item at its first ';' or '{' and counted the rest."""
+
+    def test_a_test_const_with_an_array_type_is_not_counted(self):
+        text = '#[cfg(test)]\nconst X: [u8; 2] = [\n    1, 2,\n];\nfn a() {}\n'
+        self.assertEqual(counted({'src/a.rs': text}), {'src/a.rs': 1})
+
+    def test_a_test_fn_returning_an_array_is_not_counted(self):
+        text = '#[cfg(test)]\nfn three() -> [u8; 3] {\n    let x = 1;\n    [x; 3]\n}\nfn a() {}\n'
+        self.assertEqual(counted({'src/a.rs': text}), {'src/a.rs': 1})
+
+    def test_a_test_use_tree_is_not_counted(self):
+        text = '#[cfg(test)]\nuse a::{b, c};\nfn a() {}\n'
+        self.assertEqual(counted({'src/a.rs': text}), {'src/a.rs': 1})
+
+    def test_simulator_code_with_the_same_shapes_is_set_apart(self):
+        text = '#[cfg(any(test, feature = "simulator"))]\nconst T: [u8; 2] = [\n    1, 2,\n];\nfn a() {}\n'
+        m = sloc.measure({'src/a.rs': text}, 0)
+        self.assertEqual((dict(m[0]), m[1]), ({'src/a.rs': 1}, 4))
+
+    def test_macro_rules_templates_are_read_but_macro_calls_stay_opaque(self):
+        text = ('macro_rules! group {\n    ($g:ident) => {\n        #[cfg(test)]\n        impl $g {\n'
+                '            fn names() {}\n        }\n        impl $g {\n            fn trace(&self) {\n'
+                '                #[cfg(feature = "diag")]\n                log(self);\n            }\n        }\n'
+                '    };\n}\nslots! {\n    #[cfg(feature = "diag")]\n    PROBE = [Probe];\n}\n')
+        # Counted: macro_rules! group {, ($g:ident) => {, impl $g {, fn trace(&self) {, }, }, };, }, and the 4 lines of
+        # the slots! call.
+        self.assertEqual(counted({'src/a.rs': text}), {'src/a.rs': 12})
+
+    def test_test_only_predicates_go_through_the_evaluator(self):
+        text = ('#[cfg(all(not(target_os = "switch"), test))]\nfn host_test() {}\n'
+                '#[cfg(any(test, target_os = "switch"))]\nfn shipped() {}\n')
+        self.assertEqual(counted({'src/a.rs': text}), {'src/a.rs': 2})
 
 
 class Budget(unittest.TestCase):
