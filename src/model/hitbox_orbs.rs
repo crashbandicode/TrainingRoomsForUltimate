@@ -174,21 +174,14 @@ impl Board {
 /// hitbox's marks (`legend::marks`) at its slot's angle (`angle(slot)`, `None` when the slot has no data). How many were written.
 pub fn place_orbs(set: &HandleSet, mut place: impl FnMut(&Sphere) -> Option<[f32; 3]>, lr: Option<f32>, mut angle: impl FnMut(i32) -> Option<i32>, out: &mut [Orb]) -> usize {
     let mut n = 0;
-    for (sphere, centre) in set.spheres().filter_map(|s| place(s).map(|c| (s, c))) {
-        if n < out.len() {
-            out[n] = orb_of(sphere, centre);
-            n += 1;
-        }
+    for (slot, orb) in out.iter_mut().zip(set.spheres().filter_map(|s| place(s).map(|c| orb_of(s, c)))) {
+        (*slot, n) = (orb, n + 1);
     }
-    let Some(lr) = lr else { return n };
-    for i in 0..n {
+    for i in 0..lr.map_or(0, |_| n) {
         let hit = out[i];
         let Some(angle) = (hit.kind() == KIND_HIT && hit.key & 0xff == 0).then(|| angle(((hit.key >> 8) & 0xffff) as i32)).flatten() else { continue };
-        for mark in legend::marks(&hit, angle, lr).into_iter().flatten() {
-            if n < out.len() {
-                out[n] = mark;
-                n += 1;
-            }
+        for mark in legend::marks(&hit, angle, lr.unwrap_or(1.0)).into_iter().flatten().take(out.len() - n) {
+            (out[n], n) = (mark, n + 1);
         }
     }
     n

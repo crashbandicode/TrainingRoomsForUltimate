@@ -167,7 +167,7 @@ fn the_board_keeps_each_fighters_last_pass_and_ages_out_the_gone() {
     assert_eq!(board.live().count(), 29);
     // At most BOARD_ORBS per fighter (its MAX_HELD spheres and the launch-angle marks, rc.14).
     assert_eq!(board.publish(0xc0, (0..orbs::BOARD_ORBS + 5).map(|i| orb(i as f32))), orbs::BOARD_ORBS);
-    assert!(orbs::BOARD_ORBS > MAX_HELD);
+    const { assert!(orbs::BOARD_ORBS > MAX_HELD) };
     board.clear(0xc0);
     assert_eq!(board.live().count(), 29);
     // A fighter that stops publishing ages out while others go on, counted in publishes, not in time: a paused game

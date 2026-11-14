@@ -32,36 +32,15 @@ pub fn part_status(part: i32, whole: i32, global: i32) -> i32 {
     part.max(global.max(whole.max(0)))
 }
 
-/// A hurtbox's tint for its status: invincible green; intangible sky blue, and so is a part the whole group switched off
-/// (the revival platform: nothing hits it); any other white.
+/// A hurtbox's tint for its status: invincible green; intangible sky blue, and so is a part the whole group switched off (OFF,
+/// the revival platform: nothing hits it); any other white.
 pub fn hurt_tint(status: i32) -> [f32; 3] {
-    HURT[match status {
-        INVINCIBLE => 1,
-        INTANGIBLE | OFF => 2,
-        _ => 0,
-    }]
-}
-
-/// What a launch angle draws: a line at a fixed angle, dashes where the game picks the direction at hit time (361), a
-/// centre dot where it links toward the attacker (362 and above) or the angle is not one.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Mark {
-    Line(f32),
-    Dashes(f32),
-    Dot,
+    HURT[usize::try_from(status).ok().and_then(|s| [0, 1, 2, 2].get(s).copied()).unwrap_or(0)]
 }
 
 /// The direction 361's dashes point in, counter-clockwise from forward: the launch the game gave a target in the air, measured
 /// on Eden (`hbl-trace-8fadea57-1` `t-hbl-361b`: 38.1 degrees, the first frame's fall taken from a 70-degree hit on the same CPU).
 pub const SAKURAI_SHOWN: f32 = 38.0;
-
-pub fn mark(angle: i32) -> Mark {
-    match angle {
-        0..=360 => Mark::Line(angle as f32),
-        361 => Mark::Dashes(SAKURAI_SHOWN),
-        _ => Mark::Dot,
-    }
-}
 
 /// The unit vector of `degrees`, counter-clockwise from the forward of an attacker facing `lr` (+1 right, -1 left).
 pub fn direction(degrees: f32, lr: f32) -> [f32; 2] {
@@ -75,8 +54,9 @@ pub const KIND_MARK: u32 = 4;
 pub const LINE: f32 = 0.1;
 pub const DOT: f32 = 0.25;
 
-/// The orbs marking hitbox orb `hit`'s launch angle `angle` (its owner facing `lr`), white: the line from the centre to the
-/// edge, the two dashes, or the dot.
+/// The orbs marking hitbox orb `hit`'s launch angle `angle` (its owner facing `lr`), white: a line from the centre to the edge at a
+/// fixed angle (0 to 360); two dashes where the game picks the direction when the hit lands (361); a centre dot where the hit
+/// carries the target along (362 and above), or the angle is not one.
 pub fn marks(hit: &Orb, angle: i32, lr: f32) -> [Option<Orb>; 2] {
     let index = ((hit.key >> 8) & 0xffff) as usize;
     let [x, y, z] = hit.centre;
@@ -84,10 +64,11 @@ pub fn marks(hit: &Orb, angle: i32, lr: f32) -> [Option<Orb>; 2] {
         let at = |t: f32| [x + dx * hit.radius * t, y + dy * hit.radius * t, z];
         Orb { centre: at(from), tail: at(to), radius: hit.radius * LINE, color: [255; 4], key: sphere_key(KIND_MARK, index, 0x10 + n) }
     };
-    match mark(angle) {
-        Mark::Line(d) => [Some(seg(0, direction(d, lr), 0.0, 1.0)), None],
-        Mark::Dashes(d) => [Some(seg(0, direction(d, lr), 0.1, 0.4)), Some(seg(1, direction(d, lr), 0.6, 0.9))],
-        Mark::Dot => [Some(Orb { radius: hit.radius * DOT, ..seg(0, [0.0; 2], 0.0, 0.0) }), None],
+    let dashes = direction(SAKURAI_SHOWN, lr);
+    match angle {
+        0..=360 => [Some(seg(0, direction(angle as f32, lr), 0.0, 1.0)), None],
+        361 => [Some(seg(0, dashes, 0.1, 0.4)), Some(seg(1, dashes, 0.6, 0.9))],
+        _ => [Some(Orb { radius: hit.radius * DOT, ..seg(0, [0.0; 2], 0.0, 0.0) }), None],
     }
 }
 

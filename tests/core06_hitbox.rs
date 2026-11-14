@@ -583,7 +583,7 @@ fn legend_facts_match_the_owned_elf() {
         entry[8..16].copy_from_slice(&0x403u64.to_le_bytes());
         entry[16..].copy_from_slice(&target.to_le_bytes());
         let ro = &main.bytes[main.rodata.offset..main.rodata.offset + main.rodata.size];
-        ro.chunks_exact(8).enumerate().any(|(i, _)| ro.get(i * 8..i * 8 + 24) == Some(&entry[..]))
+        (0..ro.len() / 8).any(|i| ro.get(i * 8..i * 8 + 24) == Some(&entry[..]))
     };
     assert!(reloc(0x108, 0x46a030) && reloc(0x148, 0x46a800), "HitModule vtable slots");
     assert_eq!(w(0x203db68), ldr_x(2, 8, 0x108), "HitModule::set_xlu_global thunk");

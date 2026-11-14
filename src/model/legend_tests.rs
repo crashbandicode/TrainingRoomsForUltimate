@@ -76,12 +76,16 @@ fn legend_angle_line_points_along_the_angle_mirrored_by_facing() {
 
 #[test]
 fn legend_special_angles_are_dashed_or_a_dot() {
-    assert_eq!(mark(0), Mark::Line(0.0));
-    assert_eq!(mark(360), Mark::Line(360.0));
-    assert_eq!(mark(361), Mark::Dashes(SAKURAI_SHOWN));
-    for angle in [362, 363, 365, 366, 367, 368, 400, -1] {
-        assert_eq!(mark(angle), Mark::Dot, "angle {angle}");
+    // 0 and 360 are lines (the line test), 361 two dashes, 362 and above (and a negative) one dot.
+    let shape = |angle| marks(&hit(0), angle, 1.0).map(|m| m.map(|o| (o.centre == o.tail, o.radius)));
+    for angle in [0, 360] {
+        assert!(matches!(shape(angle), [Some((false, _)), None]), "angle {angle}");
     }
+    assert!(matches!(shape(361), [Some((false, _)), Some((false, _))]));
+    for angle in [362, 363, 365, 366, 367, 368, 400, -1] {
+        assert_eq!(shape(angle), [Some((true, 4.0 * DOT)), None], "angle {angle}");
+    }
+    assert_eq!(SAKURAI_SHOWN, 38.0, "the Eden measurement (design report)");
     // 361: two dashes along the shown direction, apart, inside the hitbox; mirrored by facing.
     for lr in [1.0, -1.0] {
         let [Some(a), Some(b)] = marks(&hit(0), 361, lr) else { panic!("two dashes") };
