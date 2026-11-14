@@ -222,9 +222,13 @@ pub fn duplicate(root: &Path, id: &str, stage_name: &str) -> Result<String, Stor
     save_new(root, layout.stage, stage_name, &layout.targets)
 }
 
-/// A count of targets: `1 target`, `6 targets`.
+/// A count and its noun: `1 target`, `6 targets`, `1 file`.
+fn counted(n: usize, one: &str, many: &str) -> String {
+    format!("{n} {}", if n == 1 { one } else { many })
+}
+
 pub fn targets_label(n: usize) -> String {
-    if n == 1 { "1 target".to_owned() } else { format!("{n} targets") }
+    counted(n, "target", "targets")
 }
 
 /// The Saved layouts list's two footer lines: the layout under the cursor, then the keys (and the files skipped, if any).
@@ -233,7 +237,7 @@ pub fn list_footer(rows: &[(String, Layout)], cursor: usize, skipped: usize) -> 
         || "No saved layouts on this stage yet. ZL + Down saves one while placing".to_owned(),
         |(_, l)| format!("{} · {}", l.name, targets_label(l.targets.len())),
     );
-    let note = if skipped > 0 { format!("   {skipped} files skipped") } else { String::new() };
+    let note = if skipped > 0 { format!("   {} skipped", counted(skipped, "file", "files")) } else { String::new() };
     format!("{first}\nA open   B back{note}")
 }
 

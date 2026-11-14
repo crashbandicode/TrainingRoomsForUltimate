@@ -177,6 +177,7 @@ fn layouts_list_footer() {
     let rows = [layout("Ledge trap", 1), layout("Layout 1 · Battlefield", 6)];
     assert_eq!(list_footer(&rows, 1, 0), "Layout 1 · Battlefield · 6 targets\nA open   B back");
     assert_eq!(list_footer(&rows, 0, 2), "Ledge trap · 1 target\nA open   B back   2 files skipped");
+    assert_eq!(list_footer(&rows, 0, 1), "Ledge trap · 1 target\nA open   B back   1 file skipped", "one file, one noun");
     assert_eq!(list_footer(&[], 0, 0), "No saved layouts on this stage yet. ZL + Down saves one while placing\nA open   B back");
 }
 
