@@ -17,6 +17,7 @@
 //! NOT YET SWITCH-RUN: compiled for the Switch, not run on Eden or the console.
 
 use std::path::Path;
+use crate::engine::mii::lifetime::Configuration;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 use hos_lock::Mutex;
@@ -1705,7 +1706,7 @@ static HANDOFF_SEQ: AtomicU64 = AtomicU64::new(0);
 static HANDOFF_DROPPED: AtomicU32 = AtomicU32::new(0);
 
 /// A Save captured `state` for `role` in `slot` (game thread): the writer's copy follows. Never waits, no heap.
-fn hand_to_writer(role: Role, slot: usize, state: SavedState, mii: Option<crate::engine::mii::lifetime::Configuration>) {
+fn hand_to_writer(role: Role, slot: usize, state: SavedState, mii: Option<Configuration>) {
     let seq = HANDOFF_SEQ.fetch_add(1, Ordering::AcqRel);
     for (i, cell) in HANDOFF_STATE.iter().enumerate() {
         if cell.compare_exchange(SLOT_EMPTY, SLOT_WRITING, Ordering::Acquire, Ordering::Relaxed).is_ok() {

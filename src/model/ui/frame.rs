@@ -5,6 +5,7 @@
 //! The model decides what is on screen and where the cursor is; this module only says how it reads.
 
 use core::fmt::{self, Write};
+use super::recording_menu::{Face, Floppy, RecordingScreens};
 
 use super::menu::table::{Control, Editor, Info, Row, GROUPS, ROWS};
 use super::menu::{Entry, Grey, Menu, RowValue, LOOP_ROW};
@@ -698,7 +699,7 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
     }
 }
 
-fn paint_crop(rec: &super::recording_menu::RecordingScreens, frame: &mut Frame) {
+fn paint_crop(rec: &RecordingScreens, frame: &mut Frame) {
     let rows = rec.crop_rows();
     let cursor = rec.crop_cursor();
     for (slot, row) in rows.iter().enumerate().take(ROW_LINES) {
@@ -712,7 +713,7 @@ fn paint_crop(rec: &super::recording_menu::RecordingScreens, frame: &mut Frame) 
     let _ = frame.crumb.write_str("Crop");
 }
 
-fn paint_file(rec: &super::recording_menu::RecordingScreens, frame: &mut Frame) {
+fn paint_file(rec: &RecordingScreens, frame: &mut Frame) {
     let rows = rec.file_rows();
     let cursor = rec.file_cursor();
     let start = window_start(cursor, rows.len(), ROW_LINES);
@@ -733,7 +734,7 @@ fn paint_file(rec: &super::recording_menu::RecordingScreens, frame: &mut Frame) 
     let _ = frame.crumb.write_str(&rec.file_crumb());
 }
 
-fn paint_picker(rec: &super::recording_menu::RecordingScreens, frame: &mut Frame) {
+fn paint_picker(rec: &RecordingScreens, frame: &mut Frame) {
     let rows = rec.picker_rows();
     let cursor = rows.iter().position(|row| row.cursor).unwrap_or(0);
     let start = window_start(cursor, rows.len(), ROW_LINES);
@@ -751,7 +752,7 @@ fn paint_picker(rec: &super::recording_menu::RecordingScreens, frame: &mut Frame
     }
 }
 
-fn paint_sections(rec: &super::recording_menu::RecordingScreens, frame: &mut Frame, face: super::recording_menu::Face, group: u8) {
+fn paint_sections(rec: &RecordingScreens, frame: &mut Frame, face: Face, group: u8) {
     use super::recording_menu::FileTag;
     let popup = face == super::recording_menu::Face::Popup;
     let mut badges = 0;
@@ -834,7 +835,7 @@ fn paint_sections(rec: &super::recording_menu::RecordingScreens, frame: &mut Fra
     }
 }
 
-fn place_icon(frame: &mut Frame, index: usize, x: f32, y: f32, floppy: super::recording_menu::Floppy) {
+fn place_icon(frame: &mut Frame, index: usize, x: f32, y: f32, floppy: Floppy) {
     place_icon_color(frame, index, x, y, floppy.color());
 }
 

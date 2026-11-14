@@ -5,6 +5,7 @@
 //! statics, `trace` lines formatted into package 1's stack line), one short mutex per call, never held across a native call.
 #[cfg(feature = "diag")]
 mod meter {
+    use crate::engine::swap::character_forms::EntryState;
     use crate::model::build_split::{Gaps, Split, Step, Work};
     use std::sync::atomic::{AtomicU32, Ordering};
     // Switch std::Mutex initializes a OnceBox on its first lock. These meters
@@ -71,7 +72,7 @@ mod meter {
     /// Every entry pre-service tick, whatever the plugin does: a gap that jumps by more than `STALL_US` past the previous
     /// gap is logged with the entry's loader state. A steady slow frame rate does not log. A stall the game makes itself
     /// (a native Reload building a fighter) is measured the same way as the plugin's builds.
-    pub fn tick_any(role: usize, owner: u32, now_us: u64, e: &crate::engine::swap::character_forms::EntryState) {
+    pub fn tick_any(role: usize, owner: u32, now_us: u64, e: &EntryState) {
         let gap = CLOCKS.get(role).and_then(|m| m.lock().tick(now_us, crate::model::build_split::STALL_US));
         if let Some(gap) = gap {
             crate::engine::compat::logging::diagnostic(format_args!("[BuildSplit] stall owner={owner} gap_us={gap} loader={} outer={} installed={} changing={} count={} kinds={:x?} flags={:#x}", e.loader, e.outer, e.installed, e.changing, e.count, &e.kinds[..(e.count as usize).min(3)], e.flags
@@ -127,6 +128,7 @@ mod meter {
 
 #[cfg(not(feature = "diag"))]
 mod meter {
+    use crate::engine::swap::character_forms::EntryState;
     use crate::model::build_split::Step;
 
     #[inline(always)]
@@ -140,7 +142,7 @@ mod meter {
     #[inline(always)]
     pub fn report_settle(_owner: u32, _group: usize) {}
     #[inline(always)]
-    pub fn tick_any(_role: usize, _owner: u32, _now_us: u64, _e: &crate::engine::swap::character_forms::EntryState) {}
+    pub fn tick_any(_role: usize, _owner: u32, _now_us: u64, _e: &EntryState) {}
     #[inline(always)]
     pub fn start_queue(_role: usize) {}
     #[inline(always)]
