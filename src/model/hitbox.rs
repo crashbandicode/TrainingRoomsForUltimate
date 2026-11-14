@@ -1,5 +1,5 @@
-//! The hitbox visualizer's rules (SPEC-core-06), pure and host-tested: the colour table, the sphere placement of an extended
-//! (capsule) hitbox, what the animation commands' Lua stack means, the per-frame step order with its status exemptions, the
+//! The hitbox visualizer's rules (SPEC-core-06), pure and host-tested: the colour table, the two end spheres of an extended
+//! (capsule) hitbox (drawn as one pill, decision HB-PILLS), what the animation commands' Lua stack means, the per-frame step order with its status exemptions, the
 //! rebound rule and the bookkeeping that restores a fighter's effects once when the setting goes Off. The runtime half
 //! (`runtime::features::hitbox`) reads the game and calls these.
 //!
@@ -24,10 +24,9 @@
 pub const SLOTS: i32 = 8;
 /// The sphere's scale per unit of hitbox size (`size x 19/200`).
 pub const SCALE: f32 = 0.095;
-/// Spheres per extended hitbox: spacing is `size x 1.75`, clamped to 2..=16 spheres.
-pub const SPACING: f32 = 1.75;
-pub const SPHERE_MIN: usize = 2;
-pub const SPHERE_MAX: usize = 16;
+/// The spheres of one shape (decision HB-PILLS, 2026-11-14): its centre and, for a capsule, its second centre; the orbs
+/// draw a capsule as one pill between them.
+pub const SHAPE_SPHERES: usize = 2;
 
 /// `AttackData` field offsets (see the module notes).
 pub mod layout {
@@ -94,61 +93,6 @@ pub fn hitbox_tint(id: i32) -> [f32; 3] {
 /// The sphere scale for a hitbox size.
 pub fn sphere_scale(size: f32) -> f32 {
     size * SCALE
-}
-
-/// How many spheres an extended hitbox of `distance` between its centres and `size` is drawn with:
-/// `ceil(distance / (size x 1.75)) + 1`, clamped to 2..=16 (a non-positive size or a non-finite distance draws the minimum).
-pub fn sphere_count(distance: f32, size: f32) -> usize {
-    let step = size * SPACING;
-    if step.is_nan() || step <= 0.0 || !distance.is_finite() || distance < 0.0 {
-        return SPHERE_MIN;
-    }
-    let n = (distance / step).ceil() + 1.0;
-    if n >= SPHERE_MAX as f32 {
-        SPHERE_MAX
-    } else {
-        (n as usize).clamp(SPHERE_MIN, SPHERE_MAX)
-    }
-}
-
-/// The centres to draw spheres at (no allocation: an iterator over at most 16 points).
-#[derive(Clone, Copy, Debug)]
-pub struct Spheres {
-    a: [f32; 3],
-    b: [f32; 3],
-    n: usize,
-    i: usize,
-}
-
-impl Iterator for Spheres {
-    type Item = [f32; 3];
-
-    fn next(&mut self) -> Option<[f32; 3]> {
-        if self.i >= self.n {
-            return None;
-        }
-        let at = if self.n == 1 {
-            self.a
-        } else {
-            let t = self.i as f32 / (self.n - 1) as f32;
-            [self.a[0] + (self.b[0] - self.a[0]) * t, self.a[1] + (self.b[1] - self.a[1]) * t, self.a[2] + (self.b[2] - self.a[2]) * t]
-        };
-        self.i += 1;
-        Some(at)
-    }
-}
-
-/// A point hitbox is one sphere at `a`; one with a second centre `b` is `sphere_count` spheres evenly spaced from `a` to `b`
-/// (`t = i / (n - 1)`).
-pub fn spheres(a: [f32; 3], b: Option<[f32; 3]>, size: f32) -> Spheres {
-    match b {
-        None => Spheres { a, b: a, n: 1, i: 0 },
-        Some(b) => {
-            let d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-            let distance = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
-            Spheres { a, b, n: sphere_count(distance, size), i: 0 }
-        }
-    }
 }
 
 /// The second centre of a hitbox: the second offset vector, or `None` when it is all zero (the game leaves it zero for a point
@@ -503,7 +447,7 @@ impl Default for SleepBook {
 pub const MAX_HELD: usize = 128;
 /// The want scratch of one pass: the attack slots' spheres and the hurt parts' spheres together (decision HB1), so a
 /// full slot set never starves the hurt enumeration; what still does not fit is counted in `Counts::dropped`.
-pub const WANT_SCRATCH: usize = SLOTS as usize * SPHERE_MAX + MAX_HURTBOX_PARTS as usize * SPHERE_MAX;
+pub const WANT_SCRATCH: usize = (SLOTS as usize + MAX_HURTBOX_PARTS as usize) * SHAPE_SPHERES;
 /// Grab spheres waiting for the fighter's pass (the `CATCH` command records them; the pass requests them).
 pub const MAX_PENDING: usize = 24;
 /// Fighters tracked at once (eight entries; a fighter that is gone is forgotten without a game call).
@@ -532,10 +476,11 @@ impl Sphere {
     pub const NONE: Sphere = Sphere { key: 0, joint: 0, pos: [0.0; 3], scale: 0.0, tint: [0.0; 3] };
 }
 
-/// Append a shape's spheres to `out[..*len]` (as many as fit). Returns how many were left out for lack of room.
+/// Append a shape's spheres, its centre and its second centre (`SHAPE_SPHERES`), to `out[..*len]` (as many as fit).
+/// Returns how many were left out for lack of room.
 pub fn push_shape(out: &mut [Sphere], len: &mut usize, kind: u32, index: usize, shape: &Shape, tint: [f32; 3]) -> u32 {
     let mut left_out = 0;
-    for (i, pos) in spheres(shape.a, shape.b, shape.size).enumerate() {
+    for (i, pos) in core::iter::once(shape.a).chain(shape.b).enumerate() {
         if *len >= out.len() {
             left_out += 1;
             continue;

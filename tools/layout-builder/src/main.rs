@@ -168,12 +168,14 @@ fn add_pane(layout: &mut BFLYT, spec: &Spec, waiting: bool) -> Result<()> {
     Ok(())
 }
 
-/// The orb disc's side in pixels.
+/// The orb disc's diameter in pixels: the height of the pill textures.
 const ORB_DISC: u32 = 64;
 
-/// The hitbox orbs' texture (RGBA8, white): a disc whose opacity rises from a translucent middle to a brighter rim and fades
-/// over its last pixels, so a tinted pane reads as a sphere's outline; 4 x 4 samples per pixel for a smooth edge.
-fn orb_disc() -> Vec<u8> {
+/// A hitbox pill texture (RGBA8, white) cut from one disc: opacity rises from a translucent middle to a brighter rim and
+/// fades over its last pixels, so a tinted pill reads as the outline of its capsule; 4 x 4 samples per pixel for a smooth
+/// edge. Column `x` lies `dx(x)` pixels from the disc's vertical centre line (decision HB-PILLS): the cap is the disc's left
+/// half, its flat side on that line, and the band repeats the line itself, so a cap and a band meet with one profile.
+fn orb_texture(width: u32, dx: impl Fn(f32) -> f32) -> Vec<u8> {
     let alpha = |d: f32| -> f32 {
         if d >= 1.0 {
             return 0.0;
@@ -183,15 +185,14 @@ fn orb_disc() -> Vec<u8> {
         if d > 0.94 { a * (1.0 - d) / 0.06 } else { a }
     };
     let size = ORB_DISC as f32;
-    let centre = (size - 1.0) / 2.0;
-    let mut out = Vec::with_capacity((ORB_DISC * ORB_DISC * 4) as usize);
+    let mut out = Vec::with_capacity((width * ORB_DISC * 4) as usize);
     for y in 0..ORB_DISC {
-        for x in 0..ORB_DISC {
+        for x in 0..width {
             let mut total = 0.0;
             for sy in 0..4 {
                 for sx in 0..4 {
-                    let dx = x as f32 + (sx as f32 + 0.5) / 4.0 - 0.5 - centre;
-                    let dy = y as f32 + (sy as f32 + 0.5) / 4.0 - 0.5 - centre;
+                    let dx = dx(x as f32 + (sx as f32 + 0.5) / 4.0);
+                    let dy = y as f32 + (sy as f32 + 0.5) / 4.0 - size / 2.0;
                     total += alpha((dx * dx + dy * dy).sqrt() / (size / 2.0));
                 }
             }
@@ -331,24 +332,31 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
         layout.set_pane(name.as_str(), &PaneEdit { bind_material: Some(texture), ..Default::default() })
             .map_err(err("item picture material"))?;
     }
-    // The hitbox visualizer's own orbs: one disc texture drawn here (`orb_disc`, the plugin's own artwork, no picture file),
-    // one material, every orb picture bound to it; the panes' vertex colours tint it.
-    const ORB_TEXTURE: &str = "tr_orb_disc";
-    let disc = Dds {
-        format: TextureFormat::R8G8B8A8Unorm, width: ORB_DISC, height: ORB_DISC, depth: 1, mip_count: 1, array_count: 1,
-        is_cube: false, data: orb_disc(),
-    };
-    import_dds(&mut bntx, ORB_TEXTURE, &disc, None).map_err(err("import orb disc"))?;
+    // The hitbox visualizer's own orbs, pills (decision HB-PILLS): two textures drawn here (`orb_texture`, the plugin's own
+    // artwork, no picture file), the half-disc cap for the first `CAPS` pictures and the band for the rest, each its own
+    // material; vertex colours tint them. The materials keep the template's wrap modes: with both set to 0 the game never
+    // drew its first frame at boot (Eden 2026-11-14, rc13-pill-3/-4; the bisect rc13-pill-6v1/-7v2).
     let first_orb = panes::name_of(panes::IDX_ORB);
     let orb_template_index = layout.find_pane(first_orb.as_str()).and_then(|p| p.picture.as_ref())
         .ok_or("orb picture missing")?.material_index;
     let orb_template = layout.materials.get(usize::from(orb_template_index)).ok_or("orb template material missing")?.name.clone();
-    layout.add_texture_ref(ORB_TEXTURE);
-    layout.add_material_from_template(&orb_template, ORB_TEXTURE, Some(ORB_TEXTURE)).map_err(err("orb material"))?;
-    for i in 0..panes::ORBS {
-        let name = panes::name_of(panes::IDX_ORB + i);
-        layout.set_pane(name.as_str(), &PaneEdit { bind_material: Some(ORB_TEXTURE.into()), ..Default::default() })
-            .map_err(err("orb picture material"))?;
+    let half = ORB_DISC as f32 / 2.0;
+    let pieces: [(&str, u32, Vec<u8>, core::ops::Range<usize>); 2] = [
+        ("tr_orb_cap", ORB_DISC / 2, orb_texture(ORB_DISC / 2, |x| x - half), 0..panes::CAPS),
+        ("tr_orb_band", 4, orb_texture(4, |_| 0.0), panes::CAPS..panes::ORBS),
+    ];
+    for (texture, width, data, pictures) in pieces {
+        let dds = Dds {
+            format: TextureFormat::R8G8B8A8Unorm, width, height: ORB_DISC, depth: 1, mip_count: 1, array_count: 1, is_cube: false, data,
+        };
+        import_dds(&mut bntx, texture, &dds, None).map_err(err("import orb texture"))?;
+        layout.add_texture_ref(texture);
+        layout.add_material_from_template(&orb_template, texture, Some(texture)).map_err(err("orb material"))?;
+        for i in pictures {
+            let name = panes::name_of(panes::IDX_ORB + i);
+            layout.set_pane(name.as_str(), &PaneEdit { bind_material: Some(texture.into()), ..Default::default() })
+                .map_err(err("orb picture material"))?;
+        }
     }
     // The floppy and the loop. The panes are white; the runtime tints them.
     import_recording_icons(&mut bntx)?;

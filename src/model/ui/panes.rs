@@ -405,10 +405,13 @@ pub const IDX_IV: usize = IDX_NOTICE_LONG + 1;
 /// `TrCb` inside `TrIv` (so it hides with the strip and adds no root), and panes named `TrCb…`.
 pub const IDX_CB: usize = IDX_IV + iv::COUNT;
 /// The hitbox visualizer's own orbs (`model::hitbox_orbs`, decision HB-OWN-ORBS): a container under `RootPane` (the
-/// layout builder makes it RootPane's first child in both layouts, so every other pane draws over it) and `ORBS` pictures of the plugin's own disc texture (`tr_orb_disc`, drawn by the layout builder), tinted by
-/// their vertex colours. 512 = Training's most fighter objects (two fighters, each Ice Climbers with Nana) times the
-/// spheres one fighter holds (`hitbox::MAX_HELD`, 128); `tests/core06_orbs.rs` keeps the two equal (review HB-2).
+/// layout builder makes it RootPane's first child in both layouts, so every other pane draws over it) and `ORBS` pictures
+/// tinted by their vertex colours. Each orb is a pill (decision HB-PILLS): the first `CAPS` pictures take the plugin's
+/// half-disc texture (`tr_orb_cap`, drawn by the layout builder), the `BANDS` after them its band (`tr_orb_band`). A pill
+/// is two caps and a band, so 170 pills.
 pub const ORBS: usize = 512;
+pub const CAPS: usize = 340;
+pub const BANDS: usize = ORBS - CAPS;
 pub const IDX_ORBS: usize = IDX_CB + cb::COUNT;
 pub const IDX_ORB: usize = IDX_ORBS + 1;
 /// The orb panes' names: `tr_oa_00` .. `tr_of_11`, one prefix per hundred.

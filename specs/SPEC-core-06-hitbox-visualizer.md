@@ -46,27 +46,36 @@ The operator decided "go with discs for all" after the A/B (`docs/decisions/HB-O
 HB-OWN-ORBS): with two Ridleys the game's shared effect pool refused 22 of one fighter's 55 spheres on every pass; own
 orbs do not use that pool. This supersedes the upstream effect rendering for **fighters** (hit, hurt and grab spheres):
 
-- The sphere set (§2 colours, capsule sampling, hurtboxes of decision HB1, grab boxes) is unchanged; the per-frame pass
+- The sphere set (§2 colours, hurtboxes of decision HB1, grab boxes) is unchanged except for capsules (below); the per-frame pass
   keeps each fighter's spheres (`HandleSet`, ruling Q3) through an own-orb sink that never refuses and ends an orb when the
   fighter's status changes (the effect's `CONCLUDE_STATUS` rule).
 - Each held sphere is placed on its bone with `ModelModule::joint_global_position_with_offset(…, false)` and published
   per fighter in fixed storage. The flag is meant to make the call a read (no model update first); the guarded thunk
   passes it to the implementation behind ModelModule's vtable slot `0x158`, which is not read yet (review HB-3: a
   follow-up Eden tracepoint reads that slot's target).
-- The layout tick projects every orb with the game's own camera (`world_to_screen`'s projection, render camera) and draws
-  it as one of the plugin's disc panes (one plugin-drawn disc texture tinted per colour, size from the projected radius).
+- **Pills (decision HB-PILLS, `docs/DECISIONS.md`, 2026-11-14):** this fork draws a shape with two centres as one pill
+  and replaces §2's sampling rule (`n` spheres along the segment) for its own orbs. A shape is held as its two end
+  spheres, its centre and its second centre (sphere keys 0 and 1); a point hitbox is one sphere. The board folds the two
+  ends into one orb (centre and tail), whatever order the held set keeps them in.
+- The layout tick projects both ends of every orb, and one radius point along world x and y at each, with the game's
+  own camera (`world_to_screen`'s projection, render camera), and draws the orb as a pill of the plugin's panes: a
+  half-disc cap on each end (a radius wide, its flat side on the end, turned along the projected axis, the far cap by a
+  further 180°) and a band between the ends (the projected length, rotated the same way). The width is the mean of
+  the two ends' projected diameters. The caps and the band come from one plugin-drawn disc profile (the cap is its left
+  half, the band its centre column), tinted per colour, so they meet without a seam (Eden `rc13-pill-7v2`, 4×
+  zooms of the joins) and nothing in one pill is drawn twice. A point is two caps back to back: the disc.
   The panes' container is RootPane's first child, so the HUD, the vanilla pause menu and the plugin's menu draw over the
   orbs as they drew over the 3D effects; nothing is hidden for the menus.
-- **How many (review HB-2, 2026-11-05):** a fighter holds at most 128 spheres (`MAX_HELD`; more are counted as dropped,
-  as before). The layout has 512 orb panes: Training's most fighter objects, Player 1 and the CPU each possibly Ice
-  Climbers with Nana (four), times 128. More orbs than panes happen only while a gone fighter's last pass is still on the
-  board (a few frames). Then the cut is deterministic: every hitbox and grab box takes a pane before any hurtbox, each in
-  board-slot order, and the log says once `[Hitbox] more orbs than panes`.
+- **How many (review HB-2, 2026-11-05; HB-PILLS):** a fighter holds at most 128 spheres (`MAX_HELD`; more are counted
+  as dropped, as before). The layout has 512 orb panes, 340 caps and 172 bands: 170 pills. A pill takes two caps and,
+  when its ends project apart, a band. When the panes run out the cut is deterministic and takes whole pills, never a
+  cap without its band: every hitbox and grab box is drawn before any hurtbox, each in board-slot order, and the log
+  says once `[Hitbox] more orbs than panes` (`drawn` and `cut` count pills).
 - When the practice ends while its layout stays (the waiting room after its request ends; Training's layout outside
   Training), the tick hides every orb it showed and the container (review HB-1).
-- The discs are flat and drawn over the stage and the fighters (no depth hiding); the effect spheres' glow extended past
-  each sphere's radius, a disc stops at it.
-- **Known limitation, camera lag:** while the camera pans, the discs trail the spheres' true screen position by about one
+- The pills are flat and drawn over the stage and the fighters (no depth hiding); the effect spheres' glow extended past
+  each sphere's radius, a pill stops at it.
+- **Known limitation, camera lag:** while the camera pans, the pills trail the spheres' true screen position by about one
   to two frames of motion (measured in Eden run `tr-p23-hitbox-ab2`); still, they coincide. Projecting from a render-side
   camera was not attempted (no cheap, guarded site).
 - **Articles** (projectiles) keep the `sys_shield` effect spheres drawn at their `ATTACK` command (§6, Q1).
@@ -146,7 +155,7 @@ lines record the HitModule read's cost and the pass's own cost on the integrated
 
 | Requirement | Host test (planned name) | Eden row (planned label) | Evidence file |
 | --- | --- | --- | --- |
-| Sphere count and spacing for capsules (`n = ceil(d/(1.75 s))+1` clamped 2..16; t = i/(n−1)); single sphere for a point hitbox | `core06_capsule_sampling` | `core06-E1` screenshot of an extended hitbox (e.g. a sword tilt) | `docs/EDEN-RESULTS.md` |
+| A capsule is its two end spheres (keys 0 and 1), one pill (HB-PILLS; replaces the `n = ceil(d/(1.75 s))+1` sampling); a single sphere for a point hitbox | `core06_capsule_is_two_ends`, `a_capsules_two_ends_are_one_orb`, `projected_orbs_map_onto_the_layout_canvas`, `the_pill_panes_are_cut_whole_hurtboxes_first` | `core06-E1` screenshot of an extended hitbox (e.g. a sword tilt) | `docs/EDEN-RESULTS.md` |
 | Colour table by `id mod 8`; grab boxes magenta, a colour no hitbox uses | `core06_colour_table`, `every_grab_box_is_magenta_a_colour_no_hitbox_uses` | `core06-E2` multi-hitbox move screenshot | `docs/EDEN-RESULTS.md` |
 | Per-frame step order and status exemptions (grab range, shield, tread, DOWN) | `core06_frame_rules_table` | `core06-E3` grab, shield, missed tech cases | — |
 | First-frame draw from the `ATTACK`/`CATCH` parameters (indices as §3) | `core06_command_param_indices` (model: parameter extraction) | `core06-E4` frame-step the first active frame | — |

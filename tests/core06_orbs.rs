@@ -1,6 +1,6 @@
 //! Own orbs (decision HB-OWN-ORBS, `model::hitbox_orbs`): the own-orb `Effects` sink inside the same
 //! `HandleSet` the visualizer uses (never refused, concluded with the status like route B's effects), the board the layout
-//! tick reads, and the projection's pane plan.
+//! tick reads, and the projection's pill plan (decision HB-PILLS: a capsule is one pill, two half-disc caps and a band).
 
 // rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
 macro_rules! lib_unit_tests {
@@ -75,7 +75,7 @@ fn an_orb_is_the_hitbox_size_in_the_spheres_tint() {
     assert_eq!(&yellow.color[..3], &[255, 255, 0]);
     // The orb keeps its sphere's kind (the cut order, review HB-2).
     for kind in [hitbox::KIND_HIT, hitbox::KIND_HURT, hitbox::KIND_GRAB] {
-        assert_eq!(orbs::orb_of(&sphere(hitbox::sphere_key(kind, 3, 1), 0.0, 1.0), [0.0; 3]).kind, kind);
+        assert_eq!(orbs::orb_of(&sphere(hitbox::sphere_key(kind, 3, 1), 0.0, 1.0), [0.0; 3]).kind(), kind);
     }
     // The tints of the colour table go through the layout's linear-light encoding.
     let orange = orbs::orb_of(&Sphere { tint: hitbox::tint(1), ..s }, [0.0; 3]);
@@ -83,23 +83,62 @@ fn an_orb_is_the_hitbox_size_in_the_spheres_tint() {
 }
 
 fn orb(x: f32) -> Orb {
-    Orb { centre: [x, 0.0, 0.0], radius: 1.0, color: [1, 2, 3, 4], kind: hitbox::KIND_HURT }
+    Orb { centre: [x, 0.0, 0.0], tail: [x, 0.0, 0.0], radius: 1.0, color: [1, 2, 3, 4], key: hitbox::sphere_key(hitbox::KIND_HURT, 0, 0) }
 }
 
 fn orb_of_kind(x: f32, kind: u32) -> Orb {
-    Orb { kind, ..orb(x) }
+    Orb { key: hitbox::sphere_key(kind, 0, 0), ..orb(x) }
 }
 
-/// Review HB-2: the panes cover Training's worst case, four fighter objects (Player 1 and the CPU, each possibly Ice
-/// Climbers with Nana) of `MAX_HELD` spheres each, so a full board is drawn without a cut.
-fn the_orb_panes_cover_four_full_fighters() {
-    assert_eq!(model::panes::ORBS, orbs::ORB_FIGHTERS * MAX_HELD);
+/// Decision HB-PILLS: the 512 orb panes are 340 half-disc caps and 172 bands, so 170 pills. A pill takes two caps and,
+/// when it has a length, a band. A pill that does not get every pane it needs is cut whole, never a cap without its band,
+/// and the panes are taken in the board's draw order, so hurtboxes are cut first (review HB-2).
+fn the_pill_panes_are_cut_whole_hurtboxes_first() {
+    use model::panes::{BANDS, CAPS, ORBS};
+    assert_eq!((CAPS, BANDS, CAPS + BANDS), (340, 172, ORBS));
+    let mut panes = orbs::PaneUse::default();
+    assert_eq!(panes.take(true), Some((0, Some(0))));
+    assert_eq!(panes.take(false), Some((2, None)), "a point takes two caps and no band");
+    assert_eq!(panes.take(true), Some((4, Some(1))));
+    let mut full = orbs::PaneUse::default();
+    let drawn = (0..ORBS).filter(|_| full.take(true).is_some()).count();
+    assert_eq!(drawn, CAPS / 2, "170 pills");
+    assert_eq!((full.caps, full.bands), (CAPS, CAPS / 2), "the last pill's caps were the last caps; no cap went alone");
+    // Bands run out before caps when every pill has one only if BANDS < CAPS / 2; with 172 they never do.
+    let mut bands = orbs::PaneUse { caps: 0, bands: BANDS };
+    assert_eq!(bands.take(true), None, "no band left: the pill is cut whole");
+    assert_eq!(bands.take(false), Some((0, None)), "a point still fits");
+    // The draw order puts every hitbox and grab box before any hurtbox.
     let mut board = Board::new();
-    for f in 0..orbs::ORB_FIGHTERS {
-        let kind = |i: usize| if i.is_multiple_of(8) { hitbox::KIND_HIT } else { hitbox::KIND_HURT };
-        assert_eq!(board.publish((f + 1) << 8, (0..MAX_HELD).map(|i| orb_of_kind(i as f32, kind(i)))), MAX_HELD);
-    }
-    assert_eq!(board.in_draw_order().count(), model::panes::ORBS, "every orb of a full board has a pane");
+    let kind = |i: usize| if i.is_multiple_of(8) { hitbox::KIND_HIT } else { hitbox::KIND_HURT };
+    board.publish(0x100, (0..MAX_HELD).map(|i| orb_of_kind(i as f32, kind(i))));
+    let order: Vec<u32> = board.in_draw_order().map(|o| o.kind()).collect();
+    assert!(order[..16].iter().all(|k| *k == hitbox::KIND_HIT) && order[16..].iter().all(|k| *k == hitbox::KIND_HURT));
+}
+
+/// Decision HB-PILLS: a capsule's two end spheres (sphere 0 and sphere 1 of one shape) are one orb on the board, its
+/// centre and its tail; a point's tail is its centre.
+fn a_capsules_two_ends_are_one_orb() {
+    let end = |i: usize| sphere(hitbox::sphere_key(hitbox::KIND_HIT, 4, i), 0.0, 2.0);
+    let point = sphere(hitbox::sphere_key(hitbox::KIND_HURT, 0, 0), 0.0, 3.0);
+    let mut board = Board::new();
+    let placed = [orbs::orb_of(&end(0), [1.0, 0.0, 0.0]), orbs::orb_of(&end(1), [5.0, 0.0, 0.0]), orbs::orb_of(&point, [9.0, 0.0, 0.0])];
+    assert_eq!(board.publish(0xa0, placed.into_iter()), 2, "two shapes");
+    let live: Vec<Orb> = board.live().copied().collect();
+    assert_eq!((live[0].centre, live[0].tail, live[0].kind()), ([1.0, 0.0, 0.0], [5.0, 0.0, 0.0], hitbox::KIND_HIT));
+    assert_eq!((live[1].centre, live[1].tail), ([9.0, 0.0, 0.0], [9.0, 0.0, 0.0]), "a point's tail is its centre");
+    // The held set keeps no order: the second end may come first, with other shapes between.
+    let placed = [orbs::orb_of(&end(1), [5.0, 0.0, 0.0]), orbs::orb_of(&point, [9.0, 0.0, 0.0]), orbs::orb_of(&end(0), [1.0, 0.0, 0.0])];
+    assert_eq!(board.publish(0xa0, placed.into_iter()), 2);
+    let mut pairs: Vec<([f32; 3], [f32; 3])> = board.live().map(|o| (o.centre, o.tail)).collect();
+    pairs.sort_by(|a, b| a.0[0].total_cmp(&b.0[0]));
+    assert_eq!(pairs, [([1.0, 0.0, 0.0], [5.0, 0.0, 0.0]), ([9.0, 0.0, 0.0], [9.0, 0.0, 0.0])]);
+    // An end whose start could not be placed is drawn as a point; another shape's sphere 1 never joins a capsule.
+    let other = sphere(hitbox::sphere_key(hitbox::KIND_HIT, 5, 1), 0.0, 2.0);
+    let placed = [orbs::orb_of(&end(1), [5.0, 0.0, 0.0]), orbs::orb_of(&other, [7.0, 0.0, 0.0])];
+    assert_eq!(board.publish(0xa0, placed.into_iter()), 2);
+    let tails: Vec<[f32; 3]> = board.live().map(|o| o.tail).collect();
+    assert_eq!(tails, [[5.0, 0.0, 0.0], [7.0, 0.0, 0.0]]);
 }
 
 /// Review HB-1: what the layout tick writes into the orb panes. An inactive tick (the waiting room's practice ended while
@@ -194,7 +233,7 @@ fn an_articles_hitboxes_are_own_orbs_while_its_attack_lasts() {
     assert_eq!(hit.len(), 2, "the shot's orb (a hitbox, drawn first), then Player 1's hurtbox");
     assert_eq!(hit[0].centre, [40.0, 12.0, 0.0]);
     assert!((hit[0].radius - 1.9).abs() < 1e-5);
-    assert_eq!((hit[0].kind, &hit[0].color[..3]), (hitbox::KIND_HIT, &model::panes::linear([255, 0, 0, 255])[..3]));
+    assert_eq!((hit[0].kind(), &hit[0].color[..3]), (hitbox::KIND_HIT, &model::panes::linear([255, 0, 0, 255])[..3]));
     // Its attack ended: its orbs go and the pass says to forget it; Player 1's stay.
     assert!(!orbs::article_pass(&mut board, key, &mut Shot(false), on_bone));
     assert_eq!(board.live().count(), 1);
@@ -235,18 +274,33 @@ fn projected_orbs_map_onto_the_layout_canvas() {
     // A 720p screen maps to the same canvas.
     assert_eq!(orbs::to_canvas([1280.0, 720.0], [640.0, 360.0]), [960.0, -540.0]);
     let color = [9, 8, 7, 6];
-    let pane = orbs::plan_pane([960.0, 540.0], [[980.0, 540.0], [960.0, 530.0]], half, color).unwrap();
-    assert_eq!((pane.x, pane.y, pane.size, pane.color), (0.0, 0.0, 40.0, color), "the longer projected radius, doubled");
-    let small = orbs::plan_pane([640.0, 360.0], [[650.0, 360.0], [640.0, 365.0]], [640.0, 360.0], color).unwrap();
+    // A point: its two edges' longer projected radius, doubled; no length, the two caps back to back make the disc.
+    let r20 = |c: [f32; 2]| [[c[0] + 20.0, c[1]], [c[0], c[1] - 10.0]];
+    let dot = orbs::plan_pill([[960.0, 540.0]; 2], [r20([960.0, 540.0]); 2], half, color).unwrap();
+    assert_eq!((dot.size, dot.length, dot.band, dot.color), (40.0, 0.0, [0.0, 0.0], color));
+    assert_eq!(dot.caps, [[-10.0, 0.0], [10.0, 0.0]], "each cap a radius wide, its flat side on its end");
+    let small = orbs::plan_pill([[640.0, 360.0]; 2], [[[650.0, 360.0], [640.0, 365.0]]; 2], [640.0, 360.0], color).unwrap();
     assert_eq!(small.size, 30.0, "720p pixels are 1.5 canvas units");
-    assert!(orbs::plan_pane([f32::NAN, 0.0], [[0.0; 2]; 2], half, color).is_none());
-    assert!(orbs::plan_pane([960.0, 540.0], [[960.2, 540.0], [960.0, 540.2]], half, color).is_none(), "under a unit");
-    assert!(orbs::plan_pane([5000.0, 540.0], [[5010.0, 540.0], [5000.0, 530.0]], half, color).is_none(), "off the canvas");
-    assert!(orbs::plan_pane([1925.0, 540.0], [[1955.0, 540.0], [1925.0, 540.0]], half, color).is_some(), "partly on the canvas");
-    assert_eq!(orbs::plan_pane([960.0, 540.0], [[9000.0, 540.0], [960.0, 540.0]], half, color).unwrap().size, orbs::MAX_PANE);
-    assert!(orbs::plan_pane([960.0, 540.0], [[970.0, 540.0]; 2], [0.0, 540.0], color).is_none(), "no screen size");
-    let o = Orb { centre: [1.0, 2.0, 3.0], radius: 0.5, color, kind: hitbox::KIND_HIT };
-    assert_eq!(orbs::edge_points(&o), [[1.5, 2.0, 3.0], [1.0, 2.5, 3.0]]);
+    // A capsule along +x: the band spans the two ends, the caps sit outside them, no rotation.
+    let x = orbs::plan_pill([[960.0, 540.0], [1060.0, 540.0]], [r20([960.0, 540.0]), r20([1060.0, 540.0])], half, color).unwrap();
+    assert_eq!((x.size, x.length, x.rot, x.band), (40.0, 100.0, 0.0, [50.0, 0.0]));
+    assert_eq!(x.caps, [[-10.0, 0.0], [110.0, 0.0]]);
+    // Up the screen is up the canvas (y up), a quarter turn counter-clockwise.
+    let up = orbs::plan_pill([[960.0, 540.0], [960.0, 440.0]], [r20([960.0, 540.0]), r20([960.0, 440.0])], half, color).unwrap();
+    assert!((up.rot - 90.0).abs() < 1e-4, "{}", up.rot);
+    assert!((up.caps[0][0]).abs() < 1e-4 && (up.caps[0][1] + 10.0).abs() < 1e-4 && (up.caps[1][1] - 110.0).abs() < 1e-4, "{:?}", up.caps);
+    // One size for the whole pill: the mean of the two ends' projected radii (20 and 30), doubled.
+    let r30 = [[1090.0, 540.0], [1060.0, 540.0]];
+    assert_eq!(orbs::plan_pill([[960.0, 540.0], [1060.0, 540.0]], [r20([960.0, 540.0]), r30], half, color).unwrap().size, 50.0);
+    assert!(orbs::plan_pill([[f32::NAN, 0.0]; 2], [[[0.0; 2]; 2]; 2], half, color).is_none());
+    assert!(orbs::plan_pill([[960.0, 540.0]; 2], [[[960.2, 540.0], [960.0, 540.2]]; 2], half, color).is_none(), "under a unit");
+    assert!(orbs::plan_pill([[5000.0, 540.0]; 2], [r20([5000.0, 540.0]); 2], half, color).is_none(), "off the canvas");
+    assert!(orbs::plan_pill([[1925.0, 540.0]; 2], [[[1955.0, 540.0], [1925.0, 540.0]]; 2], half, color).is_some(), "partly on the canvas");
+    let across = orbs::plan_pill([[-500.0, 540.0], [2500.0, 540.0]], [r20([-500.0, 540.0]), r20([2500.0, 540.0])], half, color);
+    assert!(across.is_some(), "both ends off the canvas, the band across it");
+    assert_eq!(orbs::plan_pill([[960.0, 540.0]; 2], [[[9000.0, 540.0], [960.0, 540.0]]; 2], half, color).unwrap().size, orbs::MAX_PANE);
+    assert!(orbs::plan_pill([[960.0, 540.0]; 2], [[[970.0, 540.0]; 2]; 2], [0.0, 540.0], color).is_none(), "no screen size");
+    assert_eq!(orbs::edge_points([1.0, 2.0, 3.0], 0.5), [[1.5, 2.0, 3.0], [1.0, 2.5, 3.0]]);
 }
 
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
@@ -256,7 +310,8 @@ fn case_table() {
         ("own_orbs_are_never_refused_and_conclude_with_the_status", own_orbs_are_never_refused_and_conclude_with_the_status as fn()),
         ("a_grab_box_set_in_the_frame_it_connects_shows_once_not_through_the_pull", a_grab_box_set_in_the_frame_it_connects_shows_once_not_through_the_pull as fn()),
         ("an_orb_is_the_hitbox_size_in_the_spheres_tint", an_orb_is_the_hitbox_size_in_the_spheres_tint as fn()),
-        ("the_orb_panes_cover_four_full_fighters", the_orb_panes_cover_four_full_fighters as fn()),
+        ("the_pill_panes_are_cut_whole_hurtboxes_first", the_pill_panes_are_cut_whole_hurtboxes_first as fn()),
+        ("a_capsules_two_ends_are_one_orb", a_capsules_two_ends_are_one_orb as fn()),
         ("an_inactive_tick_hides_the_orbs_it_showed", an_inactive_tick_hides_the_orbs_it_showed as fn()),
         ("the_board_keeps_each_fighters_last_pass_and_ages_out_the_gone", the_board_keeps_each_fighters_last_pass_and_ages_out_the_gone as fn()),
         ("an_articles_hitboxes_are_own_orbs_while_its_attack_lasts", an_articles_hitboxes_are_own_orbs_while_its_attack_lasts as fn()),

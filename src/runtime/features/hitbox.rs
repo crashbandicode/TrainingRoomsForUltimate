@@ -1,8 +1,9 @@
 //! The hitbox visualizer, the runtime half (SPEC-core-06; the rules are `model::hitbox`).
 //!
 //! With the `hitbox_vis` setting On, every active hitbox (by id colour), every hurtbox and every grab box of a fighter in
-//! Training is drawn as one of the plugin's own translucent discs (decision HB-OWN-ORBS, option 1, operator 2026-11-05: "go
-//! with discs for all"), placed on its bone and projected with the game's camera every layout tick. An article's hitboxes
+//! Training is drawn with the plugin's own translucent panes (decision HB-OWN-ORBS, option 1, operator 2026-11-05: "go with
+//! discs for all"), a capsule as one pill (decision HB-PILLS, 2026-11-14), placed on its bone and projected with the game's
+//! camera every layout tick. An article's hitboxes
 //! are own orbs too (rc.13, `draw_articles`): the game's effect sphere on a projectile lived its whole flight but never
 //! showed. The fighter's other animation-command effects are put to sleep meanwhile, except in the grab, tread and
 //! knockdown statuses.
@@ -151,8 +152,8 @@ static STORE: Mutex<Store> =
 // A fighter's spheres are the plugin's own orbs, never game effects: the pass keeps them in the same `HandleSet` through
 // `OrbSink` (never refused; an orb ends at a status change, as the game's `CONCLUDE_STATUS` ended an effect), places each on
 // its bone with the game's `joint_global_position_with_offset` (a read: the joint flag is false) and publishes them on
-// `BOARD`. The layout tick (`draw_orbs`) projects them with the game's own `world_to_screen` and writes one disc pane per
-// orb; the panes' container is RootPane's first child, so the HUD, the pause menu and the plugin's menu draw over them as
+// `BOARD`. The layout tick (`draw_orbs`) projects them with the game's own `world_to_screen` and writes each orb's pill,
+// two half-disc caps and the band between them; the panes' container is RootPane's first child, so the HUD, the pause menu and the plugin's menu draw over them as
 // they drew over the effect spheres. Articles' hitboxes join them (`draw_articles`).
 
 static BOARD: Mutex<Board> = Mutex::new(Board::new());
@@ -181,15 +182,17 @@ struct OrbPanes {
     layout: usize,
     registrations: u32,
     container: usize,
+    /// The caps (`0..CAPS`), then the bands.
     panes: [usize; crate::model::panes::ORBS],
-    shown: usize,
+    /// Caps and bands shown.
+    shown: [usize; 2],
 }
 
 static ORB_PANES: Mutex<OrbPanes> =
-    Mutex::new(OrbPanes { layout: 0, registrations: 0, container: 0, panes: [0; crate::model::panes::ORBS], shown: 0 });
+    Mutex::new(OrbPanes { layout: 0, registrations: 0, container: 0, panes: [0; crate::model::panes::ORBS], shown: [0; 2] });
 
 /// The layout tick's draw (`ui::hud`): every live orb projected with the game's own `world_to_screen` (so the orbs follow
-/// the camera, paused or not) and written into one of the plugin's disc panes; the rest hidden. A readiness boundary:
+/// the camera, paused or not) and written into the plugin's panes as a pill; the rest hidden. A readiness boundary:
 /// nothing before boot installed the feature. Writes only the plugin's own panes.
 ///
 /// # Safety
@@ -214,12 +217,12 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         // but only in the layout those panes belong to: another layout's cached panes may be gone.
         if cache.layout == layout as usize && cache.registrations == registrations && cache.container != 0 {
             let shown = cache.shown;
-            write_tick(&mut cache, orbs::pane_tick(0, shown));
+            write_tick(&mut cache, [orbs::pane_tick(0, shown[0]), orbs::pane_tick(0, shown[1])]);
         }
         return;
     }
     let on = SETTING.load(Ordering::Acquire);
-    if !on && cache.shown == 0 && cache.layout == layout as usize {
+    if !on && cache.shown == [0; 2] && cache.layout == layout as usize {
         return;
     }
     if cache.layout != layout as usize || cache.registrations != registrations {
@@ -227,7 +230,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         cache.layout = layout as usize;
         cache.registrations = registrations;
         cache.container = container as usize;
-        cache.shown = p::ORBS;
+        cache.shown = [p::CAPS, p::BANDS];
         for k in 0..p::ORBS {
             cache.panes[k] = if container.is_null() { 0 } else { pane::find_child(container, p::name_of(p::IDX_ORB + k).as_bytes()) as usize };
         }
@@ -240,7 +243,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         }
         return;
     }
-    let mut n = 0;
+    let mut used = orbs::PaneUse::default();
     let mut over = 0;
     if on {
         let half = match natives::screen_size_words() {
@@ -248,28 +251,29 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             None => [0.0; 2],
         };
         let board = BOARD.lock();
-        // Hitboxes and grab boxes take the panes first; past `ORBS` the cut takes hurtboxes (review HB-2).
+        // Hitboxes and grab boxes take the panes first; when they run out whole pills are cut, hurtboxes first (review HB-2).
         for orb in board.in_draw_order() {
-            if n == p::ORBS {
+            let end = |at: [f32; 3]| -> Option<([f32; 2], [[f32; 2]; 2])> {
+                let [x, y] = orbs::edge_points(at, orb.radius);
+                Some((natives::world_to_screen(&at)?, [natives::world_to_screen(&x)?, natives::world_to_screen(&y)?]))
+            };
+            let (Some((a, ea)), Some((b, eb))) = (end(orb.centre), end(orb.tail)) else { continue };
+            let Some(pill) = orbs::plan_pill([a, b], [ea, eb], half, orb.color) else { continue };
+            let Some((cap, band)) = used.take(pill.length > 0.0) else {
                 over += 1;
                 continue;
+            };
+            for (k, at) in pill.caps.into_iter().enumerate() {
+                write_pane(cache.panes[cap + k], at, [pill.size / 2.0, pill.size], pill.rot + 180.0 * k as f32, pill.color);
             }
-            let [a, b] = orbs::edge_points(orb);
-            let (Some(c), Some(ea), Some(eb)) = (natives::world_to_screen(&orb.centre), natives::world_to_screen(&a), natives::world_to_screen(&b)) else { continue };
-            let Some(plan) = orbs::plan_pane(c, [ea, eb], half, orb.color) else { continue };
-            let target = cache.panes[n] as *mut skyline::nn::ui2d::Pane;
-            if !target.is_null() {
-                pane::set_pos(target, plan.x, plan.y);
-                pane::set_width(target, plan.size);
-                pane::set_height(target, plan.size);
-                pane::set_rect_color(target, plan.color);
-                pane::set_visible(target, true);
+            if let Some(band) = band {
+                write_pane(cache.panes[p::CAPS + band], pill.band, [pill.length, pill.size], pill.rot, pill.color);
             }
-            n += 1;
         }
     }
+    let n = used.caps / 2;
     let shown = cache.shown;
-    write_tick(&mut cache, orbs::pane_tick(n, shown));
+    write_tick(&mut cache, [orbs::pane_tick(used.caps, shown[0]), orbs::pane_tick(used.bands, shown[1])]);
     // Release builds say it too, once: more orbs than panes means a fighter's spheres were cut (review HB-2).
     static OVER_SAID: AtomicBool = AtomicBool::new(false);
     if over != 0 && !OVER_SAID.swap(true, Ordering::Relaxed) {
@@ -281,21 +285,40 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     stats::orbs_drawn(n as u32, over);
 }
 
-/// Apply one tick's pane writes (`orbs::pane_tick`): hide the panes that stop showing an orb, show or hide the
-/// container, and keep how many show.
-unsafe fn write_tick(cache: &mut OrbPanes, tick: Option<orbs::PaneTick>) {
+/// Show one cap or band picture (`target`, 0 when the layout lacks it) at `at`, `size` (width, height), turned by `rot`.
+unsafe fn write_pane(target: usize, at: [f32; 2], size: [f32; 2], rot: f32, color: [u8; 4]) {
     use crate::runtime::ui::pane;
-    let Some(tick) = tick else { return };
-    for k in tick.hide.0..tick.hide.1.min(crate::model::panes::ORBS) {
-        let target = cache.panes[k] as *mut skyline::nn::ui2d::Pane;
-        if !target.is_null() {
-            pane::set_visible(target, false);
+    let target = target as *mut skyline::nn::ui2d::Pane;
+    if !target.is_null() {
+        pane::set_pos(target, at[0], at[1]);
+        pane::set_width(target, size[0]);
+        pane::set_height(target, size[1]);
+        pane::set_rot_z(target, rot);
+        pane::set_rect_color(target, color);
+        pane::set_visible(target, true);
+    }
+}
+
+/// Apply one tick's pane writes (`orbs::pane_tick`, the caps' and the bands'): hide the panes that stop showing, show or
+/// hide the container, and keep how many show.
+unsafe fn write_tick(cache: &mut OrbPanes, ticks: [Option<orbs::PaneTick>; 2]) {
+    use crate::model::panes::{BANDS, CAPS};
+    use crate::runtime::ui::pane;
+    let mut container = None;
+    for (pool, (base, size)) in [(0, CAPS), (CAPS, BANDS)].into_iter().enumerate() {
+        let Some(tick) = ticks[pool] else { continue };
+        for k in tick.hide.0..tick.hide.1.min(size) {
+            let target = cache.panes[base + k] as *mut skyline::nn::ui2d::Pane;
+            if !target.is_null() {
+                pane::set_visible(target, false);
+            }
         }
+        container = Some(container == Some(true) || tick.container);
+        cache.shown[pool] = tick.shown;
     }
-    if cache.container != 0 {
-        pane::set_visible(cache.container as *mut skyline::nn::ui2d::Pane, tick.container);
+    if let (Some(show), true) = (container, cache.container != 0) {
+        pane::set_visible(cache.container as *mut skyline::nn::ui2d::Pane, show);
     }
-    cache.shown = tick.shown;
 }
 
 /// Spheres held by every fighter together (the per-frame pass skips everything when this is 0 and the setting is Off).
@@ -540,7 +563,7 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     let Some(shape) = hitbox::parse(indices, |i| lua_cell(lua, i)) else { return };
     let tint = if grab { hitbox::GRAB_TINT } else { hitbox::hitbox_tint(shape.id) };
     let made = if fighter {
-        let mut wants = [Sphere::NONE; hitbox::SPHERE_MAX];
+        let mut wants = [Sphere::NONE; hitbox::SHAPE_SPHERES];
         let mut len = 0;
         hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_GRAB, shape.id as usize, &shape, tint);
         let status = Some(natives::status_kind(accessor));
@@ -842,7 +865,7 @@ mod stats {
             let mut reader = hitbox::GameHurt { accessor, load: super::mem_load };
             let start = now();
             let mut spheres = 0usize;
-            let parts = hitbox::hurt_parts(&mut reader, |_, shape| spheres += hitbox::spheres(shape.a, shape.b, shape.size).count());
+            let parts = hitbox::hurt_parts(&mut reader, |_, shape| spheres += 1 + usize::from(shape.b.is_some()));
             slot.observe(parts, spheres, now().wrapping_sub(start));
             slot.window(REPORT_EVERY)
         };

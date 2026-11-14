@@ -61,40 +61,32 @@ fn every_grab_box_is_magenta_a_colour_no_hitbox_uses() {
 }
 
 #[test]
-fn core06_capsule_sampling() {
-    // n = ceil(d / (size * 1.75)) + 1, clamped to 2..16.
-    assert_eq!(hitbox::sphere_count(10.0, 2.0), 4); // ceil(10 / 3.5) = 3, +1
-    assert_eq!(hitbox::sphere_count(7.0, 2.0), 3); // exactly two steps, +1
-    assert_eq!(hitbox::sphere_count(0.0, 2.0), 2); // ceil(0) + 1 = 1, clamped up
-    assert_eq!(hitbox::sphere_count(0.1, 2.0), 2);
-    assert_eq!(hitbox::sphere_count(1000.0, 2.0), 16);
-    assert_eq!(hitbox::sphere_count(3.5 * 14.0, 2.0), 15);
-    assert_eq!(hitbox::sphere_count(3.5 * 15.0, 2.0), 16);
-    assert_eq!(hitbox::sphere_count(3.5 * 40.0, 2.0), 16);
-    // A degenerate size or distance draws the minimum.
-    for (d, s) in [(5.0, 0.0), (5.0, -1.0), (f32::NAN, 2.0), (f32::INFINITY, 2.0), (-3.0, 2.0), (5.0, f32::NAN)] {
-        assert_eq!(hitbox::sphere_count(d, s), 2, "{d} {s}");
-    }
-    // Evenly spaced, `t = i / (n - 1)`, both ends included.
+fn core06_capsule_is_two_ends() {
+    // Decision HB-PILLS (2026-11-14): a shape with a second centre is drawn as one pill, so it is held as its two end
+    // spheres, sphere 0 at its centre and sphere 1 at its second centre; a point hitbox is one sphere at its centre. This
+    // retires the bead rule (`ceil(d / (size x 1.75)) + 1` spheres, 2..16).
+    let tint = hitbox::hitbox_tint(0);
     let a = [1.0, 2.0, 3.0];
-    let b = [11.0, 2.0, 3.0];
-    let points: Vec<[f32; 3]> = hitbox::spheres(a, Some(b), 2.0).collect();
-    assert_eq!(points.len(), 4);
-    assert_eq!(points[0], a);
-    assert_eq!(points[3], b);
-    for (i, p) in points.iter().enumerate() {
-        let t = i as f32 / 3.0;
-        assert!((p[0] - (1.0 + 10.0 * t)).abs() < 1e-5, "{i}: {p:?}");
+    for (b, want) in [(Some([11.0, 2.0, 3.0]), vec![a, [11.0, 2.0, 3.0]]), (None, vec![a])] {
+        let shape = hitbox::Shape { id: 0, joint: 9, size: 2.0, a, b };
+        let mut out = [hitbox::Sphere::NONE; 4];
+        let mut len = 0;
+        assert_eq!(hitbox::push_shape(&mut out, &mut len, hitbox::KIND_HIT, 0, &shape, tint), 0);
+        assert_eq!(out[..len].iter().map(|s| s.pos).collect::<Vec<_>>(), want);
+        for (i, s) in out[..len].iter().enumerate() {
+            assert_eq!(s.key, hitbox::sphere_key(hitbox::KIND_HIT, 0, i));
+        }
     }
-    // A point hitbox (no second centre) is one sphere at its centre.
-    let one: Vec<[f32; 3]> = hitbox::spheres(a, None, 2.0).collect();
-    assert_eq!(one, vec![a]);
+    // However long, a capsule is two spheres (the beads stopped at 16).
+    let long = hitbox::Shape { id: 0, joint: 9, size: 1.0, a: [0.0; 3], b: Some([500.0, 0.0, 0.0]) };
+    let mut out = [hitbox::Sphere::NONE; 4];
+    let mut len = 0;
+    hitbox::push_shape(&mut out, &mut len, hitbox::KIND_HIT, 0, &long, tint);
+    assert_eq!(len, hitbox::SHAPE_SPHERES);
     assert_eq!(hitbox::second_centre([0.0; 3]), None);
     assert_eq!(hitbox::second_centre([0.0, 0.0, 0.5]), Some([0.0, 0.0, 0.5]));
     // The sphere scale is size * 19/200.
     assert!((hitbox::sphere_scale(4.0) - 0.38).abs() < 1e-6);
-    // At most 16 spheres are ever produced.
-    assert_eq!(hitbox::spheres([0.0; 3], Some([500.0, 0.0, 0.0]), 1.0).count(), 16);
 }
 
 // ---- the commands' parameters ----------------------------------------------------------------------------------------
@@ -627,10 +619,9 @@ fn part(status: u32, a: [f32; 3], b: [f32; 3], size: f32, node: u64) -> [u8; 0x5
 fn core06_hurtbox_shapes_per_fighter() {
     use model::hitbox::layout;
     assert_eq!(std::mem::size_of::<[u8; layout::HIT_PART_STRIDE]>(), 0x50);
-    // A capsule part: both centres, its size and its bone; drawn yellow with the same sphere rule as a hitbox.
+    // A capsule part: both centres, its size and its bone; drawn yellow as one pill, like a hitbox.
     let capsule = hitbox::hurtbox_shape(&part(0, [0.0, 1.0, 0.0], [0.0, 6.0, 0.0], 2.5, 0x0000_0004_1234_5678)).unwrap();
     assert_eq!((capsule.joint, capsule.size, capsule.a, capsule.b), (0x0000_0004_1234_5678, 2.5, [0.0, 1.0, 0.0], Some([0.0, 6.0, 0.0])));
-    assert_eq!(hitbox::spheres(capsule.a, capsule.b, capsule.size).count(), hitbox::sphere_count(5.0, 2.5));
     // A part whose two centres coincide is one sphere; a centre at the bone's origin is a real centre (no "zero means absent").
     let ball = hitbox::hurtbox_shape(&part(0, [1.0, 2.0, 3.0], [1.0, 2.0, 3.0], 3.0, 7)).unwrap();
     assert_eq!(ball.b, None);
@@ -902,10 +893,9 @@ fn core06_dispatch_reads_the_hit_module_only_while_the_setting_is_on() {
         assert_eq!((counts.spawned, len), (0, 0));
         assert_eq!(hurt.module_calls, 0, "status {status}: no HitModule read on a stop path");
     }
-    // On, ordinary status: the module is read and the part's capsule drawn (one part, centres 4 apart at size 2:
-    // ceil(4 / 3.5) + 1 = 3 spheres).
+    // On, ordinary status: the module is read and the part's capsule drawn (one part: its two ends, one pill).
     let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
-    assert_eq!((counts.spawned, len), (3, 3));
+    assert_eq!((counts.spawned, len), (2, 2));
     assert!(hurt.module_calls >= 1, "On: the HitModule is read");
     assert!(fx.requests.iter().all(|s| s.key >> 24 == hitbox::KIND_HURT && s.tint == hitbox::HURTBOX_TINT));
 }
@@ -1051,7 +1041,7 @@ fn core06_game_hurt_reads_the_live_layout_at_the_exact_addresses() {
     let (module, groups, parts) = (layout.module, layout.groups, layout.parts);
     let mut out = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
     let (left, len, reads) = want_via(&mut layout, &mut out);
-    assert_eq!((len, left), (4, 0), "the capsule's three spheres (4 apart at size 2) and the point part's one; the off part nothing");
+    assert_eq!((len, left), (3, 0), "the capsule's two ends and the point part's one; the off part nothing");
     assert_eq!(
         reads,
         vec![
@@ -1067,8 +1057,8 @@ fn core06_game_hurt_reads_the_live_layout_at_the_exact_addresses() {
         ],
         "the module pointer once, the two table pointers, the part total, the group's first/count, every part in place"
     );
-    assert_eq!((out[0].pos, out[1].pos, out[2].pos, out[3].pos), ([0.0, 1.0, 0.0], [0.0, 3.0, 0.0], [0.0, 5.0, 0.0], [1.0, 2.0, 3.0]));
-    assert_eq!(out[3].joint, 7);
+    assert_eq!((out[0].pos, out[1].pos, out[2].pos), ([0.0, 1.0, 0.0], [0.0, 5.0, 0.0], [1.0, 2.0, 3.0]));
+    assert_eq!(out[2].joint, 7);
     for sphere in &out[..len] {
         assert_eq!(sphere.tint, hitbox::HURTBOX_TINT, "yellow");
         assert_eq!(sphere.key >> 24, hitbox::KIND_HURT);
@@ -1169,8 +1159,8 @@ fn core06_hurt_census_window_and_line_format() {
     census.frames = u32::MAX;
     census.observe(1, 1, 1);
     assert_eq!(census.frames, u32::MAX);
-    // The want scratch is sized for the hit slots' and the hurt parts' spheres together.
-    assert_eq!(hitbox::WANT_SCRATCH, hitbox::SLOTS as usize * hitbox::SPHERE_MAX + hitbox::MAX_HURTBOX_PARTS as usize * hitbox::SPHERE_MAX);
+    // The want scratch is sized for the hit slots' and the hurt parts' spheres together (two per shape, its ends).
+    assert_eq!(hitbox::WANT_SCRATCH, (hitbox::SLOTS as usize + hitbox::MAX_HURTBOX_PARTS as usize) * hitbox::SHAPE_SPHERES);
     const { assert!(hitbox::WANT_SCRATCH >= hitbox::MAX_HELD) };
 }
 
@@ -1443,24 +1433,24 @@ fn core06_rc_dispatch_reads_only_attacks_and_requests_hits_and_grabs() {
     let mut fx = RequestSpy::new();
     let facts = facts(true, hitbox::enabled(&snapshot), false, 0);
     let (counts, hits) = hitbox::reconcile_frame(&mut set, facts, &mut wants, &mut reads, None, &mut fx);
-    assert_eq!((counts.spawned, counts.failed, counts.dropped, hits), (6, 0, 0, 5));
+    assert_eq!((counts.spawned, counts.failed, counts.dropped, hits), (4, 0, 0, 3));
     assert_eq!(reads.active, (0..8).collect::<Vec<_>>());
     assert_eq!(reads.data, [1, 5, 6]);
     assert_eq!(reads.reads, [0x1048, 0x1024, 0x1000, 0x1004, 0x1008, 0x1010, 0x1014, 0x1018,
                             0x2048, 0x2024, 0x2000, 0x2004, 0x2008, 0x2010, 0x2014, 0x2018]);
     let expected_keys: Vec<_> = std::iter::once(hitbox::sphere_key(hitbox::KIND_HIT, 1, 0))
-        .chain((0..4).map(|i| hitbox::sphere_key(hitbox::KIND_HIT, 5, i))).chain([grab.key]).collect();
+        .chain((0..2).map(|i| hitbox::sphere_key(hitbox::KIND_HIT, 5, i))).chain([grab.key]).collect();
     assert_eq!(fx.requests.iter().map(|s| s.key).collect::<Vec<_>>(), expected_keys);
     assert_eq!(fx.requests[0], hitbox::Sphere { key: expected_keys[0], joint: 7, pos: [1.0, 0.0, 0.0], scale: 0.19, tint: hitbox::hitbox_tint(1) });
     assert_eq!(fx.requests[1].joint, 9);
     assert_eq!(fx.requests[1].pos, [0.0; 3]);
-    assert_eq!(fx.requests[4].pos, [10.0, 0.0, 0.0]);
-    assert_eq!(fx.requests[4].tint, hitbox::hitbox_tint(5));
-    assert_eq!(fx.requests[5], grab);
+    assert_eq!(fx.requests[2].pos, [10.0, 0.0, 0.0], "slot 5's capsule: its two ends");
+    assert_eq!(fx.requests[2].tint, hitbox::hitbox_tint(5));
+    assert_eq!(fx.requests[3], grab);
     assert!(fx.requests.iter().all(|s| s.key >> 24 != hitbox::KIND_HURT));
     let (counts, hits) = hitbox::reconcile_frame(&mut set, facts, &mut wants, &mut reads, None, &mut fx);
-    assert_eq!((counts.spawned, counts.kept, hits), (0, 6, 5), "unchanged owned handles are retained");
-    assert_eq!(fx.requests.len(), 6);
+    assert_eq!((counts.spawned, counts.kept, hits), (0, 4, 3), "unchanged owned handles are retained");
+    assert_eq!(fx.requests.len(), 4);
 }
 
 #[test]
@@ -1479,7 +1469,7 @@ fn core06_rc_dispatch_preserves_grab_shield_off_and_retirement_cleanup() {
         let (counts, hits) = hitbox::reconcile_frame(&mut set, facts(visualizes, enabled, false, status), &mut wants, &mut reads, None, &mut fx);
         assert_eq!((reads.active.len(), reads.data.len(), reads.reads.len(), hits), (0, 0, 0, 0));
         assert_eq!(fx.requests.len(), requests, "no attack/HB1/ordinary shield request on stop path");
-        assert_eq!((counts.killed, counts.kept), if keep_grab { (5, 1) } else { (6, 0) });
+        assert_eq!((counts.killed, counts.kept), if keep_grab { (3, 1) } else { (4, 0) });
         assert!(fx.fx.live.contains(&900), "ordinary shield survives cleanup");
         assert_eq!(set.len(), usize::from(keep_grab));
     }
@@ -1592,13 +1582,13 @@ fn core06_fighter_sets_and_keys() {
             assert_ne!(a, b);
         }
     }
-    // push_shape: a capsule's spheres in order, keyed per sphere, scaled and tinted; what does not fit is counted.
+    // push_shape: a capsule's two ends in order, keyed per sphere, scaled and tinted; what does not fit is counted.
     let shape = hitbox::Shape { id: 2, joint: 9, size: 2.0, a: [0.0; 3], b: Some([10.0, 0.0, 0.0]) };
-    let mut out = [hitbox::Sphere::NONE; 3];
+    let mut out = [hitbox::Sphere::NONE; 1];
     let mut len = 0;
     let left = hitbox::push_shape(&mut out, &mut len, KIND_HIT, 2, &shape, hitbox::hitbox_tint(2));
-    assert_eq!((len, left), (3, 1), "4 spheres for 10 units at size 2, one left out");
-    assert_eq!(out[1].key, sphere_key(KIND_HIT, 2, 1));
+    assert_eq!((len, left), (1, 1), "two ends, one left out");
+    assert_eq!(out[0].key, sphere_key(KIND_HIT, 2, 0));
     assert!((out[0].scale - 0.19).abs() < 1e-6);
     // The table: one set per fighter; a new fighter takes a free set, then the least recently used one, forgotten.
     let mut table = SetTable::new();

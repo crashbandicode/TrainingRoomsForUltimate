@@ -596,6 +596,22 @@ This records the decision only; the implementation, host tests and Eden proofs a
   `mii-ordinary-player-alpha`, `mii-managed-source-coexist-alpha`, `managed-sources`,
   `managed-grouped-source-alpha`, `managed-ldn-third-source-alpha`.
 
+## 2026-11-14: rc.13 — a capsule is drawn as one pill (HB-PILLS, operator decision)
+
+The operator approved it for rc.13 after the Ridley mockup (worker B-2's design, beads next to pills from one Eden
+frame). It refines HB-OWN-ORBS (own discs for every fighter sphere, 2026-11-05, on `review/menu-proposal`), which stays:
+the orbs are still the plugin's own panes, articles' hitboxes included.
+
+- **Before:** a shape with two centres (a capsule hitbox, hurtbox or grab box) was a row of `ceil(d / (size x 1.75)) + 1`
+  discs (2..16), one pane each, with scalloped edges and darker lenses where its own discs overlapped.
+- **Now:** a shape is held as its two end spheres (`hitbox::SHAPE_SPHERES`); the board folds them into one orb with a
+  tail, and the layout tick draws it as one pill: two half-disc caps on the projected ends and a band between them,
+  turned along the projected axis, one size (the two ends' mean projected radius). A point is two caps back to back.
+  The caps and the band abut, so nothing in one pill is drawn twice.
+- **Panes:** the same 512, as 340 caps (`tr_orb_cap`) and 172 bands (`tr_orb_band`): 170 pills. When they run out whole
+  pills are cut, hitboxes and grab boxes first and hurtboxes last (review HB-2), with the same once-only log line.
+- SPEC-core-06 §2a and §9 carry the rule; `core06_capsule_is_two_ends` replaces `core06_capsule_sampling`.
+
 ## Open (2026-11-13)
 
 Opened by the primary for the operator from the lanes' reports of 2026-11-13. An item the operator has answered says

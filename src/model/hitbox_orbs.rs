@@ -1,17 +1,17 @@
 //! Own orbs: the hitbox visualizer's fighter spheres drawn by the plugin's own layout panes instead of the game's
 //! `sys_shield` effects (decision HB-OWN-ORBS, option 1, operator 2026-11-05: "go with discs for all"; the A/B is
 //! `docs/decisions/HB-OWN-ORBS-ab.png`). The shared effect pool refused part of a large fighter's spheres every pass; an
-//! orb is not asked of that pool. The layout holds `panes::ORBS` (512) orb panes, Training's most fighter objects
-//! (`ORB_FIGHTERS`) times the spheres one fighter holds (`MAX_HELD`). More orbs than panes happen only while a gone
-//! fighter's last pass is still on the board (a few frames): then the cut is deterministic, hitboxes and grab boxes before
-//! hurtboxes (`Board::in_draw_order`), and the layout tick says so once (review HB-2). An article's hitboxes are own orbs
+//! orb is not asked of that pool. A capsule is one pill (decision HB-PILLS, operator 2026-11-14): its two end spheres are
+//! one orb, drawn as two half-disc caps and the band between them. The layout holds `panes::ORBS` (512) orb panes,
+//! `panes::CAPS` caps and `panes::BANDS` bands, 170 pills. When they run out the cut is deterministic and whole pills go,
+//! hitboxes and grab boxes before hurtboxes (`Board::in_draw_order`), and the layout tick says so once (review HB-2). An article's hitboxes are own orbs
 //! too (rc.13, `Articles`): the game's effect sphere on a projectile lived its whole flight but never showed.
 //!
 //! The same `HandleSet` keeps the spheres; `OrbSink` is its `Effects` for own orbs: a request always succeeds and a held
 //! orb lives while the fighter's status is the one it was made in (what the game's `CONCLUDE_STATUS` did to an effect).
 //! The pass turns each held sphere into an `Orb` in world space (the bone's transform, a game call) and publishes the
-//! fighter's orbs on the `Board`; the layout tick projects them with the game's own `world_to_screen` and plans one pane
-//! per orb (`plan_pane`). Pure and host-tested (`tests/core06_orbs.rs`).
+//! fighter's orbs on the `Board`; the layout tick projects them with the game's own `world_to_screen` and plans each
+//! orb's pill (`plan_pill`). Pure and host-tested (`tests/core06_orbs.rs`).
 
 use super::hitbox::{want_hitboxes, AttackReader, Effects, Sphere, FIGHTER_SETS, KIND_HURT, MAX_HELD, SCALE};
 
@@ -43,18 +43,25 @@ impl Effects for OrbSink {
     }
 }
 
-/// One orb in world space, with the pane colour it is drawn in (linear-light RGBA, as the layout takes vertex colours).
+/// One orb in world space, with the pane colour it is drawn in (linear-light RGBA, as the layout takes vertex colours):
+/// a pill from `centre` to `tail` (the same point for a point hitbox).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Orb {
     pub centre: [f32; 3],
+    pub tail: [f32; 3],
     pub radius: f32,
     pub color: [u8; 4],
-    /// The sphere's kind (`hitbox::KIND_HIT`, `KIND_HURT`, `KIND_GRAB`): the cut order when the panes run out.
-    pub kind: u32,
+    /// The first sphere's `hitbox::sphere_key`.
+    pub key: u32,
 }
 
 impl Orb {
-    pub const NONE: Orb = Orb { centre: [0.0; 3], radius: 0.0, color: [0; 4], kind: 0 };
+    pub const NONE: Orb = Orb { centre: [0.0; 3], tail: [0.0; 3], radius: 0.0, color: [0; 4], key: 0 };
+
+    /// `hitbox::KIND_HIT`, `KIND_HURT` or `KIND_GRAB`: the cut order when the panes run out.
+    pub fn kind(&self) -> u32 {
+        self.key >> 24
+    }
 }
 
 /// The opacity of an orb pane's colour; the disc texture carries the shading.
@@ -65,7 +72,7 @@ pub const ORB_ALPHA: u8 = 255;
 pub fn orb_of(sphere: &Sphere, centre: [f32; 3]) -> Orb {
     let byte = |c: f32| (c.clamp(0.0, 1.0) * 255.0 + 0.5) as u8;
     let srgb = [byte(sphere.tint[0]), byte(sphere.tint[1]), byte(sphere.tint[2]), ORB_ALPHA];
-    Orb { centre, radius: sphere.scale / SCALE, color: super::panes::linear(srgb), kind: sphere.key >> 24 }
+    Orb { centre, tail: centre, radius: sphere.scale / SCALE, color: super::panes::linear(srgb), key: sphere.key }
 }
 
 /// Publishes a fighter has missed before its orbs stop being drawn (other fighters' publishes count; a pause publishes
@@ -92,7 +99,8 @@ impl Board {
         Board { keys: [0; FIGHTER_SETS], stamps: [0; FIGHTER_SETS], lens: [0; FIGHTER_SETS], orbs: [[Orb::NONE; MAX_HELD]; FIGHTER_SETS], clock: 0 }
     }
 
-    /// Replace `key`'s orbs (at most `MAX_HELD`; a new key takes a free or the stalest slot). Returns how many were kept.
+    /// Replace `key`'s orbs (at most `MAX_HELD`; a new key takes a free or the stalest slot). A capsule's second end
+    /// (sphere 1 of its shape) becomes the tail of its first (sphere 0). Returns how many were kept.
     pub fn publish(&mut self, key: usize, orbs: impl Iterator<Item = Orb>) -> usize {
         if key == 0 {
             return 0;
@@ -110,6 +118,20 @@ impl Board {
         for orb in orbs.take(MAX_HELD) {
             self.orbs[i][len] = orb;
             len += 1;
+        }
+        // The set keeps no order (it removes by swapping), so each second end looks for its first anywhere.
+        let slot = &mut self.orbs[i];
+        let mut k = 0;
+        while k < len {
+            let end = slot[k];
+            match slot[..len].iter().position(|o| end.key & 0xff == 1 && o.key == end.key - 1) {
+                Some(j) => {
+                    slot[j].tail = end.centre;
+                    len -= 1;
+                    slot[k] = slot[len];
+                }
+                None => k += 1,
+            }
         }
         self.lens[i] = len;
         len
@@ -139,8 +161,8 @@ impl Board {
     /// The live orbs in the order the panes take them: every hitbox and grab box first, then every hurtbox, each in slot
     /// order. When the panes run out the cut is deterministic and takes hurtboxes first (review HB-2).
     pub fn in_draw_order(&self) -> impl Iterator<Item = &Orb> + '_ {
-        let first = self.live().filter(|o| o.kind != KIND_HURT);
-        first.chain(self.live().filter(|o| o.kind == KIND_HURT))
+        let first = self.live().filter(|o| o.kind() != KIND_HURT);
+        first.chain(self.live().filter(|o| o.kind() == KIND_HURT))
     }
 }
 
@@ -205,7 +227,28 @@ pub fn article_pass(board: &mut Board, key: usize, attacks: &mut impl AttackRead
     true
 }
 
-/// The orb panes' writes of one layout tick (review HB-1): `drawn` orbs were written into the panes `0..drawn`, and
+/// The panes one layout tick has taken: a pill takes two caps and, when it has a length, a band; one that does not get
+/// every pane it needs is cut whole.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PaneUse {
+    pub caps: usize,
+    pub bands: usize,
+}
+
+impl PaneUse {
+    /// The first of the pill's two caps and its band, or `None` (cut).
+    pub fn take(&mut self, band: bool) -> Option<(usize, Option<usize>)> {
+        if self.caps + 2 > super::panes::CAPS || (band && self.bands >= super::panes::BANDS) {
+            return None;
+        }
+        let at = (self.caps, band.then_some(self.bands));
+        self.caps += 2;
+        self.bands += usize::from(band);
+        Some(at)
+    }
+}
+
+/// One pool's writes of one layout tick (review HB-1; the caps and the bands each): `drawn` panes were written, `0..drawn`, and
 /// `shown` panes showed an orb after the last tick. The panes `hide.0..hide.1` that showed one and do not now are hidden,
 /// and the container shows only while one orb does. An inactive tick (the waiting room's practice ended while its
 /// layout stays, or Training's layout outside Training) draws nothing, so everything shown is hidden; `None` when there
@@ -251,42 +294,53 @@ pub fn to_canvas(point: [f32; 2], half: [f32; 2]) -> [f32; 2] {
     [(point[0] - half[0]) / half[0] * CANVAS_HALF[0], (half[1] - point[1]) / half[1] * CANVAS_HALF[1]]
 }
 
-/// One orb's pane: centre and diameter in canvas units, and its colour.
+/// One orb's pill in canvas units: the two caps' centres (each a radius wide, its flat side on its end; cap 0 faces away
+/// from end 1), the band's centre and length between the ends, the pill's width (`size`, a diameter), its rotation (degrees
+/// counter-clockwise, the axis from end 0 to end 1; cap 0 turns by it, cap 1 by it plus 180) and its colour.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct OrbPane {
-    pub x: f32,
-    pub y: f32,
+pub struct Pill {
+    pub caps: [[f32; 2]; 2],
+    pub band: [f32; 2],
+    pub length: f32,
     pub size: f32,
+    pub rot: f32,
     pub color: [u8; 4],
 }
 
-/// Plan an orb's pane from the screen projections of its centre and of two points one radius from it (along world x and
-/// y): the diameter is twice the longer projected radius. `None` when a projection is not finite, the orb is under a
-/// canvas unit across, or it lies wholly off the canvas.
-pub fn plan_pane(centre: [f32; 2], edges: [[f32; 2]; 2], half: [f32; 2], color: [u8; 4]) -> Option<OrbPane> {
+/// Plan an orb's pill from the screen projections of its two ends and, for each end, of two points one radius from it
+/// (`edge_points`): each end's radius is its longer projected one and the pill's is their mean. `None` when a projection
+/// is not finite, the pill is under a canvas unit across, or it lies wholly off the canvas.
+pub fn plan_pill(ends: [[f32; 2]; 2], edges: [[[f32; 2]; 2]; 2], half: [f32; 2], color: [u8; 4]) -> Option<Pill> {
     if half[0] <= 0.0 || half[1] <= 0.0 {
         return None;
     }
-    let c = to_canvas(centre, half);
-    let mut radius = 0.0f32;
-    for edge in edges {
-        let e = to_canvas(edge, half);
-        let (dx, dy) = (e[0] - c[0], e[1] - c[1]);
-        radius = radius.max((dx * dx + dy * dy).sqrt());
-    }
-    let size = 2.0 * radius;
-    if !(c[0].is_finite() && c[1].is_finite() && size.is_finite()) || size < 1.0 {
+    let [a, b] = ends.map(|e| to_canvas(e, half));
+    let radius = |c: [f32; 2], edges: [[f32; 2]; 2]| edges.map(|e| to_canvas(e, half)).iter().fold(0.0f32, |r, e| r.max((e[0] - c[0]).hypot(e[1] - c[1])));
+    let size = radius(a, edges[0]) + radius(b, edges[1]);
+    let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+    let length = dx.hypot(dy);
+    if !(length.is_finite() && size.is_finite() && a[0].is_finite() && a[1].is_finite()) || size < 1.0 {
         return None;
     }
     let size = size.min(MAX_PANE);
-    if c[0].abs() - size / 2.0 > CANVAS_HALF[0] || c[1].abs() - size / 2.0 > CANVAS_HALF[1] {
+    let off = |i: usize| a[i].min(b[i]) - size / 2.0 > CANVAS_HALF[i] || a[i].max(b[i]) + size / 2.0 < -CANVAS_HALF[i];
+    if off(0) || off(1) {
         return None;
     }
-    Some(OrbPane { x: c[0], y: c[1], size, color })
+    let (ux, uy) = if length > 0.0 { (dx / length, dy / length) } else { (1.0, 0.0) };
+    let q = size / 4.0;
+    Some(Pill {
+        caps: [[a[0] - ux * q, a[1] - uy * q], [b[0] + ux * q, b[1] + uy * q]],
+        band: [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0],
+        length,
+        size,
+        rot: uy.atan2(ux).to_degrees(),
+        color,
+    })
 }
 
-/// The two world points one radius from `orb`'s centre that `plan_pane` takes the projected radius from.
-pub fn edge_points(orb: &Orb) -> [[f32; 3]; 2] {
-    let [x, y, z] = orb.centre;
-    [[x + orb.radius, y, z], [x, y + orb.radius, z]]
+/// The two world points one radius from `centre` that `plan_pill` takes an end's projected radius from.
+pub fn edge_points(centre: [f32; 3], radius: f32) -> [[f32; 3]; 2] {
+    let [x, y, z] = centre;
+    [[x + radius, y, z], [x, y + radius, z]]
 }
