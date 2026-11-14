@@ -1,5 +1,6 @@
 //! Worker-owned Setup drafts and close-time selection. Native validation and
 //! transaction ownership remain in the states provider; files use SetupLibrary.
+use crate::engine::macro_ui::macro_panel::LibraryRow;
 use crate::engine::stages::lobby_stages::STAGES;
 use crate::model::state::setup::{SetupEntry, SetupLibrary, SetupRecord};
 
@@ -19,7 +20,7 @@ pub fn chosen(restore: bool) -> &'static str {
 pub fn list_footer(footer: &str) -> String {
     let (row, rest) = footer.split_once('\n').unwrap_or((footer, ""));
     let note = rest.split("    ").next().filter(|note| *note != "page 1/1  skipped 0");
-    let keys = "A Go there once   X Rename   Y Make Load use it   B Back";
+    let keys = "A Open   X Rename   Y Make Load use it   B Back";
     format!("{row}\n{keys}{}", note.map_or(String::new(), |note| format!("   {note}")))
 }
 
@@ -34,6 +35,80 @@ pub fn row_label(entry: &SetupEntry, fighter: impl Fn(i32) -> String) -> String 
     let (p1, cpu) = (fighter(entry.player_kind), fighter(entry.cpu_kind));
     let (stage, x) = (stage_name(entry.stage_id), (entry.player_x, entry.cpu_x));
     format!("{} · {p1} / {cpu} · {stage} · spots {} / {}", entry.name, x.0, x.1)
+}
+
+/// Which of the Setup library's panels is up: the list, one setup's own screen, or its delete question.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum Pane {
+    #[default]
+    List,
+    Own(String),
+    Delete(String),
+}
+
+/// What a press on a panel's row leads to next.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Step {
+    Open(Pane),
+    Choose(String, bool),
+    Rename(String),
+    Remove(String),
+}
+
+/// A row of a setup's own screen or of its delete question: the panel's row id, its label, and what it does (the footer's second line).
+type Row = (&'static str, &'static str, &'static str);
+const OWN: [Row; 4] = [
+    ("restore", "Restore here", "Both fighters move there when you close the menu."),
+    ("load", "Make Load use it", "Nobody moves. Load goes there until the bound save changes."),
+    ("rename", "Rename", "Type a new name for this setup."),
+    ("delete", "Delete", "Asks once. Your saves are not touched."),
+];
+const ASK: [Row; 2] = [
+    ("keep", "Keep it", "The setup stays in the library."),
+    ("delete", "Delete it", "Removes this setup's file. Your saves are not touched."),
+];
+
+impl Pane {
+    fn table(&self) -> &'static [Row] {
+        if matches!(self, Self::Delete(_)) {
+            &ASK
+        } else {
+            &OWN
+        }
+    }
+
+    /// The panel's rows (a list's come from the library).
+    pub fn rows(&self) -> Vec<LibraryRow> {
+        self.table().iter().map(|(id, label, _)| LibraryRow { id: (*id).into(), label: (*label).into() }).collect()
+    }
+
+    /// The footer's two lines: the setup (`label`), then what the row under the cursor does.
+    pub fn footer(&self, label: &str, selected: usize) -> String {
+        let ask = if matches!(self, Self::Delete(_)) { "Delete? " } else { "" };
+        format!("{ask}{label}\n{}", self.table().get(selected).map_or("", |row| row.2))
+    }
+
+    /// A on the row `row` of this panel (a list's row is a setup's id).
+    pub fn leads_to(&self, row: &str) -> Step {
+        match (self, row) {
+            (Self::List, id) => Step::Open(Self::Own(id.into())),
+            (Self::Own(id), "restore") => Step::Choose(id.clone(), true),
+            (Self::Own(id), "load") => Step::Choose(id.clone(), false),
+            (Self::Own(id), "rename") => Step::Rename(id.clone()),
+            (Self::Own(id), _) => Step::Open(Self::Delete(id.clone())),
+            (Self::Delete(id), "delete") => Step::Remove(id.clone()),
+            (Self::Delete(id), _) => Step::Open(Self::Own(id.clone())),
+        }
+    }
+
+    /// B: the panel one step up, or none from the list (B closes it).
+    pub fn back(&self) -> Option<Self> {
+        match self {
+            Self::List => None,
+            Self::Own(_) => Some(Self::List),
+            Self::Delete(id) => Some(Self::Own(id.clone())),
+        }
+    }
 }
 
 /// The naming keyboard's sub-line: whose name it asks for and the two fighters.
@@ -233,7 +308,7 @@ impl<T: Copy, K: Copy> Setups<T, K> {
 mod tests {
     lib_unit_tests! {
     use super::*;
-    use crate::engine::macro_ui::macro_panel::{LibraryRow, MacroUi};
+    use crate::engine::macro_ui::macro_panel::MacroUi;
     use crate::model::state::{record::SavedState, setup::FighterSetup};
     use crate::model::store::Record;
     type Target = (u64, usize, bool);
@@ -339,10 +414,38 @@ mod tests {
             ui.open_library_forward(rows, skipped, "Setup library", Some("bind only".into()));
             list_footer(&ui.view().unwrap().footer)
         };
-        let keys = "A Go there once   X Rename   Y Make Load use it   B Back";
+        let keys = "A Open   X Rename   Y Make Load use it   B Back";
         assert_eq!(footer(vec![row("Corner trap · Mario / Little Mac")], 0), format!("Corner trap · Mario / Little Mac\n{keys}"));
         assert_eq!(footer(vec![row("Corner trap")], 2), format!("Corner trap\n{keys}   page 1/1  skipped 2"));
         assert_eq!(footer((0..40).map(|_| row("Setup")).collect(), 0), format!("Setup\n{keys}   page 1/2  skipped 0"));
+    }
+
+    /// A on a row opens that setup's own screen; its rows restore it, make Load use it, rename it, or ask once before deleting it; B
+    /// steps back one panel.
+    fn a_setups_own_screen_walks_from_the_list_to_its_actions_and_back() {
+        let (own, ask) = (Pane::Own("corner-trap".into()), Pane::Delete("corner-trap".into()));
+        assert_eq!(Pane::List.leads_to("corner-trap"), Step::Open(own.clone()));
+        assert_eq!(own.leads_to("restore"), Step::Choose("corner-trap".into(), true));
+        assert_eq!(own.leads_to("load"), Step::Choose("corner-trap".into(), false));
+        assert_eq!(own.leads_to("rename"), Step::Rename("corner-trap".into()));
+        assert_eq!(own.leads_to("delete"), Step::Open(ask.clone()));
+        assert_eq!(ask.leads_to("keep"), Step::Open(own.clone()));
+        assert_eq!(ask.leads_to("delete"), Step::Remove("corner-trap".into()));
+        assert_eq!((Pane::List.back(), own.back(), ask.back()), (None, Some(Pane::List), Some(own)));
+    }
+
+    /// The rows are labelled in words, the cursor starts on the safe row of the question, and the footer says what the row under the
+    /// cursor does.
+    fn the_own_screen_rows_and_footers_say_what_each_row_does() {
+        let labels = |pane: &Pane| pane.rows().into_iter().map(|row| row.label).collect::<Vec<_>>();
+        let (own, ask) = (Pane::Own("x".into()), Pane::Delete("x".into()));
+        assert_eq!(labels(&own), ["Restore here", "Make Load use it", "Rename", "Delete"]);
+        assert_eq!(labels(&ask), ["Keep it", "Delete it"]);
+        let row = "Corner trap · Mario / Little Mac · Training · spots -40 / 35";
+        assert_eq!(own.footer(row, 1), format!("{row}\nNobody moves. Load goes there until the bound save changes."));
+        assert!(own.footer(row, 0).ends_with("Both fighters move there when you close the menu."));
+        assert!(ask.footer(row, 0).starts_with("Delete? Corner trap"), "{}", ask.footer(row, 0));
+        assert_eq!(own.footer(row, 9), format!("{row}\n"), "a cursor off the rows explains nothing");
     }
 
     /// X (or Rename on a setup's own screen): the setup's record is the draft and the confirmed name overwrites its file, so the id
@@ -405,6 +508,8 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("the_list_footer_shows_the_keys_in_two_lines_and_a_page_note_only_when_it_matters", the_list_footer_shows_the_keys_in_two_lines_and_a_page_note_only_when_it_matters as fn()),
+            ("a_setups_own_screen_walks_from_the_list_to_its_actions_and_back", a_setups_own_screen_walks_from_the_list_to_its_actions_and_back as fn()),
+            ("the_own_screen_rows_and_footers_say_what_each_row_does", the_own_screen_rows_and_footers_say_what_each_row_does as fn()),
             ("renaming_a_setup_overwrites_its_file_and_keeps_its_id", renaming_a_setup_overwrites_its_file_and_keeps_its_id as fn()),
             ("the_chosen_notes_say_what_will_happen_in_plain_words", the_chosen_notes_say_what_will_happen_in_plain_words as fn()),
             ("a_row_names_the_fighters_the_stage_and_both_spots", a_row_names_the_fighters_the_stage_and_both_spots as fn()),

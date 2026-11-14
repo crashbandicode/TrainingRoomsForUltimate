@@ -321,7 +321,7 @@ pub static ROWS: [Row; 103] = [
     r(SETUPS, "Save setup to library...", "setup_library_save", Control::Editor(Editor::SetupSave),
       "Keeps what Load would load now as a named setup:\nnormally your bound save. Restore it from the library."),
     r(SETUPS, "Setup library", "", Control::Editor(Editor::SetupLibrary),
-      "The saved setups. A binds a setup to the slot and\nrestores it; Y binds it without restoring."),
+      "The saved setups. A opens one: restore it, make Load\nuse it, rename or delete it."),
     // Recording > Replays. The library groups above have no rows (revision 8.2).
     r(REPLAYS, "Ask before switching fighter", "fighter_prompt", TOGGLE,
       "On: a replay, macro, chain or combo drill on another fighter\nasks first. Off: the fighter you have stays, without asking."),

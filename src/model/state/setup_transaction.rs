@@ -156,9 +156,9 @@ impl Refusal {
             Self::Slot => "The selected save slot is unavailable",
             Self::Situation => "This setup holds a fighter pose Training does not know",
             Self::Disabled => "Enable Save States before restoring a setup",
-            Self::Stage => "This setup is for another stage. Y makes Load use it anyway",
-            Self::Fighter => "This setup is for other fighters. Y makes Load use it anyway",
-            Self::Mii => "This setup is for other Miis. Y makes Load use it anyway",
+            Self::Stage => "This setup is for another stage. Make Load use it works anywhere",
+            Self::Fighter => "This setup is for other fighters. Make Load use it works anywhere",
+            Self::Mii => "This setup is for other Miis. Make Load use it works anywhere",
         }
     }
 }
@@ -328,7 +328,7 @@ mod tests {
     fn refusals_say_which_part_differs_and_what_y_does() {
         for (refusal, differs) in [(Refusal::Stage, "stage"), (Refusal::Fighter, "fighters"), (Refusal::Mii, "Miis")] {
             let text = refusal.message();
-            assert!(text.contains(differs) && text.contains("Y makes Load use it"), "{text}");
+            assert!(text.contains(differs) && text.contains("Make Load use it"), "{text}");
             assert!(!text.contains("bind"), "{text}");
         }
         assert!(Refusal::Session.message().contains("open the Setup library again"));

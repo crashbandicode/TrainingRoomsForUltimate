@@ -1,10 +1,11 @@
 //! Setup screens on the menu worker. The states facade owns native work.
 use super::external;
 use crate::editors::setups::row_label;
-use crate::editors::setups::{chosen, list_footer, name_summary, Provider, Reply, Res, Setups};
+use crate::editors::setups::{chosen, list_footer, name_summary, Pane, Provider, Reply, Res, Setups, Step};
 use crate::engine::macro_ui::macro_panel::{LibraryRow, View};
 use crate::model::menu::{input::Button, table::Editor, Menu};
 use crate::model::state::setup::{SetupLibrary, SetupRecord};
+use crate::model::store::Record;
 use crate::runtime::features::states::setups as native;
 use crate::runtime::macros::named_macros;
 
@@ -38,6 +39,9 @@ pub struct Ui {
     target: Option<native::Target>,
     name_token: Option<u64>,
     library_count: usize,
+    pane: Pane,
+    /// The open setup's row text, for its own screen's footer.
+    label: String,
 }
 
 fn library() -> SetupLibrary {
@@ -71,7 +75,7 @@ impl Ui {
         let target = native::open(slot, enabled)?;
         match editor {
             Editor::SetupSave => self.model.begin_save(&mut Native, target)?,
-            Editor::SetupLibrary => self.show_library()?,
+            Editor::SetupLibrary => self.show(Pane::List)?,
             _ => return Err("Not a setup screen".into()),
         }
         self.target = Some(target);
@@ -79,26 +83,31 @@ impl Ui {
         Ok(())
     }
 
-    fn show_library(&mut self) -> Result<(), String> {
-        let listing = library().list().map_err(|e| e.to_string())?;
-        self.library_count = listing.entries.len();
-        let rows = listing
-            .entries
-            .into_iter()
-            .map(|entry| LibraryRow {
-                label: row_label(&entry, named_macros::fighter_label),
-                id: entry.id,
-            })
-            .collect();
-        named_macros::open_external_library(
-            rows,
-            listing.skipped.len(),
-            "Setup library",
-            Some("bind only".into()),
-        );
+    /// Opens `pane` as the layer's panel: the list of setups, or one setup's own screen or delete question.
+    fn show(&mut self, pane: Pane) -> Result<(), String> {
+        let (title, rows, skipped): (_, Vec<LibraryRow>, _) = match &pane {
+            Pane::List => {
+                let listing = library().list().map_err(|e| e.to_string())?;
+                self.library_count = listing.entries.len();
+                let entries = listing.entries.into_iter();
+                let rows = entries.map(|entry| LibraryRow {
+                    label: row_label(&entry, named_macros::fighter_label),
+                    id: entry.id,
+                });
+                ("Setup library".to_owned(), rows.collect(), listing.skipped.len())
+            }
+            Pane::Own(id) | Pane::Delete(id) => {
+                let record = library().load(id).map_err(|e| e.to_string())?;
+                self.label = row_label(&record.summary(id), named_macros::fighter_label);
+                (record.name, pane.rows(), 0)
+            }
+        };
+        let alternate = (pane == Pane::List).then(|| "bind only".to_owned());
+        named_macros::open_external_library(rows, skipped, title, alternate);
         if !external::panel_up() {
             return Err("Wait for the practice fighters to finish loading".into());
         }
+        self.pane = pane;
         Ok(())
     }
 
@@ -188,32 +197,43 @@ impl Ui {
             if let Some(id) = named_macros::take_list_rename() {
                 return self.begin_rename(id);
             }
-            let choice = named_macros::take_list_choice()
-                .map(|id| (id, true))
-                .or_else(|| named_macros::take_list_action().map(|id| (id, false)));
-            if let Some((id, restore)) = choice {
+            // A opens the row (a setup, or one of its screen's rows); Y on a list row makes Load use that setup.
+            return match (named_macros::take_list_choice(), named_macros::take_list_action()) {
+                (Some(row), _) => self.run(self.pane.leads_to(&row)),
+                (None, Some(id)) => self.run(Step::Choose(id, false)),
+                (None, None) => None,
+            };
+        }
+        None
+    }
+
+    /// Does what a press on a panel's row led to; the text is the notice.
+    fn run(&mut self, step: Step) -> Option<String> {
+        match step {
+            Step::Open(pane) => self.show(pane).err(),
+            Step::Rename(id) => self.begin_rename(id),
+            Step::Remove(id) => {
+                self.active = None;
+                Some(library().delete(&id).map_or_else(|e| e.to_string(), |()| "Setup deleted".into()))
+            }
+            Step::Choose(id, restore) => {
                 let result = (|| {
                     let target = self.target.ok_or("This setup list has closed")?;
                     let record = library().load(&id).map_err(|e| e.to_string())?;
-                    self.model
-                        .choose(&mut Native, target, record, restore)
-                        .map_err(str::to_owned)
+                    self.model.choose(&mut Native, target, record, restore).map_err(str::to_owned)
                 })();
-                match result {
-                    Ok(()) => {
-                        self.active = None;
-                        return Some(chosen(restore).into());
-                    }
-                    Err(why) => {
-                        if let Err(reopen) = self.show_library() {
-                            return Some(format!("{why}; {reopen}"));
-                        }
-                        return Some(why);
-                    }
+                if result.is_ok() {
+                    self.active = None;
+                    return Some(chosen(restore).into());
+                }
+                let why = result.err()?;
+                // Refused: the panel that asked comes back, and the notice says why.
+                match self.show(self.pane.clone()) {
+                    Err(reopen) => Some(format!("{why}; {reopen}")),
+                    Ok(()) => Some(why),
                 }
             }
         }
-        None
     }
 
     pub fn press(&mut self, button: Button) {
@@ -227,11 +247,14 @@ impl Ui {
             }
             return;
         }
-        if self.active == Some(Editor::SetupLibrary)
-            && self.library_count == 0
-            && matches!(button, Button::A | Button::Y)
-        {
-            return;
+        if self.active == Some(Editor::SetupLibrary) {
+            if let (Button::B, Some(pane)) = (button, self.pane.back()) {
+                let _ = self.show(pane);
+                return;
+            }
+            if self.library_count == 0 && matches!(button, Button::A | Button::Y) {
+                return;
+            }
         }
         external::press_panel(button);
     }
@@ -262,7 +285,9 @@ impl Ui {
         }
         let mut view = external::panel_view_now()?;
         if self.active == Some(Editor::SetupLibrary) {
-            if self.library_count == 0 {
+            if self.pane != Pane::List {
+                view.footer = self.pane.footer(&self.label, view.selected);
+            } else if self.library_count == 0 {
                 view.labels = vec!["No setups saved".into()];
                 view.footer = "Save one with Save setup to library first. B Return".into();
             } else {
