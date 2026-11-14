@@ -543,9 +543,10 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
         let mut wants = [Sphere::NONE; hitbox::SPHERE_MAX];
         let mut len = 0;
         hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_GRAB, shape.id as usize, &shape, tint);
+        let status = Some(natives::status_kind(accessor));
         let mut store = STORE.lock();
         let i = store.table.index_for(accessor);
-        wants[..len].iter().filter(|w| store.table.sets[i].push_grab(**w)).count() as u32
+        wants[..len].iter().filter(|w| store.table.sets[i].push_grab(**w, status)).count() as u32
     } else {
         let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
         ARTICLES.lock().track(id, accessor, &mut BOARD.lock());

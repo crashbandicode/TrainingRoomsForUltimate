@@ -815,8 +815,9 @@ pub trait Effects {
     fn sphere_alive(&mut self, handle: u32) -> bool;
     /// End one of the plugin's own effects.
     fn sphere_kill_own(&mut self, handle: u32);
-    /// Request a sphere; its handle, 0 when the game made none.
-    fn sphere_spawn(&mut self, sphere: &Sphere) -> u32;
+    /// Request a sphere; its handle, 0 when the game made none. `made_in`: the status a grab box's command ran in (own orbs
+    /// conclude with it, so a box set the frame its grab connected is drawn one pass, not through the pull).
+    fn sphere_spawn(&mut self, sphere: &Sphere, made_in: Option<i32>) -> u32;
 }
 
 /// What one reconciliation did.
@@ -848,7 +849,8 @@ struct Held {
 pub struct HandleSet {
     held: [Held; MAX_HELD],
     len: usize,
-    pending: [Sphere; MAX_PENDING],
+    /// Waiting grab spheres and the status their command ran in.
+    pending: [(Sphere, Option<i32>); MAX_PENDING],
     pending_len: usize,
 }
 
@@ -863,7 +865,7 @@ impl HandleSet {
         HandleSet {
             held: [Held { sphere: Sphere::NONE, handle: 0, once: false }; MAX_HELD],
             len: 0,
-            pending: [Sphere::NONE; MAX_PENDING],
+            pending: [(Sphere::NONE, None); MAX_PENDING],
             pending_len: 0,
         }
     }
@@ -888,12 +890,13 @@ impl HandleSet {
         self.held[..self.len].iter().map(|h| &h.sphere)
     }
 
-    /// The `CATCH` command made a grab sphere: requested by the fighter's next pass. `false` when the queue is full.
-    pub fn push_grab(&mut self, sphere: Sphere) -> bool {
+    /// The `CATCH` command, run in status `made_in`, made a grab sphere: requested by the fighter's next pass
+    /// (`Effects::sphere_spawn`). `false` when the queue is full.
+    pub fn push_grab(&mut self, sphere: Sphere, made_in: Option<i32>) -> bool {
         if self.pending_len == MAX_PENDING {
             return false;
         }
-        self.pending[self.pending_len] = sphere;
+        self.pending[self.pending_len] = (sphere, made_in);
         self.pending_len += 1;
         true
     }
@@ -903,12 +906,12 @@ impl HandleSet {
         self.len -= 1;
     }
 
-    fn add(&mut self, sphere: &Sphere, once: bool, fx: &mut impl Effects, c: &mut Counts) {
+    fn add(&mut self, sphere: &Sphere, once: bool, made_in: Option<i32>, fx: &mut impl Effects, c: &mut Counts) {
         if self.len == MAX_HELD {
             c.dropped += 1;
             return;
         }
-        let handle = fx.sphere_spawn(sphere);
+        let handle = fx.sphere_spawn(sphere, made_in);
         if handle == 0 {
             c.failed += 1;
             return;
@@ -944,12 +947,12 @@ impl HandleSet {
         }
         for w in wants {
             if !self.held[..self.len].iter().any(|h| !h.once && h.sphere.key == w.key) {
-                self.add(w, false, fx, &mut c);
+                self.add(w, false, None, fx, &mut c);
             }
         }
         if keep_grabs {
             for k in 0..self.pending_len {
-                let p = self.pending[k];
+                let (p, made_in) = self.pending[k];
                 // The command sets a grab box again under the same id (a tether moving out): the old sphere of that key is
                 // replaced, or kept when it is the same sphere and still exists.
                 if let Some(j) = self.held[..self.len].iter().position(|h| h.once && h.sphere.key == p.key) {
@@ -965,7 +968,7 @@ impl HandleSet {
                     }
                     self.remove(j);
                 }
-                self.add(&p, true, fx, &mut c);
+                self.add(&p, true, made_in, fx, &mut c);
             }
         }
         self.pending_len = 0;

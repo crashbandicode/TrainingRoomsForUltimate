@@ -38,8 +38,8 @@ impl Effects for OrbSink {
 
     fn sphere_kill_own(&mut self, _handle: u32) {}
 
-    fn sphere_spawn(&mut self, _sphere: &Sphere) -> u32 {
-        orb_handle(self.status)
+    fn sphere_spawn(&mut self, _sphere: &Sphere, made_in: Option<i32>) -> u32 {
+        orb_handle(made_in.unwrap_or(self.status))
     }
 }
 

@@ -34,7 +34,7 @@ fn own_orbs_are_never_refused_and_conclude_with_the_status() {
     assert_eq!((c.ended, c.spawned, c.failed), (74, 74, 0));
     // A grab sphere is held once and ends with its status, never requested again.
     let grab = sphere(hitbox::sphere_key(hitbox::KIND_GRAB, 0, 0), 9.0, 3.0);
-    assert!(set.push_grab(grab));
+    assert!(set.push_grab(grab, None));
     let c = set.reconcile(&wants, true, &mut sink);
     assert_eq!(c.spawned, 1);
     assert_eq!(set.len(), 75);
@@ -47,6 +47,22 @@ fn own_orbs_are_never_refused_and_conclude_with_the_status() {
     assert_eq!(c.killed + c.ended, 74);
     assert!(set.is_empty());
     assert_ne!(orbs::orb_handle(0), 0, "an orb handle is never the refused handle");
+}
+
+fn a_grab_box_set_in_the_frame_it_connects_shows_once_not_through_the_pull() {
+    let grab = sphere(hitbox::sphere_key(hitbox::KIND_GRAB, 0, 0), 9.0, 3.0);
+    // Samus's tether (Eden gbx-samus-t1): the CATCH command runs in CATCH (55), the pass after it is already CATCH_PULL (56).
+    let mut set = HandleSet::new();
+    assert!(set.push_grab(grab, Some(55)));
+    set.reconcile(&[], true, &mut OrbSink { status: 56 });
+    assert_eq!(set.len(), 1, "drawn the pass after its command");
+    let c = set.reconcile(&[], true, &mut OrbSink { status: 56 });
+    assert_eq!((set.len(), c.ended), (0, 1), "not held through the pull");
+    // A whiff: the pass is in the command's own status, and the box stays while the status does.
+    assert!(set.push_grab(grab, Some(55)));
+    set.reconcile(&[], true, &mut OrbSink { status: 55 });
+    set.reconcile(&[], true, &mut OrbSink { status: 55 });
+    assert_eq!(set.len(), 1);
 }
 
 fn an_orb_is_the_hitbox_size_in_the_spheres_tint() {
@@ -238,6 +254,7 @@ fn projected_orbs_map_onto_the_layout_canvas() {
 fn case_table() {
     crate::test_table::run(&[
         ("own_orbs_are_never_refused_and_conclude_with_the_status", own_orbs_are_never_refused_and_conclude_with_the_status as fn()),
+        ("a_grab_box_set_in_the_frame_it_connects_shows_once_not_through_the_pull", a_grab_box_set_in_the_frame_it_connects_shows_once_not_through_the_pull as fn()),
         ("an_orb_is_the_hitbox_size_in_the_spheres_tint", an_orb_is_the_hitbox_size_in_the_spheres_tint as fn()),
         ("the_orb_panes_cover_four_full_fighters", the_orb_panes_cover_four_full_fighters as fn()),
         ("an_inactive_tick_hides_the_orbs_it_showed", an_inactive_tick_hides_the_orbs_it_showed as fn()),

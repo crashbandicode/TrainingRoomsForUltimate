@@ -32,6 +32,7 @@ Stream `hitbox` (branch `stream/hitbox`), 2026-11-02. Spec: `specs/SPEC-core-06-
 | Requirement | Host test | Eden row (`eden/EDEN-HITBOX.md`) | Evidence |
 | --- | --- | --- | --- |
 | Sphere count and spacing for capsules; single sphere for a point hitbox | `core06_capsule_sampling` | hb-E1 extended hitbox | `eden/runs/hb-*` |
+| A grab box set the frame it connects shows that pass, not through the pull | `core06_orbs` `a_grab_box_set_in_the_frame_it_connects_shows_once_not_through_the_pull` | Eden `gbx-samus-t1` (rc.13: tether orbs in 56/58 only) | |
 | Colour table by `id mod 8`; grab boxes magenta, a colour no hitbox uses | `core06_colour_table`, `every_grab_box_is_magenta_a_colour_no_hitbox_uses` | hb-E2 multi-hitbox move | |
 | Per-frame step order and status exemptions (grab range, shield, tread, DOWN) | `core06_frame_rules_table` | hb-E3 grab, shield, missed tech | |
 | First-frame draw from the `ATTACK` / `CATCH` parameters (indices as spec section 3) | `core06_command_param_indices` | hb-E4 first active frame | |

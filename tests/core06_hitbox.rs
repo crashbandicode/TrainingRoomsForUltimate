@@ -1337,7 +1337,7 @@ impl hitbox::Effects for FakeFx {
         self.live.retain(|x| *x != h);
         self.log.push(format!("kill {h}"));
     }
-    fn sphere_spawn(&mut self, s: &hitbox::Sphere) -> u32 {
+    fn sphere_spawn(&mut self, s: &hitbox::Sphere, _made_in: Option<i32>) -> u32 {
         if self.live.len() >= self.pool {
             self.log.push(format!("refused {:#x}", s.key));
             return 0;
@@ -1422,9 +1422,9 @@ impl RequestSpy {
 impl hitbox::Effects for RequestSpy {
     fn sphere_alive(&mut self, handle: u32) -> bool { hitbox::Effects::sphere_alive(&mut self.fx, handle) }
     fn sphere_kill_own(&mut self, handle: u32) { hitbox::Effects::sphere_kill_own(&mut self.fx, handle) }
-    fn sphere_spawn(&mut self, value: &hitbox::Sphere) -> u32 {
+    fn sphere_spawn(&mut self, value: &hitbox::Sphere, made_in: Option<i32>) -> u32 {
         self.requests.push(*value);
-        hitbox::Effects::sphere_spawn(&mut self.fx, value)
+        hitbox::Effects::sphere_spawn(&mut self.fx, value, made_in)
     }
 }
 
@@ -1434,7 +1434,7 @@ fn core06_rc_dispatch_reads_only_attacks_and_requests_hits_and_grabs() {
     snapshot.set("hitbox_vis", &[1, 0]).unwrap();
     let mut set = hitbox::HandleSet::new();
     let grab = sphere(hitbox::sphere_key(hitbox::KIND_GRAB, 2, 0), 4.0);
-    assert!(set.push_grab(grab));
+    assert!(set.push_grab(grab, None));
     // Poison all unused scratch entries with valid-looking HB1 requests: the
     // production dispatcher must neither retain nor submit those stale values.
     let poison = sphere(hitbox::sphere_key(hitbox::KIND_HURT, 0, 0), 9.0);
@@ -1471,7 +1471,7 @@ fn core06_rc_dispatch_preserves_grab_shield_off_and_retirement_cleanup() {
         // A normal game shield (or another plugin's effect) is never owned.
         fx.fx.live.push(900);
         let grab = sphere(hitbox::sphere_key(hitbox::KIND_GRAB, 2, 0), 4.0);
-        set.push_grab(grab);
+        set.push_grab(grab, None);
         let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
         hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut AttackSpy::default(), None, &mut fx);
         let mut reads = AttackSpy::default();
@@ -1540,8 +1540,8 @@ fn core06_persistent_spheres() {
     let c = set.reconcile(&moved, true, &mut fx);
     assert_eq!((c.ended, c.spawned, c.killed), (1, 1, 0));
     // Grab spheres: queued by the command, requested by the pass, kept while the game keeps them, never requested again.
-    assert!(set.push_grab(sphere(sphere_key(KIND_GRAB, 0, 0), 1.0)));
-    assert!(set.push_grab(sphere(sphere_key(KIND_GRAB, 0, 1), 2.0)));
+    assert!(set.push_grab(sphere(sphere_key(KIND_GRAB, 0, 0), 1.0), None));
+    assert!(set.push_grab(sphere(sphere_key(KIND_GRAB, 0, 1), 2.0), None));
     let c = set.reconcile(&[], true, &mut fx);
     assert_eq!(c.spawned, 2, "the grab spheres");
     assert_eq!(c.killed, 3, "a grab status wants no hitbox or hurtbox spheres");
@@ -1553,12 +1553,12 @@ fn core06_persistent_spheres() {
     // The command sets the same grab box again (Steve's tether in Eden hb-03 re-issued id 0 every few frames): one sphere per
     // key, the old one replaced, never piling up.
     for x in [4.0, 5.0, 5.0] {
-        assert!(set.push_grab(sphere(sphere_key(KIND_GRAB, 0, 0), x)));
+        assert!(set.push_grab(sphere(sphere_key(KIND_GRAB, 0, 0), x), None));
         set.reconcile(&[], true, &mut fx);
     }
     assert_eq!(set.len(), 2, "the surviving grab sphere and the one of key (grab 0, sphere 0)");
     // Off / shield / rebound / not practice: every held sphere is killed by its handle, the queue is dropped.
-    assert!(set.push_grab(sphere(sphere_key(KIND_GRAB, 1, 0), 3.0)));
+    assert!(set.push_grab(sphere(sphere_key(KIND_GRAB, 1, 0), 3.0), None));
     let c = set.clear(&mut fx);
     assert_eq!((c.killed, c.spawned), (2, 0));
     assert!(set.is_empty() && fx.live.is_empty());
@@ -1607,7 +1607,7 @@ fn core06_fighter_sets_and_keys() {
     for k in 1..FIGHTER_SETS {
         table.index_for(0x1000 + k * 0x100);
     }
-    table.sets[first].push_grab(hitbox::Sphere::NONE);
+    table.sets[first].push_grab(hitbox::Sphere::NONE, None);
     assert!(!table.sets[first].is_empty());
     table.index_for(0x1000 + 0x100); // used again: 0x1000 is now the oldest
     let taken = table.index_for(0x9000);

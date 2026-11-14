@@ -19,6 +19,8 @@ With the setting on, every active hitbox of a fighter in Training is drawn as a 
   - For each fighter, each frame, each of the fighter's eight attack slots that is active is drawn with the game's `sys_shield` effect (a translucent sphere) attached to the hitbox's bone at the hitbox position, scaled to `size × 19/200`, tinted with the colour for `id mod 8`, playing at 8× rate so the effect does not pulse. Hitboxes with a second centre (extended/capsule) are drawn as `n` spheres evenly spaced along the segment, `n = ceil(distance / (size × 1.75)) + 1` clamped to 2..16.
   - Grab boxes (`CATCH` animation commands) are drawn when they are created, all in one colour no hitbox uses: magenta
     `1.0, 0.0, 1.0` (rc.13, operator: "grabs being a different color"; before it was the colour for `(id + 3) mod 8`).
+    A grab box whose command ran in a status the fighter has already left by its pass (the grab connected the frame its
+    box was set, as Samus's tether does) is drawn that pass only; before rc.13 it stayed through the whole pull.
   - The frame a hitbox is created by the attack animation command, it is drawn immediately from the command's parameters (so the first active frame is visible even before the per-frame pass).
   - When a grab ends (rebound cleared) and the fighter is not shielding, the spheres are hidden and killed.
   - While On and the fighter is not in a grab status range and not shielding, the fighter's animation-command effects are put to sleep (no hit sparks, dust, etc.), except that effects stay on in the grab/capture statuses, the tread (footstool) statuses, and the `DOWN` knockdown status (so missed-tech and footstool effects remain). Turning the setting Off restores effects the next frame.
