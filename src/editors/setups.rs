@@ -111,16 +111,19 @@ impl Pane {
     }
 }
 
-/// The naming keyboard's sub-line: whose name it asks for and the two fighters.
-pub fn name_summary(renaming: bool, player: &str, cpu: &str) -> String {
-    format!("{} · {player} / {cpu}", if renaming { "Renaming" } else { "From your bound save" })
+/// The naming keyboard's sub-line: whose name it asks for (a rename, where the fighters stand, or the bound save) and the two
+/// fighters.
+pub fn name_summary(renaming: bool, here: bool, player: &str, cpu: &str) -> String {
+    let from = if renaming { "Renaming" } else if here { "Where they stand now" } else { "From your bound save" };
+    format!("{from} · {player} / {cpu}")
 }
 
 /// Value-only boundary implemented by the native states facade.
 pub trait Provider {
     type Target: Copy;
     type Ticket: Copy;
-    fn snapshot(&mut self, target: Self::Target) -> Res<Self::Ticket>;
+    /// `here`: where both fighters stand now (Save setup here); otherwise the bound save.
+    fn snapshot(&mut self, target: Self::Target, here: bool) -> Res<Self::Ticket>;
     fn validate(&mut self, target: Self::Target, record: &SetupRecord, restore: bool) -> Res<()>;
     fn bind(&mut self, target: Self::Target, record: &SetupRecord, restore: bool) -> Res<Self::Ticket>;
     fn poll(&mut self, ticket: Self::Ticket) -> Option<Res<Reply>>;
@@ -183,11 +186,12 @@ impl<T: Copy, K: Copy> Setups<T, K> {
         &mut self,
         provider: &mut P,
         target: T,
+        here: bool,
     ) -> Result<(), &'static str> {
         if self.job.is_some() {
             return Err("A setup is already being saved or restored");
         }
-        let ticket = provider.snapshot(target)?;
+        let ticket = provider.snapshot(target, here)?;
         self.cancel_name();
         self.job = Some(Job::Snapshot {
             ticket,
@@ -314,7 +318,7 @@ mod tests {
     type Target = (u64, usize, bool);
     #[derive(Default)]
     struct Fake {
-        requested: Vec<Target>,
+        requested: Vec<(Target, bool)>,
         bound: Vec<(Target, bool, String)>,
         reply: Option<Result<Reply, &'static str>>,
         refuse: bool,
@@ -322,8 +326,8 @@ mod tests {
     impl Provider for Fake {
         type Target = Target;
         type Ticket = u32;
-        fn snapshot(&mut self, target: Target) -> Result<u32, &'static str> {
-            self.requested.push(target);
+        fn snapshot(&mut self, target: Target, here: bool) -> Result<u32, &'static str> {
+            self.requested.push((target, here));
             Ok(7)
         }
         fn validate(&mut self, _: Target, _: &SetupRecord, _: bool) -> Result<(), &'static str> {
@@ -380,7 +384,7 @@ mod tests {
     fn invalid_name_and_file_failure_keep_draft_cancel_exports_nothing() {
         let mut ui = Setups::default();
         let mut provider = Fake::default();
-        ui.begin_save(&mut provider, (2, 4, true)).unwrap();
+        ui.begin_save(&mut provider, (2, 4, true), false).unwrap();
         provider.reply = Some(Ok(Reply::Snapshot(Box::new(record()))));
         assert_eq!(ui.poll(&mut provider), Some(Ok(true)));
         let token = ui.name_revision();
@@ -404,6 +408,33 @@ mod tests {
             .is_err());
         assert!(!dir.join("setups").exists());
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Save setup here asks for a snapshot of where the fighters stand and keeps it as a new file. Nothing binds, so the bound
+    /// save (the slot Load reads) is never written; Save setup from bound save still asks for the bound save.
+    fn save_setup_here_reads_the_fighters_and_never_writes_the_bound_save() {
+        let dir = std::env::temp_dir().join(format!("tr-setup-here-{}", std::process::id()));
+        let library = SetupLibrary::new(dir.join("setups"));
+        let mut ui = Setups::default();
+        let mut provider = Fake::default();
+        ui.begin_save(&mut provider, (2, 0, true), true).unwrap();
+        let mut here = record();
+        here.player.x = 40.0;
+        provider.reply = Some(Ok(Reply::Snapshot(Box::new(here))));
+        assert_eq!(ui.poll(&mut provider), Some(Ok(true)));
+        let id = ui.save_name(ui.name_revision(), "Ledge trap", &library).unwrap();
+        assert_eq!(library.load(&id).unwrap().player.x, 40.0);
+        ui.begin_save(&mut provider, (2, 0, true), false).unwrap();
+        assert_eq!(provider.requested, vec![((2, 0, true), true), ((2, 0, true), false)]);
+        assert!(provider.bound.is_empty(), "nothing binds: the bound save is not written");
+        std::fs::remove_dir_all(dir).unwrap();
+        // The game side reads both fighters with Save's own reader and never calls Save's slot writers; only a bind writes.
+        let game = include_str!("../runtime/features/states/setups.rs");
+        assert!(game.contains("[super::read_record(&raws[0]), super::read_record(&raws[1])]"));
+        for writer in ["capture(", "hand_to_writer", "save_captured", "request_save"] {
+            assert!(!game.contains(writer), "{writer}");
+        }
+        assert_eq!(game.matches("writing = true").count(), 1, "only a bind hands the slot to the writer");
     }
 
     /// The help panel draws two footer lines: the cursor row, then the keys. The page note appears only when it says something.
@@ -496,10 +527,11 @@ mod tests {
     /// The naming keyboard says where the name goes (a rename, or a new setup from the bound save), never a numbered slot the player
     /// no longer sees. The runtime screens are Switch-only, so the reading screen's words are read from the source.
     fn the_setup_screens_name_the_bound_save_not_a_slot() {
-        assert_eq!(name_summary(false, "Mario", "Little Mac"), "From your bound save · Mario / Little Mac");
-        assert_eq!(name_summary(true, "Mario", "Little Mac"), "Renaming · Mario / Little Mac");
+        assert_eq!(name_summary(false, false, "Mario", "Little Mac"), "From your bound save · Mario / Little Mac");
+        assert_eq!(name_summary(false, true, "Mario", "Little Mac"), "Where they stand now · Mario / Little Mac");
+        assert_eq!(name_summary(true, false, "Mario", "Little Mac"), "Renaming · Mario / Little Mac");
         let ui = include_str!("../runtime/ui/setups.rs");
-        assert!(ui.contains("name_summary(") && ui.contains("Reading your save…"));
+        assert!(ui.contains("name_summary(") && ui.contains("Reading your save…") && ui.contains("Reading where they stand…"));
         assert!(!ui.contains("Save State Slot {slot}") && !ui.contains("Reading the selected saved setup"));
     }
 
@@ -515,6 +547,7 @@ mod tests {
             ("a_row_names_the_fighters_the_stage_and_both_spots", a_row_names_the_fighters_the_stage_and_both_spots as fn()),
             ("a_saved_stage_id_has_the_lobby_catalogs_name", a_saved_stage_id_has_the_lobby_catalogs_name as fn()),
             ("the_setup_screens_name_the_bound_save_not_a_slot", the_setup_screens_name_the_bound_save_not_a_slot as fn()),
+            ("save_setup_here_reads_the_fighters_and_never_writes_the_bound_save", save_setup_here_reads_the_fighters_and_never_writes_the_bound_save as fn()),
             ("library_selection_freezes_target_and_only_actual_close_binds_once", library_selection_freezes_target_and_only_actual_close_binds_once as fn()),
             ("invalid_name_and_file_failure_keep_draft_cancel_exports_nothing", invalid_name_and_file_failure_keep_draft_cancel_exports_nothing as fn()),
         ]);

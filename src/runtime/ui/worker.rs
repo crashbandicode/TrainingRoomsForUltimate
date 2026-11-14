@@ -1187,5 +1187,5 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
 
 
 fn is_setup(editor: Editor) -> bool {
-    matches!(editor, Editor::SetupSave | Editor::SetupLibrary)
+    matches!(editor, Editor::SetupSave | Editor::SetupSaveHere | Editor::SetupLibrary)
 }

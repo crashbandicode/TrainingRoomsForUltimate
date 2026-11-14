@@ -2,6 +2,10 @@
 //! asked for and did not get says why: one release-build line (`key`), and a notice (`notice`) unless the press visibly
 //! acted somewhere else (an open menu or pop-up took it).
 
+/// Save's notice with Save States Off; Save setup here gives the same one.
+// restriction: save-load-off
+pub const SAVE_STATES_OFF: &str = "Save States is Off (Saves page)";
+
 /// What was asked for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
@@ -69,8 +73,7 @@ impl Refused {
             Refused::DeluxeRows => Some(if save { "Online Deluxe's open page uses this button: close it to save" } else { "Online Deluxe's open page uses this button: close it to load" }),
             // restriction: save-load-gamecube-triggers
             Refused::GameCubeTriggers => Some("Both triggers are Online Deluxe's L + R: hold one of them"),
-            // restriction: save-load-off
-            Refused::Off => Some("Save States is Off (Saves page)"),
+            Refused::Off => Some(SAVE_STATES_OFF),
             // restriction: save-load-not-ready
             Refused::NotReady => Some("Save states have not started in this match yet"),
             // restriction: save-load-player-cpu

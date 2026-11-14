@@ -138,6 +138,8 @@ pub enum Editor {
     /// Change Stage: the stage grid in Direct mode (`GridKind::StageChange`).
     ChangeStage,
     SetupSave,
+    /// Save setup here (rc.14 SL4): both fighters where they stand, the bound save untouched.
+    SetupSaveHere,
     SetupLibrary,
     NamedLibrary,
     SaveSlotToLibrary,
@@ -228,7 +230,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 103] = [
+pub static ROWS: [Row; 104] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -317,8 +319,10 @@ pub static ROWS: [Row; 103] = [
       "The range a random value for the CPU is drawn from.\nUsed only when damage on load is Random Value."),
     r(STATES, "Buffs on load", "buff_state", Control::MultiSelect(&o::BUFFS),
       "Character buffs applied after a load.\nShulk's arts and Wario's wafts: one ticked is picked at random."),
-    // Saves > Setup library (operator 2026-11-05: it ships again)
-    r(SETUPS, "Save setup to library...", "setup_library_save", Control::Editor(Editor::SetupSave),
+    // Saves > Setup library (operator 2026-11-05: it ships again; rc.14 SL4: Save setup here, the old row renamed)
+    r(SETUPS, "Save setup here...", "", Control::Editor(Editor::SetupSaveHere),
+      "Keeps where both fighters are now as a named setup.\nYour bound save is not touched."),
+    r(SETUPS, "Save setup from bound save...", "setup_library_save", Control::Editor(Editor::SetupSave),
       "Keeps what Load would load now as a named setup:\nnormally your bound save. Restore it from the library."),
     r(SETUPS, "Setup library", "", Control::Editor(Editor::SetupLibrary),
       "The saved setups. A opens one: restore it, make Load\nuse it, rename or delete it."),

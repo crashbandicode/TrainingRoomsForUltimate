@@ -341,7 +341,8 @@ change, so existing settings files load as they are (the retired
 | Saves | Save states | CPU damage on load | dropdown | Default, Save State, Random | Default | upstream | |
 | Saves | Save states | CPU damage range | slider | 0–150 % | 0–150 | upstream | greyed unless Random |
 | Saves | Save states | Buffs on load | multi-select | 12 buffs | none | upstream | |
-| Saves | Setup library | Save setup to library… | editor | name entry for the selected slot | — | ours | |
+| Saves | Setup library | Save setup here… | editor | name entry for where both fighters stand now; the bound save is not touched | — | ours | rc.14 SL4 |
+| Saves | Setup library | Save setup from bound save… | editor | name entry for the bound save (was Save setup to library…) | — | ours | renamed rc.14 |
 | Saves | Setup library | Setup library | editor (list) | saved setups; A binds+restores, Y binds | — | ours | |
 | Recording | Recording | Record Slot | dropdown | 1–5 | 1 | upstream | was single |
 | Recording | Recording | Trigger | dropdown | Button Combination, Save State Load | Button Combination | upstream | was single |

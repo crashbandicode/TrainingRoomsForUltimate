@@ -1,9 +1,11 @@
 //! Setup selection is worker-owned; validation repeats on the game thread before
-//! either numbered record changes. No live position is an export source.
+//! either numbered record changes. A snapshot reads the bound save, or (Save setup here, rc.14 SL4: this reverses
+//! "no live position is an export source") both fighters where they stand; neither writes a numbered record.
 use super::{
     file::SLOTS,
     machine::{Situation, SituationIds},
     record::SavedState,
+    refused::SAVE_STATES_OFF,
     setup::{FighterSetup, SetupError, SetupRecord, MII_KINDS},
 };
 
@@ -145,11 +147,44 @@ pub enum Refusal {
     Stage,
     Fighter,
     Mii,
+    Off,
+}
+
+impl<I> Facts<I> {
+    /// Every setup transaction: the same practice session, both fighters loaded (an exact Mii too), nothing being
+    /// saved, loaded or placed, and a slot that exists.
+    fn admit(&self, target: Target) -> Result<(), Refusal> {
+        if target.session != self.session {
+            return Err(Refusal::Session);
+        }
+        if !self.owned {
+            return Err(Refusal::Ownership);
+        }
+        if self.busy {
+            return Err(Refusal::Busy);
+        }
+        if target.slot >= SLOTS {
+            return Err(Refusal::Slot);
+        }
+        Ok(())
+    }
+
+    /// Save setup here reads both fighters where they stand, so it is refused where a Save is not taken (Save States
+    /// Off, as the menu shows it; something being placed) and while the fighters or an exact Mii still load.
+    pub fn here(&self, target: Target) -> Result<(), Refusal> {
+        self.admit(target)?;
+        if !target.enabled {
+            return Err(Refusal::Off);
+        }
+        Ok(())
+    }
 }
 
 impl Refusal {
     pub fn message(self) -> &'static str {
         match self {
+            // restriction: save-load-off (Save setup here gives Save's own notice)
+            Self::Off => SAVE_STATES_OFF,
             Self::Session => "The practice session changed: open the Setup library again",
             Self::Ownership => "Wait for the practice fighters to finish loading",
             Self::Busy => "A save or restore is already in progress",
@@ -196,18 +231,7 @@ impl<I: Copy + Eq> Prepared<I> {
     /// Same check at selection and immediately before atomic two-role commit.
     /// Y is bind-only, so live stage/fighters and the enable flag do not restrict it.
     pub fn validate(&self, target: Target, facts: &Facts<I>, restore: bool) -> Result<(), Refusal> {
-        if target.session != facts.session {
-            return Err(Refusal::Session);
-        }
-        if !facts.owned {
-            return Err(Refusal::Ownership);
-        }
-        if facts.busy {
-            return Err(Refusal::Busy);
-        }
-        if target.slot >= SLOTS {
-            return Err(Refusal::Slot);
-        }
+        facts.admit(target)?;
         if self
             .pair
             .iter()
@@ -259,12 +283,23 @@ pub fn export(name: &str, pair: &[SavedState; 2]) -> Result<SetupRecord, &'stati
     SetupRecord::new(name, "13.0.5", pair[0].saved_stage, player, cpu).map_err(|_| SAME_STAGE)
 }
 
+/// A snapshot's two records with their exact Miis attached, as the setup they make: one mapping for the bound save and
+/// for where the fighters stand. Worker only (the Mii JSON is built here).
+pub fn export_pair<M: serde::Serialize>(name: &str, mut pair: [SavedState; 2], miis: [Option<M>; 2]) -> Result<SetupRecord, &'static str> {
+    for (saved, mii) in pair.iter_mut().zip(miis) {
+        saved.attach_mii(mii).map_err(|_| "Saved Mii could not be serialized")?;
+    }
+    export(name, &pair)
+}
+
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
     use super::super::{
-        machine::{Machine, Role},
-        record::Marker,
+        held_item::HeldItem,
+        machine::{FrameIn, Machine, Role, StatusNow},
+        record::{Charge, Marker, Steve},
+        refused::{Action, Refused},
         settings::StateSettings,
     };
     use super::*;
@@ -323,6 +358,74 @@ mod tests {
         mixed[1].saved_stage = Some(99);
         assert_eq!(export("Setup", &mixed).unwrap_err(), "Both fighters must be saved on the same stage");
         assert!(export("Setup", &pair()).is_ok());
+    }
+
+    /// Save setup here takes both fighters where they stand, so it is refused where a Save is not taken: one table runs
+    /// the Save chord through the machine and Save setup here through its facts.
+    fn save_setup_here_refuses_where_save_does() {
+        let save = FrameIn {
+            entry: 0,
+            nana: false,
+            popo: false,
+            kind: 0,
+            dead: false,
+            status: StatusNow::Other,
+            prev_rebirth: false,
+            standby: false,
+            stage_id: 17,
+            situation: facts().situations,
+            save_chord: true,
+            load_chord: false,
+            kirby: false,
+            pokemon: false,
+            buffable: false,
+        };
+        for (case, enable, placing, here) in [
+            ("nothing running", true, false, Ok(())),
+            ("Save States Off", false, false, Err(Refusal::Off)),
+            ("a setup, preview or Play warp being placed", true, true, Err(Refusal::Busy)),
+        ] {
+            let mut machine = Machine::default();
+            let settings = StateSettings { enable, ..StateSettings::default() };
+            if placing {
+                assert!(machine.begin_temporary(pair()));
+            }
+            let live = Facts { busy: machine.setup_busy(), enabled: enable, ..facts() };
+            let saved = machine.frame(&save, &settings, &mut Rng::new(3)).saved_notice.is_some();
+            assert_eq!(live.here(Target { enabled: enable, ..target() }), here, "{case}");
+            assert_eq!(saved, here.is_ok(), "{case}: Save and Save setup here agree");
+        }
+        assert_eq!(Some(Refusal::Off.message()), Refused::Off.notice(Action::Save), "Save's own words");
+        // A load being placed: Save would cut it short; Save setup here waits for it, as every setup transaction does.
+        let mut loading = Machine::default();
+        assert!(loading.bind_setup(0, pair(), true, &StateSettings::default(), &mut Rng::new(3)));
+        assert_eq!(Facts { busy: loading.setup_busy(), ..facts() }.here(target()), Err(Refusal::Busy));
+        let loading_fighters = Facts { owned: false, ..facts() };
+        assert_eq!(loading_fighters.here(target()), Err(Refusal::Ownership), "fighters or an exact Mii still loading");
+        assert_eq!(facts().here(Target { session: 5, ..target() }), Err(Refusal::Session));
+    }
+
+    /// Save setup here's pair, read as Save reads it, keeps every field a setup holds, its exact Mii and the stage.
+    fn a_live_pair_maps_to_every_setup_field_with_its_exact_mii() {
+        let mut live = pair();
+        live[0] = SavedState {
+            fighter_kind: 0x48,
+            y: 12.5,
+            percent: 37.5,
+            lr: -1.0,
+            situation_kind: 2,
+            charge: Charge { int_x: Some(3), float_y: Some(0.5), has_charge: Some(true), ..Charge::default() },
+            steve: Some(Steve { mat_iron: 4, ..Steve::START }),
+            held_item: Some(HeldItem::Item { choice: 29, variation: 6, lifetime: 120, lifetime_max: 600, fuse: -1, fuse_max: -1 }),
+            ..live[0].clone()
+        };
+        live[1].situation_kind = 5;
+        let mii = serde_json::json!({"identity": [7, 8, 9]});
+        let record = export_pair("Here", live.clone(), [Some(mii.clone()), None]).unwrap();
+        live[0].mii = Some(mii);
+        assert_eq!((&record.player, &record.cpu), (&FighterSetup::of_saved(&live[0]), &FighterSetup::of_saved(&live[1])));
+        assert_eq!((record.name.as_str(), record.stage_id), ("Here", Some(17)));
+        assert!(export_pair("Here", live, [None::<u64>, None]).is_err(), "a Mii is never kept without its exact Mii");
     }
 
     fn refusals_say_which_part_differs_and_what_y_does() {
@@ -489,6 +592,8 @@ mod tests {
         crate::test_table::run(&[
             ("export_uses_saved_pair_and_rejects_mismatched_stage_halves", export_uses_saved_pair_and_rejects_mismatched_stage_halves as fn()),
             ("export_says_nothing_is_saved_or_that_the_stages_differ", export_says_nothing_is_saved_or_that_the_stages_differ as fn()),
+            ("save_setup_here_refuses_where_save_does", save_setup_here_refuses_where_save_does as fn()),
+            ("a_live_pair_maps_to_every_setup_field_with_its_exact_mii", a_live_pair_maps_to_every_setup_field_with_its_exact_mii as fn()),
             ("refusals_say_which_part_differs_and_what_y_does", refusals_say_which_part_differs_and_what_y_does as fn()),
             ("selection_and_commit_revalidate_without_changing_frozen_target", selection_and_commit_revalidate_without_changing_frozen_target as fn()),
             ("bind_only_allows_unknown_stage_and_disabled_saves_but_not_invalid_situation", bind_only_allows_unknown_stage_and_disabled_saves_but_not_invalid_situation as fn()),

@@ -30,9 +30,11 @@ static JOBS: Exchange<Job> = Exchange::new();
 const BUSY: &str = "A setup is already being saved or restored";
 
 enum Action {
+    /// `here`: both fighters where they stand now (Save setup here); otherwise the bound save's slot.
     Snapshot {
         pair: [SavedState; 2],
         miis: [Option<Configuration>; 2],
+        here: bool,
     },
     Bind {
         prepared: Prepared<Configuration>,
@@ -131,18 +133,23 @@ fn enqueue(target: Target, action: Action) -> Result<Ticket, &'static str> {
     JOBS.submit(job).map_err(|_| BUSY)
 }
 
-pub(crate) fn request_snapshot(target: Target) -> Result<Ticket, &'static str> {
+pub(crate) fn request_snapshot(target: Target, here: bool) -> Result<Ticket, &'static str> {
     if target.slot >= 5 {
         return Err(Refusal::Slot.message());
     }
-    if target.session != facts()?.session {
+    let facts = facts()?;
+    if target.session != facts.session {
         return Err(Refusal::Session.message());
+    }
+    if here {
+        facts.here(target).map_err(Refusal::message)?;
     }
     enqueue(
         target,
         Action::Snapshot {
             pair: std::array::from_fn(|_| SavedState::never_saved()),
             miis: [None; 2],
+            here,
         },
     )
 }
@@ -173,13 +180,8 @@ pub(crate) fn poll(ticket: Ticket) -> Option<Result<Outcome, &'static str>> {
             return Err(Refusal::Session.message());
         }
         match job.action {
-            Action::Snapshot { mut pair, miis } => {
-                for (saved, mii) in pair.iter_mut().zip(miis) {
-                    saved
-                        .attach_mii(mii)
-                        .map_err(|_| "Saved Mii could not be serialized")?;
-                }
-                setup_transaction::export("Setup", &pair).map(Outcome::Snapshot)
+            Action::Snapshot { pair, miis, .. } => {
+                setup_transaction::export_pair("Setup", pair, miis).map(Outcome::Snapshot)
             }
             Action::Bind { .. } => Ok(Outcome::Bound),
         }
@@ -189,8 +191,8 @@ pub(crate) fn poll(ticket: Ticket) -> Option<Result<Outcome, &'static str>> {
 /// P1 game callback, before the ordinary enable gate (Y also works when disabled).
 pub(super) unsafe fn service() {
     let session = SESSION.load(Ordering::Acquire);
-    let observed = super::preview::observe().ok().map(|v| v.0);
-    let current = observed.and_then(|identity| {
+    let observed = super::preview::observe().ok();
+    let current = observed.as_ref().and_then(|(identity, _)| {
         super::with(|state| Facts {
             session,
             owned: true,
@@ -228,7 +230,10 @@ pub(super) unsafe fn service() {
                 return Err(Refusal::Busy.message());
             }
             match &mut job.action {
-                Action::Snapshot { pair, miis } => {
+                Action::Snapshot { here: true, .. } => {
+                    current.here(job.target).map_err(Refusal::message)?
+                }
+                Action::Snapshot { pair, miis, .. } => {
                     *pair = [
                         state.machine.record(Role::Player, job.target.slot).clone(),
                         state.machine.record(Role::Cpu, job.target.slot).clone(),
@@ -265,7 +270,17 @@ pub(super) unsafe fn service() {
             }
             Ok(())
         })
-        .unwrap_or(Err(Refusal::Ownership.message()))
+        .unwrap_or(Err(Refusal::Ownership.message()))?;
+        // Save setup here: both running bodies, read with Save's own reader and kept only if the same fighters (stage,
+        // exact Miis) are still there after the read, as the preview checkpoint keeps its live pair. No slot is written.
+        if let (Action::Snapshot { pair, miis, here: true }, Some((identity, raws))) = (&mut job.action, &observed) {
+            *pair = [super::read_record(&raws[0]), super::read_record(&raws[1])];
+            *miis = identity.miis;
+            if super::preview::observe().ok().map(|v| v.0) != Some(*identity) {
+                return Err(Refusal::Ownership.message());
+            }
+        }
+        Ok(())
     })();
     JOBS.finish_game(ticket, job, writing);
     if writing {

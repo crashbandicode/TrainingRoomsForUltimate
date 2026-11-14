@@ -13,8 +13,8 @@ struct Native;
 impl Provider for Native {
     type Target = native::Target;
     type Ticket = native::Ticket;
-    fn snapshot(&mut self, target: Self::Target) -> Res<Self::Ticket> {
-        native::request_snapshot(target)
+    fn snapshot(&mut self, target: Self::Target, here: bool) -> Res<Self::Ticket> {
+        native::request_snapshot(target, here)
     }
     fn validate(&mut self, target: Self::Target, record: &SetupRecord, restore: bool) -> Res<()> {
         native::validate_selection(target, record, restore)
@@ -42,6 +42,8 @@ pub struct Ui {
     pane: Pane,
     /// The open setup's row text, for its own screen's footer.
     label: String,
+    /// The draft being named comes from where the fighters stand (Save setup here), not the bound save.
+    here: bool,
 }
 
 fn library() -> SetupLibrary {
@@ -53,9 +55,16 @@ impl Ui {
         self.model.watching() || self.name_token.is_some()
     }
 
+    /// A Save setup row is reading its snapshot (B cancels).
+    fn reading(&self) -> bool {
+        matches!(self.active, Some(Editor::SetupSave | Editor::SetupSaveHere))
+            && self.name_token.is_none()
+            && self.model.watching()
+    }
+
     pub fn open(&mut self, editor: Editor, menu: &Menu) -> Result<(), String> {
         // A same-lobby parked naming session belongs to its original slot.
-        if editor == Editor::SetupSave
+        if matches!(editor, Editor::SetupSave | Editor::SetupSaveHere)
             && self
                 .name_token
                 .is_some_and(named_macros::external_name_open)
@@ -74,7 +83,11 @@ impl Ui {
             .is_some_and(|n| *n != 0);
         let target = native::open(slot, enabled)?;
         match editor {
-            Editor::SetupSave => self.model.begin_save(&mut Native, target)?,
+            Editor::SetupSave | Editor::SetupSaveHere => {
+                let here = editor == Editor::SetupSaveHere;
+                self.model.begin_save(&mut Native, target, here)?;
+                self.here = here;
+            }
             Editor::SetupLibrary => self.show(Pane::List)?,
             _ => return Err("Not a setup screen".into()),
         }
@@ -118,6 +131,7 @@ impl Ui {
         let token = self.model.name_revision();
         let summary = name_summary(
             self.model.renaming(),
+            self.here,
             &named_macros::fighter_label(record.player.fighter_kind),
             &named_macros::fighter_label(record.cpu.fighter_kind),
         );
@@ -237,10 +251,7 @@ impl Ui {
     }
 
     pub fn press(&mut self, button: Button) {
-        if self.active == Some(Editor::SetupSave)
-            && self.name_token.is_none()
-            && self.model.watching()
-        {
+        if self.reading() {
             if button == Button::B {
                 self.model.cancel_name();
                 self.active = None;
@@ -262,24 +273,23 @@ impl Ui {
     pub fn panel_up(&self) -> bool {
         !named_macros::suspended()
             && self.active.is_some()
-            && (external::panel_up()
-                || (self.active == Some(Editor::SetupSave)
-                    && self.name_token.is_none()
-                    && self.model.watching()))
+            && (external::panel_up() || self.reading())
     }
 
     pub fn view(&self) -> Option<View> {
         if named_macros::suspended() {
             return None;
         }
-        if self.active == Some(Editor::SetupSave)
-            && self.name_token.is_none()
-            && self.model.watching()
-        {
+        if self.reading() {
+            let (title, reading) = if self.here {
+                ("Save setup here", "Reading where they stand…")
+            } else {
+                ("Save setup from bound save", "Reading your save…")
+            };
             return Some(View {
-                title: "Save setup to library".into(),
+                title: title.into(),
                 selected: 0,
-                labels: vec!["Reading your save…".into()],
+                labels: vec![reading.into()],
                 footer: "B Cancel".into(),
             });
         }
@@ -289,7 +299,7 @@ impl Ui {
                 view.footer = self.pane.footer(&self.label, view.selected);
             } else if self.library_count == 0 {
                 view.labels = vec!["No setups saved".into()];
-                view.footer = "Save one with Save setup to library first. B Return".into();
+                view.footer = "Save one with Save setup here first. B Return".into();
             } else {
                 view.footer = list_footer(&view.footer);
             }
