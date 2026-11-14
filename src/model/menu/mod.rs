@@ -340,7 +340,7 @@ pub const OVERRIDE_COLUMN: usize = 10;
 pub const LIST_JUMP: usize = 12;
 
 /// The section an entry belongs to.
-fn group_of(entry: Entry) -> usize {
+pub(crate) fn group_of(entry: Entry) -> usize {
     match entry {
         Entry::Group(g) | Entry::ResetPage(g) => g,
         Entry::Row(r) => usize::from(ROWS[r].group),

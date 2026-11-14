@@ -8,7 +8,7 @@ use core::fmt::{self, Write};
 use super::recording_menu::{Face, Floppy, RecordingScreens};
 
 use super::menu::table::{Control, Editor, Info, Row, GROUPS, ROWS};
-use super::menu::{Entry, Grey, Menu, RowValue, LOOP_ROW};
+use super::menu::{group_of, Entry, Grey, Menu, RowValue, LOOP_ROW};
 use super::panes::{GROUPS as GROUP_LINES, ROWS as ROW_LINES, TABS};
 
 /// Fixed-capacity UTF-16 text: what a text pane's buffer holds. Writing past the capacity cuts the text.
@@ -403,13 +403,6 @@ pub fn fade_alpha(count: u32) -> u8 {
 /// The page's last line, and the title of its confirmation.
 pub const RESET_LABEL: &str = "Reset page to defaults";
 const HINT_PAGE: &str = "L/R page   Up/Down move   ZL+Up/Down section   Left/Right change   A open   X save defaults   Y reset row   B close";
-
-fn group_of(entry: Entry) -> usize {
-    match entry {
-        Entry::Group(g) | Entry::ResetPage(g) => g,
-        Entry::Row(r) => usize::from(ROWS[r].group),
-    }
-}
 
 /// A name row's value (the combo target, the draft): the name, or "none".
 fn named(out: &mut Text<72>, name: &str) -> fmt::Result {
