@@ -381,7 +381,7 @@ impl hitbox::AttackReader for GameAttacks {
     }
 }
 
-/// The articles whose `ATTACK` ran and the items with a live attack slot, drawn by every fighter pass while their attack lasts (rc.13). Locked before `BOARD`.
+/// The articles whose `ATTACK` or `CATCH` ran and the items with a live attack slot, drawn by every fighter pass (rc.13). Locked before `BOARD`.
 static ARTICLES: Mutex<orbs::Articles> = Mutex::new(orbs::Articles::new());
 
 /// Each tracked article's live attack slots as its own orbs, placed on its bones; an article that is gone (its id inactive
@@ -408,8 +408,9 @@ unsafe fn draw_articles() {
     }
     for (id, key) in articles.tracked().into_iter().filter(|t| t.0 != 0) {
         let live = smash::app::sv_battle_object::is_active(id) && smash::app::sv_battle_object::module_accessor(id) as usize == key;
-        // `key` is the live article's accessor (checked above); the natives check their own grants.
-        if !live || !orbs::article_pass(&mut board, key, &mut GameAttacks(key), |s| natives::joint_position(key, s.joint, &s.pos)) {
+        // `key` is the live article's accessor (checked above); the natives check their own grants. Tracked: its set.
+        let set = articles.track(id, key, &mut board);
+        if !live || !orbs::article_pass(&mut board, set, key, natives::status_kind(key), &mut GameAttacks(key), |s| natives::joint_position(key, s.joint, &s.pos)) {
             articles.forget(id, &mut board);
         }
     }
@@ -554,27 +555,28 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     if accessor == 0 || !hitbox::draw_on_command(true, visualizes(accessor)) {
         return;
     }
-    // A fighter's hitbox and an article's grab box are not taken from the command: the fighter's pass reads its attack
-    // slots, and an article's grab box is not drawn (its own orbs are its attack slots, `draw_articles`).
+    // A fighter's hitbox is not taken from the command: the fighter's pass reads its attack slots. A grab box waits in its
+    // set with the status its command ran in, an article's (Olimar's Pikmin) in the article's (`draw_articles`).
     let fighter = natives::is_fighter(accessor);
-    if fighter != grab {
+    if fighter && !grab {
         return;
     }
     let Some(shape) = hitbox::parse(indices, |i| lua_cell(lua, i)) else { return };
-    let tint = if grab { hitbox::GRAB_TINT } else { hitbox::hitbox_tint(shape.id) };
-    let made = if fighter {
-        let mut wants = [Sphere::NONE; hitbox::SHAPE_SPHERES];
-        let mut len = 0;
-        hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_GRAB, shape.id as usize, &shape, tint);
-        let status = Some(natives::status_kind(accessor));
-        let mut store = STORE.lock();
+    let mut wants = [Sphere::NONE; hitbox::SHAPE_SPHERES];
+    let mut len = 0;
+    hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_GRAB, shape.id as usize, &shape, hitbox::GRAB_TINT);
+    let status = Some(natives::status_kind(accessor));
+    let (mut store, mut articles);
+    let set = if fighter {
+        store = STORE.lock();
         let i = store.table.index_for(accessor);
-        wants[..len].iter().filter(|w| store.table.sets[i].push_grab(**w, status)).count() as u32
+        &mut store.table.sets[i]
     } else {
         let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
-        ARTICLES.lock().track(id, accessor, &mut BOARD.lock());
-        0
+        articles = ARTICLES.lock();
+        articles.track(id, accessor, &mut BOARD.lock())
     };
+    let made = wants[..len].iter().filter(|w| grab && set.push_grab(**w, status)).count() as u32;
     #[cfg(feature = "diag")]
     stats::command(grab, fighter, shape.id, shape.joint, shape.size, shape.b.is_some(), made);
     #[cfg(not(feature = "diag"))]

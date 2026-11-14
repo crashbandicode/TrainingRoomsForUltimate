@@ -23,7 +23,8 @@ either way.
 On draws the fighters' boxes as coloured discs: hitboxes (the attacks; each hitbox of a move gets its own colour, the
 first is red), grab boxes (always magenta, a colour no hitbox uses), and hurtboxes (the yellow bubbles: where a fighter
 can be hit). It works in Training, and on the two practice fighters in a waiting room. While a fighter shields nothing
-of it is drawn; while it is grabbing only its grab box is.
+of it is drawn; while it is grabbing only its grab box is. Projectiles and thrown items show their hitboxes too, and
+Olimar's Pikmin their grab box.
 
 - **Values:** On, Off
 - **Default:** Off

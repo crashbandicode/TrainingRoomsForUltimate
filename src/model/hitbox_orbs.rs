@@ -13,7 +13,7 @@
 //! fighter's orbs on the `Board`; the layout tick projects them with the game's own `world_to_screen` and plans each
 //! orb's pill (`plan_pill`). Pure and host-tested (`tests/core06_orbs.rs`).
 
-use super::hitbox::{want_hitboxes, AttackReader, Effects, Sphere, FIGHTER_SETS, KIND_HURT, MAX_HELD, SCALE};
+use super::hitbox::{want_hitboxes, AttackReader, Effects, HandleSet, Sphere, FIGHTER_SETS, KIND_HURT, MAX_HELD, SCALE};
 
 /// The most fighter objects Training (and the waiting room's practice) draws at once: Player 1 and the CPU, each of them
 /// possibly Ice Climbers, whose Nana is a fighter object of her own. No other fighter adds a fighter object (Pokémon
@@ -169,30 +169,32 @@ impl Board {
 /// Articles drawn at once: the board's slots past Training's fighter objects.
 pub const ARTICLES: usize = 4;
 
-/// The articles whose `ATTACK` ran (rc.13): (battle-object id, accessor), the accessor the board key of its orbs; the oldest
-/// is replaced.
+/// The articles whose `ATTACK` or `CATCH` ran (rc.13): (battle-object id, accessor), the accessor the board key of its
+/// orbs, and its spheres (a `CATCH`'s wait there with their status, as a fighter's do: Olimar's Pikmin); the oldest is
+/// replaced.
 #[derive(Default)]
 pub struct Articles {
     ids: [(u32, usize); ARTICLES],
     ages: [u32; ARTICLES],
     clock: u32,
+    sets: [HandleSet; ARTICLES],
 }
 
 impl Articles {
     pub const fn new() -> Articles {
-        Articles { ids: [(0, 0); ARTICLES], ages: [0; ARTICLES], clock: 0 }
+        Articles { ids: [(0, 0); ARTICLES], ages: [0; ARTICLES], clock: 0, sets: [HandleSet::new(); ARTICLES] }
     }
 
-    /// Track article `id` (accessor `key`); a new one takes a free slot or the oldest, whose orbs go.
-    pub fn track(&mut self, id: u32, key: usize, board: &mut Board) {
-        if self.ids.contains(&(id, key)) {
-            return;
+    /// Track article `id` (accessor `key`); a new one takes a free slot or the oldest, whose orbs and spheres go. Its set.
+    pub fn track(&mut self, id: u32, key: usize, board: &mut Board) -> &mut HandleSet {
+        let i = (0..ARTICLES).min_by_key(|&i| (self.ids[i] != (id, key), self.ids[i].0 != 0, self.ages[i])).unwrap_or(0);
+        if self.ids[i] != (id, key) {
+            self.clock = self.clock.wrapping_add(1);
+            board.clear(self.ids[i].1);
+            (self.ids[i], self.ages[i]) = ((id, key), self.clock);
+            self.sets[i].forget();
         }
-        self.clock = self.clock.wrapping_add(1);
-        let i = (0..ARTICLES).min_by_key(|&i| (self.ids[i].0 != 0, self.ages[i])).unwrap_or(0);
-        board.clear(self.ids[i].1);
-        self.ids[i] = (id, key);
-        self.ages[i] = self.clock;
+        &mut self.sets[i]
     }
 
     pub fn tracked(&self) -> [(u32, usize); ARTICLES] {
@@ -213,18 +215,16 @@ impl Articles {
     }
 }
 
-/// One article's pass: its live attack slots' spheres, placed on its bones by `place`, become its orbs on `board`.
-/// False when no slot is live: its attack ended, its orbs went, and it is forgotten.
-pub fn article_pass(board: &mut Board, key: usize, attacks: &mut impl AttackReader, mut place: impl FnMut(&Sphere) -> Option<[f32; 3]>) -> bool {
+/// One article's pass in `status`: its live attack slots' spheres and its grab spheres (held as a fighter's), placed on its
+/// bones by `place`, become its orbs on `board`. False when it holds none: its attack and grab ended, its orbs went, and it
+/// is forgotten.
+pub fn article_pass(board: &mut Board, set: &mut HandleSet, key: usize, status: i32, attacks: &mut impl AttackReader, mut place: impl FnMut(&Sphere) -> Option<[f32; 3]>) -> bool {
     let mut wants = [Sphere::NONE; MAX_HELD];
     let mut len = 0;
     want_hitboxes(attacks, &mut wants, &mut len);
-    if len == 0 {
-        board.clear(key);
-        return false;
-    }
-    board.publish(key, wants[..len].iter().filter_map(|s| place(s).map(|centre| orb_of(s, centre))));
-    true
+    set.reconcile(&wants[..len], true, &mut OrbSink { status });
+    board.publish(key, set.spheres().filter_map(|s| place(s).map(|centre| orb_of(s, centre))));
+    !set.is_empty()
 }
 
 /// The panes one layout tick has taken: a pill takes two caps and, when it has a length, a band; one that does not get
