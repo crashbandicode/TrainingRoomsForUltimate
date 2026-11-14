@@ -1045,10 +1045,12 @@ pub const NOTICE_TOP_Y: f32 = 540.0 - 24.0 - (445.0 + 50.0 / 2.0 + NOTICE_PLATE_
 /// The top band with the frame strip drawn at the top: the plates' top edge 8 units under the strip's bottom edge.
 const NOTICE_UNDER_STRIP_Y: f32 = iv::STRIP_Y - iv::STRIP_H / 2.0 - 8.0 - (445.0 + 50.0 / 2.0 + NOTICE_PLATE_PAD);
 
-/// The notice slot's y: its old place; while a practice game's notice stands (`raised`) the top band, and under the frame
-/// strip (`strip`, drawn at the top) when that is up.
-pub const fn notice_y(raised: bool, strip: bool) -> f32 {
-    [NOTICE_ORIGIN_Y, NOTICE_TOP_Y, NOTICE_UNDER_STRIP_Y][raised as usize * (1 + strip as usize)]
+/// The notice slot's y: its old place; while a practice game's notice stands (`raised`) the top band, under the frame strip
+/// (`strip`, drawn at the top) when that is up, and under the combo bar (`bar`, which hangs from the strip) when that shows:
+/// the old place is already 8 units under the bar's lowest bottom, a drilled sequence's.
+pub const fn notice_y(raised: bool, strip: bool, bar: bool) -> f32 {
+    let band = [NOTICE_TOP_Y, NOTICE_UNDER_STRIP_Y][strip as usize];
+    [NOTICE_ORIGIN_Y, band][(raised && !bar) as usize]
 }
 
 /// Pane `index`'s kind and place.

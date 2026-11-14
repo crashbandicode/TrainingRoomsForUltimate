@@ -261,16 +261,21 @@ fn eggs_spawn_ignores_the_notice() {
 }
 
 /// The notice slot's y by state (the operator, 11-14): the old place with no practice game; the top band while one runs; and,
-/// with the frame strip drawn at the top, the band directly under the strip, so the two never overlap.
+/// with the frame strip drawn at the top, the band directly under the strip, and with the combo bar under the strip too, the
+/// band under the bar (its lowest place, a drilled sequence's), so none of them overlap.
 fn eggs_notice_band() {
-    use crate::model::panes::{iv, notice_y, NOTICE_ORIGIN_Y, NOTICE_TOP_Y};
+    use crate::model::panes::{cb, iv, notice_y, NOTICE_ORIGIN_Y, NOTICE_TOP_Y};
     // The header plate's top edge above the slot's y: the box top 445 + 25, and the plate's 16 padding.
     let plates_top = 486.0;
-    assert_eq!([notice_y(false, false), notice_y(false, true)], [NOTICE_ORIGIN_Y; 2], "no game: the old place");
-    assert_eq!(notice_y(true, false), NOTICE_TOP_Y, "a game and no strip: the top band");
+    assert_eq!([notice_y(false, false, false), notice_y(false, true, false)], [NOTICE_ORIGIN_Y; 2], "no game: the old place");
+    assert_eq!(notice_y(true, false, false), NOTICE_TOP_Y, "a game and no strip: the top band");
     let strip_bottom = iv::STRIP_Y - iv::STRIP_H / 2.0;
-    let under = notice_y(true, true) + plates_top;
+    let under = notice_y(true, true, false) + plates_top;
     assert!(under <= strip_bottom && under >= strip_bottom - 20.0, "the band's top {under} is not just under the strip's {strip_bottom}");
+    // The combo bar hangs from the strip: its lowest bottom is a drilled sequence's.
+    let bar_bottom = iv::STRIP_Y + cb::SEQ_BAR_Y - cb::BAR_H / 2.0;
+    let under_bar = notice_y(true, true, true) + plates_top;
+    assert!(under_bar <= bar_bottom && under_bar >= bar_bottom - 20.0, "the band's top {under_bar} is not just under the bar's {bar_bottom}");
     assert!(NOTICE_TOP_Y + plates_top <= 540.0, "the top band is on screen");
 }
 

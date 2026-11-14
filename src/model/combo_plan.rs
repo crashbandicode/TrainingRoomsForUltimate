@@ -644,6 +644,11 @@ impl Plan<'_> {
 /// What was last written to each of the bar's panes (`frame_strip_plan::Panes`).
 pub type Renderer = super::frame_strip_plan::Panes<COUNT>;
 
+/// Whether the bar is shown: the strip shown, the helper On and a target (`Renderer::draw`; the notice slot sits under it).
+pub fn shown(helper: &Helper, strip_shown: bool) -> bool {
+    strip_shown && helper.settings().on && helper.target().is_some()
+}
+
 impl Renderer {
     /// One UI tick (the strip's rule): hidden writes only the container, once; shown writes every pane that changed.
     /// Shown needs the strip shown, the helper On and a target. `name` is the target's name. A drilled sequence
@@ -656,7 +661,7 @@ impl Renderer {
         strip_shown: bool,
         apply: impl FnMut(usize, &Look, Changed),
     ) -> usize {
-        if !(strip_shown && helper.settings().on && helper.target().is_some()) {
+        if !shown(helper, strip_shown) {
             return self.hide(at::CONTAINER, Look::HIDDEN, apply);
         }
         let plan = Plan { helper, name, seq };

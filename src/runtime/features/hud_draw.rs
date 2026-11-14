@@ -192,9 +192,10 @@ unsafe fn write_notice(container: *mut Pane, out: &TickOut, strip: bool) {
         return;
     }
     pane::set_visible(container, out.visible);
-    // A practice game's notice stands in the top band, under the frame strip when that is drawn (the operator, 11-14);
-    // every other notice keeps its place.
-    pane::set_pos(container, 0.0, p::notice_y(notices::raised(), strip));
+    // A practice game's notice stands in the top band, under the frame strip when that is drawn and under the combo bar when
+    // that shows (the operator, 11-14); every other notice keeps its place.
+    let bar = crate::runtime::features::combo::bar_shown();
+    pane::set_pos(container, 0.0, p::notice_y(notices::raised(), strip, bar));
     let Some(draw) = out.draw else { return };
     let header = find(container, p::IDX_NOTICE_HEADER);
     let header_plate = find(container, p::IDX_NOTICE_HEADER_PLATE);

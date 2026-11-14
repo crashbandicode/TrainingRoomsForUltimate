@@ -13,12 +13,12 @@
 //!   the order and at the point it did when the worker wrote it under the lock; the worker reads copies (`SAMPLE`,
 //!   `PROGRESS`) and keeps the menu's labels itself (`LABELS`).
 
-use core::sync::atomic::{AtomicI32, AtomicU32, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
 
 use hos_lock::Mutex;
 
 use crate::model::combo::{Combo, Helper, Label, Mark, Out, Outcome, Settings};
-use crate::model::combo_plan::{Renderer, SeqView};
+use crate::model::combo_plan::{self, Renderer, SeqView};
 use crate::model::drill::{Advance, SequenceRun, SequenceWalk, Stepped};
 use crate::model::frame_strip::{Tracker, Verdict};
 use crate::model::frame_strip_plan::{Changed, Look, Text};
@@ -41,6 +41,8 @@ struct Sample {
     last: Option<Combo>,
 }
 static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
+/// The bar was drawn shown on the last HUD tick that got to it: a practice game's notice sits under it (`panes::notice_y`).
+static BAR_SHOWN: AtomicBool = AtomicBool::new(false);
 /// The target's name for the bar (game threads only: the fighter frame installs a staged target's, the HUD tick reads it).
 static NAME: Mutex<Text> = Mutex::new(Text::EMPTY);
 /// The names the menu worker gives the bar at once (`set_target`, `stage_sequence`): published, and taken into `NAME` by the
@@ -495,5 +497,11 @@ pub fn hud_tick(strip_shown: bool, apply: impl FnMut(usize, &Look, Changed)) -> 
         return 0;
     };
     let Some(seq) = seq_view() else { return 0 };
+    BAR_SHOWN.store(combo_plan::shown(&helper, strip_shown), Ordering::Release);
     RENDERER.lock().draw(&helper, &name, seq.as_ref(), strip_shown, apply)
+}
+
+/// The combo bar is shown (the rule of `Renderer::draw`, as of the last HUD tick).
+pub fn bar_shown() -> bool {
+    BAR_SHOWN.load(Ordering::Acquire)
 }
