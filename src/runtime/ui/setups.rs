@@ -1,6 +1,7 @@
 //! Setup screens on the menu worker. The states facade owns native work.
 use super::external;
-use crate::editors::setups::{Provider, Reply, Res, Setups};
+use crate::editors::setups::stage_name;
+use crate::editors::setups::{chosen, list_footer, list_ignores, Provider, Reply, Res, Setups};
 use crate::engine::macro_ui::macro_panel::{LibraryRow, View};
 use crate::model::menu::{input::Button, table::Editor, Menu};
 use crate::model::state::setup::{SetupLibrary, SetupRecord};
@@ -87,10 +88,11 @@ impl Ui {
             .map(|entry| LibraryRow {
                 id: entry.id,
                 label: format!(
-                    "{} · {} / {}",
+                    "{} · {} / {} · {}",
                     entry.name,
                     named_macros::fighter_label(entry.player_kind),
-                    named_macros::fighter_label(entry.cpu_kind)
+                    named_macros::fighter_label(entry.cpu_kind),
+                    stage_name(entry.stage_id)
                 ),
             })
             .collect();
@@ -111,9 +113,8 @@ impl Ui {
             return;
         };
         let token = self.model.name_revision();
-        let slot = self.target.map_or(0, |target| target.slot + 1);
         let summary = format!(
-            "Save State Slot {slot} · {} / {}",
+            "From your bound save · {} / {}",
             named_macros::fighter_label(record.player.fighter_kind),
             named_macros::fighter_label(record.cpu.fighter_kind)
         );
@@ -190,14 +191,7 @@ impl Ui {
                 match result {
                     Ok(()) => {
                         self.active = None;
-                        return Some(
-                            if restore {
-                                "Setup will bind and restore when the menu closes"
-                            } else {
-                                "Setup will bind when the menu closes"
-                            }
-                            .into(),
-                        );
+                        return Some(chosen(restore).into());
                     }
                     Err(why) => {
                         if let Err(reopen) = self.show_library() {
@@ -222,10 +216,7 @@ impl Ui {
             }
             return;
         }
-        if self.active == Some(Editor::SetupLibrary)
-            && self.library_count == 0
-            && matches!(button, Button::A | Button::Y)
-        {
+        if self.active == Some(Editor::SetupLibrary) && list_ignores(button, self.library_count) {
             return;
         }
         external::press_panel(button);
@@ -251,7 +242,7 @@ impl Ui {
             return Some(View {
                 title: "Save setup to library".into(),
                 selected: 0,
-                labels: vec!["Reading the selected saved setup…".into()],
+                labels: vec!["Reading your save…".into()],
                 footer: "B Cancel".into(),
             });
         }
@@ -261,11 +252,7 @@ impl Ui {
                 view.labels = vec!["No setups saved".into()];
                 view.footer = "Save one with Save setup to library first. B Return".into();
             } else {
-                view.footer = format!(
-                    "{}
-A Bind and restore on menu close · Y Bind only · B Return",
-                    view.footer.split("    ").next().unwrap_or("")
-                );
+                view.footer = list_footer(&view.footer);
             }
         }
         Some(view)

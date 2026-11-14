@@ -27,7 +27,7 @@ fn write_facts(facts: Option<Facts<Configuration>>) {
     FACTS.write(facts);
 }
 static JOBS: Exchange<Job> = Exchange::new();
-const BUSY: &str = "A setup transaction is already in progress";
+const BUSY: &str = "A setup is already being saved or restored";
 
 enum Action {
     Snapshot {
@@ -179,11 +179,7 @@ pub(crate) fn poll(ticket: Ticket) -> Option<Result<Outcome, &'static str>> {
                         .attach_mii(mii)
                         .map_err(|_| "Saved Mii could not be serialized")?;
                 }
-                setup_transaction::export("Setup", &pair)
-                    .map(Outcome::Snapshot)
-                    .map_err(|_| {
-                        "Save both fighters in this slot on the same stage before exporting"
-                    })
+                setup_transaction::export("Setup", &pair).map(Outcome::Snapshot)
             }
             Action::Bind { .. } => Ok(Outcome::Bound),
         }

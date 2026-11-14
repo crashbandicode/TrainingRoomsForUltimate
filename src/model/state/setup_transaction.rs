@@ -150,19 +150,15 @@ pub enum Refusal {
 impl Refusal {
     pub fn message(self) -> &'static str {
         match self {
-            Self::Session => "This setup selection belongs to an earlier session",
+            Self::Session => "The practice session changed: open the Setup library again",
             Self::Ownership => "Wait for the practice fighters to finish loading",
             Self::Busy => "A save or restore is already in progress",
             Self::Slot => "The selected save slot is unavailable",
-            Self::Situation => "This setup contains an unsupported saved situation",
+            Self::Situation => "This setup holds a fighter pose Training does not know",
             Self::Disabled => "Enable Save States before restoring a setup",
-            Self::Stage => "Restore this setup on its saved stage; Y can bind it without moving",
-            Self::Fighter => {
-                "Restore this setup with its saved fighters; Y can bind it without moving"
-            }
-            Self::Mii => {
-                "Restore this setup with its exact saved Miis; Y can bind it without moving"
-            }
+            Self::Stage => "This setup is for another stage. Y makes Load use it anyway",
+            Self::Fighter => "This setup is for other fighters. Y makes Load use it anyway",
+            Self::Mii => "This setup is for other Miis. Y makes Load use it anyway",
         }
     }
 }
@@ -249,19 +245,18 @@ impl<I: Copy + Eq> Prepared<I> {
 
 /// Worker-only: the captured saved records, including their saved stage/Mii
 /// values, are the complete source. Naming starts with "Setup" at the caller.
-pub fn export(name: &str, pair: &[SavedState; 2]) -> Result<SetupRecord, SetupError> {
-    if pair[0].saved_stage != pair[1].saved_stage {
-        return Err(SetupError::Invalid(
-            "the two saved fighters belong to different stages",
-        ));
+/// The error is the player's text: nothing saved, or anything else that stops
+/// the pair from being one setup (the stages differ first).
+pub fn export(name: &str, pair: &[SavedState; 2]) -> Result<SetupRecord, &'static str> {
+    const SAME_STAGE: &str = "Both fighters must be saved on the same stage";
+    if !pair[0].is_saved() {
+        return Err("Nothing is saved here yet: Save first, or bind a save");
     }
-    SetupRecord::new(
-        name,
-        "13.0.5",
-        pair[0].saved_stage,
-        FighterSetup::of_saved(&pair[0]),
-        FighterSetup::of_saved(&pair[1]),
-    )
+    if pair[0].saved_stage != pair[1].saved_stage {
+        return Err(SAME_STAGE);
+    }
+    let [player, cpu] = pair.each_ref().map(FighterSetup::of_saved);
+    SetupRecord::new(name, "13.0.5", pair[0].saved_stage, player, cpu).map_err(|_| SAME_STAGE)
 }
 
 #[cfg(test)]
@@ -319,6 +314,25 @@ mod tests {
         assert!(export("Setup", &saved).is_err());
         saved[0].saved_stage = None;
         assert_eq!(export("Setup", &saved).unwrap().stage_id, None);
+    }
+
+    fn export_says_nothing_is_saved_or_that_the_stages_differ() {
+        let empty = [SavedState::never_saved(), SavedState::never_saved()];
+        assert_eq!(export("Setup", &empty).unwrap_err(), "Nothing is saved here yet: Save first, or bind a save");
+        let mut mixed = pair();
+        mixed[1].saved_stage = Some(99);
+        assert_eq!(export("Setup", &mixed).unwrap_err(), "Both fighters must be saved on the same stage");
+        assert!(export("Setup", &pair()).is_ok());
+    }
+
+    fn refusals_say_which_part_differs_and_what_y_does() {
+        for (refusal, differs) in [(Refusal::Stage, "stage"), (Refusal::Fighter, "fighters"), (Refusal::Mii, "Miis")] {
+            let text = refusal.message();
+            assert!(text.contains(differs) && text.contains("Y makes Load use it"), "{text}");
+            assert!(!text.contains("bind"), "{text}");
+        }
+        assert!(Refusal::Session.message().contains("open the Setup library again"));
+        assert!(!Refusal::Situation.message().contains("situation"));
     }
 
     fn selection_and_commit_revalidate_without_changing_frozen_target() {
@@ -474,6 +488,8 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("export_uses_saved_pair_and_rejects_mismatched_stage_halves", export_uses_saved_pair_and_rejects_mismatched_stage_halves as fn()),
+            ("export_says_nothing_is_saved_or_that_the_stages_differ", export_says_nothing_is_saved_or_that_the_stages_differ as fn()),
+            ("refusals_say_which_part_differs_and_what_y_does", refusals_say_which_part_differs_and_what_y_does as fn()),
             ("selection_and_commit_revalidate_without_changing_frozen_target", selection_and_commit_revalidate_without_changing_frozen_target as fn()),
             ("bind_only_allows_unknown_stage_and_disabled_saves_but_not_invalid_situation", bind_only_allows_unknown_stage_and_disabled_saves_but_not_invalid_situation as fn()),
             ("exact_mii_rechecked_and_owned_json_never_crosses_game_pair", exact_mii_rechecked_and_owned_json_never_crosses_game_pair as fn()),

@@ -169,11 +169,9 @@ fn library_round_trip_listing_and_stable_ids() {
         vec![SetupEntry {
             id: id.clone(),
             name: "Fox ledge drill".to_owned(),
-            game_version: "13.0.5".to_owned(),
             player_kind: 0x07,
             cpu_kind: 0x48,
             stage_id: Some(0x40),
-            exact_mii: [false, true],
         }]
     );
     assert!(listing.skipped.is_empty());

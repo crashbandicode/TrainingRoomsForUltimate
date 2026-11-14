@@ -1,9 +1,39 @@
 //! Worker-owned Setup drafts and close-time selection. Native validation and
 //! transaction ownership remain in the states provider; files use SetupLibrary.
+use crate::engine::stages::lobby_stages::STAGES;
+use crate::model::menu::input::Button;
 use crate::model::state::setup::{SetupLibrary, SetupRecord};
 
 /// A provider's answer: the value, or the refusal text.
 pub type Res<T> = Result<T, &'static str>;
+
+/// The notice after A or Y on a setup: nothing happens until the menu closes.
+pub fn chosen(restore: bool) -> &'static str {
+    if restore {
+        "Setup chosen: both fighters move there when you close the menu"
+    } else {
+        "Setup chosen: Load will go there once you close the menu. Nobody moves"
+    }
+}
+
+/// The list's two footer lines, the most the help panel draws: the cursor row, then the keys. The panel's page note stays only when it says something.
+pub fn list_footer(footer: &str) -> String {
+    let (row, rest) = footer.split_once('\n').unwrap_or((footer, ""));
+    let note = rest.split("    ").next().filter(|note| *note != "page 1/1  skipped 0");
+    let keys = "A Go there once   Y Make Load use it   B Back";
+    format!("{row}\n{keys}{}", note.map_or(String::new(), |note| format!("   {note}")))
+}
+
+/// The lobby catalog's name of the stage a setup was saved on.
+pub fn stage_name(id: Option<i32>) -> &'static str {
+    let found = STAGES.iter().find(|(stage, _)| Some(*stage as i32) == id);
+    found.map_or("unknown stage", |(_, name)| *name)
+}
+
+/// Keys the list swallows: X has no job there (the panel would close and leave a rename id behind), and A and Y have none on an empty list.
+pub fn list_ignores(button: Button, count: usize) -> bool {
+    button == Button::X || (count == 0 && matches!(button, Button::A | Button::Y))
+}
 
 /// Value-only boundary implemented by the native states facade.
 pub trait Provider {
@@ -71,7 +101,7 @@ impl<T: Copy, K: Copy> Setups<T, K> {
         target: T,
     ) -> Result<(), &'static str> {
         if self.job.is_some() {
-            return Err("A setup transaction is already in progress");
+            return Err("A setup is already being saved or restored");
         }
         let ticket = provider.snapshot(target)?;
         self.cancel_name();
@@ -107,7 +137,7 @@ impl<T: Copy, K: Copy> Setups<T, K> {
             return Ok(());
         };
         if self.job.is_some() {
-            return Err("A setup transaction is already in progress");
+            return Err("A setup is already being saved or restored");
         }
         let ticket = provider.bind(selected.target, &selected.record, selected.restore)?;
         self.job = Some(Job::Bind(ticket));
@@ -178,6 +208,7 @@ impl<T: Copy, K: Copy> Setups<T, K> {
 mod tests {
     lib_unit_tests! {
     use super::*;
+    use crate::engine::macro_ui::macro_panel::{LibraryRow, MacroUi};
     use crate::model::state::{record::SavedState, setup::FighterSetup};
     type Target = (u64, usize, bool);
     #[derive(Default)]
@@ -274,10 +305,61 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 
+    /// The help panel draws two footer lines: the cursor row, then the keys. The page note appears only when it says something.
+    fn the_list_footer_shows_the_keys_in_two_lines_and_a_page_note_only_when_it_matters() {
+        let row = |label: &str| LibraryRow { id: "corner".into(), label: label.into() };
+        let footer = |rows: Vec<LibraryRow>, skipped: usize| {
+            let mut ui = MacroUi::new();
+            ui.open_library_forward(rows, skipped, "Setup library", Some("bind only".into()));
+            list_footer(&ui.view().unwrap().footer)
+        };
+        let keys = "A Go there once   Y Make Load use it   B Back";
+        assert_eq!(footer(vec![row("Corner trap · Mario / Little Mac")], 0), format!("Corner trap · Mario / Little Mac\n{keys}"));
+        assert_eq!(footer(vec![row("Corner trap")], 2), format!("Corner trap\n{keys}   page 1/1  skipped 2"));
+        assert_eq!(footer((0..40).map(|_| row("Setup")).collect(), 0), format!("Setup\n{keys}   page 1/2  skipped 0"));
+    }
+
+    /// X has no job in the Setup library (a rename would close the list and leave its row id behind); A and Y have none on an empty list.
+    fn x_is_swallowed_in_the_list_and_a_y_in_an_empty_one() {
+        assert!(list_ignores(Button::X, 3) && list_ignores(Button::X, 0));
+        assert!(list_ignores(Button::A, 0) && list_ignores(Button::Y, 0));
+        for button in [Button::A, Button::Y, Button::B, Button::Up, Button::Down] {
+            assert!(!list_ignores(button, 3), "{button:?}");
+        }
+        for button in [Button::B, Button::Up, Button::Down] {
+            assert!(!list_ignores(button, 0), "{button:?}");
+        }
+    }
+
+    fn the_chosen_notes_say_what_will_happen_in_plain_words() {
+        let (go, load) = (chosen(true), chosen(false));
+        assert!(go.contains("both fighters move there") && go.contains("close the menu"), "{go}");
+        assert!(load.contains("Load will go there") && load.contains("Nobody moves"), "{load}");
+        assert!(!go.contains("bind") && !load.contains("bind"));
+    }
+
+    fn a_saved_stage_id_has_the_lobby_catalogs_name() {
+        assert_eq!((stage_name(Some(308)), stage_name(Some(0))), ("Training", "Battlefield"));
+        assert_eq!((stage_name(None), stage_name(Some(-5))), ("unknown stage", "unknown stage"));
+    }
+
+    /// The runtime screens are Switch-only, so their words are read from the source: the naming keyboard and the reading screen
+    /// name the bound save, never a numbered slot the player no longer sees.
+    fn the_setup_screens_name_the_bound_save_not_a_slot() {
+        let ui = include_str!("../runtime/ui/setups.rs");
+        assert!(ui.contains("From your bound save · {} / {}") && ui.contains("Reading your save…"));
+        assert!(!ui.contains("Save State Slot {slot}") && !ui.contains("Reading the selected saved setup"));
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("the_list_footer_shows_the_keys_in_two_lines_and_a_page_note_only_when_it_matters", the_list_footer_shows_the_keys_in_two_lines_and_a_page_note_only_when_it_matters as fn()),
+            ("x_is_swallowed_in_the_list_and_a_y_in_an_empty_one", x_is_swallowed_in_the_list_and_a_y_in_an_empty_one as fn()),
+            ("the_chosen_notes_say_what_will_happen_in_plain_words", the_chosen_notes_say_what_will_happen_in_plain_words as fn()),
+            ("a_saved_stage_id_has_the_lobby_catalogs_name", a_saved_stage_id_has_the_lobby_catalogs_name as fn()),
+            ("the_setup_screens_name_the_bound_save_not_a_slot", the_setup_screens_name_the_bound_save_not_a_slot as fn()),
             ("library_selection_freezes_target_and_only_actual_close_binds_once", library_selection_freezes_target_and_only_actual_close_binds_once as fn()),
             ("invalid_name_and_file_failure_keep_draft_cancel_exports_nothing", invalid_name_and_file_failure_keep_draft_cancel_exports_nothing as fn()),
         ]);

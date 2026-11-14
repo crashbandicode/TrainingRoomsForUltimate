@@ -344,12 +344,9 @@ fn check_name(name: &str) -> Result<(), SetupError> {
 pub struct SetupEntry {
     pub id: String,
     pub name: String,
-    pub game_version: String,
     pub player_kind: i32,
     pub cpu_kind: i32,
     pub stage_id: Option<i32>,
-    /// Whether the player and CPU halves carry an exact Mii configuration.
-    pub exact_mii: [bool; 2],
 }
 
 /// Every failure the setup library reports.
@@ -372,7 +369,6 @@ impl fmt::Display for SetupError {
             Self::Store(StoreError::Parse(err)) => write!(f, "malformed setup file: {err}"),
             Self::Store(StoreError::InvalidId(id)) => write!(f, "invalid setup id {id:?}"),
             Self::Store(StoreError::NotFound(id)) => write!(f, "no setup with id {id:?}"),
-            Self::Store(StoreError::NoFreeId) => f.write_str("no free setup id for this name"),
             Self::Store(err) => write!(f, "{err}"),
             Self::Invalid(why) => write!(f, "invalid setup: {why}"),
             Self::InvalidFighter { role, why } => write!(f, "invalid setup: {role} {why}"),
@@ -413,11 +409,9 @@ impl Record for SetupRecord {
         SetupEntry {
             id: id.to_owned(),
             name: self.name.clone(),
-            game_version: self.game_version.clone(),
             player_kind: self.player.fighter_kind,
             cpu_kind: self.cpu.fighter_kind,
             stage_id: self.stage_id,
-            exact_mii: [self.player.mii.is_some(), self.cpu.mii.is_some()],
         }
     }
 }

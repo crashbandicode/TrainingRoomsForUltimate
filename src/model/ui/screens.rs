@@ -366,7 +366,7 @@ pub const TILE_HIDDEN: u8 = 255;
 /// `tile_state` of a greyed cell: a delay box while a range is set, or a roster tile the editing role cannot choose.
 pub const TILE_GREYED: u8 = 2;
 
-const HINT_PANEL: &str = "D-pad move   A confirm   Y delete or other   B back";
+const HINT_PANEL: &str = "D-pad move   A confirm   Y other action   B back";
 
 /// A panel of the named-macro / replay layer (package 4): its title, the labels of its 4 x 8 page (an empty one draws nothing),
 /// the focused cell and a footer of at most two lines. Drawn in the tile panes, the same ones the item grid uses, under the
@@ -680,6 +680,14 @@ mod tests {
         assert_eq!(f.tiles[1].string_lossy(), "Switch to recorded fighter");
     }
 
+    fn the_shared_panel_hint_does_not_promise_delete() {
+        // The Setup library's Y binds only; only the combo library deletes, and its own footer says so.
+        let m = menu();
+        let mut f = Frame::new();
+        panel_frame(&m, "Setup library", "Corner trap · Mario / Mario\nA Go there once", &["Corner trap · Ma"], 0, &mut f);
+        assert_eq!(f.hint.string_lossy(), "D-pad move   A confirm   Y other action   B back");
+    }
+
     fn every_sub_screen_of_every_row_draws_within_the_budget() {
         // Open the screen of every row that has one and check the frame stays inside the layout's lines.
         for (i, row) in ROWS.iter().enumerate() {
@@ -724,6 +732,7 @@ mod tests {
             ("the_swap_groups_overrides_chords_and_chord_editor_have_frames", the_swap_groups_overrides_chords_and_chord_editor_have_frames as fn()),
             ("a_on_the_give_item_grid_asks_for_that_item_every_time_and_the_stage_grid_asks_for_nothing", a_on_the_give_item_grid_asks_for_that_item_every_time_and_the_stage_grid_asks_for_nothing as fn()),
             ("the_fighter_question_shows_its_own_keys", the_fighter_question_shows_its_own_keys as fn()),
+            ("the_shared_panel_hint_does_not_promise_delete", the_shared_panel_hint_does_not_promise_delete as fn()),
             ("every_sub_screen_of_every_row_draws_within_the_budget", every_sub_screen_of_every_row_draws_within_the_budget as fn()),
         ]);
     }
