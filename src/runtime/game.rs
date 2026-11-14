@@ -468,21 +468,6 @@ pub mod natives {
         at::<extern "C" fn(usize, u32, bool, bool)>(crate::model::sites_hitbox::HITBOX_KILL_OFFSET).map_or_else(Default::default, |f| f(accessor, handle, false, true))
     }
 
-    /// `EffectModule::is_exist_effect(accessor, handle)`: whether the effect still exists (false when the call was not granted).
-    pub unsafe fn sphere_is_exist(accessor: usize, handle: u32) -> bool {
-        at::<extern "C" fn(usize, u32) -> bool>(crate::model::sites_hitbox::HITBOX_IS_EXIST_OFFSET).map_or_else(Default::default, |f| f(accessor, handle))
-    }
-
-    /// `EffectModule::set_rgb_partial_last(accessor, r, g, b)`: tints the effect just requested.
-    pub unsafe fn sphere_set_rgb(accessor: usize, rgb: [f32; 3]) {
-        at::<extern "C" fn(usize, f32, f32, f32)>(crate::model::sites_hitbox::HITBOX_RGB_LAST_OFFSET).map_or_else(Default::default, |f| f(accessor, rgb[0], rgb[1], rgb[2]))
-    }
-
-    /// `EffectModule::set_rate_last(accessor, rate)`.
-    pub unsafe fn sphere_set_rate(accessor: usize, rate: f32) {
-        at::<extern "C" fn(usize, f32)>(crate::model::sites_hitbox::HITBOX_RATE_LAST_OFFSET).map_or_else(Default::default, |f| f(accessor, rate))
-    }
-
     /// `MotionAnimcmdModule::set_sleep_effect(accessor, sleep)`.
     pub unsafe fn set_sleep_effect(accessor: usize, sleep: bool) {
         at::<extern "C" fn(usize, bool)>(crate::model::sites_hitbox::HITBOX_SLEEP_EFFECT_OFFSET).map_or_else(Default::default, |f| f(accessor, sleep))
