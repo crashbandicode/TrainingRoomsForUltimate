@@ -127,7 +127,8 @@ because the picker lists recordings only.
 
 ![The CPU's Play chord warps to macro 1's start save, then plays the chain in order](../media/rc7-chain-play.gif)
 
-<!-- CAPTURE-REQUEST rec-chain-picker: the numbered picker for + New chain (numbers 1, 2, 3 on recordings, R removing one, then the name step). A GIF; see artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![+ New chain: the numbered picker; A numbers the tile under the cursor, R takes the last number off, B finishes; the new chain is listed](../media/rc13-chain-picker.gif)<br>
+*+ New chain opens the numbered picker. A gives the tile under the cursor the next number (Neutral air 1, Dash attack 2, P1 jab 3), R takes the last number off, A numbers it again, B finishes and asks for a name (empty keeps Chain N). The keyboard step is cut. The chain is written when the menu closes: reopened, MACROS lists Chain 2 with its three steps and CONNECTIONS. Eden, rc.13 (untested on hardware).*
 
 ## Combos
 
