@@ -46,10 +46,7 @@ mod meter {
             s.stop();
             *s
         };
-        crate::engine::compat::logging::diagnostic(format_args!(
-            "[BuildSplit] setup owner={} group={} kinds={:x?} build_of_boot={} carried_setup_us={} {}",
-            owner, group, kinds, n, setup_us, split
-        ));
+        crate::engine::compat::logging::diagnostic(format_args!("[BuildSplit] setup owner={owner} group={group} kinds={kinds:x?} build_of_boot={n} carried_setup_us={setup_us} {split}"));
     }
 
     pub fn start_settle(role: usize) {
@@ -65,10 +62,7 @@ mod meter {
             s.stop();
             *s
         };
-        crate::engine::compat::logging::diagnostic(format_args!(
-            "[BuildSplit] settle owner={} group={} settle_of_boot={} {}",
-            owner, group, n, split
-        ));
+        crate::engine::compat::logging::diagnostic(format_args!("[BuildSplit] settle owner={owner} group={group} settle_of_boot={n} {split}"));
     }
 
     static CLOCKS: [Mutex<crate::model::build_split::TickClock>; 2] =
@@ -80,9 +74,7 @@ mod meter {
     pub fn tick_any(role: usize, owner: u32, now_us: u64, e: &crate::engine::swap::character_forms::EntryState) {
         let gap = CLOCKS.get(role).and_then(|m| m.lock().tick(now_us, crate::model::build_split::STALL_US));
         if let Some(gap) = gap {
-            crate::engine::compat::logging::diagnostic(format_args!(
-                "[BuildSplit] stall owner={} gap_us={} loader={} outer={} installed={} changing={} count={} kinds={:x?} flags={:#x}",
-                owner, gap, e.loader, e.outer, e.installed, e.changing, e.count, &e.kinds[..(e.count as usize).min(3)], e.flags
+            crate::engine::compat::logging::diagnostic(format_args!("[BuildSplit] stall owner={owner} gap_us={gap} loader={} outer={} installed={} changing={} count={} kinds={:x?} flags={:#x}", e.loader, e.outer, e.installed, e.changing, e.count, &e.kinds[..(e.count as usize).min(3)], e.flags
             ));
         }
     }
@@ -100,7 +92,7 @@ mod meter {
             s.stop();
             *s
         };
-        crate::engine::compat::logging::diagnostic(format_args!("[BuildSplit] queue owner={} group={} {}", owner, group, split));
+        crate::engine::compat::logging::diagnostic(format_args!("[BuildSplit] queue owner={owner} group={group} {split}"));
     }
 
     pub fn arm(role: usize, now_us: u64) {
@@ -128,10 +120,7 @@ mod meter {
             copy
         });
         if let Some(g) = gaps.filter(|g| g.armed()) {
-            crate::engine::compat::logging::diagnostic(format_args!(
-                "[BuildSplit] gaps owner={} kind={:#x} {}",
-                owner, kind, g
-            ));
+            crate::engine::compat::logging::diagnostic(format_args!("[BuildSplit] gaps owner={owner} kind={kind:#x} {g}"));
         }
     }
 }

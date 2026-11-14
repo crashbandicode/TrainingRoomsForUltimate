@@ -131,7 +131,7 @@ struct Listing {
 }
 
 fn error_text(error: &io::Error) -> String {
-    format!("{} ({})", io_reason(error), error)
+    format!("{} ({error})", io_reason(error))
 }
 
 /// Occupancy belongs to the directory entry, not to a symlink's referent.

@@ -90,9 +90,7 @@ pub(crate) fn note_seat_memory(slot: u32, kind: u32, held: bool) {
         let now = if held { kind.saturating_add(1) } else { 0 };
         let was = cell.swap(now, core::sync::atomic::Ordering::AcqRel);
         if was != now {
-            crate::engine::compat::logging::diagnostic(format_args!(
-                "[F9Seat] memory slot={slot} held={} kind=0x{:x}",
-                held,
+            crate::engine::compat::logging::diagnostic(format_args!("[F9Seat] memory slot={slot} held={held} kind=0x{:x}",
                 if held { kind } else { was.saturating_sub(1) }
             ));
         }

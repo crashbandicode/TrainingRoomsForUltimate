@@ -254,14 +254,11 @@ unsafe fn dump_text_box(pane: *mut Pane) {
     for (i, slot) in line.iter_mut().enumerate() {
         *slot = words.sub(4).add(i).read_unaligned();
     }
-    log(format_args!(
-        "[Ui] text_box buf_len={} len={} bits={:#x} pos={} size_of_pane={} buffer={:#x} around={:04x?}",
+    log(format_args!("[Ui] text_box buf_len={} len={} bits={:#x} pos={} size_of_pane={} buffer={:#x} around={line:04x?}",
         (*tb).text_buf_len,
         (*tb).text_len,
         (*tb).bits,
         (*tb).text_position,
         core::mem::size_of::<Pane>(),
-        (*tb).text_buf as usize,
-        line
-    ));
+        (*tb).text_buf as usize));
 }

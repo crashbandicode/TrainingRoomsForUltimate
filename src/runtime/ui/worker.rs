@@ -440,9 +440,7 @@ fn press(button: Button, s: &mut Session) {
             m.press(button);
             // Eden reads where each press left the cursor (the section jump, the remembered place).
             #[cfg(feature = "diag")]
-            diagnostic(format_args!(
-                "[Ui] press {:?} page={} cursor={} depth={} screen={:?} row={:?} recording={}",
-                button,
+            diagnostic(format_args!("[Ui] press {button:?} page={} cursor={} depth={} screen={:?} row={:?} recording={}",
                 m.page().id(),
                 m.cursor(),
                 m.depth(),

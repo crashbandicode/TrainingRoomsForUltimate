@@ -647,7 +647,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
         if let Some(ids) = with(|s| s.ids.clone()) {
             if ids.is(C::KindSteve, raw.kind) {
                 if let Some(steve) = state_restore::steve_read(accessor, &ids) {
-                    diagnostic(format_args!("[TrainingRooms] state steve entry={} {:?}", raw.entry, steve));
+                    diagnostic(format_args!("[TrainingRooms] state steve entry={} {steve:?}", raw.entry));
                 }
             }
             if ids.is(C::KindOlimar, raw.kind) {
@@ -665,14 +665,11 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
                 // The copy flag, the copy-chara int, and the copy module's kind (SPEC-state-05 open question 5).
                 let module = n::work_get_int64(accessor, 0x1000_0106) as usize;
                 let module_kind = if module != 0 && module % 8 == 0 { ((module + 0x17398) as *const i32).read() } else { -999 };
-                diagnostic(format_args!(
-                    "[TrainingRooms] state kirby entry={} copy_flag={} on_start={} chara={} module_kind={}",
+                diagnostic(format_args!("[TrainingRooms] state kirby entry={} copy_flag={} on_start={} chara={} module_kind={module_kind}",
                     raw.entry,
                     natives::is_flag(accessor, ids.get(C::KirbyFlagCopy)),
                     natives::is_flag(accessor, ids.get(C::KirbyFlagCopyOnStart)),
-                    natives::get_int(accessor, ids.get(C::KirbyIntCopyChara)),
-                    module_kind
-                ));
+                    natives::get_int(accessor, ids.get(C::KirbyIntCopyChara))));
             }
             if is_pokemon_kind(raw.kind) {
                 let trainer = state_restore::trainer_of(accessor, kid(K_LINK_TRAINER));
@@ -902,7 +899,7 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
         state_diag!("[TrainingRooms] state restored ledge={ledge}");
         // rc.12 smoke row e: a placed Load says so in the release log, as a refused one does. The records follow the entry,
         // not its operator (SPEC-state-01 §8), so a Load while CPU Pilot drives Player 1 is placed; `p1_pilot` names it.
-        crate::runtime::diag_log::diagnostic(format_args!("[TrainingRooms] save_state loaded ledge={} p1_pilot={}", ledge,
+        crate::runtime::diag_log::diagnostic(format_args!("[TrainingRooms] save_state loaded ledge={ledge} p1_pilot={}",
             crate::model::recording::p1_driven_by_ai(false, crate::runtime::ui::pilot_export())));
     }
 }

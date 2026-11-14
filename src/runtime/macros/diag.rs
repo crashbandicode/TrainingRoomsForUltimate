@@ -309,10 +309,9 @@ fn audit_captures() {
             Ok(capture) => {
                 let nonempty = !capture.session.tracks.is_empty()
                     && capture.session.tracks.iter().all(|track| !track.frames.is_empty());
-                diagnostic(format_args!(
-                    "[NamedMacroDiag] capture_audit id={} native_id={:?} native_name={:?} version={:?} tracks={} truncated={} nonempty={}",
+                diagnostic(format_args!("[NamedMacroDiag] capture_audit id={} native_id={:?} native_name={:?} version={:?} tracks={} truncated={} nonempty={nonempty}",
                     entry.id, capture.replay_id, capture.replay_name, capture.game_version,
-                    capture.session.tracks.len(), capture.session.truncated, nonempty));
+                    capture.session.tracks.len(), capture.session.truncated));
                 for track in &capture.session.tracks {
                     diagnostic(format_args!(
                         "[NamedMacroDiag] capture_audit_track id={} entry={} frames={}",

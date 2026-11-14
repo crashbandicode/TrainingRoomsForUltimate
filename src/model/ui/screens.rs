@@ -268,7 +268,7 @@ fn directions_frame(menu: &Menu, screen: &Screen, row: usize, chip: usize, frame
     let mut first = true;
     for (i, weight) in weights.iter().enumerate().take(DIRECTIONS.len()) {
         if *weight != 0 {
-            let _ = write!(frame.help[1], "{}{} x{}", if first { "Selected: " } else { ", " }, DIRECTIONS[i], weight);
+            let _ = write!(frame.help[1], "{}{} x{weight}", if first { "Selected: " } else { ", " }, DIRECTIONS[i]);
             first = false;
         }
     }
@@ -374,7 +374,7 @@ pub fn panel_frame<S: AsRef<str>>(menu: &Menu, title: &str, footer: &str, labels
     frame.focus = None;
     frame.help = [Text::new(); 2];
     frame.hint.clear();
-    let _ = write!(frame.crumb, "{}  >  {}", menu.page().title(), title);
+    let _ = write!(frame.crumb, "{}  >  {title}", menu.page().title());
     frame.view = View::Tiles;
     frame.tile_cols = PANEL_COLS as u8;
     frame.tile_rows = PANEL_ROWS as u8;

@@ -432,7 +432,7 @@ impl Display for Observation {
         for id in HookId::ALL {
             let n = self.now.entries[id as usize];
             if n > 0 {
-                write!(f, "{}{}:{}", if any { "," } else { "" }, id.name(), n)?;
+                write!(f, "{}{}:{n}", if any { "," } else { "" }, id.name())?;
                 any = true;
             }
         }
@@ -446,7 +446,7 @@ impl Display for Observation {
             for id in HookId::ALL {
                 let n = self.now.allocs[id as usize];
                 if n > 0 {
-                    write!(f, "{}{}:{}", if first { "" } else { "," }, id.name(), n)?;
+                    write!(f, "{}{}:{n}", if first { "" } else { "," }, id.name())?;
                     first = false;
                 }
             }

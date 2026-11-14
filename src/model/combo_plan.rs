@@ -515,12 +515,9 @@ impl Plan<'_> {
             STREAK => {
                 let mut t = Text::EMPTY;
                 let _ = write!(
-                    t,
-                    "streak {}  best {}/{}",
+                    t, "streak {}  best {}/{total}",
                     self.helper.streak(),
-                    self.helper.best(),
-                    total
-                );
+                    self.helper.best());
                 Look::text(STREAK_X, HEADER_Y, t, MUTED)
             }
             RESULT => match (self.helper.attempt(), last) {
@@ -532,7 +529,7 @@ impl Plan<'_> {
                 ),
                 (Some(a), None) => {
                     let mut t = Text::EMPTY;
-                    let _ = write!(t, "link {} of {}", a.len(), total);
+                    let _ = write!(t, "link {} of {total}", a.len());
                     Look::text(LEFT + 120.0, FOOTER_Y, t, TEXT)
                 }
                 (None, None) => {

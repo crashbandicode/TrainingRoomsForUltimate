@@ -55,14 +55,10 @@ fn report(entries: u64, quiet_ms: u64, now: u64) {
     let step = WORKER_STEP.load(Ordering::Relaxed);
     let game = GAME_STEP.load(Ordering::Relaxed);
     let drain = now.saturating_sub(DRAIN_TICK.load(Ordering::Relaxed));
-    line(format_args!(
-        "[StallWatch] stalled entries={entries} quiet_ms={quiet_ms} last_hook={hook} open_scopes={open} worker_step={}:{} \
-         game_step={}:{} drain_ms_ago={drain}",
-        step,
+    line(format_args!("[StallWatch] stalled entries={entries} quiet_ms={quiet_ms} last_hook={hook} open_scopes={open} worker_step={step}:{} \
+         game_step={game}:{} drain_ms_ago={drain}",
         WORKER_STEPS.get(step).copied().unwrap_or("?"),
-        game,
-        GAME_STEPS.get(game).copied().unwrap_or("?"),
-    ));
+        GAME_STEPS.get(game).copied().unwrap_or("?")));
     held_locks();
 }
 

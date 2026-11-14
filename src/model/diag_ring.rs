@@ -180,7 +180,7 @@ impl<const N: usize> ByteRing<N> {
         }
         let seq = self.seq + 1;
         let mut sink = RingSink { ring: self, written: 0, limit: room - RESERVE, cut: false };
-        let _ = write!(sink, "{} #{} ", ts_ms, seq);
+        let _ = write!(sink, "{ts_ms} #{seq} ");
         match text {
             Some(text) => sink.put(text),
             None => _ = fmt::write(&mut sink, args),
