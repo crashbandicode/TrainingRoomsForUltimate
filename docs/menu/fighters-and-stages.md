@@ -500,18 +500,24 @@ Break the Targets row. Your layout stays: place more, remove some, or press X to
 
 ### Saved layouts
 
-Keeps up to 5 layouts for each stage on the card, in `ultimate/TrainingRooms/targets/`, so you can place a course once
-and come back to it.
+Your saved layouts, each one its own file in `ultimate/TrainingRooms/layouts/`, so you can place a course once and come
+back to it. The list shows the layouts of the stage you're on; other stages' layouts aren't listed, since their target
+positions belong to their stage.
 
-- **While placing:** the Save State chords work on the layout, and **ZL + D-pad Left / Right** chooses the slot (the notice
-  shows "Slot 2: 6 saved" or "Slot 2: empty"). **Save State Save** (ZL + D-pad Down by default) saves to the slot; a slot
-  that already holds a layout asks first: save again within a second to replace it. **Save State Load** (ZL + D-pad Up)
-  loads the slot, still in Placing, so you can edit it or start it with X. **ZL + Y** twice deletes the slot. Outside
-  placing, the chords are the normal save states.
-- **In the menu:** this row lists the stage's five slots as "Slot 2 · 6 targets" (or "empty"). **A** loads a slot, turns
-  Break the Targets On and leaves the menu open: close it to start at Ready. **Y** deletes a slot.
-- Editing the layout makes it a new, unsaved one until you save it.
-- If a stage's file can't be read the notice says so, and the file is left alone until you save a layout on that stage.
+- **The list:** the five layouts you used last come first, the newest at the top, inside a green outline, with a thin
+  line after the fifth; the rest follow by name, as in the Recording lists. Saving, loading, duplicating and renaming
+  count as a use, and a sixth use pushes the oldest out of the five (its file stays). Up/Down move, **A** opens the
+  layout's own screen, **B** goes back.
+- **A layout's own screen:** **Load** puts its targets on the stage and turns Break the Targets On: close the menu to start
+  at Ready. **Rename** opens the Switch keyboard (B keeps the old name). **Duplicate** saves a copy as a new layout, at the
+  top of the list. **Delete** asks once: Keep it or Delete it.
+- **While placing:** the Save State chords work on the layout. **Save State Save** (ZL + D-pad Down by default) saves it as
+  a new layout, named like "Layout 2 · Battlefield" (the lowest number free on that stage); a save never replaces another
+  layout. **ZL + D-pad Left / Right** steps through this stage's five (the notice shows "1/3 Layout 2 · Battlefield: 6"),
+  **Save State Load** (ZL + D-pad Up) loads the one shown, still in Placing, so you can edit it or start it with X, and
+  **ZL + Y** twice deletes it. Outside placing, the chords are the normal save states.
+- Editing a loaded layout doesn't change its file: save it to keep the change as a new layout.
+- A file that can't be read is skipped, and the list's help line counts it ("2 files skipped").
 
 ### CPU during a game
 

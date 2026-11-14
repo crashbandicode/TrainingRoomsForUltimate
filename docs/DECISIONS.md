@@ -1217,6 +1217,13 @@ where the targets go and then break them." TR's own design, with nothing taken f
 - A cursor places up to 10 targets: A places, B removes the last, X starts.
 - The clock starts on the first input and stops at the last break. The best time is kept per fighter and per layout.
 - Layouts are kept per stage for the session.
+- **Saved layouts (decided 11-14, ~19:50Z):** the Recording convention, not the five numbered slots per stage first
+  proposed (SPEC V2.5, `targets/<stage>.json`, never shipped). Each saved layout is its own file in `layouts/`; the list
+  shows the current stage's layouts, the five used last first; A on one opens its own screen (Load, Rename, Duplicate,
+  Delete); while placing, Save makes a new file and ZL + D-pad Left / Right step through the five. Design and mockup:
+  `artifacts/rc14-btt-layouts/DESIGN.md` (the list drawn as the Recording lists, option A).
+
+![Saved layouts: the list drawn like the Recording lists (the hot five outlined, a line after the fifth), a layout's own screen, the delete question, and the chords while placing](decisions/rc14-btt-layouts.png)
 
 ##### D5 · The HUD
 
