@@ -545,6 +545,9 @@ fn btt_layout_file_errors() {
     let dir = std::env::temp_dir().join(format!("tr-btt-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(read(&dir, 10), ([None; SLOTS], false), "no file: empty slots, nothing wrong");
+    // Something there that cannot be read (a folder in the file's place): unreadable, whatever error kind the platform gives.
+    std::fs::create_dir_all(path(&dir, 30)).unwrap();
+    assert_eq!(read(&dir, 30), ([None; SLOTS], true), "there but unreadable");
     let mut s = Sim::placing();
     s.place_at(0.0, 15.0);
     s.chord(true);

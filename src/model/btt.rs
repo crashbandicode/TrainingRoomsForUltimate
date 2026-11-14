@@ -109,9 +109,12 @@ pub fn path(root: &Path, stage: i32) -> PathBuf {
 
 /// A stage's slots and whether its file could not be read (a missing file is not an error). The menu worker's.
 pub fn read(root: &Path, stage: i32) -> (Slots, bool) {
-    match std::fs::read_to_string(path(root, stage)) {
+    let path = path(root, stage);
+    match std::fs::read_to_string(&path) {
         Ok(text) => parse(&text, stage).map_or(([None; SLOTS], true), |slots| (slots, false)),
-        Err(e) => ([None; SLOTS], e.kind() != std::io::ErrorKind::NotFound),
+        // Whether the file is there decides, not the error's kind: on the console a missing file's error is not `NotFound`
+        // (Eden btt-2 and btt-4-1: `unreadable=true` on every stage without a file).
+        Err(_) => ([None; SLOTS], path.exists()),
     }
 }
 
