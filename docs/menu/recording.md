@@ -351,6 +351,9 @@ The last row of the page. It asks first, then puts every Replays and Options row
 factory values above, until you save your own with X on another page; X doesn't save on this page). It also puts both
 [Loop](#loop) counts back to 1, whatever defaults you saved. It leaves your files, the bound save, the active macros, the
 drill and [Replay capture](#replay-capture) as they are.
+
+![Recording > Options with seven values changed and Loop at 3: Reset page to defaults, A asks, A resets; the rows and Loop read their defaults](../media/rc13-reset-page-recording.gif)<br>
+*Down from After an attempt is Reset page to defaults. A asks, A resets: Crop trailing neutral, Hitstun timing, Mash interrupts playback, Combo helper, On-time tolerance and After an attempt read their defaults, and Loop goes from 3 back to 1. Eden, rc.13 (untested on hardware).*
 ## The Recording pop-up
 
 ZR + D-pad Right opens the pop-up over the match, wherever the menu opens

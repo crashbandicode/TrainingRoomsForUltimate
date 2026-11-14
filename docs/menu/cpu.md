@@ -127,9 +127,9 @@ The direction the CPU nudges itself in during hitlag (smash DI). It does nothing
 One direction is picked at each reset (L+R+A or loading a save state) and right after you change the row. The CPU
 uses it for every hit until the next pick. Neutral means no SDI.
 
-<!-- CAPTURE-REQUEST v01-sdi-clatter: already owned by the GIF lane (audit V01): SDI Direction with the same multihit, damage and strength so only the direction changes the displacement during hitlag; Clatter Strength with the same grab at the same damage, None then High, the whole hold and escape. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
-
 ![DI Direction from nothing picked to Up x1, then SDI Direction the same: the picked chip lights at full strength, the others stay dim](../media/rc13-di-sdi-chips.gif)<br>*The DI and SDI direction grids: A on Up, and Up x1 lights at full strength while the others stay dim. Eden, rc.13 (untested on hardware).*
+
+![Side by side from the same reset, Kirby's rapid jab on CPU Mario with SDI Strength High: with SDI Direction Out (left) the CPU slides away from Kirby during the hits; with In (right) it stays against him](../media/rc13-sdi-direction.gif)<br>*Kirby's rapid jab from the same reset, SDI Strength High: with SDI Direction Out (left) the CPU slides away from Kirby while the hits land; with In (right) it stays against him until the last hit. Eden, rc.13 (untested on hardware).*
 
 More: [Direction chips](../guide/cpu-behaviour.md#direction-chips)
 
@@ -152,7 +152,7 @@ every 2.
 - **Default:** None: it doesn't mash out.
 - **How:** Left/Right cycle through the values; A opens the list.
 
-![Mario grabs the CPU at 100%: with Clatter Strength None it stays held; with High it breaks free at once](../media/rc11-cpu-clatter-strength.gif)<br>*Clatter Strength: None, then High*
+![Side by side from the same save state, Mario grabs the CPU at 100%: with Clatter Strength None (left) it stays held; with High (right) it mashes and breaks free](../media/rc13-clatter-strength.gif)<br>*Mario's grab on the CPU at 100%, from the same save state, shown at Eden speed 50 %: with Clatter Strength None (left) the CPU stays held; with High (right) it mashes and breaks free. Eden, rc.13 (untested on hardware).*
 
 ### Dodge Staling
 
@@ -518,3 +518,6 @@ Takes the CPU out of the fight without changing any of its settings.
 
 The last row of the page. It asks first, then puts every row of the CPU page back to your saved defaults (the factory
 values above, until you save your own with X).
+
+![CPU > Defence with SDI Strength High, Clatter Strength High and Dodge Staling Off: Reset page to defaults, A asks, A resets; the rows read None, None and On](../media/rc13-reset-page-cpu.gif)<br>
+*ZL + Up and Up reach the last row, Reset page to defaults. A asks, A resets: back on Defence, SDI Strength and Clatter Strength read None and Dodge Staling reads On again. Every press is named in the menu. Eden, rc.13 (untested on hardware).*

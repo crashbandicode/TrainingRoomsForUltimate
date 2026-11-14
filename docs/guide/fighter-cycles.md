@@ -41,7 +41,7 @@ stays the fighter you picked at the character select. While it is Off:
 
 The CPU has no such switch: Cycle CPU and CPU Character always work.
 
-<!-- CAPTURE-REQUEST v02-player-swapping: see Fighters & Stages › Player Swapping; the same clip goes here. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![Player Swapping Off: the Cycle Player chord changes nothing; A turns the row On; the same chord replaces Mario with Donkey Kong](../media/rc13-player-swapping-gate.gif)<br>*The same chord, Player Swapping Off then On. Eden, rc.13 (untested on hardware).*
 
 ## The Character Cycles editor
 
