@@ -190,7 +190,8 @@ Crop on a combo or a macro opens two handles, In and Out ([keys](../menu/recordi
 
 ![Crop on a two-link combo, Out 2 to 1, saves Combo 2; drilled, the bar shows its one link](../media/rc6-crop-combo.gif)
 
-<!-- CAPTURE-REQUEST rec-crop-macro: Crop on a macro: the In and Out handles, moved with L and R, then A saving a new macro. A GIF; see artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![Crop on the macro Walk and jab: In moves from 0 to 8, Out from 180 to 170, A saves a new macro](../media/rc13-crop-macro.gif)<br>
+*Crop on a 180-frame macro. R moves In from 0 to 8, Down picks Out, L moves it from 180 to 170, A saves the cut as a new file: the count goes from 13 to 14 and the original is still listed. Each press is named in a box. Eden, rc.13 (untested on hardware).*
 
 ## Sequences and the one drill
 
