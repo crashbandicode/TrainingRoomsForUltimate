@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Verify or carry the 38 approved binary item assets and their source receipt, plus rc.13's Wario bike icon.
+"""Verify or carry the 38 approved binary item assets and their source receipt, plus rc.13's Wario bike icon and rc.14's
+egg target, its cracked frame and the placing cursor (drawn by tools/draw_egg_target.py; verified with its --check).
 
 The Rust carry tools rewrite text; this identity-only binary carry checks the
 same provenance boundary before reading any stage asset. Never writes a stage.
@@ -9,6 +10,8 @@ Without --stage, verify the destination hashes and generated ledger only.
 import argparse
 import hashlib
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -24,23 +27,29 @@ def main():
         parser.error("--carry requires --stage")
     rows = manifest["files"]
     # 39 stage files, plus rc.13's Wario bike icon (an Eden capture, not a stage file; its sources.json entry appended)
-    assert len(rows) == 40
+    # and rc.14's egg target, its cracked frame and the placing cursor (drawn by a script here)
+    assert len(rows) == 43
     ledger = ["# UI item asset carry ledger", "", "Stage m5q; identity copies, no image edits. All sources are `ours-new`.",
               "rc.13 adds `icon-38.png` (Wario: Bike), an Eden capture cut out by background subtraction, and appends its",
-              "entry to `sources.json` (the stage file's digest is kept as `stage_sha256`).", "",
+              "entry to `sources.json` (the stage file's digest is kept as `stage_sha256`).",
+              "rc.14 adds `assets/egg-target/target.png` (Eggs-ercise's target), `cracked.png` (its break frame) and",
+              "`cursor.png` (the placing cursor), drawn by `tools/draw_egg_target.py`.", "",
               "| Source | Destination | SHA256 | Transform |", "| --- | --- | --- | --- |"]
     for row in rows:
         source, destination = row["source"], row["destination"]
         target = root / destination
         if row["transform"] != "identity":
-            assert row["origin"].startswith("rc.13, ours-new"), destination
+            assert row["origin"].startswith(("rc.13, ours-new", "rc.14, ours-new")), destination
+            if "drawn_by" in row:
+                subprocess.run([sys.executable, "-I", str(root / row["drawn_by"]), "--check"], check=True)
             if source is not None:
                 proof = provenance[source]
                 assert proof["origin"] == "ours-new" and row["stage_sha256"].startswith(proof["stage_sha256"])
                 if args.stage is not None:
                     assert hashlib.sha256((args.stage / source).read_bytes()).hexdigest() == row["stage_sha256"], source
             assert hashlib.sha256(target.read_bytes()).hexdigest() == row["sha256"], destination
-            ledger.append(f"| `{source or 'rc.13 Eden capture'}` | `{destination}` | `{row['sha256']}` | {row['transform']} |")
+            label = source or row.get("drawn_by") or "rc.13 Eden capture"
+            ledger.append(f"| `{label}` | `{destination}` | `{row['sha256']}` | {row['transform']} |")
             continue
         proof = provenance[source]
         assert proof["origin"] == "ours-new"
@@ -59,7 +68,7 @@ def main():
         target.write_text(content)
     else:
         assert target.read_text() == content, "stale asset ledger"
-    print("40 UI item asset files and ledger verified")
+    print("43 UI asset files and ledger verified")
 
 
 if __name__ == "__main__":

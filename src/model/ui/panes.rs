@@ -417,9 +417,36 @@ pub const IDX_ORBS: usize = IDX_CB + cb::COUNT;
 pub const IDX_ORB: usize = IDX_ORBS + 1;
 /// The orb panes' names: `tr_oa_00` .. `tr_of_11`, one prefix per hundred.
 const ORB_PREFIXES: [&str; 6] = ["tr_oa_", "tr_ob_", "tr_oc_", "tr_od_", "tr_oe_", "tr_of_"];
+/// The practice games' pictures (rc.14), under `RootPane` and drawn under the orbs, each in its own texture's colours
+/// (`assets/egg-target/`, drawn by `tools/draw_egg_target.py`): `EGGS` targets (`tr_egg_00`.., `target.png`; the SPEC's
+/// maximum of 10), `BURSTS` break pictures (`tr_eggcr_00`.., `cracked.png`; at most 2 breaks at once) and the placing
+/// cursor (`tr_egg_cursor`, `cursor.png`), drawn above the targets.
+pub const EGGS: usize = 10;
+pub const BURSTS: usize = 2;
+pub const EGG_PANES: usize = EGGS + BURSTS + 1;
+pub const IDX_EGG: usize = IDX_ORB + ORBS;
+/// Each `EggPicture`'s panes: (first, count) after `IDX_EGG`.
+pub const EGG_POOLS: [(usize, usize); 3] = [(0, EGGS), (EGGS, BURSTS), (EGGS + BURSTS, 1)];
 /// How many panes the plugin adds to the layout.
 #[cfg(test)]
-pub const COUNT: usize = IDX_ORB + ORBS;
+pub const COUNT: usize = IDX_EGG + EGG_PANES;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EggPicture {
+    Whole,
+    Cracked,
+    Cursor,
+}
+
+/// One picture this frame: `scale` (its size over the pill's), `alpha` (the pane's) and which picture.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EggLook {
+    pub scale: f32,
+    pub alpha: u8,
+    pub picture: EggPicture,
+}
+
+pub const EGG_WHOLE: EggLook = EggLook { scale: 1.0, alpha: 255, picture: EggPicture::Whole };
 
 /// The combo bar's pane indices and geometry (canvas units; the bar's centre is the origin of its panes).
 pub mod cb {
@@ -853,6 +880,9 @@ pub const fn name_of(index: usize) -> Name {
         i if i >= IDX_ITEM_ICON && i < IDX_ITEM_ICON + ITEM_ICONS => Name::indexed("tr_item_", i - IDX_ITEM_ICON),
         IDX_ORBS => Name::new("TrOrbs"),
         i if i >= IDX_ORB && i < IDX_ORB + ORBS => Name::indexed(ORB_PREFIXES[(i - IDX_ORB) / 100], (i - IDX_ORB) % 100),
+        i if i >= IDX_EGG && i < IDX_EGG + EGGS => Name::indexed("tr_egg_", i - IDX_EGG),
+        i if i >= IDX_EGG + EGGS && i < IDX_EGG + EGGS + BURSTS => Name::indexed("tr_eggcr_", i - IDX_EGG - EGGS),
+        i if i == IDX_EGG + EGGS + BURSTS => Name::new("tr_egg_cursor"),
         IDX_MENU => ROOT,
         IDX_NOTICE => Name::new("TrModDisp0"),
         IDX_NOTICE_HEADER_PLATE => Name::new("TrModDisp0HdrPlate"),
@@ -1022,6 +1052,7 @@ pub const fn spec(index: usize) -> Spec {
         i if i >= IDX_ITEM_ICON && i < IDX_ITEM_ICON + ITEM_ICONS => rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false),
         IDX_ORBS => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
         i if i >= IDX_ORB && i < IDX_ORB + ORBS => under(rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false), name_of(IDX_ORBS)),
+        i if i >= IDX_EGG && i < IDX_EGG + EGG_PANES => under(rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false), ROOT_PANE),
         IDX_MENU => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
         IDX_NOTICE => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: NOTICE_ORIGIN_Y, w: 1920.0, h: 1080.0, visible: false },
         IDX_NOTICE_HEADER_PLATE => under(rect(name, padded(NOTICE_HEADER_BOX), NOTICE_PLATE, true), name_of(IDX_NOTICE)),

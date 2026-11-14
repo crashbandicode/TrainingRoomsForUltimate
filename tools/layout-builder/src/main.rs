@@ -58,10 +58,10 @@ fn layout_specs(waiting: bool) -> Vec<Spec> {
     if waiting {
         // The panel roots belong to the waiting host: menu, notices and
         // frame strip. Keep their internal parent relationships unchanged. The
-        // hitbox orbs stay under RootPane (`orbs_first`).
-        let orbs = panes::name_of(panes::IDX_ORBS);
+        // hitbox orbs and the egg's target stay under RootPane (`orbs_first`).
+        let under_all: Vec<_> = std::iter::once(panes::IDX_ORBS).chain(panes::IDX_EGG..panes::IDX_EGG + panes::EGG_PANES).map(panes::name_of).collect();
         for spec in &mut specs {
-            if spec.parent == panes::Name::new("RootPane") && spec.name != orbs {
+            if spec.parent == panes::Name::new("RootPane") && !under_all.contains(&spec.name) {
                 spec.parent = WAITING_PORT;
             }
         }
@@ -70,13 +70,17 @@ fn layout_specs(waiting: bool) -> Vec<Spec> {
 }
 
 /// The hitbox orbs are drawn under every stock and plugin pane, as the game's effect spheres were (under the HUD, the
-/// pause menu and the plugin's menu): their container becomes RootPane's first child.
+/// pause menu and the plugin's menu): their container becomes RootPane's first child. Eggs-ercise's target (rc.14) goes
+/// and the practice games' other pictures (`panes::IDX_EGG`.., in index order, so the cursor is over the targets) go
+/// before it, so the orbs of the attack that breaks the egg draw over the target.
 fn orbs_first(layout: &mut BFLYT) -> Result<()> {
-    let orbs = panes::name_of(panes::IDX_ORBS);
     let root = layout.root_pane.as_mut().ok_or("root pane missing")?;
-    let at = root.children.iter().position(|p| p.name == orbs.as_str()).ok_or("orb container missing")?;
-    let container = root.children.remove(at);
-    root.children.insert(0, container);
+    for index in std::iter::once(panes::IDX_ORBS).chain((panes::IDX_EGG..panes::IDX_EGG + panes::EGG_PANES).rev()) {
+        let name = panes::name_of(index);
+        let at = root.children.iter().position(|p| p.name == name.as_str()).ok_or("orb container or egg missing")?;
+        let pane = root.children.remove(at);
+        root.children.insert(0, pane);
+    }
     Ok(())
 }
 
@@ -166,6 +170,20 @@ fn add_pane(layout: &mut BFLYT, spec: &Spec, waiting: bool) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Eggs-ercise's target texture and material (rc.14).
+const EGG_TEXTURE: &str = "tr_egg_target";
+
+/// The practice games' pictures in `panes::EggPicture` order: (texture and material, file in assets/egg-target/).
+fn egg_pictures() -> [(&'static str, &'static str); 3] {
+    [(EGG_TEXTURE, "target.png"), ("tr_egg_cracked", "cracked.png"), ("tr_egg_cursor", "cursor.png")]
+}
+
+/// The texture of egg pane `k` (after `panes::IDX_EGG`): its pool's picture.
+fn egg_picture_of(k: usize) -> &'static str {
+    let pool = panes::EGG_POOLS.iter().position(|&(first, count)| k >= first && k < first + count).expect("an egg pane");
+    egg_pictures()[pool].0
 }
 
 /// The orb disc's diameter in pixels: the height of the pill textures.
@@ -357,6 +375,20 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
                 .map_err(err("orb picture material"))?;
         }
     }
+    // Eggs-ercise's target (rc.14): the plugin's own picture (tools/draw_egg_target.py), BC7 sRGB as the item icons (16 KB;
+    // its flat rings keep their colours); its own material from the orbs' template (the template's wrap modes, HB-PILLS),
+    // and a white vertex colour. The break's cracked picture and the placing cursor the same way; each pane of a pool
+    // (`panes::EGG_POOLS`) binds its picture's material.
+    for (texture, file) in egg_pictures() {
+        let picture = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/egg-target").join(file);
+        import_png_file(&mut bntx, texture, &picture, &options).map_err(err("import egg picture"))?;
+        layout.add_texture_ref(texture);
+        layout.add_material_from_template(&orb_template, texture, Some(texture)).map_err(err("egg material"))?;
+    }
+    for k in 0..panes::EGG_PANES {
+        let edit = PaneEdit { bind_material: Some(egg_picture_of(k).into()), ..Default::default() };
+        layout.set_pane(panes::name_of(panes::IDX_EGG + k).as_str(), &edit).map_err(err("egg picture material"))?;
+    }
     // The floppy and the loop. The panes are white; the runtime tints them.
     import_recording_icons(&mut bntx)?;
     add_recording_icon_materials(&mut layout, waiting)?;
@@ -398,6 +430,7 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
         "panes_added": specs.len() + usize::from(waiting),
         "item_icons": panes::ITEM_ICONS,
         "recording_icons": [SAVE_TEXTURE, REPEAT_TEXTURE],
+        "egg_pictures": egg_pictures().map(|(texture, _)| texture),
     });
     std::fs::write(format!("{out}/report.json"), serde_json::to_string_pretty(&report).unwrap() + "\n")
         .map_err(err("write report"))?;
@@ -580,11 +613,11 @@ mod tests {
         let training = layout_specs(false);
         let waiting = layout_specs(true);
         assert_eq!(training.len(), waiting.len());
-        let orbs = panes::name_of(panes::IDX_ORBS);
+        let under_all: Vec<_> = std::iter::once(panes::IDX_ORBS).chain(panes::IDX_EGG..panes::IDX_EGG + panes::EGG_PANES).map(panes::name_of).collect();
         let mut roots = 0;
         for (a, b) in training.iter().zip(&waiting) {
             assert_eq!(a.name, b.name);
-            if a.parent == panes::Name::new("RootPane") && a.name != orbs {
+            if a.parent == panes::Name::new("RootPane") && !under_all.contains(&a.name) {
                 assert_eq!(b.parent, WAITING_PORT);
                 roots += 1;
             } else {
@@ -596,6 +629,29 @@ mod tests {
             assert_eq!(waiting[root].parent, WAITING_PORT);
         }
         assert_eq!(waiting[panes::IDX_ORBS].parent, panes::Name::new("RootPane"), "the orbs stay under RootPane, drawn first");
+        for egg in panes::IDX_EGG..panes::IDX_EGG + panes::EGG_PANES {
+            assert_eq!(waiting[egg].parent, panes::Name::new("RootPane"), "the practice games' pictures too");
+        }
+    }
+
+    #[test]
+    fn egg_pools_tile_the_egg_panes_and_bind_their_pictures() {
+        let mut next = 0;
+        for (first, count) in panes::EGG_POOLS {
+            assert_eq!(first, next, "pools are contiguous, in EggPicture order");
+            next += count;
+        }
+        assert_eq!(next, panes::EGG_PANES);
+        assert_eq!(panes::COUNT, panes::IDX_EGG + panes::EGG_PANES, "the egg panes are the table's last");
+        let names: Vec<_> = (0..panes::EGG_PANES).map(|k| panes::name_of(panes::IDX_EGG + k)).collect();
+        assert_eq!([names[0].as_str(), names[9].as_str()], ["tr_egg_00", "tr_egg_09"]);
+        assert_eq!([names[10].as_str(), names[11].as_str(), names[12].as_str()], ["tr_eggcr_00", "tr_eggcr_01", "tr_egg_cursor"]);
+        let table = egg_pictures();
+        for (pool, (first, count)) in panes::EGG_POOLS.into_iter().enumerate() {
+            for k in first..first + count {
+                assert_eq!(egg_picture_of(k), table[pool].0, "pane {k}");
+            }
+        }
     }
 }
 

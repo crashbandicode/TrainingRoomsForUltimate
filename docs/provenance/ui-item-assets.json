@@ -244,6 +244,30 @@
       "transform": "stage file + rc.13 append (icon 38, Wario: Bike)",
       "stage_sha256": "8fbed7ab430130d87bf6761994f6b06e911e038148d2d9e9378033ce6f870887",
       "origin": "rc.13, ours-new, Eden capture d2-bikeicon-1 + background subtraction (the primary 05:24Z 11-14: the render_item.py work dir no longer exists)"
+    },
+    {
+      "source": null,
+      "destination": "assets/egg-target/target.png",
+      "sha256": "450b29bfc1b75d50dcb068d3a5788a8673bb7a68f420ce85c9cae97e56cbdd4b",
+      "transform": "drawn by tools/draw_egg_target.py",
+      "drawn_by": "tools/draw_egg_target.py",
+      "origin": "rc.14, ours-new, Eggs-ercise's target drawn from circles by tools/draw_egg_target.py (no source picture is read, traced or sampled; the primary 12:47Z 11-14)"
+    },
+    {
+      "source": null,
+      "destination": "assets/egg-target/cracked.png",
+      "sha256": "c3d5a6d6caa7bcb3fb6551c7d15dc07cf0858a5be165e5b2e8e5bc123c8f355d",
+      "transform": "drawn by tools/draw_egg_target.py",
+      "drawn_by": "tools/draw_egg_target.py",
+      "origin": "rc.14, ours-new, the target's break frame: the same circles cut into six pushed-apart wedges by tools/draw_egg_target.py (no source picture is read, traced or sampled; the primary 13:12Z 11-14)"
+    },
+    {
+      "source": null,
+      "destination": "assets/egg-target/cursor.png",
+      "sha256": "86e95a7bc00e0c885490f1c34b5439ba1f8de8c26b000f12b12852855eb9852f",
+      "transform": "drawn by tools/draw_egg_target.py",
+      "drawn_by": "tools/draw_egg_target.py",
+      "origin": "rc.14, ours-new, the placing cursor of Break the Targets (SPEC v2: B-2 draws it): a crosshair of rings, bars and a dot drawn by tools/draw_egg_target.py (no source picture is read, traced or sampled)"
     }
   ]
 }

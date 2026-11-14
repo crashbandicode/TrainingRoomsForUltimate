@@ -3,6 +3,8 @@
 Stage m5q; identity copies, no image edits. All sources are `ours-new`.
 rc.13 adds `icon-38.png` (Wario: Bike), an Eden capture cut out by background subtraction, and appends its
 entry to `sources.json` (the stage file's digest is kept as `stage_sha256`).
+rc.14 adds `assets/egg-target/target.png` (Eggs-ercise's target), `cracked.png` (its break frame) and
+`cursor.png` (the placing cursor), drawn by `tools/draw_egg_target.py`.
 
 | Source | Destination | SHA256 | Transform |
 | --- | --- | --- | --- |
@@ -46,3 +48,6 @@ entry to `sources.json` (the stage file's digest is kept as `stage_sha256`).
 | `scripts/item-icons/assets/icon-37.png` | `assets/item-icons/icon-37.png` | `9bf26f635d1ff93720cbe7d3b06c808c909d62363780ab51113ec9fe72bf1bef` | identity |
 | `rc.13 Eden capture` | `assets/item-icons/icon-38.png` | `16a29d86e9f1c7d88e72468b6ed2ca7bebab1c2510bb5c0c5da9e33a90e6bc03` | rc.13 Eden capture |
 | `scripts/item-icons/assets/sources.json` | `assets/item-icons/sources.json` | `cbb528d2fb431efa50f981184a39eb074c3a1617ec6bc8e31f48e4188a475b67` | stage file + rc.13 append (icon 38, Wario: Bike) |
+| `tools/draw_egg_target.py` | `assets/egg-target/target.png` | `450b29bfc1b75d50dcb068d3a5788a8673bb7a68f420ce85c9cae97e56cbdd4b` | drawn by tools/draw_egg_target.py |
+| `tools/draw_egg_target.py` | `assets/egg-target/cracked.png` | `c3d5a6d6caa7bcb3fb6551c7d15dc07cf0858a5be165e5b2e8e5bc123c8f355d` | drawn by tools/draw_egg_target.py |
+| `tools/draw_egg_target.py` | `assets/egg-target/cursor.png` | `86e95a7bc00e0c885490f1c34b5439ba1f8de8c26b000f12b12852855eb9852f` | drawn by tools/draw_egg_target.py |
