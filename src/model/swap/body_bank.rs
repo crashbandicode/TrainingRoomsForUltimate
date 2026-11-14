@@ -1751,6 +1751,41 @@ pub fn cold_left(over: &mut [Cold], live: u32) -> Option<u32> {
     over.iter().find(|(kind, seen)| *seen && *kind != live).map(|(kind, _)| *kind)
 }
 
+/// rc.14 cycle fix (Eden cf-p4-y1 `cf-k1-laps`): the cold fighters' allowance over Ready Fighters, the marks of a cold
+/// fighter on screen (`live`) or still loading (not yet seen). A mark seen and left whose release has not run yet holds
+/// nothing over (it kept Gap 1's shrink from firing).
+pub fn cold_allowance(over: &[Cold], live: Option<u32>) -> usize {
+    over.iter().filter(|(kind, seen)| !*seen || live == Some(*kind)).count()
+}
+
+/// rc.14 cycle fix (Eden cf-p4-y1): while a cold mark exists the bank's lifecycle ticks, so `cold_left` sees the fighter
+/// on screen and `cold_release` frees it on the switch away; with every group Built the bank had no other work, never
+/// ticked, and the cold fighter stayed resident for good.
+pub fn cold_marks_tick(over: &[Cold]) -> bool {
+    !over.is_empty()
+}
+
+/// rc.14 (Eden a1-be759456-y2 #4345-#4348, the crash of a kept Mii group's warm attach): what a role's held module pins
+/// do on a service tick. The pins of the groups a target-first Reload kept go only with the new bank Ready (`Settle`:
+/// R gets each kind's node back, `0x17e4900`, then the pins go) or with the bank gone (`Drop`: absent, departed or
+/// retired, its groups with it). A tick whose entry or owner is not the bank's leaves them (`Wait`): there, 9 ms into a
+/// Reload out of a Pyra window, such a tick dropped them with no re-request, the kept kinds' modules lost their last
+/// reference with R's NRO tree (loader state 3), and the warm attach called into the unloaded Mii module (Unmapped
+/// Read64 via `lua2cpp_common` +0x148c, `ldr x8,[x8,#0x70]`, then a jump to 0). `bank`: (phase, departed, this tick
+/// matches the bank's entry and owner).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PinStep { Wait, Settle, Drop }
+
+pub fn pin_step(bank: Option<(Phase, bool, bool)>) -> PinStep {
+    match bank {
+        None | Some((_, true, _)) => PinStep::Drop,
+        Some((_, false, false)) => PinStep::Wait,
+        Some((Phase::Ready, false, true)) => PinStep::Settle,
+        Some((Phase::Retired, false, true)) => PinStep::Drop,
+        Some(_) => PinStep::Wait,
+    }
+}
+
 /// rc.14 cycle fix, Gap 1 (Eden cf-p3-y2: Ready Fighters lowered from 8 to 6 left the CPU at 7 bodies, "Ready 7/7", so
 /// no fighter was cold; the primary 2026-11-14 ~23:12Z on the operator's rule "what doesn't fit stays cold and what dos
 /// stays hot"): while both roles' resident bodies exceed Ready Fighters plus the cold fighters' own allowance
@@ -3934,6 +3969,31 @@ mod tests {
         assert_eq!(shrink_release([(1, 2, 2)], 7, 8), None, "it fits");
     }
 
+    /// Eden a1-be759456-y2 #4345-#4348: the kept groups' module pins stay until the new bank is Ready on its own entry;
+    /// a tick that isn't the bank's (the one that dropped them 9 ms into a Reload out of a Pyra window) waits.
+    fn kept_groups_keep_their_modules_until_the_new_bank_is_ready() {
+        assert_eq!(pin_step(Some((Phase::Building, false, false))), PinStep::Wait, "another entry's tick mid-Reload");
+        assert_eq!(pin_step(Some((Phase::Ready, false, false))), PinStep::Wait, "another entry's tick after Ready");
+        assert_eq!(pin_step(Some((Phase::Building, false, true))), PinStep::Wait);
+        assert_eq!(pin_step(Some((Phase::Changing, false, true))), PinStep::Wait);
+        assert_eq!(pin_step(Some((Phase::Idle, false, true))), PinStep::Wait);
+        assert_eq!(pin_step(Some((Phase::Ready, false, true))), PinStep::Settle, "R gets the nodes back, then they go");
+        assert_eq!(pin_step(Some((Phase::Retired, false, true))), PinStep::Drop, "a canonical replacement took the groups");
+        assert_eq!(pin_step(Some((Phase::Building, true, false))), PinStep::Drop, "departed");
+        assert_eq!(pin_step(None), PinStep::Drop);
+    }
+
+    /// Eden cf-p4-y1 `cf-k1-laps` / `cf-shrink`: a cold mark keeps the lifecycle ticking, and only a cold fighter on screen
+    /// or still loading holds a body over Ready Fighters.
+    fn a_cold_mark_ticks_the_lifecycle_and_a_left_one_holds_nothing_over() {
+        assert!(cold_marks_tick(&[(KROOL, false)]));
+        assert!(!cold_marks_tick(&[]));
+        assert_eq!(cold_allowance(&[(KROOL, false)], Some(DIDDY)), 1, "loading");
+        assert_eq!(cold_allowance(&[(KROOL, true)], Some(KROOL)), 1, "on screen");
+        assert_eq!(cold_allowance(&[(KROOL, true)], Some(DIDDY)), 0, "seen and left: its release is due, nothing over");
+        assert_eq!(cold_allowance(&[(KROOL, true), (GANONDORF, false)], Some(KROOL)), 2);
+    }
+
     /// k = 0: the same lap at Ready Fighters 10 fits whole: every press is warm and nothing is loaded or freed.
     fn a_lap_that_fits_is_all_warm() {
         let laps = run_laps(&[FALCO, GUNNER, PICHU, DIDDY, KROOL], 10);
@@ -4046,6 +4106,8 @@ mod tests {
             ("a_cold_mii_fighter_is_loaded_by_its_waiting_press", a_cold_mii_fighter_is_loaded_by_its_waiting_press as fn()),
             ("lowering_ready_fighters_frees_the_farthest_groups_until_the_total_fits", lowering_ready_fighters_frees_the_farthest_groups_until_the_total_fits as fn()),
             ("a_press_out_of_a_live_mii_waits_for_its_group_s_background_build", a_press_out_of_a_live_mii_waits_for_its_group_s_background_build as fn()),
+            ("kept_groups_keep_their_modules_until_the_new_bank_is_ready", kept_groups_keep_their_modules_until_the_new_bank_is_ready as fn()),
+            ("a_cold_mark_ticks_the_lifecycle_and_a_left_one_holds_nothing_over", a_cold_mark_ticks_the_lifecycle_and_a_left_one_holds_nothing_over as fn()),
             ("a_lap_that_fits_is_all_warm", a_lap_that_fits_is_all_warm as fn()),
             ("a_cold_fighter_takes_one_body_over_only_while_it_is_on_screen", a_cold_fighter_takes_one_body_over_only_while_it_is_on_screen as fn()),
             ("a_group_leaves_when_a_member_left_the_cycle_and_its_slot_is_reused", a_group_leaves_when_a_member_left_the_cycle_and_its_slot_is_reused as fn()),

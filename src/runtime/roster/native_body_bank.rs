@@ -571,6 +571,8 @@ static NEIGHBOURS: [AtomicU64; 2] = [AtomicU64::new(u64::MAX), AtomicU64::new(u6
 
 /// rc.12 (a′): per role, the target of the last window plan when it was target-first (`proposed`), `u32::MAX` otherwise.
 static TARGET_FIRST: [AtomicU32; 2] = [AtomicU32::new(u32::MAX), AtomicU32::new(u32::MAX)];
+/// rc.14: the module pins' "not the bank's tick" line is written once per held set (`service`).
+static PIN_WAIT_NOTED: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
 
 /// rc.12 (a′): while `submit` issues a role's target-first Reload, its target (`u32::MAX` otherwise): `retire_groups`
 /// keeps the detached groups `body_bank::kept_across_reload` admits and `build` carries them into the new bank.
@@ -989,7 +991,7 @@ fn shrink_to_ready(settings: &crate::engine::preload::cycle_preload_config::Sett
         let state = BANKS[role].lock();
         let Some(bank) = state.as_ref().filter(|b| !b.departed && b.phase != Phase::Retired) else { continue; };
         bodies += extra_bodies(bank);
-        allowed += bank.over.len();
+        allowed += crate::engine::swap::body_bank::cold_allowance(&bank.over, bank.observed.map(|(_, live)| live));
         if bank.phase != Phase::Ready || bank.swap.is_some() { continue; }
         for (index, g) in bank.groups.iter().enumerate() {
             let kinds = &g.members.kinds()[..g.members.count()];
@@ -3142,16 +3144,26 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
         // every detached group must already be gone.
         if observed.loader == 0 { retire_groups(entry, owner, "reload"); }
     }
-    // rc.13 (a′) proper: the kept groups' module pins go once the new bank is Ready (R has their nodes again).
+    // rc.13 (a′) proper: the kept groups' module pins go once the new bank is Ready (R has their nodes again), or with
+    // the bank gone; rc.14 (Eden a1-be759456-y2 #4348): never on a tick that isn't the bank's (`body_bank::pin_step`).
     if module_pins::held(role) {
-        let phase = match BANKS[role].lock().as_ref() {
-            Some(b) if b.entry == entry as usize && b.owner == owner && !b.departed => b.phase,
-            _ => Phase::Retired,
-        };
-        match phase {
-            Phase::Building | Phase::Changing => {}
-            Phase::Ready => module_pins::settle(role, resource(BASE.load(Ordering::Acquire), owner)),
-            _ => module_pins::settle(role, None),
+        let bank = BANKS[role].lock().as_ref()
+            .map(|b| (b.phase, b.departed, b.entry == entry as usize && b.owner == owner, b.entry, b.owner));
+        match crate::engine::swap::body_bank::pin_step(bank.map(|(phase, departed, ours, _, _)| (phase, departed, ours))) {
+            crate::engine::swap::body_bank::PinStep::Settle => {
+                PIN_WAIT_NOTED[role].store(false, Ordering::Release);
+                module_pins::settle(role, resource(BASE.load(Ordering::Acquire), owner));
+            }
+            crate::engine::swap::body_bank::PinStep::Drop => {
+                PIN_WAIT_NOTED[role].store(false, Ordering::Release);
+                module_pins::settle(role, None);
+            }
+            crate::engine::swap::body_bank::PinStep::Wait => if let Some((phase, _, false, bank_entry, bank_owner)) = bank {
+                if !PIN_WAIT_NOTED[role].swap(true, Ordering::AcqRel) {
+                    trace!("[GroupSwap] module pins held role={} entry={:p} owner={}: not the bank's tick (entry={:#x} owner={} phase={:?}); they wait for its Ready",
+                        role, entry, owner, bank_entry, bank_owner, phase);
+                }
+            },
         }
     }
     if PAIR_ENABLED.load(Ordering::Acquire) && observed.loader == 0 { pair_teardown(entry, "reload"); }
@@ -3340,7 +3352,9 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
                 else if bank.object_fetch.is_some() || rearm_candidate(BASE.load(Ordering::Acquire), bank).is_some() { Action::Lifecycle }
                 else if bank.prefetch.is_some()
                     || bank.groups.iter().any(|g| g.state.startable() || (g.leaving && (!leaves_at_pause(g.state) || g.release_now)))
-                    || background_candidate(bank, Some(members.kinds()[usize::from(index)])).is_some() {
+                    || background_candidate(bank, Some(members.kinds()[usize::from(index)])).is_some()
+                    // rc.14 (Eden cf-p4-y1): a cold mark ticks the lifecycle, so the cold fighter is seen and freed.
+                    || crate::engine::swap::body_bank::cold_marks_tick(&bank.over) {
                     Action::Lifecycle
                 } else { Action::SyncCopies };
         }
