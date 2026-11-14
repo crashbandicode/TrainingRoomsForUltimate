@@ -95,6 +95,19 @@ fn a_hit_that_cannot_be_told_has_no_label() {
     // Candidates that agree are still a label: 13 and 12.8 are both Sour, and the tip's ratio (0.91) is below the window.
     assert_eq!(attribute(13.0 * M, &p(&[18.0, 13.0, 12.8]), 0.0), Some(Spot::Sour));
 }
+/// Captain Falcon's forward air as the first Eden boot logged it (spots-4e9f91b5-1): the knee's three phases, damages 14 and 18, then 8 and 9,
+/// then 3. The final build's window reads each hit the way the game made it (a fresh hit is 1.26 times the damage).
+fn the_falcon_knee_hits_eden_logged() {
+    let knee = p(&[14.0, 18.0, 18.0]);
+    assert_eq!(attribute(22.68, &knee, 0.0), Some(Spot::Sweet), "18 x 1.26");
+    assert_eq!(attribute(17.64, &knee, 0.0), Some(Spot::Sour), "14 x 1.26; the 18s' ratio is 0.98");
+    let middle = p(&[8.0, 9.0, 8.0, 9.0]);
+    assert_eq!(attribute(8.736, &middle, 0.0), Some(Spot::Sour), "8 x 1.092 (stale); the 9s' ratio is 0.97");
+    assert_eq!(attribute(10.08, &middle, 0.0), None, "8 x 1.26 or 9 x 1.12: no label");
+    // The last frames: 3 and 3 after the 18 of the same action are Late; a lone 3 on its own has no label.
+    assert_eq!(attribute(3.213, &p(&[3.0, 3.0]), 18.0), Some(Spot::Late));
+    assert_eq!(attribute(3.213, &p(&[3.0, 3.0]), 0.0), None);
+}
 /// Slot `i` is active when `0[i]` is `Some(damage)`; its `AttackData` is at `0x1000 * (i + 1)`. Reading an inactive slot panics.
 struct Slots([Option<f32>; SLOTS]);
 
@@ -201,6 +214,7 @@ fn case_table() {
         ("a_hit_is_attributed_by_the_damage_it_added", a_hit_is_attributed_by_the_damage_it_added as fn()),
         ("staling_and_multipliers_cancel_in_the_ratio", staling_and_multipliers_cancel_in_the_ratio as fn()),
         ("a_hit_that_cannot_be_told_has_no_label", a_hit_that_cannot_be_told_has_no_label as fn()),
+        ("the_falcon_knee_hits_eden_logged", the_falcon_knee_hits_eden_logged as fn()),
         ("the_powers_of_a_fighter_are_read_from_its_active_slots_only", the_powers_of_a_fighter_are_read_from_its_active_slots_only as fn()),
         ("the_hit_spheres_take_the_frame_data_colours", the_hit_spheres_take_the_frame_data_colours as fn()),
         ("one_function_chooses_every_tint", one_function_chooses_every_tint as fn()),
