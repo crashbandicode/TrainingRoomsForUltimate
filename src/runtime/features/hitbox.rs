@@ -117,7 +117,10 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     let plan = run.plan(rows, seed, entry, scene::facts);
     // V2.6: the CPU is hidden while a practice game runs and `CPU during a game` says Hide, unless it is the target.
     let hide = PRACTICE_HIDE.load(Ordering::Acquire) && !run.cpu_target();
-    super::hide_cpu::hide(run.running() && hide);
+    let running = run.running();
+    super::hide_cpu::hide(running && hide);
+    // The standing notice sits in the top band while the game runs (the operator, 11-14).
+    super::notices::raise(super::notices::RAISE_EGGS, running);
     if plan == eggs::Plan::Clear {
         super::notices::clear(NOTICE_ID);
     }

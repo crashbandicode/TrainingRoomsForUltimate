@@ -192,6 +192,9 @@ unsafe fn write_notice(container: *mut Pane, out: &TickOut) {
         return;
     }
     pane::set_visible(container, out.visible);
+    // A practice game's notice stands in the top band (the operator, 11-14); every other notice keeps its place.
+    let y = [p::NOTICE_ORIGIN_Y, p::NOTICE_TOP_Y][usize::from(notices::raised())];
+    pane::set_pos(container, 0.0, y);
     let Some(draw) = out.draw else { return };
     let header = find(container, p::IDX_NOTICE_HEADER);
     let header_plate = find(container, p::IDX_NOTICE_HEADER_PLATE);

@@ -5,7 +5,7 @@
 
 use super::hitbox::{Sphere, KIND_HIT, SCALE};
 use super::hitbox_orbs::CANVAS_HALF;
-use super::panes::{EggLook, EggPicture, EGG_WHOLE, NOTICE_PLATES};
+use super::panes::{EggLook, EggPicture, EGG_WHOLE};
 use super::scene::{scene, Facts};
 
 pub const ROW: &str = "eggsercise";
@@ -306,27 +306,20 @@ impl Run {
     }
 
     /// A new target on the ground, launched (§2.3b): x in the stage's range cut to the screen (its radius and `DRIFT` in from the
-    /// edges), the apex under the screen's top (a lower launch otherwise), at rest clear of the notice's plates, and
-    /// `MIN_GAP` from `last`; none before the draw published the camera (a run's first one, with no `last`, waits for it to
-    /// hold still).
+    /// edges), the apex under the screen's top (a lower launch otherwise) and `MIN_GAP` from `last`; none before the draw
+    /// published the camera (a run's first one, with no `last`, waits for it to hold still). The notice sits in a top band
+    /// during a practice game (the operator, 11-14), so a target may rest anywhere on screen.
     fn spawn(&mut self, last: Option<[f32; 2]>) -> Option<()> {
         let ready = last.is_some() || self.still >= SETTLE;
         let View(s, o, range) = self.view.filter(|_| ready)?;
         let edge = |i: usize, c: f32| (c * CANVAS_HALF[i] - o[i]) / s[i] - c * RADIUS;
         let [x0, x1] = range.map(|v| v.max(edge(0, -1.0)).min(edge(0, 1.0)));
-        // The CPU target stands on the ground, still: no launch, no drift, and the notice's plates don't matter to a body.
-        let (cpu, disc) = (self.rows[3] == CPU, f32::from(self.rows[3] != CPU));
+        // The CPU target stands on the ground, still: no launch, no drift.
+        let disc = f32::from(self.rows[3] != CPU);
         let (x0, x1, y) = (x0 + DRIFT, x1 - DRIFT, self.ground + RADIUS * disc);
         let speed = SPEEDS[usize::from(self.rows[2].min(FAST))];
         let g = GRAVITY * speed * speed;
         let launch = disc * (LAUNCH * speed).min((2.0 * g * (edge(1, 1.0) - y).max(0.0)).sqrt());
-        // Ticks in the air: up and down, then the bounce.
-        let flight = 2.0 * (1.0 + BOUNCE) * launch / g;
-        let ([l, b, r, t], pad) = (NOTICE_PLATES, RADIUS * s[0]);
-        let clear = |[x, y]: [f32; 2]| {
-            let (cx, cy) = (x * s[0] + o[0], y * s[1] + o[1]);
-            cpu || cx + pad <= l || cx - pad >= r || cy + pad <= b || cy - pad >= t
-        };
         let gap = |at: [f32; 2]| last.is_none_or(|[x, y]| (at[0] - x).hypot(at[1] - y) >= MIN_GAP);
         let mut random = || {
             self.rng = 1_013_904_223u32.wrapping_add(self.rng.wrapping_mul(1_664_525));
@@ -339,7 +332,7 @@ impl Run {
         let tries = [(); 16].map(|_| pick());
         // Sixteen misses in a row: the end farther from the broken target, straight up.
         let far = last.map_or(x0, |[x, _]| if x - x0 > x1 - x { x0 } else { x1 });
-        let fits = |&(x, vx): &(f32, f32)| gap([x, y]) && clear([x + vx * flight, y]);
+        let fits = |&(x, _): &(f32, f32)| gap([x, y]);
         let (x, vx) = tries.into_iter().find(fits).unwrap_or((far, 0.0));
         (self.egg, self.age, self.fly) = (Some([x, y]), 0, [launch, vx, g]);
         Some(())

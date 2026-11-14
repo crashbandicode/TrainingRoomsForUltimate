@@ -1038,12 +1038,9 @@ pub const NOTICE_ORIGIN_Y: f32 = {
     bar_bottom - gap - (header_top + plate_pad)
 };
 
-/// A short notice's two plates (header and text, padded) on the canvas: `[left, bottom, right, top]`.
-pub const NOTICE_PLATES: [f32; 4] = {
-    let ([_, hy, w, hh], [_, ty, _, th]) = (padded(NOTICE_HEADER_BOX), padded(NOTICE_TEXT_BOX));
-    let o = NOTICE_ORIGIN_Y;
-    [-w / 2.0, o + ty - th / 2.0, w / 2.0, o + hy + hh / 2.0]
-};
+/// The notice slot's y while a practice game's notice stands (the operator, 11-14: "a, move the notice to the top"): the
+/// header plate's top edge 24 units under the top of the canvas, so the middle of the screen is free for the targets.
+pub const NOTICE_TOP_Y: f32 = 540.0 - 24.0 - (445.0 + 50.0 / 2.0 + NOTICE_PLATE_PAD);
 
 /// Pane `index`'s kind and place.
 pub const fn spec(index: usize) -> Spec {

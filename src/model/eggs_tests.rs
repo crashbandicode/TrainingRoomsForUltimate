@@ -217,14 +217,10 @@ fn eggs_respawn_distance() {
 }
 
 fn eggs_on_screen() {
-    use crate::model::panes::NOTICE_PLATES;
-    let [l, b, r, t] = NOTICE_PLATES;
-    // Measured on the same still: the plates span px 331-949 and 271-362.
-    assert!([l + 496.0, r - 496.0, b + 40.0, t - 106.0].iter().all(|d| d.abs() < 4.0), "{NOTICE_PLATES:?}");
     // Reset-center; the camera following Player 1 to the right (the box's left part off screen); zoomed out; zoomed in
     // (the apex clamped under the top).
     let views = [RESET_CENTRE, View([27.09, 27.09], [-900.0, -264.4], BOX), View([14.0, 14.0], [0.0, -300.0], BOX), View([40.0, 40.0], [0.0, -300.0], BOX)];
-    // §2.3b row 22: every spawn's whole path, at every speed, stays on screen; the resting target is clear of the notice.
+    // §2.3b row 22: every spawn's whole path, at every speed, stays on screen (the notice is in a top band: V2.4).
     for (view, speed) in views.into_iter().flat_map(|v| [NORMAL, SLOW, FAST].map(|s| (v, s))) {
         for seed in 0..60 {
             let mut run = started(FREE, ANY, seed);
@@ -240,14 +236,28 @@ fn eggs_on_screen() {
                     assert!(egg[0].abs() <= HALF_WIDTH && egg[1] >= RADIUS, "seed {seed}: {egg:?} outside the box");
                     run.step(true, 0.0, &[], false, 0);
                 }
-                let ([cx, cy], pad) = ([0, 1].map(|i| egg[i] * view.0[i] + view.1[i]), RADIUS * view.0[0] - 0.01);
-                // Zoomed in to 40, the whole on-screen ground is behind the plates: the fallback, not checked here.
-                let clear = cx + pad <= l || cx - pad >= r || cy + pad <= b || cy - pad >= t;
-                assert!(clear || view.0[0] == 40.0, "seed {seed}: {egg:?} rests behind the notice");
                 run.step(false, 0.0, &[hit(egg, 0.0)], false, 0);
             }
         }
     }
+}
+
+/// The operator, 11-14 ("a, move the notice to the top"): a practice game's notice sits in a top band, so a target may
+/// rest in the middle of the screen where the notice used to stand. Zoomed in to 40 the whole on-screen ground was
+/// behind the old plates (canvas x within 496 of the centre) and the spawn fell back to an end of the range.
+fn eggs_spawn_ignores_the_notice() {
+    let view = View([40.0, 40.0], [0.0, -300.0], BOX);
+    let mut middle = 0;
+    for seed in 0..40 {
+        let mut run = started(FREE, ANY, seed);
+        settle(&mut run, view);
+        run.step(false, 0.0, &[], false, 0);
+        for _ in 0..200 {
+            run.step(true, 0.0, &[], false, 0);
+        }
+        middle += usize::from(run.egg_at().is_some_and(|egg| (egg[0] * view.0[0]).abs() < 400.0));
+    }
+    assert!(middle > 10, "{middle} of 40 targets rested in the middle of the screen");
 }
 
 /// The height of the target above its spawn point after each of `n` ticks, and its x.
@@ -791,6 +801,7 @@ fn case_table() {
         ("eggs_hit_overlap", eggs_hit_overlap as fn()),
         ("eggs_respawn_distance", eggs_respawn_distance as fn()),
         ("eggs_on_screen", eggs_on_screen as fn()),
+        ("eggs_spawn_ignores_the_notice", eggs_spawn_ignores_the_notice as fn()),
         ("eggs_motion_normal", eggs_motion_normal as fn()),
         ("eggs_speed_scales_time", eggs_speed_scales_time as fn()),
         ("eggs_rest_and_pause", eggs_rest_and_pause as fn()),

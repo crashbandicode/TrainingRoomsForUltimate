@@ -402,8 +402,9 @@ timer.
 
 - **Values:** Off, 1 minute, 10 targets, 20 targets, Free practice
 - **Default:** Off
-- **How:** pick a mode and close the menu: the first target appears and the notice shows the count. The clock runs
-  while the game runs; pausing or opening the menu stops it.
+- **How:** pick a mode and close the menu: the first target appears and the notice shows the count, in a band at the
+  top of the screen so the targets keep the middle. The clock runs while the game runs; pausing or opening the menu
+  stops it.
   - **1 minute:** the notice reads "Eggs 0   1:00" and the clock counts down. At 0:00 the targets stop and the notice
     reads "Time! 12 eggs (best 15)" for three seconds.
   - **10 targets, 20 targets:** the notice reads "Eggs 0/10   0:00.00" and the clock counts up in hundredths. The last
@@ -414,7 +415,7 @@ timer.
 To go again, press L+R+A in Training (with **L+R+A Reset** On), or open and close the menu: either one starts a new run
 from 0.
 Changing the stage starts a new run too. A fighter cycle or a save-state load keeps the run going. Off removes the
-target and the notice.
+target and the notice, and the notices are back where they were.
 
 The target is drawn by the plugin, so Hitbox Visualization can be On or Off: with it On you see your hitboxes meet the
 target. Nothing changes in the game. In the waiting room's practice only your own screen shows the target. The CPU keeps
