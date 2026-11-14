@@ -510,8 +510,26 @@ fn attack_vec3(reader: &mut impl AttackReader, at: usize) -> [f32; 3] {
     [reader.read_f32(at), reader.read_f32(at + 4), reader.read_f32(at + 8)]
 }
 
-/// Ordinary hitboxes only: no HitModule lookup or HB1 part enumeration.
+/// Ordinary hitboxes only: no HitModule lookup or HB1 part enumeration. Every hitbox is a `KIND_HIT` in its per-id colour
+/// (Eggs-ercise reads these; the visualizer's pass is `want_hits`).
 pub fn want_hitboxes(reader: &mut impl AttackReader, out: &mut [Sphere], len: &mut usize) -> u32 {
+    want_hits(reader, out, len, false)
+}
+
+/// Whether the active slot at `data` is a windbox (`legend::is_windbox`): its no-reaction byte first, the knockback only when set.
+fn slot_is_windbox(reader: &mut impl AttackReader, data: usize) -> bool {
+    use super::legend;
+    let flag = reader.read_u64(data + legend::NO_REACTION) as u8;
+    if flag == 0 {
+        return false;
+    }
+    let [a, b] = legend::KNOCKBACK_QUADS.map(|at| reader.read_u64(data + at));
+    legend::is_windbox(flag, [(a >> 32) as i32, b as i32, (b >> 32) as i32])
+}
+
+/// `want_hitboxes`, and with `wind` (the windboxes asked for: *Windboxes* or *Frame data colours* ticked) each windbox a
+/// `legend::KIND_WIND` sphere in deep blue; without it nothing more is read.
+pub fn want_hits(reader: &mut impl AttackReader, out: &mut [Sphere], len: &mut usize, wind: bool) -> u32 {
     let mut left_out = 0;
     for slot in 0..SLOTS {
         if !reader.active(slot) {
@@ -528,7 +546,8 @@ pub fn want_hitboxes(reader: &mut impl AttackReader, out: &mut [Sphere], len: &m
             a: attack_vec3(reader, data + layout::OFFSET),
             b: second_centre(attack_vec3(reader, data + layout::OFFSET2)),
         };
-        left_out += push_shape(out, len, KIND_HIT, slot as usize, &shape, hitbox_tint(slot));
+        let (kind, tint) = if wind && slot_is_windbox(reader, data) { (super::legend::KIND_WIND, super::legend::WIND) } else { (KIND_HIT, hitbox_tint(slot)) };
+        left_out += push_shape(out, len, kind, slot as usize, &shape, tint);
     }
     left_out
 }
@@ -564,6 +583,8 @@ pub const WEAK_TINT: [f32; 3] = [1.0, 0.56, 0.78];
 pub fn legend_colour(kind: u32, spot: Option<super::spots::Spot>, status: i32, usual: [f32; 3], on: bool) -> [f32; 3] {
     use super::{legend, spots::Spot};
     match (on, kind, spot) {
+        // A windbox is a windbox sphere only while the windboxes are asked for (`want_hits`): deep blue either way.
+        (_, legend::KIND_WIND, _) => legend::WIND,
         (true, KIND_HIT, Some(Spot::Sour | Spot::Late)) => WEAK_TINT,
         (true, KIND_HIT, _) => STRONG_TINT,
         (true, KIND_HURT, _) => legend::hurt_tint(status),
@@ -821,7 +842,7 @@ pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphe
         counts.dropped += left_out;
         return (counts, len);
     }
-    let mut left_out = want_hitboxes(reader, wants, &mut len);
+    let mut left_out = want_hits(reader, wants, &mut len, set.identifies_wind());
     if let Some(hurt) = hurt {
         left_out += want_hurt(hurt, wants, &mut len, set.frame_data);
     }
@@ -876,6 +897,8 @@ pub struct HandleSet {
     pending_len: usize,
     /// *Frame data colours* On: the spheres take `legend_colour`'s tints, `peak` being this fighter's action's strongest damage.
     pub frame_data: bool,
+    /// *Windboxes* ticked: the windboxes are drawn deep blue (`want_hits`) whatever else is ticked.
+    pub wind: bool,
     peak: super::spots::Peak,
 }
 
@@ -893,6 +916,7 @@ impl HandleSet {
             pending: [(Sphere::NONE, None); MAX_PENDING],
             pending_len: 0,
             frame_data: false,
+            wind: false,
             peak: super::spots::Peak::new(),
         }
     }
@@ -1014,6 +1038,12 @@ impl HandleSet {
         self.len = 0;
         self.pending_len = 0;
         self.peak = super::spots::Peak::new();
+    }
+
+    /// Whether this pass tells the windboxes apart (`want_hits`): *Windboxes* ticked, or *Frame data colours* (its legend draws
+    /// them deep blue among the hitboxes). Otherwise a windbox is an ordinary hitbox in its per-id colour.
+    pub fn identifies_wind(&self) -> bool {
+        self.wind || self.frame_data
     }
 
     /// *Frame data colours* (`legend_colour`): the spheres of `wants` take their tints when the row is On, else nothing changes.

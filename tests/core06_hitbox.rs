@@ -285,9 +285,9 @@ fn core06_training_gate() {
     // The setting (rc.14): a checklist, nothing ticked by default; the visualizer runs while a ticked item draws.
     let mut snapshot = model::settings::Snapshot::factory();
     assert!(!model::legend::draws(hitbox::shown(&snapshot)));
-    snapshot.set("hitbox_vis", &[1, 1, 1, 0, 0]).unwrap();
+    snapshot.set("hitbox_vis", &[1, 1, 1, 0, 0, 0]).unwrap();
     assert!(model::legend::draws(hitbox::shown(&snapshot)));
-    snapshot.set("hitbox_vis", &[0, 0, 0, 1, 0]).unwrap();
+    snapshot.set("hitbox_vis", &[0, 0, 0, 1, 0, 0]).unwrap();
     assert!(!model::legend::draws(hitbox::shown(&snapshot)));
 }
 
@@ -687,6 +687,16 @@ fn legend_facts_match_the_owned_elf() {
     assert_eq!(w(0x46a824), 0x2943_a10a, "ldp w10, w8, [x8, #0x1c]");
     assert_eq!(w(0x46a828), 0x0aaa_7d4a, "bic w10, w10, w10, asr #31");
     assert_eq!((w(0x46a830), w(0x46a838)), (0x1a8a_c108, 0x1a88_c120), "csel gt, csel gt");
+    // Windboxes: ATTACK takes argument 26 (`add x10, x10, #0x1a0`: the 26th value past the stack's base) and stores it as a byte at
+    // `+0x70` (`strb w11, [sp, #0x90]`, the AttackData at sp+0x20); argument 27 goes to `+0x6e` (`strb w11, [sp, #0x8e]`). The knockback
+    // words: growth, fixed and base at `+0x2c`, `+0x30`, `+0x34` (`str w0, [sp, #0x4c/0x50/0x54]`), the halves `legend::KNOCKBACK_QUADS` reads.
+    assert_eq!(legend::NO_REACTION, 0x70);
+    assert_eq!(w(0x22857fc) & 0xffff_fc00, 0x9106_8000, "add xN, xN, #0x1a0");
+    assert_eq!((w(0x2285880), w(0x2285910)), (0x3902_43eb, 0x3902_3beb), "strb w11, [sp, #0x90]; strb w11, [sp, #0x8e]");
+    assert_eq!([0x2284dac, 0x2284dc0, 0x2284dd4].map(w), [0xb900_4fe0, 0xb900_53e0, 0xb900_57e0], "str w0, [sp, #0x4c / #0x50 / #0x54]");
+    assert_eq!(legend::KNOCKBACK_QUADS, [0x28, 0x30]);
+    // The defender's DamageModule hit handler (main+0x402cc0) reads it (`ldrb w8, [x22, #0x70]`, x22 the attacker's AttackData).
+    assert_eq!([0x402e04, 0x402f70, 0x4032fc].map(w), [0x3941_c2c8; 3]);
 }
 
 /// Eggs-ercise V2.2: the stage's camera range is the camera manager's four floats (left, right, top, bottom) at `+0xc20`, read
@@ -1592,7 +1602,7 @@ impl hitbox::Effects for RequestSpy {
 #[test]
 fn core06_rc_dispatch_reads_only_attacks_and_requests_hits_and_grabs() {
     let mut snapshot = model::settings::Snapshot::factory();
-    snapshot.set("hitbox_vis", &[1, 1, 1, 0, 0]).unwrap();
+    snapshot.set("hitbox_vis", &[1, 1, 1, 0, 0, 0]).unwrap();
     let mut set = hitbox::HandleSet::new();
     let grab = sphere(hitbox::sphere_key(hitbox::KIND_GRAB, 2, 0), 4.0);
     assert!(set.push_grab(grab, None));

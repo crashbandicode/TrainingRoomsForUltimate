@@ -662,6 +662,7 @@ unsafe fn draw_articles() {
         // `key` is the live article's accessor (checked above); the natives check their own grants. Tracked: its set.
         let set = articles.track(id, key, &mut board);
         set.frame_data = shown(legend::COLOURS);
+        set.wind = shown(legend::WINDBOXES);
         let place = |s: &Sphere| natives::joint_position(key, s.joint, &s.pos);
         if !live || !orbs::article_pass(&mut board, set, key, natives::status_kind(key), &mut GameAttacks(key), place, shown(legend::ANGLES).then(|| natives::lr(key))) {
             articles.forget(id, &mut board);
@@ -730,6 +731,7 @@ pub unsafe fn frame(fighter: usize) {
     let Store { table, wants, .. } = &mut *store;
     let set = &mut table.sets[i];
     set.frame_data = shown(legend::COLOURS);
+    set.wind = shown(legend::WINDBOXES);
     // Own orbs (decision HB-OWN-ORBS): while the setting is On the pass reads the HitModule (the relied `hurtbox_*` rows) and
     // plans the enabled parts' hurt spheres into the same wants as the hit spheres; `OrbSink` holds every one (never
     // refused). The reader is constructed only here, behind `enabled`: Off — and the stop paths the dispatch takes first —

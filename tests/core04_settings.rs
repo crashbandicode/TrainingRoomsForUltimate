@@ -115,7 +115,7 @@ fn core04_unknown_keys_kept_on_rewrite() {
                     assert!(!after.contains_key(key), "{key} should be dropped");
                 } else if key == "hitbox_vis" {
                     // rc.14: the two-option row comes back as the checklist (`legend::migrate`, `legend_old_hitbox_vis_migrates`).
-                    assert_eq!(after.get(key).and_then(Value::as_array).map(Vec::len), Some(5), "{snapshot}.{key}");
+                    assert_eq!(after.get(key).and_then(Value::as_array).map(Vec::len), Some(6), "{snapshot}.{key}");
                 } else {
                     assert_eq!(after.get(key), Some(value), "{snapshot}.{key}");
                 }

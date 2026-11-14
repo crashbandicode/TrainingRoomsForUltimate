@@ -13,8 +13,8 @@
 //! fighter's orbs on the `Board`; the layout tick projects them with the game's own `world_to_screen` and plans each
 //! orb's pill (`plan_pill`). Pure and host-tested (`tests/core06_orbs.rs`).
 
-use super::hitbox::{want_hitboxes, AttackReader, Effects, HandleSet, Sphere, FIGHTER_SETS, KIND_HIT, KIND_HURT, MAX_HELD, SCALE, SLOTS};
-use super::legend::{self, KIND_MARK};
+use super::hitbox::{want_hits, AttackReader, Effects, HandleSet, Sphere, FIGHTER_SETS, KIND_HIT, KIND_HURT, MAX_HELD, SCALE, SLOTS};
+use super::legend::{self, KIND_MARK, KIND_WIND};
 
 /// One fighter's orbs on the board: its spheres' and, with *Launch angles* On, up to two marks per hitbox.
 pub const BOARD_ORBS: usize = MAX_HELD + 2 * SLOTS as usize;
@@ -171,7 +171,7 @@ impl Board {
 }
 
 /// `set`'s spheres as orbs on their bones (`place`) into `out`, then, while *Launch angles* is On (`lr`: the owner's facing), each
-/// hitbox's marks (`legend::marks`) at its slot's angle (`angle(slot)`, `None` when the slot has no data). How many were written.
+/// hitbox's (and windbox's) marks (`legend::marks`) at its slot's angle (`angle(slot)`, `None` when the slot has no data). How many were written.
 pub fn place_orbs(set: &HandleSet, mut place: impl FnMut(&Sphere) -> Option<[f32; 3]>, lr: Option<f32>, mut angle: impl FnMut(i32) -> Option<i32>, out: &mut [Orb]) -> usize {
     let mut n = 0;
     for (slot, orb) in out.iter_mut().zip(set.spheres().filter_map(|s| place(s).map(|c| orb_of(s, c)))) {
@@ -179,7 +179,7 @@ pub fn place_orbs(set: &HandleSet, mut place: impl FnMut(&Sphere) -> Option<[f32
     }
     for i in 0..lr.map_or(0, |_| n) {
         let hit = out[i];
-        let Some(angle) = (hit.kind() == KIND_HIT && hit.key & 0xff == 0).then(|| angle(((hit.key >> 8) & 0xffff) as i32)).flatten() else { continue };
+        let Some(angle) = (matches!(hit.kind(), KIND_HIT | KIND_WIND) && hit.key & 0xff == 0).then(|| angle(((hit.key >> 8) & 0xffff) as i32)).flatten() else { continue };
         for mark in legend::marks(&hit, angle, lr.unwrap_or(1.0)).into_iter().flatten().take(out.len() - n) {
             (out[n], n) = (mark, n + 1);
         }
@@ -249,7 +249,7 @@ impl Articles {
 pub fn article_pass(board: &mut Board, set: &mut HandleSet, key: usize, status: i32, attacks: &mut impl AttackReader, place: impl FnMut(&Sphere) -> Option<[f32; 3]>, lr: Option<f32>) -> bool {
     let mut wants = [Sphere::NONE; MAX_HELD];
     let mut len = 0;
-    want_hitboxes(attacks, &mut wants, &mut len);
+    want_hits(attacks, &mut wants, &mut len, set.identifies_wind());
     set.tint(attacks, &mut wants[..len], status);
     set.reconcile(&wants[..len], true, &mut OrbSink { status });
     let mut orbs = [Orb::NONE; BOARD_ORBS];

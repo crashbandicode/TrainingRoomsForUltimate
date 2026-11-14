@@ -1,41 +1,62 @@
 //! The rest of Ultimate Frame Data's legend for Hitbox Visualization (rc.14; the spots lane owns strong and weak): grab boxes
-//! and the hurtboxes' states while *Frame data colours* is On, and each hitbox's launch direction while *Launch angles* is On.
-//! Windboxes keep the hit colours: the game marks no windbox, and no rule over its attack data held on Eden (the design
-//! report). Pure and host-tested; the offsets and values are the owned 13.0.5 ELF's (`tests/core06_hitbox.rs`
-//! `legend_facts_match_the_owned_elf`).
+//! and the hurtboxes' states while *Frame data colours* is On, each hitbox's launch direction while *Launch angles* is On, and
+//! the windboxes (`is_windbox`: a hitbox with knockback whose hit causes no hitstun, by the game's own no-reaction flag) in deep
+//! blue. Pure and host-tested; the offsets and values are the owned 13.0.5 ELF's (`tests/core06_hitbox.rs`
+//! `legend_facts_match_the_owned_elf`) and Eden's (the design report).
 
 use super::hitbox::sphere_key;
 use super::hitbox_orbs::Orb;
 
 /// Hitbox Visualization is one checklist (`hitbox_vis`, the operator's order of 2026-11-14 ~19:50Z): each tick draws on its own,
 /// none ticked draws nothing. The items in menu order, as bits (bit i: item i): hitboxes, grab boxes, hurtboxes, the frame data
-/// colours (applied to whatever is drawn) and the launch angles.
+/// colours (applied to whatever is drawn), the launch angles and the windboxes (the sixth, the operator ~21:28Z).
 pub const ROW: &str = "hitbox_vis";
-pub const ITEMS: usize = 5;
+pub const ITEMS: usize = 6;
 pub const HITBOXES: u8 = 1;
 pub const GRABS: u8 = 2;
 pub const HURTBOXES: u8 = 4;
 pub const COLOURS: u8 = 8;
 pub const ANGLES: u8 = 16;
+pub const WINDBOXES: u8 = 32;
 
 /// The ticked items of the row as bits.
 pub fn shown(row: &[u8]) -> u8 {
     row.iter().take(ITEMS).enumerate().fold(0, |bits, (i, v)| bits | (u8::from(*v != 0) << i))
 }
 
-/// Whether the visualizer draws anything: a box or the angles (the colours alone recolour nothing).
+/// Whether the visualizer draws anything: a box, the windboxes or the angles (the colours alone recolour nothing).
 pub fn draws(bits: u8) -> bool {
-    bits & (HITBOXES | GRABS | HURTBOXES | ANGLES) != 0
+    bits & (HITBOXES | GRABS | HURTBOXES | ANGLES | WINDBOXES) != 0
 }
 
-/// Whether an orb of `kind` (`hitbox::KIND_*`, `KIND_MARK`) shows.
+/// Whether an orb of `kind` (`hitbox::KIND_*`, `KIND_MARK`, `KIND_WIND`) shows. A windbox is a hitbox (the operator ~21:27Z):
+/// Hitboxes shows it as Windboxes does, and it is one orb either way, so it is never drawn twice.
 pub fn shows(bits: u8, kind: u32) -> bool {
-    bits & [0, HITBOXES, HURTBOXES, GRABS, ANGLES].get(kind as usize).copied().unwrap_or(0) != 0
+    bits & [0, HITBOXES, HURTBOXES, GRABS, ANGLES, HITBOXES | WINDBOXES].get(kind as usize).copied().unwrap_or(0) != 0
+}
+
+/// The windboxes' orb kind (after `KIND_MARK`): a hitbox `is_windbox` names while the windboxes are asked for (*Windboxes* or
+/// *Frame data colours* ticked); otherwise it stays a `hitbox::KIND_HIT` in its per-id colour, as before.
+pub const KIND_WIND: u32 = 5;
+/// Windboxes: deep blue (Ultimate Frame Data's legend), apart from the intangible hurtboxes' sky blue.
+pub const WIND: [f32; 3] = [0.0, 0.15, 1.0];
+/// `AttackData`'s no-reaction flag (ATTACK argument 26, a byte; `sv_animcmd::ATTACK` stores it at `main+0x2285880`). The
+/// defender's DamageModule hit handler (`main+0x402cc0`) reads it; a hit with it set leaves the target out of hitstun (Eden,
+/// the design report).
+pub const NO_REACTION: usize = 0x70;
+/// `AttackData`'s knockback words (i32: growth `+0x2c`, fixed `+0x30`, base `+0x34`), read as the two aligned quads at `+0x28`
+/// (the angle, then the growth) and `+0x30` (fixed, then base).
+pub const KNOCKBACK_QUADS: [usize; 2] = [0x28, 0x30];
+
+/// A windbox (SmashWiki's terms, the operator ~21:25Z: it pushes or pulls without hitstun; most deal no damage): the game's
+/// no-reaction flag on a hitbox with knockback (growth, fixed or base, either sign: a pull counts). Damage plays no part.
+pub fn is_windbox(no_reaction: u8, knockback: [i32; 3]) -> bool {
+    no_reaction != 0 && knockback.iter().any(|k| *k != 0)
 }
 
 /// An older two-option row (`[On, Off]`): On becomes the three boxes, Off nothing ticked. `None` for a row already a checklist.
 pub fn migrate(row: &[u8]) -> Option<[u8; ITEMS]> {
-    (row.len() == 2).then(|| if row[0] != 0 { [1, 1, 1, 0, 0] } else { [0; ITEMS] })
+    (row.len() == 2).then(|| if row[0] != 0 { [1, 1, 1, 0, 0, 0] } else { [0; ITEMS] })
 }
 /// `AttackData`'s launch angle in degrees (i32, beside `hitbox::layout`).
 pub const ANGLE: usize = 0x28;

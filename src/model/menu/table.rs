@@ -410,7 +410,7 @@ pub static ROWS: [Row; 106] = [
     // Display & Controls > On screen
     r(SCREEN, "HUD", "hud", TOGGLE, "On: the game's HUD shows as usual.\nOff: Training hides damage, pointers and off-screen bubbles."),
     r(SCREEN, "Hitbox Visualization", "hitbox_vis", Control::MultiSelect(&o::HITBOX_ITEMS),
-      "Tick what to draw. Frame data colours: Ultimate Frame Data's\ncolours. Launch angles: a line where each hit sends."),
+      "Tick what to draw. Windboxes: hits that push or pull\nwithout hitstun. Launch angles: where each hit sends."),
     r(SCREEN, "Frame Advantage", "frame_advantage", TOGGLE,
       "On: the frame advantage after each exchange is shown."),
     r(SCREEN, "Input Display", "input_display_strip", Control::Dropdown(&o::INPUT_DISPLAY),

@@ -143,7 +143,7 @@ pub static DEFS: [Def; COUNT] = [
     row!("frame_advantage", Single, 2, [1]),
     // rc.14: a checklist (`legend::ITEMS`: hitboxes, grab boxes, hurtboxes, frame data colours, launch angles), none ticked;
     // an older file's two-option row is migrated (`legend::migrate`).
-    row!("hitbox_vis", Multiple, 5, []),
+    row!("hitbox_vis", Multiple, 6, []),
     // Off, Frame strip: the frame strip (SPEC-input-06 §3.1; it replaced `input_display` and `input_display_status`).
     row!("input_display_strip", Single, 2, [1]),
     row!("hud", Single, 2, [0]),

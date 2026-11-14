@@ -146,8 +146,9 @@ impl AttackReader for Slots {
         0x1000 * (slot as usize + 1)
     }
 
-    fn read_u64(&mut self, _at: usize) -> u64 {
-        7
+    fn read_u64(&mut self, at: usize) -> u64 {
+        // Ordinary hitboxes: the no-reaction flag (`legend::NO_REACTION`) clear, so none is a windbox.
+        if at % 0x1000 == crate::model::legend::NO_REACTION { 0 } else { 7 }
     }
 
     fn read_f32(&mut self, at: usize) -> f32 {

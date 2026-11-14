@@ -37,16 +37,141 @@ fn legend_hurtbox_status_colours() {
 }
 
 #[test]
-fn legend_windboxes_keep_the_hit_colours() {
-    // Eden hbl-trace-8fadea57-1 (the design report): three 0-damage hitboxes with knockback, by their collision attribute.
-    // Ganondorf's up-tilt windbox is `collision_attr_normal`, F.L.U.D.D.'s water push `collision_attr_water`, Sing (no push,
-    // sleep) `collision_attr_sleep`. The two windboxes differ where Sing differs too, so no rule over the attack data
-    // separates them, and a 0-damage hitbox keeps the hit colours.
+fn legend_hits_keep_the_strong_and_weak_colours() {
     let usual = [0.1, 0.2, 0.3];
     for spot in [None, Some(Spot::Sweet), Some(Spot::Sour), Some(Spot::Late)] {
         let on = hitbox::legend_colour(KIND_HIT, spot, 0, usual, true);
         assert!(on == hitbox::STRONG_TINT || on == hitbox::WEAK_TINT, "{spot:?}");
     }
+}
+
+#[test]
+fn legend_windbox_is_knockback_without_hitstun() {
+    // The game's no-reaction flag (`AttackData +0x70`, ATTACK argument 26) with knockback; damage plays no part.
+    assert!(is_windbox(1, [100, 0, 0]) && is_windbox(1, [0, 30, 0]) && is_windbox(1, [0, 0, 20]));
+    assert!(is_windbox(1, [0, 0, -20]), "a pull's negative knockback counts");
+    assert!(!is_windbox(1, [0, 0, 0]), "no knockback: nothing is pushed");
+    assert!(!is_windbox(0, [100, 70, 13]), "knockback with hitstun: a hit");
+    assert_eq!(legend_colour_of_wind(), WIND);
+    // Deep blue, apart from the intangible hurtboxes' sky blue and every other legend colour.
+    for other in [hitbox::STRONG_TINT, hitbox::WEAK_TINT, HURT[0], HURT[1], HURT[2], GRAB] {
+        assert!(WIND.iter().zip(other).map(|(a, b)| (a - b).abs()).sum::<f32>() > 0.5, "{other:?}");
+    }
+}
+
+fn legend_colour_of_wind() -> [f32; 3] {
+    let colours = [false, true].map(|on| hitbox::legend_colour(KIND_WIND, None, 0, [0.1, 0.2, 0.3], on));
+    assert_eq!(colours[0], colours[1], "a windbox is deep blue whether or not Frame data colours is ticked");
+    colours[1]
+}
+
+/// Attack slots for `want_hits`: (damage, knockback growth / fixed / base, the +0x70 flag, the +0x6e flag), one point sphere each.
+struct Attacks {
+    slots: Vec<(f32, [i32; 3], u8, u8)>,
+    reads: Vec<usize>,
+}
+
+impl hitbox::AttackReader for Attacks {
+    fn active(&mut self, slot: i32) -> bool {
+        (slot as usize) < self.slots.len()
+    }
+    fn data(&mut self, slot: i32) -> usize {
+        0x1000 * (slot as usize + 1)
+    }
+    fn read_u64(&mut self, at: usize) -> u64 {
+        self.reads.push(at % 0x1000);
+        let (_, [kbg, fkb, bkb], f70, f6e) = self.slots[at / 0x1000 - 1];
+        let pair = |lo: i32, hi: i32| u64::from(lo as u32) | (u64::from(hi as u32) << 32);
+        match at % 0x1000 {
+            0x28 => pair(361, kbg),
+            0x30 => pair(fkb, bkb),
+            0x68 => u64::from(f6e) << 48,
+            0x70 => u64::from(f70),
+            _ => 0,
+        }
+    }
+    fn read_f32(&mut self, at: usize) -> f32 {
+        self.reads.push(at % 0x1000);
+        match at % 0x1000 {
+            layout::POWER => self.slots[at / 0x1000 - 1].0,
+            layout::SIZE => 2.0,
+            _ => 0.0,
+        }
+    }
+}
+
+/// F.L.U.D.D. (0 %, both flags), a damaging windbox (5 %, +0x70), Peach Bomber (12 %, +0x6e alone: hitstun), a jab (neither)
+/// and Sing-like 0 % with the flag but no knockback.
+fn cases() -> Attacks {
+    Attacks {
+        slots: vec![(0.0, [100, 70, 13], 1, 1), (5.0, [100, 0, 40], 1, 0), (12.0, [73, 0, 60], 0, 1), (2.2, [25, 0, 3], 0, 0), (0.0, [0, 0, 0], 1, 1)],
+        reads: Vec::new(),
+    }
+}
+
+#[test]
+fn legend_windboxes_by_the_flag_whatever_the_damage() {
+    let (mut out, mut len) = ([Sphere::NONE; 8], 0);
+    let mut attacks = cases();
+    assert_eq!(hitbox::want_hits(&mut attacks, &mut out, &mut len, true), 0);
+    let kinds: Vec<u32> = out[..len].iter().map(|s| s.key >> 24).collect();
+    assert_eq!(kinds, [KIND_WIND, KIND_WIND, KIND_HIT, KIND_HIT, KIND_HIT]);
+    assert!(out[..2].iter().all(|s| s.tint == WIND) && out[2..5].iter().all(|s| s.tint != WIND));
+    assert_eq!(out[..len].iter().map(|s| (s.key >> 8) & 0xffff).collect::<Vec<_>>(), [0, 1, 2, 3, 4], "one sphere a slot, its own slot");
+    // Not asked for (Hitboxes alone, no Frame data colours): today's hits in their per-id colours, the flag never read.
+    let (mut today, mut n) = ([Sphere::NONE; 8], 0);
+    let mut plain = cases();
+    hitbox::want_hits(&mut plain, &mut today, &mut n, false);
+    assert!(today[..n].iter().enumerate().all(|(i, s)| s.key == sphere_key(KIND_HIT, i, 0) && s.tint == hitbox::hitbox_tint(i as i32)));
+    assert!(!plain.reads.iter().any(|at| [0x28, 0x30, 0x70].contains(at)), "{:?}", plain.reads);
+    let (mut old, mut m) = ([Sphere::NONE; 8], 0);
+    hitbox::want_hitboxes(&mut cases(), &mut old, &mut m);
+    assert_eq!(old[..m], today[..n], "want_hitboxes (Eggs-ercise's reader) is unchanged");
+}
+
+#[test]
+fn legend_windboxes_and_hitboxes_combine() {
+    // The operator (~21:27Z): a windbox is a hitbox. Hitboxes ticked draws every hitbox, windboxes included (per-id colours, or the
+    // legend's with Frame data colours, windboxes deep blue); Windboxes ticked draws the windboxes deep blue; both ticked draw each
+    // windbox once; Windboxes alone draws only the windboxes.
+    let row = |hits: u8, wind: u8, colours: u8| shown(&[hits, 0, 0, colours, 0, wind]);
+    let drawn = |bits: u8| {
+        let mut set = HandleSet::new();
+        set.frame_data = bits & COLOURS != 0;
+        set.wind = bits & WINDBOXES != 0;
+        let (mut wants, mut len) = ([Sphere::NONE; 8], 0);
+        let mut attacks = cases();
+        hitbox::want_hits(&mut attacks, &mut wants, &mut len, set.identifies_wind());
+        set.tint(&mut attacks, &mut wants[..len], 1);
+        set.reconcile(&wants[..len], true, &mut orbs::OrbSink { status: 1 });
+        let mut out = [Orb::NONE; orbs::BOARD_ORBS];
+        let n = orbs::place_orbs(&set, |s| Some(s.pos), None, |_| None, &mut out);
+        let mut shownorbs: Vec<(u32, u32, [u8; 4])> =
+            out[..n].iter().filter(|o| shows(bits, o.kind())).map(|o| ((o.key >> 8) & 0xffff, o.kind(), o.color)).collect();
+        shownorbs.sort();
+        shownorbs
+    };
+    let blue = crate::model::panes::linear([0, 38, 255, 255]);
+    let slots = |v: &[(u32, u32, [u8; 4])]| v.iter().map(|o| o.0).collect::<Vec<_>>();
+    // Hitboxes only: all five hitboxes, the windboxes in their per-id colours.
+    let hits = drawn(row(1, 0, 0));
+    assert_eq!(slots(&hits), [0, 1, 2, 3, 4]);
+    assert!(hits.iter().all(|o| o.1 == KIND_HIT && o.2 != blue));
+    // Hitboxes with Frame data colours: all five, the two windboxes deep blue, the rest the legend's red.
+    let legend = drawn(row(1, 0, 1));
+    assert_eq!(slots(&legend), [0, 1, 2, 3, 4]);
+    assert!(legend[..2].iter().all(|o| o.1 == KIND_WIND && o.2 == blue) && legend[2..].iter().all(|o| o.2 != blue));
+    // Windboxes only: just the two windboxes, deep blue.
+    let wind = drawn(row(0, 1, 0));
+    assert_eq!(slots(&wind), [0, 1]);
+    assert!(wind.iter().all(|o| o.1 == KIND_WIND && o.2 == blue));
+    // Both: every hitbox once, the windboxes deep blue among the others (per-id colours without Frame data colours).
+    let both = drawn(row(1, 1, 0));
+    assert_eq!(slots(&both), [0, 1, 2, 3, 4], "each windbox drawn once");
+    assert!(both[..2].iter().all(|o| o.2 == blue) && both[2..].iter().all(|o| o.1 == KIND_HIT && o.2 != blue));
+    // Nothing else ticked draws a windbox; its marks are the hitbox marks.
+    assert!(draws(WINDBOXES) && shows(WINDBOXES, KIND_WIND) && !shows(WINDBOXES, KIND_HIT));
+    assert!([GRABS, HURTBOXES, COLOURS, ANGLES].iter().all(|b| !shows(*b, KIND_WIND)));
 }
 fn hit(slot: usize) -> Orb {
     Orb { centre: [10.0, 5.0, 1.0], tail: [12.0, 5.0, 1.0], radius: 4.0, color: [255, 0, 0, 255], key: sphere_key(KIND_HIT, slot, 0) }
@@ -219,16 +344,18 @@ fn legend_checklist_items_draw_independently() {
     assert!(!shows(lines, KIND_GRAB) && !shows(lines, KIND_HURT));
     // The angles alone draw their lines without the discs; every tick has its own bit.
     assert!(draws(ANGLES) && shows(ANGLES, KIND_MARK) && !shows(ANGLES, KIND_HIT));
-    assert_eq!(bits(&[1; ITEMS]), HITBOXES | GRABS | HURTBOXES | COLOURS | ANGLES);
+    assert_eq!(bits(&[1; ITEMS]), HITBOXES | GRABS | HURTBOXES | COLOURS | ANGLES | WINDBOXES);
+    assert_eq!(ITEMS, 6, "Windboxes is the sixth item");
 }
 
 #[test]
 fn legend_old_hitbox_vis_migrates() {
-    assert_eq!(migrate(&[1, 0]), Some([1, 1, 1, 0, 0]), "On: the three boxes, as before");
+    assert_eq!(migrate(&[1, 0]), Some([1, 1, 1, 0, 0, 0]), "On: the three boxes, as before (windboxes among the hitboxes)");
     assert_eq!(migrate(&[0, 1]), Some([0; ITEMS]), "Off: nothing ticked");
     assert_eq!(migrate(&[1, 0, 0, 0, 1]), None, "a checklist stays as it is");
-    // Through the settings file: an older file's On comes back as the three boxes, its Off as none; the default is none.
-    for (old, want) in [("[1, 0]", [1, 1, 1, 0, 0]), ("[0, 1]", [0; ITEMS]), ("[0, 1, 1, 0, 1]", [0, 1, 1, 0, 1])] {
+    // Through the settings file: an older file's On comes back as the three boxes, its Off as none, a five-item checklist (an
+    // rc.14 build before Windboxes) with Windboxes unticked; the default is none.
+    for (old, want) in [("[1, 0]", [1, 1, 1, 0, 0, 0]), ("[0, 1]", [0; ITEMS]), ("[0, 1, 1, 0, 1]", [0, 1, 1, 0, 1, 0]), ("[0, 0, 0, 0, 0, 1]", [0, 0, 0, 0, 0, 1])] {
         let file = format!("{{\"menu\": {{\"{ROW}\": {old}}}, \"defaults_menu\": {{\"{ROW}\": {old}}}}}");
         let loaded = crate::model::settings::parse_bytes(file.as_bytes());
         assert!(!loaded.corrupt(), "{old}: {:?}", loaded.issues);
