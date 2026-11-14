@@ -126,6 +126,9 @@ More: CPU › [Player 1 control](../menu/cpu.md#player-1-control).
 ![The notice "P1 is controlled by an AI: recording is off" on screen while the CPU pilot plays Player 1, whose tag reads CPU Lv3](../media/rc13-pilot-refusal.png)<br>
 *While the CPU pilot plays Player 1, Record shows "P1 is controlled by an AI: recording is off". Eden, rc.13 (untested on hardware).*
 
+![The notice "P1 is controlled by an AI: Play on Player 1 is off" on screen while the CPU pilot plays Player 1, whose tag reads CPU Lv3](../media/rc13-pilot-play-refusal.png)<br>
+*While the CPU pilot plays Player 1, Play on Player 1 shows "P1 is controlled by an AI: Play on Player 1 is off". Eden, rc.13 (untested on hardware).*
+
 ## Editing the shortcuts file
 
 The two shortcuts are kept in `sd:/ultimate/TrainingRooms/button_config.ini`, not with the other settings. The menu

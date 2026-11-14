@@ -166,7 +166,7 @@ picks, such as "Selected: Up x3, In x1". Shield Tilt takes one chip only: A sele
 
 SDI also needs [SDI Strength](../menu/cpu.md#sdi-strength), which is None at first.
 
-<!-- CAPTURE-REQUEST v11-delay-stills: annotated stills of a delay row: the tick values screen, and the Min/Max handles with the ticked half greyed. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+<!-- CAPTURE-REQUEST v11-delay-stills: the tick values still is in "Delay rows" below. Still wanted: an annotated still of the Min/Max handles with the ticked half greyed. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
 ![DI Direction from nothing picked to Up x1, then SDI Direction the same: the picked chip lights at full strength, the others stay dim](../media/rc13-di-sdi-chips.gif)<br>*The DI and SDI direction grids. Eden, rc.13 (untested on hardware).*
 
@@ -199,6 +199,9 @@ A on the row opens the delay pop-up. It has two ways to set the delay:
 Only one of the two can hold a value. While values are ticked, the range is greyed ("Values are ticked: clear them
 first (Y)"); while a range is set, the values are greyed ("A range is set: clear it first (Y)"). Y clears whichever
 is set. On the page, the row reads "none", a count such as "3 selected", or a range such as "10 - 40".
+
+![Ledge Delay open on its tick values: 10, 30 and 60 ticked ("3 ticked"), the cursor on 0, the Range half greyed and "not set"](../media/rc13-delay-ticks.png)<br>
+*Ledge Delay open on its tick values, labelled: three ticked, the cursor on 0, the Range half greyed. Eden, rc.13 (untested on hardware).*
 
 ## Recordings and the CPU settings
 

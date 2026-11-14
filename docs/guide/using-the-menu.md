@@ -67,7 +67,10 @@ Each row has one kind of control. A list, checklist or editor has its own footer
 | Editor (a summary and `>`) | A opens a screen of its own, such as a portrait grid, a stage list, a library or the chord editor. |
 | Info | Read-only text. |
 
-<!-- CAPTURE-REQUEST v07-control-stills: three annotated real stills of the menu: a toggle and a list, the weighted direction chips (Up x3, In x1), and a checklist/range with its disabled half. Label the focus, the value, the help line and the footer. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![The DI Direction grid with Up x3 and In x1 set: the focused row in the breadcrumb, the weights on the chips, the help line and the footer keys, labelled](../media/rc13-menu-control-chips.png)<br>
+*The DI Direction grid with Up x3 and In x1, labelled: the focused row, the weights, the help line and the footer keys. Eden, rc.13 (untested on hardware).*
+
+<!-- CAPTURE-REQUEST v07-control-stills: the weighted direction chips still is above. Still wanted: an annotated toggle and list, and a checklist/range with its disabled half. Label the focus, the value, the help line and the footer keys. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 ## Your defaults
 
 - **X** saves every current setting, on every page, as your defaults.
