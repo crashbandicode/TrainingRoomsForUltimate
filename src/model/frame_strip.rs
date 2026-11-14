@@ -320,7 +320,8 @@ pub struct Link {
 /// Hits whose spot the strip keeps (the label panes show the newest few of them).
 pub const MARKS: usize = 8;
 
-/// One labelled hit (rc.14, SP3): the frame it connected, the lane of the fighter it hit (0 P1, 1 the CPU; that lane's hitlag block is where it is\n/// labelled, since the fighter that was hit is always in hitstop and the attacker is not always painted) and its spot.
+/// One labelled hit (rc.14, SP3): the frame it connected, the lane of the fighter it hit (0 P1, 1 the CPU; that lane's hitlag block is where it is
+/// labelled, since the fighter that was hit is always in hitstop and the attacker is not always painted) and its spot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Mark {
     pub frame: u32,
