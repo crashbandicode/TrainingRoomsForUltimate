@@ -1614,19 +1614,25 @@ pub const COLD_TO_COLD_TWO: bool = true;
 /// cold fighter on screen when it is one of `over` (the fighters already loaded over Ready Fighters; every one of them
 /// must be the one on screen, `live`). So the members that fit keep their bodies, and a fighter that doesn't fit is
 /// loaded while it is on screen; [`cold_left`] frees it after.
-pub fn cold_admitted(bodies_after: usize, ready_fighters: usize, target_bodies: usize, over: &[u32], live: u32) -> bool {
-    let cold_on_screen = over.contains(&live);
+pub fn cold_admitted(bodies_after: usize, ready_fighters: usize, target_bodies: usize, over: &[Cold], live: u32) -> bool {
+    let cold_on_screen = over.iter().any(|(kind, _)| *kind == live);
     bodies_after <= ready_fighters
-        || (COLD_OVER_ONE && target_bodies == 1 && over.iter().all(|kind| *kind == live)
+        || (COLD_OVER_ONE && target_bodies == 1 && over.iter().all(|(kind, _)| *kind == live)
             && (!cold_on_screen || COLD_TO_COLD_TWO)
             && bodies_after <= ready_fighters + 1 + usize::from(cold_on_screen))
 }
 
-/// rc.14 cycle fix: after a switch, a fighter loaded over Ready Fighters ([`cold_admitted`]) that is no longer on screen
-/// (`live`). Its unit is freed while the bodies still exceed Ready Fighters; otherwise only its mark goes (a larger Ready
-/// Fighters made room, so it now fits).
-pub fn cold_left(over: &[u32], live: u32) -> Option<u32> {
-    over.iter().copied().find(|kind| *kind != live)
+/// A fighter loaded over Ready Fighters ([`cold_admitted`]): its kind, and whether it has been on screen since. Its
+/// press plans it before the switch, while the fighter it leaves is still on screen.
+pub type Cold = (u32, bool);
+
+/// rc.14 cycle fix: on each bank tick, the fighter loaded over Ready Fighters that has been on screen and no longer is
+/// (`live`), after marking the one on screen as seen. One not yet seen is its press's target, still loading or switching
+/// (Eden `cf-p1-y1` #44857-#44880: freeing it then planned it again on every tick). Its unit is freed while the bodies
+/// still exceed Ready Fighters; otherwise only its mark goes (a larger Ready Fighters made room, so it now fits).
+pub fn cold_left(over: &mut [Cold], live: u32) -> Option<u32> {
+    for cold in over.iter_mut().filter(|(kind, _)| *kind == live) { cold.1 = true; }
+    over.iter().find(|(kind, seen)| *seen && *kind != live).map(|(kind, _)| *kind)
 }
 
 /// Operator rule 2026-11-09 16:06Z (Eden `final-surface-i3-pf-1261f56c` `x6-cc`): a parked group freed now gives its
@@ -3536,7 +3542,7 @@ mod tests {
             groups.extend(plan[1].iter().flatten().copied());
         };
         refill(window, &mut groups, 0);
-        let (mut live, mut over) = (0usize, Vec::<u32>::new());
+        let (mut live, mut over) = (0usize, Vec::<Cold>::new());
         let mut out = Laps { loads: vec![], cold: vec![], hot: vec![], over_settled: 0, over_loading: 0 };
         for _ in 0..5 {
             let mut cold = Vec::new();
@@ -3556,16 +3562,19 @@ mod tests {
                             assert!(cold_admitted(loading, ready_fighters, unit.count(), &over, lap[live]),
                                 "the cold press onto {target:#x} would Reload: {loading} bodies, over {over:x?}");
                             out.over_loading = out.over_loading.max(loading.saturating_sub(ready_fighters));
-                            if loading > ready_fighters { over.push(target); }
+                            if loading > ready_fighters { over.push((target, false)); }
                             cold.push(target);
+                            // The press plans the group while the fighter it leaves is still on screen, and the bank
+                            // ticks before the switch: nothing is freed then (Eden cf-p1-y1 freed and replanned it).
+                            assert_eq!(cold_left(&mut over, lap[live]), None, "a tick before the switch frees nothing");
                             groups.push(window);
                             window = unit;
                         }
                     }
                 }
                 live = next;
-                while let Some(kind) = cold_left(&over, lap[live]) {
-                    over.retain(|k| *k != kind);
+                while let Some(kind) = cold_left(&mut over, lap[live]) {
+                    over.retain(|(k, _)| *k != kind);
                     if bodies(window, &groups) > ready_fighters {
                         let g = groups.iter().position(|m| m.index_of(kind).is_some()).expect("the cold fighter's unit");
                         groups.remove(g);
@@ -3575,7 +3584,7 @@ mod tests {
                 refill(window, &mut groups, live);
             }
             let mut hot: Vec<u32> = std::iter::once(window).chain(groups.iter().copied())
-                .flat_map(|m| m.kinds()[..m.count()].to_vec()).filter(|kind| !over.contains(kind)).collect();
+                .flat_map(|m| m.kinds()[..m.count()].to_vec()).filter(|kind| !over.iter().any(|(k, _)| k == kind)).collect();
             hot.sort_unstable();
             out.loads.push(cold.len());
             out.cold.push(cold);
@@ -3626,12 +3635,18 @@ mod tests {
         assert!(cold_admitted(9, 8, 1, &[], DIDDY));
         assert!(!cold_admitted(9, 8, 2, &[], DIDDY), "a multi-body group is no cold fighter");
         assert!(!cold_admitted(10, 8, 1, &[], DIDDY));
-        assert!(cold_admitted(10, 8, 1, &[KROOL], KROOL), "the next cold one loads while King K. Rool is on screen");
-        assert!(!cold_admitted(10, 8, 1, &[KROOL], DIDDY), "a cold fighter off screen is freed first");
-        assert!(!cold_admitted(11, 8, 1, &[KROOL], KROOL));
-        assert_eq!(cold_left(&[KROOL], KROOL), None);
-        assert_eq!(cold_left(&[KROOL], FALCO), Some(KROOL));
-        assert_eq!(cold_left(&[KROOL, GANONDORF], GANONDORF), Some(KROOL));
+        assert!(cold_admitted(10, 8, 1, &[(KROOL, true)], KROOL), "the next cold one loads while King K. Rool is on screen");
+        assert!(!cold_admitted(10, 8, 1, &[(KROOL, true)], DIDDY), "a cold fighter off screen is freed first");
+        assert!(!cold_admitted(11, 8, 1, &[(KROOL, true)], KROOL));
+        // Eden cf-p1-y1 #44857-#44880: the press's target, planned while the fighter it leaves is on screen, is not
+        // freed before it has been on screen (it was freed and planned again on every tick).
+        let mut over = [(GUNNER, false)];
+        assert_eq!(cold_left(&mut over, FALCO), None, "not yet on screen");
+        assert_eq!(cold_left(&mut over, GUNNER), None, "on screen");
+        assert_eq!(cold_left(&mut over, PICHU), Some(GUNNER), "left");
+        let mut two = [(KROOL, true), (GANONDORF, false)];
+        assert_eq!(cold_left(&mut two, KROOL), None, "Ganondorf loads beside King K. Rool on screen");
+        assert_eq!(cold_left(&mut two, GANONDORF), Some(KROOL));
     }
 
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.

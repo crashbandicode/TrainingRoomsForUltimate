@@ -1218,6 +1218,10 @@ pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>
     let Some(bank) = state.as_mut().filter(|b| b.owner == owner && b.phase == Phase::Ready && !b.departed && b.swap.is_none())
         else { return false; };
     if bank.members.index_of(kind).is_some() { return false; }
+    // A group of this kind being freed now (a cold release a moment ago) goes first; its slot and bodies come back.
+    if bank.groups.iter().any(|g| g.leaving && g.release_now && g.state != GroupState::Released && g.members.index_of(kind).is_some()) {
+        return true;
+    }
     let mii = configuration.is_some();
     if let Some(g) = bank.groups.iter().find(|g| g.state != GroupState::Released && !g.leaving && g.members.index_of(kind).is_some()) {
         let same = if mii { g.configuration == configuration } else { g.identity.is_none() };
@@ -1244,7 +1248,7 @@ pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>
     };
     let slot = bank.groups.plan(members, identity);
     let over = bodies > ready;
-    if over { bank.over.push(kind); }
+    if over { bank.over.push((kind, false)); }
     GROUP_BODIES[role].store(bank.groups.iter().filter(|g| g.state.counts_bodies())
         .map(|g| g.members.count()).sum::<usize>().min(usize::from(u8::MAX)) as u8, Ordering::Release);
     trace!("[GroupSwap] demand owner={} group={} kinds={:x?} special={:?} bodies={} ready_fighters={} cold={}: the press waits for its own group; no Reload",
@@ -1257,8 +1261,12 @@ pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>
 /// failed group is released here (nothing native), a Prefetching one leaves after its poll, any other is marked to leave
 /// now and returned for the entry tick's teardown (`leave_group`).
 fn cold_release(bank: &mut Bank, other: usize, live: Option<u32>) -> Option<usize> {
-    let kind = crate::engine::swap::body_bank::cold_left(&bank.over, live?)?;
-    if let Some(at) = bank.over.iter().position(|k| *k == kind) { bank.over.remove(at); }
+    // A mark whose group is gone (failed, released, or its press took today's path) holds nothing over any more.
+    let gone = bank.over.iter().position(|(k, _)| Some(*k) != live && !bank.groups.iter()
+        .any(|g| g.state.counts_bodies() && g.members.index_of(*k).is_some()));
+    if let Some(at) = gone { bank.over.remove(at); }
+    let kind = crate::engine::swap::body_bank::cold_left(&mut bank.over, live?)?;
+    if let Some(at) = bank.over.iter().position(|(k, _)| *k == kind) { bank.over.remove(at); }
     let ready = usize::from(crate::runtime::roster::cycle_preload_config::snapshot().ready_fighters);
     let bodies = bodies_with(bank, other);
     let group = bank.groups.iter().position(|g| g.state != GroupState::Released && !g.leaving && g.members.index_of(kind).is_some());
@@ -2291,7 +2299,7 @@ struct Bank {
     preparing: Option<Preparing>,
     /// rc.14 cycle fix: the fighters that don't fit, loaded over Ready Fighters while on screen (`demand`); the switch
     /// away from one frees it (`cold_release`). The one on screen and the next one while it loads, at most.
-    over: FixedList<u32, 2>,
+    over: FixedList<crate::engine::swap::body_bank::Cold, 2>,
 }
 
 fn role(owner: u32) -> Option<usize> {
@@ -2531,7 +2539,7 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
         pair_logged: false, identity: None, configuration: None, ordinary_identity: None,
         activated: if keeping { activated } else { Default::default() },
         construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene: None,
-        object_fetch: None, retiring: None, preparing: None, over: FixedList::new(0),
+        object_fetch: None, retiring: None, preparing: None, over: FixedList::new((0, false)),
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
     GROUP_BODIES[role].store(kept.min(usize::from(u8::MAX)) as u8, Ordering::Release);
@@ -2626,7 +2634,7 @@ unsafe fn publish_pending(owner: u32, members: Members, scene: Option<(u32, u32)
         groups: storage.groups, alias: 0, exchange: None, swap: None, prefetch: None, swap_started: None,
         pair_logged: false, identity: None, configuration: None, ordinary_identity: None, activated: Default::default(),
         construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene,
-        object_fetch: None, retiring: None, preparing: None, over: FixedList::new(0),
+        object_fetch: None, retiring: None, preparing: None, over: FixedList::new((0, false)),
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
     GROUP_BODIES[role].store(0, Ordering::Release);
