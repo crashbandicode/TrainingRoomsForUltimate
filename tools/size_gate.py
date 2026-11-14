@@ -8,8 +8,9 @@ the lead's approval in `approved_by`; lowering a ceiling (the ratchet) needs onl
 Entries without basis are historical raw-sloc4. Only rustfmt-sloc4 entries gate the normalized count;
 first ceilings and raises are checked separately for each basis, preserving the old audit history.
 
-Prints the per-module table (depth 3), the host-only simulator and test lines the count leaves out, and each budgeted
-scope. Exit status: 0 within budget, 1 over a ceiling, 2 when the budget file breaks the rules above.
+Prints the per-module table (depth 3), the host-only simulator, test and diag-only lines the count leaves out
+(tools/sloc.py), and each budgeted scope. Exit status: 0 within budget, 1 over a ceiling, 2 when the budget file
+breaks the rules above or the counter cannot place a diag-only item.
 usage: python3 -I tools/size_gate.py [--repo DIR] [--budget FILE] [--rev REV] [--depth N]"""
 import argparse
 import collections
@@ -82,22 +83,24 @@ def run(repo, budget_path, rev=None, depth=3, out=sys.stdout):
     ceilings, errors = check_budget(entries)
     files = sloc.files_git(repo, rev) if rev else sloc.files_tree(repo)
     try:
-        per_file, sim, tests, vendored = sloc.measure_normalized(files, 0)
+        counted = sloc.measure_normalized(files, 0)
     except (OSError, ValueError, sloc.subprocess.SubprocessError) as error:
         print(f'size_gate: normalization failed: {error}', file=out)
         return 2
+    per_file = counted.impl
     modules = collections.Counter()
     for name, n in per_file.items():
         modules[sloc.group(name, depth)] += n
     total = sum(per_file.values())
-    print(f'Implementation lines (rustfmt-normalized sloc4, scripts excluded) at {rev or "the working tree"}, depth {depth}:', file=out)
+    print(f'Implementation lines (rustfmt-normalized sloc4, scripts and diag-only code excluded) at {rev or "the working tree"}, depth {depth}:', file=out)
     print(f'  Formatter: {sloc.RUSTFMT_VERSION}; edition 2021', file=out)
     for name, n in sorted(modules.items(), key=lambda kv: -kv[1]):
         print(f'  {name:44s} {n:8d}  {100 * n / max(total, 1):5.1f}%', file=out)
     print(f'  {"TOTAL":44s} {total:8d}', file=out)
-    print(f'  {"host-only simulator (not counted)":44s} {sim:8d}', file=out)
-    print(f'  {"test code excluded (files + gated items)":44s} {tests:8d}', file=out)
-    print(f'  {"third_party/ (vendored, not counted)":44s} {vendored:8d}', file=out)
+    print(f'  {"host-only simulator (not counted)":44s} {counted.sim:8d}', file=out)
+    print(f'  {"test code excluded (files + gated items)":44s} {counted.tests:8d}', file=out)
+    print(f'  {"diag-only code (not in the release build)":44s} {counted.diag:8d}', file=out)
+    print(f'  {"third_party/ (vendored, not counted)":44s} {counted.vendored:8d}', file=out)
     over = []
     print('Budget (size-budget.toml):', file=out)
     for scope in sorted(ceilings, key=lambda s: (s != 'total', s)):

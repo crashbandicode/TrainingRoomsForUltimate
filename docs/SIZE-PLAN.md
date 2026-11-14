@@ -333,3 +333,16 @@ composition; no additional normalized pending allowance has been invented.
 Operator-approved L2 retains the two hos-lock declare_interior_mutable_const
 allows. The current slim working candidate measures130570 (src127132+crates3438);
 exact-source final measurement and gates remain required.
+
+### Diag-only code is not counted (operator decision, 2026-11-14)
+
+From 2026-11-14 the count leaves out diag-only code: code compiled only with `diag` or a feature that turns it on (the
+Cargo.toml closure: `seam-drill`, `arc-probe`, `console-practice-trace`, `hang-trace` with hos-lock's `owners`,
+`plugin-heap-meter`, `named-input-trace`). `tools/sloc.py` parses each `#[cfg(...)]` predicate and evaluates it in three
+values against the release build (default features); what it cannot know (`target_os`, `deluxe-sdk`) is counted, and
+so are `cfg!`, `cfg_attr` and macro bodies. It drops items, statements, fields, variants, arms and parameters to their
+Rust extent, and whole files reached only through diag-only `mod` declarations. sloc4's test and simulator rules are
+unchanged: with no diag code the count is the same as before. The gate exits 2 when a file's remaining code no longer
+parses or a dropped item does not own whole lines. Measured (`tools/sloc.py`, before → after): rc.13 `ed0d7a35`
+147,835 → 141,975; `c5191271` 147,798 → 141,917; rc.14 integration `8d129d20` 149,316 → 143,399. The ceiling stays
+147,921. Tests: `tools/test_size_gate.py` `DiagOnly`.

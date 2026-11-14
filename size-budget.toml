@@ -1655,3 +1655,9 @@ ceiling = 147921
 date = "2026-11-12"
 reason = "rc.11 on ab82d372 (147919): the frame strip hides while the waiting room's own menu is open (model::input_delay::Owners::covers_strip +3, runtime::features::hud_draw's import -1); measured 147921 (tools/size_gate.py) against 147919, +2"
 approved_by = "operator 2026-11-12: 'the size raise is fine, go ahead' (~16:10Z, for rc.11); +2 for the operator-ordered strip fix ('we should probably fix that so that it doesn't cover the leave battle')"
+
+# 2026-11-14, operator (~19:30Z, relayed by the primary c07b3449): "account diagnostic code that won't ship". From this date
+# the count is the implementation the release build compiles: test-only code (sloc4's rules, unchanged), host-only
+# simulator code and diag-only code (compiled only with `diag` or a feature that turns it on) are excluded; host-only
+# fallbacks (`not(target_os = "switch")`, `not(feature = "deluxe-sdk")`) stay counted. tools/sloc.py, docs/SIZE-PLAN.md
+# "Diag-only code is not counted". A counting change, not a raise: the ceiling stays 147921 and no entry is added.
