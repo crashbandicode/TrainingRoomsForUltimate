@@ -54,9 +54,6 @@ pub struct MappedInputs {
 
 const _: () = assert!(core::mem::size_of::<MappedInputs>() == core::mem::size_of::<Record>());
 
-impl MappedInputs {
-}
-
 impl From<Record> for MappedInputs {
     fn from(record: Record) -> MappedInputs {
         MappedInputs {
