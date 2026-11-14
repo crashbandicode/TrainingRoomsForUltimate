@@ -10,21 +10,8 @@
 use serde_json::Value;
 
 /// The fork's item identities, in the order of its 38-item list (`choice` indexes this), and rc.13's Wario bike appended as
-/// choice 38 (every older saved choice keeps its index).
-pub const ITEM_NAMES: [&str; 39] = [
-    "Banjo & Kazooie: Grenade Egg", "Bowser Jr.: Mechakoopa",
-    "Daisy: Smile Turnip", "Daisy: Winky Turnip", "Daisy: Dot-Eyes Turnip",
-    "Daisy: Stitch-Face Turnip", "Daisy: Mr. Saturn", "Daisy: Bob-omb",
-    "Diddy Kong: Banana Peel", "Diddy Kong: Peanut", "King K. Rool: Crown",
-    "Link: Remote Bomb", "Link: Arrow", "Mega Man: Metal Blade",
-    "Pac-Man: Cherry", "Pac-Man: Strawberry", "Pac-Man: Orange", "Pac-Man: Apple",
-    "Pac-Man: Melon", "Pac-Man: Galaxian", "Pac-Man: Bell", "Pac-Man: Key",
-    "Peach: Smile Turnip", "Peach: Winky Turnip", "Peach: Dot-Eyes Turnip",
-    "Peach: Stitch-Face Turnip", "Peach: Mr. Saturn", "Peach: Bob-omb",
-    "Richter: Holy Water", "R.O.B.: Gyro", "Robin: Tome", "Robin: Levin Sword",
-    "Sheik: Burst Grenade", "Simon: Holy Water", "Snake: Hand Grenade",
-    "Toon Link: Bomb", "Villager: Wood Chip", "Young Link: Bomb", "Wario: Bike",
-];
+/// choice 38 (every older saved choice keeps its index): the item grid's own list (`model::catalog::ITEMS`), one copy.
+pub use super::super::catalog::ITEMS as ITEM_NAMES;
 
 /// What the player's fighter held when the state was saved.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
