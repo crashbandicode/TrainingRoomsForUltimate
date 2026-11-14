@@ -218,7 +218,8 @@ Drilling a sequence adds a header and a row of its combos to the helper's bar.
 - **Under the row:** the current combo's own link cells. The footer names the combo that just landed and the current
   one.
 
-<!-- CAPTURE-REQUEST rec-sequence-bar: a still of the sequence bar mid-drill (a done combo green with a check, the current white, a later one grey, the streak and best), rc.13. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![The sequence bar mid-drill: the strip above, then SEQUENCE, Jab pressure, combo 2 of 3, streak 0 and best 2; combo 1 green with a check, combo 2 white, combo 3 grey, the current combo's link cell and the footer](../media/rc13-sequence-bar.png)<br>
+*The sequence bar mid-drill: combo 1 done (green, with a check), combo 2 current (white), combo 3 later (grey), with the streak and the best. Eden, rc.13 (untested on hardware).*
 
 ### Passing and dropping
 
