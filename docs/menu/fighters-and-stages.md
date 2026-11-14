@@ -368,7 +368,9 @@ The seven entries:
 - **Ice Climbers pair groups:** while the Ice Climbers pair is in a role's slot, that role's groups stay ready. Greyed
   while Group Swap or the pair bank is Off.
 - **PT / Aegis groups:** Pokémon Trainer and Pyra / Mythra are kept ready as groups of their own. Greyed while Group
-  Swap is Off.
+  Swap is Off. Each group is kept ready whole or not at all, and it needs 3 free Ready Fighters: Ready Fighters is
+  shared with the other ready fighters, and with fewer than 3 left the group isn't made ready (it loads on the swap
+  instead), with no message on screen. The row's help line says so: "PT / Aegis groups need 3 free Ready Fighters."
 - **Ice Climbers pair group:** the Ice Climbers pair is kept ready as a group of its own. Greyed while Group Swap or
   the pair bank is Off.
 - **Mii groups:** a Mii is kept ready as a group of its own, one Mii per role at a time. Greyed while Group Swap is

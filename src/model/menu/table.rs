@@ -391,7 +391,7 @@ pub static ROWS: [Row; 92] = [
     r(LOADING, "Group Swap", "cycle_preload_group_swap", TOGGLE,
       "The master switch of the group swaps below.\nOff turns every group off."),
     r(LOADING, "Swap groups", "", Control::SwapGroups,
-      "Which swaps are done as a group. An entry is greyed,\nwith the reason, while what it needs is off."),
+      "Which swaps are done as a group. A greyed entry says why.\nPT / Aegis groups need 3 free Ready Fighters."),
     // Display & Controls > On screen
     r(SCREEN, "HUD", "hud", TOGGLE, "On: the game's HUD shows as usual.\nOff: Training hides damage, pointers and off-screen bubbles."),
     r(SCREEN, "Hitbox Visualization", "hitbox_vis", TOGGLE, "On: hitboxes, grab boxes and hurtboxes (yellow) are drawn.\nOff: nothing is drawn."),
