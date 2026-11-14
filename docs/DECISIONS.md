@@ -598,7 +598,7 @@ This records the decision only; the implementation, host tests and Eden proofs a
 
 ## Open (2026-11-13/14)
 
-Opened by the primary for the operator from the lanes' reports of 2026-11-13 (rc13-hitbox-pills: 2026-11-14). An item the operator has answered says
+Opened by the primary for the operator from the lanes' reports of 2026-11-13 (rc13-hitbox-pills and rc14-eggs: 2026-11-14). An item the operator has answered says
 **Decided** under its heading (rc13-DI-lines, rc13-memory, rc13-hitbox-pills); the rest are still open. Each item says what is being decided, the options with their cost to the player, and a recommendation. In each picture the
 recommended option has a **green outline**. The pictures are drawn by `tools/render_decisions_1113.py`
 (rc13-DI-lines: author-2's mockup as drawn; rc13-memory: `tools/render_rc13_memory.py`).
@@ -621,6 +621,15 @@ recommended option has a **green outline**. The pictures are drawn by `tools/ren
 | rc13-DI-lines | DI chips like the game's blue DI indicator (A–D rejected) | **Decided 11-13: E1 x1**, all 4 layers at today's width |
 | rc13-memory | Memory levers for TrainingRooms' share | **Decided 11-13: dropped**, no lever implemented |
 | rc13-hitbox-pills | Hitbox Visualization draws capsules as pills, not rows of discs | **Decided 11-14: pills in rc.13**, with grab boxes in their own colour |
+| rc14-eggs-D1 | Eggs-ercise: the object | (a): a TR-drawn egg; open until rc.13 ships |
+| rc14-eggs-D2 | Eggs-ercise: where eggs appear | (a): a box at the stage centre, a minimum distance from the last egg, rise-and-fall on; open |
+| rc14-eggs-D3 | Eggs-ercise: what breaks an egg | one row, default Aerials, also Any attack and 12 %+; projectiles never; open |
+| rc14-eggs-D4 | Eggs-ercise: end and scoring | (a): 1 minute and Free practice, timed in game frames, a best per fighter for the session; open |
+| rc14-eggs-D5 | Eggs-ercise: the HUD | (a): TR's standing notice; open |
+| rc14-eggs-D6 | Eggs-ercise: the CPU | (a): leave it; open |
+| rc14-eggs-D7 | Eggs-ercise: the menu place | (a): Fighters & Stages › Extras; open |
+| rc14-eggs-D8 | Eggs-ercise: where it works | (a): Training and waiting-room practice; open |
+| rc14-eggs-D9 | Eggs-ercise: restart | (a): L+R+A, and reopening the menu always works; open |
 | OP1 | Push the held doc fixes | A: push the docs now, `c49681c9` after TR5 and TR8 |
 | OP2 | The standalone `libimgui_smash.nro` on the card | A: remove it |
 | OP3 | Deluxe's hidden Stages + Counterpick page | A: show it |
@@ -946,6 +955,127 @@ the dump.
 ![rc13-hitbox-pills, P1 zoomed: the real Eden frame, today's discs redrawn from the dump, and the same capsules as pills](decisions/rc13-hitbox-pills.png)
 
 ![rc13-hitbox-pills, both fighters: the same three panels](decisions/rc13-hitbox-pills-both.png)
+
+#### rc14-eggs · Eggs-ercise mode (rc.14): nine decisions
+
+**Open: the operator decides after rc.13 ships.** Nothing of it is built; rc.13 takes no Eggs-ercise code.
+
+Opened 2026-11-14. The operator: "rc14 add an eggsercise mode that let's the user practice hitting an object to
+practice their aerial. It would be a clean room port of uncle punch's eggsercise tool in training." In UnclePunch's
+Melee Training Mode, eggs appear around the stage one at a time and you break as many as you can in one minute.
+
+The full behaviour, what is known of the Melee tool and what isn't, is in the draft spec
+(`artifacts/rc14-eggsercise/SPEC.md` in the workspace, proposed as `SPEC-input-08-eggsercise`). It is clean room: taken
+only from videos, transcripts and release-note prose; no source of the Training Mode or any fork was read. The
+pictures are integration-2's mockups from the spec; the recommended option has a green **recommended** badge. Line
+counts are rough, in the size gate's normalised lines; the size gate is not raised for this feature (the spec's D10).
+
+##### D1 · The object
+
+What the player hits.
+- **(a) A TR-drawn egg:** a white disc TR draws itself, like the hitbox orbs, tested against Player 1's attack spheres
+  that TR already reads. Nothing changes in the game, so it is safe in a waiting room. There's no hitlag on a break.
+  About 170–230 lines.
+- **(b) A real game item** spawned on the stage: real hitlag and knockback, closest to Melee. TR has no way to place an
+  item at a point today (needs new reverse engineering), and a waiting-room item might be seen by the other consoles.
+  About 220–320 lines.
+- **(c) The CPU as the target,** moved to each spot and held still: real hitlag, but a fighter-sized target, not a
+  small egg, and it fights the CPU settings, save states and swaps. About 130–180 lines.
+
+**Recommendation: (a).** The one gap, no hitlag, is open question Q1 in the spec.
+
+![rc14-eggs D1: (a) a TR-drawn egg, (b) a real item, (c) the CPU as target](decisions/rc14-eggs-D1-egg-object.png)
+
+##### D2 · Where eggs appear
+
+- **(a) A box around the stage centre:** random in a fixed width and height above the ground. The smallest; wrong on
+  very wide or off-centre stages.
+- **(b) A ring around Player 1:** always reachable, but never makes you cross the stage, as Melee does. About +10
+  lines.
+- **(c) From the stage's camera range:** the best fit per stage; TR reads no stage bounds today. About +30–60 lines and
+  reverse engineering.
+
+Each new egg keeps a minimum distance from the last one (two eggs in one hit stay possible). On appearing, the egg
+rises and falls back to its height, as in Melee.
+
+**Recommendation: (a), with the minimum distance and the rise-and-fall on.** No movement option in rc.14.
+
+![rc14-eggs D2: the spawn box on Battlefield, the minimum distance and the rise-and-fall](decisions/rc14-eggs-D2-spawn-area.png)
+
+##### D3 · What breaks an egg
+
+- **(a) Aerials only:** what the operator asked for. About +5–10 lines.
+- **(b) Any attack.** No extra lines.
+- **(c) Hits of 12 % or more,** Melee's default rule. About +15–25 lines. Ultimate's damage differs from Melee's, so
+  12 % passes a different set of moves.
+
+Projectiles never break an egg.
+
+**Recommendation: one row, "Eggs break on", default Aerials, with Any attack and Hits of 12%+ as its other values.**
+
+![rc14-eggs D3: a jab, a neutral air and a laser against each rule](decisions/rc14-eggs-D3-break-rule.png)
+
+##### D4 · End and scoring
+
+- **(a) 1 minute, and Free practice** (no timer, the count goes up).
+- **(b) 1 minute only.**
+- **(c) N eggs against the clock.**
+
+**Recommendation: (a).** The minute is counted in game frames, so a pause, the menu or a slower game speed stretch it
+the same way. At the end a notice reads "Time! 23 eggs (best 31)". The best is per fighter, for this session only;
+it isn't saved.
+
+![rc14-eggs D4: the end-of-run notice, "Time! 23 eggs (best 31)"](decisions/rc14-eggs-D4-end-of-run.png)
+
+##### D5 · The HUD
+
+- **(a) TR's standing notice,** updated in place: `Eggs 12   0:43`.
+- **(b) New panes at the top left like Melee** (a counter and a timer). Changes the layout archive; costs more.
+
+**Recommendation: (a).**
+
+![rc14-eggs D5: the notice, and greyed the Melee-style alternative](decisions/rc14-eggs-D5-hud.png)
+
+##### D6 · The CPU
+
+- **(a) Leave it:** the CPU follows the CPU page as usual; hits on it don't count. No extra lines.
+- **(b) Park it** in a corner while a run is live. About +30–50 lines.
+- **(c) Hide it** as well. About +40–60 lines.
+
+**Recommendation: (a)** for rc.14; the help says the CPU page still applies. Revisit if play in Eden shows the CPU in
+the way.
+
+![rc14-eggs D6: the CPU left, parked, hidden](decisions/rc14-eggs-D6-cpu-role.png)
+
+##### D7 · The menu place
+
+- **(a) Fighters & Stages › Extras,** after Give item: two rows, "Eggs-ercise" (Off, 1 minute, Free practice) and
+  "Eggs break on" (D3). No new editor or chord.
+- **(b) A new group** appended to the menu, such as "Practice games".
+
+**Recommendation: (a).**
+
+![rc14-eggs D7: the two rows in Fighters & Stages › Extras, with their help](decisions/rc14-eggs-D7-menu-rows.png)
+
+##### D8 · Where it works
+
+- **(a) Training and waiting-room practice,** like every other TR practice feature. The egg is drawn on this console
+  only; the others in the room see nothing.
+- **(b) Training only.**
+
+**Recommendation: (a)**, which is safe only with D1 (a).
+
+![rc14-eggs D8: the same waiting room on two consoles, the egg on one only](decisions/rc14-eggs-D8-lobby.png)
+
+##### D9 · Restart
+
+- **(a) L+R+A:** the reset also starts a new run (score 0, 1:00, a new egg).
+- **(b) Loading a save state.**
+- **(c) Reopening the menu and closing it.**
+
+**Recommendation: (a)**, and (c) always works, also with L+R+A Reset Off. A save-state load keeps the run going.
+
+![rc14-eggs D9: L+R+A starts a fresh run, "Eggs 0   1:00"](decisions/rc14-eggs-D9-restart.png)
 
 ### Other projects
 
