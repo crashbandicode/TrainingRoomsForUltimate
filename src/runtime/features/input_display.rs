@@ -185,8 +185,16 @@ pub unsafe fn sample_frame(player: usize) {
     }
     let Some(cpu) = crate::runtime::features::cpu::strip_cpu(player) else { return };
     let Some(ids) = ids() else { return };
+    let cpu_accessor = cpu;
     let p1 = sample(player, &ids, true);
     let cpu = sample(cpu, &ids, false);
+    #[cfg(feature = "diag")]
+    {
+        probe_module(0, player, &p1, cpu.damage);
+        probe_module(1, cpu_accessor, &cpu, p1.damage);
+    }
+    #[cfg(not(feature = "diag"))]
+    let _ = cpu_accessor;
     // Diag build: P1's busy frames, once per classification. Motion frame changes every frame, so it
     // is not part of the key; logging it each frame rotated practice-diagnostics.log about once a minute
     // and the row gates lost their lines (rc.5 wire-fix, 2026-11-07).
@@ -233,6 +241,63 @@ pub unsafe fn sample_frame(player: usize) {
         }
         diag_frame(&cpu, check, check_now, link);
     }
+}
+
+/// Diag build (spots-2 probe): the `AttackModule` floats that scale a hitbox's damage, read raw from the module at accessor `+0xa0` on
+/// every frame a fighter attacks or is in the side-smash family, once per change. `AttackModule::get_power` (vtable slot 0x158,
+/// `main+0x3dd580`) multiplies `AttackData.power` by the floats at `+0xf0`, `+0xf4`, `+0xe0` (then adds `+0xe4`), `+0xf8`, `+0xfc`,
+/// `+0x100`, `+0x104` and `+0x210`, and blends `+0x20c` by its float argument; the charge of a smash is one of them or none of them.
+/// The line pairs each fighter's raw floats with its status, motion frame, damage and both fighters' damage, so the Eden probe fits
+/// the damage a hit added against every candidate. Every address is type-checked first (Eden answers 0 for an unmapped read).
+#[cfg(feature = "diag")]
+fn probe_module(who: usize, accessor: usize, s: &Sample, other_damage: f32) {
+    use std::fmt;
+    /// The module offsets read: `get_power`'s floats, `+0x108` (customize ratio), `+0x1e0` (power up), `+0x208..+0x214`.
+    const OFFSETS: [usize; 20] = [0xe0, 0xe4, 0xe8, 0xec, 0xf0, 0xf4, 0xf8, 0xfc, 0x100, 0x104, 0x108, 0x10c, 0x1e0, 0x1e4, 0x208, 0x20c, 0x210, 0x214, 0x238, 0x23c];
+    struct Fields([u32; 20]);
+    impl fmt::Display for Fields {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            for (i, bits) in self.0.iter().enumerate() {
+                write!(f, "{}{:#x}={:?}", if i == 0 { "" } else { " " }, OFFSETS[i], f32::from_bits(*bits))?;
+            }
+            Ok(())
+        }
+    }
+    static LAST: Mutex<[Option<(i32, bool, bool, [u32; 20])>; 2]> = Mutex::new([None, None]);
+    let family = (0x2d..=0x2f).contains(&s.status);
+    let attacking = s.powers.iter().any(|&p| p > 0.0);
+    if accessor == 0 || !(attacking || family) {
+        return;
+    }
+    // SAFETY: a read of the live fighter's accessor field; the module pointer is checked (non-null, 8-aligned, a user address) before every field read.
+    let module = unsafe { ((accessor + 0xa0) as *const usize).read() };
+    if module < 0x1000 || module & 7 != 0 || module >> 47 != 0 {
+        return;
+    }
+    let mut bits = [0u32; 20];
+    for (slot, off) in bits.iter_mut().zip(OFFSETS) {
+        // SAFETY: inside the AttackModule object (its fields end past 0x23c), read-only.
+        *slot = unsafe { ((module + off) as *const u32).read() };
+    }
+    let key = (s.status, s.stop, attacking, bits);
+    let mut last = LAST.lock();
+    if last[who] == Some(key) {
+        return;
+    }
+    last[who] = Some(key);
+    drop(last);
+    crate::runtime::diag_log::diagnostic(format_args!(
+        "[SpotsProbe] who={} status={:#x} stop={} active={} mf={} damage={:.3} other_damage={:.3} powers={:?} fields: {}",
+        ["p1", "cpu"][who],
+        s.status,
+        s.stop,
+        attacking,
+        s.motion_frame,
+        s.damage,
+        other_damage,
+        s.powers,
+        Fields(bits)
+    ));
 }
 
 /// Diag build: the hitstun reads and every prediction checked against the free frame seen (SPEC-input-06 §4, `K`),
