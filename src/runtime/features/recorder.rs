@@ -343,12 +343,7 @@ unsafe fn on_ai_frame(ai: usize) {
     };
     if let Some(write) = control.write {
         bump(COUNT_INJECT);
-        let at = |offset: usize| (controller + offset) as *mut u32;
-        at(CTRL_BUTTONS).write(write.buttons);
-        at(CTRL_STICK_X).write(write.stick_x.to_bits());
-        at(CTRL_STICK_Y).write(write.stick_y.to_bits());
-        at(CTRL_CLAMPED_X).write(write.clamped_x.to_bits());
-        at(CTRL_CLAMPED_Y).write(write.clamped_y.to_bits());
+        write_controller(controller, write);
     }
     let role = recording_host::cpu_role_control(&ctx);
     if let Some(write) = role.write {

@@ -15,11 +15,7 @@ pub fn write(line: &InstallLine<'_>) {
     // Boot thread only, outside every hook scope (`heap_allocations` counts hook scopes): one buffer of the worst case, never grown.
     let mut buffer = vec![0u8; INSTALL_LINE_CAPACITY];
     let (text, _overflow) = render_into(&mut buffer, line);
-    skyline::logging::log(text);
-    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(storage::EVENTS_LOG_PATH) {
-        let _ = writeln!(file, "{text}");
-        let _ = file.sync_data();
-    }
+    write_text(text);
 }
 
 /// One more line in `events.log` and the Skyline log, for what installs after boot (the hooks in the

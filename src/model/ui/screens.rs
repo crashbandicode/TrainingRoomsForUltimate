@@ -62,15 +62,20 @@ fn crumb(menu: &Menu, screen: &Screen, out: &mut Text<120>) {
     };
 }
 
-fn base(menu: &Menu, screen: &Screen, frame: &mut Frame) {
+/// The page's frame with its right-hand side cleared for a sub-screen or a panel: no groups, no rows of the page, no help.
+fn cleared_page(menu: &Menu, frame: &mut Frame) {
     page_frame(menu, frame);
-    // The sub-screen owns the right-hand side: no groups, no rows of the page, its own crumb.
     frame.group_count = 0;
     frame.rows.fill(RowLine::default());
     frame.row_count = 0;
     frame.focus = None;
     frame.help = [Text::new(); 2];
     frame.hint.clear();
+}
+
+fn base(menu: &Menu, screen: &Screen, frame: &mut Frame) {
+    // The sub-screen owns the right-hand side: no groups, no rows of the page, its own crumb.
+    cleared_page(menu, frame);
     crumb(menu, screen, &mut frame.crumb);
     if let Some(row) = menu.help_row() {
         let (one, two) = row.help_lines();
@@ -367,13 +372,7 @@ const HINT_PANEL: &str = "D-pad move   A confirm   Y delete or other   B back";
 /// the focused cell and a footer of at most two lines. Drawn in the tile panes, the same ones the item grid uses, under the
 /// page's tabs; the footer is the two-line help panel.
 pub fn panel_frame<S: AsRef<str>>(menu: &Menu, title: &str, footer: &str, labels: &[S], selected: usize, frame: &mut Frame) {
-    page_frame(menu, frame);
-    frame.group_count = 0;
-    frame.rows.fill(RowLine::default());
-    frame.row_count = 0;
-    frame.focus = None;
-    frame.help = [Text::new(); 2];
-    frame.hint.clear();
+    cleared_page(menu, frame);
     let _ = write!(frame.crumb, "{}  >  {title}", menu.page().title());
     frame.view = View::Tiles;
     frame.tile_cols = PANEL_COLS as u8;
