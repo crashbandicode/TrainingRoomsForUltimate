@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 127;
+pub const COUNT: usize = 126;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -141,7 +141,9 @@ pub static DEFS: [Def; COUNT] = [
     row!("buff_state", Multiple, 18, []),
     // Misc Settings.
     row!("frame_advantage", Single, 2, [1]),
-    row!("hitbox_vis", Single, 2, [1]),
+    // rc.14: a checklist (`legend::ITEMS`: hitboxes, grab boxes, hurtboxes, frame data colours, launch angles), none ticked;
+    // an older file's two-option row is migrated (`legend::migrate`).
+    row!("hitbox_vis", Multiple, 5, []),
     // Off, Frame strip: the frame strip (SPEC-input-06 §3.1; it replaced `input_display` and `input_display_status`).
     row!("input_display_strip", Single, 2, [1]),
     row!("hud", Single, 2, [0]),
@@ -217,11 +219,8 @@ pub static DEFS: [Def; COUNT] = [
     row!("eggsercise_target", Single, 2, [0]),
     // §V2.5 Break the Targets: Off / On.
     row!("btt", Single, 2, [0]),
-    // rc.14 sweet/sour spots (SP1 to SP5): the hitbox visualizer's Frame data colours, the strip's spot labels and the combo's match, all
-    // Off by default ([On, Off], stored [0, 1]); appended like lobby_items.
-    row!("frame_data_colours", Single, 2, [1]),
+    // rc.14 sweet/sour spots (SP1 to SP5): the strip's spot labels and the combo's match, both Off by default ([On, Off], stored [0, 1]);
+    // appended like lobby_items. (Frame data colours is an item of `hitbox_vis`.)
     row!("spots_strip", Single, 2, [1]),
     row!("spots_combo", Single, 2, [1]),
-    // rc.14 hb-legend: the hitbox visualizer's Launch angles, Off by default, appended the same way.
-    row!("launch_angles", Single, 2, [1]),
 ];

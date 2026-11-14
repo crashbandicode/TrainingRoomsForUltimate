@@ -1,7 +1,7 @@
 //! The hitbox visualizer, the runtime half (SPEC-core-06; the rules are `model::hitbox`).
 //!
-//! With the `hitbox_vis` setting On, every active hitbox (by id colour), every hurtbox and every grab box of a fighter in
-//! Training is drawn with the plugin's own translucent panes (decision HB-OWN-ORBS, option 1, operator 2026-11-05: "go with
+//! With items of the `hitbox_vis` checklist ticked (rc.14, `model::legend`), the ticked kinds of a fighter's boxes in Training (every
+//! active hitbox by id colour, every hurtbox, every grab box; the frame data colours and the launch-angle marks on request) are drawn with the plugin's own translucent panes (decision HB-OWN-ORBS, option 1, operator 2026-11-05: "go with
 //! discs for all"), a capsule as one pill (decision HB-PILLS, 2026-11-14), placed on its bone and projected with the game's
 //! camera every layout tick. An article's hitboxes
 //! are own orbs too (rc.13, `draw_articles`): the game's effect sphere on a projectile lived its whole flight but never
@@ -40,6 +40,7 @@ use crate::model::hitbox::{self, layout, AttackReader, Cell, Counts, FrameFacts,
 use crate::model::panes::EggLook;
 use crate::model::hitbox_orbs::{self as orbs, Board, Orb, OrbSink};
 use crate::model::install_line::{SiteReport, Written};
+use crate::model::legend;
 use crate::model::scene::Scene;
 use crate::model::settings::Snapshot;
 use crate::model::sites_hitbox;
@@ -50,12 +51,15 @@ use crate::runtime::{scene, state_natives};
 /// Boot: the feature's closure (its rows, the Training predicate and the rows of the natives it shares) passed its guards and its
 /// three hooks are installed. The per-frame pass does nothing before.
 static INSTALLED: AtomicBool = AtomicBool::new(false);
-/// `hitbox_vis` On.
+/// `hitbox_vis` draws something (`legend::draws`).
 static SETTING: AtomicBool = AtomicBool::new(false);
-/// *Frame data colours* On (rc.14, `hitbox::legend_colour`).
-static FRAME_DATA: AtomicBool = AtomicBool::new(false);
-/// *Launch angles* On (rc.14, `legend::marks`).
-static LAUNCH: AtomicBool = AtomicBool::new(false);
+/// The ticked items of `hitbox_vis` (`legend::shown`): which kinds of orb show, the frame data colours and the angles.
+static SHOWN: AtomicU8 = AtomicU8::new(0);
+
+/// Item `bit` of the checklist is ticked.
+fn shown(bit: u8) -> bool {
+    SHOWN.load(Ordering::Acquire) & bit != 0
+}
 /// The game's status ids were resolved through its constant table.
 static READY: AtomicBool = AtomicBool::new(false);
 static IDS: [AtomicI32; 6] = [const { AtomicI32::new(0) }; 6];
@@ -75,9 +79,9 @@ pub fn set_installed(on: bool) {
 
 /// Every settings publish.
 pub fn publish(snapshot: &Snapshot) {
-    SETTING.store(hitbox::enabled(snapshot), Ordering::Release);
-    FRAME_DATA.store(crate::model::spots::row_on(snapshot, crate::model::spots::ROW_FRAME_DATA), Ordering::Release);
-    LAUNCH.store(crate::model::spots::row_on(snapshot, crate::model::legend::ROW_LAUNCH), Ordering::Release);
+    let shown = hitbox::shown(snapshot);
+    SHOWN.store(shown, Ordering::Release);
+    SETTING.store(legend::draws(shown), Ordering::Release);
     let rows = u32::from_le_bytes(eggs::choices(snapshot));
     EGG_ROWS.store(rows, Ordering::Release);
     let hide = eggs::choice(snapshot, eggs::ROW_PRACTICE_CPU) == 0;
@@ -344,7 +348,7 @@ fn clear_set(store: &mut Store, i: usize, accessor: usize) -> Counts {
 /// Place every sphere `set` holds on its bone and publish them as `accessor`'s orbs, with the launch-angle marks while that row is On.
 unsafe fn publish_orbs(accessor: usize, set: &hitbox::HandleSet) -> usize {
     let mut placed = [Orb::NONE; orbs::BOARD_ORBS];
-    let lr = LAUNCH.load(Ordering::Acquire).then(|| natives::lr(accessor));
+    let lr = shown(legend::ANGLES).then(|| natives::lr(accessor));
     let place = |s: &Sphere| natives::joint_position(accessor, s.joint, &s.pos);
     let len = orbs::place_orbs(set, place, lr, |slot| orbs::slot_angle(&mut GameAttacks(accessor), slot), &mut placed);
     BOARD.lock().publish(accessor, placed[..len].iter().copied())
@@ -460,7 +464,8 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         });
         let board = BOARD.lock();
         // Hitboxes and grab boxes take the panes first; when they run out whole pills are cut, hurtboxes first (review HB-2).
-        for orb in board.in_draw_order().filter(|_| on) {
+        let bits = SHOWN.load(Ordering::Acquire);
+        for orb in board.in_draw_order().filter(|o| on && legend::shows(bits, o.kind())) {
             let Some(pill) = plan(orb, orb.color) else { continue };
             let Some((cap, band)) = used.take(pill.length > 0.0) else {
                 over += 1;
@@ -656,9 +661,9 @@ unsafe fn draw_articles() {
         let live = smash::app::sv_battle_object::is_active(id) && smash::app::sv_battle_object::module_accessor(id) as usize == key;
         // `key` is the live article's accessor (checked above); the natives check their own grants. Tracked: its set.
         let set = articles.track(id, key, &mut board);
-        set.frame_data = FRAME_DATA.load(Ordering::Acquire);
+        set.frame_data = shown(legend::COLOURS);
         let place = |s: &Sphere| natives::joint_position(key, s.joint, &s.pos);
-        if !live || !orbs::article_pass(&mut board, set, key, natives::status_kind(key), &mut GameAttacks(key), place, LAUNCH.load(Ordering::Acquire).then(|| natives::lr(key))) {
+        if !live || !orbs::article_pass(&mut board, set, key, natives::status_kind(key), &mut GameAttacks(key), place, shown(legend::ANGLES).then(|| natives::lr(key))) {
             articles.forget(id, &mut board);
         }
     }
@@ -724,12 +729,12 @@ pub unsafe fn frame(fighter: usize) {
     }
     let Store { table, wants, .. } = &mut *store;
     let set = &mut table.sets[i];
-    set.frame_data = FRAME_DATA.load(Ordering::Acquire);
+    set.frame_data = shown(legend::COLOURS);
     // Own orbs (decision HB-OWN-ORBS): while the setting is On the pass reads the HitModule (the relied `hurtbox_*` rows) and
     // plans the enabled parts' hurt spheres into the same wants as the hit spheres; `OrbSink` holds every one (never
     // refused). The reader is constructed only here, behind `enabled`: Off — and the stop paths the dispatch takes first —
     // reads no HitModule.
-    let mut hurt = enabled.then(|| hitbox::GameHurt { accessor, load: mem_load });
+    let mut hurt = (shown(legend::HURTBOXES) && enabled).then(|| hitbox::GameHurt { accessor, load: mem_load });
     let hurt: Option<&mut dyn hitbox::HurtboxReader> = hurt.as_mut().map(|h| h as _);
     let (c, len) = hitbox::reconcile_frame(set, facts, wants, &mut GameAttacks(accessor), hurt, &mut OrbSink { status });
     let placed = publish_orbs(accessor, set);
@@ -815,7 +820,7 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     let Some(shape) = hitbox::parse(indices, |i| lua_cell(lua, i)) else { return };
     let mut wants = [Sphere::NONE; hitbox::SHAPE_SPHERES];
     let mut len = 0;
-    let tint = hitbox::legend_colour(hitbox::KIND_GRAB, None, 0, hitbox::GRAB_TINT, FRAME_DATA.load(Ordering::Acquire));
+    let tint = hitbox::legend_colour(hitbox::KIND_GRAB, None, 0, hitbox::GRAB_TINT, shown(legend::COLOURS));
     hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_GRAB, shape.id as usize, &shape, tint);
     let status = Some(natives::status_kind(accessor));
     let (mut store, mut articles);

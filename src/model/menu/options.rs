@@ -35,6 +35,8 @@ pub static BUFFS: [&str; 18] = [
     "Jump", "Speed", "Shield", "Buster", "Smash", "Power Dragon", "Mini Waft", "Half Waft", "Full Waft",
 ];
 pub static INPUT_DISPLAY: [&str; 2] = ["Off", "Frame strip"];
+/// rc.14: Hitbox Visualization's checklist, in `legend::ITEMS` order.
+pub static HITBOX_ITEMS: [&str; 5] = ["Hitboxes", "Grab boxes", "Hurtboxes", "Frame data colours", "Launch angles"];
 /// SPEC-input-07 §6: frames from the recorded press that still count as on time, and what follows an attempt.
 pub static COMBO_TOLERANCE: [&str; 3] = ["Exact", "1 frame", "2 frames"];
 pub static COMBO_AFTER: [&str; 2] = ["Keep playing", "Load save state"];

@@ -282,13 +282,13 @@ fn core06_training_gate() {
             assert_eq!(hitbox::draw_on_command(enabled, visualizes), enabled && visualizes);
         }
     }
-    // The setting: a two-option single choice, On when its first option is set, Off by default.
+    // The setting (rc.14): a checklist, nothing ticked by default; the visualizer runs while a ticked item draws.
     let mut snapshot = model::settings::Snapshot::factory();
-    assert!(!hitbox::enabled(&snapshot));
-    snapshot.set("hitbox_vis", &[1, 0]).unwrap();
-    assert!(hitbox::enabled(&snapshot));
-    snapshot.set("hitbox_vis", &[0, 1]).unwrap();
-    assert!(!hitbox::enabled(&snapshot));
+    assert!(!model::legend::draws(hitbox::shown(&snapshot)));
+    snapshot.set("hitbox_vis", &[1, 1, 1, 0, 0]).unwrap();
+    assert!(model::legend::draws(hitbox::shown(&snapshot)));
+    snapshot.set("hitbox_vis", &[0, 0, 0, 1, 0]).unwrap();
+    assert!(!model::legend::draws(hitbox::shown(&snapshot)));
 }
 
 /// The waiting room resolves its own entry gate (tr-p23-rc5-1, 2026-11-05: Hitbox Visualization On, a boot whose first
@@ -1503,7 +1503,7 @@ impl hitbox::Effects for RequestSpy {
 #[test]
 fn core06_rc_dispatch_reads_only_attacks_and_requests_hits_and_grabs() {
     let mut snapshot = model::settings::Snapshot::factory();
-    snapshot.set("hitbox_vis", &[1, 0]).unwrap();
+    snapshot.set("hitbox_vis", &[1, 1, 1, 0, 0]).unwrap();
     let mut set = hitbox::HandleSet::new();
     let grab = sphere(hitbox::sphere_key(hitbox::KIND_GRAB, 2, 0), 4.0);
     assert!(set.push_grab(grab, None));
@@ -1513,7 +1513,7 @@ fn core06_rc_dispatch_reads_only_attacks_and_requests_hits_and_grabs() {
     let mut wants = [poison; hitbox::MAX_HELD];
     let mut reads = AttackSpy::default();
     let mut fx = RequestSpy::new();
-    let facts = facts(true, hitbox::enabled(&snapshot), false, 0);
+    let facts = facts(true, model::legend::draws(hitbox::shown(&snapshot)), false, 0);
     let (counts, hits) = hitbox::reconcile_frame(&mut set, facts, &mut wants, &mut reads, None, &mut fx);
     assert_eq!((counts.spawned, counts.failed, counts.dropped, hits), (4, 0, 0, 3));
     assert_eq!(reads.active, (0..8).collect::<Vec<_>>());

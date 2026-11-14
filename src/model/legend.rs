@@ -7,9 +7,36 @@
 use super::hitbox::sphere_key;
 use super::hitbox_orbs::Orb;
 
-/// The *Launch angles* row (Display & Controls, under *Frame data colours*; Off by default).
-pub const ROW_LAUNCH: &str = "launch_angles";
+/// Hitbox Visualization is one checklist (`hitbox_vis`, the operator's order of 2026-11-14 ~19:50Z): each tick draws on its own,
+/// none ticked draws nothing. The items in menu order, as bits (bit i: item i): hitboxes, grab boxes, hurtboxes, the frame data
+/// colours (applied to whatever is drawn) and the launch angles.
+pub const ROW: &str = "hitbox_vis";
+pub const ITEMS: usize = 5;
+pub const HITBOXES: u8 = 1;
+pub const GRABS: u8 = 2;
+pub const HURTBOXES: u8 = 4;
+pub const COLOURS: u8 = 8;
+pub const ANGLES: u8 = 16;
 
+/// The ticked items of the row as bits.
+pub fn shown(row: &[u8]) -> u8 {
+    row.iter().take(ITEMS).enumerate().fold(0, |bits, (i, v)| bits | (u8::from(*v != 0) << i))
+}
+
+/// Whether the visualizer draws anything: a box or the angles (the colours alone recolour nothing).
+pub fn draws(bits: u8) -> bool {
+    bits & (HITBOXES | GRABS | HURTBOXES | ANGLES) != 0
+}
+
+/// Whether an orb of `kind` (`hitbox::KIND_*`, `KIND_MARK`) shows.
+pub fn shows(bits: u8, kind: u32) -> bool {
+    bits & [0, HITBOXES, HURTBOXES, GRABS, ANGLES].get(kind as usize).copied().unwrap_or(0) != 0
+}
+
+/// An older two-option row (`[On, Off]`): On becomes the three boxes, Off nothing ticked. `None` for a row already a checklist.
+pub fn migrate(row: &[u8]) -> Option<[u8; ITEMS]> {
+    (row.len() == 2).then(|| if row[0] != 0 { [1, 1, 1, 0, 0] } else { [0; ITEMS] })
+}
 /// `AttackData`'s launch angle in degrees (i32, beside `hitbox::layout`).
 pub const ANGLE: usize = 0x28;
 /// `HitModule`'s group record: the whole status (`set_whole`) and the global status the xlu and invincible timers set.

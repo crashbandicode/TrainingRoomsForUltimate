@@ -384,9 +384,9 @@ pub fn draw_on_command(enabled: bool, visualizes: bool) -> bool {
     enabled && visualizes
 }
 
-/// The setting: `hitbox_vis` is a two-option single choice (`On`, `Off`; Off by default), On when its first option is set.
-pub fn enabled(snapshot: &super::settings::Snapshot) -> bool {
-    snapshot.get("hitbox_vis").is_some_and(|row| row.first().copied().unwrap_or(0) != 0)
+/// The ticked items of the `hitbox_vis` checklist (`legend::shown`; none by default). The visualizer runs while one of them draws.
+pub fn shown(snapshot: &super::settings::Snapshot) -> u8 {
+    snapshot.get(super::legend::ROW).map_or(0, super::legend::shown)
 }
 
 /// How many fighters the sleep bookkeeping tracks (eight entries and their partners).

@@ -12,8 +12,8 @@
 //! divided by its own damage lies in that window, and a slot outside it cannot have connected. The label shows only when every
 //! candidate gets the same class; no candidate, or candidates of different classes, is no label.
 
-/// The rows (decision SP5, colours reworded 2026-11-14): the hitbox visualizer's *Frame data colours* (hitbox::legend_colour), the strip's labels, and the combo's match. Each is a toggle, Off by default.
-pub const ROW_FRAME_DATA: &str = "frame_data_colours";
+/// The rows (decision SP5): the strip's labels and the combo's match, toggles Off by default. The hitbox visualizer's *Frame data colours*
+/// (`hitbox::legend_colour`) is an item of its checklist (`legend::COLOURS`).
 pub const ROW_STRIP: &str = "spots_strip";
 pub const ROW_COMBO: &str = "spots_combo";
 

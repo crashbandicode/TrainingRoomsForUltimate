@@ -194,7 +194,7 @@ fn the_spot_words_and_rows() {
     assert_eq!(Spot::from_key("tip"), None);
     assert_eq!((Spot::Sweet.name(), Spot::Sour.name(), Spot::Late.name()), ("Sweet", "Sour", "Late"));
     let mut snapshot = crate::model::settings::Snapshot::factory();
-    for row in [ROW_FRAME_DATA, ROW_STRIP, ROW_COMBO] {
+    for row in [ROW_STRIP, ROW_COMBO] {
         assert!(!row_on(&snapshot, row), "{row}: Off by default");
         snapshot.set(row, &[1, 0]).unwrap();
         assert!(row_on(&snapshot, row));

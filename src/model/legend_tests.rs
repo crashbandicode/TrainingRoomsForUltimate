@@ -203,3 +203,36 @@ fn legend_marks_follow_their_hitbox_and_draw_last() {
     let kinds: Vec<u32> = board.in_draw_order().map(|o| o.kind()).collect();
     assert_eq!(kinds, [KIND_HIT, KIND_HIT, KIND_HURT, KIND_MARK, KIND_MARK, KIND_MARK]);
 }
+#[test]
+fn legend_checklist_items_draw_independently() {
+    let bits = |row: &[u8]| shown(row);
+    assert_eq!(bits(&[0; ITEMS]), 0);
+    assert!(!draws(bits(&[0; ITEMS])), "nothing ticked draws nothing");
+    assert!(!draws(bits(&[0, 0, 0, 1, 0])), "the colours alone recolour nothing");
+    // Hurtboxes only.
+    let hurt = bits(&[0, 0, 1, 0, 0]);
+    assert!(draws(hurt) && shows(hurt, KIND_HURT));
+    assert!([KIND_HIT, KIND_GRAB, KIND_MARK].iter().all(|k| !shows(hurt, *k)));
+    // Hitboxes and the angles, no grab or hurt boxes.
+    let lines = bits(&[1, 0, 0, 0, 1]);
+    assert!(draws(lines) && shows(lines, KIND_HIT) && shows(lines, KIND_MARK));
+    assert!(!shows(lines, KIND_GRAB) && !shows(lines, KIND_HURT));
+    // The angles alone draw their lines without the discs; every tick has its own bit.
+    assert!(draws(ANGLES) && shows(ANGLES, KIND_MARK) && !shows(ANGLES, KIND_HIT));
+    assert_eq!(bits(&[1; ITEMS]), HITBOXES | GRABS | HURTBOXES | COLOURS | ANGLES);
+}
+
+#[test]
+fn legend_old_hitbox_vis_migrates() {
+    assert_eq!(migrate(&[1, 0]), Some([1, 1, 1, 0, 0]), "On: the three boxes, as before");
+    assert_eq!(migrate(&[0, 1]), Some([0; ITEMS]), "Off: nothing ticked");
+    assert_eq!(migrate(&[1, 0, 0, 0, 1]), None, "a checklist stays as it is");
+    // Through the settings file: an older file's On comes back as the three boxes, its Off as none; the default is none.
+    for (old, want) in [("[1, 0]", [1, 1, 1, 0, 0]), ("[0, 1]", [0; ITEMS]), ("[0, 1, 1, 0, 1]", [0, 1, 1, 0, 1])] {
+        let file = format!("{{\"menu\": {{\"{ROW}\": {old}}}, \"defaults_menu\": {{\"{ROW}\": {old}}}}}");
+        let loaded = crate::model::settings::parse_bytes(file.as_bytes());
+        assert!(!loaded.corrupt(), "{old}: {:?}", loaded.issues);
+        assert_eq!((loaded.settings.menu.get(ROW), loaded.settings.defaults.get(ROW)), (Some(&want[..]), Some(&want[..])), "{old}");
+    }
+    assert_eq!(crate::model::settings::Snapshot::factory().get(ROW), Some(&[0u8; ITEMS][..]));
+}
