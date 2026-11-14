@@ -78,7 +78,10 @@ orbs do not use that pool. This supersedes the upstream effect rendering for **f
 - **Known limitation, camera lag:** while the camera pans, the pills trail the spheres' true screen position by about one
   to two frames of motion (measured in Eden run `tr-p23-hitbox-ab2`); still, they coincide. Projecting from a render-side
   camera was not attempted (no cheap, guarded site).
-- **Articles** (projectiles) keep the `sys_shield` effect spheres drawn at their `ATTACK` command (§6, Q1).
+- **Articles and thrown items** (rc.13) are own orbs too (`Articles`, `ARTICLES` = 4 at once; a fifth replaces the
+  oldest). An article whose `ATTACK` or `CATCH` ran, or an item with a live attack slot, is drawn by every fighter pass
+  from its live attack slots on its bones while its attack lasts (§6, Q1). An article's `CATCH` (Olimar's Pikmin) waits
+  in the article's own `HandleSet` with the status it ran in and is drawn as a fighter's grab box is.
 - A failed guard of any row of the feature's closure leaves the whole feature uninstalled (install line
   `hitbox=not_installed site=<row>`): nothing is drawn, no partial path. A layout without the orb panes draws nothing and
   says so once (`[Hitbox] orb panes missing`).
@@ -120,7 +123,7 @@ No memory is written outside these calls.
 
 ## 6. Edge cases and interactions
 
-- **Projectiles and articles**: the per-frame pass runs for fighters only (the fighter vtable driver), so projectile hitboxes are not redrawn per frame; they are drawn once when their `ATTACK` command runs (any battle object executing the command, since the hook reads the Lua state's accessor) and then follow their bone with `CONCLUDE_STATUS` until the article's status ends. Multi-hit projectiles therefore keep stale spheres between hits. Q1.
+- **Projectiles and articles**: the per-frame pass runs for fighters only (the fighter vtable driver), so projectile hitboxes are not redrawn per frame; they are drawn once when their `ATTACK` command runs (any battle object executing the command, since the hook reads the Lua state's accessor) and then follow their bone with `CONCLUDE_STATUS` until the article's status ends. Multi-hit projectiles therefore keep stale spheres between hits. Q1. Fork (rc.13): articles and thrown items are own orbs redrawn from their attack slots every pass (§2a); no effect sphere is requested for them.
 - **Shielding fighter**: nothing is drawn and effects are not slept (the shield visual is itself a `sys_shield` effect; killing it would remove the player's shield bubble — this is why shielding is exempt).
 - **Grab statuses**: no drawing, no sleeping, so the grab animation effects show; grab boxes drawn at `CATCH` persist until rebound.
 - **Missed tech / footstool**: effects kept awake (`DOWN`, tread statuses) so those visual cues remain.
@@ -131,7 +134,7 @@ No memory is written outside these calls.
 - **Lobby practice (fork)**: `visualizes(accessor)` gates per fighter so opponents' hitboxes in a waiting room are never drawn and their effects never slept — carry over the gate hook.
 - **CPU-as-P1 / hot swap (fork)**: `is_training_mode()` false during a swap → nothing drawn that frame.
 - **Shield-damage rewrite inside the `ATTACK` hook**: a different feature (Infinite shield) piggybacks on this hook; it pops and re-pushes 36 Lua values on every attack command while Infinite is selected. Record as Q2 (ownership and cost).
-- **Effect budget**: the game's effect pool is finite; 8 slots × up to 16 spheres × fighters, respawned every frame, can exhaust it and drop other effects. Q3. Fork: resolved for fighters by the own orbs (§2a); articles still use the pool.
+- **Effect budget**: the game's effect pool is finite; 8 slots × up to 16 spheres × fighters, respawned every frame, can exhaust it and drop other effects. Q3. Fork: resolved by the own orbs (§2a), for fighters and, since rc.13, articles and thrown items.
 - **Fork, own orbs and the menus (§2a)**: the orbs are drawn under every pane of the layout (HUD, vanilla pause menu, plugin menu), as the 3D effects were; shielding and grab statuses draw no hurt orbs (step order above, unchanged).
 - **`077a8e43` difference**: at `97cbe9b9` the per-frame pass ran in every mode (online too), calling `set_sleep_effect(false)` on every fighter every frame and, with the setting On, drawing spheres in online matches (a desync-safe but visible and unwanted side effect, and a per-frame call outside Training). Fold in the early return.
 
@@ -166,7 +169,7 @@ lines record the HitModule read's cost and the pass's own cost on the integrated
 
 ## 10. Open questions
 
-1. **Projectile hitboxes** are drawn once and never refreshed, so multi-hit articles show stale spheres. Recommendation: either run the per-frame pass for weapons too (hook or iterate articles) or kill the article's spheres at each `ATTACK` for that object; decide after measuring the effect-pool cost.
+1. **Projectile hitboxes** are drawn once and never refreshed, so multi-hit articles show stale spheres. Recommendation: either run the per-frame pass for weapons too (hook or iterate articles) or kill the article's spheres at each `ATTACK` for that object; decide after measuring the effect-pool cost. Fork: resolved in rc.13 by the first option without the pool: articles and thrown items are own orbs redrawn from their attack slots every pass (§2a).
 2. **Shield-damage rewrite** (Infinite shield) lives in the `ATTACK` hook and re-pushes 36 Lua values per attack command. Recommendation: move the behaviour to SPEC-cpu-* (shield) as a shared hook consumer of the same site, with a fixed-size buffer; the `ATTACK` site then has two consumers in one plugin (no sharing issue).
 3. **Effect pool exhaustion.** Respawning every sphere every frame is wasteful. Recommendation: investigate keeping the follow effects alive while the attack slot stays active (effect handles from `req_follow`) and only killing on change; measure before changing the visible behaviour.
 4. **Per-frame `set_sleep_effect(false)` when Off.** Upstream calls it every frame for every fighter as the "restore" path. Recommendation: call it once on the On→Off transition (per fighter) and otherwise not at all.
