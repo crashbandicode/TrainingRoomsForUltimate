@@ -169,6 +169,8 @@ pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut([f32; 2]) -> bool) 
     }
     let phase = mode.phase();
     PHASE.store(phase as u8, Ordering::Release);
+    // The standing notice sits in the top band while the mode is on (the operator, 11-14), so the targets keep the middle.
+    notices::raise(notices::RAISE_BTT, phase != Phase::Off);
     // Asked on every pass, Off included: the text is empty exactly when the mode is Off, so the notice goes then, and the next
     // text is posted again even when it is the one shown before the Off (Ready of the same layout).
     if let Some(text) = mode.notice() {
