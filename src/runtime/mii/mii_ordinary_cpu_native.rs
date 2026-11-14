@@ -217,7 +217,7 @@ pub(super) unsafe fn prefetch_publish(entry:usize,c:Configuration,identity:crate
     shared::target_rows(c).map_err(publish_refusal)?;
     let (expected,original_kind,retained)={
         let s=super::STATE.lock();
-        if s.departed || s.busy() || s.request.is_some() || s.capture || !s.menu_valid {return Err(PublishRefusal::Busy);}
+        if s.departed || !s.publication_idle() || s.capture || !s.menu_valid {return Err(PublishRefusal::Busy);}
         let o=s.owner.as_ref().ok_or(PublishRefusal::Permanent("CPU Mii group publication without an owner"))?;
         if o.origin.binding.entry!=entry || o.origin.binding.epoch!=super::epoch() {
             return Err(PublishRefusal::Permanent("CPU Mii group publication owner/entry/epoch differ"));
@@ -292,7 +292,7 @@ unsafe fn prefetch_publish_owned(receipt:PrefetchReceipt,c:Configuration,token:s
         && rd::<u8>(entry,0x5934)==0 && rd::<u8>(entry,0x5935)==0,
         "CPU Mii group publication needs the native loader idle at 6/14").map_err(PublishRefusal::Race)?;
     let mut state=super::STATE.lock();
-    if state.departed || state.busy() || state.request.is_some() {return Err(PublishRefusal::Busy);}
+    if state.departed || !state.publication_idle() {return Err(PublishRefusal::Busy);}
     if !state.reservation.acquire(super::super::INSTALL.owns(token)) {
         return Err(PublishRefusal::Race("CPU reservation refused before the Mii group publication"));
     }

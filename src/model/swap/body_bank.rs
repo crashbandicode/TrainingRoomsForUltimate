@@ -3785,12 +3785,17 @@ mod tests {
                             window = attached;
                         }
                         None => {
-                            let unit = Members::special_group(target, budget.special).unwrap_or(Members::new(&[target]).unwrap());
+                            let unit = Members::special_group(target, budget.special).unwrap_or_else(|| Members::new(&[target]).unwrap());
                             let loading = bodies(window, &groups) + unit.count();
                             assert!(cold_admitted(loading, ready_fighters, unit.count(), &over, lap[live]),
                                 "the cold press onto {target:#x} would Reload: {loading} bodies, over {over:x?}");
                             out.over_loading = out.over_loading.max(loading.saturating_sub(ready_fighters));
                             if loading > ready_fighters { over.push((target, false)); }
+                            // A Mii group's CharInfo goes on the record beside the waiting press, then its prefetch
+                            // serves the press (Eden cf-p2-x2 #2418: any pending request refused it; never prefetched).
+                            let publishable = unit.special() != Special::Mii || mii_publish::publication_idle(false, true, true);
+                            assert_eq!(serving_step(GroupState::Planned, publishable, false), Some(Serving::Prefetch),
+                                "the press onto {target:#x} waits for a group that never prefetches");
                             cold.push(target);
                             // The press plans the group while the fighter it leaves is still on screen, and the bank
                             // ticks before the switch: nothing is freed then (Eden cf-p1-y1 freed and replanned it).
@@ -3846,6 +3851,14 @@ mod tests {
         steady(&laps, 2);
         assert_eq!(laps.cold[1], vec![KROOL, GANONDORF]);
         assert_eq!((laps.over_settled, laps.over_loading), (1, 2));
+    }
+
+    /// k = 1 with a Mii cold (Eden cf-p2-x2, Mii Gunner at Ready Fighters 6, #2418-#2468): its press waits for its own
+    /// Mii group, whose CharInfo goes on the record beside the press (`run_laps`); every lap loads Mii Gunner alone.
+    fn a_cold_mii_fighter_is_loaded_by_its_waiting_press() {
+        let laps = run_laps(&[FALCO, PICHU, DIDDY, KROOL, GUNNER], 8);
+        steady(&laps, 1);
+        assert_eq!(laps.cold[1], vec![GUNNER]);
     }
 
     /// k = 0: the same lap at Ready Fighters 10 fits whole: every press is warm and nothing is loaded or freed.
@@ -3958,6 +3971,7 @@ mod tests {
             ("a_mii_group_is_kept_across_a_reload_only_with_its_switch", a_mii_group_is_kept_across_a_reload_only_with_its_switch as fn()),
             ("five_laps_of_the_operator_cycle_keep_what_fits_hot", five_laps_of_the_operator_cycle_keep_what_fits_hot as fn()),
             ("two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot", two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot as fn()),
+            ("a_cold_mii_fighter_is_loaded_by_its_waiting_press", a_cold_mii_fighter_is_loaded_by_its_waiting_press as fn()),
             ("a_lap_that_fits_is_all_warm", a_lap_that_fits_is_all_warm as fn()),
             ("a_cold_fighter_takes_one_body_over_only_while_it_is_on_screen", a_cold_fighter_takes_one_body_over_only_while_it_is_on_screen as fn()),
             ("a_group_leaves_when_a_member_left_the_cycle_and_its_slot_is_reused", a_group_leaves_when_a_member_left_the_cycle_and_its_slot_is_reused as fn()),

@@ -14,6 +14,14 @@
 /// failed instead of prefetched, so a persistently racing owner never spins.
 pub const MII_PUBLISH_ATTEMPTS: u8 = 180;
 
+/// Whether an owner is idle enough for a Mii group's record publication: no transaction (`busy`), and no request, or
+/// only one that waits for its own group (`waits`; rc.14 cycle fix: `native_body_bank::demand` keeps the press while
+/// the group prefetches). That press has begun nothing, as if it came a tick after the publication. Eden `cf-p2-x2`
+/// #2418-#2468: any pending request refused it, the group never prefetched and the CPU press waited for good.
+pub const fn publication_idle(busy: bool, request: bool, waits: bool) -> bool {
+    !busy && (!request || waits)
+}
+
 /// What a refused record publication means for the retry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PublishRefusal {
@@ -120,10 +128,21 @@ mod tests {
         assert_eq!(attempts.last(), Some(RACE));
     }
 
+    /// rc.14 cycle fix: a press waiting for its own group lets that group's CharInfo go on the record; any other request
+    /// or transaction still holds it back.
+    fn a_press_waiting_for_its_own_group_lets_that_group_publish() {
+        assert!(publication_idle(false, false, false), "an idle owner");
+        assert!(publication_idle(false, true, true), "the press waits for this group");
+        assert!(!publication_idle(false, true, false), "another request");
+        assert!(!publication_idle(true, true, true), "a transaction");
+        assert!(!publication_idle(true, false, false));
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_press_waiting_for_its_own_group_lets_that_group_publish", a_press_waiting_for_its_own_group_lets_that_group_publish as fn()),
             ("a_repeated_race_is_noted_once_and_the_final_refusal_fails_with_its_reason", a_repeated_race_is_noted_once_and_the_final_refusal_fails_with_its_reason as fn()),
         ]);
     }

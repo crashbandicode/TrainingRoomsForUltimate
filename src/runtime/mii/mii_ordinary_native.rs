@@ -764,7 +764,7 @@ pub(super) unsafe fn prefetch_publish(entry:usize,c:Configuration,identity:crate
     target_rows(c).map_err(publish_refusal)?;
     let (expected,original_kind)={
         let s=super::STATE.lock();
-        if s.busy() || s.request.is_some() || s.capture || !s.menu_valid {return Err(PublishRefusal::Busy);}
+        if !s.publication_idle() || s.capture || !s.menu_valid {return Err(PublishRefusal::Busy);}
         let o=s.owner.as_ref().ok_or(PublishRefusal::Permanent("Mii group publication without an owner"))?;
         if o.origin.binding.entry!=entry || o.origin.binding.epoch!=super::epoch() {
             return Err(PublishRefusal::Permanent("Mii group publication owner/entry/epoch differ"));
@@ -798,7 +798,7 @@ pub(super) unsafe fn prefetch_publish(entry:usize,c:Configuration,identity:crate
         && rd::<u8>(entry,0x5934)==0 && rd::<u8>(entry,0x5935)==0,
         "Mii group publication needs the native loader idle at 6/14").map_err(PublishRefusal::Race)?;
     let mut state=super::STATE.lock();
-    if state.busy() || state.request.is_some() {return Err(PublishRefusal::Busy);}
+    if !state.publication_idle() {return Err(PublishRefusal::Busy);}
     let registry=final_registry(&helpers,None).map_err(publish_refusal)?;
     let owner=state.owner.as_mut().filter(|o|o.expected==expected)
         .ok_or(PublishRefusal::Race("Mii group publication owner changed"))?;

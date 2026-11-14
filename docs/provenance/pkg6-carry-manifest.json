@@ -3584,7 +3584,7 @@
    "dest": "src/model/swap/body_bank.rs",
    "crate": "consts",
    "src_sha256": "ab3c4adcf084b2dd9433a5fe5715b428fb38c26d3b143d7632fb3d33078df0d6",
-   "dest_sha256": "6543aa5a3be6bf27aa0f5680e015283b48e5ec38f1ad04446d9d3af388357a5b",
+   "dest_sha256": "968358844533d63ebab152317bc54b0fdf440e6895d71592fa332ef0f016a0e0",
    "edits": [
     {
      "old": "    // a native group): count it so hats and helper slots agree with the planner.\n    let used: usize = windows.iter().map(|window| window.map_or(1, |members| members.count())).sum::<usize>()\n        + existing.iter().flat_map(|groups| groups.iter()).map(|members| members.count()).sum::<usize>()\n        + budget.hats_wanted;\n    let mut remaining = budget.ready_fighters.saturating_sub(used).min(budget.pool_free);\n    // (lane depth, kind): depth is the distance from the live fighter, so a role\n    // whose nearer neighbours are already built does not outrank the other role.\n    let mut candidates: [Vec<(usize, u32)>; 2] = [Vec::new(), Vec::new()];\n    // Whole special groups (PT, Aegis, the pair) at their lane depth.\n    let mut specials: [Vec<(usize, Members)>; 2] = [Vec::new(), Vec::new()];\n    let mut room = [0usize; 2];\n    let mut group_slots = [0usize; 2];\n    for role in 0..2 {\n        let Some(window) = windows[role].filter(|window| window_swappable_with(*window, policy)) else { continue; };\n        group_slots[role] = MAX_EXTRA_GROUPS.saturating_sub(existing[role].len());\n        room[role] = group_slots[role] * NATIVE_MEMBERS;\n        for (depth, &kind) in upcoming[role].iter().enumerate() {\n            if exclude[role] == Some(kind)\n                || window.index_of(kind).is_some()\n                || existing[role].iter().any(|group| group.index_of(kind).is_some())\n            { continue; }\n            if let Some(group) = Members::special_group(kind, budget.special) {\n                // One Mii identity per resource owner: a second lane Mii, or a\n                // Mii group this role already holds, stays canonical (DESIGN \u00a72).\n                let second_mii = group.special() == Special::Mii\n                    && (specials[role].iter().any(|(_, held)| held.special() == Special::Mii)\n                        || existing[role].iter().any(|held| held.special() == Special::Mii));\n                if !second_mii && !specials[role].iter().any(|(_, held)| held.kinds()[0] == group.kinds()[0]) {\n                    specials[role].push((depth, group));\n                }\n                continue;\n            }\n            if group_member_kind(kind, policy) && !candidates[role].iter().any(|(_, held)| *held == kind) {\n                candidates[role].push((depth, kind));\n            }\n        }\n    }\n    // Special groups are taken whole at their own lane depth, interleaved with\n    // the ordinary candidates; one that no longer fits the remaining bodies or a\n    // free group slot is skipped, never split.\n    let mut chosen_special: [Vec<Members>; 2] = [Vec::new(), Vec::new()];\n    let mut scursor = [0usize; 2];\n    let mut chosen: [Vec<u32>; 2] = [Vec::new(), Vec::new()];\n    let mut cursor = [0usize; 2];\n    let take = |role: usize, chosen: &mut [Vec<u32>; 2], cursor: &mut [usize; 2], remaining: &mut usize| -> bool {\n        if *remaining == 0 || cursor[role] >= candidates[role].len() || chosen[role].len() >= room[role] {\n            return false;\n        }\n        chosen[role].push(candidates[role][cursor[role]].1);\n        cursor[role] += 1;\n        *remaining -= 1;\n        true\n    };\n    let deepest = upcoming.iter().map(|lane| lane.len()).max().unwrap_or(0);\n    for depth in 0..deepest {\n        for role in 0..2 {\n            if cursor[role] < candidates[role].len() && candidates[role][cursor[role]].0 == depth {\n                take(role, &mut chosen, &mut cursor, &mut remaining);\n            } else if scursor[role] < specials[role].len() && specials[role][scursor[role]].0 == depth {\n                let group = specials[role][scursor[role]].1;\n                scursor[role] += 1;\n                let slots_used = chosen_special[role].len() + chosen[role].len().div_ceil(NATIVE_MEMBERS);\n                if remaining >= group.count() && slots_used < group_slots[role] {\n                    chosen_special[role].push(group);\n                    remaining -= group.count();\n",
@@ -4881,6 +4881,26 @@
      "old": "        crate::test_table::run(&[\n            (\"a_mii_group_is_kept_across_a_reload_only_with_its_switch\", a_mii_group_is_kept_across_a_reload_only_with_its_switch as fn()),\n",
      "new": "        crate::test_table::run(&[\n            (\"a_gated_member_is_laid_out_alone_and_the_rest_stay_together\", a_gated_member_is_laid_out_alone_and_the_rest_stay_together as fn()),\n            (\"a_reload_keeps_the_window_whose_live_member_parks\", a_reload_keeps_the_window_whose_live_member_parks as fn()),\n            (\"the_farthest_unit_goes_never_the_next_or_the_one_on_screen\", the_farthest_unit_goes_never_the_next_or_the_one_on_screen as fn()),\n            (\"a_mii_group_is_kept_across_a_reload_only_with_its_switch\", a_mii_group_is_kept_across_a_reload_only_with_its_switch as fn()),\n",
      "reason": "rc.14 2e a-full: the primary 2026-11-14 ~21:25Z (AFULL-RESEARCH.md): A1, a target-first Reload keeps the attached window when its live member parks (outgoing_window, keep_window; KEEP_WINDOW_ACROSS_RELOAD off until the Eden rows pass, diag-cycle.req window); Kirby laid out alone (gated_alone); the farthest unit goes when what stays exceeds Ready Fighters (farthest_unit)"
+    },
+    {
+     "old": "                            let unit = Members::special_group(target, budget.special).unwrap_or(Members::new(&[target]).unwrap());\n",
+     "new": "                            let unit = Members::special_group(target, budget.special).unwrap_or_else(|| Members::new(&[target]).unwrap());\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "                            if loading > ready_fighters { over.push((target, false)); }\n                            cold.push(target);\n",
+     "new": "                            if loading > ready_fighters { over.push((target, false)); }\n                            // A Mii group's CharInfo goes on the record beside the waiting press, then its prefetch\n                            // serves the press (Eden cf-p2-x2 #2418: any pending request refused it; never prefetched).\n                            let publishable = unit.special() != Special::Mii || mii_publish::publication_idle(false, true, true);\n                            assert_eq!(serving_step(GroupState::Planned, publishable, false), Some(Serving::Prefetch),\n                                \"the press onto {target:#x} waits for a group that never prefetches\");\n                            cold.push(target);\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "\n    /// k = 0: the same lap at Ready Fighters 10 fits whole: every press is warm and nothing is loaded or freed.\n",
+     "new": "\n    /// k = 1 with a Mii cold (Eden cf-p2-x2, Mii Gunner at Ready Fighters 6, #2418-#2468): its press waits for its own\n    /// Mii group, whose CharInfo goes on the record beside the press (`run_laps`); every lap loads Mii Gunner alone.\n    fn a_cold_mii_fighter_is_loaded_by_its_waiting_press() {\n        let laps = run_laps(&[FALCO, PICHU, DIDDY, KROOL, GUNNER], 8);\n        steady(&laps, 1);\n        assert_eq!(laps.cold[1], vec![GUNNER]);\n    }\n\n    /// k = 0: the same lap at Ready Fighters 10 fits whole: every press is warm and nothing is loaded or freed.\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "            (\"two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot\", two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot as fn()),\n            (\"a_lap_that_fits_is_all_warm\", a_lap_that_fits_is_all_warm as fn()),\n",
+     "new": "            (\"two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot\", two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot as fn()),\n            (\"a_cold_mii_fighter_is_loaded_by_its_waiting_press\", a_cold_mii_fighter_is_loaded_by_its_waiting_press as fn()),\n            (\"a_lap_that_fits_is_all_warm\", a_lap_that_fits_is_all_warm as fn()),\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
     }
    ]
   },
@@ -5059,7 +5079,7 @@
    "dest": "src/model/swap/body_bank/mii_publish.rs",
    "crate": "consts",
    "src_sha256": "27966b691dd20370a74df9dabe406316f7ae39f900b1f8165f0870be03fb927f",
-   "dest_sha256": "1a01b2b4cc385e91d1bfadcded5944238b145299e5839c0b8cf6949b19509603",
+   "dest_sha256": "08abe912b9cfec7420863214582397b7ecf6311262b69bc254f00c18813ddd34",
    "edits": [
     {
      "table_tests": true,
@@ -5115,6 +5135,21 @@
       ]
      ],
      "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+    },
+    {
+     "old": "pub const MII_PUBLISH_ATTEMPTS: u8 = 180;\n\n",
+     "new": "pub const MII_PUBLISH_ATTEMPTS: u8 = 180;\n\n/// Whether an owner is idle enough for a Mii group's record publication: no transaction (`busy`), and no request, or\n/// only one that waits for its own group (`waits`; rc.14 cycle fix: `native_body_bank::demand` keeps the press while\n/// the group prefetches). That press has begun nothing, as if it came a tick after the publication. Eden `cf-p2-x2`\n/// #2418-#2468: any pending request refused it, the group never prefetched and the CPU press waited for good.\npub const fn publication_idle(busy: bool, request: bool, waits: bool) -> bool {\n    !busy && (!request || waits)\n}\n\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+     "new": "\n    /// rc.14 cycle fix: a press waiting for its own group lets that group's CharInfo go on the record; any other request\n    /// or transaction still holds it back.\n    fn a_press_waiting_for_its_own_group_lets_that_group_publish() {\n        assert!(publication_idle(false, false, false), \"an idle owner\");\n        assert!(publication_idle(false, true, true), \"the press waits for this group\");\n        assert!(!publication_idle(false, true, false), \"another request\");\n        assert!(!publication_idle(true, true, true), \"a transaction\");\n        assert!(!publication_idle(true, false, false));\n    }\n\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "        crate::test_table::run(&[\n            (\"a_repeated_race_is_noted_once_and_the_final_refusal_fails_with_its_reason\", a_repeated_race_is_noted_once_and_the_final_refusal_fails_with_its_reason as fn()),\n",
+     "new": "        crate::test_table::run(&[\n            (\"a_press_waiting_for_its_own_group_lets_that_group_publish\", a_press_waiting_for_its_own_group_lets_that_group_publish as fn()),\n            (\"a_repeated_race_is_noted_once_and_the_final_refusal_fails_with_its_reason\", a_repeated_race_is_noted_once_and_the_final_refusal_fails_with_its_reason as fn()),\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
     }
    ]
   },
@@ -21632,7 +21667,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "641c5657793cbaa25d3164a20a4d611796ed4c650587479431a90f81afd92bce",
+   "dest_sha256": "47536670245f2163c1b8796f8b324421e85888e0c52d619cf262e4081107d4d4",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -22430,6 +22465,31 @@
      "old": "    if !reuse && restore.is_none() && request==Request::CYCLE && same_class.is_none() && !hat_change && !exit {\n",
      "new": "    // Phase 2a: a direct pick, a menu choice and a restore too; a replay's recorded fighter keeps its own path.\n    if !reuse && request.replay().is_none() && !request.refresh_partners() && same_class.is_none() && !hat_change && !exit {\n",
      "reason": "rc.14 cycle fix 4: phase 2 (operator ~20:58Z, the primary ~21:05Z): 2a picks and restores take demand; 2b a Building bank is waited for; 2c a remaining Reload with Built groups is a one-member bank Reload so (a') keeps them; 2d KEEP_MII_ACROSS_RELOAD (off) and the diag knob for the rc.12 crash's fail-first row"
+    },
+    {
+     "old": "    mii_exit:None,\n",
+     "new": "    mii_exit:None,demand:None,\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "    mii_exit:Option<MiiExit>,\n}\n",
+     "new": "    mii_exit:Option<MiiExit>,\n    /// rc.14 cycle fix: the request that waits for its own `body_bank::demand` group.\n    demand:Option<Request>,\n}\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "        self.track.is_some()\n    }\n",
+     "new": "        self.track.is_some()\n    }\n    /// A Mii group's record publication may run (`mii_publish::publication_idle`).\n    fn publication_idle(&self)->bool {\n        crate::engine::swap::body_bank::mii_publish::publication_idle(self.busy(),self.request.is_some(),\n            self.request.is_some() && self.demand==self.request)\n    }\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "/// MII-GROUPS-DESIGN \u00a71.4/\u00a75.2). Idle owner only. A busy refusal is retried next\n",
+     "new": "/// MII-GROUPS-DESIGN \u00a71.4/\u00a75.2). Idle owner only, or a press waiting for this group (`State::publication_idle`). A busy refusal is retried next\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "        if configuration.is_some_and(|c|super::body_bank::demand(current.binding.owner,kind,c)) {return false;}\n",
+     "new": "        // The press waits; its group's CharInfo publication may run beside it (`State::publication_idle`).\n        let waits=configuration.is_some_and(|c|super::body_bank::demand(current.binding.owner,kind,c));\n        STATE.lock().demand=waits.then_some(request);\n        if waits {return false;}\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
     }
    ]
   },
@@ -22438,7 +22498,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu_native.rs",
    "crate": "root",
    "src_sha256": "74f7f1c6dc08e35587866089d39528392008767e3ab20b6842c2e924e9d3a3dd",
-   "dest_sha256": "e99600f778e2825d10d67862c26d06765d6ddc9bd70bf685903a0365ec722eda",
+   "dest_sha256": "cc0931c77d1a62339fc286df3327ed5f1caea6eae8d779d7025b2f238bbca829",
    "edits": [
     {
      "old": "super::note(&format!(\"[MiiOrdinaryCpu] bank settle diverged",
@@ -22759,6 +22819,16 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "old": "        if s.departed || s.busy() || s.request.is_some() || s.capture || !s.menu_valid {return Err(PublishRefusal::Busy);}\n",
+     "new": "        if s.departed || !s.publication_idle() || s.capture || !s.menu_valid {return Err(PublishRefusal::Busy);}\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "    if state.departed || state.busy() || state.request.is_some() {return Err(PublishRefusal::Busy);}\n",
+     "new": "    if state.departed || !state.publication_idle() {return Err(PublishRefusal::Busy);}\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
     }
    ]
   },
@@ -22816,7 +22886,7 @@
    "dest": "src/runtime/mii/mii_ordinary_native.rs",
    "crate": "root",
    "src_sha256": "f359be35b161aa256850d33edc2f12d042927bbfb7e1fac4192e14876a8238d2",
-   "dest_sha256": "5caf7465985f04cfa74d06276f810d46dd928584f505cba004c1bf248a85c079",
+   "dest_sha256": "6651e7635a270a5eeceeca4173bc791e982d6412e813fffbc7ef5495eed0b1e2",
    "edits": [
     {
      "old": "super::note(&format!(\"[MiiOrdinaryPlayer] bank settle diverged",
@@ -23320,6 +23390,16 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "old": "        if s.busy() || s.request.is_some() || s.capture || !s.menu_valid {return Err(PublishRefusal::Busy);}\n",
+     "new": "        if !s.publication_idle() || s.capture || !s.menu_valid {return Err(PublishRefusal::Busy);}\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "    if state.busy() || state.request.is_some() {return Err(PublishRefusal::Busy);}\n",
+     "new": "    if !state.publication_idle() {return Err(PublishRefusal::Busy);}\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
     }
    ]
   },
@@ -23328,7 +23408,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "efbfb095bb2807daf6998463a64b77b38fc81aa371b41d50023d311549bf69eb",
+   "dest_sha256": "aa56b214976dfa5a0a397f89c98316abaa0b5c2f6d07e59f8ce7c501bc292940",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -24111,6 +24191,31 @@
      "old": "    if !reuse && restore.is_none() && request==Request::CYCLE && same_class.is_none() && !hat_change && !exit {\n",
      "new": "    // Phase 2a: a direct pick, a menu choice and a restore too.\n    if !reuse && !request.refresh_partners() && same_class.is_none() && !hat_change && !exit {\n",
      "reason": "rc.14 cycle fix 4: phase 2 (operator ~20:58Z, the primary ~21:05Z): 2a picks and restores take demand; 2b a Building bank is waited for; 2c a remaining Reload with Built groups is a one-member bank Reload so (a') keeps them; 2d KEEP_MII_ACROSS_RELOAD (off) and the diag knob for the rc.12 crash's fail-first row"
+    },
+    {
+     "old": "    mii_exit:None,\n",
+     "new": "    mii_exit:None,demand:None,\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "    mii_exit:Option<MiiExit>,\n}\n",
+     "new": "    mii_exit:Option<MiiExit>,\n    /// rc.14 cycle fix: the request that waits for its own `body_bank::demand` group.\n    demand:Option<Request>,\n}\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "        self.track.is_some()\n    }\n",
+     "new": "        self.track.is_some()\n    }\n    /// A Mii group's record publication may run (`mii_publish::publication_idle`).\n    fn publication_idle(&self)->bool {\n        crate::engine::swap::body_bank::mii_publish::publication_idle(self.busy(),self.request.is_some(),\n            self.request.is_some() && self.demand==self.request)\n    }\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "/// `R+0x68`, MII-GROUPS-DESIGN \u00a71.4/\u00a75.2). Idle owner only. A busy refusal is\n",
+     "new": "/// `R+0x68`, MII-GROUPS-DESIGN \u00a71.4/\u00a75.2). Idle owner only, or a press waiting for this group (`State::publication_idle`). A busy refusal is\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "        if configuration.is_some_and(|c|super::body_bank::demand(0,kind,c)) {return false;}\n",
+     "new": "        // The press waits; its group's CharInfo publication may run beside it (`State::publication_idle`).\n        let waits=configuration.is_some_and(|c|super::body_bank::demand(0,kind,c));\n        STATE.lock().demand=waits.then_some(request);\n        if waits {return false;}\n",
+     "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
     }
    ]
   },

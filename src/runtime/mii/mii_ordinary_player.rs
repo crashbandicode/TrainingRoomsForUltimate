@@ -23,7 +23,7 @@ static STATE:OwnerMutex<State>=OwnerMutex::new(State {
     owner:None,track:None,catalog:None,capture:false,capture_at:(0,0),menu_valid:false,request:None,next:1,
     generic:None,restore:None,
     bank:None,
-    mii_exit:None,
+    mii_exit:None,demand:None,
 });
 struct Owner {
     origin:native::Snapshot,
@@ -99,12 +99,19 @@ struct State {
     restore:Option<WaitingValue>,
     bank:Option<BankTrack>,
     mii_exit:Option<MiiExit>,
+    /// rc.14 cycle fix: the request that waits for its own `body_bank::demand` group.
+    demand:Option<Request>,
 }
 impl State {
     /// An owned phase-6 transaction or bank member switch holds this adapter.
     fn busy(&self)->bool {
         if self.bank.is_some() {return true;}
         self.track.is_some()
+    }
+    /// A Mii group's record publication may run (`mii_publish::publication_idle`).
+    fn publication_idle(&self)->bool {
+        crate::engine::swap::body_bank::mii_publish::publication_idle(self.busy(),self.request.is_some(),
+            self.request.is_some() && self.demand==self.request)
     }
 }
 fn base()->usize { BASE.load(Ordering::Acquire) }
@@ -560,7 +567,7 @@ pub(super) unsafe fn service(entry:*mut u8,owner:u32)->bool {
 
 /// A planned Mii group's CharInfo goes onto this owner's selector record before
 /// the bank requests the group's keys (the key request copies the record at
-/// `R+0x68`, MII-GROUPS-DESIGN §1.4/§5.2). Idle owner only. A busy refusal is
+/// `R+0x68`, MII-GROUPS-DESIGN §1.4/§5.2). Idle owner only, or a press waiting for this group (`State::publication_idle`). A busy refusal is
 /// retried next frame at no cost; a read/write race counts against the group; a
 /// refusal that cannot clear while the owner idles fails the group at once
 /// (`crate::engine::swap::body_bank::mii_publish`). The refusal reason is noted once.
@@ -941,7 +948,10 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
             mii_cycle::Target::Saved(_)=>publish.filter(|_|MiiClass::from_kind(kind).is_some()).map(Some),
             _=>None,
         };
-        if configuration.is_some_and(|c|super::body_bank::demand(0,kind,c)) {return false;}
+        // The press waits; its group's CharInfo publication may run beside it (`State::publication_idle`).
+        let waits=configuration.is_some_and(|c|super::body_bank::demand(0,kind,c));
+        STATE.lock().demand=waits.then_some(request);
+        if waits {return false;}
     }
     if !permitted(){return false;}
     let Some(pose)=capture_reload_pose(entry,0) else {
