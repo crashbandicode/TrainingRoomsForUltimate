@@ -489,16 +489,10 @@ pub enum Step {
 }
 
 /// A plan: at most `CAPACITY` steps, no allocation.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Plan {
     steps: [Option<Step>; Plan::CAPACITY],
     len: usize,
-}
-
-impl Default for Plan {
-    fn default() -> Self {
-        Self { steps: [None; Plan::CAPACITY], len: 0 }
-    }
 }
 
 impl Plan {

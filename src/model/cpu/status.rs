@@ -5,11 +5,12 @@
 use super::ids::{Table, C, CLATTER_STATUSES};
 
 /// The situation of a fighter (`StatusModule::situation_kind`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Situation {
     Ground,
     Air,
     Cliff,
+    #[default]
     Other,
 }
 

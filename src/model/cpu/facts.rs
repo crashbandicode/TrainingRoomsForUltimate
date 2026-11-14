@@ -24,7 +24,7 @@ pub struct TechFacts {
 }
 
 /// One body's facts for one frame.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct FrameFacts {
     pub status: i32,
     /// `StatusModule::prev_status_kind(0)`.
@@ -46,26 +46,6 @@ pub struct FrameFacts {
     pub reserve_dive: bool,
     /// The work flag `FIGHTER_INSTANCE_WORK_ID_FLAG_DISABLE_ESCAPE_PENALTY` as the game has it now.
     pub penalty_disabled: bool,
-}
-
-impl Default for FrameFacts {
-    fn default() -> Self {
-        Self {
-            status: 0,
-            prev_status: 0,
-            situation: Situation::Other,
-            prev_situation: Situation::Other,
-            motion_frame: 0,
-            player_x: 0.0,
-            cpu_x: 0.0,
-            catch_cliff: false,
-            cont_cliff_attack: false,
-            tech: TechFacts::default(),
-            falling: false,
-            reserve_dive: false,
-            penalty_disabled: false,
-        }
-    }
 }
 
 /// A playback the CPU behaviours ask the recording spec to start.
