@@ -612,7 +612,40 @@ the orbs are still the plugin's own panes, articles' hitboxes included.
   pills are cut, hitboxes and grab boxes first and hurtboxes last (review HB-2), with the same once-only log line.
 - SPEC-core-06 §2a and §9 carry the rule; `core06_capsule_is_two_ends` replaces `core06_capsule_sampling`.
 
-## Open (2026-11-14, evening): the setup library
+## rc.14 previews (2026-11-14): Break the Targets
+
+Two clips from the Eden test runs of Break the Targets (`btt-4-2`, `btt-4-3`; builds `d2/btt-4` on the rc.14 core).
+These are test-run footage, not the final docs GIFs. The notice band moves once more (below the frame strip when Input
+Display is On), and the docs GIFs are shot on the final rc.14 build. Untested on hardware.
+
+![Break the Targets: Practice games › Place targets; the zoomed-out view; three targets placed with A (Place targets 3/10)](decisions/rc14-preview-btt-place.gif)
+
+*Placing: Practice games › Place targets, then A places a target where the cursor is (three placed).*
+
+![Break the Targets: a run of three targets; the clock starts on the first input, and Done shows the time and the best](decisions/rc14-preview-btt-run.gif)
+
+*A run: Targets 0/3 0:00.00 → 2/3 → "Done! 3 in 0:04.08 (best 0:04.06)".*
+
+## rc.14 sweet and sour spots (2026-11-14): decided
+
+The operator, ~17:55Z: "Can we add a sour spot and sweet spot visualization in the hitbox visualizer as a togglable
+option? Also to the input visualizer as well as a togglable option so it says if you landed the sour spot or sweet spot.
+That can be added as an option to the combo "landing" or not as well. This should go in the build you're working on."
+Then, ~18:07Z: "sp recommendations sound good".
+
+| # | Decided |
+| --- | --- |
+| SP1 | Automatic from the game's hitbox data: the strongest hitbox out on that frame is **Sweet**, weaker ones **Sour**; a hit weaker than the same move's earlier strongest hit is **Late**. Equal hitboxes, or a hit TR can't attribute, get no label |
+| SP2 | Hitbox colours with the option On: Sweet keeps today's red, Sour light blue, Late grey; grab boxes and hurtboxes unchanged |
+| SP3 | Input Display: a Sweet / Sour / Late label on each hit marker, Player 1 and CPU rows |
+| SP4 | Combos: each link remembers the spot it landed; with "Match sweet/sour spot" On a link counts only on the same spot |
+| SP5 | Three rows, all Off by default: under Hitbox Visualization, under Input Display, and in Recording › Options |
+
+## Decided (2026-11-14, evening): the setup library
+
+**Decided 2026-11-14 (~18:07Z).** The operator, verbatim: "Sl1, yes / Sl2, full fix now / Sl3 add to rc14 / Sl4 add to
+rc14". All four go into rc.14: the stage and spots on the list, a full rename with X, a setup's own screen with Delete,
+and "Save setup here". The options and recommendations below stay as the record.
 
 The operator, 2026-11-14 ~17:28Z: "the setup library and gifs could use some improvement". A review read the code and
 the two shipped GIFs and drew one mockup per change (`artifacts/setup-library-review/PROPOSAL.md`, not in this repo).
