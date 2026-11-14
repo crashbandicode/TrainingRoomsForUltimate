@@ -1105,7 +1105,8 @@ pub fn target_first(forms: Forms, groups: bool, pool: usize) -> Option<Members> 
 /// the lane gives the target no `full` window (no cycle neighbour, or only special-group ones such as Pokémon Trainer beside
 /// Kirby) the switch keeps its canonical Reload, with no bank, as before target-first. A one-member bank there let the
 /// planner add groups no window had brought: integration FLAG 2 2026-11-10 17:56Z, P1's PT group planned beside a live
-/// Kirby and deferred by D-KIRBY1, so the notice stayed at "Loading 4/7".
+/// Kirby and deferred by D-KIRBY1, so the notice stayed at "Loading 4/7". rc.14: a lane whose only neighbours form a
+/// native group or the pair gives a non-Kirby target its one-member window instead ([`special_neighbour_window`]).
 pub fn reload_window(full: Option<Members>, forms: Forms, groups: bool, pool: usize, live_gate: Option<u32>) -> Option<Members> {
     let full = full?;
     Some(target_first(forms, groups && groups_load_beside(live_gate), pool).unwrap_or(full))
@@ -1119,6 +1120,22 @@ pub fn reload_window(full: Option<Members>, forms: Forms, groups: bool, pool: us
 /// "Loading" until P1 left him (integration 2026-11-10 18:16Z; A's `tf-direct-after-3f7dca0c` #443–#446).
 pub fn groups_load_beside(live_gate: Option<u32>) -> bool {
     prefetch_admitted(live_gate).is_ok()
+}
+
+/// rc.14 pt-groups (the primary 2026-11-14 ~21:45Z; gif-lane-5 `g5-rc13-xps-6` `p2-g5-pt-groups`, Player 1's cycle Mario and
+/// Pokémon Trainer: every press a canonical Reload, the PT group never planned): the window a switch builds when the lane
+/// gives its target no full window ([`reload_window`] is `None`) and its only neighbours form a native group (Pokémon
+/// Trainer, Pyra/Mythra) or the normal Ice Climbers pair. Those groups are planned only beside a role's bank
+/// ([`plan_extra_groups_with`] gives a role without a window nothing), so without one they never load. It is the target's
+/// one-member window ([`Members::target_only`]) when group swap is on, the target is not Kirby (`ad1a54c2`'s case,
+/// integration FLAG 2 2026-11-10: P1's PT group planned beside a live Kirby, "Loading 4/7"), its groups load beside it
+/// ([`groups_load_beside`]) and such a group in `lane` fits `room` (the pool less the other role's bodies). `None` keeps
+/// the canonical Reload: no such neighbour (the menu's no-cycle pick, a Mii), the switches off, a Kirby target, a deferring
+/// gate, no room, or a target with no one-member window (a PT or Aegis form, the pair).
+pub fn special_neighbour_window(forms: Forms, lane: impl IntoIterator<Item = u32>, special: SpecialPolicy, groups: bool,
+    room: usize, live_gate: Option<u32>) -> Option<Members> {
+    let _ = (forms, lane.into_iter().count(), special, groups, room, live_gate);
+    None
 }
 
 /// The group a [`target_first`] Reload's neighbours build as: the members the `full` window would have held besides
@@ -2891,6 +2908,133 @@ mod tests {
         assert_eq!(reload_window(full, gw, true, 0, Some(GAME_WATCH)), full);
     }
 
+    // ----- rc.14 pt-groups (gif-lane-5 `g5-rc13-xps-6` `p2-g5-pt-groups`: P1's cycle Mario and Pokémon Trainer stayed cold
+    // with PT / Aegis groups On; kinds from `trio.rs` :93-97) -----
+
+    const SQUIRTLE: u32 = 0x24;
+    const IVYSAUR: u32 = 0x25;
+    const CHARIZARD: u32 = 0x26;
+    const PYRA: u32 = 0x5a;
+    const MYTHRA: u32 = 0x5b;
+
+    /// The take's P1 (original Mario; cycle Pokémon Trainer, or Pyra/Mythra) beside its CPU (window `[b]`, group `[8]`:
+    /// original Pikachu, cycle Captain Falcon) at Ready Fighters 10 and 12. The switch onto Mario has no full window, so
+    /// before rc.14 it was canonical and the planner, with no P1 window, planned nothing for P1. With the target's
+    /// one-member window the native group is planned whole beside it, and it serves every one of its forms.
+    fn a_role_whose_only_neighbours_are_a_native_group_gets_a_bank_and_plans_the_group() {
+        let mario = Forms::starting(MARIO);
+        let (cpu_window, cpu_groups) = (Members::new(&[FALCON]).unwrap(), [Members::new(&[PIKACHU]).unwrap()]);
+        let cases: [(&[u32], [u32; NATIVE_MEMBERS]); 3] = [
+            (&[SQUIRTLE, MARIO, SQUIRTLE, MARIO], [SQUIRTLE, IVYSAUR, CHARIZARD]),
+            (&[PYRA, MARIO, PYRA, MARIO], [PYRA, MYTHRA, NONE]),
+            (&[PYRA, MYTHRA, MARIO, PYRA], [PYRA, MYTHRA, NONE]),
+        ];
+        for (lane, group) in cases {
+            assert_eq!(Members::from_forms(mario, lane, 2), None, "{lane:x?}: no ordinary neighbour");
+            assert_eq!(reload_window(None, mario, true, 8, Some(MARIO)), None, "no full window");
+            for ready_fighters in [10, 12] {
+                let budget = budget_special(ready_fighters, SpecialPolicy::ALL);
+                // Without a P1 window the planner gives P1 nothing (the take: no `[GroupSwap] plan owner=0` line).
+                let canonical = plan_extra_groups([None, Some(cpu_window)], [&[], &cpu_groups], [lane, &[PIKACHU]], [None, None], budget);
+                assert!(canonical[0].iter().all(Option::is_none), "{lane:x?} RF {ready_fighters}: {canonical:x?}");
+                // `proposed`'s room: the pool (Ready Fighters less the two on screen) less the CPU's bodies.
+                let room = (ready_fighters - 2) - (cpu_window.count() - 1) - cpu_groups[0].count();
+                let window = special_neighbour_window(mario, lane.iter().copied(), SpecialPolicy::ALL, true, room, Some(MARIO));
+                assert_eq!(window, Members::target_only(mario), "{lane:x?} RF {ready_fighters}");
+                let window = window.unwrap();
+                assert_eq!((window.kinds(), window.special()), ([MARIO, NONE, NONE], Special::None));
+                let plan = plan_extra_groups([Some(window), Some(cpu_window)], [&[], &cpu_groups], [lane, &[PIKACHU]], [None, None], budget);
+                let planned = plan[0][0].unwrap_or_else(|| panic!("{lane:x?} RF {ready_fighters}: no group {plan:x?}"));
+                assert_eq!(planned.kinds(), group);
+                assert_eq!(Some(planned), Members::native_group(lane[0]));
+                assert!(matches!(planned.special(), Special::Native(_)));
+                assert!(plan[0][1..].iter().all(Option::is_none), "the group once: {plan:x?}");
+                for kind in group.iter().copied().filter(|kind| *kind != NONE) {
+                    assert!(planned.index_of(kind).is_some(), "{kind:#x} served by its group");
+                }
+            }
+        }
+    }
+
+    /// The same for the normal Ice Climbers pair under `pair_groups` (`proposed` passes a lane `0x4b` only when the role's
+    /// numbered form is the pair and its original is not Ice Climbers, as the planner's own lane filter does).
+    fn a_role_whose_only_neighbour_is_the_pair_gets_a_bank_and_plans_the_pair_group() {
+        let mario = Forms::starting(MARIO);
+        let lane = [POPO, MARIO, POPO];
+        let window = special_neighbour_window(mario, lane, SpecialPolicy::ALL, true, 8, Some(MARIO)).unwrap();
+        assert_eq!(window, Members::target_only(mario).unwrap());
+        let plan = plan_extra_groups([Some(window), None], [&[], &[]], [&lane[..], &[]], [None, None], budget_special(10, SpecialPolicy::ALL));
+        assert_eq!(plan[0][0], Some(Members::pair_group()));
+        assert_eq!(special_neighbour_window(mario, lane, SpecialPolicy::NATIVE, true, 8, Some(MARIO)), None, "pair groups off");
+        assert_eq!(special_neighbour_window(mario, lane, SpecialPolicy::ALL, true, 1, Some(MARIO)), None, "the pair needs 2");
+    }
+
+    /// What stays canonical: `ad1a54c2`'s Kirby beside Pokémon Trainer (kr-after; with the G68 step owned too, gate
+    /// `None`), a gate D-KIRBY1 defers, the switches off (PT / Aegis groups Off: the take's cold half), no room, no special
+    /// neighbour (the menu's no-cycle pick, an ordinary lane, a Mii), and a target with no one-member window.
+    fn a_kirby_target_or_a_lane_without_a_special_group_keeps_the_canonical_reload() {
+        let kirby = Forms::starting(KIRBY);
+        let kr_after = [SQUIRTLE, KIRBY, SQUIRTLE, KIRBY, SQUIRTLE];
+        assert_eq!(Members::from_forms(kirby, &kr_after, 2), None);
+        for gate in [Some(KIRBY), None] {
+            assert_eq!(special_neighbour_window(kirby, kr_after, SpecialPolicy::ALL, true, 8, gate), None, "Kirby, gate {gate:x?}");
+        }
+        let mario = Forms::starting(MARIO);
+        let lane = [SQUIRTLE, MARIO];
+        assert!(!groups_load_beside(Some(KIRBY)));
+        assert_eq!(special_neighbour_window(mario, lane, SpecialPolicy::ALL, true, 8, Some(KIRBY)), None, "deferring gate");
+        assert_eq!(special_neighbour_window(mario, lane, SpecialPolicy::NONE, true, 8, Some(MARIO)), None, "PT / Aegis groups Off");
+        assert_eq!(special_neighbour_window(mario, lane, SpecialPolicy::ALL, false, 8, Some(MARIO)), None, "Group Swap Off");
+        assert_eq!(special_neighbour_window(mario, lane, SpecialPolicy::ALL, true, 2, Some(MARIO)), None, "PT needs 3 bodies");
+        assert!(special_neighbour_window(mario, [PYRA, MARIO], SpecialPolicy::ALL, true, 2, Some(MARIO)).is_some(), "Aegis needs 2");
+        assert_eq!(special_neighbour_window(mario, std::iter::empty(), SpecialPolicy::ALL, true, 8, Some(MARIO)), None, "no cycle");
+        assert_eq!(special_neighbour_window(mario, [PIKACHU], SpecialPolicy::ALL, true, 8, Some(MARIO)), None, "ordinary lane");
+        assert_eq!(special_neighbour_window(mario, [GUNNER, MARIO], SpecialPolicy::MII, true, 8, Some(MARIO)), None, "a Mii");
+        for target in [SQUIRTLE, IVYSAUR, CHARIZARD, PYRA, MYTHRA] {
+            assert_eq!(special_neighbour_window(Forms::starting(target), [MARIO, SQUIRTLE, PYRA], SpecialPolicy::ALL, true, 8,
+                Some(target)), None, "{target:#x} has no one-member window");
+        }
+        assert_eq!(special_neighbour_window(Forms::starting(POPO), [MARIO, SQUIRTLE], SpecialPolicy::ALL, true, 8, Some(POPO)),
+            None, "the pair has its own pair-lead window");
+    }
+
+    /// The take's lap, P1 Mario > Pokémon Trainer from the canonical PT the cold half leaves, through the bank model: a
+    /// press onto the live unit is a reuse, onto a group an exchange (while the group is still Planned or Prefetching the
+    /// press waits for it: `demand`'s first branch), anything else a Reload that builds `proposed`'s window (a full window,
+    /// else this one-member window, else canonical) and keeps no group. `demand` never plans a native group for a cold
+    /// press (it is no one-member group), so without a bank the PT press stays a Reload. PT / Aegis groups On: one Reload,
+    /// the first press onto Mario, then every press warm. Off: every press a Reload, as g5-rc13-xps-6's cold half.
+    fn the_pt_lap_is_warm_after_its_first_reload_with_the_switch_on_and_cold_with_it_off() {
+        let off = SpecialPolicy { native: false, ..SpecialPolicy::ALL };
+        for (special, ready_fighters, reloads) in [(SpecialPolicy::ALL, 10, 1), (SpecialPolicy::ALL, 12, 1), (off, 10, 8), (off, 12, 8)] {
+            let budget = budget_special(ready_fighters, special);
+            let (mut window, mut groups): (Option<Members>, Vec<Members>) = (None, Vec::new());
+            let mut count = 0;
+            for press in 0..8 {
+                let target = if press % 2 == 0 { MARIO } else { SQUIRTLE };
+                let next = if target == MARIO { [SQUIRTLE, MARIO] } else { [MARIO, SQUIRTLE] };
+                if window.is_some_and(|w| w.index_of(target).is_some()) {
+                    // A reuse.
+                } else if let (Some(w), Some(g)) = (window, groups.iter().position(|g| g.index_of(target).is_some())) {
+                    let attached = groups.remove(g);
+                    groups.push(w);
+                    window = Some(attached);
+                } else {
+                    count += 1;
+                    let forms = Forms::starting(target);
+                    window = reload_window(Members::from_forms(forms, &next, 2), forms, true, ready_fighters - 2, Some(target))
+                        .or_else(|| special_neighbour_window(forms, next, special, true, ready_fighters - 2, Some(target)));
+                    groups.clear();
+                }
+                if let Some(w) = window {
+                    let plan = plan_extra_groups([Some(w), None], [&groups[..], &[]], [&next[..], &[]], [None, None], budget);
+                    groups.extend(plan[0].iter().flatten().copied());
+                }
+            }
+            assert_eq!(count, reloads, "{special:?} RF {ready_fighters}: {window:x?} {groups:x?}");
+        }
+    }
+
     /// rc.7 FLAG 3: steps two banks (`groups`, from `states`) through `next_step`, `memory::admit` and
     /// `memory::outstanding`, each step spending at most what `final-surface-i3-nt-7d720c68` measured (a prefetch 57 MB at
     /// #331, a build 18 MB at #709). Returns the tick at which each bank's group 1 was admitted, and the final states.
@@ -3702,6 +3846,10 @@ mod tests {
             ("a_kept_group_holds_its_module_across_its_owners_reload", a_kept_group_holds_its_module_across_its_owners_reload as fn()),
             ("a_role_without_a_bank_still_counts_the_window_its_next_swap_prepares", a_role_without_a_bank_still_counts_the_window_its_next_swap_prepares as fn()),
             ("a_switch_with_no_window_to_rebuild_keeps_its_canonical_reload", a_switch_with_no_window_to_rebuild_keeps_its_canonical_reload as fn()),
+            ("a_role_whose_only_neighbours_are_a_native_group_gets_a_bank_and_plans_the_group", a_role_whose_only_neighbours_are_a_native_group_gets_a_bank_and_plans_the_group as fn()),
+            ("a_role_whose_only_neighbour_is_the_pair_gets_a_bank_and_plans_the_pair_group", a_role_whose_only_neighbour_is_the_pair_gets_a_bank_and_plans_the_pair_group as fn()),
+            ("a_kirby_target_or_a_lane_without_a_special_group_keeps_the_canonical_reload", a_kirby_target_or_a_lane_without_a_special_group_keeps_the_canonical_reload as fn()),
+            ("the_pt_lap_is_warm_after_its_first_reload_with_the_switch_on_and_cold_with_it_off", the_pt_lap_is_warm_after_its_first_reload_with_the_switch_on_and_cold_with_it_off as fn()),
             ("both_banks_with_a_deferred_group_build_then_admit_it", both_banks_with_a_deferred_group_build_then_admit_it as fn()),
             ("a_canonical_reload_of_the_window_shape_retires_a_one_member_bank", a_canonical_reload_of_the_window_shape_retires_a_one_member_bank as fn()),
             ("eight_ready_fighters_default_gives_five_and_three", eight_ready_fighters_default_gives_five_and_three as fn()),
