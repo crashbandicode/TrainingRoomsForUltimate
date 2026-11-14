@@ -283,8 +283,8 @@ the first pass warps to the start save, and a chain repeats as a whole.
 - **How:** Left/Right step through the counts (wrapping). X does the same with the cursor in MACROS, here or in the
   pop-up. A opens the list of counts, but picking one there doesn't change the count in this build: use Left/Right.
 
-The count is kept with your recordings (`recording-index.json`), so *Reset page to defaults* leaves it as it is. The
-MACROS header shows it too.
+The count is kept with your recordings (`recording-index.json`), not with your saved defaults, so X doesn't save it.
+*Reset page to defaults* puts both counts, Player 1's and the CPU's, back to 1. The MACROS header shows the count too.
 
 More: [The loop](../guide/recording.md#the-loop)
 
@@ -348,10 +348,9 @@ More: [Save states](../guide/save-states.md)
 ## Reset page to defaults
 
 The last row of the page. It asks first, then puts every Replays and Options row back to your saved defaults (the
-factory values above, until you save your own with X on another page; X doesn't save on this page). It leaves your
-files, the bound save, the active macros, the drill, the [Loop](#loop) counts and
-[Replay capture](#replay-capture) as they are.
-
+factory values above, until you save your own with X on another page; X doesn't save on this page). It also puts both
+[Loop](#loop) counts back to 1, whatever defaults you saved. It leaves your files, the bound save, the active macros, the
+drill and [Replay capture](#replay-capture) as they are.
 ## The Recording pop-up
 
 ZR + D-pad Right opens the pop-up over the match, wherever the menu opens

@@ -106,6 +106,7 @@ Options › [Loop](../menu/recording.md#loop), or with X in MACROS.
 
 - **Only the first pass warps** to the start save (when its switch is On). The loop never warps back.
 - **A chain repeats as a whole:** 1, 2, 3, then 1 again. ∞ keeps going until you press the Play chord again.
+- **Reset page to defaults** (Recording › Options) puts both counts back to 1.
 
 ![The second pass of a loop continues from where the fighters are](../media/rc7-loop-no-warp.gif)
 
