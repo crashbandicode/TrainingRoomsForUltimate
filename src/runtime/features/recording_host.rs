@@ -5,6 +5,7 @@ use std::path::Path;
 use crate::engine::macros::InputFrame;
 use crate::engine::rr_host::{self, Tick};
 use crate::model::input_delay::MappedInputs;
+use crate::runtime::macros::named_macros::fighter_label;
 
 const NAME_TOKEN: u64 = 1 << 62;
 const NOTICE_ID: u8 = 0x2C;
@@ -206,7 +207,7 @@ pub fn service() {
     rr_host::set_strip_sample(super::combo::strip_sample());
     rr_host::set_record_trim(super::recorder::settings().crop);
     if player.fighter_kind >= 0 {
-        rr_host::set_fighter_label(&crate::runtime::macros::named_macros::fighter_label(player.fighter_kind));
+        rr_host::set_fighter_label(&fighter_label(player.fighter_kind));
     }
     let online = keyboard_closed();
     // Migration first. Nothing records into the old numbered slots any more (rc.12 TR2), so it finds them empty.
@@ -296,12 +297,12 @@ fn take_mismatch_answer() {
 fn apply(tick: &Tick) {
     if let Some(ask) = &tick.mismatch {
         let recorded = if ask.recorded_kind >= 0 {
-            crate::runtime::macros::named_macros::fighter_label(ask.recorded_kind)
+            fighter_label(ask.recorded_kind)
         } else {
             ask.recorded_label.clone()
         };
         let current = if ask.current_kind >= 0 {
-            crate::runtime::macros::named_macros::fighter_label(ask.current_kind)
+            fighter_label(ask.current_kind)
         } else {
             ask.current_label.clone()
         };
@@ -327,7 +328,7 @@ fn apply(tick: &Tick) {
     }
     if let Some(name) = &tick.switch_name {
         if let Some(kind) = (0..128u32).find(|kind| {
-            crate::runtime::macros::named_macros::fighter_label(*kind as i32) == name.as_str()
+            fighter_label(*kind as i32) == name.as_str()
         }) {
             crate::runtime::roster::roster_requests::request_player_kind(kind);
         }

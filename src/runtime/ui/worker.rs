@@ -25,6 +25,8 @@ use crate::runtime::macros::{named_macros, replay_capture};
 use crate::runtime::ui::{combos, external, requests};
 use crate::model::input_delay::Owners;
 use crate::runtime::ui::state::{CLOSE_COUNT, CLOSE_FADES, CLOSE_HELD, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, JUMPS, LAYOUT_READY, OPEN, POPUP, POPUP_REQ, PROMPT};
+use crate::model::storage::ROOT;
+use crate::engine::stages::stage_forms::Selection;
 
 static INPUT: Ring<64> = Ring::new();
 /// What wakes the menu worker (`wake`, any thread, game hooks included). A `hos_lock::Event`, not `std::thread::park`/`unpark`:
@@ -187,7 +189,7 @@ struct Session {
     combos: combos::Ui,
     stage_context: Option<crate::runtime::lobby::practice_stage_request::MenuContext>,
     /// The stage picked to go to: requested when the menu has closed (`close_session`).
-    stage_close: Option<crate::engine::stages::stage_forms::Selection>,
+    stage_close: Option<Selection>,
     phase: Phase,
     /// The panel row the menu is on while `phase` is `Panel`.
     panel: Option<Editor>,
@@ -506,7 +508,7 @@ fn post_recording_effect(menu: &mut Menu) {
     });
     crate::engine::rr_host::note_drill(drill.clone());
     apply_grade_target(drill.as_deref(), kind);
-    crate::engine::rr_host::publish_selection(std::path::Path::new(crate::model::storage::ROOT), &selection, kind);
+    crate::engine::rr_host::publish_selection(std::path::Path::new(ROOT), &selection, kind);
     crate::engine::rr_host::post_effect(menu.recording_mut().take_effect());
 }
 
@@ -529,7 +531,7 @@ fn apply_grade_target(drill: Option<&str>, kind: Option<crate::engine::library::
     use crate::engine::rr_host::{follow_drill, DrillFollow};
     use crate::runtime::features::combo;
 
-    let root = std::path::Path::new(crate::model::storage::ROOT);
+    let root = std::path::Path::new(ROOT);
     let mut applied = APPLIED.lock();
     let now = applied.as_ref().map(|a| (a.kind, a.id.as_str()));
     match follow_drill(now, kind, drill) {
@@ -575,7 +577,7 @@ fn apply_grade_target(drill: Option<&str>, kind: Option<crate::engine::library::
 fn sync_sequence_drill() {
     use crate::runtime::features::combo;
 
-    let root = std::path::Path::new(crate::model::storage::ROOT);
+    let root = std::path::Path::new(ROOT);
     // The plans the game replaced come back here to be dropped (the game never frees one).
     combo::reap_plans();
     let mut applied = APPLIED.lock();
@@ -614,7 +616,7 @@ fn refresh_recording(s: &mut Session) -> bool {
     menu.recording_mut().set_keyboard_blocked(crate::runtime::features::recording_host::keyboard_is_closed());
     let mut changed = false;
     if due {
-        if let Ok(loaded) = crate::engine::rr_runtime::load_catalog(std::path::Path::new(crate::model::storage::ROOT)) {
+        if let Ok(loaded) = crate::engine::rr_runtime::load_catalog(std::path::Path::new(ROOT)) {
             menu.recording_mut().set_catalog(loaded.catalog);
             menu.recording_mut().adopt(loaded.bound, loaded.active, loaded.loops, loaded.drill);
             menu.recording_mut().adopt_slots(loaded.slots);
@@ -848,7 +850,7 @@ fn sync_mii(s: &mut Session) {
 }
 /// A, X or Y on the Lobby Stages or Change Stage grid: the stage editor applies it to the menu's kept values. A stage to go to (A on
 /// Change Stage, or A in Direct on Lobby Stages) is returned: the menu closes and `close_session` requests it then.
-fn stage_press(m: &mut Menu, tile: u16, button: Button) -> Option<crate::engine::stages::stage_forms::Selection> {
+fn stage_press(m: &mut Menu, tile: u16, button: Button) -> Option<Selection> {
     use crate::editors::stages::{Effect, StageEditor, ORDER_KEY, PREFERENCES_KEY};
     let change = matches!(m.screen(), Some(Screen::Grid { layout, .. })
         if layout.kind == crate::model::menu::grid::GridKind::StageChange);

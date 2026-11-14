@@ -44,6 +44,7 @@ use crate::runtime::features::{chords, cpu, hide_cpu, input_display, notices, st
 use crate::runtime::game::{self, natives};
 use crate::runtime::macros::{named_macros, replay_preview};
 use crate::runtime::{published, scene};
+use crate::runtime::ui::pilot_export;
 
 static REC: Mutex<Recorder> = Mutex::new(Recorder::new());
 
@@ -479,7 +480,7 @@ unsafe fn chord_step(_body: Body, facing: i8) {
     }
     // rc.9 C14: Play on Player 1 is refused while an AI drives Player 1 (the same check as Record's B4).
     let play_player = match crate::model::recording::play_player_chord(play_player, || {
-        crate::model::recording::p1_driven_by_ai(natives::is_operation_cpu(0), crate::runtime::ui::pilot_export())
+        crate::model::recording::p1_driven_by_ai(natives::is_operation_cpu(0), pilot_export())
     }) {
         Ok(play) => play,
         Err(text) => {
@@ -518,7 +519,7 @@ unsafe fn begin_playback(slot: u8, facing: i8, ledge: bool) {
 /// fact includes the standalone pilot, read through its own export (`p1_driven_by_ai`).
 unsafe fn record_refusal() -> Option<RecordRefusal> {
     crate::model::recording::record_refusal(
-        crate::model::recording::p1_driven_by_ai(natives::is_operation_cpu(0), crate::runtime::ui::pilot_export()),
+        crate::model::recording::p1_driven_by_ai(natives::is_operation_cpu(0), pilot_export()),
         natives::fighter_entry(0) != 0,
         states::is_loading(),
     )

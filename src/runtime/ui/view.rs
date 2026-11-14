@@ -16,6 +16,7 @@ use crate::model::panes::{ACCENT, ACCENT_RING, BADGE_W, BADGE_X, BAND, CHIPS, CH
 const PLAYER: [u8; 4] = [255, 83, 92, 255];
 const CPU: [u8; 4] = [75, 164, 255, 255];
 use crate::runtime::ui::pane;
+use crate::model::frame::Text;
 
 /// The resolved panes of the menu in the layout now showing.
 pub struct Panes {
@@ -418,7 +419,7 @@ const PANEL_X: f32 = 520.0;
 const PANEL_NAME_W: f32 = 240.0;
 const PANEL_WEIGHT_W: f32 = 110.0;
 
-type PanelLine = Option<(crate::model::frame::Text<24>, crate::model::frame::Text<8>, Tone)>;
+type PanelLine = Option<(Text<24>, Text<8>, Tone)>;
 
 /// The panel's lines (mockup 09): a header, then each chip with a weight in chip order, `xN` at the right;
 /// "none selected" while the grid is empty.
@@ -427,8 +428,8 @@ fn selected_panel(frame: &Frame) -> [PanelLine; ROWS] {
     let mut lines: [PanelLine; ROWS] = [None; ROWS];
     let mut put = |at: usize, name: &str, weight: Option<u8>, tone: Tone| {
         if let Some(slot) = lines.get_mut(at) {
-            let mut n = crate::model::frame::Text::<24>::new();
-            let mut w = crate::model::frame::Text::<8>::new();
+            let mut n = Text::<24>::new();
+            let mut w = Text::<8>::new();
             let _ = n.write_str(name);
             if let Some(weight) = weight {
                 let _ = write!(w, "x{weight}");
@@ -518,11 +519,11 @@ impl Panes {
                 self.rect_at(needle, at.x, at.y, at.w, at.h, tint);
                 pane::set_rot_z(self.all[needle], at.rot);
             }
-            let mut name = crate::model::frame::Text::<16>::new();
+            let mut name = Text::<16>::new();
             let _ = core::fmt::Write::write_str(&mut name, DIRECTIONS[i]);
             self.label(IDX_CHIP_LABEL + i, name.units(), x, y - 70.0, CHIP_SIZE, if weight != 0 { TEXT } else { TEXT_DIM });
             if weight != 0 {
-                let mut badge = crate::model::frame::Text::<4>::new();
+                let mut badge = Text::<4>::new();
                 let _ = core::fmt::Write::write_fmt(&mut badge, format_args!("x{weight}"));
                 self.label(IDX_CHIP_BADGE + i, badge.units(), x + 60.0, y + 66.0, 60.0, TEXT_ON);
             } else {
@@ -794,7 +795,7 @@ impl Panes {
         }
         let marks = [(start, CLIP_BAR_Y - 52.0, bar.start, "in"), (end, CLIP_BAR_Y - 52.0, bar.end, "out"), (now, CLIP_BAR_Y + 70.0, bar.cursor, "now")];
         for (slot, (x, y, frames, name)) in marks.into_iter().enumerate() {
-            let mut text = crate::model::frame::Text::<16>::new();
+            let mut text = Text::<16>::new();
             let _ = write!(text, "{name} {frames}");
             self.label(IDX_CHIP_LABEL + slot, text.units(), x, y, 200.0, TEXT_DIM);
         }

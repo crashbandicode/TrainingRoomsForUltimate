@@ -8,6 +8,7 @@ use crate::engine::{mii::inventory::Snapshot, mii_root::mii_menu::Context};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use hos_lock::Mutex;
+use crate::runtime::roster::character_roster::mii_saved_alpha::menu_epoch;
 
 
 /// Which page of the menu is showing, as the Mii code asks: only "the menu's own page list is up" matters to it.
@@ -80,7 +81,7 @@ pub(crate) fn init_publications() {
 /// Native producer. Failed submission returns identical ownership to its policy.
 pub(crate) fn publish_catalog(publication: CatalogPublication) -> Result<(), CatalogPublication> {
     let sequence = sequence();
-    if !active() || publication.epoch != crate::runtime::roster::character_roster::mii_saved_alpha::menu_epoch()
+    if !active() || publication.epoch != menu_epoch()
         || !crate::runtime::mii::menu_handoff::opening_current(sequence) { return Err(publication); }
     let Some(producer) = PUBLICATIONS.get() else { return Err(publication); };
     producer.post(Publication { sequence, epoch: publication.epoch, value: publication })
@@ -91,11 +92,11 @@ pub(crate) fn publish_catalog(publication: CatalogPublication) -> Result<(), Cat
 /// epoch retirement both before and after this bounded drain.
 pub(crate) fn take_catalog() -> Option<CatalogPublication> {
     let sequence = sequence();
-    let epoch = crate::runtime::roster::character_roster::mii_saved_alpha::menu_epoch();
+    let epoch = menu_epoch();
     let open = active();
     let publication = CATALOG_READER.get()?.lock().take(sequence, epoch, open);
     if !open || !active() || sequence != self::sequence()
-        || epoch != crate::runtime::roster::character_roster::mii_saved_alpha::menu_epoch() { return None; }
+        || epoch != menu_epoch() { return None; }
     publication
 }
 
