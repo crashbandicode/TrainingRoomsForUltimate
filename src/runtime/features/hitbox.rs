@@ -325,10 +325,18 @@ struct OrbPanes {
     panes: [usize; crate::model::panes::ORBS],
     /// Caps and bands shown.
     shown: [usize; 2],
+    /// The practice games' pictures (`panes::IDX_EGG`..) and how many of each pool (`panes::EGG_POOLS`) show.
+    egg: ([usize; crate::model::panes::EGG_PANES], [usize; 3]),
 }
 
-static ORB_PANES: Mutex<OrbPanes> =
-    Mutex::new(OrbPanes { layout: 0, registrations: 0, container: 0, panes: [0; crate::model::panes::ORBS], shown: [0; 2] });
+static ORB_PANES: Mutex<OrbPanes> = Mutex::new(OrbPanes {
+    layout: 0,
+    registrations: 0,
+    container: 0,
+    panes: [0; crate::model::panes::ORBS],
+    shown: [0; 2],
+    egg: ([0; crate::model::panes::EGG_PANES], [0; 3]),
+});
 
 /// The layout tick's draw (`ui::hud`): every live orb projected with the game's own `world_to_screen` (so the orbs follow
 /// the camera, paused or not) and written into the plugin's panes as a pill; the rest hidden. A readiness boundary:
@@ -358,12 +366,13 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         if cache.layout == layout as usize && cache.registrations == registrations && cache.container != 0 {
             let shown = cache.shown;
             write_tick(&mut cache, [orbs::pane_tick(0, shown[0]), orbs::pane_tick(0, shown[1])]);
+            write_eggs(&mut cache, &[]);
         }
         return;
     }
     let on = SETTING.load(Ordering::Acquire);
     let any = on || own.iter().any(Option::is_some);
-    if !any && cache.shown == [0; 2] && cache.layout == layout as usize {
+    if !any && cache.shown == [0; 2] && cache.egg.1 == [0; 3] && cache.layout == layout as usize {
         return;
     }
     if cache.layout != layout as usize || cache.registrations != registrations {
@@ -372,6 +381,9 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         cache.registrations = registrations;
         cache.container = container as usize;
         cache.shown = [p::CAPS, p::BANDS];
+        for k in 0..p::EGG_PANES {
+            cache.egg.0[k] = pane::find_child((*layout).root_pane, p::name_of(p::IDX_EGG + k).as_bytes()) as usize;
+        }
         for k in 0..p::ORBS {
             cache.panes[k] = if container.is_null() { 0 } else { pane::find_child(container, p::name_of(p::IDX_ORB + k).as_bytes()) as usize };
         }
@@ -385,22 +397,33 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         return;
     }
     let mut used = orbs::PaneUse::default();
-    let mut over = 0;
+    let (mut over, mut looks) = (0, [None; 3]);
     if any {
         let half = match natives::screen_size_words() {
             Some([w, h]) => [orbs::screen_half(w, orbs::SCREEN_HALF_DEFAULT[0]), orbs::screen_half(h, orbs::SCREEN_HALF_DEFAULT[1])],
             None => [0.0; 2],
         };
-        let board = BOARD.lock();
-        // The target and its break animations, then hitboxes and grab boxes take the panes first; when they run out whole
-        // pills are cut, hurtboxes first (review HB-2).
-        for orb in orbs::drawn(&own, on, &board) {
-            let end = |at: [f32; 3]| -> Option<([f32; 2], [[f32; 2]; 2])> {
+        let plan = |orb: &Orb, color| {
+            let end = |at| {
                 let [x, y] = orbs::edge_points(at, orb.radius);
                 Some((natives::world_to_screen(&at)?, [natives::world_to_screen(&x)?, natives::world_to_screen(&y)?]))
             };
-            let (Some((a, ea)), Some((b, eb))) = (end(orb.centre), end(orb.tail)) else { continue };
-            let Some(pill) = orbs::plan_pill([a, b], [ea, eb], half, orb.color) else { continue };
+            let ((a, ea), (b, eb)) = (end(orb.centre)?, end(orb.tail)?);
+            orbs::plan_pill([a, b], [ea, eb], half, color)
+        };
+        // The target and its break animations are pictures whatever Hitbox Visualization says (rc.14): each is planned at the
+        // target's size in the texture's colours, then scaled and faded by its own radius and alpha (a break grows and
+        // fades). Slot 0 is the whole target, the others its cracked breaks.
+        looks = std::array::from_fn(|k| {
+            let orb = own[k]?;
+            let pill = plan(&Orb { radius: eggs::RADIUS, ..orb }, [255; 4])?;
+            let picture = if k == 0 { p::EggPicture::Whole } else { p::EggPicture::Cracked };
+            Some((pill, p::EggLook { scale: orb.radius / eggs::RADIUS, alpha: orb.color[3], picture }))
+        });
+        let board = BOARD.lock();
+        // Hitboxes and grab boxes take the panes first; when they run out whole pills are cut, hurtboxes first (review HB-2).
+        for orb in board.in_draw_order().filter(|_| on) {
+            let Some(pill) = plan(orb, orb.color) else { continue };
             let Some((cap, band)) = used.take(pill.length > 0.0) else {
                 over += 1;
                 continue;
@@ -416,6 +439,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     let n = used.caps / 2;
     let shown = cache.shown;
     write_tick(&mut cache, [orbs::pane_tick(used.caps, shown[0]), orbs::pane_tick(used.bands, shown[1])]);
+    write_eggs(&mut cache, &looks);
     // Release builds say it too, once: more orbs than panes means a fighter's spheres were cut (review HB-2).
     static OVER_SAID: AtomicBool = AtomicBool::new(false);
     if over != 0 && !OVER_SAID.swap(true, Ordering::Relaxed) {
@@ -449,6 +473,31 @@ unsafe fn write_pane(target: usize, at: [f32; 2], size: [f32; 2], rot: f32, colo
         pane::set_rect_color(target, color);
         pane::set_visible(target, true);
     }
+}
+
+/// Show this frame's practice-game pictures, each at its planned point pill (`orbs::plan_pill` with both ends on the
+/// spot): centred on it, `size × look.scale` across, unturned, in the texture's own colours at pane alpha `look.alpha`,
+/// on the next free pane of `look.picture`'s pool (a pool's extra pictures are not drawn). The panes that showed last
+/// frame and not this one hide.
+unsafe fn write_eggs(cache: &mut OrbPanes, eggs: &[Option<(orbs::Pill, crate::model::panes::EggLook)>]) {
+    use crate::model::panes::EGG_POOLS;
+    use crate::runtime::ui::pane;
+    let mut used = [0; 3];
+    for (pill, look) in eggs.iter().flatten().copied() {
+        let (pool, (first, count)) = (look.picture as usize, EGG_POOLS[look.picture as usize]);
+        if used[pool] < count && cache.egg.0[first + used[pool]] != 0 {
+            let (target, size) = (cache.egg.0[first + used[pool]], [pill.size * look.scale; 2]);
+            write_pane(target, pill.band, size, 0.0, [255; 4]);
+            pane::set_alpha(target as *mut _, look.alpha);
+            used[pool] += 1;
+        }
+    }
+    for (pool, (first, _)) in EGG_POOLS.into_iter().enumerate() {
+        for k in first + used[pool]..first + cache.egg.1[pool] {
+            pane::set_visible(cache.egg.0[k] as *mut _, false);
+        }
+    }
+    cache.egg.1 = used;
 }
 
 /// Apply one tick's pane writes (`orbs::pane_tick`, the caps' and the bands'): hide the panes that stop showing, show or
