@@ -117,25 +117,25 @@ pub unsafe fn stale_moves_toggle(ctx: &mut InlineCtx) {
 
 /// Post a notice with a static body.
 pub fn post(header: &'static str, body: &'static str, length: u16, color: [u8; 4]) {
-    send(Mail::Post { header, body, length, color });
+    send(Mail::Post(header, body, length, color));
 }
 
 /// Post a plain notice whose body was copied into its fixed buffer (`Body`). Allocation-free; any thread.
 pub fn post_body(header: &'static str, body: Body, length: u16, color: [u8; 4]) {
-    send(Mail::PostBody { header, body, length, color });
+    send(Mail::PostBody(header, body, length, color));
 }
 
 /// The standing notice `id` (package 6's Ready and hot-swap notices): created behind the plain notices or
 /// updated in place with this text, colour and a full `length`. `body` is copied (at most `BODY_MAX` bytes).
 /// Allocation-free; any thread (it goes through the mailbox, see `post`).
 pub fn upsert(id: u8, header: &'static str, body: &str, length: u16, color: [u8; 4]) {
-    send(Mail::Upsert { id, header, body: Body::copied(body), length, color });
+    send(Mail::Upsert(id, header, Body::copied(body), length, color));
 }
 
 /// The standing notice `id` on screen now, ahead of every other notice (rc.8's speed pop-up while its combo is held). `body`
 /// is copied. Allocation-free; any thread (through the mailbox).
 pub fn show_now(id: u8, header: &'static str, body: &str, length: u16, color: [u8; 4]) {
-    send(Mail::ShowNow { id, header, body: Body::copied(body), length, color });
+    send(Mail::ShowNow(id, header, Body::copied(body), length, color));
 }
 
 /// Remove the standing notice `id` (queued or on screen) and its delivery record. Any thread (through the mailbox).
@@ -153,10 +153,10 @@ pub fn saved(slot: usize) {
 /// takes `QUEUE`).
 #[derive(Clone, Copy)]
 enum Mail {
-    Post { header: &'static str, body: &'static str, length: u16, color: [u8; 4] },
-    PostBody { header: &'static str, body: Body, length: u16, color: [u8; 4] },
-    Upsert { id: u8, header: &'static str, body: Body, length: u16, color: [u8; 4] },
-    ShowNow { id: u8, header: &'static str, body: Body, length: u16, color: [u8; 4] },
+    Post(&'static str, &'static str, u16, [u8; 4]),
+    PostBody(&'static str, Body, u16, [u8; 4]),
+    Upsert(u8, &'static str, Body, u16, [u8; 4]),
+    ShowNow(u8, &'static str, Body, u16, [u8; 4]),
     Clear(u8),
     Saved(usize),
 }
@@ -171,10 +171,10 @@ fn send(mail: Mail) {
 /// Apply the posted requests to the queue, in posting order (the HUD tick, under `QUEUE`).
 fn take_mail(queue: &mut Queue) {
     MAILBOX.drain(|mail| match mail {
-        Mail::Post { header, body, length, color } => queue.post_static(header, body, length, color),
-        Mail::PostBody { header, body, length, color } => queue.post(header, body, length, color),
-        Mail::Upsert { id, header, body, length, color } => queue.upsert(id, header, body, length, color),
-        Mail::ShowNow { id, header, body, length, color } => queue.show_now(id, header, body, length, color),
+        Mail::Post(header, body, length, color) => queue.post_static(header, body, length, color),
+        Mail::PostBody(header, body, length, color) => queue.post(header, body, length, color),
+        Mail::Upsert(id, header, body, length, color) => queue.upsert(id, header, body, length, color),
+        Mail::ShowNow(id, header, body, length, color) => queue.show_now(id, header, body, length, color),
         Mail::Clear(id) => queue.clear_id(id),
         Mail::Saved(slot) => crate::model::boot_notices::saved(queue, slot),
     });
