@@ -2,9 +2,10 @@
 //!
 //! With the `hitbox_vis` setting On, every active hitbox (by id colour), every hurtbox and every grab box of a fighter in
 //! Training is drawn as one of the plugin's own translucent discs (decision HB-OWN-ORBS, option 1, operator 2026-11-05: "go
-//! with discs for all"), placed on its bone and projected with the game's camera every layout tick. An article's hitbox is
-//! still the game's `sys_shield` effect sphere (`draw_untracked`). The fighter's other animation-command effects are put to
-//! sleep meanwhile, except in the grab, tread and knockdown statuses.
+//! with discs for all"), placed on its bone and projected with the game's camera every layout tick. An article's hitboxes
+//! are own orbs too (rc.13, `draw_articles`): the game's effect sphere on a projectile lived its whole flight but never
+//! showed. The fighter's other animation-command effects are put to sleep meanwhile, except in the grab, tread and
+//! knockdown statuses.
 //!
 //! The spheres are kept, not respawned (lead ruling 2026-11-02 on Q3): each fighter's pass works out the spheres it wants and
 //! `model::hitbox::HandleSet` holds them through `OrbSink` (never refused, ended at a status change), keeps the unchanged ones
@@ -45,24 +46,20 @@ use crate::runtime::scene;
 static INSTALLED: AtomicBool = AtomicBool::new(false);
 /// `hitbox_vis` On.
 static SETTING: AtomicBool = AtomicBool::new(false);
-/// The game's status ids and effect attributes were resolved through its constant table.
+/// The game's status ids were resolved through its constant table.
 static READY: AtomicBool = AtomicBool::new(false);
 static IDS: [AtomicI32; 6] = [const { AtomicI32::new(0) }; 6];
-static ATTRIBUTE: AtomicU32 = AtomicU32::new(0);
 /// The work id of a fighter's entry (`hitbox::ENTRY_ID_NAME`), for the lobby gate; resolved with the status ids.
 static ENTRY_WORK: AtomicI32 = AtomicI32::new(0);
 static ENTRY_WORK_READY: AtomicBool = AtomicBool::new(false);
 /// Calls of `ensure_ready` since boot: the table is asked again every 30th call until it answers.
 static TRIES: AtomicU32 = AtomicU32::new(0);
-/// The `Hash40` of `sys_shield`.
-static EFFECT: AtomicU64 = AtomicU64::new(0);
 /// Fighters whose effects the plugin put to sleep (by accessor address), and how many.
 static BOOK: Mutex<SleepBook> = Mutex::new(SleepBook::new());
 static SLEPT: AtomicUsize = AtomicUsize::new(0);
 
 /// Boot: the feature installed (or not).
 pub fn set_installed(on: bool) {
-    EFFECT.store(hash40(hitbox::EFFECT), Ordering::Release);
     INSTALLED.store(on, Ordering::Release);
 }
 
@@ -86,12 +83,6 @@ fn ensure_ready() -> bool {
         let Some(value) = (unsafe { game::lua_const(lua_bind_hash(name)) }) else { return false };
         *slot = value;
     }
-    let mut attribute = 0u32;
-    for name in hitbox::ATTRIBUTE_NAMES {
-        // SAFETY: as above.
-        let Some(value) = (unsafe { game::lua_const(lua_bind_hash(name)) }) else { return false };
-        attribute |= value as u32;
-    }
     // SAFETY: as above.
     let Some(entry_work) = (unsafe { game::lua_const(lua_bind_hash(hitbox::ENTRY_ID_NAME)) }) else { return false };
     ENTRY_WORK.store(entry_work, Ordering::Release);
@@ -99,7 +90,6 @@ fn ensure_ready() -> bool {
     for (slot, value) in IDS.iter().zip(ids) {
         slot.store(value, Ordering::Release);
     }
-    ATTRIBUTE.store(attribute, Ordering::Release);
     READY.store(true, Ordering::Release);
     true
 }
@@ -163,7 +153,7 @@ static STORE: Mutex<Store> =
 // its bone with the game's `joint_global_position_with_offset` (a read: the joint flag is false) and publishes them on
 // `BOARD`. The layout tick (`draw_orbs`) projects them with the game's own `world_to_screen` and writes one disc pane per
 // orb; the panes' container is RootPane's first child, so the HUD, the pause menu and the plugin's menu draw over them as
-// they drew over the effect spheres. Articles keep the effect spheres (`draw_untracked`).
+// they drew over the effect spheres. Articles' hitboxes join them (`draw_articles`).
 
 static BOARD: Mutex<Board> = Mutex::new(Board::new());
 
@@ -334,50 +324,6 @@ pub fn forget_fighter(fighter: usize) {
     BOARD.lock().clear(accessor);
 }
 
-/// The game's effect module of one fighter, as `model::hitbox::Effects`.
-struct GameEffects {
-    accessor: usize,
-    effect: u64,
-    attribute: u32,
-}
-
-impl Effects for GameEffects {
-    fn sphere_alive(&mut self, handle: u32) -> bool {
-        // SAFETY: `accessor` is the live fighter whose pass or hook runs now; the native checks its own grant.
-        unsafe { natives::sphere_is_exist(self.accessor, handle) }
-    }
-
-    fn sphere_kill_own(&mut self, handle: u32) {
-        // SAFETY: as above; `handle` is one of this fighter's own spheres that still exists.
-        unsafe { natives::effect_kill(self.accessor, handle) }
-    }
-
-    fn sphere_spawn(&mut self, sphere: &Sphere) -> u32 {
-        // SAFETY: as above.
-        unsafe {
-            let tail = (true, self.attribute, 0, 0, 0, 0, true, true);
-            #[cfg(feature = "diag")]
-            let pool_before = stats::pool_snapshot();
-            #[cfg(feature = "diag")]
-            let limits_before = stats::emitter_limits();
-            let handle = natives::effect_req_follow(self.accessor, self.effect, sphere.joint, &sphere.pos, &[0.0; 3], sphere.scale, tail);
-            if handle != 0 {
-                natives::sphere_set_rgb(self.accessor, sphere.tint);
-                natives::sphere_set_rate(self.accessor, hitbox::RATE);
-            }
-            #[cfg(feature = "diag")]
-            if handle == 0 {
-                stats::refused(self.accessor, sphere, pool_before, limits_before);
-            }
-            handle
-        }
-    }
-}
-
-fn effects(accessor: usize) -> GameEffects {
-    GameEffects { accessor, effect: EFFECT.load(Ordering::Acquire), attribute: ATTRIBUTE.load(Ordering::Acquire) }
-}
-
 /// One raw game-memory read for `hitbox::GameHurt` (the per-frame pass's hurt reader, route B; the diag census uses the
 /// same read). The reader type-checks every pointer it dereferences before it calls this: a null or misaligned address or
 /// pointer is refused there (Eden answers 0 for an unmapped read, so a missing check would not show there).
@@ -412,20 +358,21 @@ impl hitbox::AttackReader for GameAttacks {
     }
 }
 
-/// One shape requested once and not tracked: an article's command (projectiles are not in the per-frame pass, spec Q1); it ends
-/// with the article's status.
-unsafe fn draw_untracked(accessor: usize, shape: &Shape, tint: [f32; 3]) -> u32 {
-    let mut fx = effects(accessor);
-    let mut wants = [Sphere::NONE; hitbox::SPHERE_MAX];
-    let mut len = 0;
-    hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_HIT, 0, shape, tint);
-    let mut made = 0;
-    for sphere in &wants[..len] {
-        if fx.sphere_spawn(sphere) != 0 {
-            made += 1;
+/// The articles whose `ATTACK` ran, drawn by every fighter pass while their attack lasts (rc.13). Locked before `BOARD`.
+static ARTICLES: Mutex<orbs::Articles> = Mutex::new(orbs::Articles::new());
+
+/// Each tracked article's live attack slots as its own orbs, placed on its bones; an article that is gone (its id inactive
+/// or now another object's) or whose attack ended is forgotten. `sv_battle_object` as `cpu_pilot` uses it.
+unsafe fn draw_articles() {
+    let mut articles = ARTICLES.lock();
+    let mut board = BOARD.lock();
+    for (id, key) in articles.tracked().into_iter().filter(|t| t.0 != 0) {
+        let live = smash::app::sv_battle_object::is_active(id) && smash::app::sv_battle_object::module_accessor(id) as usize == key;
+        // `key` is the live article's accessor (checked above); the natives check their own grants.
+        if !live || !orbs::article_pass(&mut board, key, &mut GameAttacks(key), |s| natives::joint_position(key, s.joint, &s.pos)) {
+            articles.forget(id, &mut board);
         }
     }
-    made
 }
 
 // ---- the per-frame pass ---------------------------------------------------------------------------------------------
@@ -508,6 +455,12 @@ pub unsafe fn frame(fighter: usize) {
     let held_now = set.len();
     HELD.store(table.held_spheres(), Ordering::Relaxed);
     drop(store);
+    // Off: the pass that clears the fighters' orbs forgets the articles too.
+    if enabled {
+        draw_articles();
+    } else {
+        ARTICLES.lock().forget_all(&mut BOARD.lock());
+    }
     counts.kept += c.kept;
     counts.spawned += c.spawned;
     counts.killed += c.killed;
@@ -550,7 +503,8 @@ unsafe fn lua_cell(lua: usize, index: usize) -> Cell {
 
 /// The plugin part of an animation command. A fighter's hitbox is drawn by its pass in the same frame (the pass runs after the
 /// game's frame, which ran this command), so nothing is requested here; a fighter's grab box is queued for that pass (the
-/// command runs inside the animation script, where the fighter's effects may be asleep); an article's shape is requested now.
+/// command runs inside the animation script, where the fighter's effects may be asleep); an article is tracked by its
+/// battle-object id, and every pass draws its attack slots (`draw_articles`).
 unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     let _scope = HookScope::enter_hook(if grab { HookId::HitboxCatch } else { HookId::HitboxAttack });
     if lua == 0 || !SETTING.load(Ordering::Acquire) || !ensure_ready() {
@@ -560,8 +514,10 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     if accessor == 0 || !hitbox::draw_on_command(true, visualizes(accessor)) {
         return;
     }
+    // A fighter's hitbox and an article's grab box are not taken from the command: the fighter's pass reads its attack
+    // slots, and an article's grab box is not drawn (its own orbs are its attack slots, `draw_articles`).
     let fighter = natives::is_fighter(accessor);
-    if fighter && !grab {
+    if fighter != grab {
         return;
     }
     let Some(shape) = hitbox::parse(indices, |i| lua_cell(lua, i)) else { return };
@@ -574,7 +530,9 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
         let i = store.table.index_for(accessor);
         wants[..len].iter().filter(|w| store.table.sets[i].push_grab(**w)).count() as u32
     } else {
-        draw_untracked(accessor, &shape, tint)
+        let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
+        ARTICLES.lock().track(id, accessor, &mut BOARD.lock());
+        0
     };
     #[cfg(feature = "diag")]
     stats::command(grab, fighter, shape.id, shape.joint, shape.size, shape.b.is_some(), made);
@@ -696,36 +654,6 @@ mod stats {
     static START: AtomicU64 = AtomicU64::new(0);
     static LAST: AtomicU64 = AtomicU64::new(u64::MAX);
     const REPORT_EVERY: u32 = 600;
-    static REFUSALS_REPORTED: AtomicU32 = AtomicU32::new(0);
-
-    /// The two hitbox_pool_* relied rows guard these owned-native facts. Called
-    /// only inside the installed hitbox unit, on the game thread; no mutation.
-    pub unsafe fn pool_snapshot() -> Option<(u32, bool)> {
-        let singleton = ((crate::runtime::game::text_base() + 0x5334920) as *const usize).read();
-        if singleton == 0 || singleton % 8 != 0 { return None; }
-        let manager = (singleton as *const usize).read();
-        if manager == 0 || manager % 8 != 0 { return None; }
-        Some((((manager + 0x19468) as *const u32).read(),
-            ((manager + 0x19460) as *const usize).read() != 0))
-    }
-
-    /// Raw native limit/count pairs from the two guarded constructor branches.
-    /// No writes and no inferred frame budget: the failed call is compared with its own entry snapshot.
-    pub unsafe fn emitter_limits() -> [i32; 4] {
-        let base = crate::runtime::game::text_base();
-        [0x5334a00, 0x5334a0c, 0x5334a04, 0x5334a14]
-            .map(|offset| ((base + offset) as *const i32).read())
-    }
-
-    pub unsafe fn refused(accessor: usize, sphere: &crate::model::hitbox::Sphere, before: Option<(u32, bool)>, limits_before: [i32; 4]) {
-        if REFUSALS_REPORTED.fetch_add(1, Ordering::Relaxed) >= 8 { return; }
-        let after = pool_snapshot();
-        let limits_after = emitter_limits();
-        diagnostic(format_args!(
-            "[Hitbox] refused accessor={accessor:#x} key={} joint={:#x} scale={} free_head_before={before:?} free_head_after={after:?} limits_before={limits_before:?} limits_after={limits_after:?}",
-            sphere.key, sphere.joint, sphere.scale
-        ));
-    }
 
     fn now() -> u64 {
         // SAFETY: `GetSystemTick` has no preconditions.

@@ -149,11 +149,7 @@ impl Analysis {
         // Function-pointer tables the text cannot show: the layout tick runs the registered draw callbacks.
         graph.dynamic.push(("hud::run".to_owned(), "hud_draw::draw".to_owned()));
         graph.dynamic.push(("hud::run".to_owned(), "hitbox::draw_orbs".to_owned()));
-        // SPEC-core-06: the held-sphere state machine (`model::hitbox::HandleSet`, not scanned) calls back into the runtime's effect module.
-        for (from, to) in [("hitbox::frame", "hitbox::sphere_alive"), ("hitbox::frame", "hitbox::sphere_kill_own"), ("hitbox::frame", "hitbox::sphere_spawn"), ("hitbox::hitbox_rebound_hook", "hitbox::sphere_alive"), ("hitbox::hitbox_rebound_hook", "hitbox::sphere_kill_own")] {
-            graph.dynamic.push((from.to_owned(), to.to_owned()));
-        }
-        // The shared production planner calls the runtime's AttackReader too.
+        // The shared production planner calls the runtime's AttackReader too (a fighter's pass and its articles').
         for to in ["hitbox::active", "hitbox::data", "hitbox::read_u64", "hitbox::read_f32"] {
             graph.dynamic.push(("hitbox::frame".to_owned(), to.to_owned()));
         }

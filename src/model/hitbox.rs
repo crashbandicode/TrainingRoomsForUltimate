@@ -22,12 +22,8 @@
 
 /// Eight attack slots per fighter (`AttackModule`).
 pub const SLOTS: i32 = 8;
-/// The game effect the spheres are made of (a translucent sphere; also the shield bubble).
-pub const EFFECT: &str = "sys_shield";
 /// The sphere's scale per unit of hitbox size (`size x 19/200`).
 pub const SCALE: f32 = 0.095;
-/// The effect's playing rate, so the sphere does not pulse.
-pub const RATE: f32 = 8.0;
 /// Spheres per extended hitbox: spacing is `size x 1.75`, clamped to 2..=16 spheres.
 pub const SPACING: f32 = 1.75;
 pub const SPHERE_MIN: usize = 2;
@@ -317,9 +313,6 @@ pub const STATUS_NAMES: [&str; 6] = [
     "FIGHTER_STATUS_KIND_GUARD_ON",
     "FIGHTER_STATUS_KIND_GUARD_DAMAGE",
 ];
-
-/// The effect attributes OR-ed for a sphere: no joint scale, follow, conclude with the status.
-pub const ATTRIBUTE_NAMES: [&str; 3] = ["EFFECT_SUB_ATTRIBUTE_NO_JOINT_SCALE", "EFFECT_SUB_ATTRIBUTE_FOLLOW", "EFFECT_SUB_ATTRIBUTE_CONCLUDE_STATUS"];
 
 impl StatusIds {
     pub fn from_values(v: [i32; 6]) -> StatusIds {

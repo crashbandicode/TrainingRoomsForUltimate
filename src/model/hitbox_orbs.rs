@@ -4,7 +4,8 @@
 //! orb is not asked of that pool. The layout holds `panes::ORBS` (512) orb panes, Training's most fighter objects
 //! (`ORB_FIGHTERS`) times the spheres one fighter holds (`MAX_HELD`). More orbs than panes happen only while a gone
 //! fighter's last pass is still on the board (a few frames): then the cut is deterministic, hitboxes and grab boxes before
-//! hurtboxes (`Board::in_draw_order`), and the layout tick says so once (review HB-2). Articles keep the effect spheres.
+//! hurtboxes (`Board::in_draw_order`), and the layout tick says so once (review HB-2). An article's hitboxes are own orbs
+//! too (rc.13, `Articles`): the game's effect sphere on a projectile lived its whole flight but never showed.
 //!
 //! The same `HandleSet` keeps the spheres; `OrbSink` is its `Effects` for own orbs: a request always succeeds and a held
 //! orb lives while the fighter's status is the one it was made in (what the game's `CONCLUDE_STATUS` did to an effect).
@@ -12,7 +13,7 @@
 //! fighter's orbs on the `Board`; the layout tick projects them with the game's own `world_to_screen` and plans one pane
 //! per orb (`plan_pane`). Pure and host-tested (`tests/core06_orbs.rs`).
 
-use super::hitbox::{Effects, Sphere, FIGHTER_SETS, KIND_HURT, MAX_HELD, SCALE};
+use super::hitbox::{want_hitboxes, AttackReader, Effects, Sphere, FIGHTER_SETS, KIND_HURT, MAX_HELD, SCALE};
 
 /// The most fighter objects Training (and the waiting room's practice) draws at once: Player 1 and the CPU, each of them
 /// possibly Ice Climbers, whose Nana is a fighter object of her own. No other fighter adds a fighter object (Pokémon
@@ -141,6 +142,67 @@ impl Board {
         let first = self.live().filter(|o| o.kind != KIND_HURT);
         first.chain(self.live().filter(|o| o.kind == KIND_HURT))
     }
+}
+
+/// Articles drawn at once: the board's slots past Training's fighter objects.
+pub const ARTICLES: usize = 4;
+
+/// The articles whose `ATTACK` ran (rc.13): (battle-object id, accessor), the accessor the board key of its orbs; the oldest
+/// is replaced.
+#[derive(Default)]
+pub struct Articles {
+    ids: [(u32, usize); ARTICLES],
+    ages: [u32; ARTICLES],
+    clock: u32,
+}
+
+impl Articles {
+    pub const fn new() -> Articles {
+        Articles { ids: [(0, 0); ARTICLES], ages: [0; ARTICLES], clock: 0 }
+    }
+
+    /// Track article `id` (accessor `key`); a new one takes a free slot or the oldest, whose orbs go.
+    pub fn track(&mut self, id: u32, key: usize, board: &mut Board) {
+        if self.ids.contains(&(id, key)) {
+            return;
+        }
+        self.clock = self.clock.wrapping_add(1);
+        let i = (0..ARTICLES).min_by_key(|&i| (self.ids[i].0 != 0, self.ages[i])).unwrap_or(0);
+        board.clear(self.ids[i].1);
+        self.ids[i] = (id, key);
+        self.ages[i] = self.clock;
+    }
+
+    pub fn tracked(&self) -> [(u32, usize); ARTICLES] {
+        self.ids
+    }
+
+    pub fn forget(&mut self, id: u32, board: &mut Board) {
+        for slot in self.ids.iter_mut().filter(|t| t.0 == id) {
+            board.clear(slot.1);
+            *slot = (0, 0);
+        }
+    }
+
+    pub fn forget_all(&mut self, board: &mut Board) {
+        for (id, _) in self.ids {
+            self.forget(id, board);
+        }
+    }
+}
+
+/// One article's pass: its live attack slots' spheres, placed on its bones by `place`, become its orbs on `board`.
+/// False when no slot is live: its attack ended, its orbs went, and it is forgotten.
+pub fn article_pass(board: &mut Board, key: usize, attacks: &mut impl AttackReader, mut place: impl FnMut(&Sphere) -> Option<[f32; 3]>) -> bool {
+    let mut wants = [Sphere::NONE; MAX_HELD];
+    let mut len = 0;
+    want_hitboxes(attacks, &mut wants, &mut len);
+    if len == 0 {
+        board.clear(key);
+        return false;
+    }
+    board.publish(key, wants[..len].iter().filter_map(|s| place(s).map(|centre| orb_of(s, centre))));
+    true
 }
 
 /// The orb panes' writes of one layout tick (review HB-1): `drawn` orbs were written into the panes `0..drawn`, and

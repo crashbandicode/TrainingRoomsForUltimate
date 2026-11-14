@@ -144,6 +144,65 @@ fn the_board_keeps_each_fighters_last_pass_and_ages_out_the_gone() {
     assert_eq!(board.publish(0, std::iter::once(orb(0.0))), 0, "no fighter, no orbs");
 }
 
+/// rc.13 (operator 2026-11-14: "projectiles now for rc13"): an article's hitboxes are own orbs too. The game's effect
+/// sphere on a projectile lived its whole flight but never showed (Eden wa-hbprobe-ae602057-1). Its `ATTACK` tracks the
+/// article by battle-object id; each pass reads its live attack slots, places them on its bones and publishes them under
+/// its accessor; it goes when its attack ends or it does.
+fn an_articles_hitboxes_are_own_orbs_while_its_attack_lasts() {
+    /// Samus's charge shot: one 1.9 hitbox in slot 0 on `top` while `on`.
+    struct Shot(bool);
+    impl hitbox::AttackReader for Shot {
+        fn active(&mut self, slot: i32) -> bool {
+            self.0 && slot == 0
+        }
+        fn data(&mut self, _slot: i32) -> usize {
+            0x1000
+        }
+        fn read_u64(&mut self, _at: usize) -> u64 {
+            0x3_1ed9_1fca
+        }
+        fn read_f32(&mut self, at: usize) -> f32 {
+            if at == 0x1024 { 1.9 } else { 0.0 }
+        }
+    }
+    let (id, key) = (0x10a8_0001u32, 0xa000usize);
+    let mut board = Board::new();
+    board.publish(0xf000, std::iter::once(orb(1.0))); // Player 1's own pass
+    let mut articles = orbs::Articles::new();
+    articles.track(id, key, &mut board);
+    articles.track(id, key, &mut board);
+    assert_eq!(articles.tracked().iter().filter(|t| t.0 != 0).count(), 1, "one article, however many ATTACKs");
+    let on_bone = |s: &Sphere| (s.joint == 0x3_1ed9_1fca).then_some([40.0 + s.pos[0], 12.0, 0.0]);
+    assert!(orbs::article_pass(&mut board, key, &mut Shot(true), on_bone));
+    let hit: Vec<Orb> = board.in_draw_order().copied().collect();
+    assert_eq!(hit.len(), 2, "the shot's orb (a hitbox, drawn first), then Player 1's hurtbox");
+    assert_eq!(hit[0].centre, [40.0, 12.0, 0.0]);
+    assert!((hit[0].radius - 1.9).abs() < 1e-5);
+    assert_eq!((hit[0].kind, &hit[0].color[..3]), (hitbox::KIND_HIT, &model::panes::linear([255, 0, 0, 255])[..3]));
+    // Its attack ended: its orbs go and the pass says to forget it; Player 1's stay.
+    assert!(!orbs::article_pass(&mut board, key, &mut Shot(false), on_bone));
+    assert_eq!(board.live().count(), 1);
+    articles.track(id, key, &mut board);
+    orbs::article_pass(&mut board, key, &mut Shot(true), on_bone);
+    articles.forget(id, &mut board);
+    assert_eq!((board.live().count(), articles.tracked().iter().filter(|t| t.0 != 0).count()), (1, 0), "gone article");
+    // Fighters and articles share the board's slots; a fifth article replaces the oldest, whose orbs go.
+    assert_eq!(orbs::ORB_FIGHTERS + orbs::ARTICLES, FIGHTER_SETS);
+    for k in 1..=orbs::ARTICLES {
+        articles.track(k as u32, k << 4, &mut board);
+        orbs::article_pass(&mut board, k << 4, &mut Shot(true), on_bone);
+    }
+    assert_eq!(board.live().count(), 1 + orbs::ARTICLES);
+    articles.track(99, 99 << 4, &mut board);
+    assert_eq!(board.live().count(), orbs::ARTICLES, "the oldest article's orb went");
+    let mut ids = articles.tracked().map(|t| t.0);
+    ids.sort();
+    assert_eq!(ids, [2, 3, 4, 99], "article 1, the oldest, was replaced");
+    // Hitbox Visualization Off: every article goes.
+    articles.forget_all(&mut board);
+    assert_eq!((board.live().count(), articles.tracked()), (1, [(0, 0); orbs::ARTICLES]));
+}
+
 fn screen_half_mirrors_the_games_size_words() {
     assert_eq!(orbs::screen_half(0.0, 960.0), 960.0);
     assert_eq!(orbs::screen_half(1920.0, 960.0), 960.0);
@@ -181,6 +240,7 @@ fn case_table() {
         ("the_orb_panes_cover_four_full_fighters", the_orb_panes_cover_four_full_fighters as fn()),
         ("an_inactive_tick_hides_the_orbs_it_showed", an_inactive_tick_hides_the_orbs_it_showed as fn()),
         ("the_board_keeps_each_fighters_last_pass_and_ages_out_the_gone", the_board_keeps_each_fighters_last_pass_and_ages_out_the_gone as fn()),
+        ("an_articles_hitboxes_are_own_orbs_while_its_attack_lasts", an_articles_hitboxes_are_own_orbs_while_its_attack_lasts as fn()),
         ("screen_half_mirrors_the_games_size_words", screen_half_mirrors_the_games_size_words as fn()),
         ("projected_orbs_map_onto_the_layout_canvas", projected_orbs_map_onto_the_layout_canvas as fn()),
     ]);
