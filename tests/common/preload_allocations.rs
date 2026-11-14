@@ -512,8 +512,12 @@ fn first_and_repeated_hat_and_group_plans_allocate_nothing() {
     assert_eq!(allocations, 0);
     assert_eq!(hat_plan, [Some(10), Some(20), Some(30), Some(11), Some(40)]);
     for groups in last {
-        assert_eq!(groups, [Members::native_group(0x24), Members::native_group(0x5a), Members::mii_group(0x48)]);
+        assert_eq!(groups[..3], [Members::native_group(0x24), Members::native_group(0x5a), Members::mii_group(0x48)]);
     }
+    // rc.14 a-full-2 (S1): with eight group slots the budget ends the plan, not the slots. Both roles' specials take 12 of
+    // the 14 bodies left, and Player 1 gets the other two as a pair.
+    assert_eq!(last[0][3], Members::new(&[3, 4]));
+    assert!(last[0][4..].iter().chain(&last[1][3..]).all(Option::is_none), "{last:x?}");
 }
 
 fn status_raise_and_delivery_formatting_use_no_heap_on_first_or_repeated_use() {

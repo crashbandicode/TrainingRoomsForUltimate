@@ -8,7 +8,7 @@
 
 use crate::engine::compat::fixed::FixedList;
 use crate::engine::seams::native_fields as fields;
-use crate::engine::swap::body_bank::Members;
+use crate::engine::swap::body_bank::{Members, PIN_CAPACITY};
 use hos_lock::Mutex;
 use std::mem::transmute;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -16,8 +16,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 pub(crate) const SEAMS: &[&str] = &["module_pins.nro_request", "module_pins.module_release", "module_pins.mutex_lock",
     "module_pins.mutex_unlock", "module_pins.tree_clear", "module_pins.found_path"];
 const HANDLE: u64 = 0xff_ffff_ffff;
-/// One `(kind, module handle)` per pinned kind: a role's kept groups hold at most this many kinds.
-type Pins = FixedList<(u32, u64), 9>;
+/// One `(kind, module handle)` per pinned kind: a role's kept window and groups hold at most this many kinds (rc.14
+/// a-full-2: derived from the group cap; a literal 9 for three groups before).
+type Pins = FixedList<(u32, u64), PIN_CAPACITY>;
 /// `main` once the rows passed; 0 pins nothing.
 static BASE: AtomicUsize = AtomicUsize::new(0);
 static PINS: [Mutex<Pins>; 2] = [Mutex::new(Pins::new((0, 0))), Mutex::new(Pins::new((0, 0)))];
@@ -71,7 +72,7 @@ pub(crate) unsafe fn pin(r: Option<usize>, role: usize, group: Members) -> bool 
     let before = pins.len();
     for &kind in &group.kinds()[..group.count()] {
         if pins.iter().any(|(k, _)| *k == kind) { continue; }
-        let Some(handle) = (pins.len() < 9).then(|| take(base, manager, r, kind)).flatten() else {
+        let Some(handle) = (pins.len() < PIN_CAPACITY).then(|| take(base, manager, r, kind)).flatten() else {
             while pins.len() > before { release(base, manager, pins.pop().unwrap_or_default().1); }
             return false;
         };

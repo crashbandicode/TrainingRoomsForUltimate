@@ -657,7 +657,20 @@ pub mod mii_publish;
 pub mod window_share;
 
 /// Groups one role may hold beyond its native window.
-pub const MAX_EXTRA_GROUPS: usize = 3;
+///
+/// rc.14 a-full-2 (S1, the primary 2026-11-14 ~23:24Z; AFULL2-RESEARCH.md "Limit 3"): native counts no detached group.
+/// What bounds residency is bodies (Ready Fighters, the fighter pool less [`POOL_RESERVE`]) and process memory
+/// (`memory::admit`), so a slot must never be what makes a fitting fighter cold (cycle-fix's Gap 2: Eden cf-p3-y2
+/// `cf-k2` presses 3, 8 and 17 and `cf-direct`, "demand declined … no free group slot"; a-full's A1 "not kept (no free
+/// group slot)"). Small units fill slots before bodies run out: Kirby alone, the role's Mii group, Design A's cold
+/// singles, Pokémon Trainer, Pyra/Mythra, the pair, a window A1 keeps. Eight covers those at Ready Fighters 12, and it is
+/// the widest per-role mask [`release_for_new_members`] keeps (one `u8` bit per parked group).
+pub const MAX_EXTRA_GROUPS: usize = 8;
+const _: () = assert!(MAX_EXTRA_GROUPS <= u8::BITS as usize, "release_for_new_members keeps one u8 bit per parked group");
+
+/// Module pins one role may hold across its Reload (`runtime::roster::module_pins`): every kind of a window A1 keeps and of
+/// the Built groups (a′) keeps, plus the Pokémon Trainer and Aegis object kinds.
+pub const PIN_CAPACITY: usize = (MAX_EXTRA_GROUPS + 1) * NATIVE_MEMBERS + 2;
 /// Fighter-pool bodies kept free for visible Reloads and helper creation.
 pub const POOL_RESERVE: usize = 6;
 
@@ -1682,6 +1695,24 @@ pub fn release_for_new_members(
     };
     let members = [0, 1].map(|role: usize| waiting_for_pause(&after[role], |kind| holds([0, 0], role, kind)));
     if members == [0, 0] || waiting([0, 0]) == 0 { return ReleaseNow::default(); }
+    // rc.14 a-full-2 (S1): the exact search runs `2^(p0 + p1)` plans on the game thread. Up to EXACT_RELEASE_SEARCH parked
+    // groups in all (every case three slots allowed: 64 plans) it stays exact; past it, the parked groups go cheapest first
+    // (fewest members the cycle keeps, then fewest bodies, then lane order) until the plan places every new member: at
+    // most `p0 + p1` plans.
+    let parked_total = parked[0].len().min(8) + parked[1].len().min(8);
+    if parked_total > EXACT_RELEASE_SEARCH {
+        let mut order = FixedList::<(usize, usize, (u8, usize)), { 2 * MAX_EXTRA_GROUPS }>::new((0, 0, (0, 0)));
+        for role in 0..2 {
+            for (index, (group, kept)) in parked[role].iter().enumerate().take(8) { order.push((role, index, (*kept, group.count()))); }
+        }
+        order.sort_by_key(|(role, index, cost)| (*cost, *role, *index));
+        let mut mask = [0u8; 2];
+        for (role, index, _) in order.iter().copied() {
+            mask[role] |= 1 << index;
+            if waiting(mask) == 0 { return ReleaseNow { groups: mask, members }; }
+        }
+        return ReleaseNow { groups: all, members };
+    }
     let mut best: Option<((usize, usize, u32), [u8; 2])> = None;
     for m0 in 0..=all[0] {
         for m1 in 0..=all[1] {
@@ -1696,6 +1727,10 @@ pub fn release_for_new_members(
     }
     ReleaseNow { groups: best.map_or(all, |(_, mask)| mask), members }
 }
+
+/// rc.14 a-full-2 (S1): the most parked groups, both roles together, [`release_for_new_members`] searches exactly (64 plans,
+/// the most three slots per role ever needed).
+pub const EXACT_RELEASE_SEARCH: usize = 6;
 
 /// Operator rule 2026-11-09 (inbox 13:21Z): whether the entry tick frees a leaving group now. A parked one
 /// ([`leaves_at_pause`]) waits for the pause unless `release_now` (the new members need its room,
@@ -2484,6 +2519,19 @@ mod tests {
         let release = choose([Some(p1), Some(falcon)], [&[], &[]],
             [&[], &[(ganon, 0)]], [&[0x16], &[0x0b]], three);
         assert_eq!(release, ReleaseNow { groups: [0, 0b1], members: [1, 0] });
+
+        // rc.14 a-full-2 (S1): past EXACT_RELEASE_SEARCH parked groups the cheapest go first, in lane order among equals,
+        // until the new members fit: seven parked singles, two new members, room for none of them.
+        let singles = [0x03, 0x05, 0x07, 0x09, 0x0a, 0x0c, 0x0d].map(|kind| (Members::new(&[kind]).unwrap(), 0u8));
+        assert!(singles.len() > EXACT_RELEASE_SEARCH);
+        let nine = GroupBudget { ready_fighters: 9, pool_free: 16, special: SpecialPolicy::NONE };
+        let release = choose([Some(p1), None], [&[], &[]], [&singles, &[]], [&[0x16, 0x17], &[]], nine);
+        assert_eq!(release, ReleaseNow { groups: [0b11, 0], members: [2, 0] });
+        // A parked single the new cycle still serves (kept 1) goes after the unserved ones.
+        let mut served_first = singles;
+        served_first[0].1 = 1;
+        let release = choose([Some(p1), None], [&[], &[]], [&served_first, &[]], [&[0x16, 0x17], &[]], nine);
+        assert_eq!(release, ReleaseNow { groups: [0b110, 0], members: [2, 0] });
     }
 
     /// Operator rule 2026-11-09 (inbox 13:21Z), point 4: with nothing parked a real shortage keeps "waiting for memory";
@@ -3845,15 +3893,31 @@ mod tests {
     /// failure here. After every switch [`cold_left`]'s fighter goes while the bodies exceed Ready Fighters, and the
     /// planner (`plan_extra_groups_with`) refills.
     fn run_laps(lap: &[u32], ready_fighters: usize) -> Laps {
+        try_laps(&console_p1(), lap, ready_fighters, SpecialPolicy::MII).unwrap_or_else(|why| panic!("{why}"))
+    }
+
+    /// Player 1, held still while the CPU laps: its window, its groups and its lane.
+    struct Side { window: Members, groups: Vec<Members>, lane: Vec<u32> }
+
+    /// The operator's rc.13 console P1 (practice-diagnostics #31-#52): window `[1c, 8, 36]` and Kirby alone `[6]`.
+    fn console_p1() -> Side {
+        Side { window: members(&[GAME_WATCH, PIKACHU, PALUTENA]), groups: vec![members(&[KIRBY])], lane: vec![PIKACHU, KIRBY, PALUTENA] }
+    }
+
+    /// [`run_laps`] for any Player 1 and special policy. `Err` names why a press would take today's Reload: "no room" (the
+    /// bodies [`cold_admitted`] refuses, Design A's memory rule) or "no free group slot" (rc.14 a-full-2, S1: a role holds
+    /// at most [`MAX_EXTRA_GROUPS`] groups; Eden cf-p3-y2 `cf-k2` presses 3, 8 and 17 and `cf-direct` declined on it).
+    fn try_laps(p1: &Side, lap: &[u32], ready_fighters: usize, special: SpecialPolicy) -> Result<Laps, String> {
         let policy = GroupPolicy { solo_popo_groups: true, ic_pair_groups: true };
-        let budget = GroupBudget { ready_fighters, pool_free: 16, special: SpecialPolicy::MII };
-        let (p1_window, p1_groups, p1_lane) = (Members::new(&[GAME_WATCH, PIKACHU, PALUTENA]).unwrap(), [Members::new(&[KIRBY]).unwrap()],
-            [PIKACHU, KIRBY, PALUTENA]);
+        let budget = GroupBudget { ready_fighters, pool_free: 16, special };
+        let (p1_window, p1_groups, p1_lane) = (p1.window, &p1.groups[..], &p1.lane[..]);
         let after = |at: usize| -> Vec<u32> { (1..lap.len()).map(|step| lap[(at + step) % lap.len()]).collect() };
         let ordinary: Vec<u32> = after(0).into_iter().filter(|kind| Members::special_group(*kind, budget.special).is_none()).collect();
-        let mut window = Members::from_cycle(lap[0], &ordinary, 2).unwrap_or(Members::new(&[lap[0]]).unwrap());
+        let mut window = Members::special_group(lap[0], budget.special)
+            .or_else(|| Members::from_cycle(lap[0], &ordinary, 2)).unwrap_or(Members::new(&[lap[0]]).unwrap());
         let mut groups: Vec<Members> = Vec::new();
-        let bodies = |window: Members, groups: &[Members]| 2 + p1_window.count() - 1 + p1_groups.len() + window.count() - 1
+        let p1_bodies = p1_window.count() - 1 + p1_groups.iter().map(|m| m.count()).sum::<usize>();
+        let bodies = |window: Members, groups: &[Members]| 2 + p1_bodies + window.count() - 1
             + groups.iter().map(|m| m.count()).sum::<usize>();
         let refill = |window: Members, groups: &mut Vec<Members>, live: usize| {
             let lane = after(live);
@@ -3879,8 +3943,15 @@ mod tests {
                         None => {
                             let unit = Members::special_group(target, budget.special).unwrap_or_else(|| Members::new(&[target]).unwrap());
                             let loading = bodies(window, &groups) + unit.count();
-                            assert!(cold_admitted(loading, ready_fighters, unit.count(), &over, lap[live]),
-                                "the cold press onto {target:#x} would Reload: {loading} bodies, over {over:x?}");
+                            if !cold_admitted(loading, ready_fighters, unit.count(), &over, lap[live]) {
+                                return Err(format!("no room: the cold press onto {target:#x} would Reload: {loading} bodies, over {over:x?}"));
+                            }
+                            // `native_body_bank::demand` plans the unit into a free slot of the role (`GroupSlots::next_slot`).
+                            if groups.len() >= MAX_EXTRA_GROUPS {
+                                return Err(format!("no free group slot: the cold press onto {target:#x} at Ready Fighters {ready_fighters} \
+                                    ({loading} bodies) finds window {:x?} and groups {:x?}", &window.kinds()[..window.count()],
+                                    groups.iter().map(|m| m.kinds()[..m.count()].to_vec()).collect::<Vec<_>>()));
+                            }
                             out.over_loading = out.over_loading.max(loading.saturating_sub(ready_fighters));
                             if loading > ready_fighters { over.push((target, false)); }
                             // A Mii group's CharInfo goes on the record beside the waiting press, then its prefetch
@@ -3915,7 +3986,42 @@ mod tests {
             out.cold.push(cold);
             out.hot.push(hot);
         }
-        out
+        Ok(out)
+    }
+
+    /// rc.14 a-full-2 (S1, the primary 2026-11-14 ~23:24Z; cycle-fix's Gap 2): a group slot never makes a fighter that fits
+    /// cold. Native counts no detached group: bodies (Ready Fighters, the pool) and process memory bound what stays resident,
+    /// and the slot count must not bind first. Every Ready Fighters total, both Player 1 shapes and lanes mixing ordinary
+    /// kinds, Kirby (alone), a Mii, Pokémon Trainer, Pyra and the Ice Climbers pair: each cold press Ready Fighters admits
+    /// finds a free group slot. "no room" is Design A's own refusal (the bodies), not a slot.
+    fn a_group_slot_never_makes_a_fitting_fighter_cold() {
+        const ROY: u32 = 0x1a;
+        let all = SpecialPolicy { native: true, pair: true, mii: true };
+        let lanes: [&[u32]; 7] = [
+            // cf-k2 (Eden cf-p3-y2): the CPU's Roy, then Mii Gunner, Pichu, Diddy Kong, King K. Rool and Ganondorf.
+            &[ROY, GUNNER, PICHU, DIDDY, KROOL, GANONDORF],
+            &[FALCO, GUNNER, PICHU, DIDDY, KROOL],
+            &[FALCO, KIRBY, GUNNER, PICHU, DIDDY, KROOL, GANONDORF],
+            &[MARIO, 0x24, KIRBY, 0x5a, GUNNER, FOX, LINK, SAMUS],
+            &[FALCON, POPO, KIRBY, GUNNER, PEACH, 0x24, LUIGI, NESS, YOSHI],
+            &[FALCO, PICHU, DIDDY, KROOL, GANONDORF, ROY, LINK, SAMUS, FOX, PEACH, LUIGI],
+            &[KIRBY, GUNNER, 0x5a, 0x24, POPO, FALCO],
+        ];
+        let mut ran = 0;
+        for ready in usize::from(crate::engine::preload::cycle_preload_config::READY_FIGHTERS_MIN)
+            ..=usize::from(crate::engine::preload::cycle_preload_config::READY_FIGHTERS_MAX) {
+            // The console's P1, and P1 alone on Mario (all the room for the CPU).
+            for p1 in [console_p1(), Side { window: members(&[MARIO]), groups: vec![], lane: vec![] }] {
+                for lane in lanes {
+                    match try_laps(&p1, lane, ready, all) {
+                        Ok(_) => ran += 1,
+                        Err(why) if why.starts_with("no room") => {}
+                        Err(why) => panic!("Ready Fighters {ready}, lane {lane:x?}: {why}"),
+                    }
+                }
+            }
+        }
+        assert!(ran > 40, "most shapes run their five laps: {ran}");
     }
 
     fn steady(laps: &Laps, k: usize) {
@@ -4106,6 +4212,7 @@ mod tests {
             ("the_farthest_unit_goes_never_the_next_or_the_one_on_screen", the_farthest_unit_goes_never_the_next_or_the_one_on_screen as fn()),
             ("a_mii_group_is_kept_across_a_reload_only_with_its_switch", a_mii_group_is_kept_across_a_reload_only_with_its_switch as fn()),
             ("five_laps_of_the_operator_cycle_keep_what_fits_hot", five_laps_of_the_operator_cycle_keep_what_fits_hot as fn()),
+            ("a_group_slot_never_makes_a_fitting_fighter_cold", a_group_slot_never_makes_a_fitting_fighter_cold as fn()),
             ("two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot", two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot as fn()),
             ("a_cold_mii_fighter_is_loaded_by_its_waiting_press", a_cold_mii_fighter_is_loaded_by_its_waiting_press as fn()),
             ("lowering_ready_fighters_frees_the_farthest_groups_until_the_total_fits", lowering_ready_fighters_frees_the_farthest_groups_until_the_total_fits as fn()),
