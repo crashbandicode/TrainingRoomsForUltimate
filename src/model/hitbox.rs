@@ -583,6 +583,11 @@ pub fn want_hitboxes(reader: &mut impl AttackReader, out: &mut [Sphere], len: &m
     left_out
 }
 
+/// The first live attack slot with data: an active item with one is drawn as an article (a thrown bomb runs no `ATTACK`).
+pub fn live_slot(reader: &mut impl AttackReader) -> Option<i32> {
+    (0..SLOTS).find(|&slot| reader.active(slot) && reader.data(slot) != 0)
+}
+
 /// The retained hurtbox reader. The runtime supplies the HitModule pointer and the in-place table reads; host probes run this
 /// same enumeration with address-counting spies (as `AttackReader` does for the attack slots). Every address is derived from
 /// `module()`; the reader only answers reads.

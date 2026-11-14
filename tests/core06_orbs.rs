@@ -182,6 +182,8 @@ fn an_articles_hitboxes_are_own_orbs_while_its_attack_lasts() {
     // Its attack ended: its orbs go and the pass says to forget it; Player 1's stay.
     assert!(!orbs::article_pass(&mut board, key, &mut Shot(false), on_bone));
     assert_eq!(board.live().count(), 1);
+    // A thrown item (a bomb, a turnip) sets its hitbox without `ATTACK`: the pass tracks an active item while a slot is live.
+    assert_eq!((hitbox::live_slot(&mut Shot(true)), hitbox::live_slot(&mut Shot(false))), (Some(0), None));
     articles.track(id, key, &mut board);
     orbs::article_pass(&mut board, key, &mut Shot(true), on_bone);
     articles.forget(id, &mut board);

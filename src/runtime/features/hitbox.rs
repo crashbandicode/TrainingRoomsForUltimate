@@ -39,7 +39,7 @@ use crate::model::settings::Snapshot;
 use crate::model::sites_hitbox;
 use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::game::{self, natives};
-use crate::runtime::scene;
+use crate::runtime::{scene, state_natives};
 
 /// Boot: the feature's closure (its rows, the Training predicate and the rows of the natives it shares) passed its guards and its
 /// three hooks are installed. The per-frame pass does nothing before.
@@ -358,7 +358,7 @@ impl hitbox::AttackReader for GameAttacks {
     }
 }
 
-/// The articles whose `ATTACK` ran, drawn by every fighter pass while their attack lasts (rc.13). Locked before `BOARD`.
+/// The articles whose `ATTACK` ran and the items with a live attack slot, drawn by every fighter pass while their attack lasts (rc.13). Locked before `BOARD`.
 static ARTICLES: Mutex<orbs::Articles> = Mutex::new(orbs::Articles::new());
 
 /// Each tracked article's live attack slots as its own orbs, placed on its bones; an article that is gone (its id inactive
@@ -366,6 +366,23 @@ static ARTICLES: Mutex<orbs::Articles> = Mutex::new(orbs::Articles::new());
 unsafe fn draw_articles() {
     let mut articles = ARTICLES.lock();
     let mut board = BOARD.lock();
+    // A thrown item (a bomb, a turnip) runs no `ATTACK`: an active item with a live attack slot is tracked as an article.
+    // The list holds this frame's active items; a tracked one is checked again on every later pass (below).
+    let manager = state_natives::item_manager();
+    let count = match manager {
+        0 => 0,
+        m => state_natives::item_active_count(m).min(16),
+    };
+    let items = (0..count).map(|i| state_natives::item_active(manager, i));
+    for item in items.filter(|&item| item != 0) {
+        let id = state_natives::item_object_id(item);
+        let key = smash::app::sv_battle_object::module_accessor(id) as usize;
+        if key != 0 && hitbox::live_slot(&mut GameAttacks(key)).is_some() {
+            #[cfg(feature = "diag")]
+            stats::item(&articles, id, key);
+            articles.track(id, key, &mut board);
+        }
+    }
     for (id, key) in articles.tracked().into_iter().filter(|t| t.0 != 0) {
         let live = smash::app::sv_battle_object::is_active(id) && smash::app::sv_battle_object::module_accessor(id) as usize == key;
         // `key` is the live article's accessor (checked above); the natives check their own grants.
@@ -727,6 +744,18 @@ mod stats {
             "[Hitbox] command kind={} fighter={fighter} id={id} joint={joint:#x} size={size:.2} extended={extended} spheres={made}",
             if grab { "catch" } else { "attack" }
         ));
+    }
+
+    /// An item about to be tracked: its first live attack slot and that hitbox's size (once per item).
+    pub fn item(articles: &super::orbs::Articles, id: u32, key: usize) {
+        if articles.tracked().contains(&(id, key)) {
+            return;
+        }
+        let mut g = super::GameAttacks(key);
+        let slot = hitbox::live_slot(&mut g).unwrap_or(0);
+        let at = hitbox::AttackReader::data(&mut g, slot) + hitbox::layout::SIZE;
+        let size = hitbox::AttackReader::read_f32(&mut g, at);
+        diagnostic(format_args!("[Hitbox] item tracked id={id:#x} slot={slot} size={size:.2}"));
     }
 
     pub fn rebound_cleared(killed: u32) {
