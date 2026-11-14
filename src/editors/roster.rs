@@ -246,19 +246,13 @@ impl RosterEditor {
             frame.tile_sig = frame.tile_sig.wrapping_mul(16777619) ^ u32::from(frame.tile_n[cell]);
             let mut label = Text::<28>::new();
             match info.content {
-                CellContent::All => {
-                    let _ = label.write_str("All");
-                }
-                CellContent::Unsupported => {
-                    let _ = label.write_str(info.label);
-                }
+                CellContent::All => _ = label.write_str("All"),
+                CellContent::Unsupported => _ = label.write_str(info.label),
                 CellContent::Fighter(kind) if self.pick() => {
                     let chosen = CHOICES.iter().position(|(k, _)| *k == kind).is_some_and(|i| values.get(i) == Some(&1));
                     let _ = write!(label, "{}{}", if chosen { "> " } else { "" }, info.label);
                 }
-                CellContent::Fighter(_) => {
-                    let _ = label.write_str(info.label);
-                }
+                CellContent::Fighter(_) => _ = label.write_str(info.label),
             }
             frame.tiles[cell] = label;
             if info.kind().is_some_and(|kind| self.mii_blocked(kind)) && frame.tile_state[cell] == 0 {

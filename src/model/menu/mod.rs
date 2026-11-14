@@ -1026,9 +1026,7 @@ impl Menu {
                     self.stack.pop();
                     self.reset_page();
                 }
-                Button::B => {
-                    self.stack.pop();
-                }
+                Button::B => _ = self.stack.pop(),
                 _ => {}
             },
         }
@@ -1358,9 +1356,7 @@ impl Menu {
         match button {
             Button::Up => self.top(Screen::List { row, cursor: (cursor + len - 1) % len }),
             Button::Down => self.top(Screen::List { row, cursor: (cursor + 1) % len }),
-            Button::JumpUp | Button::JumpDown => {
-                self.top(Screen::List { row, cursor: jumped(cursor, len, button == Button::JumpDown) });
-            }
+            Button::JumpUp | Button::JumpDown => self.top(Screen::List { row, cursor: jumped(cursor, len, button == Button::JumpDown) }),
             Button::A => {
                 match ROWS[row].control {
                     _ if ROWS[row].id == LOOP_ROW => self.recording.set_loop_row(cursor),
@@ -1369,9 +1365,7 @@ impl Menu {
                 }
                 self.stack.pop();
             }
-            Button::B => {
-                self.stack.pop();
-            }
+            Button::B => _ = self.stack.pop(),
             _ => {}
         }
     }
@@ -1400,14 +1394,10 @@ impl Menu {
         match button {
             Button::Up => self.top(Screen::Checklist { row, cursor: (cursor + len - 1) % len }),
             Button::Down => self.top(Screen::Checklist { row, cursor: (cursor + 1) % len }),
-            Button::JumpUp | Button::JumpDown => {
-                self.top(Screen::Checklist { row, cursor: jumped(cursor, len, button == Button::JumpDown) });
-            }
+            Button::JumpUp | Button::JumpDown => self.top(Screen::Checklist { row, cursor: jumped(cursor, len, button == Button::JumpDown) }),
             Button::A => self.toggle_entry(id, cursor),
             Button::ZL => self.all_or_none(id),
-            Button::B => {
-                self.stack.pop();
-            }
+            Button::B => _ = self.stack.pop(),
             _ => {}
         }
     }
@@ -1432,9 +1422,7 @@ impl Menu {
                 }
             }
             // The checklist entries and the two handles as one list; a handle being edited ignores the jump.
-            Button::JumpUp | Button::JumpDown if !editing => {
-                self.top(screen(jumped(cursor, len + 2, button == Button::JumpDown), false));
-            }
+            Button::JumpUp | Button::JumpDown if !editing => self.top(screen(jumped(cursor, len + 2, button == Button::JumpDown), false)),
             Button::Left | Button::Right => {
                 let forward = button == Button::Right;
                 if editing {
@@ -1594,9 +1582,7 @@ impl Menu {
                 }
                 self.put(id, &array);
             }
-            Button::B => {
-                self.stack.pop();
-            }
+            Button::B => _ = self.stack.pop(),
             _ => {}
         }
     }
@@ -1606,9 +1592,7 @@ impl Menu {
         match button {
             Button::Up => self.top(Screen::SwapGroups { cursor: (cursor + len - 1) % len }),
             Button::Down => self.top(Screen::SwapGroups { cursor: (cursor + 1) % len }),
-            Button::JumpUp | Button::JumpDown => {
-                self.top(Screen::SwapGroups { cursor: jumped(cursor, len, button == Button::JumpDown) });
-            }
+            Button::JumpUp | Button::JumpDown => self.top(Screen::SwapGroups { cursor: jumped(cursor, len, button == Button::JumpDown) }),
             Button::A => {
                 if self.swap_entry_grey(cursor).is_none() {
                     let id = SWAP_GROUP_IDS[cursor];
@@ -1616,9 +1600,7 @@ impl Menu {
                     self.put(id, if on { &[0, 1] } else { &[1, 0] });
                 }
             }
-            Button::B => {
-                self.stack.pop();
-            }
+            Button::B => _ = self.stack.pop(),
             _ => {}
         }
     }
@@ -1630,12 +1612,8 @@ impl Menu {
         match button {
             Button::Up => self.top(screen(situation, (cursor + len - 1) % len)),
             Button::Down => self.top(screen(situation, (cursor + 1) % len)),
-            Button::JumpUp | Button::JumpDown => {
-                self.top(screen(situation, jumped(cursor, len, button == Button::JumpDown)));
-            }
-            Button::Left if cursor == 0 => {
-                self.top(screen((situation + SITUATIONS.len() - 1) % SITUATIONS.len(), 0));
-            }
+            Button::JumpUp | Button::JumpDown => self.top(screen(situation, jumped(cursor, len, button == Button::JumpDown))),
+            Button::Left if cursor == 0 => self.top(screen((situation + SITUATIONS.len() - 1) % SITUATIONS.len(), 0)),
             Button::Right if cursor == 0 => self.top(screen((situation + 1) % SITUATIONS.len(), 0)),
             // The actions are drawn in columns of OVERRIDE_COLUMN (mockup 06): Left / Right step a column.
             Button::Left | Button::Right if cursor > 0 => {
@@ -1647,9 +1625,7 @@ impl Menu {
             }
             Button::A if cursor > 0 => self.toggle_entry(id, cursor - 1),
             Button::ZL if cursor > 0 => self.all_or_none(id),
-            Button::B => {
-                self.stack.pop();
-            }
+            Button::B => _ = self.stack.pop(),
             _ => {}
         }
     }
@@ -1659,16 +1635,12 @@ impl Menu {
         match button {
             Button::Up => self.top(Screen::Chords { cursor: (cursor + len - 1) % len }),
             Button::Down => self.top(Screen::Chords { cursor: (cursor + 1) % len }),
-            Button::JumpUp | Button::JumpDown => {
-                self.top(Screen::Chords { cursor: jumped(cursor, len, button == Button::JumpDown) });
-            }
+            Button::JumpUp | Button::JumpDown => self.top(Screen::Chords { cursor: jumped(cursor, len, button == Button::JumpDown) }),
             Button::A => {
                 let captured = Chord::from_row(self.get(CHORD_ROWS[cursor].1));
                 self.stack.push(Screen::ChordEntry { target: ChordTarget::Row(cursor as u8), captured });
             }
-            Button::B => {
-                self.stack.pop();
-            }
+            Button::B => _ = self.stack.pop(),
             _ => {}
         }
     }
@@ -1732,9 +1704,7 @@ impl Menu {
             Button::X => self.chord_capture = ChordCapture::Release,
             // Empty the chord (a menu shortcut with an empty chord is disabled).
             Button::Y => self.top(Screen::ChordEntry { target, captured: Chord::NONE }),
-            Button::B => {
-                self.stack.pop();
-            }
+            Button::B => _ = self.stack.pop(),
             _ => {}
         }
     }
@@ -1792,9 +1762,7 @@ impl Menu {
                     self.outbox.give_item = u8::try_from(item).ok();
                 }
             }
-            Button::B => {
-                self.stack.pop();
-            }
+            Button::B => _ = self.stack.pop(),
             _ => {}
         }
     }

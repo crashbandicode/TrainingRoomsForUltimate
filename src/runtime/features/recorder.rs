@@ -525,9 +525,7 @@ unsafe fn begin_playback(slot: u8, facing: i8, ledge: bool) {
     });
     let result = if ledge { rec().playback_ledge(slot, facing, catch) } else { rec().start_playback(slot, facing) };
     match result {
-        Ok(started) => {
-            event("playback_shortcut", "slot", i64::from(started.slot), "frames", i64::from(started.frames));
-        }
+        Ok(started) => event("playback_shortcut", "slot", i64::from(started.slot), "frames", i64::from(started.frames)),
         Err(refusal) => notices::refuse(refusal.text()),
     }
 }

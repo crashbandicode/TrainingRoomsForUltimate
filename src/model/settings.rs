@@ -519,9 +519,7 @@ fn snapshot_from(label: &'static str, nested: Option<Nested>, issues: &mut Vec<I
                 Ok(row) => snapshot.rows[index] = row,
                 Err(reason) => issues.push(Issue { at: format!("{label}.{id}"), reason }),
             },
-            None => {
-                snapshot.extra.insert(id, value);
-            }
+            None => _ = snapshot.extra.insert(id, value),
         }
     }
     for id in entries.duplicates {

@@ -183,9 +183,7 @@ impl<const N: usize> ByteRing<N> {
         let _ = write!(sink, "{} #{} ", ts_ms, seq);
         match text {
             Some(text) => sink.put(text),
-            None => {
-                let _ = fmt::write(&mut sink, args);
-            }
+            None => _ = fmt::write(&mut sink, args),
         }
         let (mut written, cut) = (sink.written, sink.cut);
         if cut {

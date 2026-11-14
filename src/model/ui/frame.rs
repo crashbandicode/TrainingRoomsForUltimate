@@ -431,9 +431,7 @@ pub fn write_value(menu: &Menu, row: usize, out: &mut Text<72>) {
         let _ = out.write_str("<  ");
     }
     match menu.value(row) {
-        RowValue::Toggle(on) => {
-            let _ = out.write_str(if on { "[ON]" } else { "[OFF]" });
-        }
+        RowValue::Toggle(on) => _ = out.write_str(if on { "[ON]" } else { "[OFF]" }),
         RowValue::Choice(at) => {
             let label = match (r.control, at) {
                 (Control::Dropdown(labels), Some(i)) => labels.get(i).copied().unwrap_or("-"),
@@ -442,15 +440,9 @@ pub fn write_value(menu: &Menu, row: usize, out: &mut Text<72>) {
             };
             let _ = out.write_str(label);
         }
-        RowValue::Number(Some(n)) => {
-            let _ = write!(out, "{n}");
-        }
-        RowValue::Number(None) => {
-            let _ = out.write_str("-");
-        }
-        RowValue::Checklist { ticked, total } => {
-            let _ = write!(out, "{ticked} of {total}  >");
-        }
+        RowValue::Number(Some(n)) => _ = write!(out, "{n}"),
+        RowValue::Number(None) => _ = out.write_str("-"),
+        RowValue::Checklist { ticked, total } => _ = write!(out, "{ticked} of {total}  >"),
         RowValue::Delay(view) => {
             use super::menu::DelayView;
             let _ = match view {
@@ -459,18 +451,10 @@ pub fn write_value(menu: &Menu, row: usize, out: &mut Text<72>) {
                 DelayView::Range(range) => write!(out, "{} - {}  >", range.min, range.max),
             };
         }
-        RowValue::Slider { lower, upper } => {
-            let _ = write!(out, "{lower} - {upper}  >");
-        }
-        RowValue::Chips(mask) => {
-            let _ = write!(out, "{} selected  >", mask.count_ones());
-        }
-        RowValue::Chord(chord) => {
-            let _ = write!(out, "{chord}  >");
-        }
-        RowValue::OverridesSet(n) => {
-            let _ = write!(out, "{n} of 13 set  >");
-        }
+        RowValue::Slider { lower, upper } => _ = write!(out, "{lower} - {upper}  >"),
+        RowValue::Chips(mask) => _ = write!(out, "{} selected  >", mask.count_ones()),
+        RowValue::Chord(chord) => _ = write!(out, "{chord}  >"),
+        RowValue::OverridesSet(n) => _ = write!(out, "{n} of 13 set  >"),
         RowValue::None => {
             let _ = match r.control {
                 Control::Info(Info::PermanentShortcut) => out.write_str("B + D-pad Up"),
@@ -596,9 +580,7 @@ pub fn page_frame(menu: &Menu, frame: &mut Frame) {
             let _ = frame.help[0].write_str("Puts every setting of this page back to your saved defaults (X saves them).");
             let _ = frame.help[1].write_str("A asks first. On Fighters & Stages, both fighter picks reset and load on close.");
         }
-        None => {
-            let _ = frame.help[0].write_str("A opens or closes this section.");
-        }
+        None => _ = frame.help[0].write_str("A opens or closes this section."),
     }
     let _ = frame.hint.write_str(HINT_PAGE);
     paint_recording(menu, frame);
@@ -820,12 +802,8 @@ fn paint_sections(rec: &super::recording_menu::RecordingScreens, frame: &mut Fra
                     badges += 1;
                     let _ = frame.rows[slot].label.write_str(&row.name);
                 }
-                Some(order) => {
-                    let _ = write!(frame.rows[slot].label, "{order} {}", row.name);
-                }
-                None => {
-                    let _ = frame.rows[slot].label.write_str(&row.name);
-                }
+                Some(order) => _ = write!(frame.rows[slot].label, "{order} {}", row.name),
+                None => _ = frame.rows[slot].label.write_str(&row.name),
             }
             if let Some(count) = row.chain_count {
                 let _ = write!(frame.rows[slot].value, "{count}");

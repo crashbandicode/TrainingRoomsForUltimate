@@ -1084,9 +1084,7 @@ unsafe fn run_wait(raw: &Raw, marker: Marker) {
                 with(|s| s.machine.finish_wait(role));
             }
         }
-        _ => {
-            with(|s| s.machine.finish_wait(role));
-        }
+        _ => _ = with(|s| s.machine.finish_wait(role)),
     }
 }
 

@@ -43,9 +43,7 @@ pub fn start() {
             let now = crate::runtime::clock::uptime_ms();
             match watch.observe(crate::model::hook_stats::total_entries(), now) {
                 Some(Event::Stalled { entries, quiet_ms }) => report(entries, quiet_ms, now),
-                Some(Event::Resumed { entries, quiet_ms }) => {
-                    line(format_args!("[StallWatch] resumed entries={entries} quiet_ms={quiet_ms}"));
-                }
+                Some(Event::Resumed { entries, quiet_ms }) => line(format_args!("[StallWatch] resumed entries={entries} quiet_ms={quiet_ms}")),
                 None => {}
             }
         }

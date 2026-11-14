@@ -179,9 +179,7 @@ impl StageEditor {
             let name = frame.tiles[i];
             let mut label = Text::<28>::new();
             match Self::stage_of(n) {
-                None if n == 0 => {
-                    let _ = write!(label, "{}{}", if self.all() && self.mode() == Mode::Rotation { "* " } else { "" }, name.string_lossy());
-                }
+                None if n == 0 => _ = write!(label, "{}{}", if self.all() && self.mode() == Mode::Rotation { "* " } else { "" }, name.string_lossy()),
                 None => continue,
                 Some(index) => {
                     let marker = match self.mode() {
@@ -190,12 +188,8 @@ impl StageEditor {
                         _ => None,
                     };
                     match marker {
-                        Some((0, mark)) => {
-                            let _ = label.write_str(mark);
-                        }
-                        Some((r, mark)) => {
-                            let _ = write!(label, "{r}{mark}");
-                        }
+                        Some((0, mark)) => _ = label.write_str(mark),
+                        Some((r, mark)) => _ = write!(label, "{r}{mark}"),
                         None => {}
                     }
                     let _ = label.write_str(&name.string_lossy());

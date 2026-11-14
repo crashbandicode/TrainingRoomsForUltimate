@@ -769,9 +769,7 @@ impl RecordingScreens {
                 }
                 out.push(line(ConnKind::Detail, format!("streak {} · best {}", sequence.streak, sequence.best)));
             }
-            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => {
-                out.extend(self.connection_lines(face, &item).into_iter().map(|conn| line(ConnKind::Detail, conn.text)));
-            }
+            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => out.extend(self.connection_lines(face, &item).into_iter().map(|conn| line(ConnKind::Detail, conn.text))),
         }
         out
     }

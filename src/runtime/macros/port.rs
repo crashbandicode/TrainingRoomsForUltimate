@@ -268,9 +268,7 @@ pub(crate) mod slots {
             match completion {
                 Completion::Export { diagnostic } => {
                     match message.transfer.result {
-                        SlotResult::ExportFailed(error) => {
-                            finished = Some(Finished::Export { diagnostic, result: Err(error) });
-                        },
+                        SlotResult::ExportFailed(error) => finished = Some(Finished::Export { diagnostic, result: Err(error) }),
                         SlotResult::Exported => {
                             let (frames, origin) = message.transfer.exported().unwrap();
                             let start = StartState { fighter_kind: origin.start.fighter_kind, costume: origin.start.costume,

@@ -55,12 +55,8 @@ pub(crate) fn service() {
     while let Some([what, kind]) = REQUESTS.pop() {
         let kind = kind as u32;
         match what {
-            CPU => {
-                let _ = super::character_roster::request_cpu_kind(kind);
-            }
-            PLAYER => {
-                let _ = super::character_roster::request_player_kind(kind);
-            }
+            CPU => _ = super::character_roster::request_cpu_kind(kind),
+            PLAYER => _ = super::character_roster::request_player_kind(kind),
             _ => {
                 let queued = super::character_roster::request_player_kind(kind);
                 REPLIES.push([u64::from(kind), u64::from(queued)]);

@@ -244,9 +244,7 @@ impl RecordingIndex {
             return Err(Error::Invalid("bad id"));
         }
         match reason {
-            Use::Bound | Use::SetActive | Use::Played | Use::Drilled | Use::Recorded => {
-                self.touch(kind, id, at);
-            }
+            Use::Bound | Use::SetActive | Use::Played | Use::Drilled | Use::Recorded => self.touch(kind, id, at),
         }
         Ok(())
     }
