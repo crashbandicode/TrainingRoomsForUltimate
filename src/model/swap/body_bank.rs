@@ -1134,8 +1134,13 @@ pub fn groups_load_beside(live_gate: Option<u32>) -> bool {
 /// gate, no room, or a target with no one-member window (a PT or Aegis form, the pair).
 pub fn special_neighbour_window(forms: Forms, lane: impl IntoIterator<Item = u32>, special: SpecialPolicy, groups: bool,
     room: usize, live_gate: Option<u32>) -> Option<Members> {
-    let _ = (forms, lane.into_iter().count(), special, groups, room, live_gate);
-    None
+    if !groups || forms.kinds[0] == KIRBY || !groups_load_beside(live_gate) { return None; }
+    // A Mii lane entry is a configured target whose group carries an identity: not this rule's (left as it was).
+    let beside = SpecialPolicy { mii: false, ..special };
+    let target = forms.kinds[0];
+    let fits = lane.into_iter().filter_map(|kind| Members::special_group(kind, beside))
+        .any(|group| group.count() <= room && !group.kinds()[..group.count()].contains(&target));
+    if fits { Members::target_only(forms) } else { None }
 }
 
 /// The group a [`target_first`] Reload's neighbours build as: the members the `full` window would have held besides
@@ -3013,9 +3018,10 @@ mod tests {
             for press in 0..8 {
                 let target = if press % 2 == 0 { MARIO } else { SQUIRTLE };
                 let next = if target == MARIO { [SQUIRTLE, MARIO] } else { [MARIO, SQUIRTLE] };
+                let held = groups.iter().position(|g| g.index_of(target).is_some());
                 if window.is_some_and(|w| w.index_of(target).is_some()) {
                     // A reuse.
-                } else if let (Some(w), Some(g)) = (window, groups.iter().position(|g| g.index_of(target).is_some())) {
+                } else if let (Some(w), Some(g)) = (window, held) {
                     let attached = groups.remove(g);
                     groups.push(w);
                     window = Some(attached);

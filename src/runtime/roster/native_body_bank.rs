@@ -1464,6 +1464,25 @@ pub(super) fn proposed(owner: u32, target: Forms, upcoming: &[u32]) -> Option<Me
             trace!("[BodyBank] target first owner={} target={:#x} lane={:x?} neighbours=None; one-member Reload, the Built groups stay (rc.14 2c)",
                 owner, target.kinds[0], &lane[..count]);
         }
+        // rc.14 pt-groups (the primary 2026-11-14 ~21:45Z; g5-rc13-xps-6 `p2-g5-pt-groups`): a lane whose only neighbours
+        // form a native group (Pokémon Trainer, Pyra/Mythra) or the normal pair gives the target its one-member window
+        // too, or that group is never planned: the planner plans only beside a role's bank. A lane `0x4b` is the pair
+        // only as the planner's own lane filter reads it (`plan_groups`: the role's numbered form is the pair and its
+        // original is not Ice Climbers). A Kirby target, a deferring gate and no room keep the canonical Reload
+        // (`body_bank::special_neighbour_window`).
+        let one = one.or_else(|| {
+            let logical = if role == 0 { super::Role::Player } else { super::Role::Cpu };
+            let pair = super::original_kind(logical) != Some(POPO)
+                && super::requested_forms_at(&menu, logical, POPO, Some(0)) == Forms::starting(POPO);
+            let special = special_policy(&settings);
+            let window = crate::engine::swap::body_bank::special_neighbour_window(target,
+                upcoming.iter().copied().filter(|kind| *kind != POPO || pair), special, groups_enabled(&settings),
+                pool.saturating_sub(other_total), live_gate(target.kinds[0]))?;
+            TARGET_FIRST[role].store(target.kinds[0], Ordering::Release);
+            trace!("[BodyBank] target first owner={} target={:#x} lane={:x?} upcoming={:x?} special={:?} room={}; one-member Reload, its native group or pair builds beside it (rc.14 pt-groups)",
+                owner, target.kinds[0], &lane[..count], DebugIter(upcoming.iter().take(5)), special, pool.saturating_sub(other_total));
+            Some(window)
+        });
         return one;
     };
     // rc.6 window admission (primary 2026-11-09 13:28Z; Eden final-e39-xps-hot hs08b: the window `[42, 44, 1c]` was
