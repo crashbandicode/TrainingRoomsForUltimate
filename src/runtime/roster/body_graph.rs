@@ -142,6 +142,14 @@ unsafe fn destroy_special_records(base: usize, records: [usize; 3]) {
     if records[2] != 0 && fields::object(records[2]) { free(records[2]); }
 }
 
+/// rc.14 a-full-2 (p4), diag build only: the trainer resource counts `S+0x1968` (PT) and `S+0x1980` (bit 5), with
+/// `S = *(main+0x52bc3b0)`; values only.
+#[cfg(feature = "diag")]
+unsafe fn trainer_counts(base: usize) -> Option<(u32, u32)> {
+    let s = fields::child(base, 0x52bc3b0)?;
+    Some((fields::read::<u32>(s, 0x1968)?, fields::read::<u32>(s, 0x1980)?))
+}
+
 /// What `execute` did, for the caller's teardown line.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct DestroyReceipt {
@@ -202,7 +210,17 @@ pub(crate) unsafe fn execute(base: usize, plan: &DetachedPlan<'_>, keys: &[u32],
             DestroyStep::DestroyDispatchers { arrays } => {
                 if destroy_dispatcher_arrays(base, *arrays) { receipt.dispatchers += 1; } else { receipt.skipped += 1; }
             }
-            DestroyStep::DestroyRecords { records } => { destroy_special_records(base, *records); receipt.records += 1; }
+            DestroyStep::DestroyRecords { records } => {
+                #[cfg(feature = "diag")]
+                let before = trainer_counts(base);
+                destroy_special_records(base, *records);
+                receipt.records += 1;
+                // rc.14 a-full-2 (p4): finalize decrements these before its destroy (`0x652efc`, `0x6530b4`); this
+                // teardown mirrors only `0x652f5c-0x652f84`.
+                #[cfg(feature = "diag")]
+                trace!("[Destroy] records owner={} holder={:#x} trainer_counts {:?} -> {:?}", owner, records[0], before,
+                    trainer_counts(base));
+            }
             DestroyStep::ReleaseKeys { kinds } => {
                 let (released, kept) = release_keys(kinds);
                 receipt.keys_released += released;

@@ -1218,6 +1218,10 @@ pub const KEEP_WINDOW_ACROSS_RELOAD: bool = false;
 /// until its Eden rows pass (the diag build's `diag-cycle.req` `strip` turns it on for them).
 pub const KIRBY_STRIP_BEFORE_PARK: bool = false;
 
+/// rc.14 a-full-2 (limit 2): A1 keeps a Pokémon Trainer window too ([`window_kept_across_reload`]'s `keep_pt`). Off until
+/// its Eden rows pass (the diag build's `diag-cycle.req` `pt`, with `window`, turns it on for them).
+pub const KEEP_PT_WINDOW_ACROSS_RELOAD: bool = false;
+
 /// rc.14 2e (a-full, A1; AFULL-RESEARCH.md §2): why the attached window `window` cannot be kept across its role's
 /// target-first Reload onto `target` (`Ok`: it can). The Reload start (`0x653240` → `0x653490`) deactivates every window
 /// body with the commit's own call, so a window whose live member could park is kept by detaching it before loader state
@@ -1229,9 +1233,18 @@ pub const KIRBY_STRIP_BEFORE_PARK: bool = false;
 ///   exists;
 /// - a live member Design A loaded over Ready Fighters (`live_cold`): it is the one fighter that doesn't fit, freed when
 ///   left ([`cold_left`]).
-pub fn window_kept_across_reload(window: Members, keep_mii: bool, target: u32, live_parks: bool, live_cold: bool)
-    -> Result<(), &'static str> {
-    if matches!(window.special(), Special::Native(_)) { return Err("a native group's window"); }
+///
+/// rc.14 a-full-2 (limit 2, AFULL2-RESEARCH.md): with `keep_pt` ([`KEEP_PT_WINDOW_ACROSS_RELOAD`]) a Pokémon Trainer
+/// window is kept too. The Reload start's article walk is pass 1 of `0x3a6b80`, the exchange's own `deactivate_saved`, and
+/// its zeroed `+0x5a90` is the exchange's dropped claim; once `keep_window` has taken the records out of the entry, every
+/// loader read of `+0x5a88` (`0x650b40`, `0x65120c`, `0x650c74`) finds null and destroys nothing. An Aegis window stays
+/// excluded until probe a0 shows what the Reload start leaves of its holder.
+pub fn window_kept_across_reload(window: Members, keep_mii: bool, keep_pt: bool, target: u32, live_parks: bool,
+    live_cold: bool) -> Result<(), &'static str> {
+    if matches!(window.special(), Special::Native(_)) {
+        if window.holder_step() != Some(HolderStep::Trainer) { return Err("an Aegis window (probe a0 first)"); }
+        if !keep_pt { return Err("a Pokemon Trainer window (its switch is off)"); }
+    }
     if window.special() == Special::Mii && !keep_mii { return Err("a Mii window (2d's switch is off)"); }
     if window.index_of(target).is_some() { return Err("the window holds the Reload's target"); }
     if !live_parks { return Err("the live member may not park"); }
@@ -4179,17 +4192,26 @@ mod tests {
     /// native group, a Mii without 2d's switch, holds the target, or its live member is the cold fighter Design A frees.
     fn a_reload_keeps_the_window_whose_live_member_parks() {
         let window = members(&[FALCO, PICHU, DIDDY]);
-        assert_eq!(window_kept_across_reload(window, false, KROOL, true, false), Ok(()));
-        assert_eq!(window_kept_across_reload(Members::new(&[KIRBY, PIKACHU]).unwrap(), false, PALUTENA, true, false), Ok(()),
+        assert_eq!(window_kept_across_reload(window, false, false, KROOL, true, false), Ok(()));
+        assert_eq!(window_kept_across_reload(Members::new(&[KIRBY, PIKACHU]).unwrap(), false, false, PALUTENA, true, false), Ok(()),
             "a copy-free Kirby parks, so his window stays");
-        assert_eq!(window_kept_across_reload(Members::pair_lead(LINK).unwrap(), false, MARIO, true, false), Ok(()));
-        assert!(window_kept_across_reload(window, false, KROOL, false, false).is_err(), "the live member may not park");
-        assert!(window_kept_across_reload(window, false, PICHU, true, false).is_err(), "the window holds the target");
-        assert!(window_kept_across_reload(members(&[KROOL]), false, FALCO, true, true).is_err(), "the cold fighter goes");
-        assert!(window_kept_across_reload(Members::native_group(0x24).unwrap(), false, MARIO, true, false).is_err());
+        assert_eq!(window_kept_across_reload(Members::pair_lead(LINK).unwrap(), false, false, MARIO, true, false), Ok(()));
+        assert!(window_kept_across_reload(window, false, false, KROOL, false, false).is_err(), "the live member may not park");
+        assert!(window_kept_across_reload(window, false, false, PICHU, true, false).is_err(), "the window holds the target");
+        assert!(window_kept_across_reload(members(&[KROOL]), false, false, FALCO, true, true).is_err(), "the cold fighter goes");
+        assert!(window_kept_across_reload(Members::native_group(0x24).unwrap(), false, false, MARIO, true, false).is_err());
+        // rc.14 a-full-2 (limit 2): with its switch a Pokémon Trainer window is kept, any of its forms on screen; Pyra/Mythra
+        // still are not (probe a0 first), nor is a PT window that holds the target.
+        for form in [0x24, 0x25, 0x26] {
+            assert_eq!(window_kept_across_reload(Members::native_group(form).unwrap(), false, true, MARIO, true, false), Ok(()),
+                "{form:#x}");
+        }
+        assert!(window_kept_across_reload(Members::native_group(0x5a).unwrap(), false, true, MARIO, true, false).is_err(),
+            "an Aegis window waits for its probe");
+        assert!(window_kept_across_reload(Members::native_group(0x24).unwrap(), false, true, 0x25, true, false).is_err());
         let mii = Members::mii_group(GUNNER).unwrap();
-        assert!(window_kept_across_reload(mii, false, KROOL, true, false).is_err());
-        assert_eq!(window_kept_across_reload(mii, true, KROOL, true, false), Ok(()));
+        assert!(window_kept_across_reload(mii, false, false, KROOL, true, false).is_err());
+        assert_eq!(window_kept_across_reload(mii, true, false, KROOL, true, false), Ok(()));
     }
 
     /// rc.14 a-full-2 (K-strip; the primary 2026-11-14 ~23:24Z): leaving a Kirby that holds a copy is no Reload any more.

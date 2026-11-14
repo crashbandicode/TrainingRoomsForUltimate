@@ -2159,6 +2159,8 @@ pub(super) unsafe fn submit(entry: *mut u8, owner: u32, plan: Plan,
     KEEPING[role].store(keeping, Ordering::Release);
     // rc.14 2e (a-full, A1): the attached window this target-first Reload keeps, read before `build` replaces the bank.
     let outgoing = if keeping == u32::MAX { None } else { outgoing_window(entry, owner, role, keeping) };
+    // rc.14 a-full-2 (probe a0, p4): a native window's holder before the Reload and after its start (diag build only).
+    native_window_probe(entry, owner, "before reload");
     before_reload(entry);
     if let Some(members) = plan.members {
         if !build(entry, owner, members) {
@@ -2168,10 +2170,37 @@ pub(super) unsafe fn submit(entry: *mut u8, owner: u32, plan: Plan,
     }
     let descriptor = super::native_fighter_install::Descriptor::from_bytes(&plan.descriptor);
     super::reload_at_pose(BASE.load(Ordering::Acquire), entry, &descriptor, pose);
+    native_window_probe(entry, owner, "after reload start");
     // Loader state 0 runs as soon as this pre-service poll returns (`native_service`): the window leaves first.
     if let Some(outgoing) = outgoing { keep_window(entry, owner, role, keeping, outgoing); }
     KEEPING[role].store(u32::MAX, Ordering::Release);
     true
+}
+
+/// rc.14 a-full-2, probe a0 (Aegis) and p4 (PT), diag build only: what a native window's holder looks like around the
+/// Reload start (`0x653490`: the bit-0 path walks a claimed trainer's articles at `0x653864`, the bit-2 path the holder's at
+/// `0x6534e4` when `+0x5a90` is set, then `+0x5a90 = 0`, `+0x591a = 0xff`). Values only: the flags `+0x591f`, the claim
+/// `+0x5a90`, the record `+0x5a98`, the holder's article count (`+0x10`) and each pool object's world byte `bo+0x61`
+/// (pass 1 clears it, `0x33a1c90`), `+0x5ab9` (the bit-0 path's write), and the trainer counts. No native call.
+unsafe fn native_window_probe(entry: *const u8, owner: u32, stage: &str) {
+    #[cfg(feature = "diag")]
+    {
+        let holder = read::<usize>(entry, 0x5a88);
+        if holder == 0 { return; }
+        let base = BASE.load(Ordering::Acquire);
+        let valid = valid_special_object(base, holder, owner);
+        let count = if valid { (fields::read::<u64>(holder, 0x10).unwrap_or(0) & 0xffff_ffff) as usize } else { 0 };
+        let mut world = [None::<u8>; 8];
+        for (i, byte) in world.iter_mut().enumerate().take(count) {
+            *byte = fields::child(holder, 0x20 + i * 8).and_then(|object| fields::read::<u8>(object, 0x61));
+        }
+        trace!("[GroupSwap] native window {} owner={} kinds={:x?} flags={:#x} claimed={:#x} record={:#x} holder={:#x} valid={} articles={} world={:?} pending={:#x} b9={:#x}{}",
+            stage, owner, [read::<u32>(entry, 0x18), read::<u32>(entry, 0x1c), read::<u32>(entry, 0x20)],
+            read::<u8>(entry, 0x591f), read::<usize>(entry, 0x5a90), read::<usize>(entry, 0x5a98), holder, valid, count,
+            &world[..count.min(8)], read::<u8>(entry, 0x591a), read::<u8>(entry, 0x5ab9), trainer_counts_note(base));
+    }
+    #[cfg(not(feature = "diag"))]
+    { let _ = (entry, owner, stage); }
 }
 
 /// rc.14 2e (a-full, A1): the attached window a target-first Reload may keep, as the bank knew it before `build`.
@@ -2186,6 +2215,9 @@ struct Outgoing {
     cold: bool,
     /// The bank's cold marks before `build`: those of the window's members go with the kept window.
     marks: FixedList<crate::engine::swap::body_bank::Cold, 2>,
+    /// rc.14 a-full-2 (limit 2): a Pokémon Trainer window's claimed trainer `+0x5a90` before the Reload start (non-zero:
+    /// the start ran pass 1 of `0x3a6b80` on the holder, `0x653864-0x65390c`; zero: it skipped it).
+    claimed: usize,
 }
 
 /// rc.14 2e (a-full, A1; AFULL-RESEARCH.md §2): before a target-first Reload onto `target`, whether its role's attached
@@ -2197,7 +2229,7 @@ struct Outgoing {
 /// itself is the farthest, it is not kept and native destroys it as before. No native write here.
 unsafe fn outgoing_window(entry: *mut u8, owner: u32, role: usize, target: u32) -> Option<Outgoing> {
     use crate::engine::swap::body_bank::{farthest_unit, window_kept_across_reload, COLD_OVER_ONE, KEEP_MII_ACROSS_RELOAD,
-        KEEP_WINDOW_ACROSS_RELOAD};
+        KEEP_PT_WINDOW_ACROSS_RELOAD, KEEP_WINDOW_ACROSS_RELOAD};
     if !(KEEP_WINDOW_ACROSS_RELOAD || diag_cycle(4)) || !GROUPS_ENABLED.load(Ordering::Acquire) { return None; }
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if !groups_enabled(&settings) { return None; }
@@ -2219,7 +2251,8 @@ unsafe fn outgoing_window(entry: *mut u8, owner: u32, role: usize, target: u32) 
     let live = members.kinds()[usize::from(from)];
     let cold = bank.over.iter().any(|(kind, _)| *kind == live);
     let keep_mii = KEEP_MII_ACROSS_RELOAD || diag_cycle(2);
-    if let Err(why) = window_kept_across_reload(members, keep_mii, target, parks.is_ok(), cold) {
+    let keep_pt = KEEP_PT_WINDOW_ACROSS_RELOAD || diag_cycle(16);
+    if let Err(why) = window_kept_across_reload(members, keep_mii, keep_pt, target, parks.is_ok(), cold) {
         trace!("[GroupSwap] window across reload owner={} kinds={:x?} target={:#x}: not kept ({}{}{})", owner,
             &members.kinds()[..members.count()], target, why, if parks.is_err() { ": " } else { "" }, parks.err().unwrap_or(""));
         return None;
@@ -2255,7 +2288,7 @@ unsafe fn outgoing_window(entry: *mut u8, owner: u32, role: usize, target: u32) 
         }
     }
     Some(Outgoing { members, bodies: bank.bodies, identity: bank.identity, configuration: bank.configuration, alias: bank.alias,
-        cold: bodies > ready, marks: bank.over })
+        cold: bodies > ready, marks: bank.over, claimed: read::<usize>(entry, 0x5a90) })
 }
 
 /// rc.14 2e (a-full, A1; AFULL-RESEARCH.md §1-§2): right after the Reload start (`0x653240`, inside the same pre-service
@@ -2293,7 +2326,14 @@ unsafe fn keep_window(entry: *mut u8, owner: u32, role: usize, target: u32, out:
     let Some(dispatch) = dispatcher_arrays(e).filter(|arrays| arrays.iter().all(|a| dispatcher_array_ok(*a))) else {
         return refuse("dispatcher arrays");
     };
-    if [0x5a88usize, 0x5a90, 0x5a98].iter().any(|at| read::<usize>(entry, *at) != 0) { return refuse("object records"); }
+    // rc.14 a-full-2 (limit 2): a Pokémon Trainer window carries its holder (`+0x5a88`, the 0x238-byte object of this owner)
+    // and its 0x10-byte record (`+0x5a98`); the Reload start has dropped the claim (`+0x5a90 = 0`, `0x653920`). Every
+    // other window holds none of them.
+    let trainer = out.members.holder_step() == Some(crate::engine::swap::body_bank::HolderStep::Trainer);
+    if trainer {
+        if !valid_special_object(base, read::<usize>(entry, 0x5a88), owner) { return refuse("trainer holder"); }
+        if read::<usize>(entry, 0x5a90) != 0 { return refuse("the trainer is still claimed"); }
+    } else if [0x5a88usize, 0x5a90, 0x5a98].iter().any(|at| read::<usize>(entry, *at) != 0) { return refuse("object records"); }
     let Some(mut registry) = NativeRegistry::new(base, r, owner) else { return refuse("registry unreadable"); };
     let slot = BANKS[role].lock().as_ref()
         .filter(|b| b.entry == e && b.owner == owner && b.phase == Phase::Building && !b.departed)
@@ -2347,6 +2387,52 @@ unsafe fn keep_window(entry: *mut u8, owner: u32, role: usize, target: u32, out:
         std::array::from_fn::<Option<u8>, NATIVE_MEMBERS, _>(|i| (i < count).then(|| fields::read_unchecked::<u8>(out.bodies[i].address, 0x3a))),
         cell_bytes, saved.group_ctx, dispatch, listener_counts(dispatch), saved.mii_r, out.identity.is_some(), out.members.is_pair(),
         out.cold, r, fields::read::<u64>(r, 0x4c0).unwrap_or(0));
+    if trainer { retire_kept_trainer(base, owner, group, out.claimed, saved.flags, saved.records); }
+}
+
+/// rc.14 a-full-2 (limit 2, AFULL2-RESEARCH.md): the trainer articles of a Pokémon Trainer window [`keep_window`] kept go
+/// as an exchange's detach retires them (PT-TRAINER-PARK), all at once and before loader state 3 releases R's NRO tree.
+/// Pass 1 is the Reload start's own (`0x653864-0x65390c`, when it found a claimed trainer) or `deactivate_saved`; then
+/// `release_sub_pools` and `destroy_saved` (pass 2). The split across ticks exists for live frames, and a Reload stalls
+/// anyway (28-57 ms here, `special_articles` model). The kept record's warm attach rebuilds the pool from its re-taken
+/// object kind, as for any detached PT group (`exchange_articles`). The records left the entry in `clear_window`, so loader
+/// states 2 and 3 skip the trainer functor, the bit-5 destroy and the free (`0x650b40`, `0x65120c`, `0x650c74`).
+unsafe fn retire_kept_trainer(base: usize, owner: u32, group: usize, claimed: usize, flags: u8, records: [usize; 3]) {
+    let holder = records[0];
+    let valid = valid_special_object(base, holder, owner);
+    let count = if valid { fields::read::<u64>(holder, 0x10).unwrap_or(0) & 0xffff_ffff } else { 0 };
+    if count == 0 {
+        trace!("[GroupSwap] window kept across reload owner={} group={} trainer holder={:#x} valid={} articles=0{}", owner, group,
+            holder, valid, trainer_counts_note(base));
+        return;
+    }
+    let deactivated = claimed == 0 && articles::deactivate_saved(owner, flags, holder, valid, "reload keep");
+    let pools = articles::release_sub_pools(base, holder);
+    let gone = articles::destroy_saved(base, owner, holder, "reload keep");
+    trace!("[GroupSwap] window kept across reload owner={} group={} trainer holder={:#x} articles={} pass1={} sub_pools={:?} gone={} records={:x?}{}",
+        owner, group, holder, count, if claimed != 0 { "reload start" } else if deactivated { "deactivate_saved" } else { "none" },
+        pools, gone, records, trainer_counts_note(base));
+}
+
+/// rc.14 a-full-2 (p4): the diag build's view of the trainer resource counts, `S = *(main+0x52bc3b0)`: `S+0x1968` (the PT
+/// functor's and finalize's decrement, `0x651ba0`, `0x652efc`) and `S+0x1980` (the bit-5 destroy's, `0x651228`,
+/// `0x6530b4`). Text for a diag line; empty in the release build.
+fn trainer_counts_note(base: usize) -> TrainerCounts { TrainerCounts(base) }
+
+struct TrainerCounts(usize);
+impl core::fmt::Display for TrainerCounts {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        #[cfg(feature = "diag")]
+        {
+            // SAFETY: values only; the singleton pointer is checked before either read.
+            let counts = unsafe { fields::child(self.0, 0x52bc3b0) }
+                .map(|s| unsafe { (fields::read::<u32>(s, 0x1968), fields::read::<u32>(s, 0x1980)) });
+            if let Some((Some(a), Some(b))) = counts { return write!(f, " trainer_counts=({a}, {b})"); }
+            write!(f, " trainer_counts=none")
+        }
+        #[cfg(not(feature = "diag"))]
+        { let _ = (self.0, &f); Ok(()) }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
