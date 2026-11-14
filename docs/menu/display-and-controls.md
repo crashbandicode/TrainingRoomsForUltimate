@@ -140,7 +140,7 @@ On writes Sweet, Sour or Late on each hit that connects in the frame strip. The 
 the fighter that was hit: your hit on the CPU's lane, the CPU's hit on yours. Sweet is the strongest hitbox out on that
 frame, Sour a weaker one beside it, and Late a hit weaker than the strongest hitbox earlier in the same move. The plugin
 works out which hitbox connected from the damage the hit added. When that is unclear, such as equal hitboxes or a hit on
-a shield, there is no label. A smash attack held to nearly full charge can be labelled wrongly, because the charge changes the damage. It needs Input Display set to Frame strip.
+a shield, there is no label. A charged smash attack is labelled like an uncharged one: the plugin reads the charge from the game and takes it out of the damage before it works out which hitbox connected. It needs Input Display set to Frame strip.
 
 - **Values:** On, Off
 - **Default:** Off
