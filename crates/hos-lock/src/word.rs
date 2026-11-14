@@ -291,6 +291,7 @@ impl RwLockWord {
     }
 
     /// The raw state word (tests).
+    #[cfg(test)]
     pub fn state_bits(&self) -> u32 {
         self.state.load(Relaxed)
     }

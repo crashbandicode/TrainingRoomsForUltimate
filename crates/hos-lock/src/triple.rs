@@ -78,6 +78,7 @@ impl<T: Copy> TripleBuffer<T> {
     }
 
     /// The reader: is a new value waiting (no slot changes hands)?
+    #[cfg(test)]
     pub fn has_new(&self) -> bool {
         self.middle.load(Acquire) & FRESH != 0
     }
