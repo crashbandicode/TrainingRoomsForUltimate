@@ -288,6 +288,12 @@ pub fn area_orbs(area: &WindArea, index: usize, z: f32, colour: [u8; 4]) -> [Opt
         }
     };
     let line = area.angle.map(|degrees| {
+        if degrees > 360.0 {
+            // 361: the wind has no one direction (Eden: Meta Knight's Mach Tornado, Mewtwo's Shadow Ball, Wario Waft's circles): a
+            // centre dot, as the launch angles mark a hit with no fixed direction.
+            let at = [centre[0], centre[1], z];
+            return Orb { centre: at, tail: at, radius: reach[0].min(reach[1]) * DOT, color: [255; 4], key: sphere_key(KIND_AREA, index, AREA_LINE as usize) };
+        }
         let [dx, dy] = direction(degrees, 1.0);
         // To the edge: a circle's radius; a box's nearest side along the direction.
         let t = match area.shape {

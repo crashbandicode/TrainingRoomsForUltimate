@@ -467,6 +467,13 @@ fn legend_wind_area_orbs_are_a_band_or_a_disc_with_a_line() {
     assert_eq!((disc.centre, disc.tail, disc.radius, disc.key & 0xff), ([5.0, 8.0, 0.0], [5.0, 8.0, 0.0], 6.0, AREA_CIRCLE));
     assert!(close(line.tail, [-1.0, 8.0, 0.0]), "{line:?}");
     assert!(area_orbs(&WindArea { angle: None, ..circle }, 0, 0.0, colour)[1].is_none(), "no angle: no line");
+    // 361 (Eden: the circles of Mach Tornado, Shadow Ball, Wario Waft): no one direction, a centre dot.
+    let dot = area_orbs(&WindArea { angle: Some(361.0), ..circle }, 0, 0.0, colour)[1].unwrap();
+    assert_eq!((dot.centre, dot.tail, dot.key & 0xff), ([5.0, 8.0, 0.0], [5.0, 8.0, 0.0], AREA_LINE));
+    assert!(dot.radius > 6.0 * LINE && dot.radius < 6.0, "{dot:?}");
+    // Negative angles are directions too (Eden: -150, -180): a line.
+    let back = area_orbs(&WindArea { angle: Some(-180.0), ..circle }, 0, 0.0, colour)[1].unwrap();
+    assert!(close(back.tail, [-1.0, 8.0, 0.0]), "{back:?}");
     // Shown by Windboxes alone: an area is not a hitbox; never paired as a capsule end.
     assert!(shows(WINDBOXES, KIND_AREA) && [HITBOXES, GRABS, HURTBOXES, COLOURS, ANGLES].iter().all(|b| !shows(*b, KIND_AREA)));
     assert!([AREA_BOX, AREA_CIRCLE, AREA_LINE].iter().all(|k| *k != 1));
