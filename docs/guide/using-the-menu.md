@@ -70,7 +70,10 @@ Each row has one kind of control. A list, checklist or editor has its own footer
 ![The DI Direction grid with Up x3 and In x1 set: the focused row in the breadcrumb, the weights on the chips, the help line and the footer keys, labelled](../media/rc13-menu-control-chips.png)<br>
 *The DI Direction grid with Up x3 and In x1, labelled: the focused row, the weights, the help line and the footer keys. Eden, rc.13 (untested on hardware).*
 
-<!-- CAPTURE-REQUEST v07-control-stills: the weighted direction chips still is above. Still wanted: an annotated toggle and list, and a checklist/range with its disabled half. Label the focus, the value, the help line and the footer keys. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![CPU > Defence: SDI Strength is a list, Dodge Staling a toggle; the focused row, the help line and the footer keys are marked](../media/rc13-menu-control-toggle-list.png)<br>
+*A list row and a toggle row on CPU > Defence. The focused row is SDI Strength, a list: Left and Right step it, A opens it. Dodge Staling is a toggle: A flips it. The help line and the footer keys are marked. Eden, rc.13 (untested on hardware).*
+
+<!-- CAPTURE-REQUEST v07-control-stills: the weighted direction chips and the toggle and list stills are above. Still wanted: an annotated checklist/range with its disabled half. Label the focus, the value, the help line and the footer keys. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 ## Your defaults
 
 - **X** saves every current setting, on every page, as your defaults.

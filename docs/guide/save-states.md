@@ -52,7 +52,8 @@ Every save state is a file in `sd:/ultimate/TrainingRooms/saves/`. They are list
 page (Recording › [Save states & Macros](../menu/recording.md#save-states--macros)) and in the recording pop-up
 (ZR + D-pad Right). The bound save is the green row, and the five you used last come first.
 
-<!-- CAPTURE-REQUEST v13-bound-save: a still of the SAVE STATES list with the bound save highlighted green, next to a macro's "name · start" save, so the two are not confused. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![SAVE STATES: Save 1 is bound (green); Macro 1 · start is the start save of Macro 1; Save 2 is plain](../media/rc13-bound-save.png)<br>
+*Two saves that are easy to confuse. Save 1 is the bound save, the one Save and Load use (green). "Macro 1 · start" is the save Record made as the start save of Macro 1 and is not bound; with the cursor on it CONNECTIONS names the macro. Eden, rc.13 (untested on hardware).*
 
 The names you'll see:
 

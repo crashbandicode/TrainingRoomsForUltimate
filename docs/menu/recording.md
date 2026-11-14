@@ -59,7 +59,8 @@ the number of files, such as "Save states & Macros (7)".
 - X, with the cursor in MACROS, steps the loop count of the view you're in: ∞, 1, 2, 3, 5, 10. It is the same count
   as the [Loop](#loop) row.
 
-<!-- CAPTURE-REQUEST rec-page-still: a still of the Recording page, Player view, with several saves and macros listed (the hot five outline, a green bound save and active macro, CONNECTIONS filled), rc.13. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![The Recording page, Player view: the hot five outlined, the bound save and the active macro green, orange floppies, CONNECTIONS filled](../media/rc13-recording-page.png)<br>
+*The Recording page with the cursor on Walk and jab: the five used last are outlined in each list, the bound save (Jab start) and the active macro (P1 jab) are green, the floppy marks a macro with a start save, "2" marks Chain 1's second step, and CONNECTIONS says "Starts from Jab start | Chain 1 · step 2 | Recorded on Mario". Eden, rc.13 (untested on hardware).*
 
 More: [Recording a macro](../guide/recording.md#recording-a-macro-and-its-start-save),
 [Chains](../guide/recording.md#chains), [Save states](../guide/save-states.md)
@@ -94,12 +95,26 @@ don't turn the page while a file's screen is open.
 ![A save's own screen: Duplicate makes the copy Save 1 (the count 13 to 14); on the copy, Delete removes it (back to 13)](../media/rc13-save-duplicate-delete.gif)<br>
 *A on the save Center opens its screen. A on Duplicate adds a copy, and the left-hand count goes from 13 to 14. B to the list, A on the copy ("Save 1"), Down three times to Delete, A: it is gone and the count is 13 again. Each press is named in a box. Eden, rc.13 (untested on hardware).*
 
+![A macro's own screen: Rename opens the keyboard, and the typed name shows in the breadcrumb, the list and the chain that holds it](../media/rc13-macro-rename.gif)<br>
+*A on Walk and jab opens its screen, Down to Rename, A: the Switch keyboard (a window of its own in Eden). The typed name "Renamed jab" shows in the breadcrumb and in MACROS, and Chain 1 now reads "P1 jab → Renamed jab". Each press is named in a box. Eden, rc.13 (untested on hardware).*
+
 **The numbered picker** (*+ New chain* and *Edit chain*; *+ New sequence* and *Edit combos* for combos) lists your
 recordings, or your combos (a chain can't hold a chain). A gives the one under the cursor the next number, R takes a
 number off, B finishes. A new chain or sequence then asks for a name on the Switch keyboard. An empty name, or an online
 waiting room where the keyboard can't open, makes it Chain N or Sequence N.
 
-<!-- CAPTURE-REQUEST rec-file-screens: stills of a macro's own screen (Start save, Set active, Playback slot, Rename, Crop, Make combo, Delete) and of a save's, a chain's and a combo's, rc.13. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![A macro's own screen: Start save, Set active, Playback slot, Rename, Crop, Make combo, Delete](../media/rc13-file-screen-macro.png)<br>
+*A macro (Walk and jab, with a start save): Start save reads "Jab start · On" beside the orange floppy. Eden, rc.13 (untested on hardware).*
+
+![A chain's own screen: Start save, Set active, Edit chain, Rename, Make combo, Delete](../media/rc13-file-screen-chain.png)<br>
+*A chain (Chain 1, P1 jab then Walk and jab): its Start save is the first macro's. Eden, rc.13 (untested on hardware).*
+
+![A combo's own screen: Drill, Made from, Rename, Crop, Delete](../media/rc13-file-screen-combo.png)<br>
+*A combo (Jab jab, made from the macro P1 jab). Eden, rc.13 (untested on hardware).*
+
+![A save state's own screen: Bind to Save / Load, Duplicate, Rename, Delete](../media/rc13-file-screen-save.png)<br>
+*A save state (Jab start, bound: Bind to Save / Load reads On). Eden, rc.13 (untested on hardware).*
+
 
 <!-- CAPTURE-REQUEST rec-playback-slot: a GIF of Playback slot: a macro set to Slot 1, CPU Mash on Playback Slot 1, the CPU plays the macro after a hit. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
@@ -166,7 +181,8 @@ shows here), or a chain's first macro.
 *Play on Player 1, then Edit placement moves its start 40 units left (X- forty times) and Write; the same Play now
 starts at the new spot and the jab misses. Cut at the menu steps.*
 
-<!-- CAPTURE-REQUEST rec-edit-placement-screen: a still of the Edit placement screen with its key grid (x- x+ y- y+, X- X+ Y- Y+, Momentum, Write, Keep, New, Back), rc.13. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![Replays > Edit placement: the key grid X- X+ Y- Y+, x- x+ y- y+, Momentum, Keep, Write, New, Back and the offset readout](../media/rc13-edit-placement-screen.png)<br>
+*The Edit placement screen for the active macro: the grid of keys, the offset readout ("Offset X 0.00 Y 0.00 Keep recorded speed") and the help line. Eden, rc.13 (untested on hardware).*
 
 - **Values:** an editor: the offset and the Momentum choice.
 - **How:** A opens it. The D-pad moves between keys, A presses one, B leaves. If it can't open, the help line says

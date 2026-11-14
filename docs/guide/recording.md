@@ -295,7 +295,17 @@ On the Recording page, A on a file opens its own screen. The rows each kind of f
 
 ![A macro's own screen: Set active On for Player 1, then Play on Player 1 warps to its start save and plays it](../media/rc6-macro-set-active.gif)
 
-<!-- CAPTURE-REQUEST rec-file-screens: stills of a macro's, a chain's, a combo's and a save's own screen, with every row visible, rc.13. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![A macro's own screen: Start save, Set active, Playback slot, Rename, Crop, Make combo, Delete](../media/rc13-file-screen-macro.png)<br>
+*A macro (Walk and jab, with a start save): Start save reads "Jab start · On" beside the orange floppy. Eden, rc.13 (untested on hardware).*
+
+![A chain's own screen: Start save, Set active, Edit chain, Rename, Make combo, Delete](../media/rc13-file-screen-chain.png)<br>
+*A chain (Chain 1, P1 jab then Walk and jab): its Start save is the first macro's. Eden, rc.13 (untested on hardware).*
+
+![A combo's own screen: Drill, Made from, Rename, Crop, Delete](../media/rc13-file-screen-combo.png)<br>
+*A combo (Jab jab, made from the macro P1 jab). Eden, rc.13 (untested on hardware).*
+
+![A save state's own screen: Bind to Save / Load, Duplicate, Rename, Delete](../media/rc13-file-screen-save.png)<br>
+*A save state (Jab start, bound: Bind to Save / Load reads On). Eden, rc.13 (untested on hardware).*
 
 ## Replays: Edit placement and the Replay window
 

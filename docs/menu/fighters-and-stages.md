@@ -180,7 +180,8 @@ The same list for the Mii Gunner.
 ![Mii Gunner list: Player 1's list, then ZR to the CPU's list](../media/rc11-mii-gunner.gif)<br>
 *A opens Player 1's Mii Gunner list; ZR switches to the CPU's. This profile has one saved Gunner, then Add New…, which opens Smash's Mii editor (as for the Brawler). Eden, rc.11.*
 
-<!-- CAPTURE-REQUEST v03-mii-rows: a clip for the Mii Gunner and Swordfighter rows that shows a change: a clearly different saved Mii picked, the menu closed, and the changed outfit and a distinctive special on screen (not two lookalike Miis). See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![Player 1 as a Mii Gunner: the Mii Gunner list, the other Replay Gunner picked; the menu closes and Player 1 reloads as that Mii](../media/rc13-mii-pick.gif)<br>
+*Player 1 is a Mii Gunner. Fighters & Stages > Extras > Mii Gunner opens the Player list (the saved Gunner and two Replay Gunners, ">" on the pick); A on the other Replay Gunner moves the marker, and when the menu closes "Saved Mii applied" shows and Player 1 is that Mii. Each press is named in a box. Eden, rc.13 (untested on hardware).*
 
 ## Stages
 

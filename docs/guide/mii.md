@@ -33,7 +33,8 @@ Add New…
 | "Reading saved and replay Miis…" (the help line) | The Miis are being read. |
 | "Mii lists open in Training and in waiting practice." | They can't be read in this scene. |
 
-<!-- CAPTURE-REQUEST v12-mii-list: an annotated still of a Mii list that labels the role (title), the selected "> " marker, a name, the four specials and Add New. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![The Mii Gunner list for Player: the role in the title, three Miis with their four special-move choices, the > marker on the pick, and Add New](../media/rc13-mii-list.png)<br>
+*The Mii Gunner list (the Mii Brawler list has the same layout). The title names the role (ZR switches Player and CPU), each line is a saved Mii with its four special-move choices in brackets, ">" marks the pick, and Add New opens the Mii editor. Eden, rc.13 (untested on hardware).*
 
 ## Picking a saved Mii
 
