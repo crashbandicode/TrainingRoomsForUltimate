@@ -349,8 +349,14 @@ def view(ctx):
     found = _VIEW.search(line)
     if not found:
         raise RuntimeError('no panel view: %s' % line[:200])
+    # The panel's labels are its tiles' texts: cut to the tile's width and padded with empty tiles (Eden btt5-214653c2-1).
     return {'title': json.loads(found.group(1)), 'footer': json.loads(found.group(2)), 'selected': int(found.group(3)),
-            'labels': json.loads(found.group(4))}
+            'labels': [label for label in json.loads(found.group(4)) if label]}
+
+
+def named(labels, names):
+    """The panel's (cut) labels are `names`, in order."""
+    return len(labels) == len(names) and all(name.startswith(label) for label, name in zip(labels, names))
 
 
 def open_list(ctx):
@@ -690,10 +696,17 @@ def e41(ctx, key='bf'):
     out = {'problems': []}
     stage, name = stage_of(ctx, key), STAGE_NAMES[key]
     st = to_placing(ctx, out)
-    if st['n'] != 3:
-        if st['n']:
-            clear_layout(ctx)
-        put_layout(ctx, latest(ctx), out)
+    # Always a fresh layout of three (a layout left by an earlier row, a loaded one included, is not the remembered one), 12
+    # apart: layout_near's 8 is the overlap limit itself, and a cursor a unit off is refused (Eden btt5-214653c2-1, retry 2).
+    if st['n']:
+        clear_layout(ctx)
+    st = latest(ctx)
+    cursor, spots = st['cursor'], [(p1_of(st)[0] + 10 + 12 * k, st['cursor'][1] - 6) for k in range(3)]
+    placed = []
+    for k, (x, y) in enumerate(sorted(spots, key=lambda s: abs(s[0] - cursor[0])), 1):
+        cursor = place_at(ctx, cursor, x, y, k)['cursor']
+        placed.append(list(cursor))
+    hs._remember(ctx, 'btt_layout', placed)
     want = sorted(round(float(c), 1) for t in hs._state(ctx).get('btt_layout') or [] for c in t)
     first = save_new(ctx, stage, name)
     time.sleep(0.5)
@@ -711,11 +724,9 @@ def e41(ctx, key='bf'):
     listing = open_list(ctx)
     out['list'] = listing
     out['shot_list'] = str(ctx.shot('btt-E41-list'))
-    if listing['labels'] != list_order(mine) or listing['labels'][:2] != [second[1]['name'], first[1]['name']]:
+    # Only this stage's files, in Recording's order, the newer save first (another stage's would make the count differ).
+    if not named(listing['labels'], list_order(mine)) or not named(listing['labels'][:2], [second[1]['name'], first[1]['name']]):
         out['problems'].append('the list %s, want %s (newest first)' % (listing['labels'], list_order(mine)))
-    others = {d['name'] for _, d in layouts(ctx)} - {d['name'] for _, d in mine}
-    if others & set(listing['labels']):
-        out['problems'].append('another stage\'s layouts are listed: %s' % (others & set(listing['labels'])))
     leave_list(ctx)
     save(ctx, 'e41', out)
     settle(ctx)
@@ -735,7 +746,7 @@ def e43(ctx, key='bf'):
         raise RuntimeError('btt-E41 left %d files on this stage' % len(mine))
     newest_id, newest = mine[0]
     listing = open_list(ctx)
-    if listing['labels'][:1] != [newest['name']]:
+    if not named(listing['labels'][:1], [newest['name']]):
         out['problems'].append('the list opens on %s, not the newest %s' % (listing['labels'][:1], newest['name']))
     # 1. Rename: the keyboard's name, the same file.
     own = own_row(ctx, 1)
@@ -751,7 +762,7 @@ def e43(ctx, key='bf'):
     steps.press(ctx, 'a', 1.0)  # back on the Saved layouts row: the list again
     listing = view(ctx)
     out['list_renamed'] = listing['labels']
-    if listing['labels'][:1] != ['Ledge trap']:
+    if not named(listing['labels'][:1], ['Ledge trap']):
         out['problems'].append('after the rename the list starts %s' % listing['labels'][:1])
     # 2. Duplicate: a new file with the same targets, at the top.
     before = dict(layouts(ctx))
@@ -764,7 +775,7 @@ def e43(ctx, key='bf'):
     listing = view(ctx)
     out['list_duplicated'] = listing['labels']
     out['shot_duplicated'] = str(ctx.shot('btt-E43-duplicated'))
-    if listing['labels'][:2] != [want, 'Ledge trap']:
+    if not named(listing['labels'][:2], [want, 'Ledge trap']):
         out['problems'].append('after Duplicate the list starts %s' % listing['labels'][:2])
     # 3. Delete the copy (the top row): the question first, the file still there; then Delete it.
     own_row(ctx, 3)
@@ -778,7 +789,7 @@ def e43(ctx, key='bf'):
     wait_layouts(ctx, lambda ls: copy_id not in dict(ls), 6, 'the delete')
     listing = view(ctx)
     out['list_deleted'] = listing['labels']
-    if want in listing['labels'] or listing['labels'][:1] != ['Ledge trap']:
+    if not named(listing['labels'], list_order(layouts(ctx, stage))) or not named(listing['labels'][:1], ['Ledge trap']):
         out['problems'].append('after Delete the list is %s' % listing['labels'])
     out['shot_deleted'] = str(ctx.shot('btt-E43-deleted'))
     leave_list(ctx)
@@ -922,10 +933,8 @@ def x_stages(ctx, first='bf', second='bbf'):
     listing = open_list(ctx)
     out['list_second'] = listing['labels']
     out['shot_list_second'] = str(ctx.shot('btt-X-stages-1-list'))
-    if listing['labels'] != list_order(layouts(ctx, b)):
-        out['problems'].append('step 1: the list is %s, the stage\'s files %s' % (listing['labels'], list_order(layouts(ctx, b))))
-    if {d['name'] for _, d in layouts(ctx, a)} & set(listing['labels']):
-        out['problems'].append('step 1: the first stage\'s layouts are listed')
+    if not named(listing['labels'], list_order(layouts(ctx, b))):
+        out['problems'].append('step 1: the list is %s, the stage\'s own files %s' % (listing['labels'], list_order(layouts(ctx, b))))
     leave_list(ctx)
     # 2. Two targets there, saved: a new file of its own.
     st = to_placing(ctx, out, 'xs2')

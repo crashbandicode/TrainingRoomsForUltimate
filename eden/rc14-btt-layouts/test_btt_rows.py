@@ -337,6 +337,8 @@ class Game:
             title, labels, sel = json.loads((self.files / ('%s.json' % self.own)).read_text())['name'], rows.ASK_ROWS, self.sel
         else:
             return '[NamedMacroDiag] view none visible=false'
+        # As the panel reports its tiles (Eden btt5-214653c2-1): each label cut to the tile, padded to 32 tiles.
+        labels = [label[:16] for label in labels] + [''] * (32 - len(labels))
         return '[NamedMacroDiag] view title=%s footer="" selected=%d labels=%s' % (
             json.dumps(title, ensure_ascii=False), sel, json.dumps(labels, ensure_ascii=False))
 
