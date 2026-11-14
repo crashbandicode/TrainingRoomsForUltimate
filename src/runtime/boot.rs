@@ -152,9 +152,6 @@ fn run_inner() {
 
     // 4. Compare every site window before anything is written (SPEC-core-01 §5.1 step 5b).
     let state_found = state_boot::check();
-    // Only the diag build changes it (`apply_diag_poison` below).
-    #[cfg(feature = "diag")]
-    let mut state_found = state_found;
     let mut found = [GuardOutcome::Stock; SITE_COUNT];
     for (slot, site) in found.iter_mut().zip(SITES.iter()) {
         *slot = if site.compared() {
@@ -163,18 +160,15 @@ fn run_inner() {
             site.slot_outcome(game::read_slot_target(site.offset))
         };
     }
-    let mut found4 = [GuardOutcome::Stock; sites_pkg4::SITES.len()];
-    for (slot, site) in found4.iter_mut().zip(sites_pkg4::SITES.iter()) {
-        *slot = site.outcome(&game::read_window(site.offset));
-    }
+    let found4 = game::outcomes(&sites_pkg4::SITES);
     // Package 5's rows are compared here too, before anything is written: a feature's closure (R2-1) can hold
     // a row of any table.
-    let mut ui_found = [GuardOutcome::Stock; UI_SITES.len()];
-    for (slot, site) in ui_found.iter_mut().zip(UI_SITES.iter()) {
-        *slot = site.outcome(&game::read_window(site.offset));
-    }
+    let ui_found = game::outcomes(&UI_SITES);
     // Eden proof of R2-1 (diag only): rows named in `diag-poison.txt` are treated as foreign, as if another plugin
-    // or an unknown patch had changed those bytes, so the install decisions run on a rejected row.
+    // or an unknown patch had changed those bytes, so the install decisions run on a rejected row. Only the diag
+    // build changes the outcomes.
+    #[cfg(feature = "diag")]
+    let (mut state_found, mut found4, mut ui_found) = (state_found, found4, ui_found);
     #[cfg(feature = "diag")]
     apply_diag_poison(&mut found, &mut state_found, &mut found4, &mut ui_found);
     // Package 6's CPU-as-P1 rows and the run-time texture helper's rows are compared here too (R2-1): both are capabilities.
@@ -187,14 +181,8 @@ fn run_inner() {
     let poison_text = String::new();
     let hb_found = hitbox::check(&|name| poison_text.split(|c: char| c.is_whitespace() || c == ',').any(|n| n == name));
     let developer_found = crate::runtime::developer::check();
-    let mut u4_found = [GuardOutcome::Stock; sites_u4::SITES.len()];
-    for (slot, site) in u4_found.iter_mut().zip(sites_u4::SITES.iter()) {
-        *slot = site.outcome(&game::read_window(site.offset));
-    }
-    let mut u4b_found = [GuardOutcome::Stock; sites_u4b::SITES.len()];
-    for (slot, site) in u4b_found.iter_mut().zip(sites_u4b::SITES.iter()) {
-        *slot = site.outcome(&game::read_window(site.offset));
-    }
+    let u4_found = game::outcomes(&sites_u4::SITES);
+    let u4b_found = game::outcomes(&sites_u4b::SITES);
     // A row of any table by name (names are unique across the tables, `tests/capabilities.rs`).
     let usable = |site: &sites::Site| {
         let by_name = |rows: &[sites::Site], outcomes: &[GuardOutcome]| rows.iter().position(|s| s.name == site.name).map(|i| outcomes[i].usable());

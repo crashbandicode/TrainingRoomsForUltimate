@@ -13,11 +13,7 @@ pub const N: usize = STATE_SITES.len();
 
 /// Compare every window (phase one: before anything is written).
 pub fn check() -> [GuardOutcome; N] {
-    let mut found = [GuardOutcome::Stock; N];
-    for (slot, site) in found.iter_mut().zip(STATE_SITES.iter()) {
-        *slot = site.outcome(&game::read_window(site.offset));
-    }
-    found
+    game::outcomes(&STATE_SITES)
 }
 
 /// Install the hooks when every row is usable and `frame_wrapper` (the CPU core's per-frame hook) is in.

@@ -74,10 +74,7 @@ fn at(offset: usize) -> usize {
 
 /// Compare every row of `sites_u4::SITES` with the bytes now in the game; the helper is usable only when all pass.
 pub fn install() -> [GuardOutcome; SITES.len()] {
-    let mut found = [GuardOutcome::Stock; SITES.len()];
-    for (slot, site) in found.iter_mut().zip(SITES.iter()) {
-        *slot = site.outcome(&game::read_window(site.offset));
-    }
+    let found = game::outcomes(&SITES);
     let all = found.iter().all(|o| o.usable());
     let mut slot = 0usize;
     if all {

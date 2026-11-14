@@ -10,7 +10,7 @@ use skyline::hooks::{getRegionAddress, Region};
 use skyline::nn::oe::{DisplayVersion, GetDisplayVersion};
 
 use crate::model::capabilities::Granted;
-use crate::model::guard::GUARD_BYTES;
+use crate::model::guard::{GuardOutcome, GUARD_BYTES};
 use crate::model::{lra_reset, sites, sites_pkg2, sites_pkg4};
 use crate::model::version::BUILD_ID_SCAN_BYTES;
 
@@ -84,6 +84,11 @@ pub fn read_window(offset: usize) -> [u8; GUARD_BYTES] {
     // SAFETY: only called for offsets of the site table, which lie inside `main`'s mapped image.
     unsafe { std::ptr::copy_nonoverlapping((text_base() + offset) as *const u8, out.as_mut_ptr(), GUARD_BYTES) };
     out
+}
+
+/// Every row's outcome against the 64 bytes now at its offset (an install's phase one: before anything is written).
+pub fn outcomes<const N: usize>(rows: &[sites::Site; N]) -> [GuardOutcome; N] {
+    std::array::from_fn(|i| rows[i].outcome(&read_window(rows[i].offset)))
 }
 
 /// The pointer-sized value now at `main+offset` (a vtable slot), as an offset from `.text`.

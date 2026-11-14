@@ -25,7 +25,7 @@ pub(crate) const N: usize = SITES.len();
 
 /// Compare every row of `sites_pkg6` (before anything is written): the fallback's, the roster cycle's and the diag probes'.
 pub(crate) fn check() -> [GuardOutcome; N] {
-    std::array::from_fn(|i| SITES[i].outcome(&game::read_window(SITES[i].offset)))
+    game::outcomes(&SITES)
 }
 
 /// Install the fallback when its prerequisites passed and the standalone pilot is absent. Returns whether the pilot's hook is

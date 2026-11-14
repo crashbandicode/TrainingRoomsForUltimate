@@ -21,7 +21,7 @@ pub fn publish(snapshot: &Snapshot) {
 
 /// Before any hook writes a neighboring WorkModule window.
 pub fn check() -> [GuardOutcome; 2] {
-    std::array::from_fn(|i| SITES[i].outcome(&game::read_window(SITES[i].offset)))
+    game::outcomes(&SITES)
 }
 
 pub fn install(page_enabled: bool, closure_usable: bool) -> bool {

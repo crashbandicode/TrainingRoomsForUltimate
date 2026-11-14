@@ -52,10 +52,7 @@ impl Memory for Live {
 /// Compare every row of `sites_u4b::SITES` with the bytes now in the game and decode the manager's slot from the instance words. The
 /// helper is usable only when all pass (and the texture helper of `sites_u4` is usable too).
 pub fn install() -> [GuardOutcome; SITES.len()] {
-    let mut found = [GuardOutcome::Stock; SITES.len()];
-    for (slot, site) in found.iter_mut().zip(SITES.iter()) {
-        *slot = site.outcome(&game::read_window(site.offset));
-    }
+    let found = game::outcomes(&SITES);
     let all = found.iter().all(|o| o.usable());
     let mut slot = 0usize;
     if all {
