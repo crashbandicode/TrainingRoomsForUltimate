@@ -17,8 +17,7 @@ import make_packages as mp  # noqa: E402
 
 HELPERS = mp.HELPERS + ['gna_p2_fs.py']
 SEGMENTS = mp.SEGMENTS + ['p2-fs-p1-cycle', 'p2-fs-cpu-cycle', 'p2-fs-p1-hat']
-# cycle-fix's eden/rc14-cycle-fix/cyclefix.py as of 2026-11-14 22:0xZ (untracked in its worktree), copied unchanged.
-CF = HERE / 'cyclefix.py'
+CF = HERE.parent / 'rc14-cycle-fix' / 'cyclefix.py'
 M = 'afull.py'
 ROWS = [
     ('af-setup', 'cyclefix.py', 'cf_setup', 8, 'Live values (RF 8, the console lanes), a P1 lap and a CPU lap, the notice settled.'),

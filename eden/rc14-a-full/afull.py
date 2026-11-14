@@ -208,6 +208,11 @@ def af_mii(ctx):
 def af_kirby(ctx):
     t0, out = _begin(ctx)
     cf._diag_cycle(ctx, 'off')
+    # af-5256aeab-y1: the console's P1 lane fills the bank's three group slots with singles beside Kirby's window, so the
+    # keep was refused (no free group slot, the planner's rule). A two-member lane leaves a slot.
+    seq = hs.diag_mark(ctx)
+    fx._live_set(ctx, player_roster=fs._roster([fs.PIKACHU, fs.KIRBY]))
+    out['settle0'] = fs._settled(ctx, seq, 120)
     out['to_kirby'] = _to(ctx, 0, fs.KIRBY, len(cf.P1_LANE) + 2)
     out['window'] = [hex(k) for k in (_window(ctx, 0) or [])]
     _keep_across(ctx, out, 0, fs.LINK)
@@ -218,6 +223,7 @@ def af_kirby(ctx):
     warm = kept is not None and _warm_back(ctx, out, 0, kept[0], kept[1], seq)
     out['registry'] = [t[:200] for t in _since(ctx, seq) if '[Registry] attach owner=0' in t][:3]
     _shot(ctx, out, 'shot_kirby', 'af-kirby-back')
+    fx._live_set(ctx, player_roster=fs._roster(cf.P1_LANE))
     _mark(t0, out, 'done')
     problems = []
     if out['window'] != [hex(fs.KIRBY)]:
@@ -270,6 +276,7 @@ def af_pair(ctx):
     out['to_pair'] = _to(ctx, 1, POPO, len(lane) + 2)
     out['settle1'] = fs._settled(ctx, hs.diag_mark(ctx), 90)
     out['window'] = [hex(k) for k in (_window(ctx, 1) or [])]
+    seq0 = hs.diag_mark(ctx)
     _keep_across(ctx, out, 1, fs.BOWSER)
     seq = hs.diag_mark(ctx)
     out['back'] = _to(ctx, 1, POPO, len(lane) + 2)
@@ -281,9 +288,10 @@ def af_pair(ctx):
     fx._live_set(ctx, cpu_roster=fs._roster(cf.CPU_LANE), cycle_preload_ready_fighters=fs.RF(8))
     _mark(t0, out, 'done')
     problems = []
-    if not kept or sorted(kept[1]) != [POPO, NANA]:
-        problems.append('the pair window was not kept: window %s, kept %s, not kept %s' % (out['window'], out['kept'],
-                                                                                          out['not_kept']))
+    out['pair'] = any('pair=true' in t for t in _since(ctx, seq0) if 'window kept across' in t)
+    if not kept or [hex(k) for k in kept[1]] != out['window'] or POPO not in kept[1]:
+        problems.append('the Ice Climbers window was not kept: window %s, kept %s, not kept %s' % (out['window'], out['kept'],
+                                                                                                  out['not_kept']))
     if not warm:
         problems.append('no warm return to the kept pair: %s' % out.get('attaches'))
     problems += ['bad line: %s' % t for t in out['bad'] + out.get('bad_after', [])]
