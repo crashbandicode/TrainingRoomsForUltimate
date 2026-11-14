@@ -112,14 +112,14 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     };
     let owners = published::input_owners();
     let menu_open = owners.covers_strip();
-    write_notice(notice, &notices::hud_tick(!waiting && !notice.is_null()));
+    let strip_shown = !menu_open && input_display::sampling();
+    write_notice(notice, &notices::hud_tick(!waiting && !notice.is_null()), strip_shown);
     if strip[iv::at::CONTAINER] != 0 {
         input_display::hud_tick(menu_open, |local, look, changed| {
             write_look(strip[local] as *mut Pane, p::IDX_IV + local, look, changed)
         });
     }
     if bar[cb::at::CONTAINER] != 0 {
-        let strip_shown = !menu_open && input_display::sampling();
         crate::runtime::features::combo::hud_tick(strip_shown, |local, look, changed| {
             write_look(bar[local] as *mut Pane, p::IDX_CB + local, look, changed)
         });
@@ -187,14 +187,14 @@ unsafe fn set_text(target: *mut Pane, text: &str) {
 
 // ---- the notice slot ----------------------------------------------------------------------------------
 
-unsafe fn write_notice(container: *mut Pane, out: &TickOut) {
+unsafe fn write_notice(container: *mut Pane, out: &TickOut, strip: bool) {
     if container.is_null() {
         return;
     }
     pane::set_visible(container, out.visible);
-    // A practice game's notice stands in the top band (the operator, 11-14); every other notice keeps its place.
-    let y = [p::NOTICE_ORIGIN_Y, p::NOTICE_TOP_Y][usize::from(notices::raised())];
-    pane::set_pos(container, 0.0, y);
+    // A practice game's notice stands in the top band, under the frame strip when that is drawn (the operator, 11-14);
+    // every other notice keeps its place.
+    pane::set_pos(container, 0.0, p::notice_y(notices::raised(), strip));
     let Some(draw) = out.draw else { return };
     let header = find(container, p::IDX_NOTICE_HEADER);
     let header_plate = find(container, p::IDX_NOTICE_HEADER_PLATE);

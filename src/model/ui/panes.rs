@@ -1042,6 +1042,15 @@ pub const NOTICE_ORIGIN_Y: f32 = {
 /// header plate's top edge 24 units under the top of the canvas, so the middle of the screen is free for the targets.
 pub const NOTICE_TOP_Y: f32 = 540.0 - 24.0 - (445.0 + 50.0 / 2.0 + NOTICE_PLATE_PAD);
 
+/// The top band with the frame strip drawn at the top: the plates' top edge 8 units under the strip's bottom edge.
+const NOTICE_UNDER_STRIP_Y: f32 = iv::STRIP_Y - iv::STRIP_H / 2.0 - 8.0 - (445.0 + 50.0 / 2.0 + NOTICE_PLATE_PAD);
+
+/// The notice slot's y: its old place; while a practice game's notice stands (`raised`) the top band, and under the frame
+/// strip (`strip`, drawn at the top) when that is up.
+pub const fn notice_y(raised: bool, strip: bool) -> f32 {
+    [NOTICE_ORIGIN_Y, NOTICE_TOP_Y, NOTICE_UNDER_STRIP_Y][raised as usize * (1 + strip as usize)]
+}
+
 /// Pane `index`'s kind and place.
 pub const fn spec(index: usize) -> Spec {
     let name = name_of(index);

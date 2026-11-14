@@ -260,6 +260,20 @@ fn eggs_spawn_ignores_the_notice() {
     assert!(middle > 10, "{middle} of 40 targets rested in the middle of the screen");
 }
 
+/// The notice slot's y by state (the operator, 11-14): the old place with no practice game; the top band while one runs; and,
+/// with the frame strip drawn at the top, the band directly under the strip, so the two never overlap.
+fn eggs_notice_band() {
+    use crate::model::panes::{iv, notice_y, NOTICE_ORIGIN_Y, NOTICE_TOP_Y};
+    // The header plate's top edge above the slot's y: the box top 445 + 25, and the plate's 16 padding.
+    let plates_top = 486.0;
+    assert_eq!([notice_y(false, false), notice_y(false, true)], [NOTICE_ORIGIN_Y; 2], "no game: the old place");
+    assert_eq!(notice_y(true, false), NOTICE_TOP_Y, "a game and no strip: the top band");
+    let strip_bottom = iv::STRIP_Y - iv::STRIP_H / 2.0;
+    let under = notice_y(true, true) + plates_top;
+    assert!(under <= strip_bottom && under >= strip_bottom - 20.0, "the band's top {under} is not just under the strip's {strip_bottom}");
+    assert!(NOTICE_TOP_Y + plates_top <= 540.0, "the top band is on screen");
+}
+
 /// The height of the target above its spawn point after each of `n` ticks, and its x.
 fn path(run: &mut Run, n: usize) -> Vec<[f32; 2]> {
     let spawn = run.egg_at().unwrap();
@@ -802,6 +816,7 @@ fn case_table() {
         ("eggs_respawn_distance", eggs_respawn_distance as fn()),
         ("eggs_on_screen", eggs_on_screen as fn()),
         ("eggs_spawn_ignores_the_notice", eggs_spawn_ignores_the_notice as fn()),
+        ("eggs_notice_band", eggs_notice_band as fn()),
         ("eggs_motion_normal", eggs_motion_normal as fn()),
         ("eggs_speed_scales_time", eggs_speed_scales_time as fn()),
         ("eggs_rest_and_pause", eggs_rest_and_pause as fn()),
