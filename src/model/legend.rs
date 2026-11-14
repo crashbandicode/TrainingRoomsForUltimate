@@ -29,10 +29,11 @@ pub fn draws(bits: u8) -> bool {
     bits & (HITBOXES | GRABS | HURTBOXES | ANGLES | WINDBOXES) != 0
 }
 
-/// Whether an orb of `kind` (`hitbox::KIND_*`, `KIND_MARK`, `KIND_WIND`) shows. A windbox is a hitbox (the operator ~21:27Z):
-/// Hitboxes shows it as Windboxes does, and it is one orb either way, so it is never drawn twice.
+/// Whether an orb of `kind` (`hitbox::KIND_*`, `KIND_MARK`, `KIND_WIND`, `KIND_AREA`) shows. A windbox is a hitbox (the operator
+/// ~21:27Z): Hitboxes shows it as Windboxes does, and it is one orb either way, so it is never drawn twice. A wind area is not a
+/// hitbox: Windboxes alone shows it.
 pub fn shows(bits: u8, kind: u32) -> bool {
-    bits & [0, HITBOXES, HURTBOXES, GRABS, ANGLES, HITBOXES | WINDBOXES].get(kind as usize).copied().unwrap_or(0) != 0
+    bits & [0, HITBOXES, HURTBOXES, GRABS, ANGLES, HITBOXES | WINDBOXES, WINDBOXES].get(kind as usize).copied().unwrap_or(0) != 0
 }
 
 /// The windboxes' orb kind (after `KIND_MARK`): a hitbox `is_windbox` names while the windboxes are asked for (*Windboxes* or
@@ -118,6 +119,185 @@ pub fn marks(hit: &Orb, angle: i32, lr: f32) -> [Option<Orb>; 2] {
         361 => [Some(seg(0, dashes, 0.1, 0.4)), Some(seg(1, dashes, 0.6, 0.9))],
         _ => [Some(Orb { radius: hit.radius * DOT, ..seg(0, [0.0; 2], 0.0, 0.0) }), None],
     }
+}
+
+// ---- wind areas (the primary ~22:00Z: pushes that are not hitboxes) -------------------------------------------------------
+
+/// A fighter's wind areas: the game's `AREA_WIND_2ND*` animation commands add them to the fighter's AreaModule
+/// (`add_wind_area_2nd` / `_rad`, vtable slots 0x158 / 0x160 of `FighterAreaModuleImpl`, `main+0x3d03e0` / `+0x3d0680`), and the
+/// wind manager pushes every fighter inside one. Drawn deep blue under *Windboxes*, with a white line along the wind.
+pub mod area {
+    /// The accessor's AreaModule.
+    pub const MODULE: usize = 0xc0;
+    /// Module `+0x18`: the area table; its record count (`+0x10`) and records (`+0x18`), `STRIDE` bytes each.
+    pub const TABLE: usize = 0x18;
+    pub const COUNT: usize = 0x10;
+    pub const RECORDS: usize = 0x18;
+    pub const STRIDE: usize = 0x70;
+    /// Record bytes: its kind (`WIND`, the only kind the wind manager takes: `main+0x3cfee4`), shape (0 box, 1 circle: `+0x3d045c`),
+    /// enabled (`is_enable_area`, `+0x3cf7b4`) and the wind set on it (`erase_wind`, `+0x3cfcc8`); `SHAPE`: the shape object.
+    pub const KIND: usize = 0x1;
+    pub const WIND: u8 = 0x19;
+    pub const SHAPE_TYPE: usize = 0x60;
+    pub const ENABLED: usize = 0x61;
+    pub const WIND_SET: usize = 0x63;
+    pub const SHAPE: usize = 0x28;
+    /// Shape object: a box's corners (min, max: x, y), a circle's centre and radius, the wind id (`add_wind_area_2nd`).
+    pub const BOX_MIN: usize = 0x40;
+    pub const BOX_MAX: usize = 0x50;
+    pub const CENTRE: usize = 0x80;
+    pub const RADIUS: usize = 0x90;
+    pub const ID: usize = 0x70;
+    /// The wind manager (`main+0x52b85e8` holds a pointer to a pointer to its entry vector, begin and end): `ENTRY` bytes each,
+    /// the wind id first and the wind's angle in degrees at `ENTRY_ANGLE` (the animation command's angle, mirrored by the
+    /// fighter's facing when it was set).
+    pub const MANAGER_SLOT: usize = 0x52b_85e8;
+    pub const ENTRY: usize = 0x28;
+    pub const ENTRY_ANGLE: usize = 0xc;
+    /// Bounds: records read per fighter, entries searched, areas drawn per fighter.
+    pub const MAX_RECORDS: usize = 32;
+    pub const MAX_ENTRIES: usize = 128;
+    pub const MAX_AREAS: usize = 4;
+}
+
+/// Reads for `wind_areas` (the runtime reads game memory, type-checked; the tests a fake).
+pub trait AreaReader {
+    fn area_usize(&mut self, at: usize) -> usize;
+    fn area_u8(&mut self, at: usize) -> u8;
+    fn area_u32(&mut self, at: usize) -> u32;
+    fn area_f32(&mut self, at: usize) -> f32;
+}
+
+/// A wind area in world space.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum AreaShape {
+    Box { min: [f32; 2], max: [f32; 2] },
+    Circle { centre: [f32; 2], radius: f32 },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct WindArea {
+    pub shape: AreaShape,
+    /// The wind's direction in degrees, counter-clockwise from screen right; `None` when the manager has no entry for it.
+    pub angle: Option<f32>,
+}
+
+impl WindArea {
+    pub const NONE: WindArea = WindArea { shape: AreaShape::Circle { centre: [0.0; 2], radius: 0.0 }, angle: None };
+}
+
+fn pointer(at: usize) -> bool {
+    at != 0 && at.is_multiple_of(8)
+}
+
+/// The enabled wind areas of the AreaModule at `module` into `out`, with each one's angle from the wind manager's entry vector
+/// (`entries`: the vector's address, `[begin, end]`; 0 when there is none). How many were written. A table or a pointer that
+/// does not look like one gives nothing; a shape that is not finite, or empty, is left out.
+pub fn wind_areas(reader: &mut impl AreaReader, module: usize, entries: usize, out: &mut [WindArea]) -> usize {
+    use area::*;
+    if !pointer(module) {
+        return 0;
+    }
+    let table = reader.area_usize(module + TABLE);
+    if !pointer(table) {
+        return 0;
+    }
+    let (count, records) = (reader.area_usize(table + COUNT).min(MAX_RECORDS), reader.area_usize(table + RECORDS));
+    if !pointer(records) {
+        return 0;
+    }
+    let mut n = 0;
+    for i in 0..count {
+        if n == out.len() {
+            break;
+        }
+        let rec = records + i * STRIDE;
+        if reader.area_u8(rec + KIND) != WIND || reader.area_u8(rec + ENABLED) == 0 || reader.area_u8(rec + WIND_SET) == 0 {
+            continue;
+        }
+        let shape = reader.area_usize(rec + SHAPE);
+        if !pointer(shape) {
+            continue;
+        }
+        let ty = reader.area_u8(rec + SHAPE_TYPE);
+        let area = {
+            let mut f = |at: usize| reader.area_f32(shape + at);
+            match ty {
+                0 => AreaShape::Box { min: [f(BOX_MIN), f(BOX_MIN + 4)], max: [f(BOX_MAX), f(BOX_MAX + 4)] },
+                1 => AreaShape::Circle { centre: [f(CENTRE), f(CENTRE + 4)], radius: f(RADIUS) },
+                _ => continue,
+            }
+        };
+        let usable = match area {
+            AreaShape::Box { min, max } => min.iter().chain(&max).all(|v| v.is_finite()) && max[0] > min[0] && max[1] > min[1],
+            AreaShape::Circle { centre, radius } => centre.iter().all(|v| v.is_finite()) && radius.is_finite() && radius > 0.0,
+        };
+        if !usable {
+            continue;
+        }
+        let id = reader.area_u32(shape + ID);
+        out[n] = WindArea { shape: area, angle: entry_angle(reader, entries, id) };
+        n += 1;
+    }
+    n
+}
+
+fn entry_angle(reader: &mut impl AreaReader, entries: usize, id: u32) -> Option<f32> {
+    use area::*;
+    if !pointer(entries) {
+        return None;
+    }
+    let (begin, end) = (reader.area_usize(entries), reader.area_usize(entries + 8));
+    if !pointer(begin) || end < begin || (end - begin) / ENTRY > MAX_ENTRIES {
+        return None;
+    }
+    (0..(end - begin) / ENTRY)
+        .map(|k| begin + k * ENTRY)
+        .find(|e| reader.area_u32(*e) == id)
+        .map(|e| reader.area_f32(e + ENTRY_ANGLE))
+        .filter(|a| a.is_finite())
+}
+
+/// The wind areas' orb kind (after `KIND_WIND`): shown by *Windboxes* only (an area is not a hitbox). Sphere numbers: a box's band
+/// `AREA_BOX` (the layout draws its band alone, no round ends), a circle's disc `AREA_CIRCLE`, the wind line `AREA_LINE`.
+pub const KIND_AREA: u32 = 6;
+pub const AREA_BOX: u32 = 0x20;
+pub const AREA_CIRCLE: u32 = 0x21;
+pub const AREA_LINE: u32 = 0x22;
+/// Translucent deep blue: the windboxes' colour, see-through so the fighters inside stay visible.
+pub const AREA_ALPHA: u8 = 110;
+
+/// The areas' pane colour: `WIND` as the layout takes it (linear light), at `AREA_ALPHA`.
+pub fn area_colour() -> [u8; 4] {
+    let byte = |c: f32| (c.clamp(0.0, 1.0) * 255.0 + 0.5) as u8;
+    super::panes::linear([byte(WIND[0]), byte(WIND[1]), byte(WIND[2]), AREA_ALPHA])
+}
+
+/// Area `index`'s orbs at depth `z`: its shape (a box as a band from its left to its right edge, as tall as the box; a circle as a disc)
+/// in translucent `colour`, and a white line from its centre to its edge along the wind (none without an angle).
+pub fn area_orbs(area: &WindArea, index: usize, z: f32, colour: [u8; 4]) -> [Option<Orb>; 2] {
+    let (centre, shape, reach) = match area.shape {
+        AreaShape::Box { min, max } => {
+            let (cy, half) = ((min[1] + max[1]) / 2.0, [(max[0] - min[0]) / 2.0, (max[1] - min[1]) / 2.0]);
+            let orb = Orb { centre: [min[0], cy, z], tail: [max[0], cy, z], radius: half[1], color: colour, key: sphere_key(KIND_AREA, index, AREA_BOX as usize) };
+            ([min[0] + half[0], cy], orb, half)
+        }
+        AreaShape::Circle { centre, radius } => {
+            let at = [centre[0], centre[1], z];
+            (centre, Orb { centre: at, tail: at, radius, color: colour, key: sphere_key(KIND_AREA, index, AREA_CIRCLE as usize) }, [radius; 2])
+        }
+    };
+    let line = area.angle.map(|degrees| {
+        let [dx, dy] = direction(degrees, 1.0);
+        // To the edge: a circle's radius; a box's nearest side along the direction.
+        let t = match area.shape {
+            AreaShape::Circle { radius, .. } => radius,
+            AreaShape::Box { .. } => [(reach[0], dx), (reach[1], dy)].iter().filter(|(_, d)| d.abs() > 1e-6).map(|(h, d)| h / d.abs()).fold(f32::MAX, f32::min),
+        };
+        let thick = reach[0].min(reach[1]) * LINE;
+        Orb { centre: [centre[0], centre[1], z], tail: [centre[0] + dx * t, centre[1] + dy * t, z], radius: thick, color: [255; 4], key: sphere_key(KIND_AREA, index, AREA_LINE as usize) }
+    });
+    [Some(shape), line]
 }
 
 #[cfg(test)]

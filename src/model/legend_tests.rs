@@ -363,3 +363,111 @@ fn legend_old_hitbox_vis_migrates() {
     }
     assert_eq!(crate::model::settings::Snapshot::factory().get(ROW), Some(&[0u8; ITEMS][..]));
 }
+/// Game memory for `wind_areas`: little-endian bytes from `BASE`; a read outside it is 0.
+struct Mem(Vec<u8>);
+
+const BASE: usize = 0x10_0000;
+
+impl Mem {
+    fn put(&mut self, at: usize, v: &[u8]) {
+        self.0[at - BASE..at - BASE + v.len()].copy_from_slice(v);
+    }
+    fn get<const N: usize>(&self, at: usize) -> [u8; N] {
+        at.checked_sub(BASE).and_then(|o| self.0.get(o..o + N)).map_or([0; N], |b| b.try_into().unwrap())
+    }
+}
+
+impl AreaReader for Mem {
+    fn area_usize(&mut self, at: usize) -> usize {
+        u64::from_le_bytes(self.get(at)) as usize
+    }
+    fn area_u8(&mut self, at: usize) -> u8 {
+        self.get::<1>(at)[0]
+    }
+    fn area_u32(&mut self, at: usize) -> u32 {
+        u32::from_le_bytes(self.get(at))
+    }
+    fn area_f32(&mut self, at: usize) -> f32 {
+        f32::from_le_bytes(self.get(at))
+    }
+}
+
+/// An AreaModule at `BASE` with six records: not wind; a wind box (id 7, 30 degrees); a wind circle (id 9, 200 degrees); a wind box
+/// switched off; a wind box with no manager entry (id 13); a wind record whose wind is not set. The manager's vector at `BASE+0x1000`.
+fn areas_memory() -> Mem {
+    use area::*;
+    let mut m = Mem(vec![0; 0x2000]);
+    let (table, records, entries) = (BASE + 0x100, BASE + 0x200, BASE + 0x1000);
+    m.put(BASE + TABLE, &(table as u64).to_le_bytes());
+    m.put(table + COUNT, &6u64.to_le_bytes());
+    m.put(table + RECORDS, &(records as u64).to_le_bytes());
+    let boxed = |m: &mut Mem, shape: usize, min: [f32; 2], max: [f32; 2]| {
+        for (k, v) in [min[0], min[1]].iter().enumerate() {
+            m.put(shape + BOX_MIN + 4 * k, &v.to_le_bytes());
+        }
+        for (k, v) in [max[0], max[1]].iter().enumerate() {
+            m.put(shape + BOX_MAX + 4 * k, &v.to_le_bytes());
+        }
+    };
+    // (kind, shape type, enabled, wind set, id)
+    for (i, (kind, ty, on, set, id)) in [(5u8, 0u8, 1u8, 1u8, 5u32), (WIND, 0, 1, 1, 7), (WIND, 1, 1, 1, 9), (WIND, 0, 0, 1, 11), (WIND, 0, 1, 1, 13), (WIND, 0, 1, 0, 15)].into_iter().enumerate() {
+        let (rec, shape) = (records + i * STRIDE, BASE + 0x800 + i * 0x100);
+        m.put(rec + KIND, &[kind]);
+        m.put(rec + SHAPE_TYPE, &[ty, on, 0, set]);
+        m.put(rec + SHAPE, &(shape as u64).to_le_bytes());
+        m.put(shape + ID, &id.to_le_bytes());
+        boxed(&mut m, shape, [-10.0, 2.0], [10.0, 12.0]);
+    }
+    let circle = BASE + 0x800 + 2 * 0x100;
+    m.put(circle + CENTRE, &5.0f32.to_le_bytes());
+    m.put(circle + CENTRE + 4, &8.0f32.to_le_bytes());
+    m.put(circle + RADIUS, &6.0f32.to_le_bytes());
+    let begin = BASE + 0x1100;
+    m.put(entries, &(begin as u64).to_le_bytes());
+    m.put(entries + 8, &((begin + 3 * ENTRY) as u64).to_le_bytes());
+    for (k, (id, angle)) in [(9u32, 200.0f32), (7, 30.0), (11, 90.0)].into_iter().enumerate() {
+        m.put(begin + k * ENTRY, &id.to_le_bytes());
+        m.put(begin + k * ENTRY + ENTRY_ANGLE, &angle.to_le_bytes());
+    }
+    m
+}
+
+#[test]
+fn legend_wind_areas_read_the_area_table() {
+    let mut m = areas_memory();
+    let mut out = [WindArea::NONE; area::MAX_AREAS];
+    let n = wind_areas(&mut m, BASE, BASE + 0x1000, &mut out);
+    assert_eq!(&out[..n], &[
+        WindArea { shape: AreaShape::Box { min: [-10.0, 2.0], max: [10.0, 12.0] }, angle: Some(30.0) },
+        WindArea { shape: AreaShape::Circle { centre: [5.0, 8.0], radius: 6.0 }, angle: Some(200.0) },
+        WindArea { shape: AreaShape::Box { min: [-10.0, 2.0], max: [10.0, 12.0] }, angle: None },
+    ], "not wind, switched off and not set are left out; no manager entry: no angle");
+    // No manager: the shapes without angles; a module, table or record pointer that is not one: nothing.
+    let bare = wind_areas(&mut m, BASE, 0, &mut out);
+    assert!(bare == 3 && out[..bare].iter().all(|a| a.angle.is_none()));
+    assert_eq!(wind_areas(&mut m, 0, BASE + 0x1000, &mut out), 0);
+    assert_eq!(wind_areas(&mut m, BASE + 4, BASE + 0x1000, &mut out), 0);
+    let mut one = [WindArea::NONE; 1];
+    assert_eq!(wind_areas(&mut areas_memory(), BASE, BASE + 0x1000, &mut one), 1, "at most what fits");
+}
+
+#[test]
+fn legend_wind_area_orbs_are_a_band_or_a_disc_with_a_line() {
+    let colour = [0, 10, 255, AREA_ALPHA];
+    let boxed = WindArea { shape: AreaShape::Box { min: [-10.0, 2.0], max: [10.0, 12.0] }, angle: Some(0.0) };
+    let [Some(band), Some(line)] = area_orbs(&boxed, 1, 0.5, colour) else { panic!("a band and a line") };
+    assert_eq!((band.centre, band.tail, band.radius, band.color), ([-10.0, 7.0, 0.5], [10.0, 7.0, 0.5], 5.0, colour), "left edge to right edge, as tall as the box");
+    assert_eq!((band.kind(), band.key & 0xff, (band.key >> 8) & 0xffff), (KIND_AREA, AREA_BOX, 1));
+    assert!(close(line.centre, [0.0, 7.0, 0.5]) && close(line.tail, [10.0, 7.0, 0.5]) && line.color == [255; 4], "{line:?}");
+    assert_eq!(line.key & 0xff, AREA_LINE);
+    let up = area_orbs(&WindArea { angle: Some(90.0), ..boxed }, 1, 0.0, colour)[1].unwrap();
+    assert!(close(up.tail, [0.0, 12.0, 0.0]), "to the top edge: {up:?}");
+    let circle = WindArea { shape: AreaShape::Circle { centre: [5.0, 8.0], radius: 6.0 }, angle: Some(180.0) };
+    let [Some(disc), Some(line)] = area_orbs(&circle, 0, 0.0, colour) else { panic!("a disc and a line") };
+    assert_eq!((disc.centre, disc.tail, disc.radius, disc.key & 0xff), ([5.0, 8.0, 0.0], [5.0, 8.0, 0.0], 6.0, AREA_CIRCLE));
+    assert!(close(line.tail, [-1.0, 8.0, 0.0]), "{line:?}");
+    assert!(area_orbs(&WindArea { angle: None, ..circle }, 0, 0.0, colour)[1].is_none(), "no angle: no line");
+    // Shown by Windboxes alone: an area is not a hitbox; never paired as a capsule end.
+    assert!(shows(WINDBOXES, KIND_AREA) && [HITBOXES, GRABS, HURTBOXES, COLOURS, ANGLES].iter().all(|b| !shows(*b, KIND_AREA)));
+    assert!([AREA_BOX, AREA_CIRCLE, AREA_LINE].iter().all(|k| *k != 1));
+}

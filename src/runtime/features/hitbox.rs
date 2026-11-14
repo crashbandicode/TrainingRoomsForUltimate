@@ -345,13 +345,62 @@ fn clear_set(store: &mut Store, i: usize, accessor: usize) -> Counts {
     store.table.sets[i].clear(&mut OrbSink { status: i32::MIN })
 }
 
-/// Place every sphere `set` holds on its bone and publish them as `accessor`'s orbs, with the launch-angle marks while that row is On.
-unsafe fn publish_orbs(accessor: usize, set: &hitbox::HandleSet) -> usize {
+/// Place every sphere `set` holds on its bone and publish them as `accessor`'s orbs, with the launch-angle marks while that row is On
+/// and the fighter's wind `areas` (Windboxes ticked).
+unsafe fn publish_orbs(accessor: usize, set: &hitbox::HandleSet, areas: &[legend::WindArea]) -> usize {
     let mut placed = [Orb::NONE; orbs::BOARD_ORBS];
     let lr = shown(legend::ANGLES).then(|| natives::lr(accessor));
     let place = |s: &Sphere| natives::joint_position(accessor, s.joint, &s.pos);
-    let len = orbs::place_orbs(set, place, lr, |slot| orbs::slot_angle(&mut GameAttacks(accessor), slot), &mut placed);
+    let mut len = orbs::place_orbs(set, place, lr, |slot| orbs::slot_angle(&mut GameAttacks(accessor), slot), &mut placed);
+    let colour = legend::area_colour();
+    for orb in areas.iter().enumerate().flat_map(|(k, area)| legend::area_orbs(area, k, 0.0, colour)).flatten() {
+        if len < placed.len() {
+            (placed[len], len) = (orb, len + 1);
+        }
+    }
     BOARD.lock().publish(accessor, placed[..len].iter().copied())
+}
+
+/// One raw game-memory read for `GameArea`, the wind-area reader: the pass (`frame`) runs it only behind `enabled` with Windboxes
+/// ticked, through `fighter_wind_areas`.
+fn area_load(at: usize, out: &mut [u8]) {
+    // SAFETY: called only by `GameArea`, whose every address `legend::wind_areas` derived from a pointer it type-checked first
+    // (non-zero, aligned) or from the live fighter's accessor; the read writes nothing but `out`.
+    unsafe { std::ptr::copy_nonoverlapping(at as *const u8, out.as_mut_ptr(), out.len()) };
+}
+
+/// `legend::AreaReader` over game memory (`area_load`): `legend::wind_areas` type-checks every pointer before it reads through it.
+struct GameArea;
+
+impl legend::AreaReader for GameArea {
+    fn area_usize(&mut self, at: usize) -> usize {
+        let mut b = [0u8; 8];
+        area_load(at, &mut b);
+        u64::from_le_bytes(b) as usize
+    }
+    fn area_u8(&mut self, at: usize) -> u8 {
+        let mut b = [0u8; 1];
+        area_load(at, &mut b);
+        b[0]
+    }
+    fn area_u32(&mut self, at: usize) -> u32 {
+        let mut b = [0u8; 4];
+        area_load(at, &mut b);
+        u32::from_le_bytes(b)
+    }
+    fn area_f32(&mut self, at: usize) -> f32 {
+        f32::from_bits(self.area_u32(at))
+    }
+}
+
+/// The fighter's enabled wind areas (its AreaModule, `legend::area`) with their angles from the game's wind manager.
+unsafe fn fighter_wind_areas(accessor: usize, out: &mut [legend::WindArea]) -> usize {
+    use legend::AreaReader;
+    let mut reader = GameArea;
+    let module = reader.area_usize(accessor + legend::area::MODULE);
+    let slot = reader.area_usize(crate::runtime::game::text_base() + legend::area::MANAGER_SLOT);
+    let entries = if slot != 0 && slot.is_multiple_of(8) { reader.area_usize(slot) } else { 0 };
+    legend::wind_areas(&mut reader, module, entries, out)
 }
 
 /// The orb panes of the layout last drawn into, resolved once per layout registration, and how many were shown.
@@ -467,6 +516,15 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         let bits = SHOWN.load(Ordering::Acquire);
         for orb in board.in_draw_order().filter(|o| on && legend::shows(bits, o.kind())) {
             let Some(pill) = plan(orb, orb.color) else { continue };
+            if orb.kind() == legend::KIND_AREA && orb.key & 0xff == legend::AREA_BOX {
+                // A wind area's box: its band alone, from its left edge to its right, as tall as the box.
+                let Some(band) = used.take_band() else {
+                    over += 1;
+                    continue;
+                };
+                write_pane(cache.panes[p::CAPS + band], pill.band, [pill.length, pill.size], pill.rot, pill.color);
+                continue;
+            }
             let Some((cap, band)) = used.take(pill.length > 0.0) else {
                 over += 1;
                 continue;
@@ -739,10 +797,13 @@ pub unsafe fn frame(fighter: usize) {
     let mut hurt = (shown(legend::HURTBOXES) && enabled).then(|| hitbox::GameHurt { accessor, load: mem_load });
     let hurt: Option<&mut dyn hitbox::HurtboxReader> = hurt.as_mut().map(|h| h as _);
     let (c, len) = hitbox::reconcile_frame(set, facts, wants, &mut GameAttacks(accessor), hurt, &mut OrbSink { status });
-    let placed = publish_orbs(accessor, set);
+    // Wind areas (Windboxes ticked): pushes that are not hitboxes, read from the fighter's AreaModule.
+    let mut areas = [legend::WindArea::NONE; legend::area::MAX_AREAS];
+    let found = if enabled && shown(legend::WINDBOXES) { fighter_wind_areas(accessor, &mut areas) } else { 0 };
+    let placed = publish_orbs(accessor, set, &areas[..found]);
     #[cfg(feature = "diag")]
     let (hits, hurts) = {
-        let hits = wants[..len].iter().filter(|s| s.key >> 24 == hitbox::KIND_HIT).count() as u32;
+        let hits = wants[..len].iter().filter(|s| s.key >> 24 != hitbox::KIND_HURT).count() as u32;
         (hits, len as u32 - hits)
     };
     #[cfg(feature = "diag")]

@@ -697,6 +697,30 @@ fn legend_facts_match_the_owned_elf() {
     assert_eq!(legend::KNOCKBACK_QUADS, [0x28, 0x30]);
     // The defender's DamageModule hit handler (main+0x402cc0) reads it (`ldrb w8, [x22, #0x70]`, x22 the attacker's AttackData).
     assert_eq!([0x402e04, 0x402f70, 0x4032fc].map(w), [0x3941_c2c8; 3]);
+    // Wind areas (`legend::area`). The lua_bind thunks take the AreaModule at accessor +0xc0 and call add_wind_area_2nd / _rad
+    // (slots 0x158 / 0x160); FighterAreaModuleImpl's vtable (address point main+0x4f85690, by its relocations) holds 0x3d03e0 / 0x3d0680.
+    use model::legend::area;
+    assert_eq!(area::MODULE, 0xc0);
+    assert_eq!([0x1fcc210, 0x1fcc218, 0x1fcc228].map(w), [0xf940_6000, 0xf940_ad05, 0xf940_b104], "ldr x0,[x0,#0xc0]; ldr x5,[x8,#0x158]; ldr x4,[x8,#0x160]");
+    assert!(reloc(0x4f85690 - 0x4f6e1d0 + 0x158, 0x3d03e0) && reloc(0x4f85690 - 0x4f6e1d0 + 0x160, 0x3d0680), "AreaModule wind slots");
+    // add_wind_area_2nd: the table `[this+0x18]`, its records `+0x18`, 0x70 each; the shape type byte `+0x60`; the shape object
+    // `+0x28`; a box's corners stored at shape `+0x40` / `+0x50` (`stp q2, q1`), a circle's centre `+0x80` and radius `+0x90`.
+    assert_eq!((area::TABLE, area::RECORDS, area::STRIDE, area::SHAPE_TYPE, area::SHAPE), (0x18, 0x18, 0x70, 0x60, 0x28));
+    assert_eq!([0x3d0440, 0x3d0444, 0x3d0448, 0x3d045c, 0x3d04b0].map(w), [0xf940_0e88, 0xf940_0d08, 0x321c_0be9, 0x3941_8129, 0xf940_1509]);
+    assert_eq!((area::BOX_MIN, area::BOX_MAX, area::CENTRE, area::RADIUS), (0x40, 0x50, 0x80, 0x90));
+    assert_eq!([0x3d04c8, 0x3d0534, 0x3d0530].map(w), [0xad02_0522, 0x3d80_2123, 0xbd00_9121], "stp q2,q1,[x9,#0x40]; str q3,[x9,#0x80]; str s1,[x9,#0x90]");
+    // is_enable_area: the count `+0x10` and the enabled byte `+0x61`; the wind manager's registration: the record's kind byte `+0x1`
+    // must be 0x19, the wind-set byte `+0x63`, the shape's id `+0x70`, the manager behind main+0x52b85e8.
+    assert_eq!((area::COUNT, area::ENABLED, area::KIND, area::WIND, area::WIND_SET, area::ID), (0x10, 0x61, 0x1, 0x19, 0x63, 0x70));
+    assert_eq!([0x3cf798, 0x3cf7b4, 0x3cfee0, 0x3cfee4, 0x3cfefc, 0x3cffcc].map(w), [0xf940_090a, 0x3941_8508, 0x3940_0529, 0x7100_653f, 0x3846_3f68, 0xb940_7115]);
+    let (adrp, ldr) = (w(0x3cfff4), w(0x3cfff8));
+    let page = (0x3cfff4usize & !0xfff) + ((((adrp >> 5) & 0x7ffff) << 2 | (adrp >> 29) & 3) as usize) * 0x1000;
+    assert_eq!(page + ((ldr >> 10) & 0xfff) as usize * 8, area::MANAGER_SLOT, "adrp x8 / ldr x8,[x8,#0x5e8]");
+    assert_eq!([0x3cfffc, 0x3d0000, 0x3d000c].map(w), [0xf940_0116, 0xa940_22d7, 0xb940_02e9], "ldr x22,[x8]; ldp x23,x8,[x22]; ldr w9,[x23]");
+    // The entry: 0x28 bytes, the id first, then the parameters from +4 (`strh`/`stur ... #0x6`); the angle the command stored at
+    // parameter +8 (`str s0,[sp,#0x20]`, the parameters at sp+0x18) lands at entry +0xc.
+    assert_eq!((area::ENTRY, area::ENTRY_ANGLE), (0x28, 0xc));
+    assert_eq!([0x3d0558, 0x3d0638, 0x3d0060].map(w), [0x7900_33e8, 0xbd00_23e0, 0xf800_6128], "strh w8,[sp,#0x18]; str s0,[sp,#0x20]; stur x8,[x9,#0x6]");
 }
 
 /// Eggs-ercise V2.2: the stage's camera range is the camera manager's four floats (left, right, top, bottom) at `+0xc20`, read

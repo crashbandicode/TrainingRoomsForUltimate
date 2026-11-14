@@ -16,8 +16,9 @@
 use super::hitbox::{want_hits, AttackReader, Effects, HandleSet, Sphere, FIGHTER_SETS, KIND_HIT, KIND_HURT, MAX_HELD, SCALE, SLOTS};
 use super::legend::{self, KIND_MARK, KIND_WIND};
 
-/// One fighter's orbs on the board: its spheres' and, with *Launch angles* On, up to two marks per hitbox.
-pub const BOARD_ORBS: usize = MAX_HELD + 2 * SLOTS as usize;
+/// One fighter's orbs on the board: its spheres' and, with *Launch angles* On, up to two marks per hitbox, and with *Windboxes* its wind
+/// areas (legend::area_orbs: a shape and a line each).
+pub const BOARD_ORBS: usize = MAX_HELD + 2 * SLOTS as usize + 2 * legend::area::MAX_AREAS;
 
 /// The most fighter objects Training (and the waiting room's practice) draws at once: Player 1 and the CPU, each of them
 /// possibly Ice Climbers, whose Nana is a fighter object of her own. No other fighter adds a fighter object (Pokémon
@@ -267,6 +268,14 @@ pub struct PaneUse {
 }
 
 impl PaneUse {
+    /// A band alone (a wind area's box: no round ends), or `None` (cut).
+    pub fn take_band(&mut self) -> Option<usize> {
+        (self.bands < super::panes::BANDS).then(|| {
+            self.bands += 1;
+            self.bands - 1
+        })
+    }
+
     /// The first of the pill's two caps and its band, or `None` (cut).
     pub fn take(&mut self, band: bool) -> Option<(usize, Option<usize>)> {
         if self.caps + 2 > super::panes::CAPS || (band && self.bands >= super::panes::BANDS) {
