@@ -164,7 +164,7 @@ impl ComboRecord {
                     "steps": l.legacy_presses().filter_map(|event| match event.kind {
                         Kind::Press(button) => Some(json!({
                             "button": button_key(button),
-                            "aim": aim_key(event.dir.legacy_aim()),
+                            "aim": key_of(&AIMS, event.dir.legacy_aim()),
                             "offset": event.offset,
                         })),
                         _ => None,
@@ -323,7 +323,7 @@ fn parse_step(step: &Map<String, Value>) -> Result<(Button, Aim, i32), &'static 
     let name = |k: &'static str| step.get(k).and_then(Value::as_str).ok_or(k);
     Ok((
         button_of(name("button")?).ok_or("button")?,
-        aim_of(name("aim")?).ok_or("aim")?,
+        value_of(&AIMS, name("aim")?).ok_or("aim")?,
         int(step, "offset")?,
     ))
 }
@@ -336,7 +336,7 @@ fn parse_event(event: &Map<String, Value>) -> Result<Event, &'static str> {
         "press" => Kind::Press(button_of(name("button")?).ok_or("button")?),
         "release" => Kind::Release(button_of(name("button")?).ok_or("button")?),
         "cstick" => Kind::CStick,
-        "flick" => Kind::Flick(flick_of(name("flick")?).ok_or("flick")?),
+        "flick" => Kind::Flick(value_of(&FLICKS, name("flick")?).ok_or("flick")?),
         _ => return Err("event"),
     };
     Ok(Event { kind, dir, offset })
@@ -347,7 +347,7 @@ fn event_value(event: Event) -> Value {
         json!({"kind": kind_key(event.kind), "dir": dir_key(event.dir), "offset": event.offset});
     match event.kind {
         Kind::Press(button) | Kind::Release(button) => value["button"] = json!(button_key(button)),
-        Kind::Flick(flick) => value["flick"] = json!(flick_key(flick)),
+        Kind::Flick(flick) => value["flick"] = json!(key_of(&FLICKS, flick)),
         Kind::CStick => {}
     }
     value
@@ -406,12 +406,6 @@ fn button_key(b: Button) -> &'static str {
 fn button_of(key: &str) -> Option<Button> {
     value_of(&BUTTONS, key)
 }
-fn aim_key(a: Aim) -> &'static str {
-    key_of(&AIMS, a)
-}
-fn aim_of(key: &str) -> Option<Aim> {
-    value_of(&AIMS, key)
-}
 
 const DIRS: [(Dir, &str); 9] = [
     (Dir::Neutral, "neutral"),
@@ -435,12 +429,6 @@ fn dir_key(dir: Dir) -> &'static str {
 }
 fn dir_of(key: &str) -> Option<Dir> {
     value_of(&DIRS, key)
-}
-fn flick_key(flick: Flick) -> &'static str {
-    key_of(&FLICKS, flick)
-}
-fn flick_of(key: &str) -> Option<Flick> {
-    value_of(&FLICKS, key)
 }
 fn kind_key(kind: Kind) -> &'static str {
     match kind {
