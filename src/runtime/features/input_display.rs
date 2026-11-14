@@ -264,6 +264,9 @@ fn probe_module(who: usize, accessor: usize, s: &Sample, other_damage: f32) {
         }
     }
     static LAST: Mutex<[Option<(i32, bool, bool, [u32; 20])>; 2]> = Mutex::new([None, None]);
+    /// Game frames the strip sampled (one per `sample_frame`), so a status's length in frames reads off two lines.
+    static FRAME: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let frame = if who == 0 { FRAME.fetch_add(1, Ordering::Relaxed) + 1 } else { FRAME.load(Ordering::Relaxed) };
     let family = (0x2d..=0x2f).contains(&s.status);
     let attacking = s.powers.iter().any(|&p| p > 0.0);
     if accessor == 0 || !(attacking || family) {
@@ -287,7 +290,8 @@ fn probe_module(who: usize, accessor: usize, s: &Sample, other_damage: f32) {
     last[who] = Some(key);
     drop(last);
     crate::runtime::diag_log::diagnostic(format_args!(
-        "[SpotsProbe] who={} status={:#x} stop={} active={} mf={} damage={:.3} other_damage={:.3} powers={:?} fields: {}",
+        "[SpotsProbe] frame={} who={} status={:#x} stop={} active={} mf={} damage={:.3} other_damage={:.3} powers={:?} fields: {}",
+        frame,
         ["p1", "cpu"][who],
         s.status,
         s.stop,
