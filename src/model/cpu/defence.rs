@@ -120,8 +120,6 @@ pub struct Defence {
     pub air_dodge_case: Option<u8>,
     pub clatter_counter: u32,
     pub clatter_step: f32,
-    /// The staling flag value last written, `None` until written (so a fresh body is written once).
-    pub stale_written: Option<bool>,
 }
 
 impl Defence {
@@ -133,7 +131,6 @@ impl Defence {
             air_dodge_case: None,
             clatter_counter: 0,
             clatter_step: CLATTER_STEP_DEFAULT,
-            stale_written: None,
         }
     }
 
@@ -233,20 +230,11 @@ impl Defence {
         !s.stale_dodges
     }
 
-    /// The write this frame needs, if any: the first frame of a body and any change of the row.
-    pub fn stale_write(&mut self, s: &CpuSettings) -> Option<bool> {
+    /// The write this frame needs, if any: whenever the game's flag (`now`) differs from the row. A Training reset
+    /// clears the flag, so a write made only when the row changed was lost at the first L+R+A.
+    pub const fn stale_write(s: &CpuSettings, now: bool) -> Option<bool> {
         let wanted = Self::stale_flag_wanted(s);
-        if self.stale_written == Some(wanted) {
-            return None;
-        }
-        self.stale_written = Some(wanted);
-        Some(wanted)
-    }
-
-    /// Forget what was written (a save-state load or a new session may have reset the flag).
-    #[cfg(test)]
-    pub fn stale_forget(&mut self) {
-        self.stale_written = None;
+        if now == wanted { None } else { Some(wanted) }
     }
 }
 

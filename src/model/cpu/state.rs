@@ -313,7 +313,7 @@ impl Cpu {
             fighter.defence.sdi_roll(settings, rng);
             fighter.pending &= !reroll::SDI_DIRECTION;
         }
-        out.stale_flag = fighter.defence.stale_write(settings);
+        out.stale_flag = Defence::stale_write(settings, f.penalty_disabled);
         if primary {
             let (hide, record) = tech::hide_frame(ids, settings.tech_hide, key.entry, f, *hidden);
             out.hide = hide;

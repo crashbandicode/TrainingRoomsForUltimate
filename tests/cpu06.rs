@@ -58,7 +58,6 @@ fn cpu_with(rows: &[(&str, Vec<u8>)]) -> (Cpu, FighterKey) {
     cpu.ids = table();
     let key = FighterKey::new(1, false).unwrap();
     cpu.fighters[key.index()].pending = 0;
-    cpu.fighters[key.index()].defence.stale_written = Some(false);
     (cpu, key)
 }
 

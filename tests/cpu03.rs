@@ -88,9 +88,6 @@ fn cpu_with(s: CpuSettings) -> (Cpu, FighterKey) {
     cpu.ids = table();
     let key = FighterKey::new(1, false).unwrap();
     cpu.fighters[key.index()].pending = 0;
-    // The dodge-staling flag was written on an earlier frame (the factory row is On: flag false), so a
-    // frame's output here is only the ledge step's.
-    cpu.fighters[key.index()].defence.stale_written = Some(false);
     (cpu, key)
 }
 

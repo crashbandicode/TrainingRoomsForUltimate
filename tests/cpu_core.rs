@@ -612,15 +612,15 @@ fn state06_hub_order_clears_cpu_state() {
 #[test]
 fn cpu_core_frame_with_no_work_asks_for_nothing() {
     // Settings at the factory, a body on the ground: the only thing a frame does is write the
-    // dodge-staling flag once (the row is On, so the flag is false).
+    // dodge-staling flag when the game's differs (the row is On, so the flag is false).
     let mut cpu = Cpu::factory(2);
     cpu.ids = synthetic_table();
     let key = FighterKey::new(1, false).unwrap();
-    let facts = FrameFacts { status: 5, ..FrameFacts::default() };
+    let facts = FrameFacts { status: 5, penalty_disabled: true, ..FrameFacts::default() };
     let out = cpu.frame(key, &facts);
     assert_eq!(out.stale_flag, Some(false));
     assert!(out.clatter.is_none() && out.request_status.is_none() && out.playback.is_none());
-    let again = cpu.frame(key, &facts);
+    let again = cpu.frame(key, &FrameFacts { penalty_disabled: false, ..facts });
     assert_eq!(again, Default::default());
 }
 

@@ -109,7 +109,6 @@ fn cpu_with(rows: &[(&str, Vec<u8>)]) -> (Cpu, FighterKey) {
     cpu.ids = table();
     let key = FighterKey::new(1, false).unwrap();
     cpu.fighters[key.index()].pending = 0;
-    cpu.fighters[key.index()].defence.stale_written = Some(false);
     (cpu, key)
 }
 
@@ -372,7 +371,6 @@ fn cpu04_primary_body_only() {
     let (mut cpu, popo) = cpu_with(&[("tech_hide", vec![1, 0])]);
     let nana = FighterKey::new(1, true).unwrap();
     cpu.fighters[nana.index()].pending = 0;
-    cpu.fighters[nana.index()].defence.stale_written = Some(false);
     assert_eq!(cpu.frame(nana, &hide_facts(DOWN, 8, 40, 0.0)).hide, Default::default());
     assert!(cpu.hidden.is_none());
     assert_eq!(cpu.frame(popo, &hide_facts(DOWN, 8, 40, 0.0)).hide.model_visible, Some(false));
@@ -380,7 +378,6 @@ fn cpu04_primary_body_only() {
     // An extra CPU on another entry is not the primary body either.
     let extra = FighterKey::new(2, false).unwrap();
     cpu.fighters[extra.index()].pending = 0;
-    cpu.fighters[extra.index()].defence.stale_written = Some(false);
     assert_eq!(cpu.frame(extra, &hide_facts(DOWN, 8, 40, 0.0)).hide, Default::default());
     cpu.clear_session();
     assert!(cpu.hidden.is_none(), "the record dies with the session");

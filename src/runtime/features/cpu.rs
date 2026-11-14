@@ -602,6 +602,8 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
     let cpu_x = natives::pos_x(accessor);
     let (catch_cliff, cont_cliff_attack) = ledge_facts(accessor, situation);
     let (falling, reserve_dive) = mash_facts(accessor);
+    let penalty_flag = FLAG_DISABLE_PENALTY.load(Ordering::Acquire);
+    let penalty_disabled = penalty_flag != UNRESOLVED && natives::is_flag(accessor, penalty_flag);
     let primary = !key.partner && key.entry == primary_entry(lobby);
     let tech = tech_facts(accessor, status, primary);
     let speed = crate::runtime::features::game_speed::current();
@@ -621,6 +623,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
             tech,
             falling,
             reserve_dive,
+            penalty_disabled,
         };
         cpu.fighters[key.index()].kind = kind;
         // A save state loading is package 3's fact (`states::is_loading`, the load machine's own flag).

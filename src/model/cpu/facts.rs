@@ -44,6 +44,8 @@ pub struct FrameFacts {
     /// Gravity speed y is negative, and the fast-fall flag `RESERVE_DIVE` is already set (SPEC-cpu-06).
     pub falling: bool,
     pub reserve_dive: bool,
+    /// The work flag `FIGHTER_INSTANCE_WORK_ID_FLAG_DISABLE_ESCAPE_PENALTY` as the game has it now.
+    pub penalty_disabled: bool,
 }
 
 impl Default for FrameFacts {
@@ -61,6 +63,7 @@ impl Default for FrameFacts {
             tech: TechFacts::default(),
             falling: false,
             reserve_dive: false,
+            penalty_disabled: false,
         }
     }
 }

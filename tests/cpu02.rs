@@ -325,21 +325,22 @@ fn cpu02_clatter_period_and_step() {
 }
 
 fn cpu02_stale_flag_follows_setting() {
-    // The flag equals !stale_dodges; it is written on the first frame and on any change, never every
-    // frame, and a forgotten write (a reset) is repeated.
+    // The game's flag must equal !stale_dodges: it is written whenever the game's value differs (the first frame, a
+    // menu change, and anything that clears it), never every frame. rc.13: a Training reset clears it, and a write made
+    // only on a change of the setting was never made again, so with Dodge Staling Off the gap between standing dodges
+    // grew after every L+R+A (wa-spot-a9389335-1: spot 557 -> 750 ms, roll B 707 -> 1085 ms).
     let staling_on = settings(&[]);
     let (mut cpu, key) = cpu_with(staling_on);
-    let wait = FrameFacts { status: 1, ..FrameFacts::default() };
-    assert_eq!(cpu.frame(key, &wait).stale_flag, Some(false), "staling On: the penalty flag is false");
-    assert_eq!(cpu.frame(key, &wait).stale_flag, None);
+    let game = |set: bool| FrameFacts { status: 1, penalty_disabled: set, ..FrameFacts::default() };
+    assert_eq!(cpu.frame(key, &game(true)).stale_flag, Some(false), "staling On: the penalty flag is false");
+    assert_eq!(cpu.frame(key, &game(false)).stale_flag, None, "already false");
     // The menu turns staling Off: the next frame writes true, with no reset.
     cpu.publish(settings(&[("stale_dodges", &[0, 1])]), 0);
-    assert_eq!(cpu.frame(key, &wait).stale_flag, Some(true));
-    assert_eq!(cpu.frame(key, &wait).stale_flag, None);
+    assert_eq!(cpu.frame(key, &game(false)).stale_flag, Some(true));
+    assert_eq!(cpu.frame(key, &game(true)).stale_flag, None);
+    assert_eq!(cpu.frame(key, &game(false)).stale_flag, Some(true), "a reset cleared the game's flag: written again");
     assert!(Defence::stale_flag_wanted(&settings(&[("stale_dodges", &[0, 1])])));
     assert!(!Defence::stale_flag_wanted(&staling_on));
-    cpu.fighters[key.index()].defence.stale_forget();
-    assert_eq!(cpu.frame(key, &wait).stale_flag, Some(true));
 }
 
 fn cpu02_per_fighter_state() {
