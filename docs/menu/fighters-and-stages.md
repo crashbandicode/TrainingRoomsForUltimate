@@ -417,8 +417,8 @@ timer.
 - **Values:** Off, 1 minute, 10 targets, 20 targets, Free practice
 - **Default:** Off
 - **How:** pick a mode and close the menu: the first target appears and the notice shows the count, in a band at the
-  top of the screen so the targets keep the middle. The clock runs while the game runs; pausing or opening the menu
-  stops it.
+  top, under Input Display's strip and the combo bar when they show, so the targets keep the middle of the screen.
+  The clock runs while the game runs; pausing or opening the menu stops it.
   - **1 minute:** the notice reads "Eggs 0   1:00" and the clock counts down. At 0:00 the targets stop and the notice
     reads "Time! 12 eggs (best 15)" for three seconds.
   - **10 targets, 20 targets:** the notice reads "Eggs 0/10   0:00.00" and the clock counts up in hundredths. The last
@@ -455,6 +455,7 @@ What the target is. Disc: the plugin's target, as above. CPU: the CPU itself is 
   hit that the game registers on it and that **Breaks on** lets count breaks the target: the game plays its own hitlag and
   knockback, then the CPU goes back to 0% at the next spot. The CPU stays still, so **Target speed** does nothing. It
   applies from the next time the menu closes. In the waiting room's practice the CPU is moved too.
+
 ### Target speed
 
 How fast the targets fly. Every speed traces the same path: the same height and the same landing spot.
