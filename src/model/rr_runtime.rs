@@ -201,7 +201,7 @@ pub fn finish_recording(
         .into_iter()
         .map(|entry| entry.name)
         .collect::<Vec<_>>();
-    let name = unused_label("Macro", &macro_names);
+    let name = unused_name("Macro", &macro_names);
     let start_name = format!("{name} · start");
     let recorded = match capture.role() {
         Role::Cpu => &cpu,
@@ -472,7 +472,7 @@ pub fn duplicate_save(root: &Path, id: &str, at: u64) -> Result<String, Error> {
         .into_iter()
         .map(|entry| entry.name)
         .collect::<Vec<_>>();
-    let copy = NamedSave::new(unused_label("Save", &names), source.player, source.cpu)?;
+    let copy = NamedSave::new(unused_name("Save", &names), source.player, source.cpu)?;
     let copy_id = store.save_new(&copy)?;
     let mut index = RecordingIndex::load(root)?;
     index.note_use(Kind::Save, &copy_id, Use::Recorded, at)?;
@@ -516,7 +516,7 @@ pub fn save_chord(
         .into_iter()
         .map(|entry| entry.name)
         .collect::<Vec<_>>();
-    let save = NamedSave::new(unused_label("Save", &names), player, cpu)?;
+    let save = NamedSave::new(unused_name("Save", &names), player, cpu)?;
     let id = store.save_new(&save)?;
     index.bind_save(Some(&id), at)?;
     index.save(root)?;
@@ -547,7 +547,7 @@ pub fn civil_date(unix_secs: u64) -> String {
 }
 
 pub fn unused_name(prefix: &str, names: &[String]) -> String {
-    unused_label(prefix, names)
+    format!("{prefix} {}", crate::model::recording_menu::unused_n(prefix, names))
 }
 
 /// The card, as the pop-up lists it. Hot lists and the selection come from the index.
@@ -680,17 +680,6 @@ fn fighter_name(kind: i32) -> String {
 #[cfg(not(any(test, target_os = "switch")))]
 fn fighter_name(_kind: i32) -> String {
     String::new()
-}
-
-fn unused_label(prefix: &str, names: &[String]) -> String {
-    let mut n = 1u32;
-    loop {
-        let label = format!("{prefix} {n}");
-        if !names.iter().any(|name| name == &label) {
-            return label;
-        }
-        n += 1;
-    }
 }
 
 fn record(err: impl ToString) -> Error {

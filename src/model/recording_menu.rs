@@ -2105,7 +2105,7 @@ fn item_kind_of(kind: KeyKind) -> Option<ItemKind> {
     }
 }
 
-fn unused_n(prefix: &str, names: &[String]) -> u32 {
+pub(crate) fn unused_n(prefix: &str, names: &[String]) -> u32 {
     let mut n = 1u32;
     loop {
         let label = format!("{prefix} {n}");
