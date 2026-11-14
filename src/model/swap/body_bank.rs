@@ -1247,8 +1247,10 @@ pub fn kept_across_reload_with(mii: bool, state: GroupState, members: Members, l
         && members.index_of(target).is_none()
 }
 
-/// rc.14 phase 2d: whether a target-first Reload keeps a Built Mii group. Off until the fail-first row passes with it.
-pub const KEEP_MII_ACROSS_RELOAD: bool = false;
+/// rc.14 phase 2d: whether a target-first Reload keeps a Built Mii group. On since the fail-first row of the rc.12 crash
+/// passed (Eden cf-p3-y2 `cf-mii-failfirst`: kept `[[4a], [13], [1a]]`, Mii Gunner warm-attached in 81 ms, no StallWatch,
+/// no Unmapped line; the rc.12 crash was Eden rc12-int2-f44fac2f-1, Unmapped Read64 via TR +0xfaca4).
+pub const KEEP_MII_ACROSS_RELOAD: bool = true;
 
 /// The target-first neighbours' admission (`native_body_bank::plan_groups`): the seed fits in the free pool and beside
 /// the bodies already charged, the other role's and this role's own groups kept across the Reload
@@ -2836,9 +2838,11 @@ mod tests {
         // Boot 3 #163–#169: the CPU's lane [18, 13, 27, 45] and Mii Gunner, the window [18, 13, 27] attached, the Mii
         // group [4a] Built and detached, a cycle onto 0x45. Before rc.12 the Mii group was torn down and built again.
         // Eden rc12-int2-f44fac2f-1 (#797, #1000): the kept Mii group's warm attach after the Reload crashed the guest
-        // (Unmapped Read64 in the Mii's fighter module): a Mii group is released first and built again, as before.
+        // (Unmapped Read64 in the Mii's fighter module): a Mii group was released first and built again. rc.14 2d keeps it
+        // again, with the modules pinned, since Eden cf-p3-y2's fail-first row of that crash passed.
         let mii = Members::mii_group(0x4a).unwrap();
-        assert!(!kept_across_reload(GroupState::Built, mii, false, false, Some(KROOL), true), "a Mii group is released first");
+        assert_eq!(kept_across_reload(GroupState::Built, mii, false, false, Some(KROOL), true), KEEP_MII_ACROSS_RELOAD,
+            "a Mii group is kept only with the rc.14 2d switch");
         // The next lap (#242, target 0x27): the one-member groups the cycle left behind survive too.
         assert!(kept_across_reload(GroupState::Built, members(&[KROOL]), false, false, Some(DIDDY), true));
         assert!(kept_across_reload(GroupState::Built, members(&[GANONDORF, PICHU]), false, false, Some(DIDDY), true));
