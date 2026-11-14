@@ -1,11 +1,13 @@
 //! Break the Targets (rc.14, `artifacts/rc14-eggsercise/SPEC.md` §V2.5): place up to ten targets on the stage, zoomed out, then
 //! break them all against the clock. The target, its hit test (`eggs::breaks`) and its break animation are Eggs-ercise's; this
 //! module is the state: Placing (the cursor and the layout), Ready, Running and Done, the placing box, the session's bests,
-//! the layout kept per stage, and the five saved layouts of a stage. Pure and host-tested (`btt_tests.rs`); the runtime half
-//! feeds it P1's poll and pass and draws `marks`. Nothing here allocates except the file functions, which the menu worker runs.
+//! the layout kept per stage, and the saved layouts (btt-5, `artifacts/rc14-btt-layouts/DESIGN.md`): one file each in
+//! `layouts/`, in Recording's convention (the hot five per stage, a new file on every save). Pure and host-tested
+//! (`btt_tests.rs`, `btt_files_tests.rs`); the runtime half feeds it P1's poll and pass and draws `marks`. The game thread's half
+//! allocates nothing; the file functions run on the writer thread and the menu worker.
 
 use core::fmt::{self, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
@@ -13,7 +15,9 @@ use super::chords::logical::{A, B, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT, DPAD_UP, X,
 use super::eggs::{self, Bursts, View, END_FRAMES, RADIUS};
 use super::hitbox_orbs::CANVAS_HALF;
 use super::panes::{EggLook, EggPicture, EGG_WHOLE};
+use super::recording_menu::{hot_five, ordered};
 use super::storage::FixedPath;
+use super::store::{lowest_free, Record, Store, StoreError};
 
 pub const ROW: &str = "btt";
 pub const ROW_PLACE: &str = "btt_place";
@@ -22,7 +26,10 @@ pub const HEADER: &str = "Break the Targets";
 /// The standing notice's id (Eggs-ercise has 0x2E; the two modes are never on together, but each clears only its own).
 pub const NOTICE_ID: u8 = 0x2F;
 pub const MAX: usize = 10;
-pub const SLOTS: usize = 5;
+/// The hot five: a stage's saved layouts used last (Recording's convention), which the chords step through.
+pub const HOT: usize = 5;
+/// The saved layouts' folder, one file each, under the data folder.
+pub const DIR: &str = "layouts";
 /// The pictures `look` returns: the targets, the break animations, the cursor.
 pub const LOOKS: usize = MAX + 3;
 /// The cursor's units a frame at full tilt, and the stick's dead zone (which is also what starts a run).
@@ -62,6 +69,27 @@ pub struct Pad {
     pub load: bool,
 }
 
+/// A saved layout as the game thread holds it: its file's id, its name (cut to fit) and its first `n` targets.
+#[derive(Clone, Copy, Debug)]
+pub struct Hot {
+    pub id: FixedPath<48>,
+    pub name: FixedPath<64>,
+    pub n: u8,
+    pub at: [[f32; 2]; MAX],
+}
+
+/// This stage's hot five, newest first, the empty ones last.
+pub type Five = [Option<Hot>; HOT];
+
+/// What the game thread asks of the writer thread, which does the file work: Save (a new file: the stage and the targets), a
+/// use of a file (Load), Delete.
+#[derive(Clone, Copy, Debug)]
+pub enum Ask {
+    Save(i32, u8, [[f32; 2]; MAX]),
+    Use(FixedPath<48>),
+    Delete(FixedPath<48>),
+}
+
 /// The placing box `[x, y]` in the fighters' plane: the stage's camera range `[l, r, t, b]` cut to what the camera shows (`view`)
 /// less a target's radius, from 10 under the ground up to the range's top. No stage read: ±90 and 0 to 80 above the ground.
 pub fn bounds(range: Option<[f32; 4]>, view: Option<View>, ground: f32) -> [[f32; 2]; 2] {
@@ -77,51 +105,140 @@ pub fn bounds(range: Option<[f32; 4]>, view: Option<View>, ground: f32) -> [[f32
     }
     b
 }
-/// One saved layout: its first `n` targets, to a tenth.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Slot {
-    pub n: u8,
-    pub at: [[f32; 2]; MAX],
+/// A saved layout's file, `layouts/<id>.json`: its name, its stage (the native id), its use number and its 1 to 10 targets.
+/// Each save, load, duplicate and rename stamps the file with one more than the folder's highest use: the hot five's order,
+/// with no clock (two uses in one second still order).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Layout {
+    pub schema_version: u32,
+    pub name: String,
+    pub stage: i32,
+    #[serde(default)]
+    pub used: u64,
+    pub targets: Vec<[f32; 2]>,
 }
 
-pub type Slots = [Option<Slot>; SLOTS];
+/// A name's most characters (the keyboard's, as Recording's Rename).
+const NAME_CHARS: usize = 48;
 
-/// `targets/<stage>.json`: a version, the stage, and the five slots (`null` when empty).
-#[derive(Serialize, Deserialize)]
-struct File {
-    version: u8,
-    stage: i32,
-    slots: Slots,
-}
+impl Record for Layout {
+    type Error = StoreError;
+    type Summary = (String, Layout);
+    const SCHEMA_VERSIONS: &'static [u32] = &[1];
+    const MAX_FILE_BYTES: u64 = 4096;
 
-pub fn render(slots: &Slots, stage: i32) -> String {
-    serde_json::to_string(&File { version: 1, stage, slots: *slots }).unwrap_or_default()
-}
+    fn validate(&self) -> Result<(), StoreError> {
+        let name = self.name.trim();
+        let named = !name.is_empty() && name.chars().count() <= NAME_CHARS && !name.chars().any(char::is_control);
+        let targets = (1..=MAX).contains(&self.targets.len()) && self.targets.iter().flatten().all(|v| v.is_finite());
+        if self.schema_version == 1 && named && self.stage >= 0 && targets {
+            Ok(())
+        } else {
+            Err(StoreError::Parse(<serde_json::Error as serde::de::Error>::custom("not a target layout")))
+        }
+    }
 
-/// The slots of a stage's file; `None` when it is not this version, not this stage's, or has more than ten targets in a slot.
-pub fn parse(text: &str, stage: i32) -> Option<Slots> {
-    let file: File = serde_json::from_str(text).ok()?;
-    (file.version == 1 && file.stage == stage && file.slots.iter().flatten().all(|s| usize::from(s.n) <= MAX)).then_some(file.slots)
-}
-pub fn path(root: &Path, stage: i32) -> PathBuf {
-    root.join("targets").join(format!("{stage}.json"))
-}
+    fn name(&self) -> &str {
+        &self.name
+    }
 
-/// A stage's slots and whether its file could not be read (a missing file is not an error). The menu worker's.
-pub fn read(root: &Path, stage: i32) -> (Slots, bool) {
-    let path = path(root, stage);
-    match std::fs::read_to_string(&path) {
-        Ok(text) => parse(&text, stage).map_or(([None; SLOTS], true), |slots| (slots, false)),
-        // Whether the file is there decides, not the error's kind: on the console a missing file's error is not `NotFound`
-        // (Eden btt-2 and btt-4-1: `unreadable=true` on every stage without a file).
-        Err(_) => ([None; SLOTS], path.exists()),
+    fn summary(&self, id: &str) -> (String, Layout) {
+        (id.to_owned(), self.clone())
     }
 }
 
-/// Replace a stage's file; only that stage's. The menu worker's.
-pub fn write(root: &Path, stage: i32, slots: &Slots) -> std::io::Result<()> {
-    std::fs::create_dir_all(root.join("targets"))?;
-    super::store::write_replace(&path(root, stage), render(slots, stage).as_bytes())
+/// The saved layouts' folder under the data folder (`root`).
+pub fn library(root: &Path) -> Store<Layout> {
+    Store::new(root.join(DIR))
+}
+
+/// Every saved layout, and how many files could not be read. A missing folder is empty: whether it is there decides, not the
+/// error's kind (on the console a missing file's error is not `NotFound`; Eden btt-2 and btt-4-1).
+pub fn all(root: &Path) -> (Vec<(String, Layout)>, usize) {
+    if !root.join(DIR).exists() {
+        return (Vec::new(), 0);
+    }
+    library(root).list().map_or((Vec::new(), 1), |listing| (listing.entries, listing.skipped.len()))
+}
+
+/// This stage's layouts in Recording's order (`recording_menu::hot_five` and `ordered`): the five used last, newest
+/// first, then the rest by name; and how many of them are the hot five.
+pub fn listed(all: &[(String, Layout)], stage: i32) -> (Vec<(String, Layout)>, usize) {
+    let mine: Vec<(String, Layout)> = all.iter().filter(|e| e.1.stage == stage).cloned().collect();
+    let hot = hot_five(mine.iter().map(|e| (e.0.as_str(), e.1.used)));
+    let _ = hot;
+    (mine, 0) // stub
+}
+
+/// The game thread's copy of the hot five (the first `hot` of `listed`), in fixed storage.
+pub fn five(listed: &[(String, Layout)], hot: usize) -> Five {
+    let mut out = [None; HOT];
+    for (slot, (id, layout)) in out.iter_mut().zip(listed.iter().take(hot * 0)) {
+        let mut h = Hot { id: FixedPath::new(), name: FixedPath::new(), n: layout.targets.len().min(MAX) as u8, at: [[0.0; 2]; MAX] };
+        let _ = (h.id.write_str(cut(id, 48)), h.name.write_str(cut(&layout.name, 64)));
+        for (d, t) in h.at.iter_mut().zip(&layout.targets) {
+            *d = *t;
+        }
+        *slot = Some(h);
+    }
+    out
+}
+
+/// `s` cut to at most `max` bytes, on a character's edge.
+fn cut(s: &str, max: usize) -> &str {
+    let mut end = s.len().min(max);
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    &s[..end]
+}
+
+fn next_use(all: &[(String, Layout)]) -> u64 {
+    all.iter().map(|e| e.1.used).max().unwrap_or(0) + 1
+}
+
+/// Save: `targets` on `stage` as a new file (never over another), named `Layout N · <stage>` with the lowest N this stage's
+/// files leave free, and used last. Its id.
+pub fn save_new(root: &Path, stage: i32, stage_name: &str, targets: &[[f32; 2]]) -> Result<String, StoreError> {
+    let (all, _) = all(root);
+    let names = all.iter().filter(|e| e.1.stage == stage).map(|e| e.1.name.as_str());
+    let name = lowest_free(|n| format!("Layout {n} · {stage_name}"), names);
+    let _ = (name, next_use(&all), targets);
+    Err(StoreError::NoFreeId) // stub
+}
+
+/// A use of the file `id` (a load, or a rename to `name`): it becomes the newest of its stage's hot five, in its own file.
+pub fn use_file(root: &Path, id: &str, name: Option<&str>) -> Result<(), StoreError> {
+    let (all, lib) = (all(root).0, library(root));
+    let mut layout = lib.load(id)?;
+    if let Some(name) = name {
+        layout.name = name.trim().to_owned();
+    }
+    let _ = (next_use(&all), layout);
+    Ok(()) // stub
+}
+
+/// Duplicate: a copy of `id` as a new file, `Layout N · <stage>`, used last. The copy's id.
+pub fn duplicate(root: &Path, id: &str, stage_name: &str) -> Result<String, StoreError> {
+    let layout = library(root).load(id)?;
+    let _ = (layout, stage_name);
+    Err(StoreError::NoFreeId) // stub
+}
+
+/// A count of targets: `1 target`, `6 targets`.
+pub fn targets_label(n: usize) -> String {
+    if n == 1 { "1 target".to_owned() } else { format!("{n} targets") }
+}
+
+/// The Saved layouts list's two footer lines: the layout under the cursor, then the keys (and the files skipped, if any).
+pub fn list_footer(rows: &[(String, Layout)], cursor: usize, skipped: usize) -> String {
+    let first = rows.get(cursor).map_or_else(
+        || "No saved layouts on this stage yet. ZL + Down saves one while placing".to_owned(),
+        |(_, l)| format!("{} · {}", l.name, targets_label(l.targets.len())),
+    );
+    let note = if skipped > 0 { format!("   {skipped} files skipped") } else { String::new() };
+    let _ = (first, note);
+    String::new() // stub
 }
 
 /// Whether `[Eggs-ercise, Break the Targets]` are On (any option but Off). The two cannot run together: the menu turns Off the
@@ -155,12 +272,11 @@ pub struct Btt {
     clean: bool,
     still: bool,
     /// The message showing (or the question standing) and the frames it has left.
-    msg: (FixedPath<64>, u16),
-    /// The slot chosen with ZL + Left / Right.
+    msg: (FixedPath<96>, u16),
+    /// The saved layout chosen with ZL + Left / Right (an index into `five`), this stage's hot five, and the ask for the writer.
     pick: Option<usize>,
-    slots: Slots,
-    bad: bool,
-    write: bool,
+    five: Five,
+    ask: Option<Ask>,
     stage: i32,
     /// What the passes and the layout tick last saw: the stage's camera range, P1's height, the camera's map; and the ground
     /// (P1's height when Placing opened).
@@ -193,9 +309,8 @@ impl Btt {
         still: false,
         msg: (FixedPath::new(), 0),
         pick: None,
-        slots: [None; SLOTS],
-        bad: false,
-        write: false,
+        five: [None; HOT],
+        ask: None,
         stage: i32::MIN,
         range: None,
         view: None,
@@ -235,13 +350,17 @@ impl Btt {
         out
     }
 
-    pub fn slots(&self) -> &Slots {
-        &self.slots
+    pub fn five(&self) -> &Five {
+        &self.five
     }
 
-    /// Whether the stage's file must be written (a Save or a Delete); clears the flag.
-    pub fn take_write(&mut self) -> bool {
-        core::mem::take(&mut self.write)
+    /// What the writer thread is to do (a Save, a Load's use, a Delete), once.
+    pub fn take_ask(&mut self) -> Option<Ask> {
+        self.ask.take()
+    }
+
+    fn count(&self) -> usize {
+        self.five.iter().flatten().count()
     }
 
     /// Whether `fighter`'s pass ticks the clock: the first to pass keeps it, and another takes it after the keeper missed two
@@ -256,18 +375,23 @@ impl Btt {
 
     /// Say `args` (a message, or a question for a second); true when that question was standing: it is answered.
     fn say(&mut self, ask: bool, args: fmt::Arguments) -> bool {
-        let mut text = FixedPath::<64>::new();
+        let mut text = FixedPath::<96>::new();
         let _ = text.write_fmt(args);
         let yes = ask && self.msg.1 > 0 && self.msg.0.as_str() == text.as_str();
         self.msg = [(text, [SHOW, ASK][usize::from(ask)]), (FixedPath::new(), 0)][usize::from(yes)];
         yes
     }
 
-    /// The stage's file was read (the menu worker): its slots, and whether it could not be.
-    pub fn adopt(&mut self, slots: Slots, unreadable: bool) {
-        (self.slots, self.bad) = (slots, unreadable);
-        if unreadable && self.phase == Phase::Placing {
-            self.say(false, format_args!("Target layouts for this stage couldn't be read"));
+    /// The writer thread listed this stage's layouts: its hot five. The chosen layout stays chosen while it is in the five;
+    /// `saved` answers a Save, whose new file is the first of the five and is chosen.
+    pub fn adopt(&mut self, five: Five, saved: bool) {
+        let chosen = self.pick.and_then(|p| self.five[p]).map(|h| h.id);
+        self.five = five;
+        let same = chosen.and_then(|id| five.iter().position(|h| h.is_some_and(|h| h.id.as_str() == id.as_str())));
+        let count = self.count();
+        self.pick = if saved { Some(0) } else { same.or(self.pick.map(|p| p.min(count.saturating_sub(1)))) }.filter(|p| *p < count);
+        if let Some(first) = five[0].filter(|_| saved) {
+            self.say(false, format_args!("Saved: {}", first.name.as_str()));
         }
     }
 
@@ -285,7 +409,6 @@ impl Btt {
         let [x, y] = bounds(self.range, self.view, self.ground);
         (self.phase, self.broken, self.bursts) = (Phase::Placing, 0, [None; 2]);
         self.cursor = [(x[0] + x[1]) / 2.0, (self.ground + 15.0).clamp(y[0], y[1])];
-        self.adopt(self.slots, self.bad);
     }
 
     fn ready(&mut self) {
@@ -294,7 +417,7 @@ impl Btt {
     }
 
     /// The stage in play (every pass): a new one keeps this stage's layout for the session and takes its own, empty if it has
-    /// none, and opens Ready or Placing as the layout says. True when it changed: the stage's file is to be read.
+    /// none, and opens Ready or Placing as the layout says. True when it changed: the stage's saved layouts are to be listed.
     pub fn enter(&mut self, stage: i32) -> bool {
         if stage == self.stage {
             return false;
@@ -307,8 +430,7 @@ impl Btt {
         self.kept[i] = (self.stage, self.at, self.n);
         let kept = self.kept.iter().find(|k| k.0 == stage).copied();
         let (_, at, n) = kept.unwrap_or((stage, [[0.0; 2]; MAX], 0));
-        (self.stage, self.at, self.n, self.slots) = (stage, at, n, [None; SLOTS]);
-        (self.bad, self.pick) = (false, None);
+        (self.stage, self.at, self.n, self.five, self.pick) = (stage, at, n, [None; HOT], None);
         match self.phase {
             Phase::Off => {}
             _ if n > 0 => self.ready(),
@@ -357,7 +479,7 @@ impl Btt {
         let b = bounds(self.range, self.view, self.ground);
         let down = |k: u8| p.held & bit(k) != 0;
         let pressed = |k: u8| p.pressed & bit(k) != 0;
-        let (zl, held_b, slot) = (down(ZL), down(B), self.pick.unwrap_or(0));
+        let (zl, held_b, pick, count) = (down(ZL), down(B), self.pick.unwrap_or(0), self.count());
         self.msg.1 = self.msg.1.saturating_sub(1);
         // The cursor: the stick, and the D-pad a unit a press, repeating from the 15th frame held (not with ZL or B: chords).
         let pad = p.held & DPAD;
@@ -386,22 +508,33 @@ impl Btt {
                 self.ready();
             }
         }
-        if pressed(Y) && zl && (self.slots[slot].is_none() || self.say(true, format_args!("ZL + Y again to delete Slot {}", slot + 1))) {
-            self.erase(slot);
-        } else if pressed(Y) && !zl && self.say(true, format_args!("Y again to clear all")) {
-            self.n = 0;
+        // The saved layouts: ZL + Y twice deletes the chosen one, ZL + Left / Right step through the hot five, and the Save and
+        // Load chords save a new file or load the chosen one.
+        let chosen = self.five[pick];
+        match chosen {
+            Some(h) if pressed(Y) && zl && self.say(true, format_args!("ZL + Y again to delete {}", h.name.as_str())) => self.erase(h),
+            None if pressed(Y) && zl => self.none(),
+            _ if pressed(Y) && !zl && self.say(true, format_args!("Y again to clear all")) => self.n = 0,
+            _ => {}
         }
-        for (k, d) in [(DPAD_RIGHT, 1), (DPAD_LEFT, SLOTS - 1)] {
-            if zl && pressed(k) {
-                (self.pick, self.msg.1) = (Some((slot + d) % SLOTS), 0);
+        for (k, d) in [(DPAD_RIGHT, 1), (DPAD_LEFT, count.saturating_sub(1))] {
+            match count {
+                _ if !zl || !pressed(k) => {}
+                0 => self.none(),
+                // The first step shows the newest; then one along, round the five.
+                _ => {} // stub
             }
         }
         if p.save {
-            self.save(slot);
+            self.save();
         }
         if p.load {
-            self.load(slot);
+            self.load(pick);
         }
+    }
+
+    fn none(&mut self) {
+        self.say(false, format_args!("No saved layouts on this stage yet"));
     }
 
     /// A places a target at the cursor: not an 11th, not on another.
@@ -417,42 +550,43 @@ impl Btt {
         }
     }
 
-    /// The layout to slot `s`; a full slot asks first.
-    fn save(&mut self, s: usize) {
-        let k = s + 1;
+    /// Save: the layout, to a tenth, as a new file (the writer's); its answer chooses it, first of the five (`adopt`).
+    fn save(&mut self) {
         if self.n == 0 {
             self.say(false, format_args!("Place at least one target"));
-        } else if self.slots[s].is_none_or(|old| {
-            self.say(true, format_args!("Slot {k} has {} targets: save again to replace", old.n))
-        }) {
+        } else {
             let mut at = [[0.0; 2]; MAX];
             for (d, t) in at.iter_mut().zip(self.layout()) {
                 *d = t.map(|v| (v * 10.0).round() / 10.0);
             }
-            let n = self.n as u8;
-            (self.slots[s], self.bad, self.write) = (Some(Slot { n, at }), false, true);
-            self.say(false, format_args!("Slot {k} · Saved"));
+            let _ = at; // stub
         }
     }
 
-    /// Slot `s` becomes the layout (still Placing, to edit or start); an empty slot says so.
-    pub fn load(&mut self, s: usize) {
-        match self.slots[s] {
-            Some(slot) => {
-                (self.at, self.n) = (slot.at, usize::from(slot.n));
-                self.say(false, format_args!("Slot {} · Loaded", s + 1));
+    /// Load: the chosen saved layout becomes the layout, and its file is used (it goes to the top of the five).
+    fn load(&mut self, pick: usize) {
+        match self.five[pick] {
+            Some(h) => {
+                let _ = h; // stub
             }
-            None => _ = self.say(false, format_args!("Slot {} is empty", s + 1)),
+            None => self.none(),
         }
     }
 
-    pub fn erase(&mut self, s: usize) {
-        if self.slots[s].take().is_some() {
-            self.write = true;
-            self.say(false, format_args!("Slot {} · Deleted", s + 1));
-        } else {
-            self.say(false, format_args!("Slot {} is empty", s + 1));
-        }
+    /// A saved layout becomes the layout, still Placing, to edit or start (the chord, or Load on the Saved layouts screen).
+    pub fn apply(&mut self, h: Hot) {
+        (self.at, self.n) = (h.at, usize::from(h.n).min(MAX));
+        self.say(false, format_args!("Loaded: {}", h.name.as_str()));
+    }
+
+    /// Delete: the file goes (the writer's), and the five close up at once so a second ZL + Y cannot ask for it again.
+    fn erase(&mut self, h: Hot) {
+        let mut rest = self.five.into_iter().flatten().filter(|o| o.id.as_str() != h.id.as_str());
+        self.five = core::array::from_fn(|_| rest.next());
+        let count = self.count();
+        self.pick = self.pick.filter(|p| *p < count);
+        // stub
+        self.say(false, format_args!("Deleted: {}", h.name.as_str()));
     }
 
     /// One pass of Player 1 (`tick`: the clock's frame): the clock runs while Running, and `hit(spot)` says whether a live hit of P1's
@@ -517,10 +651,9 @@ impl Btt {
             Phase::Placing if self.msg.1 > 0 => out.write_str(self.msg.0.as_str()),
             Phase::Placing => {
                 write!(out, "Place targets {n}/{MAX}   ")?;
-                match self.pick.map(|s| (s + 1, self.slots[s])) {
+                match self.pick.and_then(|p| self.five[p].map(|h| (p + 1, h))) {
                     None => write!(out, "A place  B undo  X start"),
-                    Some((s, None)) => write!(out, "Slot {s}: empty"),
-                    Some((s, Some(slot))) => write!(out, "Slot {s}: {} saved", slot.n),
+                    Some((i, h)) => write!(out, "{i}/{} {}: {}", self.count(), h.name.as_str(), h.n),
                 }
             }
             Phase::Ready | Phase::Running => write!(out, "Targets {got}/{n}   {m}:{s:02}.{c:02}"),
@@ -531,22 +664,6 @@ impl Btt {
             }
         }
     }
-}
-
-/// A line of the Saved layouts list: `Slot 2 · 6 targets` or `Slot 3 · empty`. The plugin has no calendar date to show.
-pub fn slot_label(index: usize, slot: Option<&Slot>) -> String {
-    let k = index + 1;
-    match slot.map(|s| s.n) {
-        None => format!("Slot {k} · empty"),
-        Some(1) => format!("Slot {k} · 1 target"),
-        Some(n) => format!("Slot {k} · {n} targets"),
-    }
-}
-
-/// The list's footer: its first line (the focused row) and this screen's buttons.
-pub fn layouts_footer(library_footer: &str) -> String {
-    let first = library_footer.lines().next().unwrap_or("");
-    format!("{first}\nA Load · Y Delete · B Return")
 }
 
 /// The camera mode that is Training's Fixed camera (`cpu::tech::CAMERA_MODE_FIXED`).

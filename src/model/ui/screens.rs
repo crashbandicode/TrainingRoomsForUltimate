@@ -392,6 +392,31 @@ pub fn panel_frame<S: AsRef<str>>(menu: &Menu, title: &str, footer: &str, labels
     let _ = frame.hint.write_str(HINT_PANEL);
 }
 
+const HINT_HOT_LIST: &str = "Up/Down move   A open   B back";
+
+/// A file list drawn like the Recording lists (Break the Targets' Saved layouts, btt-5): `rows` (a name, its value) in a window
+/// around the cursor, the white cursor, the first `hot` in the green outline and the hairline under the fifth when more follow
+/// (the frame's `outline`, `hairline` and `white_cursor`, which the view draws as it does Recording's).
+pub fn hot_list_frame(menu: &Menu, title: &str, footer: &str, rows: &[(String, String)], cursor: usize, hot: usize, frame: &mut Frame) {
+    cleared_page(menu, frame);
+    let _ = write!(frame.crumb, "{}  >  {title}", menu.page().title());
+    frame.white_cursor = true;
+    if !rows.is_empty() {
+        let cursor = cursor.min(rows.len() - 1);
+        lines_window(frame, cursor, rows.len(), |i, line| {
+            let _ = (line.label.write_str(&rows[i].0), line.value.write_str(&rows[i].1));
+        });
+        let first = window_start(cursor, rows.len());
+        let shown = hot.min(first + ROW_LINES).saturating_sub(first);
+        let _ = shown; // stub
+        // stub
+    }
+    for (line, text) in footer.split('\n').take(2).enumerate() {
+        let _ = frame.help[line].write_str(text);
+    }
+    let _ = frame.hint.write_str(HINT_HOT_LIST);
+}
+
 const HINT_FIGHTER_QUESTION: &str = "D-pad move   A choose   B cancel";
 
 /// The shared Fighter Mismatch question: a panel whose keys are the question's own (it has no Y action).

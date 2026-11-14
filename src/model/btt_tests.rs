@@ -1,4 +1,4 @@
-//! rc.14 Break the Targets (`artifacts/rc14-eggsercise/SPEC.md` §V2.5, acceptance rows 26-33, 41-43 and 45 (file errors); rows 31, 41 and 42
+//! rc.14 Break the Targets (`artifacts/rc14-eggsercise/SPEC.md` §V2.5, acceptance rows 26-33; 41-43 as btt-5 redrew them, `artifacts/rc14-btt-layouts/DESIGN.md`; rows 31, 41 and 42
 //! also have an Eden row).
 
 lib_unit_tests! {
@@ -73,10 +73,6 @@ impl Sim {
         self.frame(&[], [0.0; 2]);
     }
 
-    /// ZL + D-pad Right (or Left): the next (or the last) slot.
-    fn slot(&mut self, right: bool) {
-        self.tap(&[ZL, if right { DPAD_RIGHT } else { DPAD_LEFT }]);
-    }
 
     /// The cursor moved to (`x`, `y`) with the stick, then A.
     fn place_at(&mut self, x: f32, y: f32) {
@@ -158,7 +154,7 @@ fn btt_rows_and_help() {
     );
     assert_eq!(
         ROWS[layouts].help_lines(),
-        ("This stage's 5 saved target layouts: load or delete.", "While placing: ZL + Down saves, ZL + Up loads the slot.")
+        ("This stage's saved layouts, the five used last first.", "Placing: ZL + Left/Right picks, ZL + Down saves, ZL + Up loads.")
     );
     for r in [&ROWS[on], &ROWS[place], &ROWS[layouts]] {
         let (a, b) = r.help_lines();
@@ -405,165 +401,123 @@ fn btt_layout_per_stage() {
     assert_eq!((s.btt.phase(), s.btt.layout().len()), (Phase::Ready, 1));
 }
 
-/// Row 41: Save writes the slot with the targets; a full slot asks first and replaces only on a second Save within a
-/// second; no targets is refused.
-fn btt_layout_save() {
+/// A saved layout as the writer publishes it: file `id`, `name`, its targets.
+fn hot(id: &str, name: &str, at: &[[f32; 2]]) -> Hot {
+    let layout = Layout { schema_version: 1, name: name.into(), stage: 10, used: 1, targets: at.to_vec() };
+    five(&[(id.into(), layout)], 1)[0].expect("one")
+}
+
+/// The hot five the writer publishes: `list`, newest first.
+fn five_of(list: &[Hot]) -> Five {
+    let mut out = [None; HOT];
+    for (d, h) in out.iter_mut().zip(list) {
+        *d = Some(*h);
+    }
+    out
+}
+
+/// Three saved layouts on stage 10, newest first, as the writer publishes them.
+fn three() -> Five {
+    five_of(&[
+        hot("layout-3", "Layout 3 · Battlefield", &[[0.0, 15.0]]),
+        hot("ledge-trap", "Ledge trap", &[[-30.0, 21.0], [10.0, 21.0]]),
+        hot("layout-1", "Layout 1 · Battlefield", &[[5.0, 5.0], [6.0, 40.0], [7.0, 60.0]]),
+    ])
+}
+
+/// Row 41 (btt-5): the Save chord asks the writer for a new file every time, with the targets to a tenth: never a question,
+/// never a replace. Its answer chooses the new file, first of the five. No targets is refused.
+fn layout_save_makes_a_new_file_never_overwrites() {
     let mut s = Sim::placing();
     s.chord(true);
-    assert_eq!((s.text(), s.btt.take_write()), ("Place at least one target".to_owned(), false), "nothing to save");
+    assert_eq!((s.text(), s.btt.take_ask().is_none()), ("Place at least one target".to_owned(), true), "nothing to save");
     for x in [-20.0, 0.0, 20.0] {
         s.place_at(x, 15.0);
     }
-    // ZL + Right chooses Slot 2, and the notice says what it holds.
-    s.slot(true);
-    assert_eq!(s.text(), "Place targets 3/10   Slot 2: empty");
-    s.chord(true);
-    assert_eq!((s.text(), s.btt.take_write()), ("Slot 2 · Saved".to_owned(), true));
-    let slot = s.btt.slots()[1].expect("saved");
-    assert_eq!((slot.n, slot.at[..3].to_vec()), (3, vec![[-20.0, 15.0], [0.0, 15.0], [20.0, 15.0]]));
-    assert!(s.btt.slots()[0].is_none() && s.btt.slots()[2].is_none());
-    // The file: stage, version and five slots, null where empty; it parses back to the same slots.
-    let text = render(s.btt.slots(), 10);
-    let json: serde_json::Value = serde_json::from_str(&text).unwrap();
-    assert_eq!((json["version"].as_u64(), json["stage"].as_i64()), (Some(1), Some(10)));
-    assert_eq!(json["slots"].as_array().unwrap().len(), 5);
-    assert!(json["slots"][0].is_null() && json["slots"][1]["n"] == 3);
-    assert_eq!(parse(&text, 10), Some(*s.btt.slots()));
-    // A full slot asks first; a second Save within a second replaces it; one after the question lapsed asks again.
-    s.chord(true);
-    assert_eq!((s.text(), s.btt.take_write()), ("Slot 2 has 3 targets: save again to replace".to_owned(), false));
-    s.idle(70);
-    s.chord(true);
-    assert!(!s.btt.take_write(), "the question had lapsed");
-    s.chord(true);
-    assert_eq!((s.text(), s.btt.take_write()), ("Slot 2 · Saved".to_owned(), true));
-    s.place_at(40.0, 15.0);
-    s.chord(true);
-    s.chord(true);
-    assert_eq!((s.btt.slots()[1].unwrap().n, s.btt.take_write()), (4, true));
-}
-
-/// Row 42: Load puts the slot's targets back in Placing after a reboot of the game; an empty slot says so.
-fn btt_layout_load() {
-    let mut s = Sim::placing();
-    for x in [-30.0, 10.0] {
-        s.place_at(x, 21.0);
+    for _ in 0..2 {
+        s.chord(true);
+        match s.btt.take_ask() {
+            Some(Ask::Save(10, 3, at)) => assert_eq!(at[..3], [[-20.0, 15.0], [0.0, 15.0], [20.0, 15.0]]),
+            other => panic!("a new file each time: {other:?}"),
+        }
     }
-    s.slot(true);
-    s.chord(true);
-    let file = render(s.btt.slots(), 10);
-    // A fresh boot: nothing in memory but the file.
-    let mut fresh = Sim::placing();
-    fresh.btt = Btt::IDLE;
-    fresh.btt.enter(10);
-    fresh.btt.adopt(parse(&file, 10).unwrap(), false);
-    fresh.btt.close_menu(true, true);
-    assert_eq!((fresh.btt.phase(), fresh.btt.layout().len()), (Phase::Placing, 0));
-    fresh.slot(true);
-    assert_eq!(fresh.text(), "Place targets 0/10   Slot 2: 2 saved");
-    fresh.chord(false);
-    assert_eq!((fresh.btt.layout(), fresh.text()), (&[[-30.0, 21.0], [10.0, 21.0]][..], "Slot 2 · Loaded".to_owned()));
-    assert_eq!(fresh.btt.phase(), Phase::Placing, "still in Placing, to edit or start");
-    fresh.tap(&[X]);
-    assert_eq!(fresh.btt.phase(), Phase::Ready);
-    // An empty slot says so and changes nothing.
-    let mut fresh = Sim::placing();
-    fresh.btt.enter(11);
-    fresh.place_at(0.0, 15.0);
-    fresh.chord(false);
-    assert_eq!((fresh.btt.layout().len(), fresh.text()), (1, "Slot 1 is empty".to_owned()));
+    s.btt.adopt(three(), true);
+    assert_eq!(s.text(), "Saved: Layout 3 · Battlefield");
+    s.idle(130);
+    assert_eq!(s.text(), "Place targets 3/10   1/3 Layout 3 · Battlefield: 1", "the new file is chosen, first of the five");
 }
 
-/// Row 43: ZL + Y twice deletes; ZL + Left / Right chooses the slot and the notice shows it; outside Placing the chords are
-/// the normal save states.
-fn btt_layout_controls() {
+/// Row 42 (btt-5): the Load chord puts the chosen layout's targets back, still Placing, and uses its file (the writer moves
+/// it to the top: the choice follows it). Load on the Saved layouts screen puts a layout in place the same way.
+fn layout_load_puts_the_targets_back() {
     let mut s = Sim::placing();
     s.place_at(0.0, 15.0);
-    for _ in 0..3 {
-        s.slot(true);
+    s.btt.adopt(three(), false);
+    s.tap(&[ZL, DPAD_RIGHT]);
+    s.tap(&[ZL, DPAD_RIGHT]);
+    assert_eq!(s.text(), "Place targets 1/10   2/3 Ledge trap: 2");
+    s.chord(false);
+    assert_eq!((s.btt.layout(), s.text()), (&[[-30.0, 21.0], [10.0, 21.0]][..], "Loaded: Ledge trap".to_owned()));
+    assert!(matches!(s.btt.take_ask(), Some(Ask::Use(id)) if id.as_str() == "ledge-trap"));
+    assert_eq!(s.btt.phase(), Phase::Placing, "still in Placing, to edit or start");
+    // The writer's answer: the used file is now the newest; the choice stays on it.
+    let f = *s.btt.five();
+    s.btt.adopt(five_of(&[f[1].unwrap(), f[0].unwrap(), f[2].unwrap()]), false);
+    s.idle(130);
+    assert_eq!(s.text(), "Place targets 2/10   1/3 Ledge trap: 2");
+    s.tap(&[X]);
+    assert_eq!(s.btt.phase(), Phase::Ready);
+    // The Saved layouts screen's Load (the menu worker posts the layout).
+    let mut m = Sim::placing();
+    m.btt.apply(hot("wide-line", "Wide line", &[[1.0, 2.0], [3.0, 4.0]]));
+    assert_eq!((m.btt.layout(), m.text()), (&[[1.0, 2.0], [3.0, 4.0]][..], "Loaded: Wide line".to_owned()));
+}
+
+/// Row 43 (btt-5): ZL + Left / Right step through this stage's hot five (the first step shows the newest) and the notice names
+/// the chosen one; ZL + Y twice deletes it and the five close up; with none saved each chord says so; outside Placing the
+/// chords are the normal save states.
+fn layout_chords_step_the_hot_five() {
+    let mut s = Sim::placing();
+    s.place_at(0.0, 15.0);
+    s.tap(&[ZL, DPAD_RIGHT]);
+    assert_eq!(s.text(), "No saved layouts on this stage yet");
+    s.idle(130);
+    s.chord(false);
+    assert_eq!((s.text(), s.btt.layout().len()), ("No saved layouts on this stage yet".to_owned(), 1));
+    s.tap(&[ZL, Y]);
+    assert_eq!((s.text(), s.btt.take_ask().is_none()), ("No saved layouts on this stage yet".to_owned(), true));
+    s.btt.adopt(three(), false);
+    s.idle(130);
+    assert_eq!(s.text(), "Place targets 1/10   A place  B undo  X start", "nothing chosen yet");
+    let mut seen = vec![];
+    for k in [DPAD_RIGHT, DPAD_RIGHT, DPAD_RIGHT, DPAD_RIGHT, DPAD_LEFT, DPAD_LEFT] {
+        s.tap(&[ZL, k]);
+        seen.push(s.text().split("   ").nth(1).unwrap_or_default().to_owned());
     }
-    assert_eq!(s.text(), "Place targets 1/10   Slot 4: empty", "three Rights from Slot 1");
-    s.slot(false);
-    assert_eq!(s.text(), "Place targets 1/10   Slot 3: empty");
-    s.chord(true);
-    s.btt.take_write();
+    assert_eq!(seen, ["1/3 Layout 3 · Battlefield: 1", "2/3 Ledge trap: 2", "3/3 Layout 1 · Battlefield: 3", "1/3 Layout 3 · Battlefield: 1", "3/3 Layout 1 · Battlefield: 3", "2/3 Ledge trap: 2"]);
+    // ZL + Y asks, the second deletes the chosen one; the five close up at once.
     s.tap(&[ZL, Y]);
-    assert_eq!((s.text(), s.btt.slots()[2].is_some()), ("ZL + Y again to delete Slot 3".to_owned(), true));
+    assert_eq!((s.text(), s.btt.take_ask().is_none()), ("ZL + Y again to delete Ledge trap".to_owned(), true));
     s.tap(&[ZL, Y]);
-    assert_eq!((s.text(), s.btt.slots()[2].is_some(), s.btt.take_write()), ("Slot 3 · Deleted".to_owned(), false, true));
-    // The slots are a ring.
-    for want in ["Slot 4: empty", "Slot 5: empty", "Slot 1: empty"] {
-        s.slot(true);
-        assert!(s.text().ends_with(want), "{} vs {want}", s.text());
-    }
-    s.slot(false);
-    assert!(s.text().ends_with("Slot 5: empty"));
-    // ZL + D-pad is not the cursor, and ZL + Y on an empty slot does not clear the layout.
-    s.tap(&[ZL, Y]);
+    assert_eq!(s.text(), "Deleted: Ledge trap");
+    assert!(matches!(s.btt.take_ask(), Some(Ask::Delete(id)) if id.as_str() == "ledge-trap"));
+    let names: Vec<_> = s.btt.five().iter().flatten().map(|h| h.name.as_str().to_owned()).collect();
+    assert_eq!(names, ["Layout 3 · Battlefield", "Layout 1 · Battlefield"]);
+    // ZL + D-pad is not the cursor, and the layout placed stays.
     assert_eq!((s.btt.layout().len(), s.btt.cursor()), (1, Some([0.0, 15.0])));
-    // Outside Placing the save-state chords are not ours: nothing is taken or written, and the controller stays the game's.
+    // A new stage has its own five (the writer lists it), nothing chosen.
+    s.btt.enter(20);
+    assert!(s.btt.five().iter().all(Option::is_none));
+    // Outside Placing the save-state chords are not ours: nothing is asked, and the controller stays the game's.
     let mut r = ready_with_three();
+    r.btt.adopt(three(), false);
     let pad = Pad { held: bits(&[ZL, DPAD_DOWN]), pressed: bits(&[ZL, DPAD_DOWN]), save: true, ..Pad::default() };
     assert!(!r.btt.feed(pad), "not hidden from the game");
-    assert!(!r.btt.take_write());
+    assert!(r.btt.take_ask().is_none());
     assert_eq!(r.btt.phase(), Phase::Running, "a press while Ready is the first input");
     let mut off = Btt::IDLE;
     assert!(!off.feed(pad));
     assert_eq!(off.phase(), Phase::Off);
-}
-
-/// Row 45 (file errors): a file that cannot be read is ignored with the notice and left alone until a Save; another stage's
-/// file is not touched.
-fn btt_layout_file_errors() {
-    for text in [
-        "",
-        "{",
-        "[]",
-        "{\"version\":1}",
-        "{\"version\":2,\"stage\":10,\"slots\":[null,null,null,null,null]}",
-        "{\"version\":1,\"stage\":11,\"slots\":[null,null,null,null,null]}",
-        "{\"version\":1,\"stage\":10,\"slots\":[{\"n\":2,\"at\":[[1,2],[3]]},null,null,null,null]}",
-        "{\"version\":1,\"stage\":10,\"slots\":[{\"n\":11,\"at\":[[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]]},null,null,null,null]}",
-    ] {
-        assert_eq!(parse(text, 10), None, "{text}");
-    }
-    let dir = std::env::temp_dir().join(format!("tr-btt-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    assert_eq!(read(&dir, 10), ([None; SLOTS], false), "no file: empty slots, nothing wrong");
-    // Something there that cannot be read (a folder in the file's place): unreadable, whatever error kind the platform gives.
-    std::fs::create_dir_all(path(&dir, 30)).unwrap();
-    assert_eq!(read(&dir, 30), ([None; SLOTS], true), "there but unreadable");
-    let mut s = Sim::placing();
-    s.place_at(0.0, 15.0);
-    s.chord(true);
-    s.btt.take_write();
-    write(&dir, 10, s.btt.slots()).unwrap();
-    write(&dir, 20, s.btt.slots()).unwrap();
-    assert_eq!(path(&dir, 10), dir.join("targets").join("10.json"));
-    assert_eq!(read(&dir, 10), (*s.btt.slots(), false), "a round trip through the file");
-    // A corrupt file: unreadable, the slots empty, and the bytes stay as they are until a Save writes them.
-    let bad = path(&dir, 10);
-    std::fs::write(&bad, "{ not json").unwrap();
-    let (slots, unreadable) = read(&dir, 10);
-    assert!(unreadable);
-    let mut fresh = Sim::placing();
-    fresh.btt = Btt::IDLE;
-    fresh.btt.enter(10);
-    fresh.btt.adopt(slots, unreadable);
-    fresh.btt.close_menu(true, true);
-    assert_eq!(fresh.text(), "Target layouts for this stage couldn't be read");
-    fresh.place_at(0.0, 15.0);
-    fresh.slot(true);
-    fresh.slot(false);
-    assert!(!fresh.btt.take_write(), "reading and choosing write nothing");
-    assert_eq!(std::fs::read_to_string(&bad).unwrap(), "{ not json", "left alone");
-    fresh.chord(true);
-    assert!(fresh.btt.take_write(), "a Save replaces it");
-    write(&dir, 10, fresh.btt.slots()).unwrap();
-    assert!(!read(&dir, 10).1);
-    // Only that stage's file was written.
-    assert_eq!(read(&dir, 20), (*s.btt.slots(), false));
-    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// The pictures (V2.1 ii, V2.5; the pane pools of `panes::EGG_POOLS`): the target for each unbroken one, the cursor only while
@@ -645,10 +599,9 @@ fn case_table() {
         ("btt_run_and_best", btt_run_and_best as fn()),
         ("btt_restart", btt_restart as fn()),
         ("btt_layout_per_stage", btt_layout_per_stage as fn()),
-        ("btt_layout_save", btt_layout_save as fn()),
-        ("btt_layout_load", btt_layout_load as fn()),
-        ("btt_layout_controls", btt_layout_controls as fn()),
-        ("btt_layout_file_errors", btt_layout_file_errors as fn()),
+        ("layout_save_makes_a_new_file_never_overwrites", layout_save_makes_a_new_file_never_overwrites as fn()),
+        ("layout_load_puts_the_targets_back", layout_load_puts_the_targets_back as fn()),
+        ("layout_chords_step_the_hot_five", layout_chords_step_the_hot_five as fn()),
         ("btt_pictures", btt_pictures as fn()),
         ("btt_notice_reports_each_change", btt_notice_reports_each_change as fn()),
         ("btt_notice_reposts_after_off", btt_notice_reposts_after_off as fn()),

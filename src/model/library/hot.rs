@@ -7,6 +7,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use super::{check_combo_ids, check_ids, id_ok, Drill, Error, Kind, LoopCount, Role, Use};
+use crate::model::recording_menu::hot_five;
 use crate::model::store::write_replace;
 
 const MAX_INDEX_BYTES: usize = 1024 * 1024;
@@ -318,10 +319,7 @@ impl RecordingIndex {
 
     fn touch(&mut self, kind: Kind, id: &str, at: u64) {
         self.last_used.get_mut(kind).insert(id.to_owned(), at);
-        let mut rows: Vec<(String, u64)> =
-            self.last_used.get(kind).iter().map(|(id, at)| (id.clone(), *at)).collect();
-        rows.sort_by(|left, right| right.1.cmp(&left.1).then(left.0.cmp(&right.0)));
-        *self.hot.get_mut(kind) = rows.into_iter().take(5).map(|(id, _)| id).collect();
+        *self.hot.get_mut(kind) = hot_five(self.last_used.get(kind).iter().map(|(id, at)| (id.as_str(), *at)));
     }
 }
 

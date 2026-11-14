@@ -152,7 +152,7 @@ pub enum Editor {
     ComboTarget,
     /// Break the Targets: close the menu into the placing view (SPEC V2.5).
     PlaceTargets,
-    /// Break the Targets: this stage's five saved layouts.
+    /// Break the Targets: this stage's saved layouts (a file each, the hot five first).
     Layouts,
 }
 
@@ -461,7 +461,7 @@ pub static ROWS: [Row; 106] = [
     r(GAMES, "Place targets", "btt_place", Control::Editor(Editor::PlaceTargets),
       "Close the menu into the placing view, stage zoomed out.\nStick moves, A places, B removes the last, X starts."),
     r(GAMES, "Saved layouts", "btt_layouts", Control::Editor(Editor::Layouts),
-      "This stage's 5 saved target layouts: load or delete.\nWhile placing: ZL + Down saves, ZL + Up loads the slot."),
+      "This stage's saved layouts, the five used last first.\nPlacing: ZL + Left/Right picks, ZL + Down saves, ZL + Up loads."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

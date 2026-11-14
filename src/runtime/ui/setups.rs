@@ -1,7 +1,7 @@
 //! Setup screens on the menu worker. The states facade owns native work.
 use super::external;
 use crate::editors::setups::row_label;
-use crate::editors::setups::{chosen, list_footer, name_summary, Pane, Provider, Reply, Res, Setups, Step};
+use crate::editors::setups::{chosen, list_footer, name_summary, Pane, Provider, Reply, Res, Setups, Step, SETUP};
 use crate::engine::macro_ui::macro_panel::{LibraryRow, View};
 use crate::model::menu::{input::Button, table::Editor, Menu};
 use crate::model::state::setup::{SetupLibrary, SetupRecord};
@@ -112,7 +112,7 @@ impl Ui {
             Pane::Own(id) | Pane::Delete(id) => {
                 let record = library().load(id).map_err(|e| e.to_string())?;
                 self.label = row_label(&record.summary(id), named_macros::fighter_label);
-                (record.name, pane.rows(), 0)
+                (record.name, pane.rows(&SETUP), 0)
             }
         };
         let alternate = (pane == Pane::List).then(|| "bind only".to_owned());
@@ -226,6 +226,7 @@ impl Ui {
         match step {
             Step::Open(pane) => self.show(pane).err(),
             Step::Rename(id) => self.begin_rename(id),
+            Step::Duplicate(_) => None,
             Step::Remove(id) => {
                 self.active = None;
                 Some(library().delete(&id).map_or_else(|e| e.to_string(), |()| "Setup deleted".into()))
@@ -296,7 +297,7 @@ impl Ui {
         let mut view = external::panel_view_now()?;
         if self.active == Some(Editor::SetupLibrary) {
             if self.pane != Pane::List {
-                view.footer = self.pane.footer(&self.label, view.selected);
+                view.footer = self.pane.footer(&SETUP, &self.label, view.selected);
             } else if self.library_count == 0 {
                 view.labels = vec!["No setups saved".into()];
                 view.footer = "Save one with Save setup here first. B Return".into();

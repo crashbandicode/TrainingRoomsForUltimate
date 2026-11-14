@@ -1594,14 +1594,13 @@ impl RecordingScreens {
     fn items(&self, group: u8, section: u8) -> Vec<Item> {
         let combos = group == COMBOS_SEQ;
         if !combos && section == 0 {
-            return self.ordered(&self.catalog.saves, &self.catalog.hot_saves, |file| &file.id, |file| &file.name)
+            return ordered(&self.catalog.saves, &self.catalog.hot_saves, |file| &file.id, |file| &file.name)
                 .into_iter()
                 .map(|file| Item { kind: ItemKind::Save, id: file.id.clone() })
                 .collect();
         }
         if !combos {
-            let mut rows: Vec<Item> = self
-                .ordered(&self.catalog.macros, &self.catalog.hot_macros, |file| &file.id, |file| &file.name)
+            let mut rows: Vec<Item> = ordered(&self.catalog.macros, &self.catalog.hot_macros, |file| &file.id, |file| &file.name)
                 .into_iter()
                 .map(|file| Item { kind: ItemKind::Recording, id: file.id.clone() })
                 .collect();
@@ -1609,8 +1608,7 @@ impl RecordingScreens {
             return rows;
         }
         if section == 0 {
-            let mut rows: Vec<Item> = self
-                .ordered(&self.catalog.sequences, &self.catalog.hot_sequences, |file| &file.id, |file| &file.name)
+            let mut rows: Vec<Item> = ordered(&self.catalog.sequences, &self.catalog.hot_sequences, |file| &file.id, |file| &file.name)
                 .into_iter()
                 .map(|file| Item { kind: ItemKind::Sequence, id: file.id.clone() })
                 .collect();
@@ -1619,27 +1617,11 @@ impl RecordingScreens {
         }
         let mut rows = vec![Item { kind: ItemKind::SaveLastCombo, id: String::new() }];
         rows.extend(
-            self.ordered(&self.catalog.combos, &self.catalog.hot_combos, |file| &file.id, |file| &file.name)
+            ordered(&self.catalog.combos, &self.catalog.hot_combos, |file| &file.id, |file| &file.name)
                 .into_iter()
                 .map(|file| Item { kind: ItemKind::Combo, id: file.id.clone() }),
         );
         rows
-    }
-
-    fn ordered<'a, T>(&'a self, files: &'a [T], hot: &[String], id: impl Fn(&T) -> &str, name: impl Fn(&T) -> &str) -> Vec<&'a T> {
-        let _ = self;
-        let mut out: Vec<&T> = Vec::new();
-        for hot_id in hot {
-            if let Some(file) = files.iter().find(|file| id(file) == hot_id) {
-                if !out.iter().any(|kept| id(kept) == hot_id) {
-                    out.push(file);
-                }
-            }
-        }
-        let mut rest: Vec<&T> = files.iter().filter(|file| !out.iter().any(|kept| id(kept) == id(file))).collect();
-        rest.sort_by(|a, b| name(a).cmp(name(b)));
-        out.extend(rest);
-        out
     }
 
     fn section_view(&self, face: Face, group: u8, section: u8) -> SectionView {
@@ -2051,6 +2033,31 @@ impl RecordingScreens {
     fn chain_start_name(&self, chain: &MacroFile) -> Option<String> {
         self.save_name(self.chain_start_id(chain)?)
     }
+}
+
+/// The hot five: the five ids used last, newest first; an id breaks a tie. A sixth use pushes the oldest out. Recording's index
+/// (`library::RecordingIndex`) and Break the Targets' saved layouts (`model::btt::listed`) both take theirs from here.
+pub fn hot_five<'a>(uses: impl Iterator<Item = (&'a str, u64)>) -> Vec<String> {
+    let mut rows: Vec<(&str, u64)> = uses.collect();
+    rows.sort_by(|left, right| right.1.cmp(&left.1).then(left.0.cmp(right.0)));
+    rows.into_iter().take(5).map(|(id, _)| id.to_owned()).collect()
+}
+
+/// A list's order: the hot ids first, in their order (newest first), then the rest by name. Break the Targets' saved layouts
+/// use it too (`model::btt::listed`), so both lists order the same way.
+pub fn ordered<'a, T>(files: &'a [T], hot: &[String], id: impl Fn(&T) -> &str, name: impl Fn(&T) -> &str) -> Vec<&'a T> {
+    let mut out: Vec<&T> = Vec::new();
+    for hot_id in hot {
+        if let Some(file) = files.iter().find(|file| id(file) == hot_id) {
+            if !out.iter().any(|kept| id(kept) == hot_id) {
+                out.push(file);
+            }
+        }
+    }
+    let mut rest: Vec<&T> = files.iter().filter(|file| !out.iter().any(|kept| id(kept) == id(file))).collect();
+    rest.sort_by(|a, b| name(a).cmp(name(b)));
+    out.extend(rest);
+    out
 }
 
 fn header_of(group: u8, section: u8) -> &'static str {

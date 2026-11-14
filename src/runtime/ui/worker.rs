@@ -424,6 +424,8 @@ fn press(button: Button, s: &mut Session) {
                 s.setups.press(button);
             } else if s.panel.is_some_and(combos::is_combo) {
                 s.combos.press(button);
+            } else if s.panel.is_some_and(layouts::is_layouts) {
+                s.layouts.press(button);
             } else {
                 external::press_panel(button);
             }
@@ -945,7 +947,9 @@ fn publish_frame(s: &Session) {
     let Some(menu) = s.menu.as_ref() else { return };
     let mut next = NEXT_FRAME.lock();
     next.reset();
-    if s.phase == Phase::Panel || s.phase == Phase::Prompt {
+    if (s.phase == Phase::Panel || s.phase == Phase::Prompt) && s.panel.is_some_and(layouts::is_layouts) && s.layouts.paint(menu, &mut next) {
+        // Break the Targets' Saved layouts list: drawn like the Recording lists (btt-5).
+    } else if s.phase == Phase::Panel || s.phase == Phase::Prompt {
         // The layer's page may be between two views (a capture loading, a keyboard open): keep what is on screen.
         let Some(view) = (if s.panel.is_some_and(is_setup) {
             s.setups.view()

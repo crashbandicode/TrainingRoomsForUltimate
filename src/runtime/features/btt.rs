@@ -1,10 +1,10 @@
 //! Break the Targets (rc.14, `model::btt`, SPEC V2.5), the runtime half. P1's poll keeps the controller from the game while
 //! Placing and feeds the cursor; P1's pass runs the clock and breaks the targets with Eggs-ercise's hit test; while the mode
 //! is on the camera is the game's fixed one (`btt_camera`); the layout tick draws the targets, their breaks and the cursor
-//! (`look`). The menu worker reaches this module through atomics and mailboxes only. The stage's saved layouts
-//! (`targets/<stage>.json`) are read and written by the writer thread only (`service`): game threads do no file I/O and
-//! allocate nothing here, they leave a request in an atomic or a mailbox and take the answer from a published copy
-//! (`hos_lock::Published`, read without waiting).
+//! (`look`). The menu worker reaches this module through atomics and mailboxes only. The saved layouts (`layouts/`, one file
+//! each; btt-5) are the writer thread's on the game's behalf (`service`): game threads do no file I/O and allocate nothing here,
+//! they leave a request in an atomic or a mailbox and take this stage's hot five from a published copy (`hos_lock::Published`,
+//! read without waiting). The Saved layouts screen does its own file work on the menu worker and asks for the five again.
 
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU8, Ordering};
@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU8, Ordering};
 use hos_lock::{Mailbox, Mutex, Published};
 
 pub use crate::model::btt::LOOKS;
-use crate::model::btt::{self, Btt, Pad, Phase, Slots, HEADER, NOTICE_ID, SLOTS};
+use crate::model::btt::{self, Ask, Btt, Five, Hot, Pad, Phase, HEADER, HOT, NOTICE_ID};
 use crate::model::chords::{field, Sample};
 use crate::model::eggs::View;
 use crate::model::notify::DEFAULT_COLOR;
@@ -35,22 +35,39 @@ static PLACE: AtomicBool = AtomicBool::new(false);
 static OPEN: AtomicBool = AtomicBool::new(false);
 /// The mode's phase (`Phase as u8`, 0 Off), for the poll and the chords before they take the lock.
 static PHASE: AtomicU8 = AtomicU8::new(0);
-/// What the Saved layouts screen asks of the game thread (the menu worker posts, the pass runs it): `(delete, slot)`, a load
-/// when not a delete.
-pub static CMDS: Mailbox<(bool, usize), 2> = Mailbox::new();
+/// A layout the Saved layouts screen loaded, for the game thread (the menu worker posts, the pass puts it in place).
+pub static CMDS: Mailbox<Hot, 2> = Mailbox::new();
 #[cfg(feature = "diag")]
 static DIAG: AtomicU32 = AtomicU32::new(0);
-/// No stage: no read is waiting, nothing has been read yet.
+/// No stage yet.
 const NONE: i32 = i32::MIN;
-/// The stage whose file the game thread wants read (newest wins).
-static READ: AtomicI32 = AtomicI32::new(NONE);
-/// Whole-file writes, in order; four is more than a player can ask for in one poll of the writer.
-static WRITES: Mailbox<(i32, Slots), 4> = Mailbox::new();
-/// What the last read found (stage, slots, whether the file could not be read), and the last generation the game thread took.
-static RESULT: Published<(i32, Slots, bool)> = Published::new((NONE, [None; SLOTS], false));
+/// The stage in play (the pass's), for the writer and the Saved layouts screen.
+static STAGE: AtomicI32 = AtomicI32::new(NONE);
+/// The writer is to list the stage's layouts again (a stage change, or the screen changed a file).
+static READ: AtomicBool = AtomicBool::new(false);
+/// The game thread's asks, in order; four is more than a player can ask for in one poll of the writer.
+static ASKS: Mailbox<Ask, 4> = Mailbox::new();
+/// What the writer last listed (stage, its hot five, whether it answers a Save), and the last generation the game thread took.
+static RESULT: Published<(i32, Five, bool)> = Published::new((NONE, [None; HOT], false));
 static SEEN: AtomicU32 = AtomicU32::new(0);
-/// The stage and slots as last read or written (an unreadable file is empty slots): the Saved layouts screen's (any thread).
-pub static CACHE: Published<(i32, Slots)> = Published::new((NONE, [None; SLOTS]));
+
+/// The stage in play, `i32::MIN` before the first.
+pub fn stage() -> i32 {
+    STAGE.load(Ordering::Acquire)
+}
+
+/// The Saved layouts screen changed a file: the writer lists the stage again for the game thread.
+pub fn reread() {
+    READ.store(true, Ordering::Release);
+}
+
+/// A stage's name for a layout's default name: the lobby catalog's, or `Stage <id>`.
+pub fn stage_label(stage: i32) -> String {
+    match crate::editors::setups::stage_name(Some(stage)) {
+        "unknown stage" => format!("Stage {stage}"),
+        name => name.to_owned(),
+    }
+}
 
 /// Every settings publish: whether Break the Targets is On.
 pub fn publish(snapshot: &Snapshot) {
@@ -150,21 +167,22 @@ pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut([f32; 2]) -> bool) 
         mode.close_menu(false, false);
     } else {
         if stage >= 0 && mode.enter(stage) {
-            READ.store(stage, Ordering::Release);
+            STAGE.store(stage, Ordering::Release);
+            READ.store(true, Ordering::Release);
         }
-        if let Some((_, slots, bad)) = RESULT.read_if_newer(&SEEN).filter(|r| r.0 == stage) {
-            mode.adopt(slots, bad);
+        if let Some((_, five, saved)) = RESULT.read_if_newer(&SEEN).filter(|r| r.0 == stage) {
+            mode.adopt(five, saved);
         }
         if start || !on && mode.phase() != Phase::Off {
             mode.close_menu(on, place);
         }
-        CMDS.drain(|(delete, s)| [Btt::load, Btt::erase][usize::from(delete)](&mut mode, s));
+        CMDS.drain(|hot| mode.apply(hot));
         if on {
             let tick = mode.keeper(at) && !owners.covers_strip();
             broken = mode.pass(tick, hit);
         }
-        if mode.take_write() && !WRITES.post((stage, *mode.slots())) {
-            diagnostic(format_args!("[Btt] target layouts write dropped stage={stage}: the writer is behind"));
+        if let Some(ask) = mode.take_ask().filter(|ask| !ASKS.post(*ask)) {
+            diagnostic(format_args!("[Btt] layout ask dropped {ask:?}: the writer is behind"));
         }
     }
     let phase = mode.phase();
@@ -192,23 +210,34 @@ pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut([f32; 2]) -> bool) 
     broken
 }
 
-/// The writer thread, every poll: the writes asked for, then the read asked for.
+/// The writer thread, every poll: the game thread's asks (a Save makes a new file, a Load uses one, a Delete removes one), then,
+/// when anything changed or was asked for, this stage's hot five for the game thread.
 pub fn service() {
-    let root = Path::new(ROOT);
-    WRITES.drain(|(stage, slots)| {
-        // At most one retry. A failed write keeps the layouts in memory for the session and says so.
-        if !(0..2).any(|_| btt::write(root, stage, &slots).is_ok()) {
-            diagnostic(format_args!("[Btt] target layouts for stage {stage} not written; kept for this session"));
-            let why = "Could not save the target layouts";
-            notices::post(HEADER, why, 120, DEFAULT_COLOR);
+    let (root, mut asked, mut saved) = (Path::new(ROOT), false, false);
+    ASKS.drain(|ask| {
+        asked = true;
+        let done = match ask {
+            Ask::Save(stage, n, at) => btt::save_new(root, stage, &stage_label(stage), &at[..usize::from(n)]).map(|_| saved = true),
+            Ask::Use(id) => btt::use_file(root, id.as_str(), None),
+            Ask::Delete(id) => btt::library(root).delete(id.as_str()),
+        };
+        if let Err(why) = done {
+            diagnostic(format_args!("[Btt] layout {ask:?} failed: {why}"));
+            notices::post(HEADER, "Could not save the target layouts", 120, DEFAULT_COLOR);
         }
-        CACHE.publish((stage, slots));
     });
-    let stage = READ.swap(NONE, Ordering::AcqRel);
-    if stage != NONE {
-        let (slots, unreadable) = btt::read(root, stage);
-        diagnostic(format_args!("[Btt] target layouts read stage={stage} unreadable={unreadable}"));
-        RESULT.publish((stage, slots, unreadable));
-        CACHE.publish((stage, slots));
+    let stage = stage();
+    if (READ.swap(false, Ordering::AcqRel) || asked) && stage != NONE {
+        let (all, skipped) = btt::all(root);
+        let (rows, hot) = btt::listed(&all, stage);
+        RESULT.publish((stage, btt::five(&rows, hot), saved));
+        // For the Eden rows: the stage's list after each change, its first (newest) file named.
+        #[cfg(feature = "diag")]
+        {
+            let first = rows.first().map_or("", |r| r.1.name.as_str());
+            diagnostic(format_args!("[Btt] layouts stage={stage} files={} hot={hot} skipped={skipped} saved={saved} first=\"{first}\"", rows.len()));
+        }
+        #[cfg(not(feature = "diag"))]
+        let _ = skipped;
     }
 }

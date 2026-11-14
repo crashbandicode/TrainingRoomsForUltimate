@@ -511,10 +511,7 @@ pub fn skipped_note(skipped: &[SkippedFile]) -> Option<String> {
 
 /// "Combo N" with the lowest N no entry uses (SPEC-input-07 §5).
 pub fn default_name(entries: &[ComboEntry]) -> String {
-    (1..)
-        .map(|n| format!("Combo {n}"))
-        .find(|name| !entries.iter().any(|e| e.name.eq_ignore_ascii_case(name)))
-        .unwrap_or_default()
+    super::store::lowest_free(|n| format!("Combo {n}"), entries.iter().map(|e| e.name.as_str()))
 }
 
 /// A typed name, trimmed; `None` when nothing is left.

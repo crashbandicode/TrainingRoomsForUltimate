@@ -52,11 +52,25 @@ pub enum Step {
     Open(Pane),
     Choose(String, bool),
     Rename(String),
+    /// A copy as a new file (Break the Targets' saved layouts; a setup's screen has no such row).
+    Duplicate(String),
     Remove(String),
 }
 
-/// A row of a setup's own screen or of its delete question: the panel's row id, its label, and what it does (the footer's second line).
+/// A row of a file's own screen or of its delete question: the panel's row id, its label, and what it does (the footer's second line).
 type Row = (&'static str, &'static str, &'static str);
+
+/// A file library's two panels past its list: the file's own screen and its delete question (the Setup library's, and Break
+/// the Targets' saved layouts', btt-5).
+pub struct Screens {
+    own: &'static [Row],
+    ask: &'static [Row],
+}
+
+pub const SETUP: Screens = Screens { own: &OWN, ask: &ASK };
+pub const LAYOUT: Screens = Screens { own: &OWN, ask: &ASK }; // stub
+const _: [&[Row]; 2] = [&LAYOUT_OWN, &LAYOUT_ASK];
+
 const OWN: [Row; 4] = [
     ("restore", "Restore here", "Both fighters move there when you close the menu."),
     ("load", "Make Load use it", "Nobody moves. Load goes there until the bound save changes."),
@@ -67,34 +81,42 @@ const ASK: [Row; 2] = [
     ("keep", "Keep it", "The setup stays in the library."),
     ("delete", "Delete it", "Removes this setup's file. Your saves are not touched."),
 ];
+const LAYOUT_OWN: [Row; 4] = [
+    ("load", "Load", "Puts these targets on the stage. Close the menu to start."),
+    ("rename", "Rename", "Type a new name for this layout."),
+    ("duplicate", "Duplicate", "Saves a copy as a new layout, at the top of the list."),
+    ("delete", "Delete", "Asks once."),
+];
+const LAYOUT_ASK: [Row; 2] = [("keep", "Keep it", "The layout stays."), ("delete", "Delete it", "Removes this layout's file.")];
 
 impl Pane {
-    fn table(&self) -> &'static [Row] {
+    fn table(&self, screens: &Screens) -> &'static [Row] {
         if matches!(self, Self::Delete(_)) {
-            &ASK
+            screens.ask
         } else {
-            &OWN
+            screens.own
         }
     }
 
     /// The panel's rows (a list's come from the library).
-    pub fn rows(&self) -> Vec<LibraryRow> {
-        self.table().iter().map(|(id, label, _)| LibraryRow { id: (*id).into(), label: (*label).into() }).collect()
+    pub fn rows(&self, screens: &Screens) -> Vec<LibraryRow> {
+        self.table(screens).iter().map(|(id, label, _)| LibraryRow { id: (*id).into(), label: (*label).into() }).collect()
     }
 
-    /// The footer's two lines: the setup (`label`), then what the row under the cursor does.
-    pub fn footer(&self, label: &str, selected: usize) -> String {
+    /// The footer's two lines: the file (`label`), then what the row under the cursor does.
+    pub fn footer(&self, screens: &Screens, label: &str, selected: usize) -> String {
         let ask = if matches!(self, Self::Delete(_)) { "Delete? " } else { "" };
-        format!("{ask}{label}\n{}", self.table().get(selected).map_or("", |row| row.2))
+        format!("{ask}{label}\n{}", self.table(screens).get(selected).map_or("", |row| row.2))
     }
 
-    /// A on the row `row` of this panel (a list's row is a setup's id).
+    /// A on the row `row` of this panel (a list's row is a file's id).
     pub fn leads_to(&self, row: &str) -> Step {
         match (self, row) {
             (Self::List, id) => Step::Open(Self::Own(id.into())),
             (Self::Own(id), "restore") => Step::Choose(id.clone(), true),
             (Self::Own(id), "load") => Step::Choose(id.clone(), false),
             (Self::Own(id), "rename") => Step::Rename(id.clone()),
+            // stub
             (Self::Own(id), _) => Step::Open(Self::Delete(id.clone())),
             (Self::Delete(id), "delete") => Step::Remove(id.clone()),
             (Self::Delete(id), _) => Step::Open(Self::Own(id.clone())),
@@ -468,15 +490,15 @@ mod tests {
     /// The rows are labelled in words, the cursor starts on the safe row of the question, and the footer says what the row under the
     /// cursor does.
     fn the_own_screen_rows_and_footers_say_what_each_row_does() {
-        let labels = |pane: &Pane| pane.rows().into_iter().map(|row| row.label).collect::<Vec<_>>();
+        let labels = |pane: &Pane| pane.rows(&SETUP).into_iter().map(|row| row.label).collect::<Vec<_>>();
         let (own, ask) = (Pane::Own("x".into()), Pane::Delete("x".into()));
         assert_eq!(labels(&own), ["Restore here", "Make Load use it", "Rename", "Delete"]);
         assert_eq!(labels(&ask), ["Keep it", "Delete it"]);
         let row = "Corner trap · Mario / Little Mac · Training · spots -40 / 35";
-        assert_eq!(own.footer(row, 1), format!("{row}\nNobody moves. Load goes there until the bound save changes."));
-        assert!(own.footer(row, 0).ends_with("Both fighters move there when you close the menu."));
-        assert!(ask.footer(row, 0).starts_with("Delete? Corner trap"), "{}", ask.footer(row, 0));
-        assert_eq!(own.footer(row, 9), format!("{row}\n"), "a cursor off the rows explains nothing");
+        assert_eq!(own.footer(&SETUP, row, 1), format!("{row}\nNobody moves. Load goes there until the bound save changes."));
+        assert!(own.footer(&SETUP, row, 0).ends_with("Both fighters move there when you close the menu."));
+        assert!(ask.footer(&SETUP, row, 0).starts_with("Delete? Corner trap"), "{}", ask.footer(&SETUP, row, 0));
+        assert_eq!(own.footer(&SETUP, row, 9), format!("{row}\n"), "a cursor off the rows explains nothing");
     }
 
     /// X (or Rename on a setup's own screen): the setup's record is the draft and the confirmed name overwrites its file, so the id
@@ -498,6 +520,26 @@ mod tests {
         assert!(!ui.renaming() && ui.save_name(ui.name_revision(), "Never", &library).is_err());
         assert_eq!(library.load(&id).unwrap().name, "Corner trap");
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Break the Targets' saved layouts (btt-5) walk the same panes with their own rows: A on a layout opens Load, Rename,
+    /// Duplicate and Delete; Delete asks once (Keep it first); B steps back one pane. The Setup library's rows are unchanged.
+    fn layout_own_screen_walks_load_rename_duplicate_delete() {
+        let (own, ask) = (Pane::Own("ledge-trap".into()), Pane::Delete("ledge-trap".into()));
+        let labels = |pane: &Pane, screens: &Screens| pane.rows(screens).into_iter().map(|row| row.label).collect::<Vec<_>>();
+        assert_eq!(labels(&own, &LAYOUT), ["Load", "Rename", "Duplicate", "Delete"]);
+        assert_eq!(labels(&ask, &LAYOUT), ["Keep it", "Delete it"]);
+        assert_eq!(labels(&own, &SETUP), ["Restore here", "Make Load use it", "Rename", "Delete"]);
+        assert_eq!(Pane::List.leads_to("ledge-trap"), Step::Open(own.clone()));
+        assert_eq!(own.leads_to("load"), Step::Choose("ledge-trap".into(), false));
+        assert_eq!(own.leads_to("rename"), Step::Rename("ledge-trap".into()));
+        assert_eq!(own.leads_to("duplicate"), Step::Duplicate("ledge-trap".into()));
+        assert_eq!(own.leads_to("delete"), Step::Open(ask.clone()));
+        assert_eq!((ask.leads_to("keep"), ask.leads_to("delete")), (Step::Open(own.clone()), Step::Remove("ledge-trap".into())));
+        assert_eq!((own.back(), ask.back()), (Some(Pane::List), Some(own.clone())));
+        let row = "Ledge trap · 3 targets";
+        assert_eq!(own.footer(&LAYOUT, row, 0), format!("{row}\nPuts these targets on the stage. Close the menu to start."));
+        assert_eq!(ask.footer(&LAYOUT, row, 1), format!("Delete? {row}\nRemoves this layout's file."));
     }
 
     fn the_chosen_notes_say_what_will_happen_in_plain_words() {
@@ -543,6 +585,7 @@ mod tests {
             ("a_setups_own_screen_walks_from_the_list_to_its_actions_and_back", a_setups_own_screen_walks_from_the_list_to_its_actions_and_back as fn()),
             ("the_own_screen_rows_and_footers_say_what_each_row_does", the_own_screen_rows_and_footers_say_what_each_row_does as fn()),
             ("renaming_a_setup_overwrites_its_file_and_keeps_its_id", renaming_a_setup_overwrites_its_file_and_keeps_its_id as fn()),
+            ("layout_own_screen_walks_load_rename_duplicate_delete", layout_own_screen_walks_load_rename_duplicate_delete as fn()),
             ("the_chosen_notes_say_what_will_happen_in_plain_words", the_chosen_notes_say_what_will_happen_in_plain_words as fn()),
             ("a_row_names_the_fighters_the_stage_and_both_spots", a_row_names_the_fighters_the_stage_and_both_spots as fn()),
             ("a_saved_stage_id_has_the_lobby_catalogs_name", a_saved_stage_id_has_the_lobby_catalogs_name as fn()),

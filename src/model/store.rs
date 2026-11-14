@@ -462,6 +462,11 @@ pub(crate) fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
     PathBuf::from(os)
 }
 
+/// `make(n)` with the lowest `n` from 1 that no name in `taken` uses, ignoring case: "Combo N", "Layout N · Battlefield".
+pub fn lowest_free<'a>(make: impl Fn(u32) -> String, taken: impl Iterator<Item = &'a str> + Clone) -> String {
+    (1..).map(make).find(|name| !taken.clone().any(|t| t.eq_ignore_ascii_case(name))).unwrap_or_default()
+}
+
 /// The ids the store itself makes: [`MAX_ID_CHARS`] of `[a-z0-9_-]` (`slug`, with a `-N` suffix).
 pub fn default_id(id: &str) -> bool {
     !id.is_empty()
