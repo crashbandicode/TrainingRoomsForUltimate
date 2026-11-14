@@ -125,7 +125,7 @@ No memory is written outside these calls.
 
 - **Projectiles and articles**: the per-frame pass runs for fighters only (the fighter vtable driver), so projectile hitboxes are not redrawn per frame; they are drawn once when their `ATTACK` command runs (any battle object executing the command, since the hook reads the Lua state's accessor) and then follow their bone with `CONCLUDE_STATUS` until the article's status ends. Multi-hit projectiles therefore keep stale spheres between hits. Q1. Fork (rc.13): articles and thrown items are own orbs redrawn from their attack slots every pass (§2a); no effect sphere is requested for them.
 - **Shielding fighter**: nothing is drawn and effects are not slept (the shield visual is itself a `sys_shield` effect; killing it would remove the player's shield bubble — this is why shielding is exempt).
-- **Grab statuses**: no drawing, no sleeping, so the grab animation effects show; grab boxes drawn at `CATCH` persist until rebound.
+- **Grab statuses**: no hit spheres, no sleeping, so the grab animation effects show; grab boxes drawn at `CATCH` persist until rebound. Fork: the grabber's hurt orbs stay (§2a).
 - **Missed tech / footstool**: effects kept awake (`DOWN`, tread statuses) so those visual cues remain.
 - **Kirby copy, Pokémon Trainer switch, Ice Climbers**: each fighter body runs the pass independently; Nana's hitboxes are drawn too. Pokémon Trainer's trainer object is not a fighter accessor in the driver.
 - **Mii fighters, Aegis, Steve**: no special handling upstream.
@@ -135,7 +135,7 @@ No memory is written outside these calls.
 - **CPU-as-P1 / hot swap (fork)**: `is_training_mode()` false during a swap → nothing drawn that frame.
 - **Shield-damage rewrite inside the `ATTACK` hook**: a different feature (Infinite shield) piggybacks on this hook; it pops and re-pushes 36 Lua values on every attack command while Infinite is selected. Record as Q2 (ownership and cost).
 - **Effect budget**: the game's effect pool is finite; 8 slots × up to 16 spheres × fighters, respawned every frame, can exhaust it and drop other effects. Q3. Fork: resolved by the own orbs (§2a), for fighters and, since rc.13, articles and thrown items.
-- **Fork, own orbs and the menus (§2a)**: the orbs are drawn under every pane of the layout (HUD, vanilla pause menu, plugin menu), as the 3D effects were; shielding and grab statuses draw no hurt orbs (step order above, unchanged).
+- **Fork, own orbs and the menus (§2a)**: the orbs are drawn under every pane of the layout (HUD, vanilla pause menu, plugin menu), as the 3D effects were; shielding draws no hurt orbs (step order above, unchanged). A grab status (`CATCH..=CATCH_TURN`) keeps the grabber's hurt orbs and drops only its hit spheres: the grabber stays hittable, so a missed grab can be punished (the hurt read was put after the upstream grab stop in HB1 and hid them until this fix).
 - **`077a8e43` difference**: at `97cbe9b9` the per-frame pass ran in every mode (online too), calling `set_sleep_effect(false)` on every fighter every frame and, with the setting On, drawing spheres in online matches (a desync-safe but visible and unwanted side effect, and a per-frame call outside Training). Fold in the early return.
 
 ## 7. Persistence

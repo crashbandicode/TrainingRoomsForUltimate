@@ -741,10 +741,14 @@ pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphe
     if !facts.visualizes || !facts.enabled || facts.ids.shielding(facts.status) {
         return (set.clear(fx), 0);
     }
-    if facts.ids.in_grab(facts.status) {
-        return (set.reconcile(&[], true, fx), 0);
-    }
     let mut len = 0;
+    if facts.ids.in_grab(facts.status) {
+        // The grabber stays hittable through a grab: its hurt spheres stay, its hit spheres go (upstream's grab rule).
+        let left_out = hurt.map_or(0, |hurt| want_hurtboxes(hurt, wants, &mut len));
+        let mut counts = set.reconcile(&wants[..len], true, fx);
+        counts.dropped += left_out;
+        return (counts, len);
+    }
     let mut left_out = want_hitboxes(reader, wants, &mut len);
     if let Some(hurt) = hurt {
         left_out += want_hurtboxes(hurt, wants, &mut len);

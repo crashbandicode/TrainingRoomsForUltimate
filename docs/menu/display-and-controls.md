@@ -23,8 +23,8 @@ either way.
 On draws the fighters' boxes in colour: hitboxes (the attacks; each hitbox of a move gets its own colour, the first is
 red), grab boxes (always magenta, a colour no hitbox uses), and hurtboxes (yellow: where a fighter can be hit). A round
 box is a disc; a long one, such as a sword's hitbox or an arm's hurtbox, is one pill. It works in Training, and on the
-two practice fighters in a waiting room. While a fighter shields nothing of it is drawn; while it is grabbing only its
-grab box is.
+two practice fighters in a waiting room. While a fighter shields nothing of it is drawn; while it is grabbing its
+hurtboxes and grab box are, since a missed grab can be punished.
 
 - **Projectiles and thrown items:** a projectile, or a thrown item such as Link's bomb, Peach's turnip or Diddy Kong's
   banana, has its hitboxes drawn while its attack lasts. Up to four at a time; a fifth replaces the oldest. Olimar's

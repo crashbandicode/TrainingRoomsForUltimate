@@ -845,9 +845,9 @@ fn core06_hurtbox_dispatch_equivalence_with_the_hitbox_rules() {
     hurt.records[0] = part(hitbox::HIT_STATUS_OFF, [0.0; 3], [1.0; 3], 1.0, 7);
     let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(false), Some(&mut hurt), &mut fx);
     assert_eq!((counts.killed, counts.kept, counts.spawned), (2, 2, 0));
-    // Shielding and a grab status clear the whole set (hurt spheres included), like the hit spheres; the game's own shield
-    // bubble is never owned. Off clears too (facts the plan already covers).
-    for (enabled, status) in [(true, ids().guard_on), (true, ids().catch), (false, 0)] {
+    // Shielding clears the whole set (hurt spheres included), like the hit spheres; the game's own shield bubble is never
+    // owned. Off clears too (facts the plan already covers).
+    for (enabled, status) in [(true, ids().guard_on), (false, 0)] {
         let mut set = hitbox::HandleSet::new();
         let mut fx = RequestSpy::new();
         let mut hurt = hurt_spy(vec![part(0, [2.0, 1.0, 0.5], [2.0, 1.0, 0.5], 1.0, 7)], 0, 1); // a point part: one sphere
@@ -859,6 +859,19 @@ fn core06_hurtbox_dispatch_equivalence_with_the_hitbox_rules() {
         assert_eq!((counts.killed, len), (1, 0));
         assert!(fx.fx.live.contains(&900));
         assert!(set.is_empty());
+    }
+    // A grab status (`CATCH..=CATCH_TURN`) keeps the grabber's hurt spheres: a whiffed grab can be punished. Its hit spheres
+    // still go, as upstream's grab rule has them.
+    for status in [ids().catch, ids().catch_turn] {
+        let mut set = hitbox::HandleSet::new();
+        let mut fx = RequestSpy::new();
+        let mut hurt = hurt_spy(vec![part(0, [2.0, 1.0, 0.5], [2.0, 1.0, 0.5], 1.0, 7)], 0, 1);
+        let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
+        hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(true), Some(&mut hurt), &mut fx);
+        assert_eq!(set.len(), 2);
+        let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, status), &mut wants, &mut OneHit(true), Some(&mut hurt), &mut fx);
+        assert_eq!((counts.kept, counts.killed, counts.spawned, len), (1, 1, 0, 1), "status {status}");
+        assert!(set.spheres().all(|s| s.key >> 24 == hitbox::KIND_HURT), "status {status}");
     }
     // A dispatch without a reader (`None`) plans and requests the hit spheres only: what the runtime passes on its
     // Off and stop paths never asks for a hurt sphere.
@@ -873,7 +886,7 @@ fn core06_hurtbox_dispatch_equivalence_with_the_hitbox_rules() {
 #[test]
 fn core06_dispatch_reads_the_hit_module_only_while_the_setting_is_on() {
     // Route B (decision `5ca5e3b`): with the setting On the dispatch constructs the reader and reads the HitModule;
-    // with it Off — and on the stop paths it takes first (shielding, a grab status) — the reader is never touched:
+    // with it Off — and on the stop path it takes first (shielding) — the reader is never touched:
     // no module read, no part read, no hurt sphere. The runtime constructs the reader behind `enabled` itself; this
     // pins the dispatch side of the same gate.
     let mut hurt = hurt_spy(vec![part(0, [0.0, 1.0, 0.0], [0.0, 5.0, 0.0], 2.0, 0x51a3_6341)], 0, 1);
@@ -884,14 +897,24 @@ fn core06_dispatch_reads_the_hit_module_only_while_the_setting_is_on() {
     let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, false, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
     assert_eq!((counts.killed, counts.spawned, len), (0, 0, 0));
     assert_eq!((hurt.module_calls, hurt.parts_read.len(), fx.requests.len()), (0, 0, 0));
-    // Shielding and grabbing (the stop paths the dispatch takes before the reader): no HitModule read either.
-    for status in [ids().guard_on, ids().catch] {
+    // Shielding (the stop path the dispatch takes before the reader): no HitModule read either.
+    {
         let mut set = hitbox::HandleSet::new();
         let mut fx = RequestSpy::new();
         let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
-        let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, status), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
+        let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, ids().guard_on), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
         assert_eq!((counts.spawned, len), (0, 0));
-        assert_eq!(hurt.module_calls, 0, "status {status}: no HitModule read on a stop path");
+        assert_eq!(hurt.module_calls, 0, "shielding: no HitModule read on a stop path");
+    }
+    // A grab status is not a stop path for the hurtboxes: the module is read and the grabber's capsule drawn.
+    {
+        let mut set = hitbox::HandleSet::new();
+        let mut fx = RequestSpy::new();
+        let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
+        let mut hurt = hurt_spy(vec![part(0, [0.0, 1.0, 0.0], [0.0, 5.0, 0.0], 2.0, 0x51a3_6341)], 0, 1);
+        let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, ids().catch), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
+        assert_eq!((counts.spawned, len), (2, 2));
+        assert!(hurt.module_calls >= 1, "a grab status: the HitModule is read");
     }
     // On, ordinary status: the module is read and the part's capsule drawn (one part: its two ends, one pill).
     let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
