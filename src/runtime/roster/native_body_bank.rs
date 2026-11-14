@@ -978,6 +978,40 @@ fn cycle_wanted(menu: &crate::engine::compat::menu::TrainingModpackMenu, role: u
     wanted
 }
 
+/// rc.14 cycle fix, Gap 1 (`body_bank::shrink_release`): when Ready Fighters is lowered below the bodies already
+/// resident, the farthest group leaves now, one per planner pass, as `cold_release` frees a cold one. Each bank is read
+/// under its own lock alone. A cold fighter's group and its allowance (`Bank::over`), and a bank mid-switch, stay.
+fn shrink_to_ready(settings: &crate::engine::preload::cycle_preload_config::Settings,
+    lanes: &[[Option<crate::runtime::roster::cycle_preload::Target>; crate::runtime::roster::cycle_preload::MAX_TARGETS]; 4]) {
+    let (mut bodies, mut allowed) = (2usize, usize::from(settings.ready_fighters));
+    let mut units = crate::engine::compat::fixed::FixedList::<(usize, usize, usize), { 2 * MAX_EXTRA_GROUPS }>::new((0, 0, 0));
+    for role in 0..2 {
+        let state = BANKS[role].lock();
+        let Some(bank) = state.as_ref().filter(|b| !b.departed && b.phase != Phase::Retired) else { continue; };
+        bodies += extra_bodies(bank);
+        allowed += bank.over.len();
+        if bank.phase != Phase::Ready || bank.swap.is_some() { continue; }
+        for (index, g) in bank.groups.iter().enumerate() {
+            let kinds = &g.members.kinds()[..g.members.count()];
+            if !g.state.counts_bodies() || g.leaving || bank.over.iter().any(|(k, _)| kinds.contains(k)) { continue; }
+            let distance = kinds.iter().filter_map(|kind| lanes[2 + role].iter()
+                .position(|t| t.is_some_and(|t| t.kind == *kind))).min().unwrap_or(usize::MAX);
+            units.push((role, index, distance));
+        }
+    }
+    let Some((role, index)) = crate::engine::swap::body_bank::shrink_release(units.iter().copied(), bodies, allowed) else { return; };
+    let mut state = BANKS[role].lock();
+    let Some(bank) = state.as_mut().filter(|b| b.phase == Phase::Ready && !b.departed && b.swap.is_none()) else { return; };
+    let owner = bank.owner;
+    let Some(g) = bank.groups.get_mut(index).filter(|g| g.state.counts_bodies() && !g.leaving) else { return; };
+    trace!("[GroupSwap] shrink owner={} group={} kinds={:x?} state={:?} bodies={} ready_fighters={} allowed={}: Ready Fighters is below what is resident; the farthest group leaves",
+        owner, index, &g.members.kinds()[..g.members.count()], g.state, bodies, settings.ready_fighters, allowed);
+    match g.state {
+        GroupState::Planned | GroupState::Held(_) | GroupState::Failed => g.state = GroupState::Released,
+        _ => { g.leaving = true; g.release_now = true; }
+    }
+}
+
 /// Value-only group planning on the sparse planner: appends `Planned` groups to
 /// a Ready window bank; never removes or touches a native object. Returns the
 /// extra-group bodies charged to the shared budget and the per-role UI targets.
@@ -1018,6 +1052,7 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
     // now when they need its room (operator rule 2026-11-09 13:21Z, below). The window itself (on screen) stays until it
     // is switched away.
     let wanted = [cycle_wanted(menu, 0), cycle_wanted(menu, 1)];
+    shrink_to_ready(settings, lanes);
     for role in 0..2 {
         let mut state = BANKS[role].lock();
         if let Some(bank) = state.as_mut().filter(|bank| bank.phase == Phase::Ready && !bank.departed) {
@@ -1227,8 +1262,10 @@ fn bodies_with(bank: &Bank, other: usize) -> usize {
 /// prefetches (`group_lifecycle` runs its serving step first) and its first switch builds it, as for any prefetched
 /// group. True while the press waits for that group. False is today's path (the Reload): Group Swap off, no Ready bank,
 /// a kind no one-member group holds, no free slot, no room, or a group the admissions held (process memory, the pool
-/// reserve), that failed, or that is reachable already.
-pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>) -> bool {
+/// reserve), that failed, or that is reachable already. A press out of the role's live Mii group (`exit`, Gap 3) waits
+/// until its ordinary group is Built in the background (`body_bank::demand_waits`), since the warm exit takes only a
+/// Built group; without an admitted background build beside that Mii window it takes today's path at once.
+pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>, exit: bool) -> bool {
     let Some(role) = role(owner) else { return false; };
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if !ENABLED.load(Ordering::Acquire) || !settings.fighters || settings.bank_members < 2 || !groups_enabled(&settings) {
@@ -1253,9 +1290,14 @@ pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>
         return true;
     }
     let mii = configuration.is_some();
+    let observed = bank.observed.map(|(_, live)| live);
     if let Some(g) = bank.groups.iter().find(|g| g.state != GroupState::Released && !g.leaving && g.members.index_of(kind).is_some()) {
         let same = if mii { g.configuration == configuration } else { g.identity.is_none() };
-        if same && matches!(g.state, GroupState::Planned | GroupState::Prefetching) { return true; }
+        let build_owed = exit && (background_owed(bank, g, observed) || bank.background.is_some());
+        if same && exit && !exit_buildable(bank, *g.members, observed) {
+            return declined(format_args!("its group can't build beside the live Mii window"));
+        }
+        if same && crate::engine::swap::body_bank::demand_waits(g.state, exit, build_owed) { return true; }
         // A reachable group serves the press as any group swap; a held, failed or other identity's one does not.
         return if g.state.reachable() && same { false } else { declined(format_args!("its group is {:?}", g.state)) };
     }
@@ -1271,7 +1313,10 @@ pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>
         None
     };
     let Some(members) = members else { return declined(format_args!("no one-member group holds it")); };
-    let Some(live) = bank.observed.map(|(_, live)| live) else { return declined(format_args!("nothing observed live")); };
+    let Some(live) = observed else { return declined(format_args!("nothing observed live")); };
+    if exit && !exit_buildable(bank, members, observed) {
+        return declined(format_args!("no background build beside the live Mii window"));
+    }
     if bank.groups.next_slot().is_none() { return declined(format_args!("no free group slot")); }
     let (bodies, ready) = (bodies_with(bank, other) + members.count(), usize::from(settings.ready_fighters));
     if !crate::engine::swap::body_bank::cold_admitted(bodies, ready, members.count(), &bank.over, live) {
@@ -1289,6 +1334,14 @@ pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>
     trace!("[GroupSwap] demand owner={} group={} kinds={:x?} special={:?} bodies={} ready_fighters={} cold={}: the press waits for its own group; no Reload",
         owner, slot, &members.kinds()[..members.count()], members.special(), bodies, ready, over);
     true
+}
+
+/// rc.14 Gap 3: whether an ordinary group of `members` can be built in the background beside this bank's live window
+/// (`background_build_eligible`; beside a live Mii window only with the owner's ordinary baseline and its hooks on).
+fn exit_buildable(bank: &Bank, members: Members, observed: Option<u32>) -> bool {
+    BACKGROUND_ENABLED.load(Ordering::Acquire) && (bank.identity.is_none() || BACKGROUND_MII_ENABLED.load(Ordering::Acquire))
+        && background_build_eligible(members, false, *bank.members, live_identity(bank), live_kirby_gate(observed),
+            BACKGROUND_PAIR_TAIL.load(Ordering::Acquire), BACKGROUND_X4.load(Ordering::Acquire)).is_ok()
 }
 
 /// rc.14 cycle fix: after a switch, the cold fighter loaded over Ready Fighters that is no longer on screen
@@ -4902,7 +4955,10 @@ unsafe fn start_background(entry: *mut u8, owner: u32, role: usize, group: usize
         let state = BANKS[role].lock();
         let Some(bank) = state.as_ref().filter(|bank| bank.entry == entry as usize && bank.owner == owner
             && bank.phase == Phase::Ready && !bank.departed && bank.swap.is_none()) else { return; };
-        if background_candidate(bank, bank.observed.map(|(_, kind)| kind)) != Some(group) { return; }
+        let observed = bank.observed.map(|(_, kind)| kind);
+        // rc.14 Gap 3: the group a press out of a live Mii waits for (`serving_group`'s `Serving::Build`) goes first.
+        if background_candidate(bank, observed) != Some(group) && !(bank.prefetch.is_none() && bank.construction.is_none()
+            && bank.background.is_none() && bank.groups.get(group).is_some_and(|g| background_owed(bank, g, observed))) { return; }
         let g = &bank.groups[group];
         (*g.members, bank.alias, bank.members.carries_records(),
             g.identity.zip(g.configuration).filter(|_| g.members.special() == Special::Mii),
@@ -6092,6 +6148,7 @@ fn note_foreground(owner: u32, foreground: super::Foreground) {
 /// (a member change) or in no group of this bank needs none.
 unsafe fn serving_group(base: usize, bank: &Bank, target: crate::runtime::roster::cycle_preload::Target, live: Option<u32>)
     -> Option<(usize, Serving)> {
+    let observed = live;
     let live = crate::engine::swap::body_bank::d_kirby1_live(live, crate::runtime::roster::g68_step::enabled());
     if bank.members.index_of(target.kind).is_some() && bank.configuration == target.configuration { return None; }
     let (group, g) = bank.groups.iter().enumerate().find(|(_, g)| !g.leaving && g.members.index_of(target.kind).is_some()
@@ -6099,8 +6156,12 @@ unsafe fn serving_group(base: usize, bank: &Bank, target: crate::runtime::roster
     let rearm_due = !g.object_refused && bank.construction.is_none() && bank.background.is_none()
         && object_rearm_due(g.state, *g.members, detached_pool(base, bank.owner, g), g.object_held)
         && g.members.object_kind().is_some_and(|kind| crate::engine::swap::body_bank::object_rearm_admitted(live, kind).is_ok());
-    let serving = serving_step(g.state, g.identity.is_none() || g.charinfo_published, rearm_due)?;
-    (serving == Serving::ObjectRearm || crate::engine::swap::body_bank::prefetch_admitted(live).is_ok()).then_some((group, serving))
+    // rc.14 Gap 3: beside a live Mii window an ordinary group serves the press only Built (the warm exit).
+    let exit_build = bank.identity.is_some() && g.identity.is_none() && bank.prefetch.is_none() && bank.construction.is_none()
+        && bank.background.is_none() && background_owed(bank, g, observed);
+    let serving = serving_step(g.state, g.identity.is_none() || g.charinfo_published, rearm_due, exit_build)?;
+    (matches!(serving, Serving::ObjectRearm | Serving::Build) || crate::engine::swap::body_bank::prefetch_admitted(live).is_ok())
+        .then_some((group, serving))
 }
 
 unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
@@ -6204,6 +6265,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                 match foreground.target.and_then(|target| serving_group(base, bank, target, live)) {
                     Some((group, Serving::Prefetch)) => Step::Start(group, *bank.groups[group].members, bank.alias, true),
                     Some((group, Serving::ObjectRearm)) => Step::Rearm(group, *bank.groups[group].members, bank.alias),
+                    Some((group, Serving::Build)) => Step::Background(group),
                     None => Step::Idle,
                 },
             step => step,

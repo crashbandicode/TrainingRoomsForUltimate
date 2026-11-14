@@ -924,6 +924,9 @@ pub fn speculative_step_admitted(foreground: bool) -> Result<(), &'static str> {
 pub enum Serving {
     Prefetch,
     ObjectRearm,
+    /// rc.14 Gap 3: the background build of a prefetched ordinary group a press out of a live Mii group waits for (the
+    /// warm exit takes only a Built group: a prefetched one would build under the Mii's `R`, `mii_exit_saved`).
+    Build,
 }
 
 /// [`Serving`] for the group holding the press's target, in `state`. Its prefetch while it is planned or held for
@@ -931,12 +934,26 @@ pub enum Serving {
 /// canonical Reload, which destroys the window and every group. Its object re-arm while a built Pokémon Trainer group
 /// lacks its object kind (`rearm_due`, [`object_rearm_due`]): without it [`object_ready`] fails and so does the warm
 /// attach. Nothing for a prefetching group (its poll ends it) or a prefetched or built one (reachable already: its
-/// background build or pool preparation would only make the press wait longer).
-pub fn serving_step(state: GroupState, publishable: bool, rearm_due: bool) -> Option<Serving> {
+/// background build or pool preparation would only make the press wait longer), except a prefetched group whose
+/// background build is owed to a press out of a live Mii group (`exit_build`, rc.14 Gap 3).
+pub fn serving_step(state: GroupState, publishable: bool, rearm_due: bool, exit_build: bool) -> Option<Serving> {
     match state {
         _ if state.startable() => publishable.then_some(Serving::Prefetch),
         GroupState::Built if rearm_due => Some(Serving::ObjectRearm),
+        GroupState::Prefetched if exit_build => Some(Serving::Build),
         _ => None,
+    }
+}
+
+/// rc.14 cycle fix: whether a press keeps waiting for its own `demand` group in `state`: while it is planned or
+/// prefetching; a press out of a live Mii group (`exit`) also while it is prefetched and its background build is
+/// admitted (`build_owed`), since the warm exit takes only a Built group (Gap 3, Eden cf-p3-y2 `cf-k2` press 12 Reloaded).
+/// A group that serves the press as it is (reachable) or that will never serve it goes to the caller.
+pub fn demand_waits(state: GroupState, exit: bool, build_owed: bool) -> bool {
+    match state {
+        GroupState::Planned | GroupState::Prefetching => true,
+        GroupState::Prefetched => exit && build_owed,
+        _ => false,
     }
 }
 
@@ -1734,6 +1751,17 @@ pub type Cold = (u32, bool);
 pub fn cold_left(over: &mut [Cold], live: u32) -> Option<u32> {
     for cold in over.iter_mut().filter(|(kind, _)| *kind == live) { cold.1 = true; }
     over.iter().find(|(kind, seen)| *seen && *kind != live).map(|(kind, _)| *kind)
+}
+
+/// rc.14 cycle fix, Gap 1 (Eden cf-p3-y2: Ready Fighters lowered from 8 to 6 left the CPU at 7 bodies, "Ready 7/7", so
+/// no fighter was cold; the primary 2026-11-14 ~23:12Z on the operator's rule "what doesn't fit stays cold and what dos
+/// stays hot"): while both roles' resident bodies exceed Ready Fighters plus the cold fighters' own allowance
+/// (`allowed`), the group farthest from being needed leaves now, the CPU's on a tie. `units`: (role, group index,
+/// distance: its nearest member's place in the role's lane, 0 next). One per pass; the next pass sees the room it freed.
+pub fn shrink_release(units: impl IntoIterator<Item = (usize, usize, usize)>, bodies: usize, allowed: usize)
+    -> Option<(usize, usize)> {
+    if bodies <= allowed { return None; }
+    units.into_iter().max_by_key(|(role, _, distance)| (*distance, *role)).map(|(role, index, _)| (role, index))
 }
 
 /// Operator rule 2026-11-09 16:06Z (Eden `final-surface-i3-pf-1261f56c` `x6-cc`): a parked group freed now gives its
@@ -3662,20 +3690,45 @@ mod tests {
             }
             served
         };
-        let served = run(&|state| serving_step(state, true, false));
+        let served = run(&|state| serving_step(state, true, false, false));
         assert_eq!(&served[..2], &[(3, Work::Prefetch(2)), (6, Work::Press { warm: true })], "{served:?}");
         assert_eq!(served[2..].iter().map(|(_, w)| *w).collect::<Vec<_>>(), [Work::Prefetch(1), Work::Prefetch(3)]);
         // Nothing let through (the cap-era rule): the press is served at once into no reachable group.
         assert_eq!(run(&|_| None)[0], (3, Work::Press { warm: false }));
         // Each state of the target's group.
-        assert_eq!(serving_step(GroupState::Planned, true, false), Some(Serving::Prefetch));
-        assert_eq!(serving_step(GroupState::Held(Hold::Memory), true, false), Some(Serving::Prefetch));
-        assert_eq!(serving_step(GroupState::Planned, false, false), None, "a Mii group's CharInfo is published first");
+        assert_eq!(serving_step(GroupState::Planned, true, false, false), Some(Serving::Prefetch));
+        assert_eq!(serving_step(GroupState::Held(Hold::Memory), true, false, false), Some(Serving::Prefetch));
+        assert_eq!(serving_step(GroupState::Planned, false, false, false), None, "a Mii group's CharInfo is published first");
         for state in [GroupState::Prefetching, GroupState::Prefetched, GroupState::Built, GroupState::Failed] {
-            assert_eq!(serving_step(state, true, false), None, "{state:?}");
+            assert_eq!(serving_step(state, true, false, false), None, "{state:?}");
         }
         // A built PT group without its object kind: its re-arm makes it reachable (`object_ready`).
-        assert_eq!(serving_step(GroupState::Built, true, true), Some(Serving::ObjectRearm));
+        assert_eq!(serving_step(GroupState::Built, true, true, false), Some(Serving::ObjectRearm));
+    }
+
+    /// rc.14 Gap 3 (Eden cf-p3-y2 `cf-k2` press 12: out of the live Mii Gunner onto Pichu, whose group was not Built, the
+    /// press skipped `demand` and Reloaded): a press out of a live Mii group waits for its own ordinary group through its
+    /// prefetch and its background build (the warm exit takes only a Built group), then exits warm; without an admitted
+    /// background build it takes today's path at once instead of waiting for a group that cannot serve it.
+    fn a_press_out_of_a_live_mii_waits_for_its_group_s_background_build() {
+        // The group's states as the lifecycle moves it while the press waits, and the step it serves at each.
+        let mut state = GroupState::Planned;
+        let mut steps = Vec::new();
+        while demand_waits(state, true, true) {
+            let step = serving_step(state, true, false, true);
+            steps.push(step);
+            state = match (state, step) {
+                (GroupState::Planned, Some(Serving::Prefetch)) => GroupState::Prefetching,
+                (GroupState::Prefetching, None) => GroupState::Prefetched,
+                (GroupState::Prefetched, Some(Serving::Build)) => GroupState::Built,
+                other => panic!("the waiting press is stuck at {other:?}"),
+            };
+        }
+        assert_eq!(steps, [Some(Serving::Prefetch), None, Some(Serving::Build)]);
+        assert_eq!(state, GroupState::Built, "the warm exit takes it");
+        assert!(!demand_waits(GroupState::Prefetched, true, false), "no admitted background build: today's path now");
+        assert!(!demand_waits(GroupState::Prefetched, false, true), "an ordinary press takes a prefetched group at its switch");
+        assert_eq!(serving_step(GroupState::Prefetched, true, false, false), None);
     }
 
     /// The notice rule (primary 2026-11-09 02:00Z, approved for every kind): with groups on, the live attached window
@@ -3798,7 +3851,7 @@ mod tests {
                             // A Mii group's CharInfo goes on the record beside the waiting press, then its prefetch
                             // serves the press (Eden cf-p2-x2 #2418: any pending request refused it; never prefetched).
                             let publishable = unit.special() != Special::Mii || mii_publish::publication_idle(false, true, true);
-                            assert_eq!(serving_step(GroupState::Planned, publishable, false), Some(Serving::Prefetch),
+                            assert_eq!(serving_step(GroupState::Planned, publishable, false, false), Some(Serving::Prefetch),
                                 "the press onto {target:#x} waits for a group that never prefetches");
                             cold.push(target);
                             // The press plans the group while the fighter it leaves is still on screen, and the bank
@@ -3863,6 +3916,26 @@ mod tests {
         let laps = run_laps(&[FALCO, PICHU, DIDDY, KROOL, GUNNER], 8);
         steady(&laps, 1);
         assert_eq!(laps.cold[1], vec![GUNNER]);
+    }
+
+    /// Gap 1 (Eden cf-p3-y2, "Ready 7/7" at Ready Fighters 6): lowering Ready Fighters frees the farthest groups, one per
+    /// pass, until the resident bodies fit; a cold fighter's allowance stays; nothing goes while they fit.
+    fn lowering_ready_fighters_frees_the_farthest_groups_until_the_total_fits() {
+        // P1 [Mario] + group [Pikachu] (next), the CPU window [Falco, Gunner] + groups [Pichu] (next), [Diddy] (1),
+        // [King K. Rool] (2): 7 bodies, all resident at Ready Fighters 8, then lowered to 5.
+        let mut units = vec![(0, 0, 0), (1, 0, 0), (1, 1, 1), (1, 2, 2)];
+        let mut freed = Vec::new();
+        let mut bodies = 7;
+        while let Some((role, index)) = shrink_release(units.iter().copied(), bodies, 5) {
+            units.retain(|u| (u.0, u.1) != (role, index));
+            freed.push((role, index));
+            bodies -= 1;
+        }
+        assert_eq!(freed, vec![(1, 2), (1, 1)], "King K. Rool, then Diddy Kong: the farthest first");
+        assert_eq!(bodies, 5);
+        assert_eq!(shrink_release([(1, 0, 0), (0, 0, 0)], 6, 5), Some((1, 0)), "the CPU's on a tie");
+        assert_eq!(shrink_release([(1, 2, 2)], 7, 7), None, "a cold fighter on screen keeps its body over");
+        assert_eq!(shrink_release([(1, 2, 2)], 7, 8), None, "it fits");
     }
 
     /// k = 0: the same lap at Ready Fighters 10 fits whole: every press is warm and nothing is loaded or freed.
@@ -3975,6 +4048,8 @@ mod tests {
             ("five_laps_of_the_operator_cycle_keep_what_fits_hot", five_laps_of_the_operator_cycle_keep_what_fits_hot as fn()),
             ("two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot", two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot as fn()),
             ("a_cold_mii_fighter_is_loaded_by_its_waiting_press", a_cold_mii_fighter_is_loaded_by_its_waiting_press as fn()),
+            ("lowering_ready_fighters_frees_the_farthest_groups_until_the_total_fits", lowering_ready_fighters_frees_the_farthest_groups_until_the_total_fits as fn()),
+            ("a_press_out_of_a_live_mii_waits_for_its_group_s_background_build", a_press_out_of_a_live_mii_waits_for_its_group_s_background_build as fn()),
             ("a_lap_that_fits_is_all_warm", a_lap_that_fits_is_all_warm as fn()),
             ("a_cold_fighter_takes_one_body_over_only_while_it_is_on_screen", a_cold_fighter_takes_one_body_over_only_while_it_is_on_screen as fn()),
             ("a_group_leaves_when_a_member_left_the_cycle_and_its_slot_is_reused", a_group_leaves_when_a_member_left_the_cycle_and_its_slot_is_reused as fn()),

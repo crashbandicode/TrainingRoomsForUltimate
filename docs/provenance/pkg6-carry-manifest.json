@@ -3584,7 +3584,7 @@
    "dest": "src/model/swap/body_bank.rs",
    "crate": "consts",
    "src_sha256": "ab3c4adcf084b2dd9433a5fe5715b428fb38c26d3b143d7632fb3d33078df0d6",
-   "dest_sha256": "2bbb684eb92fcbb6e17eef94c6cdd49ac3572658794338a8f365669e669274ea",
+   "dest_sha256": "5eb5f536e64b85001ef127b4e4667ff0e5872de05f7eecc8693ed456c56f6504",
    "edits": [
     {
      "old": "    // a native group): count it so hats and helper slots agree with the planner.\n    let used: usize = windows.iter().map(|window| window.map_or(1, |members| members.count())).sum::<usize>()\n        + existing.iter().flat_map(|groups| groups.iter()).map(|members| members.count()).sum::<usize>()\n        + budget.hats_wanted;\n    let mut remaining = budget.ready_fighters.saturating_sub(used).min(budget.pool_free);\n    // (lane depth, kind): depth is the distance from the live fighter, so a role\n    // whose nearer neighbours are already built does not outrank the other role.\n    let mut candidates: [Vec<(usize, u32)>; 2] = [Vec::new(), Vec::new()];\n    // Whole special groups (PT, Aegis, the pair) at their lane depth.\n    let mut specials: [Vec<(usize, Members)>; 2] = [Vec::new(), Vec::new()];\n    let mut room = [0usize; 2];\n    let mut group_slots = [0usize; 2];\n    for role in 0..2 {\n        let Some(window) = windows[role].filter(|window| window_swappable_with(*window, policy)) else { continue; };\n        group_slots[role] = MAX_EXTRA_GROUPS.saturating_sub(existing[role].len());\n        room[role] = group_slots[role] * NATIVE_MEMBERS;\n        for (depth, &kind) in upcoming[role].iter().enumerate() {\n            if exclude[role] == Some(kind)\n                || window.index_of(kind).is_some()\n                || existing[role].iter().any(|group| group.index_of(kind).is_some())\n            { continue; }\n            if let Some(group) = Members::special_group(kind, budget.special) {\n                // One Mii identity per resource owner: a second lane Mii, or a\n                // Mii group this role already holds, stays canonical (DESIGN \u00a72).\n                let second_mii = group.special() == Special::Mii\n                    && (specials[role].iter().any(|(_, held)| held.special() == Special::Mii)\n                        || existing[role].iter().any(|held| held.special() == Special::Mii));\n                if !second_mii && !specials[role].iter().any(|(_, held)| held.kinds()[0] == group.kinds()[0]) {\n                    specials[role].push((depth, group));\n                }\n                continue;\n            }\n            if group_member_kind(kind, policy) && !candidates[role].iter().any(|(_, held)| *held == kind) {\n                candidates[role].push((depth, kind));\n            }\n        }\n    }\n    // Special groups are taken whole at their own lane depth, interleaved with\n    // the ordinary candidates; one that no longer fits the remaining bodies or a\n    // free group slot is skipped, never split.\n    let mut chosen_special: [Vec<Members>; 2] = [Vec::new(), Vec::new()];\n    let mut scursor = [0usize; 2];\n    let mut chosen: [Vec<u32>; 2] = [Vec::new(), Vec::new()];\n    let mut cursor = [0usize; 2];\n    let take = |role: usize, chosen: &mut [Vec<u32>; 2], cursor: &mut [usize; 2], remaining: &mut usize| -> bool {\n        if *remaining == 0 || cursor[role] >= candidates[role].len() || chosen[role].len() >= room[role] {\n            return false;\n        }\n        chosen[role].push(candidates[role][cursor[role]].1);\n        cursor[role] += 1;\n        *remaining -= 1;\n        true\n    };\n    let deepest = upcoming.iter().map(|lane| lane.len()).max().unwrap_or(0);\n    for depth in 0..deepest {\n        for role in 0..2 {\n            if cursor[role] < candidates[role].len() && candidates[role][cursor[role]].0 == depth {\n                take(role, &mut chosen, &mut cursor, &mut remaining);\n            } else if scursor[role] < specials[role].len() && specials[role][scursor[role]].0 == depth {\n                let group = specials[role][scursor[role]].1;\n                scursor[role] += 1;\n                let slots_used = chosen_special[role].len() + chosen[role].len().div_ceil(NATIVE_MEMBERS);\n                if remaining >= group.count() && slots_used < group_slots[role] {\n                    chosen_special[role].push(group);\n                    remaining -= group.count();\n",
@@ -4916,6 +4916,51 @@
      "old": "        // (Unmapped Read64 in the Mii's fighter module): a Mii group is released first and built again, as before.\n        let mii = Members::mii_group(0x4a).unwrap();\n        assert!(!kept_across_reload(GroupState::Built, mii, false, false, Some(KROOL), true), \"a Mii group is released first\");\n",
      "new": "        // (Unmapped Read64 in the Mii's fighter module): a Mii group was released first and built again. rc.14 2d keeps it\n        // again, with the modules pinned, since Eden cf-p3-y2's fail-first row of that crash passed.\n        let mii = Members::mii_group(0x4a).unwrap();\n        assert_eq!(kept_across_reload(GroupState::Built, mii, false, false, Some(KROOL), true), KEEP_MII_ACROSS_RELOAD,\n            \"a Mii group is kept only with the rc.14 2d switch\");\n",
      "reason": "rc.14 cycle fix 7: 2d on: a target-first Reload keeps a Built Mii group (Eden cf-p3-y2 cf-mii-failfirst passed)"
+    },
+    {
+     "old": "    ObjectRearm,\n}\n",
+     "new": "    ObjectRearm,\n    /// rc.14 Gap 3: the background build of a prefetched ordinary group a press out of a live Mii group waits for (the\n    /// warm exit takes only a Built group: a prefetched one would build under the Mii's `R`, `mii_exit_saved`).\n    Build,\n}\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "/// background build or pool preparation would only make the press wait longer).\npub fn serving_step(state: GroupState, publishable: bool, rearm_due: bool) -> Option<Serving> {\n",
+     "new": "/// background build or pool preparation would only make the press wait longer), except a prefetched group whose\n/// background build is owed to a press out of a live Mii group (`exit_build`, rc.14 Gap 3).\npub fn serving_step(state: GroupState, publishable: bool, rearm_due: bool, exit_build: bool) -> Option<Serving> {\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "        GroupState::Built if rearm_due => Some(Serving::ObjectRearm),\n        _ => None,\n    }\n",
+     "new": "        GroupState::Built if rearm_due => Some(Serving::ObjectRearm),\n        GroupState::Prefetched if exit_build => Some(Serving::Build),\n        _ => None,\n    }\n}\n\n/// rc.14 cycle fix: whether a press keeps waiting for its own `demand` group in `state`: while it is planned or\n/// prefetching; a press out of a live Mii group (`exit`) also while it is prefetched and its background build is\n/// admitted (`build_owed`), since the warm exit takes only a Built group (Gap 3, Eden cf-p3-y2 `cf-k2` press 12 Reloaded).\n/// A group that serves the press as it is (reachable) or that will never serve it goes to the caller.\npub fn demand_waits(state: GroupState, exit: bool, build_owed: bool) -> bool {\n    match state {\n        GroupState::Planned | GroupState::Prefetching => true,\n        GroupState::Prefetched => exit && build_owed,\n        _ => false,\n    }\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "    over.iter().find(|(kind, seen)| *seen && *kind != live).map(|(kind, _)| *kind)\n}\n",
+     "new": "    over.iter().find(|(kind, seen)| *seen && *kind != live).map(|(kind, _)| *kind)\n}\n\n/// rc.14 cycle fix, Gap 1 (Eden cf-p3-y2: Ready Fighters lowered from 8 to 6 left the CPU at 7 bodies, \"Ready 7/7\", so\n/// no fighter was cold; the primary 2026-11-14 ~23:12Z on the operator's rule \"what doesn't fit stays cold and what dos\n/// stays hot\"): while both roles' resident bodies exceed Ready Fighters plus the cold fighters' own allowance\n/// (`allowed`), the group farthest from being needed leaves now, the CPU's on a tie. `units`: (role, group index,\n/// distance: its nearest member's place in the role's lane, 0 next). One per pass; the next pass sees the room it freed.\npub fn shrink_release(units: impl IntoIterator<Item = (usize, usize, usize)>, bodies: usize, allowed: usize)\n    -> Option<(usize, usize)> {\n    if bodies <= allowed { return None; }\n    units.into_iter().max_by_key(|(role, _, distance)| (*distance, *role)).map(|(role, index, _)| (role, index))\n}\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "        let served = run(&|state| serving_step(state, true, false));\n",
+     "new": "        let served = run(&|state| serving_step(state, true, false, false));\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "        assert_eq!(serving_step(GroupState::Planned, true, false), Some(Serving::Prefetch));\n        assert_eq!(serving_step(GroupState::Held(Hold::Memory), true, false), Some(Serving::Prefetch));\n        assert_eq!(serving_step(GroupState::Planned, false, false), None, \"a Mii group's CharInfo is published first\");\n        for state in [GroupState::Prefetching, GroupState::Prefetched, GroupState::Built, GroupState::Failed] {\n            assert_eq!(serving_step(state, true, false), None, \"{state:?}\");\n        }\n        // A built PT group without its object kind: its re-arm makes it reachable (`object_ready`).\n        assert_eq!(serving_step(GroupState::Built, true, true), Some(Serving::ObjectRearm));\n",
+     "new": "        assert_eq!(serving_step(GroupState::Planned, true, false, false), Some(Serving::Prefetch));\n        assert_eq!(serving_step(GroupState::Held(Hold::Memory), true, false, false), Some(Serving::Prefetch));\n        assert_eq!(serving_step(GroupState::Planned, false, false, false), None, \"a Mii group's CharInfo is published first\");\n        for state in [GroupState::Prefetching, GroupState::Prefetched, GroupState::Built, GroupState::Failed] {\n            assert_eq!(serving_step(state, true, false, false), None, \"{state:?}\");\n        }\n        // A built PT group without its object kind: its re-arm makes it reachable (`object_ready`).\n        assert_eq!(serving_step(GroupState::Built, true, true, false), Some(Serving::ObjectRearm));\n    }\n\n    /// rc.14 Gap 3 (Eden cf-p3-y2 `cf-k2` press 12: out of the live Mii Gunner onto Pichu, whose group was not Built, the\n    /// press skipped `demand` and Reloaded): a press out of a live Mii group waits for its own ordinary group through its\n    /// prefetch and its background build (the warm exit takes only a Built group), then exits warm; without an admitted\n    /// background build it takes today's path at once instead of waiting for a group that cannot serve it.\n    fn a_press_out_of_a_live_mii_waits_for_its_group_s_background_build() {\n        // The group's states as the lifecycle moves it while the press waits, and the step it serves at each.\n        let mut state = GroupState::Planned;\n        let mut steps = Vec::new();\n        while demand_waits(state, true, true) {\n            let step = serving_step(state, true, false, true);\n            steps.push(step);\n            state = match (state, step) {\n                (GroupState::Planned, Some(Serving::Prefetch)) => GroupState::Prefetching,\n                (GroupState::Prefetching, None) => GroupState::Prefetched,\n                (GroupState::Prefetched, Some(Serving::Build)) => GroupState::Built,\n                other => panic!(\"the waiting press is stuck at {other:?}\"),\n            };\n        }\n        assert_eq!(steps, [Some(Serving::Prefetch), None, Some(Serving::Build)]);\n        assert_eq!(state, GroupState::Built, \"the warm exit takes it\");\n        assert!(!demand_waits(GroupState::Prefetched, true, false), \"no admitted background build: today's path now\");\n        assert!(!demand_waits(GroupState::Prefetched, false, true), \"an ordinary press takes a prefetched group at its switch\");\n        assert_eq!(serving_step(GroupState::Prefetched, true, false, false), None);\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "                            assert_eq!(serving_step(GroupState::Planned, publishable, false), Some(Serving::Prefetch),\n",
+     "new": "                            assert_eq!(serving_step(GroupState::Planned, publishable, false, false), Some(Serving::Prefetch),\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "\n    /// k = 0: the same lap at Ready Fighters 10 fits whole: every press is warm and nothing is loaded or freed.\n",
+     "new": "\n    /// Gap 1 (Eden cf-p3-y2, \"Ready 7/7\" at Ready Fighters 6): lowering Ready Fighters frees the farthest groups, one per\n    /// pass, until the resident bodies fit; a cold fighter's allowance stays; nothing goes while they fit.\n    fn lowering_ready_fighters_frees_the_farthest_groups_until_the_total_fits() {\n        // P1 [Mario] + group [Pikachu] (next), the CPU window [Falco, Gunner] + groups [Pichu] (next), [Diddy] (1),\n        // [King K. Rool] (2): 7 bodies, all resident at Ready Fighters 8, then lowered to 5.\n        let mut units = vec![(0, 0, 0), (1, 0, 0), (1, 1, 1), (1, 2, 2)];\n        let mut freed = Vec::new();\n        let mut bodies = 7;\n        while let Some((role, index)) = shrink_release(units.iter().copied(), bodies, 5) {\n            units.retain(|u| (u.0, u.1) != (role, index));\n            freed.push((role, index));\n            bodies -= 1;\n        }\n        assert_eq!(freed, vec![(1, 2), (1, 1)], \"King K. Rool, then Diddy Kong: the farthest first\");\n        assert_eq!(bodies, 5);\n        assert_eq!(shrink_release([(1, 0, 0), (0, 0, 0)], 6, 5), Some((1, 0)), \"the CPU's on a tie\");\n        assert_eq!(shrink_release([(1, 2, 2)], 7, 7), None, \"a cold fighter on screen keeps its body over\");\n        assert_eq!(shrink_release([(1, 2, 2)], 7, 8), None, \"it fits\");\n    }\n\n    /// k = 0: the same lap at Ready Fighters 10 fits whole: every press is warm and nothing is loaded or freed.\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "            (\"a_cold_mii_fighter_is_loaded_by_its_waiting_press\", a_cold_mii_fighter_is_loaded_by_its_waiting_press as fn()),\n            (\"a_lap_that_fits_is_all_warm\", a_lap_that_fits_is_all_warm as fn()),\n",
+     "new": "            (\"a_cold_mii_fighter_is_loaded_by_its_waiting_press\", a_cold_mii_fighter_is_loaded_by_its_waiting_press as fn()),\n            (\"lowering_ready_fighters_frees_the_farthest_groups_until_the_total_fits\", lowering_ready_fighters_frees_the_farthest_groups_until_the_total_fits as fn()),\n            (\"a_press_out_of_a_live_mii_waits_for_its_group_s_background_build\", a_press_out_of_a_live_mii_waits_for_its_group_s_background_build as fn()),\n            (\"a_lap_that_fits_is_all_warm\", a_lap_that_fits_is_all_warm as fn()),\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
     }
    ]
   },
@@ -16079,7 +16124,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "d490c3885bf5f276c78161df08e0bc2f76f0cb730f2eae39506f03fec87edb0e",
+   "dest_sha256": "5b4284ed40b71980e93df724c4116dc22fdaaa75f6bc392f47baa5dd71193561",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -18883,6 +18928,56 @@
      "old": "        construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene: None,\n        object_fetch: None, retiring: None, preparing: None, over: FixedList::new((0, false)),\n    });\n",
      "new": "        construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene: None,\n        object_fetch: None, retiring: None, preparing: None, over,\n    });\n",
      "reason": "rc.14 2e a-full (marks): Design A cold marks survive A1 and (a\u2032): the kept window keeps its members marks, build carries the marks of the groups it keeps, and the A1 Reload target is marked seen (af-49c90e9c-x1: unseen and dropped marks were never freed, 10 bodies at Ready Fighters 8)"
+    },
+    {
+     "old": "\n/// Value-only group planning on the sparse planner: appends `Planned` groups to\n",
+     "new": "\n/// rc.14 cycle fix, Gap 1 (`body_bank::shrink_release`): when Ready Fighters is lowered below the bodies already\n/// resident, the farthest group leaves now, one per planner pass, as `cold_release` frees a cold one. Each bank is read\n/// under its own lock alone. A cold fighter's group and its allowance (`Bank::over`), and a bank mid-switch, stay.\nfn shrink_to_ready(settings: &crate::engine::preload::cycle_preload_config::Settings,\n    lanes: &[[Option<crate::runtime::roster::cycle_preload::Target>; crate::runtime::roster::cycle_preload::MAX_TARGETS]; 4]) {\n    let (mut bodies, mut allowed) = (2usize, usize::from(settings.ready_fighters));\n    let mut units = crate::engine::compat::fixed::FixedList::<(usize, usize, usize), { 2 * MAX_EXTRA_GROUPS }>::new((0, 0, 0));\n    for role in 0..2 {\n        let state = BANKS[role].lock();\n        let Some(bank) = state.as_ref().filter(|b| !b.departed && b.phase != Phase::Retired) else { continue; };\n        bodies += extra_bodies(bank);\n        allowed += bank.over.len();\n        if bank.phase != Phase::Ready || bank.swap.is_some() { continue; }\n        for (index, g) in bank.groups.iter().enumerate() {\n            let kinds = &g.members.kinds()[..g.members.count()];\n            if !g.state.counts_bodies() || g.leaving || bank.over.iter().any(|(k, _)| kinds.contains(k)) { continue; }\n            let distance = kinds.iter().filter_map(|kind| lanes[2 + role].iter()\n                .position(|t| t.is_some_and(|t| t.kind == *kind))).min().unwrap_or(usize::MAX);\n            units.push((role, index, distance));\n        }\n    }\n    let Some((role, index)) = crate::engine::swap::body_bank::shrink_release(units.iter().copied(), bodies, allowed) else { return; };\n    let mut state = BANKS[role].lock();\n    let Some(bank) = state.as_mut().filter(|b| b.phase == Phase::Ready && !b.departed && b.swap.is_none()) else { return; };\n    let owner = bank.owner;\n    let Some(g) = bank.groups.get_mut(index).filter(|g| g.state.counts_bodies() && !g.leaving) else { return; };\n    trace!(\"[GroupSwap] shrink owner={} group={} kinds={:x?} state={:?} bodies={} ready_fighters={} allowed={}: Ready Fighters is below what is resident; the farthest group leaves\",\n        owner, index, &g.members.kinds()[..g.members.count()], g.state, bodies, settings.ready_fighters, allowed);\n    match g.state {\n        GroupState::Planned | GroupState::Held(_) | GroupState::Failed => g.state = GroupState::Released,\n        _ => { g.leaving = true; g.release_now = true; }\n    }\n}\n\n/// Value-only group planning on the sparse planner: appends `Planned` groups to\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "    let wanted = [cycle_wanted(menu, 0), cycle_wanted(menu, 1)];\n    for role in 0..2 {\n",
+     "new": "    let wanted = [cycle_wanted(menu, 0), cycle_wanted(menu, 1)];\n    shrink_to_ready(settings, lanes);\n    for role in 0..2 {\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "/// reserve), that failed, or that is reachable already.\npub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>) -> bool {\n",
+     "new": "/// reserve), that failed, or that is reachable already. A press out of the role's live Mii group (`exit`, Gap 3) waits\n/// until its ordinary group is Built in the background (`body_bank::demand_waits`), since the warm exit takes only a\n/// Built group; without an admitted background build beside that Mii window it takes today's path at once.\npub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>, exit: bool) -> bool {\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "    if let Some(g) = bank.groups.iter().find(|g| g.state != GroupState::Released && !g.leaving && g.members.index_of(kind).is_some()) {\n        let same = if mii { g.configuration == configuration } else { g.identity.is_none() };\n        if same && matches!(g.state, GroupState::Planned | GroupState::Prefetching) { return true; }\n",
+     "new": "    let observed = bank.observed.map(|(_, live)| live);\n    if let Some(g) = bank.groups.iter().find(|g| g.state != GroupState::Released && !g.leaving && g.members.index_of(kind).is_some()) {\n        let same = if mii { g.configuration == configuration } else { g.identity.is_none() };\n        let build_owed = exit && (background_owed(bank, g, observed) || bank.background.is_some());\n        if same && exit && !exit_buildable(bank, *g.members, observed) {\n            return declined(format_args!(\"its group can't build beside the live Mii window\"));\n        }\n        if same && crate::engine::swap::body_bank::demand_waits(g.state, exit, build_owed) { return true; }\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "    let Some(live) = bank.observed.map(|(_, live)| live) else { return declined(format_args!(\"nothing observed live\")); };\n",
+     "new": "    let Some(live) = observed else { return declined(format_args!(\"nothing observed live\")); };\n    if exit && !exit_buildable(bank, members, observed) {\n        return declined(format_args!(\"no background build beside the live Mii window\"));\n    }\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "        owner, slot, &members.kinds()[..members.count()], members.special(), bodies, ready, over);\n    true\n}\n\n",
+     "new": "        owner, slot, &members.kinds()[..members.count()], members.special(), bodies, ready, over);\n    true\n}\n\n/// rc.14 Gap 3: whether an ordinary group of `members` can be built in the background beside this bank's live window\n/// (`background_build_eligible`; beside a live Mii window only with the owner's ordinary baseline and its hooks on).\nfn exit_buildable(bank: &Bank, members: Members, observed: Option<u32>) -> bool {\n    BACKGROUND_ENABLED.load(Ordering::Acquire) && (bank.identity.is_none() || BACKGROUND_MII_ENABLED.load(Ordering::Acquire))\n        && background_build_eligible(members, false, *bank.members, live_identity(bank), live_kirby_gate(observed),\n            BACKGROUND_PAIR_TAIL.load(Ordering::Acquire), BACKGROUND_X4.load(Ordering::Acquire)).is_ok()\n}\n\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "        if background_candidate(bank, bank.observed.map(|(_, kind)| kind)) != Some(group) { return; }\n",
+     "new": "        let observed = bank.observed.map(|(_, kind)| kind);\n        // rc.14 Gap 3: the group a press out of a live Mii waits for (`serving_group`'s `Serving::Build`) goes first.\n        if background_candidate(bank, observed) != Some(group) && !(bank.prefetch.is_none() && bank.construction.is_none()\n            && bank.background.is_none() && bank.groups.get(group).is_some_and(|g| background_owed(bank, g, observed))) { return; }\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "    -> Option<(usize, Serving)> {\n    let live = crate::engine::swap::body_bank::d_kirby1_live(live, crate::runtime::roster::g68_step::enabled());\n",
+     "new": "    -> Option<(usize, Serving)> {\n    let observed = live;\n    let live = crate::engine::swap::body_bank::d_kirby1_live(live, crate::runtime::roster::g68_step::enabled());\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "    let serving = serving_step(g.state, g.identity.is_none() || g.charinfo_published, rearm_due)?;\n    (serving == Serving::ObjectRearm || crate::engine::swap::body_bank::prefetch_admitted(live).is_ok()).then_some((group, serving))\n",
+     "new": "    // rc.14 Gap 3: beside a live Mii window an ordinary group serves the press only Built (the warm exit).\n    let exit_build = bank.identity.is_some() && g.identity.is_none() && bank.prefetch.is_none() && bank.construction.is_none()\n        && bank.background.is_none() && background_owed(bank, g, observed);\n    let serving = serving_step(g.state, g.identity.is_none() || g.charinfo_published, rearm_due, exit_build)?;\n    (matches!(serving, Serving::ObjectRearm | Serving::Build) || crate::engine::swap::body_bank::prefetch_admitted(live).is_ok())\n        .then_some((group, serving))\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "                    Some((group, Serving::ObjectRearm)) => Step::Rearm(group, *bank.groups[group].members, bank.alias),\n                    None => Step::Idle,\n",
+     "new": "                    Some((group, Serving::ObjectRearm)) => Step::Rearm(group, *bank.groups[group].members, bank.alias),\n                    Some((group, Serving::Build)) => Step::Background(group),\n                    None => Step::Idle,\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
     }
    ]
   },
@@ -21712,7 +21807,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "47536670245f2163c1b8796f8b324421e85888e0c52d619cf262e4081107d4d4",
+   "dest_sha256": "d1918bab415a3cced9e18feb53a3b91dff71ec48e42404986e91200d5d264417",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -22535,6 +22630,16 @@
      "old": "        if configuration.is_some_and(|c|super::body_bank::demand(current.binding.owner,kind,c)) {return false;}\n",
      "new": "        // The press waits; its group's CharInfo publication may run beside it (`State::publication_idle`).\n        let waits=configuration.is_some_and(|c|super::body_bank::demand(current.binding.owner,kind,c));\n        STATE.lock().demand=waits.then_some(request);\n        if waits {return false;}\n",
      "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "    if !reuse && request.replay().is_none() && !request.refresh_partners() && same_class.is_none() && !hat_change && !exit {\n",
+     "new": "    // Gap 3: a press out of the live Mii group (`exit`) too; it waits until its group is Built for the warm exit.\n    if !reuse && request.replay().is_none() && !request.refresh_partners() && same_class.is_none() && !hat_change {\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "        let waits=configuration.is_some_and(|c|super::body_bank::demand(current.binding.owner,kind,c));\n",
+     "new": "        let waits=configuration.is_some_and(|c|super::body_bank::demand(current.binding.owner,kind,c,exit));\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
     }
    ]
   },
@@ -23453,7 +23558,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "aa56b214976dfa5a0a397f89c98316abaa0b5c2f6d07e59f8ce7c501bc292940",
+   "dest_sha256": "ae009bf882fbec5676abbc7ab5067e74c55cec5ae6eeeb946769210caa6ae6b3",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -24261,6 +24366,16 @@
      "old": "        if configuration.is_some_and(|c|super::body_bank::demand(0,kind,c)) {return false;}\n",
      "new": "        // The press waits; its group's CharInfo publication may run beside it (`State::publication_idle`).\n        let waits=configuration.is_some_and(|c|super::body_bank::demand(0,kind,c));\n        STATE.lock().demand=waits.then_some(request);\n        if waits {return false;}\n",
      "reason": "rc.14 cycle fix 6: a press waiting for its own demand group lets that Mii group's CharInfo publish (mii_publish::publication_idle; Eden cf-p2-x2 #2418-#2468)"
+    },
+    {
+     "old": "    if !reuse && !request.refresh_partners() && same_class.is_none() && !hat_change && !exit {\n",
+     "new": "    // Gap 3: a press out of the live Mii group (`exit`) too; it waits until its group is Built for the warm exit.\n    if !reuse && !request.refresh_partners() && same_class.is_none() && !hat_change {\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "        let waits=configuration.is_some_and(|c|super::body_bank::demand(0,kind,c));\n",
+     "new": "        let waits=configuration.is_some_and(|c|super::body_bank::demand(0,kind,c,exit));\n",
+     "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
     }
    ]
   },

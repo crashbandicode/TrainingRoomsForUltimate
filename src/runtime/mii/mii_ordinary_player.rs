@@ -940,7 +940,8 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
     // rc.14 cycle fix (Design A): a cycle press onto a fighter no reachable group serves waits for its own group
     // (`body_bank::demand`), served like any group swap, instead of the Reload that tore down every resident fighter.
     // Phase 2a: a direct pick, a menu choice and a restore too.
-    if !reuse && !request.refresh_partners() && same_class.is_none() && !hat_change && !exit {
+    // Gap 3: a press out of the live Mii group (`exit`) too; it waits until its group is Built for the warm exit.
+    if !reuse && !request.refresh_partners() && same_class.is_none() && !hat_change {
         let kind=descriptor_kind(&descriptor);
         let configuration=match destination.target {
             mii_cycle::Target::Fighter(_)=>Some(None),
@@ -949,7 +950,7 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
             _=>None,
         };
         // The press waits; its group's CharInfo publication may run beside it (`State::publication_idle`).
-        let waits=configuration.is_some_and(|c|super::body_bank::demand(0,kind,c));
+        let waits=configuration.is_some_and(|c|super::body_bank::demand(0,kind,c,exit));
         STATE.lock().demand=waits.then_some(request);
         if waits {return false;}
     }
