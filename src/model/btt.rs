@@ -222,10 +222,16 @@ impl Btt {
 
     /// What to draw: each unbroken target, the break animations, the cursor (the pools of `panes::EGG_POOLS`).
     pub fn look(&self) -> [Option<([f32; 2], EggLook)>; LOOKS] {
-        let live = (0..self.n).filter(|i| self.broken >> i & 1 == 0).map(|i| (self.at[i], EGG_WHOLE));
-        let cursor = self.cursor().map(|c| (c, EggLook { picture: EggPicture::Cursor, ..EGG_WHOLE }));
+        let mut pointer = EGG_WHOLE;
+        pointer.picture = EggPicture::Cursor;
+        let live = (0..self.n).filter(|i| self.broken >> i & 1 == 0);
+        let whole = live.map(|i| (self.at[i], EGG_WHOLE));
+        let bursts = self.bursts.into_iter().flatten().map(eggs::burst);
+        let cursor = self.cursor().map(|c| (c, pointer));
         let mut out = [None; LOOKS];
-        out.iter_mut().zip(live.chain(self.bursts.into_iter().flatten().map(eggs::burst)).chain(cursor)).for_each(|(slot, pic)| *slot = Some(pic));
+        for (slot, pic) in out.iter_mut().zip(whole.chain(bursts).chain(cursor)) {
+            *slot = Some(pic);
+        }
         out
     }
 
@@ -283,7 +289,8 @@ impl Btt {
     }
 
     fn ready(&mut self) {
-        (self.phase, self.broken, self.bursts, self.frames, self.left, self.still) = (Phase::Ready, 0, [None; 2], 0, 0, false);
+        (self.phase, self.broken, self.bursts) = (Phase::Ready, 0, [None; 2]);
+        (self.frames, self.left, self.still) = (0, 0, false);
     }
 
     /// The stage in play (every pass): a new one keeps this stage's layout for the session and takes its own, empty if it has
@@ -459,7 +466,8 @@ impl Btt {
                 self.frames += u32::from(tick);
                 for i in 0..self.n {
                     if self.broken >> i & 1 == 0 && hit(self.at[i]) {
-                        (self.broken, self.bursts) = (self.broken | 1 << i, [Some((self.at[i], 0)), self.bursts[0]]);
+                        self.broken |= 1 << i;
+                        self.bursts = [Some((self.at[i], 0)), self.bursts[0]];
                     }
                 }
                 if self.broken.count_ones() as usize == self.n {
@@ -518,7 +526,8 @@ impl Btt {
             Phase::Ready | Phase::Running => write!(out, "Targets {got}/{n}   {m}:{s:02}.{c:02}"),
             Phase::Done => {
                 let (bm, bs, bc) = clock(self.top);
-                write!(out, "Done! {n} in {m}:{s:02}.{c:02} (best {bm}:{bs:02}.{bc:02})")
+                write!(out, "Done! {n} in {m}:{s:02}.{c:02} ")?;
+                write!(out, "(best {bm}:{bs:02}.{bc:02})")
             }
         }
     }
@@ -526,15 +535,18 @@ impl Btt {
 
 /// A line of the Saved layouts list: `Slot 2 · 6 targets` or `Slot 3 · empty`. The plugin has no calendar date to show.
 pub fn slot_label(index: usize, slot: Option<&Slot>) -> String {
-    match slot {
-        None => format!("Slot {} · empty", index + 1),
-        Some(s) => format!("Slot {} · {} target{}", index + 1, s.n, if s.n == 1 { "" } else { "s" }),
+    let k = index + 1;
+    match slot.map(|s| s.n) {
+        None => format!("Slot {k} · empty"),
+        Some(1) => format!("Slot {k} · 1 target"),
+        Some(n) => format!("Slot {k} · {n} targets"),
     }
 }
 
 /// The list's footer: its first line (the focused row) and this screen's buttons.
 pub fn layouts_footer(library_footer: &str) -> String {
-    format!("{}\nA Load · Y Delete · B Return", library_footer.lines().next().unwrap_or(""))
+    let first = library_footer.lines().next().unwrap_or("");
+    format!("{first}\nA Load · Y Delete · B Return")
 }
 
 /// The camera mode that is Training's Fixed camera (`cpu::tech::CAMERA_MODE_FIXED`).

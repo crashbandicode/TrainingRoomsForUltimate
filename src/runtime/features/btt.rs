@@ -54,7 +54,7 @@ pub static CACHE: Published<(i32, Slots)> = Published::new((NONE, [None; SLOTS])
 
 /// Every settings publish: whether Break the Targets is On.
 pub fn publish(snapshot: &Snapshot) {
-    ON.store(snapshot.get(btt::ROW).is_some_and(|row| row.iter().position(|v| *v != 0) == Some(1)), Ordering::Release);
+    ON.store(btt::on(snapshot)[1], Ordering::Release);
 }
 
 /// The menu opened (the menu worker; atomics only).
