@@ -1,5 +1,6 @@
 //! Worker-to-game setup transactions. The only game-owned lock is taken by
 //! service; UI reads a small facts copy and moves already-allocated jobs.
+use crate::editors::setups::Res;
 use crate::engine::mii::lifetime::Configuration;
 pub(crate) use crate::model::state::setup_transaction::{Target, Ticket};
 use crate::model::state::{
@@ -114,11 +115,7 @@ fn prepare(record: &SetupRecord) -> Result<Prepared<Configuration>, &'static str
     Prepared::new(record, miis).map_err(|_| "Setup contains invalid saved fighter values")
 }
 
-pub(crate) fn validate_selection(
-    target: Target,
-    record: &SetupRecord,
-    restore: bool,
-) -> Result<(), &'static str> {
+pub(crate) fn validate_selection(target: Target, record: &SetupRecord, restore: bool) -> Res<()> {
     prepare(record)?
         .validate(target, &facts()?, restore)
         .map_err(Refusal::message)
@@ -150,11 +147,7 @@ pub(crate) fn request_snapshot(target: Target) -> Result<Ticket, &'static str> {
     )
 }
 
-pub(crate) fn request_bind(
-    target: Target,
-    record: &SetupRecord,
-    restore: bool,
-) -> Result<Ticket, &'static str> {
+pub(crate) fn request_bind(target: Target, record: &SetupRecord, restore: bool) -> Res<Ticket> {
     let prepared = prepare(record)?;
     prepared
         .validate(target, &facts()?, restore)

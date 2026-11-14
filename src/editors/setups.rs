@@ -2,24 +2,17 @@
 //! transaction ownership remain in the states provider; files use SetupLibrary.
 use crate::model::state::setup::{SetupLibrary, SetupRecord};
 
+/// A provider's answer: the value, or the refusal text.
+pub type Res<T> = Result<T, &'static str>;
+
 /// Value-only boundary implemented by the native states facade.
 pub trait Provider {
     type Target: Copy;
     type Ticket: Copy;
-    fn snapshot(&mut self, target: Self::Target) -> Result<Self::Ticket, &'static str>;
-    fn validate(
-        &mut self,
-        target: Self::Target,
-        record: &SetupRecord,
-        restore: bool,
-    ) -> Result<(), &'static str>;
-    fn bind(
-        &mut self,
-        target: Self::Target,
-        record: &SetupRecord,
-        restore: bool,
-    ) -> Result<Self::Ticket, &'static str>;
-    fn poll(&mut self, ticket: Self::Ticket) -> Option<Result<Reply, &'static str>>;
+    fn snapshot(&mut self, target: Self::Target) -> Res<Self::Ticket>;
+    fn validate(&mut self, target: Self::Target, record: &SetupRecord, restore: bool) -> Res<()>;
+    fn bind(&mut self, target: Self::Target, record: &SetupRecord, restore: bool) -> Res<Self::Ticket>;
+    fn poll(&mut self, ticket: Self::Ticket) -> Option<Res<Reply>>;
 }
 
 pub enum Reply {
@@ -109,10 +102,7 @@ impl<T: Copy, K: Copy> Setups<T, K> {
 
     /// On refusal the selection stays available for the caller to retry or discard.
     /// Once accepted, the provider owns it and repeated close cannot post it.
-    pub fn close_menu<P: Provider<Target = T, Ticket = K>>(
-        &mut self,
-        provider: &mut P,
-    ) -> Result<(), &'static str> {
+    pub fn close_menu<P: Provider<Target = T, Ticket = K>>(&mut self, provider: &mut P) -> Res<()> {
         let Some(selected) = self.selection.as_ref() else {
             return Ok(());
         };
@@ -127,10 +117,7 @@ impl<T: Copy, K: Copy> Setups<T, K> {
 
     /// Poll independently of panel visibility. A cancelled snapshot is retired
     /// without reopening its naming screen; errors still reach the caller.
-    pub fn poll<P: Provider<Target = T, Ticket = K>>(
-        &mut self,
-        provider: &mut P,
-    ) -> Option<Result<bool, &'static str>> {
+    pub fn poll<P: Provider<Target = T, Ticket = K>>(&mut self, provider: &mut P) -> Option<Res<bool>> {
         let (ticket, present) = match self.job.as_ref()? {
             Job::Snapshot { ticket, present } => (*ticket, *present),
             Job::Bind(ticket) => (*ticket, false),

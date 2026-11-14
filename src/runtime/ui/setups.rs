@@ -1,6 +1,6 @@
 //! Setup screens on the menu worker. The states facade owns native work.
 use super::external;
-use crate::editors::setups::{Provider, Reply, Setups};
+use crate::editors::setups::{Provider, Reply, Res, Setups};
 use crate::engine::macro_ui::macro_panel::{LibraryRow, View};
 use crate::model::menu::{input::Button, table::Editor, Menu};
 use crate::model::state::setup::{SetupLibrary, SetupRecord};
@@ -11,26 +11,16 @@ struct Native;
 impl Provider for Native {
     type Target = native::Target;
     type Ticket = native::Ticket;
-    fn snapshot(&mut self, target: Self::Target) -> Result<Self::Ticket, &'static str> {
+    fn snapshot(&mut self, target: Self::Target) -> Res<Self::Ticket> {
         native::request_snapshot(target)
     }
-    fn validate(
-        &mut self,
-        target: Self::Target,
-        record: &SetupRecord,
-        restore: bool,
-    ) -> Result<(), &'static str> {
+    fn validate(&mut self, target: Self::Target, record: &SetupRecord, restore: bool) -> Res<()> {
         native::validate_selection(target, record, restore)
     }
-    fn bind(
-        &mut self,
-        target: Self::Target,
-        record: &SetupRecord,
-        restore: bool,
-    ) -> Result<Self::Ticket, &'static str> {
+    fn bind(&mut self, target: Self::Target, record: &SetupRecord, restore: bool) -> Res<Self::Ticket> {
         native::request_bind(target, record, restore)
     }
-    fn poll(&mut self, ticket: Self::Ticket) -> Option<Result<Reply, &'static str>> {
+    fn poll(&mut self, ticket: Self::Ticket) -> Option<Res<Reply>> {
         native::poll(ticket).map(|reply| {
             reply.map(|reply| match reply {
                 native::Outcome::Snapshot(record) => Reply::Snapshot(Box::new(record)),
