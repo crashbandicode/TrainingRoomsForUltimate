@@ -347,6 +347,9 @@ pub struct SetupEntry {
     pub player_kind: i32,
     pub cpu_kind: i32,
     pub stage_id: Option<i32>,
+    /// Where each fighter stands, to whole units (the row's "spots").
+    pub player_x: i32,
+    pub cpu_x: i32,
 }
 
 /// Every failure the setup library reports.
@@ -412,6 +415,8 @@ impl Record for SetupRecord {
             player_kind: self.player.fighter_kind,
             cpu_kind: self.cpu.fighter_kind,
             stage_id: self.stage_id,
+            player_x: self.player.x.round() as i32,
+            cpu_x: self.cpu.x.round() as i32,
         }
     }
 }

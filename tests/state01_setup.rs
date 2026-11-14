@@ -172,6 +172,8 @@ fn library_round_trip_listing_and_stable_ids() {
             player_kind: 0x07,
             cpu_kind: 0x48,
             stage_id: Some(0x40),
+            player_x: -13,
+            cpu_x: 30,
         }]
     );
     assert!(listing.skipped.is_empty());

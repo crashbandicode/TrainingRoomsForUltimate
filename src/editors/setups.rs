@@ -2,7 +2,7 @@
 //! transaction ownership remain in the states provider; files use SetupLibrary.
 use crate::engine::stages::lobby_stages::STAGES;
 use crate::model::menu::input::Button;
-use crate::model::state::setup::{SetupLibrary, SetupRecord};
+use crate::model::state::setup::{SetupEntry, SetupLibrary, SetupRecord};
 
 /// A provider's answer: the value, or the refusal text.
 pub type Res<T> = Result<T, &'static str>;
@@ -28,6 +28,13 @@ pub fn list_footer(footer: &str) -> String {
 pub fn stage_name(id: Option<i32>) -> &'static str {
     let found = STAGES.iter().find(|(stage, _)| Some(*stage as i32) == id);
     found.map_or("unknown stage", |(_, name)| *name)
+}
+
+/// A list row's full text, shown in the footer under the cursor: name, fighters, stage and where each fighter stands.
+pub fn row_label(entry: &SetupEntry, fighter: impl Fn(i32) -> String) -> String {
+    let (p1, cpu) = (fighter(entry.player_kind), fighter(entry.cpu_kind));
+    let (stage, x) = (stage_name(entry.stage_id), (entry.player_x, entry.cpu_x));
+    format!("{} · {p1} / {cpu} · {stage} · spots {} / {}", entry.name, x.0, x.1)
 }
 
 /// Keys the list swallows: X has no job there (the panel would close and leave a rename id behind), and A and Y have none on an empty list.
@@ -210,6 +217,7 @@ mod tests {
     use super::*;
     use crate::engine::macro_ui::macro_panel::{LibraryRow, MacroUi};
     use crate::model::state::{record::SavedState, setup::FighterSetup};
+    use crate::model::store::Record;
     type Target = (u64, usize, bool);
     #[derive(Default)]
     struct Fake {
@@ -338,6 +346,18 @@ mod tests {
         assert!(!go.contains("bind") && !load.contains("bind"));
     }
 
+    fn a_row_names_the_fighters_the_stage_and_both_spots() {
+        let entry = SetupEntry { id: "corner-trap".into(), name: "Corner trap".into(), player_kind: 0, cpu_kind: 0x34, stage_id: Some(308), player_x: -40, cpu_x: 35 };
+        let fighter = |kind: i32| if kind == 0 { "Mario".to_owned() } else { "Little Mac".to_owned() };
+        assert_eq!(row_label(&entry, fighter), "Corner trap · Mario / Little Mac · Training · spots -40 / 35");
+        let mut saved = SavedState::never_saved();
+        saved.fighter_kind = 0;
+        saved.x = -39.6;
+        let player = FighterSetup::of_saved(&saved);
+        let record = SetupRecord::new("Setup", "13.0.5", Some(0), player.clone(), player).unwrap();
+        assert_eq!((record.summary("setup").player_x, record.summary("setup").cpu_x), (-40, -40), "the spots round to whole units");
+    }
+
     fn a_saved_stage_id_has_the_lobby_catalogs_name() {
         assert_eq!((stage_name(Some(308)), stage_name(Some(0))), ("Training", "Battlefield"));
         assert_eq!((stage_name(None), stage_name(Some(-5))), ("unknown stage", "unknown stage"));
@@ -358,6 +378,7 @@ mod tests {
             ("the_list_footer_shows_the_keys_in_two_lines_and_a_page_note_only_when_it_matters", the_list_footer_shows_the_keys_in_two_lines_and_a_page_note_only_when_it_matters as fn()),
             ("x_is_swallowed_in_the_list_and_a_y_in_an_empty_one", x_is_swallowed_in_the_list_and_a_y_in_an_empty_one as fn()),
             ("the_chosen_notes_say_what_will_happen_in_plain_words", the_chosen_notes_say_what_will_happen_in_plain_words as fn()),
+            ("a_row_names_the_fighters_the_stage_and_both_spots", a_row_names_the_fighters_the_stage_and_both_spots as fn()),
             ("a_saved_stage_id_has_the_lobby_catalogs_name", a_saved_stage_id_has_the_lobby_catalogs_name as fn()),
             ("the_setup_screens_name_the_bound_save_not_a_slot", the_setup_screens_name_the_bound_save_not_a_slot as fn()),
             ("library_selection_freezes_target_and_only_actual_close_binds_once", library_selection_freezes_target_and_only_actual_close_binds_once as fn()),

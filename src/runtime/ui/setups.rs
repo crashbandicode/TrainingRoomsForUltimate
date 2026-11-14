@@ -1,6 +1,6 @@
 //! Setup screens on the menu worker. The states facade owns native work.
 use super::external;
-use crate::editors::setups::stage_name;
+use crate::editors::setups::row_label;
 use crate::editors::setups::{chosen, list_footer, list_ignores, Provider, Reply, Res, Setups};
 use crate::engine::macro_ui::macro_panel::{LibraryRow, View};
 use crate::model::menu::{input::Button, table::Editor, Menu};
@@ -86,14 +86,8 @@ impl Ui {
             .entries
             .into_iter()
             .map(|entry| LibraryRow {
+                label: row_label(&entry, named_macros::fighter_label),
                 id: entry.id,
-                label: format!(
-                    "{} · {} / {} · {}",
-                    entry.name,
-                    named_macros::fighter_label(entry.player_kind),
-                    named_macros::fighter_label(entry.cpu_kind),
-                    stage_name(entry.stage_id)
-                ),
             })
             .collect();
         named_macros::open_external_library(
