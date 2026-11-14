@@ -1,6 +1,7 @@
-"""rc.14 recfix Eden rows (recfix lane, 2026-11-14): the two Recording fixes of `rc14/recfix`, as one row, `t-recfix`.
-NOT RUN: written for integration's final pass; the lane booted no Eden. Start: Training, P1 and the CPU the boot rows'
-fighters (g-training). Steps follow gna_p2_rec / gna_p2_l4b (their helpers, same package folder).
+"""rc.14 recfix Eden rows (recfix lane, 2026-11-14): `t-recfix` (setup, run, restore: the Start save switch and the P1 CPU
+Control refusal of `rc14/recfix`) and `t-recfix-slot` (slot_setup, slot_run, slot_restore: Playback Slot 1 on Mash).
+NOT RUN: written for integration's final pass; the lane booted no Eden. Start: Training, P1 Mario and CPU Mario (g-training).
+Steps follow gna_p2_rec / gna_p2_l4b (their helpers, same package folder).
 
   R1 Start save On (the default): Record a walk and a jab from the reset spot (Record writes the start save), walk P1
      away, Play (ZR + D-pad Left): exactly one `screen=playback role=player warp=1`.
@@ -14,8 +15,15 @@ fighters (g-training). Steps follow gna_p2_rec / gna_p2_l4b (their helpers, same
      `... Play on Player 1 is off`, no `screen=playback role=player`.
   R5 P1 CPU Control Off again: Record works (recording=1 then 0, one more macro), so R4 was the refusal and not a
      broken chord.
-Defect 2 (Playback Slot on Mash) has no row here: it is gif-lane-4's `p2-playback-slot` take (gna_p2_l4b.py:pslot); the
-decisive lines are `cpu_event command_query ... queued=` during the CPU's hitstun and `playback_mash slot=`.
+
+  Row t-recfix-slot, Defect 2 (the Playback Slot on Mash did not play on the Ally, rc.13 `2a667381`; rc.12 and rc.13
+  `7d7b74c9` passed it on Linux):
+  S1 The same fighters on both sides are asserted first (state pos `kind=`): the Ally's third run, whose own capture shows a
+     Meta Knight CPU, said Mario. S2 `rec.hitstun_setup`: a jump and a neutral air recorded on P1, Playback slot Right on its
+     screen, the menu closed, Mash = Playback Slot 1 by live reload AFTER the menu (the docs lane's order). S3 P1's forward
+     smash: `playback_mash slot=0` within 5 s, with the diag's `cpu_event command_query ... queued=` lines kept, so a miss
+     says where it stopped: `queued=false latched=false` means Mash never reached the queue, `queued=true` and no
+     `playback_mash` means the glue after the queue (recorder.rs `mash_start`).
 """
 import re
 import time
@@ -184,3 +192,50 @@ def run(ctx):
 def restore(ctx):
     fx._live_set(ctx, p1_cpu_control=OFF_ON['off'])
     return {'p1_cpu_control': 'off'}
+
+
+def _kinds(ctx):
+    """Both bodies' fighter kinds from one diag-pos.req dump."""
+    tail = cov.diag(ctx)
+    (cov.card(ctx) / 'diag-pos.req').write_text('1\n')
+    seen = {}
+    deadline = time.time() + 6
+    while len(seen) < 2 and time.time() < deadline:
+        for m in POS.finditer(tail.text()):
+            seen['player' if int(m.group(1)) == 0 else 'cpu'] = int(m.group(2))
+        time.sleep(0.2)
+    if len(seen) < 2:
+        raise RuntimeError('harness: no state pos dump for both bodies')
+    return seen
+
+
+def slot_setup(ctx):
+    kinds = _kinds(ctx)
+    if kinds['player'] != kinds['cpu']:
+        raise RuntimeError('harness: P1 and the CPU are different fighters (%s): the macro and the CPU must match' % kinds)
+    out = rec.hitstun_setup(ctx)
+    out['kinds'] = kinds
+    return out
+
+
+def slot_run(ctx):
+    t0, out = _begin(ctx)
+    problems = []
+    out['kinds'] = _kinds(ctx)
+    seq = hs.diag_mark(ctx)
+    rec._smash(ctx, t0, out, 'smash')
+    lines = [t for _, _, t in hs.diag_since(ctx, seq)]
+    out['command_query'] = [t[:240] for t in lines if 'command_query' in t][:24]
+    out['mash_lines'] = [t[:200] for t in lines if 'playback_mash' in t or 'Playback Slot is empty' in t][:6]
+    out['smash_shot'] = str(ctx.shot('recfix-slot-played'))
+    if not out.get('smash_start'):
+        queued = [t for t in out['command_query'] if 'queued=true' in t]
+        problems.append('the CPU did not play Playback Slot 1 after the hit (queue seen: %s)' % ('yes' if queued else 'no'))
+    if out.get('smash_empty'):
+        problems.append('the slot reads empty although the macro was assigned: %s' % out['smash_empty'])
+    return _finish(ctx, 'rc14-recfix-slot', out, problems)
+
+
+def slot_restore(ctx):
+    fx._live_set(ctx, mash_state=[0] * 30)
+    return {'mash_state': 'cleared'}

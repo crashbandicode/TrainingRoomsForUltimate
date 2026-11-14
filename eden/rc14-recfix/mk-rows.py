@@ -22,13 +22,23 @@ for r in d['rows']:
                    'pilot plugin): Record shows "P1 is controlled by an AI: recording is off" and writes nothing, Play on '
                    'Player 1 shows "...Play on Player 1 is off" and does not play; R5 Off again: Record writes a macro.')
     rows.append(t)
-if [r['id'] for r in rows] != ['g-gdb-on', 'g-load', 'g-gdb-attached', 'g-training', 't-recfix', 'z-boot']:
+    slot = copy.deepcopy(r)
+    slot['id'], slot['group'], slot['budget_min'] = 't-recfix-slot', 'rc14-recfix', 6
+    slot['steps'] = [{'run': 'recfix.py:slot_setup', 'check': True}, {'run': 'recfix.py:slot_run', 'check': True},
+                     {'run': 'recfix.py:slot_restore', 'check': True}]
+    slot['expect'] = ('rc.14 recfix, Defect 2: P1 and the CPU the same fighter; a jump and a neutral air recorded on P1, '
+                      'Playback slot Right on its screen, Mash = Playback Slot 1 (live, after the menu); the forward smash: '
+                      '`playback_mash slot=0` follows, and the cpu_event command_query lines are kept either way.')
+    rows.append(slot)
+if [r['id'] for r in rows] != ['g-gdb-on', 'g-load', 'g-gdb-attached', 'g-training', 't-recfix', 't-recfix-slot', 'z-boot']:
     raise SystemExit('unexpected rows: %s' % [r['id'] for r in rows])
 d['rows'] = rows
 d['setup'] = [s for s in d['setup'] if 'p2-staling-sbs' not in s['state']] + [
     {'state': '[t-recfix] a macro recorded from the reset spot (its start save is made by Record)', 'via': 'record',
      'ref': 'recfix.py:setup (gna_p2_rec._record, one bounded recording)'},
-    {'state': '[t-recfix] P1 CPU Control On, then Off', 'via': 'hook', 'ref': 'recfix.py:run (cov._page_row, A on the row)'}]
+    {'state': '[t-recfix] P1 CPU Control On, then Off', 'via': 'hook', 'ref': 'recfix.py:run (cov._page_row, A on the row)'},
+    {'state': '[t-recfix-slot] a macro in Playback Slot 1 and Mash = Playback Slot 1', 'via': 'record',
+     'ref': 'recfix.py:slot_setup (gna_p2_rec.hitstun_setup: one bounded recording, the menu, fx._live_set)'}]
 base = os.path.dirname(os.path.abspath(dst))
 missing = [k for k, v in d['segments'].items() if not os.path.exists(os.path.join(base, v['file']))]
 for need in ('menu-open', 'menu-close', 'reset-center'):
