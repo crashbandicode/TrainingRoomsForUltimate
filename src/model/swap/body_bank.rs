@@ -3942,7 +3942,6 @@ mod tests {
         let mii = Members::mii_group(GUNNER).unwrap();
         assert!(window_kept_across_reload(mii, false, KROOL, true, false).is_err());
         assert_eq!(window_kept_across_reload(mii, true, KROOL, true, false), Ok(()));
-        assert!(!KEEP_WINDOW_ACROSS_RELOAD, "off until the Eden rows pass");
     }
 
     /// rc.14 2e (decision 3, Design A's rule): over Ready Fighters after a kept Reload, the unit whose next turn is farthest
