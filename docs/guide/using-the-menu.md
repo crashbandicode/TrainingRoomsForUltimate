@@ -76,7 +76,11 @@ Each row has one kind of control. A list, checklist or editor has its own footer
 - **Reset page to defaults** is the last line of every page. A on it asks "Reset this page to your saved defaults?":
   A resets, B cancels. Only that page changes. The menu shortcuts stay as they are.
 
-<!-- CAPTURE-REQUEST v08-defaults: a GIF of the defaults workflow: a setting at A, X saves your defaults, change it to B, Y restores A; then change two rows and Reset page to defaults restores them while another page stays unchanged. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![Saves > Mirroring: X saves None as your default, Right changes it to Alternate, Y puts it back to None](../media/rc13-your-defaults.gif)<br>
+*Mirroring reads None. X saves every setting as your defaults, Right changes it to Alternate, and Y on the row puts it back to None. Eden, rc.13 (untested on hardware).*
+
+![Saves: Auto-load on death On and Mirroring Alternate; Reset page to defaults asks, A resets both; the CPU page keeps its SDI Strength High](../media/rc13-defaults-reset-page.gif)<br>
+*Two rows changed on Saves. Up to Reset page to defaults, A asks, A resets: both rows are back, and SDI Strength on the CPU page, set to High, is unchanged. Eden, rc.13 (untested on hardware).*
 
 The Recording page uses some of these buttons for its own lists: there X and Y don't save or reset, and ZR switches
 between the Player and CPU views. See [Recording](../menu/recording.md).

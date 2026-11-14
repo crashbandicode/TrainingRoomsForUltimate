@@ -402,7 +402,10 @@ Ready Fighters."
 Every entry also needs Cycle Preload above Off, Preload on Fighters or Both and Ready Fighter Bodies above Off; the
 list doesn't grey them for that.
 
-<!-- CAPTURE-REQUEST v05-swap-groups: a still of the PT / Aegis groups row with its "3 free Ready Fighters" help line, and a short group Off then On clip for each Swap groups entry not yet shown (the Ice Climbers pair bank, pair groups and pair group look alike: label each). See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![Fighters & Stages, Loading: the Swap groups row is focused and its help line reads: PT / Aegis groups need 3 free Ready Fighters](../media/rc13-swap-groups-help.png)<br>
+*The Swap groups row on the Loading section, with Ready Fighters at 2: the help line reads "PT / Aegis groups need 3 free Ready Fighters." Eden, rc.13 (untested on hardware).*
+
+<!-- CAPTURE-REQUEST v05-swap-groups: a short group Off then On clip for each Swap groups entry not yet shown (the Ice Climbers pair bank, pair groups and pair group look alike: label each). See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
 ## Practice games
 

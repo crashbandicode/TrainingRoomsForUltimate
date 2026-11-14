@@ -91,6 +91,9 @@ don't turn the page while a file's screen is open.
 | Edit chain, Edit combos | Opens the numbered picker. |
 | Delete | Removes the file at once, without asking. |
 
+![A save's own screen: Duplicate makes the copy Save 1 (the count 13 to 14); on the copy, Delete removes it (back to 13)](../media/rc13-save-duplicate-delete.gif)<br>
+*A on the save Center opens its screen. A on Duplicate adds a copy, and the left-hand count goes from 13 to 14. B to the list, A on the copy ("Save 1"), Down three times to Delete, A: it is gone and the count is 13 again. Each press is named in a box. Eden, rc.13 (untested on hardware).*
+
 **The numbered picker** (*+ New chain* and *Edit chain*; *+ New sequence* and *Edit combos* for combos) lists your
 recordings, or your combos (a chain can't hold a chain). A gives the one under the cursor the next number, R takes a
 number off, B finishes. A new chain or sequence then asks for a name on the Switch keyboard. An empty name, or an online

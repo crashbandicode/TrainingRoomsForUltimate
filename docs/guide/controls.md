@@ -123,7 +123,8 @@ While an AI plays Player 1 (the CPU pilot), these are refused with a notice:
 
 More: CPU › [Player 1 control](../menu/cpu.md#player-1-control).
 
-<!-- CAPTURE-REQUEST v17-pilot-refusal: one still of a refusal notice while the CPU pilot plays Player 1, for example "P1 is controlled by an AI: recording is off". See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![The notice "P1 is controlled by an AI: recording is off" on screen while the CPU pilot plays Player 1, whose tag reads CPU Lv3](../media/rc13-pilot-refusal.png)<br>
+*While the CPU pilot plays Player 1, Record shows "P1 is controlled by an AI: recording is off". Eden, rc.13 (untested on hardware).*
 
 ## Editing the shortcuts file
 

@@ -36,7 +36,11 @@ Waiting Room and Training have one form, and their tiles show no tag.
 Each stage keeps one form. Change Stage, Lobby Stages and Training Stage Rotation all use it, so Y on either grid
 changes it for both.
 
-<!-- CAPTURE-REQUEST v19-stage-forms: a still of the Change Stage grid with the [N], [Ω] and [BF] tags and the footer "Form: Omega" after Y; if it claims changed geometry, the same stage Normal then Ω, with the menu closed and the flat geometry visible. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![The Change Stage grid with Battlefield on its Omega form: the tile reads [Ω] and the footer reads Form: Omega](../media/rc13-stage-forms.png)<br>
+*Y on Battlefield: the tile reads [Ω] and the footer "Form: Omega". Eden, rc.13 (untested on hardware).*
+
+![Change Stage on Battlefield [N] loads it with its platforms; Y to Omega and A loads the same stage flat](../media/rc13-stage-forms.gif)<br>
+*The same stage, two forms. A on Battlefield [N] loads it with its platforms; Y changes the tile to [Ω] and A loads it flat (both loads are cut). Each press is named in a box. Eden, rc.13 (untested on hardware).*
 
 ## Lobby Stages
 

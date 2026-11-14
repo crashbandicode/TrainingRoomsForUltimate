@@ -4,7 +4,8 @@ The frame strip shows the last 60 game frames, about one second, for you and the
 timing of your follow-up. It sits at the top of the screen in Training and in waiting-room practice. It replaces the old
 15-row input log.
 
-<!-- CAPTURE-REQUEST v09-strip-labelled: an annotated still of one real strip that labels the two fighter lanes, an input chip, ADVANTAGE, LINK, INPUT and LAST. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![A frame strip just after a jab into a jab, labelled: the input chips, Player 1 lane, CPU lane, stick row, window bar, ADVANTAGE, LINK, INPUT and LAST](../media/rc13-frame-strip-labelled.png)<br>
+*The frame strip just after a jab into a jab, labelled. Eden, rc.13 (untested on hardware).*
 
 ## Turning it on and off
 

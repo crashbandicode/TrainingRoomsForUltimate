@@ -149,4 +149,5 @@ move, not one fighter's moves, so a combo recorded on one fighter can be practis
 - **Versions:** files written by 0.2.0-rc.4 and later all have `schema_version` 1. Later fields are optional, so an
   older build reads a newer file and ignores what it does not know.
 
-<!-- CAPTURE-REQUEST v20-combo-library: a still of the COMBOS list after a combo file was copied in, showing its name and "Recorded on" fighter. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![Recording > Combos & Sequences: the COMBOS list with Jab jab, Luigi jabs (Recorded on Luigi), Jab nair and Nair nair](../media/rc13-combo-library.png)<br>
+*COMBOS after combo files were copied into `combos/`: each lists its name and "Recorded on" fighter, and the one made on Luigi says so. Eden, rc.13 (untested on hardware).*
