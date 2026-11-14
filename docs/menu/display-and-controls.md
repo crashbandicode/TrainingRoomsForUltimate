@@ -20,17 +20,41 @@ either way.
 
 ### Hitbox Visualization
 
-On draws the fighters' boxes in colour. It works in Training, and on the two practice fighters in a waiting room.
+Draws the fighters' boxes in colour. It is a checklist: tick what you want to see, and each item draws on its own, so
+any mix works, such as hurtboxes alone, or hitboxes with their launch angles. It works in Training, and on the two
+practice fighters in a waiting room.
 
-- **Values:** On, Off
-- **Default:** Off
-- **How:** A, Left or Right flips it.
+- **Values:** Hitboxes, Grab boxes, Hurtboxes, Frame data colours, Launch angles.
+- **Default:** none ticked: nothing is drawn.
+- **How:** A opens the checklist; A ticks, ZL ticks all or none, B goes back. The row shows how many are ticked, such
+  as "3 of 5".
 
-| Box | Colour | What it is |
-| --- | --- | --- |
-| Hitbox | Each hitbox of a move gets its own colour; the first is red | The attack |
-| Grab box | Always magenta, a colour no hitbox uses | The grab |
-| Hurtbox | Yellow | Where a fighter can be hit |
+A settings file from before this checklist keeps what it showed: On ticks Hitboxes, Grab boxes and Hurtboxes, and Off
+ticks none.
+
+| Box | Colour | With Frame data colours ticked | What it is |
+| --- | --- | --- | --- |
+| Hitbox | Each hitbox of a move gets its own colour; the first is red | Red when strong, pink when weak | The attack |
+| Grab box | Always magenta, a colour no hitbox uses | Purple | The grab |
+| Hurtbox | Yellow | White; blue while nothing can hit it; green while hits do no damage | Where a fighter can be hit |
+
+**Frame data colours** recolours whatever is ticked in the colours of Ultimate Frame Data. A hitbox is strong when it
+is the strongest one out on that frame, such as a sword's tip, and weak when another hitbox out on the same frame is
+stronger, or when it is weaker than the strongest hitbox earlier in the same move, as the late frames of a knee are.
+A hitbox that cannot be ranked, such as a jab's single hitbox, is red. A hurtbox is blue during a spot dodge or a roll,
+and on the revival platform; it is green for the moments after leaving the platform. The plugin reads all of this from
+the game every frame, so no list of fighters is needed. Ticked alone, it draws nothing.
+
+A windbox, a hitbox that pushes without doing damage, keeps the hit colours. The game does not mark windboxes, and no
+rule from its attack data tells them apart from other hits that do no damage, such as Jigglypuff's Sing.
+
+**Launch angles** draws a white line inside each hitbox, pointing where the hit sends the fighter it lands on. The line
+mirrors when the attacker turns around. Two dashes mean the game picks the angle when the hit lands, from how hard it
+hits and whether the target is on the ground; they point at 38 degrees, where such a hit sends a fighter in the air.
+A dot means the hit carries the fighter along with the attack. With Hitboxes not ticked, the lines are drawn alone.
+
+<!-- CAPTURE-REQUEST hb-legend-v01: Hitbox Visualization with Hitboxes, Grab boxes, Hurtboxes and Frame data colours ticked, 1/4 speed. The CPU spot-dodging next to a standing Player 1: the CPU's hurtboxes blue while it dodges, white otherwise. Player 1 walks off the stage with Respawn on platform On: blue on the platform, green for the moments after it. Mario's grab: a purple grab box. Marth's forward smash: the tip red, the blade pink. See artifacts/rc14-hb-legend/. -->
+<!-- CAPTURE-REQUEST hb-legend-v02: Hitboxes and Launch angles ticked, 1/4 speed: Ganondorf's up tilt (the windbox lines, then the kick's dashes and its 70-degree line) facing right then left; Mario's jab (dashes). Then Hurtboxes alone: only the hurtboxes. See artifacts/rc14-hb-legend/. -->
 
 A round box is a disc; a long one, such as a sword's hitbox or an arm's hurtbox, is one pill. The shapes are flat and
 drawn over the stage and the fighters. While the camera pans they trail by a frame or two.
@@ -72,6 +96,7 @@ and hurtboxes keep their colours. It needs Hitbox Visualization On. Off gives ea
 
 <!-- CAPTURE-REQUEST spots-v01: Marth's forward smash at 1/4 speed with Hitbox Visualization On and Frame data colours Off, then On: the tip red and the blade pink on the early frames, the blade pink on the later frames. Captain Falcon's forward air: red on the knee's sweet frames, pink after. Same setup both times. See artifacts/rc14-spots/. -->
 <!-- CAPTURE-REQUEST v18-hitbox-legend: a still of one fighter with hitbox, hurtbox and grab box all drawn, annotated with the colours (the first hitbox red, other hitboxes in their own colours, hurtbox yellow, grab magenta) and pointing at the grabber's hurtboxes. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+
 ### Frame Advantage
 
 On shows a notice after each exchange with your frame advantage: plus means you can act before the CPU, minus means

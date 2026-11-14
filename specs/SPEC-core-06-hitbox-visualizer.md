@@ -86,14 +86,36 @@ orbs do not use that pool. This supersedes the upstream effect rendering for **f
   `hitbox=not_installed site=<row>`): nothing is drawn, no partial path. A layout without the orb panes draws nothing and
   says so once (`[Hitbox] orb panes missing`).
 
-### rc.14: Frame data colours (operator 2026-11-14; defaults SP1 and SP2 approved ~18:07Z, the colours changed ~18:15Z to Ultimate Frame Data's legend)
+### rc.14: the Frame data colours ranking rule (spots lane; operator 2026-11-14; defaults SP1 and SP2 approved ~18:07Z, the colours changed ~18:15Z to Ultimate Frame Data's legend)
 
-A second row under Hitbox Visualization, *Frame data colours* (id `frame_data_colours`, Off by default). Off is exactly the drawing above.
-On, a hitbox is **red** when it is the strongest hitbox of its frame ("Sweet") or cannot be ranked, and **pink** (`#ff8fc8`) when another
+The rule behind the *Frame data colours* item of the checklist below (it began as its own row, `frame_data_colours`, and is an item of
+`hitbox_vis` since the checklist). Unticked it is exactly the drawing above.
+Ticked, a hitbox is **red** when it is the strongest hitbox of its frame ("Sweet") or cannot be ranked, and **pink** (`#ff8fc8`) when another
 hitbox out on that frame is stronger ("Sour") or when the frame's strongest hitbox is weaker than the strongest seen earlier in the same
 action ("Late"). Damage is each active slot's `AttackData` damage (`layout::POWER`); no per-fighter table. An action is one status, and the
 motion frame going back (the same status entered again, as a jab's next hit does) starts a new one. Grab boxes and hurtboxes keep their colours (the legend lane extends the one colour
 function, `hitbox::legend_colour`). The shipped build reads each active slot's damage a second time per pass, only while the row is On.
+
+### rc.14: the Hitbox Visualization checklist, the frame data legend and launch angles (operator 2026-11-14; plan approved by the primary)
+
+`hitbox_vis` is a checklist of five items (`legend::ITEMS`): Hitboxes, Grab boxes, Hurtboxes, Frame data colours, Launch angles; nothing
+ticked by default, which draws nothing and keeps the pass and the hooks idle, as Off did. Each item draws on its own: the layout tick
+filters the orbs by kind (`legend::shows`), so any mix works; the HitModule is read only while Hurtboxes is ticked. A file from before
+the checklist migrates (`legend::migrate`): On becomes the three boxes, Off none.
+
+*Frame data colours* recolours what is drawn through one function, `hitbox::legend_colour`: a hitbox red when it is the strongest of its
+frame or cannot be ranked and pink when it is weaker (the spots lane's rule, by `AttackData` damage); a grab box purple; a hurtbox by the
+game's own status of its part (`legend::part_status`, as `HitModule::get_status` at `main+0x46a800`: the highest of the part's word, the
+group's whole status `+0x1c` taken as at least 0, and the group's global status `+0x20`): 0 white, 1 (invincible) green, 2 (intangible)
+and 3 (the whole group off: the revival platform) sky blue. Eden `hbl-trace-8fadea57-1`: a spot dodge sets whole 2, the revival platform
+whole 3, the time after it global 1, with every part word 0. **Windboxes keep the hit colours:** `ATTACK` has no windbox argument; the
+attribute rule was refuted (F.L.U.D.D.'s water push is `collision_attr_water`); two bool arguments (26 at `+0x70`, 27 at `+0x6e`) are set on
+both known windboxes and on neither Sing nor seven damaging hits, but the game's use of `+0x6e` (skipping a hit-feedback block of sound and
+effect calls) does not define "pushes without hurting", so no rule is wired.
+
+*Launch angles* adds white marks of a hitbox's own orbs, from `AttackData +0x28` (i32 degrees counter-clockwise from forward, mirrored by
+`PostureModule::lr`): a line from the centre to the edge for 0 to 360; two dashes for 361 at 38 degrees (the launch the trace measured on a
+target in the air, `t-hbl-361b`); a centre dot for 362 and above. Up to two marks per hitbox (`BOARD_ORBS`); drawn last, cut first.
 ## 3. Inputs
 
 - `hitbox_vis` setting; `shield_state` setting (see §6, the shield-damage rewrite that lives in the same hook).
@@ -148,7 +170,7 @@ No memory is written outside these calls.
 
 ## 7. Persistence
 
-Only the `hitbox_vis` setting (SPEC-core-04).
+Only the `hitbox_vis` setting (SPEC-core-04), a five-item checklist since rc.14.
 
 ## 8. Resource budget
 
@@ -175,6 +197,7 @@ lines record the HitModule read's cost and the pass's own cost on the integrated
 | Three sites guarded (64 B) and installed independently; neighbouring thunk windows checked first | `core06_site_guards` | `core06-E7` install line `handle_attack=stock/near …` | — |
 | Off restores effects next frame | `core06_off_restores` | `core06-E8` | — |
 | rc.14 Frame data colours: Sweet red, Sour and Late pink, an unrankable hitbox red; Off is today's colours; one function chooses every tint | `the_hit_spheres_take_the_frame_data_colours`, `off_is_exactly_the_old_drawing`, `one_function_chooses_every_tint`, `the_strongest_hitbox_of_a_frame_is_sweet_and_a_weaker_one_sour`, `a_hitbox_weaker_than_an_earlier_one_of_the_action_is_late` | rc14 spots, Marth forward smash and Captain Falcon forward air at 1/4 speed | `artifacts/rc14-spots/` |
+| rc.14 checklist and legend: each item draws on its own, old On/Off migrates, grab purple, hurtboxes by the game's status, windboxes uncoloured, launch angles (line, dashes at 38, dot) mirrored by facing | `legend_checklist_items_draw_independently`, `legend_old_hitbox_vis_migrates`, `legend_hitbox_visualization_is_one_checklist`, `legend_part_status_is_the_games_max`, `legend_hurtbox_status_colours`, `legend_grab_is_purple_while_frame_data_colours_is_on`, `legend_off_keeps_todays_tints`, `legend_windboxes_keep_the_hit_colours`, `legend_angle_line_points_along_the_angle_mirrored_by_facing`, `legend_special_angles_are_dashed_or_a_dot`, `legend_marks_follow_their_hitbox_and_draw_last`, `legend_facts_match_the_owned_elf` | `hbl-trace-8fadea57-1`, `hbl-final-252e200b-1`, the checklist boot | `artifacts/rc14-hb-legend/` |
 
 ## 10. Open questions
 

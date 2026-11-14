@@ -659,6 +659,7 @@ Then, ~18:07Z: "sp recommendations sound good".
 | SP3 | Input Display: a Sweet / Sour / Late label on each hit marker, Player 1 and CPU rows |
 | SP4 | Combos: each link remembers the spot it landed; with "Match sweet/sour spot" On a link counts only on the same spot |
 | SP5 | Three rows, all Off by default: under Hitbox Visualization, under Input Display, and in Recording › Options |
+| HB-CHECK | 2026-11-14 ~19:50Z, relayed by the primary: Hitbox Visualization becomes one checklist (Hitboxes, Grab boxes, Hurtboxes, Frame data colours, Launch angles), nothing ticked by default, each item drawn on its own; an older On ticks the three boxes. This replaces SP5's row under Hitbox Visualization; the Input Display and Recording rows stay. The frame data colours follow Ultimate Frame Data's legend (2026-11-14 ~18:15Z): strong red, weak pink, grab purple, hurtboxes white, blue when intangible, green when invincible; windboxes stay uncoloured (no game-derived rule) |
 
 The spots lane's mockups (drawn, not captured):
 

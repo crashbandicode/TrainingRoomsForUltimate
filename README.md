@@ -106,7 +106,7 @@ All the options: [the Fighters & Stages page](docs/menu/fighters-and-stages.md).
 
 ### Display & Controls
 
-See attack, hurt and grab boxes: set **Display & Controls → Hitbox Visualization → On**.
+See attack, hurt and grab boxes: in **Display & Controls → Hitbox Visualization**, tick Hitboxes, Grab boxes and Hurtboxes.
 
 ![Hitbox Visualization turned on: the yellow hurtboxes, then at 1/4 speed a neutral air's red hitbox](docs/media/rc11-hitbox.gif)<br>*Hitboxes and hurtboxes on*
 
