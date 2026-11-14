@@ -4,8 +4,7 @@
 //! until a Save replaces it atomically (`store::write_replace`: temp file, sync, replace; the old file
 //! is retired only after the new one is in place, and stays on any failure).
 
-use std::fs;
-use std::io;
+use std::{fs, io};
 use std::path::{Path, PathBuf};
 
 use super::file::{Defaulted, SaveFile};

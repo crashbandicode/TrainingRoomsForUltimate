@@ -15,8 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use super::choice::byteflags;
 
-use crate::engine::preload::cycle_preload_config as preload;
-use crate::engine::preload::hat_slots as hats;
+use crate::engine::preload::{cycle_preload_config as preload, hat_slots as hats};
 use crate::engine::stages::lobby_stages::LobbyStageOrder;
 use crate::engine::swap::ordered_roster::{OrderedFighterRoster, DEFAULT_KIRBY_HATS};
 use crate::engine::swap::roster_grid::Role as RosterRole;

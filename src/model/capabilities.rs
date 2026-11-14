@@ -15,10 +15,7 @@
 use super::guard::SeamKind;
 use super::sites::{Feature, Site, SITES};
 use super::sites_pkg3::STATE_SITES;
-use super::sites_pkg4;
-use super::sites_pkg6;
-use super::sites_u4;
-use super::sites_u4b;
+use super::{sites_pkg4, sites_pkg6, sites_u4, sites_u4b};
 use super::sites_ui::UI_SITES;
 
 /// Whether a row is a site this plugin writes in code: a compared hook row inside `main`'s `.text`.

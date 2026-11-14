@@ -3,8 +3,7 @@
 //! (Eden `rc6-int-smoke1`: `hook_stats allocs=cpu_frame:…`). These write the same fields through `serde_json::to_writer`, which
 //! formats numbers on the stack and escapes strings in place, so a hook logs a typed value without the heap.
 
-use std::fmt;
-use std::io;
+use std::{fmt, io};
 
 use serde::ser::{Serialize, SerializeMap, Serializer};
 

@@ -6,11 +6,9 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use crate::model::sites_pkg3 as s;
-use crate::model::state::charge;
+use crate::model::state::{charge, items, steve as steve_layout};
 use crate::model::state::ids::{Table, C, UNRESOLVED};
-use crate::model::state::items;
 use crate::model::state::record::Steve;
-use crate::model::state::steve as steve_layout;
 use crate::runtime::alloc::HookScope;
 use crate::runtime::game::{self, natives};
 use crate::runtime::state_natives as n;

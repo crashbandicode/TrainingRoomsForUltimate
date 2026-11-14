@@ -43,8 +43,7 @@ use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::features::{chords, cpu, input_display, notices, states};
 use crate::runtime::game::{self, natives};
 use crate::runtime::macros::{named_macros, replay_preview};
-use crate::runtime::published;
-use crate::runtime::scene;
+use crate::runtime::{published, scene};
 
 static REC: Mutex<Recorder> = Mutex::new(Recorder::new());
 

@@ -9,15 +9,13 @@ use hos_lock::Mutex;
 use skyline::nn::ui2d::{Layout, Pane};
 
 use crate::model::input_delay::Owners;
-use crate::model::flow;
+use crate::model::{flow, panes as p};
 use crate::model::frame::{fade_alpha, CLOSE_FRAMES};
-use crate::model::panes as p;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::published::INPUT_OWNERS;
 use crate::runtime::ui::state::{self, CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, LAYOUT_READY, MENU_SHOWN, OPEN, PAUSE_ACTIVE, POLLS_AT_TICK};
-use crate::runtime::ui::{chips, thumbs};
+use crate::runtime::ui::{chips, thumbs, hud, pane, registry};
 use crate::runtime::ui::view::Panes;
-use crate::runtime::ui::{hud, pane, registry};
 use crate::runtime::game;
 
 const INFO_TRAINING: &[u8] = b"info_training";

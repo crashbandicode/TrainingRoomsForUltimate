@@ -20,8 +20,7 @@
 //! the replace fallback leaves `settings.json.bak`, which the next load moves back before it reads
 //! anything.
 
-use std::fs;
-use std::io;
+use std::{fs, io};
 use std::path::Path;
 
 use super::settings::{self, Settings};

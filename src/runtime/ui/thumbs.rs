@@ -20,9 +20,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use hos_lock::Mutex;
 
 use crate::model::frame::Frame;
-use crate::model::panes as p;
-use crate::model::stage_textures;
-use crate::model::ui_texture as facts;
+use crate::model::{panes as p, stage_textures, ui_texture as facts};
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::ui::texture::{self, Readiness, Texture};
 use crate::runtime::ui::view::Panes;

@@ -21,8 +21,7 @@ use std::time::Duration;
 
 use skyline::hooks::InlineCtx;
 
-use crate::model::archive_name;
-use crate::model::archive_recipe;
+use crate::model::{archive_name, archive_recipe};
 use crate::model::archive_slots::{Claim, Slots};
 use crate::model::hook_stats::{load_allocations, per_load, HookId, HookScope};
 use crate::model::sites_ui::UI_ARCHIVE_ALLOC_OFFSET;

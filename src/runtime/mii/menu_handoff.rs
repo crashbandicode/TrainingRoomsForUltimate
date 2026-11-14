@@ -4,8 +4,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::OnceLock;
 use hos_lock::Mutex;
 use crate::model::close_handoff::{self, Consumer, Intent, Producer};
-use crate::engine::mii_root::mii_menu::PendingSelection;
-use crate::engine::mii_root::mii_menu::EditorRequest;
+use crate::engine::mii_root::mii_menu::{PendingSelection, EditorRequest};
 use crate::runtime::{ui::menu_app, roster::character_roster::mii_saved_alpha};
 
 /// UI-owned values, produced after the CatalogMenu closes. Post before clearing

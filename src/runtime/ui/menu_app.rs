@@ -2,8 +2,7 @@
 //! Catalogs never live inside the hook-owned App; only the UI worker receives
 //! publications and constructs the catalog menu.
 
-use std::sync::Arc;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use crate::model::catalog_mailbox::{self, Producer, Consumer, Publication};
 use crate::engine::{mii::inventory::Snapshot, mii_root::mii_menu::Context};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};

@@ -11,8 +11,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::model::input_delay::Clear;
-use crate::model::lra_reset;
-use crate::model::sites;
+use crate::model::{lra_reset, sites};
 use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::{game, hub, published, scene};
 

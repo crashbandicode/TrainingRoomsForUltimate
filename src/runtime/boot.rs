@@ -10,33 +10,25 @@ use std::path::Path;
 
 use crate::model::cpu::rng::Rng;
 use crate::model::cpu::settings::CpuSettings;
-use crate::model::developer_ini;
+use crate::model::{developer_ini, settings_file, stage_hazards, sites_pkg4, sites_hitbox, sites_pkg6, sites_u4, sites_u4b};
 use crate::model::capabilities::{self, Granted};
 use crate::model::guard::GuardOutcome;
 use crate::model::install_line::{DeveloperReport, Extra, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
 use crate::model::settings::Settings;
-use crate::model::settings_file;
 use crate::model::sites::{self, Feature, SITES};
-use crate::model::stage_hazards;
 use crate::model::storage::{self, FixedPath};
 use crate::model::thread_stacks::ThreadId;
 use crate::model::version::{self, Verdict};
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
 use crate::model::sites_pkg3::{self, STATE_SITES};
-use crate::model::sites_pkg4;
-use crate::model::sites_hitbox;
-use crate::model::sites_pkg6;
-use crate::model::sites_u4;
-use crate::model::sites_u4b;
 use crate::model::sites_ui::UI_SITES;
 use crate::model::state::file::SaveFile;
 use crate::model::state::settings::StateSettings;
 use crate::runtime::features::{
     chords, cpu, cpu_common, hitbox, hud_draw, input_delay, input_display, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states, writer,
 };
-use crate::runtime::{lobby, mii, p1, roster};
-use crate::runtime::{clock, game, import, install, published, scene, state_boot, ui};
+use crate::runtime::{lobby, mii, p1, roster, clock, game, import, install, published, scene, state_boot, ui};
 
 const SITE_COUNT: usize = SITES.len();
 

@@ -21,9 +21,8 @@ use crate::model::combo_record::{
 };
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::store::SkippedFile;
-use crate::runtime::features::notices;
+use crate::runtime::features::{notices, combo as live};
 use crate::model::menu::{input::Button, table::Editor};
-use crate::runtime::features::combo as live;
 use crate::runtime::macros::named_macros;
 
 /// Name tokens of this library: the high bit keeps them apart from the setup library's revisions.
