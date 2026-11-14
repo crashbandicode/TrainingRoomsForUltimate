@@ -36,6 +36,8 @@ Waiting Room and Training have one form, and their tiles show no tag.
 Each stage keeps one form. Change Stage, Lobby Stages and Training Stage Rotation all use it, so Y on either grid
 changes it for both.
 
+<!-- CAPTURE-REQUEST v19-stage-forms: a still of the Change Stage grid with the [N], [Ω] and [BF] tags and the footer "Form: Omega" after Y; if it claims changed geometry, the same stage Normal then Ω, with the menu closed and the flat geometry visible. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+
 ## Lobby Stages
 
 Fighters & Stages › [Lobby Stages](../menu/fighters-and-stages.md#lobby-stages) is the list the waiting rooms, and
@@ -43,19 +45,13 @@ Training with rotation On, move through. It has two modes; X switches between th
 
 ![Lobby Stages: A on Battlefield adds it as number 2](../media/rc11-lobby-stages.gif)
 
-**Rotation** (the default):
+| | Rotation (the default) | Direct |
+| --- | --- | --- |
+| A on a stage | Adds it at the end of the list, or takes it out. Its number on the tile is its place. The last stage stays. | Goes there now and closes the menu, as Change Stage does. "> " marks the Direct stage. |
+| A on All | Takes every stage, in the game's order. A stage you pick after that starts a new list with just it. | |
+| A new waiting room | Opens on the next stage of the list. The list starts as the Waiting Room only, and a change applies from the next room. | Opens on the Direct stage instead of the list. |
 
-- A on a stage adds it at the end of the list, or takes it out. Its number on the tile is its place. The last stage
-  stays.
-- A on All takes every stage, in the game's order. A stage you pick after that starts a new list with just it.
-- The list starts as the Waiting Room only.
-- Each new waiting room opens on the next stage of the list. A change applies from the next room.
-
-**Direct:**
-
-- "> " marks the Direct stage. A on a stage goes there now and closes the menu, as Change Stage does.
-- Every new waiting room opens on the Direct stage instead of the list.
-
+<!-- CAPTURE-REQUEST v06-lobby-stages-modes: a clip of Rotation versus Direct in a waiting room (see Fighters & Stages › Lobby Stages); the same clip goes here. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 The waiting rooms use this list only while Lobby Practice is On. Local wireless rooms and Quickplay each keep their own
 place in the list.
 

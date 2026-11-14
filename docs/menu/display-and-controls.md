@@ -20,22 +20,20 @@ either way.
 
 ### Hitbox Visualization
 
-On draws the fighters' boxes in colour: hitboxes (the attacks; each hitbox of a move gets its own colour, the first is
-red), grab boxes (always magenta, a colour no hitbox uses), and hurtboxes (yellow: where a fighter can be hit). A round
-box is a disc; a long one, such as a sword's hitbox or an arm's hurtbox, is one pill. It works in Training, and on the
-two practice fighters in a waiting room. While a fighter shields nothing of it is drawn; while it is grabbing its
-hurtboxes and grab box are, since a missed grab can be punished.
-
-- **Projectiles and thrown items:** a projectile, or a thrown item such as Link's bomb, Peach's turnip or Diddy Kong's
-  banana, has its hitboxes drawn while its attack lasts. Up to four at a time; a fifth replaces the oldest. Olimar's
-  Pikmin show their grab box.
-- **Grab boxes** show only in the grab's active frames. A grab that catches on the frame its box appears, as Samus's
-  tether does, shows its box for that frame only, not through the pull.
-- The shapes are flat and drawn over the stage and the fighters. While the camera pans they trail by a frame or two.
+On draws the fighters' boxes in colour. It works in Training, and on the two practice fighters in a waiting room.
 
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A, Left or Right flips it.
+
+| Box | Colour | What it is |
+| --- | --- | --- |
+| Hitbox | Each hitbox of a move gets its own colour; the first is red | The attack |
+| Grab box | Always magenta, a colour no hitbox uses | The grab |
+| Hurtbox | Yellow | Where a fighter can be hit |
+
+A round box is a disc; a long one, such as a sword's hitbox or an arm's hurtbox, is one pill. The shapes are flat and
+drawn over the stage and the fighters. While the camera pans they trail by a frame or two.
 
 ![Hitbox Visualization turned on: the yellow hurtboxes, then at 1/4 speed a neutral air's red hitbox](../media/rc11-hitbox.gif)
 
@@ -43,14 +41,23 @@ hurtboxes and grab box are, since a missed grab can be punished.
 
 *Pills: at 1/4 speed, Ridley standing shows his hurtboxes as yellow pills; his forward tilt and down tilt draw their hitbox as one red pill along the tail. Eden, rc.13 (untested on hardware).*
 
-![At 1/4 speed, a red disc rides on Ridley's fireball, Link's arrow and Link's thrown bomb while each is in flight](../media/rc13-projectile-hitboxes.gif)
-
-*Projectiles and thrown items: at 1/4 speed, a red disc rides on Ridley's fireball, Link's arrow and Link's thrown bomb while each is in flight. Eden, rc.13 (untested on hardware).*
+**Shield and grab.** While a fighter shields nothing of it is drawn. While it is grabbing, its hurtboxes and grab box
+are, since a missed grab can be punished. Grab boxes show only in the grab's active frames: a grab that catches on the
+frame its box appears, as Samus's tether does, shows its box for that frame only, not through the pull.
 
 ![At 1/4 speed, the magenta grab boxes of Mario's grab, Samus's tether and Olimar's Pikmin; each grabber keeps its yellow hurtboxes](../media/rc13-grab-boxes.gif)
 
 *Grab boxes: at 1/4 speed, Mario's standing grab, Samus's tether (a pill along the beam) and the Pikmin Olimar throws, each grab box in magenta; the grabber keeps its yellow hurtboxes through the grab. Eden, rc.13 (untested on hardware).*
 
+**Projectiles and thrown items.** A projectile, or a thrown item such as Link's bomb, Peach's turnip or Diddy Kong's
+banana, has its hitboxes drawn while its attack lasts. Up to four at a time; a fifth replaces the oldest. Olimar's Pikmin
+show their grab box.
+
+![At 1/4 speed, a red disc rides on Ridley's fireball, Link's arrow and Link's thrown bomb while each is in flight](../media/rc13-projectile-hitboxes.gif)
+
+*Projectiles and thrown items: at 1/4 speed, a red disc rides on Ridley's fireball, Link's arrow and Link's thrown bomb while each is in flight. Eden, rc.13 (untested on hardware).*
+
+<!-- CAPTURE-REQUEST v18-hitbox-legend: a still of one fighter with hitbox, hurtbox and grab box all drawn, annotated with the colours (the first hitbox red, other hitboxes in their own colours, hurtbox yellow, grab magenta) and pointing at the grabber's hurtboxes. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 ### Frame Advantage
 
 On shows a notice after each exchange with your frame advantage: plus means you can act before the CPU, minus means

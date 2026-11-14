@@ -171,7 +171,40 @@ def waiting_room_match():
     c.text(24, 280, "A new room starts from the fighters you picked for the match.", "xs", MUTED)
     c.save("waiting-room-match")
 
-ALL = {"waiting_room_match": waiting_room_match, "mii_waiting_room": mii_waiting_room, "cpu_action_flow": cpu_action_flow, "chip_weights": chip_weights, "cycle_numbers": cycle_numbers, "strip_timeline": strip_timeline}
+def game_speed_scale():
+    c = Canvas(W, 250)
+    title(c, "The five game speeds", "hold R + D-pad Up, then D-pad Left or Right steps one speed; it stops at both ends")
+    labels = ["1/4", "1/2", "2/3", "x1", "x1.5"]
+    x0, x1 = 120, 1080
+    step = (x1 - x0) / 4
+    c.line([(x0, 120), (x1, 120)], LINE, 4)
+    for i, name in enumerate(labels):
+        x = x0 + step * i
+        col = GREEN if name == "x1" else FG
+        c.circle(x, 120, 16, fill=TILE, outline=col, width=3)
+        c.text(x, 112, "", "s", col, "m")
+        c.text(x, 148, name, "h", col, "m")
+    d.arrow(c, (x0 + step * 3, 78), (x0 + step * 2, 78), P1, 3)
+    c.text(x0 + step * 2.5, 52, "D-pad Left: slower", "xs", P1, "m")
+    d.arrow(c, (x0 + step * 3, 78), (x0 + step * 4, 78), CPU, 3)
+    c.text(x0 + step * 3.5, 52, "D-pad Right: faster", "xs", CPU, "m")
+    c.text(24, 196, "In Training, a stopwatch on the HUD shows any speed but x1.", "xs", MUTED)
+    c.text(24, 218, "In a waiting room only your practice changes speed; each new practice starts at x1, and a match always starts at x1.", "xs", MUTED)
+    c.save("game-speed-scale")
+
+def combo_sharing():
+    c = Canvas(W, 240)
+    title(c, "Sharing a combo", "a combo is one small file")
+    d.box(c, 24, 70, 280, 170, ["Card 1", "sd:/ultimate/TrainingRooms/", "combos/nair-loop.json"], col=MACRO_C, font="xs")
+    d.box(c, 330, 70, 600, 170, ["Copy the file", "(take the card out,", "or use FTP)"], col=LINE, font="xs")
+    d.box(c, 650, 70, 906, 170, ["Card 2", "the same folder:", "combos/nair-loop.json"], col=MACRO_C, font="xs")
+    d.box(c, 956, 70, 1176, 170, ["Open the menu", "COMBOS lists it, with", "Recorded on <fighter>"], col=GREEN, font="xs")
+    for x0, x1 in ((280, 330), (600, 650), (906, 956)):
+        d.arrow(c, (x0, 120), (x1, 120), MUTED)
+    c.text(24, 196, "Drill it (A in the pop-up, or Drill on its own screen) and do the combo on any fighter.", "xs", MUTED)
+    c.save("combo-sharing")
+
+ALL = {"combo_sharing": combo_sharing, "game_speed_scale": game_speed_scale, "waiting_room_match": waiting_room_match, "mii_waiting_room": mii_waiting_room, "cpu_action_flow": cpu_action_flow, "chip_weights": chip_weights, "cycle_numbers": cycle_numbers, "strip_timeline": strip_timeline}
 
 if __name__ == "__main__":
     for name in (sys.argv[1:] or list(ALL)):
