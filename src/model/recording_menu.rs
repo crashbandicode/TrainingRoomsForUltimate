@@ -152,6 +152,8 @@ pub enum Effect {
     WriteSequenceCombos { id: String, combos: Vec<String> },
     /// *+ Save last combo…*: the host saves the strip's latest exchange under `name` (empty: Combo N) and drills it.
     SaveLastCombo { name: String },
+    /// Start save flipped on a macro's or a chain's screen. The host writes the switch into the file (Play reads it there).
+    SetStartSave { id: String, chain: bool, on: bool },
 }
 
 /// The file kinds Delete removes through [`Effect::DeleteFile`]. A save state has its own effect.
@@ -1373,8 +1375,9 @@ impl RecordingScreens {
     }
 
     fn set_start(&mut self, _kind: ItemKind, id: &str, on: bool) {
-        if let Some(file) = self.catalog.macros.iter_mut().find(|file| file.id == id) {
+        if let Some(file) = self.catalog.macros.iter_mut().find(|file| file.id == id && file.start_save_on != on) {
             file.start_save_on = on;
+            self.last_effect = Effect::SetStartSave { id: id.to_string(), chain: file.chain, on };
         }
     }
 

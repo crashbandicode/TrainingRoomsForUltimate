@@ -1357,6 +1357,8 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, online: bool, ti
             }
         }
         Effect::SaveLastCombo { name } => save_last_combo(root, &name, tick),
+        Effect::SetStartSave { id, chain: true, on } => rename::<Chain>(root, MACROS_DIR, &id, |f| f.start_save_on = on),
+        Effect::SetStartSave { id, chain: false, on } => rename::<MacroRecording>(root, MACROS_DIR, &id, |f| f.start_save_on = on),
     }
 }
 
@@ -1411,7 +1413,8 @@ pub fn delete_file(root: &Path, kind: crate::model::recording_menu::FileKind, id
     true
 }
 
-/// Rename on a save, a macro, a chain, a combo or a sequence: the file is rewritten under its id.
+/// Rename on a save, a macro, a chain, a combo or a sequence, or a macro's or chain's Start save switch: the file is
+/// rewritten under its id.
 fn rename<R: Record>(root: &Path, dir: &str, id: &str, set: impl FnOnce(&mut R)) {
     let store = Store::<R>::new(root.join(dir));
     let Ok(mut file) = store.load(id) else { return };
@@ -3306,11 +3309,78 @@ mod tests {
         assert_eq!(momentum_play("momentum-nowarp", running, None, false), None, "no start save, no warp: nothing is set");
     }
 
+    /// rc.14 recfix: a macro's or a chain's screen, Start save, Left or Right. The switch goes into the file (the worker's
+    /// steps: the press, `post_effect(take_effect())`, `service_at`), a reload of the catalog reads it back, and Play reads
+    /// it from the file: Off plays from where the fighters stand, On warps to the start save first. Eden rc.13 gif-lane-4:
+    /// Play with the switch Off still warped, because the menu only changed its own copy of the catalog.
+    fn the_start_save_switch_reaches_the_file_and_the_play() {
+        use crate::model::menu::input::Button as MenuButton;
+        use crate::model::menu::table::SAVES_MACROS;
+        use crate::model::recording_menu::{Face, RecordingScreens};
+        let _hold = hold();
+        for chain in [false, true] {
+            let root = scratch(if chain { "start-switch-chain" } else { "start-switch-macro" });
+            let work = |screens: &mut RecordingScreens| {
+                post_effect(screens.take_effect());
+                let _ = service_at(&root, &none(), "2026-11-14", state(8), state(7), false);
+            };
+            let reload = |screens: &mut RecordingScreens| screens.set_catalog(super::super::rr_runtime::load_catalog(&root).unwrap().catalog);
+            let file_switch = |id: &str| match chain {
+                true => Store::<Chain>::new(root.join(MACROS_DIR)).load(id).unwrap().start_save_on,
+                false => Library::new(root.join(MACROS_DIR)).load(id).unwrap().start_save_on,
+            };
+            let play = |warp: Option<&str>, tag: &str| {
+                on_chords(false, true, false);
+                let tick = service_at(&root, &none(), "2026-11-14", state(8), state(7), false);
+                assert_eq!(tick.warp.as_deref(), warp, "{tag}: Play warps only with the switch On");
+                assert_eq!(tick.diags.iter().any(|line| line == "screen=playback role=player warp=1"), warp.is_some(), "{tag}");
+                if warp.is_none() {
+                    assert_eq!(take_player_frame().expect("plays at once").buttons, 4, "{tag}");
+                }
+            };
+            reset_host();
+            let _ = service_at(&root, &none(), "2026-11-14", state(8), state(7), false);
+            let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&NamedSave::new("Run", state(8), state(7)).unwrap()).unwrap();
+            let step = one_macro(&root, "Run", 4, 8, Some(&save));
+            let id = match chain {
+                true => Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&Chain::new("Chain 1", vec![step]).unwrap()).unwrap(),
+                false => step,
+            };
+            let mut index = RecordingIndex::load(&root).unwrap();
+            index.set_active(Role::Player, Some(&id), 1).unwrap();
+            index.save(&root).unwrap();
+            let mut screens = RecordingScreens::new();
+            reload(&mut screens);
+            let at = screens.section(Face::Page, SAVES_MACROS, 1).rows.iter().position(|row| row.name == if chain { "Chain 1" } else { "Run" }).unwrap();
+            screens.set_cursor(Face::Page, SAVES_MACROS, 1, at);
+            screens.handle_page(MenuButton::A, true, SAVES_MACROS);
+            assert_eq!(screens.file_rows()[0].title, "Start save");
+            assert!(file_switch(&id), "a new file starts On");
+
+            screens.handle_page(MenuButton::Left, true, SAVES_MACROS);
+            work(&mut screens);
+            assert!(!file_switch(&id), "Off is written to the file");
+            reload(&mut screens);
+            assert_eq!(screens.file_rows()[0].value, "Off", "and survives a reload of the catalog");
+            play(None, "Off");
+
+            reset_host();
+            let _ = service_at(&root, &none(), "2026-11-14", state(8), state(7), false);
+            screens.handle_page(MenuButton::Right, true, SAVES_MACROS);
+            work(&mut screens);
+            assert!(file_switch(&id), "On is written to the file");
+            reload(&mut screens);
+            assert_eq!(screens.file_rows()[0].value, "Run · On", "and survives a reload of the catalog");
+            play(Some(&save), "On");
+        }
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("posted_chords_reach_the_role_machines", posted_chords_reach_the_role_machines as fn()),
+            ("the_start_save_switch_reaches_the_file_and_the_play", the_start_save_switch_reaches_the_file_and_the_play as fn()),
             ("a_posted_record_stores_the_start_save", a_posted_record_stores_the_start_save as fn()),
             ("migration_from_the_worker_runs_once", migration_from_the_worker_runs_once as fn()),
             ("the_worker_crop_writes_a_new_file", the_worker_crop_writes_a_new_file as fn()),
