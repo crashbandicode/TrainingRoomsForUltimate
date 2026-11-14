@@ -2,7 +2,8 @@
 
 Operator 2026-11-09 (memory `feature-ledger-gif-after-ship`): after each card ship, one row per feature with its Eden
 and Switch tests and a GIF that shows the effect. Brought current to rc.11 `0c628724`, the shipped build, by the
-primary's 2026-11-12 13:35Z and 17:49Z orders.
+primary's 2026-11-12 13:35Z and 17:49Z orders. It is the record of that ship: rc.12 and rc.13 have no rows here (their
+changes are in their release notes, on their Forgejo release pages).
 Rows #1-#73 are the rc.3-to-rc.6 features of `RC5-TEST-COVERAGE-AUDIT.md`, #74-#79 the features added on
 2026-11-09, and #80-#92 the rc.8 to rc.11 features.
 

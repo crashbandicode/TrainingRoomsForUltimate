@@ -126,5 +126,8 @@ endorsed by Nintendo.
 
 ## More
 
-[The docs](docs/README.md): every menu page and guide. Release notes: [rc.9](docs/RELEASE-NOTES-rc9.md) is the newest
-written; this build is rc.11 (see [Status](docs/TECHNICAL.md#status)). [Technical notes](docs/TECHNICAL.md).
+[The docs](docs/README.md): every menu page and guide. The newest build is
+[rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13), Eden-tested and
+**untested on hardware** (see [Status](docs/TECHNICAL.md#status)). Release notes: rc.12's and rc.13's are on their
+[release pages](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases); [rc.9](docs/RELEASE-NOTES-rc9.md)
+is the newest written in this folder. [Technical notes](docs/TECHNICAL.md).
