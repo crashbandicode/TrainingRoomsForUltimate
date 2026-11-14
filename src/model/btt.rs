@@ -439,8 +439,8 @@ impl Btt {
 
     /// One pass of Player 1 (`tick`: the clock's frame): the clock runs while Running, and `hit(spot)` says whether a live hit of P1's
     /// breaks the unbroken target there (`eggs::breaks`; the caller also owns the hitlag and the break animation). The last target
-    /// ends the run on that frame. The notice's length when its text changed.
-    pub fn pass(&mut self, tick: bool, mut hit: impl FnMut([f32; 2]) -> bool) -> Option<u16> {
+    /// ends the run on that frame. The notice's change is `notice`'s, asked by the caller after the pass: the pass does not use it up.
+    pub fn pass(&mut self, tick: bool, mut hit: impl FnMut([f32; 2]) -> bool) {
         eggs::age(&mut self.bursts, tick);
         match self.phase {
             Phase::Running => {
@@ -462,7 +462,6 @@ impl Btt {
             }
             _ => {}
         }
-        self.notice()
     }
 
     /// The run is over: the clock stops, and the session's best for this layout.

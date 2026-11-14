@@ -605,6 +605,26 @@ fn btt_pictures() {
     assert_eq!((s.btt.phase(), count(&s.btt, EggPicture::Cracked), count(&s.btt, EggPicture::Whole)), (Phase::Done, 2, 0));
 }
 
+/// The runtime posts the notice when `notice` says it changed, after the pass: the pass must not have used the change up (Eden
+/// btt-2: the pass returned it and the runtime dropped it, so no notice and no `[Btt]` line ever showed).
+fn btt_notice_reports_each_change() {
+    let mut s = Sim::placing();
+    s.btt.pass(true, |_| false);
+    assert_eq!(s.btt.notice(), Some(u16::MAX), "the Placing text, after a pass");
+    assert_eq!(s.btt.notice(), None, "reported once");
+    s.place_at(0.0, 15.0);
+    s.btt.pass(true, |_| false);
+    assert_eq!(s.btt.notice(), Some(u16::MAX), "a target placed");
+    s.tap(&[X]);
+    s.btt.pass(true, |_| false);
+    assert_eq!(s.btt.notice(), Some(u16::MAX), "Ready");
+    s.tap(&[A]);
+    pass(&mut s.btt, &[]);
+    assert_eq!(s.btt.notice(), Some(u16::MAX), "the clock moved");
+    pass(&mut s.btt, &[hit_at([0.0, 15.0])]);
+    assert_eq!((s.btt.phase(), s.btt.notice()), (Phase::Done, Some(u16::MAX)), "the run ended on that pass");
+}
+
 /// The clock ticks once a frame however many of P1's fighters pass, and follows a swap.
 fn btt_clock_keeper() {
     let mut b = Btt::IDLE;
@@ -629,6 +649,7 @@ fn case_table() {
         ("btt_layout_controls", btt_layout_controls as fn()),
         ("btt_layout_file_errors", btt_layout_file_errors as fn()),
         ("btt_pictures", btt_pictures as fn()),
+        ("btt_notice_reports_each_change", btt_notice_reports_each_change as fn()),
         ("btt_clock_keeper", btt_clock_keeper as fn()),
     ]);
 }
