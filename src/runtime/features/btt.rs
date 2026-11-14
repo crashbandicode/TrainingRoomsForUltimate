@@ -174,15 +174,17 @@ pub unsafe fn pass(at: usize, top: [f32; 3], mut hit: impl FnMut([f32; 2]) -> bo
         }
     }
     let phase = mode.phase();
-    let was = PHASE.swap(phase as u8, Ordering::AcqRel);
-    if phase == Phase::Off {
-        if was != phase as u8 {
-            notices::clear(btt::NOTICE_ID);
-        }
-    } else if let Some(length) = mode.notice() {
+    PHASE.store(phase as u8, Ordering::Release);
+    // Asked on every pass, Off included: the text is empty exactly when the mode is Off, so the notice goes then, and the next
+    // text is posted again even when it is the one shown before the Off (Ready of the same layout).
+    if let Some(length) = mode.notice() {
         let mut text = FixedPath::<96>::new();
         let _ = mode.write_notice(&mut text);
-        notices::upsert(btt::NOTICE_ID, btt::HEADER, text.as_str(), length, DEFAULT_COLOR);
+        if text.as_str().is_empty() {
+            notices::clear(btt::NOTICE_ID);
+        } else {
+            notices::upsert(btt::NOTICE_ID, btt::HEADER, text.as_str(), length, DEFAULT_COLOR);
+        }
         // For the Eden rows: a line per change, and while Running (its clock changes every frame) every tenth, or on a break.
         #[cfg(feature = "diag")]
         if phase != Phase::Running || broken > 0 || DIAG.fetch_add(1, Ordering::Relaxed) % 10 == 0 {

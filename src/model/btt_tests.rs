@@ -625,6 +625,20 @@ fn btt_notice_reports_each_change() {
     assert_eq!((s.btt.phase(), s.btt.notice()), (Phase::Done, Some(u16::MAX)), "the run ended on that pass");
 }
 
+/// The runtime asks `notice` on every pass, Off included, and clears the notice when the text is empty: turning the mode Off
+/// reports the empty text once, and turning it back On to the same Ready text reports that text again (the Off cleared it).
+fn btt_notice_reposts_after_off() {
+    let mut s = ready_with_three();
+    s.btt.pass(true, |_| false);
+    let text = s.text();
+    assert_eq!((s.btt.notice(), text.as_str()), (Some(u16::MAX), "Targets 0/3   0:00.00"), "Ready, posted");
+    s.btt.close_menu(false, false);
+    assert_eq!((s.btt.phase(), s.btt.notice(), s.text()), (Phase::Off, Some(u16::MAX), String::new()), "Off: the empty text, once");
+    assert_eq!(s.btt.notice(), None, "Off, nothing new");
+    s.btt.close_menu(true, false);
+    assert_eq!((s.btt.phase(), s.btt.notice(), s.text()), (Phase::Ready, Some(u16::MAX), text), "On again: posted again");
+}
+
 /// The clock ticks once a frame however many of P1's fighters pass, and follows a swap.
 fn btt_clock_keeper() {
     let mut b = Btt::IDLE;
@@ -650,6 +664,7 @@ fn case_table() {
         ("btt_layout_file_errors", btt_layout_file_errors as fn()),
         ("btt_pictures", btt_pictures as fn()),
         ("btt_notice_reports_each_change", btt_notice_reports_each_change as fn()),
+        ("btt_notice_reposts_after_off", btt_notice_reposts_after_off as fn()),
         ("btt_clock_keeper", btt_clock_keeper as fn()),
     ]);
 }
