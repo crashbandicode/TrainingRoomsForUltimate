@@ -1,7 +1,6 @@
 //! Worker-owned Setup drafts and close-time selection. Native validation and
 //! transaction ownership remain in the states provider; files use SetupLibrary.
 use crate::engine::stages::lobby_stages::STAGES;
-use crate::model::menu::input::Button;
 use crate::model::state::setup::{SetupEntry, SetupLibrary, SetupRecord};
 
 /// A provider's answer: the value, or the refusal text.
@@ -20,7 +19,7 @@ pub fn chosen(restore: bool) -> &'static str {
 pub fn list_footer(footer: &str) -> String {
     let (row, rest) = footer.split_once('\n').unwrap_or((footer, ""));
     let note = rest.split("    ").next().filter(|note| *note != "page 1/1  skipped 0");
-    let keys = "A Go there once   Y Make Load use it   B Back";
+    let keys = "A Go there once   X Rename   Y Make Load use it   B Back";
     format!("{row}\n{keys}{}", note.map_or(String::new(), |note| format!("   {note}")))
 }
 
@@ -37,9 +36,9 @@ pub fn row_label(entry: &SetupEntry, fighter: impl Fn(i32) -> String) -> String 
     format!("{} · {p1} / {cpu} · {stage} · spots {} / {}", entry.name, x.0, x.1)
 }
 
-/// Keys the list swallows: X has no job there (the panel would close and leave a rename id behind), and A and Y have none on an empty list.
-pub fn list_ignores(button: Button, count: usize) -> bool {
-    button == Button::X || (count == 0 && matches!(button, Button::A | Button::Y))
+/// The naming keyboard's sub-line: whose name it asks for and the two fighters.
+pub fn name_summary(renaming: bool, player: &str, cpu: &str) -> String {
+    format!("{} · {player} / {cpu}", if renaming { "Renaming" } else { "From your bound save" })
 }
 
 /// Value-only boundary implemented by the native states facade.
@@ -75,6 +74,8 @@ pub struct Setups<T, K> {
     draft: Option<Box<SetupRecord>>,
     selection: Option<Selection<T>>,
     name_revision: u64,
+    /// The setup being renamed (its id): the confirmed name overwrites its file instead of making a new one.
+    rename_id: Option<String>,
 }
 
 impl<T, K> Default for Setups<T, K> {
@@ -84,6 +85,7 @@ impl<T, K> Default for Setups<T, K> {
             draft: None,
             selection: None,
             name_revision: 0,
+            rename_id: None,
         }
     }
 }
@@ -176,9 +178,21 @@ impl<T: Copy, K: Copy> Setups<T, K> {
         })
     }
 
+    pub fn renaming(&self) -> bool {
+        self.rename_id.is_some()
+    }
+
+    /// The setup `id`, as loaded, is the draft; the name the player confirms overwrites its file.
+    pub fn begin_rename(&mut self, id: String, record: SetupRecord) {
+        self.cancel_name();
+        self.draft = Some(Box::new(record));
+        self.rename_id = Some(id);
+    }
+
     /// Cancel exports nothing. A provider ticket is deliberately not dropped.
     pub fn cancel_name(&mut self) {
         self.draft = None;
+        self.rename_id = None;
         self.name_revision = self.name_revision.wrapping_add(1);
         if let Some(Job::Snapshot { present, .. }) = &mut self.job {
             *present = false;
@@ -193,7 +207,7 @@ impl<T: Copy, K: Copy> Setups<T, K> {
     }
 
     /// Validation and I/O failures retain the draft, including the last valid
-    /// attempted name. Successful save creates a new file, never an overwrite.
+    /// attempted name. A save creates a new file, never an overwrite; a rename overwrites its own file.
     pub fn save_name(
         &mut self,
         revision: u64,
@@ -205,7 +219,11 @@ impl<T: Copy, K: Copy> Setups<T, K> {
         }
         let draft = self.draft.as_mut().ok_or("No setup draft to save")?;
         draft.set_name(name).map_err(|e| e.to_string())?;
-        let id = library.save_new(draft).map_err(|e| e.to_string())?;
+        let saved = match &self.rename_id {
+            Some(id) => library.overwrite(id, draft).map(|()| id.clone()),
+            None => library.save_new(draft),
+        };
+        let id = saved.map_err(|e| e.to_string())?;
         self.cancel_name();
         Ok(id)
     }
@@ -321,22 +339,31 @@ mod tests {
             ui.open_library_forward(rows, skipped, "Setup library", Some("bind only".into()));
             list_footer(&ui.view().unwrap().footer)
         };
-        let keys = "A Go there once   Y Make Load use it   B Back";
+        let keys = "A Go there once   X Rename   Y Make Load use it   B Back";
         assert_eq!(footer(vec![row("Corner trap · Mario / Little Mac")], 0), format!("Corner trap · Mario / Little Mac\n{keys}"));
         assert_eq!(footer(vec![row("Corner trap")], 2), format!("Corner trap\n{keys}   page 1/1  skipped 2"));
         assert_eq!(footer((0..40).map(|_| row("Setup")).collect(), 0), format!("Setup\n{keys}   page 1/2  skipped 0"));
     }
 
-    /// X has no job in the Setup library (a rename would close the list and leave its row id behind); A and Y have none on an empty list.
-    fn x_is_swallowed_in_the_list_and_a_y_in_an_empty_one() {
-        assert!(list_ignores(Button::X, 3) && list_ignores(Button::X, 0));
-        assert!(list_ignores(Button::A, 0) && list_ignores(Button::Y, 0));
-        for button in [Button::A, Button::Y, Button::B, Button::Up, Button::Down] {
-            assert!(!list_ignores(button, 3), "{button:?}");
-        }
-        for button in [Button::B, Button::Up, Button::Down] {
-            assert!(!list_ignores(button, 0), "{button:?}");
-        }
+    /// X (or Rename on a setup's own screen): the setup's record is the draft and the confirmed name overwrites its file, so the id
+    /// and every other field stay; a cancelled rename changes nothing and leaves no rename behind.
+    fn renaming_a_setup_overwrites_its_file_and_keeps_its_id() {
+        let dir = std::env::temp_dir().join(format!("tr-setup-rename-{}", std::process::id()));
+        let library = SetupLibrary::new(dir.join("setups"));
+        let id = library.save_new(&record()).unwrap();
+        let mut ui = Setups::<Target, u32>::default();
+        ui.begin_rename(id.clone(), library.load(&id).unwrap());
+        assert!(ui.renaming());
+        let token = ui.name_revision();
+        assert_eq!(ui.save_name(token, "Corner trap", &library).unwrap(), id);
+        assert!(!ui.renaming());
+        assert_eq!(library.load(&id).unwrap().name, "Corner trap");
+        assert_eq!(library.list().unwrap().entries.len(), 1, "a rename writes no second file");
+        ui.begin_rename(id.clone(), library.load(&id).unwrap());
+        ui.cancel_name();
+        assert!(!ui.renaming() && ui.save_name(ui.name_revision(), "Never", &library).is_err());
+        assert_eq!(library.load(&id).unwrap().name, "Corner trap");
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     fn the_chosen_notes_say_what_will_happen_in_plain_words() {
@@ -363,11 +390,13 @@ mod tests {
         assert_eq!((stage_name(None), stage_name(Some(-5))), ("unknown stage", "unknown stage"));
     }
 
-    /// The runtime screens are Switch-only, so their words are read from the source: the naming keyboard and the reading screen
-    /// name the bound save, never a numbered slot the player no longer sees.
+    /// The naming keyboard says where the name goes (a rename, or a new setup from the bound save), never a numbered slot the player
+    /// no longer sees. The runtime screens are Switch-only, so the reading screen's words are read from the source.
     fn the_setup_screens_name_the_bound_save_not_a_slot() {
+        assert_eq!(name_summary(false, "Mario", "Little Mac"), "From your bound save · Mario / Little Mac");
+        assert_eq!(name_summary(true, "Mario", "Little Mac"), "Renaming · Mario / Little Mac");
         let ui = include_str!("../runtime/ui/setups.rs");
-        assert!(ui.contains("From your bound save · {} / {}") && ui.contains("Reading your save…"));
+        assert!(ui.contains("name_summary(") && ui.contains("Reading your save…"));
         assert!(!ui.contains("Save State Slot {slot}") && !ui.contains("Reading the selected saved setup"));
     }
 
@@ -376,7 +405,7 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("the_list_footer_shows_the_keys_in_two_lines_and_a_page_note_only_when_it_matters", the_list_footer_shows_the_keys_in_two_lines_and_a_page_note_only_when_it_matters as fn()),
-            ("x_is_swallowed_in_the_list_and_a_y_in_an_empty_one", x_is_swallowed_in_the_list_and_a_y_in_an_empty_one as fn()),
+            ("renaming_a_setup_overwrites_its_file_and_keeps_its_id", renaming_a_setup_overwrites_its_file_and_keeps_its_id as fn()),
             ("the_chosen_notes_say_what_will_happen_in_plain_words", the_chosen_notes_say_what_will_happen_in_plain_words as fn()),
             ("a_row_names_the_fighters_the_stage_and_both_spots", a_row_names_the_fighters_the_stage_and_both_spots as fn()),
             ("a_saved_stage_id_has_the_lobby_catalogs_name", a_saved_stage_id_has_the_lobby_catalogs_name as fn()),

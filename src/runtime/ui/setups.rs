@@ -1,7 +1,7 @@
 //! Setup screens on the menu worker. The states facade owns native work.
 use super::external;
 use crate::editors::setups::row_label;
-use crate::editors::setups::{chosen, list_footer, list_ignores, Provider, Reply, Res, Setups};
+use crate::editors::setups::{chosen, list_footer, name_summary, Provider, Reply, Res, Setups};
 use crate::engine::macro_ui::macro_panel::{LibraryRow, View};
 use crate::model::menu::{input::Button, table::Editor, Menu};
 use crate::model::state::setup::{SetupLibrary, SetupRecord};
@@ -107,13 +107,26 @@ impl Ui {
             return;
         };
         let token = self.model.name_revision();
-        let summary = format!(
-            "From your bound save · {} / {}",
-            named_macros::fighter_label(record.player.fighter_kind),
-            named_macros::fighter_label(record.cpu.fighter_kind)
+        let summary = name_summary(
+            self.model.renaming(),
+            &named_macros::fighter_label(record.player.fighter_kind),
+            &named_macros::fighter_label(record.cpu.fighter_kind),
         );
         self.name_token = Some(token);
         named_macros::offer_external_name(token, &record.name, &summary);
+    }
+
+    /// X on a row: the setup's name goes through the keyboard, as a new setup's does; the panel X closed is gone, so the naming
+    /// page is the open screen.
+    fn begin_rename(&mut self, id: String) -> Option<String> {
+        let record = match library().load(&id) {
+            Ok(record) => record,
+            Err(why) => return Some(why.to_string()),
+        };
+        self.model.begin_rename(id, record);
+        self.active = Some(Editor::SetupSave);
+        self.offer_name();
+        None
     }
 
     pub fn active_editor(&self) -> Option<Editor> {
@@ -151,11 +164,12 @@ impl Ui {
         if let Some(token) = self.name_token {
             if let Some(confirmed) = named_macros::take_confirmed_name() {
                 if confirmed.context.token == token {
+                    let verb = if self.model.renaming() { "Renamed to" } else { "Saved setup" };
                     match self.model.save_name(token, &confirmed.name, &library()) {
                         Ok(_) => {
                             self.name_token = None;
                             self.active = None;
-                            return Some(format!("Saved setup {}", confirmed.name.trim()));
+                            return Some(format!("{verb} {}", confirmed.name.trim()));
                         }
                         Err(why) => {
                             self.offer_name();
@@ -171,6 +185,9 @@ impl Ui {
             }
         }
         if self.active == Some(Editor::SetupLibrary) {
+            if let Some(id) = named_macros::take_list_rename() {
+                return self.begin_rename(id);
+            }
             let choice = named_macros::take_list_choice()
                 .map(|id| (id, true))
                 .or_else(|| named_macros::take_list_action().map(|id| (id, false)));
@@ -210,7 +227,10 @@ impl Ui {
             }
             return;
         }
-        if self.active == Some(Editor::SetupLibrary) && list_ignores(button, self.library_count) {
+        if self.active == Some(Editor::SetupLibrary)
+            && self.library_count == 0
+            && matches!(button, Button::A | Button::Y)
+        {
             return;
         }
         external::press_panel(button);
