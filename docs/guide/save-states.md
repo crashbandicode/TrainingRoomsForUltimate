@@ -170,27 +170,30 @@ death is On: a save state loads instead". Its value is kept, and counts again wh
 
 A setup is a spot you practise from, kept under a name: where both fighters stand, which fighters they are, and the
 stage. Setups live in their own library, `sd:/ultimate/TrainingRooms/setups/`, apart from your save states, and using
-one never changes a save file. Both rows are in Saves › [Setup library](../menu/saves.md#setup-library).
+one never changes a save file. The rows are in Saves › [Setup library](../menu/saves.md#setup-library).
 
 <!-- CAPTURE-REQUEST setup-own-screen: a new clip, rc14-setup-own-screen.gif (see docs/menu/saves.md). It replaces the A-versus-Y picture, which showed the old A and Y. -->
 
 ### Making a setup
 
-1. Put both fighters where you want to practise and press Save (ZL + D-pad Down). This replaces the spot in your bound
-   save. To keep that spot too, bind another save first (Recording ›
-   [Save states & Macros](../menu/recording.md#save-states--macros)). If your bound save is already the spot you
-   want, skip this step.
-2. Open Saves › Save setup to library... and press A. It reads your save ("Reading your save…"); B cancels.
-3. The keyboard opens with the name "Setup" and "From your bound save" under the name box. Type a name of up to 48
+1. Put both fighters where you want to practise.
+2. Open Saves › Save setup here... and press A.
+3. The keyboard opens with the name "Setup" and "Where they stand now" under the name box. Type a name of up to 48
    characters and confirm.
 4. The notice reads "Saved setup" and the name.
 
-A setup is a copy of your bound save, the one Load goes to, not of where the fighters stand now. That is why step 1
-matters: without it you keep the old spot.
+<!-- CAPTURE-REQUEST setup-save-here: the clip requested in docs/menu/saves.md › Save setup here... (rc14-save-setup-here.gif). -->
 
-Both fighters must have been saved on the same stage. With nothing saved yet, the notice reads "Nothing is saved here
-yet: Save first, or bind a save"; with the two saved on different stages, "Both fighters must be saved on the same
-stage". Either way nothing is kept. Each setup is a new file; one never overwrites another.
+Your bound save, the one Load goes to, stays as it was. The setup keeps what Save keeps: which fighters they are, where
+they stand and face, their damage, ground, air or ledge, their charges, Player 1's held item, a Mii's exact look, and
+the stage. With Save States Off, while a save or load is under way, or while a fighter is still loading, it keeps
+nothing and says why (the list is in [Saves › Save setup here...](../menu/saves.md#save-setup-here)).
+
+To keep your bound save itself as a setup, use Saves › Save setup from bound save... instead. It reads your save
+("Reading your save…"; B cancels), and the keyboard shows "From your bound save". It copies the spot Load goes to, not
+where the fighters stand now. Both fighters must have been saved on the same stage. With nothing saved yet, the notice
+reads "Nothing is saved here yet: Save first, or bind a save"; with the two saved on different stages, "Both fighters
+must be saved on the same stage". Either way nothing is kept. Each setup is a new file; one never overwrites another.
 
 ### Using a setup
 

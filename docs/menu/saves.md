@@ -153,22 +153,48 @@ below.
 
 <!-- CAPTURE-REQUEST setup-own-screen: a new clip, rc14-setup-own-screen.gif (Setup library, A on Corner trap: the screen with Restore here, Make Load use it, Rename, Delete; Right moves the cursor and the line under the rows changes; B goes back to the list). Replaces the A-versus-Y picture. Plan: artifacts/setup-library-review/PROPOSAL.md section 2 and storyboard-setup-library.png. -->
 
-### Save setup to library...
+### Save setup here...
+
+Keeps where both fighters stand now as a new setup under a name you type. Your bound save is not touched.
+
+<!-- CAPTURE-REQUEST setup-save-here: a new clip, rc14-save-setup-here.gif. Training, Mario vs Little Mac: Load puts both in the middle (the bound save); walk them to the far left and far right; Saves › Save setup here..., the keyboard with "Where they stand now", type Corner trap, the notice "Saved setup Corner trap"; the Setup library lists Corner trap with its spots; close the menu and Load: both go back to the middle, so the bound save did not change. The same clip goes in docs/guide/save-states.md › Making a setup. -->
+
+- **Values:** a name of up to 48 characters
+- **Default:** the name "Setup"
+- **How:** put both fighters where you want to practise, open the menu and press A on this row. The keyboard opens,
+  with "Where they stand now" and the two fighters under the name box. Type a name and confirm. The notice reads
+  "Saved setup" and the name.
+
+It keeps what Save keeps: which fighters they are, where they stand and which way they face, their damage, whether
+they are on the ground, in the air or on the ledge, their charges, Player 1's held item, a Mii's exact look, and the
+stage. For the Ice Climbers it keeps Popo's spot, as Save does. Load still goes to your bound save; to make Load go to
+the new setup, open it in the Setup library and pick Make Load use it.
+
+It keeps nothing, and says why on the page's second line, when:
+
+| What it says | What to do |
+| --- | --- |
+| "Save States is Off (Saves page)" | Turn [Save States](#save-states) On. |
+| "A save or restore is already in progress" | Wait for the save, load or setup under way to finish, then try again. |
+| "Wait for the practice fighters to finish loading" | A fighter, or a Mii's exact look, is still loading or changing: try again in a moment. |
+
+More: [Save states › Making a setup](../guide/save-states.md#making-a-setup)
+
+### Save setup from bound save...
 
 Keeps the spot your Load chord goes to now, your bound save, as a new setup under a name you type.
 
 ![The Setup library is empty ("No setups saved"); Save setup to library... keeps the saved spot as the setup Corner trap, and the Setup library then lists it (Corner trap · Mario / Mario)](../media/rc11-save-setup.gif)
 
-<!-- CAPTURE-REQUEST setup-save-setup: reshoot this clip as rc14-save-setup.gif after the list-screen fixes (Mario vs Little Mac on far-apart spots: Save, Save setup to library..., the keyboard, the notice, the list with the new row, its footer naming the stage and the spots). Plan: artifacts/setup-library-review/PROPOSAL.md section 2.1 and storyboard-save-setup.png. -->
+<!-- CAPTURE-REQUEST setup-save-setup: reshoot this clip as rc14-save-setup.gif after the list-screen fixes (Mario vs Little Mac on far-apart spots: Save, Save setup from bound save..., the keyboard, the notice, the list with the new row, its footer naming the stage and the spots). Plan: artifacts/setup-library-review/PROPOSAL.md section 2.1 and storyboard-save-setup.png. -->
 
 - **Values:** a name of up to 48 characters
 - **Default:** the name "Setup"
 - **How:** A reads your save ("Reading your save…"; B cancels), then the keyboard opens, with "From your bound save" and
   the two fighters under the name box. Type a name and confirm. The notice reads "Saved setup" and the name.
 
-It copies your bound save, not where the fighters stand now. To keep a new spot, press Save (ZL + D-pad Down) there
-first. Save replaces the spot in your bound save (with nothing bound, it makes a new save), so to keep the old spot too,
-bind another save first ([Save states & Macros](recording.md#save-states--macros)).
+It copies your bound save, not where the fighters stand now: for that, use Save setup here... above. This row keeps a
+save you already have as a setup.
 
 Both fighters must have been saved on the same stage. With nothing saved yet, the notice reads "Nothing is saved here
 yet: Save first, or bind a save"; with the two saved on different stages, "Both fighters must be saved on the same
