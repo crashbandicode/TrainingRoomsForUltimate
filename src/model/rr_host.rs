@@ -22,12 +22,13 @@ use super::rr_runtime::{
     KeyboardOffer, Tape, EMPTY_COMBO, READ_WINDOW, RESIDENT_FRAMES,
 };
 use crate::model::combo::Combo;
+use crate::model::combo_record::{ComboLibrary, ComboRecord};
 use crate::model::cpu::playback::PlaybackState;
 use crate::model::input_delay::MappedInputs;
 use crate::model::recording::{inject_values, ControlCtx, ControlOut, CpuRoleDrive, Inject, Phase};
 use crate::model::recording_menu::{Effect, LoopMark, Selection, ViewRole};
 use crate::model::state::record::SavedState;
-use crate::model::store::Store;
+use crate::model::store::{Record, Store};
 
 const ROLE_PLAYER: u8 = 1;
 const ROLE_CPU: u8 = 2;
@@ -872,7 +873,7 @@ pub fn follow_grade<'a>(applied: Option<&str>, drill: Option<&'a str>) -> GradeF
 #[cfg(test)]
 pub fn start_sequence_drill(root: &Path, id: &str) -> Option<crate::model::drill::SequenceDrill> {
     let sequence = Store::<Sequence>::new(root.join(SEQUENCES_DIR)).load(id).ok()?;
-    let combos = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
+    let combos = ComboLibrary::new(root.join("combos"));
     let present = sequence.present_ids(&combos);
     let ids = present.iter().map(String::as_str).collect::<Vec<_>>();
     Some(crate::model::drill::SequenceDrill::resume(id, &ids, sequence.streak, sequence.best))
@@ -909,7 +910,7 @@ impl SequencePlan {
 /// The plan of sequence `id`, read from the card. A deleted combo is skipped. None when the file does not load.
 pub fn sequence_plan(root: &Path, id: &str) -> Option<SequencePlan> {
     let sequence = Store::<Sequence>::new(root.join(SEQUENCES_DIR)).load(id).ok()?;
-    let combos = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
+    let combos = ComboLibrary::new(root.join("combos"));
     let steps = sequence
         .combos
         .iter()
@@ -1262,7 +1263,7 @@ fn ask_drill(root: &Path, tick: &mut Tick) {
     let Some(id) = lock(&DRILL_ASK).take() else {
         return;
     };
-    let Ok(record) = crate::model::combo_record::ComboLibrary::new(root.join("combos")).load(&id) else {
+    let Ok(record) = ComboLibrary::new(root.join("combos")).load(&id) else {
         return;
     };
     let Some(recorded) = record.recorded_on.filter(|name| !name.is_empty()) else {
@@ -1339,11 +1340,21 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, online: bool, ti
                 }
             }
         }
-        Effect::RenameSave { id, name } => rename_save(root, &id, name),
-        Effect::RenameMacro { id, name } => rename_macro(root, &id, name),
-        Effect::RenameChain { id, name } => rename_chain(root, &id, name),
-        Effect::RenameCombo { id, name } => rename_combo(root, &id, name),
-        Effect::RenameSequence { id, name } => rename_sequence(root, &id, name),
+        Effect::RenameSave { id, name } => {
+            rename::<NamedSave>(root, SAVES_DIR, &id, |f| f.name = name)
+        }
+        Effect::RenameMacro { id, name } => {
+            rename::<MacroRecording>(root, MACROS_DIR, &id, |f| f.name = name)
+        }
+        Effect::RenameChain { id, name } => {
+            rename::<Chain>(root, MACROS_DIR, &id, |f| f.name = name)
+        }
+        Effect::RenameCombo { id, name } => {
+            rename::<ComboRecord>(root, "combos", &id, |f| f.name = name)
+        }
+        Effect::RenameSequence { id, name } => {
+            rename::<Sequence>(root, SEQUENCES_DIR, &id, |f| f.name = name)
+        }
         Effect::DeleteFile { kind, id } => {
             if delete_file(root, kind, &id) {
                 bump_catalog();
@@ -1394,7 +1405,7 @@ pub fn delete_file(root: &Path, kind: crate::model::recording_menu::FileKind, id
     let deleted = match kind {
         FileKind::Macro => Library::new(root.join(MACROS_DIR)).delete(id).is_ok(),
         FileKind::Chain => Store::<Chain>::new(root.join(MACROS_DIR)).delete(id).is_ok(),
-        FileKind::Combo => crate::model::combo_record::ComboLibrary::new(root.join("combos")).delete(id).is_ok(),
+        FileKind::Combo => ComboLibrary::new(root.join("combos")).delete(id).is_ok(),
         FileKind::Sequence => Store::<Sequence>::new(root.join(SEQUENCES_DIR)).delete(id).is_ok(),
     };
     if !deleted {
@@ -1422,46 +1433,11 @@ pub fn delete_file(root: &Path, kind: crate::model::recording_menu::FileKind, id
     true
 }
 
-fn rename_save(root: &Path, id: &str, name: String) {
-    let store = Store::<NamedSave>::new(root.join(SAVES_DIR));
-    let Ok(mut save) = store.load(id) else { return };
-    save.name = name;
-    if store.overwrite(id, &save).is_ok() {
-        bump_catalog();
-    }
-}
-
-fn rename_macro(root: &Path, id: &str, name: String) {
-    let store = Library::new(root.join(MACROS_DIR));
+/// Rename on a save, a macro, a chain, a combo or a sequence: the file is rewritten under its id.
+fn rename<R: Record>(root: &Path, dir: &str, id: &str, set: impl FnOnce(&mut R)) {
+    let store = Store::<R>::new(root.join(dir));
     let Ok(mut file) = store.load(id) else { return };
-    file.name = name;
-    if store.overwrite(id, &file).is_ok() {
-        bump_catalog();
-    }
-}
-
-fn rename_chain(root: &Path, id: &str, name: String) {
-    let store = Store::<Chain>::new(root.join(MACROS_DIR));
-    let Ok(mut file) = store.load(id) else { return };
-    file.name = name;
-    if store.overwrite(id, &file).is_ok() {
-        bump_catalog();
-    }
-}
-
-fn rename_combo(root: &Path, id: &str, name: String) {
-    let store = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
-    let Ok(mut file) = store.load(id) else { return };
-    file.name = name;
-    if store.overwrite(id, &file).is_ok() {
-        bump_catalog();
-    }
-}
-
-fn rename_sequence(root: &Path, id: &str, name: String) {
-    let store = Store::<Sequence>::new(root.join(SEQUENCES_DIR));
-    let Ok(mut file) = store.load(id) else { return };
-    file.name = name;
+    set(&mut file);
     if store.overwrite(id, &file).is_ok() {
         bump_catalog();
     }
@@ -1533,7 +1509,7 @@ fn finish_make(root: &Path, tick: &mut Tick) {
 
 fn write_crop_range(root: &Path, source: &str, combo: bool, start: u32, end: u32) -> Option<String> {
     if combo {
-        let library = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
+        let library = ComboLibrary::new(root.join("combos"));
         let original = library.load(source).ok()?;
         let span = original.combo.len() as u32;
         let (start, end) = clamp_range(start, end, span)?;
@@ -2887,7 +2863,7 @@ mod tests {
         let nair = one_combo(&root, "Nair loop combo", Move::Aerial);
         let id = one_sequence(&root, "Corner to kill", &[ryu.clone(), nair.clone()]);
         let plan = sequence_plan(&root, &id).unwrap();
-        rename_combo(&root, &ryu, "Ryu opener".into());
+        rename::<ComboRecord>(&root, "combos", &ryu, |f| f.name = "Ryu opener".into());
         assert!(save_sequence_progress(&root, &id, 2, 3));
         let renamed = sequence_plan(&root, &id).unwrap();
         assert_eq!(renamed.steps[0].name, "Ryu opener");
