@@ -73,8 +73,10 @@ Ice Climbers can be loaded as the pair (Popo and Nana) or as Popo alone. Three s
 
 - **Fighters & Stages ›
   [Solo Popo (original Ice Climbers)](../menu/fighters-and-stages.md#solo-popo-original-ice-climbers):** Player 1
-  picked Ice Climbers at the character select. It covers Player 1's 0.
-- **The "S" mark on Ice Climbers in the Player list** (Y in Character Cycles): the Ice Climbers in Player 1's cycle.
+  picked Ice Climbers at the character select. It applies only to them: Player 1's 0 (picking them again in Player
+  Character counts too).
+- **The "S" mark on Ice Climbers in the Player list** (Y in Character Cycles): the Ice Climbers in Player 1's cycle,
+  and Ice Climbers picked in Player Character when Player 1 started as another fighter.
 - **The "S" mark on Ice Climbers in the CPU list** (Y in Character Cycles, CPU list): the CPU's Ice Climbers, its 0
   and its cycle alike.
 

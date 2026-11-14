@@ -42,6 +42,11 @@ The pick follows the fighter on screen: when you enter Training, or a cycle chor
 fighter. A greyed Mii tile has no Mii that Player 1 can load (the help line reads "… - unavailable"). In a waiting room
 this changes only your practice fighter; the match uses the fighter you picked for it.
 
+Ice Climbers picked here are Popo alone when the "S" mark on Ice Climbers in the Player list of
+[Character Cycles](#character-cycles) is On. [Solo Popo (original Ice Climbers)](#solo-popo-original-ice-climbers) does
+not apply to this pick: it applies only to the Ice Climbers picked at the character select. (If Player 1 picked Ice
+Climbers there, picking them here again is going back to that fighter, so that row still decides.)
+
 ### CPU Character
 
 The same grid for the CPU. The new fighter loads when you close the menu. It always works; in a waiting room it
@@ -78,7 +83,10 @@ More: [Fighter cycles › The Character Cycles editor](../guide/fighter-cycles.m
 
 On: when Player 1 picked Ice Climbers at the character select, Player 1 is Popo alone, without Nana. That counts for
 Player 1's 0 in the cycle too. The Ice Climbers in a cycle list have their own Solo Popo mark (Y in
-[Character Cycles](#character-cycles)); the CPU's mark covers both its cycle and the CPU's own pick.
+[Character Cycles](#character-cycles)); the CPU's mark covers both its cycle and the CPU's own pick. This row applies
+only to the Ice Climbers picked at the character select. Ice Climbers picked in [Player Character](#player-character)
+after starting as another fighter follow the Player list's "S" mark, like the cycle, so with this row Off Player 1 can
+still be Popo alone.
 
 - **Values:** On, Off
 - **Default:** Off
