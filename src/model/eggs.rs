@@ -379,6 +379,7 @@ impl Run {
     /// minute ends). The notice's length when its text changed (`write_notice`).
     pub fn step(&mut self, tick: bool, y: f32, hits: &[Hit], air: bool, kind: i32) -> Option<u16> {
         // The break animations run on the clock's ticks (pause freezes them); an ended run only finishes them.
+        let dt = u32::from(tick);
         age(&mut self.bursts, tick);
         self.air = air;
         // A run the CPU target's last hit ended still holds its target until this pass closes it.
