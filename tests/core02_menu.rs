@@ -158,14 +158,14 @@ fn layout_row_counts_match_the_rc_freeze() {
 
 fn core02_table_carriage_return() {
     // A grid page whose last row is short: moving right off the end of the row returns to its first
-    // cell and skips the empty cells (the item grid docked: 38 of 40 cells).
+    // cell and skips the empty cells (the item grid docked: 39 of 40 cells, rc.13's Wario bike is cell 38).
     let layout = GridLayout::new(GridKind::Items, ConsoleMode::Docked);
-    assert_eq!(layout.page_len(0), 38);
-    assert_eq!(layout.step(0, 37, Move::Right), 35);
-    assert_eq!(layout.step(0, 35, Move::Left), 37, "left from the first cell comes to the last filled one");
+    assert_eq!(layout.page_len(0), 39);
+    assert_eq!(layout.step(0, 38, Move::Right), 35);
+    assert_eq!(layout.step(0, 35, Move::Left), 38, "left from the first cell comes to the last filled one");
     // Down from the row above the short row, in an empty column, skips to the next filled cell below.
-    assert_eq!(layout.step(0, 33, Move::Down), 3, "cell 38 is empty: the move goes on and wraps to the top");
-    assert_eq!(layout.step(0, 3, Move::Up), 33, "up from the top wraps past the empty cell");
+    assert_eq!(layout.step(0, 34, Move::Down), 4, "cell 39 is empty: the move goes on and wraps to the top");
+    assert_eq!(layout.step(0, 4, Move::Up), 34, "up from the top wraps past the empty cell");
 }
 
 fn core02_page_machine() {
@@ -909,14 +909,14 @@ fn grid_screen_pages_with_l_r_and_keeps_the_cursor_on_a_tile() {
     assert_eq!(at(&m), (2, 0));
     m.press(Button::R);
     assert_eq!(at(&m), (0, 0), "pages wrap");
-    // The last page has six tiles: moving to it from a later cell lands on its last tile.
+    // The last page has seven tiles (rc.13's Wario bike is the seventh): moving to it from a later cell lands on its last tile.
     for _ in 0..3 {
         m.press(Button::Down);
     }
     m.press(Button::Right);
     assert_eq!(at(&m), (0, 13));
     m.press(Button::L);
-    assert_eq!(at(&m), (2, 5));
+    assert_eq!(at(&m), (2, 6));
     // Docked, the item grid is one page: L / R stay on it.
     let mut m = menu();
     goto(&mut m, "Give item");

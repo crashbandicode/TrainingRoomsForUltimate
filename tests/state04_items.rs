@@ -60,6 +60,22 @@ fn state04_choice_of_a_held_item() {
     assert_eq!(items::choice_of(ids.get(C::ItemDaisyTurnip), 5, kind_of), Some(3));
 }
 
+/// rc.13 (the operator: "Wario's bike should be one of the character items we can spawn"): the bike is appended as choice 38,
+/// so every saved choice keeps its index; it needs Wario's data; every list of the grid agrees on 39.
+fn state04_wario_bike() {
+    let ids = Table::sequential(5000);
+    let spec = items::spec_for(38).expect("choice 38");
+    assert_eq!((spec.kind, spec.source, spec.turnip), (C::ItemWarioBike, Some(C::KindWario), None));
+    assert_eq!(items::choice_of(ids.get(C::ItemWarioBike), 0, |c: C| ids.get(c)), Some(38));
+    assert_eq!(items::spec_for(37).map(|s| s.kind), Some(C::ItemYoungBomb), "Young Link keeps choice 37");
+    assert_eq!(model::state::held_item::ITEM_NAMES[38], "Wario: Bike");
+    assert_eq!(model::catalog::ITEMS, model::state::held_item::ITEM_NAMES);
+    // The carried engine copy (`src/model/items/character_items.rs`, not in this crate) is the same list.
+    let carried = include_str!("../src/model/items/character_items.rs");
+    assert!(carried.contains("pub const ITEM_NAMES: [&str; 39]") && carried.contains("\"Wario: Bike\""));
+    assert_eq!(model::menu::grid::ITEM_TILES, 39);
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -67,5 +83,6 @@ fn case_table() {
         ("state04_snapshot_precedence", state04_snapshot_precedence as fn()),
         ("state04_face_probability_hooks", state04_face_probability_hooks as fn()),
         ("state04_choice_of_a_held_item", state04_choice_of_a_held_item as fn()),
+        ("state04_wario_bike", state04_wario_bike as fn()),
     ]);
 }

@@ -110,11 +110,14 @@ More: [Fighter cycles › Kirby hats](../guide/fighter-cycles.md#kirby-hats)
 
 ### Give item
 
-Opens a grid of 38 fighter items: turnips (each face), bombs, Pac-Man's bonus fruit, Robin's tome and Levin Sword, and
-more. A puts the item in Player 1's hand as soon as the menu closes, in place of anything Player 1 holds. The notice
-reads "Character Item" and the item's name.
+Opens a grid of 39 fighter items: turnips (each face), bombs, Pac-Man's bonus fruit, Robin's tome and Levin Sword,
+Wario's bike (the last tile), and more. A puts the item in Player 1's hand as soon as the menu closes, in place of
+anything Player 1 holds. The notice reads "Character Item" and the item's name.
 
-- **Values:** the 38 items
+Wario's bike works for any fighter: Player 1 carries it, and A throws it. It drives forward and hits whoever it meets,
+then stays on the floor.
+
+- **Values:** the 39 items
 - **How:** A opens the grid. The D-pad moves, L / R turn its page, A gives, B goes back. Every A asks again, the same
   item included; if you press A on several, the last one is given.
 

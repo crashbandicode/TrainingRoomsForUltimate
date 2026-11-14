@@ -91,6 +91,7 @@ pub fn spec_for(choice: u8) -> Option<Spec> {
         35 => spec(C::ItemToonBomb, Some(C::KindToonLink)),
         36 => spec(C::ItemWoodChip, Some(C::KindVillager)),
         37 => spec(C::ItemYoungBomb, Some(C::KindYoungLink)),
+        38 => spec(C::ItemWarioBike, Some(C::KindWario)),
         _ => None,
     }
 }

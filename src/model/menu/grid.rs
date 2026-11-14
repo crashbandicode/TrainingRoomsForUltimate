@@ -1,8 +1,8 @@
 //! Paging of the item and stage grids by console mode (N5, Q14 B). The mode is an input: the
 //! layout is chosen when the grid opens and stays fixed until it closes (SPEC-core-03 §2.5).
 //!
-//! * Items (38): docked, one page of 5 columns x 8 rows (38 used, short names); handheld, three
-//!   pages of 4 x 4 (16, 16, 6, full names).
+//! * Items (39): docked, one page of 5 columns x 8 rows (39 used, short names); handheld, three
+//!   pages of 4 x 4 (16, 16, 7, full names).
 //! * Stages (All and the catalog's stages, 116 tiles for the carried catalog of 115): docked, three pages of\n//!   5 x 8 (40, 40, 36, short names); handheld, eight pages of 4 x 4 (seven of 16, one of 4, full names).
 
 /// The console's operation mode when a grid opens.
@@ -36,8 +36,8 @@ pub enum RosterUse {
     Hats,
 }
 
-/// The give-item grid's tiles (`ITEM_NAMES`: 38 items, turnip faces included).
-pub const ITEM_TILES: usize = 38;
+/// The give-item grid's tiles (`ITEM_NAMES`: 39 items, turnip faces included).
+pub const ITEM_TILES: usize = 39;
 /// The stage grid's tiles: the All tile and every stage of the catalog (never a hard-coded count: lead ruling
 /// 2026-11-02; the carried catalog has 115 stages, package 6 supplies the authoritative list).
 pub const STAGE_TILES: usize = 118;

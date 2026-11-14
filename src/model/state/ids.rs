@@ -175,6 +175,7 @@ crate::model::cpu::ids::game_constants! {
     ItemToonBomb = "ITEM_KIND_TOONLINKBOMB",
     ItemWoodChip = "ITEM_KIND_WOOD",
     ItemYoungBomb = "ITEM_KIND_YOUNGLINKBOMB",
+    ItemWarioBike = "ITEM_KIND_WARIOBIKE",
     ItemBanana = "ITEM_KIND_BANANA",
     ItemDaisyTurnip = "ITEM_KIND_DAISYDAIKON",
     ItemPeachTurnip = "ITEM_KIND_PEACHDAIKON",

@@ -9502,7 +9502,7 @@
    "dest": "src/model/items/character_items.rs",
    "crate": "consts",
    "src_sha256": "57640dd2a5a9ea201d3a588e05bb950f5f7cecb551d602acfeeb44d0b5a3c2bf",
-   "dest_sha256": "3821e1da5f6be98a151c99851ae757df4356079d412863a58072afc3286ad507",
+   "dest_sha256": "41c39793abc82a38f03145d8561b00a4f315cb663b818fe2e0e77d3daf740c07",
    "edits": [
     {
      "old": "use {crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::Toggle, crate::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};\n",
@@ -9591,6 +9591,16 @@
       ]
      ],
      "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+    },
+    {
+     "old": "pub const ITEM_NAMES: [&str; 38] = [",
+     "new": "pub const ITEM_NAMES: [&str; 39] = [",
+     "reason": "rc.13 (the operator 11-14: \"Wario's bike should be one of the character items we can spawn\"): Wario's bike (ITEM_KIND_WARIOBIKE, needs Wario's data) is appended to the Give item list as choice 38, so every older saved choice keeps its index"
+    },
+    {
+     "old": "    \"Toon Link: Bomb\", \"Villager: Wood Chip\", \"Young Link: Bomb\",\n];",
+     "new": "    \"Toon Link: Bomb\", \"Villager: Wood Chip\", \"Young Link: Bomb\", \"Wario: Bike\",\n];",
+     "reason": "rc.13 (the operator 11-14: \"Wario's bike should be one of the character items we can spawn\"): Wario's bike (ITEM_KIND_WARIOBIKE, needs Wario's data) is appended to the Give item list as choice 38, so every older saved choice keeps its index"
     }
    ]
   },
@@ -13255,7 +13265,7 @@
    "dest": "src/runtime/roster/character_items.rs",
    "crate": "root",
    "src_sha256": "b0679903a58021f041bec47d30926f946fc6ef8dbfb679574fd12e597ab78933",
-   "dest_sha256": "70bb80751e948cc549c6e3a6c9f820a6db16a028bc49b752c770ccd479d17701",
+   "dest_sha256": "1123cdcd39e8d88b1d6219e400dcec9053b3b284797a5f91569e510d057bff54",
    "edits": [
     {
      "old": "const LEGACY_INDICES: [usize; 38] = [\n    4, 15, 5, 6, 7, 8, 9, 10, 0, 1, 12, 13, 14, 16,\n    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,\n    31, 32, 2, 3, 11, 40, 41, 42, 43, 44,\n];",
@@ -13355,6 +13365,16 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "old": "const LEGACY_INDICES: [usize; 38] = [\n    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,\n];\n\n",
+     "new": "",
+     "reason": "rc.13 (the operator 11-14: \"Wario's bike should be one of the character items we can spawn\"): Wario's bike (ITEM_KIND_WARIOBIKE, needs Wario's data) is appended to the Give item list as choice 38, so every older saved choice keeps its index; the identity position map goes, the table is indexed by the choice"
+    },
+    {
+     "old": "let item = &ALL_CHAR_ITEMS[*LEGACY_INDICES.get(choice)?];",
+     "new": "let item = ALL_CHAR_ITEMS.get(choice)?;",
+     "reason": "rc.13 (the operator 11-14: \"Wario's bike should be one of the character items we can spawn\"): Wario's bike (ITEM_KIND_WARIOBIKE, needs Wario's data) is appended to the Give item list as choice 38, so every older saved choice keeps its index; the identity position map goes, the table is indexed by the choice"
     }
    ]
   },

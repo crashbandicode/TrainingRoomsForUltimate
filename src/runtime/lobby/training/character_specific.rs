@@ -1,4 +1,4 @@
-//! The fork's `training::character_specific`, as far as the roster cycle's character items use it: the table of the 38 grantable
+//! The fork's `training::character_specific`, as far as the roster cycle's character items use it: the table of the 39 grantable
 //! items and the turnip face override. Our code: the table is SPEC-state-04 section 2.1 (item kind, owner fighter, variation per
 //! entry, in the order of `engine::items::character_items::ITEM_NAMES`); the face override is package 3's (the sixteen turnip
 //! probability hooks read it).
@@ -97,16 +97,17 @@ pub(crate) mod items {
                 $m!(FIGHTER_KIND_TOONLINK, ITEM_KIND_TOONLINKBOMB),
                 $m!(FIGHTER_KIND_MURABITO, ITEM_KIND_WOOD),
                 $m!(FIGHTER_KIND_YOUNGLINK, ITEM_KIND_YOUNGLINKBOMB),
+                $m!(FIGHTER_KIND_WARIO, ITEM_KIND_WARIOBIKE),
             ]
         };
     }
 
     /// Entry `choice` is the item named `ITEM_NAMES[choice]` (the saved item choice indexes this table directly).
-    pub static ALL_CHAR_ITEMS: [CharItem; 38] = rows!(item);
+    pub static ALL_CHAR_ITEMS: [CharItem; 39] = rows!(item);
 
     /// The same rows by constant name, for the diag dump (`[ItemTable]`): `(fighter, item kind, variation)`.
     #[cfg(feature = "diag")]
-    const NAMES: [(&str, Option<&str>, Option<&str>); 38] = rows!(names);
+    const NAMES: [(&str, Option<&str>, Option<&str>); 39] = rows!(names);
 
     /// Diag build, once, from the first practice frame (the game's constant table is built by then): every constant of the table,
     /// resolved through the game's own lookup (`game::lua_const`, package 2's mechanism), one `[ItemTable]` line per entry. A name

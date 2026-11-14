@@ -13,10 +13,6 @@ use crate::runtime::lobby::training::{self, character_specific::items::{ALL_CHAR
 use crate::runtime::roster::character_roster::sources;
 use crate::engine::swap::source_lifetime::Holder;
 
-const LEGACY_INDICES: [usize; 38] = [
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
-];
-
 #[derive(Clone, Copy)]
 struct Spec { choice: usize, kind: i32, variation: i32, source: i32 }
 #[derive(Clone, Copy)]
@@ -54,7 +50,7 @@ power_functions!(peach, PEACH);
 power_functions!(daisy, DAISY);
 
 fn spec(choice: usize) -> Option<Spec> {
-    let item = &ALL_CHAR_ITEMS[*LEGACY_INDICES.get(choice)?];
+    let item = ALL_CHAR_ITEMS.get(choice)?;
     let kind = match choice {
         2..=5 => *ITEM_KIND_DAISYDAIKON,
         8 => *ITEM_KIND_BANANA,
