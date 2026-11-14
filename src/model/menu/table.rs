@@ -221,7 +221,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 92] = [
+pub static ROWS: [Row; 93] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -275,6 +275,8 @@ pub static ROWS: [Row; 92] = [
           "Frames after a grab before the CPU pummels. Tick values or a range.\nIt pummels until its throw, or with Throw None until the grab ends."),
     r(ATTACKS, "Falling Aerials", "falling_aerials", Control::YesNoRandom,
       "Whether the CPU's aerials come while it is falling.\nRandom picks either way each time."),
+    r(ATTACKS, "Aerial Drift", "aerial_drift", Control::MultiSelect(&o::AERIAL_DRIFT),
+      "Where the CPU drifts during its mashed aerials. In and Out\nare relative to you. With several ticked it picks one at random."),
     delay(ATTACKS, "Aerial Delay", "aerial_delay", 1, "aerial_delay_range",
           "Frames the CPU waits before an aerial.\nTick values, or set a minimum and a maximum."),
     r(ATTACKS, "Full Hop", "full_hop", Control::YesNoRandom,

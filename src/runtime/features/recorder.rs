@@ -367,6 +367,18 @@ unsafe fn on_ai_frame(ai: usize) {
         bump(COUNT_INJECT);
         write_controller(controller, write);
     }
+    // Aerial Drift: on the mashed aerial's airborne frames the rolled drift holds the stick x the AI just wrote.
+    if let (None, None, Some(key)) = (control.write, role.write, key) {
+        let cpu_x = game::natives::pos_x(body.accessor);
+        if let Some(drift) = cpu::aerial_drift(key, cpu_x, f32::from(facing)) {
+            let stick = drift.unwrap_or(0.0) as i64;
+            event("aerial_drift", "x", cpu_x as i64, "stick", stick);
+            if let Some(x) = drift {
+                ((controller + CTRL_STICK_X) as *mut u32).write(x.to_bits());
+                ((controller + CTRL_CLAMPED_X) as *mut u32).write(x.to_bits());
+            }
+        }
+    }
     if control.hold_cliff_timer || role.hold_cliff_timer {
         let rest = INT_CLIFF_REST.load(Ordering::Acquire);
         if rest != UNRESOLVED

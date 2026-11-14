@@ -213,6 +213,9 @@ impl Mash {
     /// Steps 3 and 4: the dash latch, then the current action's command bits and its completion.
     pub fn perform(&mut self, t: &Table, s: &CpuSettings, counters: &mut Counters, f: &CmdFacts) -> CmdOut {
         let mut out = CmdOut::default();
+        if self.rolled.drift_status != Some(f.status) {
+            self.rolled.drift_status = None;
+        }
         let in_dash = t.is(C::StatusDash, f.status);
         if !(self.queue.current() == Some(Action::DASH_ATTACK) && in_dash) {
             self.transitioning_dash = false;
@@ -310,6 +313,9 @@ impl Mash {
             if t.is(expected, f.status) || character_completes(t, f, expected) {
                 self.complete();
                 self.rolled.angle_status = self.rolled.attack_angle.map(|_| f.status);
+                if action.is_aerial() {
+                    self.rolled.drift_status = Some(f.status);
+                }
                 let _ = s;
                 return out;
             }

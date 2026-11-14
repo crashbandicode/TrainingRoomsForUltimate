@@ -124,6 +124,10 @@ pub struct Rolled {
     pub fast_fall: bool,
     pub falling_aerial: bool,
     pub fast_fall_delay: u16,
+    /// Aerial Drift: the picked option (0 None, 1 In, 2 Out, 3 Forward, 4 Back), `None` for an empty row.
+    pub drift: Option<usize>,
+    /// The status the mashed aerial completed in: the drift holds while the body stays in it.
+    pub drift_status: Option<i32>,
 }
 
 /// What `buffer_menu_mash` did.
@@ -173,7 +177,7 @@ impl Mash {
     pub const fn new() -> Self {
         Self {
             queue: Queue::new(),
-            rolled: Rolled { attack_angle: None, angle_status: None, aerial_delay: 0, full_hop: false, fast_fall: false, falling_aerial: false, fast_fall_delay: 0 },
+            rolled: Rolled { attack_angle: None, angle_status: None, aerial_delay: 0, full_hop: false, fast_fall: false, falling_aerial: false, fast_fall_delay: 0, drift: None, drift_status: None },
             transitioning_dash: false,
             queued_aerial: None,
             latch: None,
@@ -229,6 +233,7 @@ impl Mash {
         self.rolled.full_hop = s.full_hop.pick(rng) == Some(0);
         self.rolled.fast_fall = s.fast_fall.pick(rng) == Some(0);
         self.rolled.falling_aerial = s.falling_aerials.pick(rng) == Some(0);
+        self.rolled.drift = s.aerial_drift.pick(rng);
         Buffered::Queued { follow_up: follow_up.is_some() }
     }
 

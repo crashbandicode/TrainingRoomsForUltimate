@@ -533,11 +533,13 @@ fn cpu06_roll_points() {
         }),
         ("fast_fall", &[1, 0]),
         ("full_hop", &[0, 1]),
+        ("aerial_drift", &[0, 0, 0, 1, 0]),
     ]);
     let mut r = rng();
     let mut mash = Mash::new();
     mash.buffer_menu_mash(&s, &mut r, BufferContext::default(), Some(Action::UAIR));
     assert_eq!(mash.rolled.attack_angle, Some(1));
+    assert_eq!(mash.rolled.drift, Some(3), "Forward");
     assert_eq!(mash.rolled.aerial_delay, 7);
     assert!(mash.rolled.fast_fall);
     assert!(!mash.rolled.full_hop);

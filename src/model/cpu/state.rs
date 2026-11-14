@@ -577,6 +577,17 @@ impl Cpu {
         throw::attack_angle_value(&fighter.mash, fighter.seen.situation == Situation::Cliff, self.playback.running)
     }
 
+    /// Aerial Drift: `Some` on the mashed aerial's airborne frames, holding the rolled drift's stick x (In and Out
+    /// follow you, `dx` = your x less the CPU's; Forward and Back the facing `lr`); `None` otherwise and during a playback.
+    pub fn aerial_drift(&self, key: FighterKey, dx: f32, lr: f32) -> Option<Option<f32>> {
+        let Fighter { mash, seen, .. } = &self.fighters[key.index()];
+        let air = seen.situation == Situation::Air && !self.playback.running;
+        let held = air && mash.rolled.drift_status == Some(seen.status);
+        let t = if dx > 0.0 { 1.0 } else { -1.0 };
+        let options = [None, Some(t), Some(-t), Some(lr), Some(-lr)];
+        held.then(|| mash.rolled.drift.and_then(|d| options[d]))
+    }
+
     /// `get_stick_y`: crouch.
     pub fn crouch_stick(&self, key: FighterKey) -> Option<f32> {
         let fighter = &self.fighters[key.index()];

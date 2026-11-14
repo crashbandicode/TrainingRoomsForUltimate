@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 115;
+pub const COUNT: usize = 116;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -199,4 +199,6 @@ pub static DEFS: [Def; COUNT] = [
     row!("lobby_items", Single, 2, [0]),
     // rc.6 CPU level: Off, Lv 1..=9; Off (the game's own level) until the player picks one. Appended like lobby_items.
     row!("cpu_level", Single, 10, [0]),
+    // rc.13 Aerial Drift: None, In, Out, Forward, Back; appended like lobby_items.
+    row!("aerial_drift", Weighted, 5, []),
 ];

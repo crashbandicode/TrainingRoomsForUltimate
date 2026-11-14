@@ -15,6 +15,7 @@ pub static MASH_TRIGGERS: [&str; 17] = [
 ];
 
 pub static ATTACK_ANGLE: [&str; 3] = ["Neutral", "Up", "Down"];
+pub static AERIAL_DRIFT: [&str; 5] = ["None", "In", "Out", "Forward", "Back"];
 pub static THROW: [&str; 5] = ["None", "Forward Throw", "Backward Throw", "Up Throw", "Down Throw"];
 pub static LEDGE_OPTIONS: [&str; 10] = [
     "Neutral Getup", "Roll", "Jump", "Getup Attack", "Wait", "Playback Slot 1", "Playback Slot 2", "Playback Slot 3",

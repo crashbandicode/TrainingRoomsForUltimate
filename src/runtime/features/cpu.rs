@@ -353,6 +353,11 @@ pub fn mash_head(key: FighterKey) -> Option<u8> {
     with(|cpu| cpu.fighters[key.index()].mash.queue.current().and_then(|a| a.playback_slot())).flatten()
 }
 
+/// Aerial Drift for the body `key` at `cpu_x` facing `lr`: the recorder writes it to the CPU's controller.
+pub fn aerial_drift(key: FighterKey, cpu_x: f32, lr: f32) -> Option<Option<f32>> {
+    with(|cpu| cpu.aerial_drift(key, player_x() - cpu_x, lr)).flatten()
+}
+
 /// The recorder is done with the head (the playback it asked for ended or was refused).
 pub fn mash_pop(key: FighterKey) {
     with(|cpu| {

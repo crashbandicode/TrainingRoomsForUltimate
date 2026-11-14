@@ -367,6 +367,16 @@ Whether the CPU waits until it is falling before its aerial.
 
 ![The CPU jumps out of Mario's jab and does a neutral air, three times: Falling Aerials No (on the way up), Falling Aerials Yes (on the way down), then Aerial Delay 30 frames (later still); a zoomed view of the CPU at the right](../media/rc11-cpu-falling-aerials-aerial-delay.gif)<br>*Falling Aerials No, then Yes, then Aerial Delay 30 (shared with Aerial Delay)*
 
+### Aerial Drift
+
+Which way the CPU holds the stick during an aerial from its mash, from the frame the aerial starts until it lands. In
+and Out are relative to you, as in DI: In drifts toward you, Out away. Forward and Back follow the way the CPU faces.
+The jump before the aerial, the landing and a playback are left alone, and Fast Fall keeps its timing.
+
+- **Values:** None, In, Out, Forward, Back. With several ticked it picks one at random for each mash.
+- **Default:** none ticked: no drift.
+- **How:** A opens the checklist; A ticks, ZL ticks all or none, B goes back.
+
 ### Aerial Delay
 
 Frames the CPU waits, once it can, before its aerial.

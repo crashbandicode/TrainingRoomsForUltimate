@@ -247,6 +247,53 @@ fn cpu06_attack_angle() {
     assert_eq!(cpu.attack_angle(key), None, "a native tilt after the mash's");
 }
 
+/// rc.13 (the operator 2026-11-14: "drifting options for aerial mashed"): the rolled drift holds the stick only on the
+/// mashed aerial's airborne frames; In and Out follow you, Forward and Back the CPU's facing.
+fn cpu06_aerial_drift() {
+    let (mut cpu, key) = cpu_with(&[]);
+    let seen = |cpu: &mut Cpu, status: C, situation: Situation| {
+        cpu.frame(key, &FrameFacts { status: st(status), situation, ..FrameFacts::default() });
+        cpu.command_flags(key, false, &CmdFacts { status: st(status), situation, ..CmdFacts::default() });
+    };
+    cpu.fighters[key.index()].mash.queue.push(Action::FAIR);
+    cpu.fighters[key.index()].mash.rolled.drift = Some(1);
+    seen(&mut cpu, C::StatusJumpAerial, Situation::Air);
+    assert_eq!(cpu.aerial_drift(key, 10.0, 1.0), None, "not on the jump before the aerial");
+    seen(&mut cpu, C::StatusAttackAir, Situation::Air);
+    assert!(cpu.fighters[key.index()].mash.queue.is_empty());
+    assert_eq!(cpu.aerial_drift(key, 10.0, -1.0), Some(Some(1.0)), "In: toward you, on your right");
+    assert_eq!(cpu.aerial_drift(key, -10.0, -1.0), Some(Some(-1.0)), "In: toward you, on your left");
+    for (drift, x) in [(2, -1.0), (3, -1.0), (4, 1.0)] {
+        cpu.fighters[key.index()].mash.rolled.drift = Some(drift);
+        assert_eq!(cpu.aerial_drift(key, 10.0, -1.0), Some(Some(x)), "Out, Forward, Back ({drift})");
+    }
+    cpu.fighters[key.index()].mash.rolled.drift = None;
+    assert_eq!(cpu.aerial_drift(key, 10.0, 1.0), Some(None), "no drift rolled: the aerial is still reported");
+    cpu.fighters[key.index()].mash.rolled.drift = Some(1);
+    cpu.playback = PlaybackState { running: true, ..PlaybackState::default() };
+    assert_eq!(cpu.aerial_drift(key, 10.0, 1.0), None, "a playback has the stick");
+    cpu.playback = PlaybackState::default();
+    seen(&mut cpu, C::StatusLanding, Situation::Ground);
+    assert_eq!(cpu.aerial_drift(key, 10.0, 1.0), None, "not in the landing");
+    seen(&mut cpu, C::StatusAttackAir, Situation::Air);
+    assert_eq!(cpu.aerial_drift(key, 10.0, 1.0), None, "a native aerial after the mash's");
+    // Fast Fall and its delay keep their frame: the same hop with and without a drift.
+    let dive_at = |drift: Option<usize>| {
+        let (mut cpu, key) = cpu_with(&[("fast_fall_delay", delay(&[3]))]);
+        let rolled = &mut cpu.fighters[key.index()].mash.rolled;
+        (rolled.fast_fall, rolled.drift) = (true, drift);
+        cpu.fighters[key.index()].mash.queue.push(Action::FAIR);
+        cpu.command_flags(key, false, &air(C::StatusAttackAir));
+        (0..16).find(|n| {
+            cpu.tick_clock();
+            let f = FrameFacts { status: st(C::StatusAttackAir), situation: Situation::Air, falling: *n >= 4, ..FrameFacts::default() };
+            cpu.frame(key, &f).fast_fall
+        })
+    };
+    assert_eq!(dive_at(Some(1)), Some(7));
+    assert_eq!(dive_at(Some(1)), dive_at(None));
+}
+
 fn cpu06_crouch_statuses() {
     let (mut cpu, key) = cpu_with(&[("crouch", vec![1, 0])]);
     for status in [C::StatusWait, C::StatusSquat, C::StatusSquatB, C::StatusSquatF, C::StatusSquatRv, C::StatusSquatWait] {
@@ -418,6 +465,7 @@ fn case_table() {
         ("cpu06_fast_fall_rules", cpu06_fast_fall_rules as fn()),
         ("cpu06_fast_fall_at_the_apex_of_a_hop", cpu06_fast_fall_at_the_apex_of_a_hop as fn()),
         ("cpu06_attack_angle", cpu06_attack_angle as fn()),
+        ("cpu06_aerial_drift", cpu06_aerial_drift as fn()),
         ("cpu06_crouch_statuses", cpu06_crouch_statuses as fn()),
         ("cpu06_throw_state_machine", cpu06_throw_state_machine as fn()),
         ("cpu06_throw_none_pummels_until_the_grab_ends", cpu06_throw_none_pummels_until_the_grab_ends as fn()),
