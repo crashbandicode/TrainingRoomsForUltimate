@@ -68,6 +68,11 @@ macro_rules! game_constants {
                 table
             }
 
+            /// Every value, in C order.
+            pub fn values(&self) -> &[i32; COUNT] {
+                &self.values
+            }
+
             pub fn get(&self, c: C) -> i32 {
                 self.values[c as usize]
             }
