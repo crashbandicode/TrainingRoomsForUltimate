@@ -1,6 +1,6 @@
 //! Clip checkpoints are game-owned values. UI close only posts retirement;
 //! native observations and state-machine changes run on a fighter callback.
-use super::{Raw, Role, ACTIVE, CONSTS_READY, KILLING, LOADING, TEMPORARY};
+use super::{Raw, Role, ACTIVE, CONSTS_READY, TEMPORARY};
 use crate::engine::mii::lifetime::Configuration;
 use crate::model::state::{
     ids::C,
@@ -130,16 +130,7 @@ pub(crate) unsafe fn request(start: bool) -> Result<(), &'static str> {
         CHECKPOINT.lock().capture(identity, pair).map_err(message)?;
     }
     let pair = CHECKPOINT.lock().restore(&identity).map_err(message)?;
-    let accepted = super::with(|state| {
-        let accepted = state.machine.begin_temporary(pair);
-        if accepted {
-            LOADING.store(true, Ordering::Release);
-            KILLING.store(true, Ordering::Release);
-            TEMPORARY.store(true, Ordering::Release);
-        }
-        accepted
-    })
-    .unwrap_or(false);
+    let accepted = super::begin_temporary(pair);
     if !accepted {
         if first {
             CHECKPOINT.lock().clear();

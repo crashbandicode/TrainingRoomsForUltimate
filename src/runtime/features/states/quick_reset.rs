@@ -1,5 +1,5 @@
 //! Waiting-room reset adapter. Native facts are read outside all state locks.
-use super::{Raw, Role, ACTIVE, KILLING, LOADING, TEMPORARY};
+use super::{Raw, Role, ACTIVE, LOADING};
 use crate::engine::lobby::practice_policy::Context;
 use crate::model::input_delay::MappedInputs;
 use crate::model::state::quick_reset::{Pose, QuickReset};
@@ -60,16 +60,7 @@ pub(crate) unsafe fn request() -> Result<(), &'static str> {
     }
     let entries = entries().ok_or(NOT_READY)?;
     let pair = QUICK.lock().pair(entries).ok_or(NOT_READY)?;
-    let accepted = super::with(|s| {
-        let accepted = s.machine.begin_temporary(pair.map(Pose::record));
-        if accepted {
-            LOADING.store(true, Ordering::Release);
-            KILLING.store(true, Ordering::Release);
-            TEMPORARY.store(true, Ordering::Release);
-        }
-        accepted
-    })
-    .unwrap_or(false);
+    let accepted = super::begin_temporary(pair.map(Pose::record));
     if !accepted {
         return Err("A restore is already in progress");
     }

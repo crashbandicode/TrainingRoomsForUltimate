@@ -490,6 +490,21 @@ fn hook_settings() -> StateSettings {
     }
 }
 
+/// A temporary restore of `pair` (a named save, the quick reset, the preview checkpoint): when the machine takes it, the
+/// load, kill and temporary flags go up. Whether it was taken.
+fn begin_temporary(pair: [SavedState; 2]) -> bool {
+    with(|state| {
+        let accepted = state.machine.begin_temporary(pair);
+        if accepted {
+            LOADING.store(true, Ordering::Release);
+            KILLING.store(true, Ordering::Release);
+            TEMPORARY.store(true, Ordering::Release);
+        }
+        accepted
+    })
+    .unwrap_or(false)
+}
+
 /// Ask the game's table for every constant, once. Called from the frame step outside its `HookScope`.
 fn ensure_consts() -> bool {
     if CONSTS_READY.load(Ordering::Acquire) {
@@ -737,16 +752,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
             NAMED_LOAD.take(take_pair)
         };
         if let Some(pair) = named {
-            let accepted = with(|state| {
-                let accepted = state.machine.begin_temporary(pair);
-                if accepted {
-                    LOADING.store(true, Ordering::Release);
-                    KILLING.store(true, Ordering::Release);
-                    TEMPORARY.store(true, Ordering::Release);
-                }
-                accepted
-            })
-            .unwrap_or(false);
+            let accepted = begin_temporary(pair);
             if accepted {
                 recorder::on_load_request();
                 hud_load(Role::Player.index(), true);
