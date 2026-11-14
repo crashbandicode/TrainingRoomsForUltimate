@@ -86,6 +86,14 @@ orbs do not use that pool. This supersedes the upstream effect rendering for **f
   `hitbox=not_installed site=<row>`): nothing is drawn, no partial path. A layout without the orb panes draws nothing and
   says so once (`[Hitbox] orb panes missing`).
 
+### rc.14: Frame data colours (operator 2026-11-14; defaults SP1 and SP2 approved ~18:07Z, the colours changed ~18:15Z to Ultimate Frame Data's legend)
+
+A second row under Hitbox Visualization, *Frame data colours* (id `frame_data_colours`, Off by default). Off is exactly the drawing above.
+On, a hitbox is **red** when it is the strongest hitbox of its frame ("Sweet") or cannot be ranked, and **pink** (`#ff8fc8`) when another
+hitbox out on that frame is stronger ("Sour") or when the frame's strongest hitbox is weaker than the strongest seen earlier in the same
+action ("Late"). Damage is each active slot's `AttackData` damage (`layout::POWER`); no per-fighter table. An action is one status, and the
+motion frame going back (the same status entered again, as a jab's next hit does) starts a new one. Grab boxes and hurtboxes keep their colours (the legend lane extends the one colour
+function, `hitbox::legend_colour`). The shipped build reads each active slot's damage a second time per pass, only while the row is On.
 ## 3. Inputs
 
 - `hitbox_vis` setting; `shield_state` setting (see §6, the shield-damage rewrite that lives in the same hook).
@@ -166,6 +174,7 @@ lines record the HitModule read's cost and the pass's own cost on the integrated
 | Training-only gate incl. `077a8e43` early return; no effect-sleep calls online | `core06_training_gate` | `core06-E6` Quickplay match with setting On: no spheres, effects normal | `docs/EDEN-RESULTS.md` |
 | Three sites guarded (64 B) and installed independently; neighbouring thunk windows checked first | `core06_site_guards` | `core06-E7` install line `handle_attack=stock/near …` | — |
 | Off restores effects next frame | `core06_off_restores` | `core06-E8` | — |
+| rc.14 Frame data colours: Sweet red, Sour and Late pink, an unrankable hitbox red; Off is today's colours; one function chooses every tint | `the_hit_spheres_take_the_frame_data_colours`, `off_is_exactly_the_old_drawing`, `one_function_chooses_every_tint`, `the_strongest_hitbox_of_a_frame_is_sweet_and_a_weaker_one_sour`, `a_hitbox_weaker_than_an_earlier_one_of_the_action_is_late` | rc14 spots, Marth forward smash and Captain Falcon forward air at 1/4 speed | `artifacts/rc14-spots/` |
 
 ## 10. Open questions
 

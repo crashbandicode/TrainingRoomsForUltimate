@@ -57,6 +57,20 @@ show their grab box.
 
 *Projectiles and thrown items: at 1/4 speed, a red disc rides on Ridley's fireball, Link's arrow and Link's thrown bomb while each is in flight. Eden, rc.13 (untested on hardware).*
 
+### Frame data colours
+
+On draws hitboxes in the colours of Ultimate Frame Data: a strong hitbox is red and a weak one is pink. A hitbox is
+strong when it is the strongest one out on that frame, such as a sword's tip or a knee's sweet spot. It is weak when
+another hitbox out on the same frame is stronger, or when it is weaker than the strongest hitbox earlier in the same
+move, as the late frames of a knee are. The plugin reads each hitbox's damage from the game, so no list of fighters is
+needed. A hitbox it cannot rank, such as a jab's single hitbox or several hitboxes of equal damage, is red. Grab boxes
+and hurtboxes keep their colours. It needs Hitbox Visualization On. Off gives each hitbox its own colour, as before.
+
+- **Values:** On, Off
+- **Default:** Off
+- **How:** A, Left or Right flips it.
+
+<!-- CAPTURE-REQUEST spots-v01: Marth's forward smash at 1/4 speed with Hitbox Visualization On and Frame data colours Off, then On: the tip red and the blade pink on the early frames, the blade pink on the later frames. Captain Falcon's forward air: red on the knee's sweet frames, pink after. Same setup both times. See artifacts/rc14-spots/. -->
 <!-- CAPTURE-REQUEST v18-hitbox-legend: a still of one fighter with hitbox, hurtbox and grab box all drawn, annotated with the colours (the first hitbox red, other hitboxes in their own colours, hurtbox yellow, grab magenta) and pointing at the grabber's hurtboxes. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 ### Frame Advantage
 
@@ -87,6 +101,22 @@ a menu is open, the waiting room's own menu included, and comes back when the me
 ![The frame strip in a waiting room, hidden while the waiting room's menu is open](../media/rc11-strip-under-menu.gif)
 
 More: [Frame strip](../guide/frame-strip.md)
+
+### Spot labels
+
+On writes Sweet, Sour or Late on each hit that connects in the frame strip. The label sits on the grey hitlag block of
+the fighter that was hit: your hit on the CPU's lane, the CPU's hit on yours. Sweet is the strongest hitbox out on that
+frame, Sour a weaker one beside it, and Late a hit weaker than the strongest hitbox earlier in the same move. The plugin
+works out which hitbox connected from the damage the hit added. When that is unclear, such as equal hitboxes or a hit on
+a shield, there is no label. A smash attack held to nearly full charge can be labelled wrongly, because the charge changes the damage. It needs Input Display set to Frame strip.
+
+- **Values:** On, Off
+- **Default:** Off
+- **How:** A, Left or Right flips it.
+
+More: [Frame strip](../guide/frame-strip.md#spot-labels)
+
+<!-- CAPTURE-REQUEST spots-v02: the frame strip after Marth's forward smash lands with the tip (Sweet) and again with the blade (Sour); then a hit by the CPU on Player 1, labelled on Player 1's lane. Spot labels Off first, then On. See artifacts/rc14-spots/. -->
 
 ### Input Delay
 

@@ -128,6 +128,19 @@ The texts are ASCII: the game's font is not assumed to carry `−` or `→` (the
 - **Settings from before the strip:** the retired `input_display` row is read as the base read it, padded or cut to
   its four options, its first set option the mode; Off stays Off, anything else is the strip (review IV-3).
 
+### rc.14: spot labels (operator 2026-11-14, SP3)
+
+A second row under Input Display, *Spot labels* (id `spots_strip`, Off by default). With it On, each connecting hit is labelled Sweet, Sour
+or Late on its hitlag block, in the lane of the fighter that was hit (the victim is always in hitstop; the attacker's own block is not always
+painted). The label reuses the lane's run-length text boxes: no new panes. The spot is `spots::attribute` over the damage the hit added to the
+defender and the attacker's active slot damages. Eden (2026-11-14) measured what the game adds: 1.26 times a slot's damage for a fresh
+hit (two fighters' 1.2 times a fresh move's 1.05), about 1.07 for a stale one, a little more after a smash is held. A slot is a candidate when
+added damage over its damage is in `K_LOW..=K_HIGH` (1.0 to 1.6); so a hit that added 16.9 with Marth's forward smash active (blades 13, tip 18)
+is a blade's, and a stale tip hit that a blade could also have made is not labelled. A nearly fully charged smash can still scale a blade's
+ratio into the tip's window: a known limit. No
+candidate, candidates of different classes, a hit that added nothing (a shield), and a frame on which both fighters were struck are not
+labelled. The strip samples the attack slots' damage for both fighters and each fighter's damage percent every frame, whatever the row says,
+because a saved combo keeps each link's spot (SPEC-input-07).
 ## 4. Native reads
 
 All of them existed before this spec; no new hook or native site is added.
@@ -177,6 +190,8 @@ in §2 needs how many hitlag frames remain, so `StopModule::get_hit_stop_real_fr
 on each CPU hitstun frame, `stun_check predicted=… seen=…` for each hit not followed up, `link …` for each link,
 `advantage …` for each exchange, `shown=… menu_open=… on=…` on each show or hide.
 
+rc.14 adds three guarded natives to the display's closure, all already rows of the hitbox visualizer: `attack_is_attack` (both fighters now),
+`attack_data` (the slot's damage) and `damage_of` (the damage percent).
 ## 5. Timing
 
 ### 5.1 Sampling order

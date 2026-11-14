@@ -54,6 +54,13 @@ The helper grades only while *Combo helper* is On, a target is set and the strip
   helper requests the existing save-state load (`features::states::request_load`, the Load chord's own path). It
   only acts when save states are enabled, as the chord.
 
+### rc.14: Match sweet/sour spot (operator 2026-11-14, SP4)
+
+Each link remembers the spot its follow-up hit landed (`Link.spot`, `LinkRec.spot`; Sweet, Sour, Late or none). The combo file gets one
+optional field per link, `"spot"` (`"sweet"`, `"sour"` or `"late"`); a file without it, or with another word, reads as no spot. The row
+*Match sweet/sour spot* (`spots_combo`, Recording › Options, Off by default): On, a link counts only if the attempt lands the saved link's
+spot; a link saved with none always matches; an attempt whose spot could not be told does not match a saved spot. The failure is the first
+fault after a wrong move: "L1 Sour, saved Sweet" (`Reason::WrongSpot`).
 ## 4. The reference library (storage)
 
 - `sd:/ultimate/TrainingRooms/combos/<id>.json` on the generic `model::store::Store` (path-safe ids, atomic writes,

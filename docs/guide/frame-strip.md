@@ -61,6 +61,10 @@ A chip appears on the frame a button goes down. The chip is the button, not the 
 | Shield (L or R) | Slate |
 | Grab (Z) | Purple |
 
+### Spot labels
+
+With Display & Controls › [Spot labels](../menu/display-and-controls.md#spot-labels) On, each hit that connects is
+labelled Sweet, Sour or Late on the hitlag block of the fighter that was hit. A hit whose spot cannot be told has no label.
 A white tick drops from the chip to Player 1's lane. Up to eight chips stay on the strip.
 
 The arrow on a chip is the left stick on that frame, binned to eight screen directions: right, up-right, up, up-left, left, down-left, down, down-right. A stick inside the dead zone (a small horizontal tilt, or a small vertical tilt) has no arrow. The arrow is drawn only when that bin is a direction.
