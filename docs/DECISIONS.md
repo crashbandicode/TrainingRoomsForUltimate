@@ -641,6 +641,14 @@ Then, ~18:07Z: "sp recommendations sound good".
 | SP4 | Combos: each link remembers the spot it landed; with "Match sweet/sour spot" On a link counts only on the same spot |
 | SP5 | Three rows, all Off by default: under Hitbox Visualization, under Input Display, and in Recording › Options |
 
+The spots lane's mockups (drawn, not captured):
+
+![SP1/SP2: hitbox colours, Off (today) and On: Sweet, Sour, Late](decisions/rc14-spots-SP1-hitbox-colours.png)
+
+![SP3: Sweet / Sour / Late labels on the frame strip's hitlag blocks](decisions/rc14-spots-SP2-frame-strip.png)
+
+![SP4: Match sweet/sour spot, the row and a graded link that failed on the spot](decisions/rc14-spots-SP3-combo.png)
+
 ## Decided (2026-11-14, evening): the setup library
 
 **Decided 2026-11-14 (~18:07Z).** The operator, verbatim: "Sl1, yes / Sl2, full fix now / Sl3 add to rc14 / Sl4 add to
