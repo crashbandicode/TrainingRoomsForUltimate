@@ -20,7 +20,7 @@ use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, AtomicUsize, Ordering}
 use hos_lock::Mutex;
 use skyline::nn::ui2d::Pane;
 
-use crate::model::guard::GuardOutcome;
+use crate::model::guard::{words, GuardOutcome};
 use crate::model::hash40::hash40;
 use crate::model::sites_u4::{self, SITES};
 use crate::model::sites_u4b;
@@ -82,10 +82,9 @@ pub fn install() -> [GuardOutcome; SITES.len()] {
     let mut slot = 0usize;
     if all {
         // Words 10 and 11 of the lookup's window are the `adrp`/`ldr` pair that names the service slot.
-        let window = game::read_window(sites_u4::UI_TEX_FIND_HANDLE_OFFSET);
-        let first = sites_u4::UI_TEX_SERVICE_SLOT_WORDS_OFFSET - sites_u4::UI_TEX_FIND_HANDLE_OFFSET;
-        let word = |at: usize| u32::from_le_bytes([window[at], window[at + 1], window[at + 2], window[at + 3]]);
-        let (adrp, ldr) = (word(first), word(first + 4));
+        let word = words(&game::read_window(sites_u4::UI_TEX_FIND_HANDLE_OFFSET));
+        let first = (sites_u4::UI_TEX_SERVICE_SLOT_WORDS_OFFSET - sites_u4::UI_TEX_FIND_HANDLE_OFFSET) / 4;
+        let (adrp, ldr) = (word[first], word[first + 1]);
         let pc = at(sites_u4::UI_TEX_SERVICE_SLOT_WORDS_OFFSET) as u64;
         // The slot must be the one the constant names (the decode is position independent).
         let want = at(facts::SERVICE_SLOT) as u64;

@@ -12,7 +12,7 @@ use crate::model::cpu::rng::Rng;
 use crate::model::cpu::settings::CpuSettings;
 use crate::model::{developer_ini, settings_file, stage_hazards, sites_pkg4, sites_hitbox, sites_pkg6, sites_u4, sites_u4b};
 use crate::model::capabilities::{self, Granted};
-use crate::model::guard::GuardOutcome;
+use crate::model::guard::{words, GuardOutcome};
 use crate::model::install_line::{DeveloperReport, Extra, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
 use crate::model::settings::Settings;
 use crate::model::sites::{self, Feature, SITES};
@@ -615,9 +615,8 @@ fn install_pkg4(poll_ok: bool, cpu_core_on: bool, notices_closure: bool, found4:
 fn install_hazards(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str, Written)) -> bool {
     let sites_ok = sites::feature_usable(Feature::StageHazards, usable);
     let flag = sites::find("hazard_flag").and_then(|site| {
-        let window = game::read_window(site.offset);
-        let word = |i: usize| u32::from_le_bytes([window[4 * i], window[4 * i + 1], window[4 * i + 2], window[4 * i + 3]]);
-        stage_hazards::flag_offset(site.offset, word(0), word(1)).filter(|offset| *offset == stage_hazards::FLAG_OFFSET)
+        let word = words(&game::read_window(site.offset));
+        stage_hazards::flag_offset(site.offset, word[0], word[1]).filter(|offset| *offset == stage_hazards::FLAG_OFFSET)
     });
     match stage_hazards::plan(flag, sites_ok) {
         stage_hazards::Plan::Enabled => {

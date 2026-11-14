@@ -18,7 +18,7 @@ use core::slice;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use crate::model::effect_texture::{self as facts, Absent, Common, Memory, Visual};
-use crate::model::guard::GuardOutcome;
+use crate::model::guard::{words, GuardOutcome};
 use crate::model::sites_u4b::{self, SITES};
 use crate::model::sites_ui::decode_adrp_ldr;
 use crate::runtime::diag_log::diagnostic;
@@ -59,12 +59,11 @@ pub fn install() -> [GuardOutcome; SITES.len()] {
     let all = found.iter().all(|o| o.usable());
     let mut slot = 0usize;
     if all {
-        let window = game::read_window(sites_u4b::EFFMGR_INSTANCE_WORDS_OFFSET);
-        let word = |i: usize| u32::from_le_bytes([window[4 * i], window[4 * i + 1], window[4 * i + 2], window[4 * i + 3]]);
+        let word = words(&game::read_window(sites_u4b::EFFMGR_INSTANCE_WORDS_OFFSET));
         let pc = at(sites_u4b::EFFMGR_INSTANCE_WORDS_OFFSET) as u64;
         // `adrp x8, page; ldr x8, [x8, #off]; ldr x0, [x8]`: the slot is the one the constant names, and the instance is read through it.
-        slot = match decode_adrp_ldr(pc, word(0), word(1)) {
-            Some(address) if address == at(facts::MANAGER_SLOT) as u64 && word(2) == LDR_X0_X8 => address as usize,
+        slot = match decode_adrp_ldr(pc, word[0], word[1]) {
+            Some(address) if address == at(facts::MANAGER_SLOT) as u64 && word[2] == LDR_X0_X8 => address as usize,
             _ => 0,
         };
     }

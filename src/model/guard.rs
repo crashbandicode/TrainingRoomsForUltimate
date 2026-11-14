@@ -284,7 +284,7 @@ pub const BR_X17: u32 = 0xd61f_0220;
 pub const B_MASK: u32 = 0xfc00_0000;
 pub const B_OPCODE: u32 = 0x1400_0000;
 
-fn words(bytes: &[u8; GUARD_BYTES]) -> [u32; WORDS] {
+pub fn words(bytes: &[u8; GUARD_BYTES]) -> [u32; WORDS] {
     let mut out = [0u32; WORDS];
     for (i, word) in out.iter_mut().enumerate() {
         *word = u32::from_le_bytes([bytes[4 * i], bytes[4 * i + 1], bytes[4 * i + 2], bytes[4 * i + 3]]);
