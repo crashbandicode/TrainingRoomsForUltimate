@@ -36,9 +36,9 @@ pub fn normalize(rows: &mut Snapshot) {
     }
 }
 
-lib_unit_tests! {
 #[cfg(test)]
 mod tests {
+lib_unit_tests! {
     use super::*;
     use crate::model::{btt, settings::{self, Settings}};
 
