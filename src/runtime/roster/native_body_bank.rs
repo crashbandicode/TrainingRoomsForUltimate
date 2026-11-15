@@ -2355,7 +2355,12 @@ unsafe fn keep_window(entry: *mut u8, owner: u32, role: usize, target: u32, out:
                 saved.info_3a0 = read_info_3a0(e);
                 if out.identity.is_some() { saved.identity = Some((save_resource_words(r), save_entry_identity(e))); }
                 // A pair window leaves as N3 parks it: flags without the pair-active bit, no Nana alias (`+0x4180`).
-                if out.members.is_pair() { saved.flags &= !PAIR_ACTIVE_FLAG; saved.ctx[1] = 0; }
+                // rc.14 a-full-2: `PAIR_ACTIVE_FLAG` is a value (6), not a mask; `&= !6` dropped the bank bit too, so the
+                // control select (`0x64fb70`) picked no context at the warm return (a1-enable `a1-pair3`).
+                if out.members.is_pair() {
+                    saved.flags = crate::engine::swap::body_bank::parked_pair_flags(saved.flags);
+                    saved.ctx[1] = 0;
+                }
                 clear_window(e);
                 detach_dispatcher(e);
                 let slot = bank.groups.plan(out.members, None);

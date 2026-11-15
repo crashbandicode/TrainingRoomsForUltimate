@@ -15,6 +15,15 @@ pub const BANK_FLAG: u8 = 4;
 /// bit 2 (bank table and teardown). A parked pair and ordinary members use
 /// [`BANK_FLAG`] (ICE-CLIMBERS-OPTIMIZATION addendum, "Hybrid layout").
 pub const PAIR_ACTIVE_FLAG: u8 = 6;
+
+/// rc.14 a-full-2 (the A1 pair defect, a1-enable boot `a1-be759456-y2c` `a1-pair3`): the window flags of a pair window
+/// parked as N3 parks it (`commit_change`: `+0x591f = BANK_FLAG`, `+0x4180 = 0`). [`PAIR_ACTIVE_FLAG`] is the active
+/// pair's whole value (bit 1 | bit 2), not a mask: the bank bit 2 stays, because the control select `0x64fb70` picks the
+/// window's context only with it (`tbz w8, #2` at `0x64fb94`; without it `+0x4178` stays 0 and `0x64fc1c` stores to
+/// `null+0x70`).
+pub fn parked_pair_flags(flags: u8) -> u8 {
+    (flags & !PAIR_ACTIVE_FLAG) | BANK_FLAG
+}
 pub const POPO: u32 = 0x4b;
 pub const NANA: u32 = 0x4c;
 pub const KIRBY: u32 = 0x06;
@@ -4214,6 +4223,20 @@ mod tests {
         assert_eq!(window_kept_across_reload(mii, true, false, KROOL, true, false), Ok(()));
     }
 
+    /// rc.14 a-full-2 (the A1 pair defect: a1-enable `a1-be759456-y2c` `a1-pair3`, 451 × `Unmapped Write8 @ 0x70` from the
+    /// control select `0x64fb70`, "verification failed"): a pair window A1 keeps leaves as N3 parks one, with the bank flag
+    /// and no pair bit. The select needs bit 2 to pick the window's context; an exchange-parked pair record carries 4 and
+    /// attaches warm.
+    fn a_kept_pair_window_keeps_the_bank_flag_as_n3_parks_it() {
+        assert_eq!(parked_pair_flags(PAIR_ACTIVE_FLAG), BANK_FLAG, "the active pair's 6 parks as N3's 4");
+        assert_eq!(parked_pair_flags(BANK_FLAG), BANK_FLAG, "an already parked pair stays 4");
+        assert_ne!(parked_pair_flags(PAIR_ACTIVE_FLAG) & BANK_FLAG, 0, "the control select needs bit 2");
+        assert_eq!(parked_pair_flags(PAIR_ACTIVE_FLAG) & (PAIR_ACTIVE_FLAG & !BANK_FLAG), 0, "the pair bit 1 is dropped");
+        for member in [0u8, 1, 2] {
+            assert_ne!(Members::pair_group().expected_flags(member) & BANK_FLAG, 0);
+        }
+    }
+
     /// rc.14 a-full-2 (K-strip; the primary 2026-11-14 ~23:24Z): leaving a Kirby that holds a copy is no Reload any more.
     /// His copy goes natively first (a Reloaded Kirby is hatless too), then he parks like any member, and the target's
     /// Built group attaches warm. Only an unreadable copy state, an earlier copy still being cleared, or the switch off
@@ -4255,6 +4278,7 @@ mod tests {
             ("a_gated_member_is_laid_out_alone_and_the_rest_stay_together", a_gated_member_is_laid_out_alone_and_the_rest_stay_together as fn()),
             ("a_reload_keeps_the_window_whose_live_member_parks", a_reload_keeps_the_window_whose_live_member_parks as fn()),
             ("a_kirby_with_a_copy_loses_it_and_parks_instead_of_the_reload", a_kirby_with_a_copy_loses_it_and_parks_instead_of_the_reload as fn()),
+            ("a_kept_pair_window_keeps_the_bank_flag_as_n3_parks_it", a_kept_pair_window_keeps_the_bank_flag_as_n3_parks_it as fn()),
             ("the_farthest_unit_goes_never_the_next_or_the_one_on_screen", the_farthest_unit_goes_never_the_next_or_the_one_on_screen as fn()),
             ("a_mii_group_is_kept_across_a_reload_only_with_its_switch", a_mii_group_is_kept_across_a_reload_only_with_its_switch as fn()),
             ("five_laps_of_the_operator_cycle_keep_what_fits_hot", five_laps_of_the_operator_cycle_keep_what_fits_hot as fn()),
