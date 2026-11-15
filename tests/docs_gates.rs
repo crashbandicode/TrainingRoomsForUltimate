@@ -2,7 +2,7 @@
 //! relative link or image that points nowhere, an `#anchor` the forge would not find, a page no link reaches, a
 //! `docs/CURRENT-RELEASE.md` without its one `Current release: rc.N` line, an entry point that does not name that release,
 //! a "newest" or "current" sentence that names another one, and a quoted notice or refusal text that is not a string literal
-//! of `src/`. The rules, the forge's slug rules and the allowlists (each entry with its reason) are at the top of that file.
+//! of the code the release build compiles (test, simulator and diag-only code do not count). The rules, the forge's slug rules and the allowlists (each entry with its reason) are at the top of that file.
 //!
 //! The fixtures (`tools/test_docs_check.py`, `tools/test_check_external_links.py`) prove each rule fails on a seeded
 //! break and passes on the clean case; the external-link script's tests use a server on 127.0.0.1 only. The network check

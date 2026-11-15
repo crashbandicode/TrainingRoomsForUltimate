@@ -25,13 +25,16 @@ Rules (a problem's rule name is the first word of its line):
   version-stale    a sentence that says "newest", "latest", "currently", "current release/build/version", "this
                    release/build/version" or "up to date" and names another release (rc.N or rcN, also 0.2.0-rc.N).
   notice-text      a "double-quoted" text that must be a notice, refusal or greyed-row reason of the plugin, but is not a
-                   string literal in src/ (or crates/): on `docs/guide/troubleshooting.md` every quoted text; on any other
+                   string literal of the code the release build compiles in src/ (or crates/): test code (a `tests/`
+                   folder, `*_tests.rs`, `#[cfg(test)]`, by tools/sloc.py's evaluator, the size gate's rule), host-only
+                   simulator code and diag-only code do not count, because the player never sees what only they hold.
+                   On `docs/guide/troubleshooting.md` every quoted text; on any other
                    player page a quoted text in a sentence that says notice, refus*, message, help line, reason or
                    greyed; in docs/RESTRICTIONS.md the quoted texts of the Message column. A text matches a literal when
                    it is part of it, or fits its `{}` holes ("Loading 6/10" fits "Loading {}/{}"); text around a ‹name›,
                    a {hole} or an ellipsis is matched piece by piece, "Header · Body" per part, and "save (load) again"
                    as "save again" and "load again". Comments and char literals of the Rust source do not count. This
-                   proves the wording exists in the code, not that the notice shows in the situation the page describes.
+                   proves the wording exists in shipped code, not that the notice shows in the situation the page describes.
                    Texts built from pieces at run time go in `NOTICE_OK` with the reason.
   allowlist-stale  an entry of the lists below that matches no file, or whose sentence or text is gone.
 
@@ -58,6 +61,9 @@ import sys
 import unicodedata
 from typing import NamedTuple
 from urllib.parse import unquote, urlsplit
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # python3 -I leaves the script's folder out
+import sloc  # noqa: E402
 
 CURRENT_PAGE = "docs/CURRENT-RELEASE.md"
 CURRENT_LINE = re.compile(r"^Current release: (rc\.\d+)\s*$", re.M)
@@ -727,17 +733,24 @@ class Corpus(NamedTuple):
     patterns: list  # a literal with `{}` holes as a regex: "Loading {}/{}" fits "Loading 6/10"
 
 
+def release_sources(root):
+    """{path: text} of the Rust code of src/ and crates/ that the release build compiles. tools/sloc.py's cfg evaluator
+    decides (the size gate's rule): a `tests/` folder, a file or module behind `#[cfg(test)]` (`*_tests.rs`,
+    `mod tests`), host-only simulator code and diag-only code are left out, so a text that only they hold is no text."""
+    files = {p: t for p, t in sloc.files_tree(root).items() if p.endswith("Cargo.toml") or p.startswith(("src/", "crates/"))}
+    release = sloc.Release({p: t for p, t in files.items() if p.endswith("Cargo.toml")})
+    sources = {p: t for p, t in files.items() if p.endswith(".rs")}
+    scans = {p: sloc.cfg_scan(t, release.decider(p)) for p, t in sources.items()}
+    status = sloc.cfg_status(sources, scans)
+    return {p: sloc.cut(t, scans[p][0]) for p, t in sources.items() if status[p] is None}
+
+
 def corpus_of(root):
-    """The string literals of src/ and crates/ under `root`."""
+    """The string literals of the code the release build compiles under `root` (see `release_sources`)."""
     if root not in _corpora:
         found = set()
-        for base in ("src", "crates"):
-            for folder, dirs, files in os.walk(os.path.join(root, base)):
-                dirs[:] = sorted(x for x in dirs if x != "target" and not x.startswith("."))
-                for name in sorted(files):
-                    if name.endswith(".rs"):
-                        with open(os.path.join(folder, name), encoding="utf-8") as handle:
-                            found.update(s for s in map(_flat, rust_strings(handle.read())) if len(s) >= 3)
+        for text in release_sources(root).values():
+            found.update(s for s in map(_flat, rust_strings(text)) if len(s) >= 3)
         patterns = set()
         for literal in found:
             for variant in {literal, literal.rstrip(".")}:

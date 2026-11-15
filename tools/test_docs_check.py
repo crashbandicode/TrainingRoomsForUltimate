@@ -309,8 +309,9 @@ NOTICE_PAGE = "docs/guide/troubleshooting.md"
 STRICT = cfg(notice_pages=[NOTICE_PAGE])
 
 
-def notice_problems(page, text, **config):
-    files = dict(CLEAN, **{"src/lib.rs": SRC, "docs/README.md": CLEAN["docs/README.md"] + f"- [p]({page[len('docs/'):]})\n", page: text})
+def notice_problems(page, text, sources=None, **config):
+    """notice-text and allowlist problems of `page` with `text`; `sources` ({path: text}) replaces src/lib.rs's SRC."""
+    files = dict(CLEAN, **(sources or {"src/lib.rs": SRC}), **{"docs/README.md": CLEAN["docs/README.md"] + f"- [p]({page[len('docs/'):]})\n", page: text})
     return [(r, p, t) for r, p, t in problems(files, config=config.pop("config", STRICT)) if r in ("notice-text", "allowlist-stale")]
 
 
@@ -365,6 +366,33 @@ class NoticeTexts(unittest.TestCase):
     def test_a_tree_without_rust_source_reports_every_quoted_text(self):
         files = dict(CLEAN, **{NOTICE_PAGE: '# T\n\n"Wait for the swap to finish".\n', "docs/README.md": CLEAN["docs/README.md"] + "- [t](guide/troubleshooting.md)\n"})
         self.assertEqual([r for r, _, _ in problems(files, config=STRICT) if r == "notice-text"], ["notice-text"])
+
+    def test_a_text_only_test_diag_or_simulator_code_holds_is_not_a_notice(self):
+        """The player never sees what only tests (a `#[cfg(test)]` module, a `*_tests.rs` file, a tests/ folder), diag-only
+        code or host-only simulator code hold, so a page that quotes it is wrong."""
+        sources = {
+            "src/lib.rs": 'pub const A: &str = "Shown to the player";\n'
+                          '#[cfg(not(test))] pub const B: &str = "Shown outside tests too";\n'
+                          '#[cfg(test)] mod tests { const T: &str = "Only in a test module"; }\n'
+                          '#[cfg(test)] mod lib_tests;\n'
+                          'mod deep;\n'
+                          '#[cfg(feature = "diag")] pub const D: &str = "Only in the diag build";\n'
+                          '#[cfg(feature = "simulator")] pub const S: &str = "Only in the simulator";\n'
+                          '#[cfg(all(test, feature = "x"))] pub const U: &str = "Only in a gated test";\n',
+            "src/lib_tests.rs": 'const F: &str = "Only in a tests file";\n',
+            "src/deep.rs": '#[cfg(test)]\nmod tests;\npub const E: &str = "Shown from a nested module";\n',
+            "src/deep/tests.rs": 'const G: &str = "Only in a nested tests file";\n',
+            "src/tests/more.rs": 'const H: &str = "Only under a tests folder";\n',
+            "crates/c/src/lib.rs": 'pub const C: &str = "Shown from a crate";\n',
+            "crates/c/tests/it.rs": 'const I: &str = "Only in a crate test";\n',
+        }
+        shown = '# T\n\n"Shown to the player", "Shown outside tests too", "Shown from a nested module" and "Shown from a crate".\n'
+        self.assertEqual(notice_problems(NOTICE_PAGE, shown, sources=sources), [])
+        for text in ("Only in a test module", "Only in a tests file", "Only in a nested tests file", "Only under a tests folder",
+                     "Only in a crate test", "Only in the diag build", "Only in the simulator", "Only in a gated test"):
+            with self.subTest(text):
+                got = notice_problems(NOTICE_PAGE, f'# T\n\n"{text}".\n', sources=sources)
+                self.assertEqual([r for r, _, _ in got], ["notice-text"], text)
 
     def test_the_rust_tokenizer_keeps_real_strings_only(self):
         self.assertEqual(d.rust_strings('let a = "x"; // "no"\nlet b = \'"\'; let c: &\'a str = r##"y "# z"##; /* "no" */ let e = "t\\u{e9}\\n";'), ["x", 'y "# z', "té\n"])
