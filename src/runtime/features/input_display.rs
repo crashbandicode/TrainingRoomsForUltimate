@@ -136,8 +136,14 @@ pub fn set_fighter_read(on: bool) {
     KIND_ON.store(on, Ordering::Release);
 }
 
-/// One fighter's frame (SPEC-input-06 §4).
-unsafe fn sample(accessor: usize, ids: &Table, p1: bool) -> Sample {
+/// Whether a spot is wanted (rc.14 SP3/SP4): *Spot labels* or *Match sweet/sour spot* On. Only then the strip reads the hitboxes'
+/// launch numbers, the charge, the weights and the knockback received (spots-3: no cost while both are Off).
+fn spots_wanted() -> bool {
+    published::live().is_some_and(|live| live.input_display.spots || live.combo.match_spot)
+}
+
+/// One fighter's frame (SPEC-input-06 §4); `spots`: read what the spot of a hit needs (`spots_wanted`).
+unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample {
     let status = natives::status_kind(accessor);
     let prev = natives::prev_status_kind(accessor, 0);
     let hitstun = ids.hitstun(status);
@@ -150,8 +156,15 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool) -> Sample {
     // display off. A default here would record every combo as right-facing and grounded.
     let lr = natives::lr(accessor);
     let situation = natives::situation_kind(accessor);
-    // The attack slots' damage, for the spot of a hit (rc.14, SP1): both fighters', read from the game's own `AttackData`.
-    let (active, powers) = crate::model::hitbox::powers(&mut super::hitbox::GameAttacks(accessor));
+    // The attack slots' launch numbers, for the spot of a hit (rc.14, SP1): both fighters', read from the game's own `AttackData`; P1's
+    // busy frames need whether any slot is active either way.
+    let (active, powers) = if spots || p1 {
+        crate::model::hitbox::powers(&mut super::hitbox::GameAttacks(accessor))
+    } else {
+        (false, Default::default())
+    };
+    let powers = if spots { powers } else { Default::default() };
+    let read = |f: unsafe fn(usize) -> f32| if spots { f(accessor) } else { 0.0 };
     Sample {
         stop: natives::is_stop(accessor),
         hitstun,
@@ -160,7 +173,9 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool) -> Sample {
         active: p1 && active,
         damage: natives::damage(accessor, 0),
         powers,
-        power_mul: natives::attack_power_mul(accessor),
+        power_mul: read(natives::attack_power_mul),
+        weight: read(natives::weight),
+        launched: read(natives::damage_reaction),
         attack: if p1 { ids.attack(status) } else { None },
         reaction,
         shielding: ids.shielding(status),
@@ -187,12 +202,15 @@ pub unsafe fn sample_frame(player: usize) {
     let Some(cpu) = crate::runtime::features::cpu::strip_cpu(player) else { return };
     let Some(ids) = ids() else { return };
     let cpu_accessor = cpu;
-    let p1 = sample(player, &ids, true);
-    let cpu = sample(cpu, &ids, false);
+    let spots = spots_wanted();
+    let p1 = sample(player, &ids, true, spots);
+    let cpu = sample(cpu, &ids, false, spots);
     #[cfg(feature = "diag")]
     {
         probe_module(0, player, &p1, cpu.damage);
         probe_module(1, cpu_accessor, &cpu, p1.damage);
+        probe_damage(0, player, &p1);
+        probe_damage(1, cpu_accessor, &cpu);
     }
     #[cfg(not(feature = "diag"))]
     let _ = cpu_accessor;
@@ -229,8 +247,11 @@ pub unsafe fn sample_frame(player: usize) {
         let (check_now, link, advantage_now) = (tracker.stun_check, tracker.latest_link(), tracker.advantage());
         let (read, mark) = (tracker.spot_read.take(), tracker.marks().next());
         drop(tracker);
-        if let Some((frame, gained, mul, powers)) = read {
-            crate::runtime::diag_log::diagnostic(format_args!("[Spots] stop frame={frame} gained={gained:.3} mul={mul:.4} powers={powers:?} newest_mark={mark:?}"));
+        if let Some((frame, landed, launch, powers)) = read {
+            crate::runtime::diag_log::diagnostic(format_args!(
+                "[Spots] stop frame={frame} gained={:.3} launched={:.3} mul={:.4} before={:.3} weight={:.2} powers={powers:?} newest_mark={mark:?}",
+                landed.gained, landed.launched, launch.mul, launch.percent, launch.weight
+            ));
         }
         if advantage_now != advantage {
             if let Some(a) = advantage_now {
@@ -302,6 +323,55 @@ fn probe_module(who: usize, accessor: usize, s: &Sample, other_damage: f32) {
         other_damage,
         s.powers,
         Fields(bits)
+    ));
+}
+
+/// Diag build (spots-3 probe): the fighter's own damage record 0 as the hit handler (`main+0x402cc0`) leaves it, read raw from the
+/// DamageModule (accessor `+0xa8`, records from module `+0x18`): the knockback stored at `+0x10` (what `DamageModule::reaction` returns), and
+/// the hit's ids copied beside it (attacker object `+0x44`, attack slot `+0x52`, `+0x53`, `+0x55`), once per change, with the thunk's value
+/// and the hitstun left. Shows whether the knockback is still there when the strip samples the hit and whether `+0x52` names the slot.
+/// Every pointer is type-checked first (Eden answers 0 for an unmapped read).
+#[cfg(feature = "diag")]
+fn probe_damage(who: usize, accessor: usize, s: &Sample) {
+    static LAST: Mutex<[Option<(bool, u32, u32, u32)>; 2]> = Mutex::new([None, None]);
+    let pointer = |p: usize| p >= 0x1000 && p & 7 == 0 && p >> 47 == 0;
+    if !pointer(accessor) {
+        return;
+    }
+    // SAFETY: the live fighter's accessor; each pointer is checked before it is followed, and the record's fields lie inside its 0x1c0 bytes.
+    let (kb, ids, more, after) = unsafe {
+        let module = ((accessor + 0xa8) as *const usize).read();
+        if !pointer(module) {
+            return;
+        }
+        let rec = ((module + 0x18) as *const usize).read();
+        if !pointer(rec) {
+            return;
+        }
+        let word = |at: usize| ((rec + at) as *const u32).read();
+        (word(0x10), word(0x50), word(0x44), [word(0x160), word(0x1a0), word(0x8), word(0xc)])
+    };
+    let key = (s.stop, kb, ids, more);
+    let mut last = LAST.lock();
+    if last[who] == Some(key) {
+        return;
+    }
+    last[who] = Some(key);
+    drop(last);
+    crate::runtime::diag_log::diagnostic(format_args!(
+        "[SpotsKB] who={} stop={} damage={:.3} thunk={:.3} rec10={:.3} rec50={ids:#010x} slot={} attacker={more:#x} rec160={:.3} rec1a0={:#x} rec08={:.3} rec0c={:.3} weight={:.2} hitstun={:?}",
+        ["p1", "cpu"][who],
+        s.stop,
+        s.damage,
+        s.launched,
+        f32::from_bits(kb),
+        (ids >> 16) & 0xff,
+        f32::from_bits(after[0]),
+        after[1],
+        f32::from_bits(after[2]),
+        f32::from_bits(after[3]),
+        s.weight,
+        s.reaction,
     ));
 }
 

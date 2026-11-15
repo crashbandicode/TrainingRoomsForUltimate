@@ -761,6 +761,20 @@ unsafe fn draw_articles() {
     }
 }
 
+/// *Frame data colours* (spots-3): what this fighter's hitboxes launch, by which they rank: its own damage multiplier (the smash charge) and
+/// the other practice fighter as it is now (Player 1's hitboxes against the primary CPU, any other fighter's against Player 1); a standard
+/// target (weight 100, 0%) when there is none.
+unsafe fn fighter_launch(accessor: usize) -> crate::model::spots::Launch {
+    let p1 = natives::module_accessor(0);
+    let target = if p1 == Some(accessor) { natives::module_accessor(i32::from(crate::runtime::features::cpu::primary_entry_now())) } else { p1 };
+    let mul = natives::attack_power_mul(accessor);
+    let standard = crate::model::spots::Launch::STANDARD;
+    match target.filter(|&t| t != accessor) {
+        Some(t) => crate::model::spots::Launch { mul, percent: natives::damage(t, 0), weight: natives::weight(t) },
+        None => crate::model::spots::Launch { mul, ..standard },
+    }
+}
+
 // ---- the per-frame pass ---------------------------------------------------------------------------------------------
 
 /// One fighter's pass (SPEC-core-06 §5), after the game's frame for it. A readiness boundary: nothing happens before boot
@@ -823,6 +837,9 @@ pub unsafe fn frame(fighter: usize) {
     let set = &mut table.sets[i];
     set.frame_data = shown(legend::COLOURS);
     set.wind = shown(legend::WINDBOXES);
+    if set.frame_data && enabled {
+        set.launch = fighter_launch(accessor);
+    }
     // Own orbs (decision HB-OWN-ORBS): while the setting is On the pass reads the HitModule (the relied `hurtbox_*` rows) and
     // plans the enabled parts' hurt spheres into the same wants as the hit spheres; `OrbSink` holds every one (never
     // refused). The reader is constructed only here, behind `enabled`: Off — and the stop paths the dispatch takes first —

@@ -106,11 +106,38 @@ fn display_toggle_flips_the_strip_row() {
     }
 }
 
-/// The damages of hitboxes 0.. (the rest inactive).
+/// The damages of hitboxes 0.. (the rest inactive), with no knockback numbers: damage ranks them.
 fn p(values: &[f32]) -> Powers {
-    let mut out = [0.0; spots::SLOTS];
-    out[..values.len()].copy_from_slice(values);
+    let mut out = [spots::Hit::default(); spots::SLOTS];
+    for (slot, damage) in values.iter().enumerate() {
+        out[slot].damage = *damage;
+    }
     out
+}
+
+/// spots-3: King K. Rool's Gut Check, the hit and the gust of equal damage (numbers drawn for the case). The CPU (weight 98, at 20%) takes
+/// the hit of slot `slot`; the runtime reads the knockback it received. The labelled hits.
+fn gut_check_marks(slot: usize, launched: bool) -> Vec<Mark> {
+    let mut powers = p(&[]);
+    powers[0] = spots::Hit { damage: 14.0, growth: 90, fixed: 0, base: 70 };
+    powers[1] = spots::Hit { damage: 14.0, growth: 50, fixed: 0, base: 40 };
+    let gained = 14.0 * M;
+    let received = spots::knockback(&powers[slot], gained / spots::TARGET_MUL, 20.0 + gained, 98.0);
+    let calm = Sample { actionable: true, damage: 20.0, power_mul: 1.0, weight: 98.0, ..Sample::default() };
+    let swing = |stop| Sample { attack: Some(Move::DownSpecial), status: ATTACK, active: true, stop, powers, ..calm };
+    let hurt = Sample { stop: true, hitstun: true, launched: if launched { received } else { 0.0 }, damage: 20.0 + gained, ..calm };
+    let mut t = Tracker::new();
+    t.step(calm, calm, NONE);
+    t.step(swing(false), calm, NONE);
+    t.step(swing(true), hurt, NONE);
+    t.marks().collect()
+}
+
+/// spots-3: hitboxes of equal damage are told apart by the knockback the defender received; without that reading, no label.
+fn a_hit_of_equal_damage_is_labelled_by_the_knockback_the_cpu_received() {
+    assert_eq!(gut_check_marks(0, true), vec![Mark { frame: 3, lane: 1, spot: Spot::Sweet }], "the hit");
+    assert_eq!(gut_check_marks(1, true), vec![Mark { frame: 3, lane: 1, spot: Spot::Sour }], "the gust");
+    assert!(gut_check_marks(1, false).is_empty(), "no knockback read: equal damage, no label");
 }
 
 /// Three frames: both calm (the victim at 20%), the attacker swings, the attacker hits (hitlag) and the victim, hurt, has
@@ -234,6 +261,7 @@ fn case_table() {
         ("display_toggle_flips_the_strip_row", display_toggle_flips_the_strip_row as fn()),
         ("a_hit_is_labelled_with_its_spot_on_the_lane_of_the_fighter_it_hit", a_hit_is_labelled_with_its_spot_on_the_lane_of_the_fighter_it_hit as fn()),
         ("a_hit_that_cannot_be_told_is_not_labelled", a_hit_that_cannot_be_told_is_not_labelled as fn()),
+        ("a_hit_of_equal_damage_is_labelled_by_the_knockback_the_cpu_received", a_hit_of_equal_damage_is_labelled_by_the_knockback_the_cpu_received as fn()),
         ("a_charged_hit_is_labelled_by_the_hitbox_that_dealt_it", a_charged_hit_is_labelled_by_the_hitbox_that_dealt_it as fn()),
         ("a_weaker_hit_later_in_the_same_action_is_late", a_weaker_hit_later_in_the_same_action_is_late as fn()),
         ("a_link_remembers_the_spot_of_its_follow_up_hit", a_link_remembers_the_spot_of_its_follow_up_hit as fn()),

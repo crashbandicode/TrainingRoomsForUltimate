@@ -36,6 +36,8 @@ ROWS = [
      "`AttackModule::attack_data(accessor, slot, bool)` (lua_bind thunk to vtable slot 0x1e8): the slot's `AttackData` (stride 0x130 from the pointer at module `+0x68`). Layout in `model::hitbox::layout`, derived in `docs/test-provenance/core-06.md`."),
     ("attack_power_mul_status", 0x1FD0550, CALLED,
      "`AttackModule::power_mul_status(accessor)` (lua_bind thunk `ldr x0,[x0,#0xa0]; ldr x8,[x0]; ldr x1,[x8,#0x1f8]; br x1`; slot 0x1f8 is `ldr s0,[x0,#0xe0]`): the status-scoped damage multiplier of the module, which `L2CFighterCommon::sub_set_attack_s4_power_mul` sets from the smash charge (`AttackModule::set_power_mul_status`, slot 0x1f0 = `str s0,[x0,#0xe0]`) and `AttackModule::get_power` multiplies every slot's damage by. 1.0 uncharged. Read for the sweet/sour attribution."),
+    ("damage_reaction", 0x200B710, CALLED,
+     "`DamageModule::reaction(accessor, index)` (lua_bind thunk `ldr x0,[x0,#0xa8]; ldr x8,[x0]; ldr x2,[x8,#0xd0]; br x2`; the fighter's slot 0xd0 reads the float at `+0x10` of damage record `index`, 0x1c0 bytes each from module `+0x18`): the knockback the defender received, which the hit handler stores for the strongest hit of the frame. Read for the sweet/sour attribution (spots-3)."),
     ("effect_req_follow", 0x2017730, CALLED,
      "`EffectModule::req_follow(accessor, Hash40 effect, Hash40 joint, pos&, rot&, scale, follow, attribute, 0, 0, 0, 0, bool, bool)`: spawns the sphere (the game's `sys_shield` effect) attached to the hitbox's bone."),
     ("sphere_effect_kill", 0x2017840, CALLED,

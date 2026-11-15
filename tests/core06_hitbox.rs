@@ -388,13 +388,13 @@ fn core06_off_restores() {
 
 #[test]
 fn core06_site_guards() {
-    // Three hooks, thirteen called natives (the last one Eggs-ercise's hitlag, `StopModule::set_hit_stop_frame`; one is the attack module's
-    // damage multiplier, rc.14 spots-2) and eleven relied
+    // Three hooks, fourteen called natives (the last one Eggs-ercise's hitlag, `StopModule::set_hit_stop_frame`; one is the attack module's
+    // damage multiplier, rc.14 spots-2; one the knockback a defender received, spots-3) and eleven relied
     // windows (the Lua stack reads, HB1's three HitModule windows, for the own orbs (decision HB-OWN-ORBS) the bone transform,
     // the projection and its screen size words and, for Eggs-ercise's spawn range, the camera limit accessor).
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 13);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 14);
     assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 11);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
@@ -442,6 +442,7 @@ fn core06_site_guards() {
         (sites_hitbox::HITBOX_IS_ATTACK_OFFSET, "attack_is_attack"),
         (sites_hitbox::HITBOX_ATTACK_DATA_OFFSET, "attack_data"),
         (sites_hitbox::HITBOX_POWER_MUL_OFFSET, "attack_power_mul_status"),
+        (sites_hitbox::HITBOX_DAMAGE_REACTION_OFFSET, "damage_reaction"),
         (sites_hitbox::HITBOX_REQ_FOLLOW_OFFSET, "effect_req_follow"),
         (sites_hitbox::HITBOX_KILL_OFFSET, "sphere_effect_kill"),
         (sites_hitbox::HITBOX_IS_EXIST_OFFSET, "sphere_effect_is_exist"),
@@ -476,6 +477,7 @@ fn core06_rows_match_the_owned_elf() {
         ("attack_is_attack", "_ZN3app8lua_bind28AttackModule__is_attack_implEPNS_26BattleObjectModuleAccessorEib"),
         ("attack_data", "_ZN3app8lua_bind30AttackModule__attack_data_implEPNS_26BattleObjectModuleAccessorEib"),
         ("attack_power_mul_status", "_ZN3app8lua_bind35AttackModule__power_mul_status_implEPNS_26BattleObjectModuleAccessorE"),
+        ("damage_reaction", "_ZN3app8lua_bind27DamageModule__reaction_implEPNS_26BattleObjectModuleAccessorEi"),
         ("effect_req_follow", "_ZN3app8lua_bind29EffectModule__req_follow_implEPNS_26BattleObjectModuleAccessorEN3phx6Hash40ES4_RKNS3_8Vector3fES7_fbjiiiibb"),
         ("sphere_effect_kill", "_ZN3app8lua_bind23EffectModule__kill_implEPNS_26BattleObjectModuleAccessorEjbb"),
         ("sphere_effect_is_exist", "_ZN3app8lua_bind34EffectModule__is_exist_effect_implEPNS_26BattleObjectModuleAccessorEj"),
@@ -649,6 +651,37 @@ fn smash_charge_multiplier_matches_the_owned_game() {
         })
         .expect("a relocation for the stub's GOT slot");
     assert!(imported.contains("AttackModule__set_power_mul_status_impl"), "the script's last call imports {imported}");
+}
+
+/// rc.14 spots-3: `DamageModule::reaction(accessor, index)` is the knockback the defender received, as the game's hit handler stores it. Proven
+/// from the owned game: the thunk and its vtable slot (the fighter DamageModule's address point main+0x4f86a48, by its relocations), the getter
+/// reading `+0x10` of the 0x1c0-byte damage record, and the hit handler (main+0x402cc0) storing the knockback its formula (main+0x401e50)
+/// returned there when it is larger than the stored one, with the hit's id block (the attack slot at `+0x32`) beside it.
+#[test]
+fn damage_reaction_matches_the_owned_game() {
+    let Some(main) = common::owned_main("damage_reaction_matches_the_owned_game") else { return };
+    let w = |offset: usize| word_at(&main, offset);
+    let thunk = sites_hitbox::HITBOX_DAMAGE_REACTION_OFFSET;
+    assert_eq!([w(thunk), w(thunk + 4), w(thunk + 8), w(thunk + 12)], [ldr_x(0, 0, 0xa8), ldr_x(8, 0, 0), ldr_x(2, 8, 0xd0), 0xd61f_0040], "the thunk");
+    let reloc = |slot: usize, target: u64| {
+        let mut entry = [0u8; 24];
+        entry[..8].copy_from_slice(&((0x4f86a48 + slot) as u64).to_le_bytes());
+        entry[8..16].copy_from_slice(&0x403u64.to_le_bytes());
+        entry[16..].copy_from_slice(&target.to_le_bytes());
+        let ro = &main.bytes[main.rodata.offset..main.rodata.offset + main.rodata.size];
+        (0..ro.len() / 8).any(|i| ro.get(i * 8..i * 8 + 24) == Some(&entry[..]))
+    };
+    assert!(reloc(0xc8, 0x3ff9f0) && reloc(0xd0, 0x3ffa10), "DamageModule vtable slots: damage, reaction");
+    // reaction: `ldr x8,[x0,#0x18]; orr w9,wzr,#0x1c0; smaddl x8,w1,w9,x8; ldr s0,[x8,#0x10]; ret`.
+    assert_eq!([w(0x3ffa10), w(0x3ffa14), w(0x3ffa18), w(0x3ffa1c), w(0x3ffa20)], [ldr_x(8, 0, 0x18), 0x321a_0be9, 0x9b29_2028, ldr_s(0, 8, 0x10), 0xd65f_03c0]);
+    // The hit handler: `ldrb w26,[x20,#0x32]` (the attack slot id of the hit), the record `madd x24,x23,x8(=0x1c0),x9`, `bl 0x401e50` (the knockback),
+    // `ldr s0,[x24,#0x10]!; fcmp s8,s0; b.le` (only a larger one is stored), `ldp x9,x10,[x20,#0x20]; ... stp x10,x11,[x8,#0x48]` (the id block
+    // with it: the hit's +0x32 at the record's +0x52), `str s8,[x24]`.
+    assert_eq!(w(0x402d00), 0x3940_ca9a, "ldrb w26, [x20, #0x32]");
+    assert_eq!([w(0x402e28), w(0x402e2c)], [0x321a_0be8, 0x9b08_26f8], "the record");
+    assert_eq!(w(0x402f00), 0x97ff_fbd4, "bl 0x401e50");
+    assert_eq!([w(0x402f5c), w(0x402f60), w(0x402f64)], [0xbc41_0f00, 0x1e20_2100, 0x5400_180d], "compare");
+    assert_eq!([w(0x402f9c), w(0x402fb0), w(0x402fb4)], [0xa942_2a89, 0xa904_ad0a, str_s(8, 24, 0)], "store");
 }
 
 /// rc.14 hb-legend: the launch angle field of `AttackData`, and the `HitStatus` values with the
