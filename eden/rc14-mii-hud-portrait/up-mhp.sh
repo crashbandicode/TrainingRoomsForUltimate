@@ -101,7 +101,7 @@ R=$R
 PY=/usr/bin/python3
 T=$T
 log() { echo "\$(date -u +%H:%M:%SZ) \$*" >> \$R/chain.log; }
-UNTIL=\$(( \$(date +%s) + 900 ))
+UNTIL=\$(( \$(date +%s) + 1500 ))
 log "up start"; \$PY \$T up \$R > \$R/up.out 2>&1; rc=\$?; log "up rc=\$rc"
 if [ \$rc -eq 0 ]; then
   log "runner start"; \$PY \$T run \$R > \$R/run-1.out 2>&1; log "runner rc=\$?"

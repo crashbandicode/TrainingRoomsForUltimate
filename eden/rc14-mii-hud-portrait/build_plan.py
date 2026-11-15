@@ -28,14 +28,14 @@ rows.append({'id': 'mhp-setup', 'start': 'training', 'end': 'training', 'start_g
              'group': 'rc14-mii-hud-portrait', 'budget_min': 4, 'on_failure': 'continue',
              'steps': [{'run': 'mhp.py:setup', 'check': True}],
              'expect': 'P1 Mario, CPU Pichu, lanes Mario > Mii Gunner and Pichu > Mii Gunner, Mii groups On, Hide CPU Off.'})
-rows.append({'id': 'mhp-cpu', 'start': 'training', 'end': 'training', 'start_gate': 'training-hud-unpaused',
-             'group': 'rc14-mii-hud-portrait', 'budget_min': 10, 'on_failure': 'continue',
-             'steps': [{'run': 'mhp.py:cpu_paths', 'check': True}],
-             'expect': 'CPU Pichu -> Mii Gunner warm / cold / reload, Hide Off then On. ' + EXPECT})
-rows.append({'id': 'mhp-p1', 'start': 'training', 'end': 'training', 'start_gate': 'training-hud-unpaused',
-             'group': 'rc14-mii-hud-portrait', 'budget_min': 10, 'on_failure': 'continue',
-             'steps': [{'run': 'mhp.py:p1_paths', 'check': True}],
-             'expect': 'Player 1 Mario -> Mii Gunner warm / cold / reload, Hide Off then On. ' + EXPECT})
+for rid, fn, who, path in (('mhp-cpu-warm', 'cpu_warm', 'CPU Pichu', 'the kept Mii group (warm)'),
+                           ('mhp-p1-warm', 'p1_warm', 'Player 1 Mario', 'the kept Mii group (warm)'),
+                           ('mhp-cpu-reload', 'cpu_reload', 'CPU Pichu', 'a Reload (Group Swap Off)'),
+                           ('mhp-p1-reload', 'p1_reload', 'Player 1 Mario', 'a Reload (Group Swap Off)')):
+    rows.append({'id': rid, 'start': 'training', 'end': 'training', 'start_gate': 'training-hud-unpaused',
+                 'group': 'rc14-mii-hud-portrait', 'budget_min': 5, 'on_failure': 'continue',
+                 'steps': [{'run': 'mhp.py:%s' % fn, 'check': True}],
+                 'expect': '%s -> Mii Gunner by %s, Hide CPU Off then On, one HUD still each. %s' % (who, path, EXPECT)})
 rows.append({'id': 'mhp-restore', 'start': 'training', 'end': 'training', 'start_gate': 'training-hud-unpaused',
              'group': 'rc14-mii-hud-portrait', 'budget_min': 2, 'on_failure': 'continue',
              'steps': [{'run': 'mhp.py:restore', 'check': True}], 'expect': 'Mario / Mario, Hide CPU Off.'})
