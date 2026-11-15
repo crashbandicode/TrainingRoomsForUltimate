@@ -49,6 +49,7 @@ extern "C" fn on_init(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5:
         hub::run(Clear::TrainingReset);
         // rc.14: L+R+A and Change Stage restart an Eggs-ercise run; a fighter swap (hot swap) does not.
         crate::runtime::features::hitbox::eggs_reset();
+        crate::runtime::features::mashout::reset();
         crate::runtime::features::btt::reset();
     }
     result

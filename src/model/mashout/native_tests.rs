@@ -3,7 +3,7 @@ use super::*;
 use std::collections::HashMap;
 
 fn record(remaining: f32) -> Record {
-    Record { remaining, automatic: 1.0, manual: 8.0, button_mul: 1.8, sign: [0, 0],
+    Record { remaining, automatic: 1.0, manual: 8.0, button_mul: 1.8, threshold: 0.5, sign: [0, 0],
         source: -1, stick_block: 0, button_block: 0, accepted: 0, other_block: 0,
         cross_reload: 4, other_reload: 3 }
 }
@@ -37,6 +37,40 @@ fn native_subtraction_order_and_latches() {
     stick.step(Input { axes: [0.5, -0.5], trigger: 0 });
     assert_eq!(stick.remaining, 80.0);
     assert_eq!(stick.sign, [1, 1], "threshold endpoints retain the last signs");
+}
+
+#[test]
+fn native_threshold_boundaries_are_strict() {
+    for threshold in [0.0_f32, 0.5, 0.9] {
+        let mut r = record(90.0);
+        r.threshold = threshold;
+        r.sign = [-1, 1];
+        r.step(Input { axes: [threshold, -threshold], trigger: 0 });
+        assert_eq!(r.sign, [-1, 1], "inclusive middle interval at {threshold}");
+        assert_eq!(r.remaining, 89.0, "endpoints subtract automatic only");
+        let outside = threshold.next_up();
+        r.step(Input { axes: [outside, -outside], trigger: 0 });
+        assert_eq!(r.sign, [1, -1], "one ULP crosses both strict boundaries");
+        assert_eq!(r.remaining, 80.0, "diagonal crossing subtracts manual once");
+    }
+    for threshold in [1.0, 1.25, f32::MAX] {
+        let mut r = record(90.0);
+        r.threshold = threshold;
+        r.sign = [-1, 1];
+        r.step(Input { axes: [1.0, -1.0], trigger: 0 });
+        assert_eq!((r.sign, r.remaining), ([-1, 1], 89.0));
+    }
+}
+
+#[test]
+fn native_threshold_invalid_values_are_rejected() {
+    for threshold in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.1] {
+        let mut s = seed(90.0);
+        s.record.threshold = threshold;
+        assert!(!s.record.valid());
+        assert!(matches!(Solver::new(s), Err(Error::InvalidSeed)));
+        assert!(matches!(Clock::new(s.record), Err(ClockError::InvalidRecord)));
+    }
 }
 
 #[test]
@@ -144,6 +178,42 @@ fn native_solver_matches_full_mask_oracle() {
 }
 
 #[test]
+fn native_threshold_solver_matches_full_mask_oracle() {
+    for threshold in [0.0_f32, 0.5, 0.9, 1.0_f32.next_down(), 1.0, 1.25] {
+        // No useful button deduction: the only acceleration comes from a reachable stick edge.
+        let mut s = seed(5.0);
+        s.record.threshold = threshold;
+        s.record.button_mul = 0.0;
+        let bounds = solve(s).unwrap();
+        let expected = if threshold < 1.0 { 1 } else { 5 };
+        assert_eq!(bounds, Bounds { fastest: expected, no_input: Some(5) });
+        assert_eq!(oracle(s, 5), Some(expected), "stick-only {threshold}");
+        // At/above 1, buttons still work after releasing the initially held categories.
+        s.record.button_mul = 1.8;
+        s.held = BUTTONS;
+        let expected = if threshold < 1.0 { 1 } else { 2 };
+        assert_eq!(solve(s).unwrap().fastest, expected);
+        assert_eq!(oracle(s, 2), Some(expected), "held buttons {threshold}");
+    }
+}
+
+#[test]
+fn native_threshold_blocks_unreachable_zero_auto_sticks() {
+    for threshold in [1.0, 1.25] {
+        let mut s = seed(8.0);
+        s.record.threshold = threshold;
+        s.record.automatic = 0.0;
+        s.record.button_mul = 0.0;
+        assert_eq!(oracle(s, 3), None, "full normalized axes never cross {threshold}");
+        assert_eq!(solve(s), Err(Error::NeverEscapes));
+        s.deadline = Some(3);
+        assert_eq!(solve(s), Ok(Bounds { fastest: 3, no_input: Some(3) }));
+        s.record.threshold = 0.9;
+        assert_eq!(solve(s), Ok(Bounds { fastest: 1, no_input: Some(3) }));
+    }
+}
+
+#[test]
 fn native_solver_work_chunks_do_not_change_the_answer() {
     let s = seed(180.1);
     let expected = solve(s).unwrap();
@@ -193,6 +263,34 @@ fn native_clock_rejects_two_updates_per_sample() {
     changed = record(90.0);
     changed.accepted = 4;
     assert_eq!(clock.observe(changed, Input::default(), false), Err(ClockError::Ambiguous));
+}
+
+#[test]
+fn native_clock_uses_actual_threshold_and_binds_changes() {
+    let mut initial = record(20.0);
+    initial.threshold = 0.9;
+    let mut clock = Clock::new(initial).unwrap();
+    let input = Input { axes: [0.75, 0.0], trigger: 0 };
+    // Independent expected native record: 0.75 is below the sampled 0.9 threshold.
+    let mut live = initial;
+    live.remaining = 19.0;
+    clock.observe(live, input, false).unwrap();
+    assert_eq!(clock.elapsed(), 1);
+    let mut changed = live;
+    changed.threshold = 0.5;
+    assert_ne!(Seed { record: live, held: 0, deadline: None }, Seed { record: changed, held: 0, deadline: None });
+    assert_eq!(clock.observe(changed, input, false), Err(ClockError::Ambiguous));
+    changed.remaining = 18.0;
+    assert_eq!(clock.observe(changed, input, false), Err(ClockError::TransitionMismatch));
+
+    initial.threshold = 0.0;
+    let mut clock = Clock::new(initial).unwrap();
+    let mut live = initial;
+    live.remaining = 11.0;
+    live.sign = [1, 0];
+    live.button_block = 4;
+    clock.observe(live, Input { axes: [0.25, 0.0], trigger: 0 }, false).unwrap();
+    assert_eq!(clock.elapsed(), 1, "actual zero threshold accepts the small positive axis");
 }
 
 #[test]

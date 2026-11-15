@@ -65,6 +65,8 @@ const HOOK_LOCKS: &[(&str, &str)] = &[
     // rc.14 Break the Targets: P1's poll (the input thread), P1's pass (the game thread) and the layout tick take it; the menu worker
     // reaches it only through atomics and a mailbox.
     ("features/btt.rs", "BTT"),
+    // Mash's lifecycle belongs only to fighter callbacks; its solver worker must never take it.
+    ("features/mashout.rs", "GAME"),
     ("compat/menu.rs", "EDITED"),
     ("ui/input.rs", "ADAPTER"),
     ("ui/menu_app.rs", "QUICK_MENU_APP"),
@@ -86,7 +88,7 @@ mod thread_stacks;
 const FEATURE_ONLY_ENTRIES: &[(&str, &str)] = &[("practice_trace::writer", "console-practice-trace (diag probe feature) only, inside a cfg-gated block")];
 
 /// Entry points on the publishing path that a plugin thread calls (not threads of their own).
-const PUBLISHING_ENTRIES: &[&str] = &["published::publish", "menu::apply_kept"];
+const PUBLISHING_ENTRIES: &[&str] = &["published::publish", "menu::apply_kept", "mashout::service"];
 
 /// `module::function` of every plugin thread's entry, derived from `model::thread_stacks::THREADS` (each row's `symbol`, its closure
 /// suffix dropped), so a new or renamed thread cannot be missed; the diag-only threads are identified by their stable IDs and live in modules the

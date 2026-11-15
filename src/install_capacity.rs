@@ -72,9 +72,18 @@ const fn longest_name(tables: &[&[Site]]) -> usize {
     longest
 }
 
-/// Every table whose rows the line reports, once each (base/packages, UI, Hitbox and Developer).
-const TABLES: [&[Site]; 8] =
-    [&sites::SITES, &sites_pkg3::STATE_SITES, &sites_pkg4::SITES, &sites_ui::UI_SITES, &sites_u4::SITES, &sites_pkg6::SITES, &crate::model::sites_hitbox::SITES, &crate::model::developer_debug::SITES];
+/// Every table whose rows the line reports, once each (base/packages, UI, Hitbox, Developer and Mash).
+const TABLES: [&[Site]; 9] = [
+    &sites::SITES,
+    &sites_pkg3::STATE_SITES,
+    &sites_pkg4::SITES,
+    &sites_ui::UI_SITES,
+    &sites_u4::SITES,
+    &sites_pkg6::SITES,
+    &crate::model::sites_hitbox::SITES,
+    &crate::model::developer_debug::SITES,
+    &crate::model::sites_mashout::SITES,
+];
 
 /// The site fields at their longest.
 pub const SITE_FIELDS: usize = site_fields(&TABLES);
@@ -88,8 +97,7 @@ const fn max(a: usize, b: usize) -> usize {
 }
 
 /// The feature reports at their longest: ` <feature>=not_installed reason=<reason or site:<row>>`.
-pub const FEATURE_FIELDS: usize =
-    MAX_FEATURE_REPORTS * (1 + MAX_FEATURE_NAME + "=not_installed".len() + " reason=".len() + max(MAX_REASON, "site:".len() + longest_name(&TABLES)));
+pub const FEATURE_FIELDS: usize = MAX_FEATURE_REPORTS * (1 + MAX_FEATURE_NAME + "=not_installed".len() + " reason=".len() + max(MAX_REASON, "site:".len() + longest_name(&TABLES)));
 
 /// The seam installer's fields at their longest (`seam_install::InstallFields`): every seam row in each of the three lists that
 /// print a code (`seams_other`, `seams_skipped`, `seams_shadow_diff`, as `<label>:<code>,`) and in `seams_external` (`<label>,`),
@@ -105,8 +113,7 @@ const fn seam_fields() -> usize {
     let with_code = labels + rows.len() * (1 + MAX_SEAM_CODE + 1);
     let without_code = labels + rows.len();
     let missing = MISSING_SHOWN * (MAX_MISSING_LABEL + 1) + ",...".len();
-    let words = "seams= seams_stock= seams_other=[] seams_skipped=[] seams_shadow_diff=[] seams_missing=[] seams_external=[] seams_unchecked= seams_images_unchecked=".len()
-        + 4 * 5;
+    let words = "seams= seams_stock= seams_other=[] seams_skipped=[] seams_shadow_diff=[] seams_missing=[] seams_external=[] seams_unchecked= seams_images_unchecked=".len() + 4 * 5;
     3 * with_code + without_code + missing + words
 }
 
@@ -276,6 +283,9 @@ mod tests {
         assert_eq!(seam_fields(), lists + MISSING_SHOWN * (MAX_MISSING_LABEL + 1) + ",...".len() + words.len() + 4 * 5);
         assert_eq!(SEAM_FIELDS, seam_fields());
         assert_eq!(INSTALL_LINE_CAPACITY, FIXED_FIELDS + SITE_FIELDS + FEATURE_FIELDS + SEAM_FIELDS + DRILL_FIELDS + OVERFLOW_TAIL);
+        for site in &crate::model::sites_mashout::SITES {
+            assert_eq!(rows().filter(|row| row.name == site.name).count(), 1, "Mash report must be counted once");
+        }
     }
 
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.

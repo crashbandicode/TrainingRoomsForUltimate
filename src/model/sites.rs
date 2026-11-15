@@ -47,6 +47,8 @@ features! {
     CpuCore => "cpu_core",
     /// SPEC-cpu-02: SDI, air-dodge direction, clatter (DI needs the `common` module, see `cpu::common`).
     CpuDefence => "cpu_defence",
+    /// Mash out's guarded native record/input reader and threshold getter.
+    Mashout => "mashout",
     /// SPEC-cpu-03: the ledge options.
     CpuLedge => "cpu_ledge",
     /// SPEC-cpu-04: tech, missed tech, hidden tech animations (the camera and the script status-change

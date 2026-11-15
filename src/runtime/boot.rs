@@ -8,27 +8,25 @@
 use std::fs;
 use std::path::Path;
 
+use crate::model::capabilities::{self, Granted};
 use crate::model::cpu::rng::Rng;
 use crate::model::cpu::settings::CpuSettings;
-use crate::model::{developer_ini, settings_file, stage_hazards, sites_pkg4, sites_hitbox, sites_pkg6, sites_u4, sites_u4b};
-use crate::model::capabilities::{self, Granted};
 use crate::model::guard::{words, GuardOutcome};
 use crate::model::install_line::{DeveloperReport, Extra, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};
 use crate::model::settings::Settings;
 use crate::model::sites::{self, Feature, SITES};
-use crate::model::storage::{self, FixedPath};
-use crate::model::thread_stacks::ThreadId;
-use crate::model::version::{self, Verdict};
-use crate::runtime::alloc::hook_allocations;
-use crate::runtime::diag_log::{self, diagnostic};
 use crate::model::sites_pkg3::{self, STATE_SITES};
 use crate::model::sites_ui::UI_SITES;
 use crate::model::state::file::SaveFile;
 use crate::model::state::settings::StateSettings;
-use crate::runtime::features::{
-    chords, cpu, cpu_common, hitbox, hud_draw, input_delay, input_display, lra_reset, notices, recorder, reset_hub, stage_hazards as hazards, states, writer,
-};
-use crate::runtime::{lobby, mii, p1, roster, clock, game, import, install, published, scene, state_boot, ui};
+use crate::model::storage::{self, FixedPath};
+use crate::model::thread_stacks::ThreadId;
+use crate::model::version::{self, Verdict};
+use crate::model::{developer_ini, settings_file, sites_hitbox, sites_mashout, sites_pkg4, sites_pkg6, sites_u4, sites_u4b, stage_hazards};
+use crate::runtime::alloc::hook_allocations;
+use crate::runtime::diag_log::{self, diagnostic};
+use crate::runtime::features::{chords, cpu, cpu_common, hitbox, hud_draw, input_delay, input_display, lra_reset, mashout, notices, recorder, reset_hub, stage_hazards as hazards, states, writer};
+use crate::runtime::{clock, game, import, install, lobby, mii, p1, published, roster, scene, state_boot, ui};
 
 const SITE_COUNT: usize = SITES.len();
 
@@ -52,6 +50,7 @@ fn run_inner() {
     diag_log::set_tick(crate::runtime::seams::seam_install::report_late);
     // The CPU-as-P1 fallback's file work (its request.json read and its receipts): on the heartbeat, never in its hooks.
     diag_log::set_tick(p1::service);
+    diag_log::set_tick(mashout::service);
     diag_log::start_drain_thread();
 
     // 1. The version guard: nothing else runs on another game.
@@ -121,20 +120,13 @@ fn run_inner() {
     let loaded = loaded.settings;
     // The CPU behaviours' state exists before the first publish and before any hook is installed. The
     // generator is the plugin's own (never the game's): seeded from the system tick and an address.
-    cpu::init(
-        CpuSettings::from_snapshot(&loaded.menu),
-        Rng::seed_from(clock::uptime_ms(), (run as fn() as usize) as u64),
-    );
+    cpu::init(CpuSettings::from_snapshot(&loaded.menu), Rng::seed_from(clock::uptime_ms(), (run as fn() as usize) as u64));
     // Native Training until the waiting room's practice says otherwise (package 6 calls this again).
     cpu::set_lobby(false);
     scene::set_lobby_active(false);
     // Package 3: the save-state slots (read once, here, on a thread with an explicit stack; the writer
     // thread keeps the file current).
-    states::init(
-        StateSettings::from_snapshot(&loaded.menu),
-        load_save_states(),
-        Rng::seed_from(clock::uptime_ms().rotate_left(7), ((run as fn() as usize) as u64) ^ 0x5a7e_57a7),
-    );
+    states::init(StateSettings::from_snapshot(&loaded.menu), load_save_states(), Rng::seed_from(clock::uptime_ms().rotate_left(7), ((run as fn() as usize) as u64) ^ 0x5a7e_57a7));
     states::start_writer();
     #[cfg(feature = "diag")]
     states::start_diag_triggers();
@@ -154,23 +146,20 @@ fn run_inner() {
     let state_found = state_boot::check();
     let mut found = [GuardOutcome::Stock; SITE_COUNT];
     for (slot, site) in found.iter_mut().zip(SITES.iter()) {
-        *slot = if site.compared() {
-            site.outcome(&game::read_window(site.offset))
-        } else {
-            site.slot_outcome(game::read_slot_target(site.offset))
-        };
+        *slot = if site.compared() { site.outcome(&game::read_window(site.offset)) } else { site.slot_outcome(game::read_slot_target(site.offset)) };
     }
     let found4 = game::outcomes(&sites_pkg4::SITES);
     // Package 5's rows are compared here too, before anything is written: a feature's closure (R2-1) can hold
     // a row of any table.
     let ui_found = game::outcomes(&UI_SITES);
+    let mashout_found = game::outcomes(&sites_mashout::SITES);
     // Eden proof of R2-1 (diag only): rows named in `diag-poison.txt` are treated as foreign, as if another plugin
     // or an unknown patch had changed those bytes, so the install decisions run on a rejected row. Only the diag
     // build changes the outcomes.
     #[cfg(feature = "diag")]
-    let (mut state_found, mut found4, mut ui_found) = (state_found, found4, ui_found);
+    let (mut state_found, mut found4, mut ui_found, mut mashout_found) = (state_found, found4, ui_found, mashout_found);
     #[cfg(feature = "diag")]
-    apply_diag_poison(&mut found, &mut state_found, &mut found4, &mut ui_found);
+    apply_diag_poison(&mut found, &mut state_found, &mut found4, &mut ui_found, &mut mashout_found);
     // Package 6's CPU-as-P1 rows and the run-time texture helper's rows are compared here too (R2-1): both are capabilities.
     let found6 = p1::check();
     // SPEC-core-06's rows: compared before anything is written (the rebound thunk's window holds its neighbours).
@@ -195,6 +184,7 @@ fn run_inner() {
             .or_else(|| by_name(&sites_u4b::SITES, &u4b_found))
             .or_else(|| by_name(&sites_hitbox::SITES, &hb_found))
             .or_else(|| by_name(&crate::model::developer_debug::SITES, &developer_found))
+            .or_else(|| by_name(&sites_mashout::SITES, &mashout_found))
             .unwrap_or(false)
     };
     // The native-call layer calls only what passed (`game::natives` and `state_natives` refuse the rest).
@@ -343,28 +333,56 @@ fn run_inner() {
     } else {
         diagnostic(format_args!("[TrainingRooms] roster cycle not started: a game function it calls failed its site guard"));
     }
-    let developer_debug_on = crate::runtime::developer::install(
-        developer.developer_page, capabilities::unit_usable(Feature::DeveloperDebug, &usable),
-    );
+    let mashout_closure = capabilities::unit_usable(Feature::Mashout, &usable);
+    let mashout_active_cell = game::natives::ACTIVE_CELL_GUARDED.load(std::sync::atomic::Ordering::Acquire);
+    let mashout_roster_ready = roster::character_roster::mashout_ready();
+    let mashout_on = capabilities::mashout_ready(mashout_closure, cpu_core_on, recording_on, mashout_active_cell, roster_on && mashout_roster_ready);
+    let mashout_reason = if !mashout_closure {
+        None
+    } else if !cpu_core_on {
+        Some("cpu_core_not_installed")
+    } else if !recording_on {
+        Some("recording_not_installed")
+    } else if !mashout_active_cell {
+        Some("active_cell_not_guarded")
+    } else if !roster_on || !mashout_roster_ready {
+        Some("roster_not_ready")
+    } else {
+        None
+    };
+    // CPU Defence already installs this shared hook on its unchanged closure.
+    if mashout_on && !cpu_defence_on {
+        skyline::install_hook!(cpu::cpu_clatter_start_hook);
+        mark("clatter_start_hook", Written::Far);
+    }
+    mashout::set_admission(mashout_on);
+    let developer_debug_on = crate::runtime::developer::install(developer.developer_page, capabilities::unit_usable(Feature::DeveloperDebug, &usable));
 
     // 6. The install line: the base sites, then package 3's, package 4's and package 5's.
     const STATE_END: usize = SITE_COUNT + state_boot::N;
     // Construct the already-owned report vector directly: an intermediate full array
     // remains in the boot frame even while the synchronous loader fallback runs.
-    let mut reports: Vec<SiteReport> = (0..STATE_END + sites_pkg4::SITES.len()).map(|i| {
-        if i < SITE_COUNT {
-            SiteReport { site: SITES[i].name, found: found[i], written: written[i] }
-        } else if i < STATE_END {
-            state_reports[i - SITE_COUNT]
-        } else {
-            let j = i - STATE_END;
-            SiteReport { site: sites_pkg4::SITES[j].name, found: found4[j], written: written4[j] }
-        }
-    }).collect();
+    let mut reports: Vec<SiteReport> = (0..STATE_END + sites_pkg4::SITES.len())
+        .map(|i| {
+            if i < SITE_COUNT {
+                SiteReport { site: SITES[i].name, found: found[i], written: written[i] }
+            } else if i < STATE_END {
+                state_reports[i - SITE_COUNT]
+            } else {
+                let j = i - STATE_END;
+                SiteReport { site: sites_pkg4::SITES[j].name, found: found4[j], written: written4[j] }
+            }
+        })
+        .collect();
     reports.extend(ui::reports(&ui_install));
     reports.extend(p1::reports(&found6, &written6));
     reports.extend(hitbox::reports(&hb_found, &hb_written));
     reports.extend(crate::runtime::developer::reports(&developer_found, developer_debug_on));
+    reports.extend(sites_mashout::SITES.iter().zip(mashout_found).map(|(site, found)| SiteReport {
+        site: site.name,
+        found,
+        written: if found.usable() { Written::Checked } else { Written::Skipped },
+    }));
     // A feature that is not installed names the first row of its closure that was rejected, when there is one.
     let blocked = |feature: Feature| capabilities::blocked_by(feature, &usable);
     let report = |feature: Feature, installed: bool, reason: Option<&'static str>| FeatureReport {
@@ -392,13 +410,24 @@ fn run_inner() {
         report(Feature::CpuCamera, cpu_camera_on, None),
         report(Feature::CpuCommon, false, if common_blocked { None } else { cpu_common_reason }),
         report(Feature::StateCore, state_on, None),
-        FeatureReport { feature: Feature::Hitbox.name(), installed: hitbox_on, reason: (!hitbox_on && !cpu_core_on).then_some("cpu_core_not_installed"), site: if hitbox_on || !cpu_core_on { None } else { blocked(Feature::Hitbox) } },
+        FeatureReport {
+            feature: Feature::Hitbox.name(),
+            installed: hitbox_on,
+            reason: (!hitbox_on && !cpu_core_on).then_some("cpu_core_not_installed"),
+            site: if hitbox_on || !cpu_core_on { None } else { blocked(Feature::Hitbox) },
+        },
         FeatureReport { feature: "chords", installed: input_delay_on, reason: input_delay_reason, site: None },
         report(Feature::InputDisplay, display_on, None),
         report(Feature::Recording, recording_on, None),
+        report(Feature::Mashout, mashout_on, mashout_reason),
         report(Feature::Notices, notices_on, None),
         report(Feature::Ui, ui_install.anchors, None),
-        FeatureReport { feature: Feature::P1Cpu.name(), installed: p1_on, reason: p1_reason, site: if p1_on || p1_reason.is_some_and(|r| r != "prerequisite_feature") { None } else { blocked(Feature::P1Cpu) } },
+        FeatureReport {
+            feature: Feature::P1Cpu.name(),
+            installed: p1_on,
+            reason: p1_reason,
+            site: if p1_on || p1_reason.is_some_and(|r| r != "prerequisite_feature") { None } else { blocked(Feature::P1Cpu) },
+        },
         report(Feature::UiTexture, capabilities::unit_usable(Feature::UiTexture, &usable), None),
         FeatureReport { feature: "named_macros", installed: macros_on, reason: if macros_on { None } else { Some("row_rejected_or_recorder_off") }, site: None },
         FeatureReport { feature: "live_replay", installed: capture_on, reason: if capture_on { None } else { Some("capture_off_or_guard") }, site: None },
@@ -422,11 +451,7 @@ fn run_inner() {
         features: &features,
         seams: Some(Extra(&seam_fields)),
         developer: Some(DeveloperReport { on: developer.developer_page, reason: developer.reason.text() }),
-        settings: Some(SettingsReport {
-            input_delay: loaded.menu.input_delay(),
-            lra_reset: loaded.menu.lra_reset(),
-            stage_hazards: loaded.menu.stage_hazards(),
-        }),
+        settings: Some(SettingsReport { input_delay: loaded.menu.input_delay(), lra_reset: loaded.menu.lra_reset(), stage_hazards: loaded.menu.stage_hazards() }),
         migration: Some(migration.as_str()),
         heap_allocations: Some(hook_allocations()),
     };
@@ -442,13 +467,15 @@ fn run_inner() {
 /// install decision, each name logged (`diag_poison <name> found=<bool>`).
 #[cfg(feature = "diag")]
 fn diag_poison_text() -> String {
-    let Some(path) = FixedPath::<128>::in_root("diag-poison.txt") else { return String::new() };
+    let Some(path) = FixedPath::<128>::in_root("diag-poison.txt") else {
+        return String::new();
+    };
     fs::read_to_string(path.as_str()).unwrap_or_default()
 }
 
 #[cfg(feature = "diag")]
 #[inline(never)] // stream/stack: its locals live only while it runs, not in boot's frame on Skyline's 64 KiB thread
-fn apply_diag_poison(found: &mut [GuardOutcome], state: &mut [GuardOutcome], found4: &mut [GuardOutcome], ui: &mut [GuardOutcome]) {
+fn apply_diag_poison(found: &mut [GuardOutcome], state: &mut [GuardOutcome], found4: &mut [GuardOutcome], ui: &mut [GuardOutcome], mashout: &mut [GuardOutcome]) {
     let text = diag_poison_text();
     let poison = |rows: &[sites::Site], outcomes: &mut [GuardOutcome], name: &str| -> bool {
         match rows.iter().position(|row| row.name == name) {
@@ -460,7 +487,12 @@ fn apply_diag_poison(found: &mut [GuardOutcome], state: &mut [GuardOutcome], fou
         }
     };
     for name in text.split(|c: char| c.is_whitespace() || c == ',').filter(|n| !n.is_empty()) {
-        let hit = poison(&SITES, found, name) || poison(&STATE_SITES, state, name) || poison(&sites_pkg4::SITES, found4, name) || poison(&UI_SITES, ui, name) || sites_hitbox::SITES.iter().any(|row| row.name == name);
+        let hit = poison(&SITES, found, name)
+            || poison(&STATE_SITES, state, name)
+            || poison(&sites_pkg4::SITES, found4, name)
+            || poison(&UI_SITES, ui, name)
+            || poison(&sites_mashout::SITES, mashout, name)
+            || sites_hitbox::SITES.iter().any(|row| row.name == name);
         diagnostic(format_args!("[TrainingRooms] diag_poison {name} found={hit}"));
     }
 }
@@ -521,11 +553,7 @@ fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str,
     }
     // The hooks in the `common` script module install when that module loads, through the nro-load
     // provider (`libnro_hook`); the install line names why they are not installed yet, or at all.
-    let common = if sites::feature_usable(Feature::CpuCommon, usable) {
-        cpu_common::register()
-    } else {
-        Some("site_guard_failed")
-    };
+    let common = if sites::feature_usable(Feature::CpuCommon, usable) { cpu_common::register() } else { Some("site_guard_failed") };
     // The game's CommonParams object, for the shield damage multiplier (SPEC-cpu-05 section 4).
     let shield_damage = sites::feature_usable(Feature::CpuShieldDamage, usable);
     if shield_damage {
@@ -631,7 +659,6 @@ fn read_developer_ini() -> developer_ini::DeveloperIni {
         None => developer_ini::DeveloperIni::default(),
     }
 }
-
 
 /// Read `settings.json` (or the fork's file name, once) on its own thread (stack from `model::thread_stacks`), joined here
 /// (SPEC-core-04 §5). All of the file logic, including the recovery of a file that does not read

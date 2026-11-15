@@ -308,6 +308,15 @@ impl Cpu {
 
     // ---- one body's frame ----------------------------------------------------------------------
 
+    /// A practice game temporarily owns this body. Restore its visibility and retire queued
+    /// actions without editing any CPU setting; accessor hooks yield at the same runtime boundary.
+    pub fn practice_frame(&mut self, key: FighterKey) -> FrameOut {
+        let fighter = &mut self.fighters[key.index()];
+        fighter.mash = Mash::new();
+        fighter.throw = Throw::new();
+        FrameOut { vanish: hide::step(&mut fighter.away, false, false), ..FrameOut::default() }
+    }
+
     /// The once-per-frame dispatch for the CPU-role body `key` (SPEC-cpu-01 §5 "Ordering": dodge
     /// staling, hide tech (primary body), mistech, clatter, ledge, then the DI case reset).
     pub fn frame(&mut self, key: FighterKey, f: &FrameFacts) -> FrameOut {
@@ -621,5 +630,33 @@ impl Cpu {
     pub fn frame_advantage(&mut self, player_actionable: bool, cpu_actionable: bool) -> Option<i32> {
         let (on, empty) = (self.settings.frame_advantage, self.settings.mash_state.is_empty());
         self.advantage.step(on, empty, player_actionable, cpu_actionable)
+    }
+}
+
+#[cfg(test)]
+mod practice_tests {
+    lib_unit_tests! {
+        use super::*;
+
+        #[test]
+        fn mashout_cpu_ownership_restores_visibility_and_yields_automation_without_setting_edits() {
+            let mut cpu = Cpu::factory(7);
+            cpu.settings.hide_cpu = true;
+            let settings = cpu.settings;
+            let key = FighterKey::new(1, false).unwrap();
+            cpu.fighters[key.index()].away = true;
+            cpu.fighters[key.index()].throw.case = Some(1);
+            cpu.fighters[key.index()].throw.delay = Some(1);
+            cpu.fighters[key.index()].throw.pummel = Some(1);
+            let practice = cpu.practice_frame(key);
+            assert_eq!(practice, FrameOut { vanish: Some(false), ..FrameOut::default() });
+            assert_eq!(cpu.fighters[key.index()].throw, Throw::new());
+            assert_eq!(cpu.fighters[key.index()].mash, Mash::new());
+            assert_eq!(cpu.settings, settings);
+            assert_eq!(cpu.practice_frame(key), FrameOut::default());
+            // Releasing the owner restores the user's Hide CPU rule on its next ordinary frame.
+            assert_eq!(cpu.frame(key, &FrameFacts::default()).vanish, Some(true));
+            assert_eq!(cpu.settings, settings);
+        }
     }
 }

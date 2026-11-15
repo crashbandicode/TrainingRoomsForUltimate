@@ -34,7 +34,7 @@ use callgraph::{Graph, Tok};
 const LOCK_METHODS: &[&str] = &["lock", "read", "write"];
 const GUARD_HELPERS: &[&str] = &["lock_write", "lock_read"];
 const WAITS: &[&str] = &["sleep", "park", "park_timeout", "recv", "recv_timeout", "join", "wait", "wait_timeout", "wait_while"];
-const PUBLISHING_ENTRIES: &[&str] = &["published::publish", "menu::apply_kept"];
+const PUBLISHING_ENTRIES: &[&str] = &["published::publish", "menu::apply_kept", "mashout::service"];
 const ALIASES: &[(&str, &str)] = &[("ui/menu_app.rs", "menu"), ("ui/menu_app.rs", "menu_app")];
 
 /// `(function, via)` edges the scan reports that the code does not have, each with the reason (read in the source).

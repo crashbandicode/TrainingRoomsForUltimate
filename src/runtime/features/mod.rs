@@ -15,6 +15,7 @@ pub mod input_delay;
 pub mod input_display;
 pub mod item_bridge;
 pub mod lra_reset;
+pub mod mashout;
 pub mod notices;
 pub mod recorder;
 pub mod recording_host;

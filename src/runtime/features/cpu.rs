@@ -360,6 +360,8 @@ fn role_scene() -> Option<Scene> {
 
 /// All accessor-only hooks pass through current scene AND generation admission.
 fn role_of(accessor: usize) -> Option<FighterKey> {
+    // The selected Mash attacker belongs to its real-move plan, including while it holds P1.
+    if unsafe { crate::runtime::features::mashout::owns_cpu(accessor) } { return None; }
     let scene = role_scene();
     with(|cpu| role_adapter::role(cpu, scene, accessor)).flatten()
 }
@@ -466,6 +468,7 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
     if ready {
         // SAFETY: `a0` is the fighter object the game just ran a frame of.
         unsafe { fighter_frame(a0, receipt) };
+        unsafe { crate::runtime::features::mashout::frame(a0) };
         // SPEC-core-06: the hitbox visualizer's pass (a readiness boundary: nothing until boot installed it), after the combo and
         // before the save states (SPEC-core-01 §5.2).
         unsafe { crate::runtime::features::hitbox::frame(a0) };
@@ -570,6 +573,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
     let primary = !key.partner && key.entry == primary_entry(lobby);
     let tech = tech_facts(accessor, status, primary);
     let speed = crate::runtime::features::game_speed::current();
+    let practice_owned = crate::runtime::features::mashout::owns_cpu(accessor);
 
     let out = with(|cpu| {
         if !cpu.roles.set(receipt, accessor, key) { return None; }
@@ -603,7 +607,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
                 counts::bump(counts::FRAME);
             }
         }
-        let out = cpu.frame(key, &facts);
+        let out = if practice_owned { cpu.practice_frame(key) } else { cpu.frame(key, &facts) };
         hide_cpu::publish_panels(cpu.hidden_panels());
         Some(out)
     }).flatten();
@@ -925,11 +929,22 @@ pub unsafe fn cpu_clatter_start_hook(
 ) -> u64 {
     let _scope = HookScope::enter_hook(HookId::CpuClatterStart);
     bump(counts_index::CLATTER_START);
-    if let Some(key) = role_of(accessor) {
-        with(|cpu| cpu.clatter_start(key, manual_rate));
-        cpu_event!("clatter_start entry={} manual_rate={manual_rate:.3} initial={initial:.1}", key.entry);
-    }
-    call_original!(accessor, initial, auto_rate, manual_rate, a, b, c, d)
+    let p1 = crate::runtime::features::mashout::seed_token(accessor);
+    crate::model::mashout::admission::start_dispatch(
+        p1.is_some(),
+        || call_original!(accessor, initial, auto_rate, manual_rate, a, b, c, d),
+        || {
+            if DEFENCE_ON.load(Ordering::Acquire) {
+                if let Some(key) = role_of(accessor) {
+                    with(|cpu| cpu.clatter_start(key, manual_rate));
+                    cpu_event!("clatter_start entry={} manual_rate={manual_rate:.3} initial={initial:.1}", key.entry);
+                }
+            }
+        },
+        || {
+            if let Some(token) = p1 { crate::runtime::features::mashout::seed_after(accessor, token, a, b, c, d); }
+        },
+    )
 }
 
 // ---- SPEC-cpu-03 hook -----------------------------------------------------------------------------------

@@ -12338,7 +12338,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "fcd0b5888ef014f5dbdf3c60fd9eacfabfd17722711a29ca4abbccf009db49d7",
+   "dest_sha256": "c70857e361938e4247b7dd1dfde080d290aaa946ad2ec6b853dd5f906cfc8ffd",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -13596,6 +13596,21 @@
      "old": "    waiting_icon_source(base).map(|(_, pane)| pane)\n}\n",
      "new": "    waiting_icon_source(base).map(|(_, pane)| pane)\n}\n\n/// Hide CPU in a waiting room: CPU4's partner card in `info_waiting` (`tp_0N`: window, damage, portrait), the parent of\n/// the partner portrait `waiting_partner_icon` resolves as the game's damage setters do. Read fresh each time, only a\n/// pane named like a partner card is returned (`hide::room_card`), nothing is cached and nothing is allocated. `None` until\n/// the roster's own seam gate passed (`BASE`), so the waiting-UI natives are only called on a checked game.\npub(crate) unsafe fn waiting_cpu_card() -> Option<*mut skyline::nn::ui2d::Pane> {\n    use skyline::nn::ui2d::Pane;\n    let base = BASE.load(Ordering::Acquire);\n    if base == 0 {\n        return None;\n    }\n    let picture = pointer_chain(waiting_icon_pane(base, 4)?, &[8])?;\n    let card = pointer_chain(picture, &[core::mem::offset_of!(Pane, parent)])?;\n    let name = read::<[u8; 25]>(card, core::mem::offset_of!(Pane, name));\n    crate::model::cpu::hide::room_card(&name).then_some(card as *mut Pane)\n}\n",
      "reason": "rc.14 hide-room-panel (the primary 2026-11-15 ~12:58Z): Hide CPU in a waiting room hides CPU4's info_waiting partner card (tp_0N), found as the parent of the partner portrait waiting_partner_icon resolves"
+    },
+    {
+     "old": "static BASE: AtomicUsize = AtomicUsize::new(0);",
+     "new": "static BASE: AtomicUsize = AtomicUsize::new(0);\n// Positive completion, unlike BASE (stored before later owners may refuse installation).\nstatic MASHOUT_READY: AtomicBool = AtomicBool::new(false);\npub(crate) fn mashout_ready() -> bool {\n    MASHOUT_READY.load(Ordering::Acquire)\n        && crate::runtime::roster::character_lifecycle::native_hooks_ready()\n}",
+     "reason": "rc.15 Mash out approved M3 reader admission (primary2026-11-15): availability requires positive completed roster installation and lifecycle readiness; BASE alone is stored before later refusal paths."
+    },
+    {
+     "old": "    fn sync_selection(self, fighter: TrioFighter) {\n        let mut m = lock_write(&MENU);",
+     "new": "    fn sync_selection(self, fighter: TrioFighter) {\n        if self == Self::Cpu && crate::runtime::features::mashout::temporary_cpu_selection(fighter.kind()) {\n            return;\n        }\n        let mut m = lock_write(&MENU);",
+     "reason": "rc.15 Mash out real-attacker setup: a qualified temporary CPU load/restoration does not write its attacker into the user CPU selection; loader/cycle/preload ownership and all other selection updates are unchanged."
+    },
+    {
+     "old": "        skyline::install_hooks!(load_local_waiting_icons, load_online_waiting_icons);\n        trace!",
+     "new": "        skyline::install_hooks!(load_local_waiting_icons, load_online_waiting_icons);\n        MASHOUT_READY.store(true, Ordering::Release);\n        trace!",
+     "reason": "rc.15 Mash out approved M3 reader admission: publish positive readiness only after native service, body bank, Mii owners and icon hooks have reached successful installation end."
     }
    ]
   },

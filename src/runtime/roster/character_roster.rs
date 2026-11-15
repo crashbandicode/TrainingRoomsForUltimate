@@ -100,6 +100,12 @@ fn settled_cpu_mii() -> Option<crate::engine::mii::lifetime::Configuration> {
 }
 
 static BASE: AtomicUsize = AtomicUsize::new(0);
+// Positive completion, unlike BASE (stored before later owners may refuse installation).
+static MASHOUT_READY: AtomicBool = AtomicBool::new(false);
+pub(crate) fn mashout_ready() -> bool {
+    MASHOUT_READY.load(Ordering::Acquire)
+        && crate::runtime::roster::character_lifecycle::native_hooks_ready()
+}
 /// The main image base this module installed with (0 before install); for the WP-P
 /// readback facade's lifecycle hooks outside this module (its only callers, in
 /// `training/save_states.rs`, are compiled with the same feature).
@@ -180,6 +186,9 @@ impl Role {
         self == Self::Cpu || setting(&MENU).trio_practice == OnOff::ON
     }
     fn sync_selection(self, fighter: TrioFighter) {
+        if self == Self::Cpu && crate::runtime::features::mashout::temporary_cpu_selection(fighter.kind()) {
+            return;
+        }
         let mut m = lock_write(&MENU);
         match self {
             Self::Player => m.player_character = fighter,
@@ -2330,6 +2339,7 @@ pub fn init(load_contract: Option<VerifiedLoad>) {
         body_bank::install(base);
         mii_hud_portrait::init(base);
         skyline::install_hooks!(load_local_waiting_icons, load_online_waiting_icons);
+        MASHOUT_READY.store(true, Ordering::Release);
         trace!("[CharacterRoster] native async loader installed; ordinary P1/CPU1; waiting_enabled={}; one existing entry per role; no manual loader pumping", true);
     }
 }

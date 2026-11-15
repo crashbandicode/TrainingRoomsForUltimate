@@ -12,6 +12,9 @@ pub struct Record {
     pub automatic: f32,
     pub manual: f32,
     pub button_mul: f32,
+    /// Actual native threshold getter parameter, captured alongside the inline fields;
+    /// this is not a field at an offset inside the native clatter record.
+    pub threshold: f32,
     pub sign: [i8; 2],
     pub source: i8,
     pub stick_block: i8,
@@ -54,7 +57,7 @@ fn reduce(remaining: f32, manual: f32, automatic: f32) -> f32 {
 
 impl Record {
     pub fn valid(self) -> bool {
-        [self.remaining, self.automatic, self.manual, self.button_mul]
+        [self.remaining, self.automatic, self.manual, self.button_mul, self.threshold]
             .into_iter()
             .all(|n| n.is_finite() && n >= 0.0)
             && (self.manual * self.button_mul).is_finite()
@@ -75,9 +78,9 @@ impl Record {
         self.button_block = dec(self.button_block);
         self.other_block = dec(self.other_block);
         let sign = [0, 1].map(|i| {
-            if input.axes[i] > 0.5 {
+            if input.axes[i] > self.threshold {
                 1
-            } else if input.axes[i] < -0.5 {
+            } else if input.axes[i] < -self.threshold {
                 -1
             } else {
                 self.sign[i]
@@ -187,7 +190,10 @@ impl Solver {
             return Err(Error::InvalidSeed);
         }
         let r = seed.record;
-        let maximum = r.manual.max(r.manual * r.button_mul);
+        // Effective axes are normalized to [-1, 1]; strict comparison makes a stick
+        // sign change unreachable at threshold 1 or above, including from neutral.
+        let stick = if r.threshold < 1.0 { r.manual } else { 0.0 };
+        let maximum = stick.max(r.manual * r.button_mul);
         let result = if reduce(r.remaining, maximum, r.automatic) == r.remaining {
             Some(
                 seed.deadline
@@ -233,7 +239,7 @@ impl Solver {
         };
         let r = self.seed.record;
         self.put(released, reduce(remaining, 0.0, r.automatic));
-        if controls.stick == 0 {
+        if controls.stick == 0 && r.threshold < 1.0 {
             self.put(
                 Controls {
                     button: 4,

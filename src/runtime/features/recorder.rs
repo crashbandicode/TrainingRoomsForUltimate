@@ -307,6 +307,10 @@ unsafe fn on_ai_frame(ai: usize) {
     if ((body.entry_ptr + ENTRY_CONTROLLER_FIELD) as *const usize).read() != controller || !load_consts() {
         return;
     }
+    if super::mashout::owns_cpu(body.accessor) {
+        write_controller(controller, Inject::NEUTRAL);
+        return;
+    }
     bump(COUNT_AI_FRAME);
     let settings = settings();
     let key = FighterKey::new(body.entry_id, false);
