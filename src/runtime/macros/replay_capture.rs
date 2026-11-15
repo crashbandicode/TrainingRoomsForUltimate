@@ -276,13 +276,8 @@ fn service_file_name() {
     if let Some(name) = crate::runtime::macros::named_macros::take_confirmed_name_for(token) {
         let file = FILE_NAME.lock().unwrap().take();
         if let Some(file) = file {
-            let kind = match &file {
-                crate::engine::rr_runtime::ClipFile::Macro(_) => crate::engine::library::Kind::Macro,
-                crate::engine::rr_runtime::ClipFile::Combo(_) => crate::engine::library::Kind::Combo,
-            };
             match crate::engine::rr_runtime::save_clip_file(std::path::Path::new(crate::model::storage::ROOT), file, &name) {
                 Ok(id) => {
-                    crate::engine::rr_host::note_hot(std::path::Path::new(crate::model::storage::ROOT), kind, &id);
                     crate::engine::rr_host::bump_catalog();
                     crate::runtime::diag_log::diagnostic(format_args!("[ClipEditor] saved_new={id}"));
                 }

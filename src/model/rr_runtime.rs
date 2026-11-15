@@ -308,7 +308,8 @@ pub enum ClipFile { Macro(Box<MacroRecording>), Combo(Box<ComboRecord>) }
 
 /// Always creates a fresh id; empty keyboard text chooses the next unused number.
 pub fn save_clip_file(root: &Path, file: ClipFile, typed: &str) -> Result<String, Error> {
-    match file {
+    let kind = match &file { ClipFile::Macro(_) => Kind::Macro, ClipFile::Combo(_) => Kind::Combo };
+    let id = match file {
         ClipFile::Macro(mut recording) => {
             let library = Library::new(root.join(MACROS_DIR));
             let names: Vec<_> = library.list().map_err(record)?.entries.into_iter().map(|entry| entry.name).collect();
@@ -321,7 +322,9 @@ pub fn save_clip_file(root: &Path, file: ClipFile, typed: &str) -> Result<String
             recording.name = if typed.trim().is_empty() { unused_name("Combo", &names) } else { typed.trim().to_owned() };
             library.save_new(&recording).map_err(record)
         }
-    }
+    }?;
+    super::rr_host::note_hot(root, kind, &id);
+    Ok(id)
 }
 
 pub fn crop_macro(
