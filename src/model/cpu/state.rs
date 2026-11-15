@@ -323,7 +323,7 @@ impl Cpu {
             fighter.pending &= !reroll::SDI_DIRECTION;
         }
         // Hide CPU: while hidden no behaviour runs (nothing below is asked of the game).
-        out.vanish = hide::step(&mut fighter.away, self.scene, settings.hide_cpu, f.request);
+        out.vanish = hide::step(&mut fighter.away, settings.hide_cpu, f.request);
         if out.vanish == Some(true) {
             return out;
         }

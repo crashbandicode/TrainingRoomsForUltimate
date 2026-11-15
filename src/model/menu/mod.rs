@@ -142,8 +142,6 @@ pub enum Grey {
     RangeSet,
     /// The range of a delay row while the checklist holds a value.
     ChecklistSet,
-    /// Hide CPU in a waiting room (until the LDN check has passed).
-    WaitingRoom,
     /// Target speed while Break the Targets is On (SPEC V2.5): the targets do not move.
     TargetsStill,
 }
@@ -158,7 +156,6 @@ impl Grey {
             Grey::NeedsThreeBodies => "Needs Ready Fighter Bodies set to 3",
             Grey::RangeSet => "A range is set: clear it first (Y)",
             Grey::ChecklistSet => "Values are ticked: clear them first (Y)",
-            Grey::WaitingRoom => "Not in a waiting room yet",
             Grey::TargetsStill => "Targets stay still",
         }
     }
@@ -836,7 +833,6 @@ impl Menu {
             "save_damage_limits_cpu" if self.get("save_damage_cpu").get(2).copied().unwrap_or(0) == 0 => {
                 Some(Grey::DamageNotRandom)
             }
-            "hide_cpu" if self.env.waiting_room => Some(Grey::WaitingRoom),
             "eggsercise_speed" if self.get("btt").get(1).is_some_and(|v| *v != 0) => Some(Grey::TargetsStill),
             _ => None,
         }

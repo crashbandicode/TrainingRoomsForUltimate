@@ -3,23 +3,22 @@
 //! its HUD panel go and come back with it. No CPU setting is ever written. The runtime asks once per body frame
 //! (`Cpu::frame`) and does what the step says (`runtime::features::hide_cpu`; the panel in `runtime::ui::hud`).
 
-use super::role::Scene;
 
 /// One body's step: `Some(true)` hides it (written on the first frame and again on every later one, so a reset or a swap
 /// that rebuilt the body cannot leave it showing), `Some(false)` shows it again (the first frame after), `None` leaves it.
 ///
-/// The rule: the Hide CPU row is On, or a practice game asked for the CPU to be hidden (`request`); a waiting room never
-/// hides it, because hiding writes the practice CPU's game state, which the other consoles could see before the LDN check
-/// has passed. `away` is whether the body was hidden last frame.
-pub fn step(away: &mut bool, scene: Scene, row: bool, request: bool) -> Option<bool> {
-    let wanted = scene == Scene::Training && (row || request);
+/// The rule: the Hide CPU row is On, or a practice game asked for the CPU to be hidden (`request`), in Training and in the
+/// waiting room's practice alike (rc.14, 11-15: the room's practice is local to each console). `away` is whether the body was
+/// hidden last frame.
+pub fn step(away: &mut bool, row: bool, request: bool) -> Option<bool> {
+    let wanted = row || request;
     (std::mem::replace(away, wanted) || wanted).then_some(wanted)
 }
 
 /// The body's player tag (the floating label and arrow): the game's two per-fighter cursor work flags,
 /// `FIGHTER_INSTANCE_WORK_ID_FLAG_CURSOR` and `..._FLAG_NAME_CURSOR`, the pair the game's own cursor helper writes
 /// (`main+0x67db00`; a Final Smash turns the other fighters' tags off with it and back on with `true`). `Some(shown)` to
-/// write: off on every hidden frame, on the frame the body is shown, nothing otherwise (so never in a waiting room).
+/// write: off on every hidden frame, on the frame the body is shown, nothing otherwise.
 pub fn tag(step: Option<bool>) -> Option<bool> {
     step.map(|hidden| !hidden)
 }

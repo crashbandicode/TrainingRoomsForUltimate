@@ -60,7 +60,7 @@ fn hide_cpu_rule() {
         for (row, practice) in [(false, false), (true, false), (false, true), (true, true)] {
             // rc.14 (11-15): the same rule in the waiting room's practice as in Training.
             let want = if row || practice { Some(true) } else { None };
-            assert_eq!(hide::step(&mut false, scene, row, practice), want, "{scene:?} row {row} practice {practice}");
+            assert_eq!(hide::step(&mut false, row, practice), want, "{scene:?} row {row} practice {practice}");
         }
     }
     // The factory has it Off; the CPU frame follows the rule for each body.
