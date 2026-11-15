@@ -127,7 +127,8 @@ because the picker lists recordings only.
 
 ![The CPU's Play chord warps to macro 1's start save, then plays the chain in order](../media/rc7-chain-play.gif)
 
-<!-- CAPTURE-REQUEST rec-chain-picker: the numbered picker for + New chain (numbers 1, 2, 3 on recordings, R removing one, then the name step). A GIF; see artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![+ New chain: the numbered picker; A numbers the tile under the cursor, R takes the last number off, B finishes; the new chain is listed](../media/rc13-chain-picker.gif)<br>
+*+ New chain opens the numbered picker. A gives the tile under the cursor the next number (Neutral air 1, Dash attack 2, P1 jab 3), R takes the last number off, A numbers it again, B finishes and asks for a name (empty keeps Chain N). The keyboard step is cut. The chain is written when the menu closes: reopened, MACROS lists Chain 2 with its three steps and CONNECTIONS. Eden, rc.13 (untested on hardware).*
 
 ## Combos
 
@@ -329,6 +330,9 @@ the side that plays it.
 **The Replay window** lists your saved match captures. A opens the clip editor on one: the fighter, the crop window,
 the playhead and the timeline. On a capture's Mii track it reads the recorded Mii, asks Fighter Mismatch, and Switch
 loads that exact Mii on the CPU. Its keys are in the [menu reference](../menu/recording.md#replay-window).
+
+![Replay capture flips On; after a 1-stock match the Save Replay question is answered Yes and "Replay saved" shows; the Replay window then lists the capture](../media/rc13-replay-capture.gif)<br>
+*With Replay capture On, a 1-stock match is played and its replay saved: A, A, Y on the results opens "Save a replay of this battle?", Right and A answer Yes ("Replay saved"), and Recording > Replays > Replay window then lists the capture with its name and length. The loads, the match and the menus between the clips are cut. Eden, rc.13 (untested on hardware).*
 
 <!-- CAPTURE-REQUEST rec-replay-editor: the Replay window's clip editor, a still with the fighter, the crop window, the playhead and the timeline visible (rc.13). See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
