@@ -3,6 +3,14 @@
 Start with the [README](../README.md) for installing and the buttons. Each page of the in-game menu has its own doc
 below, with every option on it; the guides explain a topic across pages.
 
+## Start here
+
+| Page | Covers |
+| --- | --- |
+| [Getting started](guide/getting-started.md) | What you need, installing, the first start, opening the menu, a first look around, and how to read the build tag. |
+| [Current release](CURRENT-RELEASE.md) | Which release is current, what's new in it, how to install it and its known issues. |
+| [Troubleshooting](guide/troubleshooting.md) | What you may see, why, and what to do: the plugin or the menu not loading, greyed rows, the notices that say no, slow fighter loading, waiting rooms, settings, and where the logs are. |
+
 ## The menu, page by page
 
 Open the menu with B + D-pad Up (or Minus). L and R turn the pages.
@@ -42,7 +50,7 @@ Open the menu with B + D-pad Up (or Minus). L and R turn the pages.
 - [Restrictions](RESTRICTIONS.md): every message that refuses something, and the approval behind it.
 - [Building](BUILD.md) and [differences from the Training Modpack](DIFFERENCES-FROM-THE-FORK.md).
 - Release notes: [rc.5](RELEASE-NOTES-rc5.md), [rc.6](RELEASE-NOTES-rc6.md), [rc.8](RELEASE-NOTES-rc8.md),
-  [rc.9](RELEASE-NOTES-rc9.md) in this folder; rc.12's and rc.13's are on their
+  [rc.9](RELEASE-NOTES-rc9.md) in this folder; rc.12's, rc.13's and rc.14's are on their
   [release pages](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases). rc.7, rc.10 and rc.11 have
   none; see [Status](TECHNICAL.md#status).
 
