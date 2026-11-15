@@ -124,12 +124,18 @@ show their grab box.
 
 ### Frame data colours
 
-On draws hitboxes in the colours of Ultimate Frame Data: a strong hitbox is red and a weak one is pink. A hitbox is
-strong when it is the strongest one out on that frame, such as a sword's tip or a knee's sweet spot. It is weak when
-another hitbox out on the same frame is stronger, or when it is weaker than the strongest hitbox earlier in the same
-move, as the late frames of a knee are. The plugin reads each hitbox's damage from the game, so no list of fighters is
-needed. A hitbox it cannot rank, such as a jab's single hitbox or several hitboxes of equal damage, is red. Grab boxes
-and hurtboxes keep their colours. It needs Hitbox Visualization On. Off gives each hitbox its own colour, as before.
+On draws hitboxes in the colours of Ultimate Frame Data: a strong hitbox is red and a weak one is pink. Strong means
+it launches hardest. A hitbox is strong when it would send the other fighter further than any other hitbox out on that
+frame, such as a sword's tip or a knee's sweet spot. It is weak when another hitbox out on the same frame launches
+harder, as King K. Rool's Gut Check gust does beside its hit of the same damage. It is also weak when it launches less
+than the strongest hitbox earlier in the same move, as the late frames of a knee do. This is SmashWiki's definition of
+sweet and sour spots. The plugin works out the launch from each hitbox's own numbers in the game (damage, base knockback,
+knockback growth, set knockback), using the game's knockback formula and the other fighter's percent and weight at that
+moment, so no list of fighters is needed. Damage decides only between hitboxes that launch the same. The launch angle
+plays no part: which direction is best depends on the situation. With no other fighter to measure against, the colours
+rank the hitboxes as they would launch a middleweight at 0%. A hitbox it cannot rank, such as a jab's single hitbox or
+several identical hitboxes, is red. Grab boxes and hurtboxes keep their colours. It needs Hitbox Visualization On. Off
+gives each hitbox its own colour, as before.
 
 - **Values:** On, Off
 - **Default:** Off
@@ -171,10 +177,13 @@ More: [Frame strip](../guide/frame-strip.md)
 ### Spot labels
 
 On writes Sweet, Sour or Late on each hit that connects in the frame strip. The label sits on the grey hitlag block of
-the fighter that was hit: your hit on the CPU's lane, the CPU's hit on yours. Sweet is the strongest hitbox out on that
-frame, Sour a weaker one beside it, and Late a hit weaker than the strongest hitbox earlier in the same move. The plugin
-works out which hitbox connected from the damage the hit added. When that is unclear, such as equal hitboxes or a hit on
-a shield, there is no label. A charged smash attack is labelled like an uncharged one: the plugin reads the charge from the game and takes it out of the damage before it works out which hitbox connected. It needs Input Display set to Frame strip.
+the fighter that was hit: your hit on the CPU's lane, the CPU's hit on yours. Sweet is the hitbox out on that frame that
+launches the other fighter hardest, Sour one that launches it less, and Late a hit that launches less than the strongest
+hitbox earlier in the same move. The ranking is the one [Frame data colours](#frame-data-colours) uses; the launch angle
+plays no part. The plugin works out which hitbox connected from what the other fighter took: the damage the hit added,
+and how hard the game launched it. So two hitboxes of the same damage, such as Gut Check's hit and its gust, are told
+apart. When it is unclear, such as identical hitboxes or a hit on a shield, there is no label. A charged smash attack is
+labelled like an uncharged one: the plugin reads the charge from the game. It needs Input Display set to Frame strip.
 
 - **Values:** On, Off
 - **Default:** Off

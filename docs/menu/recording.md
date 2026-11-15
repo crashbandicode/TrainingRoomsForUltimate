@@ -343,7 +343,8 @@ More: [Combos](../guide/recording.md#combos)
 A saved combo remembers, for each link, whether its hit landed Sweet, Sour or Late (see
 [Spot labels](display-and-controls.md#spot-labels)). On: a link counts only if your attempt lands the same spot as the
 saved link. A link that lands Sour where the saved one landed Sweet drops, and the bar says "L1 Sour, saved Sweet". A link
-saved with no spot, such as one from an older combo file or from equal hitboxes, always matches. Off: the spot is not
+saved with no spot always matches: one from an older combo file, one from identical hitboxes, or one saved while both this
+row and Spot labels were Off, because the plugin works out spots only while one of them is On. Off: the spot is not
 compared.
 
 - **Values:** On, Off

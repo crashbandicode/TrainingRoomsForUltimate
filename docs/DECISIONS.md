@@ -655,6 +655,7 @@ Then, ~18:07Z: "sp recommendations sound good".
 | # | Decided |
 | --- | --- |
 | SP1 | Automatic from the game's hitbox data: the strongest hitbox out on that frame is **Sweet**, weaker ones **Sour**; a hit weaker than the same move's earlier strongest hit is **Late**. Equal hitboxes, or a hit TR can't attribute, get no label |
+| SP1-KB | 2026-11-15 ~02:00Z, relayed by the primary after the operator asked to follow how such cases are handled online: "strongest" means the hardest launch. A hitbox ranks by the knockback it gives the defender (SmashWiki's sweet/sour spot definition and its knockback formula, from each hitbox's own damage, base knockback, growth and set knockback, against the defender's percent and weight at that moment); damage decides only between equal knockbacks; Late is measured in knockback; the launch angle is not used. A hit is attributed by the knockback the defender received, the damage kept as a cross-check. Spots are worked out only while Spot labels or Match sweet/sour spot is On; with no defender, the colours rank as against a middleweight at 0%. This replaces SP1's ranking by damage |
 | SP2 | Hitbox colours with the option On: Sweet keeps today's red, Sour light blue, Late grey; grab boxes and hurtboxes unchanged |
 | SP3 | Input Display: a Sweet / Sour / Late label on each hit marker, Player 1 and CPU rows |
 | SP4 | Combos: each link remembers the spot it landed; with "Match sweet/sour spot" On a link counts only on the same spot |
