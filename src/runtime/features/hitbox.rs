@@ -240,9 +240,9 @@ unsafe fn eggs_cpu_diag(run: &eggs::Run, before: u32, at: usize, damage: f32, st
     }
     let want = (last != u64::MAX).then(|| [f32::from_bits((last >> 32) as u32), f32::from_bits(last as u32)]);
     let pos = [natives::pos_x(at), natives::pos_y(at)];
-    let (status, situation, (age, fly)) = (natives::status_kind(at), natives::situation_kind(at), run.flight());
+    let (status, situation, (egg, age, fly)) = (natives::status_kind(at), natives::situation_kind(at), run.flight());
     crate::runtime::diag_log::diagnostic(format_args!(
-        "[Eggs] cpu damage={damage} score={score} move={moved:?} want={want:?} at={pos:?} age={age} fly={fly:?} \
+        "[Eggs] cpu damage={damage} score={score} move={moved:?} want={want:?} at={pos:?} egg={egg:?} age={age} fly={fly:?} \
          status={status} situation={situation} stop={stop}"
     ));
 }

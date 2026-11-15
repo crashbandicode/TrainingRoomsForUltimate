@@ -378,10 +378,10 @@ impl Run {
         (self.egg, self.age, self.fly, self.cpu) = (Some(at), 0, [v, 0.0, GRAVITY * speed * speed], 0);
     }
 
-    /// Diag only: the target's ticks since its spawn and its flight (launch speed, sideways speed, gravity).
+    /// Diag only: the target's spawn point, its ticks since and its flight (launch speed, sideways speed, gravity).
     #[cfg(feature = "diag")]
-    pub fn flight(&self) -> (u32, [f32; 3]) {
-        (self.age, self.fly)
+    pub fn flight(&self) -> (Option<[f32; 2]>, u32, [f32; 3]) {
+        (self.egg, self.age, self.fly)
     }
 
     /// Where the target is now (the fighters' plane): up and back down in `2 v / g` ticks, one bounce at `BOUNCE` times the
