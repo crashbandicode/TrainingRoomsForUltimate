@@ -223,8 +223,9 @@ unsafe fn eggs_cpu(run: &mut eggs::Run, fighter: usize, entry: i32) -> Option<()
 }
 
 /// Diag: one line per event of the CPU target (a placement afresh, a landing, a counted hit) and every 6th held tick: where
-/// the game's frame left it (`at`, before this pass moves it), where the last pass put it (`want`), the flight's tick and
-/// launch, its status and situation. Eden reads the flight and the game's drift from the path off these.
+/// the game's frame left it (`at`, its `top` joint before this pass moves it), where the last pass put it (`want`), the
+/// flight's tick and launch, its status and the ids of FALL and WAIT. Eden reads the flight and the game's drift from the
+/// path off these. Only natives the feature's closure already has (the joint read, the status, the constant table).
 #[cfg(feature = "diag")]
 unsafe fn eggs_cpu_diag(run: &eggs::Run, before: u32, at: usize, damage: f32, stop: bool, moved: Option<([f32; 2], eggs::Put)>) {
     // The last pass's position as two f32 bit patterns; all ones is none.
@@ -239,11 +240,13 @@ unsafe fn eggs_cpu_diag(run: &eggs::Run, before: u32, at: usize, damage: f32, st
         return;
     }
     let want = (last != u64::MAX).then(|| [f32::from_bits((last >> 32) as u32), f32::from_bits(last as u32)]);
-    let pos = [natives::pos_x(at), natives::pos_y(at)];
-    let (status, situation, (egg, age, fly)) = (natives::status_kind(at), natives::situation_kind(at), run.flight());
+    let pos = natives::joint_position(at, hash40("top"), &[0.0; 3]).map_or([f32::NAN; 2], |p| [p[0], p[1]]);
+    let (status, (egg, age, fly)) = (natives::status_kind(at), run.flight());
+    let id = |name| game::lua_const(lua_bind_hash(name)).unwrap_or(-1);
+    let (fall, wait) = (id("FIGHTER_STATUS_KIND_FALL"), id("FIGHTER_STATUS_KIND_WAIT"));
     crate::runtime::diag_log::diagnostic(format_args!(
         "[Eggs] cpu damage={damage} score={score} move={moved:?} want={want:?} at={pos:?} egg={egg:?} age={age} fly={fly:?} \
-         status={status} situation={situation} stop={stop}"
+         status={status} fall={fall} wait={wait} stop={stop}"
     ));
 }
 

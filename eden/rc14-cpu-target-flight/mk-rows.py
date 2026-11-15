@@ -29,7 +29,7 @@ rows = [
     row('cf-groundhit', 'groundhit', 'Normal, Any attack: the CPU launched 7 in front of Fox (diag-egg.req); after it lands, a '
         'jab counts (score 1) with the CPU on the ground; the next spot is placed afresh in the air.', 3),
     row('cf-airhit', 'airhit', 'Slow, Breaks on Aerials: the CPU launched beside Fox; a full-hop nair counts with the CPU '
-        'airborne (situation 2); the next spot is placed afresh in the air and rises.', 5),
+        'airborne (2+ above the ground); the next spot is placed afresh in the air and rises.', 5),
     row('cf-done10', 'done10', '10 targets: ten launches beside Fox, each jabbed after it lands; the notice reads "Done! 10 in".',
         6),
     row('cf-reset', 'reset', 'L+R+A while the CPU flies: "Eggs 0" again, a new first target placed afresh in the air that '

@@ -3,7 +3,7 @@ build of the branch, worker A's eggs harness (eggsrows.py, eggsfly.py, hotslots.
 
 The diag build writes one `[Eggs] cpu` line per event of the CPU target (a placement afresh, a landing, a counted hit) and
 every 6th held tick (cfcheck.py reads them: where TR put it, where the game's frame left it, the flight's tick, launch,
-status and situation). Rows:
+status against the FALL and WAIT ids). Rows:
   flight_normal / flight_slow / flight_fast: Target CPU, Free practice: stills in flight and at rest; the flight against
     the model (cfcheck.problems: drift and path error <= 0.5, apex, landing tick, FALL in flight, WAIT on the ground).
   groundhit: the CPU launched beside Fox (diag-egg.req), a jab after it lands counts with the CPU on the ground.
@@ -219,8 +219,8 @@ def groundhit(ctx, t0, out, problems):
     out['hit'] = rec
     if not rec:
         problems.append('no counted jab on the landed CPU in %d tries' % len(out['tries']))
-    elif rec['situation'] != cfcheck.GROUND:
-        problems.append('the CPU was not on the ground at the hit: situation %s' % rec['situation'])
+    elif abs(cfcheck.height(rec)) > cfcheck.REST:
+        problems.append('the CPU was not on the ground at the hit: %.2f above it' % cfcheck.height(rec))
     nxt = reader.wait(FRESH_AIR, 4, after=n) if rec else None
     out['next'] = nxt and nxt[:300]
     if rec and not nxt:
@@ -257,8 +257,8 @@ def airhit(ctx, t0, out, problems):
     if not rec:
         problems.append('no counted nair on the flying CPU in %d tries' % len(tries))
         return
-    if rec['situation'] != cfcheck.AIR:
-        problems.append('the CPU was not airborne at the hit: situation %s' % rec['situation'])
+    if cfcheck.height(rec) < cfcheck.AIRBORNE:
+        problems.append('the CPU was not airborne at the hit: %.2f above the ground' % cfcheck.height(rec))
     i, nxt = reader.find(FRESH_AIR, 6, after=n)
     out['next'] = nxt and nxt[:300]
     time.sleep(1.2 / FACTOR['slow'])
