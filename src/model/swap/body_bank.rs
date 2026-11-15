@@ -1252,9 +1252,11 @@ pub const KIRBY_STRIP_BEFORE_PARK: bool = true;
 /// pool prepared on the worker, its attach, ready, no fallback). It only acts while A1 does.
 pub const KEEP_PT_WINDOW_ACROSS_RELOAD: bool = true;
 
-/// rc.14 a-full-2 (after probe a0): A1 keeps a Pyra/Mythra window too ([`window_kept_across_reload`]'s `keep_aegis`). Off
-/// until its Eden row passes (the diag build's `diag-cycle.req` `aegis`, with `window`, turns it on for it).
-pub const KEEP_AEGIS_WINDOW_ACROSS_RELOAD: bool = false;
+/// rc.14 a-full-2 (after probe a0): A1 keeps a Pyra/Mythra window too ([`window_kept_across_reload`]'s `keep_aegis`). On
+/// since a2-aegis passed in boots a2-99b9083f-y1 and a2-f4acc30e-x1 and the object-module fix `08cc9932` covers the crash
+/// that boot 3's a2-p4 hit (the primary, a-full-3 brief 2026-11-15); the counted receipts are the final pass's a2-aegis and
+/// a2-pyra-keep-all rows with every switch on, and a failure there reverts this flip. It only acts while A1 does.
+pub const KEEP_AEGIS_WINDOW_ACROSS_RELOAD: bool = true;
 
 /// rc.14 2e (a-full, A1; AFULL-RESEARCH.md §2): why the attached window `window` cannot be kept across its role's
 /// target-first Reload onto `target` (`Ok`: it can). The Reload start (`0x653240` → `0x653490`) deactivates every window
@@ -4266,6 +4268,24 @@ mod tests {
             "the Aegis switch keeps no PT window");
     }
 
+    /// rc.14 a-full-3 (the primary, a-full-3 brief 2026-11-15: a2-aegis passed in boots 3 and 4, the object-module fix `08cc9932`
+    /// covers the crash): the shipped switches keep every kind of window across a Reload, and a Kirby that holds a copy
+    /// loses it instead of taking the Reload. The counted receipts are the final pass's a2-aegis and a2-pyra-keep-all rows.
+    fn the_shipped_switches_keep_every_window_kind_across_a_reload() {
+        let kept = |window: Members| window_kept_across_reload(window, KEEP_MII_ACROSS_RELOAD, KEEP_PT_WINDOW_ACROSS_RELOAD,
+            KEEP_AEGIS_WINDOW_ACROSS_RELOAD, MARIO, true, false);
+        assert_eq!(kept(members(&[FALCO, PICHU, DIDDY])), Ok(()), "an ordinary window");
+        assert_eq!(kept(Members::mii_group(GUNNER).unwrap()), Ok(()), "a Mii window");
+        for form in [0x24, 0x25, 0x26] {
+            assert_eq!(kept(Members::native_group(form).unwrap()), Ok(()), "a Pokemon Trainer window, form {form:#x}");
+        }
+        for form in [0x5a, 0x5b] {
+            assert_eq!(kept(Members::native_group(form).unwrap()), Ok(()), "a Pyra / Mythra window, form {form:#x}");
+        }
+        assert_eq!([KEEP_WINDOW_ACROSS_RELOAD, KEEP_MII_ACROSS_RELOAD, KEEP_PT_WINDOW_ACROSS_RELOAD, KEEP_AEGIS_WINDOW_ACROSS_RELOAD,
+            KIRBY_STRIP_BEFORE_PARK], [true; 5], "A1, Mii, Pokemon Trainer, Pyra / Mythra and the Kirby copy strip");
+    }
+
     /// rc.14 a-full-2 (the A1 pair defect: a1-enable `a1-be759456-y2c` `a1-pair3`, 451 × `Unmapped Write8 @ 0x70` from the
     /// control select `0x64fb70`, "verification failed"): a pair window A1 keeps leaves as N3 parks one, with the bank flag
     /// and no pair bit. The select needs bit 2 to pick the window's context; an exchange-parked pair record carries 4 and
@@ -4351,6 +4371,7 @@ mod tests {
             ("a_gated_member_is_laid_out_alone_and_the_rest_stay_together", a_gated_member_is_laid_out_alone_and_the_rest_stay_together as fn()),
             ("a_reload_keeps_the_window_whose_live_member_parks", a_reload_keeps_the_window_whose_live_member_parks as fn()),
             ("a_kirby_with_a_copy_loses_it_and_parks_instead_of_the_reload", a_kirby_with_a_copy_loses_it_and_parks_instead_of_the_reload as fn()),
+            ("the_shipped_switches_keep_every_window_kind_across_a_reload", the_shipped_switches_keep_every_window_kind_across_a_reload as fn()),
             ("a_kept_pair_window_keeps_the_bank_flag_as_n3_parks_it", a_kept_pair_window_keeps_the_bank_flag_as_n3_parks_it as fn()),
             ("a_destroyed_holder_gives_back_the_count_finalize_gives_back", a_destroyed_holder_gives_back_the_count_finalize_gives_back as fn()),
             ("the_farthest_unit_goes_never_the_next_or_the_one_on_screen", the_farthest_unit_goes_never_the_next_or_the_one_on_screen as fn()),
