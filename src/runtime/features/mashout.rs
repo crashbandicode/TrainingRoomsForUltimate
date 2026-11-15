@@ -218,7 +218,7 @@ impl Game {
             self.generation
         ));
     }
-    fn retire(&mut self) {
+    fn end_practice(&mut self) {
         revoke();
         OWN_CPU.store(0, Ordering::Release);
         TEMP_KIND.store(u32::MAX, Ordering::Release);
@@ -288,11 +288,11 @@ pub unsafe fn frame(fighter: usize) {
         return;
     }
     let Some(where_now) = scene::current() else {
-        game.retire();
+        game.end_practice();
         return;
     };
     if game.scene.is_some_and(|old| old != where_now) {
-        game.retire();
+        game.end_practice();
     }
     game.scene = Some(where_now);
     let Some(ids) = ids() else {
@@ -588,7 +588,7 @@ pub unsafe fn frame(fighter: usize) {
         Step::Failed => (),
         Step::Restore => {
             if game.original.is_none() {
-                game.retire();
+                game.end_practice();
                 return;
             }
             if !released {
@@ -597,7 +597,7 @@ pub unsafe fn frame(fighter: usize) {
             revoke();
             OWN_CPU.store(0, Ordering::Release);
             let Some(original) = game.original else {
-                game.retire();
+                game.end_practice();
                 return;
             };
             let body = natives::entry_active_body(natives::fighter_entry(cpu_entry));
@@ -605,7 +605,7 @@ pub unsafe fn frame(fighter: usize) {
                 return;
             }
             if ((body + 0xc) as *const u32).read() == original {
-                game.retire();
+                game.end_practice();
             } else if !game.restore_requested
                 && crate::runtime::roster::character_roster::cpu_reload_ready()
             {

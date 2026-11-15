@@ -7,8 +7,10 @@ use super::sites::{Feature, Site};
 pub static SITES: [Site; 17] = include!(concat!(env!("OUT_DIR"), "/tables/sites_mashout.SITES.rs"));
 
 #[cfg(test)]
-#[path = "../../tests/common/mod.rs"]
-mod owned;
+lib_unit_tests! {
+    #[path = "../../tests/common/mod.rs"]
+    mod owned;
+}
 
 #[cfg(test)]
 mod tests {

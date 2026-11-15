@@ -66,6 +66,11 @@ fn show(worker: &mut Worker, text: &str) {
     if worker.shown.as_str() == text {
         return;
     }
+    #[cfg(feature = "diag")]
+    crate::runtime::diag_log::diagnostic(format_args!(
+        "[Mashout] notice gen={} text={text}",
+        worker.generation
+    ));
     worker.shown = crate::model::storage::FixedPath::new();
     let _ = core::fmt::Write::write_str(&mut worker.shown, text);
     if text.is_empty() {

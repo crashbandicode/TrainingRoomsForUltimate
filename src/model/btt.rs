@@ -627,11 +627,7 @@ impl Btt {
                     self.done();
                 }
             }
-            Phase::Done => {
-                if result_tick(&mut self.left, tick) {
-                    self.ready();
-                }
-            }
+            Phase::Done if result_tick(&mut self.left, tick) => self.ready(),
             _ => {}
         }
         (self.broken & !was).count_ones() as u8

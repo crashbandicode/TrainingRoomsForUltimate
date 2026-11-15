@@ -29,6 +29,7 @@
 //! list reads): 704.
 
 //! rc.15 article hurtboxes adds the approved Called `article_get_from_no` row: 270 site rows to 271.
+//! rc.15 Mash adds its separately frozen 17 approved reader rows in a 26th data file. The historical digests stay unchanged.
 
 use crate::model::sha256::sha256_hex;
 use std::fmt::Write;
@@ -91,7 +92,7 @@ fn every_data_row_has_a_64_byte_guard() {
         }
         files += 1;
     }
-    assert_eq!((files, rows), (25, SEAM_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS));
+    assert_eq!((files, rows), (26, SEAM_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS + crate::model::sites_mashout::SITES.len()));
 }
 
 const SEAM_ROWS: usize = 704;
