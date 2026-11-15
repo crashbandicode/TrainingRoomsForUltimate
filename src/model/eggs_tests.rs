@@ -685,6 +685,26 @@ fn eggs_target_cpu_hidden() {
     assert_eq!(choice(&snapshot, ROW_PRACTICE_CPU), 0, "CPU during a game: Hide first");
 }
 
+/// V2.6: the practice game's request to hide the CPU (`hides_cpu`), one table: CPU during a game says Hide and a game runs,
+/// except that the CPU is never hidden while it is the Eggs-ercise target (the target wins; its body, its tag and its panel
+/// all stay); Break the Targets hides it whatever the Eggs rows say; Show never hides it.
+fn eggs_practice_hide_request() {
+    // (CPU during a game is Hide, an Eggs run is on, the CPU is its target, Break the Targets runs) -> the request
+    let table = [
+        ((true, true, false, false), true, "Eggs-ercise, Target Disc, Hide"),
+        ((true, true, true, false), false, "Eggs-ercise, Target CPU, Hide: the target wins"),
+        ((true, false, false, true), true, "Break the Targets, Hide"),
+        ((true, false, false, false), false, "no game"),
+        ((false, true, false, false), false, "Eggs-ercise, Target Disc, Show"),
+        ((false, true, true, false), false, "Eggs-ercise, Target CPU, Show"),
+        ((false, false, false, true), false, "Break the Targets, Show"),
+        ((false, false, false, false), false, "no game, Show"),
+    ];
+    for ((practice_hide, running, cpu_target, btt), want, what) in table {
+        assert_eq!(hides_cpu(practice_hide, running, cpu_target, btt), want, "{what}");
+    }
+}
+
 /// V2.1: a break freezes the breaker for `HITLAG` ticks in native Training only (the waiting room waits for the LDN
 /// check).
 fn eggs_hitlag() {
@@ -990,6 +1010,7 @@ fn case_table() {
         ("eggs_stage_range", eggs_stage_range as fn()),
         ("eggs_target_cpu", eggs_target_cpu as fn()),
         ("eggs_target_cpu_hidden", eggs_target_cpu_hidden as fn()),
+        ("eggs_practice_hide_request", eggs_practice_hide_request as fn()),
         ("eggs_cpu_flies_like_the_disc", eggs_cpu_flies_like_the_disc as fn()),
         ("eggs_cpu_pass_follows_the_flight", eggs_cpu_pass_follows_the_flight as fn()),
         ("eggs_cpu_air_hits", eggs_cpu_air_hits as fn()),

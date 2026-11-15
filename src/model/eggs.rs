@@ -144,6 +144,11 @@ pub fn choice(snapshot: &super::settings::Snapshot, id: &str) -> u8 {
     row.iter().position(|v| *v != 0).unwrap_or(0) as u8
 }
 
+/// STUB (fail-first): the request ignores the target.
+pub const fn hides_cpu(practice_hide: bool, running: bool, _cpu_target: bool, btt: bool) -> bool {
+    practice_hide && (running || btt)
+}
+
 /// One live attack of the fighter in world space: a pill from `.0` to `.1` (the same point for a point hitbox), its radius
 /// and its damage.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

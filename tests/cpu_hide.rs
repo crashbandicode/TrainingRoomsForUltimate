@@ -15,6 +15,7 @@ use model::cpu::hide;
 use model::cpu::role::{FighterKey, Scene};
 use model::cpu::settings::CpuSettings;
 use model::cpu::state::Cpu;
+use model::eggs;
 use model::menu::table::ROWS;
 use model::menu::{Env, Grey, Menu};
 use model::settings::{Settings, Snapshot};
@@ -238,4 +239,103 @@ fn hide_cpu_play_refusal() {
     // Play on CPU while the CPU is hidden is refused: the notice names the row, or the game when a practice game asked.
     assert_eq!(hide::refusal(false), "The CPU is hidden: turn Hide CPU Off first");
     assert_eq!(hide::refusal(true), "The CPU is hidden during this game");
+}
+
+/// One setting of the practice games, as the plugin's frame sees it: CPU during a game (Hide), an Eggs-ercise run on, the CPU as
+/// its target, Break the Targets running.
+#[derive(Clone, Copy, Debug)]
+struct Game {
+    practice_hide: bool,
+    running: bool,
+    cpu_target: bool,
+    btt: bool,
+}
+
+impl Game {
+    /// The request the game makes of the CPU body: the one decision (`eggs::hides_cpu`) the body, tag and panel all follow.
+    fn request(self) -> bool {
+        eggs::hides_cpu(self.practice_hide, self.running, self.cpu_target, self.btt)
+    }
+}
+
+/// Every setting a game can be in: a CPU target needs a run, and Hide CPU On makes the target the disc (`eggs::choices`).
+fn games(row: bool) -> Vec<Game> {
+    let mut all = Vec::new();
+    for practice_hide in [false, true] {
+        for running in [false, true] {
+            for cpu_target in [false, true] {
+                for btt in [false, true] {
+                    if (cpu_target && !running) || (cpu_target && row) || (running && btt) {
+                        continue;
+                    }
+                    all.push(Game { practice_hide, running, cpu_target, btt });
+                }
+            }
+        }
+    }
+    all
+}
+
+fn cpu_with_row(row: bool) -> Cpu {
+    let mut cpu = cpu(&[]);
+    set_row(&mut cpu, row);
+    cpu
+}
+
+fn set_row(cpu: &mut Cpu, row: bool) {
+    let mut snap = Snapshot::factory();
+    snap.set("hide_cpu", &[[0, 1], [1, 0]][usize::from(row)]).unwrap();
+    cpu.publish(CpuSettings::from_snapshot(&snap), 0);
+}
+
+#[test]
+fn hide_cpu_target_cpu_keeps_tag_and_panel() {
+    // Eggs-ercise on, Target CPU, CPU during a game Hide, Hide CPU Off: the CPU is the target, so the body, its tag and its
+    // panel all stay. No frame hides it and none writes the tag or the panel.
+    let target = Game { practice_hide: true, running: true, cpu_target: true, btt: false };
+    assert!(!target.request(), "the target wins over CPU during a game");
+    let mut cpu = cpu_with_row(false);
+    for _ in 0..3 {
+        let out = frame(&mut cpu, body(), target.request());
+        assert_eq!((out.vanish, hide::tag(out.vanish), cpu.hidden_panels()), (None, None, 0));
+        assert!(runs_behaviours(&out), "shown: the CPU's behaviours run");
+    }
+    // The same game with the disc as the target hides body, tag and panel together.
+    let disc = Game { cpu_target: false, ..target };
+    assert_eq!(tag_and_panels(&mut cpu, body(), disc.request()), (Some(false), CPU_PANEL));
+    // The menu closes on Target CPU while the CPU is hidden: it is shown at once, its tag back on and its panel clear.
+    assert_eq!(tag_and_panels(&mut cpu, body(), target.request()), (Some(true), 0));
+    assert_eq!(tag_and_panels(&mut cpu, body(), target.request()), (None, 0), "then the game owns the tag again");
+}
+
+#[test]
+fn hide_cpu_body_tag_panel_share_one_decision() {
+    // Every pair of consecutive states (the Hide CPU row x a practice game's setting), each pair from a fresh CPU. After a frame
+    // the body is hidden exactly when the row or the game's request says so; its tag is written off, and its panel is hidden,
+    // in exactly those frames; the tag is written on only in the frame that shows a body that was hidden (and then the panel
+    // is clear); and a frame that leaves the body alone leaves the tag alone. One decision, read three ways.
+    let states: Vec<(bool, Game)> = [false, true].into_iter().flat_map(|row| games(row).into_iter().map(move |g| (row, g))).collect();
+    assert_eq!(states.len(), 14, "8 settings with the row Off, 6 with it On (its CPU target is the disc)");
+    for &(row_a, game_a) in &states {
+        for &(row_b, game_b) in &states {
+            let mut cpu = cpu_with_row(row_a);
+            let mut was_hidden = false;
+            for (row, game) in [(row_a, game_a), (row_b, game_b), (row_b, game_b)] {
+                set_row(&mut cpu, row);
+                let out = frame(&mut cpu, body(), game.request());
+                let what = format!("row {row} {game:?}, hidden before: {was_hidden}");
+                let wanted = row || (game.practice_hide && ((game.running && !game.cpu_target) || game.btt));
+                let hidden = out.vanish == Some(true);
+                assert_eq!(hidden, wanted, "the body: {what}");
+                assert_eq!(hide::tag(out.vanish) == Some(false), hidden, "the tag is off with the body: {what}");
+                assert_eq!(cpu.hidden_panels() & CPU_PANEL != 0, hidden, "the panel is hidden with the body: {what}");
+                match hide::tag(out.vanish) {
+                    Some(true) => assert!(was_hidden && !hidden && cpu.hidden_panels() == 0, "the tag comes on with the show: {what}"),
+                    None => assert!(!was_hidden && !hidden, "no tag write only for a body left alone: {what}"),
+                    Some(false) => {}
+                }
+                was_hidden = hidden;
+            }
+        }
+    }
 }
