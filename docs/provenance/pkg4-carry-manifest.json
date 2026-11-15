@@ -1374,7 +1374,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "a658e04ce4bab0b3b487d85d4e3a49fb5820235b9f19417d08283d3f88591a6a",
+   "dest_sha256": "1757e1cccc457318bca5cf1dd1338c75d7966871d5aba268b628c3a2e96e082b",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -1967,6 +1967,21 @@
      "old": "                NameBody::Macro(_) => None,\n            },\n            _ => None,\n        }\n    }\n\n    /// Checkpoint an unfinished native edit, without confirmation or any I/O\n    /// effect. Empty/whitespace drafts are valid; final save validation is separate.\n",
      "new": "                NameBody::Macro(_) => None,\n            },\n            _ => None,\n        }\n    }\n\n    pub fn native_name_allows_empty(&self) -> bool {\n        self.external_name_token() == Some(CLIP_NAME_TOKEN)\n    }\n\n    /// Checkpoint an unfinished native edit, without confirmation or any I/O\n    /// effect. Empty/whitespace drafts are valid; final save validation is separate.\n",
      "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
+    },
+    {
+     "old": "struct PlaceDraft {",
+     "new": "impl NameDraft {\n    fn from_recording(recording: &MacroRecording, placement: Placement) -> Self {\n        Self {\n            name: recording.name.clone(),\n            native_cursor: recording.name.encode_utf16().count(),\n            page: 0,\n            cursor: 31,\n            body: NameBody::Macro(Box::new(MacroNameBody {\n                frames: recording.frames.clone(),\n                start: recording.start,\n                placement,\n                version: recording.game_version.clone(),\n                mii: recording.mii,\n            })),\n            keyboard_title: MACRO_KEYBOARD_TITLE,\n        }\n    }\n}\n\nstruct PlaceDraft {",
+     "reason": "rc.15 Phase 3 approved LOW-risk reuse (2026-11-15): share the recording-to-name-draft projection; caller effects and all fields preserved."
+    },
+    {
+     "old": "        self.screen = Screen::Save(NameDraft {\n            name: recording.name.clone(),\n            native_cursor: recording.name.encode_utf16().count(),\n            page: 0,\n            cursor: 31,\n            body: NameBody::Macro(Box::new(MacroNameBody {\n                frames: recording.frames.clone(),\n                start: recording.start,\n                placement: recording.placement,\n                version: recording.game_version.clone(),\n                mii: recording.mii,\n            })),\n            keyboard_title: MACRO_KEYBOARD_TITLE,\n        }",
+     "new": "        self.screen = Screen::Save(NameDraft::from_recording(&recording, recording.placement)",
+     "reason": "rc.15 Phase 3 approved LOW-risk reuse (2026-11-15): share the recording-to-name-draft projection; caller effects and all fields preserved."
+    },
+    {
+     "old": "        let draft = NameDraft {\n            name: source.name.clone(),\n            native_cursor: source.name.encode_utf16().count(),\n            page: 0,\n            cursor: 31,\n            body: NameBody::Macro(Box::new(MacroNameBody {\n                frames: source.frames.clone(),\n                start: source.start,\n                placement,\n                version: source.game_version.clone(),\n                mii: source.mii,\n            })),\n            keyboard_title: MACRO_KEYBOARD_TITLE,\n        }",
+     "new": "        let draft = NameDraft::from_recording(source, placement)",
+     "reason": "rc.15 Phase 3 approved LOW-risk reuse (2026-11-15): share the recording-to-name-draft projection; caller effects and all fields preserved."
     }
    ]
   },

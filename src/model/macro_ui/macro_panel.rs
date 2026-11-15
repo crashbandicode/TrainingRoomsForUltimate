@@ -294,6 +294,25 @@ struct NameDraft {
     keyboard_title: &'static str,
 }
 
+impl NameDraft {
+    fn from_recording(recording: &MacroRecording, placement: Placement) -> Self {
+        Self {
+            name: recording.name.clone(),
+            native_cursor: recording.name.encode_utf16().count(),
+            page: 0,
+            cursor: 31,
+            body: NameBody::Macro(Box::new(MacroNameBody {
+                frames: recording.frames.clone(),
+                start: recording.start,
+                placement,
+                version: recording.game_version.clone(),
+                mii: recording.mii,
+            })),
+            keyboard_title: MACRO_KEYBOARD_TITLE,
+        }
+    }
+}
+
 struct PlaceDraft {
     working: Placement,
     cursor: usize,
@@ -907,20 +926,7 @@ impl MacroUi {
 
     /// Put an unsaved recording back on screen after the disk write failed.
     pub fn restore_draft(&mut self, recording: MacroRecording) {
-        self.screen = Screen::Save(NameDraft {
-            name: recording.name.clone(),
-            native_cursor: recording.name.encode_utf16().count(),
-            page: 0,
-            cursor: 31,
-            body: NameBody::Macro(Box::new(MacroNameBody {
-                frames: recording.frames.clone(),
-                start: recording.start,
-                placement: recording.placement,
-                version: recording.game_version.clone(),
-                mii: recording.mii,
-            })),
-            keyboard_title: MACRO_KEYBOARD_TITLE,
-        });
+        self.screen = Screen::Save(NameDraft::from_recording(&recording, recording.placement));
         self.playback_on = false;
     }
 
@@ -1458,20 +1464,7 @@ impl MacroUi {
         let Some(source) = editing.as_ref().map(|editing| &editing.recording).or(self.loaded.as_ref().map(|loaded| &loaded.recording)) else {
             return Effect::Notify("Nothing to save".to_owned());
         };
-        let draft = NameDraft {
-            name: source.name.clone(),
-            native_cursor: source.name.encode_utf16().count(),
-            page: 0,
-            cursor: 31,
-            body: NameBody::Macro(Box::new(MacroNameBody {
-                frames: source.frames.clone(),
-                start: source.start,
-                placement,
-                version: source.game_version.clone(),
-                mii: source.mii,
-            })),
-            keyboard_title: MACRO_KEYBOARD_TITLE,
-        };
+        let draft = NameDraft::from_recording(source, placement);
         self.held_save = None;
         self.screen = Screen::Save(draft);
         Effect::None
