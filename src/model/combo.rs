@@ -487,6 +487,10 @@ pub struct Attempt {
 }
 
 impl Attempt {
+    fn new(exchange: u32, junction: bool) -> Self {
+        Self { exchange, grades: [None; LINKS], len: 0, summary: None, junction }
+    }
+
     pub fn grades(&self) -> impl Iterator<Item = &Grade> {
         self.grades[..self.len].iter().flatten()
     }
@@ -630,13 +634,7 @@ impl Helper {
     /// for the exchange to close.
     pub fn continue_with(&mut self, target: Combo) {
         self.target = Some(target);
-        self.attempt = Some(Attempt {
-            exchange: self.capture.exchange,
-            grades: [None; LINKS],
-            len: 0,
-            summary: None,
-            junction: true,
-        });
+        self.attempt = Some(Attempt::new(self.capture.exchange, true));
     }
 
     /// Back to the first combo of a sequence. Its attempt starts on the first link of a later exchange, as a single
@@ -767,13 +765,7 @@ impl Helper {
             return;
         };
         if self.attempt.is_none() {
-            self.attempt = Some(Attempt {
-                exchange: start,
-                grades: [None; LINKS],
-                len: 0,
-                summary: None,
-                junction: false,
-            });
+            self.attempt = Some(Attempt::new(start, false));
         }
         while let Some(attempt) = self.attempt.as_ref().filter(|a| a.open()) {
             let reference = self.target.as_ref().unwrap().get(attempt.len).copied().unwrap();
@@ -823,13 +815,7 @@ impl Helper {
             if !first || target.get(0).is_none_or(|r| r.from != rec.from) {
                 return;
             }
-            self.attempt = Some(Attempt {
-                exchange,
-                grades: [None; LINKS],
-                len: 0,
-                summary: None,
-                junction: false,
-            });
+            self.attempt = Some(Attempt::new(exchange, false));
         }
         let Some(attempt) = self.attempt.as_mut() else {
             return;
