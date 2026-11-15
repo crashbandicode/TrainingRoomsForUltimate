@@ -127,8 +127,9 @@ show their grab box.
 On draws hitboxes in the colours of Ultimate Frame Data: a strong hitbox is red and a weak one is pink. Strong means
 it launches hardest. A hitbox is strong when it would send the other fighter further than any other hitbox out on that
 frame, such as a sword's tip or a knee's sweet spot. It is weak when another hitbox out on the same frame launches
-harder, as King K. Rool's Gut Check gust does beside its hit of the same damage. It is also weak when it launches less
-than the strongest hitbox earlier in the same move, as the late frames of a knee do. This is SmashWiki's definition of
+harder, such as the gust of King K. Rool's Gut Check beside its hit. SmashWiki says the gust deals the same damage as
+the hit; in the game's own data it deals 0.7 times the hit's damage, and the plugin follows the game. It is also weak
+when it launches less than the strongest hitbox earlier in the same move, as the late frames of a knee do. This is SmashWiki's definition of
 sweet and sour spots. The plugin works out the launch from each hitbox's own numbers in the game (damage, base knockback,
 knockback growth, set knockback), using the game's knockback formula and the other fighter's percent and weight at that
 moment, so no list of fighters is needed. Damage decides only between hitboxes that launch the same. The launch angle
@@ -180,10 +181,11 @@ On writes Sweet, Sour or Late on each hit that connects in the frame strip. The 
 the fighter that was hit: your hit on the CPU's lane, the CPU's hit on yours. Sweet is the hitbox out on that frame that
 launches the other fighter hardest, Sour one that launches it less, and Late a hit that launches less than the strongest
 hitbox earlier in the same move. The ranking is the one [Frame data colours](#frame-data-colours) uses; the launch angle
-plays no part. The plugin works out which hitbox connected from what the other fighter took: the damage the hit added,
-and how hard the game launched it. So two hitboxes of the same damage, such as Gut Check's hit and its gust, are told
-apart. When it is unclear, such as identical hitboxes or a hit on a shield, there is no label. A charged smash attack is
-labelled like an uncharged one: the plugin reads the charge from the game. It needs Input Display set to Frame strip.
+plays no part. The game itself records which hitbox connected, and the plugin reads that record. It checks it against
+what the other fighter took: the damage the hit added and how hard the game launched it. So two hitboxes of the same
+damage, such as the two pairs in Mario's jab, are told apart, and so is a stale hit. A hit has no label when it cannot
+be checked, such as identical hitboxes, a hit on a shield or a projectile's hit. A charged smash attack is labelled like
+an uncharged one: the plugin reads the charge from the game. It needs Input Display set to Frame strip.
 
 - **Values:** On, Off
 - **Default:** Off

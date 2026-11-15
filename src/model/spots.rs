@@ -9,11 +9,10 @@
 //! * when the frame's strongest is weaker than the strongest seen earlier in the same action (the sweet phase is over), its hitboxes are **Late**;
 //! * hitboxes equal in knockback and damage, and a lone hitbox with nothing stronger before it, have no label.
 //!
-//! A hit is attributed (`attribute`) by what the defender took: the damage it gained, divided by each slot's damage and the attacker's
-//! `AttackModule::power_mul_status` (the smash charge), must lie in `K_LOW..=K_HIGH` (the defender's side adds 1.26 for a fresh hit, about
-//! 1.07 stalest: Eden, 2026-11-14), and the knockback it received (`DamageModule::reaction`, the value the game's hit handler stores for the
-//! strongest hit of the frame) divided by the slot's knockback must lie in `KB_LOW..=KB_HIGH`. The label shows only when every slot left
-//! gets the same class; without the knockback reading, slots equal in damage but of different classes give no label.
+//! A hit is attributed (`attribute`) to the attack slot the game itself recorded for it: the defender's damage record keeps the slot id of
+//! the hit whose knockback it stored (`+0x52`, beside the knockback at `+0x10` that `DamageModule::reaction` returns; spots-3, Eden
+//! 2026-11-15). Two cross-checks against that slot: the damage gained over its damage and the attacker's charge in `K_LOW..=K_HIGH`, and
+//! the knockback received over its knockback in `KB_LOW..=KB_HIGH`. Anything else has no label.
 
 /// The rows (decision SP5): the strip's labels and the combo's match, toggles Off by default. The hitbox visualizer's *Frame data colours*
 /// (`hitbox::legend_colour`) is an item of its checklist (`legend::COLOURS`).
@@ -63,18 +62,18 @@ impl Launch {
 /// Damages closer than this are equal; so are knockbacks closer than `KB_EPS`.
 pub const EPS: f32 = 0.05;
 pub const KB_EPS: f32 = 0.5;
-/// The window of added damage over the hitbox's own damage times the attacker's charge (decision SP1's attribution), set from the
-/// `[Spots]` lines of Eden (the module notes): the remaining multiplier is 1.26 for a fresh hit and about 1.07 stalest.
-pub const K_LOW: f32 = 1.0;
+/// The window of added damage over the recorded slot's damage times the attacker's charge: a fresh hit adds 1.26 (Eden, 2026-11-14); a
+/// stale one less, down to 0.563 measured (spots-3, Eden 2026-11-15: a jab the CPU mashed on every frame it could), so 0.5.
+pub const K_LOW: f32 = 0.5;
 pub const K_HIGH: f32 = 1.6;
 /// The defender's side of a fresh hit's damage (1.26, Eden 2026-11-14) and the part of it that is the 1-on-1 ratio (1.2; the rest, 1.05, is
 /// the attacker's freshness, which the formula's damage keeps).
 pub const DEALT: f32 = 1.26;
 pub const TARGET_MUL: f32 = 1.2;
-/// The window of received knockback over a slot's knockback: the multipliers every hitbox of a move shares and the formula leaves out
-/// (rage up to 1.1, crouching 0.85).
-pub const KB_LOW: f32 = 0.8;
-pub const KB_HIGH: f32 = 1.2;
+/// The window of received knockback over the recorded slot's knockback by the formula: Eden measured 0.932 (a fully charged smash) to 1.020
+/// (a fully staled jab) on the game's own slot (spots3-bade7ea6-1, `artifacts/rc14-spots-3/eden/replay_table.py`), plus a margin of 0.03.
+pub const KB_LOW: f32 = 0.90;
+pub const KB_HIGH: f32 = 1.05;
 
 /// The knockback of `hit` dealing damage `d` to a defender of weight `w` at percent `p` after the hit, by the game's formula (SmashWiki,
 /// *Knockback*): ((p/10 + p·d/20) · 200/(w+100) · 1.4 + 18) · growth/100 + base; a fixed knockback f takes the place of d, with p = 10.
@@ -181,38 +180,27 @@ impl Peak {
     }
 }
 
-/// A hit as the defender took it: the damage it gained and the knockback it received (`DamageModule::reaction`; 0.0 when not read).
+/// A hit as the defender took it: the damage it gained, the knockback it received (`DamageModule::reaction`; 0.0 when not read) and the
+/// attack slot the game recorded for it (`None`: not read, not written this frame, or another object's hit).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Landed {
     pub gained: f32,
     pub launched: f32,
+    pub slot: Option<usize>,
 }
 
-/// The spot of the hit `landed` from the attacker's `active` hitboxes, `launch` (its multiplier and the defender before the hit) and the
-/// action's `earlier` peak. `None` when it cannot be told, which includes a multiplier that is not a positive number (0.0: a read that
-/// was not made).
+/// The spot of the hit `landed`: the class of the slot the game recorded, among the attacker's `active` hitboxes against `launch` (its
+/// multiplier and the defender before the hit) with the action's `earlier` peak, when that slot is active and both cross-checks hold. `None`
+/// otherwise, which includes a multiplier that is not a positive number (0.0: a read that was not made).
 pub fn attribute(landed: Landed, active: &Powers, launch: Launch, earlier: &Hit) -> Option<Spot> {
-    let Landed { gained, launched } = landed;
+    let Landed { gained, launched, slot } = landed;
+    let hit = active.get(slot?).filter(|h| h.damage > 0.0)?;
     if !gained.is_finite() || gained <= 0.0 || !launch.mul.is_finite() || launch.mul <= 0.0 {
         return None;
     }
-    let classes = classify(active, launch, earlier);
-    let read = launched.is_finite() && launched > 0.0 && launch.weight.is_finite() && launch.weight > 0.0;
-    let mut found: Option<Option<Spot>> = None;
-    for (slot, hit) in active.iter().enumerate().filter(|(_, h)| h.damage > 0.0) {
-        if !(K_LOW..=K_HIGH).contains(&(gained / (hit.damage * launch.mul))) {
-            continue;
-        }
-        let k = knockback(hit, gained / TARGET_MUL, launch.percent + gained, launch.weight);
-        if read && !(k > 0.0 && (KB_LOW..=KB_HIGH).contains(&(launched / k))) {
-            continue;
-        }
-        match found {
-            Some(other) if other != classes[slot] => return None,
-            _ => found = Some(classes[slot]),
-        }
-    }
-    found.flatten()
+    let k = knockback(hit, gained / TARGET_MUL, launch.percent + gained, launch.weight());
+    let fits = (K_LOW..=K_HIGH).contains(&(gained / (hit.damage * launch.mul))) && k > 0.0 && (KB_LOW..=KB_HIGH).contains(&(launched / k));
+    fits.then(|| classify(active, launch, earlier)[slot?]).flatten()
 }
 
 #[cfg(test)]

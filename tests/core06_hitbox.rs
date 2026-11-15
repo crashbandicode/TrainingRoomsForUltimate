@@ -389,13 +389,13 @@ fn core06_off_restores() {
 #[test]
 fn core06_site_guards() {
     // Three hooks, fourteen called natives (the last one Eggs-ercise's hitlag, `StopModule::set_hit_stop_frame`; one is the attack module's
-    // damage multiplier, rc.14 spots-2; one the knockback a defender received, spots-3) and eleven relied
+    // damage multiplier, rc.14 spots-2; one the knockback a defender received, spots-3) and thirteen relied (two the damage record, spots-3)
     // windows (the Lua stack reads, HB1's three HitModule windows, for the own orbs (decision HB-OWN-ORBS) the bone transform,
     // the projection and its screen size words and, for Eggs-ercise's spawn range, the camera limit accessor).
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
     assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 14);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 11);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 13);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
         assert_eq!(site.feature, Feature::Hitbox);
@@ -443,6 +443,8 @@ fn core06_site_guards() {
         (sites_hitbox::HITBOX_ATTACK_DATA_OFFSET, "attack_data"),
         (sites_hitbox::HITBOX_POWER_MUL_OFFSET, "attack_power_mul_status"),
         (sites_hitbox::HITBOX_DAMAGE_REACTION_OFFSET, "damage_reaction"),
+        (sites_hitbox::DAMAGE_RECORD_OFFSET, "damage_record_layout"),
+        (sites_hitbox::DAMAGE_HIT_IDS_OFFSET, "damage_record_hit_ids"),
         (sites_hitbox::HITBOX_REQ_FOLLOW_OFFSET, "effect_req_follow"),
         (sites_hitbox::HITBOX_KILL_OFFSET, "sphere_effect_kill"),
         (sites_hitbox::HITBOX_IS_EXIST_OFFSET, "sphere_effect_is_exist"),
@@ -682,6 +684,12 @@ fn damage_reaction_matches_the_owned_game() {
     assert_eq!(w(0x402f00), 0x97ff_fbd4, "bl 0x401e50");
     assert_eq!([w(0x402f5c), w(0x402f60), w(0x402f64)], [0xbc41_0f00, 0x1e20_2100, 0x5400_180d], "compare");
     assert_eq!([w(0x402f9c), w(0x402fb0), w(0x402fb4)], [0xa942_2a89, 0xa904_ad0a, str_s(8, 24, 0)], "store");
+    // The two Relied rows the plugin reads record 0 by (`sites_hitbox::damage_record`): `ldr x11,[x20,#0x30]; str x9,[x8,#0x40]` put the
+    // hit's +0x24 (the attacker's object id) at +0x44 and its +0x32 (the slot) at +0x52; the module is the thunk's `[x0,#0xa8]`.
+    use model::sites_hitbox::damage_record as r;
+    assert_eq!([w(0x402fa0), w(0x402fac)], [ldr_x(11, 20, 0x30), str_x(9, 8, 0x40)]);
+    assert_eq!((r::MODULE, r::RECORDS, r::ATTACKER, r::SLOT), (0xa8, 0x18, 0x40 + (0x24 - 0x20), 0x50 + (0x32 - 0x30)));
+    assert_eq!((sites_hitbox::DAMAGE_RECORD_OFFSET, sites_hitbox::DAMAGE_HIT_IDS_OFFSET), (0x3ffa10, 0x402f9c));
 }
 
 /// rc.14 hb-legend: the launch angle field of `AttackData`, and the `HitStatus` values with the

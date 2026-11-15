@@ -1,6 +1,6 @@
 //! Decisions SP1 and SP2 (rc.14), ranked by launch power (spots-3): which hitbox is sweet, sour or late, which one a hit connected, and the
-//! *Frame data colours*. Numbers are drawn for the cases (a tip of 16 over blades of 13, a kick and a gust of equal damage); the plugin reads
-//! them from the game.
+//! *Frame data colours*. Numbers are drawn for the classification cases (a tip of 16 over blades of 13, a hit and a gust of equal damage);
+//! the attribution cases replay what Eden logged (spots3-bade7ea6-1) where they say so. The plugin reads every number from the game.
 
 lib_unit_tests! {
 use super::*;
@@ -113,130 +113,130 @@ fn the_peak_starts_over_with_a_new_status_or_when_the_motion_goes_back() {
 /// The measured multiplier: a fresh hit adds 1.26 times its hitbox's damage (Eden, 2026-11-14).
 const M: f32 = 1.26;
 
-/// What the defender received from `hit` when it gained `gained` at `before` percent: the formula's knockback, as the game stores it.
-fn took(hit: (f32, i32, i32, i32), gained: f32, before: f32) -> Landed {
-    let h = Hit { damage: hit.0, growth: hit.1, fixed: hit.2, base: hit.3 };
-    Landed { gained, launched: knockback(&h, gained / TARGET_MUL, before + gained, 98.0) }
+/// The hit of `slot` as the game records it: the defender (weight `w`, at `before`) gained `gained` and received that slot's knockback times `r`.
+fn took(active: &Powers, slot: usize, gained: f32, before: f32, w: f32, r: f32) -> Landed {
+    Landed { gained, launched: r * knockback(&active[slot], gained / TARGET_MUL, before + gained, w), slot: Some(slot) }
 }
 
-fn by_damage(gained: f32) -> Landed {
-    Landed { gained, launched: 0.0 }
+/// A defender of weight `w` at `percent`.
+fn on(w: f32, percent: f32) -> Launch {
+    Launch { mul: 1.0, percent, weight: w }
 }
 
-/// The hard case: hitboxes of equal damage. The damage the defender gained cannot tell them apart; the knockback it received can.
-fn a_hit_of_equal_damage_is_attributed_by_the_knockback_received() {
-    let (hit, gust) = ((14.0, 90, 0, 70), (14.0, 50, 0, 40));
-    let gut_check = hits(&[hit, gust]);
-    for before in [0.0, 60.0, 120.0] {
-        assert_eq!(attribute(took(hit, 14.0 * M, before), &gut_check, at(before), &NONE), Some(Spot::Sweet), "the hit at {before}%");
-        assert_eq!(attribute(took(gust, 14.0 * M, before), &gut_check, at(before), &NONE), Some(Spot::Sour), "the gust at {before}%");
-    }
-    // Rage and crouching scale what the defender receives, for every hitbox alike.
-    for r in [0.85, 1.1] {
-        let mut landed = took(gust, 14.0 * M, 60.0);
-        landed.launched *= r;
-        assert_eq!(attribute(landed, &gut_check, at(60.0), &NONE), Some(Spot::Sour), "the gust at x{r}");
-    }
-    assert_eq!(attribute(by_damage(14.0 * M), &gut_check, at(60.0), &NONE), None, "without the knockback reading: equal damage, never a guess");
-}
-
-/// The damage window stays as a cross-check: both readings must fit the same hitbox.
-fn a_hit_both_readings_cannot_place_has_no_label() {
-    let marth = hits(&[(13.0, 70, 0, 40), (18.0, 80, 0, 50)]);
-    let blade = took((13.0, 70, 0, 40), 13.0 * M, 30.0);
-    assert_eq!(attribute(blade, &marth, at(30.0), &NONE), Some(Spot::Sour));
-    let wrong = Landed { launched: took((18.0, 80, 0, 50), 13.0 * M, 30.0).launched * 3.0, ..blade };
-    assert_eq!(attribute(wrong, &marth, at(30.0), &NONE), None, "a knockback no hitbox gives");
-    assert_eq!(attribute(Landed { gained: 30.0 * M, ..blade }, &marth, at(30.0), &NONE), None, "a damage no hitbox deals");
-}
-
-/// Marth's forward smash as the game reports its damages: three blade hitboxes of 13 and a tip of 18.
+/// Marth's forward smash as Eden logged it (spots3-bade7ea6-1): three blades (13, growth 75, base 48) and the tip (18, 80, 80).
 fn marth() -> Powers {
-    p(&[13.0, 13.0, 13.0, 18.0])
+    hits(&[(13.0, 75, 0, 48), (13.0, 75, 0, 48), (13.0, 75, 0, 48), (18.0, 80, 0, 80)])
+}
+
+/// The hard case: hitboxes of equal damage. The damage cannot tell them apart; the game records which slot hit, and the knockback the
+/// defender received agrees. Mario's jab as Eden logged it: two slots of (2.2, 30, 20) beat two of (2.2, 20, 15).
+fn a_hit_of_equal_damage_is_attributed_by_the_slot_the_game_recorded() {
+    let gut_check = hits(&[(14.0, 90, 0, 70), (14.0, 50, 0, 40)]);
+    for before in [0.0, 60.0, 120.0] {
+        assert_eq!(attribute(took(&gut_check, 0, 14.0 * M, before, 98.0, 1.0), &gut_check, at(before), &NONE), Some(Spot::Sweet), "the hit at {before}%");
+        assert_eq!(attribute(took(&gut_check, 1, 14.0 * M, before, 98.0, 1.0), &gut_check, at(before), &NONE), Some(Spot::Sour), "the gust at {before}%");
+    }
+    let jab = hits(&[(2.2, 30, 0, 20), (2.2, 30, 0, 20), (2.2, 20, 0, 15), (2.2, 20, 0, 15)]);
+    // Eden: the CPU Mario's jab on P1 Marth (weight 90) at 29.4%, fully staled (gained 1.239, 0.563 of 2.2): 27.987 received from slot 1.
+    assert_eq!(attribute(Landed { gained: 1.239, launched: 27.987, slot: Some(1) }, &jab, on(90.0, 29.362), &NONE), Some(Spot::Sweet));
+    assert_eq!(attribute(Landed { gained: 1.239, launched: 20.395, slot: Some(2) }, &jab, on(90.0, 30.601), &NONE), Some(Spot::Sour));
+    let unread = Landed { slot: None, ..took(&gut_check, 1, 14.0 * M, 60.0, 98.0, 1.0) };
+    assert_eq!(attribute(unread, &gut_check, at(60.0), &NONE), None, "no record (not read, or a projectile's): never a guess");
+}
+
+/// Both cross-checks hold the recorded slot to what the defender took.
+fn a_hit_both_readings_cannot_place_has_no_label() {
+    let blade = took(&marth(), 0, 13.0 * M, 30.0, 98.0, 1.0);
+    assert_eq!(attribute(blade, &marth(), at(30.0), &NONE), Some(Spot::Sour));
+    for r in [0.85, 1.1] {
+        assert_eq!(attribute(Landed { launched: blade.launched * r, ..blade }, &marth(), at(30.0), &NONE), None, "a knockback the slot does not give: x{r}");
+    }
+    assert_eq!(attribute(Landed { gained: 30.0 * M, ..blade }, &marth(), at(30.0), &NONE), None, "a damage the slot does not deal");
+    assert_eq!(attribute(Landed { launched: 0.0, ..blade }, &marth(), at(30.0), &NONE), None, "no knockback read");
 }
 
 fn a_hit_is_attributed_by_the_damage_it_added() {
-    assert_eq!(attribute(by_damage(18.0 * M), &marth(), at(0.0), &NONE), Some(Spot::Sweet));
-    assert_eq!(attribute(by_damage(13.0 * M), &marth(), at(0.0), &NONE), Some(Spot::Sour));
-    // The hit Eden logged: 16.926 added. The blade's ratio is 1.30; the tip's would be 0.94, below any multiplier the game uses.
-    assert_eq!(attribute(by_damage(16.926), &marth(), at(0.0), &NONE), Some(Spot::Sour));
-    assert_eq!(attribute(by_damage(13.0 * M), &p(&[13.0]), at(0.0), &p(&[16.0])[0]), Some(Spot::Late));
+    // Eden (spots3-bade7ea6-1, Marth's forward smash on Mario at 0%, the C-stick held 6 frames: charge 1.0267): the tip, then a blade.
+    let launch = Launch { mul: 1.0267, ..at(0.0) };
+    assert_eq!(attribute(Landed { gained: 23.285, launched: 117.183, slot: Some(3) }, &marth(), launch, &NONE), Some(Spot::Sweet));
+    assert_eq!(attribute(Landed { gained: 16.817, launched: 73.054, slot: Some(0) }, &marth(), launch, &NONE), Some(Spot::Sour));
+    let late = hits(&[(13.0, 75, 0, 48)]);
+    assert_eq!(attribute(took(&late, 0, 13.0 * M, 0.0, 98.0, 1.0), &late, at(0.0), &marth()[3]), Some(Spot::Late), "a blade after the tip");
 }
 
+/// Staling lowers the damage the slot adds, down to 0.563 measured; the window keeps it. Marth's jab tip on K. Rool, stale (Eden): the game's
+/// slot 2, Sweet, where the damage alone looked like a fresh 3 (the defect of the first boot).
 fn staling_and_multipliers_cancel_in_the_ratio() {
-    for m in [1.07, 1.15, M, 1.35] {
-        assert_eq!(attribute(by_damage(13.0 * m), &marth(), at(0.0), &NONE), Some(Spot::Sour), "a blade hit at {m}");
+    for m in [0.563, 0.82, 1.07, M, 1.35] {
+        assert_eq!(attribute(took(&marth(), 0, 13.0 * m, 0.0, 98.0, 1.0), &marth(), at(0.0), &NONE), Some(Spot::Sour), "a blade hit at {m}");
     }
-    assert_eq!(attribute(by_damage(18.0 * 1.35), &marth(), at(0.0), &NONE), Some(Spot::Sweet), "a slightly charged tip hit");
-    // A stale tip hit could also be a blade hit: 20.7 is 1.59 times 13. No label.
-    for m in [1.07, 1.15] {
-        assert_eq!(attribute(by_damage(18.0 * m), &marth(), at(0.0), &NONE), None, "a tip hit at {m}");
-    }
+    let jab = hits(&[(3.0, 15, 0, 30), (3.0, 12, 0, 30), (5.0, 12, 0, 30), (5.0, 12, 0, 30)]);
+    assert_eq!(attribute(Landed { gained: 4.082, launched: 32.918, slot: Some(2) }, &jab, on(133.0, 12.718), &NONE), Some(Spot::Sweet));
+    assert_eq!(attribute(Landed { gained: 2.968, launched: 32.493, slot: Some(1) }, &jab, on(133.0, 7.056), &NONE), Some(Spot::Sour));
+    assert_eq!(attribute(took(&marth(), 0, 13.0 * 0.45, 0.0, 98.0, 1.0), &marth(), at(0.0), &NONE), None, "below the measured floor");
 }
 
 fn a_hit_that_cannot_be_told_has_no_label() {
-    assert_eq!(attribute(by_damage(15.5 * M), &p(&[16.0, 15.0]), at(0.0), &NONE), None, "two candidates of different classes");
-    assert_eq!(attribute(by_damage(12.0 * M), &p(&[12.0, 12.0, 12.0]), at(0.0), &NONE), None, "equal hitboxes");
-    assert_eq!(attribute(by_damage(30.0 * M), &p(&[16.0, 13.0]), at(0.0), &NONE), None, "no hitbox could have dealt it");
+    let equal = hits(&[(12.0, 90, 0, 40), (12.0, 90, 0, 40), (12.0, 90, 0, 40)]);
+    assert_eq!(attribute(took(&equal, 1, 12.0 * M, 0.0, 98.0, 1.0), &equal, at(0.0), &NONE), None, "identical hitboxes");
+    let blade = took(&marth(), 0, 13.0 * M, 0.0, 98.0, 1.0);
+    for slot in [4, 7, 8, 200] {
+        assert_eq!(attribute(Landed { slot: Some(slot), ..blade }, &marth(), at(0.0), &NONE), None, "slot {slot}: not active or not a slot");
+    }
     for gained in [0.0, -3.0, f32::NAN, f32::INFINITY] {
-        assert_eq!(attribute(by_damage(gained), &marth(), at(0.0), &NONE), None, "{gained}");
+        assert_eq!(attribute(Landed { gained, ..blade }, &marth(), at(0.0), &NONE), None, "{gained}");
     }
-    assert_eq!(attribute(by_damage(16.0), &p(&[]), at(0.0), &NONE), None, "nothing active");
-    // Candidates that agree are still a label: 13 and 12.8 are both Sour, and the tip's ratio (0.91) is below the window.
-    assert_eq!(attribute(by_damage(13.0 * M), &p(&[18.0, 13.0, 12.8]), at(0.0), &NONE), Some(Spot::Sour));
+    assert_eq!(attribute(blade, &p(&[]), at(0.0), &NONE), None, "nothing active");
 }
 
-/// Captain Falcon's forward air as the first Eden boot logged it (spots-4e9f91b5-1): the knee's three phases, damages 14 and 18, then 8 and 9,
-/// then 3. The window reads each hit the way the game made it (a fresh hit is 1.26 times the damage).
+/// Captain Falcon's forward air: its late hitboxes as Eden logged them (spots3-bade7ea6-1: two of 3, growth 80, base 35; 50.164 received at 0%)
+/// after the knee of the same action are Late; on their own they are identical, no label.
 fn the_falcon_knee_hits_eden_logged() {
-    let knee = p(&[14.0, 18.0, 18.0]);
-    assert_eq!(attribute(by_damage(22.68), &knee, at(0.0), &NONE), Some(Spot::Sweet), "18 x 1.26");
-    assert_eq!(attribute(by_damage(17.64), &knee, at(0.0), &NONE), Some(Spot::Sour), "14 x 1.26; the 18s' ratio is 0.98");
-    let middle = p(&[8.0, 9.0, 8.0, 9.0]);
-    assert_eq!(attribute(by_damage(8.736), &middle, at(0.0), &NONE), Some(Spot::Sour), "8 x 1.092 (stale); the 9s' ratio is 0.97");
-    assert_eq!(attribute(by_damage(10.08), &middle, at(0.0), &NONE), None, "8 x 1.26 or 9 x 1.12: no label");
-    // The last frames: 3 and 3 after the 18 of the same action are Late; a lone 3 on its own has no label.
-    assert_eq!(attribute(by_damage(3.213), &p(&[3.0, 3.0]), at(0.0), &p(&[18.0])[0]), Some(Spot::Late));
-    assert_eq!(attribute(by_damage(3.213), &p(&[3.0, 3.0]), at(0.0), &NONE), None);
+    let late = hits(&[(3.0, 80, 0, 35), (3.0, 80, 0, 35)]);
+    let knee = Hit { damage: 18.0, growth: 100, fixed: 0, base: 30 };
+    let hit = Landed { gained: 3.213, launched: 50.164, slot: Some(0) };
+    assert_eq!(attribute(hit, &late, at(0.0), &knee), Some(Spot::Late));
+    assert_eq!(attribute(hit, &late, at(0.0), &NONE), None);
 }
 
-/// A smash charged to `mul` (the game's `AttackModule::power_mul_status`, 1.0 uncharged): every slot's damage is multiplied by it, so a hit adds
-/// the slot's damage x `mul` x 1.26 and the label follows the hitbox, not the charge (spots-2, 2026-11-14).
+/// A smash charged to `mul` (the game's `AttackModule::power_mul_status`, 1.0 uncharged): every slot's damage is multiplied by it, and the label
+/// follows the slot the game recorded, not the charge (spots-2, 2026-11-14).
 fn a_charged_smash_is_attributed_by_the_hitbox_that_dealt_it() {
-    let charged = |mul| Launch { mul, ..at(0.0) };
-    for mul in [1.0, 1.1, 1.2, 1.3, 1.4] {
-        assert_eq!(attribute(by_damage(13.0 * mul * M), &marth(), charged(mul), &NONE), Some(Spot::Sour), "a blade hit at charge {mul}");
-        assert_eq!(attribute(by_damage(18.0 * mul * M), &marth(), charged(mul), &NONE), Some(Spot::Sweet), "a tip hit at charge {mul}");
+    for mul in [1.0, 1.2, 1.4] {
+        let launch = Launch { mul, ..at(0.0) };
+        assert_eq!(attribute(took(&marth(), 0, 13.0 * mul * M, 0.0, 98.0, 0.95), &marth(), launch, &NONE), Some(Spot::Sour), "a blade hit at charge {mul}");
+        assert_eq!(attribute(took(&marth(), 3, 18.0 * mul * M, 0.0, 98.0, 0.95), &marth(), launch, &NONE), Some(Spot::Sweet), "a tip hit at charge {mul}");
     }
-    assert_eq!(attribute(by_damage(3.0 * 1.4 * M), &p(&[3.0, 3.0]), charged(1.4), &p(&[18.0])[0]), Some(Spot::Late));
 }
 
-/// A charge does not make a hit tellable: a stale tip hit that a blade could also have made is still no label.
+/// A charged hit whose record is not this attack's (not read, or another object's) has no label, charged or not.
 fn a_charged_hit_that_cannot_be_told_has_no_label() {
-    assert_eq!(attribute(by_damage(18.0 * 1.4 * 1.07), &marth(), Launch { mul: 1.4, ..at(0.0) }, &NONE), None, "the blade's ratio is 1.48");
+    let hit = Landed { slot: None, ..took(&marth(), 3, 18.0 * 1.4 * M, 0.0, 98.0, 0.95) };
+    assert_eq!(attribute(hit, &marth(), Launch { mul: 1.4, ..at(0.0) }, &NONE), None);
 }
 
-/// Marth's forward smash held to different charges, as Eden logged it (spots2-d37c0734-1, Yoga, 2026-11-14, `sp-charge`).
+/// Marth's forward smash held to different charges, as Eden logged it (spots3-bade7ea6-1, `sp-charge`): the received knockback over the formula's
+/// is 0.93 to 0.96 for these (the lowest the boot measured), inside the window.
 fn the_charged_marth_hits_eden_logged() {
-    for (gained, mul, expected) in [
-        (23.436, 1.0333, Spot::Sweet),
-        (16.817, 1.0267, Spot::Sour),
-        (27.821, 1.2267, Spot::Sweet),
-        (20.311, 1.2400, Spot::Sour),
-        (28.123, 1.2400, Spot::Sweet),
-        (20.093, 1.2267, Spot::Sour),
-        (31.752, 1.4000, Spot::Sweet),
-        (22.932, 1.4000, Spot::Sour),
+    for (gained, mul, launched, slot, expected) in [
+        (23.285, 1.0267, 117.183, 3, Spot::Sweet),
+        (16.817, 1.0267, 73.054, 0, Spot::Sour),
+        (28.123, 1.2400, 127.084, 3, Spot::Sweet),
+        (20.202, 1.2333, 77.814, 0, Spot::Sour),
+        (31.752, 1.4000, 135.677, 3, Spot::Sweet),
+        (22.932, 1.4000, 82.248, 0, Spot::Sour),
     ] {
-        assert_eq!(attribute(by_damage(gained), &marth(), Launch { mul, ..at(0.0) }, &NONE), Some(expected), "{gained} added at charge {mul}");
+        let hit = Landed { gained, launched, slot: Some(slot) };
+        assert_eq!(attribute(hit, &marth(), Launch { mul, ..at(0.0) }, &NONE), Some(expected), "{gained} added at charge {mul}");
     }
 }
 
 /// The multiplier is the game's own number; one that was not read (0.0) or is not a usable number labels nothing.
 fn an_unusable_multiplier_gives_no_label() {
     for mul in [0.0, -1.0, f32::NAN, f32::INFINITY] {
-        for gained in [18.0 * M, 13.0 * M] {
-            assert_eq!(attribute(by_damage(gained), &marth(), Launch { mul, ..at(0.0) }, &NONE), None, "multiplier {mul}");
+        for slot in [0, 3] {
+            let hit = took(&marth(), slot, marth()[slot].damage * M, 0.0, 98.0, 1.0);
+            assert_eq!(attribute(hit, &marth(), Launch { mul, ..at(0.0) }, &NONE), None, "multiplier {mul}");
         }
     }
 }
@@ -360,7 +360,7 @@ fn case_table() {
         ("ties_at_the_top_are_all_sweet", ties_at_the_top_are_all_sweet as fn()),
         ("a_hitbox_weaker_than_an_earlier_one_of_the_action_is_late", a_hitbox_weaker_than_an_earlier_one_of_the_action_is_late as fn()),
         ("the_peak_starts_over_with_a_new_status_or_when_the_motion_goes_back", the_peak_starts_over_with_a_new_status_or_when_the_motion_goes_back as fn()),
-        ("a_hit_of_equal_damage_is_attributed_by_the_knockback_received", a_hit_of_equal_damage_is_attributed_by_the_knockback_received as fn()),
+        ("a_hit_of_equal_damage_is_attributed_by_the_slot_the_game_recorded", a_hit_of_equal_damage_is_attributed_by_the_slot_the_game_recorded as fn()),
         ("a_hit_both_readings_cannot_place_has_no_label", a_hit_both_readings_cannot_place_has_no_label as fn()),
         ("a_hit_is_attributed_by_the_damage_it_added", a_hit_is_attributed_by_the_damage_it_added as fn()),
         ("staling_and_multipliers_cancel_in_the_ratio", staling_and_multipliers_cancel_in_the_ratio as fn()),
