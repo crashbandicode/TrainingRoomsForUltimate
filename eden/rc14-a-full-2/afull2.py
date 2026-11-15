@@ -253,6 +253,7 @@ def a2_pt(ctx):
     _, out['to_pt'] = af._pick(ctx, 0, PT)
     out['settle1'] = fs._settled(ctx, hs.diag_mark(ctx), 90)
     out['window'] = [hex(k) for k in (af._window(ctx, 0) or [])]
+    seq_keep = hs.diag_mark(ctx)
     lines = af._keep_across(ctx, out, 0, fs.BOWSER, 'reload window pt')
     _knob(ctx, 'window')
     out['probe'] = [t[:600] for t in lines if PROBE.search(t)][:4]
@@ -277,8 +278,15 @@ def a2_pt(ctx):
                                                                                         out['not_kept']))
     if not warm:
         problems.append('no warm return to the kept PT window: %s' % out.get('attaches'))
-    if not any('rebuilt' in t for t in out['articles_back']):
-        problems.append('the trainer articles were not rebuilt at the return: %s' % out['articles_back'])
+    # The kept record's pool comes back before or at its attach: rc.14 prepares a retired PT group's articles on the task
+    # worker once its object kind is re-taken (`articles prepared … pool=0->1`, boot a2-e881df1e-y1 #9761-#9864), else
+    # the attach rebuilds them (`articles rebuilt`).
+    group = kept[0] if kept else None
+    prepared = [t[:240] for t in af._since(ctx, seq_keep)
+                if re.search(r'\[GroupSwap\] articles prepared owner=0 group=%s .*pool=0->[1-9]' % group, t)]
+    out['articles_prepared'] = prepared[:2]
+    if not prepared and not any('rebuilt' in t for t in out['articles_back']):
+        problems.append('the trainer articles came back neither prepared nor rebuilt: %s' % out['articles_back'])
     if not all(p.get('outcome') for p in out['laps']):
         problems.append('a lap press did not apply: %s' % [(p.get('kind'), p.get('outcome')) for p in out['laps']])
     problems += ['bad line: %s' % t for t in out['bad'] + out.get('bad_after', []) + out['bad_laps']]
