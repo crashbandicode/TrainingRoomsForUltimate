@@ -5,41 +5,30 @@
      release's name commit. The docs checks (tests/docs_gates.rs) fail until they all name the same release. The steps are
      in docs/BUILD.md, "Release checklist". -->
 
-Current release: rc.14
+Current release: rc.15
 
-Status: **Eden-tested and untested on hardware.** rc.14 was run in the Eden emulator (2026-11-15); no one has run it
-on a Switch yet. This page says which release is current. The [README](../README.md) and the
-[technical notes](TECHNICAL.md#status) follow it.
-
-Its release page, with the notes and the plugin files:
-[v0.2.0-rc.14](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.14).
+Status: **Internal candidate, untested on hardware.** The feature pages carry their individual Eden evidence;
+the final integrated gate and Eden smoke are pending. This page says which release is current. The
+[README](../README.md) and the [technical notes](TECHNICAL.md#status) follow it.
 
 ## Which build is mine?
 
-Open the menu (B + D-pad Up) and read the end of the key hints at the foot of the page. rc.14 reads
-`0.2.0-rc.14 · rc14` and then the commit it was built from. Builds before rc.14 start with `0.2.0-rc.6` whatever their
+Open the menu (B + D-pad Up) and read the end of the key hints at the foot of the page. rc.15 reads
+`0.2.0-rc.15 · rc15` and then the commit it was built from. Builds before rc.14 start with `0.2.0-rc.6` whatever their
 release, so for them read the second part (`rc13`, `rc12`, ...).
 More: [Getting started › Which build you have](guide/getting-started.md#which-build-you-have).
 
-## What's new in rc.14
+## What's new in rc.15
 
-- **Practice games.** Fighters & Stages › Practice games: Eggs-ercise, where targets pop up for you to break, and Break
-  the Targets, where you place up to 10 targets yourself and break them against the clock. Layouts are saved as files.
-  [Practice games](menu/fighters-and-stages.md#practice-games)
-- **Hide CPU.** The CPU page can take the CPU out of the fight without touching its settings.
-  [Hide CPU](menu/cpu.md#hide-cpu)
-- **Hitbox Visualization is one checklist.** Hitboxes, Grab boxes, Hurtboxes, Frame data colours, Launch angles and
-  Windboxes, in any mix. [Hitbox Visualization](menu/display-and-controls.md#hitbox-visualization)
-- **Sweet and sour spots.** Frame data colours show strong and weak hitboxes, Spot labels name each hit Sweet, Sour or
-  Late on the frame strip, and a combo can match the spot it was saved with.
-  [Frame data colours](menu/display-and-controls.md#frame-data-colours),
-  [Spot labels](menu/display-and-controls.md#spot-labels),
-  [Match sweet/sour spot](menu/recording.md#match-sweet-sour-spot)
-- **Setup library.** Saves › Save setup here... keeps where both fighters stand now as a named setup, and each setup has
-  a screen of its own to restore, rename or delete it. [Setup library](menu/saves.md#setup-library)
-- **Fighter cycles.** A cycle with more fighters than Ready Fighters leaves room for keeps the ones that fit loaded and
-  loads the rest when you swap to them.
-  [What the Loading rows do](guide/fighter-cycles.md#what-the-loading-rows-do)
+- **One clip editor.** Crop a macro, combo or drill with the Replay window's editor. Save the kept part as a new file;
+  macros can preview on the CPU, while combos and drills crop whole links or steps.
+  [Recording](menu/recording.md)
+- **Input drills.** Record a drill directly, or make one from a macro with no hits. Practise and grade its input steps,
+  with up to 16 steps per drill. [Recording guide](guide/recording.md)
+- **Article hurtboxes.** A separate checklist option draws supported fighter articles and items, including Pikmin, Cypher and Gyro.
+  [Hitbox Visualization](menu/display-and-controls.md#hitbox-visualization)
+- **Colour legend.** Hitbox Visualization's checklist shows the colours for its current normal or Frame data scheme.
+  [Hitbox Visualization](menu/display-and-controls.md#hitbox-visualization)
 
 ## Installing
 
@@ -63,6 +52,7 @@ Something else? [Troubleshooting](guide/troubleshooting.md) says what to check a
 
 - Release notes in this folder: [rc.5](RELEASE-NOTES-rc5.md), [rc.6](RELEASE-NOTES-rc6.md),
   [rc.8](RELEASE-NOTES-rc8.md) and [rc.9](RELEASE-NOTES-rc9.md).
-- On their release pages: [rc.12](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.12)
-  and [rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13).
+- On their release pages: [rc.12](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.12),
+  [rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13)
+  and [rc.14](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.14).
 - rc.7, rc.10 and rc.11 have no notes: see [Status](TECHNICAL.md#status).

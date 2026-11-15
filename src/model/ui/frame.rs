@@ -1037,11 +1037,11 @@ mod tests {
         assert!(curve[0] > 240 && curve[13] < 70);
     }
 
-    /// R13: the crate version, `rc8` and the commit's short sha (`git rev-parse --short=8`: 8 hex digits, more only if
+    /// R13: the crate version, the build name and the commit's short sha (`git rev-parse --short=8`: 8 hex digits, more only if
     /// 8 are ambiguous), `-dirty` with uncommitted changes, or `unknown` without git.
     fn the_build_tag_reads_version_name_and_short_sha() {
         let rest = BUILD_TAG.strip_prefix(env!("CARGO_PKG_VERSION")).expect(BUILD_TAG);
-        let sha = rest.strip_prefix(" · rc14 ").expect(BUILD_TAG);
+        let sha = rest.strip_prefix(" · rc15 ").expect(BUILD_TAG);
         let hex = sha.strip_suffix("-dirty").unwrap_or(sha);
         assert!(sha == "unknown" || (hex.len() >= 8 && hex.bytes().all(|b| b.is_ascii_hexdigit())), "{BUILD_TAG}");
     }

@@ -3,7 +3,7 @@
 TrainingRooms adds practice tools to Super Smash Bros. Ultimate's Training mode and to the waiting rooms of online and
 local play: hitboxes, save states, recordings, combo drills, game speed and more, all from one menu.
 
-**Current release: [rc.14](docs/CURRENT-RELEASE.md)**, Eden-tested and untested on hardware. What's new, how to
+**Current release: [rc.15](docs/CURRENT-RELEASE.md)**, an internal candidate, untested on hardware. What's new, how to
 install it and what is known not to work are on that page. New here? Start with [Getting started](docs/guide/getting-started.md). Something not
 working? See [Troubleshooting](docs/guide/troubleshooting.md).
 
@@ -147,8 +147,8 @@ endorsed by Nintendo.
 
 ## More
 
-[The docs](docs/README.md): every menu page and guide. The current release is [rc.14](docs/CURRENT-RELEASE.md),
-**Eden-tested and untested on hardware** (see [Status](docs/TECHNICAL.md#status)): what's new, how to install it and its
+[The docs](docs/README.md): every menu page and guide. The current release is [rc.15](docs/CURRENT-RELEASE.md),
+**an internal candidate, untested on hardware** (see [Status](docs/TECHNICAL.md#status)): what's new, how to install it and its
 known issues.
 Release notes for rc.12, rc.13 and rc.14 are on their
 [release pages](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases); the ones in the docs folder
