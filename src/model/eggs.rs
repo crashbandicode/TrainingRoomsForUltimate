@@ -116,9 +116,10 @@ pub fn age(bursts: &mut Bursts, tick: bool) {
     }
 }
 
-/// The hitlag of a break: native Training only, until the waiting room's LDN check (V2.1).
+/// The hitlag of a break (Eggs-ercise and Break the Targets): wherever the practice is live, native Training or an active
+/// waiting-room practice (`scene::is_training`; V2.1; rc.14, 11-15: the LDN pass showed it local to the console).
 pub fn hitlag(facts: Facts) -> Option<i32> {
-    facts.native_training.then_some(HITLAG)
+    super::scene::is_training(facts).then_some(HITLAG)
 }
 
 
