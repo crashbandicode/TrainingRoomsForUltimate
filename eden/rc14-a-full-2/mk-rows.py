@@ -30,10 +30,11 @@ ROWS = [
     ('a2-strip-same', M, 'a2_strip_same', 5, 'K-strip k3: a Pikachu hat, the press onto the Built Pikachu group.'),
     ('a2-strip-move', M, 'a2_strip_move', 5, 'K-strip k4: the press inside his copy special (B held).'),
     ('a2-restore', M, 'a2_restore', 3, "The knob off, cycle-fix's restore."),
+    # No Reload out of a native window (lane changes and pauses only), so it goes before those rows.
+    ('a2-p4', M, 'a2_p4', 8, 'p4: PT then Aegis groups parked (lane PT -> Pyra -> Palutena) and freed by a pause; each `[Destroy] records` gives back one count.'),
     # Reloads out of native windows last: cycle-fix 23:47Z, the pins `settle(None)` drops on such a Reload (a1's crash).
     ('a2-pt', M, 'a2_pt', 10, 'Limit 2 PT p1-p4: the PT window kept by `reload window pt`, articles retired; warm back, rebuilt; laps; counts.'),
     ('a2-aegis', M, 'a2_aegis', 8, 'Limit 2 Aegis: a Pyra window kept by `reload window aegis`, the partner holder intact; warm back, ready, no fallback.'),
-    ('a2-p4', M, 'a2_p4', 8, 'p4: PT then Aegis groups parked (lane PT -> Pyra -> Palutena) and freed by a pause; each `[Destroy] records` gives back one count.'),
     # The primary ~00:33Z: a1-enable's pair rows (a1.py at rc14/a1-enable 0997fe4a) with A1 on, for the kept-pair fix.
     ('a1-paircontrol2', 'a1.py', 'a1_paircontrol', 5, 'Control: the pair as a planner-built group, Diddy Kong to Popo: warm, ready, no fallback.'),
     ('a1-pair', 'a1.py', 'a1_pair', 9, 'Ready Fighters 10, CPU Solo Popo Off: the pair window kept (flags 4, as N3 parks it), then its warm return; no Unmapped.'),
