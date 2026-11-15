@@ -185,6 +185,10 @@ An object with no enabled hurtbox group draws none. These use the same discs, pi
 At most eight endpoints per object and 24 together are admitted, always as complete shapes. They take spare object
 slots and draw after the other boxes, so attacking objects and fighters keep priority.
 
+![Olimar's three Pikmin with Article hurtboxes off, yellow hurtbox pills on, status colours on, and off again](../media/rc15-article-hurtboxes.gif)
+
+*Article hurtboxes: Off, yellow pills, Frame data colours (blue for the Pikmin's current hit status), then Off again. Eden, 2026-11-15, rc.15 source `6def8553`, diag `48ea01d1`; untested on hardware.*
+
 ![At 1/4 speed, a red disc rides on Ridley's fireball, Link's arrow and Link's thrown bomb while each is in flight](../media/rc13-projectile-hitboxes.gif)
 
 *Projectiles and thrown items: at 1/4 speed, a red disc rides on Ridley's fireball, Link's arrow and Link's thrown bomb while each is in flight. Eden, rc.13 (untested on hardware).*

@@ -13,4 +13,4 @@ The existing boot version/build-ID verdict remains authoritative. The wrapper us
 
 The dated native evidence record `artifacts/rc15-article-hurt/NATIVE-ABI.md` retains symbol, dispatch, pointer-return and ordinal derivation. Its actual19-NRO card copy dated 2026-11-15 produced no detected references at the thunk, concrete getter or virtual slot. The scan recognizes constants and MOVZ/MOVK construction; it does not establish absence of other address construction or later plugins. Install-time guards remain required.
 
-`core06_site_guards` pins the row and its capability dependency; `core06_rows_match_the_owned_elf` compares all 64 guard bytes and the exported symbol against the owned ELF. These extensions await the coordinated host gates. This seam record claims no runtime rendering or lifecycle coverage.
+`core06_site_guards` pins the row and its capability dependency; `core06_rows_match_the_owned_elf` compares all 64 guard bytes and the exported symbol against the owned ELF. Both passed in the full XPS gate for `6def8553` on 2026-11-15. This seam record claims no runtime rendering or lifecycle coverage.
