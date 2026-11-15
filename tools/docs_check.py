@@ -1,6 +1,6 @@
 """Offline docs gates for README.md and docs/**/*.md: links, anchors, orphan pages and version claims.
 
-Operator order 2026-11-15: "automated checks for stale links/outdated version references and docs as gates". Run by
+Ordered 2026-11-15: checks for stale links and outdated version references, run as gates. Run by
 `tests/docs_gates.rs` on every `cargo test` (`python3 -I tools/docs_check.py [--root DIR] [--verbose]`). It reads only the
 files under the root: no network and no clock, so every host gives the same answer. The one outside call is `git ls-files`,
 when the root has a `.git`: the gate hosts' stage leaves docs/media and every .gif out of the work tree, so a link target
@@ -25,7 +25,7 @@ Rules (a problem's rule name is the first word of its line):
   version-stale    a sentence that says "newest", "latest", "currently", "current release/build/version", "this
                    release/build/version" or "up to date" and names another release (rc.N or rcN, also 0.2.0-rc.N).
   version-cargo    the crate version in Cargo.toml (`0.2.0-rc.N`) does not name the current release: the menu footer
-                   starts with it (`0.2.0-rc.14 · rc14 <commit>`), and the release tag is `v0.2.0-rc.14`. Operator
+                   starts with it (`0.2.0-rc.14 · rc14 <commit>`), and the release tag is `v0.2.0-rc.14`. Decided
                    2026-11-15: the footer and the tag agree. The bump (Cargo.toml, Cargo.lock's own entry) goes in the
                    release's name commit with build.rs's BUILD_NAME, never before the release is the current one.
   notice-text      a "double-quoted" text that must be a notice, refusal or greyed-row reason of the plugin, but is not a
@@ -131,7 +131,7 @@ NOTICE_OK = [
 ]
 
 # Pages whose every "double-quoted" text must be a notice text; and pages where only one table column is checked
-# (page -> column number, 1 is the first): RESTRICTIONS' Message column, not the operator's words in Approved.
+# (page -> column number, 1 is the first): RESTRICTIONS' Message column, not the approvals in Approved.
 NOTICE_PAGES = ["docs/guide/troubleshooting.md"]
 NOTICE_COLUMNS = {"docs/RESTRICTIONS.md": 2}
 NOTICE_WORDS = re.compile(r"notice|refus|message|help line|reason|greyed", re.I)

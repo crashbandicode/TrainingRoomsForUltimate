@@ -143,7 +143,7 @@ no clock and no git are used, so every host gives the same answer. The rules are
   feature ledgers) are skipped, by the list `HISTORICAL` with a reason each; a sentence that has to stay is listed in
   `CLAIM_OK` with its reason. A list entry that matches nothing fails. The crate version in `Cargo.toml`
   (`0.2.0-rc.N`, with `Cargo.lock`'s own entry) must name that release too: the menu footer starts with it and the release
-  tag is `v0.2.0-rc.N` (operator 2026-11-15: the footer and the tag agree).
+  tag is `v0.2.0-rc.N` (decided 2026-11-15: the footer and the tag agree).
 - **Notice texts.** A text in double quotes that has to be a notice, a refusal or a greyed-row reason must be a string
   literal of the code the release build compiles in `src/` (or `crates/`), so a reworded notice breaks the page that
   quotes it. Test code (a `tests/` folder, `*_tests.rs`, `#[cfg(test)]`), host-only simulator code and diag-only code do not

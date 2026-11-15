@@ -1,4 +1,4 @@
-//! Docs gates (operator order 2026-11-15): `tools/docs_check.py` reads `README.md` and `docs/**/*.md` and fails on a
+//! Docs gates (ordered 2026-11-15): `tools/docs_check.py` reads `README.md` and `docs/**/*.md` and fails on a
 //! relative link or image that points nowhere, an `#anchor` the forge would not find, a page no link reaches, a
 //! `docs/CURRENT-RELEASE.md` without its one `Current release: rc.N` line, an entry point that does not name that release,
 //! a "newest" or "current" sentence that names another one, and a quoted notice or refusal text that is not a string literal
