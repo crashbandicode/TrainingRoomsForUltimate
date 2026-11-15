@@ -7,7 +7,7 @@ param(
     [string]$Port = '6587',
     [switch]$Launch
 )
-# wind-articles (11-15): stage ONE boot of this lane's plan (eden/rc14-wind-articles/plan/rows), copied from rc14-hide-cpu-tag/stage-hidetag.ps1, itself from integration-3's stage-final.ps1 (Yoga/XPS
+# wind-articles (11-15): stage ONE boot of this lane's plan (built into artifacts/rc14-wind-audit/stage/plan/rows), copied from rc14-hide-cpu-tag/stage-hidetag.ps1, itself from integration-3's stage-final.ps1 (Yoga/XPS
 # branch only; the base inputs, base config and card set are integration-3's, read-only). Without -Launch it builds the stage tarball,
 # dry-runs the rows and renders the up script; -Launch copies them to the host and starts the detached chain (up, run, hold <= 25 min or
 # RELEASE, down). Launch only after the primary granted the slot.
@@ -22,11 +22,11 @@ $hosts = @{
 $s = "$t/stage-$Label"
 $sha = (Get-FileHash -Algorithm SHA256 $Nro).Hash.ToLower()
 if (-not $Commit) { $Commit = (git -C /home/intpa/tr-fixes-20261113/wind-articles rev-parse --short=8 HEAD) }
-& /usr/bin/python3 -I "$d/build_plan.py" "$d/plan/rows"
+& /usr/bin/python3 -I "$d/build_plan.py" "$t/plan/rows"
 Remove-Item -Recurse -Force $s -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force $s | Out-Null
 Copy-Item -Recurse "$e/inputs-base" "$s/inputs"
-Copy-Item -Recurse "$d/plan/rows" "$s/rows-hang"
+Copy-Item -Recurse "$t/plan/rows" "$s/rows-hang"
 Get-ChildItem "$s/rows-hang" -Recurse -Directory -Filter __pycache__ | Remove-Item -Recurse -Force
 Copy-Item $Nro "$s/inputs/plugins/libtraining_rooms.nro" -Force
 $m = [IO.File]::ReadAllText("$s/inputs/manifest.json") | ConvertFrom-Json -AsHashtable
