@@ -45,6 +45,10 @@ static PANELS_HIDDEN: AtomicUsize = AtomicUsize::new(0);
 /// while the body is, and visible again on the first tick after. Player 1's part and every other pane are left alone.
 pub(super) unsafe fn cpu_panels(layout: *mut Layout, name: &[u8]) {
     use crate::model::cpu::hide;
+    if name == b"info_waiting" {
+        room_card();
+        return;
+    }
     if name != b"info_melee" {
         return;
     }
@@ -73,6 +77,33 @@ pub(super) unsafe fn cpu_panels(layout: *mut Layout, name: &[u8]) {
         now |= usize::from(hidden) << entry;
     }
     PANELS_HIDDEN.store(now, Ordering::Release);
+}
+
+/// The waiting room's CPU card Hide CPU hid (only this rule's tick touches it).
+static ROOM_HIDDEN: AtomicUsize = AtomicUsize::new(0);
+
+/// Hide CPU in a waiting room's practice: the room shows its CPU (entry 4) not in `info_melee` but as a partner card of
+/// `info_waiting` (`tp_0N`: window, damage, portrait), found fresh each tick through the game's own partner mapping
+/// (`character_roster::waiting_cpu_card`). Invisible on every tick while the body is hidden, visible once after.
+unsafe fn room_card() {
+    use crate::model::cpu::hide;
+    let was = ROOM_HIDDEN.load(Ordering::Acquire) != 0;
+    let wanted = hide::room_panel(crate::runtime::features::hide_cpu::panels());
+    let mut hidden = was;
+    if let Some(visible) = hide::panel_write(wanted, &mut hidden) {
+        let card = crate::runtime::roster::character_roster::waiting_cpu_card();
+        if let Some(card) = card {
+            super::pane::set_visible(card, visible);
+        }
+        #[cfg(feature = "diag")]
+        if was != hidden {
+            crate::runtime::diag_log::diagnostic(format_args!(
+                "[TrainingRooms] hide_cpu room card visible={visible} found={}",
+                card.is_some()
+            ));
+        }
+    }
+    ROOM_HIDDEN.store(usize::from(hidden), Ordering::Release);
 }
 
 pub(super) unsafe fn hud_rule(layout: *mut Layout, name: &[u8]) {

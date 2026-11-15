@@ -1894,6 +1894,22 @@ pub(super) unsafe fn waiting_icon_pane(base: usize, owner: u32) -> Option<*const
     waiting_icon_source(base).map(|(_, pane)| pane)
 }
 
+/// Hide CPU in a waiting room: CPU4's partner card in `info_waiting` (`tp_0N`: window, damage, portrait), the parent of
+/// the partner portrait `waiting_partner_icon` resolves as the game's damage setters do. Read fresh each time, only a
+/// pane named like a partner card is returned (`hide::room_card`), nothing is cached and nothing is allocated. `None` until
+/// the roster's own seam gate passed (`BASE`), so the waiting-UI natives are only called on a checked game.
+pub(crate) unsafe fn waiting_cpu_card() -> Option<*mut skyline::nn::ui2d::Pane> {
+    use skyline::nn::ui2d::Pane;
+    let base = BASE.load(Ordering::Acquire);
+    if base == 0 {
+        return None;
+    }
+    let picture = pointer_chain(waiting_icon_pane(base, 4)?, &[8])?;
+    let card = pointer_chain(picture, &[core::mem::offset_of!(Pane, parent)])?;
+    let name = read::<[u8; 25]>(card, core::mem::offset_of!(Pane, name));
+    crate::model::cpu::hide::room_card(&name).then_some(card as *mut Pane)
+}
+
 /// Undo a custom waiting portrait with the same native kind assignment used by
 /// ordinary swaps. Resolve the registered listener and generation-checked pane
 /// now; never use a saved UI address during departure. Success retires its native

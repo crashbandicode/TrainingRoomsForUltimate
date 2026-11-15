@@ -35,6 +35,19 @@ pub fn panel_part(entry: usize) -> Option<[u8; 2]> {
     (entry < 8).then(|| [b'p', b'1' + entry as u8])
 }
 
+/// A waiting room has no `info_melee` panel for its practice CPU: the CPU's card (window, damage, portrait) is one of
+/// `info_waiting`'s three partner cards, `tp_00`..`tp_02`. `name` is the pane the runtime found as the parent of the
+/// CPU's partner portrait (the one the game's damage setters pick); only a partner card is ever hidden.
+pub fn room_card(name: &[u8]) -> bool {
+    let name = name.split(|&b| b == 0).next().unwrap_or_default();
+    matches!(name, [b't', b'p', b'_', b'0', b'0'..=b'2'])
+}
+
+/// The waiting room's practice CPU (entry 4) has its card hidden while its body is.
+pub fn room_panel(panels: u8) -> bool {
+    panels & (1 << super::role::LOBBY_CPU_ENTRY) != 0
+}
+
 /// One `info_melee` tick for one entry's panel: `Some(visible)` to write. Hidden on every tick while `wanted` (a rebuilt
 /// layout cannot show it), visible on the first tick after, and nothing for a panel this rule did not hide (`hidden`).
 pub fn panel_write(wanted: bool, hidden: &mut bool) -> Option<bool> {

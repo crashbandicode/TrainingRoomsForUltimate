@@ -8,7 +8,8 @@
 //!
 //! The player tag goes with the body: the game's two per-fighter cursor flags (`hide::tag`), written through package 2's
 //! guarded `WorkModule::set_flag`. The HUD panel too: the wrapper publishes the hidden entries (`publish_panels`) and the
-//! `info_melee` tick hides those parts (`runtime::ui::hud::cpu_panels`).
+//! `info_melee` tick hides those parts (`runtime::ui::hud::cpu_panels`); in a waiting room the `info_waiting` tick hides
+//! the CPU's partner card instead (`room_card`).
 
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
 

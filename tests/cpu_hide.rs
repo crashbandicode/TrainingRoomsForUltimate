@@ -203,6 +203,35 @@ fn hide_cpu_tag_in_the_waiting_room() {
 }
 
 #[test]
+fn hide_cpu_room_card_mapping() {
+    // A waiting room shows its CPU as a partner card of `info_waiting` (`tp_00`..`tp_02`), not as an `info_melee` part: the
+    // room's hidden CPU (entry 4) hides its card, found as the parent of the CPU's partner portrait.
+    let mut room = cpu(&[("hide_cpu", &ON)]);
+    room.scene = Scene::Lobby;
+    let room_cpu = FighterKey::new(4, false).unwrap();
+    frame(&mut room, room_cpu, false);
+    assert!(hide::room_panel(room.hidden_panels()), "the room's CPU is hidden: its card hides");
+    // Training's CPU (entry 1) is never a room card, and neither is Player 1.
+    let mut training = cpu(&[("hide_cpu", &ON)]);
+    frame(&mut training, body(), false);
+    assert!(!hide::room_panel(training.hidden_panels()));
+    assert!(!hide::room_panel(1 << 0));
+    // Shown again: the card comes back (the same tick rule as the panels).
+    let mut snap = Snapshot::factory();
+    snap.set("hide_cpu", &[0, 1]).unwrap();
+    room.publish(CpuSettings::from_snapshot(&snap), 0);
+    frame(&mut room, room_cpu, false);
+    assert!(!hide::room_panel(room.hidden_panels()));
+    // Only a partner card is ever hidden: the pane's name is checked (NUL-padded as the game stores it).
+    for name in [&b"tp_00"[..], b"tp_01", b"tp_02", b"tp_02\0\0\0\0"] {
+        assert!(hide::room_card(name), "{name:?}");
+    }
+    for name in [&b"tp_03"[..], b"tp_0", b"tp_000", b"set_rep_tp_00", b"info_tp", b"players", b"p5", b"RootPane", b""] {
+        assert!(!hide::room_card(name), "{name:?}");
+    }
+}
+
+#[test]
 fn hide_cpu_panel_rule() {
     // The panel parts of `info_melee` go by entry: Player 1's is `p1` and is never one this rule hides.
     assert_eq!(hide::panel_part(0), Some(*b"p1"));
