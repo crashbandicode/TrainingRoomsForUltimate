@@ -1720,8 +1720,8 @@ pub fn release_for_new_members(
     let parked_total = parked[0].len().min(8) + parked[1].len().min(8);
     if parked_total > EXACT_RELEASE_SEARCH {
         let mut order = FixedList::<(usize, usize, (u8, usize)), { 2 * MAX_EXTRA_GROUPS }>::new((0, 0, (0, 0)));
-        for role in 0..2 {
-            for (index, (group, kept)) in parked[role].iter().enumerate().take(8) { order.push((role, index, (*kept, group.count()))); }
+        for (role, groups) in parked.iter().enumerate() {
+            for (index, (group, kept)) in groups.iter().enumerate().take(8) { order.push((role, index, (*kept, group.count()))); }
         }
         order.sort_by_key(|(role, index, cost)| (*cost, *role, *index));
         let mut mask = [0u8; 2];
@@ -3939,8 +3939,8 @@ mod tests {
             + groups.iter().map(|m| m.count()).sum::<usize>();
         let refill = |window: Members, groups: &mut Vec<Members>, live: usize| {
             let lane = after(live);
-            let plan = plan_extra_groups_with(policy, [Some(p1_window), Some(window)], [&p1_groups[..], &groups[..]],
-                [&p1_lane[..], &lane[..]], [None, None], budget);
+            let plan = plan_extra_groups_with(policy, [Some(p1_window), Some(window)], [p1_groups, &groups[..]],
+                [p1_lane, &lane[..]], [None, None], budget);
             groups.extend(plan[1].iter().flatten().copied());
         };
         refill(window, &mut groups, 0);
