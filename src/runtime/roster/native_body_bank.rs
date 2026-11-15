@@ -1227,7 +1227,8 @@ static DIAG_CYCLE: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::
 #[cfg(feature = "diag")]
 pub(crate) fn set_diag_cycle(bits: u8) {
     DIAG_CYCLE.store(bits, Ordering::Release);
-    trace!("[GroupSwap] diag cycle force_reload={} keep_mii={} keep_window={}", bits & 1 != 0, bits & 2 != 0, bits & 4 != 0);
+    trace!("[GroupSwap] diag cycle force_reload={} keep_mii={} keep_window={} kirby_strip={} keep_pt={} keep_aegis={}",
+        bits & 1 != 0, bits & 2 != 0, bits & 4 != 0, bits & 8 != 0, bits & 16 != 0, bits & 32 != 0);
 }
 
 fn diag_cycle(bit: u8) -> bool {
@@ -2252,7 +2253,8 @@ unsafe fn outgoing_window(entry: *mut u8, owner: u32, role: usize, target: u32) 
     let cold = bank.over.iter().any(|(kind, _)| *kind == live);
     let keep_mii = KEEP_MII_ACROSS_RELOAD || diag_cycle(2);
     let keep_pt = KEEP_PT_WINDOW_ACROSS_RELOAD || diag_cycle(16);
-    if let Err(why) = window_kept_across_reload(members, keep_mii, keep_pt, target, parks.is_ok(), cold) {
+    let keep_aegis = crate::engine::swap::body_bank::KEEP_AEGIS_WINDOW_ACROSS_RELOAD || diag_cycle(32);
+    if let Err(why) = window_kept_across_reload(members, keep_mii, keep_pt, keep_aegis, target, parks.is_ok(), cold) {
         trace!("[GroupSwap] window across reload owner={} kinds={:x?} target={:#x}: not kept ({}{}{})", owner,
             &members.kinds()[..members.count()], target, why, if parks.is_err() { ": " } else { "" }, parks.err().unwrap_or(""));
         return None;
@@ -2330,9 +2332,17 @@ unsafe fn keep_window(entry: *mut u8, owner: u32, role: usize, target: u32, out:
     // and its 0x10-byte record (`+0x5a98`); the Reload start has dropped the claim (`+0x5a90 = 0`, `0x653920`). Every
     // other window holds none of them.
     let trainer = out.members.holder_step() == Some(crate::engine::swap::body_bank::HolderStep::Trainer);
+    // rc.14 a-full-2 (after probe a0): a Pyra/Mythra window carries only its holder; its claim and record are zero around
+    // the Reload start (boot a2-e881df1e-y1), so nothing of it was walked and nothing needs retiring.
+    let partner = out.members.holder_step() == Some(crate::engine::swap::body_bank::HolderStep::Partner);
     if trainer {
         if !valid_special_object(base, read::<usize>(entry, 0x5a88), owner) { return refuse("trainer holder"); }
         if read::<usize>(entry, 0x5a90) != 0 { return refuse("the trainer is still claimed"); }
+    } else if partner {
+        if !valid_special_object(base, read::<usize>(entry, 0x5a88), owner) { return refuse("partner holder"); }
+        if read::<usize>(entry, 0x5a90) != 0 || read::<usize>(entry, 0x5a98) != 0 {
+            return refuse("the partner holder has a claim or record (probe a0 saw neither)");
+        }
     } else if [0x5a88usize, 0x5a90, 0x5a98].iter().any(|at| read::<usize>(entry, *at) != 0) { return refuse("object records"); }
     let Some(mut registry) = NativeRegistry::new(base, r, owner) else { return refuse("registry unreadable"); };
     let slot = BANKS[role].lock().as_ref()
@@ -2393,6 +2403,12 @@ unsafe fn keep_window(entry: *mut u8, owner: u32, role: usize, target: u32, out:
         cell_bytes, saved.group_ctx, dispatch, listener_counts(dispatch), saved.mii_r, out.identity.is_some(), out.members.is_pair(),
         out.cold, r, fields::read::<u64>(r, 0x4c0).unwrap_or(0));
     if trainer { retire_kept_trainer(base, owner, group, out.claimed, saved.flags, saved.records); }
+    if partner {
+        let holder = saved.records[0];
+        trace!("[GroupSwap] window kept across reload owner={} group={} partner holder={:#x} articles={} records={:x?} flags={:#x}{}",
+            owner, group, holder, fields::read::<u64>(holder, 0x10).unwrap_or(0) & 0xffff_ffff, saved.records, saved.flags,
+            trainer_counts_note(base));
+    }
 }
 
 /// rc.14 a-full-2 (limit 2, AFULL2-RESEARCH.md): the trainer articles of a Pokémon Trainer window [`keep_window`] kept go
