@@ -12093,7 +12093,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "8e52211aba5f9e25589b3c019ad237ef13ba547e158f326a5ae2263705efc93a",
+   "dest_sha256": "e2eb41779f13c83f48fa8172bf75e4f5d95cdb58f50dd703aabac6a7981bad38",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -13341,6 +13341,11 @@
      "old": "    if request.epoch != state.epoch\n        || scope(role) != Some(request.scope)\n        || (!role.enabled() && !request.once && !matches!(request.selection, Selection::RefreshPartners))\n    {\n",
      "new": "    let refresh = matches!(request.selection, Selection::RefreshPartners);\n    if request.epoch != state.epoch || scope(role) != Some(request.scope) || !admitted(role.enabled(), request.once, refresh) {\n",
      "reason": "rc.12 TR8 (operator 2026-11-13, docs/DECISIONS.md TR8 B): a Player Character pick is one load the user chose (once), so it loads with Player Swapping Off like a combo Switch; both admission checks use cycle_members::admitted"
+    },
+    {
+     "old": "/// Called before G lock; the current probe may already own INSTALL, never a roster replacement.\npub(crate) unsafe fn mii_cpu_probe_roster_idle() -> bool {\n",
+     "new": "/// Training's No. of CPUs as the game holds it, for the CPU frame wrapper's role rule (`model::cpu::role::is_cpu_role`):\n/// `None` outside native Training, before this cycle's boot or when the count's rows failed. Reads only: no lock, no\n/// native call, no allocation (it runs inside the fighter frame hook).\npub(crate) unsafe fn training_cpu_quantity() -> Option<u32> {\n    native_source::training_cpu_quantity()\n}\n\n/// Called before G lock; the current probe may already own INSTALL, never a roster replacement.\npub(crate) unsafe fn mii_cpu_probe_roster_idle() -> bool {\n",
+     "reason": "rc.14 mii-hud-portrait (2026-11-15): the CPU frame wrapper reads No. of CPUs so a parked Training entry (F9 seat 2/3, the Mii HUD bust helper, a hat entry) is not a CPU role; Hide CPU had hidden the bust helper during its render (a grey portrait). The deleted `character_sources::reserved` row of this ledger relies on that role rule"
     }
    ]
   },
