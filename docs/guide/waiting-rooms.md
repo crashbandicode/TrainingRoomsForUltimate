@@ -28,7 +28,7 @@ With Lobby Practice On, you use the same menu and chords as in Training:
 | Stages | [Change Stage](stages.md#change-stage) goes to another stage now, and each new room opens on the next stage of [Lobby Stages](stages.md#lobby-stages). [Stage Hazards](stages.md#stage-hazards) counts there too. |
 | Fighters and items | Player Character, CPU Character, Give item and the Mii rows change your practice fighter; the match still uses the one you picked for it. *Add New…* opens Smash's Mii editor ([Mii fighters › In a waiting room](mii.md#in-a-waiting-room)). |
 | Eggs-ercise | [Eggs-ercise](../menu/fighters-and-stages.md#eggs-ercise): the targets show on your screen only. To start a new run here, open and close the menu. |
-| L + R + A | Puts both practice fighters back where they first stood (Display & Controls › [L+R+A Reset](../menu/display-and-controls.md#lra-reset)). |
+| L + R + A | Puts both practice fighters back where they first stood (Display & Controls › [L+R+A Reset](../menu/display-and-controls.md#l-r-a-reset)). |
 | Respawn | As in Training, a KO'd practice fighter is back at once unless Fighters & Stages › [Respawn on platform](../menu/fighters-and-stages.md#respawn-on-platform) is On. |
 | Game speed | See [below](#game-speed). |
 ![Saving a combo in a waiting room, then drilling it: a try graded TRUE](../media/rc11-lobby-combos.gif)

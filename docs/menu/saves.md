@@ -7,7 +7,7 @@ Minus), then press R once from the CPU page, or L until the title reads Saves.
 [Save states](../guide/save-states.md) explains saving and loading step by step.
 
 The save states themselves (the files you bind, rename and delete) are listed on the Recording page, under
-[Save states & Macros](recording.md#save-states--macros).
+[Save states & Macros](recording.md#save-states-macros).
 
 ## Save states
 

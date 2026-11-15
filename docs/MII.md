@@ -7,7 +7,7 @@ This page is the parity checklist of 2026-11-05 (branch `p23/mii-editor`). "Fork
 stage; "Here" paths to this repository.
 
 The native editor ran on the fork's builds. In this repository the rows below have host tests, and the rc.6 Eden rows
-that ran them are listed under [Eden, rc.6](#eden-rc6).
+that ran them are listed under [Eden, rc.6](#eden-rc-6).
 
 ## Checklist
 

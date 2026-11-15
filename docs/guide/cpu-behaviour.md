@@ -220,7 +220,7 @@ plays.
 
 ## What a reset does
 
-L+R+A (while [L+R+A Reset](../menu/display-and-controls.md#lra-reset) is On) and loading a save state reset Training.
+L+R+A (while [L+R+A Reset](../menu/display-and-controls.md#l-r-a-reset) is On) and loading a save state reset Training.
 For the CPU this means:
 
 - anything it was about to do is dropped;

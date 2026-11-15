@@ -49,7 +49,7 @@ The chords use one save at a time, the *bound* save:
 - Load warps to the bound save. With nothing bound, it does nothing.
 
 Every save state is a file in `sd:/ultimate/TrainingRooms/saves/`. They are listed under SAVE STATES on the Recording
-page (Recording › [Save states & Macros](../menu/recording.md#save-states--macros)) and in the recording pop-up
+page (Recording › [Save states & Macros](../menu/recording.md#save-states-macros)) and in the recording pop-up
 (ZR + D-pad Right). The bound save is the green row, and the five you used last come first.
 
 ![SAVE STATES: Save 1 is bound (green); Macro 1 · start is the start save of Macro 1; Save 2 is plain](../media/rc13-bound-save.png)<br>
@@ -68,7 +68,7 @@ To bind another save:
 - In the pop-up, put the cursor on it and press A.
 - On the Recording page, A opens the save's own screen. Its first row is Bind to Save / Load: A flips it, Right binds,
   Left unbinds. The screen also has Duplicate (a copy named Save N), Rename (up to 48 characters) and Delete. See
-  [Recording › A file's own screen](recording.md#a-files-own-screen).
+  [Recording › A file's own screen](recording.md#a-file-s-own-screen).
 
 Deleting the bound save leaves nothing bound, so Load does nothing until you bind another save or press Save.
 

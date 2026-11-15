@@ -118,7 +118,7 @@ waiting room where the keyboard can't open, makes it Chain N or Sequence N.
 
 <!-- CAPTURE-REQUEST rec-playback-slot: a GIF of Playback slot: a macro set to Slot 1, CPU Mash on Playback Slot 1, the CPU plays the macro after a hit. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
-More: [A file's own screen](../guide/recording.md#a-files-own-screen)
+More: [A file's own screen](../guide/recording.md#a-file-s-own-screen)
 
 ## Combos & Sequences
 
@@ -142,7 +142,7 @@ It is shown in the Player view only. The left column shows the number of files, 
   keyboard asks for a name; an empty name, or an online waiting room, gives it the next Combo N. With no combo on the
   strip yet, it says so and saves nothing.
 - A on *+ New sequence* opens the numbered picker of your combos, then the name. A on a combo or a sequence opens its
-  own screen ([rows above](#a-files-own-screen)).
+  own screen ([rows above](#a-file-s-own-screen)).
 - X and Y do nothing here. ZR switches to the CPU view, which hides this section.
 
 ![A sequence drill: Pair 1 lands, Pair 2 drops, back to combo 1](../media/rc7-sequence-drill.gif)<br>
@@ -254,7 +254,7 @@ How macros play, and how the combo helper grades.
 On: a macro made with Record (ZR + D-pad Down) drops the idle frames at its end, where no button is held and both
 sticks rest in the middle. Off: it keeps every frame up to the stop; use this for a macro meant to end standing
 still. A take that is idle throughout saves nothing ("Recording was empty"). To cut a macro anywhere, use Crop on
-its own screen ([above](#a-files-own-screen)).
+its own screen ([above](#a-file-s-own-screen)).
 
 ![Side by side, the same macro on Loop 2 with Crop trailing neutral Off and On: On starts again every 1.22 s, while Off waits out the recorded idle and starts again every 4.07 s](../media/rc12-crop-trailing-neutral.gif)
 
@@ -326,7 +326,7 @@ More: [Recordings and the CPU settings](../guide/cpu-behaviour.md#recordings-and
 
 ### Combo helper
 
-On: while a combo or a sequence is the drill (see [Combos & Sequences](#combos--sequences)), a bar under the frame
+On: while a combo or a sequence is the drill (see [Combos & Sequences](#combos-sequences)), a bar under the frame
 strip grades each attempt link by link: on time or how many frames early or late, the streak and the best. Off: no
 grading. The drill stays chosen either way.
 
@@ -417,7 +417,7 @@ Under the title are the pop-up's own tabs:
 ### The lists and the hot five
 
 Each tab shows the same two lists as the page's section, four rows of each, with the same
-[hot five](#save-states--macros). Up/Down move inside a list, Left/Right switch lists, ZL + Up/Down move 12 rows. A
+[hot five](#save-states-macros). Up/Down move inside a list, Left/Right switch lists, ZL + Up/Down move 12 rows. A
 column on the right, headed CONNECTIONS, shows the row under the cursor and the files joined to it, each in a box
 labelled SAVE STATE, MACRO, COMBO or SEQUENCE ([how to read it](../guide/recording.md#reading-the-lists)).
 

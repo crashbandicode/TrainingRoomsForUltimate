@@ -102,7 +102,7 @@ Each link:
 | `window` | no (`null`) | The combo window, `[first, last]`: the frames on which the follow-up's press would still have made a true combo. |
 | `steps` | yes when `events` is absent, else the press subset | The presses of the follow-up, oldest first, at most 4. A file with no `events` is graded on these presses. A newer file still writes them so an older build can open it. |
 | `events` | no | The input events of the follow-up, oldest first, at most 12: presses, releases, the C-stick, and stick flicks. When this field is present, the combo is graded on it. |
-| `spot` | no | The spot the follow-up's hit landed: `"sweet"`, `"sour"` or `"late"`. A link with no `spot`, or any other word, has no spot and always matches. It is compared only when Recording › Options › [Match sweet/sour spot](../menu/recording.md#match-sweetsour-spot) is On. |
+| `spot` | no | The spot the follow-up's hit landed: `"sweet"`, `"sour"` or `"late"`. A link with no `spot`, or any other word, has no spot and always matches. It is compared only when Recording › Options › [Match sweet/sour spot](../menu/recording.md#match-sweet-sour-spot) is On. |
 | `drift` | no | The held direction between the events, facing-relative. Shown only. It is not graded. |
 
 Each step:

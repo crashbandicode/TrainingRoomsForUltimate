@@ -81,7 +81,7 @@ any builder change that alters the recipes for the same table.
 
 `--cfg test`, on the builder crate only: since rc.10 S3 the plugin files the builder includes by path keep
 `panes::specs()` and `archive_recipe::{make, build}` behind `#[cfg(test)]`, so a plain `cargo build` of the builder no
-longer compiles. The flag reaches no dependency; 2026-11-13 this build reproduced the committed `f96bdcfc…` and
+longer compiles. The flag reaches no dependency; 2026-11-13 the builder reproduced the committed `f96bdcfc…` and
 `f988800a…` byte for byte from the rc.13 (a′) tree (`30ddd8f5`).
 
 Current recipes (rebuilt 2026-11-13 for rc.13's DI chips, E1 x1: three more needle blocks of `CHIPS`, 33 panes, so each
@@ -122,3 +122,39 @@ The tool uses the operator's own MIT crate **nx-layout-toolbox** as a git depend
 - reproducible from a clean checkout: 2026-11-02 the recipe built from the git dependency is byte-identical to the committed `assets/info_training.tra1` (sha256 `a1f3ee13...`, target archive fnv `e8a5a9ce3f4ec968`; rebuilt 2026-11-02 after the chip-grid geometry change, in the Ally WSL with `eden/ally/ally-build.sh recipe`: sha256 `225fdfd0...`, target archive fnv `6ba2f66617e6c4ea`, 529,300 B) given the same stock archive.
 
 Item pictures: the builder reads the 39 PNGs from assets/item-icons (the 38 approved renders and rc.13's Wario bike, an Eden capture cut out by background subtraction), appends BC7 sRGB textures and corresponding picture materials to the stock combined BNTX, and emits the same TRA1 delta format. Verify source/destination provenance with `python3 -I tools/carry_ui_items.py`; the 40-file ledger is docs/provenance/ui-item-assets-ledger.md. Regenerate both recipes whenever the shared pane table changes. The generated target archives stay private.
+
+## Docs checks
+
+`cargo test` runs `tests/docs_gates.rs`, which runs `python3 -I tools/docs_check.py` over `README.md` and `docs/**/*.md`
+and the fixtures that prove each rule fails on a seeded break (`tools/test_docs_check.py`,
+`tools/test_check_external_links.py`). It needs `/usr/bin/python3` and has no skip switch, like the size gate. No network,
+no clock and no git are used, so every host gives the same answer. The rules are:
+
+- **Links.** Every relative link and image resolves to a file or folder (with the exact case), and every `#anchor` to a
+  heading, by the forge's slug rules (they are not GitHub's: `L+R+A Reset` is `#l-r-a-reset`). A path that starts with `/`
+  or leaves the repository fails. Links inside code, code blocks and comments are not read.
+- **Orphans.** Every page under `docs/` is reached by a chain of links from `README.md` or `docs/README.md`. A link to a
+  folder does not count. The pages kept on purpose without a link (redirect stubs, the folders of project records) are
+  listed with their reason in `tools/docs_check.py` (`ORPHAN_OK`).
+- **Versions.** `docs/CURRENT-RELEASE.md` holds one `Current release: rc.N` line. The README's top (it must link that
+  page), that page, `guide/getting-started.md` and the Status section of `TECHNICAL.md` must name that release. A sentence
+  with "newest", "latest", "currently", "current release/build/version" or "this release/build/version" that names another
+  release fails. Pages that describe their own build (release notes, decisions, provenance, measurements, the media and
+  feature ledgers) are skipped, by the list `HISTORICAL` with a reason each; a sentence that has to stay is listed in
+  `CLAIM_OK` with its reason. A list entry that matches nothing fails.
+
+## Release checklist
+
+The docs steps of a release. The build, the tag, the Forgejo release and the card are in the playbook's
+`docs/CHECKLIST.md` and the operator's order.
+
+1. Edit `docs/CURRENT-RELEASE.md`: the `Current release:` line, the status, what's new, the known issues.
+2. Make the README's top and the Status section of `docs/TECHNICAL.md` name that release. `cargo test` fails until they
+   do (`tools/docs_check.py`, rule `version-name`), and also on any "newest" or "latest" sentence that still names the
+   old one (`version-stale`).
+3. Publish the Forgejo release page (the docs link to `releases/tag/v0.2.0-<rc>`).
+4. Run `python3 -I tools/check_external_links.py` from the repository root. It asks the network about every `http(s)`
+   link in `README.md` and `docs/`, and about the forge's release list, prints a report and changes nothing. It exits 1
+   when a link fails, or when the forge already has a release newer than the one `CURRENT-RELEASE.md` names; fix those by
+   hand. `--strict` also fails a moved link (a redirect); `--skip REGEX` leaves a URL out. It is not part of `cargo test`:
+   it needs the network.

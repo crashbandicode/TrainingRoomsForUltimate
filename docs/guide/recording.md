@@ -42,7 +42,7 @@ rename it on its own screen). The Record presses themselves are not in the recor
 
 - **Who records:** the side the pop-up is set to (Player 1 until you pick CPU there). A recording made for the CPU
   names the CPU's fighter. Stopping makes the new macro that side's active macro, so you can Play at once, and the
-  most recently used of its kind (the [hot five](../menu/recording.md#save-states--macros)).
+  most recently used of its kind (the [hot five](../menu/recording.md#save-states-macros)).
 - **The start save:** Record also writes a save state, "Macro 1 · start", with both fighters where they stood. The
   macro remembers that save, and the fighter's facing and speed at that moment.
 - **Start save switch** (on the macro's own screen, On by default): On warps both fighters to the start save once,
@@ -116,7 +116,7 @@ A chain is a macro made of macros: an ordered list of your recordings, numbered 
 because the picker lists recordings only.
 
 - **Make one:** + New chain, the last row under MACROS, opens the numbered picker
-  ([how it works](../menu/recording.md#a-files-own-screen)). It is the Character Cycles picker, except that R can take
+  ([how it works](../menu/recording.md#a-file-s-own-screen)). It is the Character Cycles picker, except that R can take
   off the last number, so a chain can end up empty. A on a tile that already has a number does nothing.
 - **Where it starts:** at its first macro's start save. The chain has its own Start save switch, On by default. On
   warps there once when the Play chord starts the chain. Off plays from where the fighters are. The macros inside don't
@@ -183,7 +183,7 @@ recorded one.
 
 ### Crop
 
-Crop on a combo or a macro opens two handles, In and Out ([keys](../menu/recording.md#a-files-own-screen)).
+Crop on a combo or a macro opens two handles, In and Out ([keys](../menu/recording.md#a-file-s-own-screen)).
 
 - The cut is saved as a new file under the next unused Macro N or Combo N, and you go back to the original, which stays.
 - A macro crop keeps that range of frames. The new macro keeps the original's one start save, stamped at the crop's
@@ -282,7 +282,7 @@ A row's connections are not limited to the side in view.
 ## A file's own screen
 
 On the Recording page, A on a file opens its own screen. The rows each kind of file has are in
-[the menu reference](../menu/recording.md#a-files-own-screen). The rules behind them:
+[the menu reference](../menu/recording.md#a-file-s-own-screen). The rules behind them:
 
 - **Set active** is one row, for the side in view: Right sets On and Left sets Off. Left on a row that is already Off
   doesn't clear the other side.

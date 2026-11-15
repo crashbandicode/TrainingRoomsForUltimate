@@ -39,7 +39,7 @@ stubs, loop heads and function entries); the spinner is in game or SDK code. Its
 ## Done: 0.2.0-rc.3 (2026-11-05)
 
 Four additions on top of rc.2 (candidate `p23/rc3-candidate` `3c8f5bc`; see
-[Differences from the fork](DIFFERENCES-FROM-THE-FORK.md#added-in-rc3)):
+[Differences from the fork](DIFFERENCES-FROM-THE-FORK.md#added-in-rc-3)):
 
 - **Frame strip** (decision INPUT-VIZ, option A): the input display is a strip of the last 60 frames of Player 1 and
   the CPU, with how each follow-up linked and the frame advantage. It replaces the 15-row input log.
@@ -54,7 +54,7 @@ Four additions on top of rc.2 (candidate `p23/rc3-candidate` `3c8f5bc`; see
 ## Done: 0.2.0-rc.2 (2026-11-05)
 
 The three operator decisions of 2026-11-05 that rc.1 did not carry (code at `p23/rc2-pause-helper` `9b28ca0`; see
-[Differences from the fork](DIFFERENCES-FROM-THE-FORK.md#added-in-rc2)):
+[Differences from the fork](DIFFERENCES-FROM-THE-FORK.md#added-in-rc-2)):
 
 - **Pause while a helper fighter loads** (decision PAUSE-HELPER, option a): when the pause opens while a preloaded
   helper entry has no actor yet, the entry is retired through the game's single-slot retire, creation waits until the
