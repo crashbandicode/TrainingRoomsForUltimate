@@ -515,10 +515,16 @@ turning one On turns the other Off.
   - To go again, press L+R+A in Training (with **L+R+A Reset** On), or open and close the menu. Each stage keeps its own
     layout until the game closes.
 
+![Break the Targets: Ready at 0:00.00, the first input starts the clock, the three targets break one after another, Done! 3 in 0:04.73, then Ready again with every target back](../media/rc14-btt-run.gif)<br>
+*A run on Battlefield: Ready reads "Targets 0/3   0:00.00" and waits; Mario's first input starts the clock; each break freezes him for a moment and plays the break animation ("Targets 1/3", "2/3"); the third break stops the clock: "Done! 3 in 0:04.73 (best 0:04.73)", then Ready again with every target back. Eden, rc.14 (untested on hardware).*
+
 ### Place targets
 
 Closes the menu into the placing view and turns Break the Targets On (and Eggs-ercise Off), without a visit to the
 Break the Targets row. Your layout stays: place more, remove some, or press X to start.
+
+![Place targets: the menu closes into the zoomed-out placing view, the crosshair moves and A places three targets, B removes the last, X starts](../media/rc14-btt-place.gif)<br>
+*Practice games > Place targets, A: the menu closes into the placing view ("Place targets 0/10"). The crosshair moves and A places three targets ("Place targets 3/10"); B removes the last one ("2/10"); X starts: Ready, "Targets 0/2   0:00.00". Eden, rc.14 (untested on hardware).*
 
 ### Saved layouts
 
