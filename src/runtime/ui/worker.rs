@@ -745,8 +745,7 @@ fn sync_panels(s: &mut Session) {
     let prompt_visible = named_macros::fighter_prompt_up() && LAYOUT_READY.load(Ordering::Acquire);
     // A closed menu has dropped its model; a fighter question opened since then still needs the flow below (ShowPrompt
     // builds the model it is drawn on). The clip editor's own question too: the hand-over closed the menu (#68).
-    let prompt_phase = s.phase == Phase::Menu || s.phase == Phase::Clip;
-    if s.menu.is_none() && !(prompt_phase && prompt_visible && !OPEN.load(Ordering::Acquire)) {
+    if !flow::panels_can_sync(s.menu.is_some(), s.phase, prompt_visible, OPEN.load(Ordering::Acquire)) {
         return;
     }
     if s.pending_close.is_some() {
@@ -850,7 +849,8 @@ fn sync_panels(s: &mut Session) {
         }
         Step::HideClip => {
             EXT_SHOWN.store(false, Ordering::Release);
-            FRAME_SEQ.fetch_add(1, Ordering::Release);
+            let seq = FRAME_SEQ.fetch_add(1, Ordering::Release) + 1;
+            diagnostic(format_args!("[UiClipFrame] hidden seq={seq}"));
         }
         Step::ShowPrompt => {
             // The frame is built from a menu model (its panel frame); a closed menu has none, so open one as the pop-up does.
@@ -1081,7 +1081,10 @@ fn hand_over(next: &Frame) {
     if *last != *next {
         *last = *next;
         FRAME.write(*next);
-        FRAME_SEQ.fetch_add(1, Ordering::Release);
+        let seq = FRAME_SEQ.fetch_add(1, Ordering::Release) + 1;
+        if next.view == crate::model::frame::View::Clip {
+            diagnostic(format_args!("[UiClipFrame] published seq={seq} start={} end={} cursor={} playing={}", next.clip.start, next.clip.end, next.clip.cursor, next.clip.playing));
+        }
     }
 }
 

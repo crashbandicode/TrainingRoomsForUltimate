@@ -83,6 +83,11 @@ pub fn frame_needs_menu(phase: Phase) -> bool {
     phase != Phase::Clip
 }
 
+/// Clip state outlives the disposable menu, including the last sync that hides it.
+pub fn panels_can_sync(menu_present: bool, phase: Phase, prompt_visible: bool, open: bool) -> bool {
+    menu_present || phase == Phase::Clip || (phase == Phase::Menu && prompt_visible && !open)
+}
+
 /// The phase after the menu's session is reset (every close moves the input generation). The clip editor outlives the
 /// menu on purpose (the hand-over closes it), so it keeps drawing until the layer closes it (`next`: `HideClip`).
 pub fn after_session_reset(phase: Phase) -> Phase {
@@ -148,6 +153,24 @@ mod tests {
         assert_eq!(next(Phase::Prompt, in_menu), (Phase::Menu, Step::HidePrompt));
     }
 
+    fn clip_sync_outlives_menu_on_both_entry_routes() {
+        for entry in [Phase::Menu, Phase::Panel] {
+            let (phase, step) = next(entry, seen(true, true, true));
+            assert_eq!(step, Step::HandOverToClip);
+            let phase = after_session_reset(phase);
+            assert!(panels_can_sync(false, phase, false, false), "handle and preview redraw after menu drops");
+            assert_eq!(next(phase, seen(false, true, true)), (Phase::Clip, Step::Nothing));
+            assert!(panels_can_sync(false, phase, false, false), "B must reach HideClip");
+            assert_eq!(next(phase, seen(false, false, false)), (Phase::Menu, Step::HideClip));
+        }
+        for phase in [Phase::Menu, Phase::Panel, Phase::Prompt] {
+            for menu in [false, true] { for prompt in [false, true] { for open in [false, true] {
+                let previous = menu || (phase == Phase::Menu && prompt && !open);
+                assert_eq!(panels_can_sync(menu, phase, prompt, open), previous);
+            } } }
+        }
+    }
+
     /// CODE-FINDINGS #23: the pop-up's close starts the close window; over the open menu the menu's own close does.
     fn the_pop_ups_close_starts_the_close_window() {
         assert!(popup_closed(false, true, false));
@@ -177,6 +200,7 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("the_hand_over_close_keeps_the_clip_editor_drawn", the_hand_over_close_keeps_the_clip_editor_drawn as fn()),
+            ("clip_sync_outlives_menu_on_both_entry_routes", clip_sync_outlives_menu_on_both_entry_routes as fn()),
             ("a_fighter_question_inside_the_open_menu_stays_the_menu_panels", a_fighter_question_inside_the_open_menu_stays_the_menu_panels as fn()),
             ("the_pop_ups_close_starts_the_close_window", the_pop_ups_close_starts_the_close_window as fn()),
             ("the_close_window_waits_for_the_buttons_held_when_it_began", the_close_window_waits_for_the_buttons_held_when_it_began as fn()),
