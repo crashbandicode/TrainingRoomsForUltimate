@@ -540,7 +540,7 @@ the mode is Off; "Time!", the end notice and the wait between runs count as runn
 - A hidden CPU's "CPU" tag and its panel at the bottom of the screen are hidden too. They always follow the CPU: shown
   when it is shown, hidden when it is hidden.
 - When the CPU is the Eggs-ercise target (**Target** reads CPU), the CPU is never hidden, so the setting changes nothing
-  for it: its body and its panel stay.
+  for it: its body, its "CPU" tag and its panel stay, also while it flies.
 
 ## Reset page to defaults
 

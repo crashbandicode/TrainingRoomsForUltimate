@@ -53,6 +53,36 @@ pub(crate) fn panels() -> u8 {
     PANELS.load(Ordering::Acquire)
 }
 
+/// The fighter object whose player tag the Eggs-ercise CPU target's pass wants kept on this tick (`keep_cursor`), else 0.
+static KEPT: AtomicUsize = AtomicUsize::new(0);
+
+/// Whether a CPU body was hidden by its last step (the hide step's off-write owns its tag then).
+pub(crate) fn hidden() -> bool {
+    HIDDEN.load(Ordering::Acquire)
+}
+
+/// From the CPU target's pass (`hitbox::eggs_cpu`): `keep` (`eggs::keeps_cursor`) asks for `fighter`'s tag flag to be written
+/// on right after this pass. It only stores a value; the write is `write_kept_cursor`'s.
+pub(crate) fn keep_cursor(fighter: usize, keep: bool) {
+    KEPT.store(fighter * usize::from(keep), Ordering::Release);
+}
+
+/// From the CPU frame wrapper right after the hitbox pass of `fighter`: when that pass asked for it, write `FLAG_CURSOR` = true
+/// (`flag`, from the game's constant table; `UNRESOLVED` skips it) through package 2's guarded `WorkModule::set_flag`, the call the
+/// hide step's tag write uses. Taken once: a tick whose pass asked for nothing writes nothing.
+///
+/// # Safety
+/// The game thread, with `fighter` the fighter object the game just ran a frame of.
+pub(crate) unsafe fn write_kept_cursor(fighter: usize, flag: i32) {
+    if fighter == 0 || flag == UNRESOLVED || KEPT.compare_exchange(fighter, 0, Ordering::AcqRel, Ordering::Acquire).is_err() {
+        return;
+    }
+    let accessor = natives::fighter_accessor(fighter);
+    if accessor != 0 {
+        natives::set_flag(accessor, true, flag);
+    }
+}
+
 /// Once from `lobby::init`: compare every row (the installer logs a group it skips); nothing is written unless all passed.
 pub(crate) fn init() {
     let rows = gate("hide_cpu", &NATIVES.map(|(label, ..)| label), false);

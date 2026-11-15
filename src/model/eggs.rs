@@ -51,10 +51,13 @@ pub enum Put {
     Land,
 }
 
-/// STUB (fail-first): the tag is never kept.
+/// Whether TR keeps the CPU target's player tag on this tick, by writing `FLAG_CURSOR` = true (rc.14 cpu-tag-target). The
+/// game turns the flag off for the CPU that TR places in the air (Eden's cursor probe: false through the flight, true again at
+/// the landing). `moved` is the target's pass (`Run::cpu_pass`): a position means TR owns the placement this tick (the flight
+/// and the hold at rest); none means the game owns the CPU (the hit's pass, its hitlag, a run that ended), and the tag stays
+/// the game's business there, as in vanilla. A hidden body keeps the hide step's off-write (`cpu::hide::tag`).
 pub fn keeps_cursor(moved: Option<([f32; 2], Put)>, body_hidden: bool) -> bool {
-    let _ = (moved, body_hidden);
-    false
+    moved.is_some() && !body_hidden
 }
 
 /// `Aerials`: the fighter's status is `FIGHTER_STATUS_KIND_ATTACK_AIR` (13.0.5; the pilot's move observer's value).

@@ -205,6 +205,9 @@ unsafe fn eggs_cpu(run: &mut eggs::Run, fighter: usize, entry: i32) -> Option<()
     let moved = run.cpu_pass(damage, stopped);
     #[cfg(feature = "diag")]
     eggs_cpu_diag(run, score, at, damage, stopped, moved);
+    // The game turns the placed CPU's tag flag off in the air: while TR owns the placement and the body is shown, the CPU frame
+    // wrapper writes it on again right after this pass (`hide_cpu::write_kept_cursor`).
+    super::hide_cpu::keep_cursor(fighter, eggs::keeps_cursor(moved, super::hide_cpu::hidden()));
     let ([x, y], put) = moved?;
     state_natives::set_pos(at, &state_natives::Vector3f { x, y, z: 0.0 });
     state_natives::clear_speed_all(at);

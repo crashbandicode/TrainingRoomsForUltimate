@@ -469,6 +469,9 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         // SPEC-core-06: the hitbox visualizer's pass (a readiness boundary: nothing until boot installed it), after the combo and
         // before the save states (SPEC-core-01 §5.2).
         unsafe { crate::runtime::features::hitbox::frame(a0) };
+        // The Eggs-ercise CPU target's player tag: the game turns its flag off for the placed CPU, so when the pass just run asked
+        // for it (`hide_cpu::keep_cursor`) the flag is written on again, the one write after the placement.
+        unsafe { hide_cpu::write_kept_cursor(a0, konst(C::WorkFlagCursor)) };
         // Package 3: the save-state step runs on the same per-fighter callback, after the CPU's.
         {
             let _state = HookScope::enter_hook(HookId::StateFrame);
