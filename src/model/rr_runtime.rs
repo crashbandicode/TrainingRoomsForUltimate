@@ -872,7 +872,9 @@ mod tests {
         screens.handle_page(MenuButton::B, true, SAVES_MACROS);
         assert!(matches!(screens.take_effect(), Effect::Keyboard { header: "Name chain", .. }));
         assert!(!screens.has_chain_named("Chain 1"), "no chain before the name is answered");
-        close_overlay(&mut screens);
+        screens.submit_name("");
+        assert!(screens.has_chain_named("Chain 1"));
+        let _ = screens.take_effect();
         screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 0);
         screens.handle_page(MenuButton::A, true, COMBOS_SEQ);
         assert!(matches!(screens.take_effect(), Effect::Keyboard { header: "Name combo", .. }));
