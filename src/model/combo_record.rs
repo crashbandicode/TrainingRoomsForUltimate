@@ -274,14 +274,9 @@ impl ComboRecord {
             Some(Value::String(text)) => shown_name(text).unwrap_or_default(),
             Some(_) => return Err("name"),
         };
-        let recorded_on = object
-            .get("recorded_on")
-            .and_then(Value::as_str)
-            .and_then(shown_name);
-        let made_from = object
-            .get("made_from")
-            .and_then(Value::as_str)
-            .and_then(shown_name);
+        let shown = |key| object.get(key).and_then(Value::as_str).and_then(shown_name);
+        let recorded_on = shown("recorded_on");
+        let made_from = shown("made_from");
         let input = object.get("schema_version").and_then(Value::as_u64) == Some(2);
         if input && object.get("kind").and_then(Value::as_str) != Some("input_drill") { return Err("kind"); }
         let key = if input { "input_steps" } else { "links" };
