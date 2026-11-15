@@ -40,7 +40,7 @@ fn a_bad_file_is_skipped_with_its_name_and_reason_and_the_others_stay() {
     let dir = folder("bad");
     write(&dir, "good.json", &format!(r#"{{"name": "Good", "links": [{LINK}]}}"#));
     write(&dir, "typo.json", &format!(r#"{{"name": "Typo", "links": [{}]}}"#, LINK.replace("up_tilt", "uptilt")));
-    write(&dir, "newer.json", &format!(r#"{{"schema_version": 2, "name": "Newer", "links": [{LINK}]}}"#));
+    write(&dir, "newer.json", &format!(r#"{{"schema_version": 3, "name": "Newer", "links": [{LINK}]}}"#));
     write(&dir, "broken.json", "{\"name\": \"Broken\", \"links\": [");
     write(&dir, "notes.txt", "not a combo");
     write(&dir, "._good.json", "\0\x05\x16\x07 macOS resource fork");
@@ -49,7 +49,7 @@ fn a_bad_file_is_skipped_with_its_name_and_reason_and_the_others_stay() {
     let reasons: Vec<(&str, &str)> = listing.skipped.iter().map(|s| (s.file.as_str(), s.reason.as_str())).collect();
     assert_eq!(reasons.len(), 3, "{reasons:?}");
     assert!(reasons.contains(&("typo.json", "malformed file: bad combo field: to")), "the text docs/COMBOS.md shows: {reasons:?}");
-    assert!(reasons.iter().any(|(f, r)| *f == "newer.json" && r.contains("schema version 2")), "{reasons:?}");
+    assert!(reasons.iter().any(|(f, r)| *f == "newer.json" && r.contains("schema version 3")), "{reasons:?}");
     assert!(reasons.iter().any(|(f, r)| *f == "broken.json" && r.contains("malformed")), "{reasons:?}");
     // One notice: the first file, its reason, and how many more.
     let note = skipped_note(&listing.skipped).unwrap();
