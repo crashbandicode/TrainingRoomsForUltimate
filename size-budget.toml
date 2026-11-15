@@ -1673,3 +1673,11 @@ ceiling = 148075
 date = "2026-11-15"
 reason = "rc.15 integration: operator-authorized increase of 154 normalized implementation lines from 147921 to 148075; counting rules and gate enforcement unchanged."
 approved_by = "Operator 2026-11-15 ~16:00Z: 'Raise limit by ~150'; exact ceiling 148075 relayed by the primary c07b3449 for rc.15 integration. Combos and drills remain capped at 16 units."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 148194
+date = "2026-11-15"
+reason = "rc.15 final merged implementation measured 148194 on dae81738 after the accepted feature heads, Phase3 reuse (-73), colour legend (+56), release identity and measured stack-bound refresh. This replaces the provisional 148075 ceiling with the exact final total; counting rules and gate enforcement are unchanged."
+approved_by = "Operator 2026-11-15 18:54Z via AskUserQuestion: 'Set limit to final total', relayed by the primary c07b3449. Supersedes the earlier about-20-lines-over allowance; exact measured final total 148194."
