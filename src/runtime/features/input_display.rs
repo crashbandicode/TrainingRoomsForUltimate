@@ -143,19 +143,22 @@ fn spots_wanted() -> bool {
 }
 
 /// The attacker's battle object id and the attack slot this fighter's damage record 0 keeps (`sites_hitbox::damage_record`), read raw when
-/// both relied rows passed their guards; every pointer is checked first (Eden answers 0 for an unmapped read).
+/// both relied rows passed their guards, and the damage the record says the hit dealt (0.0 unless its own row passed too); every pointer is
+/// checked first (Eden answers 0 for an unmapped read).
 ///
 /// # Safety
 /// `accessor` is a live fighter's accessor, on the game thread inside its frame.
-unsafe fn struck(accessor: usize) -> Option<(u32, u8)> {
-    use crate::model::sites_hitbox::{damage_record as r, DAMAGE_HIT_IDS_OFFSET, DAMAGE_RECORD_OFFSET};
-    if !crate::runtime::game::granted(DAMAGE_RECORD_OFFSET) || !crate::runtime::game::granted(DAMAGE_HIT_IDS_OFFSET) {
+unsafe fn struck(accessor: usize) -> Option<(u32, u8, f32)> {
+    use crate::model::sites_hitbox::{damage_record as r, DAMAGE_DEALT_OFFSET, DAMAGE_HIT_IDS_OFFSET, DAMAGE_RECORD_OFFSET};
+    use crate::runtime::game::granted;
+    if !granted(DAMAGE_RECORD_OFFSET) || !granted(DAMAGE_HIT_IDS_OFFSET) {
         return None;
     }
     let pointer = |p: usize| p >= 0x1000 && p & 7 == 0 && p >> 47 == 0;
     let module = Some(((accessor + r::MODULE) as *const usize).read()).filter(|&p| pointer(p))?;
     let record = Some(((module + r::RECORDS) as *const usize).read()).filter(|&p| pointer(p))?;
-    Some((((record + r::ATTACKER) as *const u32).read(), ((record + r::SLOT) as *const u8).read()))
+    let dealt = if granted(DAMAGE_DEALT_OFFSET) { ((record + r::DEALT) as *const f32).read() } else { 0.0 };
+    Some((((record + r::ATTACKER) as *const u32).read(), ((record + r::SLOT) as *const u8).read(), dealt))
 }
 
 /// One fighter's frame (SPEC-input-06 §4); `spots`: read what the spot of a hit needs (`spots_wanted`).
@@ -183,6 +186,7 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample 
     let read = |f: unsafe fn(usize) -> f32| if spots { f(accessor) } else { 0.0 };
     // The record names the hit only on the frame its knockback was written (the game clears it on the next).
     let launched = read(natives::damage_reaction);
+    let struck = if launched > 0.0 { struck(accessor) } else { None };
     Sample {
         stop: natives::is_stop(accessor),
         hitstun,
@@ -194,7 +198,8 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample 
         power_mul: read(natives::attack_power_mul),
         weight: read(natives::weight),
         launched,
-        struck: if launched > 0.0 { struck(accessor) } else { None },
+        struck: struck.map(|(id, slot, _)| (id, slot)),
+        dealt: struck.map_or(0.0, |(_, _, dealt)| dealt),
         object_id: if spots { ((accessor + natives::ACCESSOR_OBJECT_ID_FIELD) as *const u32).read() } else { 0 },
         attack: if p1 { ids.attack(status) } else { None },
         reaction,
@@ -267,19 +272,10 @@ pub unsafe fn sample_frame(player: usize) {
         let (check_now, link, advantage_now) = (tracker.stun_check, tracker.latest_link(), tracker.advantage());
         let (read, mark) = (tracker.spot_read.take(), tracker.marks().next());
         drop(tracker);
-        // spots-3 (is a hit a windbox?): the recorded slot's no-reaction byte (`legend::NO_REACTION`) and the target's status on the hit's frame.
-        for (target, by, by_accessor) in [(&cpu, &p1, player), (&p1, &cpu, cpu_accessor)] {
-            if let Some((_, slot)) = target.struck.filter(|(id, _)| *id == by.object_id) {
-                // SAFETY: the attacking fighter's live accessor; the slot is the one the game recorded, and `attack_data` answers 0 for none.
-                let data = unsafe { natives::attack_data(by_accessor, i32::from(slot)) };
-                let flag = if data == 0 { None } else { Some(unsafe { ((data + crate::model::legend::NO_REACTION) as *const u8).read() }) };
-                crate::runtime::diag_log::diagnostic(format_args!("[SpotsWind] slot={slot} no_reaction={flag:?} target_status={:#x} hitstun={}", target.status, target.hitstun));
-            }
-        }
-        if let Some((frame, landed, launch, powers, attacker)) = read {
+        if let Some((frame, landed, launch, powers)) = read {
             crate::runtime::diag_log::diagnostic(format_args!(
-                "[Spots] stop frame={frame} gained={:.3} launched={:.3} mul={:.4} before={:.3} weight={:.2} attacker={attacker:.3} recorded={:?} powers={powers:?} newest_mark={mark:?}",
-                landed.gained, landed.launched, launch.mul, launch.percent, launch.weight, landed.slot
+                "[Spots] stop frame={frame} gained={:.3} launched={:.3} mul={:.4} before={:.3} weight={:.2} attacker={:.3} recorded={:?} powers={powers:?} newest_mark={mark:?}",
+                landed.gained, landed.launched, launch.mul, launch.percent, launch.weight, launch.attacker, landed.slot
             ));
         }
         if advantage_now != advantage {

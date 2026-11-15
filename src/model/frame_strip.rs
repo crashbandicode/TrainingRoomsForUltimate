@@ -121,10 +121,12 @@ pub struct Sample {
     /// made, which leaves a hit unlabelled.
     pub power_mul: f32,
     /// As the other fighter's target (spots-3): its weight and the knockback it received this frame (`DamageModule::reaction`; 0.0 when not
-    /// read or none), and with it the attacker's object id and attack slot its damage record keeps (`+0x44`, `+0x52`).
+    /// read or none), and with it the attacker's object id and attack slot its damage record keeps (`+0x44`, `+0x52`) and the damage the
+    /// record says the frame's hit dealt (`+0x8`; 0.0 when not read).
     pub weight: f32,
     pub launched: f32,
     pub struck: Option<(u32, u8)>,
+    pub dealt: f32,
     /// The battle object id (accessor `+0x8`): what a record's attacker is compared with.
     pub object_id: u32,
     /// The status kind and the motion frame (a new move starts when either goes back).
@@ -427,9 +429,8 @@ pub struct Tracker {
     marks: [Option<Mark>; MARKS],
     mark_head: usize,
     #[cfg(feature = "diag")]
-    /// Diag build: the frame, what the defender took, the attacker's launch, hitboxes and percent (rage) of the last hitstop that began (the
-    /// `[Spots]` line).
-    pub spot_read: Option<(u32, spots::Landed, spots::Launch, Powers, f32)>,
+    /// Diag build: the frame, what the defender took, the attacker's launch and hitboxes of the last hitstop that began (the `[Spots]` line).
+    pub spot_read: Option<(u32, spots::Landed, spots::Launch, Powers)>,
 }
 
 impl Tracker {
@@ -678,16 +679,23 @@ impl Tracker {
     /// frame's hitboxes join each fighter's action peak. Returns P1's spot when P1 hit the CPU. A frame where both fighters were struck is a trade:
     /// nobody's hit is labelled.
     fn spots(&mut self, p1: &Sample, cpu: &Sample) -> Option<Spot> {
-        let gained = |old: Option<f32>, now: f32| old.map_or(0.0, |old| now - old);
-        let (p1_gain, cpu_gain) = (gained(self.damage[0], p1.damage), gained(self.damage[1], cpu.damage));
+        // Each fighter's percent before this frame and the damage it took: the rise, or the record's when the damage cap cut that short.
+        let (p1_before, cpu_before) = (self.damage[0].unwrap_or(p1.damage), self.damage[1].unwrap_or(cpu.damage));
+        let gained = |before: f32, now: &Sample| spots::added(now.damage - before, now.dealt, now.damage);
+        let (p1_gain, cpu_gain) = (gained(p1_before, p1), gained(cpu_before, cpu));
         self.damage = [Some(p1.damage), Some(cpu.damage)];
         let (cpu_rise, p1_rise) = (cpu.stop && !self.cpu_was_stop, p1.stop && !self.p1_was_stop);
         let (on_cpu, on_p1) = (cpu_rise && cpu_gain > 0.0, p1_rise && p1_gain > 0.0);
         self.p1_was_stop = p1.stop;
         let earlier = [self.peaks[0].earlier(p1.status, p1.motion_frame), self.peaks[1].earlier(cpu.status, cpu.motion_frame)];
         // Each fighter's hitboxes against the other as it was before this frame's hit.
-        let launch = |attacker: &Sample, target: &Sample, gain: f32| spots::Launch { mul: attacker.power_mul, percent: target.damage - gain, weight: target.weight };
-        let launches = [launch(p1, cpu, cpu_gain), launch(cpu, p1, p1_gain)];
+        let launch = |attacker: &Sample, target: &Sample, before: f32| spots::Launch {
+            mul: attacker.power_mul,
+            percent: before,
+            weight: target.weight,
+            attacker: attacker.damage,
+        };
+        let launches = [launch(p1, cpu, cpu_before), launch(cpu, p1, p1_before)];
         // The slot the target's damage record names counts only when the record's attacker is the other fighter (not its projectile).
         let took = |target: &Sample, gained: f32, by: &Sample| spots::Landed {
             gained,
@@ -698,7 +706,7 @@ impl Tracker {
         if cpu_rise || p1_rise {
             let attacker = usize::from(p1_gain > cpu_gain);
             let landed = [took(cpu, cpu_gain, p1), took(p1, p1_gain, cpu)][attacker];
-            self.spot_read = Some((self.frame, landed, launches[attacker], [p1.powers, cpu.powers][attacker], [p1.damage, cpu.damage][attacker]));
+            self.spot_read = Some((self.frame, landed, launches[attacker], [p1.powers, cpu.powers][attacker]));
         }
         let hit = match (on_cpu, on_p1) {
             (true, false) => Some((1, spots::attribute(took(cpu, cpu_gain, p1), &p1.powers, launches[0], &earlier[0]))),

@@ -395,7 +395,7 @@ fn core06_site_guards() {
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
     assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 14);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 13);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 14);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
         assert_eq!(site.feature, Feature::Hitbox);
@@ -445,6 +445,7 @@ fn core06_site_guards() {
         (sites_hitbox::HITBOX_DAMAGE_REACTION_OFFSET, "damage_reaction"),
         (sites_hitbox::DAMAGE_RECORD_OFFSET, "damage_record_layout"),
         (sites_hitbox::DAMAGE_HIT_IDS_OFFSET, "damage_record_hit_ids"),
+        (sites_hitbox::DAMAGE_DEALT_OFFSET, "damage_record_dealt"),
         (sites_hitbox::HITBOX_REQ_FOLLOW_OFFSET, "effect_req_follow"),
         (sites_hitbox::HITBOX_KILL_OFFSET, "sphere_effect_kill"),
         (sites_hitbox::HITBOX_IS_EXIST_OFFSET, "sphere_effect_is_exist"),
@@ -690,6 +691,13 @@ fn damage_reaction_matches_the_owned_game() {
     assert_eq!([w(0x402fa0), w(0x402fac)], [ldr_x(11, 20, 0x30), str_x(9, 8, 0x40)]);
     assert_eq!((r::MODULE, r::RECORDS, r::ATTACKER, r::SLOT), (0xa8, 0x18, 0x40 + (0x24 - 0x20), 0x50 + (0x32 - 0x30)));
     assert_eq!((sites_hitbox::DAMAGE_RECORD_OFFSET, sites_hitbox::DAMAGE_HIT_IDS_OFFSET), (0x3ffa10, 0x402f9c));
+    // The third Relied row: the hit's damage transaction (main+0x4026c0) adds the hit's damage into record +0x8 (`ldr s0,[x8,#0x8];
+    // fadd s0,s9,s0; str s0,[x8,#0x8]`), and the hit handler takes +0x0 plus +0x8 as the knockback's percent (`ldr s14,[x24,#0x8]` ...
+    // `ldr s0,[x24]; fadd s0,s14,s0`).
+    let dealt = r::DEALT as u32;
+    assert_eq!([w(0x402908), w(0x40290c), w(0x402910)], [ldr_s(0, 8, dealt), 0x1e20_2920, str_s(0, 8, dealt)], "the damage added");
+    assert_eq!([w(0x402e44), w(0x402e94), w(0x402e98)], [ldr_s(14, 24, dealt), ldr_s(0, 24, 0), 0x1e20_29c0], "the knockback's percent");
+    assert_eq!(sites_hitbox::DAMAGE_DEALT_OFFSET, 0x4028e0);
 }
 
 /// rc.14 hb-legend: the launch angle field of `AttackData`, and the `HitStatus` values with the

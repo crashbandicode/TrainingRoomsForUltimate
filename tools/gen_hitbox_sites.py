@@ -42,6 +42,8 @@ ROWS = [
      "The fighter DamageModule's `reaction` (vtable slot 0xd0: `ldr x8,[x0,#0x18]; orr w9,wzr,#0x1c0; smaddl x8,w1,w9,x8; ldr s0,[x8,#0x10]; ret`): the damage records from module `+0x18`, 0x1c0 bytes each, the knockback at `+0x10`. Relied on to read record 0 raw (spots-3)."),
     ("damage_record_hit_ids", 0x402F9C, RELIED,
      "The DamageModule hit handler's copy of the hit's id block beside the knockback it stores (`ldp x9,x10,[x20,#0x20]; ldr x11,[x20,#0x30]; ... str x9,[x8,#0x40]; stp x10,x11,[x8,#0x48]; str s8,[x24]`): the attacker's object id (hit `+0x24`) at record `+0x44` and the attack slot (hit `+0x32`, the id passed to `AttackModule::attack_data`) at `+0x52`. Relied on for the spot attribution (spots-3)."),
+    ("damage_record_dealt", 0x4028E0, RELIED,
+     "The DamageModule's damage transaction for a hit (`main+0x4026c0`) adding into the hit's damage record (`orr w9,wzr,#0x1c0; mul x9,x26,x9; ldr x8,[x19,#0x18]; ... ldr s0,[x8,#0x8]; fadd s0,s9,s0; str s0,[x8,#0x8]`): record `+0x8` sums the frame's damage before the 1-on-1 ratio, which the hit handler adds to `+0x0` for the knockback's percent. Relied on to read a hit's damage when the damage cap cuts the percent's rise short (spots-3)."),
     ("effect_req_follow", 0x2017730, CALLED,
      "`EffectModule::req_follow(accessor, Hash40 effect, Hash40 joint, pos&, rot&, scale, follow, attribute, 0, 0, 0, 0, bool, bool)`: spawns the sphere (the game's `sys_shield` effect) attached to the hitbox's bone."),
     ("sphere_effect_kill", 0x2017840, CALLED,

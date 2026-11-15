@@ -17,7 +17,8 @@
 //!
 //! rc.14 spots-2 added `attack_power_mul_status` to `sites_hitbox` (the getter of the module's damage multiplier, the smash charge): 261 site rows
 //! to 262 (the count the lane's base held was 261), and the site digest with them. spots-3 added `damage_reaction` (the knockback a
-//! defender received): 263; and the Relied `damage_record_layout`, `damage_record_hit_ids` (the record's slot): 265.
+//! defender received): 263; and the Relied `damage_record_layout`, `damage_record_hit_ids` (the record's slot): 265; and the Relied
+//! `damage_record_dealt` (the hit's damage past the damage cap): 266.
 
 use crate::model::sha256::sha256_hex;
 use std::fmt::Write;
@@ -84,7 +85,7 @@ fn every_data_row_has_a_64_byte_guard() {
 
 const SEAM_ROWS: usize = 688;
 const SEAM_DIGEST: &str = "77138f9ec6999107ad65a7ba8a734b6583f9f107059331ca4d371b38bffbe67e";
-const SITE_ROWS: usize = 265;
+const SITE_ROWS: usize = 266;
 const SITE_DIGEST: &str = "4a279b8601a97f19353549baa5b574707229231bc3be8f44b479ac4033e74e87";
 const UI_ROWS: usize = 6;
 const UI_DIGEST: &str = "35ddb9f164a3ac26ba2e5c45c35066ee738e796589d58e2c697c82e486567b15";

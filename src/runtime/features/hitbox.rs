@@ -770,7 +770,7 @@ unsafe fn fighter_launch(accessor: usize) -> crate::model::spots::Launch {
     let mul = natives::attack_power_mul(accessor);
     let standard = crate::model::spots::Launch::STANDARD;
     match target.filter(|&t| t != accessor) {
-        Some(t) => crate::model::spots::Launch { mul, percent: natives::damage(t, 0), weight: natives::weight(t) },
+        Some(t) => crate::model::spots::Launch { mul, percent: natives::damage(t, 0), weight: natives::weight(t), ..standard },
         None => crate::model::spots::Launch { mul, ..standard },
     }
 }

@@ -28,7 +28,7 @@ fn hits(values: &[(f32, i32, i32, i32)]) -> Powers {
 const NONE: Hit = Hit { damage: 0.0, growth: 0, fixed: 0, base: 0 };
 /// A defender at `percent` of weight 98 (a middleweight), the attacker uncharged.
 fn at(percent: f32) -> Launch {
-    Launch { mul: 1.0, percent, weight: 98.0 }
+    Launch { mul: 1.0, percent, weight: 98.0, attacker: 0.0 }
 }
 
 fn the_knockback_is_the_games_formula() {
@@ -64,7 +64,7 @@ fn the_ranking_follows_the_defenders_percent_and_weight() {
     let active = hits(&[(8.0, 40, 0, 90), (8.0, 120, 0, 30)]);
     assert_eq!(classify(&active, at(0.0), &NONE)[..2], [Some(Spot::Sweet), Some(Spot::Sour)], "at 0% the base wins");
     assert_eq!(classify(&active, at(150.0), &NONE)[..2], [Some(Spot::Sour), Some(Spot::Sweet)], "at 150% the growth wins");
-    let tipping = |weight| classify(&active, Launch { mul: 1.0, percent: 70.0, weight }, &NONE)[1];
+    let tipping = |weight| classify(&active, Launch { mul: 1.0, percent: 70.0, weight, attacker: 0.0 }, &NONE)[1];
     assert_eq!([tipping(60.0), tipping(140.0)], [Some(Spot::Sweet), Some(Spot::Sour)], "a light and a heavy defender at the same percent");
 }
 
@@ -120,7 +120,7 @@ fn took(active: &Powers, slot: usize, gained: f32, before: f32, w: f32, r: f32) 
 
 /// A defender of weight `w` at `percent`.
 fn on(w: f32, percent: f32) -> Launch {
-    Launch { mul: 1.0, percent, weight: w }
+    Launch { mul: 1.0, percent, weight: w, attacker: 0.0 }
 }
 
 /// Marth's forward smash as Eden logged it (spots3-bade7ea6-1): three blades (13, growth 75, base 48) and the tip (18, 80, 80).
@@ -231,6 +231,42 @@ fn the_charged_marth_hits_eden_logged() {
     }
 }
 
+/// Rage (the attacker's percent) scales what the defender receives; the expected knockback carries the game's multiplier, which stops at
+/// 1.1, so a hit stays labelled at any attacker percent: below the cap (Eden: P1 Marth at 60.3% landed a blade hit that received 74.664,
+/// x1.022 the same hit's 73.054 from 0%; spots3-bedc9a69-1, `sp-rage`), at it (150%) and far above it (999%).
+fn an_uncharged_hit_at_full_rage_stays_labelled() {
+    assert_eq!([0.0, 35.0, 150.0, 999.0].map(rage), [1.0, 1.0, RAGE_MAX, RAGE_MAX]);
+    assert!((rage(60.349) - 1.02204).abs() < 1e-4, "{}", rage(60.349));
+    let raged = |attacker| Launch { mul: 1.0267, attacker, ..at(0.0) };
+    assert_eq!(attribute(Landed { gained: 16.817, launched: 74.664, slot: Some(0) }, &marth(), raged(60.349), &NONE), Some(Spot::Sour));
+    let full = took(&marth(), 3, 18.0 * M, 0.0, 98.0, 1.1);
+    for attacker in [150.0, 999.0] {
+        assert_eq!(attribute(full, &marth(), Launch { attacker, ..at(0.0) }, &NONE), Some(Spot::Sweet), "{attacker}%: x1.1 expected");
+    }
+    assert_eq!(attribute(full, &marth(), at(0.0), &NONE), None, "the same knockback from an attacker at 0% is not this slot's");
+}
+
+/// Fixed knockback takes no rage (the game's knockback function multiplies rage on its growth path only): a set-knockback hitbox launches
+/// alike from any attacker percent while a growth one gains rage, so the attacker's percent can turn the ranking.
+fn fixed_knockback_takes_no_rage() {
+    let pair = hits(&[(6.0, 100, 60, 30), (8.0, 90, 0, 34)]);
+    let (calm, raged) = (on(98.0, 50.0), Launch { attacker: 999.0, ..on(98.0, 50.0) });
+    assert_eq!(classify(&pair, calm, &NONE)[..2], [Some(Spot::Sweet), Some(Spot::Sour)]);
+    assert_eq!(classify(&pair, raged, &NONE)[..2], [Some(Spot::Sour), Some(Spot::Sweet)], "rage lifts the growth hitbox only");
+    let set = took(&pair, 0, 6.0 * M, 50.0, 98.0, 0.95);
+    assert_eq!(attribute(set, &pair, raged, &NONE), Some(Spot::Sour), "the set knockback expected without rage");
+}
+
+/// The game caps any knockback at 2500 (`reaction_max`): a hit past it on a defender at 900% is received as 2500 and still placed, and two
+/// hitboxes that both pass it launch alike, so their damage ranks them.
+fn the_knockback_ceiling_is_the_games() {
+    let smash = hits(&[(30.0, 100, 0, 40), (20.0, 100, 0, 30)]);
+    let hit = Landed { gained: 30.0 * M, launched: REACTION_MAX, slot: Some(0) };
+    assert_eq!(attribute(hit, &smash, on(60.0, 900.0), &NONE), Some(Spot::Sweet));
+    let capped = hits(&[(30.0, 100, 0, 40), (28.0, 100, 0, 400)]);
+    assert_eq!(classify(&capped, on(60.0, 950.0), &NONE)[..2], [Some(Spot::Sweet), Some(Spot::Sour)], "both past 2500: the damage decides");
+}
+
 /// The multiplier is the game's own number; one that was not read (0.0) or is not a usable number labels nothing.
 fn an_unusable_multiplier_gives_no_label() {
     for mul in [0.0, -1.0, f32::NAN, f32::INFINITY] {
@@ -310,7 +346,7 @@ fn the_hit_spheres_take_the_frame_data_colours() {
     frame(&mut set, [None, blade, blade, None, None, None, None, None], 21);
     assert_eq!(tints(&set, &[1, 2]), [strong, strong]);
     // Gut Check: the hit and the gust deal the same damage; the gust launches less, so it is pink. Against the defender the pass set.
-    set.launch = Launch { mul: 1.0, percent: 80.0, weight: 98.0 };
+    set.launch = Launch { mul: 1.0, percent: 80.0, weight: 98.0, attacker: 0.0 };
     frame(&mut set, [Some((14.0, 90, 0, 70)), Some((14.0, 50, 0, 40)), None, None, None, None, None, None], 22);
     assert_eq!(tints(&set, &[0, 1]), [strong, weak]);
 }
@@ -369,6 +405,9 @@ fn case_table() {
         ("a_charged_smash_is_attributed_by_the_hitbox_that_dealt_it", a_charged_smash_is_attributed_by_the_hitbox_that_dealt_it as fn()),
         ("the_charged_marth_hits_eden_logged", the_charged_marth_hits_eden_logged as fn()),
         ("a_charged_hit_that_cannot_be_told_has_no_label", a_charged_hit_that_cannot_be_told_has_no_label as fn()),
+        ("an_uncharged_hit_at_full_rage_stays_labelled", an_uncharged_hit_at_full_rage_stays_labelled as fn()),
+        ("fixed_knockback_takes_no_rage", fixed_knockback_takes_no_rage as fn()),
+        ("the_knockback_ceiling_is_the_games", the_knockback_ceiling_is_the_games as fn()),
         ("an_unusable_multiplier_gives_no_label", an_unusable_multiplier_gives_no_label as fn()),
         ("the_powers_of_a_fighter_are_read_from_its_active_slots_only", the_powers_of_a_fighter_are_read_from_its_active_slots_only as fn()),
         ("the_hit_spheres_take_the_frame_data_colours", the_hit_spheres_take_the_frame_data_colours as fn()),

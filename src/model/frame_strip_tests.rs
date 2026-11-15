@@ -149,6 +149,23 @@ fn a_hit_of_equal_damage_is_labelled_by_the_slot_the_game_recorded() {
     assert!(gut_check_marks(1, false).is_empty(), "the record names another object (a projectile): no label");
 }
 
+/// spots-3: past the game's damage cap (999%). The CPU at 995%, then at 999%, takes P1's 13 (16.38 added): its percent rises 4, then not at
+/// all, so the hit is seen and placed by the damage its record says it took (`+0x8`, before the 1-on-1 ratio).
+fn a_hit_past_the_damage_cap_is_labelled_by_the_records_damage() {
+    let powers = p(&[16.0, 13.0]);
+    let p1 = Sample { actionable: true, power_mul: 1.0, object_id: P1_ID, ..Sample::default() };
+    let swing = |stop| Sample { attack: Some(Move::Jab), status: ATTACK, active: true, stop, powers, ..p1 };
+    for before in [995.0, spots::DAMAGE_MAX] {
+        let calm = Sample { actionable: true, damage: before, ..Sample::default() };
+        let hurt = Sample { damage: spots::DAMAGE_MAX, dealt: 13.0 * M / spots::TARGET_MUL, ..struck_by(calm, P1_ID, &powers, 1, 13.0 * M, before) };
+        let mut t = Tracker::new();
+        t.step(p1, calm, NONE);
+        t.step(swing(false), calm, NONE);
+        t.step(swing(true), hurt, NONE);
+        assert_eq!(t.marks().collect::<Vec<_>>(), vec![Mark { frame: 3, lane: 1, spot: Spot::Sour }], "from {before}%");
+    }
+}
+
 /// Three frames: both calm (the victim at 20%), the attacker swings, the attacker's slot `slot` hits (hitlag) and the victim, hurt, has
 /// `gained` more damage. The labelled hits.
 fn marks_of(attacker_is_p1: bool, powers: &[f32], slot: usize, gained: f32) -> Vec<Mark> {
@@ -271,6 +288,7 @@ fn case_table() {
         ("a_hit_is_labelled_with_its_spot_on_the_lane_of_the_fighter_it_hit", a_hit_is_labelled_with_its_spot_on_the_lane_of_the_fighter_it_hit as fn()),
         ("a_hit_that_cannot_be_told_is_not_labelled", a_hit_that_cannot_be_told_is_not_labelled as fn()),
         ("a_hit_of_equal_damage_is_labelled_by_the_slot_the_game_recorded", a_hit_of_equal_damage_is_labelled_by_the_slot_the_game_recorded as fn()),
+        ("a_hit_past_the_damage_cap_is_labelled_by_the_records_damage", a_hit_past_the_damage_cap_is_labelled_by_the_records_damage as fn()),
         ("a_charged_hit_is_labelled_by_the_hitbox_that_dealt_it", a_charged_hit_is_labelled_by_the_hitbox_that_dealt_it as fn()),
         ("a_weaker_hit_later_in_the_same_action_is_late", a_weaker_hit_later_in_the_same_action_is_late as fn()),
         ("a_link_remembers_the_spot_of_its_follow_up_hit", a_link_remembers_the_spot_of_its_follow_up_hit as fn()),

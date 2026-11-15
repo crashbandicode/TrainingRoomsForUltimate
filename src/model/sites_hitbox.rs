@@ -29,13 +29,17 @@ pub const HITBOX_DAMAGE_REACTION_OFFSET: usize = 0x200_b710;
 /// each, the knockback at `+0x10`) and the hit handler's copy of the hit's id block beside the knockback it stores (`damage_record`).
 pub const DAMAGE_RECORD_OFFSET: usize = 0x3f_fa10;
 pub const DAMAGE_HIT_IDS_OFFSET: usize = 0x40_2f9c;
+/// spots-3, relied on: the hit's damage transaction adding the hit's damage into record `+0x8` (`DAMAGE_DEALT_OFFSET`).
+pub const DAMAGE_DEALT_OFFSET: usize = 0x40_28e0;
 
-/// The defender's damage record 0, read raw (`DAMAGE_RECORD_OFFSET`, `DAMAGE_HIT_IDS_OFFSET`): the accessor's DamageModule, its record
-/// array, and in the record the attacker's battle object id (the hit's `+0x24`) and the attack slot (the hit's `+0x32`, the id the handler
-/// passes to `AttackModule::attack_data`).
+/// The defender's damage record 0, read raw (`DAMAGE_RECORD_OFFSET`, `DAMAGE_HIT_IDS_OFFSET`, `DAMAGE_DEALT_OFFSET`): the accessor's
+/// DamageModule, its record array, and in the record the attacker's battle object id (the hit's `+0x24`), the attack slot (the hit's `+0x32`,
+/// the id the handler passes to `AttackModule::attack_data`) and the frame's damage before the 1-on-1 ratio (`+0x8`; Eden: the percent's rise
+/// over it is 1.2000 on 93 hits).
 pub mod damage_record {
     pub const MODULE: usize = 0xa8;
     pub const RECORDS: usize = 0x18;
+    pub const DEALT: usize = 0x8;
     pub const ATTACKER: usize = 0x44;
     pub const SLOT: usize = 0x52;
 }
@@ -73,4 +77,4 @@ pub const CAMERA_LIMIT_FIELD: usize = 0xc20;
 /// The three hooks' rows (the other rows are called or relied on, never written).
 pub const HOOK_ROWS: [&str; 3] = ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound"];
 
-pub static SITES: [Site; 30] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));
+pub static SITES: [Site; 31] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));

@@ -132,7 +132,10 @@ the hit; in the game's own data it deals 0.7 times the hit's damage, and the plu
 when it launches less than the strongest hitbox earlier in the same move, as the late frames of a knee do. This is SmashWiki's definition of
 sweet and sour spots. The plugin works out the launch from each hitbox's own numbers in the game (damage, base knockback,
 knockback growth, set knockback), using the game's knockback formula and the other fighter's percent and weight at that
-moment, so no list of fighters is needed. Damage decides only between hitboxes that launch the same. The launch angle
+moment, so no list of fighters is needed. It also counts the attacker's rage the way the game does: from 35% damage a
+hitbox launches harder, up to 1.1 times at 150%, and no harder after that; a set knockback hitbox gets no rage. The game
+never launches harder than its own limit, so two hitboxes that both reach it launch the same. Damage decides only between
+hitboxes that launch the same. The launch angle
 plays no part: which direction is best depends on the situation. With no other fighter to measure against, the colours
 rank the hitboxes as they would launch a middleweight at 0%. A hitbox it cannot rank, such as a jab's single hitbox or
 several identical hitboxes, is red. Grab boxes and hurtboxes keep their colours. It needs Hitbox Visualization On. Off
@@ -185,7 +188,9 @@ plays no part. The game itself records which hitbox connected, and the plugin re
 what the other fighter took: the damage the hit added and how hard the game launched it. So two hitboxes of the same
 damage, such as the two pairs in Mario's jab, are told apart, and so is a stale hit. A hit has no label when it cannot
 be checked, such as identical hitboxes, a hit on a shield or a projectile's hit. A charged smash attack is labelled like
-an uncharged one: the plugin reads the charge from the game. It needs Input Display set to Frame strip.
+an uncharged one: the plugin reads the charge from the game. Labels work at any damage on either side. Damage stops at
+999%, so a hit there adds little or nothing, and the plugin then reads the hit's damage from the game's record. It
+needs Input Display set to Frame strip.
 
 - **Values:** On, Off
 - **Default:** Off

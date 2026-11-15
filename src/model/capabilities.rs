@@ -133,8 +133,8 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 10] = [
         "stop_is_stop", "utility_get_category", "utility_get_kind", "work_get_int", "work_get_param_float",
     ]),
     (Feature::InputDisplay, &[
-        "attack_data", "attack_is_attack", "attack_power_mul_status", "cancel_is_enable", "damage_of", "damage_reaction", "damage_record_hit_ids",
-        "damage_record_layout", "fighter_manager_get_entry", "lua_const_lookup", "motion_frame", "prev_status_kind", "situation_kind", "state_lr",
+        "attack_data", "attack_is_attack", "attack_power_mul_status", "cancel_is_enable", "damage_of", "damage_reaction", "damage_record_dealt",
+        "damage_record_hit_ids", "damage_record_layout", "fighter_manager_get_entry", "lua_const_lookup", "motion_frame", "prev_status_kind", "situation_kind", "state_lr",
         "status_kind", "stop_is_stop", "transition_term_hook", "work_get_param_float",
     ]),
     (Feature::NamedMacros, &["fighter_information", "fighter_manager_get_entry", "is_operation_cpu", "state_lr", "ui_is_ready_go", "work_get_int"]),

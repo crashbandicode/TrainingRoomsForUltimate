@@ -41,17 +41,48 @@ pub struct Hit {
 pub type Powers = [Hit; SLOTS];
 
 /// What a hitbox's knockback depends on besides its own numbers: the attacker's damage multiplier (`AttackModule::power_mul_status`: 1.0, or
-/// the smash charge), the defender's percent before the hit and its weight (`WorkModule` parameter `weight`).
+/// the smash charge), the defender's percent before the hit and its weight (`WorkModule` parameter `weight`), and the attacker's percent
+/// (its rage, `rage`).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Launch {
     pub mul: f32,
     pub percent: f32,
     pub weight: f32,
+    pub attacker: f32,
+}
+
+/// The game's own numbers (13.0.5): rage from `fighter/common/param/common.prc` (`damage_reaction_mul_min_damage`, `_max_damage`,
+/// `damage_reaction_mul_max`); the knockback ceiling (`reaction_max`) and the damage cap (`damage_max`) from the battle parameters.
+pub const RAGE_FROM: f32 = 35.0;
+pub const RAGE_FULL: f32 = 150.0;
+pub const RAGE_MAX: f32 = 1.1;
+pub const REACTION_MAX: f32 = 2500.0;
+pub const DAMAGE_MAX: f32 = 999.0;
+
+/// The rage multiplier of an attacker at `percent`, as the fighter's update computes it every frame (`main+0x617bf0`, passed to
+/// `AttackModule::set_damage_reaction_mul`): 1 + (max − 1) · (percent − 35) / (150 − 35), the result held within 1.0 ..= 1.1. Any percent
+/// goes in; the game bounds the multiplier, not the percent. Eden measured x1.022 at 60.3% (spots3-bedc9a69-1).
+pub fn rage(percent: f32) -> f32 {
+    ((RAGE_MAX - 1.0) * ((percent - RAGE_FROM) / (RAGE_FULL - RAGE_FROM)) + 1.0).max(1.0).min(RAGE_MAX)
+}
+
+/// The knockback the game gives `hit` (`knockback`) with the attacker's rage, which only a hitbox without fixed knockback takes
+/// (`main+0x401e50`: the fixed path skips it), and never above the game's ceiling, `REACTION_MAX`.
+fn launched_by(hit: &Hit, d: f32, p: f32, w: f32, attacker: f32) -> f32 {
+    rage(attacker) * knockback(hit, d, p, w)
+}
+
+/// The damage a hit added, in the percent's terms: the rise of the defender's percent (`gained`), or, when the game's damage cap cut that
+/// short (`after`, the percent after the hit, at `DAMAGE_MAX`), the damage the defender's record says the hit dealt (`dealt`, record `+0x8`,
+/// before the 1-on-1 ratio, so times `TARGET_MUL`). 0.0 when neither shows a hit.
+pub fn added(gained: f32, dealt: f32, after: f32) -> f32 {
+    let _ = (dealt, after);
+    gained
 }
 
 impl Launch {
     /// Where there is no defender to read (a lone fighter): weight 100 at 0%.
-    pub const STANDARD: Launch = Launch { mul: 1.0, percent: 0.0, weight: 100.0 };
+    pub const STANDARD: Launch = Launch { mul: 1.0, percent: 0.0, weight: 100.0, attacker: 0.0 };
 
     /// The weight, the standard 100 when it was not read.
     fn weight(self) -> f32 {
@@ -70,8 +101,8 @@ pub const K_HIGH: f32 = 1.6;
 /// the attacker's freshness, which the formula's damage keeps).
 pub const DEALT: f32 = 1.26;
 pub const TARGET_MUL: f32 = 1.2;
-/// The window of received knockback over the recorded slot's knockback by the formula: Eden measured 0.932 (a fully charged smash) to 1.020
-/// (a fully staled jab) on the game's own slot (spots3-bade7ea6-1, `artifacts/rc14-spots-3/eden/replay_table.py`), plus a margin of 0.03.
+/// The window of received knockback over the recorded slot's knockback by the formula times the attacker's `rage`: Eden measured 0.932 (a
+/// fully charged smash) to 1.020 (a fully staled jab) on the game's own slot (`artifacts/rc14-spots-3/eden/replay_table.py`), plus 0.03.
 pub const KB_LOW: f32 = 0.90;
 pub const KB_HIGH: f32 = 1.05;
 
@@ -92,7 +123,7 @@ struct Power {
 impl Power {
     fn of(hit: &Hit, launch: Launch) -> Power {
         let d = hit.damage * launch.mul;
-        Power { knockback: knockback(hit, d, launch.percent + d * DEALT, launch.weight()), damage: hit.damage }
+        Power { knockback: launched_by(hit, d, launch.percent + d * DEALT, launch.weight(), launch.attacker), damage: hit.damage }
     }
 
     /// Weaker than `other`: by more than `KB_EPS` in knockback, or equal in knockback and by more than `EPS` in damage.
@@ -198,7 +229,7 @@ pub fn attribute(landed: Landed, active: &Powers, launch: Launch, earlier: &Hit)
     if !gained.is_finite() || gained <= 0.0 || !launch.mul.is_finite() || launch.mul <= 0.0 {
         return None;
     }
-    let k = knockback(hit, gained / TARGET_MUL, launch.percent + gained, launch.weight());
+    let k = launched_by(hit, gained / TARGET_MUL, launch.percent + gained, launch.weight(), launch.attacker);
     let fits = (K_LOW..=K_HIGH).contains(&(gained / (hit.damage * launch.mul))) && k > 0.0 && (KB_LOW..=KB_HIGH).contains(&(launched / k));
     fits.then(|| classify(active, launch, earlier)[slot?]).flatten()
 }
