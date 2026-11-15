@@ -1187,7 +1187,8 @@ mod stats {
         let groups = if module == 0 { 0 } else { reader.read_usize(module + hitbox::layout::HIT_GROUPS) };
         let count = if groups == 0 { 0 } else { reader.read_i16(groups + hitbox::layout::HIT_GROUP_COUNT) };
         let enabled = hitbox::hurt_parts(&mut reader, false, |_, _, _| {});
-        diagnostic(format_args!("[Hitbox] article hurt id={id:#x} accessor={key:#x} group=0 parts={count} enabled={enabled} endpoints={drawn} cut={cut}"));
+        let kind = unsafe { super::natives::fighter_kind(key) };
+        diagnostic(format_args!("[Hitbox] article hurt id={id:#x} kind={kind:?} accessor={key:#x} group=0 parts={count} enabled={enabled} endpoints={drawn} cut={cut}"));
     }
 
     pub fn wanted(hits: u32, hurts: u32) {
