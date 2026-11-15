@@ -113,9 +113,10 @@ fn the_peak_starts_over_with_a_new_status_or_when_the_motion_goes_back() {
 /// The measured multiplier: a fresh hit adds 1.26 times its hitbox's damage (Eden, 2026-11-14).
 const M: f32 = 1.26;
 
-/// The hit of `slot` as the game records it: the defender (weight `w`, at `before`) gained `gained` and received that slot's knockback times `r`.
+/// The hit of `slot` as the game records it: the defender (weight `w`, at `before`) gained `gained` and received that slot's knockback times `r`,
+/// by the game's percent (the percent before plus the hit's damage before the 1-on-1 ratio, `gained / TARGET_MUL`).
 fn took(active: &Powers, slot: usize, gained: f32, before: f32, w: f32, r: f32) -> Landed {
-    Landed { gained, launched: r * knockback(&active[slot], gained / TARGET_MUL, before + gained, w), slot: Some(slot) }
+    Landed { gained, launched: r * knockback(&active[slot], gained / TARGET_MUL, before + gained / TARGET_MUL, w), slot: Some(slot) }
 }
 
 /// A defender of weight `w` at `percent`.
@@ -144,11 +145,14 @@ fn a_hit_of_equal_damage_is_attributed_by_the_slot_the_game_recorded() {
     assert_eq!(attribute(unread, &gut_check, at(60.0), &NONE), None, "no record (not read, or a projectile's): never a guess");
 }
 
-/// Both cross-checks hold the recorded slot to what the defender took.
+/// Both cross-checks hold the recorded slot to what the defender took; the knockback window is 0.96..=1.05 (Eden's spread 0.990..1.020 plus 0.03).
 fn a_hit_both_readings_cannot_place_has_no_label() {
     let blade = took(&marth(), 0, 13.0 * M, 30.0, 98.0, 1.0);
     assert_eq!(attribute(blade, &marth(), at(30.0), &NONE), Some(Spot::Sour));
-    for r in [0.85, 1.1] {
+    for r in [0.97, 1.04] {
+        assert_eq!(attribute(Landed { launched: blade.launched * r, ..blade }, &marth(), at(30.0), &NONE), Some(Spot::Sour), "inside the window: x{r}");
+    }
+    for r in [0.95, 1.06] {
         assert_eq!(attribute(Landed { launched: blade.launched * r, ..blade }, &marth(), at(30.0), &NONE), None, "a knockback the slot does not give: x{r}");
     }
     assert_eq!(attribute(Landed { gained: 30.0 * M, ..blade }, &marth(), at(30.0), &NONE), None, "a damage the slot does not deal");
@@ -204,19 +208,19 @@ fn the_falcon_knee_hits_eden_logged() {
 fn a_charged_smash_is_attributed_by_the_hitbox_that_dealt_it() {
     for mul in [1.0, 1.2, 1.4] {
         let launch = Launch { mul, ..at(0.0) };
-        assert_eq!(attribute(took(&marth(), 0, 13.0 * mul * M, 0.0, 98.0, 0.95), &marth(), launch, &NONE), Some(Spot::Sour), "a blade hit at charge {mul}");
-        assert_eq!(attribute(took(&marth(), 3, 18.0 * mul * M, 0.0, 98.0, 0.95), &marth(), launch, &NONE), Some(Spot::Sweet), "a tip hit at charge {mul}");
+        assert_eq!(attribute(took(&marth(), 0, 13.0 * mul * M, 0.0, 98.0, 0.99), &marth(), launch, &NONE), Some(Spot::Sour), "a blade hit at charge {mul}");
+        assert_eq!(attribute(took(&marth(), 3, 18.0 * mul * M, 0.0, 98.0, 0.99), &marth(), launch, &NONE), Some(Spot::Sweet), "a tip hit at charge {mul}");
     }
 }
 
 /// A charged hit whose record is not this attack's (not read, or another object's) has no label, charged or not.
 fn a_charged_hit_that_cannot_be_told_has_no_label() {
-    let hit = Landed { slot: None, ..took(&marth(), 3, 18.0 * 1.4 * M, 0.0, 98.0, 0.95) };
+    let hit = Landed { slot: None, ..took(&marth(), 3, 18.0 * 1.4 * M, 0.0, 98.0, 0.99) };
     assert_eq!(attribute(hit, &marth(), Launch { mul: 1.4, ..at(0.0) }, &NONE), None);
 }
 
 /// Marth's forward smash held to different charges, as Eden logged it (spots3-bade7ea6-1, `sp-charge`): the received knockback over the formula's
-/// is 0.93 to 0.96 for these (the lowest the boot measured), inside the window.
+/// is 0.990 to 0.995 for these (the lowest the boots measured), inside the window.
 fn the_charged_marth_hits_eden_logged() {
     for (gained, mul, launched, slot, expected) in [
         (23.285, 1.0267, 117.183, 3, Spot::Sweet),
@@ -229,6 +233,30 @@ fn the_charged_marth_hits_eden_logged() {
         let hit = Landed { gained, launched, slot: Some(slot) };
         assert_eq!(attribute(hit, &marth(), Launch { mul, ..at(0.0) }, &NONE), Some(expected), "{gained} added at charge {mul}");
     }
+}
+
+/// The percent the game feeds its knockback function is the percent before the hit plus the hit's damage before the 1-on-1 ratio (the damage
+/// record's `+0x0` + `+0x8`, `main+0x402e94`), not the percent after the hit. Two hits as Eden recorded them (spots3-bade7ea6-1, with the record's
+/// own `rec08`): the knockback the game gave over the formula's is 0.9904 and 1.0200, the ends of the 93 recorded hits' spread. The percent after
+/// the hit, the formula before this change, puts the first at 0.9324, outside the window, and a knockback by it is not this slot's.
+fn the_knockback_percent_is_the_games_on_recorded_hits() {
+    let jab = hits(&[(2.2, 30, 0, 20), (2.2, 30, 0, 20), (2.2, 20, 0, 15), (2.2, 20, 0, 15)]);
+    // (slot's powers, the hit's slot, charge, gained, the record's +0x8, the percent before, weight, received, received over the game's formula):
+    // `sp-charge`, Marth's forward smash held to 1.4, its tip on Mario at 0%; `rage-stand-lines.txt`, the CPU Mario's fully staled jab (0.563 of 2.2)
+    // on Marth at 29.362%.
+    let recorded = [(marth(), 3, 1.4, 31.752, 26.46, 0.0, 98.0, 135.677, 0.9904), (jab, 1, 1.0, 1.239, 1.033, 29.362, 90.0, 27.987, 1.0200)];
+    for (powers, slot, mul, gained, rec08, before, w, received, ratio) in recorded {
+        assert!((gained / TARGET_MUL - rec08).abs() < 2e-3, "the percent's rise is 1.2 times the record's damage: {gained} over {rec08}");
+        let game = knockback(&powers[slot], rec08, before + rec08, w);
+        assert!((received / game - ratio).abs() < 5e-4, "{received} over {game}: {}", received / game);
+        assert!((KB_LOW..=KB_HIGH).contains(&(received / game)));
+        let launch = Launch { mul, percent: before, weight: w, attacker: 0.0 };
+        assert_eq!(attribute(Landed { gained, launched: received, slot: Some(slot) }, &powers, launch, &NONE), Some(Spot::Sweet), "the hit at {before}%");
+    }
+    let after = knockback(&marth()[3], 26.46, 0.0 + 31.752, 98.0);
+    assert!(135.677 / after < KB_LOW, "by the percent after the hit the tip's ratio is {}", 135.677 / after);
+    let launch = Launch { mul: 1.4, ..on(98.0, 0.0) };
+    assert_eq!(attribute(Landed { gained: 31.752, launched: after, slot: Some(3) }, &marth(), launch, &NONE), None);
 }
 
 /// Rage (the attacker's percent) scales what the defender receives; the expected knockback carries the game's multiplier, which stops at
@@ -253,7 +281,7 @@ fn fixed_knockback_takes_no_rage() {
     let (calm, raged) = (on(98.0, 50.0), Launch { attacker: 999.0, ..on(98.0, 50.0) });
     assert_eq!(classify(&pair, calm, &NONE)[..2], [Some(Spot::Sweet), Some(Spot::Sour)]);
     assert_eq!(classify(&pair, raged, &NONE)[..2], [Some(Spot::Sour), Some(Spot::Sweet)], "rage lifts the growth hitbox only");
-    let set = took(&pair, 0, 6.0 * M, 50.0, 98.0, 0.95);
+    let set = took(&pair, 0, 6.0 * M, 50.0, 98.0, 0.99);
     assert_eq!(attribute(set, &pair, raged, &NONE), Some(Spot::Sour), "the set knockback expected without rage");
 }
 
@@ -405,6 +433,7 @@ fn case_table() {
         ("a_charged_smash_is_attributed_by_the_hitbox_that_dealt_it", a_charged_smash_is_attributed_by_the_hitbox_that_dealt_it as fn()),
         ("the_charged_marth_hits_eden_logged", the_charged_marth_hits_eden_logged as fn()),
         ("a_charged_hit_that_cannot_be_told_has_no_label", a_charged_hit_that_cannot_be_told_has_no_label as fn()),
+        ("the_knockback_percent_is_the_games_on_recorded_hits", the_knockback_percent_is_the_games_on_recorded_hits as fn()),
         ("an_uncharged_hit_at_full_rage_stays_labelled", an_uncharged_hit_at_full_rage_stays_labelled as fn()),
         ("fixed_knockback_takes_no_rage", fixed_knockback_takes_no_rage as fn()),
         ("the_knockback_ceiling_is_the_games", the_knockback_ceiling_is_the_games as fn()),

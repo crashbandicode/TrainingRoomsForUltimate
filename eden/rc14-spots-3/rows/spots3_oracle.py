@@ -1,5 +1,6 @@
 """spots-3's oracle, pure (no Eden): the diag lines parsed and the spot rules restated from their public sources, apart from the plugin's
-code: SmashWiki's knockback formula, the ranking by knockback then damage, the damage window (1.0..1.6) and the received-knockback window.
+code: SmashWiki's knockback formula with the game's percent (before + the hit's damage before the 1-on-1 ratio, `struck_at`, spots-4), the ranking
+by knockback then damage, the damage window (0.5..1.6) and the received-knockback window (0.96..1.05).
 
   [Spots] stop frame=<n> gained=<d> launched=<kb> mul=<charge> before=<percent> weight=<w> attacker=<percent>
           powers=[Hit { damage: .., growth: .., fixed: .., base: .. }, ..] newest_mark=<None | Some(Mark {..})>
@@ -7,7 +8,7 @@ code: SmashWiki's knockback formula, the ranking by knockback then damage, the d
 """
 import re
 
-K_LOW, K_HIGH, KB_LOW, KB_HIGH, DEALT, TARGET_MUL, KB_EPS, EPS = 0.5, 1.6, 0.90, 1.05, 1.26, 1.2, 0.5, 0.05
+K_LOW, K_HIGH, KB_LOW, KB_HIGH, DEALT, TARGET_MUL, KB_EPS, EPS = 0.5, 1.6, 0.96, 1.05, 1.26, 1.2, 0.5, 0.05
 # The game's own numbers (13.0.5): rage (fighter/common/param/common.prc), the knockback ceiling and the damage cap (the battle parameters).
 RAGE_FROM, RAGE_FULL, RAGE_MAX, REACTION_MAX, DAMAGE_MAX = 35.0, 150.0, 1.1, 2500.0, 999.0
 STOP = re.compile(r'\[Spots\] stop frame=(\d+) gained=(\S+) launched=(\S+) mul=(\S+) before=(\S+) weight=(\S+) attacker=(\S+)(?: recorded=(None|Some\(\d+\)))? '
@@ -30,6 +31,12 @@ def knockback(hit, d, p, w):
     return ((p / 10 + p * d / 20) * 200 / (w + 100) * 1.4 + 18) * hit['growth'] / 100 + hit['base']
 
 
+def struck_at(before, added):
+    """The percent the game feeds its knockback function (13.0.5 main+0x402e94: record +0x0 + record +0x8): the defender's percent before the
+    hit plus the hit's damage before the 1-on-1 ratio, which is the percent's rise (`added`) over TARGET_MUL."""
+    return before + added / TARGET_MUL
+
+
 def rage(percent):
     """The game's rage (13.0.5 main+0x617bf0): 1 + (1.1 - 1) * (percent - 35) / (150 - 35), the multiplier held within 1.0..1.1; any percent."""
     return min(max((RAGE_MAX - 1.0) * ((percent - RAGE_FROM) / (RAGE_FULL - RAGE_FROM)) + 1.0, 1.0), RAGE_MAX)
@@ -42,7 +49,7 @@ def launched_by(hit, d, p, w, attacker):
 
 def power(hit, mul, before, weight, attacker=0.0):
     d = hit['damage'] * mul
-    return (launched_by(hit, d, before + d * DEALT, weight if weight > 0 else 100.0, attacker), hit['damage'])
+    return (launched_by(hit, d, struck_at(before, d * DEALT), weight if weight > 0 else 100.0, attacker), hit['damage'])
 
 
 def below(a, b):
@@ -65,7 +72,7 @@ def candidates(hit):
     for i, h in enumerate(hit['powers']):
         if h['damage'] <= 0 or hit['mul'] <= 0 or not K_LOW <= hit['gained'] / (h['damage'] * hit['mul']) <= K_HIGH:
             continue
-        k = launched_by(h, hit['gained'] / TARGET_MUL, hit['before'] + hit['gained'], hit['weight'] if hit['weight'] > 0 else 100.0, hit.get('attacker', 0.0))
+        k = launched_by(h, hit['gained'] / TARGET_MUL, struck_at(hit['before'], hit['gained']), hit['weight'] if hit['weight'] > 0 else 100.0, hit.get('attacker', 0.0))
         hit['kb_ratio'][i] = round(hit['launched'] / k, 4) if k > 0 else None
         if hit['launched'] > 0 and hit['weight'] > 0 and not (k > 0 and KB_LOW <= hit['launched'] / k <= KB_HIGH):
             continue
@@ -105,7 +112,7 @@ def expected(hit, slot, classes):
     if slot is None or slot >= len(hit['powers']) or hit['powers'][slot]['damage'] <= 0 or hit['mul'] <= 0 or hit['gained'] <= 0:
         return None
     s = hit['powers'][slot]
-    k = launched_by(s, hit['gained'] / TARGET_MUL, hit['before'] + hit['gained'], hit['weight'] if hit['weight'] > 0 else 100.0, hit.get('attacker', 0.0))
+    k = launched_by(s, hit['gained'] / TARGET_MUL, struck_at(hit['before'], hit['gained']), hit['weight'] if hit['weight'] > 0 else 100.0, hit.get('attacker', 0.0))
     fits = K_LOW <= hit['gained'] / (s['damage'] * hit['mul']) <= K_HIGH and k > 0 and KB_LOW <= hit['launched'] / k <= KB_HIGH
     return classes.get(slot) if fits else None
 

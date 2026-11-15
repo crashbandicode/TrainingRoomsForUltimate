@@ -102,13 +102,22 @@ pub const K_HIGH: f32 = 1.6;
 /// the attacker's freshness, which the formula's damage keeps).
 pub const DEALT: f32 = 1.26;
 pub const TARGET_MUL: f32 = 1.2;
-/// The window of received knockback over the recorded slot's knockback by the formula times the attacker's `rage`: Eden measured 0.932 (a
-/// fully charged smash) to 1.020 (a fully staled jab) on the game's own slot (`artifacts/rc14-spots-3/eden/replay_table.py`), plus 0.03.
-pub const KB_LOW: f32 = 0.90;
+/// The window of received knockback over the recorded slot's knockback by the formula times the attacker's `rage`, with the game's percent
+/// (`struck_at`): Eden measured 0.9904 (a fully charged smash) to 1.0200 (a fully staled jab) on the game's own slot over the 93 hits of
+/// spots3-bade7ea6-1 and spots3-bedc9a69-1 (`eden/rc14-spots-3/spread.py`), plus a margin of 0.03 each side, to two decimals.
+pub const KB_LOW: f32 = 0.96;
 pub const KB_HIGH: f32 = 1.05;
 
-/// The knockback of `hit` dealing damage `d` to a defender of weight `w` at percent `p` after the hit, by the game's formula (SmashWiki,
-/// *Knockback*): ((p/10 + p·d/20) · 200/(w+100) · 1.4 + 18) · growth/100 + base; a fixed knockback f takes the place of d, with p = 10.
+/// The percent the game feeds its knockback function for a hit that raised the defender from `before` by `added` (the percent's rise): the
+/// percent before plus the hit's damage before the 1-on-1 ratio, the defender's damage record `+0x0` + `+0x8` (the hit handler, `main+0x402e94`,
+/// passes that sum on to `main+0x401e50`). `+0x8` is `added / TARGET_MUL`: Eden's rise over it is 1.2000 on all 93 recorded hits. SmashWiki's
+/// "percent after the hit" (`before + added`) overstates it by the ratio's 0.2.
+fn struck_at(before: f32, added: f32) -> f32 {
+    before + added / TARGET_MUL
+}
+
+/// The knockback of `hit` dealing damage `d` to a defender of weight `w` at percent `p` (`struck_at`, the game's percent), by the game's formula
+/// (SmashWiki, *Knockback*): ((p/10 + p·d/20) · 200/(w+100) · 1.4 + 18) · growth/100 + base; a fixed knockback f takes the place of d, with p = 10.
 pub fn knockback(hit: &Hit, d: f32, p: f32, w: f32) -> f32 {
     let (p, d) = if hit.fixed != 0 { (10.0, hit.fixed as f32) } else { (p, d) };
     ((p / 10.0 + p * d / 20.0) * 200.0 / (w + 100.0) * 1.4 + 18.0) * hit.growth as f32 / 100.0 + hit.base as f32
@@ -124,7 +133,7 @@ struct Power {
 impl Power {
     fn of(hit: &Hit, launch: Launch) -> Power {
         let d = hit.damage * launch.mul;
-        Power { knockback: launched_by(hit, d, launch.percent + d * DEALT, launch.weight(), launch.attacker), damage: hit.damage }
+        Power { knockback: launched_by(hit, d, struck_at(launch.percent, d * DEALT), launch.weight(), launch.attacker), damage: hit.damage }
     }
 
     /// Weaker than `other`: by more than `KB_EPS` in knockback, or equal in knockback and by more than `EPS` in damage.
@@ -230,7 +239,7 @@ pub fn attribute(landed: Landed, active: &Powers, launch: Launch, earlier: &Hit)
     if !gained.is_finite() || gained <= 0.0 || !launch.mul.is_finite() || launch.mul <= 0.0 {
         return None;
     }
-    let k = launched_by(hit, gained / TARGET_MUL, launch.percent + gained, launch.weight(), launch.attacker);
+    let k = launched_by(hit, gained / TARGET_MUL, struck_at(launch.percent, gained), launch.weight(), launch.attacker);
     let fits = (K_LOW..=K_HIGH).contains(&(gained / (hit.damage * launch.mul))) && k > 0.0 && (KB_LOW..=KB_HIGH).contains(&(launched / k));
     fits.then(|| classify(active, launch, earlier)[slot?]).flatten()
 }

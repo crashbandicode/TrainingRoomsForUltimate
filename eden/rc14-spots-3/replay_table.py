@@ -41,7 +41,7 @@ def own_ratio(h):
     s = h['powers'][h['game_slot']]
     if s['damage'] <= 0 or h['launched'] <= 0:
         return None
-    k = o.launched_by(s, h['gained'] / o.TARGET_MUL, h['before'] + h['gained'], h['weight'] if h['weight'] > 0 else 100.0, h.get('attacker', 0.0))
+    k = o.launched_by(s, h['gained'] / o.TARGET_MUL, o.struck_at(h['before'], h['gained']), h['weight'] if h['weight'] > 0 else 100.0, h.get('attacker', 0.0))
     return h['launched'] / k if k > 0 else None
 
 
@@ -57,7 +57,9 @@ def replay(h, window):
 def main():
     rows = [(row, h) for row, h in hits_of(sys.argv[1]) if h.get('gained', 0) > 0 and h.get('game_slot') is not None]
     ratios = [r for r in (own_ratio(h) for _, h in rows) if r]
-    window = (round(min(ratios) - 0.03, 2), round(max(ratios) + 0.03, 2)) if ratios else (0.8, 1.2)
+    # spots-4: the window is the shipped one (the oracle's KB_LOW..KB_HIGH, the plugin's constants), not one derived from these hits, so the
+    # replay tests the window. The spread, and the window it implies with a margin of 0.03, are printed at the end.
+    window = (o.KB_LOW, o.KB_HIGH)
     print('| row | frame | gained | received | game slot | slot class | shown (old rule) | record-slot rule | equal | ratio |')
     print('| --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | ---: |')
     agree = late = 0
@@ -72,8 +74,9 @@ def main():
         agree += equal
         print('| %s | %s | %.3f | %.3f | %d | %s | %s | %s | %s | %s |' % (row, h.get('frame'), h['gained'], h['launched'], h['game_slot'], cls, shown, new,
                                                                      'yes' if equal else 'NO', '%.4f' % r if r else '-'))
-    print('\n%d hits with a record, %d equal to the slot class (%d Late kept from history); ratio spread %.4f..%.4f, window %s' % (
-        len(rows), agree, late, min(ratios), max(ratios), window))
+    print('\n%d hits with a record, %d equal to the slot class (%d Late kept from history); own-slot ratio spread %.4f..%.4f over %d hits with a '
+          'knockback; shipped window %s; spread plus 0.03: %.3f..%.3f' % (len(rows), agree, late, min(ratios), max(ratios), len(ratios), window,
+                                                                         min(ratios) - 0.03, max(ratios) + 0.03))
 
 
 if __name__ == '__main__':

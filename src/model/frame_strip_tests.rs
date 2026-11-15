@@ -122,7 +122,8 @@ fn p(values: &[f32]) -> Powers {
 /// `victim` (at `before`, standard weight) hurt by slot `slot` of `powers`, whose owner's object id is `by`: the damage it gained, and what its damage
 /// record holds on that frame (the knockback the game stored and the attacker's id and slot).
 fn struck_by(victim: Sample, by: u32, powers: &Powers, slot: usize, gained: f32, before: f32) -> Sample {
-    let launched = spots::knockback(&powers[slot], gained / spots::TARGET_MUL, before + gained, 100.0);
+    // The game's percent for its knockback: the percent before plus the hit's damage before the 1-on-1 ratio (spots-4).
+    let launched = spots::knockback(&powers[slot], gained / spots::TARGET_MUL, before + gained / spots::TARGET_MUL, 100.0);
     Sample { stop: true, hitstun: true, damage: before + gained, launched, struck: Some((by, slot as u8)), ..victim }
 }
 

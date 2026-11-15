@@ -141,7 +141,8 @@ fn a_hit_block_carries_its_spot_label_when_the_row_is_on() {
     for (attacker_is_p1, slot, gained, label) in [(true, 1, 18.0 * 1.26, "Sweet"), (true, 0, 13.0 * 1.26, "Sour"), (false, 0, 13.0 * 1.26, "Sour")] {
         let mut t = Tracker::new();
         // The victim's damage record on the hit's first frame: the knockback the game stored and the attacker's slot (spots-3).
-        let launched = spots::knockback(&powers[slot], gained / spots::TARGET_MUL, 20.0 + gained, 100.0);
+        // (the game's percent: the 20% before plus the hit's damage before the 1-on-1 ratio)
+        let launched = spots::knockback(&powers[slot], gained / spots::TARGET_MUL, 20.0 + gained / spots::TARGET_MUL, 100.0);
         for f in 1..=8u32 {
             let victim = match f {
                 1..=3 => calm(20.0),

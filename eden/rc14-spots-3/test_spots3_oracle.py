@@ -34,7 +34,8 @@ def record(damage, slot, kb, rec08=0.0):
 
 def received(hit, gained, before, r=1.0, weight=98.0):
     h = {'damage': hit[0], 'growth': hit[1], 'fixed': hit[2], 'base': hit[3]}
-    return r * o.knockback(h, gained / o.TARGET_MUL, before + gained, weight)
+    # The game's percent: before plus the hit's damage before the 1-on-1 ratio (main+0x402e94), not the percent after the hit (spots-4).
+    return r * o.knockback(h, gained / o.TARGET_MUL, before + gained / o.TARGET_MUL, weight)
 
 
 class Oracle(unittest.TestCase):
@@ -112,7 +113,7 @@ class Tables(unittest.TestCase):
         g = 4.082
         hit = {'powers': [{'damage': d, 'growth': gr, 'fixed': f, 'base': b} for d, gr, f, b in JAB], 'gained': g, 'before': 12.718, 'weight': 133.0,
                'mul': 1.0, 'game_slot': 2, 'launched': received(JAB[2], g, 12.718, weight=133.0)}
-        cls, new, r = replay_table.replay(hit, (0.9, 1.05))
+        cls, new, r = replay_table.replay(hit, (o.KB_LOW, o.KB_HIGH))
         self.assertEqual((cls, new, round(r, 3)), ('Sweet', 'Sweet', 1.0))
         self.assertEqual(replay_table.replay(hit, (1.1, 1.2))[1], None, 'outside the window: no label')
 
