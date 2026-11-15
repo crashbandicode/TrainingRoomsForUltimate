@@ -830,11 +830,116 @@ fn match_sweet_sour_spot_grades_the_spot_a_link_landed() {
     assert_eq!(summarized_with(&link(Some(Sweet)), &wrong_move, Outcome::Completed, true).fault, Some((0, Reason::WrongMove(Move::Jab))));
 }
 
+fn direction_order_matches_original_mappings_and_ties() {
+    fn original_facing_dir(bin: Option<u8>, facing: i8) -> Dir {
+        let Some(bin) = bin else { return Dir::Neutral };
+        let bin = if facing < 0 {
+            match bin {
+                0 => 4,
+                1 => 3,
+                3 => 1,
+                4 => 0,
+                5 => 7,
+                7 => 5,
+                other => other,
+            }
+        } else {
+            bin
+        };
+        match bin {
+            0 => Dir::Forward,
+            1 => Dir::ForwardUp,
+            2 => Dir::Up,
+            3 => Dir::BackUp,
+            4 => Dir::Back,
+            5 => Dir::BackDown,
+            6 => Dir::Down,
+            _ => Dir::ForwardDown,
+        }
+    }
+
+    fn original_drift_index(dir: Dir) -> Option<usize> {
+        Some(match dir {
+            Dir::Forward => 0,
+            Dir::ForwardUp => 1,
+            Dir::Up => 2,
+            Dir::BackUp => 3,
+            Dir::Back => 4,
+            Dir::BackDown => 5,
+            Dir::Down => 6,
+            Dir::ForwardDown => 7,
+            Dir::Neutral | Dir::Side => return None,
+        })
+    }
+
+    fn original_modal_drift(counts: &[u8; 8], order: &[u8; 8], seen: usize) -> Option<Dir> {
+        let dirs = [
+            Dir::Forward,
+            Dir::ForwardUp,
+            Dir::Up,
+            Dir::BackUp,
+            Dir::Back,
+            Dir::BackDown,
+            Dir::Down,
+            Dir::ForwardDown,
+        ];
+        let mut best: Option<Dir> = None;
+        let mut best_count = 0u8;
+        for index in order.iter().take(seen).map(|index| usize::from(*index)) {
+            if counts[index] > best_count {
+                best_count = counts[index];
+                best = Some(dirs[index]);
+            }
+        }
+        best
+    }
+
+    for facing in i8::MIN..=i8::MAX {
+        assert_eq!(facing_dir(None, facing), original_facing_dir(None, facing));
+        for bin in u8::MIN..=u8::MAX {
+            assert_eq!(facing_dir(Some(bin), facing), original_facing_dir(Some(bin), facing),
+                "bin={bin} facing={facing}");
+        }
+    }
+    let dirs = [Dir::Forward, Dir::ForwardUp, Dir::Up, Dir::BackUp,
+        Dir::Back, Dir::BackDown, Dir::Down, Dir::ForwardDown, Dir::Neutral, Dir::Side];
+    for dir in dirs {
+        assert_eq!(drift_index(dir), original_drift_index(dir));
+    }
+    // Every tie winner and runner-up, both encounter orders, zero and saturated counts.
+    for first in 0..8 {
+        for second in 0..8 {
+            if first == second { continue; }
+            let mut order = [0; 8];
+            order[0] = first as u8;
+            order[1] = second as u8;
+            for count in [0, 1, 2, 254, 255] {
+                let mut counts = [0; 8];
+                counts[first] = count;
+                counts[second] = count;
+                for seen in 0..=2 {
+                    assert_eq!(modal_drift(&counts, &order, seen),
+                        original_modal_drift(&counts, &order, seen));
+                }
+                assert_eq!(modal_drift(&counts, &order, 2),
+                    (count != 0).then_some(dirs[first]));
+                if count < 255 {
+                    counts[second] = count + 1;
+                    assert_eq!(modal_drift(&counts, &order, 2), Some(dirs[second]));
+                    assert_eq!(modal_drift(&counts, &order, 2),
+                        original_modal_drift(&counts, &order, 2));
+                }
+            }
+        }
+    }
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 
 #[test]
 fn case_table() {
     crate::test_table::run(&[
+        ("direction_order_matches_original_mappings_and_ties", direction_order_matches_original_mappings_and_ties as fn()),
         ("a_save_state_load_clears_the_attempt_and_the_next_one_starts_fresh", a_save_state_load_clears_the_attempt_and_the_next_one_starts_fresh as fn()),
         ("aims_merge_left_and_right", aims_merge_left_and_right as fn()),
         ("settings_read_the_three_rows", settings_read_the_three_rows as fn()),

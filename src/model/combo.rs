@@ -1115,30 +1115,16 @@ pub fn facing_dir(bin: Option<u8>, facing: i8) -> Dir {
     } else {
         bin
     };
-    match bin {
-        0 => Dir::Forward,
-        1 => Dir::ForwardUp,
-        2 => Dir::Up,
-        3 => Dir::BackUp,
-        4 => Dir::Back,
-        5 => Dir::BackDown,
-        6 => Dir::Down,
-        _ => Dir::ForwardDown,
-    }
+    DIRECTIONS[usize::from(bin.min(7))]
 }
 
+const DIRECTIONS: [Dir; 8] = [
+    Dir::Forward, Dir::ForwardUp, Dir::Up, Dir::BackUp,
+    Dir::Back, Dir::BackDown, Dir::Down, Dir::ForwardDown,
+];
+
 fn drift_index(dir: Dir) -> Option<usize> {
-    Some(match dir {
-        Dir::Forward => 0,
-        Dir::ForwardUp => 1,
-        Dir::Up => 2,
-        Dir::BackUp => 3,
-        Dir::Back => 4,
-        Dir::BackDown => 5,
-        Dir::Down => 6,
-        Dir::ForwardDown => 7,
-        Dir::Neutral | Dir::Side => return None,
-    })
+    DIRECTIONS.iter().position(|&candidate| candidate == dir)
 }
 
 fn note_drift(counts: &mut [u8; 8], order: &mut [u8; 8], seen: &mut usize, index: usize) {
@@ -1150,22 +1136,12 @@ fn note_drift(counts: &mut [u8; 8], order: &mut [u8; 8], seen: &mut usize, index
 }
 
 fn modal_drift(counts: &[u8; 8], order: &[u8; 8], seen: usize) -> Option<Dir> {
-    let dirs = [
-        Dir::Forward,
-        Dir::ForwardUp,
-        Dir::Up,
-        Dir::BackUp,
-        Dir::Back,
-        Dir::BackDown,
-        Dir::Down,
-        Dir::ForwardDown,
-    ];
     let mut best: Option<Dir> = None;
     let mut best_count = 0u8;
     for index in order.iter().take(seen).map(|index| usize::from(*index)) {
         if counts[index] > best_count {
             best_count = counts[index];
-            best = Some(dirs[index]);
+            best = Some(DIRECTIONS[index]);
         }
     }
     best
