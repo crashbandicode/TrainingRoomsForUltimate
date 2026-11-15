@@ -11,6 +11,6 @@
 
 The existing boot version/build-ID verdict remains authoritative. The wrapper uses `state_natives::at` and therefore calls only a granted offset. The Hitbox row enters that feature's existing capability closure. No new allocation or lock is introduced.
 
-The dated [native evidence](/home/intpa/smash-training-lobby/artifacts/rc15-article-hurt/NATIVE-ABI.md) retains symbol, dispatch, pointer-return and ordinal derivation. Its actual19-NRO card copy dated 2026-11-15 produced no detected references at the thunk, concrete getter or virtual slot. The scan recognizes constants and MOVZ/MOVK construction; it does not establish absence of other address construction or later plugins. Install-time guards remain required.
+The dated native evidence record `artifacts/rc15-article-hurt/NATIVE-ABI.md` retains symbol, dispatch, pointer-return and ordinal derivation. Its actual19-NRO card copy dated 2026-11-15 produced no detected references at the thunk, concrete getter or virtual slot. The scan recognizes constants and MOVZ/MOVK construction; it does not establish absence of other address construction or later plugins. Install-time guards remain required.
 
 `core06_site_guards` pins the row and its capability dependency; `core06_rows_match_the_owned_elf` compares all 64 guard bytes and the exported symbol against the owned ELF. These extensions await the coordinated host gates. This seam record claims no runtime rendering or lifecycle coverage.

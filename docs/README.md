@@ -61,6 +61,7 @@ Kept for the history of decisions and measurements; they describe the build of t
 - [Decisions](DECISIONS.md) and [decisions/](decisions/), [design/](design/), [the menu redesign](menu-redesign.md),
   [the menu mockup](menu-mockup/), the [roadmap](ROADMAP.md).
 - [Mii developer notes](MII.md).
+- [Indexed article native seam](native/article-hurtboxes.md): ABI, version and guard evidence.
 - Measurements: [code reduction (rc.10)](CODE-REDUCTION-rc10.md), [coverage (rc.9)](COVERAGE-rc9.md),
   [size plan](SIZE-PLAN.md), [test cuts (rc.9)](TEST-CUT-LEDGER-rc9.md), [resource costs](resource-costs.md),
   [asset reproduction](ASSET-REPRODUCTION-R15.md).

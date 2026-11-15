@@ -28,6 +28,8 @@
 //! game's own read joined (queue, begin, cleanup, local wireless's request and cleanup windows, the header and record
 //! list reads): 704.
 
+//! rc.15 article hurtboxes adds the approved Called `article_get_from_no` row: 270 site rows to 271.
+
 use crate::model::sha256::sha256_hex;
 use std::fmt::Write;
 
@@ -94,8 +96,8 @@ fn every_data_row_has_a_64_byte_guard() {
 
 const SEAM_ROWS: usize = 704;
 const SEAM_DIGEST: &str = "cb2c75e34e6f3258900a157be9b79d08b7ed396c5500f98d132e7627858d6adc";
-const SITE_ROWS: usize = 270;
-const SITE_DIGEST: &str = "bf5cc3e12c19cc2d8df3319cb8a4c5747a4ae89131cd1407695e6d4008478ac0";
+const SITE_ROWS: usize = 271;
+const SITE_DIGEST: &str = "be91fb4420835245bab6ccdf242fc4350cf3c9764929a4c402ab5f07cff7860e";
 const UI_ROWS: usize = 6;
 const UI_DIGEST: &str = "35ddb9f164a3ac26ba2e5c45c35066ee738e796589d58e2c697c82e486567b15";
 const COMMON_ROWS: usize = 4;

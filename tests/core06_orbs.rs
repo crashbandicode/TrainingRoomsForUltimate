@@ -227,8 +227,8 @@ fn an_articles_hitboxes_are_own_orbs_while_its_attack_lasts() {
     board.publish(0xf000, std::iter::once(orb(1.0))); // Player 1's own pass
     let mut articles = orbs::Articles::new();
     let mut set = HandleSet::new();
-    articles.track(id, key, &mut board, true).unwrap().0;
-    articles.track(id, key, &mut board, true).unwrap().0;
+    articles.track(id, key, &mut board, true).unwrap();
+    articles.track(id, key, &mut board, true).unwrap();
     assert_eq!(articles.tracked().iter().filter(|t| t.0 != 0).count(), 1, "one article, however many ATTACKs");
     let on_bone = |s: &Sphere| (s.joint == 0x3_1ed9_1fca).then_some([40.0 + s.pos[0], 12.0, 0.0]);
     assert!(orbs::article_pass(&mut board, &mut set, key, 7, &mut Shot(true), on_bone, orbs::Extras::NONE));
@@ -242,18 +242,18 @@ fn an_articles_hitboxes_are_own_orbs_while_its_attack_lasts() {
     assert_eq!(board.live().count(), 1);
     // A thrown item (a bomb, a turnip) sets its hitbox without `ATTACK`: the pass tracks an active item while a slot is live.
     assert_eq!((hitbox::live_slot(&mut Shot(true)), hitbox::live_slot(&mut Shot(false))), (Some(0), None));
-    articles.track(id, key, &mut board, true).unwrap().0;
+    articles.track(id, key, &mut board, true).unwrap();
     orbs::article_pass(&mut board, &mut set, key, 7, &mut Shot(true), on_bone, orbs::Extras::NONE);
     articles.forget(id, &mut board);
     assert_eq!((board.live().count(), articles.tracked().iter().filter(|t| t.0 != 0).count()), (1, 0), "gone article");
     // Fighters and articles share the board's slots; a fifth article replaces the oldest, whose orbs go.
     assert_eq!(orbs::ORB_FIGHTERS + orbs::ARTICLES, FIGHTER_SETS);
     for k in 1..=orbs::ARTICLES {
-        articles.track(k as u32, k << 4, &mut board, true).unwrap().0;
+        articles.track(k as u32, k << 4, &mut board, true).unwrap();
         orbs::article_pass(&mut board, &mut HandleSet::new(), k << 4, 7, &mut Shot(true), on_bone, orbs::Extras::NONE);
     }
     assert_eq!(board.live().count(), 1 + orbs::ARTICLES);
-    articles.track(99, 99 << 4, &mut board, true).unwrap().0;
+    articles.track(99, 99 << 4, &mut board, true).unwrap();
     assert_eq!(board.live().count(), orbs::ARTICLES, "the oldest article's orb went");
     let mut ids = articles.tracked().map(|t| t.0);
     ids.sort();
@@ -332,19 +332,19 @@ fn an_articles_wind_area_is_drawn_and_keeps_it_tracked() {
 
 fn article_hurtboxes_take_free_slots_and_draw_after_every_other_kind() {
     let (mut board, mut articles) = (Board::new(), orbs::Articles::new());
-    for id in 1..=4 { articles.track(id, id as usize * 16, &mut board, true).unwrap().0; }
+    for id in 1..=4 { articles.track(id, id as usize * 16, &mut board, true).unwrap(); }
     let before = articles.tracked();
     assert!(!articles.track(99, 0x990, &mut board, false).is_some());
     assert_eq!(articles.tracked(), before, "hurt-only discovery never evicts an attacking object");
     articles.forget(3, &mut board);
     assert!(articles.track(99, 0x990, &mut board, false).is_some());
     assert!(!*articles.track(99, 0x990, &mut board, false).unwrap().1);
-    articles.track(100, 0x1000, &mut board, true).unwrap().0;
+    articles.track(100, 0x1000, &mut board, true).unwrap();
     assert!(!articles.tracked().contains(&(99, 0x990)), "an attack evicts the passive object before an older attacker");
     assert!(articles.tracked().contains(&(1, 16)));
     articles.forget(100, &mut board);
     assert!(articles.track(99, 0x990, &mut board, false).is_some());
-    articles.track(99, 0x990, &mut board, true).unwrap().0;
+    articles.track(99, 0x990, &mut board, true).unwrap();
     assert!(*articles.track(99, 0x990, &mut board, false).unwrap().1, "ATTACK promotes an existing passive object");
     // One article pill published first: its two endpoints still pair, and every other kind draws before it.
     let hurts = [0, 1].map(|end| sphere(hitbox::sphere_key(hitbox::KIND_ARTICLE_HURT, 0, end), end as f32 * 2.0, 2.0));

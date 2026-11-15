@@ -1031,7 +1031,7 @@ unsafe fn wind_command(lua: usize) {
     }
     let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
     let mut articles = ARTICLES.lock();
-    articles.track(id, accessor, &mut BOARD.lock(), true).unwrap().0;
+    articles.track(id, accessor, &mut BOARD.lock(), true).unwrap();
 }
 
 /// `sv_animcmd::AREA_WIND_2ND` (a box): the plugin part first, then the game's own command.
