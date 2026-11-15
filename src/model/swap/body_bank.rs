@@ -1223,9 +1223,10 @@ pub fn gated_alone(kind: u32) -> bool {
 pub const KEEP_WINDOW_ACROSS_RELOAD: bool = false;
 
 /// rc.14 a-full-2 (K-strip; AFULL2-RESEARCH.md "Limit 1"): a live Kirby that holds a copy loses it natively and parks
-/// ([`KirbyDeparture::Strip`]) instead of taking the copy gate's Reload, which also rebuilt the target's own group. Off
-/// until its Eden rows pass (the diag build's `diag-cycle.req` `strip` turns it on for them).
-pub const KIRBY_STRIP_BEFORE_PARK: bool = false;
+/// ([`KirbyDeparture::Strip`]) instead of taking the copy gate's Reload, which also rebuilt the target's own group. On
+/// since its Eden rows passed (boot `a2-03c5f73f-y2`: a2-strip, a2-strip-same, a2-strip-move; the primary
+/// 2026-11-15 ~00:50Z).
+pub const KIRBY_STRIP_BEFORE_PARK: bool = true;
 
 /// rc.14 a-full-2 (limit 2): A1 keeps a Pokémon Trainer window too ([`window_kept_across_reload`]'s `keep_pt`). Off until
 /// its Eden rows pass (the diag build's `diag-cycle.req` `pt`, with `window`, turns it on for them).
