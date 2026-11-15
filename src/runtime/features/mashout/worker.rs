@@ -1,6 +1,6 @@
-//! Single existing diagnostic-worker consumer. All solver, grading, best and cache work lives here.
+//! Single existing diagnostic-worker consumer. All solver, grading and best work lives here.
 use super::*;
-use crate::model::mashout::{native::Seed, session::Session};
+use crate::model::mashout::{native::Seed, run::Run};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Key {
@@ -52,17 +52,13 @@ pub(super) enum Event {
 }
 struct Worker {
     generation: u64,
-    session: Session<Key>,
-    faulted: bool,
+    session: Run<Key>,
     shown: crate::model::storage::FixedPath<256>,
-    wanted: bool,
 }
 static WORKER: Mutex<Worker> = Mutex::new(Worker {
     generation: 0,
-    session: Session::new(),
-    faulted: false,
+    session: Run::new(),
     shown: crate::model::storage::FixedPath::new(),
-    wanted: false,
 });
 
 fn show(worker: &mut Worker, text: &str) {
@@ -83,19 +79,20 @@ pub(super) fn service() {
     // Worker-only lock; no hook ever takes WORKER or a Session reference.
     let mut worker = WORKER.lock();
     let wanted = WANTED.load(Ordering::Acquire);
-    if wanted && (!READY.load(Ordering::Acquire) || CONFIG.read().is_none()) {
+    if !wanted {
+        worker.session.cancel();
+        EVENTS.drain(|_| ());
+        show(&mut worker, "");
+        notices::raise(NOTICE_RAISE, false);
+        return;
+    }
+    notices::raise(NOTICE_RAISE, true);
+    if !READY.load(Ordering::Acquire) || CONFIG.read().is_none() {
         worker.session.cancel();
         EVENTS.drain(|_| ());
         show(&mut worker, UNAVAILABLE_NOTICE);
-        notices::raise(NOTICE_RAISE, true);
         return;
     }
-    if worker.wanted && !wanted {
-        worker.session.cancel();
-        show(&mut worker, "");
-    }
-    worker.wanted = wanted;
-    notices::raise(NOTICE_RAISE, wanted);
     EVENTS.drain(|event| match event {
         Event::Setup(generation, text) => {
             if generation < worker.generation {
@@ -103,34 +100,32 @@ pub(super) fn service() {
             }
             worker.generation = generation;
             worker.session.cancel();
-            worker.faulted = false;
-            if wanted {
-                show(&mut worker, text);
-            }
+            show(&mut worker, text);
         }
         Event::Begin(generation, key, seed) => {
-            if generation < worker.generation || !wanted {
+            if generation < worker.generation {
                 return;
             }
             worker.generation = generation;
-            worker.faulted = false;
-            if worker.session.begin(generation, key, seed).is_err() {
-                worker.faulted = true;
+            if worker.session.capture(generation, key, seed).is_err() {
+                worker.session.cancel();
+                // restriction: MASH-M1-MISMATCH
                 show(&mut worker, "Native model unavailable · no grade");
             }
         }
         Event::Observe(generation, elapsed, escaped) => {
             if generation == worker.generation
-                && !worker.faulted
-                && FAULT.load(Ordering::Acquire) != generation
+                && !faulted(generation, FAULT.load(Ordering::Acquire))
             {
-                worker.session.observe(generation, elapsed, escaped);
+                worker
+                    .session
+                    .observe_generation(generation, elapsed, escaped);
             }
         }
         Event::Pulse(generation, tick) => {
-            if generation == worker.generation && worker.session.pass(generation, tick) {
+            if generation == worker.generation && worker.session.pass_generation(generation, tick) {
                 if !REPLIES.post(generation) {
-                    FAULT.store(generation, Ordering::Release);
+                    fault(generation);
                 }
             }
         }
@@ -139,10 +134,7 @@ pub(super) fn service() {
                 return;
             }
             worker.session.cancel();
-            worker.faulted = true;
-            if wanted {
-                show(&mut worker, reason);
-            }
+            show(&mut worker, reason);
         }
         Event::Cancel(generation) => {
             if generation != worker.generation {
@@ -152,28 +144,25 @@ pub(super) fn service() {
             show(&mut worker, "");
         }
     });
-    if FAULT.load(Ordering::Acquire) == worker.generation && worker.generation != 0 {
+    worker.session.advance(256);
+    // Completion linearizes at this load, after solver work and before any best/Done publication.
+    if faulted(worker.generation, FAULT.load(Ordering::Acquire)) {
         worker.session.cancel();
-        worker.faulted = true;
-        if wanted {
-            show(&mut worker, "Observation queue full · no grade");
-        }
-    }
-    if !worker.faulted {
-        worker.session.advance(256);
-        if let Some(error) = worker.session.error() {
-            worker.faulted = true;
-            show(&mut worker, "Native model unavailable · no grade");
-            crate::runtime::diag_log::diagnostic(format_args!(
-                "[Mashout] solver_error gen={} error={error:?}",
-                worker.generation
-            ));
-        } else if worker.session.run().phase() != crate::model::mashout::run::Phase::Off {
-            if let Some(text) = worker.session.run_mut().notice() {
-                if wanted {
-                    show(&mut worker, text.as_str());
-                }
-            }
+        // restriction: MASH-M1-MISMATCH
+        show(&mut worker, "Observation incomplete · no grade");
+    } else if let Some(error) = worker.session.error() {
+        // restriction: MASH-M1-MISMATCH
+        show(&mut worker, "Native model unavailable · no grade");
+        crate::runtime::diag_log::diagnostic(format_args!(
+            "[Mashout] solver_error gen={} error={error:?}",
+            worker.generation
+        ));
+        worker.session.cancel();
+    } else {
+        worker.session.finish();
+        if worker.session.phase() != crate::model::mashout::run::Phase::Off {
+            let text = worker.session.notice();
+            show(&mut worker, text.as_str());
         }
     }
 }

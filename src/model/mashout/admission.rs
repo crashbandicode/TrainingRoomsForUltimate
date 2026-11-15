@@ -3,6 +3,11 @@
 // restriction: M3-READER-GUARD
 pub const UNAVAILABLE_NOTICE: &str = "Mash out unavailable";
 
+/// A newer dropped observation also invalidates older attempts still queued for grading.
+pub const fn faulted(generation: u64, through: u64) -> bool {
+    generation != 0 && generation <= through
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Admission {
     available: bool,
@@ -46,13 +51,26 @@ pub fn start_dispatch<T>(
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
-        use super::{start_dispatch, Admission, UNAVAILABLE_NOTICE};
+        use super::{faulted, start_dispatch, Admission, UNAVAILABLE_NOTICE};
         use crate::model::{
             guard::GuardOutcome,
             mashout::grade::{grade, Bounds, Grade, Outcome},
             sites_mashout::SITES,
         };
         use std::cell::Cell;
+
+        #[test]
+        fn mashout_fault_watermark_survives_retirement_and_retry() {
+            use core::sync::atomic::{AtomicU64, Ordering};
+            let through = AtomicU64::new(0);
+            for generation in [4, 4, 0, 0, 5] {
+                through.fetch_max(generation, Ordering::AcqRel);
+                assert!(faulted(4, through.load(Ordering::Acquire)));
+            }
+            assert!(faulted(5, through.load(Ordering::Acquire)));
+            assert!(!faulted(0, through.load(Ordering::Acquire)));
+            assert!(!faulted(6, through.load(Ordering::Acquire)));
+        }
 
         #[test]
         fn mashout_p1_observer_calls_original_once_after_no_cpu_automation() {

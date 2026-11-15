@@ -1,10 +1,10 @@
 //! Mash out: real CPU moves and the approved existing-frame native clock.
-//! Hooks publish values only; the existing diagnostic worker owns solver, grading, bests and cache.
+//! Hooks publish values only; the existing diagnostic worker owns solver, grading and bests.
 
 use super::{notices, recorder, states};
 use crate::model::cpu::{hash::lua_bind_hash, role::LOBBY_CPU_ENTRY};
 use crate::model::mashout::{
-    admission::{Admission, UNAVAILABLE_NOTICE},
+    admission::{faulted, Admission, UNAVAILABLE_NOTICE},
     moves::{Config, OrdinaryGrab},
     native::Clock,
 };
@@ -72,8 +72,12 @@ pub(crate) fn temporary_cpu_selection(kind: u32) -> bool {
 
 fn post(event: worker::Event, generation: u64) {
     if !EVENTS.post(event) {
-        FAULT.store(generation, Ordering::Release);
+        fault(generation);
     }
+}
+
+fn fault(generation: u64) {
+    FAULT.fetch_max(generation, Ordering::AcqRel);
 }
 
 fn revoke() {
@@ -128,7 +132,7 @@ pub(crate) unsafe fn seed_after(
         })
         .flatten();
     if !SEEDS.post((token.generation, sample)) {
-        FAULT.store(token.generation, Ordering::Release);
+        fault(token.generation);
     }
 }
 
@@ -271,7 +275,12 @@ pub unsafe fn frame(fighter: usize) {
     if natives::entry_active_body(entry) != fighter {
         return;
     }
-    let mut game = GAME.lock();
+    let Some(mut game) = GAME.try_lock() else {
+        fault(GENERATION.load(Ordering::Acquire));
+        revoke();
+        OWN_CPU.store(0, Ordering::Release);
+        return;
+    };
     let facts = scene::facts();
     if facts.busy {
         revoke();
@@ -315,6 +324,7 @@ pub unsafe fn frame(fighter: usize) {
     if restart {
         revoke();
         post(worker::Event::Cancel(game.generation), game.generation);
+        game.generation = GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
         game.config = config;
         game.clock = None;
         game.restore_requested = false;
@@ -357,8 +367,9 @@ pub unsafe fn frame(fighter: usize) {
         return;
     }
     let covered = published::input_owners().covers_strip();
-    if FAULT.load(Ordering::Acquire) == game.generation && game.generation != 0 {
-        game.fail("Observation queue full · no grade");
+    if faulted(game.generation, FAULT.load(Ordering::Acquire)) {
+        // restriction: MASH-M1-MISMATCH
+        game.fail("Observation incomplete · no grade");
     }
     REPLIES.drain(|generation| {
         if generation == game.generation && game.step == Step::Result {
@@ -372,6 +383,7 @@ pub unsafe fn frame(fighter: usize) {
         if generation != game.generation { return; }
         if matches!(game.step, Step::Held | Step::Result) { game.fail("Capture restarted · no grade"); return; }
         if game.step != Step::Entering { return; }
+        // restriction: M3-READER-GUARD
         let Some(sample) = sample else { game.fail("Native capture seed unavailable · no grade"); return; };
         let cpu_status = natives::status_kind(cpu);
         if !linked || ![ids[1], ids[8], ids[9], ids[10]].contains(&cpu_status) || sample.record.automatic <= 0.0 {
@@ -423,6 +435,7 @@ pub unsafe fn frame(fighter: usize) {
             let roll = skyline::nn::os::GetSystemTick() as u64;
             game.requested = config.resolve(roll, roll.rotate_left(17));
             let Some(request) = game.requested else {
+                // restriction: MASH-M1-MISMATCH
                 game.fail("Attacker unavailable");
                 return;
             };
@@ -475,6 +488,7 @@ pub unsafe fn frame(fighter: usize) {
                 .all(|v| v.is_finite())
                 || facing == 0.0
             {
+                // restriction: MASH-M1-MISMATCH
                 game.fail("Position unavailable");
                 return;
             }

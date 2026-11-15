@@ -1,6 +1,8 @@
 //! Attempt lifecycle; native observations own the elapsed clock and escape fact.
 
 use super::grade::{grade, Bounds, Outcome};
+use super::native::{Error, Seed, Solver};
+use crate::model::practice_games::{record_time, result_tick};
 use crate::model::{eggs::END_FRAMES, storage::FixedPath};
 use core::fmt::{self, Write};
 
@@ -30,7 +32,9 @@ pub struct Run<K: Copy + Eq> {
     result: Option<Result>,
     left: u16,
     bests: [Option<(K, u32)>; 16],
-    shown: FixedPath<256>,
+    generation: u64,
+    solver: Option<Solver>,
+    error: Option<Error>,
 }
 
 impl<K: Copy + Eq> Default for Run<K> {
@@ -50,38 +54,43 @@ impl<K: Copy + Eq> Run<K> {
             result: None,
             left: 0,
             bests: [None; 16],
-            shown: FixedPath::new(),
+            generation: 0,
+            solver: None,
+            error: None,
         }
     }
 
     pub fn phase(&self) -> Phase {
         self.phase
     }
+    #[cfg(test)]
     pub fn key(&self) -> Option<K> {
         self.key
     }
+    #[cfg(test)]
     pub fn elapsed(&self) -> u32 {
         self.elapsed
     }
+    #[cfg(test)]
     pub fn bounds(&self) -> Option<Bounds> {
         self.bounds
     }
+    #[cfg(test)]
     pub fn escaped(&self) -> bool {
         self.escaped
     }
+    #[cfg(test)]
     pub fn result(&self) -> Option<Result> {
         self.result
     }
+    #[cfg(test)]
     pub fn remaining(&self) -> u16 {
         self.left
     }
 
+    #[cfg(test)]
     pub fn best(&self, key: K) -> Option<u32> {
-        self.bests
-            .iter()
-            .flatten()
-            .find(|b| b.0 == key)
-            .map(|b| b.1)
+        crate::model::practice_games::best_time(&self.bests, key)
     }
 
     fn clear(&mut self, phase: Phase) {
@@ -92,6 +101,8 @@ impl<K: Copy + Eq> Run<K> {
         self.escaped = false;
         self.result = None;
         self.left = 0;
+        self.solver = None;
+        self.error = None;
     }
 
     pub fn enable(&mut self, on: bool) {
@@ -129,11 +140,79 @@ impl<K: Copy + Eq> Run<K> {
         true
     }
 
+    /// Begin the observed native attempt. Generation is retained across cancellation.
+    pub fn capture(
+        &mut self,
+        generation: u64,
+        key: K,
+        seed: Seed,
+    ) -> core::result::Result<(), Error> {
+        if generation <= self.generation {
+            return Err(Error::InvalidSeed);
+        }
+        self.generation = generation;
+        self.enable(true);
+        self.restart();
+        self.begin(key);
+        self.captured();
+        match Solver::new(seed) {
+            Ok(solver) => {
+                self.solver = Some(solver);
+                Ok(())
+            }
+            Err(error) => {
+                self.error = Some(error);
+                Err(error)
+            }
+        }
+    }
+
+    pub fn observe_generation(&mut self, generation: u64, elapsed: u32, escaped: bool) {
+        if generation == self.generation {
+            self.observe(elapsed, escaped);
+        }
+    }
+
+    pub fn pass_generation(&mut self, generation: u64, tick: bool) -> bool {
+        if generation != self.generation {
+            return false;
+        }
+        let done = self.phase == Phase::Done;
+        self.pass(tick);
+        done && self.phase == Phase::Setup
+    }
+
+    /// Incremental solver work, called only by the existing worker. No separate cache or attempt owner.
+    pub fn advance(&mut self, mut budget: u32) {
+        while budget != 0 {
+            let Some(solver) = self.solver.as_mut() else {
+                return;
+            };
+            let work = budget.min(u32::from(u16::MAX)) as u16;
+            budget -= u32::from(work);
+            let Some(result) = solver.advance(work) else {
+                continue;
+            };
+            self.solver = None;
+            match result {
+                Ok(bounds) => self.set_bounds(bounds),
+                Err(error) => self.error = Some(error),
+            }
+            return;
+        }
+    }
+
+    pub fn cancel(&mut self) {
+        self.enable(false);
+    }
+    pub fn error(&self) -> Option<Error> {
+        self.error
+    }
+
     /// The caller binds this result to the current attempt before delivering it.
     pub fn set_bounds(&mut self, bounds: Bounds) {
         if matches!(self.phase, Phase::Entering | Phase::Mashing) {
             self.bounds = Some(bounds);
-            self.finish();
         }
     }
 
@@ -143,10 +222,10 @@ impl<K: Copy + Eq> Run<K> {
         }
         self.elapsed = elapsed;
         self.escaped = escaped;
-        self.finish();
     }
 
-    fn finish(&mut self) {
+    /// Commit only after the worker's final observation-admission check.
+    pub fn finish(&mut self) {
         if self.phase != Phase::Mashing || !self.escaped {
             return;
         }
@@ -155,18 +234,7 @@ impl<K: Copy + Eq> Run<K> {
         };
         let outcome = grade(self.elapsed, bounds);
         let best = if matches!(outcome, Outcome::Graded(_)) {
-            let i = self
-                .bests
-                .iter()
-                .position(|b| b.is_some_and(|b| b.0 == key))
-                .unwrap_or_else(|| {
-                    self.bests.rotate_left(1);
-                    self.bests[15] = Some((key, u32::MAX));
-                    15
-                });
-            let best = self.bests[i].map_or(self.elapsed, |b| b.1.min(self.elapsed));
-            self.bests[i] = Some((key, best));
-            Some(best)
+            Some(record_time(&mut self.bests, key, self.elapsed))
         } else {
             None
         };
@@ -182,20 +250,16 @@ impl<K: Copy + Eq> Run<K> {
 
     /// Only the result delay counts here; native mash ticks arrive via observe.
     pub fn pass(&mut self, tick: bool) {
-        if self.phase == Phase::Done && tick {
-            self.left -= 1;
-            if self.left == 0 {
-                self.clear(Phase::Setup);
-            }
+        if self.phase == Phase::Done && result_tick(&mut self.left, tick) {
+            self.clear(Phase::Setup);
         }
     }
 
-    pub fn notice(&mut self) -> Option<FixedPath<256>> {
+    /// The notice worker owns delivery deduplication, including setup messages.
+    pub fn notice(&self) -> FixedPath<256> {
         let mut text = FixedPath::new();
         let _ = self.write_notice(&mut text);
-        let changed = text.as_str() != self.shown.as_str();
-        self.shown = text;
-        changed.then_some(text)
+        text
     }
 
     pub fn write_notice(&self, out: &mut impl Write) -> fmt::Result {
@@ -255,6 +319,10 @@ impl<K: Copy + Eq> Run<K> {
 }
 
 #[cfg(test)]
+#[path = "session_tests.rs"]
+mod session_tests;
+
+#[cfg(test)]
 mod tests {
     lib_unit_tests! {
     use super::{Bounds, Outcome, Phase, Run};
@@ -269,6 +337,7 @@ mod tests {
         assert!(run.captured());
         run.set_bounds(bounds);
         run.observe(elapsed, true);
+        run.finish();
     }
 
     #[test]
@@ -307,6 +376,7 @@ mod tests {
         assert_eq!(early.elapsed(), 7);
         assert_eq!(early.result(), None);
         early.observe(30, true);
+        early.finish();
         let mut late = Run::<u32>::new();
         late.enable(true);
         late.begin(9);
@@ -319,6 +389,7 @@ mod tests {
         assert_eq!(late.elapsed(), 30);
         assert_eq!(late.result(), None);
         late.set_bounds(FINITE);
+        late.finish();
         assert_eq!(early.result(), late.result());
         assert_eq!(late.result().unwrap().outcome, Outcome::Graded(Grade::Good));
         late.set_bounds(Bounds { fastest: 100, no_input: None });
@@ -452,28 +523,40 @@ mod tests {
     #[test]
     fn mashout_run_notices() {
         let mut run = Run::<u32>::new();
-        assert!(run.notice().is_none());
+        assert_eq!(run.notice().as_str(), "");
         run.enable(true);
-        assert_eq!(run.notice().unwrap().as_str(), "Mash out · Setting up");
-        assert!(run.notice().is_none());
+        assert_eq!(run.notice().as_str(), "Mash out · Setting up");
+        assert_eq!(run.notice().as_str(), "Mash out · Setting up");
         attempt(&mut run, 1, 24, FINITE);
         attempt(&mut run, 1, 30, FINITE);
-        assert_eq!(run.notice().unwrap().as_str(), "Good · 30f · fastest 10f · no mash 90f · best 24f");
-        assert!(run.notice().is_none());
+        assert_eq!(run.notice().as_str(), "Good · 30f · fastest 10f · no mash 90f · best 24f");
+        assert_eq!(run.notice().as_str(), "Good · 30f · fastest 10f · no mash 90f · best 24f");
         attempt(&mut run, 2, 34, Bounds { fastest: 12, no_input: None });
-        assert_eq!(run.notice().unwrap().as_str(), "Escaped · 34f · fastest 12f (no grade: this hold never ends on its own)");
+        assert_eq!(run.notice().as_str(), "Escaped · 34f · fastest 12f (no grade: this hold never ends on its own)");
         attempt(&mut run, 3, 80, Bounds { fastest: 80, no_input: Some(80) });
-        let text = run.notice().unwrap();
+        let text = run.notice();
         assert!(text.as_str().contains("Mashing can't shorten this hold"));
         assert!(!text.as_str().contains("best"));
         attempt(&mut run, 4, 9, FINITE);
-        assert!(run.notice().unwrap().as_str().contains("Model mismatch"));
+        assert!(run.notice().as_str().contains("Model mismatch"));
         attempt(&mut run, 5, u32::MAX, Bounds { fastest: 1, no_input: Some(u32::MAX) });
         let mut out = FixedPath::<256>::new();
         assert!(run.write_notice(&mut out).is_ok());
         run.enable(false);
-        assert_eq!(run.notice().unwrap().as_str(), "");
-        assert!(run.notice().is_none());
+        assert_eq!(run.notice().as_str(), "");
+        assert_eq!(run.notice().as_str(), "");
+    }
+
+    #[test]
+    fn mashout_run_identical_result_after_setup_is_rendered_again() {
+        let mut run = Run::<u32>::new();
+        run.enable(true);
+        attempt(&mut run, 1, 30, FINITE);
+        let first = run.notice();
+        run.restart();
+        assert_eq!(run.notice().as_str(), "Mash out · Setting up");
+        attempt(&mut run, 1, 30, FINITE);
+        assert_eq!(run.notice().as_str(), first.as_str());
     }
     }
 }
