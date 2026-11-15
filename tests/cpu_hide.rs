@@ -17,7 +17,7 @@ use model::cpu::settings::CpuSettings;
 use model::cpu::state::Cpu;
 use model::eggs;
 use model::menu::table::ROWS;
-use model::menu::{Env, Grey, Menu};
+use model::menu::{Env, Menu};
 use model::settings::{Settings, Snapshot};
 
 const ON: [u8; 2] = [1, 0];
@@ -58,7 +58,8 @@ fn hidden() -> FrameOut {
 fn hide_cpu_rule() {
     for scene in [Scene::Training, Scene::Lobby] {
         for (row, practice) in [(false, false), (true, false), (false, true), (true, true)] {
-            let want = if scene == Scene::Training && (row || practice) { Some(true) } else { None };
+            // rc.14 (11-15): the same rule in the waiting room's practice as in Training.
+            let want = if row || practice { Some(true) } else { None };
             assert_eq!(hide::step(&mut false, scene, row, practice), want, "{scene:?} row {row} practice {practice}");
         }
     }
@@ -111,33 +112,39 @@ fn hide_cpu_edges() {
     // the state belongs to the CPU's key, not to the game's body.
     both.fighters[body().index()].kind = 7;
     assert_eq!(frame(&mut both, body(), false), hidden());
-    // Leaving Training (or the practice scene) while hidden: the next frame of that body, in a waiting room, shows it.
+    // The waiting room's practice follows the same rule (rc.14, 11-15): with the row On a body there stays hidden.
     both.scene = Scene::Lobby;
-    assert_eq!(frame(&mut both, body(), false).vanish, Some(false));
+    assert_eq!(frame(&mut both, body(), false), hidden());
     // A save state load, L+R+A and opening the menu are not events of this model: no frame says anything but the rule.
 }
 
 #[test]
-fn hide_cpu_waiting_room_gate() {
-    // Until the LDN check has passed, a waiting room's CPU is never hidden: not by the row, not by a practice game.
+fn hide_cpu_in_the_waiting_room() {
+    // rc.14 (the operator, 11-15 11:35Z): Hide CPU works in the waiting room's practice as in Training. The row hides the
+    // room's CPU (entry 4), a practice game's request hides it, neither shows it; the menu row is a plain toggle there.
+    let room_cpu = FighterKey::new(4, false).unwrap();
     let mut lobby = cpu(&[("hide_cpu", &ON)]);
     lobby.scene = Scene::Lobby;
-    for practice in [false, true] {
-        let out = frame(&mut lobby, FighterKey::new(4, false).unwrap(), practice);
-        assert_eq!((out.vanish, runs_behaviours(&out)), (None, true), "practice {practice}");
-    }
-    // The setting itself is kept for Training.
-    assert!(lobby.settings.hide_cpu);
-    // The row says so in a waiting room's menu (greyed, with the reason) and is a plain toggle in Training: the CPU page's
-    // Level group, after CPU Level, Off by default.
+    assert_eq!(frame(&mut lobby, room_cpu, false), hidden(), "the row hides it");
+    let mut asked = cpu(&[]);
+    asked.scene = Scene::Lobby;
+    assert_eq!(frame(&mut asked, room_cpu, true), hidden(), "a practice game's request hides it");
+    let out = frame(&mut asked, room_cpu, false);
+    assert_eq!((out.vanish, runs_behaviours(&out)), (Some(false), true), "the request over: shown, behaviours run");
+    let mut neither = cpu(&[]);
+    neither.scene = Scene::Lobby;
+    let out = frame(&mut neither, room_cpu, false);
+    assert_eq!((out.vanish, runs_behaviours(&out)), (None, true), "neither: left alone");
+    // Outside practice (a match, a stale lobby flag) no CPU frame runs at all: the scene is none.
+    assert_eq!(model::scene::scene(model::scene::Facts::default()), None);
+    assert_eq!(model::scene::scene(model::scene::Facts { lobby_active: true, ..Default::default() }), None);
+    // The row: the CPU page's Level group, after CPU Level, Off by default, a plain toggle in Training and in a room.
     let row = ROWS.iter().position(|r| r.id == "hide_cpu").expect("the Hide CPU row");
     assert_eq!(ROWS[row - 1].id, "cpu_level");
     assert_eq!(ROWS[row].page(), model::menu::table::Page::Cpu);
     assert!(!CpuSettings::from_snapshot(&Snapshot::factory()).hide_cpu);
     let menu = |waiting_room| Menu::new(Settings::factory(), Env { waiting_room, ..Env::default() });
-    assert_eq!(menu(false).grey(row), None);
-    assert_eq!(menu(true).grey(row), Some(Grey::WaitingRoom));
-    assert_eq!(Grey::WaitingRoom.text(), "Not in a waiting room yet");
+    assert_eq!([menu(false).grey(row), menu(true).grey(row)], [None, None]);
 }
 
 /// One frame's tag write and the HUD panels hidden after it.
@@ -180,18 +187,19 @@ fn hide_cpu_tag_follows_the_body() {
 }
 
 #[test]
-fn hide_cpu_tag_waiting_room() {
-    // A waiting room never hides the CPU, so neither its tag nor its panel is written there.
+fn hide_cpu_tag_in_the_waiting_room() {
+    // rc.14 (11-15): the waiting room hides the CPU as Training does, and its tag and its panel go with the body (the room's
+    // CPU is entry 4: panel bit 4).
     let mut lobby = cpu(&[("hide_cpu", &ON)]);
     lobby.scene = Scene::Lobby;
     for practice in [false, true] {
-        assert_eq!(tag_and_panels(&mut lobby, FighterKey::new(4, false).unwrap(), practice), (None, 0), "practice {practice}");
+        assert_eq!(tag_and_panels(&mut lobby, FighterKey::new(4, false).unwrap(), practice), (Some(false), 1 << 4), "practice {practice}");
     }
-    // Leaving Training while hidden: the waiting room's first frame shows the body, its tag and its panel.
+    // Hidden in Training, then the waiting room: it stays hidden there, tag and panel too.
     let mut both = cpu(&[("hide_cpu", &ON)]);
     assert_eq!(tag_and_panels(&mut both, body(), false), (Some(false), CPU_PANEL));
     both.scene = Scene::Lobby;
-    assert_eq!(tag_and_panels(&mut both, body(), false), (Some(true), 0));
+    assert_eq!(tag_and_panels(&mut both, body(), false), (Some(false), CPU_PANEL));
 }
 
 #[test]
