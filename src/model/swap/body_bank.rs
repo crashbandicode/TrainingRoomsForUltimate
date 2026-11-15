@@ -1200,6 +1200,16 @@ pub fn special_neighbour_window(forms: Forms, lane: impl IntoIterator<Item = u32
     if fits { Members::target_only(forms) } else { None }
 }
 
+/// rc.14 ptg-room (pt-n1 `t-ptg-regress-cpu`, the primary 2026-11-15 ~10:30Z): the other role's bodies the room of
+/// [`special_neighbour_window`] is charged: its live window's other members and its groups that count bodies and are not
+/// leaving. A leaving group goes: a parked one as soon as new members need its room (`release_for_new_members`, which the
+/// planner runs once this role has its bank), any other on the entry tick. `EXTRAS` is not read: it keeps the window a
+/// Reload built, which an exchange can move into a group counted again (the CPU's start-up window `[54, 13, 27]`, #527).
+pub fn unparked_bodies(window: usize, groups: impl IntoIterator<Item = (usize, GroupState, bool)>) -> usize {
+    // Fail-first stub: today's charge, every group that counts bodies (parked ones included).
+    window.saturating_sub(1) + groups.into_iter().filter(|(_, state, _)| state.counts_bodies()).map(|(count, _, _)| count).sum::<usize>()
+}
+
 /// The group a [`target_first`] Reload's neighbours build as: the members the `full` window would have held besides
 /// `target`, laid out like any group (Kirby at cell 0). The planner plans it first, ahead of the rest of the lane, so it
 /// is admitted on the same cost the full window's supplements were (`memory::window_extras` over those members is
@@ -3262,6 +3272,63 @@ mod tests {
         }
     }
 
+    // ----- rc.14 ptg-room (pt-n1 `t-ptg-regress-cpu` on the candidate 542296d5, Yoga, 2026-11-15) -----
+
+    /// The row's state at the On half's press onto Mario (#4341). Ready Fighters 10 gives a pool of 8. The CPU is on Falcon
+    /// in its window `[b, d]`. Its groups are `[54, 13, 27]` (its start-up window, parked since this row's setup left it out
+    /// of the cycle, #3948), `[f]` (live) and `[0]` (its Mario window, parked at #4076). P1 is on a canonical Pokémon
+    /// Trainer, its cycle Mario and PT. The room for P1's one-member Mario window is the pool less the CPU's live bodies:
+    /// 8 - (1 + 1) = 6. pt-n1 charged `EXTRAS` 2 plus every group 5 = 7: room 1, PT refused, every press a Reload. With the
+    /// bank, the planner frees the fewest parked CPU bodies for PT (`release_for_new_members`) and plans it.
+    fn a_parked_group_of_the_other_role_leaves_room_for_the_trainer() {
+        let (b, d, f) = (0x0b, 0x0d, 0x0f);
+        let cpu_window = Members::new(&[b, d]).unwrap();
+        let start_up = Members::new(&[0x54, 0x13, 0x27]).unwrap();
+        let (live_f, parked_mario) = (Members::new(&[f]).unwrap(), Members::new(&[MARIO]).unwrap());
+        let groups = [(start_up, true), (live_f, false), (parked_mario, true)];
+        let other = unparked_bodies(cpu_window.count(), groups.iter().map(|(m, leaving)| (m.count(), GroupState::Built, *leaving)));
+        let room = 8usize.saturating_sub(other);
+        assert_eq!(room, 6, "the CPU's live bodies: Peach beside Falcon and the [f] group");
+        let mario = Forms::starting(MARIO);
+        let lane = [SQUIRTLE, MARIO, SQUIRTLE, MARIO];
+        let window = special_neighbour_window(mario, lane, SpecialPolicy::ALL, true, room, Some(MARIO));
+        assert_eq!(window, Members::target_only(mario), "the one-member Mario bank");
+        let windows = [window, Some(cpu_window)];
+        let budget = budget_special(10, SpecialPolicy::ALL);
+        let cpu_lane = [d, f, b];
+        // Beside the parked groups the plan has no room for PT; the release frees the fewest parked bodies and PT is planned.
+        let beside = plan_extra_groups(windows, [&[], &[start_up, live_f, parked_mario]], [&lane, &cpu_lane], [None, None], budget);
+        assert!(beside[0].iter().all(Option::is_none), "PT waits beside the parked groups: {beside:x?}");
+        let parked = [(start_up, 0u8), (parked_mario, 0u8)];
+        let release = release_for_new_members([&[], &[live_f]], [&[], &parked], |role, kind| role == 1 && kind == f,
+            |existing, freed| plan_extra_groups(windows, existing, [&lane, &cpu_lane], [None, None],
+                GroupBudget { pool_free: budget.pool_free + freed, ..budget }));
+        assert_eq!(release.members[0], 3, "Squirtle, Ivysaur and Charizard load once parked CPU bodies go: {release:?}");
+        let kept: Vec<Members> = std::iter::once(live_f).chain(parked.iter().enumerate()
+            .filter(|(i, _)| release.groups[1] & (1 << i) == 0).map(|(_, (m, _))| *m)).collect();
+        let after = plan_extra_groups(windows, [&[], &kept[..]], [&lane, &cpu_lane], [None, None], budget);
+        assert_eq!(after[0][0].map(Members::kinds), Some([SQUIRTLE, IVYSAUR, CHARIZARD]), "{release:?} {after:x?}");
+    }
+
+    /// The count's rule: a parked or otherwise leaving group is not charged, a live one is, and a released or failed one
+    /// never was. Live groups that fill the pool still keep the canonical Reload; the same groups parked leave room.
+    fn parked_groups_do_not_count_against_the_room_but_live_ones_do() {
+        let built = GroupState::Built;
+        assert_eq!(unparked_bodies(1, std::iter::empty()), 0);
+        assert_eq!(unparked_bodies(3, [(3, built, true), (2, built, false)]), 4);
+        assert_eq!(unparked_bodies(2, [(3, built, true), (1, GroupState::Prefetching, true), (2, GroupState::Released, false),
+            (1, GroupState::Failed, false)]), 1);
+        let mario = Forms::starting(MARIO);
+        let live = [(3, built, false), (2, GroupState::Prefetched, false), (1, GroupState::Planned, false)];
+        let room = 8usize.saturating_sub(unparked_bodies(2, live));
+        assert_eq!(room, 1);
+        assert_eq!(special_neighbour_window(mario, [SQUIRTLE, MARIO], SpecialPolicy::ALL, true, room, Some(MARIO)), None);
+        let parked = live.map(|(count, state, _)| (count, state, count > 1));
+        let room = 8usize.saturating_sub(unparked_bodies(2, parked));
+        assert_eq!(room, 6);
+        assert!(special_neighbour_window(mario, [SQUIRTLE, MARIO], SpecialPolicy::ALL, true, room, Some(MARIO)).is_some());
+    }
+
     /// rc.7 FLAG 3: steps two banks (`groups`, from `states`) through `next_step`, `memory::admit` and
     /// `memory::outstanding`, each step spending at most what `final-surface-i3-nt-7d720c68` measured (a prefetch 57 MB at
     /// #331, a build 18 MB at #709). Returns the tick at which each bank's group 1 was admitted, and the final states.
@@ -4361,6 +4428,8 @@ mod tests {
             ("a_role_whose_only_neighbour_is_the_pair_gets_a_bank_and_plans_the_pair_group", a_role_whose_only_neighbour_is_the_pair_gets_a_bank_and_plans_the_pair_group as fn()),
             ("a_kirby_target_or_a_lane_without_a_special_group_keeps_the_canonical_reload", a_kirby_target_or_a_lane_without_a_special_group_keeps_the_canonical_reload as fn()),
             ("the_pt_lap_is_warm_after_its_first_reload_with_the_switch_on_and_cold_with_it_off", the_pt_lap_is_warm_after_its_first_reload_with_the_switch_on_and_cold_with_it_off as fn()),
+            ("a_parked_group_of_the_other_role_leaves_room_for_the_trainer", a_parked_group_of_the_other_role_leaves_room_for_the_trainer as fn()),
+            ("parked_groups_do_not_count_against_the_room_but_live_ones_do", parked_groups_do_not_count_against_the_room_but_live_ones_do as fn()),
             ("both_banks_with_a_deferred_group_build_then_admit_it", both_banks_with_a_deferred_group_build_then_admit_it as fn()),
             ("a_canonical_reload_of_the_window_shape_retires_a_one_member_bank", a_canonical_reload_of_the_window_shape_retires_a_one_member_bank as fn()),
             ("eight_ready_fighters_default_gives_five_and_three", eight_ready_fighters_default_gives_five_and_three as fn()),
