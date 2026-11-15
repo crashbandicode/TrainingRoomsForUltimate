@@ -571,7 +571,7 @@ static NEIGHBOURS: [AtomicU64; 2] = [AtomicU64::new(u64::MAX), AtomicU64::new(u6
 
 /// rc.12 (a′): per role, the target of the last window plan when it was target-first (`proposed`), `u32::MAX` otherwise.
 static TARGET_FIRST: [AtomicU32; 2] = [AtomicU32::new(u32::MAX), AtomicU32::new(u32::MAX)];
-/// rc.14: the module pins' "not the bank's tick" line is written once per held set (`service`).
+/// rc.14: the module pins' "this tick is another entry's" line is written once per held set (`service`).
 static PIN_WAIT_NOTED: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
 
 /// rc.12 (a′): while `submit` issues a role's target-first Reload, its target (`u32::MAX` otherwise): `retire_groups`
@@ -1297,7 +1297,7 @@ pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>
         let same = if mii { g.configuration == configuration } else { g.identity.is_none() };
         let build_owed = exit && (background_owed(bank, g, observed) || bank.background.is_some());
         if same && exit && !exit_buildable(bank, *g.members, observed) {
-            return declined(format_args!("its group can't build beside the live Mii window"));
+            return declined(format_args!("its group has no background build beside the live Mii window"));
         }
         if same && crate::engine::swap::body_bank::demand_waits(g.state, exit, build_owed) { return true; }
         // A reachable group serves the press as any group swap; a held, failed or other identity's one does not.
@@ -3160,7 +3160,7 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
             }
             crate::engine::swap::body_bank::PinStep::Wait => if let Some((phase, _, false, bank_entry, bank_owner)) = bank {
                 if !PIN_WAIT_NOTED[role].swap(true, Ordering::AcqRel) {
-                    trace!("[GroupSwap] module pins held role={} entry={:p} owner={}: not the bank's tick (entry={:#x} owner={} phase={:?}); they wait for its Ready",
+                    trace!("[GroupSwap] module pins held role={} entry={:p} owner={}: this tick is another entry's (bank entry={:#x} owner={} phase={:?}); they wait for the bank's Ready",
                         role, entry, owner, bank_entry, bank_owner, phase);
                 }
             },

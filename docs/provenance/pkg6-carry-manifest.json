@@ -16139,7 +16139,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "13c67641c0d529be4c23e964e86442ceba2ff850c11343a9089c013b2fe58c08",
+   "dest_sha256": "a652c9b2fa59cd19f02233eadb1fb64848e45eba02983bc7c23c5cda9c52f753",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -19013,6 +19013,21 @@
      "old": "                    || background_candidate(bank, Some(members.kinds()[usize::from(index)])).is_some() {\n",
      "new": "                    || background_candidate(bank, Some(members.kinds()[usize::from(index)])).is_some()\n                    // rc.14 (Eden cf-p4-y1): a cold mark ticks the lifecycle, so the cold fighter is seen and freed.\n                    || crate::engine::swap::body_bank::cold_marks_tick(&bank.over) {\n",
      "reason": "rc.14 cycle fix 9: kept groups' module pins wait for the new bank's Ready on every Reload (a1 crash); a cold mark ticks the lifecycle and only a live or loading one holds a body over (cf-p4-y1)"
+    },
+    {
+     "old": "/// rc.14: the module pins' \"not the bank's tick\" line is written once per held set (`service`).\n",
+     "new": "/// rc.14: the module pins' \"this tick is another entry's\" line is written once per held set (`service`).\n",
+     "reason": "rc.14 cycle fix 10: two diag lines reworded without refusal words (compliance: no user-facing refusal)"
+    },
+    {
+     "old": "            return declined(format_args!(\"its group can't build beside the live Mii window\"));\n",
+     "new": "            return declined(format_args!(\"its group has no background build beside the live Mii window\"));\n",
+     "reason": "rc.14 cycle fix 10: two diag lines reworded without refusal words (compliance: no user-facing refusal)"
+    },
+    {
+     "old": "                    trace!(\"[GroupSwap] module pins held role={} entry={:p} owner={}: not the bank's tick (entry={:#x} owner={} phase={:?}); they wait for its Ready\",\n",
+     "new": "                    trace!(\"[GroupSwap] module pins held role={} entry={:p} owner={}: this tick is another entry's (bank entry={:#x} owner={} phase={:?}); they wait for the bank's Ready\",\n",
+     "reason": "rc.14 cycle fix 10: two diag lines reworded without refusal words (compliance: no user-facing refusal)"
     }
    ]
   },
