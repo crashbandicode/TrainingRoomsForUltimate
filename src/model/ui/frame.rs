@@ -670,8 +670,7 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
     frame.white_cursor = true;
     if rec.picker_open() {
         paint_picker(rec, frame);
-    } else if rec.crop_open() {
-        paint_crop(rec, frame);
+
     } else if rec.file_open() && face == Face::Page {
         paint_file(rec, frame);
     } else {
@@ -714,20 +713,6 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
         }
         let _ = frame.help[1].write_str(&joined);
     }
-}
-
-fn paint_crop(rec: &RecordingScreens, frame: &mut Frame) {
-    let rows = rec.crop_rows();
-    let cursor = rec.crop_cursor();
-    for (slot, row) in rows.iter().enumerate().take(ROW_LINES) {
-        let _ = frame.rows[slot].label.write_str(&row.title);
-        let _ = frame.rows[slot].value.write_str(&row.value);
-        frame.row_count += 1;
-        if slot == cursor {
-            frame.focus = Some(slot as u8);
-        }
-    }
-    let _ = frame.crumb.write_str("Crop");
 }
 
 fn paint_file(rec: &RecordingScreens, frame: &mut Frame) {

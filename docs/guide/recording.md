@@ -184,18 +184,16 @@ recorded one.
 
 ### Crop
 
-Crop on a combo or a macro opens two handles, In and Out ([keys](../menu/recording.md#a-file-s-own-screen)).
+Crop on a combo or a macro opens the Replay window's clip editor ([keys](../menu/recording.md#replay-window)).
 
-- The cut is saved as a new file under the next unused Macro N or Combo N, and you go back to the original, which stays.
+- L selects In and R selects Out; Left/Right move the selected handle. Hold to move faster. B leaves.
+- A opens the name keyboard and saves the cut as a new file. An empty name uses the next unused Macro N or Combo N. The original stays.
 - A macro crop keeps that range of frames. The new macro keeps the original's one start save, stamped at the crop's
   start frame; no pose is stored for every frame.
-- A combo crop keeps the links from the first handle through the last.
+- X previews a macro's kept inputs on the CPU, including a Player 1 macro.
+- A combo crop keeps the links from the first handle through the last. The handles step by whole links, and X is not offered.
 - A chain has no Crop row, because it has no frames of its own. The Replay window is a separate row under Replays.
 
-![Crop on a two-link combo, Out 2 to 1, saves Combo 2; drilled, the bar shows its one link](../media/rc6-crop-combo.gif)
-
-![Crop on the macro Walk and jab: In moves from 0 to 8, Out from 180 to 170, A saves a new macro](../media/rc13-crop-macro.gif)<br>
-*Crop on a 180-frame macro. R moves In from 0 to 8, Down picks Out, L moves it from 180 to 170, A saves the cut as a new file: the count goes from 13 to 14 and the original is still listed. Each press is named in a box. Eden, rc.13 (untested on hardware).*
 
 ## Sequences and the one drill
 

@@ -93,6 +93,7 @@ pub fn after_session_reset(phase: Phase) -> Phase {
 pub fn next(phase: Phase, seen: Seen) -> (Phase, Step) {
     match phase {
         Phase::Menu if !seen.menu_open && seen.prompt_visible && !seen.clip_visible => (Phase::Prompt, Step::ShowPrompt),
+        Phase::Menu if seen.menu_open && seen.clip_visible && seen.clip_foreground => (Phase::Clip, Step::HandOverToClip),
         Phase::Menu => (Phase::Menu, Step::Nothing),
         // The clip editor's own question answered or retired: the editor is drawn again.
         Phase::Prompt if !seen.prompt_visible && !seen.menu_open && seen.clip_visible => (Phase::Clip, Step::HidePrompt),

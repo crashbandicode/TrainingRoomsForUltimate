@@ -1361,7 +1361,7 @@ impl MacroUi {
         };
         if let Some((token, title, raw)) = external {
             let name = raw.trim();
-            if let Err(err) = external_name(name) {
+            if let Err(err) = if token == CLIP_NAME_TOKEN && name.is_empty() { Ok(()) } else { external_name(name) } {
                 return Effect::Notify(err.to_string());
             }
             let name = name.to_owned();
@@ -1513,6 +1513,9 @@ impl Default for MacroUi {
         Self::new()
     }
 }
+
+/// Caller-owned clip naming accepts empty text for its numbered-name fallback.
+pub const CLIP_NAME_TOKEN: u64 = (1 << 62) + 1;
 
 fn external_name(name: &str) -> Result<(), MacroError> {
     let name = name.trim();
@@ -2323,6 +2326,15 @@ mod tests {
         assert!(ui.native_name_title().is_none());
     }
 
+    fn clip_keyboard_accepts_empty_default_name() {
+        let mut ui = MacroUi::new();
+        ui.offer_name(NameContext { token: CLIP_NAME_TOKEN, title: "Name macro" }, "Original", "Save as a new file");
+        let Effect::NameConfirmed { context, name } = ui.confirm_native_name("   ".into()) else { panic!("empty clip name must reach numbered-name saving"); };
+        assert_eq!(context.token, CLIP_NAME_TOKEN);
+        assert!(name.is_empty());
+        assert!(ui.name_prompt().is_none());
+    }
+
     fn mii_identity_keeps_exact_class_and_refuses_unknown() {
         use crate::engine::mii::inventory::MiiClass;
         let classes = [MiiClass::Brawler, MiiClass::Swordfighter, MiiClass::Gunner];
@@ -2349,6 +2361,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("clip_keyboard_accepts_empty_default_name", clip_keyboard_accepts_empty_default_name as fn()),
             ("native_keyboard_validation_preserves_draft_and_inputs", native_keyboard_validation_preserves_draft_and_inputs as fn()),
             ("empty_name_stays_on_the_dialog_and_typed_name_pages", empty_name_stays_on_the_dialog_and_typed_name_pages as fn()),
             ("crop_drops_only_the_neutral_tail", crop_drops_only_the_neutral_tail as fn()),

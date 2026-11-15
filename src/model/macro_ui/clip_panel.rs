@@ -11,7 +11,7 @@ pub enum ClipAction {
 }
 pub enum ClipEffect {
     None, StopPreview, Preview(Box<MacroRecording>), Close,
-    Export(Box<MacroRecording>), Error(String),
+    Export(Box<MacroRecording>), ExportCombo(Box<crate::model::combo_record::ComboRecord>), Error(String),
 }
 
 /// P-TIMER: a selection across a capture break (play resumed after a stretch with no live play: sudden death).
@@ -86,7 +86,9 @@ pub struct ClipHelp {
 
 /// Button text for the step the crop editor is actually on.
 pub fn clip_help(view: &ClipView, coarse: &str, chord: &str, pace: i32) -> ClipHelp {
-    let controls = "D-pad Up/Down: fighter. X preview. A save. B close.".to_owned();
+    let controls = format!("{}{}A save. B close.",
+        if view.context.fighters() { "D-pad Up/Down: fighter. " } else { "" },
+        if view.context.preview() { "X preview. " } else { "" });
     if view.playing {
         return ClipHelp {
             primary: "Previewing the selection.".to_owned(),
@@ -111,9 +113,9 @@ pub fn clip_help(view: &ClipView, coarse: &str, chord: &str, pace: i32) -> ClipH
     };
     let follow = if pace > 1 {
         if pace >= 180 {
-            format!("Moving {pace} frames per tick.")
+            format!("Moving {pace} {} per tick.", if view.context == ClipContext::Combo { "links" } else { "frames" })
         } else {
-            format!("Moving {pace} frames per tick and speeding up.")
+            format!("Moving {pace} {} per tick and speeding up.", if view.context == ClipContext::Combo { "links" } else { "frames" })
         }
     } else {
         follow
@@ -201,8 +203,23 @@ impl OpenInputGuard {
     }
 }
 
+/// The same editor changes units and offered actions with its source.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClipContext { Replay { fighters: bool }, Macro { player: bool }, Combo }
+
+impl ClipContext {
+    pub fn preview(self) -> bool { !matches!(self, Self::Combo) }
+    pub fn fighters(self) -> bool { matches!(self, Self::Replay { fighters: true }) }
+}
+
+enum FileSource {
+    Macro { recording: Box<MacroRecording>, player: bool },
+    Combo(Box<crate::model::combo_record::ComboRecord>),
+}
+
 #[derive(Clone, Debug)]
 pub struct ClipView {
+    pub context: ClipContext,
     pub total: u32,
     pub start: u32,
     pub end: u32,
@@ -223,6 +240,7 @@ pub struct ClipView {
 
 pub struct ClipEditor {
     session: ReplaySession,
+    file: Option<FileSource>,
     previous: Option<ReplaySession>,
     previous_selected: bool,
     track: usize,
@@ -250,10 +268,44 @@ impl ClipEditor {
         let window = session.tracks[0].window()?;
         let mut open_guard = OpenInputGuard::new();
         open_guard.arm();
-        Ok(Self { session, previous: None, previous_selected: false, track: 0, window,
+        Ok(Self { session, file: None, previous: None, previous_selected: false, track: 0, window,
             handle: Handle::Playhead, playing: false, clean_statuses, move_rules: None, move_start: None,
             source_name: "Latest Vault capture".into(), previous_name: "Previous Vault capture".into(),
             open_guard, error: None })
+    }
+
+    /// Saved files have one side and one start context. A combo has link units,
+    /// with no invented frame samples or continuous inputs.
+    pub fn macro_file(recording: MacroRecording, player: bool) -> Result<Self, String> {
+        recording.validate().map_err(|error| error.to_string())?;
+        let total = recording.frames.len() as u32;
+        let name = recording.name.clone();
+        Self::file(FileSource::Macro { recording: Box::new(recording), player }, total, name)
+    }
+
+    pub fn combo_file(recording: crate::model::combo_record::ComboRecord) -> Result<Self, String> {
+        recording.validate().map_err(|error| error.to_string())?;
+        let total = recording.combo.len() as u32;
+        let name = recording.name.clone();
+        Self::file(FileSource::Combo(Box::new(recording)), total, name)
+    }
+
+    fn file(file: FileSource, total: u32, source_name: String) -> Result<Self, String> {
+        let mut open_guard = OpenInputGuard::new();
+        open_guard.arm();
+        Ok(Self { session: ReplaySession { tracks: Vec::new(), truncated: false, breaks: Vec::new() },
+            file: Some(file), previous: None, previous_selected: false, track: 0,
+            window: FrameWindow::new(total).map_err(|error| error.to_string())?, handle: Handle::Playhead, playing: false,
+            clean_statuses: Vec::new(), move_rules: None, move_start: None,
+            source_name, previous_name: String::new(), open_guard, error: None })
+    }
+
+    pub fn context(&self) -> ClipContext {
+        match &self.file {
+            Some(FileSource::Macro { player, .. }) => ClipContext::Macro { player: *player },
+            Some(FileSource::Combo(_)) => ClipContext::Combo,
+            None => ClipContext::Replay { fighters: self.session.tracks.len() > 1 },
+        }
     }
 
     /// Physical A edge gate for the native adapter; see `OpenInputGuard`.
@@ -293,6 +345,7 @@ impl ClipEditor {
     }
 
     pub fn select_kind(&mut self, kind: i32) {
+        if self.file.is_some() { return; }
         if let Some(index) = self.session.tracks.iter().position(|t| t.frames[0].start.fighter_kind == kind) {
             self.set_track(index);
         }
@@ -303,6 +356,7 @@ impl ClipEditor {
     /// real change of track or capture answers; re-selecting the current track,
     /// or toggling with no previous capture, selects nothing new.
     pub fn peek_selection(&self, action: ClipAction) -> Option<(i32, i32, bool)> {
+        if self.file.is_some() { return None; }
         match action {
             ClipAction::PreviousFighter | ClipAction::NextFighter => {
                 let count = self.session.tracks.len();
@@ -326,14 +380,21 @@ impl ClipEditor {
     pub fn report_error(&mut self, message: String) { self.error = Some(message); }
 
     pub fn view(&self) -> ClipView {
-        let track = self.track();
-        ClipView { total: self.window.total(), start: self.window.start(), end: self.window.end(),
+        let (entry, fighter_kind, clean_start, quantized) = match &self.file {
+            Some(FileSource::Macro { recording, player }) =>
+                (i32::from(!*player), recording.start.fighter_kind, true, false),
+            Some(FileSource::Combo(_)) => (0, -1, true, false),
+            None => {
+                let track = self.track();
+                (track.entry, self.sample().start.fighter_kind,
+                    self.move_start.is_some() || self.clean_statuses.contains(&track.frames[self.window.start() as usize].start.status),
+                    track.quantized_analog)
+            }
+        };
+        ClipView { context: self.context(), total: self.window.total(), start: self.window.start(), end: self.window.end(),
             cursor: self.window.cursor(), handle: self.handle, playing: self.playing,
-            entry: track.entry, fighter_kind: self.sample().start.fighter_kind,
-            previous_selected: self.previous_selected, previous_available: self.previous.is_some(),
-            clean_start: self.move_start.is_some() || self.clean_statuses.contains(&track.frames[self.window.start() as usize].start.status),
-            move_start: self.move_start,
-            quantized: track.quantized_analog, truncated: self.session.truncated,
+            entry, fighter_kind, previous_selected: self.previous_selected, previous_available: self.previous.is_some(),
+            clean_start, move_start: self.move_start, quantized, truncated: self.session.truncated,
             source_name: self.source_name.clone(), error: self.error.clone() }
     }
 
@@ -361,6 +422,12 @@ impl ClipEditor {
     }
 
     fn export_selection(&self, name: &str) -> Result<MacroRecording, String> {
+        if let Some(FileSource::Macro { recording, .. }) = &self.file {
+            let mut kept = (**recording).clone();
+            kept.name = name.to_owned();
+            kept.frames = recording.frames[self.window.start() as usize..self.window.end() as usize].to_vec();
+            return Ok(kept);
+        }
         // P-TIMER: the inputs after a break (sudden death) never play from a state before it.
         if self.session.break_within(self.window.start(), self.window.end().saturating_sub(1)).is_some() {
             return Err(BREAK_CROSSED.into());
@@ -387,6 +454,13 @@ impl ClipEditor {
     }
 
     pub fn on_action(&mut self, action: ClipAction) -> ClipEffect {
+        if self.file.is_some() && matches!(action,
+            ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture | ClipAction::UseLeadIn) {
+            return ClipEffect::None;
+        }
+        if !self.context().preview() && matches!(action, ClipAction::TogglePlay | ClipAction::Restart) {
+            return ClipEffect::None;
+        }
         self.error = None;
         let effect = self.apply_action(action);
         if let ClipEffect::Error(message) = &effect { self.report_error(message.clone()); }
@@ -471,6 +545,20 @@ impl ClipEditor {
             }
             ClipAction::Confirm => {
                 self.pause();
+                if let Some(FileSource::Combo(recording)) = &self.file {
+                    let links = recording.combo.links().skip(self.window.start() as usize)
+                        .take((self.window.end() - self.window.start()) as usize).copied();
+                    let kept = crate::model::combo::Combo::from_links(links).expect("nonempty selected links");
+                    let mut saved = crate::model::combo_record::ComboRecord::new(recording.name.clone(), kept, recording.recorded_on.clone());
+                    saved.made_from = recording.made_from.clone();
+                    return ClipEffect::ExportCombo(Box::new(saved));
+                }
+                if self.file.is_some() {
+                    return match self.export_selection(&self.source_name) {
+                        Ok(recording) => ClipEffect::Export(Box::new(recording)),
+                        Err(error) => ClipEffect::Error(error),
+                    };
+                }
                 let suffix = format!(" P{}", self.track().entry + 1);
                 let prefix: String = self.source_name.chars()
                     .take(MAX_NAME_CHARS.saturating_sub(suffix.chars().count())).collect();
@@ -526,6 +614,79 @@ mod tests {
         e.on_action(ClipAction::Nudge(1));
         assert!(e.view().move_start.is_none());
         assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Error(_)));
+    }
+
+    fn saved_macro(player: bool) -> ClipEditor {
+        let replay = editor();
+        let recording = MacroRecording::new("Recorded", "13.0.5", replay.track().frames[0].start,
+            replay.track().frames.iter().map(|frame| frame.input).collect()).unwrap();
+        ClipEditor::macro_file(recording, player).unwrap()
+    }
+
+    fn replay_and_saved_macro_controls_have_parity() {
+        for mut e in [editor(), saved_macro(false), saved_macro(true)] {
+            e.on_action(ClipAction::SelectIn);
+            e.on_action(ClipAction::Nudge(2));
+            e.on_action(ClipAction::SelectOut);
+            e.on_action(ClipAction::Nudge(-3));
+            assert_eq!((e.view().start, e.view().end), (2, 7));
+            let ClipEffect::Preview(preview) = e.on_action(ClipAction::TogglePlay) else { panic!("preview") };
+            assert_eq!(preview.frames.iter().map(|frame| frame.buttons).collect::<Vec<_>>(), vec![2, 3, 4, 5, 6]);
+            e.on_action(ClipAction::TogglePlay);
+            let ClipEffect::Export(saved) = e.on_action(ClipAction::Confirm) else { panic!("export") };
+            assert_eq!(saved.frames, preview.frames);
+            assert!(matches!(e.on_action(ClipAction::Cancel), ClipEffect::Close));
+        }
+    }
+
+    fn combo_editor() -> ClipEditor {
+        use crate::model::{combo::{Combo, LinkRec}, combo_record::ComboRecord, frame_strip::{Move, Verdict}};
+        let moves = [(Move::Aerial, Move::SideTilt), (Move::SideTilt, Move::NeutralSpecial), (Move::NeutralSpecial, Move::Aerial)];
+        let combo = Combo::from_links(moves.map(|(from, to)| LinkRec::presses(from, to, Verdict::True(None), None, &[]))).unwrap();
+        ClipEditor::combo_file(ComboRecord::new("Combo source".into(), combo, Some("Mario".into()))).unwrap()
+    }
+
+    fn combo_clip_handles_snap_to_whole_links() {
+        let mut e = combo_editor();
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(1));
+        e.on_action(ClipAction::SelectOut);
+        e.on_action(ClipAction::Nudge(-1));
+        assert_eq!((e.view().start, e.view().end), (1, 2));
+        let ClipEffect::ExportCombo(saved) = e.on_action(ClipAction::Confirm) else { panic!("combo") };
+        assert_eq!(saved.combo.len(), 1);
+        assert_eq!(saved.combo.get(0).unwrap().from, crate::model::frame_strip::Move::SideTilt);
+        assert_eq!(saved.recorded_on.as_deref(), Some("Mario"));
+        // The source and its three links are retained for a second crop.
+        assert_eq!(e.view().total, 3);
+        e.on_action(ClipAction::Nudge(-100));
+        assert_eq!((e.view().start, e.view().end), (1, 2));
+    }
+
+    fn combo_clip_has_no_preview_action_or_help() {
+        let mut e = combo_editor();
+        let before = (e.view().start, e.view().end, e.view().handle);
+        for action in [ClipAction::TogglePlay, ClipAction::Restart] {
+            assert!(matches!(e.on_action(action), ClipEffect::None));
+            assert!(!e.view().playing);
+            assert!(e.view().error.is_none());
+        }
+        assert_eq!((e.view().start, e.view().end, e.view().handle), before);
+        let help = clip_help(&e.view(), "ZL/ZR", "ZL", 1);
+        assert_eq!(help.controls, "A save. B close.");
+        assert!(!help.notice.contains("preview"));
+    }
+
+    fn file_clip_single_side_does_not_change_selection() {
+        for mut e in [saved_macro(false), saved_macro(true), combo_editor()] {
+            e.on_action(ClipAction::SelectIn);
+            e.on_action(ClipAction::Nudge(1));
+            for action in [ClipAction::NextFighter, ClipAction::PreviousFighter, ClipAction::ToggleCapture] {
+                assert!(e.peek_selection(action).is_none());
+                assert!(matches!(e.on_action(action), ClipEffect::None));
+                assert_eq!(e.view().start, 1);
+            }
+        }
     }
 
     /// One native P1 mapping sample of physical A: (held level, release edge, press edge).
@@ -687,6 +848,10 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("replay_and_saved_macro_controls_have_parity", replay_and_saved_macro_controls_have_parity as fn()),
+            ("combo_clip_handles_snap_to_whole_links", combo_clip_handles_snap_to_whole_links as fn()),
+            ("combo_clip_has_no_preview_action_or_help", combo_clip_has_no_preview_action_or_help as fn()),
+            ("file_clip_single_side_does_not_change_selection", file_clip_single_side_does_not_change_selection as fn()),
             ("move_snap_previews_and_exports_the_same_local_inputs_and_is_idempotent", move_snap_previews_and_exports_the_same_local_inputs_and_is_idempotent as fn()),
             ("normalized_pad_cannot_bypass_or_clear_opening_press_ownership", normalized_pad_cannot_bypass_or_clear_opening_press_ownership as fn()),
             ("invalid_start_requires_explicit_lead_in_and_keeps_selection", invalid_start_requires_explicit_lead_in_and_keeps_selection as fn()),

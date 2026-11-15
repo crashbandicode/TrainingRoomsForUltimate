@@ -555,7 +555,12 @@ fn post_recording_effect(menu: &mut Menu) {
     crate::engine::rr_host::note_drill(drill.clone());
     apply_grade_target(drill.as_deref(), kind);
     crate::engine::rr_host::publish_selection(std::path::Path::new(ROOT), &selection, kind);
-    crate::engine::rr_host::post_effect(menu.recording_mut().take_effect());
+    match menu.recording_mut().take_effect() {
+        crate::model::recording_menu::Effect::OpenCrop { source, combo } => {
+            crate::runtime::macros::replay_capture::open_file_editor(&source, combo);
+        }
+        effect => crate::engine::rr_host::post_effect(effect),
+    }
 }
 
 /// What the frame hook drills: the kind and id, and for a sequence the plan it was given (to see a change on the card).

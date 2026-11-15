@@ -132,7 +132,7 @@ pub enum Effect {
     None,
     Keyboard { header: &'static str, draft: String },
     MakeCombo { source: String, chain: bool },
-    Crop { source: String, combo: bool, start: u32, end: u32 },
+    OpenCrop { source: String, combo: bool },
     DuplicateSave { source: String },
     DeleteSave { source: String },
     /// A chain the menu just named. The host writes it; the local row is what the menu test sees first.
@@ -423,17 +423,6 @@ struct BuiltRow {
     drill: Option<String>,
 }
 
-/// The crop screen's two handles. L and R move the focused one. A saves. B returns.
-#[derive(Clone, Debug)]
-struct CropDraft {
-    source: String,
-    combo: bool,
-    span: u32,
-    start: u32,
-    end: u32,
-    out: bool,
-}
-
 /// The pop-up and the Recording page.
 #[derive(Clone, Debug)]
 pub struct RecordingScreens {
@@ -455,7 +444,6 @@ pub struct RecordingScreens {
     slots: [Option<String>; 5],
     last_effect: Effect,
     serial: u32,
-    crop: Option<CropDraft>,
 }
 
 impl RecordingScreens {
@@ -479,7 +467,6 @@ impl RecordingScreens {
             slots: Default::default(),
             last_effect: Effect::None,
             serial: 0,
-            crop: None,
         }
     }
 
@@ -492,7 +479,6 @@ impl RecordingScreens {
         if !self.popup_open && self.overlay_face == Face::Popup {
             self.picker = None;
             self.keyboard = None;
-            self.crop = None;
         }
     }
 
@@ -832,9 +818,6 @@ impl RecordingScreens {
         }
     }
 
-    pub fn crop_open(&self) -> bool {
-        self.crop.is_some()
-    }
 
     /// The index's selection, with every catalog load (`CatalogWatch::take_load`: a new opening or a file write). The
     /// menu publishes its selection back to the index (`rr_host::publish_selection`), so it must never hold one older
@@ -900,25 +883,12 @@ impl RecordingScreens {
             role.diag(),
             self.loop_of(role).label(),
         );
-        if let Some(crop) = &self.crop {
-            line.push_str(&format!(
-                " screen=crop source={} combo={} open=1 in={} out={}",
-                crop.source,
-                i32::from(crop.combo),
-                crop.start,
-                crop.end
-            ));
-        }
         line
     }
 
     /// One pop-up button. Always consumed while the pop-up is open.
     pub fn press_popup(&mut self, button: Button) {
         if !self.popup_open {
-            return;
-        }
-        if self.crop.is_some() {
-            self.press_crop(button);
             return;
         }
         if self.overlay_face == Face::Popup && self.overlay_open() {
@@ -948,10 +918,6 @@ impl RecordingScreens {
 
     /// One Recording-page button. L, R, and B pass through unless a file screen is open.
     pub fn handle_page(&mut self, button: Button, on_library: bool, group: u8) -> PageHit {
-        if self.crop.is_some() {
-            self.press_crop(button);
-            return PageHit::Consumed;
-        }
         if self.overlay_open() && self.overlay_face == Face::Page {
             self.press_overlay(button, Face::Page);
             return PageHit::Consumed;
@@ -1288,56 +1254,8 @@ impl RecordingScreens {
         }
     }
 
-    fn open_crop(&mut self, kind: ItemKind, id: String) {
-        let combo = kind == ItemKind::Combo;
-        let span = match kind {
-            ItemKind::Combo => self.combo_by_id(&id).map(|file| file.span).unwrap_or(0),
-            ItemKind::Recording => self.macro_by_id(&id).map(|file| file.span).unwrap_or(0),
-            _ => 0,
-        };
-        let span = span.max(1);
-        self.crop = Some(CropDraft { source: id, combo, span, start: 0, end: span, out: false });
-    }
-
-    fn press_crop(&mut self, button: Button) {
-        let Some(crop) = self.crop.as_mut() else { return };
-        match button {
-            Button::L | Button::R => {
-                let delta = if button == Button::L { -1 } else { 1 };
-                if crop.out {
-                    let next = (crop.end as i32 + delta).clamp(crop.start as i32 + 1, crop.span as i32);
-                    crop.end = next as u32;
-                } else {
-                    let next = (crop.start as i32 + delta).clamp(0, crop.end as i32 - 1);
-                    crop.start = next as u32;
-                }
-            }
-            Button::Up | Button::Down => crop.out = !crop.out,
-            Button::A => {
-                let Some(crop) = self.crop.take() else { return };
-                self.last_effect = Effect::Crop {
-                    source: crop.source,
-                    combo: crop.combo,
-                    start: crop.start,
-                    end: crop.end,
-                };
-            }
-            Button::B => self.crop = None,
-            _ => {}
-        }
-    }
-
-    pub fn crop_cursor(&self) -> usize {
-        usize::from(self.crop.as_ref().is_some_and(|crop| crop.out))
-    }
-
-    pub fn crop_rows(&self) -> Vec<FileRow> {
-        let Some(crop) = &self.crop else { return Vec::new() };
-        vec![
-            FileRow { title: "In".into(), value: format!("{}", crop.start), floppy: None },
-            FileRow { title: "Out".into(), value: format!("{}", crop.end), floppy: None },
-            FileRow { title: "Save".into(), value: "A saves a new file".into(), floppy: None },
-        ]
+    fn open_crop(&mut self, kind: ItemKind, source: String) {
+        self.last_effect = Effect::OpenCrop { source, combo: kind == ItemKind::Combo };
     }
 
     fn set_bound(&mut self, id: &str, on: bool) {
@@ -2618,7 +2536,7 @@ mod tests {
         assert!(screens.picker_open());
     }
 
-    fn the_crop_screen_posts_a_new_range_and_b_returns() {
+    fn crop_actions_open_the_shared_clip_editor() {
         let mut screens = screens();
         let row = screens.section(Face::Page, SAVES_MACROS, 1).rows.iter().position(|row| row.name == "Nair loop").unwrap();
         screens.set_cursor(Face::Page, SAVES_MACROS, 1, row);
@@ -2626,28 +2544,11 @@ mod tests {
         let crop = screens.file_rows().iter().position(|row| row.title == "Crop").unwrap();
         screens.set_file_cursor(crop);
         screens.handle_page(Button::A, true, SAVES_MACROS);
-        assert!(screens.crop_open());
-        assert!(matches!(screens.last_effect(), Effect::None));
-        assert!(screens.diag_line(Face::Page, SAVES_MACROS).contains("screen=crop source=nair combo=0"));
-        screens.handle_page(Button::R, true, SAVES_MACROS);
-        screens.handle_page(Button::Down, true, SAVES_MACROS);
-        screens.handle_page(Button::L, true, SAVES_MACROS);
-        screens.handle_page(Button::A, true, SAVES_MACROS);
-        match screens.last_effect() {
-            Effect::Crop { source, combo, start, end } => {
-                assert_eq!((source.as_str(), *combo, *start, *end), ("nair", false, 1, 11));
-            }
-            other => panic!("crop effect, got {other:?}"),
-        }
-        assert!(!screens.crop_open());
+        assert_eq!(screens.take_effect(), Effect::OpenCrop { source: "nair".into(), combo: false });
+        // The same action dispatches the combo, without an intermediate editor or write.
+        screens.open_crop(ItemKind::Combo, "combo".into());
+        assert_eq!(screens.take_effect(), Effect::OpenCrop { source: "combo".into(), combo: true });
         assert!(screens.catalog().macros.iter().any(|file| file.id == "nair" && file.name == "Nair loop"));
-        let _ = screens.take_effect();
-
-        screens.handle_page(Button::A, true, SAVES_MACROS);
-        assert!(screens.crop_open());
-        screens.handle_page(Button::B, true, SAVES_MACROS);
-        assert!(!screens.crop_open());
-        assert!(matches!(screens.take_effect(), Effect::None));
     }
 
     fn recording_popup_request_opens_the_popup() {
@@ -2848,7 +2749,7 @@ mod tests {
             ("the_combo_panel_lists_each_links_events_and_drift", the_combo_panel_lists_each_links_events_and_drift as fn()),
             ("the_floppy_is_grey_when_the_switch_is_off", the_floppy_is_grey_when_the_switch_is_off as fn()),
             ("new_chain_and_new_sequence_open_the_picker", new_chain_and_new_sequence_open_the_picker as fn()),
-            ("the_crop_screen_posts_a_new_range_and_b_returns", the_crop_screen_posts_a_new_range_and_b_returns as fn()),
+            ("crop_actions_open_the_shared_clip_editor", crop_actions_open_the_shared_clip_editor as fn()),
             ("recording_popup_request_opens_the_popup", recording_popup_request_opens_the_popup as fn()),
             ("a_numbered_row_drills_that_combo_and_drill_sequence_drills_the_sequence", a_numbered_row_drills_that_combo_and_drill_sequence_drills_the_sequence as fn()),
             ("edit_combos_writes_the_new_order_and_r_removes_the_last_number", edit_combos_writes_the_new_order_and_r_removes_the_last_number as fn()),

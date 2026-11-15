@@ -11,12 +11,12 @@ use super::library::{
     StartSaveState, Use, MACROS_DIR, SAVES_DIR, SEQUENCES_DIR,
 };
 use super::frame_queue::FrameQueue;
-use super::macros::{FrameWindow, InputFrame, Library, MacroRecording, MomentumMode, Placement, MAX_FRAMES};
+use super::macros::{InputFrame, Library, MacroRecording, MomentumMode, Placement, MAX_FRAMES};
 #[cfg(test)]
 use super::macros::FrameSnapshot;
 use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
-    chord_notice, civil_date, crop_combo_file, crop_macro_file, delete_save,
+    chord_notice, civil_date, delete_save,
     drive_mash, drive_play, drive_step, duplicate_save, finish_recording, migrate_at_boot,
     push_frame, save_chord, save_made_combo, start_save_notice, toggle_record, Capture,
     KeyboardOffer, Tape, EMPTY_COMBO, READ_WINDOW, RESIDENT_FRAMES,
@@ -621,7 +621,7 @@ pub fn catalog_generation() -> u64 {
     CATALOG_GEN.load(Ordering::Acquire)
 }
 
-fn bump_catalog() {
+pub(crate) fn bump_catalog() {
     CATALOG_GEN.fetch_add(1, Ordering::Release);
     BOUND_DIRTY.store(true, Ordering::Release);
 }
@@ -1278,15 +1278,7 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
             tick.diags.push(format!("screen=rename header={header}"));
             tick.keyboard = Some(KeyboardOffer { header, draft });
         }
-        Effect::Crop { source, combo, start, end } => {
-            if write_crop_range(root, &source, combo, start, end).is_some() {
-                tick.diags.push(format!(
-                    "screen=crop source={source} combo={} saved=1",
-                    i32::from(combo)
-                ));
-                bump_catalog();
-            }
-        }
+        Effect::OpenCrop { .. } => {} // The menu worker opens the shared clip editor.
         Effect::MakeCombo { source, chain } => {
             begin_make(root, machine, book, &source, chain, tick)
         }
@@ -1480,37 +1472,6 @@ fn finish_make(root: &Path, tick: &mut Tick) {
     }
 }
 
-fn write_crop_range(root: &Path, source: &str, combo: bool, start: u32, end: u32) -> Option<String> {
-    if combo {
-        let library = ComboLibrary::new(root.join("combos"));
-        let original = library.load(source).ok()?;
-        let span = original.combo.len() as u32;
-        let (start, end) = clamp_range(start, end, span)?;
-        let names = library.list().ok()?.entries.into_iter().map(|entry| entry.name).collect::<Vec<_>>();
-        let name = super::rr_runtime::unused_name("Combo", &names);
-        let id = crop_combo_file(root, source, start, end, &name).ok()?;
-        note_hot(root, Kind::Combo, &id);
-        return Some(id);
-    }
-    let library = Library::new(root.join(MACROS_DIR));
-    let original = library.load(source).ok()?;
-    let span = original.frames.len() as u32;
-    let (start, end) = clamp_range(start, end, span)?;
-    let snapshot = super::macros::FrameSnapshot { frame: start, state: original.start };
-    let names = library.list().ok()?.entries.into_iter().map(|entry| entry.name).collect::<Vec<_>>();
-    let name = super::rr_runtime::unused_name("Macro", &names);
-    let id = crop_macro_file(root, source, start, end, &snapshot, &name).ok()?;
-    note_hot(root, Kind::Macro, &id);
-    Some(id)
-}
-
-fn clamp_range(start: u32, end: u32, span: u32) -> Option<(u32, u32)> {
-    let mut window = FrameWindow::new(span).ok()?;
-    window.set_in(start);
-    window.set_out(end);
-    Some((window.start(), window.end()))
-}
-
 fn note_hot(root: &Path, kind: Kind, id: &str) {
     let Ok(mut index) = RecordingIndex::load(root) else {
         return;
@@ -1524,9 +1485,9 @@ fn note_hot(root: &Path, kind: Kind, id: &str) {
 pub fn write_crop(root: &Path, source: &str, combo: bool) -> Option<String> {
     let window = lock(&CROP).take()?;
     if combo {
-        crop_combo_file(root, source, window.start, window.end, &window.name).ok()
+        super::rr_runtime::crop_combo_file(root, source, window.start, window.end, &window.name).ok()
     } else {
-        crop_macro_file(
+        super::rr_runtime::crop_macro_file(
             root,
             source,
             window.start,
@@ -1949,9 +1910,9 @@ mod tests {
             snapshot: FrameSnapshot { frame: 0, state: StartState::neutral(8, 0, 1.0) },
             name: "Nair crop".into(),
         });
-        post_effect(Effect::Crop { source: macro_id.clone(), combo: false, start: 0, end: 1 });
+        post_effect(Effect::OpenCrop { source: macro_id.clone(), combo: false });
         let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7));
-        assert!(tick.diags.iter().any(|line| line.starts_with("screen=crop source=")));
+        assert!(tick.diags.iter().all(|line| !line.starts_with("screen=crop source=")), "opening the editor never writes a file");
         assert_eq!(Library::new(root.join(MACROS_DIR)).list().unwrap().entries.len(), 2);
         post_effect(Effect::Keyboard { header: "Name macro", draft: "Nair".into() });
         let named = service_at(&root, &none(), "2026-11-06", state(8), state(7));

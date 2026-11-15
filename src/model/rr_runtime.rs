@@ -303,6 +303,27 @@ pub struct KeyboardOffer {
     pub draft: String,
 }
 
+/// A kept file owned by the shared clip editor until the keyboard confirms it.
+pub enum ClipFile { Macro(Box<MacroRecording>), Combo(Box<ComboRecord>) }
+
+/// Always creates a fresh id; empty keyboard text chooses the next unused number.
+pub fn save_clip_file(root: &Path, file: ClipFile, typed: &str) -> Result<String, Error> {
+    match file {
+        ClipFile::Macro(mut recording) => {
+            let library = Library::new(root.join(MACROS_DIR));
+            let names: Vec<_> = library.list().map_err(record)?.entries.into_iter().map(|entry| entry.name).collect();
+            recording.name = if typed.trim().is_empty() { unused_name("Macro", &names) } else { typed.trim().to_owned() };
+            library.save_new(&recording).map_err(record)
+        }
+        ClipFile::Combo(mut recording) => {
+            let library = ComboLibrary::new(root.join("combos"));
+            let names: Vec<_> = library.list().map_err(record)?.entries.into_iter().map(|entry| entry.name).collect();
+            recording.name = if typed.trim().is_empty() { unused_name("Combo", &names) } else { typed.trim().to_owned() };
+            library.save_new(&recording).map_err(record)
+        }
+    }
+}
+
 pub fn crop_macro(
     frames: &[InputFrame],
     start: u32,
@@ -917,6 +938,61 @@ mod tests {
         assert_eq!(combos.load(&combo_id).unwrap().combo.links().count(), 2);
     }
 
+    fn file_clip_save_as_new_preserves_original() {
+        use crate::model::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
+        let root = scratch("shared-clip");
+        let macros = Library::new(root.join(MACROS_DIR));
+        let source = recording("Original", &[1, 2, 3, 4], Some("keep"));
+        let id = macros.save_new(&source).unwrap();
+        let path = macros.dir().join(format!("{id}.json"));
+        let before = std::fs::read(&path).unwrap();
+        let mut editor = ClipEditor::macro_file(source, false).unwrap();
+        editor.on_action(ClipAction::SelectIn);
+        editor.on_action(ClipAction::Nudge(1));
+        let ClipEffect::Export(cut) = editor.on_action(ClipAction::Confirm) else { panic!("macro export"); };
+        let new_id = save_clip_file(&root, ClipFile::Macro(cut), "Kept").unwrap();
+        assert_ne!(id, new_id);
+        assert_eq!(std::fs::read(path).unwrap(), before);
+        let kept = macros.load(&new_id).unwrap();
+        assert_eq!(kept.name, "Kept");
+        assert_eq!(kept.frames.iter().map(|f| f.buttons).collect::<Vec<_>>(), vec![2, 3, 4]);
+        assert_eq!(kept.start_save.as_deref(), Some("keep"));
+
+        let combos = ComboLibrary::new(root.join("combos"));
+        let source = ComboRecord::new("Original".into(), Combo::from_links([
+            link(Move::Aerial, Move::SideTilt), link(Move::SideTilt, Move::NeutralSpecial),
+        ]).unwrap(), None);
+        let id = combos.save_new(&source).unwrap();
+        let path = combos.dir().join(format!("{id}.json"));
+        let before = std::fs::read(&path).unwrap();
+        let mut editor = ClipEditor::combo_file(source).unwrap();
+        editor.on_action(ClipAction::SelectIn);
+        editor.on_action(ClipAction::Nudge(1));
+        let ClipEffect::ExportCombo(cut) = editor.on_action(ClipAction::Confirm) else { panic!("combo export"); };
+        let new_id = save_clip_file(&root, ClipFile::Combo(cut), "Last link").unwrap();
+        assert_ne!(id, new_id);
+        assert_eq!(std::fs::read(path).unwrap(), before);
+        let kept = combos.load(&new_id).unwrap();
+        assert_eq!(kept.name, "Last link");
+        assert_eq!(kept.combo.links().count(), 1);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    fn file_clip_empty_name_uses_unused_number() {
+        let root = scratch("clip-name");
+        let source = recording("Macro 1", &[1, 2], None);
+        let macros = Library::new(root.join(MACROS_DIR));
+        macros.save_new(&source).unwrap();
+        let id = save_clip_file(&root, ClipFile::Macro(Box::new(source)), "  ").unwrap();
+        assert_eq!(macros.load(&id).unwrap().name, "Macro 2");
+        let combos = ComboLibrary::new(root.join("combos"));
+        let source = ComboRecord::new("Combo 1".into(), Combo::from_links([link(Move::Aerial, Move::SideTilt)]).unwrap(), None);
+        combos.save_new(&source).unwrap();
+        let id = save_clip_file(&root, ClipFile::Combo(Box::new(source)), "").unwrap();
+        assert_eq!(combos.load(&id).unwrap().name, "Combo 2");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     fn replay_export_has_no_start_save() {
         let frames = vec![frame(1), frame(2), frame(3)];
         let snapshot = FrameSnapshot {
@@ -1181,6 +1257,8 @@ mod tests {
             ("rename_uses_the_switch_keyboard_headers", rename_uses_the_switch_keyboard_headers as fn()),
             ("an_online_room_opens_every_name_keyboard", an_online_room_opens_every_name_keyboard as fn()),
             ("crop_writes_a_new_file_and_leaves_the_original", crop_writes_a_new_file_and_leaves_the_original as fn()),
+            ("file_clip_save_as_new_preserves_original", file_clip_save_as_new_preserves_original as fn()),
+            ("file_clip_empty_name_uses_unused_number", file_clip_empty_name_uses_unused_number as fn()),
             ("replay_export_has_no_start_save", replay_export_has_no_start_save as fn()),
             ("make_combo_on_a_chain_plays_one_pass_on_player_1", make_combo_on_a_chain_plays_one_pass_on_player_1 as fn()),
             ("the_chord_notice_shows_once", the_chord_notice_shows_once as fn()),
