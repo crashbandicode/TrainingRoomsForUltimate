@@ -37,6 +37,7 @@ import gna_p2_fs as fs  # noqa: E402
 import fx  # noqa: E402
 import cyclefix as cf  # noqa: E402
 import afull as af  # noqa: E402
+import steps  # noqa: E402
 from gna import _begin, _mark, _shot, _finish, OFF  # noqa: E402
 
 KNOB = 'window mii'   # A1 on and Mii groups kept: both switches as the build ships them
@@ -96,21 +97,22 @@ def _status(ctx):
 
 def _bodies(lines, owner=None):
     """Every `demand` and `cold release` in `lines`: what it counted against Ready Fighters. A demand over Ready Fighters is
-    a cold fighter (`cold=true`, at most one body over, `body_bank::cold_admitted`); a release names the bodies before it."""
+    a cold fighter (`cold=true`, at most one body over, or two while a cold fighter is on screen: `COLD_TO_COLD_TWO`,
+    `body_bank::cold_admitted`); a release names the bodies before it."""
     seen, bad = [], []
     for t in lines:
         m = DEMAND.search(t)
         if m and (owner is None or int(m.group(1)) == owner):
             b, r, cold = int(m.group(2)), int(m.group(3)), m.group(4) == 'true'
             seen.append(('demand', b, r, cold))
-            if b > r + 1 or cold != (b > r):
+            if b > r + 2 or cold != (b > r):
                 bad.append(t[:220])
             continue
         m = RELEASE.search(t)
         if m and (owner is None or int(m.group(1)) == owner):
             b, r = int(m.group(3)), int(m.group(4))
             seen.append(('release', b, r, True))
-            if b > r + 1 or b <= r:
+            if b > r + 2 or b <= r:
                 bad.append(t[:220])
     return seen, bad
 
@@ -263,7 +265,7 @@ def a1_regress(ctx, rf=8, picks=None, name='a1-regress'):
         problems.append('the keep left a cold fighter and neither a `cold release` nor its group leaving the cycle followed: status %s' % out['status_end'])
     if rf < 8 and not any(kind == 'demand' for kind, *_ in out['bodies_seen']):
         problems.append('no cold press in the laps at Ready Fighters %d: the lane fit' % rf)
-    problems += ['over Ready Fighters + 1, or cold flag wrong: %s' % t for t in bodies_bad]
+    problems += ['over Ready Fighters + 2, or cold flag wrong: %s' % t for t in bodies_bad]
     problems += ['demand declined: %s' % t for t in out['declined']]
     problems += lap_problems
     problems += ['bad line: %s' % t for t in out['bad_all']]
@@ -495,6 +497,10 @@ def a1_crash(ctx):
     lane = [fs.GUNNER, fs.PICHU, fs.DIDDY, fs.KROOL, cf.PYRA]
     seq = hs.diag_mark(ctx)
     fx._live_set(ctx, cpu_roster=fs._roster(lane), cycle_preload_ready_fighters=fs.RF(8))
+    # The fighters that left the list are freed at the next pause (fighter-cycles.md): + twice, as cf-pyra-keep does, so Pyra's group has room.
+    time.sleep(1.0)
+    steps.press(ctx, 'plus', 2.0)
+    steps.press(ctx, 'plus', 2.0)
     out['settle0'] = fs._settled(ctx, seq, 150)
     out['to_gunner'] = _land(ctx, 1, fs.GUNNER)
     out['settle1'] = fs._settled(ctx, hs.diag_mark(ctx), 120)
@@ -626,7 +632,7 @@ def a1_cold(ctx):
         problems.append('no cold press (a demand over Ready Fighters) after the keep: the lane fit')
     if not out['cold_release']:
         problems.append('no `cold release` after the keep')
-    problems += ['over Ready Fighters + 1, or cold flag wrong: %s' % t for t in bodies_bad]
+    problems += ['over Ready Fighters + 2, or cold flag wrong: %s' % t for t in bodies_bad]
     problems += ['demand declined: %s' % t for t in out['declined']]
     problems += lap_problems
     if out['stalls']:
