@@ -16139,7 +16139,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "a652c9b2fa59cd19f02233eadb1fb64848e45eba02983bc7c23c5cda9c52f753",
+   "dest_sha256": "0adaf24bb6456d304e6817d8f1d97fe31007c9323c97522d926bca62f78aa60d",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -19028,6 +19028,11 @@
      "old": "                    trace!(\"[GroupSwap] module pins held role={} entry={:p} owner={}: not the bank's tick (entry={:#x} owner={} phase={:?}); they wait for its Ready\",\n",
      "new": "                    trace!(\"[GroupSwap] module pins held role={} entry={:p} owner={}: this tick is another entry's (bank entry={:#x} owner={} phase={:?}); they wait for the bank's Ready\",\n",
      "reason": "rc.14 cycle fix 10: two diag lines reworded without refusal words (compliance: no user-facing refusal)"
+    },
+    {
+     "old": "                    trace!(\"[GroupSwap] module pins held role={} entry={:p} owner={}: this tick is another entry's (bank entry={:#x} owner={} phase={:?}); they wait for the bank's Ready\",\n",
+     "new": "                    trace!(\"[GroupSwap] module pins held role={} entry={:p} owner={}: this tick is another entry's (bank entry={:#x} owner={} phase={:?}); they stay until the bank is Ready\",\n",
+     "reason": "rc.14 cycle fix 11: the pins diag line reworded without 'wait for' (compliance)"
     }
    ]
   },

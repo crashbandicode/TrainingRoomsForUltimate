@@ -3160,7 +3160,7 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
             }
             crate::engine::swap::body_bank::PinStep::Wait => if let Some((phase, _, false, bank_entry, bank_owner)) = bank {
                 if !PIN_WAIT_NOTED[role].swap(true, Ordering::AcqRel) {
-                    trace!("[GroupSwap] module pins held role={} entry={:p} owner={}: this tick is another entry's (bank entry={:#x} owner={} phase={:?}); they wait for the bank's Ready",
+                    trace!("[GroupSwap] module pins held role={} entry={:p} owner={}: this tick is another entry's (bank entry={:#x} owner={} phase={:?}); they stay until the bank is Ready",
                         role, entry, owner, bank_entry, bank_owner, phase);
                 }
             },
