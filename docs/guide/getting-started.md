@@ -98,7 +98,7 @@ At the bottom of every menu page, the key hints end with the **build tag**. For 
 So a build whose tag reads `0.2.0-rc.15 · rc15 …` is rc.15. [Current release](../CURRENT-RELEASE.md) says which release
 that page describes, what it adds and what is known not to work.
 
-**An older build** reads differently. Its first part is `0.2.0-rc.6`, whatever its release, so read the second part: rc.13
+**A build before rc.14** reads differently. Its first part is `0.2.0-rc.6`, whatever its release, so read the second part: rc.13
 showed `rc13`, rc.12 `rc12`, and so on.
 
 ![Two menu pages whose key hints end with the build tag](../media/rc11-footer-tag.gif)<br>
