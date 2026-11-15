@@ -1361,20 +1361,8 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
                 bump_catalog();
             }
         }
-        Effect::WriteChain { name, steps } => {
-            if let Ok(chain) = Chain::new(name, steps) {
-                if Store::<super::library::Chain>::new(root.join(MACROS_DIR)).save_new(&chain).is_ok() {
-                    bump_catalog();
-                }
-            }
-        }
-        Effect::WriteSequence { name, combos } => {
-            if let Ok(sequence) = Sequence::new(name, combos) {
-                if Store::<Sequence>::new(root.join(SEQUENCES_DIR)).save_new(&sequence).is_ok() {
-                    bump_catalog();
-                }
-            }
-        }
+        Effect::WriteChain { name, steps } => save_new_record(root, MACROS_DIR, Chain::new(name, steps).ok()),
+        Effect::WriteSequence { name, combos } => save_new_record(root, SEQUENCES_DIR, Sequence::new(name, combos).ok()),
         Effect::RenameSave { id, name } => {
             rename::<NamedSave>(root, SAVES_DIR, &id, |f| f.name = name)
         }
@@ -1453,6 +1441,14 @@ pub fn delete_file(root: &Path, kind: crate::model::recording_menu::FileKind, id
         }
     }
     true
+}
+
+fn save_new_record<R: Record>(root: &Path, dir: &str, file: Option<R>) {
+    if let Some(file) = file {
+        if Store::<R>::new(root.join(dir)).save_new(&file).is_ok() {
+            bump_catalog();
+        }
+    }
 }
 
 /// Rename on a save, a macro, a chain, a combo or a sequence, or a macro's or chain's Start save switch: the file is
