@@ -3599,7 +3599,7 @@
    "dest": "src/model/swap/body_bank.rs",
    "crate": "consts",
    "src_sha256": "ab3c4adcf084b2dd9433a5fe5715b428fb38c26d3b143d7632fb3d33078df0d6",
-   "dest_sha256": "3ee9f2e7930bafa2970b9216ae16baa86610823761caf13788a10efc1cd99a25",
+   "dest_sha256": "b3fadd420238211305023ac731196fd005d077143ae99884cffd080831f2a4fd",
    "edits": [
     {
      "old": "    // a native group): count it so hats and helper slots agree with the planner.\n    let used: usize = windows.iter().map(|window| window.map_or(1, |members| members.count())).sum::<usize>()\n        + existing.iter().flat_map(|groups| groups.iter()).map(|members| members.count()).sum::<usize>()\n        + budget.hats_wanted;\n    let mut remaining = budget.ready_fighters.saturating_sub(used).min(budget.pool_free);\n    // (lane depth, kind): depth is the distance from the live fighter, so a role\n    // whose nearer neighbours are already built does not outrank the other role.\n    let mut candidates: [Vec<(usize, u32)>; 2] = [Vec::new(), Vec::new()];\n    // Whole special groups (PT, Aegis, the pair) at their lane depth.\n    let mut specials: [Vec<(usize, Members)>; 2] = [Vec::new(), Vec::new()];\n    let mut room = [0usize; 2];\n    let mut group_slots = [0usize; 2];\n    for role in 0..2 {\n        let Some(window) = windows[role].filter(|window| window_swappable_with(*window, policy)) else { continue; };\n        group_slots[role] = MAX_EXTRA_GROUPS.saturating_sub(existing[role].len());\n        room[role] = group_slots[role] * NATIVE_MEMBERS;\n        for (depth, &kind) in upcoming[role].iter().enumerate() {\n            if exclude[role] == Some(kind)\n                || window.index_of(kind).is_some()\n                || existing[role].iter().any(|group| group.index_of(kind).is_some())\n            { continue; }\n            if let Some(group) = Members::special_group(kind, budget.special) {\n                // One Mii identity per resource owner: a second lane Mii, or a\n                // Mii group this role already holds, stays canonical (DESIGN \u00a72).\n                let second_mii = group.special() == Special::Mii\n                    && (specials[role].iter().any(|(_, held)| held.special() == Special::Mii)\n                        || existing[role].iter().any(|held| held.special() == Special::Mii));\n                if !second_mii && !specials[role].iter().any(|(_, held)| held.kinds()[0] == group.kinds()[0]) {\n                    specials[role].push((depth, group));\n                }\n                continue;\n            }\n            if group_member_kind(kind, policy) && !candidates[role].iter().any(|(_, held)| *held == kind) {\n                candidates[role].push((depth, kind));\n            }\n        }\n    }\n    // Special groups are taken whole at their own lane depth, interleaved with\n    // the ordinary candidates; one that no longer fits the remaining bodies or a\n    // free group slot is skipped, never split.\n    let mut chosen_special: [Vec<Members>; 2] = [Vec::new(), Vec::new()];\n    let mut scursor = [0usize; 2];\n    let mut chosen: [Vec<u32>; 2] = [Vec::new(), Vec::new()];\n    let mut cursor = [0usize; 2];\n    let take = |role: usize, chosen: &mut [Vec<u32>; 2], cursor: &mut [usize; 2], remaining: &mut usize| -> bool {\n        if *remaining == 0 || cursor[role] >= candidates[role].len() || chosen[role].len() >= room[role] {\n            return false;\n        }\n        chosen[role].push(candidates[role][cursor[role]].1);\n        cursor[role] += 1;\n        *remaining -= 1;\n        true\n    };\n    let deepest = upcoming.iter().map(|lane| lane.len()).max().unwrap_or(0);\n    for depth in 0..deepest {\n        for role in 0..2 {\n            if cursor[role] < candidates[role].len() && candidates[role][cursor[role]].0 == depth {\n                take(role, &mut chosen, &mut cursor, &mut remaining);\n            } else if scursor[role] < specials[role].len() && specials[role][scursor[role]].0 == depth {\n                let group = specials[role][scursor[role]].1;\n                scursor[role] += 1;\n                let slots_used = chosen_special[role].len() + chosen[role].len().div_ceil(NATIVE_MEMBERS);\n                if remaining >= group.count() && slots_used < group_slots[role] {\n                    chosen_special[role].push(group);\n                    remaining -= group.count();\n",
@@ -5230,6 +5230,11 @@
     {
      "old": "            (\"the_pt_lap_is_warm_after_its_first_reload_with_the_switch_on_and_cold_with_it_off\", the_pt_lap_is_warm_after_its_first_reload_with_the_switch_on_and_cold_with_it_off as fn()),\n            (\"both_banks_with_a_deferred_group_build_then_admit_it\", both_banks_with_a_deferred_group_build_then_admit_it as fn()),\n",
      "new": "            (\"the_pt_lap_is_warm_after_its_first_reload_with_the_switch_on_and_cold_with_it_off\", the_pt_lap_is_warm_after_its_first_reload_with_the_switch_on_and_cold_with_it_off as fn()),\n            (\"a_parked_group_of_the_other_role_leaves_room_for_the_trainer\", a_parked_group_of_the_other_role_leaves_room_for_the_trainer as fn()),\n            (\"parked_groups_do_not_count_against_the_room_but_live_ones_do\", parked_groups_do_not_count_against_the_room_but_live_ones_do as fn()),\n            (\"both_banks_with_a_deferred_group_build_then_admit_it\", both_banks_with_a_deferred_group_build_then_admit_it as fn()),\n",
+     "reason": "rc.14 ptg-room (the primary 2026-11-15 ~10:30Z; pt-n1 t-ptg-regress-cpu on 542296d5: the CPU's parked groups and its stale start-up window extras used P1's room, PT stayed canonical): the room of the one-member window for a native group or the pair is the pool less the other role's live, unparked bodies (body_bank::unparked_bodies)"
+    },
+    {
+     "old": "    // Fail-first stub: today's charge, every group that counts bodies (parked ones included).\n    window.saturating_sub(1) + groups.into_iter().filter(|(_, state, _)| state.counts_bodies()).map(|(count, _, _)| count).sum::<usize>()\n",
+     "new": "    window.saturating_sub(1) + groups.into_iter().filter(|(_, state, leaving)| state.counts_bodies() && !leaving)\n        .map(|(count, _, _)| count).sum::<usize>()\n",
      "reason": "rc.14 ptg-room (the primary 2026-11-15 ~10:30Z; pt-n1 t-ptg-regress-cpu on 542296d5: the CPU's parked groups and its stale start-up window extras used P1's room, PT stayed canonical): the room of the one-member window for a native group or the pair is the pool less the other role's live, unparked bodies (body_bank::unparked_bodies)"
     }
    ]
@@ -16749,7 +16754,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "b1df408e5afc10f97482e3b78d3125761b63c036bee2301a66d1a8e4525c8cd5",
+   "dest_sha256": "ffb73f0fbb7c27bceae01a565ef40f627a5731f33124dc4419f71d04abb590ac",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -19893,6 +19898,26 @@
      "old": "    let Some((role, index)) = capacity_release(settled, parked.iter().copied()) else { return; };\n",
      "new": "    let Some((role, index)) = capacity_release(settled, parked.iter().copied()) else {\n        if let Some(shortfall) = shortfall.filter(|_| settled && parked.is_empty()) {\n            super::sources::give_back_for(owner, group, shortfall);\n        }\n        return;\n    };\n",
      "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "\n/// Both roles' bodies: the two on screen, this bank's extras and the other role's (`other`, [`role_extra_bodies`]).\n",
+     "new": "\n/// rc.14 ptg-room: [`role_extra_bodies`] without the leaving groups (`body_bank::unparked_bodies`), read the same way.\nfn role_unparked_bodies(role: usize) -> usize {\n    BANKS[role].lock().as_ref().filter(|b| !b.departed && b.phase != Phase::Retired).map_or(0, |b|\n        crate::engine::swap::body_bank::unparked_bodies(b.members.count(), b.groups.iter().map(|g| (g.members.count(), g.state, g.leaving))))\n}\n\n/// Both roles' bodies: the two on screen, this bank's extras and the other role's (`other`, [`role_extra_bodies`]).\n",
+     "reason": "rc.14 ptg-room (the primary 2026-11-15 ~10:30Z; pt-n1 t-ptg-regress-cpu on 542296d5: the CPU's parked groups and its stale start-up window extras used P1's room, PT stayed canonical): the room of the one-member window for a native group or the pair is the pool less the other role's live, unparked bodies (body_bank::unparked_bodies)"
+    },
+    {
+     "old": "            let special = special_policy(&settings);\n            let window = crate::engine::swap::body_bank::special_neighbour_window(target,\n",
+     "new": "            let special = special_policy(&settings);\n            // rc.14 ptg-room (pt-n1 `t-ptg-regress-cpu`): the room is the pool less the other role's live, unparked bodies\n            // (`body_bank::unparked_bodies`), not `EXTRAS + GROUP_BODIES`: a parked group goes when PT needs its room\n            // (`release_for_new_members`, once this bank is Ready), and `EXTRAS` can still hold a window an exchange moved\n            // into a group. Read under that bank's lock alone, as `role_extra_bodies`; this role's lock is not held here.\n            let room = pool.saturating_sub(role_unparked_bodies(1 - role));\n            let window = crate::engine::swap::body_bank::special_neighbour_window(target,\n",
+     "reason": "rc.14 ptg-room (the primary 2026-11-15 ~10:30Z; pt-n1 t-ptg-regress-cpu on 542296d5: the CPU's parked groups and its stale start-up window extras used P1's room, PT stayed canonical): the room of the one-member window for a native group or the pair is the pool less the other role's live, unparked bodies (body_bank::unparked_bodies)"
+    },
+    {
+     "old": "                pool.saturating_sub(other_total), live_gate(target.kinds[0]))?;\n",
+     "new": "                room, live_gate(target.kinds[0]))?;\n",
+     "reason": "rc.14 ptg-room (the primary 2026-11-15 ~10:30Z; pt-n1 t-ptg-regress-cpu on 542296d5: the CPU's parked groups and its stale start-up window extras used P1's room, PT stayed canonical): the room of the one-member window for a native group or the pair is the pool less the other role's live, unparked bodies (body_bank::unparked_bodies)"
+    },
+    {
+     "old": "                owner, target.kinds[0], &lane[..count], DebugIter(upcoming.iter().take(5)), special, pool.saturating_sub(other_total));\n",
+     "new": "                owner, target.kinds[0], &lane[..count], DebugIter(upcoming.iter().take(5)), special, room);\n",
+     "reason": "rc.14 ptg-room (the primary 2026-11-15 ~10:30Z; pt-n1 t-ptg-regress-cpu on 542296d5: the CPU's parked groups and its stale start-up window extras used P1's room, PT stayed canonical): the room of the one-member window for a native group or the pair is the pool less the other role's live, unparked bodies (body_bank::unparked_bodies)"
     }
    ]
   },

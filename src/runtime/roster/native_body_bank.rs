@@ -1251,6 +1251,12 @@ fn role_extra_bodies(role: usize) -> usize {
     BANKS[role].lock().as_ref().filter(|b| !b.departed && b.phase != Phase::Retired).map_or(0, extra_bodies)
 }
 
+/// rc.14 ptg-room: [`role_extra_bodies`] without the leaving groups (`body_bank::unparked_bodies`), read the same way.
+fn role_unparked_bodies(role: usize) -> usize {
+    BANKS[role].lock().as_ref().filter(|b| !b.departed && b.phase != Phase::Retired).map_or(0, |b|
+        crate::engine::swap::body_bank::unparked_bodies(b.members.count(), b.groups.iter().map(|g| (g.members.count(), g.state, g.leaving))))
+}
+
 /// Both roles' bodies: the two on screen, this bank's extras and the other role's (`other`, [`role_extra_bodies`]).
 fn bodies_with(bank: &Bank, other: usize) -> usize {
     2 + other + extra_bodies(bank)
@@ -1553,12 +1559,17 @@ pub(super) fn proposed(owner: u32, target: Forms, upcoming: &[u32]) -> Option<Me
             let pair = super::original_kind(logical) != Some(POPO)
                 && super::requested_forms_at(&menu, logical, POPO, Some(0)) == Forms::starting(POPO);
             let special = special_policy(&settings);
+            // rc.14 ptg-room (pt-n1 `t-ptg-regress-cpu`): the room is the pool less the other role's live, unparked bodies
+            // (`body_bank::unparked_bodies`), not `EXTRAS + GROUP_BODIES`: a parked group goes when PT needs its room
+            // (`release_for_new_members`, once this bank is Ready), and `EXTRAS` can still hold a window an exchange moved
+            // into a group. Read under that bank's lock alone, as `role_extra_bodies`; this role's lock is not held here.
+            let room = pool.saturating_sub(role_unparked_bodies(1 - role));
             let window = crate::engine::swap::body_bank::special_neighbour_window(target,
                 upcoming.iter().copied().filter(|kind| *kind != POPO || pair), special, groups_enabled(&settings),
-                pool.saturating_sub(other_total), live_gate(target.kinds[0]))?;
+                room, live_gate(target.kinds[0]))?;
             TARGET_FIRST[role].store(target.kinds[0], Ordering::Release);
             trace!("[BodyBank] target first owner={} target={:#x} lane={:x?} upcoming={:x?} special={:?} room={}; one-member Reload, its native group or pair builds beside it (rc.14 pt-groups)",
-                owner, target.kinds[0], &lane[..count], DebugIter(upcoming.iter().take(5)), special, pool.saturating_sub(other_total));
+                owner, target.kinds[0], &lane[..count], DebugIter(upcoming.iter().take(5)), special, room);
             Some(window)
         });
         return one;

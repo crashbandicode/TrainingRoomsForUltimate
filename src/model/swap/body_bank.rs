@@ -1206,8 +1206,8 @@ pub fn special_neighbour_window(forms: Forms, lane: impl IntoIterator<Item = u32
 /// planner runs once this role has its bank), any other on the entry tick. `EXTRAS` is not read: it keeps the window a
 /// Reload built, which an exchange can move into a group counted again (the CPU's start-up window `[54, 13, 27]`, #527).
 pub fn unparked_bodies(window: usize, groups: impl IntoIterator<Item = (usize, GroupState, bool)>) -> usize {
-    // Fail-first stub: today's charge, every group that counts bodies (parked ones included).
-    window.saturating_sub(1) + groups.into_iter().filter(|(_, state, _)| state.counts_bodies()).map(|(count, _, _)| count).sum::<usize>()
+    window.saturating_sub(1) + groups.into_iter().filter(|(_, state, leaving)| state.counts_bodies() && !leaving)
+        .map(|(count, _, _)| count).sum::<usize>()
 }
 
 /// The group a [`target_first`] Reload's neighbours build as: the members the `full` window would have held besides
