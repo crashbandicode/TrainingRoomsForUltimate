@@ -62,22 +62,54 @@ def _slots(ctx, seq):
     return [t[:200] for t in af._since(ctx, seq) if SLOT.search(t)]
 
 
-def a2_k2(ctx):
+DECLINED = re.compile(r'\[GroupSwap\] demand declined owner=1 kind=(0x[0-9a-f]+): (.*)')
+
+
+def _with_reasons(ctx, name, run):
+    """cycle-fix's row `run`; a failure also names `demand`'s own declines and any slot refusal (boot a2-e881df1e-y1: the
+    decline had rotated out of the diag log by the time it was read)."""
     seq = hs.diag_mark(ctx)
-    out = cf.cf_k2(ctx)
+    try:
+        out = run(ctx)
+    except RuntimeError as failed:
+        lines = af._since(ctx, seq)
+        declined = sorted({DECLINED.search(t).group(2)[:120] for t in lines if DECLINED.search(t)})[:6]
+        raise RuntimeError('%s; demand declines: %s; slot refusals: %s' % (str(failed)[:900], declined or 'none',
+                                                                         _slots(ctx, seq)[:2] or 'none'))
     hits = _slots(ctx, seq)
     if hits:
-        raise RuntimeError('a2-k2: a group slot made a fitting fighter cold: %s' % hits[:3])
+        raise RuntimeError('%s: a group slot made a fitting fighter cold: %s' % (name, hits[:3]))
     return out
+
+
+READY = re.compile(r'\[CyclePreload\] applied .*? ready_fighters=(\d+)')
+
+
+def a2_k2(ctx):
+    """cf-k2 in the state its expectation was written for (its docstring: Player 1 still Mario > Pikachu; it sets Ready
+    Fighters 6 itself). Boot a2-e881df1e-y1's first pass ran it with the console's P1 lane (Pikachu, Kirby, Palutena),
+    whose bodies left the CPU 4 cold fighters a lap. The Ready Fighters the plugin applied is read back and named."""
+    seq = hs.diag_mark(ctx)
+    fx._live_set(ctx, player_roster=fs._roster([fs.PIKACHU]))
+    fs._settled(ctx, seq, 120)
+    try:
+        return _with_reasons(ctx, 'a2-k2', cf.cf_k2)
+    except RuntimeError as failed:
+        applied = [int(m.group(1)) for _, _, t in hs.diag_lines(ctx) for m in [READY.search(t)] if m]
+        raise RuntimeError('%s; Ready Fighters applied %s; P1 lane Mario > Pikachu; CPU lap %d members'
+                           % (str(failed)[:1200], applied[-1:] or 'unread', len(cf.CPU_LANE) + 2))
+    finally:
+        fx._live_set(ctx, player_roster=fs._roster(cf.P1_LANE))
 
 
 def a2_direct(ctx):
+    """cf-direct from the console lanes at Ready Fighters 8, set again here so a retry after other rows starts the same."""
+    _knob(ctx, 'off')
     seq = hs.diag_mark(ctx)
-    out = cf.cf_direct(ctx)
-    hits = _slots(ctx, seq)
-    if hits:
-        raise RuntimeError('a2-direct: a group slot made a fitting fighter cold: %s' % hits[:3])
-    return out
+    fx._live_set(ctx, player_roster=fs._roster(cf.P1_LANE), cpu_roster=fs._roster(cf.CPU_LANE),
+                 cycle_preload_ready_fighters=fs.RF(8))
+    fs._settled(ctx, seq, 120)
+    return _with_reasons(ctx, 'a2-direct', cf.cf_direct)
 
 
 def a2_r6(ctx):
@@ -215,7 +247,10 @@ def a2_pt(ctx):
     fx._live_set(ctx, player_roster=fs._roster(lane), player_kirby_hats=fs._roster(fs.HATS),
                  cycle_preload_ready_fighters=fs.RF(10))
     out['settle0'] = fs._settled(ctx, seq, 120)
-    out['to_pt'] = af._to(ctx, 0, PT, len(lane) + 2)
+    # Boot a2-e881df1e-y1: cycle presses never reached PT (no `request owner=0 kind=0x24`); a direct pick once its group
+    # is built, as a1-enable's `_land` does.
+    out['pt_built'] = bool(hs.wait_diag(ctx, seq, r'background built owner=0 group=\d+ ok=true reason=\S+ kinds=\[24, 25, 26\]', 90))
+    _, out['to_pt'] = af._pick(ctx, 0, PT)
     out['settle1'] = fs._settled(ctx, hs.diag_mark(ctx), 90)
     out['window'] = [hex(k) for k in (af._window(ctx, 0) or [])]
     lines = af._keep_across(ctx, out, 0, fs.BOWSER, 'reload window pt')
@@ -258,8 +293,10 @@ def a2_aegis_probe(ctx):
     lane = [fs.PIKACHU, PYRA]
     fx._live_set(ctx, player_roster=fs._roster(lane), cycle_preload_ready_fighters=fs.RF(10))
     out['settle0'] = fs._settled(ctx, seq, 120)
-    out['to_pyra'] = af._to(ctx, 0, PYRA, len(lane) + 2)
+    out['pyra_built'] = bool(hs.wait_diag(ctx, seq, r'background built owner=0 group=\d+ ok=true reason=\S+ kinds=\[5a, 5b\]', 90))
+    _, out['to_pyra'] = af._pick(ctx, 0, PYRA)
     out['settle1'] = fs._settled(ctx, hs.diag_mark(ctx), 90)
+    out['window'] = [hex(k) for k in (af._window(ctx, 0) or [])]
     lines = af._keep_across(ctx, out, 0, fs.BOWSER, 'reload')
     out['probe'] = [t[:600] for t in lines if PROBE.search(t)][:4]
     _mark(t0, out, 'done')
