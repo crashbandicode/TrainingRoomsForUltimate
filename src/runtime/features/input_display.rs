@@ -217,8 +217,9 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample 
 /// # Safety
 /// `player` is P1's live module accessor; the call is made on the game thread inside the fighter's frame.
 pub unsafe fn sample_frame(player: usize) {
+    if !ENABLED.load(Ordering::Acquire) { return; }
     let input_drill = crate::engine::rr_host::input_observation_wanted() || super::combo::input_observation_wanted();
-    if !ENABLED.load(Ordering::Acquire) || (!sampling() && !input_drill) || player == 0 {
+    if (!sampling() && !input_drill) || player == 0 {
         return;
     }
     if input_drill && published::input_owners().contains(Owners::MENU) { return; }
