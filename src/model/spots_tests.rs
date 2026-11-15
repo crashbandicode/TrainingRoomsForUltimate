@@ -45,7 +45,7 @@ fn the_knockback_is_the_games_formula() {
 }
 
 /// The definition (SmashWiki): the sweet spot launches hardest; a hitbox dealing more damage but launching less is the sour one.
-fn the_hitbox_that_launches_hardest_is_sweet_not_the_one_that_deals_most() {
+fn the_strongest_hitbox_of_a_frame_is_sweet_and_a_weaker_one_sour() {
     let active = hits(&[(10.0, 70, 0, 80), (12.0, 50, 0, 20)]);
     assert_eq!(classify(&active, at(20.0), &NONE)[..2], [Some(Spot::Sweet), Some(Spot::Sour)]);
 }
@@ -68,20 +68,24 @@ fn the_ranking_follows_the_defenders_percent_and_weight() {
     assert_eq!([tipping(60.0), tipping(140.0)], [Some(Spot::Sweet), Some(Spot::Sour)], "a light and a heavy defender at the same percent");
 }
 
-fn ties_rank_by_damage_and_equal_hitboxes_have_no_label() {
+/// Ties: equal knockback ranks by damage; equal on both, no label.
+fn equal_hitboxes_and_a_lone_hitbox_have_no_label() {
     // Fixed knockback: both launch 54.4 at any damage, so damage ranks them.
     let fixed = hits(&[(8.0, 100, 50, 0), (5.0, 100, 50, 0)]);
     assert_eq!(classify(&fixed, at(40.0), &NONE)[..2], [Some(Spot::Sweet), Some(Spot::Sour)]);
     let jab = hits(&[(3.0, 100, 0, 20), (3.0, 100, 0, 20), (3.0, 100, 0, 20)]);
     assert_eq!(classify(&jab, at(40.0), &NONE), [None; SLOTS], "equal on both");
     assert_eq!(classify(&hits(&[(12.0, 90, 0, 40)]), at(40.0), &NONE), [None; SLOTS], "a lone hitbox");
-    let top = hits(&[(16.0, 90, 0, 40), (16.0, 90, 0, 40), (13.0, 90, 0, 40)]);
-    assert_eq!(classify(&top, at(0.0), &NONE)[..3], [Some(Spot::Sweet), Some(Spot::Sweet), Some(Spot::Sour)], "ties at the top are all Sweet");
     assert_eq!(classify(&p(&[16.0, 0.0]), at(0.0), &NONE)[1], None, "a slot with no damage has no label");
 }
 
+fn ties_at_the_top_are_all_sweet() {
+    let top = hits(&[(16.0, 90, 0, 40), (16.0, 90, 0, 40), (13.0, 90, 0, 40)]);
+    assert_eq!(classify(&top, at(0.0), &NONE)[..3], [Some(Spot::Sweet), Some(Spot::Sweet), Some(Spot::Sour)]);
+}
+
 /// Late is the timing case, measured in knockback: this frame's strongest launches less than the action's earlier peak, even when it deals more.
-fn a_hitbox_launching_less_than_an_earlier_one_of_the_action_is_late() {
+fn a_hitbox_weaker_than_an_earlier_one_of_the_action_is_late() {
     let knee = Hit { damage: 18.0, growth: 100, fixed: 0, base: 30 };
     let after = hits(&[(19.0, 50, 0, 10), (19.0, 50, 0, 10)]);
     assert_eq!(classify(&after, at(30.0), &knee)[..2], [Some(Spot::Late); 2]);
@@ -93,7 +97,7 @@ fn a_hitbox_launching_less_than_an_earlier_one_of_the_action_is_late() {
     assert_eq!(classify(&p(&[13.0]), at(0.0), &p(&[16.0])[0])[0], Some(Spot::Late));
 }
 
-fn the_peak_keeps_the_strongest_hitbox_and_starts_over_with_a_new_action() {
+fn the_peak_starts_over_with_a_new_status_or_when_the_motion_goes_back() {
     let mut peak = Peak::new();
     assert_eq!(peak.earlier(10, 0.0), NONE);
     let strong = Hit { damage: 10.0, growth: 100, fixed: 0, base: 60 };
@@ -205,8 +209,11 @@ fn a_charged_smash_is_attributed_by_the_hitbox_that_dealt_it() {
         assert_eq!(attribute(by_damage(18.0 * mul * M), &marth(), charged(mul), &NONE), Some(Spot::Sweet), "a tip hit at charge {mul}");
     }
     assert_eq!(attribute(by_damage(3.0 * 1.4 * M), &p(&[3.0, 3.0]), charged(1.4), &p(&[18.0])[0]), Some(Spot::Late));
-    // A charge does not make a hit tellable: a stale tip hit that a blade could also have made is still no label.
-    assert_eq!(attribute(by_damage(18.0 * 1.4 * 1.07), &marth(), charged(1.4), &NONE), None, "the blade's ratio is 1.48");
+}
+
+/// A charge does not make a hit tellable: a stale tip hit that a blade could also have made is still no label.
+fn a_charged_hit_that_cannot_be_told_has_no_label() {
+    assert_eq!(attribute(by_damage(18.0 * 1.4 * 1.07), &marth(), Launch { mul: 1.4, ..at(0.0) }, &NONE), None, "the blade's ratio is 1.48");
 }
 
 /// Marth's forward smash held to different charges, as Eden logged it (spots2-d37c0734-1, Yoga, 2026-11-14, `sp-charge`).
@@ -346,12 +353,13 @@ fn the_spot_words_and_rows() {
 fn case_table() {
     crate::test_table::run(&[
         ("the_knockback_is_the_games_formula", the_knockback_is_the_games_formula as fn()),
-        ("the_hitbox_that_launches_hardest_is_sweet_not_the_one_that_deals_most", the_hitbox_that_launches_hardest_is_sweet_not_the_one_that_deals_most as fn()),
+        ("the_strongest_hitbox_of_a_frame_is_sweet_and_a_weaker_one_sour", the_strongest_hitbox_of_a_frame_is_sweet_and_a_weaker_one_sour as fn()),
         ("gut_checks_gust_is_sour_beside_the_hit_of_equal_damage", gut_checks_gust_is_sour_beside_the_hit_of_equal_damage as fn()),
         ("the_ranking_follows_the_defenders_percent_and_weight", the_ranking_follows_the_defenders_percent_and_weight as fn()),
-        ("ties_rank_by_damage_and_equal_hitboxes_have_no_label", ties_rank_by_damage_and_equal_hitboxes_have_no_label as fn()),
-        ("a_hitbox_launching_less_than_an_earlier_one_of_the_action_is_late", a_hitbox_launching_less_than_an_earlier_one_of_the_action_is_late as fn()),
-        ("the_peak_keeps_the_strongest_hitbox_and_starts_over_with_a_new_action", the_peak_keeps_the_strongest_hitbox_and_starts_over_with_a_new_action as fn()),
+        ("equal_hitboxes_and_a_lone_hitbox_have_no_label", equal_hitboxes_and_a_lone_hitbox_have_no_label as fn()),
+        ("ties_at_the_top_are_all_sweet", ties_at_the_top_are_all_sweet as fn()),
+        ("a_hitbox_weaker_than_an_earlier_one_of_the_action_is_late", a_hitbox_weaker_than_an_earlier_one_of_the_action_is_late as fn()),
+        ("the_peak_starts_over_with_a_new_status_or_when_the_motion_goes_back", the_peak_starts_over_with_a_new_status_or_when_the_motion_goes_back as fn()),
         ("a_hit_of_equal_damage_is_attributed_by_the_knockback_received", a_hit_of_equal_damage_is_attributed_by_the_knockback_received as fn()),
         ("a_hit_both_readings_cannot_place_has_no_label", a_hit_both_readings_cannot_place_has_no_label as fn()),
         ("a_hit_is_attributed_by_the_damage_it_added", a_hit_is_attributed_by_the_damage_it_added as fn()),
@@ -360,6 +368,7 @@ fn case_table() {
         ("the_falcon_knee_hits_eden_logged", the_falcon_knee_hits_eden_logged as fn()),
         ("a_charged_smash_is_attributed_by_the_hitbox_that_dealt_it", a_charged_smash_is_attributed_by_the_hitbox_that_dealt_it as fn()),
         ("the_charged_marth_hits_eden_logged", the_charged_marth_hits_eden_logged as fn()),
+        ("a_charged_hit_that_cannot_be_told_has_no_label", a_charged_hit_that_cannot_be_told_has_no_label as fn()),
         ("an_unusable_multiplier_gives_no_label", an_unusable_multiplier_gives_no_label as fn()),
         ("the_powers_of_a_fighter_are_read_from_its_active_slots_only", the_powers_of_a_fighter_are_read_from_its_active_slots_only as fn()),
         ("the_hit_spheres_take_the_frame_data_colours", the_hit_spheres_take_the_frame_data_colours as fn()),
