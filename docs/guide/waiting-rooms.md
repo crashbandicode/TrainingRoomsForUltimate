@@ -4,7 +4,8 @@ While you wait for a match, Smash puts you in a waiting room with training partn
 practice there too: the same menu, the same chords, the same CPU settings. It knows two kinds of waiting room: local
 wireless rooms, and the online waiting room of Quickplay.
 
-![In a local wireless waiting room, B + D-pad Up opens the menu and the hitboxes show](../media/rc11-waiting-menu.gif)
+![In a local wireless waiting room: Display & Controls, Hitbox Visualization 0 of 6, its checklist with Hurtboxes ticked (1 of 6), and both practice fighters drawn as yellow pills with the Waiting and Ready signs still on screen](../media/rc14-waiting-menu.gif)<br>
+*The room menu on Display & Controls: Hitbox Visualization opens a checklist, A ticks Hurtboxes (the row reads 1 of 6), and when the menu closes both practice fighters are drawn as yellow pills; the Waiting and Ready signs stay on screen. The footer reads 0.2.0-rc.14 · rc14 400e2c69. The first second, the CPU page, is a separate recording cut in before Display & Controls. Eden, rc.14 (untested on hardware).*
 
 ## Turn on Lobby Practice first
 

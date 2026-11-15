@@ -133,7 +133,8 @@ All the options: [the Display & Controls page](docs/menu/display-and-controls.md
 Practise while you wait for an online or local match: turn on **Fighters & Stages → Lobby Practice** first (it's Off at
 first), then open the room menu with **B + D-pad Up**.
 
-![In a local waiting room, B + D-pad Up opens the menu, Hitbox Visualization goes On, and the boxes show in the room](docs/media/rc11-waiting-menu.gif)<br>*The menu in a waiting room (B + D-pad Up)*
+![In a local wireless waiting room: Display & Controls, Hitbox Visualization 0 of 6, its checklist with Hurtboxes ticked (1 of 6), and both practice fighters drawn as yellow pills with the Waiting and Ready signs still on screen](docs/media/rc14-waiting-menu.gif)<br>
+*The menu in a waiting room (B + D-pad Up): Hitbox Visualization with Hurtboxes ticked draws both practice fighters as yellow pills. The first second, the CPU page, is a separate recording cut in before Display & Controls. Eden, rc.14 (untested on hardware).*
 
 More: [the waiting rooms guide](docs/guide/waiting-rooms.md).
 

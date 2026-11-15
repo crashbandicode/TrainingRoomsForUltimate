@@ -394,12 +394,11 @@ doesn't reach the game.
 Combos & Sequences, *+ Save last combo…* adds Combo 1 (recorded on Sheik); A drills it; back in the room the helper
 bar shows Combo 1; the next jab > jab links: TRUE −1, "1 of 1 true", held (the strip zoomed along the bottom). Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-**Clip** [`rc11-waiting-menu.gif`](media/rc11-waiting-menu.gif): In a Local Wireless waiting room, B + D-pad Up opens the menu, Hitbox Visualization goes On, and the boxes show in the room
+**Clip** [`rc14-waiting-menu.gif`](media/rc14-waiting-menu.gif): In a Local Wireless waiting room, the menu on Display & Controls, Hitbox Visualization with Hurtboxes ticked, and both practice fighters drawn as yellow pills
 
-*Eden, 2026-11-12, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), the guest of a Local Wireless room hosted
-in Eden (`docs-ldn66d-0c628724`, `fx-waiting-hitboxes`), the waiting room as the boot's first practice: the room; the
-menu on Display & Controls; Hitbox Visualization from Off to On; the menu closes and both practice fighters show their
-boxes. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-15, rc.14 `400e2c69` (diag NRO `99feb831`, footer 0.2.0-rc.14 · rc14 400e2c69, log lines only), the guest of a Local Wireless room hosted
+in Eden, the waiting room as the boot's first practice: the menu on Display & Controls, Hitbox Visualization 0 of 6; its checklist, Hurtboxes ticked (1 of 6); the menu closes and both practice
+fighters show their hurtboxes as pills. The first second (the CPU page) is a separate recording cut in. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 ### Menu navigation
 
