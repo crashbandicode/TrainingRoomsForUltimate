@@ -130,9 +130,10 @@ and everything else that is already loaded stays loaded: the groups beside it, a
 with the one you swapped from, windows included. When more would stay than Ready Fighters allows, the fighter whose
 turn is farthest away is freed, never the next one or the one on screen.
 
-Two cases differ. Kirby is always loaded alone, so a swap away from a Kirby that holds a copied ability gives up only
-Kirby. Pokémon Trainer and Pyra / Mythra windows are never kept this way: swapping away from one loads it again the
-next time you reach it.
+Pokémon Trainer and Pyra / Mythra stay loaded the same way. When a swap has to load a fighter, the window a Trainer or
+a Pyra / Mythra was on is kept too, and swapping back to it is instant. Kirby holding a copied ability gives the copy up
+before he leaves and then stays loaded like any other fighter. He comes back without it, and the next Kirby hat click
+gives the same hat again.
 
 The notice "Fighters" counts them while they load:
 
