@@ -1,0 +1,165 @@
+"""rc.14 mem-headroom (2026-11-15): the give-back row, one short targeted boot (the primary's grant).
+
+mh_pyra_pause: the operator's Loading settings (Ready Fighters 8, Ready Fighter Bodies 3, Cycle Preload 5, Ready Hats 5)
+and the console's P1 lane (Pikachu > Kirby > Palutena) with Kirby's five hats; P1 on Kirby, so the created helper entries
+fill with his hats (P-HOT §5.1). The CPU's lane is Mii Gunner > Diddy Kong, then Pyra / Mythra joins it (Mii Gunner > Pyra >
+Diddy Kong, a2-pyra-keep-all's lane). The Pyra / Mythra group is held for memory by the helpers' room: when the process
+would still hold it, a diag memory reserve (`diag-memory-reserve.req`, `process_memory::DIAG_RESERVE`) leaves it
+`SHORT` bytes short, a shortfall the idle helpers cover. Pass, in order:
+- the group held for memory (`[GroupSwap] held owner=1 ... kinds=[5a, 5b]`);
+- the give-back marks idle helpers (`[GroupSwap] give-back owner=1 ... marked=`) and the notice says "load after you pause";
+- one Training pause (Plus, Plus): the pause retires them (`[GroupSwap] give-back retire ... retired=true`), then the
+  Pyra / Mythra group builds (`background built owner=1 ... ok=true ... kinds=[5a, 5b]`);
+- `[MemoryCensus]` lines; no StallWatch; no Unmapped access in the row (`trace.unmapped_access`), z-boot reads the console.
+mh_restore: the reserve 0, the remembered values (cycle-fix's restore)."""
+import re
+import sys
+import time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+
+import hotslots as hs  # noqa: E402
+import gna_p2_fs as fs  # noqa: E402
+import fx  # noqa: E402
+import cyclefix as cf  # noqa: E402
+import afull as af  # noqa: E402
+import steps  # noqa: E402
+from gna import _begin, _mark, _shot, _finish  # noqa: E402
+
+PYRA = 0x5a
+MB = 1 << 20
+# The Pyra / Mythra group's admission need (Eden smoke2r-2 #6769: "< 237076480 bytes"; memory.rs: the set's cost with
+# the 12.5 % margin and the 16 MiB floor).
+AEGIS_NEED = 237076480
+SHORT = 24 * MB
+RESERVE = 'diag-memory-reserve.req'
+CREATED_READY = re.compile(r'\[CharacterSources\] ready slot=([4-7]) kind=(0x[0-9a-f]+)')
+HELD = re.compile(r'\[GroupSwap\] held owner=1 group=\d+ reason=process headroom .*kinds=\[5a, 5b\]')
+MARKED = re.compile(r'\[GroupSwap\] give-back owner=1 group=\d+ shortfall=(\d+) marked=(0b[01]+)')
+NOTICE = re.compile(r'\[PreloadStatus\] state=\w+ .*text="[^"]*load after you pause\)"')
+RETIRED = re.compile(r'\[GroupSwap\] give-back retire slot=(\d) entry=\S+ kind=(0x[0-9a-f]+) retired=(true|false)')
+AT_PAUSE = re.compile(r'\[GroupSwap\] give-back at pause marked=(0b[01]+) idle=(0b[01]+) cycle_waits=(true|false) '
+                      r'install=(true|false) retired=(0b[01]+)')
+BUILT = re.compile(r'\[GroupSwap\] background built owner=1 group=\d+ ok=true reason=\S+ kinds=\[5a, 5b\]')
+CENSUS = re.compile(r'\[MemoryCensus\] ')
+HEADROOM = re.compile(r'headroom=(?:Some\()?(\d+)')
+
+
+def _reserve(ctx, bytes_):
+    """Write `diag-memory-reserve.req` and wait for the plugin's `state diag_memory_reserve` line."""
+    seq = hs.diag_mark(ctx)
+    path = Path(ctx.instance['diag_log']).with_name(RESERVE)
+    tmp = path.with_name(RESERVE + '.tmp')
+    tmp.write_text('%d\n' % bytes_)
+    tmp.replace(path)
+    return fs._line(ctx, seq, r'\[TrainingRooms\] state diag_memory_reserve bytes=%d' % bytes_, 10)
+
+
+def _unmapped(ctx):
+    got = ctx.call('trace.unmapped_access', {})
+    try:
+        return int(got.get('total')) if isinstance(got, dict) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _headroom(ctx):
+    """The newest process headroom the plugin printed (census or ready line), bytes."""
+    for _, _, t in reversed(hs.diag_lines(ctx)):
+        if CENSUS.search(t) or '[BodyBank] ready ' in t:
+            m = HEADROOM.search(t)
+            if m:
+                return int(m.group(1))
+    return None
+
+
+def _wait(ctx, seq, regex, cap):
+    found = hs.wait_diag(ctx, seq, regex.pattern, cap)
+    return found[2][:400] if found else None
+
+
+def mh_pyra_pause(ctx):
+    t0, out = _begin(ctx)
+    problems = []
+    cf._diag_cycle(ctx, 'off')
+    out['unmapped_before'] = _unmapped(ctx)
+    seq0 = hs.diag_mark(ctx)
+    # 1. The operator's settings, P1's console lane with Kirby's hats, the CPU without Pyra yet.
+    fx._live_set(ctx, player_roster=fs._roster(cf.P1_LANE), player_kirby_hats=fs._roster(fs.HATS),
+                 cpu_roster=fs._roster([fs.GUNNER, fs.DIDDY]), cycle_preload_ready_fighters=fs.RF(8),
+                 cycle_preload_bank_members=fs.BODIES['3'], cycle_preload_slots=fs.SLOTS(5),
+                 cycle_preload_ready_hats=fs.RH(5))
+    out['settle0'] = fs._settled(ctx, seq0, 120)
+    out['to_kirby'] = af._to(ctx, 0, fs.KIRBY, len(cf.P1_LANE) + 2)
+    # 2. The created helpers fill with Kirby's hats (up to 90 s for at least two).
+    deadline = time.monotonic() + 90
+    created = {}
+    while time.monotonic() < deadline:
+        ctx.check_stop()
+        created = {m.group(1): m.group(2) for t in af._since(ctx, seq0) for m in [CREATED_READY.search(t)] if m}
+        if len(created) >= 2:
+            time.sleep(5.0)
+            created = {m.group(1): m.group(2) for t in af._since(ctx, seq0) for m in [CREATED_READY.search(t)] if m}
+            break
+        time.sleep(1.0)
+    out['created_ready'] = created
+    out['census_filled'] = [t[:600] for t in af._since(ctx, seq0) if CENSUS.search(t)][-2:]
+    if len(created) < 2:
+        problems.append('precondition: the created helpers did not fill (ready slots %s)' % created)
+    # 3. Short of the Pyra / Mythra group's room by SHORT: the helpers hold it (a reserve when the process would not).
+    headroom = _headroom(ctx)
+    out['headroom_before'] = headroom
+    reserve = max(0, (headroom or 0) - AEGIS_NEED + SHORT)
+    out['reserve'] = reserve
+    out['reserve_line'] = _reserve(ctx, reserve)
+    seq = hs.diag_mark(ctx)
+    fx._live_set(ctx, cpu_roster=fs._roster([fs.GUNNER, PYRA, fs.DIDDY]))
+    out['held'] = _wait(ctx, seq, HELD, 60)
+    out['marked'] = _wait(ctx, seq, MARKED, 30)
+    out['notice'] = _wait(ctx, seq, NOTICE, 30)
+    out['early_build'] = [t[:300] for t in af._since(ctx, seq) if BUILT.search(t)][:1]
+    _shot(ctx, out, 'shot_before_pause', 'mh-before-pause')
+    if not out['held']:
+        problems.append('precondition: the Pyra / Mythra group was never held for memory (built early: %s)' % out['early_build'])
+    if not out['marked']:
+        problems.append('no give-back mark for the held group')
+    if not out['notice']:
+        problems.append('the notice never said "load after you pause"')
+    # 4. One pause: the marked helpers go, then the group builds.
+    pause = hs.diag_mark(ctx)
+    steps.press(ctx, 'plus', 3.0)
+    steps.press(ctx, 'plus', 2.0)
+    out['at_pause'] = _wait(ctx, pause, AT_PAUSE, 20)
+    out['retired'] = [t[:300] for t in af._since(ctx, pause) if RETIRED.search(t)]
+    out['built'] = _wait(ctx, pause, BUILT, 120)
+    out['settle_after'] = fs._settled(ctx, pause, 90)
+    _shot(ctx, out, 'shot_after', 'mh-after-pause')
+    lines = af._since(ctx, seq0)
+    out['census'] = [t[:600] for t in lines if CENSUS.search(t)][-6:]
+    out['stalls'] = [t[:200] for t in lines if 'StallWatch' in t][-3:]
+    out['bad'] = af._bad(lines)
+    out['unmapped_after'] = _unmapped(ctx)
+    _mark(t0, out, 'done')
+    m = AT_PAUSE.search(out['at_pause'] or '')
+    if not m or m.group(5) == '0b0':
+        problems.append('the pause retired no helper: %s' % out['at_pause'])
+    if not any(RETIRED.search(t) and RETIRED.search(t).group(3) == 'true' for t in out['retired']):
+        problems.append('no retire succeeded: %s' % out['retired'])
+    if not out['built']:
+        problems.append('the Pyra / Mythra group did not build after the pause (settle %s)' % out['settle_after'])
+    if not out['census']:
+        problems.append('no [MemoryCensus] line')
+    if out['stalls']:
+        problems.append('StallWatch: %s' % out['stalls'][-1])
+    if out['unmapped_before'] is None or out['unmapped_after'] != out['unmapped_before']:
+        problems.append('Unmapped accesses during the row: %s -> %s' % (out['unmapped_before'], out['unmapped_after']))
+    problems += ['bad line: %s' % t for t in out['bad']]
+    return _finish(ctx, 'mh-pyra-pause', out, problems)
+
+
+def mh_restore(ctx):
+    _reserve(ctx, 0)
+    cf._diag_cycle(ctx, 'off')
+    return cf.cf_restore(ctx)
