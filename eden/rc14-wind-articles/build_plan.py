@@ -33,6 +33,10 @@ rows.append(row('w-articles', 'articles', 9, "Windboxes alone, 25 % stills: Samu
 rows.append(row('w-items', 'items', 9, "Settle rows: Sheik's Burst Grenade and R.O.B.'s Gyro are items; the item scan tracks them and the "
                 "probe lines record their live slots (nr, kb) and wind areas. Check: stills and the item tracked; the lines are the finding."))
 rows.append(by_id['z-boot'])
+# Added mid-boot in windart-y1 (rows and hooks only): the vacuum's windbox lives only until the CPU is pulled in and caught, between the
+# 25 % stills; at 10 % a still catches it.
+rows.append(row('w-krool-v', 'krool_vacuum_slow', 4, "Retake at 10 %: King K. Rool's Blunderbuss vacuum windbox (deep blue, in front "
+                "of the gun) in a still; it lives only until the CPU is pulled in and caught."))
 plan['rows'] = rows
 plan['scope'] = ('rc.14 wind-articles (11-15): articles\' and items\' wind areas under Windboxes, K. Rool\'s windboxes, Burst Grenade '
                  'and Gyro settled. One instance, Training, muted, GDB stub on. No card; nothing pushed.')

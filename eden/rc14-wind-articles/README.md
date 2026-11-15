@@ -15,4 +15,6 @@
 - **Staging:** `stage-windart.ps1` (from `rc14-hide-cpu-tag/stage-hidetag.ps1`) renders `up-windart.sh` (from `up-hidetag.sh`,
   owner `Claude wind-articles`, runtime 5400 s).
 - **Runner:** the playbook's `tools/eden-runner` at `13b2e83` (`~/pb-terra-13b2e83` on the hosts). Offline dry-run READY
-  (8 rows, 37 budget minutes, `artifacts/rc14-wind-audit/stage/dry-out`).
+  (`artifacts/rc14-wind-audit/stage/dry-out`).
+- **Boot `windart-y1`:** Yoga, 9 of 9 rows PASS, including `w-krool-v`, the 10 % vacuum retake added mid-boot
+  (`RESULTS-windart-y1.md`).

@@ -52,6 +52,8 @@ of Bowser's Fire Breath. The game marks them itself, and the plugin uses that ma
 draws it too; with both ticked it is drawn once, in deep blue, and with Windboxes alone only the windboxes are drawn.
 
 These moves have a windbox in the game's own move data. A few moves whose names the data does not give are left out.
+Sheik's Burst Grenade is an item: its pulls are windboxes of the grenade, drawn like any item's. R.O.B.'s Gyro has none:
+its spin on the ground hits with hitstun, so it is drawn under Hitboxes.
 King K. Rool's Blunderbuss pulls with a windbox (and grab boxes catch who it pulls in). His Crownerang has a small
 windbox on his arm while he throws the crown. Palutena's Counter and Greninja's down taunt have one too.
 
@@ -91,7 +93,7 @@ windbox on his arm while he throws the crown. Palutena's Counter and Greninja's 
 | Robin | up special (where it lands) |
 | Rosalina | neutral special (calling Luma back) |
 | Sephiroth | Final Smash |
-| Sheik | up special |
+| Sheik | up special, side special (the grenade's pull, before it explodes) |
 | Squirtle | neutral special |
 | Toon Link | down aerial (as it lands) |
 | Wii Fit Trainer | neutral special (while charging) |
@@ -100,7 +102,9 @@ windbox on his arm while he throws the crown. Palutena's Counter and Greninja's 
 Some moves push through a wind area instead of a hitbox. Windboxes draws those too: a see-through deep blue box or
 circle where the wind blows, with a white line, edged in dark so it shows on a pale stage, pointing the way it pushes. A
 dot in the middle means the wind has no one direction. The wind areas of what a fighter throws or summons are drawn too,
-such as Zelda's Triforce of Wisdom, which pulls, and Hero's Kaboom. An item's wind area is drawn the same way.
+such as the pillar of Ness's PK Fire, Samus's bomb and Palutena's Explosive Flame; Zelda's Triforce of Wisdom, which
+pulls, and Hero's Kaboom make theirs the same way. An item's wind area is drawn the same way, such as the one Sheik's
+Burst Grenade makes when it explodes.
 Stage hazards are not drawn, such as Pac-Land's fire hydrant.
 
 These fighters have moves with a wind area. Eden tried the special moves and smashes of every fighter whose moves can
@@ -129,10 +133,13 @@ have one.
 | Marth | neutral special (when held), down special, forward smash, up smash, down smash |
 | Meta Knight | neutral special |
 | Mewtwo | neutral special, down special, forward smash, up smash, down smash |
+| Ness | side special (the PK Fire pillar) |
 | Palutena | every special, forward smash, up smash, down smash |
 | Robin | up smash, down smash |
 | Roy | neutral special, down special, up smash, down smash |
 | Ryu | every special, forward smash, up smash, down smash |
+| Samus | down special (the bomb) |
+| Sheik | side special (the Burst Grenade as it explodes) |
 | Shulk | forward smash, up smash |
 | Wario | down special |
 

@@ -92,6 +92,41 @@ def items(ctx):
     return _finish(ctx, 'windart-items', out, _problems(out))
 
 
+def _burst_at(ctx, out, tag, move, at, pct):
+    """hblfinal._burst at Eden speed `pct` % (reset-center, then `move` with a still at each of `at` seconds after its start)."""
+    from hblegend import SEG, _play
+    _play(ctx, 'reset-center', seg=Path(__file__).resolve().parent / 'segments')
+    time.sleep(2.0)
+    mark = hs.diag_mark(ctx)
+    _speed(ctx, pct)
+    shots = []
+    try:
+        start = time.time()
+        ctx.call('macro.play', {'path': str(SEG / ('%s.edenmacro.json' % move))})
+        for t in at:
+            delay = start + t - time.time()
+            if delay > 0:
+                time.sleep(delay)
+            shots.append(str(ctx.shot('hbf-%s-t%04d' % (tag, int(t * 100)))))
+        ctx.runner.wait_macro(ctx.on, 120)
+        ctx.call('input.reset')
+    finally:
+        _speed(ctx, 100)
+    time.sleep(2.0)
+    out[tag] = {'shots': shots, 'lines': [t[:400] for _, _, t in hs.diag_since(ctx, mark) if KEEP.search(t)]}
+
+
+def krool_vacuum_slow(ctx):
+    """Retake (w-krool-v): in w-krool the vacuum's windbox was drawn for about 6 frames, until the CPU was pulled in and caught,
+    between the 25 % stills. At 10 %, stills every 0.4 s through that window."""
+    _, out = _begin(ctx)
+    _fighter(ctx, KROOL, out, 'krool_hud')
+    _burst_at(ctx, out, 'krool-vacuum-10', 'nspecial-hold', _steps(8.0, 13.6, 15), 10)
+    out['krool-vacuum-10']['expected_stills'] = 15
+    out['krool-vacuum-10']['need'] = ('drawn',)
+    return _finish(ctx, 'windart-krool-v', out, _problems(out))
+
+
 def restore(ctx):
     out = {'speed': _speed(ctx, 100)}
     fx._live_set(ctx, hitbox_vis=[0, 0, 0, 0, 0, 0], mash_state=[0] * ACTIONS)
