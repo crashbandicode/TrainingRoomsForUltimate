@@ -27,7 +27,8 @@ With Lobby Practice On, you use the same menu and chords as in Training:
 | Combos | Save a combo you landed and drill it with the combo helper, as in Training. See [Recording › Combos](recording.md#combos). |
 | Stages | [Change Stage](stages.md#change-stage) goes to another stage now, and each new room opens on the next stage of [Lobby Stages](stages.md#lobby-stages). [Stage Hazards](stages.md#stage-hazards) counts there too. |
 | Fighters and items | Player Character, CPU Character, Give item and the Mii rows change your practice fighter; the match still uses the one you picked for it. *Add New…* opens Smash's Mii editor ([Mii fighters › In a waiting room](mii.md#in-a-waiting-room)). |
-| Eggs-ercise | [Eggs-ercise](../menu/fighters-and-stages.md#eggs-ercise): the targets show on your screen only. To start a new run here, open and close the menu. |
+| Practice games | [Eggs-ercise](../menu/fighters-and-stages.md#eggs-ercise) and [Break the Targets](../menu/fighters-and-stages.md#break-the-targets) work as in Training: a break freezes your fighter for a moment, and Break the Targets zooms the camera out. The targets show on your screen only. To start a new run here, open and close the menu. |
+| Hide CPU | CPU › [Hide CPU](../menu/cpu.md#hide-cpu) hides the first training partner, as in Training, and so does a practice game set to hide it. |
 | L + R + A | Puts both practice fighters back where they first stood (Display & Controls › [L+R+A Reset](../menu/display-and-controls.md#l-r-a-reset)). |
 | Respawn | As in Training, a KO'd practice fighter is back at once unless Fighters & Stages › [Respawn on platform](../menu/fighters-and-stages.md#respawn-on-platform) is On. |
 | Game speed | See [below](#game-speed). |

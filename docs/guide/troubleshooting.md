@@ -96,7 +96,6 @@ A greyed row is dimmed and ignores A, and the menu shows why. These are the reas
 | "Needs Ready Fighter Bodies set to 3" | The Ice Climbers pair bank needs Ready Fighter Bodies at 3. |
 | "A range is set: clear it first (Y)" | A delay row holds a range, so its checklist is greyed. Y clears the range. |
 | "Values are ticked: clear them first (Y)" | A delay row holds ticked values, so its range is greyed. Y clears the ticks. |
-| "Not in a waiting room yet" | Hide CPU works in Training only. In a waiting room its row is greyed and does nothing. |
 | "Targets stay still" | Target speed does nothing while Break the Targets is On: the targets don't move. |
 
 More: [Using the menu](using-the-menu.md).
@@ -180,7 +179,7 @@ More: [Fighter cycles › What the Loading rows do](fighter-cycles.md#what-the-l
 - **Plus doesn't open the game's menu in a Quickplay room.** While the TrainingRooms menu is open, Plus doesn't reach the
   game. Close the menu (B), then open the game's menu to Leave Battle.
 - **A fighter swap says "Close the current game menu before swapping".** The game's own menu is open. Close it.
-- **Hide CPU is greyed** ("Not in a waiting room yet"), and Eggs-ercise shows its targets on your own screen only.
+- **Eggs-ercise and Break the Targets** show their targets on your own screen only.
 - **While the CPU pilot plays Player 1,** Record, Play on Player 1 and L + R + A are refused.
 
 More: [Waiting rooms](waiting-rooms.md).

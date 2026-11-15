@@ -509,7 +509,7 @@ Takes the CPU out of the fight without changing any of its settings.
 - Off: the CPU is shown again where it stood, with its tag and panel, and the CPU page applies from that frame.
 - It stays hidden through L+R+A, a loaded save state and a changed CPU fighter.
 - Play on CPU is refused while the CPU is hidden ("The CPU is hidden: turn Hide CPU Off first").
-- Training only: in a waiting room the row is greyed ("Not in a waiting room yet") and does nothing.
+- It works in the waiting room's practice too: there it hides the first training partner.
 
 - **Values:** On, Off.
 - **Default:** Off.

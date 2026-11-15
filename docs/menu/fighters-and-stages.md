@@ -456,7 +456,7 @@ Changing the stage starts a new run too. A fighter cycle or a save-state load ke
 target and the notice, and the notices are back where they were.
 
 The target is drawn by the plugin, so Hitbox Visualization can be On or Off: with it On you see your hitboxes meet the
-target. Nothing changes in the game. In the waiting room's practice only your own screen shows the target. The CPU keeps
+target. Nothing changes in the game. It works in the waiting room's practice as in Training, a break's freeze included, and only your own screen shows the target. The CPU keeps
 doing what the CPU page says; hitting it doesn't count, unless the CPU is the target (see **Target**).
 
 ### Breaks on
@@ -522,6 +522,8 @@ turning one On turns the other Off.
     break freezes your fighter for a moment and plays the same break animation as Eggs-ercise.
   - To go again, press L+R+A in Training (with **L+R+A Reset** On), or open and close the menu. Each stage keeps its own
     layout until the game closes.
+  - In the waiting room's practice it works as in Training: the camera zooms out and a break freezes your fighter. The
+    targets and the camera are on your own screen only.
 
 ![Break the Targets: Ready at 0:00.00, the first input starts the clock, the three targets break one after another, Done! 3 in 0:04.15, then Ready again with every target back](../media/rc14-btt-run.gif)<br>
 *A run on Battlefield: Ready reads "Targets 0/3   0:00.00" and waits; Fox's first input starts the clock; each break freezes him for a moment and plays the break animation ("Targets 1/3", "2/3"); the third break stops the clock: "Done! 3 in 0:04.15 (best 0:04.15)", then Ready again with every target back. Eden, rc.14 (untested on hardware).*
