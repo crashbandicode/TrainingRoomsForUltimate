@@ -1,6 +1,7 @@
 //! Clip selection. Native input consumption, not rendering, advances the preview.
 use {crate::engine::macros::FrameWindow, crate::engine::macros::MacroRecording, crate::engine::macros::MoveStart, crate::engine::macros::MoveStartRules, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::ReplayTrack, crate::engine::macros::MAX_NAME_CHARS};
 use crate::engine::macro_ui::macro_panel::Pad;
+use crate::model::combo_record::UnitKind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Handle { Playhead, In, Out }
@@ -113,9 +114,9 @@ pub fn clip_help(view: &ClipView, coarse: &str, chord: &str, pace: i32) -> ClipH
     };
     let follow = if pace > 1 {
         if pace >= 180 {
-            format!("Moving {pace} {} per tick.", if view.context == ClipContext::Combo { "links" } else { "frames" })
+            format!("Moving {pace} {} per tick.", view.context.units())
         } else {
-            format!("Moving {pace} {} per tick and speeding up.", if view.context == ClipContext::Combo { "links" } else { "frames" })
+            format!("Moving {pace} {} per tick and speeding up.", view.context.units())
         }
     } else {
         follow
@@ -205,11 +206,12 @@ impl OpenInputGuard {
 
 /// The same editor changes units and offered actions with its source.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ClipContext { Replay { fighters: bool }, Macro { player: bool }, Combo }
+pub enum ClipContext { Replay { fighters: bool }, Macro { player: bool }, Combo { unit: UnitKind } }
 
 impl ClipContext {
-    pub fn preview(self) -> bool { !matches!(self, Self::Combo) }
+    pub fn preview(self) -> bool { !matches!(self, Self::Combo { .. }) }
     pub fn fighters(self) -> bool { matches!(self, Self::Replay { fighters: true }) }
+    pub fn units(self) -> &'static str { match self { Self::Combo { unit } => unit.plural(), _ => "frames" } }
 }
 
 enum FileSource {
@@ -285,7 +287,7 @@ impl ClipEditor {
 
     pub fn combo_file(recording: crate::model::combo_record::ComboRecord) -> Result<Self, String> {
         recording.validate().map_err(|error| error.to_string())?;
-        let total = recording.combo.len() as u32;
+        let total = recording.unit_count();
         let name = recording.name.clone();
         Self::file(FileSource::Combo(Box::new(recording)), total, name)
     }
@@ -303,7 +305,7 @@ impl ClipEditor {
     pub fn context(&self) -> ClipContext {
         match &self.file {
             Some(FileSource::Macro { player, .. }) => ClipContext::Macro { player: *player },
-            Some(FileSource::Combo(_)) => ClipContext::Combo,
+            Some(FileSource::Combo(recording)) => ClipContext::Combo { unit: recording.unit_kind() },
             None => ClipContext::Replay { fighters: self.session.tracks.len() > 1 },
         }
     }
@@ -546,12 +548,10 @@ impl ClipEditor {
             ClipAction::Confirm => {
                 self.pause();
                 if let Some(FileSource::Combo(recording)) = &self.file {
-                    let links = recording.combo.links().skip(self.window.start() as usize)
-                        .take((self.window.end() - self.window.start()) as usize).copied();
-                    let kept = crate::model::combo::Combo::from_links(links).expect("nonempty selected links");
-                    let mut saved = crate::model::combo_record::ComboRecord::new(recording.name.clone(), kept, recording.recorded_on.clone());
-                    saved.made_from = recording.made_from.clone();
-                    return ClipEffect::ExportCombo(Box::new(saved));
+                    return match recording.crop_units(self.window.start(), self.window.end()) {
+                        Ok(saved) => ClipEffect::ExportCombo(Box::new(saved)),
+                        Err(error) => ClipEffect::Error(error.to_string()),
+                    };
                 }
                 if self.file.is_some() {
                     return match self.export_selection(&self.source_name) {

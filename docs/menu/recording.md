@@ -86,7 +86,7 @@ don't turn the page while a file's screen is open.
 | Set active | On makes this the active macro of the view you're in, replacing the one before. Off clears it. |
 | Playback slot | None or Slot 1 to 5 (Left/Right, or A to step on). The CPU plays this macro when it picks that Playback Slot in Mash, Followup, the overrides or Ledge Options. One macro per slot: choosing a slot another macro holds takes it. A slot holds up to 600 frames (10 s), so crop a longer macro first. Kept with the library; deleting the macro empties its slot. |
 | Rename | Opens the Switch keyboard (up to 48 characters). B, or an empty name, keeps the old name. |
-| Crop | Opens the [clip editor](#replay-window). L picks In, R picks Out; Left/Right move it. Macros use frames and X previews on the CPU; combos use whole links and have no X action. A names and saves a new file; the original stays. B leaves. |
+| Crop | Opens the [clip editor](#replay-window). L picks In, R picks Out; Left/Right move it. Macros use frames and X previews on the CPU; combos use whole links and drills use whole steps, with no X action. A names and saves a new file of the same kind; the original stays. B leaves. |
 | Make combo | Plays the file once on Player 1 from its start save and saves the hits that land as a new combo. |
 | Drill, Drill sequence | Makes this the one combo or sequence the combo helper grades. |
 | Edit chain, Edit combos | Opens the numbered picker. |
@@ -219,12 +219,12 @@ controller:
 | --- | --- |
 | Up/Down | Pick whose inputs to take when the capture has two sides. A file has one side, so this does nothing. |
 | L / R | L picks the start and R the end. |
-| Left/Right | Move it (hold to go faster): frames for replays and macros, whole links for combos. |
-| X | Previews the kept part on the CPU, including a Player 1 macro. Not offered for combos. |
-| A | Names and saves the kept part as a new macro or combo. An empty name uses the next unused Macro N or Combo N. The original stays. |
+| Left/Right | Move it (hold to go faster): frames for replays and macros, whole links for combos, whole steps for drills. |
+| X | Previews the kept part on the CPU, including a Player 1 macro. Not offered for combos or drills. |
+| A | Names and saves the kept part as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays. |
 | B | Leaves. |
 
-Crop on a macro or combo opens this same editor. A one-side file has no fighter-selection row. A combo has no preview button.
+Crop on a macro, combo or drill opens this same editor. A one-side file has no fighter-selection row. Combos and drills have no preview button.
 
 ![A capture cropped in the Replay window and saved, then played: the CPU becomes the recorded Mii Gunner](../media/rc11-replay-window.gif)<br>
 *Opening a replay moment*

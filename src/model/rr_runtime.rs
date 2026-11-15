@@ -319,7 +319,7 @@ pub fn save_clip_file(root: &Path, file: ClipFile, typed: &str) -> Result<String
         ClipFile::Combo(mut recording) => {
             let library = ComboLibrary::new(root.join("combos"));
             let names: Vec<_> = library.list().map_err(record)?.entries.into_iter().map(|entry| entry.name).collect();
-            recording.name = if typed.trim().is_empty() { unused_name("Combo", &names) } else { typed.trim().to_owned() };
+            recording.name = if typed.trim().is_empty() { unused_name(recording.unit_kind().name_prefix(), &names) } else { typed.trim().to_owned() };
             library.save_new(&recording).map_err(record)
         }
     }?;
@@ -981,6 +981,48 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    fn drill_units_share_clip_editor_and_save_same_kind() {
+        use crate::engine::macro_ui::{clip_panel::{clip_help, ClipAction, ClipContext, ClipEditor, ClipEffect}, macro_panel::{MacroUi, NameContext, Effect as NameEffect, CLIP_NAME_TOKEN}};
+        use crate::model::{combo::{InputCapture, Snap}, combo_record::UnitKind};
+        let mut capture = InputCapture::new();
+        for (frame, buttons) in [(0, 1), (2, 0), (23, 2), (25, 0), (46, 1), (48, 0)] {
+            capture.step(Snap { buttons, facing: 1, ..Snap::empty(frame) });
+        }
+        let source = ComboRecord::new("Drill 1".into(), capture.combo, Some("Mario".into())).with_made_from("macro-7");
+        let root = scratch("drill-clip");
+        let library = ComboLibrary::new(root.join("combos"));
+        let original = library.save_new(&source).unwrap();
+        let path = root.join("combos").join(format!("{original}.json"));
+        let bytes = std::fs::read(&path).unwrap();
+        let mut editor = ClipEditor::combo_file(library.load(&original).unwrap()).unwrap();
+        assert_eq!(editor.view().context, ClipContext::Combo { unit: UnitKind::Step });
+        assert_eq!(editor.view().total, 3);
+        editor.on_action(ClipAction::SelectIn);
+        editor.on_action(ClipAction::Nudge(1));
+        editor.on_action(ClipAction::SelectOut);
+        editor.on_action(ClipAction::Nudge(-1));
+        assert_eq!((editor.view().start, editor.view().end), (1, 2));
+        assert!(matches!(editor.on_action(ClipAction::TogglePlay), ClipEffect::None));
+        let help = clip_help(&editor.view(), "ZL", "ZL", 20);
+        assert!(!help.controls.contains("X preview"));
+        assert!(help.follow.contains("steps"));
+        let mut naming = MacroUi::new();
+        naming.offer_name(NameContext { token: CLIP_NAME_TOKEN, title: "Name drill" }, "Drill 1", "Save as a new file");
+        let NameEffect::NameConfirmed { name, .. } = naming.confirm_native_name(String::new()) else { panic!("empty drill name"); };
+        let ClipEffect::ExportCombo(kept) = editor.on_action(ClipAction::Confirm) else { panic!("drill export"); };
+        let id = save_clip_file(&root, ClipFile::Combo(kept), &name).unwrap();
+        let saved = library.load(&id).unwrap();
+        assert_eq!(saved.name, "Drill 2");
+        assert_eq!((saved.unit_kind(), saved.unit_count()), (UnitKind::Step, 1));
+        assert_eq!(saved.combo.get(0).unwrap().events().next().unwrap().offset, 0);
+        assert_eq!(saved.made_from, source.made_from);
+        assert_eq!(saved.recorded_on, source.recorded_on);
+        assert_ne!(id, original);
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        assert!(matches!(editor.on_action(ClipAction::Cancel), ClipEffect::Close));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     fn file_clip_empty_name_uses_unused_number() {
         use crate::engine::macro_ui::{clip_panel::{ClipAction, ClipEditor, ClipEffect}, macro_panel::{MacroUi, NameContext, Effect as NameEffect, CLIP_NAME_TOKEN}};
         let mut naming = MacroUi::new();
@@ -1270,6 +1312,7 @@ mod tests {
             ("crop_writes_a_new_file_and_leaves_the_original", crop_writes_a_new_file_and_leaves_the_original as fn()),
             ("file_clip_save_as_new_preserves_original", file_clip_save_as_new_preserves_original as fn()),
             ("file_clip_empty_name_uses_unused_number", file_clip_empty_name_uses_unused_number as fn()),
+            ("drill_units_share_clip_editor_and_save_same_kind", drill_units_share_clip_editor_and_save_same_kind as fn()),
             ("replay_export_has_no_start_save", replay_export_has_no_start_save as fn()),
             ("make_combo_on_a_chain_plays_one_pass_on_player_1", make_combo_on_a_chain_plays_one_pass_on_player_1 as fn()),
             ("the_chord_notice_shows_once", the_chord_notice_shows_once as fn()),

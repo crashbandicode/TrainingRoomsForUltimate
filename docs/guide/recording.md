@@ -184,13 +184,13 @@ recorded one.
 
 ### Crop
 
-Crop on a combo or a macro opens the Replay window's clip editor ([keys](../menu/recording.md#replay-window)).
+Crop on a combo, drill or macro opens the Replay window's clip editor ([keys](../menu/recording.md#replay-window)).
 
 - L selects In and R selects Out; Left/Right move the selected handle. Hold to move faster. B leaves.
-- A opens the name keyboard and saves the cut as a new file. An empty name uses the next unused Macro N or Combo N. The original stays.
+- A opens the name keyboard and saves the cut as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays.
 - A macro crop keeps that range of input frames and the original's one start context; no pose is stored for every frame.
 - X previews a macro's kept inputs on the CPU, including a Player 1 macro.
-- A combo crop keeps the links from the first handle through the last. The handles step by whole links, and X is not offered.
+- A combo crop keeps the links from the first handle through the last; a drill crop keeps the selected steps. The handles step by whole links or steps, and X is not offered.
 - A chain has no Crop row, because it has no frames of its own. The Replay window is a separate row under Replays.
 
 

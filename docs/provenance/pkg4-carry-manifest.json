@@ -1129,7 +1129,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "12d9aaf45ae72458e5396a940b825a7ec371e39add33bdb39e9522eddb8c0bf4",
+   "dest_sha256": "449bd5ec9dee69c2f2a37b571dcb95b2ecbd2c2e074c90e200c3fff0b1b0501a",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1291,6 +1291,36 @@
      "old": "    PreviousFighter, NextFighter, ToggleCapture, UseLeadIn, Confirm, Cancel,\n}\npub enum ClipEffect {\n    None, StopPreview, Preview(Box<MacroRecording>), Close,\n    Export(Box<MacroRecording>), Error(String),\n}\n\n/// P-TIMER: a selection across a capture break (play resumed after a stretch with no live play: sudden death).\npub const BREAK_CROSSED: &str = \"The selection crosses the sudden-death restart. Keep it on one side.\";\n",
      "new": "    PreviousFighter, NextFighter, ToggleCapture, UseLeadIn, Confirm, Cancel,\n}\npub enum ClipEffect {\n    None, StopPreview, Preview(Box<MacroRecording>), Close,\n    Export(Box<MacroRecording>), ExportCombo(Box<crate::model::combo_record::ComboRecord>), Error(String),\n}\n\n/// P-TIMER: a selection across a capture break (play resumed after a stretch with no live play: sudden death).\npub const BREAK_CROSSED: &str = \"The selection crosses the sudden-death restart. Keep it on one side.\";\n",
      "reason": "rc.15 operator 2026-11-15: saved macro/combo Crop uses shared clip editor; CPU macro preview, link-only combos, keyboard save as new."
+    },
+    {
+     "old": "            }\n            ClipAction::Confirm => {\n                self.pause();\n                if let Some(FileSource::Combo(recording)) = &self.file {\n                    let links = recording.combo.links().skip(self.window.start() as usize)\n                        .take((self.window.end() - self.window.start()) as usize).copied();\n                    let kept = crate::model::combo::Combo::from_links(links).expect(\"nonempty selected links\");\n                    let mut saved = crate::model::combo_record::ComboRecord::new(recording.name.clone(), kept, recording.recorded_on.clone());\n                    saved.made_from = recording.made_from.clone();\n                    return ClipEffect::ExportCombo(Box::new(saved));\n                }\n                if self.file.is_some() {\n                    return match self.export_selection(&self.source_name) {\n                        Ok(recording) => ClipEffect::Export(Box::new(recording)),\n",
+     "new": "            }\n            ClipAction::Confirm => {\n                self.pause();\n                if let Some(FileSource::Combo(recording)) = &self.file {\n                    return match recording.crop_units(self.window.start(), self.window.end()) {\n                        Ok(saved) => ClipEffect::ExportCombo(Box::new(saved)),\n                        Err(error) => ClipEffect::Error(error.to_string()),\n                    };\n                }\n                if self.file.is_some() {\n                    return match self.export_selection(&self.source_name) {\n                        Ok(recording) => ClipEffect::Export(Box::new(recording)),\n",
+     "reason": "rc.15 shared clip editor consumes the agreed opaque crop-unit API for hit combos and input drills; context supplies labels and default names, with no preview for either kind."
+    },
+    {
+     "old": "\n    pub fn context(&self) -> ClipContext {\n        match &self.file {\n            Some(FileSource::Macro { player, .. }) => ClipContext::Macro { player: *player },\n            Some(FileSource::Combo(_)) => ClipContext::Combo,\n            None => ClipContext::Replay { fighters: self.session.tracks.len() > 1 },\n        }\n    }\n\n",
+     "new": "\n    pub fn context(&self) -> ClipContext {\n        match &self.file {\n            Some(FileSource::Macro { player, .. }) => ClipContext::Macro { player: *player },\n            Some(FileSource::Combo(recording)) => ClipContext::Combo { unit: recording.unit_kind() },\n            None => ClipContext::Replay { fighters: self.session.tracks.len() > 1 },\n        }\n    }\n\n",
+     "reason": "rc.15 shared clip editor consumes the agreed opaque crop-unit API for hit combos and input drills; context supplies labels and default names, with no preview for either kind."
+    },
+    {
+     "old": "    }\n\n    pub fn combo_file(recording: crate::model::combo_record::ComboRecord) -> Result<Self, String> {\n        recording.validate().map_err(|error| error.to_string())?;\n        let total = recording.combo.len() as u32;\n        let name = recording.name.clone();\n        Self::file(FileSource::Combo(Box::new(recording)), total, name)\n    }\n\n",
+     "new": "    }\n\n    pub fn combo_file(recording: crate::model::combo_record::ComboRecord) -> Result<Self, String> {\n        recording.validate().map_err(|error| error.to_string())?;\n        let total = recording.unit_count();\n        let name = recording.name.clone();\n        Self::file(FileSource::Combo(Box::new(recording)), total, name)\n    }\n\n",
+     "reason": "rc.15 shared clip editor consumes the agreed opaque crop-unit API for hit combos and input drills; context supplies labels and default names, with no preview for either kind."
+    },
+    {
+     "old": "}\n\n/// The same editor changes units and offered actions with its source.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum ClipContext { Replay { fighters: bool }, Macro { player: bool }, Combo }\n\nimpl ClipContext {\n    pub fn preview(self) -> bool { !matches!(self, Self::Combo) }\n    pub fn fighters(self) -> bool { matches!(self, Self::Replay { fighters: true }) }\n}\n\nenum FileSource {\n    Macro { recording: Box<MacroRecording>, player: bool },\n",
+     "new": "}\n\n/// The same editor changes units and offered actions with its source.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum ClipContext { Replay { fighters: bool }, Macro { player: bool }, Combo { unit: UnitKind } }\n\nimpl ClipContext {\n    pub fn preview(self) -> bool { !matches!(self, Self::Combo { .. }) }\n    pub fn fighters(self) -> bool { matches!(self, Self::Replay { fighters: true }) }\n    pub fn units(self) -> &'static str { match self { Self::Combo { unit } => unit.plural(), _ => \"frames\" } }\n}\n\nenum FileSource {\n    Macro { recording: Box<MacroRecording>, player: bool },\n",
+     "reason": "rc.15 shared clip editor consumes the agreed opaque crop-unit API for hit combos and input drills; context supplies labels and default names, with no preview for either kind."
+    },
+    {
+     "old": "        ),\n    };\n    let follow = if pace > 1 {\n        if pace >= 180 {\n            format!(\"Moving {pace} {} per tick.\", if view.context == ClipContext::Combo { \"links\" } else { \"frames\" })\n        } else {\n            format!(\"Moving {pace} {} per tick and speeding up.\", if view.context == ClipContext::Combo { \"links\" } else { \"frames\" })\n        }\n    } else {\n        follow\n    };\n",
+     "new": "        ),\n    };\n    let follow = if pace > 1 {\n        if pace >= 180 {\n            format!(\"Moving {pace} {} per tick.\", view.context.units())\n        } else {\n            format!(\"Moving {pace} {} per tick and speeding up.\", view.context.units())\n        }\n    } else {\n        follow\n    };\n",
+     "reason": "rc.15 shared clip editor consumes the agreed opaque crop-unit API for hit combos and input drills; context supplies labels and default names, with no preview for either kind."
+    },
+    {
+     "old": "//! Clip selection. Native input consumption, not rendering, advances the preview.\nuse {crate::engine::macros::FrameWindow, crate::engine::macros::MacroRecording, crate::engine::macros::MoveStart, crate::engine::macros::MoveStartRules, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::ReplayTrack, crate::engine::macros::MAX_NAME_CHARS};\nuse crate::engine::macro_ui::macro_panel::Pad;\n\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum Handle { Playhead, In, Out }\n#[derive(Clone, Copy, Debug)]\n",
+     "new": "//! Clip selection. Native input consumption, not rendering, advances the preview.\nuse {crate::engine::macros::FrameWindow, crate::engine::macros::MacroRecording, crate::engine::macros::MoveStart, crate::engine::macros::MoveStartRules, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::ReplayTrack, crate::engine::macros::MAX_NAME_CHARS};\nuse crate::engine::macro_ui::macro_panel::Pad;\nuse crate::model::combo_record::UnitKind;\n\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum Handle { Playhead, In, Out }\n#[derive(Clone, Copy, Debug)]\n",
+     "reason": "rc.15 shared clip editor consumes the agreed opaque crop-unit API for hit combos and input drills; context supplies labels and default names, with no preview for either kind."
     }
    ]
   },
@@ -3190,7 +3220,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "aa92501974673fa2a4d6aa5030df0e8c156fd14729d89c4935f8561031d17eb2",
+   "dest_sha256": "72f8a3d42aa392a69af135454659e529f17b1611ba8ce0b0dc720a6064aeb78f",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -3626,6 +3656,11 @@
      "old": "    let token = crate::engine::macro_ui::macro_panel::CLIP_NAME_TOKEN;\n    if let Some(name) = crate::runtime::macros::named_macros::take_confirmed_name_for(token) {\n        let file = FILE_NAME.lock().unwrap().take();\n        if let Some(file) = file {\n            let kind = match &file {\n                crate::engine::rr_runtime::ClipFile::Macro(_) => crate::engine::library::Kind::Macro,\n                crate::engine::rr_runtime::ClipFile::Combo(_) => crate::engine::library::Kind::Combo,\n            };\n            match crate::engine::rr_runtime::save_clip_file(std::path::Path::new(crate::model::storage::ROOT), file, &name) {\n                Ok(id) => {\n                    crate::engine::rr_host::note_hot(std::path::Path::new(crate::model::storage::ROOT), kind, &id);\n                    crate::engine::rr_host::bump_catalog();\n                    crate::runtime::diag_log::diagnostic(format_args!(\"[ClipEditor] saved_new={id}\"));\n                }\n                Err(error) => notify(error.to_string()),\n",
      "new": "    let token = crate::engine::macro_ui::macro_panel::CLIP_NAME_TOKEN;\n    if let Some(name) = crate::runtime::macros::named_macros::take_confirmed_name_for(token) {\n        let file = FILE_NAME.lock().unwrap().take();\n        if let Some(file) = file {\n            match crate::engine::rr_runtime::save_clip_file(std::path::Path::new(crate::model::storage::ROOT), file, &name) {\n                Ok(id) => {\n                    crate::engine::rr_host::bump_catalog();\n                    crate::runtime::diag_log::diagnostic(format_args!(\"[ClipEditor] saved_new={id}\"));\n                }\n                Err(error) => notify(error.to_string()),\n",
      "reason": "rc.15 operator 2026-11-15: saved macro/combo Crop uses shared clip editor; CPU macro preview, link-only combos, keyboard save as new."
+    },
+    {
+     "old": "\nfn name_file(file: crate::engine::rr_runtime::ClipFile) {\n    let (title, name) = match &file {\n        crate::engine::rr_runtime::ClipFile::Macro(recording) => (\"Name macro\", recording.name.as_str()),\n        crate::engine::rr_runtime::ClipFile::Combo(recording) => (\"Name combo\", recording.name.as_str()),\n    };\n    crate::runtime::macros::named_macros::offer_external_name_titled(\n        crate::engine::macro_ui::macro_panel::CLIP_NAME_TOKEN, title, name, \"Save as a new file\");\n    *FILE_NAME.lock().unwrap() = Some(file);\n",
+     "new": "\nfn name_file(file: crate::engine::rr_runtime::ClipFile) {\n    let (title, name) = match &file {\n        crate::engine::rr_runtime::ClipFile::Macro(recording) => (\"Name macro\", recording.name.as_str()),\n        crate::engine::rr_runtime::ClipFile::Combo(recording) => (match recording.unit_kind() {\n            crate::model::combo_record::UnitKind::Link => \"Name combo\",\n            crate::model::combo_record::UnitKind::Step => \"Name drill\",\n        }, recording.name.as_str()),\n    };\n    crate::runtime::macros::named_macros::offer_external_name_titled(\n        crate::engine::macro_ui::macro_panel::CLIP_NAME_TOKEN, title, name, \"Save as a new file\");\n    *FILE_NAME.lock().unwrap() = Some(file);\n",
+     "reason": "rc.15 shared clip editor consumes the agreed opaque crop-unit API for hit combos and input drills; context supplies labels and default names, with no preview for either kind."
     }
    ]
   },

@@ -264,7 +264,10 @@ static FILE_NAME: Mutex<Option<crate::engine::rr_runtime::ClipFile>> = Mutex::ne
 fn name_file(file: crate::engine::rr_runtime::ClipFile) {
     let (title, name) = match &file {
         crate::engine::rr_runtime::ClipFile::Macro(recording) => ("Name macro", recording.name.as_str()),
-        crate::engine::rr_runtime::ClipFile::Combo(recording) => ("Name combo", recording.name.as_str()),
+        crate::engine::rr_runtime::ClipFile::Combo(recording) => (match recording.unit_kind() {
+            crate::model::combo_record::UnitKind::Link => "Name combo",
+            crate::model::combo_record::UnitKind::Step => "Name drill",
+        }, recording.name.as_str()),
     };
     crate::runtime::macros::named_macros::offer_external_name_titled(
         crate::engine::macro_ui::macro_panel::CLIP_NAME_TOKEN, title, name, "Save as a new file");

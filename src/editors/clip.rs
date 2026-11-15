@@ -50,10 +50,10 @@ pub fn clip_frame(view: &ClipView, fighter: &str, pace: i32, frame: &mut Frame) 
             frame.row_count += 1;
         }
     };
-    if view.context != ClipContext::Combo { line("Fighter", fighter, Tone::Normal); }
+    if view.context.preview() { line("Fighter", fighter, Tone::Normal); }
     let mut window = String::new();
-    if view.context == ClipContext::Combo {
-        let _ = write!(window, "{} - {}  ({length} links of {})", view.start + 1, view.end, view.total);
+    if let ClipContext::Combo { unit } = view.context {
+        let _ = write!(window, "{} - {}  ({length} {} of {})", view.start + 1, view.end, if length == 1 { unit.singular() } else { unit.plural() }, view.total);
     } else {
         let _ = write!(window, "{} - {}  ({length} frames, {:.2}s of {})", view.start, view.end, length as f32 / FPS, view.total);
     }
