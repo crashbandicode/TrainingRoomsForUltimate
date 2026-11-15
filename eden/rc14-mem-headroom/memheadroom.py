@@ -44,8 +44,9 @@ AT_PAUSE = re.compile(r'\[GroupSwap\] give-back at pause marked=(0b[01]+) idle=(
                       r'install=(true|false) retired=(0b[01]+)')
 BUILT = re.compile(r'\[GroupSwap\] background built owner=1 group=\d+ ok=true reason=\S+ kinds=\[5a, 5b\]')
 CENSUS = re.compile(r'\[MemoryCensus\] ')
+CENSUS_CREATED = re.compile(r'([4-7]):(0x[0-9a-f]+) ready')
 PLAN = re.compile(r'\[GroupSwap\] plan owner=1 group=\d+ kinds=\[5a, 5b\]')
-HEADROOM = re.compile(r'headroom=(?:Some\()?(\d+)')
+HEADROOM_ANY = re.compile(r'headroom=(?:Some\()?(\d+)\)?(?:->(?:Some\()?(\d+))?')
 
 
 def _reserve(ctx, bytes_):
@@ -67,12 +68,12 @@ def _unmapped(ctx):
 
 
 def _headroom(ctx):
-    """The newest process headroom the plugin printed (census or ready line), bytes."""
+    """The newest process headroom the plugin printed, bytes: any `headroom=` (census, ready, prefetch, memory, a free or a
+    purge, whose `->` value is the one after it)."""
     for _, _, t in reversed(hs.diag_lines(ctx)):
-        if CENSUS.search(t) or '[BodyBank] ready ' in t:
-            m = HEADROOM.search(t)
-            if m:
-                return int(m.group(1))
+        m = HEADROOM_ANY.search(t)
+        if m:
+            return int(m.group(2) or m.group(1))
     return None
 
 
@@ -86,50 +87,73 @@ def mh_pyra_pause(ctx):
     t0, out = _begin(ctx)
     problems = []
     cf._diag_cycle(ctx, 'off')
+    # A retry starts from no reserve (a reserve stays in the plugin until it is written again).
+    out['reserve_cleared'] = _reserve(ctx, 0)
     out['unmapped_before'] = _unmapped(ctx)
     seq0 = hs.diag_mark(ctx)
     # 1. The operator's settings, P1 Kirby with his hats (a short P1 lane, so Pyra / Mythra's two bodies fit Ready
     #    Fighters 8 and are planned, not cold), the CPU without Pyra yet.
-    fx._live_set(ctx, player_roster=fs._roster([fs.KIRBY]), player_kirby_hats=fs._roster(fs.HATS),
-                 cpu_roster=fs._roster([fs.GUNNER, fs.DIDDY]), cycle_preload_ready_fighters=fs.RF(8),
-                 cycle_preload_bank_members=fs.BODIES['3'], cycle_preload_slots=fs.SLOTS(5),
-                 cycle_preload_ready_hats=fs.RH(5))
+    # The cycle rows' base values (`_preload_base`: Group Swap and every swap group on, both preload sources, Cycle Preload
+    # 5, Ready Hats 5, Bodies 3); boot mh-14ae232f-y1's first pass ran on the card fixture's Group Swap Off.
+    fx._live_set(ctx, **fs._preload_base(player_roster=fs._roster([fs.KIRBY]), player_kirby_hats=fs._roster(fs.HATS),
+                                         cpu_roster=fs._roster([fs.GUNNER, fs.DIDDY]), cycle_preload_ready_fighters=fs.RF(8)))
     out['settle0'] = fs._settled(ctx, seq0, 120)
     out['to_kirby'] = af._to(ctx, 0, fs.KIRBY, 4)
     out['p1_now'] = fs._live_kinds(ctx).get(0)
+    # The CPU's first swap builds its bank ("swap the CPU to load 1 more"): its groups are planned only then.
+    out['cpu_to_gunner'] = af._to(ctx, 1, fs.GUNNER, 4)
+    out['cpu_now'] = fs._live_kinds(ctx).get(1)
+    out['settle1'] = fs._settled(ctx, hs.diag_mark(ctx), 90)
     # A pause frees the groups that left the cycles, so the later hold finds no parked group (parked groups go first).
     steps.press(ctx, 'plus', 3.0)
     steps.press(ctx, 'plus', 2.0)
     time.sleep(3.0)
     out['preclean'] = [t[:200] for t in af._since(ctx, seq0) if '] pause frees ' in t][:6]
-    # 2. The created helpers fill with Kirby's hats (up to 90 s for at least two).
+    # 2. The created helpers fill with Kirby's hats (up to 90 s for at least two). Ready lines of the whole diag window: a
+    #    helper loaded before this row (a retry) prints none again.
     deadline = time.monotonic() + 90
     created = {}
     while time.monotonic() < deadline:
         ctx.check_stop()
-        created = {m.group(1): m.group(2) for t in af._since(ctx, seq0) for m in [CREATED_READY.search(t)] if m}
+        created = {m.group(1): m.group(2) for _, _, t in hs.diag_lines(ctx) for m in [CREATED_READY.search(t)] if m}
         if len(created) >= 2:
             time.sleep(5.0)
-            created = {m.group(1): m.group(2) for t in af._since(ctx, seq0) for m in [CREATED_READY.search(t)] if m}
+            created = {m.group(1): m.group(2) for _, _, t in hs.diag_lines(ctx) for m in [CREATED_READY.search(t)] if m}
             break
         time.sleep(1.0)
-    out['created_ready'] = created
     out['census_filled'] = [t[:600] for t in af._since(ctx, seq0) if CENSUS.search(t)][-2:]
+    # Boot mh-14ae232f-y1: the ready lines rotate out of the diag window within minutes; the newest census lists the
+    # created helpers too (`created=[4:0x18 ready, ...]`).
+    for t in [t for _, _, t in hs.diag_lines(ctx) if CENSUS.search(t)][-1:]:
+        for slot, kind in CENSUS_CREATED.findall(t.split('created=[', 1)[-1].split(']', 1)[0]):
+            created.setdefault(slot, kind)
+    out['created_ready'] = created
     if len(created) < 2:
         problems.append('precondition: the created helpers did not fill (ready slots %s)' % created)
     # 3. Short of the Pyra / Mythra group's room by SHORT: the helpers hold it (a reserve when the process would not).
-    headroom = _headroom(ctx)
-    out['headroom_before'] = headroom
-    reserve = max(0, (headroom or 0) - AEGIS_NEED + SHORT)
-    out['reserve'] = reserve
-    out['reserve_line'] = _reserve(ctx, reserve)
-    seq = hs.diag_mark(ctx)
-    fx._live_set(ctx, cpu_roster=fs._roster([fs.GUNNER, PYRA, fs.DIDDY]))
-    out['held'] = _wait(ctx, seq, HELD, 60)
+    out['attempts'] = []
+    for attempt in range(2):
+        # Boot mh-14ae232f-y1 retry 5: the newest headroom line was stale and the group fit at once. The second attempt
+        # drops Pyra, pauses (its free prints the headroom after it) and adds it again against that value.
+        headroom = _headroom(ctx)
+        reserve = max(0, (headroom or 0) - AEGIS_NEED + SHORT)
+        record = {'headroom_before': headroom, 'reserve': reserve, 'reserve_line': _reserve(ctx, reserve)}
+        seq = hs.diag_mark(ctx)
+        fx._live_set(ctx, cpu_roster=fs._roster([fs.GUNNER, PYRA, fs.DIDDY]))
+        record['held'] = _wait(ctx, seq, HELD, 60)
+        record['early_build'] = [t[:300] for t in af._since(ctx, seq) if BUILT.search(t)][:1]
+        out['attempts'].append(record)
+        if record['held'] or attempt:
+            break
+        fx._live_set(ctx, cpu_roster=fs._roster([fs.GUNNER, fs.DIDDY]))
+        time.sleep(2.0)
+        steps.press(ctx, 'plus', 3.0)
+        steps.press(ctx, 'plus', 2.0)
+        time.sleep(3.0)
+    out.update({k: out['attempts'][-1][k] for k in ('headroom_before', 'reserve', 'reserve_line', 'held', 'early_build')})
     out['marked'] = _wait(ctx, seq, MARKED, 30)
     out['notice'] = _wait(ctx, seq, NOTICE, 30)
     out['plan'] = [t[:240] for t in af._since(ctx, seq) if PLAN.search(t)][:2]
-    out['early_build'] = [t[:300] for t in af._since(ctx, seq) if BUILT.search(t)][:1]
     _shot(ctx, out, 'shot_before_pause', 'mh-before-pause')
     if not out['held']:
         problems.append('precondition: the Pyra / Mythra group was never held for memory (built early: %s)' % out['early_build'])
@@ -147,7 +171,9 @@ def mh_pyra_pause(ctx):
     out['settle_after'] = fs._settled(ctx, pause, 90)
     _shot(ctx, out, 'shot_after', 'mh-after-pause')
     lines = af._since(ctx, seq0)
-    out['census'] = [t[:600] for t in lines if CENSUS.search(t)][-6:]
+    # A census follows a `[BodyBank] ready` (a swap); a pass with no swap after its mark has none of its own (retry 4 of boot
+    # mh-14ae232f-y1), so the newest ones of the diag window count.
+    out['census'] = [t[:600] for _, _, t in hs.diag_lines(ctx) if CENSUS.search(t)][-6:]
     out['stalls'] = [t[:200] for t in lines if 'StallWatch' in t][-3:]
     out['bad'] = af._bad(lines)
     out['unmapped_after'] = _unmapped(ctx)
