@@ -482,8 +482,8 @@ What the target is. Disc: the plugin's target, as above. CPU: the CPU itself is 
   goes back to 0% at the next spot and flies again. A hit that doesn't count puts it back on its flight. It applies from
   the next time the menu closes. In the waiting room's practice the CPU is moved too.
 
-![Target set to CPU: Fox jabs the CPU three times and the count goes 1/10, 2/10, 3/10, the CPU put back at a fresh spot after each counted hit](../media/rc14-eggs-cpu-target.gif)<br>
-*Practice games, Eggs-ercise on 10 targets: Target reads Disc, then CPU, and the menu closes. Fox walks up to the CPU (Mario) and jabs it three times; each counted hit moves the count on ("Eggs 1/10", "2/10", "3/10") and the CPU is put back at a fresh spot, and no disc target appears. Eden, rc.14 (untested on hardware).*
+![Target set to CPU: the CPU flies up and down with its CPU tag on, rests, and Fox's neutral air hits it in the air; the count goes up and the CPU is put back at 0% at a new spot](../media/rc14-eggs-cpu-target.gif)<br>
+*Practice games, Eggs-ercise on Free practice with Breaks on Aerials and Target speed Slow: Target reads Disc, then CPU, and the menu closes. The CPU (Mario) is launched, flies up and falls back with its "CPU" tag on, and stands where it lands. Fox takes a full hop and a neutral air hits it in the air: the count goes up, the CPU is put back at 0% at a new spot and flies again, and no disc target appears. Eden, rc.14 (untested on hardware).*
 
 ### Target speed
 
