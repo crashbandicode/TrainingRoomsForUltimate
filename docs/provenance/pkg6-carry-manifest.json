@@ -12328,7 +12328,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "e2eb41779f13c83f48fa8172bf75e4f5d95cdb58f50dd703aabac6a7981bad38",
+   "dest_sha256": "fcd0b5888ef014f5dbdf3c60fd9eacfabfd17722711a29ca4abbccf009db49d7",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -13581,6 +13581,11 @@
      "old": "/// Called before G lock; the current probe may already own INSTALL, never a roster replacement.\npub(crate) unsafe fn mii_cpu_probe_roster_idle() -> bool {\n",
      "new": "/// Training's No. of CPUs as the game holds it, for the CPU frame wrapper's role rule (`model::cpu::role::is_cpu_role`):\n/// `None` outside native Training, before this cycle's boot or when the count's rows failed. Reads only: no lock, no\n/// native call, no allocation (it runs inside the fighter frame hook).\npub(crate) unsafe fn training_cpu_quantity() -> Option<u32> {\n    native_source::training_cpu_quantity()\n}\n\n/// Called before G lock; the current probe may already own INSTALL, never a roster replacement.\npub(crate) unsafe fn mii_cpu_probe_roster_idle() -> bool {\n",
      "reason": "rc.14 mii-hud-portrait (2026-11-15): the CPU frame wrapper reads No. of CPUs so a parked Training entry (F9 seat 2/3, the Mii HUD bust helper, a hat entry) is not a CPU role; Hide CPU had hidden the bust helper during its render (a grey portrait). The deleted `character_sources::reserved` row of this ledger relies on that role rule"
+    },
+    {
+     "old": "    waiting_icon_source(base).map(|(_, pane)| pane)\n}\n",
+     "new": "    waiting_icon_source(base).map(|(_, pane)| pane)\n}\n\n/// Hide CPU in a waiting room: CPU4's partner card in `info_waiting` (`tp_0N`: window, damage, portrait), the parent of\n/// the partner portrait `waiting_partner_icon` resolves as the game's damage setters do. Read fresh each time, only a\n/// pane named like a partner card is returned (`hide::room_card`), nothing is cached and nothing is allocated. `None` until\n/// the roster's own seam gate passed (`BASE`), so the waiting-UI natives are only called on a checked game.\npub(crate) unsafe fn waiting_cpu_card() -> Option<*mut skyline::nn::ui2d::Pane> {\n    use skyline::nn::ui2d::Pane;\n    let base = BASE.load(Ordering::Acquire);\n    if base == 0 {\n        return None;\n    }\n    let picture = pointer_chain(waiting_icon_pane(base, 4)?, &[8])?;\n    let card = pointer_chain(picture, &[core::mem::offset_of!(Pane, parent)])?;\n    let name = read::<[u8; 25]>(card, core::mem::offset_of!(Pane, name));\n    crate::model::cpu::hide::room_card(&name).then_some(card as *mut Pane)\n}\n",
+     "reason": "rc.14 hide-room-panel (the primary 2026-11-15 ~12:58Z): Hide CPU in a waiting room hides CPU4's info_waiting partner card (tp_0N), found as the parent of the partner portrait waiting_partner_icon resolves"
     }
    ]
   },
