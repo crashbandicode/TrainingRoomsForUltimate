@@ -152,6 +152,7 @@ hats ahead of time, in the background. The notice "Fighters" counts them:
 | "Swap once to load", "Swap P1 once to load", "Swap the CPU once to load", "Swap both once to load" | That role's first swap starts the loading. | Swap once. |
 | "Loaded 7/10 · swap to load 3 more" | The rest load after the next swap. | Swap once more. |
 | "(2 waiting for memory)" or "(2 waiting for pool space)" | Some fighters are held until there is room, then load. They are not failed. | If it keeps saying so, lower Ready Fighters or Ready Hats. |
+| "(2 load after you pause)" | Kirby's hats or other fighters loaded ahead hold the room these fighters need. The next pause unloads them. | Pause once; the fighters then load. |
 | "Paused" | Loading waits while something else, such as a swap or a save-state load, needs the game. | Wait. |
 
 If swaps are slow, look at Fighters & Stages › Loading (collapsed: A on its header opens it):

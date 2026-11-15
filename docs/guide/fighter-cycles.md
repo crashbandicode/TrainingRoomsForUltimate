@@ -143,6 +143,7 @@ The notice "Fighters" counts them while they load:
 | "Swap once to load", "Swap P1 once to load", "Swap the CPU once to load", "Swap both once to load" | That role's first swap starts the loading. |
 | "Loaded 7/10 · swap to load 3 more" | The rest load after the next swap. |
 | "(2 waiting for memory)" or "(… waiting for pool space)" | Some wait for room, then load. If it keeps saying so, lower Ready Fighters or Ready Hats. |
+| "(2 load after you pause)" | Kirby's hats or other fighters loaded ahead hold the room these need. The next pause unloads them, then these load. |
 | "Paused" | Loading waits while something else, such as a swap or a save-state load, needs the game. |
 
 The rows are in the Loading section of Fighters & Stages, collapsed until you open it:
