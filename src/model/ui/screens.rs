@@ -84,7 +84,7 @@ fn base(menu: &Menu, screen: &Screen, frame: &mut Frame) {
     }
 }
 
-fn push(frame: &mut Frame, label: &str, value: &str, tone: Tone) {
+pub(crate) fn push(frame: &mut Frame, label: &str, value: &str, tone: Tone) {
     let at = usize::from(frame.row_count);
     if at >= ROW_LINES {
         return;

@@ -7,6 +7,7 @@ use core::fmt::Write;
 
 use crate::engine::macro_ui::clip_panel::{clip_help, ClipContext, ClipView, Handle};
 use crate::model::frame::{ClipBar, Frame, Tone, View, TITLE};
+use crate::model::screens::push;
 
 /// Frames per second of the game: the length of a window in seconds.
 const FPS: f32 = 60.0;
@@ -40,39 +41,29 @@ pub fn clip_frame(view: &ClipView, fighter: &str, pace: i32, frame: &mut Frame) 
         playing: view.playing,
     };
     let length = view.end.saturating_sub(view.start);
-    let mut line = |label: &str, value: &str, tone: Tone| {
-        let at = usize::from(frame.row_count);
-        if at < frame.rows.len() {
-            let row = &mut frame.rows[at];
-            let _ = row.label.write_str(label);
-            let _ = row.value.write_str(value);
-            row.value_tone = tone;
-            frame.row_count += 1;
-        }
-    };
-    if view.context.preview() { line("Fighter", fighter, Tone::Normal); }
+    if view.context.preview() { push(frame, "Fighter", fighter, Tone::Normal); }
     let mut window = String::new();
     if let ClipContext::Combo { unit } = view.context {
         let _ = write!(window, "{} - {}  ({length} {} of {})", view.start + 1, view.end, if length == 1 { unit.singular() } else { unit.plural() }, view.total);
     } else {
         let _ = write!(window, "{} - {}  ({length} frames, {:.2}s of {})", view.start, view.end, length as f32 / FPS, view.total);
     }
-    line("Crop window", &window, Tone::Normal);
+    push(frame, "Crop window", &window, Tone::Normal);
     let mut head = String::new();
     let _ = write!(head, "{}{}", view.cursor, if view.playing { "  playing" } else { "" });
-    line("Playhead", &head, if view.playing { Tone::On } else { Tone::Normal });
+    push(frame, "Playhead", &head, if view.playing { Tone::On } else { Tone::Normal });
     if view.truncated {
-        line("This capture is partial", "", Tone::Dim);
+        push(frame, "This capture is partial", "", Tone::Dim);
     }
     if view.quantized {
-        line("Frames were quantized by the capture", "", Tone::Dim);
+        push(frame, "Frames were quantized by the capture", "", Tone::Dim);
     }
     if view.previous_available {
-        line("Capture", if view.previous_selected { "previous" } else { "latest" }, Tone::Dim);
+        push(frame, "Capture", if view.previous_selected { "previous" } else { "latest" }, Tone::Dim);
     }
     let help = clip_help(view, COARSE, CHORD, pace);
     if !help.notice.is_empty() {
-        line(&help.notice, "", Tone::Dim);
+        push(frame, &help.notice, "", Tone::Dim);
     }
     let _ = frame.help[0].write_str(&help.primary);
     let _ = frame.help[1].write_str(&help.follow);
