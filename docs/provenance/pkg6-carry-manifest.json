@@ -8474,7 +8474,7 @@
    "dest": "src/model/swap/capacity_creation.rs",
    "crate": "consts",
    "src_sha256": "f130c2364f384fd3ab98e41b45416b73ed3c595dfa8e5576721a1f855157a304",
-   "dest_sha256": "6b77ca56c8689d46918a3329954817f9c7ad4132a90ae6dbbe48a7989ce7a9cf",
+   "dest_sha256": "4a54f0fff49895a2bf8ffeb025394edbbe0a07b4d0c2b4d564a1f157bf0e9c09",
    "edits": [
     {
      "table_tests": true,
@@ -8541,6 +8541,11 @@
      "old": "            (\"the_line_names_the_sp1_owner\", the_line_names_the_sp1_owner as fn()),\n        ]);\n",
      "new": "            (\"the_line_names_the_sp1_owner\", the_line_names_the_sp1_owner as fn()),\n            (\"a_refused_creation_stays_offered_so_its_preflight_runs_again\",\n                a_refused_creation_stays_offered_so_its_preflight_runs_again as fn()),\n        ]);\n",
      "reason": "rc.14 creation-hold fail-first: rc.14 creation-hold: held_allowance stub (today's cap) and its fail-first case; created_allowance calls it"
+    },
+    {
+     "old": "/// rc.14 creation-hold (the primary 2026-11-15 ~09:20Z): fail-first stub, today's cap that ends AT the refused extra.\npub fn held_allowance(allowance: usize, position: Option<usize>) -> usize {\n    position.map_or(allowance, |position| allowance.min(position))\n",
+     "new": "/// rc.14 creation-hold (the primary 2026-11-15 ~09:20Z): the cap used to end AT the refused extra (`min(position)`), a\n/// latch for the rest of the scene (Eden smoke2r-f1, cycle-f1).\npub fn held_allowance(allowance: usize, position: Option<usize>) -> usize {\n    position.map_or(allowance, |position| allowance.min(position + 1))\n",
+     "reason": "rc.14 creation-hold fix: rc.14 creation-hold: held_allowance keeps the refused extra offered (min(position + 1)), so its preflight runs again and a pass clears the hold"
     }
    ]
   },
@@ -14138,7 +14143,7 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "0d52fd5261304d2bfba61abe27f5172bbc1ed8c2095cbf687fa5f4233ece60a4",
+   "dest_sha256": "b5eef93376a68eee2b6d3a8830cf1566c030b08b37c7e9d95c63d87f3963070c",
    "edits": [
     {
      "delete_from": "/// Skip plugin automations for an owned helper body.",
@@ -16671,6 +16676,11 @@
      "old": "    state.creation_hold.filter(|(epoch,_)|state.book.is_current(*epoch)).map_or(allowance,|(_,position)|allowance.min(usize::from(position)))\n",
      "new": "    // rc.14 creation-hold: the refused extra stays offered, so its preflight runs again and a pass clears the hold.\n    creation::held_allowance(allowance,state.creation_hold.filter(|(epoch,_)|state.book.is_current(*epoch)).map(|(_,position)|usize::from(position)))\n",
      "reason": "rc.14 creation-hold fail-first: rc.14 creation-hold: held_allowance stub (today's cap) and its fail-first case; created_allowance calls it"
+    },
+    {
+     "old": "/// creation the preflight refused ends it at that entry while the hold stands (`creation_hold`).\n",
+     "new": "/// creation the preflight refused ends it with that entry while the hold stands (`creation_hold`): the refused entry is\n/// still offered, so its preflight runs again on each helper callback and a pass clears the hold\n/// (`creation::held_allowance`).\n",
+     "reason": "rc.14 creation-hold fix: rc.14 creation-hold: held_allowance keeps the refused extra offered (min(position + 1)), so its preflight runs again and a pass clears the hold"
     }
    ]
   },

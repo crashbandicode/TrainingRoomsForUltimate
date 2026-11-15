@@ -716,7 +716,9 @@ fn helper_view(state:&State,slot:u32)->[Option<Want>;crate::runtime::roster::cyc
 }
 
 /// The created entries this scene's plan may use (`hat_slots::created_allowance`), counted by the plan's purposes; a
-/// creation the preflight refused ends it at that entry while the hold stands (`creation_hold`).
+/// creation the preflight refused ends it with that entry while the hold stands (`creation_hold`): the refused entry is
+/// still offered, so its preflight runs again on each helper callback and a pass clears the hold
+/// (`creation::held_allowance`).
 fn created_allowance(state:&State,backend:Backend)->usize {
     use crate::engine::preload::hat_slots::Purpose;
     let helpers=backend.helpers();

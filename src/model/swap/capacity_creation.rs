@@ -194,9 +194,10 @@ pub fn held_limit(limit: usize, helpers: usize, position: Option<usize>) -> usiz
 /// The created entries creation may still offer while a refusal stands for the extra at `position` in the scene's
 /// creation order (`character_sources::created_allowance`): the extras before it and the refused one itself, so its
 /// preflight runs again on each helper callback and a pass clears the hold. Nothing past it is offered.
-/// rc.14 creation-hold (the primary 2026-11-15 ~09:20Z): fail-first stub, today's cap that ends AT the refused extra.
+/// rc.14 creation-hold (the primary 2026-11-15 ~09:20Z): the cap used to end AT the refused extra (`min(position)`), a
+/// latch for the rest of the scene (Eden smoke2r-f1, cycle-f1).
 pub fn held_allowance(allowance: usize, position: Option<usize>) -> usize {
-    position.map_or(allowance, |position| allowance.min(position))
+    position.map_or(allowance, |position| allowance.min(position + 1))
 }
 
 /// Result of the exact-Mii proof for one layout owner. A Mii kind alone is not a proof.
