@@ -1228,9 +1228,10 @@ pub const KEEP_WINDOW_ACROSS_RELOAD: bool = false;
 /// 2026-11-15 ~00:50Z).
 pub const KIRBY_STRIP_BEFORE_PARK: bool = true;
 
-/// rc.14 a-full-2 (limit 2): A1 keeps a Pokémon Trainer window too ([`window_kept_across_reload`]'s `keep_pt`). Off until
-/// its Eden rows pass (the diag build's `diag-cycle.req` `pt`, with `window`, turns it on for them).
-pub const KEEP_PT_WINDOW_ACROSS_RELOAD: bool = false;
+/// rc.14 a-full-2 (limit 2): A1 keeps a Pokémon Trainer window too ([`window_kept_across_reload`]'s `keep_pt`). On since
+/// boot a2-e881df1e-y1's a2-pt-r passed the corrected check (the primary ~01:35Z; `eval_pt_return.py`: the kept group's
+/// pool prepared on the worker, its attach, ready, no fallback). It only acts while A1 does.
+pub const KEEP_PT_WINDOW_ACROSS_RELOAD: bool = true;
 
 /// rc.14 2e (a-full, A1; AFULL-RESEARCH.md §2): why the attached window `window` cannot be kept across its role's
 /// target-first Reload onto `target` (`Ok`: it can). The Reload start (`0x653240` → `0x653490`) deactivates every window

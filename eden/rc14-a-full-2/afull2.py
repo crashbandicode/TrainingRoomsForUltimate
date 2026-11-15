@@ -281,16 +281,37 @@ def a2_pt(ctx):
     # The kept record's pool comes back before or at its attach: rc.14 prepares a retired PT group's articles on the task
     # worker once its object kind is re-taken (`articles prepared … pool=0->1`, boot a2-e881df1e-y1 #9761-#9864), else
     # the attach rebuilds them (`articles rebuilt`).
-    group = kept[0] if kept else None
-    prepared = [t[:240] for t in af._since(ctx, seq_keep)
-                if re.search(r'\[GroupSwap\] articles prepared owner=0 group=%s .*pool=0->[1-9]' % group, t)]
-    out['articles_prepared'] = prepared[:2]
-    if not prepared and not any('rebuilt' in t for t in out['articles_back']):
-        problems.append('the trainer articles came back neither prepared nor rebuilt: %s' % out['articles_back'])
+    out.update(pt_return_verdict(kept, af._since(ctx, seq_keep), back))
+    problems += out['pt_problems']
     if not all(p.get('outcome') for p in out['laps']):
         problems.append('a lap press did not apply: %s' % [(p.get('kind'), p.get('outcome')) for p in out['laps']])
     problems += ['bad line: %s' % t for t in out['bad'] + out.get('bad_after', []) + out['bad_laps']]
     return _finish(ctx, 'a2-pt', out, problems)
+
+
+def pt_return_verdict(kept, since_keep, back):
+    """The kept PT window's return, as rc.14 does it (the primary ~01:35Z): the task worker prepares the retired pool once
+    the object kind is re-taken (`articles prepared owner=0 group=<kept> … pool=0->N`, between the keep and the attach),
+    then the kept `[24, 25, 26]` group attaches, the bank is ready on a PT form, and no fallback comes. Pure: lines in,
+    findings out (the offline check of a saved log uses it too)."""
+    group = kept[0] if kept else None
+    prepared = [t[:240] for t in since_keep
+                if group is not None and re.search(r'\[GroupSwap\] articles prepared owner=0 group=%d .*pool=0->[1-9]' % group, t)]
+    attach = [t[:200] for t in back
+              if group is not None and re.search(r'\[GroupSwap\] attach owner=0 group=%d member=\d+ kinds=\[24, 25, 26\]' % group, t)]
+    ready = [t[:200] for t in back if re.search(r'\[BodyBank\] ready owner=0 index=\d+ kind=0x2[456] ', t)]
+    fallback = [t[:200] for t in back if re.search(r'\[GroupSwap\] fallback owner=0 ', t)]
+    problems = []
+    if not prepared:
+        problems.append('no worker-prepared pool for the kept group %s' % group)
+    if not attach:
+        problems.append('no attach of the kept [24, 25, 26] group %s' % group)
+    if not ready:
+        problems.append('no ready on a PT form after the attach')
+    if fallback:
+        problems.append('a fallback at the return: %s' % fallback[:2])
+    return {'articles_prepared': prepared[:2], 'pt_attach': attach[:2], 'pt_ready': ready[:2], 'pt_fallback': fallback[:2],
+            'pt_problems': problems}
 
 
 def a2_aegis_probe(ctx):
