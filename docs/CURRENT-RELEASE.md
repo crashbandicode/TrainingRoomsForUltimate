@@ -5,14 +5,11 @@
      release's name commit. The docs checks (tests/docs_gates.rs) fail until they all name the same release. The steps are
      in docs/BUILD.md, "Release checklist". -->
 
-<!-- TODO (integration-3, at the final pass): once the final Eden pass has passed, add "Eden-tested" to the Status line below,
-     to the README's top and to the Status section of docs/TECHNICAL.md ("Eden-tested and untested on hardware", as for
-     rc.12 and rc.13). Until then the build is only "untested on hardware". -->
-
 Current release: rc.14
 
-Status: **untested on hardware.** No one has run rc.14 on a Switch yet. This page says which release is current. The
-[README](../README.md) and the [technical notes](TECHNICAL.md#status) follow it.
+Status: **Eden-tested and untested on hardware.** rc.14 was run in the Eden emulator (2026-11-15); no one has run it
+on a Switch yet. This page says which release is current. The [README](../README.md) and the
+[technical notes](TECHNICAL.md#status) follow it.
 
 Its release page, with the notes and the plugin files:
 [v0.2.0-rc.14](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.14).
