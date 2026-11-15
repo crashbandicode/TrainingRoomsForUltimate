@@ -878,12 +878,11 @@ impl RecordingScreens {
             Face::Popup => "recording-popup",
             Face::Page => "recording-page",
         };
-        let mut line = format!(
+        format!(
             "screen={screen} role={} tab={tab} loop={} hot={hot} hairline={hair} floppy={floppy} header={header} active={active} group={group_name}",
             role.diag(),
             self.loop_of(role).label(),
-        );
-        line
+        )
     }
 
     /// One pop-up button. Always consumed while the pop-up is open.

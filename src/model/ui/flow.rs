@@ -123,6 +123,11 @@ mod tests {
     /// the editor was never drawn although it held the game. The clip phase survives the reset; the layer closing the
     /// editor ends it.
     fn the_hand_over_close_keeps_the_clip_editor_drawn() {
+        // A file's Crop opens directly from the menu; a replay opens from its panel.
+        for phase in [Phase::Menu, Phase::Panel] {
+            assert_eq!(next(phase, seen(true, true, true)), (Phase::Clip, Step::HandOverToClip));
+            assert_eq!(next(phase, Seen { clip_foreground: false, ..seen(true, true, true) }), (phase, Step::Nothing));
+        }
         assert_eq!(after_session_reset(Phase::Clip), Phase::Clip);
         assert_eq!(next(after_session_reset(Phase::Clip), seen(false, true, true)), (Phase::Clip, Step::Nothing));
         assert_eq!(next(Phase::Clip, seen(false, false, false)), (Phase::Menu, Step::HideClip));

@@ -259,12 +259,12 @@ pub fn open_file_editor(id: &str, combo: bool) {
     crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
 }
 
-static FILE_NAME: Mutex<Option<crate::model::rr_runtime::ClipFile>> = Mutex::new(None);
+static FILE_NAME: Mutex<Option<crate::engine::rr_runtime::ClipFile>> = Mutex::new(None);
 
-fn name_file(file: crate::model::rr_runtime::ClipFile) {
+fn name_file(file: crate::engine::rr_runtime::ClipFile) {
     let (title, name) = match &file {
-        crate::model::rr_runtime::ClipFile::Macro(recording) => ("Name macro", recording.name.as_str()),
-        crate::model::rr_runtime::ClipFile::Combo(recording) => ("Name combo", recording.name.as_str()),
+        crate::engine::rr_runtime::ClipFile::Macro(recording) => ("Name macro", recording.name.as_str()),
+        crate::engine::rr_runtime::ClipFile::Combo(recording) => ("Name combo", recording.name.as_str()),
     };
     crate::runtime::macros::named_macros::offer_external_name_titled(
         crate::engine::macro_ui::macro_panel::CLIP_NAME_TOKEN, title, name, "Save as a new file");
@@ -276,8 +276,13 @@ fn service_file_name() {
     if let Some(name) = crate::runtime::macros::named_macros::take_confirmed_name_for(token) {
         let file = FILE_NAME.lock().unwrap().take();
         if let Some(file) = file {
-            match crate::model::rr_runtime::save_clip_file(std::path::Path::new(crate::model::storage::ROOT), file, &name) {
+            let kind = match &file {
+                crate::engine::rr_runtime::ClipFile::Macro(_) => crate::engine::library::Kind::Macro,
+                crate::engine::rr_runtime::ClipFile::Combo(_) => crate::engine::library::Kind::Combo,
+            };
+            match crate::engine::rr_runtime::save_clip_file(std::path::Path::new(crate::model::storage::ROOT), file, &name) {
                 Ok(id) => {
+                    crate::engine::rr_host::note_hot(std::path::Path::new(crate::model::storage::ROOT), kind, &id);
                     crate::engine::rr_host::bump_catalog();
                     crate::runtime::diag_log::diagnostic(format_args!("[ClipEditor] saved_new={id}"));
                 }
@@ -931,7 +936,7 @@ fn apply_action(action: ClipAction) {
             crate::runtime::macros::replay_preview::request_stop();
             *HOLD.lock().unwrap() = (0, 0, false);
             if file {
-                name_file(crate::model::rr_runtime::ClipFile::Macro(recording));
+                name_file(crate::engine::rr_runtime::ClipFile::Macro(recording));
                 return;
             }
             match attach(recording) {
@@ -940,7 +945,7 @@ fn apply_action(action: ClipAction) {
         }
         Some(ClipEffect::ExportCombo(recording)) => {
             *HOLD.lock().unwrap() = (0, 0, false);
-            name_file(crate::model::rr_runtime::ClipFile::Combo(recording));
+            name_file(crate::engine::rr_runtime::ClipFile::Combo(recording));
         }
         Some(ClipEffect::Error(error)) => {
             crate::runtime::macros::replay_preview::request_stop();

@@ -1472,7 +1472,7 @@ fn finish_make(root: &Path, tick: &mut Tick) {
     }
 }
 
-fn note_hot(root: &Path, kind: Kind, id: &str) {
+pub(crate) fn note_hot(root: &Path, kind: Kind, id: &str) {
     let Ok(mut index) = RecordingIndex::load(root) else {
         return;
     };

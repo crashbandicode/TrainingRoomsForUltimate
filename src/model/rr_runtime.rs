@@ -939,7 +939,7 @@ mod tests {
     }
 
     fn file_clip_save_as_new_preserves_original() {
-        use crate::model::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
+        use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
         let root = scratch("shared-clip");
         let macros = Library::new(root.join(MACROS_DIR));
         let source = recording("Original", &[1, 2, 3, 4], Some("keep"));
