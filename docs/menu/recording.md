@@ -218,13 +218,18 @@ controller:
 | Key | What it does |
 | --- | --- |
 | Up/Down | Pick whose inputs to take when the capture has two sides. A file has one side, so this does nothing. |
-| L / R | L picks the start and R the end. |
+| L / R | L picks the start and R the end. After a preview or save, pick a handle again before moving it. |
 | Left/Right | Move it (hold to go faster): frames for replays and macros, whole links for combos, whole steps for drills. |
 | X | Previews the kept part on the CPU, including a Player 1 macro. Not offered for combos or drills. |
 | A | Names and saves the kept part as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays. |
 | B | Leaves. |
 
 Crop on a macro, combo or drill opens this same editor. A one-side file has no fighter-selection row. Combos and drills have no preview button.
+
+![Moving a macro's start handle from frame 0 to 180 keeps the final 134 frames](../media/rc15-crop-editor.gif)<br>
+*Macro Crop, Eden, 2026-11-15, rc.15 d520d325 (untested on hardware). L selects the start handle; Left/Right moves it. This clip shows range selection.*
+
+[Crop acceptance evidence](../EVIDENCE-rc15-crop-editor.md)
 
 ![A capture cropped in the Replay window and saved, then played: the CPU becomes the recorded Mii Gunner](../media/rc11-replay-window.gif)<br>
 *Opening a replay moment*

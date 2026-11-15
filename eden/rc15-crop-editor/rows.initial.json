@@ -1,0 +1,408 @@
+{
+  "game_id": "01006A800016E000",
+  "start": "frontend-ready",
+  "early_stop": false,
+  "on_failure": "continue",
+  "scope": "rc.15 crop editor: live macro crop/CPU preview/save-new, whole-link combo crop/empty default, and Replay clip redraw regression. One muted owned Eden boot; no card/push/release.",
+  "setup": [
+    {
+      "state": "Muted persisted volume0, memory_layout_mode0, GDB stub before game.load; tested rc15 NRO",
+      "via": "hook",
+      "ref": "crop_runtime.py:configure; gdb_rc8.py:gdb_on; config plugin pin"
+    },
+    {
+      "state": "Training, P1 Mario (CSS tile 0), CPU Mario through the menu",
+      "via": "segment",
+      "ref": "library attract-cancel, main-stage, stage-css, enter-training; steps.py boot_training"
+    },
+    {
+      "state": "Two-link clean-room combo and initial library in owned profile",
+      "via": "fixture",
+      "ref": "fixtures/cov-crop; cov.prep in crop_runtime.py:macro_crop"
+    },
+    {
+      "state": "Live P1 recording with unwanted jump, pause, then jab; shared Crop UI",
+      "via": "hook",
+      "ref": "crop_runtime.py:macro_crop; existing recording chord segments"
+    },
+    {
+      "state": "Existing combo opens shared link editor; empty keyboard name creates numbered copy",
+      "via": "hook",
+      "ref": "crop_runtime.py:combo_crop"
+    },
+    {
+      "state": "Saved replay capture opens the same standalone editor through Replay window",
+      "via": "fixture",
+      "ref": "fixtures/cov-replay; crop_runtime.py:replay_clip_redraw"
+    }
+  ],
+  "segments": {
+    "attract-cancel": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/attract-cancel.edenmacro.json",
+      "sha256": "1b506dbfc689e79e8bfca69b74274ab674b91ac8359219a1a4c95faa81aae70f",
+      "cap": 30,
+      "start_gate": null,
+      "end_gate": "main",
+      "library": "attract-cancel"
+    },
+    "main-stage": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/main-stage.edenmacro.json",
+      "sha256": "ce6714b44f34f04cacd0d17454e4773c8906d289e5a37e34c606c604e6e4acfb",
+      "cap": 60,
+      "start_gate": "main",
+      "end_gate": "stage",
+      "library": "main-stage"
+    },
+    "stage-css": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/stage-css.edenmacro.json",
+      "sha256": "240249606f15207106e4cc654cc3ee173efa97d51ea276586c82e6c7c438db74",
+      "cap": 30,
+      "start_gate": "stage",
+      "end_gate": "css",
+      "library": "stage-css"
+    },
+    "enter-training": {
+      "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/enter-training.edenmacro.json",
+      "sha256": "7cdd035473160fec1a0e8c601c05f599f5b21556ac1cb4479b358c629e05b5c1",
+      "cap": 30,
+      "start_gate": "ready",
+      "end_gate": "p1-original",
+      "library": "enter-training"
+    },
+    "menu-open": {
+      "file": "segments/menu-open.edenmacro.json",
+      "sha256": "1185704f7b97f2981a8bae42fbe42166d5bc37aa2e9cba197bdf585a616f78ce",
+      "cap": 30
+    },
+    "menu-open-held": {
+      "file": "segments/menu-open-held.edenmacro.json",
+      "sha256": "3681bea36144a83bdb7c8ee2e9d14ebb67385698d8e87ba4abfeb1a5088d46fa",
+      "cap": 30
+    },
+    "menu-close": {
+      "file": "segments/menu-close.edenmacro.json",
+      "sha256": "b45ca532f18b9a3a7938a04b4a6b0513b7288ed584705fd042e40125bd5c4a89",
+      "cap": 30
+    },
+    "reset-center": {
+      "file": "segments/reset-center.edenmacro.json",
+      "sha256": "54e917aa28b0af97505e73a53fa991d3f79ed597b79ae8bc07f364c5fc6dbdd7",
+      "cap": 30
+    },
+    "jab": {
+      "file": "segments/jab.edenmacro.json",
+      "sha256": "12769777ca262a7e3515f8f81a72c7470e7dffa98d9bdfb56e1887dfc702f278",
+      "cap": 30
+    },
+    "fsmash": {
+      "file": "segments/fsmash.edenmacro.json",
+      "sha256": "2a6f61ae325478ba8a005edef0012064069fde9c0a88d93ff242c8c736d2452f",
+      "cap": 30
+    },
+    "chord-save": {
+      "file": "segments/chord-save.edenmacro.json",
+      "sha256": "fd05baa42ae7353f6be4ef1fa861d55b958ad1de31e05229286ad18b52bbe56c",
+      "cap": 30
+    },
+    "chord-load": {
+      "file": "segments/chord-load.edenmacro.json",
+      "sha256": "1f1f8ca9d99c990e8fa6ae9348fc31f6ae36e7f2fa09c88d84485abfd2f0cb74",
+      "cap": 30
+    },
+    "run-off-left": {
+      "file": "segments/run-off-left.edenmacro.json",
+      "sha256": "0be2efe593aedc582301f22767f8f131bae3d17c5dd2b6d64e1d173499dfc16c",
+      "cap": 30
+    },
+    "menu-open-slow": {
+      "file": "segments/menu-open-slow.edenmacro.json",
+      "sha256": "4ecac33f10f510a20f106ea027b57db73b12498a28d583cfd7d2a3d4f7d74c69",
+      "cap": 30
+    },
+    "lra-held": {
+      "file": "segments/lra-held.edenmacro.json",
+      "sha256": "687ffa03cebe0c1f5350cc51471634cb98af2419bd351c81389253edbf78b570",
+      "cap": 30
+    },
+    "p2-fs-p1-cycle": {
+      "file": "segments/p2-fs-p1-cycle.edenmacro.json",
+      "sha256": "17bc57c1b2a568edb0d66a8b02e3026383f48c2cacda725e6d1427420f07d5d8",
+      "cap": 90
+    },
+    "p2-fs-cpu-cycle": {
+      "file": "segments/p2-fs-cpu-cycle.edenmacro.json",
+      "sha256": "6b91e87d53a6faae0b4acf15e60b526d00aff01e2f5054d9d473f04ea4682ce6",
+      "cap": 90
+    },
+    "p2-fs-p1-hat": {
+      "file": "segments/p2-fs-p1-hat.edenmacro.json",
+      "sha256": "83b189729f74fb1a2f0a546f12c32deed6ef26854fe343b392cfb4aa5d56f746",
+      "cap": 90
+    },
+    "chord-record": {
+      "file": "segments/chord-record.edenmacro.json",
+      "sha256": "f2fa1848d9988aea562b142421767175b60a3b836770c3f537b7473e9dd18e04",
+      "cap": 30
+    },
+    "chord-play-cpu": {
+      "file": "segments/chord-play-cpu.edenmacro.json",
+      "sha256": "56b9f03c84a8521c261b7cdee25702d379ecf4eabc556ccef98e7097fc3bb8f9",
+      "cap": 30
+    },
+    "chord-play-p1": {
+      "file": "segments/chord-play-p1.edenmacro.json",
+      "sha256": "0cde25d7bb1a6f68194603d41c2f0f6f125f33c15b73af117bc7440c0803fc6e",
+      "cap": 30
+    },
+    "chord-popup": {
+      "file": "segments/chord-popup.edenmacro.json",
+      "sha256": "d4f4376b8f2fc8821b8dbe795f2f0ca46902bb47ae6bc132ad0e117937433b97",
+      "cap": 30
+    },
+    "p2-rec-chord-record": {
+      "file": "segments/p2-rec-chord-record.edenmacro.json",
+      "sha256": "f2fa1848d9988aea562b142421767175b60a3b836770c3f537b7473e9dd18e04",
+      "cap": 30
+    },
+    "p2-rec-chord-play-p1": {
+      "file": "segments/p2-rec-chord-play-p1.edenmacro.json",
+      "sha256": "0cde25d7bb1a6f68194603d41c2f0f6f125f33c15b73af117bc7440c0803fc6e",
+      "cap": 30
+    },
+    "p2-rec-chord-popup": {
+      "file": "segments/p2-rec-chord-popup.edenmacro.json",
+      "sha256": "d4f4376b8f2fc8821b8dbe795f2f0ca46902bb47ae6bc132ad0e117937433b97",
+      "cap": 30
+    }
+  },
+  "gates": {
+    "frontend-ready": {
+      "kind": "status",
+      "expect": {
+        "running": false
+      },
+      "cap": 10
+    },
+    "loaded": {
+      "library": "loaded"
+    },
+    "main": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/main.png",
+      "sha256": "902628cebd8620847be44e41a826046740f495ca0dfa7e78d8482c43c0da1bdc",
+      "roi": [
+        150,
+        265,
+        450,
+        335
+      ],
+      "tolerance": 18,
+      "cap": 45,
+      "reference_is_roi": true,
+      "library": "main",
+      "scale": "fit",
+      "frame": [
+        1280,
+        720
+      ],
+      "recover": "attract-cancel",
+      "recover_times": 4
+    },
+    "stage": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/stage.png",
+      "sha256": "99e7013e2be97b8173498e36a9b0e3b849c4e403bd239f1febda185470617033",
+      "roi": [
+        110,
+        445,
+        290,
+        495
+      ],
+      "tolerance": 18,
+      "cap": 45,
+      "reference_is_roi": true,
+      "library": "stage",
+      "scale": "fit",
+      "frame": [
+        1280,
+        720
+      ]
+    },
+    "css": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/css.png",
+      "sha256": "a7a15642548952e4e263e42d467542b2877576cac4785061c21988e6cd7c0b76",
+      "roi": [
+        55,
+        55,
+        675,
+        155
+      ],
+      "tolerance": 20,
+      "cap": 60,
+      "reference_is_roi": true,
+      "library": "css",
+      "scale": "fit",
+      "frame": [
+        1280,
+        720
+      ]
+    },
+    "training-hud-unpaused": {
+      "kind": "image",
+      "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/training-hud-unpaused.png",
+      "sha256": "7ecf9a4258ace218ad179e2fe14dcaf9d3dd906c594dec2ec8216cb5e02a8d2c",
+      "roi": [
+        280,
+        580,
+        302,
+        615
+      ],
+      "tolerance": 18,
+      "cap": 10,
+      "reference_is_roi": true,
+      "library": "training-hud-unpaused",
+      "scale": "fit",
+      "frame": [
+        1280,
+        720
+      ],
+      "scope": "Undimmed native zero digit (tolerance 18: the XPS docs-lb4 value; the Yoga and Surface passed at 8)"
+    }
+  },
+  "recover": [
+    {
+      "run": "steps.py:recover_training",
+      "check": true
+    }
+  ],
+  "gif_presets": {},
+  "rows": [
+    {
+      "id": "g-gdb-on",
+      "start": "frontend-ready",
+      "end": "frontend-ready",
+      "group": "gna/boot",
+      "on_failure": "stop",
+      "budget_min": 1,
+      "steps": [
+        {
+          "run": "crop_runtime.py:configure",
+          "check": true
+        }
+      ],
+      "expect": "Eden's GDB stub on (core.use_gdbstub, the port in gdb-port.txt) before game.load; the holding helper started."
+    },
+    {
+      "id": "g-load",
+      "start": "frontend-ready",
+      "end": "boot",
+      "group": "gna/boot",
+      "on_failure": "stop",
+      "budget_min": 5,
+      "steps": [
+        {
+          "call": "game.load",
+          "params": {
+            "path": "@game"
+          },
+          "job_cap": 240
+        },
+        {
+          "run": "gna.py:wait_load_screen",
+          "check": true
+        },
+        {
+          "run": "gdb_rc11.py:gdb_kick",
+          "check": true
+        },
+        {
+          "gate": "loaded"
+        },
+        {
+          "reason": "the other plugins finish booting (no log line marks it)",
+          "wait_ms": 15000
+        },
+        {
+          "shot": "boot"
+        }
+      ],
+      "expect": "The game loads with the stub on and the helper attached."
+    },
+    {
+      "id": "g-gdb-attached",
+      "start": "boot",
+      "end": "boot",
+      "group": "gna/boot",
+      "on_failure": "stop",
+      "budget_min": 1,
+      "steps": [
+        {
+          "run": "gdb_rc8.py:gdb_attached",
+          "check": true
+        }
+      ],
+      "expect": "The GDB helper attached (hold.log \"first\") and the game draws."
+    },
+    {
+      "id": "g-training",
+      "start": "boot",
+      "end": "training",
+      "group": "gna/boot",
+      "on_failure": "stop",
+      "budget_min": 5,
+      "steps": [
+        {
+          "run": "steps.py:boot_training",
+          "check": true
+        }
+      ],
+      "expect": "Training from the main menu: the tile cursor puts P1 on Mario (tile 0), enter-training, the HUD gate, the CPU Mario through the menu."
+    },
+    {
+      "id": "crop-macro",
+      "start": "training",
+      "end": "training",
+      "group": "crop",
+      "on_failure": "stop",
+      "budget_min": 6,
+      "steps": [
+        {
+          "run": "crop_runtime.py:macro_crop",
+          "check": true
+        }
+      ],
+      "expect": "A live macro opens ClipEditor, physical handles crop bad start, X previews CPU, real keyboard saves new; original bytes stay; new macro plays kept inputs."
+    },
+    {
+      "id": "crop-combo",
+      "start": "training",
+      "end": "training",
+      "group": "crop",
+      "on_failure": "stop",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "crop_runtime.py:combo_crop",
+          "check": true
+        }
+      ],
+      "expect": "Same editor, one whole link kept, X no action/help, empty real keyboard name gives new Combo N; original bytes stay."
+    },
+    {
+      "id": "crop-replay-redraw",
+      "start": "training",
+      "end": "training",
+      "group": "crop",
+      "on_failure": "stop",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "crop_runtime.py:replay_clip_redraw",
+          "check": true
+        }
+      ],
+      "expect": "Replay browser entry shares the standalone clip path: stills and UiClipFrame logs prove handle redraw, X CPU preview and B hiding."
+    }
+  ]
+}
