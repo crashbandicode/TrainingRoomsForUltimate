@@ -303,22 +303,6 @@ pub struct KeyboardOffer {
     pub draft: String,
 }
 
-/// Online waiting rooms do not open the keyboard. The caller keeps the N name.
-pub fn keyboard_opens(online: bool) -> bool {
-    let mode = if online { 0x0701_0000 } else { 0 };
-    crate::model::scene::combo_name_keyboard(true, mode)
-}
-
-pub fn offer_keyboard(header: &'static str, draft: &str, online: bool) -> Option<KeyboardOffer> {
-    if !keyboard_opens(online) {
-        return None;
-    }
-    Some(KeyboardOffer {
-        header,
-        draft: draft.to_string(),
-    })
-}
-
 pub fn crop_macro(
     frames: &[InputFrame],
     start: u32,
@@ -875,14 +859,12 @@ mod tests {
         assert!(screens.has_chain_named("Chain 1"));
     }
 
-    /// Operator 2026-11-15: Quickplay's room opens the name keyboard like a local-wireless room. Rename, a new chain and
-    /// Save last combo each ask for a name; nothing is saved or renamed before the keyboard answers.
+    /// Operator 2026-11-15: Quickplay's room opens the name keyboard like a local-wireless room, so the menu has no
+    /// blocked mode any more. Rename, a new chain and Save last combo each ask for a name; nothing is saved or renamed
+    /// before the keyboard answers.
     fn an_online_room_opens_every_name_keyboard() {
-        assert!(keyboard_opens(true));
-        assert_eq!(offer_keyboard("Name macro", "Macro 1", true).map(|offer| offer.header), Some("Name macro"));
         let mut screens = RecordingScreens::new();
         screens.set_catalog(header_catalog());
-        screens.set_keyboard_blocked(true);
         assert_header(&mut screens, SAVES_MACROS, 1, "Nair", "Name macro");
         assert_eq!(screens.take_effect(), Effect::Keyboard { header: "Name macro", draft: "Nair".into() });
         close_overlay(&mut screens);

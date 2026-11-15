@@ -18,7 +18,7 @@ use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
     chord_notice, civil_date, crop_combo_file, crop_macro_file, delete_save,
     drive_mash, drive_play, drive_step, duplicate_save, finish_recording, migrate_at_boot,
-    offer_keyboard, push_frame, save_chord, save_made_combo, start_save_notice, toggle_record, Capture,
+    push_frame, save_chord, save_made_combo, start_save_notice, toggle_record, Capture,
     KeyboardOffer, Tape, EMPTY_COMBO, READ_WINDOW, RESIDENT_FRAMES,
 };
 use crate::model::combo::Combo;
@@ -485,7 +485,6 @@ pub fn service_at(
     date: &str,
     player: SavedState,
     cpu: SavedState,
-    online: bool,
 ) -> Tick {
     let mut tick = Tick::default();
     apply_waiting_answer(&mut tick);
@@ -575,7 +574,7 @@ pub fn service_at(
         step_role(root, machine, &book, Role::Cpu);
     }
     if menu_pending() {
-        apply_menu(root, machine, &book, online, &mut tick);
+        apply_menu(root, machine, &book, &mut tick);
     }
     ask_drill(root, &mut tick);
     finish_make(root, &mut tick);
@@ -583,10 +582,10 @@ pub fn service_at(
 }
 
 /// A record or a menu effect while the old slot image is still filling. Migration stays pending.
-pub fn service_pending(root: &Path, player: SavedState, cpu: SavedState, online: bool) -> Tick {
+pub fn service_pending(root: &Path, player: SavedState, cpu: SavedState) -> Tick {
     DEFER_MIGRATE.store(true, Ordering::Release);
     let empty = [None, None, None, None, None];
-    let tick = service_at(root, &empty, "", player, cpu, online);
+    let tick = service_at(root, &empty, "", player, cpu);
     DEFER_MIGRATE.store(false, Ordering::Release);
     tick
 }
@@ -1271,16 +1270,13 @@ fn ask_drill(root: &Path, tick: &mut Tick) {
     tick.mismatch = Some(ask);
 }
 
-fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, online: bool, tick: &mut Tick) {
+fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick) {
     let effect = std::mem::replace(&mut *lock(&MENU_EFFECT), Effect::None);
     match effect {
         Effect::None => {}
         Effect::Keyboard { header, draft } => {
-            if let Some(offer) = offer_keyboard(header, &draft, online) {
-                tick.diags
-                    .push(format!("screen=rename header={}", offer.header));
-                tick.keyboard = Some(offer);
-            }
+            tick.diags.push(format!("screen=rename header={header}"));
+            tick.keyboard = Some(KeyboardOffer { header, draft });
         }
         Effect::Crop { source, combo, start, end } => {
             if write_crop_range(root, &source, combo, start, end).is_some() {
@@ -1292,7 +1288,7 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, online: bool, ti
             }
         }
         Effect::MakeCombo { source, chain } => {
-            begin_make(root, machine, book, &source, chain, online, tick)
+            begin_make(root, machine, book, &source, chain, tick)
         }
         Effect::DuplicateSave { source } => {
             if duplicate_save(root, &source, unix_now()).is_ok() {
@@ -1430,7 +1426,6 @@ fn begin_make(
     book: &Book,
     source: &str,
     chain: bool,
-    online: bool,
     tick: &mut Tick,
 ) {
     let _ = chain;
@@ -1458,9 +1453,6 @@ fn begin_make(
     let since = lock(&STRIP).0;
     *lock(&MAKE) = Some(MakeJob { source: source.to_string(), ready: true, since });
     tick.diags.push(format!("screen=make-combo source={source} playing={}", i32::from(effect.started)));
-    if online {
-        tick.keyboard = None;
-    }
 }
 
 fn finish_make(root: &Path, tick: &mut Tick) {
@@ -1744,7 +1736,6 @@ mod tests {
             "2026-11-06",
             player.clone(),
             cpu.clone(),
-            false,
         );
         let save = NamedSave::new("Nair start", player.clone(), cpu.clone()).unwrap();
         let save_id = Store::<NamedSave>::new(root.join(SAVES_DIR))
@@ -1778,7 +1769,7 @@ mod tests {
         index.set_active(Role::Player, Some(&id), 1).unwrap();
         index.save(&root).unwrap();
         on_chords(false, true, false);
-        let tick = service_at(&root, &none(), "2026-11-06", player, cpu, false);
+        let tick = service_at(&root, &none(), "2026-11-06", player, cpu);
         assert_eq!(tick.warp.as_deref(), Some(save_id.as_str()));
         assert!(tick
             .diags
@@ -1786,13 +1777,13 @@ mod tests {
             .any(|line| line == "screen=playback role=player warp=1"));
         assert!(take_player_frame().is_none(), "no frame before the warp's restore lands");
         warp_landed();
-        let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert_eq!(take_player_frame().expect("player frame").buttons, 4);
-        let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert_eq!(take_player_frame().expect("next frame").buttons, 5);
         assert!(tick.diags.iter().all(|line| !line.contains("warp=1")));
         note_mash();
-        let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(tick
             .diags
             .iter()
@@ -1814,7 +1805,7 @@ mod tests {
             },
         );
         on_chords(true, false, false);
-        let _ = service_at(&root, &none(), "2026-11-06", state(13), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-06", state(13), state(7));
         let macros = Library::new(root.join(MACROS_DIR));
         let listed = macros.list().unwrap();
         assert_eq!(listed.entries.len(), 1);
@@ -1839,7 +1830,7 @@ mod tests {
             }],
             start: StartState::neutral(3, 0, 1.0),
         });
-        let first = service_at(&root, &slots, "2026-11-06", state(1), state(1), false);
+        let first = service_at(&root, &slots, "2026-11-06", state(1), state(1));
         assert!(first
             .diags
             .iter()
@@ -1860,7 +1851,7 @@ mod tests {
             }],
             start: StartState::neutral(4, 0, 1.0),
         });
-        let second = service_at(&root, &slots, "2026-11-06", state(1), state(1), false);
+        let second = service_at(&root, &slots, "2026-11-06", state(1), state(1));
         assert!(second
             .diags
             .iter()
@@ -1934,10 +1925,10 @@ mod tests {
         let _hold = hold();
         reset_host();
         let root = scratch("posted");
-        let _ = service_at(&root, &none(), "2026-11-06", state(1), state(1), false);
+        let _ = service_at(&root, &none(), "2026-11-06", state(1), state(1));
         let id = super::super::rr_runtime::save_chord(&root, state(3), state(4), 1).unwrap();
         post_effect(Effect::DuplicateSave { source: id.clone() });
-        let _ = service_at(&root, &none(), "2026-11-06", state(3), state(4), false);
+        let _ = service_at(&root, &none(), "2026-11-06", state(3), state(4));
         let listed = Store::<NamedSave>::new(root.join(SAVES_DIR)).list().unwrap();
         assert_eq!(listed.entries.len(), 2);
         assert_eq!(RecordingIndex::load(&root).unwrap().bound(), Some(id.as_str()));
@@ -1959,14 +1950,14 @@ mod tests {
             name: "Nair crop".into(),
         });
         post_effect(Effect::Crop { source: macro_id.clone(), combo: false, start: 0, end: 1 });
-        let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(tick.diags.iter().any(|line| line.starts_with("screen=crop source=")));
         assert_eq!(Library::new(root.join(MACROS_DIR)).list().unwrap().entries.len(), 2);
         post_effect(Effect::Keyboard { header: "Name macro", draft: "Nair".into() });
-        let named = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let named = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert_eq!(named.keyboard.as_ref().map(|offer| offer.header), Some("Name macro"));
         post_effect(Effect::DeleteSave { source: id });
-        let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(RecordingIndex::load(&root).unwrap().bound().is_none());
     }
 
@@ -1976,7 +1967,7 @@ mod tests {
         let root = scratch("empty");
         on_chords(true, false, false);
         on_chords(true, false, false);
-        let tick = service_at(&root, &none(), "2026-11-06", state(1), state(1), false);
+        let tick = service_at(&root, &none(), "2026-11-06", state(1), state(1));
         assert!(Library::new(root.join(MACROS_DIR))
             .list()
             .unwrap()
@@ -2066,12 +2057,12 @@ mod tests {
         let root = scratch("cpu-role");
         set_record_role(Role::Cpu);
         on_chords(true, false, false);
-        let start = service_at(&root, &none(), "2026-11-06", state(13), state(7), false);
+        let start = service_at(&root, &none(), "2026-11-06", state(13), state(7));
         assert!(start.diags.iter().any(|line| line == "screen=recording role=cpu recording=1"));
         push_capture(ROLE_CPU, InputFrame { buttons: 9, ..InputFrame::default() });
         push_capture(ROLE_PLAYER, InputFrame { buttons: 1, ..InputFrame::default() });
         on_chords(true, false, false);
-        let stop = service_at(&root, &none(), "2026-11-06", state(13), state(7), false);
+        let stop = service_at(&root, &none(), "2026-11-06", state(13), state(7));
         assert!(stop.diags.iter().any(|line| line == "screen=recording role=cpu recording=0"));
         let macros = Library::new(root.join(MACROS_DIR));
         let listed = macros.list().unwrap();
@@ -2118,7 +2109,7 @@ mod tests {
         cpu_menu_role();
         on_chords(true, false, false);
         cpu_role_after_chord(1);
-        let _ = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-07", state(13), state(7));
         for _ in 0..crate::model::recording::LOCKOUT_FRAMES {
             assert!(drive_cpu(1).is_none());
         }
@@ -2129,7 +2120,7 @@ mod tests {
         }
         on_chords(true, false, false);
         cpu_role_after_chord(1);
-        let _stopped = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
+        let _stopped = service_at(&root, &none(), "2026-11-07", state(13), state(7));
         assert!(Library::new(root.join(MACROS_DIR)).list().unwrap().entries.is_empty());
     }
 
@@ -2140,7 +2131,7 @@ mod tests {
         cpu_menu_role();
         on_chords(true, false, false);
         cpu_role_after_chord(1);
-        let started = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
+        let started = service_at(&root, &none(), "2026-11-07", state(13), state(7));
         assert!(started.diags.iter().any(|line| line.contains("role=cpu") && line.contains("recording=1")));
         for _ in 0..crate::model::recording::LOCKOUT_FRAMES {
             assert!(drive_cpu(1).is_none());
@@ -2158,7 +2149,7 @@ mod tests {
         on_chords(true, false, false);
         cpu_role_after_chord(1);
         assert!(cpu_role_phase().is_none());
-        let stopped = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
+        let stopped = service_at(&root, &none(), "2026-11-07", state(13), state(7));
         assert!(stopped.diags.iter().any(|line| line.contains("recording=0")));
         let macros = Library::new(root.join(MACROS_DIR));
         let listed = macros.list().unwrap();
@@ -2183,15 +2174,15 @@ mod tests {
             None,
         );
         on_chords(false, false, true);
-        let played = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
+        let played = service_at(&root, &none(), "2026-11-07", state(13), state(7));
         if played.warp.is_some() {
             assert!(take_cpu_frame().is_none(), "no frame before the warp's restore lands");
             warp_landed();
-            let _ = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
+            let _ = service_at(&root, &none(), "2026-11-07", state(13), state(7));
         }
         for (index, expected) in jab.iter().enumerate() {
             if index > 0 {
-                let _ = service_at(&root, &none(), "2026-11-07", state(13), state(7), false);
+                let _ = service_at(&root, &none(), "2026-11-07", state(13), state(7));
             }
             let frame = take_cpu_frame().expect("play on cpu posts the stored frame");
             assert_eq!(frame.buttons, *expected);
@@ -2206,7 +2197,7 @@ mod tests {
         let _hold = hold();
         reset_host();
         let root = scratch("cpu-warp");
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         let save = NamedSave::new("Jab start", state(8), state(7)).unwrap();
         let save_id = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&save).unwrap();
         let jab = [33_281u32, 33_281, 0x8000, 0x8000];
@@ -2220,16 +2211,16 @@ mod tests {
         index.save(&root).unwrap();
 
         on_chords(false, false, true);
-        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert_eq!(tick.warp.as_deref(), Some(save_id.as_str()));
         assert!(take_cpu_frame().is_none(), "frame 0 must not be fed before the restore");
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(take_cpu_frame().is_none(), "the run holds while the restore is pending");
 
         warp_landed();
         let mut fed = Vec::new();
         for _ in 0..jab.len() {
-            let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+            let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
             fed.push(take_cpu_frame().expect("a frame after the restore").buttons);
         }
         assert_eq!(fed, jab, "the whole file, from its first press, reaches the CPU");
@@ -2239,7 +2230,7 @@ mod tests {
         let _hold = hold();
         reset_host();
         let root = scratch("cpu-nowarp");
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         let frames = vec![InputFrame { buttons: 33_281, ..InputFrame::default() }];
         let recording =
             super::super::macros::MacroRecording::new("Jab", "13.0.5", StartState::neutral(7, 0, 1.0), frames).unwrap();
@@ -2248,7 +2239,7 @@ mod tests {
         index.set_active(Role::Cpu, Some(&id), 1).unwrap();
         index.save(&root).unwrap();
         on_chords(false, false, true);
-        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(tick.warp.is_none());
         assert_eq!(take_cpu_frame().expect("no warp, no wait").buttons, 33_281);
     }
@@ -2280,7 +2271,7 @@ mod tests {
 
     /// A file of `n` distinct frames (buttons 1..=n), active on `role`, with no start save.
     fn active_plain_macro(root: &Path, role: Role, n: u32) -> Vec<u32> {
-        let _ = service_at(root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(root, &none(), "2026-11-08", state(8), state(7));
         let buttons: Vec<u32> = (1..=n).collect();
         let frames = buttons.iter().map(|&buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
         let recording =
@@ -2293,7 +2284,7 @@ mod tests {
     }
 
     fn tick(root: &Path) {
-        let _ = service_at(root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(root, &none(), "2026-11-08", state(8), state(7));
     }
 
     /// Eden `rc5-fid-measure1` (2026-11-08): the worker's ticks are not the game's frames. Two ticks
@@ -2380,7 +2371,7 @@ mod tests {
         on_chords(true, false, false);
         cpu_role_after_chord(1);
         assert!(cpu_role_phase().is_none());
-        let _ = service_at(&root, &none(), "2026-11-07", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-07", state(8), state(7));
         let frames = [1u32, 36_872, 36_872, 36_872, 33_281];
         for buttons in frames {
             let mut out = press(buttons);
@@ -2389,7 +2380,7 @@ mod tests {
         }
         on_chords(true, false, false);
         cpu_role_after_chord(1);
-        let _ = service_at(&root, &none(), "2026-11-07", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-07", state(8), state(7));
         let macros = Library::new(root.join(MACROS_DIR));
         let listed = macros.list().unwrap();
         assert_eq!(listed.entries.len(), 1);
@@ -2405,7 +2396,7 @@ mod tests {
         on_chords(true, false, false);
         push_capture(ROLE_PLAYER, InputFrame { buttons: 4, ..InputFrame::default() });
         on_chords(true, false, false);
-        let tick = service_pending(&root, state(8), state(7), false);
+        let tick = service_pending(&root, state(8), state(7));
         assert!(!migrated());
         assert!(tick.diags.iter().any(|line| line.contains("recording=0")));
         assert_eq!(Library::new(root.join(MACROS_DIR)).list().unwrap().entries.len(), 1);
@@ -2414,7 +2405,7 @@ mod tests {
             frames: vec![InputFrame { buttons: 2, ..InputFrame::default() }],
             start: StartState::neutral(3, 0, 1.0),
         });
-        let migrated_tick = service_at(&root, &slots, "2026-11-06", state(8), state(7), false);
+        let migrated_tick = service_at(&root, &slots, "2026-11-06", state(8), state(7));
         assert!(migrated());
         assert!(migrated_tick.diags.iter().any(|line| line == "screen=migrate once=1"));
     }
@@ -2437,15 +2428,15 @@ mod tests {
         // An earlier exchange is on the strip; the source's own link arrives while it plays.
         set_strip_sample((0, Some(sample_combo())));
         post_effect(Effect::MakeCombo { source: source.clone(), chain: false });
-        let playing = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let playing = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert_eq!(playing.warp.as_deref(), Some(save_id.as_str()));
         assert!(take_player_frame().is_none(), "the source waits for its start save's restore");
         warp_landed();
-        let fed = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let fed = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(fed.diags.iter().all(|line| !line.contains("saved=1")), "the combo is made after the source has played");
         assert_eq!(take_player_frame().expect("source frame").buttons, 11);
         set_strip_sample((1, Some(sample_combo())));
-        let saved = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let saved = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(saved.diags.iter().any(|line| line.contains("screen=make-combo") && line.contains("saved=1")));
         let combos = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
         let listed = combos.list().unwrap();
@@ -2467,9 +2458,9 @@ mod tests {
         let source = one_macro(&root, "Bare", 3, 8, None);
         set_strip_sample((0, Some(crate::model::combo::Combo::default())));
         post_effect(Effect::MakeCombo { source: source.clone(), chain: false });
-        let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert_eq!(take_player_frame().expect("the source plays").buttons, 3);
-        let empty = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let empty = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(empty.diags.iter().any(|line| line == "screen=notice kind=combo-empty"));
         assert!(empty.notices.contains(&EMPTY_COMBO));
         assert!(crate::model::combo_record::ComboLibrary::new(root.join("combos")).list().unwrap().entries.is_empty());
@@ -2478,7 +2469,7 @@ mod tests {
         let gone = one_macro(&root, "Gone", 4, 8, Some("deleted-save"));
         set_strip_sample((0, Some(sample_combo())));
         post_effect(Effect::MakeCombo { source: gone, chain: false });
-        let missing = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let missing = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(missing.warp.is_none());
         assert!(missing.diags.iter().any(|line| line == "screen=notice kind=macro-start-save-missing"));
         assert_eq!(take_player_frame().expect("plays anyway").buttons, 4);
@@ -2488,13 +2479,13 @@ mod tests {
         let chain = Chain::new("Gap", vec!["missing-macro".into(), present]).unwrap();
         let chain_id = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&chain).unwrap();
         post_effect(Effect::MakeCombo { source: chain_id, chain: true });
-        let gap = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let gap = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(gap.warp.is_none());
         assert_eq!(take_player_frame().expect("skips the missing step").buttons, 6);
 
         reset_host();
         post_effect(Effect::Keyboard { header: "Name macro", draft: "Online".into() });
-        let online = service_at(&root, &none(), "2026-11-06", state(8), state(7), true);
+        let online = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         let offer = online.keyboard.expect("an online room offers the name keyboard");
         assert_eq!((offer.header, offer.draft.as_str()), ("Name macro", "Online"));
         assert!(online.diags.iter().any(|line| line == "screen=rename header=Name macro"));
@@ -2510,10 +2501,10 @@ mod tests {
         let source = one_macro(&root, "Whiff", 3, 8, None);
         set_strip_sample((4, Some(sample_combo())));
         post_effect(Effect::MakeCombo { source, chain: false });
-        let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert_eq!(take_player_frame().expect("the source plays").buttons, 3);
         set_strip_sample((4, Some(sample_combo())));
-        let done = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let done = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(done.diags.iter().any(|line| line == "screen=notice kind=combo-empty"), "{:?}", done.diags);
         assert!(done.diags.iter().all(|line| !line.contains("saved=1")));
         assert!(crate::model::combo_record::ComboLibrary::new(root.join("combos")).list().unwrap().entries.is_empty());
@@ -2526,18 +2517,18 @@ mod tests {
         let _hold = hold();
         reset_host();
         let root = scratch("save-last");
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         set_fighter_label("Mario");
         let combos = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
         set_strip_sample((0, None));
         post_effect(Effect::SaveLastCombo { name: String::new() });
-        let empty = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let empty = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(empty.diags.iter().any(|line| line == "screen=notice kind=combo-empty"), "{:?}", empty.diags);
         assert!(empty.notices.contains(&EMPTY_COMBO));
         assert!(combos.list().map(|listed| listed.entries.is_empty()).unwrap_or(true));
         set_strip_sample((3, Some(sample_combo())));
         post_effect(Effect::SaveLastCombo { name: "Ryu BnB".into() });
-        let saved = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let saved = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(saved.diags.iter().any(|line| line.starts_with("screen=save-last-combo saved=")), "{:?}", saved.diags);
         let listed = combos.list().unwrap();
         assert_eq!(listed.entries.len(), 1);
@@ -2548,7 +2539,7 @@ mod tests {
         assert_eq!(index.drill().map(|drill| (drill.kind, drill.id.as_str())), Some((DrillKind::Combo, id.as_str())));
         assert_eq!(index.hot(Kind::Combo).first(), Some(&id));
         post_effect(Effect::SaveLastCombo { name: String::new() });
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         let names: Vec<String> = combos.list().unwrap().entries.into_iter().map(|entry| entry.name).collect();
         assert!(names.iter().any(|name| name == "Combo 1"), "{names:?}");
     }
@@ -2566,11 +2557,11 @@ mod tests {
         index.save(&root).unwrap();
         set_role_fighter(Role::Player, 8);
         on_chords(false, true, false);
-        let held = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let held = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(held.diags.iter().any(|line| line.contains("screen=mismatch ask=macro ")));
         assert!(take_player_frame().is_none());
         answer_mismatch(MismatchChoice::Keep);
-        let kept = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let kept = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(kept.switch_kind.is_none());
         assert_eq!(take_player_frame().expect("keep plays").buttons, 15);
 
@@ -2580,9 +2571,9 @@ mod tests {
         index.save(&root).unwrap();
         set_role_fighter(Role::Player, 8);
         on_chords(false, true, false);
-        let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         answer_mismatch(MismatchChoice::Switch);
-        let switched = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let switched = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert_eq!(switched.switch_kind, Some(13));
         assert!(switched.switch_player);
         assert_eq!(take_player_frame().expect("switch plays").buttons, 15);
@@ -2593,10 +2584,10 @@ mod tests {
         index.save(&root).unwrap();
         set_role_fighter(Role::Player, 8);
         on_chords(false, true, false);
-        let chain_ask = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let chain_ask = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(chain_ask.diags.iter().any(|line| line.contains("ask=macro1")));
         answer_mismatch(MismatchChoice::Cancel);
-        let cancelled = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let cancelled = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(take_player_frame().is_none());
         assert!(cancelled.switch_kind.is_none());
     }
@@ -2617,13 +2608,13 @@ mod tests {
         set_role_fighter(Role::Cpu, 0);
         on_chords(false, false, true);
         assert!(pending());
-        let held = service_pending(&root, state(0), state(0), false);
+        let held = service_pending(&root, state(0), state(0));
         assert!(held.diags.iter().any(|line| line.contains("screen=mismatch ask=macro1 rows=")), "{:?}", held.diags);
         assert!(held.mismatch.is_some());
         assert!(!pending(), "a question waiting for its answer is not work");
         answer_mismatch(MismatchChoice::Keep);
         assert!(pending(), "the answer must reach the tick");
-        let kept = service_pending(&root, state(0), state(0), false);
+        let kept = service_pending(&root, state(0), state(0));
         assert!(kept.diags.iter().any(|line| line == "screen=mismatch ask=macro1 answer=keep"));
         assert!(kept.switch_kind.is_none());
         assert_eq!(take_cpu_frame().expect("keep plays macro 1 on the current fighter").buttons, 15);
@@ -2631,10 +2622,10 @@ mod tests {
         reset_host();
         set_role_fighter(Role::Cpu, 0);
         on_chords(false, false, true);
-        let _ = service_pending(&root, state(0), state(0), false);
+        let _ = service_pending(&root, state(0), state(0));
         answer_mismatch(MismatchChoice::Switch);
         assert!(pending());
-        let switched = service_pending(&root, state(0), state(0), false);
+        let switched = service_pending(&root, state(0), state(0));
         assert!(switched.diags.iter().any(|line| line == "screen=mismatch ask=macro1 answer=switch"));
         assert_eq!(switched.switch_kind, Some(13));
         assert!(!switched.switch_player, "the CPU's chain switches the CPU");
@@ -2642,10 +2633,10 @@ mod tests {
         reset_host();
         set_role_fighter(Role::Cpu, 0);
         on_chords(false, false, true);
-        let _ = service_pending(&root, state(0), state(0), false);
+        let _ = service_pending(&root, state(0), state(0));
         set_role_fighter(Role::Cpu, 13);
         answer_mismatch(MismatchChoice::Keep);
-        let _ = service_pending(&root, state(13), state(13), false);
+        let _ = service_pending(&root, state(13), state(13));
         assert!(lock(&ANSWER).is_none(), "an answer the fighters no longer need is dropped");
     }
 
@@ -2665,7 +2656,7 @@ mod tests {
             index.save(&root).unwrap();
             set_role_fighter(role, 2);
             on_chords(chords.0, chords.1, chords.2);
-            let tick = service_pending(&root, state(2), state(2), false);
+            let tick = service_pending(&root, state(2), state(2));
             let ask = tick.mismatch.expect("the recorded fighter is asked about");
             assert_eq!((ask.role, ask.recorded_kind, ask.current_kind), (side, 1, 2), "{role:?}");
         }
@@ -2689,7 +2680,7 @@ mod tests {
             index.save(&root).unwrap();
             set_role_fighter(Role::Player, 8);
             on_chords(false, true, false);
-            let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+            let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7));
             assert!(tick.mismatch.is_none(), "{origin}: nothing asks");
             let kept = format!("screen=mismatch ask={origin} prompt=off answer=keep");
             assert!(tick.diags.contains(&kept), "{origin}: {:?}", tick.diags);
@@ -2710,7 +2701,7 @@ mod tests {
         note_drill(Some("seed".into()));
         note_drill(Some(id));
         set_fighter_label("Mario");
-        let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(tick.mismatch.is_none(), "nothing asks");
         assert!(tick.diags.iter().any(|line| line == "screen=mismatch ask=combo prompt=off answer=keep"), "{:?}", tick.diags);
         assert!(tick.switch_name.is_none());
@@ -2726,11 +2717,11 @@ mod tests {
         note_drill(Some("seed".into()));
         note_drill(Some(id));
         set_fighter_label("Mario");
-        let asked = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let asked = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(asked.diags.iter().any(|line| line.contains("screen=mismatch ask=combo")));
         assert!(asked.switch_name.is_none());
         answer_mismatch(MismatchChoice::Switch);
-        let switched = service_at(&root, &none(), "2026-11-06", state(8), state(7), false);
+        let switched = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert_eq!(switched.switch_name.as_deref(), Some("Ryu"));
         assert!(switched.switch_player);
     }
@@ -2912,11 +2903,11 @@ mod tests {
         let nair = one_combo(&root, "Nair loop combo", Move::Aerial);
         let id = one_sequence(&root, "Corner to kill", &[ryu.clone(), nair.clone()]);
         post_effect(Effect::WriteSequenceCombos { id: id.clone(), combos: vec![nair.clone(), ryu.clone()] });
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         let file = Store::<Sequence>::new(root.join(SEQUENCES_DIR)).load(&id).unwrap();
         assert_eq!(file.combos, [nair.clone(), ryu.clone()], "Edit combos is saved");
         post_effect(Effect::DeleteFile { kind: FileKind::Combo, id: ryu.clone() });
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(crate::model::combo_record::ComboLibrary::new(root.join("combos")).load(&ryu).is_err(), "the combo is gone");
         let plan = sequence_plan(&root, &id).unwrap();
         assert_eq!(plan.steps.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(), [nair.as_str()], "the sequence skips it");
@@ -2924,16 +2915,16 @@ mod tests {
         index.set_drill(Some(Drill { kind: DrillKind::Sequence, id: id.clone() }), 1).unwrap();
         index.save(&root).unwrap();
         post_effect(Effect::DeleteFile { kind: FileKind::Sequence, id: id.clone() });
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(sequence_plan(&root, &id).is_none(), "the sequence is gone");
         assert!(RecordingIndex::load(&root).unwrap().drill().is_none(), "and is no longer the drill");
         let chain_macro = one_macro(&root, "Jab", 1, 8, None);
         let chain = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&Chain::new("Chain 1", vec![chain_macro.clone()]).unwrap()).unwrap();
         post_effect(Effect::WriteChainSteps { id: chain.clone(), steps: vec![] });
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(Store::<Chain>::new(root.join(MACROS_DIR)).load(&chain).unwrap().recordings.is_empty(), "Edit chain is saved");
         post_effect(Effect::DeleteFile { kind: FileKind::Chain, id: chain.clone() });
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(Store::<Chain>::new(root.join(MACROS_DIR)).load(&chain).is_err(), "the chain is gone");
         let mut index = RecordingIndex::load(&root).unwrap();
         index.set_active(Role::Player, Some(&chain_macro), 2).unwrap();
@@ -2962,7 +2953,7 @@ mod tests {
         publish_selection(&root, &selection, None);
         assert_eq!(take_slots_dirty(), None, "the same slots again copy nothing");
         post_effect(Effect::DeleteFile { kind: FileKind::Macro, id: chain_macro.clone() });
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(Library::new(root.join(MACROS_DIR)).load(&chain_macro).is_err(), "the macro is gone");
         assert!(RecordingIndex::load(&root).unwrap().active(Role::Player).is_none(), "and is no longer active");
         assert_eq!(RecordingIndex::load(&root).unwrap().slots(), &[None, None, Some(other), None, None], "nor in a slot");
@@ -3053,7 +3044,7 @@ mod tests {
         assert_eq!(target.recording.placement.delta_x, 1.5);
 
         on_chords(false, false, true);
-        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert_eq!(tick.warp.as_deref(), Some(start.as_str()));
         assert_eq!(tick.warp_place.map(|(role, place)| (role, place.delta_x)), Some((Role::Cpu, 1.5)));
         let pair = warp_pair(saves.load(&start).unwrap(), tick.warp_place);
@@ -3067,9 +3058,9 @@ mod tests {
         keep_placement(&id, Placement { delta_x: -2.0, delta_y: 0.0, ..Placement::default() });
         warp_landed();
         on_chords(false, false, true);
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         on_chords(false, false, true);
-        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert_eq!(tick.warp_place.map(|(_, place)| place.delta_x), Some(-2.0), "Keep wins until the game closes");
         assert_eq!(macros.load(&id).unwrap().placement.delta_x, 1.5, "Keep leaves the file alone");
 
@@ -3118,10 +3109,10 @@ mod tests {
         index.save(&root).unwrap();
         set_role_fighter(Role::Cpu, 7);
         on_chords(false, false, true);
-        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(tick.mismatch.is_some(), "the recorded fighter is asked about");
         answer_mismatch(MismatchChoice::Switch);
-        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert_eq!(tick.switch_kind, Some(0x48));
         assert_eq!(tick.switch_mii, Some(crate::engine::mii::replay::Target::mii(configuration)), "the recorded Mii");
 
@@ -3131,9 +3122,9 @@ mod tests {
         index.save(&root).unwrap();
         set_role_fighter(Role::Cpu, 7);
         on_chords(false, false, true);
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         answer_mismatch(MismatchChoice::Switch);
-        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert_eq!((tick.switch_kind, tick.switch_mii), (Some(1), None), "any other fighter keeps the kind route");
     }
 
@@ -3240,7 +3231,7 @@ mod tests {
         on_chords(true, false, false);
         let mut stopped = state(13);
         stopped.x = 25.0;
-        let _ = service_at(&root, &none(), "2026-11-08", stopped, state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", stopped, state(7));
         let macros = Library::new(root.join(MACROS_DIR));
         let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
         let id = macros.list().unwrap().entries[0].id.clone();
@@ -3256,7 +3247,7 @@ mod tests {
         on_chords(true, false, false);
         push_capture(ROLE_CPU, InputFrame { buttons: 8, ..InputFrame::default() });
         on_chords(true, false, false);
-        let _ = service_at(&root, &none(), "2026-11-08", state(13), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(13), state(7));
         let cpu = macros.list().unwrap().entries.iter().map(|e| macros.load(&e.id).unwrap()).find(|r| r.start.fighter_kind == 7)
             .expect("the CPU's macro");
         assert_eq!((cpu.start.speed_x, cpu.start.speed_y, cpu.start.facing), (2.5, -1.0, -1.0));
@@ -3269,7 +3260,7 @@ mod tests {
     fn momentum_play(tag: &str, start: StartState, placement: Option<Placement>, start_save: bool) -> Option<StartSpeed> {
         reset_host();
         let root = scratch(tag);
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&NamedSave::new("Run", state(8), state(7)).unwrap()).unwrap();
         let frames = vec![InputFrame { buttons: 4, ..InputFrame::default() }, InputFrame { buttons: 5, ..InputFrame::default() }];
         let mut recording = MacroRecording::new("Run", "13.0.5", start, frames).unwrap();
@@ -3284,10 +3275,10 @@ mod tests {
             keep_placement(&id, placement);
         }
         on_chords(false, true, false);
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(take_start_speed(Role::Player).is_none(), "{tag}: nothing before the run's first input");
         warp_landed();
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7), false);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert_eq!(take_player_frame().expect("the first input").buttons, 4);
         let given = take_start_speed(Role::Player);
         assert!(take_start_speed(Role::Player).is_none(), "{tag}: once per Play");
@@ -3324,7 +3315,7 @@ mod tests {
             let root = scratch(if chain { "start-switch-chain" } else { "start-switch-macro" });
             let work = |screens: &mut RecordingScreens| {
                 post_effect(screens.take_effect());
-                let _ = service_at(&root, &none(), "2026-11-14", state(8), state(7), false);
+                let _ = service_at(&root, &none(), "2026-11-14", state(8), state(7));
             };
             let reload = |screens: &mut RecordingScreens| screens.set_catalog(super::super::rr_runtime::load_catalog(&root).unwrap().catalog);
             let file_switch = |id: &str| match chain {
@@ -3333,7 +3324,7 @@ mod tests {
             };
             let play = |warp: Option<&str>, tag: &str| {
                 on_chords(false, true, false);
-                let tick = service_at(&root, &none(), "2026-11-14", state(8), state(7), false);
+                let tick = service_at(&root, &none(), "2026-11-14", state(8), state(7));
                 assert_eq!(tick.warp.as_deref(), warp, "{tag}: Play warps only with the switch On");
                 assert_eq!(tick.diags.iter().any(|line| line == "screen=playback role=player warp=1"), warp.is_some(), "{tag}");
                 if warp.is_none() {
@@ -3341,7 +3332,7 @@ mod tests {
                 }
             };
             reset_host();
-            let _ = service_at(&root, &none(), "2026-11-14", state(8), state(7), false);
+            let _ = service_at(&root, &none(), "2026-11-14", state(8), state(7));
             let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&NamedSave::new("Run", state(8), state(7)).unwrap()).unwrap();
             let step = one_macro(&root, "Run", 4, 8, Some(&save));
             let id = match chain {
@@ -3367,7 +3358,7 @@ mod tests {
             play(None, "Off");
 
             reset_host();
-            let _ = service_at(&root, &none(), "2026-11-14", state(8), state(7), false);
+            let _ = service_at(&root, &none(), "2026-11-14", state(8), state(7));
             screens.handle_page(MenuButton::Right, true, SAVES_MACROS);
             work(&mut screens);
             assert!(file_switch(&id), "On is written to the file");

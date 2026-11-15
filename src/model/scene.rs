@@ -27,13 +27,6 @@ pub const fn is_training(facts: Facts) -> bool {
     !facts.busy && (facts.native_training || (facts.lobby_active && facts.waiting_room))
 }
 
-/// A combo's name row may open a keyboard. Training uses ShowKeyboard. A local-wireless
-/// waiting room uses the inline Calc. An online waiting mode (`mode & 0x7fff0000 == 0x07010000`,
-/// the online half of the waiting scene) is not shown safe, so the row opens neither.
-pub const fn combo_name_keyboard(waiting: bool, mode: u32) -> bool {
-    !(waiting && (mode & 0x7fff_0000) == 0x0701_0000)
-}
-
 /// Where the practice behaviours are live (`None` while busy or outside practice). Native Training wins over a stale lobby flag.
 pub const fn scene(facts: Facts) -> Option<Scene> {
     if facts.busy {

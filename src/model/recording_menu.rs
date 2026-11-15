@@ -456,8 +456,6 @@ pub struct RecordingScreens {
     last_effect: Effect,
     serial: u32,
     crop: Option<CropDraft>,
-    /// Online waiting room: the keyboard stays closed and an empty name keeps N.
-    keyboard_blocked: bool,
 }
 
 impl RecordingScreens {
@@ -482,7 +480,6 @@ impl RecordingScreens {
             last_effect: Effect::None,
             serial: 0,
             crop: None,
-            keyboard_blocked: false,
         }
     }
 
@@ -833,10 +830,6 @@ impl RecordingScreens {
         } else {
             "A open   X loop in MACROS   ZR role   L/R page   B close"
         }
-    }
-
-    pub fn set_keyboard_blocked(&mut self, blocked: bool) {
-        self.keyboard_blocked = blocked;
     }
 
     pub fn crop_open(&self) -> bool {
@@ -1422,10 +1415,6 @@ impl RecordingScreens {
         };
         let previous = self.item_name(&Item { kind, id: id.to_string() });
         self.keyboard = Some(Keyboard { kind: key, ids: Vec::new(), target: Some(id.to_string()) });
-        if self.keyboard_blocked {
-            self.submit_name("");
-            return;
-        }
         self.last_effect = Effect::Keyboard { header, draft: previous };
     }
 
@@ -1533,10 +1522,6 @@ impl RecordingScreens {
 
     fn open_keyboard(&mut self, kind: KeyKind, header: &'static str, ids: Vec<String>) {
         self.keyboard = Some(Keyboard { kind, ids, target: None });
-        if self.keyboard_blocked {
-            self.submit_name("");
-            return;
-        }
         self.last_effect = Effect::Keyboard { header, draft: String::new() };
     }
 
@@ -2834,8 +2819,7 @@ mod tests {
         );
     }
 
-    /// The typed name goes to the host with the save; an empty name lets the host pick Combo N. Where no keyboard can
-    /// open (an online room), A saves at once under Combo N.
+    /// The typed name goes to the host with the save; an empty name lets the host pick Combo N.
     fn save_last_combo_posts_the_typed_name_or_combo_n() {
         let mut screens = screens();
         screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 0);
@@ -2846,9 +2830,6 @@ mod tests {
         screens.handle_page(Button::A, true, COMBOS_SEQ);
         let _ = screens.take_effect();
         screens.submit_name("");
-        assert_eq!(screens.take_effect(), Effect::SaveLastCombo { name: String::new() });
-        screens.set_keyboard_blocked(true);
-        screens.handle_page(Button::A, true, COMBOS_SEQ);
         assert_eq!(screens.take_effect(), Effect::SaveLastCombo { name: String::new() });
     }
 

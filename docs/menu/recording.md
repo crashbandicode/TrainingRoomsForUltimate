@@ -100,8 +100,8 @@ don't turn the page while a file's screen is open.
 
 **The numbered picker** (*+ New chain* and *Edit chain*; *+ New sequence* and *Edit combos* for combos) lists your
 recordings, or your combos (a chain can't hold a chain). A gives the one under the cursor the next number, R takes a
-number off, B finishes. A new chain or sequence then asks for a name on the Switch keyboard. An empty name, or an online
-waiting room where the keyboard can't open, makes it Chain N or Sequence N.
+number off, B finishes. A new chain or sequence then asks for a name on the Switch keyboard. An empty name makes it
+Chain N or Sequence N.
 
 ![Edit chain: the CPU plays Chain 1, the numbered picker takes numbers off and gives them again, the CPU plays the new order](../media/rc14-chain-edit.gif)<br>
 *Chain 1 (Walk, Crouch, P1 jab) played by the CPU; on its own screen, Edit chain opens the picker, whose tiles run A to Z (Crouch, P1 jab, Walk) with their numbers: R takes Walk's and Crouch's numbers off, A numbers Crouch 2 and Walk 3, so the chain reads P1 jab, Crouch, Walk; B finishes and the CPU plays the new order. Eden, rc.14 (untested on hardware).*
@@ -143,8 +143,8 @@ It is shown in the Player view only. The left column shows the number of files, 
 
 - Up/Down, Left/Right and ZL + Up/Down move as in Save states & Macros.
 - A on *+ Save last combo…* keeps the last combo the frame strip saw as a new combo and makes it the drill. The Switch
-  keyboard asks for a name; an empty name, or an online waiting room, gives it the next Combo N. With no combo on the
-  strip yet, it says so and saves nothing.
+  keyboard asks for a name; an empty name gives it the next Combo N. With no combo on the strip yet, it says so and
+  saves nothing.
 - A on *+ New sequence* opens the numbered picker of your combos, then the name. A on a combo or a sequence opens its
   own screen ([rows above](#a-file-s-own-screen)).
 - X and Y do nothing here. ZR switches to the CPU view, which hides this section.

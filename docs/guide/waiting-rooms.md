@@ -73,7 +73,7 @@ practice changes speed; the room's own timers keep their pace, and a match alway
 
 | Case | What happens |
 | --- | --- |
-| Names online | In Quickplay's room the name keyboard doesn't open. A combo or a recording saved there keeps its numbered name (such as "Combo 3"); rename it later in Training. Local wireless rooms open the keyboard. |
+| The name keyboard | It opens in Quickplay's room as in a local wireless room. A match closes the keyboard and nothing typed is applied; back in the same room it reopens with what you typed. |
 | Leaving Quickplay | While the TrainingRooms menu is open, Plus doesn't reach the game. Close the menu (B) before you open the game's menu to Leave Battle. |
 | The game's menu | While it is open, the chords don't fire, and a fighter swap is refused with the notice "Close the current game menu before swapping". |
 | The CPU pilot | While it plays Player 1, Record, Play on Player 1 and L + R + A are refused. See [Controls › When the CPU pilot plays Player 1](controls.md#when-the-cpu-pilot-plays-player-1). |

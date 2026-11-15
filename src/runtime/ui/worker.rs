@@ -659,7 +659,6 @@ fn refresh_recording(s: &mut Session) -> bool {
     let (watch, due) = s.catalog_watch.take_load(gen);
     s.catalog_watch = watch;
     let Some(menu) = s.menu.as_mut() else { return false };
-    menu.recording_mut().set_keyboard_blocked(crate::runtime::features::recording_host::keyboard_is_closed());
     let mut changed = false;
     if due {
         if let Ok(loaded) = crate::engine::rr_runtime::load_catalog(std::path::Path::new(ROOT)) {

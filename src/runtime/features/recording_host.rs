@@ -209,10 +209,9 @@ pub fn service() {
     if player.fighter_kind >= 0 {
         rr_host::set_fighter_label(&fighter_label(player.fighter_kind));
     }
-    let online = keyboard_closed();
     // Migration first. Nothing records into the old numbered slots any more (rc.12 TR2), so it finds them empty.
     if !rr_host::migrated() {
-        let tick = rr_host::service_at(root, &Default::default(), &rr_host::today(), player, cpu, online);
+        let tick = rr_host::service_at(root, &Default::default(), &rr_host::today(), player, cpu);
         apply(&tick);
         sync_bound(root);
         return;
@@ -222,7 +221,7 @@ pub fn service() {
     if !rr_host::pending() {
         return;
     }
-    let tick = rr_host::service_pending(root, player, cpu, online);
+    let tick = rr_host::service_pending(root, player, cpu);
     apply(&tick);
 }
 
@@ -395,17 +394,6 @@ fn emit(lines: &[String]) {
     let _ = lines;
 }
 
-pub(crate) fn keyboard_is_closed() -> bool {
-    keyboard_closed()
-}
-
 pub(crate) fn take_typed_name() -> Option<String> {
     crate::runtime::macros::named_macros::take_confirmed_name_for(NAME_TOKEN)
-}
-
-fn keyboard_closed() -> bool {
-    let mode = crate::runtime::lobby::game_mode::current()
-        .map(|mode| mode.mode)
-        .unwrap_or(0);
-    !crate::model::scene::combo_name_keyboard(crate::runtime::ui::facts::fact_waiting_scene(), mode)
 }

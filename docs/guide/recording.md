@@ -291,8 +291,8 @@ On the Recording page, A on a file opens its own screen. The rows each kind of f
   - Rename opens the Switch keyboard. B, or an empty confirm, keeps the old name.
   - A new chain or sequence with an empty name is Chain N or Sequence N. A recording stopped with no typed name is
     Macro N, a duplicated save is Save N, and a combo saved with no typed name is Combo N.
-  - In an online waiting room the keyboard stays closed, and B on the name step keeps that N name. A local-wireless
-    waiting room and Training open the keyboard.
+  - Training and every waiting room, local wireless or Quickplay, open the keyboard. In a waiting room a match closes
+    it and nothing typed is applied; back in the same room it reopens with what you typed.
 - **The breadcrumb** reads "Recording (Player view) > Save states & Macros > name", or Combos & Sequences for a combo or
   a sequence. The CPU view says "Recording (CPU view)".
 - **A combo's help lines** list each link as the two moves and TRUE or not, then its input events, then its drift when

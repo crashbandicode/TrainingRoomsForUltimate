@@ -175,9 +175,8 @@ More: [Fighter cycles › What the Loading rows do](fighter-cycles.md#what-the-l
   partners' level isn't applied, and the match is played with the fighters you picked for it. If the menu was open, it
   closes, and the changes from that visit are not kept. Back in the same room after the match, your practice fighters
   and Kirby's hat return.
-- **The name keyboard doesn't open in Quickplay's room.** The next combo or recording you save there gets a numbered name,
-  such as "Combo 3" ("The next combo gets a Combo N name"). Rename it later in Training. Local wireless rooms open the
-  keyboard.
+- **The name keyboard closed by itself in a waiting room.** A match started: the keyboard closes and nothing typed is
+  applied, so the name is still the old one. Back in the same room it reopens with what you typed.
 - **Plus doesn't open the game's menu in a Quickplay room.** While the TrainingRooms menu is open, Plus doesn't reach the
   game. Close the menu (B), then open the game's menu to Leave Battle.
 - **A fighter swap says "Close the current game menu before swapping".** The game's own menu is open. Close it.
