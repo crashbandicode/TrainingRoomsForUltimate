@@ -342,7 +342,7 @@ pub fn swatches(bits: u8) -> impl Iterator<Item = (&'static str, [u8; 4])> {
     let other = [
         (bits & GRABS != 0, "Grab box", grab),
         (hurt, "Hurt / article: normal", c(0)),
-        (hurt && on, "Hurt: can't be hit", c(INTANGIBLE)),
+        (hurt && on, "Hurt: unhittable", c(INTANGIBLE)),
         (hurt && on, "Hurt: no damage", c(INVINCIBLE)),
         (wind || on && bits & HITBOXES != 0, "Windbox", WIND),
         (wind, "Wind area (box / circle)", WIND),
