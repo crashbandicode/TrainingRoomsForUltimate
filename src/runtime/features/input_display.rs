@@ -290,7 +290,7 @@ fn probe_module(who: usize, accessor: usize, s: &Sample, other_damage: f32) {
     static FRAME: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
     let frame = if who == 0 { FRAME.fetch_add(1, Ordering::Relaxed) + 1 } else { FRAME.load(Ordering::Relaxed) };
     let family = (0x2d..=0x2f).contains(&s.status);
-    let attacking = s.powers.iter().any(|&p| p > 0.0);
+    let attacking = s.powers.iter().any(|p| p.damage > 0.0);
     if accessor == 0 || !(attacking || family) {
         return;
     }
