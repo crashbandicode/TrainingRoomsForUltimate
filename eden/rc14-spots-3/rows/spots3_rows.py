@@ -4,7 +4,6 @@ Gut Check: the gust labelled Sour), `sp_rage` (a raged hit for the knockback win
 """
 import copy
 import json
-import re
 import sys
 import time
 from pathlib import Path
@@ -42,11 +41,12 @@ sr.STOP, sr._hits, sr._verdict = o.STOP, _hits, _verdict
 sr._classes = lambda gained, powers, earlier=0.0, mul=1.0: _LAST['classes']
 
 
-def _reload(ctx, p1, cpu, labels, mash=None, frame_data=False, items=None):
+def _reload(ctx, p1, cpu, labels, mash=None, frame_data=False, items=None, extra=None):
     """spots_rows' reload (the same rows) with the CPU's Mash and Mash Triggers (`mash`: (action, trigger), or None for the factory's nothing)
-    and Hitbox Visualization's six items (`items`; default the three boxes and Frame data colours as `frame_data`)."""
+    and Hitbox Visualization's six items (`items`; default the three boxes and Frame data colours as `frame_data`); `extra`: more menu rows."""
     data = copy.deepcopy(sr.mem._base(ctx))
     menu = data.setdefault('menu', {})
+    menu.update(extra or {})
     on, off = [1, 0], [0, 1]
     menu['hitbox_vis'] = list(items) if items else [1, 1, 1, int(frame_data), 0, 0]
     menu['spots_strip'] = on if labels else off
@@ -89,7 +89,54 @@ def sp_late(ctx, walks=(24, 28, 32, 36, 44)):
     return out
 
 
-WIND = re.compile(r'\[SpotsWind\] slot=(\d+) no_reaction=(\S+) target_status=(\S+) hitstun=(\w+)')
+
+
+CAP_BEFORE = 995.0
+
+
+def cap_states(base, percent=CAP_BEFORE):
+    """The boot's save_states.json (`base`, parsed) with the CPU's slot 0 at `percent`: what sp_cap loads. Stage it as the boot's
+    save_states.json; other rows are unchanged while Saves > CPU damage on load stays Default (0%)."""
+    out = copy.deepcopy(base)
+    out['cpu'][0]['percent'] = percent
+    return out
+
+
+def sp_cap(ctx, walks=(8, 28), tries=2):
+    """Past the game's damage cap (999%; spots-3 (b), the primary ~04:45Z): Saves > CPU damage on load = Save State, Load (slot 0 holds
+    the CPU at 995%, `cap_states`), then P1 Marth's forward smash (13 or 18, x1.26, more than the 4% gap). The percent's rise is cut at
+    999, so the plugin takes the hit's damage from the defender's record (+0x8, `rec08` x 1.2). PASS: a labelled hit past the cap, its
+    gained equal to rec08 x 1.2, and no label the oracle disagrees with. Precondition: no save state was loaded earlier in the boot (the
+    plugin reads save_states.json once) and the staged file is `cap_states` of the boot's."""
+    landed, bad = [], []
+    try:
+        _reload(ctx, MARTH, MARIO, True, extra={'save_damage_cpu': [0, 1, 0]})
+        time.sleep(4.0)
+        for _ in range(tries):
+            for walk in walks:
+                ctx.play('p23-state-load')
+                time.sleep(2.0)
+                seq = hs.diag_mark(ctx)
+                if walk:
+                    ctx.play(sr._walk(walk))
+                ctx.play('sp-csmash')
+                time.sleep(3.5)
+                for hit in _hits(hs.diag_since(ctx, seq)):
+                    why = _verdict(hit)
+                    hit.update(walk=walk)
+                    landed.append(hit)
+                    if why:
+                        bad.append((walk, why))
+    finally:
+        _reload(ctx, MARTH, MARIO, True)
+    capped = [h for h in landed if h.get('capped') and h['label']]
+    out = {'hits': landed, 'bad': bad, 'capped_labelled': len(capped), 'shot': str(ctx.shot('sp-cap'))}
+    steps.save(ctx, 'cap', out)
+    if bad:
+        raise RuntimeError('labels the oracle disagrees with: %s' % bad[:6])
+    if not capped:
+        raise RuntimeError('no labelled hit past the damage cap: %d hits, befores %s' % (len(landed), sorted({round(h['before']) for h in landed})))
+    return {'capped_labelled': len(capped), 'hits': len(landed), 'labels': sorted({h['label'] for h in capped})}
 
 
 def _swing_lines(ctx, walk, attack, wait):
@@ -103,54 +150,44 @@ def _swing_lines(ctx, walk, attack, wait):
     return hs.diag_since(ctx, seq)
 
 
-def kr_gutcheck(ctx, setups=((MARTH, FTILT),), walks=(76, 88), rounds=4):
+def kr_gutcheck(ctx, setups=((MARTH, FTILT), (MARTH, JAB)), walks=(64, 76, 88), rounds=2):
     """King K. Rool's Gut Check: P1 K. Rool walks in and does down special while the CPU mashes an attack (Always), so the CPU's hit triggers the
-    counter, whose hits land on the CPU. Every label is checked by the record-slot oracle. The row passes when a counter hit on the CPU from its
-    weaker hitbox (the gust: the game's slot whose class is Sour) is labelled Sour. Also kept: each hit's `[SpotsWind]` line (the recorded slot's
-    no-reaction byte, ATTACK arg 26, and the target's status and hitstun), and one 1/4-speed clip with Hitbox Visualization on Windboxes only."""
-    landed, bad, wind = [], [], []
-    for cpu, action in setups:
-        seq = hs.diag_mark(ctx)
-        _reload(ctx, KROOL, cpu, True, mash=(action, ALWAYS))
-        time.sleep(28.0)
-        census = sr._census(ctx, seq, sr.KINDS[KROOL], cap=30)
-        steps.save(ctx, 'setup-%d-%d' % (cpu, action), {'cpu': cpu, 'action': action, 'census': census, 'shot': str(ctx.shot('kr-setup-%d-%d' % (cpu, action)))})
-        if not census:
-            bad.append((cpu, action, 'the census never named K. Rool'))
-            continue
-        for rnd in range(rounds):
-            for walk in walks:
-                lines = _swing_lines(ctx, walk, 'sp-downb', 3.5)
-                wind += [{'cpu': cpu, 'walk': walk, 'line': t[t.index('[SpotsWind]'):]} for _, _, t in lines if '[SpotsWind]' in t]
-                for hit in _hits(lines):
-                    why = _verdict(hit)
-                    hit.update(cpu=cpu, action=action, walk=walk, round=rnd)
-                    landed.append(hit)
-                    if why:
-                        bad.append((cpu, walk, why))
-    gust = [h for h in landed if h['label'] == 'Sour' and h['mark'] and h['mark'][1] == 1 and h.get('game_slot_class') == 'Sour']
-    # The operator's question (via the primary, ~03:25Z): is the gust a windbox? Windboxes only, 1/4 speed, through one counter.
-    clip = None
+    counter, whose hits land on the CPU. Every label is checked by the record-slot oracle; the row passes when a counter hit on the CPU is
+    labelled and no label disagrees. The gust (the counter's weaker hitbox) connected once, in spots3-bade7ea6-1 (Sour, the game's slot 1); it
+    did not recur in 16 tries of spots3-bedc9a69-1, so the row reports it when it comes and does not require it (the primary, ~04:15Z). Gut
+    Check has no windbox (the wind-audit lane, from the game data)."""
+    landed, bad = [], []
     try:
-        _reload(ctx, KROOL, MARTH, True, mash=(FTILT, ALWAYS), items=[0, 0, 0, 0, 0, 1])
-        time.sleep(3.0)
-        sr._speed_hold(ctx, ['left', 'left', 'left'])
-        clip = sr._gif(ctx, 'kr-windboxes-only', 'sp-downb', 68 * 4, seconds=14)  # sp-wf272: 68 game frames of walk at 1/4 speed
-        clip['shot'] = str(ctx.shot('kr-windboxes-only-after'))
-    except Exception as exc:  # the clip is evidence for the question, not the row's verdict
-        clip = {'error': repr(exc)}
+        for cpu, action in setups:
+            seq = hs.diag_mark(ctx)
+            _reload(ctx, KROOL, cpu, True, mash=(action, ALWAYS))
+            time.sleep(28.0)
+            census = sr._census(ctx, seq, sr.KINDS[KROOL], cap=30)
+            steps.save(ctx, 'setup-%d-%d' % (cpu, action), {'cpu': cpu, 'action': action, 'census': census, 'shot': str(ctx.shot('kr-setup-%d-%d' % (cpu, action)))})
+            if not census:
+                bad.append((cpu, action, 'the census never named K. Rool'))
+                continue
+            for rnd in range(rounds):
+                for walk in walks:
+                    for hit in _hits(_swing_lines(ctx, walk, 'sp-downb', 3.5)):
+                        why = _verdict(hit)
+                        hit.update(cpu=cpu, action=action, walk=walk, round=rnd)
+                        landed.append(hit)
+                        if why:
+                            bad.append((cpu, walk, why))
     finally:
-        sr._speed_hold(ctx, ['right', 'right', 'right'])
         # Leave Marth vs Mario, so the next row's start gate (the Training HUD) sees the fighters it was captured with.
         sr.sp_setup(ctx, MARTH, MARIO, frame_data=False, labels=True)
-    out = {'hits': landed, 'bad': bad, 'gust_sour': len(gust), 'wind': wind, 'clip': clip,
+    counters = [h for h in landed if h['label'] and h['mark'] and h['mark'][1] == 1]
+    gust = [h for h in counters if h['label'] == 'Sour' and h.get('game_slot_class') == 'Sour']
+    out = {'hits': landed, 'bad': bad, 'counters': len(counters), 'gust_sour': len(gust),
            'labels': sorted({h['label'] or 'none' for h in landed if h['gained'] > 0})}
     steps.save(ctx, 'gutcheck', out)
     if bad:
         raise RuntimeError('labels the oracle disagrees with: %s' % bad[:6])
-    if not gust:
-        raise RuntimeError('no counter hit from the weaker slot labelled Sour (NOT REPRODUCED or wrong): labels %s, %d hits' % (out['labels'], len(landed)))
-    return {'gust_sour': len(gust), 'labels': out['labels'], 'hits': len(landed), 'wind': [w['line'] for w in wind][:8]}
+    if not counters:
+        raise RuntimeError('no labelled counter hit on the CPU: labels %s, %d hits' % (out['labels'], len(landed)))
+    return {'counters': len(counters), 'gust_sour': len(gust), 'labels': out['labels'], 'hits': len(landed)}
 
 
 def sp_stale_tip(ctx, stand_s=16.0):

@@ -27,8 +27,9 @@ def stop(frame, gained, launched, before, label=None, hits=(HIT, GUST), attacker
             % (frame, gained, launched, before, weight, attacker, rec, powers(*hits), mark))
 
 
-def record(damage, slot, kb):
-    return '[SpotsKB] who=cpu stop=true damage=%.3f thunk=%.3f rec10=%.3f rec50=0x00%02x0000 slot=%d attacker=0x10 rec160=0.000' % (damage, kb, kb, slot, slot)
+def record(damage, slot, kb, rec08=0.0):
+    return ('[SpotsKB] who=cpu stop=true damage=%.3f thunk=%.3f rec10=%.3f rec50=0x00%02x0000 slot=%d attacker=0x10 rec160=0.000 rec1a0=0x0 '
+            'rec08=%.3f rec0c=%.3f weight=98.00 hitstun=None' % (damage, kb, kb, slot, slot, rec08, rec08))
 
 
 def received(hit, gained, before, r=1.0, weight=98.0):
@@ -65,6 +66,29 @@ class Oracle(unittest.TestCase):
         hit = self.one([record(34.4, 1, kb)], stop(5, 14.4, kb, 20.0, 'Sour', recorded=0))
         self.assertIn('read slot 0', o.verdict(hit))
 
+    def test_rage_is_folded_into_the_expected_knockback(self):
+        # Eden's raged blade: P1 Marth at 60.3%, 74.664 received (x1.022 the 0% hit's 73.054).
+        self.assertAlmostEqual(o.rage(60.349), 1.022, places=3)
+        self.assertEqual([round(o.rage(p), 6) for p in (0.0, 35.0, 150.0, 999.0)], [1.0, 1.0, 1.1, 1.1])
+        g = 16.38 * 1.26
+        kb = received(HIT, g, 20.0, r=1.1)
+        line = stop(5, g, kb, 20.0, 'Sweet', recorded=0, attacker=150.0)
+        hit = self.one([record(20.0 + g, 0, kb)], line)
+        self.assertIsNone(o.verdict(hit))
+        self.assertEqual(hit['expected'], 'Sweet')
+        unraged = self.one([record(20.0 + g, 0, kb)], line.replace('attacker=150.000', 'attacker=0.000'))
+        self.assertIn('gives None', o.verdict(unraged))
+
+    def test_past_the_damage_cap_the_record_gives_the_damage(self):
+        # The CPU at 995%: the gust's 14.448 (x1.26) stops at 999; the plugin's gained is the record's +0x8 x 1.2.
+        g = 11.466 * 1.26
+        kb = received(GUST, g, 995.0)
+        hit = self.one([record(o.DAMAGE_MAX, 1, kb, rec08=g / 1.2)], stop(5, g, kb, 995.0, 'Sour', recorded=1))
+        self.assertIsNone(o.verdict(hit))
+        self.assertEqual((hit['capped'], hit['game_slot'], hit['expected']), (True, 1, 'Sour'))
+        short = self.one([record(o.DAMAGE_MAX, 1, kb, rec08=g / 1.2)], stop(5, 4.0, kb, 995.0, None, recorded=1))
+        self.assertIn('past the damage cap', o.verdict(short))
+
     def test_late_is_accepted_and_the_damage_oracle_kept(self):
         hit = self.hit(1, 'Late', 11.466 * 1.26)
         self.assertIsNone(o.verdict(hit, damage_classes={'Sour'}))
@@ -77,7 +101,7 @@ class Tables(unittest.TestCase):
         for frame, (which, slot, r) in enumerate(((GUST, 1, 1.0), (HIT, 0, 1.03), (GUST, 1, 0.95)), start=1):
             g = which[0] * 1.26
             kb = received(which, g, 20.0, r)
-            lines += [record(20.0 + g, slot, kb), stop(frame, g, kb, 20.0, None, attacker=60.0, recorded=slot)]
+            lines += [record(20.0 + g, slot, kb), stop(frame, g, kb, 20.0, None, recorded=slot)]
         rows = kb_table.table(lines)
         self.assertEqual([r['game_slot'] for r in rows], [1, 0, 1])
         self.assertEqual([round(r['own'], 2) for r in rows], [1.0, 1.03, 0.95])

@@ -12,7 +12,8 @@
 //! A hit is attributed (`attribute`) to the attack slot the game itself recorded for it: the defender's damage record keeps the slot id of
 //! the hit whose knockback it stored (`+0x52`, beside the knockback at `+0x10` that `DamageModule::reaction` returns; spots-3, Eden
 //! 2026-11-15). Two cross-checks against that slot: the damage gained over its damage and the attacker's charge in `K_LOW..=K_HIGH`, and
-//! the knockback received over its knockback in `KB_LOW..=KB_HIGH`. Anything else has no label.
+//! the knockback received over its knockback in `KB_LOW..=KB_HIGH`. Anything else has no label. The knockback carries the attacker's rage
+//! and the game's ceiling (`launched_by`), and past the damage cap the damage comes from the record (`added`), so no percent is out of range.
 
 /// The rows (decision SP5): the strip's labels and the combo's match, toggles Off by default. The hitbox visualizer's *Frame data colours*
 /// (`hitbox::legend_colour`) is an item of its checklist (`legend::COLOURS`).
@@ -63,21 +64,21 @@ pub const DAMAGE_MAX: f32 = 999.0;
 /// `AttackModule::set_damage_reaction_mul`): 1 + (max − 1) · (percent − 35) / (150 − 35), the result held within 1.0 ..= 1.1. Any percent
 /// goes in; the game bounds the multiplier, not the percent. Eden measured x1.022 at 60.3% (spots3-bedc9a69-1).
 pub fn rage(percent: f32) -> f32 {
-    ((RAGE_MAX - 1.0) * ((percent - RAGE_FROM) / (RAGE_FULL - RAGE_FROM)) + 1.0).max(1.0).min(RAGE_MAX)
+    ((RAGE_MAX - 1.0) * ((percent - RAGE_FROM) / (RAGE_FULL - RAGE_FROM)) + 1.0).clamp(1.0, RAGE_MAX)
 }
 
 /// The knockback the game gives `hit` (`knockback`) with the attacker's rage, which only a hitbox without fixed knockback takes
 /// (`main+0x401e50`: the fixed path skips it), and never above the game's ceiling, `REACTION_MAX`.
 fn launched_by(hit: &Hit, d: f32, p: f32, w: f32, attacker: f32) -> f32 {
-    rage(attacker) * knockback(hit, d, p, w)
+    let r = if hit.fixed == 0 { rage(attacker) } else { 1.0 };
+    (r * knockback(hit, d, p, w)).min(REACTION_MAX)
 }
 
 /// The damage a hit added, in the percent's terms: the rise of the defender's percent (`gained`), or, when the game's damage cap cut that
 /// short (`after`, the percent after the hit, at `DAMAGE_MAX`), the damage the defender's record says the hit dealt (`dealt`, record `+0x8`,
 /// before the 1-on-1 ratio, so times `TARGET_MUL`). 0.0 when neither shows a hit.
 pub fn added(gained: f32, dealt: f32, after: f32) -> f32 {
-    let _ = (dealt, after);
-    gained
+    if after >= DAMAGE_MAX - EPS { gained.max(dealt * TARGET_MUL) } else { gained }
 }
 
 impl Launch {

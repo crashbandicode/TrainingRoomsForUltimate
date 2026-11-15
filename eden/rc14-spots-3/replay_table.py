@@ -41,14 +41,14 @@ def own_ratio(h):
     s = h['powers'][h['game_slot']]
     if s['damage'] <= 0 or h['launched'] <= 0:
         return None
-    k = o.knockback(s, h['gained'] / o.TARGET_MUL, h['before'] + h['gained'], h['weight'] if h['weight'] > 0 else 100.0)
+    k = o.launched_by(s, h['gained'] / o.TARGET_MUL, h['before'] + h['gained'], h['weight'] if h['weight'] > 0 else 100.0, h.get('attacker', 0.0))
     return h['launched'] / k if k > 0 else None
 
 
 def replay(h, window):
     slot = h['game_slot']
     s = h['powers'][slot]
-    cls = o.classes_of(h['powers'], h['mul'] or 1.0, h['before'], h['weight']).get(slot)
+    cls = o.classes_of(h['powers'], h['mul'] or 1.0, h['before'], h['weight'], h.get('attacker', 0.0)).get(slot)
     r = own_ratio(h)
     ok = s['damage'] > 0 and (h['mul'] or 0) > 0 and K_LOW <= h['gained'] / (s['damage'] * h['mul']) <= K_HIGH and r is not None and window[0] <= r <= window[1]
     return cls, (cls if ok else None), r
