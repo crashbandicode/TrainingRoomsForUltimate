@@ -22,8 +22,8 @@ AF = HERE.parent / 'rc14-a-full' / 'afull.py'
 M = 'afull2.py'
 ROWS = [
     ('a2-setup', M, 'a2_setup', 8, 'Live values (Ready Fighters 8, the console lanes), a P1 lap and a CPU lap, the notice settled; knob off.'),
+    ('a2-direct', M, 'a2_direct', 4, "S1 / Gap 2: cycle-fix's cf-direct (at Ready Fighters 8, before cf-k2 lowers it): a pick outside the cycle is served by a demand group."),
     ('a2-k2', M, 'a2_k2', 10, "S1 / Gap 2: cycle-fix's cf-k2 (k = 2, Ready Fighters 6): no 'no free group slot', no Reload."),
-    ('a2-direct', M, 'a2_direct', 4, "S1 / Gap 2: cycle-fix's cf-direct: a pick outside the cycle is served by a demand group."),
     ('a2-r6', M, 'a2_r6', 7, 'S1 / A1: the console P1 lane, Kirby alone, kept by the forced Reload (no slot refusal), warm return.'),
     ('a2-strip', M, 'a2_strip', 8, 'K-strip k2 + k5: Kirby with a hat, the press strips and parks him, the target warm; back to Kirby warm.'),
     ('a2-strip-same', M, 'a2_strip_same', 5, 'K-strip k3: a Pikachu hat, the press onto the Built Pikachu group.'),
