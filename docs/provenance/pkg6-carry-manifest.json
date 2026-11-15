@@ -8474,7 +8474,7 @@
    "dest": "src/model/swap/capacity_creation.rs",
    "crate": "consts",
    "src_sha256": "f130c2364f384fd3ab98e41b45416b73ed3c595dfa8e5576721a1f855157a304",
-   "dest_sha256": "4a54f0fff49895a2bf8ffeb025394edbbe0a07b4d0c2b4d564a1f157bf0e9c09",
+   "dest_sha256": "9dffb0e4cf0bde4d006d6235b1d0f5c57d02efef1f0db59f354f1470b5fb0355",
    "edits": [
     {
      "table_tests": true,
@@ -8546,6 +8546,16 @@
      "old": "/// rc.14 creation-hold (the primary 2026-11-15 ~09:20Z): fail-first stub, today's cap that ends AT the refused extra.\npub fn held_allowance(allowance: usize, position: Option<usize>) -> usize {\n    position.map_or(allowance, |position| allowance.min(position))\n",
      "new": "/// rc.14 creation-hold (the primary 2026-11-15 ~09:20Z): the cap used to end AT the refused extra (`min(position)`), a\n/// latch for the rest of the scene (Eden smoke2r-f1, cycle-f1).\npub fn held_allowance(allowance: usize, position: Option<usize>) -> usize {\n    position.map_or(allowance, |position| allowance.min(position + 1))\n",
      "reason": "rc.14 creation-hold fix: rc.14 creation-hold: held_allowance keeps the refused extra offered (min(position + 1)), so its preflight runs again and a pass clears the hold"
+    },
+    {
+     "old": "    position.map_or(allowance, |position| allowance.min(position + 1))\n}\n",
+     "new": "    position.map_or(allowance, |position| allowance.min(position + 1))\n}\n\n/// The created entries before a standing refusal at `position`: what entry 3's borrow waits for\n/// (`hat_slots::created_busy`, \"less any a refused creation ended\"). Unchanged by rc.14 creation-hold: while the refused\n/// extra is tried again, the borrow does not wait for it.\npub fn ended_allowance(allowance: usize, position: Option<usize>) -> usize {\n    position.map_or(allowance, |position| allowance.min(position))\n}\n",
+     "reason": "rc.14 creation-hold borrow: rc.14 creation-hold: entry 3's borrow keeps waiting only for the created entries before a refused one (ended_allowance), as before the fix"
+    },
+    {
+     "old": "        assert_eq!(held_limit(9, 2, Some(1)), 3, \"the readiness line's count is unchanged\");\n    }\n",
+     "new": "        assert_eq!(held_limit(9, 2, Some(1)), 3, \"the readiness line's count is unchanged\");\n        assert_eq!(ended_allowance(4, Some(1)), 1, \"entry 3's borrow still waits only for the entries before the refused one\");\n        assert_eq!(ended_allowance(4, None), 4);\n    }\n",
+     "reason": "rc.14 creation-hold borrow: rc.14 creation-hold: entry 3's borrow keeps waiting only for the created entries before a refused one (ended_allowance), as before the fix"
     }
    ]
   },
@@ -14143,7 +14153,7 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "b5eef93376a68eee2b6d3a8830cf1566c030b08b37c7e9d95c63d87f3963070c",
+   "dest_sha256": "d8c53eb4f213dba5628b91addb3521a97395ced0d02e8310050f090807dc3b90",
    "edits": [
     {
      "delete_from": "/// Skip plugin automations for an owned helper body.",
@@ -16681,6 +16691,21 @@
      "old": "/// creation the preflight refused ends it at that entry while the hold stands (`creation_hold`).\n",
      "new": "/// creation the preflight refused ends it with that entry while the hold stands (`creation_hold`): the refused entry is\n/// still offered, so its preflight runs again on each helper callback and a pass clears the hold\n/// (`creation::held_allowance`).\n",
      "reason": "rc.14 creation-hold fix: rc.14 creation-hold: held_allowance keeps the refused extra offered (min(position + 1)), so its preflight runs again and a pass clears the hold"
+    },
+    {
+     "old": "        if training {created_allowance(state,Backend::Training)} else {0});\n",
+     "new": "        // rc.14 creation-hold: the borrow keeps waiting only for the created entries before a refused one (unchanged).\n        if training {let (allowance,hold)=created_plan(state,Backend::Training); creation::ended_allowance(allowance,hold)} else {0});\n",
+     "reason": "rc.14 creation-hold borrow: rc.14 creation-hold: entry 3's borrow keeps waiting only for the created entries before a refused one (ended_allowance), as before the fix"
+    },
+    {
+     "old": "/// The created entries this scene's plan may use (`hat_slots::created_allowance`), counted by the plan's purposes; a\n/// creation the preflight refused ends it with that entry while the hold stands (`creation_hold`): the refused entry is\n/// still offered, so its preflight runs again on each helper callback and a pass clears the hold\n/// (`creation::held_allowance`).\nfn created_allowance(state:&State,backend:Backend)->usize {\n",
+     "new": "/// What creation may offer of the created entries this scene's plan may use: a creation the preflight refused ends it\n/// with that entry while the hold stands (`creation_hold`). The refused entry is still offered, so its preflight runs\n/// again on each helper callback and a pass clears the hold (`creation::held_allowance`).\nfn created_allowance(state:&State,backend:Backend)->usize {\n    let (allowance,hold)=created_plan(state,backend);\n    creation::held_allowance(allowance,hold)\n}\n\n/// The created entries this scene's plan may use (`hat_slots::created_allowance`), counted by the plan's purposes, and\n/// the position of a creation the preflight refused in this scene while that hold stands (`creation_hold`).\nfn created_plan(state:&State,backend:Backend)->(usize,Option<usize>) {\n",
+     "reason": "rc.14 creation-hold borrow: rc.14 creation-hold: entry 3's borrow keeps waiting only for the created entries before a refused one (ended_allowance), as before the fix"
+    },
+    {
+     "old": "    // rc.14 creation-hold: the refused extra stays offered, so its preflight runs again and a pass clears the hold.\n    creation::held_allowance(allowance,state.creation_hold.filter(|(epoch,_)|state.book.is_current(*epoch)).map(|(_,position)|usize::from(position)))\n",
+     "new": "    (allowance,state.creation_hold.filter(|(epoch,_)|state.book.is_current(*epoch)).map(|(_,position)|usize::from(position)))\n",
+     "reason": "rc.14 creation-hold borrow: rc.14 creation-hold: entry 3's borrow keeps waiting only for the created entries before a refused one (ended_allowance), as before the fix"
     }
    ]
   },

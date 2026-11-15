@@ -200,6 +200,13 @@ pub fn held_allowance(allowance: usize, position: Option<usize>) -> usize {
     position.map_or(allowance, |position| allowance.min(position + 1))
 }
 
+/// The created entries before a standing refusal at `position`: what entry 3's borrow waits for
+/// (`hat_slots::created_busy`, "less any a refused creation ended"). Unchanged by rc.14 creation-hold: while the refused
+/// extra is tried again, the borrow does not wait for it.
+pub fn ended_allowance(allowance: usize, position: Option<usize>) -> usize {
+    position.map_or(allowance, |position| allowance.min(position))
+}
+
 /// Result of the exact-Mii proof for one layout owner. A Mii kind alone is not a proof.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExactMiiProof {
@@ -492,6 +499,8 @@ mod tests {
         assert_eq!(held_allowance(4, None), 4, "no hold: the plan's allowance");
         assert_eq!(held_allowance(1, Some(1)), 1, "never more than the plan's allowance");
         assert_eq!(held_limit(9, 2, Some(1)), 3, "the readiness line's count is unchanged");
+        assert_eq!(ended_allowance(4, Some(1)), 1, "entry 3's borrow still waits only for the entries before the refused one");
+        assert_eq!(ended_allowance(4, None), 4);
     }
 
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.

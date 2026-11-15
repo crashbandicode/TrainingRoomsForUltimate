@@ -690,7 +690,8 @@ fn purpose_view(state:&State,slot:usize,targets:[Option<Want>;crate::runtime::ro
         .is_some_and(|source|targets.iter().flatten().any(|w|w.kind==source.kind&&w.configuration==source.configuration));
     // §5.1: the borrow waits for the created entries the plan may use; one not created yet is not in use.
     let created_busy=crate::engine::preload::hat_slots::created_busy(extras.iter().map(|s|reservation_for(state,*s as u32).is_some()&&in_plan(*s)),
-        if training {created_allowance(state,Backend::Training)} else {0});
+        // rc.14 creation-hold: the borrow keeps waiting only for the created entries before a refused one (unchanged).
+        if training {let (allowance,hold)=created_plan(state,Backend::Training); creation::ended_allowance(allowance,hold)} else {0});
     let borrow_open=training&&borrow_admitted(unsafe{native_source::training_cpu_quantity()},
         crate::runtime::ui::state::PAUSE_ACTIVE.load(Ordering::Acquire),state.book.can_replace(BORROW_ENTRY)==Ok(true));
     slot_view(plan,SlotFacts{training,slot,created:extras.contains(&slot),created_busy,borrow_open,borrowed})
@@ -715,11 +716,17 @@ fn helper_view(state:&State,slot:u32)->[Option<Want>;crate::runtime::roster::cyc
     purpose_view(state,slot as usize,plan_targets(state))
 }
 
-/// The created entries this scene's plan may use (`hat_slots::created_allowance`), counted by the plan's purposes; a
-/// creation the preflight refused ends it with that entry while the hold stands (`creation_hold`): the refused entry is
-/// still offered, so its preflight runs again on each helper callback and a pass clears the hold
-/// (`creation::held_allowance`).
+/// What creation may offer of the created entries this scene's plan may use: a creation the preflight refused ends it
+/// with that entry while the hold stands (`creation_hold`). The refused entry is still offered, so its preflight runs
+/// again on each helper callback and a pass clears the hold (`creation::held_allowance`).
 fn created_allowance(state:&State,backend:Backend)->usize {
+    let (allowance,hold)=created_plan(state,backend);
+    creation::held_allowance(allowance,hold)
+}
+
+/// The created entries this scene's plan may use (`hat_slots::created_allowance`), counted by the plan's purposes, and
+/// the position of a creation the preflight refused in this scene while that hold stands (`creation_hold`).
+fn created_plan(state:&State,backend:Backend)->(usize,Option<usize>) {
     use crate::engine::preload::hat_slots::Purpose;
     let helpers=backend.helpers();
     let extras=crate::engine::preload::cycle_preload_capacity::extra_slots(backend);
@@ -729,8 +736,7 @@ fn created_allowance(state:&State,backend:Backend)->usize {
         if *purpose==Some(Purpose::Hat) {hats+=1;} else {fighters+=1;}
     }
     let allowance=crate::engine::preload::hat_slots::created_allowance(fighters,hats,helpers.len(),created,backend==Backend::Training);
-    // rc.14 creation-hold: the refused extra stays offered, so its preflight runs again and a pass clears the hold.
-    creation::held_allowance(allowance,state.creation_hold.filter(|(epoch,_)|state.book.is_current(*epoch)).map(|(_,position)|usize::from(position)))
+    (allowance,state.creation_hold.filter(|(epoch,_)|state.book.is_current(*epoch)).map(|(_,position)|usize::from(position)))
 }
 
 /// P-HOT §3.5.1 rule 2: a speculative hat-only load admitted on Training's entry 3 publishes the borrow record.
