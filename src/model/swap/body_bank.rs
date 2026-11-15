@@ -1218,9 +1218,10 @@ pub fn gated_alone(kind: u32) -> bool {
     kind == KIRBY
 }
 
-/// rc.14 2e (a-full, A1): whether a mod Reload keeps the attached window as a detached Built group. Off until the Eden
-/// rows pass with it (the diag build's `diag-cycle.req` `window` turns it on for them).
-pub const KEEP_WINDOW_ACROSS_RELOAD: bool = false;
+/// rc.14 2e (a-full, A1): whether a mod Reload keeps the attached window as a detached Built group. On since the Eden rows of
+/// a1-enable passed with it (a window kept across a Reload, a cold target freed on leaving, Kirby alone and with a copy, a Mii
+/// window); the diag build's `diag-cycle.req` `window` is no longer needed for it.
+pub const KEEP_WINDOW_ACROSS_RELOAD: bool = true;
 
 /// rc.14 a-full-2 (K-strip; AFULL2-RESEARCH.md "Limit 1"): a live Kirby that holds a copy loses it natively and parks
 /// ([`KirbyDeparture::Strip`]) instead of taking the copy gate's Reload, which also rebuilt the target's own group. On
