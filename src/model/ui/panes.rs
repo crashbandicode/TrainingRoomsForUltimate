@@ -177,18 +177,35 @@ pub const fn row_span(popup: bool) -> (f32, f32) {
     if popup { (POP_ROW_LEFT, POP_ROW_RIGHT) } else { (ROW_LEFT, ROW_RIGHT) }
 }
 
-/// A row's label width in the column: the page's, or what the pop-up's narrower column leaves beside a short value.
-pub const fn row_label_w(popup: bool) -> f32 {
-    if popup { POP_ROW_RIGHT - POP_ROW_LEFT - POP_LABEL_INSET - POP_VALUE_W - 16.0 } else { ROW_LABEL_W }
+/// Inner padding between a list's chrome (the outline's and the cursor's edges, the cursor's left bar) and the row text,
+/// on both sides (rc.14 list-padding, GIF review of `8199c696`: the first letters ran under the box's left edge and "3
+/// targets" touched its right). Every list row is placed through `row_label_box` and `row_value_box`, so no list loses it.
+pub const ROW_PAD: f32 = 20.0;
+/// The outline's and the cursor's edge width, and the white cursor's left bar: its centre inside the span's left edge and
+/// its width.
+pub const CHROME_EDGE: f32 = 2.0;
+pub const CURSOR_BAR_X: f32 = 4.0;
+pub const CURSOR_BAR_W: f32 = 6.0;
+
+/// A row's label box in the column, centre x and width: the page's starts one pad inside the column's left edge; the
+/// pop-up's starts past the order badge's room (wider than the pad) and leaves what its narrower column has beside a short
+/// value. Both stop where the value's box starts, less a gap.
+pub const fn row_label_box(popup: bool) -> (f32, f32) {
+    let left = if popup { POP_ROW_LEFT + POP_LABEL_INSET } else { ROW_LEFT + ROW_PAD };
+    let width = if popup { POP_ROW_RIGHT - POP_ROW_LEFT - POP_LABEL_INSET - POP_VALUE_W - 16.0 } else { ROW_LABEL_W - ROW_PAD };
+    (left + width / 2.0, width)
 }
 
-pub const fn row_value_w(popup: bool) -> f32 {
-    if popup { POP_VALUE_W } else { ROW_VALUE_W }
+/// A row's value box, centre x and width: the right-aligned text ends one pad inside the column's right edge, and the
+/// box's left edge stays where it was.
+pub const fn row_value_box(popup: bool) -> (f32, f32) {
+    let width = (if popup { POP_VALUE_W } else { ROW_VALUE_W }) - ROW_PAD;
+    (row_value_right(popup) - width / 2.0, width)
 }
 
-/// Where a row's name starts in its column: the page's at its left edge; the pop-up's after the order badge's room.
-pub const fn row_label_left(popup: bool) -> f32 {
-    if popup { POP_ROW_LEFT + POP_LABEL_INSET } else { ROW_LEFT }
+/// Where a row's value text ends; what sits left of it (a floppy, a loop mark) is placed from here.
+pub const fn row_value_right(popup: bool) -> f32 {
+    row_span(popup).1 - ROW_PAD
 }
 
 /// Room for the order badge, and for a section header's mark, before the names (r8: the names start past both).
@@ -1082,7 +1099,10 @@ pub const fn spec(index: usize) -> Spec {
         i if i >= IDX_TILE_LABEL && i < IDX_TILE_LABEL + TILES => hidden(text(name, [0.0, 0.0, 100.0, TILE_LABEL_H], Align::Center, FONT_SMALL, 28, TEXT)),
         i if i >= IDX_TILE_STRIPE && i < IDX_TILE_SOLO => hidden(rect(name, [0.0, 0.0, 4.0, 86.0], TEXT, false)),
         i if i >= IDX_FLOPPY && i < IDX_SUB => hidden(rect(name, [0.0, 0.0, 28.0, 28.0], [255, 255, 255, 255], false)),
-        i if i >= IDX_SUB && i < IDX_CONN_DIV => hidden(text(name, [row_label_left(true) + row_label_w(true) / 2.0, row_y(i - IDX_SUB) - SUB_DROP, row_label_w(true), SUB_H], Align::Left, FONT_SUBLINE, 64, TEXT_DIM)),
+        i if i >= IDX_SUB && i < IDX_CONN_DIV => {
+            let (x, w) = row_label_box(true);
+            hidden(text(name, [x, row_y(i - IDX_SUB) - SUB_DROP, w, SUB_H], Align::Left, FONT_SUBLINE, 64, TEXT_DIM))
+        }
         IDX_CONN_DIV => hidden(rect(name, [CONN_DIVIDER_X, 15.0, 3.0, 640.0], RULE, false)),
         IDX_CONN_HEAD => hidden(text(name, [(CONN_LEFT + CONN_RIGHT) / 2.0, ROW_FIRST_Y, CONN_RIGHT - CONN_LEFT, CONN_LINE_H], Align::Left, FONT_SMALL, 48, TEXT_DIM)),
         i if i >= IDX_CONN && i < IDX_CONN_BOX => hidden(text(name, [(CONN_LEFT + CONN_RIGHT) / 2.0, conn_y(i - IDX_CONN), CONN_RIGHT - CONN_LEFT, CONN_LINE_H], Align::Left, FONT_SMALL, 72, TEXT)),
@@ -1128,9 +1148,11 @@ pub const fn spec(index: usize) -> Spec {
         i => {
             let row = (i - IDX_ROW) / 2;
             if (i - IDX_ROW).is_multiple_of(2) {
-                text(name, [ROW_LEFT + ROW_LABEL_W / 2.0, row_y(row), ROW_LABEL_W, ROW_H], Align::Left, FONT, 80, TEXT)
+                let (x, w) = row_label_box(false);
+                text(name, [x, row_y(row), w, ROW_H], Align::Left, FONT, 80, TEXT)
             } else {
-                text(name, [ROW_RIGHT - ROW_VALUE_W / 2.0, row_y(row), ROW_VALUE_W, ROW_H], Align::Right, FONT, 72, TEXT)
+                let (x, w) = row_value_box(false);
+                text(name, [x, row_y(row), w, ROW_H], Align::Right, FONT, 72, TEXT)
             }
         }
     }

@@ -137,21 +137,21 @@ impl Panes {
         // Rows; on the direction grid the same panes carry the "Selected (weight)" panel at the right of the chips.
         let panel = if frame.view == View::Chips { selected_panel(frame) } else { [None; ROWS] };
         // The r8 pop-up's list column (left of CONNECTIONS); the page keeps its own.
-        let (_, right) = p::row_span(frame.popup);
-        let (label_left, label_w, value_w) = (p::row_label_left(frame.popup), p::row_label_w(frame.popup), p::row_value_w(frame.popup));
+        // Both boxes sit inside the list's outline and cursor with a pad (`panes::ROW_PAD`), the same for every list.
+        let ((label_x, label_w), (value_x, value_w)) = (p::row_label_box(frame.popup), p::row_value_box(frame.popup));
         for (i, line) in panel.into_iter().enumerate() {
             let sub = list && i < usize::from(frame.row_count) && !frame.rows[i].sub.is_empty();
             if sub {
                 // The name rises and its subline sits under it, both on the row's plate.
-                self.label(IDX_SUB + i, frame.rows[i].sub.units(), label_left + label_w / 2.0, p::row_y(i) - SUB_DROP, label_w, TEXT_DIM);
+                self.label(IDX_SUB + i, frame.rows[i].sub.units(), label_x, p::row_y(i) - SUB_DROP, label_w, TEXT_DIM);
             } else {
                 self.hide(IDX_SUB + i);
             }
             if list && i < usize::from(frame.row_count) {
                 let row = &frame.rows[i];
                 let rise = if sub { SUB_RISE } else { 0.0 };
-                self.place(p::row_label_index(i), label_left + label_w / 2.0, p::row_y(i) + rise, label_w);
-                self.place(p::row_value_index(i), right - value_w / 2.0, p::row_y(i) - VALUE_DROP + rise, value_w);
+                self.place(p::row_label_index(i), label_x, p::row_y(i) + rise, label_w);
+                self.place(p::row_value_index(i), value_x, p::row_y(i) - VALUE_DROP + rise, value_w);
                 self.text(p::row_label_index(i), row.label.units(), tone_color(row.label_tone));
                 self.text(p::row_value_index(i), row.value.units(), tone_color(row.value_tone));
             } else if frame.view == View::Delay && i < 4 {
@@ -225,8 +225,8 @@ impl Panes {
         }
         if frame.white_cursor {
             if let Some(slot) = frame.focus {
-                let x = left + 4.0;
-                self.rect_at(IDX_CURSOR, x, p::row_y(usize::from(slot)), 6.0, ROW_H, CURSOR_WHITE);
+                let x = left + p::CURSOR_BAR_X;
+                self.rect_at(IDX_CURSOR, x, p::row_y(usize::from(slot)), p::CURSOR_BAR_W, ROW_H, CURSOR_WHITE);
                 self.stroke(IDX_CURSOR + 1, slot, 1, (left, right), CURSOR_WHITE);
             }
         }
@@ -372,7 +372,7 @@ impl Panes {
         let h = (top - bottom).abs().max(ROW_H);
         let x = (left + right) / 2.0;
         let w = right - left;
-        let edge = 2.0;
+        let edge = p::CHROME_EDGE;
         self.rect_at(index, left + edge / 2.0, y, edge, h, color);
         self.rect_at(index + 1, right - edge / 2.0, y, edge, h, color);
         self.rect_at(index + 2, x, top - edge / 2.0, w, edge, color);
