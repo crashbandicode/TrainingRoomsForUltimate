@@ -18,8 +18,8 @@ pub enum Scene {
 /// The practice CPU's entry in the waiting room.
 pub const LOBBY_CPU_ENTRY: i32 = 4;
 
-/// Whether a fighter on `entry`, operated by the CPU or not, is a CPU role for this scene.
-pub const fn is_cpu_role(scene: Scene, entry: i32, operated_by_cpu: bool) -> bool {
+/// Whether a fighter on `entry`, operated by the CPU or not, is a CPU role for this scene. `cpus`: Training's No. of CPUs.
+pub const fn is_cpu_role(scene: Scene, entry: i32, operated_by_cpu: bool, _cpus: Option<u32>) -> bool {
     if !operated_by_cpu || entry <= 0 || entry >= 8 {
         return false;
     }
@@ -121,7 +121,7 @@ impl RoleTable {
         if accessor == 0
             || key.entry != receipt.entry
             || !self.current(receipt)
-            || !is_cpu_role(receipt.scene, i32::from(key.entry), true)
+            || !is_cpu_role(receipt.scene, i32::from(key.entry), true, None)
         {
             return false;
         }

@@ -537,7 +537,13 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
     let Some(receipt) = receipt.filter(|_| current_frame) else { return };
     let scene = scene_now.unwrap_or(Scene::Training);
     let lobby = scene == Scene::Lobby;
-    if !is_cpu_role(scene, entry, reset_hub::cpu_operated(fighter)) {
+    // Training's No. of CPUs decides whether an entry above 1 is a CPU or one of TR's parked entries (`is_cpu_role`).
+    let cpus = if scene == Scene::Training && entry >= 2 {
+        crate::runtime::roster::character_roster::training_cpu_quantity()
+    } else {
+        None
+    };
+    if !is_cpu_role(scene, entry, reset_hub::cpu_operated(fighter), cpus) {
         with(|cpu| cpu.roles.forget(accessor));
         return;
     }
