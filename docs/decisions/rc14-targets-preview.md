@@ -4,8 +4,7 @@ Test-run footage from Eden, 2026-11-14. Untested on hardware.
 
 ## Newest takes (the rc.14 build, footer "rc14 8199c696", shot about 23:50Z)
 
-The practice-game notice now sits in a band at the top. More takes on this build (the layout list, the CPU as the
-target) will be added here.
+The practice-game notice now sits in a band at the top. The layout-list take on this build will be added here.
 
 **Break the Targets, saved layouts (new):** on Battlefield, three targets are placed, and ZL + Down saves them as
 Layout 1. Y twice clears the stage. A second course is placed higher and saved as Layout 2. ZL + Right steps to the
@@ -22,6 +21,11 @@ from 0 to 1.
 for about three seconds. A Fast one settles in about half a second.
 
 ![Eggs-ercise target speed, Slow beside Fast](rc14-preview-eggs-speed.gif)
+
+**Target: CPU:** on 10 targets, the Target row is switched from Disc to CPU. Fox jabs the CPU three times and the notice
+counts 1/10, 2/10, 3/10. After each counted hit the CPU is put back at a fresh spot at 0 %. No disc appears.
+
+![Eggs-ercise with the CPU as the target, on the rc.14 build](rc14-preview-eggs-cpu-target-v2.gif)
 
 ## Earlier takes (the draft build)
 
