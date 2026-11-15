@@ -442,6 +442,9 @@ timer.
 ![Eggs-ercise 1 minute: the row set from Off to 1 minute, the menu closed, Fox chases the launched target and a neutral air breaks it](../media/rc14-eggs-1-minute.gif)<br>
 *Practice games > Eggs-ercise: Right turns Off into 1 minute and the menu closes. The notice reads "Eggs 0 0:59" and counts down; Fox chases the target the game launches and a neutral air breaks it: "Eggs 1". Eden, rc.14 (untested on hardware).*
 
+![Eggs-ercise 10 targets: the row set from Off to 10 targets, the menu closed, Fox breaks the targets one after another and the count climbs from 0/10 to 9/10; the tenth break stops the clock: Done! 10 in 0:15.53](../media/rc14-eggs-n-targets.gif)<br>
+*Practice games > Eggs-ercise: Right twice turns Off into 10 targets and the menu closes. The notice reads "Eggs 0/10   0:00.00" and the clock counts up in hundredths; Fox chases each target and breaks it, and the count climbs ("Eggs 3/10", "7/10", "9/10"). The tenth break stops the clock: "Done! 10 in 0:15.53 (best 0:15.53)". Eden, rc.14 (untested on hardware).*
+
 To go again, press L+R+A in Training (with **L+R+A Reset** On), or open and close the menu: either one starts a new run
 from 0.
 Changing the stage starts a new run too. A fighter cycle or a save-state load keeps the run going. Off removes the
