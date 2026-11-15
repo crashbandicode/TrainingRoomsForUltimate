@@ -207,6 +207,28 @@ fn hide_cpu_panel_rule() {
     assert_eq!(ticks, [None, Some(false), Some(false), Some(true), None]);
 }
 
+#[test]
+fn hide_cpu_panel_follows_the_entry() {
+    // The panel is the hidden body's own entry's part, whatever entry the CPU has: never an assumed `p2`.
+    for entry in 1..8u8 {
+        let mut cpu = cpu(&[("hide_cpu", &ON)]);
+        let key = FighterKey::new(i32::from(entry), false).unwrap();
+        assert_eq!(tag_and_panels(&mut cpu, key, false), (Some(false), 1 << entry), "entry {entry}");
+        let parts: Vec<_> = (0..8).filter(|e| cpu.hidden_panels() & (1 << e) != 0).filter_map(hide::panel_part).collect();
+        assert_eq!(parts, [[b'p', b'1' + entry]], "entry {entry}: only its own part");
+        // Ice Climbers' Nana is the same entry: the same part.
+        let nana = FighterKey::new(i32::from(entry), true).unwrap();
+        assert_eq!(tag_and_panels(&mut cpu, nana, false), (Some(false), 1 << entry));
+    }
+    // Two CPU entries hidden at once: both parts, and Player 1's (`p1`) never.
+    let mut two = cpu(&[("hide_cpu", &ON)]);
+    for entry in [1, 3] {
+        frame(&mut two, FighterKey::new(entry, false).unwrap(), false);
+    }
+    assert_eq!(two.hidden_panels(), (1 << 1) | (1 << 3));
+    assert_eq!(two.hidden_panels() & 1, 0);
+}
+
 fn cpu_with_factory() -> Cpu {
     cpu(&[])
 }
