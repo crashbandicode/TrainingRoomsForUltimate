@@ -102,9 +102,10 @@ windbox on his arm while he throws the crown. Palutena's Counter and Greninja's 
 Some moves push through a wind area instead of a hitbox. Windboxes draws those too: a see-through deep blue box or
 circle where the wind blows, with a white line, edged in dark so it shows on a pale stage, pointing the way it pushes. A
 dot in the middle means the wind has no one direction. The wind areas of what a fighter throws or summons are drawn too,
-such as the pillar of Ness's PK Fire, Samus's bomb and Palutena's Explosive Flame; Zelda's Triforce of Wisdom, which
-pulls, and Hero's Kaboom make theirs the same way. An item's wind area is drawn the same way, such as the one Sheik's
-Burst Grenade makes when it explodes.
+such as the pillar of Ness's PK Fire, Samus's bomb and Palutena's Explosive Flame. Zelda's Triforce of Wisdom, which
+pulls, and Hero's Kaboom make theirs the same way: they take the same path, but were not filmed on their own. An item's
+wind area is drawn the same way, such as the one Sheik's Burst Grenade makes when it explodes; other items, such as the
+Gust Bellows or a Poké Ball's Pokémon, take that path too and were not filmed on their own.
 Stage hazards are not drawn, such as Pac-Land's fire hydrant.
 
 These fighters have moves with a wind area. Eden tried the special moves and smashes of every fighter whose moves can
