@@ -161,7 +161,8 @@ A dot means the hit carries the fighter along with the attack. With Hitboxes not
 A round box is a disc; a long one, such as a sword's hitbox or an arm's hurtbox, is one pill. The shapes are flat and
 drawn over the stage and the fighters. While the camera pans they trail by a frame or two.
 
-![Hitbox Visualization turned on: the yellow hurtboxes, then at 1/4 speed a neutral air's red hitbox](../media/rc11-hitbox.gif)
+![Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked: the yellow hurtbox pills, then at 1/4 speed a neutral air's red hitbox](../media/rc14-hitbox.gif)<br>
+*Display & Controls > On screen > Hitbox Visualization, A: the checklist (its help line: Tick what to draw. Windboxes: hits that push or pull without hitstun. Launch angles: where each hit sends.). A ticks Hitboxes, Grab boxes and Hurtboxes, B goes back, and the menu closes onto both fighters' hurtboxes as yellow pills, one pill for each long limb or the torso. At 1/4 speed Mario's short hop and neutral air show its red hitbox; the menu footer reads 0.2.0-rc.14 · rc14 17e50cd0. Eden, rc.14 (untested on hardware).*
 
 ![At 1/4 speed, Ridley's hurtboxes as yellow pills, and his tail attacks' hitbox as one red pill along the tail](../media/rc13-pills.gif)
 

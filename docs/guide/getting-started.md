@@ -5,8 +5,8 @@ local play. Hitboxes, save states, recordings, combo drills, game speed and more
 button chord. It is a Skyline plugin for game version 13.0.5. It is an unofficial fan project (MIT license), not
 affiliated with or endorsed by Nintendo.
 
-![The menu's five pages, then Hitbox Visualization turned on and a neutral air's red hitbox](../media/rc11-menu-tour.gif)<br>
-*The menu, then hitboxes on. Eden, rc.11.*
+![The menu's five pages, then Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked, both fighters' hurtboxes as yellow pills and a neutral air's red hitbox](../media/rc14-menu-tour.gif)<br>
+*The menu's five pages, then Hitbox Visualization with Hitboxes, Grab boxes and Hurtboxes ticked. Eden, rc.14 (untested on hardware).*
 
 This page takes you from an empty card to your first practice. Something not working?
 [Troubleshooting](troubleshooting.md) lists what you may see and what to do.

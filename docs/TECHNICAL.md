@@ -8,11 +8,11 @@ rc.13's and rc.14's are on their Forgejo release pages, linked from [CURRENT-REL
 
 Practice tools for Training mode and the online waiting rooms of Super Smash Bros. Ultimate 13.0.5, as a Skyline plugin.
 
-**Clip** [`rc11-menu-tour.gif`](media/rc11-menu-tour.gif): The TrainingRooms menu: the five pages, then Hitbox Visualization turned On and a neutral air's hitbox
+**Clip** [`rc14-menu-tour.gif`](media/rc14-menu-tour.gif): The TrainingRooms menu: the five pages, then Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked, and a neutral air's hitbox
 
-*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Training, Mario vs Palutena with nothing drawn; the menu on CPU, then Saves,
-Recording, Fighters & Stages and Display & Controls; Hitbox Visualization from Off to On; back in Training yellow
-hurtboxes cover both fighters; at 1/4 speed Mario's neutral air shows its red hitbox. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
+*Eden, 2026-11-15, rc.14 `17e50cd0` (diag NRO `addcdd7e`, footer 0.2.0-rc.14 · rc14 17e50cd0, log lines only), Training, Mario vs Palutena with nothing drawn; the menu on CPU, then Saves,
+Recording, Fighters & Stages and Display & Controls; Hitbox Visualization opens a checklist (its help line: Tick what to draw. Windboxes: hits that push or pull without hitstun. Launch angles: where each hit sends.), A ticks Hitboxes, Grab boxes and Hurtboxes; back in Training
+both fighters' hurtboxes are yellow pills; at 1/4 speed Mario's neutral air shows its red hitbox. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 ## Install
 
@@ -78,10 +78,10 @@ their own build; see [MEDIA.md](MEDIA.md).
 
 ### Hitboxes and grab boxes
 
-**Clip** [`rc11-hitbox.gif`](media/rc11-hitbox.gif): Hitbox Visualization turned On; the hurtboxes; at 1/4 speed a neutral air's red hitbox, held
+**Clip** [`rc14-hitbox.gif`](media/rc14-hitbox.gif): Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked; the hurtboxes as pills; at 1/4 speed a neutral air's red hitbox, held
 
-*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Training with nothing drawn; Display & Controls › Hitbox Visualization from Off to On;
-back in Training the yellow hurtboxes cover both fighters; R + D-pad Up steps the speed to 1/4, and Mario's short-hop
+*Eden, 2026-11-15, rc.14 `17e50cd0` (diag NRO `addcdd7e`, footer 0.2.0-rc.14 · rc14 17e50cd0, log lines only), Training with nothing drawn; Display & Controls › Hitbox Visualization opens a checklist
+(its help line: Tick what to draw. Windboxes: hits that push or pull without hitstun. Launch angles: where each hit sends.), A ticks Hitboxes, Grab boxes and Hurtboxes, B goes back; in Training the yellow hurtbox pills cover both fighters; R + D-pad Up steps the speed to 1/4, and Mario's short-hop
 neutral air keeps its red hitbox on screen for over a second (the frame strip's lane turns red with it). Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 Hitbox Visualization (Display & Controls) draws the fighters' hurtboxes (yellow), hitboxes and grab boxes. Since rc.3

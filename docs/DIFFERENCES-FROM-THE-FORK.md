@@ -18,7 +18,8 @@ This page lists only the changes, each checked against the code of 0.2.0-rc.3 (`
 
 ## Menu
 
-![The five pages](media/rc11-menu-tour.gif)
+![The five pages, then Hitbox Visualization's checklist and the hurtboxes as pills](media/rc14-menu-tour.gif)<br>
+*The five pages of the menu, then Hitbox Visualization with three rows ticked. Eden, rc.14 (untested on hardware).*
 
 | Change | Where in the code |
 | --- | --- |

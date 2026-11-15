@@ -3,7 +3,8 @@
 Every TrainingRooms setting is in one menu with five pages. This page explains how to open it, move around it and
 change a row. What each row does is on the page's own doc, linked below.
 
-![The five pages of the menu, then Hitbox Visualization turned on and a neutral air's red hitbox](../media/rc11-menu-tour.gif)
+![The menu's five pages, then Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked, both fighters' hurtboxes as yellow pills and a neutral air's red hitbox](../media/rc14-menu-tour.gif)<br>
+*The five pages in order; on Display & Controls, Hitbox Visualization opens a checklist: A ticks a row, Down moves, B goes back. Eden, rc.14 (untested on hardware).*
 
 ## Opening and closing
 

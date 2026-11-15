@@ -7,7 +7,8 @@ local play: hitboxes, save states, recordings, combo drills, game speed and more
 install it and what is known not to work are on that page. New here? Start with [Getting started](docs/guide/getting-started.md). Something not
 working? See [Troubleshooting](docs/guide/troubleshooting.md).
 
-![The menu's five pages, then Hitbox Visualization turned on and a neutral air's red hitbox](docs/media/rc11-menu-tour.gif)<br>*The menu, then hitboxes on*
+![The menu's five pages, then Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked, both fighters' hurtboxes as yellow pills and a neutral air's red hitbox](docs/media/rc14-menu-tour.gif)<br>
+*The menu's five pages, then Hitbox Visualization: A ticks Hitboxes, Grab boxes and Hurtboxes, and both fighters are drawn as yellow pills. Eden, rc.14 (untested on hardware).*
 
 Every option is documented in the [docs](docs/README.md), one page per menu page.
 
@@ -112,7 +113,8 @@ All the options: [the Fighters & Stages page](docs/menu/fighters-and-stages.md).
 
 See attack, hurt and grab boxes: in **Display & Controls → Hitbox Visualization**, tick Hitboxes, Grab boxes and Hurtboxes.
 
-![Hitbox Visualization turned on: the yellow hurtboxes, then at 1/4 speed a neutral air's red hitbox](docs/media/rc11-hitbox.gif)<br>*Hitboxes and hurtboxes on*
+![Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked: the yellow hurtbox pills, then at 1/4 speed a neutral air's red hitbox](docs/media/rc14-hitbox.gif)<br>
+*Hitboxes, Grab boxes and Hurtboxes ticked: the hurtboxes are yellow pills, and at 1/4 speed Mario's neutral air shows its red hitbox. Eden, rc.14 (untested on hardware).*
 
 The grab boxes are magenta:
 
