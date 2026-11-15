@@ -291,6 +291,9 @@ impl std::fmt::Display for CacheText {
         use crate::engine::swap::body_bank::Hold;
         let held = fighters.held;
         match (failed > 0, fighters.hold.filter(|_| held > 0)) {
+            // rc.14 mem-headroom: the next pause frees the room these wait for (speculative helpers, `give_back`).
+            (true, Some(Hold::Memory)) if fighters.room_at_pause => write!(f, " ({} failed, {} load after you pause)", failed, held)?,
+            (false, Some(Hold::Memory)) if fighters.room_at_pause => write!(f, " ({} load after you pause)", held)?,
             (true, Some(hold)) => {
                 let what = if hold == Hold::Memory { "memory" } else { "pool space" };
                 // restriction: preload-failed-and-waiting
@@ -352,7 +355,7 @@ impl CacheStatus {
 
     /// What the notice shows, without what changes afterwards for no reader's benefit: a settled
     /// result is the same whether a prefetched group has since been built, so that is no change.
-    fn shown_key(self) -> (u8, u8, u8, u8, u8, u8) {
+    fn shown_key(self) -> (u8, u8, u8, u8, u8, u8, bool) {
         let (class, swap) = match self.progress() {
             Progress::Hidden => (0, 0),
             Progress::Loading => (1, 0),
@@ -361,7 +364,9 @@ impl CacheStatus {
             Progress::Waiting => (3, self.fighters.swap),
             Progress::Partial | Progress::Done | Progress::Ready => (4, 0),
         };
-        (class, self.fighters.loaded(), self.fighters.planned, self.fighters.failed, swap, self.fighters.held)
+        // rc.14 mem-headroom: "waiting for memory" turning into "load after you pause" is a change shown.
+        (class, self.fighters.loaded(), self.fighters.planned, self.fighters.failed, swap, self.fighters.held,
+            self.fighters.room_at_pause && self.fighters.held > 0)
     }
 
     pub fn announce(self, shown: Option<Self>, paused_polls: u8) -> bool {

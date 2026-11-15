@@ -7,7 +7,7 @@
 //! | Consumer | Admission | Held while |
 //! | --- | --- | --- |
 //! | group prefetch (`body_bank`, `Step::Start`) | discretionary: Admit / Defer / Refuse (group fails, canonical) | prefetching: all; prefetched: its build |
-//! | helper source load (`sources::service`), speculative | discretionary: refused = stays planned, retried | in flight: all |
+//! | helper source load (`sources::service`), speculative | discretionary, beside what the cycle waits for ([`admit_speculative`]): refused = stays planned, retried | in flight: all |
 //! | helper owner creation for a speculative target (`sources::create_capacity`) | with the load it hosts, beside what the cycle waits for | (that load) |
 //! | speculative load on a created entry (`sources::service`) | discretionary, beside what the cycle waits for ([`admit_created`]) | in flight: all |
 //! | helper source load for a visible request (demand) | not refused here | in flight: all |
@@ -66,4 +66,12 @@ pub(crate) fn admit_created(cost: GroupCost) -> (Decision, MemorySample) {
     let sample = MemorySample::capture();
     let headroom = headroom(&sample);
     (memory::created_admission(headroom, outstanding(), cycle_waiting(), cost), sample)
+}
+
+/// rc.14 mem-headroom F1: a speculative helper load, on a seat as on a created entry: [`admit`] that also leaves
+/// [`cycle_waiting`] (`memory::speculative_admission`).
+pub(crate) fn admit_speculative(cost: GroupCost) -> (Decision, MemorySample) {
+    let sample = MemorySample::capture();
+    let headroom = headroom(&sample);
+    (memory::speculative_admission(headroom, outstanding(), cycle_waiting(), cost), sample)
 }

@@ -1201,11 +1201,11 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
                 .and_then(|bank| bank.groups.iter().enumerate().find(|(_, g)| matches!(g.state, GroupState::Held(_)))
                     .map(|(group, g)| (bank.owner, group, *g.members, g.state)));
             let Some((owner, group, members, state)) = held else { continue; };
-            let refused = state == GroupState::Held(Hold::Memory) && matches!(
-                super::process_memory::admit(memory::group_cost(&members.kinds()[..members.count()])).0.admission,
-                Admission::Refuse);
-            if let Some(reason) = still_short(state, refused, pool_free, members.count()) {
-                release_for_capacity(owner, group, reason);
+            let decision = (state == GroupState::Held(Hold::Memory))
+                .then(|| super::process_memory::admit(memory::group_cost(&members.kinds()[..members.count()])).0)
+                .filter(|decision| matches!(decision.admission, Admission::Refuse));
+            if let Some(reason) = still_short(state, decision.is_some(), pool_free, members.count()) {
+                release_for_capacity(owner, group, reason, decision.map(|d| d.need.saturating_sub(d.available)));
             }
         }
     }
@@ -1399,6 +1399,9 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
     // or a release decided for it is in progress; "waiting for memory" means nothing more can be freed.
     let settled = RELEASE_WATCH.lock().settled();
     let coming = room_coming(settled, (0..2).any(releasing));
+    // rc.14 mem-headroom F2: helpers marked to give their memory back free it at the next pause (the source lock, before
+    // any bank lock).
+    let at_pause = super::sources::give_back_pending();
     for (role, state) in BANKS.iter().enumerate() {
         let planned = PLANNED_TARGETS[role].load(Ordering::Acquire);
         let releasing = RELEASE_MEMBERS[role].load(Ordering::Acquire);
@@ -1432,7 +1435,16 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
         // The Waiting text names the role whose own swap its unstarted fighters wait for.
         result.swap |= counts.swap_owed(role);
     }
+    result.room_at_pause = at_pause && result.held > 0 && result.hold == Some(Hold::Memory);
     result
+}
+
+/// rc.14 mem-headroom F2: the pause retired helpers (`sources::give_back_at_pause`): their room is on its way, as a parked
+/// group's free (the release watch: nothing more is freed for capacity, and a group held for memory shows as loading,
+/// until the game has unloaded their files and the purge ran).
+pub(super) fn note_room_freed() {
+    let mut watch = RELEASE_WATCH.lock();
+    *watch = watch.freed();
 }
 
 /// A kind held by any of this role's groups (window or extra): helper look-ahead
@@ -3331,7 +3343,13 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
     // (WORKPLAN §2.4, declared behaviour change); silent once nothing is left to clear.
     if observed.loader == 0 && observed.outer == 3 && observed.installed != 0 { retire_window(entry, owner, "reload", false); }
     let started = now_us();
-    let step = match service_locked(entry, owner, role) {
+    let action = service_locked(entry, owner, role);
+    #[cfg(feature = "diag")]
+    {
+        let owed = CENSUS_OWED.swap(u32::MAX, Ordering::AcqRel);
+        if owed != u32::MAX { census(owed); }
+    }
+    let step = match action {
         Action::None => return,
         Action::Swap => { perform_swap(entry, owner, role); "swap" }
         Action::Lifecycle => { group_lifecycle(entry, owner, role); "lifecycle" }
@@ -3340,6 +3358,33 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
         Action::Background => { settle_background(entry, owner, role); "background settle" }
     };
     slow_step(owner, step, started);
+}
+
+/// rc.14 mem-headroom (diag): the owner whose `[BodyBank] ready` owes a `[MemoryCensus]` line, or `u32::MAX`.
+#[cfg(feature = "diag")]
+static CENSUS_OWED: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(u32::MAX);
+
+/// rc.14 mem-headroom (the primary 2026-11-15: the final pass measures where the process budget goes): one line after a
+/// `[BodyBank] ready`, under no lock of its own caller: the process charge, the fighter pool, each role's resident bank
+/// bodies (window, Built groups), the helper sources (seats and created entries, `sources::census_helpers`), the module
+/// pins of kept groups and the object-module holds. Each bank lock, then the source lock, in turn.
+#[cfg(feature = "diag")]
+unsafe fn census(owner: u32) {
+    let sample = MemorySample::capture();
+    let pool = pool_counts(BASE.load(Ordering::Acquire)).map(|(capacity, live)| (live, capacity));
+    let mut bank = [(0u8, 0u8); 2];
+    let mut objects = 0u8;
+    for (role, counts) in bank.iter_mut().enumerate() {
+        if let Some(b) = BANKS[role].lock().as_ref().filter(|b| !b.departed && b.phase != Phase::Retired) {
+            let groups = b.groups.iter().filter(|g| g.state == GroupState::Built).map(|g| g.members.count()).sum::<usize>();
+            *counts = (b.members.count().min(255) as u8, groups.min(255) as u8);
+            objects = objects.saturating_add(b.groups.iter().filter(|g| g.object_module != 0).count().min(255) as u8);
+        }
+    }
+    let pins = [module_pins::count(0).min(255) as u8, module_pins::count(1).min(255) as u8];
+    let helpers = super::sources::census_helpers();
+    trace!("{}", crate::engine::preload::give_back::Census { owner, headroom: sample.headroom(),
+        committed: sample.committed.get(), pool, bank, helpers, pins, objects });
 }
 
 /// Logged once: the service hook ran on a thread other than MainThread while a purge was owed (it waits for one that is).
@@ -3471,6 +3516,9 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
             if bank.phase != Phase::Ready || bank.bodies != now {
                 trace!("[BodyBank] ready owner={} index={} kind=0x{:x} previous={:?} bodies={:?} headroom={}",
                     owner, index, members.kinds()[index as usize], bank.phase, now, headroom_now());
+                // rc.14 mem-headroom: the per-consumer census follows once this bank lock is released (`service`).
+                #[cfg(feature = "diag")]
+                CENSUS_OWED.store(owner, Ordering::Release);
                 #[cfg(feature = "diag")]
                 crate::runtime::roster::identity_view::report(owner, resource(BASE.load(Ordering::Acquire), owner).unwrap_or(0), "ready");
                 if members.is_pair_lead() {
@@ -6680,7 +6728,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                     trace!("[GroupSwap] held owner={} group={} reason=fighter pool {}/{} reserve {} < {} bodies; retried",
                         owner, group, live, capacity, POOL_RESERVE, members.count());
                 }
-                release_for_capacity(owner, group, "fighter pool");
+                release_for_capacity(owner, group, "fighter pool", None);
                 return;
             }
             // GS-PANIC: the group's measured cost (prefetch + build) against the headroom every other consumer has
@@ -6713,7 +6761,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                             owner, group, headroom, decision.need, &members.kinds()[..members.count()], decision.outstanding,
                             cost.prefetch, cost.build);
                     }
-                    release_for_capacity(owner, group, "process headroom");
+                    release_for_capacity(owner, group, "process headroom", Some(decision.need.saturating_sub(decision.available)));
                     return;
                 }
             }
@@ -7104,9 +7152,11 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
 /// Operator rule 2026-11-09 (inbox 13:21Z): a prefetch refused for process memory or fighter-pool bodies while groups are
 /// parked frees one of them now (`body_bank::capacity_release`: the fewest members the cycle keeps, then the fewest
 /// bodies; never one a committed switch targets), unless one is going already. The refused group is retried after it, so
-/// parked groups go one at a time and only while refusals last; a refusal with nothing parked stays "waiting for memory".
+/// parked groups go one at a time and only while refusals last. rc.14 mem-headroom F2: a memory refusal (`shortfall`, the
+/// bytes it lacks) with nothing parked, once the release watch settled, marks the farthest idle created helpers that make
+/// the room (`sources::give_back_for`); the next pause retires them. With none, it stays "waiting for memory".
 /// Value-only (the entry tick frees the group, `leaves_now`); never under the bank lock.
-fn release_for_capacity(owner: u32, group: usize, reason: &str) {
+fn release_for_capacity(owner: u32, group: usize, reason: &str, shortfall: Option<u64>) {
     // Operator rule 2026-11-09 16:06Z: an earlier free's room still arriving is room on its way; nothing more goes.
     let settled = RELEASE_WATCH.lock().settled();
     let mut parked = FixedList::<((usize, usize), Members, u8), { 2 * MAX_EXTRA_GROUPS }>::new(((0, 0), Members::pair_group(), 0));
@@ -7119,7 +7169,12 @@ fn release_for_capacity(owner: u32, group: usize, reason: &str) {
             if bank.swap.is_none_or(|s| s.group != index) { parked.push(((role, index), *g.members, g.parked_kept)); }
         }
     }
-    let Some((role, index)) = capacity_release(settled, parked.iter().copied()) else { return; };
+    let Some((role, index)) = capacity_release(settled, parked.iter().copied()) else {
+        if let Some(shortfall) = shortfall.filter(|_| settled && parked.is_empty()) {
+            super::sources::give_back_for(owner, group, shortfall);
+        }
+        return;
+    };
     let mut state = BANKS[role].lock();
     let Some(bank) = state.as_mut() else { return; };
     let parked_owner = bank.owner;

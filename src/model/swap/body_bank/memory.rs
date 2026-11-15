@@ -213,8 +213,7 @@ pub fn created_admission(headroom: Option<u64>, outstanding: u64, waiting: u64, 
 /// and 3) as on a created entry. A seat's load used [`admit`] alone and took the room a group held for memory waited
 /// for (Eden smoke2r-2 #6912: seat 2 held for Pyra while the CPU's `[5a, 5b]` group waited).
 pub fn speculative_admission(headroom: Option<u64>, outstanding: u64, waiting: u64, cost: GroupCost) -> Decision {
-    let _ = waiting;
-    admit(headroom, outstanding, cost)
+    created_admission(headroom, outstanding, waiting, cost)
 }
 
 #[cfg(test)]

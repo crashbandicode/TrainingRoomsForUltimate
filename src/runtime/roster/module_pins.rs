@@ -87,6 +87,10 @@ pub(crate) unsafe fn pin(r: Option<usize>, role: usize, group: Members) -> bool 
 
 pub(crate) fn held(role: usize) -> bool { !PINS[role].lock().is_empty() }
 
+/// rc.14 mem-headroom (diag census): how many kinds' modules this role's kept groups pin.
+#[cfg(feature = "diag")]
+pub(crate) fn count(role: usize) -> usize { PINS[role].lock().len() }
+
 /// rc.14 a-full-2 (boot a2-99b9083f-y1, integration-3's smoke2: `0x33c23f8` read the vtable of an Aegis holder's article
 /// in the unloaded `0x75` module): the bank gives a group's object-kind token back right after its holder step, which drops
 /// R's node for that kind's NRO while the holder still runs code from it. Before that, the group takes one reference of

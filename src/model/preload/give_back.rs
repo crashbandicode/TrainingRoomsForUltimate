@@ -27,14 +27,25 @@ pub struct Candidate {
 /// them when every idle helper together would not cover it: they stay loaded (what doesn't fit stays cold, what fits
 /// stays hot).
 pub fn choose(candidates: &[Candidate], shortfall: u64) -> u8 {
-    let _ = (candidates, shortfall);
-    0
+    let mut order = [None; 8];
+    for (at, candidate) in order.iter_mut().zip(candidates.iter().filter(|c| c.idle && c.slot < 8)) {
+        *at = Some(*candidate);
+    }
+    // Farthest first: a helper the plan no longer wants, then the highest place; the lower slot of equals.
+    order.sort_unstable_by_key(|c| c.map(|c| (std::cmp::Reverse(c.place.map_or(u16::MAX, u16::from)), c.slot)));
+    let mut marked = 0u8;
+    let mut freed = 0u64;
+    for candidate in order.iter().flatten() {
+        if freed >= shortfall { break; }
+        marked |= 1 << candidate.slot;
+        freed = freed.saturating_add(candidate.cost);
+    }
+    if freed >= shortfall { marked } else { 0 }
 }
 
 /// At the pause: the marked slots retired now. Only while the cycle still waits for memory, and only slots still idle.
 pub fn at_pause(marked: u8, idle: u8, cycle_waits: bool) -> u8 {
-    let _ = (marked, idle, cycle_waits);
-    0
+    if cycle_waits { marked & idle } else { 0 }
 }
 
 /// One helper entry in the census: its slot, its source's kind, Ready, leased, marked to give its memory back.

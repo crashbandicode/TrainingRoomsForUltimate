@@ -5224,7 +5224,7 @@
    "dest": "src/model/swap/body_bank/memory.rs",
    "crate": "consts",
    "src_sha256": "bfbc9c80a215184a125634c4b90fbf97c63007608db892a95df466d784869915",
-   "dest_sha256": "0f5a7926e8656fc9902a9f304cda0154e4953ddabdbaab0c22e45105cb51472e",
+   "dest_sha256": "44c3c6baa3edfbe93555f4d04d3e0665a7b5236bb5c97fc35c1a0af9ce1a17f3",
    "edits": [
     {
      "old": "        GroupState::Prefetching => with_margin(cost.total()),\n        GroupState::Prefetched => with_margin(cost.build),\n        GroupState::Planned | GroupState::Built | GroupState::Failed => 0,\n    }\n}\n",
@@ -5316,6 +5316,11 @@
      "old": "            (\"a_created_entry_gives_way_to_what_the_cycle_waits_for\", a_created_entry_gives_way_to_what_the_cycle_waits_for as fn()),\n        ]);\n",
      "new": "            (\"a_created_entry_gives_way_to_what_the_cycle_waits_for\", a_created_entry_gives_way_to_what_the_cycle_waits_for as fn()),\n            (\"a_seat_speculative_load_leaves_what_the_cycle_waits_for\", a_seat_speculative_load_leaves_what_the_cycle_waits_for as fn()),\n        ]);\n",
      "reason": "rc.14 mem-headroom fail-first: fail-first cases and model stubs: a seat's speculative admission, the room_at_pause notice field (the primary 2026-11-15)"
+    },
+    {
+     "old": "    let _ = waiting;\n    admit(headroom, outstanding, cost)\n",
+     "new": "    created_admission(headroom, outstanding, waiting, cost)\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
     }
    ]
   },
@@ -8928,7 +8933,7 @@
    "dest": "src/model/preload/cycle_preload_policy.rs",
    "crate": "root",
    "src_sha256": "8f006ae6d6f978d500da383c4edbb5e731d9b91e19fa7b3e18037e73224ae7b2",
-   "dest_sha256": "bc039110bf349fd9629cdc4eb3c4713c2dc8221bca704802df61bc96b7f31873",
+   "dest_sha256": "51bcb15f5c1c526e3d0ee7cb9c9cf4023730ae71f45005769ad4207713500b21",
    "edits": [
     {
      "old": "/// CPU's fighter look-ahead. Each CPU fighter that `merge` would place before the last Player hat\n/// moves, in its own order, to just behind that hat; every other pair of targets keeps `merge`'s\n/// order, and a target in both lanes keeps the earlier, hat position. The cost is the CPU's next\n/// swap, which may then find no warm helper for its fighter. Without a Player hat this is `merge`.\npub fn merge_player_hats_first<T: Copy + Eq, const N: usize>(lanes: [[Option<T>; N]; 4], slots: u8) -> [Option<T>; N] {\n    let mut order: Vec<(usize, T)> = Vec::with_capacity(4 * N);\n    for depth in 0..N {\n        for (lane, targets) in lanes.iter().enumerate() {\n            if let Some(target) = targets[depth] {\n                order.push((lane, target));\n            }\n        }\n    }\n    if let Some(last_hat) = order.iter().rposition(|(lane, _)| *lane == PLAYER_HATS) {\n        let (head, tail) = order.split_at(last_hat + 1);\n        let mut ranked: Vec<(usize, T)> = head.iter().copied().filter(|(lane, _)| *lane != CPU_FIGHTERS).collect();\n        ranked.extend(head.iter().copied().filter(|(lane, _)| *lane == CPU_FIGHTERS));\n        ranked.extend_from_slice(tail);\n        order = ranked;\n    }\n    let limit = usize::from(slots).min(crate::engine::preload::cycle_preload_capacity::MAX_TARGETS).min(N);\n    let mut result = [None; N];\n    let mut count = 0;\n    for (_, target) in order {\n        if count >= limit {\n",
@@ -9187,6 +9192,21 @@
      "old": "            (\"held_fighters_read_waiting_not_failed\", held_fighters_read_waiting_not_failed as fn()),\n            (\"the_waiting_text_names_the_role_that_must_swap\", the_waiting_text_names_the_role_that_must_swap as fn()),\n",
      "new": "            (\"held_fighters_read_waiting_not_failed\", held_fighters_read_waiting_not_failed as fn()),\n            (\"waiting_for_memory_shows_only_when_nothing_is_left_to_free\", waiting_for_memory_shows_only_when_nothing_is_left_to_free as fn()),\n            (\"the_waiting_text_names_the_role_that_must_swap\", the_waiting_text_names_the_role_that_must_swap as fn()),\n",
      "reason": "rc.14 mem-headroom fail-first: fail-first cases and model stubs: a seat's speculative admission, the room_at_pause notice field (the primary 2026-11-15)"
+    },
+    {
+     "old": "        match (failed > 0, fighters.hold.filter(|_| held > 0)) {\n            (true, Some(hold)) => {\n",
+     "new": "        match (failed > 0, fighters.hold.filter(|_| held > 0)) {\n            // rc.14 mem-headroom: the next pause frees the room these wait for (speculative helpers, `give_back`).\n            (true, Some(Hold::Memory)) if fighters.room_at_pause => write!(f, \" ({} failed, {} load after you pause)\", failed, held)?,\n            (false, Some(Hold::Memory)) if fighters.room_at_pause => write!(f, \" ({} load after you pause)\", held)?,\n            (true, Some(hold)) => {\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "    fn shown_key(self) -> (u8, u8, u8, u8, u8, u8) {\n",
+     "new": "    fn shown_key(self) -> (u8, u8, u8, u8, u8, u8, bool) {\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "        (class, self.fighters.loaded(), self.fighters.planned, self.fighters.failed, swap, self.fighters.held)\n",
+     "new": "        // rc.14 mem-headroom: \"waiting for memory\" turning into \"load after you pause\" is a change shown.\n        (class, self.fighters.loaded(), self.fighters.planned, self.fighters.failed, swap, self.fighters.held,\n            self.fighters.room_at_pause && self.fighters.held > 0)\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
     }
    ]
   },
@@ -14103,7 +14123,7 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "f10ce4da97f5beeddc27a0362cd7684d4b6f0fa3fae0d3018ae1c8e696328f18",
+   "dest_sha256": "3e1366a0448069855bdf64eabce9fddb155b1adf6f3396b3753f951eeb77a53e",
    "edits": [
     {
      "delete_from": "/// Skip plugin automations for an owned helper body.",
@@ -16606,6 +16626,31 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "old": "    creation_hold: Option<(SceneEpoch, u8)>,\n}\n",
+     "new": "    creation_hold: Option<(SceneEpoch, u8)>,\n    /// rc.14 mem-headroom F2: the created helper slots (one bit per slot) a cycle group held for memory needs the room of\n    /// (`give_back::choose`); the next pause retires them ([`pause_opening`]).\n    give_back: Option<(SceneEpoch, u8)>,\n}\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "    creation_hold: None,\n});\n",
+     "new": "    creation_hold: None,\n    give_back: None,\n});\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "    let _ = exposed;\n}\n",
+     "new": "    let _ = exposed;\n    give_back_at_pause();\n}\n\n/// rc.14 mem-headroom F2: a created helper slot's give-back facts (`give_back::Candidate`: its plan place, its measured\n/// cost, whether nothing uses it), its entry and its source's kind; None when the slot holds no current source on our own\n/// live created entry. Values only (STATE held by the caller).\nfn give_back_candidate(state: &State, slot: usize) -> Option<(crate::engine::preload::give_back::Candidate, usize, u32)> {\n    let index = crate::engine::preload::cycle_preload_capacity::capacity_index(slot)?;\n    let (epoch, value) = state.capacities[index].reservation?;\n    if !state.book.is_current(epoch) || value.entry == 0 || value.entry_destroyed || value.owner_retired {\n        return None;\n    }\n    let source = state.sources[slot].filter(|source| state.book.is_current(source.token.epoch())\n        && source.token.entry() == NativeEntry(value.entry as u64))?;\n    let ready = state.book.phase(slot) == Ok(Phase::Ready) && source.install.is_none();\n    let leased = state.leases.iter().flatten().any(|live| live.source == source.token);\n    let requested = state.wants.iter().flatten().any(|want| want.kind == source.kind);\n    let place = plan_targets(state).iter()\n        .position(|want| want.is_some_and(|want| want.kind == source.kind && want.configuration == source.configuration))\n        .and_then(|place| u8::try_from(place).ok());\n    let cost = crate::engine::swap::body_bank::memory::helper_cost(source.kind).total();\n    Some((crate::engine::preload::give_back::Candidate { slot: slot as u8, place, cost, idle: ready && !leased && !requested },\n        value.entry, source.kind))\n}\n\n/// rc.14 mem-headroom F2 (the primary 2026-11-15 ~06:20Z): a cycle group of `owner` is held for memory `shortfall` bytes\n/// short and no parked group is left to free (`body_bank::release_for_capacity`). The farthest idle created helpers whose\n/// room covers it are marked (`give_back::choose`; none when all of them would not make the room); the next pause\n/// retires them ([`give_back_at_pause`]). Logged when the marks change. Takes the source lock; never call it with a\n/// bank lock held.\npub(super) fn give_back_for(owner: u32, group: usize, shortfall: u64) {\n    use crate::engine::preload::cycle_preload_capacity::ALL_EXTRA_SLOTS;\n    use crate::engine::preload::give_back::{choose, Candidate};\n    let mut candidates = [Candidate { slot: 0, place: None, cost: 0, idle: false }; ALL_EXTRA_SLOTS.len()];\n    let mut kinds = [u32::MAX; 8];\n    let mut count = 0;\n    let mut state = STATE.lock();\n    for slot in ALL_EXTRA_SLOTS {\n        if let Some((candidate, _, kind)) = give_back_candidate(&state, slot) {\n            candidates[count] = candidate;\n            count += 1;\n            kinds[slot] = kind;\n        }\n    }\n    let marked = choose(&candidates[..count], shortfall);\n    let epoch = state.book.epoch();\n    let before = state.give_back.filter(|(marked_in, _)| *marked_in == epoch).map_or(0, |(_, marked)| marked);\n    state.give_back = (marked != 0).then_some((epoch, marked));\n    drop(state);\n    if marked != before {\n        crate::engine::compat::logging::diagnostic(format_args!(\n            \"[GroupSwap] give-back owner={} group={} shortfall={} marked={:#b} created={:x?} helpers={}; the next pause retires them\",\n            owner, group, shortfall, marked, kinds, count));\n    }\n}\n\n/// rc.14 mem-headroom (diag): every helper source for the `[MemoryCensus]` line, by entry slot: its kind, Ready, leased,\n/// marked to give its memory back.\n#[cfg(feature = \"diag\")]\npub(crate) fn census_helpers() -> [Option<crate::engine::preload::give_back::Helper>; 8] {\n    let state = STATE.lock();\n    let marked = state.give_back.filter(|(epoch, _)| state.book.is_current(*epoch)).map_or(0, |(_, marked)| marked);\n    std::array::from_fn(|slot| {\n        let source = state.sources[slot].filter(|source| state.book.is_current(source.token.epoch()))?;\n        Some(crate::engine::preload::give_back::Helper { slot: slot as u8, kind: source.kind,\n            ready: state.book.phase(slot) == Ok(Phase::Ready) && source.install.is_none(),\n            leased: state.leases.iter().flatten().any(|live| live.source == source.token),\n            marked: marked & (1 << slot) != 0 })\n    })\n}\n\n/// rc.14 mem-headroom F2: whether the next pause retires a marked helper (the notice's \"load after you pause\").\npub(crate) fn give_back_pending() -> bool {\n    let state = STATE.lock();\n    state.give_back.is_some_and(|(epoch, marked)| marked != 0 && state.book.is_current(epoch))\n}\n\n/// rc.14 mem-headroom F2, at the pause-open after [`pause_opening`]'s actorless retires: each marked helper still idle is\n/// retired, only while the cycle still waits for memory (`give_back::at_pause`) and no native install runs, through the\n/// same native single-slot retire and PAUSE ledger; its destructor callback ([`on_destroy`]) drops its source. The room is\n/// then on its way (`body_bank::note_room_freed`). Never mid-game: this is the only caller. No plugin lock is held across\n/// the native retire.\nunsafe fn give_back_at_pause() {\n    use super::native_source_capacity::{entry_at, entry_facts, retire_at};\n    let marked = {\n        let state = STATE.lock();\n        state.give_back.filter(|(epoch, _)| state.book.is_current(*epoch)).map_or(0, |(_, marked)| marked)\n    };\n    if marked == 0 { return; }\n    let waits = super::process_memory::cycle_waiting() > 0;\n    let install = INSTALL.active();\n    let mut idle = 0u8;\n    let mut entries = [(0usize, u32::MAX); 8];\n    {\n        let state = STATE.lock();\n        for slot in (0..8usize).filter(|slot| marked & (1 << slot) != 0) {\n            if let Some((candidate, entry, kind)) = give_back_candidate(&state, slot) {\n                if candidate.idle { idle |= 1 << slot; }\n                entries[slot] = (entry, kind);\n            }\n        }\n    }\n    let retire = if install { 0 } else { crate::engine::preload::give_back::at_pause(marked, idle, waits) };\n    let mut retired = 0u8;\n    for slot in (0..8usize).filter(|slot| retire & (1 << slot) != 0) {\n        let (entry, kind) = entries[slot];\n        let Some(index) = crate::engine::preload::cycle_preload_capacity::capacity_index(slot) else { continue; };\n        if entry == 0 || entry_at(slot) != entry || !aligned(entry as *const u8) || entry_facts(entry).phase == 3 { continue; }\n        if !PAUSE.lock().begin(index, entry) { continue; }\n        let ok = retire_at(slot, entry);\n        if ok { retired |= 1 << slot; } else { PAUSE.lock().refused(index); }\n        crate::engine::compat::logging::diagnostic(format_args!(\n            \"[GroupSwap] give-back retire slot={} entry=0x{:x} kind=0x{:x} retired={}\", slot, entry, kind, ok));\n    }\n    {\n        // Retired or not wanted any more: the marks go; a native install kept them for the next pause.\n        let mut state = STATE.lock();\n        if !install { state.give_back = None; }\n    }\n    crate::engine::compat::logging::diagnostic(format_args!(\n        \"[GroupSwap] give-back at pause marked={:#b} idle={:#b} cycle_waits={} install={} retired={:#b}\",\n        marked, idle, waits, install, retired));\n    if retired != 0 { super::body_bank::note_room_freed(); }\n}\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "        state.creation_hold = None;\n    }\n",
+     "new": "        state.creation_hold = None;\n        state.give_back = None;\n    }\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "    // rc.6 window admission (primary 2026-11-09 13:28Z): a created entry's load also leaves what the cycle waits for.\n    let memory_cost = crate::engine::swap::body_bank::memory::helper_cost(wanted.kind);\n    let memory_committed = if speculative {\n        let (decision, sample) = if is_capacity { super::process_memory::admit_created(memory_cost) } else { super::process_memory::admit(memory_cost) };\n",
+     "new": "    // rc.6 window admission (primary 2026-11-09 13:28Z): a created entry's load also leaves what the cycle waits for;\n    // rc.14 mem-headroom F1: so does a seat's (`memory::speculative_admission`).\n    let memory_cost = crate::engine::swap::body_bank::memory::helper_cost(wanted.kind);\n    let memory_committed = if speculative {\n        let (decision, sample) = super::process_memory::admit_speculative(memory_cost);\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
     }
    ]
   },
@@ -16614,7 +16659,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "ba0622114c831129b5aa044a32767f9bdf6a4588eeeba72420cb156c0666055c",
+   "dest_sha256": "b1df408e5afc10f97482e3b78d3125761b63c036bee2301a66d1a8e4525c8cd5",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -19708,6 +19753,56 @@
      "old": "                g.object_held = false;\n                g.saved = None;\n",
      "new": "                g.object_held = false;\n                // Its object module reference went with its records' destroy (`DestroyRecords::module`).\n                g.object_module = 0;\n                g.saved = None;\n",
      "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "            let refused = state == GroupState::Held(Hold::Memory) && matches!(\n                super::process_memory::admit(memory::group_cost(&members.kinds()[..members.count()])).0.admission,\n                Admission::Refuse);\n            if let Some(reason) = still_short(state, refused, pool_free, members.count()) {\n                release_for_capacity(owner, group, reason);\n",
+     "new": "            let decision = (state == GroupState::Held(Hold::Memory))\n                .then(|| super::process_memory::admit(memory::group_cost(&members.kinds()[..members.count()])).0)\n                .filter(|decision| matches!(decision.admission, Admission::Refuse));\n            if let Some(reason) = still_short(state, decision.is_some(), pool_free, members.count()) {\n                release_for_capacity(owner, group, reason, decision.map(|d| d.need.saturating_sub(d.available)));\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "    let coming = room_coming(settled, (0..2).any(releasing));\n    for (role, state) in BANKS.iter().enumerate() {\n",
+     "new": "    let coming = room_coming(settled, (0..2).any(releasing));\n    // rc.14 mem-headroom F2: helpers marked to give their memory back free it at the next pause (the source lock, before\n    // any bank lock).\n    let at_pause = super::sources::give_back_pending();\n    for (role, state) in BANKS.iter().enumerate() {\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "        result.swap |= counts.swap_owed(role);\n    }\n    result\n}\n\n",
+     "new": "        result.swap |= counts.swap_owed(role);\n    }\n    result.room_at_pause = at_pause && result.held > 0 && result.hold == Some(Hold::Memory);\n    result\n}\n\n/// rc.14 mem-headroom F2: the pause retired helpers (`sources::give_back_at_pause`): their room is on its way, as a parked\n/// group's free (the release watch: nothing more is freed for capacity, and a group held for memory shows as loading,\n/// until the game has unloaded their files and the purge ran).\npub(super) fn note_room_freed() {\n    let mut watch = RELEASE_WATCH.lock();\n    *watch = watch.freed();\n}\n\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "    let step = match service_locked(entry, owner, role) {\n",
+     "new": "    let action = service_locked(entry, owner, role);\n    #[cfg(feature = \"diag\")]\n    {\n        let owed = CENSUS_OWED.swap(u32::MAX, Ordering::AcqRel);\n        if owed != u32::MAX { census(owed); }\n    }\n    let step = match action {\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "    slow_step(owner, step, started);\n}\n",
+     "new": "    slow_step(owner, step, started);\n}\n\n/// rc.14 mem-headroom (diag): the owner whose `[BodyBank] ready` owes a `[MemoryCensus]` line, or `u32::MAX`.\n#[cfg(feature = \"diag\")]\nstatic CENSUS_OWED: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(u32::MAX);\n\n/// rc.14 mem-headroom (the primary 2026-11-15: the final pass measures where the process budget goes): one line after a\n/// `[BodyBank] ready`, under no lock of its own caller: the process charge, the fighter pool, each role's resident bank\n/// bodies (window, Built groups), the helper sources (seats and created entries, `sources::census_helpers`), the module\n/// pins of kept groups and the object-module holds. Each bank lock, then the source lock, in turn.\n#[cfg(feature = \"diag\")]\nunsafe fn census(owner: u32) {\n    let sample = MemorySample::capture();\n    let pool = pool_counts(BASE.load(Ordering::Acquire)).map(|(capacity, live)| (live, capacity));\n    let mut bank = [(0u8, 0u8); 2];\n    let mut objects = 0u8;\n    for (role, counts) in bank.iter_mut().enumerate() {\n        if let Some(b) = BANKS[role].lock().as_ref().filter(|b| !b.departed && b.phase != Phase::Retired) {\n            let groups = b.groups.iter().filter(|g| g.state == GroupState::Built).map(|g| g.members.count()).sum::<usize>();\n            *counts = (b.members.count().min(255) as u8, groups.min(255) as u8);\n            objects = objects.saturating_add(b.groups.iter().filter(|g| g.object_module != 0).count().min(255) as u8);\n        }\n    }\n    let pins = [module_pins::count(0).min(255) as u8, module_pins::count(1).min(255) as u8];\n    let helpers = super::sources::census_helpers();\n    trace!(\"{}\", crate::engine::preload::give_back::Census { owner, headroom: sample.headroom(),\n        committed: sample.committed.get(), pool, bank, helpers, pins, objects });\n}\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "                    owner, index, members.kinds()[index as usize], bank.phase, now, headroom_now());\n                #[cfg(feature = \"diag\")]\n",
+     "new": "                    owner, index, members.kinds()[index as usize], bank.phase, now, headroom_now());\n                // rc.14 mem-headroom: the per-consumer census follows once this bank lock is released (`service`).\n                #[cfg(feature = \"diag\")]\n                CENSUS_OWED.store(owner, Ordering::Release);\n                #[cfg(feature = \"diag\")]\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "                release_for_capacity(owner, group, \"fighter pool\");\n",
+     "new": "                release_for_capacity(owner, group, \"fighter pool\", None);\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "                    release_for_capacity(owner, group, \"process headroom\");\n",
+     "new": "                    release_for_capacity(owner, group, \"process headroom\", Some(decision.need.saturating_sub(decision.available)));\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "/// parked groups go one at a time and only while refusals last; a refusal with nothing parked stays \"waiting for memory\".\n/// Value-only (the entry tick frees the group, `leaves_now`); never under the bank lock.\nfn release_for_capacity(owner: u32, group: usize, reason: &str) {\n",
+     "new": "/// parked groups go one at a time and only while refusals last. rc.14 mem-headroom F2: a memory refusal (`shortfall`, the\n/// bytes it lacks) with nothing parked, once the release watch settled, marks the farthest idle created helpers that make\n/// the room (`sources::give_back_for`); the next pause retires them. With none, it stays \"waiting for memory\".\n/// Value-only (the entry tick frees the group, `leaves_now`); never under the bank lock.\nfn release_for_capacity(owner: u32, group: usize, reason: &str, shortfall: Option<u64>) {\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "    let Some((role, index)) = capacity_release(settled, parked.iter().copied()) else { return; };\n",
+     "new": "    let Some((role, index)) = capacity_release(settled, parked.iter().copied()) else {\n        if let Some(shortfall) = shortfall.filter(|_| settled && parked.is_empty()) {\n            super::sources::give_back_for(owner, group, shortfall);\n        }\n        return;\n    };\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
     }
    ]
   },
@@ -28399,7 +28494,7 @@
    "dest": "src/runtime/roster/process_memory.rs",
    "crate": "root",
    "src_sha256": "ec5971f8d90cdb2081fc1a3129a14762629d5542a7522cc1c2e5a20df4db192d",
-   "dest_sha256": "82f2015dbd34a0e9b62850bab91c63a44e617b3c087cdf5e850911430c5b2570",
+   "dest_sha256": "6266386347197067d2bac8dffb8c0cba7cd9afd026b87ac68a0deccd8f9e5c19",
    "edits": [
     {
      "old": "/// One discretionary admission against the current headroom less [`outstanding`], with the sample it used.\npub(crate) fn admit(cost: GroupCost) -> (Decision, MemorySample) {\n    let sample = MemorySample::capture();\n    (memory::admit(sample.headroom(), outstanding(), cost), sample)\n",
@@ -28440,6 +28535,16 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "old": "//! | helper source load (`sources::service`), speculative | discretionary: refused = stays planned, retried | in flight: all |\n",
+     "new": "//! | helper source load (`sources::service`), speculative | discretionary, beside what the cycle waits for ([`admit_speculative`]): refused = stays planned, retried | in flight: all |\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "    (memory::created_admission(headroom, outstanding(), cycle_waiting(), cost), sample)\n}\n",
+     "new": "    (memory::created_admission(headroom, outstanding(), cycle_waiting(), cost), sample)\n}\n\n/// rc.14 mem-headroom F1: a speculative helper load, on a seat as on a created entry: [`admit`] that also leaves\n/// [`cycle_waiting`] (`memory::speculative_admission`).\npub(crate) fn admit_speculative(cost: GroupCost) -> (Decision, MemorySample) {\n    let sample = MemorySample::capture();\n    let headroom = headroom(&sample);\n    (memory::speculative_admission(headroom, outstanding(), cycle_waiting(), cost), sample)\n}\n",
+     "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
     }
    ]
   },
