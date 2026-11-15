@@ -32,9 +32,24 @@ pub const AERIALS: u8 = 1;
 pub const STRONG: u8 = 2;
 /// `Hits of 12%+`.
 pub const STRONG_DAMAGE: f32 = 12.0;
-/// The `eggsercise_target` row's options (V2.1): the plugin's disc, or the CPU, standing still.
+/// The `eggsercise_target` row's options (V2.1): the plugin's disc, or the CPU, flying the disc's flight (the operator,
+/// 11-15; it stood still before).
 pub const DISC: u8 = 0;
 pub const CPU: u8 = 1;
+/// In flight the CPU target is never put lower than this above its ground (the launch tick, the bounce's touch): the
+/// game's own gravity moves it for one frame before the next placement, and must not land it mid-flight.
+pub const LIFT: f32 = 1.0;
+
+/// What the CPU target's pass asks of the game besides its position (`Run::cpu_pass`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Put {
+    /// Only the position (its speed cleared): every tick it is held.
+    Hold,
+    /// Afresh: 0%, and its pose: in the air (`true`, the game's fall) or standing.
+    Fresh(bool),
+    /// The flight came to rest: standing.
+    Land,
+}
 /// `Aerials`: the fighter's status is `FIGHTER_STATUS_KIND_ATTACK_AIR` (13.0.5; the pilot's move observer's value).
 pub const ATTACK_AIR: i32 = 0x36;
 /// `1 minute`, in clock ticks (D4: Player 1's game frames, so pause, menus and Game speed stretch it alike).
@@ -198,9 +213,11 @@ pub struct Run {
     pub view: Option<View>,
     /// Draw ticks the camera has held the same `view`.
     still: u32,
-    /// Whether Player 1 was in an aerial on its last pass, and the CPU target's state (`cpu_pass`).
+    /// Whether Player 1 was in an aerial on its last pass, the CPU target's state (`cpu_pass`), and whether it was last
+    /// put in the air.
     air: bool,
     cpu: u8,
+    aloft: bool,
     /// The session's bests per fighter kind (`& 127`), and the last run's at 128, per mode (`TIMED` to `TWENTY`, from 0):
     /// the 1-minute score, and the fastest 10 and 20 as `!frames`, so the larger is the better in all three.
     best: [[u32; 3]; 129],
@@ -223,6 +240,7 @@ impl Run {
         still: 0,
         air: false,
         cpu: 0,
+        aloft: false,
         best: [[0; 3]; 129],
     };
 
@@ -326,12 +344,13 @@ impl Run {
         let View(s, o, range) = self.view.filter(|_| ready)?;
         let edge = |i: usize, c: f32| (c * CANVAS_HALF[i] - o[i]) / s[i] - c * RADIUS;
         let [x0, x1] = range.map(|v| v.max(edge(0, -1.0)).min(edge(0, 1.0)));
-        // The CPU target stands on the ground, still: no launch, no drift.
-        let disc = f32::from(self.rows[3] != CPU);
-        let (x0, x1, y) = (x0 + DRIFT, x1 - DRIFT, self.ground + RADIUS * disc);
+        // The disc's centre is `RADIUS` above the ground; the CPU target's feet are on it, and it flies the disc's flight
+        // (the operator, 11-15): its feet trace the disc's bottom edge.
+        let disc = self.ground + RADIUS;
+        let (x0, x1, y) = (x0 + DRIFT, x1 - DRIFT, [disc, self.ground][usize::from(self.rows[3] == CPU)]);
         let speed = SPEEDS[usize::from(self.rows[2].min(FAST))];
         let g = GRAVITY * speed * speed;
-        let launch = disc * (LAUNCH * speed).min((2.0 * g * (edge(1, 1.0) - y).max(0.0)).sqrt());
+        let launch = (LAUNCH * speed).min((2.0 * g * (edge(1, 1.0) - disc).max(0.0)).sqrt());
         let gap = |at: [f32; 2]| last.is_none_or(|[x, y]| (at[0] - x).hypot(at[1] - y) >= MIN_GAP);
         let mut random = || {
             self.rng = 1_013_904_223u32.wrapping_add(self.rng.wrapping_mul(1_664_525));
@@ -339,7 +358,7 @@ impl Run {
         };
         let mut pick = || {
             let x = x0 + random() * (x1 - x0);
-            (x, disc * (2.0 * random() - 1.0) * DRIFT_SPEED * speed)
+            (x, (2.0 * random() - 1.0) * DRIFT_SPEED * speed)
         };
         let tries = [(); 16].map(|_| pick());
         // Sixteen misses in a row: the end farther from the broken target, straight up.
@@ -350,10 +369,19 @@ impl Run {
         Some(())
     }
 
-    /// Diag only (Eden's `diag-egg.req`): the target at `at`, at rest.
+    /// Diag only (Eden's `diag-egg.req`): the target at `at`: the disc at rest there; the CPU target placed afresh there and
+    /// launched straight up at the run's speed.
     #[cfg(feature = "diag")]
     pub fn place(&mut self, at: [f32; 2]) {
-        (self.egg, self.age, self.fly) = (Some(at), 0, [0.0, 0.0, GRAVITY]);
+        let speed = SPEEDS[usize::from(self.rows[2].min(FAST))];
+        let v = LAUNCH * speed * f32::from(u8::from(self.rows[3] == CPU));
+        (self.egg, self.age, self.fly, self.cpu) = (Some(at), 0, [v, 0.0, GRAVITY * speed * speed], 0);
+    }
+
+    /// Diag only: the target's ticks since its spawn and its flight (launch speed, sideways speed, gravity).
+    #[cfg(feature = "diag")]
+    pub fn flight(&self) -> (u32, [f32; 3]) {
+        (self.age, self.fly)
     }
 
     /// Where the target is now (the fighters' plane): up and back down in `2 v / g` ticks, one bounce at `BOUNCE` times the
@@ -395,7 +423,9 @@ impl Run {
             (self.score, self.bursts) = (self.score + 1, [Some((egg, 0)), self.bursts[0]]);
             self.spawn(Some(egg));
         }
-        self.age += dt;
+        // The flight holds while the CPU target is in a hit (its hitlag, then the placement): an uncounted hit puts it back
+        // where it was hit, and a counted one's next target flies from its start.
+        self.age += dt * u32::from(self.cpu < 3);
         match self.rows[0] {
             TIMED => self.frames -= dt,
             _ => self.frames += dt * u32::from(self.goal() > 0),
@@ -412,37 +442,45 @@ impl Run {
         (self.shown.replace(shown) != Some(shown)).then_some(u16::MAX)
     }
 
-    /// The CPU target's pass (V2.1; the CPU's own fighter pass): where to hold the CPU, and whether to put it there afresh (its
-    /// position, damage and status) this tick; `None` leaves it to the game (no CPU target, a run that ended, the hitlag and
-    /// knockback after a hit). `damage` is its damage, `stopped` whether it is in hitlag. The first damage after a placement
-    /// has read 0% is a hit; it breaks the target when the rule lets it count, and then the next spot comes once the hitlag is
-    /// over (a hit that does not count puts the CPU back where it was). `cpu`: 0 place, 1 wait for 0%, 2 armed, 3 counted hit
-    /// in hitlag, 4 uncounted.
-    pub fn cpu_pass(&mut self, damage: f32, stopped: bool) -> Option<([f32; 2], bool)> {
-        let spot = self.egg.filter(|_| self.cpu_target() && !self.ended())?;
-        match (self.cpu, damage > 0.0) {
+    /// Whether the target is still in flight (launched, not yet at rest).
+    fn flying(&self) -> bool {
+        let [v, _, g] = self.fly;
+        v > 0.0 && (self.age as f32) < 2.0 * v / g * (1.0 + BOUNCE)
+    }
+
+    /// The CPU target's pass (V2.1; the CPU's own fighter pass): where to hold the CPU this tick, the target's moving spot
+    /// (`egg_at`, at least `LIFT` above its ground while it flies), and what else to ask (`Put`); `None` leaves it to the
+    /// game (no CPU target, a run that ended, the hitlag and knockback after a hit). `damage` is its damage, `stopped`
+    /// whether it is in hitlag. The first damage after a placement has read 0% is a hit, in the air or on the ground; it
+    /// breaks the target when the rule lets it count, and then the next spot comes once the hitlag is over (a hit that does
+    /// not count puts the CPU back on its flight where it was hit). `cpu`: 0 place, 1 wait for 0%, 2 armed, 3 counted hit in
+    /// hitlag, 4 uncounted.
+    pub fn cpu_pass(&mut self, damage: f32, stopped: bool) -> Option<([f32; 2], Put)> {
+        self.egg.filter(|_| self.cpu_target() && !self.ended())?;
+        let fresh = match (self.cpu, damage > 0.0) {
             (2, true) => {
                 let counts = counts(self.rows[1], self.air, damage);
                 (self.cpu, self.score) = (3 + u8::from(!counts), self.score + u32::from(counts));
-                None
+                return None;
             }
-            (3 | 4, _) if stopped => None,
-            (3 | 4, _) => {
-                if self.cpu == 3 {
-                    self.spawn(Some(spot));
-                }
-                self.cpu = 1;
-                Some((self.egg.unwrap_or(spot), true))
+            (3 | 4, _) if stopped => return None,
+            (3, _) => {
+                // The next target, `MIN_GAP` from where this one was hit.
+                self.spawn(self.egg_at());
+                true
             }
-            (0, _) | (1, true) => {
-                self.cpu = 1;
-                Some((spot, true))
-            }
-            _ => {
-                self.cpu = 2;
-                Some((spot, false))
-            }
-        }
+            (0 | 4, _) | (1, true) => true,
+            _ => false,
+        };
+        self.cpu = 1 + u8::from(!fresh);
+        let ([x, y], [_, ground], aloft) = (self.egg_at()?, self.egg?, self.flying());
+        let put = match (fresh, self.aloft && !aloft) {
+            (true, _) => Put::Fresh(aloft),
+            (false, true) => Put::Land,
+            _ => Put::Hold,
+        };
+        self.aloft = aloft;
+        Some(([x, if aloft { y.max(ground + LIFT) } else { y }], put))
     }
 
     /// The notice (SPEC V2.4): `Eggs N   m:ss` (1 minute), `Eggs N/10   m:ss.cc` (10 or 20 targets), `Eggs N` (free

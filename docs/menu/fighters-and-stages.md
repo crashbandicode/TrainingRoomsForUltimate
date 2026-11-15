@@ -458,14 +458,17 @@ What the target is. Disc: the plugin's target, as above. CPU: the CPU itself is 
 
 - **Values:** Disc, CPU
 - **Default:** Disc
-- **How:** CPU: the CPU is put on the ground at the spot where the next target would appear, with 0%, and held there. A
-  hit that the game registers on it and that **Breaks on** lets count breaks the target: the game plays its own hitlag and
-  knockback, then the CPU goes back to 0% at the next spot. The CPU stays still, so **Target speed** does nothing. It
-  applies from the next time the menu closes. In the waiting room's practice the CPU is moved too.
+- **How:** CPU: the CPU flies like the disc. At each spot it starts on the ground with 0%, is launched up, drifts a
+  little, falls back, bounces once and then stands where it landed until you hit it. In the air it shows the game's own
+  falling pose. **Target speed** applies to it as to the disc. A hit that the game registers on it, in the air or on the
+  ground, and that **Breaks on** lets count breaks the target: the game plays its own hitlag and knockback, then the CPU
+  goes back to 0% at the next spot and flies again. A hit that doesn't count puts it back on its flight. It applies from
+  the next time the menu closes. In the waiting room's practice the CPU is moved too.
 
 ### Target speed
 
-How fast the targets fly. Every speed traces the same path: the same height and the same landing spot.
+How fast the targets fly, the disc or the CPU. Every speed traces the same path: the same height and the same landing
+spot.
 
 - **Values:** Normal, Slow, Fast
 - **Default:** Normal

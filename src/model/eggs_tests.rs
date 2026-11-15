@@ -84,7 +84,7 @@ fn eggs_rows_and_help() {
     assert_eq!(rows[1].help_lines(), ("Which of your hits break a target. Projectiles never do.", "12%+: only attacks that deal 12% or more."));
     // §2.3b's speed row, renamed by V2.2.
     assert_eq!((rows[2].title, values(rows[2])), ("Target", vec!["Disc", "CPU"]));
-    assert_eq!(rows[2].help_lines(), ("Disc: a target appears. CPU: the CPU is the target.", "The CPU target stays still and is reset after each hit."));
+    assert_eq!(rows[2].help_lines(), ("Disc: a target appears. CPU: the CPU is the target.", "The CPU flies like the disc and is reset after each hit."));
     assert_eq!((rows[3].title, values(rows[3])), ("Target speed", vec!["Normal", "Slow", "Fast"]));
     assert_eq!(
         rows[3].help_lines(),
@@ -399,33 +399,41 @@ fn started_cpu(mode: u8, rule: u8, seed: u32) -> Run {
     run
 }
 
-/// V2.1 (D1 c): with the CPU as the target no disc is drawn; the CPU is placed on the spawn spot with 0% and held there, a
-/// hit the game registers on it (its damage rises) that the rule lets count breaks the target (the game's own hitlag and
-/// knockback play), and after the hitlag the CPU is put back at the next spawn spot.
+/// V2.1 (D1 c), flying since the operator's 11-15 order: with the CPU as the target no disc is drawn; the CPU is placed
+/// afresh at 0% on the target's spot and follows its flight to rest on the ground, where it is held; a hit the game
+/// registers on it (its damage rises) that the rule lets count breaks the target (the game's own hitlag and knockback
+/// play), and after the hitlag the CPU is put at the next spawn spot.
 fn eggs_target_cpu() {
     let mut run = started_cpu(FREE, ANY, 7);
     assert_eq!(run.cpu_pass(0.0, false), None, "nothing to place before the first target");
     pass(&mut run, &[], false);
     assert!(target(&mut run).is_none() && run.look(false, || None).iter().all(Option::is_none), "the CPU is the target: no disc");
-    let (spot, fresh) = run.cpu_pass(0.0, false).expect("placed");
-    assert!(fresh && spot[1] == 0.0 && spot[0].abs() <= HALF_WIDTH, "on the ground, in the box: {spot:?}");
+    let (first, put) = run.cpu_pass(0.0, false).expect("placed");
+    assert!(put == Put::Fresh(true) && first[0].abs() <= HALF_WIDTH, "afresh in the air, in the box: {first:?} {put:?}");
+    for _ in 0..120 {
+        pass(&mut run, &[], false);
+        run.cpu_pass(0.0, false);
+    }
+    let (spot, put) = run.cpu_pass(0.0, false).expect("at rest");
+    assert!(put == Put::Hold && spot[1].abs() < 1e-3, "at rest on the ground: {spot:?} {put:?}");
     for _ in 0..30 {
         pass(&mut run, &[], false);
-        assert_eq!(run.cpu_pass(0.0, false), Some((spot, false)), "held, tick after tick");
+        assert_eq!(run.cpu_pass(0.0, false), Some((spot, Put::Hold)), "held at rest, tick after tick");
     }
     // Still damaged from before the placement took: asked again until it reads 0.
     let mut stale = started_cpu(FREE, ANY, 7);
     pass(&mut stale, &[], false);
-    assert_eq!(stale.cpu_pass(40.0, false).map(|p| p.1), Some(true));
-    assert_eq!(stale.cpu_pass(40.0, false).map(|p| p.1), Some(true), "a stale 40% is not a hit");
-    assert_eq!((stale.score, stale.cpu_pass(0.0, false).map(|p| p.1)), (0, Some(false)));
-    // A hit: the count rises, the game plays its hitlag and knockback (nothing asked of the CPU), then the next spot.
+    assert_eq!(stale.cpu_pass(40.0, false).map(|p| p.1), Some(Put::Fresh(true)));
+    assert_eq!(stale.cpu_pass(40.0, false).map(|p| p.1), Some(Put::Fresh(true)), "a stale 40% is not a hit");
+    assert_eq!((stale.score, stale.cpu_pass(0.0, false).map(|p| p.1)), (0, Some(Put::Hold)));
+    // A hit on the ground at rest: the count rises, the game plays its hitlag and knockback (nothing asked of the CPU),
+    // then the next spot, launched again.
     assert_eq!(run.cpu_pass(9.0, false), None);
     assert_eq!(run.score, 1);
     assert_eq!(notice_after(&mut run), "Eggs 1");
     assert_eq!(run.cpu_pass(9.0, true), None, "in hitlag");
-    let (next, fresh) = run.cpu_pass(9.0, false).expect("the next spawn");
-    assert!(fresh && gap(next, spot) >= MIN_GAP, "reset at the next spot: {next:?}");
+    let (next, put) = run.cpu_pass(9.0, false).expect("the next spawn");
+    assert!(put == Put::Fresh(true) && gap(next, spot) >= MIN_GAP - LIFT, "reset at the next spot, flying: {next:?} {put:?}");
     // The rule filters: Aerials counts only in an aerial; Hits of 12%+ only a hit of 12 or more. A hit that does not count
     // resets the CPU where it was.
     let mut aerials = started_cpu(FREE, AERIALS, 7);
@@ -433,7 +441,8 @@ fn eggs_target_cpu() {
     let (spot, _) = aerials.cpu_pass(0.0, false).unwrap();
     aerials.cpu_pass(0.0, false);
     assert_eq!(aerials.cpu_pass(5.0, false), None);
-    assert_eq!((aerials.score, aerials.cpu_pass(5.0, false)), (0, Some((spot, true))), "a jab does not count: reset in place");
+    let back = Some((spot, Put::Fresh(true)));
+    assert_eq!((aerials.score, aerials.cpu_pass(5.0, false)), (0, back), "a jab does not count: reset in place");
     pass(&mut aerials, &[], true);
     aerials.cpu_pass(0.0, false);
     aerials.cpu_pass(5.0, false);
@@ -472,9 +481,6 @@ fn started_with(mode: u8, rule: u8, speed: u8, target: u8, seed: u32, view: View
     run
 }
 
-/// Fail-first stand-in for the model's lift (removed with the implementation).
-const LIFT: f32 = 1.0;
-
 /// The operator, 11-15: the CPU target is in the air like the discs. The same seed and camera give the CPU the disc's
 /// launch, drift, apex, bounce and rest at every Target speed; its feet trace the disc's bottom edge.
 fn eggs_cpu_flies_like_the_disc() {
@@ -497,27 +503,37 @@ fn eggs_cpu_flies_like_the_disc() {
 }
 
 /// The CPU target's pass puts it on the moving `egg_at()` every tick: in flight, a point within `LIFT` of the ground is
-/// raised to `LIFT` (the game never lands it mid-flight); at rest, exactly the path's end.
+/// raised to `LIFT` (the game never lands it mid-flight); at rest, exactly the path's end. It is placed afresh in the air
+/// once, held without a pose request through the flight, stood up once when the flight comes to rest, then held.
 fn eggs_cpu_pass_follows_the_flight() {
     for speed in [NORMAL, SLOW, FAST] {
         let mut run = started_with(FREE, ANY, speed, CPU, 7, RESET_CENTRE);
         pass(&mut run, &[], false);
-        let ground = run.egg_at().unwrap()[1];
-        let mut top = 0.0f32;
+        let ground = run.egg.unwrap()[1];
+        let (mut top, mut puts) = (0.0f32, vec![]);
         for tick in 0..400 {
             let want = run.egg_at().unwrap();
             let [v, _, g] = run.fly;
             let aloft = v > 0.0 && (run.age as f32) < 2.0 * v / g * (1.0 + BOUNCE);
-            let at = run.cpu_pass(0.0, false).expect("held every tick").0;
+            let (at, put) = run.cpu_pass(0.0, false).expect("held every tick");
             let expect = if aloft { [want[0], want[1].max(ground + LIFT)] } else { want };
             assert_eq!(at, expect, "speed {speed} tick {tick}");
+            assert!(at[1] >= ground + LIFT || !aloft, "speed {speed} tick {tick}: {at:?} too low in flight");
             top = top.max(at[1] - ground);
+            if puts.last().is_none_or(|(p, _)| *p != put) {
+                puts.push((put, tick));
+            }
             pass(&mut run, &[], false);
         }
         assert!((top - 21.6).abs() < 0.2, "speed {speed}: the flight's apex {top}, the disc's 21.6");
+        let kinds: Vec<Put> = puts.iter().map(|p| p.0).collect();
+        assert_eq!(kinds, [Put::Fresh(true), Put::Hold, Put::Land, Put::Hold], "speed {speed}: {puts:?}");
+        let landed = puts[2].1 as f32 + 1.0;
+        let want = 96.0 / SPEEDS[usize::from(speed)];
+        assert!((landed - want).abs() <= 1.0, "speed {speed}: at rest after {landed} ticks, want {want}");
         let rest = run.egg_at();
         assert_eq!(run.cpu_pass(0.0, false).map(|p| p.0), rest, "at rest on the ground");
-        assert_eq!(rest.map(|r| r[1]), Some(ground));
+        assert!(rest.is_some_and(|r| (r[1] - ground).abs() < 1e-3), "{rest:?}");
     }
 }
 
@@ -528,7 +544,7 @@ fn eggs_cpu_air_hits() {
     let fly = |rule: u8| {
         let mut run = started_with(FREE, rule, NORMAL, CPU, 7, View([14.0, 14.0], [0.0, -300.0], BOX));
         pass(&mut run, &[], false);
-        let ground = run.egg_at().unwrap()[1];
+        let ground = run.egg.unwrap()[1];
         let mut at = [0.0; 2];
         for _ in 0..20 {
             at = run.cpu_pass(0.0, false).expect("held").0;
@@ -544,8 +560,9 @@ fn eggs_cpu_air_hits() {
         pass(&mut run, &[], false);
         assert_eq!(run.cpu_pass(9.0, true), None, "in hitlag");
     }
-    let next = run.cpu_pass(9.0, false).expect("the next spot").0;
+    let (next, put) = run.cpu_pass(9.0, false).expect("the next spot");
     assert!(next[1] <= ground + LIFT && gap(next, at) >= MIN_GAP - RADIUS, "0% at the next spot: {next:?} from {at:?}");
+    assert_eq!(put, Put::Fresh(true), "afresh (0%), in the air");
     let mut top = next[1];
     for _ in 0..30 {
         pass(&mut run, &[], false);
@@ -560,8 +577,14 @@ fn eggs_cpu_air_hits() {
         pass(&mut run, &[], false);
         assert_eq!(run.cpu_pass(5.0, true), None, "in hitlag");
     }
-    let back = run.cpu_pass(5.0, false).expect("put back").0;
-    assert_eq!((run.score, back), (0, before), "back on its flight where it was hit, not counted (from {at:?})");
+    let back = run.cpu_pass(5.0, false).expect("put back");
+    assert_eq!((run.score, back), (0, (before, Put::Fresh(true))), "back on its flight where it was hit, not counted (from {at:?})");
+    let mut on = before;
+    for _ in 0..5 {
+        pass(&mut run, &[], false);
+        on = run.cpu_pass(0.0, false).expect("held").0;
+    }
+    assert!(on[1] > before[1] + 1.0, "the flight goes on from there, still rising: {on:?} from {before:?}");
     // In an aerial, the same hit in the air counts.
     let (mut run, _, _) = fly(AERIALS);
     pass(&mut run, &[], true);

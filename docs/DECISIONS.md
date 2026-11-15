@@ -1140,6 +1140,8 @@ counts are rough, in the size gate's normalised lines; the size gate is not rais
 
 **Decided: (a) with hitlag, and (c) as an option.** "D1, add hitlag to the target, make the CPU an option to enable". The disc becomes TR's own bullseye target. P1 freezes on a break, using the game's own hitlag, or 6 frames as seen in Melee. A short break animation of our own plays (13:13Z). A row "Target: Disc / CPU" makes the CPU the target, held still and reset after each hit.
 
+**Changed 2026-11-15 (the operator, ~02:20Z):** the CPU target is no longer held still. It flies the disc's flight (launched up, a little drift, one bounce, then it stands where it landed), Target speed applies to it, and in the air it shows the game's own falling pose. Hits count in the air and on the ground as before. This reverses SPEC-eggsercise V2.1's "the CPU stays still" (2026-11-14). The rc.14 preview GIFs of the CPU target show the old, still CPU until their reshoot (`rc14-eggs-cpu-target`).
+
 D1 target look (B-2, `ab35f8f8`): our own bullseye, plus a cracked frame for the break animation. Eden stills, 2026-11-14 (run `rc14-egg-target-2`, 6/6 PASS):
 
 ![rc14-eggs D1 target look: the bullseye and its cracked break frame, on a light and a dark background, at 2x](decisions/rc14-eggs-target-textures.png)

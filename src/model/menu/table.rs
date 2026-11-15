@@ -451,7 +451,7 @@ pub static ROWS: [Row; 106] = [
     r(GAMES, "Breaks on", "eggsercise_break", Control::Dropdown(&o::EGGS_BREAK),
       "Which of your hits break a target. Projectiles never do.\n12%+: only attacks that deal 12% or more."),
     r(GAMES, "Target", "eggsercise_target", Control::Dropdown(&o::EGGS_TARGET),
-      "Disc: a target appears. CPU: the CPU is the target.\nThe CPU target stays still and is reset after each hit."),
+      "Disc: a target appears. CPU: the CPU is the target.\nThe CPU flies like the disc and is reset after each hit."),
     r(GAMES, "Target speed", "eggsercise_speed", Control::Dropdown(&o::EGGS_SPEED),
       "How fast targets fly. Normal is Melee's Eggs-ercise speed.\nSlow: half speed. Fast: one and a half times as fast."),
     r(GAMES, "CPU during a game", "practice_cpu", Control::Dropdown(&o::PRACTICE_CPU),

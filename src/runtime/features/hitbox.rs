@@ -190,31 +190,61 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     Some(())
 }
 
-/// The CPU target's pass (V2.1; the practice CPU's own frame, only while a run has it as the target): hold it on the spot the
-/// run asks for, and when it says so put it back afresh, at 0% and standing, as a save state's load places a fighter.
+/// The CPU target's pass (V2.1; the practice CPU's own frame, only while a run has it as the target): put it where the run
+/// asks, on the target's flight (the operator, 11-15), its speed cleared; afresh, at 0% and in the game's own fall (in the
+/// air) or standing (at rest), as a save state's load places a fighter; and standing once the flight comes to rest.
 unsafe fn eggs_cpu(run: &mut eggs::Run, fighter: usize, entry: i32) -> Option<()> {
     run.cpu_target().then_some(())?;
     let primary = [1, LOBBY_CPU_ENTRY][usize::from(scene::current()? == Scene::Lobby)];
     (entry == primary).then_some(())?;
     let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
-    let damage = natives::damage(at, 0);
+    let (damage, stopped) = (natives::damage(at, 0), natives::is_stop(at));
     #[cfg(feature = "diag")]
     let score = run.score;
-    let moved = run.cpu_pass(damage, natives::is_stop(at));
+    let moved = run.cpu_pass(damage, stopped);
     #[cfg(feature = "diag")]
-    if run.score > score || moved.is_some_and(|m| m.1) {
-        crate::runtime::diag_log::diagnostic(format_args!("[Eggs] cpu damage={damage} score={} move={moved:?}", run.score));
-    }
-    let ([x, y], fresh) = moved?;
+    eggs_cpu_diag(run, score, at, damage, stopped, moved);
+    let ([x, y], put) = moved?;
     state_natives::set_pos(at, &state_natives::Vector3f { x, y, z: 0.0 });
     state_natives::clear_speed_all(at);
-    if fresh {
-        state_natives::heal(at, -natives::damage(at, 0));
-        if let Some(wait) = game::lua_const(lua_bind_hash("FIGHTER_STATUS_KIND_WAIT")) {
-            state_natives::status_request(at, wait);
+    let air = match put {
+        eggs::Put::Hold => return Some(()),
+        eggs::Put::Fresh(air) => {
+            state_natives::heal(at, -natives::damage(at, 0));
+            air
         }
+        eggs::Put::Land => false,
+    };
+    let name = ["FIGHTER_STATUS_KIND_WAIT", "FIGHTER_STATUS_KIND_FALL"][usize::from(air)];
+    if let Some(status) = game::lua_const(lua_bind_hash(name)) {
+        state_natives::status_request(at, status);
     }
     Some(())
+}
+
+/// Diag: one line per event of the CPU target (a placement afresh, a landing, a counted hit) and every 6th held tick: where
+/// the game's frame left it (`at`, before this pass moves it), where the last pass put it (`want`), the flight's tick and
+/// launch, its status and situation. Eden reads the flight and the game's drift from the path off these.
+#[cfg(feature = "diag")]
+unsafe fn eggs_cpu_diag(run: &eggs::Run, before: u32, at: usize, damage: f32, stop: bool, moved: Option<([f32; 2], eggs::Put)>) {
+    // The last pass's position as two f32 bit patterns; all ones is none.
+    static WANT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(u64::MAX);
+    static TICK: AtomicU32 = AtomicU32::new(0);
+    let score = run.score;
+    let event = score > before || moved.is_some_and(|m| m.1 != eggs::Put::Hold);
+    let next = moved.map_or(u64::MAX, |([x, y], _)| u64::from(x.to_bits()) << 32 | u64::from(y.to_bits()));
+    let last = WANT.swap(next, Ordering::Relaxed);
+    let tick = TICK.fetch_add(1, Ordering::Relaxed);
+    if !event && (last == u64::MAX || moved.is_none() || tick % 6 != 0) {
+        return;
+    }
+    let want = (last != u64::MAX).then(|| [f32::from_bits((last >> 32) as u32), f32::from_bits(last as u32)]);
+    let pos = [natives::pos_x(at), natives::pos_y(at)];
+    let (status, situation, (age, fly)) = (natives::status_kind(at), natives::situation_kind(at), run.flight());
+    crate::runtime::diag_log::diagnostic(format_args!(
+        "[Eggs] cpu damage={damage} score={score} move={moved:?} want={want:?} at={pos:?} age={age} fly={fly:?} \
+         status={status} situation={situation} stop={stop}"
+    ));
 }
 
 /// What a practice game reads of Player 1: its top joint, its live attack pills and their number, whether it is in an aerial
