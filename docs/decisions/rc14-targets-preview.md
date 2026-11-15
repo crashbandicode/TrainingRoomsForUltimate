@@ -17,8 +17,8 @@ outlined in green (Layout 7 to 3), and the rest follow (Layout 1, 2). A on a lay
 opens its own screen (Load, Rename, Duplicate, Delete). Load turns Break the Targets on and puts its three targets on
 the stage.
 
-Known display bug, being fixed for rc.14: the selection box and the green outline run through the first letter of each
-name, and "targets" touches the right edge.
+Re-shot on the list-padding build (footer "rc14 4f810d34"): the names now sit clear of the selection box and the green
+outline, and "3 targets" clears the right edge.
 
 ![Break the Targets: the saved-layouts list, a layout's own screen, and Load](rc14-preview-btt-layouts-list.gif)
 
@@ -36,6 +36,13 @@ for about three seconds. A Fast one settles in about half a second.
 counts 1/10, 2/10, 3/10. After each counted hit the CPU is put back at a fresh spot at 0 %. No disc appears.
 
 ![Eggs-ercise with the CPU as the target, on the rc.14 build](rc14-preview-eggs-cpu-target-v2.gif)
+
+**10 targets:** Eggs-ercise goes from Off to 10 targets, and the clock counts up as Fox breaks them one by one (0/10, 3/10,
+7/10, 9/10). The tenth stops it: "Done! 10 in 0:15.53 (best 0:15.53)". Shot on the list-padding build ("rc14 4f810d34").
+
+![Eggs-ercise, 10 targets, on the rc.14 build](rc14-preview-eggs-n-targets-v2.gif)
+
+Still to come on this build: Break the Targets placing and a full run (being shot now).
 
 ## Earlier takes (the draft build)
 
