@@ -24,6 +24,10 @@ Rules (a problem's rule name is the first word of its line):
                    to docs/CURRENT-RELEASE.md.
   version-stale    a sentence that says "newest", "latest", "currently", "current release/build/version", "this
                    release/build/version" or "up to date" and names another release (rc.N or rcN, also 0.2.0-rc.N).
+  version-cargo    the crate version in Cargo.toml (`0.2.0-rc.N`) does not name the current release: the menu footer
+                   starts with it (`0.2.0-rc.14 · rc14 <commit>`), and the release tag is `v0.2.0-rc.14`. Operator
+                   2026-11-15: the footer and the tag agree. The bump (Cargo.toml, Cargo.lock's own entry) goes in the
+                   release's name commit with build.rs's BUILD_NAME, never before the release is the current one.
   notice-text      a "double-quoted" text that must be a notice, refusal or greyed-row reason of the plugin, but is not a
                    string literal of the code the release build compiles in src/ (or crates/): test code (a `tests/`
                    folder, `*_tests.rs`, `#[cfg(test)]`, by tools/sloc.py's evaluator, the size gate's rule), host-only
@@ -545,6 +549,15 @@ def crate_version(root):
     return match.group(1) if match else ""
 
 
+def lock_version(root):
+    """The version Cargo.lock records for the root package (the name in Cargo.toml), or "" without either file."""
+    if not (os.path.isfile(os.path.join(root, "Cargo.toml")) and os.path.isfile(os.path.join(root, "Cargo.lock"))):
+        return ""
+    name = re.search(r'^name\s*=\s*"([^"]+)"', read(root, "Cargo.toml"), re.M)
+    entry = re.search(rf'\[\[package\]\]\nname = "{re.escape(name.group(1))}"\nversion = "([^"]+)"', read(root, "Cargo.lock")) if name else None
+    return entry.group(1) if entry else ""
+
+
 def current_release(tree, problems):
     """The release named by the one `Current release: rc.N` line of docs/CURRENT-RELEASE.md, or None."""
     if CURRENT_PAGE not in tree.files:
@@ -610,12 +623,11 @@ def sentences(block):
             yield part.strip()
 
 
-def claim_text(sentence, crate):
-    """The sentence as the reader sees it: link targets and bare URLs gone, the crate version (0.2.0-rc.6) gone."""
+def claim_text(sentence):
+    """The sentence as the reader sees it: link targets and bare URLs gone, backticks gone."""
     text = re.sub(r"!?\[([^\]]*)\]\([^)]*\)", r"\1", sentence)
     text = re.sub(r"https?://\S+", "", text)
-    text = text.replace("`", "")
-    return text.replace(crate, "") if crate else text
+    return text.replace("`", "")
 
 
 def check_versions(tree, config, problems, used):
@@ -624,13 +636,22 @@ def check_versions(tree, config, problems, used):
         return
     number = release.split(".")[1]
     crate = crate_version(tree.root)
+    if crate and not re.fullmatch(rf"\d+\.\d+\.\d+-rc\.{number}", crate):
+        problems.append(Problem(
+            "version-cargo", "Cargo.toml", 1,
+            f"the crate version is {crate}, but the current release is {release}: the menu footer starts with the crate version, "
+            f"so it must read 0.2.0-{release} (Cargo.lock's own entry too)",
+        ))
+    locked = lock_version(tree.root)
+    if crate and locked and locked != crate:
+        problems.append(Problem("version-cargo", "Cargo.lock", 1, f"the lock file has this package at {locked}, but Cargo.toml says {crate}"))
     for rel in tree.files:
         if matches(rel, config.historical):
             used.add(("historical", matches(rel, config.historical)[0][0]))
             continue
         for line, block in blocks(tree.text(rel)):
             for sentence in sentences(block):
-                text = claim_text(sentence, crate)
+                text = claim_text(sentence)
                 if not CLAIM_WORDS.search(text):
                     continue
                 named = {m.group(1) for m in RELEASE_TOKEN.finditer(text)}
@@ -654,7 +675,7 @@ def check_versions(tree, config, problems, used):
         label = rel if where is None else f"{rel} ({where})"
         if part is None:
             problems.append(Problem("version-name", rel, 1, f"has no `{where}` section to name {release} in"))
-        elif not names_release(claim_text(part, crate), release):
+        elif not names_release(claim_text(part), release):
             problems.append(Problem("version-name", rel, 1, f"{label} does not name the current release, {release}"))
         if rel == "README.md" and part is not None:
             links = [link.target for link in parse_links(part).links]

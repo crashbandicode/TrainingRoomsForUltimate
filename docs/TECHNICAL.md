@@ -61,8 +61,9 @@ current values as defaults, B goes back. Each page ends with *Reset page to defa
 where you left it. The chords are edited on Display & Controls › Button chords.
 
 The key hints at the foot of every page end with the build tag: the version, then the build name and the commit the NRO
-was built from, for example `0.2.0-rc.6 · rc13 ed0d7a35` (rc.8 to rc.12 builds read `rc8` to `rc12`; the clip below is
-rc.11's). A build from uncommitted changes adds `-dirty`.
+was built from, for example `0.2.0-rc.14 · rc14 1a2b3c4d`. Builds before rc.14 kept the version `0.2.0-rc.6` and told
+themselves apart by the build name: rc.13 read `0.2.0-rc.6 · rc13 ed0d7a35`, rc.8 to rc.12 read `rc8` to `rc12` (the clip
+below is rc.11's). A build from uncommitted changes adds `-dirty`.
 
 **Clip** [`rc11-footer-tag.gif`](media/rc11-footer-tag.gif): the menu opens on two pages whose key hints end with `0.2.0-rc.6 · rc11 0c628724`
 
@@ -452,9 +453,9 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 ## Status
 
 The current release is **rc.14**, **untested on hardware**: [Current release](CURRENT-RELEASE.md) says what it adds,
-how to install it and what is known not to work. The menu footer reads `0.2.0-rc.6 · rc14` and then the commit it was
-built from. The version number has stayed `0.2.0-rc.6` since rc.6; the build name after it (rc8 to rc14) tells the builds
-apart.
+how to install it and what is known not to work. The menu footer reads `0.2.0-rc.14 · rc14` and then the commit it was
+built from: from rc.14 the version number is the release's own name, the same as its tag. Builds before it kept the
+version `0.2.0-rc.6` from rc.6 on, and the build name after it (rc8 to rc13) told them apart.
 
 [rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13) (`ed0d7a35`,
 2026-11-14, Eden-tested and untested on hardware; footer `0.2.0-rc.6 · rc13 ed0d7a35`) adds Aerial Drift,

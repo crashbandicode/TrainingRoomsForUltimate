@@ -86,20 +86,23 @@ See [Waiting rooms](waiting-rooms.md).
 At the bottom of every menu page, the key hints end with the **build tag**. For example:
 
 ```text
-0.2.0-rc.6 · rc14 1a2b3c4d
+0.2.0-rc.14 · rc14 1a2b3c4d
 ```
 
 | Part | What it is |
 | --- | --- |
-| `0.2.0-rc.6` | The version number inside the plugin. It has stayed `0.2.0-rc.6` since rc.6, so it doesn't tell builds apart. |
-| `rc14` | The build name. This is the part to read: rc.14 shows `rc14`, rc.13 showed `rc13`, and so on. |
+| `0.2.0-rc.14` | The version number inside the plugin. From rc.14 on it is the release's own name, the same as the release's tag (`v0.2.0-rc.14`). |
+| `rc14` | The build name, the short form of the same release: rc.14 shows `rc14`. |
 | `1a2b3c4d` | The commit the build was made from: eight characters, digits and the letters a to f, so yours will differ. `-dirty` after it means the build was made from uncommitted changes, and `unknown` means the commit wasn't known. |
 
-So a build whose tag reads `0.2.0-rc.6 · rc14 …` is rc.14. [Current release](../CURRENT-RELEASE.md) says which release
+So a build whose tag reads `0.2.0-rc.14 · rc14 …` is rc.14. [Current release](../CURRENT-RELEASE.md) says which release
 that page describes, what it adds and what is known not to work.
 
+**An older build** reads differently. Its first part is `0.2.0-rc.6`, whatever its release, so read the second part: rc.13
+showed `rc13`, rc.12 `rc12`, and so on.
+
 ![Two menu pages whose key hints end with the build tag](../media/rc11-footer-tag.gif)<br>
-*The tag at the foot of two pages. Eden, rc.11, so this clip reads `rc11`.*
+*The tag at the foot of two pages. Eden, rc.11, so this older clip reads `0.2.0-rc.6 · rc11`.*
 
 ## Where to go next
 

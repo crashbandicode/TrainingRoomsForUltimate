@@ -1,7 +1,8 @@
 # Current release
 
 <!-- Whoever ships a release: change the `Current release:` line below first, then the README's top and the Status section
-     of docs/TECHNICAL.md. The docs checks (tests/docs_gates.rs) fail until all three name the same release. The steps are
+     of docs/TECHNICAL.md, and put the same release in Cargo.toml's version (0.2.0-rc.N, with Cargo.lock's own entry) in the
+     release's name commit. The docs checks (tests/docs_gates.rs) fail until they all name the same release. The steps are
      in docs/BUILD.md, "Release checklist". -->
 
 <!-- TODO (integration-3, at the final pass): once the final Eden pass has passed, add "Eden-tested" to the Status line below,
@@ -19,8 +20,9 @@ Its release page, with the notes and the plugin files:
 ## Which build is mine?
 
 Open the menu (B + D-pad Up) and read the end of the key hints at the foot of the page. rc.14 reads
-`0.2.0-rc.6 · rc14` and then the commit it was built from. The first part stays `0.2.0-rc.6` in every build since rc.6;
-the second tells them apart. More: [Getting started › Which build you have](guide/getting-started.md#which-build-you-have).
+`0.2.0-rc.14 · rc14` and then the commit it was built from. Builds before rc.14 start with `0.2.0-rc.6` whatever their
+release, so for them read the second part (`rc13`, `rc12`, ...).
+More: [Getting started › Which build you have](guide/getting-started.md#which-build-you-have).
 
 ## What's new in rc.14
 

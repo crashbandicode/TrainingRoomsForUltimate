@@ -20,7 +20,7 @@ release](../CURRENT-RELEASE.md)). New here? [Getting started](getting-started.md
 It starts with the milliseconds since the console booted, and it looks like this (the middle is cut here):
 
 ```text
-48213 plugin=training_rooms/0.2.0-rc.6 game=13.0.5 build=21450c64… … result=installed heap_allocations=0
+48213 plugin=training_rooms/0.2.0-rc.14 game=13.0.5 build=21450c64… … result=installed heap_allocations=0
 ```
 
 | What the line says | Why | What to do |

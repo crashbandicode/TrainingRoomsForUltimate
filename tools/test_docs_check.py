@@ -43,7 +43,8 @@ FORGE_SLUGS = [
 CURRENT = "# Current release\n\nCurrent release: rc.14\n"
 
 CLEAN = {
-    "Cargo.toml": '[package]\nversion = "0.2.0-rc.6"\n',
+    "Cargo.toml": '[package]\nname = "training_rooms"\nversion = "0.2.0-rc.14"\n',
+    "Cargo.lock": '# generated\n\n[[package]]\nname = "other"\nversion = "1.0.0"\n\n[[package]]\nname = "training_rooms"\nversion = "0.2.0-rc.14"\ndependencies = []\n',
     "README.md": (
         "# Project\n\nIntro. **Current release: [rc.14](docs/CURRENT-RELEASE.md)**, untested.\n\n## Install\n\n"
         "See [the docs](docs/README.md) and ![a picture](docs/media/pic.gif).\n"
@@ -54,7 +55,7 @@ CLEAN = {
     ),
     "docs/CURRENT-RELEASE.md": CURRENT,
     "docs/guide/getting-started.md": (
-        "# Getting started\n\nThe footer reads `0.2.0-rc.6 · rc14 1a2b3c4d`: that is rc.14.\n\n"
+        "# Getting started\n\nThe footer reads `0.2.0-rc.14 · rc14 1a2b3c4d`: that is rc.14.\n\n"
         "## Which build\n\nSee [Technical](../TECHNICAL.md#status) and [this page](#which-build).\n"
     ),
     "docs/TECHNICAL.md": "# Technical\n\n## Status\n\nThe current release is rc.14, as the footer shows.\n\n## Other\n\nText.\n",
@@ -258,9 +259,27 @@ class Versions(unittest.TestCase):
         text = CLEAN["docs/TECHNICAL.md"] + "\nThe newest build is rc.14, and the latest notes are [rc.14](CURRENT-RELEASE.md).\n"
         self.assertEqual(problems({}, **{"docs/TECHNICAL.md": text}), [])
 
-    def test_the_crate_version_is_not_a_release_claim(self):
-        text = CLEAN["docs/TECHNICAL.md"] + "\nThe version is currently 0.2.0-rc.6 in every build.\n"
+    def test_the_crate_version_must_name_the_current_release(self):
+        """The footer starts with the crate version and the tag is v0.2.0-rc.N: Cargo.toml and Cargo.lock follow CURRENT-RELEASE."""
+        behind = '[package]\nname = "training_rooms"\nversion = "0.2.0-rc.13"\n'
+        got = problems({}, **{"Cargo.toml": behind, "Cargo.lock": CLEAN["Cargo.lock"].replace("rc.14", "rc.13")})
+        self.assertEqual([(r, p) for r, p, _ in got], [("version-cargo", "Cargo.toml")])
+        self.assertIn("0.2.0-rc.13", got[0][2])
+        self.assertIn("rc.14", got[0][2])
+        ahead = CLEAN["Cargo.toml"].replace("rc.14", "rc.15")
+        self.assertEqual(rules(**{"Cargo.toml": ahead, "Cargo.lock": CLEAN["Cargo.lock"].replace("rc.14", "rc.15")}), ["version-cargo"])
+
+    def test_the_lock_file_must_agree_with_cargo_toml(self):
+        got = problems({}, **{"Cargo.lock": CLEAN["Cargo.lock"].replace("training_rooms\"\nversion = \"0.2.0-rc.14", "training_rooms\"\nversion = \"0.2.0-rc.6")})
+        self.assertEqual([(r, p) for r, p, _ in got], [("version-cargo", "Cargo.lock")])
+        no_lock = {"Cargo.lock": None}
+        self.assertEqual(problems({}, **no_lock), [])
+
+    def test_the_crate_version_may_be_named_in_a_claim_sentence_only_as_the_current_release(self):
+        text = CLEAN["docs/TECHNICAL.md"] + "\nThe version is currently 0.2.0-rc.14 in every build.\n"
         self.assertEqual(problems({}, **{"docs/TECHNICAL.md": text}), [])
+        old = CLEAN["docs/TECHNICAL.md"] + "\nThe version is currently 0.2.0-rc.6 in every build.\n"
+        self.assertEqual(rules(**{"docs/TECHNICAL.md": old}), ["version-stale"])
 
     def test_a_caption_that_names_the_build_of_a_clip_is_not_a_claim(self):
         text = CLEAN["docs/guide/getting-started.md"] + "\n*Eden, rc.13 (untested on hardware).*\n"

@@ -141,7 +141,9 @@ no clock and no git are used, so every host gives the same answer. The rules are
   with "newest", "latest", "currently", "current release/build/version" or "this release/build/version" that names another
   release fails. Pages that describe their own build (release notes, decisions, provenance, measurements, the media and
   feature ledgers) are skipped, by the list `HISTORICAL` with a reason each; a sentence that has to stay is listed in
-  `CLAIM_OK` with its reason. A list entry that matches nothing fails.
+  `CLAIM_OK` with its reason. A list entry that matches nothing fails. The crate version in `Cargo.toml`
+  (`0.2.0-rc.N`, with `Cargo.lock`'s own entry) must name that release too: the menu footer starts with it and the release
+  tag is `v0.2.0-rc.N` (operator 2026-11-15: the footer and the tag agree).
 - **Notice texts.** A text in double quotes that has to be a notice, a refusal or a greyed-row reason must be a string
   literal of the code the release build compiles in `src/` (or `crates/`), so a reworded notice breaks the page that
   quotes it. Test code (a `tests/` folder, `*_tests.rs`, `#[cfg(test)]`), host-only simulator code and diag-only code do not
@@ -160,8 +162,12 @@ The docs steps of a release. The build, the tag, the Forgejo release and the car
 2. Make the README's top and the Status section of `docs/TECHNICAL.md` name that release. `cargo test` fails until they
    do (`tools/docs_check.py`, rule `version-name`), and also on any "newest" or "latest" sentence that still names the
    old one (`version-stale`).
-3. Publish the Forgejo release page (the docs link to `releases/tag/v0.2.0-<rc>`).
-4. Run `python3 -I tools/check_external_links.py` from the repository root. It asks the network about every `http(s)`
+3. Put the release in the crate version in the release's name commit (`Cargo.toml` `version = "0.2.0-rc.N"` and
+   `Cargo.lock`'s `training_rooms` entry, with `build.rs` `BUILD_NAME`, `tests/build_tag.rs` and the frame.rs build-tag
+   test): the footer reads `0.2.0-rc.N · rcN <commit>`. Not before: `cargo test` fails (`version-cargo`) while the crate
+   version and `Current release:` name different releases.
+4. Publish the Forgejo release page (the docs link to `releases/tag/v0.2.0-<rc>`).
+5. Run `python3 -I tools/check_external_links.py` from the repository root. It asks the network about every `http(s)`
    link in `README.md` and `docs/`, and about the forge's release list, prints a report and changes nothing. It exits 1
    when a link fails, or when the forge already has a release newer than the one `CURRENT-RELEASE.md` names; fix those by
    hand. `--strict` also fails a moved link (a redirect); `--skip REGEX` leaves a URL out. It is not part of `cargo test`:
