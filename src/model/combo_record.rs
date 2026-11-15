@@ -16,7 +16,8 @@ use super::store::{default_id, Record, SkippedFile, Store, StoreError};
 
 /// The format's version. Fields added since are optional, so rc.4 (the first writer) reads every file written now.
 pub const SCHEMA_VERSION: u32 = 1;
-pub const MAX_FILE_BYTES: u64 = 64 * 1024;
+// restriction: combo-file-size — worker-side reads retain the existing 4 KiB per unit budget.
+pub const MAX_FILE_BYTES: u64 = LINKS as u64 * 4096;
 /// Longest name, in Unicode scalar values (the keyboard's limit, `MAX_NAME_CHARS` of macros and setups).
 pub const MAX_NAME_CHARS: usize = 48;
 /// The directory under the data folder.
@@ -159,30 +160,13 @@ impl ComboRecord {
         if start >= end || end > self.unit_count() {
             return Err(ComboError::Invalid("crop units"));
         }
-        let mut combo = Combo::from_links(
-            self.combo
-                .links()
-                .skip(start as usize)
-                .take((end - start) as usize)
-                .copied(),
-        )
-        .unwrap();
+        let origin = if self.combo.input_only { self.combo.get(start as usize).unwrap().events().next().unwrap().offset } else { 0 };
+        let mut combo = Combo::from_links(self.combo.links().skip(start as usize).take((end-start) as usize).map(|link| {
+            let mut link = *link;
+            for event in link.events.iter_mut().flatten() { event.offset -= origin; }
+            link
+        })).unwrap();
         combo.input_only = self.combo.input_only;
-        if combo.input_only {
-            let origin = combo.get(0).unwrap().events().next().unwrap().offset;
-            let links = combo
-                .links()
-                .map(|l| {
-                    let mut l = *l;
-                    for e in l.events.iter_mut().flatten() {
-                        e.offset -= origin;
-                    }
-                    l
-                })
-                .collect::<Vec<_>>();
-            combo = Combo::from_links(links).unwrap();
-            combo.input_only = true;
-        }
         let mut record = Self::new(self.name.clone(), combo, self.recorded_on.clone());
         record.made_from = self.made_from.clone();
         Ok(record)
@@ -228,21 +212,11 @@ impl ComboRecord {
             object.insert("name".into(), json!(self.name));
             return Value::Object(object);
         }
-        if self.combo.input_only {
-            let mut value = json!({"schema_version": 2, "kind": "input_drill", "name": self.name,
-                "input_steps": self.combo.links().map(|l| json!({"events": l.events().map(event_value).collect::<Vec<_>>()})).collect::<Vec<_>>() });
-            if let Some(f) = &self.recorded_on {
-                value["recorded_on"] = json!(f);
-            }
-            if let Some(f) = &self.made_from {
-                value["made_from"] = json!(f);
-            }
-            return value;
-        }
         let links: Vec<Value> = self
             .combo
             .links()
             .map(|l| {
+                if self.combo.input_only { return json!({"events": l.events().map(event_value).collect::<Vec<_>>()}); }
                 let mut link = json!({
                     "from": move_key(l.from),
                     "to": move_key(l.to),
@@ -272,8 +246,9 @@ impl ComboRecord {
                 link
             })
             .collect();
-        let mut value =
-            json!({"schema_version": SCHEMA_VERSION, "name": self.name, "links": links});
+        let mut value = json!({"schema_version": version, "name": self.name});
+        value[if self.combo.input_only { "input_steps" } else { "links" }] = Value::Array(links);
+        if self.combo.input_only { value["kind"] = json!("input_drill"); }
         if let Some(fighter) = &self.recorded_on {
             value["recorded_on"] = json!(fighter);
         }
@@ -307,57 +282,27 @@ impl ComboRecord {
             .get("made_from")
             .and_then(Value::as_str)
             .and_then(shown_name);
-        if object.get("schema_version").and_then(Value::as_u64) == Some(2) {
-            if object.get("kind").and_then(Value::as_str) != Some("input_drill") {
-                return Err("kind");
+        let input = object.get("schema_version").and_then(Value::as_u64) == Some(2);
+        if input && object.get("kind").and_then(Value::as_str) != Some("input_drill") { return Err("kind"); }
+        let key = if input { "input_steps" } else { "links" };
+        let links = object.get(key).and_then(Value::as_array).ok_or(key)?;
+        if links.is_empty() || links.len() > LINKS { return Err(key); }
+        let mut previous = 0;
+        let mut combo = Combo::from_links(links.iter().map(|value| {
+            if !input { return link_of(value); }
+            let events = value.get("events").and_then(Value::as_array).ok_or("events")?;
+            if events.is_empty() || events.len() > STEPS { return Err("events"); }
+            let mut link = LinkRec::INPUT;
+            for (slot, event) in link.events.iter_mut().zip(events) {
+                let event = parse_event(event.as_object().ok_or("event")?)?;
+                if event.offset < previous { return Err("offset"); }
+                previous = event.offset;
+                *slot = Some(event);
             }
-            let steps = object
-                .get("input_steps")
-                .and_then(Value::as_array)
-                .ok_or("input_steps")?;
-            let mut links = Vec::new();
-            let mut previous = 0;
-            for step in steps {
-                let events = step
-                    .get("events")
-                    .and_then(Value::as_array)
-                    .ok_or("events")?;
-                if events.is_empty() || events.len() > STEPS {
-                    return Err("events");
-                }
-                let mut link = LinkRec::INPUT;
-                for (slot, e) in link.events.iter_mut().zip(events) {
-                    let e = parse_event(e.as_object().ok_or("event")?)?;
-                    if e.offset < previous {
-                        return Err("offset");
-                    }
-                    previous = e.offset;
-                    *slot = Some(e);
-                }
-                links.push(link);
-            }
-            let mut combo = Combo::from_links(links).ok_or("input_steps")?;
-            combo.input_only = true;
-            if combo.get(0).unwrap().events().next().unwrap().offset != 0 {
-                return Err("offset");
-            }
-            return Ok(Self {
-                name,
-                combo,
-                recorded_on,
-                made_from,
-                source: Some(object.clone()),
-            });
-        }
-        let links = object
-            .get("links")
-            .and_then(Value::as_array)
-            .ok_or("links")?;
-        if links.is_empty() || links.len() > LINKS {
-            return Err("links");
-        }
-        let combo = Combo::from_links(links.iter().map(link_of).collect::<Result<Vec<_>, _>>()?)
-            .ok_or("links")?;
+            Ok(link)
+        }).collect::<Result<Vec<_>,_>>()?).ok_or(key)?;
+        combo.input_only = input;
+        if input && combo.get(0).unwrap().events().next().unwrap().offset != 0 { return Err("offset"); }
         Ok(ComboRecord {
             name,
             combo,

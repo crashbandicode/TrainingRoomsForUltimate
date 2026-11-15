@@ -151,3 +151,13 @@ move, not one fighter's moves, so a combo recorded on one fighter can be practis
 
 ![Recording > Combos & Sequences: the COMBOS list with Jab jab, Luigi jabs (Recorded on Luigi), Jab nair and Nair nair](../media/rc13-combo-library.png)<br>
 *COMBOS after combo files were copied into `combos/`: each lists its name and "Recorded on" fighter, and the one made on Luigi says so. Eden, rc.13 (untested on hardware).*
+
+## Input-drill files (rc.15)
+
+Input drills share this folder and the combo id namespace, with default names Drill N. They are listed separately under COMBOS > DRILLS. Existing hit combos still write schema 1 unchanged. A no-hit drill writes schema 2 with an explicit kind and input steps:
+
+```json
+{"schema_version":2,"kind":"input_drill","name":"Drill 1","input_steps":[{"events":[{"kind":"press","button":"jump","dir":"neutral","offset":0},{"kind":"release","button":"jump","dir":"neutral","offset":2}]}]}
+```
+
+Each step has 1–12 events. There are at most 16 steps, sharing the combo capacity. Event fields use the same kinds and facing-relative directions as link events. Offsets are nonnegative frames from the take's first event, which is offset 0; they stay global across steps. Idle gaps greater than 20 frames start a step, and every 12 events continue in another step. A whole-step crop rebases the retained events from the new first event. No hit, move, spot, window or TRUE verdict is stored or graded. Releases are required. Optional recorded_on and made_from have the same meaning as on hit combos; direct recordings have no made_from. Renaming preserves the kind and unknown metadata. Schema-1 files remain readable as before.

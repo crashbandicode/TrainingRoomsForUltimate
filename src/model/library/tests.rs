@@ -696,7 +696,7 @@ fn ordered_catalog() -> crate::model::recording_menu::Catalog {
                 vec!["nair".into(), "gone".into(), "dash".into()],
             ),
         ],
-        combos: vec![ComboFile {
+        combos: vec![ComboFile { input_only: false,
             id: "c1".into(),
             name: "One".into(),
             recorded_on: String::new(),

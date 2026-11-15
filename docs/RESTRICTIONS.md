@@ -5,6 +5,9 @@ the 3 above it (playbook `docs/CHECKLIST.md`, the "cites an approved restriction
 
 | ID | Message | Why | Approved |
 | --- | --- | --- | --- |
+| `drill-capacity` | "Drill too long: keep it to 16 steps" | Input drills share the existing combo bounds (LINKS × STEPS); overflow saves nothing. | operator 2026-11-15, keep 16 for rc.15 |
+| `combo-capacity` | "Combo too long: keep it to 16 links" | Hit combos share the same unit bound; an overfull exchange saves nothing. | operator 2026-11-15, keep 16 for rc.15 |
+| `combo-file-size` | `file is {bytes} bytes (maximum {max})` (`StoreError::FileTooLarge`, unchanged) | Worker-side combo/drill reads allow `LINKS * 4096` bytes (64 KiB at 16 units), retaining the old 4 KiB/unit budget; larger files still refuse. | primary 2026-11-15, following the operator's 16-unit decision |
 | `mii-class-unavailable` | `"{label} - unavailable"` (`src/editors/roster.rs`) | A greyed Mii tile: the role has no Mii of that class it can load (`docs/MII.md` row 17; the fork's behaviour). | operator 2026-11-05 ("approve all four") |
 | `replay-preview-fighter` | "Preview fighter is not available" (`src/model/macro_ui/replay_target.rs`) | The capture's fighter kind is not one the roster can load, so there is nothing to preview or switch to. | operator 2026-11-05 ("approve all four") |
 | `replay-mii-metadata` | "Recorded Mii metadata is unavailable" (`src/model/macro_ui/replay_target.rs`) | The capture's Mii could not be resolved, so Switch cannot load that exact Mii; Keep still plays the inputs. | operator 2026-11-05 ("approve all four") |

@@ -95,10 +95,12 @@ pub fn drift_text(dir: Dir) -> Text {
 }
 
 /// "3 of 4 true", "stopped: 2 of 4", "cleared".
-pub fn result_text(s: &Summary) -> Text {
+pub fn result_text(s: &Summary) -> Text { result_mode(s, false) }
+fn result_mode(s: &Summary, input: bool) -> Text {
     let mut t = Text::EMPTY;
     let _ = match s.outcome {
         Outcome::Completed if s.clean => write!(t, "clean, {} of {}", s.true_links, s.total),
+        Outcome::Completed if input => write!(t, "{} of {} counted", s.true_links, s.total),
         Outcome::Completed => write!(t, "{} of {} true", s.true_links, s.total),
         Outcome::Stopped => write!(t, "stopped: {} of {}", s.true_links, s.total),
         Outcome::Cleared => write!(t, "cleared"),
@@ -107,55 +109,57 @@ pub fn result_text(s: &Summary) -> Text {
 }
 
 /// The first fault: "L3 DROP +1", "L2 wrong move: Aerial", "L1 Jump missing", "L2 Jump 2f late".
-pub fn reason_text(s: &Summary) -> Text {
+pub fn reason_text(s: &Summary) -> Text { reason_mode(s, false) }
+fn reason_mode(s: &Summary, input: bool) -> Text {
+    let unit = if input { "S" } else { "L" };
     let mut t = Text::EMPTY;
     let Some((link, reason)) = s.fault else {
         return t;
     };
     let n = u32::from(link) + 1;
     let _ = match reason {
-        Reason::Drop(d) => write!(t, "L{n} DROP +{d}"),
-        Reason::WrongMove(m) => write!(t, "L{n} wrong move: {}", m.name()),
-        Reason::Missing(b) => write!(t, "L{n} {} missing", button_name(b)),
+        Reason::Drop(d) => write!(t, "{unit}{n} DROP +{d}"),
+        Reason::WrongMove(m) => write!(t, "{unit}{n} wrong move: {}", m.name()),
+        Reason::Missing(b) => write!(t, "{unit}{n} {} missing", button_name(b)),
         Reason::Off(b, d) => write!(
             t,
-            "L{n} {} {}f {}",
+            "{unit}{n} {} {}f {}",
             button_name(b),
             d.abs(),
             if d > 0 { "late" } else { "early" }
         ),
-        Reason::MissingRelease(b) => write!(t, "L{n} {} release missing", button_name(b)),
+        Reason::MissingRelease(b) => write!(t, "{unit}{n} {} release missing", button_name(b)),
         Reason::ReleaseOff(b, d) => {
             write!(
                 t,
-                "L{n} {} release {}f {}",
+                "{unit}{n} {} release {}f {}",
                 button_name(b),
                 d.abs(),
                 if d > 0 { "late" } else { "early" }
             )
         }
         Reason::MissingFlick(flick) => {
-            write!(t, "L{n} {} missing", event_label(Kind::Flick(flick)))
+            write!(t, "{unit}{n} {} missing", event_label(Kind::Flick(flick)))
         }
         Reason::FlickOff(flick, d) => {
             write!(
                 t,
-                "L{n} {} {}f {}",
+                "{unit}{n} {} {}f {}",
                 event_label(Kind::Flick(flick)),
                 d.abs(),
                 if d > 0 { "late" } else { "early" }
             )
         }
-        Reason::MissingCStick => write!(t, "L{n} C-stick missing"),
+        Reason::MissingCStick => write!(t, "{unit}{n} C-stick missing"),
         Reason::CStickOff(d) => write!(
             t,
-            "L{n} C-stick {}f {}",
+            "{unit}{n} C-stick {}f {}",
             d.abs(),
             if d > 0 { "late" } else { "early" }
         ),
-        Reason::WrongDir(kind) => write!(t, "L{n} {} wrong direction", event_label(kind)),
-        Reason::WrongSpot(Some(got), saved) => write!(t, "L{n} {}, saved {}", got.name(), saved.name()),
-        Reason::WrongSpot(None, saved) => write!(t, "L{n} no spot, saved {}", saved.name()),
+        Reason::WrongDir(kind) => write!(t, "{unit}{n} {} wrong direction", event_label(kind)),
+        Reason::WrongSpot(Some(got), saved) => write!(t, "{unit}{n} {}, saved {}", got.name(), saved.name()),
+        Reason::WrongSpot(None, saved) => write!(t, "{unit}{n} no spot, saved {}", saved.name()),
     };
     t
 }
@@ -479,6 +483,8 @@ impl Plan<'_> {
         use at::*;
         let last = self.helper.attempt().and_then(|a| a.summary);
         let total = self.helper.target().map_or(0, |t| t.len());
+        let input = self.helper.target().is_some_and(|t| t.input_only);
+        let units = if input { "steps" } else { "links" };
         if let Some(seq) = self.seq {
             match i {
                 CONTAINER => {
@@ -508,7 +514,7 @@ impl Plan<'_> {
             i if i >= SEQ_BACKDROP => Look::HIDDEN,
             HEADER => {
                 let name = if self.name.units().is_empty() {
-                    Text::new("Combo")
+                    Text::new(if input { "Drill" } else { "Combo" })
                 } else {
                     *self.name
                 };
@@ -526,17 +532,17 @@ impl Plan<'_> {
                 (_, Some(s)) => Look::text(
                     LEFT + 120.0,
                     FOOTER_Y,
-                    result_text(&s),
+                    result_mode(&s, input),
                     if s.clean { GOOD } else { TEXT },
                 ),
                 (Some(a), None) => {
                     let mut t = Text::EMPTY;
-                    let _ = write!(t, "link {} of {total}", a.len());
+                    let _ = write!(t, "{} {} of {total}", if input { "step" } else { "link" }, a.len());
                     Look::text(LEFT + 120.0, FOOTER_Y, t, TEXT)
                 }
                 (None, None) => {
                     let mut t = Text::EMPTY;
-                    let _ = write!(t, "ready: {total} links");
+                    let _ = write!(t, "ready: {total} {units}");
                     Look::text(LEFT + 120.0, FOOTER_Y, t, MUTED)
                 }
             },
@@ -544,7 +550,7 @@ impl Plan<'_> {
                 Some(s) if s.fault.is_some() => Look::text(
                     LEFT + 460.0,
                     FOOTER_Y,
-                    reason_text(&s),
+                    reason_mode(&s, input),
                     if s.clean { GOOD } else { WARN },
                 ),
                 Some(s) if s.clean => match shown_drift(self.helper) {
@@ -574,21 +580,24 @@ impl Plan<'_> {
             return Look::HIDDEN;
         };
         let (cx, cell_w) = self.cell_geometry(c);
-        let ruler_x = |_: usize, frames: i32| ruler_at(cx, frames);
+        let input = self.helper.target().is_some_and(|t| t.input_only);
+        let origin = if input { reference.events().next().map_or(0,|e|e.offset) } else { 0 };
+        let ruler_x = |_: usize, frames: i32| ruler_at(cx, frames - origin);
         let first_step = reference.events[0];
         match (i - CELL) / CELLS {
             0 => Look::rect(cx, CELL_Y, cell_w, CELL_COLOR),
             1 => {
                 let mut t = Text::EMPTY;
-                let _ = write!(
+                if input { let _ = write!(t, "Step {}", k + 1); } else { let _ = write!(
                     t,
                     "{} {}>{}",
                     k + 1,
                     reference.from.name(),
                     reference.to.name()
-                );
+                ); }
                 Look::text(cx, CELL_Y + TITLE_DY, t, MUTED)
             }
+            2 if input => Look::HIDDEN,
             2 => match grade {
                 Some(g) if g.wrong_move => {
                     Look::text(cx - 48.0, CELL_Y + VERDICT_DY, Text::new("WRONG MOVE"), BAD)
@@ -617,6 +626,7 @@ impl Plan<'_> {
                 _ => Look::HIDDEN,
             },
             4 => Look::rect(cx, CELL_Y + RULER_DY, RULER_W, RULE),
+            5 if input => Look::HIDDEN,
             5 => match grade.map_or(reference.window, |g| g.link.window) {
                 Some((a, b)) => {
                     let (x0, x1) = (ruler_x(c, a), ruler_x(c, b + 1));

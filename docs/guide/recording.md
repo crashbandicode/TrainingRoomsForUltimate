@@ -143,7 +143,7 @@ because the picker lists recordings only.
   save (a chain uses its first macro's) and keeps what it did as a new combo, Combo N, with Made from set to the
   source.
   - The file on screen stays, the drill doesn't change, and the new combo joins the five most recently used.
-  - A pass with no hit and no follow-up saves nothing and says "No combo yet: land a hit and a follow-up first."
+  - A pass with no hit saves its input steps as Drill N under COMBOS > DRILLS. A pass that touches the opponent but has no follow-up still says "No combo yet: land a hit and a follow-up first."
   - If the start save was deleted, Make combo skips the warp, shows "No start save. This macro plays from where the
     fighters are." and still plays. A switch that is Off, or a file that never had a start save, doesn't warp and shows
     nothing. A chain whose first macro is missing skips that step and plays the next one still there.
@@ -182,6 +182,19 @@ recorded one.
 
 *Cropped to the top of the screen.*
 
+### Input drills
+
+**DRILLS >** under COMBOS opens the input-drill list in Training and waiting rooms. A drill needs no contact with the opponent: use it for dash-back, short hops, fast-falls or a movement sequence. Its default name is Drill N. Its file screen has Drill, Rename, Crop and Delete, plus Made from when a macro or chain made it.
+
+- **Record directly:** choose **+ Record drill…**. The library closes and shows the configured Record chord. Press that chord to start recording Player 1, then press it again to stop and save the take straight as a drill. It becomes the current grading target. This one take uses Player 1 even if the pop-up's Record role is CPU; later ordinary recordings keep their selected role. Opening the library before starting cancels the armed take. The menu press and the Record chords are excluded.
+- **From a macro or chain:** Make combo saves an input drill when the pass touches no opponent. A pass with hit links keeps making a hit combo. The source and current grading target stay selected as before.
+- **Steps:** presses, releases, C-stick and stick flicks share a step until more than 20 frames pass without an input event. A step with 12 events continues in another step. The current shared combo capacity is 16 steps of up to 12 events; an overfull take saves nothing.
+- **Grading:** the same event kind, facing-relative direction, order and On-time tolerance apply. The first event starts the clock; later steps keep their recorded offsets, including idle gaps. Missing or late releases drop an input step. There is no move, hit, spot or TRUE requirement; the TRUE field stays blank.
+- **Progress:** the bar shows steps, Best counts steps that counted, and the streak counts complete clean attempts. After an attempt, more than 20 idle frames allow a fresh attempt.
+- **Crop:** the shared clip editor's handles select whole steps. It saves a new Drill N and leaves the original; the retained first event becomes time zero. X has no preview, as for hit combos.
+
+Sequences in rc.15 offer hit combos only. Their continuation currently checks the hit connecting two combos, which an input drill does not have.
+
 ### Crop
 
 Crop on a combo, drill or macro opens the Replay window's clip editor ([keys](../menu/recording.md#replay-window)).
@@ -196,7 +209,7 @@ Crop on a combo, drill or macro opens the Replay window's clip editor ([keys](..
 
 ## Sequences and the one drill
 
-A sequence is an ordered list of combos. It stores each combo's id, so renaming a combo shows the new name in the
+A sequence is an ordered list of hit combos. Input drills are excluded in rc.15 because continuation requires a connecting hit. It stores each combo's id, so renaming a combo shows the new name in the
 sequence, and deleting a combo makes the sequence skip that step. An empty sequence drills nothing, and a sequence of
 any length drills every combo in it.
 

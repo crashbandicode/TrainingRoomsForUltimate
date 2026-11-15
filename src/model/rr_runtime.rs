@@ -13,7 +13,7 @@ use super::macros::{FrameSnapshot, FrameWindow, InputFrame, Library, MacroRecord
 #[cfg(test)]
 use super::macros::MAX_FRAMES;
 use super::playback::{Book, Playback};
-use crate::model::combo::{Combo, LinkRec};
+use crate::model::combo::Combo;
 use crate::model::combo_record::{clean_name, default_name, ComboLibrary, ComboRecord};
 use crate::model::state::record::SavedState;
 use crate::model::store::Store;
@@ -356,16 +356,6 @@ pub fn crop_macro_file(
     library.save_new(&cropped).map_err(record)
 }
 
-pub fn crop_combo(combo: &Combo, start: u32, end: u32, name: &str) -> Result<ComboRecord, Error> {
-    let links: Vec<LinkRec> = combo.links().cloned().collect();
-    let mut window = FrameWindow::new(links.len() as u32).map_err(record)?;
-    window.set_in(start);
-    window.set_out(end);
-    let sliced = links[window.start() as usize..window.end() as usize].to_vec();
-    let next = Combo::from_links(sliced).ok_or(Error::Invalid("bad crop"))?;
-    Ok(ComboRecord::new(name.to_string(), next, None))
-}
-
 pub fn crop_combo_file(
     root: &Path,
     id: &str,
@@ -375,7 +365,7 @@ pub fn crop_combo_file(
 ) -> Result<String, Error> {
     let library = ComboLibrary::new(root.join("combos"));
     let original = library.load(id).map_err(record)?;
-    let cropped = crop_combo(&original.combo, start, end, name)?;
+    let mut cropped = original.crop_units(start, end).map_err(record)?; cropped.name = name.to_string();
     library.save_new(&cropped).map_err(record)
 }
 
@@ -402,10 +392,13 @@ pub struct MakeComboPass {
 }
 
 /// The strip's combo, named Combo N, marked made from `source`. The drill is not written.
-pub fn save_made_combo(root: &Path, combo: &Combo, source: &str, at: u64) -> Result<String, Error> {
+pub fn save_made_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<String>, at: u64) -> Result<String, Error> {
     let library = ComboLibrary::new(root.join("combos"));
     let entries = library.list().map_err(record)?.entries;
-    let made = ComboRecord::new(default_name(&entries), *combo, None).with_made_from(source);
+    let prefix = if combo.input_only { "Drill" } else { "Combo" };
+    let name = crate::model::store::lowest_free(|n| format!("{prefix} {n}"), entries.iter().map(|e| e.name.as_str()));
+    let mut made = ComboRecord::new(name, *combo, recorded_on);
+    if !source.is_empty() { made = made.with_made_from(source); }
     let id = library.save_new(&made).map_err(record)?;
     let mut index = RecordingIndex::load(root)?;
     index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
@@ -630,7 +623,7 @@ pub fn load_catalog(root: &Path) -> Result<CatalogLoad, Error> {
                 .as_ref()
                 .map(|file| crate::model::recording_menu::combo_link_lines(&file.combo))
                 .unwrap_or_default();
-            catalog.combos.push(ComboFile {
+            catalog.combos.push(ComboFile { input_only: record.as_ref().is_some_and(|f| f.combo.input_only),
                 id: entry.id,
                 name: entry.name,
                 recorded_on: record.as_ref().and_then(|file| file.recorded_on.clone()).unwrap_or_default(),
@@ -655,7 +648,7 @@ pub fn load_catalog(root: &Path) -> Result<CatalogLoad, Error> {
     }
     catalog.hot_macros = index.hot(Kind::Macro).to_vec();
     catalog.hot_saves = index.hot(Kind::Save).to_vec();
-    catalog.hot_combos = index.hot(Kind::Combo).to_vec();
+    catalog.hot_combos = [false,true].into_iter().flat_map(|input| index.hot_where(Kind::Combo, |id| catalog.combos.iter().any(|f| f.id == id && f.input_only == input))).collect();
     catalog.hot_sequences = index.hot(Kind::Sequence).to_vec();
     let mark = |count: LoopCount| match count {
         LoopCount::Infinite => LoopMark::Infinite,
@@ -676,7 +669,7 @@ pub fn load_catalog(root: &Path) -> Result<CatalogLoad, Error> {
 
 // The fighter table is the switch (and test) roster. A host library build has no names.
 #[cfg(any(test, target_os = "switch"))]
-fn fighter_name(kind: i32) -> String {
+pub(super) fn fighter_name(kind: i32) -> String {
     if kind < 0 {
         return String::new();
     }
@@ -686,7 +679,7 @@ fn fighter_name(kind: i32) -> String {
 }
 
 #[cfg(not(any(test, target_os = "switch")))]
-fn fighter_name(_kind: i32) -> String {
+pub(super) fn fighter_name(_kind: i32) -> String {
     String::new()
 }
 
@@ -1210,7 +1203,7 @@ mod tests {
                     span: 0,
                 },
             ],
-            combos: vec![ComboFile {
+            combos: vec![ComboFile { input_only: false,
                 id: "c1".into(),
                 name: "One".into(),
                 recorded_on: String::new(),

@@ -46,6 +46,10 @@ const HOOK_LOCKS: &[(&str, &str)] = &[
     ("features/input_display.rs", "IDS"),
     ("features/input_display.rs", "RENDERER"),
     ("features/combo.rs", "HELPER"),
+    ("features/combo.rs", "NAME"),
+    ("features/combo.rs", "PLAN"),
+    ("features/combo.rs", "RUN"),
+    ("features/combo.rs", "RENDERER"),
     ("features/input_delay.rs", "ADAPTER"),
     ("features/notices.rs", "QUEUE"),
     ("features/notices.rs", "BOOT_NOTICES"),
@@ -304,8 +308,22 @@ struct Scan {
     ambiguous: BTreeMap<String, usize>,
 }
 
-fn scan(runtime: &Path, entries: &[&str], locks: &[(&str, &str)], allowed: &[(&str, &str, &str)]) -> Scan {
+fn scan(
+    runtime: &Path,
+    entries: &[&str],
+    locks: &[(&str, &str)],
+    allowed: &[(&str, &str, &str)],
+) -> Scan {
     let graph = Graph::scan(runtime, &[]);
+    scan_graph(&graph, entries, locks, allowed)
+}
+
+fn scan_graph(
+    graph: &Graph,
+    entries: &[&str],
+    locks: &[(&str, &str)],
+    allowed: &[(&str, &str, &str)],
+) -> Scan {
     let mut by_name: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     for (i, f) in graph.funcs.iter().enumerate() {
         by_name.entry(f.name.clone()).or_default().push(i);
@@ -317,25 +335,108 @@ fn scan(runtime: &Path, entries: &[&str], locks: &[(&str, &str)], allowed: &[(&s
         if starts.is_empty() && FEATURE_ONLY_ENTRIES.iter().any(|(e, _)| e == entry) {
             continue;
         }
-        assert!(!starts.is_empty(), "entry {entry} not found under {}", runtime.display());
+        assert!(!starts.is_empty(), "entry {entry} not found");
         let mut seen = BTreeSet::new();
-        let mut stack: Vec<(usize, String)> = starts.into_iter().map(|s| (s, (*entry).to_owned())).collect();
+        let mut stack: Vec<(usize, String)> = starts
+            .into_iter()
+            .map(|s| (s, (*entry).to_owned()))
+            .collect();
         while let Some((i, via)) = stack.pop() {
             if !seen.insert(i) {
                 continue;
             }
             let key = graph.funcs[i].key();
             for (file, lock) in locks {
-                if takes_lock(&graph, i, file, lock) && !allowed.iter().any(|(f, l, _)| *f == key && l == lock) {
-                    violations.insert(format!("{entry} -> ... -> {key} takes {file}::{lock} (called from {via})"));
+                if takes_lock(graph, i, file, lock)
+                    && !allowed.iter().any(|(f, l, _)| *f == key && l == lock)
+                {
+                    violations.insert(format!(
+                        "{entry} -> ... -> {key} takes {file}::{lock} (called from {via})"
+                    ));
                 }
             }
-            for callee in edges(&graph, i, &by_name, &mut ambiguous) {
+            for callee in edges(graph, i, &by_name, &mut ambiguous) {
                 stack.push((callee, key.clone()));
             }
         }
     }
-    Scan { violations, ambiguous }
+    Scan {
+        violations,
+        ambiguous,
+    }
+}
+
+fn hud_borrow_contract(hud: &[Tok], seq: &[Tok]) -> bool {
+    let at = |body: &[Tok], pattern: &str| {
+        let pattern = callgraph::lex(pattern);
+        body.windows(pattern.len()).position(|w| w == pattern)
+    };
+    let Some(start) = at(hud, "HELPER.try_lock() else { return 0") else {
+        return false;
+    };
+    let Some(draw) = at(hud, "panes.draw(&helper") else {
+        return false;
+    };
+    let Some(end) = at(hud, "drop(helper)") else {
+        return false;
+    };
+    let Some(apply) = at(hud, "apply(") else {
+        return false;
+    };
+    start < draw && draw < end && end < apply
+        && at(hud, "RENDERER.try_lock() else { return 0").is_some()
+        && at(hud, "NAME.try_lock()").is_some()
+        && at(seq, "PLAN.try_lock()?").is_some() && at(seq, "RUN.try_lock()?").is_some()
+        && hud[start..end].iter().chain(seq).all(|t| !matches!(t, Tok::Ident(s) if ["lock", "read", "write", "Box", "Vec", "String", "alloc", "after_strip", "session_clear", "set_target"].contains(&s.as_str())))
+}
+
+#[test]
+fn combo_hud_has_no_wait_or_native_apply_under_helper_and_seeds_fail() {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut graph = Graph::scan(&runtime, &[]);
+    let hud = graph.find("combo::hud_tick")[0];
+    let seq = graph.find("combo::seq_view")[0];
+    assert!(hud_borrow_contract(
+        &graph.funcs[hud].body,
+        &graph.funcs[seq].body
+    ));
+    let mut bad_hud = graph.funcs[hud].body.clone();
+    let at = bad_hud
+        .windows(3)
+        .position(|w| w == callgraph::lex("RENDERER.try_lock"))
+        .unwrap()
+        + 2;
+    bad_hud[at] = Tok::Ident("lock".into());
+    assert!(
+        !hud_borrow_contract(&bad_hud, &graph.funcs[seq].body),
+        "blocking RENDERER seed escaped"
+    );
+    for method in ["RUN", "PLAN"] {
+        let mut bad = graph.funcs[seq].body.clone();
+        let at = bad
+            .windows(3)
+            .position(|w| w == callgraph::lex(&format!("{method}.try_lock")))
+            .unwrap()
+            + 2;
+        bad[at] = Tok::Ident("lock".into());
+        assert!(
+            !hud_borrow_contract(&graph.funcs[hud].body, &bad),
+            "blocking {method} seed escaped"
+        );
+    }
+    // Exercise the ownership scanner with a plugin entry reaching a newly inventoried successful try.
+    graph.funcs[hud].body =
+        callgraph::lex("NAME.try_lock(); PLAN.try_lock(); RUN.try_lock(); RENDERER.try_lock();");
+    let result = scan_graph(&graph, &["combo::hud_tick"], HOOK_LOCKS, &[]);
+    for name in ["NAME", "PLAN", "RUN", "RENDERER"] {
+        assert!(
+            result
+                .violations
+                .iter()
+                .any(|v| v.contains(&format!("features/combo.rs::{name}"))),
+            "try ownership seed {name} missed"
+        );
+    }
 }
 
 #[test]

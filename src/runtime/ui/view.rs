@@ -243,7 +243,7 @@ impl Panes {
         for (section, slot) in headers.take(2).enumerate() {
             let color = match frame.head_tag[section] {
                 Some(FileTag::Macro) => KIND_MACRO,
-                Some(FileTag::Combo) => KIND_COMBO,
+                Some(FileTag::Combo | FileTag::Drill) => KIND_COMBO,
                 Some(FileTag::Sequence) => KIND_SEQUENCE,
                 Some(FileTag::Save) | None => continue,
             };
@@ -338,6 +338,7 @@ impl Panes {
                 FileTag::Save => (&[83, 65, 86, 69, 32, 83, 84, 65, 84, 69], [240, 150, 60, 255]),
                 FileTag::Macro => (&[77, 65, 67, 82, 79], [92, 150, 240, 255]),
                 FileTag::Combo => (&[67, 79, 77, 66, 79], [170, 120, 240, 255]),
+                FileTag::Drill => (&[68, 82, 73, 76, 76], [170, 120, 240, 255]),
                 FileTag::Sequence => (&[83, 69, 81, 85, 69, 78, 67, 69], [235, 105, 170, 255]),
             };
             let left = if child { CONN_LEFT + CONN_INDENT } else { CONN_LEFT };

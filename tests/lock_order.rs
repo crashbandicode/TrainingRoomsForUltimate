@@ -474,18 +474,31 @@ fn index_end(body: &[Tok], i: usize) -> usize {
 }
 
 fn takes(ctx: &Ctx, f: usize) -> Vec<Take> {
+    takes_mode(ctx, f, false)
+}
+
+fn takes_mode(ctx: &Ctx, f: usize, include_try: bool) -> Vec<Take> {
     let body = &ctx.graph.funcs[f].body;
     let mut out = Vec::new();
+    let acquisition =
+        |m: &str| LOCK_METHODS.contains(&m) || (include_try && TRY_METHODS.contains(&m));
     // `accessor(…).lock()` (character_roster's `state_for(role).lock()`): a take of each lock the accessor hands out,
     // held over its statement.
     for i in 1..body.len() {
-        if punct(body.get(i), '.') && ident(body.get(i + 1)).is_some_and(|m| LOCK_METHODS.contains(&m)) && punct(body.get(i + 2), '(') {
+        if punct(body.get(i), '.')
+            && ident(body.get(i + 1)).is_some_and(acquisition)
+            && punct(body.get(i + 2), '(')
+        {
             for lock in accessor_take(ctx, f, i) {
                 let s = statement_start(body, i);
                 let arm = s >= 2 && punct(body.get(s - 1), '>') && punct(body.get(s - 2), '=');
                 let lets = ident(body.get(s)) == Some("let");
                 let bound = lets && punct(body.get(i + 4), ';');
-                let name_at = if ident(body.get(s + 1)) == Some("mut") { s + 2 } else { s + 1 };
+                let name_at = if ident(body.get(s + 1)) == Some("mut") {
+                    s + 2
+                } else {
+                    s + 1
+                };
                 let end = if let Some(close) = closure_end(body, s, i) {
                     close
                 } else if let Some(open) = condition_end(body, s, i) {
@@ -494,7 +507,11 @@ fn takes(ctx: &Ctx, f: usize) -> Vec<Take> {
                     let block = block_end(body, i);
                     let name = ident(body.get(name_at)).unwrap_or("");
                     (i..block)
-                        .find(|&j| ident(body.get(j)) == Some("drop") && punct(body.get(j + 1), '(') && ident(body.get(j + 2)) == Some(name))
+                        .find(|&j| {
+                            ident(body.get(j)) == Some("drop")
+                                && punct(body.get(j + 1), '(')
+                                && ident(body.get(j + 2)) == Some(name)
+                        })
                         .unwrap_or(block)
                 } else {
                     statement_end(body, s, i, arm)
@@ -504,13 +521,19 @@ fn takes(ctx: &Ctx, f: usize) -> Vec<Take> {
         }
     }
     for i in 0..body.len() {
-        let Some(lock) = ctx.lock_at(f, i) else { continue };
+        let Some(lock) = ctx.lock_at(f, i) else {
+            continue;
+        };
         // `NAME.lock()`, or one lock of a static array, `NAME[role].lock()` (native_body_bank's `BANKS`).
         let dot = index_end(body, i) + 1;
         let method = punct(body.get(dot), '.')
-            && ident(body.get(dot + 1)).is_some_and(|m| LOCK_METHODS.contains(&m))
+            && ident(body.get(dot + 1)).is_some_and(acquisition)
             && punct(body.get(dot + 2), '(');
-        let head = if i >= 2 && body[i - 1] == Tok::PathSep { i - 2 } else { i };
+        let head = if i >= 2 && body[i - 1] == Tok::PathSep {
+            i - 2
+        } else {
+            i
+        };
         let helper = head >= 3
             && punct(body.get(head - 1), '&')
             && punct(body.get(head - 2), '(')
@@ -524,7 +547,9 @@ fn takes(ctx: &Ctx, f: usize) -> Vec<Take> {
         // `let [mut] name = NAME.lock()[.unwrap()|.expect(..)];` binds the guard.
         let call_close = if helper { i + 1 } else { dot + 3 };
         let mut after = call_close + 1;
-        if punct(body.get(after), '.') && matches!(ident(body.get(after + 1)), Some("unwrap" | "expect")) {
+        if punct(body.get(after), '.')
+            && matches!(ident(body.get(after + 1)), Some("unwrap" | "expect"))
+        {
             let open = after + 2;
             let mut depth = 0;
             let mut j = open;
@@ -541,15 +566,30 @@ fn takes(ctx: &Ctx, f: usize) -> Vec<Take> {
             }
             after = j + 1;
         }
+        if include_try && punct(body.get(after), '?') {
+            after += 1;
+        }
         let lets = ident(body.get(s)) == Some("let");
         let mut name_at = s + 1;
         if ident(body.get(name_at)) == Some("mut") {
             name_at += 1;
         }
-        let simple = lets && ident(body.get(name_at)).is_some() && punct(body.get(name_at + 1), '=') && name_at + 2 == at;
-        let bound_name = (simple && punct(body.get(after), ';')).then(|| ident(body.get(name_at)).unwrap().to_owned());
+        let simple = lets
+            && ident(body.get(name_at)).is_some()
+            && punct(body.get(name_at + 1), '=')
+            && name_at + 2 == at;
+        let mut bound_name = (simple && punct(body.get(after), ';'))
+            .then(|| ident(body.get(name_at)).unwrap().to_owned());
         // `let Ok(mut g) = NAME.lock() else {…};` binds it too.
         let else_bound = lets && ident(body.get(after)) == Some("else");
+        if include_try
+            && else_bound
+            && matches!(ident(body.get(name_at)), Some("Some" | "Ok"))
+            && punct(body.get(name_at + 1), '(')
+        {
+            let inner = name_at + 2 + usize::from(ident(body.get(name_at + 2)) == Some("mut"));
+            bound_name = ident(body.get(inner)).map(str::to_owned);
+        }
         let end = if let Some(close) = closure_end(body, s, at) {
             close
         } else if let Some(open) = condition_end(body, s, at) {
@@ -557,7 +597,9 @@ fn takes(ctx: &Ctx, f: usize) -> Vec<Take> {
         } else if let Some(name) = bound_name {
             let block = block_end(body, at);
             let dropped = (at..block).find(|&j| {
-                ident(body.get(j)) == Some("drop") && punct(body.get(j + 1), '(') && ident(body.get(j + 2)) == Some(name.as_str())
+                ident(body.get(j)) == Some("drop")
+                    && punct(body.get(j + 1), '(')
+                    && ident(body.get(j + 2)) == Some(name.as_str())
             });
             dropped.unwrap_or(block)
         } else if else_bound {
@@ -636,17 +678,37 @@ fn plugin_entry_funcs(graph: &Graph) -> Vec<(Vec<usize>, String)> {
 }
 
 fn scan(graph: &Graph) -> (Ctx<'_>, Scan) {
+    scan_mode(graph, false)
+}
+
+fn scan_mode(graph: &Graph, include_try: bool) -> (Ctx<'_>, Scan) {
     let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
     let ctx = Ctx::new(graph, static_locks(&runtime));
     let n = graph.funcs.len();
-    let mut s = Scan { takes: (0..n).map(|f| takes(&ctx, f)).collect(), ..Scan::default() };
-    let callees: Vec<BTreeSet<usize>> =
-        (0..n).map(|f| calls(&graph.funcs[f].body).iter().flat_map(|c| ctx.resolve(f, c)).collect()).collect();
-    s.reach = s.takes.iter().map(|t| t.iter().map(|t| t.lock).collect()).collect();
+    let mut s = Scan {
+        takes: (0..n).map(|f| takes_mode(&ctx, f, include_try)).collect(),
+        ..Scan::default()
+    };
+    let callees: Vec<BTreeSet<usize>> = (0..n)
+        .map(|f| {
+            calls(&graph.funcs[f].body)
+                .iter()
+                .flat_map(|c| ctx.resolve(f, c))
+                .collect()
+        })
+        .collect();
+    s.reach = s
+        .takes
+        .iter()
+        .map(|t| t.iter().map(|t| t.lock).collect())
+        .collect();
     loop {
         let mut changed = false;
         for (f, out) in callees.iter().enumerate() {
-            let add: BTreeSet<usize> = out.iter().flat_map(|&c| s.reach[c].iter().copied()).collect();
+            let add: BTreeSet<usize> = out
+                .iter()
+                .flat_map(|&c| s.reach[c].iter().copied())
+                .collect();
             let before = s.reach[f].len();
             s.reach[f].extend(add);
             changed |= s.reach[f].len() != before;
@@ -1661,4 +1723,87 @@ fn the_scan_sees_an_inversion_a_relock_and_a_dropped_guard() {
     assert!(!text.iter().any(|t| t.contains("worker::block_statement_ends")), "a block statement ends with its block: {text:?}");
     assert_eq!(cycles(&edges, ctx.locks.len()).len(), 1, "{text:?}");
     assert!(waits.iter().any(|w| w.contains("worker::sleeps_holding")), "{waits:?}");
+}
+
+
+#[test]
+fn combo_hud_borrows_helper_through_draw_and_try_order_seeds_are_detected() {
+    let mut graph = runtime_graph();
+    let hud = graph.find("combo::hud_tick")[0];
+    let seed = graph.find("combo::on_layout_registered")[0];
+    {
+        let (ctx, s) = scan_mode(&graph, true);
+        let lock = |name: &str| {
+            ctx.locks
+                .iter()
+                .position(|(file, n)| file == "features/combo.rs" && n == name)
+                .unwrap()
+        };
+        let helper = s.takes[hud]
+            .iter()
+            .find(|t| t.lock == lock("HELPER"))
+            .unwrap();
+        let body_calls = calls(&graph.funcs[hud].body);
+        let draw = body_calls
+            .iter()
+            .find(|c| {
+                c.receiver.as_deref() == Some("panes") && c.segments.last().unwrap() == "draw"
+            })
+            .unwrap();
+        let apply = body_calls.iter().find(|c| c.segments == ["apply"]).unwrap();
+        assert!(
+            helper.at < draw.at && draw.at < helper.end && helper.end < apply.at,
+            "borrow must span model draw, end before native apply"
+        );
+        let (all, _) = edges(&ctx, &s);
+        assert!(all.iter().any(|e| e.func == "combo::hud_tick"
+            && e.held == lock("HELPER")
+            && e.taken == lock("PLAN")));
+        assert!(all.iter().any(|e| e.func == "combo::seq_view"
+            && e.held == lock("PLAN")
+            && e.taken == lock("RUN")));
+        assert!(!all.iter().any(|e| e.func == "combo::hud_tick"
+            && e.held == lock("HELPER")
+            && e.taken == lock("HELPER")));
+    }
+    // The same successful-try parser must see a reverse order and reentry, while respecting explicit drop.
+    graph.funcs[seed].body = callgraph::lex("let Some(run) = RUN.try_lock() else { return }; let Some(helper) = HELPER.try_lock() else { return }; drop(helper); let Some(again) = RUN.try_lock() else { return }; drop(again); drop(run); NAME.try_lock();");
+    let (ctx, s) = scan_mode(&graph, true);
+    let (all, _) = edges(&ctx, &s);
+    let relevant: BTreeSet<_> = all
+        .into_iter()
+        .filter(|e| {
+            matches!(
+                e.func.as_str(),
+                "combo::hud_tick" | "combo::seq_view" | "combo::on_layout_registered"
+            )
+        })
+        .collect();
+    let lock = |name: &str| {
+        ctx.locks
+            .iter()
+            .position(|(file, n)| file == "features/combo.rs" && n == name)
+            .unwrap()
+    };
+    assert!(
+        cycles(&relevant, ctx.locks.len())
+            .iter()
+            .any(|c| c.contains(&lock("HELPER")) && c.contains(&lock("RUN"))),
+        "seeded RUN -> HELPER was missed: {relevant:?}"
+    );
+    assert!(
+        relevant
+            .iter()
+            .any(|e| e.func == "combo::on_layout_registered"
+                && e.held == lock("RUN")
+                && e.taken == lock("RUN")),
+        "seeded reentry missed"
+    );
+    assert!(
+        !relevant
+            .iter()
+            .any(|e| e.func == "combo::on_layout_registered"
+                && (e.held == lock("HELPER") && e.taken == lock("RUN") || e.taken == lock("NAME"))),
+        "explicitly dropped guards were extended"
+    );
 }

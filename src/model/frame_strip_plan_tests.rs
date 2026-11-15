@@ -221,8 +221,29 @@ fn a_hit_block_carries_its_spot_label_when_the_row_is_on() {
     }
 }
 
-/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+fn deferred_cached_looks_match_direct_visible_writes() {
+    let mut direct = Panes::<1>::new();
+    let mut deferred = Panes::<1>::new();
+    let shown = Look::text(3.0, 4.0, Text::new("Step 40"), [1, 2, 3, 255]);
+    for invalidate in [false, true] {
+        if invalidate { direct.invalidate(); deferred.invalidate(); }
+        for look in [shown, shown, Look::HIDDEN, Look::HIDDEN, shown] {
+            let mut expected = Vec::new();
+            let count = direct.show(|_| look, |i, look, change| expected.push((i, *look, change)));
+            let mut changes = [None];
+            assert_eq!(deferred.show(|_| look, |i, _, change| changes[i] = Some(change)), count);
+            let actual: Vec<_> = changes.iter().enumerate().filter_map(|(i, c)| c.map(|c| (i, *deferred.written(i).unwrap(), c))).collect();
+            assert_eq!(expected.len(), actual.len());
+            for ((i, want, changed), (j, got, flags)) in expected.into_iter().zip(actual) {
+                assert_eq!((i, changed, want.visible), (j, flags, got.visible));
+                // Native apply returns after setting visibility when hidden; retained fields must not be applied then.
+                if want.visible { assert_eq!(want, got); }
+            }
+        }
+    }
+}
 
+/// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
     crate::test_table::run(&[
@@ -230,6 +251,7 @@ fn case_table() {
         ("input_lines", input_lines as fn()),
         ("the_stick_row_scrolls_and_freezes_with_the_strip", the_stick_row_scrolls_and_freezes_with_the_strip as fn()),
         ("a_hit_block_carries_its_spot_label_when_the_row_is_on", a_hit_block_carries_its_spot_label_when_the_row_is_on as fn()),
+        ("deferred_cached_looks_match_direct_visible_writes", deferred_cached_looks_match_direct_visible_writes as fn()),
     ]);
 }
 }

@@ -447,6 +447,9 @@ impl<const N: usize> Panes<N> {
         Self { written: [None; N] }
     }
 
+    /// The cached look for native writes deferred until the model guard is released.
+    pub fn written(&self, index: usize) -> Option<&Look> { self.written[index].as_ref() }
+
     /// The layout was registered again: nothing the plugin wrote is there any more.
     pub fn invalidate(&mut self) {
         self.written = [None; N];

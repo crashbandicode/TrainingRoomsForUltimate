@@ -245,6 +245,7 @@ impl LinkRec {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Combo {
     pub input_only: bool,
+    pub overflow: bool,
     links: [Option<LinkRec>; LINKS],
     len: usize,
 }
@@ -258,6 +259,7 @@ impl Default for Combo {
 impl Combo {
     pub const EMPTY: Combo = Combo {
         input_only: false,
+        overflow: false,
         links: [None; LINKS],
         len: 0,
     };
@@ -276,6 +278,7 @@ impl Combo {
     /// False when the combo is full.
     pub fn push(&mut self, link: LinkRec) -> bool {
         if self.len == LINKS {
+            self.overflow = true;
             return false;
         }
         self.links[self.len] = Some(link);
@@ -571,7 +574,7 @@ struct Capture {
     frame: u32,
 }
 
-/// The helper: the capture, the target and the attempts. `Copy`, so the HUD can take a snapshot.
+/// The helper: game-owned capture, target and attempts. The HUD borrows its static storage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Helper {
     capture: Capture,
@@ -649,9 +652,11 @@ impl Helper {
 
     /// *Save last combo*: the open exchange when it has a link, else the one before.
     pub fn last_combo(&self) -> Option<Combo> {
-        [self.capture.current, self.capture.previous]
-            .into_iter()
-            .find(|c| !c.is_empty())
+        self.last_combo_ref().copied()
+    }
+
+    pub fn last_combo_ref(&self) -> Option<&Combo> {
+        [&self.capture.current, &self.capture.previous].into_iter().find(|c| !c.is_empty())
     }
 
     /// Links captured so far (wrapping). A change means `last_combo` holds a link captured since the count was read.
@@ -696,7 +701,7 @@ impl Helper {
             self.on_clear(&mut out);
         }
         self.capture.frame = tracker.frame();
-        let input_only = self.target.is_some_and(|t| t.input_only);
+        let input_only = self.target.as_ref().is_some_and(|t| t.input_only);
         let (exchange, first_hit) = tracker.exchange();
         if exchange != self.capture.exchange {
             if !input_only {
@@ -748,7 +753,7 @@ impl Helper {
         if !self.settings.on {
             return;
         }
-        if self.attempt.is_some_and(|a| !a.open())
+        if self.attempt.as_ref().is_some_and(|a| !a.open())
             && self
                 .input
                 .last
@@ -770,8 +775,8 @@ impl Helper {
                 junction: false,
             });
         }
-        while let Some(attempt) = self.attempt.filter(Attempt::open) {
-            let reference = self.target.unwrap().get(attempt.len).copied().unwrap();
+        while let Some(attempt) = self.attempt.as_ref().filter(|a| a.open()) {
+            let reference = self.target.as_ref().unwrap().get(attempt.len).copied().unwrap();
             let deadline =
                 reference.events().last().unwrap().offset + i32::from(self.settings.tolerance);
             if (snap.frame - start) < deadline as u32 {
@@ -807,7 +812,7 @@ impl Helper {
     }
 
     fn on_link(&mut self, rec: LinkRec, first: bool, exchange: u32, out: &mut Out) {
-        let Some(target) = self.target.filter(|_| self.settings.on) else {
+        let Some(target) = self.target.as_ref().filter(|_| self.settings.on) else {
             return;
         };
         let open = self
@@ -860,7 +865,7 @@ impl Helper {
     /// Ends the open attempt with `outcome`, records it and asks for the load after it when set.
     fn resolve_open(&mut self, outcome: Outcome, out: &mut Out) {
         let tolerance = self.settings.tolerance;
-        let Some(total) = self.target.map(|t| t.len()) else {
+        let Some(total) = self.target.as_ref().map(|t| t.len()) else {
             return;
         };
         let Some(attempt) = self.attempt.as_ref().filter(|a| a.open()) else {
@@ -1174,7 +1179,6 @@ mod tests;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct InputCapture {
     pub combo: Combo,
-    pub overflow: bool,
     prev: Option<Snap>,
     first: Option<u32>,
     last: Option<u32>,
@@ -1186,7 +1190,6 @@ impl InputCapture {
                 input_only: true,
                 ..Combo::EMPTY
             },
-            overflow: false,
             prev: None,
             first: None,
             last: None,
@@ -1202,6 +1205,7 @@ impl InputCapture {
         self.step_mode(snap, true);
     }
     fn step_mode(&mut self, snap: Snap, group_idle: bool) {
+        if self.combo.overflow { return; }
         let mut edges = [None; STEPS];
         let mut count = 0;
         push_edges(&mut edges, &mut count, self.prev, snap);
@@ -1220,7 +1224,6 @@ impl InputCapture {
                         .is_some_and(|last| event.frame - last > super::frame_strip::DROP_MAX)))
                 && !self.combo.push(LinkRec::INPUT)
             {
-                self.overflow = true;
                 return;
             }
             let link = self.combo.links[self.combo.len - 1].as_mut().unwrap();

@@ -1084,6 +1084,7 @@ impl Menu {
             let on_library = group.is_some_and(|g| g == usize::from(table::SAVES_MACROS) || g == usize::from(table::COMBOS_SEQ));
             let which = group.unwrap_or(usize::from(table::SAVES_MACROS)) as u8;
             match self.recording.handle_page(button, on_library, which) {
+                super::recording_menu::PageHit::Close => { self.closed = true; return; }
                 super::recording_menu::PageHit::Consumed => {
                     self.clamp_cursor();
                     return;

@@ -64,6 +64,7 @@ pub enum Face {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PageHit {
     Consumed,
+    Close,
     Passthrough,
     LeaveUp,
     LeaveDown,
@@ -130,6 +131,7 @@ impl Floppy {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Effect {
     None,
+    RecordDrill,
     Keyboard { header: &'static str, draft: String },
     MakeCombo { source: String, chain: bool },
     OpenCrop { source: String, combo: bool },
@@ -190,6 +192,7 @@ pub struct MacroFile {
 /// A combo file. `links` are the lines [`combo_link_lines`] produces: the move, then its events, then drift.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ComboFile {
+    pub input_only: bool,
     pub id: String,
     pub name: String,
     /// The fighter the file says it was recorded on (empty: not recorded).
@@ -275,6 +278,7 @@ pub struct ConnLine {
 /// The kind of library file a CONNECTIONS box names (its pill: SAVE STATE, MACRO, COMBO, SEQUENCE).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FileTag {
+    Drill,
     Save,
     Macro,
     Combo,
@@ -320,6 +324,8 @@ pub struct FileRow {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ItemKind {
+    Drills,
+    RecordDrill,
     Save,
     Recording,
     Combo,
@@ -333,7 +339,7 @@ enum ItemKind {
 impl ItemKind {
     /// A row that does something instead of naming a file.
     const fn action(self) -> bool {
-        matches!(self, ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo)
+        matches!(self, ItemKind::Drills | ItemKind::RecordDrill | ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo)
     }
 }
 
@@ -345,13 +351,15 @@ struct Item {
 
 #[derive(Clone, Copy, Debug)]
 struct Place {
+    drills: bool,
+    parent_at: usize,
     section: u8,
     at: [usize; 2],
 }
 
 impl Place {
     const fn new() -> Place {
-        Place { section: 0, at: [0, 0] }
+        Place { drills: false, parent_at: 0, section: 0, at: [0, 0] }
     }
 }
 
@@ -609,6 +617,7 @@ impl RecordingScreens {
         let Some(file) = &self.file else { return String::new() };
         let role = if self.page_role == ViewRole::Cpu { "CPU view" } else { "Player view" };
         let group = match file.kind {
+            ItemKind::Combo if self.combo_by_id(&file.id).is_some_and(|f| f.input_only) => "Combos & Sequences  >  Drills",
             ItemKind::Combo | ItemKind::Sequence => "Combos & Sequences",
             _ => "Save states & Macros",
         };
@@ -699,7 +708,7 @@ impl RecordingScreens {
                     self.catalog.combos.iter().filter(|combo| combo.made_from.as_deref() == Some(item.id.as_str())).collect();
                 if !combos.is_empty() {
                     out.push(line(ConnKind::Heading, "combos made from it".to_string()));
-                    out.extend(combos.iter().map(|combo| line(ConnKind::Child(FileTag::Combo), combo.name.clone())));
+                    out.extend(combos.iter().map(|combo| line(ConnKind::Child(if combo.input_only { FileTag::Drill } else { FileTag::Combo }), combo.name.clone())));
                 }
                 if !file.chain && !file.recorded_on.is_empty() {
                     let seconds = file.span as f32 / 60.0;
@@ -708,7 +717,7 @@ impl RecordingScreens {
             }
             ItemKind::Combo => {
                 let Some(combo) = self.combo_by_id(&item.id) else { return out };
-                out.push(line(ConnKind::Head(FileTag::Combo), combo.name.clone()));
+                out.push(line(ConnKind::Head(if combo.input_only { FileTag::Drill } else { FileTag::Combo }), combo.name.clone()));
                 if let Some(source) = combo.made_from.as_deref().and_then(|id| self.macro_by_id(id)) {
                     out.push(line(ConnKind::Heading, "made from".to_string()));
                     out.push(line(ConnKind::Child(FileTag::Macro), source.name.clone()));
@@ -725,9 +734,10 @@ impl RecordingScreens {
                     out.push(line(ConnKind::Heading, "in sequences".to_string()));
                     out.extend(sequences.into_iter().map(|text| line(ConnKind::Child(FileTag::Sequence), text)));
                 }
-                let links = combo.links.iter().filter(|text| link_head(text)).count();
+                let links = combo.span;
+                let units = if combo.input_only { "steps" } else { "links" };
                 if !combo.links.is_empty() {
-                    out.push(line(ConnKind::Heading, format!("Its links ({links})")));
+                    out.push(line(ConnKind::Heading, format!("Its {units} ({links})")));
                     out.extend(combo.links.iter().map(|text| {
                         line(if link_head(text) { ConnKind::Link } else { ConnKind::LinkSub }, text.clone())
                     }));
@@ -748,7 +758,7 @@ impl RecordingScreens {
                 }
                 out.push(line(ConnKind::Detail, format!("streak {} · best {}", sequence.streak, sequence.best)));
             }
-            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => out.extend(self.connection_lines(face, &item).into_iter().map(|conn| line(ConnKind::Detail, conn.text))),
+            _ => out.extend(self.connection_lines(face, &item).into_iter().map(|conn| line(ConnKind::Detail, conn.text))),
         }
         out
     }
@@ -896,6 +906,7 @@ impl RecordingScreens {
         }
         let group = self.popup_group();
         match button {
+            Button::B if self.place(Face::Popup, group).drills => self.toggle_drills(Face::Popup, group),
             Button::B => self.popup_open = false,
             Button::Y => {}
             Button::L => self.set_popup_role(ViewRole::Player),
@@ -921,6 +932,7 @@ impl RecordingScreens {
             self.press_overlay(button, Face::Page);
             return PageHit::Consumed;
         }
+        if button == Button::B && on_library && self.place(Face::Page, group).drills { self.toggle_drills(Face::Page, group); return PageHit::Consumed; }
         match button {
             Button::X => {
                 if on_library && self.in_macros(Face::Page, group) {
@@ -951,7 +963,7 @@ impl RecordingScreens {
             }
             Button::A => {
                 self.activate(Face::Page, group);
-                PageHit::Consumed
+                if self.last_effect == Effect::RecordDrill { PageHit::Close } else { PageHit::Consumed }
             }
         }
     }
@@ -1038,7 +1050,7 @@ impl RecordingScreens {
     fn nudge_popup(&mut self, delta: isize) {
         let group = self.popup_group();
         let section = usize::from(self.place(Face::Popup, group).section);
-        let len = self.items(group, section as u8).len();
+        let len = self.items(Face::Popup, group, section as u8).len();
         if len == 0 {
             return;
         }
@@ -1051,7 +1063,7 @@ impl RecordingScreens {
 
     fn nudge_page(&mut self, group: u8, delta: isize) -> PageHit {
         let section = self.place(Face::Page, group).section;
-        let len = self.items(group, section).len();
+        let len = self.items(Face::Page, group, section).len();
         let at = self.place(Face::Page, group).at[usize::from(section)];
         let at = if len == 0 { 0 } else { at.min(len - 1) };
         let at_edge = len == 0 || (delta < 0 && at == 0) || (delta > 0 && at + 1 >= len);
@@ -1065,7 +1077,7 @@ impl RecordingScreens {
             return PageHit::Consumed;
         }
         if delta < 0 && section == 1 {
-            let upper = self.items(group, 0).len();
+            let upper = self.items(Face::Page, group, 0).len();
             self.place_mut(Face::Page, group).section = 0;
             self.place_mut(Face::Page, group).at[0] = upper.saturating_sub(1);
             return PageHit::Consumed;
@@ -1076,7 +1088,7 @@ impl RecordingScreens {
     fn swap_section(&mut self, face: Face, group: u8) {
         let from = self.place(face, group).section;
         let to = 1 - from;
-        let len = self.items(group, to).len();
+        let len = self.items(face, group, to).len();
         let kept = self.place(face, group).at[usize::from(from)];
         let index = if len == 0 { 0 } else { kept.min(len - 1) };
         let place = self.place_mut(face, group);
@@ -1086,14 +1098,21 @@ impl RecordingScreens {
 
     fn page_section(&mut self, face: Face, group: u8, forward: bool) {
         let section = usize::from(self.place(face, group).section);
-        let len = self.items(group, section as u8).len();
+        let len = self.items(face, group, section as u8).len();
         let at = self.place(face, group).at[section];
         self.place_mut(face, group).at[section] = page_by(at, len, forward);
+    }
+
+    fn toggle_drills(&mut self, face: Face, group: u8) {
+        let place = self.place_mut(face, group); place.drills = !place.drills;
+        core::mem::swap(&mut place.at[1], &mut place.parent_at); place.section = 1;
     }
 
     fn activate(&mut self, face: Face, group: u8) {
         let Some(item) = self.focused(face, group) else { return };
         match (face, item.kind) {
+            (_, ItemKind::Drills) => self.toggle_drills(face, group),
+            (_, ItemKind::RecordDrill) => { self.last_effect = Effect::RecordDrill; self.popup_open = false; }
             (Face::Popup, ItemKind::Save) => self.set_bound(&item.id, true),
             (Face::Popup, ItemKind::Recording) => self.set_active(self.popup_role, &item.id, true),
             (Face::Popup, ItemKind::Combo | ItemKind::Sequence) => self.set_drill(item.kind, item.id),
@@ -1127,7 +1146,7 @@ impl RecordingScreens {
     }
 
     fn close_sequence_gap(&mut self, id: &str) {
-        let known: Vec<String> = self.catalog.combos.iter().map(|file| file.id.clone()).collect();
+        let known: Vec<String> = self.catalog.combos.iter().filter(|f| !f.input_only).map(|file| file.id.clone()).collect();
         if let Some(sequence) = self.catalog.sequences.iter_mut().find(|file| file.id == id) {
             ordered_ids::retain_existing(&mut sequence.combos, |step| known.iter().any(|id| id == step));
         }
@@ -1234,7 +1253,7 @@ impl RecordingScreens {
                     ItemKind::Recording => Some(FileKind::Macro),
                     ItemKind::Combo => Some(FileKind::Combo),
                     ItemKind::Sequence => Some(FileKind::Sequence),
-                    ItemKind::Save | ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => None,
+                    _ => None,
                 };
                 self.delete_file(kind, &id);
                 if kind == ItemKind::Save {
@@ -1326,9 +1345,9 @@ impl RecordingScreens {
             ItemKind::Save => (KeyKind::RenameSave, "Name save state"),
             ItemKind::Recording if self.macro_by_id(id).is_some_and(|file| file.chain) => (KeyKind::RenameChain, "Name chain"),
             ItemKind::Recording => (KeyKind::RenameMacro, "Name macro"),
-            ItemKind::Combo => (KeyKind::RenameCombo, "Name combo"),
+            ItemKind::Combo => (KeyKind::RenameCombo, if self.combo_by_id(id).is_some_and(|f| f.input_only) { "Name drill" } else { "Name combo" }),
             ItemKind::Sequence => (KeyKind::RenameSequence, "Name sequence"),
-            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => return,
+            _ => return,
         };
         let previous = self.item_name(&Item { kind, id: id.to_string() });
         self.keyboard = Some(Keyboard { kind: key, ids: Vec::new(), target: Some(id.to_string()) });
@@ -1354,7 +1373,7 @@ impl RecordingScreens {
         }
         let ids = match kind {
             PickerKind::NewChain | PickerKind::EditChain => self.recording_ids(),
-            PickerKind::NewSequence | PickerKind::EditSequence => self.catalog.combos.iter().map(|file| file.id.clone()).collect(),
+            PickerKind::NewSequence | PickerKind::EditSequence => self.catalog.combos.iter().filter(|f| !f.input_only).map(|file| file.id.clone()).collect(),
         };
         let order = editing.as_ref().map(|id| self.existing_order(kind, id)).unwrap_or_default();
         let values = fill_ranks(&ids, &order);
@@ -1485,7 +1504,7 @@ impl RecordingScreens {
 
     fn focused(&self, face: Face, group: u8) -> Option<Item> {
         let place = self.place(face, group);
-        let items = self.items(group, place.section);
+        let items = self.items(face, group, place.section);
         if items.is_empty() {
             return None;
         }
@@ -1493,7 +1512,7 @@ impl RecordingScreens {
         items.get(at).cloned()
     }
 
-    fn items(&self, group: u8, section: u8) -> Vec<Item> {
+    fn items(&self, face: Face, group: u8, section: u8) -> Vec<Item> {
         let combos = group == COMBOS_SEQ;
         if !combos && section == 0 {
             return ordered(&self.catalog.saves, &self.catalog.hot_saves, |file| &file.id, |file| &file.name)
@@ -1517,17 +1536,20 @@ impl RecordingScreens {
             rows.push(Item { kind: ItemKind::NewSequence, id: String::new() });
             return rows;
         }
-        let mut rows = vec![Item { kind: ItemKind::SaveLastCombo, id: String::new() }];
+        let drills = self.place(face, group).drills;
+        let mut rows = vec![Item { kind: if drills { ItemKind::RecordDrill } else { ItemKind::SaveLastCombo }, id: String::new() }];
         rows.extend(
             ordered(&self.catalog.combos, &self.catalog.hot_combos, |file| &file.id, |file| &file.name)
                 .into_iter()
+                .filter(|file| file.input_only == drills)
                 .map(|file| Item { kind: ItemKind::Combo, id: file.id.clone() }),
         );
+        if !drills { rows.push(Item { kind: ItemKind::Drills, id: String::new() }); }
         rows
     }
 
     fn section_view(&self, face: Face, group: u8, section: u8) -> SectionView {
-        let items = self.items(group, section);
+        let items = self.items(face, group, section);
         let file_count = items.iter().filter(|item| !item.kind.action()).count();
         // Action rows that head the list (+ Save last combo…): the hot marks and the hairline count files only.
         let lead = items.iter().take_while(|item| item.kind.action()).count();
@@ -1535,7 +1557,7 @@ impl RecordingScreens {
         let cursor = place.at[usize::from(section)];
         let focused = self.focused(face, group);
         let role = self.role(face);
-        let header = header_of(group, section);
+        let header = if group == COMBOS_SEQ && section == 1 && place.drills { "DRILLS" } else { header_of(group, section) };
         let rows = items
             .iter()
             .enumerate()
@@ -1580,7 +1602,7 @@ impl RecordingScreens {
                 Some(file) => recorded(&file.recorded_on),
                 None => String::new(),
             },
-            ItemKind::Combo => self.combo_by_id(&item.id).map(|file| recorded(&file.recorded_on)).unwrap_or_default(),
+            ItemKind::Combo => self.combo_by_id(&item.id).map(|file| if file.input_only { format!("{} steps{}", file.span, if file.recorded_on.is_empty() { String::new() } else { format!(" · {}", recorded(&file.recorded_on)) }) } else { recorded(&file.recorded_on) }).unwrap_or_default(),
             ItemKind::Sequence => self
                 .catalog
                 .sequences
@@ -1594,7 +1616,7 @@ impl RecordingScreens {
                         .join(" → ")
                 })
                 .unwrap_or_default(),
-            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => String::new(),
+            _ => String::new(),
         }
     }
 
@@ -1604,9 +1626,9 @@ impl RecordingScreens {
             ItemKind::Recording => &self.catalog.hot_macros,
             ItemKind::Combo => &self.catalog.hot_combos,
             ItemKind::Sequence => &self.catalog.hot_sequences,
-            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => return false,
+            _ => return false,
         };
-        hot.iter().take(5).any(|id| id == &item.id)
+        hot.iter().filter(|id| item.kind != ItemKind::Combo || self.combo_by_id(id).map(|f| f.input_only) == self.combo_by_id(&item.id).map(|f| f.input_only)).take(5).any(|id| id == &item.id)
     }
 
     fn is_green(&self, item: &Item, role: ViewRole) -> bool {
@@ -1614,7 +1636,7 @@ impl RecordingScreens {
             ItemKind::Save => self.bound.as_deref() == Some(item.id.as_str()),
             ItemKind::Recording => self.active[role.index()].as_deref() == Some(item.id.as_str()),
             ItemKind::Combo | ItemKind::Sequence => self.drill.as_deref() == Some(item.id.as_str()),
-            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => false,
+            _ => false,
         }
     }
 
@@ -1652,6 +1674,8 @@ impl RecordingScreens {
 
     fn item_name(&self, item: &Item) -> String {
         match item.kind {
+            ItemKind::Drills => "DRILLS >".to_string(),
+            ItemKind::RecordDrill => "+ Record drill…".to_string(),
             ItemKind::NewChain => "+ New chain".to_string(),
             ItemKind::NewSequence => "+ New sequence".to_string(),
             ItemKind::SaveLastCombo => "+ Save last combo…".to_string(),
@@ -1665,7 +1689,7 @@ impl RecordingScreens {
             ItemKind::Recording => self.macro_by_id(id).map(|file| file.name.clone()),
             ItemKind::Combo => self.combo_by_id(id).map(|file| file.name.clone()),
             ItemKind::Sequence => self.sequence_by_id(id).map(|file| file.name.clone()),
-            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => None,
+            _ => None,
         }
     }
 
@@ -1691,7 +1715,7 @@ impl RecordingScreens {
                     file.name = name.to_string();
                 }
             }
-            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => {}
+            _ => {}
         }
     }
 
@@ -1701,7 +1725,7 @@ impl RecordingScreens {
             ItemKind::Recording => self.catalog.macros.retain(|file| file.id != id),
             ItemKind::Combo => self.catalog.combos.retain(|file| file.id != id),
             ItemKind::Sequence => self.catalog.sequences.retain(|file| file.id != id),
-            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => {}
+            _ => {}
         }
     }
 
@@ -1712,6 +1736,8 @@ impl RecordingScreens {
             ItemKind::Recording => self.macro_lines(&item.id, role),
             ItemKind::Combo => self.combo_lines(&item.id),
             ItemKind::Sequence => self.sequence_lines(&item.id),
+            ItemKind::Drills => vec![line("Input drills")],
+            ItemKind::RecordDrill => vec![line("Record Player 1 directly as an input drill.")],
             ItemKind::NewChain => vec![line("A new chain")],
             ItemKind::NewSequence => vec![line("A new sequence")],
             ItemKind::SaveLastCombo => vec![line("Saves the strip's latest exchange as a combo and drills it. A names it.")],
@@ -1815,7 +1841,7 @@ impl RecordingScreens {
             ItemKind::Recording => self.macro_file_rows(id),
             ItemKind::Combo => self.combo_file_rows(id),
             ItemKind::Sequence => self.sequence_file_rows(id),
-            ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo => Vec::new(),
+            _ => Vec::new(),
         }
     }
 
@@ -2030,13 +2056,15 @@ pub(crate) fn unused_n(prefix: &str, names: &[String]) -> u32 {
 
 /// A link's move line ("L1 jab → jab TRUE"), not the events or drift line under it.
 fn link_head(line: &str) -> bool {
-    line.strip_prefix('L').and_then(|rest| rest.split_once(' ')).is_some_and(|(n, _)| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+    line.strip_prefix(['L','S']).and_then(|rest| rest.split_once(' ')).is_some_and(|(n, _)| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
 }
 
 /// One link's move line, then its input events, then drift when the file recorded a hold.
 /// An older presses-only file shows its presses and no drift.
 pub fn combo_link_lines(combo: &Combo) -> Vec<String> {
-    combo.links().enumerate().flat_map(|(index, link)| link_panel_lines(index, link)).collect()
+    combo.links().enumerate().flat_map(|(index, link)| {
+        if combo.input_only { let mut lines = vec![format!("S{} Step {}", index + 1, index + 1)]; if let Some(events) = event_line(link) { lines.push(events); } lines } else { link_panel_lines(index, link) }
+    }).collect()
 }
 
 fn link_panel_lines(index: usize, link: &super::combo::LinkRec) -> Vec<String> {
@@ -2220,7 +2248,7 @@ mod tests {
                     span: 0,
                 },
             ],
-            combos: vec![ComboFile {
+            combos: vec![ComboFile { input_only: false,
                 id: "nairc".into(),
                 name: "Nair loop combo".into(),
                 recorded_on: String::new(),
@@ -2568,7 +2596,7 @@ mod tests {
         let mut screens = screens();
         screens.catalog.combos.insert(
             0,
-            ComboFile {
+            ComboFile { input_only: false,
                 id: "ryu".into(),
                 name: "Ryu BnB".into(),
                 recorded_on: String::new(),
@@ -2734,9 +2762,29 @@ mod tests {
     }
 
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
+    fn drills_are_a_filtered_combo_sublist_on_both_faces() {
+        for face in [Face::Page,Face::Popup] {
+            let mut screens=RecordingScreens::new(); let mut cat=example(); let mut drill=cat.combos[0].clone();
+            drill.id="input-drill".into(); drill.name="Movement".into(); drill.input_only=true; cat.combos.push(drill); screens.set_catalog(cat);
+            screens.popup_open=true; screens.popup_tab=1;
+            let root=screens.section(face,COMBOS_SEQ,1); assert!(root.rows.iter().any(|r| r.name=="DRILLS >")); assert!(!root.rows.iter().any(|r| r.name=="Movement"));
+            screens.place_mut(face,COMBOS_SEQ).at[1]=2; screens.toggle_drills(face,COMBOS_SEQ);
+            let drills=screens.section(face,COMBOS_SEQ,1); assert_eq!((drills.header,drills.files),("DRILLS",1));
+            assert_eq!(drills.rows[0].name,"+ Record drill…"); assert_eq!(drills.rows[1].name,"Movement");
+            assert!(!drills.rows[0].hot && !drills.rows[0].green);
+            if face==Face::Page { assert_eq!(screens.handle_page(Button::B,true,COMBOS_SEQ),PageHit::Consumed); } else { screens.press_popup(Button::B); assert!(screens.popup_open); }
+            assert!(!screens.place(face,COMBOS_SEQ).drills); assert_eq!(screens.place(face,COMBOS_SEQ).at[1],2);
+            screens.toggle_drills(face,COMBOS_SEQ); screens.place_mut(face,COMBOS_SEQ).at[1]=0;
+            if face==Face::Page { assert_eq!(screens.handle_page(Button::A,true,COMBOS_SEQ),PageHit::Close); } else { screens.press_popup(Button::A); assert!(!screens.popup_open); }
+            assert_eq!(screens.take_effect(),Effect::RecordDrill);
+            screens.open_picker(PickerKind::NewSequence,Face::Page,None); assert!(screens.picker.as_ref().unwrap().ids.iter().all(|id| id!="input-drill"));
+        }
+    }
+
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("drills_are_a_filtered_combo_sublist_on_both_faces",drills_are_a_filtered_combo_sublist_on_both_faces as fn()),
             ("a_reopened_menu_loads_the_catalog_without_a_new_file", a_reopened_menu_loads_the_catalog_without_a_new_file as fn()),
             ("one_save_is_bound_and_the_page_opens_it", one_save_is_bound_and_the_page_opens_it as fn()),
             ("popup_buttons_match_q11", popup_buttons_match_q11 as fn()),

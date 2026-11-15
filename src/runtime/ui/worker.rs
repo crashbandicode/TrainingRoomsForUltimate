@@ -283,6 +283,7 @@ fn run() {
         }
         // The named-macro layer's model is this thread's (design C): its worker tick runs before the panels are looked at.
         crate::runtime::macros::port::worker_tick();
+        if let Some(id) = crate::engine::rr_host::take_saved_drill() { apply_grade_target(Some(&id), Some(crate::engine::library::DrillKind::Combo)); }
         sync_sequence_drill();
         // The roster's answers to the combo panel's switch at menu close (the game frame ran the request: the lock-free runtime).
         super::combos::service_switch_replies();
@@ -332,6 +333,7 @@ fn sync_input_generation(s: &mut Session) {
 
 fn handle(event: Event, s: &mut Session) {
     if event == Event::Open {
+        crate::engine::rr_host::arm_drill_record(false);
         s.stage_context = crate::runtime::lobby::practice_stage_request::menu_context();
         s.stage_close = None;
         let settings = SETTINGS.lock().clone().unwrap_or_else(Settings::factory);
@@ -385,6 +387,7 @@ fn toggle_popup(s: &mut Session) {
     }
     refresh_recording(s);
     if let Some(menu) = s.menu.as_mut() {
+        if !menu.recording().popup_open() { crate::engine::rr_host::arm_drill_record(false); }
         menu.on_request(crate::model::chords::Request::RecordingPopup);
         publish_popup(menu.recording().popup_open());
         post_recording_effect(menu);
@@ -555,7 +558,12 @@ fn post_recording_effect(menu: &mut Menu) {
     crate::engine::rr_host::note_drill(drill.clone());
     apply_grade_target(drill.as_deref(), kind);
     crate::engine::rr_host::publish_selection(std::path::Path::new(ROOT), &selection, kind);
-    match menu.recording_mut().take_effect() {
+    let effect = menu.recording_mut().take_effect();
+    if effect == crate::model::recording_menu::Effect::RecordDrill {
+        let chord = crate::model::menu::chord::Chord::from_row(menu.settings().menu.get("input_record").unwrap_or(&[]));
+        notices::post_body("Record drill", crate::model::notify::Body::copied(&format!("{chord}: start; again: stop and save")), 240, DEFAULT_COLOR);
+    }
+    match effect {
         crate::model::recording_menu::Effect::OpenCrop { source, combo } => {
             crate::runtime::macros::replay_capture::open_file_editor(&source, combo);
         }

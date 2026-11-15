@@ -213,6 +213,10 @@ impl RecordingIndex {
         self.migration.as_ref()
     }
 
+    pub fn hot_where(&self, kind: Kind, include: impl Fn(&str) -> bool) -> Vec<String> {
+        hot_five(self.last_used.get(kind).iter().filter(|(id,_)| include(id)).map(|(id,at)| (id.as_str(),*at)))
+    }
+
     pub fn hot(&self, kind: Kind) -> &[String] {
         self.hot.get(kind)
     }

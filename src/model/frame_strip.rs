@@ -543,6 +543,8 @@ impl Tracker {
         self.history.iter().flatten().copied()
     }
 
+    pub fn contact_now(&self) -> bool { self.last_hit.is_some_and(|hit| hit.frame == self.frame) }
+
     pub fn latest_link(&self) -> Option<Link> {
         self.history[0]
     }

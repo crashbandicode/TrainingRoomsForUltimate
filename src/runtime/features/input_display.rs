@@ -217,9 +217,11 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample 
 /// # Safety
 /// `player` is P1's live module accessor; the call is made on the game thread inside the fighter's frame.
 pub unsafe fn sample_frame(player: usize) {
-    if !ENABLED.load(Ordering::Acquire) || !sampling() || player == 0 {
+    let input_drill = crate::engine::rr_host::input_observation_wanted() || super::combo::input_observation_wanted();
+    if !ENABLED.load(Ordering::Acquire) || (!sampling() && !input_drill) || player == 0 {
         return;
     }
+    if input_drill && published::input_owners().contains(Owners::MENU) { return; }
     if crate::runtime::features::states::is_loading() {
         TRACKER.lock().clear();
         return;
@@ -265,6 +267,7 @@ pub unsafe fn sample_frame(player: usize) {
     #[cfg(feature = "diag")]
     let (check, advantage) = (tracker.stun_check, tracker.advantage());
     tracker.step(p1, cpu, inputs);
+    if let Some(snap) = tracker.snaps().last() { crate::engine::rr_host::observe_input(snap, tracker.contact_now()); }
     // The combo helper reads the same step (SPEC-input-07 §3); lock order TRACKER, then the helper's.
     crate::runtime::features::combo::after_strip(&tracker, p1_kind);
     #[cfg(feature = "diag")]

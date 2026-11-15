@@ -29,20 +29,30 @@ use crate::runtime::published;
 static HELPER: Mutex<Helper> = Mutex::new(Helper::new());
 /// What the frame hands the menu worker, a triple buffer: neither side waits (docs lane review R1 addendum, 2026-11-10 00:25Z).
 /// Written under `HELPER` (one writer at a time); read by the menu worker only (`strip_sample`, `last_combo`).
-static SAMPLE: hos_lock::TripleBuffer<Sample> = hos_lock::TripleBuffer::new(Sample { seen: 0, strip: None, last: None });
+static SAMPLE: hos_lock::TripleBuffer<Sample> = hos_lock::TripleBuffer::new(Sample {
+    seen: 0,
+    strip_valid: false,
+    last: None,
+});
 
 #[derive(Clone, Copy)]
 struct Sample {
     /// The helper's count of links captured (`Helper::seen`).
     seen: u32,
     /// The strip's last combo for the recording host: none after a session clear.
-    strip: Option<Combo>,
+    strip_valid: bool,
     /// *Save last combo*'s: the helper's, which it keeps across a clear.
     last: Option<Combo>,
 }
-static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
+// Changed flags share the renderer's static ownership; native pane writes run after HELPER is dropped.
+static RENDERER: Mutex<(Renderer, [Option<Changed>; combo_plan::COUNT])> =
+    Mutex::new((Renderer::new(), [None; combo_plan::COUNT]));
 /// The bar was drawn shown on the last HUD tick that got to it: a practice game's notice sits under it (`panes::notice_y`).
 static BAR_SHOWN: AtomicBool = AtomicBool::new(false);
+static INPUT_TARGET: AtomicBool = AtomicBool::new(false);
+pub fn input_observation_wanted() -> bool {
+    INPUT_TARGET.load(Ordering::Acquire) && settings().on
+}
 /// The target's name for the bar (game threads only: the fighter frame installs a staged target's, the HUD tick reads it).
 static NAME: Mutex<Text> = Mutex::new(Text::EMPTY);
 /// The names the menu worker gives the bar at once (`set_target`, `stage_sequence`): published, and taken into `NAME` by the
@@ -52,7 +62,11 @@ static NAME_POSTED: hos_lock::Published<Text> = hos_lock::Published::new(Text::E
 static NAME_SEEN: AtomicU32 = AtomicU32::new(0);
 
 /// The names the menu shows, the target's and the draft's: the menu worker's own (no game thread takes this lock).
-static LABELS: Mutex<Labels> = Mutex::new(Labels { target: Label::EMPTY, draft: Label::EMPTY, pending: None });
+static LABELS: Mutex<Labels> = Mutex::new(Labels {
+    target: Label::EMPTY,
+    draft: Label::EMPTY,
+    pending: None,
+});
 
 struct Labels {
     target: Label,
@@ -118,7 +132,11 @@ pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
         drop(plan);
         let stepped = stepped.map(|(s, generation)| note_step(s, generation));
         let last = helper.last_combo();
-        SAMPLE.write(Sample { seen: helper.seen(), strip: last, last });
+        SAMPLE.write(Sample {
+            seen: helper.seen(),
+            strip_valid: true,
+            last,
+        });
         (out, name, stepped)
     };
     if let Some(text) = name {
@@ -135,9 +153,20 @@ pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
 
 /// The run of the staged sequence: a new plan (another sequence, or its combos changed) starts over at combo 1 from
 /// the streak and best its file had.
-fn sequence_run<'a>(run: &'a mut Option<(u32, SequenceRun)>, plan: &SequenceStage, helper: &mut Helper) -> &'a mut SequenceRun {
-    if run.as_ref().is_none_or(|(generation, _)| *generation != plan.generation) {
-        let fresh = SequenceRun::new(SequenceWalk::resume(plan.steps.len(), plan.streak, plan.best));
+fn sequence_run<'a>(
+    run: &'a mut Option<(u32, SequenceRun)>,
+    plan: &SequenceStage,
+    helper: &mut Helper,
+) -> &'a mut SequenceRun {
+    if run
+        .as_ref()
+        .is_none_or(|(generation, _)| *generation != plan.generation)
+    {
+        let fresh = SequenceRun::new(SequenceWalk::resume(
+            plan.steps.len(),
+            plan.streak,
+            plan.best,
+        ));
         fresh.start(helper, &plan.steps);
         *run = Some((plan.generation, fresh));
     }
@@ -163,7 +192,11 @@ pub fn session_clear() {
             None => (helper.clear(), None),
         };
         let stepped = stepped.map(|(s, generation)| note_step(s, generation));
-        SAMPLE.write(Sample { seen: helper.seen(), strip: None, last: helper.last_combo() });
+        SAMPLE.write(Sample {
+            seen: helper.seen(),
+            strip_valid: false,
+            last: helper.last_combo(),
+        });
         (out, stepped)
     };
     report(out);
@@ -175,9 +208,15 @@ pub fn session_clear() {
 /// Under `HELPER` (so `PROGRESS` has one writer at a time): the streak and best after a graded step of the drilled sequence, and
 /// for a finished run or a drop the progress the worker saves.
 fn note_step(stepped: Stepped, generation: u32) -> (Stepped, u32, u32) {
-    let (streak, best) = RUN.lock().map_or((0, 0), |(_, run)| (run.walk().streak(), run.walk().best()));
+    let (streak, best) = RUN
+        .lock()
+        .map_or((0, 0), |(_, run)| (run.walk().streak(), run.walk().best()));
     if matches!(stepped.advance, Advance::Finished | Advance::Dropped) {
-        PROGRESS.write(Progress { generation, streak, best });
+        PROGRESS.write(Progress {
+            generation,
+            streak,
+            best,
+        });
     }
     (stepped, streak, best)
 }
@@ -202,7 +241,11 @@ pub struct Progress {
 }
 
 /// The game hands the menu worker the latest progress (written under `HELPER`, read by the worker only): neither side waits.
-static PROGRESS: hos_lock::TripleBuffer<Progress> = hos_lock::TripleBuffer::new(Progress { generation: 0, streak: 0, best: 0 });
+static PROGRESS: hos_lock::TripleBuffer<Progress> = hos_lock::TripleBuffer::new(Progress {
+    generation: 0,
+    streak: 0,
+    best: 0,
+});
 
 /// The worker saves the drilled sequence's streak and best to its file (`rr_host::save_sequence_progress`): the latest progress
 /// since its last take, as the `Option` this was (a newer one replaced an untaken one there too).
@@ -227,7 +270,8 @@ pub struct SequenceStage {
 static PLAN: Mutex<Option<Box<SequenceStage>>> = Mutex::new(None);
 /// The worker's staged plans on their way to `PLAN`, and the replaced ones on their way back: the worker allocates and drops
 /// them, a game thread never does.
-static PLAN_POST: crate::model::box_handoff::BoxHandoff<SequenceStage> = crate::model::box_handoff::BoxHandoff::new();
+static PLAN_POST: crate::model::box_handoff::BoxHandoff<SequenceStage> =
+    crate::model::box_handoff::BoxHandoff::new();
 /// The frame hook's run of the staged plan, by the plan's generation.
 static RUN: Mutex<Option<(u32, SequenceRun)>> = Mutex::new(None);
 static PLAN_GENERATION: AtomicU32 = AtomicU32::new(0);
@@ -237,7 +281,9 @@ pub fn reap_plans() {
     PLAN_POST.reap();
     let stalls = PLAN_POST.take_stalls();
     if stalls != 0 {
-        crate::runtime::diag_log::diagnostic(format_args!("[Combo] plan installs deferred={stalls} (both retire slots full)"));
+        crate::runtime::diag_log::diagnostic(format_args!(
+            "[Combo] plan installs deferred={stalls} (both retire slots full)"
+        ));
     }
 }
 
@@ -249,20 +295,31 @@ pub fn stage_sequence(plan: Option<(&crate::engine::rr_host::SequencePlan, bool)
         let generation = if same_steps {
             PLAN_GENERATION.load(Ordering::Relaxed)
         } else {
-            PLAN_GENERATION.fetch_add(1, Ordering::Relaxed).wrapping_add(1)
+            PLAN_GENERATION
+                .fetch_add(1, Ordering::Relaxed)
+                .wrapping_add(1)
         };
         Box::new(SequenceStage {
             generation,
             name: Text::new(&plan.name),
             steps: plan.steps.iter().map(|step| step.combo).collect(),
-            names: plan.steps.iter().map(|step| Text::new(&step.name)).collect(),
+            names: plan
+                .steps
+                .iter()
+                .map(|step| Text::new(&step.name))
+                .collect(),
             streak: plan.streak,
             best: plan.best,
         })
     });
     let generation = next.as_ref().map_or(0, |stage| stage.generation);
     if let Some(stage) = next.as_deref() {
-        tr_seq_plan_v1(stage.generation, stage.steps.len() as u32, stage.streak, stage.best);
+        tr_seq_plan_v1(
+            stage.generation,
+            stage.steps.len() as u32,
+            stage.streak,
+            stage.best,
+        );
         NAME_POSTED.publish(stage.names.first().copied().unwrap_or(Text::EMPTY));
         let mut labels = LABELS.lock();
         labels.settle();
@@ -277,9 +334,17 @@ pub fn stage_sequence(plan: Option<(&crate::engine::rr_host::SequencePlan, bool)
 fn seq_view() -> Option<Option<SeqView>> {
     let mut plan = PLAN.try_lock()?;
     PLAN_POST.install(&mut plan);
-    let Some(plan) = plan.as_deref() else { return Some(None) };
-    let run = RUN.lock().filter(|(generation, _)| *generation == plan.generation).map(|(_, run)| run);
-    let walk = run.map_or(SequenceWalk::resume(plan.steps.len(), plan.streak, plan.best), |run| run.walk());
+    let Some(plan) = plan.as_deref() else {
+        return Some(None);
+    };
+    let run = RUN
+        .try_lock()?
+        .filter(|(generation, _)| *generation == plan.generation)
+        .map(|(_, run)| run);
+    let walk = run.map_or(
+        SequenceWalk::resume(plan.steps.len(), plan.streak, plan.best),
+        |run| run.walk(),
+    );
     let steps = plan.steps.len();
     let at = walk.cursor();
     let first = SeqView::first_chip(at, steps);
@@ -297,7 +362,9 @@ fn seq_view() -> Option<Option<SeqView>> {
         first,
         chips,
         last,
-        last_name: last.and_then(|s| plan.names.get(s.step).copied()).unwrap_or(Text::EMPTY),
+        last_name: last
+            .and_then(|s| plan.names.get(s.step).copied())
+            .unwrap_or(Text::EMPTY),
     }))
 }
 
@@ -334,7 +401,16 @@ fn report(out: Out) {
             Some(Mark::At(d)) => d,
             _ => i32::MIN,
         };
-        tr_combo_link_v1(index as u32, verdict_value(grade.link.verdict), flags, offset);
+        tr_combo_link_v1(
+            index as u32,
+            if grade.input_only {
+                i32::MIN
+            } else {
+                verdict_value(grade.link.verdict)
+            },
+            flags,
+            offset,
+        );
     }
     if let Some(s) = out.resolved {
         let outcome = match s.outcome {
@@ -342,7 +418,12 @@ fn report(out: Out) {
             Outcome::Stopped => 2,
             Outcome::Cleared => 3,
         };
-        tr_combo_attempt_v1(outcome, u32::from(s.true_links), u32::from(s.total), s.fault.map_or(0, |(k, _)| u32::from(k) + 1));
+        tr_combo_attempt_v1(
+            outcome,
+            u32::from(s.true_links),
+            u32::from(s.total),
+            s.fault.map_or(0, |(k, _)| u32::from(k) + 1),
+        );
     }
     if out.load {
         crate::runtime::features::states::request_load();
@@ -411,7 +492,7 @@ pub fn last_combo() -> Option<Combo> {
 /// The last combo published by the strip and the count of links captured (worker; the recording host's tick, on `tr-menu`'s
 /// deepest path), read in place as `last_combo`.
 pub fn strip_sample() -> (u32, Option<Combo>) {
-    SAMPLE.with_latest(|sample, _| (sample.seen, sample.strip))
+    SAMPLE.with_latest(|sample, _| (sample.seen, sample.last.filter(|_| sample.strip_valid)))
 }
 
 /// The worker read the saved-combo list (`tr_combo_listed_v1`).
@@ -422,12 +503,25 @@ pub fn listed(entries: usize, skipped: usize, shared: usize) {
 
 /// The worker decided or answered a combo's fighter question (`tr_combo_fighter_v1`).
 pub fn fighter_event(event: u32, recorded: Option<u32>, current: Option<u32>, detail: u32) {
-    tr_combo_fighter_v1(event, recorded.unwrap_or(u32::MAX), current.unwrap_or(u32::MAX), detail);
+    tr_combo_fighter_v1(
+        event,
+        recorded.unwrap_or(u32::MAX),
+        current.unwrap_or(u32::MAX),
+        detail,
+    );
 }
 
 /// The worker saved `combo`.
 pub fn saved(combo: &Combo) {
-    tr_combo_saved_v1(combo.len() as u32, combo.get(0).map_or(i32::MIN, |l| verdict_value(l.verdict)), 0, 0);
+    tr_combo_saved_v1(
+        combo.len() as u32,
+        combo
+            .get(0)
+            .filter(|_| !combo.input_only)
+            .map_or(i32::MIN, |l| verdict_value(l.verdict)),
+        0,
+        0,
+    );
 }
 
 /// A new target (worker): staged, so the helper starts over on it at the next frame, and the menu and the bar show its name at
@@ -450,6 +544,7 @@ static STAGED_SEEN: AtomicU32 = AtomicU32::new(0);
 /// Publish a grade target without taking `HELPER` (the menu worker: the drill, `ui::worker`, and the combo panel's target,
 /// `set_target`). The next `after_strip` installs it, and the menu's target label becomes its name then.
 pub fn stage_target(target: Option<(Combo, &str)>) {
+    INPUT_TARGET.store(target.is_some_and(|(c, _)| c.input_only), Ordering::Release);
     let name = target.map_or("", |(_, name)| name);
     let mut labels = LABELS.lock();
     labels.settle();
@@ -476,19 +571,17 @@ pub fn labels() -> (Label, Label) {
 
 /// The plugin's layout was registered again: every pane is written again.
 pub fn on_layout_registered() {
-    RENDERER.lock().invalidate();
+    RENDERER.lock().0.invalidate();
 }
 
 /// One HUD tick: the bar's writes, shown with the strip while the helper is On and has a target. It runs on the UI pass, on the
 /// game's task workers (`anchors::ui_pass_calculate`), while the fighter frame may hold `HELPER`, `NAME` or `PLAN`: it takes
 /// them with `try_lock`, and on contention writes nothing this pass (the bar keeps its panes; the next pass draws). No plugin
 /// thread takes them (the menu worker posts: `NAME_POSTED`, `PLAN_POST`); this tick takes what it posted first.
-pub fn hud_tick(strip_shown: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
-    // One copy of the helper (11 KB), as before the `try_lock`: an `Option<Helper>` on the way added 8.8 KB to the game task
-    // worker's frame (`hud_draw::draw`).
-    let helper = match HELPER.try_lock() {
-        Some(guard) => *guard,
-        None => return 0,
+pub fn hud_tick(strip_shown: bool, mut apply: impl FnMut(usize, &Look, Changed)) -> usize {
+    // The old 11 KB Helper copy (and an intermediate Option copy) exhausted game-task stack; borrow static storage.
+    let Some(helper) = HELPER.try_lock() else {
+        return 0;
     };
     let Some(name) = NAME.try_lock().map(|mut name| {
         take_posted_name(&mut name);
@@ -497,8 +590,27 @@ pub fn hud_tick(strip_shown: bool, apply: impl FnMut(usize, &Look, Changed)) -> 
         return 0;
     };
     let Some(seq) = seq_view() else { return 0 };
+    let Some(mut renderer) = RENDERER.try_lock() else {
+        return 0;
+    };
     BAR_SHOWN.store(combo_plan::shown(&helper, strip_shown), Ordering::Release);
-    RENDERER.lock().draw(&helper, &name, seq.as_ref(), strip_shown, apply)
+    let (panes, changes) = &mut *renderer;
+    changes.fill(None);
+    let writes = panes.draw(
+        &helper,
+        &name,
+        seq.as_ref(),
+        strip_shown,
+        |i, _, changed| changes[i] = Some(changed),
+    );
+    drop(helper);
+    // Native text setters can grow buffers; no helper guard crosses those calls.
+    for (i, changed) in changes.iter().enumerate() {
+        if let Some(changed) = changed {
+            apply(i, panes.written(i).unwrap(), *changed);
+        }
+    }
+    writes
 }
 
 /// The combo bar is shown (the rule of `Renderer::draw`, as of the last HUD tick).

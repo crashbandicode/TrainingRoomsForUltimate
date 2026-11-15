@@ -1460,4 +1460,3 @@ today.
 ### TR15 — One clip editor for saved files (2026-11-15)
 
 Crop on macros and combos uses the Replay window clip editor and keyboard save-as-new. Macro X previews kept inputs on the CPU, including a Player 1 macro. Combo handles select whole links; X is absent and has no action. Chains remain unchanged. This follows the operator ruling of 2026-11-15; no capture metadata, combo format or grader changes are part of it.
-
