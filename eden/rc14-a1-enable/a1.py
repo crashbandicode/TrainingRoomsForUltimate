@@ -141,7 +141,12 @@ def _land(ctx, owner, kind, cap=60):
     if fs._live_kinds(ctx).get(owner) == kind:
         return {'already': True}
     seq, line = af._pick(ctx, owner, kind, cap)
-    return {'applied': bool(line), 'line': (line or '')[:160]}
+    # The kind line can be the request's HUD refresh, before the Reload finished (a native group takes seconds): wait for the live kind.
+    deadline = time.monotonic() + 40
+    while line and fs._live_kinds(ctx).get(owner) != kind and time.monotonic() < deadline:
+        ctx.check_stop()
+        time.sleep(1.0)
+    return {'applied': bool(line) and fs._live_kinds(ctx).get(owner) == kind, 'line': (line or '')[:160]}
 
 
 def _fallbacks(lines, owner):
@@ -493,7 +498,14 @@ def a1_crash(ctx):
     out['settle0'] = fs._settled(ctx, seq, 150)
     out['to_gunner'] = _land(ctx, 1, fs.GUNNER)
     out['settle1'] = fs._settled(ctx, hs.diag_mark(ctx), 120)
-    out['to_pyra'] = _land(ctx, 1, cf.PYRA)
+    # Pyra by the cycle chord, as cycle-fix's cf-pyra-keep does: a direct Character pick of Pyra only refreshed the HUD and never
+    # loaded it in the first proof boot (`on_pyra` stayed Mii Gunner).
+    saved_lane = cf.CPU_LANE
+    cf.CPU_LANE = lane
+    try:
+        out['to_pyra'] = cf._to(ctx, cf.PYRA)
+    finally:
+        cf.CPU_LANE = saved_lane
     out['settle2'] = fs._settled(ctx, hs.diag_mark(ctx), 90)
     out['on_pyra'] = fs._live_kinds(ctx).get(1)
     out['unmapped_before'] = _unmapped_total(ctx)
@@ -543,8 +555,8 @@ def a1_crash(ctx):
 
 def a1_cold(ctx):
     """The path boot a1-be759456-y2c did not exercise (the primary's order, 00:3xZ): a cold press AFTER the keep, with no room.
-    cycle-fix's k = 1 shape (Player 1 Mario > Pikachu, the CPU's four lane members, Ready Fighters 6): one CPU fighter does not
-    fit. The CPU takes its lane by direct picks (so its original, Pyra or not, never enters), A1 keeps its window across a forced
+    cycle-fix's k = 1 shape (Player 1 Mario > Pikachu, the CPU's four lane members) at Ready Fighters 5 (6 fits
+    exactly, as the first proof boot's a1-cold showed): one CPU fighter does not fit. The CPU takes its lane by direct picks (so its original, Pyra or not, never enters), A1 keeps its window across a forced
     Reload (a direct pick of Bowser), the kept window attaches back, then three laps over the lane: the cold member is served by
     a `demand` (not declined for room), and the switch away frees it (`cold release`). Pass: the keep is logged, every demand and
     release counts at most Ready Fighters + 1 bodies, no declined press after the keep, no Reload or teardown in the laps, at
@@ -553,7 +565,7 @@ def a1_cold(ctx):
     problems = []
     cf._diag_cycle(ctx, KNOB)
     seq = hs.diag_mark(ctx)
-    fx._live_set(ctx, **cf._k1_values(6))
+    fx._live_set(ctx, **cf._k1_values(5))
     out['settle0'] = fs._settled(ctx, seq, 120)
     out['p1_lap'] = [fs._brief(fs._press_cycle(ctx, 0)) for _ in range(2)]
     out['settle1'] = fs._settled(ctx, hs.diag_mark(ctx), 120)
@@ -562,6 +574,14 @@ def a1_cold(ctx):
     out['unmapped_before'] = _unmapped_total(ctx)
     out['bank'] = [_pick_rec(ctx, kind, i) for i, kind in enumerate(picks)]
     out['settle2'] = fs._settled(ctx, hs.diag_mark(ctx), 120)
+    # Design A refuses to keep a window whose live member is the cold fighter (`window_kept_across_reload`): the CPU goes live
+    # on a member that fits before the forced Reload. The cold one is the one a `demand` loaded over Ready Fighters.
+    cold_kinds = {int(k, 16) for rec in out['bank'] for t in rec.get('demand', []) if (m := DEMAND.search(t)) and m.group(4) == 'true'
+                  for k in re.findall(r'kinds=\[([0-9a-f]+)\]', t)}
+    out['cold_kinds_seen'] = sorted(hex(k) for k in cold_kinds)
+    fits = [k for k in picks if k not in cold_kinds and k != fs.GUNNER]
+    out['live_for_keep'] = _land(ctx, 1, fits[0]) if fits else None
+    out['settle2b'] = fs._settled(ctx, hs.diag_mark(ctx), 60)
     out['status_before'] = _status(ctx)
     seq_keep, _lines = _keep(ctx, out, 1, fs.BOWSER, 'reload window mii')
     kept = out['kept'][-1] if out['kept'] else None
@@ -594,8 +614,8 @@ def a1_cold(ctx):
     out['bad'] = af._bad(after)
     fx._live_set(ctx, **cf._values(8))
     _mark(t0, out, 'done')
-    if not out['ready_fighters'] or out['ready_fighters'] > 6:
-        problems.append('Ready Fighters is %s, not 6' % out['ready_fighters'])
+    if not out['ready_fighters'] or out['ready_fighters'] > 5:
+        problems.append('Ready Fighters is %s, not 5' % out['ready_fighters'])
     if not out['picked']:
         problems.append('Bowser did not apply')
     if not kept:
@@ -615,3 +635,21 @@ def a1_cold(ctx):
         problems.append('Unmapped accesses during the row: %s -> %s' % (out['unmapped_before'], out['unmapped_after']))
     problems += ['bad line: %s' % t for t in out['bad']]
     return _finish(ctx, 'a1-cold', out, problems)
+
+
+def a1_cf_pyra_keep(ctx):
+    """cycle-fix's cf-pyra-keep from its own starting state: the k = 1 fixture's values (Ready Fighters 6, Player 1 Mario > Pikachu,
+    Mario / Mario picked, the Kirby hat list as the card had it), not from what the rows before it left (the first proof boot's
+    cf-pyra-keep started with Player 1's three-fighter lane and hats at Ready Fighters 10 and found the CPU short of memory:
+    `Loaded 5/8 (3 waiting for memory)`, and its cycle never reached Pyra)."""
+    original = fs._remember_original(ctx)
+    values = cf._k1_values(6)
+    if original.get('player_kirby_hats') is not None:
+        values['player_kirby_hats'] = original['player_kirby_hats']
+    cf._diag_cycle(ctx, KNOB)
+    seq = hs.diag_mark(ctx)
+    fs._picks(ctx, cf.MARIO, cf.MARIO, cap=120, **values)
+    out = fs._settled(ctx, seq, 150)
+    if not out.get('settled'):
+        raise RuntimeError('a1-cf-pyra-keep: the k = 1 starting state did not settle: %s' % out)
+    return cf.cf_pyra_keep(ctx)
