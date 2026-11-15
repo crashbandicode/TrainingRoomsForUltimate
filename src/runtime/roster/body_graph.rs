@@ -132,14 +132,67 @@ unsafe fn destroy_dispatcher_arrays(base: usize, arrays: [usize; 2]) -> bool {
 
 /// Finalize's destruction of the records (`0x652f5c-0x652f84`): children through
 /// `0x3a6b80`, the object freed, then the PT auxiliary object freed.
-unsafe fn destroy_special_records(base: usize, records: [usize; 3]) {
+///
+/// rc.14 a-full-2 (p4; boot a2-e881df1e-y1: `S+0x1968` stayed 2 across this teardown of a PT group with no PT holder left,
+/// and `S+0x1980` climbed 2 -> 4 -> 5): finalize first gives back the shared trainer count of the window's kind, by its
+/// flags (`body_bank::holder_counts`): bit 0 `S+0x1968` (`0x652ed4-0x652f54`), bit 5 `S+0x1980` (`0x653090-0x65310c`).
+/// This teardown now does the same, before the holder goes. The bug predates rc.14 (every detached PT/Aegis group TR
+/// destroyed since special groups).
+unsafe fn destroy_special_records(base: usize, records: [usize; 3], flags: u8) {
     let release: unsafe extern "C" fn(usize) = std::mem::transmute(base + SPECIAL_OBJECT_RELEASE);
     let free: unsafe extern "C" fn(usize) = std::mem::transmute(base + HEAP_FREE);
     if records[0] != 0 {
+        let (trainer, partner) = crate::engine::swap::body_bank::holder_counts(flags);
+        if trainer { give_back_holder_count(base, TRAINER_COUNT, TRAINER_SHARED_OBJECT); }
+        if partner { give_back_holder_count(base, PARTNER_COUNT, PARTNER_SHARED_OBJECT); }
         release(records[0]);
         free(records[0]);
     }
     if records[2] != 0 && fields::object(records[2]) { free(records[2]); }
+}
+
+/// `S = *(main+0x52bc3b0)`: the shared trainer resources finalize counts down under `S+0x1988`.
+pub(crate) const TRAINER_SHARED: usize = 0x52bc3b0;
+const TRAINER_LOCK: usize = 0x1988;
+const TRAINER_COUNT: usize = 0x1968;
+const TRAINER_SHARED_OBJECT: usize = 0x1960;
+const PARTNER_COUNT: usize = 0x1980;
+const PARTNER_SHARED_OBJECT: usize = 0x1978;
+/// The game's mutex lock and unlock (`0x39c1a40`/`0x39c1a50`, what finalize calls on `S+0x1988`) and libc++
+/// `__shared_weak_count::__release_weak` (`0x39c2670`).
+pub(crate) const MUTEX_LOCK: usize = 0x39c1a40;
+pub(crate) const MUTEX_UNLOCK: usize = 0x39c1a50;
+pub(crate) const RELEASE_WEAK: usize = 0x39c2670;
+
+/// Finalize's give-back, word for word (`0x652ef8-0x652f58`): under `S+0x1988`, the count goes down by one unless it is
+/// already 0 (`subs`, `b.lt`); at 0 the shared object leaves `S` (`+object-8`, `+object` nulled), its control block drops
+/// an owner (`+8`), and the last owner disposes it (`vt+0x10`) and releases the weak count; the count is stored 0.
+unsafe fn give_back_holder_count(base: usize, count: usize, object: usize) {
+    let Some(s) = fields::child(base, TRAINER_SHARED) else { return; };
+    let lock: unsafe extern "C" fn(usize) = std::mem::transmute(base + MUTEX_LOCK);
+    let unlock: unsafe extern "C" fn(usize) = std::mem::transmute(base + MUTEX_UNLOCK);
+    lock(s + TRAINER_LOCK);
+    let left = fields::read_unchecked::<i32>(s, count) - 1;
+    if left >= 0 {
+        fields::write_unchecked(s, count, left);
+        if left == 0 {
+            let block = fields::read_unchecked::<usize>(s, object);
+            fields::write_unchecked(s, object - 8, 0usize);
+            fields::write_unchecked(s, object, 0usize);
+            if block != 0 && fields::object(block) {
+                let owners = &*((block + 8) as *const std::sync::atomic::AtomicI64);
+                if owners.fetch_sub(1, std::sync::atomic::Ordering::AcqRel) == 0 {
+                    let dispose: unsafe extern "C" fn(usize) =
+                        std::mem::transmute(fields::read_unchecked::<usize>(fields::read_unchecked::<usize>(block, 0), 0x10));
+                    dispose(block);
+                    let release_weak: unsafe extern "C" fn(usize) = std::mem::transmute(base + RELEASE_WEAK);
+                    release_weak(block);
+                }
+            }
+            fields::write_unchecked(s, count, 0i32);
+        }
+    }
+    unlock(s + TRAINER_LOCK);
 }
 
 /// rc.14 a-full-2 (p4), diag build only: the trainer resource counts `S+0x1968` (PT) and `S+0x1980` (bit 5), with
@@ -210,10 +263,10 @@ pub(crate) unsafe fn execute(base: usize, plan: &DetachedPlan<'_>, keys: &[u32],
             DestroyStep::DestroyDispatchers { arrays } => {
                 if destroy_dispatcher_arrays(base, *arrays) { receipt.dispatchers += 1; } else { receipt.skipped += 1; }
             }
-            DestroyStep::DestroyRecords { records } => {
+            DestroyStep::DestroyRecords { records, flags } => {
                 #[cfg(feature = "diag")]
                 let before = trainer_counts(base);
-                destroy_special_records(base, *records);
+                destroy_special_records(base, *records, *flags);
                 receipt.records += 1;
                 // rc.14 a-full-2 (p4): finalize decrements these before its destroy (`0x652efc`, `0x6530b4`); this
                 // teardown mirrors only `0x652f5c-0x652f84`.

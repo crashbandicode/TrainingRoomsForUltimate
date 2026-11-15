@@ -24,6 +24,13 @@ pub const PAIR_ACTIVE_FLAG: u8 = 6;
 pub fn parked_pair_flags(flags: u8) -> u8 {
     (flags & !PAIR_ACTIVE_FLAG) | BANK_FLAG
 }
+
+/// rc.14 a-full-2 (p4): which shared trainer counts finalize gives back before it destroys a native holder, by the window
+/// flags `+0x591f`: `(S+0x1968, S+0x1980)`, `S = *(main+0x52bc3b0)`. Bit 0 (PT) at `0x652ed4`, bit 5 at `0x653090`; each
+/// only with a holder. `body_graph::destroy_special_records` mirrors it.
+pub fn holder_counts(flags: u8) -> (bool, bool) {
+    (flags & 1 != 0, flags & 0x20 != 0)
+}
 pub const POPO: u32 = 0x4b;
 pub const NANA: u32 = 0x4c;
 pub const KIRBY: u32 = 0x06;
@@ -4274,6 +4281,21 @@ mod tests {
         assert_eq!(farthest_unit(&[], &lap, KROOL), None);
     }
 
+    /// rc.14 a-full-2 (p4; boot a2-e881df1e-y1: `S+0x1968` stayed 2 across `[Destroy] records` of a PT group with no PT
+    /// holder alive, and `S+0x1980` climbed 2 -> 4 -> 5): tearing a native holder down gives back the count finalize gives
+    /// back before its destroy, by the window's flags. Bit 0 (PT): `S+0x1968` (`0x652ed4-0x652f54`); bit 5 (Aegis):
+    /// `S+0x1980` (`0x653090-0x65310c`).
+    fn a_destroyed_holder_gives_back_the_count_finalize_gives_back() {
+        let flags = |m: Members| match m.special() { Special::Native(flags) => flags, _ => 0 };
+        let pt = flags(Members::native_group(0x24).unwrap());
+        let aegis = flags(Members::native_group(0x5a).unwrap());
+        assert_eq!(holder_counts(pt), (true, false), "PT {pt:#x}");
+        assert_eq!(holder_counts(aegis), (false, true), "Aegis {aegis:#x}");
+        assert_eq!(holder_counts(BANK_FLAG), (false, false));
+        assert_eq!(holder_counts(PAIR_ACTIVE_FLAG), (false, false));
+        assert_eq!(holder_counts(0), (false, false));
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
@@ -4282,6 +4304,7 @@ mod tests {
             ("a_reload_keeps_the_window_whose_live_member_parks", a_reload_keeps_the_window_whose_live_member_parks as fn()),
             ("a_kirby_with_a_copy_loses_it_and_parks_instead_of_the_reload", a_kirby_with_a_copy_loses_it_and_parks_instead_of_the_reload as fn()),
             ("a_kept_pair_window_keeps_the_bank_flag_as_n3_parks_it", a_kept_pair_window_keeps_the_bank_flag_as_n3_parks_it as fn()),
+            ("a_destroyed_holder_gives_back_the_count_finalize_gives_back", a_destroyed_holder_gives_back_the_count_finalize_gives_back as fn()),
             ("the_farthest_unit_goes_never_the_next_or_the_one_on_screen", the_farthest_unit_goes_never_the_next_or_the_one_on_screen as fn()),
             ("a_mii_group_is_kept_across_a_reload_only_with_its_switch", a_mii_group_is_kept_across_a_reload_only_with_its_switch as fn()),
             ("five_laps_of_the_operator_cycle_keep_what_fits_hot", five_laps_of_the_operator_cycle_keep_what_fits_hot as fn()),

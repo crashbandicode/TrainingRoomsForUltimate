@@ -6171,7 +6171,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
             let created = [0usize, 8, 16].map(|o| read::<usize>(entry, 0x5a88 + o));
             if members.carries_records() && valid_special_object(base, created[0], owner) {
                 records = created;
-                detached.records = Some(RecordsRef { records: created, valid: true });
+                detached.records = Some(RecordsRef { records: created, valid: true, flags: read::<u8>(entry, 0x591f) });
             }
             if let Some(kind) = members.object_kind() { detached.held_kinds.push(kind); }
         }
@@ -6904,7 +6904,7 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
                         valid: saved.dispatch.iter().all(|a| *a == 0 || dispatcher_array_ok(*a)) });
                     if saved.records != [0, 0, 0] {
                         detached.records = Some(RecordsRef { records: saved.records,
-                            valid: group.members.carries_records() && valid_special_object(base, saved.records[0], owner) });
+                            valid: group.members.carries_records() && valid_special_object(base, saved.records[0], owner), flags: saved.flags });
                     }
                     // Inbox 00:18Z: a re-acquired object kind is a held key: the plan's key step returns it (rc6-bg-pt4:
                     // left on R, the next Reload's state 7 refused on `R+0x18 == 2`).
@@ -7141,7 +7141,7 @@ unsafe fn leave_group(entry: *const u8, owner: u32, role: usize, group: usize) {
                     valid: saved.dispatch.iter().all(|a| *a == 0 || dispatcher_array_ok(*a)) });
                 if saved.records != [0, 0, 0] {
                     detached.records = Some(RecordsRef { records: saved.records,
-                        valid: g.members.carries_records() && valid_special_object(base, saved.records[0], owner) });
+                        valid: g.members.carries_records() && valid_special_object(base, saved.records[0], owner), flags: saved.flags });
                 }
                 // Inbox 00:18Z: its re-acquired object kind goes with it (the plan's key step).
                 if g.object_held { detached.held_kinds.push(PT_OBJECT_KIND); }
@@ -7780,6 +7780,10 @@ pub(super) unsafe fn install(base: usize) {
     let special_ok = gate(SEAM_GROUP, SPECIAL_SEAMS, groups_ok
         && fingerprint(base, SPECIAL_OBJECT_RELEASE, &[0xf81b0ff9, 0xa9015ff8, 0xa90257f6, 0xa9034ff4], "SpecialGroups")
         && fingerprint(base, HEAP_FREE, &[0xd100c3ff, 0xa9027bfd, 0x910083fd, 0xf81f83a0], "SpecialGroups")
+        // rc.14 a-full-2 (p4): the give-back finalize does before its destroy (`body_graph::destroy_special_records`).
+        && fingerprint(base, graph::MUTEX_LOCK, &[0xd000c6f0, 0xf9460211, 0x91300210, 0xd61f0220], "SpecialGroups")
+        && fingerprint(base, graph::MUTEX_UNLOCK, &[0xd000c6f0, 0xf9460611, 0x91302210, 0xd61f0220], "SpecialGroups")
+        && fingerprint(base, graph::RELEASE_WEAK, &[0xd000c6f0, 0xf9410e11, 0x91086210, 0xd61f0220], "SpecialGroups")
         && fingerprint(base, articles::POOL_BUILD, &articles::POOL_BUILD_WORDS, "SpecialGroups")
         && fingerprint(base, RELEASE_KEY, &[0xa9bd57f6, 0xa9014ff4, 0xa9027bfd, 0x910083fd, 0x9100a013, 0xaa0003f4], "SpecialGroups"))
         && groups_ok;

@@ -346,7 +346,7 @@ fn detached_teardown_streams_all_phases_and_refusals_without_allocations() {
             ContextRef { ctx: 2, controller: 33, valid: mask & 8 != 0 }];
         let groups = [DetachedView { owner: 0, bodies: &bodies, contexts: &contexts,
             dispatch: Some(DispatcherRef { arrays: [100, 101], valid: mask & 16 != 0 }),
-            records: Some(RecordsRef { records: [200, 201, 202], valid: mask & 32 != 0 }), held_kinds: &[7, 8, 7] },
+            records: Some(RecordsRef { records: [200, 201, 202], valid: mask & 32 != 0, flags: 0 }), held_kinds: &[7, 8, 7] },
             DetachedView { owner: 1, bodies: &bodies[1..], contexts: &contexts[1..], dispatch: None,
                 records: None, held_kinds: &[8, 9] }];
         let consumers = NativeConsumers { pad_routes: std::array::from_fn(|slot|

@@ -102,9 +102,9 @@ pub struct ContextRef { pub ctx: usize, pub controller: usize, pub valid: bool }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DispatcherRef { pub arrays: [usize; 2], pub valid: bool }
 
-/// A native group's object records (`+0x5a88/+0x5a90/+0x5a98`).
+/// A native group's object records (`+0x5a88/+0x5a90/+0x5a98`), with its window flags `+0x591f` (rc.14 a-full-2, p4: the counts finalize gives back go by them).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct RecordsRef { pub records: [usize; 3], pub valid: bool }
+pub struct RecordsRef { pub records: [usize; 3], pub valid: bool, pub flags: u8 }
 
 /// Native readers holding a pointer to one of our objects (Fable §2.2).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -159,7 +159,7 @@ pub enum DestroyStep {
     /// `0x37ae5e0` on a stack copy of the dispatcher struct (after the bodies).
     DestroyDispatchers { arrays: [usize; 2] },
     /// `0x3a6b80` then `0x392eb40` (+ the PT auxiliary object), after the contexts.
-    DestroyRecords { records: [usize; 3] },
+    DestroyRecords { records: [usize; 3], flags: u8 },
     /// The kinds whose prefetch keys the bundles still hold. The bank's arm
     /// returns the ledger's tokens through `r_handle::release` (orphan key first;
     /// WP4, the only caller of `0x17e2fe0`/`0x17e8610`).
@@ -284,7 +284,7 @@ impl DetachedPlan<'_> {
         let dispatchers = self.groups.iter().filter_map(|g| g.dispatch).filter(|d| d.valid)
             .map(|d| DestroyStep::DestroyDispatchers { arrays: d.arrays });
         let records = self.groups.iter().filter_map(|g| g.records).filter(|r| r.valid)
-            .map(|r| DestroyStep::DestroyRecords { records: r.records });
+            .map(|r| DestroyStep::DestroyRecords { records: r.records, flags: r.flags });
         routes.chain(bodies).chain(contexts).chain(dispatchers).chain(records)
     }
 
@@ -320,7 +320,7 @@ struct Phases {
     bodies: Vec<u32>,
     contexts: Vec<usize>,
     dispatchers: Vec<[usize; 2]>,
-    records: Vec<[usize; 3]>,
+    records: Vec<([usize; 3], u8)>,
     keys: Vec<u32>,
     skipped: Vec<Skipped>,
     attached: Attached,
@@ -378,7 +378,7 @@ impl Phases {
             if dispatch.valid { self.dispatchers.push(dispatch.arrays); } else { self.skipped.push(Skipped::Dispatchers(dispatch.arrays)); }
         }
         if let Some(records) = group.records {
-            if records.valid { self.records.push(records.records); } else { self.skipped.push(Skipped::Records(records.records)); }
+            if records.valid { self.records.push((records.records, records.flags)); } else { self.skipped.push(Skipped::Records(records.records)); }
         }
         for kind in &group.held_kinds {
             if !self.keys.contains(kind) { self.keys.push(*kind); }
@@ -391,7 +391,7 @@ impl Phases {
         steps.extend(self.bodies.into_iter().map(|id| DestroyStep::DestroyBody { id }));
         steps.extend(self.contexts.into_iter().map(|ctx| DestroyStep::FreeContext { ctx }));
         steps.extend(self.dispatchers.into_iter().map(|arrays| DestroyStep::DestroyDispatchers { arrays }));
-        steps.extend(self.records.into_iter().map(|records| DestroyStep::DestroyRecords { records }));
+        steps.extend(self.records.into_iter().map(|(records, flags)| DestroyStep::DestroyRecords { records, flags }));
         if !self.keys.is_empty() { steps.push(DestroyStep::ReleaseKeys { kinds: self.keys }); }
         DestroyPlan { steps, skipped: self.skipped, attached: self.attached, kirby_cells: self.kirby_cells,
             kirby_misplaced: self.kirby_misplaced, kirby_branch_mismatch: self.kirby_branch_mismatch }
@@ -580,7 +580,7 @@ mod tests {
             bodies: vec![body(0x90000, 0x21, 0, true), BodyRef { id: 0xa0000, kind: 0x1e, cell: 1, activated: false, valid: false, registered: Some(0x1e) }],
             contexts: vec![ctx(0x1187044b80, 0x1180e94200), ContextRef { ctx: 0x1187044a00, controller: 0, valid: false }],
             dispatch: Some(DispatcherRef { arrays: [0x11e22b0000, 0x11e22b0100], valid: false }),
-            records: Some(RecordsRef { records: [0x11f0000000, 0, 0x11f0000300], valid: false }),
+            records: Some(RecordsRef { records: [0x11f0000000, 0, 0x11f0000300], valid: false, flags: 0 }),
             held_kinds: vec![0x2f] };
         let plan = destroy_plan(&Bundle::Detached(group), &consumers);
         assert_eq!(plan.skipped, vec![Skipped::Context(0x1187044a00), Skipped::Body(0xa0000),
