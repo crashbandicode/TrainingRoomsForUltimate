@@ -7,6 +7,7 @@ from this folder.
 import hashlib
 import json
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -31,8 +32,15 @@ ROWS = [
     ('a2-restore', M, 'a2_restore', 3, "The knob off, cycle-fix's restore."),
     # Reloads out of native windows last: cycle-fix 23:47Z, the pins `settle(None)` drops on such a Reload (a1's crash).
     ('a2-pt', M, 'a2_pt', 10, 'Limit 2 PT p1-p4: the PT window kept by `reload window pt`, articles retired; warm back, rebuilt; laps; counts.'),
+    # The primary ~00:33Z: a1-enable's pair rows (a1.py at rc14/a1-enable 0997fe4a) with A1 on, for the kept-pair fix.
+    ('a1-paircontrol2', 'a1.py', 'a1_paircontrol', 5, 'Control: the pair as a planner-built group, Diddy Kong to Popo: warm, ready, no fallback.'),
+    ('a1-pair', 'a1.py', 'a1_pair', 9, 'Ready Fighters 10, CPU Solo Popo Off: the pair window kept (flags 4, as N3 parks it), then its warm return; no Unmapped.'),
+    ('a1-restore', 'a1.py', 'a1_restore', 3, 'The knob off, Solo Popo (CPU) back, the remembered values, Mario / Mario.'),
     ('a2-aegis-probe', M, 'a2_aegis_probe', 6, 'Probe a0 (diag only): a Pyra window across a forced Reload, the holder before and after the start.'),
 ]
+# After z-boot: the probe reads the Reload out of a Pyra window that crashed a1-enable's boot (the primary: last, no retry).
+AFTER_Z = ('a2-aegis-probe',)
+A1 = ('/home/intpa/tr-fixes-20261113/a1-enable', '0997fe4a', 'eden/rc14-a1-enable/a1.py')
 
 
 def row(rid, module, fn, budget, expect):
@@ -59,7 +67,8 @@ def plan(skip=()):
             'scope': 'rc.14 a-full-2: one boot, the boot rows, the a2-* rows (S1, K-strip, PT, probe a0), z-boot.',
             'setup': setup, 'segments': segs, 'gates': mp.gates(),
             'recover': [{'run': 'steps.py:recover_training', 'check': True}], 'gif_presets': {},
-            'rows': mp.boot_rows() + [row(*r) for r in ROWS if r[0] not in skip] + [mp.end_row()]}
+            'rows': mp.boot_rows() + [row(*r) for r in ROWS if r[0] not in skip and r[0] not in AFTER_Z] + [mp.end_row()]
+                    + [row(*r) for r in ROWS if r[0] not in skip and r[0] in AFTER_Z]}
 
 
 def main(out, skip=()):
@@ -72,6 +81,10 @@ def main(out, skip=()):
     shutil.copyfile(CF, rows / 'cyclefix.py')
     shutil.copyfile(AF, rows / 'afull.py')
     shutil.copyfile(HERE / M, rows / M)
+    # a1-enable's a1.py at its pinned commit (read-only `git show`; never its working copy).
+    repo, rev, path = A1
+    (rows / 'a1.py').write_bytes(subprocess.run(['git', '-C', repo, 'show', '%s:%s' % (rev, path)], check=True,
+                                                capture_output=True).stdout)
     for name in SEGMENTS:
         shutil.copyfile(LIB / 'segments' / (name + '.edenmacro.json'), rows / 'segments' / (name + '.edenmacro.json'))
     (rows / 'rows.json').write_text(json.dumps(plan(skip), indent=1) + '\n')
