@@ -388,8 +388,9 @@ fn core06_off_restores() {
 
 #[test]
 fn core06_site_guards() {
-    // Three hooks, fourteen called natives (the last one Eggs-ercise's hitlag, `StopModule::set_hit_stop_frame`; one is the attack module's
-    // damage multiplier, rc.14 spots-2; one the knockback a defender received, spots-3) and thirteen relied (two the damage record, spots-3)
+    // Seven hooks (rc.14 wind-articles added the four AREA_WIND_2ND* commands), fourteen called natives (the last one Eggs-ercise's hitlag,
+    // `StopModule::set_hit_stop_frame`; one is the attack module's damage multiplier, rc.14 spots-2; one the knockback a defender received,
+    // spots-3) and thirteen relied (two the damage record, spots-3)
     // windows (the Lua stack reads, HB1's three HitModule windows, for the own orbs (decision HB-OWN-ORBS) the bone transform,
     // the projection and its screen size words and, for Eggs-ercise's spawn range, the camera limit accessor).
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
@@ -461,6 +462,10 @@ fn core06_site_guards() {
         (sites_hitbox::ORB_JOINT_POSITION_OFFSET, "orb_joint_position"),
         (sites_hitbox::ORB_WORLD_TO_SCREEN_OFFSET, "orb_world_to_screen"),
         (sites_hitbox::ORB_SCREEN_SIZE_OFFSET, "orb_screen_size"),
+        (sites_hitbox::AREA_WIND_OFFSET, "hitbox_area_wind"),
+        (sites_hitbox::AREA_WIND_ARG10_OFFSET, "hitbox_area_wind_arg10"),
+        (sites_hitbox::AREA_WIND_RAD_OFFSET, "hitbox_area_wind_rad"),
+        (sites_hitbox::AREA_WIND_RAD_ARG9_OFFSET, "hitbox_area_wind_rad_arg9"),
     ] {
         assert_eq!(model::sites_hitbox::SITES.iter().find(|s| s.name == name).map(|s| s.offset), Some(offset), "{name}");
     }
@@ -490,6 +495,10 @@ fn core06_rows_match_the_owned_elf() {
         ("sv_battle_object_module_accessor", "_ZN3app9sv_system29battle_object_module_accessorEP9lua_State"),
         ("stop_set_hit_stop_frame", "_ZN3app8lua_bind35StopModule__set_hit_stop_frame_implEPNS_26BattleObjectModuleAccessorEib"),
         ("camera_limit_range", "_ZN3app6camera22get_camera_limit_rangeEv"),
+        ("hitbox_area_wind", "_ZN3app10sv_animcmd13AREA_WIND_2NDEP9lua_State"),
+        ("hitbox_area_wind_arg10", "_ZN3app10sv_animcmd19AREA_WIND_2ND_arg10EP9lua_State"),
+        ("hitbox_area_wind_rad", "_ZN3app10sv_animcmd17AREA_WIND_2ND_RADEP9lua_State"),
+        ("hitbox_area_wind_rad_arg9", "_ZN3app10sv_animcmd22AREA_WIND_2ND_RAD_arg9EP9lua_State"),
     ] {
         let site = SITES.iter().find(|s| s.name == name).unwrap();
         assert_eq!(main.symbol(symbol), Some(site.offset), "{name}");
@@ -770,6 +779,55 @@ fn legend_facts_match_the_owned_elf() {
     // parameter +8 (`str s0,[sp,#0x20]`, the parameters at sp+0x18) lands at entry +0xc.
     assert_eq!((area::ENTRY, area::ENTRY_ANGLE), (0x28, 0xc));
     assert_eq!([0x3d0558, 0x3d0638, 0x3d0060].map(w), [0x7900_33e8, 0xbd00_23e0, 0xf800_6128], "strh w8,[sp,#0x18]; str s0,[sp,#0x20]; stur x8,[x9,#0x6]");
+}
+
+/// rc.14 wind-articles: the four wind-area commands the plugin hooks. Each reads the running object's accessor from the Lua state
+/// (`ldur x8,[x0,#-8]; ldr x8,[x8,#0x1a0]`), takes its AreaModule (`ldr x0,[x8,#0xc0]`, `legend::area::MODULE`) and calls a worker that
+/// adds the record through the module's slot 0x158 (`add_wind_area_2nd`, boxes) or 0x160 (`_rad`, circles). Nothing in them depends on
+/// the object being a fighter, so an article's command writes its own AreaModule.
+#[test]
+fn core06_wind_area_commands_match_the_owned_elf() {
+    use model::legend::area;
+    let Some(main) = common::owned_main("core06_wind_area_commands_match_the_owned_elf") else { return };
+    let w = |offset: usize| word_at(&main, offset);
+    let bl_target = |at: usize| {
+        let word = w(at);
+        assert_eq!(word & 0xfc00_0000, 0x9400_0000, "bl at {at:#x}");
+        (at as i64 + ((((word & 0x03ff_ffff) << 6) as i32 >> 6) as i64) * 4) as usize
+    };
+    for (offset, load, call, worker, slot) in [
+        (sites_hitbox::AREA_WIND_OFFSET, 0x44, 0x4c, 0x22a_8fd0, 0x158),
+        (sites_hitbox::AREA_WIND_ARG10_OFFSET, 0x44, 0x4c, 0x22a_8fd0, 0x158),
+        (sites_hitbox::AREA_WIND_RAD_OFFSET, 0x44, 0x4c, 0x22a_86a0, 0x160),
+        (sites_hitbox::AREA_WIND_RAD_ARG9_OFFSET, 0x44, 0x4c, 0x22a_86a0, 0x160),
+    ] {
+        assert_eq!([w(offset + 0x10), w(offset + 0x14)], [0xf85f_8008, ldr_x(8, 8, 0x1a0)], "{offset:#x}: ldur x8,[x0,#-8]; ldr x8,[x8,#0x1a0]");
+        assert_eq!(w(offset + load), ldr_x(0, 8, area::MODULE as u32), "{offset:#x}: ldr x0,[x8,#0xc0]");
+        assert_eq!(bl_target(offset + call), worker, "{offset:#x}: the worker");
+        // The worker reaches the module's wind slot (`ldr x8,[x8,#slot]` before its `blr x8`).
+        let reaches = (worker..worker + 0x1000).step_by(4).any(|at| w(at) == ldr_x(8, 8, slot));
+        assert!(reaches, "{worker:#x} loads slot {slot:#x}");
+    }
+}
+
+/// rc.14 wind-articles: `legend::wind_areas` reads one AreaModule table for every object. The two functions that write it
+/// (`add_wind_area_2nd` main+0x3d03e0 and `_rad` main+0x3d0680, whose stores `legend_facts_match_the_owned_elf` checks) sit at
+/// slots 0x158 / 0x160 of four AreaModule vtables, by their relocations: the fighter's (address point main+0x4f85690) and three
+/// more, so an article's or an item's module keeps the same records.
+#[test]
+fn legend_every_area_module_writes_the_table_the_reader_reads() {
+    let Some(main) = common::owned_main("legend_every_area_module_writes_the_table_the_reader_reads") else { return };
+    let reloc = |at: usize, target: u64| {
+        let mut entry = [0u8; 24];
+        entry[..8].copy_from_slice(&(at as u64).to_le_bytes());
+        entry[8..16].copy_from_slice(&0x403u64.to_le_bytes());
+        entry[16..].copy_from_slice(&target.to_le_bytes());
+        let ro = &main.bytes[main.rodata.offset..main.rodata.offset + main.rodata.size];
+        (0..ro.len() / 8).any(|i| ro.get(i * 8..i * 8 + 24) == Some(&entry[..]))
+    };
+    for vtable in [0x4f6_9ec0usize, 0x4f8_5690, 0x507_6470, 0x517_9668] {
+        assert!(reloc(vtable + 0x158, 0x3d03e0) && reloc(vtable + 0x160, 0x3d0680), "vtable {vtable:#x}: add_wind_area_2nd / _rad");
+    }
 }
 
 /// Eggs-ercise V2.2: the stage's camera range is the camera manager's four floats (left, right, top, bottom) at `+0xc20`, read

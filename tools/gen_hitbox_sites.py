@@ -78,6 +78,15 @@ ROWS = [
      "`StopModule::set_hit_stop_frame(accessor, frames, bool)` (lua_bind thunk `ldr x0,[x0,#0x90]; ldr x8,[x0]; ldr x3,[x8,#0xd0]; and w2,w2,#1; br x3`): freezes the fighter that broke an Eggs-ercise target for the hitlag frames, as a hit does (SPEC V2.1); called with false only."),
     ("camera_limit_range", 0X15CB9B0, RELIED,
      "`app::camera::get_camera_limit_range` (`main+0x15cb9b0`): loads the camera manager `**(main+0x52b8f00)` and returns the four floats at `+0xc20`, the stage"),
+    # rc.14 wind-articles: the four wind-area commands, hooked so an article that runs one is tracked and its area drawn.
+    ("hitbox_area_wind", 0x22A98C0, HOOK,
+     "`app::sv_animcmd::AREA_WIND_2ND(lua_State*)`: the animation command that adds a box wind area to the running object's AreaModule (accessor `+0xc0`; worker `main+0x22a8fd0`, AreaModule slot 0x158 `add_wind_area_2nd`). Replace hook at the entry, plugin part first: an article that runs it is tracked so its area is drawn (rc.14 wind-articles)."),
+    ("hitbox_area_wind_arg10", 0x22A9960, HOOK,
+     "`app::sv_animcmd::AREA_WIND_2ND_arg10(lua_State*)`: the same command with ten arguments (worker `main+0x22a8fd0`, slot 0x158). Replace hook at the entry, plugin part first (rc.14 wind-articles)."),
+    ("hitbox_area_wind_rad", 0x22A8E90, HOOK,
+     "`app::sv_animcmd::AREA_WIND_2ND_RAD(lua_State*)`: the animation command that adds a circle wind area (worker `main+0x22a86a0`, AreaModule slot 0x160 `add_wind_area_2nd_rad`). Replace hook at the entry, plugin part first (rc.14 wind-articles)."),
+    ("hitbox_area_wind_rad_arg9", 0x22A8F30, HOOK,
+     "`app::sv_animcmd::AREA_WIND_2ND_RAD_arg9(lua_State*)`: the circle command with nine arguments (worker `main+0x22a86a0`, slot 0x160). Replace hook at the entry, plugin part first (rc.14 wind-articles)."),
 ]
 
 

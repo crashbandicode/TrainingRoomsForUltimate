@@ -3,7 +3,8 @@
 //! read from the owned 13.0.5 ELF by `tools/gen_hitbox_sites.py` and `tests/core06_hitbox.rs` re-checks every row against
 //! it. Offsets are from the start of `.text`.
 //!
-//! Three hooks (the `ATTACK` and `CATCH` animation commands and `GrabModule::set_rebound`), eleven called natives of the
+//! Seven hooks (the `ATTACK` and `CATCH` animation commands, `GrabModule::set_rebound` and, rc.14 wind-articles, the four
+//! `AREA_WIND_2ND*` commands), eleven called natives of the
 //! attack, damage, effect and motion modules, the Lua state's accessor getter, two relied-on windows (the Lua stack reads the plugin
 //! repeats from the game's own command code), three relied-on windows of HitModule (the hurtbox tables, decision HB1), two of the
 //! DamageModule's damage record (spots-3) and,
@@ -74,7 +75,15 @@ pub const HITBOX_HIT_STOP_OFFSET: usize = 0x208_9260;
 /// (`sites_pkg2::CAMERA_MANAGER_SLOT_OFFSET`) four floats at `CAMERA_LIMIT_FIELD`; the plugin reads them, never calls it.
 pub const CAMERA_LIMIT_RANGE_OFFSET: usize = 0x15c_b9b0;
 pub const CAMERA_LIMIT_FIELD: usize = 0xc20;
-/// The three hooks' rows (the other rows are called or relied on, never written).
-pub const HOOK_ROWS: [&str; 3] = ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound"];
+/// rc.14 wind-articles: the four wind-area animation commands (`app::sv_animcmd::AREA_WIND_2ND`, `_arg10`, `_RAD`, `_RAD_arg9`). Each
+/// takes the running object's AreaModule (accessor `+0xc0`) and adds a wind record; an article that runs one is tracked so its area
+/// is drawn (`legend::wind_tracks`).
+pub const AREA_WIND_OFFSET: usize = 0x22a_98c0;
+pub const AREA_WIND_ARG10_OFFSET: usize = 0x22a_9960;
+pub const AREA_WIND_RAD_OFFSET: usize = 0x22a_8e90;
+pub const AREA_WIND_RAD_ARG9_OFFSET: usize = 0x22a_8f30;
+/// The seven hooks' rows (the other rows are called or relied on, never written).
+pub const HOOK_ROWS: [&str; 7] =
+    ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound", "hitbox_area_wind", "hitbox_area_wind_arg10", "hitbox_area_wind_rad", "hitbox_area_wind_rad_arg9"];
 
-pub static SITES: [Site; 31] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));
+pub static SITES: [Site; 35] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));

@@ -51,9 +51,57 @@ moved but can still act. Most deal no damage, such as F.L.U.D.D.'s water, and so
 of Bowser's Fire Breath. The game marks them itself, and the plugin uses that mark. A windbox is a hitbox, so Hitboxes
 draws it too; with both ticked it is drawn once, in deep blue, and with Windboxes alone only the windboxes are drawn.
 
+These moves have a windbox in the game's own move data. A few moves whose names the data does not give are left out.
+King K. Rool's Blunderbuss pulls with a windbox (and grab boxes catch who it pulls in). His Crownerang has a small
+windbox on his arm while he throws the crown. Palutena's Counter and Greninja's down taunt have one too.
+
+| Fighter | Moves with a windbox |
+| --- | --- |
+| Bowser | neutral special (one of the two flames) |
+| Cloud | neutral special, down special |
+| Corrin | up special |
+| Dark Samus, Samus | Final Smash (before the beam) |
+| Ganondorf | up tilt |
+| Greninja | up special (the water), down taunt |
+| Hero | Kaboom; Whack and Thwack |
+| Ice Climbers | down special |
+| Incineroar | side special |
+| Inkling | neutral special (the ink) |
+| Jigglypuff | Final Smash |
+| Kazuya | the last hit of Flash Punch Combo, Final Smash |
+| Ken | Final Smash |
+| King Dedede | neutral special (Inhale) |
+| King K. Rool | neutral special (Blunderbuss, held), side special (Crownerang) |
+| Kirby | neutral special (Inhale) |
+| Little Mac | dash attack, side special |
+| Lucas | down special |
+| Luigi | down special |
+| Mario | down special (F.L.U.D.D.) |
+| Mega Man | up aerial |
+| Meta Knight | neutral special |
+| Mii Brawler | side special (Suplex) |
+| Mii Gunner | down special (Absorbing Vortex, as it ends) |
+| Mii Swordfighter | neutral special (Shuriken of Light) |
+| Ness | down special (as it ends) |
+| Pac-Man | dash attack, down special (the hydrant's water) |
+| Palutena | forward smash, down smash, down special (Counter), Final Smash |
+| Piranha Plant | side special, Final Smash |
+| Pit, Dark Pit | down special |
+| Pyra and Mythra | side special (Pyra's sword), Final Smash |
+| Robin | up special (where it lands) |
+| Rosalina | neutral special (calling Luma back) |
+| Sephiroth | Final Smash |
+| Sheik | up special |
+| Squirtle | neutral special |
+| Toon Link | down aerial (as it lands) |
+| Wii Fit Trainer | neutral special (while charging) |
+| Zelda | down special (the Phantom) |
+
 Some moves push through a wind area instead of a hitbox. Windboxes draws those too: a see-through deep blue box or
 circle where the wind blows, with a white line, edged in dark so it shows on a pale stage, pointing the way it pushes. A
-dot in the middle means the wind has no one direction. Items' wind, such as the Gust Bellows, is not drawn.
+dot in the middle means the wind has no one direction. The wind areas of what a fighter throws or summons are drawn too,
+such as Zelda's Triforce of Wisdom, which pulls, and Hero's Kaboom. An item's wind area is drawn the same way.
+Stage hazards are not drawn, such as Pac-Land's fire hydrant.
 
 These fighters have moves with a wind area. Eden tried the special moves and smashes of every fighter whose moves can
 make one, and Ganondorf's up tilt; aerials, throws and the other tilts were not tried, so a move missing here may still

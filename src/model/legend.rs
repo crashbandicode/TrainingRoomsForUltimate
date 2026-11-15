@@ -320,6 +320,27 @@ pub fn area_orbs(area: &WindArea, index: usize, z: f32, colour: [u8; 4]) -> [Opt
     [Some(shape), shadow, line]
 }
 
+// ---- articles' and items' wind areas (rc.14 wind-articles) ----------------------------------------------------------------
+
+/// A wind-area command (`AREA_WIND_2ND`, `_arg10`, `_RAD`, `_RAD_arg9`: `sites_hitbox`) tracks the object running it as an article,
+/// as ATTACK and CATCH do, while the visualizer is on with *Windboxes* ticked and the practice visualizes the object. A fighter's
+/// areas stay with its own pass. 30 such commands on 17 fighters run in article scripts (Zelda's Triforce of Wisdom, Hero's Bang
+/// and Kaboom, the Final Smashes' black holes; `artifacts/rc14-wind-audit/out/windareas.txt`).
+pub fn wind_tracks(enabled: bool, windboxes: bool, fighter: bool, visualizes: bool) -> bool {
+    enabled && windboxes && !fighter && visualizes
+}
+
+/// An active item is tracked as an article while it has a live attack slot or an enabled wind area (`wind_areas`, read only while
+/// *Windboxes* is ticked).
+pub fn tracks_item(live_slot: bool, wind_areas: usize) -> bool {
+    live_slot || wind_areas > 0
+}
+
+/// A tracked article stays while it holds a sphere (a live hitbox or a waiting grab box) or an enabled wind area.
+pub fn keeps_article(holds: bool, wind_areas: usize) -> bool {
+    holds || wind_areas > 0
+}
+
 #[cfg(test)]
 #[path = "legend_tests.rs"]
 mod tests;

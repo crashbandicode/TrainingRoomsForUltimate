@@ -536,3 +536,39 @@ fn legend_board_holds_every_orb_of_every_area() {
     // A band, a shadow and a line for each of `MAX_AREAS` areas, beside the spheres and the launch-angle marks.
     assert!(orbs::BOARD_ORBS >= hitbox::MAX_HELD + 2 * hitbox::SLOTS as usize + 3 * area::MAX_AREAS, "{}", orbs::BOARD_ORBS);
 }
+// ---- articles' and items' wind areas (rc.14 wind-articles) ----------------------------------------------------------------
+
+/// A wind-area command tracks the object running it as an article while the visualizer is on with Windboxes ticked and the
+/// practice visualizes it; a fighter keeps its areas in its own pass, and nothing is tracked otherwise.
+#[test]
+fn legend_a_wind_command_tracks_a_visualized_article_only() {
+    assert!(wind_tracks(true, true, false, true), "Zelda's Triforce, Hero's Kaboom: an article running AREA_WIND_2ND*");
+    for (enabled, windboxes, fighter, visualizes) in [(false, true, false, true), (true, false, false, true), (true, true, true, true), (true, true, false, false)] {
+        assert!(!wind_tracks(enabled, windboxes, fighter, visualizes), "enabled {enabled} windboxes {windboxes} fighter {fighter} visualizes {visualizes}");
+    }
+}
+
+/// An active item is tracked with a live attack slot (a thrown bomb) or with an enabled wind area.
+#[test]
+fn legend_an_item_with_a_wind_area_is_tracked() {
+    assert!(tracks_item(true, 0) && tracks_item(false, 1) && tracks_item(true, area::MAX_AREAS));
+    assert!(!tracks_item(false, 0));
+}
+
+/// A tracked article stays while it holds a sphere or has a wind area: Zelda's Triforce pulls before any of its hitboxes.
+#[test]
+fn legend_an_article_is_kept_while_it_has_a_wind_area() {
+    assert!(keeps_article(true, 0) && keeps_article(false, 1) && keeps_article(true, 2));
+    assert!(!keeps_article(false, 0));
+}
+
+/// The menu docs name the windbox moves from the game data that the public lists miss, say that articles' and items' wind
+/// areas are drawn, and that stage hazards are not.
+#[test]
+fn legend_docs_name_the_game_data_windboxes() {
+    let docs = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/docs/menu/display-and-controls.md"));
+    for want in ["Crownerang", "Counter", "down taunt", "Blunderbuss", "Triforce of Wisdom", "Kaboom", "Stage hazards", "fire hydrant"] {
+        assert!(docs.contains(want), "docs/menu/display-and-controls.md names {want}");
+    }
+    assert!(!docs.contains("Items' wind, such as the Gust Bellows, is not drawn"), "items' wind areas are drawn now");
+}

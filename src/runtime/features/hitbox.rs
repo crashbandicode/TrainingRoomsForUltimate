@@ -12,7 +12,8 @@
 //! `model::hitbox::HandleSet` holds them through `OrbSink` (never refused, ended at a status change), keeps the unchanged ones
 //! and drops the ones that changed or went away. The pass publishes the held spheres' world positions; `draw_orbs` draws them.
 //!
-//! Three hooks (`sites_hitbox`: the `ATTACK` and `CATCH` animation commands and `GrabModule::set_rebound`) and one per-frame
+//! Seven hooks (`sites_hitbox`: the `ATTACK` and `CATCH` animation commands, `GrabModule::set_rebound` and the four
+//! `AREA_WIND_2ND*` commands, rc.14 wind-articles) and one per-frame
 //! pass, `frame`, which the CPU core's on-frame wrapper calls for every fighter after the game's own frame (SPEC-core-01 §5.2:
 //! after combo, before the save states). The pass is a readiness boundary of the capability model (`INSTALLED`): until boot
 //! says the feature's whole closure passed its guards it makes no call and reads no native. Every native goes through
@@ -49,7 +50,7 @@ use crate::runtime::game::{self, natives};
 use crate::runtime::{scene, state_natives};
 
 /// Boot: the feature's closure (its rows, the Training predicate and the rows of the natives it shares) passed its guards and its
-/// three hooks are installed. The per-frame pass does nothing before.
+/// seven hooks are installed. The per-frame pass does nothing before.
 static INSTALLED: AtomicBool = AtomicBool::new(false);
 /// `hitbox_vis` draws something (`legend::draws`).
 static SETTING: AtomicBool = AtomicBool::new(false);
@@ -395,7 +396,7 @@ unsafe fn publish_orbs(accessor: usize, set: &hitbox::HandleSet, areas: &[legend
 }
 
 /// One raw game-memory read for `GameArea`, the wind-area reader: the pass (`frame`) runs it only behind `enabled` with Windboxes
-/// ticked, through `fighter_wind_areas`.
+/// ticked, through `object_wind_areas`.
 fn area_load(at: usize, out: &mut [u8]) {
     // SAFETY: called only by `GameArea`, whose every address `legend::wind_areas` derived from a pointer it type-checked first
     // (non-zero, aligned) or from the live fighter's accessor; the read writes nothing but `out`.
@@ -426,8 +427,9 @@ impl legend::AreaReader for GameArea {
     }
 }
 
-/// The fighter's enabled wind areas (its AreaModule, `legend::area`) with their angles from the game's wind manager.
-unsafe fn fighter_wind_areas(accessor: usize, out: &mut [legend::WindArea]) -> usize {
+/// An object's enabled wind areas (its AreaModule at accessor `+0xc0`, `legend::area`) with their angles from the game's wind
+/// manager: a fighter's, an article's or an item's (every AreaModule writes the same table: `legend_every_area_module_writes_the_table_the_reader_reads`).
+unsafe fn object_wind_areas(accessor: usize, out: &mut [legend::WindArea]) -> usize {
     use legend::AreaReader;
     let mut reader = GameArea;
     let module = reader.area_usize(accessor + legend::area::MODULE);
@@ -723,16 +725,21 @@ impl hitbox::AttackReader for GameAttacks {
     }
 }
 
-/// The articles whose `ATTACK` or `CATCH` ran and the items with a live attack slot, drawn by every fighter pass (rc.13). Locked before `BOARD`.
+/// The articles whose `ATTACK`, `CATCH` or wind-area command ran and the items with a live attack slot or a wind area, drawn by
+/// every fighter pass (rc.13; wind areas rc.14 wind-articles). Locked before `BOARD`.
 static ARTICLES: Mutex<orbs::Articles> = Mutex::new(orbs::Articles::new());
 
-/// Each tracked article's live attack slots as its own orbs, placed on its bones; an article that is gone (its id inactive
-/// or now another object's) or whose attack ended is forgotten. `sv_battle_object` as `cpu_pilot` uses it.
+/// Each tracked article's live attack slots as its own orbs, placed on its bones, and with *Windboxes* ticked its wind areas; an
+/// article that is gone (its id inactive or now another object's), or whose attack, grab and wind ended, is forgotten.
+/// `sv_battle_object` as `cpu_pilot` uses it.
 unsafe fn draw_articles() {
     let mut articles = ARTICLES.lock();
     let mut board = BOARD.lock();
-    // A thrown item (a bomb, a turnip) runs no `ATTACK`: an active item with a live attack slot is tracked as an article.
-    // The list holds this frame's active items; a tracked one is checked again on every later pass (below).
+    let wind = shown(legend::WINDBOXES);
+    let mut areas = [legend::WindArea::NONE; legend::area::MAX_AREAS];
+    // A thrown item (a bomb, a turnip) runs no `ATTACK`: an active item with a live attack slot, or with Windboxes ticked an
+    // enabled wind area, is tracked as an article (`legend::tracks_item`). The list holds this frame's active items; a tracked one
+    // is checked again on every later pass (below).
     let manager = state_natives::item_manager();
     let count = match manager {
         0 => 0,
@@ -742,7 +749,12 @@ unsafe fn draw_articles() {
     for item in items.filter(|&item| item != 0) {
         let id = state_natives::item_object_id(item);
         let key = smash::app::sv_battle_object::module_accessor(id) as usize;
-        if key != 0 && hitbox::live_slot(&mut GameAttacks(key)).is_some() {
+        if key == 0 {
+            continue;
+        }
+        let live_slot = hitbox::live_slot(&mut GameAttacks(key)).is_some();
+        let found = if wind && !live_slot { object_wind_areas(key, &mut areas) } else { 0 };
+        if legend::tracks_item(live_slot, found) {
             #[cfg(feature = "diag")]
             stats::item(&articles, id, key);
             articles.track(id, key, &mut board);
@@ -753,9 +765,17 @@ unsafe fn draw_articles() {
         // `key` is the live article's accessor (checked above); the natives check their own grants. Tracked: its set.
         let set = articles.track(id, key, &mut board);
         set.frame_data = shown(legend::COLOURS);
-        set.wind = shown(legend::WINDBOXES);
+        set.wind = wind;
         let place = |s: &Sphere| natives::joint_position(key, s.joint, &s.pos);
-        if !live || !orbs::article_pass(&mut board, set, key, natives::status_kind(key), &mut GameAttacks(key), place, shown(legend::ANGLES).then(|| natives::lr(key))) {
+        // Only a live article is read: its areas, its facing and its status (`legend::keeps_article` inside the pass).
+        let kept = live && {
+            let found = if wind { object_wind_areas(key, &mut areas) } else { 0 };
+            #[cfg(feature = "diag")]
+            stats::object(id, key, &areas[..found]);
+            let extras = orbs::Extras { lr: shown(legend::ANGLES).then(|| natives::lr(key)), areas: &areas[..found] };
+            orbs::article_pass(&mut board, set, key, natives::status_kind(key), &mut GameAttacks(key), place, extras)
+        };
+        if !kept {
             articles.forget(id, &mut board);
         }
     }
@@ -849,7 +869,7 @@ pub unsafe fn frame(fighter: usize) {
     let (c, len) = hitbox::reconcile_frame(set, facts, wants, &mut GameAttacks(accessor), hurt, &mut OrbSink { status });
     // Wind areas (Windboxes ticked): pushes that are not hitboxes, read from the fighter's AreaModule.
     let mut areas = [legend::WindArea::NONE; legend::area::MAX_AREAS];
-    let found = if enabled && shown(legend::WINDBOXES) { fighter_wind_areas(accessor, &mut areas) } else { 0 };
+    let found = if enabled && shown(legend::WINDBOXES) { object_wind_areas(accessor, &mut areas) } else { 0 };
     let placed = publish_orbs(accessor, set, &areas[..found]);
     #[cfg(feature = "diag")]
     let (hits, hurts) = {
@@ -967,6 +987,56 @@ pub unsafe fn hitbox_catch_hook(lua_state: usize) {
     call_original!(lua_state)
 }
 
+/// The plugin part of a wind-area command (rc.14 wind-articles): an article the practice visualizes that adds a wind area (Zelda's
+/// Triforce of Wisdom, Hero's Bang and Kaboom, a Final Smash's black hole) is tracked by its battle-object id, as an ATTACK's is, so
+/// `draw_articles` reads its own AreaModule. A fighter's areas are read by its own pass (`legend::wind_tracks`).
+unsafe fn wind_command(lua: usize) {
+    let _scope = HookScope::enter_hook(HookId::HitboxWind);
+    let (enabled, windboxes) = (SETTING.load(Ordering::Acquire), shown(legend::WINDBOXES));
+    if lua == 0 || !enabled || !windboxes || !ensure_ready() {
+        return;
+    }
+    let accessor = natives::lua_accessor(lua);
+    if accessor == 0 {
+        return;
+    }
+    let fighter = natives::is_fighter(accessor);
+    if !legend::wind_tracks(enabled, windboxes, fighter, !fighter && visualizes(accessor)) {
+        return;
+    }
+    let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
+    let mut articles = ARTICLES.lock();
+    articles.track(id, accessor, &mut BOARD.lock());
+}
+
+/// `sv_animcmd::AREA_WIND_2ND` (a box): the plugin part first, then the game's own command.
+#[skyline::hook(offset = sites_hitbox::AREA_WIND_OFFSET)]
+pub unsafe fn hitbox_area_wind_hook(lua_state: usize) {
+    wind_command(lua_state);
+    call_original!(lua_state)
+}
+
+/// `sv_animcmd::AREA_WIND_2ND_arg10` (a box): the plugin part first, then the game's own command.
+#[skyline::hook(offset = sites_hitbox::AREA_WIND_ARG10_OFFSET)]
+pub unsafe fn hitbox_area_wind_arg10_hook(lua_state: usize) {
+    wind_command(lua_state);
+    call_original!(lua_state)
+}
+
+/// `sv_animcmd::AREA_WIND_2ND_RAD` (a circle): the plugin part first, then the game's own command.
+#[skyline::hook(offset = sites_hitbox::AREA_WIND_RAD_OFFSET)]
+pub unsafe fn hitbox_area_wind_rad_hook(lua_state: usize) {
+    wind_command(lua_state);
+    call_original!(lua_state)
+}
+
+/// `sv_animcmd::AREA_WIND_2ND_RAD_arg9` (a circle): the plugin part first, then the game's own command.
+#[skyline::hook(offset = sites_hitbox::AREA_WIND_RAD_ARG9_OFFSET)]
+pub unsafe fn hitbox_area_wind_rad_arg9_hook(lua_state: usize) {
+    wind_command(lua_state);
+    call_original!(lua_state)
+}
+
 /// `GrabModule::set_rebound`: a grab ended when the rebound is cleared; the fighter's spheres go (by their own handles) unless it
 /// shields, and its next pass brings back what still stands.
 #[skyline::hook(offset = sites_hitbox::HITBOX_REBOUND_OFFSET)]
@@ -1006,7 +1076,7 @@ pub fn check(poisoned: &dyn Fn(&str) -> bool) -> [GuardOutcome; N] {
     })
 }
 
-/// Boot: install the three hooks and switch the per-frame pass on when the feature's whole closure passed its guards (`closure`:
+/// Boot: install the seven hooks and switch the per-frame pass on when the feature's whole closure passed its guards (`closure`:
 /// its own rows, the Training predicate and the rows of the natives it shares, `model::capabilities`; and the CPU core whose
 /// frame wrapper carries the pass). Returns whether it is installed and the per-row state for the install line.
 pub fn install(found: &[GuardOutcome; N], closure: bool) -> (bool, [Written; N]) {
@@ -1020,6 +1090,10 @@ pub fn install(found: &[GuardOutcome; N], closure: bool) -> (bool, [Written; N])
         skyline::install_hook!(hitbox_attack_hook);
         skyline::install_hook!(hitbox_catch_hook);
         skyline::install_hook!(hitbox_rebound_hook);
+        skyline::install_hook!(hitbox_area_wind_hook);
+        skyline::install_hook!(hitbox_area_wind_arg10_hook);
+        skyline::install_hook!(hitbox_area_wind_rad_hook);
+        skyline::install_hook!(hitbox_area_wind_rad_arg9_hook);
         for (slot, site) in written.iter_mut().zip(&sites_hitbox::SITES) {
             if sites_hitbox::HOOK_ROWS.contains(&site.name) {
                 *slot = Written::Far;
@@ -1152,6 +1226,68 @@ mod stats {
         let at = hitbox::AttackReader::data(&mut g, slot) + hitbox::layout::SIZE;
         let size = hitbox::AttackReader::read_f32(&mut g, at);
         diagnostic(format_args!("[Hitbox] item tracked id={id:#x} slot={slot} size={size:.2}"));
+    }
+
+    /// The last line group's signature per tracked object (by battle-object id), so the probe writes only on a change.
+    static LAST_OBJECT: Mutex<[(u32, u64); 8]> = Mutex::new([(0, 0); 8]);
+
+    /// rc.14 wind-articles probe (diag only): a tracked article's or item's live attack slots (the no-reaction byte, the knockback
+    /// words, the damage) and its wind areas (shape, angle), one group of `[Legend] object` lines whenever they change. The Eden
+    /// settle rows read them (Sheik's Burst Grenade, R.O.B.'s Gyro, items).
+    pub fn object(id: u32, key: usize, areas: &[crate::model::legend::WindArea]) {
+        use crate::model::legend::{self, AreaShape};
+        use hitbox::AttackReader;
+        let fnv = |h: u64, v: u64| (h ^ v).wrapping_mul(0x0000_0100_0000_01b3);
+        let mut g = super::GameAttacks(key);
+        let mut slots = [(0i32, 0u8, [0i32; 3], 0f32); 8];
+        let mut live = 0;
+        let mut sig = fnv(0xcbf2_9ce4_8422_2325, u64::from(id));
+        for slot in 0..hitbox::SLOTS {
+            let data = if g.active(slot) { g.data(slot) } else { 0 };
+            if data == 0 || live == slots.len() {
+                continue;
+            }
+            let nr = g.read_u64(data + legend::NO_REACTION) as u8;
+            let [a, b] = legend::KNOCKBACK_QUADS.map(|at| g.read_u64(data + at));
+            let kb = [(a >> 32) as i32, b as i32, (b >> 32) as i32];
+            let dmg = g.read_f32(data + hitbox::layout::POWER);
+            slots[live] = (slot, nr, kb, dmg);
+            live += 1;
+            sig = [u64::from(slot as u32), u64::from(nr), a, b].into_iter().fold(sig, fnv);
+        }
+        for area in areas {
+            let words = match area.shape {
+                AreaShape::Box { min, max } => [min[0], min[1], max[0], max[1]],
+                AreaShape::Circle { centre, radius } => [centre[0], centre[1], radius, 0.0],
+            };
+            sig = words.iter().chain(area.angle.iter()).fold(sig, |h, v| fnv(h, (*v as i32) as u32 as u64));
+        }
+        {
+            let mut last = LAST_OBJECT.lock();
+            let i = last.iter().position(|e| e.0 == id).or_else(|| last.iter().position(|e| e.0 == 0)).unwrap_or(id as usize % 8);
+            if last[i] == (id, sig) {
+                return;
+            }
+            last[i] = (id, sig);
+        }
+        // SAFETY: `key` is the live tracked object's accessor (draw_articles checked it this pass).
+        let status = unsafe { super::natives::status_kind(key) };
+        diagnostic(format_args!("[Legend] object id={id:#x} status={status} slots={live} areas={}", areas.len()));
+        for (slot, nr, [g, f, b], dmg) in &slots[..live] {
+            diagnostic(format_args!("[Legend] object id={id:#x} slot={slot} nr={nr} kb={g}/{f}/{b} dmg={dmg:.2}"));
+        }
+        for (k, area) in areas.iter().enumerate() {
+            match area.shape {
+                AreaShape::Box { min, max } => diagnostic(format_args!(
+                    "[Legend] object id={id:#x} area={k} box=({:.1},{:.1})-({:.1},{:.1}) angle={:?}",
+                    min[0], min[1], max[0], max[1], area.angle
+                )),
+                AreaShape::Circle { centre, radius } => diagnostic(format_args!(
+                    "[Legend] object id={id:#x} area={k} circle=({:.1},{:.1}) r={radius:.1} angle={:?}",
+                    centre[0], centre[1], area.angle
+                )),
+            }
+        }
     }
 
     pub fn rebound_cleared(killed: u32) {

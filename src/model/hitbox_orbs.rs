@@ -244,19 +244,40 @@ impl Articles {
     }
 }
 
+/// What an article's pass draws besides its spheres: the launch-angle marks while *Launch angles* is On (`lr`: the article's
+/// facing) and its wind areas while *Windboxes* is ticked.
+#[derive(Clone, Copy, Default)]
+pub struct Extras<'a> {
+    pub lr: Option<f32>,
+    pub areas: &'a [legend::WindArea],
+}
+
+impl Extras<'_> {
+    pub const NONE: Extras<'static> = Extras { lr: None, areas: &[] };
+}
+
 /// One article's pass in `status`: its live attack slots' spheres and its grab spheres (held as a fighter's), placed on its
-/// bones by `place`, become its orbs on `board`. False when it holds none: its attack and grab ended, its orbs went, and it
-/// is forgotten.
-pub fn article_pass(board: &mut Board, set: &mut HandleSet, key: usize, status: i32, attacks: &mut impl AttackReader, place: impl FnMut(&Sphere) -> Option<[f32; 3]>, lr: Option<f32>) -> bool {
+/// bones by `place`, become its orbs on `board`, followed by its wind `areas` (rc.14 wind-articles: read from its own
+/// AreaModule while *Windboxes* is ticked). False when it holds none and has no area: its attack, grab and wind ended, its orbs
+/// went, and it is forgotten (`legend::keeps_article`).
+pub fn article_pass(board: &mut Board, set: &mut HandleSet, key: usize, status: i32, attacks: &mut impl AttackReader, place: impl FnMut(&Sphere) -> Option<[f32; 3]>, extras: Extras<'_>) -> bool {
+    let Extras { lr, areas } = extras;
     let mut wants = [Sphere::NONE; MAX_HELD];
     let mut len = 0;
     want_hits(attacks, &mut wants, &mut len, set.identifies_wind());
     set.tint(attacks, &mut wants[..len], status);
     set.reconcile(&wants[..len], true, &mut OrbSink { status });
     let mut orbs = [Orb::NONE; BOARD_ORBS];
-    let n = place_orbs(set, place, lr, |slot| slot_angle(attacks, slot), &mut orbs);
+    let mut n = place_orbs(set, place, lr, |slot| slot_angle(attacks, slot), &mut orbs);
+    // Its wind areas after its spheres, as a fighter's pass publishes its own (the runtime's `publish_orbs`).
+    let colour = legend::area_colour();
+    for orb in areas.iter().enumerate().flat_map(|(k, area)| legend::area_orbs(area, k, 0.0, colour)).flatten() {
+        if n < orbs.len() {
+            (orbs[n], n) = (orb, n + 1);
+        }
+    }
     board.publish(key, orbs[..n].iter().copied());
-    !set.is_empty()
+    legend::keeps_article(!set.is_empty(), areas.len())
 }
 
 /// The panes one layout tick has taken: a pill takes two caps and, when it has a length, a band; one that does not get
