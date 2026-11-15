@@ -230,7 +230,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 106] = [
+pub static ROWS: [Row; 109] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -462,6 +462,12 @@ pub static ROWS: [Row; 106] = [
       "Close the menu into the placing view, stage zoomed out.\nStick moves, A places, B removes the last, X starts."),
     r(GAMES, "Saved layouts", "btt_layouts", Control::Editor(Editor::Layouts),
       "This stage's saved layouts, the five used last first.\nPlacing: ZL + Left/Right picks, ZL + Down saves, ZL + Up loads."),
+    r(GAMES, "Mash out", "mashout", Control::Dropdown(&super::super::mashout::moves::ON_OFF_LABELS),
+      "Practice escaping a capture.\nStarts when the menu closes."),
+    r(GAMES, "State", "mashout_state", Control::Dropdown(&super::super::mashout::moves::STATE_LABELS),
+      "The capture to practice.\nGrab: escape an ordinary grab."),
+    r(GAMES, "Attacker move", "mashout_attacker", Control::Dropdown(&super::super::mashout::moves::ATTACKER_LABELS),
+      "The fighter whose standing grab to practice.\nRandom chooses from every ordinary fighter."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

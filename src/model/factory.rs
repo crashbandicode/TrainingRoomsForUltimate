@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 126;
+pub const COUNT: usize = 129;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -223,4 +223,14 @@ pub static DEFS: [Def; COUNT] = [
     // appended like lobby_items. (Frame data colours is an item of `hitbox_vis`.)
     row!("spots_strip", Single, 2, [1]),
     row!("spots_combo", Single, 2, [1]),
+    // rc.15 Mash out stage 1: Off/On; Grab is stable state index 0. Attacker indices
+    // reuse the append-only TR roster, with Random after its 89 ordinary choices.
+    row!("mashout", Single, 2, [0]),
+    row!("mashout_state", Single, 1, [0]),
+    Def {
+        id: "mashout_attacker",
+        kind: Kind::Single,
+        len: super::mashout::moves::ATTACKER_LABELS.len(),
+        default: &ones::<{ super::mashout::moves::ATTACKER_LABELS.len() }>(&[0]),
+    },
 ];

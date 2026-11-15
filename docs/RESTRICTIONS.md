@@ -5,6 +5,9 @@ the 3 above it (playbook `docs/CHECKLIST.md`, the "cites an approved restriction
 
 | ID | Message | Why | Approved |
 | --- | --- | --- | --- |
+| MASH-R2-NO-END | Escaped · {elapsed}f · fastest {fastest}f (no grade: this hold never ends on its own) | Native no-input escape is infinite and no verified deadline exists, so S has no finite denominator; no best/streak entry. | primary R2, 2026-11-15 |
+| MASH-R2-NO-SAVING | Escaped · {elapsed}f · Mashing can't shorten this hold | F equals the no-input duration, including Robin at damage >=120; no best/streak entry. | primary R2, 2026-11-15 |
+| MASH-M1-MISMATCH | Model mismatch · {elapsed}f · fastest {fastest}f (no grade); invalid bounds variant | An escape below the exact optimum or inconsistent native/model bounds must be diagnosed with no tolerance or fallback score. | primary M1/R2, 2026-11-15 |
 | `drill-capacity` | "Drill too long: keep it to 16 steps" | Input drills share the existing combo bounds (LINKS × STEPS); overflow saves nothing. | operator 2026-11-15, keep 16 for rc.15 |
 | `combo-capacity` | "Combo too long: keep it to 16 links" | Hit combos share the same unit bound; an overfull exchange saves nothing. | operator 2026-11-15, keep 16 for rc.15 |
 | `combo-file-size` | `file is {bytes} bytes (maximum {max})` (`StoreError::FileTooLarge`, unchanged) | Worker-side combo/drill reads allow `LINKS * 4096` bytes (64 KiB at 16 units), retaining the old 4 KiB/unit budget; larger files still refuse. | primary 2026-11-15, following the operator's 16-unit decision |
