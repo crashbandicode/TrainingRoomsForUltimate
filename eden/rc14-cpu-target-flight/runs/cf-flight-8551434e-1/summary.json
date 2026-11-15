@@ -1,0 +1,69 @@
+{
+  "rows": [
+    {
+      "id": "g-gdb-on",
+      "status": "pass"
+    },
+    {
+      "id": "g-load",
+      "status": "pass"
+    },
+    {
+      "id": "g-gdb-attached",
+      "status": "pass"
+    },
+    {
+      "id": "g-training",
+      "status": "pass"
+    },
+    {
+      "id": "cf-normal",
+      "status": "pass"
+    },
+    {
+      "id": "cf-slow",
+      "status": "pass"
+    },
+    {
+      "id": "cf-fast",
+      "status": "pass"
+    },
+    {
+      "id": "cf-groundhit",
+      "status": "pass"
+    },
+    {
+      "id": "cf-airhit",
+      "status": "pass"
+    },
+    {
+      "id": "cf-done10",
+      "status": "fail",
+      "reason": "RuntimeError('cf-done10: no \"Done! 10\" notice')",
+      "evidence": [
+        "/home/intpa/eden-runs/cf-flight-8551434e-1/out/cf-done10/diag-035224Z-663820-FAIL.png"
+      ],
+      "failure_kind": "unknown",
+      "failure_cause": "unclassified:RuntimeError"
+    },
+    {
+      "id": "cf-reset",
+      "status": "pass"
+    },
+    {
+      "id": "z-boot",
+      "status": "pass"
+    }
+  ],
+  "failed": 1,
+  "by_kind": {
+    "unknown": [
+      "cf-done10"
+    ]
+  },
+  "by_cause": {
+    "unclassified:RuntimeError": [
+      "cf-done10"
+    ]
+  }
+}

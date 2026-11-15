@@ -130,6 +130,16 @@ pub fn texture_of(stage_id: u32) -> Option<(&'static str, bool)> {
 /// The archive-relative path of a stage's thumbnail, written into `out` (no allocation); its length.
 pub fn path_into(stage_id: u32, out: &mut [u8; 96]) -> Option<usize> {
     let (name, patch) = texture_of(stage_id)?;
+    build(name, patch, out)
+}
+
+/// rc.14: the tile picture of every Stage Builder stage: the game's own custom-stage icon (`ui_stage_edit`, a patch file
+/// of the stock 13.0.5 data.arc).
+pub fn custom_path_into(out: &mut [u8; 96]) -> Option<usize> {
+    build("sp_edit", true, out)
+}
+
+fn build(name: &str, patch: bool, out: &mut [u8; 96]) -> Option<usize> {
     let prefix: &[u8] = if patch { b"ui/replace_patch/stage/stage_1/stage_1_" } else { b"ui/replace/stage/stage_1/stage_1_" };
     let suffix: &[u8] = b".bntx";
     let total = prefix.len() + name.len() + suffix.len();
@@ -146,6 +156,12 @@ pub fn path_into(stage_id: u32, out: &mut [u8; 96]) -> Option<usize> {
 mod tests {
     lib_unit_tests! {
     use super::*;
+
+    fn the_custom_stage_tiles_use_the_games_custom_stage_icon() {
+        let mut buffer = [0u8; 96];
+        let len = custom_path_into(&mut buffer).unwrap();
+        assert_eq!(&buffer[..len], b"ui/replace_patch/stage/stage_1/stage_1_sp_edit.bntx");
+    }
 
     fn path(id: u32) -> String {
         let mut buffer = [0u8; 96];
@@ -165,6 +181,7 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("paths_follow_the_documented_examples", paths_follow_the_documented_examples as fn()),
+            ("the_custom_stage_tiles_use_the_games_custom_stage_icon", the_custom_stage_tiles_use_the_games_custom_stage_icon as fn()),
         ]);
     }
     }

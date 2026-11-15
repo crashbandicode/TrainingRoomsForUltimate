@@ -75,7 +75,7 @@ These can't be changed in the chord editor.
   the CPU's Kirby. More: [Fighter cycles](fighter-cycles.md).
 - **L + R + A** resets. In Training it is the game's own reset. In a waiting room it puts both practice fighters back
   where they first stood. It can only be turned on or off, at Display & Controls ›
-  [L+R+A Reset](../menu/display-and-controls.md#lra-reset) (On by default).
+  [L+R+A Reset](../menu/display-and-controls.md#l-r-a-reset) (On by default).
 
 ## GameCube controller
 

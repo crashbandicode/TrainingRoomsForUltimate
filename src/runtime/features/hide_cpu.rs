@@ -5,12 +5,17 @@
 //! the step. A hidden body is invisible (model, effects, shadow), has no hurtbox and no push, has no hitbox out, and waits in
 //! the game's own hitlag, renewed every frame, so its status, motion and fall wait with it. Shown, all of it comes back
 //! and the body goes on from the same spot and status. The practice games ask through `hide` and `restore`.
+//!
+//! The player tag goes with the body: the game's two per-fighter cursor flags (`hide::tag`), written through package 2's
+//! guarded `WorkModule::set_flag`. The HUD panel too: the wrapper publishes the hidden entries (`publish_panels`) and the
+//! `info_melee` tick hides those parts (`runtime::ui::hud::cpu_panels`).
 
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
 
 use crate::model::cpu::hide;
+use crate::model::cpu::ids::UNRESOLVED;
 use crate::runtime::features::notices;
-use crate::runtime::game;
+use crate::runtime::game::{self, natives};
 use crate::runtime::seams::seam_install::gate;
 
 /// Every native takes the accessor and two more words, so one call shape serves them all (a bool or an i32 argument is read
@@ -34,6 +39,49 @@ static BASE: AtomicUsize = AtomicUsize::new(0);
 pub(crate) static REQUEST: AtomicBool = AtomicBool::new(false);
 /// A CPU body was hidden by its last step.
 static HIDDEN: AtomicBool = AtomicBool::new(false);
+/// The entries whose HUD panel is hidden, one bit each (`Cpu::hidden_panels`), for the `info_melee` tick.
+static PANELS: AtomicU8 = AtomicU8::new(0);
+
+/// From the CPU frame wrapper after each body frame and on a session clear: the entries whose panel is hidden.
+pub(crate) fn publish_panels(bits: u8) {
+    let bits = bits * u8::from(BASE.load(Ordering::Acquire) != 0);
+    PANELS.store(bits, Ordering::Release);
+}
+
+/// The entries whose HUD panel is hidden.
+pub(crate) fn panels() -> u8 {
+    PANELS.load(Ordering::Acquire)
+}
+
+/// The fighter object whose player tag the Eggs-ercise CPU target's pass wants kept on this tick (`keep_cursor`), else 0.
+static KEPT: AtomicUsize = AtomicUsize::new(0);
+
+/// Whether a CPU body was hidden by its last step (the hide step's off-write owns its tag then).
+pub(crate) fn hidden() -> bool {
+    HIDDEN.load(Ordering::Acquire)
+}
+
+/// From the CPU target's pass (`hitbox::eggs_cpu`): `keep` (`eggs::keeps_cursor`) asks for `fighter`'s tag flag to be written
+/// on right after this pass. It only stores a value; the write is `write_kept_cursor`'s.
+pub(crate) fn keep_cursor(fighter: usize, keep: bool) {
+    KEPT.store(fighter * usize::from(keep), Ordering::Release);
+}
+
+/// From the CPU frame wrapper right after the hitbox pass of `fighter`: when that pass asked for it, write `FLAG_CURSOR` = true
+/// (`flag`, from the game's constant table; `UNRESOLVED` skips it) through package 2's guarded `WorkModule::set_flag`, the call the
+/// hide step's tag write uses. Taken once: a tick whose pass asked for nothing writes nothing.
+///
+/// # Safety
+/// The game thread, with `fighter` the fighter object the game just ran a frame of.
+pub(crate) unsafe fn write_kept_cursor(fighter: usize, flag: i32) {
+    if fighter == 0 || flag == UNRESOLVED || KEPT.compare_exchange(fighter, 0, Ordering::AcqRel, Ordering::Acquire).is_err() {
+        return;
+    }
+    let accessor = natives::fighter_accessor(fighter);
+    if accessor != 0 {
+        natives::set_flag(accessor, true, flag);
+    }
+}
 
 /// Once from `lobby::init`: compare every row (the installer logs a group it skips); nothing is written unless all passed.
 pub(crate) fn init() {
@@ -61,11 +109,11 @@ pub(crate) fn refuses_play() -> bool {
     hidden
 }
 
-/// Do one body's step.
+/// Do one body's step. `tag` is the two cursor flags' ids from the game's constant table (`UNRESOLVED` skips one).
 ///
 /// # Safety
 /// The game thread, with `accessor` the module accessor of a live fighter.
-pub(crate) unsafe fn apply(accessor: usize, step: Option<bool>) {
+pub(crate) unsafe fn apply(accessor: usize, step: Option<bool>, tag: [i32; 2]) {
     let base = BASE.load(Ordering::Acquire);
     let Some(hidden) = step.filter(|_| base != 0) else { return };
     HIDDEN.store(hidden, Ordering::Release);
@@ -73,5 +121,10 @@ pub(crate) unsafe fn apply(accessor: usize, step: Option<bool>) {
         let [a, b] = if hidden { hid } else { vis };
         let call: extern "C" fn(usize, usize, usize) = std::mem::transmute(base + offset);
         call(accessor, a, b);
+    }
+    if let Some(shown) = hide::tag(step) {
+        for flag in tag.into_iter().filter(|&flag| flag != UNRESOLVED) {
+            natives::set_flag(accessor, shown, flag);
+        }
     }
 }

@@ -15,6 +15,33 @@ pub const BANK_FLAG: u8 = 4;
 /// bit 2 (bank table and teardown). A parked pair and ordinary members use
 /// [`BANK_FLAG`] (ICE-CLIMBERS-OPTIMIZATION addendum, "Hybrid layout").
 pub const PAIR_ACTIVE_FLAG: u8 = 6;
+
+/// rc.14 a-full-2 (the A1 pair defect, a1-enable boot `a1-be759456-y2c` `a1-pair3`): the window flags of a pair window
+/// parked as N3 parks it (`commit_change`: `+0x591f = BANK_FLAG`, `+0x4180 = 0`). [`PAIR_ACTIVE_FLAG`] is the active
+/// pair's whole value (bit 1 | bit 2), not a mask: the bank bit 2 stays, because the control select `0x64fb70` picks the
+/// window's context only with it (`tbz w8, #2` at `0x64fb94`; without it `+0x4178` stays 0 and `0x64fc1c` stores to
+/// `null+0x70`).
+pub fn parked_pair_flags(flags: u8) -> u8 {
+    (flags & !PAIR_ACTIVE_FLAG) | BANK_FLAG
+}
+
+/// rc.14 a-full-2 (p4): which shared trainer counts finalize gives back before it destroys a native holder, by the window
+/// flags `+0x591f`: `(S+0x1968, S+0x1980)`, `S = *(main+0x52bc3b0)`. Bit 0 (PT) at `0x652ed4`, bit 5 at `0x653090`; each
+/// only with a holder. `body_graph::destroy_special_records` mirrors it.
+pub fn holder_counts(flags: u8) -> (bool, bool) {
+    (flags & 1 != 0, flags & 0x20 != 0)
+}
+
+/// rc.14 a-full-2 (boot a2-99b9083f-y1 and integration-3's smoke2: an Aegis holder's article called through a vtable in
+/// its unloaded object-kind module): the kinds `module_pins::pin` holds for a group kept across its owner's Reload. Its
+/// members, and for a group whose holder runs code from its object kind's own NRO ([`Members::object_kind`]: PT `0x72`,
+/// Aegis `0x75`) that kind too ([`PIN_CAPACITY`] counts both).
+pub fn pin_kinds(group: Members) -> crate::engine::compat::fixed::FixedList<u32, { NATIVE_MEMBERS + 1 }> {
+    let mut kinds = crate::engine::compat::fixed::FixedList::new(0);
+    for &kind in &group.kinds()[..group.count()] { kinds.push(kind); }
+    if let Some(object) = group.object_kind() { kinds.push(object); }
+    kinds
+}
 pub const POPO: u32 = 0x4b;
 pub const NANA: u32 = 0x4c;
 pub const KIRBY: u32 = 0x06;
@@ -23,7 +50,7 @@ pub const KIRBY: u32 = 0x06;
 // WORKPLAN §2.2): one capability row per fighter form, each gate a one-liner over the table, and
 // the FACT every row encodes documented there. The names and signatures are unchanged for every
 // caller (`body_bank::member_forms_in`, `body_bank::prefetch_admitted`, …).
-pub use crate::engine::swap::swap_model::capabilities::{d_kirby1_applies, d_kirby1_live, group_member_kind, kirby_parkable, member_forms, member_forms_in, native_group_request, object_rearm_admitted, original_bankable, original_form_bankable, pair_lead_extra, pair_request, prefetch_admitted, single_member_request, swap_commit_index, swap_commit_index_in, window_swappable_with};
+pub use crate::engine::swap::swap_model::capabilities::{d_kirby1_applies, d_kirby1_live, group_member_kind, kirby_departure, kirby_parkable, KirbyDeparture, member_forms, member_forms_in, native_group_request, object_rearm_admitted, original_bankable, original_form_bankable, pair_lead_extra, pair_request, prefetch_admitted, single_member_request, swap_commit_index, swap_commit_index_in, window_swappable_with};
 #[cfg(test)]
 pub use crate::engine::swap::swap_model::capabilities::{key_release_admitted, special_group_kind, swappable_kind, window_swappable};
 use crate::engine::swap::swap_model::capabilities::{bankable_kind, pins_cell0};
@@ -657,7 +684,20 @@ pub mod mii_publish;
 pub mod window_share;
 
 /// Groups one role may hold beyond its native window.
-pub const MAX_EXTRA_GROUPS: usize = 3;
+///
+/// rc.14 a-full-2 (S1, the primary 2026-11-14 ~23:24Z; AFULL2-RESEARCH.md "Limit 3"): native counts no detached group.
+/// What bounds residency is bodies (Ready Fighters, the fighter pool less [`POOL_RESERVE`]) and process memory
+/// (`memory::admit`), so a slot must never be what makes a fitting fighter cold (cycle-fix's Gap 2: Eden cf-p3-y2
+/// `cf-k2` presses 3, 8 and 17 and `cf-direct`, "demand declined … no free group slot"; a-full's A1 "not kept (no free
+/// group slot)"). Small units fill slots before bodies run out: one-member groups, the role's Mii group, Design A's cold
+/// singles, Pokémon Trainer, Pyra/Mythra, the pair, a window A1 keeps. Eight covers those at Ready Fighters 12, and it is
+/// the widest per-role mask [`release_for_new_members`] keeps (one `u8` bit per parked group).
+pub const MAX_EXTRA_GROUPS: usize = 8;
+const _: () = assert!(MAX_EXTRA_GROUPS <= u8::BITS as usize, "release_for_new_members keeps one u8 bit per parked group");
+
+/// Module pins one role may hold across its Reload (`runtime::roster::module_pins`): every kind of a window A1 keeps and of
+/// the Built groups (a′) keeps, plus the Pokémon Trainer and Aegis object kinds.
+pub const PIN_CAPACITY: usize = (MAX_EXTRA_GROUPS + 1) * NATIVE_MEMBERS + 2;
 /// Fighter-pool bodies kept free for visible Reloads and helper creation.
 pub const POOL_RESERVE: usize = 6;
 
@@ -924,6 +964,9 @@ pub fn speculative_step_admitted(foreground: bool) -> Result<(), &'static str> {
 pub enum Serving {
     Prefetch,
     ObjectRearm,
+    /// rc.14 Gap 3: the background build of a prefetched ordinary group a press out of a live Mii group waits for (the
+    /// warm exit takes only a Built group: a prefetched one would build under the Mii's `R`, `mii_exit_saved`).
+    Build,
 }
 
 /// [`Serving`] for the group holding the press's target, in `state`. Its prefetch while it is planned or held for
@@ -931,12 +974,26 @@ pub enum Serving {
 /// canonical Reload, which destroys the window and every group. Its object re-arm while a built Pokémon Trainer group
 /// lacks its object kind (`rearm_due`, [`object_rearm_due`]): without it [`object_ready`] fails and so does the warm
 /// attach. Nothing for a prefetching group (its poll ends it) or a prefetched or built one (reachable already: its
-/// background build or pool preparation would only make the press wait longer).
-pub fn serving_step(state: GroupState, publishable: bool, rearm_due: bool) -> Option<Serving> {
+/// background build or pool preparation would only make the press wait longer), except a prefetched group whose
+/// background build is owed to a press out of a live Mii group (`exit_build`, rc.14 Gap 3).
+pub fn serving_step(state: GroupState, publishable: bool, rearm_due: bool, exit_build: bool) -> Option<Serving> {
     match state {
         _ if state.startable() => publishable.then_some(Serving::Prefetch),
         GroupState::Built if rearm_due => Some(Serving::ObjectRearm),
+        GroupState::Prefetched if exit_build => Some(Serving::Build),
         _ => None,
+    }
+}
+
+/// rc.14 cycle fix: whether a press keeps waiting for its own `demand` group in `state`: while it is planned or
+/// prefetching; a press out of a live Mii group (`exit`) also while it is prefetched and its background build is
+/// admitted (`build_owed`), since the warm exit takes only a Built group (Gap 3, Eden cf-p3-y2 `cf-k2` press 12 Reloaded).
+/// A group that serves the press as it is (reachable) or that will never serve it goes to the caller.
+pub fn demand_waits(state: GroupState, exit: bool, build_owed: bool) -> bool {
+    match state {
+        GroupState::Planned | GroupState::Prefetching => true,
+        GroupState::Prefetched => exit && build_owed,
+        _ => false,
     }
 }
 
@@ -1157,31 +1214,30 @@ pub fn neighbour_group(full: Members, target: u32, policy: GroupPolicy, exclude:
             count += 1;
         }
     }
-    // rc.14 2e: a gated member ([`gated_alone`]) is no seed partner; the planner gives it its own group.
-    if count > 1 {
-        let mut kept = 0;
-        for i in 0..count {
-            if !gated_alone(kinds[i]) { kinds[kept] = kinds[i]; kept += 1; }
-        }
-        for kind in kinds.iter_mut().skip(kept) { *kind = u32::MAX; }
-        count = kept;
-    }
     if count == 0 { None } else { Members::laid_out(&kinds[..count]) }
 }
 
-/// rc.14 2e (a-full; the primary 2026-11-14 ~21:25Z, decision 1): a member whose departure a live gate may refuse is
-/// laid out alone, never in a group with others. A live Kirby that holds a copy may not park (`kirby_park_gate`,
-/// EXCLUSIONS-AUDIT §2), so leaving him takes a Reload, and that Reload destroys the attached window. With Kirby alone,
-/// that window is Kirby's own, and every other member stays in a detached group that the target-first Reload keeps
-/// ([`kept_across_reload`]). The Ice Climbers pair is already a whole group of its own (`Members::pair_group`, never
-/// merged with ordinary kinds).
-pub fn gated_alone(kind: u32) -> bool {
-    kind == KIRBY
-}
+/// rc.14 2e (a-full, A1): whether a mod Reload keeps the attached window as a detached Built group. On since the Eden rows of
+/// a1-enable passed with it (a window kept across a Reload, a cold target freed on leaving, Kirby alone and with a copy, a Mii
+/// window); the diag build's `diag-cycle.req` `window` is no longer needed for it.
+pub const KEEP_WINDOW_ACROSS_RELOAD: bool = true;
 
-/// rc.14 2e (a-full, A1): whether a mod Reload keeps the attached window as a detached Built group. Off until the Eden
-/// rows pass with it (the diag build's `diag-cycle.req` `window` turns it on for them).
-pub const KEEP_WINDOW_ACROSS_RELOAD: bool = false;
+/// rc.14 a-full-2 (K-strip; AFULL2-RESEARCH.md "Limit 1"): a live Kirby that holds a copy loses it natively and parks
+/// ([`KirbyDeparture::Strip`]) instead of taking the copy gate's Reload, which also rebuilt the target's own group. On
+/// since its Eden rows passed (boot `a2-03c5f73f-y2`: a2-strip, a2-strip-same, a2-strip-move; the primary
+/// 2026-11-15 ~00:50Z).
+pub const KIRBY_STRIP_BEFORE_PARK: bool = true;
+
+/// rc.14 a-full-2 (limit 2): A1 keeps a Pokémon Trainer window too ([`window_kept_across_reload`]'s `keep_pt`). On since
+/// boot a2-e881df1e-y1's a2-pt-r passed the corrected check (the primary ~01:35Z; `eval_pt_return.py`: the kept group's
+/// pool prepared on the worker, its attach, ready, no fallback). It only acts while A1 does.
+pub const KEEP_PT_WINDOW_ACROSS_RELOAD: bool = true;
+
+/// rc.14 a-full-2 (after probe a0): A1 keeps a Pyra/Mythra window too ([`window_kept_across_reload`]'s `keep_aegis`). On
+/// since a2-aegis passed in boots a2-99b9083f-y1 and a2-f4acc30e-x1 and the object-module fix `08cc9932` covers the crash
+/// that boot 3's a2-p4 hit (the primary, a-full-3 brief 2026-11-15); the counted receipts are the final pass's a2-aegis and
+/// a2-pyra-keep-all rows with every switch on, and a failure there reverts this flip. It only acts while A1 does.
+pub const KEEP_AEGIS_WINDOW_ACROSS_RELOAD: bool = true;
 
 /// rc.14 2e (a-full, A1; AFULL-RESEARCH.md §2): why the attached window `window` cannot be kept across its role's
 /// target-first Reload onto `target` (`Ok`: it can). The Reload start (`0x653240` → `0x653490`) deactivates every window
@@ -1194,9 +1250,27 @@ pub const KEEP_WINDOW_ACROSS_RELOAD: bool = false;
 ///   exists;
 /// - a live member Design A loaded over Ready Fighters (`live_cold`): it is the one fighter that doesn't fit, freed when
 ///   left ([`cold_left`]).
-pub fn window_kept_across_reload(window: Members, keep_mii: bool, target: u32, live_parks: bool, live_cold: bool)
-    -> Result<(), &'static str> {
-    if matches!(window.special(), Special::Native(_)) { return Err("a native group's window"); }
+///
+/// rc.14 a-full-2 (limit 2, AFULL2-RESEARCH.md): with `keep_pt` ([`KEEP_PT_WINDOW_ACROSS_RELOAD`]) a Pokémon Trainer
+/// window is kept too. The Reload start's article walk is pass 1 of `0x3a6b80`, the exchange's own `deactivate_saved`, and
+/// its zeroed `+0x5a90` is the exchange's dropped claim; once `keep_window` has taken the records out of the entry, every
+/// loader read of `+0x5a88` (`0x650b40`, `0x65120c`, `0x650c74`) finds null and destroys nothing.
+///
+/// rc.14 a-full-2 (the primary ~01:35Z, after probe a0): with `keep_aegis` ([`KEEP_AEGIS_WINDOW_ACROSS_RELOAD`]) a
+/// Pyra/Mythra window is kept as well. A0 (boot a2-e881df1e-y1) found its claim `+0x5a90` and record `+0x5a98` zero before
+/// and after the Reload start, so the start's bit-2 walk (gated on `+0x5a90`, `0x6534e4`) leaves its holder alone. Once
+/// the records leave the entry, state 2's bit-5 destroy (`0x651200-0x6512a0`) and state 3's free skip it.
+pub fn window_kept_across_reload(window: Members, keep_mii: bool, keep_pt: bool, keep_aegis: bool, target: u32,
+    live_parks: bool, live_cold: bool) -> Result<(), &'static str> {
+    if matches!(window.special(), Special::Native(_)) {
+        match window.holder_step() {
+            Some(HolderStep::Trainer) if !keep_pt => return Err("a Pokemon Trainer window (its switch is off)"),
+            Some(HolderStep::Partner) if !keep_aegis => return Err("an Aegis window (its switch is off)"),
+            Some(HolderStep::Partner) => {}
+            Some(HolderStep::Trainer) => {}
+            None => return Err("a native window without a holder step"),
+        }
+    }
     if window.special() == Special::Mii && !keep_mii { return Err("a Mii window (2d's switch is off)"); }
     if window.index_of(target).is_some() { return Err("the window holds the Reload's target"); }
     if !live_parks { return Err("the live member may not park"); }
@@ -1247,8 +1321,10 @@ pub fn kept_across_reload_with(mii: bool, state: GroupState, members: Members, l
         && members.index_of(target).is_none()
 }
 
-/// rc.14 phase 2d: whether a target-first Reload keeps a Built Mii group. Off until the fail-first row passes with it.
-pub const KEEP_MII_ACROSS_RELOAD: bool = false;
+/// rc.14 phase 2d: whether a target-first Reload keeps a Built Mii group. On since the fail-first row of the rc.12 crash
+/// passed (Eden cf-p3-y2 `cf-mii-failfirst`: kept `[[4a], [13], [1a]]`, Mii Gunner warm-attached in 81 ms, no StallWatch,
+/// no Unmapped line; the rc.12 crash was Eden rc12-int2-f44fac2f-1, Unmapped Read64 via TR +0xfaca4).
+pub const KEEP_MII_ACROSS_RELOAD: bool = true;
 
 /// The target-first neighbours' admission (`native_body_bank::plan_groups`): the seed fits in the free pool and beside
 /// the bodies already charged, the other role's and this role's own groups kept across the Reload
@@ -1508,11 +1584,6 @@ pub fn plan_extra_groups_with(
             let mut deferred = None;
             let mut pinned = false;
             for &kind in &chosen[role][start..start + size] {
-                // rc.14 2e: a gated member (Kirby) takes its own one-member group in the next slot (`gated_alone`).
-                if *size > 1 && gated_alone(kind) {
-                    deferred = Some(kind);
-                    continue;
-                }
                 if pins_cell0(kind) {
                     if pinned {
                         deferred = Some(kind);
@@ -1663,6 +1734,24 @@ pub fn release_for_new_members(
     };
     let members = [0, 1].map(|role: usize| waiting_for_pause(&after[role], |kind| holds([0, 0], role, kind)));
     if members == [0, 0] || waiting([0, 0]) == 0 { return ReleaseNow::default(); }
+    // rc.14 a-full-2 (S1): the exact search runs `2^(p0 + p1)` plans on the game thread. Up to EXACT_RELEASE_SEARCH parked
+    // groups in all (every case three slots allowed: 64 plans) it stays exact; past it, the parked groups go cheapest first
+    // (fewest members the cycle keeps, then fewest bodies, then lane order) until the plan places every new member: at
+    // most `p0 + p1` plans.
+    let parked_total = parked[0].len().min(8) + parked[1].len().min(8);
+    if parked_total > EXACT_RELEASE_SEARCH {
+        let mut order = FixedList::<(usize, usize, (u8, usize)), { 2 * MAX_EXTRA_GROUPS }>::new((0, 0, (0, 0)));
+        for (role, groups) in parked.iter().enumerate() {
+            for (index, (group, kept)) in groups.iter().enumerate().take(8) { order.push((role, index, (*kept, group.count()))); }
+        }
+        order.sort_by_key(|(role, index, cost)| (*cost, *role, *index));
+        let mut mask = [0u8; 2];
+        for (role, index, _) in order.iter().copied() {
+            mask[role] |= 1 << index;
+            if waiting(mask) == 0 { return ReleaseNow { groups: mask, members }; }
+        }
+        return ReleaseNow { groups: all, members };
+    }
     let mut best: Option<((usize, usize, u32), [u8; 2])> = None;
     for m0 in 0..=all[0] {
         for m1 in 0..=all[1] {
@@ -1677,6 +1766,10 @@ pub fn release_for_new_members(
     }
     ReleaseNow { groups: best.map_or(all, |(_, mask)| mask), members }
 }
+
+/// rc.14 a-full-2 (S1): the most parked groups, both roles together, [`release_for_new_members`] searches exactly (64 plans,
+/// the most three slots per role ever needed).
+pub const EXACT_RELEASE_SEARCH: usize = 6;
 
 /// Operator rule 2026-11-09 (inbox 13:21Z): whether the entry tick frees a leaving group now. A parked one
 /// ([`leaves_at_pause`]) waits for the pause unless `release_now` (the new members need its room,
@@ -1732,6 +1825,52 @@ pub type Cold = (u32, bool);
 pub fn cold_left(over: &mut [Cold], live: u32) -> Option<u32> {
     for cold in over.iter_mut().filter(|(kind, _)| *kind == live) { cold.1 = true; }
     over.iter().find(|(kind, seen)| *seen && *kind != live).map(|(kind, _)| *kind)
+}
+
+/// rc.14 cycle fix (Eden cf-p4-y1 `cf-k1-laps`): the cold fighters' allowance over Ready Fighters, the marks of a cold
+/// fighter on screen (`live`) or still loading (not yet seen). A mark seen and left whose release has not run yet holds
+/// nothing over (it kept Gap 1's shrink from firing).
+pub fn cold_allowance(over: &[Cold], live: Option<u32>) -> usize {
+    over.iter().filter(|(kind, seen)| !*seen || live == Some(*kind)).count()
+}
+
+/// rc.14 cycle fix (Eden cf-p4-y1): while a cold mark exists the bank's lifecycle ticks, so `cold_left` sees the fighter
+/// on screen and `cold_release` frees it on the switch away; with every group Built the bank had no other work, never
+/// ticked, and the cold fighter stayed resident for good.
+pub fn cold_marks_tick(over: &[Cold]) -> bool {
+    !over.is_empty()
+}
+
+/// rc.14 (Eden a1-be759456-y2 #4345-#4348, the crash of a kept Mii group's warm attach): what a role's held module pins
+/// do on a service tick. The pins of the groups a target-first Reload kept go only with the new bank Ready (`Settle`:
+/// R gets each kind's node back, `0x17e4900`, then the pins go) or with the bank gone (`Drop`: absent, departed or
+/// retired, its groups with it). A tick whose entry or owner is not the bank's leaves them (`Wait`): there, 9 ms into a
+/// Reload out of a Pyra window, such a tick dropped them with no re-request, the kept kinds' modules lost their last
+/// reference with R's NRO tree (loader state 3), and the warm attach called into the unloaded Mii module (Unmapped
+/// Read64 via `lua2cpp_common` +0x148c, `ldr x8,[x8,#0x70]`, then a jump to 0). `bank`: (phase, departed, this tick
+/// matches the bank's entry and owner).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PinStep { Wait, Settle, Drop }
+
+pub fn pin_step(bank: Option<(Phase, bool, bool)>) -> PinStep {
+    match bank {
+        None | Some((_, true, _)) => PinStep::Drop,
+        Some((_, false, false)) => PinStep::Wait,
+        Some((Phase::Ready, false, true)) => PinStep::Settle,
+        Some((Phase::Retired, false, true)) => PinStep::Drop,
+        Some(_) => PinStep::Wait,
+    }
+}
+
+/// rc.14 cycle fix, Gap 1 (Eden cf-p3-y2: Ready Fighters lowered from 8 to 6 left the CPU at 7 bodies, "Ready 7/7", so
+/// no fighter was cold; the primary 2026-11-14 ~23:12Z on the operator's rule "what doesn't fit stays cold and what dos
+/// stays hot"): while both roles' resident bodies exceed Ready Fighters plus the cold fighters' own allowance
+/// (`allowed`), the group farthest from being needed leaves now, the CPU's on a tie. `units`: (role, group index,
+/// distance: its nearest member's place in the role's lane, 0 next). One per pass; the next pass sees the room it freed.
+pub fn shrink_release(units: impl IntoIterator<Item = (usize, usize, usize)>, bodies: usize, allowed: usize)
+    -> Option<(usize, usize)> {
+    if bodies <= allowed { return None; }
+    units.into_iter().max_by_key(|(role, _, distance)| (*distance, *role)).map(|(role, index, _)| (role, index))
 }
 
 /// Operator rule 2026-11-09 16:06Z (Eden `final-surface-i3-pf-1261f56c` `x6-cc`): a parked group freed now gives its
@@ -2419,6 +2558,19 @@ mod tests {
         let release = choose([Some(p1), Some(falcon)], [&[], &[]],
             [&[], &[(ganon, 0)]], [&[0x16], &[0x0b]], three);
         assert_eq!(release, ReleaseNow { groups: [0, 0b1], members: [1, 0] });
+
+        // rc.14 a-full-2 (S1): past EXACT_RELEASE_SEARCH parked groups the cheapest go first, in lane order among equals,
+        // until the new members fit: seven parked singles, two new members, room for none of them.
+        let singles = [0x03, 0x05, 0x07, 0x09, 0x0a, 0x0c, 0x0d].map(|kind| (Members::new(&[kind]).unwrap(), 0u8));
+        assert!(singles.len() > EXACT_RELEASE_SEARCH);
+        let nine = GroupBudget { ready_fighters: 9, pool_free: 16, special: SpecialPolicy::NONE };
+        let release = choose([Some(p1), None], [&[], &[]], [&singles, &[]], [&[0x16, 0x17], &[]], nine);
+        assert_eq!(release, ReleaseNow { groups: [0b11, 0], members: [2, 0] });
+        // A parked single the new cycle still serves (kept 1) goes after the unserved ones.
+        let mut served_first = singles;
+        served_first[0].1 = 1;
+        let release = choose([Some(p1), None], [&[], &[]], [&served_first, &[]], [&[0x16, 0x17], &[]], nine);
+        assert_eq!(release, ReleaseNow { groups: [0b110, 0], members: [2, 0] });
     }
 
     /// Operator rule 2026-11-09 (inbox 13:21Z), point 4: with nothing parked a real shortage keeps "waiting for memory";
@@ -2694,12 +2846,11 @@ mod tests {
         // The pair is never an upcoming member: a pair-lead window never takes Popo as its extra.
         assert!(!pair_lead_extra(POPO));
         assert_eq!(Members::from_pair(&[POPO, LINK], 2).unwrap().kinds(), [POPO, NANA, LINK]);
-        // Groups: the first pinned kind in lane order takes cell 0, the later one its own group. Since rc.14 2e Kirby is
-        // always alone (`gated_alone`), so Solo Popo leads the shared group whichever comes first.
+        // Groups: the first pinned kind in lane order takes cell 0, the later one its own group.
         let solo_policy = GroupPolicy { solo_popo_groups: true, ..GroupPolicy::DEFAULT };
         let window = members(&[MARIO, LINK, SAMUS]);
         let plan = plan_extra_groups_with(solo_policy, [Some(window), None], [&[], &[]], [&[KIRBY, POPO, FOX], &[]], [None, None], budget(8));
-        assert_eq!(kinds_of(&plan[0]), vec![vec![POPO, FOX], vec![KIRBY]]);
+        assert_eq!(kinds_of(&plan[0]), vec![vec![KIRBY, FOX], vec![POPO]]);
         let plan = plan_extra_groups_with(solo_policy, [Some(window), None], [&[], &[]], [&[POPO, KIRBY, FOX], &[]], [None, None], budget(8));
         assert_eq!(kinds_of(&plan[0]), vec![vec![POPO, FOX], vec![KIRBY]]);
     }
@@ -2791,16 +2942,16 @@ mod tests {
     fn the_rest_of_the_lane_is_planned_as_groups_beside_the_target() {
         let window = target_first(Forms::starting(GAME_WATCH), true, 6).unwrap();
         let lane: &[u32] = &[PIKACHU, KIRBY, PALUTENA];
-        // The members today's window held are the first group (since rc.14 2e without Kirby, who is laid out alone)...
+        // The members today's window held are the first group (Kirby laid out at cell 0)...
         let full = Members::from_forms(Forms::starting(GAME_WATCH), lane, 2).unwrap();
         let seed = neighbour_group(full, GAME_WATCH, GroupPolicy::DEFAULT, None).unwrap();
-        assert_eq!(seed.kinds(), [PIKACHU, NONE, NONE]);
-        // ...and the planner takes the rest of the lane beside it: with the console's Ready Fighters (8), Kirby's own group
-        // and Palutena, the leftover pair split around Kirby.
+        assert_eq!(seed.kinds(), [KIRBY, PIKACHU, NONE]);
+        // ...and the planner takes the rest of the lane beside it: with the console's Ready Fighters (8), Palutena alone.
+        // Without the seed it would have made one triple, whose admission needs more than the pair the window charged.
         let plan = plan_extra_groups([Some(window), None], [&[seed], &[]], [lane, &[]], [None, None], budget(8));
-        assert_eq!(kinds_of(&plan[0]), vec![vec![PALUTENA], vec![KIRBY]]);
+        assert_eq!(kinds_of(&plan[0]), vec![vec![PALUTENA]]);
         let unseeded = plan_extra_groups([Some(window), None], [&[], &[]], [lane, &[]], [None, None], budget(8));
-        assert_eq!(kinds_of(&unseeded[0]), vec![vec![PIKACHU, PALUTENA], vec![KIRBY]]);
+        assert_eq!(kinds_of(&unseeded[0]), vec![vec![KIRBY, PIKACHU, PALUTENA]]);
         // Both build in the background beside the one-member window, the neighbours first.
         let palutena = plan[0][0].unwrap();
         for group in [seed, palutena] {
@@ -2836,9 +2987,11 @@ mod tests {
         // Boot 3 #163–#169: the CPU's lane [18, 13, 27, 45] and Mii Gunner, the window [18, 13, 27] attached, the Mii
         // group [4a] Built and detached, a cycle onto 0x45. Before rc.12 the Mii group was torn down and built again.
         // Eden rc12-int2-f44fac2f-1 (#797, #1000): the kept Mii group's warm attach after the Reload crashed the guest
-        // (Unmapped Read64 in the Mii's fighter module): a Mii group is released first and built again, as before.
+        // (Unmapped Read64 in the Mii's fighter module): a Mii group was released first and built again. rc.14 2d keeps it
+        // again, with the modules pinned, since Eden cf-p3-y2's fail-first row of that crash passed.
         let mii = Members::mii_group(0x4a).unwrap();
-        assert!(!kept_across_reload(GroupState::Built, mii, false, false, Some(KROOL), true), "a Mii group is released first");
+        assert_eq!(kept_across_reload(GroupState::Built, mii, false, false, Some(KROOL), true), KEEP_MII_ACROSS_RELOAD,
+            "a Mii group is kept only with the rc.14 2d switch");
         // The next lap (#242, target 0x27): the one-member groups the cycle left behind survive too.
         assert!(kept_across_reload(GroupState::Built, members(&[KROOL]), false, false, Some(DIDDY), true));
         assert!(kept_across_reload(GroupState::Built, members(&[GANONDORF, PICHU]), false, false, Some(DIDDY), true));
@@ -3658,20 +3811,45 @@ mod tests {
             }
             served
         };
-        let served = run(&|state| serving_step(state, true, false));
+        let served = run(&|state| serving_step(state, true, false, false));
         assert_eq!(&served[..2], &[(3, Work::Prefetch(2)), (6, Work::Press { warm: true })], "{served:?}");
         assert_eq!(served[2..].iter().map(|(_, w)| *w).collect::<Vec<_>>(), [Work::Prefetch(1), Work::Prefetch(3)]);
         // Nothing let through (the cap-era rule): the press is served at once into no reachable group.
         assert_eq!(run(&|_| None)[0], (3, Work::Press { warm: false }));
         // Each state of the target's group.
-        assert_eq!(serving_step(GroupState::Planned, true, false), Some(Serving::Prefetch));
-        assert_eq!(serving_step(GroupState::Held(Hold::Memory), true, false), Some(Serving::Prefetch));
-        assert_eq!(serving_step(GroupState::Planned, false, false), None, "a Mii group's CharInfo is published first");
+        assert_eq!(serving_step(GroupState::Planned, true, false, false), Some(Serving::Prefetch));
+        assert_eq!(serving_step(GroupState::Held(Hold::Memory), true, false, false), Some(Serving::Prefetch));
+        assert_eq!(serving_step(GroupState::Planned, false, false, false), None, "a Mii group's CharInfo is published first");
         for state in [GroupState::Prefetching, GroupState::Prefetched, GroupState::Built, GroupState::Failed] {
-            assert_eq!(serving_step(state, true, false), None, "{state:?}");
+            assert_eq!(serving_step(state, true, false, false), None, "{state:?}");
         }
         // A built PT group without its object kind: its re-arm makes it reachable (`object_ready`).
-        assert_eq!(serving_step(GroupState::Built, true, true), Some(Serving::ObjectRearm));
+        assert_eq!(serving_step(GroupState::Built, true, true, false), Some(Serving::ObjectRearm));
+    }
+
+    /// rc.14 Gap 3 (Eden cf-p3-y2 `cf-k2` press 12: out of the live Mii Gunner onto Pichu, whose group was not Built, the
+    /// press skipped `demand` and Reloaded): a press out of a live Mii group waits for its own ordinary group through its
+    /// prefetch and its background build (the warm exit takes only a Built group), then exits warm; without an admitted
+    /// background build it takes today's path at once instead of waiting for a group that cannot serve it.
+    fn a_press_out_of_a_live_mii_waits_for_its_group_s_background_build() {
+        // The group's states as the lifecycle moves it while the press waits, and the step it serves at each.
+        let mut state = GroupState::Planned;
+        let mut steps = Vec::new();
+        while demand_waits(state, true, true) {
+            let step = serving_step(state, true, false, true);
+            steps.push(step);
+            state = match (state, step) {
+                (GroupState::Planned, Some(Serving::Prefetch)) => GroupState::Prefetching,
+                (GroupState::Prefetching, None) => GroupState::Prefetched,
+                (GroupState::Prefetched, Some(Serving::Build)) => GroupState::Built,
+                other => panic!("the waiting press is stuck at {other:?}"),
+            };
+        }
+        assert_eq!(steps, [Some(Serving::Prefetch), None, Some(Serving::Build)]);
+        assert_eq!(state, GroupState::Built, "the warm exit takes it");
+        assert!(!demand_waits(GroupState::Prefetched, true, false), "no admitted background build: today's path now");
+        assert!(!demand_waits(GroupState::Prefetched, false, true), "an ordinary press takes a prefetched group at its switch");
+        assert_eq!(serving_step(GroupState::Prefetched, true, false, false), None);
     }
 
     /// The notice rule (primary 2026-11-09 02:00Z, approved for every kind): with groups on, the live attached window
@@ -3753,20 +3931,36 @@ mod tests {
     /// failure here. After every switch [`cold_left`]'s fighter goes while the bodies exceed Ready Fighters, and the
     /// planner (`plan_extra_groups_with`) refills.
     fn run_laps(lap: &[u32], ready_fighters: usize) -> Laps {
+        try_laps(&console_p1(), lap, ready_fighters, SpecialPolicy::MII).unwrap_or_else(|why| panic!("{why}"))
+    }
+
+    /// Player 1, held still while the CPU laps: its window, its groups and its lane.
+    struct Side { window: Members, groups: Vec<Members>, lane: Vec<u32> }
+
+    /// The operator's rc.13 console P1 (practice-diagnostics #31-#52): window `[1c, 8, 36]` and Kirby alone `[6]`.
+    fn console_p1() -> Side {
+        Side { window: members(&[GAME_WATCH, PIKACHU, PALUTENA]), groups: vec![members(&[KIRBY])], lane: vec![PIKACHU, KIRBY, PALUTENA] }
+    }
+
+    /// [`run_laps`] for any Player 1 and special policy. `Err` names why a press would take today's Reload: "no room" (the
+    /// bodies [`cold_admitted`] refuses, Design A's memory rule) or "no free group slot" (rc.14 a-full-2, S1: a role holds
+    /// at most [`MAX_EXTRA_GROUPS`] groups; Eden cf-p3-y2 `cf-k2` presses 3, 8 and 17 and `cf-direct` declined on it).
+    fn try_laps(p1: &Side, lap: &[u32], ready_fighters: usize, special: SpecialPolicy) -> Result<Laps, String> {
         let policy = GroupPolicy { solo_popo_groups: true, ic_pair_groups: true };
-        let budget = GroupBudget { ready_fighters, pool_free: 16, special: SpecialPolicy::MII };
-        let (p1_window, p1_groups, p1_lane) = (Members::new(&[GAME_WATCH, PIKACHU, PALUTENA]).unwrap(), [Members::new(&[KIRBY]).unwrap()],
-            [PIKACHU, KIRBY, PALUTENA]);
+        let budget = GroupBudget { ready_fighters, pool_free: 16, special };
+        let (p1_window, p1_groups, p1_lane) = (p1.window, &p1.groups[..], &p1.lane[..]);
         let after = |at: usize| -> Vec<u32> { (1..lap.len()).map(|step| lap[(at + step) % lap.len()]).collect() };
         let ordinary: Vec<u32> = after(0).into_iter().filter(|kind| Members::special_group(*kind, budget.special).is_none()).collect();
-        let mut window = Members::from_cycle(lap[0], &ordinary, 2).unwrap_or(Members::new(&[lap[0]]).unwrap());
+        let mut window = Members::special_group(lap[0], budget.special)
+            .or_else(|| Members::from_cycle(lap[0], &ordinary, 2)).unwrap_or(Members::new(&[lap[0]]).unwrap());
         let mut groups: Vec<Members> = Vec::new();
-        let bodies = |window: Members, groups: &[Members]| 2 + p1_window.count() - 1 + p1_groups.len() + window.count() - 1
+        let p1_bodies = p1_window.count() - 1 + p1_groups.iter().map(|m| m.count()).sum::<usize>();
+        let bodies = |window: Members, groups: &[Members]| 2 + p1_bodies + window.count() - 1
             + groups.iter().map(|m| m.count()).sum::<usize>();
         let refill = |window: Members, groups: &mut Vec<Members>, live: usize| {
             let lane = after(live);
-            let plan = plan_extra_groups_with(policy, [Some(p1_window), Some(window)], [&p1_groups[..], &groups[..]],
-                [&p1_lane[..], &lane[..]], [None, None], budget);
+            let plan = plan_extra_groups_with(policy, [Some(p1_window), Some(window)], [p1_groups, &groups[..]],
+                [p1_lane, &lane[..]], [None, None], budget);
             groups.extend(plan[1].iter().flatten().copied());
         };
         refill(window, &mut groups, 0);
@@ -3787,14 +3981,21 @@ mod tests {
                         None => {
                             let unit = Members::special_group(target, budget.special).unwrap_or_else(|| Members::new(&[target]).unwrap());
                             let loading = bodies(window, &groups) + unit.count();
-                            assert!(cold_admitted(loading, ready_fighters, unit.count(), &over, lap[live]),
-                                "the cold press onto {target:#x} would Reload: {loading} bodies, over {over:x?}");
+                            if !cold_admitted(loading, ready_fighters, unit.count(), &over, lap[live]) {
+                                return Err(format!("no room: the cold press onto {target:#x} would Reload: {loading} bodies, over {over:x?}"));
+                            }
+                            // `native_body_bank::demand` plans the unit into a free slot of the role (`GroupSlots::next_slot`).
+                            if groups.len() >= MAX_EXTRA_GROUPS {
+                                return Err(format!("no free group slot: the cold press onto {target:#x} at Ready Fighters {ready_fighters} \
+                                    ({loading} bodies) finds window {:x?} and groups {:x?}", &window.kinds()[..window.count()],
+                                    groups.iter().map(|m| m.kinds()[..m.count()].to_vec()).collect::<Vec<_>>()));
+                            }
                             out.over_loading = out.over_loading.max(loading.saturating_sub(ready_fighters));
                             if loading > ready_fighters { over.push((target, false)); }
                             // A Mii group's CharInfo goes on the record beside the waiting press, then its prefetch
                             // serves the press (Eden cf-p2-x2 #2418: any pending request refused it; never prefetched).
                             let publishable = unit.special() != Special::Mii || mii_publish::publication_idle(false, true, true);
-                            assert_eq!(serving_step(GroupState::Planned, publishable, false), Some(Serving::Prefetch),
+                            assert_eq!(serving_step(GroupState::Planned, publishable, false, false), Some(Serving::Prefetch),
                                 "the press onto {target:#x} waits for a group that never prefetches");
                             cold.push(target);
                             // The press plans the group while the fighter it leaves is still on screen, and the bank
@@ -3823,7 +4024,42 @@ mod tests {
             out.cold.push(cold);
             out.hot.push(hot);
         }
-        out
+        Ok(out)
+    }
+
+    /// rc.14 a-full-2 (S1, the primary 2026-11-14 ~23:24Z; cycle-fix's Gap 2): a group slot never makes a fighter that fits
+    /// cold. Native counts no detached group: bodies (Ready Fighters, the pool) and process memory bound what stays resident,
+    /// and the slot count must not bind first. Every Ready Fighters total, both Player 1 shapes and lanes mixing ordinary
+    /// kinds, Kirby (alone), a Mii, Pokémon Trainer, Pyra and the Ice Climbers pair: each cold press Ready Fighters admits
+    /// finds a free group slot. "no room" is Design A's own refusal (the bodies), not a slot.
+    fn a_group_slot_never_makes_a_fitting_fighter_cold() {
+        const ROY: u32 = 0x1a;
+        let all = SpecialPolicy { native: true, pair: true, mii: true };
+        let lanes: [&[u32]; 7] = [
+            // cf-k2 (Eden cf-p3-y2): the CPU's Roy, then Mii Gunner, Pichu, Diddy Kong, King K. Rool and Ganondorf.
+            &[ROY, GUNNER, PICHU, DIDDY, KROOL, GANONDORF],
+            &[FALCO, GUNNER, PICHU, DIDDY, KROOL],
+            &[FALCO, KIRBY, GUNNER, PICHU, DIDDY, KROOL, GANONDORF],
+            &[MARIO, 0x24, KIRBY, 0x5a, GUNNER, FOX, LINK, SAMUS],
+            &[FALCON, POPO, KIRBY, GUNNER, PEACH, 0x24, LUIGI, NESS, YOSHI],
+            &[FALCO, PICHU, DIDDY, KROOL, GANONDORF, ROY, LINK, SAMUS, FOX, PEACH, LUIGI],
+            &[KIRBY, GUNNER, 0x5a, 0x24, POPO, FALCO],
+        ];
+        let mut ran = 0;
+        for ready in usize::from(crate::engine::preload::cycle_preload_config::READY_FIGHTERS_MIN)
+            ..=usize::from(crate::engine::preload::cycle_preload_config::READY_FIGHTERS_MAX) {
+            // The console's P1, and P1 alone on Mario (all the room for the CPU).
+            for p1 in [console_p1(), Side { window: members(&[MARIO]), groups: vec![], lane: vec![] }] {
+                for lane in lanes {
+                    match try_laps(&p1, lane, ready, all) {
+                        Ok(_) => ran += 1,
+                        Err(why) if why.starts_with("no room") => {}
+                        Err(why) => panic!("Ready Fighters {ready}, lane {lane:x?}: {why}"),
+                    }
+                }
+            }
+        }
+        assert!(ran > 40, "most shapes run their five laps: {ran}");
     }
 
     fn steady(laps: &Laps, k: usize) {
@@ -3859,6 +4095,51 @@ mod tests {
         let laps = run_laps(&[FALCO, PICHU, DIDDY, KROOL, GUNNER], 8);
         steady(&laps, 1);
         assert_eq!(laps.cold[1], vec![GUNNER]);
+    }
+
+    /// Gap 1 (Eden cf-p3-y2, "Ready 7/7" at Ready Fighters 6): lowering Ready Fighters frees the farthest groups, one per
+    /// pass, until the resident bodies fit; a cold fighter's allowance stays; nothing goes while they fit.
+    fn lowering_ready_fighters_frees_the_farthest_groups_until_the_total_fits() {
+        // P1 [Mario] + group [Pikachu] (next), the CPU window [Falco, Gunner] + groups [Pichu] (next), [Diddy] (1),
+        // [King K. Rool] (2): 7 bodies, all resident at Ready Fighters 8, then lowered to 5.
+        let mut units = vec![(0, 0, 0), (1, 0, 0), (1, 1, 1), (1, 2, 2)];
+        let mut freed = Vec::new();
+        let mut bodies = 7;
+        while let Some((role, index)) = shrink_release(units.iter().copied(), bodies, 5) {
+            units.retain(|u| (u.0, u.1) != (role, index));
+            freed.push((role, index));
+            bodies -= 1;
+        }
+        assert_eq!(freed, vec![(1, 2), (1, 1)], "King K. Rool, then Diddy Kong: the farthest first");
+        assert_eq!(bodies, 5);
+        assert_eq!(shrink_release([(1, 0, 0), (0, 0, 0)], 6, 5), Some((1, 0)), "the CPU's on a tie");
+        assert_eq!(shrink_release([(1, 2, 2)], 7, 7), None, "a cold fighter on screen keeps its body over");
+        assert_eq!(shrink_release([(1, 2, 2)], 7, 8), None, "it fits");
+    }
+
+    /// Eden a1-be759456-y2 #4345-#4348: the kept groups' module pins stay until the new bank is Ready on its own entry;
+    /// a tick that isn't the bank's (the one that dropped them 9 ms into a Reload out of a Pyra window) waits.
+    fn kept_groups_keep_their_modules_until_the_new_bank_is_ready() {
+        assert_eq!(pin_step(Some((Phase::Building, false, false))), PinStep::Wait, "another entry's tick mid-Reload");
+        assert_eq!(pin_step(Some((Phase::Ready, false, false))), PinStep::Wait, "another entry's tick after Ready");
+        assert_eq!(pin_step(Some((Phase::Building, false, true))), PinStep::Wait);
+        assert_eq!(pin_step(Some((Phase::Changing, false, true))), PinStep::Wait);
+        assert_eq!(pin_step(Some((Phase::Idle, false, true))), PinStep::Wait);
+        assert_eq!(pin_step(Some((Phase::Ready, false, true))), PinStep::Settle, "R gets the nodes back, then they go");
+        assert_eq!(pin_step(Some((Phase::Retired, false, true))), PinStep::Drop, "a canonical replacement took the groups");
+        assert_eq!(pin_step(Some((Phase::Building, true, false))), PinStep::Drop, "departed");
+        assert_eq!(pin_step(None), PinStep::Drop);
+    }
+
+    /// Eden cf-p4-y1 `cf-k1-laps` / `cf-shrink`: a cold mark keeps the lifecycle ticking, and only a cold fighter on screen
+    /// or still loading holds a body over Ready Fighters.
+    fn a_cold_mark_ticks_the_lifecycle_and_a_left_one_holds_nothing_over() {
+        assert!(cold_marks_tick(&[(KROOL, false)]));
+        assert!(!cold_marks_tick(&[]));
+        assert_eq!(cold_allowance(&[(KROOL, false)], Some(DIDDY)), 1, "loading");
+        assert_eq!(cold_allowance(&[(KROOL, true)], Some(KROOL)), 1, "on screen");
+        assert_eq!(cold_allowance(&[(KROOL, true)], Some(DIDDY)), 0, "seen and left: its release is due, nothing over");
+        assert_eq!(cold_allowance(&[(KROOL, true), (GANONDORF, false)], Some(KROOL)), 2);
     }
 
     /// k = 0: the same lap at Ready Fighters 10 fits whole: every press is warm and nothing is loaded or freed.
@@ -3903,45 +4184,89 @@ mod tests {
             kept_across_reload_with(KEEP_MII_ACROSS_RELOAD, GroupState::Built, mii, false, false, Some(KROOL), true));
     }
 
-    /// rc.14 2e (the primary 2026-11-14 ~21:25Z, decision 1): Kirby, whose departure the copy gate may refuse, is laid out
-    /// alone. The planner gives him his own one-member group and keeps the others of his chunk together; the target-first
-    /// seed leaves him out. The operator's P1 lane (Mr. Game & Watch > Pikachu > Kirby > Palutena) is the console's shape.
-    fn a_gated_member_is_laid_out_alone_and_the_rest_stay_together() {
-        assert!(gated_alone(KIRBY));
-        for kind in [MARIO, PIKACHU, PALUTENA, POPO, NANA, GUNNER] { assert!(!gated_alone(kind), "{kind:#x}"); }
-        let window = target_first(Forms::starting(GAME_WATCH), true, 6).unwrap();
-        let lane: &[u32] = &[PIKACHU, KIRBY, PALUTENA];
-        let plan = plan_extra_groups([Some(window), None], [&[], &[]], [lane, &[]], [None, None], budget(8));
-        assert_eq!(kinds_of(&plan[0]), vec![vec![PIKACHU, PALUTENA], vec![KIRBY]]);
-        let full = Members::from_forms(Forms::starting(GAME_WATCH), lane, 2).unwrap();
-        assert_eq!(neighbour_group(full, GAME_WATCH, GroupPolicy::DEFAULT, None).map(Members::kinds), Some([PIKACHU, NONE, NONE]));
-        // Kirby alone is his own group; a lane of Kirby and one other gives two one-member groups.
-        assert_eq!(neighbour_group(members(&[KIRBY, GAME_WATCH]), GAME_WATCH, GroupPolicy::DEFAULT, None).map(Members::kinds),
-            Some([KIRBY, NONE, NONE]));
-        let plan = plan_extra_groups([Some(window), None], [&[], &[]], [&[KIRBY, PIKACHU], &[]], [None, None], budget(8));
-        assert_eq!(kinds_of(&plan[0]), vec![vec![PIKACHU], vec![KIRBY]]);
-        // Beside Solo Popo (who also takes cell 0) the two never share a group either.
-        let solo_policy = GroupPolicy { solo_popo_groups: true, ..GroupPolicy::DEFAULT };
-        let plan = plan_extra_groups_with(solo_policy, [Some(members(&[MARIO, LINK, SAMUS])), None], [&[], &[]],
-            [&[KIRBY, POPO, FOX], &[]], [None, None], budget(8));
-        assert_eq!(kinds_of(&plan[0]), vec![vec![POPO, FOX], vec![KIRBY]]);
-    }
-
     /// rc.14 2e (a-full, A1): a mod Reload keeps the attached window when its live member parks, unless the window is a
     /// native group, a Mii without 2d's switch, holds the target, or its live member is the cold fighter Design A frees.
     fn a_reload_keeps_the_window_whose_live_member_parks() {
         let window = members(&[FALCO, PICHU, DIDDY]);
-        assert_eq!(window_kept_across_reload(window, false, KROOL, true, false), Ok(()));
-        assert_eq!(window_kept_across_reload(Members::new(&[KIRBY, PIKACHU]).unwrap(), false, PALUTENA, true, false), Ok(()),
+        assert_eq!(window_kept_across_reload(window, false, false, false, KROOL, true, false), Ok(()));
+        assert_eq!(window_kept_across_reload(Members::new(&[KIRBY, PIKACHU]).unwrap(), false, false, false, PALUTENA, true, false), Ok(()),
             "a copy-free Kirby parks, so his window stays");
-        assert_eq!(window_kept_across_reload(Members::pair_lead(LINK).unwrap(), false, MARIO, true, false), Ok(()));
-        assert!(window_kept_across_reload(window, false, KROOL, false, false).is_err(), "the live member may not park");
-        assert!(window_kept_across_reload(window, false, PICHU, true, false).is_err(), "the window holds the target");
-        assert!(window_kept_across_reload(members(&[KROOL]), false, FALCO, true, true).is_err(), "the cold fighter goes");
-        assert!(window_kept_across_reload(Members::native_group(0x24).unwrap(), false, MARIO, true, false).is_err());
+        assert_eq!(window_kept_across_reload(Members::pair_lead(LINK).unwrap(), false, false, false, MARIO, true, false), Ok(()));
+        assert!(window_kept_across_reload(window, false, false, false, KROOL, false, false).is_err(), "the live member may not park");
+        assert!(window_kept_across_reload(window, false, false, false, PICHU, true, false).is_err(), "the window holds the target");
+        assert!(window_kept_across_reload(members(&[KROOL]), false, false, false, FALCO, true, true).is_err(), "the cold fighter goes");
+        assert!(window_kept_across_reload(Members::native_group(0x24).unwrap(), false, false, false, MARIO, true, false).is_err());
+        // rc.14 a-full-2 (limit 2): with its switch a Pokémon Trainer window is kept, any of its forms on screen; Pyra/Mythra
+        // still are not (probe a0 first), nor is a PT window that holds the target.
+        for form in [0x24, 0x25, 0x26] {
+            assert_eq!(window_kept_across_reload(Members::native_group(form).unwrap(), false, true, false, MARIO, true, false), Ok(()),
+                "{form:#x}");
+        }
+        assert!(window_kept_across_reload(Members::native_group(0x5a).unwrap(), false, true, false, MARIO, true, false).is_err(),
+            "an Aegis window needs its own switch");
+        assert!(window_kept_across_reload(Members::native_group(0x24).unwrap(), false, true, false, 0x25, true, false).is_err());
         let mii = Members::mii_group(GUNNER).unwrap();
-        assert!(window_kept_across_reload(mii, false, KROOL, true, false).is_err());
-        assert_eq!(window_kept_across_reload(mii, true, KROOL, true, false), Ok(()));
+        assert!(window_kept_across_reload(mii, false, false, false, KROOL, true, false).is_err());
+        assert_eq!(window_kept_across_reload(mii, true, false, false, KROOL, true, false), Ok(()));
+        // rc.14 a-full-2 (after probe a0): with its switch a Pyra/Mythra window is kept, either form on screen; not one that
+        // holds the target, and the PT switch alone keeps none.
+        for form in [0x5a, 0x5b] {
+            assert_eq!(window_kept_across_reload(Members::native_group(form).unwrap(), false, false, true, MARIO, true, false), Ok(()),
+                "{form:#x}");
+        }
+        assert!(window_kept_across_reload(Members::native_group(0x5a).unwrap(), false, false, true, 0x5b, true, false).is_err());
+        assert!(window_kept_across_reload(Members::native_group(0x24).unwrap(), false, false, true, MARIO, true, false).is_err(),
+            "the Aegis switch keeps no PT window");
+    }
+
+    /// rc.14 a-full-3 (the primary, a-full-3 brief 2026-11-15: a2-aegis passed in boots 3 and 4, the object-module fix `08cc9932`
+    /// covers the crash): the shipped switches keep every kind of window across a Reload, and a Kirby that holds a copy
+    /// loses it instead of taking the Reload. The counted receipts are the final pass's a2-aegis and a2-pyra-keep-all rows.
+    fn the_shipped_switches_keep_every_window_kind_across_a_reload() {
+        let kept = |window: Members| window_kept_across_reload(window, KEEP_MII_ACROSS_RELOAD, KEEP_PT_WINDOW_ACROSS_RELOAD,
+            KEEP_AEGIS_WINDOW_ACROSS_RELOAD, MARIO, true, false);
+        assert_eq!(kept(members(&[FALCO, PICHU, DIDDY])), Ok(()), "an ordinary window");
+        assert_eq!(kept(Members::mii_group(GUNNER).unwrap()), Ok(()), "a Mii window");
+        for form in [0x24, 0x25, 0x26] {
+            assert_eq!(kept(Members::native_group(form).unwrap()), Ok(()), "a Pokemon Trainer window, form {form:#x}");
+        }
+        for form in [0x5a, 0x5b] {
+            assert_eq!(kept(Members::native_group(form).unwrap()), Ok(()), "a Pyra / Mythra window, form {form:#x}");
+        }
+        assert_eq!([KEEP_WINDOW_ACROSS_RELOAD, KEEP_MII_ACROSS_RELOAD, KEEP_PT_WINDOW_ACROSS_RELOAD, KEEP_AEGIS_WINDOW_ACROSS_RELOAD,
+            KIRBY_STRIP_BEFORE_PARK], [true; 5], "A1, Mii, Pokemon Trainer, Pyra / Mythra and the Kirby copy strip");
+    }
+
+    /// rc.14 a-full-2 (the A1 pair defect: a1-enable `a1-be759456-y2c` `a1-pair3`, 451 × `Unmapped Write8 @ 0x70` from the
+    /// control select `0x64fb70`, "verification failed"): a pair window A1 keeps leaves as N3 parks one, with the bank flag
+    /// and no pair bit. The select needs bit 2 to pick the window's context; an exchange-parked pair record carries 4 and
+    /// attaches warm.
+    fn a_kept_pair_window_keeps_the_bank_flag_as_n3_parks_it() {
+        assert_eq!(parked_pair_flags(PAIR_ACTIVE_FLAG), BANK_FLAG, "the active pair's 6 parks as N3's 4");
+        assert_eq!(parked_pair_flags(BANK_FLAG), BANK_FLAG, "an already parked pair stays 4");
+        assert_ne!(parked_pair_flags(PAIR_ACTIVE_FLAG) & BANK_FLAG, 0, "the control select needs bit 2");
+        assert_eq!(parked_pair_flags(PAIR_ACTIVE_FLAG) & (PAIR_ACTIVE_FLAG & !BANK_FLAG), 0, "the pair bit 1 is dropped");
+        for member in [0u8, 1, 2] {
+            assert_ne!(Members::pair_group().expected_flags(member) & BANK_FLAG, 0);
+        }
+    }
+
+    /// rc.14 a-full-2 (K-strip; the primary 2026-11-14 ~23:24Z): leaving a Kirby that holds a copy is no Reload any more.
+    /// His copy goes natively first (a Reloaded Kirby is hatless too), then he parks like any member, and the target's
+    /// Built group attaches warm. Only an unreadable copy state, an earlier copy still being cleared, or the switch off
+    /// keeps today's Reload.
+    fn a_kirby_with_a_copy_loses_it_and_parks_instead_of_the_reload() {
+        let copied = Some(1u128 << 3);
+        assert_eq!(kirby_departure(false, Some(0), false, true), KirbyDeparture::Park);
+        assert_eq!(kirby_departure(false, Some(0), false, false), KirbyDeparture::Park, "copy-free parks either way");
+        assert_eq!(kirby_departure(true, copied, false, true), KirbyDeparture::Strip, "a copy from an inhale");
+        assert_eq!(kirby_departure(true, copied, true, true), KirbyDeparture::Strip, "a Kirby Hats copy and its lease");
+        assert_eq!(kirby_departure(true, Some(0), false, true), KirbyDeparture::Strip, "the copy flag alone");
+        assert_eq!(kirby_departure(false, Some(0), true, true), KirbyDeparture::Strip, "a hat lease alone");
+        assert!(matches!(kirby_departure(false, copied, false, true), KirbyDeparture::Reload(_)),
+            "an earlier copy's objects still being cleared: no copy for the native loss");
+        assert!(matches!(kirby_departure(true, None, false, true), KirbyDeparture::Reload(_)), "unreadable: today's Reload");
+        assert!(matches!(kirby_departure(true, copied, false, false), KirbyDeparture::Reload(_)), "the switch off");
     }
 
     /// rc.14 2e (decision 3, Design A's rule): over Ready Fighters after a kept Reload, the unit whose next turn is farthest
@@ -3960,17 +4285,55 @@ mod tests {
         assert_eq!(farthest_unit(&[], &lap, KROOL), None);
     }
 
+    /// rc.14 a-full-2 (p4; boot a2-e881df1e-y1: `S+0x1968` stayed 2 across `[Destroy] records` of a PT group with no PT
+    /// holder alive, and `S+0x1980` climbed 2 -> 4 -> 5): tearing a native holder down gives back the count finalize gives
+    /// back before its destroy, by the window's flags. Bit 0 (PT): `S+0x1968` (`0x652ed4-0x652f54`); bit 5 (Aegis):
+    /// `S+0x1980` (`0x653090-0x65310c`).
+    fn a_destroyed_holder_gives_back_the_count_finalize_gives_back() {
+        let flags = |m: Members| match m.special() { Special::Native(flags) => flags, _ => 0 };
+        let pt = flags(Members::native_group(0x24).unwrap());
+        let aegis = flags(Members::native_group(0x5a).unwrap());
+        assert_eq!(holder_counts(pt), (true, false), "PT {pt:#x}");
+        assert_eq!(holder_counts(aegis), (false, true), "Aegis {aegis:#x}");
+        assert_eq!(holder_counts(BANK_FLAG), (false, false));
+        assert_eq!(holder_counts(PAIR_ACTIVE_FLAG), (false, false));
+        assert_eq!(holder_counts(0), (false, false));
+    }
+
+    /// rc.14 a-full-2 (boot a2-99b9083f-y1: a kept Aegis group torn down after its owner's Reload read a vtable in the
+    /// unloaded `0x75` module, R's NRO tree `[0, 8, 5a, 5b, f]`): a group kept across a Reload pins its object kind's module
+    /// with its members'; an ordinary group pins only its members.
+    fn a_kept_holder_pins_its_object_kind_with_its_members() {
+        let kinds = |m: Members| pin_kinds(m).iter().copied().collect::<Vec<u32>>();
+        assert_eq!(kinds(Members::native_group(0x5a).unwrap()), vec![0x5a, 0x5b, AEGIS_OBJECT_KIND]);
+        assert_eq!(kinds(Members::native_group(0x5b).unwrap()), vec![0x5a, 0x5b, AEGIS_OBJECT_KIND]);
+        assert_eq!(kinds(Members::native_group(0x24).unwrap()), vec![0x24, 0x25, 0x26, PT_OBJECT_KIND]);
+        assert_eq!(kinds(Members::new(&[0x08, 0x13]).unwrap()), vec![0x08, 0x13]);
+        assert_eq!(kinds(Members::pair_lead(0x02).unwrap()).len(), Members::pair_lead(0x02).unwrap().count());
+        // The pins of a window plus every kept group fit, with both object kinds.
+        const { assert!((MAX_EXTRA_GROUPS + 1) * NATIVE_MEMBERS + 2 <= PIN_CAPACITY) };
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("a_gated_member_is_laid_out_alone_and_the_rest_stay_together", a_gated_member_is_laid_out_alone_and_the_rest_stay_together as fn()),
+            ("a_kept_holder_pins_its_object_kind_with_its_members", a_kept_holder_pins_its_object_kind_with_its_members as fn()),
             ("a_reload_keeps_the_window_whose_live_member_parks", a_reload_keeps_the_window_whose_live_member_parks as fn()),
+            ("a_kirby_with_a_copy_loses_it_and_parks_instead_of_the_reload", a_kirby_with_a_copy_loses_it_and_parks_instead_of_the_reload as fn()),
+            ("the_shipped_switches_keep_every_window_kind_across_a_reload", the_shipped_switches_keep_every_window_kind_across_a_reload as fn()),
+            ("a_kept_pair_window_keeps_the_bank_flag_as_n3_parks_it", a_kept_pair_window_keeps_the_bank_flag_as_n3_parks_it as fn()),
+            ("a_destroyed_holder_gives_back_the_count_finalize_gives_back", a_destroyed_holder_gives_back_the_count_finalize_gives_back as fn()),
             ("the_farthest_unit_goes_never_the_next_or_the_one_on_screen", the_farthest_unit_goes_never_the_next_or_the_one_on_screen as fn()),
             ("a_mii_group_is_kept_across_a_reload_only_with_its_switch", a_mii_group_is_kept_across_a_reload_only_with_its_switch as fn()),
             ("five_laps_of_the_operator_cycle_keep_what_fits_hot", five_laps_of_the_operator_cycle_keep_what_fits_hot as fn()),
+            ("a_group_slot_never_makes_a_fitting_fighter_cold", a_group_slot_never_makes_a_fitting_fighter_cold as fn()),
             ("two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot", two_fighters_that_do_not_fit_stay_cold_and_the_rest_hot as fn()),
             ("a_cold_mii_fighter_is_loaded_by_its_waiting_press", a_cold_mii_fighter_is_loaded_by_its_waiting_press as fn()),
+            ("lowering_ready_fighters_frees_the_farthest_groups_until_the_total_fits", lowering_ready_fighters_frees_the_farthest_groups_until_the_total_fits as fn()),
+            ("a_press_out_of_a_live_mii_waits_for_its_group_s_background_build", a_press_out_of_a_live_mii_waits_for_its_group_s_background_build as fn()),
+            ("kept_groups_keep_their_modules_until_the_new_bank_is_ready", kept_groups_keep_their_modules_until_the_new_bank_is_ready as fn()),
+            ("a_cold_mark_ticks_the_lifecycle_and_a_left_one_holds_nothing_over", a_cold_mark_ticks_the_lifecycle_and_a_left_one_holds_nothing_over as fn()),
             ("a_lap_that_fits_is_all_warm", a_lap_that_fits_is_all_warm as fn()),
             ("a_cold_fighter_takes_one_body_over_only_while_it_is_on_screen", a_cold_fighter_takes_one_body_over_only_while_it_is_on_screen as fn()),
             ("a_group_leaves_when_a_member_left_the_cycle_and_its_slot_is_reused", a_group_leaves_when_a_member_left_the_cycle_and_its_slot_is_reused as fn()),

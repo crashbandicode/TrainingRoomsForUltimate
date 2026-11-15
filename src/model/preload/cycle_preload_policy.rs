@@ -221,6 +221,9 @@ pub struct BuiltFighters {
     pub swap: u8,
     pub held: u8,
     pub hold: Option<crate::engine::swap::body_bank::Hold>,
+    /// rc.14 mem-headroom: the room the fighters held for memory wait for is held by speculative helpers the next pause
+    /// retires (`give_back`), so something is left to free.
+    pub room_at_pause: bool,
 }
 
 impl BuiltFighters {
@@ -288,6 +291,9 @@ impl std::fmt::Display for CacheText {
         use crate::engine::swap::body_bank::Hold;
         let held = fighters.held;
         match (failed > 0, fighters.hold.filter(|_| held > 0)) {
+            // rc.14 mem-headroom: the next pause frees the room these wait for (speculative helpers, `give_back`).
+            (true, Some(Hold::Memory)) if fighters.room_at_pause => write!(f, " ({} failed, {} load after you pause)", failed, held)?,
+            (false, Some(Hold::Memory)) if fighters.room_at_pause => write!(f, " ({} load after you pause)", held)?,
             (true, Some(hold)) => {
                 let what = if hold == Hold::Memory { "memory" } else { "pool space" };
                 // restriction: preload-failed-and-waiting
@@ -349,7 +355,7 @@ impl CacheStatus {
 
     /// What the notice shows, without what changes afterwards for no reader's benefit: a settled
     /// result is the same whether a prefetched group has since been built, so that is no change.
-    fn shown_key(self) -> (u8, u8, u8, u8, u8, u8) {
+    fn shown_key(self) -> (u8, u8, u8, u8, u8, u8, bool) {
         let (class, swap) = match self.progress() {
             Progress::Hidden => (0, 0),
             Progress::Loading => (1, 0),
@@ -358,7 +364,9 @@ impl CacheStatus {
             Progress::Waiting => (3, self.fighters.swap),
             Progress::Partial | Progress::Done | Progress::Ready => (4, 0),
         };
-        (class, self.fighters.loaded(), self.fighters.planned, self.fighters.failed, swap, self.fighters.held)
+        // rc.14 mem-headroom: "waiting for memory" turning into "load after you pause" is a change shown.
+        (class, self.fighters.loaded(), self.fighters.planned, self.fighters.failed, swap, self.fighters.held,
+            self.fighters.room_at_pause && self.fighters.held > 0)
     }
 
     pub fn announce(self, shown: Option<Self>, paused_polls: u8) -> bool {
@@ -538,6 +546,25 @@ mod tests {
         assert_eq!(admitted.text().to_string(), "Ready 5/5");
     }
 
+    /// rc.14 mem-headroom (the primary 2026-11-15 ~06:20Z: "waiting for memory" only when nothing is left to free; Eden
+    /// smoke2r-2 read "Loaded 7/9 (2 waiting for memory)" while four created helpers held about 250 MB): held fighters
+    /// whose room the next pause frees say so, with or without a failure beside them; a pool hold is not memory.
+    fn waiting_for_memory_shows_only_when_nothing_is_left_to_free() {
+        use crate::engine::swap::body_bank::Hold;
+        let assets = readiness(5, 1, false, [Some(1)], NONE, ready_of(&[1]));
+        let memory = BuiltFighters { planned: 9, ready: 7, held: 2, hold: Some(Hold::Memory), ..BuiltFighters::default() };
+        assert_eq!(CacheStatus::new(assets, memory, false).text().to_string(), "Loaded 7/9 (2 waiting for memory)",
+            "nothing is left to free");
+        let pause = BuiltFighters { room_at_pause: true, ..memory };
+        let freed = CacheStatus::new(assets, pause, false);
+        assert_eq!(freed.text().to_string(), "Loaded 7/9 (2 load after you pause)");
+        assert!(CacheStatus::new(assets, memory, false).announce(Some(freed), 0), "the change is shown");
+        let failed = CacheStatus::new(assets, BuiltFighters { failed: 1, held: 1, ..pause }, false);
+        assert_eq!(failed.text().to_string(), "Loaded 7/9 (1 failed, 1 load after you pause)");
+        let pool = CacheStatus::new(assets, BuiltFighters { hold: Some(Hold::Pool), ..pause }, false);
+        assert_eq!(pool.text().to_string(), "Loaded 7/9 (2 waiting for pool space)");
+    }
+
     fn fighters(planned: u8, ready: u8, prefetched: u8, failed: u8, pending: u8) -> BuiltFighters {
         BuiltFighters { planned, ready, prefetched, failed, pending, ..BuiltFighters::default() }
     }
@@ -558,7 +585,8 @@ mod tests {
             total = BuiltFighters { planned: total.planned + f.planned, ready: total.ready + f.ready,
                 prefetched: total.prefetched + f.prefetched, failed: total.failed + f.failed,
                 pending: total.pending + f.pending, swap: total.swap | counts.swap_owed(role),
-                held: total.held + f.held, hold: crate::engine::swap::body_bank::merge_hold(total.hold, f.hold) };
+                held: total.held + f.held, hold: crate::engine::swap::body_bank::merge_hold(total.hold, f.hold),
+                room_at_pause: total.room_at_pause || f.room_at_pause };
         }
         total
     }
@@ -731,6 +759,7 @@ mod tests {
             ("a_parked_seat_loads_its_member_even_when_the_other_seat_holds_it", a_parked_seat_loads_its_member_even_when_the_other_seat_holds_it as fn()),
             ("warm_assets_never_claim_fighters_are_ready", warm_assets_never_claim_fighters_are_ready as fn()),
             ("held_fighters_read_waiting_not_failed", held_fighters_read_waiting_not_failed as fn()),
+            ("waiting_for_memory_shows_only_when_nothing_is_left_to_free", waiting_for_memory_shows_only_when_nothing_is_left_to_free as fn()),
             ("the_waiting_text_names_the_role_that_must_swap", the_waiting_text_names_the_role_that_must_swap as fn()),
             ("player_kirby_hats_rank_above_the_cpu_fighter_lookahead", player_kirby_hats_rank_above_the_cpu_fighter_lookahead as fn()),
             ("announces_changes_once_and_debounces_pause", announces_changes_once_and_debounces_pause as fn()),

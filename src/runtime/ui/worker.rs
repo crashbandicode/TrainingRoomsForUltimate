@@ -158,8 +158,46 @@ fn env() -> Env {
         combo_draft: crate::runtime::features::combo::labels().1,
         build_tag: crate::model::frame::BUILD_TAG,
         waiting_room: crate::runtime::scene::lobby_active(),
+        // rc.14: the save's Stage Builder stages are tiles after the catalog on both stage grids.
+        custom_stages: crate::runtime::lobby::custom_stages::published()
+            .map_or(0, |p| u16::try_from(p.customs.len()).unwrap_or(u16::MAX)),
         ..Env::default()
     }
+}
+
+/// rc.14: the save's Stage Builder stages (`runtime::lobby::custom_stages`). With `reread` (MainThread copied the game's
+/// own list anew) the stages deleted in Stage Builder leave the kept orders (current and saved defaults); otherwise (a
+/// menu commit) the list taken last is kept. Then the list and the order are published for the hooks. Before the first
+/// copy nothing changes.
+fn refresh_custom_stages(reread: bool) {
+    use crate::editors::stages::{ORDER_KEY, STAGE_ORDER_KEY};
+    use crate::engine::stages::custom_stages::{Published, StageOrder};
+    use crate::runtime::lobby::custom_stages;
+    let customs = if reread {
+        let Some(list) = custom_stages::read_list() else { return };
+        list
+    } else {
+        let Some(published) = custom_stages::published() else { return };
+        published.customs.clone()
+    };
+    let Some(settings) = SETTINGS.lock().clone() else { return };
+    let mut current = StageOrder::default();
+    for defaults in [false, true] {
+        let snapshot = if defaults { &settings.defaults } else { &settings.menu };
+        let legacy = snapshot.extra().get(ORDER_KEY).and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
+        let mut order = StageOrder::read(snapshot.extra().get(STAGE_ORDER_KEY), legacy);
+        let changed = order.prune(&customs) | order.remember(&customs);
+        if changed && snapshot.extra().contains_key(STAGE_ORDER_KEY) {
+            // The catalog projection is unchanged by a pruned custom stage; only the order with custom stages is written.
+            if let Ok(value) = serde_json::to_value(&order) {
+                adopt_typed(defaults, &[], &[(STAGE_ORDER_KEY, value)]);
+            }
+        }
+        if !defaults {
+            current = order;
+        }
+    }
+    custom_stages::publish(Published { order: current, customs });
 }
 
 /// A Combos row's result (SPEC-input-07 §6): a notice, and the names the open menu shows.
@@ -231,6 +269,10 @@ fn run() {
         }
         if WRITEBACK.swap(false, Ordering::AcqRel) {
             crate::runtime::compat::menu::flush_writeback();
+        }
+        // rc.14: boot and every scene change read the save's Stage Builder stages again (until a read succeeds).
+        if crate::runtime::lobby::custom_stages::refresh_wanted() {
+            refresh_custom_stages(true);
         }
         if POPUP_REQ.swap(false, Ordering::AcqRel) {
             toggle_popup(&mut session);
@@ -868,20 +910,31 @@ fn sync_mii(s: &mut Session) {
 /// A, X or Y on the Lobby Stages or Change Stage grid: the stage editor applies it to the menu's kept values. A stage to go to (A on
 /// Change Stage, or A in Direct on Lobby Stages) is returned: the menu closes and `close_session` requests it then.
 fn stage_press(m: &mut Menu, tile: u16, button: Button) -> Option<Selection> {
-    use crate::editors::stages::{Effect, StageEditor, ORDER_KEY, PREFERENCES_KEY};
+    use crate::editors::stages::{Effect, ORDER_KEY, PREFERENCES_KEY, STAGE_ORDER_KEY};
     let change = matches!(m.screen(), Some(Screen::Grid { layout, .. })
         if layout.kind == crate::model::menu::grid::GridKind::StageChange);
-    let mut editor = StageEditor::read(m.kept(ORDER_KEY), m.top_extra(PREFERENCES_KEY));
+    let mut editor = stage_editor(m);
     let effect = if change { editor.change(usize::from(tile), button) } else { editor.press(usize::from(tile), button) };
     if effect == Effect::Nothing {
         return None;
     }
     m.set_kept(ORDER_KEY, editor.order_value());
+    m.set_kept(STAGE_ORDER_KEY, editor.stage_order_value());
     m.set_top_extra(PREFERENCES_KEY, editor.preferences_value());
     match effect {
         Effect::Request(selection) => Some(selection),
+        // The request waits, queued, for the game's read of the stage (`practice_stage_request::update`).
+        Effect::RequestCustom(id) => Some(Selection::normal(crate::engine::stages::custom_stages::encode(id))),
         _ => None,
     }
+}
+
+/// rc.14: the stage grids' editor over the menu's kept values and the save's Stage Builder stages as last read.
+fn stage_editor(m: &Menu) -> crate::editors::stages::StageEditor {
+    use crate::editors::stages::{StageEditor, ORDER_KEY, PREFERENCES_KEY, STAGE_ORDER_KEY};
+    let published = crate::runtime::lobby::custom_stages::published();
+    StageEditor::read_with(m.kept(STAGE_ORDER_KEY), m.kept(ORDER_KEY), m.top_extra(PREFERENCES_KEY),
+        published.as_ref().map(|p| p.customs.as_slice()))
 }
 
 /// Close the menu, then request the stage picked in it, as the fork does (`src/common/menu.rs`, `stage_close`): with the
@@ -889,6 +942,8 @@ fn stage_press(m: &mut Menu, tile: u16, button: Button) -> Option<Selection> {
 /// a notice; nothing is half-applied (the request is all or nothing, `practice_stage_request::queue`).
 fn close_session(s: &mut Session) {
     if let Some(menu) = s.menu.as_mut() { close(menu, &mut s.setups); }
+    // rc.14: the committed stage order (with its custom stages) is what the stage cycles move through from now on.
+    refresh_custom_stages(false);
     // A combo's Switch (SPEC-input-07 §4a) goes to the roster loader once the menu has closed.
     s.combos.after_close();
     let Some(selection) = s.stage_close.take() else { return };
@@ -981,10 +1036,7 @@ fn publish_frame(s: &Session) {
         if let Some(Screen::Grid { layout, page, cell }) = menu.screen().copied() {
             use crate::model::menu::grid::GridKind;
             if matches!(layout.kind, GridKind::Stages | GridKind::StageChange) {
-                let editor = crate::editors::stages::StageEditor::read(
-                    menu.kept(crate::editors::stages::ORDER_KEY),
-                    menu.top_extra(crate::editors::stages::PREFERENCES_KEY),
-                );
+                let editor = stage_editor(menu);
                 let focused = layout.tile(page, cell).unwrap_or(0);
                 if layout.kind == GridKind::StageChange {
                     editor.decorate_change(&mut next, focused);

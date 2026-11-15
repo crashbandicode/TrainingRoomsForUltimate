@@ -200,7 +200,9 @@ mod ev {
     pub const TECH_CALL: usize = 18;
     pub const OOS_CALL: usize = 19;
     pub const TAUNT: usize = 20;
-    pub const COUNT: usize = 21;
+    pub const HIDE: usize = 21;
+    pub const TAG: usize = 22;
+    pub const COUNT: usize = 23;
 }
 
 #[cfg(feature = "diag")]
@@ -467,6 +469,9 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         // SPEC-core-06: the hitbox visualizer's pass (a readiness boundary: nothing until boot installed it), after the combo and
         // before the save states (SPEC-core-01 §5.2).
         unsafe { crate::runtime::features::hitbox::frame(a0) };
+        // The Eggs-ercise CPU target's player tag: the game turns its flag off for the placed CPU, so when the pass just run asked
+        // for it (`hide_cpu::keep_cursor`) the flag is written on again, the one write after the placement.
+        unsafe { hide_cpu::write_kept_cursor(a0, konst(C::WorkFlagCursor)) };
         // Package 3: the save-state step runs on the same per-fighter callback, after the CPU's.
         {
             let _state = HookScope::enter_hook(HookId::StateFrame);
@@ -523,6 +528,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
             let any = cpu.roles.any();
             if any {
                 cpu.clear_session();
+                hide_cpu::publish_panels(cpu.hidden_panels());
             }
             any
         });
@@ -535,7 +541,13 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
     let Some(receipt) = receipt.filter(|_| current_frame) else { return };
     let scene = scene_now.unwrap_or(Scene::Training);
     let lobby = scene == Scene::Lobby;
-    if !is_cpu_role(scene, entry, reset_hub::cpu_operated(fighter)) {
+    // Training's No. of CPUs decides whether an entry above 1 is a CPU or one of TR's parked entries (`is_cpu_role`).
+    let cpus = if scene == Scene::Training && entry >= 2 {
+        crate::runtime::roster::character_roster::training_cpu_quantity()
+    } else {
+        None
+    };
+    if !is_cpu_role(scene, entry, reset_hub::cpu_operated(fighter), cpus) {
         with(|cpu| cpu.roles.forget(accessor));
         return;
     }
@@ -591,7 +603,9 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
                 counts::bump(counts::FRAME);
             }
         }
-        Some(cpu.frame(key, &facts))
+        let out = cpu.frame(key, &facts);
+        hide_cpu::publish_panels(cpu.hidden_panels());
+        Some(out)
     }).flatten();
     cpu_event_on_change!(
         ev::ROLE,
@@ -609,11 +623,43 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
         key.entry,
         key.partner
     );
+    #[cfg(feature = "diag")]
+    cursor_probe(key, accessor);
     if let Some(out) = out {
+        cpu_event_on_change!(
+            ev::HIDE,
+            key.index(),
+            out.vanish.map(u64::from),
+            "hide entry={} partner={} hidden={:?} tag={:?} panels={:#04b}",
+            key.entry,
+            key.partner,
+            out.vanish,
+            crate::model::cpu::hide::tag(out.vanish),
+            hide_cpu::panels()
+        );
         apply(accessor, out);
     }
     #[cfg(feature = "diag")]
     counts::report_if_due();
+}
+
+/// Diag build: the CPU body's two cursor flags (its player tag), one line when either changes, beside the `hide entry=` and
+/// `status entry=` lines. While a practice game moves the CPU every tick (the Eggs-ercise CPU target's flight) the tag is
+/// gone; this line says whether the game turned the flags off or the flags stayed on (rc.14 cpu-tag-target).
+#[cfg(feature = "diag")]
+unsafe fn cursor_probe(key: FighterKey, accessor: usize) {
+    let [cursor, name] = [C::WorkFlagCursor, C::WorkFlagNameCursor].map(|id| {
+        let flag = konst(id);
+        flag != UNRESOLVED && natives::is_flag(accessor, flag)
+    });
+    cpu_event_on_change!(
+        ev::TAG,
+        key.index(),
+        Some(u64::from(cursor) | u64::from(name) << 1),
+        "cursor entry={} partner={} flag={cursor} name_flag={name}",
+        key.entry,
+        key.partner
+    );
 }
 
 // ---- the per-feature facts and appliers of the frame wrapper (R2-1) -----------------------------------------
@@ -696,7 +742,7 @@ unsafe fn tech_facts(accessor: usize, status: i32, primary: bool) -> TechFacts {
 /// Do what the frame asked, with no lock held: the core's own requests, then each feature's, each behind its
 /// own install flag.
 unsafe fn apply(accessor: usize, out: FrameOut) {
-    hide_cpu::apply(accessor, out.vanish);
+    hide_cpu::apply(accessor, out.vanish, [konst(C::WorkFlagCursor), konst(C::WorkFlagNameCursor)]);
     if let Some(value) = out.stale_flag {
         let flag = konst(C::WorkFlagDisableEscapePenalty);
         if flag != UNRESOLVED {

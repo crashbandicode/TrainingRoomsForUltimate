@@ -3,7 +3,8 @@
 //! Decision B4 (SPEC-cpu-01 question 7): the CPU settings apply to the CPU role only, never to
 //! entry 0, so a P1 driven by an AI (the standalone pilot, or the fallback) is never touched. The
 //! role is the game's own operator flag (`FighterInformation::is_operation_cpu`) on an entry that is
-//! not entry 0 and, in the waiting room, only the practice CPU's entry 4. Decision B6: one state per
+//! not entry 0, in Training not one of TR's parked entries above No. of CPUs (rc.14), and, in the
+//! waiting room, only the practice CPU's entry 4. Decision B6: one state per
 //! fighter body, so Popo and Nana (one entry, two bodies) each have their own.
 
 /// Where the behaviours are live (SPEC-cpu-01 "Where it is live").
@@ -18,14 +19,28 @@ pub enum Scene {
 /// The practice CPU's entry in the waiting room.
 pub const LOBBY_CPU_ENTRY: i32 = 4;
 
-/// Whether a fighter on `entry`, operated by the CPU or not, is a CPU role for this scene.
-pub const fn is_cpu_role(scene: Scene, entry: i32, operated_by_cpu: bool) -> bool {
+/// Whether a fighter on `entry`, operated by the CPU or not, is a CPU role for this scene. `cpus` is Training's No. of
+/// CPUs as the game holds it (`None` when it cannot be read); see [`live_training_entry`].
+pub const fn is_cpu_role(scene: Scene, entry: i32, operated_by_cpu: bool, cpus: Option<u32>) -> bool {
     if !operated_by_cpu || entry <= 0 || entry >= 8 {
         return false;
     }
     match scene {
-        Scene::Training => true,
+        Scene::Training => live_training_entry(entry, cpus),
         Scene::Lobby => entry == LOBBY_CPU_ENTRY,
+    }
+}
+
+/// A Training entry the game plays as a CPU now: entries 1..=No. of CPUs. The entries above it are TR's parked ones: F9's
+/// seats 2 and 3 (`parked_entries::helper_seat`, which are also the Mii HUD bust's helper rows) and the hat entries 4..7.
+/// The game flags them CPU-operated and runs their frames (the bust render poses its helper), but no CPU behaviour acts on
+/// them: rc.14's Hide CPU hid the helper during its render, and the Mii's HUD portrait was the bust's bare grey
+/// background. A count TR does not open (`parked_entries::training_quantity_open`: unreadable, or not one to three)
+/// loads none of them, so every operated entry stays a CPU.
+pub const fn live_training_entry(entry: i32, cpus: Option<u32>) -> bool {
+    match cpus {
+        Some(count @ 1..=3) => entry <= count as i32,
+        _ => true,
     }
 }
 
@@ -116,12 +131,13 @@ impl RoleTable {
             && self.entry_generations[usize::from(receipt.entry)] == Some(receipt.entry_generation)
     }
 
-    /// Publish only a frame still owned after native callbacks have completed.
+    /// Publish only a frame still owned after native callbacks have completed. The scene rule is checked here; the live
+    /// count (`is_cpu_role`'s `cpus`) is the frame wrapper's, which checks it before it registers a body.
     pub fn set(&mut self, receipt: FrameReceipt, accessor: usize, key: FighterKey) -> bool {
         if accessor == 0
             || key.entry != receipt.entry
             || !self.current(receipt)
-            || !is_cpu_role(receipt.scene, i32::from(key.entry), true)
+            || !is_cpu_role(receipt.scene, i32::from(key.entry), true, None)
         {
             return false;
         }

@@ -492,6 +492,17 @@ pub mod natives {
         at::<extern "C" fn(usize) -> f32>(crate::model::sites_hitbox::HITBOX_POWER_MUL_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
+    /// `DamageModule::reaction(accessor, 0)`: the knockback the fighter received, as the game's hit handler stored it for the strongest hit of
+    /// the frame (spots-3). 0.0 until the row was granted, which the strip reads as no reading.
+    pub unsafe fn damage_reaction(accessor: usize) -> f32 {
+        at::<extern "C" fn(usize, i32) -> f32>(crate::model::sites_hitbox::HITBOX_DAMAGE_REACTION_OFFSET).map_or_else(Default::default, |f| f(accessor, 0))
+    }
+
+    /// The fighter's weight (`WorkModule::get_param_float(accessor, hash40("weight"), 0)`), 0.0 when the row was not granted.
+    pub unsafe fn weight(accessor: usize) -> f32 {
+        get_param_float(accessor, crate::model::cpu::hash::hash40("weight"), 0)
+    }
+
     /// `EffectModule::req_follow(accessor, effect, joint, pos, rot, scale, tail.0, ..., tail.7)`: `tail` is the native's last eight
     /// arguments in the symbol's order (`bool, u32, i32, i32, i32, i32, bool, bool`; the second is the effect attribute, the fourth the
     /// lifetime). The effect's handle (an `unsigned int`, as `kill` and `is_exist_effect` take it), 0 when the game made none or the

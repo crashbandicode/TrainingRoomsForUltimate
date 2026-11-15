@@ -51,8 +51,98 @@ moved but can still act. Most deal no damage, such as F.L.U.D.D.'s water, and so
 of Bowser's Fire Breath. The game marks them itself, and the plugin uses that mark. A windbox is a hitbox, so Hitboxes
 draws it too; with both ticked it is drawn once, in deep blue, and with Windboxes alone only the windboxes are drawn.
 
-Some pushes are not hitboxes but wind areas, such as the Gust Bellows item and some fighters' wind effects. These are
-not drawn.
+These moves have a windbox in the game's own move data. A few moves whose names the data does not give are left out.
+Sheik's Burst Grenade is an item: its pulls are windboxes of the grenade, drawn like any item's. R.O.B.'s Gyro has none:
+its spin on the ground hits with hitstun, so it is drawn under Hitboxes.
+King K. Rool's Blunderbuss pulls with a windbox (and grab boxes catch who it pulls in). His Crownerang has a small
+windbox on his arm while he throws the crown. Palutena's Counter and Greninja's down taunt have one too.
+
+| Fighter | Moves with a windbox |
+| --- | --- |
+| Bowser | neutral special (one of the two flames) |
+| Cloud | neutral special, down special |
+| Corrin | up special |
+| Dark Samus, Samus | Final Smash (before the beam) |
+| Ganondorf | up tilt |
+| Greninja | up special (the water), down taunt |
+| Hero | Kaboom; Whack and Thwack |
+| Ice Climbers | down special |
+| Incineroar | side special |
+| Inkling | neutral special (the ink) |
+| Jigglypuff | Final Smash |
+| Kazuya | the last hit of Flash Punch Combo, Final Smash |
+| Ken | Final Smash |
+| King Dedede | neutral special (Inhale) |
+| King K. Rool | neutral special (Blunderbuss, held), side special (Crownerang) |
+| Kirby | neutral special (Inhale) |
+| Little Mac | dash attack, side special |
+| Lucas | down special |
+| Luigi | down special |
+| Mario | down special (F.L.U.D.D.) |
+| Mega Man | up aerial |
+| Meta Knight | neutral special |
+| Mii Brawler | side special (Suplex) |
+| Mii Gunner | down special (Absorbing Vortex, as it ends) |
+| Mii Swordfighter | neutral special (Shuriken of Light) |
+| Ness | down special (as it ends) |
+| Pac-Man | dash attack, down special (the hydrant's water) |
+| Palutena | forward smash, down smash, down special (Counter), Final Smash |
+| Piranha Plant | side special, Final Smash |
+| Pit, Dark Pit | down special |
+| Pyra and Mythra | side special (Pyra's sword), Final Smash |
+| Robin | up special (where it lands) |
+| Rosalina | neutral special (calling Luma back) |
+| Sephiroth | Final Smash |
+| Sheik | up special, side special (the grenade's pull, before it explodes) |
+| Squirtle | neutral special |
+| Toon Link | down aerial (as it lands) |
+| Wii Fit Trainer | neutral special (while charging) |
+| Zelda | down special (the Phantom) |
+
+Some moves push through a wind area instead of a hitbox. Windboxes draws those too: a see-through deep blue box or
+circle where the wind blows, with a white line, edged in dark so it shows on a pale stage, pointing the way it pushes. A
+dot in the middle means the wind has no one direction. The wind areas of what a fighter throws or summons are drawn too,
+such as the pillar of Ness's PK Fire, Samus's bomb and Palutena's Explosive Flame. Zelda's Triforce of Wisdom, which
+pulls, and Hero's Kaboom make theirs the same way: they take the same path, but were not filmed on their own. An item's
+wind area is drawn the same way, such as the one Sheik's Burst Grenade makes when it explodes; other items, such as the
+Gust Bellows or a Poké Ball's Pokémon, take that path too and were not filmed on their own.
+Stage hazards are not drawn, such as Pac-Land's fire hydrant.
+
+These fighters have moves with a wind area. Eden tried the special moves and smashes of every fighter whose moves can
+make one, and Ganondorf's up tilt; aerials, throws and the other tilts were not tried, so a move missing here may still
+have one.
+
+| Fighter | Moves with a wind area |
+| --- | --- |
+| Bayonetta | neutral special |
+| Bowser Jr. | neutral special |
+| Chrom | neutral special (Flare Blade), down special, up smash, down smash |
+| Cloud | neutral special, down special |
+| Corrin | neutral special |
+| Dr. Mario | side special |
+| Falco | up special |
+| Fox | up special |
+| Ganondorf | neutral special, up special, down special, up tilt |
+| Greninja | side special, up smash |
+| Ike | neutral special, side special, down special, forward smash, down smash |
+| Ken | every special, forward smash, up smash, down smash |
+| King Dedede | neutral special, up special |
+| Kirby | neutral special |
+| Lucas | neutral special, side special, down special, forward smash, down smash |
+| Lucina | neutral special (when held), down special, forward smash, up smash, down smash |
+| Mario | side special |
+| Marth | neutral special (when held), down special, forward smash, up smash, down smash |
+| Meta Knight | neutral special |
+| Mewtwo | neutral special, down special, forward smash, up smash, down smash |
+| Ness | side special (the PK Fire pillar) |
+| Palutena | every special, forward smash, up smash, down smash |
+| Robin | up smash, down smash |
+| Roy | neutral special, down special, up smash, down smash |
+| Ryu | every special, forward smash, up smash, down smash |
+| Samus | down special (the bomb) |
+| Sheik | side special (the Burst Grenade as it explodes) |
+| Shulk | forward smash, up smash |
+| Wario | down special |
 
 **Launch angles** draws a white line inside each hitbox, pointing where the hit sends the fighter it lands on. The line
 mirrors when the attacker turns around. Two dashes mean the game picks the angle when the hit lands, from how hard it
@@ -65,6 +155,7 @@ A dot means the hit carries the fighter along with the attack. With Hitboxes not
 
 ![Windboxes only at 1/10 speed: King K. Rool holds B and the Blunderbuss becomes a vacuum; its deep-blue windbox pulls Mario in until he is caught](../media/rc14-windbox-krool-vacuum.gif)<br>
 *Windboxes only, 1/10 speed: after the cannonball hits, holding B turns the Blunderbuss into a vacuum. Its windbox (deep blue) pulls Mario in without damage until he's caught. Eden, rc.14 (untested on hardware).*
+<!-- CAPTURE-REQUEST hb-legend-v03: Windboxes alone, 1/4 speed: Mario's F.L.U.D.D. (the water deep blue, nothing else drawn), then Bowser's Fire Breath (only the flame that does not cause hitstun, deep blue), then Ganondorf's up tilt (its deep blue windbox discs and the see-through blue box with its white line, which shows where the wind blows), then Chrom's Flare Blade held to charge (the see-through blue box on him with its white line pointing up and to the left). Then Hitboxes alone on F.L.U.D.D. (the water in its hitbox colour). Shoot it over the white Training grid on the build with the stronger wind-area colour. See artifacts/rc14-hb-legend/. -->
 <!-- CAPTURE-REQUEST hb-legend-v02: Hitboxes and Launch angles ticked, 1/4 speed: Ganondorf's up tilt (the windbox lines, then the kick's dashes and its 70-degree line) facing right then left; Mario's jab (dashes). Then Hurtboxes alone: only the hurtboxes. See artifacts/rc14-hb-legend/. -->
 
 A round box is a disc; a long one, such as a sword's hitbox or an arm's hurtbox, is one pill. The shapes are flat and
@@ -94,12 +185,22 @@ show their grab box.
 
 ### Frame data colours
 
-On draws hitboxes in the colours of Ultimate Frame Data: a strong hitbox is red and a weak one is pink. A hitbox is
-strong when it is the strongest one out on that frame, such as a sword's tip or a knee's sweet spot. It is weak when
-another hitbox out on the same frame is stronger, or when it is weaker than the strongest hitbox earlier in the same
-move, as the late frames of a knee are. The plugin reads each hitbox's damage from the game, so no list of fighters is
-needed. A hitbox it cannot rank, such as a jab's single hitbox or several hitboxes of equal damage, is red. Grab boxes
-and hurtboxes keep their colours. It needs Hitbox Visualization On. Off gives each hitbox its own colour, as before.
+On draws hitboxes in the colours of Ultimate Frame Data: a strong hitbox is red and a weak one is pink. Strong means
+it launches hardest. A hitbox is strong when it would send the other fighter further than any other hitbox out on that
+frame, such as a sword's tip or a knee's sweet spot. It is weak when another hitbox out on the same frame launches
+harder, such as the gust of King K. Rool's Gut Check beside its hit. SmashWiki says the gust deals the same damage as
+the hit; in the game's own data it deals 0.7 times the hit's damage, and the plugin follows the game. It is also weak
+when it launches less than the strongest hitbox earlier in the same move, as the late frames of a knee do. This is SmashWiki's definition of
+sweet and sour spots. The plugin works out the launch from each hitbox's own numbers in the game (damage, base knockback,
+knockback growth, set knockback), using the game's knockback formula and the other fighter's percent and weight at that
+moment, so no list of fighters is needed. It also counts the attacker's rage the way the game does: from 35% damage a
+hitbox launches harder, up to 1.1 times at 150%, and no harder after that; a set knockback hitbox gets no rage. The game
+never launches harder than its own limit, so two hitboxes that both reach it launch the same. Damage decides only between
+hitboxes that launch the same. The launch angle
+plays no part: which direction is best depends on the situation. With no other fighter to measure against, the colours
+rank the hitboxes as they would launch a middleweight at 0%. A hitbox it cannot rank, such as a jab's single hitbox or
+several identical hitboxes, is red. Grab boxes and hurtboxes keep their colours. It needs Hitbox Visualization On. Off
+gives each hitbox its own colour, as before.
 
 - **Values:** On, Off
 - **Default:** Off
@@ -141,10 +242,16 @@ More: [Frame strip](../guide/frame-strip.md)
 ### Spot labels
 
 On writes Sweet, Sour or Late on each hit that connects in the frame strip. The label sits on the grey hitlag block of
-the fighter that was hit: your hit on the CPU's lane, the CPU's hit on yours. Sweet is the strongest hitbox out on that
-frame, Sour a weaker one beside it, and Late a hit weaker than the strongest hitbox earlier in the same move. The plugin
-works out which hitbox connected from the damage the hit added. When that is unclear, such as equal hitboxes or a hit on
-a shield, there is no label. A charged smash attack is labelled like an uncharged one: the plugin reads the charge from the game and takes it out of the damage before it works out which hitbox connected. It needs Input Display set to Frame strip.
+the fighter that was hit: your hit on the CPU's lane, the CPU's hit on yours. Sweet is the hitbox out on that frame that
+launches the other fighter hardest, Sour one that launches it less, and Late a hit that launches less than the strongest
+hitbox earlier in the same move. The ranking is the one [Frame data colours](#frame-data-colours) uses; the launch angle
+plays no part. The game itself records which hitbox connected, and the plugin reads that record. It checks it against
+what the other fighter took: the damage the hit added and how hard the game launched it. So two hitboxes of the same
+damage, such as the two pairs in Mario's jab, are told apart, and so is a stale hit. A hit has no label when it cannot
+be checked, such as identical hitboxes, a hit on a shield or a projectile's hit. A charged smash attack is labelled like
+an uncharged one: the plugin reads the charge from the game. Labels work at any damage on either side. Damage stops at
+999%, so a hit there adds little or nothing, and the plugin then reads the hit's damage from the game's record. It
+needs Input Display set to Frame strip.
 
 - **Values:** On, Off
 - **Default:** Off

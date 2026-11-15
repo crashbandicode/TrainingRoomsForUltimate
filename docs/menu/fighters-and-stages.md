@@ -190,7 +190,8 @@ The same list for the Mii Gunner.
 Opens a grid of every stage. A on a stage closes the menu and goes there: the notice reads "Practice Stage · Stage
 requested", then "Stage ready". It works in Training and in waiting-room practice.
 
-- **Values:** any of the 117 stages, the Waiting Room and Training included, in the forms the game has for each
+- **Values:** any of the 117 stages, the Waiting Room and Training included, in the forms the game has for each; then
+  your Stage Builder stages ([Custom stages](../guide/stages.md#custom-stages))
 - **How:** A opens the grid. The D-pad moves, L / R turn its page, Y picks the focused stage's form first (the tile
   shows [N], [Ω] or [BF]), A goes there, B goes back.
 
@@ -220,7 +221,8 @@ More: [Waiting rooms](../guide/waiting-rooms.md)
 The stage list: each new waiting room opens on the next stage of it, and Training does too with
 [Training Stage Rotation](#training-stage-rotation) On.
 
-- **Values:** All, or your own order; Rotation or Direct
+- **Values:** All, or your own order, your Stage Builder stages included (their tiles come after the game's stages;
+  see [Custom stages](../guide/stages.md#custom-stages)); Rotation or Direct
 - **Default:** the Waiting Room only, Rotation
 - **How:** A opens the grid. X switches between the two modes. Y changes the focused stage's form. L / R turn the page,
   B goes back.
@@ -340,6 +342,9 @@ The total number of fighters kept loaded, for Player 1 and the CPU together, the
 - **Values:** 2 to 12
 - **Default:** 10
 - **How:** Left or Right steps one (it stops at 2 and 12); A opens the list.
+- **When your cycles need more:** the fighters that fit stay loaded and the others stay cold. A cold fighter is loaded
+  while it's on screen and freed after, so you go one fighter over this number only for that time. The rest of the
+  cycle never loads again. Lowering this number frees the loaded fighters whose turn is farthest away, right away.
 
 ### Ready Hats
 
@@ -470,17 +475,20 @@ What the target is. Disc: the plugin's target, as above. CPU: the CPU itself is 
 
 - **Values:** Disc, CPU
 - **Default:** Disc
-- **How:** CPU: the CPU is put on the ground at the spot where the next target would appear, with 0%, and held there. A
-  hit that the game registers on it and that **Breaks on** lets count breaks the target: the game plays its own hitlag and
-  knockback, then the CPU goes back to 0% at the next spot. The CPU stays still, so **Target speed** does nothing. It
-  applies from the next time the menu closes. In the waiting room's practice the CPU is moved too.
+- **How:** CPU: the CPU flies like the disc. At each spot it starts on the ground with 0%, is launched up, drifts a
+  little, falls back, bounces once and then stands where it landed until you hit it. In the air it shows the game's own
+  falling pose. **Target speed** applies to it as to the disc. A hit that the game registers on it, in the air or on the
+  ground, and that **Breaks on** lets count breaks the target: the game plays its own hitlag and knockback, then the CPU
+  goes back to 0% at the next spot and flies again. A hit that doesn't count puts it back on its flight. It applies from
+  the next time the menu closes. In the waiting room's practice the CPU is moved too.
 
 ![Target set to CPU: Fox jabs the CPU three times and the count goes 1/10, 2/10, 3/10, the CPU put back at a fresh spot after each counted hit](../media/rc14-eggs-cpu-target.gif)<br>
 *Practice games, Eggs-ercise on 10 targets: Target reads Disc, then CPU, and the menu closes. Fox walks up to the CPU (Mario) and jabs it three times; each counted hit moves the count on ("Eggs 1/10", "2/10", "3/10") and the CPU is put back at a fresh spot, and no disc target appears. Eden, rc.14 (untested on hardware).*
 
 ### Target speed
 
-How fast the targets fly. Every speed traces the same path: the same height and the same landing spot.
+How fast the targets fly, the disc or the CPU. Every speed traces the same path: the same height and the same landing
+spot.
 
 - **Values:** Normal, Slow, Fast
 - **Default:** Normal
@@ -562,6 +570,10 @@ the mode is Off; "Time!", the end notice and the wait between runs count as runn
 - **Default:** Hide
 - **How:** Hide: the CPU is hidden while a game runs, and afterwards it is as **Hide CPU** says. Show: the CPU stays as
   it is. It applies when the menu closes.
+- A hidden CPU's "CPU" tag and its panel at the bottom of the screen are hidden too. They always follow the CPU: shown
+  when it is shown, hidden when it is hidden.
+- When the CPU is the Eggs-ercise target (**Target** reads CPU), the CPU is never hidden, so the setting changes nothing
+  for it: its body, its "CPU" tag and its panel stay, also while it flies.
 
 ![CPU during a game on Hide: Eggs-ercise 1 minute starts and the CPU is hidden with its tag and panel; Eggs-ercise Off brings it back with both](../media/rc14-cpu-during-a-game.gif)<br>
 *Practice games with CPU during a game on Hide: Right on Eggs-ercise sets 1 minute and the menu closes; the CPU (Hero) is hidden while the eggs run ("Eggs 0 1:00"), and its "CPU" tag and its panel at the bottom are hidden with it. Left sets Eggs-ercise Off and Hero is back with its tag and panel. The input is named in a box. Eden, rc.14 (untested on hardware).*

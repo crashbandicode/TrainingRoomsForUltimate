@@ -1059,6 +1059,13 @@ pub(crate) unsafe fn mii_saved_cpu_visible_ready(entry: *const u8, owner: u32, k
     }
 }
 
+/// Training's No. of CPUs as the game holds it, for the CPU frame wrapper's role rule (`model::cpu::role::is_cpu_role`):
+/// `None` outside native Training, before this cycle's boot or when the count's rows failed. Reads only: no lock, no
+/// native call, no allocation (it runs inside the fighter frame hook).
+pub(crate) unsafe fn training_cpu_quantity() -> Option<u32> {
+    native_source::training_cpu_quantity()
+}
+
 /// Called before G lock; the current probe may already own INSTALL, never a roster replacement.
 pub(crate) unsafe fn mii_cpu_probe_roster_idle() -> bool {
     crate::model::parked_entries::training_quantity_open(native_source::training_cpu_quantity())

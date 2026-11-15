@@ -122,7 +122,7 @@ waiting room where the keyboard can't open, makes it Chain N or Sequence N.
 ![A macro's own screen: Playback slot Right sets Slot 1; then Fox's forward smash hits the CPU and the CPU plays the macro](../media/rc14-playback-slot.gif)<br>
 *Macro 1's own screen: Playback slot reads None, Right sets Slot 1, and the menu closes. With the CPU's Mash on Playback Slot 1 (set beforehand), Fox's forward smash hits the CPU (Mario, 17.6%) and the CPU plays the macro, "Input Recording: Playback" on screen. Eden, rc.14 (untested on hardware).*
 
-More: [A file's own screen](../guide/recording.md#a-files-own-screen)
+More: [A file's own screen](../guide/recording.md#a-file-s-own-screen)
 
 ## Combos & Sequences
 
@@ -146,7 +146,7 @@ It is shown in the Player view only. The left column shows the number of files, 
   keyboard asks for a name; an empty name, or an online waiting room, gives it the next Combo N. With no combo on the
   strip yet, it says so and saves nothing.
 - A on *+ New sequence* opens the numbered picker of your combos, then the name. A on a combo or a sequence opens its
-  own screen ([rows above](#a-files-own-screen)).
+  own screen ([rows above](#a-file-s-own-screen)).
 - X and Y do nothing here. ZR switches to the CPU view, which hides this section.
 
 ![A sequence drill: Pair 1 lands, Pair 2 drops, back to combo 1](../media/rc7-sequence-drill.gif)<br>
@@ -242,6 +242,9 @@ closes. X, Y and *Reset page to defaults* don't change it. If you have Online De
 ![Replay capture turned on in the menu, then shown on in Online Deluxe](../media/rc11-replay-capture.gif)<br>
 *Turning replay capture on*
 
+![Replay capture flips On; after a 1-stock match the Save Replay question is answered Yes and "Replay saved" shows; the Replay window then lists the capture](../media/rc13-replay-capture.gif)<br>
+*With Replay capture On, a 1-stock match is played and its replay saved: A, A, Y on the results opens "Save a replay of this battle?", Right and A answer Yes ("Replay saved"), and Recording > Replays > Replay window then lists the capture with its name and length. The loads, the match and the menus between the clips are cut. Eden, rc.13 (untested on hardware).*
+
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A, Left or Right flips it.
@@ -255,7 +258,7 @@ How macros play, and how the combo helper grades.
 On: a macro made with Record (ZR + D-pad Down) drops the idle frames at its end, where no button is held and both
 sticks rest in the middle. Off: it keeps every frame up to the stop; use this for a macro meant to end standing
 still. A take that is idle throughout saves nothing ("Recording was empty"). To cut a macro anywhere, use Crop on
-its own screen ([above](#a-files-own-screen)).
+its own screen ([above](#a-file-s-own-screen)).
 
 ![Side by side, the same macro on Loop 2 with Crop trailing neutral Off and On: On starts again every 1.22 s, while Off waits out the recorded idle and starts again every 4.07 s](../media/rc12-crop-trailing-neutral.gif)
 
@@ -327,7 +330,7 @@ More: [Recordings and the CPU settings](../guide/cpu-behaviour.md#recordings-and
 
 ### Combo helper
 
-On: while a combo or a sequence is the drill (see [Combos & Sequences](#combos--sequences)), a bar under the frame
+On: while a combo or a sequence is the drill (see [Combos & Sequences](#combos-sequences)), a bar under the frame
 strip grades each attempt link by link: on time or how many frames early or late, the streak and the best. Off: no
 grading. The drill stays chosen either way.
 
@@ -344,7 +347,8 @@ More: [Combos](../guide/recording.md#combos)
 A saved combo remembers, for each link, whether its hit landed Sweet, Sour or Late (see
 [Spot labels](display-and-controls.md#spot-labels)). On: a link counts only if your attempt lands the same spot as the
 saved link. A link that lands Sour where the saved one landed Sweet drops, and the bar says "L1 Sour, saved Sweet". A link
-saved with no spot, such as one from an older combo file or from equal hitboxes, always matches. Off: the spot is not
+saved with no spot always matches: one from an older combo file, one from identical hitboxes, or one saved while both this
+row and Spot labels were Off, because the plugin works out spots only while one of them is On. Off: the spot is not
 compared.
 
 - **Values:** On, Off
@@ -418,7 +422,7 @@ Under the title are the pop-up's own tabs:
 ### The lists and the hot five
 
 Each tab shows the same two lists as the page's section, four rows of each, with the same
-[hot five](#save-states--macros). Up/Down move inside a list, Left/Right switch lists, ZL + Up/Down move 12 rows. A
+[hot five](#save-states-macros). Up/Down move inside a list, Left/Right switch lists, ZL + Up/Down move 12 rows. A
 column on the right, headed CONNECTIONS, shows the row under the cursor and the files joined to it, each in a box
 labelled SAVE STATE, MACRO, COMBO or SEQUENCE ([how to read it](../guide/recording.md#reading-the-lists)).
 

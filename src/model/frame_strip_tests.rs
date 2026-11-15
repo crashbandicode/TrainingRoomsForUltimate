@@ -13,8 +13,12 @@ fn idle() -> Sample {
 }
 
 fn attack(mv: Move, status: i32, motion_frame: f32) -> Sample {
-    Sample { attack: Some(mv), status, motion_frame, power_mul: 1.0, ..Sample::default() }
+    Sample { attack: Some(mv), status, motion_frame, power_mul: 1.0, object_id: P1_ID, ..Sample::default() }
 }
+
+/// The fighters' battle object ids (what a damage record names as the attacker).
+const P1_ID: u32 = 0x10;
+const CPU_ID: u32 = 0x20;
 
 /// A script: P1, the CPU and P1's inputs for each frame, from frame 1.
 struct Script {
@@ -106,24 +110,75 @@ fn display_toggle_flips_the_strip_row() {
     }
 }
 
-/// The damages of hitboxes 0.. (the rest inactive).
+/// The damages of hitboxes 0.. (the rest inactive), each of growth 100 and no base: damage ranks them.
 fn p(values: &[f32]) -> Powers {
-    let mut out = [0.0; spots::SLOTS];
-    out[..values.len()].copy_from_slice(values);
+    let mut out = [spots::Hit::default(); spots::SLOTS];
+    for (slot, damage) in values.iter().enumerate() {
+        out[slot] = spots::Hit { damage: *damage, growth: 100, fixed: 0, base: 0 };
+    }
     out
 }
 
-/// Three frames: both calm (the victim at 20%), the attacker swings, the attacker hits (hitlag) and the victim, hurt, has
+/// `victim` (at `before`, standard weight) hurt by slot `slot` of `powers`, whose owner's object id is `by`: the damage it gained, and what its damage
+/// record holds on that frame (the knockback the game stored and the attacker's id and slot).
+fn struck_by(victim: Sample, by: u32, powers: &Powers, slot: usize, gained: f32, before: f32) -> Sample {
+    // The game's percent for its knockback: the percent before plus the hit's damage before the 1-on-1 ratio (spots-4).
+    let launched = spots::knockback(&powers[slot], gained / spots::TARGET_MUL, before + gained / spots::TARGET_MUL, 100.0);
+    Sample { stop: true, hitstun: true, damage: before + gained, launched, struck: Some((by, slot as u8)), ..victim }
+}
+
+/// spots-3: King K. Rool's Gut Check, the hit and the gust of equal damage (numbers drawn for the case). The CPU takes the hit of slot `slot`;
+/// `recorded`: its damage record names P1 and the slot. The labelled hits.
+fn gut_check_marks(slot: usize, recorded: bool) -> Vec<Mark> {
+    let mut powers = p(&[]);
+    powers[0] = spots::Hit { damage: 14.0, growth: 90, fixed: 0, base: 70 };
+    powers[1] = spots::Hit { damage: 14.0, growth: 50, fixed: 0, base: 40 };
+    let calm = Sample { actionable: true, damage: 20.0, power_mul: 1.0, ..Sample::default() };
+    let swing = |stop| Sample { attack: Some(Move::DownSpecial), status: ATTACK, active: true, stop, powers, object_id: P1_ID, ..calm };
+    let hurt = struck_by(calm, if recorded { P1_ID } else { CPU_ID }, &powers, slot, 14.0 * M, 20.0);
+    let mut t = Tracker::new();
+    t.step(calm, calm, NONE);
+    t.step(swing(false), calm, NONE);
+    t.step(swing(true), hurt, NONE);
+    t.marks().collect()
+}
+
+/// spots-3: hitboxes of equal damage are told apart by the slot the game recorded; a record that names another object is no label.
+fn a_hit_of_equal_damage_is_labelled_by_the_slot_the_game_recorded() {
+    assert_eq!(gut_check_marks(0, true), vec![Mark { frame: 3, lane: 1, spot: Spot::Sweet }], "the hit");
+    assert_eq!(gut_check_marks(1, true), vec![Mark { frame: 3, lane: 1, spot: Spot::Sour }], "the gust");
+    assert!(gut_check_marks(1, false).is_empty(), "the record names another object (a projectile): no label");
+}
+
+/// spots-3: past the game's damage cap (999%). The CPU at 995%, then at 999%, takes P1's 13 (16.38 added): its percent rises 4, then not at
+/// all, so the hit is seen and placed by the damage its record says it took (`+0x8`, before the 1-on-1 ratio).
+fn a_hit_past_the_damage_cap_is_labelled_by_the_records_damage() {
+    let powers = p(&[16.0, 13.0]);
+    let p1 = Sample { actionable: true, power_mul: 1.0, object_id: P1_ID, ..Sample::default() };
+    let swing = |stop| Sample { attack: Some(Move::Jab), status: ATTACK, active: true, stop, powers, ..p1 };
+    for before in [995.0, spots::DAMAGE_MAX] {
+        let calm = Sample { actionable: true, damage: before, ..Sample::default() };
+        let hurt = Sample { damage: spots::DAMAGE_MAX, dealt: 13.0 * M / spots::TARGET_MUL, ..struck_by(calm, P1_ID, &powers, 1, 13.0 * M, before) };
+        let mut t = Tracker::new();
+        t.step(p1, calm, NONE);
+        t.step(swing(false), calm, NONE);
+        t.step(swing(true), hurt, NONE);
+        assert_eq!(t.marks().collect::<Vec<_>>(), vec![Mark { frame: 3, lane: 1, spot: Spot::Sour }], "from {before}%");
+    }
+}
+
+/// Three frames: both calm (the victim at 20%), the attacker swings, the attacker's slot `slot` hits (hitlag) and the victim, hurt, has
 /// `gained` more damage. The labelled hits.
-fn marks_of(attacker_is_p1: bool, powers: &[f32], gained: f32) -> Vec<Mark> {
-    marks_charged(attacker_is_p1, powers, 1.0, gained)
+fn marks_of(attacker_is_p1: bool, powers: &[f32], slot: usize, gained: f32) -> Vec<Mark> {
+    marks_charged(attacker_is_p1, powers, 1.0, slot, gained)
 }
 
 /// marks_of with the attacker's AttackModule::power_mul_status at mul (a smash charged to that multiplier).
-fn marks_charged(attacker_is_p1: bool, powers: &[f32], mul: f32, gained: f32) -> Vec<Mark> {
-    let calm = Sample { actionable: true, damage: 20.0, power_mul: mul, ..Sample::default() };
+fn marks_charged(attacker_is_p1: bool, powers: &[f32], mul: f32, slot: usize, gained: f32) -> Vec<Mark> {
+    let id = if attacker_is_p1 { P1_ID } else { CPU_ID };
+    let calm = Sample { actionable: true, damage: 20.0, power_mul: mul, object_id: id, ..Sample::default() };
     let swing = |stop| Sample { attack: Some(Move::Jab), status: ATTACK, active: true, stop, powers: p(powers), ..calm };
-    let hurt = Sample { stop: true, hitstun: true, damage: 20.0 + gained, ..Sample::default() };
+    let hurt = struck_by(Sample { object_id: id ^ 0x30, ..Sample::default() }, id, &p(powers), slot, gained, 20.0);
     let mut t = Tracker::new();
     for frame in 1..=3 {
         let (attacker, victim) = match frame {
@@ -144,10 +199,10 @@ const M: f32 = 1.26;
 fn a_hit_is_labelled_with_its_spot_on_the_lane_of_the_fighter_it_hit() {
     let tip_and_blade = [13.0, 13.0, 13.0, 18.0];
     let mark = |lane, spot| vec![Mark { frame: 3, lane, spot }];
-    assert_eq!(marks_of(true, &tip_and_blade, 18.0 * M), mark(1, Spot::Sweet), "P1's hit is on the lane of the CPU it hit");
-    assert_eq!(marks_of(true, &tip_and_blade, 13.0 * M), mark(1, Spot::Sour));
-    assert_eq!(marks_of(false, &tip_and_blade, 13.0 * M), mark(0, Spot::Sour), "the CPU's hit is on P1's lane");
-    assert_eq!(marks_of(true, &tip_and_blade, 13.0 * 1.15), mark(1, Spot::Sour), "a staled hit");
+    assert_eq!(marks_of(true, &tip_and_blade, 3, 18.0 * M), mark(1, Spot::Sweet), "P1's hit is on the lane of the CPU it hit");
+    assert_eq!(marks_of(true, &tip_and_blade, 0, 13.0 * M), mark(1, Spot::Sour));
+    assert_eq!(marks_of(false, &tip_and_blade, 0, 13.0 * M), mark(0, Spot::Sour), "the CPU's hit is on P1's lane");
+    assert_eq!(marks_of(true, &tip_and_blade, 3, 18.0 * 0.6), mark(1, Spot::Sweet), "a staled tip");
 }
 
 /// A smash charged by the game's own multiplier (`AttackModule::power_mul_status`): the label follows the hitbox that dealt the hit, not the charge.
@@ -155,19 +210,18 @@ fn a_charged_hit_is_labelled_by_the_hitbox_that_dealt_it() {
     let tip_and_blade = [13.0, 13.0, 13.0, 18.0];
     let mark = |lane, spot| vec![Mark { frame: 3, lane, spot }];
     for charge in [1.0, 1.2, 1.4] {
-        assert_eq!(marks_charged(true, &tip_and_blade, charge, 13.0 * charge * M), mark(1, Spot::Sour), "a blade hit at charge {charge}");
-        assert_eq!(marks_charged(true, &tip_and_blade, charge, 18.0 * charge * M), mark(1, Spot::Sweet), "a tip hit at charge {charge}");
+        assert_eq!(marks_charged(true, &tip_and_blade, charge, 0, 13.0 * charge * M), mark(1, Spot::Sour), "a blade hit at charge {charge}");
+        assert_eq!(marks_charged(true, &tip_and_blade, charge, 3, 18.0 * charge * M), mark(1, Spot::Sweet), "a tip hit at charge {charge}");
     }
-    assert_eq!(marks_charged(false, &tip_and_blade, 1.4, 13.0 * 1.4 * M), mark(0, Spot::Sour), "the CPU's charged hit is on P1's lane");
-    assert!(marks_charged(true, &tip_and_blade, 0.0, 13.0 * 1.4 * M).is_empty(), "a multiplier that was not read: no label");
+    assert_eq!(marks_charged(false, &tip_and_blade, 1.4, 0, 13.0 * 1.4 * M), mark(0, Spot::Sour), "the CPU's charged hit is on P1's lane");
+    assert!(marks_charged(true, &tip_and_blade, 0.0, 0, 13.0 * 1.4 * M).is_empty(), "a multiplier that was not read: no label");
 }
-/// Never a guess: equal hitboxes, a hit two hitboxes could have made, a hit that added no damage (a shield), a trade.
+/// Never a guess: equal hitboxes, a hit that added no damage (a shield), a trade.
 fn a_hit_that_cannot_be_told_is_not_labelled() {
-    assert!(marks_of(true, &[12.0, 12.0, 12.0], 12.0 * M).is_empty(), "equal hitboxes");
-    assert!(marks_of(true, &[16.0, 15.0], 15.5 * M).is_empty(), "two candidates of different classes");
-    assert!(marks_of(true, &[16.0, 13.0], 0.0).is_empty(), "no damage: a shield");
+    assert!(marks_of(true, &[12.0, 12.0, 12.0], 1, 12.0 * M).is_empty(), "equal hitboxes");
+    assert!(marks_of(true, &[16.0, 13.0], 1, 0.0).is_empty(), "no damage: a shield");
     let calm = Sample { actionable: true, damage: 20.0, ..Sample::default() };
-    let hit = Sample { stop: true, hitstun: true, active: true, powers: p(&[16.0, 13.0]), damage: 36.0, ..Sample::default() };
+    let hit = Sample { active: true, powers: p(&[16.0, 13.0]), ..struck_by(calm, P1_ID, &p(&[16.0, 13.0]), 1, 16.0, 20.0) };
     let mut t = Tracker::new();
     t.step(calm, calm, NONE);
     t.step(hit, hit, NONE);
@@ -177,9 +231,9 @@ fn a_hit_that_cannot_be_told_is_not_labelled() {
 /// SP1: a weaker hitbox than the strongest of the same action is Late; a new action starts over.
 fn a_weaker_hit_later_in_the_same_action_is_late() {
     for (status, expected) in [(ATTACK, Some(Spot::Late)), (ATTACK + 1, None)] {
-        let calm = Sample { actionable: true, damage: 20.0, power_mul: 1.0, ..Sample::default() };
+        let calm = Sample { actionable: true, damage: 20.0, power_mul: 1.0, object_id: P1_ID, ..Sample::default() };
         let swing = |status, stop, powers: &[f32]| Sample { attack: Some(Move::Jab), status, active: true, stop, powers: p(powers), ..calm };
-        let hurt = Sample { stop: true, hitstun: true, damage: 20.0 + 13.0 * M, ..Sample::default() };
+        let hurt = struck_by(Sample::default(), P1_ID, &p(&[13.0]), 0, 13.0 * M, 20.0);
         let mut t = Tracker::new();
         t.step(calm, calm, NONE);
         t.step(swing(ATTACK, false, &[16.0]), calm, NONE);
@@ -191,7 +245,7 @@ fn a_weaker_hit_later_in_the_same_action_is_late() {
 
 /// SP4: the follow-up hit's spot is on its link, and a saved link keeps it.
 fn a_link_remembers_the_spot_of_its_follow_up_hit() {
-    for (second, gained, expected) in [(&[13.0, 18.0][..], 18.0 * M, Some(Spot::Sweet)), (&[13.0, 18.0], 13.0 * M, Some(Spot::Sour)), (&[13.0], 13.0 * M, None)] {
+    for (second, slot, gained, expected) in [(&[13.0, 18.0][..], 1, 18.0 * M, Some(Spot::Sweet)), (&[13.0, 18.0], 0, 13.0 * M, Some(Spot::Sour)), (&[13.0], 0, 13.0 * M, None)] {
         let mut t = Tracker::new();
         for f in 1..=26u32 {
             let (p1, inputs) = match f {
@@ -206,7 +260,7 @@ fn a_link_remembers_the_spot_of_its_follow_up_hit() {
                 1..=6 => idle(),
                 7..=10 => Sample { stop: true, hitstun: true, damage: 3.0, reaction: Some(18.0), ..Sample::default() },
                 11..=25 => Sample { hitstun: true, damage: 3.0, reaction: Some(18.0 - (f - 11) as f32), ..Sample::default() },
-                _ => Sample { stop: true, hitstun: true, damage: 3.0 + gained, reaction: Some(30.0), ..Sample::default() },
+                _ => Sample { damage: 3.0 + gained, reaction: Some(30.0), ..struck_by(Sample::default(), P1_ID, &p(second), slot, gained, 3.0) },
             };
             t.step(p1, cpu, inputs);
         }
@@ -234,6 +288,8 @@ fn case_table() {
         ("display_toggle_flips_the_strip_row", display_toggle_flips_the_strip_row as fn()),
         ("a_hit_is_labelled_with_its_spot_on_the_lane_of_the_fighter_it_hit", a_hit_is_labelled_with_its_spot_on_the_lane_of_the_fighter_it_hit as fn()),
         ("a_hit_that_cannot_be_told_is_not_labelled", a_hit_that_cannot_be_told_is_not_labelled as fn()),
+        ("a_hit_of_equal_damage_is_labelled_by_the_slot_the_game_recorded", a_hit_of_equal_damage_is_labelled_by_the_slot_the_game_recorded as fn()),
+        ("a_hit_past_the_damage_cap_is_labelled_by_the_records_damage", a_hit_past_the_damage_cap_is_labelled_by_the_records_damage as fn()),
         ("a_charged_hit_is_labelled_by_the_hitbox_that_dealt_it", a_charged_hit_is_labelled_by_the_hitbox_that_dealt_it as fn()),
         ("a_weaker_hit_later_in_the_same_action_is_late", a_weaker_hit_later_in_the_same_action_is_late as fn()),
         ("a_link_remembers_the_spot_of_its_follow_up_hit", a_link_remembers_the_spot_of_its_follow_up_hit as fn()),

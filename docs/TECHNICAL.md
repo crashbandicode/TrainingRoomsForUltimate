@@ -2,8 +2,9 @@
 
 The detail behind the [README](../README.md): how TrainingRooms is installed and built, how each feature behaves, and
 where every clip in the README was recorded (build, commit and what the run checked). Release notes are the
-`RELEASE-NOTES-rc*.md` files in this folder: rc.5, rc.6, rc.8 and rc.9 (rc.7, rc.10 and rc.11 have none); rc.12's and
-rc.13's are on their Forgejo release pages, linked under [Status](#status).
+`RELEASE-NOTES-rc*.md` files in this folder: rc.5, rc.6, rc.8 and rc.9 (rc.7, rc.10 and rc.11 have none); rc.12's,
+rc.13's and rc.14's are on their Forgejo release pages, linked from [CURRENT-RELEASE.md](CURRENT-RELEASE.md) and
+[Status](#status).
 
 Practice tools for Training mode and the online waiting rooms of Super Smash Bros. Ultimate 13.0.5, as a Skyline plugin.
 
@@ -60,8 +61,9 @@ current values as defaults, B goes back. Each page ends with *Reset page to defa
 where you left it. The chords are edited on Display & Controls › Button chords.
 
 The key hints at the foot of every page end with the build tag: the version, then the build name and the commit the NRO
-was built from, for example `0.2.0-rc.6 · rc13 ed0d7a35` (rc.8 to rc.12 builds read `rc8` to `rc12`; the clip below is
-rc.11's). A build from uncommitted changes adds `-dirty`.
+was built from, for example `0.2.0-rc.14 · rc14 1a2b3c4d`. Builds before rc.14 kept the version `0.2.0-rc.6` and told
+themselves apart by the build name: rc.13 read `0.2.0-rc.6 · rc13 ed0d7a35`, rc.8 to rc.12 read `rc8` to `rc12` (the clip
+below is rc.11's). A build from uncommitted changes adds `-dirty`.
 
 **Clip** [`rc11-footer-tag.gif`](media/rc11-footer-tag.gif): the menu opens on two pages whose key hints end with `0.2.0-rc.6 · rc11 0c628724`
 
@@ -450,10 +452,13 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Status
 
-The newest build is **rc.13** (`ed0d7a35`, 2026-11-14,
-[release and notes](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13)),
-Eden-tested and **untested on hardware**: the menu footer reads `0.2.0-rc.6 · rc13 ed0d7a35`. The version number has
-stayed `0.2.0-rc.6` since rc.6; the build name after it (rc8 to rc13) tells the builds apart. rc.13 adds Aerial Drift,
+The current release is **rc.14**, **untested on hardware**: [Current release](CURRENT-RELEASE.md) says what it adds,
+how to install it and what is known not to work. The menu footer reads `0.2.0-rc.14 · rc14` and then the commit it was
+built from: from rc.14 the version number is the release's own name, the same as its tag. Builds before it kept the
+version `0.2.0-rc.6` from rc.6 on, and the build name after it (rc8 to rc13) told them apart.
+
+[rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13) (`ed0d7a35`,
+2026-11-14, Eden-tested and untested on hardware; footer `0.2.0-rc.6 · rc13 ed0d7a35`) adds Aerial Drift,
 Taunts, Wario's bike in Give item, Training opening on the stage you pick, and Left / Right on On/Off rows; its delay
 rows and Input Delay count game frames at every Game speed; Hitbox Visualization draws long boxes as pills, gives
 projectiles and thrown items their own orbs and shows grab boxes in magenta; and a CPU on Mash Triggers Always no longer
@@ -478,7 +483,7 @@ pilot and imgui_smash.
 
 rc.2 added the pause-helper fix, the Solo Popo mark placement and the Kirby hat-request endings. Limitations kept from
 the fork are listed in [Differences from the fork](DIFFERENCES-FROM-THE-FORK.md); planned work is in the
-[ROADMAP](ROADMAP.md). 0.1.0 crashes at console boot; use a newer build, the newest being [0.2.0-rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13) (Eden-tested, untested on hardware).
+[ROADMAP](ROADMAP.md). 0.1.0 crashes at console boot; use a newer build: the current release is [rc.14](CURRENT-RELEASE.md) (untested on hardware).
 
 ## Build
 

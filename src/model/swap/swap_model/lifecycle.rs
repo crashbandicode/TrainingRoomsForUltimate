@@ -102,9 +102,12 @@ pub struct ContextRef { pub ctx: usize, pub controller: usize, pub valid: bool }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DispatcherRef { pub arrays: [usize; 2], pub valid: bool }
 
-/// A native group's object records (`+0x5a88/+0x5a90/+0x5a98`).
+/// A native group's object records (`+0x5a88/+0x5a90/+0x5a98`), with its window flags `+0x591f` (rc.14 a-full-2, p4: the counts finalize gives back go by them).
+/// `module`: the reference this group holds on its object kind's module (`module_pins::hold`, 0 = none). rc.14 a-full-2
+/// (boot a2-99b9083f-y1, integration-3's smoke2): the holder's article runs code from that NRO, so the reference goes only
+/// after the holder's destroy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct RecordsRef { pub records: [usize; 3], pub valid: bool }
+pub struct RecordsRef { pub records: [usize; 3], pub valid: bool, pub flags: u8, pub module: u64 }
 
 /// Native readers holding a pointer to one of our objects (Fable §2.2).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -158,8 +161,9 @@ pub enum DestroyStep {
     FreeContext { ctx: usize },
     /// `0x37ae5e0` on a stack copy of the dispatcher struct (after the bodies).
     DestroyDispatchers { arrays: [usize; 2] },
-    /// `0x3a6b80` then `0x392eb40` (+ the PT auxiliary object), after the contexts.
-    DestroyRecords { records: [usize; 3] },
+    /// `0x3a6b80` then `0x392eb40` (+ the PT auxiliary object), after the contexts; then the object kind's module
+    /// reference the group held ([`RecordsRef::module`]) goes.
+    DestroyRecords { records: [usize; 3], flags: u8, module: u64 },
     /// The kinds whose prefetch keys the bundles still hold. The bank's arm
     /// returns the ledger's tokens through `r_handle::release` (orphan key first;
     /// WP4, the only caller of `0x17e2fe0`/`0x17e8610`).
@@ -284,7 +288,7 @@ impl DetachedPlan<'_> {
         let dispatchers = self.groups.iter().filter_map(|g| g.dispatch).filter(|d| d.valid)
             .map(|d| DestroyStep::DestroyDispatchers { arrays: d.arrays });
         let records = self.groups.iter().filter_map(|g| g.records).filter(|r| r.valid)
-            .map(|r| DestroyStep::DestroyRecords { records: r.records });
+            .map(|r| DestroyStep::DestroyRecords { records: r.records, flags: r.flags, module: r.module });
         routes.chain(bodies).chain(contexts).chain(dispatchers).chain(records)
     }
 
@@ -320,7 +324,7 @@ struct Phases {
     bodies: Vec<u32>,
     contexts: Vec<usize>,
     dispatchers: Vec<[usize; 2]>,
-    records: Vec<[usize; 3]>,
+    records: Vec<([usize; 3], u8, u64)>,
     keys: Vec<u32>,
     skipped: Vec<Skipped>,
     attached: Attached,
@@ -378,7 +382,7 @@ impl Phases {
             if dispatch.valid { self.dispatchers.push(dispatch.arrays); } else { self.skipped.push(Skipped::Dispatchers(dispatch.arrays)); }
         }
         if let Some(records) = group.records {
-            if records.valid { self.records.push(records.records); } else { self.skipped.push(Skipped::Records(records.records)); }
+            if records.valid { self.records.push((records.records, records.flags, records.module)); } else { self.skipped.push(Skipped::Records(records.records)); }
         }
         for kind in &group.held_kinds {
             if !self.keys.contains(kind) { self.keys.push(*kind); }
@@ -391,7 +395,7 @@ impl Phases {
         steps.extend(self.bodies.into_iter().map(|id| DestroyStep::DestroyBody { id }));
         steps.extend(self.contexts.into_iter().map(|ctx| DestroyStep::FreeContext { ctx }));
         steps.extend(self.dispatchers.into_iter().map(|arrays| DestroyStep::DestroyDispatchers { arrays }));
-        steps.extend(self.records.into_iter().map(|records| DestroyStep::DestroyRecords { records }));
+        steps.extend(self.records.into_iter().map(|(records, flags, module)| DestroyStep::DestroyRecords { records, flags, module }));
         if !self.keys.is_empty() { steps.push(DestroyStep::ReleaseKeys { kinds: self.keys }); }
         DestroyPlan { steps, skipped: self.skipped, attached: self.attached, kirby_cells: self.kirby_cells,
             kirby_misplaced: self.kirby_misplaced, kirby_branch_mismatch: self.kirby_branch_mismatch }
@@ -580,7 +584,7 @@ mod tests {
             bodies: vec![body(0x90000, 0x21, 0, true), BodyRef { id: 0xa0000, kind: 0x1e, cell: 1, activated: false, valid: false, registered: Some(0x1e) }],
             contexts: vec![ctx(0x1187044b80, 0x1180e94200), ContextRef { ctx: 0x1187044a00, controller: 0, valid: false }],
             dispatch: Some(DispatcherRef { arrays: [0x11e22b0000, 0x11e22b0100], valid: false }),
-            records: Some(RecordsRef { records: [0x11f0000000, 0, 0x11f0000300], valid: false }),
+            records: Some(RecordsRef { records: [0x11f0000000, 0, 0x11f0000300], valid: false, flags: 0, module: 0x75_0000_0001 }),
             held_kinds: vec![0x2f] };
         let plan = destroy_plan(&Bundle::Detached(group), &consumers);
         assert_eq!(plan.skipped, vec![Skipped::Context(0x1187044a00), Skipped::Body(0xa0000),
@@ -619,6 +623,31 @@ mod tests {
         assert_eq!(destroy_plan(&Bundle::Attached(s_a), &NativeConsumers::default()).kirby_cells, 0);
     }
 
+    /// rc.14 a-full-2 (boot a2-99b9083f-y1 and integration-3's smoke2, `0x33c23f8` reading the vtable of an object in an
+    /// unloaded module): a detached Aegis/PT holder keeps its object kind's module reference until it is destroyed. The
+    /// plan drops it with the destroy (after it), never before; a holder the plan refuses keeps it (leaked, never unloaded
+    /// under a live holder).
+    fn a_destroyed_holder_drops_its_object_module_after_the_destroy() {
+        let records = RecordsRef { records: [0x11e38ab100, 0, 0], valid: true, flags: 0x64, module: 0x62ae7d500 };
+        let group = DetachedGroup { owner: OWNER, bodies: cells([0x5a, 0x5b, 0], [0x10, 0x20, 0]).into_iter().take(2).collect(),
+            contexts: vec![ctx(0x100, 0x1000), ctx(0x200, 0x2000)], records: Some(records), held_kinds: vec![], ..Default::default() };
+        let plan = destroy_plan(&Bundle::Detached(group.clone()), &NativeConsumers::default());
+        let step = DestroyStep::DestroyRecords { records: records.records, flags: 0x64, module: 0x62ae7d500 };
+        let at = plan.steps.iter().position(|s| *s == step).expect("the destroy carries the group's module reference");
+        assert!(plan.steps[..at].iter().filter(|s| matches!(s, DestroyStep::DestroyBody { .. })).count() == 2,
+            "the bodies go first, as finalize orders them");
+        let views = [DetachedView { owner: OWNER, bodies: &group.bodies, contexts: &group.contexts, dispatch: None,
+            records: Some(records), held_kinds: &[] }];
+        let consumers = NativeConsumers::default();
+        let detached = DetachedPlan { groups: &views, consumers: &consumers };
+        assert!(detached.steps().any(|s| s == step), "the runtime plan carries it too");
+        // Refused records: no destroy, so the reference stays.
+        let refused = DetachedGroup { records: Some(RecordsRef { valid: false, ..records }), ..group };
+        let plan = destroy_plan(&Bundle::Detached(refused), &NativeConsumers::default());
+        assert_eq!(plan.records(), 0);
+        assert_eq!(plan.skipped, vec![Skipped::Records(records.records)]);
+    }
+
     /// The host walk model: S-B and K6 spin, S-K and S-A do not (D-HANG1-SEPARATION §1).
     fn s_b_and_k6_walk_the_registry_and_s_k_s_a_do_not() {
         let s_b = Bundle::Attached(AttachedGroup { owner: OWNER, cells: cells([0x05, KIRBY, 0x07], [0x50, 0x60, 0x70]), contexts: vec![] });
@@ -643,6 +672,7 @@ mod tests {
             ("invalid_objects_are_skipped_not_destroyed", invalid_objects_are_skipped_not_destroyed as fn()),
             ("a_kirby_outside_cell_0_is_reported_as_the_d_hang1_hazard", a_kirby_outside_cell_0_is_reported_as_the_d_hang1_hazard as fn()),
             ("s_b_and_k6_walk_the_registry_and_s_k_s_a_do_not", s_b_and_k6_walk_the_registry_and_s_k_s_a_do_not as fn()),
+            ("a_destroyed_holder_drops_its_object_module_after_the_destroy", a_destroyed_holder_drops_its_object_module_after_the_destroy as fn()),
         ]);
     }
     }

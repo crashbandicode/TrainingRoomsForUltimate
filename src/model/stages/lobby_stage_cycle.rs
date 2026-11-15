@@ -85,6 +85,19 @@ impl<S: CycleStage> StageCycle<S> {
         self.pending.map(|(stage, _)| stage)
     }
 
+    /// rc.14: the stage `prepare` would reserve next (the reserved one when there is one), without reserving it: what a
+    /// custom stage's read-ahead aims at.
+    pub fn peek(&self, stages: &[S]) -> Option<S> {
+        if let Some((stage, _)) = self.pending {
+            return Some(stage);
+        }
+        let next = self
+            .last
+            .and_then(|last| stages.iter().position(|stage| stage.identity() == last))
+            .map_or(0, |index| (index + 1) % stages.len().max(1));
+        stages.get(next).copied()
+    }
+
     pub fn prepare_direct(&mut self, stage: S) -> Option<S> {
         self.pending.get_or_insert((stage, false));
         self.pending.map(|(stage, _)| stage)
@@ -132,6 +145,34 @@ impl StageCycle<crate::engine::stages::lobby_stages::Selection> {
             }))
         } else {
             Ok(self.prepare(&order.selections(&prefs.rotation_forms)?))
+        }
+    }
+
+    /// rc.14: what `prepare_lists` would reserve next, without reserving it.
+    pub fn peek_lists(&self, lists: &crate::engine::stages::custom_stages::Lists, direct_enabled: bool)
+        -> Option<crate::engine::stages::lobby_stages::Selection> {
+        if let Some((selection, _)) = self.pending { return Some(selection); }
+        if direct_enabled && lists.direct_mode { Some(lists.direct) } else { self.peek(&lists.rotation) }
+    }
+
+    /// rc.14: `prepare_preferences` over the lists the runtime built with the save's custom stages
+    /// (`custom_stages::lists`); they are built only when no choice is reserved yet.
+    pub fn prepare_lists(
+        &mut self,
+        enabled: bool,
+        lists: impl FnOnce() -> Result<crate::engine::stages::custom_stages::Lists, &'static str>,
+        direct_enabled: bool,
+    ) -> Result<Option<crate::engine::stages::lobby_stages::Selection>, &'static str> {
+        if !enabled {
+            self.cancel_preload();
+            return Ok(None);
+        }
+        if let Some((selection, _)) = self.pending { return Ok(Some(selection)); }
+        let lists = lists()?;
+        if direct_enabled && lists.direct_mode {
+            Ok(self.prepare_direct(lists.direct))
+        } else {
+            Ok(self.prepare(&lists.rotation))
         }
     }
 

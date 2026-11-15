@@ -175,8 +175,14 @@ pub(crate) fn admit(v: View, settled: Option<Commit>) -> Result<usize, &'static 
 }
 
 pub(crate) fn plan(v: View, settled: Option<Commit>, target: u32, hash: u64) -> Result<(Commit, [u8; 0xb0]), &'static str> {
+    plan_with(v, settled, target, hash, false)
+}
+
+/// `plan`; `again` lifts the same-stage refusal: rc.14's custom stages are all native kind 325, each another layout in
+/// the rule.
+fn plan_with(v: View, settled: Option<Commit>, target: u32, hash: u64, again: bool) -> Result<(Commit, [u8; 0xb0]), &'static str> {
     let next = admit(v, settled)?;
-    check(target != v.kind(), "stage already active")?;
+    check(again || target != v.kind(), "stage already active")?;
     check(hash != 0 && hash <= 0xffffffffff, "invalid stage hash")?;
     let mut descriptor = v.descriptor;
     descriptor[..4].copy_from_slice(&target.to_le_bytes());
@@ -192,7 +198,7 @@ pub(crate) fn plan(v: View, settled: Option<Commit>, target: u32, hash: u64) -> 
 pub(crate) fn plan_selection(v: View, settled: Option<Commit>, selection: crate::engine::stages::lobby_stages::Selection,
     hash: u64) -> Result<(Commit, [u8; 0xb0]), &'static str> {
     let target = crate::engine::stages::lobby_stages::native_stage(selection)?;
-    plan(v, settled, target, hash)
+    plan_with(v, settled, target, hash, crate::engine::stages::custom_stages::decode(selection.stage).is_some())
 }
 
 #[cfg(test)]
@@ -282,10 +288,27 @@ mod tests {
         assert_eq!(acknowledge(loaded,c,wrong),Err("activation native readiness inconsistent"));
     }
 
+    fn one_custom_stage_goes_to_another_in_place() {
+        // rc.14: every custom stage is native kind 325; another one is another layout in the rule, not the stage on screen.
+        let mut v = waiting();
+        v.descriptor[..4].copy_from_slice(&325u32.to_le_bytes());
+        v.descriptor[8..16].copy_from_slice(&0x14d051407du64.to_le_bytes());
+        v.resources[2] = Some(Resource { address: 56, state: 1, kind: 325, hash: 0x14d051407d });
+        let custom = Selection { stage: crate::engine::stages::custom_stages::encode(12), form: Form::Normal };
+        let (c, descriptor) = plan_selection(v, None, custom, 0x14d051407d).unwrap();
+        assert_eq!((c.target, c.hash), (325, 0x14d051407d));
+        assert_eq!(descriptor[..4], 325u32.to_le_bytes());
+        // A catalog stage is still refused while it is the one on screen.
+        let bf = waiting();
+        let waiting_room = Selection { stage: 311, form: Form::Normal };
+        assert_eq!(plan_selection(bf, None, waiting_room, 0x165a48f367).map(|_| ()), Err("stage already active"));
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("one_custom_stage_goes_to_another_in_place", one_custom_stage_goes_to_another_in_place as fn()),
             ("alternate_forms_complete_then_require_a_new_menu_and_preserve_match_cache_ownership", alternate_forms_complete_then_require_a_new_menu_and_preserve_match_cache_ownership as fn()),
             ("observed_state6_requires_native_readiness_and_exact_allocation_lease_once", observed_state6_requires_native_readiness_and_exact_allocation_lease_once as fn()),
         ]);

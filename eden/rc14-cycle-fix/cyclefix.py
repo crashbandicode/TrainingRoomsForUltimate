@@ -27,6 +27,7 @@ sys.path.insert(0, str(HERE))
 
 import hotslots as hs  # noqa: E402
 import gna_p2_fs as fs  # noqa: E402
+import steps  # noqa: E402
 import fx  # noqa: E402
 from gna import _begin, _mark, _shot, _finish, _reset, MARIO  # noqa: E402
 
@@ -375,3 +376,214 @@ def cf_mii_failfirst(ctx):
     if out['stalls']:
         problems.append('StallWatch: %s' % out['stalls'][-1])
     return _finish(ctx, 'cf-mii-failfirst', out, problems)
+
+
+# --- rc.14 Gaps 1 and 3 (Eden cf-p3-y2), and k = 1 from the boot --------------------------------------------------------
+# The boot's settings.json fixture (mk-rows.py phase 3, cf_fixture.py) already holds the k = 1 values, Ready Fighters 6,
+# Player 1 Mario > Pikachu, the CPU cycle above: the scene builds with them, so no lowered value is resident (Gap 1).
+
+def k1_fixture():
+    """The menu values the phase 3 boot's settings.json fixture holds (mk-rows.py)."""
+    return _k1_values(6)
+
+
+def cf_boot(ctx):
+    """The fixture's values are live from the scene's first frame; the CPU short (the notice at Ready Fighters 6)."""
+    fs._remember_original(ctx)
+    t0, out = _begin(ctx)
+    menu = fs._menu(ctx)
+    want = k1_fixture()
+    out['mismatch'] = sorted(k for k, v in want.items() if menu.get(k) != v)
+    out['settle'] = fs._settled(ctx, 0, 150)
+    observed = [m.group(2) for _, _, t in hs.diag_lines(ctx) for m in [fs.OBSERVED.search(t)] if m and m.group(1) == '1']
+    out['cpu_original'] = '0x' + observed[0] if observed else None
+    _shot(ctx, out, 'shot_settled', 'cf-boot-settled')
+    _mark(t0, out, 'done')
+    problems = ['live values differ from the fixture: %s' % out['mismatch']] if out['mismatch'] else []
+    if not out['settle'] or (out['settle'].get('planned') or 99) > 6:
+        problems.append('the scene did not settle within Ready Fighters 6: %s' % out['settle'])
+    return _finish(ctx, 'cf-boot', out, problems)
+
+
+def _status_after(ctx, seq, after, cap):
+    """The first `[PreloadStatus] state=` line after the first line matching `after` (both since `seq`, by #seq), waited
+    for at most `cap` seconds after that line is seen; None when either is missing."""
+    marker = re.compile(after)
+    deadline = None
+    while True:
+        ctx.check_stop()
+        lines = hs.diag_since(ctx, seq)
+        at = next((s for s, _, t in lines if marker.search(t)), None)
+        if at is not None:
+            found = next((t[:300] for s, _, t in lines if s > at and '[PreloadStatus] state=' in t), None)
+            if found:
+                return found
+            deadline = deadline or time.monotonic() + cap
+        elif deadline is None:
+            deadline = time.monotonic() + 30.0
+        if time.monotonic() > deadline:
+            return None
+        time.sleep(0.25)
+
+
+def cf_shrink(ctx):
+    """Gap 1: Ready Fighters back from 7 (everything resident, cf-k1-fits) to 6: the farthest group leaves at once
+    (`[GroupSwap] shrink`), the notice settles within 6, and the next two laps each load the same one cold fighter."""
+    t0, out = _begin(ctx)
+    seq = hs.diag_mark(ctx)
+    fx._live_set(ctx, cycle_preload_ready_fighters=fs.RF(6))
+    out['shrink'] = fs._line(ctx, seq, r'\[GroupSwap\] shrink owner=', 30)
+    out['freed'] = fs._line(ctx, seq, r'\[GroupSwap\] frees now owner=1 .*freed=true', 10)
+    # The primary 2026-11-15 ~00:25Z (cf-p5-x1 read the status line printed in the shrink's own tick, before the leave):
+    # only the first status line after the `frees now … freed=true` line counts, within 5 s, and it must read Ready 6/6.
+    out['status_after'] = _status_after(ctx, seq, r'\[GroupSwap\] frees now owner=1 .*freed=true', 5.0)
+    presses = _lap(ctx, out, 'shrunk', 3, 1.5, 20)
+    out['shrunk_cold'], problems = _judge(presses, len(CPU_LANE) + 1)
+    _mark(t0, out, 'done')
+    if not out['shrink'] or not out['freed']:
+        problems.append('no shrink and free after Ready Fighters dropped to 6: %s %s' % (out['shrink'], out['freed']))
+    if not out['status_after'] or 'text="Ready 6/6"' not in out['status_after']:
+        problems.append('the first status after the free is not Ready 6/6: %s' % out['status_after'])
+    if any(len(c) != 1 for c in out['shrunk_cold']):
+        problems.append('not one cold load per lap: %s' % out['shrunk_cold'])
+    return _finish(ctx, 'cf-shrink', out, problems)
+
+
+EXIT = {
+    'demand': re.compile(r'\[GroupSwap\] demand owner=1 .*kinds=\[f\]'),
+    'declined': re.compile(r'\[GroupSwap\] demand declined owner=1 '),
+    'background': re.compile(r'\[GroupSwap\] background built owner=1 '),
+    'warm_exit': re.compile(r'\[GroupSwap\] warm exit owner=1 kind=0xf'),
+    'reload': PATTERNS['reload'],
+    'teardown': PATTERNS['teardown'],
+    'canonical': PATTERNS['canonical'],
+    'stall': PATTERNS['stall'],
+}
+
+
+def cf_exit(ctx):
+    """Gap 3: out of the live Mii Gunner onto a fighter no Built group holds (a direct CPU Character pick of Bowser,
+    outside a small cycle): the press waits for Bowser's own group through its prefetch and its background build beside
+    the Mii window, then exits warm. No Reload, no teardown, no canonical replacement. The groups the smaller cycle
+    leaves are parked until a pause (operator decision 2026-11-08 23:42Z), so Training's pause opens and closes first:
+    their slots are free for Bowser's group (the slot limit itself is Gap 2, a-full-2's)."""
+    global CPU_LANE
+    t0, out = _begin(ctx)
+    lane = CPU_LANE
+    CPU_LANE = [fs.GUNNER, fs.PICHU]
+    try:
+        seq = hs.diag_mark(ctx)
+        fx._live_set(ctx, cpu_roster=fs._roster(CPU_LANE), cycle_preload_ready_fighters=fs.RF(8))
+        time.sleep(1.0)
+        steps.press(ctx, 'plus', 2.0)
+        steps.press(ctx, 'plus', 2.0)
+        out['pause_frees'] = [t[:200] for _, _, t in hs.diag_since(ctx, seq) if '[GroupSwap] pause frees owner=1' in t][:4]
+        out['settle'] = fs._settled(ctx, seq, 120)
+        out['to_gunner'] = _to(ctx, fs.GUNNER)
+        out['gunner'] = fs._live_kinds(ctx).get(1)
+        out['settle_gunner'] = fs._settled(ctx, hs.diag_mark(ctx), 60)
+        seq = hs.diag_mark(ctx)
+        menu = fs._menu(ctx)
+        fx._live_set(ctx, cpu_character=fs._onehot(menu, 'cpu_character', fs.CHOICES.index(fs.BOWSER)))
+        out['picked'] = fs._line(ctx, seq, fs._kind_line(1, fs.BOWSER), 60)
+        time.sleep(1.5)
+        lines = [t for _, _, t in hs.diag_since(ctx, seq)]
+        for key, regex in EXIT.items():
+            out[key] = [t[:300] for t in lines if regex.search(t)][:4]
+        _shot(ctx, out, 'shot_bowser', 'cf-exit-bowser')
+        out['after'] = _press(ctx, 1.5)
+    finally:
+        CPU_LANE = lane
+        fx._live_set(ctx, cpu_roster=fs._roster(CPU_LANE))
+    _mark(t0, out, 'done')
+    problems = []
+    if out['gunner'] != fs.GUNNER:
+        problems.append('the CPU never reached Mii Gunner: %s' % out['gunner'])
+    if not out['picked']:
+        problems.append('the pick of Bowser did not apply')
+    for key in ('demand', 'background', 'warm_exit'):
+        if not out[key]:
+            problems.append('no %s line' % key)
+    for key in ('declined', 'reload', 'teardown', 'canonical', 'stall'):
+        if out[key]:
+            problems.append('%s: %s' % (key, out[key][0][:160]))
+    return _finish(ctx, 'cf-exit', out, problems)
+
+
+# --- The a1-enable crash (Eden a1-be759456-y2, 2026-11-14 ~23:27Z) ---------------------------------------------------------
+# A target-first Reload out of a Pyra window (a native group) kept `[4a]` with `reload mii`; the kept groups' module pins
+# went 9 ms into the Reload with no re-request (#4348 `re_requested=false`), and the warm attach of `[4a]` called into
+# the unloaded Mii module (Unmapped Read64 via lua2cpp_common +0x148c, then a jump to 0). Pyra/Mythra's kind 0x5a is the
+# one a1's log names (`cpu_original: 0x5a`) and hotslots.py's NO_ENTRY_WINDOW lists.
+PYRA = 0x5a
+PINS = re.compile(r'\[GroupSwap\] module pins (released|held) role=1 ')
+READY_ON = re.compile(r'\[BodyBank\] ready owner=1 index=\d+ kind=0xf ')
+
+
+def cf_pyra_keep(ctx):
+    """The CPU on its Pyra window (a cycle Mii Gunner > Pyra/Mythra > Diddy Kong at Ready Fighters 8), today's Reload
+    forced with the Mii group kept (`diag-cycle.req` `reload mii`) by a direct pick of Bowser, then presses back to Mii
+    Gunner: the kept `[4a]` attaches warm. Pass: the pins go with `re_requested=true` only after Bowser's bank is Ready
+    (a1's crash dropped them first), the Mii group is kept and attached warm, no StallWatch line (z-boot scans the console
+    for Unmapped)."""
+    global CPU_LANE
+    t0, out = _begin(ctx)
+    lane = CPU_LANE
+    CPU_LANE = [fs.GUNNER, PYRA, fs.DIDDY]
+    try:
+        seq = hs.diag_mark(ctx)
+        fx._live_set(ctx, cpu_roster=fs._roster(CPU_LANE), cycle_preload_ready_fighters=fs.RF(8))
+        time.sleep(1.0)
+        steps.press(ctx, 'plus', 2.0)
+        steps.press(ctx, 'plus', 2.0)
+        out['settle'] = fs._settled(ctx, seq, 150)
+        _lap(ctx, out, 'warm', 1, 1.5, 20)
+        out['to_pyra'] = _to(ctx, PYRA)
+        out['on_pyra'] = fs._live_kinds(ctx).get(1)
+        out['settle_pyra'] = fs._settled(ctx, hs.diag_mark(ctx), 60)
+        out['knob'] = _diag_cycle(ctx, 'reload mii')
+        seq = hs.diag_mark(ctx)
+        menu = fs._menu(ctx)
+        fx._live_set(ctx, cpu_character=fs._onehot(menu, 'cpu_character', fs.CHOICES.index(fs.BOWSER)))
+        out['picked'] = fs._line(ctx, seq, fs._kind_line(1, fs.BOWSER), 60)
+        time.sleep(3.0)
+        lines = [(s, t) for s, _, t in hs.diag_since(ctx, seq)]
+        out['target_first'] = [t[:240] for _, t in lines if PATTERNS['target_first'].search(t)][:2]
+        out['reload'] = [t[:240] for _, t in lines if PATTERNS['reload'].search(t)][:2]
+        out['kept'] = [t[:300] for _, t in lines if '[GroupSwap] kept across reload owner=1' in t][:2]
+        out['window'] = [t[:240] for _, t in lines if '[GroupSwap] window across reload owner=1' in t][:2]
+        out['pins'] = [(s, t[:300]) for s, t in lines if PINS.search(t)][:4]
+        out['ready'] = [(s, t[:200]) for s, t in lines if READY_ON.search(t)][:1]
+        out['knob_off'] = _diag_cycle(ctx, 'off')
+        out['settle_after'] = fs._settled(ctx, hs.diag_mark(ctx), 60)
+        presses = []
+        for _ in range(len(CPU_LANE) + 1):
+            rec = _press(ctx, 2.0)
+            presses.append(rec)
+            if rec.get('kind') == hex(fs.GUNNER):
+                break
+        out['presses'] = presses
+        time.sleep(3.0)
+        out['stalls'] = [t[:200] for _, _, t in hs.diag_lines(ctx) if 'StallWatch' in t][-3:]
+    finally:
+        CPU_LANE = lane
+        fx._live_set(ctx, cpu_roster=fs._roster(CPU_LANE))
+    _mark(t0, out, 'done')
+    problems = []
+    if out['on_pyra'] != PYRA:
+        problems.append('the CPU never reached Pyra: %s' % out['on_pyra'])
+    if not out['picked'] or not out['reload']:
+        problems.append('no Reload for the pick: %s %s' % (out['picked'], out['reload']))
+    if not any('4a' in t.split('groups=')[-1] for t in out['kept']):
+        problems.append('the Mii group was not kept: %s' % out['kept'])
+    released = [(s, t) for s, t in out['pins'] if ' released ' in t]
+    if any('re_requested=false' in t for _, t in released):
+        problems.append('pins dropped with no re-request: %s' % released)
+    if not released or not out['ready'] or released[0][0] < out['ready'][0][0]:
+        problems.append('pins not released after the new bank was Ready: pins %s ready %s' % (released, out['ready']))
+    gunner = [p for p in presses if p.get('kind') == hex(fs.GUNNER)]
+    if not gunner or gunner[0].get('route') != 'group-warm':
+        problems.append('no warm attach of the kept Mii group: %s' % [(p.get('kind'), p.get('route')) for p in presses])
+    if out['stalls']:
+        problems.append('StallWatch: %s' % out['stalls'][-1])
+    return _finish(ctx, 'cf-pyra-keep', out, problems)

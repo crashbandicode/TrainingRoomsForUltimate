@@ -169,7 +169,9 @@ picks, such as "Selected: Up x3, In x1". Shield Tilt takes one chip only: A sele
 
 SDI also needs [SDI Strength](../menu/cpu.md#sdi-strength), which is None at first.
 
-<!-- CAPTURE-REQUEST v11-delay-stills: the tick values still is in "Delay rows" below. Still wanted: an annotated still of the Min/Max handles with the ticked half greyed. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![Ledge Delay open with the Min and Max handles set and the tick values greyed, labelled](../media/rc13-menu-control-range.png)<br>
+*A delay row with its range set: the Min and Max handles are in use and the checklist half is greyed. Eden, rc.13 (untested on hardware).*
+
 
 ![DI Direction from nothing picked to Up x1, then SDI Direction the same: the picked chip lights at full strength, the others stay dim](../media/rc13-di-sdi-chips.gif)<br>*The DI and SDI direction grids. Eden, rc.13 (untested on hardware).*
 
@@ -221,7 +223,7 @@ plays.
 
 ## What a reset does
 
-L+R+A (while [L+R+A Reset](../menu/display-and-controls.md#lra-reset) is On) and loading a save state reset Training.
+L+R+A (while [L+R+A Reset](../menu/display-and-controls.md#l-r-a-reset) is On) and loading a save state reset Training.
 For the CPU this means:
 
 - anything it was about to do is dropped;

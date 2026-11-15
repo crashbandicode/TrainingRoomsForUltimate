@@ -162,6 +162,9 @@ struct State {
     /// lobby-preload D: a creation preflight refusal standing in this scene and the refused
     /// extra's position in the creation order. Only the readiness line reads it.
     creation_hold: Option<(SceneEpoch, u8)>,
+    /// rc.14 mem-headroom F2: the created helper slots (one bit per slot) a cycle group held for memory needs the room of
+    /// (`give_back::choose`); the next pause retires them ([`pause_opening`]).
+    give_back: Option<(SceneEpoch, u8)>,
 }
 
 static STATE: Mutex<State> = Mutex::new(State {
@@ -178,6 +181,7 @@ static STATE: Mutex<State> = Mutex::new(State {
     failed: 0,
     capacities: [const { Capacity::NEW }; crate::engine::preload::cycle_preload_capacity::ALL_EXTRA_SLOTS.len()],
     creation_hold: None,
+    give_back: None,
 });
 /// P-HOT §3.5.1 (operator decisions "B" and "1"): entry 3 borrowed by the fifth Kirby hat while one CPU is visible.
 /// F9 reads `current()` (a borrowed entry 3 holds no CPU rotation fighter) and ends the borrow with
@@ -278,6 +282,129 @@ pub(super) unsafe fn pause_opening() {
     crate::engine::compat::logging::diagnostic(format_args!("[PauseHelper] pause opening exposed={}", exposed));
     #[cfg(not(feature = "diag"))]
     let _ = exposed;
+    give_back_at_pause();
+}
+
+/// rc.14 mem-headroom F2: a created helper slot's give-back facts (`give_back::Candidate`: its plan place, its measured
+/// cost, whether nothing uses it), its entry and its source's kind; None when the slot holds no current source on our own
+/// live created entry. Values only (STATE held by the caller).
+fn give_back_candidate(state: &State, slot: usize) -> Option<(crate::engine::preload::give_back::Candidate, usize, u32)> {
+    let index = crate::engine::preload::cycle_preload_capacity::capacity_index(slot)?;
+    let (epoch, value) = state.capacities[index].reservation?;
+    if !state.book.is_current(epoch) || value.entry == 0 || value.entry_destroyed || value.owner_retired {
+        return None;
+    }
+    let source = state.sources[slot].filter(|source| state.book.is_current(source.token.epoch())
+        && source.token.entry() == NativeEntry(value.entry as u64))?;
+    let ready = state.book.phase(slot) == Ok(Phase::Ready) && source.install.is_none();
+    let leased = state.leases.iter().flatten().any(|live| live.source == source.token);
+    let requested = state.wants.iter().flatten().any(|want| want.kind == source.kind);
+    let place = plan_targets(state).iter()
+        .position(|want| want.is_some_and(|want| want.kind == source.kind && want.configuration == source.configuration))
+        .and_then(|place| u8::try_from(place).ok());
+    let cost = crate::engine::swap::body_bank::memory::helper_cost(source.kind).total();
+    Some((crate::engine::preload::give_back::Candidate { slot: slot as u8, place, cost, idle: ready && !leased && !requested },
+        value.entry, source.kind))
+}
+
+/// rc.14 mem-headroom F2 (the primary 2026-11-15 ~06:20Z): a cycle group of `owner` is held for memory `shortfall` bytes
+/// short and no parked group is left to free (`body_bank::release_for_capacity`). The farthest idle created helpers whose
+/// room covers it are marked (`give_back::choose`; none when all of them would not make the room); the next pause
+/// retires them ([`give_back_at_pause`]). Logged when the marks change. Takes the source lock; never call it with a
+/// bank lock held.
+pub(super) fn give_back_for(owner: u32, group: usize, shortfall: u64) {
+    use crate::engine::preload::cycle_preload_capacity::ALL_EXTRA_SLOTS;
+    use crate::engine::preload::give_back::{choose, Candidate};
+    let mut candidates = [Candidate { slot: 0, place: None, cost: 0, idle: false }; ALL_EXTRA_SLOTS.len()];
+    let mut kinds = [u32::MAX; 8];
+    let mut count = 0;
+    let mut state = STATE.lock();
+    for slot in ALL_EXTRA_SLOTS {
+        if let Some((candidate, _, kind)) = give_back_candidate(&state, slot) {
+            candidates[count] = candidate;
+            count += 1;
+            kinds[slot] = kind;
+        }
+    }
+    let marked = choose(&candidates[..count], shortfall);
+    let epoch = state.book.epoch();
+    let before = state.give_back.filter(|(marked_in, _)| *marked_in == epoch).map_or(0, |(_, marked)| marked);
+    state.give_back = (marked != 0).then_some((epoch, marked));
+    drop(state);
+    if marked != before {
+        crate::engine::compat::logging::diagnostic(format_args!(
+            "[GroupSwap] give-back owner={} group={} shortfall={} marked={:#b} created={:x?} helpers={}; the next pause retires them",
+            owner, group, shortfall, marked, kinds, count));
+    }
+}
+
+/// rc.14 mem-headroom (diag): every helper source for the `[MemoryCensus]` line, by entry slot: its kind, Ready, leased,
+/// marked to give its memory back.
+#[cfg(feature = "diag")]
+pub(crate) fn census_helpers() -> [Option<crate::engine::preload::give_back::Helper>; 8] {
+    let state = STATE.lock();
+    let marked = state.give_back.filter(|(epoch, _)| state.book.is_current(*epoch)).map_or(0, |(_, marked)| marked);
+    std::array::from_fn(|slot| {
+        let source = state.sources[slot].filter(|source| state.book.is_current(source.token.epoch()))?;
+        Some(crate::engine::preload::give_back::Helper { slot: slot as u8, kind: source.kind,
+            ready: state.book.phase(slot) == Ok(Phase::Ready) && source.install.is_none(),
+            leased: state.leases.iter().flatten().any(|live| live.source == source.token),
+            marked: marked & (1 << slot) != 0 })
+    })
+}
+
+/// rc.14 mem-headroom F2: whether the next pause retires a marked helper (the notice's "load after you pause").
+pub(crate) fn give_back_pending() -> bool {
+    let state = STATE.lock();
+    state.give_back.is_some_and(|(epoch, marked)| marked != 0 && state.book.is_current(epoch))
+}
+
+/// rc.14 mem-headroom F2, at the pause-open after [`pause_opening`]'s actorless retires: each marked helper still idle is
+/// retired, only while the cycle still waits for memory (`give_back::at_pause`) and no native install runs, through the
+/// same native single-slot retire and PAUSE ledger; its destructor callback ([`on_destroy`]) drops its source. The room is
+/// then on its way (`body_bank::note_room_freed`). Never mid-game: this is the only caller. No plugin lock is held across
+/// the native retire.
+unsafe fn give_back_at_pause() {
+    use super::native_source_capacity::{entry_at, entry_facts, retire_at};
+    let marked = {
+        let state = STATE.lock();
+        state.give_back.filter(|(epoch, _)| state.book.is_current(*epoch)).map_or(0, |(_, marked)| marked)
+    };
+    if marked == 0 { return; }
+    let waits = super::process_memory::cycle_waiting() > 0;
+    let install = INSTALL.active();
+    let mut idle = 0u8;
+    let mut entries = [(0usize, u32::MAX); 8];
+    {
+        let state = STATE.lock();
+        for slot in (0..8usize).filter(|slot| marked & (1 << slot) != 0) {
+            if let Some((candidate, entry, kind)) = give_back_candidate(&state, slot) {
+                if candidate.idle { idle |= 1 << slot; }
+                entries[slot] = (entry, kind);
+            }
+        }
+    }
+    let retire = if install { 0 } else { crate::engine::preload::give_back::at_pause(marked, idle, waits) };
+    let mut retired = 0u8;
+    for slot in (0..8usize).filter(|slot| retire & (1 << slot) != 0) {
+        let (entry, kind) = entries[slot];
+        let Some(index) = crate::engine::preload::cycle_preload_capacity::capacity_index(slot) else { continue; };
+        if entry == 0 || entry_at(slot) != entry || !aligned(entry as *const u8) || entry_facts(entry).phase == 3 { continue; }
+        if !PAUSE.lock().begin(index, entry) { continue; }
+        let ok = retire_at(slot, entry);
+        if ok { retired |= 1 << slot; } else { PAUSE.lock().refused(index); }
+        crate::engine::compat::logging::diagnostic(format_args!(
+            "[GroupSwap] give-back retire slot={} entry=0x{:x} kind=0x{:x} retired={}", slot, entry, kind, ok));
+    }
+    {
+        // Retired or not wanted any more: the marks go; a native install kept them for the next pause.
+        let mut state = STATE.lock();
+        if !install { state.give_back = None; }
+    }
+    crate::engine::compat::logging::diagnostic(format_args!(
+        "[GroupSwap] give-back at pause marked={:#b} idle={:#b} cycle_waits={} install={} retired={:#b}",
+        marked, idle, waits, install, retired));
+    if retired != 0 { super::body_bank::note_room_freed(); }
 }
 
 /// A retire this ledger began has both native completions: the slot may be created again in this scene.
@@ -1502,6 +1629,7 @@ pub fn scene_changed() {
         for capacity in &mut state.capacities {capacity.stable=None;capacity.attempted=None;capacity.first_load=None;}
         // Keep the old reservation until both actual native boundaries arrive.
         state.creation_hold = None;
+        state.give_back = None;
     }
     state
         .book
@@ -2306,10 +2434,11 @@ unsafe fn service_load(ctx: &ServiceEntryContext, entry: *mut u8, slot: u32, is_
     // is discretionary: it starts only when the headroom covers its measured cost beside what every other consumer
     // still holds; otherwise it stays in the plan and a later callback tries again. A demand load (a visible request
     // waits for it) is not refused here. Both hold their cost while in flight (`helper_outstanding`).
-    // rc.6 window admission (primary 2026-11-09 13:28Z): a created entry's load also leaves what the cycle waits for.
+    // rc.6 window admission (primary 2026-11-09 13:28Z): a created entry's load also leaves what the cycle waits for;
+    // rc.14 mem-headroom F1: so does a seat's (`memory::speculative_admission`).
     let memory_cost = crate::engine::swap::body_bank::memory::helper_cost(wanted.kind);
     let memory_committed = if speculative {
-        let (decision, sample) = if is_capacity { super::process_memory::admit_created(memory_cost) } else { super::process_memory::admit(memory_cost) };
+        let (decision, sample) = super::process_memory::admit_speculative(memory_cost);
         // F9-SEAT-NOTICE: a seat held for memory counts in the readiness notice until a load on it is admitted.
         crate::runtime::roster::f9_gate::note_seat_memory(slot, wanted.kind,
             decision.admission != crate::engine::swap::body_bank::memory::Admission::Admit);

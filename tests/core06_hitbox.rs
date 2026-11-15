@@ -388,14 +388,15 @@ fn core06_off_restores() {
 
 #[test]
 fn core06_site_guards() {
-    // Three hooks, thirteen called natives (the last one Eggs-ercise's hitlag, `StopModule::set_hit_stop_frame`; one is the attack module's
-    // damage multiplier, rc.14 spots-2) and eleven relied
+    // Seven hooks (rc.14 wind-articles added the four AREA_WIND_2ND* commands), fourteen called natives (the last one Eggs-ercise's hitlag,
+    // `StopModule::set_hit_stop_frame`; one is the attack module's damage multiplier, rc.14 spots-2; one the knockback a defender received,
+    // spots-3) and thirteen relied (two the damage record, spots-3)
     // windows (the Lua stack reads, HB1's three HitModule windows, for the own orbs (decision HB-OWN-ORBS) the bone transform,
     // the projection and its screen size words and, for Eggs-ercise's spawn range, the camera limit accessor).
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 13);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 11);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 14);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 14);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
         assert_eq!(site.feature, Feature::Hitbox);
@@ -442,6 +443,10 @@ fn core06_site_guards() {
         (sites_hitbox::HITBOX_IS_ATTACK_OFFSET, "attack_is_attack"),
         (sites_hitbox::HITBOX_ATTACK_DATA_OFFSET, "attack_data"),
         (sites_hitbox::HITBOX_POWER_MUL_OFFSET, "attack_power_mul_status"),
+        (sites_hitbox::HITBOX_DAMAGE_REACTION_OFFSET, "damage_reaction"),
+        (sites_hitbox::DAMAGE_RECORD_OFFSET, "damage_record_layout"),
+        (sites_hitbox::DAMAGE_HIT_IDS_OFFSET, "damage_record_hit_ids"),
+        (sites_hitbox::DAMAGE_DEALT_OFFSET, "damage_record_dealt"),
         (sites_hitbox::HITBOX_REQ_FOLLOW_OFFSET, "effect_req_follow"),
         (sites_hitbox::HITBOX_KILL_OFFSET, "sphere_effect_kill"),
         (sites_hitbox::HITBOX_IS_EXIST_OFFSET, "sphere_effect_is_exist"),
@@ -457,6 +462,10 @@ fn core06_site_guards() {
         (sites_hitbox::ORB_JOINT_POSITION_OFFSET, "orb_joint_position"),
         (sites_hitbox::ORB_WORLD_TO_SCREEN_OFFSET, "orb_world_to_screen"),
         (sites_hitbox::ORB_SCREEN_SIZE_OFFSET, "orb_screen_size"),
+        (sites_hitbox::AREA_WIND_OFFSET, "hitbox_area_wind"),
+        (sites_hitbox::AREA_WIND_ARG10_OFFSET, "hitbox_area_wind_arg10"),
+        (sites_hitbox::AREA_WIND_RAD_OFFSET, "hitbox_area_wind_rad"),
+        (sites_hitbox::AREA_WIND_RAD_ARG9_OFFSET, "hitbox_area_wind_rad_arg9"),
     ] {
         assert_eq!(model::sites_hitbox::SITES.iter().find(|s| s.name == name).map(|s| s.offset), Some(offset), "{name}");
     }
@@ -476,6 +485,7 @@ fn core06_rows_match_the_owned_elf() {
         ("attack_is_attack", "_ZN3app8lua_bind28AttackModule__is_attack_implEPNS_26BattleObjectModuleAccessorEib"),
         ("attack_data", "_ZN3app8lua_bind30AttackModule__attack_data_implEPNS_26BattleObjectModuleAccessorEib"),
         ("attack_power_mul_status", "_ZN3app8lua_bind35AttackModule__power_mul_status_implEPNS_26BattleObjectModuleAccessorE"),
+        ("damage_reaction", "_ZN3app8lua_bind27DamageModule__reaction_implEPNS_26BattleObjectModuleAccessorEi"),
         ("effect_req_follow", "_ZN3app8lua_bind29EffectModule__req_follow_implEPNS_26BattleObjectModuleAccessorEN3phx6Hash40ES4_RKNS3_8Vector3fES7_fbjiiiibb"),
         ("sphere_effect_kill", "_ZN3app8lua_bind23EffectModule__kill_implEPNS_26BattleObjectModuleAccessorEjbb"),
         ("sphere_effect_is_exist", "_ZN3app8lua_bind34EffectModule__is_exist_effect_implEPNS_26BattleObjectModuleAccessorEj"),
@@ -485,6 +495,10 @@ fn core06_rows_match_the_owned_elf() {
         ("sv_battle_object_module_accessor", "_ZN3app9sv_system29battle_object_module_accessorEP9lua_State"),
         ("stop_set_hit_stop_frame", "_ZN3app8lua_bind35StopModule__set_hit_stop_frame_implEPNS_26BattleObjectModuleAccessorEib"),
         ("camera_limit_range", "_ZN3app6camera22get_camera_limit_rangeEv"),
+        ("hitbox_area_wind", "_ZN3app10sv_animcmd13AREA_WIND_2NDEP9lua_State"),
+        ("hitbox_area_wind_arg10", "_ZN3app10sv_animcmd19AREA_WIND_2ND_arg10EP9lua_State"),
+        ("hitbox_area_wind_rad", "_ZN3app10sv_animcmd17AREA_WIND_2ND_RADEP9lua_State"),
+        ("hitbox_area_wind_rad_arg9", "_ZN3app10sv_animcmd22AREA_WIND_2ND_RAD_arg9EP9lua_State"),
     ] {
         let site = SITES.iter().find(|s| s.name == name).unwrap();
         assert_eq!(main.symbol(symbol), Some(site.offset), "{name}");
@@ -651,6 +665,50 @@ fn smash_charge_multiplier_matches_the_owned_game() {
     assert!(imported.contains("AttackModule__set_power_mul_status_impl"), "the script's last call imports {imported}");
 }
 
+/// rc.14 spots-3: `DamageModule::reaction(accessor, index)` is the knockback the defender received, as the game's hit handler stores it. Proven
+/// from the owned game: the thunk and its vtable slot (the fighter DamageModule's address point main+0x4f86a48, by its relocations), the getter
+/// reading `+0x10` of the 0x1c0-byte damage record, and the hit handler (main+0x402cc0) storing the knockback its formula (main+0x401e50)
+/// returned there when it is larger than the stored one, with the hit's id block (the attack slot at `+0x32`) beside it.
+#[test]
+fn damage_reaction_matches_the_owned_game() {
+    let Some(main) = common::owned_main("damage_reaction_matches_the_owned_game") else { return };
+    let w = |offset: usize| word_at(&main, offset);
+    let thunk = sites_hitbox::HITBOX_DAMAGE_REACTION_OFFSET;
+    assert_eq!([w(thunk), w(thunk + 4), w(thunk + 8), w(thunk + 12)], [ldr_x(0, 0, 0xa8), ldr_x(8, 0, 0), ldr_x(2, 8, 0xd0), 0xd61f_0040], "the thunk");
+    let reloc = |slot: usize, target: u64| {
+        let mut entry = [0u8; 24];
+        entry[..8].copy_from_slice(&((0x4f86a48 + slot) as u64).to_le_bytes());
+        entry[8..16].copy_from_slice(&0x403u64.to_le_bytes());
+        entry[16..].copy_from_slice(&target.to_le_bytes());
+        let ro = &main.bytes[main.rodata.offset..main.rodata.offset + main.rodata.size];
+        (0..ro.len() / 8).any(|i| ro.get(i * 8..i * 8 + 24) == Some(&entry[..]))
+    };
+    assert!(reloc(0xc8, 0x3ff9f0) && reloc(0xd0, 0x3ffa10), "DamageModule vtable slots: damage, reaction");
+    // reaction: `ldr x8,[x0,#0x18]; orr w9,wzr,#0x1c0; smaddl x8,w1,w9,x8; ldr s0,[x8,#0x10]; ret`.
+    assert_eq!([w(0x3ffa10), w(0x3ffa14), w(0x3ffa18), w(0x3ffa1c), w(0x3ffa20)], [ldr_x(8, 0, 0x18), 0x321a_0be9, 0x9b29_2028, ldr_s(0, 8, 0x10), 0xd65f_03c0]);
+    // The hit handler: `ldrb w26,[x20,#0x32]` (the attack slot id of the hit), the record `madd x24,x23,x8(=0x1c0),x9`, `bl 0x401e50` (the knockback),
+    // `ldr s0,[x24,#0x10]!; fcmp s8,s0; b.le` (only a larger one is stored), `ldp x9,x10,[x20,#0x20]; ... stp x10,x11,[x8,#0x48]` (the id block
+    // with it: the hit's +0x32 at the record's +0x52), `str s8,[x24]`.
+    assert_eq!(w(0x402d00), 0x3940_ca9a, "ldrb w26, [x20, #0x32]");
+    assert_eq!([w(0x402e28), w(0x402e2c)], [0x321a_0be8, 0x9b08_26f8], "the record");
+    assert_eq!(w(0x402f00), 0x97ff_fbd4, "bl 0x401e50");
+    assert_eq!([w(0x402f5c), w(0x402f60), w(0x402f64)], [0xbc41_0f00, 0x1e20_2100, 0x5400_180d], "compare");
+    assert_eq!([w(0x402f9c), w(0x402fb0), w(0x402fb4)], [0xa942_2a89, 0xa904_ad0a, str_s(8, 24, 0)], "store");
+    // The two Relied rows the plugin reads record 0 by (`sites_hitbox::damage_record`): `ldr x11,[x20,#0x30]; str x9,[x8,#0x40]` put the
+    // hit's +0x24 (the attacker's object id) at +0x44 and its +0x32 (the slot) at +0x52; the module is the thunk's `[x0,#0xa8]`.
+    use model::sites_hitbox::damage_record as r;
+    assert_eq!([w(0x402fa0), w(0x402fac)], [ldr_x(11, 20, 0x30), str_x(9, 8, 0x40)]);
+    assert_eq!((r::MODULE, r::RECORDS, r::ATTACKER, r::SLOT), (0xa8, 0x18, 0x40 + (0x24 - 0x20), 0x50 + (0x32 - 0x30)));
+    assert_eq!((sites_hitbox::DAMAGE_RECORD_OFFSET, sites_hitbox::DAMAGE_HIT_IDS_OFFSET), (0x3ffa10, 0x402f9c));
+    // The third Relied row: the hit's damage transaction (main+0x4026c0) adds the hit's damage into record +0x8 (`ldr s0,[x8,#0x8];
+    // fadd s0,s9,s0; str s0,[x8,#0x8]`), and the hit handler takes +0x0 plus +0x8 as the knockback's percent (`ldr s14,[x24,#0x8]` ...
+    // `ldr s0,[x24]; fadd s0,s14,s0`).
+    let dealt = r::DEALT as u32;
+    assert_eq!([w(0x402908), w(0x40290c), w(0x402910)], [ldr_s(0, 8, dealt), 0x1e20_2920, str_s(0, 8, dealt)], "the damage added");
+    assert_eq!([w(0x402e44), w(0x402e94), w(0x402e98)], [ldr_s(14, 24, dealt), ldr_s(0, 24, 0), 0x1e20_29c0], "the knockback's percent");
+    assert_eq!(sites_hitbox::DAMAGE_DEALT_OFFSET, 0x4028e0);
+}
+
 /// rc.14 hb-legend: the launch angle field of `AttackData`, and the `HitStatus` values with the
 /// game's own effective status of a hurtbox part (`model::legend`).
 #[test]
@@ -721,6 +779,55 @@ fn legend_facts_match_the_owned_elf() {
     // parameter +8 (`str s0,[sp,#0x20]`, the parameters at sp+0x18) lands at entry +0xc.
     assert_eq!((area::ENTRY, area::ENTRY_ANGLE), (0x28, 0xc));
     assert_eq!([0x3d0558, 0x3d0638, 0x3d0060].map(w), [0x7900_33e8, 0xbd00_23e0, 0xf800_6128], "strh w8,[sp,#0x18]; str s0,[sp,#0x20]; stur x8,[x9,#0x6]");
+}
+
+/// rc.14 wind-articles: the four wind-area commands the plugin hooks. Each reads the running object's accessor from the Lua state
+/// (`ldur x8,[x0,#-8]; ldr x8,[x8,#0x1a0]`), takes its AreaModule (`ldr x0,[x8,#0xc0]`, `legend::area::MODULE`) and calls a worker that
+/// adds the record through the module's slot 0x158 (`add_wind_area_2nd`, boxes) or 0x160 (`_rad`, circles). Nothing in them depends on
+/// the object being a fighter, so an article's command writes its own AreaModule.
+#[test]
+fn core06_wind_area_commands_match_the_owned_elf() {
+    use model::legend::area;
+    let Some(main) = common::owned_main("core06_wind_area_commands_match_the_owned_elf") else { return };
+    let w = |offset: usize| word_at(&main, offset);
+    let bl_target = |at: usize| {
+        let word = w(at);
+        assert_eq!(word & 0xfc00_0000, 0x9400_0000, "bl at {at:#x}");
+        (at as i64 + ((((word & 0x03ff_ffff) << 6) as i32 >> 6) as i64) * 4) as usize
+    };
+    for (offset, load, call, worker, slot) in [
+        (sites_hitbox::AREA_WIND_OFFSET, 0x44, 0x4c, 0x22a_8fd0, 0x158),
+        (sites_hitbox::AREA_WIND_ARG10_OFFSET, 0x44, 0x4c, 0x22a_8fd0, 0x158),
+        (sites_hitbox::AREA_WIND_RAD_OFFSET, 0x44, 0x4c, 0x22a_86a0, 0x160),
+        (sites_hitbox::AREA_WIND_RAD_ARG9_OFFSET, 0x44, 0x4c, 0x22a_86a0, 0x160),
+    ] {
+        assert_eq!([w(offset + 0x10), w(offset + 0x14)], [0xf85f_8008, ldr_x(8, 8, 0x1a0)], "{offset:#x}: ldur x8,[x0,#-8]; ldr x8,[x8,#0x1a0]");
+        assert_eq!(w(offset + load), ldr_x(0, 8, area::MODULE as u32), "{offset:#x}: ldr x0,[x8,#0xc0]");
+        assert_eq!(bl_target(offset + call), worker, "{offset:#x}: the worker");
+        // The worker reaches the module's wind slot (`ldr x8,[x8,#slot]` before its `blr x8`).
+        let reaches = (worker..worker + 0x1000).step_by(4).any(|at| w(at) == ldr_x(8, 8, slot));
+        assert!(reaches, "{worker:#x} loads slot {slot:#x}");
+    }
+}
+
+/// rc.14 wind-articles: `legend::wind_areas` reads one AreaModule table for every object. The two functions that write it
+/// (`add_wind_area_2nd` main+0x3d03e0 and `_rad` main+0x3d0680, whose stores `legend_facts_match_the_owned_elf` checks) sit at
+/// slots 0x158 / 0x160 of four AreaModule vtables, by their relocations: the fighter's (address point main+0x4f85690) and three
+/// more, so an article's or an item's module keeps the same records.
+#[test]
+fn legend_every_area_module_writes_the_table_the_reader_reads() {
+    let Some(main) = common::owned_main("legend_every_area_module_writes_the_table_the_reader_reads") else { return };
+    let reloc = |at: usize, target: u64| {
+        let mut entry = [0u8; 24];
+        entry[..8].copy_from_slice(&(at as u64).to_le_bytes());
+        entry[8..16].copy_from_slice(&0x403u64.to_le_bytes());
+        entry[16..].copy_from_slice(&target.to_le_bytes());
+        let ro = &main.bytes[main.rodata.offset..main.rodata.offset + main.rodata.size];
+        (0..ro.len() / 8).any(|i| ro.get(i * 8..i * 8 + 24) == Some(&entry[..]))
+    };
+    for vtable in [0x4f6_9ec0usize, 0x4f8_5690, 0x507_6470, 0x517_9668] {
+        assert!(reloc(vtable + 0x158, 0x3d03e0) && reloc(vtable + 0x160, 0x3d0680), "vtable {vtable:#x}: add_wind_area_2nd / _rad");
+    }
 }
 
 /// Eggs-ercise V2.2: the stage's camera range is the camera manager's four floats (left, right, top, bottom) at `+0xc20`, read

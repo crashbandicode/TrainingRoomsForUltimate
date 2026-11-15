@@ -444,14 +444,14 @@ pub static ROWS: [Row; 106] = [
       "The level of the CPUs in Training and the lobby.\nOff: the game's own level."),
     // rc.14 Hide CPU (SPEC-eggsercise V2.6): after CPU Level, the last row of the last group of GROUPS.
     r(LEVEL, "Hide CPU", "hide_cpu", TOGGLE,
-      "On: the CPU is invisible, takes no hits and doesn't move.\nIts damage still shows. Off: it's back where it was."),
+      "On: the CPU is invisible, takes no hits and doesn't move.\nIts tag and panel hide too. Off: it's back where it was."),
     // Fighters & Stages > Practice games (rc.14, appended like Level)
     r(GAMES, "Eggs-ercise", "eggsercise", Control::Dropdown(&o::EGGSERCISE),
       "Break the targets that appear. Starts when the menu closes.\nTimed: 60 s, or break 10 or 20 fastest. Free practice: no timer."),
     r(GAMES, "Breaks on", "eggsercise_break", Control::Dropdown(&o::EGGS_BREAK),
       "Which of your hits break a target. Projectiles never do.\n12%+: only attacks that deal 12% or more."),
     r(GAMES, "Target", "eggsercise_target", Control::Dropdown(&o::EGGS_TARGET),
-      "Disc: a target appears. CPU: the CPU is the target.\nThe CPU target stays still and is reset after each hit."),
+      "Disc: a target appears. CPU: the CPU is the target.\nThe CPU flies like the disc and is reset after each hit."),
     r(GAMES, "Target speed", "eggsercise_speed", Control::Dropdown(&o::EGGS_SPEED),
       "How fast targets fly. Normal is Melee's Eggs-ercise speed.\nSlow: half speed. Fast: one and a half times as fast."),
     r(GAMES, "CPU during a game", "practice_cpu", Control::Dropdown(&o::PRACTICE_CPU),

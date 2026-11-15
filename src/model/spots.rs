@@ -1,18 +1,19 @@
-//! Sweet, sour and late spots (rc.14, operator decisions SP1 to SP5, 2026-11-14), pure and host-tested. A hitbox is a spot by its
-//! damage, read from the game's own `AttackData` (`hitbox::layout::POWER`), never from a per-fighter table:
+//! Sweet, sour and late spots (rc.14, operator decisions SP1 to SP5, 2026-11-14; ranked by launch power since spots-3, 2026-11-15), pure and
+//! host-tested. SmashWiki's definition: the sweet spot is the part of an attack with the most desirable knockback, usually the most
+//! powerful; a sour spot the least powerful. So a hitbox ranks by the knockback it gives the defender (`knockback`, the game's formula), from
+//! its own `AttackData` (damage, base knockback, growth, fixed knockback: `hitbox::powers`) and the defender's percent and weight at that
+//! moment, never from a per-fighter table; damage decides only between equal knockbacks. The launch angle (the "most desirable" direction)
+//! is a matter of taste and plays no part.
 //!
-//! * among the hitboxes active on one frame the strongest is **Sweet** (ties at the top are all Sweet) and a weaker one is **Sour**;
-//! * when the frame's strongest hitbox is weaker than the strongest seen earlier in the same action (the sweet phase is over), its hitboxes are **Late**;
-//! * when every active hitbox has the same damage and nothing stronger came earlier there is no label.
+//! * among the hitboxes active on one frame the one that launches hardest is **Sweet** (ties at the top are all Sweet) and a weaker one **Sour**;
+//! * when the frame's strongest is weaker than the strongest seen earlier in the same action (the sweet phase is over), its hitboxes are **Late**;
+//! * hitboxes equal in knockback and damage, and a lone hitbox with nothing stronger before it, have no label.
 //!
-//! The game does not say which slot connected (the only native is `AttackModule::is_infliction_status`, one flag for the whole
-//! module), so a hit is attributed by the damage it added to the defender (`attribute`): the game scales every slot's damage by the
-//! same numbers. The attacker's own is `AttackModule::power_mul_status` (module `+0xe0`: 1.0, or the smash charge, which the common
-//! fighter script sets with `set_power_mul_status` and `get_power` multiplies every slot by; the strip reads it through the game's
-//! getter and `attribute` divides it out), and the defender's side adds the rest (Eden, 2026-11-14: a fresh hit adds 1.26 times the
-//! slot's damage, two fighters' 1.2 times the 1.05 of a fresh move; staling lowers it to about 1.07). So a slot is a candidate when
-//! the added damage divided by its own damage and the charge lies in that window, and a slot outside it cannot have connected. The
-//! label shows only when every candidate gets the same class; no candidate, or candidates of different classes, is no label.
+//! A hit is attributed (`attribute`) to the attack slot the game itself recorded for it: the defender's damage record keeps the slot id of
+//! the hit whose knockback it stored (`+0x52`, beside the knockback at `+0x10` that `DamageModule::reaction` returns; spots-3, Eden
+//! 2026-11-15). Two cross-checks against that slot: the damage gained over its damage and the attacker's charge in `K_LOW..=K_HIGH`, and
+//! the knockback received over its knockback in `KB_LOW..=KB_HIGH`. Anything else has no label. The knockback carries the attacker's rage
+//! and the game's ceiling (`launched_by`), and past the damage cap the damage comes from the record (`added`), so no percent is out of range.
 
 /// The rows (decision SP5): the strip's labels and the combo's match, toggles Off by default. The hitbox visualizer's *Frame data colours*
 /// (`hitbox::legend_colour`) is an item of its checklist (`legend::COLOURS`).
@@ -27,15 +28,141 @@ pub fn row_on(snapshot: &super::settings::Snapshot, id: &str) -> bool {
 /// Attack slots a fighter has (`hitbox::SLOTS`).
 pub const SLOTS: usize = 8;
 
-/// The damage of each attack slot that is active, 0.0 for one that is not (or that deals none).
-pub type Powers = [f32; SLOTS];
+/// One active attack slot's launch numbers, from its `AttackData` (`hitbox::layout::POWER`, `legend::KNOCKBACK_QUADS`); all zero for a slot
+/// that is not active.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Hit {
+    pub damage: f32,
+    pub growth: i32,
+    pub fixed: i32,
+    pub base: i32,
+}
 
-/// Damages closer than this are equal.
+/// Every attack slot's `Hit`.
+pub type Powers = [Hit; SLOTS];
+
+/// What a hitbox's knockback depends on besides its own numbers: the attacker's damage multiplier (`AttackModule::power_mul_status`: 1.0, or
+/// the smash charge), the defender's percent before the hit and its weight (`WorkModule` parameter `weight`), and the attacker's percent
+/// (its rage, `rage`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Launch {
+    pub mul: f32,
+    pub percent: f32,
+    pub weight: f32,
+    pub attacker: f32,
+}
+
+/// The game's own numbers (13.0.5): rage from `fighter/common/param/common.prc` (`damage_reaction_mul_min_damage`, `_max_damage`,
+/// `damage_reaction_mul_max`); the knockback ceiling (`reaction_max`) and the damage cap (`damage_max`) from the battle parameters.
+pub const RAGE_FROM: f32 = 35.0;
+pub const RAGE_FULL: f32 = 150.0;
+pub const RAGE_MAX: f32 = 1.1;
+pub const REACTION_MAX: f32 = 2500.0;
+pub const DAMAGE_MAX: f32 = 999.0;
+
+/// The rage multiplier of an attacker at `percent`, as the fighter's update computes it every frame (`main+0x617bf0`, passed to
+/// `AttackModule::set_damage_reaction_mul`): 1 + (max − 1) · (percent − 35) / (150 − 35), the result held within 1.0 ..= 1.1. Any percent
+/// goes in; the game bounds the multiplier, not the percent. Eden measured x1.022 at 60.3% (spots3-bedc9a69-1).
+pub fn rage(percent: f32) -> f32 {
+    ((RAGE_MAX - 1.0) * ((percent - RAGE_FROM) / (RAGE_FULL - RAGE_FROM)) + 1.0).clamp(1.0, RAGE_MAX)
+}
+
+/// The knockback the game gives `hit` (`knockback`) with the attacker's rage, which only a hitbox without fixed knockback takes
+/// (`main+0x401e50`: the fixed path skips it), and never above the game's ceiling, `REACTION_MAX`.
+fn launched_by(hit: &Hit, d: f32, p: f32, w: f32, attacker: f32) -> f32 {
+    let r = if hit.fixed == 0 { rage(attacker) } else { 1.0 };
+    (r * knockback(hit, d, p, w)).min(REACTION_MAX)
+}
+
+/// The damage a hit added, in the percent's terms: the rise of the defender's percent (`gained`), or, when the game's damage cap cut that
+/// short (`after`, the percent after the hit, at `DAMAGE_MAX`), the damage the defender's record says the hit dealt (`dealt`, record `+0x8`,
+/// before the 1-on-1 ratio, so times `TARGET_MUL`). 0.0 when neither shows a hit.
+pub fn added(gained: f32, dealt: f32, after: f32) -> f32 {
+    if after >= DAMAGE_MAX - EPS { gained.max(dealt * TARGET_MUL) } else { gained }
+}
+
+impl Launch {
+    /// Where there is no defender to read (a lone fighter): weight 100 at 0%.
+    pub const STANDARD: Launch = Launch { mul: 1.0, percent: 0.0, weight: 100.0, attacker: 0.0 };
+
+    /// The weight, the standard 100 when it was not read.
+    fn weight(self) -> f32 {
+        if self.weight.is_finite() && self.weight > 0.0 { self.weight } else { 100.0 }
+    }
+}
+
+/// Damages closer than this are equal; so are knockbacks closer than `KB_EPS`.
 pub const EPS: f32 = 0.05;
-/// The window of added damage over the hitbox's own damage times the attacker's charge (decision SP1's attribution), set from the
-/// `[Spots]` lines of Eden (the module notes): the remaining multiplier is 1.26 for a fresh hit and about 1.07 stalest.
-pub const K_LOW: f32 = 1.0;
+pub const KB_EPS: f32 = 0.5;
+/// The window of added damage over the recorded slot's damage times the attacker's charge: a fresh hit adds 1.26 (Eden, 2026-11-14); a
+/// stale one less, down to 0.563 measured (spots-3, Eden 2026-11-15: a jab the CPU mashed on every frame it could), so 0.5.
+pub const K_LOW: f32 = 0.5;
 pub const K_HIGH: f32 = 1.6;
+/// The defender's side of a fresh hit's damage (1.26, Eden 2026-11-14) and the part of it that is the 1-on-1 ratio (1.2; the rest, 1.05, is
+/// the attacker's freshness, which the formula's damage keeps).
+pub const DEALT: f32 = 1.26;
+pub const TARGET_MUL: f32 = 1.2;
+/// The window of received knockback over the recorded slot's knockback by the formula times the attacker's `rage`, with the game's percent
+/// (`struck_at`): Eden measured 0.9904 (a fully charged smash) to 1.0200 (a fully staled jab) on the game's own slot over the 93 hits of
+/// spots3-bade7ea6-1 and spots3-bedc9a69-1 (`eden/rc14-spots-3/spread.py`), plus a margin of 0.03 each side, to two decimals.
+pub const KB_LOW: f32 = 0.96;
+pub const KB_HIGH: f32 = 1.05;
+
+/// The percent the game feeds its knockback function for a hit that raised the defender from `before` by `added` (the percent's rise): the
+/// percent before plus the hit's damage before the 1-on-1 ratio, the defender's damage record `+0x0` + `+0x8` (the hit handler, `main+0x402e94`,
+/// passes that sum on to `main+0x401e50`). `+0x8` is `added / TARGET_MUL`: Eden's rise over it is 1.2000 on all 93 recorded hits. SmashWiki's
+/// "percent after the hit" (`before + added`) overstates it by the ratio's 0.2.
+fn struck_at(before: f32, added: f32) -> f32 {
+    before + added / TARGET_MUL
+}
+
+/// The knockback of `hit` dealing damage `d` to a defender of weight `w` at percent `p` (`struck_at`, the game's percent), by the game's formula
+/// (SmashWiki, *Knockback*): ((p/10 + p·d/20) · 200/(w+100) · 1.4 + 18) · growth/100 + base; a fixed knockback f takes the place of d, with p = 10.
+pub fn knockback(hit: &Hit, d: f32, p: f32, w: f32) -> f32 {
+    let (p, d) = if hit.fixed != 0 { (10.0, hit.fixed as f32) } else { (p, d) };
+    ((p / 10.0 + p * d / 20.0) * 200.0 / (w + 100.0) * 1.4 + 18.0) * hit.growth as f32 / 100.0 + hit.base as f32
+}
+
+/// What a hitbox ranks by: its knockback against the defender, then its damage.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Power {
+    knockback: f32,
+    damage: f32,
+}
+
+impl Power {
+    fn of(hit: &Hit, launch: Launch) -> Power {
+        let d = hit.damage * launch.mul;
+        Power { knockback: launched_by(hit, d, struck_at(launch.percent, d * DEALT), launch.weight(), launch.attacker), damage: hit.damage }
+    }
+
+    /// Weaker than `other`: by more than `KB_EPS` in knockback, or equal in knockback and by more than `EPS` in damage.
+    fn below(self, other: Power) -> bool {
+        if (self.knockback - other.knockback).abs() > KB_EPS { self.knockback < other.knockback } else { self.damage < other.damage - EPS }
+    }
+}
+
+/// The class of every slot of `active` against `launch`, `earlier` being the strongest hitbox seen before this frame in the same action
+/// (`Hit::default()` when none); `None` for a slot that is not active and for one with no label.
+pub fn classify(active: &Powers, launch: Launch, earlier: &Hit) -> [Option<Spot>; SLOTS] {
+    let mut out = [None; SLOTS];
+    let live = |h: &&Hit| h.damage > 0.0;
+    let Some(strongest) = active.iter().filter(live).map(|h| Power::of(h, launch)).reduce(|a, b| if a.below(b) { b } else { a }) else { return out };
+    let late = earlier.damage > 0.0 && strongest.below(Power::of(earlier, launch));
+    for (slot, hit) in active.iter().enumerate().filter(|(_, h)| live(h)) {
+        let power = Power::of(hit, launch);
+        out[slot] = if late {
+            Some(Spot::Late)
+        } else if power.below(strongest) {
+            Some(Spot::Sour)
+        } else if active.iter().filter(live).any(|h| Power::of(h, launch).below(power)) {
+            Some(Spot::Sweet)
+        } else {
+            None
+        };
+    }
+    out
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Spot {
@@ -60,68 +187,61 @@ impl Spot {
     }
 }
 
-/// The class of a hitbox of damage `p` among the `active` ones, `earlier` being the strongest damage seen before this frame in the
-/// same action (0.0 when none). `None`: no label.
-pub fn classify(p: f32, active: &Powers, earlier: f32) -> Option<Spot> {
-    if p.is_nan() || p <= 0.0 {
-        return None;
-    }
-    let strongest = active.iter().copied().fold(0.0, f32::max);
-    if strongest < earlier - EPS {
-        Some(Spot::Late)
-    } else if p < strongest - EPS {
-        Some(Spot::Sour)
-    } else if active.iter().any(|&q| q > 0.0 && q < p - EPS) {
-        Some(Spot::Sweet)
-    } else {
-        None
-    }
-}
-
-/// The strongest damage of one fighter's current action: what `classify` takes as `earlier`. An action is one status; a new one
-/// starts when the status changes or the motion goes back (the same status entered again, as a jab's next hit does).
+/// The strongest hitbox of one fighter's current action: what `classify` takes as `earlier`. An action is one status; a new one starts when
+/// the status changes or the motion goes back (the same status entered again, as a jab's next hit does). It keeps the hitbox, not a number,
+/// so it is measured again against the defender as it is now.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Peak {
     status: i32,
     frame: f32,
-    value: f32,
+    hit: Hit,
 }
 
 impl Peak {
     pub const fn new() -> Peak {
-        Peak { status: i32::MIN, frame: 0.0, value: 0.0 }
+        Peak { status: i32::MIN, frame: 0.0, hit: Hit { damage: 0.0, growth: 0, fixed: 0, base: 0 } }
     }
 
-    /// The strongest damage seen earlier in this action, for a frame in `status` at motion frame `frame`.
-    pub fn earlier(&mut self, status: i32, frame: f32) -> f32 {
+    /// The strongest hitbox seen earlier in this action, for a frame in `status` at motion frame `frame`.
+    pub fn earlier(&mut self, status: i32, frame: f32) -> Hit {
         if status != self.status || frame < self.frame {
-            self.value = 0.0;
+            self.hit = Hit::default();
         }
         (self.status, self.frame) = (status, frame);
-        self.value
+        self.hit
     }
 
-    /// Fold this frame's active damages in, after the frame was classified.
-    pub fn fold(&mut self, active: &Powers) {
-        self.value = self.value.max(active.iter().copied().fold(0.0, f32::max));
-    }
-}
-/// The spot of the hit that added `gained` damage to the defender, from the attacker's `active` hitboxes, the attacker's damage multiplier
-/// `mul` (`AttackModule::power_mul_status`: 1.0, or the smash charge; 0.0 is a read that was not made) and the action's `earlier` peak.
-/// `None` when it cannot be told, which includes a multiplier that is not a positive number.
-pub fn attribute(gained: f32, active: &Powers, mul: f32, earlier: f32) -> Option<Spot> {
-    if !gained.is_finite() || gained <= 0.0 || !mul.is_finite() || mul <= 0.0 {
-        return None;
-    }
-    let mut found: Option<Option<Spot>> = None;
-    for &p in active.iter().filter(|&&p| p > 0.0 && (K_LOW..=K_HIGH).contains(&(gained / (p * mul)))) {
-        let class = classify(p, active, earlier);
-        match found {
-            Some(other) if other != class => return None,
-            _ => found = Some(class),
+    /// Fold this frame's active hitboxes in, after the frame was classified.
+    pub fn fold(&mut self, active: &Powers, launch: Launch) {
+        for hit in active.iter().filter(|h| h.damage > 0.0) {
+            if self.hit.damage <= 0.0 || Power::of(&self.hit, launch).below(Power::of(hit, launch)) {
+                self.hit = *hit;
+            }
         }
     }
-    found.flatten()
+}
+
+/// A hit as the defender took it: the damage it gained, the knockback it received (`DamageModule::reaction`; 0.0 when not read) and the
+/// attack slot the game recorded for it (`None`: not read, not written this frame, or another object's hit).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Landed {
+    pub gained: f32,
+    pub launched: f32,
+    pub slot: Option<usize>,
+}
+
+/// The spot of the hit `landed`: the class of the slot the game recorded, among the attacker's `active` hitboxes against `launch` (its
+/// multiplier and the defender before the hit) with the action's `earlier` peak, when that slot is active and both cross-checks hold. `None`
+/// otherwise, which includes a multiplier that is not a positive number (0.0: a read that was not made).
+pub fn attribute(landed: Landed, active: &Powers, launch: Launch, earlier: &Hit) -> Option<Spot> {
+    let Landed { gained, launched, slot } = landed;
+    let hit = active.get(slot?).filter(|h| h.damage > 0.0)?;
+    if !gained.is_finite() || gained <= 0.0 || !launch.mul.is_finite() || launch.mul <= 0.0 {
+        return None;
+    }
+    let k = launched_by(hit, gained / TARGET_MUL, struck_at(launch.percent, gained), launch.weight(), launch.attacker);
+    let fits = (K_LOW..=K_HIGH).contains(&(gained / (hit.damage * launch.mul))) && k > 0.0 && (KB_LOW..=KB_HIGH).contains(&(launched / k));
+    fits.then(|| classify(active, launch, earlier)[slot?]).flatten()
 }
 
 #[cfg(test)]

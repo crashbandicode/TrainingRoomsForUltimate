@@ -51,6 +51,8 @@ pub struct Env {
     pub build_tag: &'static str,
     /// The menu opened in a waiting room's practice, where Hide CPU does nothing yet (SPEC-eggsercise V2.6).
     pub waiting_room: bool,
+    /// rc.14: how many Stage Builder stages the save holds (extra tiles after the catalog on the stage grids).
+    pub custom_stages: u16,
 }
 
 impl Default for Env {
@@ -67,6 +69,7 @@ impl Default for Env {
             combo_draft: super::combo::Label::EMPTY,
             build_tag: "",
             waiting_room: false,
+            custom_stages: 0,
         }
     }
 }
@@ -1205,8 +1208,8 @@ impl Menu {
             }
             // The console mode is read now and the layout stays until the grid closes.
             Editor::GiveItem => Screen::Grid { layout: GridLayout::new(GridKind::Items, self.env.console), page: 0, cell: 0 },
-            Editor::StageGrid => Screen::Grid { layout: GridLayout::new(GridKind::Stages, self.env.console), page: 0, cell: 0 },
-            Editor::ChangeStage => Screen::Grid { layout: GridLayout::new(GridKind::StageChange, self.env.console), page: 0, cell: 0 },
+            Editor::StageGrid => Screen::Grid { layout: GridLayout::new(GridKind::Stages, self.env.console).with_custom_stages(self.env.custom_stages), page: 0, cell: 0 },
+            Editor::ChangeStage => Screen::Grid { layout: GridLayout::new(GridKind::StageChange, self.env.console).with_custom_stages(self.env.custom_stages), page: 0, cell: 0 },
             Editor::PortraitPlayer => self.roster_screen(RosterUse::PlayerPick),
             Editor::PortraitCpu => self.roster_screen(RosterUse::CpuPick),
             Editor::CharacterCycles => self.roster_screen(RosterUse::Cycles),
@@ -1310,6 +1313,10 @@ impl Menu {
         if matches!(row.control, Control::Editor(Editor::KirbyHats)) {
             changed |= self.reset_row("cpu_kirby_hats");
         }
+        // rc.14: the order with custom stages is the Lobby Stages row's second kept key.
+        if matches!(row.control, Control::Editor(Editor::StageGrid)) {
+            changed |= self.reset_row("lobby_stage_order");
+        }
         // One row, both roles' loop counts: the counts are the recording index's, not in the settings snapshots.
         if row.id == LOOP_ROW {
             changed |= self.recording.reset_loops();
@@ -1342,6 +1349,10 @@ impl Menu {
 
     /// Factory JSON of a kept key. A missing key already means this. `None` when this menu does not own it.
     fn kept_page_default(id: &str) -> Option<serde_json::Value> {
+        if id == "lobby_stage_order" {
+            // `custom_stages::StageOrder::default()` (the Waiting Room alone; its test pins this form).
+            return Some(serde_json::json!({"all": false, "entries": [{"stage": 311}]}));
+        }
         let values = match id {
             "player_roster" | "cpu_roster" => Self::bytes(Self::CYCLE_CHOICES + 1, &[(0, 1)]),
             "player_kirby_hats" | "cpu_kirby_hats" => Self::bytes(Self::CYCLE_CHOICES + 1, &[(1, 1)]),

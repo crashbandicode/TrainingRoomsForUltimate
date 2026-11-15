@@ -75,6 +75,14 @@ impl TrainingRotation {
     pub fn entry(
         &mut self, owner: usize, enabled: bool, order: LobbyStageOrder, prefs: &Preferences,
     ) -> Entry {
+        self.entry_lists(owner, enabled, || crate::engine::stages::custom_stages::lists(order, prefs, None))
+    }
+
+    /// rc.14: `entry` over the lists the runtime built with the save's custom stages (`custom_stages::lists`).
+    pub fn entry_lists(
+        &mut self, owner: usize, enabled: bool,
+        lists: impl FnOnce() -> Result<crate::engine::stages::custom_stages::Lists, &'static str>,
+    ) -> Entry {
         if self.owner != Some(owner) {
             self.sequence_initialized();
             self.owner = Some(owner);
@@ -93,7 +101,7 @@ impl TrainingRotation {
         // prepared and abandoned; it resolves the current preferences.
         self.cycle.cancel_preload();
         self.current = None;
-        match self.cycle.prepare_preferences(true, order, prefs, false) {
+        match self.cycle.prepare_lists(true, lists, false) {
             Ok(Some(selection)) => match native_stage(selection) {
                 Ok(native) => Entry::Prepared(selection, native),
                 Err(why) => {
@@ -104,6 +112,11 @@ impl TrainingRotation {
             Ok(None) => Entry::Refused("no Training rotation stages selected"),
             Err(why) => Entry::Refused(why),
         }
+    }
+
+    /// rc.14: the stage the next genuine entry would prepare (rotation only), for a custom stage's read-ahead.
+    pub fn peek(&self, lists: &crate::engine::stages::custom_stages::Lists) -> Option<Selection> {
+        self.cycle.peek_lists(lists, false)
     }
 
     /// The product reenter succeeded for `owner`; its next age-zero call is a return.

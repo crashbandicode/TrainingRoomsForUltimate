@@ -42,7 +42,7 @@ rename it on its own screen). The Record presses themselves are not in the recor
 
 - **Who records:** the side the pop-up is set to (Player 1 until you pick CPU there). A recording made for the CPU
   names the CPU's fighter. Stopping makes the new macro that side's active macro, so you can Play at once, and the
-  most recently used of its kind (the [hot five](../menu/recording.md#save-states--macros)).
+  most recently used of its kind (the [hot five](../menu/recording.md#save-states-macros)).
 - **The start save:** Record also writes a save state, "Macro 1 · start", with both fighters where they stood. The
   macro remembers that save, and the fighter's facing and speed at that moment.
 - **Start save switch** (on the macro's own screen, On by default): On warps both fighters to the start save once,
@@ -117,7 +117,7 @@ A chain is a macro made of macros: an ordered list of your recordings, numbered 
 because the picker lists recordings only.
 
 - **Make one:** + New chain, the last row under MACROS, opens the numbered picker
-  ([how it works](../menu/recording.md#a-files-own-screen)). It is the Character Cycles picker, except that R can take
+  ([how it works](../menu/recording.md#a-file-s-own-screen)). It is the Character Cycles picker, except that R can take
   off the last number, so a chain can end up empty. A on a tile that already has a number does nothing.
 - **Where it starts:** at its first macro's start save. The chain has its own Start save switch, On by default. On
   warps there once when the Play chord starts the chain. Off plays from where the fighters are. The macros inside don't
@@ -128,7 +128,8 @@ because the picker lists recordings only.
 
 ![The CPU's Play chord warps to macro 1's start save, then plays the chain in order](../media/rc7-chain-play.gif)
 
-<!-- CAPTURE-REQUEST rec-chain-picker: the numbered picker for + New chain (numbers 1, 2, 3 on recordings, R removing one, then the name step). A GIF; see artifacts/docs4/CAPTURE-REQUESTS.md. -->
+![+ New chain: the numbered picker; A numbers the tile under the cursor, R takes the last number off, B finishes; the new chain is listed](../media/rc13-chain-picker.gif)<br>
+*+ New chain opens the numbered picker. A gives the tile under the cursor the next number (Neutral air 1, Dash attack 2, P1 jab 3), R takes the last number off, A numbers it again, B finishes and asks for a name (empty keeps Chain N). The keyboard step is cut. The chain is written when the menu closes: reopened, MACROS lists Chain 2 with its three steps and CONNECTIONS. Eden, rc.13 (untested on hardware).*
 
 ## Combos
 
@@ -183,7 +184,7 @@ recorded one.
 
 ### Crop
 
-Crop on a combo or a macro opens two handles, In and Out ([keys](../menu/recording.md#a-files-own-screen)).
+Crop on a combo or a macro opens two handles, In and Out ([keys](../menu/recording.md#a-file-s-own-screen)).
 
 - The cut is saved as a new file under the next unused Macro N or Combo N, and you go back to the original, which stays.
 - A macro crop keeps that range of frames. The new macro keeps the original's one start save, stamped at the crop's
@@ -282,7 +283,7 @@ A row's connections are not limited to the side in view.
 ## A file's own screen
 
 On the Recording page, A on a file opens its own screen. The rows each kind of file has are in
-[the menu reference](../menu/recording.md#a-files-own-screen). The rules behind them:
+[the menu reference](../menu/recording.md#a-file-s-own-screen). The rules behind them:
 
 - **Set active** is one row, for the side in view: Right sets On and Left sets Off. Left on a row that is already Off
   doesn't clear the other side.
@@ -330,6 +331,9 @@ the side that plays it.
 **The Replay window** lists your saved match captures. A opens the clip editor on one: the fighter, the crop window,
 the playhead and the timeline. On a capture's Mii track it reads the recorded Mii, asks Fighter Mismatch, and Switch
 loads that exact Mii on the CPU. Its keys are in the [menu reference](../menu/recording.md#replay-window).
+
+![Replay capture flips On; after a 1-stock match the Save Replay question is answered Yes and "Replay saved" shows; the Replay window then lists the capture](../media/rc13-replay-capture.gif)<br>
+*With Replay capture On, a 1-stock match is played and its replay saved: A, A, Y on the results opens "Save a replay of this battle?", Right and A answer Yes ("Replay saved"), and Recording > Replays > Replay window then lists the capture with its name and length. The loads, the match and the menus between the clips are cut. Eden, rc.13 (untested on hardware).*
 
 <!-- CAPTURE-REQUEST rec-replay-editor: the Replay window's clip editor, a still with the fighter, the crop window, the playhead and the timeline visible (rc.13). See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 

@@ -3,6 +3,10 @@
 TrainingRooms adds practice tools to Super Smash Bros. Ultimate's Training mode and to the waiting rooms of online and
 local play: hitboxes, save states, recordings, combo drills, game speed and more, all from one menu.
 
+**Current release: [rc.14](docs/CURRENT-RELEASE.md)**, untested on hardware. What's new, how to install it and what is
+known not to work are on that page. New here? Start with [Getting started](docs/guide/getting-started.md). Something not
+working? See [Troubleshooting](docs/guide/troubleshooting.md).
+
 ![The menu's five pages, then Hitbox Visualization turned on and a neutral air's red hitbox](docs/media/rc11-menu-tour.gif)<br>*The menu, then hitboxes on*
 
 Every option is documented in the [docs](docs/README.md), one page per menu page.
@@ -114,6 +118,10 @@ The grab boxes are magenta:
 
 ![At 1/4 speed, the magenta grab boxes of Mario's grab, Samus's tether and Olimar's Pikmin; each grabber keeps its yellow hurtboxes](docs/media/rc13-grab-boxes.gif)<br>*Grab boxes in magenta. Eden, rc.13 (untested on hardware).*
 
+Tick **Windboxes** to see the pushes that cause no hitstun, such as F.L.U.D.D.'s water, in deep blue.
+
+<!-- CAPTURE-REQUEST hb-legend-v03 (README clip): the windbox clip described under hb-legend-v03 in docs/menu/display-and-controls.md, F.L.U.D.D. then Ganondorf's up tilt, one short clip with a one-line caption. -->
+
 The page also has the input display, frame advantage and your own buttons.
 
 All the options: [the Display & Controls page](docs/menu/display-and-controls.md).
@@ -136,11 +144,11 @@ endorsed by Nintendo.
 
 ## More
 
-[The docs](docs/README.md): every menu page and guide. The newest build is
-[rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13), Eden-tested and
-**untested on hardware** (see [Status](docs/TECHNICAL.md#status)). Release notes: rc.12's and rc.13's are on their
-[release pages](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases); [rc.9](docs/RELEASE-NOTES-rc9.md)
-is the newest written in this folder. [Technical notes](docs/TECHNICAL.md).
+[The docs](docs/README.md): every menu page and guide. The current release is [rc.14](docs/CURRENT-RELEASE.md),
+**untested on hardware** (see [Status](docs/TECHNICAL.md#status)): what's new, how to install it and its known issues.
+Release notes for rc.12, rc.13 and rc.14 are on their
+[release pages](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases); the ones in the docs folder
+(rc.5, rc.6, rc.8 and rc.9) are listed on [the docs page](docs/README.md#reference). [Technical notes](docs/TECHNICAL.md).
 
 ## Build
 

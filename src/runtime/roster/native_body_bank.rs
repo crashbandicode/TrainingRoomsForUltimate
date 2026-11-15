@@ -571,6 +571,8 @@ static NEIGHBOURS: [AtomicU64; 2] = [AtomicU64::new(u64::MAX), AtomicU64::new(u6
 
 /// rc.12 (a′): per role, the target of the last window plan when it was target-first (`proposed`), `u32::MAX` otherwise.
 static TARGET_FIRST: [AtomicU32; 2] = [AtomicU32::new(u32::MAX), AtomicU32::new(u32::MAX)];
+/// rc.14: the module pins' "this tick is another entry's" line is written once per held set (`service`).
+static PIN_WAIT_NOTED: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
 
 /// rc.12 (a′): while `submit` issues a role's target-first Reload, its target (`u32::MAX` otherwise): `retire_groups`
 /// keeps the detached groups `body_bank::kept_across_reload` admits and `build` carries them into the new bank.
@@ -978,6 +980,40 @@ fn cycle_wanted(menu: &crate::engine::compat::menu::TrainingModpackMenu, role: u
     wanted
 }
 
+/// rc.14 cycle fix, Gap 1 (`body_bank::shrink_release`): when Ready Fighters is lowered below the bodies already
+/// resident, the farthest group leaves now, one per planner pass, as `cold_release` frees a cold one. Each bank is read
+/// under its own lock alone. A cold fighter's group and its allowance (`Bank::over`), and a bank mid-switch, stay.
+fn shrink_to_ready(settings: &crate::engine::preload::cycle_preload_config::Settings,
+    lanes: &[[Option<crate::runtime::roster::cycle_preload::Target>; crate::runtime::roster::cycle_preload::MAX_TARGETS]; 4]) {
+    let (mut bodies, mut allowed) = (2usize, usize::from(settings.ready_fighters));
+    let mut units = crate::engine::compat::fixed::FixedList::<(usize, usize, usize), { 2 * MAX_EXTRA_GROUPS }>::new((0, 0, 0));
+    for role in 0..2 {
+        let state = BANKS[role].lock();
+        let Some(bank) = state.as_ref().filter(|b| !b.departed && b.phase != Phase::Retired) else { continue; };
+        bodies += extra_bodies(bank);
+        allowed += crate::engine::swap::body_bank::cold_allowance(&bank.over, bank.observed.map(|(_, live)| live));
+        if bank.phase != Phase::Ready || bank.swap.is_some() { continue; }
+        for (index, g) in bank.groups.iter().enumerate() {
+            let kinds = &g.members.kinds()[..g.members.count()];
+            if !g.state.counts_bodies() || g.leaving || bank.over.iter().any(|(k, _)| kinds.contains(k)) { continue; }
+            let distance = kinds.iter().filter_map(|kind| lanes[2 + role].iter()
+                .position(|t| t.is_some_and(|t| t.kind == *kind))).min().unwrap_or(usize::MAX);
+            units.push((role, index, distance));
+        }
+    }
+    let Some((role, index)) = crate::engine::swap::body_bank::shrink_release(units.iter().copied(), bodies, allowed) else { return; };
+    let mut state = BANKS[role].lock();
+    let Some(bank) = state.as_mut().filter(|b| b.phase == Phase::Ready && !b.departed && b.swap.is_none()) else { return; };
+    let owner = bank.owner;
+    let Some(g) = bank.groups.get_mut(index).filter(|g| g.state.counts_bodies() && !g.leaving) else { return; };
+    trace!("[GroupSwap] shrink owner={} group={} kinds={:x?} state={:?} bodies={} ready_fighters={} allowed={}: Ready Fighters is below what is resident; the farthest group leaves",
+        owner, index, &g.members.kinds()[..g.members.count()], g.state, bodies, settings.ready_fighters, allowed);
+    match g.state {
+        GroupState::Planned | GroupState::Held(_) | GroupState::Failed => g.state = GroupState::Released,
+        _ => { g.leaving = true; g.release_now = true; }
+    }
+}
+
 /// Value-only group planning on the sparse planner: appends `Planned` groups to
 /// a Ready window bank; never removes or touches a native object. Returns the
 /// extra-group bodies charged to the shared budget and the per-role UI targets.
@@ -1018,6 +1054,7 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
     // now when they need its room (operator rule 2026-11-09 13:21Z, below). The window itself (on screen) stays until it
     // is switched away.
     let wanted = [cycle_wanted(menu, 0), cycle_wanted(menu, 1)];
+    shrink_to_ready(settings, lanes);
     for role in 0..2 {
         let mut state = BANKS[role].lock();
         if let Some(bank) = state.as_mut().filter(|bank| bank.phase == Phase::Ready && !bank.departed) {
@@ -1164,11 +1201,11 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
                 .and_then(|bank| bank.groups.iter().enumerate().find(|(_, g)| matches!(g.state, GroupState::Held(_)))
                     .map(|(group, g)| (bank.owner, group, *g.members, g.state)));
             let Some((owner, group, members, state)) = held else { continue; };
-            let refused = state == GroupState::Held(Hold::Memory) && matches!(
-                super::process_memory::admit(memory::group_cost(&members.kinds()[..members.count()])).0.admission,
-                Admission::Refuse);
-            if let Some(reason) = still_short(state, refused, pool_free, members.count()) {
-                release_for_capacity(owner, group, reason);
+            let decision = (state == GroupState::Held(Hold::Memory))
+                .then(|| super::process_memory::admit(memory::group_cost(&members.kinds()[..members.count()])).0)
+                .filter(|decision| matches!(decision.admission, Admission::Refuse));
+            if let Some(reason) = still_short(state, decision.is_some(), pool_free, members.count()) {
+                release_for_capacity(owner, group, reason, decision.map(|d| d.need.saturating_sub(d.available)));
             }
         }
     }
@@ -1190,7 +1227,8 @@ static DIAG_CYCLE: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::
 #[cfg(feature = "diag")]
 pub(crate) fn set_diag_cycle(bits: u8) {
     DIAG_CYCLE.store(bits, Ordering::Release);
-    trace!("[GroupSwap] diag cycle force_reload={} keep_mii={} keep_window={}", bits & 1 != 0, bits & 2 != 0, bits & 4 != 0);
+    trace!("[GroupSwap] diag cycle force_reload={} keep_mii={} keep_window={} kirby_strip={} keep_pt={} keep_aegis={}",
+        bits & 1 != 0, bits & 2 != 0, bits & 4 != 0, bits & 8 != 0, bits & 16 != 0, bits & 32 != 0);
 }
 
 fn diag_cycle(bit: u8) -> bool {
@@ -1227,8 +1265,10 @@ fn bodies_with(bank: &Bank, other: usize) -> usize {
 /// prefetches (`group_lifecycle` runs its serving step first) and its first switch builds it, as for any prefetched
 /// group. True while the press waits for that group. False is today's path (the Reload): Group Swap off, no Ready bank,
 /// a kind no one-member group holds, no free slot, no room, or a group the admissions held (process memory, the pool
-/// reserve), that failed, or that is reachable already.
-pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>) -> bool {
+/// reserve), that failed, or that is reachable already. A press out of the role's live Mii group (`exit`, Gap 3) waits
+/// until its ordinary group is Built in the background (`body_bank::demand_waits`), since the warm exit takes only a
+/// Built group; without an admitted background build beside that Mii window it takes today's path at once.
+pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>, exit: bool) -> bool {
     let Some(role) = role(owner) else { return false; };
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if !ENABLED.load(Ordering::Acquire) || !settings.fighters || settings.bank_members < 2 || !groups_enabled(&settings) {
@@ -1253,9 +1293,14 @@ pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>
         return true;
     }
     let mii = configuration.is_some();
+    let observed = bank.observed.map(|(_, live)| live);
     if let Some(g) = bank.groups.iter().find(|g| g.state != GroupState::Released && !g.leaving && g.members.index_of(kind).is_some()) {
         let same = if mii { g.configuration == configuration } else { g.identity.is_none() };
-        if same && matches!(g.state, GroupState::Planned | GroupState::Prefetching) { return true; }
+        let build_owed = exit && (background_owed(bank, g, observed) || bank.background.is_some());
+        if same && exit && !exit_buildable(bank, *g.members, observed) {
+            return declined(format_args!("its group has no background build beside the live Mii window"));
+        }
+        if same && crate::engine::swap::body_bank::demand_waits(g.state, exit, build_owed) { return true; }
         // A reachable group serves the press as any group swap; a held, failed or other identity's one does not.
         return if g.state.reachable() && same { false } else { declined(format_args!("its group is {:?}", g.state)) };
     }
@@ -1271,7 +1316,10 @@ pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>
         None
     };
     let Some(members) = members else { return declined(format_args!("no one-member group holds it")); };
-    let Some(live) = bank.observed.map(|(_, live)| live) else { return declined(format_args!("nothing observed live")); };
+    let Some(live) = observed else { return declined(format_args!("nothing observed live")); };
+    if exit && !exit_buildable(bank, members, observed) {
+        return declined(format_args!("no background build beside the live Mii window"));
+    }
     if bank.groups.next_slot().is_none() { return declined(format_args!("no free group slot")); }
     let (bodies, ready) = (bodies_with(bank, other) + members.count(), usize::from(settings.ready_fighters));
     if !crate::engine::swap::body_bank::cold_admitted(bodies, ready, members.count(), &bank.over, live) {
@@ -1289,6 +1337,14 @@ pub(super) fn demand(owner: u32, kind: u32, configuration: Option<Configuration>
     trace!("[GroupSwap] demand owner={} group={} kinds={:x?} special={:?} bodies={} ready_fighters={} cold={}: the press waits for its own group; no Reload",
         owner, slot, &members.kinds()[..members.count()], members.special(), bodies, ready, over);
     true
+}
+
+/// rc.14 Gap 3: whether an ordinary group of `members` can be built in the background beside this bank's live window
+/// (`background_build_eligible`; beside a live Mii window only with the owner's ordinary baseline and its hooks on).
+fn exit_buildable(bank: &Bank, members: Members, observed: Option<u32>) -> bool {
+    BACKGROUND_ENABLED.load(Ordering::Acquire) && (bank.identity.is_none() || BACKGROUND_MII_ENABLED.load(Ordering::Acquire))
+        && background_build_eligible(members, false, *bank.members, live_identity(bank), live_kirby_gate(observed),
+            BACKGROUND_PAIR_TAIL.load(Ordering::Acquire), BACKGROUND_X4.load(Ordering::Acquire)).is_ok()
 }
 
 /// rc.14 cycle fix: after a switch, the cold fighter loaded over Ready Fighters that is no longer on screen
@@ -1343,6 +1399,9 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
     // or a release decided for it is in progress; "waiting for memory" means nothing more can be freed.
     let settled = RELEASE_WATCH.lock().settled();
     let coming = room_coming(settled, (0..2).any(releasing));
+    // rc.14 mem-headroom F2: helpers marked to give their memory back free it at the next pause (the source lock, before
+    // any bank lock).
+    let at_pause = super::sources::give_back_pending();
     for (role, state) in BANKS.iter().enumerate() {
         let planned = PLANNED_TARGETS[role].load(Ordering::Acquire);
         let releasing = RELEASE_MEMBERS[role].load(Ordering::Acquire);
@@ -1376,7 +1435,16 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
         // The Waiting text names the role whose own swap its unstarted fighters wait for.
         result.swap |= counts.swap_owed(role);
     }
+    result.room_at_pause = at_pause && result.held > 0 && result.hold == Some(Hold::Memory);
     result
+}
+
+/// rc.14 mem-headroom F2: the pause retired helpers (`sources::give_back_at_pause`): their room is on its way, as a parked
+/// group's free (the release watch: nothing more is freed for capacity, and a group held for memory shows as loading,
+/// until the game has unloaded their files and the purge ran).
+pub(super) fn note_room_freed() {
+    let mut watch = RELEASE_WATCH.lock();
+    *watch = watch.freed();
 }
 
 /// A kind held by any of this role's groups (window or extra): helper look-ahead
@@ -1618,9 +1686,10 @@ unsafe fn plan_in(entry: *const u8, owner: u32, descriptor: [u8; 0x70], upcoming
             };
         // A live Kirby parks only copy-free (EXCLUSIONS §2); a refusal is today's
         // Reload, which destroys this window and its groups as it always did.
+        // rc.14 a-full-2 (K-strip): a copy he holds goes first (`kirby_departure_gate`).
         let gated = gated || ((in_window || in_group) && target != KIRBY
             && members.ready_index(snapshot(entry)).is_some_and(|from|
-                match kirby_park_gate(entry, owner, members, from) {
+                match kirby_departure_gate(entry, owner, members, from, target) {
                     Ok(()) => false,
                     Err(reason) => {
                         trace!("[KirbyPark] fallback owner={} target={:#x} reason={}; canonical Reload", owner, target, reason);
@@ -1726,9 +1795,17 @@ unsafe fn pair_parkable(entry: *const u8, owner: u32) -> Result<(), &'static str
 /// remembered pointer; the decision itself is `body_bank::kirby_parkable`.
 /// Never called under the bank lock (the source lock is taken inside).
 unsafe fn kirby_park_gate(entry: *const u8, owner: u32, members: Members, from: u8) -> Result<(), &'static str> {
+    if members.kinds()[usize::from(from)] != KIRBY { return Ok(()); }
+    let (copy, retained, leased, _, _) = live_kirby_copy_state(entry, owner, from)?;
+    crate::engine::swap::body_bank::kirby_parkable(copy, retained, leased)
+}
+
+/// The live Kirby at cell `from`, proven as `kirby_park_gate` proves it, and what its gate reads: `(FLAG_COPY, retained copy
+/// object groups, hat lease, module accessor, body id)`.
+unsafe fn live_kirby_copy_state(entry: *const u8, owner: u32, from: u8)
+    -> Result<(bool, Option<u128>, bool, *mut smash::app::BattleObjectModuleAccessor, u32), &'static str> {
     use smash::app::{lua_bind::WorkModule, BattleObjectModuleAccessor};
     use smash::lib::lua_const::FIGHTER_KIRBY_INSTANCE_WORK_ID_FLAG_COPY;
-    if members.kinds()[usize::from(from)] != KIRBY { return Ok(()); }
     let base = BASE.load(Ordering::Acquire);
     let Some(body) = fields::child(entry as usize, 0x4160 + usize::from(from) * 8) else { return Err("Kirby body missing"); };
     if fields::read::<usize>(body, 0) != Some(base + FIGHTER_VTABLE)
@@ -1741,7 +1818,38 @@ unsafe fn kirby_park_gate(entry: *const u8, owner: u32, members: Members, from: 
     let copy = WorkModule::is_flag(module, *FIGHTER_KIRBY_INSTANCE_WORK_ID_FLAG_COPY);
     let retained = super::sources::retained_copy_kinds(module);
     let leased = super::sources::hat_lease_on_body(id);
-    crate::engine::swap::body_bank::kirby_parkable(copy, retained, leased)
+    Ok((copy, retained, leased, module, id))
+}
+
+/// rc.14 a-full-2 (K-strip): [`body_bank::KIRBY_STRIP_BEFORE_PARK`], or the diag build's `diag-cycle.req` `strip`.
+fn kirby_strip_on() -> bool {
+    crate::engine::swap::body_bank::KIRBY_STRIP_BEFORE_PARK || diag_cycle(8)
+}
+
+/// rc.14 a-full-2 (K-strip; AFULL2-RESEARCH.md "Limit 1", the primary 2026-11-14 ~23:24Z): [`kirby_park_gate`] for a live
+/// Kirby leaving for a warm member or group. When the gate refuses only because he holds a copy or a hat lease
+/// (`body_bank::kirby_departure` → `Strip`), his copy goes first through native copy loss, Kirby Hats' route
+/// (`sources::clear_hat_for_switch`, `0xb96770` behind seam `sources.kirby_copy_clear`), and his hat leases are released
+/// (`sources::finish_hat_clear`). Then the gate runs again. A Reloaded Kirby is hatless too, so nothing is lost against
+/// the copy gate's Reload, and the target's Built group stays warm instead of being rebuilt. Every other refusal, a
+/// strip that fails, and the switch off keep the refusal: today's Reload, logged with its reason (`[KirbyPark] strip`
+/// with `gate=Err`; a counted failure in the Eden rows). Same callback as the gate; no bank lock is held, and the source
+/// lock is taken and dropped inside `clear_hat_for_switch` before its native call.
+unsafe fn kirby_departure_gate(entry: *const u8, owner: u32, members: Members, from: u8, target: u32)
+    -> Result<(), &'static str> {
+    use crate::engine::swap::body_bank::{kirby_departure, KirbyDeparture};
+    let first = kirby_park_gate(entry, owner, members, from);
+    if first.is_ok() || members.kinds()[usize::from(from)] != KIRBY || !kirby_strip_on() { return first; }
+    let Ok((copy, retained, leased, module, id)) = live_kirby_copy_state(entry, owner, from) else { return first; };
+    if kirby_departure(copy, retained, leased, true) != KirbyDeparture::Strip { return first; }
+    let cleared = super::sources::clear_hat_for_switch(module)
+        .and_then(|()| super::sources::finish_hat_clear(module, false));
+    let after = kirby_park_gate(entry, owner, members, from);
+    let now = live_kirby_copy_state(entry, owner, from).ok();
+    trace!("[KirbyPark] strip owner={} target={:#x} body={:#x} copy={} retained={:?} lease={} cleared={:?} after={:?} gate={:?}{}",
+        owner, target, id, copy, retained, leased, cleared, now.map(|(c, r, l, _, _)| (c, r, l)), after,
+        if after.is_ok() { "; parks copy-free" } else { "; today's Reload" });
+    after
 }
 
 /// D-KIRBY1 (D-KIRBY1-ROB1-RCA.md §3): the kind the window's live Kirby copies
@@ -2021,9 +2129,14 @@ unsafe fn return_object_key(base: usize, role: usize, owner: u32, group: usize, 
         if !held { return; }
     }
     let alias = BANKS[role].lock().as_ref().map_or(0, |bank| bank.alias);
+    // rc.14 a-full-2 (integration-3's smoke2): the trainer window's holder runs code from the object kind's NRO; a reference
+    // of ours bridges the token's release, then R gets its node again (as `complete_exchange`'s post-build release does).
+    let held = crate::runtime::roster::module_pins::hold(alias, kind);
     let receipt = r_handle::release(base, ledger_role(role), Some(group), Some(&[kind][..]), &Occupancy::default(), why);
-    trace!("[GroupSwap] keys returned owner={} group={} object_kind={:#x} released={} kept={} map={} reason={}",
-        owner, group, kind, receipt.released, receipt.kept.len(), fields::read::<u64>(alias, 0x18).map_or(-1, |m| m as i64), why);
+    let asked = crate::runtime::roster::module_pins::hand_to(alias, kind, held);
+    trace!("[GroupSwap] keys returned owner={} group={} object_kind={:#x} released={} kept={} map={} module={:#x} asked={} reason={}",
+        owner, group, kind, receipt.released, receipt.kept.len(), fields::read::<u64>(alias, 0x18).map_or(-1, |m| m as i64), held,
+        asked, why);
 }
 
 /// The entry bytes a warm exit from this role's live Mii group writes back for `kind`: the reachable group `switch`
@@ -2064,6 +2177,8 @@ pub(super) unsafe fn submit(entry: *mut u8, owner: u32, plan: Plan,
     KEEPING[role].store(keeping, Ordering::Release);
     // rc.14 2e (a-full, A1): the attached window this target-first Reload keeps, read before `build` replaces the bank.
     let outgoing = if keeping == u32::MAX { None } else { outgoing_window(entry, owner, role, keeping) };
+    // rc.14 a-full-2 (probe a0, p4): a native window's holder before the Reload and after its start (diag build only).
+    native_window_probe(entry, owner, "before reload");
     before_reload(entry);
     if let Some(members) = plan.members {
         if !build(entry, owner, members) {
@@ -2073,10 +2188,37 @@ pub(super) unsafe fn submit(entry: *mut u8, owner: u32, plan: Plan,
     }
     let descriptor = super::native_fighter_install::Descriptor::from_bytes(&plan.descriptor);
     super::reload_at_pose(BASE.load(Ordering::Acquire), entry, &descriptor, pose);
+    native_window_probe(entry, owner, "after reload start");
     // Loader state 0 runs as soon as this pre-service poll returns (`native_service`): the window leaves first.
     if let Some(outgoing) = outgoing { keep_window(entry, owner, role, keeping, outgoing); }
     KEEPING[role].store(u32::MAX, Ordering::Release);
     true
+}
+
+/// rc.14 a-full-2, probe a0 (Aegis) and p4 (PT), diag build only: what a native window's holder looks like around the
+/// Reload start (`0x653490`: the bit-0 path walks a claimed trainer's articles at `0x653864`, the bit-2 path the holder's at
+/// `0x6534e4` when `+0x5a90` is set, then `+0x5a90 = 0`, `+0x591a = 0xff`). Values only: the flags `+0x591f`, the claim
+/// `+0x5a90`, the record `+0x5a98`, the holder's article count (`+0x10`) and each pool object's world byte `bo+0x61`
+/// (pass 1 clears it, `0x33a1c90`), `+0x5ab9` (the bit-0 path's write), and the trainer counts. No native call.
+unsafe fn native_window_probe(entry: *const u8, owner: u32, stage: &str) {
+    #[cfg(feature = "diag")]
+    {
+        let holder = read::<usize>(entry, 0x5a88);
+        if holder == 0 { return; }
+        let base = BASE.load(Ordering::Acquire);
+        let valid = valid_special_object(base, holder, owner);
+        let count = if valid { (fields::read::<u64>(holder, 0x10).unwrap_or(0) & 0xffff_ffff) as usize } else { 0 };
+        let mut world = [None::<u8>; 8];
+        for (i, byte) in world.iter_mut().enumerate().take(count) {
+            *byte = fields::child(holder, 0x20 + i * 8).and_then(|object| fields::read::<u8>(object, 0x61));
+        }
+        trace!("[GroupSwap] native window {} owner={} kinds={:x?} flags={:#x} claimed={:#x} record={:#x} holder={:#x} valid={} articles={} world={:?} pending={:#x} b9={:#x}{}",
+            stage, owner, [read::<u32>(entry, 0x18), read::<u32>(entry, 0x1c), read::<u32>(entry, 0x20)],
+            read::<u8>(entry, 0x591f), read::<usize>(entry, 0x5a90), read::<usize>(entry, 0x5a98), holder, valid, count,
+            &world[..count.min(8)], read::<u8>(entry, 0x591a), read::<u8>(entry, 0x5ab9), trainer_counts_note(base));
+    }
+    #[cfg(not(feature = "diag"))]
+    { let _ = (entry, owner, stage); }
 }
 
 /// rc.14 2e (a-full, A1): the attached window a target-first Reload may keep, as the bank knew it before `build`.
@@ -2089,6 +2231,11 @@ struct Outgoing {
     alias: usize,
     /// The bodies that stay exceed Ready Fighters: the target is loaded as Design A's cold fighter (`bank.over`).
     cold: bool,
+    /// The bank's cold marks before `build`: those of the window's members go with the kept window.
+    marks: FixedList<crate::engine::swap::body_bank::Cold, 2>,
+    /// rc.14 a-full-2 (limit 2): a Pokémon Trainer window's claimed trainer `+0x5a90` before the Reload start (non-zero:
+    /// the start ran pass 1 of `0x3a6b80` on the holder, `0x653864-0x65390c`; zero: it skipped it).
+    claimed: usize,
 }
 
 /// rc.14 2e (a-full, A1; AFULL-RESEARCH.md §2): before a target-first Reload onto `target`, whether its role's attached
@@ -2100,7 +2247,7 @@ struct Outgoing {
 /// itself is the farthest, it is not kept and native destroys it as before. No native write here.
 unsafe fn outgoing_window(entry: *mut u8, owner: u32, role: usize, target: u32) -> Option<Outgoing> {
     use crate::engine::swap::body_bank::{farthest_unit, window_kept_across_reload, COLD_OVER_ONE, KEEP_MII_ACROSS_RELOAD,
-        KEEP_WINDOW_ACROSS_RELOAD};
+        KEEP_PT_WINDOW_ACROSS_RELOAD, KEEP_WINDOW_ACROSS_RELOAD};
     if !(KEEP_WINDOW_ACROSS_RELOAD || diag_cycle(4)) || !GROUPS_ENABLED.load(Ordering::Acquire) { return None; }
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     if !groups_enabled(&settings) { return None; }
@@ -2113,7 +2260,8 @@ unsafe fn outgoing_window(entry: *mut u8, owner: u32, role: usize, target: u32) 
         .map(|b| *b.members)?;
     // The gates read the live body and the sources: outside the bank lock, as `plan_in` calls them.
     let from = members.ready_index(snapshot(entry))?;
-    let parks = kirby_park_gate(entry, owner, members, from)
+    // rc.14 a-full-2 (K-strip): a copy the live Kirby holds goes first, so his window can stay.
+    let parks = kirby_departure_gate(entry, owner, members, from, target)
         .and_then(|()| if members.is_pair() && from == 0 { pair_parkable(entry, owner) } else { Ok(()) });
     let mut state = BANKS[role].lock();
     let bank = state.as_mut().filter(|b| b.entry == entry as usize && b.owner == owner && b.phase == Phase::Ready
@@ -2121,7 +2269,9 @@ unsafe fn outgoing_window(entry: *mut u8, owner: u32, role: usize, target: u32) 
     let live = members.kinds()[usize::from(from)];
     let cold = bank.over.iter().any(|(kind, _)| *kind == live);
     let keep_mii = KEEP_MII_ACROSS_RELOAD || diag_cycle(2);
-    if let Err(why) = window_kept_across_reload(members, keep_mii, target, parks.is_ok(), cold) {
+    let keep_pt = KEEP_PT_WINDOW_ACROSS_RELOAD || diag_cycle(16);
+    let keep_aegis = crate::engine::swap::body_bank::KEEP_AEGIS_WINDOW_ACROSS_RELOAD || diag_cycle(32);
+    if let Err(why) = window_kept_across_reload(members, keep_mii, keep_pt, keep_aegis, target, parks.is_ok(), cold) {
         trace!("[GroupSwap] window across reload owner={} kinds={:x?} target={:#x}: not kept ({}{}{})", owner,
             &members.kinds()[..members.count()], target, why, if parks.is_err() { ": " } else { "" }, parks.err().unwrap_or(""));
         return None;
@@ -2157,7 +2307,7 @@ unsafe fn outgoing_window(entry: *mut u8, owner: u32, role: usize, target: u32) 
         }
     }
     Some(Outgoing { members, bodies: bank.bodies, identity: bank.identity, configuration: bank.configuration, alias: bank.alias,
-        cold: bodies > ready })
+        cold: bodies > ready, marks: bank.over, claimed: read::<usize>(entry, 0x5a90) })
 }
 
 /// rc.14 2e (a-full, A1; AFULL-RESEARCH.md §1-§2): right after the Reload start (`0x653240`, inside the same pre-service
@@ -2195,7 +2345,22 @@ unsafe fn keep_window(entry: *mut u8, owner: u32, role: usize, target: u32, out:
     let Some(dispatch) = dispatcher_arrays(e).filter(|arrays| arrays.iter().all(|a| dispatcher_array_ok(*a))) else {
         return refuse("dispatcher arrays");
     };
-    if [0x5a88usize, 0x5a90, 0x5a98].iter().any(|at| read::<usize>(entry, *at) != 0) { return refuse("object records"); }
+    // rc.14 a-full-2 (limit 2): a Pokémon Trainer window carries its holder (`+0x5a88`, the 0x238-byte object of this owner)
+    // and its 0x10-byte record (`+0x5a98`); the Reload start has dropped the claim (`+0x5a90 = 0`, `0x653920`). Every
+    // other window holds none of them.
+    let trainer = out.members.holder_step() == Some(crate::engine::swap::body_bank::HolderStep::Trainer);
+    // rc.14 a-full-2 (after probe a0): a Pyra/Mythra window carries only its holder; its claim and record are zero around
+    // the Reload start (boot a2-e881df1e-y1), so nothing of it was walked and nothing needs retiring.
+    let partner = out.members.holder_step() == Some(crate::engine::swap::body_bank::HolderStep::Partner);
+    if trainer {
+        if !valid_special_object(base, read::<usize>(entry, 0x5a88), owner) { return refuse("trainer holder"); }
+        if read::<usize>(entry, 0x5a90) != 0 { return refuse("the trainer is still claimed"); }
+    } else if partner {
+        if !valid_special_object(base, read::<usize>(entry, 0x5a88), owner) { return refuse("partner holder"); }
+        if read::<usize>(entry, 0x5a90) != 0 || read::<usize>(entry, 0x5a98) != 0 {
+            return refuse("the partner holder has a claim or record (probe a0 saw neither)");
+        }
+    } else if [0x5a88usize, 0x5a90, 0x5a98].iter().any(|at| read::<usize>(entry, *at) != 0) { return refuse("object records"); }
     let Some(mut registry) = NativeRegistry::new(base, r, owner) else { return refuse("registry unreadable"); };
     let slot = BANKS[role].lock().as_ref()
         .filter(|b| b.entry == e && b.owner == owner && b.phase == Phase::Building && !b.departed)
@@ -2217,7 +2382,12 @@ unsafe fn keep_window(entry: *mut u8, owner: u32, role: usize, target: u32, out:
                 saved.info_3a0 = read_info_3a0(e);
                 if out.identity.is_some() { saved.identity = Some((save_resource_words(r), save_entry_identity(e))); }
                 // A pair window leaves as N3 parks it: flags without the pair-active bit, no Nana alias (`+0x4180`).
-                if out.members.is_pair() { saved.flags &= !PAIR_ACTIVE_FLAG; saved.ctx[1] = 0; }
+                // rc.14 a-full-2: `PAIR_ACTIVE_FLAG` is a value (6), not a mask; `&= !6` dropped the bank bit too, so the
+                // control select (`0x64fb70`) picked no context at the warm return (a1-enable `a1-pair3`).
+                if out.members.is_pair() {
+                    saved.flags = crate::engine::swap::body_bank::parked_pair_flags(saved.flags);
+                    saved.ctx[1] = 0;
+                }
                 clear_window(e);
                 detach_dispatcher(e);
                 let slot = bank.groups.plan(out.members, None);
@@ -2227,7 +2397,12 @@ unsafe fn keep_window(entry: *mut u8, owner: u32, role: usize, target: u32, out:
                 g.bodies = out.bodies;
                 g.identity = out.identity;
                 g.configuration = out.configuration;
-                if out.cold && !bank.over.iter().any(|(kind, _)| *kind == target) { bank.over.push((target, false)); }
+                // The Reload puts the target on screen itself, so its mark is seen at once (`Cold`): the switch away frees
+                // it. Unseen, it was never freed (af-49c90e9c-x1 af-attach: `over [(f, false)]`, 10 bodies at Ready Fighters 8).
+                for mark in out.marks.iter().filter(|(kind, _)| out.members.index_of(*kind).is_some()) {
+                    if !bank.over.iter().any(|(kind, _)| *kind == mark.0) { bank.over.push(*mark); }
+                }
+                if out.cold && !bank.over.iter().any(|(kind, _)| *kind == target) { bank.over.push((target, true)); }
                 GROUP_BODIES[role].store(bank.groups.iter().filter(|g| g.state.counts_bodies())
                     .map(|g| g.members.count()).sum::<usize>().min(usize::from(u8::MAX)) as u8, Ordering::Release);
                 Some((slot, saved))
@@ -2244,6 +2419,58 @@ unsafe fn keep_window(entry: *mut u8, owner: u32, role: usize, target: u32, out:
         std::array::from_fn::<Option<u8>, NATIVE_MEMBERS, _>(|i| (i < count).then(|| fields::read_unchecked::<u8>(out.bodies[i].address, 0x3a))),
         cell_bytes, saved.group_ctx, dispatch, listener_counts(dispatch), saved.mii_r, out.identity.is_some(), out.members.is_pair(),
         out.cold, r, fields::read::<u64>(r, 0x4c0).unwrap_or(0));
+    if trainer { retire_kept_trainer(base, owner, group, out.claimed, saved.flags, saved.records); }
+    if partner {
+        let holder = saved.records[0];
+        trace!("[GroupSwap] window kept across reload owner={} group={} partner holder={:#x} articles={} records={:x?} flags={:#x}{}",
+            owner, group, holder, fields::read::<u64>(holder, 0x10).unwrap_or(0) & 0xffff_ffff, saved.records, saved.flags,
+            trainer_counts_note(base));
+    }
+}
+
+/// rc.14 a-full-2 (limit 2, AFULL2-RESEARCH.md): the trainer articles of a Pokémon Trainer window [`keep_window`] kept go
+/// as an exchange's detach retires them (PT-TRAINER-PARK), all at once and before loader state 3 releases R's NRO tree.
+/// Pass 1 is the Reload start's own (`0x653864-0x65390c`, when it found a claimed trainer) or `deactivate_saved`; then
+/// `release_sub_pools` and `destroy_saved` (pass 2). The split across ticks exists for live frames, and a Reload stalls
+/// anyway (28-57 ms here, `special_articles` model). The kept record's warm attach rebuilds the pool from its re-taken
+/// object kind, as for any detached PT group (`exchange_articles`). The records left the entry in `clear_window`, so loader
+/// states 2 and 3 skip the trainer functor, the bit-5 destroy and the free (`0x650b40`, `0x65120c`, `0x650c74`).
+unsafe fn retire_kept_trainer(base: usize, owner: u32, group: usize, claimed: usize, flags: u8, records: [usize; 3]) {
+    let holder = records[0];
+    let valid = valid_special_object(base, holder, owner);
+    let count = if valid { fields::read::<u64>(holder, 0x10).unwrap_or(0) & 0xffff_ffff } else { 0 };
+    if count == 0 {
+        trace!("[GroupSwap] window kept across reload owner={} group={} trainer holder={:#x} valid={} articles=0{}", owner, group,
+            holder, valid, trainer_counts_note(base));
+        return;
+    }
+    let deactivated = claimed == 0 && articles::deactivate_saved(owner, flags, holder, valid, "reload keep");
+    let pools = articles::release_sub_pools(base, holder);
+    let gone = articles::destroy_saved(base, owner, holder, "reload keep");
+    trace!("[GroupSwap] window kept across reload owner={} group={} trainer holder={:#x} articles={} pass1={} sub_pools={:?} gone={} records={:x?}{}",
+        owner, group, holder, count, if claimed != 0 { "reload start" } else if deactivated { "deactivate_saved" } else { "none" },
+        pools, gone, records, trainer_counts_note(base));
+}
+
+/// rc.14 a-full-2 (p4): the diag build's view of the trainer resource counts, `S = *(main+0x52bc3b0)`: `S+0x1968` (the PT
+/// functor's and finalize's decrement, `0x651ba0`, `0x652efc`) and `S+0x1980` (the bit-5 destroy's, `0x651228`,
+/// `0x6530b4`). Text for a diag line; empty in the release build.
+fn trainer_counts_note(base: usize) -> TrainerCounts { TrainerCounts(base) }
+
+struct TrainerCounts(usize);
+impl core::fmt::Display for TrainerCounts {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        #[cfg(feature = "diag")]
+        {
+            // SAFETY: values only; the singleton pointer is checked before either read.
+            let counts = unsafe { fields::child(self.0, 0x52bc3b0) }
+                .map(|s| unsafe { (fields::read::<u32>(s, 0x1968), fields::read::<u32>(s, 0x1980)) });
+            if let Some((Some(a), Some(b))) = counts { return write!(f, " trainer_counts=({a}, {b})"); }
+            write!(f, " trainer_counts=none")
+        }
+        #[cfg(not(feature = "diag"))]
+        { let _ = (self.0, &f); Ok(()) }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -2400,6 +2627,10 @@ struct GroupData {
     /// Inbox 02:42Z: its prepared pool build left the pool empty or was not queued (logged; not retried; its attach
     /// rebuilds the pool itself).
     prepare_refused: bool,
+    /// rc.14 a-full-2 (boot a2-99b9083f-y1, integration-3's smoke2): the reference this group's holder keeps on its
+    /// object kind's module (`module_pins::hold`, taken before its background build gives the object token back; 0 =
+    /// none). Its teardown drops it after the holder's destroy (`RecordsRef::module`); its attach hands it to R.
+    object_module: u64,
 }
 
 impl GroupData {
@@ -2409,7 +2640,8 @@ impl GroupData {
             bodies: [Body::default(); NATIVE_MEMBERS], since_us: 0, busy_logged: false, kirby_logged: false,
             memory_logged: false, memory_deferred: false, prefetch_committed: None,
             identity, configuration, charinfo_published: false, publish: PublishAttempts::new(), background_refused: false,
-            leaving: false, release_now: false, parked_kept: 0, object_held: false, object_refused: false, prepare_refused: false }
+            leaving: false, release_now: false, parked_kept: 0, object_held: false, object_refused: false, prepare_refused: false,
+            object_module: 0 }
     }
 }
 
@@ -2759,12 +2991,17 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
     // activation receipts; any other build starts with none.
     let keeping = KEEPING[role].load(Ordering::Acquire) == members.kinds()[0] && members.count() == 1
         && state.as_ref().is_some_and(|bank| bank.entry == entry as usize && bank.owner == owner);
-    let (mut storage, activated) = match state.take() {
-        Some(bank) => (BankStorage { members: bank.members, groups: bank.groups }, bank.activated),
-        None => (BANK_STORAGE[role].lock().take().expect("boot-reserved bank storage"), Default::default()),
+    let (mut storage, activated, marks) = match state.take() {
+        Some(bank) => (BankStorage { members: bank.members, groups: bank.groups }, bank.activated, bank.over),
+        None => (BANK_STORAGE[role].lock().take().expect("boot-reserved bank storage"), Default::default(), FixedList::new((0, false))),
     };
     *storage.members = members;
     if !keeping { storage.groups.clear(); }
+    // rc.14 2e: a cold fighter's mark (Design A, `Cold`) stays with the group (a′) keeps it in, so the switch away from it
+    // still frees it (af-49c90e9c-x1: a kept cold fighter lost its mark here and stayed over Ready Fighters).
+    let mut over = FixedList::new((0, false));
+    for mark in marks.iter().filter(|(kind, _)| keeping && storage.groups.iter()
+        .any(|g| g.state.counts_bodies() && !g.leaving && g.members.index_of(*kind).is_some())) { over.push(*mark); }
     let kept = storage.groups.iter().filter(|g| g.state.counts_bodies()).map(|g| g.members.count()).sum::<usize>();
     *state = Some(Bank {
         entry: entry as usize, owner, epoch: super::mii_saved_alpha::current_generation(role as u32),
@@ -2775,7 +3012,7 @@ pub(super) unsafe fn build(entry: *const u8, owner: u32, members: Members) -> bo
         pair_logged: false, identity: None, configuration: None, ordinary_identity: None,
         activated: if keeping { activated } else { Default::default() },
         construction: None, background: None, tick: TickGap::default(), held_turn: 0, scene: None,
-        object_fetch: None, retiring: None, preparing: None, over: FixedList::new((0, false)),
+        object_fetch: None, retiring: None, preparing: None, over,
     });
     EXTRAS[role].store((members.count() - 1) as u8, Ordering::Release);
     GROUP_BODIES[role].store(kept.min(usize::from(u8::MAX)) as u8, Ordering::Release);
@@ -2943,7 +3180,7 @@ pub(super) unsafe fn switch(entry: *mut u8, owner: u32, kind: u32, forms: Forms)
         }
     }
     if kind != KIRBY {
-        if let Err(reason) = kirby_park_gate(entry, owner, members, from) {
+        if let Err(reason) = kirby_departure_gate(entry, owner, members, from, kind) {
             trace!("[KirbyPark] fallback owner={} target={:#x} reason={}; switch refused", owner, kind, reason);
             return false;
         }
@@ -3077,16 +3314,26 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
         // every detached group must already be gone.
         if observed.loader == 0 { retire_groups(entry, owner, "reload"); }
     }
-    // rc.13 (a′) proper: the kept groups' module pins go once the new bank is Ready (R has their nodes again).
+    // rc.13 (a′) proper: the kept groups' module pins go once the new bank is Ready (R has their nodes again), or with
+    // the bank gone; rc.14 (Eden a1-be759456-y2 #4348): never on a tick that isn't the bank's (`body_bank::pin_step`).
     if module_pins::held(role) {
-        let phase = match BANKS[role].lock().as_ref() {
-            Some(b) if b.entry == entry as usize && b.owner == owner && !b.departed => b.phase,
-            _ => Phase::Retired,
-        };
-        match phase {
-            Phase::Building | Phase::Changing => {}
-            Phase::Ready => module_pins::settle(role, resource(BASE.load(Ordering::Acquire), owner)),
-            _ => module_pins::settle(role, None),
+        let bank = BANKS[role].lock().as_ref()
+            .map(|b| (b.phase, b.departed, b.entry == entry as usize && b.owner == owner, b.entry, b.owner));
+        match crate::engine::swap::body_bank::pin_step(bank.map(|(phase, departed, ours, _, _)| (phase, departed, ours))) {
+            crate::engine::swap::body_bank::PinStep::Settle => {
+                PIN_WAIT_NOTED[role].store(false, Ordering::Release);
+                module_pins::settle(role, resource(BASE.load(Ordering::Acquire), owner));
+            }
+            crate::engine::swap::body_bank::PinStep::Drop => {
+                PIN_WAIT_NOTED[role].store(false, Ordering::Release);
+                module_pins::settle(role, None);
+            }
+            crate::engine::swap::body_bank::PinStep::Wait => if let Some((phase, _, false, bank_entry, bank_owner)) = bank {
+                if !PIN_WAIT_NOTED[role].swap(true, Ordering::AcqRel) {
+                    trace!("[GroupSwap] module pins held role={} entry={:p} owner={}: this tick is another entry's (bank entry={:#x} owner={} phase={:?}); they stay until the bank is Ready",
+                        role, entry, owner, bank_entry, bank_owner, phase);
+                }
+            },
         }
     }
     if PAIR_ENABLED.load(Ordering::Acquire) && observed.loader == 0 { pair_teardown(entry, "reload"); }
@@ -3096,7 +3343,13 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
     // (WORKPLAN §2.4, declared behaviour change); silent once nothing is left to clear.
     if observed.loader == 0 && observed.outer == 3 && observed.installed != 0 { retire_window(entry, owner, "reload", false); }
     let started = now_us();
-    let step = match service_locked(entry, owner, role) {
+    let action = service_locked(entry, owner, role);
+    #[cfg(feature = "diag")]
+    {
+        let owed = CENSUS_OWED.swap(u32::MAX, Ordering::AcqRel);
+        if owed != u32::MAX { census(owed); }
+    }
+    let step = match action {
         Action::None => return,
         Action::Swap => { perform_swap(entry, owner, role); "swap" }
         Action::Lifecycle => { group_lifecycle(entry, owner, role); "lifecycle" }
@@ -3105,6 +3358,33 @@ pub(super) unsafe fn service(entry: *mut u8, owner: u32) {
         Action::Background => { settle_background(entry, owner, role); "background settle" }
     };
     slow_step(owner, step, started);
+}
+
+/// rc.14 mem-headroom (diag): the owner whose `[BodyBank] ready` owes a `[MemoryCensus]` line, or `u32::MAX`.
+#[cfg(feature = "diag")]
+static CENSUS_OWED: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(u32::MAX);
+
+/// rc.14 mem-headroom (the primary 2026-11-15: the final pass measures where the process budget goes): one line after a
+/// `[BodyBank] ready`, under no lock of its own caller: the process charge, the fighter pool, each role's resident bank
+/// bodies (window, Built groups), the helper sources (seats and created entries, `sources::census_helpers`), the module
+/// pins of kept groups and the object-module holds. Each bank lock, then the source lock, in turn.
+#[cfg(feature = "diag")]
+unsafe fn census(owner: u32) {
+    let sample = MemorySample::capture();
+    let pool = pool_counts(BASE.load(Ordering::Acquire)).map(|(capacity, live)| (live, capacity));
+    let mut bank = [(0u8, 0u8); 2];
+    let mut objects = 0u8;
+    for (role, counts) in bank.iter_mut().enumerate() {
+        if let Some(b) = BANKS[role].lock().as_ref().filter(|b| !b.departed && b.phase != Phase::Retired) {
+            let groups = b.groups.iter().filter(|g| g.state == GroupState::Built).map(|g| g.members.count()).sum::<usize>();
+            *counts = (b.members.count().min(255) as u8, groups.min(255) as u8);
+            objects = objects.saturating_add(b.groups.iter().filter(|g| g.object_module != 0).count().min(255) as u8);
+        }
+    }
+    let pins = [module_pins::count(0).min(255) as u8, module_pins::count(1).min(255) as u8];
+    let helpers = super::sources::census_helpers();
+    trace!("{}", crate::engine::preload::give_back::Census { owner, headroom: sample.headroom(),
+        committed: sample.committed.get(), pool, bank, helpers, pins, objects });
 }
 
 /// Logged once: the service hook ran on a thread other than MainThread while a purge was owed (it waits for one that is).
@@ -3236,6 +3516,9 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
             if bank.phase != Phase::Ready || bank.bodies != now {
                 trace!("[BodyBank] ready owner={} index={} kind=0x{:x} previous={:?} bodies={:?} headroom={}",
                     owner, index, members.kinds()[index as usize], bank.phase, now, headroom_now());
+                // rc.14 mem-headroom: the per-consumer census follows once this bank lock is released (`service`).
+                #[cfg(feature = "diag")]
+                CENSUS_OWED.store(owner, Ordering::Release);
                 #[cfg(feature = "diag")]
                 crate::runtime::roster::identity_view::report(owner, resource(BASE.load(Ordering::Acquire), owner).unwrap_or(0), "ready");
                 if members.is_pair_lead() {
@@ -3275,7 +3558,9 @@ unsafe fn service_locked(entry: *mut u8, owner: u32, role: usize) -> Action {
                 else if bank.object_fetch.is_some() || rearm_candidate(BASE.load(Ordering::Acquire), bank).is_some() { Action::Lifecycle }
                 else if bank.prefetch.is_some()
                     || bank.groups.iter().any(|g| g.state.startable() || (g.leaving && (!leaves_at_pause(g.state) || g.release_now)))
-                    || background_candidate(bank, Some(members.kinds()[usize::from(index)])).is_some() {
+                    || background_candidate(bank, Some(members.kinds()[usize::from(index)])).is_some()
+                    // rc.14 (Eden cf-p4-y1): a cold mark ticks the lifecycle, so the cold fighter is seen and freed.
+                    || crate::engine::swap::body_bank::cold_marks_tick(&bank.over) {
                     Action::Lifecycle
                 } else { Action::SyncCopies };
         }
@@ -4890,7 +5175,10 @@ unsafe fn start_background(entry: *mut u8, owner: u32, role: usize, group: usize
         let state = BANKS[role].lock();
         let Some(bank) = state.as_ref().filter(|bank| bank.entry == entry as usize && bank.owner == owner
             && bank.phase == Phase::Ready && !bank.departed && bank.swap.is_none()) else { return; };
-        if background_candidate(bank, bank.observed.map(|(_, kind)| kind)) != Some(group) { return; }
+        let observed = bank.observed.map(|(_, kind)| kind);
+        // rc.14 Gap 3: the group a press out of a live Mii waits for (`serving_group`'s `Serving::Build`) goes first.
+        if background_candidate(bank, observed) != Some(group) && !(bank.prefetch.is_none() && bank.construction.is_none()
+            && bank.background.is_none() && bank.groups.get(group).is_some_and(|g| background_owed(bank, g, observed))) { return; }
         let g = &bank.groups[group];
         (*g.members, bank.alias, bank.members.carries_records(),
             g.identity.zip(g.configuration).filter(|_| g.members.special() == Special::Mii),
@@ -5350,6 +5638,15 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
     // body's tail released nothing (`bg_mii_tail_release`): every key of the group goes here, its identity in R. So does
     // every key of a group built beside a live Mii window (X6), with the baseline in R; its object kind among them, after
     // the holder step that read through it.
+    // rc.14 a-full-2 (boot a2-99b9083f-y1, integration-3's smoke2): that object token is R's node for the object kind's
+    // NRO, which the holder's article runs code from. Before it goes, the group takes its own reference on that module and
+    // keeps it while the holder lives detached (`module_pins::hold`; dropped after the holder's destroy, handed to R at
+    // its attach). Without it the holder outlived the module once no other entry held it, and its destroy called through
+    // a vtable in unmapped memory (`0x33c23f8`).
+    let object_module = match b.members.object_kind() {
+        Some(kind) if alias_ok && b.holder_due && valid && holder_ok => crate::runtime::roster::module_pins::hold(b.alias, kind),
+        _ => 0,
+    };
     let mut mii_keys = None;
     if alias_ok && b.mii.is_some() {
         let occupancy = occupancy_snapshot(role, None);
@@ -5381,6 +5678,7 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
                         g.saved = Some(window);
                         g.bodies = bodies;
                         g.state = GroupState::Built;
+                        g.object_module = object_module;
                         true
                     }
                     Some(g) => { g.state = GroupState::Failed; g.background_refused = true; false }
@@ -5411,6 +5709,12 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
             trace!("[GroupSwap] settled owner={} group={} object_kind={:#x} map=0 settled={:x?}", owner, b.group, kind, settled);
         }
     }
+    if object_module != 0 || b.members.object_kind().is_some_and(|_| b.holder_due) {
+        trace!("[GroupSwap] object module held owner={} group={} object_kind={:x?} module={:#x} stored={}", owner, b.group,
+            b.members.object_kind(), object_module, stored);
+    }
+    // A group that was not stored keeps no holder of ours: its reference goes now (its object token stays until its teardown).
+    if !stored { crate::runtime::roster::module_pins::drop_hold(object_module); }
     if b.holder_due {
         let holder = b.records[0];
         trace!("[GroupSwap] background holder settled owner={} group={} ok={} records={:x?} table=+{:#x} slot={} articles={} live_records={:x?}",
@@ -5467,6 +5771,8 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
     // A one-member Mii group's identity and configuration for the native Mii-setup step
     // (WP-M2): set by the Phase B arm below, read after the bank lock is dropped.
     let mut mii_build: Option<(MiiIdentity, Configuration)> = None;
+    // rc.14 a-full-2: the attaching group's object module reference (its kind, the handle), handed to R after the bank lock.
+    let mut object_handover: Option<(u32, u64)> = None;
     // K15: the Phase B construction and U18's attach register bodies through `prepare_entry`, whose
     // copy relations load Kirby's hat models (`0x17f06a0`); their packages must be resident first, as
     // native's completion and its holders wait guarantee (`swap_model::copy_packages`). No bank lock
@@ -5572,6 +5878,10 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
         group.release_now = false;
         let prepared = match (group.state, group.saved.take()) {
             (GroupState::Built, Some(y)) => {
+                // rc.14 a-full-2: its holder becomes the window's; the reference it kept on its object kind's module goes to
+                // R below. The record now holds the outgoing window, whose holder R's node already covers.
+                let handle = std::mem::replace(&mut group.object_module, 0);
+                object_handover = target_members.object_kind().filter(|_| handle != 0).map(|kind| (kind, handle));
                 let x_bodies = std::mem::replace(&mut bank.bodies, group.bodies);
                 // SPECIAL-GROUPS §1 (c): each window keeps its own Mii set in R, and its body init's `D+0x3a0` words.
                 saved_x.mii_r = Some(take_mii_r(alias));
@@ -5689,6 +5999,10 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
         bank.swap_started = Some((swap.kind, swap.requested_us));
         (prepared, before.unwrap(), alias)
     };
+    if let Some((kind, handle)) = object_handover {
+        let asked = crate::runtime::roster::module_pins::hand_to(alias, kind, handle);
+        trace!("[GroupSwap] object module handed to R owner={} kind={:#x} module={:#x} R={:#x} asked={}", owner, kind, handle, alias, asked);
+    }
     let started = now_us();
     split::start(role, started);
     // U18: the outgoing window leaves the copy registry and the entry's header and roster become
@@ -5887,6 +6201,10 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
         if let Some(kind) = built.object_kind() {
             if alias != 0 && resource(base, owner) == Some(alias) {
                 let object = [kind];
+                // rc.14 a-full-2 (integration-3's smoke2): the window's holder runs code from the object kind's NRO, and the
+                // token below is R's node for it. A reference of ours bridges the release, then R gets its node again, as a
+                // Reload-built window keeps it until state 3.
+                let held = crate::runtime::roster::module_pins::hold(alias, kind);
                 if fields::read::<u64>(alias, 0x18).unwrap_or(0) != 0 {
                     let receipt = r_handle::release(base, lrole, Some(group), Some(&object[..]), &Occupancy::default(), "post-build object release");
                     trace!("[GroupSwap] released owner={} object_kind={:#x} map={} flags={:#x} orphan_keys={:x?}", owner, kind,
@@ -5900,6 +6218,8 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
                     let settled = r_handle::settle(lrole, group, &object, "post-build object freed by native (map=0)");
                     trace!("[GroupSwap] settled owner={} object_kind={:#x} map=0 settled={:x?}", owner, kind, settled);
                 }
+                let asked = crate::runtime::roster::module_pins::hand_to(alias, kind, held);
+                trace!("[GroupSwap] object module kept for the window owner={} kind={:#x} module={:#x} asked={}", owner, kind, held, asked);
             }
         }
         // The role's real ledger against the owner's map (WP2's line at the build seam, U13:
@@ -5957,7 +6277,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
             let created = [0usize, 8, 16].map(|o| read::<usize>(entry, 0x5a88 + o));
             if members.carries_records() && valid_special_object(base, created[0], owner) {
                 records = created;
-                detached.records = Some(RecordsRef { records: created, valid: true });
+                detached.records = Some(RecordsRef { records: created, valid: true, flags: read::<u8>(entry, 0x591f), module: 0 });
             }
             if let Some(kind) = members.object_kind() { detached.held_kinds.push(kind); }
         }
@@ -6080,6 +6400,7 @@ fn note_foreground(owner: u32, foreground: super::Foreground) {
 /// (a member change) or in no group of this bank needs none.
 unsafe fn serving_group(base: usize, bank: &Bank, target: crate::runtime::roster::cycle_preload::Target, live: Option<u32>)
     -> Option<(usize, Serving)> {
+    let observed = live;
     let live = crate::engine::swap::body_bank::d_kirby1_live(live, crate::runtime::roster::g68_step::enabled());
     if bank.members.index_of(target.kind).is_some() && bank.configuration == target.configuration { return None; }
     let (group, g) = bank.groups.iter().enumerate().find(|(_, g)| !g.leaving && g.members.index_of(target.kind).is_some()
@@ -6087,8 +6408,12 @@ unsafe fn serving_group(base: usize, bank: &Bank, target: crate::runtime::roster
     let rearm_due = !g.object_refused && bank.construction.is_none() && bank.background.is_none()
         && object_rearm_due(g.state, *g.members, detached_pool(base, bank.owner, g), g.object_held)
         && g.members.object_kind().is_some_and(|kind| crate::engine::swap::body_bank::object_rearm_admitted(live, kind).is_ok());
-    let serving = serving_step(g.state, g.identity.is_none() || g.charinfo_published, rearm_due)?;
-    (serving == Serving::ObjectRearm || crate::engine::swap::body_bank::prefetch_admitted(live).is_ok()).then_some((group, serving))
+    // rc.14 Gap 3: beside a live Mii window an ordinary group serves the press only Built (the warm exit).
+    let exit_build = bank.identity.is_some() && g.identity.is_none() && bank.prefetch.is_none() && bank.construction.is_none()
+        && bank.background.is_none() && background_owed(bank, g, observed);
+    let serving = serving_step(g.state, g.identity.is_none() || g.charinfo_published, rearm_due, exit_build)?;
+    (matches!(serving, Serving::ObjectRearm | Serving::Build) || crate::engine::swap::body_bank::prefetch_admitted(live).is_ok())
+        .then_some((group, serving))
 }
 
 unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
@@ -6192,6 +6517,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                 match foreground.target.and_then(|target| serving_group(base, bank, target, live)) {
                     Some((group, Serving::Prefetch)) => Step::Start(group, *bank.groups[group].members, bank.alias, true),
                     Some((group, Serving::ObjectRearm)) => Step::Rearm(group, *bank.groups[group].members, bank.alias),
+                    Some((group, Serving::Build)) => Step::Background(group),
                     None => Step::Idle,
                 },
             step => step,
@@ -6402,7 +6728,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                     trace!("[GroupSwap] held owner={} group={} reason=fighter pool {}/{} reserve {} < {} bodies; retried",
                         owner, group, live, capacity, POOL_RESERVE, members.count());
                 }
-                release_for_capacity(owner, group, "fighter pool");
+                release_for_capacity(owner, group, "fighter pool", None);
                 return;
             }
             // GS-PANIC: the group's measured cost (prefetch + build) against the headroom every other consumer has
@@ -6435,7 +6761,7 @@ unsafe fn group_lifecycle(entry: *mut u8, owner: u32, role: usize) {
                             owner, group, headroom, decision.need, &members.kinds()[..members.count()], decision.outstanding,
                             cost.prefetch, cost.build);
                     }
-                    release_for_capacity(owner, group, "process headroom");
+                    release_for_capacity(owner, group, "process headroom", Some(decision.need.saturating_sub(decision.available)));
                     return;
                 }
             }
@@ -6684,7 +7010,8 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
                         valid: saved.dispatch.iter().all(|a| *a == 0 || dispatcher_array_ok(*a)) });
                     if saved.records != [0, 0, 0] {
                         detached.records = Some(RecordsRef { records: saved.records,
-                            valid: group.members.carries_records() && valid_special_object(base, saved.records[0], owner) });
+                            valid: group.members.carries_records() && valid_special_object(base, saved.records[0], owner), flags: saved.flags,
+                            module: group.object_module });
                     }
                     // Inbox 00:18Z: a re-acquired object kind is a held key: the plan's key step returns it (rc6-bg-pt4:
                     // left on R, the next Reload's state 7 refused on `R+0x18 == 2`).
@@ -6707,6 +7034,8 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
                 g.leaving = false;
                 g.release_now = false;
                 g.object_held = false;
+                // Its object module reference went into the plan with its records (dropped after their destroy).
+                g.object_module = 0;
                 g.saved = None;
                 g.bodies = [Body::default(); NATIVE_MEMBERS];
             }
@@ -6823,9 +7152,11 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
 /// Operator rule 2026-11-09 (inbox 13:21Z): a prefetch refused for process memory or fighter-pool bodies while groups are
 /// parked frees one of them now (`body_bank::capacity_release`: the fewest members the cycle keeps, then the fewest
 /// bodies; never one a committed switch targets), unless one is going already. The refused group is retried after it, so
-/// parked groups go one at a time and only while refusals last; a refusal with nothing parked stays "waiting for memory".
+/// parked groups go one at a time and only while refusals last. rc.14 mem-headroom F2: a memory refusal (`shortfall`, the
+/// bytes it lacks) with nothing parked, once the release watch settled, marks the farthest idle created helpers that make
+/// the room (`sources::give_back_for`); the next pause retires them. With none, it stays "waiting for memory".
 /// Value-only (the entry tick frees the group, `leaves_now`); never under the bank lock.
-fn release_for_capacity(owner: u32, group: usize, reason: &str) {
+fn release_for_capacity(owner: u32, group: usize, reason: &str, shortfall: Option<u64>) {
     // Operator rule 2026-11-09 16:06Z: an earlier free's room still arriving is room on its way; nothing more goes.
     let settled = RELEASE_WATCH.lock().settled();
     let mut parked = FixedList::<((usize, usize), Members, u8), { 2 * MAX_EXTRA_GROUPS }>::new(((0, 0), Members::pair_group(), 0));
@@ -6838,7 +7169,12 @@ fn release_for_capacity(owner: u32, group: usize, reason: &str) {
             if bank.swap.is_none_or(|s| s.group != index) { parked.push(((role, index), *g.members, g.parked_kept)); }
         }
     }
-    let Some((role, index)) = capacity_release(settled, parked.iter().copied()) else { return; };
+    let Some((role, index)) = capacity_release(settled, parked.iter().copied()) else {
+        if let Some(shortfall) = shortfall.filter(|_| settled && parked.is_empty()) {
+            super::sources::give_back_for(owner, group, shortfall);
+        }
+        return;
+    };
     let mut state = BANKS[role].lock();
     let Some(bank) = state.as_mut() else { return; };
     let parked_owner = bank.owner;
@@ -6921,7 +7257,8 @@ unsafe fn leave_group(entry: *const u8, owner: u32, role: usize, group: usize) {
                     valid: saved.dispatch.iter().all(|a| *a == 0 || dispatcher_array_ok(*a)) });
                 if saved.records != [0, 0, 0] {
                     detached.records = Some(RecordsRef { records: saved.records,
-                        valid: g.members.carries_records() && valid_special_object(base, saved.records[0], owner) });
+                        valid: g.members.carries_records() && valid_special_object(base, saved.records[0], owner), flags: saved.flags,
+                        module: g.object_module });
                 }
                 // Inbox 00:18Z: its re-acquired object kind goes with it (the plan's key step).
                 if g.object_held { detached.held_kinds.push(PT_OBJECT_KIND); }
@@ -7014,6 +7351,8 @@ unsafe fn leave_group(entry: *const u8, owner: u32, role: usize, group: usize) {
                 g.leaving = false;
                 // Its re-acquired object kind went with the group's other tokens above.
                 g.object_held = false;
+                // Its object module reference went with its records' destroy (`DestroyRecords::module`).
+                g.object_module = 0;
                 g.saved = None;
                 g.bodies = [Body::default(); NATIVE_MEMBERS];
             }
@@ -7560,6 +7899,10 @@ pub(super) unsafe fn install(base: usize) {
     let special_ok = gate(SEAM_GROUP, SPECIAL_SEAMS, groups_ok
         && fingerprint(base, SPECIAL_OBJECT_RELEASE, &[0xf81b0ff9, 0xa9015ff8, 0xa90257f6, 0xa9034ff4], "SpecialGroups")
         && fingerprint(base, HEAP_FREE, &[0xd100c3ff, 0xa9027bfd, 0x910083fd, 0xf81f83a0], "SpecialGroups")
+        // rc.14 a-full-2 (p4): the give-back finalize does before its destroy (`body_graph::destroy_special_records`).
+        && fingerprint(base, graph::MUTEX_LOCK, &[0xd000c6f0, 0xf9460211, 0x91300210, 0xd61f0220], "SpecialGroups")
+        && fingerprint(base, graph::MUTEX_UNLOCK, &[0xd000c6f0, 0xf9460611, 0x91302210, 0xd61f0220], "SpecialGroups")
+        && fingerprint(base, graph::RELEASE_WEAK, &[0xd000c6f0, 0xf9410e11, 0x91086210, 0xd61f0220], "SpecialGroups")
         && fingerprint(base, articles::POOL_BUILD, &articles::POOL_BUILD_WORDS, "SpecialGroups")
         && fingerprint(base, RELEASE_KEY, &[0xa9bd57f6, 0xa9014ff4, 0xa9027bfd, 0x910083fd, 0x9100a013, 0xaa0003f4], "SpecialGroups"))
         && groups_ok;

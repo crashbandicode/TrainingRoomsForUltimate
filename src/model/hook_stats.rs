@@ -76,6 +76,8 @@ hook_ids! {
     HitboxAttack => "hitbox_attack",
     HitboxCatch => "hitbox_catch",
     HitboxRebound => "hitbox_rebound",
+    /// rc.14 wind-articles: the four `AREA_WIND_2ND*` commands (an article that adds a wind area is tracked).
+    HitboxWind => "hitbox_wind",
     HitboxFrame => "hitbox_frame",
     HitboxOrbs => "hitbox_orbs",
     /// Package 6, nested inside the hooks above so an allocation is charged to the step that made it: the roster cycle's input

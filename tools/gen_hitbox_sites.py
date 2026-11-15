@@ -36,6 +36,14 @@ ROWS = [
      "`AttackModule::attack_data(accessor, slot, bool)` (lua_bind thunk to vtable slot 0x1e8): the slot's `AttackData` (stride 0x130 from the pointer at module `+0x68`). Layout in `model::hitbox::layout`, derived in `docs/test-provenance/core-06.md`."),
     ("attack_power_mul_status", 0x1FD0550, CALLED,
      "`AttackModule::power_mul_status(accessor)` (lua_bind thunk `ldr x0,[x0,#0xa0]; ldr x8,[x0]; ldr x1,[x8,#0x1f8]; br x1`; slot 0x1f8 is `ldr s0,[x0,#0xe0]`): the status-scoped damage multiplier of the module, which `L2CFighterCommon::sub_set_attack_s4_power_mul` sets from the smash charge (`AttackModule::set_power_mul_status`, slot 0x1f0 = `str s0,[x0,#0xe0]`) and `AttackModule::get_power` multiplies every slot's damage by. 1.0 uncharged. Read for the sweet/sour attribution."),
+    ("damage_reaction", 0x200B710, CALLED,
+     "`DamageModule::reaction(accessor, index)` (lua_bind thunk `ldr x0,[x0,#0xa8]; ldr x8,[x0]; ldr x2,[x8,#0xd0]; br x2`; the fighter's slot 0xd0 reads the float at `+0x10` of damage record `index`, 0x1c0 bytes each from module `+0x18`): the knockback the defender received, which the hit handler stores for the strongest hit of the frame. Read for the sweet/sour attribution (spots-3)."),
+    ("damage_record_layout", 0x3FFA10, RELIED,
+     "The fighter DamageModule's `reaction` (vtable slot 0xd0: `ldr x8,[x0,#0x18]; orr w9,wzr,#0x1c0; smaddl x8,w1,w9,x8; ldr s0,[x8,#0x10]; ret`): the damage records from module `+0x18`, 0x1c0 bytes each, the knockback at `+0x10`. Relied on to read record 0 raw (spots-3)."),
+    ("damage_record_hit_ids", 0x402F9C, RELIED,
+     "The DamageModule hit handler's copy of the hit's id block beside the knockback it stores (`ldp x9,x10,[x20,#0x20]; ldr x11,[x20,#0x30]; ... str x9,[x8,#0x40]; stp x10,x11,[x8,#0x48]; str s8,[x24]`): the attacker's object id (hit `+0x24`) at record `+0x44` and the attack slot (hit `+0x32`, the id passed to `AttackModule::attack_data`) at `+0x52`. Relied on for the spot attribution (spots-3)."),
+    ("damage_record_dealt", 0x4028E0, RELIED,
+     "The DamageModule's damage transaction for a hit (`main+0x4026c0`) adding into the hit's damage record (`orr w9,wzr,#0x1c0; mul x9,x26,x9; ldr x8,[x19,#0x18]; ... ldr s0,[x8,#0x8]; fadd s0,s9,s0; str s0,[x8,#0x8]`): record `+0x8` sums the frame's damage before the 1-on-1 ratio, which the hit handler adds to `+0x0` for the knockback's percent. Relied on to read a hit's damage when the damage cap cuts the percent's rise short (spots-3)."),
     ("effect_req_follow", 0x2017730, CALLED,
      "`EffectModule::req_follow(accessor, Hash40 effect, Hash40 joint, pos&, rot&, scale, follow, attribute, 0, 0, 0, 0, bool, bool)`: spawns the sphere (the game's `sys_shield` effect) attached to the hitbox's bone."),
     ("sphere_effect_kill", 0x2017840, CALLED,
@@ -70,6 +78,15 @@ ROWS = [
      "`StopModule::set_hit_stop_frame(accessor, frames, bool)` (lua_bind thunk `ldr x0,[x0,#0x90]; ldr x8,[x0]; ldr x3,[x8,#0xd0]; and w2,w2,#1; br x3`): freezes the fighter that broke an Eggs-ercise target for the hitlag frames, as a hit does (SPEC V2.1); called with false only."),
     ("camera_limit_range", 0X15CB9B0, RELIED,
      "`app::camera::get_camera_limit_range` (`main+0x15cb9b0`): loads the camera manager `**(main+0x52b8f00)` and returns the four floats at `+0xc20`, the stage"),
+    # rc.14 wind-articles: the four wind-area commands, hooked so an article that runs one is tracked and its area drawn.
+    ("hitbox_area_wind", 0x22A98C0, HOOK,
+     "`app::sv_animcmd::AREA_WIND_2ND(lua_State*)`: the animation command that adds a box wind area to the running object's AreaModule (accessor `+0xc0`; worker `main+0x22a8fd0`, AreaModule slot 0x158 `add_wind_area_2nd`). Replace hook at the entry, plugin part first: an article that runs it is tracked so its area is drawn (rc.14 wind-articles)."),
+    ("hitbox_area_wind_arg10", 0x22A9960, HOOK,
+     "`app::sv_animcmd::AREA_WIND_2ND_arg10(lua_State*)`: the same command with ten arguments (worker `main+0x22a8fd0`, slot 0x158). Replace hook at the entry, plugin part first (rc.14 wind-articles)."),
+    ("hitbox_area_wind_rad", 0x22A8E90, HOOK,
+     "`app::sv_animcmd::AREA_WIND_2ND_RAD(lua_State*)`: the animation command that adds a circle wind area (worker `main+0x22a86a0`, AreaModule slot 0x160 `add_wind_area_2nd_rad`). Replace hook at the entry, plugin part first (rc.14 wind-articles)."),
+    ("hitbox_area_wind_rad_arg9", 0x22A8F30, HOOK,
+     "`app::sv_animcmd::AREA_WIND_2ND_RAD_arg9(lua_State*)`: the circle command with nine arguments (worker `main+0x22a86a0`, slot 0x160). Replace hook at the entry, plugin part first (rc.14 wind-articles)."),
 ]
 
 

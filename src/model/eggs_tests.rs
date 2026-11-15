@@ -84,7 +84,7 @@ fn eggs_rows_and_help() {
     assert_eq!(rows[1].help_lines(), ("Which of your hits break a target. Projectiles never do.", "12%+: only attacks that deal 12% or more."));
     // §2.3b's speed row, renamed by V2.2.
     assert_eq!((rows[2].title, values(rows[2])), ("Target", vec!["Disc", "CPU"]));
-    assert_eq!(rows[2].help_lines(), ("Disc: a target appears. CPU: the CPU is the target.", "The CPU target stays still and is reset after each hit."));
+    assert_eq!(rows[2].help_lines(), ("Disc: a target appears. CPU: the CPU is the target.", "The CPU flies like the disc and is reset after each hit."));
     assert_eq!((rows[3].title, values(rows[3])), ("Target speed", vec!["Normal", "Slow", "Fast"]));
     assert_eq!(
         rows[3].help_lines(),
@@ -399,33 +399,41 @@ fn started_cpu(mode: u8, rule: u8, seed: u32) -> Run {
     run
 }
 
-/// V2.1 (D1 c): with the CPU as the target no disc is drawn; the CPU is placed on the spawn spot with 0% and held there, a
-/// hit the game registers on it (its damage rises) that the rule lets count breaks the target (the game's own hitlag and
-/// knockback play), and after the hitlag the CPU is put back at the next spawn spot.
+/// V2.1 (D1 c), flying since the operator's 11-15 order: with the CPU as the target no disc is drawn; the CPU is placed
+/// afresh at 0% on the target's spot and follows its flight to rest on the ground, where it is held; a hit the game
+/// registers on it (its damage rises) that the rule lets count breaks the target (the game's own hitlag and knockback
+/// play), and after the hitlag the CPU is put at the next spawn spot.
 fn eggs_target_cpu() {
     let mut run = started_cpu(FREE, ANY, 7);
     assert_eq!(run.cpu_pass(0.0, false), None, "nothing to place before the first target");
     pass(&mut run, &[], false);
     assert!(target(&mut run).is_none() && run.look(false, || None).iter().all(Option::is_none), "the CPU is the target: no disc");
-    let (spot, fresh) = run.cpu_pass(0.0, false).expect("placed");
-    assert!(fresh && spot[1] == 0.0 && spot[0].abs() <= HALF_WIDTH, "on the ground, in the box: {spot:?}");
+    let (first, put) = run.cpu_pass(0.0, false).expect("placed");
+    assert!(put == Put::Fresh(true) && first[0].abs() <= HALF_WIDTH, "afresh in the air, in the box: {first:?} {put:?}");
+    for _ in 0..120 {
+        pass(&mut run, &[], false);
+        run.cpu_pass(0.0, false);
+    }
+    let (spot, put) = run.cpu_pass(0.0, false).expect("at rest");
+    assert!(put == Put::Hold && spot[1].abs() < 1e-3, "at rest on the ground: {spot:?} {put:?}");
     for _ in 0..30 {
         pass(&mut run, &[], false);
-        assert_eq!(run.cpu_pass(0.0, false), Some((spot, false)), "held, tick after tick");
+        assert_eq!(run.cpu_pass(0.0, false), Some((spot, Put::Hold)), "held at rest, tick after tick");
     }
     // Still damaged from before the placement took: asked again until it reads 0.
     let mut stale = started_cpu(FREE, ANY, 7);
     pass(&mut stale, &[], false);
-    assert_eq!(stale.cpu_pass(40.0, false).map(|p| p.1), Some(true));
-    assert_eq!(stale.cpu_pass(40.0, false).map(|p| p.1), Some(true), "a stale 40% is not a hit");
-    assert_eq!((stale.score, stale.cpu_pass(0.0, false).map(|p| p.1)), (0, Some(false)));
-    // A hit: the count rises, the game plays its hitlag and knockback (nothing asked of the CPU), then the next spot.
+    assert_eq!(stale.cpu_pass(40.0, false).map(|p| p.1), Some(Put::Fresh(true)));
+    assert_eq!(stale.cpu_pass(40.0, false).map(|p| p.1), Some(Put::Fresh(true)), "a stale 40% is not a hit");
+    assert_eq!((stale.score, stale.cpu_pass(0.0, false).map(|p| p.1)), (0, Some(Put::Hold)));
+    // A hit on the ground at rest: the count rises, the game plays its hitlag and knockback (nothing asked of the CPU),
+    // then the next spot, launched again.
     assert_eq!(run.cpu_pass(9.0, false), None);
     assert_eq!(run.score, 1);
     assert_eq!(notice_after(&mut run), "Eggs 1");
     assert_eq!(run.cpu_pass(9.0, true), None, "in hitlag");
-    let (next, fresh) = run.cpu_pass(9.0, false).expect("the next spawn");
-    assert!(fresh && gap(next, spot) >= MIN_GAP, "reset at the next spot: {next:?}");
+    let (next, put) = run.cpu_pass(9.0, false).expect("the next spawn");
+    assert!(put == Put::Fresh(true) && gap(next, spot) >= MIN_GAP - LIFT, "reset at the next spot, flying: {next:?} {put:?}");
     // The rule filters: Aerials counts only in an aerial; Hits of 12%+ only a hit of 12 or more. A hit that does not count
     // resets the CPU where it was.
     let mut aerials = started_cpu(FREE, AERIALS, 7);
@@ -433,7 +441,8 @@ fn eggs_target_cpu() {
     let (spot, _) = aerials.cpu_pass(0.0, false).unwrap();
     aerials.cpu_pass(0.0, false);
     assert_eq!(aerials.cpu_pass(5.0, false), None);
-    assert_eq!((aerials.score, aerials.cpu_pass(5.0, false)), (0, Some((spot, true))), "a jab does not count: reset in place");
+    let back = Some((spot, Put::Fresh(true)));
+    assert_eq!((aerials.score, aerials.cpu_pass(5.0, false)), (0, back), "a jab does not count: reset in place");
     pass(&mut aerials, &[], true);
     aerials.cpu_pass(0.0, false);
     aerials.cpu_pass(5.0, false);
@@ -462,6 +471,196 @@ fn eggs_target_cpu() {
     // Off: no run, nothing asked.
     let mut off = Run::IDLE;
     assert_eq!(off.cpu_pass(0.0, false), None);
+}
+
+/// A run of `mode` under `rule` at `speed` with `target`, the camera held still at `view`.
+fn started_with(mode: u8, rule: u8, speed: u8, target: u8, seed: u32, view: View) -> Run {
+    let mut run = Run::IDLE;
+    assert_eq!(run.plan([mode, rule, speed, target], Some(seed), 0, || TRAINING), Plan::Read);
+    settle(&mut run, view);
+    run
+}
+
+/// The operator, 11-15: the CPU target is in the air like the discs. The same seed and camera give the CPU the disc's
+/// launch, drift, apex, bounce and rest at every Target speed; its feet trace the disc's bottom edge.
+fn eggs_cpu_flies_like_the_disc() {
+    let views = [RESET_CENTRE, View([14.0, 14.0], [0.0, -300.0], BOX), View([40.0, 40.0], [0.0, -300.0], BOX)];
+    for (view, speed) in views.into_iter().flat_map(|v| [NORMAL, SLOW, FAST].map(|s| (v, s))) {
+        for seed in 0..20 {
+            let [mut disc, mut cpu] = [DISC, CPU].map(|t| started_with(FREE, ANY, speed, t, seed, view));
+            let mut top = 0.0f32;
+            for tick in 0..300 {
+                pass(&mut disc, &[], false);
+                pass(&mut cpu, &[], false);
+                let (d, c) = (disc.egg_at().unwrap(), cpu.egg_at().unwrap());
+                let same = (c[0] - d[0]).abs() < 1e-4 && (c[1] + RADIUS - d[1]).abs() < 1e-4;
+                assert!(same, "seed {seed} speed {speed} tick {tick}: the CPU at {c:?}, the disc at {d:?}");
+                top = top.max(c[1]);
+            }
+            assert!(top > 10.0, "seed {seed} speed {speed} {view:?}: the CPU's highest point is {top}");
+        }
+    }
+}
+
+/// The CPU target's pass puts it on the moving `egg_at()` every tick: in flight, a point within `LIFT` of the ground is
+/// raised to `LIFT` (the game never lands it mid-flight); at rest, exactly the path's end. It is placed afresh in the air
+/// once, held without a pose request through the flight, stood up once when the flight comes to rest, then held.
+fn eggs_cpu_pass_follows_the_flight() {
+    for speed in [NORMAL, SLOW, FAST] {
+        let mut run = started_with(FREE, ANY, speed, CPU, 7, RESET_CENTRE);
+        pass(&mut run, &[], false);
+        let ground = run.egg.unwrap()[1];
+        let (mut top, mut puts) = (0.0f32, vec![]);
+        for tick in 0..400 {
+            let want = run.egg_at().unwrap();
+            let [v, _, g] = run.fly;
+            let aloft = v > 0.0 && (run.age as f32) < 2.0 * v / g * (1.0 + BOUNCE);
+            let (at, put) = run.cpu_pass(0.0, false).expect("held every tick");
+            let expect = if aloft { [want[0], want[1].max(ground + LIFT)] } else { want };
+            assert_eq!(at, expect, "speed {speed} tick {tick}");
+            assert!(at[1] >= ground + LIFT || !aloft, "speed {speed} tick {tick}: {at:?} too low in flight");
+            top = top.max(at[1] - ground);
+            if puts.last().is_none_or(|(p, _)| *p != put) {
+                puts.push((put, tick));
+            }
+            pass(&mut run, &[], false);
+        }
+        assert!((top - 21.6).abs() < 0.2, "speed {speed}: the flight's apex {top}, the disc's 21.6");
+        let kinds: Vec<Put> = puts.iter().map(|p| p.0).collect();
+        assert_eq!(kinds, [Put::Fresh(true), Put::Hold, Put::Land, Put::Hold], "speed {speed}: {puts:?}");
+        let landed = puts[2].1 as f32 + 1.0;
+        let want = 96.0 / SPEEDS[usize::from(speed)];
+        assert!((landed - want).abs() <= 1.0, "speed {speed}: at rest after {landed} ticks, want {want}");
+        let rest = run.egg_at();
+        assert_eq!(run.cpu_pass(0.0, false).map(|p| p.0), rest, "at rest on the ground");
+        assert!(rest.is_some_and(|r| (r[1] - ground).abs() < 1e-3), "{rest:?}");
+    }
+}
+
+/// rc.14 cpu-tag-target: the game turns the CPU's cursor flag (its player tag) off for the CPU the target places in the air
+/// (Eden's cursor probe: false through the flight, true again at the landing). While TR owns the placement (every tick the
+/// pass returns a position: the flight and the hold at rest) and the body is not hidden, it keeps the flag on. Where the game
+/// owns the CPU (the hit, its hitlag, a run that ended: no position) the tag stays the game's business, and a hidden body's
+/// off-write wins.
+fn eggs_cpu_target_keeps_its_cursor() {
+    let mut run = started_with(FREE, ANY, NORMAL, CPU, 7, RESET_CENTRE);
+    assert!(!keeps_cursor(run.cpu_pass(0.0, false), false), "nothing placed before the first target");
+    pass(&mut run, &[], false);
+    let mut puts = vec![];
+    for tick in 0..130 {
+        let moved = run.cpu_pass(0.0, false);
+        let put = moved.expect("held every tick").1;
+        assert!(keeps_cursor(moved, false), "tick {tick} ({put:?}): the flight and the hold keep the tag on");
+        assert!(!keeps_cursor(moved, true), "tick {tick}: a hidden body's off-write wins");
+        if puts.last() != Some(&put) {
+            puts.push(put);
+        }
+        pass(&mut run, &[], false);
+    }
+    assert_eq!(puts, [Put::Fresh(true), Put::Hold, Put::Land, Put::Hold], "the flight, its landing and the rest were all covered");
+    // A hit: the game owns the CPU in the hit's pass and in its hitlag: no write. After the hitlag it is placed at the
+    // next spot (TR owns it again).
+    assert!(!keeps_cursor(run.cpu_pass(9.0, false), false), "the hit's pass");
+    assert!(!keeps_cursor(run.cpu_pass(9.0, true), false), "in hitlag");
+    assert!(keeps_cursor(run.cpu_pass(9.0, false), false), "placed at the next spot");
+    // A run the last hit ended is the game's again.
+    let mut ten = started_cpu(TEN, ANY, 7);
+    pass(&mut ten, &[], false);
+    for _ in 0..10 {
+        ten.cpu_pass(0.0, false);
+        ten.cpu_pass(0.0, false);
+        ten.cpu_pass(5.0, false);
+        ten.cpu_pass(5.0, true);
+        pass(&mut ten, &[], false);
+    }
+    assert!(ten.ended());
+    assert!(!keeps_cursor(ten.cpu_pass(0.0, false), false), "ended: released to the game");
+}
+
+/// Hits in the air: a counted one breaks the target (the game's hitlag plays, nothing is asked), then the CPU goes to 0%
+/// at the next spot and flies again; an uncounted one puts it back on its flight where it was hit.
+fn eggs_cpu_air_hits() {
+    // Placed, then armed (0% read), 20 ticks into the flight.
+    let fly = |rule: u8| {
+        let mut run = started_with(FREE, rule, NORMAL, CPU, 7, View([14.0, 14.0], [0.0, -300.0], BOX));
+        pass(&mut run, &[], false);
+        let ground = run.egg.unwrap()[1];
+        let mut at = [0.0; 2];
+        for _ in 0..20 {
+            at = run.cpu_pass(0.0, false).expect("held").0;
+            pass(&mut run, &[], false);
+        }
+        assert!(at[1] > ground + 10.0, "mid-flight: {at:?}");
+        (run, ground, at)
+    };
+    let (mut run, ground, at) = fly(ANY);
+    assert_eq!(run.cpu_pass(9.0, false), None, "the hit: the game plays it");
+    assert_eq!(run.score, 1, "a hit in the air counts");
+    for _ in 0..6 {
+        pass(&mut run, &[], false);
+        assert_eq!(run.cpu_pass(9.0, true), None, "in hitlag");
+    }
+    let (next, put) = run.cpu_pass(9.0, false).expect("the next spot");
+    assert!(next[1] <= ground + LIFT && gap(next, at) >= MIN_GAP - RADIUS, "0% at the next spot: {next:?} from {at:?}");
+    assert_eq!(put, Put::Fresh(true), "afresh (0%), in the air");
+    let mut top = next[1];
+    for _ in 0..30 {
+        pass(&mut run, &[], false);
+        top = top.max(run.cpu_pass(0.0, false).expect("held").0[1]);
+    }
+    assert!(top > ground + 15.0, "the next spot flies again: {top}");
+    // Aerials, and Player 1 not in an aerial: the hit does not count; after the hitlag the CPU is back where it was hit.
+    let (mut run, _, at) = fly(AERIALS);
+    let before = run.cpu_pass(0.0, false).expect("held").0;
+    assert_eq!(run.cpu_pass(5.0, false), None);
+    for _ in 0..6 {
+        pass(&mut run, &[], false);
+        assert_eq!(run.cpu_pass(5.0, true), None, "in hitlag");
+    }
+    let back = run.cpu_pass(5.0, false).expect("put back");
+    assert_eq!((run.score, back), (0, (before, Put::Fresh(true))), "back on its flight where it was hit, not counted (from {at:?})");
+    let mut on = before;
+    for _ in 0..5 {
+        pass(&mut run, &[], false);
+        on = run.cpu_pass(0.0, false).expect("held").0;
+    }
+    assert!(on[1] > before[1] + 1.0, "the flight goes on from there, still rising: {on:?} from {before:?}");
+    // In an aerial, the same hit in the air counts.
+    let (mut run, _, _) = fly(AERIALS);
+    pass(&mut run, &[], true);
+    run.cpu_pass(0.0, false);
+    assert_eq!((run.cpu_pass(5.0, false), run.score), (None, 1), "an aerial's hit in the air counts");
+}
+
+/// `10 targets` with the CPU as the target, each pass through `plan` as the runtime does it: the CPU's tenth counted hit
+/// ends the run, and Player 1's next pass closes it ("Done! 10", the best kept) with the clock stopped at the hit's frame.
+/// Eden cf-flight-8551434e-1: the notice stayed at "Eggs 9/10" (`plan` idled the ended run before its closing pass).
+fn eggs_cpu_done() {
+    let rows = [TEN, ANY, NORMAL, CPU];
+    let mut run = started_with(TEN, ANY, NORMAL, CPU, 7, View([14.0, 14.0], [0.0, -300.0], BOX));
+    // Player 1's frame: the plan, then the step when it says Read (the runtime's `eggs_pass`).
+    let p1 = |run: &mut Run| match run.plan(rows, None, 0, || TRAINING) {
+        Plan::Read => {
+            let tick = run.keeper(P1);
+            run.step(tick, 0.0, &[], false, 7)
+        }
+        _ => None,
+    };
+    // Ten targets of four frames each: placed, armed, hit, hitlag. Player 1's pass comes first in a frame, then the CPU's.
+    let mut end = None;
+    for k in 0..10 {
+        for (damage, stopped) in [(0.0, false), (0.0, false), (5.0, false), (5.0, true)] {
+            if p1(&mut run) == Some(END_FRAMES) {
+                end = Some(k);
+            }
+            run.cpu_pass(damage, stopped);
+        }
+    }
+    assert_eq!((run.score, end), (10, Some(9)), "the frame after the tenth hit closes the run");
+    assert_eq!(run.frames, 9 * 4 + 3, "the clock stopped at the tenth hit's frame");
+    assert!(notice(&run).starts_with("Done! 10 in 0:00.") && notice(&run).contains("(best"), "{}", notice(&run));
+    assert_eq!((p1(&mut run), run.cpu_pass(0.0, false)), (None, None), "closed; the CPU is released");
+    assert_eq!(run.plan(rows, None, 0, || panic!("closed: nothing is read")), Plan::Idle, "it waits for a restart");
 }
 
 /// The notice after one more pass of Player 1.
@@ -524,6 +723,26 @@ fn eggs_target_cpu_hidden() {
     snapshot.set(ROW_HIDE_CPU, &[0, 1]).unwrap();
     assert_eq!(choices(&snapshot)[3], CPU, "Off: the CPU is the target again");
     assert_eq!(choice(&snapshot, ROW_PRACTICE_CPU), 0, "CPU during a game: Hide first");
+}
+
+/// V2.6: the practice game's request to hide the CPU (`hides_cpu`), one table: CPU during a game says Hide and a game runs,
+/// except that the CPU is never hidden while it is the Eggs-ercise target (the target wins; its body, its tag and its panel
+/// all stay); Break the Targets hides it whatever the Eggs rows say; Show never hides it.
+fn eggs_practice_hide_request() {
+    // (CPU during a game is Hide, an Eggs run is on, the CPU is its target, Break the Targets runs) -> the request
+    let table = [
+        ((true, true, false, false), true, "Eggs-ercise, Target Disc, Hide"),
+        ((true, true, true, false), false, "Eggs-ercise, Target CPU, Hide: the target wins"),
+        ((true, false, false, true), true, "Break the Targets, Hide"),
+        ((true, false, false, false), false, "no game"),
+        ((false, true, false, false), false, "Eggs-ercise, Target Disc, Show"),
+        ((false, true, true, false), false, "Eggs-ercise, Target CPU, Show"),
+        ((false, false, false, true), false, "Break the Targets, Show"),
+        ((false, false, false, false), false, "no game, Show"),
+    ];
+    for ((practice_hide, running, cpu_target, btt), want, what) in table {
+        assert_eq!(hides_cpu(practice_hide, running, cpu_target, btt), want, "{what}");
+    }
 }
 
 /// V2.1: a break freezes the breaker for `HITLAG` ticks in native Training only (the waiting room waits for the LDN
@@ -831,6 +1050,12 @@ fn case_table() {
         ("eggs_stage_range", eggs_stage_range as fn()),
         ("eggs_target_cpu", eggs_target_cpu as fn()),
         ("eggs_target_cpu_hidden", eggs_target_cpu_hidden as fn()),
+        ("eggs_practice_hide_request", eggs_practice_hide_request as fn()),
+        ("eggs_cpu_target_keeps_its_cursor", eggs_cpu_target_keeps_its_cursor as fn()),
+        ("eggs_cpu_flies_like_the_disc", eggs_cpu_flies_like_the_disc as fn()),
+        ("eggs_cpu_pass_follows_the_flight", eggs_cpu_pass_follows_the_flight as fn()),
+        ("eggs_cpu_air_hits", eggs_cpu_air_hits as fn()),
+        ("eggs_cpu_done", eggs_cpu_done as fn()),
         ("eggs_break_anim_timing", eggs_break_anim_timing as fn()),
         ("eggs_break_anim_overlap", eggs_break_anim_overlap as fn()),
         ("eggs_timer_end", eggs_timer_end as fn()),

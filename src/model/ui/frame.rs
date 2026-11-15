@@ -744,7 +744,7 @@ fn paint_file(rec: &RecordingScreens, frame: &mut Frame) {
         }
         // Before the start save's name: the value is right-aligned, so the chip sits left of its text.
         if let Some(floppy) = row.floppy {
-            let x = super::panes::ROW_RIGHT - super::panes::text_width(row.value.encode_utf16().count()) - 22.0;
+            let x = super::panes::row_value_right(false) - super::panes::text_width(row.value.encode_utf16().count()) - 22.0;
             place_icon(frame, 2, x, super::panes::row_y(slot), floppy);
         }
     }
@@ -800,7 +800,7 @@ fn paint_sections(rec: &RecordingScreens, frame: &mut Frame, face: Face, group: 
         }
         if let Some(mark) = view.header_loop {
             // Left of the right-aligned count, as a start save's floppy sits left of its name (`paint_file`).
-            let right = super::panes::row_span(face == super::recording_menu::Face::Popup).1;
+            let right = super::panes::row_value_right(face == super::recording_menu::Face::Popup);
             let x = right - super::panes::text_width(mark.label().encode_utf16().count()) - 22.0;
             place_icon_color(frame, super::panes::FLOPPIES + usize::from(section), x, super::panes::row_y(base), [236, 238, 242, 255]);
             let _ = write!(frame.rows[base].value, "{}", mark.label());
@@ -863,7 +863,7 @@ fn place_icon_color(frame: &mut Frame, index: usize, x: f32, y: f32, color: [u8;
 }
 
 fn p_row_x(popup: bool) -> f32 {
-    super::panes::row_span(popup).1 - 40.0
+    super::panes::row_value_right(popup) - 40.0
 }
 
 fn window_start(cursor: usize, len: usize, shown: usize) -> usize {
@@ -975,7 +975,7 @@ mod tests {
         assert!(chip.on, "the Start save row has its floppy");
         assert_eq!(chip.color, Floppy::On.color());
         assert_eq!(chip.y, super::super::panes::row_y(0));
-        let text_left = super::super::panes::ROW_RIGHT - super::super::panes::text_width(value.encode_utf16().count());
+        let text_left = super::super::panes::row_value_right(false) - super::super::panes::text_width(value.encode_utf16().count());
         assert!(chip.x < text_left, "the chip sits before the name, not over it");
         assert!(frame.icons.iter().enumerate().all(|(i, icon)| i == 2 || !icon.on), "one chip on a file screen");
     }
@@ -1055,7 +1055,7 @@ mod tests {
     /// 8 are ambiguous), `-dirty` with uncommitted changes, or `unknown` without git.
     fn the_build_tag_reads_version_name_and_short_sha() {
         let rest = BUILD_TAG.strip_prefix(env!("CARGO_PKG_VERSION")).expect(BUILD_TAG);
-        let sha = rest.strip_prefix(" · rc13 ").expect(BUILD_TAG);
+        let sha = rest.strip_prefix(" · rc14 ").expect(BUILD_TAG);
         let hex = sha.strip_suffix("-dirty").unwrap_or(sha);
         assert!(sha == "unknown" || (hex.len() >= 8 && hex.bytes().all(|b| b.is_ascii_hexdigit())), "{BUILD_TAG}");
     }
@@ -1129,10 +1129,31 @@ mod tests {
         assert_eq!(f.tab_slots()[1].unwrap().left, a.left + a.width + 84.0);
     }
 
+    /// rc.14 list-padding (GIF review of `8199c696`, Saved layouts): the cursor's left bar and the outline's edges ran
+    /// through the first letter of every row, and "3 targets" touched the outline's right edge. Every list places its
+    /// text through `row_label_box` and `row_value_box`; on both faces the text is at least `GAP` layout units (pixels of
+    /// the 1920 x 1080 layout) from the innermost chrome edge on each side, and the two boxes do not overlap.
+    fn list_text_keeps_a_gap_to_the_outline_and_the_cursor_on_both_sides() {
+        use super::super::panes::{row_label_box, row_span, row_value_box, CHROME_EDGE, CURSOR_BAR_W, CURSOR_BAR_X};
+        const GAP: f32 = 12.0;
+        for popup in [false, true] {
+            let (left, right) = row_span(popup);
+            let ((lx, lw), (vx, vw)) = (row_label_box(popup), row_value_box(popup));
+            let (label_left, label_right) = (lx - lw / 2.0, lx + lw / 2.0);
+            let (value_left, value_right) = (vx - vw / 2.0, vx + vw / 2.0);
+            let chrome_left = left + CHROME_EDGE.max(CURSOR_BAR_X + CURSOR_BAR_W / 2.0);
+            let chrome_right = right - CHROME_EDGE;
+            assert!(label_left - chrome_left >= GAP, "popup={popup}: the label starts {} units from the cursor's bar", label_left - chrome_left);
+            assert!(chrome_right - value_right >= GAP, "popup={popup}: the value ends {} units from the outline", chrome_right - value_right);
+            assert!(label_right < value_left, "popup={popup}: the label's box runs into the value's");
+        }
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("list_text_keeps_a_gap_to_the_outline_and_the_cursor_on_both_sides", list_text_keeps_a_gap_to_the_outline_and_the_cursor_on_both_sides as fn()),
             ("the_tab_row_has_a_slot_per_named_tab_and_one_active", the_tab_row_has_a_slot_per_named_tab_and_one_active as fn()),
             ("recording_paint_uses_a_green_plate_a_white_cursor_and_the_visible_hot_rows", recording_paint_uses_a_green_plate_a_white_cursor_and_the_visible_hot_rows as fn()),
             ("a_macro_screen_draws_the_floppy_before_the_start_save_name", a_macro_screen_draws_the_floppy_before_the_start_save_name as fn()),

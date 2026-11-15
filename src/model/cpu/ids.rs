@@ -325,6 +325,9 @@ game_constants! {
     TermContAppealS = "FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_APPEAL_S",
     TermContAppealLw = "FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_APPEAL_LW",
     KirbyFlagCopy = "FIGHTER_KIRBY_INSTANCE_WORK_ID_FLAG_COPY",
+    // rc.14 Hide CPU: a fighter's player tag, the pair the game's own cursor helper writes (`main+0x67db00`).
+    WorkFlagCursor = "FIGHTER_INSTANCE_WORK_ID_FLAG_CURSOR",
+    WorkFlagNameCursor = "FIGHTER_INSTANCE_WORK_ID_FLAG_NAME_CURSOR",
 }
 
 /// The statuses of the clatter list, in the spec's order.

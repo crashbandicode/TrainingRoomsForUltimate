@@ -281,15 +281,64 @@ fn cpu_settings_read_a_changed_snapshot() {
 #[test]
 fn cpu01_cpu_role_only_when_p1_ai() {
     // Entry 0 is never a CPU role, even when an AI (the pilot or the fallback) operates it.
-    assert!(!is_cpu_role(Scene::Training, 0, true));
-    assert!(!is_cpu_role(Scene::Lobby, 0, true));
+    assert!(!is_cpu_role(Scene::Training, 0, true, None));
+    assert!(!is_cpu_role(Scene::Lobby, 0, true, None));
     // The CPU role: entry 1 in Training (any non-zero operated entry), entry 4 in the waiting room.
-    assert!(is_cpu_role(Scene::Training, 1, true));
-    assert!(is_cpu_role(Scene::Lobby, 4, true));
-    assert!(!is_cpu_role(Scene::Lobby, 1, true), "only entries 0 and 4 are serviced in the lobby; 0 is never a CPU");
+    assert!(is_cpu_role(Scene::Training, 1, true, None));
+    assert!(is_cpu_role(Scene::Lobby, 4, true, None));
+    assert!(!is_cpu_role(Scene::Lobby, 1, true, None), "only entries 0 and 4 are serviced in the lobby; 0 is never a CPU");
     // A human-operated entry is not a role; out-of-range entries are refused.
-    assert!(!is_cpu_role(Scene::Training, 1, false));
-    assert!(!is_cpu_role(Scene::Training, 8, true) && !is_cpu_role(Scene::Training, -1, true));
+    assert!(!is_cpu_role(Scene::Training, 1, false, None));
+    assert!(!is_cpu_role(Scene::Training, 8, true, None) && !is_cpu_role(Scene::Training, -1, true, None));
+}
+
+/// rc.14 mii-hud-portrait: in Training the CPU role is a CPU the game plays, entries 1..=No. of CPUs. The entries above it
+/// are TR's parked ones: F9's seats 2 and 3 (also the Mii HUD bust's helper rows) and the hat entries 4..7. The game flags
+/// them CPU-operated and runs their frames (the bust render poses its helper), but no CPU behaviour may act on them: Hide
+/// CPU hid the helper during its render and the Mii's HUD portrait came out as the bare grey background (Eden hidetag-2,
+/// `cpu_event hide entry=2 hidden=Some(true)` between `issued render helper=2` and `bound`).
+#[test]
+fn cpu_role_is_a_live_cpu_never_a_parked_helper() {
+    // One CPU: entry 1 is the CPU; the bust helpers 2/3 and the hat entries are not.
+    assert!(is_cpu_role(Scene::Training, 1, true, Some(1)));
+    for entry in 2..8 {
+        assert!(!is_cpu_role(Scene::Training, entry, true, Some(1)), "entry {entry} is parked at one CPU");
+    }
+    // Two or three CPUs: the promoted seats are CPUs and keep every behaviour, Hide CPU included.
+    assert!(is_cpu_role(Scene::Training, 2, true, Some(2)) && !is_cpu_role(Scene::Training, 3, true, Some(2)));
+    assert!((1..=3).all(|e| is_cpu_role(Scene::Training, e, true, Some(3))) && !is_cpu_role(Scene::Training, 4, true, Some(3)));
+    // No readable or no open count: TR loads no parked entry, so every operated entry stays a role (the rule before).
+    for cpus in [None, Some(0), Some(4)] {
+        assert!((1..8).all(|e| is_cpu_role(Scene::Training, e, true, cpus)), "cpus {cpus:?}");
+    }
+    // Still never entry 0 or a human; the waiting room is unchanged (entry 4 only, whatever the count).
+    assert!(!is_cpu_role(Scene::Training, 0, true, Some(1)) && !is_cpu_role(Scene::Training, 1, false, Some(1)));
+    assert!(is_cpu_role(Scene::Lobby, 4, true, Some(1)) && !is_cpu_role(Scene::Lobby, 2, true, Some(3)));
+}
+
+/// The same rule as F9's own: an entry is a CPU role exactly when it is not a parked helper seat
+/// (`parked_entries::helper_seat`) or a hat entry (`parked_entries::hat_may_use`), at every count.
+#[test]
+fn cpu_role_parity_with_parked_seats_and_hat_entries() {
+    use model::parked_entries::{hat_may_use, helper_seat};
+    for cpus in [None, Some(0), Some(1), Some(2), Some(3), Some(4)] {
+        for slot in [2u32, 3] {
+            assert_eq!(is_cpu_role(Scene::Training, slot as i32, true, cpus), !helper_seat(slot, cpus, false), "seat {slot} cpus {cpus:?}");
+        }
+        for slot in 4u32..8 {
+            assert_eq!(is_cpu_role(Scene::Training, slot as i32, true, cpus), !hat_may_use(slot, cpus, false), "hat {slot} cpus {cpus:?}");
+        }
+    }
+}
+
+/// The frame wrapper gives the role rule the game's own No. of CPUs (the field F9 reads), for every entry above 1.
+#[test]
+fn cpu_role_frame_wrapper_reads_no_of_cpus() {
+    let source = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/cpu.rs")).unwrap();
+    assert!(source.contains("character_roster::training_cpu_quantity()"), "the wrapper reads No. of CPUs");
+    assert!(source.contains("is_cpu_role(scene, entry, reset_hub::cpu_operated(fighter), cpus)"), "and passes it to the role rule");
+    let roster = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/roster/character_roster.rs")).unwrap();
+    assert!(roster.contains("pub(crate) unsafe fn training_cpu_quantity() -> Option<u32> {\n    native_source::training_cpu_quantity()\n}"));
 }
 
 #[test]

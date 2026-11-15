@@ -15,6 +15,7 @@ use model::cpu::hide;
 use model::cpu::role::{FighterKey, Scene};
 use model::cpu::settings::CpuSettings;
 use model::cpu::state::Cpu;
+use model::eggs;
 use model::menu::table::ROWS;
 use model::menu::{Env, Grey, Menu};
 use model::settings::{Settings, Snapshot};
@@ -139,9 +140,202 @@ fn hide_cpu_waiting_room_gate() {
     assert_eq!(Grey::WaitingRoom.text(), "Not in a waiting room yet");
 }
 
+/// One frame's tag write and the HUD panels hidden after it.
+fn tag_and_panels(cpu: &mut Cpu, key: FighterKey, practice: bool) -> (Option<bool>, u8) {
+    let out = frame(cpu, key, practice);
+    (hide::tag(out.vanish), cpu.hidden_panels())
+}
+
+/// The CPU entry's panel bit (entry 1 in Training).
+const CPU_PANEL: u8 = 1 << 1;
+
+#[test]
+fn hide_cpu_tag_follows_the_body() {
+    // The row: the tag (the game's two cursor flags) goes with the body on its first hidden frame, on every hidden frame
+    // after (a rebuilt body cannot show it), and comes back on the frame the body is shown; untouched otherwise.
+    let mut cpu = cpu(&[("hide_cpu", &ON)]);
+    assert_eq!(tag_and_panels(&mut cpu, body(), false), (Some(false), CPU_PANEL));
+    assert_eq!(tag_and_panels(&mut cpu, body(), false), (Some(false), CPU_PANEL));
+    // A reset or swap rebuilds the body's state: its first frame hides tag and panel again.
+    cpu.clear_session();
+    assert_eq!(cpu.hidden_panels(), 0);
+    assert_eq!(tag_and_panels(&mut cpu, body(), false), (Some(false), CPU_PANEL));
+    let mut snap = Snapshot::factory();
+    snap.set("hide_cpu", &[0, 1]).unwrap();
+    cpu.publish(CpuSettings::from_snapshot(&snap), 0);
+    assert_eq!(tag_and_panels(&mut cpu, body(), false), (Some(true), 0), "shown: the tag is back on the same frame");
+    assert_eq!(tag_and_panels(&mut cpu, body(), false), (None, 0), "then the game owns it again");
+    // A practice game's request (CPU during a game: Hide): the same, both Ice Climbers on the one entry.
+    let mut game = cpu_with_factory();
+    for key in [body(), FighterKey::new(1, true).unwrap()] {
+        assert_eq!(tag_and_panels(&mut game, key, true), (Some(false), CPU_PANEL));
+    }
+    for key in [body(), FighterKey::new(1, true).unwrap()] {
+        assert_eq!(tag_and_panels(&mut game, key, false).0, Some(true));
+    }
+    assert_eq!(game.hidden_panels(), 0);
+    // Never shown or hidden: no tag write, no panel.
+    let mut off = cpu_with_factory();
+    assert_eq!(tag_and_panels(&mut off, body(), false), (None, 0));
+}
+
+#[test]
+fn hide_cpu_tag_waiting_room() {
+    // A waiting room never hides the CPU, so neither its tag nor its panel is written there.
+    let mut lobby = cpu(&[("hide_cpu", &ON)]);
+    lobby.scene = Scene::Lobby;
+    for practice in [false, true] {
+        assert_eq!(tag_and_panels(&mut lobby, FighterKey::new(4, false).unwrap(), practice), (None, 0), "practice {practice}");
+    }
+    // Leaving Training while hidden: the waiting room's first frame shows the body, its tag and its panel.
+    let mut both = cpu(&[("hide_cpu", &ON)]);
+    assert_eq!(tag_and_panels(&mut both, body(), false), (Some(false), CPU_PANEL));
+    both.scene = Scene::Lobby;
+    assert_eq!(tag_and_panels(&mut both, body(), false), (Some(true), 0));
+}
+
+#[test]
+fn hide_cpu_panel_rule() {
+    // The panel parts of `info_melee` go by entry: Player 1's is `p1` and is never one this rule hides.
+    assert_eq!(hide::panel_part(0), Some(*b"p1"));
+    assert_eq!(hide::panel_part(1), Some(*b"p2"));
+    assert_eq!(hide::panel_part(7), Some(*b"p8"));
+    assert_eq!(hide::panel_part(8), None);
+    assert_eq!(hide::panels([false, false, true, false, false, true]), (1 << 1) | (1 << 2));
+    // Each `info_melee` tick: hidden on every tick while wanted, visible once after, nothing for a panel it never hid.
+    let mut hidden = false;
+    let ticks: Vec<_> = [false, true, true, false, false].iter().map(|&wanted| hide::panel_write(wanted, &mut hidden)).collect();
+    assert_eq!(ticks, [None, Some(false), Some(false), Some(true), None]);
+}
+
+#[test]
+fn hide_cpu_panel_follows_the_entry() {
+    // The panel is the hidden body's own entry's part, whatever entry the CPU has: never an assumed `p2`.
+    for entry in 1..8u8 {
+        let mut cpu = cpu(&[("hide_cpu", &ON)]);
+        let key = FighterKey::new(i32::from(entry), false).unwrap();
+        assert_eq!(tag_and_panels(&mut cpu, key, false), (Some(false), 1 << entry), "entry {entry}");
+        let parts: Vec<_> = (0..8).filter(|e| cpu.hidden_panels() & (1 << e) != 0).filter_map(hide::panel_part).collect();
+        assert_eq!(parts, [[b'p', b'1' + entry]], "entry {entry}: only its own part");
+        // Ice Climbers' Nana is the same entry: the same part.
+        let nana = FighterKey::new(i32::from(entry), true).unwrap();
+        assert_eq!(tag_and_panels(&mut cpu, nana, false), (Some(false), 1 << entry));
+    }
+    // Two CPU entries hidden at once: both parts, and Player 1's (`p1`) never.
+    let mut two = cpu(&[("hide_cpu", &ON)]);
+    for entry in [1, 3] {
+        frame(&mut two, FighterKey::new(entry, false).unwrap(), false);
+    }
+    assert_eq!(two.hidden_panels(), (1 << 1) | (1 << 3));
+    assert_eq!(two.hidden_panels() & 1, 0);
+}
+
+fn cpu_with_factory() -> Cpu {
+    cpu(&[])
+}
+
 #[test]
 fn hide_cpu_play_refusal() {
     // Play on CPU while the CPU is hidden is refused: the notice names the row, or the game when a practice game asked.
     assert_eq!(hide::refusal(false), "The CPU is hidden: turn Hide CPU Off first");
     assert_eq!(hide::refusal(true), "The CPU is hidden during this game");
+}
+
+/// One setting of the practice games, as the plugin's frame sees it: CPU during a game (Hide), an Eggs-ercise run on, the CPU as
+/// its target, Break the Targets running.
+#[derive(Clone, Copy, Debug)]
+struct Game {
+    practice_hide: bool,
+    running: bool,
+    cpu_target: bool,
+    btt: bool,
+}
+
+impl Game {
+    /// The request the game makes of the CPU body: the one decision (`eggs::hides_cpu`) the body, tag and panel all follow.
+    fn request(self) -> bool {
+        eggs::hides_cpu(self.practice_hide, self.running, self.cpu_target, self.btt)
+    }
+}
+
+/// Every setting a game can be in: a CPU target needs a run, and Hide CPU On makes the target the disc (`eggs::choices`).
+fn games(row: bool) -> Vec<Game> {
+    let mut all = Vec::new();
+    for practice_hide in [false, true] {
+        for running in [false, true] {
+            for cpu_target in [false, true] {
+                for btt in [false, true] {
+                    if (cpu_target && !running) || (cpu_target && row) || (running && btt) {
+                        continue;
+                    }
+                    all.push(Game { practice_hide, running, cpu_target, btt });
+                }
+            }
+        }
+    }
+    all
+}
+
+fn cpu_with_row(row: bool) -> Cpu {
+    let mut cpu = cpu(&[]);
+    set_row(&mut cpu, row);
+    cpu
+}
+
+fn set_row(cpu: &mut Cpu, row: bool) {
+    let mut snap = Snapshot::factory();
+    snap.set("hide_cpu", &[[0, 1], [1, 0]][usize::from(row)]).unwrap();
+    cpu.publish(CpuSettings::from_snapshot(&snap), 0);
+}
+
+#[test]
+fn hide_cpu_target_cpu_keeps_tag_and_panel() {
+    // Eggs-ercise on, Target CPU, CPU during a game Hide, Hide CPU Off: the CPU is the target, so the body, its tag and its
+    // panel all stay. No frame hides it and none writes the tag or the panel.
+    let target = Game { practice_hide: true, running: true, cpu_target: true, btt: false };
+    assert!(!target.request(), "the target wins over CPU during a game");
+    let mut cpu = cpu_with_row(false);
+    for _ in 0..3 {
+        let out = frame(&mut cpu, body(), target.request());
+        assert_eq!((out.vanish, hide::tag(out.vanish), cpu.hidden_panels()), (None, None, 0));
+        assert!(runs_behaviours(&out), "shown: the CPU's behaviours run");
+    }
+    // The same game with the disc as the target hides body, tag and panel together.
+    let disc = Game { cpu_target: false, ..target };
+    assert_eq!(tag_and_panels(&mut cpu, body(), disc.request()), (Some(false), CPU_PANEL));
+    // The menu closes on Target CPU while the CPU is hidden: it is shown at once, its tag back on and its panel clear.
+    assert_eq!(tag_and_panels(&mut cpu, body(), target.request()), (Some(true), 0));
+    assert_eq!(tag_and_panels(&mut cpu, body(), target.request()), (None, 0), "then the game owns the tag again");
+}
+
+#[test]
+fn hide_cpu_body_tag_panel_share_one_decision() {
+    // Every pair of consecutive states (the Hide CPU row x a practice game's setting), each pair from a fresh CPU. After a frame
+    // the body is hidden exactly when the row or the game's request says so; its tag is written off, and its panel is hidden,
+    // in exactly those frames; the tag is written on only in the frame that shows a body that was hidden (and then the panel
+    // is clear); and a frame that leaves the body alone leaves the tag alone. One decision, read three ways.
+    let states: Vec<(bool, Game)> = [false, true].into_iter().flat_map(|row| games(row).into_iter().map(move |g| (row, g))).collect();
+    assert_eq!(states.len(), 14, "8 settings with the row Off, 6 with it On (its CPU target is the disc)");
+    for &(row_a, game_a) in &states {
+        for &(row_b, game_b) in &states {
+            let mut cpu = cpu_with_row(row_a);
+            let mut was_hidden = false;
+            for (row, game) in [(row_a, game_a), (row_b, game_b), (row_b, game_b)] {
+                set_row(&mut cpu, row);
+                let out = frame(&mut cpu, body(), game.request());
+                let what = format!("row {row} {game:?}, hidden before: {was_hidden}");
+                let wanted = row || (game.practice_hide && ((game.running && !game.cpu_target) || game.btt));
+                let hidden = out.vanish == Some(true);
+                assert_eq!(hidden, wanted, "the body: {what}");
+                assert_eq!(hide::tag(out.vanish) == Some(false), hidden, "the tag is off with the body: {what}");
+                assert_eq!(cpu.hidden_panels() & CPU_PANEL != 0, hidden, "the panel is hidden with the body: {what}");
+                match hide::tag(out.vanish) {
+                    Some(true) => assert!(was_hidden && !hidden && cpu.hidden_panels() == 0, "the tag comes on with the show: {what}"),
+                    None => assert!(!was_hidden && !hidden, "no tag write only for a body left alone: {what}"),
+                    Some(false) => {}
+                }
+                was_hidden = hidden;
+            }
+        }
+    }
 }

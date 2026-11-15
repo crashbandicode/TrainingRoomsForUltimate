@@ -4,6 +4,7 @@ checks and their failure messages); it does NOT prove the plugin: the model is `
 the SPEC, so a disagreement between the two is for the Eden boot to find. Run: /usr/bin/python3 -I test_btt_rows.py
 """
 import json
+import random
 import sys
 import tempfile
 import time
@@ -18,6 +19,14 @@ import steps  # noqa: E402
 MAX, APART = 10, 8.0
 
 
+def clip_label(label):
+    """`clip_label` of src/model/macro_ui/macro_panel.rs (rc.14 list-padding, 9724bdf9) restated: a library tile shows at most 16
+    characters; a longer name is its first 15 (a trailing space dropped) and an ellipsis; the footer keeps the full name."""
+    if len(label) <= 16:
+        return label
+    return label[:15].rstrip() + '…'
+
+
 class Game:
     """Placing / Ready / Running / Done as SPEC V2.5 says, one macro at a time, 60 frames a second of simulated time."""
 
@@ -30,6 +39,7 @@ class Game:
         self.p1, self.facing, self.frames, self.left = [-30.0, 0.0, 0.0], 1, 0, 0
         self.pick, self.msg, self.broken, self.menu, self.row_on = None, ('', 0), set(), False, False
         self.mode_cam, self.shown = 1, None
+        self.jitter = None  # a random.Random: each held-stick macro runs 1 frame short, as aimed or 1 frame long
         self.ask = ('', 0)
         self.files = self.root / 'layouts'
         self.sdmc = self.root
@@ -177,8 +187,9 @@ class Game:
         frames = 20
         if name.startswith('btt-') and name[4] in 'rlud' and name[5:].isdigit():
             n = int(name[5:])
-            dx = {'r': 2.0, 'l': -2.0}.get(name[4], 0.0) * n
-            dy = {'u': 2.0, 'd': -2.0}.get(name[4], 0.0) * n
+            held = n if self.jitter is None else max(0, n + self.jitter.choice((-1, 0, 1)))  # what the game polled
+            dx = {'r': 2.0, 'l': -2.0}.get(name[4], 0.0) * held
+            dy = {'u': 2.0, 'd': -2.0}.get(name[4], 0.0) * held
             if self.phase == 'Placing':
                 self.cursor = [min(135.0, max(-135.0, self.cursor[0] + dx)), min(100.0, max(-10.0, self.cursor[1] + dy))]
             frames = n + 3
@@ -337,8 +348,9 @@ class Game:
             title, labels, sel = json.loads((self.files / ('%s.json' % self.own)).read_text())['name'], rows.ASK_ROWS, self.sel
         else:
             return '[NamedMacroDiag] view none visible=false'
-        # As the panel reports its tiles (Eden btt5-214653c2-1): each label cut to the tile, padded to 32 tiles.
-        labels = [label[:16] for label in labels] + [''] * (32 - len(labels))
+        # As the panel reports its tiles (Eden btt5-214653c2-1): each label cut to the tile (list-padding: with an ellipsis),
+        # padded to 32 tiles.
+        labels = [clip_label(label) for label in labels] + [''] * (32 - len(labels))
         return '[NamedMacroDiag] view title=%s footer="" selected=%d labels=%s' % (
             json.dumps(title, ensure_ascii=False), sel, json.dumps(labels, ensure_ascii=False))
 
@@ -498,6 +510,68 @@ def mutations():
             print('MUTATION %s' % ('KILLED' if killed else 'KILLED FOR ANOTHER REASON'), name, repr(error)[:160])
     return ok
 
+BASE_CHANGE = rows.change_stage
+
+
+def old_put_layout(ctx, st, out):
+    """btt-5's `put_layout` as it was: three targets 8 apart (+10, +18, +26 of P1), each aimed at its own absolute spot."""
+    px, y = rows.p1_of(st)[0], st['cursor'][1] - 6
+    cursor = st['cursor']
+    for k, (x, yy) in enumerate(sorted([(px + 10, y), (px + 18, y), (px + 26, y)], key=lambda t: abs(t[0] - st['cursor'][0])), 1):
+        cursor = rows.place_at(ctx, cursor, x, yy, k)['cursor']
+
+
+def drift(seeds, put):
+    """The seeds on which `put` does not get its three targets placed when every held-stick macro may run a frame short or
+    long (the Yoga under two Edens and a build, Eden rc14-int3-btt-s1): (seed, why)."""
+    failed = []
+    for seed in seeds:
+        root = tempfile.mkdtemp(prefix='btt-drift-')
+        rows.change_stage = BASE_CHANGE
+        game = Game(root)
+        ctx = Ctx(game, Path(root))
+        install(game, ctx)
+        rows.change_stage(ctx, 'bf')
+        game.jitter = random.Random(seed)
+        try:
+            st = rows.to_placing(ctx, {})
+            put(ctx, st, {})
+            if len(game.targets) != 3:
+                failed.append((seed, '%d targets' % len(game.targets)))
+        except RuntimeError as error:
+            failed.append((seed, str(error)[:90]))
+    return failed
+
+
+def tiles_and_drift():
+    """The tile cut the rows expect is the plugin's (list-padding), and the layout the rows place survives a frame of drift."""
+    ok = True
+    # The cut: list-padding's own test vectors (screens.rs `a_library_tile_cut_at_sixteen_characters_ends_in_an_ellipsis`).
+    for name, tile in [('Corner trap · Mario / Little Mac', 'Corner trap · M…'), ('Make Load use it', 'Make Load use it'),
+                       ('Fox drill', 'Fox drill'), ('Previous Vault capture', 'Previous Vault…'),
+                       ('Layout 2 · Battlefield', 'Layout 2 · Batt…'), ('Seeded · Big Battlefield', 'Seeded · Big Ba…')]:
+        good = rows.tile_label(name) == tile == clip_label(name)
+        print('PASS' if good else 'FAIL', 'tile cut', repr(name), '->', repr(rows.tile_label(name)))
+        ok &= good
+    full = 'Layout 2 · Battlefield'
+    for labels, names, want, what in [(['Layout 2 · Batt…'], [full], True, 'the tile as the plugin cuts it'),
+                                      (['Layout 2 · Battl'], [full], False, 'the plain 16 cut of before list-padding'),
+                                      (['Layout 2 · Batt…'], ['Layout 2 · Bxttlefield'], False, 'another name with the same start'),
+                                      (['Layout 2 · Batt…', 'Ledge trap'], [full], False, 'a different count')]:
+        good = rows.named(labels, names) is want
+        print('PASS' if good else 'FAIL', 'named():', what)
+        ok &= good
+    # The drift: btt-5's absolute 8-apart aims fail on some seeds (the failure Eden saw), the rows' 12-apart relative aims on none.
+    old_failed = drift(range(40), old_put_layout)
+    new_failed = drift(range(150), rows.put_layout)
+    good = bool(old_failed) and all('Too close' in why or 'not seen' in why for _, why in old_failed)
+    print('PASS' if good else 'FAIL', 'btt-5 layout (8 apart, absolute aims) fails on %d of 40 seeds of a frame of drift' % len(old_failed), old_failed[:2])
+    ok &= good
+    print('PASS' if not new_failed else 'FAIL', 'the layout (12 apart, aimed from the actual cursor) fails on %d of 150 seeds' % len(new_failed), new_failed[:3])
+    ok &= not new_failed
+    return ok
+
+
 def main():
     root = tempfile.mkdtemp(prefix='btt-sim-')
     game = Game(root)
@@ -536,6 +610,7 @@ def main():
         ok &= check(name, fn, ctx, **kwargs)
     # The checks fail when the plugin does what the rows forbid (mutations of the simulation).
     ok &= mutations()
+    ok &= tiles_and_drift()
     print('ALL PASS' if ok else 'SOME FAILED')
     return 0 if ok else 1
 

@@ -177,6 +177,11 @@ pub fn native_forms(stage: u32) -> [Option<u32>; 3] {
 }
 
 pub fn native_stage(selection: Selection) -> Result<u32, &'static str> {
+    // rc.14: a Stage Builder stage (its save file id, encoded) loads as SP_Edit, one form; the runtime loads its file first.
+    if crate::engine::stages::custom_stages::decode(selection.stage).is_some() {
+        return (selection.form == crate::engine::stages::stage_forms::Form::Normal)
+            .then_some(crate::engine::stages::custom_stages::CUSTOM_STAGE_KIND).ok_or("a custom stage has one form");
+    }
     if !STAGES.iter().any(|(stage, _)| *stage == selection.stage) {
         return Err("stage outside native selectable catalog");
     }

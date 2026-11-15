@@ -32,16 +32,44 @@ fn prepare_entry(index: usize) -> Option<(Selection, u32)> {
     let menu = read(&MENU);
     let prefs = crate::runtime::compat::common::menu::stage_preferences();
     let mut cycles = CYCLES.lock().unwrap();
-    match cycles[index].prepare_preferences(menu.lobby_practice == OnOff::ON,
-        menu.lobby_stages, &prefs, true)
+    // rc.14: the lists carry the save's custom stages (`custom_stages::lists`).
+    match cycles[index].prepare_lists(menu.lobby_practice == OnOff::ON,
+        || crate::runtime::lobby::custom_stages::lists(menu.lobby_stages, &prefs), true)
         .and_then(|selection| selection.map(|selection| native_stage(selection)
             .map(|stage| (selection, stage))).transpose()) {
-        Ok(selection) => selection,
+        Ok(Some((selection, stage))) => {
+            // A custom stage goes into the rule now, before its resources are requested; on any refusal the entry keeps
+            // the native waiting stage (the approved fallback and notice) and the reservation is dropped.
+            if let Some(id) = crate::engine::stages::custom_stages::decode(selection.stage) {
+                // SAFETY: MainThread, inside the native resource callback or the setter's call site.
+                if let Err(why) = unsafe { crate::runtime::lobby::custom_stages::load(id) } {
+                    crate::runtime::lobby::custom_stages::refused(id, why);
+                    cycles[index].cancel_preload();
+                    return None;
+                }
+            }
+            Some((selection, stage))
+        }
+        Ok(None) => None,
         Err(why) => {
             crate::engine::compat::logging::diagnostic(format_args!("[LobbyStageProbe] preparation refused: {why}"));
             None
         }
     }
+}
+
+/// rc.14: the stage the next waiting-room entry would take (Lobby Practice On), for a custom stage's read-ahead: this
+/// waiting family's, or local wireless's from Training.
+pub(crate) fn peek_next() -> Option<Selection> {
+    let menu = read(&MENU);
+    if menu.lobby_practice != OnOff::ON {
+        return None;
+    }
+    let prefs = crate::runtime::compat::common::menu::stage_preferences();
+    let lists = crate::runtime::lobby::custom_stages::lists_quiet(menu.lobby_stages, &prefs).ok()?;
+    let index = crate::runtime::lobby::game_mode::current().and_then(|mode| cycle_index(mode.mode)).unwrap_or(0);
+    let cycles = CYCLES.try_lock().ok()?;
+    cycles[index].peek_lists(&lists, true)
 }
 
 fn consume_entry(index: usize) -> Option<(Selection, u32)> {

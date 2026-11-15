@@ -1,0 +1,423 @@
+{
+ "game_id": "01006A800016E000",
+ "start": "frontend-ready",
+ "early_stop": false,
+ "on_failure": "continue",
+ "scope": "rc.14 cycle fix (Design A): one boot, the boot rows, the cf-* rows, z-boot; the fix diag through prep_run --tr-nro.",
+ "setup": [
+  {
+   "state": "Eden frontend ready, game not loaded, GDB stub on before game.load (gdb-port.txt), muted, 1x; TrainingRooms NRO swapped in by prep_run.py --tr-nro",
+   "via": "hook",
+   "ref": "gdb_rc8.py:gdb_on; gdb_rc11.py:gdb_kick; the lifecycle mute and eden_settings"
+  },
+  {
+   "state": "Training, P1 Mario (CSS tile 0), CPU Mario through the menu",
+   "via": "segment",
+   "ref": "library attract-cancel, main-stage, stage-css, enter-training; steps.py boot_training"
+  },
+  {
+   "state": "The card's starting values from the host config's pinned settings.json; each take sets its own live values (diag-settings-next.json) in its _setup step",
+   "via": "fixture",
+   "ref": "config files: TrainingRooms/settings.json; gna.py:_base"
+  },
+  {
+   "state": "Training, Ready Fighters 6, P1 Mario > Pikachu, CPU original > Mii Gunner > Pichu > Diddy Kong > King K. Rool, every Loading row at the card value, from the scene's first frame",
+   "via": "fixture",
+   "ref": "files: settings.json (cf_fixture.py applies fixture.json to the pinned copy before Up)"
+  }
+ ],
+ "segments": {
+  "attract-cancel": {
+   "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/attract-cancel.edenmacro.json",
+   "sha256": "1b506dbfc689e79e8bfca69b74274ab674b91ac8359219a1a4c95faa81aae70f",
+   "cap": 30,
+   "start_gate": null,
+   "end_gate": "main",
+   "library": "attract-cancel"
+  },
+  "main-stage": {
+   "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/main-stage.edenmacro.json",
+   "sha256": "ce6714b44f34f04cacd0d17454e4773c8906d289e5a37e34c606c604e6e4acfb",
+   "cap": 60,
+   "start_gate": "main",
+   "end_gate": "stage",
+   "library": "main-stage"
+  },
+  "stage-css": {
+   "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/stage-css.edenmacro.json",
+   "sha256": "240249606f15207106e4cc654cc3ee173efa97d51ea276586c82e6c7c438db74",
+   "cap": 30,
+   "start_gate": "stage",
+   "end_gate": "css",
+   "library": "stage-css"
+  },
+  "enter-training": {
+   "file": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/segments/enter-training.edenmacro.json",
+   "sha256": "7cdd035473160fec1a0e8c601c05f599f5b21556ac1cb4479b358c629e05b5c1",
+   "cap": 30,
+   "start_gate": "ready",
+   "end_gate": "p1-original",
+   "library": "enter-training"
+  },
+  "menu-open": {
+   "file": "segments/menu-open.edenmacro.json",
+   "sha256": "1185704f7b97f2981a8bae42fbe42166d5bc37aa2e9cba197bdf585a616f78ce",
+   "cap": 30
+  },
+  "menu-open-held": {
+   "file": "segments/menu-open-held.edenmacro.json",
+   "sha256": "3681bea36144a83bdb7c8ee2e9d14ebb67385698d8e87ba4abfeb1a5088d46fa",
+   "cap": 30
+  },
+  "menu-close": {
+   "file": "segments/menu-close.edenmacro.json",
+   "sha256": "b45ca532f18b9a3a7938a04b4a6b0513b7288ed584705fd042e40125bd5c4a89",
+   "cap": 30
+  },
+  "reset-center": {
+   "file": "segments/reset-center.edenmacro.json",
+   "sha256": "54e917aa28b0af97505e73a53fa991d3f79ed597b79ae8bc07f364c5fc6dbdd7",
+   "cap": 30
+  },
+  "jab": {
+   "file": "segments/jab.edenmacro.json",
+   "sha256": "12769777ca262a7e3515f8f81a72c7470e7dffa98d9bdfb56e1887dfc702f278",
+   "cap": 30
+  },
+  "fsmash": {
+   "file": "segments/fsmash.edenmacro.json",
+   "sha256": "2a6f61ae325478ba8a005edef0012064069fde9c0a88d93ff242c8c736d2452f",
+   "cap": 30
+  },
+  "chord-save": {
+   "file": "segments/chord-save.edenmacro.json",
+   "sha256": "fd05baa42ae7353f6be4ef1fa861d55b958ad1de31e05229286ad18b52bbe56c",
+   "cap": 30
+  },
+  "chord-load": {
+   "file": "segments/chord-load.edenmacro.json",
+   "sha256": "1f1f8ca9d99c990e8fa6ae9348fc31f6ae36e7f2fa09c88d84485abfd2f0cb74",
+   "cap": 30
+  },
+  "run-off-left": {
+   "file": "segments/run-off-left.edenmacro.json",
+   "sha256": "0be2efe593aedc582301f22767f8f131bae3d17c5dd2b6d64e1d173499dfc16c",
+   "cap": 30
+  },
+  "menu-open-slow": {
+   "file": "segments/menu-open-slow.edenmacro.json",
+   "sha256": "4ecac33f10f510a20f106ea027b57db73b12498a28d583cfd7d2a3d4f7d74c69",
+   "cap": 30
+  },
+  "lra-held": {
+   "file": "segments/lra-held.edenmacro.json",
+   "sha256": "687ffa03cebe0c1f5350cc51471634cb98af2419bd351c81389253edbf78b570",
+   "cap": 30
+  },
+  "p2-fs-p1-cycle": {
+   "file": "segments/p2-fs-p1-cycle.edenmacro.json",
+   "sha256": "17bc57c1b2a568edb0d66a8b02e3026383f48c2cacda725e6d1427420f07d5d8",
+   "cap": 90
+  },
+  "p2-fs-cpu-cycle": {
+   "file": "segments/p2-fs-cpu-cycle.edenmacro.json",
+   "sha256": "6b91e87d53a6faae0b4acf15e60b526d00aff01e2f5054d9d473f04ea4682ce6",
+   "cap": 90
+  },
+  "p2-fs-p1-hat": {
+   "file": "segments/p2-fs-p1-hat.edenmacro.json",
+   "sha256": "83b189729f74fb1a2f0a546f12c32deed6ef26854fe343b392cfb4aa5d56f746",
+   "cap": 90
+  }
+ },
+ "gates": {
+  "frontend-ready": {
+   "kind": "status",
+   "expect": {
+    "running": false
+   },
+   "cap": 10
+  },
+  "loaded": {
+   "library": "loaded"
+  },
+  "main": {
+   "kind": "image",
+   "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/main.png",
+   "sha256": "902628cebd8620847be44e41a826046740f495ca0dfa7e78d8482c43c0da1bdc",
+   "roi": [
+    150,
+    265,
+    450,
+    335
+   ],
+   "tolerance": 18,
+   "cap": 45,
+   "reference_is_roi": true,
+   "library": "main",
+   "scale": "fit",
+   "frame": [
+    1280,
+    720
+   ],
+   "recover": "attract-cancel",
+   "recover_times": 4
+  },
+  "stage": {
+   "kind": "image",
+   "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/stage.png",
+   "sha256": "99e7013e2be97b8173498e36a9b0e3b849c4e403bd239f1febda185470617033",
+   "roi": [
+    110,
+    445,
+    290,
+    495
+   ],
+   "tolerance": 18,
+   "cap": 45,
+   "reference_is_roi": true,
+   "library": "stage",
+   "scale": "fit",
+   "frame": [
+    1280,
+    720
+   ]
+  },
+  "css": {
+   "kind": "image",
+   "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/css.png",
+   "sha256": "a7a15642548952e4e263e42d467542b2877576cac4785061c21988e6cd7c0b76",
+   "roi": [
+    55,
+    55,
+    675,
+    155
+   ],
+   "tolerance": 20,
+   "cap": 60,
+   "reference_is_roi": true,
+   "library": "css",
+   "scale": "fit",
+   "frame": [
+    1280,
+    720
+   ]
+  },
+  "training-hud-unpaused": {
+   "kind": "image",
+   "reference": "/home/intpa/ssbu-mod-playbook/tools/eden-runner/library/refs/training-hud-unpaused.png",
+   "sha256": "7ecf9a4258ace218ad179e2fe14dcaf9d3dd906c594dec2ec8216cb5e02a8d2c",
+   "roi": [
+    280,
+    580,
+    302,
+    615
+   ],
+   "tolerance": 18,
+   "cap": 10,
+   "reference_is_roi": true,
+   "library": "training-hud-unpaused",
+   "scale": "fit",
+   "frame": [
+    1280,
+    720
+   ],
+   "scope": "Undimmed native zero digit (tolerance 18: the XPS docs-lb4 value; the Yoga and Surface passed at 8)"
+  }
+ },
+ "recover": [
+  {
+   "run": "steps.py:recover_training",
+   "check": true
+  }
+ ],
+ "gif_presets": {},
+ "rows": [
+  {
+   "id": "g-gdb-on",
+   "start": "frontend-ready",
+   "end": "frontend-ready",
+   "group": "gna/boot",
+   "on_failure": "stop",
+   "budget_min": 1,
+   "steps": [
+    {
+     "run": "gdb_rc8.py:gdb_on",
+     "check": true
+    }
+   ],
+   "expect": "Eden's GDB stub on (core.use_gdbstub, the port in gdb-port.txt) before game.load; the holding helper started."
+  },
+  {
+   "id": "g-load",
+   "start": "frontend-ready",
+   "end": "boot",
+   "group": "gna/boot",
+   "on_failure": "stop",
+   "budget_min": 5,
+   "steps": [
+    {
+     "call": "game.load",
+     "params": {
+      "path": "@game"
+     },
+     "job_cap": 240
+    },
+    {
+     "run": "gna.py:wait_load_screen",
+     "check": true
+    },
+    {
+     "run": "gdb_rc11.py:gdb_kick",
+     "check": true
+    },
+    {
+     "gate": "loaded"
+    },
+    {
+     "reason": "the other plugins finish booting (no log line marks it)",
+     "wait_ms": 15000
+    },
+    {
+     "shot": "boot"
+    }
+   ],
+   "expect": "The game loads with the stub on and the helper attached."
+  },
+  {
+   "id": "g-gdb-attached",
+   "start": "boot",
+   "end": "boot",
+   "group": "gna/boot",
+   "on_failure": "stop",
+   "budget_min": 1,
+   "steps": [
+    {
+     "run": "gdb_rc8.py:gdb_attached",
+     "check": true
+    }
+   ],
+   "expect": "The GDB helper attached (hold.log \"first\") and the game draws."
+  },
+  {
+   "id": "g-training",
+   "start": "boot",
+   "end": "training",
+   "group": "gna/boot",
+   "on_failure": "stop",
+   "budget_min": 5,
+   "steps": [
+    {
+     "run": "steps.py:boot_training",
+     "check": true
+    }
+   ],
+   "expect": "Training from the main menu: the tile cursor puts P1 on Mario (tile 0), enter-training, the HUD gate, the CPU Mario through the menu."
+  },
+  {
+   "id": "cf-boot",
+   "start": "training",
+   "end": "training",
+   "start_gate": "training-hud-unpaused",
+   "group": "rc14-cycle-fix",
+   "budget_min": 4,
+   "steps": [
+    {
+     "run": "cyclefix.py:cf_boot",
+     "check": true
+    }
+   ],
+   "expect": "The fixture values live from the first frame (Ready Fighters 6, P1 Mario > Pikachu, the CPU cycle); settled within 6."
+  },
+  {
+   "id": "cf-k1-laps",
+   "start": "training",
+   "end": "training",
+   "start_gate": "training-hud-unpaused",
+   "group": "rc14-cycle-fix",
+   "budget_min": 12,
+   "steps": [
+    {
+     "run": "cyclefix.py:cf_k1_laps",
+     "check": true
+    }
+   ],
+   "expect": "Five patient and two fast CPU laps: one cold load per lap, the same fighter, no Reload."
+  },
+  {
+   "id": "cf-k1-fits",
+   "start": "training",
+   "end": "training",
+   "start_gate": "training-hud-unpaused",
+   "group": "rc14-cycle-fix",
+   "budget_min": 5,
+   "steps": [
+    {
+     "run": "cyclefix.py:cf_k1_fits",
+     "check": true
+    }
+   ],
+   "expect": "Ready Fighters 7: the lap fits, all warm; the headroom for the memory comparison."
+  },
+  {
+   "id": "cf-shrink",
+   "start": "training",
+   "end": "training",
+   "start_gate": "training-hud-unpaused",
+   "group": "rc14-cycle-fix",
+   "budget_min": 7,
+   "steps": [
+    {
+     "run": "cyclefix.py:cf_shrink",
+     "check": true
+    }
+   ],
+   "expect": "Gap 1: Ready Fighters 7 to 6 frees the farthest group at once; one cold load per lap."
+  },
+  {
+   "id": "cf-pyra-keep",
+   "start": "training",
+   "end": "training",
+   "start_gate": "training-hud-unpaused",
+   "group": "rc14-cycle-fix",
+   "budget_min": 9,
+   "steps": [
+    {
+     "run": "cyclefix.py:cf_pyra_keep",
+     "check": true
+    }
+   ],
+   "expect": "The a1 crash: a Reload out of a Pyra window keeps [4a]; its module pins go only after Ready; the warm attach is clean."
+  },
+  {
+   "id": "cf-restore",
+   "start": "training",
+   "end": "training",
+   "start_gate": "training-hud-unpaused",
+   "group": "rc14-cycle-fix",
+   "budget_min": 3,
+   "steps": [
+    {
+     "run": "cyclefix.py:cf_restore",
+     "check": true
+    }
+   ],
+   "expect": "The remembered values back, Mario / Mario."
+  },
+  {
+   "id": "z-boot",
+   "start": "training",
+   "end": "training",
+   "group": "gna/z",
+   "budget_min": 1,
+   "start_gate": "training-hud-unpaused",
+   "steps": [
+    {
+     "run": "hotslots.py:unmapped",
+     "check": true
+    }
+   ],
+   "expect": "The boot ends with no Unmapped access, no panic and no heap in hooks."
+  }
+ ]
+}

@@ -5,6 +5,8 @@
 //! The policies the lobby's game-facing files call are on the Switch as well (`waiting_hazards_policy` needs the Mii crate, which is).
 
 pub mod catalog;
+/// rc.14: Stage Builder stages as extra entries of the stage lists.
+pub mod custom_stages;
 #[cfg(any(test, target_os = "switch"))]
 pub mod lobby_stage_cycle;
 pub mod lobby_stages;

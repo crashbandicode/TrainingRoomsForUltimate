@@ -134,15 +134,20 @@ fn the_stick_row_scrolls_and_freezes_with_the_strip() {
 /// Decision SP3: with the labels On, a hit block carries its spot, on the lane of the fighter that was hit; Off, nothing is written for it.
 fn a_hit_block_carries_its_spot_label_when_the_row_is_on() {
     let calm = |damage| Sample { actionable: true, damage, ..Sample::default() };
-    let mut powers = [0.0; crate::model::spots::SLOTS];
-    powers[..2].copy_from_slice(&[13.0, 18.0]);
-    let swing = |stop| Sample { attack: Some(Move::Jab), status: 0x27, active: true, stop, powers, power_mul: 1.0, ..Sample::default() };
-    for (attacker_is_p1, gained, label) in [(true, 18.0 * 1.26, "Sweet"), (true, 13.0 * 1.26, "Sour"), (false, 13.0 * 1.26, "Sour")] {
+    use crate::model::spots::{self, Hit};
+    let mut powers = [Hit::default(); spots::SLOTS];
+    (powers[0], powers[1]) = (Hit { damage: 13.0, growth: 100, fixed: 0, base: 0 }, Hit { damage: 18.0, growth: 100, fixed: 0, base: 0 });
+    let swing = |stop| Sample { attack: Some(Move::Jab), status: 0x27, active: true, stop, powers, power_mul: 1.0, object_id: 7, ..Sample::default() };
+    for (attacker_is_p1, slot, gained, label) in [(true, 1, 18.0 * 1.26, "Sweet"), (true, 0, 13.0 * 1.26, "Sour"), (false, 0, 13.0 * 1.26, "Sour")] {
         let mut t = Tracker::new();
+        // The victim's damage record on the hit's first frame: the knockback the game stored and the attacker's slot (spots-3).
+        // (the game's percent: the 20% before plus the hit's damage before the 1-on-1 ratio)
+        let launched = spots::knockback(&powers[slot], gained / spots::TARGET_MUL, 20.0 + gained / spots::TARGET_MUL, 100.0);
         for f in 1..=8u32 {
             let victim = match f {
                 1..=3 => calm(20.0),
-                4..=7 => Sample { stop: true, hitstun: true, damage: 20.0 + gained, ..Sample::default() },
+                4 => Sample { stop: true, hitstun: true, damage: 20.0 + gained, launched, struck: Some((7, slot as u8)), ..Sample::default() },
+                5..=7 => Sample { stop: true, hitstun: true, damage: 20.0 + gained, ..Sample::default() },
                 _ => Sample { hitstun: true, damage: 20.0 + gained, ..Sample::default() },
             };
             let attacker = if f == 1 || f == 2 { calm(0.0) } else { swing((4..=7).contains(&f)) };

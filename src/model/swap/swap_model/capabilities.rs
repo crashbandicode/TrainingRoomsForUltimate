@@ -573,6 +573,32 @@ pub fn kirby_parkable(copy_flag: bool, retained_copy_kinds: Option<u128>, hat_le
     departure_admitted(FormClass::Kirby, copy_flag, retained_copy_kinds, hat_lease_on_body)
 }
 
+/// rc.14 a-full-2 (K-strip; AFULL2-RESEARCH.md "Limit 1", the primary 2026-11-14 ~23:24Z): how a live Kirby leaves for a
+/// warm member or group.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KirbyDeparture {
+    /// Copy-free: he parks as any member ([`kirby_parkable`]).
+    Park,
+    /// He holds a copy or a hat lease, with his copy objects readable. Native copy loss runs first (`0xb96770`, the silent
+    /// KO variant Kirby Hats uses), then the gate again. A Reloaded Kirby is hatless too, so the strip loses nothing
+    /// against the Reload it replaces, and the target's Built group stays warm instead of being rebuilt.
+    Strip,
+    /// Today's Reload: the switch is off, the copy objects can't be read, or an earlier copy's objects are still being
+    /// cleared (no copy left for the native loss to clear).
+    Reload(&'static str),
+}
+
+/// [`KirbyDeparture`] from the values `kirby_park_gate` reads; `strip` is the K-strip switch.
+pub fn kirby_departure(copy_flag: bool, retained_copy_kinds: Option<u128>, hat_lease_on_body: bool, strip: bool)
+    -> KirbyDeparture {
+    match kirby_parkable(copy_flag, retained_copy_kinds, hat_lease_on_body) {
+        Ok(()) => KirbyDeparture::Park,
+        Err(why) if !strip || retained_copy_kinds.is_none() || (!copy_flag && retained_copy_kinds != Some(0)) =>
+            KirbyDeparture::Reload(why),
+        Err(_) => KirbyDeparture::Strip,
+    }
+}
+
 /// D-KIRBY1 (D-KIRBY1-ROB1-RCA §3): while a role's live member is of a row with
 /// `prefetch_while_live: false` (Kirby), its resource owner holds no bank prefetch key. A Kirby copy
 /// registers the copied kind on Kirby's own R (`[KirbyProbe] request owner=R kind=…`) and the

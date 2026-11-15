@@ -455,19 +455,120 @@ fn legend_wind_areas_read_the_area_table() {
 fn legend_wind_area_orbs_are_a_band_or_a_disc_with_a_line() {
     let colour = [0, 10, 255, AREA_ALPHA];
     let boxed = WindArea { shape: AreaShape::Box { min: [-10.0, 2.0], max: [10.0, 12.0] }, angle: Some(0.0) };
-    let [Some(band), Some(line)] = area_orbs(&boxed, 1, 0.5, colour) else { panic!("a band and a line") };
+    let [Some(band), Some(_), Some(line)] = area_orbs(&boxed, 1, 0.5, colour) else { panic!("a band, a shadow and a line") };
     assert_eq!((band.centre, band.tail, band.radius, band.color), ([-10.0, 7.0, 0.5], [10.0, 7.0, 0.5], 5.0, colour), "left edge to right edge, as tall as the box");
     assert_eq!((band.kind(), band.key & 0xff, (band.key >> 8) & 0xffff), (KIND_AREA, AREA_BOX, 1));
     assert!(close(line.centre, [0.0, 7.0, 0.5]) && close(line.tail, [10.0, 7.0, 0.5]) && line.color == [255; 4], "{line:?}");
     assert_eq!(line.key & 0xff, AREA_LINE);
-    let up = area_orbs(&WindArea { angle: Some(90.0), ..boxed }, 1, 0.0, colour)[1].unwrap();
+    let up = area_orbs(&WindArea { angle: Some(90.0), ..boxed }, 1, 0.0, colour)[2].unwrap();
     assert!(close(up.tail, [0.0, 12.0, 0.0]), "to the top edge: {up:?}");
     let circle = WindArea { shape: AreaShape::Circle { centre: [5.0, 8.0], radius: 6.0 }, angle: Some(180.0) };
-    let [Some(disc), Some(line)] = area_orbs(&circle, 0, 0.0, colour) else { panic!("a disc and a line") };
+    let [Some(disc), Some(_), Some(line)] = area_orbs(&circle, 0, 0.0, colour) else { panic!("a disc, a shadow and a line") };
     assert_eq!((disc.centre, disc.tail, disc.radius, disc.key & 0xff), ([5.0, 8.0, 0.0], [5.0, 8.0, 0.0], 6.0, AREA_CIRCLE));
     assert!(close(line.tail, [-1.0, 8.0, 0.0]), "{line:?}");
-    assert!(area_orbs(&WindArea { angle: None, ..circle }, 0, 0.0, colour)[1].is_none(), "no angle: no line");
+    assert!(area_orbs(&WindArea { angle: None, ..circle }, 0, 0.0, colour)[2].is_none(), "no angle: no line");
+    // 361 (Eden: the circles of Mach Tornado, Shadow Ball, Wario Waft): no one direction, a centre dot.
+    let dot = area_orbs(&WindArea { angle: Some(361.0), ..circle }, 0, 0.0, colour)[2].unwrap();
+    assert_eq!((dot.centre, dot.tail, dot.key & 0xff), ([5.0, 8.0, 0.0], [5.0, 8.0, 0.0], AREA_LINE));
+    assert!(dot.radius > 6.0 * LINE && dot.radius < 6.0, "{dot:?}");
+    // Negative angles are directions too (Eden: -150, -180): a line.
+    let back = area_orbs(&WindArea { angle: Some(-180.0), ..circle }, 0, 0.0, colour)[2].unwrap();
+    assert!(close(back.tail, [-1.0, 8.0, 0.0]), "{back:?}");
     // Shown by Windboxes alone: an area is not a hitbox; never paired as a capsule end.
     assert!(shows(WINDBOXES, KIND_AREA) && [HITBOXES, GRABS, HURTBOXES, COLOURS, ANGLES].iter().all(|b| !shows(*b, KIND_AREA)));
-    assert!([AREA_BOX, AREA_CIRCLE, AREA_LINE].iter().all(|k| *k != 1));
+    assert!([AREA_BOX, AREA_CIRCLE, AREA_LINE, AREA_SHADOW].iter().all(|k| *k != 1));
+}
+
+/// A pane colour's red, green and blue as linear-light fractions (the layout takes vertex colours as linear light).
+fn rgb(colour: [u8; 4]) -> [f32; 3] {
+    [colour[0], colour[1], colour[2]].map(|c| f32::from(c) / 255.0)
+}
+
+fn luminance(rgb: [f32; 3]) -> f32 {
+    0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+}
+
+#[test]
+fn legend_wind_area_fill_reads_over_light_and_dark_backgrounds() {
+    // The layout blends in linear light, and the band's texture is opaque only `BAND_MIDDLE` in its middle (tools/layout-builder
+    // `orb_texture`: 0.30), scaled by the pane's alpha; Eden at alpha 110 showed (226, 226, 242) over the grid's 240 white, too pale.
+    const BAND_MIDDLE: f32 = 0.30;
+    let colour = area_colour();
+    let a = BAND_MIDDLE * f32::from(colour[3]) / 255.0;
+    let linear = |v: u8| {
+        let s = f32::from(v) / 255.0;
+        if s <= 0.04045 { s / 12.92 } else { ((s + 0.055) / 1.055).powf(2.4) }
+    };
+    // What a background of sRGB grey `bg` becomes under the fill, as a ratio of its luminance.
+    let ratio = |bg: u8| {
+        let b = linear(bg);
+        luminance(rgb(colour).map(|c| b * (1.0 - a) + c * a)) / luminance([b; 3])
+    };
+    assert!(ratio(240) <= 0.75, "over the Training grid's white the fill darkens it by a quarter or more: {}", ratio(240));
+    assert!(ratio(30) >= 2.5, "over a dark stage the fill lifts its luminance 2.5 times or more: {}", ratio(30));
+    // Still the windboxes' deep blue, as the windbox discs are tinted.
+    assert_eq!(colour[..3], crate::model::panes::linear([0, 38, 255, 255])[..3]);
+}
+
+#[test]
+fn legend_wind_line_has_a_dark_shadow_under_it() {
+    let colour = area_colour();
+    let boxed = WindArea { shape: AreaShape::Box { min: [-10.0, 2.0], max: [10.0, 12.0] }, angle: Some(0.0) };
+    let [Some(band), Some(shadow), Some(line)] = area_orbs(&boxed, 1, 0.5, colour) else { panic!("a band, a shadow and a line") };
+    // The shadow is the line's own pill, wider, dark and opaque; it comes between the band and the line (a later pane draws over
+    // an earlier one), so the white line keeps a dark outline over a pale or a dark background.
+    assert_eq!((shadow.centre, shadow.tail, shadow.kind(), shadow.key & 0xff, (shadow.key >> 8) & 0xffff), (line.centre, line.tail, KIND_AREA, AREA_SHADOW, 1));
+    assert!(SHADOW_GROW > 1.0 && (shadow.radius - line.radius * SHADOW_GROW).abs() < 1e-5, "{shadow:?} {line:?}");
+    assert!(luminance(rgb(shadow.color)) < 0.01 && shadow.color[3] == 255 && luminance(rgb(line.color)) > 0.99 && line.color[3] == 255, "{shadow:?}");
+    assert_ne!(shadow.key, line.key);
+    assert_eq!((band.color, line.color), (colour, [255; 4]), "the fill and the white line are as before");
+    // A centre dot (361) is outlined too; a wind with no angle has no line and no shadow.
+    let circle = WindArea { shape: AreaShape::Circle { centre: [5.0, 8.0], radius: 6.0 }, angle: Some(361.0) };
+    let [_, Some(ring), Some(dot)] = area_orbs(&circle, 0, 0.0, colour) else { panic!("a disc, a ring and a dot") };
+    assert_eq!((ring.centre, ring.tail, ring.key & 0xff), (dot.centre, dot.tail, AREA_SHADOW));
+    assert!(ring.radius > dot.radius && ring.radius < 6.0, "{ring:?} {dot:?}");
+    let [_, none_s, none_l] = area_orbs(&WindArea { angle: None, ..circle }, 0, 0.0, colour);
+    assert!(none_s.is_none() && none_l.is_none());
+}
+
+#[test]
+fn legend_board_holds_every_orb_of_every_area() {
+    // A band, a shadow and a line for each of `MAX_AREAS` areas, beside the spheres and the launch-angle marks.
+    assert!(orbs::BOARD_ORBS >= hitbox::MAX_HELD + 2 * hitbox::SLOTS as usize + 3 * area::MAX_AREAS, "{}", orbs::BOARD_ORBS);
+}
+// ---- articles' and items' wind areas (rc.14 wind-articles) ----------------------------------------------------------------
+
+/// A wind-area command tracks the object running it as an article while the visualizer is on with Windboxes ticked and the
+/// practice visualizes it; a fighter keeps its areas in its own pass, and nothing is tracked otherwise.
+#[test]
+fn legend_a_wind_command_tracks_a_visualized_article_only() {
+    assert!(wind_tracks(true, true, false, true), "Zelda's Triforce, Hero's Kaboom: an article running AREA_WIND_2ND*");
+    for (enabled, windboxes, fighter, visualizes) in [(false, true, false, true), (true, false, false, true), (true, true, true, true), (true, true, false, false)] {
+        assert!(!wind_tracks(enabled, windboxes, fighter, visualizes), "enabled {enabled} windboxes {windboxes} fighter {fighter} visualizes {visualizes}");
+    }
+}
+
+/// An active item is tracked with a live attack slot (a thrown bomb) or with an enabled wind area.
+#[test]
+fn legend_an_item_with_a_wind_area_is_tracked() {
+    assert!(tracks_item(true, 0) && tracks_item(false, 1) && tracks_item(true, area::MAX_AREAS));
+    assert!(!tracks_item(false, 0));
+}
+
+/// A tracked article stays while it holds a sphere or has a wind area: Zelda's Triforce pulls before any of its hitboxes.
+#[test]
+fn legend_an_article_is_kept_while_it_has_a_wind_area() {
+    assert!(keeps_article(true, 0) && keeps_article(false, 1) && keeps_article(true, 2));
+    assert!(!keeps_article(false, 0));
+}
+
+/// The menu docs name the windbox moves from the game data that the public lists miss, say that articles' and items' wind
+/// areas are drawn, and that stage hazards are not.
+#[test]
+fn legend_docs_name_the_game_data_windboxes() {
+    let docs = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/docs/menu/display-and-controls.md"));
+    for want in ["Crownerang", "Counter", "down taunt", "Blunderbuss", "Triforce of Wisdom", "Kaboom", "Stage hazards", "fire hydrant"] {
+        assert!(docs.contains(want), "docs/menu/display-and-controls.md names {want}");
+    }
+    assert!(!docs.contains("Items' wind, such as the Gust Bellows, is not drawn"), "items' wind areas are drawn now");
 }

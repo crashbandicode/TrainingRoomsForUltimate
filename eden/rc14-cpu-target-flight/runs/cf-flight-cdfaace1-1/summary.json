@@ -1,0 +1,55 @@
+{
+  "rows": [
+    {
+      "id": "g-gdb-on",
+      "status": "pass"
+    },
+    {
+      "id": "g-load",
+      "status": "pass"
+    },
+    {
+      "id": "g-gdb-attached",
+      "status": "pass"
+    },
+    {
+      "id": "g-training",
+      "status": "pass"
+    },
+    {
+      "id": "cf-normal",
+      "status": "pass"
+    },
+    {
+      "id": "cf-slow",
+      "status": "pass"
+    },
+    {
+      "id": "cf-fast",
+      "status": "pass"
+    },
+    {
+      "id": "cf-groundhit",
+      "status": "pass"
+    },
+    {
+      "id": "cf-airhit",
+      "status": "pass"
+    },
+    {
+      "id": "cf-done10",
+      "status": "pass"
+    },
+    {
+      "id": "cf-reset",
+      "status": "pass"
+    },
+    {
+      "id": "z-boot",
+      "status": "pass"
+    }
+  ],
+  "failed": 0,
+  "by_kind": {},
+  "by_cause": {}
+}

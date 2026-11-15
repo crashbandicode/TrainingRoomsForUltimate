@@ -119,9 +119,21 @@ Loading a fighter from scratch takes a moment and stops the game. So TrainingRoo
 hats ahead of time in the background, and a chord or a click only swaps in a fighter that is already there. The defaults
 suit most players; change them only to use less memory.
 
-If a cycle has more fighters than Ready Fighters leaves room for, one can't stay loaded. A swap to it loads it alone.
-The groups already loaded beside it stay, and only the fighters that were on screen with the one you swapped from load
-again in the background.
+If a cycle has more fighters than Ready Fighters leaves room for, the fighters that fit stay loaded and the others stay
+cold. A swap to a cold fighter loads it while you wait (the fighter you left stays on screen until it is ready), and it
+is freed after you swap away from it. Nothing else loads again. While a cold fighter is on screen, one fighter more than
+Ready Fighters is loaded. Lowering Ready Fighters frees the loaded fighters whose turn is farthest away, right away.
+In a very long cycle every loading spot can be taken; then a swap to a cold fighter still reloads that side's fighters.
+
+If a cycle has more fighters than Ready Fighters leaves room for, one can't stay loaded. A swap to it loads it alone,
+and everything else that is already loaded stays loaded: the groups beside it, and the fighters that were on screen
+with the one you swapped from, windows included. When more would stay than Ready Fighters allows, the fighter whose
+turn is farthest away is freed, never the next one or the one on screen.
+
+Pokémon Trainer and Pyra / Mythra stay loaded the same way. When a swap has to load a fighter, the window a Trainer or
+a Pyra / Mythra was on is kept too, and swapping back to it is instant. Kirby holding a copied ability gives the copy up
+before he leaves and then stays loaded like any other fighter. He comes back without it, and the next Kirby hat click
+gives the same hat again.
 
 The notice "Fighters" counts them while they load:
 
@@ -131,6 +143,7 @@ The notice "Fighters" counts them while they load:
 | "Swap once to load", "Swap P1 once to load", "Swap the CPU once to load", "Swap both once to load" | That role's first swap starts the loading. |
 | "Loaded 7/10 · swap to load 3 more" | The rest load after the next swap. |
 | "(2 waiting for memory)" or "(… waiting for pool space)" | Some wait for room, then load. If it keeps saying so, lower Ready Fighters or Ready Hats. |
+| "(2 load after you pause)" | Kirby's hats or other fighters loaded ahead hold the room these need. The next pause unloads them, then these load. |
 | "Paused" | Loading waits while something else, such as a swap or a save-state load, needs the game. |
 
 The rows are in the Loading section of Fighters & Stages, collapsed until you open it:

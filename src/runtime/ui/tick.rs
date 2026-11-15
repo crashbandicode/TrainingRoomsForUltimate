@@ -73,6 +73,7 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     }
     hud::run(layout, name);
     hud::hud_rule(layout, name);
+    hud::cpu_panels(layout, name);
     if !practice_layout {
         return;
     }

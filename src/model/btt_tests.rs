@@ -224,6 +224,51 @@ fn btt_placing_inputs() {
     assert_eq!(s.btt.cursor(), at);
 }
 
+/// Row 26's overlap rule is STRICT at two radii: a target exactly `APART` (8.0) from another is accepted, one under 8 is
+/// refused with "Too close to another target". The Eden rows (`eden/rc14-btt-layouts/btt_rows.py`) place targets with held
+/// stick macros (2 units a frame), so this boundary is what a one-frame jitter of a macro crosses.
+fn btt_overlap_rule_is_strict_at_apart() {
+    assert_eq!(APART, 8.0, "two target radii");
+    // A second target `dx` right and `dy` up of the first by D-pad presses (a unit each): (accepted, the notice).
+    let second = |dx: u32, dy: u32| {
+        let mut s = Sim::placing();
+        s.tap(&[A]);
+        for _ in 0..dx {
+            s.tap(&[DPAD_RIGHT]);
+        }
+        for _ in 0..dy {
+            s.tap(&[DPAD_UP]);
+        }
+        s.tap(&[A]);
+        (s.btt.layout().len() == 2, s.text())
+    };
+    let refused = "Too close to another target".to_owned();
+    let placed = "Place targets 2/10   A place  B undo  X start".to_owned();
+    assert_eq!(second(7, 0), (false, refused.clone()), "7.0 apart, along x");
+    assert_eq!(second(8, 0), (true, placed.clone()), "exactly 8.0 apart, along x: accepted");
+    assert_eq!(second(0, 7), (false, refused.clone()), "7.0 apart, along y");
+    assert_eq!(second(0, 8), (true, placed.clone()), "exactly 8.0 apart, along y: accepted");
+    // A distance, not a per-axis gap: 6 and 5 is 7.81, 5 and 5 is 7.07; 6 and 6 is 8.49.
+    assert_eq!(second(6, 5), (false, refused.clone()), "7.81 apart");
+    assert_eq!(second(5, 5), (false, refused), "7.07 apart");
+    assert_eq!(second(6, 6), (true, placed.clone()), "8.49 apart");
+    // The stick moves 2 a frame: 4 frames is the 8.0 the Eden rows aim at, 3 is 6.0 (one frame short).
+    for (frames, ok) in [(3, false), (4, true), (5, true)] {
+        let mut s = Sim::placing();
+        s.tap(&[A]);
+        s.push([1.0, 0.0], frames);
+        s.tap(&[A]);
+        assert_eq!(s.btt.layout().len() == 2, ok, "{frames} stick frames on: {}", s.text());
+    }
+    // The rule is also what lets a third target sit 8 on from the second: a chain of exactly-8 gaps is accepted.
+    let mut s = Sim::placing();
+    for _ in 0..3 {
+        s.tap(&[A]);
+        s.push([1.0, 0.0], 4);
+    }
+    assert_eq!(s.btt.layout(), [[0.0, 15.0], [8.0, 15.0], [16.0, 15.0]]);
+}
+
 /// Row 27: the cursor stays in the placing box at full tilt in every direction; no stage read: ±90 and 0 to 80 above the
 /// ground; with the stage's camera range it is cut to what the camera shows.
 fn btt_cursor_clamp() {
@@ -594,6 +639,7 @@ fn case_table() {
     crate::test_table::run(&[
         ("btt_rows_and_help", btt_rows_and_help as fn()),
         ("btt_placing_inputs", btt_placing_inputs as fn()),
+        ("btt_overlap_rule_is_strict_at_apart", btt_overlap_rule_is_strict_at_apart as fn()),
         ("btt_cursor_clamp", btt_cursor_clamp as fn()),
         ("btt_ready_waits_for_input", btt_ready_waits_for_input as fn()),
         ("btt_run_and_best", btt_run_and_best as fn()),
