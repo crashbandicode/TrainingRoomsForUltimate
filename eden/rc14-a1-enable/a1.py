@@ -39,7 +39,7 @@ import cyclefix as cf  # noqa: E402
 import afull as af  # noqa: E402
 from gna import _begin, _mark, _shot, _finish, OFF  # noqa: E402
 
-KNOB = 'window'
+KNOB = 'window mii'   # A1 on and Mii groups kept: both switches as the build ships them
 DEMAND = re.compile(r'\[GroupSwap\] demand owner=(\d) group=\d+ kinds=\[[^\]]*\] special=\S+ bodies=(\d+) ready_fighters=(\d+) '
                     r'cold=(true|false)')
 RELEASE = re.compile(r'\[GroupSwap\] cold release owner=(\d) group=\d+ kinds=\[([^\]]*)\] state=\S+ bodies=(\d+) '
@@ -208,7 +208,7 @@ def a1_regress(ctx, rf=8, picks=None, name='a1-regress'):
     out['window_before'] = [hex(k) for k in (af._window(ctx, 1) or [])]
     out['status_before'] = _status(ctx)
     out['bodies_before'] = _sets(ctx)
-    seq_keep, keep_lines = _keep(ctx, out, 1, fs.BOWSER, 'reload window')
+    seq_keep, keep_lines = _keep(ctx, out, 1, fs.BOWSER, 'reload window mii')
     _shot(ctx, out, 'shot_bowser', 'a1-regress-bowser')
     kept = out['kept'][-1] if out['kept'] else None
     out['status_after_keep'] = _status(ctx)
@@ -237,10 +237,11 @@ def a1_regress(ctx, rf=8, picks=None, name='a1-regress'):
     out['status_end'] = _status(ctx)
     out['bodies_end'] = _sets(ctx)
     lines = af._since(ctx, seq0)
-    out['bodies_seen'], bodies_bad = _bodies(lines)
+    after = af._since(ctx, seq_keep)
+    out['bodies_seen'], bodies_bad = _bodies(after)
     # The forced Reload's own line (diag 
-    # The forced Reload's own line (the diag knob's forced Reload: "today's Reload forced (diag)") is the row's setup, not a press that found no room.
-    out['declined'] = [t[:240] for t in lines if DECLINED.search(t) and 'forced (diag)' not in t]
+    # Only presses after the keep count; the forced Reload's own line ("today's Reload forced (diag)") is the row's setup.
+    out['declined'] = [t[:240] for t in after if DECLINED.search(t) and 'forced (diag)' not in t]
     out['cold_release'] = [t[:240] for t in lines if RELEASE.search(t)][:6]
     out['left_target'] = [t[:240] for t in lines if LEFT_TARGET.search(t)][:4]
     out['bad_all'] = af._bad(lines)
@@ -278,7 +279,7 @@ def a1_kirby(ctx):
     out['settle0'] = fs._settled(ctx, seq, 120)
     out['to_kirby'] = af._to(ctx, 0, fs.KIRBY, len(cf.P1_LANE) + 2)
     out['window'] = [hex(k) for k in (af._window(ctx, 0) or [])]
-    _keep(ctx, out, 0, fs.LINK, 'reload window')
+    _keep(ctx, out, 0, fs.LINK, 'reload window mii')
     seq = hs.diag_mark(ctx)
     out['back'] = af._to(ctx, 0, fs.KIRBY, len(cf.P1_LANE) + 2)
     time.sleep(3.0)
@@ -395,7 +396,7 @@ def a1_pair(ctx):
     out['settle1'] = fs._settled(ctx, hs.diag_mark(ctx), 90)
     out['window'] = [hex(k) for k in (af._window(ctx, 1) or [])]
     _shot(ctx, out, 'shot_pair_before', 'a1-pair-before')
-    _keep(ctx, out, 1, fs.BOWSER, 'reload window')
+    _keep(ctx, out, 1, fs.BOWSER, 'reload window mii')
     seq = hs.diag_mark(ctx)
     out['back'] = _land(ctx, 1, af.POPO)
     time.sleep(3.0)
@@ -465,3 +466,77 @@ def a1_paircontrol(ctx):
         problems.append('the pair group exchange fell back or was refused: %s %s' % (out['fallbacks'], out['refused']))
     problems += ['bad line: %s' % t for t in out['bad']]
     return _finish(ctx, 'a1-paircontrol', out, problems)
+
+PINS_HELD = re.compile(r'\[GroupSwap\] module pins (released|held) role=1 ')
+READY_BOWSER = re.compile(r'\[BodyBank\] ready owner=1 index=\d+ kind=0xf ')
+
+
+def _unmapped_total(ctx):
+    got = ctx.call('trace.unmapped_access', {})
+    try:
+        return int(got.get('total')) if isinstance(got, dict) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def a1_crash(ctx):
+    """a1-be759456-y2's crash row with A1 and Mii groups kept ON: the CPU's cycle Mii Gunner > Pichu > Diddy Kong > King K. Rool >
+    Pyra/Mythra (0x5a, a native group) at Ready Fighters 8, the CPU on its Pyra window with the lane's other members built as
+    groups (`[[13], [27, 45], [4a]]` in the crash), a forced Reload (a direct pick of Bowser) out of that window, then the warm
+    attach of the kept Mii Gunner group. Pass: no Unmapped access and no StallWatch in the row; the module pins go with
+    `re_requested=true` only after Bowser's bank is Ready (a `held ... not the bank's tick` line may come first: the wait path);
+    the Mii group is kept and attaches warm."""
+    t0, out = _begin(ctx)
+    lane = [fs.GUNNER, fs.PICHU, fs.DIDDY, fs.KROOL, cf.PYRA]
+    seq = hs.diag_mark(ctx)
+    fx._live_set(ctx, cpu_roster=fs._roster(lane), cycle_preload_ready_fighters=fs.RF(8))
+    out['settle0'] = fs._settled(ctx, seq, 150)
+    out['to_gunner'] = _land(ctx, 1, fs.GUNNER)
+    out['settle1'] = fs._settled(ctx, hs.diag_mark(ctx), 120)
+    out['to_pyra'] = _land(ctx, 1, cf.PYRA)
+    out['settle2'] = fs._settled(ctx, hs.diag_mark(ctx), 90)
+    out['on_pyra'] = fs._live_kinds(ctx).get(1)
+    out['unmapped_before'] = _unmapped_total(ctx)
+    out['knob'] = cf._diag_cycle(ctx, 'reload mii window')
+    seq = hs.diag_mark(ctx)
+    seq_pick, out['picked'] = af._pick(ctx, 1, fs.BOWSER)
+    time.sleep(3.0)
+    out['knob_back'] = cf._diag_cycle(ctx, KNOB)
+    lines = [(s, t) for s, _, t in hs.diag_since(ctx, seq)]
+    out['window_across'] = [t[:240] for _, t in lines if '[GroupSwap] window across reload owner=1' in t][:2]
+    out['kept_groups'] = [t[:300] for _, t in lines if '[GroupSwap] kept across reload owner=1' in t][:2]
+    out['pins'] = [(s, t[:300]) for s, t in lines if PINS_HELD.search(t)][:6]
+    out['ready'] = [(s, t[:200]) for s, t in lines if READY_BOWSER.search(t)][:1]
+    out['settle3'] = fs._settled(ctx, hs.diag_mark(ctx), 60)
+    seq_back = hs.diag_mark(ctx)
+    out['back'] = _land(ctx, 1, fs.GUNNER)
+    time.sleep(3.0)
+    back = af._since(ctx, seq_back)
+    out['route'] = hs._route(1, back)
+    out['fallbacks'] = _fallbacks(back, 1)
+    out['stalls'] = [t[:200] for _, _, t in hs.diag_lines(ctx) if 'StallWatch' in t][-3:]
+    out['unmapped_after'] = _unmapped_total(ctx)
+    out['bad'] = af._bad(af._since(ctx, seq))
+    fx._live_set(ctx, cpu_roster=fs._roster(cf.CPU_LANE))
+    _shot(ctx, out, 'shot_after', 'a1-crash-after')
+    _mark(t0, out, 'done')
+    problems = []
+    if out['on_pyra'] != cf.PYRA:
+        problems.append('the CPU never reached its Pyra window: %s' % out['on_pyra'])
+    if not out['picked']:
+        problems.append('Bowser did not apply')
+    if not any('4a' in t.split('groups=')[-1] for t in out['kept_groups']):
+        problems.append('the Mii group was not kept across the Reload: %s' % out['kept_groups'])
+    released = [(s, t) for s, t in out['pins'] if ' released ' in t]
+    if any('re_requested=false' in t for _, t in released):
+        problems.append('pins dropped with no re-request: %s' % released)
+    if not released or not out['ready'] or released[0][0] < out['ready'][0][0]:
+        problems.append('pins not released after the new bank was Ready: pins %s ready %s' % (released, out['ready']))
+    if not out['back'].get('applied') or out['route'] != 'group-warm' or out['fallbacks']:
+        problems.append('no warm attach of the kept Mii group: back %s route %s fallbacks %s' % (out['back'], out['route'], out['fallbacks']))
+    if out['stalls']:
+        problems.append('StallWatch: %s' % out['stalls'][-1])
+    if out['unmapped_before'] is None or out['unmapped_after'] is None or out['unmapped_after'] != out['unmapped_before']:
+        problems.append('Unmapped accesses during the row: %s -> %s' % (out['unmapped_before'], out['unmapped_after']))
+    problems += ['bad line: %s' % t for t in out['bad']]
+    return _finish(ctx, 'a1-crash', out, problems)

@@ -20,6 +20,7 @@ SEGMENTS = mp.SEGMENTS + ['p2-fs-p1-cycle', 'p2-fs-cpu-cycle', 'p2-fs-p1-hat']
 CF = HERE.parent / 'rc14-cycle-fix' / 'cyclefix.py'
 AF = HERE.parent / 'rc14-a-full' / 'afull.py'
 M = 'a1.py'
+AFTER_Z = ('a1-pair', 'a1-paircontrol', 'a1-restore')   # after z-boot: a failing pair return leaves Unmapped accesses that would fail z-boot for the wrong reason
 ROWS = [
     ('a1-setup', 'a1.py', 'a1_setup', 8, 'Live values (Ready Fighters 8, the console lanes), a P1 lap and a CPU lap, the notice settled; A1 on (knob window).'),
     ('a1-regress', M, 'a1_regress', 9, 'A forced Reload keeps the CPU window; the warm attach back; three CPU laps: cold release follows, bodies stay '
@@ -29,6 +30,8 @@ ROWS = [
     ('a1-kirby-copy', M, 'a1_kirby_copy', 6, "r7: Ready Fighters 10, the P1 lane settled, Kirby with a hat: the press to Palutena takes the gated "
                                              "Reload; Kirby's window and Palutena's group go; the other Built groups are kept."),
     ('a1-mii', M, 'a1_mii', 7, 'Ready Fighters 10: the Mii Gunner window (not the cold fighter) kept across the forced Reload, then warm-attached again.'),
+    ('cf-pyra-keep', 'cyclefix.py', 'cf_pyra_keep', 9, 'cycle-fix row (6c044efc) on the A1-on build: a Reload out of a Pyra window keeps [4a]; its pins go only after the new bank is Ready; the kept Mii group attaches warm.'),
+    ('a1-crash', M, 'a1_crash', 9, 'a1-be759456-y2 crash row with A1 and Mii groups kept ON: the Pyra window, a forced Reload, the warm attach of the kept [4a]: no Unmapped, no StallWatch, pins after Ready.'),
     ('a1-pair', M, 'a1_pair', 9, 'Ready Fighters 10, CPU Solo Popo Off: the Ice Climbers pair window (Popo and Nana) kept, then its warm return.'),
     ('a1-paircontrol', M, 'a1_paircontrol', 5, 'Control for a1-pair: the pair as a planner-built group (never a kept window), Pichu to Popo: warm, ready, no fallback.'),
     ('a1-restore', M, 'a1_restore', 3, 'The knob off, the remembered values back, Mario / Mario.'),
@@ -59,7 +62,8 @@ def plan(skip=()):
                      'through prep_run --tr-nro.',
             'setup': setup, 'segments': segs, 'gates': mp.gates(),
             'recover': [{'run': 'steps.py:recover_training', 'check': True}], 'gif_presets': {},
-            'rows': mp.boot_rows() + [row(*r) for r in ROWS if r[0] not in skip] + [mp.end_row()]}
+            'rows': mp.boot_rows() + [row(*r) for r in ROWS if r[0] not in skip and r[0] not in AFTER_Z] + [mp.end_row()]
+            + [row(*r) for r in ROWS if r[0] not in skip and r[0] in AFTER_Z]}
 
 
 def main(out, skip=()):
