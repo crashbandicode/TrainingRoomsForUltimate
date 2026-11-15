@@ -17,6 +17,10 @@ Rows (hooks; evidence is the diag log and the receipts):
 - a2_strip_move (k4): Kirby with a hat holds B (his copy special), and the press comes in the middle of it.
 - a2_pt (p1-p4): Player 1 on a PT window, `reload window pt`: the window kept (special Native), its articles retired;
   back to PT warm, articles rebuilt; two P1 laps. The trainer counts S+0x1968/S+0x1980 are logged by the diag build.
+- a2_kirby_grouped (a-full-3, gated_alone's revert): a2-strip's flow with the shipped switches only; Kirby's window holds
+  another member (precondition), the press away strips and parks him, the target warm, back to Kirby warm.
+- a2_p4 / a2_pyra_keep_all (a-full-3): setups reworked to reach their preconditions (fresh groups at Ready Fighters 12 / 10,
+  a direct pick onto the built Pyra group); their assertions are unchanged.
 - a2_aegis_probe (a0, diag only): Player 1 on a Pyra window, `reload window`: the probe lines before and after the Reload
   start (flags, +0x5a90, holder articles). Last before z: a1-enable's crash followed a Reload out of a Pyra window.
 - a2_restore: the knob off, cycle-fix's restore."""
@@ -173,6 +177,7 @@ def _hat_and_press(ctx, t0, out, hats, target, during=None):
     `during` holds a button first and presses inside it. The lines since the press."""
     fx._live_set(ctx, player_kirby_hats=fs._roster(hats))
     out['to_kirby'] = af._to(ctx, 0, fs.KIRBY, len(cf.P1_LANE) + 2)
+    out['window'] = [hex(k) for k in (af._window(ctx, 0) or [])]
     out['hat'] = bool(fs._hat(ctx, t0, out, 'hat'))
     time.sleep(1.0)
     seq = hs.diag_mark(ctx)
@@ -188,15 +193,17 @@ def _hat_and_press(ctx, t0, out, hats, target, during=None):
     return af._since(ctx, seq)
 
 
-def a2_strip(ctx):
+def _strip_row(ctx, name, knob, grouped):
+    """The a2-strip flow under `name`: the diag knob `knob`, Ready Fighters 10, Kirby with a hat, the press to the next
+    fighter; then back to Kirby. `grouped`: Kirby's window must hold another member (gated_alone's revert, a-full-3)."""
     t0, out = _begin(ctx)
-    _knob(ctx, 'window strip')
+    _knob(ctx, knob)
     seq = hs.diag_mark(ctx)
     fx._live_set(ctx, player_roster=fs._roster(cf.P1_LANE), cycle_preload_ready_fighters=fs.RF(10))
     out['settle0'] = fs._settled(ctx, seq, 120)
     lines = _hat_and_press(ctx, t0, out, fs.HATS, None)
     out['k2'] = _strip_lines(lines)
-    _shot(ctx, out, 'shot_after', 'a2-strip-after')
+    _shot(ctx, out, 'shot_after', name + '-after')
     seq = hs.diag_mark(ctx)
     out['back'] = af._to(ctx, 0, fs.KIRBY, len(cf.P1_LANE) + 2)
     time.sleep(2.0)
@@ -205,14 +212,28 @@ def a2_strip(ctx):
                  'attach': [t[:200] for t in back if ATTACH0.search(t) or REUSE0.search(t)][:3],
                  'registry': [t[:200] for t in back if '[Registry] attach owner=0' in t][:3],
                  'bad': af._bad(back)}
-    _shot(ctx, out, 'shot_kirby', 'a2-strip-kirby-back')
+    _shot(ctx, out, 'shot_kirby', name + '-kirby-back')
     _mark(t0, out, 'done')
     problems = [] if out['hat'] else ['no hat confirmed: the copy gate was not set up']
+    if grouped and (hex(fs.KIRBY) not in out['window'] or len(out['window']) < 2):
+        problems.append('precondition: Kirby is not grouped with another member: window %s' % out['window'])
     problems += _strip_problems(out['k2'], 'k2')
     if out['k5']['reload'] or not out['k5']['attach']:
         problems.append('k5: the return to Kirby was not warm: %s' % out['k5'])
     problems += ['k5 bad line: %s' % t for t in out['k5']['bad']]
-    return _finish(ctx, 'a2-strip', out, problems)
+    return _finish(ctx, name, out, problems)
+
+
+def a2_strip(ctx):
+    return _strip_row(ctx, 'a2-strip', 'window strip', False)
+
+
+def a2_kirby_grouped(ctx):
+    """gated_alone's revert (a-full-3): Kirby is laid out like any member again, so his window holds other fighters. With
+    the shipped switches only (the knob off) a Kirby with a hat is pressed away: his copy goes natively and he parks, no
+    Reload and no `[KirbyPark] fallback`; the next fighter's window attaches warm (or is reused); back to Kirby warm.
+    a2-strip's checks, plus the precondition that Kirby's window holds another member."""
+    return _strip_row(ctx, 'a2-kirby-grouped', 'off', True)
 
 
 def a2_strip_same(ctx):
@@ -380,9 +401,13 @@ def a2_aegis(ctx):
 
 
 BUILT = r'background built owner=0 group=\d+ ok=true reason=\S+ kinds=\[%s\]'
-P4_STEPS = [([fs.PIKACHU, PT], [BUILT % '24, 25, 26']),
-            ([fs.PIKACHU, PYRA], [FREES % '24, 25, 26', BUILT % '5a, 5b']),
-            ([fs.PIKACHU, fs.PALUTENA], [FREES % '5a, 5b'])]
+# Each step's group must be BUILT fresh (a hard precondition, boot a2-f4acc30e-x1: the lanes at Ready Fighters 8 built
+# neither the PT nor the Pyra group, so there was no teardown to count). The first column of a step is its lane, the
+# second the line its group's build prints (None: no build in this step), the third the group the lane change frees.
+P4_STEPS = [([fs.PIKACHU, PT], BUILT % '24, 25, 26', None),
+            ([fs.PIKACHU, PYRA], BUILT % '5a, 5b', FREES % '24, 25, 26'),
+            ([fs.PIKACHU, fs.PALUTENA], None, FREES % '5a, 5b')]
+P4_READY_FIGHTERS = 12
 
 
 def a2_p4(ctx):
@@ -394,16 +419,45 @@ def a2_p4(ctx):
 
     Boot a2-99b9083f-y1 crashed here (`0x33c23f8`, the Aegis group a2-aegis kept, torn down by the first step's shrink):
     every switch is on for it now (`window mii pt aegis strip`, no forced Reload), and the object modules the groups hold
-    are reported (`object module held` / `dropped` / `handed to R`). No crash is the first verdict (z-boot reads the console)."""
+    are reported (`object module held` / `dropped` / `handed to R`). No crash is the first verdict (z-boot reads the console).
+
+    Setup (a-full-3; the assertions are unchanged): boot a2-f4acc30e-x1 built no fresh PT or Pyra group, so there was no
+    teardown to count. Ready Fighters 8 leaves no room for a 3-body PT group beside the console's CPU lane (a2-pt's own
+    precondition: "Loaded 6/8 · swap P1 to load 2 more"), so every step runs at Ready Fighters 12. A group an earlier row
+    left in the cycle would be reused, not built, so the row first drops PT and Pyra from the lane and pauses (freeing what
+    parked) before its own count starts; those frees are recorded apart (`preclean`). P1 is picked to Pikachu only when it
+    isn't there (a pick to the fighter already shown waits its whole 60 s cap). A group that is not built within its wait
+    is a precondition failure, named as one."""
     t0, out = _begin(ctx)
     _knob(ctx, 'window mii pt aegis strip')
+    live = fs._live_kinds(ctx).get(0)
+    out['p1_before'] = hex(live) if live is not None else None
+    if live != fs.PIKACHU:
+        _, out['to_pikachu'] = af._pick(ctx, 0, fs.PIKACHU)
+    clean = hs.diag_mark(ctx)
+    fx._live_set(ctx, player_roster=fs._roster([fs.PIKACHU, fs.PALUTENA]),
+                 cycle_preload_ready_fighters=fs.RF(P4_READY_FIGHTERS))
+    out['preclean_settle'] = fs._settled(ctx, clean, 90)
+    _pause(ctx)
+    time.sleep(2.0)
+    out['preclean'] = [t[:200] for t in af._since(ctx, clean) if '] pause frees ' in t or '[Destroy] records' in t][:6]
     seq0 = hs.diag_mark(ctx)
-    _, out['to_pikachu'] = af._pick(ctx, 0, fs.PIKACHU)
     out['steps'] = []
-    for i, (lane, waits) in enumerate(P4_STEPS):
+    for i, (lane, built, frees) in enumerate(P4_STEPS):
         seq = hs.diag_mark(ctx)
-        fx._live_set(ctx, player_roster=fs._roster(lane), cycle_preload_ready_fighters=fs.RF(8))
-        step = {'lane': [hex(k) for k in lane], 'seen': [bool(hs.wait_diag(ctx, seq, w, 90)) for w in waits]}
+        fx._live_set(ctx, player_roster=fs._roster(lane), cycle_preload_ready_fighters=fs.RF(P4_READY_FIGHTERS))
+        step = {'lane': [hex(k) for k in lane]}
+        if built:
+            step['built'] = bool(hs.wait_diag(ctx, seq, built, 120))
+            if not step['built']:
+                out['steps'].append(step)
+                _knob(ctx, 'off')
+                _mark(t0, out, 'precondition')
+                return _finish(ctx, 'a2-p4', out, ['precondition: no fresh group built for the lane %s at Ready Fighters %d '
+                                                   '(waited 120 s, last status %s)' % (step['lane'], P4_READY_FIGHTERS,
+                                                                                       fs._last_planned(ctx))])
+        if frees:
+            step['left'] = bool(hs.wait_diag(ctx, seq, frees, 90))
         # Training's pause (Plus, held, Plus) frees what parked, as `hs.pause_frees` does; that helper also marks a guest
         # trace this run has none of (boot a2-99b9083f-y1: KeyError 'trace_jsonl'). Informational: the verdict is the counts.
         pause = hs.diag_mark(ctx)
@@ -451,10 +505,71 @@ def a2_pyra_keep_a1(ctx):
     return _pyra_keep(ctx, ' window')
 
 
+PYRA_BUILT_CPU = r'background built owner=1 group=\d+ ok=true reason=\S+ kinds=\[5a, 5b\]'
+PYRA_READY_FIGHTERS = 10
+
+
+def _fresh_cpu_pyra_group(ctx, out):
+    """a2-pyra-keep-all's precondition: the CPU's Pyra group built fresh. A group an earlier row left in the CPU's cycle is
+    reused, not built, and one the lane could not fit (Ready Fighters 8: the console lanes plan 7) stays cold, so the lane
+    drops Pyra, a pause frees what parked, and the lane with Pyra is set again at Ready Fighters 10, the shipped value."""
+    clean = hs.diag_mark(ctx)
+    fx._live_set(ctx, cpu_roster=fs._roster([fs.GUNNER, fs.DIDDY]), cycle_preload_ready_fighters=fs.RF(PYRA_READY_FIGHTERS))
+    time.sleep(2.0)
+    _pause(ctx)
+    time.sleep(2.0)
+    out['preclean'] = [t[:200] for t in af._since(ctx, clean) if '] pause frees ' in t or '[Destroy] records' in t][:6]
+    seq = hs.diag_mark(ctx)
+    fx._live_set(ctx, cpu_roster=fs._roster([fs.GUNNER, PYRA, fs.DIDDY]), cycle_preload_ready_fighters=fs.RF(PYRA_READY_FIGHTERS))
+    out['pyra_built'] = bool(hs.wait_diag(ctx, seq, PYRA_BUILT_CPU, 120))
+    out['settle_fresh'] = fs._settled(ctx, seq, 90)
+    if not out['pyra_built']:
+        raise RuntimeError('a2-pyra-keep-all precondition: no fresh CPU Pyra group built at Ready Fighters %d (waited 120 s, '
+                           'settle %s)' % (PYRA_READY_FIGHTERS, out['settle_fresh']))
+
+
 def a2_pyra_keep_all(ctx):
     """The same with every switch on (the primary 03:00Z): the Aegis keep too (`reload mii window pt aegis strip`), so the
-    CPU's Pyra window is kept as a group and its holder lives on past the Reload."""
-    return _pyra_keep(ctx, ' window pt aegis strip')
+    CPU's Pyra window is kept as a group and its holder lives on past the Reload.
+
+    Setup (a-full-3; cf-pyra-keep's assertions are unchanged, they run as written): in boot a2-f4acc30e-x1 the warm lap's
+    first press onto Pyra found no group built (route `canonical`, "demand declined … no one-member group holds it"), the
+    later presses went round the cycle, and the row ended on Mii Gunner ("the CPU never reached Pyra: 74", decimal for
+    0x4a). So its warm lap starts only after the CPU's Pyra group is built fresh (`_fresh_cpu_pyra_group`; a precondition
+    failure otherwise), and the CPU lands on Pyra by a direct pick of that group, as a2-aegis does for Player 1. The
+    receipt also names the Pyra window's keep (`pyra_window_kept`, `partner_holder`) and the object-module lines; they are
+    evidence, not a verdict."""
+    fx._live_set(ctx, player_roster=fs._roster(cf.P1_LANE))
+    seq0 = hs.diag_mark(ctx)
+    prepared = {}
+    orig_diag, orig_lap, orig_to, orig_finish = cf._diag_cycle, cf._lap, cf._to, cf._finish
+
+    def diag(c, words):
+        return orig_diag(c, words + ' window pt aegis strip' if words.startswith('reload') else words)
+
+    def lap(c, out, tag, laps, gap, settle):
+        if tag == 'warm' and not prepared:
+            prepared['done'] = True
+            _fresh_cpu_pyra_group(c, out)
+        return orig_lap(c, out, tag, laps, gap, settle)
+
+    def to(c, kind, cap=12):
+        if kind != PYRA:
+            return orig_to(c, kind, cap)
+        return {'direct_pick': af._pick(c, 1, PYRA)[1]}
+
+    def finish(c, name, out, problems):
+        lines = af._since(c, seq0)
+        out['pyra_window_kept'] = [t[:300] for t in lines if '[GroupSwap] window kept across reload owner=1' in t][:2]
+        out['partner_holder'] = [t[:300] for t in lines if 'partner holder=' in t][:2]
+        out['object_modules'] = [t[:220] for t in lines if OBJECT_MODULE.search(t)][:8]
+        return orig_finish(c, name, out, problems)
+
+    cf._diag_cycle, cf._lap, cf._to, cf._finish = diag, lap, to, finish
+    try:
+        return cf.cf_pyra_keep(ctx)
+    finally:
+        cf._diag_cycle, cf._lap, cf._to, cf._finish = orig_diag, orig_lap, orig_to, orig_finish
 
 
 def a2_aegis_probe(ctx):
