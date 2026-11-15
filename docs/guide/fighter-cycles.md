@@ -125,6 +125,15 @@ is freed after you swap away from it. Nothing else loads again. While a cold fig
 Ready Fighters is loaded. Lowering Ready Fighters frees the loaded fighters whose turn is farthest away, right away.
 In a very long cycle every loading spot can be taken; then a swap to a cold fighter still reloads that side's fighters.
 
+If a cycle has more fighters than Ready Fighters leaves room for, one can't stay loaded. A swap to it loads it alone,
+and everything else that is already loaded stays loaded: the groups beside it, and the fighters that were on screen
+with the one you swapped from, windows included. When more would stay than Ready Fighters allows, the fighter whose
+turn is farthest away is freed, never the next one or the one on screen.
+
+Two cases differ. Kirby is always loaded alone, so a swap away from a Kirby that holds a copied ability gives up only
+Kirby. Pokémon Trainer and Pyra / Mythra windows are never kept this way: swapping away from one loads it again the
+next time you reach it.
+
 The notice "Fighters" counts them while they load:
 
 | Notice | Meaning |
