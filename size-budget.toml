@@ -1665,3 +1665,11 @@ approved_by = "operator 2026-11-12: 'the size raise is fine, go ahead' (~16:10Z,
 # as the yes for folding the test and simulator rules into the same cfg evaluator: test-only and host-only simulator
 # code are now placed by that evaluator too (sloc4 ended a gated item at its first ';' or '{'), and a macro_rules!
 # template's cfgs count like any other. c5191271: 141917 -> 141269 (648 lines). The ceiling stays 147921; no entry.
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 148075
+date = "2026-11-15"
+reason = "rc.15 integration: operator-authorized increase of 154 normalized implementation lines from 147921 to 148075; counting rules and gate enforcement unchanged."
+approved_by = "Operator 2026-11-15 ~16:00Z: 'Raise limit by ~150'; exact ceiling 148075 relayed by the primary c07b3449 for rc.15 integration. Combos and drills remain capped at 16 units."
