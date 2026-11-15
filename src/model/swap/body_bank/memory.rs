@@ -275,6 +275,18 @@ mod tests {
             "with room for both, the seat loads beside the group's wait");
     }
 
+    /// rc.14 ic-pair-cost (the primary 2026-11-15 ~10:20Z): the Ice Climbers pair `[4b, 4c]` is charged what it was
+    /// measured at, not two default builds. The table had no build observation for the set (n=0), so each member took
+    /// `DEFAULT_BUILD` (101.4 MiB): 270.3 MB, need 320.8 MB. Measured over the 131 final-pass and lane logs that carry
+    /// `[GroupSwap] memory … kinds=[4b, 4c] phase=…` lines: prefetch at most 59,506,688 B, build at most 19,398,656 B.
+    /// Eden rr1-n1 a1-paircontrol2 #8903 held the pair at 255,021,056 B of headroom; that headroom admits it.
+    fn the_ice_climbers_pair_is_charged_its_measured_cost() {
+        let pair = cost(&[0x4b, 0x4c]);
+        assert!(pair.total() >= 59_506_688 + 19_398_656, "at least the measured maxima: {pair:?}");
+        assert!(pair.total() <= 100 * MIB, "not two default builds: {pair:?}");
+        assert_eq!(admit(Some(255_021_056), 0, pair).admission, Admission::Admit, "rr1-n1 #8903's headroom");
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
@@ -282,6 +294,7 @@ mod tests {
             ("every_measured_kind_set_and_helper_load_is_charged_at_least_its_measurement", every_measured_kind_set_and_helper_load_is_charged_at_least_its_measurement as fn()),
             ("a_created_entry_gives_way_to_what_the_cycle_waits_for", a_created_entry_gives_way_to_what_the_cycle_waits_for as fn()),
             ("a_seat_speculative_load_leaves_what_the_cycle_waits_for", a_seat_speculative_load_leaves_what_the_cycle_waits_for as fn()),
+            ("the_ice_climbers_pair_is_charged_its_measured_cost", the_ice_climbers_pair_is_charged_its_measured_cost as fn()),
         ]);
     }
     }

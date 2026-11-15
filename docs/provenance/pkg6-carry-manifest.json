@@ -5224,7 +5224,7 @@
    "dest": "src/model/swap/body_bank/memory.rs",
    "crate": "consts",
    "src_sha256": "bfbc9c80a215184a125634c4b90fbf97c63007608db892a95df466d784869915",
-   "dest_sha256": "44c3c6baa3edfbe93555f4d04d3e0665a7b5236bb5c97fc35c1a0af9ce1a17f3",
+   "dest_sha256": "39405d5b5b366aed55367fe4ffb31a169bc4684771d9f33ecf1791dc335ede4a",
    "edits": [
     {
      "old": "        GroupState::Prefetching => with_margin(cost.total()),\n        GroupState::Prefetched => with_margin(cost.build),\n        GroupState::Planned | GroupState::Built | GroupState::Failed => 0,\n    }\n}\n",
@@ -5321,6 +5321,16 @@
      "old": "    let _ = waiting;\n    admit(headroom, outstanding, cost)\n",
      "new": "    created_admission(headroom, outstanding, waiting, cost)\n",
      "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+     "new": "\n    /// rc.14 ic-pair-cost (the primary 2026-11-15 ~10:20Z): the Ice Climbers pair `[4b, 4c]` is charged what it was\n    /// measured at, not two default builds. The table had no build observation for the set (n=0), so each member took\n    /// `DEFAULT_BUILD` (101.4 MiB): 270.3 MB, need 320.8 MB. Measured over the 131 final-pass and lane logs that carry\n    /// `[GroupSwap] memory \u2026 kinds=[4b, 4c] phase=\u2026` lines: prefetch at most 59,506,688 B, build at most 19,398,656 B.\n    /// Eden rr1-n1 a1-paircontrol2 #8903 held the pair at 255,021,056 B of headroom; that headroom admits it.\n    fn the_ice_climbers_pair_is_charged_its_measured_cost() {\n        let pair = cost(&[0x4b, 0x4c]);\n        assert!(pair.total() >= 59_506_688 + 19_398_656, \"at least the measured maxima: {pair:?}\");\n        assert!(pair.total() <= 100 * MIB, \"not two default builds: {pair:?}\");\n        assert_eq!(admit(Some(255_021_056), 0, pair).admission, Admission::Admit, \"rr1-n1 #8903's headroom\");\n    }\n\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+     "reason": "rc.14 ic-pair-cost fail-first: rc.14 ic-pair-cost: the Ice Climbers pair cost case, failing on the table without a pair build observation"
+    },
+    {
+     "old": "            (\"a_seat_speculative_load_leaves_what_the_cycle_waits_for\", a_seat_speculative_load_leaves_what_the_cycle_waits_for as fn()),\n        ]);\n",
+     "new": "            (\"a_seat_speculative_load_leaves_what_the_cycle_waits_for\", a_seat_speculative_load_leaves_what_the_cycle_waits_for as fn()),\n            (\"the_ice_climbers_pair_is_charged_its_measured_cost\", the_ice_climbers_pair_is_charged_its_measured_cost as fn()),\n        ]);\n",
+     "reason": "rc.14 ic-pair-cost fail-first: rc.14 ic-pair-cost: the Ice Climbers pair cost case, failing on the table without a pair build observation"
     }
    ]
   },
