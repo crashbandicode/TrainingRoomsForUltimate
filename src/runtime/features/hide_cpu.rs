@@ -5,12 +5,17 @@
 //! the step. A hidden body is invisible (model, effects, shadow), has no hurtbox and no push, has no hitbox out, and waits in
 //! the game's own hitlag, renewed every frame, so its status, motion and fall wait with it. Shown, all of it comes back
 //! and the body goes on from the same spot and status. The practice games ask through `hide` and `restore`.
+//!
+//! The player tag goes with the body: the game's two per-fighter cursor flags (`hide::tag`), written through package 2's
+//! guarded `WorkModule::set_flag`. The HUD panel too: the wrapper publishes the hidden entries (`publish_panels`) and the
+//! `info_melee` tick hides those parts (`runtime::ui::hud::cpu_panels`).
 
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
 
 use crate::model::cpu::hide;
+use crate::model::cpu::ids::UNRESOLVED;
 use crate::runtime::features::notices;
-use crate::runtime::game;
+use crate::runtime::game::{self, natives};
 use crate::runtime::seams::seam_install::gate;
 
 /// Every native takes the accessor and two more words, so one call shape serves them all (a bool or an i32 argument is read
@@ -34,6 +39,19 @@ static BASE: AtomicUsize = AtomicUsize::new(0);
 pub(crate) static REQUEST: AtomicBool = AtomicBool::new(false);
 /// A CPU body was hidden by its last step.
 static HIDDEN: AtomicBool = AtomicBool::new(false);
+/// The entries whose HUD panel is hidden, one bit each (`Cpu::hidden_panels`), for the `info_melee` tick.
+static PANELS: AtomicU8 = AtomicU8::new(0);
+
+/// From the CPU frame wrapper after each body frame and on a session clear: the entries whose panel is hidden.
+pub(crate) fn publish_panels(bits: u8) {
+    let bits = bits * u8::from(BASE.load(Ordering::Acquire) != 0);
+    PANELS.store(bits, Ordering::Release);
+}
+
+/// The entries whose HUD panel is hidden.
+pub(crate) fn panels() -> u8 {
+    PANELS.load(Ordering::Acquire)
+}
 
 /// Once from `lobby::init`: compare every row (the installer logs a group it skips); nothing is written unless all passed.
 pub(crate) fn init() {
@@ -61,11 +79,11 @@ pub(crate) fn refuses_play() -> bool {
     hidden
 }
 
-/// Do one body's step.
+/// Do one body's step. `tag` is the two cursor flags' ids from the game's constant table (`UNRESOLVED` skips one).
 ///
 /// # Safety
 /// The game thread, with `accessor` the module accessor of a live fighter.
-pub(crate) unsafe fn apply(accessor: usize, step: Option<bool>) {
+pub(crate) unsafe fn apply(accessor: usize, step: Option<bool>, tag: [i32; 2]) {
     let base = BASE.load(Ordering::Acquire);
     let Some(hidden) = step.filter(|_| base != 0) else { return };
     HIDDEN.store(hidden, Ordering::Release);
@@ -73,5 +91,10 @@ pub(crate) unsafe fn apply(accessor: usize, step: Option<bool>) {
         let [a, b] = if hidden { hid } else { vis };
         let call: extern "C" fn(usize, usize, usize) = std::mem::transmute(base + offset);
         call(accessor, a, b);
+    }
+    if let Some(shown) = hide::tag(step) {
+        for flag in tag.into_iter().filter(|&flag| flag != UNRESOLVED) {
+            natives::set_flag(accessor, shown, flag);
+        }
     }
 }

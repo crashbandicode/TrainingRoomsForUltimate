@@ -38,6 +38,43 @@ pub(super) unsafe fn run(layout: *mut Layout, name: &[u8]) {
 const HUD_LAYOUTS: [&[u8]; 5] = [b"info_playercursor", b"info_playercursor_item", b"info_melee", b"info_radar_a", b"info_radar_b"];
 static HIDDEN_BY_MENU: AtomicUsize = AtomicUsize::new(0);
 
+/// The `info_melee` panels Hide CPU hid, one bit per entry (only this rule's tick touches it).
+static PANELS_HIDDEN: AtomicUsize = AtomicUsize::new(0);
+
+/// Hide CPU: a hidden CPU's HUD panel (its `info_melee` part: portrait, name, damage, stocks) is invisible on every tick
+/// while the body is, and visible again on the first tick after. Player 1's part and every other pane are left alone.
+pub(super) unsafe fn cpu_panels(layout: *mut Layout, name: &[u8]) {
+    use crate::model::cpu::hide;
+    if name != b"info_melee" {
+        return;
+    }
+    let wanted = usize::from(crate::runtime::features::hide_cpu::panels());
+    let was = PANELS_HIDDEN.load(Ordering::Acquire);
+    let root = (*layout).root_pane;
+    if wanted | was == 0 || root.is_null() {
+        return;
+    }
+    let mut now = 0;
+    for entry in 0..8 {
+        let mut hidden = was & (1 << entry) != 0;
+        if let (Some(visible), Some(part)) = (hide::panel_write(wanted & (1 << entry) != 0, &mut hidden), hide::panel_part(entry)) {
+            let pane = super::pane::find(root, &part);
+            if !pane.is_null() {
+                super::pane::set_visible(pane, visible);
+            }
+            #[cfg(feature = "diag")]
+            if (was & (1 << entry) != 0) != hidden {
+                crate::runtime::diag_log::diagnostic(format_args!(
+                    "[TrainingRooms] hide_cpu panel entry={entry} visible={visible} found={}",
+                    !pane.is_null()
+                ));
+            }
+        }
+        now |= usize::from(hidden) << entry;
+    }
+    PANELS_HIDDEN.store(now, Ordering::Release);
+}
+
 pub(super) unsafe fn hud_rule(layout: *mut Layout, name: &[u8]) {
     let Some(index) = HUD_LAYOUTS.iter().position(|n| *n == name) else { return };
     let root = (*layout).root_pane;

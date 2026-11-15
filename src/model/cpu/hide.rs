@@ -1,7 +1,7 @@
 //! Hide CPU (rc.14, SPEC-eggsercise V2.6): while the rule says so, a CPU body is invisible, has no hurtbox and no
-//! collision, and takes no action; when the rule stops saying so, it is shown again where it stood. No CPU setting is
-//! ever written. The runtime asks once per body frame (`Cpu::frame`) and does what the step says
-//! (`runtime::features::hide_cpu`).
+//! collision, and takes no action; when the rule stops saying so, it is shown again where it stood. Its player tag and
+//! its HUD panel go and come back with it. No CPU setting is ever written. The runtime asks once per body frame
+//! (`Cpu::frame`) and does what the step says (`runtime::features::hide_cpu`; the panel in `runtime::ui::hud`).
 
 use super::role::Scene;
 
@@ -18,24 +18,28 @@ pub fn step(away: &mut bool, scene: Scene, row: bool, request: bool) -> Option<b
 
 /// The body's player tag (the floating label and arrow): the game's two per-fighter cursor work flags,
 /// `FIGHTER_INSTANCE_WORK_ID_FLAG_CURSOR` and `..._FLAG_NAME_CURSOR`, the pair the game's own cursor helper writes
-/// (`main+0x67db00`). `Some(shown)` to write, from the body's `step`.
-pub const fn tag(_step: Option<bool>) -> Option<bool> {
-    None
+/// (`main+0x67db00`; a Final Smash turns the other fighters' tags off with it and back on with `true`). `Some(shown)` to
+/// write: off on every hidden frame, on the frame the body is shown, nothing otherwise (so never in a waiting room).
+pub fn tag(step: Option<bool>) -> Option<bool> {
+    step.map(|hidden| !hidden)
 }
 
-/// The HUD panels to hide, one bit per entry, from each body's `away` (in `FighterKey::index` order: two per entry).
-pub fn panels(_away: impl IntoIterator<Item = bool>) -> u8 {
-    0
+/// The HUD panels to hide, one bit per entry: the entries with a body hidden on its last frame (`away`, in
+/// `FighterKey::index` order, two bodies per entry). A rebuilt body starts shown and its first frame hides it again.
+pub fn panels(away: impl IntoIterator<Item = bool>) -> u8 {
+    away.into_iter().take(16).enumerate().filter(|(_, away)| *away).fold(0, |bits, (body, _)| bits | (1 << (body / 2)))
 }
 
-/// The part of the `info_melee` layout that is `entry`'s HUD panel (portrait, name, damage, stocks).
-pub fn panel_part(_entry: usize) -> Option<[u8; 2]> {
-    None
+/// The part of the `info_melee` layout that is `entry`'s HUD panel (portrait, name, damage, stocks): `p1` for entry 0
+/// (Player 1) up to `p8`.
+pub fn panel_part(entry: usize) -> Option<[u8; 2]> {
+    (entry < 8).then(|| [b'p', b'1' + entry as u8])
 }
 
-/// One `info_melee` tick for one entry's panel: `Some(visible)` to write. `hidden` is whether this rule hid it.
-pub fn panel_write(_wanted: bool, _hidden: &mut bool) -> Option<bool> {
-    None
+/// One `info_melee` tick for one entry's panel: `Some(visible)` to write. Hidden on every tick while `wanted` (a rebuilt
+/// layout cannot show it), visible on the first tick after, and nothing for a panel this rule did not hide (`hidden`).
+pub fn panel_write(wanted: bool, hidden: &mut bool) -> Option<bool> {
+    (std::mem::replace(hidden, wanted) || wanted).then_some(!wanted)
 }
 
 /// The notice for Play on CPU while the CPU is hidden: by a practice game's request, or by the row.

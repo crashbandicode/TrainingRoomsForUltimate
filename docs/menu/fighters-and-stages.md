@@ -532,6 +532,7 @@ the mode is Off; "Time!", the end notice and the wait between runs count as runn
 - **Default:** Hide
 - **How:** Hide: the CPU is hidden while a game runs, and afterwards it is as **Hide CPU** says. Show: the CPU stays as
   it is. It applies when the menu closes.
+- A hidden CPU's "CPU" tag and its panel at the bottom of the screen are hidden too.
 
 ## Reset page to defaults
 

@@ -200,7 +200,8 @@ mod ev {
     pub const TECH_CALL: usize = 18;
     pub const OOS_CALL: usize = 19;
     pub const TAUNT: usize = 20;
-    pub const COUNT: usize = 21;
+    pub const HIDE: usize = 21;
+    pub const COUNT: usize = 22;
 }
 
 #[cfg(feature = "diag")]
@@ -523,6 +524,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
             let any = cpu.roles.any();
             if any {
                 cpu.clear_session();
+                hide_cpu::publish_panels(cpu.hidden_panels());
             }
             any
         });
@@ -591,7 +593,9 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
                 counts::bump(counts::FRAME);
             }
         }
-        Some(cpu.frame(key, &facts))
+        let out = cpu.frame(key, &facts);
+        hide_cpu::publish_panels(cpu.hidden_panels());
+        Some(out)
     }).flatten();
     cpu_event_on_change!(
         ev::ROLE,
@@ -610,6 +614,17 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
         key.partner
     );
     if let Some(out) = out {
+        cpu_event_on_change!(
+            ev::HIDE,
+            key.index(),
+            out.vanish.map(u64::from),
+            "hide entry={} partner={} hidden={:?} tag={:?} panels={:#04b}",
+            key.entry,
+            key.partner,
+            out.vanish,
+            crate::model::cpu::hide::tag(out.vanish),
+            hide_cpu::panels()
+        );
         apply(accessor, out);
     }
     #[cfg(feature = "diag")]
@@ -696,7 +711,7 @@ unsafe fn tech_facts(accessor: usize, status: i32, primary: bool) -> TechFacts {
 /// Do what the frame asked, with no lock held: the core's own requests, then each feature's, each behind its
 /// own install flag.
 unsafe fn apply(accessor: usize, out: FrameOut) {
-    hide_cpu::apply(accessor, out.vanish);
+    hide_cpu::apply(accessor, out.vanish, [konst(C::WorkFlagCursor), konst(C::WorkFlagNameCursor)]);
     if let Some(value) = out.stale_flag {
         let flag = konst(C::WorkFlagDisableEscapePenalty);
         if flag != UNRESOLVED {

@@ -504,9 +504,9 @@ When it differs from the level in Training's own menu, a notice says so each tim
 Takes the CPU out of the fight without changing any of its settings.
 
 - On: the CPU is invisible and has no shadow or effects. Your attacks, grabs and projectiles pass through it, it
-  doesn't push you, and it takes no action: it doesn't move, fall or attack. Its damage still shows at the bottom of
-  the screen.
-- Off: the CPU is shown again where it stood, and the CPU page applies from that frame.
+  doesn't push you, and it takes no action: it doesn't move, fall or attack. Its "CPU" tag and its panel at the bottom
+  of the screen are hidden too.
+- Off: the CPU is shown again where it stood, with its tag and panel, and the CPU page applies from that frame.
 - It stays hidden through L+R+A, a loaded save state and a changed CPU fighter.
 - Play on CPU is refused while the CPU is hidden ("The CPU is hidden: turn Hide CPU Off first").
 - Training only: in a waiting room the row is greyed ("Not in a waiting room yet") and does nothing.
