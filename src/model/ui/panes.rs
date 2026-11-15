@@ -728,7 +728,7 @@ const fn iv_spec(local: usize, name: Name) -> Spec {
     };
     let parent = Name::new("TrIv");
     match local {
-        CONTAINER => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: STRIP_Y, w: STRIP_W, h: STRIP_H, visible: false },
+        CONTAINER => container(name, ROOT_PANE, [0.0, STRIP_Y, STRIP_W, STRIP_H]),
         BACKDROP => under(rect(name, [0.0, 0.0, STRIP_W, STRIP_H], BACKDROP_COLOR, true), parent),
         i if i < SEPARATOR => iv_text(name, [LABEL_X, 0.0, 60.0], Align::Center, FONT_TAG),
         SEPARATOR => under(rect(name, [DIVIDER_X, 19.5, 1.5, 147.0], RULE, false), parent),
@@ -831,7 +831,7 @@ const fn cb_spec(local: usize, name: Name) -> Spec {
     use iv::{FONT_SUB, FONT_TAG};
     let parent = Name::new("TrCb");
     match local {
-        CONTAINER => Spec { name, parent: Name::new("TrIv"), kind: Kind::Null, x: 0.0, y: BAR_Y, w: BAR_W, h: BAR_H, visible: false },
+        CONTAINER => container(name, Name::new("TrIv"), [0.0, BAR_Y, BAR_W, BAR_H]),
         BACKDROP => hidden(under(rect(name, [0.0, 0.0, BAR_W, BAR_H], cb::BACKDROP_COLOR, true), parent)),
         HEADER => cb_text(name, [LEFT + 180.0, HEADER_Y, 360.0], Align::Left, FONT_SUB),
         STREAK => cb_text(name, [STREAK_X, HEADER_Y, 120.0], Align::Center, FONT_TAG),
@@ -1034,6 +1034,10 @@ const fn text(name: Name, [x, y, w, h]: [f32; 4], align: Align, font: (f32, f32)
 
 const ROOT_PANE: Name = Name::new("RootPane");
 
+const fn container(name: Name, parent: Name, [x, y, w, h]: [f32; 4]) -> Spec {
+    Spec { name, parent, kind: Kind::Null, x, y, w, h, visible: false }
+}
+
 const fn under(mut spec: Spec, parent: Name) -> Spec {
     spec.parent = parent;
     spec
@@ -1075,11 +1079,11 @@ pub const fn spec(index: usize) -> Spec {
     let name = name_of(index);
     match index {
         i if i >= IDX_ITEM_ICON && i < IDX_ITEM_ICON + ITEM_ICONS => rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false),
-        IDX_ORBS => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
+        IDX_ORBS => container(name, ROOT_PANE, [0.0, 0.0, 1920.0, 1080.0]),
         i if i >= IDX_ORB && i < IDX_ORB + ORBS => under(rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false), name_of(IDX_ORBS)),
         i if i >= IDX_EGG && i < IDX_EGG + EGG_PANES => under(rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false), ROOT_PANE),
-        IDX_MENU => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: 0.0, w: 1920.0, h: 1080.0, visible: false },
-        IDX_NOTICE => Spec { name, parent: ROOT_PANE, kind: Kind::Null, x: 0.0, y: NOTICE_ORIGIN_Y, w: 1920.0, h: 1080.0, visible: false },
+        IDX_MENU => container(name, ROOT_PANE, [0.0, 0.0, 1920.0, 1080.0]),
+        IDX_NOTICE => container(name, ROOT_PANE, [0.0, NOTICE_ORIGIN_Y, 1920.0, 1080.0]),
         IDX_NOTICE_HEADER_PLATE => under(rect(name, padded(NOTICE_HEADER_BOX), NOTICE_PLATE, true), name_of(IDX_NOTICE)),
         IDX_NOTICE_HEADER => under(text(name, NOTICE_HEADER_BOX, Align::Center, FONT_SMALL, 24, NOTICE_HEADER), name_of(IDX_NOTICE)),
         IDX_NOTICE_TEXT_PLATE => under(rect(name, padded(NOTICE_TEXT_BOX), NOTICE_PLATE, true), name_of(IDX_NOTICE)),
