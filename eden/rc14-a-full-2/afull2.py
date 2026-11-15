@@ -240,17 +240,33 @@ def a2_strip_move(ctx):
     return _finish(ctx, 'a2-strip-move', out, problems)
 
 
+def _pause(ctx):
+    """Training's pause (Plus, held, Plus): parked groups are freed as it opens (operator decision 23:42Z)."""
+    steps.press(ctx, 'plus', 3.0)
+    steps.press(ctx, 'plus', 2.0)
+
+
 def a2_pt(ctx):
     t0, out = _begin(ctx)
     _knob(ctx, 'window')
-    seq = hs.diag_mark(ctx)
     lane = [fs.PIKACHU, PT, fs.PALUTENA]
+    # Precondition (boot a2-99b9083f-y1: PT never built as a group, "Loaded 6/8 · swap P1 to load 2 more", so the pick was
+    # a Reload and nothing could be kept): P1 on Pikachu, any PT group from an earlier row freed (a lane without PT and a
+    # pause), then the PT lane at Ready Fighters 12, and the pick only once a fresh `[24, 25, 26]` group is built.
+    _, out['to_pikachu'] = af._pick(ctx, 0, fs.PIKACHU)
+    fx._live_set(ctx, player_roster=fs._roster([fs.PIKACHU, fs.PALUTENA]), cycle_preload_ready_fighters=fs.RF(12))
+    time.sleep(2.0)
+    _pause(ctx)
+    seq = hs.diag_mark(ctx)
     fx._live_set(ctx, player_roster=fs._roster(lane), player_kirby_hats=fs._roster(fs.HATS),
-                 cycle_preload_ready_fighters=fs.RF(10))
+                 cycle_preload_ready_fighters=fs.RF(12))
     out['settle0'] = fs._settled(ctx, seq, 120)
     # Boot a2-e881df1e-y1: cycle presses never reached PT (no `request owner=0 kind=0x24`); a direct pick once its group
     # is built, as a1-enable's `_land` does.
-    out['pt_built'] = bool(hs.wait_diag(ctx, seq, r'background built owner=0 group=\d+ ok=true reason=\S+ kinds=\[24, 25, 26\]', 90))
+    out['pt_built'] = bool(hs.wait_diag(ctx, seq, r'background built owner=0 group=\d+ ok=true reason=\S+ kinds=\[24, 25, 26\]', 120))
+    if not out['pt_built']:
+        _mark(t0, out, 'precondition')
+        raise RuntimeError('a2-pt precondition: no PT group built at Ready Fighters 12 (settle %s)' % out['settle0'])
     _, out['to_pt'] = af._pick(ctx, 0, PT)
     out['settle1'] = fs._settled(ctx, hs.diag_mark(ctx), 90)
     out['window'] = [hex(k) for k in (af._window(ctx, 0) or [])]
@@ -318,6 +334,7 @@ def pt_return_verdict(kept, since_keep, back):
 DESTROY_RECORDS = re.compile(r'\[Destroy\] records owner=0 holder=(0x[0-9a-f]+) trainer_counts Some\(\((\d+), (\d+)\)\) -> '
                              r'Some\(\((\d+), (\d+)\)\)')
 FREES = r'\[GroupSwap\] (frees now|left cycle|pause frees) owner=0 group=\d+ kinds=\[%s\]'
+OBJECT_MODULE = re.compile(r'object module (held|dropped|handed to R|kept for the window)')
 
 
 def a2_aegis(ctx):
@@ -373,9 +390,13 @@ def a2_p4(ctx):
     both groups), the lane goes PT -> Pyra -> Palutena, so each native group is built in the background, leaves the cycle
     and parks; a Training pause after each step frees what parked (operator decision 23:42Z, as `hs.pause_frees`). Pass:
     every `[Destroy] records` line drops exactly one of `S+0x1968` (PT holder) or `S+0x1980` (Aegis holder), and at least
-    one of each kind came."""
+    one of each kind came.
+
+    Boot a2-99b9083f-y1 crashed here (`0x33c23f8`, the Aegis group a2-aegis kept, torn down by the first step's shrink):
+    every switch is on for it now (`window mii pt aegis strip`, no forced Reload), and the object modules the groups hold
+    are reported (`object module held` / `dropped` / `handed to R`). No crash is the first verdict (z-boot reads the console)."""
     t0, out = _begin(ctx)
-    _knob(ctx, 'off')
+    _knob(ctx, 'window mii pt aegis strip')
     seq0 = hs.diag_mark(ctx)
     _, out['to_pikachu'] = af._pick(ctx, 0, fs.PIKACHU)
     out['steps'] = []
@@ -386,8 +407,7 @@ def a2_p4(ctx):
         # Training's pause (Plus, held, Plus) frees what parked, as `hs.pause_frees` does; that helper also marks a guest
         # trace this run has none of (boot a2-99b9083f-y1: KeyError 'trace_jsonl'). Informational: the verdict is the counts.
         pause = hs.diag_mark(ctx)
-        steps.press(ctx, 'plus', 3.0)
-        steps.press(ctx, 'plus', 2.0)
+        _pause(ctx)
         step['pause_frees'] = [t[:200] for t in af._since(ctx, pause) if '] pause frees ' in t][:4]
         out['steps'].append(step)
     time.sleep(2.0)
@@ -404,6 +424,8 @@ def a2_p4(ctx):
         else:
             problems.append('holder %s: counts (%s, %s) -> (%s, %s), not one given back' % (holder, a, b, a2, b2))
     out['given_back'] = {'pt': pt, 'aegis': aegis}
+    out['object_modules'] = [t[:220] for t in af._since(ctx, seq0) if OBJECT_MODULE.search(t)][:10]
+    _knob(ctx, 'off')
     _mark(t0, out, 'done')
     if not pt or not aegis:
         problems.append('a PT and an Aegis teardown were both needed: %s (steps %s)' % (out['given_back'], out['steps']))
@@ -411,18 +433,28 @@ def a2_p4(ctx):
     return _finish(ctx, 'a2-p4', out, problems)
 
 
+def _pyra_keep(ctx, extra):
+    fx._live_set(ctx, player_roster=fs._roster(cf.P1_LANE))
+    orig = cf._diag_cycle
+    cf._diag_cycle = lambda c, words: orig(c, words + extra if words.startswith('reload') else words)
+    try:
+        return cf.cf_pyra_keep(ctx)
+    finally:
+        cf._diag_cycle = orig
+
+
 def a2_pyra_keep_a1(ctx):
     """integration-3's smoke2 crash row (head 79ba5ba9, the primary 02:20Z): cycle-fix's cf-pyra-keep with A1's window keep
     on for its forced Reload (`reload mii window`, what the A1 constant does there; the Aegis keep stays off, so the
     Pyra window is refused as it was there), on this stack (PT ON, K-strip ON, p4). P1's lane goes back to cycle-fix's
     first. The Reload out of the CPU's Pyra window runs state 2's bit-5 destroy of its holder (`0x651200-0x6512a0`)."""
-    fx._live_set(ctx, player_roster=fs._roster(cf.P1_LANE))
-    orig = cf._diag_cycle
-    cf._diag_cycle = lambda c, words: orig(c, words + ' window' if words.startswith('reload') else words)
-    try:
-        return cf.cf_pyra_keep(ctx)
-    finally:
-        cf._diag_cycle = orig
+    return _pyra_keep(ctx, ' window')
+
+
+def a2_pyra_keep_all(ctx):
+    """The same with every switch on (the primary 03:00Z): the Aegis keep too (`reload mii window pt aegis strip`), so the
+    CPU's Pyra window is kept as a group and its holder lives on past the Reload."""
+    return _pyra_keep(ctx, ' window pt aegis strip')
 
 
 def a2_aegis_probe(ctx):
