@@ -466,30 +466,7 @@ pub fn rank(values: &[u8], catalog_index: usize) -> Option<u8> {
 /// Append a catalog entry to the cycle. A selected entry keeps its rank, and
 /// choosing from All leaves exactly that one explicit member.
 pub fn select_kind(values: &mut [u8], catalog_index: usize) -> bool {
-    let Some((all, ranks)) = values.split_first_mut() else {
-        return false;
-    };
-    let Some(&current) = ranks.get(catalog_index) else {
-        return false;
-    };
-    let all_mode = *all != 0;
-    if !all_mode && current != 0 {
-        return false;
-    }
-    let count = if all_mode {
-        0
-    } else {
-        ranks.iter().filter(|rank| **rank != 0).count()
-    };
-    let Ok(next) = u8::try_from(count + 1) else {
-        return false;
-    };
-    if all_mode {
-        *all = 0;
-        ranks.fill(0);
-    }
-    ranks[catalog_index] = next;
-    true
+    crate::model::numbered_picker::give_next_number(values, catalog_index)
 }
 
 /// Remove a catalog entry and compact later ranks. The final explicit member

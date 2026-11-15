@@ -1551,7 +1551,7 @@
    "dest": "src/model/swap/roster_grid.rs",
    "crate": "tui",
    "src_sha256": "90f7eaf48933ccfb39e4696cb8dd38782dfd194630bfd031ed4bbf2442cc5d20",
-   "dest_sha256": "250492ea97fbcadc63f6630907cf4aa9a6889d25519ce9edd132577c8b34013c",
+   "dest_sha256": "e8f4035a6b860ae3a0c0bd603af679e97a1eaf87fdff5db68187562ce4a87715",
    "edits": [
     {
      "old": "pub fn css_order(kinds: &[u32], values: &[u8], excluded: Option<u32>) -> Vec<u32> {\n    GRID.iter()\n        .filter_map(|slot| match slot {\n            Slot::Fighter(kind, _) => Some(*kind),\n            Slot::Shared(group) => {\n                let default = group.forms()[0].0;\n                Some(\n                    selected_group_index(kinds, values, default)\n                        .map(|i| kinds[i])\n                        .unwrap_or(default),\n                )\n            }\n            _ => None,\n        })\n        .filter(|kind| kinds.contains(kind) && excluded.map(group_kind) != Some(group_kind(*kind)))\n        .collect()\n}",
@@ -1715,6 +1715,11 @@
       ]
      ],
      "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+    },
+    {
+     "old": "pub fn select_kind(values: &mut [u8], catalog_index: usize) -> bool {\n    let Some((all, ranks)) = values.split_first_mut() else {\n        return false;\n    };\n    let Some(&current) = ranks.get(catalog_index) else {\n        return false;\n    };\n    let all_mode = *all != 0;\n    if !all_mode && current != 0 {\n        return false;\n    }\n    let count = if all_mode {\n        0\n    } else {\n        ranks.iter().filter(|rank| **rank != 0).count()\n    };\n    let Ok(next) = u8::try_from(count + 1) else {\n        return false;\n    };\n    if all_mode {\n        *all = 0;\n        ranks.fill(0);\n    }\n    ranks[catalog_index] = next;\n    true\n}",
+     "new": "pub fn select_kind(values: &mut [u8], catalog_index: usize) -> bool {\n    crate::model::numbered_picker::give_next_number(values, catalog_index)\n}",
+     "reason": "rc.15 reuse (2026-11-15): share the identical append-number implementation with model::numbered_picker; keep the model dependency direction for by-path tests and preserve Character Cycles' separate final-member removal rule."
     }
    ]
   },
