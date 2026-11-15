@@ -31,6 +31,14 @@ practice fighters in a waiting room.
 
 The checklist has a **Colour legend** beside it. Its swatches follow the current ticks, including the change to strong/weak and hurtbox status colours when Frame data colours is ticked. Fighter and article hurtboxes share the same key.
 
+![Hitbox Visualization with Frame data colours unticked: the checklist beside thirteen labelled colour swatches](../media/rc15-colour-legend-normal.png)
+
+*Colour legend with Frame data colours Off: eight hitbox colours, grab and shared hurtbox colours, windboxes, wind areas and direction lines. Eden, 2026-11-15, rc.15 source `35268287`, diag `1660a9e4`; untested on hardware.*
+
+![Frame data colours ticked: red strong and pink weak hitboxes, purple grab boxes, and white, blue and green hurtbox swatches](../media/rc15-colour-legend-frame-data.png)
+
+*The same checklist with Frame data colours On: the legend changes as the tick changes. Eden, 2026-11-15, rc.15 source `35268287`, diag `1660a9e4`; untested on hardware.*
+
 A settings file from before this checklist keeps what it showed: On ticks Hitboxes, Grab boxes and Hurtboxes, and Off
 ticks none. Existing checklists keep their choices; Article hurtboxes starts unticked.
 
@@ -211,8 +219,8 @@ never launches harder than its own limit, so two hitboxes that both reach it lau
 hitboxes that launch the same. The launch angle
 plays no part: which direction is best depends on the situation. With no other fighter to measure against, the colours
 rank the hitboxes as they would launch a middleweight at 0%. A hitbox it cannot rank, such as a jab's single hitbox or
-several identical hitboxes, is red. Grab boxes and hurtboxes keep their colours. It needs Hitbox Visualization On. Off
-gives each hitbox its own colour, as before.
+several identical hitboxes, is red. Grab boxes and hurtboxes use the colours in the table above. It recolours only what
+is ticked. Off gives each hitbox its own colour, as before.
 
 - **Values:** On, Off
 - **Default:** Off
