@@ -8,6 +8,19 @@ use super::*;
 const NORMAL: i32 = 1;
 const ZOOM: i32 = 8;
 
+/// Where the mode takes the game's camera and reads the stage's camera range (the normal placing box): native Training and an
+/// active waiting-room practice (rc.14, 11-15: the LDN pass showed both local to the console); not in a match, not while a
+/// fighter swap owns the scene, not on a lobby flag left over from an earlier room.
+fn btt_room_uses_the_fixed_camera_and_the_normal_box() {
+    use crate::model::scene::Facts;
+    let training = Facts { native_training: true, ..Facts::default() };
+    let room = Facts { lobby_active: true, waiting_room: true, ..Facts::default() };
+    assert_eq!([own_camera(training), own_camera(room)], [true; 2], "Training and the waiting room's practice");
+    let stale = Facts { lobby_active: true, ..Facts::default() };
+    let busy = Facts { busy: true, ..room };
+    assert_eq!([own_camera(Facts::default()), own_camera(stale), own_camera(busy)], [false; 3], "outside practice");
+}
+
 fn btt_camera_switches_by_state() {
     let mut cam = Camera::IDLE;
     // Not wanted, and the game on its own camera: nothing to do, nothing held.
@@ -62,6 +75,7 @@ fn btt_camera_manager_pointer_is_checked_before_it_is_read() {
 #[test]
 fn case_table() {
     crate::test_table::run(&[
+        ("btt_room_uses_the_fixed_camera_and_the_normal_box", btt_room_uses_the_fixed_camera_and_the_normal_box as fn()),
         ("btt_camera_switches_by_state", btt_camera_switches_by_state as fn()),
         ("btt_camera_reasserts_at_a_rate_and_keeps_the_first_mode", btt_camera_reasserts_at_a_rate_and_keeps_the_first_mode as fn()),
         ("btt_camera_stands_down_without_a_manager", btt_camera_stands_down_without_a_manager as fn()),

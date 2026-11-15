@@ -745,12 +745,15 @@ fn eggs_practice_hide_request() {
     }
 }
 
-/// V2.1: a break freezes the breaker for `HITLAG` ticks in native Training only (the waiting room waits for the LDN
-/// check).
+/// V2.1: a break freezes the breaker for `HITLAG` ticks wherever the practice is live: native Training and an active
+/// waiting-room practice (rc.14, 11-15: the LDN pass showed it local to the console). Not in a match, not while a fighter
+/// swap owns the scene, and not on a lobby flag left over from an earlier room.
 fn eggs_hitlag() {
     assert_eq!(HITLAG, 6);
-    assert_eq!(hitlag(TRAINING), Some(6));
-    assert_eq!([hitlag(LOBBY), hitlag(MATCH)], [None; 2]);
+    assert_eq!([hitlag(TRAINING), hitlag(LOBBY)], [Some(6); 2], "Training and the waiting room's practice");
+    let stale = Facts { waiting_room: false, ..LOBBY };
+    let busy = Facts { busy: true, ..LOBBY };
+    assert_eq!([hitlag(MATCH), hitlag(stale), hitlag(busy)], [None; 3], "outside practice");
 }
 
 /// V2.1 row 24: a break starts one animation at the spot: the broken target grows and fades out, gone after

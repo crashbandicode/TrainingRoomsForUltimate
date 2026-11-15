@@ -157,8 +157,9 @@ pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut([f32; 2]) -> bool) 
     let place = start && PLACE.swap(false, Ordering::AcqRel);
     let owners = published::input_owners();
     let live = crate::model::scene::scene(facts).is_some();
-    // The waiting room keeps the game's own camera and the fallback box until its LDN check passes (V2.5, D8).
-    let native = live && facts.native_training;
+    // The mode's camera and the stage's range (the normal placing box) where `btt::own_camera` says; elsewhere the game's own
+    // camera and the fallback box.
+    let native = live && btt::own_camera(facts);
     let range = native.then(|| natives::camera_limit_range()).flatten();
     let stage = if live { natives::stage_id() } else { -1 };
     let (mut broken, mut mode) = (0, BTT.lock());
@@ -206,7 +207,7 @@ pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut([f32; 2]) -> bool) 
     }
     drop(mode);
     // The fixed camera while the mode is on, except under the plugin's menu, the game's pause and the waiting room's UI.
-    btt_camera::apply(phase != Phase::Off && !owners.covers_strip() && facts.native_training);
+    btt_camera::apply(phase != Phase::Off && !owners.covers_strip() && btt::own_camera(facts));
     broken
 }
 

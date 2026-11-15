@@ -683,6 +683,12 @@ impl Btt {
     }
 }
 
+/// Where the mode takes the game's camera (the fixed view) and reads the stage's camera range (the normal placing box); elsewhere
+/// the game's own camera and the fallback box. Native Training only until the waiting room's LDN check passes (V2.5, D8).
+pub const fn own_camera(facts: super::scene::Facts) -> bool {
+    facts.native_training
+}
+
 /// The camera mode that is Training's Fixed camera (`cpu::tech::CAMERA_MODE_FIXED`).
 pub const FIXED: i32 = super::cpu::tech::CAMERA_MODE_FIXED;
 /// Frames between two asks while the game keeps taking the camera back (its own Training Camera option, a reset).
