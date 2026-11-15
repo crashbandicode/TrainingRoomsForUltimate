@@ -256,7 +256,7 @@ fn legend_off_keeps_todays_tints() {
     ] {
         let mut hurt = Hurt { whole, words, reads: Vec::new() };
         let (mut out, mut len) = ([Sphere::NONE; 4], 0);
-        assert_eq!(hitbox::want_hurt(&mut hurt, &mut out, &mut len, legend), 0);
+        assert_eq!(hitbox::want_hurt(&mut hurt, &mut out, &mut len, legend, hitbox::KIND_HURT), 0);
         assert_eq!([out[0].tint, out[1].tint], want, "legend {legend} whole {whole} words {words:?}");
         assert_eq!(hurt.reads.contains(&(GROUPS + GROUP_WHOLE)), legend, "the whole word is read only while On");
     }
@@ -344,22 +344,27 @@ fn legend_checklist_items_draw_independently() {
     assert!(!shows(lines, KIND_GRAB) && !shows(lines, KIND_HURT));
     // The angles alone draw their lines without the discs; every tick has its own bit.
     assert!(draws(ANGLES) && shows(ANGLES, KIND_MARK) && !shows(ANGLES, KIND_HIT));
-    assert_eq!(bits(&[1; ITEMS]), HITBOXES | GRABS | HURTBOXES | COLOURS | ANGLES | WINDBOXES);
-    assert_eq!(ITEMS, 6, "Windboxes is the sixth item");
+    let article = bits(&[0, 0, 0, 0, 0, 0, 1]);
+    assert!(draws(article) && shows(article, hitbox::KIND_ARTICLE_HURT));
+    assert!([KIND_HIT, KIND_HURT, KIND_GRAB, KIND_MARK, KIND_WIND, KIND_AREA].iter().all(|k| !shows(article, *k)));
+    assert!(!shows(HURTBOXES, hitbox::KIND_ARTICLE_HURT));
+    assert_eq!(bits(&[1; ITEMS]), HITBOXES | GRABS | HURTBOXES | COLOURS | ANGLES | WINDBOXES | ARTICLE_HURTBOXES);
+    assert_eq!(ITEMS, 7, "Article hurtboxes appended as bit64");
 }
 
 #[test]
 fn legend_old_hitbox_vis_migrates() {
-    assert_eq!(migrate(&[1, 0]), Some([1, 1, 1, 0, 0, 0]), "On: the three boxes, as before (windboxes among the hitboxes)");
+    assert_eq!(migrate(&[1, 0]), Some([1, 1, 1, 0, 0, 0, 0]), "On: the three boxes, as before (windboxes among the hitboxes)");
     assert_eq!(migrate(&[0, 1]), Some([0; ITEMS]), "Off: nothing ticked");
     assert_eq!(migrate(&[1, 0, 0, 0, 1]), None, "a checklist stays as it is");
     // Through the settings file: an older file's On comes back as the three boxes, its Off as none, a five-item checklist (an
     // rc.14 build before Windboxes) with Windboxes unticked; the default is none.
-    for (old, want) in [("[1, 0]", [1, 1, 1, 0, 0, 0]), ("[0, 1]", [0; ITEMS]), ("[0, 1, 1, 0, 1]", [0, 1, 1, 0, 1, 0]), ("[0, 0, 0, 0, 0, 1]", [0, 0, 0, 0, 0, 1])] {
+    for (old, want) in [("[1, 0]", [1, 1, 1, 0, 0, 0, 0]), ("[0, 1]", [0; ITEMS]), ("[0, 1, 1, 0, 1]", [0, 1, 1, 0, 1, 0, 0]), ("[0, 0, 0, 0, 0, 1]", [0, 0, 0, 0, 0, 1, 0]), ("[0, 0, 0, 0, 0, 0, 1]", [0, 0, 0, 0, 0, 0, 1])] {
         let file = format!("{{\"menu\": {{\"{ROW}\": {old}}}, \"defaults_menu\": {{\"{ROW}\": {old}}}}}");
         let loaded = crate::model::settings::parse_bytes(file.as_bytes());
         assert!(!loaded.corrupt(), "{old}: {:?}", loaded.issues);
         assert_eq!((loaded.settings.menu.get(ROW), loaded.settings.defaults.get(ROW)), (Some(&want[..]), Some(&want[..])), "{old}");
+        assert_eq!(crate::model::settings::parse_bytes(loaded.settings.to_json().as_bytes()).settings.menu.get(ROW), Some(&want[..]));
     }
     assert_eq!(crate::model::settings::Snapshot::factory().get(ROW), Some(&[0u8; ITEMS][..]));
 }

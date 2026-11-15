@@ -1,5 +1,6 @@
 //! The game natives the save states call (package 3). Each is a guarded `Called` row of
-//! `model::sites_pkg3` (a `lua_bind` thunk: the module accessor first, then its arguments).
+//! `model::sites_pkg3` (a `lua_bind` thunk: the module accessor first, then its arguments); the indexed article getter
+//! belongs to `sites_hitbox` and requires that feature's grant.
 //!
 //! # Safety
 //! Every function is only valid after the `StateCore` sites passed their guards, with `accessor` the
@@ -107,6 +108,12 @@ pub unsafe fn article_is_exist(accessor: usize, article: i32) -> bool {
 /// The `Article*` of article `article`, or 0.
 pub unsafe fn article_get(accessor: usize, article: i32) -> usize {
     at::<extern "C" fn(usize, i32) -> usize>(s::STATE_ARTICLE_GET_ARTICLE_OFFSET).map_or_else(Default::default, |f| f(accessor, article))
+}
+
+/// Nullable `Article*` at the zero-based matching-kind ordinal in the current ring (13.0.5 native ABI).
+pub unsafe fn article_get_from_no(accessor: usize, article: i32, ordinal: i32) -> usize {
+    at::<extern "C" fn(usize, i32, i32) -> usize>(crate::model::sites_hitbox::HITBOX_ARTICLE_FROM_NO_OFFSET)
+        .map_or_else(Default::default, |f| f(accessor, article, ordinal))
 }
 
 pub unsafe fn article_object_id(article: usize) -> u32 {

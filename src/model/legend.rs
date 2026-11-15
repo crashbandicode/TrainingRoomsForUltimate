@@ -11,13 +11,14 @@ use super::hitbox_orbs::Orb;
 /// none ticked draws nothing. The items in menu order, as bits (bit i: item i): hitboxes, grab boxes, hurtboxes, the frame data
 /// colours (applied to whatever is drawn), the launch angles and the windboxes (the sixth, the operator ~21:28Z).
 pub const ROW: &str = "hitbox_vis";
-pub const ITEMS: usize = 6;
+pub const ITEMS: usize = 7;
 pub const HITBOXES: u8 = 1;
 pub const GRABS: u8 = 2;
 pub const HURTBOXES: u8 = 4;
 pub const COLOURS: u8 = 8;
 pub const ANGLES: u8 = 16;
 pub const WINDBOXES: u8 = 32;
+pub const ARTICLE_HURTBOXES: u8 = 64;
 
 /// The ticked items of the row as bits.
 pub fn shown(row: &[u8]) -> u8 {
@@ -26,14 +27,14 @@ pub fn shown(row: &[u8]) -> u8 {
 
 /// Whether the visualizer draws anything: a box, the windboxes or the angles (the colours alone recolour nothing).
 pub fn draws(bits: u8) -> bool {
-    bits & (HITBOXES | GRABS | HURTBOXES | ANGLES | WINDBOXES) != 0
+    bits & (HITBOXES | GRABS | HURTBOXES | ANGLES | WINDBOXES | ARTICLE_HURTBOXES) != 0
 }
 
 /// Whether an orb of `kind` (`hitbox::KIND_*`, `KIND_MARK`, `KIND_WIND`, `KIND_AREA`) shows. A windbox is a hitbox (the operator
 /// ~21:27Z): Hitboxes shows it as Windboxes does, and it is one orb either way, so it is never drawn twice. A wind area is not a
 /// hitbox: Windboxes alone shows it.
 pub fn shows(bits: u8, kind: u32) -> bool {
-    bits & [0, HITBOXES, HURTBOXES, GRABS, ANGLES, HITBOXES | WINDBOXES, WINDBOXES].get(kind as usize).copied().unwrap_or(0) != 0
+    bits & [0, HITBOXES, HURTBOXES, GRABS, ANGLES, HITBOXES | WINDBOXES, WINDBOXES, ARTICLE_HURTBOXES].get(kind as usize).copied().unwrap_or(0) != 0
 }
 
 /// The windboxes' orb kind (after `KIND_MARK`): a hitbox `is_windbox` names while the windboxes are asked for (*Windboxes* or
@@ -57,7 +58,7 @@ pub fn is_windbox(no_reaction: u8, knockback: [i32; 3]) -> bool {
 
 /// An older two-option row (`[On, Off]`): On becomes the three boxes, Off nothing ticked. `None` for a row already a checklist.
 pub fn migrate(row: &[u8]) -> Option<[u8; ITEMS]> {
-    (row.len() == 2).then(|| if row[0] != 0 { [1, 1, 1, 0, 0, 0] } else { [0; ITEMS] })
+    (row.len() == 2).then(|| if row[0] != 0 { [1, 1, 1, 0, 0, 0, 0] } else { [0; ITEMS] })
 }
 /// `AttackData`'s launch angle in degrees (i32, beside `hitbox::layout`).
 pub const ANGLE: usize = 0x28;

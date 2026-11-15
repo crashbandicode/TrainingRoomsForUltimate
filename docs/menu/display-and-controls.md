@@ -20,23 +20,24 @@ either way.
 
 ### Hitbox Visualization
 
-Draws the fighters' boxes in colour. It is a checklist: tick what you want to see, and each item draws on its own, so
+Draws the fighters' boxes and, optionally, hittable objects' hurtboxes in colour. It is a checklist: tick what you want to see, and each item draws on its own, so
 any mix works, such as hurtboxes alone, or hitboxes with their launch angles. It works in Training, and on the two
 practice fighters in a waiting room.
 
-- **Values:** Hitboxes, Grab boxes, Hurtboxes, Frame data colours, Launch angles, Windboxes.
+- **Values:** Hitboxes, Grab boxes, Hurtboxes, Frame data colours, Launch angles, Windboxes, Article hurtboxes.
 - **Default:** none ticked: nothing is drawn.
 - **How:** A opens the checklist; A ticks, ZL ticks all or none, B goes back. The row shows how many are ticked, such
-  as "3 of 6".
+  as "3 of 7".
 
 A settings file from before this checklist keeps what it showed: On ticks Hitboxes, Grab boxes and Hurtboxes, and Off
-ticks none.
+ticks none. Existing checklists keep their choices; Article hurtboxes starts unticked.
 
 | Box | Colour | With Frame data colours ticked | What it is |
 | --- | --- | --- | --- |
 | Hitbox | Each hitbox of a move gets its own colour; the first is red | Red when strong, pink when weak | The attack |
 | Grab box | Always magenta, a colour no hitbox uses | Purple | The grab |
 | Hurtbox | Yellow | White; blue while nothing can hit it; green while hits do no damage | Where a fighter can be hit |
+| Article hurtbox | Yellow | The same status colours as a fighter's hurtbox | Where an article or item can be hit |
 | Windbox | Its hitbox colour; deep blue with Windboxes ticked | Deep blue | A hitbox that pushes or pulls without hitstun |
 
 **Frame data colours** recolours whatever is ticked in the colours of Ultimate Frame Data. A hitbox is strong when it
@@ -178,7 +179,11 @@ frame its box appears, as Samus's tether does, shows its box for that frame only
 
 **Projectiles and thrown items.** A projectile, or a thrown item such as Link's bomb, Peach's turnip or Diddy Kong's
 banana, has its hitboxes drawn while its attack lasts. Up to four at a time; a fifth replaces the oldest. Olimar's Pikmin
-show their grab box.
+show their grab box. **Article hurtboxes** also draws the enabled hurtboxes the game gives articles and items, including
+objects without an active attack. It works in Training; waiting-room objects whose owner is unknown stay hidden.
+An object with no enabled hurtbox group draws none. These use the same discs, pills and status colours as fighters.
+At most eight endpoints per object and 24 together are admitted, always as complete shapes. They take spare object
+slots and draw after the other boxes, so attacking objects and fighters keep priority.
 
 ![At 1/4 speed, a red disc rides on Ridley's fireball, Link's arrow and Link's thrown bomb while each is in flight](../media/rc13-projectile-hitboxes.gif)
 

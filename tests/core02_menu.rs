@@ -115,11 +115,11 @@ fn the_spot_rows_sit_next_to_their_features() {
 fn legend_hitbox_visualization_is_one_checklist() {
     let row = ROWS.iter().find(|r| r.id == "hitbox_vis").expect("the row");
     let Control::MultiSelect(items) = row.control else { panic!("a checklist") };
-    assert_eq!(items, ["Hitboxes", "Grab boxes", "Hurtboxes", "Frame data colours", "Launch angles", "Windboxes"]);
+    assert_eq!(items, ["Hitboxes", "Grab boxes", "Hurtboxes", "Frame data colours", "Launch angles", "Windboxes", "Article hurtboxes"]);
     assert_eq!((row.title, row.help.lines().count()), ("Hitbox Visualization", 2));
     assert!(ROWS.iter().all(|r| r.id != "frame_data_colours" && r.id != "launch_angles"));
     let def = model::factory::DEFS.iter().find(|d| d.id == "hitbox_vis").expect("a factory row");
-    assert_eq!(def.default, [0u8; 6], "nothing ticked");
+    assert_eq!(def.default, [0u8; 7], "nothing ticked");
 }
 fn layout_row_counts_match_the_rc_freeze() {
     let counts = |pilot| {

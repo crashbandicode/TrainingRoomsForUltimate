@@ -388,14 +388,15 @@ fn core06_off_restores() {
 
 #[test]
 fn core06_site_guards() {
-    // Seven hooks (rc.14 wind-articles added the four AREA_WIND_2ND* commands), fourteen called natives (the last one Eggs-ercise's hitlag,
+    // Seven hooks (rc.14 wind-articles added the four AREA_WIND_2ND* commands), fifteen called natives (including indexed article lookup;
+    // another is Eggs-ercise's hitlag,
     // `StopModule::set_hit_stop_frame`; one is the attack module's damage multiplier, rc.14 spots-2; one the knockback a defender received,
     // spots-3) and thirteen relied (two the damage record, spots-3)
     // windows (the Lua stack reads, HB1's three HitModule windows, for the own orbs (decision HB-OWN-ORBS) the bone transform,
     // the projection and its screen size words and, for Eggs-ercise's spawn range, the camera limit accessor).
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 14);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 15);
     assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 14);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
@@ -454,6 +455,7 @@ fn core06_site_guards() {
         (sites_hitbox::HITBOX_RATE_LAST_OFFSET, "effect_set_rate_last"),
         (sites_hitbox::HITBOX_SLEEP_EFFECT_OFFSET, "motion_animcmd_set_sleep_effect"),
         (sites_hitbox::HITBOX_ACCESSOR_OFFSET, "sv_battle_object_module_accessor"),
+        (sites_hitbox::HITBOX_ARTICLE_FROM_NO_OFFSET, "article_get_from_no"),
         (sites_hitbox::HITBOX_ATTACK_STACK_OFFSET, "hitbox_attack_stack"),
         (sites_hitbox::HITBOX_CATCH_STACK_OFFSET, "hitbox_catch_stack"),
         (sites_hitbox::HITBOX_HURT_MODULE_OFFSET, "hurtbox_module"),
@@ -493,6 +495,7 @@ fn core06_rows_match_the_owned_elf() {
         ("effect_set_rate_last", "_ZN3app8lua_bind32EffectModule__set_rate_last_implEPNS_26BattleObjectModuleAccessorEf"),
         ("motion_animcmd_set_sleep_effect", "_ZN3app8lua_bind42MotionAnimcmdModule__set_sleep_effect_implEPNS_26BattleObjectModuleAccessorEb"),
         ("sv_battle_object_module_accessor", "_ZN3app9sv_system29battle_object_module_accessorEP9lua_State"),
+        ("article_get_from_no", "_ZN3app8lua_bind39ArticleModule__get_article_from_no_implEPNS_26BattleObjectModuleAccessorEii"),
         ("stop_set_hit_stop_frame", "_ZN3app8lua_bind35StopModule__set_hit_stop_frame_implEPNS_26BattleObjectModuleAccessorEib"),
         ("camera_limit_range", "_ZN3app6camera22get_camera_limit_rangeEv"),
         ("hitbox_area_wind", "_ZN3app10sv_animcmd13AREA_WIND_2NDEP9lua_State"),
@@ -1006,6 +1009,7 @@ impl hitbox::HurtboxReader for HurtSpy {
     }
 
     fn read_i32(&mut self, at: usize) -> i32 {
+        if [model::legend::GROUP_WHOLE, model::legend::GROUP_GLOBAL].contains(&(at.wrapping_sub(self.groups))) { return 0; }
         assert_eq!(at, self.module + hb_layout::HIT_PART_TOTAL, "the part count is read once, at +0x78");
         self.total
     }
@@ -1075,6 +1079,47 @@ fn core06_hurtbox_reader_enumerates_the_enabled_parts() {
     assert_eq!(len, 1, "a coinciding centre pair is one sphere");
     assert_eq!(out[0].pos, [1.0, 2.0, 3.0]);
     assert_eq!(out[0].key, hitbox::sphere_key(hitbox::KIND_HURT, 0, 0));
+}
+
+#[test]
+fn article_hurtboxes_share_the_reader_and_admit_whole_shapes_within_both_caps() {
+    let capsule = part(0, [0.0; 3], [0.0, 2.0, 0.0], 2.0, 7);
+    let point = part(0, [0.0; 3], [0.0; 3], 2.0, 7);
+    let mut out = [hitbox::Sphere::NONE; 128];
+    let (mut len, mut budget) = (0, hitbox::ARTICLE_HURT_BATCH);
+    assert_eq!(hitbox::want_article_hurt(&mut hurt_spy(vec![capsule; 5], 0, 5), &mut out, &mut len, false, &mut budget), 2);
+    assert_eq!((len, budget), (8, 16));
+    assert!(out[..len].iter().all(|s| s.key >> 24 == hitbox::KIND_ARTICLE_HURT && s.tint == hitbox::HURTBOX_TINT));
+    let mut records = vec![point; 7];
+    records.extend([capsule, point]);
+    (len, budget) = (0, hitbox::ARTICLE_HURT_BATCH);
+    assert_eq!(hitbox::want_article_hurt(&mut hurt_spy(records, 0, 9), &mut out, &mut len, false, &mut budget), 2);
+    assert_eq!((len, out[7].key), (8, hitbox::sphere_key(hitbox::KIND_ARTICLE_HURT, 8, 0)), "skip both ends; a later point still fits");
+    let mut dropped = 0;
+    budget = hitbox::ARTICLE_HURT_BATCH;
+    for want in [8, 8, 8, 0] {
+        len = 0;
+        dropped += hitbox::want_article_hurt(&mut hurt_spy(vec![capsule; 4], 0, 4), &mut out, &mut len, false, &mut budget);
+        assert_eq!(len, want);
+    }
+    assert_eq!((budget, dropped), (0, 8));
+    (len, budget) = (0, hitbox::ARTICLE_HURT_BATCH);
+    assert_eq!(hitbox::want_article_hurt(&mut hurt_spy(vec![], 0, 0), &mut out, &mut len, false, &mut budget), 0);
+    assert_eq!((len, budget), (0, hitbox::ARTICLE_HURT_BATCH), "empty groups fabricate nothing");
+    let mut record = point;
+    record[..4].copy_from_slice(&model::legend::INVINCIBLE.to_le_bytes());
+    hitbox::want_article_hurt(&mut hurt_spy(vec![record], 0, 1), &mut out, &mut len, true, &mut budget);
+    assert_eq!((len, out[0].tint), (1, model::legend::hurt_tint(model::legend::INVINCIBLE)));
+}
+
+#[test]
+fn article_discovery_is_off_without_queries_and_visits_every_matching_ordinal() {
+    assert_eq!(hitbox::article_instances(false, |_, _| panic!("Off called a native")).count(), 0);
+    let queries = std::cell::RefCell::new(Vec::new());
+    let seen: Vec<_> = hitbox::article_instances(true, |kind, n| { queries.borrow_mut().push((kind, n)); match (kind, n) { (0, 0..=2) => 10 + n as usize, (1, 0) => 20, _ => 0 } }).collect();
+    let queries = queries.into_inner();
+    assert_eq!(seen, [10, 11, 12, 20]);
+    assert_eq!(queries[..5], [(0, 0), (0, 1), (0, 2), (0, 3), (1, 0)]);
 }
 
 #[test]

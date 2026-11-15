@@ -458,6 +458,9 @@ pub const FIGHTER_SETS: usize = 8;
 pub const KIND_HIT: u32 = 1;
 pub const KIND_HURT: u32 = 2;
 pub const KIND_GRAB: u32 = 3;
+pub const KIND_ARTICLE_HURT: u32 = 7;
+pub const ARTICLE_HURT_LIMIT: usize = 8;
+pub const ARTICLE_HURT_BATCH: usize = 24;
 
 /// The identity of one sphere: what it belongs to (`kind`), which slot, part or grab id (`index`), which sphere of its capsule.
 pub const fn sphere_key(kind: u32, index: usize, sphere: usize) -> u32 {
@@ -481,6 +484,10 @@ impl Sphere {
 /// Append a shape's spheres, its centre and its second centre (`SHAPE_SPHERES`), to `out[..*len]` (as many as fit).
 /// Returns how many were left out for lack of room.
 pub fn push_shape(out: &mut [Sphere], len: &mut usize, kind: u32, index: usize, shape: &Shape, tint: [f32; 3]) -> u32 {
+    let need = 1 + usize::from(shape.b.is_some());
+    if kind == KIND_ARTICLE_HURT && out.len().saturating_sub(*len) < need {
+        return need as u32;
+    }
     let mut left_out = 0;
     for (i, pos) in core::iter::once(shape.a).chain(shape.b).enumerate() {
         if *len >= out.len() {
@@ -589,7 +596,7 @@ pub fn legend_colour(kind: u32, spot: Option<super::spots::Spot>, status: i32, u
         (_, legend::KIND_WIND, _) => legend::WIND,
         (true, KIND_HIT, Some(Spot::Sour | Spot::Late)) => WEAK_TINT,
         (true, KIND_HIT, _) => STRONG_TINT,
-        (true, KIND_HURT, _) => legend::hurt_tint(status),
+        (true, KIND_HURT | KIND_ARTICLE_HURT, _) => legend::hurt_tint(status),
         (true, KIND_GRAB, _) => legend::GRAB,
         _ => usual,
     }
@@ -634,15 +641,30 @@ pub trait HurtboxReader {
 /// rule as a hitbox. The tables are read in place (layout `layout::HIT_*`); a table that does not look like one gives nothing.
 /// Appends to `out[..*len]`; returns how many were left out for lack of room.
 pub fn want_hurtboxes(reader: &mut (impl HurtboxReader + ?Sized), out: &mut [Sphere], len: &mut usize) -> u32 {
-    want_hurt(reader, out, len, false)
+    want_hurt(reader, out, len, false, KIND_HURT)
 }
 
-/// `want_hurtboxes`, each part tinted by `legend_colour` with its status (`legend`: *Frame data colours* On).
-pub fn want_hurt(reader: &mut (impl HurtboxReader + ?Sized), out: &mut [Sphere], len: &mut usize, legend: bool) -> u32 {
+/// The same reader and status colours for articles; at most eight endpoints, admitting only whole shapes.
+pub fn want_article_hurt(reader: &mut (impl HurtboxReader + ?Sized), out: &mut [Sphere], len: &mut usize, legend: bool, budget: &mut usize) -> u32 {
+    let (start, cap) = (*len, out.len().min(*len + ARTICLE_HURT_LIMIT.min(*budget)));
+    let cut = want_hurt(reader, &mut out[..cap], len, legend, KIND_ARTICLE_HURT);
+    *budget -= *len - start;
+    cut
+}
+
+/// Matching instance ordinals end at null; active_num has a different predicate. Off makes no native query.
+pub fn article_instances(enabled: bool, get: impl Fn(i32, i32) -> usize + Copy) -> impl Iterator<Item = usize> {
+    (0..if enabled { super::state::ids::ARTICLE_COUNT } else { 0 }).flat_map(move |kind| {
+        (0..).map_while(move |ordinal| match get(kind, ordinal) { 0 => None, article => Some(article) })
+    })
+}
+
+/// Enabled parts with their status colours and the requested sphere kind.
+pub fn want_hurt(reader: &mut (impl HurtboxReader + ?Sized), out: &mut [Sphere], len: &mut usize, legend: bool, kind: u32) -> u32 {
     let mut left_out = 0;
     hurt_parts(reader, legend, |index, shape, status| {
-        let tint = legend_colour(KIND_HURT, None, status, HURTBOX_TINT, legend);
-        left_out += push_shape(out, len, KIND_HURT, index, shape, tint) as usize
+        let tint = legend_colour(kind, None, status, HURTBOX_TINT, legend);
+        left_out += push_shape(out, len, kind, index, shape, tint) as usize
     });
     left_out as u32
 }
@@ -839,14 +861,14 @@ pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphe
     let mut len = 0;
     if facts.ids.in_grab(facts.status) {
         // The grabber stays hittable through a grab: its hurt spheres stay, its hit spheres go (upstream's grab rule).
-        let left_out = hurt.map_or(0, |hurt| want_hurt(hurt, wants, &mut len, set.frame_data));
+        let left_out = hurt.map_or(0, |hurt| want_hurt(hurt, wants, &mut len, set.frame_data, KIND_HURT));
         let mut counts = set.reconcile(&wants[..len], true, fx);
         counts.dropped += left_out;
         return (counts, len);
     }
     let mut left_out = want_hits(reader, wants, &mut len, set.identifies_wind());
     if let Some(hurt) = hurt {
-        left_out += want_hurt(hurt, wants, &mut len, set.frame_data);
+        left_out += want_hurt(hurt, wants, &mut len, set.frame_data, KIND_HURT);
     }
     set.tint(reader, &mut wants[..len], facts.status);
     let mut counts = set.reconcile(&wants[..len], true, fx);

@@ -51,6 +51,8 @@ pub const HITBOX_RGB_LAST_OFFSET: usize = 0x201_7c80;
 pub const HITBOX_RATE_LAST_OFFSET: usize = 0x201_7ce0;
 pub const HITBOX_SLEEP_EFFECT_OFFSET: usize = 0x206_9140;
 pub const HITBOX_ACCESSOR_OFFSET: usize = 0x227_daf0;
+/// `ArticleModule::get_article_from_no(accessor, kind, ordinal)`: nullable `Article*`, not an accessor.
+pub const HITBOX_ARTICLE_FROM_NO_OFFSET: usize = 0x209_2e10;
 #[cfg(test)]
 pub const HITBOX_ATTACK_STACK_OFFSET: usize = 0x228_4cd0;
 #[cfg(test)]
@@ -86,4 +88,4 @@ pub const AREA_WIND_RAD_ARG9_OFFSET: usize = 0x22a_8f30;
 pub const HOOK_ROWS: [&str; 7] =
     ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound", "hitbox_area_wind", "hitbox_area_wind_arg10", "hitbox_area_wind_rad", "hitbox_area_wind_rad_arg9"];
 
-pub static SITES: [Site; 35] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));
+pub static SITES: [Site; 36] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));

@@ -227,8 +227,8 @@ fn an_articles_hitboxes_are_own_orbs_while_its_attack_lasts() {
     board.publish(0xf000, std::iter::once(orb(1.0))); // Player 1's own pass
     let mut articles = orbs::Articles::new();
     let mut set = HandleSet::new();
-    articles.track(id, key, &mut board);
-    articles.track(id, key, &mut board);
+    articles.track(id, key, &mut board, true).unwrap().0;
+    articles.track(id, key, &mut board, true).unwrap().0;
     assert_eq!(articles.tracked().iter().filter(|t| t.0 != 0).count(), 1, "one article, however many ATTACKs");
     let on_bone = |s: &Sphere| (s.joint == 0x3_1ed9_1fca).then_some([40.0 + s.pos[0], 12.0, 0.0]);
     assert!(orbs::article_pass(&mut board, &mut set, key, 7, &mut Shot(true), on_bone, orbs::Extras::NONE));
@@ -242,18 +242,18 @@ fn an_articles_hitboxes_are_own_orbs_while_its_attack_lasts() {
     assert_eq!(board.live().count(), 1);
     // A thrown item (a bomb, a turnip) sets its hitbox without `ATTACK`: the pass tracks an active item while a slot is live.
     assert_eq!((hitbox::live_slot(&mut Shot(true)), hitbox::live_slot(&mut Shot(false))), (Some(0), None));
-    articles.track(id, key, &mut board);
+    articles.track(id, key, &mut board, true).unwrap().0;
     orbs::article_pass(&mut board, &mut set, key, 7, &mut Shot(true), on_bone, orbs::Extras::NONE);
     articles.forget(id, &mut board);
     assert_eq!((board.live().count(), articles.tracked().iter().filter(|t| t.0 != 0).count()), (1, 0), "gone article");
     // Fighters and articles share the board's slots; a fifth article replaces the oldest, whose orbs go.
     assert_eq!(orbs::ORB_FIGHTERS + orbs::ARTICLES, FIGHTER_SETS);
     for k in 1..=orbs::ARTICLES {
-        articles.track(k as u32, k << 4, &mut board);
+        articles.track(k as u32, k << 4, &mut board, true).unwrap().0;
         orbs::article_pass(&mut board, &mut HandleSet::new(), k << 4, 7, &mut Shot(true), on_bone, orbs::Extras::NONE);
     }
     assert_eq!(board.live().count(), 1 + orbs::ARTICLES);
-    articles.track(99, 99 << 4, &mut board);
+    articles.track(99, 99 << 4, &mut board, true).unwrap().0;
     assert_eq!(board.live().count(), orbs::ARTICLES, "the oldest article's orb went");
     let mut ids = articles.tracked().map(|t| t.0);
     ids.sort();
@@ -274,7 +274,7 @@ fn an_articles_grab_box_is_an_own_orb_while_its_status_lasts() {
     let tint = hitbox::GRAB_TINT;
     let pikmin = Sphere { key: hitbox::sphere_key(hitbox::KIND_GRAB, 0, 0), joint: 0x3_1ed9_1fca, pos: [0.0; 3], scale: hitbox::sphere_scale(3.0), tint };
     let on_bone = |s: &Sphere| (s.joint == 0x3_1ed9_1fca).then_some([25.0, 4.0, 0.0]);
-    let set = articles.track(id, key, &mut board);
+    let set = articles.track(id, key, &mut board, true).unwrap().0;
     assert!(set.push_grab(pikmin, Some(40)));
     for pass in 0..3 {
         assert!(orbs::article_pass(&mut board, set, key, 40, &mut Shot(false), on_bone, orbs::Extras::NONE), "pass {pass}: no hitbox, still tracked");
@@ -298,9 +298,9 @@ fn an_articles_grab_box_is_an_own_orb_while_its_status_lasts() {
     kinds.sort();
     assert_eq!(kinds, [hitbox::KIND_HIT, hitbox::KIND_GRAB]);
     // A forgotten article drops what its set held.
-    assert!(articles.track(id, key, &mut board).push_grab(pikmin, Some(40)));
+    assert!(articles.track(id, key, &mut board, true).unwrap().0.push_grab(pikmin, Some(40)));
     articles.forget(id, &mut board);
-    assert!(articles.track(id, key, &mut board).is_empty(), "a forgotten article's waiting grab box went with it");
+    assert!(articles.track(id, key, &mut board, true).unwrap().0.is_empty(), "a forgotten article's waiting grab box went with it");
 }
 
 /// rc.14 wind-articles: an article's wind area (Zelda's Triforce of Wisdom pulls, Hero's Kaboom pushes; their `AREA_WIND_2ND*` runs
@@ -313,21 +313,57 @@ fn an_articles_wind_area_is_drawn_and_keeps_it_tracked() {
     let mut articles = orbs::Articles::new();
     let on_bone = |s: &Sphere| (s.joint == 0x3_1ed9_1fca).then_some([40.0 + s.pos[0], 12.0, 0.0]);
     let pull = [WindArea { shape: AreaShape::Circle { centre: [10.0, 20.0], radius: 30.0 }, angle: Some(-90.0) }];
-    let set = articles.track(id, key, &mut board);
+    let set = articles.track(id, key, &mut board, true).unwrap().0;
     for pass in 0..3 {
-        assert!(orbs::article_pass(&mut board, set, key, 9, &mut Shot(false), on_bone, orbs::Extras { lr: None, areas: &pull }), "pass {pass}: no hitbox, a wind area: kept");
+        assert!(orbs::article_pass(&mut board, set, key, 9, &mut Shot(false), on_bone, orbs::Extras { areas: &pull, ..orbs::Extras::NONE }), "pass {pass}: no hitbox, a wind area: kept");
         let drawn: Vec<Orb> = board.live().copied().collect();
         assert_eq!(drawn.len(), 3, "pass {pass}: the disc, the line's shadow and the line");
         assert!(drawn.iter().all(|o| o.kind() == legend::KIND_AREA));
         assert_eq!((drawn[0].centre, drawn[0].radius), ([10.0, 20.0, 0.0], 30.0));
     }
     // Its hitbox beside its area: the sphere first, then the area's three orbs.
-    assert!(orbs::article_pass(&mut board, set, key, 9, &mut Shot(true), on_bone, orbs::Extras { lr: None, areas: &pull }));
+    assert!(orbs::article_pass(&mut board, set, key, 9, &mut Shot(true), on_bone, orbs::Extras { areas: &pull, ..orbs::Extras::NONE }));
     let kinds: Vec<u32> = board.live().map(|o| o.kind()).collect();
     assert_eq!(kinds, [hitbox::KIND_HIT, legend::KIND_AREA, legend::KIND_AREA, legend::KIND_AREA]);
     // The area ended and nothing is held: forgotten, its orbs gone.
     assert!(!orbs::article_pass(&mut board, set, key, 9, &mut Shot(false), on_bone, orbs::Extras::NONE));
     assert_eq!(board.live().count(), 0);
+}
+
+fn article_hurtboxes_take_free_slots_and_draw_after_every_other_kind() {
+    let (mut board, mut articles) = (Board::new(), orbs::Articles::new());
+    for id in 1..=4 { articles.track(id, id as usize * 16, &mut board, true).unwrap().0; }
+    let before = articles.tracked();
+    assert!(!articles.track(99, 0x990, &mut board, false).is_some());
+    assert_eq!(articles.tracked(), before, "hurt-only discovery never evicts an attacking object");
+    articles.forget(3, &mut board);
+    assert!(articles.track(99, 0x990, &mut board, false).is_some());
+    assert!(!*articles.get(99, 0x990).unwrap().1);
+    articles.track(100, 0x1000, &mut board, true).unwrap().0;
+    assert!(!articles.tracked().contains(&(99, 0x990)), "an attack evicts the passive object before an older attacker");
+    assert!(articles.tracked().contains(&(1, 16)));
+    articles.forget(100, &mut board);
+    assert!(articles.track(99, 0x990, &mut board, false).is_some());
+    articles.track(99, 0x990, &mut board, true).unwrap().0;
+    assert!(*articles.get(99, 0x990).unwrap().1, "ATTACK promotes an existing passive object");
+    // One article pill published first: its two endpoints still pair, and every other kind draws before it.
+    let hurts = [0, 1].map(|end| sphere(hitbox::sphere_key(hitbox::KIND_ARTICLE_HURT, 0, end), end as f32 * 2.0, 2.0));
+    let mut set = HandleSet::new();
+    let extras = orbs::Extras { hurt: &hurts, ..orbs::Extras::NONE };
+    let place = |s: &Sphere| Some(s.pos);
+    assert!(orbs::article_pass(&mut board, &mut set, 0x990, 0, &mut Shot(false), place, extras));
+    board.publish(0xf000, [hitbox::KIND_HURT, model::legend::KIND_MARK, hitbox::KIND_HIT].into_iter().map(|k| orb_of_kind(0.0, k)));
+    let kinds: Vec<_> = board.in_draw_order().map(|o| o.kind()).collect();
+    assert_eq!(kinds, [hitbox::KIND_HIT, hitbox::KIND_HURT, model::legend::KIND_MARK, hitbox::KIND_ARTICLE_HURT]);
+    let pill = board.in_draw_order().last().unwrap();
+    assert_ne!(pill.centre, pill.tail);
+    let mut panes = orbs::PaneUse { caps: model::panes::CAPS - 6, bands: 0 };
+    let kept: Vec<_> = board.in_draw_order().filter(|o| panes.take(o.centre != o.tail).is_some()).map(|o| o.kind()).collect();
+    assert_eq!(kept, kinds[..3], "the article pill is cut first and whole");
+    assert!(!orbs::article_pass(&mut board, &mut set, 0x990, 0, &mut Shot(false), place, orbs::Extras::NONE), "unticking removes its hurt-only lifetime");
+    assert!(board.live().all(|o| o.kind() != hitbox::KIND_ARTICLE_HURT));
+    articles.forget_all(&mut board);
+    assert_eq!(articles.tracked(), [(0, 0); orbs::ARTICLES]);
 }
 
 fn screen_half_mirrors_the_games_size_words() {
@@ -387,6 +423,7 @@ fn case_table() {
         ("an_articles_hitboxes_are_own_orbs_while_its_attack_lasts", an_articles_hitboxes_are_own_orbs_while_its_attack_lasts as fn()),
         ("an_articles_grab_box_is_an_own_orb_while_its_status_lasts", an_articles_grab_box_is_an_own_orb_while_its_status_lasts as fn()),
         ("an_articles_wind_area_is_drawn_and_keeps_it_tracked", an_articles_wind_area_is_drawn_and_keeps_it_tracked as fn()),
+        ("article_hurtboxes_take_free_slots_and_draw_after_every_other_kind", article_hurtboxes_take_free_slots_and_draw_after_every_other_kind as fn()),
         ("screen_half_mirrors_the_games_size_words", screen_half_mirrors_the_games_size_words as fn()),
         ("projected_orbs_map_onto_the_layout_canvas", projected_orbs_map_onto_the_layout_canvas as fn()),
     ]);

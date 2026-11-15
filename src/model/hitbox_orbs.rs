@@ -13,7 +13,7 @@
 //! fighter's orbs on the `Board`; the layout tick projects them with the game's own `world_to_screen` and plans each
 //! orb's pill (`plan_pill`). Pure and host-tested (`tests/core06_orbs.rs`).
 
-use super::hitbox::{want_hits, AttackReader, Effects, HandleSet, Sphere, FIGHTER_SETS, KIND_HIT, KIND_HURT, MAX_HELD, SCALE, SLOTS};
+use super::hitbox::{want_hits, AttackReader, Effects, HandleSet, Sphere, FIGHTER_SETS, KIND_ARTICLE_HURT, KIND_HIT, KIND_HURT, MAX_HELD, SCALE, SLOTS};
 use super::legend::{self, KIND_MARK, KIND_WIND};
 
 /// One fighter's orbs on the board: its spheres' and, with *Launch angles* On, up to two marks per hitbox, and with *Windboxes* its wind
@@ -167,7 +167,7 @@ impl Board {
     /// marks, each in slot order. When the panes run out the cut is deterministic and takes the marks, then hurtboxes first (review HB-2).
     pub fn in_draw_order(&self) -> impl Iterator<Item = &Orb> + '_ {
         let of = move |kind: fn(u32) -> bool| self.live().filter(move |o| kind(o.kind()));
-        of(|k| k != KIND_HURT && k != KIND_MARK).chain(of(|k| k == KIND_HURT)).chain(of(|k| k == KIND_MARK))
+        of(|k| k != KIND_HURT && k != KIND_MARK && k != KIND_ARTICLE_HURT).chain(of(|k| k == KIND_HURT)).chain(of(|k| k == KIND_MARK)).chain(of(|k| k == KIND_ARTICLE_HURT))
     }
 }
 
@@ -207,23 +207,27 @@ pub struct Articles {
     ages: [u32; ARTICLES],
     clock: u32,
     sets: [HandleSet; ARTICLES],
+    attacking: [bool; ARTICLES],
 }
 
 impl Articles {
     pub const fn new() -> Articles {
-        Articles { ids: [(0, 0); ARTICLES], ages: [0; ARTICLES], clock: 0, sets: [HandleSet::new(); ARTICLES] }
+        Articles { ids: [(0, 0); ARTICLES], ages: [0; ARTICLES], clock: 0, sets: [HandleSet::new(); ARTICLES], attacking: [false; ARTICLES] }
     }
 
-    /// Track article `id` (accessor `key`); a new one takes a free slot or the oldest, whose orbs and spheres go. Its set.
-    pub fn track(&mut self, id: u32, key: usize, board: &mut Board) -> &mut HandleSet {
-        let i = (0..ARTICLES).min_by_key(|&i| (self.ids[i] != (id, key), self.ids[i].0 != 0, self.ages[i])).unwrap_or(0);
+    /// Track an object and its priority. Hurt-only discovery takes free slots; attacks evict passive objects before the oldest attack.
+    pub fn track(&mut self, id: u32, key: usize, board: &mut Board, attacking: bool) -> Option<(&mut HandleSet, &mut bool)> {
+        let i = (0..ARTICLES).min_by_key(|&i| (self.ids[i] != (id, key), self.ids[i].0 != 0, self.attacking[i], self.ages[i])).unwrap_or(0);
+        if !attacking && self.ids[i] != (id, key) && self.ids[i].0 != 0 { return None; }
         if self.ids[i] != (id, key) {
             self.clock = self.clock.wrapping_add(1);
             board.clear(self.ids[i].1);
             (self.ids[i], self.ages[i]) = ((id, key), self.clock);
             self.sets[i].forget();
+            self.attacking[i] = false;
         }
-        &mut self.sets[i]
+        self.attacking[i] |= attacking;
+        Some((&mut self.sets[i], &mut self.attacking[i]))
     }
 
     pub fn tracked(&self) -> [(u32, usize); ARTICLES] {
@@ -250,10 +254,11 @@ impl Articles {
 pub struct Extras<'a> {
     pub lr: Option<f32>,
     pub areas: &'a [legend::WindArea],
+    pub hurt: &'a [Sphere],
 }
 
 impl Extras<'_> {
-    pub const NONE: Extras<'static> = Extras { lr: None, areas: &[] };
+    pub const NONE: Extras<'static> = Extras { lr: None, areas: &[], hurt: &[] };
 }
 
 /// One article's pass in `status`: its live attack slots' spheres and its grab spheres (held as a fighter's), placed on its
@@ -261,11 +266,14 @@ impl Extras<'_> {
 /// AreaModule while *Windboxes* is ticked). False when it holds none and has no area: its attack, grab and wind ended, its orbs
 /// went, and it is forgotten (`legend::keeps_article`).
 pub fn article_pass(board: &mut Board, set: &mut HandleSet, key: usize, status: i32, attacks: &mut impl AttackReader, place: impl FnMut(&Sphere) -> Option<[f32; 3]>, extras: Extras<'_>) -> bool {
-    let Extras { lr, areas } = extras;
+    let Extras { lr, areas, hurt } = extras;
     let mut wants = [Sphere::NONE; MAX_HELD];
     let mut len = 0;
     want_hits(attacks, &mut wants, &mut len, set.identifies_wind());
     set.tint(attacks, &mut wants[..len], status);
+    let n = hurt.len().min(wants.len() - len);
+    wants[len..len + n].copy_from_slice(&hurt[..n]);
+    len += n;
     set.reconcile(&wants[..len], true, &mut OrbSink { status });
     let mut orbs = [Orb::NONE; BOARD_ORBS];
     let mut n = place_orbs(set, place, lr, |slot| slot_angle(attacks, slot), &mut orbs);

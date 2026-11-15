@@ -735,10 +735,13 @@ static ARTICLES: Mutex<orbs::Articles> = Mutex::new(orbs::Articles::new());
 /// Each tracked article's live attack slots as its own orbs, placed on its bones, and with *Windboxes* ticked its wind areas; an
 /// article that is gone (its id inactive or now another object's), or whose attack, grab and wind ended, is forgotten.
 /// `sv_battle_object` as `cpu_pilot` uses it.
-unsafe fn draw_articles() {
+unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader: impl FnMut(usize) -> Option<R>) -> u32 {
     let mut articles = ARTICLES.lock();
     let mut board = BOARD.lock();
     let wind = shown(legend::WINDBOXES);
+    let hurt = shown(legend::ARTICLE_HURTBOXES) && matches!(scene::current(), Some(Scene::Training));
+    let (mut dropped, mut budget) = (0, hitbox::ARTICLE_HURT_BATCH);
+    let mut hurts = [Sphere::NONE; hitbox::ARTICLE_HURT_LIMIT];
     let mut areas = [legend::WindArea::NONE; legend::area::MAX_AREAS];
     // A thrown item (a bomb, a turnip) runs no `ATTACK`: an active item with a live attack slot, or with Windboxes ticked an
     // enabled wind area, is tracked as an article (`legend::tracks_item`). The list holds this frame's active items; a tracked one
@@ -748,9 +751,9 @@ unsafe fn draw_articles() {
         0 => 0,
         m => state_natives::item_active_count(m).min(16),
     };
-    let items = (0..count).map(|i| state_natives::item_active(manager, i));
-    for item in items.filter(|&item| item != 0) {
-        let id = state_natives::item_object_id(item);
+    let items = (0..count).map(|i| state_natives::item_active(manager, i)).filter(|&item| item != 0).map(|item| state_natives::item_object_id(item));
+    let instances = hitbox::article_instances(hurt, |kind, ordinal| state_natives::article_get_from_no(owner, kind, ordinal)).map(|article| state_natives::article_object_id(article));
+    for id in items.chain(instances).filter(|&id| state_natives::object_is_active(id)) {
         let key = smash::app::sv_battle_object::module_accessor(id) as usize;
         if key == 0 {
             continue;
@@ -760,13 +763,22 @@ unsafe fn draw_articles() {
         if legend::tracks_item(live_slot, found) {
             #[cfg(feature = "diag")]
             stats::item(&articles, id, key);
-            articles.track(id, key, &mut board);
+            let _ = articles.track(id, key, &mut board, true);
+        }
+        if hurt && !articles.tracked().contains(&(id, key)) {
+            let (mut len, mut cap) = (0, hurts.len());
+            if let Some(mut reader) = hurt_reader(key) {
+                let cut = hitbox::want_article_hurt(&mut reader, &mut hurts, &mut len, false, &mut cap);
+                #[cfg(feature = "diag")]
+                stats::article_hurt(id, key, len, cut);
+                if len != 0 && articles.track(id, key, &mut board, false).is_none() { dropped += cut + len as u32; }
+            }
         }
     }
     for (id, key) in articles.tracked().into_iter().filter(|t| t.0 != 0) {
         let live = smash::app::sv_battle_object::is_active(id) && smash::app::sv_battle_object::module_accessor(id) as usize == key;
         // `key` is the live article's accessor (checked above); the natives check their own grants. Tracked: its set.
-        let set = articles.track(id, key, &mut board);
+        let Some((set, attacking)) = articles.track(id, key, &mut board, false) else { continue };
         set.frame_data = shown(legend::COLOURS);
         set.wind = wind;
         let place = |s: &Sphere| natives::joint_position(key, s.joint, &s.pos);
@@ -775,13 +787,23 @@ unsafe fn draw_articles() {
             let found = if wind { object_wind_areas(key, &mut areas) } else { 0 };
             #[cfg(feature = "diag")]
             stats::object(id, key, &areas[..found]);
-            let extras = orbs::Extras { lr: shown(legend::ANGLES).then(|| natives::lr(key)), areas: &areas[..found] };
-            orbs::article_pass(&mut board, set, key, natives::status_kind(key), &mut GameAttacks(key), place, extras)
+            let mut len = 0;
+            if let Some(mut reader) = hurt.then(|| hurt_reader(key)).flatten() {
+                let cut = hitbox::want_article_hurt(&mut reader, &mut hurts, &mut len, set.frame_data, &mut budget);
+                dropped += cut;
+                #[cfg(feature = "diag")]
+                stats::article_hurt(id, key, len, cut);
+            }
+            let extras = orbs::Extras { lr: shown(legend::ANGLES).then(|| natives::lr(key)), areas: &areas[..found], hurt: &hurts[..len] };
+            let kept = orbs::article_pass(&mut board, set, key, natives::status_kind(key), &mut GameAttacks(key), place, extras);
+            *attacking = found != 0 || set.spheres().any(|s| s.key >> 24 != hitbox::KIND_ARTICLE_HURT);
+            kept
         };
         if !kept {
             articles.forget(id, &mut board);
         }
     }
+    dropped
 }
 
 /// *Frame data colours* (spots-3): what this fighter's hitboxes launch, by which they rank: its own damage multiplier (the smash charge) and
@@ -890,7 +912,7 @@ pub unsafe fn frame(fighter: usize) {
     drop(store);
     // Off: the pass that clears the fighters' orbs forgets the articles too.
     if enabled {
-        draw_articles();
+        counts.dropped += draw_articles(accessor, |key| enabled.then(|| hitbox::GameHurt { accessor: key, load: mem_load }));
     } else {
         ARTICLES.lock().forget_all(&mut BOARD.lock());
     }
@@ -967,7 +989,7 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     } else {
         let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
         articles = ARTICLES.lock();
-        articles.track(id, accessor, &mut BOARD.lock())
+        articles.track(id, accessor, &mut BOARD.lock(), true).unwrap().0
     };
     let made = wants[..len].iter().filter(|w| grab && set.push_grab(**w, status)).count() as u32;
     #[cfg(feature = "diag")]
@@ -1009,7 +1031,7 @@ unsafe fn wind_command(lua: usize) {
     }
     let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
     let mut articles = ARTICLES.lock();
-    articles.track(id, accessor, &mut BOARD.lock());
+    articles.track(id, accessor, &mut BOARD.lock(), true).unwrap().0;
 }
 
 /// `sv_animcmd::AREA_WIND_2ND` (a box): the plugin part first, then the game's own command.
@@ -1143,6 +1165,7 @@ mod stats {
     static MAX_TICKS: AtomicU64 = AtomicU64::new(0);
     static START: AtomicU64 = AtomicU64::new(0);
     static LAST: AtomicU64 = AtomicU64::new(u64::MAX);
+    static LAST_ARTICLE_HURT: [AtomicU64; 16] = [const { AtomicU64::new(u64::MAX) }; 16];
     const REPORT_EVERY: u32 = 600;
 
     fn now() -> u64 {
@@ -1152,6 +1175,19 @@ mod stats {
 
     pub fn frame_begin() {
         START.store(now(), Ordering::Relaxed);
+    }
+
+    /// Native group evidence, including live objects with no enabled part; no additional read in release.
+    pub fn article_hurt(id: u32, key: usize, drawn: usize, cut: u32) {
+        use hitbox::HurtboxReader;
+        let sig = (u64::from(id) << 32) | ((drawn as u64) << 16) | u64::from(cut.min(0xffff));
+        if LAST_ARTICLE_HURT[(id >> 16) as usize % 16].swap(sig, Ordering::Relaxed) == sig { return; }
+        let mut reader = hitbox::GameHurt { accessor: key, load: super::mem_load };
+        let module = reader.module();
+        let groups = if module == 0 { 0 } else { reader.read_usize(module + hitbox::layout::HIT_GROUPS) };
+        let count = if groups == 0 { 0 } else { reader.read_i16(groups + hitbox::layout::HIT_GROUP_COUNT) };
+        let enabled = hitbox::hurt_parts(&mut reader, false, |_, _, _| {});
+        diagnostic(format_args!("[Hitbox] article hurt id={id:#x} accessor={key:#x} group=0 parts={count} enabled={enabled} endpoints={drawn} cut={cut}"));
     }
 
     pub fn wanted(hits: u32, hurts: u32) {
