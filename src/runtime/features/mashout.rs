@@ -6,7 +6,7 @@ use crate::model::cpu::{hash::lua_bind_hash, role::LOBBY_CPU_ENTRY};
 use crate::model::mashout::{
     admission::{Admission, UNAVAILABLE_NOTICE},
     moves::{Config, OrdinaryGrab},
-    native::{Clock, Seed},
+    native::Clock,
 };
 use crate::model::{notify::DEFAULT_COLOR, scene::Scene, settings::Snapshot};
 use crate::runtime::{

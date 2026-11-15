@@ -151,9 +151,9 @@ impl Controls {
     }
 
     fn at(mut index: usize) -> Self {
-        let mask = index % 2 != 0;
+        let mask = index & 1 != 0;
         index /= 2;
-        let held = index % 2 != 0;
+        let held = index & 1 != 0;
         index /= 2;
         let other = index % 4;
         index /= 4;

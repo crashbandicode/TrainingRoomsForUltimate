@@ -9,6 +9,7 @@ pub(super) struct Sample {
     pub record: Record,
     pub input: Input,
     pub current: u32,
+    #[cfg(feature = "diag")]
     pub previous: u32,
     pub alternate: u32,
     pub history: u8,
@@ -96,6 +97,7 @@ pub(super) unsafe fn sample(accessor: usize, threshold: f32) -> Option<Sample> {
         record,
         input,
         current: read::<u32>(control, 0x9c)?,
+        #[cfg(feature = "diag")]
         previous: read::<u32>(control, 0xa0)?,
         alternate: read::<u32>(control, 0xa4)?,
         history: read::<u8>(control, 0x102)?,

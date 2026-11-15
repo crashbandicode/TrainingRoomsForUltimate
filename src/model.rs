@@ -133,6 +133,7 @@ pub mod eggs;
 pub mod btt;
 #[path = "model/sites_hitbox.rs"]
 pub mod sites_hitbox;
+#[path = "model/sites_mashout.rs"]
 pub mod sites_mashout;
 #[path = "model/sites_u4.rs"]
 pub mod sites_u4;
