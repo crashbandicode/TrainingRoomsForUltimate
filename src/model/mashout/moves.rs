@@ -1,7 +1,11 @@
 //! Ordinary Grab selection. Fighter identity comes from Training Rooms' serialized roster table;
 //! native initialized clatter values and move-entry success are observed by the runtime.
 
-use crate::model::{settings::Snapshot, swap::trio::CHOICES};
+use crate::model::settings::Snapshot;
+
+#[path = "../swap/choices.rs"]
+mod choices;
+use choices::CHOICES;
 
 pub const ROW: &str = "mashout";
 pub const STATE_ROW: &str = "mashout_state";
