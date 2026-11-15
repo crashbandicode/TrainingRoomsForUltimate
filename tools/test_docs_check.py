@@ -61,7 +61,14 @@ CLEAN = {
     "docs/media/pic.gif": "GIF",
 }
 
-NO_ALLOWANCE = d.Config(historical=[("docs/RELEASE-NOTES-rc*.md", "a past release")], orphan_ok=[], claim_ok=[], must_name=d.MUST_NAME)
+def cfg(**changes):
+    """A config with no allowance and no notice pages: the real lists name pages the small fixtures do not have."""
+    base = dict(historical=[("docs/RELEASE-NOTES-rc*.md", "a past release")], orphan_ok=[], claim_ok=[], must_name=d.MUST_NAME,
+                notice_ok=[], notice_pages=[], notice_columns={})
+    return d.Config(**dict(base, **changes))
+
+
+NO_ALLOWANCE = cfg()
 
 
 def build(files):
@@ -201,7 +208,7 @@ class Orphans(unittest.TestCase):
         self.assertEqual(rules(**files), ["orphan"])
 
     def test_a_listed_orphan_passes_and_a_stale_entry_fails(self):
-        listed = d.Config(historical=NO_ALLOWANCE.historical, orphan_ok=[("docs/old/*", "records")], claim_ok=[], must_name=d.MUST_NAME)
+        listed = cfg(orphan_ok=[("docs/old/*", "records")])
         self.assertEqual(problems({"docs/old/x.md": "# X\n"}, config=listed), [])
         self.assertEqual([r for r, _, _ in problems({}, config=listed)], ["allowlist-stale"])
 
@@ -264,7 +271,7 @@ class Versions(unittest.TestCase):
 
     def test_a_listed_historical_page_may_name_its_own_release(self):
         self.assertEqual(problems({}), [])  # RELEASE-NOTES-rc9.md says "The newest build is rc.9." and is listed
-        unlisted = d.Config(historical=[], orphan_ok=[], claim_ok=[], must_name=d.MUST_NAME)
+        unlisted = cfg(historical=[])
         got = problems({}, config=unlisted)
         self.assertIn("version-stale", [r for r, _, _ in got])
 
@@ -276,9 +283,90 @@ class Versions(unittest.TestCase):
     def test_an_allowed_claim_passes_and_a_stale_allowance_fails(self):
         text = CLEAN["docs/TECHNICAL.md"] + "\nThe newest notes written in this folder are rc.9's.\n"
         self.assertEqual(rules(**{"docs/TECHNICAL.md": text}), ["version-stale"])
-        allowed = d.Config(historical=NO_ALLOWANCE.historical, orphan_ok=[], claim_ok=[("docs/TECHNICAL.md", "newest notes written in this folder", "about notes, not the build")], must_name=d.MUST_NAME)
+        allowed = cfg(claim_ok=[("docs/TECHNICAL.md", "newest notes written in this folder", "about notes, not the build")])
         self.assertEqual(problems({}, config=allowed, **{"docs/TECHNICAL.md": text}), [])
         self.assertEqual([r for r, _, _ in problems({}, config=allowed)], ["allowlist-stale"])
+
+
+SRC = '''
+// "Gone in a comment"
+/* "Gone in a block /* "nested" */ comment" */
+pub const A: &str = "Wait for the swap to finish";
+pub const B: &str = r#"A raw "quoted" text"#;
+pub fn f(save: bool, name: &str) {
+    let _quote = '"';
+    let _lifetime: &'static str = "Real text after a char literal";
+    let _ = format!("Loading {}/{}", 1, 2);
+    let _ = if save { "A setup is placed: save again after it" } else { "A setup is placed: load again after it" };
+    let _ = ["Same as ", name, ", nothing new saved"];
+    let _ = ("Practice Stage", "Stage requested");
+    let _ = "Escaped \\"quote\\" and a\\
+              continued line";
+}
+'''
+NOTICE_PAGE = "docs/guide/troubleshooting.md"
+STRICT = cfg(notice_pages=[NOTICE_PAGE])
+
+
+def notice_problems(page, text, **config):
+    files = dict(CLEAN, **{"src/lib.rs": SRC, "docs/README.md": CLEAN["docs/README.md"] + f"- [p]({page[len('docs/'):]})\n", page: text})
+    return [(r, p, t) for r, p, t in problems(files, config=config.pop("config", STRICT)) if r in ("notice-text", "allowlist-stale")]
+
+
+class NoticeTexts(unittest.TestCase):
+    def test_a_quoted_text_that_is_in_the_code_passes(self):
+        self.assertEqual(notice_problems(NOTICE_PAGE, '# T\n\n| "Wait for the swap to finish" | why |\n'), [])
+
+    def test_a_reworded_text_fails_on_the_notice_page(self):
+        got = notice_problems(NOTICE_PAGE, '# T\n\n| "Wait for the swap to end" | why |\n')
+        self.assertEqual([r for r, _, _ in got], ["notice-text"])
+        self.assertIn("Wait for the swap to end", got[0][2])
+
+    def test_the_holes_of_a_format_string_fit_a_shown_number(self):
+        self.assertEqual(notice_problems(NOTICE_PAGE, '# T\n\n"Loading 6/10", then "Loading 7/10".\n'), [])
+        self.assertEqual([r for r, _, _ in notice_problems(NOTICE_PAGE, '# T\n\n"Loading 6 of 10".\n')], ["notice-text"])
+
+    def test_two_texts_in_one_cell_and_either_word_in_brackets(self):
+        text = '# T\n\n| "A setup is placed: save again after it" (or "load again after it") |\n| "A setup is placed: save (load) again after it" |\n'
+        self.assertEqual(notice_problems(NOTICE_PAGE, text), [])
+        self.assertEqual([r for r, _, _ in notice_problems(NOTICE_PAGE, '# T\n\n"A setup is placed: save (stop) again after it".\n')], ["notice-text"])
+
+    def test_text_around_a_name_or_a_dot_is_matched_piece_by_piece(self):
+        self.assertEqual(notice_problems(NOTICE_PAGE, '# T\n\n"Same as ‹saved name›, nothing new saved" and "Practice Stage · Stage requested".\n'), [])
+        self.assertEqual([r for r, _, _ in notice_problems(NOTICE_PAGE, '# T\n\n"Same as ‹name›, something else entirely".\n')], ["notice-text"])
+
+    def test_a_text_only_in_a_comment_does_not_count_and_a_char_literal_does_not_shift_the_pairing(self):
+        self.assertEqual([r for r, _, _ in notice_problems(NOTICE_PAGE, '# T\n\n"Gone in a comment".\n')], ["notice-text"])
+        self.assertEqual(notice_problems(NOTICE_PAGE, '# T\n\n"Real text after a char literal".\n'), [])
+
+    def test_other_player_pages_are_checked_only_in_sentences_about_notices(self):
+        about = '# P\n\nThe notice reads "Not in the code at all".\n'
+        self.assertEqual([r for r, _, _ in notice_problems("docs/guide/p.md", about)], ["notice-text"])
+        for plain in ('# P\n\nThe row is called "Not in the code at all".\n', '# P\n\nThe help line says "Wait for the swap to finish".\n'):
+            self.assertEqual(notice_problems("docs/guide/p.md", plain), [], plain)
+
+    def test_only_the_message_column_of_restrictions_is_checked(self):
+        row = '# R\n\n| ID | Message | Approved |\n| --- | --- | --- |\n| `a` | "Wait for the swap to finish" | operator ("yes to both") |\n| `b` | "Not a text" | ok |\n'
+        cfg_r = cfg(notice_columns={"docs/RESTRICTIONS.md": 2})
+        got = notice_problems("docs/RESTRICTIONS.md", row, config=cfg_r)
+        self.assertEqual([(r, t.split('"')[1]) for r, _, t in got], [("notice-text", "Not a text")])
+
+    def test_a_listed_text_passes_and_a_stale_entry_fails(self):
+        page = '# T\n\nThe notice reads "Built from pieces at run time".\n'
+        allowed = cfg(notice_pages=[NOTICE_PAGE], notice_ok=[(NOTICE_PAGE, "Built from pieces at run time", "joined at run time")])
+        self.assertEqual(notice_problems(NOTICE_PAGE, page, config=allowed), [])
+        self.assertEqual([r for r, _, _ in notice_problems(NOTICE_PAGE, "# T\n\nNothing quoted.\n", config=allowed)], ["allowlist-stale"])
+
+    def test_a_historical_page_may_quote_a_notice_that_is_gone(self):
+        text = '# Notes\n\nThe notice read "Long gone".\n'
+        self.assertEqual(notice_problems("docs/RELEASE-NOTES-rc5.md", text), [])
+
+    def test_a_tree_without_rust_source_reports_every_quoted_text(self):
+        files = dict(CLEAN, **{NOTICE_PAGE: '# T\n\n"Wait for the swap to finish".\n', "docs/README.md": CLEAN["docs/README.md"] + "- [t](guide/troubleshooting.md)\n"})
+        self.assertEqual([r for r, _, _ in problems(files, config=STRICT) if r == "notice-text"], ["notice-text"])
+
+    def test_the_rust_tokenizer_keeps_real_strings_only(self):
+        self.assertEqual(d.rust_strings('let a = "x"; // "no"\nlet b = \'"\'; let c: &\'a str = r##"y "# z"##; /* "no" */ let e = "t\\u{e9}\\n";'), ["x", 'y "# z', "té\n"])
 
 
 class Reports(unittest.TestCase):

@@ -142,6 +142,12 @@ no clock and no git are used, so every host gives the same answer. The rules are
   release fails. Pages that describe their own build (release notes, decisions, provenance, measurements, the media and
   feature ledgers) are skipped, by the list `HISTORICAL` with a reason each; a sentence that has to stay is listed in
   `CLAIM_OK` with its reason. A list entry that matches nothing fails.
+- **Notice texts.** A text in double quotes that has to be a notice, a refusal or a greyed-row reason must be a string
+  literal of `src/` (or `crates/`), so a reworded notice breaks the page that quotes it. On `guide/troubleshooting.md` every
+  quoted text counts; on any other player page, a quoted text in a sentence that says notice, refus…, message, help line,
+  reason or greyed; in `RESTRICTIONS.md`, the Message column. A text fits a literal when it is part of it, or fits its
+  `{}` holes ("Loading 6/10" fits "Loading {}/{}"). A notice built from pieces at run time goes in `NOTICE_OK` with its
+  reason. The check shows the wording exists in the code, not that the notice appears in the situation the page describes.
 
 ## Release checklist
 

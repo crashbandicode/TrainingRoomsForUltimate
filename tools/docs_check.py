@@ -22,7 +22,16 @@ Rules (a problem's rule name is the first word of its line):
                    to docs/CURRENT-RELEASE.md.
   version-stale    a sentence that says "newest", "latest", "currently", "current release/build/version", "this
                    release/build/version" or "up to date" and names another release (rc.N or rcN, also 0.2.0-rc.N).
-  allowlist-stale  an entry of the lists below that matches no file, or whose sentence is gone.
+  notice-text      a "double-quoted" text that must be a notice, refusal or greyed-row reason of the plugin, but is not a
+                   string literal in src/ (or crates/): on `docs/guide/troubleshooting.md` every quoted text; on any other
+                   player page a quoted text in a sentence that says notice, refus*, message, help line, reason or
+                   greyed; in docs/RESTRICTIONS.md the quoted texts of the Message column. A text matches a literal when
+                   it is part of it, or fits its `{}` holes ("Loading 6/10" fits "Loading {}/{}"); text around a ‹name›,
+                   a {hole} or an ellipsis is matched piece by piece, "Header · Body" per part, and "save (load) again"
+                   as "save again" and "load again". Comments and char literals of the Rust source do not count. This
+                   proves the wording exists in the code, not that the notice shows in the situation the page describes.
+                   Texts built from pieces at run time go in `NOTICE_OK` with the reason.
+  allowlist-stale  an entry of the lists below that matches no file, or whose sentence or text is gone.
 
 Anchors follow the slug rules of the forge's Markdown renderer (Forgejo). They are NOT GitHub's: GitHub drops punctuation
 (`L+R+A Reset` is `lra-reset` there), the forge turns it into a hyphen (`l-r-a-reset`). The rule, read from the forge's own
@@ -97,6 +106,23 @@ CLAIM_OK = [
     ),
 ]
 
+# Quoted texts that are real notices but are built from pieces at run time, so no one literal holds them (`notice-text`).
+# (path, the quoted text, reason). An entry whose text is gone from the page fails as `allowlist-stale`.
+NOTICE_OK = [
+    ("docs/TECHNICAL.md", "Same as 格斗, nothing new saved", "the notice with a Mii's name filled in: src/model/notify.rs joins 'Same as ', the name and ', nothing new saved'"),
+    ("docs/guide/cpu-behaviour.md", "Selected: Up x3, In x1", "a help line built per chip: src/model/ui/screens.rs writes 'Selected: ' then '<direction> x<weight>' for each"),
+    ("docs/menu/cpu.md", "Selected: Up x2, Out x1", "the same help line, built per chip in src/model/ui/screens.rs"),
+    ("docs/menu/fighters-and-stages.md", "1/3 Layout 2 · Battlefield: 6", "the Saved layouts notice, built from the position, the layout's name and its target count"),
+    ("docs/menu/recording.md", "Offset X 0.00 Y 0.00 Keep recorded speed", "the first line of a longer help text: src/model/macro_ui/macro_panel.rs writes 'Offset X {} Y {} {}' and more after it"),
+    ("docs/RESTRICTIONS.md", "Combos work in Training", "a retired restriction: the row says the string is gone from src/"),
+]
+
+# Pages whose every "double-quoted" text must be a notice text; and pages where only one table column is checked
+# (page -> column number, 1 is the first): RESTRICTIONS' Message column, not the operator's words in Approved.
+NOTICE_PAGES = ["docs/guide/troubleshooting.md"]
+NOTICE_COLUMNS = {"docs/RESTRICTIONS.md": 2}
+NOTICE_WORDS = re.compile(r"notice|refus|message|help line|reason|greyed", re.I)
+
 # Pages and sections that must name the current release: (path, heading text or None for the whole page, or "top" for
 # the part before the first heading after the title).
 MUST_NAME = [
@@ -128,6 +154,9 @@ class Config(NamedTuple):
     orphan_ok: list = ORPHAN_OK
     claim_ok: list = CLAIM_OK
     must_name: list = MUST_NAME
+    notice_ok: list = NOTICE_OK
+    notice_pages: list = NOTICE_PAGES
+    notice_columns: dict = NOTICE_COLUMNS
 
 
 class Link(NamedTuple):
@@ -597,6 +626,149 @@ def check_versions(tree, config, problems, used):
                 problems.append(Problem("version-name", rel, 1, f"the README's top does not link to {CURRENT_PAGE}"))
 
 
+# --- notice texts -----------------------------------------------------------------------------------------------------
+
+_TOKEN = re.compile(r'//[^\n]*|/\*|r#*"|"|\'')
+_STRING_END = re.compile(r'(?:[^"\\]|\\.)*"', re.S)
+_CHAR = re.compile(r"'(?:\\[^']+|[^\\'])'")
+_ESCAPES = {"n": "\n", "t": "\t", "\\": "\\", '"': '"', "'": "'", "0": "\0", "r": "\r"}
+
+
+def _unescape(body):
+    body = re.sub(r"\\\n\s*", "", body)
+    body = re.sub(r"\\u\{([0-9a-fA-F_]+)\}", lambda m: chr(int(m.group(1).replace("_", ""), 16)), body)
+    body = re.sub(r"\\x([0-9a-fA-F]{2})", lambda m: chr(int(m.group(1), 16)), body)
+    return re.sub(r"\\(.)", lambda m: _ESCAPES.get(m.group(1), m.group(1)), body, flags=re.S)
+
+
+def rust_strings(src):
+    """The text of every string literal in Rust source (plain, byte and raw); comments, char literals and lifetimes are
+    skipped, so a quote inside them cannot throw the pairing off."""
+    out, pos, size = [], 0, len(src)
+    while True:
+        token = _TOKEN.search(src, pos)
+        if token is None:
+            return out
+        start, text = token.start(), token.group(0)
+        pos = token.end()
+        if text.startswith("//"):
+            continue
+        if text == "/*":
+            depth = 1
+            while depth and pos < size:
+                opening, closing = src.find("/*", pos), src.find("*/", pos)
+                if closing < 0:
+                    pos = size
+                elif 0 <= opening < closing:
+                    depth, pos = depth + 1, opening + 2
+                else:
+                    depth, pos = depth - 1, closing + 2
+        elif text.startswith("r"):
+            if start and (src[start - 1].isalnum() or src[start - 1] == "_"):
+                continue  # the tail of a name, not a raw string
+            end = src.find('"' + "#" * text.count("#"), pos)
+            if end < 0:
+                return out
+            out.append(src[pos:end])
+            pos = end + 1 + text.count("#")
+        elif text == '"':
+            end = _STRING_END.match(src, pos)
+            if end is None:
+                return out
+            out.append(_unescape(src[pos : end.end() - 1]))
+            pos = end.end()
+        else:
+            char = _CHAR.match(src, start)
+            pos = char.end() if char else start + 1
+
+
+def _flat(text):
+    return re.sub(r"\s+", " ", text).strip()
+
+
+HOLE = re.compile(r"\{[^{}]*\}")
+PIECES = re.compile(r"‹[^›]*›|\{[^{}]*\}|…| · ")  # a ‹name›, a {hole}, an ellipsis, or the "Header · Body" dot
+EITHER = re.compile(r"\b([a-z]+) \(([a-z]+)\)(?= [a-z]|$)")  # "save (load) again", "to save (load)"
+_corpora = {}
+
+
+class Corpus(NamedTuple):
+    text: str  # every literal, one per line, whitespace collapsed
+    patterns: list  # a literal with `{}` holes as a regex: "Loading {}/{}" fits "Loading 6/10"
+
+
+def corpus_of(root):
+    """The string literals of src/ and crates/ under `root`."""
+    if root not in _corpora:
+        found = set()
+        for base in ("src", "crates"):
+            for folder, dirs, files in os.walk(os.path.join(root, base)):
+                dirs[:] = sorted(x for x in dirs if x != "target" and not x.startswith("."))
+                for name in sorted(files):
+                    if name.endswith(".rs"):
+                        with open(os.path.join(folder, name), encoding="utf-8") as handle:
+                            found.update(s for s in map(_flat, rust_strings(handle.read())) if len(s) >= 3)
+        patterns = set()
+        for literal in found:
+            for variant in {literal, literal.rstrip(".")}:
+                if HOLE.search(variant) and len(HOLE.sub("", variant).strip()) >= 5:
+                    patterns.add("(?s)" + ".*?".join(re.escape(part) for part in HOLE.split(variant)))
+        _corpora[root] = Corpus("\n".join(sorted(found)), [re.compile(p) for p in sorted(patterns)])
+    return _corpora[root]
+
+
+def _plain(text, corpus):
+    return text in corpus.text or any(p.fullmatch(text) for p in corpus.patterns)
+
+
+def text_exists(quote, corpus):
+    """Whether a quoted text is in the code: see the `notice-text` rule at the top of this file."""
+    quote = _flat(quote)
+    for variant in ([quote] if not EITHER.search(quote) else [EITHER.sub(r"\1", quote), EITHER.sub(r"\2", quote)]):
+        if _plain(variant, corpus):
+            continue
+        parts = [part.strip(" .,:;") for part in PIECES.split(variant)]
+        big = [part for part in parts if len(part) >= 6]
+        if len(parts) < 2 or not big or not all(_plain(part, corpus) for part in big):
+            return False
+    return True
+
+
+QUOTE = re.compile(r'(?<![\w)])"([^"\n]{2,160}?)"(?![\w(])')
+
+
+def notice_quotes(rel, text, config):
+    """(line, text) of each double-quoted text on a page that has to be a notice (the rule's scope is at the top)."""
+    column = config.notice_columns.get(rel)
+    for line, block in blocks(text if column is not None else mask_inline_code(text)):
+        if column is not None:
+            cells = block.split("|")
+            scope = [cells[column]] if block.lstrip().startswith("|") and len(cells) > column + 1 else []
+        else:
+            scope = [s for s in sentences(block) if rel in config.notice_pages or NOTICE_WORDS.search(s)]
+        for sentence in scope:
+            plain = re.sub(r"https?://\S+", "", re.sub(r"!?\[([^\]]*)\]\([^)]*\)", r"\1", sentence))
+            for match in QUOTE.finditer(plain):
+                yield line, match.group(1)
+
+
+def check_notices(tree, config, problems, used):
+    wanted = []
+    for rel in tree.files:
+        if matches(rel, config.historical):
+            continue
+        wanted += [(rel, line, quote) for line, quote in notice_quotes(rel, tree.text(rel), config)]
+    if not wanted:
+        return
+    corpus = corpus_of(tree.root)
+    for rel, line, quote in wanted:
+        excused = [(p, q) for p, q, _ in config.notice_ok if p == rel and q == _flat(quote)]
+        if excused:
+            used.add(("notice_ok", *excused[0]))
+        elif not text_exists(quote, corpus):
+            problems.append(Problem("notice-text", rel, line, f'"{quote}" is not a text in src/ (a reworded notice, or one built from pieces: NOTICE_OK)'))
+
+
 def check_allowlists(tree, config, used, problems):
     for name, entries in (("historical", config.historical), ("orphan_ok", config.orphan_ok)):
         for pattern, _ in entries:
@@ -605,6 +777,9 @@ def check_allowlists(tree, config, used, problems):
     for path, snippet, _ in config.claim_ok:
         if path not in tree.files or snippet not in tree.text(path):
             problems.append(Problem("allowlist-stale", "tools/docs_check.py", 1, f"claim_ok entry for {path}: the text `{snippet[:50]}` is gone"))
+    for path, quote, _ in config.notice_ok:
+        if path not in tree.files or f'"{quote}"' not in _flat(tree.text(path)):
+            problems.append(Problem("allowlist-stale", "tools/docs_check.py", 1, f"notice_ok entry for {path}: the text `{quote[:50]}` is gone"))
 
 
 def check(root, config=None, used=None):
@@ -616,6 +791,7 @@ def check(root, config=None, used=None):
     check_links(tree, problems, graph)
     check_orphans(tree, config, problems, graph, used)
     check_versions(tree, config, problems, used)
+    check_notices(tree, config, problems, used)
     check_allowlists(tree, config, used, problems)
     return sorted(set(problems), key=lambda p: (p.path, p.line, p.rule, p.text))
 
