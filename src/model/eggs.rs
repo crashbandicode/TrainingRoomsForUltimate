@@ -50,6 +50,13 @@ pub enum Put {
     /// The flight came to rest: standing.
     Land,
 }
+
+/// STUB (fail-first): the tag is never kept.
+pub fn keeps_cursor(moved: Option<([f32; 2], Put)>, body_hidden: bool) -> bool {
+    let _ = (moved, body_hidden);
+    false
+}
+
 /// `Aerials`: the fighter's status is `FIGHTER_STATUS_KIND_ATTACK_AIR` (13.0.5; the pilot's move observer's value).
 pub const ATTACK_AIR: i32 = 0x36;
 /// `1 minute`, in clock ticks (D4: Player 1's game frames, so pause, menus and Game speed stretch it alike).

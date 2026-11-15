@@ -537,6 +537,46 @@ fn eggs_cpu_pass_follows_the_flight() {
     }
 }
 
+/// rc.14 cpu-tag-target: the game turns the CPU's cursor flag (its player tag) off for the CPU the target places in the air
+/// (Eden's cursor probe: false through the flight, true again at the landing). While TR owns the placement (every tick the
+/// pass returns a position: the flight and the hold at rest) and the body is not hidden, it keeps the flag on. Where the game
+/// owns the CPU (the hit, its hitlag, a run that ended: no position) the tag stays the game's business, and a hidden body's
+/// off-write wins.
+fn eggs_cpu_target_keeps_its_cursor() {
+    let mut run = started_with(FREE, ANY, NORMAL, CPU, 7, RESET_CENTRE);
+    assert!(!keeps_cursor(run.cpu_pass(0.0, false), false), "nothing placed before the first target");
+    pass(&mut run, &[], false);
+    let mut puts = vec![];
+    for tick in 0..130 {
+        let moved = run.cpu_pass(0.0, false);
+        let put = moved.expect("held every tick").1;
+        assert!(keeps_cursor(moved, false), "tick {tick} ({put:?}): the flight and the hold keep the tag on");
+        assert!(!keeps_cursor(moved, true), "tick {tick}: a hidden body's off-write wins");
+        if puts.last() != Some(&put) {
+            puts.push(put);
+        }
+        pass(&mut run, &[], false);
+    }
+    assert_eq!(puts, [Put::Fresh(true), Put::Hold, Put::Land, Put::Hold], "the flight, its landing and the rest were all covered");
+    // A hit: the game owns the CPU in the hit's pass and in its hitlag: no write. After the hitlag it is placed at the
+    // next spot (TR owns it again).
+    assert!(!keeps_cursor(run.cpu_pass(9.0, false), false), "the hit's pass");
+    assert!(!keeps_cursor(run.cpu_pass(9.0, true), false), "in hitlag");
+    assert!(keeps_cursor(run.cpu_pass(9.0, false), false), "placed at the next spot");
+    // A run the last hit ended is the game's again.
+    let mut ten = started_cpu(TEN, ANY, 7);
+    pass(&mut ten, &[], false);
+    for _ in 0..10 {
+        ten.cpu_pass(0.0, false);
+        ten.cpu_pass(0.0, false);
+        ten.cpu_pass(5.0, false);
+        ten.cpu_pass(5.0, true);
+        pass(&mut ten, &[], false);
+    }
+    assert!(ten.ended());
+    assert!(!keeps_cursor(ten.cpu_pass(0.0, false), false), "ended: released to the game");
+}
+
 /// Hits in the air: a counted one breaks the target (the game's hitlag plays, nothing is asked), then the CPU goes to 0%
 /// at the next spot and flies again; an uncounted one puts it back on its flight where it was hit.
 fn eggs_cpu_air_hits() {
@@ -1011,6 +1051,7 @@ fn case_table() {
         ("eggs_target_cpu", eggs_target_cpu as fn()),
         ("eggs_target_cpu_hidden", eggs_target_cpu_hidden as fn()),
         ("eggs_practice_hide_request", eggs_practice_hide_request as fn()),
+        ("eggs_cpu_target_keeps_its_cursor", eggs_cpu_target_keeps_its_cursor as fn()),
         ("eggs_cpu_flies_like_the_disc", eggs_cpu_flies_like_the_disc as fn()),
         ("eggs_cpu_pass_follows_the_flight", eggs_cpu_pass_follows_the_flight as fn()),
         ("eggs_cpu_air_hits", eggs_cpu_air_hits as fn()),
