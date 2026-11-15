@@ -314,7 +314,9 @@ impl Run {
             Some(seed) => self.start(rows, seed),
             None => {}
         }
-        if self.rows[0] == OFF || self.ended() && self.bursts == [None; 2] || entry != 0 {
+        // An ended run is read again only to finish its break animations, or to close it when the CPU target's own pass
+        // counted the last target (its target is still held: `step` writes the end notice and the best).
+        if self.rows[0] == OFF || self.ended() && self.egg.is_none() && self.bursts == [None; 2] || entry != 0 {
             return Plan::Idle;
         }
         let facts = f();
@@ -418,6 +420,8 @@ impl Run {
             self.ground = y;
             self.spawn(None);
         }
+        // The pass that closes a run the CPU target's last hit ended: the clock stopped on that hit's frame.
+        let dt = dt * u32::from(!self.ended());
         let egg = self.egg_at()?;
         if self.rows[3] == DISC && hits.iter().any(|h| breaks(self.rows[1], air, h, egg)) {
             (self.score, self.bursts) = (self.score + 1, [Some((egg, 0)), self.bursts[0]]);
