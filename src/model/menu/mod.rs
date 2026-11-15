@@ -876,9 +876,13 @@ impl Menu {
                 self.outbox.rerolls |= bit;
             }
         }
-        // The two practice games exclude each other: the one turned On last wins (tt::exclusive).
-        if matches!(id, "eggsercise" | "btt") && super::btt::on(&self.settings.menu) == [true; 2] {
-            self.put_one_hot(if id == "btt" { "eggsercise" } else { "btt" }, 0);
+        // A registered game turned On last clears every peer through tracked menu writes.
+        if super::practice_games::ROWS.contains(&id) && self.get(id).iter().skip(1).any(|value| *value != 0) {
+            for &other in super::practice_games::ROWS {
+                if other != id && self.settings.menu.get(other).is_some() {
+                    self.put_one_hot(other, 0);
+                }
+            }
         }
     }
 

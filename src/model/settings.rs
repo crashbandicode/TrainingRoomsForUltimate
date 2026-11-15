@@ -555,11 +555,9 @@ pub fn parse(text: &str) -> Loaded {
     }
     let mut menu = snapshot_from("menu", top.menu, &mut issues);
     let mut defaults = snapshot_from("defaults_menu", top.defaults, &mut issues);
-    // The two practice games exclude each other (`btt::on`): a file with both On keeps Eggs-ercise.
+    // Restored snapshots have no edit order: keep the first active registered practice game.
     for rows in [&mut menu, &mut defaults] {
-        if super::btt::on(rows) == [true; 2] {
-            let _ = rows.set("btt", &[1, 0]);
-        }
+        super::practice_games::normalize(rows);
     }
     let mut extra = Map::new();
     for (key, value) in top.others.items {

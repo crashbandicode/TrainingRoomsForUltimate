@@ -243,10 +243,11 @@ pub fn list_footer(rows: &[(String, Layout)], cursor: usize, skipped: usize) -> 
     format!("{first}\nA open   B back{note}")
 }
 
-/// Whether `[Eggs-ercise, Break the Targets]` are On (any option but Off). The two cannot run together: the menu turns Off the
-/// one not turned On last, and a settings file with both On (hand-edited) keeps Eggs-ercise.
+/// Whether `[Eggs-ercise, Break the Targets]` are the effective practice game. The shared registry
+/// resolves conflicting snapshots, preserving Eggs-ercise's precedence over Break the Targets.
 pub fn on(rows: &super::settings::Snapshot) -> [bool; 2] {
-    ["eggsercise", ROW].map(|id| rows.get(id).is_some_and(|r| r.iter().skip(1).any(|v| *v != 0)))
+    let active = super::practice_games::active(rows);
+    ["eggsercise", ROW].map(|id| active == Some(id))
 }
 
 /// The layout's identity for the session's best: its target positions to half a unit, in no order.
