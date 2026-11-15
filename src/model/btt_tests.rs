@@ -297,6 +297,73 @@ fn btt_cursor_clamp() {
         }
     }
 }
+/// Battlefield's fixed camera (`btt_cursor_clamp`), and a view of the same camera moving: its canvas origin `lift` canvas units
+/// lower, so the placing box it gives starts high above the ground (Eden rc14-int3-rr2-f1: the mode took the camera and the
+/// cursor, untouched, went from (-47, 15) to (-40.1, 117.6)).
+fn fixed_view() -> View {
+    View([6.89, 6.80], [0.0, -172.26], [-170.0, 170.0])
+}
+
+fn moving_view(lift: f32) -> View {
+    View([6.89, 6.80], [0.0, -172.26 - lift], [-170.0, 170.0])
+}
+
+/// Placing on Battlefield with the fixed camera settled (three layout ticks of the same view): the cursor's start.
+fn placing_settled() -> (Sim, [f32; 2]) {
+    let mut s = Sim::placing();
+    s.btt.sense(Some([-170.0, 170.0, 130.0, -80.0]), 0.0);
+    for _ in 0..3 {
+        s.btt.see(Some(fixed_view()));
+    }
+    s.btt.close_menu(true, true);
+    let start = s.btt.cursor().unwrap();
+    (s, start)
+}
+
+/// A camera change alone never moves the cursor from a spot inside the settled view: through a camera that moves (a new view
+/// every layout tick, boxes that leave the start out) and back to the settled one, polls with no input keep the start.
+fn btt_cursor_stays_through_a_camera_change() {
+    let (mut s, start) = placing_settled();
+    assert_eq!(start, [0.0, 15.0]);
+    for k in 0..8 {
+        s.btt.see(Some(moving_view(900.0 - 40.0 * k as f32)));
+        s.idle(1);
+        assert_eq!(s.btt.cursor(), Some(start), "the camera moving (tick {k}) dragged the cursor");
+    }
+    for _ in 0..4 {
+        s.btt.see(Some(fixed_view()));
+        s.idle(1);
+    }
+    assert_eq!(s.btt.cursor(), Some(start), "inside the settled box: never moved");
+}
+
+/// The cursor never stays off screen: a start the settled view leaves out is not moved while the camera changes, and is clamped
+/// into the box once the camera has settled (the same view three ticks running); the stick still clamps at once.
+fn btt_cursor_off_screen_is_clamped_once_settled() {
+    let (mut s, start) = placing_settled();
+    let range = Some([-170.0, 170.0, 130.0, -80.0]);
+    let far = moving_view(900.0);
+    let b = bounds(range, Some(far), 0.0);
+    assert!(start[1] < b[1][0], "the far view leaves the start out: {start:?} {b:?}");
+    for _ in 0..2 {
+        s.btt.see(Some(far));
+        s.idle(1);
+        assert_eq!(s.btt.cursor(), Some(start), "not before the camera has settled");
+    }
+    s.btt.see(Some(far));
+    s.idle(1);
+    let [x, y] = s.btt.cursor().unwrap();
+    assert_eq!((x, y), (start[0], b[1][0]), "clamped once settled: onto the box's bottom edge, x kept");
+    s.btt.see(Some(far));
+    s.idle(3);
+    assert_eq!(s.btt.cursor(), Some([x, y]), "settled: no further change");
+    // A new camera move, then the stick: a moved cursor is clamped into the box of the moment, as before.
+    s.btt.see(Some(moving_view(400.0)));
+    s.push([0.0, -1.0], 200);
+    let now = bounds(range, Some(moving_view(400.0)), 0.0);
+    assert_eq!(s.btt.cursor().unwrap()[1], now[1][0], "the stick clamps at once");
+}
+
 /// Row 28: X with no targets is refused; with one or more it goes to Ready at 0:00.00; the clock starts on the first input,
 /// not before.
 fn btt_ready_waits_for_input() {
@@ -641,6 +708,8 @@ fn case_table() {
         ("btt_placing_inputs", btt_placing_inputs as fn()),
         ("btt_overlap_rule_is_strict_at_apart", btt_overlap_rule_is_strict_at_apart as fn()),
         ("btt_cursor_clamp", btt_cursor_clamp as fn()),
+        ("btt_cursor_stays_through_a_camera_change", btt_cursor_stays_through_a_camera_change as fn()),
+        ("btt_cursor_off_screen_is_clamped_once_settled", btt_cursor_off_screen_is_clamped_once_settled as fn()),
         ("btt_ready_waits_for_input", btt_ready_waits_for_input as fn()),
         ("btt_run_and_best", btt_run_and_best as fn()),
         ("btt_restart", btt_restart as fn()),
