@@ -190,7 +190,8 @@ The same list for the Mii Gunner.
 Opens a grid of every stage. A on a stage closes the menu and goes there: the notice reads "Practice Stage · Stage
 requested", then "Stage ready". It works in Training and in waiting-room practice.
 
-- **Values:** any of the 117 stages, the Waiting Room and Training included, in the forms the game has for each
+- **Values:** any of the 117 stages, the Waiting Room and Training included, in the forms the game has for each; then
+  your Stage Builder stages ([Custom stages](../guide/stages.md#custom-stages))
 - **How:** A opens the grid. The D-pad moves, L / R turn its page, Y picks the focused stage's form first (the tile
   shows [N], [Ω] or [BF]), A goes there, B goes back.
 
@@ -220,7 +221,8 @@ More: [Waiting rooms](../guide/waiting-rooms.md)
 The stage list: each new waiting room opens on the next stage of it, and Training does too with
 [Training Stage Rotation](#training-stage-rotation) On.
 
-- **Values:** All, or your own order; Rotation or Direct
+- **Values:** All, or your own order, your Stage Builder stages included (their tiles come after the game's stages;
+  see [Custom stages](../guide/stages.md#custom-stages)); Rotation or Direct
 - **Default:** the Waiting Room only, Rotation
 - **How:** A opens the grid. X switches between the two modes. Y changes the focused stage's form. L / R turn the page,
   B goes back.

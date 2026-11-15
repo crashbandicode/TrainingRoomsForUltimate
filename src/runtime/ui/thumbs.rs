@@ -112,8 +112,12 @@ unsafe fn wanted(s: &State, i: usize) -> Option<u64> {
             .flatten()
     } else {
         let mut buffer = [0u8; 96];
-        stage_id(s.want[i])
-            .and_then(|id| stage_textures::path_into(id, &mut buffer))
+        // rc.14: a tile after the catalog is a Stage Builder stage: the game's custom-stage icon.
+        let custom = s.want[i] != u16::MAX && usize::from(s.want[i]) > crate::engine::stages::lobby_stages::STAGES.len();
+        let len = if custom { stage_textures::custom_path_into(&mut buffer) } else {
+            stage_id(s.want[i]).and_then(|id| stage_textures::path_into(id, &mut buffer))
+        };
+        len
             .and_then(|len| core::str::from_utf8(&buffer[..len]).ok())
             .map(texture::path_hash)
     }

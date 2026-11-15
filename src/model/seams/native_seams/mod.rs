@@ -35,6 +35,9 @@ pub mod rows_cpu_level;
 pub mod rows_res_unload;
 /// rc.13, (a′) proper: a kept group's fighter module pinned across its owner's Reload (src/runtime/roster/module_pins.rs).
 pub mod rows_module_pins;
+/// rc.14: custom stages: the game's custom-stage loader and free, its own load around them, and the setter's stage-325 byte
+/// (`src/runtime/lobby/custom_stages.rs`).
+pub mod rows_custom_stages;
 /// rc.8: the game speed bind, the Training menu's own store-and-text path and the slow table's steps
 /// (`src/runtime/features/game_speed.rs`).
 pub mod rows_game_speed;
@@ -198,10 +201,10 @@ impl Site {
 
 /// Every row file, in table order: the one list a new row file joins (`COUNT`, `SITES`, and the host
 /// tests' `all()` read it).
-const TABLES: [&[Seam]; 14] = [
+const TABLES: [&[Seam]; 15] = [
     rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS, rows_q15::ROWS,
     rows_lobby_items::ROWS, rows_lobby_persist::ROWS, rows_cpu_level::ROWS, rows_res_unload::ROWS,
-    rows_game_speed::ROWS, rows_lobby_speed::ROWS, rows_module_pins::ROWS,
+    rows_game_speed::ROWS, rows_lobby_speed::ROWS, rows_module_pins::ROWS, rows_custom_stages::ROWS,
 ];
 
 const fn total(tables: &[&[Seam]]) -> usize {

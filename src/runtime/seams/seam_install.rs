@@ -84,6 +84,8 @@ const AUTHORITATIVE: &[&str] = &[
     "practice_stage_observer",
     "lobby_stage_probe",
     "training_stage_rotation",
+    // rc.14 custom stages: the loader is called only when every row is stock (approved fail-safe guard).
+    "custom_stages",
     "hazard_manager",
     "game_mode",
     "character_sources",

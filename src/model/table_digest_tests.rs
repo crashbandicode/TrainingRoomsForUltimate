@@ -22,6 +22,11 @@
 //!
 //! rc.14 wind-articles added the four wind-area commands (`hitbox_area_wind`, `_arg10`, `_rad`, `_rad_arg9`, hooked so an
 //! article's wind area is drawn) to `sites_hitbox`: 266 site rows to 270, and the site digest with them.
+//!
+//! rc.14 custom stages added `rows_custom_stages` (9 rows: the game's custom-stage loader and free, its own load around them,
+//! the setter's stage-325 byte): 688 seam rows to 697, a 25th data file, and the seam digest with them. After cs-proof-2 the
+//! game's own read joined (queue, begin, cleanup, local wireless's request and cleanup windows, the header and record
+//! list reads): 704.
 
 use crate::model::sha256::sha256_hex;
 use std::fmt::Write;
@@ -41,10 +46,11 @@ fn digest<T: std::fmt::Debug>(tables: &[&[T]]) -> (usize, String) {
 #[test]
 fn every_seam_row_is_the_row_it_was() {
     use crate::engine::seams::native_seams as s;
-    let tables: [&[s::Seam]; 14] = [
+    let tables: [&[s::Seam]; 15] = [
         s::rows_a1::ROWS, s::rows_a2::ROWS, s::rows_a3::ROWS, s::rows_a4::ROWS, s::rows_a5::ROWS, s::rows_identity::ROWS,
         s::rows_q15::ROWS, s::rows_lobby_items::ROWS, s::rows_lobby_persist::ROWS, s::rows_cpu_level::ROWS,
         s::rows_res_unload::ROWS, s::rows_game_speed::ROWS, s::rows_lobby_speed::ROWS, s::rows_module_pins::ROWS,
+        s::rows_custom_stages::ROWS,
     ];
     assert_eq!(digest(&tables), (SEAM_ROWS, SEAM_DIGEST.to_owned()));
 }
@@ -83,11 +89,11 @@ fn every_data_row_has_a_64_byte_guard() {
         }
         files += 1;
     }
-    assert_eq!((files, rows), (24, SEAM_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS));
+    assert_eq!((files, rows), (25, SEAM_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS));
 }
 
-const SEAM_ROWS: usize = 688;
-const SEAM_DIGEST: &str = "77138f9ec6999107ad65a7ba8a734b6583f9f107059331ca4d371b38bffbe67e";
+const SEAM_ROWS: usize = 704;
+const SEAM_DIGEST: &str = "cb2c75e34e6f3258900a157be9b79d08b7ed396c5500f98d132e7627858d6adc";
 const SITE_ROWS: usize = 270;
 const SITE_DIGEST: &str = "bf5cc3e12c19cc2d8df3319cb8a4c5747a4ae89131cd1407695e6d4008478ac0";
 const UI_ROWS: usize = 6;

@@ -61,6 +61,8 @@ impl State {
                 self.status = Some(status);
                 let message = match phase {
                     Phase::Complete => Some("Stage ready".to_owned()),
+                    // rc.14: the custom stage's approved notice is already up.
+                    Phase::Refused(why) if why == crate::runtime::lobby::custom_stages::NOTICE_POSTED => None,
                     Phase::Refused(why) => Some(format!("Stage unchanged: {why}")),
                     Phase::Retained(why) => Some(format!("Stage request stopped: {why}")),
                     _ => None,
@@ -129,6 +131,8 @@ fn queue(selection: Selection, context: MenuContext) -> Result<u64, &'static str
 pub(crate) fn depart() {
     EPOCH.fetch_add(1, Ordering::AcqRel);
     if let Some(mut state)=STATE.try_lock() { state.retire(); }
+    // rc.14: once the scene has changed, the rule gets back what it held before a custom stage was loaded into it.
+    crate::runtime::lobby::custom_stages::depart();
 }
 
 #[repr(C)]
@@ -262,6 +266,18 @@ unsafe fn prepare(ticket:Ticket,settled:Option<Commit>)->Result<(Commit,[u8;0xb0
     // All fallible reads/checks precede publication, under the current update.
     check(read(ticket.scene)?==first,"native admission changed during preparation")?;
     check(EPOCH.load(Ordering::Acquire)==ticket.scene.epoch,"scene epoch changed")?;
+    // rc.14: a custom stage goes into the rule first (the game's loader), and the descriptor carries the byte the setter
+    // copies for stage 325. The last fallible step: nothing is written unless every guard holds; otherwise the stage on
+    // screen stays and the approved notice says which custom stage was not loaded.
+    if let Some(id)=crate::engine::stages::custom_stages::decode(ticket.selection.stage) {
+        match crate::runtime::lobby::custom_stages::load(id) {
+            Ok(byte) => plan.1[0x98]=byte,
+            Err(why) => {
+                crate::runtime::lobby::custom_stages::refused(id,why);
+                return Err(crate::runtime::lobby::custom_stages::NOTICE_POSTED);
+            }
+        }
+    }
     Ok(plan)
 }
 
@@ -285,6 +301,9 @@ unsafe fn publish(c:Commit,descriptor:[u8;0xb0]) {
 /// Same native entry callback as the passive observer; no competing hook.
 pub(crate) unsafe fn update(wrapper:usize,core:usize,mode:u32,melee:u8,active_object:usize) {
     if !VERIFIED.load(Ordering::Acquire) { return; }
+    // rc.14: the custom stages' list snapshot and read through the game's save object, in scope (this update runs in
+    // Training and the waiting-room practice only).
+    crate::runtime::lobby::custom_stages::service(mode==crate::engine::stages::training_stage_rotation_policy::TRAINING_MODE);
     let Some(mut state)=STATE.try_lock() else { return };
     let scene=Scene { epoch:EPOCH.load(Ordering::Acquire),wrapper,core,mode,melee };
     if state.seen.is_some_and(|(old,_)|old!=scene) { state.retire(); }
@@ -325,6 +344,21 @@ pub(crate) unsafe fn update(wrapper:usize,core:usize,mode:u32,melee:u8,active_ob
     if !policy::current_request(ticket.scene,scene,ticket.original,active_object)
         || state.status.map(|s|s.id)!=Some(ticket.id) {
         state.phase(Phase::Refused("stale request")); return;
+    }
+    // rc.14: a custom stage waits, queued, for the game's read of it (`custom_stages::service`).
+    if let Some(id)=crate::engine::stages::custom_stages::decode(ticket.selection.stage) {
+        use crate::runtime::lobby::custom_stages::{self as custom, Readiness};
+        custom::pick(id);
+        match custom::readiness(id) {
+            Readiness::Waiting => { state.queued=Some(ticket); return; }
+            Readiness::Failed => {
+                custom::pick(0);
+                custom::refused(id,"the game's read of it did not finish");
+                state.phase(Phase::Refused(custom::NOTICE_POSTED));
+                return;
+            }
+            Readiness::Ready => custom::pick(0),
+        }
     }
     match prepare(ticket,state.settled) {
         Ok((commit,descriptor)) => {

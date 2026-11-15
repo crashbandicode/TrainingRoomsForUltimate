@@ -4,6 +4,8 @@
 //! The functions at the bottom are the call sites the fork's mixed code made (decision D5): `init` once from boot after the roster
 //! cycle, `update` once per game frame, `observe` from the fighter init path and `frame` from the per-fighter frame callback.
 
+/// rc.14: Stage Builder stages in the stage lists (the save's list, the game's loader into the rule, the rule given back).
+pub(crate) mod custom_stages;
 pub(crate) mod game_mode;
 pub(crate) mod lobby_items;
 pub(crate) mod lobby_persist;
@@ -36,6 +38,8 @@ pub(crate) fn init() {
     // The waiting room's practice panel: saved Training partners and behavior (rc.6). Its sites are nobody else's.
     lobby_persist::init();
     lobby_stage::init();
+    // rc.14 custom stages: no hook, only its rows (the loads ride the stage hooks above and the practice request).
+    custom_stages::init();
     // rc.6 CPU level: no hook, only its rows (the clock rides `update`, the step rides `frame`).
     crate::runtime::features::cpu_level::init();
     // rc.14 Hide CPU: no hook, only its rows (the step rides the CPU frame).
@@ -67,6 +71,8 @@ pub(crate) fn update() {
     // The CPU level's Training session clock: it runs in every scene, so the character select between two Training entries
     // ends a session.
     crate::runtime::features::cpu_level::poll();
+    // rc.14: a new scene asks the menu worker to read the save's Stage Builder stages again.
+    custom_stages::frame();
 }
 
 /// A fighter's on-init has run (the reset hub's wrapper): the practice engine records the entry.

@@ -379,7 +379,7 @@
    "dest": "src/model/seams/native_seams/mod.rs",
    "crate": "consts",
    "src_sha256": "9c16e57af94e9f6424c92a5bd3de8df64508eb3cda01ff7c4eb9c1054c8338e3",
-   "dest_sha256": "3f4d3ca45c7733cf84914aed0b48523c7695d673fbaa48ddc8ca6af4c4001b2d",
+   "dest_sha256": "233ee199eb6a207057d4a1c24c83c4245dd79d6f0d108212f8476dceff0da5f1",
    "edits": [
     {
      "old": "        first.then_some(seam.offset)\n    })\n}\n\n/// The 64-byte comparison of one site.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum GuardOutcome {\n    /// Identical to 13.0.5.\n    Stock,\n    /// Only Skyline hook shapes differ. `at` is the byte offset of the first; `usable` applies the\n    /// kind's rule (false: another plugin owns the words we would replace or rely on).\n    HookedByOther { at: usize, usable: bool },\n    /// A `Sharing::EntryOrBody` entry row whose entry another plugin's far jump owns, with the body\n    /// after it stock: usable, through the body site (`entry_or_body_outcome`).\n    Shared,\n    /// A change that is not a hook: the site is left alone.\n    Foreign { first_diff: usize },\n}\n\nimpl GuardOutcome {\n    pub const fn usable(self) -> bool {\n        match self {\n            GuardOutcome::Stock | GuardOutcome::Shared => true,\n            GuardOutcome::HookedByOther { usable, .. } => usable,\n            GuardOutcome::Foreign { .. } => false,\n        }\n    }\n\n    /// The install line's word for the outcome.\n    pub const fn code(self) -> &'static str {\n        match self {\n            GuardOutcome::Stock => \"stock\",\n            GuardOutcome::HookedByOther { usable: true, .. } => \"other\",\n            GuardOutcome::HookedByOther { usable: false, .. } => \"occupied\",\n            GuardOutcome::Shared => \"shared\",\n            GuardOutcome::Foreign { .. } => \"foreign\",\n        }\n    }\n}\n\nconst WORDS: usize = GUARD_BYTES / 4;\nconst NOP: u32 = 0xd503_201f;\nconst LDR_X17_LITERAL_8: u32 = 0x5800_0051;\nconst BR_X17: u32 = 0xd61f_0220;\nconst B_MASK: u32 = 0xfc00_0000;\nconst B_OPCODE: u32 = 0x1400_0000;\n\nfn words(bytes: &[u8; GUARD_BYTES]) -> [u32; WORDS] {\n    let mut out = [0u32; WORDS];\n    for (i, word) in out.iter_mut().enumerate() {\n        *word = u32::from_le_bytes([bytes[4 * i], bytes[4 * i + 1], bytes[4 * i + 2], bytes[4 * i + 3]]);\n    }\n    out\n}\n\n/// Length in words of a Skyline hook shape starting at word `i` (cut at the end of the window).\nfn hook_shape(actual: &[u32; WORDS], i: usize) -> Option<usize> {\n    let at = |k: usize| actual.get(i + k).copied();\n    let len = if at(0) == Some(NOP) && at(1) == Some(LDR_X17_LITERAL_8) && at(2) == Some(BR_X17) {\n        5\n    } else if at(0) == Some(LDR_X17_LITERAL_8) && at(1) == Some(BR_X17) {\n        4\n    } else if actual[i] & B_MASK == B_OPCODE {\n        1\n    } else {\n        return None;\n    };\n    Some(len.min(WORDS - i))\n}\n\n/// Whether a hook shape at word `word` takes words this kind needs as they are.\nconst fn blocks(kind: SeamKind, word: usize) -> bool {\n    match kind {\n        SeamKind::Hook { .. } => word < HOOK_SPAN_WORDS,\n        SeamKind::Called => false,\n        SeamKind::Relied => word == 0,\n    }\n}\n\n/// Compare a site's 64 bytes now (`actual`) with its 13.0.5 bytes (`expected`).\npub fn guard_outcome(expected: &[u8; GUARD_BYTES], actual: &[u8; GUARD_BYTES], kind: SeamKind) -> GuardOutcome {\n    let expected = words(expected);\n    let actual = words(actual);\n    let mut first_hook = None;\n    let mut usable = true;\n    let mut i = 0;\n    while i < WORDS {\n        if actual[i] == expected[i] {\n            i += 1;\n            continue;\n        }\n        let Some(len) = hook_shape(&actual, i) else {\n            return GuardOutcome::Foreign { first_diff: 4 * i };\n        };\n        first_hook.get_or_insert(4 * i);\n        // A shape that starts inside the span also covers every word it spans.\n        if (i..i + len).any(|w| blocks(kind, w)) {\n            usable = false;\n        }\n        i += len;\n    }\n    match first_hook {\n        None => GuardOutcome::Stock,\n        Some(at) => GuardOutcome::HookedByOther { at, usable },\n    }\n}\n",
@@ -604,6 +604,21 @@
      "old": "    rows_lobby_items::ROWS, rows_lobby_persist::ROWS, rows_cpu_level::ROWS, rows_res_unload::ROWS,\n    rows_game_speed::ROWS, rows_lobby_speed::ROWS,\n];\n",
      "new": "    rows_lobby_items::ROWS, rows_lobby_persist::ROWS, rows_cpu_level::ROWS, rows_res_unload::ROWS,\n    rows_game_speed::ROWS, rows_lobby_speed::ROWS, rows_module_pins::ROWS,\n];\n",
      "reason": "rc.13 (a-prime) proper (the primary 2026-11-13 21:16Z, tightened 22:19Z; probe wa-aprime-probe-9ad09558-2 #1459-#1648): loader state 3 releases R NRO tree, so a group kept across its owner target-first Reload lived only on a helper seat module reference; each kept group now pins its fighter modules (module_pins) until the new bank is Ready and R requests them again, and is kept only when pinned; the rc.12 keep loop is kept_groups, shared with the pre-pass"
+    },
+    {
+     "old": "pub mod rows_module_pins;\n/// rc.8: the game speed bind, the Training menu's own store-and-text path and the slow table's steps\n",
+     "new": "pub mod rows_module_pins;\n/// rc.14: custom stages: the game's custom-stage loader and free, its own load around them, and the setter's stage-325 byte\n/// (`src/runtime/lobby/custom_stages.rs`).\npub mod rows_custom_stages;\n/// rc.8: the game speed bind, the Training menu's own store-and-text path and the slow table's steps\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): the custom_stages seam rows (rows_custom_stages, 9 rows) join the table"
+    },
+    {
+     "old": "/// tests' `all()` read it).\nconst TABLES: [&[Seam]; 14] = [\n    rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS, rows_q15::ROWS,\n",
+     "new": "/// tests' `all()` read it).\nconst TABLES: [&[Seam]; 15] = [\n    rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS, rows_q15::ROWS,\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): the custom_stages seam rows (rows_custom_stages, 9 rows) join the table"
+    },
+    {
+     "old": "    rows_lobby_items::ROWS, rows_lobby_persist::ROWS, rows_cpu_level::ROWS, rows_res_unload::ROWS,\n    rows_game_speed::ROWS, rows_lobby_speed::ROWS, rows_module_pins::ROWS,\n];\n",
+     "new": "    rows_lobby_items::ROWS, rows_lobby_persist::ROWS, rows_cpu_level::ROWS, rows_res_unload::ROWS,\n    rows_game_speed::ROWS, rows_lobby_speed::ROWS, rows_module_pins::ROWS, rows_custom_stages::ROWS,\n];\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): the custom_stages seam rows (rows_custom_stages, 9 rows) join the table"
     }
    ]
   },
@@ -9705,7 +9720,7 @@
    "dest": "src/model/stages/lobby_stages.rs",
    "crate": "consts",
    "src_sha256": "86d084f7400d24e8e6be5554b391071a5b3a36d6208ccf28651727199b37586f",
-   "dest_sha256": "a3a629e9a3a9627a08198806c167b993f7f8a182242d8ed46acda6d0d4a3babd",
+   "dest_sha256": "f427e83c1c62fa2d62cc8e431c11f5facca0606fe1dfb5fbe690fca345dbd3f7",
    "edits": [
     {
      "old": "use {training_mod_tui::StatefulTable, training_mod_tui::SubMenu, training_mod_tui::SubMenuType, training_mod_tui::Toggle, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, training_mod_tui::NX_SUBMENU_ROWS};\n",
@@ -9793,6 +9808,16 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "old": "pub fn native_stage(selection: Selection) -> Result<u32, &'static str> {\n    if !STAGES.iter().any(|(stage, _)| *stage == selection.stage) {\n",
+     "new": "pub fn native_stage(selection: Selection) -> Result<u32, &'static str> {\n    // rc.14: a Stage Builder stage (its save file id, encoded) loads as SP_Edit, one form; the runtime loads its file first.\n    if crate::engine::stages::custom_stages::decode(selection.stage).is_some() {\n        return (selection.form == crate::engine::stages::stage_forms::Form::Normal)\n            .then_some(crate::engine::stages::custom_stages::CUSTOM_STAGE_KIND).ok_or(\"form unavailable for this stage\");\n    }\n    if !STAGES.iter().any(|(stage, _)| *stage == selection.stage) {\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15, route approved): an encoded custom stage (high byte 0x80) maps to the game's custom stage kind 325, Normal form only"
+    },
+    {
+     "old": "        return (selection.form == crate::engine::stages::stage_forms::Form::Normal)\n            .then_some(crate::engine::stages::custom_stages::CUSTOM_STAGE_KIND).ok_or(\"form unavailable for this stage\");\n    }\n",
+     "new": "        return (selection.form == crate::engine::stages::stage_forms::Form::Normal)\n            .then_some(crate::engine::stages::custom_stages::CUSTOM_STAGE_KIND).ok_or(\"a custom stage has one form\");\n    }\n",
+     "reason": "rc.14 custom stages (compliance: refusals cite an approved restriction): a custom stage has one form (internal reason)"
     }
    ]
   },
@@ -9801,7 +9826,7 @@
    "dest": "src/model/stages/lobby_stage_cycle.rs",
    "crate": "root",
    "src_sha256": "c4a313db7890e6529419e036dbc9403a4e503f0533633438f7828df58beed3cf",
-   "dest_sha256": "2f62df89a2aaf4e1d53f127c7c2e6fb876f4014d617c277781e38175fd2cd2f8",
+   "dest_sha256": "c68b023faa9e09d8c85ef4f4259f3be5c1e5a03f1d246ff2b630052a04dd2391",
    "widen": true,
    "edits": [
     {
@@ -9814,6 +9839,21 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "old": "            Ok(self.prepare(&order.selections(&prefs.rotation_forms)?))\n        }\n",
+     "new": "            Ok(self.prepare(&order.selections(&prefs.rotation_forms)?))\n        }\n    }\n\n    /// rc.14: `prepare_preferences` over the lists the runtime built with the save's custom stages\n    /// (`custom_stages::lists`); they are built only when no choice is reserved yet.\n    pub fn prepare_lists(\n        &mut self,\n        enabled: bool,\n        lists: impl FnOnce() -> Result<crate::engine::stages::custom_stages::Lists, &'static str>,\n        direct_enabled: bool,\n    ) -> Result<Option<crate::engine::stages::lobby_stages::Selection>, &'static str> {\n        if !enabled {\n            self.cancel_preload();\n            return Ok(None);\n        }\n        if let Some((selection, _)) = self.pending { return Ok(Some(selection)); }\n        let lists = lists()?;\n        if direct_enabled && lists.direct_mode {\n            Ok(self.prepare_direct(lists.direct))\n        } else {\n            Ok(self.prepare(&lists.rotation))\n        }\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): the waiting-room cycle prepares from lists built with the save's custom stages (prepare_lists)"
+    },
+    {
+     "old": "\n    pub fn prepare_direct(&mut self, stage: S) -> Option<S> {\n",
+     "new": "\n    /// rc.14: the stage `prepare` would reserve next (the reserved one when there is one), without reserving it: what a\n    /// custom stage's read-ahead aims at.\n    pub fn peek(&self, stages: &[S]) -> Option<S> {\n        if let Some((stage, _)) = self.pending {\n            return Some(stage);\n        }\n        let next = self\n            .last\n            .and_then(|last| stages.iter().position(|stage| stage.identity() == last))\n            .map_or(0, |index| (index + 1) % stages.len().max(1));\n        stages.get(next).copied()\n    }\n\n    pub fn prepare_direct(&mut self, stage: S) -> Option<S> {\n",
+     "reason": "rc.14 custom stages after cs-proof-2 (the primary 2026-11-15 ~05:18Z: list and data through the game's own save object, never a file): peek / peek_lists: the next stage without reserving it"
+    },
+    {
+     "old": "            Ok(self.prepare(&order.selections(&prefs.rotation_forms)?))\n        }\n    }\n\n",
+     "new": "            Ok(self.prepare(&order.selections(&prefs.rotation_forms)?))\n        }\n    }\n\n    /// rc.14: what `prepare_lists` would reserve next, without reserving it.\n    pub fn peek_lists(&self, lists: &crate::engine::stages::custom_stages::Lists, direct_enabled: bool)\n        -> Option<crate::engine::stages::lobby_stages::Selection> {\n        if let Some((selection, _)) = self.pending { return Some(selection); }\n        if direct_enabled && lists.direct_mode { Some(lists.direct) } else { self.peek(&lists.rotation) }\n    }\n\n",
+     "reason": "rc.14 custom stages after cs-proof-2 (the primary 2026-11-15 ~05:18Z: list and data through the game's own save object, never a file): peek / peek_lists: the next stage without reserving it"
     }
    ]
   },
@@ -9822,7 +9862,7 @@
    "dest": "src/model/stages/practice_stage_request_policy.rs",
    "crate": "root",
    "src_sha256": "f21325a210af687c2c008978356be0f0850b064390c242c8bb2d8ec955d002a6",
-   "dest_sha256": "d54a8fa4d37d91a45c7370ee48334cc70234f7a80ec173d0a11d2b7dc75a619a",
+   "dest_sha256": "e71e3bbcbf3ab576c007907986db432156a7526aa4863af1c227be814095f171",
    "widen": true,
    "edits": [
     {
@@ -9870,6 +9910,31 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "old": "pub(crate) fn plan(v: View, settled: Option<Commit>, target: u32, hash: u64) -> Result<(Commit, [u8; 0xb0]), &'static str> {\n    let next = admit(v, settled)?;\n",
+     "new": "pub(crate) fn plan(v: View, settled: Option<Commit>, target: u32, hash: u64) -> Result<(Commit, [u8; 0xb0]), &'static str> {\n    plan_with(v, settled, target, hash, false)\n}\n\n/// `plan`; `again` lifts the same-stage refusal: rc.14's custom stages are all native kind 325, each another layout in\n/// the rule.\nfn plan_with(v: View, settled: Option<Commit>, target: u32, hash: u64, again: bool) -> Result<(Commit, [u8; 0xb0]), &'static str> {\n    let next = admit(v, settled)?;\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): one custom stage to another (both native kind 325) is not refused as the stage already active"
+    },
+    {
+     "old": "    let next = admit(v, settled)?;\n    check(target != v.kind(), \"stage already active\")?;\n    check(hash != 0 && hash <= 0xffffffffff, \"invalid stage hash\")?;\n",
+     "new": "    let next = admit(v, settled)?;\n    check(again || target != v.kind(), \"stage already active\")?;\n    check(hash != 0 && hash <= 0xffffffffff, \"invalid stage hash\")?;\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): one custom stage to another (both native kind 325) is not refused as the stage already active"
+    },
+    {
+     "old": "    let target = crate::engine::stages::lobby_stages::native_stage(selection)?;\n    plan(v, settled, target, hash)\n}\n",
+     "new": "    let target = crate::engine::stages::lobby_stages::native_stage(selection)?;\n    plan_with(v, settled, target, hash, crate::engine::stages::custom_stages::decode(selection.stage).is_some())\n}\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): one custom stage to another (both native kind 325) is not refused as the stage already active"
+    },
+    {
+     "old": "\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+     "new": "\n    fn one_custom_stage_goes_to_another_in_place() {\n        // rc.14: every custom stage is native kind 325; another one is another layout in the rule, not the stage on screen.\n        let mut v = waiting();\n        v.descriptor[..4].copy_from_slice(&325u32.to_le_bytes());\n        v.descriptor[8..16].copy_from_slice(&0x14d051407du64.to_le_bytes());\n        v.resources[2] = Some(Resource { address: 56, state: 1, kind: 325, hash: 0x14d051407d });\n        let custom = Selection { stage: crate::engine::stages::custom_stages::encode(12), form: Form::Normal };\n        let (c, descriptor) = plan_selection(v, None, custom, 0x14d051407d).unwrap();\n        assert_eq!((c.target, c.hash), (325, 0x14d051407d));\n        assert_eq!(descriptor[..4], 325u32.to_le_bytes());\n        // A catalog stage is still refused while it is the one on screen.\n        let bf = waiting();\n        let waiting_room = Selection { stage: 311, form: Form::Normal };\n        assert_eq!(plan_selection(bf, None, waiting_room, 0x165a48f367).map(|_| ()), Err(\"stage already active\"));\n    }\n\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): one custom stage to another (both native kind 325) is not refused as the stage already active"
+    },
+    {
+     "old": "        crate::test_table::run(&[\n            (\"alternate_forms_complete_then_require_a_new_menu_and_preserve_match_cache_ownership\", alternate_forms_complete_then_require_a_new_menu_and_preserve_match_cache_ownership as fn()),\n",
+     "new": "        crate::test_table::run(&[\n            (\"one_custom_stage_goes_to_another_in_place\", one_custom_stage_goes_to_another_in_place as fn()),\n            (\"alternate_forms_complete_then_require_a_new_menu_and_preserve_match_cache_ownership\", alternate_forms_complete_then_require_a_new_menu_and_preserve_match_cache_ownership as fn()),\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): one custom stage to another (both native kind 325) is not refused as the stage already active"
     }
    ]
   },
@@ -9878,7 +9943,7 @@
    "dest": "src/model/stages/training_stage_rotation_policy.rs",
    "crate": "root",
    "src_sha256": "7c87c293b95021b738e748aad978d7e90399781320f8a1cfa1b7b2fde7a81981",
-   "dest_sha256": "704183244f0fd736366213e623d69c3e3ff2b68dbceef082f474d4cbc9fe2c00",
+   "dest_sha256": "d0f2513ba6f0895eb9965e01fa7271cc01be65f0095aecd7ebc91dbb05b62361",
    "widen": true,
    "edits": [
     {
@@ -10004,6 +10069,21 @@
      "old": "            (\"direct_completion_replaces_the_reapplied_stage_and_uncertainty_clears_it\", direct_completion_replaces_the_reapplied_stage_and_uncertainty_clears_it as fn()),\n            (\"qualified_loader_rejects_other_callers_slots_descriptors_and_scenes\", qualified_loader_rejects_other_callers_slots_descriptors_and_scenes as fn()),\n",
      "new": "            (\"direct_completion_replaces_the_reapplied_stage_and_uncertainty_clears_it\", direct_completion_replaces_the_reapplied_stage_and_uncertainty_clears_it as fn()),\n            (\"the_stage_select_pick_opens_training_and_a_return_through_the_character_select_rotates\", the_stage_select_pick_opens_training_and_a_return_through_the_character_select_rotates as fn()),\n            (\"qualified_loader_rejects_other_callers_slots_descriptors_and_scenes\", qualified_loader_rejects_other_callers_slots_descriptors_and_scenes as fn()),\n",
      "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
+    },
+    {
+     "old": "    ) -> Entry {\n        if self.owner != Some(owner) {\n",
+     "new": "    ) -> Entry {\n        self.entry_lists(owner, enabled, || crate::engine::stages::custom_stages::lists(order, prefs, None))\n    }\n\n    /// rc.14: `entry` over the lists the runtime built with the save's custom stages (`custom_stages::lists`).\n    pub fn entry_lists(\n        &mut self, owner: usize, enabled: bool,\n        lists: impl FnOnce() -> Result<crate::engine::stages::custom_stages::Lists, &'static str>,\n    ) -> Entry {\n        if self.owner != Some(owner) {\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): Training Stage Rotation enters from lists built with the save's custom stages (entry_lists; entry keeps its catalog lists)"
+    },
+    {
+     "old": "        self.current = None;\n        match self.cycle.prepare_preferences(true, order, prefs, false) {\n            Ok(Some(selection)) => match native_stage(selection) {\n",
+     "new": "        self.current = None;\n        match self.cycle.prepare_lists(true, lists, false) {\n            Ok(Some(selection)) => match native_stage(selection) {\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): Training Stage Rotation enters from lists built with the save's custom stages (entry_lists; entry keeps its catalog lists)"
+    },
+    {
+     "old": "            Err(why) => Entry::Refused(why),\n        }\n    }\n\n",
+     "new": "            Err(why) => Entry::Refused(why),\n        }\n    }\n\n    /// rc.14: the stage the next genuine entry would prepare (rotation only), for a custom stage's read-ahead.\n    pub fn peek(&self, lists: &crate::engine::stages::custom_stages::Lists) -> Option<Selection> {\n        self.cycle.peek_lists(lists, false)\n    }\n\n",
+     "reason": "rc.14 custom stages after cs-proof-2 (the primary 2026-11-15 ~05:18Z: list and data through the game's own save object, never a file): peek: the next entry's stage"
     }
    ]
   },
@@ -10680,7 +10760,7 @@
    "dest": "src/runtime/seams/seam_install.rs",
    "crate": "root",
    "src_sha256": "8c81d985258c0189ec1161fdc60efe573952596c55325cce07fbe9dc8c7503cd",
-   "dest_sha256": "cb7b76eec0d3ae6f4c85f70ddfbba30201e1299612e0de19cf15fbf76b70e19a",
+   "dest_sha256": "a139f78fc0f156e0b3752c6e029797374f1481ef826a3c3e434d4d09984ee05c",
    "edits": [
     {
      "old": "use crate::model;\n",
@@ -10786,6 +10866,11 @@
      "old": "    \"cpu_level\",\n",
      "new": "    \"cpu_level\",\n    \"hide_cpu\",\n",
      "reason": "rc.14 Hide CPU (SPEC-eggsercise V2.6; the operator 2026-11-14): the new seam group hide_cpu joins the authoritative groups (its rows are in rows_cpu_level.ROWS.tsv)"
+    },
+    {
+     "old": "    \"training_stage_rotation\",\n    \"hazard_manager\",\n",
+     "new": "    \"training_stage_rotation\",\n    // rc.14 custom stages: the loader is called only when every row is stock (approved fail-safe guard).\n    \"custom_stages\",\n    \"hazard_manager\",\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): the custom_stages group is authoritative (the loader is called only when every row is stock)"
     }
    ]
   },
@@ -21399,7 +21484,7 @@
    "dest": "src/runtime/lobby/training_stage_rotation.rs",
    "crate": "root",
    "src_sha256": "28da0ade48dbe422fe6adbe67c5412d803410ccdc0e70a0d3f374398b670c739",
-   "dest_sha256": "cd00f094da6f94abfa43cb257509123946a4755d3838c09041f39077851fc872",
+   "dest_sha256": "3fb0369aad4bc5cd8efea3d2a2fdb6fa05490925a2cc51a69fe2b822d746cae6",
    "edits": [
     {
      "old": "//! the native setter itself stores.\n\nuse crate::engine::stages::training_stage_rotation_policy as policy;\n\nuse std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};\nuse std::sync::Mutex;\n\nuse skyline::hooks::{getRegionAddress, InlineCtx, Region};\nuse {crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};\nuse crate::runtime::compat::sync::read;\n\n",
@@ -21425,6 +21510,31 @@
      "old": "    let enabled = enabled();\n    let result = ROTATION.lock().apply(enabled, |native| {\n        // Same catalog row the waiting preload reads: 40-bit package hash at +0x18.\n",
      "new": "    let enabled = enabled();\n    let result = ROTATION.lock().apply(enabled, previous, |native| {\n        // Same catalog row the waiting preload reads: 40-bit package hash at +0x18.\n",
      "reason": "rc.13 item 3 (the operator 2026-11-13: the stage picked before the character select is not honoured): Training Stage Rotation lets the stage select pick open Training; a pick the sequence has not carried before (its first entry, or a new pick) stands and the cursor stays, later returns through the character select rotate (apply takes the descriptor previous id)"
+    },
+    {
+     "old": "    let prefs = crate::runtime::compat::common::menu::stage_preferences();\n    let outcome = ROTATION.lock().entry(context, enabled, order, &prefs);\n    if outcome != policy::Entry::Disabled {\n",
+     "new": "    let prefs = crate::runtime::compat::common::menu::stage_preferences();\n    // rc.14: the lists carry the save's custom stages (`custom_stages::lists`).\n    let outcome = ROTATION.lock().entry_lists(context, enabled,\n        || crate::runtime::lobby::custom_stages::lists(order, &prefs));\n    if outcome != policy::Entry::Disabled {\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): the rotation uses lists with custom stages; a custom entry is loaded into the rule and the descriptor carries the setter's 325 byte (fallback: Training's own stage, notice)"
+    },
+    {
+     "old": "        Ok(Some(applied)) => {\n            // Index-0 practice descriptor: the fingerprinted setter stores the\n",
+     "new": "        Ok(Some(applied)) => {\n            // rc.14: a custom stage goes into the rule first (the game's loader), and the descriptor carries the byte the\n            // setter copies for stage 325 (+0x98). A refusal keeps Training's own stage (the approved fallback and notice).\n            if applied.native == crate::engine::stages::custom_stages::CUSTOM_STAGE_KIND {\n                let custom = applied.selection.and_then(|s| crate::engine::stages::custom_stages::decode(s.stage));\n                let byte = match custom {\n                    Some(id) => crate::runtime::lobby::custom_stages::load(id).map_err(|why| {\n                        crate::runtime::lobby::custom_stages::refused(id, why);\n                        why\n                    }),\n                    // A completed Change Stage reapplied: the rule still holds that stage.\n                    None => crate::runtime::lobby::custom_stages::save_byte().ok_or(\"custom stages unavailable\"),\n                };\n                match byte {\n                    Ok(byte) => crate::engine::seams::native_fields::write_unchecked(descriptor, 0x98, byte),\n                    Err(why) => {\n                        // Training's own stage loads: the rotation no longer knows the stage on screen.\n                        ROTATION.lock().direct_uncertain();\n                        log(format_args!(\"[TrainingRotation] custom apply refused: {why}\"));\n                        return;\n                    }\n                }\n            }\n            // Index-0 practice descriptor: the fingerprinted setter stores the\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): the rotation uses lists with custom stages; a custom entry is loaded into the rule and the descriptor carries the setter's 325 byte (fallback: Training's own stage, notice)"
+    },
+    {
+     "old": "                    // A completed Change Stage reapplied: the rule still holds that stage.\n                    None => crate::runtime::lobby::custom_stages::save_byte().ok_or(\"custom stages unavailable\"),\n                };\n",
+     "new": "                    // A completed Change Stage reapplied: the rule still holds that stage.\n                    None => crate::runtime::lobby::custom_stages::save_byte().ok_or(\"custom stage rule not readable\"),\n                };\n",
+     "reason": "rc.14 custom stages (compliance: refusals cite an approved restriction): the diagnostic wording of a custom stage not loaded"
+    },
+    {
+     "old": "                        ROTATION.lock().direct_uncertain();\n                        log(format_args!(\"[TrainingRotation] custom apply refused: {why}\"));\n                        return;\n",
+     "new": "                        ROTATION.lock().direct_uncertain();\n                        log(format_args!(\"[TrainingRotation] custom stage not loaded, native stage kept: {why}\"));\n                        return;\n",
+     "reason": "rc.14 custom stages (compliance: refusals cite an approved restriction): the diagnostic wording of a custom stage not loaded"
+    },
+    {
+     "old": "            mode.melee, unsafe { crate::runtime::compat::common::is_native_training_mode() }));\n    }\n}\n\n",
+     "new": "            mode.melee, unsafe { crate::runtime::compat::common::is_native_training_mode() }));\n    }\n}\n\n/// rc.14: the stage Training Stage Rotation's next genuine entry would take (On only), for a custom stage's read-ahead.\npub(crate) fn peek_next() -> Option<crate::engine::stages::lobby_stages::Selection> {\n    if !VERIFIED.load(Ordering::Acquire) || !enabled() {\n        return None;\n    }\n    let order = read(&MENU).lobby_stages;\n    let prefs = crate::runtime::compat::common::menu::stage_preferences();\n    let lists = crate::runtime::lobby::custom_stages::lists_quiet(order, &prefs).ok()?;\n    ROTATION.try_lock()?.peek(&lists)\n}\n\n",
+     "reason": "rc.14 custom stages after cs-proof-2 (the primary 2026-11-15 ~05:18Z: list and data through the game's own save object, never a file): peek_next: the stage the next entry takes, for the read-ahead"
     }
    ]
   },
@@ -27111,7 +27221,7 @@
    "dest": "src/runtime/lobby/practice_stage_request.rs",
    "crate": "root",
    "src_sha256": "a8da0a25cd70d8782d76e6eb8c21a1a5e80a052314bb20dc57d3de0bd5d8d211",
-   "dest_sha256": "1a956c5e412caf420d2c938d82a189ba5a4b997ca95340e9cb29743d71970630",
+   "dest_sha256": "a361bc61c0656076868dfb19ad1f0b8d84e0249604b82ebe7dd43354bc4dd837",
    "edits": [
     {
      "old": "notification(\"Practice Stage\".into(), message, 180);",
@@ -27202,6 +27312,41 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "old": "    if let Some(mut state)=STATE.try_lock() { state.retire(); }\n}\n",
+     "new": "    if let Some(mut state)=STATE.try_lock() { state.retire(); }\n    // rc.14: once the scene has changed, the rule gets back what it held before a custom stage was loaded into it.\n    crate::runtime::lobby::custom_stages::depart();\n}\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): Change Stage loads a custom stage into the rule (custom_stages::load) as its last fallible step and carries the setter's 325 byte at +0x98; departure gives the rule back"
+    },
+    {
+     "old": "    check(EPOCH.load(Ordering::Acquire)==ticket.scene.epoch,\"scene epoch changed\")?;\n    Ok(plan)\n",
+     "new": "    check(EPOCH.load(Ordering::Acquire)==ticket.scene.epoch,\"scene epoch changed\")?;\n    // rc.14: a custom stage goes into the rule first (the game's loader), and the descriptor carries the byte the setter\n    // copies for stage 325. The last fallible step: nothing is written unless every guard holds; a refusal leaves the\n    // stage on screen and says why (\"Stage unchanged: \u2026\").\n    if let Some(id)=crate::engine::stages::custom_stages::decode(ticket.selection.stage) {\n        plan.1[0x98]=crate::runtime::lobby::custom_stages::load(id)?;\n    }\n    Ok(plan)\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): Change Stage loads a custom stage into the rule (custom_stages::load) as its last fallible step and carries the setter's 325 byte at +0x98; departure gives the rule back"
+    },
+    {
+     "old": "                    Phase::Complete => Some(\"Stage ready\".to_owned()),\n                    Phase::Refused(why) => Some(format!(\"Stage unchanged: {why}\")),\n",
+     "new": "                    Phase::Complete => Some(\"Stage ready\".to_owned()),\n                    // rc.14: the custom stage's approved notice is already up.\n                    Phase::Refused(why) if why == crate::runtime::lobby::custom_stages::NOTICE_POSTED => None,\n                    Phase::Refused(why) => Some(format!(\"Stage unchanged: {why}\")),\n",
+     "reason": "rc.14 custom stages (compliance: refusals cite an approved restriction): a custom stage Change Stage could not load posts the approved notice (custom-stage-missing) instead of its own \"Stage unchanged\""
+    },
+    {
+     "old": "    // rc.14: a custom stage goes into the rule first (the game's loader), and the descriptor carries the byte the setter\n    // copies for stage 325. The last fallible step: nothing is written unless every guard holds; a refusal leaves the\n    // stage on screen and says why (\"Stage unchanged: \u2026\").\n    if let Some(id)=crate::engine::stages::custom_stages::decode(ticket.selection.stage) {\n",
+     "new": "    // rc.14: a custom stage goes into the rule first (the game's loader), and the descriptor carries the byte the setter\n    // copies for stage 325. The last fallible step: nothing is written unless every guard holds; otherwise the stage on\n    // screen stays and the approved notice says which custom stage was not loaded.\n    if let Some(id)=crate::engine::stages::custom_stages::decode(ticket.selection.stage) {\n",
+     "reason": "rc.14 custom stages (compliance: refusals cite an approved restriction): a custom stage Change Stage could not load posts the approved notice (custom-stage-missing) instead of its own \"Stage unchanged\""
+    },
+    {
+     "old": "    if let Some(id)=crate::engine::stages::custom_stages::decode(ticket.selection.stage) {\n        plan.1[0x98]=crate::runtime::lobby::custom_stages::load(id)?;\n    }\n",
+     "new": "    if let Some(id)=crate::engine::stages::custom_stages::decode(ticket.selection.stage) {\n        match crate::runtime::lobby::custom_stages::load(id) {\n            Ok(byte) => plan.1[0x98]=byte,\n            Err(why) => {\n                crate::runtime::lobby::custom_stages::refused(id,why);\n                return Err(crate::runtime::lobby::custom_stages::NOTICE_POSTED);\n            }\n        }\n    }\n",
+     "reason": "rc.14 custom stages (compliance: refusals cite an approved restriction): a custom stage Change Stage could not load posts the approved notice (custom-stage-missing) instead of its own \"Stage unchanged\""
+    },
+    {
+     "old": "    if !VERIFIED.load(Ordering::Acquire) { return; }\n    let Some(mut state)=STATE.try_lock() else { return };\n",
+     "new": "    if !VERIFIED.load(Ordering::Acquire) { return; }\n    // rc.14: the custom stages' list snapshot and read through the game's save object, in scope (this update runs in\n    // Training and the waiting-room practice only).\n    crate::runtime::lobby::custom_stages::service(mode==crate::engine::stages::training_stage_rotation_policy::TRAINING_MODE);\n    let Some(mut state)=STATE.try_lock() else { return };\n",
+     "reason": "rc.14 custom stages after cs-proof-2 (the primary 2026-11-15 ~05:18Z: list and data through the game's own save object, never a file): each in-scope update runs custom_stages::service (list snapshot, the game's read); a custom Change Stage ticket waits queued for the read, or fails with the approved notice"
+    },
+    {
+     "old": "    }\n    match prepare(ticket,state.settled) {\n",
+     "new": "    }\n    // rc.14: a custom stage waits, queued, for the game's read of it (`custom_stages::service`).\n    if let Some(id)=crate::engine::stages::custom_stages::decode(ticket.selection.stage) {\n        use crate::runtime::lobby::custom_stages::{self as custom, Readiness};\n        custom::pick(id);\n        match custom::readiness(id) {\n            Readiness::Waiting => { state.queued=Some(ticket); return; }\n            Readiness::Failed => {\n                custom::pick(0);\n                custom::refused(id,\"the game's read of it did not finish\");\n                state.phase(Phase::Refused(custom::NOTICE_POSTED));\n                return;\n            }\n            Readiness::Ready => custom::pick(0),\n        }\n    }\n    match prepare(ticket,state.settled) {\n",
+     "reason": "rc.14 custom stages after cs-proof-2 (the primary 2026-11-15 ~05:18Z: list and data through the game's own save object, never a file): each in-scope update runs custom_stages::service (list snapshot, the game's read); a custom Change Stage ticket waits queued for the read, or fails with the approved notice"
     }
    ]
   },
@@ -28527,7 +28672,7 @@
    "dest": "src/runtime/lobby/lobby_stage.rs",
    "crate": "root",
    "src_sha256": "0b660f82e43258aaee60241bc531c29d8a35e17078a038f35b79ecd03f11dd37",
-   "dest_sha256": "7e6a3dc076915e6e91eaf55e3b34f7d98e9f0cc83f76345ef29c8e1a1527bd66",
+   "dest_sha256": "852c10ffb5e584bdd60749c3b8b1bcbc3ac52e3842d454f51108405edd9112f5",
    "edits": [
     {
      "line_patch": [
@@ -28555,6 +28700,21 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "old": "    let mut cycles = CYCLES.lock().unwrap();\n    match cycles[index].prepare_preferences(menu.lobby_practice == OnOff::ON,\n        menu.lobby_stages, &prefs, true)\n        .and_then(|selection| selection.map(|selection| native_stage(selection)\n",
+     "new": "    let mut cycles = CYCLES.lock().unwrap();\n    // rc.14: the lists carry the save's custom stages (`custom_stages::lists`).\n    match cycles[index].prepare_lists(menu.lobby_practice == OnOff::ON,\n        || crate::runtime::lobby::custom_stages::lists(menu.lobby_stages, &prefs), true)\n        .and_then(|selection| selection.map(|selection| native_stage(selection)\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): the waiting-room entry uses lists with custom stages and loads a custom pick into the rule before its resources are requested (fallback: native stage, notice)"
+    },
+    {
+     "old": "            .map(|stage| (selection, stage))).transpose()) {\n        Ok(selection) => selection,\n        Err(why) => {\n",
+     "new": "            .map(|stage| (selection, stage))).transpose()) {\n        Ok(Some((selection, stage))) => {\n            // A custom stage goes into the rule now, before its resources are requested; on any refusal the entry keeps\n            // the native waiting stage (the approved fallback and notice) and the reservation is dropped.\n            if let Some(id) = crate::engine::stages::custom_stages::decode(selection.stage) {\n                // SAFETY: MainThread, inside the native resource callback or the setter's call site.\n                if let Err(why) = unsafe { crate::runtime::lobby::custom_stages::load(id) } {\n                    crate::runtime::lobby::custom_stages::refused(id, why);\n                    cycles[index].cancel_preload();\n                    return None;\n                }\n            }\n            Some((selection, stage))\n        }\n        Ok(None) => None,\n        Err(why) => {\n",
+     "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): the waiting-room entry uses lists with custom stages and loads a custom pick into the rule before its resources are requested (fallback: native stage, notice)"
+    },
+    {
+     "old": "            None\n        }\n    }\n}\n\nfn consume_entry(index: usize) -> Option<(Selection, u32)> {\n",
+     "new": "            None\n        }\n    }\n}\n\n/// rc.14: the stage the next waiting-room entry would take (Lobby Practice On), for a custom stage's read-ahead: this\n/// waiting family's, or local wireless's from Training.\npub(crate) fn peek_next() -> Option<Selection> {\n    let menu = read(&MENU);\n    if menu.lobby_practice != OnOff::ON {\n        return None;\n    }\n    let prefs = crate::runtime::compat::common::menu::stage_preferences();\n    let lists = crate::runtime::lobby::custom_stages::lists_quiet(menu.lobby_stages, &prefs).ok()?;\n    let index = crate::runtime::lobby::game_mode::current().and_then(|mode| cycle_index(mode.mode)).unwrap_or(0);\n    let cycles = CYCLES.try_lock().ok()?;\n    cycles[index].peek_lists(&lists, true)\n}\n\nfn consume_entry(index: usize) -> Option<(Selection, u32)> {\n",
+     "reason": "rc.14 custom stages after cs-proof-2 (the primary 2026-11-15 ~05:18Z: list and data through the game's own save object, never a file): peek_next: the stage the next waiting entry takes, for the read-ahead"
     }
    ]
   },

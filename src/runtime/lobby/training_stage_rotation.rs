@@ -46,12 +46,25 @@ pub(crate) fn training_entry(context: usize) {
         (menu.training_stage_rotation == OnOff::ON, menu.lobby_stages)
     };
     let prefs = crate::runtime::compat::common::menu::stage_preferences();
-    let outcome = ROTATION.lock().entry(context, enabled, order, &prefs);
+    // rc.14: the lists carry the save's custom stages (`custom_stages::lists`).
+    let outcome = ROTATION.lock().entry_lists(context, enabled,
+        || crate::runtime::lobby::custom_stages::lists(order, &prefs));
     if outcome != policy::Entry::Disabled {
         log(format_args!(
             "[TrainingRotation] entry owner=0x{context:x} melee=0x{:02x} native_training={} outcome={outcome:?}",
             mode.melee, unsafe { crate::runtime::compat::common::is_native_training_mode() }));
     }
+}
+
+/// rc.14: the stage Training Stage Rotation's next genuine entry would take (On only), for a custom stage's read-ahead.
+pub(crate) fn peek_next() -> Option<crate::engine::stages::lobby_stages::Selection> {
+    if !VERIFIED.load(Ordering::Acquire) || !enabled() {
+        return None;
+    }
+    let order = read(&MENU).lobby_stages;
+    let prefs = crate::runtime::compat::common::menu::stage_preferences();
+    let lists = crate::runtime::lobby::custom_stages::lists_quiet(order, &prefs).ok()?;
+    ROTATION.try_lock()?.peek(&lists)
 }
 
 /// The product reenter succeeded for `context`; its next age-zero call is a return.
@@ -85,6 +98,28 @@ pub(crate) unsafe fn resource_request(ctx: &InlineCtx, mode: crate::runtime::lob
     });
     match result {
         Ok(Some(applied)) => {
+            // rc.14: a custom stage goes into the rule first (the game's loader), and the descriptor carries the byte the
+            // setter copies for stage 325 (+0x98). A refusal keeps Training's own stage (the approved fallback and notice).
+            if applied.native == crate::engine::stages::custom_stages::CUSTOM_STAGE_KIND {
+                let custom = applied.selection.and_then(|s| crate::engine::stages::custom_stages::decode(s.stage));
+                let byte = match custom {
+                    Some(id) => crate::runtime::lobby::custom_stages::load(id).map_err(|why| {
+                        crate::runtime::lobby::custom_stages::refused(id, why);
+                        why
+                    }),
+                    // A completed Change Stage reapplied: the rule still holds that stage.
+                    None => crate::runtime::lobby::custom_stages::save_byte().ok_or("custom stage rule not readable"),
+                };
+                match byte {
+                    Ok(byte) => crate::engine::seams::native_fields::write_unchecked(descriptor, 0x98, byte),
+                    Err(why) => {
+                        // Training's own stage loads: the rotation no longer knows the stage on screen.
+                        ROTATION.lock().direct_uncertain();
+                        log(format_args!("[TrainingRotation] custom stage not loaded, native stage kept: {why}"));
+                        return;
+                    }
+                }
+            }
             // Index-0 practice descriptor: the fingerprinted setter stores the
             // stage id at +0 and the package hash at +8. No other byte changes.
             crate::engine::seams::native_fields::write_unchecked(descriptor, 0, applied.native);

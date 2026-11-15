@@ -65,16 +65,18 @@ pub struct GridLayout {
     pub rows: u8,
     /// Docked grids use the short names (SPEC-core-03 §2.5).
     pub short_names: bool,
+    /// rc.14: the save's custom stages, extra tiles after the catalog on the two stage grids (counted when the grid opens).
+    pub extra: u16,
 }
 
 impl GridLayout {
     pub const fn new(kind: GridKind, mode: ConsoleMode) -> GridLayout {
         if let GridKind::Roster(_) = kind {
-            return GridLayout { kind, mode, cols: ROSTER_COLS, rows: ROSTER_ROWS, short_names: true };
+            return GridLayout { kind, mode, cols: ROSTER_COLS, rows: ROSTER_ROWS, short_names: true, extra: 0 };
         }
         match mode {
-            ConsoleMode::Docked => GridLayout { kind, mode, cols: 5, rows: 8, short_names: true },
-            ConsoleMode::Handheld => GridLayout { kind, mode, cols: 4, rows: 4, short_names: false },
+            ConsoleMode::Docked => GridLayout { kind, mode, cols: 5, rows: 8, short_names: true, extra: 0 },
+            ConsoleMode::Handheld => GridLayout { kind, mode, cols: 4, rows: 4, short_names: false, extra: 0 },
         }
     }
 
@@ -82,10 +84,18 @@ impl GridLayout {
     pub const fn tiles(&self) -> usize {
         match self.kind {
             GridKind::Items => ITEM_TILES,
-            GridKind::Stages => STAGE_TILES,
-            GridKind::StageChange => STAGE_TILES - 1,
+            GridKind::Stages => STAGE_TILES + self.extra as usize,
+            GridKind::StageChange => STAGE_TILES - 1 + self.extra as usize,
             GridKind::Roster(_) => ROSTER_TILES,
         }
+    }
+
+    /// The same grid with `n` custom stages after the catalog (stage grids only; the other grids keep their tiles).
+    pub const fn with_custom_stages(mut self, n: u16) -> GridLayout {
+        if matches!(self.kind, GridKind::Stages | GridKind::StageChange) {
+            self.extra = n;
+        }
+        self
     }
 
     /// The tile number of the grid's first cell (1 for Change Stage, whose first tile is the first stage).

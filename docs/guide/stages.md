@@ -42,6 +42,25 @@ changes it for both.
 ![Change Stage on Battlefield [N] loads it with its platforms; Y to Omega and A loads the same stage flat](../media/rc13-stage-forms.gif)<br>
 *The same stage, two forms. A on Battlefield [N] loads it with its platforms; Y changes the tile to [Ω] and A loads it flat (both loads are cut). Each press is named in a box. Eden, rc.13 (untested on hardware).*
 
+## Custom stages
+
+The stages you made in Stage Builder are in the lists too. Each one is a tile after the game's stages, on Change Stage
+and on Lobby Stages, under the name you gave it. Make three, and the grids end with three more tiles.
+
+- **Change Stage** goes to one in Training or in a waiting room, like any other stage.
+- **Lobby Stages** can put them in the list, so waiting rooms, and Training with rotation On, move through them too.
+  In Direct, A on one goes there now.
+- A custom stage has one form: Y does nothing on its tile.
+- **Deleted in Stage Builder:** the stage leaves every grid and every list you kept. The next stages move up to close
+  the gap.
+- If your Direct stage was a custom stage you deleted, the next room opens on the game stage you had as Direct before
+  it (the Waiting Room if none), and the notice reads "Custom stage missing: ‹its name›".
+- The game reads a custom stage from your save when it is needed. Change Stage waits a moment for it. Training Stage
+  Rotation and the waiting rooms read the next one while you practice, so the first entry after the game starts can
+  open a normal stage with the notice, and the next one opens the custom stage.
+- If a custom stage can't be loaded right then (for example while the game is saving), you get that notice too, and a
+  normal stage opens instead. On Change Stage the stage on screen stays.
+
 ## Lobby Stages
 
 Fighters & Stages › [Lobby Stages](../menu/fighters-and-stages.md#lobby-stages) is the list the waiting rooms, and

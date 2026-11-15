@@ -912,6 +912,33 @@ fn replay_capture_toggle_writes_its_ini() {
 
 // ---- N5: paging by console mode ------------------------------------------------------------------
 
+fn custom_stages_are_extra_tiles_at_the_end_of_both_stage_grids() {
+    // rc.14: 3 Stage Builder stages in the save are 3 more tiles after the 117 catalog stages, on Change Stage and on
+    // Lobby Stages; none in the save leaves both grids as they were.
+    for (key, kind, before) in [("Change Stage", GridKind::StageChange, 117), ("Lobby Stages", GridKind::Stages, 118)] {
+        for (customs, tiles) in [(0u16, before), (3, before + 3)] {
+            let mut m = menu_with(Env { console: ConsoleMode::Handheld, custom_stages: customs, ..Env::default() });
+            goto(&mut m, key);
+            m.press(Button::A);
+            let Some(Screen::Grid { layout, .. }) = m.screen().copied() else { panic!("{key}: {:?}", m.screen()) };
+            assert_eq!(layout.kind, kind);
+            assert_eq!(layout.tiles(), tiles, "{key} with {customs} custom stages");
+            let last = layout.pages() - 1;
+            let cells = layout.page_len(last);
+            assert_eq!(layout.tile(last, cells - 1), Some(117 + usize::from(customs)), "{key}: the last tile is the last custom stage");
+        }
+    }
+}
+
+fn reset_page_resets_the_stage_order_with_custom_stages_too() {
+    // rc.14: Lobby Stages keeps two values (the catalog order and the order with custom stages); Reset page sets both back.
+    let mut m = menu();
+    m.set_kept("lobby_stage_order", serde_json::json!({"all": false, "entries": [{"custom": 12}]}));
+    goto(&mut m, "Lobby Stages");
+    reset_page(&mut m);
+    assert_eq!(m.kept("lobby_stage_order"), Some(&serde_json::json!({"all": false, "entries": [{"stage": 311}]})));
+}
+
 fn change_stage_comes_before_the_rotation_rows_and_opens_the_stages_without_all() {
     let mut m = menu_with(Env { console: ConsoleMode::Docked, ..Env::default() });
     let titles: Vec<&str> = (0..m.entry_count(Page::FightersStages))
@@ -1038,6 +1065,8 @@ fn case_table() {
         ("chord_text_and_row_conversion", chord_text_and_row_conversion as fn()),
         ("left_right_flip_a_toggle_row_as_a_does", left_right_flip_a_toggle_row_as_a_does as fn()),
         ("replay_capture_toggle_writes_its_ini", replay_capture_toggle_writes_its_ini as fn()),
+        ("custom_stages_are_extra_tiles_at_the_end_of_both_stage_grids", custom_stages_are_extra_tiles_at_the_end_of_both_stage_grids as fn()),
+        ("reset_page_resets_the_stage_order_with_custom_stages_too", reset_page_resets_the_stage_order_with_custom_stages_too as fn()),
         ("change_stage_comes_before_the_rotation_rows_and_opens_the_stages_without_all", change_stage_comes_before_the_rotation_rows_and_opens_the_stages_without_all as fn()),
         ("grid_screen_pages_with_l_r_and_keeps_the_cursor_on_a_tile", grid_screen_pages_with_l_r_and_keeps_the_cursor_on_a_tile as fn()),
     ]);
