@@ -314,6 +314,100 @@ def pt_return_verdict(kept, since_keep, back):
             'pt_problems': problems}
 
 
+DESTROY_RECORDS = re.compile(r'\[Destroy\] records owner=0 holder=(0x[0-9a-f]+) trainer_counts Some\(\((\d+), (\d+)\)\) -> '
+                             r'Some\(\((\d+), (\d+)\)\)')
+FREES = r'\[GroupSwap\] (frees now|left cycle|pause frees) owner=0 group=\d+ kinds=\[%s\]'
+
+
+def a2_aegis(ctx):
+    """Limit 2, Aegis (after probe a0): a Pyra/Mythra window kept across a forced Reload (`reload window aegis`), then its
+    warm return. Pass: the keep and its `partner holder` line, the kept `[5a, 5b]` group's attach, ready on Pyra or Mythra,
+    no fallback, two presses applied after; no bad line."""
+    t0, out = _begin(ctx)
+    _knob(ctx, 'window')
+    seq = hs.diag_mark(ctx)
+    fx._live_set(ctx, player_roster=fs._roster([fs.PIKACHU, PYRA]), cycle_preload_ready_fighters=fs.RF(10))
+    out['settle0'] = fs._settled(ctx, seq, 120)
+    out['pyra_built'] = bool(hs.wait_diag(ctx, seq, r'background built owner=0 group=\d+ ok=true reason=\S+ kinds=\[5a, 5b\]', 90))
+    _, out['to_pyra'] = af._pick(ctx, 0, PYRA)
+    out['settle1'] = fs._settled(ctx, hs.diag_mark(ctx), 90)
+    out['window'] = [hex(k) for k in (af._window(ctx, 0) or [])]
+    lines = af._keep_across(ctx, out, 0, fs.BOWSER, 'reload window aegis')
+    _knob(ctx, 'window')
+    out['partner'] = [t[:300] for t in lines if 'partner holder=' in t][:2]
+    out['probe'] = [t[:400] for t in lines if PROBE.search(t)][:2]
+    kept = out['kept'][-1] if out['kept'] else None
+    seq = hs.diag_mark(ctx)
+    _, out['picked_back'] = af._pick(ctx, 0, PYRA)
+    time.sleep(3.0)
+    back = af._since(ctx, seq)
+    group = kept[0] if kept else None
+    out['attach'] = [t[:200] for t in back if group is not None
+                     and re.search(r'\[GroupSwap\] attach owner=0 group=%d member=\d+ kinds=\[5a, 5b\]' % group, t)][:2]
+    out['ready'] = [t[:200] for t in back if re.search(r'\[BodyBank\] ready owner=0 index=\d+ kind=0x5[ab] ', t)][:2]
+    out['fallback'] = [t[:200] for t in back if re.search(r'\[GroupSwap\] fallback owner=0 ', t)][:2]
+    out['laps'] = [fs._brief(fs._press_cycle(ctx, 0)) for _ in range(2)]
+    out['bad'] = af._bad(af._since(ctx, seq) + lines)
+    _shot(ctx, out, 'shot_pyra', 'a2-aegis-back')
+    _mark(t0, out, 'done')
+    problems = []
+    if not kept or sorted(kept[1]) != [0x5a, 0x5b] or not out['partner']:
+        problems.append('the Aegis window was not kept: window %s, kept %s, not kept %s' % (out['window'], out['kept'], out['not_kept']))
+    if not out['attach'] or not out['ready'] or out['fallback']:
+        problems.append('no warm return to the kept Aegis window: attach %s ready %s fallback %s' % (out['attach'], out['ready'], out['fallback']))
+    if not all(p.get('outcome') for p in out['laps']):
+        problems.append('a press after the return did not apply: %s' % out['laps'])
+    problems += ['bad line: %s' % t for t in out['bad']]
+    return _finish(ctx, 'a2-aegis', out, problems)
+
+
+BUILT = r'background built owner=0 group=\d+ ok=true reason=\S+ kinds=\[%s\]'
+P4_STEPS = [([fs.PIKACHU, PT], [BUILT % '24, 25, 26']),
+            ([fs.PIKACHU, PYRA], [FREES % '24, 25, 26', BUILT % '5a, 5b']),
+            ([fs.PIKACHU, fs.PALUTENA], [FREES % '5a, 5b'])]
+
+
+def a2_p4(ctx):
+    """p4: tearing down a PT and then an Aegis group gives back finalize's shared trainer count. P1 on Pikachu (outside
+    both groups), the lane goes PT -> Pyra -> Palutena, so each native group is built in the background, leaves the cycle
+    and parks; a Training pause after each step frees what parked (operator decision 23:42Z, `hs.pause_frees`). Pass:
+    every `[Destroy] records` line drops exactly one of `S+0x1968` (PT holder) or `S+0x1980` (Aegis holder), and at least
+    one of each kind came."""
+    t0, out = _begin(ctx)
+    _knob(ctx, 'off')
+    seq0 = hs.diag_mark(ctx)
+    _, out['to_pikachu'] = af._pick(ctx, 0, fs.PIKACHU)
+    out['steps'] = []
+    for i, (lane, waits) in enumerate(P4_STEPS):
+        seq = hs.diag_mark(ctx)
+        fx._live_set(ctx, player_roster=fs._roster(lane), cycle_preload_ready_fighters=fs.RF(8))
+        step = {'lane': [hex(k) for k in lane], 'seen': [bool(hs.wait_diag(ctx, seq, w, 90)) for w in waits]}
+        try:   # informational: the verdict is the counts below
+            step['pause'] = hs.pause_frees(ctx, 'a2-p4-pause%d' % i, expect_freed=0)
+        except RuntimeError as failed:
+            step['pause'] = str(failed)[:300]
+        out['steps'].append(step)
+    time.sleep(2.0)
+    found = [m.groups() for t in af._since(ctx, seq0) for m in [DESTROY_RECORDS.search(t)] if m]
+    out['destroys'] = found[:8]
+    pt = aegis = 0
+    problems = []
+    for holder, a, b, a2, b2 in found:
+        da, db = int(a) - int(a2), int(b) - int(b2)
+        if (da, db) == (1, 0):
+            pt += 1
+        elif (da, db) == (0, 1):
+            aegis += 1
+        else:
+            problems.append('holder %s: counts (%s, %s) -> (%s, %s), not one given back' % (holder, a, b, a2, b2))
+    out['given_back'] = {'pt': pt, 'aegis': aegis}
+    _mark(t0, out, 'done')
+    if not pt or not aegis:
+        problems.append('a PT and an Aegis teardown were both needed: %s (steps %s)' % (out['given_back'], out['steps']))
+    problems += ['bad line: %s' % t for t in af._bad(af._since(ctx, seq0))]
+    return _finish(ctx, 'a2-p4', out, problems)
+
+
 def a2_aegis_probe(ctx):
     """a0, diag only: what the Reload start does to an Aegis window's holder (AFULL2-RESEARCH.md "Aegis"). No keep."""
     t0, out = _begin(ctx)

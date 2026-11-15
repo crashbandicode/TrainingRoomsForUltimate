@@ -32,6 +32,8 @@ ROWS = [
     ('a2-restore', M, 'a2_restore', 3, "The knob off, cycle-fix's restore."),
     # Reloads out of native windows last: cycle-fix 23:47Z, the pins `settle(None)` drops on such a Reload (a1's crash).
     ('a2-pt', M, 'a2_pt', 10, 'Limit 2 PT p1-p4: the PT window kept by `reload window pt`, articles retired; warm back, rebuilt; laps; counts.'),
+    ('a2-aegis', M, 'a2_aegis', 8, 'Limit 2 Aegis: a Pyra window kept by `reload window aegis`, the partner holder intact; warm back, ready, no fallback.'),
+    ('a2-p4', M, 'a2_p4', 8, 'p4: PT then Aegis groups parked (lane PT -> Pyra -> Palutena) and freed by a pause; each `[Destroy] records` gives back one count.'),
     # The primary ~00:33Z: a1-enable's pair rows (a1.py at rc14/a1-enable 0997fe4a) with A1 on, for the kept-pair fix.
     ('a1-paircontrol2', 'a1.py', 'a1_paircontrol', 5, 'Control: the pair as a planner-built group, Diddy Kong to Popo: warm, ready, no fallback.'),
     ('a1-pair', 'a1.py', 'a1_pair', 9, 'Ready Fighters 10, CPU Solo Popo Off: the pair window kept (flags 4, as N3 parks it), then its warm return; no Unmapped.'),
@@ -59,12 +61,12 @@ def plan(skip=()):
         {'state': 'Training, Ready Fighters 8, P1 original > Pikachu > Kirby > Palutena, CPU original > Mii Gunner > '
                   'Pichu > Diddy Kong > King K. Rool, every Loading row at the card value (its live values)',
          'via': 'hook', 'ref': 'cyclefix.py:cf_setup'},
-        {'state': 'Per row: diag-cycle.req `window` / `reload window` / `window strip` / `reload window pt` / `reload`, '
+        {'state': 'Per row: diag-cycle.req `window` / `reload window` / `window strip` / `reload window pt` / `reload window aegis` / `reload`, '
                   'the lanes and Ready Fighters by live settings; Kirby hats by the Kirby Hats shortcut',
          'via': 'hook', 'ref': 'afull2.py'}]
     setup[0] = dict(setup[0], state=setup[0]['state'] + '; TrainingRooms NRO swapped in by prep_run.py --tr-nro')
     return {'game_id': '01006A800016E000', 'start': 'frontend-ready', 'early_stop': False, 'on_failure': 'continue',
-            'scope': 'rc.14 a-full-2: one boot, the boot rows, the a2-* rows (S1, K-strip, PT, probe a0), z-boot.',
+            'scope': 'rc.14 a-full-2: one boot, the boot rows, the a2-* rows (S1, K-strip, PT, Aegis, p4, probe a0), z-boot.',
             'setup': setup, 'segments': segs, 'gates': mp.gates(),
             'recover': [{'run': 'steps.py:recover_training', 'check': True}], 'gif_presets': {},
             'rows': mp.boot_rows() + [row(*r) for r in ROWS if r[0] not in skip and r[0] not in AFTER_Z] + [mp.end_row()]
