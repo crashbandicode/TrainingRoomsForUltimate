@@ -8474,7 +8474,7 @@
    "dest": "src/model/swap/capacity_creation.rs",
    "crate": "consts",
    "src_sha256": "f130c2364f384fd3ab98e41b45416b73ed3c595dfa8e5576721a1f855157a304",
-   "dest_sha256": "8a37d7111c79d037a4879afeb5ce24373c1b75e5b404d6ff547fee5d0a69b923",
+   "dest_sha256": "6b77ca56c8689d46918a3329954817f9c7ad4132a90ae6dbbe48a7989ce7a9cf",
    "edits": [
     {
      "table_tests": true,
@@ -8526,6 +8526,21 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "old": "    position.map_or(limit, |position| limit.min(helpers + position))\n}\n",
+     "new": "    position.map_or(limit, |position| limit.min(helpers + position))\n}\n\n/// The created entries creation may still offer while a refusal stands for the extra at `position` in the scene's\n/// creation order (`character_sources::created_allowance`): the extras before it and the refused one itself, so its\n/// preflight runs again on each helper callback and a pass clears the hold. Nothing past it is offered.\n/// rc.14 creation-hold (the primary 2026-11-15 ~09:20Z): fail-first stub, today's cap that ends AT the refused extra.\npub fn held_allowance(allowance: usize, position: Option<usize>) -> usize {\n    position.map_or(allowance, |position| allowance.min(position))\n}\n",
+     "reason": "rc.14 creation-hold fail-first: rc.14 creation-hold: held_allowance stub (today's cap) and its fail-first case; created_allowance calls it"
+    },
+    {
+     "old": "\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+     "new": "\n    /// rc.14 creation-hold (Eden final pass on b9f34f02: smoke2r-f1 #1303 and cycle-f1 #2527, `capacity creation waiting\n    /// slot=6 \u2026 \"bank: active input row is not the committed bank member's\"`, then no creation for the rest of the boot,\n    /// 1,134 s and 662 s): a refusal at the extra in position 1 (slot 6) with slot 7 created capped the allowance at 1, so\n    /// slot 6 was never offered again, its preflight never ran again and the hold never cleared. The refused extra stays\n    /// offered (the designed wait: its preflight is evaluated again on every helper callback); none past it.\n    fn a_refused_creation_stays_offered_so_its_preflight_runs_again() {\n        assert_eq!(held_allowance(4, Some(1)), 2, \"slot 7 created, slot 6 refused: slot 6 is still offered\");\n        assert_eq!(held_allowance(4, Some(0)), 1, \"slot 7 refused: slot 7 is still offered\");\n        assert_eq!(held_allowance(4, None), 4, \"no hold: the plan's allowance\");\n        assert_eq!(held_allowance(1, Some(1)), 1, \"never more than the plan's allowance\");\n        assert_eq!(held_limit(9, 2, Some(1)), 3, \"the readiness line's count is unchanged\");\n    }\n\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+     "reason": "rc.14 creation-hold fail-first: rc.14 creation-hold: held_allowance stub (today's cap) and its fail-first case; created_allowance calls it"
+    },
+    {
+     "old": "            (\"the_line_names_the_sp1_owner\", the_line_names_the_sp1_owner as fn()),\n        ]);\n",
+     "new": "            (\"the_line_names_the_sp1_owner\", the_line_names_the_sp1_owner as fn()),\n            (\"a_refused_creation_stays_offered_so_its_preflight_runs_again\",\n                a_refused_creation_stays_offered_so_its_preflight_runs_again as fn()),\n        ]);\n",
+     "reason": "rc.14 creation-hold fail-first: rc.14 creation-hold: held_allowance stub (today's cap) and its fail-first case; created_allowance calls it"
     }
    ]
   },
@@ -14123,7 +14138,7 @@
    "dest": "src/runtime/roster/character_sources.rs",
    "crate": "root",
    "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-   "dest_sha256": "3e1366a0448069855bdf64eabce9fddb155b1adf6f3396b3753f951eeb77a53e",
+   "dest_sha256": "0d52fd5261304d2bfba61abe27f5172bbc1ed8c2095cbf687fa5f4233ece60a4",
    "edits": [
     {
      "delete_from": "/// Skip plugin automations for an owned helper body.",
@@ -16651,6 +16666,11 @@
      "old": "    // rc.6 window admission (primary 2026-11-09 13:28Z): a created entry's load also leaves what the cycle waits for.\n    let memory_cost = crate::engine::swap::body_bank::memory::helper_cost(wanted.kind);\n    let memory_committed = if speculative {\n        let (decision, sample) = if is_capacity { super::process_memory::admit_created(memory_cost) } else { super::process_memory::admit(memory_cost) };\n",
      "new": "    // rc.6 window admission (primary 2026-11-09 13:28Z): a created entry's load also leaves what the cycle waits for;\n    // rc.14 mem-headroom F1: so does a seat's (`memory::speculative_admission`).\n    let memory_cost = crate::engine::swap::body_bank::memory::helper_cost(wanted.kind);\n    let memory_committed = if speculative {\n        let (decision, sample) = super::process_memory::admit_speculative(memory_cost);\n",
      "reason": "rc.14 mem-headroom fix: F1 seat speculative loads leave what the cycle waits for; F2 pause-time give-back of idle created helpers for a group held for memory, the honest notice; the diag [MemoryCensus] line (the primary 2026-11-15)"
+    },
+    {
+     "old": "    state.creation_hold.filter(|(epoch,_)|state.book.is_current(*epoch)).map_or(allowance,|(_,position)|allowance.min(usize::from(position)))\n",
+     "new": "    // rc.14 creation-hold: the refused extra stays offered, so its preflight runs again and a pass clears the hold.\n    creation::held_allowance(allowance,state.creation_hold.filter(|(epoch,_)|state.book.is_current(*epoch)).map(|(_,position)|usize::from(position)))\n",
+     "reason": "rc.14 creation-hold fail-first: rc.14 creation-hold: held_allowance stub (today's cap) and its fail-first case; created_allowance calls it"
     }
    ]
   },

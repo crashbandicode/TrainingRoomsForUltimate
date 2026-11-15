@@ -191,6 +191,14 @@ pub fn held_limit(limit: usize, helpers: usize, position: Option<usize>) -> usiz
     position.map_or(limit, |position| limit.min(helpers + position))
 }
 
+/// The created entries creation may still offer while a refusal stands for the extra at `position` in the scene's
+/// creation order (`character_sources::created_allowance`): the extras before it and the refused one itself, so its
+/// preflight runs again on each helper callback and a pass clears the hold. Nothing past it is offered.
+/// rc.14 creation-hold (the primary 2026-11-15 ~09:20Z): fail-first stub, today's cap that ends AT the refused extra.
+pub fn held_allowance(allowance: usize, position: Option<usize>) -> usize {
+    position.map_or(allowance, |position| allowance.min(position))
+}
+
 /// Result of the exact-Mii proof for one layout owner. A Mii kind alone is not a proof.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExactMiiProof {
@@ -472,6 +480,19 @@ mod tests {
             "owner index=1 count=1 kind=0x4a proof=not-applicable (not ordinary, grouped, a ready bank or a proven exact Mii)");
     }
 
+    /// rc.14 creation-hold (Eden final pass on b9f34f02: smoke2r-f1 #1303 and cycle-f1 #2527, `capacity creation waiting
+    /// slot=6 … "bank: active input row is not the committed bank member's"`, then no creation for the rest of the boot,
+    /// 1,134 s and 662 s): a refusal at the extra in position 1 (slot 6) with slot 7 created capped the allowance at 1, so
+    /// slot 6 was never offered again, its preflight never ran again and the hold never cleared. The refused extra stays
+    /// offered (the designed wait: its preflight is evaluated again on every helper callback); none past it.
+    fn a_refused_creation_stays_offered_so_its_preflight_runs_again() {
+        assert_eq!(held_allowance(4, Some(1)), 2, "slot 7 created, slot 6 refused: slot 6 is still offered");
+        assert_eq!(held_allowance(4, Some(0)), 1, "slot 7 refused: slot 7 is still offered");
+        assert_eq!(held_allowance(4, None), 4, "no hold: the plan's allowance");
+        assert_eq!(held_allowance(1, Some(1)), 1, "never more than the plan's allowance");
+        assert_eq!(held_limit(9, 2, Some(1)), 3, "the readiness line's count is unchanged");
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
@@ -482,6 +503,8 @@ mod tests {
             ("sp1_return_visit_admits_the_proven_visible_mii_cpu", sp1_return_visit_admits_the_proven_visible_mii_cpu as fn()),
             ("body_bank_row_needs_the_committed_window_and_its_active_member", body_bank_row_needs_the_committed_window_and_its_active_member as fn()),
             ("the_line_names_the_sp1_owner", the_line_names_the_sp1_owner as fn()),
+            ("a_refused_creation_stays_offered_so_its_preflight_runs_again",
+                a_refused_creation_stays_offered_so_its_preflight_runs_again as fn()),
         ]);
     }
     }

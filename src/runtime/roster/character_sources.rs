@@ -727,7 +727,8 @@ fn created_allowance(state:&State,backend:Backend)->usize {
         if *purpose==Some(Purpose::Hat) {hats+=1;} else {fighters+=1;}
     }
     let allowance=crate::engine::preload::hat_slots::created_allowance(fighters,hats,helpers.len(),created,backend==Backend::Training);
-    state.creation_hold.filter(|(epoch,_)|state.book.is_current(*epoch)).map_or(allowance,|(_,position)|allowance.min(usize::from(position)))
+    // rc.14 creation-hold: the refused extra stays offered, so its preflight runs again and a pass clears the hold.
+    creation::held_allowance(allowance,state.creation_hold.filter(|(epoch,_)|state.book.is_current(*epoch)).map(|(_,position)|usize::from(position)))
 }
 
 /// P-HOT §3.5.1 rule 2: a speculative hat-only load admitted on Training's entry 3 publishes the borrow record.
