@@ -983,7 +983,7 @@ mod tests {
 
     fn drill_units_share_clip_editor_and_save_same_kind() {
         use crate::engine::macro_ui::{clip_panel::{clip_help, ClipAction, ClipContext, ClipEditor, ClipEffect}, macro_panel::{MacroUi, NameContext, Effect as NameEffect, CLIP_NAME_TOKEN}};
-        use crate::model::{combo::{InputCapture, Snap}, combo_record::UnitKind};
+        use crate::model::{combo::InputCapture, combo_record::UnitKind, frame_strip::Snap};
         let mut capture = InputCapture::new();
         for (frame, buttons) in [(0, 1), (2, 0), (23, 2), (25, 0), (46, 1), (48, 0)] {
             capture.step(Snap { buttons, facing: 1, ..Snap::empty(frame) });

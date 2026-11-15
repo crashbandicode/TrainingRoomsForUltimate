@@ -9,7 +9,7 @@ fn capture(script: &[(u32,u32)]) -> Combo {
 }
 fn run(helper: &mut Helper, until: u32, script: &[(u32,u32)]) {
     let mut buttons=0;
-    for f in 0..=until { if let Some((_,b))=script.iter().find(|(at,_)| *at==f) { buttons=*b; }
+    for f in 0..=until { if let Some((_,b))=script.iter().find(|(at,_)| *at==f) { buttons = *b; }
         helper.settings = Settings::factory(); helper.step_inputs(snap(f,buttons), &mut Out::default());
     }
 }
