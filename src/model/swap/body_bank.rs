@@ -3372,22 +3372,36 @@ mod tests {
     }
 
     fn both_banks_with_a_deferred_group_build_then_admit_it() {
-        use super::memory::{group_cost, outstanding};
+        use super::memory::{admit, group_cost, outstanding, Admission};
         // Primary 2026-11-10 22:15Z: both banks hold a deferred Planned group behind a Prefetched one, and both must make
-        // progress. `final-surface-i3-nt-7d720c68` at #346: each bank's pair group Prefetched and one member Planned (P1
-        // [Samus], the CPU [0xf]), 565 MB of headroom, 478 MB held by the two pair groups' builds.
-        let groups = [[Members::pair_group(), Members::new(&[0x03]).unwrap()], [Members::pair_group(), Members::new(&[0x0f]).unwrap()]];
+        // progress. From `final-surface-i3-nt-7d720c68` #346: each bank's pair group Prefetched and one member Planned (P1
+        // [Samus], the CPU [0xf]) at 565 MB of headroom; then the pair's unmeasured build was charged 2 x DEFAULT_BUILD, so
+        // the two pair builds held 478 MB and both Planned groups deferred.
+        // rc.14 ic-pair-cost: the pair is charged its measured cost now (build 19.4 MB, 21.8 MB held each), so at #346's
+        // headroom nothing defers any more: both Planned groups are admitted at once and every group builds.
+        let pairs = [[Members::pair_group(), Members::new(&[0x03]).unwrap()], [Members::pair_group(), Members::new(&[0x0f]).unwrap()]];
         let at_346 = [[GroupState::Prefetched, GroupState::Planned]; 2];
-        assert_eq!(2 * outstanding(GroupState::Prefetched, group_cost(&[POPO, NANA])), 478_642_176);
-        // Tick 0 defers both (#345/#346), tick 1 builds both pair groups, tick 2 admits both deferred groups.
-        assert_eq!(step_banks(groups, at_346, 565_465_088, true), ([Some(2), Some(2)], [[GroupState::Built; 2]; 2]));
+        assert_eq!(2 * outstanding(GroupState::Prefetched, group_cost(&[POPO, NANA])), 43_646_976);
+        assert_eq!(step_banks(pairs, at_346, 565_465_088, true), ([Some(0), Some(0)], [[GroupState::Built; 2]; 2]));
+        // The scenario itself stands with a front group whose measured build is still large: Game & Watch alone (built
+        // 98.4 MiB as a single), 116.1 MB held by each bank's Prefetched build, 232.2 MB by both. At 310 MB of headroom
+        // [Samus] (need 173.3 MB) and [0xf] (need 96.3 MB) each fit the headroom but not beside both builds: deferred.
+        let fronts = [[Members::new(&[GAME_WATCH]).unwrap(), Members::new(&[0x03]).unwrap()],
+            [Members::new(&[GAME_WATCH]).unwrap(), Members::new(&[0x0f]).unwrap()]];
+        let held = 2 * outstanding(GroupState::Prefetched, group_cost(&[GAME_WATCH]));
+        assert_eq!(held, 232_243_200);
+        assert_eq!(admit(Some(310_000_000), held, group_cost(&[0x03])).admission, Admission::Defer, "P1's [Samus] defers");
+        assert_eq!(admit(Some(310_000_000), held, group_cost(&[0x0f])).admission, Admission::Defer, "the CPU's [0xf] defers");
+        // Tick 0 defers both, tick 1 builds both front groups, tick 2 admits both deferred groups.
+        assert_eq!(step_banks(fronts, at_346, 310_000_000, true), ([Some(2), Some(2)], [[GroupState::Built; 2]; 2]));
         // `7d720c68`'s pick re-picked both deferred prefetches on every tick, and nothing moved.
-        assert_eq!(step_banks(groups, at_346, 565_465_088, false), ([None, None], at_346));
-        // One bank (the docs lane, 22:24Z: a heavy draw with a reserve), the other with nothing left to do. 300 MB covers
-        // [Samus] (173 MB) but not beside the pair group's build (239 MB held): it waits for its own bank's build.
+        assert_eq!(step_banks(fronts, at_346, 310_000_000, false), ([None, None], at_346));
+        // One bank (the docs lane, 22:24Z: a heavy draw with a reserve), the other with nothing left to do. 250 MB covers
+        // [Samus] (173.3 MB) but not beside the front group's build (116.1 MB held): it waits for its own bank's build.
         let one = [at_346[0], [GroupState::Built; 2]];
-        assert_eq!(step_banks(groups, one, 300_000_000, true), ([Some(2), None], [[GroupState::Built; 2]; 2]));
-        assert_eq!(step_banks(groups, one, 300_000_000, false), ([None, None], one));
+        assert_eq!(admit(Some(250_000_000), held / 2, group_cost(&[0x03])).admission, Admission::Defer);
+        assert_eq!(step_banks(fronts, one, 250_000_000, true), ([Some(2), None], [[GroupState::Built; 2]; 2]));
+        assert_eq!(step_banks(fronts, one, 250_000_000, false), ([None, None], one));
     }
 
     fn a_canonical_reload_of_the_window_shape_retires_a_one_member_bank() {
