@@ -2673,7 +2673,7 @@
    "dest": "src/model/mii/ordinary_cpu.rs",
    "crate": "mii",
    "src_sha256": "e4628b4e3e7a00dc2c29d715b9755284f5afa3446513824912066178f0cc6caf",
-   "dest_sha256": "2044c8bd3cc6f92607ce66520189b679eeccef8dda01a9897113bd56a9973ba2",
+   "dest_sha256": "bd29e7177fa178d3828ab0bd0facc6f07f62f172f74c901f4bad74b7d45a865d",
    "edits": [
     {
      "old": "/// and an extra index/selector equal to the destination refuses. A protected set\n/// that cannot fit the fixed record table refuses instead of truncating.\npub fn assignment_with(layout:crate::engine::mii::backend::Layout,extras:crate::engine::mii::capacity::Extras,\n    destination:usize,owners:&[Option<Owner>;8])->Option<[Option<u16>;8]> {\n    if !layout.selector(destination) || extras.entry(destination).is_some() {return None;}\n    if !layout.shape_with(&owners.map(|o|o.map_or(0,|o|o.entry)),extras) {\n        return None;\n    }\n    let mut protected = [None; 8];\n    let mut used = 0;\n",
@@ -2961,6 +2961,11 @@
      "old": "            (\"ordinary_cycle_commits_kirby_mario_and_exact_origin\", ordinary_cycle_commits_kirby_mario_and_exact_origin as fn()),\n        ]);\n",
      "new": "            (\"ordinary_cycle_commits_kirby_mario_and_exact_origin\", ordinary_cycle_commits_kirby_mario_and_exact_origin as fn()),\n            (\"a_freed_mii_with_a_hat_waits_for_its_own_group_instead_of_a_reload\",\n                a_freed_mii_with_a_hat_waits_for_its_own_group_instead_of_a_reload as fn()),\n        ]);\n",
      "reason": "rc.14 mii-freed fail-first: rc.14 mii-freed: demand_gate stub (today's gate) and its fail-first case; the CPU demand gate calls it"
+    },
+    {
+     "old": "/// rc.14 mii-freed (the primary 2026-11-15 ~11:40Z): fail-first stub, today's gate (a hat change always Reloads).\npub fn demand_gate(reuse:bool,replay:bool,refresh_partners:bool,same_class:bool,hat_change:bool,mii_group:bool)->bool {\n    let _=mii_group;\n    !reuse && !replay && !refresh_partners && !same_class && !hat_change\n",
+     "new": "/// rc.14 mii-freed (the primary 2026-11-15 ~11:40Z): a hat change used to send every such press to the Reload, so a\n/// Mii whose group a shrink (or any release) had freed came back canonically when its hat differed from the CPU's\n/// (Eden rr2-n3 #880-#900). A saved Mii's group carries its own hat, so only a non-Mii hat change keeps the Reload.\npub fn demand_gate(reuse:bool,replay:bool,refresh_partners:bool,same_class:bool,hat_change:bool,mii_group:bool)->bool {\n    !reuse && !replay && !refresh_partners && !same_class && (!hat_change || mii_group)\n",
+     "reason": "rc.14 mii-freed fix: rc.14 mii-freed: a saved Mii served by its own group waits for it even with a hat change (demand_gate)"
     }
    ]
   },

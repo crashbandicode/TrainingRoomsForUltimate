@@ -40,10 +40,11 @@ pub fn cpu_hat_route(layout:crate::engine::mii::backend::Layout,owner:usize,befo
 /// rc.14 cycle fix (Design A): whether a CPU press with no reachable group may wait for its own group
 /// (`body_bank::demand`) instead of today's Reload. `mii_group`: the target is a saved Mii served by the role's Mii
 /// group, whose plan carries the configuration's own hat (`mii_identity_of`) and whose prefetch registers it.
-/// rc.14 mii-freed (the primary 2026-11-15 ~11:40Z): fail-first stub, today's gate (a hat change always Reloads).
+/// rc.14 mii-freed (the primary 2026-11-15 ~11:40Z): a hat change used to send every such press to the Reload, so a
+/// Mii whose group a shrink (or any release) had freed came back canonically when its hat differed from the CPU's
+/// (Eden rr2-n3 #880-#900). A saved Mii's group carries its own hat, so only a non-Mii hat change keeps the Reload.
 pub fn demand_gate(reuse:bool,replay:bool,refresh_partners:bool,same_class:bool,hat_change:bool,mii_group:bool)->bool {
-    let _=mii_group;
-    !reuse && !replay && !refresh_partners && !same_class && !hat_change
+    !reuse && !replay && !refresh_partners && !same_class && (!hat_change || mii_group)
 }
 
 /// A changed headgear row cannot reuse the retained O's kind*42+3 resource key.
