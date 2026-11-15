@@ -33,6 +33,7 @@ import gna_p2_fs as fs  # noqa: E402
 import fx  # noqa: E402
 import cyclefix as cf  # noqa: E402
 import afull as af  # noqa: E402
+import steps  # noqa: E402
 from gna import _begin, _mark, _shot, _finish  # noqa: E402
 
 PT, PYRA = 0x24, 0x5a
@@ -370,7 +371,7 @@ P4_STEPS = [([fs.PIKACHU, PT], [BUILT % '24, 25, 26']),
 def a2_p4(ctx):
     """p4: tearing down a PT and then an Aegis group gives back finalize's shared trainer count. P1 on Pikachu (outside
     both groups), the lane goes PT -> Pyra -> Palutena, so each native group is built in the background, leaves the cycle
-    and parks; a Training pause after each step frees what parked (operator decision 23:42Z, `hs.pause_frees`). Pass:
+    and parks; a Training pause after each step frees what parked (operator decision 23:42Z, as `hs.pause_frees`). Pass:
     every `[Destroy] records` line drops exactly one of `S+0x1968` (PT holder) or `S+0x1980` (Aegis holder), and at least
     one of each kind came."""
     t0, out = _begin(ctx)
@@ -382,10 +383,12 @@ def a2_p4(ctx):
         seq = hs.diag_mark(ctx)
         fx._live_set(ctx, player_roster=fs._roster(lane), cycle_preload_ready_fighters=fs.RF(8))
         step = {'lane': [hex(k) for k in lane], 'seen': [bool(hs.wait_diag(ctx, seq, w, 90)) for w in waits]}
-        try:   # informational: the verdict is the counts below
-            step['pause'] = hs.pause_frees(ctx, 'a2-p4-pause%d' % i, expect_freed=0)
-        except RuntimeError as failed:
-            step['pause'] = str(failed)[:300]
+        # Training's pause (Plus, held, Plus) frees what parked, as `hs.pause_frees` does; that helper also marks a guest
+        # trace this run has none of (boot a2-99b9083f-y1: KeyError 'trace_jsonl'). Informational: the verdict is the counts.
+        pause = hs.diag_mark(ctx)
+        steps.press(ctx, 'plus', 3.0)
+        steps.press(ctx, 'plus', 2.0)
+        step['pause_frees'] = [t[:200] for t in af._since(ctx, pause) if '] pause frees ' in t][:4]
         out['steps'].append(step)
     time.sleep(2.0)
     found = [m.groups() for t in af._since(ctx, seq0) for m in [DESTROY_RECORDS.search(t)] if m]
