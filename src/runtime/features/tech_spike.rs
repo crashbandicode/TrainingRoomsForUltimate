@@ -1,4 +1,4 @@
-//! S0 only: real hidden-CPU hit, counter calls for persistent guest traces, and a bounded ground walk.
+//! S0 only: real hidden-CPU hit, plugin-observed diag counters, and a bounded ground walk.
 //! Not a product mode or a product Training-only restriction. No hook, worker, or blocking lock added.
 //! `diag-tech-s0.req`: hidden | invisible | camera | walk | off. Each launch fixture is 60%, (0,30).
 
@@ -41,6 +41,8 @@ struct Spike {
     weight: f32,
     player_scope: Option<FrameReceipt>,
     cpu_scope: Option<FrameReceipt>,
+    status_before: i32,
+    launch_left: u8,
 }
 
 impl Spike {
@@ -53,6 +55,8 @@ impl Spike {
             weight: 0.0,
             player_scope: None,
             cpu_scope: None,
+            status_before: -1,
+            launch_left: 0,
         }
     }
 }
@@ -149,6 +153,30 @@ unsafe fn place(accessor: usize, x: f32, y: f32) {
     state::init_pos(accessor, &Vector3f { x, y, z: 0.0 });
 }
 
+/// Use the existing guarded, installed button-on seam, including TR's own pass-through hook for P1.
+unsafe fn guard_on(accessor: usize, button: i32) -> Option<bool> {
+    let offset = crate::model::sites_pkg2::CHECK_BUTTON_ON_HOOK_OFFSET;
+    if !game::granted(offset) {
+        return None;
+    }
+    let on: extern "C" fn(usize, i32) -> bool = std::mem::transmute(game::text_base() + offset);
+    Some(on(accessor, button))
+}
+
+/// The immediate post-call sample and the next three native P1 frame observations. No retained accessor.
+unsafe fn launch_sample(run: &Spike, player: usize, sample: u8) {
+    let Some(all) = id("KINETIC_ENERGY_RESERVE_ATTRIBUTE_ALL") else {
+        diagnostic(format_args!("[TechPractice] launch unavailable=energy_id"));
+        return;
+    };
+    let speed_x: extern "C" fn(usize, i32) -> f32 = std::mem::transmute(game::text_base() + 0x2043a00);
+    diagnostic(format_args!(
+        "[TechPractice] launch cpu_hidden={} set_attack=ok p1_status_before={} p1_status_after={} reaction={:.3} speed=({:.5},{:.5}) frame={} sample={sample} mode={}",
+        hide_cpu::hidden(), run.status_before, natives::status_kind(player), natives::damage_reaction(player),
+        speed_x(player, all), natives::sum_speed_y(player, all), run.age, run.mode
+    ));
+}
+
 /// Layout reads are independently guarded by the exact native accessors' 64-byte windows.
 /// Endpoints return SIMD q0 (not Rust's four-float HFA ABI), so read their guarded fields instead.
 unsafe fn point(line: usize, right: bool) -> Option<[f32; 2]> {
@@ -165,19 +193,40 @@ unsafe fn walk(accessor: usize) {
     let touch: extern "C" fn(usize, i32) -> usize = std::mem::transmute(game::text_base() + 0x2029fb0);
     let next: extern "C" fn(usize, *const [f32; 2]) -> usize = std::mem::transmute(game::text_base() + 0x15cbc60);
     let mut line = touch(accessor, down);
+    let seed = line;
     let mut seen = [0usize; 64];
     let mut end = [0.0; 2];
     for index in 0..seen.len() {
         if line == 0 || line & 7 != 0 || seen[..index].contains(&line) {
             diagnostic(format_args!("[TrainingRooms] tech_s0_walk end index={index} line=0x{line:x}"));
+            diagnostic(format_args!(
+                "[TechPractice] walk closed={} count={index}",
+                line != 0 && line == seed && index > 0
+            ));
             return;
         }
         seen[index] = line;
         let (Some(left), Some(right)) = (point(line, false), point(line, true)) else {
+            diagnostic(format_args!("[TechPractice] walk closed=false count={index} invalid_vertex=true"));
             return;
         };
         let normal = ((line + 0xa0) as *const [f32; 2]).read_unaligned();
         let flags = ((line + 0xc5) as *const u8).read();
+        let floor = flags & 8 != 0;
+        let wall = flags & 3 != 0;
+        let kind = if floor || normal[1] >= 0.7 {
+            "floor"
+        } else if wall {
+            "wall"
+        } else if normal[1] < 0.0 {
+            "ceiling"
+        } else {
+            "other"
+        };
+        diagnostic(format_args!(
+            "[TechPractice] walk line={index} left=({:.5},{:.5}) right=({:.5},{:.5}) normal=({:.5},{:.5}) floor={floor} wall={wall} kind={kind} flags={flags:#x}",
+            left[0], left[1], right[0], right[1], normal[0], normal[1]
+        ));
         diagnostic(format_args!(
             "[TrainingRooms] tech_s0_line index={index} line=0x{line:x} left={left:?} right={right:?} normal={normal:?} flags={flags:#x}"
         ));
@@ -190,6 +239,7 @@ unsafe fn walk(accessor: usize) {
         line = next(line, &end);
     }
     diagnostic(format_args!("[TrainingRooms] tech_s0_walk cap=64"));
+    diagnostic(format_args!("[TechPractice] walk closed={} count=64", line == seed));
 }
 
 /// Game thread only, from the existing CPU frame after Hide CPU and Eggs/BTT. No accessor is retained across frames.
@@ -244,6 +294,8 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>, launcher: boo
                 weight: natives::weight(at),
                 player_scope: receipt,
                 cpu_scope: None,
+                status_before: -1,
+                launch_left: 0,
             };
             if command <= 2 {
                 state::heal(at, -natives::damage(at, 0));
@@ -260,9 +312,21 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>, launcher: boo
                 natives::damage(at, 0),
                 natives::weight(at)
             ));
+            let cpu_kind = natives::module_accessor(1).and_then(|cpu| natives::fighter_kind(cpu)).unwrap_or(-1);
+            diagnostic(format_args!(
+                "[TechPractice] fixture p1_kind={} cpu_kind={cpu_kind} stage={} damage={:.3} weight={:.3}",
+                natives::fighter_kind(at).unwrap_or(-1),
+                natives::stage_id(),
+                natives::damage(at, 0),
+                natives::weight(at)
+            ));
         }
         if run.active {
             run.age = run.age.saturating_add(1);
+            if run.launch_left > 0 {
+                launch_sample(&run, at, 4 - run.launch_left);
+                run.launch_left -= 1;
+            }
             if run.phase <= 2 {
                 place(at, 0.0, 30.0);
             }
@@ -270,6 +334,19 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>, launcher: boo
                 let count: extern "C" fn(usize, i32) -> u8 = std::mem::transmute(game::text_base() + 0x20013c0);
                 let previous: extern "C" fn(usize, i32) -> u8 = std::mem::transmute(game::text_base() + 0x20013d0);
                 let (c, p) = (count(at, guard), previous(at, guard));
+                if let Some(guard_on) = guard_on(at, guard) {
+                    diagnostic(format_args!(
+                        "[TechPractice] v1 frame={} c={c} p={p} guard_on={guard_on} status={} grounded={} reaction={:.3} pos=({:.3},{:.3})",
+                        run.age,
+                        natives::status_kind(at),
+                        natives::is_grounded(at),
+                        natives::damage_reaction(at),
+                        natives::pos_x(at),
+                        natives::pos_y(at)
+                    ));
+                } else {
+                    diagnostic(format_args!("[TechPractice] v1 unavailable=button_guard frame={}", run.age));
+                }
                 if run.age <= 40 || c <= 3 || run.age % 60 == 0 {
                     diagnostic(format_args!(
                         "[TrainingRooms] tech_s0_p1 age={} c={c} p={p} status={} damage={:.3} pos={:.3},{:.3} reaction={:.3}",
@@ -293,6 +370,12 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>, launcher: boo
                 state::set_lr(at, 1.0);
                 state::heal(at, -natives::damage(at, 0));
                 if let Some(data) = AttackData::new(run.weight) {
+                    let Some(player) = natives::module_accessor(0) else {
+                        diagnostic(format_args!("[TechPractice] launch unavailable=player"));
+                        run.phase = 4;
+                        return;
+                    };
+                    run.status_before = natives::status_kind(player);
                     if run.mode == 2 {
                         // Approved DESIGN §8 variant: still invisible, but not frozen for this launch frame.
                         let stop: extern "C" fn(usize, i32, bool) = std::mem::transmute(game::text_base() + 0x2089260);
@@ -300,6 +383,8 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>, launcher: boo
                     }
                     let set: extern "C" fn(usize, i32, i32, *const AttackData) = std::mem::transmute(game::text_base() + 0x1fd0110);
                     set(at, 0, 0, &data);
+                    launch_sample(&run, player, 0);
+                    run.launch_left = 3;
                     diagnostic(format_args!(
                         "[TrainingRooms] tech_s0_launch mode={} age={} cpu={:.3},{:.3} stop={}",
                         run.mode,
