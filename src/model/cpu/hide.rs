@@ -16,6 +16,28 @@ pub fn step(away: &mut bool, scene: Scene, row: bool, request: bool) -> Option<b
     (std::mem::replace(away, wanted) || wanted).then_some(wanted)
 }
 
+/// The body's player tag (the floating label and arrow): the game's two per-fighter cursor work flags,
+/// `FIGHTER_INSTANCE_WORK_ID_FLAG_CURSOR` and `..._FLAG_NAME_CURSOR`, the pair the game's own cursor helper writes
+/// (`main+0x67db00`). `Some(shown)` to write, from the body's `step`.
+pub const fn tag(_step: Option<bool>) -> Option<bool> {
+    None
+}
+
+/// The HUD panels to hide, one bit per entry, from each body's `away` (in `FighterKey::index` order: two per entry).
+pub fn panels(_away: impl IntoIterator<Item = bool>) -> u8 {
+    0
+}
+
+/// The part of the `info_melee` layout that is `entry`'s HUD panel (portrait, name, damage, stocks).
+pub fn panel_part(_entry: usize) -> Option<[u8; 2]> {
+    None
+}
+
+/// One `info_melee` tick for one entry's panel: `Some(visible)` to write. `hidden` is whether this rule hid it.
+pub fn panel_write(_wanted: bool, _hidden: &mut bool) -> Option<bool> {
+    None
+}
+
 /// The notice for Play on CPU while the CPU is hidden: by a practice game's request, or by the row.
 pub const fn refusal(request: bool) -> &'static str {
     // restriction: hide-cpu-play

@@ -259,6 +259,11 @@ impl Cpu {
         if let Some(scene) = scene { self.scene = scene; }
     }
 
+    /// Hide CPU: the entries whose HUD panel is hidden (one bit each), the entries with a body hidden on its last frame.
+    pub fn hidden_panels(&self) -> u8 {
+        hide::panels(self.fighters.iter().map(|f| f.away))
+    }
+
     /// No native accessors are dereferenced during retirement.
     pub fn retire_entry(&mut self, entry: u32) {
         self.roles.retire_entry(entry);
