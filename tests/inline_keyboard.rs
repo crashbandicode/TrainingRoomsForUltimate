@@ -22,6 +22,18 @@ use mii::inline_keyboard::{Decision, Limit, Signals, Text};
 #[global_allocator]
 static ALLOCATOR: hook_stats::CountingAllocator = hook_stats::CountingAllocator;
 
+fn keyboard_minimum_is_explicit_in_both_transports() {
+    use mii::inline_keyboard::{minimum_length, write_name_lengths};
+    for (allow_empty, minimum) in [(false, 1u32), (true, 0u32)] {
+        let mut config = [0xa5; 0x4d0];
+        write_name_lengths(&mut config, 48, allow_empty);
+        assert_eq!(u32::from_le_bytes(config[0x3ac..0x3b0].try_into().unwrap()), 48);
+        assert_eq!(u32::from_le_bytes(config[0x3b0..0x3b4].try_into().unwrap()), minimum);
+        assert_eq!(minimum_length(allow_empty), minimum);
+        assert!(config[..0x3ac].iter().chain(config[0x3b4..].iter()).all(|b| *b == 0xa5));
+    }
+}
+
 fn enter_freezes_its_value_across_later_change_and_invalid_callbacks() {
     let mut signals = Signals { limit: Limit::Macro, ..Signals::default() };
     signals.enter(&[65, 66], 2);
@@ -93,6 +105,7 @@ fn keyboard_validation_does_not_allocate_on_first_or_repeated_use() {
 #[test]
 fn case_table() {
     crate::test_table::run(&[
+        ("keyboard_minimum_is_explicit_in_both_transports", keyboard_minimum_is_explicit_in_both_transports as fn()),
         ("enter_freezes_its_value_across_later_change_and_invalid_callbacks", enter_freezes_its_value_across_later_change_and_invalid_callbacks as fn()),
     ]);
 }

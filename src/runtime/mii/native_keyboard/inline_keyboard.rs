@@ -168,6 +168,10 @@ impl Keyboard {
     /// Must run on the bound UI thread. Applet-drawn mode still needs the
     /// operator's console acceptance; the normal inline mode requires a renderer.
     pub(crate) unsafe fn open(text: Text, thread: usize) -> Option<Self> {
+        Self::open_with_empty(text, thread, false)
+    }
+
+    pub(crate) unsafe fn open_with_empty(text: Text, thread: usize, allow_empty: bool) -> Option<Self> {
         if thread != current_thread() || sdk_work_size() != 0x698 {
             return None;
         }
@@ -197,7 +201,7 @@ impl Keyboard {
         let appear = Appear {
             keyboard_type: 0, ok_text: [0; 9], optional_left: 0, optional_right: 0,
             prediction: 0, disable_cancel: 0, disabled_keys: 0,
-            max_length: text.limit().units() as i32, min_length: 1,
+            max_length: text.limit().units() as i32, min_length: crate::engine::mii::inline_keyboard::minimum_length(allow_empty) as i32,
             enable_return: 0, padding0: [0; 3], flags: 0, use_save_data: 0,
             padding1: [0; 7], user_id: [0; 16],
         };

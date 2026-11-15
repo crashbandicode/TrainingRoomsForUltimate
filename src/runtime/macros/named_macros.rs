@@ -347,15 +347,15 @@ fn resume_name() {
         let ui = lock_read(&UI);
         let title = ui.native_name_title().unwrap_or(MACRO_KEYBOARD_TITLE);
         ui.name_prompt().zip(ui.native_name_cursor()).map(|(name, cursor)| {
-            (name.to_owned(), cursor, title)
+            (name.to_owned(), cursor, title, ui.native_name_allows_empty())
         })
     };
-    let Some((name, cursor, title)) = values else { pending.take(); return };
+    let Some((name, cursor, title, allow_empty)) = values else { pending.take(); return };
     let id = NAME_SERIAL.fetch_add(1, Ordering::Relaxed);
     let opened = if job.waiting {
-        crate::runtime::mii::native_keyboard::request_inline(id, &name, cursor)
+        crate::runtime::mii::native_keyboard::request_inline(id, &name, cursor, allow_empty)
     } else {
-        crate::runtime::mii::native_keyboard::request(id, title, &name)
+        crate::runtime::mii::native_keyboard::request(id, title, &name, allow_empty)
     };
     match opened {
         Ok(()) => {
@@ -545,17 +545,17 @@ fn request_native_name() {
         let ui = lock_read(&UI);
         let title = ui.native_name_title().unwrap_or(MACRO_KEYBOARD_TITLE);
         ui.name_prompt().zip(ui.native_name_cursor()).map(|(name, cursor)| {
-            (name.to_owned(), cursor, title)
+            (name.to_owned(), cursor, title, ui.native_name_allows_empty())
         })
     };
-    let Some((initial, cursor, title)) = values else { return };
+    let Some((initial, cursor, title, allow_empty)) = values else { return };
     let id = NAME_SERIAL.fetch_add(1, Ordering::Relaxed);
     let job = NameJob { id, generation: SESSION_GENERATION.load(Ordering::Relaxed),
         replay: crate::runtime::macros::replay_capture::panel_visible(), waiting: crate::runtime::ui::facts::fact_waiting_scene(),
         phase: NamePhase::Active };
     *NAME_JOB.lock().unwrap() = Some(job);
-    let result = if job.waiting { crate::runtime::mii::native_keyboard::request_inline(id, &initial, cursor) }
-        else { crate::runtime::mii::native_keyboard::request(id, title, &initial) };
+    let result = if job.waiting { crate::runtime::mii::native_keyboard::request_inline(id, &initial, cursor, allow_empty) }
+        else { crate::runtime::mii::native_keyboard::request(id, title, &initial, allow_empty) };
     if let Err(error) = result {
         NAME_JOB.lock().unwrap().take();
         notify(&error);

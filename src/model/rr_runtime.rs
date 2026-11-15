@@ -982,16 +982,24 @@ mod tests {
     }
 
     fn file_clip_empty_name_uses_unused_number() {
+        use crate::engine::macro_ui::{clip_panel::{ClipAction, ClipEditor, ClipEffect}, macro_panel::{MacroUi, NameContext, Effect as NameEffect, CLIP_NAME_TOKEN}};
+        let mut naming = MacroUi::new();
+        naming.offer_name(NameContext { token: CLIP_NAME_TOKEN, title: "Name macro" }, "Original", "Save as a new file");
+        let NameEffect::NameConfirmed { name, .. } = naming.confirm_native_name(String::new()) else { panic!("empty name confirmation"); };
         let root = scratch("clip-name");
         let source = recording("Macro 1", &[1, 2], None);
         let macros = Library::new(root.join(MACROS_DIR));
         macros.save_new(&source).unwrap();
-        let id = save_clip_file(&root, ClipFile::Macro(Box::new(source)), "  ").unwrap();
+        let mut editor = ClipEditor::macro_file(source, false).unwrap();
+        let ClipEffect::Export(kept) = editor.on_action(ClipAction::Confirm) else { panic!("macro export"); };
+        let id = save_clip_file(&root, ClipFile::Macro(kept), &name).unwrap();
         assert_eq!(macros.load(&id).unwrap().name, "Macro 2");
         let combos = ComboLibrary::new(root.join("combos"));
         let source = ComboRecord::new("Combo 1".into(), Combo::from_links([link(Move::Aerial, Move::SideTilt)]).unwrap(), None);
         combos.save_new(&source).unwrap();
-        let id = save_clip_file(&root, ClipFile::Combo(Box::new(source)), "").unwrap();
+        let mut editor = ClipEditor::combo_file(source).unwrap();
+        let ClipEffect::ExportCombo(kept) = editor.on_action(ClipAction::Confirm) else { panic!("combo export"); };
+        let id = save_clip_file(&root, ClipFile::Combo(kept), &name).unwrap();
         assert_eq!(combos.load(&id).unwrap().name, "Combo 2");
         std::fs::remove_dir_all(root).unwrap();
     }

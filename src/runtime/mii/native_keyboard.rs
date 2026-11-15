@@ -42,8 +42,6 @@ const MAX_NAME_LENGTH: u32 = {
     MAX_NAME_CHARS as u32
 };
 const _: () = assert!(OUTPUT_UTF16_UNITS * 2 == 0x7D4);
-/// Little-endian `u32` max length. The binding marks offset 0x3ac as that field.
-const MAX_LENGTH_OFFSET: usize = 0x3ac;
 /// `nn::Result` success. Eden models the same zero value as `ResultSuccess`.
 const SDK_SUCCESS: u32 = 0;
 /// Module SWKBD (159) description 1. The pinned binding treats only this as cancel.
@@ -72,7 +70,7 @@ pub enum KeyboardResult {
 
 /// Queue one keyboard request. `Ok` means the queue accepted it, not that the
 /// applet has closed. `id` is returned unchanged from [`poll`].
-pub fn request(id: u64, title: &str, initial: &str) -> Result<(), String> {
+pub fn request(id: u64, title: &str, initial: &str, allow_empty: bool) -> Result<(), String> {
     validate_title(title)?;
     validate_initial(initial)?;
     let job = Job {
@@ -80,16 +78,17 @@ pub fn request(id: u64, title: &str, initial: &str) -> Result<(), String> {
         title: title.to_string(),
         initial: initial.to_string(),
         inline: None,
+        allow_empty,
     };
     let mut guard = STATE.lock();
     enqueue(&mut guard, job)
 }
 
 /// Waiting-room names use UTF-16 cursor coordinates and the macro scalar limit.
-pub fn request_inline(id: u64, initial: &str, cursor: usize) -> Result<(), String> {
+pub fn request_inline(id: u64, initial: &str, cursor: usize, allow_empty: bool) -> Result<(), String> {
     let text = inline_keyboard::Text::macro_name(initial, cursor)
         .ok_or_else(|| "Invalid unfinished keyboard text/caret".to_string())?;
-    let job = Job { id, title: String::new(), initial: initial.to_owned(), inline: Some(text) };
+    let job = Job { id, title: String::new(), initial: initial.to_owned(), inline: Some(text), allow_empty };
     enqueue(&mut STATE.lock(), job)
 }
 
@@ -144,6 +143,7 @@ struct Job {
     title: String,
     initial: String,
     inline: Option<inline_keyboard::Text>,
+    allow_empty: bool,
 }
 
 struct InlineOwner { id: u64, keyboard: inline_keyboard::Keyboard }
@@ -258,7 +258,7 @@ pub fn service(allow_waiting: fn() -> bool) {
         // A Mii owner may still be finalizing. Keep the request queued, with its
         // cancellation flag intact, rather than opening a competing keyboard.
         if inline_keyboard::active() { STATE.lock().pending = Some(job); return; }
-        let keyboard = unsafe { inline_keyboard::Keyboard::open(text, inline_keyboard::current_thread()) };
+        let keyboard = unsafe { inline_keyboard::Keyboard::open_with_empty(text, inline_keyboard::current_thread(), job.allow_empty) };
         match keyboard {
             Some(keyboard) => service_inline(InlineOwner { id: job.id, keyboard }, allow_waiting),
             None => finish(&mut STATE.lock(), job.id, KeyboardResult::Failed(PREPARATION_FAILURE)),
@@ -274,7 +274,7 @@ pub fn service(allow_waiting: fn() -> bool) {
         return;
     };
     crate::engine::compat::logging::diagnostic(format_args!("[NativeKeyboard] begin id={}", job.id));
-    let result = show_native(&job.title, &job.initial);
+    let result = show_native(&job.title, &job.initial, job.allow_empty);
     // Do not put user-entered names in diagnostic logs.
     let code = match &result {
         KeyboardResult::Confirmed(_) => SDK_SUCCESS,
@@ -324,7 +324,7 @@ fn service_inline(mut owner: InlineOwner, allow_waiting: fn() -> bool) {
     STATE.lock().owner = Some(owner);
 }
 
-fn show_native(title: &str, initial: &str) -> KeyboardResult {
+fn show_native(title: &str, initial: &str, allow_empty: bool) -> KeyboardResult {
     let Ok(header) = utf16_z(title) else {
         return KeyboardResult::Failed(PREPARATION_FAILURE);
     };
@@ -357,7 +357,7 @@ fn show_native(title: &str, initial: &str) -> KeyboardResult {
     }
     // Preset and the text setters run first so a default max cannot remain in
     // the high bytes of the u32 at 0x3ac.
-    write_max_length(&mut arg.keyboard_config);
+    crate::engine::mii::inline_keyboard::write_name_lengths(&mut arg.keyboard_config, MAX_NAME_LENGTH, allow_empty);
 
     let mut output = vec![0u16; OUTPUT_UTF16_UNITS];
     // Give the SDK a plain descriptor, never a mutable Rust Box/Vec header.
@@ -379,11 +379,6 @@ fn utf16_z(text: &str) -> Result<Vec<u16>, ()> {
     }
     units.push(0);
     Ok(units)
-}
-
-fn write_max_length(config: &mut [u8; 0x4D0]) {
-    let start = MAX_LENGTH_OFFSET;
-    config[start..start + 4].copy_from_slice(&MAX_NAME_LENGTH.to_le_bytes());
 }
 
 fn allocate_work_buffer(size: usize) -> Result<*mut skyline::libc::c_void, ()> {
@@ -455,6 +450,7 @@ mod tests {
             title: "Name".to_string(),
             initial: String::new(),
             inline: None,
+            allow_empty: false,
         }
     }
 

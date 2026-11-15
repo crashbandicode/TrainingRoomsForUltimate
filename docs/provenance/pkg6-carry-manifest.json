@@ -21438,7 +21438,7 @@
    "dest": "src/runtime/mii/native_keyboard.rs",
    "crate": "root",
    "src_sha256": "6416fd30fcebbcd18e6672070a744b1321ea32c8ec9726f1ae7aaed7de718ef4",
-   "dest_sha256": "42d808b912ea6f2521aae847625e497610f64b3712e8c2c609590fb57bfc6456",
+   "dest_sha256": "013acd11da8aae2702302dd0902f9d1f39877a65951117bbe7a7b920cbd45c0f",
    "edits": [
     {
      "old": "use parking_lot::Mutex;",
@@ -21455,6 +21455,51 @@
      ],
      "macro": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "old": "            id,\n            title: \"Name\".to_string(),\n            initial: String::new(),\n            inline: None,\n        }\n    }\n\n    fn success_code_returns_decoded_text() {\n",
+     "new": "            id,\n            title: \"Name\".to_string(),\n            initial: String::new(),\n            inline: None,\n            allow_empty: false,\n        }\n    }\n\n    fn success_code_returns_decoded_text() {\n",
+     "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
+    },
+    {
+     "old": "        return Err(());\n    }\n    units.push(0);\n    Ok(units)\n}\n\nfn write_max_length(config: &mut [u8; 0x4D0]) {\n    let start = MAX_LENGTH_OFFSET;\n    config[start..start + 4].copy_from_slice(&MAX_NAME_LENGTH.to_le_bytes());\n}\n\nfn allocate_work_buffer(size: usize) -> Result<*mut skyline::libc::c_void, ()> {\n    let mut raw = std::ptr::null_mut();\n",
+     "new": "        return Err(());\n    }\n    units.push(0);\n    Ok(units)\n}\n\nfn allocate_work_buffer(size: usize) -> Result<*mut skyline::libc::c_void, ()> {\n    let mut raw = std::ptr::null_mut();\n",
+     "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
+    },
+    {
+     "old": "        set_initial_text_utf8(&mut arg, initial.as_ptr().cast());\n    }\n    // Preset and the text setters run first so a default max cannot remain in\n    // the high bytes of the u32 at 0x3ac.\n    write_max_length(&mut arg.keyboard_config);\n\n    let mut output = vec![0u16; OUTPUT_UTF16_UNITS];\n    // Give the SDK a plain descriptor, never a mutable Rust Box/Vec header.\n    // The pinned wrapper passes this same pointer + UTF-16-unit-count layout.\n",
+     "new": "        set_initial_text_utf8(&mut arg, initial.as_ptr().cast());\n    }\n    // Preset and the text setters run first so a default max cannot remain in\n    // the high bytes of the u32 at 0x3ac.\n    crate::engine::mii::inline_keyboard::write_name_lengths(&mut arg.keyboard_config, MAX_NAME_LENGTH, allow_empty);\n\n    let mut output = vec![0u16; OUTPUT_UTF16_UNITS];\n    // Give the SDK a plain descriptor, never a mutable Rust Box/Vec header.\n    // The pinned wrapper passes this same pointer + UTF-16-unit-count layout.\n",
+     "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
+    },
+    {
+     "old": "    }\n    STATE.lock().owner = Some(owner);\n}\n\nfn show_native(title: &str, initial: &str) -> KeyboardResult {\n    let Ok(header) = utf16_z(title) else {\n        return KeyboardResult::Failed(PREPARATION_FAILURE);\n    };\n    let Ok(initial) = CString::new(initial) else {\n",
+     "new": "    }\n    STATE.lock().owner = Some(owner);\n}\n\nfn show_native(title: &str, initial: &str, allow_empty: bool) -> KeyboardResult {\n    let Ok(header) = utf16_z(title) else {\n        return KeyboardResult::Failed(PREPARATION_FAILURE);\n    };\n    let Ok(initial) = CString::new(initial) else {\n",
+     "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
+    },
+    {
+     "old": "        STATE.lock().pending = Some(job);\n        return;\n    };\n    crate::engine::compat::logging::diagnostic(format_args!(\"[NativeKeyboard] begin id={}\", job.id));\n    let result = show_native(&job.title, &job.initial);\n    // Do not put user-entered names in diagnostic logs.\n    let code = match &result {\n        KeyboardResult::Confirmed(_) => SDK_SUCCESS,\n        KeyboardResult::Cancelled => SDK_CANCEL,\n",
+     "new": "        STATE.lock().pending = Some(job);\n        return;\n    };\n    crate::engine::compat::logging::diagnostic(format_args!(\"[NativeKeyboard] begin id={}\", job.id));\n    let result = show_native(&job.title, &job.initial, job.allow_empty);\n    // Do not put user-entered names in diagnostic logs.\n    let code = match &result {\n        KeyboardResult::Confirmed(_) => SDK_SUCCESS,\n        KeyboardResult::Cancelled => SDK_CANCEL,\n",
+     "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
+    },
+    {
+     "old": "        }\n        // A Mii owner may still be finalizing. Keep the request queued, with its\n        // cancellation flag intact, rather than opening a competing keyboard.\n        if inline_keyboard::active() { STATE.lock().pending = Some(job); return; }\n        let keyboard = unsafe { inline_keyboard::Keyboard::open(text, inline_keyboard::current_thread()) };\n        match keyboard {\n            Some(keyboard) => service_inline(InlineOwner { id: job.id, keyboard }, allow_waiting),\n            None => finish(&mut STATE.lock(), job.id, KeyboardResult::Failed(PREPARATION_FAILURE)),\n        }\n",
+     "new": "        }\n        // A Mii owner may still be finalizing. Keep the request queued, with its\n        // cancellation flag intact, rather than opening a competing keyboard.\n        if inline_keyboard::active() { STATE.lock().pending = Some(job); return; }\n        let keyboard = unsafe { inline_keyboard::Keyboard::open_with_empty(text, inline_keyboard::current_thread(), job.allow_empty) };\n        match keyboard {\n            Some(keyboard) => service_inline(InlineOwner { id: job.id, keyboard }, allow_waiting),\n            None => finish(&mut STATE.lock(), job.id, KeyboardResult::Failed(PREPARATION_FAILURE)),\n        }\n",
+     "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
+    },
+    {
+     "old": "    id: u64,\n    title: String,\n    initial: String,\n    inline: Option<inline_keyboard::Text>,\n}\n\nstruct InlineOwner { id: u64, keyboard: inline_keyboard::Keyboard }\n\n",
+     "new": "    id: u64,\n    title: String,\n    initial: String,\n    inline: Option<inline_keyboard::Text>,\n    allow_empty: bool,\n}\n\nstruct InlineOwner { id: u64, keyboard: inline_keyboard::Keyboard }\n\n",
+     "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
+    },
+    {
+     "old": "}\n\n/// Queue one keyboard request. `Ok` means the queue accepted it, not that the\n/// applet has closed. `id` is returned unchanged from [`poll`].\npub fn request(id: u64, title: &str, initial: &str) -> Result<(), String> {\n    validate_title(title)?;\n    validate_initial(initial)?;\n    let job = Job {\n        id,\n        title: title.to_string(),\n        initial: initial.to_string(),\n        inline: None,\n    };\n    let mut guard = STATE.lock();\n    enqueue(&mut guard, job)\n}\n\n/// Waiting-room names use UTF-16 cursor coordinates and the macro scalar limit.\npub fn request_inline(id: u64, initial: &str, cursor: usize) -> Result<(), String> {\n    let text = inline_keyboard::Text::macro_name(initial, cursor)\n        .ok_or_else(|| \"Invalid unfinished keyboard text/caret\".to_string())?;\n    let job = Job { id, title: String::new(), initial: initial.to_owned(), inline: Some(text) };\n    enqueue(&mut STATE.lock(), job)\n}\n\n/// Safe from retirement/input callbacks: only marks intent. Calc/Finalize always\n",
+     "new": "}\n\n/// Queue one keyboard request. `Ok` means the queue accepted it, not that the\n/// applet has closed. `id` is returned unchanged from [`poll`].\npub fn request(id: u64, title: &str, initial: &str, allow_empty: bool) -> Result<(), String> {\n    validate_title(title)?;\n    validate_initial(initial)?;\n    let job = Job {\n        id,\n        title: title.to_string(),\n        initial: initial.to_string(),\n        inline: None,\n        allow_empty,\n    };\n    let mut guard = STATE.lock();\n    enqueue(&mut guard, job)\n}\n\n/// Waiting-room names use UTF-16 cursor coordinates and the macro scalar limit.\npub fn request_inline(id: u64, initial: &str, cursor: usize, allow_empty: bool) -> Result<(), String> {\n    let text = inline_keyboard::Text::macro_name(initial, cursor)\n        .ok_or_else(|| \"Invalid unfinished keyboard text/caret\".to_string())?;\n    let job = Job { id, title: String::new(), initial: initial.to_owned(), inline: Some(text), allow_empty };\n    enqueue(&mut STATE.lock(), job)\n}\n\n/// Safe from retirement/input callbacks: only marks intent. Calc/Finalize always\n",
+     "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
+    },
+    {
+     "old": "    assert!(MAX_NAME_CHARS <= 500);\n    MAX_NAME_CHARS as u32\n};\nconst _: () = assert!(OUTPUT_UTF16_UNITS * 2 == 0x7D4);\n/// Little-endian `u32` max length. The binding marks offset 0x3ac as that field.\nconst MAX_LENGTH_OFFSET: usize = 0x3ac;\n/// `nn::Result` success. Eden models the same zero value as `ResultSuccess`.\nconst SDK_SUCCESS: u32 = 0;\n/// Module SWKBD (159) description 1. The pinned binding treats only this as cancel.\nconst SDK_CANCEL: u32 = 0x29f;\n",
+     "new": "    assert!(MAX_NAME_CHARS <= 500);\n    MAX_NAME_CHARS as u32\n};\nconst _: () = assert!(OUTPUT_UTF16_UNITS * 2 == 0x7D4);\n/// `nn::Result` success. Eden models the same zero value as `ResultSuccess`.\nconst SDK_SUCCESS: u32 = 0;\n/// Module SWKBD (159) description 1. The pinned binding treats only this as cancel.\nconst SDK_CANCEL: u32 = 0x29f;\n",
+     "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
     }
    ]
   },
@@ -21463,7 +21508,7 @@
    "dest": "src/runtime/mii/native_keyboard/inline_keyboard.rs",
    "crate": "root",
    "src_sha256": "4e3eb198a8c8924d0513ca9475f851543e4e53947f05b95847af70491a4cf154",
-   "dest_sha256": "f0939ed2f53a495dbe8ddd3a7d2bed9a6affea4ba073b2b6d766e9ee85933d0c",
+   "dest_sha256": "ab50ca4cbe2961849d7fd71574736b36eabae3b43cf76479fbbd9963c575e645",
    "edits": [
     {
      "old": "    fn sdk_finished(this: *mut Object, callback: unsafe extern \"C\" fn());\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn mii_limit_and_native_buffer_size_are_unchanged() {\n        let text = Text::new(&[65; 10], 4).unwrap();\n        assert_eq!(text.terminated().len(), 11);\n        assert_eq!(std::mem::size_of_val(text.terminated()), 22);\n        assert!(Text::new(&[65; 11], 0).is_none());\n        assert!(Text::new(&[65], 2).is_none());\n        assert!(Text::new(&[0], 0).is_none());\n    }\n\n    #[test]\n    fn macro_limit_counts_scalars_and_preserves_utf16_caret() {\n        let name = \"\ud83d\ude00\".repeat(super::super::MAX_NAME_CHARS);\n        let text = Text::macro_name(&name, 2).unwrap();\n        assert_eq!(text.units().len(), 96);\n        assert_eq!(text.cursor(), 2);\n        assert!(Text::macro_name(&format!(\"{name}a\"), 0).is_none());\n        assert!(Text::macro_name(&\"a\".repeat(49), 0).is_none());\n        assert!(Text::macro_name(\"\ud83d\ude00\", 1).is_none());\n        assert!(text_signal(&[0xd800], 1, 1, Limit::Macro).is_none());\n        assert!(text_signal(&[65], -1, 0, Limit::Macro).is_none());\n    }\n}\n",
@@ -21594,6 +21639,16 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "old": "        sdk_cursor(&mut object, text.cursor() as i32);\n        let appear = Appear {\n            keyboard_type: 0, ok_text: [0; 9], optional_left: 0, optional_right: 0,\n            prediction: 0, disable_cancel: 0, disabled_keys: 0,\n            max_length: text.limit().units() as i32, min_length: 1,\n            enable_return: 0, padding0: [0; 3], flags: 0, use_save_data: 0,\n            padding1: [0; 7], user_id: [0; 16],\n        };\n        sdk_appear(&mut object, &appear);\n",
+     "new": "        sdk_cursor(&mut object, text.cursor() as i32);\n        let appear = Appear {\n            keyboard_type: 0, ok_text: [0; 9], optional_left: 0, optional_right: 0,\n            prediction: 0, disable_cancel: 0, disabled_keys: 0,\n            max_length: text.limit().units() as i32, min_length: crate::engine::mii::inline_keyboard::minimum_length(allow_empty) as i32,\n            enable_return: 0, padding0: [0; 3], flags: 0, use_save_data: 0,\n            padding1: [0; 7], user_id: [0; 16],\n        };\n        sdk_appear(&mut object, &appear);\n",
+     "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
+    },
+    {
+     "old": "impl Keyboard {\n    /// Must run on the bound UI thread. Applet-drawn mode still needs the\n    /// operator's console acceptance; the normal inline mode requires a renderer.\n    pub(crate) unsafe fn open(text: Text, thread: usize) -> Option<Self> {\n        if thread != current_thread() || sdk_work_size() != 0x698 {\n            return None;\n        }\n        let mut lease = Lease::acquire()?;\n",
+     "new": "impl Keyboard {\n    /// Must run on the bound UI thread. Applet-drawn mode still needs the\n    /// operator's console acceptance; the normal inline mode requires a renderer.\n    pub(crate) unsafe fn open(text: Text, thread: usize) -> Option<Self> {\n        Self::open_with_empty(text, thread, false)\n    }\n\n    pub(crate) unsafe fn open_with_empty(text: Text, thread: usize, allow_empty: bool) -> Option<Self> {\n        if thread != current_thread() || sdk_work_size() != 0x698 {\n            return None;\n        }\n        let mut lease = Lease::acquire()?;\n",
+     "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
     }
    ]
   },
@@ -28708,7 +28763,7 @@
    "dest": "src/model/mii/inline_keyboard.rs",
    "crate": "root",
    "src_sha256": "4e3eb198a8c8924d0513ca9475f851543e4e53947f05b95847af70491a4cf154",
-   "dest_sha256": "5083b5fc7bcd7096b019789faed5e6f9bca9ea3fa5d4bfb14aec057fc92280f7",
+   "dest_sha256": "aee3fe7b7fd49c2a3e44aacba69a66014a2fcf8b55ed5575138085b91bb73e19",
    "edits": [
     {
      "old": "#[cfg_attr(not(feature = \"mii-editor-alpha\"), allow(dead_code))]\n    pub(crate) fn new",
@@ -28925,6 +28980,11 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "old": "use std::convert::TryFrom;\n\nconst MII_UNITS: usize = 10;\nconst MACRO_UNITS: usize = MAX_NAME_CHARS * 2;\n\n#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]\npub enum Limit {\n    #[default]\n",
+     "new": "use std::convert::TryFrom;\n\nconst MII_UNITS: usize = 10;\nconst MACRO_UNITS: usize = MAX_NAME_CHARS * 2;\n\n/// The clip naming owner alone can confirm an empty name for numbered defaults.\npub const fn minimum_length(allow_empty: bool) -> u32 { if allow_empty { 0 } else { 1 } }\n\n/// Pinned SwkbdConfigCommon: u32 maximum at 0x3ac, minimum immediately after it.\npub fn write_name_lengths(config: &mut [u8; 0x4d0], maximum: u32, allow_empty: bool) {\n    config[0x3ac..0x3b0].copy_from_slice(&maximum.to_le_bytes());\n    config[0x3b0..0x3b4].copy_from_slice(&minimum_length(allow_empty).to_le_bytes());\n}\n\n#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]\npub enum Limit {\n    #[default]\n",
+     "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
     }
    ]
   },

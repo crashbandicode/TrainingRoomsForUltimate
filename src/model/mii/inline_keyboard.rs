@@ -6,6 +6,15 @@ use std::convert::TryFrom;
 const MII_UNITS: usize = 10;
 const MACRO_UNITS: usize = MAX_NAME_CHARS * 2;
 
+/// The clip naming owner alone can confirm an empty name for numbered defaults.
+pub const fn minimum_length(allow_empty: bool) -> u32 { if allow_empty { 0 } else { 1 } }
+
+/// Pinned SwkbdConfigCommon: u32 maximum at 0x3ac, minimum immediately after it.
+pub fn write_name_lengths(config: &mut [u8; 0x4d0], maximum: u32, allow_empty: bool) {
+    config[0x3ac..0x3b0].copy_from_slice(&maximum.to_le_bytes());
+    config[0x3b0..0x3b4].copy_from_slice(&minimum_length(allow_empty).to_le_bytes());
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Limit {
     #[default]

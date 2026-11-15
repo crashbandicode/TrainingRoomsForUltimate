@@ -1344,7 +1344,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "253fb214139b97735f1ed9f884ff6658279c8da0ad36e66ccbd5ee9d82018d51",
+   "dest_sha256": "a658e04ce4bab0b3b487d85d4e3a49fb5820235b9f19417d08283d3f88591a6a",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -1927,6 +1927,16 @@
      "old": "            _ => return Effect::None,\n        };\n        if let Some((token, title, raw)) = external {\n            let name = raw.trim();\n            if let Err(err) = external_name(name) {\n                return Effect::Notify(err.to_string());\n            }\n            let name = name.to_owned();\n            self.screen = Screen::Closed;\n",
      "new": "            _ => return Effect::None,\n        };\n        if let Some((token, title, raw)) = external {\n            let name = raw.trim();\n            if let Err(err) = if token == CLIP_NAME_TOKEN && name.is_empty() { Ok(()) } else { external_name(name) } {\n                return Effect::Notify(err.to_string());\n            }\n            let name = name.to_owned();\n            self.screen = Screen::Closed;\n",
      "reason": "rc.15 operator 2026-11-15: saved macro/combo Crop uses shared clip editor; CPU macro preview, link-only combos, keyboard save as new."
+    },
+    {
+     "old": "    }\n\n    fn clip_keyboard_accepts_empty_default_name() {\n        let mut ui = MacroUi::new();\n        ui.offer_name(NameContext { token: CLIP_NAME_TOKEN, title: \"Name macro\" }, \"Original\", \"Save as a new file\");\n        let Effect::NameConfirmed { context, name } = ui.confirm_native_name(\"   \".into()) else { panic!(\"empty clip name must reach numbered-name saving\"); };\n        assert_eq!(context.token, CLIP_NAME_TOKEN);\n        assert!(name.is_empty());\n        assert!(ui.name_prompt().is_none());\n    }\n\n    fn mii_identity_keeps_exact_class_and_refuses_unknown() {\n        use crate::engine::mii::inventory::MiiClass;\n",
+     "new": "    }\n\n    fn clip_keyboard_accepts_empty_default_name() {\n        let mut ui = MacroUi::new();\n        assert!(!ui.native_name_allows_empty());\n        for token in [0, 9, CLIP_NAME_TOKEN - 1, CLIP_NAME_TOKEN + 1, u64::MAX] {\n            ui.offer_name(NameContext { token, title: \"Name combo\" }, \"Original\", \"Save as a new file\");\n            assert!(!ui.native_name_allows_empty(), \"non-clip owner {token}\");\n            assert_eq!(crate::engine::mii::inline_keyboard::minimum_length(ui.native_name_allows_empty()), 1);\n            assert!(matches!(ui.confirm_native_name(String::new()), Effect::Notify(_)));\n            ui = MacroUi::new();\n        }\n        ui.offer_name(NameContext { token: CLIP_NAME_TOKEN, title: \"Name macro\" }, \"Original\", \"Save as a new file\");\n        assert!(ui.native_name_allows_empty());\n        assert_eq!(crate::engine::mii::inline_keyboard::minimum_length(ui.native_name_allows_empty()), 0);\n        // Interrupt/park checkpoints values without discarding the owning token;\n        // resume reads this same policy when it reconstructs the native request.\n        assert!(ui.checkpoint_native_name(\"\", 0));\n        ui.invalidate_practice_context();\n        assert_eq!(ui.name_prompt(), Some(\"\"));\n        assert!(ui.native_name_allows_empty());\n        let Effect::NameConfirmed { context, name } = ui.confirm_native_name(String::new()) else { panic!(\"empty clip name must reach numbered-name saving\"); };\n        assert_eq!(context.token, CLIP_NAME_TOKEN);\n        assert!(name.is_empty());\n        assert!(ui.name_prompt().is_none());\n        assert!(!ui.native_name_allows_empty());\n    }\n\n    fn mii_identity_keeps_exact_class_and_refuses_unknown() {\n        use crate::engine::mii::inventory::MiiClass;\n",
+     "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
+    },
+    {
+     "old": "                NameBody::Macro(_) => None,\n            },\n            _ => None,\n        }\n    }\n\n    /// Checkpoint an unfinished native edit, without confirmation or any I/O\n    /// effect. Empty/whitespace drafts are valid; final save validation is separate.\n",
+     "new": "                NameBody::Macro(_) => None,\n            },\n            _ => None,\n        }\n    }\n\n    pub fn native_name_allows_empty(&self) -> bool {\n        self.external_name_token() == Some(CLIP_NAME_TOKEN)\n    }\n\n    /// Checkpoint an unfinished native edit, without confirmation or any I/O\n    /// effect. Empty/whitespace drafts are valid; final save validation is separate.\n",
+     "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
     }
    ]
   },
@@ -2212,7 +2222,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "2ea503a161d72e93e750df72559e46849239a0061705371a8517f1092ca22f7f",
+   "dest_sha256": "9bb847668ddead65c8628949086f1c8b45060e7f72016c88f01ae0a32c55bfa4",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -2958,6 +2968,16 @@
      "old": "        rstick_x: frame.rstick_x, rstick_y: frame.rstick_y })\n}\n\n/// Publishing/boot reservation only; the capture owner atomically excludes an\n/// active capture. Playback buffers are filled exclusively by the menu worker.\npub fn prepare_buffers() {\n    CAPTURE.prepare(crate::engine::macros::MAX_FRAMES);\n}\n",
      "new": "        rstick_x: frame.rstick_x, rstick_y: frame.rstick_y })\n}\n",
      "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
+    },
+    {
+     "old": "    let values = {\n        let ui = lock_read(&UI);\n        let title = ui.native_name_title().unwrap_or(MACRO_KEYBOARD_TITLE);\n        ui.name_prompt().zip(ui.native_name_cursor()).map(|(name, cursor)| {\n            (name.to_owned(), cursor, title)\n        })\n    };\n    let Some((initial, cursor, title)) = values else { return };\n    let id = NAME_SERIAL.fetch_add(1, Ordering::Relaxed);\n    let job = NameJob { id, generation: SESSION_GENERATION.load(Ordering::Relaxed),\n        replay: crate::runtime::macros::replay_capture::panel_visible(), waiting: crate::runtime::ui::facts::fact_waiting_scene(),\n        phase: NamePhase::Active };\n    *NAME_JOB.lock().unwrap() = Some(job);\n    let result = if job.waiting { crate::runtime::mii::native_keyboard::request_inline(id, &initial, cursor) }\n        else { crate::runtime::mii::native_keyboard::request(id, title, &initial) };\n    if let Err(error) = result {\n        NAME_JOB.lock().unwrap().take();\n        notify(&error);\n    }\n",
+     "new": "    let values = {\n        let ui = lock_read(&UI);\n        let title = ui.native_name_title().unwrap_or(MACRO_KEYBOARD_TITLE);\n        ui.name_prompt().zip(ui.native_name_cursor()).map(|(name, cursor)| {\n            (name.to_owned(), cursor, title, ui.native_name_allows_empty())\n        })\n    };\n    let Some((initial, cursor, title, allow_empty)) = values else { return };\n    let id = NAME_SERIAL.fetch_add(1, Ordering::Relaxed);\n    let job = NameJob { id, generation: SESSION_GENERATION.load(Ordering::Relaxed),\n        replay: crate::runtime::macros::replay_capture::panel_visible(), waiting: crate::runtime::ui::facts::fact_waiting_scene(),\n        phase: NamePhase::Active };\n    *NAME_JOB.lock().unwrap() = Some(job);\n    let result = if job.waiting { crate::runtime::mii::native_keyboard::request_inline(id, &initial, cursor, allow_empty) }\n        else { crate::runtime::mii::native_keyboard::request(id, title, &initial, allow_empty) };\n    if let Err(error) = result {\n        NAME_JOB.lock().unwrap().take();\n        notify(&error);\n    }\n",
+     "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
+    },
+    {
+     "old": "    let values = {\n        let ui = lock_read(&UI);\n        let title = ui.native_name_title().unwrap_or(MACRO_KEYBOARD_TITLE);\n        ui.name_prompt().zip(ui.native_name_cursor()).map(|(name, cursor)| {\n            (name.to_owned(), cursor, title)\n        })\n    };\n    let Some((name, cursor, title)) = values else { pending.take(); return };\n    let id = NAME_SERIAL.fetch_add(1, Ordering::Relaxed);\n    let opened = if job.waiting {\n        crate::runtime::mii::native_keyboard::request_inline(id, &name, cursor)\n    } else {\n        crate::runtime::mii::native_keyboard::request(id, title, &name)\n    };\n    match opened {\n        Ok(()) => {\n            job.id = id;\n",
+     "new": "    let values = {\n        let ui = lock_read(&UI);\n        let title = ui.native_name_title().unwrap_or(MACRO_KEYBOARD_TITLE);\n        ui.name_prompt().zip(ui.native_name_cursor()).map(|(name, cursor)| {\n            (name.to_owned(), cursor, title, ui.native_name_allows_empty())\n        })\n    };\n    let Some((name, cursor, title, allow_empty)) = values else { pending.take(); return };\n    let id = NAME_SERIAL.fetch_add(1, Ordering::Relaxed);\n    let opened = if job.waiting {\n        crate::runtime::mii::native_keyboard::request_inline(id, &name, cursor, allow_empty)\n    } else {\n        crate::runtime::mii::native_keyboard::request(id, title, &name, allow_empty)\n    };\n    match opened {\n        Ok(()) => {\n            job.id = id;\n",
+     "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
     }
    ]
   },

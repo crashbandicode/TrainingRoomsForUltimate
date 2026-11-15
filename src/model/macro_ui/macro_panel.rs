@@ -451,6 +451,10 @@ impl MacroUi {
         }
     }
 
+    pub fn native_name_allows_empty(&self) -> bool {
+        self.external_name_token() == Some(CLIP_NAME_TOKEN)
+    }
+
     /// Checkpoint an unfinished native edit, without confirmation or any I/O
     /// effect. Empty/whitespace drafts are valid; final save validation is separate.
     /// Rejected text/caret leaves the entire existing draft untouched.
@@ -2328,11 +2332,28 @@ mod tests {
 
     fn clip_keyboard_accepts_empty_default_name() {
         let mut ui = MacroUi::new();
+        assert!(!ui.native_name_allows_empty());
+        for token in [0, 9, CLIP_NAME_TOKEN - 1, CLIP_NAME_TOKEN + 1, u64::MAX] {
+            ui.offer_name(NameContext { token, title: "Name combo" }, "Original", "Save as a new file");
+            assert!(!ui.native_name_allows_empty(), "non-clip owner {token}");
+            assert_eq!(crate::engine::mii::inline_keyboard::minimum_length(ui.native_name_allows_empty()), 1);
+            assert!(matches!(ui.confirm_native_name(String::new()), Effect::Notify(_)));
+            ui = MacroUi::new();
+        }
         ui.offer_name(NameContext { token: CLIP_NAME_TOKEN, title: "Name macro" }, "Original", "Save as a new file");
-        let Effect::NameConfirmed { context, name } = ui.confirm_native_name("   ".into()) else { panic!("empty clip name must reach numbered-name saving"); };
+        assert!(ui.native_name_allows_empty());
+        assert_eq!(crate::engine::mii::inline_keyboard::minimum_length(ui.native_name_allows_empty()), 0);
+        // Interrupt/park checkpoints values without discarding the owning token;
+        // resume reads this same policy when it reconstructs the native request.
+        assert!(ui.checkpoint_native_name("", 0));
+        ui.invalidate_practice_context();
+        assert_eq!(ui.name_prompt(), Some(""));
+        assert!(ui.native_name_allows_empty());
+        let Effect::NameConfirmed { context, name } = ui.confirm_native_name(String::new()) else { panic!("empty clip name must reach numbered-name saving"); };
         assert_eq!(context.token, CLIP_NAME_TOKEN);
         assert!(name.is_empty());
         assert!(ui.name_prompt().is_none());
+        assert!(!ui.native_name_allows_empty());
     }
 
     fn mii_identity_keeps_exact_class_and_refuses_unknown() {
