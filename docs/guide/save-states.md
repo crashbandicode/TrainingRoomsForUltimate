@@ -173,7 +173,9 @@ A setup is a spot you practise from, kept under a name: where both fighters stan
 stage. Setups live in their own library, `sd:/ultimate/TrainingRooms/setups/`, apart from your save states, and using
 one never changes a save file. The rows are in Saves › [Setup library](../menu/saves.md#setup-library).
 
-<!-- CAPTURE-REQUEST setup-own-screen: a new clip, rc14-setup-own-screen.gif (see docs/menu/saves.md). It replaces the A-versus-Y picture, which showed the old A and Y. -->
+![A setup's own screen: Restore here, Make Load use it, Rename, Delete](../media/rc14-setup-own-screen.gif)<br>
+*The same clip as in the Saves page reference (menu/saves.md), for the Setup library section. Eden, rc.14 (untested on hardware).*
+
 
 ### Making a setup
 
@@ -183,7 +185,9 @@ one never changes a save file. The rows are in Saves › [Setup library](../menu
    characters and confirm.
 4. The notice reads "Saved setup" and the name.
 
-<!-- CAPTURE-REQUEST setup-save-here: the clip requested in docs/menu/saves.md › Save setup here... (rc14-save-setup-here.gif). -->
+![Save setup here: the Name setup screen, the notice, the Setup library lists it, Load still goes to the bound save](../media/rc14-save-setup-here.gif)<br>
+*The same clip as in the Saves page reference (menu/saves.md), for the Setup library section. Eden, rc.14 (untested on hardware).*
+
 
 Your bound save, the one Load goes to, stays as it was. The setup keeps what Save keeps: which fighters they are, where
 they stand and face, their damage, ground, air or ledge, their charges, Player 1's held item, a Mii's exact look, and
@@ -215,7 +219,9 @@ you close the menu. Nobody moves".
 **To drill a setup again and again: Make Load use it, then Load.** Restore here is for putting yourself there once.
 Neither row writes a save file. On the list, Y is the one-press shortcut for Make Load use it.
 
-<!-- CAPTURE-REQUEST setup-load-target: a new clip, rc14-setup-load-target.gif (A on Corner trap, Make Load use it, close the menu, nobody moves; Load goes to the setup, and again after a smash). The same clip goes in docs/menu/saves.md. Plan: artifacts/setup-library-review/PROPOSAL.md section 2.3 and storyboard-load-target.png. -->
+![Make Load use it: nobody moves, Load goes to the setup](../media/rc14-setup-load-target.gif)<br>
+*The same clip as in the Saves page reference (menu/saves.md), for the Setup library section. Eden, rc.14 (untested on hardware).*
+
 
 ### When Restore here says no
 

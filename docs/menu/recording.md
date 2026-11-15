@@ -116,8 +116,8 @@ waiting room where the keyboard can't open, makes it Chain N or Sequence N.
 *A save state (Jab start, bound: Bind to Save / Load reads On). Eden, rc.13 (untested on hardware).*
 
 
-![A macro's own screen: Playback slot Right sets Slot 1; then Mario's forward smash hits the CPU and the CPU plays the macro](../media/rc14-playback-slot.gif)<br>
-*Macro 1's own screen: Playback slot reads None, Right sets Slot 1, and the menu closes. With the CPU's Mash on Playback Slot 1 (set beforehand), Mario's forward smash hits the CPU (Richter, 22.4%) and the CPU plays the macro, "Input Recording: Playback" on screen. Eden, rc.14 (untested on hardware).*
+![A macro's own screen: Playback slot Right sets Slot 1; then Fox's forward smash hits the CPU and the CPU plays the macro](../media/rc14-playback-slot.gif)<br>
+*Macro 1's own screen: Playback slot reads None, Right sets Slot 1, and the menu closes. With the CPU's Mash on Playback Slot 1 (set beforehand), Fox's forward smash hits the CPU (Mario, 17.6%) and the CPU plays the macro, "Input Recording: Playback" on screen. Eden, rc.14 (untested on hardware).*
 
 More: [A file's own screen](../guide/recording.md#a-files-own-screen)
 

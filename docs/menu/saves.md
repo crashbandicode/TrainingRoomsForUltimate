@@ -151,13 +151,17 @@ stage. Keep as many as you like, then put both fighters on any of them in one st
 states (they are files in `sd:/ultimate/TrainingRooms/setups/`): Load uses a setup only if you pick Make Load use it
 below.
 
-<!-- CAPTURE-REQUEST setup-own-screen: a new clip, rc14-setup-own-screen.gif (Setup library, A on Corner trap: the screen with Restore here, Make Load use it, Rename, Delete; Right moves the cursor and the line under the rows changes; B goes back to the list). Replaces the A-versus-Y picture. Plan: artifacts/setup-library-review/PROPOSAL.md section 2 and storyboard-setup-library.png. -->
+![A setup's own screen: Restore here, Make Load use it, Rename, Delete; Right moves the cursor and the line under the rows changes; B goes back to the list](../media/rc14-setup-own-screen.gif)<br>
+*Saves > Setup library: A opens the list (the footer names the setup, its fighters, the stage and the spots), A on Corner trap opens its own screen, Right moves to Make Load use it and the line under the rows changes ("Nobody moves. Load goes there until the bound save changes."), B goes back to the list. Eden, rc.14 (untested on hardware).*
+
 
 ### Save setup here...
 
 Keeps where both fighters stand now as a new setup under a name you type. Your bound save is not touched.
 
-<!-- CAPTURE-REQUEST setup-save-here: a new clip, rc14-save-setup-here.gif. Training, Mario vs Little Mac: Load puts both in the middle (the bound save); walk them to the far left and far right; Saves › Save setup here..., the keyboard with "Where they stand now", type Corner trap, the notice "Saved setup Corner trap"; the Setup library lists Corner trap with its spots; close the menu and Load: both go back to the middle, so the bound save did not change. The same clip goes in docs/guide/save-states.md › Making a setup. -->
+![Save setup here: both fighters walked apart, the Name setup screen, the notice Saved setup Corner trap, the Setup library lists it, Load still goes back to the middle](../media/rc14-save-setup-here.gif)<br>
+*Mario against Little Mac: Load puts both in the middle (the bound save); both walked apart (Little Mac at 18.5%); Saves > Save setup here... opens "Name setup" (the name is typed on the Switch keyboard, not in the picture); the notice reads "Saved setup Corner trap"; the Setup library lists Corner trap with its spots; the menu closes and Load puts both back in the middle, so the bound save did not change. Eden, rc.14 (untested on hardware).*
+
 
 - **Values:** a name of up to 48 characters
 - **Default:** the name "Setup"
@@ -186,7 +190,9 @@ Keeps the spot your Load chord goes to now, your bound save, as a new setup unde
 
 ![The Setup library is empty ("No setups saved"); Save setup to library... keeps the saved spot as the setup Corner trap, and the Setup library then lists it (Corner trap · Mario / Mario)](../media/rc11-save-setup.gif)
 
-<!-- CAPTURE-REQUEST setup-save-setup: reshoot this clip as rc14-save-setup.gif after the list-screen fixes (Mario vs Little Mac on far-apart spots: Save, Save setup from bound save..., the keyboard, the notice, the list with the new row, its footer naming the stage and the spots). Plan: artifacts/setup-library-review/PROPOSAL.md section 2.1 and storyboard-save-setup.png. -->
+![Save setup from bound save: both far apart, Save, the Name setup screen, the notice, the Setup library lists the new setup with its footer](../media/rc14-save-setup.gif)<br>
+*Mario against Little Mac far apart: Save; Saves > Save setup from bound save... opens "Name setup" ("From your bound save"); the notice reads "Saved setup Corner trap"; the Setup library lists the new row and its footer names the fighters, the stage and the spots. Eden, rc.14 (untested on hardware).*
+
 
 - **Values:** a name of up to 48 characters
 - **Default:** the name "Setup"
@@ -211,9 +217,13 @@ full row shows under the grid for the setup under the cursor. With no setups, th
 
 ![Setup library, rc.11 clip (before the setup's own screen): a setup chosen from the list puts both fighters where it was saved when the menu closes](../media/rc11-setup-library.gif)
 
-<!-- CAPTURE-REQUEST setup-library: reshoot this clip as rc14-setup-library.gif after the list-screen fixes (Load puts both in the middle; Setup library, A on Corner trap, A on Restore here; the menu closes and both jump to the far spots; Load goes back to the middle). Plan: artifacts/setup-library-review/PROPOSAL.md section 2.2 and storyboard-setup-library.png. -->
+![Setup library: A on Corner trap, Restore here, the menu closes and both fighters jump to the setup's spots; Load goes back to the middle](../media/rc14-setup-library.gif)<br>
+*Both in the middle (Load); Saves > Setup library, A, A on Corner trap, A on Restore here ("Both fighters move there when you close the menu."); the menu closes and both jump to the setup's spots; Load puts them back in the middle. Eden, rc.14 (untested on hardware).*
 
-<!-- CAPTURE-REQUEST setup-load-target: a new clip, rc14-setup-load-target.gif (A on Corner trap, Make Load use it, close the menu, nobody moves; Load goes to the setup, and again after a smash). Plan: artifacts/setup-library-review/PROPOSAL.md section 2.3 and storyboard-load-target.png. -->
+
+![Setup library: Make Load use it, the menu closes and nobody moves; Load goes to the setup, and again after a smash](../media/rc14-setup-load-target.gif)<br>
+*Corner trap's own screen, Right to Make Load use it, A: "Setup chosen: Load will go there once you close the menu. Nobody moves." The menu closes and both stay in the middle; Load puts both on the setup's spots; a smash, and Load puts them there again. Eden, rc.14 (untested on hardware).*
+
 
 - **How:** A opens the list. Up / Down / Left / Right choose a setup, then:
   - **A** opens the setup's own screen (below).

@@ -439,6 +439,9 @@ timer.
   - **Free practice:** only the count.
   - The best is per fighter and per mode, and lasts until the game closes.
 
+![Eggs-ercise 1 minute: the row set from Off to 1 minute, the menu closed, Fox chases the launched target and a neutral air breaks it](../media/rc14-eggs-1-minute.gif)<br>
+*Practice games > Eggs-ercise: Right turns Off into 1 minute and the menu closes. The notice reads "Eggs 0 0:59" and counts down; Fox chases the target the game launches and a neutral air breaks it: "Eggs 1". Eden, rc.14 (untested on hardware).*
+
 To go again, press L+R+A in Training (with **L+R+A Reset** On), or open and close the menu: either one starts a new run
 from 0.
 Changing the stage starts a new run too. A fighter cycle or a save-state load keeps the run going. Off removes the
@@ -469,6 +472,9 @@ What the target is. Disc: the plugin's target, as above. CPU: the CPU itself is 
   knockback, then the CPU goes back to 0% at the next spot. The CPU stays still, so **Target speed** does nothing. It
   applies from the next time the menu closes. In the waiting room's practice the CPU is moved too.
 
+![Target set to CPU: Fox jabs the CPU three times and the count goes 1/10, 2/10, 3/10, the CPU put back at a fresh spot after each counted hit](../media/rc14-eggs-cpu-target.gif)<br>
+*Practice games, Eggs-ercise on 10 targets: Target reads Disc, then CPU, and the menu closes. Fox walks up to the CPU (Mario) and jabs it three times; each counted hit moves the count on ("Eggs 1/10", "2/10", "3/10") and the CPU is put back at a fresh spot, and no disc target appears. Eden, rc.14 (untested on hardware).*
+
 ### Target speed
 
 How fast the targets fly. Every speed traces the same path: the same height and the same landing spot.
@@ -477,6 +483,9 @@ How fast the targets fly. Every speed traces the same path: the same height and 
 - **Default:** Normal
 - **How:** Normal: up for half a second, at rest after about 1.6 s. Slow: half as fast (at rest after about 3.2 s).
   Fast: one and a half times as fast (at rest after about 1.1 s). It applies from the next time the menu closes.
+
+![Side by side, Target speed Slow (left) and Fast (right): the Fast target is at rest on the ground within about a second while the Slow one is still in the air](../media/rc14-eggs-speed.gif)<br>
+*Target speed Slow (left) and Fast (right), each from the first moment its target is launched: the Fast target flies up, falls, bounces and rests on the ground within about a second; the Slow one is still in the air after three seconds. Eden, rc.14 (untested on hardware).*
 
 ### Break the Targets
 
@@ -529,6 +538,12 @@ positions belong to their stage.
 - Editing a loaded layout doesn't change its file: save it to keep the change as a new layout.
 - A file that can't be read is skipped, and the list's help line counts it ("2 files skipped").
 
+![Break the Targets in Placing: ZL + Down saves the course as a layout, Y twice clears, a second course is saved, ZL + Right names the other layout and ZL + Up puts its targets back](../media/rc14-btt-layouts.gif)<br>
+*Break the Targets on Battlefield, Placing: three targets, ZL + Down: "Saved: Layout 1 · Battlefield"; Y twice clears them; a second course is placed and saved as Layout 2; ZL + Right names the other layout ("2/2 Layout 1 · Battlefield: 3") and ZL + Up loads it: "Loaded: Layout 1 · Battlefield", and its three targets are back where they were. Eden, rc.14 (untested on hardware).*
+
+![The Saved layouts list and a layout's own screen: the five used last outlined, A opens Load, Rename, Duplicate, Delete; Load puts the targets on the stage](../media/rc14-btt-layouts-list.gif)<br>
+*Fighters & Stages > Practice games > Saved layouts, A: Battlefield's layouts, the five used last in the green outline and a thin line under the fifth (Layout 7 to Layout 3, then Layout 1 and 2). A on Layout 7 opens its own screen; A on Load turns Break the Targets On and the menu closes onto the zoomed-out stage with the three targets: "Loaded Layout 7 · Battlefield: close the menu to start". Eden, rc.14 (untested on hardware).*
+
 ### CPU during a game
 
 Whether the CPU is hidden for as long as a practice game runs (a game runs from the menu close that starts a mode until
@@ -538,6 +553,9 @@ the mode is Off; "Time!", the end notice and the wait between runs count as runn
 - **Default:** Hide
 - **How:** Hide: the CPU is hidden while a game runs, and afterwards it is as **Hide CPU** says. Show: the CPU stays as
   it is. It applies when the menu closes.
+
+![CPU during a game on Hide: Eggs-ercise 1 minute starts and the CPU is hidden; Eggs-ercise Off brings it back](../media/rc14-cpu-during-a-game.gif)<br>
+*Practice games with CPU during a game on Hide: Right on Eggs-ercise sets 1 minute and the menu closes; the CPU is hidden while the eggs run ("Eggs 0 1:00"). Left sets Eggs-ercise Off and the CPU is back. The input is named in a box. Eden, rc.14 (untested on hardware).*
 
 ## Reset page to defaults
 
