@@ -5224,7 +5224,7 @@
    "dest": "src/model/swap/body_bank/memory.rs",
    "crate": "consts",
    "src_sha256": "bfbc9c80a215184a125634c4b90fbf97c63007608db892a95df466d784869915",
-   "dest_sha256": "22b542279249cdee96149ecad53eeccfd14f72da597c12043ec0d46af2e54cc9",
+   "dest_sha256": "0f5a7926e8656fc9902a9f304cda0154e4953ddabdbaab0c22e45105cb51472e",
    "edits": [
     {
      "old": "        GroupState::Prefetching => with_margin(cost.total()),\n        GroupState::Prefetched => with_margin(cost.build),\n        GroupState::Planned | GroupState::Built | GroupState::Failed => 0,\n    }\n}\n",
@@ -5301,6 +5301,21 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "old": "\n#[cfg(test)]\n",
+     "new": "\n/// rc.14 mem-headroom (F1, the primary 2026-11-15 ~06:20Z): a speculative helper load, on Training's seats (entries 2\n/// and 3) as on a created entry. A seat's load used [`admit`] alone and took the room a group held for memory waited\n/// for (Eden smoke2r-2 #6912: seat 2 held for Pyra while the CPU's `[5a, 5b]` group waited).\npub fn speculative_admission(headroom: Option<u64>, outstanding: u64, waiting: u64, cost: GroupCost) -> Decision {\n    let _ = waiting;\n    admit(headroom, outstanding, cost)\n}\n\n#[cfg(test)]\n",
+     "reason": "rc.14 mem-headroom fail-first: fail-first cases and model stubs: a seat's speculative admission, the room_at_pause notice field (the primary 2026-11-15)"
+    },
+    {
+     "old": "\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+     "new": "\n    /// rc.14 mem-headroom F1 (Eden smoke2r-2 a2-pyra-keep-all, #6912/#6949): a seat's speculative load (Pichu, a seat\n    /// member of the CPU's rotation) that the headroom holds alone is not admitted while the CPU's Pyra/Mythra group waits\n    /// for memory; it is deferred, not refused, exactly as a created entry's load is, and loads once there is room for both.\n    fn a_seat_speculative_load_leaves_what_the_cycle_waits_for() {\n        let seat = helper_cost(0x13);\n        let room = with_margin(seat.total()) + FLOOR;\n        let waiting = with_margin(cost(&[0x5a, 0x5b]).total());\n        assert_eq!(speculative_admission(Some(room), 0, 0, seat).admission, Admission::Admit, \"nothing waits: it loads\");\n        let held = speculative_admission(Some(room), 0, waiting, seat);\n        assert_eq!(held.admission, Admission::Defer, \"{held:?}\");\n        assert_eq!(held, created_admission(Some(room), 0, waiting, seat), \"a seat's rule is a created entry's\");\n        assert_eq!(speculative_admission(Some(room + waiting), 0, waiting, seat).admission, Admission::Admit,\n            \"with room for both, the seat loads beside the group's wait\");\n    }\n\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+     "reason": "rc.14 mem-headroom fail-first: fail-first cases and model stubs: a seat's speculative admission, the room_at_pause notice field (the primary 2026-11-15)"
+    },
+    {
+     "old": "            (\"a_created_entry_gives_way_to_what_the_cycle_waits_for\", a_created_entry_gives_way_to_what_the_cycle_waits_for as fn()),\n        ]);\n",
+     "new": "            (\"a_created_entry_gives_way_to_what_the_cycle_waits_for\", a_created_entry_gives_way_to_what_the_cycle_waits_for as fn()),\n            (\"a_seat_speculative_load_leaves_what_the_cycle_waits_for\", a_seat_speculative_load_leaves_what_the_cycle_waits_for as fn()),\n        ]);\n",
+     "reason": "rc.14 mem-headroom fail-first: fail-first cases and model stubs: a seat's speculative admission, the room_at_pause notice field (the primary 2026-11-15)"
     }
    ]
   },
@@ -8913,7 +8928,7 @@
    "dest": "src/model/preload/cycle_preload_policy.rs",
    "crate": "root",
    "src_sha256": "8f006ae6d6f978d500da383c4edbb5e731d9b91e19fa7b3e18037e73224ae7b2",
-   "dest_sha256": "e1840c06c1cdf86a31c6db3f662972f5b0ba5cca9282d1108456b8f4c5f01d21",
+   "dest_sha256": "bc039110bf349fd9629cdc4eb3c4713c2dc8221bca704802df61bc96b7f31873",
    "edits": [
     {
      "old": "/// CPU's fighter look-ahead. Each CPU fighter that `merge` would place before the last Player hat\n/// moves, in its own order, to just behind that hat; every other pair of targets keeps `merge`'s\n/// order, and a target in both lanes keeps the earlier, hat position. The cost is the CPU's next\n/// swap, which may then find no warm helper for its fighter. Without a Player hat this is `merge`.\npub fn merge_player_hats_first<T: Copy + Eq, const N: usize>(lanes: [[Option<T>; N]; 4], slots: u8) -> [Option<T>; N] {\n    let mut order: Vec<(usize, T)> = Vec::with_capacity(4 * N);\n    for depth in 0..N {\n        for (lane, targets) in lanes.iter().enumerate() {\n            if let Some(target) = targets[depth] {\n                order.push((lane, target));\n            }\n        }\n    }\n    if let Some(last_hat) = order.iter().rposition(|(lane, _)| *lane == PLAYER_HATS) {\n        let (head, tail) = order.split_at(last_hat + 1);\n        let mut ranked: Vec<(usize, T)> = head.iter().copied().filter(|(lane, _)| *lane != CPU_FIGHTERS).collect();\n        ranked.extend(head.iter().copied().filter(|(lane, _)| *lane == CPU_FIGHTERS));\n        ranked.extend_from_slice(tail);\n        order = ranked;\n    }\n    let limit = usize::from(slots).min(crate::engine::preload::cycle_preload_capacity::MAX_TARGETS).min(N);\n    let mut result = [None; N];\n    let mut count = 0;\n    for (_, target) in order {\n        if count >= limit {\n",
@@ -9152,6 +9167,26 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "old": "    pub hold: Option<crate::engine::swap::body_bank::Hold>,\n}\n",
+     "new": "    pub hold: Option<crate::engine::swap::body_bank::Hold>,\n    /// rc.14 mem-headroom: the room the fighters held for memory wait for is held by speculative helpers the next pause\n    /// retires (`give_back`), so something is left to free.\n    pub room_at_pause: bool,\n}\n",
+     "reason": "rc.14 mem-headroom fail-first: fail-first cases and model stubs: a seat's speculative admission, the room_at_pause notice field (the primary 2026-11-15)"
+    },
+    {
+     "old": "\n    fn fighters(planned: u8, ready: u8, prefetched: u8, failed: u8, pending: u8) -> BuiltFighters {\n",
+     "new": "\n    /// rc.14 mem-headroom (the primary 2026-11-15 ~06:20Z: \"waiting for memory\" only when nothing is left to free; Eden\n    /// smoke2r-2 read \"Loaded 7/9 (2 waiting for memory)\" while four created helpers held about 250 MB): held fighters\n    /// whose room the next pause frees say so, with or without a failure beside them; a pool hold is not memory.\n    fn waiting_for_memory_shows_only_when_nothing_is_left_to_free() {\n        use crate::engine::swap::body_bank::Hold;\n        let assets = readiness(5, 1, false, [Some(1)], NONE, ready_of(&[1]));\n        let memory = BuiltFighters { planned: 9, ready: 7, held: 2, hold: Some(Hold::Memory), ..BuiltFighters::default() };\n        assert_eq!(CacheStatus::new(assets, memory, false).text().to_string(), \"Loaded 7/9 (2 waiting for memory)\",\n            \"nothing is left to free\");\n        let pause = BuiltFighters { room_at_pause: true, ..memory };\n        let freed = CacheStatus::new(assets, pause, false);\n        assert_eq!(freed.text().to_string(), \"Loaded 7/9 (2 load after you pause)\");\n        assert!(CacheStatus::new(assets, memory, false).announce(Some(freed), 0), \"the change is shown\");\n        let failed = CacheStatus::new(assets, BuiltFighters { failed: 1, held: 1, ..pause }, false);\n        assert_eq!(failed.text().to_string(), \"Loaded 7/9 (1 failed, 1 load after you pause)\");\n        let pool = CacheStatus::new(assets, BuiltFighters { hold: Some(Hold::Pool), ..pause }, false);\n        assert_eq!(pool.text().to_string(), \"Loaded 7/9 (2 waiting for pool space)\");\n    }\n\n    fn fighters(planned: u8, ready: u8, prefetched: u8, failed: u8, pending: u8) -> BuiltFighters {\n",
+     "reason": "rc.14 mem-headroom fail-first: fail-first cases and model stubs: a seat's speculative admission, the room_at_pause notice field (the primary 2026-11-15)"
+    },
+    {
+     "old": "                held: total.held + f.held, hold: crate::engine::swap::body_bank::merge_hold(total.hold, f.hold) };\n",
+     "new": "                held: total.held + f.held, hold: crate::engine::swap::body_bank::merge_hold(total.hold, f.hold),\n                room_at_pause: total.room_at_pause || f.room_at_pause };\n",
+     "reason": "rc.14 mem-headroom fail-first: fail-first cases and model stubs: a seat's speculative admission, the room_at_pause notice field (the primary 2026-11-15)"
+    },
+    {
+     "old": "            (\"held_fighters_read_waiting_not_failed\", held_fighters_read_waiting_not_failed as fn()),\n            (\"the_waiting_text_names_the_role_that_must_swap\", the_waiting_text_names_the_role_that_must_swap as fn()),\n",
+     "new": "            (\"held_fighters_read_waiting_not_failed\", held_fighters_read_waiting_not_failed as fn()),\n            (\"waiting_for_memory_shows_only_when_nothing_is_left_to_free\", waiting_for_memory_shows_only_when_nothing_is_left_to_free as fn()),\n            (\"the_waiting_text_names_the_role_that_must_swap\", the_waiting_text_names_the_role_that_must_swap as fn()),\n",
+     "reason": "rc.14 mem-headroom fail-first: fail-first cases and model stubs: a seat's speculative admission, the room_at_pause notice field (the primary 2026-11-15)"
     }
    ]
   },

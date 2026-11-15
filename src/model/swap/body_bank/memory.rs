@@ -209,6 +209,14 @@ pub fn created_admission(headroom: Option<u64>, outstanding: u64, waiting: u64, 
     admit(headroom, outstanding.saturating_add(waiting), cost)
 }
 
+/// rc.14 mem-headroom (F1, the primary 2026-11-15 ~06:20Z): a speculative helper load, on Training's seats (entries 2
+/// and 3) as on a created entry. A seat's load used [`admit`] alone and took the room a group held for memory waited
+/// for (Eden smoke2r-2 #6912: seat 2 held for Pyra while the CPU's `[5a, 5b]` group waited).
+pub fn speculative_admission(headroom: Option<u64>, outstanding: u64, waiting: u64, cost: GroupCost) -> Decision {
+    let _ = waiting;
+    admit(headroom, outstanding, cost)
+}
+
 #[cfg(test)]
 mod tests {
     //! Replays of the logged sequences. Headroom values are the `[GroupSwap] prefetch … headroom=` admission samples
@@ -253,12 +261,28 @@ mod tests {
         assert_eq!(window_waiting(&[0x44, 0x1c], 2), 0, "an admitted window leaves nothing waiting");
     }
 
+    /// rc.14 mem-headroom F1 (Eden smoke2r-2 a2-pyra-keep-all, #6912/#6949): a seat's speculative load (Pichu, a seat
+    /// member of the CPU's rotation) that the headroom holds alone is not admitted while the CPU's Pyra/Mythra group waits
+    /// for memory; it is deferred, not refused, exactly as a created entry's load is, and loads once there is room for both.
+    fn a_seat_speculative_load_leaves_what_the_cycle_waits_for() {
+        let seat = helper_cost(0x13);
+        let room = with_margin(seat.total()) + FLOOR;
+        let waiting = with_margin(cost(&[0x5a, 0x5b]).total());
+        assert_eq!(speculative_admission(Some(room), 0, 0, seat).admission, Admission::Admit, "nothing waits: it loads");
+        let held = speculative_admission(Some(room), 0, waiting, seat);
+        assert_eq!(held.admission, Admission::Defer, "{held:?}");
+        assert_eq!(held, created_admission(Some(room), 0, waiting, seat), "a seat's rule is a created entry's");
+        assert_eq!(speculative_admission(Some(room + waiting), 0, waiting, seat).admission, Admission::Admit,
+            "with room for both, the seat loads beside the group's wait");
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("every_measured_kind_set_and_helper_load_is_charged_at_least_its_measurement", every_measured_kind_set_and_helper_load_is_charged_at_least_its_measurement as fn()),
             ("a_created_entry_gives_way_to_what_the_cycle_waits_for", a_created_entry_gives_way_to_what_the_cycle_waits_for as fn()),
+            ("a_seat_speculative_load_leaves_what_the_cycle_waits_for", a_seat_speculative_load_leaves_what_the_cycle_waits_for as fn()),
         ]);
     }
     }
