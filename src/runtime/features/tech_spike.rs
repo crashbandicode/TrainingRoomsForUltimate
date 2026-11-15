@@ -190,8 +190,12 @@ unsafe fn point(line: usize, right: bool) -> Option<[f32; 2]> {
 
 unsafe fn walk(accessor: usize) {
     let Some(down) = id("GROUND_TOUCH_ID_DOWN") else { return };
+    // Owned main+15cbc88/15cbcdc load q1 from the Vector2f reference (16 bytes),
+    // though the following distance reduction uses XY. Provide its complete native storage.
+    #[repr(C, align(16))]
+    struct NativePoint([f32; 4]);
     let touch: extern "C" fn(usize, i32) -> usize = std::mem::transmute(game::text_base() + 0x2029fb0);
-    let next: extern "C" fn(usize, *const [f32; 2]) -> usize = std::mem::transmute(game::text_base() + 0x15cbc60);
+    let next: extern "C" fn(usize, *const NativePoint) -> usize = std::mem::transmute(game::text_base() + 0x15cbc60);
     let mut line = touch(accessor, down);
     let seed = line;
     let mut seen = [0usize; 64];
@@ -236,7 +240,7 @@ unsafe fn walk(accessor: usize) {
         } else {
             left
         };
-        line = next(line, &end);
+        line = next(line, &NativePoint([end[0], end[1], 0.0, 0.0]));
     }
     diagnostic(format_args!("[TrainingRooms] tech_s0_walk cap=64"));
     diagnostic(format_args!("[TechPractice] walk closed={} count=64", line == seed));
