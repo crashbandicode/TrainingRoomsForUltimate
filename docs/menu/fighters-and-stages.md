@@ -442,8 +442,8 @@ timer.
 ![Eggs-ercise 1 minute: the row set from Off to 1 minute, the menu closed, Fox chases the launched target and a neutral air breaks it](../media/rc14-eggs-1-minute.gif)<br>
 *Practice games > Eggs-ercise: Right turns Off into 1 minute and the menu closes. The notice reads "Eggs 0 0:59" and counts down; Fox chases the target the game launches and a neutral air breaks it: "Eggs 1". Eden, rc.14 (untested on hardware).*
 
-![Eggs-ercise 10 targets: the row set from Off to 10 targets, the menu closed, Fox breaks the targets one after another and the count climbs from 0/10 to 9/10; the tenth break stops the clock: Done! 10 in 0:15.53](../media/rc14-eggs-n-targets.gif)<br>
-*Practice games > Eggs-ercise: Right twice turns Off into 10 targets and the menu closes. The notice reads "Eggs 0/10   0:00.00" and the clock counts up in hundredths; Fox chases each target and breaks it, and the count climbs ("Eggs 3/10", "7/10", "9/10"). The tenth break stops the clock: "Done! 10 in 0:15.53 (best 0:15.53)". Eden, rc.14 (untested on hardware).*
+![Eggs-ercise 10 targets: the row set from Off to 10 targets, the menu closed, Fox breaks the targets one after another and the count climbs from 0/10 to 9/10; the tenth break stops the clock: Done! 10 in 0:16.96](../media/rc14-eggs-n-targets.gif)<br>
+*Practice games > Eggs-ercise: Right twice turns Off into 10 targets and the menu closes. The notice reads "Eggs 0/10   0:00.00" and the clock counts up in hundredths; Fox chases each target and breaks it, and the count climbs ("Eggs 3/10", "7/10", "9/10"). The tenth break stops the clock: "Done! 10 in 0:16.96 (best 0:16.96)". Eden, rc.14 (untested on hardware).*
 
 To go again, press L+R+A in Training (with **L+R+A Reset** On), or open and close the menu: either one starts a new run
 from 0.
@@ -515,8 +515,8 @@ turning one On turns the other Off.
   - To go again, press L+R+A in Training (with **L+R+A Reset** On), or open and close the menu. Each stage keeps its own
     layout until the game closes.
 
-![Break the Targets: Ready at 0:00.00, the first input starts the clock, the three targets break one after another, Done! 3 in 0:04.73, then Ready again with every target back](../media/rc14-btt-run.gif)<br>
-*A run on Battlefield: Ready reads "Targets 0/3   0:00.00" and waits; Mario's first input starts the clock; each break freezes him for a moment and plays the break animation ("Targets 1/3", "2/3"); the third break stops the clock: "Done! 3 in 0:04.73 (best 0:04.73)", then Ready again with every target back. Eden, rc.14 (untested on hardware).*
+![Break the Targets: Ready at 0:00.00, the first input starts the clock, the three targets break one after another, Done! 3 in 0:04.15, then Ready again with every target back](../media/rc14-btt-run.gif)<br>
+*A run on Battlefield: Ready reads "Targets 0/3   0:00.00" and waits; Fox's first input starts the clock; each break freezes him for a moment and plays the break animation ("Targets 1/3", "2/3"); the third break stops the clock: "Done! 3 in 0:04.15 (best 0:04.15)", then Ready again with every target back. Eden, rc.14 (untested on hardware).*
 
 ### Place targets
 
