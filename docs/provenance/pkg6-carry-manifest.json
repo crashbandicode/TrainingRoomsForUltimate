@@ -2673,7 +2673,7 @@
    "dest": "src/model/mii/ordinary_cpu.rs",
    "crate": "mii",
    "src_sha256": "e4628b4e3e7a00dc2c29d715b9755284f5afa3446513824912066178f0cc6caf",
-   "dest_sha256": "4e3a245a174fc50d955783c4258bfddf397f9a94f18e71caef63307818cc109a",
+   "dest_sha256": "2044c8bd3cc6f92607ce66520189b679eeccef8dda01a9897113bd56a9973ba2",
    "edits": [
     {
      "old": "/// and an extra index/selector equal to the destination refuses. A protected set\n/// that cannot fit the fixed record table refuses instead of truncating.\npub fn assignment_with(layout:crate::engine::mii::backend::Layout,extras:crate::engine::mii::capacity::Extras,\n    destination:usize,owners:&[Option<Owner>;8])->Option<[Option<u16>;8]> {\n    if !layout.selector(destination) || extras.entry(destination).is_some() {return None;}\n    if !layout.shape_with(&owners.map(|o|o.map_or(0,|o|o.entry)),extras) {\n        return None;\n    }\n    let mut protected = [None; 8];\n    let mut used = 0;\n",
@@ -2946,6 +2946,21 @@
       ]
      ],
      "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+    },
+    {
+     "old": "        Err(reason)=>Err(reason),\n    }\n}\n\n",
+     "new": "        Err(reason)=>Err(reason),\n    }\n}\n\n/// rc.14 cycle fix (Design A): whether a CPU press with no reachable group may wait for its own group\n/// (`body_bank::demand`) instead of today's Reload. `mii_group`: the target is a saved Mii served by the role's Mii\n/// group, whose plan carries the configuration's own hat (`mii_identity_of`) and whose prefetch registers it.\n/// rc.14 mii-freed (the primary 2026-11-15 ~11:40Z): fail-first stub, today's gate (a hat change always Reloads).\npub fn demand_gate(reuse:bool,replay:bool,refresh_partners:bool,same_class:bool,hat_change:bool,mii_group:bool)->bool {\n    let _=mii_group;\n    !reuse && !replay && !refresh_partners && !same_class && !hat_change\n}\n\n",
+     "reason": "rc.14 mii-freed fail-first: rc.14 mii-freed: demand_gate stub (today's gate) and its fail-first case; the CPU demand gate calls it"
+    },
+    {
+     "old": "                Ok(Destination {target:Target::fighter(kind),cursor:Some(0)}));\n        }\n    }\n\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n    #[test]\n    fn case_table() {\n        crate::test_table::run(&[\n",
+     "new": "                Ok(Destination {target:Target::fighter(kind),cursor:Some(0)}));\n        }\n    }\n\n    /// rc.14 mii-freed (Eden rr2-n3 on 180890dc #782-#900; cyclefix-n2 #4314-#4424): the CPU's Mii Gunner (hat 125,\n    /// tokens [4b, 7d, 0, 25] #857) was resident, a shrink freed its Mii group, and the press onto it from the CPU's\n    /// original (no hat) went to the canonical Reload with no `demand` line, tearing down the window and K. Rool's group.\n    /// The press's hat differs from the CPU's (`hat_change`), and the gate sent every hat change to the Reload. A cold Mii\n    /// whose hat matched took the demand path (cf-p2-x2 #2417, a Mii with hat 0). A saved Mii's own group carries its\n    /// hat, so a hat change waits for that group too; an ordinary fighter's hat change, a retained same-class change, a\n    /// reuse, a replay and a partner refresh keep their paths.\n    fn a_freed_mii_with_a_hat_waits_for_its_own_group_instead_of_a_reload() {\n        assert!(demand_gate(false, false, false, false, true, true), \"resident, freed by a shrink, pressed: the demand path\");\n        assert!(demand_gate(false, false, false, false, false, true), \"a Mii whose hat matches: the demand path, as before\");\n        assert!(demand_gate(false, false, false, false, false, false), \"an ordinary fighter: the demand path, as before\");\n        assert!(!demand_gate(false, false, false, false, true, false), \"an ordinary fighter's hat change keeps its Reload\");\n        assert!(!demand_gate(false, false, false, true, true, true), \"a retained same-class change keeps its path\");\n        assert!(!demand_gate(true, false, false, false, true, true), \"a reuse keeps the bank's own switch\");\n        assert!(!demand_gate(false, true, false, false, true, true), \"a replay keeps its recorded fighter's path\");\n        assert!(!demand_gate(false, false, true, false, true, true), \"a partner refresh never waits\");\n    }\n\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n    #[test]\n    fn case_table() {\n        crate::test_table::run(&[\n",
+     "reason": "rc.14 mii-freed fail-first: rc.14 mii-freed: demand_gate stub (today's gate) and its fail-first case; the CPU demand gate calls it"
+    },
+    {
+     "old": "            (\"ordinary_cycle_commits_kirby_mario_and_exact_origin\", ordinary_cycle_commits_kirby_mario_and_exact_origin as fn()),\n        ]);\n",
+     "new": "            (\"ordinary_cycle_commits_kirby_mario_and_exact_origin\", ordinary_cycle_commits_kirby_mario_and_exact_origin as fn()),\n            (\"a_freed_mii_with_a_hat_waits_for_its_own_group_instead_of_a_reload\",\n                a_freed_mii_with_a_hat_waits_for_its_own_group_instead_of_a_reload as fn()),\n        ]);\n",
+     "reason": "rc.14 mii-freed fail-first: rc.14 mii-freed: demand_gate stub (today's gate) and its fail-first case; the CPU demand gate calls it"
     }
    ]
   },
@@ -22777,7 +22792,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "d1918bab415a3cced9e18feb53a3b91dff71ec48e42404986e91200d5d264417",
+   "dest_sha256": "1aa4ab14efd281ff3cdd07e780255dcae28f657a62b8fa86f66e75220025d007",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -23610,6 +23625,11 @@
      "old": "        let waits=configuration.is_some_and(|c|super::body_bank::demand(current.binding.owner,kind,c));\n",
      "new": "        let waits=configuration.is_some_and(|c|super::body_bank::demand(current.binding.owner,kind,c,exit));\n",
      "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "    if !reuse && request.replay().is_none() && !request.refresh_partners() && same_class.is_none() && !hat_change {\n        let kind=descriptor_kind(&descriptor);\n        let configuration=match destination.target.kind() {\n            TargetKind::Fighter(_)=>Some(None),\n            TargetKind::Original if origin_saved.is_none()=>Some(None),\n            TargetKind::Saved=>publish.filter(|_|MiiClass::from_kind(kind).is_some()).map(Some),\n            _=>None,\n        };\n",
+     "new": "    // rc.14 mii-freed: a saved Mii whose hat differs from the CPU's (`hat_change`) waits for its own Mii group too; that\n    // group's plan carries the configuration's hat (`demand_gate`). Eden rr2-n3 #880-#900: the Reload instead.\n    let kind=descriptor_kind(&descriptor);\n    let configuration=match destination.target.kind() {\n        TargetKind::Fighter(_)=>Some(None),\n        TargetKind::Original if origin_saved.is_none()=>Some(None),\n        TargetKind::Saved=>publish.filter(|_|MiiClass::from_kind(kind).is_some()).map(Some),\n        _=>None,\n    };\n    if crate::engine::mii::ordinary_cpu::demand_gate(reuse,request.replay().is_some(),request.refresh_partners(),\n        same_class.is_some(),hat_change,matches!(configuration,Some(Some(_)))) {\n",
+     "reason": "rc.14 mii-freed fail-first: rc.14 mii-freed: demand_gate stub (today's gate) and its fail-first case; the CPU demand gate calls it"
     }
    ]
   },

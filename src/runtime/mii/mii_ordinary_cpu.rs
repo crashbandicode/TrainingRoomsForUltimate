@@ -1146,14 +1146,17 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
     // (`body_bank::demand`), served like any group swap, instead of the Reload that tore down every resident fighter.
     // Phase 2a: a direct pick, a menu choice and a restore too; a replay's recorded fighter keeps its own path.
     // Gap 3: a press out of the live Mii group (`exit`) too; it waits until its group is Built for the warm exit.
-    if !reuse && request.replay().is_none() && !request.refresh_partners() && same_class.is_none() && !hat_change {
-        let kind=descriptor_kind(&descriptor);
-        let configuration=match destination.target.kind() {
-            TargetKind::Fighter(_)=>Some(None),
-            TargetKind::Original if origin_saved.is_none()=>Some(None),
-            TargetKind::Saved=>publish.filter(|_|MiiClass::from_kind(kind).is_some()).map(Some),
-            _=>None,
-        };
+    // rc.14 mii-freed: a saved Mii whose hat differs from the CPU's (`hat_change`) waits for its own Mii group too; that
+    // group's plan carries the configuration's hat (`demand_gate`). Eden rr2-n3 #880-#900: the Reload instead.
+    let kind=descriptor_kind(&descriptor);
+    let configuration=match destination.target.kind() {
+        TargetKind::Fighter(_)=>Some(None),
+        TargetKind::Original if origin_saved.is_none()=>Some(None),
+        TargetKind::Saved=>publish.filter(|_|MiiClass::from_kind(kind).is_some()).map(Some),
+        _=>None,
+    };
+    if crate::engine::mii::ordinary_cpu::demand_gate(reuse,request.replay().is_some(),request.refresh_partners(),
+        same_class.is_some(),hat_change,matches!(configuration,Some(Some(_)))) {
         // The press waits; its group's CharInfo publication may run beside it (`State::publication_idle`).
         let waits=configuration.is_some_and(|c|super::body_bank::demand(current.binding.owner,kind,c,exit));
         STATE.lock().demand=waits.then_some(request);

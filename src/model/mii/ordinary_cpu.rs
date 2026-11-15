@@ -37,6 +37,15 @@ pub fn cpu_hat_route(layout:crate::engine::mii::backend::Layout,owner:usize,befo
     }
 }
 
+/// rc.14 cycle fix (Design A): whether a CPU press with no reachable group may wait for its own group
+/// (`body_bank::demand`) instead of today's Reload. `mii_group`: the target is a saved Mii served by the role's Mii
+/// group, whose plan carries the configuration's own hat (`mii_identity_of`) and whose prefetch registers it.
+/// rc.14 mii-freed (the primary 2026-11-15 ~11:40Z): fail-first stub, today's gate (a hat change always Reloads).
+pub fn demand_gate(reuse:bool,replay:bool,refresh_partners:bool,same_class:bool,hat_change:bool,mii_group:bool)->bool {
+    let _=mii_group;
+    !reuse && !replay && !refresh_partners && !same_class && !hat_change
+}
+
 /// A changed headgear row cannot reuse the retained O's kind*42+3 resource key.
 /// This is branch selection only; SameClass still validates all of its old proofs.
 pub fn retained_same_class_candidate(before:Configuration,after:Configuration)->bool {
@@ -535,11 +544,31 @@ mod generic_completion_tests {
         }
     }
 
+    /// rc.14 mii-freed (Eden rr2-n3 on 180890dc #782-#900; cyclefix-n2 #4314-#4424): the CPU's Mii Gunner (hat 125,
+    /// tokens [4b, 7d, 0, 25] #857) was resident, a shrink freed its Mii group, and the press onto it from the CPU's
+    /// original (no hat) went to the canonical Reload with no `demand` line, tearing down the window and K. Rool's group.
+    /// The press's hat differs from the CPU's (`hat_change`), and the gate sent every hat change to the Reload. A cold Mii
+    /// whose hat matched took the demand path (cf-p2-x2 #2417, a Mii with hat 0). A saved Mii's own group carries its
+    /// hat, so a hat change waits for that group too; an ordinary fighter's hat change, a retained same-class change, a
+    /// reuse, a replay and a partner refresh keep their paths.
+    fn a_freed_mii_with_a_hat_waits_for_its_own_group_instead_of_a_reload() {
+        assert!(demand_gate(false, false, false, false, true, true), "resident, freed by a shrink, pressed: the demand path");
+        assert!(demand_gate(false, false, false, false, false, true), "a Mii whose hat matches: the demand path, as before");
+        assert!(demand_gate(false, false, false, false, false, false), "an ordinary fighter: the demand path, as before");
+        assert!(!demand_gate(false, false, false, false, true, false), "an ordinary fighter's hat change keeps its Reload");
+        assert!(!demand_gate(false, false, false, true, true, true), "a retained same-class change keeps its path");
+        assert!(!demand_gate(true, false, false, false, true, true), "a reuse keeps the bank's own switch");
+        assert!(!demand_gate(false, true, false, false, true, true), "a replay keeps its recorded fighter's path");
+        assert!(!demand_gate(false, false, true, false, true, true), "a partner refresh never waits");
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("ordinary_cycle_commits_kirby_mario_and_exact_origin", ordinary_cycle_commits_kirby_mario_and_exact_origin as fn()),
+            ("a_freed_mii_with_a_hat_waits_for_its_own_group_instead_of_a_reload",
+                a_freed_mii_with_a_hat_waits_for_its_own_group_instead_of_a_reload as fn()),
         ]);
     }
     }
