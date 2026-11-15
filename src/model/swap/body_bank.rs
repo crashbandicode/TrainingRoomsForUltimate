@@ -4340,7 +4340,7 @@ mod tests {
         assert_eq!(kinds(Members::new(&[0x08, 0x13]).unwrap()), vec![0x08, 0x13]);
         assert_eq!(kinds(Members::pair_lead(0x02).unwrap()).len(), Members::pair_lead(0x02).unwrap().count());
         // The pins of a window plus every kept group fit, with both object kinds.
-        assert!((MAX_EXTRA_GROUPS + 1) * NATIVE_MEMBERS + 2 <= PIN_CAPACITY);
+        const { assert!((MAX_EXTRA_GROUPS + 1) * NATIVE_MEMBERS + 2 <= PIN_CAPACITY) };
     }
 
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
