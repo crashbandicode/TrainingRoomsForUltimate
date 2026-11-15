@@ -868,19 +868,32 @@ mod tests {
         assert_header(&mut screens, COMBOS_SEQ, 0, "Seq", "Name sequence");
         screens.submit_name("");
         assert_eq!(screens.catalog().sequences[0].name, "Seq");
-        assert!(!keyboard_opens(true));
-        assert!(offer_keyboard("Name macro", "Macro 1", true).is_none());
-        assert_eq!(
-            offer_keyboard("Name macro", "Macro 1", false)
-                .unwrap()
-                .header,
-            "Name macro"
-        );
         close_overlay(&mut screens);
         open_row(&mut screens, SAVES_MACROS, 1, "+ New chain");
         screens.handle_page(MenuButton::B, true, SAVES_MACROS);
         screens.submit_name("");
         assert!(screens.has_chain_named("Chain 1"));
+    }
+
+    /// Operator 2026-11-15: Quickplay's room opens the name keyboard like a local-wireless room. Rename, a new chain and
+    /// Save last combo each ask for a name; nothing is saved or renamed before the keyboard answers.
+    fn an_online_room_opens_every_name_keyboard() {
+        assert!(keyboard_opens(true));
+        assert_eq!(offer_keyboard("Name macro", "Macro 1", true).map(|offer| offer.header), Some("Name macro"));
+        let mut screens = RecordingScreens::new();
+        screens.set_catalog(header_catalog());
+        screens.set_keyboard_blocked(true);
+        assert_header(&mut screens, SAVES_MACROS, 1, "Nair", "Name macro");
+        assert_eq!(screens.take_effect(), Effect::Keyboard { header: "Name macro", draft: "Nair".into() });
+        close_overlay(&mut screens);
+        open_row(&mut screens, SAVES_MACROS, 1, "+ New chain");
+        screens.handle_page(MenuButton::B, true, SAVES_MACROS);
+        assert!(matches!(screens.take_effect(), Effect::Keyboard { header: "Name chain", .. }));
+        assert!(!screens.has_chain_named("Chain 1"), "no chain before the name is answered");
+        close_overlay(&mut screens);
+        screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 0);
+        screens.handle_page(MenuButton::A, true, COMBOS_SEQ);
+        assert!(matches!(screens.take_effect(), Effect::Keyboard { header: "Name combo", .. }));
     }
 
     fn crop_writes_a_new_file_and_leaves_the_original() {
@@ -1182,6 +1195,7 @@ mod tests {
             ("the_play_chords_drive_the_role_machines", the_play_chords_drive_the_role_machines as fn()),
             ("a_chain_asks_fighter_mismatch_for_macro_1_only", a_chain_asks_fighter_mismatch_for_macro_1_only as fn()),
             ("rename_uses_the_switch_keyboard_headers", rename_uses_the_switch_keyboard_headers as fn()),
+            ("an_online_room_opens_every_name_keyboard", an_online_room_opens_every_name_keyboard as fn()),
             ("crop_writes_a_new_file_and_leaves_the_original", crop_writes_a_new_file_and_leaves_the_original as fn()),
             ("replay_export_has_no_start_save", replay_export_has_no_start_save as fn()),
             ("make_combo_on_a_chain_plays_one_pass_on_player_1", make_combo_on_a_chain_plays_one_pass_on_player_1 as fn()),

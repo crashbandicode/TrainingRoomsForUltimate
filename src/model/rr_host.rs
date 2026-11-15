@@ -2459,7 +2459,8 @@ mod tests {
         assert!(index.hot(Kind::Combo).contains(&listed.entries[0].id));
     }
 
-    fn make_combo_failures_notice_and_skip_the_keyboard_online() {
+    /// Operator 2026-11-15: the name keyboard opens in Quickplay's room too (it replaced `combo-name-online-default`).
+    fn make_combo_failures_notice_and_open_the_keyboard_online() {
         let _hold = hold();
         reset_host();
         let root = scratch("make-fail");
@@ -2494,8 +2495,9 @@ mod tests {
         reset_host();
         post_effect(Effect::Keyboard { header: "Name macro", draft: "Online".into() });
         let online = service_at(&root, &none(), "2026-11-06", state(8), state(7), true);
-        assert!(online.keyboard.is_none());
-        assert!(online.diags.iter().all(|line| !line.contains("screen=rename")));
+        let offer = online.keyboard.expect("an online room offers the name keyboard");
+        assert_eq!((offer.header, offer.draft.as_str()), ("Name macro", "Online"));
+        assert!(online.diags.iter().any(|line| line == "screen=rename header=Name macro"));
     }
 
     /// Eden rc6-seq-explore1 `seq-make` (2026-11-08 12:28Z, primary inbox 13:31Z): a played macro that lands no hit was
@@ -3401,7 +3403,7 @@ mod tests {
             ("cpu_role_player_path_still_stores_the_polls", cpu_role_player_path_still_stores_the_polls as fn()),
             ("a_record_writes_before_migration_when_the_slot_image_is_absent", a_record_writes_before_migration_when_the_slot_image_is_absent as fn()),
             ("make_combo_plays_the_named_file_and_keeps_the_drill", make_combo_plays_the_named_file_and_keeps_the_drill as fn()),
-            ("make_combo_failures_notice_and_skip_the_keyboard_online", make_combo_failures_notice_and_skip_the_keyboard_online as fn()),
+            ("make_combo_failures_notice_and_open_the_keyboard_online", make_combo_failures_notice_and_open_the_keyboard_online as fn()),
             ("make_combo_with_no_hit_saves_nothing_not_the_previous_exchange", make_combo_with_no_hit_saves_nothing_not_the_previous_exchange as fn()),
             ("save_last_combo_writes_the_latest_exchange_names_it_and_drills_it", save_last_combo_writes_the_latest_exchange_names_it_and_drills_it as fn()),
             ("mismatch_holds_playback_until_keep_or_switch", mismatch_holds_playback_until_keep_or_switch as fn()),

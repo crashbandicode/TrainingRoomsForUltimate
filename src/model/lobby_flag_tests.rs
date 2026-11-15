@@ -488,10 +488,45 @@ mod tests {
         None
     }
 
+    /// Operator 2026-11-15: a Quickplay match may interrupt the name keyboard. Its start is the same clock decision as a
+    /// local-wireless match's (`suspend_waiting`, which closes the inline keyboard and applies nothing:
+    /// `named_macros::suspend_waiting`), and the return is the same room, so the draft is parked as in local wireless.
+    fn a_quickplay_match_suspends_naming_as_a_local_match_does() {
+        use crate::engine::mii::backend::Layout;
+        let scene = |melee, mode| Scene { initialized: true, melee, mode };
+        let rooms = [
+            ("local wireless", scene(0x0d, 0x0201_0000), scene(0x01, 0x0201_0000)),
+            ("quickplay route 1", WAITING, BATTLE),
+            ("quickplay route 2", scene(0x0d, 0x0701_0400), scene(0x10, 0x0701_0400)),
+        ];
+        for (name, room, battle) in rooms {
+            let (_, start) = step(ready(room), Some(battle), true);
+            let expected = Step { scene_changed: true, suspend_waiting: true, active: false, active_changed: true };
+            assert_eq!(start, expected, "{name}: the match start");
+            let continuation = |s: Scene| Layout::continuation(s.initialized, s.melee, s.mode);
+            assert!(continuation(room).is_some() && continuation(room) == continuation(battle), "{name}: same room after the match");
+        }
+    }
+
+    /// Operator 2026-11-15: no name keyboard is refused in an online room (it replaced `combo-name-online-default`).
+    fn no_name_keyboard_reads_the_online_mode() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut files = Vec::new();
+        rust_files(&root, &mut files);
+        for path in files.iter().filter(|path| !path.ends_with("lobby_flag_tests.rs")) {
+            let text = std::fs::read_to_string(path).unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+            for needle in ["combo_name_keyboard", "keyboard_blocked", "fn keyboard_closed", "fn name_keyboard_opens"] {
+                assert!(!text.contains(needle), "{} gates a name keyboard on the room: {needle}", path.display());
+            }
+        }
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_quickplay_match_suspends_naming_as_a_local_match_does", a_quickplay_match_suspends_naming_as_a_local_match_does as fn()),
+            ("no_name_keyboard_reads_the_online_mode", no_name_keyboard_reads_the_online_mode as fn()),
             ("training_behaviour_follows_the_live_scene_at_every_station", training_behaviour_follows_the_live_scene_at_every_station as fn()),
             ("slot_one_still_tears_the_waiting_room_down", slot_one_still_tears_the_waiting_room_down as fn()),
             ("a_battle_at_station_1_keeps_the_games_death_parameters", a_battle_at_station_1_keeps_the_games_death_parameters as fn()),
