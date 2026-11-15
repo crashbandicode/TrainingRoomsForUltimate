@@ -1395,24 +1395,8 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
                 bump_catalog();
             }
         }
-        Effect::WriteChainSteps { id, steps } => {
-            let store = Store::<Chain>::new(root.join(MACROS_DIR));
-            if let Ok(mut chain) = store.load(&id) {
-                chain.recordings = steps;
-                if store.overwrite(&id, &chain).is_ok() {
-                    bump_catalog();
-                }
-            }
-        }
-        Effect::WriteSequenceCombos { id, combos } => {
-            let store = Store::<Sequence>::new(root.join(SEQUENCES_DIR));
-            if let Ok(mut sequence) = store.load(&id) {
-                sequence.combos = combos;
-                if store.overwrite(&id, &sequence).is_ok() {
-                    bump_catalog();
-                }
-            }
-        }
+        Effect::WriteChainSteps { id, steps } => rename::<Chain>(root, MACROS_DIR, &id, |f| f.recordings = steps),
+        Effect::WriteSequenceCombos { id, combos } => rename::<Sequence>(root, SEQUENCES_DIR, &id, |f| f.combos = combos),
         Effect::SaveLastCombo { name } => save_last_combo(root, &name, tick),
         Effect::SetStartSave { id, chain: true, on } => rename::<Chain>(root, MACROS_DIR, &id, |f| f.start_save_on = on),
         Effect::SetStartSave { id, chain: false, on } => rename::<MacroRecording>(root, MACROS_DIR, &id, |f| f.start_save_on = on),
