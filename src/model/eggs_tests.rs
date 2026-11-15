@@ -592,6 +592,37 @@ fn eggs_cpu_air_hits() {
     assert_eq!((run.cpu_pass(5.0, false), run.score), (None, 1), "an aerial's hit in the air counts");
 }
 
+/// `10 targets` with the CPU as the target, each pass through `plan` as the runtime does it: the CPU's tenth counted hit
+/// ends the run, and Player 1's next pass closes it ("Done! 10", the best kept) with the clock stopped at the hit's frame.
+/// Eden cf-flight-8551434e-1: the notice stayed at "Eggs 9/10" (`plan` idled the ended run before its closing pass).
+fn eggs_cpu_done() {
+    let rows = [TEN, ANY, NORMAL, CPU];
+    let mut run = started_with(TEN, ANY, NORMAL, CPU, 7, View([14.0, 14.0], [0.0, -300.0], BOX));
+    // Player 1's frame: the plan, then the step when it says Read (the runtime's `eggs_pass`).
+    let p1 = |run: &mut Run| match run.plan(rows, None, 0, || TRAINING) {
+        Plan::Read => {
+            let tick = run.keeper(P1);
+            run.step(tick, 0.0, &[], false, 7)
+        }
+        _ => None,
+    };
+    // Ten targets of four frames each: placed, armed, hit, hitlag. Player 1's pass comes first in a frame, then the CPU's.
+    let mut end = None;
+    for k in 0..10 {
+        for (damage, stopped) in [(0.0, false), (0.0, false), (5.0, false), (5.0, true)] {
+            if p1(&mut run) == Some(END_FRAMES) {
+                end = Some(k);
+            }
+            run.cpu_pass(damage, stopped);
+        }
+    }
+    assert_eq!((run.score, end), (10, Some(9)), "the frame after the tenth hit closes the run");
+    assert_eq!(run.frames, 9 * 4 + 3, "the clock stopped at the tenth hit's frame");
+    assert!(notice(&run).starts_with("Done! 10 in 0:00.") && notice(&run).contains("(best"), "{}", notice(&run));
+    assert_eq!((p1(&mut run), run.cpu_pass(0.0, false)), (None, None), "closed; the CPU is released");
+    assert_eq!(run.plan(rows, None, 0, || panic!("closed: nothing is read")), Plan::Idle, "it waits for a restart");
+}
+
 /// The notice after one more pass of Player 1.
 fn notice_after(run: &mut Run) -> String {
     pass(run, &[], false);
@@ -962,6 +993,7 @@ fn case_table() {
         ("eggs_cpu_flies_like_the_disc", eggs_cpu_flies_like_the_disc as fn()),
         ("eggs_cpu_pass_follows_the_flight", eggs_cpu_pass_follows_the_flight as fn()),
         ("eggs_cpu_air_hits", eggs_cpu_air_hits as fn()),
+        ("eggs_cpu_done", eggs_cpu_done as fn()),
         ("eggs_break_anim_timing", eggs_break_anim_timing as fn()),
         ("eggs_break_anim_overlap", eggs_break_anim_overlap as fn()),
         ("eggs_timer_end", eggs_timer_end as fn()),

@@ -303,8 +303,10 @@ def reset(ctx, t0, out, problems):
     n = len(reader.lines())
     _mark(t0, out, 'reset')
     _reset(ctx)
-    restart = reader.wait(r'\[Eggs\] notice="Eggs 0"', 6, after=n)
+    # The new run writes its first notice on the pass that spawns its first target, after the camera has held still
+    # (eggs.rs SETTLE), so the notice is looked for once that target is placed (cf-flight-8551434e-1: 9 s after the reset).
     fresh = reader.wait(FRESH_AIR, 20, after=n)
+    restart = reader.wait(r'\[Eggs\] notice="Eggs 0"', 3, after=n)
     land = reader.wait(LAND, 8, after=n) if fresh else None
     time.sleep(0.6)
     out['rest'] = str(ctx.shot('cf-reset-rest'))
