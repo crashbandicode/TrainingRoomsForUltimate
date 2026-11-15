@@ -2,7 +2,9 @@
 
 Operator order 2026-11-15: "automated checks for stale links/outdated version references and docs as gates". Run by
 `tests/docs_gates.rs` on every `cargo test` (`python3 -I tools/docs_check.py [--root DIR] [--verbose]`). It reads only the
-files under the root: no network, no clock, no git, so every host gives the same answer. Exit 0: clean; 1: problems
+files under the root: no network and no clock, so every host gives the same answer. The one outside call is `git ls-files`,
+when the root has a `.git`: the gate hosts' stage leaves docs/media and every .gif out of the work tree, so a link target
+is judged by what the commit holds (`tracked_paths`). Exit 0: clean; 1: problems
 (printed one per line as `rule path:line: message`); 2: it could not run (no root, unreadable file).
 `tools/check_external_links.py` is the network check (a release step); it reuses `external_links` below.
 
@@ -51,6 +53,7 @@ import html
 import os
 import posixpath
 import re
+import subprocess
 import sys
 import unicodedata
 from typing import NamedTuple
@@ -390,10 +393,34 @@ def anchors_of(text):
 # --- the tree ---------------------------------------------------------------------------------------------------------
 
 
+def tracked_paths(root):
+    """(files, folders) as git lists them: tracked, plus untracked and not ignored. None when `root` has no `.git`.
+
+    The gate hosts build from a stage that leaves `docs/media` and every `*.gif` out of the work tree (remote-gate.ps1,
+    skip-worktree), so a link to a clip must be judged by what the commit holds, not by what is on that disk."""
+    if not os.path.exists(os.path.join(root, ".git")):
+        return None
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    try:
+        listing = subprocess.run(["git", "-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                                 capture_output=True, check=True, env=env, timeout=120).stdout
+    except subprocess.CalledProcessError as error:
+        raise OSError(f"git ls-files failed in {root}: {error.stderr.decode('utf-8', 'replace').strip()}") from error
+    except subprocess.SubprocessError as error:
+        raise OSError(f"git ls-files did not finish in {root}: {error}") from error
+    files = {path for path in listing.decode("utf-8").split("\0") if path}
+    folders = {""}
+    for path in files:
+        parts = path.split("/")[:-1]
+        folders.update("/".join(parts[:n]) for n in range(1, len(parts) + 1))
+    return files, folders
+
+
 class Tree:
     def __init__(self, root):
         self.root = root
         self.files = markdown_files(root)
+        self.listed = tracked_paths(root)
         self._texts, self._anchors, self._listing = {}, {}, {}
 
     def text(self, rel):
@@ -415,7 +442,10 @@ class Tree:
         return self._listing[folder]
 
     def exists(self, rel):
-        """Whether the path exists with exactly this spelling, folder by folder."""
+        """Whether the path exists with exactly this spelling: in git's list when the root is a git work tree (see
+        `tracked_paths`), else on disk, folder by folder."""
+        if self.listed is not None:
+            return rel in self.listed[0] or rel in self.listed[1]
         folder = ""
         for part in rel.split("/"):
             if part not in self._names(folder):

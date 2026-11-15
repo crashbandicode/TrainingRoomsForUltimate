@@ -7,6 +7,7 @@ import contextlib
 import io
 import os
 import pathlib
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -367,6 +368,54 @@ class NoticeTexts(unittest.TestCase):
 
     def test_the_rust_tokenizer_keeps_real_strings_only(self):
         self.assertEqual(d.rust_strings('let a = "x"; // "no"\nlet b = \'"\'; let c: &\'a str = r##"y "# z"##; /* "no" */ let e = "t\\u{e9}\\n";'), ["x", 'y "# z', "té\n"])
+
+
+def git(root, *args):
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    subprocess.run(["git", "-C", root, *args], check=True, capture_output=True, env=env)
+
+
+class GateStage(unittest.TestCase):
+    """remote-gate's stage leaves docs/media and every .gif out of the work tree (skip-worktree): links to them must
+    be judged by what git holds."""
+
+    def stage(self, extra=None, ignore=""):
+        root = build(dict(CLEAN, **(extra or {})))
+        git(root, "init", "-q")
+        if ignore:
+            pathlib.Path(root, ".gitignore").write_text(ignore)
+        git(root, "add", "-A")
+        return root
+
+    def test_a_clip_that_git_holds_but_the_work_tree_lacks_passes(self):
+        root = self.stage()
+        git(root, "update-index", "--skip-worktree", "docs/media/pic.gif")
+        os.remove(os.path.join(root, "docs/media/pic.gif"))
+        self.assertEqual(d.check(root, NO_ALLOWANCE), [])
+
+    def test_a_clip_that_git_does_not_hold_fails_even_when_it_is_on_disk(self):
+        root = self.stage({"README.md": CLEAN["README.md"] + "\n![x](docs/media/local.gif)\n", "docs/media/local.gif": "GIF"}, ignore="local.gif\n")
+        self.assertEqual([(p.rule, p.text) for p in d.check(root, NO_ALLOWANCE)], [("link-missing", "`docs/media/local.gif`: no such file or folder")])
+
+    def test_an_untracked_file_that_is_not_ignored_counts_while_authoring(self):
+        root = self.stage()
+        pathlib.Path(root, "docs/media/new.gif").write_text("GIF")
+        pathlib.Path(root, "README.md").write_text(CLEAN["README.md"] + "\n![x](docs/media/new.gif)\n")
+        self.assertEqual(d.check(root, NO_ALLOWANCE), [])
+
+    def test_the_case_of_a_path_must_match_git_s_list(self):
+        root = self.stage({"README.md": CLEAN["README.md"] + "\n![x](docs/media/PIC.gif)\n"})
+        self.assertEqual([p.rule for p in d.check(root, NO_ALLOWANCE)], ["link-missing"])
+
+    def test_a_folder_link_resolves_through_the_list(self):
+        root = self.stage({"README.md": CLEAN["README.md"] + "\n[x](docs/media/)\n"})
+        self.assertEqual(d.check(root, NO_ALLOWANCE), [])
+
+    def test_a_git_that_cannot_list_is_an_error_not_a_pass(self):
+        root = build(CLEAN)
+        pathlib.Path(root, ".git").write_text("not a repository")
+        with self.assertRaises(OSError):
+            d.check(root, NO_ALLOWANCE)
 
 
 class Reports(unittest.TestCase):
