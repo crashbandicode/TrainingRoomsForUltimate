@@ -72,12 +72,16 @@ impl Orb {
 /// The opacity of an orb pane's colour; the disc texture carries the shading.
 pub const ORB_ALPHA: u8 = 255;
 
+/// Exact sRGB bytes shared by spheres, wind areas and the menu colour key.
+pub fn tint_colour(tint: [f32; 3], alpha: u8) -> [u8; 4] {
+    let byte = |c: f32| (c.clamp(0.0, 1.0) * 255.0 + 0.5) as u8;
+    [byte(tint[0]), byte(tint[1]), byte(tint[2]), alpha]
+}
+
 /// The orb a held sphere becomes: `centre` is the bone's transform of the sphere's offset (the runtime's game call); the
 /// radius is the hitbox size (route B's effect scale is `size x SCALE`).
 pub fn orb_of(sphere: &Sphere, centre: [f32; 3]) -> Orb {
-    let byte = |c: f32| (c.clamp(0.0, 1.0) * 255.0 + 0.5) as u8;
-    let srgb = [byte(sphere.tint[0]), byte(sphere.tint[1]), byte(sphere.tint[2]), ORB_ALPHA];
-    Orb { centre, tail: centre, radius: sphere.scale / SCALE, color: super::panes::linear(srgb), key: sphere.key }
+    Orb { centre, tail: centre, radius: sphere.scale / SCALE, color: super::panes::linear(tint_colour(sphere.tint, ORB_ALPHA)), key: sphere.key }
 }
 
 /// Publishes a fighter has missed before its orbs stop being drawn (other fighters' publishes count; a pause publishes

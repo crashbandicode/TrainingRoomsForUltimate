@@ -289,6 +289,8 @@ pub enum FileTag {
 /// its kind box, a heading over the files joined to it, each of those in its own box, and plain lines.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ConnKind {
+    /// A colour-key chip in the shared side panel.
+    Swatch([u8; 4]),
     Head(FileTag),
     Child(FileTag),
     Heading,

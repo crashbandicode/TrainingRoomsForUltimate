@@ -29,6 +29,8 @@ practice fighters in a waiting room.
 - **How:** A opens the checklist; A ticks, ZL ticks all or none, B goes back. The row shows how many are ticked, such
   as "3 of 7".
 
+The checklist has a **Colour legend** beside it. Its swatches follow the current ticks, including the change to strong/weak and hurtbox status colours when Frame data colours is ticked. Fighter and article hurtboxes share the same key.
+
 A settings file from before this checklist keeps what it showed: On ticks Hitboxes, Grab boxes and Hurtboxes, and Off
 ticks none. Existing checklists keep their choices; Article hurtboxes starts unticked.
 

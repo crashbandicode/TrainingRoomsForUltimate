@@ -100,6 +100,8 @@ pub fn direction(degrees: f32, lr: f32) -> [f32; 2] {
 
 /// The marks' orb kind (after `hitbox::KIND_GRAB`); their sphere numbers start at 0x10, so `Board::publish` never pairs them.
 pub const KIND_MARK: u32 = 4;
+/// White for launch marks and wind direction lines.
+pub const DIRECTION_COLOUR: [u8; 4] = [255; 4];
 /// A line's or dash's radius and a dot's, as fractions of the hitbox's.
 pub const LINE: f32 = 0.1;
 pub const DOT: f32 = 0.25;
@@ -112,7 +114,7 @@ pub fn marks(hit: &Orb, angle: i32, lr: f32) -> [Option<Orb>; 2] {
     let [x, y, z] = hit.centre;
     let seg = |n: usize, [dx, dy]: [f32; 2], from: f32, to: f32| {
         let at = |t: f32| [x + dx * hit.radius * t, y + dy * hit.radius * t, z];
-        Orb { centre: at(from), tail: at(to), radius: hit.radius * LINE, color: [255; 4], key: sphere_key(KIND_MARK, index, 0x10 + n) }
+        Orb { centre: at(from), tail: at(to), radius: hit.radius * LINE, color: DIRECTION_COLOUR, key: sphere_key(KIND_MARK, index, 0x10 + n) }
     };
     let dashes = direction(SAKURAI_SHOWN, lr);
     match angle {
@@ -276,8 +278,7 @@ pub const SHADOW_GROW: f32 = 1.6;
 
 /// The areas' pane colour: `WIND` as the layout takes it (linear light), at `AREA_ALPHA`.
 pub fn area_colour() -> [u8; 4] {
-    let byte = |c: f32| (c.clamp(0.0, 1.0) * 255.0 + 0.5) as u8;
-    super::panes::linear([byte(WIND[0]), byte(WIND[1]), byte(WIND[2]), AREA_ALPHA])
+    super::panes::linear(super::hitbox_orbs::tint_colour(WIND, AREA_ALPHA))
 }
 
 /// Area `index`'s orbs at depth `z`, in the order they draw (a later pane draws over an earlier one): its shape (a box as a band from
@@ -301,7 +302,7 @@ pub fn area_orbs(area: &WindArea, index: usize, z: f32, colour: [u8; 4]) -> [Opt
             // 361: the wind has no one direction (Eden: Meta Knight's Mach Tornado, Mewtwo's Shadow Ball, Wario Waft's circles): a
             // centre dot, as the launch angles mark a hit with no fixed direction.
             let at = [centre[0], centre[1], z];
-            return Orb { centre: at, tail: at, radius: reach[0].min(reach[1]) * DOT, color: [255; 4], key: sphere_key(KIND_AREA, index, AREA_LINE as usize) };
+            return Orb { centre: at, tail: at, radius: reach[0].min(reach[1]) * DOT, color: DIRECTION_COLOUR, key: sphere_key(KIND_AREA, index, AREA_LINE as usize) };
         }
         let [dx, dy] = direction(degrees, 1.0);
         // To the edge: a circle's radius; a box's nearest side along the direction.
@@ -310,7 +311,7 @@ pub fn area_orbs(area: &WindArea, index: usize, z: f32, colour: [u8; 4]) -> [Opt
             AreaShape::Box { .. } => [(reach[0], dx), (reach[1], dy)].iter().filter(|(_, d)| d.abs() > 1e-6).map(|(h, d)| h / d.abs()).fold(f32::MAX, f32::min),
         };
         let thick = reach[0].min(reach[1]) * LINE;
-        Orb { centre: [centre[0], centre[1], z], tail: [centre[0] + dx * t, centre[1] + dy * t, z], radius: thick, color: [255; 4], key: sphere_key(KIND_AREA, index, AREA_LINE as usize) }
+        Orb { centre: [centre[0], centre[1], z], tail: [centre[0] + dx * t, centre[1] + dy * t, z], radius: thick, color: DIRECTION_COLOUR, key: sphere_key(KIND_AREA, index, AREA_LINE as usize) }
     });
     let shadow = line.map(|l| Orb {
         radius: l.radius * SHADOW_GROW,
@@ -322,6 +323,33 @@ pub fn area_orbs(area: &WindArea, index: usize, z: f32, colour: [u8; 4]) -> [Opt
 }
 
 // ---- articles' and items' wind areas (rc.14 wind-articles) ----------------------------------------------------------------
+
+/// The current checklist's colour key, in sRGB (the UI converts once); only enabled drawing families appear.
+pub fn swatches(bits: u8) -> impl Iterator<Item = (&'static str, [u8; 4])> {
+    use super::hitbox as h;
+    use super::hitbox_orbs::{tint_colour as rgba, ORB_ALPHA};
+    let on = bits & COLOURS != 0;
+    let hurt = bits & (HURTBOXES | ARTICLE_HURTBOXES) != 0;
+    let wind = bits & WINDBOXES != 0;
+    let (names, colours): (&[_], &[_]) = if on {
+        (&["Strong hitbox", "Weak hitbox"], &[h::STRONG_TINT, h::WEAK_TINT])
+    } else {
+        (&["Hitbox 1", "Hitbox 2", "Hitbox 3", "Hitbox 4", "Hitbox 5", "Hitbox 6", "Hitbox 7", "Hitbox 8"], &h::TINTS)
+    };
+    let hits = (0..names.len()).filter(move |_| bits & HITBOXES != 0).map(move |i| (names[i], colours[i]));
+    let c = |status| h::legend_colour(h::KIND_HURT, None, status, h::HURTBOX_TINT, on);
+    let grab = h::legend_colour(h::KIND_GRAB, None, 0, h::GRAB_TINT, on);
+    let other = [
+        (bits & GRABS != 0, "Grab box", grab),
+        (hurt, "Hurt / article: normal", c(0)),
+        (hurt && on, "Hurt: can't be hit", c(INTANGIBLE)),
+        (hurt && on, "Hurt: no damage", c(INVINCIBLE)),
+        (wind || on && bits & HITBOXES != 0, "Windbox", WIND),
+        (wind, "Wind area (box / circle)", WIND),
+    ].into_iter().filter(|(show, ..)| *show).map(|(_, n, t)| (n, t));
+    hits.chain(other).map(|(n, t)| (n, rgba(t, ORB_ALPHA)))
+        .chain((bits & (ANGLES | WINDBOXES) != 0).then_some(("Launch / wind lines", DIRECTION_COLOUR)))
+}
 
 /// A wind-area command (`AREA_WIND_2ND`, `_arg10`, `_RAD`, `_RAD_arg9`: `sites_hitbox`) tracks the object running it as an article,
 /// as ATTACK and CATCH do, while the visualizer is on with *Windboxes* ticked and the practice visualizes the object. A fighter's

@@ -577,3 +577,47 @@ fn legend_docs_name_the_game_data_windboxes() {
     }
     assert!(!docs.contains("Items' wind, such as the Gust Bellows, is not drawn"), "items' wind areas are drawn now");
 }
+
+#[test]
+fn menu_swatches_match_the_renderer_in_both_schemes() {
+    let rendered = |tint| orbs::orb_of(&Sphere { tint, ..Sphere::NONE }, [0.0; 3]).color;
+    for on in [false, true] {
+        let rows: Vec<_> = swatches(127 ^ if on { 0 } else { COLOURS }).collect();
+        let colour = |name| rows.iter().find(|(label, ..)| *label == name).unwrap().1;
+        if on {
+            assert_eq!(crate::model::panes::linear(colour("Strong hitbox")), rendered(hitbox::legend_colour(KIND_HIT, None, 0, hitbox::TINTS[0], true)));
+            assert_eq!(crate::model::panes::linear(colour("Weak hitbox")), rendered(hitbox::legend_colour(KIND_HIT, Some(Spot::Late), 0, hitbox::TINTS[0], true)));
+        } else {
+            assert_eq!(rows[..8].iter().map(|r| crate::model::panes::linear(r.1)).collect::<Vec<_>>(), hitbox::TINTS.map(rendered));
+        }
+        for (name, kind, status, usual) in [
+            ("Grab box", KIND_GRAB, 0, hitbox::GRAB_TINT),
+            ("Hurt / article: normal", KIND_HURT, 0, hitbox::HURTBOX_TINT),
+            ("Windbox", KIND_WIND, 0, WIND),
+        ] {
+            assert_eq!(crate::model::panes::linear(colour(name)), rendered(hitbox::legend_colour(kind, None, status, usual, on)));
+        }
+        for (name, status) in [("Hurt: can't be hit", INTANGIBLE), ("Hurt: no damage", INVINCIBLE)] {
+            assert_eq!(rows.iter().any(|r| r.0 == name), on);
+            if on {
+                for kind in [KIND_HURT, hitbox::KIND_ARTICLE_HURT] {
+                    assert_eq!(crate::model::panes::linear(colour(name)), rendered(hitbox::legend_colour(kind, None, status, hitbox::HURTBOX_TINT, on)));
+                }
+            }
+        }
+        assert_eq!(crate::model::panes::linear(colour("Wind area (box / circle)")), area_colour());
+        let hit = orbs::Orb { radius: 1.0, ..orbs::Orb::NONE };
+        assert_eq!(colour("Launch / wind lines"), marks(&hit, 45, 1.0)[0].unwrap().color);
+    }
+    for bits in 0..=127 {
+        let rows: Vec<_> = swatches(bits).collect();
+        assert!(rows.len() <= crate::model::panes::CONN_LINES);
+        assert_eq!(rows.is_empty(), !draws(bits));
+        assert_eq!(rows.iter().any(|r| r.0 == "Windbox"), bits & WINDBOXES != 0 || bits & (HITBOXES | COLOURS) == HITBOXES | COLOURS);
+        assert_eq!(rows.iter().any(|r| r.0 == "Wind area (box / circle)"), bits & WINDBOXES != 0);
+        assert_eq!(rows.iter().any(|r| r.0 == "Hurt / article: normal"), bits & (HURTBOXES | ARTICLE_HURTBOXES) != 0);
+    }
+    assert_eq!(swatches(ANGLES).collect::<Vec<_>>(), [("Launch / wind lines", DIRECTION_COLOUR)]);
+    assert_eq!(swatches(ARTICLE_HURTBOXES).next().unwrap().1, orbs::tint_colour(hitbox::HURTBOX_TINT, 255));
+    assert!(crate::model::panes::CONN_LINES <= crate::model::panes::CONN_BOXES * 4, "every side-panel chip has an existing rectangle");
+}

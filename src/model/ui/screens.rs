@@ -171,6 +171,15 @@ fn checklist_frame(menu: &Menu, screen: &Screen, row: usize, cursor: usize, fram
         line.value_tone = tone;
     });
     let _ = frame.hint.write_str(HINT_CHECKLIST);
+    if r.id == super::legend::ROW {
+        frame.popup = true;
+        let _ = frame.conn_head.write_str("Colour legend");
+        for (i, (name, colour)) in super::legend::swatches(super::legend::shown(&current)).enumerate() {
+            let _ = frame.conn[i].write_str(name);
+            frame.conn_kind[i] = super::recording_menu::ConnKind::Swatch(colour);
+            frame.conn_count += 1;
+        }
+    }
 }
 
 /// The delay popup (N3, mockup 19): the checklist as a grid of boxes (a ticked value on the accent) over the min-max
@@ -765,10 +774,34 @@ mod tests {
         assert!(view.footer.starts_with("Corner trap · Mario / Little Mac\n"), "{}", view.footer);
     }
 
+    fn hitbox_checklist_colour_key_updates_and_clears_with_the_screen() {
+        let mut m = menu();
+        open(&mut m, "Hitbox Visualization");
+        assert!(frame(&m).popup);
+        assert_eq!(frame(&m).conn_count, 0);
+        m.press(Button::A);
+        let first = frame(&m);
+        assert_eq!(first.conn_count, 8);
+        assert_eq!(first.conn[0].string_lossy(), "Hitbox 1");
+        assert!(matches!(first.conn_kind[0], super::super::recording_menu::ConnKind::Swatch([255, 0, 0, 255])));
+        for _ in 0..3 { m.press(Button::Down); }
+        m.press(Button::A);
+        let coloured = frame(&m);
+        assert_eq!(coloured.conn_count, 3);
+        assert_eq!(coloured.conn[0].string_lossy(), "Strong hitbox");
+        assert_eq!(coloured.conn[1].string_lossy(), "Weak hitbox");
+        assert_eq!(coloured.conn[2].string_lossy(), "Windbox");
+        m.press(Button::B);
+        let back = frame(&m);
+        assert!(!back.popup && back.conn_count == 0);
+        assert!(back.conn_kind.iter().all(|kind| *kind == super::super::recording_menu::ConnKind::Detail));
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("hitbox_checklist_colour_key_updates_and_clears_with_the_screen", hitbox_checklist_colour_key_updates_and_clears_with_the_screen as fn()),
             ("a_library_tile_cut_at_sixteen_characters_ends_in_an_ellipsis", a_library_tile_cut_at_sixteen_characters_ends_in_an_ellipsis as fn()),
             ("the_delay_popup_greys_the_checklist_once_a_range_is_set_and_says_why",the_delay_popup_greys_the_checklist_once_a_range_is_set_and_says_why as fn()),
             ("the_overrides_screen_is_columns_of_boxes_and_left_right_step_a_column", the_overrides_screen_is_columns_of_boxes_and_left_right_step_a_column as fn()),

@@ -318,6 +318,11 @@ impl Panes {
             let units = frame.conn[i].units();
             let tone = tone_color(frame.conn_tone[i]);
             let (tag, child) = match frame.conn_kind[i] {
+                ConnKind::Swatch(colour) => {
+                    self.rect_at(IDX_CONN_BOX + i, CONN_LEFT + 12.0, y, 24.0, 24.0, colour);
+                    self.label(IDX_CONN + i, units, x + 20.0, y, w - 40.0, tone);
+                    continue;
+                }
                 ConnKind::Head(tag) => (Some(tag), false),
                 ConnKind::Child(tag) => (Some(tag), true),
                 ConnKind::Heading => {
