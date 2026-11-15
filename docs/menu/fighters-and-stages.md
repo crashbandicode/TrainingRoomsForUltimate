@@ -563,8 +563,8 @@ the mode is Off; "Time!", the end notice and the wait between runs count as runn
 - **How:** Hide: the CPU is hidden while a game runs, and afterwards it is as **Hide CPU** says. Show: the CPU stays as
   it is. It applies when the menu closes.
 
-![CPU during a game on Hide: Eggs-ercise 1 minute starts and the CPU is hidden; Eggs-ercise Off brings it back](../media/rc14-cpu-during-a-game.gif)<br>
-*Practice games with CPU during a game on Hide: Right on Eggs-ercise sets 1 minute and the menu closes; the CPU is hidden while the eggs run ("Eggs 0 1:00"). Left sets Eggs-ercise Off and the CPU is back. The input is named in a box. Eden, rc.14 (untested on hardware).*
+![CPU during a game on Hide: Eggs-ercise 1 minute starts and the CPU is hidden with its tag and panel; Eggs-ercise Off brings it back with both](../media/rc14-cpu-during-a-game.gif)<br>
+*Practice games with CPU during a game on Hide: Right on Eggs-ercise sets 1 minute and the menu closes; the CPU (Hero) is hidden while the eggs run ("Eggs 0 1:00"), and its "CPU" tag and its panel at the bottom are hidden with it. Left sets Eggs-ercise Off and Hero is back with its tag and panel. The input is named in a box. Eden, rc.14 (untested on hardware).*
 
 ## Reset page to defaults
 

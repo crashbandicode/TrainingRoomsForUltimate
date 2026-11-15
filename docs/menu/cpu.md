@@ -515,8 +515,8 @@ Takes the CPU out of the fight without changing any of its settings.
 - **Default:** Off.
 - **How:** Left/Right or A.
 
-![Hide CPU: Mario jabs the CPU (Little Mac), Hide CPU On makes the CPU vanish, Off brings it back and the next jab hits it](../media/rc14-hide-cpu.gif)<br>
-*CPU > Level > Hide CPU: Mario jabs the CPU, Little Mac (2.7%); D-pad Right turns Hide CPU On and the CPU is gone, only its marker stays, and Mario's jab hits nothing; D-pad Left turns it Off, the CPU is back and takes the next jab. The input is named in a box. Eden, rc.14 (untested on hardware).*
+![Hide CPU: Mario jabs the CPU (Hero), Hide CPU On makes the CPU vanish with its tag and its panel, Off brings it back with both and the next jab hits it](../media/rc14-hide-cpu.gif)<br>
+*CPU > Level > Hide CPU: Mario jabs the CPU, Hero (2.7%); D-pad Right turns Hide CPU On and the CPU is gone, and its "CPU" tag and its panel at the bottom go with it, leaving only Mario's panel, and Mario's jab hits nothing; D-pad Left turns it Off, Hero is back with its tag and panel and takes the next jab. The input is named in a box. Eden, rc.14 (untested on hardware).*
 ## Reset page to defaults
 
 The last row of the page. It asks first, then puts every row of the CPU page back to your saved defaults (the factory
