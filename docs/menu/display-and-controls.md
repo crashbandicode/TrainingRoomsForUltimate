@@ -52,8 +52,8 @@ of Bowser's Fire Breath. The game marks them itself, and the plugin uses that ma
 draws it too; with both ticked it is drawn once, in deep blue, and with Windboxes alone only the windboxes are drawn.
 
 Some moves push through a wind area instead of a hitbox. Windboxes draws those too: a see-through deep blue box or
-circle where the wind blows, with a white line pointing the way it pushes. Items' wind, such as the Gust Bellows, is
-not drawn.
+circle where the wind blows, with a white line, edged in dark so it shows on a pale stage, pointing the way it pushes. A
+dot in the middle means the wind has no one direction. Items' wind, such as the Gust Bellows, is not drawn.
 
 These fighters have moves with a wind area. Eden tried the special moves and smashes of every fighter whose moves can
 make one, and Ganondorf's up tilt; aerials, throws and the other tilts were not tried, so a move missing here may still
