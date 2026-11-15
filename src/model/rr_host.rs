@@ -1904,16 +1904,11 @@ mod tests {
         )
         .unwrap();
         let macro_id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
-        set_crop_window(CropWindow {
-            start: 0,
-            end: 1,
-            snapshot: FrameSnapshot { frame: 0, state: StartState::neutral(8, 0, 1.0) },
-            name: "Nair crop".into(),
-        });
         post_effect(Effect::OpenCrop { source: macro_id.clone(), combo: false });
         let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(tick.diags.iter().all(|line| !line.starts_with("screen=crop source=")), "opening the editor never writes a file");
-        assert_eq!(Library::new(root.join(MACROS_DIR)).list().unwrap().entries.len(), 2);
+        assert_eq!(Library::new(root.join(MACROS_DIR)).list().unwrap().entries.len(), 1);
+        assert_eq!(Library::new(root.join(MACROS_DIR)).load(&macro_id).unwrap().frames, recording.frames);
         post_effect(Effect::Keyboard { header: "Name macro", draft: "Nair".into() });
         let named = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert_eq!(named.keyboard.as_ref().map(|offer| offer.header), Some("Name macro"));
