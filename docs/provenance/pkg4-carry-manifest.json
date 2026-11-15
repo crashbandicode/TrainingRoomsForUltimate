@@ -1274,7 +1274,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "9bd50f80c3e7291522099a01499c315820f6139bf5df1f813e1ae65cf296a604",
+   "dest_sha256": "13dc82929e1031a07363b3ebf83dbcaaf606036ea89339c8b7bac1be26d1faec",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -1832,6 +1832,11 @@
      "old": "        assert!(ui.restored_target(1, (4.0, 8.0)).is_none());\n        ui.offer_save(frames(), start(), false, \"13.0.5\");\n        ui.on_pad(Pad::Left);\n",
      "new": "        assert!(ui.restored_target(1, (4.0, 8.0)).is_none());\n        ui.offer_save_with_mii(frames(), start(), false, \"13.0.5\", None);\n        ui.on_pad(Pad::Left);\n",
      "reason": "TR2/TR9 V2 (operator 2026-11-13, DECISIONS TR9 V2 and TR2): the record_trigger row is retired as library/migrate.rs says, so the old named capture (the record-on-load start, its capture buffer and its save offer) is unreachable and deleted; numbered-slot playback stays (TR1)."
+    },
+    {
+     "old": "fn clip_label(label: &str) -> String {\n    label.chars().take(16).collect()\n}\n",
+     "new": "/// A tile's name: at most 16 characters (docs/menu/saves.md). A longer name is cut to 15 and ends in \"\u2026\", which the\n/// menu's font has, so the cut shows; the footer keeps the full name.\nfn clip_label(label: &str) -> String {\n    const TILE_CHARS: usize = 16;\n    if label.chars().count() <= TILE_CHARS {\n        return label.to_owned();\n    }\n    let mut out: String = label.chars().take(TILE_CHARS - 1).collect();\n    out.truncate(out.trim_end().len());\n    out.push('\u2026');\n    out\n}\n",
+     "reason": "rc.14 list-padding (GIF review of `8199c696`, Saves > Setup library): a library tile cut at 16 characters ends in an ellipsis, so the cut shows (\"Corner trap \u00b7 M\u2026\"); the footer keeps the full name"
     }
    ]
   },

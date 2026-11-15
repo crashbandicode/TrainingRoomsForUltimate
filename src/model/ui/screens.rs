@@ -748,11 +748,29 @@ mod tests {
         }
     }
 
+    /// rc.14 list-padding (GIF review of `8199c696`, Saves > Setup library): a library tile's name is cut at 16
+    /// characters (docs/menu/saves.md) and the cut showed no mark ("Corner trap · Ma"). A longer name now ends in "…"
+    /// inside the same 16, a name of 16 or fewer stays whole, and the footer keeps the full name.
+    fn a_library_tile_cut_at_sixteen_characters_ends_in_an_ellipsis() {
+        use crate::engine::macro_ui::macro_panel::{LibraryRow, MacroUi};
+        let row = |label: &str| LibraryRow { id: label.into(), label: label.into() };
+        let mut ui = MacroUi::new();
+        ui.open_library(vec![row("Corner trap · Mario / Little Mac"), row("Make Load use it"), row("Fox drill"), row("Previous Vault capture")], 0);
+        let view = ui.view().expect("the library is open");
+        assert_eq!(view.labels[0], "Corner trap · M…");
+        assert_eq!(view.labels[1], "Make Load use it", "sixteen characters fit whole");
+        assert_eq!(view.labels[2], "Fox drill");
+        assert_eq!(view.labels[3], "Previous Vault…", "a space before the cut is not kept");
+        assert!(view.labels.iter().all(|label| label.chars().count() <= 16));
+        assert!(view.footer.starts_with("Corner trap · Mario / Little Mac\n"), "{}", view.footer);
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("the_delay_popup_greys_the_checklist_once_a_range_is_set_and_says_why", the_delay_popup_greys_the_checklist_once_a_range_is_set_and_says_why as fn()),
+            ("a_library_tile_cut_at_sixteen_characters_ends_in_an_ellipsis", a_library_tile_cut_at_sixteen_characters_ends_in_an_ellipsis as fn()),
+            ("the_delay_popup_greys_the_checklist_once_a_range_is_set_and_says_why",the_delay_popup_greys_the_checklist_once_a_range_is_set_and_says_why as fn()),
             ("the_overrides_screen_is_columns_of_boxes_and_left_right_step_a_column", the_overrides_screen_is_columns_of_boxes_and_left_right_step_a_column as fn()),
             ("the_swap_groups_overrides_chords_and_chord_editor_have_frames", the_swap_groups_overrides_chords_and_chord_editor_have_frames as fn()),
             ("a_on_the_give_item_grid_asks_for_that_item_every_time_and_the_stage_grid_asks_for_nothing", a_on_the_give_item_grid_asks_for_that_item_every_time_and_the_stage_grid_asks_for_nothing as fn()),

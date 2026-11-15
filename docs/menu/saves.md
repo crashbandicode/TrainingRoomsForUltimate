@@ -206,8 +206,8 @@ More: [Save states › Making a setup](../guide/save-states.md#making-a-setup)
 
 Lists your setups, A to Z, so you can open one. A row reads "name · Player 1's fighter / the CPU's fighter · stage ·
 spots", such as "Corner trap · Mario / Little Mac · Training · spots -40 / 35". The spots are where the two fighters
-stand, in the units of the floor markers; a minus is left of the middle. The grid cuts a row off at 16 characters, so the
-full row shows under the grid for the setup under the cursor. With no setups, the list reads "No setups saved".
+stand, in the units of the floor markers; a minus is left of the middle. The grid cuts a longer row off at 16 characters
+and ends it with "…", so the full row shows under the grid for the setup under the cursor. With no setups, the list reads "No setups saved".
 
 ![Setup library, rc.11 clip (before the setup's own screen): a setup chosen from the list puts both fighters where it was saved when the menu closes](../media/rc11-setup-library.gif)
 

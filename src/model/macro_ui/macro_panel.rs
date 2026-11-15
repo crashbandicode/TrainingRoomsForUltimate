@@ -1708,8 +1708,17 @@ fn shown_name(name: &str) -> String {
     }
 }
 
+/// A tile's name: at most 16 characters (docs/menu/saves.md). A longer name is cut to 15 and ends in "…", which the
+/// menu's font has, so the cut shows; the footer keeps the full name.
 fn clip_label(label: &str) -> String {
-    label.chars().take(16).collect()
+    const TILE_CHARS: usize = 16;
+    if label.chars().count() <= TILE_CHARS {
+        return label.to_owned();
+    }
+    let mut out: String = label.chars().take(TILE_CHARS - 1).collect();
+    out.truncate(out.trim_end().len());
+    out.push('…');
+    out
 }
 
 fn clip_version(version: &str) -> String {

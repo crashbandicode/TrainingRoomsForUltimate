@@ -199,8 +199,8 @@ must be saved on the same stage". Either way nothing is kept. Each setup is a ne
 ### Using a setup
 
 Saves › Setup library lists each setup, A to Z, as "name · Player 1's fighter / the CPU's fighter · stage · spots", such
-as "Corner trap · Mario / Little Mac · Training · spots -40 / 35". A row is cut off at 16 characters on the grid; the
-full row shows under the grid for the setup under the cursor. Choose a setup with Up / Down / Left / Right and press A:
+as "Corner trap · Mario / Little Mac · Training · spots -40 / 35". A row longer than 16 characters is cut off on the grid
+and ends with "…"; the full row shows under the grid for the setup under the cursor. Choose a setup with Up / Down / Left / Right and press A:
 its own screen opens, with four rows. The line under them says what the row under the cursor does.
 
 | Row | What it does | When the menu closes | The next Load |
