@@ -64,8 +64,8 @@ fn the_ranking_follows_the_defenders_percent_and_weight() {
     let active = hits(&[(8.0, 40, 0, 90), (8.0, 120, 0, 30)]);
     assert_eq!(classify(&active, at(0.0), &NONE)[..2], [Some(Spot::Sweet), Some(Spot::Sour)], "at 0% the base wins");
     assert_eq!(classify(&active, at(150.0), &NONE)[..2], [Some(Spot::Sour), Some(Spot::Sweet)], "at 150% the growth wins");
-    let tipping = |weight| classify(&active, Launch { mul: 1.0, percent: 50.0, weight }, &NONE)[1];
-    assert_ne!(tipping(60.0), tipping(140.0), "a light and a heavy defender at the same percent");
+    let tipping = |weight| classify(&active, Launch { mul: 1.0, percent: 70.0, weight }, &NONE)[1];
+    assert_eq!([tipping(60.0), tipping(140.0)], [Some(Spot::Sweet), Some(Spot::Sour)], "a light and a heavy defender at the same percent");
 }
 
 fn ties_rank_by_damage_and_equal_hitboxes_have_no_label() {

@@ -247,9 +247,9 @@ pub unsafe fn sample_frame(player: usize) {
         let (check_now, link, advantage_now) = (tracker.stun_check, tracker.latest_link(), tracker.advantage());
         let (read, mark) = (tracker.spot_read.take(), tracker.marks().next());
         drop(tracker);
-        if let Some((frame, landed, launch, powers)) = read {
+        if let Some((frame, landed, launch, powers, attacker)) = read {
             crate::runtime::diag_log::diagnostic(format_args!(
-                "[Spots] stop frame={frame} gained={:.3} launched={:.3} mul={:.4} before={:.3} weight={:.2} powers={powers:?} newest_mark={mark:?}",
+                "[Spots] stop frame={frame} gained={:.3} launched={:.3} mul={:.4} before={:.3} weight={:.2} attacker={attacker:.3} powers={powers:?} newest_mark={mark:?}",
                 landed.gained, landed.launched, launch.mul, launch.percent, launch.weight
             ));
         }

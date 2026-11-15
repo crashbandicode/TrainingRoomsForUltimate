@@ -78,8 +78,9 @@ pub const KB_HIGH: f32 = 1.2;
 
 /// The knockback of `hit` dealing damage `d` to a defender of weight `w` at percent `p` after the hit, by the game's formula (SmashWiki,
 /// *Knockback*): ((p/10 + p·d/20) · 200/(w+100) · 1.4 + 18) · growth/100 + base; a fixed knockback f takes the place of d, with p = 10.
-pub fn knockback(_hit: &Hit, _d: f32, _p: f32, _w: f32) -> f32 {
-    0.0 // STUB (spots-3 tests first): every hitbox launches the same, so damage alone ranks, as before.
+pub fn knockback(hit: &Hit, d: f32, p: f32, w: f32) -> f32 {
+    let (p, d) = if hit.fixed != 0 { (10.0, hit.fixed as f32) } else { (p, d) };
+    ((p / 10.0 + p * d / 20.0) * 200.0 / (w + 100.0) * 1.4 + 18.0) * hit.growth as f32 / 100.0 + hit.base as f32
 }
 
 /// What a hitbox ranks by: its knockback against the defender, then its damage.
@@ -105,7 +106,7 @@ impl Power {
 /// (`Hit::default()` when none); `None` for a slot that is not active and for one with no label.
 pub fn classify(active: &Powers, launch: Launch, earlier: &Hit) -> [Option<Spot>; SLOTS] {
     let mut out = [None; SLOTS];
-    let live = |h: &&Hit| h.damage > 0.0 && !h.damage.is_nan();
+    let live = |h: &&Hit| h.damage > 0.0;
     let Some(strongest) = active.iter().filter(live).map(|h| Power::of(h, launch)).reduce(|a, b| if a.below(b) { b } else { a }) else { return out };
     let late = earlier.damage > 0.0 && strongest.below(Power::of(earlier, launch));
     for (slot, hit) in active.iter().enumerate().filter(|(_, h)| live(h)) {
@@ -196,7 +197,7 @@ pub fn attribute(landed: Landed, active: &Powers, launch: Launch, earlier: &Hit)
         return None;
     }
     let classes = classify(active, launch, earlier);
-    let read = false && launched.is_finite() && launched > 0.0 && launch.weight.is_finite() && launch.weight > 0.0; // STUB: the reading is not used yet
+    let read = launched.is_finite() && launched > 0.0 && launch.weight.is_finite() && launch.weight > 0.0;
     let mut found: Option<Option<Spot>> = None;
     for (slot, hit) in active.iter().enumerate().filter(|(_, h)| h.damage > 0.0) {
         if !(K_LOW..=K_HIGH).contains(&(gained / (hit.damage * launch.mul))) {

@@ -16,7 +16,8 @@
 //! and the site digest with them. V2.2 added camera_limit_range (the stage's camera range): 260.
 //!
 //! rc.14 spots-2 added `attack_power_mul_status` to `sites_hitbox` (the getter of the module's damage multiplier, the smash charge): 261 site rows
-//! to 262 (the count the lane's base held was 261), and the site digest with them.
+//! to 262 (the count the lane's base held was 261), and the site digest with them. spots-3 added `damage_reaction` (the knockback a
+//! defender received): 263.
 
 use crate::model::sha256::sha256_hex;
 use std::fmt::Write;
@@ -83,8 +84,8 @@ fn every_data_row_has_a_64_byte_guard() {
 
 const SEAM_ROWS: usize = 688;
 const SEAM_DIGEST: &str = "77138f9ec6999107ad65a7ba8a734b6583f9f107059331ca4d371b38bffbe67e";
-const SITE_ROWS: usize = 262;
-const SITE_DIGEST: &str = "b31ae467adef3ab06554baa4eca330cbe87c5a780ba1d66c2d26a4c31f67b836";
+const SITE_ROWS: usize = 263;
+const SITE_DIGEST: &str = "2923497fff65ba7cc15155f89df92d94ac56482a2758495e09c09f76951f90e8";
 const UI_ROWS: usize = 6;
 const UI_DIGEST: &str = "35ddb9f164a3ac26ba2e5c45c35066ee738e796589d58e2c697c82e486567b15";
 const COMMON_ROWS: usize = 4;

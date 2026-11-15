@@ -602,10 +602,10 @@ fn tint_legend(reader: &mut impl AttackReader, wants: &mut [Sphere], peak: &mut 
     use super::spots;
     let (_, active) = powers(reader);
     let earlier = peak.earlier(status, reader.motion());
-    let spots = spots::classify(&active, launch, &earlier);
+    let classes = spots::classify(&active, launch, &earlier);
     for sphere in wants.iter_mut().filter(|s| s.key >> 24 != KIND_HURT) {
         let kind = sphere.key >> 24;
-        let spot = if kind == KIND_HIT { spots[((sphere.key >> 8) & 0xffff) as usize % spots::SLOTS] } else { None };
+        let spot = if kind == KIND_HIT { classes[((sphere.key >> 8) & 0xffff) as usize % spots::SLOTS] } else { None };
         sphere.tint = legend_colour(kind, spot, 0, sphere.tint, true);
     }
     peak.fold(&active, launch);
