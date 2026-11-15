@@ -128,10 +128,10 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
     let mut run = RUN.lock();
     let plan = run.plan(rows, seed, entry, scene::facts);
-    // V2.6: the CPU is hidden while a practice game runs and `CPU during a game` says Hide, unless it is the target.
+    // V2.6: the CPU is hidden while a practice game runs and `CPU during a game` says Hide, unless it is the target
+    // (`eggs::hides_cpu`). The CPU's body, its tag and its panel follow this one request (`cpu::hide::step`).
     let running = run.running();
-    let game = running && !run.cpu_target() || btt::running();
-    super::hide_cpu::hide(PRACTICE_HIDE.load(Ordering::Acquire) && game);
+    super::hide_cpu::hide(eggs::hides_cpu(PRACTICE_HIDE.load(Ordering::Acquire), running, run.cpu_target(), btt::running()));
     // The standing notice sits in the top band while the game runs (the operator, 11-14).
     super::notices::raise(super::notices::RAISE_EGGS, running);
     if plan == eggs::Plan::Clear {

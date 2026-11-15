@@ -201,7 +201,8 @@ mod ev {
     pub const OOS_CALL: usize = 19;
     pub const TAUNT: usize = 20;
     pub const HIDE: usize = 21;
-    pub const COUNT: usize = 22;
+    pub const TAG: usize = 22;
+    pub const COUNT: usize = 23;
 }
 
 #[cfg(feature = "diag")]
@@ -619,6 +620,8 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
         key.entry,
         key.partner
     );
+    #[cfg(feature = "diag")]
+    cursor_probe(key, accessor);
     if let Some(out) = out {
         cpu_event_on_change!(
             ev::HIDE,
@@ -635,6 +638,25 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
     }
     #[cfg(feature = "diag")]
     counts::report_if_due();
+}
+
+/// Diag build: the CPU body's two cursor flags (its player tag), one line when either changes, beside the `hide entry=` and
+/// `status entry=` lines. While a practice game moves the CPU every tick (the Eggs-ercise CPU target's flight) the tag is
+/// gone; this line says whether the game turned the flags off or the flags stayed on (rc.14 cpu-tag-target).
+#[cfg(feature = "diag")]
+unsafe fn cursor_probe(key: FighterKey, accessor: usize) {
+    let [cursor, name] = [C::WorkFlagCursor, C::WorkFlagNameCursor].map(|id| {
+        let flag = konst(id);
+        flag != UNRESOLVED && natives::is_flag(accessor, flag)
+    });
+    cpu_event_on_change!(
+        ev::TAG,
+        key.index(),
+        Some(u64::from(cursor) | u64::from(name) << 1),
+        "cursor entry={} partner={} flag={cursor} name_flag={name}",
+        key.entry,
+        key.partner
+    );
 }
 
 // ---- the per-feature facts and appliers of the frame wrapper (R2-1) -----------------------------------------

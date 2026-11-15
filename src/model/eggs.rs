@@ -144,9 +144,14 @@ pub fn choice(snapshot: &super::settings::Snapshot, id: &str) -> u8 {
     row.iter().position(|v| *v != 0).unwrap_or(0) as u8
 }
 
-/// STUB (fail-first): the request ignores the target.
-pub const fn hides_cpu(practice_hide: bool, running: bool, _cpu_target: bool, btt: bool) -> bool {
-    practice_hide && (running || btt)
+/// V2.6: whether a practice game asks for the CPU to be hidden this frame (`hide_cpu::hide`, the `request` of
+/// `cpu::hide::step`). `practice_hide`: CPU during a game says Hide; `running`: an Eggs-ercise run is on (`Run::running`);
+/// `cpu_target`: the CPU is its target (`Run::cpu_target`); `btt`: Break the Targets runs. An Eggs-ercise run hides the CPU
+/// unless the CPU is its target: the target wins, and then the CPU's body, its tag and its panel all stay, because all three
+/// follow the one step this request feeds (`cpu::hide::step`, `tag` and `panels`). Break the Targets hides it whatever the
+/// Eggs rows say.
+pub const fn hides_cpu(practice_hide: bool, running: bool, cpu_target: bool, btt: bool) -> bool {
+    practice_hide && (running && !cpu_target || btt)
 }
 
 /// One live attack of the fighter in world space: a pill from `.0` to `.1` (the same point for a point hitbox), its radius

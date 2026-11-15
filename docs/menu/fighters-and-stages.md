@@ -535,7 +535,10 @@ the mode is Off; "Time!", the end notice and the wait between runs count as runn
 - **Default:** Hide
 - **How:** Hide: the CPU is hidden while a game runs, and afterwards it is as **Hide CPU** says. Show: the CPU stays as
   it is. It applies when the menu closes.
-- A hidden CPU's "CPU" tag and its panel at the bottom of the screen are hidden too.
+- A hidden CPU's "CPU" tag and its panel at the bottom of the screen are hidden too. They always follow the CPU: shown
+  when it is shown, hidden when it is hidden.
+- When the CPU is the Eggs-ercise target (**Target** reads CPU), the CPU is never hidden, so the setting changes nothing
+  for it: its body and its panel stay.
 
 ## Reset page to defaults
 
