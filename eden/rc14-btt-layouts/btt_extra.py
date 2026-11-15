@@ -32,6 +32,28 @@ def stages(ctx, first='bf', second='bbf'):
     """The operator's question (save and load on different stages), btt-5: btt_rows.x_stages."""
     return br.x_stages(ctx, first, second)
 
+def to_floor(ctx, out):
+    """Placing with Popo on the main floor (y under 1), so the run's walks stay on one level (btt-5, 11-15): the reset spots of
+    these boots were raised platforms (Big Battlefield y 47.2, Battlefield 24.1), and in rc14-int3-btt-f1 a walk to the right
+    dropped Popo to a lower platform under the third target. Off a platform: the mode Off (the stick is the game's), a down
+    flick (`btt-d10`, full tilt from neutral) drops through it, then Placing again. The state of the Placing line."""
+    st = br.to_placing(ctx, out, 'ice')
+    for attempt in range(3):
+        y = br.p1_of(st)[1]
+        out.setdefault('floor', []).append(round(y, 2))
+        if y < 1.0:
+            return st
+        mark = hs.diag_mark(ctx)
+        br.set_row(ctx, False)
+        br.wait_state(ctx, mark, lambda s: s['phase'] == 'Off', 8, 'the mode Off before the drop')
+        time.sleep(0.5)
+        ctx.play('btt-d10')
+        time.sleep(2.0)
+        br.settle(ctx)
+        st = br.to_placing(ctx, out, 'ice-floor%d' % (attempt + 1))
+    raise RuntimeError('harness: Popo is not on the floor after three drops (y %s)' % out['floor'])
+
+
 def ice(ctx):
     """Row (a): Ice Climbers as Player 1 through Placing and a three-target run."""
     out = {'problems': []}
@@ -41,7 +63,7 @@ def ice(ctx):
     if not er._fighter(ctx, er.ICS, out, 'ics_hud'):
         raise RuntimeError('Player 1 did not become Ice Climbers: %s' % out)
     out['menu'] = {k: er._menu(ctx).get(k) for k in ('solo_popo_player_cycle', 'solo_popo_original', 'trio_practice')}
-    st = br.to_placing(ctx, out, 'ice')
+    st = to_floor(ctx, out)
     if st['n']:
         st = br.clear_layout(ctx)
     out['shot_placing_empty'] = str(ctx.shot('btt-X-ice-placing'))

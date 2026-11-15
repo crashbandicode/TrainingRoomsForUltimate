@@ -175,9 +175,11 @@ def layout_near(st):
     12 apart: the plugin refuses a target under 8 (two radii) from another (`src/model/btt.rs` `put`, strict `<`; host test
     `btt_overlap_rule_is_strict_at_apart`), and the stick macros land within a frame or two (2 to 4 units) of where they
     aim under load, so a gap of exactly 8 (btt-5's +10, +18, +26) was refused when one macro ran a frame long (Eden
-    rc14-int3-btt-s1, int3). btt-4's 14/34/54 put the third past a side platform's edge; +34 is the old second place."""
-    px = p1_of(st)[0]
-    y = st['cursor'][1] - 6
+    rc14-int3-btt-s1, int3). btt-4's 14/34/54 put the third past a side platform's edge; +34 is the old second place.
+    btt-5 (11-15): the height is P1's own, 9 above where it stands (the cursor's start, 15 up, less 6), not the cursor's: in
+    rc14-int3-rr2-f1 the camera's move dragged the untouched cursor to y 117.6 and the targets went 111 units over P1."""
+    px, py = p1_of(st)[0], p1_of(st)[1]
+    y = py + 9
     return [(px + 10, y), (px + 22, y), (px + 34, y)]
 
 
@@ -596,6 +598,18 @@ def e28(ctx):
     return {'ready_text': ready['text'], 'running_lines': len(clocks)}
 
 
+def left_level(ctx, targets):
+    """After a walk: P1 must still stand at the targets' level (its chest, 9 above its feet, within 15 of the row). A walk off a
+    platform's edge drops it to another level, where no attack reaches the row (btt-5, 11-15: rc14-int3-btt-f1 fell from y
+    47.2 to 24.1 and spent its attempts 32 units under the third target). The harness's fault, so it says so at once."""
+    st = latest(ctx)
+    if st is None or not st['p1'] or not targets:
+        return
+    row = sum(t[1] for t in targets) / len(targets)
+    if abs(st['p1'][1] + 9 - row) > 15:
+        raise RuntimeError("harness: P1 left the targets' level: P1 y %.1f, targets at y %.1f" % (st['p1'][1], row))
+
+
 def run_targets(ctx, targets, cap_s=90):
     """One run with P1: walk to within reach of each target (P1's x from the per-tick lines) and attack until the count rises.
     The Done state and the attempts made."""
@@ -618,9 +632,12 @@ def run_targets(ctx, targets, cap_s=90):
                 last_x = here
                 ctx.play('btt-walk-r8')
                 time.sleep(0.3)
+                left_level(ctx, targets)
                 continue
             if gap < 4:
                 ctx.play('btt-walk-l8')
+                time.sleep(0.3)
+                left_level(ctx, targets)
                 continue
             move = ATTACKS[attempt % len(ATTACKS)]
             mark = hs.diag_mark(ctx)
