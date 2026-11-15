@@ -31,6 +31,17 @@ pub fn parked_pair_flags(flags: u8) -> u8 {
 pub fn holder_counts(flags: u8) -> (bool, bool) {
     (flags & 1 != 0, flags & 0x20 != 0)
 }
+
+/// rc.14 a-full-2 (boot a2-99b9083f-y1 and integration-3's smoke2: an Aegis holder's article called through a vtable in
+/// its unloaded object-kind module): the kinds `module_pins::pin` holds for a group kept across its owner's Reload. Its
+/// members, and for a group whose holder runs code from its object kind's own NRO ([`Members::object_kind`]: PT `0x72`,
+/// Aegis `0x75`) that kind too ([`PIN_CAPACITY`] counts both).
+pub fn pin_kinds(group: Members) -> crate::engine::compat::fixed::FixedList<u32, { NATIVE_MEMBERS + 1 }> {
+    let mut kinds = crate::engine::compat::fixed::FixedList::new(0);
+    for &kind in &group.kinds()[..group.count()] { kinds.push(kind); }
+    if let Some(object) = group.object_kind() { kinds.push(object); }
+    kinds
+}
 pub const POPO: u32 = 0x4b;
 pub const NANA: u32 = 0x4c;
 pub const KIRBY: u32 = 0x06;
@@ -4318,10 +4329,25 @@ mod tests {
         assert_eq!(holder_counts(0), (false, false));
     }
 
+    /// rc.14 a-full-2 (boot a2-99b9083f-y1: a kept Aegis group torn down after its owner's Reload read a vtable in the
+    /// unloaded `0x75` module, R's NRO tree `[0, 8, 5a, 5b, f]`): a group kept across a Reload pins its object kind's module
+    /// with its members'; an ordinary group pins only its members.
+    fn a_kept_holder_pins_its_object_kind_with_its_members() {
+        let kinds = |m: Members| pin_kinds(m).iter().copied().collect::<Vec<u32>>();
+        assert_eq!(kinds(Members::native_group(0x5a).unwrap()), vec![0x5a, 0x5b, AEGIS_OBJECT_KIND]);
+        assert_eq!(kinds(Members::native_group(0x5b).unwrap()), vec![0x5a, 0x5b, AEGIS_OBJECT_KIND]);
+        assert_eq!(kinds(Members::native_group(0x24).unwrap()), vec![0x24, 0x25, 0x26, PT_OBJECT_KIND]);
+        assert_eq!(kinds(Members::new(&[0x08, 0x13]).unwrap()), vec![0x08, 0x13]);
+        assert_eq!(kinds(Members::pair_lead(0x02).unwrap()).len(), Members::pair_lead(0x02).unwrap().count());
+        // The pins of a window plus every kept group fit, with both object kinds.
+        assert!((MAX_EXTRA_GROUPS + 1) * NATIVE_MEMBERS + 2 <= PIN_CAPACITY);
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_kept_holder_pins_its_object_kind_with_its_members", a_kept_holder_pins_its_object_kind_with_its_members as fn()),
             ("a_gated_member_is_laid_out_alone_and_the_rest_stay_together", a_gated_member_is_laid_out_alone_and_the_rest_stay_together as fn()),
             ("a_reload_keeps_the_window_whose_live_member_parks", a_reload_keeps_the_window_whose_live_member_parks as fn()),
             ("a_kirby_with_a_copy_loses_it_and_parks_instead_of_the_reload", a_kirby_with_a_copy_loses_it_and_parks_instead_of_the_reload as fn()),

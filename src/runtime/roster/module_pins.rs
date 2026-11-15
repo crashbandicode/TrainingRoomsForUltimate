@@ -64,15 +64,19 @@ unsafe fn release(base: usize, manager: usize, handle: u64) {
     release(manager, &handle);
 }
 
-/// Pins every kind of `group` R's tree holds; true when all of them are pinned (now or by an earlier keep). A group not
-/// wholly pinned keeps none of its new pins.
+/// Pins every kind of `group` R's tree holds (`body_bank::pin_kinds`: its members, then its object kind); true when all of
+/// its members are pinned (now or by an earlier keep). A group not wholly pinned keeps none of its new pins. The object
+/// kind is pinned whenever R has its node (a window's holder runs code from it; rc.14 a-full-2, boot a2-99b9083f-y1); a
+/// detached group's holder without one keeps its own reference (`hold`), so its absence refuses nothing.
 pub(crate) unsafe fn pin(r: Option<usize>, role: usize, group: Members) -> bool {
     let (Some(r), Some((base, manager))) = (r, manager()) else { return false; };
     let mut pins = PINS[role].lock();
     let before = pins.len();
-    for &kind in &group.kinds()[..group.count()] {
+    for (i, &kind) in crate::engine::swap::body_bank::pin_kinds(group).iter().enumerate() {
         if pins.iter().any(|(k, _)| *k == kind) { continue; }
+        let object = i >= group.count();
         let Some(handle) = (pins.len() < PIN_CAPACITY).then(|| take(base, manager, r, kind)).flatten() else {
+            if object { continue; }
             while pins.len() > before { release(base, manager, pins.pop().unwrap_or_default().1); }
             return false;
         };
@@ -82,6 +86,37 @@ pub(crate) unsafe fn pin(r: Option<usize>, role: usize, group: Members) -> bool 
 }
 
 pub(crate) fn held(role: usize) -> bool { !PINS[role].lock().is_empty() }
+
+/// rc.14 a-full-2 (boot a2-99b9083f-y1, integration-3's smoke2: `0x33c23f8` read the vtable of an Aegis holder's article
+/// in the unloaded `0x75` module): the bank gives a group's object-kind token back right after its holder step, which drops
+/// R's node for that kind's NRO while the holder still runs code from it. Before that, the group takes one reference of
+/// its own on the module of R's node for `kind` ([`take`]); it keeps it until the holder is destroyed ([`drop_hold`]) or
+/// the holder becomes R's window ([`hand_to`]). The module's handle, or 0 when R holds no node for `kind` or the rows did
+/// not pass.
+pub(crate) unsafe fn hold(r: usize, kind: u32) -> u64 {
+    let Some((base, manager)) = manager().filter(|_| r != 0) else { return 0; };
+    take(base, manager, r, kind).unwrap_or(0)
+}
+
+/// The holder [`hold`] kept alive is destroyed: our reference goes.
+pub(crate) unsafe fn drop_hold(handle: u64) {
+    if handle == 0 { return; }
+    if let Some((base, manager)) = manager() { release(base, manager, handle); }
+}
+
+/// The holder became `r`'s window: `r` gets its node for `kind` again (`0x17e4900`, as [`settle`] gives a kept kind back),
+/// unless it still has one, then our reference goes. Native's next Reload then destroys the holder (state 2) before it
+/// releases `r`'s tree (state 3). Whether `r` asked again.
+pub(crate) unsafe fn hand_to(r: usize, kind: u32, handle: u64) -> bool {
+    let Some((base, manager)) = manager().filter(|_| handle != 0) else { return false; };
+    let asked = r != 0 && find(r + 0x4b8, u64::from(kind) * 0x2a).is_none();
+    if asked {
+        let request: unsafe extern "C" fn(usize, u32) = transmute(base + 0x17e4900);
+        request(r, kind);
+    }
+    release(base, manager, handle);
+    asked
+}
 
 /// The role's new bank is Ready on `r` (`Some`): R gets each pinned kind's node again (`0x17e4900`), then the pins go.
 /// `None` (the bank is retired or its entry destroyed): the pins go alone.

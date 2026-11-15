@@ -3584,7 +3584,7 @@
    "dest": "src/model/swap/body_bank.rs",
    "crate": "consts",
    "src_sha256": "ab3c4adcf084b2dd9433a5fe5715b428fb38c26d3b143d7632fb3d33078df0d6",
-   "dest_sha256": "66e35f7a8c86a8ea9bac8e188182dc053fcb3ab0e650f574c5b4a05a308b9490",
+   "dest_sha256": "a8cd94ec416e09155e081938e613ab4b1d0480588231b9e014b4acdc98333784",
    "edits": [
     {
      "old": "    // a native group): count it so hats and helper slots agree with the planner.\n    let used: usize = windows.iter().map(|window| window.map_or(1, |members| members.count())).sum::<usize>()\n        + existing.iter().flat_map(|groups| groups.iter()).map(|members| members.count()).sum::<usize>()\n        + budget.hats_wanted;\n    let mut remaining = budget.ready_fighters.saturating_sub(used).min(budget.pool_free);\n    // (lane depth, kind): depth is the distance from the live fighter, so a role\n    // whose nearer neighbours are already built does not outrank the other role.\n    let mut candidates: [Vec<(usize, u32)>; 2] = [Vec::new(), Vec::new()];\n    // Whole special groups (PT, Aegis, the pair) at their lane depth.\n    let mut specials: [Vec<(usize, Members)>; 2] = [Vec::new(), Vec::new()];\n    let mut room = [0usize; 2];\n    let mut group_slots = [0usize; 2];\n    for role in 0..2 {\n        let Some(window) = windows[role].filter(|window| window_swappable_with(*window, policy)) else { continue; };\n        group_slots[role] = MAX_EXTRA_GROUPS.saturating_sub(existing[role].len());\n        room[role] = group_slots[role] * NATIVE_MEMBERS;\n        for (depth, &kind) in upcoming[role].iter().enumerate() {\n            if exclude[role] == Some(kind)\n                || window.index_of(kind).is_some()\n                || existing[role].iter().any(|group| group.index_of(kind).is_some())\n            { continue; }\n            if let Some(group) = Members::special_group(kind, budget.special) {\n                // One Mii identity per resource owner: a second lane Mii, or a\n                // Mii group this role already holds, stays canonical (DESIGN \u00a72).\n                let second_mii = group.special() == Special::Mii\n                    && (specials[role].iter().any(|(_, held)| held.special() == Special::Mii)\n                        || existing[role].iter().any(|held| held.special() == Special::Mii));\n                if !second_mii && !specials[role].iter().any(|(_, held)| held.kinds()[0] == group.kinds()[0]) {\n                    specials[role].push((depth, group));\n                }\n                continue;\n            }\n            if group_member_kind(kind, policy) && !candidates[role].iter().any(|(_, held)| *held == kind) {\n                candidates[role].push((depth, kind));\n            }\n        }\n    }\n    // Special groups are taken whole at their own lane depth, interleaved with\n    // the ordinary candidates; one that no longer fits the remaining bodies or a\n    // free group slot is skipped, never split.\n    let mut chosen_special: [Vec<Members>; 2] = [Vec::new(), Vec::new()];\n    let mut scursor = [0usize; 2];\n    let mut chosen: [Vec<u32>; 2] = [Vec::new(), Vec::new()];\n    let mut cursor = [0usize; 2];\n    let take = |role: usize, chosen: &mut [Vec<u32>; 2], cursor: &mut [usize; 2], remaining: &mut usize| -> bool {\n        if *remaining == 0 || cursor[role] >= candidates[role].len() || chosen[role].len() >= room[role] {\n            return false;\n        }\n        chosen[role].push(candidates[role][cursor[role]].1);\n        cursor[role] += 1;\n        *remaining -= 1;\n        true\n    };\n    let deepest = upcoming.iter().map(|lane| lane.len()).max().unwrap_or(0);\n    for depth in 0..deepest {\n        for role in 0..2 {\n            if cursor[role] < candidates[role].len() && candidates[role][cursor[role]].0 == depth {\n                take(role, &mut chosen, &mut cursor, &mut remaining);\n            } else if scursor[role] < specials[role].len() && specials[role][scursor[role]].0 == depth {\n                let group = specials[role][scursor[role]].1;\n                scursor[role] += 1;\n                let slots_used = chosen_special[role].len() + chosen[role].len().div_ceil(NATIVE_MEMBERS);\n                if remaining >= group.count() && slots_used < group_slots[role] {\n                    chosen_special[role].push(group);\n                    remaining -= group.count();\n",
@@ -5126,6 +5126,21 @@
      "old": "            assert_eq!(window_kept_across_reload(Members::native_group(form).unwrap(), false, true, MARIO, true, false), Ok(()),\n                \"{form:#x}\");\n        }\n        assert!(window_kept_across_reload(Members::native_group(0x5a).unwrap(), false, true, MARIO, true, false).is_err(),\n            \"an Aegis window waits for its probe\");\n        assert!(window_kept_across_reload(Members::native_group(0x24).unwrap(), false, true, 0x25, true, false).is_err());\n        let mii = Members::mii_group(GUNNER).unwrap();\n        assert!(window_kept_across_reload(mii, false, false, KROOL, true, false).is_err());\n        assert_eq!(window_kept_across_reload(mii, true, false, KROOL, true, false), Ok(()));\n",
      "new": "            assert_eq!(window_kept_across_reload(Members::native_group(form).unwrap(), false, true, false, MARIO, true, false), Ok(()),\n                \"{form:#x}\");\n        }\n        assert!(window_kept_across_reload(Members::native_group(0x5a).unwrap(), false, true, false, MARIO, true, false).is_err(),\n            \"an Aegis window needs its own switch\");\n        assert!(window_kept_across_reload(Members::native_group(0x24).unwrap(), false, true, false, 0x25, true, false).is_err());\n        let mii = Members::mii_group(GUNNER).unwrap();\n        assert!(window_kept_across_reload(mii, false, false, false, KROOL, true, false).is_err());\n        assert_eq!(window_kept_across_reload(mii, true, false, false, KROOL, true, false), Ok(()));\n        // rc.14 a-full-2 (after probe a0): with its switch a Pyra/Mythra window is kept, either form on screen; not one that\n        // holds the target, and the PT switch alone keeps none.\n        for form in [0x5a, 0x5b] {\n            assert_eq!(window_kept_across_reload(Members::native_group(form).unwrap(), false, false, true, MARIO, true, false), Ok(()),\n                \"{form:#x}\");\n        }\n        assert!(window_kept_across_reload(Members::native_group(0x5a).unwrap(), false, false, true, 0x5b, true, false).is_err());\n        assert!(window_kept_across_reload(Members::native_group(0x24).unwrap(), false, false, true, MARIO, true, false).is_err(),\n            \"the Aegis switch keeps no PT window\");\n",
      "reason": "rc.14 a-full-2 Aegis: A1 keeps a Pyra/Mythra window across a Reload behind KEEP_AEGIS_WINDOW_ACROSS_RELOAD (off until a2-aegis passes; diag-cycle aegis); probe a0 found claim and record zero"
+    },
+    {
+     "old": "    (flags & 1 != 0, flags & 0x20 != 0)\n}\n",
+     "new": "    (flags & 1 != 0, flags & 0x20 != 0)\n}\n\n/// rc.14 a-full-2 (boot a2-99b9083f-y1 and integration-3's smoke2: an Aegis holder's article called through a vtable in\n/// its unloaded object-kind module): the kinds `module_pins::pin` holds for a group kept across its owner's Reload. Its\n/// members, and for a group whose holder runs code from its object kind's own NRO ([`Members::object_kind`]: PT `0x72`,\n/// Aegis `0x75`) that kind too ([`PIN_CAPACITY`] counts both).\npub fn pin_kinds(group: Members) -> crate::engine::compat::fixed::FixedList<u32, { NATIVE_MEMBERS + 1 }> {\n    let mut kinds = crate::engine::compat::fixed::FixedList::new(0);\n    for &kind in &group.kinds()[..group.count()] { kinds.push(kind); }\n    if let Some(object) = group.object_kind() { kinds.push(object); }\n    kinds\n}\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+     "new": "\n    /// rc.14 a-full-2 (boot a2-99b9083f-y1: a kept Aegis group torn down after its owner's Reload read a vtable in the\n    /// unloaded `0x75` module, R's NRO tree `[0, 8, 5a, 5b, f]`): a group kept across a Reload pins its object kind's module\n    /// with its members'; an ordinary group pins only its members.\n    fn a_kept_holder_pins_its_object_kind_with_its_members() {\n        let kinds = |m: Members| pin_kinds(m).iter().copied().collect::<Vec<u32>>();\n        assert_eq!(kinds(Members::native_group(0x5a).unwrap()), vec![0x5a, 0x5b, AEGIS_OBJECT_KIND]);\n        assert_eq!(kinds(Members::native_group(0x5b).unwrap()), vec![0x5a, 0x5b, AEGIS_OBJECT_KIND]);\n        assert_eq!(kinds(Members::native_group(0x24).unwrap()), vec![0x24, 0x25, 0x26, PT_OBJECT_KIND]);\n        assert_eq!(kinds(Members::new(&[0x08, 0x13]).unwrap()), vec![0x08, 0x13]);\n        assert_eq!(kinds(Members::pair_lead(0x02).unwrap()).len(), Members::pair_lead(0x02).unwrap().count());\n        // The pins of a window plus every kept group fit, with both object kinds.\n        assert!((MAX_EXTRA_GROUPS + 1) * NATIVE_MEMBERS + 2 <= PIN_CAPACITY);\n    }\n\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "        crate::test_table::run(&[\n            (\"a_gated_member_is_laid_out_alone_and_the_rest_stay_together\", a_gated_member_is_laid_out_alone_and_the_rest_stay_together as fn()),\n",
+     "new": "        crate::test_table::run(&[\n            (\"a_kept_holder_pins_its_object_kind_with_its_members\", a_kept_holder_pins_its_object_kind_with_its_members as fn()),\n            (\"a_gated_member_is_laid_out_alone_and_the_rest_stay_together\", a_gated_member_is_laid_out_alone_and_the_rest_stay_together as fn()),\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
     }
    ]
   },
@@ -6231,7 +6246,7 @@
    "dest": "src/model/swap/swap_model/lifecycle.rs",
    "crate": "consts",
    "src_sha256": "8bfb6a934f7d9250c7800ae01bbbd3372caa737fdba33cbbed9ea95b07a9275b",
-   "dest_sha256": "2d37560cc1b3c79c5fb46e59bb488bfc735994208c28e8c6d003a37f4e1c4bfd",
+   "dest_sha256": "d227a7cc2c2fb7d197ba3e6a242d9cd82070292b1ade9f4007acb33ad2fb80d1",
    "edits": [
     {
      "old": "impl Phases {\n    fn route(&mut self, slot: u8, controller: usize) {\n        if !self.routes.iter().any(|(s, _)| *s == slot) { self.routes.push((slot, controller)); }\n    }\n\n    /// Every route slot naming one of `controllers` is cleared first (D-PTA1c).\n    fn routes_for(&mut self, owner: u32, controllers: &[usize], consumers: &NativeConsumers) {\n        for route in consumers.pad_routes.iter().flatten() {\n            if route.controller != 0 && controllers.contains(&route.controller) { self.route(route.slot, route.controller); }\n        }\n        // Nana's route (`owner+8`, U2): the same rule from the separately probed word.\n        if let Some(controller) = consumers.nana_owner_plus_8 {\n            let slot = owner.saturating_add(8);\n            if controller != 0 && slot < PAD_SLOTS as u32 && controllers.contains(&controller) { self.route(slot as u8, controller); }\n        }\n    }\n\n    /// Kirby fields count only `valid` refs: an invalid ref's `kind` is the planned kind, not the\n    /// body's own `+0xc` that `unprepare` reads (Yoga `m4b3` #140: the incoming window's Kirby\n",
@@ -6451,6 +6466,51 @@
      "old": "            records: Some(RecordsRef { records: [0x11f0000000, 0, 0x11f0000300], valid: false }),\n",
      "new": "            records: Some(RecordsRef { records: [0x11f0000000, 0, 0x11f0000300], valid: false, flags: 0 }),\n",
      "reason": "rc.14 a-full-2 p4: a native holder's teardown gives back finalize's shared trainer count by the window flags (holder_counts, RecordsRef/DestroyRecords flags, give_back_holder_count; predates rc.14)"
+    },
+    {
+     "old": "#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub struct RecordsRef { pub records: [usize; 3], pub valid: bool, pub flags: u8 }\n",
+     "new": "/// `module`: the reference this group holds on its object kind's module (`module_pins::hold`, 0 = none). rc.14 a-full-2\n/// (boot a2-99b9083f-y1, integration-3's smoke2): the holder's article runs code from that NRO, so the reference goes only\n/// after the holder's destroy.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub struct RecordsRef { pub records: [usize; 3], pub valid: bool, pub flags: u8, pub module: u64 }\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "    /// `0x3a6b80` then `0x392eb40` (+ the PT auxiliary object), after the contexts.\n    DestroyRecords { records: [usize; 3], flags: u8 },\n",
+     "new": "    /// `0x3a6b80` then `0x392eb40` (+ the PT auxiliary object), after the contexts; then the object kind's module\n    /// reference the group held ([`RecordsRef::module`]) goes.\n    DestroyRecords { records: [usize; 3], flags: u8, module: u64 },\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "            .map(|r| DestroyStep::DestroyRecords { records: r.records, flags: r.flags });\n",
+     "new": "            .map(|r| DestroyStep::DestroyRecords { records: r.records, flags: r.flags, module: r.module });\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "    records: Vec<([usize; 3], u8)>,\n",
+     "new": "    records: Vec<([usize; 3], u8, u64)>,\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "            if records.valid { self.records.push((records.records, records.flags)); } else { self.skipped.push(Skipped::Records(records.records)); }\n",
+     "new": "            if records.valid { self.records.push((records.records, records.flags, records.module)); } else { self.skipped.push(Skipped::Records(records.records)); }\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "        steps.extend(self.records.into_iter().map(|(records, flags)| DestroyStep::DestroyRecords { records, flags }));\n",
+     "new": "        steps.extend(self.records.into_iter().map(|(records, flags, module)| DestroyStep::DestroyRecords { records, flags, module }));\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "            records: Some(RecordsRef { records: [0x11f0000000, 0, 0x11f0000300], valid: false, flags: 0 }),\n",
+     "new": "            records: Some(RecordsRef { records: [0x11f0000000, 0, 0x11f0000300], valid: false, flags: 0, module: 0x75_0000_0001 }),\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "\n    /// The host walk model: S-B and K6 spin, S-K and S-A do not (D-HANG1-SEPARATION \u00a71).\n",
+     "new": "\n    /// rc.14 a-full-2 (boot a2-99b9083f-y1 and integration-3's smoke2, `0x33c23f8` reading the vtable of an object in an\n    /// unloaded module): a detached Aegis/PT holder keeps its object kind's module reference until it is destroyed. The\n    /// plan drops it with the destroy (after it), never before; a holder the plan refuses keeps it (leaked, never unloaded\n    /// under a live holder).\n    fn a_destroyed_holder_drops_its_object_module_after_the_destroy() {\n        let records = RecordsRef { records: [0x11e38ab100, 0, 0], valid: true, flags: 0x64, module: 0x62ae7d500 };\n        let group = DetachedGroup { owner: OWNER, bodies: cells([0x5a, 0x5b, 0], [0x10, 0x20, 0]).into_iter().take(2).collect(),\n            contexts: vec![ctx(0x100, 0x1000), ctx(0x200, 0x2000)], records: Some(records), held_kinds: vec![], ..Default::default() };\n        let plan = destroy_plan(&Bundle::Detached(group.clone()), &NativeConsumers::default());\n        let step = DestroyStep::DestroyRecords { records: records.records, flags: 0x64, module: 0x62ae7d500 };\n        let at = plan.steps.iter().position(|s| *s == step).expect(\"the destroy carries the group's module reference\");\n        assert!(plan.steps[..at].iter().filter(|s| matches!(s, DestroyStep::DestroyBody { .. })).count() == 2,\n            \"the bodies go first, as finalize orders them\");\n        let views = [DetachedView { owner: OWNER, bodies: &group.bodies, contexts: &group.contexts, dispatch: None,\n            records: Some(records), held_kinds: &[] }];\n        let consumers = NativeConsumers::default();\n        let detached = DetachedPlan { groups: &views, consumers: &consumers };\n        assert!(detached.steps().any(|s| s == step), \"the runtime plan carries it too\");\n        // Refused records: no destroy, so the reference stays.\n        let refused = DetachedGroup { records: Some(RecordsRef { valid: false, ..records }), ..group };\n        let plan = destroy_plan(&Bundle::Detached(refused), &NativeConsumers::default());\n        assert_eq!(plan.records(), 0);\n        assert_eq!(plan.skipped, vec![Skipped::Records(records.records)]);\n    }\n\n    /// The host walk model: S-B and K6 spin, S-K and S-A do not (D-HANG1-SEPARATION \u00a71).\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "            (\"s_b_and_k6_walk_the_registry_and_s_k_s_a_do_not\", s_b_and_k6_walk_the_registry_and_s_k_s_a_do_not as fn()),\n        ]);\n",
+     "new": "            (\"s_b_and_k6_walk_the_registry_and_s_k_s_a_do_not\", s_b_and_k6_walk_the_registry_and_s_k_s_a_do_not as fn()),\n            (\"a_destroyed_holder_drops_its_object_module_after_the_destroy\", a_destroyed_holder_drops_its_object_module_after_the_destroy as fn()),\n        ]);\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
     }
    ]
   },
@@ -11120,7 +11180,7 @@
    "dest": "src/runtime/roster/body_graph.rs",
    "crate": "root",
    "src_sha256": "e701462e66e878ef1ad0b3ff491d283b77524d7b9cae4132f5b989f7feeb7a91",
-   "dest_sha256": "2ece745ef394d6d2e684c8939a7d1414e5280d9bb2b9e0f0bf4a10ef27d9b359",
+   "dest_sha256": "f394743d8e5d3aeb113599888100194c0e30d63fe549f610f14c5ab6856b90cf",
    "edits": [
     {
      "old": "//!   keeps Kirby at cell 0 or canonical-only (K-rows decide, WORKPLAN \u00a72.14).\n//!   The window and every detached group share those per-`(entry, sub)` lists; U18\n//!   (`swap_model::copy_registry`) keeps them the attached window's, so a detached\n//!   body unloads over empty cells (`execute_with`'s hook, `retire_groups`).\nuse crate::engine::seams::native_fields as fields;\nuse crate::engine::swap::swap_model::lifecycle::{Attached, ContextRef, DestroyPlan, DestroyStep, NativeConsumers, RouteRef, PAD_SLOTS};\n\nmacro_rules! trace {\n    ($($arg:tt)*) => { crate::engine::compat::logging::diagnostic(format_args!($($arg)*)) };\n}\n\n",
@@ -11181,6 +11241,16 @@
      "old": "            DestroyStep::DestroyRecords { records } => {\n                #[cfg(feature = \"diag\")]\n                let before = trainer_counts(base);\n                destroy_special_records(base, *records);\n",
      "new": "            DestroyStep::DestroyRecords { records, flags } => {\n                #[cfg(feature = \"diag\")]\n                let before = trainer_counts(base);\n                destroy_special_records(base, *records, *flags);\n",
      "reason": "rc.14 a-full-2 p4: a native holder's teardown gives back finalize's shared trainer count by the window flags (holder_counts, RecordsRef/DestroyRecords flags, give_back_holder_count; predates rc.14)"
+    },
+    {
+     "old": "            DestroyStep::DestroyRecords { records, flags } => {\n",
+     "new": "            DestroyStep::DestroyRecords { records, flags, module } => {\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "                receipt.records += 1;\n                // rc.14 a-full-2 (p4): finalize decrements these before its destroy (`0x652efc`, `0x6530b4`); this\n",
+     "new": "                receipt.records += 1;\n                // rc.14 a-full-2 (boot a2-99b9083f-y1): the object kind's module the holder ran code from goes only now.\n                super::module_pins::drop_hold(*module);\n                if *module != 0 { trace!(\"[Destroy] object module dropped owner={} holder={:#x} module={:#x}\", owner, records[0], module); }\n                // rc.14 a-full-2 (p4): finalize decrements these before its destroy (`0x652efc`, `0x6530b4`); this\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
     }
    ]
   },
@@ -16359,7 +16429,7 @@
    "dest": "src/runtime/roster/native_body_bank.rs",
    "crate": "root",
    "src_sha256": "ccf7ac678691fa0101a1eff5dbd9300a1b12fe64e9ebbde515697adfbb841c98",
-   "dest_sha256": "1310a2275244520df59b7c564899e18acb58724bb40fb7e2d0725aaf29801809",
+   "dest_sha256": "ba0622114c831129b5aa044a32767f9bdf6a4588eeeba72420cb156c0666055c",
    "edits": [
     {
      "old": "unsafe fn finalize_entry(entry: *mut u8) -> u64 {\n",
@@ -19373,6 +19443,86 @@
      "old": "    if trainer { retire_kept_trainer(base, owner, group, out.claimed, saved.flags, saved.records); }\n}\n",
      "new": "    if trainer { retire_kept_trainer(base, owner, group, out.claimed, saved.flags, saved.records); }\n    if partner {\n        let holder = saved.records[0];\n        trace!(\"[GroupSwap] window kept across reload owner={} group={} partner holder={:#x} articles={} records={:x?} flags={:#x}{}\",\n            owner, group, holder, fields::read::<u64>(holder, 0x10).unwrap_or(0) & 0xffff_ffff, saved.records, saved.flags,\n            trainer_counts_note(base));\n    }\n}\n",
      "reason": "rc.14 a-full-2 Aegis: A1 keeps a Pyra/Mythra window across a Reload behind KEEP_AEGIS_WINDOW_ACROSS_RELOAD (off until a2-aegis passes; diag-cycle aegis); probe a0 found claim and record zero"
+    },
+    {
+     "old": "    let receipt = r_handle::release(base, ledger_role(role), Some(group), Some(&[kind][..]), &Occupancy::default(), why);\n    trace!(\"[GroupSwap] keys returned owner={} group={} object_kind={:#x} released={} kept={} map={} reason={}\",\n        owner, group, kind, receipt.released, receipt.kept.len(), fields::read::<u64>(alias, 0x18).map_or(-1, |m| m as i64), why);\n",
+     "new": "    // rc.14 a-full-2 (integration-3's smoke2): the trainer window's holder runs code from the object kind's NRO; a reference\n    // of ours bridges the token's release, then R gets its node again (as `complete_exchange`'s post-build release does).\n    let held = crate::runtime::roster::module_pins::hold(alias, kind);\n    let receipt = r_handle::release(base, ledger_role(role), Some(group), Some(&[kind][..]), &Occupancy::default(), why);\n    let asked = crate::runtime::roster::module_pins::hand_to(alias, kind, held);\n    trace!(\"[GroupSwap] keys returned owner={} group={} object_kind={:#x} released={} kept={} map={} module={:#x} asked={} reason={}\",\n        owner, group, kind, receipt.released, receipt.kept.len(), fields::read::<u64>(alias, 0x18).map_or(-1, |m| m as i64), held,\n        asked, why);\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "    prepare_refused: bool,\n}\n",
+     "new": "    prepare_refused: bool,\n    /// rc.14 a-full-2 (boot a2-99b9083f-y1, integration-3's smoke2): the reference this group's holder keeps on its\n    /// object kind's module (`module_pins::hold`, taken before its background build gives the object token back; 0 =\n    /// none). Its teardown drops it after the holder's destroy (`RecordsRef::module`); its attach hands it to R.\n    object_module: u64,\n}\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "            leaving: false, release_now: false, parked_kept: 0, object_held: false, object_refused: false, prepare_refused: false }\n",
+     "new": "            leaving: false, release_now: false, parked_kept: 0, object_held: false, object_refused: false, prepare_refused: false,\n            object_module: 0 }\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "    // the holder step that read through it.\n    let mut mii_keys = None;\n",
+     "new": "    // the holder step that read through it.\n    // rc.14 a-full-2 (boot a2-99b9083f-y1, integration-3's smoke2): that object token is R's node for the object kind's\n    // NRO, which the holder's article runs code from. Before it goes, the group takes its own reference on that module and\n    // keeps it while the holder lives detached (`module_pins::hold`; dropped after the holder's destroy, handed to R at\n    // its attach). Without it the holder outlived the module once no other entry held it, and its destroy called through\n    // a vtable in unmapped memory (`0x33c23f8`).\n    let object_module = match b.members.object_kind() {\n        Some(kind) if alias_ok && b.holder_due && valid && holder_ok => crate::runtime::roster::module_pins::hold(b.alias, kind),\n        _ => 0,\n    };\n    let mut mii_keys = None;\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "                        g.state = GroupState::Built;\n                        true\n",
+     "new": "                        g.state = GroupState::Built;\n                        g.object_module = object_module;\n                        true\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "    }\n    if b.holder_due {\n",
+     "new": "    }\n    if object_module != 0 || b.members.object_kind().is_some_and(|_| b.holder_due) {\n        trace!(\"[GroupSwap] object module held owner={} group={} object_kind={:x?} module={:#x} stored={}\", owner, b.group,\n            b.members.object_kind(), object_module, stored);\n    }\n    // A group that was not stored keeps no holder of ours: its reference goes now (its object token stays until its teardown).\n    if !stored { crate::runtime::roster::module_pins::drop_hold(object_module); }\n    if b.holder_due {\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "    let mut mii_build: Option<(MiiIdentity, Configuration)> = None;\n    // K15: the Phase B construction and U18's attach register bodies through `prepare_entry`, whose\n",
+     "new": "    let mut mii_build: Option<(MiiIdentity, Configuration)> = None;\n    // rc.14 a-full-2: the attaching group's object module reference (its kind, the handle), handed to R after the bank lock.\n    let mut object_handover: Option<(u32, u64)> = None;\n    // K15: the Phase B construction and U18's attach register bodies through `prepare_entry`, whose\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "            (GroupState::Built, Some(y)) => {\n                let x_bodies = std::mem::replace(&mut bank.bodies, group.bodies);\n",
+     "new": "            (GroupState::Built, Some(y)) => {\n                // rc.14 a-full-2: its holder becomes the window's; the reference it kept on its object kind's module goes to\n                // R below. The record now holds the outgoing window, whose holder R's node already covers.\n                let handle = std::mem::replace(&mut group.object_module, 0);\n                object_handover = target_members.object_kind().filter(|_| handle != 0).map(|kind| (kind, handle));\n                let x_bodies = std::mem::replace(&mut bank.bodies, group.bodies);\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "        (prepared, before.unwrap(), alias)\n    };\n    let started = now_us();\n    split::start(role, started);\n",
+     "new": "        (prepared, before.unwrap(), alias)\n    };\n    if let Some((kind, handle)) = object_handover {\n        let asked = crate::runtime::roster::module_pins::hand_to(alias, kind, handle);\n        trace!(\"[GroupSwap] object module handed to R owner={} kind={:#x} module={:#x} R={:#x} asked={}\", owner, kind, handle, alias, asked);\n    }\n    let started = now_us();\n    split::start(role, started);\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "                let object = [kind];\n                if fields::read::<u64>(alias, 0x18).unwrap_or(0) != 0 {\n",
+     "new": "                let object = [kind];\n                // rc.14 a-full-2 (integration-3's smoke2): the window's holder runs code from the object kind's NRO, and the\n                // token below is R's node for it. A reference of ours bridges the release, then R gets its node again, as a\n                // Reload-built window keeps it until state 3.\n                let held = crate::runtime::roster::module_pins::hold(alias, kind);\n                if fields::read::<u64>(alias, 0x18).unwrap_or(0) != 0 {\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "                    trace!(\"[GroupSwap] settled owner={} object_kind={:#x} map=0 settled={:x?}\", owner, kind, settled);\n                }\n            }\n        }\n",
+     "new": "                    trace!(\"[GroupSwap] settled owner={} object_kind={:#x} map=0 settled={:x?}\", owner, kind, settled);\n                }\n                let asked = crate::runtime::roster::module_pins::hand_to(alias, kind, held);\n                trace!(\"[GroupSwap] object module kept for the window owner={} kind={:#x} module={:#x} asked={}\", owner, kind, held, asked);\n            }\n        }\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "                detached.records = Some(RecordsRef { records: created, valid: true, flags: read::<u8>(entry, 0x591f) });\n",
+     "new": "                detached.records = Some(RecordsRef { records: created, valid: true, flags: read::<u8>(entry, 0x591f), module: 0 });\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "                            valid: group.members.carries_records() && valid_special_object(base, saved.records[0], owner), flags: saved.flags });\n",
+     "new": "                            valid: group.members.carries_records() && valid_special_object(base, saved.records[0], owner), flags: saved.flags,\n                            module: group.object_module });\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "                g.release_now = false;\n                g.object_held = false;\n                g.saved = None;\n                g.bodies = [Body::default(); NATIVE_MEMBERS];\n",
+     "new": "                g.release_now = false;\n                g.object_held = false;\n                // Its object module reference went into the plan with its records (dropped after their destroy).\n                g.object_module = 0;\n                g.saved = None;\n                g.bodies = [Body::default(); NATIVE_MEMBERS];\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "                        valid: g.members.carries_records() && valid_special_object(base, saved.records[0], owner), flags: saved.flags });\n",
+     "new": "                        valid: g.members.carries_records() && valid_special_object(base, saved.records[0], owner), flags: saved.flags,\n                        module: g.object_module });\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
+    },
+    {
+     "old": "                g.object_held = false;\n                g.saved = None;\n",
+     "new": "                g.object_held = false;\n                // Its object module reference went with its records' destroy (`DestroyRecords::module`).\n                g.object_module = 0;\n                g.saved = None;\n",
+     "reason": "rc.14 a-full-2 object module: an object-kind holder (Aegis 0x75, PT 0x72) keeps a reference on its object kind's NRO from the holder step until its destroy or until it becomes a window (then R gets its node again via 0x17e4900); module pins take the object kind too (the smoke2 / a2-99b9083f-y1 crash 0x33c23f8)"
     }
    ]
   },

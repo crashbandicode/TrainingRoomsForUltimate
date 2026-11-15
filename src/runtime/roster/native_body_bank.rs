@@ -2117,9 +2117,14 @@ unsafe fn return_object_key(base: usize, role: usize, owner: u32, group: usize, 
         if !held { return; }
     }
     let alias = BANKS[role].lock().as_ref().map_or(0, |bank| bank.alias);
+    // rc.14 a-full-2 (integration-3's smoke2): the trainer window's holder runs code from the object kind's NRO; a reference
+    // of ours bridges the token's release, then R gets its node again (as `complete_exchange`'s post-build release does).
+    let held = crate::runtime::roster::module_pins::hold(alias, kind);
     let receipt = r_handle::release(base, ledger_role(role), Some(group), Some(&[kind][..]), &Occupancy::default(), why);
-    trace!("[GroupSwap] keys returned owner={} group={} object_kind={:#x} released={} kept={} map={} reason={}",
-        owner, group, kind, receipt.released, receipt.kept.len(), fields::read::<u64>(alias, 0x18).map_or(-1, |m| m as i64), why);
+    let asked = crate::runtime::roster::module_pins::hand_to(alias, kind, held);
+    trace!("[GroupSwap] keys returned owner={} group={} object_kind={:#x} released={} kept={} map={} module={:#x} asked={} reason={}",
+        owner, group, kind, receipt.released, receipt.kept.len(), fields::read::<u64>(alias, 0x18).map_or(-1, |m| m as i64), held,
+        asked, why);
 }
 
 /// The entry bytes a warm exit from this role's live Mii group writes back for `kind`: the reachable group `switch`
@@ -2610,6 +2615,10 @@ struct GroupData {
     /// Inbox 02:42Z: its prepared pool build left the pool empty or was not queued (logged; not retried; its attach
     /// rebuilds the pool itself).
     prepare_refused: bool,
+    /// rc.14 a-full-2 (boot a2-99b9083f-y1, integration-3's smoke2): the reference this group's holder keeps on its
+    /// object kind's module (`module_pins::hold`, taken before its background build gives the object token back; 0 =
+    /// none). Its teardown drops it after the holder's destroy (`RecordsRef::module`); its attach hands it to R.
+    object_module: u64,
 }
 
 impl GroupData {
@@ -2619,7 +2628,8 @@ impl GroupData {
             bodies: [Body::default(); NATIVE_MEMBERS], since_us: 0, busy_logged: false, kirby_logged: false,
             memory_logged: false, memory_deferred: false, prefetch_committed: None,
             identity, configuration, charinfo_published: false, publish: PublishAttempts::new(), background_refused: false,
-            leaving: false, release_now: false, parked_kept: 0, object_held: false, object_refused: false, prepare_refused: false }
+            leaving: false, release_now: false, parked_kept: 0, object_held: false, object_refused: false, prepare_refused: false,
+            object_module: 0 }
     }
 }
 
@@ -5580,6 +5590,15 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
     // body's tail released nothing (`bg_mii_tail_release`): every key of the group goes here, its identity in R. So does
     // every key of a group built beside a live Mii window (X6), with the baseline in R; its object kind among them, after
     // the holder step that read through it.
+    // rc.14 a-full-2 (boot a2-99b9083f-y1, integration-3's smoke2): that object token is R's node for the object kind's
+    // NRO, which the holder's article runs code from. Before it goes, the group takes its own reference on that module and
+    // keeps it while the holder lives detached (`module_pins::hold`; dropped after the holder's destroy, handed to R at
+    // its attach). Without it the holder outlived the module once no other entry held it, and its destroy called through
+    // a vtable in unmapped memory (`0x33c23f8`).
+    let object_module = match b.members.object_kind() {
+        Some(kind) if alias_ok && b.holder_due && valid && holder_ok => crate::runtime::roster::module_pins::hold(b.alias, kind),
+        _ => 0,
+    };
     let mut mii_keys = None;
     if alias_ok && b.mii.is_some() {
         let occupancy = occupancy_snapshot(role, None);
@@ -5611,6 +5630,7 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
                         g.saved = Some(window);
                         g.bodies = bodies;
                         g.state = GroupState::Built;
+                        g.object_module = object_module;
                         true
                     }
                     Some(g) => { g.state = GroupState::Failed; g.background_refused = true; false }
@@ -5641,6 +5661,12 @@ unsafe fn finish_background(entry: *const u8, owner: u32, role: usize, b: Backgr
             trace!("[GroupSwap] settled owner={} group={} object_kind={:#x} map=0 settled={:x?}", owner, b.group, kind, settled);
         }
     }
+    if object_module != 0 || b.members.object_kind().is_some_and(|_| b.holder_due) {
+        trace!("[GroupSwap] object module held owner={} group={} object_kind={:x?} module={:#x} stored={}", owner, b.group,
+            b.members.object_kind(), object_module, stored);
+    }
+    // A group that was not stored keeps no holder of ours: its reference goes now (its object token stays until its teardown).
+    if !stored { crate::runtime::roster::module_pins::drop_hold(object_module); }
     if b.holder_due {
         let holder = b.records[0];
         trace!("[GroupSwap] background holder settled owner={} group={} ok={} records={:x?} table=+{:#x} slot={} articles={} live_records={:x?}",
@@ -5697,6 +5723,8 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
     // A one-member Mii group's identity and configuration for the native Mii-setup step
     // (WP-M2): set by the Phase B arm below, read after the bank lock is dropped.
     let mut mii_build: Option<(MiiIdentity, Configuration)> = None;
+    // rc.14 a-full-2: the attaching group's object module reference (its kind, the handle), handed to R after the bank lock.
+    let mut object_handover: Option<(u32, u64)> = None;
     // K15: the Phase B construction and U18's attach register bodies through `prepare_entry`, whose
     // copy relations load Kirby's hat models (`0x17f06a0`); their packages must be resident first, as
     // native's completion and its holders wait guarantee (`swap_model::copy_packages`). No bank lock
@@ -5802,6 +5830,10 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
         group.release_now = false;
         let prepared = match (group.state, group.saved.take()) {
             (GroupState::Built, Some(y)) => {
+                // rc.14 a-full-2: its holder becomes the window's; the reference it kept on its object kind's module goes to
+                // R below. The record now holds the outgoing window, whose holder R's node already covers.
+                let handle = std::mem::replace(&mut group.object_module, 0);
+                object_handover = target_members.object_kind().filter(|_| handle != 0).map(|kind| (kind, handle));
                 let x_bodies = std::mem::replace(&mut bank.bodies, group.bodies);
                 // SPECIAL-GROUPS §1 (c): each window keeps its own Mii set in R, and its body init's `D+0x3a0` words.
                 saved_x.mii_r = Some(take_mii_r(alias));
@@ -5919,6 +5951,10 @@ unsafe fn perform_swap(entry: *mut u8, owner: u32, role: usize) {
         bank.swap_started = Some((swap.kind, swap.requested_us));
         (prepared, before.unwrap(), alias)
     };
+    if let Some((kind, handle)) = object_handover {
+        let asked = crate::runtime::roster::module_pins::hand_to(alias, kind, handle);
+        trace!("[GroupSwap] object module handed to R owner={} kind={:#x} module={:#x} R={:#x} asked={}", owner, kind, handle, alias, asked);
+    }
     let started = now_us();
     split::start(role, started);
     // U18: the outgoing window leaves the copy registry and the entry's header and roster become
@@ -6117,6 +6153,10 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
         if let Some(kind) = built.object_kind() {
             if alias != 0 && resource(base, owner) == Some(alias) {
                 let object = [kind];
+                // rc.14 a-full-2 (integration-3's smoke2): the window's holder runs code from the object kind's NRO, and the
+                // token below is R's node for it. A reference of ours bridges the release, then R gets its node again, as a
+                // Reload-built window keeps it until state 3.
+                let held = crate::runtime::roster::module_pins::hold(alias, kind);
                 if fields::read::<u64>(alias, 0x18).unwrap_or(0) != 0 {
                     let receipt = r_handle::release(base, lrole, Some(group), Some(&object[..]), &Occupancy::default(), "post-build object release");
                     trace!("[GroupSwap] released owner={} object_kind={:#x} map={} flags={:#x} orphan_keys={:x?}", owner, kind,
@@ -6130,6 +6170,8 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
                     let settled = r_handle::settle(lrole, group, &object, "post-build object freed by native (map=0)");
                     trace!("[GroupSwap] settled owner={} object_kind={:#x} map=0 settled={:x?}", owner, kind, settled);
                 }
+                let asked = crate::runtime::roster::module_pins::hand_to(alias, kind, held);
+                trace!("[GroupSwap] object module kept for the window owner={} kind={:#x} module={:#x} asked={}", owner, kind, held, asked);
             }
         }
         // The role's real ledger against the owner's map (WP2's line at the build seam, U13:
@@ -6187,7 +6229,7 @@ unsafe fn complete_exchange(base: usize, entry: *mut u8, owner: u32, role: usize
             let created = [0usize, 8, 16].map(|o| read::<usize>(entry, 0x5a88 + o));
             if members.carries_records() && valid_special_object(base, created[0], owner) {
                 records = created;
-                detached.records = Some(RecordsRef { records: created, valid: true, flags: read::<u8>(entry, 0x591f) });
+                detached.records = Some(RecordsRef { records: created, valid: true, flags: read::<u8>(entry, 0x591f), module: 0 });
             }
             if let Some(kind) = members.object_kind() { detached.held_kinds.push(kind); }
         }
@@ -6920,7 +6962,8 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
                         valid: saved.dispatch.iter().all(|a| *a == 0 || dispatcher_array_ok(*a)) });
                     if saved.records != [0, 0, 0] {
                         detached.records = Some(RecordsRef { records: saved.records,
-                            valid: group.members.carries_records() && valid_special_object(base, saved.records[0], owner), flags: saved.flags });
+                            valid: group.members.carries_records() && valid_special_object(base, saved.records[0], owner), flags: saved.flags,
+                            module: group.object_module });
                     }
                     // Inbox 00:18Z: a re-acquired object kind is a held key: the plan's key step returns it (rc6-bg-pt4:
                     // left on R, the next Reload's state 7 refused on `R+0x18 == 2`).
@@ -6943,6 +6986,8 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
                 g.leaving = false;
                 g.release_now = false;
                 g.object_held = false;
+                // Its object module reference went into the plan with its records (dropped after their destroy).
+                g.object_module = 0;
                 g.saved = None;
                 g.bodies = [Body::default(); NATIVE_MEMBERS];
             }
@@ -7157,7 +7202,8 @@ unsafe fn leave_group(entry: *const u8, owner: u32, role: usize, group: usize) {
                     valid: saved.dispatch.iter().all(|a| *a == 0 || dispatcher_array_ok(*a)) });
                 if saved.records != [0, 0, 0] {
                     detached.records = Some(RecordsRef { records: saved.records,
-                        valid: g.members.carries_records() && valid_special_object(base, saved.records[0], owner), flags: saved.flags });
+                        valid: g.members.carries_records() && valid_special_object(base, saved.records[0], owner), flags: saved.flags,
+                        module: g.object_module });
                 }
                 // Inbox 00:18Z: its re-acquired object kind goes with it (the plan's key step).
                 if g.object_held { detached.held_kinds.push(PT_OBJECT_KIND); }
@@ -7250,6 +7296,8 @@ unsafe fn leave_group(entry: *const u8, owner: u32, role: usize, group: usize) {
                 g.leaving = false;
                 // Its re-acquired object kind went with the group's other tokens above.
                 g.object_held = false;
+                // Its object module reference went with its records' destroy (`DestroyRecords::module`).
+                g.object_module = 0;
                 g.saved = None;
                 g.bodies = [Body::default(); NATIVE_MEMBERS];
             }

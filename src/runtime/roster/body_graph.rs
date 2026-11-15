@@ -263,11 +263,14 @@ pub(crate) unsafe fn execute(base: usize, plan: &DetachedPlan<'_>, keys: &[u32],
             DestroyStep::DestroyDispatchers { arrays } => {
                 if destroy_dispatcher_arrays(base, *arrays) { receipt.dispatchers += 1; } else { receipt.skipped += 1; }
             }
-            DestroyStep::DestroyRecords { records, flags } => {
+            DestroyStep::DestroyRecords { records, flags, module } => {
                 #[cfg(feature = "diag")]
                 let before = trainer_counts(base);
                 destroy_special_records(base, *records, *flags);
                 receipt.records += 1;
+                // rc.14 a-full-2 (boot a2-99b9083f-y1): the object kind's module the holder ran code from goes only now.
+                super::module_pins::drop_hold(*module);
+                if *module != 0 { trace!("[Destroy] object module dropped owner={} holder={:#x} module={:#x}", owner, records[0], module); }
                 // rc.14 a-full-2 (p4): finalize decrements these before its destroy (`0x652efc`, `0x6530b4`); this
                 // teardown mirrors only `0x652f5c-0x652f84`.
                 #[cfg(feature = "diag")]
