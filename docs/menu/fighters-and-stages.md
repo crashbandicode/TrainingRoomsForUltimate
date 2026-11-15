@@ -340,6 +340,9 @@ The total number of fighters kept loaded, for Player 1 and the CPU together, the
 - **Values:** 2 to 12
 - **Default:** 10
 - **How:** Left or Right steps one (it stops at 2 and 12); A opens the list.
+- **When your cycles need more:** the fighters that fit stay loaded and the others stay cold. A cold fighter is loaded
+  while it's on screen and freed after, so you go one fighter over this number only for that time. The rest of the
+  cycle never loads again. Lowering this number frees the loaded fighters whose turn is farthest away, right away.
 
 ### Ready Hats
 

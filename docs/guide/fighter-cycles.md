@@ -119,9 +119,11 @@ Loading a fighter from scratch takes a moment and stops the game. So TrainingRoo
 hats ahead of time in the background, and a chord or a click only swaps in a fighter that is already there. The defaults
 suit most players; change them only to use less memory.
 
-If a cycle has more fighters than Ready Fighters leaves room for, one can't stay loaded. A swap to it loads it alone.
-The groups already loaded beside it stay, and only the fighters that were on screen with the one you swapped from load
-again in the background.
+If a cycle has more fighters than Ready Fighters leaves room for, the fighters that fit stay loaded and the others stay
+cold. A swap to a cold fighter loads it while you wait (the fighter you left stays on screen until it is ready), and it
+is freed after you swap away from it. Nothing else loads again. While a cold fighter is on screen, one fighter more than
+Ready Fighters is loaded. Lowering Ready Fighters frees the loaded fighters whose turn is farthest away, right away.
+In a very long cycle every loading spot can be taken; then a swap to a cold fighter still reloads that side's fighters.
 
 The notice "Fighters" counts them while they load:
 
