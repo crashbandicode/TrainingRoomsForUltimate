@@ -316,8 +316,7 @@ impl ComboRecord {
 fn int(object: &Map<String, Value>, key: &'static str) -> Result<i32, &'static str> {
     object
         .get(key)
-        .and_then(Value::as_i64)
-        .and_then(|v| i32::try_from(v).ok())
+        .and_then(int_value)
         .ok_or(key)
 }
 
@@ -341,9 +340,7 @@ fn link_of(value: &Value) -> Result<LinkRec, &'static str> {
         None | Some(Value::Null) => None,
         Some(Value::Array(pair)) if pair.len() == 2 => {
             let at = |i: usize| {
-                pair[i]
-                    .as_i64()
-                    .and_then(|v| i32::try_from(v).ok())
+                int_value(&pair[i])
                     .ok_or("window")
             };
             Some((at(0)?, at(1)?))
@@ -682,3 +679,7 @@ mod share_tests;
 #[cfg(test)]
 #[path = "combo_notice_tests.rs"]
 mod notice_tests;
+
+fn int_value(value: &Value) -> Option<i32> {
+    value.as_i64().and_then(|v| i32::try_from(v).ok())
+}
