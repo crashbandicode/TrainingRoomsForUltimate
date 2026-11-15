@@ -170,20 +170,35 @@ def place_at(ctx, cursor, x, y, expect_n):
 
 
 def layout_near(st):
-    """Three targets for P1: 14, 34 and 54 units in front of it, at a fighter's chest (the cursor starts 15 up; the macros
-    move on a 2-unit grid, so 6 down is exact: 3 frames). x is rounded by `goto` to the grid; `place_at` checks the miss."""
+    """Three targets for P1: 10, 22 and 34 units in front of it, at a fighter's chest (the cursor starts 15 up; the macros
+    move on a 2-unit grid, so 6 down is exact: 3 frames). x is rounded by `goto` to the grid; `place_at` checks the miss.
+    12 apart: the plugin refuses a target under 8 (two radii) from another (`src/model/btt.rs` `put`, strict `<`; host test
+    `btt_overlap_rule_is_strict_at_apart`), and the stick macros land within a frame or two (2 to 4 units) of where they
+    aim under load, so a gap of exactly 8 (btt-5's +10, +18, +26) was refused when one macro ran a frame long (Eden
+    rc14-int3-btt-s1, int3). btt-4's 14/34/54 put the third past a side platform's edge; +34 is the old second place."""
     px = p1_of(st)[0]
     y = st['cursor'][1] - 6
-    return [(px + 10, y), (px + 18, y), (px + 26, y)]  # btt-4: 14/34/54 put the third past a side platform's edge
+    return [(px + 10, y), (px + 22, y), (px + 34, y)]
+
+
+def place_spots(ctx, cursor, spots, first=1):
+    """Place `spots` in the order given (the caller's: nearest the cursor first). The first is aimed at its own spot; each next
+    at the PLAN's spacing from the previous target's ACTUAL place, so a target that landed a unit or two off moves the rest
+    with it and the gap the plan chose stays (int3: aimed at absolute spots a one-frame drift of the first macro left the
+    second under the 8-unit limit). The states after each A, with the aim."""
+    placed, last = [], None
+    for k, spot in enumerate(spots, first):
+        x, y = spot if last is None else (cursor[0] + spot[0] - last[0], cursor[1] + spot[1] - last[1])
+        got = place_at(ctx, cursor, x, y, k)
+        cursor, last = got['cursor'], spot
+        placed.append({'aim': [x, y], 'cursor': list(cursor), 'text': got['text']})
+    return placed
+
 
 def put_layout(ctx, st, out):
     """Place the three targets of `layout_near`, nearest the cursor first; the states reported after each A."""
     spots = sorted(layout_near(st), key=lambda t: abs(t[0] - st['cursor'][0]))
-    cursor, placed = st['cursor'], []
-    for k, (x, y) in enumerate(spots, 1):
-        got = place_at(ctx, cursor, x, y, k)
-        cursor = got['cursor']
-        placed.append({'aim': [x, y], 'cursor': list(cursor), 'text': got['text']})
+    placed = place_spots(ctx, st['cursor'], spots)
     out.setdefault('placed', []).extend(placed)
     hs._remember(ctx, 'btt_layout', [p['cursor'] for p in placed])
     hs._remember(ctx, 'btt_p1', list(p1_of(st)))
@@ -354,9 +369,20 @@ def view(ctx):
             'labels': [label for label in json.loads(found.group(4)) if label]}
 
 
+TILE_CHARS = 16  # docs/menu/saves.md; `clip_label` in src/model/macro_ui/macro_panel.rs
+
+
+def tile_label(name):
+    """A name as a library tile shows it (rc.14 list-padding, 9724bdf9): whole at 16 characters or fewer, else the first 15
+    (a trailing space dropped) and an ellipsis. Before list-padding the cut was the plain first 16 (no mark)."""
+    if len(name) <= TILE_CHARS:
+        return name
+    return name[:TILE_CHARS - 1].rstrip() + '…'
+
+
 def named(labels, names):
-    """The panel's (cut) labels are `names`, in order."""
-    return len(labels) == len(names) and all(name.startswith(label) for label, name in zip(labels, names))
+    """The panel's labels are `names` as tiles show them (`tile_label`), in order, exactly."""
+    return len(labels) == len(names) and all(label == tile_label(name) for label, name in zip(labels, names))
 
 
 def open_list(ctx):
@@ -701,11 +727,9 @@ def e41(ctx, key='bf'):
     if st['n']:
         clear_layout(ctx)
     st = latest(ctx)
-    cursor, spots = st['cursor'], [(p1_of(st)[0] + 10 + 12 * k, st['cursor'][1] - 6) for k in range(3)]
-    placed = []
-    for k, (x, y) in enumerate(sorted(spots, key=lambda s: abs(s[0] - cursor[0])), 1):
-        cursor = place_at(ctx, cursor, x, y, k)['cursor']
-        placed.append(list(cursor))
+    spots = [(p1_of(st)[0] + 10 + 12 * k, st['cursor'][1] - 6) for k in range(3)]
+    spots.sort(key=lambda s: abs(s[0] - st['cursor'][0]))
+    placed = [got['cursor'] for got in place_spots(ctx, st['cursor'], spots)]
     hs._remember(ctx, 'btt_layout', placed)
     want = sorted(round(float(c), 1) for t in hs._state(ctx).get('btt_layout') or [] for c in t)
     first = save_new(ctx, stage, name)
@@ -941,9 +965,7 @@ def x_stages(ctx, first='bf', second='bbf'):
     if st['n']:
         clear_layout(ctx)
     st = latest(ctx)
-    cursor = st['cursor']
-    for k, (x, y) in enumerate(sorted(layout_near(st)[:2], key=lambda t: abs(t[0] - st['cursor'][0])), 1):
-        cursor = place_at(ctx, cursor, x, y, k)['cursor']
+    place_spots(ctx, st['cursor'], sorted(layout_near(st)[:2], key=lambda t: abs(t[0] - st['cursor'][0])))
     made = save_new(ctx, b, STAGE_NAMES[second])
     out['saved_second'] = made
     if bytes_of(a) != files_a:
