@@ -172,6 +172,32 @@ fn maximum_inline_bodies_continue_through_redraw_update_and_delivery_without_hea
     assert_eq!(ALLOCS.with(Cell::get), before);
 }
 
+fn copied_body_matches_single_part_joined() {
+    let over_capacity = format!("{FULL_STATIC_BODY}x");
+    let before = ALLOCS.with(Cell::get);
+    for text in ["", "simple text", "é日本🦀", FULL_STATIC_BODY, &over_capacity] {
+        assert_eq!(Body::copied(text), Body::joined(&[text]));
+    }
+    assert_eq!(ALLOCS.with(Cell::get), before);
+}
+
+fn copied_multibyte_body_truncates_at_a_complete_character_without_heap() {
+    // 317 ASCII bytes plus the two-byte é fit; the following four-byte crab crosses byte 320.
+    // The expected prefix and length are independent of the production truncation loop.
+    let expected = format!("{}é", "a".repeat(317));
+    let text = format!("{expected}🦀tail");
+    assert!(text.len() > BODY_MAX);
+    let before = ALLOCS.with(Cell::get);
+    let copied = Body::copied(&text);
+    let joined = Body::joined(&[&text]);
+    assert_eq!(copied.as_str().as_bytes(), expected.as_bytes());
+    assert_eq!(copied.as_str().len(), 319);
+    assert_eq!(std::str::from_utf8(copied.as_str().as_bytes()), Ok(expected.as_str()));
+    assert!(copied.as_str().len() <= BODY_MAX);
+    assert_eq!(copied, joined);
+    assert_eq!(ALLOCS.with(Cell::get), before);
+}
+
 // ---- damage display ------------------------------------------------------------------------------
 
 fn pane_rules_fixture() {
@@ -239,6 +265,8 @@ fn case_table() {
         ("longest_chords_survive_queue_utf16_wrap_and_preallocated_pane_boundaries", longest_chords_survive_queue_utf16_wrap_and_preallocated_pane_boundaries as fn()),
         ("full_queue_drops_the_oldest_waiting_never_the_one_on_screen", full_queue_drops_the_oldest_waiting_never_the_one_on_screen as fn()),
         ("maximum_inline_bodies_continue_through_redraw_update_and_delivery_without_heap", maximum_inline_bodies_continue_through_redraw_update_and_delivery_without_heap as fn()),
+        ("copied_body_matches_single_part_joined", copied_body_matches_single_part_joined as fn()),
+        ("copied_multibyte_body_truncates_at_a_complete_character_without_heap", copied_multibyte_body_truncates_at_a_complete_character_without_heap as fn()),
         ("pane_rules_fixture", pane_rules_fixture as fn()),
         ("missing_accessor_zero", missing_accessor_zero as fn()),
         ("the_standing_api_is_bounded_and_allocation_free", the_standing_api_is_bounded_and_allocation_free as fn()),

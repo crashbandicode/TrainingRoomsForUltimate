@@ -30,13 +30,7 @@ pub struct Body {
 
 impl Body {
     pub fn copied(text: &str) -> Body {
-        let mut end = text.len().min(BODY_MAX);
-        while !text.is_char_boundary(end) {
-            end -= 1;
-        }
-        let mut bytes = [0u8; BODY_MAX];
-        bytes[..end].copy_from_slice(&text.as_bytes()[..end]);
-        Body { bytes, len: end as u16 }
+        Self::joined(&[text])
     }
 
     /// `parts` one after another, copied as far as they fit (cut at a character boundary). No allocation.
