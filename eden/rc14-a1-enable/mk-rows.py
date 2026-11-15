@@ -32,6 +32,7 @@ ROWS = [
     ('a1-mii', M, 'a1_mii', 7, 'Ready Fighters 10: the Mii Gunner window (not the cold fighter) kept across the forced Reload, then warm-attached again.'),
     ('cf-pyra-keep', 'cyclefix.py', 'cf_pyra_keep', 9, 'cycle-fix row (6c044efc) on the A1-on build: a Reload out of a Pyra window keeps [4a]; its pins go only after the new bank is Ready; the kept Mii group attaches warm.'),
     ('a1-crash', M, 'a1_crash', 9, 'a1-be759456-y2 crash row with A1 and Mii groups kept ON: the Pyra window, a forced Reload, the warm attach of the kept [4a]: no Unmapped, no StallWatch, pins after Ready.'),
+    ('a1-cold', M, 'a1_cold', 10, 'The path af-49c90e9c-x1 declined (no room): at Ready Fighters 6 (k = 1) a cold press after the keep is served by a demand and the switch away frees it (cold release).'),
     ('a1-pair', M, 'a1_pair', 9, 'Ready Fighters 10, CPU Solo Popo Off: the Ice Climbers pair window (Popo and Nana) kept, then its warm return.'),
     ('a1-paircontrol', M, 'a1_paircontrol', 5, 'Control for a1-pair: the pair as a planner-built group (never a kept window), Pichu to Popo: warm, ready, no fallback.'),
     ('a1-restore', M, 'a1_restore', 3, 'The knob off, the remembered values back, Mario / Mario.'),

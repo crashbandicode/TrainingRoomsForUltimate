@@ -540,3 +540,78 @@ def a1_crash(ctx):
         problems.append('Unmapped accesses during the row: %s -> %s' % (out['unmapped_before'], out['unmapped_after']))
     problems += ['bad line: %s' % t for t in out['bad']]
     return _finish(ctx, 'a1-crash', out, problems)
+
+def a1_cold(ctx):
+    """The path boot a1-be759456-y2c did not exercise (the primary's order, 00:3xZ): a cold press AFTER the keep, with no room.
+    cycle-fix's k = 1 shape (Player 1 Mario > Pikachu, the CPU's four lane members, Ready Fighters 6): one CPU fighter does not
+    fit. The CPU takes its lane by direct picks (so its original, Pyra or not, never enters), A1 keeps its window across a forced
+    Reload (a direct pick of Bowser), the kept window attaches back, then three laps over the lane: the cold member is served by
+    a `demand` (not declined for room), and the switch away frees it (`cold release`). Pass: the keep is logged, every demand and
+    release counts at most Ready Fighters + 1 bodies, no declined press after the keep, no Reload or teardown in the laps, at
+    least one cold press and one cold release, no StallWatch, no Unmapped access."""
+    t0, out = _begin(ctx)
+    problems = []
+    cf._diag_cycle(ctx, KNOB)
+    seq = hs.diag_mark(ctx)
+    fx._live_set(ctx, **cf._k1_values(6))
+    out['settle0'] = fs._settled(ctx, seq, 120)
+    out['p1_lap'] = [fs._brief(fs._press_cycle(ctx, 0)) for _ in range(2)]
+    out['settle1'] = fs._settled(ctx, hs.diag_mark(ctx), 120)
+    picks = [fs.GUNNER] + LAP_PICKS
+    out['ready_fighters'] = _ready_fighters(ctx)
+    out['unmapped_before'] = _unmapped_total(ctx)
+    out['bank'] = [_pick_rec(ctx, kind, i) for i, kind in enumerate(picks)]
+    out['settle2'] = fs._settled(ctx, hs.diag_mark(ctx), 120)
+    out['status_before'] = _status(ctx)
+    seq_keep, _lines = _keep(ctx, out, 1, fs.BOWSER, 'reload window mii')
+    kept = out['kept'][-1] if out['kept'] else None
+    out['status_after_keep'] = _status(ctx)
+    if kept:
+        group, kinds = int(kept[0]), [int(k) for k in kept[1]]
+        target = next((k for k in kinds if k != fs.GUNNER), kinds[0])
+        seq_back, out['picked_back'] = af._pick(ctx, 1, target)
+        out['warm_back'] = af._warm_back(ctx, out, 1, group, kinds, seq_back) and _returned(ctx, out, 1, seq_back)
+        time.sleep(2.0)
+    live = fs._live_kinds(ctx).get(1)
+    order = picks[picks.index(live) + 1:] + picks[:picks.index(live) + 1] if live in picks else picks
+    laps = []
+    for lap in range(3):
+        for kind in order:
+            ctx.check_stop()
+            fs._settled(ctx, hs.diag_mark(ctx), 20)
+            laps.append(_pick_rec(ctx, kind, len(laps)))
+    out['laps'] = laps
+    out['laps_cold'], lap_problems = cf._judge(laps, len(picks))
+    out['settle_end'] = fs._settled(ctx, hs.diag_mark(ctx), 90)
+    out['status_end'] = _status(ctx)
+    after = af._since(ctx, seq_keep)
+    out['bodies_seen'], bodies_bad = _bodies(after)
+    out['declined'] = [t[:240] for t in after if DECLINED.search(t) and 'forced (diag)' not in t]
+    out['cold_release'] = [t[:240] for t in after if RELEASE.search(t)][:8]
+    out['cold_demands'] = [t[:240] for t in after if (m := DEMAND.search(t)) and m.group(4) == 'true'][:8]
+    out['stalls'] = [t[:200] for _, _, t in hs.diag_lines(ctx) if 'StallWatch' in t][-3:]
+    out['unmapped_after'] = _unmapped_total(ctx)
+    out['bad'] = af._bad(after)
+    fx._live_set(ctx, **cf._values(8))
+    _mark(t0, out, 'done')
+    if not out['ready_fighters'] or out['ready_fighters'] > 6:
+        problems.append('Ready Fighters is %s, not 6' % out['ready_fighters'])
+    if not out['picked']:
+        problems.append('Bowser did not apply')
+    if not kept:
+        problems.append('the window was not kept: kept %s, not kept %s' % (out['kept'], out['not_kept']))
+    elif not out.get('warm_back'):
+        problems.append('no warm attach of the kept window: attaches %s, fallbacks %s' % (out.get('attaches'), out.get('fallbacks')))
+    if not out['cold_demands']:
+        problems.append('no cold press (a demand over Ready Fighters) after the keep: the lane fit')
+    if not out['cold_release']:
+        problems.append('no `cold release` after the keep')
+    problems += ['over Ready Fighters + 1, or cold flag wrong: %s' % t for t in bodies_bad]
+    problems += ['demand declined: %s' % t for t in out['declined']]
+    problems += lap_problems
+    if out['stalls']:
+        problems.append('StallWatch: %s' % out['stalls'][-1])
+    if out['unmapped_before'] is None or out['unmapped_after'] is None or out['unmapped_after'] != out['unmapped_before']:
+        problems.append('Unmapped accesses during the row: %s -> %s' % (out['unmapped_before'], out['unmapped_after']))
+    problems += ['bad line: %s' % t for t in out['bad']]
+    return _finish(ctx, 'a1-cold', out, problems)
