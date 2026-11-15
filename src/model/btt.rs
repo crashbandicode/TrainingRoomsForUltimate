@@ -35,6 +35,8 @@ pub const LOOKS: usize = MAX + 3;
 /// The cursor's units a frame at full tilt, and the stick's dead zone (which is also what starts a run).
 const SPEED: f32 = 2.0;
 const DEAD: f32 = 0.3;
+/// Layout ticks the placing box must stay the same, after the one that changed it, before the camera counts as settled.
+const CALM: u8 = 2;
 /// Frames a question stands (a second) or a message shows.
 const ASK: u16 = 60;
 const SHOW: u16 = 120;
@@ -284,6 +286,9 @@ pub struct Btt {
     view: Option<View>,
     here: f32,
     ground: f32,
+    /// The placing box the last layout tick's view gave, and for how many ticks running it has stayed the same (`see`).
+    seen: [[f32; 2]; 2],
+    calm: u8,
     kept: [(i32, [[f32; 2]; MAX], usize); KEPT],
     /// The session's best per layout (its key, frames), and the one of the run just done.
     best: [(u64, u32); BESTS],
@@ -316,6 +321,8 @@ impl Btt {
         view: None,
         here: 0.0,
         ground: 0.0,
+        seen: [[0.0; 2]; 2],
+        calm: 0,
         kept: [(i32::MIN, [[0.0; 2]; MAX], 0); KEPT],
         best: [(0, 0); BESTS],
         top: 0,
@@ -400,8 +407,13 @@ impl Btt {
         (self.range, self.here) = (range, here);
     }
 
+    /// The camera has settled once the placing box its view gives stays the same, to half a unit, for `CALM` ticks running: a
+    /// camera on its way to the fixed view gives a new box every tick (Eden rc14-int3-rr2-f1).
     pub fn see(&mut self, view: Option<View>) {
         self.view = view;
+        let b = bounds(self.range, view, self.ground);
+        let same = b.iter().flatten().zip(self.seen.iter().flatten()).all(|(a, z)| (a - z).abs() < 0.5);
+        (self.seen, self.calm) = (b, if same { self.calm.saturating_add(1) } else { 0 });
     }
 
     fn start(&mut self) {
@@ -487,9 +499,13 @@ impl Btt {
         let repeat = self.rep == 0 || self.rep >= 15 && self.rep % 2 == 1;
         let step = f32::from(pad != 0 && !zl && !held_b && repeat);
         let unit = [[DPAD_RIGHT, DPAD_LEFT], [DPAD_UP, DPAD_DOWN]].map(|[hi, lo]| step * (f32::from(down(hi)) - f32::from(down(lo))));
+        // A camera change alone never moves the cursor: it is kept in the box when it moves, and once the camera has settled, so
+        // it never stays off screen either (btt-5, 11-15; Eden rc14-int3-rr2-f1 dragged an untouched cursor 100 units up).
+        let tilt = [0, 1].map(|i| p.stick[i] * SPEED * f32::from(p.stick[i].abs() >= DEAD));
+        let clamp = tilt.iter().chain(&unit).any(|v| *v != 0.0) || self.calm >= CALM;
         for (i, range) in b.into_iter().enumerate() {
-            let tilt = p.stick[i] * SPEED * f32::from(p.stick[i].abs() >= DEAD);
-            self.cursor[i] = (self.cursor[i] + tilt + unit[i]).clamp(range[0], range[1]);
+            let at = self.cursor[i] + tilt[i] + unit[i];
+            self.cursor[i] = if clamp { at.clamp(range[0], range[1]) } else { at };
         }
         // B removes the last target on release, if nothing else was pressed while it was held.
         if pressed(B) || held_b && p.pressed != 0 {
