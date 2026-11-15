@@ -24,11 +24,13 @@ ROWS = [
     ('a1-setup', 'a1.py', 'a1_setup', 8, 'Live values (Ready Fighters 8, the console lanes), a P1 lap and a CPU lap, the notice settled; A1 on (knob window).'),
     ('a1-regress', M, 'a1_regress', 9, 'A forced Reload keeps the CPU window; the warm attach back; three CPU laps: cold release follows, bodies stay '
                                        'within Ready Fighters + 1, no declined press, no Reload or teardown, at most Ready Fighters after.'),
+    ('a1-regress7', M, 'a1_regress7', 9, 'The same at Ready Fighters 7 with the Mii in the laps: two lane fighters do not fit, so the laps after the keep need cold presses (demand), which af-49c90e9c-x1 declined.'),
     ('a1-kirby', M, 'a1_kirby', 7, 'r6: Kirby alone in his window, kept by the forced Reload, then the warm return at cell 0.'),
     ('a1-kirby-copy', M, 'a1_kirby_copy', 6, "r7: Ready Fighters 10, the P1 lane settled, Kirby with a hat: the press to Palutena takes the gated "
                                              "Reload; Kirby's window and Palutena's group go; the other Built groups are kept."),
     ('a1-mii', M, 'a1_mii', 7, 'Ready Fighters 10: the Mii Gunner window (not the cold fighter) kept across the forced Reload, then warm-attached again.'),
     ('a1-pair', M, 'a1_pair', 9, 'Ready Fighters 10, CPU Solo Popo Off: the Ice Climbers pair window (Popo and Nana) kept, then its warm return.'),
+    ('a1-paircontrol', M, 'a1_paircontrol', 5, 'Control for a1-pair: the pair as a planner-built group (never a kept window), Pichu to Popo: warm, ready, no fallback.'),
     ('a1-restore', M, 'a1_restore', 3, 'The knob off, the remembered values back, Mario / Mario.'),
 ]
 
