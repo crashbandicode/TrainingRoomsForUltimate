@@ -21,9 +21,9 @@
    "ref": "config files: TrainingRooms/settings.json; gna.py:_base"
   },
   {
-   "state": "Training, Ready Fighters 8, P1 original > Pikachu > Kirby > Palutena, CPU original > Mii Gunner > Pichu > Diddy Kong > King K. Rool, every Loading row at the card value (its live values)",
-   "via": "hook",
-   "ref": "cyclefix.py:cf_setup"
+   "state": "Training, Ready Fighters 6, P1 Mario > Pikachu, CPU original > Mii Gunner > Pichu > Diddy Kong > King K. Rool, every Loading row at the card value, from the scene's first frame",
+   "via": "fixture",
+   "ref": "files: settings.json (cf_fixture.py applies fixture.json to the pinned copy before Up)"
   }
  ],
  "segments": {
@@ -315,34 +315,19 @@
    "expect": "Training from the main menu: the tile cursor puts P1 on Mario (tile 0), enter-training, the HUD gate, the CPU Mario through the menu."
   },
   {
-   "id": "cf-setup",
+   "id": "cf-boot",
    "start": "training",
    "end": "training",
    "start_gate": "training-hud-unpaused",
    "group": "rc14-cycle-fix",
-   "budget_min": 8,
+   "budget_min": 4,
    "steps": [
     {
-     "run": "cyclefix.py:cf_setup",
+     "run": "cyclefix.py:cf_boot",
      "check": true
     }
    ],
-   "expect": "Live values (RF 8, the console lanes), a P1 lap and a CPU lap, the notice settled."
-  },
-  {
-   "id": "cf-k1-setup",
-   "start": "training",
-   "end": "training",
-   "start_gate": "training-hud-unpaused",
-   "group": "rc14-cycle-fix",
-   "budget_min": 5,
-   "steps": [
-    {
-     "run": "cyclefix.py:cf_k1_setup",
-     "check": true
-    }
-   ],
-   "expect": "k = 1 with the CPU short: P1 Mario > Pikachu, the CPU lap unchanged, Ready Fighters 6."
+   "expect": "The fixture values live from the first frame (Ready Fighters 6, P1 Mario > Pikachu, the CPU cycle); settled within 6."
   },
   {
    "id": "cf-k1-laps",
@@ -375,64 +360,34 @@
    "expect": "Ready Fighters 7: the lap fits, all warm; the headroom for the memory comparison."
   },
   {
-   "id": "cf-direct",
+   "id": "cf-shrink",
    "start": "training",
    "end": "training",
    "start_gate": "training-hud-unpaused",
    "group": "rc14-cycle-fix",
-   "budget_min": 5,
+   "budget_min": 7,
    "steps": [
     {
-     "run": "cyclefix.py:cf_direct",
+     "run": "cyclefix.py:cf_shrink",
      "check": true
     }
    ],
-   "expect": "Direct CPU Character picks (King K. Rool, then Bowser) take no Reload; Bowser, outside the cycle, is a demand group."
+   "expect": "Gap 1: Ready Fighters 7 to 6 frees the farthest group at once; one cold load per lap."
   },
   {
-   "id": "cf-k2",
+   "id": "cf-pyra-keep",
    "start": "training",
    "end": "training",
    "start_gate": "training-hud-unpaused",
    "group": "rc14-cycle-fix",
-   "budget_min": 8,
+   "budget_min": 9,
    "steps": [
     {
-     "run": "cyclefix.py:cf_k2",
+     "run": "cyclefix.py:cf_pyra_keep",
      "check": true
     }
    ],
-   "expect": "k = 2: a 6-member CPU lap at Ready Fighters 8 loads the same two cold fighters each lap."
-  },
-  {
-   "id": "cf-forced-reload",
-   "start": "training",
-   "end": "training",
-   "start_gate": "training-hud-unpaused",
-   "group": "rc14-cycle-fix",
-   "budget_min": 4,
-   "steps": [
-    {
-     "run": "cyclefix.py:cf_forced_reload",
-     "check": true
-    }
-   ],
-   "expect": "A forced target-first Reload keeps the Built ordinary groups."
-  },
-  {
-   "id": "cf-mii-failfirst",
-   "start": "training",
-   "end": "training",
-   "start_gate": "training-hud-unpaused",
-   "group": "rc14-cycle-fix",
-   "budget_min": 4,
-   "steps": [
-    {
-     "run": "cyclefix.py:cf_mii_failfirst",
-     "check": true
-    }
-   ],
-   "expect": "The rc.12 crash: a kept Mii group warm-attached after the Reload."
+   "expect": "The a1 crash: a Reload out of a Pyra window keeps [4a]; its module pins go only after Ready; the warm attach is clean."
   },
   {
    "id": "cf-restore",

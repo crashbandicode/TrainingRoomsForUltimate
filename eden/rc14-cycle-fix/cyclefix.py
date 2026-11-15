@@ -405,6 +405,27 @@ def cf_boot(ctx):
     return _finish(ctx, 'cf-boot', out, problems)
 
 
+def _status_after(ctx, seq, after, cap):
+    """The first `[PreloadStatus] state=` line after the first line matching `after` (both since `seq`, by #seq), waited
+    for at most `cap` seconds after that line is seen; None when either is missing."""
+    marker = re.compile(after)
+    deadline = None
+    while True:
+        ctx.check_stop()
+        lines = hs.diag_since(ctx, seq)
+        at = next((s for s, _, t in lines if marker.search(t)), None)
+        if at is not None:
+            found = next((t[:300] for s, _, t in lines if s > at and '[PreloadStatus] state=' in t), None)
+            if found:
+                return found
+            deadline = deadline or time.monotonic() + cap
+        elif deadline is None:
+            deadline = time.monotonic() + 30.0
+        if time.monotonic() > deadline:
+            return None
+        time.sleep(0.25)
+
+
 def cf_shrink(ctx):
     """Gap 1: Ready Fighters back from 7 (everything resident, cf-k1-fits) to 6: the farthest group leaves at once
     (`[GroupSwap] shrink`), the notice settles within 6, and the next two laps each load the same one cold fighter."""
@@ -412,14 +433,17 @@ def cf_shrink(ctx):
     seq = hs.diag_mark(ctx)
     fx._live_set(ctx, cycle_preload_ready_fighters=fs.RF(6))
     out['shrink'] = fs._line(ctx, seq, r'\[GroupSwap\] shrink owner=', 30)
-    out['settle'] = fs._settled(ctx, seq, 120)
+    out['freed'] = fs._line(ctx, seq, r'\[GroupSwap\] frees now owner=1 .*freed=true', 10)
+    # The primary 2026-11-15 ~00:25Z (cf-p5-x1 read the status line printed in the shrink's own tick, before the leave):
+    # only the first status line after the `frees now … freed=true` line counts, within 5 s, and it must read Ready 6/6.
+    out['status_after'] = _status_after(ctx, seq, r'\[GroupSwap\] frees now owner=1 .*freed=true', 5.0)
     presses = _lap(ctx, out, 'shrunk', 3, 1.5, 20)
     out['shrunk_cold'], problems = _judge(presses, len(CPU_LANE) + 1)
     _mark(t0, out, 'done')
-    if not out['shrink']:
-        problems.append('no shrink line after Ready Fighters dropped to 6')
-    if not out['settle'] or (out['settle'].get('planned') or 99) > 6:
-        problems.append('not settled within Ready Fighters 6: %s' % out['settle'])
+    if not out['shrink'] or not out['freed']:
+        problems.append('no shrink and free after Ready Fighters dropped to 6: %s %s' % (out['shrink'], out['freed']))
+    if not out['status_after'] or 'text="Ready 6/6"' not in out['status_after']:
+        problems.append('the first status after the free is not Ready 6/6: %s' % out['status_after'])
     if any(len(c) != 1 for c in out['shrunk_cold']):
         problems.append('not one cold load per lap: %s' % out['shrunk_cold'])
     return _finish(ctx, 'cf-shrink', out, problems)
