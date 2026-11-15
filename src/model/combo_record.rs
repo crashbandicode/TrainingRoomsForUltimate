@@ -25,6 +25,31 @@ pub const DIR: &str = "combos";
 pub const MAX_FILE_NAME_CHARS: usize = 64;
 
 pub type ComboLibrary = Store<ComboRecord>;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnitKind {
+    Link,
+    Step,
+}
+impl UnitKind {
+    pub fn singular(self) -> &'static str {
+        match self {
+            Self::Link => "link",
+            Self::Step => "step",
+        }
+    }
+    pub fn plural(self) -> &'static str {
+        match self {
+            Self::Link => "links",
+            Self::Step => "steps",
+        }
+    }
+    pub fn name_prefix(self) -> &'static str {
+        match self {
+            Self::Link => "Combo",
+            Self::Step => "Drill",
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum ComboError {
@@ -64,7 +89,12 @@ pub struct ComboRecord {
 impl PartialEq for ComboRecord {
     fn eq(&self, other: &Self) -> bool {
         (&self.name, &self.combo, &self.recorded_on, &self.made_from)
-            == (&other.name, &other.combo, &other.recorded_on, &other.made_from)
+            == (
+                &other.name,
+                &other.combo,
+                &other.recorded_on,
+                &other.made_from,
+            )
     }
 }
 
@@ -115,6 +145,49 @@ fn shown_name(text: &str) -> Option<String> {
 }
 
 impl ComboRecord {
+    pub fn unit_kind(&self) -> UnitKind {
+        if self.combo.input_only {
+            UnitKind::Step
+        } else {
+            UnitKind::Link
+        }
+    }
+    pub fn unit_count(&self) -> u32 {
+        self.combo.len() as u32
+    }
+    pub fn crop_units(&self, start: u32, end: u32) -> Result<Self, ComboError> {
+        if start >= end || end > self.unit_count() {
+            return Err(ComboError::Invalid("crop units"));
+        }
+        let mut combo = Combo::from_links(
+            self.combo
+                .links()
+                .skip(start as usize)
+                .take((end - start) as usize)
+                .copied(),
+        )
+        .unwrap();
+        combo.input_only = self.combo.input_only;
+        if combo.input_only {
+            let origin = combo.get(0).unwrap().events().next().unwrap().offset;
+            let links = combo
+                .links()
+                .map(|l| {
+                    let mut l = *l;
+                    for e in l.events.iter_mut().flatten() {
+                        e.offset -= origin;
+                    }
+                    l
+                })
+                .collect::<Vec<_>>();
+            combo = Combo::from_links(links).unwrap();
+            combo.input_only = true;
+        }
+        let mut record = Self::new(self.name.clone(), combo, self.recorded_on.clone());
+        record.made_from = self.made_from.clone();
+        Ok(record)
+    }
+
     /// A combo the plugin saves now (no file yet).
     pub fn new(name: String, combo: Combo, recorded_on: Option<String>) -> Self {
         ComboRecord {
@@ -144,11 +217,27 @@ impl ComboRecord {
     }
 
     fn to_value(&self) -> Value {
+        let version = if self.combo.input_only {
+            2
+        } else {
+            SCHEMA_VERSION
+        };
         if let Some(source) = &self.source {
             let mut object = source.clone();
-            object.insert("schema_version".into(), json!(SCHEMA_VERSION));
+            object.insert("schema_version".into(), json!(version));
             object.insert("name".into(), json!(self.name));
             return Value::Object(object);
+        }
+        if self.combo.input_only {
+            let mut value = json!({"schema_version": 2, "kind": "input_drill", "name": self.name,
+                "input_steps": self.combo.links().map(|l| json!({"events": l.events().map(event_value).collect::<Vec<_>>()})).collect::<Vec<_>>() });
+            if let Some(f) = &self.recorded_on {
+                value["recorded_on"] = json!(f);
+            }
+            if let Some(f) = &self.made_from {
+                value["made_from"] = json!(f);
+            }
+            return value;
         }
         let links: Vec<Value> = self
             .combo
@@ -202,7 +291,7 @@ impl ComboRecord {
         let object = value.as_object().ok_or("not an object")?;
         match object.get("schema_version") {
             None => {}
-            Some(version) if version.as_u64() == Some(u64::from(SCHEMA_VERSION)) => {}
+            Some(version) if matches!(version.as_u64(), Some(1 | 2)) => {}
             Some(_) => return Err("schema_version"),
         }
         let name = match object.get("name") {
@@ -214,7 +303,52 @@ impl ComboRecord {
             .get("recorded_on")
             .and_then(Value::as_str)
             .and_then(shown_name);
-        let made_from = object.get("made_from").and_then(Value::as_str).and_then(shown_name);
+        let made_from = object
+            .get("made_from")
+            .and_then(Value::as_str)
+            .and_then(shown_name);
+        if object.get("schema_version").and_then(Value::as_u64) == Some(2) {
+            if object.get("kind").and_then(Value::as_str) != Some("input_drill") {
+                return Err("kind");
+            }
+            let steps = object
+                .get("input_steps")
+                .and_then(Value::as_array)
+                .ok_or("input_steps")?;
+            let mut links = Vec::new();
+            let mut previous = 0;
+            for step in steps {
+                let events = step
+                    .get("events")
+                    .and_then(Value::as_array)
+                    .ok_or("events")?;
+                if events.is_empty() || events.len() > STEPS {
+                    return Err("events");
+                }
+                let mut link = LinkRec::INPUT;
+                for (slot, e) in link.events.iter_mut().zip(events) {
+                    let e = parse_event(e.as_object().ok_or("event")?)?;
+                    if e.offset < previous {
+                        return Err("offset");
+                    }
+                    previous = e.offset;
+                    *slot = Some(e);
+                }
+                links.push(link);
+            }
+            let mut combo = Combo::from_links(links).ok_or("input_steps")?;
+            combo.input_only = true;
+            if combo.get(0).unwrap().events().next().unwrap().offset != 0 {
+                return Err("offset");
+            }
+            return Ok(Self {
+                name,
+                combo,
+                recorded_on,
+                made_from,
+                source: Some(object.clone()),
+            });
+        }
         let links = object
             .get("links")
             .and_then(Value::as_array)
@@ -320,7 +454,10 @@ fn link_of(value: &Value) -> Result<LinkRec, &'static str> {
         events,
         presses_only,
         drift,
-        spot: o.get("spot").and_then(Value::as_str).and_then(Spot::from_key),
+        spot: o
+            .get("spot")
+            .and_then(Value::as_str)
+            .and_then(Spot::from_key),
     })
 }
 
@@ -461,7 +598,7 @@ impl<'de> Deserialize<'de> for ComboRecord {
 impl Record for ComboRecord {
     type Error = ComboError;
     type Summary = ComboEntry;
-    const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION];
+    const SCHEMA_VERSIONS: &'static [u32] = &[1, 2];
     const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;
 
     fn validate(&self) -> Result<(), ComboError> {
@@ -511,7 +648,10 @@ pub fn skipped_note(skipped: &[SkippedFile]) -> Option<String> {
 
 /// "Combo N" with the lowest N no entry uses (SPEC-input-07 §5).
 pub fn default_name(entries: &[ComboEntry]) -> String {
-    super::store::lowest_free(|n| format!("Combo {n}"), entries.iter().map(|e| e.name.as_str()))
+    super::store::lowest_free(
+        |n| format!("Combo {n}"),
+        entries.iter().map(|e| e.name.as_str()),
+    )
 }
 
 /// A typed name, trimmed; `None` when nothing is left.

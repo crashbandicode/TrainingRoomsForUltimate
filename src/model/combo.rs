@@ -2,11 +2,11 @@
 //! strip links, kept as combos; a saved reference; and each attempt graded link by link against it. Pure and
 //! allocation-free: it steps once per frame right after the strip's tracker (`model::frame_strip`), on fixed arrays.
 
-use super::spots::Spot;
 use super::frame_strip::{
     bin_stick, stick_axis, Button, Link, Move, Snap, Tracker, Verdict, CSTICK_ON, DASH_FLICK_X,
     DASH_STICK_X, DIVE_CONT, DIVE_FLICK, FLICK_JUMP, JUMP_FLICK_Y, JUMP_STICK_Y, PRESS_BITS,
 };
+use super::spots::Spot;
 
 /// A name the menu shows (the target, the draft): `Copy`, 48 characters at most, cut at a character boundary.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -176,6 +176,16 @@ pub struct LinkRec {
 }
 
 impl LinkRec {
+    pub const INPUT: Self = Self {
+        from: Move::Other,
+        to: Move::Other,
+        verdict: Verdict::Drop(0),
+        window: None,
+        events: [None; STEPS],
+        presses_only: false,
+        drift: None,
+        spot: None,
+    };
     /// The follow-up's events from the tracker's snaps in `(after, hit]`. The first 12 are kept.
     pub fn of(link: &Link, tracker: &Tracker, after: u32) -> LinkRec {
         let a1 = link.actionable as i32;
@@ -234,6 +244,7 @@ impl LinkRec {
 /// The links of one exchange, in order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Combo {
+    pub input_only: bool,
     links: [Option<LinkRec>; LINKS],
     len: usize,
 }
@@ -246,6 +257,7 @@ impl Default for Combo {
 
 impl Combo {
     pub const EMPTY: Combo = Combo {
+        input_only: false,
         links: [None; LINKS],
         len: 0,
     };
@@ -300,6 +312,7 @@ pub enum Mark {
 /// One attempted link against its reference link.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Grade {
+    pub input_only: bool,
     /// The attempt's own link, and the reference link it was graded against.
     pub link: LinkRec,
     pub reference: LinkRec,
@@ -315,7 +328,7 @@ pub struct Grade {
 impl Grade {
     /// TRUE and the right move (SPEC-input-07 §3).
     pub fn is_true(&self) -> bool {
-        self.link.is_true() && !self.wrong_move
+        !self.input_only && self.link.is_true() && !self.wrong_move
     }
 
     pub fn missing(&self) -> Option<usize> {
@@ -356,6 +369,10 @@ impl Grade {
 /// and the old aim. Any other reference matches the next event of the same kind; a different direction is
 /// [`Mark::WrongDir`] and is not skipped. A reference release the attempt has no match for is not graded (rc.12).
 pub fn grade(reference: &LinkRec, attempt: &LinkRec) -> Grade {
+    grade_mode(reference, attempt, false)
+}
+
+fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool) -> Grade {
     let mut used = [false; STEPS];
     let mut marks = [None; STEPS];
     let mut from = 0;
@@ -368,7 +385,7 @@ pub fn grade(reference: &LinkRec, attempt: &LinkRec) -> Grade {
         });
         // rc.12: the follow-up's events end at its hit, so a button still held when the hit lands has no release here.
         // Holding it longer does not change the move that came out: a release with no counterpart is not graded.
-        if found.is_none() && matches!(want.kind, Kind::Release(_)) {
+        if !input_only && found.is_none() && matches!(want.kind, Kind::Release(_)) {
             continue;
         }
         *mark = Some(match found {
@@ -389,12 +406,16 @@ pub fn grade(reference: &LinkRec, attempt: &LinkRec) -> Grade {
         .filter(|&i| attempt.events[i].is_some() && !used[i])
         .count() as u8;
     Grade {
+        input_only,
         link: *attempt,
         reference: *reference,
-        wrong_move: attempt.to != reference.to,
+        wrong_move: !input_only && attempt.to != reference.to,
         marks,
         extra,
-        wrong_spot: reference.spot.is_some_and(|saved| attempt.spot != Some(saved)),
+        wrong_spot: (!input_only)
+            .then_some(reference.spot)
+            .flatten()
+            .is_some_and(|saved| attempt.spot != Some(saved)),
     }
 }
 
@@ -563,6 +584,7 @@ pub struct Helper {
     best: u8,
     pending_load: bool,
     settings: Settings,
+    input: InputCapture,
 }
 
 impl Helper {
@@ -584,12 +606,14 @@ impl Helper {
             best: 0,
             pending_load: false,
             settings: Settings::factory(),
+            input: InputCapture::new(),
         }
     }
 
     /// A new target (or none): the attempt and the history start over.
     pub fn set_target(&mut self, target: Option<Combo>) {
         self.target = target;
+        self.input = InputCapture::new();
         self.attempt = None;
         self.results = [None; RESULTS];
         self.streak = 0;
@@ -672,9 +696,12 @@ impl Helper {
             self.on_clear(&mut out);
         }
         self.capture.frame = tracker.frame();
+        let input_only = self.target.is_some_and(|t| t.input_only);
         let (exchange, first_hit) = tracker.exchange();
         if exchange != self.capture.exchange {
-            self.resolve_open(Outcome::Stopped, &mut out);
+            if !input_only {
+                self.resolve_open(Outcome::Stopped, &mut out);
+            }
             if !self.capture.current.is_empty() {
                 self.capture.previous = self.capture.current;
             }
@@ -693,7 +720,19 @@ impl Helper {
             let first = self.capture.current.is_empty();
             self.capture.current.push(rec);
             self.seen = self.seen.wrapping_add(1);
-            self.on_link(rec, first, exchange, &mut out);
+            if !input_only {
+                self.on_link(rec, first, exchange, &mut out);
+            }
+        }
+        if input_only {
+            if let Some(snap) = tracker.snaps().last() {
+                self.step_inputs(snap, &mut out);
+            }
+            if self.pending_load {
+                self.pending_load = false;
+                out.load = true;
+            }
+            return out;
         }
         if !tracker.exchange_open() {
             self.resolve_open(Outcome::Stopped, &mut out);
@@ -705,9 +744,59 @@ impl Helper {
         out
     }
 
+    fn step_inputs(&mut self, snap: Snap, out: &mut Out) {
+        if !self.settings.on {
+            return;
+        }
+        if self.attempt.is_some_and(|a| !a.open())
+            && self
+                .input
+                .last
+                .is_some_and(|last| snap.frame.saturating_sub(last) > super::frame_strip::DROP_MAX)
+        {
+            self.input.restart();
+            self.attempt = None;
+        }
+        self.input.step_mode(snap, false);
+        let Some(start) = self.input.first else {
+            return;
+        };
+        if self.attempt.is_none() {
+            self.attempt = Some(Attempt {
+                exchange: start,
+                grades: [None; LINKS],
+                len: 0,
+                summary: None,
+                junction: false,
+            });
+        }
+        while let Some(attempt) = self.attempt.filter(Attempt::open) {
+            let reference = self.target.unwrap().get(attempt.len).copied().unwrap();
+            let deadline =
+                reference.events().last().unwrap().offset + i32::from(self.settings.tolerance);
+            if (snap.frame - start) < deadline as u32 {
+                break;
+            }
+            let actual = self
+                .input
+                .combo
+                .get(attempt.len)
+                .copied()
+                .unwrap_or(LinkRec::INPUT);
+            self.on_link(actual, false, start, out);
+            if self
+                .attempt
+                .is_some_and(|a| a.open() && a.len == self.input.combo.len())
+            {
+                self.input.combo.push(LinkRec::INPUT);
+            }
+        }
+    }
+
     fn on_clear(&mut self, out: &mut Out) {
         self.resolve_open(Outcome::Cleared, out);
         self.pending_load = false;
+        self.input = InputCapture::new();
         if !self.capture.current.is_empty() {
             self.capture.previous = self.capture.current;
         }
@@ -759,11 +848,11 @@ impl Helper {
         let Some(reference) = target.get(attempt.len) else {
             return;
         };
-        let g = grade(reference, &rec);
+        let g = grade_mode(reference, &rec, target.input_only);
         attempt.grades[attempt.len] = Some(g);
         out.link = Some((attempt.len, g));
         attempt.len += 1;
-        if attempt.len == target.len() {
+        if attempt.len == target.len() || (target.input_only && !g.clean(self.settings.tolerance)) {
             self.resolve_open(Outcome::Completed, out);
         }
     }
@@ -822,7 +911,13 @@ fn off_reason(event: Event, delta: i32) -> Reason {
     }
 }
 
-fn summarize(attempt: &Attempt, total: usize, outcome: Outcome, tolerance: u8, match_spot: bool) -> Summary {
+fn summarize(
+    attempt: &Attempt,
+    total: usize,
+    outcome: Outcome,
+    tolerance: u8,
+    match_spot: bool,
+) -> Summary {
     let grades = || attempt.grades().enumerate();
     let event = |g: &Grade, step: usize| g.reference.events[step];
     let wrong_move = grades()
@@ -846,7 +941,15 @@ fn summarize(attempt: &Attempt, total: usize, outcome: Outcome, tolerance: u8, m
             Some((i as u8, Reason::WrongSpot(g.link.spot, saved)))
         })
     };
-    let true_links = grades().filter(|(_, g)| g.is_true()).count() as u8;
+    let true_links = grades()
+        .filter(|(_, g)| {
+            if g.input_only {
+                g.clean(tolerance)
+            } else {
+                g.is_true()
+            }
+        })
+        .count() as u8;
     let clean = outcome == Outcome::Completed
         && grades().all(|(_, g)| g.clean(tolerance) && !(match_spot && g.wrong_spot));
     Summary {
@@ -855,7 +958,11 @@ fn summarize(attempt: &Attempt, total: usize, outcome: Outcome, tolerance: u8, m
         true_links,
         total: total as u8,
         clean,
-        fault: wrong_move.or_else(wrong_spot).or_else(missing).or_else(wrong_dir).or_else(off),
+        fault: wrong_move
+            .or_else(wrong_spot)
+            .or_else(missing)
+            .or_else(wrong_dir)
+            .or_else(off),
     }
 }
 
@@ -1062,3 +1169,76 @@ fn modal_drift(counts: &[u8; 8], order: &[u8; 8], seen: usize) -> Option<Dir> {
 #[cfg(test)]
 #[path = "combo_tests.rs"]
 mod tests;
+
+/// Conversion accumulator shared by Record/Make and the input mode of the same attempt engine.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InputCapture {
+    pub combo: Combo,
+    pub overflow: bool,
+    prev: Option<Snap>,
+    first: Option<u32>,
+    last: Option<u32>,
+}
+impl InputCapture {
+    pub const fn new() -> Self {
+        Self {
+            combo: Combo {
+                input_only: true,
+                ..Combo::EMPTY
+            },
+            overflow: false,
+            prev: None,
+            first: None,
+            last: None,
+        }
+    }
+    fn restart(&mut self) {
+        *self = Self {
+            prev: self.prev,
+            ..Self::new()
+        };
+    }
+    pub fn step(&mut self, snap: Snap) {
+        self.step_mode(snap, true);
+    }
+    fn step_mode(&mut self, snap: Snap, group_idle: bool) {
+        let mut edges = [None; STEPS];
+        let mut count = 0;
+        push_edges(&mut edges, &mut count, self.prev, snap);
+        self.prev = Some(snap);
+        for event in edges.into_iter().flatten() {
+            let start = *self.first.get_or_insert(event.frame);
+            let full = self
+                .combo
+                .links()
+                .last()
+                .is_none_or(|l| l.events().count() == STEPS);
+            if (full
+                || (group_idle
+                    && self
+                        .last
+                        .is_some_and(|last| event.frame - last > super::frame_strip::DROP_MAX)))
+                && !self.combo.push(LinkRec::INPUT)
+            {
+                self.overflow = true;
+                return;
+            }
+            let link = self.combo.links[self.combo.len - 1].as_mut().unwrap();
+            *link.events.iter_mut().find(|e| e.is_none()).unwrap() = Some(Event {
+                kind: event.kind,
+                dir: event.dir,
+                offset: (event.frame - start) as i32,
+            });
+            self.last = Some(event.frame);
+        }
+    }
+}
+impl Default for InputCapture {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+#[path = "input_drill_tests.rs"]
+mod input_drill_tests;
