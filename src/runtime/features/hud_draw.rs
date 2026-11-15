@@ -111,7 +111,7 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
         (c.notice as *mut Pane, c.strip, c.bar)
     };
     let owners = published::input_owners();
-    let menu_open = owners.covers_strip();
+    let menu_open = owners.covers_hud();
     let strip_shown = !menu_open && input_display::sampling();
     write_notice(notice, &notices::hud_tick(!waiting && !notice.is_null()), strip_shown);
     if strip[iv::at::CONTAINER] != 0 {

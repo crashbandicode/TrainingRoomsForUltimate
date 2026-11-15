@@ -229,7 +229,7 @@ More: [Frame strip › ADVANTAGE](../guide/frame-strip.md#advantage)
 
 Frame strip draws the last second of frames at the top of the screen: your presses, your frames and the CPU's, how
 each follow-up linked, and the frame advantage. It works in Training and in waiting-room practice. It steps aside while
-a menu is open, the waiting room's own menu included, and comes back when the menu closes.
+a menu or the clip editor is open, the waiting room's own menu included, and comes back when it closes. The combo or drill helper bar steps aside with it.
 
 - **Values:** Off, Frame strip
 - **Default:** Frame strip

@@ -224,7 +224,7 @@ controller:
 | A | Names and saves the kept part as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays. |
 | B | Leaves. |
 
-Crop on a macro, combo or drill opens this same editor. A one-side file has no fighter-selection row. Combos and drills have no preview button.
+Crop on a macro, combo or drill opens this same editor. A one-side file has no fighter-selection row. Combos and drills have no preview button. The frame strip and helper bar step aside until you leave the editor, including after preview or save.
 
 ![Moving a macro's start handle from frame 0 to 180 keeps the final 134 frames](../media/rc15-crop-editor.gif)<br>
 *Macro Crop, Eden, 2026-11-15, rc.15 d520d325 (untested on hardware). L selects the start handle; Left/Right moves it. This clip shows range selection.*

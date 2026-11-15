@@ -23,7 +23,7 @@ the lanes. On the right, three readouts say who could act first after the last h
 follow-up was a true combo (LINK), and how the press was timed (INPUT). A LAST row under the lanes keeps the last four
 follow-ups. The clips on this page are listed in [MEDIA.md](../MEDIA.md).
 
-- **It hides** while the TrainingRooms menu, the recording pop-up, the Fighter Mismatch question, the game's pause menu
+- **It hides**, along with the combo or drill helper bar, while the clip editor, the TrainingRooms menu, the recording pop-up, the Fighter Mismatch question, the game's pause menu
   or the waiting room's own menu is open, while Input Display is Off, and outside Training and lobby practice.
 - **It clears** when the scene changes, when you hot-swap, when a save state loads, and when Training resets or
   replaces a fighter. The frames from before that did not happen.

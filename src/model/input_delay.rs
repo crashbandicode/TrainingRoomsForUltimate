@@ -137,10 +137,15 @@ impl Owners {
         self.0 & !(Self::STOP_CHORD.0 | Self::REPLAY_LOADING.0) != 0
     }
 
-    /// What hides the frame strip and the combo bar (docs/FRAME-STRIP.md): the plugin's menu, the game's pause menu, or
+    /// Menu coverage shared with gameplay clocks/camera: the plugin's menu, the game's pause menu, or
     /// the waiting room's own menu (Leave Battle, Training Partners, Behavior), which the strip drew over before rc.11.
     pub const fn covers_strip(self) -> bool {
         self.0 & (Self::MENU.0 | Self::VANILLA_PAUSE.0 | Self::NATIVE_UI_BUSY.0) != 0
+    }
+
+    /// Shared HUD visibility, including the clip editor. Gameplay clocks and camera keep their existing menu rule.
+    pub const fn covers_hud(self) -> bool {
+        self.covers_strip() || self.contains(Self::REPLAY_EDITOR)
     }
 }
 

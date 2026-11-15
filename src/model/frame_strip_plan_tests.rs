@@ -64,6 +64,57 @@ fn hidden_writes_only_the_container_once_and_showing_again_writes_only_it() {
     assert_eq!((n, seen[0].0), (1, at::CONTAINER), "nothing else changed while hidden");
 }
 
+#[test]
+fn clip_editor_hides_and_restores_both_hud_renderers() {
+    use crate::model::{combo, combo_plan, frame_strip::Button, input_delay::Owners, flow::{self, Phase, Seen, Step}};
+
+    for bits in 0..64 {
+        let owners = Owners::from_bits(bits);
+        assert_eq!(owners.covers_hud(), owners.covers_strip() || owners.contains(Owners::REPLAY_EDITOR));
+    }
+    assert!(!Owners::REPLAY_EDITOR.covers_strip(), "keep gameplay clocks and camera unchanged");
+    for input_only in [false, true] {
+        for entry in [Phase::Menu, Phase::Panel] {
+            let tracker = true_combo();
+            let link = combo::LinkRec::presses(Move::Jab, Move::UpTilt, Verdict::True(None), None,
+                &[combo::Event::press(Button::Attack, combo::Aim::Neutral, 0)]);
+            let mut target = combo::Combo::from_links([link]).unwrap();
+            target.input_only = input_only;
+            let mut helper = combo::Helper::new();
+            helper.set_target(Some(target));
+            helper.step(&tracker, combo::Settings { on: true, ..combo::Settings::factory() });
+            let mut strip = Renderer::new();
+            let mut bar = combo_plan::Renderer::new();
+            let mut visible = [false; 2];
+            let mut draw = |owners: Owners| {
+                let shown = !owners.covers_hud();
+                strip.draw(&tracker, shown, |i, look, _| {
+                    if i == at::CONTAINER { visible[0] = look.visible; }
+                });
+                bar.draw(&helper, &Text::new("Target"), None, shown, |i, look, _| {
+                    if i == combo_plan::at::CONTAINER { visible[1] = look.visible; }
+                });
+                visible
+            };
+            assert_eq!(draw(Owners::NONE), [true; 2]);
+            let clip = Seen { menu_open: true, panel_visible: true, clip_visible: true,
+                clip_foreground: true, prompt_visible: false };
+            let (phase, step) = flow::next(entry, clip);
+            assert_eq!((phase, step), (Phase::Clip, Step::HandOverToClip));
+            // sync_owner retains REPLAY_EDITOR while the editor exists, even after the menu drops.
+            assert_eq!(draw(Owners::REPLAY_EDITOR), [false; 2]);
+            // Saving opens the keyboard without closing the clip; neither HUD may redraw over it on return.
+            let naming = Seen { menu_open: false, clip_foreground: false, ..clip };
+            assert_eq!(flow::next(phase, naming), (Phase::Clip, Step::Nothing));
+            assert_eq!(draw(Owners::REPLAY_EDITOR), [false; 2]);
+            assert_eq!(flow::next(phase, Seen { clip_foreground: true, ..naming }), (Phase::Clip, Step::Nothing));
+            assert_eq!(draw(Owners::REPLAY_EDITOR), [false; 2]);
+            assert_eq!(flow::next(phase, Seen::default()), (Phase::Menu, Step::HideClip));
+            assert_eq!(draw(Owners::NONE), [true; 2], "B/close restores both cached containers");
+        }
+    }
+}
+
 fn input_lines() {
     let base = true_combo().latest_link().unwrap();
     let mut l = base;
