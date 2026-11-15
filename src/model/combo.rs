@@ -1204,7 +1204,10 @@ impl InputCapture {
     pub fn step(&mut self, snap: Snap) {
         self.step_mode(snap, true);
     }
-    fn step_mode(&mut self, snap: Snap, group_idle: bool) {
+    fn step_mode(&mut self, mut snap: Snap, group_idle: bool) {
+        if stick_axis(snap.lstick_y) < JUMP_STICK_Y {
+            snap.buttons &= !FLICK_JUMP;
+        }
         if self.combo.overflow { return; }
         let mut edges = [None; STEPS];
         let mut count = 0;

@@ -14,6 +14,52 @@ fn run(helper: &mut Helper, until: u32, script: &[(u32,u32)]) {
     }
 }
 #[test]
+fn input_idle_flag_does_not_start_a_drill_or_hide_jump() {
+    // Native rc15-input-drill-1b134e51: neutral 0x8000 produced a phantom Jump
+    // before four real dash inputs. Existing macro capture treats it as idle.
+    assert!(capture(&[(0,FLICK_JUMP),(30,FLICK_JUMP)]).is_empty());
+    let c=capture(&[(0,FLICK_JUMP),(30,FLICK_JUMP|0x4),(32,FLICK_JUMP)]);
+    let events=c.get(0).unwrap().events().collect::<Vec<_>>();
+    assert_eq!(events,vec![Event {kind:Kind::Press(Button::Jump),dir:Dir::Neutral,offset:0},Event {kind:Kind::Release(Button::Jump),dir:Dir::Neutral,offset:2}]);
+    let first_jump=capture(&[(0,FLICK_JUMP|0x4),(2,FLICK_JUMP)]);
+    assert_eq!(first_jump.get(0).unwrap().events().collect::<Vec<_>>(),events);
+    let mut helper=Helper::new(); helper.set_target(Some(c));
+    run(&mut helper,35,&[(0,FLICK_JUMP),(30,FLICK_JUMP|0x4),(32,FLICK_JUMP)]);
+    assert!(helper.results().next().unwrap().clean); assert_eq!((helper.best(),helper.streak()),(1,1));
+    let first=capture(&[(0,FLICK_JUMP|1),(1,FLICK_JUMP)]);
+    assert_eq!(first.get(0).unwrap().events().next().unwrap().kind,Kind::Press(Button::Attack));
+    assert_eq!(first.get(0).unwrap().events().count(),2);
+    let mut tap=InputCapture::new(); tap.step(Snap {buttons:FLICK_JUMP,lstick_y:100,facing:1,..Snap::empty(0)});
+    assert!(tap.combo.get(0).unwrap().events().any(|e| e.kind==Kind::Flick(Flick::TapJump)));
+}
+#[test]
+fn four_dash_fixture_with_native_idle_flag_saves_and_grades_four_steps() {
+    // Same four dash blocks as drill-move.edenmacro.json (0,46,91,137),
+    // preceded by the 95 idle frames observed in the failed native take.
+    let starts=[95,141,186,232];
+    let snapshot=|frame| Snap {
+        buttons:FLICK_JUMP,
+        lstick_x:starts.iter().position(|start| (*start..*start+12).contains(&frame))
+            .map_or(0,|i| if i%2==0 {127} else {-127}),
+        facing:1,
+        ..Snap::empty(frame)
+    };
+    let mut capture=InputCapture::new();
+    for frame in 0..=250 { capture.step(snapshot(frame)); }
+    let drill=capture.combo;
+    assert_eq!(drill.len(),4);
+    assert!(drill.links().all(|link| link.events().count()==1 && link.events().next().unwrap().kind==Kind::Flick(Flick::Dash)));
+    assert_eq!(drill.links().map(|link| link.events().next().unwrap().offset).collect::<Vec<_>>(),vec![0,46,91,137]);
+    let mut helper=Helper::new(); helper.set_target(Some(drill));
+    for frame in 0..=250 {
+        helper.step_inputs(Snap {frame:500+frame,..snapshot(frame)},&mut Out::default());
+    }
+    let result=helper.results().next().unwrap();
+    assert!(result.clean); assert_eq!(result.graded,4);
+    assert_eq!((helper.best(),helper.streak()),(4,1));
+}
+
+#[test]
 fn input_idle_groups_and_continuations_share_combo_bounds() {
     assert_eq!(capture(&[(0,1),(20,0)]).len(),1);
     assert_eq!(capture(&[(0,1),(21,0)]).len(),2);
