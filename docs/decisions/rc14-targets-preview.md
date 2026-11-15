@@ -42,7 +42,19 @@ counts 1/10, 2/10, 3/10. After each counted hit the CPU is put back at a fresh s
 
 ![Eggs-ercise, 10 targets, on the rc.14 build](rc14-preview-eggs-n-targets-v2.gif)
 
-Still to come on this build: Break the Targets placing and a full run (being shot now).
+**Break the Targets, placing:** Practice games › Place targets closes the menu into the zoomed-out placing view. The
+crosshair moves, and A places three targets ("Place targets 3/10"). B removes the last one, and X starts at Ready with
+the two left ("Targets 0/2 0:00.00").
+
+![Break the Targets: placing targets, removing one, and starting](rc14-preview-btt-place-v2.gif)
+
+**Break the Targets, a run:** at Ready the clock reads 0:00.00 and starts on the first input. Three breaks later it stops:
+"Done! 3 in 0:04.73 (best 0:04.73)". Then it's Ready again, with every target back.
+
+![Break the Targets: a full run to Done! and back to Ready](rc14-preview-btt-run-v2.gif)
+
+Coming before release: when the CPU is hidden, its floating "CPU" tag and its HUD panel will be hidden too, and these
+clips will be re-shot. With Target set to CPU, the CPU will fly like the discs.
 
 ## Earlier takes (the draft build)
 
