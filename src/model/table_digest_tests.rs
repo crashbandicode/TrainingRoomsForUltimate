@@ -19,6 +19,9 @@
 //! to 262 (the count the lane's base held was 261), and the site digest with them. spots-3 added `damage_reaction` (the knockback a
 //! defender received): 263; and the Relied `damage_record_layout`, `damage_record_hit_ids` (the record's slot): 265; and the Relied
 //! `damage_record_dealt` (the hit's damage past the damage cap): 266.
+//!
+//! rc.14 wind-articles added the four wind-area commands (`hitbox_area_wind`, `_arg10`, `_rad`, `_rad_arg9`, hooked so an
+//! article's wind area is drawn) to `sites_hitbox`: 266 site rows to 270, and the site digest with them.
 
 use crate::model::sha256::sha256_hex;
 use std::fmt::Write;
@@ -85,8 +88,8 @@ fn every_data_row_has_a_64_byte_guard() {
 
 const SEAM_ROWS: usize = 688;
 const SEAM_DIGEST: &str = "77138f9ec6999107ad65a7ba8a734b6583f9f107059331ca4d371b38bffbe67e";
-const SITE_ROWS: usize = 266;
-const SITE_DIGEST: &str = "8e008c353712f3c32c596fe4961fb17c976a92dadacc7d43923ef438ad9bc07e";
+const SITE_ROWS: usize = 270;
+const SITE_DIGEST: &str = "bf5cc3e12c19cc2d8df3319cb8a4c5747a4ae89131cd1407695e6d4008478ac0";
 const UI_ROWS: usize = 6;
 const UI_DIGEST: &str = "35ddb9f164a3ac26ba2e5c45c35066ee738e796589d58e2c697c82e486567b15";
 const COMMON_ROWS: usize = 4;
