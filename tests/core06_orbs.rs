@@ -338,14 +338,14 @@ fn article_hurtboxes_take_free_slots_and_draw_after_every_other_kind() {
     assert_eq!(articles.tracked(), before, "hurt-only discovery never evicts an attacking object");
     articles.forget(3, &mut board);
     assert!(articles.track(99, 0x990, &mut board, false).is_some());
-    assert!(!*articles.get(99, 0x990).unwrap().1);
+    assert!(!*articles.track(99, 0x990, &mut board, false).unwrap().1);
     articles.track(100, 0x1000, &mut board, true).unwrap().0;
     assert!(!articles.tracked().contains(&(99, 0x990)), "an attack evicts the passive object before an older attacker");
     assert!(articles.tracked().contains(&(1, 16)));
     articles.forget(100, &mut board);
     assert!(articles.track(99, 0x990, &mut board, false).is_some());
     articles.track(99, 0x990, &mut board, true).unwrap().0;
-    assert!(*articles.get(99, 0x990).unwrap().1, "ATTACK promotes an existing passive object");
+    assert!(*articles.track(99, 0x990, &mut board, false).unwrap().1, "ATTACK promotes an existing passive object");
     // One article pill published first: its two endpoints still pair, and every other kind draws before it.
     let hurts = [0, 1].map(|end| sphere(hitbox::sphere_key(hitbox::KIND_ARTICLE_HURT, 0, end), end as f32 * 2.0, 2.0));
     let mut set = HandleSet::new();
