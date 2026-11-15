@@ -1,9 +1,9 @@
 """rc.14 mem-headroom (2026-11-15): the give-back row, one short targeted boot (the primary's grant).
 
 mh_pyra_pause: the operator's Loading settings (Ready Fighters 8, Ready Fighter Bodies 3, Cycle Preload 5, Ready Hats 5)
-and the console's P1 lane (Pikachu > Kirby > Palutena) with Kirby's five hats; P1 on Kirby, so the created helper entries
-fill with his hats (P-HOT §5.1). The CPU's lane is Mii Gunner > Diddy Kong, then Pyra / Mythra joins it (Mii Gunner > Pyra >
-Diddy Kong, a2-pyra-keep-all's lane). The Pyra / Mythra group is held for memory by the helpers' room: when the process
+and P1 Kirby (a lane of Kirby alone) with his five hats; P1 on Kirby, so the created helper entries fill with his hats
+(P-HOT §5.1); a pause frees the groups that left the cycles. The CPU's lane is Mii Gunner > Diddy Kong, then Pyra / Mythra
+joins it (Mii Gunner > Pyra > Diddy Kong, a2-pyra-keep-all's lane), which fits Ready Fighters 8 beside P1's two bodies. The Pyra / Mythra group is held for memory by the helpers' room: when the process
 would still hold it, a diag memory reserve (`diag-memory-reserve.req`, `process_memory::DIAG_RESERVE`) leaves it
 `SHORT` bytes short, a shortfall the idle helpers cover. Pass, in order:
 - the group held for memory (`[GroupSwap] held owner=1 ... kinds=[5a, 5b]`);
@@ -44,6 +44,7 @@ AT_PAUSE = re.compile(r'\[GroupSwap\] give-back at pause marked=(0b[01]+) idle=(
                       r'install=(true|false) retired=(0b[01]+)')
 BUILT = re.compile(r'\[GroupSwap\] background built owner=1 group=\d+ ok=true reason=\S+ kinds=\[5a, 5b\]')
 CENSUS = re.compile(r'\[MemoryCensus\] ')
+PLAN = re.compile(r'\[GroupSwap\] plan owner=1 group=\d+ kinds=\[5a, 5b\]')
 HEADROOM = re.compile(r'headroom=(?:Some\()?(\d+)')
 
 
@@ -81,18 +82,26 @@ def _wait(ctx, seq, regex, cap):
 
 
 def mh_pyra_pause(ctx):
+    fs._remember_original(ctx)
     t0, out = _begin(ctx)
     problems = []
     cf._diag_cycle(ctx, 'off')
     out['unmapped_before'] = _unmapped(ctx)
     seq0 = hs.diag_mark(ctx)
-    # 1. The operator's settings, P1's console lane with Kirby's hats, the CPU without Pyra yet.
-    fx._live_set(ctx, player_roster=fs._roster(cf.P1_LANE), player_kirby_hats=fs._roster(fs.HATS),
+    # 1. The operator's settings, P1 Kirby with his hats (a short P1 lane, so Pyra / Mythra's two bodies fit Ready
+    #    Fighters 8 and are planned, not cold), the CPU without Pyra yet.
+    fx._live_set(ctx, player_roster=fs._roster([fs.KIRBY]), player_kirby_hats=fs._roster(fs.HATS),
                  cpu_roster=fs._roster([fs.GUNNER, fs.DIDDY]), cycle_preload_ready_fighters=fs.RF(8),
                  cycle_preload_bank_members=fs.BODIES['3'], cycle_preload_slots=fs.SLOTS(5),
                  cycle_preload_ready_hats=fs.RH(5))
     out['settle0'] = fs._settled(ctx, seq0, 120)
-    out['to_kirby'] = af._to(ctx, 0, fs.KIRBY, len(cf.P1_LANE) + 2)
+    out['to_kirby'] = af._to(ctx, 0, fs.KIRBY, 4)
+    out['p1_now'] = fs._live_kinds(ctx).get(0)
+    # A pause frees the groups that left the cycles, so the later hold finds no parked group (parked groups go first).
+    steps.press(ctx, 'plus', 3.0)
+    steps.press(ctx, 'plus', 2.0)
+    time.sleep(3.0)
+    out['preclean'] = [t[:200] for t in af._since(ctx, seq0) if '] pause frees ' in t][:6]
     # 2. The created helpers fill with Kirby's hats (up to 90 s for at least two).
     deadline = time.monotonic() + 90
     created = {}
@@ -119,6 +128,7 @@ def mh_pyra_pause(ctx):
     out['held'] = _wait(ctx, seq, HELD, 60)
     out['marked'] = _wait(ctx, seq, MARKED, 30)
     out['notice'] = _wait(ctx, seq, NOTICE, 30)
+    out['plan'] = [t[:240] for t in af._since(ctx, seq) if PLAN.search(t)][:2]
     out['early_build'] = [t[:300] for t in af._since(ctx, seq) if BUILT.search(t)][:1]
     _shot(ctx, out, 'shot_before_pause', 'mh-before-pause')
     if not out['held']:
