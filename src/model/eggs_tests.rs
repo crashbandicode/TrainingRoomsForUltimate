@@ -464,6 +464,111 @@ fn eggs_target_cpu() {
     assert_eq!(off.cpu_pass(0.0, false), None);
 }
 
+/// A run of `mode` under `rule` at `speed` with `target`, the camera held still at `view`.
+fn started_with(mode: u8, rule: u8, speed: u8, target: u8, seed: u32, view: View) -> Run {
+    let mut run = Run::IDLE;
+    assert_eq!(run.plan([mode, rule, speed, target], Some(seed), 0, || TRAINING), Plan::Read);
+    settle(&mut run, view);
+    run
+}
+
+/// Fail-first stand-in for the model's lift (removed with the implementation).
+const LIFT: f32 = 1.0;
+
+/// The operator, 11-15: the CPU target is in the air like the discs. The same seed and camera give the CPU the disc's
+/// launch, drift, apex, bounce and rest at every Target speed; its feet trace the disc's bottom edge.
+fn eggs_cpu_flies_like_the_disc() {
+    let views = [RESET_CENTRE, View([14.0, 14.0], [0.0, -300.0], BOX), View([40.0, 40.0], [0.0, -300.0], BOX)];
+    for (view, speed) in views.into_iter().flat_map(|v| [NORMAL, SLOW, FAST].map(|s| (v, s))) {
+        for seed in 0..20 {
+            let [mut disc, mut cpu] = [DISC, CPU].map(|t| started_with(FREE, ANY, speed, t, seed, view));
+            let mut top = 0.0f32;
+            for tick in 0..300 {
+                pass(&mut disc, &[], false);
+                pass(&mut cpu, &[], false);
+                let (d, c) = (disc.egg_at().unwrap(), cpu.egg_at().unwrap());
+                let same = (c[0] - d[0]).abs() < 1e-4 && (c[1] + RADIUS - d[1]).abs() < 1e-4;
+                assert!(same, "seed {seed} speed {speed} tick {tick}: the CPU at {c:?}, the disc at {d:?}");
+                top = top.max(c[1]);
+            }
+            assert!(top > 10.0, "seed {seed} speed {speed} {view:?}: the CPU's highest point is {top}");
+        }
+    }
+}
+
+/// The CPU target's pass puts it on the moving `egg_at()` every tick: in flight, a point within `LIFT` of the ground is
+/// raised to `LIFT` (the game never lands it mid-flight); at rest, exactly the path's end.
+fn eggs_cpu_pass_follows_the_flight() {
+    for speed in [NORMAL, SLOW, FAST] {
+        let mut run = started_with(FREE, ANY, speed, CPU, 7, RESET_CENTRE);
+        pass(&mut run, &[], false);
+        let ground = run.egg_at().unwrap()[1];
+        let mut top = 0.0f32;
+        for tick in 0..400 {
+            let want = run.egg_at().unwrap();
+            let [v, _, g] = run.fly;
+            let aloft = v > 0.0 && (run.age as f32) < 2.0 * v / g * (1.0 + BOUNCE);
+            let at = run.cpu_pass(0.0, false).expect("held every tick").0;
+            let expect = if aloft { [want[0], want[1].max(ground + LIFT)] } else { want };
+            assert_eq!(at, expect, "speed {speed} tick {tick}");
+            top = top.max(at[1] - ground);
+            pass(&mut run, &[], false);
+        }
+        assert!((top - 21.6).abs() < 0.2, "speed {speed}: the flight's apex {top}, the disc's 21.6");
+        let rest = run.egg_at();
+        assert_eq!(run.cpu_pass(0.0, false).map(|p| p.0), rest, "at rest on the ground");
+        assert_eq!(rest.map(|r| r[1]), Some(ground));
+    }
+}
+
+/// Hits in the air: a counted one breaks the target (the game's hitlag plays, nothing is asked), then the CPU goes to 0%
+/// at the next spot and flies again; an uncounted one puts it back on its flight where it was hit.
+fn eggs_cpu_air_hits() {
+    // Placed, then armed (0% read), 20 ticks into the flight.
+    let fly = |rule: u8| {
+        let mut run = started_with(FREE, rule, NORMAL, CPU, 7, View([14.0, 14.0], [0.0, -300.0], BOX));
+        pass(&mut run, &[], false);
+        let ground = run.egg_at().unwrap()[1];
+        let mut at = [0.0; 2];
+        for _ in 0..20 {
+            at = run.cpu_pass(0.0, false).expect("held").0;
+            pass(&mut run, &[], false);
+        }
+        assert!(at[1] > ground + 10.0, "mid-flight: {at:?}");
+        (run, ground, at)
+    };
+    let (mut run, ground, at) = fly(ANY);
+    assert_eq!(run.cpu_pass(9.0, false), None, "the hit: the game plays it");
+    assert_eq!(run.score, 1, "a hit in the air counts");
+    for _ in 0..6 {
+        pass(&mut run, &[], false);
+        assert_eq!(run.cpu_pass(9.0, true), None, "in hitlag");
+    }
+    let next = run.cpu_pass(9.0, false).expect("the next spot").0;
+    assert!(next[1] <= ground + LIFT && gap(next, at) >= MIN_GAP - RADIUS, "0% at the next spot: {next:?} from {at:?}");
+    let mut top = next[1];
+    for _ in 0..30 {
+        pass(&mut run, &[], false);
+        top = top.max(run.cpu_pass(0.0, false).expect("held").0[1]);
+    }
+    assert!(top > ground + 15.0, "the next spot flies again: {top}");
+    // Aerials, and Player 1 not in an aerial: the hit does not count; after the hitlag the CPU is back where it was hit.
+    let (mut run, _, at) = fly(AERIALS);
+    let before = run.cpu_pass(0.0, false).expect("held").0;
+    assert_eq!(run.cpu_pass(5.0, false), None);
+    for _ in 0..6 {
+        pass(&mut run, &[], false);
+        assert_eq!(run.cpu_pass(5.0, true), None, "in hitlag");
+    }
+    let back = run.cpu_pass(5.0, false).expect("put back").0;
+    assert_eq!((run.score, back), (0, before), "back on its flight where it was hit, not counted (from {at:?})");
+    // In an aerial, the same hit in the air counts.
+    let (mut run, _, _) = fly(AERIALS);
+    pass(&mut run, &[], true);
+    run.cpu_pass(0.0, false);
+    assert_eq!((run.cpu_pass(5.0, false), run.score), (None, 1), "an aerial's hit in the air counts");
+}
+
 /// The notice after one more pass of Player 1.
 fn notice_after(run: &mut Run) -> String {
     pass(run, &[], false);
@@ -831,6 +936,9 @@ fn case_table() {
         ("eggs_stage_range", eggs_stage_range as fn()),
         ("eggs_target_cpu", eggs_target_cpu as fn()),
         ("eggs_target_cpu_hidden", eggs_target_cpu_hidden as fn()),
+        ("eggs_cpu_flies_like_the_disc", eggs_cpu_flies_like_the_disc as fn()),
+        ("eggs_cpu_pass_follows_the_flight", eggs_cpu_pass_follows_the_flight as fn()),
+        ("eggs_cpu_air_hits", eggs_cpu_air_hits as fn()),
         ("eggs_break_anim_timing", eggs_break_anim_timing as fn()),
         ("eggs_break_anim_overlap", eggs_break_anim_overlap as fn()),
         ("eggs_timer_end", eggs_timer_end as fn()),
