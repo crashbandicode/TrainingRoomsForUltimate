@@ -17,8 +17,8 @@ use super::hitbox::{want_hits, AttackReader, Effects, HandleSet, Sphere, FIGHTER
 use super::legend::{self, KIND_MARK, KIND_WIND};
 
 /// One fighter's orbs on the board: its spheres' and, with *Launch angles* On, up to two marks per hitbox, and with *Windboxes* its wind
-/// areas (legend::area_orbs: a shape and a line each).
-pub const BOARD_ORBS: usize = MAX_HELD + 2 * SLOTS as usize + 2 * legend::area::MAX_AREAS;
+/// areas (legend::area_orbs: a shape, the line's shadow and the line each).
+pub const BOARD_ORBS: usize = MAX_HELD + 2 * SLOTS as usize + 3 * legend::area::MAX_AREAS;
 
 /// The most fighter objects Training (and the waiting room's practice) draws at once: Player 1 and the CPU, each of them
 /// possibly Ice Climbers, whose Nana is a fighter object of her own. No other fighter adds a fighter object (Pokémon

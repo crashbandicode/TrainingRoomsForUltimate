@@ -264,8 +264,14 @@ pub const KIND_AREA: u32 = 6;
 pub const AREA_BOX: u32 = 0x20;
 pub const AREA_CIRCLE: u32 = 0x21;
 pub const AREA_LINE: u32 = 0x22;
-/// Translucent deep blue: the windboxes' colour, see-through so the fighters inside stay visible.
-pub const AREA_ALPHA: u8 = 110;
+pub const AREA_SHADOW: u32 = 0x23;
+/// Translucent deep blue: the windboxes' colour, at full pane alpha like every other orb. The band texture is only 0.30 opaque in
+/// its middle (`tools/layout-builder` `orb_texture`), so the fighters inside stay visible; at 110 Eden showed (226, 226, 242) over
+/// the Training grid's 240 white, too pale to read (hb-legend-finish, 2026-11-15).
+pub const AREA_ALPHA: u8 = 255;
+/// The wind line's shadow: the line's pill `SHADOW_GROW` times as wide, near-black navy and opaque, drawn under the white line.
+pub const SHADOW: [u8; 3] = [0, 0, 40];
+pub const SHADOW_GROW: f32 = 1.6;
 
 /// The areas' pane colour: `WIND` as the layout takes it (linear light), at `AREA_ALPHA`.
 pub fn area_colour() -> [u8; 4] {
@@ -273,9 +279,11 @@ pub fn area_colour() -> [u8; 4] {
     super::panes::linear([byte(WIND[0]), byte(WIND[1]), byte(WIND[2]), AREA_ALPHA])
 }
 
-/// Area `index`'s orbs at depth `z`: its shape (a box as a band from its left to its right edge, as tall as the box; a circle as a disc)
-/// in translucent `colour`, and a white line from its centre to its edge along the wind (none without an angle).
-pub fn area_orbs(area: &WindArea, index: usize, z: f32, colour: [u8; 4]) -> [Option<Orb>; 2] {
+/// Area `index`'s orbs at depth `z`, in the order they draw (a later pane draws over an earlier one): its shape (a box as a band from
+/// its left to its right edge, as tall as the box; a circle as a disc) in translucent `colour`, the dark shadow of its line (a wider
+/// pill under it, so the white line keeps an outline over a pale or a dark background) and a white line from its centre to its edge
+/// along the wind (none, and no shadow, without an angle).
+pub fn area_orbs(area: &WindArea, index: usize, z: f32, colour: [u8; 4]) -> [Option<Orb>; 3] {
     let (centre, shape, reach) = match area.shape {
         AreaShape::Box { min, max } => {
             let (cy, half) = ((min[1] + max[1]) / 2.0, [(max[0] - min[0]) / 2.0, (max[1] - min[1]) / 2.0]);
@@ -303,7 +311,13 @@ pub fn area_orbs(area: &WindArea, index: usize, z: f32, colour: [u8; 4]) -> [Opt
         let thick = reach[0].min(reach[1]) * LINE;
         Orb { centre: [centre[0], centre[1], z], tail: [centre[0] + dx * t, centre[1] + dy * t, z], radius: thick, color: [255; 4], key: sphere_key(KIND_AREA, index, AREA_LINE as usize) }
     });
-    [Some(shape), line]
+    let shadow = line.map(|l| Orb {
+        radius: l.radius * SHADOW_GROW,
+        color: super::panes::linear([SHADOW[0], SHADOW[1], SHADOW[2], 255]),
+        key: sphere_key(KIND_AREA, index, AREA_SHADOW as usize),
+        ..l
+    });
+    [Some(shape), shadow, line]
 }
 
 #[cfg(test)]
