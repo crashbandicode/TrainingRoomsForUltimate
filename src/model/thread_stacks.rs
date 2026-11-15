@@ -64,6 +64,8 @@ pub struct ThreadStack {
 const KIB: usize = 1024;
 
 /// The table (one row per `ThreadId`, in its order).
+// rc.15 static-bound refresh: IniWriter/Import/Menu from diag 1d619d6b, ELF6b2b58db (2026-11-15).
+// Runtime paint marks and stack allocations retain their recorded provenance below.
 pub const THREADS: [ThreadStack; 18] = [
     // Includes the registered TICK steps (indirect calls, outside the static walk): the drain closure's 2,928 B frame plus the
     // deeper step, `p1::service` 5,168 B (diag ELF of the rc.6 hook-allocation fix; report_late's path was 5696 in all); measured11184 dominates.
@@ -80,13 +82,13 @@ pub const THREADS: [ThreadStack; 18] = [
     // diag: request files, diag-settings.json parse, publish and apply
     row(ThreadId::StateDiag, c"tr-state-diag", 40 * KIB, 17_616, 8_960, "Eden st-02..st-12, final-surface-of-1261f56c", "states::start_diag_triggers::{closure#0}"),
     // button_config.ini, replay_capture.ini and settings.json atomic writes
-    row(ThreadId::IniWriter, c"tr-ini-writer", 28 * KIB, 3_248, 9_344, "Eden st-02..st-12", "features::writer::run"),
+    row(ThreadId::IniWriter, c"tr-ini-writer", 28 * KIB, 8_880, 9_344, "Eden st-02..st-12", "features::writer::run"),
     // mii-editor-last.json (and the diag results observer trace): serialise from the boxed slot, atomic replace
     row(ThreadId::TraceWriter, c"tr-trace-writer", 28 * KIB, 2_720, 8_624, "Eden st-02..st-12, ui18-02 native Mii editor", "compat::filesystem::init::{closure#0}"),
     // diag: diag-settings-next.json parse, publish and apply
     row(ThreadId::DiagReload, c"tr-diag-reload", 40 * KIB, 17_696, 15_712, "Eden final-rc8-chain-test-722525a5-r2, the rc.8 pass's chained 9d6c7e02 sessions", "diag_reload::start::{closure#0}"),
     // first-boot import of the fork's files (blocking part), joined with a deadline
-    row(ThreadId::Import, c"tr-import", 32 * KIB, 8_048, 10_080, "Eden st-02..st-12", "import::start::{closure#0}"),
+    row(ThreadId::Import, c"tr-import", 32 * KIB, 8_064, 10_080, "Eden st-02..st-12", "import::start::{closure#0}"),
     // first-boot import of the fork's captures in the background
     row(ThreadId::ImportCaptures, c"tr-import-captures", 24 * KIB, 4_336, 0, "", "import::start_background::{closure#0}"),
     // the menu worker: model steps, screens, settings JSON on close. Its deepest static path is the recording host's tick
@@ -96,7 +98,7 @@ pub const THREADS: [ThreadStack; 18] = [
     // base (0x1101726000, size 0xe000), so it needed at least 57,344 + 0x130 = 57,648 B (its last paint mark was 54,960).
     // rc.7 svc clobbers (2026-11-11): with hos-lock's arbiter calls declaring clobber_abi("C"), values no longer ride in
     // x8-x17 across them, and the static path grew from 50,208 to 50,368 B (diag ELF of p23/rc7-svc-clobber).
-    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 50_368, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
+    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 53_888, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_672, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified
