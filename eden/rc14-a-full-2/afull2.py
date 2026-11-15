@@ -408,6 +408,20 @@ def a2_p4(ctx):
     return _finish(ctx, 'a2-p4', out, problems)
 
 
+def a2_pyra_keep_a1(ctx):
+    """integration-3's smoke2 crash row (head 79ba5ba9, the primary 02:20Z): cycle-fix's cf-pyra-keep with A1's window keep
+    on for its forced Reload (`reload mii window`, what the A1 constant does there; the Aegis keep stays off, so the
+    Pyra window is refused as it was there), on this stack (PT ON, K-strip ON, p4). P1's lane goes back to cycle-fix's
+    first. The Reload out of the CPU's Pyra window runs state 2's bit-5 destroy of its holder (`0x651200-0x6512a0`)."""
+    fx._live_set(ctx, player_roster=fs._roster(cf.P1_LANE))
+    orig = cf._diag_cycle
+    cf._diag_cycle = lambda c, words: orig(c, words + ' window' if words.startswith('reload') else words)
+    try:
+        return cf.cf_pyra_keep(ctx)
+    finally:
+        cf._diag_cycle = orig
+
+
 def a2_aegis_probe(ctx):
     """a0, diag only: what the Reload start does to an Aegis window's holder (AFULL2-RESEARCH.md "Aegis"). No keep."""
     t0, out = _begin(ctx)

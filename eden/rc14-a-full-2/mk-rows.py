@@ -35,6 +35,8 @@ ROWS = [
     # Reloads out of native windows last: cycle-fix 23:47Z, the pins `settle(None)` drops on such a Reload (a1's crash).
     ('a2-pt', M, 'a2_pt', 10, 'Limit 2 PT p1-p4: the PT window kept by `reload window pt`, articles retired; warm back, rebuilt; laps; counts.'),
     ('a2-aegis', M, 'a2_aegis', 8, 'Limit 2 Aegis: a Pyra window kept by `reload window aegis`, the partner holder intact; warm back, ready, no fallback.'),
+    # The primary 02:20Z: integration-3's smoke2 crash (79ba5ba9, cf-pyra-keep with A1 on) on this stack, after its own rows.
+    ('a2-pyra-keep-a1', M, 'a2_pyra_keep_a1', 8, "cycle-fix's cf-pyra-keep with `reload mii window`: the Reload out of the CPU's Pyra window, no crash."),
     # The primary ~00:33Z: a1-enable's pair rows (a1.py at rc14/a1-enable 0997fe4a) with A1 on, for the kept-pair fix.
     ('a1-paircontrol2', 'a1.py', 'a1_paircontrol', 5, 'Control: the pair as a planner-built group, Diddy Kong to Popo: warm, ready, no fallback.'),
     ('a1-pair', 'a1.py', 'a1_pair', 9, 'Ready Fighters 10, CPU Solo Popo Off: the pair window kept (flags 4, as N3 parks it), then its warm return; no Unmapped.'),
