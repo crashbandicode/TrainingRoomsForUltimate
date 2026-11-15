@@ -62,6 +62,9 @@ A dot means the hit carries the fighter along with the attack. With Hitboxes not
 <!-- CAPTURE-REQUEST hb-legend-v01: Hitbox Visualization with Hitboxes, Grab boxes, Hurtboxes and Frame data colours ticked, 1/4 speed. The CPU spot-dodging next to a standing Player 1: the CPU's hurtboxes blue while it dodges, white otherwise. Player 1 walks off the stage with Respawn on platform On: blue on the platform, green for the moments after it. Mario's grab: a purple grab box. Marth's forward smash: the tip red, the blade pink. See artifacts/rc14-hb-legend/. -->
 ![Windboxes ticked at 1/4 speed: F.L.U.D.D.'s water as a deep-blue disc pushing the CPU; Ganondorf's up tilt with deep-blue windboxes inside the see-through wind-area box and its white line; then the same up tilt with Hitboxes ticked too, the kick's hit drawn](../media/rc14-windboxes.gif)<br>
 *Windboxes on, at 1/4 speed: F.L.U.D.D.'s water and Ganondorf's up-tilt wind push without hitstun, drawn deep blue; the wind area is the see-through box with its white line. With Hitboxes ticked too, the kick's hit is drawn as well (the last frames). Eden, rc.14 (untested on hardware).*
+
+![Windboxes only at 1/10 speed: King K. Rool holds B and the Blunderbuss becomes a vacuum; its deep-blue windbox pulls Mario in until he is caught](../media/rc14-windbox-krool-vacuum.gif)<br>
+*Windboxes only, 1/10 speed: after the cannonball hits, holding B turns the Blunderbuss into a vacuum. Its windbox (deep blue) pulls Mario in without damage until he's caught. Eden, rc.14 (untested on hardware).*
 <!-- CAPTURE-REQUEST hb-legend-v02: Hitboxes and Launch angles ticked, 1/4 speed: Ganondorf's up tilt (the windbox lines, then the kick's dashes and its 70-degree line) facing right then left; Mario's jab (dashes). Then Hurtboxes alone: only the hurtboxes. See artifacts/rc14-hb-legend/. -->
 
 A round box is a disc; a long one, such as a sword's hitbox or an arm's hurtbox, is one pill. The shapes are flat and
