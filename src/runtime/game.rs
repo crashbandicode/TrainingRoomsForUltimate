@@ -164,6 +164,37 @@ pub mod natives {
         Some(std::mem::transmute_copy(&(text_base() + offset)))
     }
 
+    pub unsafe fn tech_magnitude(kb: f32) -> Option<f32> {
+        let f = at::<extern "C" fn(usize,usize,i32,i32,f32,f32,f32)->f32>(crate::model::sites_tech_launch::MAGNITUDE_OFFSET)?;
+        Some(f(0,0,0,0,kb,0.0,0.0))
+    }
+    pub unsafe fn tech_reaction(kb: f32) -> Option<f32> {
+        Some(at::<extern "C" fn(f32)->f32>(crate::model::sites_tech_launch::REACTION_OFFSET)?(kb))
+    }
+    pub unsafe fn tech_cos(angle: f32) -> Option<f32> {
+        Some(at::<extern "C" fn(f32)->f32>(crate::model::sites_tech_launch::COS_OFFSET)?(angle))
+    }
+    pub unsafe fn tech_sin(angle: f32) -> Option<f32> {
+        Some(at::<extern "C" fn(f32)->f32>(crate::model::sites_tech_launch::SIN_OFFSET)?(angle))
+    }
+    pub unsafe fn tech_overwrite_reaction(accessor: usize, frames: f32) -> Option<()> {
+        at::<extern "C" fn(usize,f32)>(crate::model::sites_tech_launch::OVERWRITE_REACTION_OFFSET)?(accessor,frames); Some(())
+    }
+    pub unsafe fn tech_damage_stop(accessor: usize, frames: i32) -> Option<()> {
+        at::<extern "C" fn(usize,i32,bool)>(crate::model::sites_hitbox::HITBOX_HIT_STOP_OFFSET)?(accessor,frames,true); Some(())
+    }
+    pub unsafe fn tech_is_damage(accessor: usize) -> Option<bool> {
+        Some(at::<extern "C" fn(usize)->bool>(crate::model::sites_tech_launch::IS_DAMAGE_OFFSET)?(accessor))
+    }
+    pub unsafe fn tech_energy(accessor: usize, id: i32) -> Option<usize> {
+        Some(at::<extern "C" fn(usize,i32)->usize>(crate::model::sites_tech_launch::GET_ENERGY_OFFSET)?(accessor,id))
+    }
+    pub unsafe fn tech_speed(energy: usize) -> Option<(f32,f32)> {
+        let x = at::<extern "C" fn(usize)->f32>(crate::model::sites_tech_launch::SPEED_X_OFFSET)?(energy);
+        let y = at::<extern "C" fn(usize)->f32>(crate::model::sites_tech_launch::SPEED_Y_OFFSET)?(energy);
+        Some((x,y))
+    }
+
     pub unsafe fn status_kind(accessor: usize) -> i32 {
         at::<extern "C" fn(usize) -> i32>(sites_pkg2::STATUS_KIND_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }

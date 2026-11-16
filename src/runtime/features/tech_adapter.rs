@@ -1,11 +1,11 @@
 //! Product launch adapter. Game-thread-only owner; no stored live native pointer.
 //! The native hitlag resolver is supplied by the core (never a DIAG fixture value).
 use super::tech_info_seed as info_seed;
-use super::tech_native as native;
+use super::tech_native;
 use crate::model::cpu::role::FrameReceipt;
 use crate::model::tech_launch::{HitHeight, Launch, Launcher, Vec2};
-use crate::runtime::game::{self, natives};
-use crate::runtime::state_natives::{self as state, Vector3f};
+use crate::runtime::game::natives;
+use crate::runtime::state_natives::{self, Vector3f};
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -105,10 +105,10 @@ unsafe fn prepare(
     if !launch.valid() {
         return Err(Error::InvalidInput);
     }
-    if !native::launch_ready(accessor) || (launch.di.is_some() && !super::cpu_common::di_ready()) {
+    if !tech_native::launch_ready(accessor) || (launch.di.is_some() && !super::cpu_common::di_ready()) {
         return Err(Error::Guards);
     }
-    let id = |name| native::id(name).ok_or(Error::NativeValue);
+    let id = |name| tech_native::id(name).ok_or(Error::NativeValue);
     let heights = [
         id("HIT_HEIGHT_LOW")?,
         id("HIT_HEIGHT_CENTER")?,
@@ -120,12 +120,9 @@ unsafe fn prepare(
         HitHeight::High => 2,
     }];
     let angle = launch.angle.rem_euclid(360.0);
-    let (direction, _) = native::native_direction(angle).ok_or(Error::NativeValue)?;
-    let magnitude: extern "C" fn(usize, usize, i32, i32, f32, f32, f32) -> f32 =
-        std::mem::transmute(game::text_base() + 0x403a20);
-    let magnitude = magnitude(0, 0, 0, 0, launch.knockback, 0.0, 0.0);
-    let calc: extern "C" fn(f32) -> f32 = std::mem::transmute(game::text_base() + 0x404ec0);
-    let reaction = calc(launch.knockback);
+    let (direction, _) = tech_native::native_direction(angle).ok_or(Error::NativeValue)?;
+    let magnitude = natives::tech_magnitude(launch.knockback).ok_or(Error::Guards)?;
+    let reaction = natives::tech_reaction(launch.knockback).ok_or(Error::Guards)?;
     let stop = hitlag(accessor, launch.hit_damage)?;
     let seed = info_seed::Seed {
         height,
@@ -154,8 +151,8 @@ unsafe fn prepare(
     })
 }
 unsafe fn position(accessor: usize, pos: Vec2, facing: f32) {
-    state::clear_speed_all(accessor);
-    state::init_pos(
+    state_natives::clear_speed_all(accessor);
+    state_natives::init_pos(
         accessor,
         &Vector3f {
             x: pos.x,
@@ -163,12 +160,12 @@ unsafe fn position(accessor: usize, pos: Vec2, facing: f32) {
             z: 0.0,
         },
     );
-    state::set_lr(accessor, facing);
+    state_natives::set_lr(accessor, facing);
 }
 unsafe fn hold(accessor: usize, owned: Owned) {
-    state::set_sleep(accessor, true);
-    state::clear_speed_all(accessor);
-    state::set_pos(
+    state_natives::set_sleep(accessor, true);
+    state_natives::clear_speed_all(accessor);
+    state_natives::set_pos(
         accessor,
         &Vector3f {
             x: owned.launch.start.x,
@@ -176,7 +173,7 @@ unsafe fn hold(accessor: usize, owned: Owned) {
             z: 0.0,
         },
     );
-    state::set_lr(accessor, owned.launch.facing);
+    state_natives::set_lr(accessor, owned.launch.facing);
 }
 impl Launcher for Adapter {
     type Error = Error;
@@ -240,13 +237,13 @@ impl Launcher for Adapter {
                 .filter(|x| x.owner == self.owner && x.phase == Phase::Held)
                 .ok_or(Error::NotPlaced)?;
             let accessor = current(owned)?;
-            if !native::launch_ready(accessor) {
+            if !tech_native::launch_ready(accessor) {
                 return Err(Error::Guards);
             }
             owned.phase = Phase::Flying;
             *slot = Some(owned);
             drop(slot); // DI hook can read ownership during native init/release.
-            state::set_sleep(accessor, false);
+            state_natives::set_sleep(accessor, false);
             let plan = super::tech_launch_native::Plan {
                 start: owned.launch.start,
                 facing: owned.launch.facing,
@@ -323,14 +320,14 @@ unsafe fn restore_pending() {
         .compare_exchange(owner, 0, Ordering::AcqRel, Ordering::Acquire)
         .ok();
     if let Ok(accessor) = accessor {
-        state::set_sleep(accessor, false);
+        state_natives::set_sleep(accessor, false);
         if owned.phase == Phase::Yielded || super::states::is_loading() {
             return;
         }
         position(accessor, owned.saved.position, owned.saved.facing);
-        state::heal(accessor, -natives::damage(accessor, 0));
-        state::add_damage(accessor, owned.saved.percent);
-        state::set_situation_kind(
+        state_natives::heal(accessor, -natives::damage(accessor, 0));
+        state_natives::add_damage(accessor, owned.saved.percent);
+        state_natives::set_situation_kind(
             accessor,
             if owned.saved.grounded {
                 owned.prepared.ground
@@ -387,7 +384,7 @@ pub(super) unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
     if owned.phase == Phase::Yielded {
         if let Some(mut slot) = OWNED.try_lock() {
             if slot.is_some_and(|x| x.owner == owned.owner) {
-                state::set_sleep(natives::fighter_accessor(fighter), false);
+                state_natives::set_sleep(natives::fighter_accessor(fighter), false);
                 *slot = None;
             }
         }

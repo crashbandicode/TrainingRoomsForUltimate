@@ -23,8 +23,6 @@ pub mod state_effects;
 pub mod state_restore;
 pub mod states;
 pub mod stage_hazards;
-mod tech_direct_v1_guards;
-mod tech_direct_v3_guards;
 #[cfg(feature = "diag")]
 pub mod tech_spike;
 #[cfg(feature = "diag")]

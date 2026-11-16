@@ -276,7 +276,9 @@ fn info_launch_uses_one_pre_init_damage_stop_without_energy_rewrite() {
         assert!(!source.contains("0x20f8320"));
         assert!(!source.contains("0x20f6560"));
     }
-    let arm = core.find("stop(accessor, plan.frames, true)").unwrap();
+    let arm = core
+        .find("natives::tech_damage_stop(accessor, plan.frames)")
+        .unwrap();
     let verify = core.find("if !stopped || !damage").unwrap();
     let init = core
         .find("natives::change_status_force(accessor, fly, false)")

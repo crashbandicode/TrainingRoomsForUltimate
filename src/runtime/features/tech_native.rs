@@ -24,7 +24,7 @@ pub(super) unsafe fn v1_guarded() -> bool {
     let base = game::text_base();
     let mut all = base != 0;
     if all {
-        for &(offset, expected) in super::tech_direct_v1_guards::DIRECT_V1_GUARDS {
+        for &(offset, expected) in crate::model::sites_tech_launch::v1::DIRECT_V1_GUARDS {
             let ok = std::slice::from_raw_parts((base + offset) as *const u8, 64) == expected;
             diagnostic(format_args!(
                 "[TrainingRooms] tech_s0_guard site=direct_v1_{offset:x} ok={ok}"
@@ -39,7 +39,8 @@ pub(super) unsafe fn v1_guarded() -> bool {
 /// Check the concrete Damage/Work virtual targets used by the new native calls.
 pub(super) unsafe fn v1_damage_module(accessor: usize) -> Option<()> {
     let base = game::text_base();
-    for &(module_offset, slot, expected) in super::tech_direct_v1_guards::DIRECT_V1_VIRTUAL_TARGETS
+    for &(module_offset, slot, expected) in
+        crate::model::sites_tech_launch::v1::DIRECT_V1_VIRTUAL_TARGETS
     {
         let module = ((accessor + module_offset) as *const usize).read();
         if module == 0 || module & 7 != 0 {
@@ -81,7 +82,7 @@ pub(super) unsafe fn v3_guarded() -> bool {
     let base = game::text_base();
     let mut ok = base != 0;
     if ok {
-        for &(offset, expected) in super::tech_direct_v3_guards::DIRECT_V3_GUARDS {
+        for &(offset, expected) in crate::model::sites_tech_launch::v3::DIRECT_V3_GUARDS {
             let equal = std::slice::from_raw_parts((base + offset) as *const u8, 64) == expected;
             diagnostic(format_args!(
                 "[TechDirect] v3_guard offset={offset:x} ok={equal}"
@@ -92,7 +93,8 @@ pub(super) unsafe fn v3_guarded() -> bool {
             let target = ((base + offset) as *const usize).read();
             let outside = target != 0
                 && target & 3 == 0
-                && !(base..base + super::tech_direct_v3_guards::MAIN_IMAGE_END).contains(&target);
+                && !(base..base + crate::model::sites_tech_launch::v3::MAIN_IMAGE_END)
+                    .contains(&target);
             diagnostic(format_args!(
                 "[TechDirect] v3_import slot={offset:x} target={target:x} outside_main={outside}"
             ));
@@ -100,13 +102,15 @@ pub(super) unsafe fn v3_guarded() -> bool {
         }
     }
     if ok {
-        let first: extern "C" fn(f32) -> f32 = std::mem::transmute(base + 0x39c07d0);
-        let second: extern "C" fn(f32) -> f32 = std::mem::transmute(base + 0x39c07e0);
-        let (x0, y0) = (first(0.0), second(0.0));
-        let (x90, y90) = (
-            first(std::f32::consts::FRAC_PI_2),
-            second(std::f32::consts::FRAC_PI_2),
+        let values = (
+            natives::tech_cos(0.0),
+            natives::tech_sin(0.0),
+            natives::tech_cos(std::f32::consts::FRAC_PI_2),
+            natives::tech_sin(std::f32::consts::FRAC_PI_2),
         );
+        let (Some(x0), Some(y0), Some(x90), Some(y90)) = values else {
+            return false;
+        };
         // Identify order at known inputs. The rounded quarter-turn has a small negative cosine;
         // sign/order checks here are not a tolerance in the frame-by-frame fidelity comparison.
         ok = x0.to_bits() == 1.0f32.to_bits()
@@ -124,11 +128,9 @@ pub(super) unsafe fn native_direction(degrees: f32) -> Option<(Vec2, f32)> {
         return None;
     }
     let radians = degrees.to_radians();
-    let cos: extern "C" fn(f32) -> f32 = std::mem::transmute(game::text_base() + 0x39c07d0);
-    let sin: extern "C" fn(f32) -> f32 = std::mem::transmute(game::text_base() + 0x39c07e0);
     let v = Vec2 {
-        x: cos(radians),
-        y: sin(radians),
+        x: natives::tech_cos(radians)?,
+        y: natives::tech_sin(radians)?,
     };
     (v.x.is_finite() && v.y.is_finite()).then_some((v, radians))
 }
@@ -198,9 +200,7 @@ pub(super) unsafe fn info_guarded() -> bool {
     ok
 }
 
-#[path = "tech_reaction_guard.rs"]
-mod reaction_guard;
-pub(super) use reaction_guard::CORE_GUARDS;
+pub(super) use crate::model::sites_tech_launch::core::CORE_GUARDS;
 
 static GUARDED: AtomicU8 = AtomicU8::new(0);
 pub(super) unsafe fn launch_ready(accessor: usize) -> bool {
@@ -214,6 +214,11 @@ pub(super) unsafe fn launch_ready(accessor: usize) -> bool {
     }
     use crate::model::{sites_pkg2 as p2, sites_pkg3 as p3, sites_pkg4 as p4};
     GUARDED.load(Ordering::Acquire) == 1
+        && crate::model::sites_tech_launch::SITES
+            .iter()
+            .all(|s| game::granted(s.offset))
+        && game::granted(crate::model::sites_tech_launch::GET_ENERGY_OFFSET)
+        && game::granted(crate::model::sites_hitbox::HITBOX_HIT_STOP_OFFSET)
         && v1_guarded()
         && v3_guarded()
         && info_guarded()
@@ -254,9 +259,7 @@ pub(super) unsafe fn damage_velocity(accessor: usize) -> Option<Vec2> {
     if vptr != base + 0x4f88568 || ((vptr + 0x60) as *const usize).read() != base + 0x479d40 {
         return None;
     }
-    let get: extern "C" fn(usize, i32) -> usize =
-        std::mem::transmute(game::text_base() + 0x2043970);
-    let energy = get(accessor, id("FIGHTER_KINETIC_ENERGY_ID_DAMAGE")?);
+    let energy = natives::tech_energy(accessor, id("FIGHTER_KINETIC_ENERGY_ID_DAMAGE")?)?;
     if energy < 0x1000 || energy & 7 != 0 || energy >> 47 != 0 {
         return None;
     }
@@ -271,11 +274,7 @@ pub(super) unsafe fn damage_velocity(accessor: usize) -> Option<Vec2> {
     if (((base + offset) + 0x20) as *const usize).read() != base + target {
         return None;
     }
-    let x: extern "C" fn(usize) -> f32 = std::mem::transmute(game::text_base() + 0x20f6460);
-    let y: extern "C" fn(usize) -> f32 = std::mem::transmute(game::text_base() + 0x20f6480);
-    let speed = Vec2 {
-        x: x(energy),
-        y: y(energy),
-    };
+    let (x, y) = natives::tech_speed(energy)?;
+    let speed = Vec2 { x, y };
     (speed.x.is_finite() && speed.y.is_finite()).then_some(speed)
 }

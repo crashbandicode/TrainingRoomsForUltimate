@@ -1,8 +1,8 @@
 //! The one V8 mutation sequence used by both product and diagnostic launchers.
-use super::{tech_info_seed::Seed, tech_native as native};
+use super::{tech_info_seed::Seed, tech_native};
 use crate::model::tech_launch::Vec2;
-use crate::runtime::game::{self, natives};
-use crate::runtime::state_natives::{self as state, Vector3f};
+use crate::runtime::game::natives;
+use crate::runtime::state_natives::{self, Vector3f};
 #[derive(Clone, Copy)]
 pub(super) struct Plan {
     pub start: Vec2,
@@ -46,10 +46,10 @@ pub(super) unsafe fn launch(
     plan: Plan,
     mut observe: impl FnMut(Moment) -> Option<()>,
 ) -> Result<Vec2, Error> {
-    if !native::launch_ready(accessor) {
+    if !tech_native::launch_ready(accessor) {
         return Err(Error::Guard);
     }
-    let id = |name| native::id(name).ok_or(Error::Value);
+    let id = |name| tech_native::id(name).ok_or(Error::Value);
     let heights = [
         id("HIT_HEIGHT_LOW")?,
         id("HIT_HEIGHT_CENTER")?,
@@ -73,8 +73,8 @@ pub(super) unsafe fn launch(
     {
         return Err(Error::Value);
     }
-    state::clear_speed_all(accessor);
-    state::init_pos(
+    state_natives::clear_speed_all(accessor);
+    state_natives::init_pos(
         accessor,
         &Vector3f {
             x: plan.start.x,
@@ -82,34 +82,33 @@ pub(super) unsafe fn launch(
             z: 0.0,
         },
     );
-    state::set_lr(accessor, plan.facing);
-    state::heal(accessor, -natives::damage(accessor, 0));
-    state::add_damage(accessor, plan.percent);
-    state::set_situation_kind(accessor, air);
+    state_natives::set_lr(accessor, plan.facing);
+    state_natives::heal(accessor, -natives::damage(accessor, 0));
+    state_natives::add_damage(accessor, plan.percent);
+    state_natives::set_situation_kind(accessor, air);
     observe(Moment::Placed).ok_or(Error::Observation)?;
-    let overwrite: extern "C" fn(usize, f32) = std::mem::transmute(game::text_base() + 0x200b8b0);
-    overwrite(accessor, plan.reaction);
+    natives::tech_overwrite_reaction(accessor, plan.reaction).ok_or(Error::Guard)?;
     observe(Moment::Reaction).ok_or(Error::Observation)?;
     if let Some(lr) = plan.reserve_lr {
         natives::set_float(accessor, lr, reserve);
     }
     observe(Moment::Reserve).ok_or(Error::Observation)?;
-    let before = native::damage_info(accessor).ok_or(Error::Guard)?;
+    let before = tech_native::damage_info(accessor).ok_or(Error::Guard)?;
     observe(Moment::InfoBefore(before)).ok_or(Error::Observation)?;
     let module = ((accessor + 0xa8) as *const usize).read();
     if !plan.seed.write((module + 0x80) as *mut u8, heights) {
         return Err(Error::Value);
     }
     observe(Moment::InfoAfter(
-        native::damage_info(accessor).ok_or(Error::Guard)?,
+        tech_native::damage_info(accessor).ok_or(Error::Guard)?,
     ))
     .ok_or(Error::Observation)?;
     // V8: init must observe the damage stop and choose the native deferred-motion path.
-    let stop: extern "C" fn(usize, i32, bool) = std::mem::transmute(game::text_base() + 0x2089260);
-    stop(accessor, plan.frames, true);
-    let is_damage: extern "C" fn(usize) -> bool =
-        std::mem::transmute(game::text_base() + 0x2089220);
-    let (stopped, damage) = (natives::is_stop(accessor), is_damage(accessor));
+    natives::tech_damage_stop(accessor, plan.frames).ok_or(Error::Guard)?;
+    let (stopped, damage) = (
+        natives::is_stop(accessor),
+        natives::tech_is_damage(accessor).ok_or(Error::Guard)?,
+    );
     observe(Moment::Stop { stopped, damage }).ok_or(Error::Observation)?;
     if !stopped || !damage {
         return Err(Error::DamageStop { stopped, damage });
@@ -133,7 +132,7 @@ pub(super) unsafe fn launch(
         readback: natives::get_int(accessor, action),
     })
     .ok_or(Error::Observation)?;
-    let speed = native::damage_velocity(accessor).ok_or(Error::Value)?;
+    let speed = tech_native::damage_velocity(accessor).ok_or(Error::Value)?;
     observe(Moment::Speed(speed)).ok_or(Error::Observation)?;
     Ok(speed)
 }

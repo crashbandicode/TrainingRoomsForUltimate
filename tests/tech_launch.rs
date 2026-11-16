@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 #[path = "../src/model/tech_launch.rs"]
 mod tech_launch;
 use tech_launch::*;
