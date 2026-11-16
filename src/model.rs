@@ -243,4 +243,5 @@ pub mod boot_notices;
 #[path = "model/tech_launch.rs"]
 pub mod tech_launch;
 
+#[path = "model/sites_tech_launch.rs"]
 pub mod sites_tech_launch;
