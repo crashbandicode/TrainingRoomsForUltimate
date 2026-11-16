@@ -724,7 +724,7 @@ fn scan_mode(graph: &Graph, include_try: bool) -> (Ctx<'_>, Scan) {
             entries.push((vec![i], "game-hook".to_owned()));
         }
     }
-    for key in GAME_ENTRIES {
+    for key in game_root_keys() {
         entries.push((graph.find(key), "game-hook".to_owned()));
     }
     for (key, name, module) in plugin_entries() {
@@ -941,8 +941,6 @@ const TYPED_STATIC_CALLS: &[(&str, &str, &str)] = &[
 /// the game's on-init callback (`reset_hub::on_init`), Skyline's NRO-load hooks, and the exported trace control.
 /// `every_function_handed_to_the_game_is_listed` keeps this complete.
 const GAME_ENTRIES: &[&str] = &[
-    // Audit the staged fighter pass even before the launch adapter is bound.
-    "tech::frame",
     "cpu::on_frame",
     "cpu_common::di_hook",
     "cpu_common::change_status_hook",
@@ -972,6 +970,15 @@ const GAME_ENTRIES: &[&str] = &[
     "seam_drill::inline_3",
     "probe::mounted",
 ];
+
+/// Staged game-thread passes are audited even before their native callback is
+/// bound. They are not claims of a registered handoff: GAME_ENTRIES stays the
+/// exact callback inventory checked by every_function_handed_to_the_game_is_listed.
+const STAGED_GAME_ROOTS: &[&str] = &["tech::frame"];
+
+fn game_root_keys() -> impl Iterator<Item = &'static str> {
+    GAME_ENTRIES.iter().chain(STAGED_GAME_ROOTS).copied()
+}
 
 /// Functions whose address is handed out (`extern "C"`, `as *const ()`) that are not game entry points, and why.
 const NOT_GAME_ENTRIES: &[(&str, &str)] = &[
@@ -1211,7 +1218,7 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
         seen
     };
     let mut hooks: Vec<usize> = (0..n).filter(|&f| graph.funcs[f].attrs.contains("skyline::hook")).collect();
-    hooks.extend(GAME_ENTRIES.iter().flat_map(|key| graph.find(key)));
+    hooks.extend(game_root_keys().flat_map(|key| graph.find(key)));
     let mut out = Shared {
         game_waits: BTreeMap::new(),
         game_hooks: BTreeMap::new(),
@@ -1248,7 +1255,7 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
 /// `artifacts/phase23/TASK-OPUS-rc6-lockfree.md`): no lock that a game entry point waits on is held by a plugin thread. There is no
 /// exception: no list of locks shared on purpose, no hooks excepted because a run measured them on MainThread
 /// (`artifacts/phase23/hook-threads/TABLE.md` keeps those measurements). It walks the shipped build and the diag build (the Eden
-/// runs': its own modules, threads and hooks too), every `#[skyline::hook]` and `GAME_ENTRIES`, the callback tables and bare-name
+/// runs': its own modules, threads and hooks too), every `#[skyline::hook]`, `GAME_ENTRIES` and `STAGED_GAME_ROOTS`, the callback tables and bare-name
 /// function values; `the_shared_lock_check_sees_a_seeded_hazard` runs the same predicate on a seeded fixture.
 #[test]
 fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
@@ -1545,6 +1552,9 @@ fn the_native_service_poll_is_walked_from_its_dispatch() {
 #[test]
 fn every_listed_entry_resolves() {
     let graph = runtime_graph();
+    for key in STAGED_GAME_ROOTS {
+        assert!(!graph.find(key).is_empty(), "staged game root {key} resolves to no function");
+    }
     let unscanned = |key: &str| UNSCANNED_ENTRIES.iter().any(|(k, _)| *k == key);
     let mut keys: Vec<(String, Vec<usize>)> = GAME_ENTRIES.iter().map(|k| ((*k).to_owned(), graph.find(k))).collect();
     for (key, _, module) in plugin_entries() {
@@ -1698,7 +1708,8 @@ fn the_shared_lock_check_sees_a_seeded_hazard() {
 #[test]
 fn tech_frame_is_a_game_root_before_binding_and_reaches_seeded_helper_lock() {
     let mut graph = runtime_graph();
-    assert!(GAME_ENTRIES.contains(&"tech::frame"));
+    assert!(STAGED_GAME_ROOTS.contains(&"tech::frame"));
+    assert!(!GAME_ENTRIES.contains(&"tech::frame"), "an unbound staged root is not a registered callback");
     let roots = graph.find("tech::frame");
     assert_eq!(roots.len(), 1);
     let helper = graph.find("tech::still_tumbling")[0];
