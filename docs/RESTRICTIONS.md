@@ -5,6 +5,7 @@ the 3 above it (playbook `docs/CHECKLIST.md`, the "cites an approved restriction
 
 | ID | Message | Why | Approved |
 | --- | --- | --- | --- |
+| `btt-projectile-guard` | "Projectile detection unavailable" | The optional projectile native boundary failed a guard; its row is unavailable while BTT melee and Hitbox remain installed. The saved On/Off value is retained. | primary 2026-11-16, explicit isolated-boundary ruling; for operator review |
 | `drill-capacity` | "Drill too long: keep it to 16 steps" | Input drills share the existing combo bounds (LINKS × STEPS); overflow saves nothing. | operator 2026-11-15, keep 16 for rc.15 |
 | `combo-capacity` | "Combo too long: keep it to 16 links" | Hit combos share the same unit bound; an overfull exchange saves nothing. | operator 2026-11-15, keep 16 for rc.15 |
 | `combo-file-size` | `file is {bytes} bytes (maximum {max})` (`StoreError::FileTooLarge`, unchanged) | Worker-side combo/drill reads allow `LINKS * 4096` bytes (64 KiB at 16 units), retaining the old 4 KiB/unit budget; larger files still refuse. | primary 2026-11-15, following the operator's 16-unit decision |
