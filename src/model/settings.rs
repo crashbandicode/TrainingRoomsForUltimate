@@ -162,6 +162,14 @@ pub fn parse_row(def: &Def, value: &Value) -> Result<Vec<u8>, Reason> {
         return Ok(elements);
     }
     elements.resize(def.len, 0);
+    // Single rows use the first selected option, as the menu displays them. Old files may
+    // contain several; normalize at both file load and Snapshot::set so defaults/writeback
+    // cannot preserve a displayed On whose typed value also contains Off. Keep None intact.
+    if def.kind == Kind::Single {
+        if let Some(first) = elements.iter().position(|v| *v != 0) {
+            elements[first + 1..].fill(0);
+        }
+    }
     Ok(elements)
 }
 
