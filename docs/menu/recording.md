@@ -329,7 +329,7 @@ the first pass warps to the start save, and a chain repeats as a whole.
 - **Values:** ∞, 1, 2, 3, 5, 10
 - **Default:** 1, for Player 1 and for the CPU
 - **How:** Left/Right step through the counts (wrapping). X does the same with the cursor in MACROS, here or in the
-  pop-up. A opens the list of counts, but picking one there doesn't change the count in this build: use Left/Right.
+  pop-up. A opens the list: Up/Down picks a count, A applies it, and B cancels.
 
 The count is kept with your recordings (`recording-index.json`), not with your saved defaults, so X doesn't save it.
 *Reset page to defaults* puts both counts, Player 1's and the CPU's, back to 1. The MACROS header shows the count too.
