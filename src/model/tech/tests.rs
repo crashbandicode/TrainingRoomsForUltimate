@@ -146,12 +146,12 @@ fn di_off_writes_neutral_stick() {
     assert_eq!(Di::Off.sample(&mut |_|panic!("off must not draw")),Some(v(0.,0.)));
     assert_eq!(Di::Player.sample(&mut |_|panic!("player owns DI")),None);
 }
-fn decision()->Decision{ Decision {tech:None,count:254,previous:254,window:12,lockout:28,reaction:20.,damage_fall:false,enabled:true,press_frame_offset:0} }
+fn decision()->Decision{ Decision {tech:None,count:254,previous:254,window:12.0,lockout:28,reaction:20.,damage_fall:false,enabled:true,press_frame_offset:Some(0)} }
 #[test]
 fn grade_each_offset() {
-    for c in 0..12 { assert_eq!(grade(Decision{tech:Some(Direction::InPlace),count:c,..decision()}),Some(Grade::Perfect(c))); }
+    for c in 0..12 { assert_eq!(grade(Decision{tech:Some(Direction::InPlace),count:c,..decision()}),Some(Grade::Perfect(Some(c)))); }
     for direction in [Direction::InPlace,Direction::RollLeft,Direction::RollRight,Direction::Wall,Direction::WallJump,Direction::Ceiling] {
-        assert_eq!(grade(Decision{tech:Some(direction),count:4,..decision()}),Some(Grade::Perfect(4)));
+        assert_eq!(grade(Decision{tech:Some(direction),count:4,..decision()}),Some(Grade::Perfect(Some(4))));
     }
 }
 #[test]
@@ -162,7 +162,7 @@ fn early_by_counts_frames_past_window() {
 #[test]
 fn lockout_grade() {
     assert_eq!(grade(Decision{count:3,previous:27,..decision()}),Some(Grade::Locked(27)));
-    assert_eq!(grade(Decision{tech:Some(Direction::Wall),count:3,previous:28,..decision()}),Some(Grade::Perfect(3)));
+    assert_eq!(grade(Decision{tech:Some(Direction::Wall),count:3,previous:28,..decision()}),Some(Grade::Perfect(Some(3))));
 }
 #[test]
 fn held_tech_is_untimed() {
@@ -203,13 +203,13 @@ fn session_time_ends_and_finishes_the_flight() {let mut s=flying(Length::Frames(
 #[test]
 fn free_practice_never_ends() {let mut s=flying(Length::Free);for _ in 0..20000{s.tick(false,false);}assert_eq!(s.phase,Phase::Flight);assert_eq!(s.stop(),Action::Summary);}
 #[test]
-fn summary_counts_streak_and_average() {let mut s=Summary::default();for g in [Grade::Perfect(2),Grade::Perfect(6),Grade::Early(1),Grade::Held,Grade::Perfect(4)]{s.record(g);}
+fn summary_counts_streak_and_average() {let mut s=Summary::default();for g in [Grade::Perfect(Some(2)),Grade::Perfect(Some(6)),Grade::Early(1),Grade::Held,Grade::Perfect(Some(4))]{s.record(g);}
     assert_eq!((s.attempts,s.streak,s.best,s.average()),(5,2,2,Some(4.)));let mut text=String::new();s.write(&mut text).unwrap();assert!(text.len()<=96,"{text}");
 }
 #[test]
 fn hit_damage_range_and_default() {assert_eq!(HIT_DAMAGE_DEFAULT,12.);assert_eq!(HIT_DAMAGE_RANGE,[1.,30.]);}
 #[test]
-fn presets_only_set_damage_and_height() {let mut l=Launch {start:v(2.,3.),target:v(4.,5.),angle:90.,knockback:100.,percent:60.,hit_damage:12.,height:HitHeight::Middle,hit_from_behind:false,facing:1.,di:Some(v(0.,0.))};let old=l;
+fn presets_only_set_damage_and_height() {let mut l=Launch {start:v(2.,3.),target:v(4.,5.),angle:90.,knockback:100.,percent:60.,hit_damage:12.,height:HitHeight::Middle,hit_from_behind:false,grounded_hit:false,facing:1.,di:Some(v(0.,0.))};let old=l;
     preset(&mut l,30.,HitHeight::High);assert_eq!(l,Launch {hit_damage:30.,height:HitHeight::High,..old});
 }
 }

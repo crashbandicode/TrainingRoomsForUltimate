@@ -2,7 +2,7 @@
 //! This is host-testable planning, not a native integration/DI parity claim.
 use super::super::tech_launch::{self as flight, FlightParams};
 use super::{
-    add, dot, finite, scale, sub,
+    add, finite, scale, sub,
     surface::{self, Kind, Line, Surfaces, Walk},
     Vec2,
 };
@@ -136,19 +136,5 @@ pub fn editor_bounds(range: [f32; 4]) -> Box2 {
             x: range[1],
             y: range[2],
         },
-    }
-}
-
-/// Cursor motion is shared in units/dead-zone with BTT (2/frame, .3).
-pub fn move_cursor(cursor: Vec2, stick: Vec2, bounds: Box2) -> Vec2 {
-    let d = if finite(stick) && dot(stick, stick) >= 0.09 {
-        scale(stick, 2.0)
-    } else {
-        Vec2::default()
-    };
-    let p = add(cursor, d);
-    Vec2 {
-        x: p.x.clamp(bounds.min.x, bounds.max.x),
-        y: p.y.clamp(bounds.min.y, bounds.max.y),
     }
 }

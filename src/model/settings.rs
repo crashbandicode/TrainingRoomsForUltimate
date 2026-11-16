@@ -32,7 +32,7 @@ pub const LAST_PAGE_KEY: &str = "last_page";
 pub const MII_PREFERENCES_KEY: &str = "mii_preferences";
 /// Largest weight on a weighted row.
 pub const WEIGHT_MAX: u8 = 5;
-/// Largest slider value (the two damage ranges).
+/// Largest legacy damage-slider value; Tech ranges use their declared index scale.
 pub const SLIDER_MAX: u8 = 150;
 /// Keys older builds wrote that nothing reads any more (SPEC-core-01 §6, SPEC-core-02 question 4;
 /// `character_item` since decision N6, converted once by the first-boot import).
@@ -50,7 +50,7 @@ pub enum Kind {
     Multiple,
     /// Each option `0..=WEIGHT_MAX`.
     Weighted,
-    /// `[lower, upper]`, `lower <= upper <= SLIDER_MAX`.
+    /// `[lower, upper]`, ordered and bounded by the declared row scale (legacy: SLIDER_MAX).
     Slider,
     /// The optional range of a delay row (N3): empty (no range) or `[min, max]` as **option
     /// indices** of the row's own value set, `min <= max <= RANGE_INDEX_MAX`. Absent from the file
@@ -107,7 +107,7 @@ pub enum Reason {
     ElementAboveMax,
     /// A slider array does not have exactly two elements.
     BadSliderLength,
-    /// A slider's `lower` is above its `upper` (or either is above `SLIDER_MAX`).
+    /// A slider's `lower` is above its `upper`.
     BadSliderRange,
     /// `Snapshot::set` was given an id this build has no row for.
     UnknownId,
@@ -139,7 +139,7 @@ pub fn parse_row(def: &Def, value: &Value) -> Result<Vec<u8>, Reason> {
     let mut elements = Vec::with_capacity(items.len());
     for item in items {
         let byte = item.as_u64().and_then(|n| u8::try_from(n).ok()).ok_or(Reason::ElementNotAByte)?;
-        if byte > def.kind.max() {
+        if byte > super::tech_settings::scale(def.id).map_or(def.kind.max(), |s| s.max) {
             return Err(Reason::ElementAboveMax);
         }
         elements.push(byte);
@@ -555,11 +555,11 @@ pub fn parse(text: &str) -> Loaded {
     }
     let mut menu = snapshot_from("menu", top.menu, &mut issues);
     let mut defaults = snapshot_from("defaults_menu", top.defaults, &mut issues);
-    // The two practice games exclude each other (`btt::on`): a file with both On keeps Eggs-ercise.
+    // A hand-edited conflict keeps the earlier practice game: Eggs-ercise, then BTT, then Tech.
     for rows in [&mut menu, &mut defaults] {
-        if super::btt::on(rows) == [true; 2] {
-            let _ = rows.set("btt", &[1, 0]);
-        }
+        let on = super::tech_settings::practice(rows);
+        if on[0] && on[1] { let _ = rows.set("btt", &[1, 0]); }
+        if (on[0] || on[1]) && on[2] { let _ = rows.set("tech_practice", &[1, 0, 0, 0, 0, 0]); }
     }
     let mut extra = Map::new();
     for (key, value) in top.others.items {

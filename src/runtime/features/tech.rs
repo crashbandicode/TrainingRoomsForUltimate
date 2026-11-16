@@ -1,0 +1,618 @@
+//! Stage Tech practicer. UI/input/layout exchange only plain snapshots; the
+//! launch adapter stays on the P1 game thread. No default hitlag resolver exists.
+use super::{
+    notices,
+    tech_adapter::{Adapter, HitlagResolver},
+    tech_surfaces::{self, NativeSource, PlatformScan, ScanState},
+};
+use crate::model::btt::{Pad, LOOKS};
+use crate::model::chords::{field, Sample};
+use crate::model::cpu::hash::hash40;
+use crate::model::cpu::rng::Rng;
+use crate::model::panes::{EggLook, EggPicture, EGG_WHOLE};
+use crate::model::settings::Snapshot;
+use crate::model::storage::FixedPath;
+use crate::model::tech::{
+    controller::{Controller, Event, Outcome, Setup},
+    picker::{self, Pick, Picker},
+    planner,
+    session::{Bests, Length, Phase},
+    solver,
+    surface::{Kind, Surfaces, Walk},
+    Vec2,
+};
+use crate::model::tech_launch::{FlightParams, Launcher};
+use crate::model::tech_settings::{self, Config};
+use crate::runtime::game::natives;
+use crate::runtime::{published, scene};
+use hos_lock::{Mailbox, Mutex, Published};
+use std::cell::RefCell;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::OnceLock;
+
+const NOTICE: u8 = 0x32;
+static CONFIG: Published<Option<Config>> = Published::new(None);
+static OPEN: AtomicBool = AtomicBool::new(false);
+static START: AtomicBool = AtomicBool::new(false);
+static EDIT: AtomicBool = AtomicBool::new(false);
+static RESET: AtomicBool = AtomicBool::new(false);
+static RUNNING: AtomicBool = AtomicBool::new(false);
+static PLACING: AtomicBool = AtomicBool::new(false);
+static GUARD_PRESS: AtomicBool = AtomicBool::new(false);
+static HITLAG: OnceLock<HitlagResolver> = OnceLock::new();
+static OUTCOMES: Mailbox<Outcome, 4> = Mailbox::new();
+struct ViewState {
+    picker: Picker,
+    surfaces: Surfaces,
+    range: Option<[f32; 4]>,
+    start: bool,
+}
+static VIEW: Mutex<ViewState> = Mutex::new(ViewState {
+    picker: Picker::EMPTY,
+    surfaces: Surfaces::EMPTY,
+    range: None,
+    start: false,
+});
+struct Practice {
+    adapter: Adapter,
+    controller: Controller,
+    config: Config,
+    pending: bool,
+    reroll: bool,
+    sampled: Option<(Setup, picker::Spot)>,
+    approximate: bool,
+    scan: Option<PlatformScan>,
+    scan_done: bool,
+    stage: i32,
+    fighter_kind: i32,
+    identity: crate::model::cpu::role::FrameReceipt,
+    rng: Rng,
+    after_reaction: u16,
+    planning_failed: bool,
+}
+thread_local! {
+    static LIVE: RefCell<Option<Practice>> = const { RefCell::new(None) };
+    static BESTS: RefCell<Bests> = const { RefCell::new(Bests::EMPTY) };
+}
+
+/// Core supplies its verified product resolver; never install a fixture/default.
+/// Call before the first Tech session. Rebinding is rejected by OnceLock.
+pub fn bind_hitlag(resolver: HitlagResolver) -> Result<(), HitlagResolver> {
+    HITLAG.set(resolver)
+}
+pub fn publish(snapshot: &Snapshot) {
+    CONFIG.publish(Some(tech_settings::read(snapshot)));
+}
+pub fn menu_opened() {
+    VIEW.lock().start = false;
+    GUARD_PRESS.store(false, Ordering::Release);
+    PLACING.store(false, Ordering::Release);
+    OPEN.store(true, Ordering::Release);
+    notices::clear(NOTICE);
+    notices::raise(notices::RAISE_TECH, false);
+}
+pub fn menu_closed(edit: bool) {
+    OPEN.store(false, Ordering::Release);
+    EDIT.store(edit, Ordering::Release);
+    START.store(true, Ordering::Release);
+}
+pub fn reset() {
+    RESET.store(true, Ordering::Release);
+}
+pub fn running() -> bool {
+    RUNNING.load(Ordering::Acquire)
+}
+pub fn placing() -> bool {
+    PLACING.load(Ordering::Acquire)
+}
+/// Native decision seam posts the exact attempt-tagged snapshot, before status
+/// mutation. ContactReceipt alone deliberately cannot synthesize this snapshot.
+pub fn observe(outcome: Outcome) -> bool {
+    OUTCOMES.post(outcome)
+}
+/// Reserved for a proven native guard press after contact. Currently unbound:
+/// neither raw shoulder input nor a trigger-count decrease proves a new press.
+pub fn guard_press() {
+    if !OPEN.load(Ordering::Acquire)
+        && !scene::facts().busy
+        && !published::input_owners().covers_strip()
+    {
+        GUARD_PRESS.store(true, Ordering::Release);
+    }
+}
+fn kind(config: Config) -> Option<Kind> {
+    match config.surface {
+        1 => Some(Kind::Floor),
+        2 => Some(Kind::Wall),
+        3 => Some(Kind::Ceiling),
+        _ => None,
+    }
+}
+fn length(config: Config) -> Length {
+    match config.session {
+        1 => Length::Attempts(20),
+        2 => Length::Attempts(10),
+        3 => Length::Frames(3600),
+        4 => Length::Frames(10800),
+        _ => Length::Free,
+    }
+}
+fn draw(rng: &mut Rng, n: u32) -> u32 {
+    if n == 0 {
+        return 0;
+    }
+    let threshold = n.wrapping_neg() % n;
+    loop {
+        let v = rng.next_u32();
+        if v >= threshold {
+            return v % n;
+        }
+    }
+}
+/// Owned P1 poll, shared BTT logical controls. Only the editor consumes input.
+pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
+    if !placing() || OPEN.load(Ordering::Acquire) {
+        return false;
+    }
+    let Some(config) = CONFIG.read() else {
+        return false;
+    };
+    let mut view = VIEW.lock();
+    let Some(range) = view.range else {
+        return true;
+    };
+    let stick = [0, 1].map(|i| ((controller + field::STICKS[i]) as *const f32).read_volatile());
+    let ViewState {
+        picker,
+        surfaces,
+        start,
+        ..
+    } = &mut *view;
+    if picker.feed(
+        Pad {
+            stick,
+            held: sample.held,
+            pressed: sample.pressed,
+            save: false,
+            load: false,
+        },
+        surfaces,
+        range,
+        kind(config),
+    ) == Pick::Start
+    {
+        *start = true;
+    }
+    true
+}
+/// BTT's existing egg/cursor pane pool draws the selected point and its normal.
+pub fn look(active: bool) -> [Option<([f32; 2], EggLook)>; LOOKS] {
+    let mut out = [None; LOOKS];
+    if !active || !running() {
+        return out;
+    }
+    let view = VIEW.lock();
+    let spot = if placing() {
+        view.picker.hovered
+    } else {
+        view.picker.selected
+    };
+    if let Some(spot) = spot {
+        out[0] = Some((
+            [spot.point.x, spot.point.y],
+            EggLook {
+                scale: 0.3,
+                ..EGG_WHOLE
+            },
+        ));
+        if placing() {
+            let tip = crate::model::tech::add(
+                spot.point,
+                crate::model::tech::scale(spot.line.normal, 5.),
+            );
+            let side = Vec2 {
+                x: -spot.line.normal.y,
+                y: spot.line.normal.x,
+            };
+            let back =
+                crate::model::tech::add(tip, crate::model::tech::scale(spot.line.normal, -1.5));
+            let points = [
+                crate::model::tech::add(
+                    spot.point,
+                    crate::model::tech::scale(spot.line.normal, 2.5),
+                ),
+                tip,
+                crate::model::tech::add(back, side),
+                crate::model::tech::add(back, crate::model::tech::scale(side, -1.)),
+            ];
+            for (slot, p) in out[1..5].iter_mut().zip(points) {
+                *slot = Some((
+                    [p.x, p.y],
+                    EggLook {
+                        scale: 0.12,
+                        ..EGG_WHOLE
+                    },
+                ));
+            }
+        }
+    }
+    if placing() {
+        out[LOOKS - 1] = Some((
+            [view.picker.cursor.x, view.picker.cursor.y],
+            EggLook {
+                picture: EggPicture::Cursor,
+                ..EGG_WHOLE
+            },
+        ));
+    }
+    out
+}
+unsafe fn still_tumbling(accessor: usize) -> Option<bool> {
+    static IDS: OnceLock<[i32; 7]> = OnceLock::new();
+    if IDS.get().is_none() {
+        let names = [
+            "FIGHTER_STATUS_KIND_DAMAGE_FLY",
+            "FIGHTER_STATUS_KIND_DAMAGE_FLY_ROLL",
+            "FIGHTER_STATUS_KIND_DAMAGE_FLY_METEOR",
+            "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_D",
+            "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_U",
+            "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_LR",
+            "FIGHTER_STATUS_KIND_DAMAGE_FALL",
+        ];
+        let mut ids = [0; 7];
+        for (slot, name) in ids.iter_mut().zip(names) {
+            *slot = super::tech_native::id(name)?;
+        }
+        IDS.set(ids).ok();
+    }
+    Some(IDS.get()?.contains(&natives::status_kind(accessor)))
+}
+fn notice(run: &Practice, text: Option<&str>) {
+    use core::fmt::Write;
+    let mut message = FixedPath::<192>::new();
+    let best = BESTS.with(|bests| {
+        bests
+            .borrow_mut()
+            .record(run.fighter_kind, run.controller.session.summary.best)
+    });
+    if let Some(text) = text {
+        let _ = message.write_str(text);
+    } else if matches!(run.controller.session.phase, Phase::Off | Phase::Done) {
+        let _ = run.controller.session.summary.write(&mut message);
+        let _ = write!(message, " · fighter best {best}");
+    } else if placing() {
+        let _ = message.write_str("Choose a surface · A sets · X starts");
+    } else {
+        if let Some(grade) = run.controller.session.result {
+            let _ = grade.write(&mut message);
+        } else {
+            let _ = message.write_str("Tech the selected surface");
+        }
+        if let Some(direction) = run.controller.direction {
+            let _ = write!(message, " · {}", direction.label());
+        }
+        let _ = message.write_str(" · ");
+        let _ = run.controller.session.write_progress(&mut message);
+        if run.approximate {
+            let _ = message.write_str(" · Auto approximate");
+        }
+    }
+    notices::raise(notices::RAISE_TECH, true);
+    notices::upsert(
+        NOTICE,
+        "Tech Practice",
+        message.as_str(),
+        u16::MAX,
+        crate::model::notify::DEFAULT_COLOR,
+    );
+}
+/// P1 post-native pass. The caller supplies the live fighter; no pointer survives
+/// this call. Ice Climbers' secondary body is excluded by the native partner id.
+pub unsafe fn frame(fighter: usize) {
+    if !super::tech_adapter::tech_ready() {
+        return;
+    }
+    if !super::tech_placing::ready() {
+        return;
+    }
+    if !scene::is_native_training() {
+        LIVE.with(|slot| {
+            if let Some(mut run) = slot.borrow_mut().take() {
+                run.controller.stop(&mut run.adapter);
+            }
+        });
+        RUNNING.store(false, Ordering::Release);
+        PLACING.store(false, Ordering::Release);
+        notices::clear(NOTICE);
+        notices::raise(notices::RAISE_TECH, false);
+        super::tech_placing::request(2, false);
+        return;
+    }
+    let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
+    if entry != 0 {
+        return;
+    }
+    let at = natives::fighter_accessor(fighter);
+    if at == 0 || natives::module_accessor(0) != Some(at) {
+        return;
+    }
+    // The same owned-player receipt gate used by the adapter excludes nonowners.
+    let Some(identity) = super::cpu::tech_player_receipt().ok().flatten() else {
+        return;
+    };
+    let Some(config) = CONFIG.read() else {
+        return;
+    };
+    let facts = scene::facts();
+    let stop = config.session == 0;
+    let restart = START.load(Ordering::Acquire) | RESET.load(Ordering::Acquire);
+    let open = OPEN.load(Ordering::Acquire);
+    LIVE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        if stop {
+            VIEW.lock().start = false;
+            if let Some(run) = slot.as_mut() {
+                run.controller.stop(&mut run.adapter);
+                if !open {
+                    notice(run, None);
+                }
+            }
+            *slot = None;
+            RUNNING.store(false, Ordering::Release);
+            PLACING.store(false, Ordering::Release);
+            return;
+        }
+        if slot.is_none() {
+            let Some(hitlag) = HITLAG.get().copied() else {
+                return;
+            };
+            let Some(fighter_kind) = natives::fighter_kind(at) else {
+                return;
+            };
+            *slot = Some(Practice {
+                adapter: Adapter::new(hitlag),
+                controller: Controller::IDLE,
+                config,
+                pending: false,
+                reroll: true,
+                sampled: None,
+                approximate: false,
+                scan: None,
+                scan_done: false,
+                stage: -1,
+                fighter_kind,
+                identity,
+                rng: Rng::new(Rng::seed_from(
+                    skyline::nn::os::GetSystemTick() as u64,
+                    at as u64,
+                )),
+                after_reaction: 0,
+                planning_failed: false,
+            });
+        }
+        let run = slot.as_mut().unwrap();
+        RUNNING.store(true, Ordering::Release);
+        if open {
+            if !matches!(run.controller.session.phase, Phase::Off | Phase::Done) {
+                run.controller.stop(&mut run.adapter);
+            }
+            return;
+        }
+        if facts.busy || published::input_owners().covers_strip() {
+            GUARD_PRESS.store(false, Ordering::Release);
+            return;
+        }
+        let stage = natives::stage_id();
+        let Some(range) = natives::camera_limit_range() else {
+            return;
+        };
+        let Some(mut source) = NativeSource::new(at) else {
+            return;
+        };
+        if stage != run.stage {
+            run.controller.stop(&mut run.adapter);
+            run.stage = stage;
+            run.scan = PlatformScan::new(range);
+            run.scan_done = false;
+            let mut view = VIEW.lock();
+            view.picker.enter(
+                stage,
+                Vec2 {
+                    x: natives::pos_x(at),
+                    y: natives::pos_y(at),
+                },
+            );
+            view.start = false;
+            view.surfaces = Surfaces::EMPTY;
+        }
+        {
+            let mut view = VIEW.lock();
+            view.range = Some(range);
+            if view.surfaces.state == Walk::Broken && view.surfaces.lines().next().is_none() {
+                if let Some((seed, end)) = source.seed() {
+                    view.surfaces.begin(seed, end);
+                }
+            }
+            if view.surfaces.state == Walk::More {
+                view.surfaces.step(&mut source);
+            } else if view.surfaces.state == Walk::Closed && !run.scan_done {
+                if let Some(scan) = run.scan.as_mut() {
+                    match scan.step(&mut source, &mut view.surfaces) {
+                        ScanState::More => {}
+                        ScanState::Done => run.scan_done = true,
+                        ScanState::Broken | ScanState::Full => {
+                            notice(run, Some("Surface discovery incomplete"));
+                            return;
+                        }
+                    }
+                }
+            }
+            if view.surfaces.state != Walk::Closed || !run.scan_done {
+                notice(run, Some("Finding stage surfaces…"));
+                return;
+            }
+        }
+        let owner_changed = run.identity != identity;
+        run.identity = identity;
+        if restart || owner_changed || run.controller.session.phase == Phase::Off {
+            START.store(false, Ordering::Release);
+            RESET.store(false, Ordering::Release);
+            if run.controller.session.phase != Phase::Off {
+                run.controller.stop(&mut run.adapter);
+            }
+            VIEW.lock().start = false;
+            let Some(fighter_kind) = natives::fighter_kind(at) else {
+                return;
+            };
+            run.fighter_kind = fighter_kind;
+            run.config = config;
+            run.controller.start(length(config));
+            run.pending = true;
+            run.reroll = true;
+            run.sampled = None;
+            run.planning_failed = false;
+            PLACING.store(
+                EDIT.swap(false, Ordering::AcqRel)
+                    || config.surface == 4 && VIEW.lock().picker.selected.is_none(),
+                Ordering::Release,
+            );
+        }
+        if placing() {
+            let mut view = VIEW.lock();
+            if !view.start {
+                drop(view);
+                notice(run, None);
+                return;
+            }
+            view.start = false;
+            PLACING.store(false, Ordering::Release);
+        }
+        OUTCOMES.drain(|outcome| {
+            run.controller.outcome(outcome);
+        });
+        if let Ok(event) = run.controller.tick(
+            &mut run.adapter,
+            false,
+            GUARD_PRESS.swap(false, Ordering::AcqRel),
+        ) {
+            if event == Event::Summary {
+                run.pending = false;
+                run.planning_failed = false;
+            }
+            if let Event::NeedSetup { reroll } = event {
+                run.pending = true;
+                run.reroll = reroll;
+                if reroll {
+                    run.sampled = None;
+                }
+            }
+        }
+        if run.controller.session.phase == Phase::Flight {
+            let reaction =
+                super::tech_native::id("FIGHTER_INSTANCE_WORK_ID_FLOAT_DAMAGE_REACTION_FRAME")
+                    .map(|id| natives::get_float(at, id));
+            if reaction.is_some_and(|r| r.is_finite() && r <= 0.) {
+                run.after_reaction = run.after_reaction.saturating_add(1);
+            } else {
+                run.after_reaction = 0;
+            }
+            let left_tumble = run.adapter.attempt().ok().is_some_and(|attempt| {
+                attempt.state == crate::model::tech_launch::AttemptState::Flying
+            }) && still_tumbling(at) == Some(false);
+            if (run.after_reaction > 120 || left_tumble) && !run.controller.awaiting_outcome() {
+                match run.controller.abandon() {
+                    Event::NeedSetup { reroll } => {
+                        run.pending = true;
+                        run.reroll = reroll;
+                    }
+                    Event::Summary => run.adapter.restore(),
+                    _ => {}
+                }
+            }
+        }
+        if run.planning_failed {
+            notice(
+                run,
+                Some("Approximate aim has no solution for these values"),
+            );
+            return;
+        }
+        if run.pending {
+            if run.reroll && run.sampled.is_none() {
+                let Some(blast) = tech_surfaces::blast_bounds() else {
+                    return;
+                };
+                let gravity = natives::get_param_float(at, hash40("air_accel_y"), 0);
+                let cap = natives::get_param_float(at, hash40("air_speed_y_stable"), 0);
+                if !gravity.is_finite() || gravity <= 0. || !cap.is_finite() || cap <= 0. {
+                    return;
+                }
+                let mut view = VIEW.lock();
+                let spot = if run.config.surface == 4 {
+                    view.picker.selected.filter(|s| s.current(&mut source))
+                } else {
+                    picker::random_spot(
+                        &view.surfaces,
+                        &mut source,
+                        kind(run.config),
+                        range,
+                        &mut |n| draw(&mut run.rng, n),
+                    )
+                };
+                let Some(spot) = spot else {
+                    drop(view);
+                    notice(run, Some("Choose a stage surface"));
+                    return;
+                };
+                view.picker.selected = Some(spot);
+                let result = planner::plan(
+                    run.config,
+                    planner::Context {
+                        surfaces: &view.surfaces,
+                        spot,
+                        params: FlightParams {
+                            brake: 0.051,
+                            gravity,
+                            fall_speed_cap: cap,
+                        },
+                        blast: solver::editor_bounds(blast),
+                        view: (run.config.camera == 1).then(|| solver::editor_bounds(range)),
+                    },
+                    &mut |n| draw(&mut run.rng, n),
+                );
+                let Some(plan) = result else {
+                    run.planning_failed = true;
+                    drop(view);
+                    notice(
+                        run,
+                        Some("Approximate aim has no solution for these values"),
+                    );
+                    return;
+                };
+                run.sampled = Some((plan.setup, spot));
+                run.approximate = plan.approximate;
+            }
+            if let Some((setup, spot)) = run.sampled {
+                if !spot.current(&mut source) {
+                    notice(run, Some("Selected surface moved; choose a stage point"));
+                    return;
+                }
+                if matches!(
+                    run.controller.place(&mut run.adapter, setup),
+                    Ok(Event::Placed)
+                ) {
+                    run.pending = false;
+                    run.after_reaction = 0;
+                }
+            }
+        }
+        notice(run, None);
+    });
+    super::tech_placing::request(
+        2,
+        running()
+            && !open
+            && !published::input_owners().covers_strip()
+            && (placing() || config.camera == 1),
+    );
+}

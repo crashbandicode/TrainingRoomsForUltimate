@@ -258,7 +258,10 @@ fn slider_frame(menu: &Menu, screen: &Screen, row: usize, state: SliderState, fr
     let lower = matches!(state, SliderState::LowerHover | SliderState::LowerSelected);
     for (i, name) in ["Min", "Max"].into_iter().enumerate() {
         let value = values.get(i).copied().unwrap_or(0);
-        push(frame, name, &format!("{value}%"), if selected && (i == 0) == lower { Tone::On } else { Tone::Normal });
+        let mut label = String::new();
+        if let Some(spec) = super::tech_settings::scale(ROWS[row].id) { let _ = spec.write(value, &mut label); }
+        else { let _ = write!(label, "{value}%"); }
+        push(frame, name, &label, if selected && (i == 0) == lower { Tone::On } else { Tone::Normal });
     }
     frame.focus = Some(u8::from(!lower));
     let _ = frame.hint.write_str(HINT_SLIDER);
@@ -273,7 +276,7 @@ fn directions_frame(menu: &Menu, screen: &Screen, row: usize, chip: usize, frame
     }
     frame.chip_focus = chip as u8;
     frame.chip_visual = match ROWS[row].id {
-        "di_state" => ChipVisual::Di,
+        "di_state" | "tech_di_direction" => ChipVisual::Di,
         "sdi_state" => ChipVisual::Sdi,
         _ => ChipVisual::None,
     };

@@ -109,6 +109,8 @@ pub mod ordered_ids;
 pub mod pause_helper;
 #[path = "model/settings.rs"]
 pub mod settings;
+#[path = "model/tech_settings.rs"]
+pub mod tech_settings;
 #[path = "model/settings_file.rs"]
 pub mod settings_file;
 #[path = "model/sha256.rs"]
@@ -247,3 +249,5 @@ pub mod tech_launch;
 
 #[path = "model/sites_tech_launch.rs"]
 pub mod sites_tech_launch;
+#[path = "model/sites_tech_surfaces.rs"]
+pub mod sites_tech_surfaces;

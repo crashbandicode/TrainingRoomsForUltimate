@@ -52,6 +52,7 @@ pub fn clear_intro_store() {
 static RAISED: AtomicU8 = AtomicU8::new(0);
 pub const RAISE_EGGS: u8 = 1;
 pub const RAISE_BTT: u8 = 2;
+pub const RAISE_TECH: u8 = 4;
 
 /// A practice game's bit: its notice stands (`on`) or is gone.
 pub fn raise(mode: u8, on: bool) {

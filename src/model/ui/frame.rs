@@ -445,7 +445,14 @@ pub fn write_value(menu: &Menu, row: usize, out: &mut Text<72>) {
                 DelayView::Range(range) => write!(out, "{} - {}  >", range.min, range.max),
             };
         }
-        RowValue::Slider { lower, upper } => _ = write!(out, "{lower} - {upper}  >"),
+        RowValue::Slider { lower, upper } => {
+            if let Some(spec) = super::tech_settings::scale(r.id) {
+                let _ = spec.write(lower, out);
+                let _ = out.write_str(" - ");
+                let _ = spec.write(upper, out);
+                let _ = out.write_str("  >");
+            } else { let _ = write!(out, "{lower} - {upper}  >"); }
+        }
         RowValue::Chips(mask) => _ = write!(out, "{} selected  >", mask.count_ones()),
         RowValue::Chord(chord) => _ = write!(out, "{chord}  >"),
         RowValue::OverridesSet(n) => _ = write!(out, "{n} of 13 set  >"),

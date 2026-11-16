@@ -32,3 +32,8 @@ mod tech_native;
 mod tech_launch_native;
 pub mod tech_adapter;
 pub mod writer;
+
+pub mod tech;
+pub mod tech_surfaces;
+
+mod tech_placing;

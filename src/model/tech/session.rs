@@ -15,7 +15,7 @@ pub enum Direction {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Grade {
-    Perfect(u16),
+    Perfect(Option<u16>),
     Held,
     Early(u16),
     Locked(u16),
@@ -34,7 +34,9 @@ impl Grade {
     }
     pub fn write(self, out: &mut impl Write) -> fmt::Result {
         match self {
-            Self::Perfect(n) => write!(out, "Perfect · {n}f"),
+            Self::Perfect(Some(n)) => write!(out, "Perfect · {n}f"),
+            // restriction: tech-calibration-unmeasured
+            Self::Perfect(None) => out.write_str("Perfect · timing unavailable"),
             Self::Held => out.write_str("Tech (held)"),
             Self::Early(n) => write!(out, "Early by {n}f"),
             Self::Locked(n) => write!(out, "Locked out (2nd press {n}f after 1st)"),
@@ -51,13 +53,13 @@ pub struct Decision {
     pub tech: Option<Direction>,
     pub count: u16,
     pub previous: u16,
-    pub window: u16,
+    pub window: f32,
     pub lockout: u16,
     pub reaction: f32,
     pub damage_fall: bool,
     pub enabled: bool,
     /// V1 native press-frame calibration supplied by runtime, never guessed here.
-    pub press_frame_offset: u16,
+    pub press_frame_offset: Option<u16>,
 }
 /// None waits for a new press for up to LATE frames after contact.
 pub fn grade(d: Decision) -> Option<Grade> {
@@ -65,7 +67,10 @@ pub fn grade(d: Decision) -> Option<Grade> {
         return Some(if d.reaction <= 0.0 || d.damage_fall {
             Grade::Held
         } else {
-            Grade::Perfect(d.count + d.press_frame_offset)
+            Grade::Perfect(
+                d.press_frame_offset
+                    .map(|offset| d.count.saturating_add(offset)),
+            )
         });
     }
     if !d.enabled {
@@ -74,11 +79,13 @@ pub fn grade(d: Decision) -> Option<Grade> {
     if d.damage_fall || d.reaction <= 0.0 {
         return Some(Grade::AfterHitstun);
     }
-    if d.count < d.window && d.previous < d.lockout {
+    let count = f32::from(d.count);
+    if count < d.window && d.previous < d.lockout {
         return Some(Grade::Locked(d.previous));
     }
-    if d.count >= d.window && d.count < d.window.saturating_add(d.lockout) {
-        return Some(Grade::Early(d.count - d.window + 1));
+    if count >= d.window && count < d.window + f32::from(d.lockout) {
+        // Count advances in whole frames; ceil(window) is the first early count.
+        return Some(Grade::Early((count - d.window.ceil()) as u16 + 1));
     }
     None
 }
@@ -117,6 +124,7 @@ pub struct Summary {
     pub streak: u32,
     pub best: u32,
     pub offset_sum: u32,
+    pub timed_perfect: u32,
 }
 impl Summary {
     pub fn record(&mut self, grade: Grade) {
@@ -133,7 +141,10 @@ impl Summary {
         match grade {
             Grade::Perfect(n) => {
                 self.perfect += 1;
-                self.offset_sum += u32::from(n);
+                if let Some(n) = n {
+                    self.offset_sum += u32::from(n);
+                    self.timed_perfect += 1;
+                }
             }
             Grade::Held => self.held += 1,
             Grade::Early(_) => self.early += 1,
@@ -143,7 +154,7 @@ impl Summary {
         }
     }
     pub fn average(&self) -> Option<f32> {
-        (self.perfect > 0).then(|| self.offset_sum as f32 / self.perfect as f32)
+        (self.timed_perfect > 0).then(|| self.offset_sum as f32 / self.timed_perfect as f32)
     }
     pub fn write(&self, out: &mut impl Write) -> fmt::Result {
         write!(
@@ -186,6 +197,7 @@ impl Session {
             streak: 0,
             best: 0,
             offset_sum: 0,
+            timed_perfect: 0,
         },
         result: None,
         length: Length::Free,
@@ -229,7 +241,7 @@ impl Session {
     }
     /// No contact, KO or tumble escape repeats the same sampled setup immediately.
     pub fn abandon(&mut self) -> Action {
-        if self.phase != Phase::Flight {
+        if !matches!(self.phase, Phase::Flight | Phase::Delay(_)) {
             return Action::None;
         }
         self.result = Some(Grade::NoContact);
@@ -242,7 +254,8 @@ impl Session {
         }
     }
     /// Exactly one tick per P1 game frame. Menus pass paused=true.
-    /// `new_guard_press` is native trigger-count restart, not shield held.
+    /// `new_guard_press` requires a separately proven native press event.
+    /// A raw shoulder sample or counter decrease is not sufficient proof.
     pub fn tick(&mut self, paused: bool, new_guard_press: bool) -> Action {
         if paused || matches!(self.phase, Phase::Off | Phase::Done) {
             return Action::None;
@@ -293,5 +306,49 @@ impl Session {
             _ => {}
         }
         Action::None
+    }
+}
+
+impl Direction {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::InPlace => "In place",
+            Self::RollLeft => "Roll left",
+            Self::RollRight => "Roll right",
+            Self::Wall => "Wall tech",
+            Self::WallJump => "Wall jump",
+            Self::Ceiling => "Ceiling tech",
+        }
+    }
+}
+impl Session {
+    pub fn write_progress(&self, out: &mut impl Write) -> fmt::Result {
+        match self.length {
+            Length::Attempts(n) => write!(out, "{}/{}", self.summary.attempts, n),
+            Length::Frames(total) => {
+                let seconds = total.saturating_sub(self.elapsed).div_ceil(60);
+                write!(out, "{}:{:02} left", seconds / 60, seconds % 60)
+            }
+            Length::Free => write!(out, "#{}", self.summary.attempts),
+        }?;
+        write!(out, " · streak {}", self.summary.streak)
+    }
+}
+/// Best streaks persist for this process/session family, independently of the
+/// current run's summary. Fixed storage follows the existing practice-game model.
+pub struct Bests {
+    entries: [u32; 128],
+}
+impl Bests {
+    pub const EMPTY: Self = Self { entries: [0; 128] };
+    pub fn record(&mut self, fighter: i32, streak: u32) -> u32 {
+        let Some(best) = usize::try_from(fighter)
+            .ok()
+            .and_then(|kind| self.entries.get_mut(kind))
+        else {
+            return streak;
+        };
+        *best = (*best).max(streak);
+        *best
     }
 }
