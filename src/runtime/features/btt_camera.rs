@@ -48,6 +48,14 @@ unsafe fn manager() -> usize {
 /// # Safety
 /// The game thread, in a battle scene.
 pub unsafe fn apply(want: bool) {
+    if !USABLE.load(Ordering::Acquire) { return; }
+    request(1, want);
+}
+
+/// Shared placing camera: BTT bit 1, Tech bit 2. The last owner restores the first native mode.
+/// # Safety
+/// The game thread, in a battle scene; callers release their bit on every placing exit.
+pub unsafe fn request(owner_bit: u8, want: bool) {
     if !USABLE.load(Ordering::Acquire) {
         return;
     }
@@ -55,7 +63,7 @@ pub unsafe fn apply(want: bool) {
     let mode = (manager != 0 && scene::current().is_some()).then(|| ((manager + sites_pkg2::CAMERA_MODE_FIELD) as *const i32).read_volatile());
     let act = {
         let mut camera = CAMERA.lock();
-        let act = camera.step(want, mode);
+        let act = camera.request(owner_bit, want, mode);
         HOLD.store(camera.holding(), Ordering::Release);
         act
     };
@@ -63,7 +71,7 @@ pub unsafe fn apply(want: bool) {
     let changed = natives::change_active_camera(manager, to);
     #[cfg(feature = "diag")]
     crate::runtime::diag_log::diagnostic(format_args!(
-        "[Btt] camera want={want} mode_before={mode:?} mode_after={} changed={changed:?}",
+        "[Btt] camera want={want} mode_before={mode:?} mode_after={} changed={changed:?} owner={owner_bit}",
         ((manager + sites_pkg2::CAMERA_MODE_FIELD) as *const i32).read_volatile()
     ));
     #[cfg(not(feature = "diag"))]

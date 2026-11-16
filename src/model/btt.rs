@@ -258,6 +258,24 @@ pub fn projectile_breaks(
     })
 }
 
+/// Shared placing controls, without stage bounds or projection.
+pub fn placing_motion(p: &Pad, was: u16, repeat_age: &mut u8) -> [f32; 2] {
+    let (tilt, unit) = placing_parts(p, was, repeat_age);
+    [0, 1].map(|i| tilt[i] + unit[i])
+}
+
+// Keep the two terms so BTT retains its original (cursor + tilt) + unit rounding.
+fn placing_parts(p: &Pad, was: u16, repeat_age: &mut u8) -> ([f32; 2], [f32; 2]) {
+    let down = |k: u8| p.held & bit(k) != 0;
+    let pad = p.held & DPAD;
+    *repeat_age = repeat_age.saturating_add(1) * u8::from(pad != 0 && pad == was & DPAD);
+    let repeat = *repeat_age == 0 || *repeat_age >= 15 && *repeat_age % 2 == 1;
+    let step = f32::from(pad != 0 && !down(ZL) && !down(B) && repeat);
+    let unit = [[DPAD_RIGHT, DPAD_LEFT], [DPAD_UP, DPAD_DOWN]].map(|[hi, lo]| step * (f32::from(down(hi)) - f32::from(down(lo))));
+    let tilt = [0, 1].map(|i| p.stick[i] * SPEED * f32::from(p.stick[i].abs() >= DEAD));
+    (tilt, unit)
+}
+
 /// The layout's identity for the session's best: its target positions to half a unit, in no order.
 fn key(at: &[[f32; 2]]) -> u64 {
     let h = |v: f32, m: u64| ((v * 2.0).round() as i64 as u64).wrapping_mul(m);
@@ -502,15 +520,9 @@ impl Btt {
         let pressed = |k: u8| p.pressed & bit(k) != 0;
         let (zl, held_b, pick, count) = (down(ZL), down(B), self.pick.unwrap_or(0), self.count());
         self.msg.1 = self.msg.1.saturating_sub(1);
-        // The cursor: the stick, and the D-pad a unit a press, repeating from the 15th frame held (not with ZL or B: chords).
-        let pad = p.held & DPAD;
-        self.rep = self.rep.saturating_add(1) * u8::from(pad != 0 && pad == was & DPAD);
-        let repeat = self.rep == 0 || self.rep >= 15 && self.rep % 2 == 1;
-        let step = f32::from(pad != 0 && !zl && !held_b && repeat);
-        let unit = [[DPAD_RIGHT, DPAD_LEFT], [DPAD_UP, DPAD_DOWN]].map(|[hi, lo]| step * (f32::from(down(hi)) - f32::from(down(lo))));
+        let (tilt, unit) = placing_parts(&p, was, &mut self.rep);
         // A camera change alone never moves the cursor: it is kept in the box when it moves, and once the camera has settled, so
         // it never stays off screen either (btt-5, 11-15; Eden rc14-int3-rr2-f1 dragged an untouched cursor 100 units up).
-        let tilt = [0, 1].map(|i| p.stick[i] * SPEED * f32::from(p.stick[i].abs() >= DEAD));
         let clamp = tilt.iter().chain(&unit).any(|v| *v != 0.0) || self.calm >= CALM;
         for (i, range) in b.into_iter().enumerate() {
             let at = self.cursor[i] + tilt[i] + unit[i];
@@ -721,10 +733,17 @@ pub const fn pointer_ok(p: usize) -> bool {
 pub struct Camera {
     saved: Option<i32>,
     cool: u32,
+    owners: u8,
 }
 
 impl Camera {
-    pub const IDLE: Camera = Camera { saved: None, cool: 0 };
+    pub const IDLE: Camera = Camera { saved: None, cool: 0, owners: 0 };
+
+    /// BTT uses bit 1, Tech bit 2; a handover preserves the first native mode.
+    pub fn request(&mut self, owner_bit: u8, want: bool, mode: Option<i32>) -> Option<i32> {
+        self.owners = self.owners & !owner_bit | owner_bit * u8::from(want);
+        self.step(self.owners != 0, mode)
+    }
 
     /// The mode took the camera from the game and has not given it back: the Hide Tech camera hooks stand down.
     pub fn holding(&self) -> bool {
@@ -733,16 +752,16 @@ impl Camera {
 
     /// One pass of Player 1: `want` the Fixed camera, `mode` the game's now (`None`: no camera manager, the scene is over). It
     /// asks (`Some(mode)`) for the Fixed camera at most once in `RETRY` frames while the game is in another mode, and gives the camera back
-    /// at once, to the mode first seen, when it is not wanted. A mode the game was already in (the Fixed camera) is not held.
+    /// at once, to the mode first seen, when it is not wanted. The first mode is retained even when it was already Fixed.
     pub fn step(&mut self, want: bool, mode: Option<i32>) -> Option<i32> {
         self.cool = self.cool.saturating_sub(1);
         let Some(now) = mode else {
             self.saved = None;
             return None;
         };
+        if want { self.saved.get_or_insert(now); }
         match (want, self.saved) {
             (true, _) if now != FIXED && self.cool == 0 => {
-                self.saved.get_or_insert(now);
                 self.cool = RETRY;
                 Some(FIXED)
             }

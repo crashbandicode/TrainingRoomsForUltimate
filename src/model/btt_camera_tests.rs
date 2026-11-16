@@ -58,9 +58,9 @@ fn btt_camera_stands_down_without_a_manager() {
     // The scene ended (no manager): nothing to restore, and the hooks are free again.
     assert_eq!((cam.step(true, None), cam.holding()), (None, false));
     assert_eq!(cam.step(false, Some(FIXED)), None, "nothing was held across the scene");
-    // Already on the Fixed camera when asked (the game's own option): nothing switched, nothing to restore.
+    // Already Fixed: remember that exact mode too, even though no native switch is needed.
     let mut cam = Camera::IDLE;
-    assert_eq!((cam.step(true, Some(FIXED)), cam.holding()), (None, false));
+    assert_eq!((cam.step(true, Some(FIXED)), cam.holding()), (None, true));
     assert_eq!(cam.step(false, Some(FIXED)), None);
 }
 
@@ -93,6 +93,41 @@ fn btt_camera_manager_pointer_is_checked_before_it_is_read() {
         assert!(!pointer_ok(bad), "{bad:#x}");
     }
 }
+fn btt_camera_owners_preserve_mode_through_handover() {
+    fn call(cam: &mut Camera, mode: &mut i32, owner: u8, want: bool) -> Option<i32> {
+        let act = cam.request(owner, want, Some(*mode));
+        if let Some(to) = act { *mode = to; }
+        act
+    }
+    for before in [NORMAL, ZOOM, FIXED] {
+        // BTT only, Tech only: stable requests never acquire a second time.
+        for owner in [1, 2] {
+            let (mut cam, mut mode) = (Camera::IDLE, before);
+            assert_eq!(call(&mut cam, &mut mode, owner, true), (before != FIXED).then_some(FIXED));
+            for _ in 0..60 { assert_eq!(call(&mut cam, &mut mode, owner, true), None); }
+            call(&mut cam, &mut mode, owner, false);
+            assert_eq!(mode, before);
+            assert!(!cam.holding());
+        }
+        // Both, then each direction of handover: the remaining owner keeps Fixed and the first saved mode.
+        for (first, second) in [(1, 2), (2, 1)] {
+            let (mut cam, mut mode) = (Camera::IDLE, before);
+            call(&mut cam, &mut mode, first, true);
+            assert_eq!(call(&mut cam, &mut mode, second, true), None);
+            assert_eq!(call(&mut cam, &mut mode, first, false), None);
+            assert_eq!(mode, FIXED);
+            assert!(cam.holding());
+            for _ in 0..60 { assert_eq!(call(&mut cam, &mut mode, second, true), None); }
+            call(&mut cam, &mut mode, second, false);
+            assert_eq!(mode, before);
+            assert!(!cam.holding());
+        }
+    }
+    let mut cam = Camera::IDLE;
+    assert_eq!(cam.request(1, true, Some(FIXED)), None);
+    assert_eq!(cam.request(1, false, Some(ZOOM)), Some(FIXED), "an original Fixed mode is preserved too");
+}
+
 /// The cases of this module in one table.
 #[test]
 fn case_table() {
@@ -102,6 +137,7 @@ fn case_table() {
         ("btt_camera_reasserts_at_a_rate_and_keeps_the_first_mode", btt_camera_reasserts_at_a_rate_and_keeps_the_first_mode as fn()),
         ("btt_camera_stands_down_without_a_manager", btt_camera_stands_down_without_a_manager as fn()),
         ("btt_camera_restores_each_placement_exit", btt_camera_restores_each_placement_exit as fn()),
+        ("btt_camera_owners_preserve_mode_through_handover", btt_camera_owners_preserve_mode_through_handover as fn()),
         ("btt_camera_manager_pointer_is_checked_before_it_is_read", btt_camera_manager_pointer_is_checked_before_it_is_read as fn()),
     ]);
 }

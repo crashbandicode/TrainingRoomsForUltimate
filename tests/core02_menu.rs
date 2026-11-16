@@ -145,10 +145,10 @@ fn layout_row_counts_match_the_rc_freeze() {
     // rc.14 SL4: the Setup library group gained Save setup here (10 → 11).
     // rc.14: Display & Controls gained Frame data colours and Spot labels, Recording gained Match sweet/sour spot (the operator, 2026-11-14,
     // SP1 to SP5; 11 → 13 and 12 → 13). rc.14 hb-legend: Frame data colours and Launch angles became items of the Hitbox Visualization checklist (13 → 12).
-    assert_eq!(counts(false), [34, 11, 13, 53, 12, 3]);
-    assert_eq!(counts(true), [33, 11, 13, 53, 12, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 123);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 122);
+    assert_eq!(counts(false), [34, 11, 13, 54, 12, 3]);
+    assert_eq!(counts(true), [33, 11, 13, 54, 12, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 124);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 123);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 5);
@@ -160,7 +160,7 @@ fn layout_row_counts_match_the_rc_freeze() {
     // (104: Lobby Items, Phase 2 N11; 105: Ready Hats, P-HOT; rc.6: CPU Level; rc.13: Aerial Drift, Taunts; rc.14: Hide CPU and the
     // seven Practice games rows; Save setup here; two spots rows.)
     // rc.15 DESIGN §7: session row and twenty variable/editor rows follow BTT.
-    assert_eq!(ROWS.len(), 127);
+    assert_eq!(ROWS.len(), 128);
     for editor in [Editor::SetupSave, Editor::SetupSaveHere, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }
