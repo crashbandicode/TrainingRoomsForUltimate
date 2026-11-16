@@ -164,38 +164,77 @@ fn actual_cpu_request_handoff_and_reload_readiness() {
         roster,
         "fn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool)",
     );
-    let request = block(roster, "pub fn request_cpu_kind(kind: u32)");
-    let readiness = block(roster, "pub fn cpu_reload_ready() -> bool");
-    let notice = block(roster, "pub(crate) fn notice_blocked() -> bool");
-    let preload_pending = block(cpu, "pub(super) fn preload_pending()->bool");
-    let intercept = block(
-        cpu,
-        "pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option<bool>",
+    let queue_with = block(
+        roster,
+        "fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: bool,",
     );
+    let request = block(roster, "pub fn request_cpu_kind(kind: u32)");
+    let request_with = block(roster, "fn request_cpu_kind_with(kind: u32,");
+    let readiness = block(roster, "pub fn cpu_reload_ready() -> bool");
+    let readiness_with = block(roster, "fn cpu_reload_ready_with(read_scope:");
+    let notice = block(roster, "pub(crate) fn notice_blocked() -> bool");
+    let notice_with = block(roster, "fn notice_blocked_with(backend_ready:");
+    let preload_pending = block(cpu, "pub(super) fn preload_pending()->bool");
+    let intercept = block(cpu,
+        "pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<bool>");
 
     assert!(player.contains(
-        "pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option<bool>"
+        "pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<bool>"
     ));
-    let player_stub = "pub fn intercept(_: Role, _: Selection, _: bool) -> Option<bool> { None }";
-    let saved_stub = if saved_alpha.contains(
-        "pub(super) fn intercept(roster_role: Role, selection: Selection) -> Option<bool>",
-    ) {
-        "pub fn intercept(_: Role, _: Selection) -> Option<bool> { None }"
-    } else {
-        assert!(saved_alpha
-            .contains("pub(super) fn intercept(roster_role: Role, selection: Selection) -> bool"));
-        "pub fn intercept(_: Role, _: Selection) -> bool { false }"
-    };
+    let player_stub = "pub fn intercept_with(_: Role, _: Selection, _: bool, _: impl Fn() -> super::TrainingModpackMenu) -> Option<bool> { None }";
+    assert!(saved_alpha.contains(
+        "pub(super) fn intercept_with(roster_role: Role, selection: Selection, read_menu: impl Fn() -> TrainingModpackMenu) -> Option<bool>"
+    ));
+    let saved_stub = "pub fn intercept_with(_: Role, _: Selection, _: impl Fn() -> super::TrainingModpackMenu) -> Option<bool> { None }";
 
     let mut fixture = FIXTURE.to_owned();
     fixture = replace_once(fixture, "// CPU_PRELOAD_PENDING", preload_pending);
-    fixture = replace_once(fixture, "// CPU_INTERCEPT", intercept);
-    fixture = replace_once(fixture, "// NOTICE_BLOCKED", notice);
-    fixture = replace_once(fixture, "// QUEUE_ADMITTED", queue);
-    fixture = replace_once(fixture, "// CPU_RELOAD_READY", readiness);
-    fixture = replace_once(fixture, "// REQUEST_CPU_KIND", request);
+    // Existing fixture assertions call the wrapper; routing executes the exact
+    // closure-based native-owner implementation extracted above.
+    let cpu_intercept = format!("{intercept}\npub fn intercept(role: Role, selection: Selection, user_request: bool) -> Option<bool> {{ intercept_with(role, selection, user_request, || setting(&MENU)) }}");
+    fixture = replace_once(fixture, "// CPU_INTERCEPT", &cpu_intercept);
+    fixture = replace_once(
+        fixture,
+        "// NOTICE_BLOCKED",
+        &format!("{notice}\n{notice_with}"),
+    );
+    fixture = replace_once(
+        fixture,
+        "// QUEUE_ADMITTED",
+        &format!("{queue}\n{queue_with}"),
+    );
+    fixture = replace_once(
+        fixture,
+        "// CPU_RELOAD_READY",
+        &format!("{readiness}\n{readiness_with}"),
+    );
+    fixture = replace_once(
+        fixture,
+        "// REQUEST_CPU_KIND",
+        &format!("{request}\n{request_with}"),
+    );
     fixture = replace_once(fixture, "// PLAYER_INTERCEPT_STUB", player_stub);
     fixture = replace_once(fixture, "// SAVED_ALPHA_INTERCEPT_STUB", saved_stub);
+    // The old stand-in separated the factory from its Fighter return type.
+    // The actual enqueue closure names TrioFighter, so use the same value type.
+    fixture = replace_once(
+        fixture,
+        "struct TrioFighter;",
+        "type TrioFighter = Fighter;",
+    );
+    fixture = replace_once(fixture, "impl TrioFighter {", "impl Fighter {");
+    fixture.push_str(
+        r#"
+// Dependency stand-ins for the real closure-taking runtime fragments.
+type Scope = RequestScope;
+impl Role {
+    fn enabled_with(self, read_menu: impl Fn() -> TrainingModpackMenu) -> bool {
+        let _ = read_menu();
+        self.enabled()
+    }
+}
+"#,
+    );
 
     let unique = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
