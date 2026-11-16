@@ -61,9 +61,169 @@ impl Input {
 #[derive(Clone, Copy)]
 struct Baseline {
     input: Input,
+    hidden: Hidden,
     attempt: u32,
     scope: FrameReceipt,
     complete: bool,
+}
+/// Owned 13.0.5 energy layout and runtime-resolved work keys; no DamageInfo bytes are copied.
+#[derive(Clone, Copy)]
+struct Hidden {
+    vptr: usize,
+    reset_type: i32,
+    enabled: u8,
+    counter: u32,
+    b8: u16,
+    ba: u8,
+    bb: u8,
+    speed: [u32; 2],
+    accel: [u32; 2],
+    brake: [u32; 2],
+    limit: [u32; 2],
+    alternate: Option<([u32; 2], i32)>,
+    floats: [f32; 3],
+    flags: [bool; 4],
+    motion: MotionContext,
+}
+/// Diagnostic observations only. Reading module state does not trace the
+/// common module's instruction paths or reproduce its pending-motion effects.
+#[derive(Clone, Copy)]
+struct MotionContext {
+    actual: u64,
+    pending: u64,
+    frame: u32,
+    rate: u32,
+    damage_rate: u32,
+    init_reaction: u32,
+    rotation: u32,
+    roll_set_angle: bool,
+    pierce_ground: bool,
+    stopped_damage: bool,
+    cursor: bool,
+    cursor_frame: i32,
+    paralyze_frame: i32,
+}
+unsafe fn motion_context(accessor: usize) -> Option<MotionContext> {
+    let damage_stop: extern "C" fn(usize) -> bool =
+        std::mem::transmute(game::text_base() + 0x2089220);
+    let rate: extern "C" fn(usize) -> f32 = std::mem::transmute(game::text_base() + 0x205cc30);
+    Some(MotionContext {
+        actual: natives::motion_kind(accessor),
+        pending: state::work_get_int64(accessor, id("FIGHTER_STATUS_DAMAGE_WORK_INT_MOTION_KIND")?)
+            as u64,
+        frame: natives::motion_frame(accessor).to_bits(),
+        rate: rate(accessor).to_bits(),
+        damage_rate: natives::get_float(
+            accessor,
+            id("FIGHTER_STATUS_DAMAGE_WORK_FLOAT_DAMAGE_MOTION_RATE")?,
+        )
+        .to_bits(),
+        init_reaction: natives::get_float(
+            accessor,
+            id("FIGHTER_STATUS_DAMAGE_WORK_FLOAT_REACTION_FRAME")?,
+        )
+        .to_bits(),
+        rotation: natives::get_float(accessor, id("FIGHTER_STATUS_DAMAGE_WORK_FLOAT_ROT_ANGLE")?)
+            .to_bits(),
+        roll_set_angle: natives::is_flag(
+            accessor,
+            id("FIGHTER_STATUS_DAMAGE_FLAG_FLY_ROLL_SET_ANGLE")?,
+        ),
+        pierce_ground: natives::is_flag(
+            accessor,
+            id("FIGHTER_INSTANCE_WORK_ID_FLAG_PIERCE_GROUND_DAMAGE")?,
+        ),
+        stopped_damage: damage_stop(accessor),
+        cursor: natives::is_flag(accessor, id("FIGHTER_INSTANCE_WORK_ID_FLAG_CURSOR")?),
+        cursor_frame: natives::get_int(accessor, id("FIGHTER_INSTANCE_WORK_ID_INT_CURSOR_FRAME")?),
+        paralyze_frame: natives::get_int(
+            accessor,
+            id("FIGHTER_INSTANCE_WORK_ID_INT_INVALID_PARALYZE_FRAME")?,
+        ),
+    })
+}
+unsafe fn float_ids() -> Option<[i32; 3]> {
+    Some([
+        id("FIGHTER_INSTANCE_WORK_ID_FLOAT_DAMAGE_REACTION_FRAME")?,
+        id("FIGHTER_INSTANCE_WORK_ID_FLOAT_DAMAGE_REACTION_FRAME_LAST")?,
+        id("FIGHTER_INSTANCE_WORK_ID_FLOAT_DAMAGE_SPEED_UP_MAX_MAG")?,
+    ])
+}
+unsafe fn flag_ids() -> Option<[i32; 4]> {
+    Some([
+        id("FIGHTER_INSTANCE_WORK_ID_FLAG_DAMAGE_SPEED_UP")?,
+        id("FIGHTER_INSTANCE_WORK_ID_FLAG_DAMAGE_FLY_AIR")?,
+        id("FIGHTER_STATUS_DAMAGE_FLAG_END_REACTION")?,
+        id("FIGHTER_STATUS_DAMAGE_FLAG_GROUND")?,
+    ])
+}
+unsafe fn hidden(accessor: usize) -> Option<Hidden> {
+    let e = energy(accessor)?;
+    let vptr = (e as *const usize).read();
+    let offset = vptr.checked_sub(game::text_base())?;
+    if offset != 0x4f88968 && offset != 0x4f88a18 {
+        return None;
+    }
+    // Only the alternate energy has these trailing fields. Its virtual speed
+    // getter selects +0xc0 while the signed +0xd0 counter is positive.
+    let alternate = (offset == 0x4f88a18).then(|| {
+        (
+            ((e + 0xc0) as *const [u32; 2]).read_unaligned(),
+            ((e + 0xd0) as *const i32).read(),
+        )
+    });
+    Some(Hidden {
+        vptr,
+        reset_type: ((e + 0xa0) as *const i32).read(),
+        enabled: ((e + 0x30) as *const u8).read(),
+        counter: ((e + 0xb4) as *const u32).read(),
+        b8: ((e + 0xb8) as *const u16).read(),
+        ba: ((e + 0xba) as *const u8).read(),
+        bb: ((e + 0xbb) as *const u8).read(),
+        speed: ((e + 0x10) as *const [u32; 2]).read_unaligned(),
+        accel: ((e + 0x40) as *const [u32; 2]).read_unaligned(),
+        brake: ((e + 0x60) as *const [u32; 2]).read_unaligned(),
+        limit: ((e + 0x70) as *const [u32; 2]).read_unaligned(),
+        alternate,
+        floats: float_ids()?.map(|key| natives::get_float(accessor, key)),
+        flags: flag_ids()?.map(|key| natives::is_flag(accessor, key)),
+        motion: motion_context(accessor)?,
+    })
+}
+unsafe fn log_hidden(run: &Spike, accessor: usize, moment: &str) -> Option<Hidden> {
+    let h = hidden(accessor)?;
+    let kind = match run.mode {
+        1 => "ordinary",
+        2 => "match",
+        _ => "fresh",
+    };
+    let (alternate_speed, alternate_frames) = h.alternate.unwrap_or(([0; 2], 0));
+    diagnostic(format_args!(
+        "[TechDirect] hidden attempt={} mode={} kind={kind} moment={moment} frame={} age={} vptr=0x{:x} vptr_offset=0x{:x} reset={} enabled={} b4={:08x} b8={:04x} ba={:02x} bb={:02x} speed=({:08x},{:08x}) accel=({:08x},{:08x}) brake=({:08x},{:08x}) limit=({:08x},{:08x}) alt_present={} alt_speed=({:08x},{:08x}) alt_frames={} reaction={:08x} reaction_last={:08x} speed_up={} speed_up_max={:08x} fly_air={} end_reaction={} ground={} status={} grounded={}",
+        run.attempt,run.mode_name(),run.sample,run.age,h.vptr,h.vptr.wrapping_sub(game::text_base()),
+        h.reset_type,h.enabled,h.counter,h.b8,h.ba,h.bb,
+        h.speed[0],h.speed[1],h.accel[0],h.accel[1],h.brake[0],h.brake[1],h.limit[0],h.limit[1],
+        h.alternate.is_some(),alternate_speed[0],alternate_speed[1],alternate_frames,
+        h.floats[0].to_bits(),h.floats[1].to_bits(),h.flags[0],h.floats[2].to_bits(),
+        h.flags[1],h.flags[2],h.flags[3],natives::status_kind(accessor),natives::is_grounded(accessor)
+    ));
+    let m = h.motion;
+    diagnostic(format_args!(
+        "[TechDirect] context attempt={} mode={} kind={kind} moment={moment} frame={} age={} motion_actual={:016x} motion_pending={:016x} motion_frame={:08x} motion_rate={:08x} damage_motion_rate={:08x} init_reaction={:08x} rotation={:08x} roll_set_angle={} pierce_ground={} stopped_damage={} stopped={} cursor={} cursor_frame={} paralyze_frame={} paths=fe844/ffd90/fe99c/feb84/fef5c path_execution=UNOBSERVED reset_type={} type5_info_read=UNOBSERVED",
+        run.attempt,run.mode_name(),run.sample,run.age,m.actual,m.pending,m.frame,m.rate,
+        m.damage_rate,m.init_reaction,m.rotation,m.roll_set_angle,m.pierce_ground,m.stopped_damage,
+        natives::is_stop(accessor),m.cursor,m.cursor_frame,m.paralyze_frame,h.reset_type
+    ));
+    Some(h)
+}
+unsafe fn apply_derived(accessor: usize, observed: Hidden) -> Option<()> {
+    for (key, value) in float_ids()?.into_iter().zip(observed.floats) {
+        natives::set_float(accessor, value, key);
+    }
+    for (key, value) in flag_ids()?.into_iter().zip(observed.flags) {
+        natives::set_flag(accessor, value, key);
+    }
+    Some(())
 }
 struct Spike {
     active: bool,
@@ -76,6 +236,7 @@ struct Spike {
     arrange_cpu: bool,
     contact: bool,
     inspecting: bool,
+    inspect_last: Option<(u32, u32, i32)>,
     player_scope: Option<FrameReceipt>,
     input: Input,
     baseline: Option<Baseline>,
@@ -93,6 +254,7 @@ impl Spike {
             arrange_cpu: false,
             contact: false,
             inspecting: false,
+            inspect_last: None,
             player_scope: None,
             input: Input::empty(),
             baseline: None,
@@ -153,9 +315,15 @@ unsafe fn guarded() -> bool {
         crate::model::sites_pkg3::STATE_HEAL_OFFSET,
         crate::model::sites_pkg3::STATE_ADD_DAMAGE_OFFSET,
         crate::model::sites_pkg3::STATE_SET_SITUATION_KIND_OFFSET,
+        crate::model::sites_pkg3::STATE_WORK_GET_INT64_OFFSET,
         crate::model::sites_pkg2::CHANGE_STATUS_FORCE_OFFSET,
         crate::model::sites_pkg2::WORK_SET_FLOAT_OFFSET,
         crate::model::sites_pkg2::WORK_GET_FLOAT_OFFSET,
+        crate::model::sites_pkg2::WORK_IS_FLAG_OFFSET,
+        crate::model::sites_pkg2::WORK_SET_FLAG_OFFSET,
+        crate::model::sites_pkg2::WORK_GET_INT_OFFSET,
+        crate::model::sites_pkg2::MOTION_KIND_OFFSET,
+        crate::model::sites_pkg2::MOTION_FRAME_OFFSET,
         crate::model::sites_pkg2::STAGE_ID_CALL_OFFSET,
         crate::model::sites_pkg2::STAGE_TABLE_OFFSET,
         crate::model::sites_pkg2::STATUS_KIND_OFFSET,
@@ -238,31 +406,95 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
     place(accessor, input);
     state::heal(accessor, -natives::damage(accessor, 0));
     state::add_damage(accessor, input.percent);
+    let velocity = math::launch_velocity(input.kb, input.direction)?;
+    #[repr(C, align(16))]
+    struct NativeVector([f32; 4]);
+    let enable: extern "C" fn(usize) = std::mem::transmute(game::text_base() + 0x20f6560);
+    let damage = energy(accessor)?;
+    let observed = if run.mode == 2 {
+        Some(run.baseline?.hidden)
+    } else {
+        None
+    };
+    log_hidden(
+        run,
+        accessor,
+        if observed.is_some() {
+            "match_pre"
+        } else {
+            "cold_pre"
+        },
+    )?;
+    let vector = NativeVector([velocity.x, velocity.y, 0.0, 0.0]);
+    if let Some(observed) = observed {
+        // The export dispatches through slot+0x40. Guard both export and actual target.
+        let vptr = (damage as *const usize).read();
+        let target = ((vptr + 0x40) as *const usize).read();
+        if target != game::text_base() + 0x6d8560 {
+            diagnostic(format_args!(
+                "[TechDirect] fault=reset_target actual=0x{target:x}"
+            ));
+            return None;
+        }
+        let reset: extern "C" fn(usize, i32, *const NativeVector, *const NativeVector, usize) =
+            std::mem::transmute(game::text_base() + 0x20f64d0);
+        // x2 is read as q0 (16 bytes); x3 is unused by this guarded damage reset body.
+        reset(
+            damage,
+            observed.reset_type,
+            &vector,
+            &NativeVector([0.0; 4]),
+            accessor,
+        );
+        diagnostic(format_args!(
+            "[TechDirect] seed attempt={} source=ordinary baseline_attempt={} reset={} before_status=true type5_info_read=UNOBSERVED",
+            run.attempt,run.baseline?.attempt,observed.reset_type
+        ));
+    } else {
+        // Cold V1 precedes the first real hit. Observe this provisional state explicitly;
+        // never invent a reset type or borrow a type from a later reference hit.
+        let set: extern "C" fn(usize, *const NativeVector) =
+            std::mem::transmute(game::text_base() + 0x20f8320);
+        set(damage, &vector);
+        diagnostic(format_args!(
+            "[TechDirect] seed attempt={} source=cold_unseeded before_status=true",
+            run.attempt
+        ));
+    }
+    enable(damage);
     state::set_situation_kind(accessor, id("SITUATION_KIND_AIR")?);
     natives::set_float(accessor, native_reaction, reaction_id);
     natives::change_status_force(accessor, id("FIGHTER_STATUS_KIND_DAMAGE_FLY")?, false);
-    // The native status initializes first. No DamageInfo/energy bytes from the reference hit are cloned.
     if !is_status(
         natives::status_kind(accessor),
         "FIGHTER_STATUS_KIND_DAMAGE_FLY",
     ) {
         return None;
     }
-    let velocity = math::launch_velocity(input.kb, input.direction)?;
-    #[repr(C, align(16))]
-    struct NativeVector([f32; 4]);
-    let set: extern "C" fn(usize, *const NativeVector) =
-        std::mem::transmute(game::text_base() + 0x20f8320);
-    let enable: extern "C" fn(usize) = std::mem::transmute(game::text_base() + 0x20f6560);
-    let damage = energy(accessor)?;
-    // Owned full-body proof: this setter's only write is the same speed store as Damage's own setter.
-    set(damage, &NativeVector([velocity.x, velocity.y, 0.0, 0.0]));
-    enable(damage);
-    natives::set_float(accessor, native_reaction, reaction_id);
+    if let Some(observed) = observed {
+        apply_derived(accessor, observed)?;
+    } else {
+        natives::set_float(accessor, native_reaction, reaction_id);
+    }
     setup(run, accessor);
+    log_hidden(
+        run,
+        accessor,
+        if observed.is_some() {
+            "match_launch"
+        } else {
+            "cold_launch"
+        },
+    )?;
+    let actual_velocity = self::velocity(accessor)?;
+    let actual_reaction = reaction(accessor)?;
     diagnostic(format_args!(
-        "[TechDirect] launched attempt={} mode=direct vx={:08x} vy={:08x} reaction={:08x}",
+        "[TechDirect] launched attempt={} mode=direct vx={:08x} vy={:08x} reaction={:08x} age={} requested_vx={:08x} requested_vy={:08x} requested_reaction={:08x}",
         run.attempt,
+        actual_velocity.x.to_bits(),
+        actual_velocity.y.to_bits(),
+        actual_reaction.to_bits(),
+        run.age,
         velocity.x.to_bits(),
         velocity.y.to_bits(),
         native_reaction.to_bits()
@@ -483,6 +715,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             return;
         }
         run.inspecting = true;
+        run.inspect_last = None;
     }
     if run.inspecting {
         let generation = crate::runtime::published::live_generation();
@@ -492,11 +725,27 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
                     natives::module_accessor(1).map_or(-1, |a| natives::status_kind(a));
                 let cpu_wait = id("FIGHTER_STATUS_KIND_WAIT") == Some(cpu_status);
                 let adopted = super::cpu::adopted_settings_generation();
-                diagnostic(format_args!("[TechDirect] settings generation={generation} adopted={adopted} mash_state={:?} mash_triggers={} cpu_status={cpu_status} cpu_wait={cpu_wait}",live.cpu.mash_state.0,live.cpu.mash_triggers));
+                let observed = (generation, adopted, cpu_status);
+                if run.inspect_last != Some(observed) {
+                    // A generation identifies the immutable published array/trigger values.
+                    // Re-emit adoption/status transitions, without per-frame array spam.
+                    diagnostic(format_args!("[TechDirect] settings generation={generation} adopted={adopted} mash_state={:?} mash_triggers={} cpu_status={cpu_status} cpu_wait={cpu_wait}",live.cpu.mash_state.0,live.cpu.mash_triggers));
+                    run.inspect_last = Some(observed);
+                }
             }
         }
     }
     if command == 5 {
+        if !guarded() {
+            diagnostic(format_args!("[TechDirect] fault=off_guards"));
+            return;
+        }
+        state::heal(accessor, -natives::damage(accessor, 0));
+        diagnostic(format_args!(
+            "[TechDirect] healed damage={:08x} status={}",
+            natives::damage(accessor, 0).to_bits(),
+            natives::status_kind(accessor)
+        ));
         let baseline = run.baseline;
         *run = Spike::new();
         run.baseline = baseline;
@@ -530,14 +779,19 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             walk(accessor);
             return;
         }
+        let Some(direction) = math::direction_degrees(315.0) else {
+            diagnostic(format_args!("[TechDirect] fault=direction"));
+            run.stop();
+            return;
+        };
         run.input = Input {
             origin: Vec2 {
                 x: if command == 1 { -40.0 } else { 0.0 },
                 y: if command == 1 { 0.01 } else { 30.0 },
             },
-            direction: Vec2 { x: 0.0, y: -1.0 },
+            direction,
             kb: 100.0,
-            angle: 270.0,
+            angle: 315.0,
             percent: if command == 1 { 20.0 } else { 60.0 },
             weight: natives::weight(accessor),
             lr: 1.0,
@@ -558,7 +812,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
         place(accessor, run.input);
         state::heal(accessor, -natives::damage(accessor, 0));
         state::add_damage(accessor, run.input.percent);
-        if command == 1 {
+        if command == 1 || command == 2 {
             let (Some(ground), Some(wait)) =
                 (id("SITUATION_KIND_GROUND"), id("FIGHTER_STATUS_KIND_WAIT"))
             else {
@@ -568,12 +822,22 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             };
             state::set_situation_kind(accessor, ground);
             natives::change_status_force(accessor, wait, false);
-            run.baseline = None;
-            run.arrange_cpu = true;
-            diagnostic(format_args!(
-                "[TechDirect] ordinary_armed attempt={}",
-                run.attempt
-            ));
+            if command == 1 {
+                run.baseline = None;
+                run.arrange_cpu = true;
+                diagnostic(format_args!(
+                    "[TechDirect] ordinary_armed attempt={}",
+                    run.attempt
+                ));
+            } else {
+                run.phase = 1;
+                diagnostic(format_args!(
+                    "[TechDirect] match_armed attempt={} grounded={} status={}",
+                    run.attempt,
+                    natives::is_grounded(accessor),
+                    natives::status_kind(accessor)
+                ));
+            }
         } else {
             run.phase = 1;
         }
@@ -606,8 +870,14 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
                         weight: natives::weight(accessor),
                         lr: natives::lr(accessor),
                     };
+                    let Some(observed) = log_hidden(&run, accessor, "real_hitlag") else {
+                        diagnostic(format_args!("[TechDirect] fault=real_hidden"));
+                        run.stop();
+                        return;
+                    };
                     run.baseline = Some(Baseline {
                         input: run.input,
+                        hidden: observed,
                         attempt: run.attempt,
                         scope: receipt.unwrap(),
                         complete: false,
@@ -663,6 +933,22 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             return;
         };
         let input = run.input;
+        if run.sample < 20
+            && log_hidden(
+                &run,
+                accessor,
+                if run.sample == 0 {
+                    "first_sample"
+                } else {
+                    "sample"
+                },
+            )
+            .is_none()
+        {
+            diagnostic(format_args!("[TechDirect] fault=sample_hidden"));
+            run.stop();
+            return;
+        }
         diagnostic(format_args!("[TechDirect] frame attempt={} mode={} frame={} vx={:08x} vy={:08x} reaction={:08x} hitstun={:08x} status={status} tumble={} kb={:08x} angle={:08x} percent={:08x} weight={:08x} x={:08x} y={:08x}",
             run.attempt,run.mode_name(),run.sample,v.x.to_bits(),v.y.to_bits(),reaction.to_bits(),reaction.to_bits(),tumble(status),input.kb.to_bits(),input.angle.to_bits(),input.percent.to_bits(),input.weight.to_bits(),natives::pos_x(accessor).to_bits(),natives::pos_y(accessor).to_bits()));
         run.sample = run.sample.saturating_add(1);
