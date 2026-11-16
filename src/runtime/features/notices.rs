@@ -47,11 +47,10 @@ pub fn clear_intro_store() {
     INTRO_STORE_DUE.store(false, Ordering::Release);
 }
 
-/// The practice games whose standing notice is up, one bit each (`RAISE_EGGS`; Break the Targets has its own): while
+/// The practice games whose standing notice is up, one bit each (`RAISE_EGGS`): while
 /// any is, the notice slot sits in the top band (`panes::NOTICE_TOP_Y`), so the targets keep the middle of the screen.
 static RAISED: AtomicU8 = AtomicU8::new(0);
 pub const RAISE_EGGS: u8 = 1;
-pub const RAISE_BTT: u8 = 2;
 
 /// A practice game's bit: its notice stands (`on`) or is gone.
 pub fn raise(mode: u8, on: bool) {

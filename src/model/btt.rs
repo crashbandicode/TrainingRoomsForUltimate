@@ -23,8 +23,7 @@ pub const ROW: &str = "btt";
 pub const ROW_PLACE: &str = "btt_place";
 pub const ROW_LAYOUTS: &str = "btt_layouts";
 pub const HEADER: &str = "Break the Targets";
-/// The standing notice's id (Eggs-ercise has 0x2E; the two modes are never on together, but each clears only its own).
-pub const NOTICE_ID: u8 = 0x2F;
+/// At most ten targets in one course.
 pub const MAX: usize = 10;
 /// The hot five: a stage's saved layouts used last (Recording's convention), which the chords step through.
 pub const HOT: usize = 5;
