@@ -1,5 +1,5 @@
 //! S0 diagnostic launcher. A rewritten ordinary CPU hit keeps the whole native damage path.
-//! diag-tech-s0.req: real-hit | direct-post | ordinary | direct-match | direct | walk | off | inspect.
+//! diag-tech-s0.req: real-hit | direct-post[-log|-full] | ordinary | direct-match | direct | walk | off | inspect.
 //! No product mode, heap, blocking lock or new hook.
 use super::tech_spike_guards;
 use crate::model::cpu::hash::lua_bind_hash;
@@ -12,6 +12,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 
 static REQUEST: AtomicU8 = AtomicU8::new(0);
 static GUARDED: AtomicU8 = AtomicU8::new(0);
+static V1_GUARDED: AtomicU8 = AtomicU8::new(0);
 static OBSERVING: AtomicBool = AtomicBool::new(false);
 static NEXT_ATTEMPT: AtomicU32 = AtomicU32::new(1);
 static RUN: hos_lock::Mutex<Spike> = hos_lock::Mutex::new(Spike::new());
@@ -26,6 +27,8 @@ pub fn request(text: &str) {
         "inspect" => 6,
         "real-hit" => 7,
         "direct-post" => 8,
+        "direct-post-log" => 9,
+        "direct-post-full" => 10,
         _ => {
             diagnostic(format_args!("[TechDirect] request invalid"));
             return;
@@ -244,6 +247,7 @@ struct Spike {
     input: Input,
     baseline: Option<Baseline>,
     rewritten: u32,
+    launch_reaction: f32,
 }
 impl Spike {
     const fn new() -> Self {
@@ -264,6 +268,7 @@ impl Spike {
             input: Input::empty(),
             baseline: None,
             rewritten: 0,
+            launch_reaction: 0.0,
         }
     }
     fn mode_name(&self) -> &'static str {
@@ -272,6 +277,9 @@ impl Spike {
         } else {
             "direct"
         }
+    }
+    fn post_init(&self) -> bool {
+        matches!(self.mode, 8..=10)
     }
     fn stop(&mut self) {
         self.active = false;
@@ -306,7 +314,8 @@ unsafe fn guarded() -> bool {
     let mut all = base != 0;
     if all {
         for &(name, offset, expected) in tech_spike_guards::SITES {
-            let ok = std::slice::from_raw_parts((base + offset) as *const u8, 64) == expected;
+            let ok =
+                std::slice::from_raw_parts((base + offset) as *const u8, 64) == expected.as_slice();
             diagnostic(format_args!(
                 "[TrainingRooms] tech_s0_guard site={name} ok={ok}"
             ));
@@ -353,6 +362,124 @@ unsafe fn guarded() -> bool {
     all &= super::cpu_common::passive_ready();
     GUARDED.store(if all { 1 } else { 2 }, Ordering::Release);
     all
+}
+
+unsafe fn v1_guarded() -> bool {
+    match V1_GUARDED.load(Ordering::Acquire) {
+        1 => return true,
+        2 => return false,
+        _ => {}
+    }
+    let base = game::text_base();
+    let mut all = base != 0;
+    if all {
+        for &(offset, expected) in super::tech_direct_v1_guards::DIRECT_V1_GUARDS {
+            let ok = std::slice::from_raw_parts((base + offset) as *const u8, 64) == expected;
+            diagnostic(format_args!(
+                "[TrainingRooms] tech_s0_guard site=direct_v1_{offset:x} ok={ok}"
+            ));
+            all &= ok;
+        }
+    }
+    V1_GUARDED.store(if all { 1 } else { 2 }, Ordering::Release);
+    all
+}
+
+/// Check the concrete Damage/Work virtual targets used by the new native calls.
+unsafe fn v1_damage_module(accessor: usize) -> Option<()> {
+    let base = game::text_base();
+    for &(module_offset, slot, expected) in super::tech_direct_v1_guards::DIRECT_V1_VIRTUAL_TARGETS
+    {
+        let module = ((accessor + module_offset) as *const usize).read();
+        if module == 0 || module & 7 != 0 {
+            return None;
+        }
+        let vptr = (module as *const usize).read();
+        if vptr == 0 || vptr & 7 != 0 {
+            return None;
+        }
+        let target = ((vptr + slot) as *const usize).read();
+        if !expected.iter().any(|&offset| target == base + offset) {
+            diagnostic(format_args!(
+                "[TechDirect] fault=v1_damage_target slot={slot:x} actual=0x{target:x}"
+            ));
+            return None;
+        }
+    }
+    Some(())
+}
+
+fn complete_baseline(run: &mut Spike) {
+    if !matches!(run.mode, 1 | 7) || run.sample < 20 || !run.contact {
+        return;
+    }
+    let Some(baseline) = run.baseline.as_mut().filter(|b| !b.complete) else {
+        return;
+    };
+    baseline.complete = true;
+    let input = baseline.input;
+    diagnostic(format_args!("[TechDirect] baseline_complete attempt={} command={} kb={:08x} direction_x={:08x} direction_y={:08x} percent={:08x} weight={:08x} start_x={:08x} start_y={:08x} lr={:08x} ground_at_hit={}",
+        baseline.attempt,run.mode,input.kb.to_bits(),input.direction.x.to_bits(),input.direction.y.to_bits(),
+        input.percent.to_bits(),input.weight.to_bits(),input.origin.x.to_bits(),input.origin.y.to_bits(),input.lr.to_bits(),baseline.hidden.flags[3]));
+}
+
+unsafe fn post_init_v1(run: &Spike, accessor: usize) -> Option<()> {
+    if run.mode != 10 {
+        return Some(());
+    }
+    let reaction_ids = float_ids()?;
+    let flags = flag_ids()?;
+    let wanted = [run.launch_reaction - 1.0, run.launch_reaction];
+    let mut writes = 0u8;
+    for (index, value) in wanted.into_iter().enumerate() {
+        let key = reaction_ids[index];
+        if natives::get_float(accessor, key).to_bits() != value.to_bits() {
+            natives::set_float(accessor, value, key);
+            writes |= 1 << index;
+        }
+    }
+    for (index, value) in [(1usize, true), (2usize, false)] {
+        if natives::is_flag(accessor, flags[index]) != value {
+            natives::set_flag(accessor, value, flags[index]);
+            writes |= 1 << (index + 1);
+        }
+    }
+    diagnostic(format_args!("[TechDirect] derived attempt={} command={} writes={writes:02x} wanted_reaction={:08x} wanted_last={:08x} fly_air=true end_reaction=false",
+        run.attempt,run.mode,wanted[0].to_bits(),wanted[1].to_bits()));
+
+    v1_damage_module(accessor)?;
+    let baseline = run.baseline?;
+    // The native common helper passes math_toint(status reaction), then
+    // as_number(), to this bool predicate. It does not return MAX_MAG.
+    let observed_init = f32::from_bits(baseline.hidden.motion.init_reaction);
+    if !observed_init.is_finite() || observed_init < 0.0 || observed_init > i32::MAX as f32 {
+        return None;
+    }
+    let predicate_input = (observed_init as i64) as f32;
+    let eligible: extern "C" fn(usize, f32) -> bool =
+        std::mem::transmute(game::text_base() + 0x693e50);
+    let speed_up = eligible(accessor, predicate_input);
+    // S0's explicitly permitted same-boot seed: this is the game's own
+    // MAX_MAG for the identical R1 input, never a guessed 2.0 multiplier.
+    // The generic product calculation remains a follow-up to the trace.
+    // The normal common helper's false branch explicitly clears MAX_MAG.
+    let max_mag = if speed_up {
+        baseline.hidden.floats[2]
+    } else {
+        0.0
+    };
+    if !max_mag.is_finite() {
+        return None;
+    }
+    if natives::get_float(accessor, reaction_ids[2]).to_bits() != max_mag.to_bits() {
+        natives::set_float(accessor, max_mag, reaction_ids[2]);
+    }
+    if natives::is_flag(accessor, flags[0]) != speed_up {
+        natives::set_flag(accessor, speed_up, flags[0]);
+    }
+    diagnostic(format_args!("[TechDirect] speed_up_seed attempt={} command={} baseline_attempt={} predicate_reaction={:08x} baseline_init_reaction={:08x} calc_reaction={:08x} eligible={speed_up} baseline_eligible={} max_mag={:08x} mag_source=baseline_native inherited_info=true",
+        run.attempt,run.mode,baseline.attempt,predicate_input.to_bits(),observed_init.to_bits(),run.launch_reaction.to_bits(),baseline.hidden.flags[0],max_mag.to_bits()));
+    Some(())
 }
 /// The existing ATTACK hook calls this AFTER the game's command, before returning to ACMD.
 /// Restrict edits to this attempt's fresh ordinary CPU accessor. Never copy AttackData or
@@ -484,6 +611,7 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
     if native_reaction.to_bits() != reference.to_bits() {
         return None;
     }
+    run.launch_reaction = native_reaction;
     let reaction_id = id("FIGHTER_INSTANCE_WORK_ID_FLOAT_DAMAGE_REACTION_FRAME")?;
     place(accessor, input);
     state::heal(accessor, -natives::damage(accessor, 0));
@@ -532,7 +660,7 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
             "[TechDirect] seed attempt={} source=ordinary baseline_attempt={} reset={} before_status=true type5_info_read=UNOBSERVED",
             run.attempt,run.baseline?.attempt,observed.reset_type
         ));
-    } else if run.mode == 8 {
+    } else if run.post_init() {
         diagnostic(format_args!(
             "[TechDirect] seed attempt={} source=post_init_pending before_status=false",
             run.attempt
@@ -548,11 +676,44 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
             run.attempt
         ));
     }
-    if run.mode != 8 {
+    if !run.post_init() {
         enable(damage);
     }
-    state::set_situation_kind(accessor, id("SITUATION_KIND_AIR")?);
-    natives::set_float(accessor, native_reaction, reaction_id);
+    if matches!(run.mode, 9 | 10) {
+        if !v1_guarded() {
+            return None;
+        }
+        v1_damage_module(accessor)?;
+        let overwrite: extern "C" fn(usize, f32) =
+            std::mem::transmute(game::text_base() + 0x200b8b0);
+        overwrite(accessor, native_reaction);
+        diagnostic(format_args!(
+            "[TechDirect] log_reaction attempt={} command={} reaction={:08x} before_status=true",
+            run.attempt,
+            run.mode,
+            native_reaction.to_bits()
+        ));
+    }
+    let ground_at_hit = run.post_init() && run.baseline?.hidden.flags[3];
+    state::set_situation_kind(
+        accessor,
+        id(if ground_at_hit {
+            "SITUATION_KIND_GROUND"
+        } else {
+            "SITUATION_KIND_AIR"
+        })?,
+    );
+    if run.post_init() {
+        natives::set_flag(
+            accessor,
+            ground_at_hit,
+            id("FIGHTER_STATUS_DAMAGE_FLAG_GROUND")?,
+        );
+    }
+    // D2 measures the log's effect on init; a manual reaction write would hide O1.
+    if !matches!(run.mode, 9 | 10) {
+        natives::set_float(accessor, native_reaction, reaction_id);
+    }
     natives::change_status_force(accessor, id("FIGHTER_STATUS_KIND_DAMAGE_FLY")?, false);
     if !is_status(
         natives::status_kind(accessor),
@@ -562,7 +723,7 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
     }
     if let Some(observed) = observed {
         apply_derived(accessor, observed)?;
-    } else {
+    } else if !matches!(run.mode, 9 | 10) {
         natives::set_float(accessor, native_reaction, reaction_id);
     }
     setup(run, accessor);
@@ -588,8 +749,8 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
         velocity.y.to_bits(),
         native_reaction.to_bits()
     ));
-    run.started = run.mode != 8;
-    run.phase = if run.mode == 8 { 3 } else { 2 };
+    run.started = !run.post_init();
+    run.phase = if run.post_init() { 3 } else { 2 };
     Some(())
 }
 
@@ -660,11 +821,7 @@ pub unsafe fn decision(accessor: usize, status: i32, passive: bool) {
     diagnostic(format_args!("[TechDirect] contact attempt={} mode={} frame={} surface={surface} line=0x{line:x} x={:08x} y={:08x} nx={:08x} ny={:08x} passive={passive} status={status}",
         run.attempt,run.mode_name(),run.sample,natives::pos_x(accessor).to_bits(),natives::pos_y(accessor).to_bits(),normal[0].to_bits(),normal[1].to_bits()));
     run.contact = true;
-    if run.mode == 1 && run.sample >= 20 {
-        if let Some(b) = &mut run.baseline {
-            b.complete = true;
-        }
-    }
+    complete_baseline(&mut run);
 }
 
 /// Layout reads are independently guarded by the exact native accessors' 64-byte windows.
@@ -916,7 +1073,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             weight: natives::weight(accessor),
             lr: 1.0,
         };
-        if command == 2 {
+        if matches!(command, 2 | 8..=10) {
             let Some(baseline) = baseline.filter(|b| b.complete && Some(b.scope) == receipt) else {
                 diagnostic(format_args!("[TechDirect] fault=baseline_incomplete"));
                 run.stop();
@@ -928,11 +1085,15 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
                 return;
             }
             run.input = baseline.input;
+            let input = run.input;
+            diagnostic(format_args!("[TechDirect] baseline_adopted attempt={} command={} baseline_attempt={} kb={:08x} direction_x={:08x} direction_y={:08x} percent={:08x} weight={:08x} start_x={:08x} start_y={:08x} lr={:08x} ground_at_hit={}",
+                run.attempt,command,baseline.attempt,input.kb.to_bits(),input.direction.x.to_bits(),input.direction.y.to_bits(),
+                input.percent.to_bits(),input.weight.to_bits(),input.origin.x.to_bits(),input.origin.y.to_bits(),input.lr.to_bits(),baseline.hidden.flags[3]));
         }
         place(accessor, run.input);
         state::heal(accessor, -natives::damage(accessor, 0));
         state::add_damage(accessor, run.input.percent);
-        if command == 1 || command == 2 || command == 7 {
+        if matches!(command, 1 | 2 | 7..=10) {
             let (Some(ground), Some(wait)) =
                 (id("SITUATION_KIND_GROUND"), id("FIGHTER_STATUS_KIND_WAIT"))
             else {
@@ -1073,6 +1234,11 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
         let enable: extern "C" fn(usize) = std::mem::transmute(game::text_base() + 0x20f6560);
         set(damage, &NativeVector([wanted.x, wanted.y, 0.0, 0.0]));
         enable(damage);
+        if post_init_v1(&run, accessor).is_none() {
+            diagnostic(format_args!("[TechDirect] fault=post_init_derived"));
+            run.stop();
+            return;
+        }
         if log_hidden(&run, accessor, "post_init_write").is_none() {
             diagnostic(format_args!("[TechDirect] fault=post_init_hidden"));
             run.stop();
@@ -1129,10 +1295,6 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
         diagnostic(format_args!("[TechDirect] frame attempt={} mode={} frame={} vx={:08x} vy={:08x} reaction={:08x} hitstun={:08x} status={status} tumble={} kb={:08x} angle={:08x} percent={:08x} weight={:08x} x={:08x} y={:08x}",
             run.attempt,run.mode_name(),run.sample,v.x.to_bits(),v.y.to_bits(),reaction.to_bits(),reaction.to_bits(),tumble(status),input.kb.to_bits(),input.angle.to_bits(),input.percent.to_bits(),input.weight.to_bits(),natives::pos_x(accessor).to_bits(),natives::pos_y(accessor).to_bits()));
         run.sample = run.sample.saturating_add(1);
-        if (run.mode == 1 || run.mode == 7) && run.sample >= 20 && run.contact {
-            if let Some(b) = &mut run.baseline {
-                b.complete = true;
-            }
-        }
+        complete_baseline(&mut run);
     }
 }
