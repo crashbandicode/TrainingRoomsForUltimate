@@ -1898,6 +1898,42 @@ fn layout_menu_reads_are_nonblocking_and_a_blocking_edit_seed_fails() {
     }
 }
 
+#[test]
+fn tech_receipt_roots_do_not_wait_on_edits_and_busy_preserves_ownership() {
+    let mut graph = runtime_graph();
+    let one = |g: &Graph, file: &str, key: &str| {
+        let found: Vec<_> = g.find(key).into_iter().filter(|&i| g.funcs[i].file == file).collect();
+        assert_eq!(found.len(), 1, "{file}::{key}");
+        found[0]
+    };
+    let roots = [
+        ("features/tech.rs", "tech::frame"),
+        ("features/tech_adapter.rs", "tech_adapter::attempt"),
+        ("features/tech_adapter.rs", "tech_adapter::frame"),
+        ("features/cpu.rs", "cpu::tech_player_receipt"),
+    ];
+    for (file, key) in roots {
+        assert_eq!(menu_edit_wait_path(&graph, one(&graph, file, key)), None, "{key} waits on EDITED");
+    }
+    let read = one(&graph, "compat/menu.rs", "menu::try_current_menu");
+    let at = graph.funcs[read].body.iter().position(|t| *t == Tok::Ident("try_lock".into())).unwrap();
+    graph.funcs[read].body[at] = Tok::Ident("lock".into());
+    for (file, key) in roots {
+        let witness = menu_edit_wait_path(&graph, one(&graph, file, key)).expect("seeded blocking edit must FAIL the complete Tech root");
+        assert!(witness.iter().any(|key| key == "practice::try_context"), "{witness:?}");
+        assert!(witness.iter().any(|key| key == "cpu::try_role_scene"), "{witness:?}");
+        assert_eq!(witness.last().unwrap(), "menu::try_current_menu");
+    }
+    let source = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime/features/tech_adapter.rs")).unwrap();
+    assert!(source.contains(".map_err(|_| Error::Busy)?"), "receipt unavailability must stay Busy");
+    assert!(source.contains("Err(Error::Busy) => return Err(Error::Busy)"), "attempt must retain ownership on Busy");
+    let frame = &source[source.find("pub(super) unsafe fn frame(").unwrap()..];
+    let busy = frame.find("if fresh == Err(Error::Busy)").unwrap();
+    let retire = frame.find("*slot = None;").unwrap();
+    assert!(busy < retire && frame[busy..retire].contains("return;"), "frame must defer Busy before retiring its lease");
+    assert!(source.contains("receipt == owned.receipt && accessor == owned.accessor_token"), "fresh success must preserve both identity checks");
+}
+
 /// The scan on a small fixture: a guard bound by `let` and held over a call, a temporary held over its statement, a
 /// guard dropped before the call, and an inversion between two threads.
 #[test]

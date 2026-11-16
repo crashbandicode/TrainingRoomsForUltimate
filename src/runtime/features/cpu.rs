@@ -243,11 +243,7 @@ fn with<R>(f: impl FnOnce(&mut Cpu) -> R) -> Option<R> {
 
 /// Product launch ownership: no wait on the CPU state from a hook.
 pub(super) fn tech_player_receipt() -> Result<Option<FrameReceipt>, ()> {
-    let scene = role_scene();
-    let mut guard = CPU.try_lock().ok_or(())?;
-    let Some(cpu) = guard.as_mut() else { return Ok(None); };
-    let Some(receipt) = cpu.roles.receipt(0) else { return Ok(None); };
-    Ok(role_adapter::current_frame(cpu, scene, receipt).then_some(receipt))
+    role_adapter::try_player_receipt(&CPU, try_role_scene().map_err(|_| ()))
 }
 
 /// Create the state (boot, before any hook is installed).
@@ -370,6 +366,20 @@ fn role_scene() -> Option<Scene> {
     };
     if scene.is_none() { forget_player_position(); }
     scene
+}
+
+/// Unknown menu eligibility is Busy, never a scene departure or a new receipt.
+fn try_role_scene() -> Result<Option<Scene>, crate::runtime::compat::menu::MenuBusy> {
+    use crate::engine::lobby::practice_policy::Context;
+    let scene = crate::runtime::scene::current();
+    let context = crate::runtime::lobby::training::practice::try_context()?;
+    let scene = match (scene, context) {
+        (Some(Scene::Training), Some(Context::Training)) => Some(Scene::Training),
+        (Some(Scene::Lobby), Some(Context::Waiting)) => Some(Scene::Lobby),
+        _ => None,
+    };
+    if scene.is_none() { forget_player_position(); }
+    Ok(scene)
 }
 
 /// All accessor-only hooks pass through current scene AND generation admission.

@@ -10,6 +10,9 @@ macro_rules! lib_unit_tests {
 #[path = "../src/model.rs"]
 #[allow(dead_code)]
 mod model;
+#[path = "../src/runtime/features/cpu_role_adapter.rs"]
+#[allow(dead_code)]
+mod role_adapter;
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
@@ -369,6 +372,25 @@ fn cpu_core_role_table_finds_bodies_by_accessor() {
     let keys: std::collections::BTreeSet<_> =
         (0..8).flat_map(|e| [false, true].map(|p| FighterKey::new(e, p).unwrap().index())).collect();
     assert_eq!(keys.len(), FighterKey::COUNT);
+}
+
+#[test]
+fn tech_receipt_busy_preserves_the_current_owned_generation() {
+    let mut cpu = Cpu::new(CpuSettings::from_snapshot(&Snapshot::factory()), 7);
+    cpu.role_scene(Some(Scene::Lobby));
+    let receipt = cpu.roles.receipt(0).unwrap();
+    let state = hos_lock::Mutex::new(Some(cpu));
+    assert_eq!(role_adapter::try_player_receipt(&state, Err(())), Err(()));
+    assert_eq!(state.lock().as_ref().unwrap().roles.receipt(0), Some(receipt));
+    let held = state.lock();
+    assert_eq!(role_adapter::try_player_receipt(&state, Ok(Some(Scene::Lobby))), Err(()));
+    assert_eq!(held.as_ref().unwrap().roles.receipt(0), Some(receipt));
+    drop(held);
+    assert_eq!(role_adapter::try_player_receipt(&state, Ok(Some(Scene::Lobby))), Ok(Some(receipt)));
+    assert!(state.lock().as_ref().unwrap().roles.current(receipt));
+    // A known departure, unlike Busy, follows the original receipt invalidation.
+    assert_eq!(role_adapter::try_player_receipt(&state, Ok(None)), Ok(None));
+    assert!(!state.lock().as_ref().unwrap().roles.current(receipt));
 }
 
 /// B4: under the P1 pilot the CPU settings can never write entry 0. The role table is the one place a
