@@ -194,7 +194,7 @@ dependencies = [
 
 [[package]]
 name = "layout-builder"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "nx-layout-toolbox",
  "serde_json",

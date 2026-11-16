@@ -232,7 +232,6 @@ unsafe fn write_notice(container: *mut Pane, out: &TickOut, strip: bool) {
 }
 
 
-
 // Compact BTT HUD: existing builders/target material, independent of the transient notice queue.
 unsafe fn write_btt(root: *mut Pane, covered: bool, strip: bool) {
     let container = pane::find_child(root, p::name_of(p::IDX_BTT).as_bytes());

@@ -500,8 +500,8 @@ spot.
 
 ### Break the Targets
 
-A practice game where you choose where the targets go. The stage zooms out so all of it is on screen, you place up to 10
-targets wherever you like, and then you break them all against the clock. It can't run together with Eggs-ercise:
+A practice game where you choose where the targets go. The stage zooms out while you place up to 10 targets, then
+returns to your previous camera mode when you start. Break them all against the clock. It can't run together with Eggs-ercise:
 turning one On turns the other Off.
 
 - **Values:** Off, On
@@ -509,24 +509,29 @@ turning one On turns the other Off.
 - **How:** turn it On and close the menu. With no targets placed yet the placing view opens; with a layout it opens at
   Ready. The Place targets row below goes straight to the placing view.
   - **Placing:** the left stick moves a crosshair (up to 2 units a frame), the D-pad moves it one unit a press (held, it
-    repeats). **A** places a target at the crosshair, and the notice shows "Place targets 3/10". A target can't go on top of
+    repeats). **A** places a target at the crosshair, and the compact box shows "3/10". A target can't go on top of
     another, and 10 is the most. **B** removes the last target when you let go of it: B + D-pad Up still opens the menu and
     removes nothing. **Y** twice clears them all. **X** starts, once at least one target is placed. The game doesn't see
     these buttons while you place.
   - **Ready:** every target is up and the clock reads 0:00.00. It starts with your first input: a button, or the stick
     leaving its dead zone.
-  - **Running:** the notice reads "Targets 4/10   0:07.12". Breaking the last target stops the clock and the notice reads
+  - **Running:** a small target chip, "4/10" and "0:07.12" share one line at the top-left, clear of the frame strip. Breaking the last target stops the clock and the notice reads
     "Done! 10 in 0:18.27 (best 0:16.90)" for three seconds, then Ready again with every target back.
   - The best time is per fighter and per layout, and lasts until the game closes.
-  - Targets stay where you put them: **Target speed** is greyed ("Targets stay still"). **Breaks on** applies, and a
-    break freezes your fighter for a moment and plays the same break animation as Eggs-ercise.
+  - Targets stay where you put them: **Target speed** is greyed ("Targets stay still"). **Breaks on** applies to your fighter's attacks,
+    which briefly freeze your fighter on a break. Projectile hits use their native attack shapes and play the same break animation.
   - To go again, press L+R+A in Training (with **L+R+A Reset** On), or open and close the menu. Each stage keeps its own
     layout until the game closes.
-  - In the waiting room's practice it works as in Training: the camera zooms out and a break freezes your fighter. The
+  - In the waiting room's practice it works as in Training: the camera zooms out while placing and returns on start. The
     targets and the camera are on your own screen only.
 
 ![Break the Targets: Ready at 0:00.00, the first input starts the clock, the three targets break one after another, Done! 3 in 0:04.15, then Ready again with every target back](../media/rc14-btt-run.gif)<br>
 *A run on Battlefield: Ready reads "Targets 0/3   0:00.00" and waits; Fox's first input starts the clock; each break freezes him for a moment and plays the break animation ("Targets 1/3", "2/3"); the third break stops the clock: "Done! 3 in 0:04.15 (best 0:04.15)", then Ready again with every target back. Eden, rc.14 (untested on hardware).*
+
+### Projectiles break targets
+
+**On** by default. P1's projectiles and articles can break targets with their active hitboxes, including fireballs, arrows
+and charge shots. **Off** leaves target breaks to your fighter's attacks. This setting is independent of Hitbox Visualization.
 
 ### Place targets
 
