@@ -459,12 +459,12 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
     if entry == 1 {
         if run.active && run.arrange_cpu {
             let input = Input {
-                origin: Vec2 { x: -12.0, y: 0.01 },
+                origin: Vec2 { x: -52.0, y: 0.01 },
                 ..Input::empty()
             };
             place(accessor, input);
             run.arrange_cpu = false;
-            diagnostic(format_args!("[TechDirect] ordinary_cpu_fixture x={:08x} y={:08x} lr={:08x} unmodified_move=true",(-12.0f32).to_bits(),0.01f32.to_bits(),1.0f32.to_bits()));
+            diagnostic(format_args!("[TechDirect] ordinary_cpu_fixture x={:08x} y={:08x} lr={:08x} unmodified_move=true",(-52.0f32).to_bits(),0.01f32.to_bits(),1.0f32.to_bits()));
         }
         return;
     }
@@ -532,13 +532,13 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
         }
         run.input = Input {
             origin: Vec2 {
-                x: 0.0,
+                x: if command == 1 { -40.0 } else { 0.0 },
                 y: if command == 1 { 0.01 } else { 30.0 },
             },
             direction: Vec2 { x: 0.0, y: -1.0 },
             kb: 100.0,
             angle: 270.0,
-            percent: 60.0,
+            percent: if command == 1 { 20.0 } else { 60.0 },
             weight: natives::weight(accessor),
             lr: 1.0,
         };
