@@ -141,8 +141,8 @@ pub static DEFS: [Def; COUNT] = [
     row!("buff_state", Multiple, 18, []),
     // Misc Settings.
     row!("frame_advantage", Single, 2, [1]),
-    // rc.14: a checklist (`legend::ITEMS`: hitboxes, grab boxes, hurtboxes, frame data colours, launch angles), none ticked;
-    // an older file's two-option row is migrated (`legend::migrate`).
+    // Six visible checklist items, none ticked; seven stored slots retain the original bit positions.
+    // Slot 3 (the retired colour mode) is ignored; an older two-option row migrates (`legend::migrate`).
     row!("hitbox_vis", Multiple, 7, []),
     // Off, Frame strip: the frame strip (SPEC-input-06 §3.1; it replaced `input_display` and `input_display_status`).
     row!("input_display_strip", Single, 2, [1]),
@@ -220,7 +220,7 @@ pub static DEFS: [Def; COUNT] = [
     // §V2.5 Break the Targets: Off / On.
     row!("btt", Single, 2, [0]),
     // rc.14 sweet/sour spots (SP1 to SP5): the strip's spot labels and the combo's match, both Off by default ([On, Off], stored [0, 1]);
-    // appended like lobby_items. (Frame data colours is an item of `hitbox_vis`.)
+    // appended like lobby_items.
     row!("spots_strip", Single, 2, [1]),
     row!("spots_combo", Single, 2, [1]),
 ];

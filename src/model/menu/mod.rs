@@ -758,7 +758,10 @@ impl Menu {
             }
             Control::YesNoRandom => RowValue::Choice(yes_no_random(array)),
             Control::MultiSelect(labels) => {
-                RowValue::Checklist { ticked: array.iter().filter(|v| **v != 0).count(), total: labels.len() }
+                RowValue::Checklist {
+                    ticked: (0..labels.len()).filter(|i| array.get(super::legend::option_slot(row.id, *i)).is_some_and(|v| *v != 0)).count(),
+                    total: labels.len(),
+                }
             }
             Control::MultiSelectRange { first, step, range_id } => {
                 RowValue::Delay(match self.range_of(range_id, first, step) {
@@ -1413,8 +1416,10 @@ impl Menu {
     /// ZL: tick all, or clear all when every entry is already ticked.
     fn all_or_none(&mut self, id: &str) {
         let mut array = self.get(id).to_vec();
-        let all = array.iter().all(|v| *v != 0);
-        for slot in &mut array {
+        let len = if id == super::legend::ROW { options::HITBOX_ITEMS.len() } else { array.len() };
+        let all = (0..len).all(|i| array[super::legend::option_slot(id, i)] != 0);
+        for i in 0..len {
+            let slot = &mut array[super::legend::option_slot(id, i)];
             *slot = if all { 0 } else { (*slot).max(1) };
         }
         self.put(id, &array);
@@ -1427,7 +1432,7 @@ impl Menu {
             Button::Up => self.top(Screen::Checklist { row, cursor: (cursor + len - 1) % len }),
             Button::Down => self.top(Screen::Checklist { row, cursor: (cursor + 1) % len }),
             Button::JumpUp | Button::JumpDown => self.top(Screen::Checklist { row, cursor: jumped(cursor, len, button == Button::JumpDown) }),
-            Button::A => self.toggle_entry(id, cursor),
+            Button::A => self.toggle_entry(id, super::legend::option_slot(id, cursor)),
             Button::ZL => self.all_or_none(id),
             Button::B => _ = self.stack.pop(),
             _ => {}

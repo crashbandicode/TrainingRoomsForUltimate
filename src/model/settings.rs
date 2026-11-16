@@ -137,7 +137,12 @@ pub fn parse_row(def: &Def, value: &Value) -> Result<Vec<u8>, Reason> {
         return Err(Reason::NotAnArray);
     };
     let mut elements = Vec::with_capacity(items.len());
-    for item in items {
+    for (index, item) in items.iter().enumerate() {
+        // rc.15: keep the seven-slot file layout; the retired colour-mode slot has no meaning.
+        if def.id == super::legend::ROW && index == 3 {
+            elements.push(0);
+            continue;
+        }
         let byte = item.as_u64().and_then(|n| u8::try_from(n).ok()).ok_or(Reason::ElementNotAByte)?;
         if byte > def.kind.max() {
             return Err(Reason::ElementAboveMax);
@@ -652,11 +657,35 @@ mod tests {
         assert!(loaded.settings.menu.stage_hazards());
     }
 
+    fn retired_hitbox_colour_slot_is_ignored_in_both_snapshots_and_round_trips() {
+        for obsolete in [serde_json::json!(0), serde_json::json!(1), serde_json::json!(255), serde_json::json!(-1),
+                         serde_json::json!("obsolete"), Value::Null, serde_json::json!({}), serde_json::json!([])] {
+            let saved = serde_json::json!({
+                "menu": {"hitbox_vis": [1, 0, 1, obsolete.clone(), 1, 0, 1], "lra_reset": [0, 1]},
+                "defaults_menu": {"hitbox_vis": [0, 1, 0, obsolete, 0, 1, 0], "lra_reset": [1, 0]}
+            });
+            let loaded = parse(&saved.to_string());
+            assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+            assert_eq!(loaded.settings.menu.get("hitbox_vis"), Some([1, 0, 1, 0, 1, 0, 1].as_slice()));
+            assert_eq!(loaded.settings.defaults.get("hitbox_vis"), Some([0, 1, 0, 0, 0, 1, 0].as_slice()));
+            assert!(!loaded.settings.menu.lra_reset());
+            assert!(loaded.settings.defaults.lra_reset());
+            assert_eq!(parse(&loaded.settings.to_json()).settings, loaded.settings);
+        }
+        let mut snapshot = Snapshot::factory();
+        snapshot.set("hitbox_vis", &[1, 0, 1, 255, 1, 0, 1]).unwrap();
+        assert_eq!(snapshot.get("hitbox_vis"), Some([1, 0, 1, 0, 1, 0, 1].as_slice()));
+        assert_eq!(snapshot.set("hitbox_vis", &[1, 0, 1, 255, 2, 0, 1]), Err(Reason::ElementAboveMax));
+        let (_, def) = def("hitbox_vis").unwrap();
+        assert_eq!(parse_row(def, &serde_json::json!([1, 0, "bad", null, 1, 0, 1])), Err(Reason::ElementNotAByte));
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("factory_round_trips", factory_round_trips as fn()),
+            ("retired_hitbox_colour_slot_is_ignored_in_both_snapshots_and_round_trips", retired_hitbox_colour_slot_is_ignored_in_both_snapshots_and_round_trips as fn()),
             ("a_bad_row_defaults_and_is_reported", a_bad_row_defaults_and_is_reported as fn()),
         ]);
     }

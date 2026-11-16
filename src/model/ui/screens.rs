@@ -165,7 +165,7 @@ fn checklist_frame(menu: &Menu, screen: &Screen, row: usize, cursor: usize, fram
     let current = menu.settings().menu.get(r.id).map(<[u8]>::to_vec).unwrap_or_default();
     lines_window(frame, cursor, total, |i, line| {
         line.label = option_label(r, i, 0, 1);
-        let weight = current.get(i).copied().unwrap_or(0);
+        let weight = current.get(super::legend::option_slot(r.id, i)).copied().unwrap_or(0);
         let (text, tone) = mark(weight != 0);
         let _ = line.value.write_str(text);
         line.value_tone = tone;
@@ -781,17 +781,12 @@ mod tests {
         assert_eq!(frame(&m).conn_count, 0);
         m.press(Button::A);
         let first = frame(&m);
-        assert_eq!(first.conn_count, 1);
-        assert!(first.rows.iter().all(|row| row.sub.is_empty()), "legend colour names reuse only empty checklist sublines");
-        assert_eq!(first.conn[0].string_lossy(), "Multi-colour — Hitbox (attack): one shade per hitbox");
-        assert!(matches!(first.conn_kind[0], super::super::recording_menu::ConnKind::Swatch(super::super::legend::Swatch::HitboxShades)));
-        for _ in 0..3 { m.press(Button::Down); }
-        m.press(Button::A);
-        let coloured = frame(&m);
-        assert_eq!(coloured.conn_count, 3);
-        assert_eq!(coloured.conn[0].string_lossy(), "Red — Strong hitbox");
-        assert_eq!(coloured.conn[1].string_lossy(), "Pink — Weak hitbox");
-        assert_eq!(coloured.conn[2].string_lossy(), "Blue — Windbox (pushes without flinching)");
+        assert_eq!(first.conn_count, 3);
+        assert!(first.rows.iter().all(|row| row.sub.is_empty()), "checklist sublines stay empty");
+        assert_eq!(first.conn[0].string_lossy(), "Red — Strong hitbox");
+        assert_eq!(first.conn[1].string_lossy(), "Pink — Weak hitbox");
+        assert_eq!(first.conn[2].string_lossy(), "Sky blue — Windbox (pushes without flinching)");
+        assert!(matches!(first.conn_kind[0], super::super::recording_menu::ConnKind::Swatch(_)));
         m.press(Button::B);
         let back = frame(&m);
         assert!(!back.popup && back.conn_count == 0);

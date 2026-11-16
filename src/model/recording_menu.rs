@@ -290,7 +290,7 @@ pub enum FileTag {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ConnKind {
     /// A colour-key chip in the shared side panel.
-    Swatch(super::legend::Swatch),
+    Swatch([u8; 4]),
     Head(FileTag),
     Child(FileTag),
     Heading,

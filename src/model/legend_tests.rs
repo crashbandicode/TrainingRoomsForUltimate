@@ -1,4 +1,5 @@
 use super::*;
+const RETIRED_COLOURS: u8 = 8;
 use crate::model::hitbox::{self, layout, HandleSet, HurtboxReader, Sphere, KIND_GRAB, KIND_HIT, KIND_HURT};
 use crate::model::hitbox_orbs::{self as orbs, Board};
 use crate::model::spots::Spot;
@@ -28,19 +29,18 @@ fn legend_part_status_is_the_games_max() {
 
 #[test]
 fn legend_hurtbox_status_colours() {
-    assert_eq!(hurt_tint(0), [1.0, 1.0, 1.0], "normal: white");
-    assert_eq!(hurt_tint(INVINCIBLE), [0.0, 0.5, 0.375], "invincible: teal");
-    assert_eq!(hurt_tint(INTANGIBLE), [0.45, 0.8, 1.0], "intangible: sky blue");
-    assert_eq!(hurt_tint(OFF), [0.45, 0.8, 1.0], "switched off as a whole (the revival platform): nothing hits it, drawn as intangible");
-    assert_eq!(hurt_tint(-1), [1.0, 1.0, 1.0]);
+    assert_eq!(hurt_tint(0), [0.6; 3], "normal: grey");
+    assert_eq!(hurt_tint(INVINCIBLE), [0.2, 1.0, 0.2], "invincible: green");
+    assert_eq!(hurt_tint(INTANGIBLE), [1.0, 1.0, 0.0], "intangible: yellow");
+    assert_eq!(hurt_tint(OFF), hurt_tint(INTANGIBLE), "revival platform cannot be hit");
+    assert_eq!(hurt_tint(-1), hurt_tint(0));
     assert!(![hurt_tint(INTANGIBLE), hurt_tint(INVINCIBLE), hurt_tint(0)].contains(&GRAB));
 }
 
 #[test]
 fn legend_hits_keep_the_strong_and_weak_colours() {
-    let usual = [0.1, 0.2, 0.3];
     for spot in [None, Some(Spot::Sweet), Some(Spot::Sour), Some(Spot::Late)] {
-        let on = hitbox::legend_colour(KIND_HIT, spot, 0, usual, true);
+        let on = hitbox::legend_colour(KIND_HIT, spot, 0);
         assert!(on == hitbox::STRONG_TINT || on == hitbox::WEAK_TINT, "{spot:?}");
     }
 }
@@ -53,16 +53,14 @@ fn legend_windbox_is_knockback_without_hitstun() {
     assert!(!is_windbox(1, [0, 0, 0]), "no knockback: nothing is pushed");
     assert!(!is_windbox(0, [100, 70, 13]), "knockback with hitstun: a hit");
     assert_eq!(legend_colour_of_wind(), WIND);
-    // Deep blue, apart from the intangible hurtboxes' sky blue and every other legend colour.
+    // Sky blue is distinct from every other legend colour.
     for other in [hitbox::STRONG_TINT, hitbox::WEAK_TINT, HURT[0], HURT[1], HURT[2], GRAB] {
         assert!(WIND.iter().zip(other).map(|(a, b)| (a - b).abs()).sum::<f32>() > 0.5, "{other:?}");
     }
 }
 
 fn legend_colour_of_wind() -> [f32; 3] {
-    let colours = [false, true].map(|on| hitbox::legend_colour(KIND_WIND, None, 0, [0.1, 0.2, 0.3], on));
-    assert_eq!(colours[0], colours[1], "a windbox is deep blue whether or not Frame data colours is ticked");
-    colours[1]
+    hitbox::legend_colour(KIND_WIND, None, 0)
 }
 
 /// Attack slots for `want_hits`: (damage, knockback growth / fixed / base, the +0x70 flag, the +0x6e flag), one point sphere each.
@@ -118,7 +116,7 @@ fn legend_windboxes_by_the_flag_whatever_the_damage() {
     assert_eq!(kinds, [KIND_WIND, KIND_WIND, KIND_HIT, KIND_HIT, KIND_HIT]);
     assert!(out[..2].iter().all(|s| s.tint == WIND) && out[2..5].iter().all(|s| s.tint != WIND));
     assert_eq!(out[..len].iter().map(|s| (s.key >> 8) & 0xffff).collect::<Vec<_>>(), [0, 1, 2, 3, 4], "one sphere a slot, its own slot");
-    // Not asked for (Hitboxes alone, no Frame data colours): today's hits in their per-id colours, the flag never read.
+    // The Eggs-ercise geometry reader still avoids wind classification; its attacks use the unranked strong tint.
     let (mut today, mut n) = ([Sphere::NONE; 8], 0);
     let mut plain = cases();
     hitbox::want_hits(&mut plain, &mut today, &mut n, false);
@@ -131,17 +129,13 @@ fn legend_windboxes_by_the_flag_whatever_the_damage() {
 
 #[test]
 fn legend_windboxes_and_hitboxes_combine() {
-    // The operator (~21:27Z): a windbox is a hitbox. Hitboxes ticked draws every hitbox, windboxes included (per-id colours, or the
-    // legend's with Frame data colours, windboxes deep blue); Windboxes ticked draws the windboxes deep blue; both ticked draw each
-    // windbox once; Windboxes alone draws only the windboxes.
+    // A windbox is a hitbox: either choice shows it, both show it once, and the retired colour slot has no effect.
     let row = |hits: u8, wind: u8, colours: u8| shown(&[hits, 0, 0, colours, 0, wind]);
     let drawn = |bits: u8| {
         let mut set = HandleSet::new();
-        set.frame_data = bits & COLOURS != 0;
-        set.wind = bits & WINDBOXES != 0;
         let (mut wants, mut len) = ([Sphere::NONE; 8], 0);
         let mut attacks = cases();
-        hitbox::want_hits(&mut attacks, &mut wants, &mut len, set.identifies_wind());
+        hitbox::want_hits(&mut attacks, &mut wants, &mut len, true);
         set.tint(&mut attacks, &mut wants[..len], 1);
         set.reconcile(&wants[..len], true, &mut orbs::OrbSink { status: 1 });
         let mut out = [Orb::NONE; orbs::BOARD_ORBS];
@@ -151,27 +145,27 @@ fn legend_windboxes_and_hitboxes_combine() {
         shownorbs.sort();
         shownorbs
     };
-    let blue = crate::model::panes::linear([0, 38, 255, 255]);
+    let blue = crate::model::panes::linear([115, 204, 255, 255]);
     let slots = |v: &[(u32, u32, [u8; 4])]| v.iter().map(|o| o.0).collect::<Vec<_>>();
-    // Hitboxes only: all five hitboxes, the windboxes in their per-id colours.
+    // Hitboxes alone includes blue windboxes and ranked attacks.
     let hits = drawn(row(1, 0, 0));
     assert_eq!(slots(&hits), [0, 1, 2, 3, 4]);
-    assert!(hits.iter().all(|o| o.1 == KIND_HIT && o.2 != blue));
-    // Hitboxes with Frame data colours: all five, the two windboxes deep blue, the rest the legend's red.
+    assert!(hits[..2].iter().all(|o| o.1 == KIND_WIND && o.2 == blue) && hits[2..].iter().all(|o| o.1 == KIND_HIT && o.2 != blue));
+    // A stale removed-option value makes no difference.
     let legend = drawn(row(1, 0, 1));
-    assert_eq!(slots(&legend), [0, 1, 2, 3, 4]);
+    assert_eq!(legend, hits, "retired colour slot is ignored");
     assert!(legend[..2].iter().all(|o| o.1 == KIND_WIND && o.2 == blue) && legend[2..].iter().all(|o| o.2 != blue));
-    // Windboxes only: just the two windboxes, deep blue.
+    // Windboxes only: just the two sky-blue windboxes.
     let wind = drawn(row(0, 1, 0));
     assert_eq!(slots(&wind), [0, 1]);
     assert!(wind.iter().all(|o| o.1 == KIND_WIND && o.2 == blue));
-    // Both: every hitbox once, the windboxes deep blue among the others (per-id colours without Frame data colours).
+    // Both: every hitbox once, with sky-blue windboxes among the strength-coloured attacks.
     let both = drawn(row(1, 1, 0));
     assert_eq!(slots(&both), [0, 1, 2, 3, 4], "each windbox drawn once");
     assert!(both[..2].iter().all(|o| o.2 == blue) && both[2..].iter().all(|o| o.1 == KIND_HIT && o.2 != blue));
     // Nothing else ticked draws a windbox; its marks are the hitbox marks.
     assert!(draws(WINDBOXES) && shows(WINDBOXES, KIND_WIND) && !shows(WINDBOXES, KIND_HIT));
-    assert!([GRABS, HURTBOXES, COLOURS, ANGLES].iter().all(|b| !shows(*b, KIND_WIND)));
+    assert!([GRABS, HURTBOXES, RETIRED_COLOURS, ANGLES].iter().all(|b| !shows(*b, KIND_WIND)));
 }
 fn hit(slot: usize) -> Orb {
     Orb { centre: [10.0, 5.0, 1.0], tail: [12.0, 5.0, 1.0], radius: 4.0, color: [255, 0, 0, 255], key: sphere_key(KIND_HIT, slot, 0) }
@@ -226,39 +220,27 @@ fn legend_special_angles_are_dashed_or_a_dot() {
 }
 
 #[test]
-fn legend_grab_is_purple_while_frame_data_colours_is_on() {
-    let colour = |on| hitbox::legend_colour(KIND_GRAB, None, 0, hitbox::GRAB_TINT, on);
-    assert_eq!((colour(false), colour(true)), (hitbox::GRAB_TINT, GRAB), "Off: today's magenta; On: purple");
-    // Purple is none of the On colours of hits and hurtboxes.
+fn legend_grab_is_always_purple() {
+    assert_eq!(hitbox::legend_colour(KIND_GRAB, None, 0), GRAB);
+    assert_eq!(hitbox::GRAB_TINT, GRAB);
     for other in [hitbox::STRONG_TINT, hitbox::WEAK_TINT, HURT[0], HURT[1], HURT[2]] {
-        assert!(GRAB.iter().zip(other).map(|(a, b)| (a - b).abs()).sum::<f32>() > 0.5, "{other:?}");
+        assert_ne!(GRAB, other);
     }
 }
 
 #[test]
-fn legend_off_keeps_todays_tints() {
-    let usual = [0.1, 0.2, 0.3];
-    for kind in [KIND_HIT, KIND_HURT, KIND_GRAB] {
-        for spot in [None, Some(Spot::Sweet), Some(Spot::Sour), Some(Spot::Late)] {
-            for status in [0, INVINCIBLE, INTANGIBLE, OFF] {
-                assert_eq!(hitbox::legend_colour(kind, spot, status, usual, false), usual, "{kind} {spot:?} {status}");
-            }
-        }
-    }
-    // On: a hurtbox takes its status' colour.
-    assert_eq!([0, INVINCIBLE, INTANGIBLE].map(|s| hitbox::legend_colour(KIND_HURT, None, s, usual, true)), HURT);
-    // The hurt pass: Off every part is today's yellow and the group's words are not read; On each part takes the game's status.
-    for (legend, whole, words, want) in [
-        (false, INTANGIBLE, [0, 1], [hitbox::HURTBOX_TINT; 2]),
-        (true, 0, [0, INVINCIBLE], [HURT[0], HURT[1]]),
-        (true, INTANGIBLE, [0, INVINCIBLE], [HURT[2]; 2]),
-        (true, -1, [INTANGIBLE, 0], [HURT[2], HURT[0]]),
+fn legend_status_colours_are_the_only_hurtbox_scheme() {
+    assert_eq!([0, INVINCIBLE, INTANGIBLE].map(|status| hitbox::legend_colour(KIND_HURT, None, status)), HURT);
+    for (whole, words, want) in [
+        (0, [0, INVINCIBLE], [HURT[0], HURT[1]]),
+        (INTANGIBLE, [0, INVINCIBLE], [HURT[2]; 2]),
+        (-1, [INTANGIBLE, 0], [HURT[2], HURT[0]]),
     ] {
         let mut hurt = Hurt { whole, words, reads: Vec::new() };
         let (mut out, mut len) = ([Sphere::NONE; 4], 0);
-        assert_eq!(hitbox::want_hurt(&mut hurt, &mut out, &mut len, legend, hitbox::KIND_HURT), 0);
-        assert_eq!([out[0].tint, out[1].tint], want, "legend {legend} whole {whole} words {words:?}");
-        assert_eq!(hurt.reads.contains(&(GROUPS + GROUP_WHOLE)), legend, "the whole word is read only while On");
+        assert_eq!(hitbox::want_hurt(&mut hurt, &mut out, &mut len, true, KIND_HURT), 0);
+        assert_eq!([out[0].tint, out[1].tint], want, "whole {whole} words {words:?}");
+        assert!(hurt.reads.contains(&(GROUPS + GROUP_WHOLE)), "always read the live status");
     }
 }
 
@@ -348,7 +330,7 @@ fn legend_checklist_items_draw_independently() {
     assert!(draws(article) && shows(article, hitbox::KIND_ARTICLE_HURT));
     assert!([KIND_HIT, KIND_HURT, KIND_GRAB, KIND_MARK, KIND_WIND, KIND_AREA].iter().all(|k| !shows(article, *k)));
     assert!(!shows(HURTBOXES, hitbox::KIND_ARTICLE_HURT));
-    assert_eq!(bits(&[1; ITEMS]), HITBOXES | GRABS | HURTBOXES | COLOURS | ANGLES | WINDBOXES | ARTICLE_HURTBOXES);
+    assert_eq!(bits(&[1; ITEMS]), HITBOXES | GRABS | HURTBOXES | ANGLES | WINDBOXES | ARTICLE_HURTBOXES);
     assert_eq!(ITEMS, 7, "Article hurtboxes appended as bit64");
 }
 
@@ -480,7 +462,7 @@ fn legend_wind_area_orbs_are_a_band_or_a_disc_with_a_line() {
     let back = area_orbs(&WindArea { angle: Some(-180.0), ..circle }, 0, 0.0, colour)[2].unwrap();
     assert!(close(back.tail, [-1.0, 8.0, 0.0]), "{back:?}");
     // Shown by Windboxes alone: an area is not a hitbox; never paired as a capsule end.
-    assert!(shows(WINDBOXES, KIND_AREA) && [HITBOXES, GRABS, HURTBOXES, COLOURS, ANGLES].iter().all(|b| !shows(*b, KIND_AREA)));
+    assert!(shows(WINDBOXES, KIND_AREA) && [HITBOXES, GRABS, HURTBOXES, RETIRED_COLOURS, ANGLES].iter().all(|b| !shows(*b, KIND_AREA)));
     assert!([AREA_BOX, AREA_CIRCLE, AREA_LINE, AREA_SHADOW].iter().all(|k| *k != 1));
 }
 
@@ -511,8 +493,8 @@ fn legend_wind_area_fill_reads_over_light_and_dark_backgrounds() {
     };
     assert!(ratio(240) <= 0.75, "over the Training grid's white the fill darkens it by a quarter or more: {}", ratio(240));
     assert!(ratio(30) >= 2.5, "over a dark stage the fill lifts its luminance 2.5 times or more: {}", ratio(30));
-    // Burnt orange differs from the blue windbox discs without weakening either background-contrast bound.
-    assert_eq!(colour[..3], crate::model::panes::linear([173, 77, 0, 255])[..3]);
+    // Olive area fill differs from the sky-blue windbox discs.
+    assert_eq!(colour[..3], crate::model::panes::linear([75, 85, 0, 255])[..3]);
 }
 
 #[test]
@@ -521,12 +503,12 @@ fn legend_wind_line_has_a_dark_shadow_under_it() {
     let boxed = WindArea { shape: AreaShape::Box { min: [-10.0, 2.0], max: [10.0, 12.0] }, angle: Some(0.0) };
     let [Some(band), Some(shadow), Some(line)] = area_orbs(&boxed, 1, 0.5, colour) else { panic!("a band, a shadow and a line") };
     // The shadow is the line's own pill, wider, dark and opaque; it comes between the band and the line (a later pane draws over
-    // an earlier one), so the silver line keeps a dark outline over a pale or a dark background.
+    // an earlier one), so the white line keeps a dark outline over a pale or a dark background.
     assert_eq!((shadow.centre, shadow.tail, shadow.kind(), shadow.key & 0xff, (shadow.key >> 8) & 0xffff), (line.centre, line.tail, KIND_AREA, AREA_SHADOW, 1));
     assert!(SHADOW_GROW > 1.0 && (shadow.radius - line.radius * SHADOW_GROW).abs() < 1e-5, "{shadow:?} {line:?}");
-    assert!(luminance(rgb(shadow.color)) < 0.01 && shadow.color[3] == 255 && line.color[3] == 255, "{shadow:?}");
+    assert!(luminance(rgb(shadow.color)) < 0.01 && shadow.color[3] == 255 && luminance(rgb(line.color)) > 0.99 && line.color[3] == 255, "{shadow:?}");
     assert_ne!(shadow.key, line.key);
-    assert_eq!((band.color, line.color), (colour, crate::model::panes::linear(DIRECTION_COLOUR)), "area fill and silver line share their menu colours");
+    assert_eq!((band.color, line.color), (colour, crate::model::panes::linear(DIRECTION_COLOUR)), "area fill and white line share their menu colours");
     // A centre dot (361) is outlined too; a wind with no angle has no line and no shadow.
     let circle = WindArea { shape: AreaShape::Circle { centre: [5.0, 8.0], radius: 6.0 }, angle: Some(361.0) };
     let [_, Some(ring), Some(dot)] = area_orbs(&circle, 0, 0.0, colour) else { panic!("a disc, a ring and a dot") };
@@ -579,59 +561,45 @@ fn legend_docs_name_the_game_data_windboxes() {
 }
 
 #[test]
-fn menu_swatches_match_the_renderer_in_both_schemes() {
-    let rendered = |tint| orbs::orb_of(&Sphere { tint, ..Sphere::NONE }, [0.0; 3]).color;
-    for on in [false, true] {
-        let rows: Vec<_> = swatches(127 ^ if on { 0 } else { COLOURS }).collect();
-        let colour = |name| rows.iter().find(|(label, ..)| *label == name).unwrap().1.colours().next().unwrap();
-        if on {
-            assert_eq!(crate::model::panes::linear(colour("Red — Strong hitbox")), rendered(hitbox::legend_colour(KIND_HIT, None, 0, hitbox::TINTS[0], true)));
-            assert_eq!(crate::model::panes::linear(colour("Pink — Weak hitbox")), rendered(hitbox::legend_colour(KIND_HIT, Some(Spot::Late), 0, hitbox::TINTS[0], true)));
-        } else {
-            assert_eq!(rows[0].1.colours().map(crate::model::panes::linear).collect::<Vec<_>>(), hitbox::TINTS.map(rendered));
+fn menu_swatches_match_the_renderer() {
+    let rows: Vec<_> = swatches(127).collect();
+    let colour = |name| rows.iter().find(|(label, ..)| *label == name).unwrap().1;
+    let rendered = |kind, spot, status| orbs::orb_of(&Sphere { tint: hitbox::legend_colour(kind, spot, status), ..Sphere::NONE }, [0.0; 3]).color;
+    for (name, kind, spot, status) in [
+        ("Red — Strong hitbox", KIND_HIT, None, 0),
+        ("Pink — Weak hitbox", KIND_HIT, Some(Spot::Late), 0),
+        ("Purple — Grab box (grabs you)", KIND_GRAB, None, 0),
+        ("Grey — Hurtbox (can be hit)", KIND_HURT, None, 0),
+        ("Yellow — Hurtbox (cannot be hit)", KIND_HURT, None, INTANGIBLE),
+        ("Green — Hurtbox (takes no damage)", KIND_HURT, None, INVINCIBLE),
+        ("Sky blue — Windbox (pushes without flinching)", KIND_WIND, None, 0),
+    ] {
+        assert_eq!(crate::model::panes::linear(colour(name)), rendered(kind, spot, status), "{name}");
+        if kind == KIND_HURT {
+            assert_eq!(rendered(kind, spot, status), rendered(hitbox::KIND_ARTICLE_HURT, spot, status));
         }
-        for (name, kind, status, usual) in [
-            (if on { "Purple — Grab box (grabs you)" } else { "Magenta — Grab box (grabs you)" }, KIND_GRAB, 0, hitbox::GRAB_TINT),
-            (if on { "White — Hurtbox (can be hit)" } else { "Yellow — Hurtbox (can be hit)" }, KIND_HURT, 0, hitbox::HURTBOX_TINT),
-            ("Blue — Windbox (pushes without flinching)", KIND_WIND, 0, WIND),
-        ] {
-            assert_eq!(crate::model::panes::linear(colour(name)), rendered(hitbox::legend_colour(kind, None, status, usual, on)));
-        }
-        for (name, status) in [("Sky blue — Hurtbox (cannot be hit)", INTANGIBLE), ("Teal — Hurtbox (takes no damage)", INVINCIBLE)] {
-            assert_eq!(rows.iter().any(|r| r.0 == name), on);
-            if on {
-                for kind in [KIND_HURT, hitbox::KIND_ARTICLE_HURT] {
-                    assert_eq!(crate::model::panes::linear(colour(name)), rendered(hitbox::legend_colour(kind, None, status, hitbox::HURTBOX_TINT, on)));
-                }
-            }
-        }
-        assert_eq!(crate::model::panes::linear(colour("Burnt orange — Wind area (pushes in a box or circle)")), area_colour());
-        let hit = orbs::Orb { radius: 1.0, ..orbs::Orb::NONE };
-        assert_eq!(crate::model::panes::linear(colour("Silver — Launch / wind direction")), marks(&hit, 45, 1.0)[0].unwrap().color);
     }
+    assert_eq!(crate::model::panes::linear(colour("Olive — Wind area (pushes in a box or circle)")), area_colour());
+    let hit = orbs::Orb { radius: 1.0, ..orbs::Orb::NONE };
+    assert_eq!(crate::model::panes::linear(colour("White — Launch / wind direction")), marks(&hit, 45, 1.0)[0].unwrap().color);
     for bits in 0..=127 {
         let rows: Vec<_> = swatches(bits).collect();
-        assert!(rows.len() <= 9);
-        assert!(rows.iter().map(|r| r.1.colours().count()).sum::<usize>() <= crate::model::panes::CONN_BOXES * 4);
+        assert!(rows.len() <= 9 && rows.len() <= crate::model::panes::CONN_BOXES * 4);
         assert!(rows.iter().all(|(label, _)| label.encode_utf16().count() <= 72));
-        assert_eq!(rows.iter().filter(|r| r.1 == Swatch::HitboxShades).count(), usize::from(bits & (HITBOXES | COLOURS) == HITBOXES));
         assert_eq!(rows.is_empty(), !draws(bits));
-        assert_eq!(rows.iter().any(|r| r.0 == "Blue — Windbox (pushes without flinching)"), bits & WINDBOXES != 0 || bits & (HITBOXES | COLOURS) == HITBOXES | COLOURS);
-        assert_eq!(rows.iter().any(|r| r.0 == "Burnt orange — Wind area (pushes in a box or circle)"), bits & WINDBOXES != 0);
-        assert_eq!(rows.iter().any(|r| r.0.ends_with("— Hurtbox (can be hit)")), bits & (HURTBOXES | ARTICLE_HURTBOXES) != 0);
+        assert_eq!(rows.iter().any(|r| r.0 == "Sky blue — Windbox (pushes without flinching)"), bits & (HITBOXES | WINDBOXES) != 0);
+        assert_eq!(rows.iter().any(|r| r.0 == "Olive — Wind area (pushes in a box or circle)"), bits & WINDBOXES != 0);
+        assert_eq!(rows.iter().filter(|r| r.0.contains("— Hurtbox")).count(), if bits & (HURTBOXES | ARTICLE_HURTBOXES) != 0 { 3 } else { 0 });
+        assert_eq!(rows, swatches(bits ^ RETIRED_COLOURS).collect::<Vec<_>>(), "retired flag does not select a colour scheme");
     }
-    assert_eq!(swatches(ANGLES).collect::<Vec<_>>(), [("Silver — Launch / wind direction", Swatch::Colour(DIRECTION_COLOUR))]);
-    assert_eq!(swatches(ARTICLE_HURTBOXES).next().unwrap().1.colours().next().unwrap(), orbs::tint_colour(hitbox::HURTBOX_TINT, 255));
+    assert_eq!(swatches(ANGLES).collect::<Vec<_>>(), [("White — Launch / wind direction", DIRECTION_COLOUR)]);
 }
 
-/// Every single-colour family has its own key; the attack-ID group intentionally shows all eight shades.
+/// Every drawn family has its own colour in the only scheme.
 #[test]
 fn legend_families_have_distinct_colours_in_every_checklist() {
     for bits in 0..=127 {
-        let colours: Vec<_> = swatches(bits).filter_map(|(_, swatch)| match swatch {
-            Swatch::Colour(c) => Some(c),
-            Swatch::HitboxShades => None,
-        }).collect();
+        let colours: Vec<_> = swatches(bits).map(|(_, colour)| colour).collect();
         for (i, c) in colours.iter().enumerate() {
             assert!(!colours[i + 1..].contains(c), "duplicate colour {c:?} for checklist {bits}");
         }
@@ -648,14 +616,14 @@ fn legend_families_have_distinct_colours_in_every_checklist() {
 fn legend_columns_fit_and_preserve_the_checklist() {
     use crate::model::panes as p;
     let [(cx, cw), (mx, mw)] = swatch_columns(p::CONN_LEFT, p::CONN_RIGHT);
-    assert!(cx >= p::CONN_LEFT + 128.0 && cx + cw < mx && mw > 0.0);
+    assert!(cx >= p::CONN_LEFT + 24.0 && cx + cw < mx && mw > 0.0);
     assert_eq!(mx + mw, p::CONN_RIGHT);
     for bits in 0..=127 {
         let rows: Vec<_> = swatches(bits).collect();
-        assert!(rows.len() <= p::ROWS, "the checklist's unused subline pool fits every colour name");
+        assert!(rows.len() <= p::CHIPS, "the unused chip-label pool fits every colour name");
         for (name, _) in rows {
             let (colour, meaning) = name.split_once(" — ").expect("a colour name and meaning in every row");
-            assert!(colour.len() <= 12 && !meaning.is_empty());
+            assert!(colour.encode_utf16().count() + 3 <= 16 && !meaning.is_empty());
         }
     }
 }

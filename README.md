@@ -131,10 +131,10 @@ See where summoned objects and items can be hit: **Display & Controls → Hitbox
 ![Olimar's Pikmin without hurtboxes, with yellow hurtbox pills, with status colours, then without](docs/media/rc15-article-hurtboxes.gif)<br>
 *Article hurtboxes Off → yellow pills → status colours → Off. Eden, 2026-11-15, rc.15 `6def8553`; Pikmin shown.*
 
-Read the colours beside the checklist: press **A** on **Hitbox Visualization**, then **A** on **Frame data colours** to see the **Colour legend** change with it.
+Read what each colour means beside the checklist: press **A** on **Hitbox Visualization** to see the **Colour legend** for what you ticked.
 
 ![The Hitbox Visualization checklist beside its labelled colour swatches](docs/media/rc15-colour-legend-normal.png)<br>
-*Colour legend, normal colours; [the Frame data colours view](docs/media/rc15-colour-legend-frame-data.png). Eden, 2026-11-15, rc.15 `35268287`. Stills only; no legend GIF yet.*
+*Earlier two-scheme build, before the single-palette update; [the Frame data colours view](docs/media/rc15-colour-legend-frame-data.png). Eden, 2026-11-15, rc.15 `35268287`. Stills only; no legend GIF yet.*
 
 The grab boxes are magenta:
 

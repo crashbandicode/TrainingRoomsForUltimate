@@ -37,27 +37,164 @@ fn int(v: i64) -> Cell {
 
 #[test]
 fn core06_colour_table() {
-    // The spec's table, by `id mod 8` (rc.13: no purple or pink in it, that colour is the grab boxes').
-    let spec: [[f32; 3]; 8] = [[1.0, 0.0, 0.0], [1.0, 0.4, 0.0], [0.8, 1.0, 0.0], [0.2, 1.0, 0.2], [0.0, 0.8, 1.0], [0.0, 0.4, 1.0], [0.0, 1.0, 0.6], [1.0, 1.0, 1.0]];
-    for (id, tint) in spec.iter().enumerate() {
-        assert_eq!(hitbox::hitbox_tint(id as i32), *tint, "id {id}");
-        assert_eq!(hitbox::hitbox_tint(id as i32 + 8), *tint, "id {} wraps", id + 8);
+    // A hitbox without a weaker strength classification starts red for every ID.
+    for id in [i32::MIN, -9, -1, 0, 1, 7, 8, 15, 255, i32::MAX] {
+        let tint = hitbox::hitbox_tint(id);
+        assert_eq!(tint, [1.0, 0.0, 0.0], "id {id}");
         assert!(tint.contains(&1.0), "fully saturated: {tint:?}");
     }
-    // A negative id wraps the same way.
-    assert_eq!(hitbox::hitbox_tint(-1), spec[7]);
+    assert_eq!(hitbox::HURTBOX_TINT, [0.6; 3]);
 }
 
 #[test]
-fn every_grab_box_is_magenta_a_colour_no_hitbox_uses() {
-    // One colour for every grab id: the command's tint is `GRAB_TINT` whatever its id (`animation_command`).
-    assert_eq!(hitbox::GRAB_TINT, [1.0, 0.0, 1.0]);
-    let distance = |a: [f32; 3], b: [f32; 3]| ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt();
-    for id in 0..8 {
-        let hit = hitbox::hitbox_tint(id);
-        assert!(distance(hit, hitbox::GRAB_TINT) >= 1.0, "hitbox id {id} {hit:?} is near the grab colour");
+fn every_grab_box_is_purple_distinct_from_hits_and_hurtboxes() {
+    assert_eq!(hitbox::GRAB_TINT, [0.6, 0.2, 1.0]);
+    for tint in [hitbox::STRONG_TINT, hitbox::WEAK_TINT, hitbox::HURTBOX_TINT] {
+        assert_ne!(tint, hitbox::GRAB_TINT, "purple identifies grabs separately: {tint:?}");
     }
-    assert!(distance(hitbox::HURTBOX_TINT, hitbox::GRAB_TINT) >= 1.0);
+}
+
+// Host-only perceptual regression: sRGB decoding, XYZ D65 and CIELab D65.
+// D65 reference white is [95.047, 100, 108.883]; no chromatic adaptation is applied.
+fn srgb_lab_d65(rgb: [f64; 3]) -> [f64; 3] {
+    let [r, g, b] = rgb.map(|v| {
+        if v <= 0.04045 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
+    });
+    let xyz = [
+        (0.4124564 * r + 0.3575761 * g + 0.1804375 * b) / 0.95047,
+        0.2126729 * r + 0.7151522 * g + 0.0721750 * b,
+        (0.0193339 * r + 0.1191920 * g + 0.9503041 * b) / 1.08883,
+    ];
+    let [x, y, z] = xyz.map(|v| {
+        let delta: f64 = 6.0 / 29.0;
+        if v > delta.powi(3) { v.cbrt() } else { v / (3.0 * delta.powi(2)) + 4.0 / 29.0 }
+    });
+    [116.0 * y - 16.0, 500.0 * (x - y), 200.0 * (y - z)]
+}
+
+// CIEDE2000, kL=kC=kH=1; Sharma, Wu and Dalal (2005), equations 2-22.
+// Primary source and validation data:
+// https://hajim.rochester.edu/ece/sites/gsharma/ciede2000/
+fn ciede2000(first: [f64; 3], second: [f64; 3]) -> f64 {
+    let [l1, a1, b1] = first;
+    let [l2, a2, b2] = second;
+    let c_bar = (a1.hypot(b1) + a2.hypot(b2)) / 2.0;
+    let chroma_ratio = |c: f64| {
+        let c7 = c.powi(7);
+        (c7 / (c7 + 25.0_f64.powi(7))).sqrt()
+    };
+    let g = 0.5 * (1.0 - chroma_ratio(c_bar));
+    let (a1p, a2p) = ((1.0 + g) * a1, (1.0 + g) * a2);
+    let (c1, c2) = (a1p.hypot(b1), a2p.hypot(b2));
+    let hue = |a: f64, b: f64| {
+        if a == 0.0 && b == 0.0 { 0.0 } else { b.atan2(a).to_degrees().rem_euclid(360.0) }
+    };
+    let (h1, h2) = (hue(a1p, b1), hue(a2p, b2));
+    let delta_h = if c1 * c2 == 0.0 {
+        0.0
+    } else if (h2 - h1).abs() <= 180.0 {
+        h2 - h1
+    } else if h2 > h1 {
+        h2 - h1 - 360.0
+    } else {
+        h2 - h1 + 360.0
+    };
+    let h_bar = if c1 * c2 == 0.0 {
+        h1 + h2
+    } else if (h1 - h2).abs() <= 180.0 {
+        (h1 + h2) / 2.0
+    } else if h1 + h2 < 360.0 {
+        (h1 + h2 + 360.0) / 2.0
+    } else {
+        (h1 + h2 - 360.0) / 2.0
+    };
+    let cos = |degrees: f64| degrees.to_radians().cos();
+    let t = 1.0 - 0.17 * cos(h_bar - 30.0) + 0.24 * cos(2.0 * h_bar)
+        + 0.32 * cos(3.0 * h_bar + 6.0) - 0.20 * cos(4.0 * h_bar - 63.0);
+    let (l_bar, cp_bar) = ((l1 + l2) / 2.0, (c1 + c2) / 2.0);
+    let sl = 1.0 + 0.015 * (l_bar - 50.0).powi(2) / (20.0 + (l_bar - 50.0).powi(2)).sqrt();
+    let sc = 1.0 + 0.045 * cp_bar;
+    let sh = 1.0 + 0.015 * cp_bar * t;
+    let rotation = -2.0 * chroma_ratio(cp_bar)
+        * (60.0 * (-((h_bar - 275.0) / 25.0).powi(2)).exp()).to_radians().sin();
+    let dl = (l2 - l1) / sl;
+    let dc = (c2 - c1) / sc;
+    let dh = 2.0 * (c1 * c2).sqrt() * (delta_h / 2.0).to_radians().sin() / sh;
+    (dl * dl + dc * dc + dh * dh + rotation * dc * dh).sqrt()
+}
+
+#[test]
+fn core06_ciede2000_matches_sharma_reference_pairs() {
+    // Published supplementary data, including achromatic, hue-wrap and 180-degree boundary cases.
+    // Expected differences are published to four decimals; half a last-place unit is 0.00005.
+    // https://hajim.rochester.edu/ece/sites/gsharma/ciede2000/dataNprograms/ciede2000testdata.txt
+    let pairs = [
+        ([50.0, 2.6772, -79.7751], [50.0, 0.0, -82.7485], 2.0425),
+        ([50.0, 3.1571, -77.2803], [50.0, 0.0, -82.7485], 2.8615),
+        ([50.0, 2.8361, -74.0200], [50.0, 0.0, -82.7485], 3.4412),
+        ([50.0, -1.3802, -84.2814], [50.0, 0.0, -82.7485], 1.0000),
+        ([50.0, 0.0, 0.0], [50.0, -1.0, 2.0], 2.3669),
+        ([50.0, -1.0, 2.0], [50.0, 0.0, 0.0], 2.3669),
+        ([50.0, 2.4900, -0.0010], [50.0, -2.4900, 0.0009], 7.1792),
+        ([50.0, 2.4900, -0.0010], [50.0, -2.4900, 0.0010], 7.1792),
+        ([50.0, 2.4900, -0.0010], [50.0, -2.4900, 0.0011], 7.2195),
+        ([50.0, -0.0010, 2.4900], [50.0, 0.0010, -2.4900], 4.8045),
+        ([50.0, 2.5000, 0.0], [73.0, 25.0, -18.0], 27.1492),
+        ([2.0776, 0.0795, -1.1350], [0.9033, -0.0636, -0.5514], 0.9082),
+    ];
+    for (first, second, expected) in pairs {
+        for (a, b) in [(first, second), (second, first)] {
+            let actual = ciede2000(a, b);
+            assert!((actual - expected).abs() <= 0.00005, "{a:?} / {b:?}: {actual:.9} != {expected}");
+        }
+        assert_eq!(ciede2000(first, first), 0.0);
+    }
+    // Anchor the conversion as well as the difference formula.
+    for (rgb, expected) in [
+        ([0.0; 3], [0.0; 3]),
+        ([1.0; 3], [100.0, 0.0, 0.0]),
+        ([1.0, 0.0, 0.0], [53.2408, 80.0925, 67.2032]),
+    ] {
+        let actual = srgb_lab_d65(rgb);
+        for (component, expected_component) in actual.into_iter().zip(expected) {
+            assert!((component - expected_component).abs() <= 0.0001, "sRGB {rgb:?}, Lab {actual:?}");
+        }
+    }
+}
+
+#[test]
+fn core06_palette_is_perceptually_distinct() {
+    use model::{hitbox_orbs as orbs, legend};
+    let palette = [
+        ("strong", hitbox::STRONG_TINT),
+        ("weak", hitbox::WEAK_TINT),
+        ("grab", legend::GRAB),
+        ("hurt", legend::HURT[0]),
+        ("invincible", legend::HURT[1]),
+        ("intangible", legend::HURT[2]),
+        ("windbox", legend::WIND),
+        ("wind area", legend::WIND_AREA),
+        ("direction", std::array::from_fn(|i| f32::from(legend::DIRECTION_COLOUR[i]) / 255.0)),
+    ];
+    // Primary-approved replacement for the inherited RGB-distance >=1.0 criterion.
+    // All 36 pairs must meet the fixed perceptual threshold; report every failing pair.
+    let displayed_lab = |tint| {
+        let rgba = orbs::tint_colour(tint, orbs::ORB_ALPHA);
+        srgb_lab_d65(std::array::from_fn(|i| f64::from(rgba[i]) / 255.0))
+    };
+    let mut failures = Vec::new();
+    let mut compared = 0;
+    for (i, &(left_name, left)) in palette.iter().enumerate() {
+        for &(right_name, right) in &palette[i + 1..] {
+            let difference = ciede2000(displayed_lab(left), displayed_lab(right));
+            compared += 1;
+            if !difference.is_finite() || difference < 20.0 {
+                failures.push(format!("{left_name} / {right_name}: DeltaE2000={difference:.9}, required >=20"));
+            }
+        }
+    }
+    assert_eq!(compared, 36);
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 #[test]
@@ -911,7 +1048,7 @@ fn part(status: u32, a: [f32; 3], b: [f32; 3], size: f32, node: u64) -> [u8; 0x5
 fn core06_hurtbox_shapes_per_fighter() {
     use model::hitbox::layout;
     assert_eq!(std::mem::size_of::<[u8; layout::HIT_PART_STRIDE]>(), 0x50);
-    // A capsule part: both centres, its size and its bone; drawn yellow as one pill, like a hitbox.
+    // A capsule part: both centres, its size and its bone; drawn grey as one pill, like a hitbox.
     let capsule = hitbox::hurtbox_shape(&part(0, [0.0, 1.0, 0.0], [0.0, 6.0, 0.0], 2.5, 0x0000_0004_1234_5678)).unwrap();
     assert_eq!((capsule.joint, capsule.size, capsule.a, capsule.b), (0x0000_0004_1234_5678, 2.5, [0.0, 1.0, 0.0], Some([0.0, 6.0, 0.0])));
     // A part whose two centres coincide is one sphere; a centre at the bone's origin is a real centre (no "zero means absent").
@@ -924,8 +1061,8 @@ fn core06_hurtbox_shapes_per_fighter() {
         assert!(hitbox::hurtbox_shape(&part(status, [0.0; 3], [1.0; 3], 1.0, 7)).is_some(), "status {status}");
     }
     assert_eq!(hitbox::hurtbox_shape(&part(hitbox::HIT_STATUS_OFF, [0.0; 3], [1.0; 3], 1.0, 7)), None);
-    // The tint: yellow, fully saturated.
-    assert_eq!(hitbox::HURTBOX_TINT, [1.0, 1.0, 0.0]);
+    // A normal hurtbox has the same grey identity in every drawing path.
+    assert_eq!(hitbox::HURTBOX_TINT, [0.6; 3]);
     // A group's parts: `first..first + count`, inside the module's part count; anything else is not a hurtbox table.
     assert_eq!(hitbox::group_parts(0, 12, 12), Some(0..12));
     assert_eq!(hitbox::group_parts(3, 4, 20), Some(3..7));
@@ -1050,7 +1187,7 @@ fn core06_hurtbox_reader_enumerates_the_enabled_parts() {
         assert_eq!(*at, 0xd000 + i * hb_layout::HIT_PART_STRIDE);
     }
     for sphere in &out[..len] {
-        assert_eq!(sphere.tint, hitbox::HURTBOX_TINT, "yellow");
+        assert_eq!(sphere.tint, hitbox::HURTBOX_TINT, "grey");
         assert_eq!(sphere.joint, 0x51a3_6341);
         assert!((sphere.scale - hitbox::sphere_scale(2.4)).abs() < 1e-6);
         assert_eq!(sphere.key >> 24, hitbox::KIND_HURT);
@@ -1136,11 +1273,18 @@ fn core06_hurtbox_dispatch_equivalence_with_the_hitbox_rules() {
         fn data(&mut self, _slot: i32) -> usize {
             0x1000
         }
-        fn read_u64(&mut self, _at: usize) -> u64 {
-            7
+        fn read_u64(&mut self, at: usize) -> u64 {
+            match at {
+                0x1048 => 7,
+                0x1028 => (90u64 << 32) | 45,
+                0x1030 => 40u64 << 32,
+                0x1070 => 0,
+                _ => panic!("non-attack word read {at:#x}"),
+            }
         }
         fn read_f32(&mut self, at: usize) -> f32 {
             match at {
+                0x1020 => 10.0,
                 0x1024 => 2.0,
                 0x1000 => 1.0,
                 0x1004 | 0x1008 | 0x1010 | 0x1014 | 0x1018 => 0.0,
@@ -1417,7 +1561,7 @@ fn core06_game_hurt_reads_the_live_layout_at_the_exact_addresses() {
     assert_eq!((out[0].pos, out[1].pos, out[2].pos), ([0.0, 1.0, 0.0], [0.0, 5.0, 0.0], [1.0, 2.0, 3.0]));
     assert_eq!(out[2].joint, 7);
     for sphere in &out[..len] {
-        assert_eq!(sphere.tint, hitbox::HURTBOX_TINT, "yellow");
+        assert_eq!(sphere.tint, hitbox::HURTBOX_TINT, "grey");
         assert_eq!(sphere.key >> 24, hitbox::KIND_HURT);
     }
 }
@@ -1723,12 +1867,20 @@ impl hitbox::AttackReader for AttackSpy {
 
     fn read_u64(&mut self, at: usize) -> u64 {
         self.reads.push(at);
-        match at { 0x1048 => 7, 0x2048 => 9, _ => panic!("non-attack node read {at:#x}") }
+        match at {
+            0x1048 => 7,
+            0x2048 => 9,
+            0x1028 | 0x2028 => (90u64 << 32) | 45,
+            0x1030 | 0x2030 => 40u64 << 32,
+            0x1070 | 0x2070 => 0,
+            _ => panic!("non-attack word read {at:#x}"),
+        }
     }
 
     fn read_f32(&mut self, at: usize) -> f32 {
         self.reads.push(at);
         match at {
+            0x1020 | 0x2020 => 10.0,
             0x1024 | 0x2024 => 2.0,
             0x1000 => 1.0,
             0x1004 | 0x1008 | 0x1010 | 0x1014 | 0x1018 => 0.0,
@@ -1791,10 +1943,11 @@ fn core06_rc_dispatch_reads_only_attacks_and_requests_hits_and_grabs() {
     let facts = facts(true, model::legend::draws(hitbox::shown(&snapshot)), false, 0);
     let (counts, hits) = hitbox::reconcile_frame(&mut set, facts, &mut wants, &mut reads, None, &mut fx);
     assert_eq!((counts.spawned, counts.failed, counts.dropped, hits), (4, 0, 0, 3));
-    assert_eq!(reads.active, (0..8).collect::<Vec<_>>());
-    assert_eq!(reads.data, [1, 5, 6]);
-    assert_eq!(reads.reads, [0x1048, 0x1024, 0x1000, 0x1004, 0x1008, 0x1010, 0x1014, 0x1018,
-                            0x2048, 0x2024, 0x2000, 0x2004, 0x2008, 0x2010, 0x2014, 0x2018]);
+    assert_eq!(reads.active, (0..8).chain(0..8).collect::<Vec<_>>());
+    assert_eq!(reads.data, [1, 5, 6, 1, 5, 6]);
+    assert_eq!(reads.reads, [0x1048, 0x1024, 0x1000, 0x1004, 0x1008, 0x1010, 0x1014, 0x1018, 0x1070,
+                            0x2048, 0x2024, 0x2000, 0x2004, 0x2008, 0x2010, 0x2014, 0x2018, 0x2070,
+                            0x1028, 0x1030, 0x1020, 0x2028, 0x2030, 0x2020]);
     let expected_keys: Vec<_> = std::iter::once(hitbox::sphere_key(hitbox::KIND_HIT, 1, 0))
         .chain((0..2).map(|i| hitbox::sphere_key(hitbox::KIND_HIT, 5, i))).chain([grab.key]).collect();
     assert_eq!(fx.requests.iter().map(|s| s.key).collect::<Vec<_>>(), expected_keys);

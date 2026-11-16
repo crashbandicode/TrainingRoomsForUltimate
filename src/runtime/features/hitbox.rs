@@ -1,7 +1,7 @@
 //! The hitbox visualizer, the runtime half (SPEC-core-06; the rules are `model::hitbox`).
 //!
 //! With items of the `hitbox_vis` checklist ticked (rc.14, `model::legend`), the ticked kinds of a fighter's boxes in Training (every
-//! active hitbox by id colour, every hurtbox, every grab box; the frame data colours and the launch-angle marks on request) are drawn with the plugin's own translucent panes (decision HB-OWN-ORBS, option 1, operator 2026-11-05: "go with
+//! active hitbox by strength, every hurtbox by status, every grab box; launch-angle marks on request) are drawn with the plugin's own translucent panes (decision HB-OWN-ORBS, option 1, operator 2026-11-05: "go with
 //! discs for all"), a capsule as one pill (decision HB-PILLS, 2026-11-14), placed on its bone and projected with the game's
 //! camera every layout tick. An article's hitboxes
 //! are own orbs too (rc.13, `draw_articles`): the game's effect sphere on a projectile lived its whole flight but never
@@ -779,8 +779,6 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
         let live = smash::app::sv_battle_object::is_active(id) && smash::app::sv_battle_object::module_accessor(id) as usize == key;
         // `key` is the live article's accessor (checked above); the natives check their own grants. Tracked: its set.
         let Some((set, attacking)) = articles.track(id, key, &mut board, false) else { continue };
-        set.frame_data = shown(legend::COLOURS);
-        set.wind = wind;
         let place = |s: &Sphere| natives::joint_position(key, s.joint, &s.pos);
         // Only a live article is read: its areas, its facing and its status (`legend::keeps_article` inside the pass).
         let kept = live && {
@@ -789,7 +787,7 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
             stats::object(id, key, &areas[..found]);
             let mut len = 0;
             if let Some(mut reader) = hurt.then(|| hurt_reader(key)).flatten() {
-                let cut = hitbox::want_article_hurt(&mut reader, &mut hurts, &mut len, set.frame_data, &mut budget);
+                let cut = hitbox::want_article_hurt(&mut reader, &mut hurts, &mut len, true, &mut budget);
                 dropped += cut;
                 #[cfg(feature = "diag")]
                 stats::article_hurt(id, key, len, cut);
@@ -880,9 +878,7 @@ pub unsafe fn frame(fighter: usize) {
     }
     let Store { table, wants, .. } = &mut *store;
     let set = &mut table.sets[i];
-    set.frame_data = shown(legend::COLOURS);
-    set.wind = shown(legend::WINDBOXES);
-    if set.frame_data && enabled {
+    if enabled {
         set.launch = fighter_launch(accessor);
     }
     // Own orbs (decision HB-OWN-ORBS): while the setting is On the pass reads the HitModule (the relied `hurtbox_*` rows) and
@@ -978,7 +974,7 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     let Some(shape) = hitbox::parse(indices, |i| lua_cell(lua, i)) else { return };
     let mut wants = [Sphere::NONE; hitbox::SHAPE_SPHERES];
     let mut len = 0;
-    let tint = hitbox::legend_colour(hitbox::KIND_GRAB, None, 0, hitbox::GRAB_TINT, shown(legend::COLOURS));
+    let tint = hitbox::legend_colour(hitbox::KIND_GRAB, None, 0);
     hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_GRAB, shape.id as usize, &shape, tint);
     let status = Some(natives::status_kind(accessor));
     let (mut store, mut articles);

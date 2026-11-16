@@ -47,7 +47,7 @@ Open the menu with B + D-pad Up (or Minus). L and R turn the pages.
 | Crop macros, combos and input drills into new files while keeping the originals. | A on the file's Crop; L/R, Left/Right, A save. | [Macro GIF](media/rc15-crop-editor.gif), [drill GIF](media/rc15-input-drill.gif), [editor keys](menu/recording.md#replay-window). |
 | Record a no-hit movement drill or make one from a no-hit macro. | A on DRILLS > → + Record drill…, then the Record chord; or Make combo. | [Drill Crop GIF](media/rc15-input-drill.gif), [how to record](menu/recording.md#input-drills); no recording/conversion GIF yet. |
 | Draw the hurtboxes of hittable articles and items. | Hitbox Visualization → Article hurtboxes, A tick. | [Pikmin GIF](media/rc15-article-hurtboxes.gif), [drawing options](menu/display-and-controls.md#hitbox-visualization). |
-| Read a colour key that follows the checklist and Frame data colours. | A on Hitbox Visualization; A ticks Frame data colours. | [Normal still](media/rc15-colour-legend-normal.png), [frame-data still](media/rc15-colour-legend-frame-data.png); no GIF yet. |
+| Read a colour key that explains what you ticked. | A on Hitbox Visualization. | [Earlier normal still](media/rc15-colour-legend-normal.png), [earlier frame-data still](media/rc15-colour-legend-frame-data.png); updated palette awaiting hardware review; no GIF yet. |
 
 ## Reference
 

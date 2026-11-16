@@ -273,7 +273,7 @@ pub fn article_pass(board: &mut Board, set: &mut HandleSet, key: usize, status: 
     let Extras { lr, areas, hurt } = extras;
     let mut wants = [Sphere::NONE; MAX_HELD];
     let mut len = 0;
-    want_hits(attacks, &mut wants, &mut len, set.identifies_wind());
+    want_hits(attacks, &mut wants, &mut len, true);
     set.tint(attacks, &mut wants[..len], status);
     let n = hurt.len().min(wants.len() - len);
     wants[len..len + n].copy_from_slice(&hurt[..n]);

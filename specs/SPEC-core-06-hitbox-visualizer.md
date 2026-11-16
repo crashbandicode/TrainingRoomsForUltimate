@@ -206,3 +206,8 @@ lines record the HitModule read's cost and the pass's own cost on the integrated
 3. **Effect pool exhaustion.** Respawning every sphere every frame is wasteful. Recommendation: investigate keeping the follow effects alive while the attack slot stays active (effect handles from `req_follow`) and only killing on change; measure before changing the visible behaviour.
 4. **Per-frame `set_sleep_effect(false)` when Off.** Upstream calls it every frame for every fighter as the "restore" path. Recommendation: call it once on the On→Off transition (per fighter) and otherwise not at all.
 5. **Colour comment mismatch** (orange `#ff9900` vs components `1.0, 0.4, 0.0`). Recommendation: pick the components (what the player saw); the designer may retune the eight tints for colour-blind contrast.
+
+
+### Single palette (2026-11-16)
+
+HB-PALETTE-ONLY supersedes earlier per-ID and optional frame-data colours: red strong attacks, pink weak attacks, purple grabs, grey normal hurtboxes, yellow intangible hurtboxes (primary default), green invulnerable hurtboxes, sky-blue windboxes, olive wind areas and white direction lines. No colour-scheme toggle remains. The six visible choices map to existing saved slots 0,1,2,4,5,6; retired slot3 is ignored and canonicalized to zero even for a malformed old value. Names and meanings use fixed columns; no pane pool or runtime bound changes. Updated native appearance is pending the shared Switch session.

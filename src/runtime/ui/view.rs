@@ -307,7 +307,6 @@ impl Panes {
             self.hide(index);
         }
         let mut boxes = 0;
-        let mut swatches = 0;
         let mut ticks = 0;
         let mut last_child = None;
         for i in 0..CONN_LINES {
@@ -319,21 +318,14 @@ impl Panes {
             let units = frame.conn[i].units();
             let tone = tone_color(frame.conn_tone[i]);
             let (tag, child) = match frame.conn_kind[i] {
-                ConnKind::Swatch(swatch) => {
-                    let mut left = CONN_LEFT;
-                    let grouped = swatch == crate::model::legend::Swatch::HitboxShades;
-                    let size = if grouped { 12.0 } else { 24.0 };
-                    for colour in swatch.colours() {
-                        self.rect_at(IDX_CONN_BOX + swatches, left + size / 2.0, y, size, 24.0, colour);
-                        swatches += 1;
-                        left += size + 4.0;
-                    }
-                    // The checklist has no sublines: reuse those text panes for a fixed colour column.
-                    // All legend rows, including the eight-shade row, share the same meaning start.
+                ConnKind::Swatch(colour) => {
+                    self.rect_at(IDX_CONN_BOX + i, CONN_LEFT + 12.0, y, 24.0, 24.0, colour);
+                    // Checklist popups do not use chip labels; reuse their matching-size text panes.
+                    // All meanings start at the same x coordinate.
                     let split = units.iter().position(|u| *u == 0x2014).map_or(0, |i| i + 2);
                     let (colour, meaning) = units.split_at(split);
                     let [(cx, cw), (mx, mw)] = crate::model::legend::swatch_columns(CONN_LEFT, CONN_RIGHT);
-                    self.label(IDX_SUB + i, colour, cx + cw / 2.0, y, cw, tone);
+                    self.label(IDX_CHIP_LABEL + i, colour, cx + cw / 2.0, y, cw, tone);
                     self.label(IDX_CONN + i, meaning, mx + mw / 2.0, y, mw, tone);
                     continue;
                 }

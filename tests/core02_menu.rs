@@ -110,17 +110,39 @@ fn the_spot_rows_sit_next_to_their_features() {
     }
 }
 
-/// rc.14 hb-legend (the operator, ~19:50Z, Windboxes ~21:28Z): Hitbox Visualization is one checklist of six items, nothing ticked by default; Frame
-/// data colours and Launch angles are its items, not rows.
+/// rc.15: six visible items retain seven stored slots; the colour-mode slot is retired.
 fn legend_hitbox_visualization_is_one_checklist() {
     let row = ROWS.iter().find(|r| r.id == "hitbox_vis").expect("the row");
     let Control::MultiSelect(items) = row.control else { panic!("a checklist") };
-    assert_eq!(items, ["Hitboxes", "Grab boxes", "Hurtboxes", "Frame data colours", "Launch angles", "Windboxes", "Article hurtboxes"]);
+    assert_eq!(items, ["Hitboxes", "Grab boxes", "Hurtboxes", "Launch angles", "Windboxes", "Article hurtboxes"]);
     assert_eq!((row.title, row.help.lines().count()), ("Hitbox Visualization", 2));
     assert!(ROWS.iter().all(|r| r.id != "frame_data_colours" && r.id != "launch_angles"));
     let def = model::factory::DEFS.iter().find(|d| d.id == "hitbox_vis").expect("a factory row");
     assert_eq!(def.default, [0u8; 7], "nothing ticked");
 }
+fn hitbox_visible_options_keep_their_storage_bits_and_zl_toggles_all_six() {
+    for (cursor, slot) in [0, 1, 2, 4, 5, 6].into_iter().enumerate() {
+        let mut m = menu();
+        let row = goto(&mut m, "hitbox_vis");
+        m.press(Button::A);
+        for _ in 0..cursor { m.press(Button::Down); }
+        m.press(Button::A);
+        let mut expected = [0; 7];
+        expected[slot] = 1;
+        assert_eq!(get(&m, "hitbox_vis"), expected, "visible option {cursor}");
+        assert_eq!(m.value(row), RowValue::Checklist { ticked: 1, total: 6 });
+    }
+    let mut m = menu();
+    let row = goto(&mut m, "hitbox_vis");
+    m.press(Button::A);
+    m.press(Button::ZL);
+    assert_eq!(get(&m, "hitbox_vis"), [1, 1, 1, 0, 1, 1, 1]);
+    assert_eq!(m.value(row), RowValue::Checklist { ticked: 6, total: 6 });
+    m.press(Button::ZL);
+    assert_eq!(get(&m, "hitbox_vis"), [0; 7]);
+    assert_eq!(m.value(row), RowValue::Checklist { ticked: 0, total: 6 });
+}
+
 fn layout_row_counts_match_the_rc_freeze() {
     let counts = |pilot| {
         [Page::Cpu, Page::Saves, Page::Recording, Page::FightersStages, Page::DisplayControls, Page::Developer]
@@ -1034,6 +1056,7 @@ fn case_table() {
         ("layout_row_counts_match_the_rc_freeze", layout_row_counts_match_the_rc_freeze as fn()),
         ("the_spot_rows_sit_next_to_their_features", the_spot_rows_sit_next_to_their_features as fn()),
         ("legend_hitbox_visualization_is_one_checklist", legend_hitbox_visualization_is_one_checklist as fn()),
+        ("hitbox_visible_options_keep_their_storage_bits_and_zl_toggles_all_six", hitbox_visible_options_keep_their_storage_bits_and_zl_toggles_all_six as fn()),
         ("core02_table_carriage_return", core02_table_carriage_return as fn()),
         ("core02_page_machine", core02_page_machine as fn()),
         ("core02_y_clears_weighted_only", core02_y_clears_weighted_only as fn()),

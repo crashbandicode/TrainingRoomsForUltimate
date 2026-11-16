@@ -24,12 +24,12 @@ Draws the fighters' boxes and, optionally, hittable objects' hurtboxes in colour
 any mix works, such as hurtboxes alone, or hitboxes with their launch angles. It works in Training, and on the two
 practice fighters in a waiting room.
 
-- **Values:** Hitboxes, Grab boxes, Hurtboxes, Frame data colours, Launch angles, Windboxes, Article hurtboxes.
+- **Values:** Hitboxes, Grab boxes, Hurtboxes, Launch angles, Windboxes, Article hurtboxes.
 - **Default:** none ticked: nothing is drawn.
 - **How:** A opens the checklist; A ticks, ZL ticks all or none, B goes back. The row shows how many are ticked, such
-  as "3 of 7".
+  as "3 of 6".
 
-Press **A** on **Hitbox Visualization** to read the **Colour legend** beside the checklist; **A** on **Frame data colours** changes its key along with the drawing. Its swatches follow the ticks, including strong/weak and hurtbox status colours. Fighter and article hurtboxes share the same key.
+Press **A** on **Hitbox Visualization** to read the **Colour legend** beside the checklist. Each swatch names its colour and explains what it shows, with the meanings lined up. Only ticked drawing families appear. Fighter and article hurtboxes share the same key.
 
 ![Hitbox Visualization with Frame data colours unticked: the checklist beside thirteen labelled colour swatches](../media/rc15-colour-legend-normal.png)
 
@@ -39,32 +39,32 @@ Press **A** on **Hitbox Visualization** to read the **Colour legend** beside the
 
 *The same checklist with Frame data colours On: the legend changes as the tick changes. Eden, 2026-11-15, rc.15 source `35268287`, diag `1660a9e4`; untested on hardware.*
 
-The current menu names each colour and explains it. The older captures above and below show the previous palette: wind areas are now burnt orange, direction lines silver, and invulnerable hurtboxes teal.
+The captures above and below show an older build with two colour schemes. The current menu has one scheme and no Frame data colours option; its colours are listed below. The updated palette awaits hardware review.
 
 A settings file from before this checklist keeps what it showed: On ticks Hitboxes, Grab boxes and Hurtboxes, and Off
-ticks none. Existing checklists keep their choices; Article hurtboxes starts unticked.
+ticks none. Existing checklists keep their drawing choices; the removed Frame data colours value is ignored. Article hurtboxes starts unticked in files that predate it.
 
-| Box | Colour | With Frame data colours ticked | What it is |
-| --- | --- | --- | --- |
-| Hitbox | Each hitbox of a move gets its own colour; the first is red | Red when strong, pink when weak | The attack |
-| Grab box | Always magenta, a colour no hitbox uses | Purple | The grab |
-| Hurtbox | Yellow | White; sky blue while nothing can hit it; teal while hits do no damage | Where a fighter can be hit |
-| Article hurtbox | Yellow | The same status colours as a fighter's hurtbox | Where an article or item can be hit |
-| Windbox | Its hitbox colour; deep blue with Windboxes ticked | Deep blue | A hitbox that pushes or pulls without hitstun |
-| Wind area | Burnt orange | Burnt orange | A box or circle that pushes fighters |
-| Launch / wind direction | Silver | Silver | The direction of a launch or push |
+| Colour | What it shows |
+| --- | --- |
+| Red | Strong hitbox: an attack that launches hardest |
+| Pink | Weak hitbox: a weaker part or later frame of an attack |
+| Purple | Grab box: grabs you |
+| Grey | Hurtbox: can be hit |
+| Yellow | Hurtbox: cannot be hit |
+| Green | Hurtbox: takes no damage |
+| Sky blue | Windbox: pushes or pulls without flinching |
+| Olive | Wind area: pushes in a box or circle |
+| White | Launch / wind direction |
 
-**Frame data colours** gives strong and weak hitboxes different colours, and shows whether a hurtbox can be hit. A hitbox is strong when it
-is the strongest one out on that frame, such as a sword's tip, and weak when another hitbox out on the same frame is
-stronger, or when it is weaker than the strongest hitbox earlier in the same move, as the late frames of a knee are.
-A hitbox that cannot be ranked, such as a jab's single hitbox, is red. A hurtbox is blue during a spot dodge or a roll,
-and on the revival platform; it is teal for the moments after leaving the platform. The plugin reads all of this from
-the game every frame, so no list of fighters is needed. Ticked alone, it draws nothing.
+Hitboxes use red for the strongest attack out on that frame and pink when another hitbox is stronger,
+or when the hitbox is weaker than the strongest one earlier in the same move. An attack the plugin cannot rank
+stays red. Hurtboxes turn yellow during a spot dodge or roll and on the revival platform; they turn green for
+the moments after leaving the platform. Normal hurtboxes are grey. The plugin reads this from the game every frame.
 
-**Windboxes** draws the windboxes in deep blue. A windbox pushes or pulls without hitstun: the fighter it lands on is
+**Windboxes** draws the windboxes in sky blue. A windbox pushes or pulls without hitstun: the fighter it lands on is
 moved but can still act. Most deal no damage, such as F.L.U.D.D.'s water, and some do, such as one of the two flames
 of Bowser's Fire Breath. The game marks them itself, and the plugin uses that mark. A windbox is a hitbox, so Hitboxes
-draws it too; with both ticked it is drawn once, in deep blue, and with Windboxes alone only the windboxes are drawn.
+draws it too; with both ticked it is drawn once, in sky blue, and with Windboxes alone only the windboxes are drawn.
 
 These moves have a windbox in the game's own move data. A few moves whose names the data does not give are left out.
 Sheik's Burst Grenade is an item: its pulls are windboxes of the grenade, drawn like any item's. R.O.B.'s Gyro has none:
@@ -164,7 +164,6 @@ mirrors when the attacker turns around. Two dashes mean the game picks the angle
 hits and whether the target is on the ground; they point at 38 degrees, where such a hit sends a fighter in the air.
 A dot means the hit carries the fighter along with the attack. With Hitboxes not ticked, the lines are drawn alone.
 
-<!-- CAPTURE-REQUEST hb-legend-v01: Hitbox Visualization with Hitboxes, Grab boxes, Hurtboxes and Frame data colours ticked, 1/4 speed. The CPU spot-dodging next to a standing Player 1: the CPU's hurtboxes blue while it dodges, white otherwise. Player 1 walks off the stage with Respawn on platform On: blue on the platform, green for the moments after it. Mario's grab: a purple grab box. Marth's forward smash: the tip red, the blade pink. See artifacts/rc14-hb-legend/. -->
 ![Windboxes ticked at 1/4 speed: F.L.U.D.D.'s water as a deep-blue disc pushing the CPU; Ganondorf's up tilt with deep-blue windboxes inside the see-through wind-area box and its white line; then the same up tilt with Hitboxes ticked too, the kick's hit drawn](../media/rc14-windboxes.gif)<br>
 *Windboxes on, at 1/4 speed: F.L.U.D.D.'s water and Ganondorf's up-tilt wind push without hitstun, drawn deep blue; the wind area is the see-through box with its white line. With Hitboxes ticked too, the kick's hit is drawn as well (the last frames). Eden, rc.14 (untested on hardware).*
 
@@ -207,9 +206,9 @@ slots and draw after the other boxes, so attacking objects and fighters keep pri
 
 *Projectiles and thrown items: at 1/4 speed, a red disc rides on Ridley's fireball, Link's arrow and Link's thrown bomb while each is in flight. Eden, rc.13 (untested on hardware).*
 
-### Frame data colours
+### Hitbox strength colours
 
-On draws hitboxes in the colours of Ultimate Frame Data: a strong hitbox is red and a weak one is pink. Strong means
+Hitboxes always use strength colours: a strong hitbox is red and a weak one is pink. Strong means
 it launches hardest. A hitbox is strong when it would send the other fighter further than any other hitbox out on that
 frame, such as a sword's tip or a knee's sweet spot. It is weak when another hitbox out on the same frame launches
 harder, such as the gust of King K. Rool's Gut Check beside its hit. SmashWiki says the gust deals the same damage as
@@ -224,14 +223,8 @@ hitboxes that launch the same. The launch angle
 plays no part: which direction is best depends on the situation. With no other fighter to measure against, the colours
 rank the hitboxes as they would launch a middleweight at 0%. A hitbox it cannot rank, such as a jab's single hitbox or
 several identical hitboxes, is red. Grab boxes and hurtboxes use the colours in the table above. It recolours only what
-is ticked. Off gives each hitbox its own colour, as before.
+is ticked. There is no separate colour toggle.
 
-- **Values:** On, Off
-- **Default:** Off
-- **How:** A, Left or Right flips it.
-
-<!-- CAPTURE-REQUEST spots-v01: Marth's forward smash at 1/4 speed with Hitbox Visualization On and Frame data colours Off, then On: the tip red and the blade pink on the early frames, the blade pink on the later frames. Captain Falcon's forward air: red on the knee's sweet frames, pink after. Same setup both times. See artifacts/rc14-spots/. -->
-<!-- CAPTURE-REQUEST v18-hitbox-legend: a still of one fighter with hitbox, hurtbox and grab box all drawn, annotated with the colours (the first hitbox red, other hitboxes in their own colours, hurtbox yellow, grab magenta) and pointing at the grabber's hurtboxes. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
 ### Frame Advantage
 
@@ -268,7 +261,7 @@ More: [Frame strip](../guide/frame-strip.md)
 On writes Sweet, Sour or Late on each hit that connects in the frame strip. The label sits on the grey hitlag block of
 the fighter that was hit: your hit on the CPU's lane, the CPU's hit on yours. Sweet is the hitbox out on that frame that
 launches the other fighter hardest, Sour one that launches it less, and Late a hit that launches less than the strongest
-hitbox earlier in the same move. The ranking is the one [Frame data colours](#frame-data-colours) uses; the launch angle
+hitbox earlier in the same move. The ranking is the one [Hitbox strength colours](#hitbox-strength-colours) uses; the launch angle
 plays no part. The game itself records which hitbox connected, and the plugin reads that record. It checks it against
 what the other fighter took: the damage the hit added and how hard the game launched it. So two hitboxes of the same
 damage, such as the two pairs in Mario's jab, are told apart, and so is a stale hit. A hit has no label when it cannot
