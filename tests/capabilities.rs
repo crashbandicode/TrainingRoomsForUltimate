@@ -667,6 +667,20 @@ fn surface_rows_are_registered_through_boot() {
 }
 
 #[test]
+fn tech_stage_and_kind_dependencies_are_admission_requirements() {
+    let needed = capabilities::CROSS_NEEDS.iter()
+        .find(|(unit, _)| *unit == Feature::TechPractice).unwrap().1;
+    for name in ["camera_limit_range", "stage_id_call", "utility_get_kind"] {
+        assert!(needed.contains(&name), "actual Tech frame dependency {name}");
+        let row = capabilities::find(name).expect("existing guarded native");
+        let usable = |site: &model::sites::Site| site.name != name;
+        assert_eq!(capabilities::blocked_by(Feature::TechPractice, &usable), Some(name));
+        assert!(!capabilities::unit_usable(Feature::TechPractice, &usable));
+        assert!(!Granted::from_usable(&usable).allows(row.offset));
+    }
+}
+
+#[test]
 fn contact_query_requires_both_installed_observer_prerequisites() {
     let a = Analysis::new();
     let body = |key: &str| a.graph.funcs[a.graph.find(key)[0]].body.clone();
