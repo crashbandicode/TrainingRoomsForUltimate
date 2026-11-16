@@ -1,5 +1,5 @@
 //! S0 diagnostic launcher. A rewritten ordinary CPU hit keeps the whole native damage path.
-//! diag-tech-s0.req: real-hit | ordinary | direct-match | direct | walk | off | inspect.
+//! diag-tech-s0.req: real-hit | direct-post | ordinary | direct-match | direct | walk | off | inspect.
 //! No product mode, heap, blocking lock or new hook.
 use super::tech_spike_guards;
 use crate::model::cpu::hash::lua_bind_hash;
@@ -25,6 +25,7 @@ pub fn request(text: &str) {
         "off" => 5,
         "inspect" => 6,
         "real-hit" => 7,
+        "direct-post" => 8,
         _ => {
             diagnostic(format_args!("[TechDirect] request invalid"));
             return;
@@ -531,6 +532,11 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
             "[TechDirect] seed attempt={} source=ordinary baseline_attempt={} reset={} before_status=true type5_info_read=UNOBSERVED",
             run.attempt,run.baseline?.attempt,observed.reset_type
         ));
+    } else if run.mode == 8 {
+        diagnostic(format_args!(
+            "[TechDirect] seed attempt={} source=post_init_pending before_status=false",
+            run.attempt
+        ));
     } else {
         // Cold V1 precedes the first real hit. Observe this provisional state explicitly;
         // never invent a reset type or borrow a type from a later reference hit.
@@ -542,7 +548,9 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
             run.attempt
         ));
     }
-    enable(damage);
+    if run.mode != 8 {
+        enable(damage);
+    }
     state::set_situation_kind(accessor, id("SITUATION_KIND_AIR")?);
     natives::set_float(accessor, native_reaction, reaction_id);
     natives::change_status_force(accessor, id("FIGHTER_STATUS_KIND_DAMAGE_FLY")?, false);
@@ -580,8 +588,8 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
         velocity.y.to_bits(),
         native_reaction.to_bits()
     ));
-    run.started = true;
-    run.phase = 2;
+    run.started = run.mode != 8;
+    run.phase = if run.mode == 8 { 3 } else { 2 };
     Some(())
 }
 
@@ -1046,6 +1054,36 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             }
             just_launched = true; // Sample0 follows the next original native integration; V1 still logs this frame.
         }
+    } else if run.phase == 3 {
+        // This callback follows the NEXT original native fighter frame after DAMAGE_FLY init.
+        // Move only the speed/enable write; retain the native status, reaction and motion context.
+        let Some(damage) = energy(accessor) else {
+            run.stop();
+            return;
+        };
+        let Some(wanted) = math::launch_velocity(run.input.kb, run.input.direction) else {
+            run.stop();
+            return;
+        };
+        let before = velocity(accessor);
+        #[repr(C, align(16))]
+        struct NativeVector([f32; 4]);
+        let set: extern "C" fn(usize, *const NativeVector) =
+            std::mem::transmute(game::text_base() + 0x20f8320);
+        let enable: extern "C" fn(usize) = std::mem::transmute(game::text_base() + 0x20f6560);
+        set(damage, &NativeVector([wanted.x, wanted.y, 0.0, 0.0]));
+        enable(damage);
+        if log_hidden(&run, accessor, "post_init_write").is_none() {
+            diagnostic(format_args!("[TechDirect] fault=post_init_hidden"));
+            run.stop();
+            return;
+        }
+        let actual = velocity(accessor);
+        diagnostic(format_args!("[TechDirect] post_init_speed attempt={} age={} before_vx={:08x} before_vy={:08x} vx={:08x} vy={:08x} requested_vx={:08x} requested_vy={:08x}",
+            run.attempt,run.age,before.map_or(u32::MAX,|v|v.x.to_bits()),before.map_or(u32::MAX,|v|v.y.to_bits()),actual.map_or(u32::MAX,|v|v.x.to_bits()),actual.map_or(u32::MAX,|v|v.y.to_bits()),wanted.x.to_bits(),wanted.y.to_bits()));
+        run.started = true;
+        run.phase = 2;
+        just_launched = true;
     }
     let status = natives::status_kind(accessor);
     if let Some(button) = id("CONTROL_PAD_BUTTON_GUARD") {
