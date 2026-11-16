@@ -1,4 +1,4 @@
-//! The one V8 mutation sequence used by both product and diagnostic launchers.
+//! The one V9 mutation sequence used by both product and diagnostic launchers.
 use super::{tech_info_seed::Seed, tech_native};
 use crate::model::tech_launch::Vec2;
 use crate::runtime::game::natives;
@@ -56,6 +56,7 @@ pub(super) unsafe fn launch(
         id("HIT_HEIGHT_HIGH")?,
     ];
     let air = id("SITUATION_KIND_AIR")?;
+    let ground = id("SITUATION_KIND_GROUND")?;
     let fly = id("FIGHTER_STATUS_KIND_DAMAGE_FLY")?;
     let reserve = id("FIGHTER_STATUS_WORK_ID_FLOAT_RESERVE_DAMAGE_LR")?;
     let action = id("FIGHTER_STATUS_DAMAGE_WORK_INT_STOP_RELEASE_ACTION")?;
@@ -73,6 +74,12 @@ pub(super) unsafe fn launch(
     {
         return Err(Error::Value);
     }
+    // The product hold does not manufacture a grounded situation. Refuse before mutation.
+    if plan.ground_to_air
+        && (natives::situation_kind(accessor) != ground || !natives::is_grounded(accessor))
+    {
+        return Err(Error::Value);
+    }
     state_natives::clear_speed_all(accessor);
     state_natives::init_pos(
         accessor,
@@ -85,7 +92,9 @@ pub(super) unsafe fn launch(
     state_natives::set_lr(accessor, plan.facing);
     state_natives::heal(accessor, -natives::damage(accessor, 0));
     state_natives::add_damage(accessor, plan.percent);
-    state_natives::set_situation_kind(accessor, air);
+    if !plan.ground_to_air {
+        state_natives::set_situation_kind(accessor, air);
+    }
     observe(Moment::Placed).ok_or(Error::Observation)?;
     natives::tech_overwrite_reaction(accessor, plan.reaction).ok_or(Error::Guard)?;
     observe(Moment::Reaction).ok_or(Error::Observation)?;
@@ -118,20 +127,21 @@ pub(super) unsafe fn launch(
         return Err(Error::Status);
     }
     observe(Moment::Initialized).ok_or(Error::Observation)?;
-    // Native release owns motion/rotation/roll; only the reviewed release action is seeded here.
-    if plan.ground_to_air {
-        natives::set_int(accessor, ground_to_air, action);
-    }
+    // Native grounded damage init owns the release action; never seed the work value.
+    let readback = natives::get_int(accessor, action);
     observe(Moment::Action {
-        written: plan.ground_to_air,
+        written: false,
         value: if plan.ground_to_air {
             ground_to_air
         } else {
             -1
         },
-        readback: natives::get_int(accessor, action),
+        readback,
     })
     .ok_or(Error::Observation)?;
+    if plan.ground_to_air && readback != ground_to_air {
+        return Err(Error::Status);
+    }
     let speed = tech_native::damage_velocity(accessor).ok_or(Error::Value)?;
     observe(Moment::Speed(speed)).ok_or(Error::Observation)?;
     Ok(speed)

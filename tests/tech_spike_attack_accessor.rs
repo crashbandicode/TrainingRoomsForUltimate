@@ -284,6 +284,25 @@ fn info_launch_uses_one_pre_init_damage_stop_without_energy_rewrite() {
         .find("natives::change_status_force(accessor, fly, false)")
         .unwrap();
     assert!(arm < verify && verify < init);
+    // Grounded v9 launches must not manufacture a release action or lose GROUND before init.
+    assert!(!core.contains("natives::set_int("));
+    let ground_precheck = core
+        .find("natives::situation_kind(accessor) != ground")
+        .unwrap();
+    let first_mutation = core
+        .find("state_natives::clear_speed_all(accessor)")
+        .unwrap();
+    assert!(ground_precheck < first_mutation);
+    assert!(core.contains(
+        "if !plan.ground_to_air {\n        state_natives::set_situation_kind(accessor, air);"
+    ));
+    let native_action = core
+        .find("let readback = natives::get_int(accessor, action)")
+        .unwrap();
+    let action_check = core
+        .find("plan.ground_to_air && readback != ground_to_air")
+        .unwrap();
+    assert!(init < native_action && native_action < action_check);
     assert!(core.contains("is_damage(accessor)"));
     assert!(diag.contains("fixed9_fixture"));
     assert!(!product.contains("fixed9"));
