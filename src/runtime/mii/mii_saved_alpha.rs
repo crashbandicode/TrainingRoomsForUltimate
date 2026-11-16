@@ -185,17 +185,17 @@ pub(crate) fn menu_close(pending: Option<PendingSelection>) {
 
 /// A captured saved-original same-class origin cannot leave for an unqualified ordinary→Mii return.
 /// Its Player cycle is exactly slot0 → selected distinct saved Mii → slot0.
-pub(super) fn intercept(roster_role: Role, selection: Selection) -> bool {
+pub(super) fn intercept(roster_role: Role, selection: Selection) -> Option<bool> {
     if !ENABLED.load(Ordering::Acquire) {
         // The feature adds saved-Mii roster values, but a failed native contract must never
         // forward that value (or strand a native saved origin) through the ordinary loader.
-        return original_kind(roster_role).is_some_and(|k| (0x48..=0x4a).contains(&k))
-            || matches!(selection, Selection::Direct(f) if (0x48..=0x4a).contains(&f.kind()));
+        return (original_kind(roster_role).is_some_and(|k| (0x48..=0x4a).contains(&k))
+            || matches!(selection, Selection::Direct(f) if (0x48..=0x4a).contains(&f.kind()))).then_some(false);
     }
     let i = usize::from(roster_role == Role::Cpu);
     if unified(i) {
-        return original_kind(roster_role).is_some_and(|k|MiiClass::from_kind(k).is_some())
-            || matches!(selection,Selection::Direct(f) if MiiClass::from_kind(f.kind()).is_some());
+        return (original_kind(roster_role).is_some_and(|k|MiiClass::from_kind(k).is_some())
+            || matches!(selection,Selection::Direct(f) if MiiClass::from_kind(f.kind()).is_some())).then_some(false);
     }
     let mut state = ALPHA.lock();
     let Some(owner) = state.owner[i].as_ref() else {
@@ -206,12 +206,12 @@ pub(super) fn intercept(roster_role: Role, selection: Selection) -> bool {
         if protected {
             notice("saved Mii cycle unavailable until the current menu catalog/owner is qualified; other Mii transitions remain unsupported");
         }
-        return protected;
+        return protected.then_some(false);
     };
     if super::mii_ordinary_cpu::writers_reserved(i,i as u16) {
-        drop(state);notice("saved Mii cycle refused: ordinary CPU retains its destination");return true;
+        drop(state);notice("saved Mii cycle refused: ordinary CPU retains its destination");return Some(false);
     }
-    if i == 0
+    let accepted = i == 0
         && matches!(selection, Selection::Cycle)
         && owner.state.phase() == Phase::Ready
         && (owner.cycled
@@ -219,8 +219,8 @@ pub(super) fn intercept(roster_role: Role, selection: Selection) -> bool {
                 .player_roster
                 .fighters()
                 .iter()
-                .any(|f| f.kind() == owner.state.original().canonical().class as u32))
-    {
+                .any(|f| f.kind() == owner.state.original().canonical().class as u32));
+    if accepted {
         state.intent[i] = Some(Intent::Cycle);
         WORK.store(true, Ordering::Release);
     } else {
@@ -233,7 +233,7 @@ pub(super) fn intercept(roster_role: Role, selection: Selection) -> bool {
             "outbound character change refused: alpha preserves the saved-original same-class origin round trip",
         );
     }
-    true
+    Some(accepted)
 }
 
 fn refresh_work(s: &Alpha) {

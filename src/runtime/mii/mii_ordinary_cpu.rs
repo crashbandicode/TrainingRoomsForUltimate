@@ -487,6 +487,7 @@ pub(super) fn request_restore(value:WaitingValue)->bool {
     s.restore=Some(value);s.request=Some(Request::CYCLE);
     true
 }
+/// None leaves routing to the roster; Some reports a consumed request's acceptance.
 pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option<bool> {
     if role!=Role::Cpu || !ENABLED.load(Ordering::Acquire) {return None;}
     let mut s=STATE.lock();
@@ -497,7 +498,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
         if unsafe {super::mii_auto_init::origin_capture_pending(Role::Cpu,false,s.capture)} {
             drop(s);
             if user_request {notify(Role::Cpu,"Wait for the practice character to finish loading".into());}
-            return Some(true);
+            return Some(false);
         }
         let wants_mii=setting(&MENU).cpu_roster.fighters_excluding_fixed(None).iter()
             .any(|f|MiiClass::from_kind(f.kind()).is_some());
@@ -507,7 +508,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
             if user_request && mii_backend::current().is_some() {
                 notify(Role::Cpu,"Wait for the practice character to finish loading".into());
             }
-            return Some(true);
+            return Some(false);
         }
         return None;
     };
@@ -524,7 +525,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
     // Automatic partner reconciliation may repeat while an owned operation
     // waits. Coalesce it without a per-frame synchronous diagnostic write.
     if matches!(selection,Selection::RefreshPartners)
-        && (s.departed || s.request.is_some() || s.busy()) {return Some(true);}
+        && (s.departed || s.request.is_some() || s.busy()) {return Some(false);}
     // Reservation starts at the INSTALL ticket, never at this menu/catalog capture.
     let request=match selection {
         Selection::Cycle=>Some(Request::CYCLE),
@@ -534,7 +535,8 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
     let manual_direct=user_request && matches!(selection,Selection::Direct(_));
     // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.
     let replace_restore=manual_direct && s.restore.is_some();
-    if !s.departed && !s.busy() && (s.request.is_none() || replace_restore) && request.is_some() {
+    let accepted=!s.departed && !s.busy() && (s.request.is_none() || replace_restore) && request.is_some();
+    if accepted {
         s.restore=None;
         if user_request {WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);}
         s.request=request;
@@ -549,7 +551,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
         drop(s);note("request refused: owned CPU request busy or unsupported");
         if manual_direct {notify(Role::Cpu,"Finish the current practice action first".into());}
     }
-    Some(true)
+    Some(accepted)
 }
 
 /// What `begin` waits on, in `permitted()`'s order.

@@ -351,6 +351,7 @@ pub(super) fn request_restore(value:WaitingValue)->bool {
     s.restore=Some(value);s.request=Some(Request::CYCLE);
     true
 }
+/// None leaves routing to the roster; Some reports a consumed request's acceptance.
 pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option<bool> {
     if role!=Role::Player || !ENABLED.load(Ordering::Acquire) {return None;}
     let mut s=STATE.lock();
@@ -361,7 +362,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
         if unsafe {super::mii_auto_init::origin_capture_pending(Role::Player,false,s.capture)} {
             drop(s);
             if user_request {notify(Role::Player,"Wait for the practice character to finish loading".into());}
-            return Some(true);
+            return Some(false);
         }
         let automatic=super::mii_auto_init::pending();
         let qualifying=unsafe {mii_backend::ready()} && (automatic || s.capture);
@@ -373,7 +374,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
             if user_request && mii_backend::current().is_some() {
                 notify(Role::Player,"Wait for the practice character to finish loading".into());
             }
-            return Some(true);
+            return Some(false);
         }
         return None;
     };
@@ -396,7 +397,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
     // The roster reconciles partner count every frame. Coalesce that automatic
     // request while an owned operation is pending; do not sync a refusal to SD.
     if matches!(selection,Selection::RefreshPartners) && (s.request.is_some() || s.busy()) {
-        return Some(true);
+        return Some(false);
     }
     let request=match selection {
         Selection::Cycle=>Some(Request::CYCLE),
@@ -406,7 +407,8 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
     let manual_direct=user_request && matches!(selection,Selection::Direct(_));
     // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.
     let replace_restore=manual_direct && s.restore.is_some();
-    if !s.busy() && (s.request.is_none() || replace_restore) && request.is_some() {
+    let accepted=!s.busy() && (s.request.is_none() || replace_restore) && request.is_some();
+    if accepted {
         s.restore=None;
         if user_request {WAITING_MEMORY.lock().manual_request(Role::Player as usize);}
         s.request=request;
@@ -414,7 +416,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
         drop(s);note("request refused: owned Player request busy or unsupported");
         if manual_direct {notify(Role::Player,"Finish the current practice action first".into());}
     }
-    Some(true)
+    Some(accepted)
 }
 
 unsafe fn permitted()->bool {permitted_but_install() && !INSTALL.active()}
