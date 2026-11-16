@@ -132,12 +132,18 @@ fn takes_lock(graph: &Graph, index: usize, file: &str, name: &str) -> bool {
 }
 
 fn takes_lock_methods(graph: &Graph, index: usize, file: &str, name: &str, methods: &[&str], by_reference: bool) -> bool {
+    takes_lock_on_thread(graph, index, file, name, methods, by_reference, None)
+}
+
+fn takes_lock_on_thread(graph: &Graph, index: usize, file: &str, name: &str, methods: &[&str], by_reference: bool, plugin: Option<bool>) -> bool {
     let f = &graph.funcs[index];
     let module = Path::new(file).file_stem().unwrap().to_string_lossy().into_owned();
     let toks = &f.body;
     let ident = |k: usize, s: &str| matches!(toks.get(k), Some(Tok::Ident(t)) if t == s);
     let punct = |k: usize, c: char| matches!(toks.get(k), Some(Tok::Punct(p)) if *p == c);
+    let excluded = plugin.and_then(|plugin| callgraph::thread_dispatch(toks).map(|(p, g)| if plugin { g } else { p }));
     for i in 0..toks.len() {
+        if excluded.as_ref().is_some_and(|range| range.contains(&i)) { continue; }
         if !ident(i, name) {
             continue;
         }
@@ -191,9 +197,10 @@ const TYPED_STATIC_CALLS: &[(&str, &str, &str)] = &[
 ];
 
 /// The names `index` calls only inside the game-thread branch of an `on_plugin_thread()` dispatch: not followed on a plugin thread.
-fn game_branch_only(graph: &Graph, index: usize) -> BTreeSet<String> {
+fn other_thread_branch_only(graph: &Graph, index: usize, plugin: bool) -> BTreeSet<String> {
     let body = &graph.funcs[index].body;
-    let Some((_, game)) = callgraph::thread_dispatch(body) else { return BTreeSet::new() };
+    let Some((p, g)) = callgraph::thread_dispatch(body) else { return BTreeSet::new() };
+    let game = if plugin { g } else { p };
     let called = |k: usize| match (body.get(k), body.get(k + 1)) {
         (Some(Tok::Ident(name)), Some(Tok::Punct('('))) => Some(name.clone()),
         _ => None,
@@ -256,6 +263,10 @@ fn typed_static_callees(graph: &Graph, from: usize) -> BTreeSet<usize> {
 /// Callees of `index`: path calls, plus method calls whose name is unique among scanned receiver methods. Ambiguous method names
 /// are recorded in `ambiguous` (name -> how many functions carry it).
 fn edges(graph: &Graph, index: usize, by_name: &BTreeMap<String, Vec<usize>>, ambiguous: &mut BTreeMap<String, usize>) -> BTreeSet<usize> {
+    edges_on_thread(graph, index, by_name, ambiguous, true)
+}
+
+fn edges_on_thread(graph: &Graph, index: usize, by_name: &BTreeMap<String, Vec<usize>>, ambiguous: &mut BTreeMap<String, usize>, plugin: bool) -> BTreeSet<usize> {
     let from = &graph.funcs[index];
     let refs = Graph::references(from);
     // A path edge keeps the module qualifier: `p1::publish(..)` reaches the `publish` of module `p1` only (the capability resolver's rule;
@@ -303,7 +314,7 @@ fn edges(graph: &Graph, index: usize, by_name: &BTreeMap<String, Vec<usize>>, am
             _ => {}
         }
     }
-    let game_only = game_branch_only(graph, index);
+    let game_only = other_thread_branch_only(graph, index, plugin);
     out.retain(|&c| !game_only.contains(&graph.funcs[c].name));
     out
 }
@@ -527,6 +538,19 @@ fn static_types(root: &Path, types: &[&str]) -> Vec<(String, String)> {
 
 /// The staged Tech pass is a hook root before the launch binding exists. Walk
 /// its helpers too: a hidden blocking initializer is as unsafe as VIEW.lock().
+fn non_switch_only(f: &callgraph::Func, runtime: &Path) -> bool {
+    // The shared lexer removes string contents from attributes. Require both
+    // its exact negative target predicate and the original attached predicate;
+    // unsupported cfg syntax remains audited rather than silently skipped.
+    let attrs: String = f.attrs.split_whitespace().collect();
+    if !attrs.contains("cfg(not(target_os=))") { return false; }
+    let source = std::fs::read_to_string(runtime.join(&f.file)).unwrap();
+    let compact: String = source.split_whitespace().collect();
+    ["", "pub", "pub(crate)", "unsafe", "pubunsafe", "pub(crate)unsafe"].iter().any(|prefix| {
+        compact.contains(&format!("#[cfg(not(target_os=\"switch\"))]{prefix}fn{}(", f.name))
+    })
+}
+
 fn tech_frame_waits(graph: &Graph, runtime: &Path) -> BTreeSet<String> {
     let roots = graph.find("tech::frame");
     assert_eq!(roots.len(), 1, "Tech fighter pass must remain an explicit audit root");
@@ -541,23 +565,26 @@ fn tech_frame_waits(graph: &Graph, runtime: &Path) -> BTreeSet<String> {
     let mut violations = BTreeSet::new();
     while let Some((i, via)) = stack.pop() {
         if !seen.insert(i) { continue; }
+        if non_switch_only(&graph.funcs[i], runtime) { continue; }
         let key = graph.funcs[i].key();
         let path = if via.is_empty() { key.clone() } else { format!("{via} -> {key}") };
         for (file, name) in &locks {
-            if takes_lock_methods(graph, i, file, name, &["lock", "read", "write"], true) {
+            if takes_lock_on_thread(graph, i, file, name, &["lock", "read", "write"], true, Some(false)) {
                 violations.insert(format!("{path} blocks on {file}::{name}"));
             }
         }
         for (file, name) in &cells {
-            if takes_lock_methods(graph, i, file, name, &["set", "get_or_init", "get_or_try_init", "wait"], false) {
+            if takes_lock_on_thread(graph, i, file, name, &["set", "get_or_init", "get_or_try_init", "wait"], false, Some(false)) {
                 violations.insert(format!("{path} initializes or waits on {file}::{name}"));
             }
         }
         // Same explicit allocation spellings covered by the existing HUD audit.
-        if graph.funcs[i].body.iter().any(|t| matches!(t, Tok::Ident(s) if ["Box", "Vec", "String", "alloc"].contains(&s.as_str()))) {
+        let plugin_range = callgraph::thread_dispatch(&graph.funcs[i].body).map(|(p, _)| p);
+        if graph.funcs[i].body.iter().enumerate().any(|(at, t)| !plugin_range.as_ref().is_some_and(|p| p.contains(&at))
+            && matches!(t, Tok::Ident(s) if ["Box", "Vec", "String", "alloc"].contains(&s.as_str()))) {
             violations.insert(format!("{path} reaches an allocation spelling"));
         }
-        stack.extend(edges(graph, i, &by_name, &mut BTreeMap::new()).into_iter().map(|next| (next, path.clone())));
+        stack.extend(edges_on_thread(graph, i, &by_name, &mut BTreeMap::new(), false).into_iter().map(|next| (next, path.clone())));
     }
     violations
 }
@@ -591,6 +618,32 @@ fn tech_frame_audit_rejects_reachable_lock_initialization_and_allocation_seeds()
     }
     graph.funcs[helper].body = callgraph::lex("VIEW.try_lock(); TUMBLE_IDS.get();");
     assert!(tech_frame_waits(&graph, &runtime).is_empty(), "nonblocking access was rejected");
+}
+
+#[test]
+fn tech_frame_audit_follows_game_branch_and_switch_implementation() {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut graph = Graph::scan(&runtime, &[]);
+    graph.precise_imports = true;
+    let frame = graph.find("tech::frame")[0];
+    let helper = graph.find("tech::still_tumbling")[0];
+    graph.funcs[frame].body = callgraph::lex("still_tumbling(0);");
+    graph.funcs[helper].body = callgraph::lex("if threads::on_plugin_thread() { VIEW.lock(); } else { VIEW.try_lock(); }");
+    assert!(tech_frame_waits(&graph, &runtime).is_empty(), "plugin branch was walked as a game hook");
+    graph.funcs[helper].body = callgraph::lex("if threads::on_plugin_thread() { VIEW.try_lock(); } else { VIEW.lock(); }");
+    assert!(tech_frame_waits(&graph, &runtime).iter().any(|v| v.contains("blocks on features/tech.rs::VIEW")), "game branch wait escaped");
+    // Use real target attributes, not a function-name exemption. A wait seeded
+    // into the host fallback is irrelevant; the Switch implementation must fail.
+    let variants = graph.find("clock::uptime_ms");
+    assert_eq!(variants.len(), 2);
+    let host = *variants.iter().find(|&&i| non_switch_only(&graph.funcs[i], &runtime)).unwrap();
+    let switch = *variants.iter().find(|&&i| i != host).unwrap();
+    graph.funcs[frame].body = callgraph::lex("clock::uptime_ms();");
+    graph.funcs[host].body = callgraph::lex("tech::VIEW.lock();");
+    graph.funcs[switch].body.clear();
+    assert!(tech_frame_waits(&graph, &runtime).is_empty(), "host-only fallback was walked as Switch code");
+    graph.funcs[switch].body = callgraph::lex("tech::VIEW.lock();");
+    assert!(tech_frame_waits(&graph, &runtime).iter().any(|v| v.contains("blocks on features/tech.rs::VIEW")), "Switch wait escaped");
 }
 
 /// The audit's raw material (IMPLEMENTATION-PROGRESS-sync.md (removed after v0.2.0-rc.1; see that tag)): every static lock (ours and carried package-6 code, std or hos-lock)
