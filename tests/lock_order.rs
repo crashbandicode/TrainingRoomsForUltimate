@@ -203,6 +203,11 @@ impl<'g> Ctx<'g> {
         }
         let Some(all) = self.by_name.get(last) else { return Vec::new() };
         if call.method {
+            if call.receiver.as_deref().is_some_and(|receiver| {
+                self.graph.foreign_static_receiver(f, receiver) || self.graph.foreign_guard_receiver(f, receiver)
+            }) {
+                return Vec::new();
+            }
             let methods: Vec<usize> = all.iter().copied().filter(|&c| self.graph.funcs[c].has_receiver).collect();
             if methods.len() == 1 {
                 return if methods[0] != from { methods } else { Vec::new() };
@@ -1770,6 +1775,23 @@ fn tech_frame_is_a_game_root_before_binding_and_reaches_seeded_helper_lock() {
     assert!(s.roles[helper].contains("game-hook"), "Tech helper lost its game-thread role");
     assert!(shared.game_hooks.get(&view).is_some_and(|hooks| hooks.contains("tech::frame")),
         "reachable blocking VIEW seed escaped game-root inventory");
+}
+
+#[test]
+fn statics_use_their_declared_foreign_or_runtime_receiver_type() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/lock_order_receiver");
+    let mut graph = Graph::scan(&dir, &[]);
+    graph.precise_imports = true;
+    let ctx = Ctx::new(&graph, Vec::new());
+    let reset = graph.find("lua_vm::reset")[0];
+    for (root, expected) in [
+        ("worker::foreign_static", false), ("worker::runtime_static", true), ("worker::unresolved_static", true),
+        ("worker::foreign_guard", false), ("worker::runtime_guard", true), ("worker::unresolved_guard", true),
+    ] {
+        let from = graph.find(root)[0];
+        let targets: BTreeSet<_> = calls(&graph.funcs[from].body).iter().flat_map(|call| ctx.resolve(from, call)).collect();
+        assert_eq!(targets.contains(&reset), expected, "{root}: {targets:?}");
+    }
 }
 
 /// The scan on a small fixture: a guard bound by `let` and held over a call, a temporary held over its statement, a
