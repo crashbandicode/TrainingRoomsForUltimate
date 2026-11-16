@@ -1681,3 +1681,11 @@ ceiling = 148194
 date = "2026-11-15"
 reason = "rc.15 final merged implementation measured 148194 on dae81738 after the accepted feature heads, Phase3 reuse (-73), colour legend (+56), release identity and measured stack-bound refresh. This replaces the provisional 148075 ceiling with the exact final total; counting rules and gate enforcement are unchanged."
 approved_by = "Operator 2026-11-15 18:54Z via AskUserQuestion: 'Set limit to final total', relayed by the primary c07b3449. Supersedes the earlier about-20-lines-over allowance; exact measured final total 148194."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 148236
+date = "2026-11-16"
+reason = "rc.15 shared nonblocking menu fix measured total 148236, +42 over 148194. Lead-approved FOR OPERATOR REVIEW; hardware-reship integration records the combined total. Counting rules and features unchanged."
+approved_by = "Operator rc.15 size approval; primary 20:08Z, rc.15 approval, 2026-11-16: explicitly authorizes this measured-total entry FOR OPERATOR REVIEW."
