@@ -658,7 +658,7 @@ fn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool)
         return;
     };
     let occupied = if busy() {
-        Some("Wait for the character swap to finish")
+        Some(crate::engine::mii::ordinary_cpu::SWAP_BUSY_NOTICE)
     } else if training::recording_or_playback() {
         Some("Finish recording or playback before swapping")
     } else if training::save_states::is_loading() {

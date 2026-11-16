@@ -6,6 +6,37 @@ pub const OWNER: usize = 1;
 #[cfg(test)]
 pub const DESTINATION: u16 = 1;
 
+// restriction: character-swap-busy
+pub const SWAP_BUSY_NOTICE: &str = "Wait for the character swap to finish";
+
+/// An intercepted request is either queued or consumed without replacing the existing request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CpuInterceptAdmission {
+    Queue,
+    Consumed,
+    ConsumedBusy,
+}
+impl CpuInterceptAdmission {
+    pub fn cpu_refusal_notice(self) -> Option<&'static str> {
+        matches!(self, Self::ConsumedBusy).then_some(SWAP_BUSY_NOTICE)
+    }
+}
+
+/// The ordinary CPU owner's existing admission predicate. A detected user Cycle
+/// refused by pending work shares the generic roster's busy notice.
+pub fn cpu_intercept_admission(
+    departed: bool, busy: bool, pending: bool, replace_restore: bool,
+    request_supported: bool, user_cycle: bool,
+) -> CpuInterceptAdmission {
+    if !departed && !busy && (!pending || replace_restore) && request_supported {
+        CpuInterceptAdmission::Queue
+    } else if user_cycle && (busy || pending) {
+        CpuInterceptAdmission::ConsumedBusy
+    } else {
+        CpuInterceptAdmission::Consumed
+    }
+}
+
 /// Exact native CPU descriptor receipts qualify all three classes. Runtime adapter acceptance is separate.
 pub fn supported_kind(kind: u32) -> bool { matches!(kind, 0x48..=0x4a) }
 
@@ -1506,3 +1537,45 @@ mod recapture_diagnostic_tests {
 #[cfg(test)]
 #[path="created_destination_tests.rs"]
 mod created_destination_tests;
+
+#[cfg(test)]
+mod cpu_intercept_notice_tests {
+    use super::{cpu_intercept_admission, CpuInterceptAdmission::*, SWAP_BUSY_NOTICE};
+
+    #[test]
+    fn cpu_pending_cycle_is_consumed_with_shared_notice() {
+        // The first request remains pending: the second detected Cycle is consumed,
+        // rather than queued over it, and selects the generic roster's exact notice.
+        let pending_cycle = cpu_intercept_admission(false, false, true, false, true, true);
+        assert_eq!(pending_cycle, ConsumedBusy);
+        assert_eq!(pending_cycle.cpu_refusal_notice(), Some(SWAP_BUSY_NOTICE));
+        assert_eq!(cpu_intercept_admission(false, true, false, false, true, true), ConsumedBusy);
+        assert_eq!(SWAP_BUSY_NOTICE, "Wait for the character swap to finish");
+        // An automatic request has no user-facing refusal.
+        let automatic = cpu_intercept_admission(false, false, true, false, true, false);
+        assert_eq!(automatic, Consumed);
+        assert_eq!(automatic.cpu_refusal_notice(), None);
+    }
+
+    #[test]
+    fn cpu_direct_refusal_and_restore_replacement_are_unchanged() {
+        // Manual Direct does not become Cycle's busy-notice path. Runtime retains
+        // its existing "Finish the current practice action first" notifier.
+        let direct = cpu_intercept_admission(false, false, true, false, true, false);
+        assert_eq!(direct, Consumed);
+        assert_eq!(direct.cpu_refusal_notice(), None);
+        assert_eq!(cpu_intercept_admission(false, true, false, false, true, false), Consumed);
+        // Before INSTALL, the explicit Direct pick still supersedes its pending restore.
+        assert_eq!(cpu_intercept_admission(false, false, true, true, true, false), Queue);
+        assert_eq!(cpu_intercept_admission(false, true, true, true, true, false), Consumed);
+    }
+
+    #[test]
+    fn cpu_intercept_preserves_admission_boundaries() {
+        assert_eq!(cpu_intercept_admission(false, false, false, false, true, true), Queue);
+        assert_eq!(cpu_intercept_admission(true, false, false, false, true, true), Consumed);
+        assert_eq!(cpu_intercept_admission(false, false, false, false, false, true), Consumed);
+        assert_eq!(cpu_intercept_admission(true, false, true, true, true, false), Consumed);
+        assert_eq!(cpu_intercept_admission(false, false, true, true, false, false), Consumed);
+    }
+}

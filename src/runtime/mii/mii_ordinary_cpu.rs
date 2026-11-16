@@ -534,7 +534,10 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
     let manual_direct=user_request && matches!(selection,Selection::Direct(_));
     // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.
     let replace_restore=manual_direct && s.restore.is_some();
-    if !s.departed && !s.busy() && (s.request.is_none() || replace_restore) && request.is_some() {
+    let admission=crate::engine::mii::ordinary_cpu::cpu_intercept_admission(
+        s.departed,s.busy(),s.request.is_some(),replace_restore,request.is_some(),
+        user_request && matches!(selection,Selection::Cycle));
+    if admission==crate::engine::mii::ordinary_cpu::CpuInterceptAdmission::Queue {
         s.restore=None;
         if user_request {WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);}
         s.request=request;
@@ -548,6 +551,9 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
     } else {
         drop(s);note("request refused: owned CPU request busy or unsupported");
         if manual_direct {notify(Role::Cpu,"Finish the current practice action first".into());}
+        else if let Some(message)=admission.cpu_refusal_notice() {
+            notify(Role::Cpu,message.into());
+        }
     }
     Some(true)
 }
