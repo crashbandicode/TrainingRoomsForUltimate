@@ -92,6 +92,23 @@ fn btt_projectiles_default_and_round_trip() {
     assert_eq!(loaded.menu.get(id), Some(&[1, 0][..]));
 }
 
+fn unavailable_projectiles_leave_melee_and_placement_usable() {
+    let mut m = Menu::new(Settings::factory(), Env { btt_projectiles_ready: false, ..Env::default() });
+    let projectile = row("btt_projectiles");
+    assert_eq!(m.grey(projectile), Some(Grey::ProjectilesUnavailable));
+    let depth = m.depth();
+    m.activate(projectile);
+    m.cycle(projectile, true);
+    m.cycle(projectile, false);
+    assert_eq!((m.depth(), m.get("btt_projectiles")), (depth, &[0, 1][..]));
+    assert_eq!(m.grey(row("btt")), None);
+    assert_eq!(m.grey(row("btt_place")), None);
+    m.cycle(row("btt"), true);
+    assert_eq!(m.get("btt"), &[0, 1]);
+    m.activate(row("btt_place"));
+    assert!(m.take_outbox().place_targets);
+}
+
 /// The cases of this module in one table.
 #[test]
 fn case_table() {
@@ -99,6 +116,7 @@ fn case_table() {
         ("btt_and_eggsercise_exclude_each_other", btt_and_eggsercise_exclude_each_other as fn()),
         ("a_file_with_both_practice_games_on_keeps_eggsercise", a_file_with_both_practice_games_on_keeps_eggsercise as fn()),
         ("place_targets_closes_the_menu_with_a_request", place_targets_closes_the_menu_with_a_request as fn()),
+        ("unavailable_projectiles_leave_melee_and_placement_usable", unavailable_projectiles_leave_melee_and_placement_usable as fn()),
         ("btt_projectiles_default_and_round_trip", btt_projectiles_default_and_round_trip as fn()),
         ("target_speed_greys_while_the_targets_stay_still", target_speed_greys_while_the_targets_stay_still as fn()),
     ]);

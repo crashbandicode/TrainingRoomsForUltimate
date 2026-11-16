@@ -124,6 +124,7 @@ pub fn call_name(offset: usize) -> Option<&'static str> {
 /// `print_cross_needs`, checked by `cross_needs_match_the_call_graph`), as the first row of each called
 /// function.
 pub static CROSS_NEEDS: [(Feature, &[&str]); 11] = [
+    (Feature::BttProjectiles, &["article_get_from_no", "attack_data", "attack_is_attack", "orb_joint_position", "state_article_object_id", "state_object_is_active", "state_object_module_accessor"]),
     (Feature::CpuCommon, &["transition_term_hook", "work_set_float"]),
     (Feature::CpuCore, &["fighter_information", "is_operation_cpu"]),
     (Feature::CpuMash, &["fighter_manager_get_entry", "motion_kind", "transition_term_hook"]),

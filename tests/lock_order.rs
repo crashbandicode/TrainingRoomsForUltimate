@@ -683,7 +683,11 @@ fn scan(graph: &Graph) -> (Ctx<'_>, Scan) {
 
 fn scan_mode(graph: &Graph, include_try: bool) -> (Ctx<'_>, Scan) {
     let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
-    let ctx = Ctx::new(graph, static_locks(&runtime));
+    scan_with_locks(graph, static_locks(&runtime), include_try)
+}
+
+fn scan_with_locks(graph: &Graph, locks: Vec<(String, String)>, include_try: bool) -> (Ctx<'_>, Scan) {
+    let ctx = Ctx::new(graph, locks);
     let n = graph.funcs.len();
     let mut s = Scan {
         takes: (0..n).map(|f| takes_mode(&ctx, f, include_try)).collect(),
@@ -1284,6 +1288,45 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// A camera mutex is forbidden even if no plugin thread holds it. Seed the real callbacks and require the normal
+/// game-entry walk to find each wait from cpu::on_frame; a disconnected camera callback cannot make this test pass.
+#[test]
+fn btt_camera_is_lock_free_and_cpu_frame_reaches_seeded_camera_waits() {
+    let mut graph = runtime_graph();
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut locks = static_locks(&runtime);
+    let camera = ("features/btt_camera.rs".to_owned(), "CAMERA".to_owned());
+    if !locks.contains(&camera) {
+        locks.push(camera.clone());
+    }
+    let camera_lock = locks.iter().position(|lock| lock == &camera).unwrap();
+    let callbacks: Vec<usize> = ["btt_camera::apply", "btt_camera::request", "btt_camera::frame"].iter().map(|entry| {
+        let found = graph.find(entry);
+        assert_eq!(found.len(), 1, "camera callback {entry}");
+        found[0]
+    }).collect();
+    {
+        let (ctx, scan) = scan_with_locks(&graph, locks.clone(), false);
+        for &at in &callbacks {
+            let reached: Vec<String> = scan.reach[at].iter().map(|&lock| lock_name(&ctx, lock)).collect();
+            assert!(reached.is_empty(), "{} reaches blocking locks: {reached:?}", graph.funcs[at].key());
+        }
+    }
+    for at in callbacks {
+        let original = graph.funcs[at].body.clone();
+        graph.funcs[at].body.extend(callgraph::lex("CAMERA.lock();"));
+        {
+            let (ctx, scan) = scan_with_locks(&graph, locks.clone(), false);
+            assert!(scan.reach[at].contains(&camera_lock), "camera lock seed was not parsed");
+            let shared = shared_locks(&ctx, &scan);
+            let want = format!("{} (hook cpu::on_frame)", graph.funcs[at].key());
+            assert!(shared.game_waits.get(&camera_lock).is_some_and(|waits| waits.contains(&want)),
+                    "CPU frame did not reach the camera seed: {want}");
+        }
+        graph.funcs[at].body = original;
+    }
 }
 
 /// The diag build's call graph (`runtime_graph` plus the `#[cfg(feature = "diag")]` modules).

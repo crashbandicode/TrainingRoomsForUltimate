@@ -14,7 +14,7 @@ use hos_lock::{Mailbox, Mutex, Published};
 pub use crate::model::btt::LOOKS;
 use crate::model::btt::{self, Ask, Btt, Five, Hot, Pad, Phase, HEADER, HOT};
 use crate::model::chords::{field, Sample};
-use crate::model::eggs::View;
+use crate::model::eggs::{self, View};
 use crate::model::panes::EggLook;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::settings::Snapshot;
@@ -246,4 +246,31 @@ pub fn service() {
         #[cfg(not(feature = "diag"))]
         let _ = skipped;
     }
+}
+
+static USABLE: AtomicBool = AtomicBool::new(false);
+pub fn set_usable(on: bool) { USABLE.store(on, Ordering::Release); }
+
+/// # Safety
+/// Called on the game thread with a live fighter or null.
+/// Break the Targets' pass (`runtime::features::btt`): Player 1's entry-0 fighters read the same pills Eggs-ercise does, while the mode
+/// needs them. Idle (the mode Off, no menu open) it does nothing; with a menu open and the row Off it only keeps the stage's layouts current.
+pub unsafe fn frame(fighter: usize) -> Option<()> {
+    if !USABLE.load(Ordering::Acquire) { return None; }
+    (fighter != 0).then_some(())?;
+    let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
+    (entry == 0 && !idle()).then_some(())?;
+    let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
+    let (top, hits, n, aerial, _) = reading().then(|| super::hitbox::p1_read(at)).unwrap_or_default();
+    let rule = super::hitbox::egg_rule();
+    let mut melee = false;
+    let broke = pass(at, top, |spot| {
+        let hit = hits[..n].iter().any(|h| eggs::breaks(rule, aerial, h, spot));
+        melee |= hit;
+        hit || super::btt_projectiles::hit(at, spot)
+    });
+    // V2.1: the fighter whose attack broke a target freezes, as on a hit.
+    let frames = (broke > 0 && melee).then(scene::facts).and_then(eggs::hitlag)?;
+    natives::set_hit_stop_frame(at, frames);
+    Some(())
 }

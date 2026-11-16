@@ -158,6 +158,7 @@ fn env() -> Env {
         combo_draft: crate::runtime::features::combo::labels().1,
         build_tag: crate::model::frame::BUILD_TAG,
         waiting_room: crate::runtime::scene::lobby_active(),
+        btt_projectiles_ready: crate::runtime::features::btt_projectiles::ready(),
         // rc.14: the save's Stage Builder stages are tiles after the catalog on both stage grids.
         custom_stages: crate::runtime::lobby::custom_stages::published()
             .map_or(0, |p| u16::try_from(p.customs.len()).unwrap_or(u16::MAX)),

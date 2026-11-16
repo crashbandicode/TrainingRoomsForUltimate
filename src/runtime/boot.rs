@@ -282,6 +282,9 @@ fn run_inner() {
     // SPEC-core-06: the hitbox visualizer rides on the CPU core's per-fighter frame wrapper; its closure (own rows, the Training
     // predicate, the shared natives' rows) must have passed as a whole.
     let (hitbox_on, hb_written) = hitbox::install(&hb_found, cpu_core_on && capabilities::unit_usable(Feature::Hitbox, &usable));
+    crate::runtime::features::btt::set_usable(hitbox_on);
+    let btt_projectiles_on = hitbox_on && capabilities::unit_usable(Feature::BttProjectiles, &usable);
+    crate::runtime::features::btt_projectiles::set_ready(btt_projectiles_on);
     // Package 6: the roster cycle (hot swap, preload, Kirby hats, items), the Mii files and the waiting-room practice engine. The cycle
     // starts only when every game function its code calls through `smash::` passed its guard (`roster::CALLED_ROWS`); each of its
     // files then checks its own seam rows and installs nothing when they are refused (the seam fields of the install line say which).
@@ -405,6 +408,7 @@ fn run_inner() {
         report(Feature::CpuCamera, cpu_camera_on, None),
         report(Feature::CpuCommon, false, if common_blocked { None } else { cpu_common_reason }),
         report(Feature::StateCore, state_on, None),
+        FeatureReport { feature: Feature::BttProjectiles.name(), installed: btt_projectiles_on, reason: (!hitbox_on).then_some("hitbox_not_installed"), site: if btt_projectiles_on || !hitbox_on { None } else { blocked(Feature::BttProjectiles) } },
         FeatureReport { feature: Feature::Hitbox.name(), installed: hitbox_on, reason: (!hitbox_on && !cpu_core_on).then_some("cpu_core_not_installed"), site: if hitbox_on || !cpu_core_on { None } else { blocked(Feature::Hitbox) } },
         FeatureReport { feature: "chords", installed: input_delay_on, reason: input_delay_reason, site: None },
         report(Feature::InputDisplay, display_on, None),

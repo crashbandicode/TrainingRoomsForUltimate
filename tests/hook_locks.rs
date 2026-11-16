@@ -455,6 +455,34 @@ fn combo_hud_has_no_wait_or_native_apply_under_helper_and_seeds_fail() {
     }
 }
 
+/// Camera requests and the game-frame applier stay lock-free even when only game threads reach them.
+/// Use the production reach scanner; CAMERA is also named explicitly so the seeded lock is seen after it becomes a Cell.
+#[test]
+fn btt_camera_callbacks_take_no_lock_and_camera_lock_seeds_fail() {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut graph = Graph::scan(&runtime, &[]);
+    let entries = ["btt_camera::apply", "btt_camera::request", "btt_camera::frame"];
+    let mut locks = static_locks(&runtime);
+    let camera = ("features/btt_camera.rs".to_owned(), "CAMERA".to_owned());
+    if !locks.contains(&camera) {
+        locks.push(camera);
+    }
+    let refs: Vec<(&str, &str)> = locks.iter().map(|(file, name)| (file.as_str(), name.as_str())).collect();
+    let result = scan_graph(&graph, &entries, &refs, &[]);
+    assert!(result.violations.is_empty(), "camera callbacks reach locks: {:?}", result.violations);
+    for entry in entries {
+        let found = graph.find(entry);
+        assert_eq!(found.len(), 1, "camera callback {entry}");
+        let at = found[0];
+        let original = graph.funcs[at].body.clone();
+        graph.funcs[at].body.extend(callgraph::lex("CAMERA.lock();"));
+        let seeded = scan_graph(&graph, &[entry], &refs, &[]);
+        assert!(seeded.violations.iter().any(|v| v.contains(&format!("{entry} takes features/btt_camera.rs::CAMERA"))),
+                "blocking camera seed escaped {entry}: {:?}", seeded.violations);
+        graph.funcs[at].body = original;
+    }
+}
+
 #[test]
 fn no_plugin_thread_reaches_a_lock_a_hook_takes() {
     let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");

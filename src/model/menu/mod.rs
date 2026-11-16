@@ -51,6 +51,8 @@ pub struct Env {
     pub build_tag: &'static str,
     /// The menu opened in a waiting room's practice, where Hide CPU does nothing yet (SPEC-eggsercise V2.6).
     pub waiting_room: bool,
+    /// Optional native projectile boundary passed its guards.
+    pub btt_projectiles_ready: bool,
     /// rc.14: how many Stage Builder stages the save holds (extra tiles after the catalog on the stage grids).
     pub custom_stages: u16,
 }
@@ -69,6 +71,7 @@ impl Default for Env {
             combo_draft: super::combo::Label::EMPTY,
             build_tag: "",
             waiting_room: false,
+            btt_projectiles_ready: true,
             custom_stages: 0,
         }
     }
@@ -152,6 +155,7 @@ pub enum Grey {
     TechDiSet,
     /// Tech practice always hides the CPU.
     TechCpu,
+    ProjectilesUnavailable,
 }
 
 impl Grey {
@@ -164,6 +168,7 @@ impl Grey {
             Grey::NeedsThreeBodies => "Needs Ready Fighter Bodies set to 3",
             Grey::RangeSet => "A range is set: clear it first (Y)",
             Grey::ChecklistSet => "Values are ticked: clear them first (Y)",
+            Grey::ProjectilesUnavailable => "Projectile detection unavailable",
             Grey::TargetsStill => "Targets stay still",
             Grey::TechAuto => "Auto chooses this value",
             Grey::TechDiSet => "Used by DI Set",
@@ -854,6 +859,7 @@ impl Menu {
                 Some(Grey::DamageNotRandom)
             }
             "practice_cpu" if super::tech_settings::selected(&self.settings.menu, "tech_practice") > 0 => Some(Grey::TechCpu),
+            "btt_projectiles" if !self.env.btt_projectiles_ready => Some(Grey::ProjectilesUnavailable),
             "eggsercise_speed" if self.get("btt").get(1).is_some_and(|v| *v != 0) => Some(Grey::TargetsStill),
             _ => None,
         }
