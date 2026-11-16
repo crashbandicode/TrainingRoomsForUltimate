@@ -310,9 +310,6 @@ pub unsafe fn frame(fighter: usize) {
     if !super::tech_adapter::tech_ready() {
         return;
     }
-    if !super::tech_placing::ready() {
-        return;
-    }
     if !scene::is_native_training() {
         {
             let mut view = VIEW.lock();
@@ -330,7 +327,7 @@ pub unsafe fn frame(fighter: usize) {
         PLACING.store(false, Ordering::Release);
         notices::clear(NOTICE);
         notices::raise(notices::RAISE_TECH, false);
-        super::tech_placing::request(2, false);
+        super::btt_camera::request(2, false);
         return;
     }
     let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
@@ -633,7 +630,7 @@ pub unsafe fn frame(fighter: usize) {
         }
         notice(run, None);
     });
-    super::tech_placing::request(
+    super::btt_camera::request(
         2,
         running()
             && !open

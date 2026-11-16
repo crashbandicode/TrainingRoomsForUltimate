@@ -1,5 +1,5 @@
 //! BTT placing controls over the complete camera rectangle, including undersides.
-use super::placing::placing_motion;
+use crate::model::btt::placing_motion;
 use super::surface::{Kind, Line, Source, Surfaces, END_MARGIN};
 use super::{add, dot, finite, scale, sub, Vec2};
 use crate::model::btt::Pad;

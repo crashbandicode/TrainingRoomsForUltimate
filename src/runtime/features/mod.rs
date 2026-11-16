@@ -36,4 +36,3 @@ pub mod writer;
 pub mod tech;
 pub mod tech_surfaces;
 
-mod tech_placing;
