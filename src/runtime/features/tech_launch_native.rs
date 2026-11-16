@@ -104,7 +104,7 @@ pub(super) unsafe fn launch(
     ))
     .ok_or(Error::Observation)?;
     // V8: init must observe the damage stop and choose the native deferred-motion path.
-    natives::tech_damage_stop(accessor, plan.frames).ok_or(Error::Guard)?;
+    natives::set_hit_stop_frame(accessor, plan.frames, true).ok_or(Error::Guard)?;
     let (stopped, damage) = (
         natives::is_stop(accessor),
         natives::tech_is_damage(accessor).ok_or(Error::Guard)?,

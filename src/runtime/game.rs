@@ -180,9 +180,6 @@ pub mod natives {
     pub unsafe fn tech_overwrite_reaction(accessor: usize, frames: f32) -> Option<()> {
         at::<extern "C" fn(usize,f32)>(crate::model::sites_tech_launch::OVERWRITE_REACTION_OFFSET)?(accessor,frames); Some(())
     }
-    pub unsafe fn tech_damage_stop(accessor: usize, frames: i32) -> Option<()> {
-        at::<extern "C" fn(usize,i32,bool)>(crate::model::sites_hitbox::HITBOX_HIT_STOP_OFFSET)?(accessor,frames,true); Some(())
-    }
     pub unsafe fn tech_is_damage(accessor: usize) -> Option<bool> {
         Some(at::<extern "C" fn(usize)->bool>(crate::model::sites_tech_launch::IS_DAMAGE_OFFSET)?(accessor))
     }
@@ -394,9 +391,10 @@ pub mod natives {
         at::<extern "C" fn(usize) -> bool>(sites_pkg4::STOP_IS_STOP_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
-    /// `StopModule::set_hit_stop_frame(accessor, frames, false)`: the body is in hitstop for `frames` ticks, as after a hit.
-    pub unsafe fn set_hit_stop_frame(accessor: usize, frames: i32) {
-        at::<extern "C" fn(usize, i32, bool)>(crate::model::sites_hitbox::HITBOX_HIT_STOP_OFFSET).map_or_else(Default::default, |f| f(accessor, frames, false))
+    /// `StopModule::set_hit_stop_frame(accessor, frames, damage)`: the body is in hitstop for `frames` ticks, as after a hit.
+    pub unsafe fn set_hit_stop_frame(accessor: usize, frames: i32, damage: bool) -> Option<()> {
+        at::<extern "C" fn(usize, i32, bool)>(crate::model::sites_hitbox::HITBOX_HIT_STOP_OFFSET)?(accessor, frames, damage);
+        Some(())
     }
 
     /// `WorkModule::set_int(accessor, value, id)`.
