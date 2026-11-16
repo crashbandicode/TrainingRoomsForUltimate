@@ -102,18 +102,18 @@ pub enum NativeOutcome {
     Miss,
 }
 
-/// Observe entry into the requested status after the pre-status snapshot.
+/// Classify the retained, actually entered native status after the decision.
 /// `ids` uses the core contact-status order: PASSIVE, PASSIVE_FB, DOWN,
 /// REFLECT_D, PASSIVE_CEIL, STOP_CEIL, REFLECT_U, PASSIVE_WALL,
 /// PASSIVE_WALL_JUMP, STOP_WALL, REFLECT_LR. A request or unchanged source
 /// status alone supplies no accepted-outcome evidence.
 pub fn accepted_status(
     snapshot: super::super::tech_launch::DecisionSnapshot,
-    observed_status: i32,
     ids: [i32; 11],
 ) -> Option<NativeOutcome> {
     let source = snapshot.source_status?;
-    if observed_status != snapshot.contact.requested_status || observed_status == source {
+    let observed_status = snapshot.entered_status?;
+    if observed_status == source {
         return None;
     }
     Some(match ids.iter().position(|&id| id == observed_status)? {
@@ -355,7 +355,7 @@ impl Session {
         if !matches!(self.phase, Phase::Flight | Phase::Delay(_)) {
             return Action::None;
         }
-        self.result = Some(Grade::NoContact);
+        self.result = Some(Grade::Unavailable);
         if self.expired() {
             self.phase = Phase::Done;
             Action::Summary

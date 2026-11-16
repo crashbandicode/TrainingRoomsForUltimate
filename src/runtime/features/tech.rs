@@ -541,19 +541,24 @@ pub unsafe fn frame(fighter: usize) {
             view.start = false;
             PLACING.store(false, Ordering::Release);
         }
-        let Ok(attempt) = run.adapter.attempt() else {
+        let Ok(_attempt) = run.adapter.attempt() else {
             return;
         };
+        if run
+            .decision
+            .is_some_and(|(s, _)| !run.controller.accepts_snapshot(s.attempt))
+        {
+            run.decision = None;
+        }
         DECISIONS.drain(|snapshot| {
-            if attempt.id == snapshot.attempt && run.decision.is_none() {
+            if run.controller.accepts_snapshot(snapshot.attempt) && run.decision.is_none() {
                 run.decision = Some((snapshot, 0));
             }
         });
         if let Some((snapshot, age)) = run.decision {
-            let status = natives::status_kind(at);
-            let accepted = GRADING_IDS.get().and_then(|ids| {
-                crate::model::tech::session::accepted_status(snapshot, status, *ids)
-            });
+            let accepted = GRADING_IDS
+                .get()
+                .and_then(|ids| crate::model::tech::session::accepted_status(snapshot, *ids));
             let event = if accepted.is_some() {
                 run.controller.snapshot_at(snapshot, accepted, age)
             } else if age >= HOLD {
@@ -681,6 +686,7 @@ pub unsafe fn frame(fighter: usize) {
                     Ok(Event::Placed)
                 ) {
                     run.pending = false;
+                    run.decision = None;
                     run.after_reaction = 0;
                 }
             }

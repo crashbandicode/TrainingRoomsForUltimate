@@ -149,16 +149,19 @@ impl Controller {
             self.fresh_outcome = false;
         }
     }
+    /// Shared runtime/controller admission gate for retryable native delivery.
+    pub fn accepts_snapshot(&self, attempt: u64) -> bool {
+        self.session.phase == Phase::Flight
+            && self.attempt == Some(attempt)
+            && self.last_contact != Some(attempt)
+    }
     fn accept_outcome(
         &mut self,
         attempt: u64,
         direction: Option<Direction>,
         grade: Option<Grade>,
     ) -> Event {
-        if self.session.phase != Phase::Flight
-            || self.attempt != Some(attempt)
-            || self.last_contact == Some(attempt)
-        {
+        if !self.accepts_snapshot(attempt) {
             return Event::None;
         }
         self.direction = direction;

@@ -588,6 +588,7 @@ fn snapshot(attempt: u64) -> crate::model::tech_launch::DecisionSnapshot {
             position: Vec2::default(),
         },
         source_status: Some(123),
+        entered_status: None,
         guard_count: Some(254),
         previous_guard_gap: Some(254),
         guard_event: None,
@@ -895,7 +896,7 @@ fn delayed_miss_delivery_does_not_invent_past_guard_observations() {
 }
 
 #[test]
-fn native_status_acceptance_requires_observed_transition_into_exact_request() {
+fn native_status_acceptance_requires_retained_actual_transition() {
     use session::{accepted_status, NativeOutcome};
     let ids = [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110];
     for (index, expected) in [
@@ -918,34 +919,106 @@ fn native_status_acceptance_requires_observed_transition_into_exact_request() {
         s.source_status = Some(90);
         s.contact.requested_status = ids[index];
         assert_eq!(
-            accepted_status(s, 90, ids),
+            accepted_status(s, ids),
             None,
             "request alone is not acceptance"
         );
+        s.entered_status = Some(999);
         assert_eq!(
-            accepted_status(s, 999, ids),
+            accepted_status(s, ids),
             None,
-            "unrelated status is not acceptance"
+            "unrecognized actual status stays unavailable"
         );
-        assert_eq!(accepted_status(s, ids[index], ids), Some(expected));
+        s.entered_status = Some(ids[index]);
+        assert_eq!(accepted_status(s, ids), Some(expected));
+        s.contact.requested_status = 998;
+        assert_eq!(
+            accepted_status(s, ids),
+            Some(expected),
+            "actual status owns the outcome even when the request differs"
+        );
         s.source_status = Some(ids[index]);
         assert_eq!(
-            accepted_status(s, ids[index], ids),
+            accepted_status(s, ids),
             None,
             "unchanged source is not a transition"
         );
         s.source_status = None;
         assert_eq!(
-            accepted_status(s, ids[index], ids),
+            accepted_status(s, ids),
             None,
-            "unavailable source is not a transition"
+            "missing source is unavailable"
         );
     }
-    let mut s = snapshot(1);
-    s.source_status = Some(90);
-    assert_eq!(
-        accepted_status(s, 999, ids),
-        None,
-        "unknown requested status stays unavailable"
+}
+
+#[test]
+fn snapshot_admission_rejects_core_ack_retry_then_allows_next_attempt() {
+    use session::NativeOutcome;
+    let mut c = Controller::IDLE;
+    let mut f = Fake::new();
+    c.start(Length::Free);
+    c.place(&mut f, setup()).unwrap();
+    let first = f.attempt.id;
+    assert!(
+        !c.accepts_snapshot(first),
+        "held/delayed receipt is not a decision"
     );
+    c.tick(&mut f, false, None).unwrap();
+    c.tick(&mut f, false, None).unwrap();
+    assert!(c.accepts_snapshot(first));
+    assert!(!c.accepts_snapshot(first + 1));
+    assert_eq!(
+        c.snapshot(snapshot(first), Some(NativeOutcome::Tech(None))),
+        Event::Graded
+    );
+    // The core can retry its already-posted bytes when its later ack lock was Busy.
+    assert!(
+        !c.accepts_snapshot(first),
+        "ack retry must not occupy runtime pending inbox"
+    );
+    c.tick(&mut f, false, None).unwrap();
+    for _ in 1..45 {
+        c.tick(&mut f, false, None).unwrap();
+    }
+    assert_eq!(
+        c.tick(&mut f, false, None),
+        Ok(Event::NeedSetup { reroll: true })
+    );
+    assert!(!c.accepts_snapshot(first));
+    c.place(&mut f, setup()).unwrap();
+    let next = f.attempt.id;
+    assert_ne!(next, first);
+    assert!(!c.accepts_snapshot(first));
+    assert!(!c.accepts_snapshot(next));
+    c.tick(&mut f, false, None).unwrap();
+    c.tick(&mut f, false, None).unwrap();
+    assert!(!c.accepts_snapshot(first));
+    assert!(
+        c.accepts_snapshot(next),
+        "retry rejection must not starve the next original delivery"
+    );
+    assert_eq!(
+        c.snapshot(snapshot(next), Some(NativeOutcome::Tech(None))),
+        Event::Graded
+    );
+    assert_eq!(c.session.summary.attempts, 2);
+}
+
+#[test]
+fn abandonment_without_a_decision_never_invents_no_contact() {
+    use super::session::{Grade, Length};
+    let mut c = super::controller::Controller::IDLE;
+    let mut launcher = Fake::new();
+    c.start(Length::Free);
+    c.place(&mut launcher, setup()).unwrap();
+    while c.session.phase != super::session::Phase::Flight {
+        c.tick(&mut launcher, false, None).unwrap();
+    }
+    assert_eq!(
+        c.abandon(),
+        super::controller::Event::NeedSetup { reroll: false }
+    );
+    assert_eq!(c.session.result, Some(Grade::Unavailable));
+    assert_eq!(c.session.summary.attempts, 0);
 }
