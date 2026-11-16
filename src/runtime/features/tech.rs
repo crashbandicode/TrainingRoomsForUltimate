@@ -84,7 +84,6 @@ pub fn publish(snapshot: &Snapshot) {
     CONFIG.publish(Some(tech_settings::read(snapshot)));
 }
 pub fn menu_opened() {
-    VIEW.lock().start = false;
     GUARD_PRESS.store(false, Ordering::Release);
     PLACING.store(false, Ordering::Release);
     OPEN.store(true, Ordering::Release);
@@ -490,7 +489,8 @@ pub unsafe fn frame(fighter: usize) {
         OUTCOMES.drain(|outcome| {
             run.controller.outcome(outcome);
         });
-        if let Ok(event) = run.controller.tick(
+        if let Ok(event) = Controller::tick(
+            &mut run.controller,
             &mut run.adapter,
             false,
             GUARD_PRESS.swap(false, Ordering::AcqRel),
