@@ -274,6 +274,8 @@ fn run_inner() {
     }
     let hazards_on = install_hazards(&usable, &mut mark);
     let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on, cpu_common_reason, cpu_shield_damage_on, cpu_camera_on) = install_cpu(&usable, &mut mark);
+    let tech_practice_on = cpu_core_on && capabilities::unit_usable(Feature::TechPractice, &usable);
+    crate::runtime::features::tech_adapter::set_ready(tech_practice_on);
     // Break the Targets' camera asks the game through the camera unit's change_active_camera row: behind the unit's closure, apart from the other features.
     crate::runtime::features::btt_camera::set_usable(cpu_camera_on);
     let cpu_mash_on = cpu_core_on && install_cpu_mash(&usable, &mut mark);
@@ -396,6 +398,7 @@ fn run_inner() {
         report(Feature::CpuDefence, cpu_defence_on, None),
         report(Feature::CpuLedge, cpu_ledge_on, None),
         report(Feature::CpuTech, cpu_tech_on, None),
+        report(Feature::TechPractice, tech_practice_on, (!cpu_core_on).then_some("cpu_core_not_installed")),
         report(Feature::CpuShield, cpu_shield_on, None),
         report(Feature::CpuMash, cpu_mash_on, None),
         report(Feature::CpuShieldDamage, cpu_shield_damage_on, None),

@@ -214,12 +214,14 @@ fn cpu_sites_features_need_the_core() {
     assert!(sites::feature_usable(Feature::CpuShield, |s| s.name != "common_params_fill"), "a lost CommonParams site costs only the multiplier");
     assert!(!sites::feature_usable(Feature::CpuShield, |s| s.name != "check_button_off_hook"));
     // The core does not need the features' hooks.
-    // Its role test and owned tech cleanup require other units' called natives, not their hooks.
+    // Its role test requires other units' called natives, not their hooks.
+    // Optional Stage tech cleanup is behind the separately installed adapter boundary.
     assert!(sites::feature_usable(Feature::CpuCore, |s|
         matches!(s.feature, Feature::CpuCore | Feature::Training | Feature::ResetHub)
         || !matches!(s.kind, model::guard::SeamKind::Hook { .. })));
     for name in ["change_status_force", "state_set_sleep", "state_init_pos", "state_heal", "state_add_damage"] {
-        assert!(!sites::feature_usable(Feature::CpuCore, |s| s.name != name), "core cleanup requires {name}");
+        assert!(sites::feature_usable(Feature::CpuCore, |s| s.name != name), "optional tech cleanup must not disable the core: {name}");
+        assert!(!sites::feature_usable(Feature::TechPractice, |s| s.name != name), "tech cleanup requires {name}");
     }
     assert!(!sites::feature_usable(Feature::CpuCore, |s| s.name != "is_operation_cpu"));
     assert!(!sites::feature_usable(Feature::CpuCore, |s| s.name != "cpu_on_frame_slot"));

@@ -179,6 +179,9 @@ pub struct Launch {
     pub height: HitHeight,
     pub facing: f32,
     pub hit_from_behind: bool,
+    /// True only for a launch whose start is a grounded floor-hit fixture.
+    /// Air starts always use false, regardless of the player's saved pose.
+    pub grounded_hit: bool,
     pub di: Option<Vec2>,
 }
 
@@ -189,16 +192,93 @@ pub enum HitHeight {
     High,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AttemptState {
+    Idle,
+    Held,
+    Stopped,
+    Flying,
+    Contact,
+    Abandoned,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Surface {
+    Floor,
+    Wall,
+    Ceiling,
+}
+
+/// Observed at the native status-decision seam, before the original status change.
+/// This is a contact request and passive-eligibility receipt, not proof of a successful tech.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ContactReceipt {
+    pub surface: Surface,
+    pub requested_status: i32,
+    pub passive_enabled: bool,
+    pub position: Vec2,
+}
+
+/// Fresh per accepted placement. Missing contact stays missing until the native seam observes it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Attempt {
+    pub id: u64,
+    pub state: AttemptState,
+    pub contact: Option<ContactReceipt>,
+}
+impl Attempt {
+    pub const IDLE: Self = Self {
+        id: 0,
+        state: AttemptState::Idle,
+        contact: None,
+    };
+    pub fn held(id: u64) -> Self {
+        Self {
+            id,
+            state: AttemptState::Held,
+            contact: None,
+        }
+    }
+    pub fn launched(&mut self) {
+        if self.state == AttemptState::Held {
+            self.state = AttemptState::Stopped;
+        }
+    }
+    pub fn observe_stop(&mut self, stopped: bool) {
+        if self.state == AttemptState::Stopped && !stopped {
+            self.state = AttemptState::Flying;
+        }
+    }
+    pub fn record_contact(&mut self, receipt: ContactReceipt) {
+        if matches!(self.state, AttemptState::Stopped | AttemptState::Flying)
+            && receipt.position.finite()
+        {
+            self.contact = Some(receipt);
+            self.state = AttemptState::Contact;
+        }
+    }
+    pub fn mark_abandoned(&mut self) {
+        if self.state != AttemptState::Idle {
+            self.state = AttemptState::Abandoned;
+        }
+    }
+}
+
 /// Native calls and guards belong to the core, which owns sleep/placement/release.
 /// A rejected request does not begin or count an attempt.
 pub trait Launcher {
     type Error;
     fn place(&mut self, launch: Launch) -> Result<(), Self::Error>;
     fn launch(&mut self) -> Result<(), Self::Error>;
+    /// Busy means no fresh observation was obtained; callers must not infer contact.
+    fn attempt(&self) -> Result<Attempt, Self::Error>;
     fn restore(&mut self);
 }
 
 impl Launch {
+    pub fn ground_to_air(self) -> bool {
+        self.grounded_hit
+    }
     /// Validate the whole request before holding or mutating the owned player.
     pub fn valid(self) -> bool {
         self.start.finite()

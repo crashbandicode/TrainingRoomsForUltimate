@@ -98,6 +98,8 @@ extern "C" fn change_status_hook(fighter: usize, status: L2CValue, unk: L2CValue
             // SAFETY: the function passed its guard; it takes the script object and returns a value.
             address != 0 && unsafe { std::mem::transmute::<usize, IsEnablePassiveFn>(address)(fighter) }.as_bool()
         };
+        // Optional Stage tech observes the same native decision, before CPU substitution.
+        unsafe { super::tech_adapter::decision(cpu::script_accessor(fighter), requested, passive) };
         #[cfg(feature = "diag")]
         unsafe {
             let accessor = cpu::script_accessor(fighter);

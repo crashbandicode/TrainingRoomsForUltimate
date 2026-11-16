@@ -3,7 +3,9 @@
 use super::tech_info_seed as info_seed;
 use super::tech_native;
 use crate::model::cpu::role::FrameReceipt;
-use crate::model::tech_launch::{HitHeight, Launch, Launcher, Vec2};
+use crate::model::tech_launch::{
+    Attempt, ContactReceipt, HitHeight, Launch, Launcher, Surface, Vec2,
+};
 use crate::runtime::game::natives;
 use crate::runtime::state_natives::{self, Vector3f};
 use std::marker::PhantomData;
@@ -46,6 +48,7 @@ struct Prepared {
     fall: i32,
     di_x: i32,
     di_y: i32,
+    contact_statuses: [i32; 11],
 }
 #[derive(Clone, Copy)]
 struct Owned {
@@ -56,17 +59,28 @@ struct Owned {
     launch: Launch,
     prepared: Prepared,
     phase: Phase,
+    attempt: Attempt,
 }
 static OWNED: hos_lock::Mutex<Option<Owned>> = hos_lock::Mutex::new(None);
 static NEXT: AtomicU64 = AtomicU64::new(1);
 static RESTORE: AtomicU64 = AtomicU64::new(0);
 static YIELD_TO_STATE: AtomicBool = AtomicBool::new(false);
+static READY: AtomicBool = AtomicBool::new(false);
+
+/// Boot publishes this only after the TechPractice closure passed every guard.
+pub(crate) fn set_ready(ready: bool) {
+    READY.store(ready, Ordering::Release);
+}
+pub(crate) fn tech_ready() -> bool {
+    READY.load(Ordering::Acquire)
+}
 
 /// Construct and use only on the native game thread. Rc marker prevents thread transfer.
 /// place may replace a completed attempt; the first saved pose survives until restore.
 pub struct Adapter {
     owner: u64,
     acquired: bool,
+    last_attempt: Attempt,
     hitlag: HitlagResolver,
     _game_thread: PhantomData<Rc<()>>,
 }
@@ -76,6 +90,7 @@ impl Adapter {
         Self {
             owner: NEXT.fetch_add(1, Ordering::Relaxed),
             acquired: false,
+            last_attempt: Attempt::IDLE,
             hitlag,
             _game_thread: PhantomData,
         }
@@ -105,7 +120,9 @@ unsafe fn prepare(
     if !launch.valid() {
         return Err(Error::InvalidInput);
     }
-    if !tech_native::launch_ready(accessor) || (launch.di.is_some() && !super::cpu_common::di_ready()) {
+    if !tech_native::launch_ready(accessor)
+        || (launch.di.is_some() && !super::cpu_common::di_ready())
+    {
         return Err(Error::Guards);
     }
     let id = |name| tech_native::id(name).ok_or(Error::NativeValue);
@@ -148,6 +165,19 @@ unsafe fn prepare(
         fall: id("FIGHTER_STATUS_KIND_FALL")?,
         di_x: id("FIGHTER_STATUS_DAMAGE_WORK_FLOAT_VECOR_CORRECT_STICK_X")?,
         di_y: id("FIGHTER_STATUS_DAMAGE_WORK_FLOAT_VECOR_CORRECT_STICK_Y")?,
+        contact_statuses: [
+            id("FIGHTER_STATUS_KIND_PASSIVE")?,
+            id("FIGHTER_STATUS_KIND_PASSIVE_FB")?,
+            id("FIGHTER_STATUS_KIND_DOWN")?,
+            id("FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_D")?,
+            id("FIGHTER_STATUS_KIND_PASSIVE_CEIL")?,
+            id("FIGHTER_STATUS_KIND_STOP_CEIL")?,
+            id("FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_U")?,
+            id("FIGHTER_STATUS_KIND_PASSIVE_WALL")?,
+            id("FIGHTER_STATUS_KIND_PASSIVE_WALL_JUMP")?,
+            id("FIGHTER_STATUS_KIND_STOP_WALL")?,
+            id("FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_LR")?,
+        ],
     })
 }
 unsafe fn position(accessor: usize, pos: Vec2, facing: f32) {
@@ -178,6 +208,9 @@ unsafe fn hold(accessor: usize, owned: Owned) {
 impl Launcher for Adapter {
     type Error = Error;
     fn place(&mut self, launch: Launch) -> Result<(), Error> {
+        if !tech_ready() {
+            return Err(Error::Guards);
+        }
         unsafe {
             if super::states::is_loading() || YIELD_TO_STATE.load(Ordering::Acquire) {
                 return Err(Error::Busy);
@@ -215,10 +248,12 @@ impl Launcher for Adapter {
                 launch,
                 prepared,
                 phase: Phase::Held,
+                attempt: Attempt::held(NEXT.fetch_add(1, Ordering::Relaxed)),
             };
             *slot = Some(owned);
             drop(slot);
             self.acquired = true;
+            self.last_attempt = owned.attempt;
             RESTORE
                 .compare_exchange(self.owner, 0, Ordering::AcqRel, Ordering::Acquire)
                 .ok();
@@ -228,6 +263,9 @@ impl Launcher for Adapter {
         }
     }
     fn launch(&mut self) -> Result<(), Error> {
+        if !tech_ready() {
+            return Err(Error::Guards);
+        }
         unsafe {
             if super::states::is_loading() || YIELD_TO_STATE.load(Ordering::Acquire) {
                 return Err(Error::Busy);
@@ -252,22 +290,43 @@ impl Launcher for Adapter {
                 seed: owned.prepared.seed,
                 frames: owned.prepared.stop,
                 reserve_lr: Some(owned.launch.reserve_damage_lr()),
-                ground_to_air: owned.saved.grounded,
+                ground_to_air: owned.launch.ground_to_air(),
             };
-            if let Err(error) = super::tech_launch_native::launch(accessor, plan, |_| Some(())) {
+            if let Err(error) = super::tech_launch_native::launch(accessor, plan, |moment| {
+                if let super::tech_launch_native::Moment::Stop {
+                    stopped: true,
+                    damage: true,
+                } = moment
+                {
+                    let mut slot = OWNED.try_lock()?;
+                    let active = slot.as_mut().filter(|x| x.owner == self.owner)?;
+                    active.attempt.launched();
+                }
+                Some(())
+            }) {
                 crate::runtime::diag_log::diagnostic(format_args!(
                     "[TechPractice] launch_refused reason={error:?}"
                 ));
                 self.restore();
                 return Err(Error::NativeValue);
             }
+            self.last_attempt.launched();
             Ok(())
         }
     }
     fn restore(&mut self) {
+        if !tech_ready() {
+            return;
+        }
         if !self.acquired {
             return;
         }
+        if let Some(slot) = OWNED.try_lock() {
+            if let Some(active) = slot.filter(|x| x.owner == self.owner) {
+                self.last_attempt = active.attempt;
+            }
+        }
+        self.last_attempt.mark_abandoned();
         // Only an adapter that acquired the lease may enqueue its cleanup.
         if RESTORE
             .compare_exchange(0, self.owner, Ordering::AcqRel, Ordering::Acquire)
@@ -279,6 +338,30 @@ impl Launcher for Adapter {
                 restore_pending();
             }
         }
+    }
+    fn attempt(&self) -> Result<Attempt, Error> {
+        if !tech_ready() {
+            return Err(Error::Guards);
+        }
+        let slot = OWNED.try_lock().ok_or(Error::Busy)?;
+        if let Some(active) = slot.filter(|x| x.owner == self.owner) {
+            match unsafe { current(active) } {
+                Ok(_) => {
+                    let mut attempt = active.attempt;
+                    if active.phase == Phase::Yielded
+                        || RESTORE.load(Ordering::Acquire) == self.owner
+                    {
+                        attempt.mark_abandoned();
+                    }
+                    return Ok(attempt);
+                }
+                Err(Error::Busy) => return Err(Error::Busy),
+                Err(_) => {}
+            }
+        }
+        let mut last = self.last_attempt;
+        last.mark_abandoned();
+        Ok(last)
     }
 }
 impl Drop for Adapter {
@@ -348,6 +431,9 @@ unsafe fn restore_pending() {
 }
 /// Existing post-native P1 callback; sleep only pauses animcmd, so hold position every frame.
 pub(super) unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
+    if !tech_ready() {
+        return;
+    }
     if fighter == 0 || ((fighter + 0x10) as *const i32).read() != 0 {
         return;
     }
@@ -369,7 +455,7 @@ pub(super) unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
     let Some(mut slot) = OWNED.try_lock() else {
         return;
     };
-    let Some(owned) = *slot else {
+    let Some(mut owned) = *slot else {
         return;
     };
     let fresh = current(owned);
@@ -379,6 +465,12 @@ pub(super) unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
     if receipt != Some(owned.receipt) || fresh.is_err() {
         *slot = None;
         return;
+    }
+    if owned.phase == Phase::Flying {
+        owned
+            .attempt
+            .observe_stop(natives::is_stop(natives::fighter_accessor(fighter)));
+        *slot = Some(owned);
     }
     drop(slot);
     if owned.phase == Phase::Yielded {
@@ -394,6 +486,9 @@ pub(super) unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
 }
 /// Existing DI hook calls this before its CPU role gate. None preserves player DI.
 pub(super) unsafe fn di_before(accessor: usize) -> bool {
+    if !tech_ready() {
+        return false;
+    }
     let Some(slot) = OWNED.try_lock() else {
         return false;
     };
@@ -410,4 +505,42 @@ pub(super) unsafe fn di_before(accessor: usize) -> bool {
     natives::set_float(accessor, di.x, owned.prepared.di_x);
     natives::set_float(accessor, di.y, owned.prepared.di_y);
     true
+}
+
+/// Existing common status-decision seam, before the original native status change.
+/// Records only known contact requests for this exact owned player and attempt.
+pub(super) unsafe fn decision(accessor: usize, status: i32, passive: impl FnOnce() -> bool) {
+    if !tech_ready() {
+        return;
+    }
+    let Some(mut slot) = OWNED.try_lock() else {
+        return;
+    };
+    let Some(owned) = slot.as_mut() else { return };
+    if owned.phase != Phase::Flying || current(*owned) != Ok(accessor) {
+        return;
+    }
+    let Some(index) = owned
+        .prepared
+        .contact_statuses
+        .iter()
+        .position(|&s| s == status)
+    else {
+        return;
+    };
+    let surface = match index {
+        0..=3 => Surface::Floor,
+        4..=6 => Surface::Ceiling,
+        _ => Surface::Wall,
+    };
+    let contact = ContactReceipt {
+        surface,
+        requested_status: status,
+        passive_enabled: passive(),
+        position: Vec2 {
+            x: natives::pos_x(accessor),
+            y: natives::pos_y(accessor),
+        },
+    };
+    owned.attempt.record_contact(contact);
 }

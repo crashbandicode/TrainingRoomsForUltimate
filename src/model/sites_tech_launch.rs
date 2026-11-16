@@ -41,7 +41,7 @@ const fn window(offset: usize) -> [u8; 64] {
 const fn site(name: &'static str, offset: usize) -> Site {
     Site {
         name,
-        feature: Feature::CpuCore,
+        feature: Feature::TechPractice,
         offset,
         kind: SeamKind::Called,
         guard: window(offset),

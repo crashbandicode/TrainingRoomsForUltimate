@@ -44,6 +44,15 @@ struct Boundary {
 }
 
 const BOUNDARIES: &[Boundary] = &[
+    // Optional Stage tech owns all adapter native calls. These are real first-condition
+    // checks of the flag boot sets only after its complete closure passed.
+    Boundary { function: "tech_adapter::frame", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::di_before", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::decision", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::place", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::launch", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::restore", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::attempt", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     // The save-state step of the per-fighter frame wrapper: a no-op until boot activates package 3.
     Boundary { function: "states::frame", owner: Some(Feature::StateCore), gate: Gate::Flag("ACTIVE") },
     // The frame wrapper's per-feature facts and appliers: each checks its feature's install flag first.
@@ -568,6 +577,28 @@ fn the_install_line_names_the_row_that_blocked_a_feature() {
     }
     .to_string();
     assert!(line.contains(" cpu_mash=not_installed reason=site:motion_kind "), "{line}");
+}
+
+#[test]
+fn optional_tech_poison_preserves_existing_features() {
+    use model::install_line::{FeatureReport, InstallLine};
+    for poison in ["tech_cos", "tech_magnitude", "state_set_sleep"] {
+        let row = capabilities::find(poison).expect("poison names a real guarded row");
+        let usable = |s: &model::sites::Site| s.name != poison;
+        for unit in [Feature::CpuCore, Feature::CpuCommon, Feature::Hitbox] {
+            assert!(capabilities::unit_usable(unit, &usable), "{poison} disabled {}", unit.name());
+        }
+        assert!(!Granted::from_usable(&usable).allows(row.offset));
+        let site = capabilities::blocked_by(Feature::TechPractice, &usable);
+        assert_eq!(site, Some(poison));
+        let report = FeatureReport { feature: Feature::TechPractice.name(), installed: false, reason: None, site };
+        let line = InstallLine {
+            tick: 1, version: "test", display: b"13.0.5", build_id: None,
+            verdict: model::version::Verdict::Supported, sites: &[], features: &[report],
+            seams: None, developer: None, settings: None, migration: None, heap_allocations: Some(0),
+        }.to_string();
+        assert!(line.contains(&format!(" tech_practice=not_installed reason=site:{poison} ")), "{line}");
+    }
 }
 
 /// Input Delay installs on its own rows: the input display's reads in its hook are behind the display's flag

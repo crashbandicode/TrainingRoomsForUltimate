@@ -1,7 +1,7 @@
 #[allow(dead_code)]
 #[path = "../src/model/tech_launch.rs"]
 mod launch;
-use launch::{HitHeight, Launch, Vec2};
+use launch::{Attempt, AttemptState, ContactReceipt, HitHeight, Launch, Surface, Vec2};
 fn request() -> Launch {
     Launch {
         start: Vec2 { x: -30.0, y: 20.0 },
@@ -13,6 +13,7 @@ fn request() -> Launch {
         height: HitHeight::Middle,
         facing: 1.0,
         hit_from_behind: false,
+        grounded_hit: false,
         di: Some(Vec2::default()),
     }
 }
@@ -104,4 +105,77 @@ fn neutral_di_and_player_di_are_distinct_requests() {
     .valid());
     assert_eq!(neutral.percent, 60.0);
     assert_eq!(neutral.hit_damage, 12.0);
+}
+
+#[test]
+fn airborne_start_never_requests_ground_to_air() {
+    for angle in [38.0, 142.0, 218.0, 322.0] {
+        for facing in [-1.0, 1.0] {
+            let air = Launch {
+                angle,
+                facing,
+                grounded_hit: false,
+                ..request()
+            };
+            assert!(!air.ground_to_air());
+            assert!(Launch {
+                grounded_hit: true,
+                ..air
+            }
+            .ground_to_air());
+        }
+    }
+    let source = include_str!("../src/runtime/features/tech_adapter.rs");
+    assert!(source.contains("ground_to_air: owned.launch.ground_to_air()"));
+    assert!(!source.contains("ground_to_air: owned.saved.grounded"));
+}
+
+fn contact(passive_enabled: bool) -> ContactReceipt {
+    ContactReceipt {
+        surface: Surface::Wall,
+        requested_status: 42,
+        passive_enabled,
+        position: Vec2 { x: 20.0, y: 30.0 },
+    }
+}
+
+#[test]
+fn attempt_observations_do_not_invent_contact() {
+    let mut attempt = Attempt::held(1);
+    attempt.observe_stop(false);
+    attempt.record_contact(contact(true));
+    assert_eq!(attempt.state, AttemptState::Held);
+    assert_eq!(attempt.contact, None);
+    attempt.launched();
+    assert_eq!(attempt.state, AttemptState::Stopped);
+    attempt.observe_stop(true);
+    assert_eq!(attempt.state, AttemptState::Stopped);
+    attempt.observe_stop(false);
+    assert_eq!(attempt.state, AttemptState::Flying);
+    assert_eq!(attempt.contact, None);
+    attempt.mark_abandoned();
+    attempt.record_contact(contact(true));
+    assert_eq!(attempt.state, AttemptState::Abandoned);
+    assert_eq!(attempt.contact, None);
+    assert_eq!(Attempt::held(2).contact, None);
+}
+
+#[test]
+fn contact_receipt_is_first_native_decision() {
+    for stopped in [true, false] {
+        let mut attempt = Attempt::held(3);
+        attempt.launched();
+        attempt.observe_stop(stopped);
+        let mut invalid = contact(true);
+        invalid.position.x = f32::NAN;
+        attempt.record_contact(invalid);
+        assert_eq!(attempt.contact, None);
+        attempt.record_contact(contact(false));
+        assert_eq!(attempt.state, AttemptState::Contact);
+        attempt.record_contact(contact(true));
+        assert_eq!(attempt.contact, Some(contact(false)));
+        attempt.mark_abandoned();
+        assert_eq!(attempt.state, AttemptState::Abandoned);
+        assert_eq!(attempt.contact, Some(contact(false)));
+    }
 }
