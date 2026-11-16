@@ -1,5 +1,5 @@
-//! S0 diagnostic launcher. A rewritten ordinary CPU hit keeps the whole native damage path.
-//! diag-tech-s0.req: real-hit | direct-post[-log|-full] | ordinary | direct-match | direct | walk | off | inspect.
+//! S0 direct launcher: AIR and native log-reaction init, then damage speed.
+//! diag-tech-s0.req: direct-v2 | direct-v2-n1 | ordinary | walk | off | inspect.
 //! No product mode, heap, blocking lock or new hook.
 use super::tech_spike_guards;
 use crate::model::cpu::hash::lua_bind_hash;
@@ -20,15 +20,11 @@ static RUN: hos_lock::Mutex<Spike> = hos_lock::Mutex::new(Spike::new());
 pub fn request(text: &str) {
     let command = match text {
         "ordinary" => 1,
-        "direct-match" => 2,
-        "direct" => 3,
         "walk" => 4,
         "off" => 5,
         "inspect" => 6,
-        "real-hit" => 7,
-        "direct-post" => 8,
-        "direct-post-log" => 9,
-        "direct-post-full" => 10,
+        "direct-v2" => 11,
+        "direct-v2-n1" => 12,
         _ => {
             diagnostic(format_args!("[TechDirect] request invalid"));
             return;
@@ -198,8 +194,7 @@ unsafe fn hidden(accessor: usize) -> Option<Hidden> {
 unsafe fn log_hidden(run: &Spike, accessor: usize, moment: &str) -> Option<Hidden> {
     let h = hidden(accessor)?;
     let kind = match run.mode {
-        1 | 7 => "ordinary",
-        2 => "match",
+        1 => "ordinary",
         _ => "fresh",
     };
     let (alternate_speed, alternate_frames) = h.alternate.unwrap_or(([0; 2], 0));
@@ -221,15 +216,6 @@ unsafe fn log_hidden(run: &Spike, accessor: usize, moment: &str) -> Option<Hidde
     ));
     Some(h)
 }
-unsafe fn apply_derived(accessor: usize, observed: Hidden) -> Option<()> {
-    for (key, value) in float_ids()?.into_iter().zip(observed.floats) {
-        natives::set_float(accessor, value, key);
-    }
-    for (key, value) in flag_ids()?.into_iter().zip(observed.flags) {
-        natives::set_flag(accessor, value, key);
-    }
-    Some(())
-}
 struct Spike {
     active: bool,
     heal_pending: bool,
@@ -246,8 +232,6 @@ struct Spike {
     player_scope: Option<FrameReceipt>,
     input: Input,
     baseline: Option<Baseline>,
-    rewritten: u32,
-    launch_reaction: f32,
 }
 impl Spike {
     const fn new() -> Self {
@@ -267,19 +251,14 @@ impl Spike {
             player_scope: None,
             input: Input::empty(),
             baseline: None,
-            rewritten: 0,
-            launch_reaction: 0.0,
         }
     }
     fn mode_name(&self) -> &'static str {
-        if self.mode == 1 || self.mode == 7 {
+        if self.mode == 1 {
             "ordinary"
         } else {
             "direct"
         }
-    }
-    fn post_init(&self) -> bool {
-        matches!(self.mode, 8..=10)
     }
     fn stop(&mut self) {
         self.active = false;
@@ -410,7 +389,7 @@ unsafe fn v1_damage_module(accessor: usize) -> Option<()> {
 }
 
 fn complete_baseline(run: &mut Spike) {
-    if !matches!(run.mode, 1 | 7) || run.sample < 20 || !run.contact {
+    if run.mode != 1 || run.sample < 20 || !run.contact {
         return;
     }
     let Some(baseline) = run.baseline.as_mut().filter(|b| !b.complete) else {
@@ -423,136 +402,6 @@ fn complete_baseline(run: &mut Spike) {
         input.percent.to_bits(),input.weight.to_bits(),input.origin.x.to_bits(),input.origin.y.to_bits(),input.lr.to_bits(),baseline.hidden.flags[3]));
 }
 
-unsafe fn post_init_v1(run: &Spike, accessor: usize) -> Option<()> {
-    if run.mode != 10 {
-        return Some(());
-    }
-    let reaction_ids = float_ids()?;
-    let flags = flag_ids()?;
-    let wanted = [run.launch_reaction - 1.0, run.launch_reaction];
-    let mut writes = 0u8;
-    for (index, value) in wanted.into_iter().enumerate() {
-        let key = reaction_ids[index];
-        if natives::get_float(accessor, key).to_bits() != value.to_bits() {
-            natives::set_float(accessor, value, key);
-            writes |= 1 << index;
-        }
-    }
-    for (index, value) in [(1usize, true), (2usize, false)] {
-        if natives::is_flag(accessor, flags[index]) != value {
-            natives::set_flag(accessor, value, flags[index]);
-            writes |= 1 << (index + 1);
-        }
-    }
-    diagnostic(format_args!("[TechDirect] derived attempt={} command={} writes={writes:02x} wanted_reaction={:08x} wanted_last={:08x} fly_air=true end_reaction=false",
-        run.attempt,run.mode,wanted[0].to_bits(),wanted[1].to_bits()));
-
-    v1_damage_module(accessor)?;
-    let baseline = run.baseline?;
-    // The native common helper passes math_toint(status reaction), then
-    // as_number(), to this bool predicate. It does not return MAX_MAG.
-    let observed_init = f32::from_bits(baseline.hidden.motion.init_reaction);
-    if !observed_init.is_finite() || observed_init < 0.0 || observed_init > i32::MAX as f32 {
-        return None;
-    }
-    let predicate_input = (observed_init as i64) as f32;
-    let eligible: extern "C" fn(usize, f32) -> bool =
-        std::mem::transmute(game::text_base() + 0x693e50);
-    let speed_up = eligible(accessor, predicate_input);
-    // S0's explicitly permitted same-boot seed: this is the game's own
-    // MAX_MAG for the identical R1 input, never a guessed 2.0 multiplier.
-    // The generic product calculation remains a follow-up to the trace.
-    // The normal common helper's false branch explicitly clears MAX_MAG.
-    let max_mag = if speed_up {
-        baseline.hidden.floats[2]
-    } else {
-        0.0
-    };
-    if !max_mag.is_finite() {
-        return None;
-    }
-    if natives::get_float(accessor, reaction_ids[2]).to_bits() != max_mag.to_bits() {
-        natives::set_float(accessor, max_mag, reaction_ids[2]);
-    }
-    if natives::is_flag(accessor, flags[0]) != speed_up {
-        natives::set_flag(accessor, speed_up, flags[0]);
-    }
-    diagnostic(format_args!("[TechDirect] speed_up_seed attempt={} command={} baseline_attempt={} predicate_reaction={:08x} baseline_init_reaction={:08x} calc_reaction={:08x} eligible={speed_up} baseline_eligible={} max_mag={:08x} mag_source=baseline_native inherited_info=true",
-        run.attempt,run.mode,baseline.attempt,predicate_input.to_bits(),observed_init.to_bits(),run.launch_reaction.to_bits(),baseline.hidden.flags[0],max_mag.to_bits()));
-    Some(())
-}
-/// The existing ATTACK hook calls this AFTER the game's command, before returning to ACMD.
-/// Restrict edits to this attempt's fresh ordinary CPU accessor. Never copy AttackData or
-/// manufacture a damage log, status, kinetic energy or collision result.
-pub unsafe fn attack(lua_state: usize) {
-    if !OBSERVING.load(Ordering::Acquire) {
-        return;
-    }
-    let Some(mut run) = RUN.try_lock() else {
-        return;
-    };
-    if !run.active || run.mode != 7 || run.baseline.is_some() || !guarded() {
-        return;
-    }
-    if !crate::runtime::scene::is_native_training() {
-        return;
-    }
-    let accessor = natives::lua_accessor(lua_state);
-    if accessor == 0 || natives::module_accessor(1) != Some(accessor) {
-        return;
-    }
-    let base = game::text_base();
-    let module = ((accessor + 0xa0) as *const usize).read();
-    if module == 0 {
-        return;
-    }
-    let vptr = (module as *const usize).read();
-    for (slot, offset) in [
-        (0xf8, 0x3dd2f0),
-        (0x108, 0x3dd360),
-        (0x178, 0x3dd7d0),
-        (0x188, 0x3dd830),
-        (0x198, 0x3dd890),
-    ] {
-        if ((vptr + slot) as *const usize).read() != base + offset {
-            diagnostic(format_args!("[TechHit] fault=setter_target slot={slot:x}"));
-            run.stop();
-            return;
-        }
-    }
-    let power: extern "C" fn(usize, i32, f32, bool) = std::mem::transmute(base + 0x1fd0270);
-    let angle: extern "C" fn(usize, i32, i32, bool) = std::mem::transmute(base + 0x1fd02b0);
-    let growth: extern "C" fn(usize, i32, i32, bool) = std::mem::transmute(base + 0x1fd03c0);
-    let fixed: extern "C" fn(usize, i32, i32, bool) = std::mem::transmute(base + 0x1fd0400);
-    let knockback: extern "C" fn(usize, i32, i32, bool) = std::mem::transmute(base + 0x1fd0440);
-    for slot in 0..crate::model::spots::SLOTS as i32 {
-        if !natives::attack_is_attack(accessor, slot) {
-            continue;
-        }
-        power(accessor, slot, 1.0, false);
-        angle(accessor, slot, 90, false);
-        growth(accessor, slot, 0, false);
-        fixed(accessor, slot, 1, false);
-        knockback(accessor, slot, 100, false);
-        let data = natives::attack_data(accessor, slot);
-        if data == 0 {
-            diagnostic(format_args!("[TechHit] fault=slot_readback slot={slot}"));
-            run.stop();
-            return;
-        }
-        let damage = ((data + 0x20) as *const f32).read();
-        let values = ((data + 0x28) as *const [i32; 4]).read_unaligned();
-        let p1_damage = natives::module_accessor(0).map_or(f32::NAN, |a| natives::damage(a, 0));
-        diagnostic(format_args!("[TechHit] rewrite attempt={} slot={slot} cpu_kind={} motion={:016x} motion_frame={:08x} damage={:08x} angle={} growth={} fixed={} base={} power_mul={:08x} p1_before={:08x}",
-            run.attempt,natives::fighter_kind(accessor).unwrap_or(-1),natives::motion_kind(accessor),natives::motion_frame(accessor).to_bits(),damage.to_bits(),values[0],values[1],values[2],values[3],natives::attack_power_mul(accessor).to_bits(),p1_damage.to_bits()));
-        if damage.to_bits() != 1.0f32.to_bits() || values != [90, 0, 1, 100] {
-            diagnostic(format_args!("[TechHit] fault=setter_readback slot={slot}"));
-            run.stop();
-            return;
-        }
-        run.rewritten = run.rewritten.saturating_add(1);
-    }
-}
 unsafe fn energy(accessor: usize) -> Option<usize> {
     let get: extern "C" fn(usize, i32) -> usize =
         std::mem::transmute(game::text_base() + 0x2043970);
@@ -596,7 +445,31 @@ unsafe fn setup(run: &Spike, accessor: usize) {
         run.attempt,run.mode_name(),natives::fighter_kind(accessor).unwrap_or(-1),input.kb.to_bits(),input.angle.to_bits(),
         input.percent.to_bits(),input.weight.to_bits(),input.origin.x.to_bits(),input.origin.y.to_bits(),input.lr.to_bits()));
 }
+unsafe fn write_speed(run: &Spike, accessor: usize, timing: &str) -> Option<()> {
+    let damage = energy(accessor)?;
+    let wanted = math::launch_velocity(run.input.kb, run.input.direction)?;
+    let before = velocity(accessor);
+    #[repr(C, align(16))]
+    struct NativeVector([f32; 4]);
+    let set: extern "C" fn(usize, *const NativeVector) =
+        std::mem::transmute(game::text_base() + 0x20f8320);
+    let enable: extern "C" fn(usize) = std::mem::transmute(game::text_base() + 0x20f6560);
+    set(damage, &NativeVector([wanted.x, wanted.y, 0.0, 0.0]));
+    enable(damage);
+    log_hidden(run, accessor, "post_init_write")?;
+    let actual = velocity(accessor);
+    diagnostic(format_args!(
+        "[TechDirect] speed_write attempt={} command={} age={} timing={timing}",
+        run.attempt, run.mode, run.age
+    ));
+    diagnostic(format_args!("[TechDirect] post_init_speed attempt={} age={} before_vx={:08x} before_vy={:08x} vx={:08x} vy={:08x} requested_vx={:08x} requested_vy={:08x}",
+        run.attempt,run.age,before.map_or(u32::MAX,|v|v.x.to_bits()),before.map_or(u32::MAX,|v|v.y.to_bits()),actual.map_or(u32::MAX,|v|v.x.to_bits()),actual.map_or(u32::MAX,|v|v.y.to_bits()),wanted.x.to_bits(),wanted.y.to_bits()));
+    Some(())
+}
 unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
+    if !v1_guarded() {
+        return None;
+    }
     let input = run.input;
     let calc: extern "C" fn(f32) -> f32 = std::mem::transmute(game::text_base() + 0x404ec0);
     let native_reaction = calc(input.kb);
@@ -611,109 +484,21 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
     if native_reaction.to_bits() != reference.to_bits() {
         return None;
     }
-    run.launch_reaction = native_reaction;
-    let reaction_id = id("FIGHTER_INSTANCE_WORK_ID_FLOAT_DAMAGE_REACTION_FRAME")?;
     place(accessor, input);
     state::heal(accessor, -natives::damage(accessor, 0));
     state::add_damage(accessor, input.percent);
-    let velocity = math::launch_velocity(input.kb, input.direction)?;
-    #[repr(C, align(16))]
-    struct NativeVector([f32; 4]);
-    let enable: extern "C" fn(usize) = std::mem::transmute(game::text_base() + 0x20f6560);
-    let damage = energy(accessor)?;
-    let observed = if run.mode == 2 {
-        Some(run.baseline?.hidden)
-    } else {
-        None
-    };
-    log_hidden(
-        run,
-        accessor,
-        if observed.is_some() {
-            "match_pre"
-        } else {
-            "cold_pre"
-        },
-    )?;
-    let vector = NativeVector([velocity.x, velocity.y, 0.0, 0.0]);
-    if let Some(observed) = observed {
-        // The export dispatches through slot+0x40. Guard both export and actual target.
-        let vptr = (damage as *const usize).read();
-        let target = ((vptr + 0x40) as *const usize).read();
-        if target != game::text_base() + 0x6d8560 {
-            diagnostic(format_args!(
-                "[TechDirect] fault=reset_target actual=0x{target:x}"
-            ));
-            return None;
-        }
-        let reset: extern "C" fn(usize, i32, *const NativeVector, *const NativeVector, usize) =
-            std::mem::transmute(game::text_base() + 0x20f64d0);
-        // x2 is read as q0 (16 bytes); x3 is unused by this guarded damage reset body.
-        reset(
-            damage,
-            observed.reset_type,
-            &vector,
-            &NativeVector([0.0; 4]),
-            accessor,
-        );
-        diagnostic(format_args!(
-            "[TechDirect] seed attempt={} source=ordinary baseline_attempt={} reset={} before_status=true type5_info_read=UNOBSERVED",
-            run.attempt,run.baseline?.attempt,observed.reset_type
-        ));
-    } else if run.post_init() {
-        diagnostic(format_args!(
-            "[TechDirect] seed attempt={} source=post_init_pending before_status=false",
-            run.attempt
-        ));
-    } else {
-        // Cold V1 precedes the first real hit. Observe this provisional state explicitly;
-        // never invent a reset type or borrow a type from a later reference hit.
-        let set: extern "C" fn(usize, *const NativeVector) =
-            std::mem::transmute(game::text_base() + 0x20f8320);
-        set(damage, &vector);
-        diagnostic(format_args!(
-            "[TechDirect] seed attempt={} source=cold_unseeded before_status=true",
-            run.attempt
-        ));
-    }
-    if !run.post_init() {
-        enable(damage);
-    }
-    if matches!(run.mode, 9 | 10) {
-        if !v1_guarded() {
-            return None;
-        }
-        v1_damage_module(accessor)?;
-        let overwrite: extern "C" fn(usize, f32) =
-            std::mem::transmute(game::text_base() + 0x200b8b0);
-        overwrite(accessor, native_reaction);
-        diagnostic(format_args!(
-            "[TechDirect] log_reaction attempt={} command={} reaction={:08x} before_status=true",
-            run.attempt,
-            run.mode,
-            native_reaction.to_bits()
-        ));
-    }
-    let ground_at_hit = run.post_init() && run.baseline?.hidden.flags[3];
-    state::set_situation_kind(
-        accessor,
-        id(if ground_at_hit {
-            "SITUATION_KIND_GROUND"
-        } else {
-            "SITUATION_KIND_AIR"
-        })?,
-    );
-    if run.post_init() {
-        natives::set_flag(
-            accessor,
-            ground_at_hit,
-            id("FIGHTER_STATUS_DAMAGE_FLAG_GROUND")?,
-        );
-    }
-    // D2 measures the log's effect on init; a manual reaction write would hide O1.
-    if !matches!(run.mode, 9 | 10) {
-        natives::set_float(accessor, native_reaction, reaction_id);
-    }
+    // The first native energy update must take its air branch, even for a grounded real hit.
+    state::set_situation_kind(accessor, id("SITUATION_KIND_AIR")?);
+    log_hidden(run, accessor, "cold_pre")?;
+    v1_damage_module(accessor)?;
+    let overwrite: extern "C" fn(usize, f32) = std::mem::transmute(game::text_base() + 0x200b8b0);
+    overwrite(accessor, native_reaction);
+    diagnostic(format_args!(
+        "[TechDirect] log_reaction attempt={} command={} reaction={:08x} before_status=true",
+        run.attempt,
+        run.mode,
+        native_reaction.to_bits()
+    ));
     natives::change_status_force(accessor, id("FIGHTER_STATUS_KIND_DAMAGE_FLY")?, false);
     if !is_status(
         natives::status_kind(accessor),
@@ -721,36 +506,21 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
     ) {
         return None;
     }
-    if let Some(observed) = observed {
-        apply_derived(accessor, observed)?;
-    } else if !matches!(run.mode, 9 | 10) {
-        natives::set_float(accessor, native_reaction, reaction_id);
-    }
     setup(run, accessor);
-    log_hidden(
-        run,
-        accessor,
-        if observed.is_some() {
-            "match_launch"
-        } else {
-            "cold_launch"
-        },
-    )?;
-    let actual_velocity = self::velocity(accessor)?;
-    let actual_reaction = reaction(accessor)?;
+    log_hidden(run, accessor, "cold_launch")?;
+    let wanted = math::launch_velocity(input.kb, input.direction)?;
+    let actual = velocity(accessor)?;
     diagnostic(format_args!(
         "[TechDirect] launched attempt={} mode=direct vx={:08x} vy={:08x} reaction={:08x} age={} requested_vx={:08x} requested_vy={:08x} requested_reaction={:08x}",
-        run.attempt,
-        actual_velocity.x.to_bits(),
-        actual_velocity.y.to_bits(),
-        actual_reaction.to_bits(),
-        run.age,
-        velocity.x.to_bits(),
-        velocity.y.to_bits(),
-        native_reaction.to_bits()
+        run.attempt, actual.x.to_bits(), actual.y.to_bits(), reaction(accessor)?.to_bits(), run.age,
+        wanted.x.to_bits(), wanted.y.to_bits(), native_reaction.to_bits()
     ));
-    run.started = !run.post_init();
-    run.phase = if run.post_init() { 3 } else { 2 };
+    // E1 writes after synchronous status init; E2 measures the existing N+1 control.
+    if run.mode == 11 {
+        write_speed(run, accessor, "same_callback")?;
+    }
+    run.started = run.mode == 11;
+    run.phase = if run.started { 2 } else { 3 };
     Some(())
 }
 
@@ -946,11 +716,10 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             place(accessor, input);
             run.arrange_cpu = false;
             diagnostic(format_args!(
-                "[TechDirect] ordinary_cpu_fixture x={:08x} y={:08x} lr={:08x} unmodified_move={}",
+                "[TechDirect] ordinary_cpu_fixture x={:08x} y={:08x} lr={:08x} unmodified_move=true",
                 input.origin.x.to_bits(),
                 input.origin.y.to_bits(),
-                input.lr.to_bits(),
-                run.mode != 7
+                input.lr.to_bits()
             ));
         }
         return;
@@ -1049,7 +818,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             walk(accessor);
             return;
         }
-        let angle = if command == 7 { 90.0 } else { 315.0 };
+        let angle = 315.0;
         let Some(direction) = math::direction_degrees(angle) else {
             diagnostic(format_args!("[TechDirect] fault=direction"));
             run.stop();
@@ -1057,12 +826,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
         };
         let origin = Vec2 {
             x: natives::pos_x(accessor),
-            y: natives::pos_y(accessor)
-                + if command == 1 || command == 7 {
-                    0.0
-                } else {
-                    30.0
-                },
+            y: natives::pos_y(accessor) + if command == 1 { 0.0 } else { 30.0 },
         };
         run.input = Input {
             origin,
@@ -1073,7 +837,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             weight: natives::weight(accessor),
             lr: 1.0,
         };
-        if matches!(command, 2 | 8..=10) {
+        if matches!(command, 11 | 12) && baseline.is_some() {
             let Some(baseline) = baseline.filter(|b| b.complete && Some(b.scope) == receipt) else {
                 diagnostic(format_args!("[TechDirect] fault=baseline_incomplete"));
                 run.stop();
@@ -1089,11 +853,16 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             diagnostic(format_args!("[TechDirect] baseline_adopted attempt={} command={} baseline_attempt={} kb={:08x} direction_x={:08x} direction_y={:08x} percent={:08x} weight={:08x} start_x={:08x} start_y={:08x} lr={:08x} ground_at_hit={}",
                 run.attempt,command,baseline.attempt,input.kb.to_bits(),input.direction.x.to_bits(),input.direction.y.to_bits(),
                 input.percent.to_bits(),input.weight.to_bits(),input.origin.x.to_bits(),input.origin.y.to_bits(),input.lr.to_bits(),baseline.hidden.flags[3]));
+        } else if matches!(command, 11 | 12) {
+            let input = run.input;
+            diagnostic(format_args!("[TechDirect] baseline_cold attempt={} command={} baseline_attempt=0 kb={:08x} direction_x={:08x} direction_y={:08x} percent={:08x} weight={:08x} start_x={:08x} start_y={:08x} lr={:08x} source=fixed",
+                run.attempt,command,input.kb.to_bits(),input.direction.x.to_bits(),input.direction.y.to_bits(),
+                input.percent.to_bits(),input.weight.to_bits(),input.origin.x.to_bits(),input.origin.y.to_bits(),input.lr.to_bits()));
         }
         place(accessor, run.input);
         state::heal(accessor, -natives::damage(accessor, 0));
         state::add_damage(accessor, run.input.percent);
-        if matches!(command, 1 | 2 | 7..=10) {
+        if matches!(command, 1 | 11 | 12) {
             let (Some(ground), Some(wait)) =
                 (id("SITUATION_KIND_GROUND"), id("FIGHTER_STATUS_KIND_WAIT"))
             else {
@@ -1103,16 +872,13 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             };
             state::set_situation_kind(accessor, ground);
             natives::change_status_force(accessor, wait, false);
-            if command == 1 || command == 7 {
+            if command == 1 {
                 run.baseline = None;
                 run.arrange_cpu = true;
                 diagnostic(format_args!(
                     "[TechDirect] ordinary_armed attempt={}",
                     run.attempt
                 ));
-                if command == 7 {
-                    diagnostic(format_args!("[TechHit] armed attempt={} damage=3f800000 angle=90 growth=0 fixed=1 base=100 percent=42700000 weight={:08x}",run.attempt,run.input.weight.to_bits()));
-                }
             } else {
                 run.phase = 1;
                 diagnostic(format_args!(
@@ -1133,36 +899,12 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
     }
     run.age = run.age.saturating_add(1);
     let status = natives::status_kind(accessor);
-    if (run.mode == 1 || run.mode == 7) && !run.started && tumble(status) {
+    if run.mode == 1 && !run.started && tumble(status) {
         if natives::is_stop(accessor) && run.baseline.is_none() {
             if let Some(v) = velocity(accessor) {
                 let speed = (v.x * v.x + v.y * v.y).sqrt();
                 let kb = natives::damage_reaction(accessor);
                 if speed > 0.0 && kb > 0.0 {
-                    if run.mode == 7 {
-                        if run.rewritten == 0 {
-                            diagnostic(format_args!("[TechHit] fault=unmodified_contact"));
-                            run.stop();
-                            return;
-                        }
-                        let hit = crate::model::spots::Hit {
-                            damage: 1.0,
-                            growth: 0,
-                            fixed: 1,
-                            base: 100,
-                        };
-                        let expected = crate::model::spots::knockback(
-                            &hit,
-                            hit.damage,
-                            natives::damage(accessor, 0),
-                            run.input.weight,
-                        );
-                        let reference =
-                            math::launch_velocity(expected, run.input.direction).unwrap();
-                        let h = hidden(accessor);
-                        diagnostic(format_args!("[TechHit] received attempt={} rewrites={} expected_kb={:08x} actual_kb={:08x} equal_kb={} expected_vx={:08x} expected_vy={:08x} base_vx={:08x} base_vy={:08x} virtual_vx={:08x} virtual_vy={:08x} percent={:08x} weight={:08x} age={}",
-                            run.attempt,run.rewritten,expected.to_bits(),kb.to_bits(),expected.to_bits()==kb.to_bits(),reference.x.to_bits(),reference.y.to_bits(),h.map_or(u32::MAX,|h|h.speed[0]),h.map_or(u32::MAX,|h|h.speed[1]),v.x.to_bits(),v.y.to_bits(),natives::damage(accessor,0).to_bits(),run.input.weight.to_bits(),run.age));
-                    }
                     run.input = Input {
                         origin: Vec2 {
                             x: natives::pos_x(accessor),
@@ -1216,37 +958,12 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             just_launched = true; // Sample0 follows the next original native integration; V1 still logs this frame.
         }
     } else if run.phase == 3 {
-        // This callback follows the NEXT original native fighter frame after DAMAGE_FLY init.
-        // Move only the speed/enable write; retain the native status, reaction and motion context.
-        let Some(damage) = energy(accessor) else {
-            run.stop();
-            return;
-        };
-        let Some(wanted) = math::launch_velocity(run.input.kb, run.input.direction) else {
-            run.stop();
-            return;
-        };
-        let before = velocity(accessor);
-        #[repr(C, align(16))]
-        struct NativeVector([f32; 4]);
-        let set: extern "C" fn(usize, *const NativeVector) =
-            std::mem::transmute(game::text_base() + 0x20f8320);
-        let enable: extern "C" fn(usize) = std::mem::transmute(game::text_base() + 0x20f6560);
-        set(damage, &NativeVector([wanted.x, wanted.y, 0.0, 0.0]));
-        enable(damage);
-        if post_init_v1(&run, accessor).is_none() {
-            diagnostic(format_args!("[TechDirect] fault=post_init_derived"));
+        // E2: this callback follows one original native frame after DAMAGE_FLY init.
+        if write_speed(&run, accessor, "next_callback").is_none() {
+            diagnostic(format_args!("[TechDirect] fault=post_init_speed"));
             run.stop();
             return;
         }
-        if log_hidden(&run, accessor, "post_init_write").is_none() {
-            diagnostic(format_args!("[TechDirect] fault=post_init_hidden"));
-            run.stop();
-            return;
-        }
-        let actual = velocity(accessor);
-        diagnostic(format_args!("[TechDirect] post_init_speed attempt={} age={} before_vx={:08x} before_vy={:08x} vx={:08x} vy={:08x} requested_vx={:08x} requested_vy={:08x}",
-            run.attempt,run.age,before.map_or(u32::MAX,|v|v.x.to_bits()),before.map_or(u32::MAX,|v|v.y.to_bits()),actual.map_or(u32::MAX,|v|v.x.to_bits()),actual.map_or(u32::MAX,|v|v.y.to_bits()),wanted.x.to_bits(),wanted.y.to_bits()));
         run.started = true;
         run.phase = 2;
         just_launched = true;

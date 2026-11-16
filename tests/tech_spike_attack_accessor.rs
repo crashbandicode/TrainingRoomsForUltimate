@@ -35,39 +35,12 @@ fn native_module_offset(bytes: &[u8; 64]) -> usize {
 }
 
 #[test]
-fn attack_guard_inspects_the_module_loaded_by_all_native_setters() {
+fn direct_launcher_does_not_rewrite_cpu_attacks() {
     let source = include_str!("../src/runtime/features/tech_spike.rs");
-    let attack = source
-        .split_once("pub unsafe fn attack(")
-        .expect("diagnostic ATTACK callback")
-        .1;
-    let statement = attack
-        .split_once("let module =")
-        .expect("CPU-hit guard module load")
-        .1
-        .split(';')
-        .next()
-        .unwrap();
-    let compact: String = statement.chars().filter(|c| !c.is_whitespace()).collect();
-    let offset = compact
-        .split_once("accessor+")
-        .expect("module load is BOMA-relative")
-        .1;
-    let literal = offset
-        .split(')')
-        .next()
-        .unwrap()
-        .strip_prefix("0x")
-        .expect("explicit module offset");
-    let source_offset = usize::from_str_radix(literal, 16).expect("hex module offset");
-    for (name, address) in SETTERS {
-        let native_offset = native_module_offset(setter_guard(name, address));
-        assert_eq!(native_offset, 0xa0, "{name}: owned AttackModule layout");
-        assert_eq!(
-            source_offset, native_offset,
-            "{name}: guard must inspect the native AttackModule, not WorkModule"
-        );
-    }
+    let hook = include_str!("../src/runtime/features/hitbox.rs");
+    assert!(!source.contains("pub unsafe fn attack("));
+    assert!(!source.contains("\"real-hit\" =>"));
+    assert!(!hook.contains("tech_spike::attack("));
 }
 
 #[test]
