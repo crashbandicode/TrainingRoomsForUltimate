@@ -1689,3 +1689,11 @@ ceiling = 148236
 date = "2026-11-16"
 reason = "rc.15 shared nonblocking menu fix measured total 148236, +42 over 148194. Lead-approved FOR OPERATOR REVIEW; hardware-reship integration records the combined total. Counting rules and features unchanged."
 approved_by = "Operator rc.15 size approval; primary 20:08Z, rc.15 approval, 2026-11-16: explicitly authorizes this measured-total entry FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150210
+date = "2026-11-16"
+reason = "rc.15 Stage tech v9 measured total on 0938ec33: 150210, +2016 over 148194. Lead-approved FOR OPERATOR REVIEW; final total set at integration. No code-counting change or feature removal."
+approved_by = "Operator rc.15-update size approval: final total set at integration; primary 18:49Z, 2026-11-16, explicitly authorizes this measured-total budget entry FOR OPERATOR REVIEW."
