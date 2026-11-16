@@ -288,6 +288,7 @@ impl<K: Copy + Eq> Run<K> {
             }
             Phase::Mashing => write!(out, "Mash out · Mash! · {}f", self.elapsed),
             Phase::Done if self.native_ended => {
+                // restriction: MASH-NATIVE-END
                 out.write_str("Move ended before escape · no grade")
             }
             Phase::Done => {

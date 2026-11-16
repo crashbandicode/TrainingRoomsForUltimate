@@ -647,3 +647,28 @@ fn native_end_consumed_before_arithmetic_only_for_held_current_epoch() {
         assert_eq!(ARMED.load(Ordering::Relaxed), 0);
     }
 }
+
+#[test]
+fn escape_status_and_already_exhausted_clock_take_precedence_over_end() {
+    unsafe {
+        for status in [68, 69, 75] {
+            let mut m = NativeMemory::new();
+            let mut g = held_downthrow(&mut m);
+            let token = end_token(m.control.as_ptr() as usize, 0).unwrap();
+            let mut record = g.clock.unwrap().last();
+            let input = reader::sample(m.p1(), 0.37).unwrap().input;
+            let mut clock = g.clock.unwrap();
+            while record.remaining > 0.0 {
+                record.step(input);
+                clock.observe(record, input, false).unwrap();
+            }
+            if status == 75 { g.clock = Some(clock); }
+            END_QUEUE.with_borrow_mut(|q| q.push(token));
+            m.update(&mut g, status);
+            assert_eq!(g.step, Step::Held, "End must not replace a native escape");
+            assert!(g.clock.is_some());
+            assert_eq!(g.failed, None);
+            if status == 75 { assert!(g.clock.unwrap().exhausted()); }
+        }
+    }
+}

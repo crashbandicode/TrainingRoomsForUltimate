@@ -591,6 +591,8 @@ pub unsafe fn frame(fighter: usize) {
             && ended.epoch == game.epoch
             && ended.accessor == p1
             && game.step == Step::Held
+            && ![ids[5], ids[6]].contains(&status)
+            && !game.clock.is_some_and(|clock| clock.exhausted())
             && !faulted(game.generation, FAULT.load(Ordering::Acquire))
         {
             revoke();
