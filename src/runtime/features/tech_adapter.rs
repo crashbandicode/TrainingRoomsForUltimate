@@ -495,6 +495,9 @@ pub(super) unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
         owned
             .attempt
             .observe_stop(natives::is_stop(natives::fighter_accessor(fighter)));
+        if let Ok(accessor) = fresh {
+            observe_entry(&mut owned, accessor);
+        }
         *slot = Some(owned);
     }
     drop(slot);
@@ -525,7 +528,7 @@ unsafe fn deliver_decision() {
     {
         return;
     }
-    let Some(snapshot) = owned.decision.pending_decision() else {
+    let Some(snapshot) = owned.decision.confirmed_decision() else {
         return;
     };
     drop(slot);
@@ -566,14 +569,18 @@ pub(super) unsafe fn di_before(accessor: usize) -> bool {
 
 /// Existing common status-decision seam, before the original native status change.
 /// Records only known contact requests for this exact owned player and attempt.
-pub(super) unsafe fn decision(accessor: usize, status: i32, passive: impl FnOnce() -> bool) {
+pub(super) unsafe fn decision(
+    accessor: usize,
+    status: i32,
+    passive: impl FnOnce() -> bool,
+) -> Option<u64> {
     if !tech_ready() {
-        return;
+        return None;
     }
     let Some(mut slot) = OWNED.try_lock() else {
-        return;
+        return None;
     };
-    let Some(owned) = slot.as_mut() else { return };
+    let Some(owned) = slot.as_mut() else { return None };
     if owned.phase != Phase::Flying
         || !matches!(
             owned.attempt.state,
@@ -581,7 +588,7 @@ pub(super) unsafe fn decision(accessor: usize, status: i32, passive: impl FnOnce
         )
         || current(*owned) != Ok(accessor)
     {
-        return;
+        return None;
     }
     let Some(index) = owned
         .prepared
@@ -589,7 +596,7 @@ pub(super) unsafe fn decision(accessor: usize, status: i32, passive: impl FnOnce
         .iter()
         .position(|&s| s == status)
     else {
-        return;
+        return None;
     };
     let surface = match index {
         0..=3 => Surface::Floor,
@@ -607,13 +614,54 @@ pub(super) unsafe fn decision(accessor: usize, status: i32, passive: impl FnOnce
     };
     owned.attempt.record_contact(contact);
     if owned.attempt.contact != Some(contact) {
-        return;
+        return None;
     }
     owned.decision.capture_first(super::tech_decision::snapshot(
         accessor,
         owned.attempt.id,
         contact,
     ));
+    let attempt = owned.attempt.id;
+    drop(slot);
+    deliver_decision();
+    Some(attempt)
+}
+
+/// Read only after fresh ownership validation, and only until the first confirmation.
+unsafe fn observe_entry(owned: &mut Owned, accessor: usize) {
+    if owned
+        .decision
+        .pending_decision()
+        .is_some_and(|s| s.entered_status.is_none())
+    {
+        owned.decision.observe_entered_status(
+            owned.attempt.id,
+            super::tech_decision::entered_status(accessor),
+            &owned.prepared.contact_statuses,
+        );
+    }
+}
+
+/// Existing status hook calls this after its original returns. The accessor is an
+/// equality token only: resolve the live owned body again before reading native state.
+pub(super) unsafe fn confirm_decision(accessor: usize, attempt: u64) {
+    if !tech_ready() {
+        return;
+    }
+    let Some(mut slot) = OWNED.try_lock() else { return };
+    let Some(owned) = slot.as_mut() else { return };
+    if owned.phase != Phase::Flying
+        || owned.attempt.id != attempt
+        || RESTORE.load(Ordering::Acquire) == owned.owner
+        || super::states::is_loading()
+    {
+        return;
+    }
+    let Ok(fresh) = current(*owned) else { return };
+    if fresh != accessor {
+        return;
+    }
+    observe_entry(owned, fresh);
     drop(slot);
     deliver_decision();
 }

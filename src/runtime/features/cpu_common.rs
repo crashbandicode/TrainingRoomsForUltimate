@@ -97,6 +97,7 @@ extern "C" fn change_status_hook(fighter: usize, status: L2CValue, unk: L2CValue
     let _scope = HookScope::enter();
     let mut status = status;
     let mut unk = unk;
+    let mut decision = None;
     if let Some(requested) = status.as_int() {
         let passive = || {
             let address = IS_ENABLE_PASSIVE.load(Ordering::Acquire);
@@ -104,7 +105,9 @@ extern "C" fn change_status_hook(fighter: usize, status: L2CValue, unk: L2CValue
             address != 0 && unsafe { std::mem::transmute::<usize, IsEnablePassiveFn>(address)(fighter) }.as_bool()
         };
         // Optional Stage tech observes the same native decision, before CPU substitution.
-        unsafe { super::tech_adapter::decision(cpu::script_accessor(fighter), requested, passive) };
+        let accessor = unsafe { cpu::script_accessor(fighter) };
+        decision = unsafe { super::tech_adapter::decision(accessor, requested, passive) }
+            .map(|attempt| (accessor, attempt));
         #[cfg(feature = "diag")]
         unsafe {
             let accessor = cpu::script_accessor(fighter);
@@ -120,7 +123,12 @@ extern "C" fn change_status_hook(fighter: usize, status: L2CValue, unk: L2CValue
     }
     // SAFETY: set by `install`.
     let original: ChangeStatusFn = unsafe { std::mem::transmute(ORIGINAL_CHANGE_STATUS.load(Ordering::Acquire)) };
-    original(fighter, status, unk)
+    let result = original(fighter, status, unk);
+    if let Some((accessor, attempt)) = decision {
+        // Re-resolves fresh ownership; the pre-call accessor is only an identity token.
+        unsafe { super::tech_adapter::confirm_decision(accessor, attempt) };
+    }
+    result
 }
 
 extern "C" fn sub_guard_cont_hook(fighter: usize) -> L2CValue {

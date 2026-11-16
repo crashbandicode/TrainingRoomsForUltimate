@@ -227,6 +227,9 @@ pub struct DecisionSnapshot {
     pub attempt: u64,
     pub contact: ContactReceipt,
     pub source_status: Option<i32>,
+    /// First guarded post-request contact status observed different from known source.
+    /// None is unconfirmed/unavailable, never a miss or requested-status success.
+    pub entered_status: Option<i32>,
     pub guard_count: Option<u8>,
     pub previous_guard_gap: Option<u8>,
     /// None means the native event stream is unbound/unproven, never no press.
@@ -240,21 +243,44 @@ pub struct DecisionSnapshot {
     pub press_frame_offset: Option<u16>,
 }
 
-/// One immutable native decision, retained until its exact attempt is accepted.
+/// Immutable pre-decision fields plus one actual entry, retained until observer acknowledgement.
 /// Construct a fresh delivery with each placement; no previous attempt is reused.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DecisionDelivery(Option<DecisionSnapshot>);
 impl DecisionDelivery {
     pub const EMPTY: Self = Self(None);
-    pub fn capture_first(&mut self, snapshot: DecisionSnapshot) -> bool {
+    pub fn capture_first(&mut self, mut snapshot: DecisionSnapshot) -> bool {
         if self.0.is_some() {
             return false;
         }
+        snapshot.entered_status = None;
         self.0 = Some(snapshot);
         true
     }
     pub fn pending_decision(self) -> Option<DecisionSnapshot> {
         self.0
+    }
+    /// Confirm only this attempt from an actual native transition, never its request.
+    pub fn observe_entered_status(
+        &mut self,
+        attempt: u64,
+        actual: Option<i32>,
+        contact_statuses: &[i32],
+    ) -> bool {
+        let Some(snapshot) = self.0.as_mut() else { return false };
+        let Some((source, actual)) = snapshot.source_status.zip(actual) else { return false };
+        if snapshot.attempt != attempt
+            || snapshot.entered_status.is_some()
+            || actual == source
+            || !contact_statuses.contains(&actual)
+        {
+            return false;
+        }
+        snapshot.entered_status = Some(actual);
+        true
+    }
+    pub fn confirmed_decision(self) -> Option<DecisionSnapshot> {
+        self.0.filter(|snapshot| snapshot.entered_status.is_some())
     }
     pub fn acknowledge_decision(&mut self, attempt: u64) -> bool {
         if self.0.is_some_and(|snapshot| snapshot.attempt == attempt) {

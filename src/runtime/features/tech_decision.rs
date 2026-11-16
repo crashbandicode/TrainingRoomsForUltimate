@@ -38,6 +38,11 @@ unsafe fn control(accessor: usize) -> Option<usize> {
     pointer(((module + 0x110) as *const usize).read()).then_some(module)
 }
 
+/// Existing guarded status accessor; caller first proves a fresh owned player.
+pub(super) unsafe fn entered_status(accessor: usize) -> Option<i32> {
+    game::granted(p2::STATUS_KIND_OFFSET).then(|| natives::status_kind(accessor))
+}
+
 pub(super) unsafe fn snapshot(
     accessor: usize,
     attempt: u64,
@@ -75,6 +80,7 @@ pub(super) unsafe fn snapshot(
         attempt,
         contact,
         source_status,
+        entered_status: None,
         guard_count,
         previous_guard_gap,
         guard_event: None,

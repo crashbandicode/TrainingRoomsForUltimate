@@ -49,6 +49,7 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "tech::frame", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::frame", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::di_before", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::confirm_decision", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::decision", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::place", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::launch", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
@@ -778,4 +779,43 @@ fn projectile_accessor_failure_leaves_hitbox_and_btt_melee_installed() {
     assert!(a.reach(start).0.contains(&row.offset));
     let worker = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime/ui/worker.rs")).unwrap();
     assert!(worker.contains("btt_projectiles_ready: crate::runtime::features::btt_projectiles::ready()"));
+}
+
+#[test]
+fn native_confirmation_is_after_original_and_retried_on_owned_frame() {
+    let a = Analysis::new();
+    let body = |name: &str| &a.graph.funcs[a.graph.find(name)[0]].body;
+    let at = |body: &[Tok], snippet: &str| {
+        let wanted = callgraph::lex(snippet);
+        body.windows(wanted.len()).position(|w| w == wanted.as_slice())
+            .unwrap_or_else(|| panic!("missing native confirmation invariant: {snippet}"))
+    };
+    let hook = body("cpu_common::change_status_hook");
+    assert!(at(hook, "tech_adapter::decision(accessor, requested, passive)") < at(hook, "original(fighter, status, unk)"));
+    assert!(at(hook, "original(fighter, status, unk)") < at(hook, "tech_adapter::confirm_decision(accessor, attempt)"));
+    let confirm = body("tech_adapter::confirm_decision");
+    assert!(at(confirm, "owned.attempt.id != attempt") < at(confirm, "current(*owned)"));
+    assert!(at(confirm, "current(*owned)") < at(confirm, "if fresh != accessor"));
+    assert!(at(confirm, "if fresh != accessor") < at(confirm, "observe_entry(owned, fresh)"));
+    assert!(at(confirm, "drop(slot)") < at(confirm, "deliver_decision()"));
+    let frame = body("tech_adapter::frame");
+    assert!(at(frame, "receipt != Some(owned.receipt) || fresh.is_err()") < at(frame, "observe_entry(&mut owned, accessor)"));
+    let delivery = body("tech_adapter::deliver_decision");
+    assert!(at(delivery, "owned.decision.confirmed_decision()") < at(delivery, "observer(snapshot)"));
+    let observed = body("tech_decision::entered_status");
+    assert!(at(observed, "game::granted(p2::STATUS_KIND_OFFSET)") < at(observed, "natives::status_kind(accessor)"));
+}
+
+#[test]
+fn unbound_native_hitlag_cannot_construct_launch_adapter() {
+    let a = Analysis::new();
+    let body = &a.graph.funcs[a.graph.find("tech::frame")[0]].body;
+    let at = |snippet: &str| {
+        let wanted = callgraph::lex(snippet);
+        body.windows(wanted.len()).position(|w| w == wanted.as_slice())
+            .unwrap_or_else(|| panic!("missing native hitlag admission: {snippet}"))
+    };
+    assert!(at("let Some(hitlag) = HITLAG.get().copied() else { return; };") < at("Adapter::new(hitlag)"));
+    let runtime = std::fs::read_to_string("src/runtime/features/tech.rs").unwrap();
+    assert!(runtime.contains("static HITLAG: OnceLock<HitlagResolver> = OnceLock::new()"));
 }

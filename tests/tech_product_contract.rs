@@ -238,10 +238,11 @@ fn decision_readers_match_owned_native_byte_and_float_abis() {
 #[test]
 fn rejected_decision_delivery_retains_exact_native_snapshot_until_matching_ack() {
     use launch::{DecisionDelivery, DecisionSnapshot};
-    let native = DecisionSnapshot {
+    let mut native = DecisionSnapshot {
         attempt: 17,
         contact: contact(false),
         source_status: Some(81),
+        entered_status: None,
         guard_count: Some(12),
         previous_guard_gap: Some(254),
         guard_event: None,
@@ -261,9 +262,12 @@ fn rejected_decision_delivery_retains_exact_native_snapshot_until_matching_ack()
         reaction: Some(0.0),
         ..native
     }));
+    assert_eq!(delivery.confirmed_decision(), None);
+    assert!(delivery.observe_entered_status(native.attempt, Some(90), &[90]));
+    native.entered_status = Some(90);
     for accepted in [false, false, true] {
         let sent = delivery
-            .pending_decision()
+            .confirmed_decision()
             .expect("busy must retain decision");
         assert_eq!(sent, native);
         assert_eq!(sent.window_multiplier.unwrap().to_bits(), 0x3f855555);
@@ -292,6 +296,7 @@ fn unavailable_guard_event_survives_delivery_distinct_from_no_press() {
         attempt: 41,
         contact: contact(false),
         source_status: None,
+        entered_status: None,
         guard_count: None,
         previous_guard_gap: None,
         guard_event: None,
@@ -318,4 +323,77 @@ fn unavailable_guard_event_survives_delivery_distinct_from_no_press() {
     }
     assert_eq!(observed, [None, Some(false), Some(true)]);
     assert_ne!(observed[0], observed[1]);
+}
+
+fn unconfirmed_native_decision() -> launch::DecisionSnapshot {
+    launch::DecisionSnapshot {
+        attempt: 51, contact: contact(false), source_status: Some(81), entered_status: None,
+        guard_count: Some(12), previous_guard_gap: Some(254), guard_event: None,
+        window_base: Some(12), window_multiplier: Some(f32::from_bits(0x3f855555)),
+        lockout: Some(28), reaction: Some(f32::from_bits(0x41880001)),
+        damage_fall: Some(false), stick_x: Some(-0.75), press_frame_offset: None,
+    }
+}
+
+#[test]
+fn native_entry_requires_observed_transition_not_request() {
+    use launch::DecisionDelivery;
+    let sample = unconfirmed_native_decision();
+    let statuses = [sample.contact.requested_status, 81, 90, 91];
+    for source in [None, Some(81)] {
+        let mut delivery = DecisionDelivery::EMPTY;
+        // Even a supplied pre-request outcome cannot bypass native confirmation.
+        assert!(delivery.capture_first(launch::DecisionSnapshot {
+            source_status: source, entered_status: Some(90), ..sample
+        }));
+        assert_eq!(delivery.pending_decision().unwrap().entered_status, None);
+        assert_eq!(delivery.confirmed_decision(), None);
+        for actual in [None, Some(81), Some(999)] {
+            assert!(!delivery.observe_entered_status(sample.attempt, actual, &statuses));
+            assert_eq!(delivery.confirmed_decision(), None);
+        }
+        assert_eq!(delivery.observe_entered_status(sample.attempt, Some(90), &statuses), source.is_some());
+        assert_eq!(delivery.confirmed_decision().is_some(), source.is_some());
+    }
+}
+
+#[test]
+fn native_entry_confirmation_retains_predecision_and_first_actual_bits() {
+    use launch::DecisionDelivery;
+    let sample = unconfirmed_native_decision();
+    for actual in [90, 91] { // Actual tech or miss is retained even when different from request.
+        assert_ne!(actual, sample.contact.requested_status);
+        let mut delivery = DecisionDelivery::EMPTY;
+        assert!(delivery.capture_first(sample));
+        assert!(delivery.observe_entered_status(sample.attempt, Some(actual), &[90, 91]));
+        let expected = launch::DecisionSnapshot { entered_status: Some(actual), ..sample };
+        for later in [None, Some(81), Some(90), Some(91)] {
+            assert!(!delivery.observe_entered_status(sample.attempt, later, &[90, 91]));
+            assert!(!delivery.capture_first(unconfirmed_native_decision()));
+            let sent = delivery.confirmed_decision().unwrap();
+            assert_eq!(sent, expected); // Busy observer retries identical predecision and actual bytes.
+            assert_eq!(sent.reaction.unwrap().to_bits(), 0x41880001);
+            assert_eq!(sent.window_multiplier.unwrap().to_bits(), 0x3f855555);
+            assert!(!delivery.acknowledge_decision(sample.attempt + 1));
+        }
+        assert!(delivery.acknowledge_decision(sample.attempt));
+        assert_eq!(delivery.confirmed_decision(), None);
+    }
+}
+
+#[test]
+fn native_entry_rejects_stale_attempt_and_reset() {
+    use launch::DecisionDelivery;
+    let sample = unconfirmed_native_decision();
+    let mut delivery = DecisionDelivery::EMPTY;
+    assert!(delivery.capture_first(sample));
+    assert!(!delivery.observe_entered_status(sample.attempt + 1, Some(90), &[90]));
+    assert_eq!(delivery.confirmed_decision(), None);
+    // Owned drop/reset discards its mailbox. A new placement has a unique attempt.
+    delivery = DecisionDelivery::EMPTY;
+    assert!(!delivery.observe_entered_status(sample.attempt, Some(90), &[90]));
+    assert!(delivery.capture_first(launch::DecisionSnapshot { attempt: sample.attempt + 1, ..sample }));
+    assert!(!delivery.observe_entered_status(sample.attempt, Some(90), &[90]));
+    assert_eq!(delivery.confirmed_decision(), None);
+    assert!(delivery.observe_entered_status(sample.attempt + 1, Some(90), &[90]));
 }
