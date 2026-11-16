@@ -223,4 +223,5 @@ pub static DEFS: [Def; COUNT] = [
     // appended like lobby_items.
     row!("spots_strip", Single, 2, [1]),
     row!("spots_combo", Single, 2, [1]),
+    row!("btt_projectiles", Single, 2, [1]),
 ];

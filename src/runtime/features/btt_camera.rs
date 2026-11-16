@@ -1,6 +1,5 @@
 //! Break the Targets' camera (rc.14, `artifacts/rc14-eggsercise/SPEC.md` §V2.5 `camera`), the runtime half of
-//! `model::btt_camera`: the game's own Training Fixed camera (mode 4) shows the whole stage while the mode is Placing, Ready or
-//! Running, and the camera the game was in comes back when it ends. The switch is the game's own `change_active_camera`
+//! `model::btt_camera`: the game's own Training Fixed camera (mode 4) shows the whole stage while the mode is Placing, and the camera the game was in comes back on every placement exit. The switch is the game's own `change_active_camera`
 //! (`game::natives::change_active_camera`), asked from Player 1's pass on the game thread with no lock held (the camera hooks
 //! take the CPU lock). The row is the camera unit's: a rejected guard turns off this camera and nothing else (boundaries in
 //! `tests/capabilities.rs`). Eden evidence: `tmp-deluxe/btt-camera/FINDINGS.md`, run `d2-btt-cam-1`.

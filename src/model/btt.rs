@@ -249,6 +249,16 @@ pub fn on(rows: &super::settings::Snapshot) -> [bool; 2] {
     ["eggsercise", ROW].map(|id| rows.get(id).is_some_and(|r| r.iter().skip(1).any(|v| *v != 0)))
 }
 
+/// Only P1's ArticleModule supplies `get`; Off performs no discovery or hit reads.
+pub fn projectile_breaks(
+    enabled: bool, spot: [f32; 2], get: impl Fn(i32, i32) -> usize + Copy,
+    mut read: impl FnMut(usize) -> Option<([eggs::Hit; super::hitbox::SLOTS as usize], usize)>,
+) -> bool {
+    super::hitbox::article_instances(enabled, get).filter(|a| pointer_ok(*a)).any(|article| {
+        read(article).is_some_and(|(hits, n)| hits[..n].iter().any(|h| eggs::breaks(eggs::ANY, false, h, spot)))
+    })
+}
+
 /// The layout's identity for the session's best: its target positions to half a unit, in no order.
 fn key(at: &[[f32; 2]]) -> u64 {
     let h = |v: f32, m: u64| ((v * 2.0).round() as i64 as u64).wrapping_mul(m);
@@ -667,13 +677,13 @@ impl Btt {
             Phase::Off => Ok(()),
             Phase::Placing if self.msg.1 > 0 => out.write_str(self.msg.0.as_str()),
             Phase::Placing => {
-                write!(out, "Place targets {n}/{MAX}   ")?;
+                write!(out, "{n}/{MAX}   ")?;
                 match self.pick.and_then(|p| self.five[p].map(|h| (p + 1, h))) {
                     None => write!(out, "A place  B undo  X start"),
                     Some((i, h)) => write!(out, "{i}/{} {}: {}", self.count(), h.name.as_str(), h.n),
                 }
             }
-            Phase::Ready | Phase::Running => write!(out, "Targets {got}/{n}   {m}:{s:02}.{c:02}"),
+            Phase::Ready | Phase::Running => write!(out, "{got}/{n} {m}:{s:02}.{c:02}"),
             Phase::Done => {
                 let (bm, bs, bc) = clock(self.top);
                 write!(out, "Done! {n} in {m}:{s:02}.{c:02} ")?;
@@ -690,6 +700,11 @@ pub const fn own_camera(facts: super::scene::Facts) -> bool {
     super::scene::is_training(facts)
 }
 
+/// Placement alone owns the zoomed-out view; all exits restore the saved native mode.
+pub const fn wants_camera(phase: Phase, covered: bool, facts: super::scene::Facts) -> bool {
+    matches!(phase, Phase::Placing) && !covered && own_camera(facts)
+}
+
 /// The camera mode that is Training's Fixed camera (`cpu::tech::CAMERA_MODE_FIXED`).
 pub const FIXED: i32 = super::cpu::tech::CAMERA_MODE_FIXED;
 /// Frames between two asks while the game keeps taking the camera back (its own Training Camera option, a reset).
@@ -701,7 +716,7 @@ pub const fn pointer_ok(p: usize) -> bool {
 }
 
 /// The camera's state (`runtime::features::btt_camera`: the stage is shown by the game's own Training Fixed camera, mode 4, in
-/// Placing, Ready and Running): the mode the game was in when this mode first took the camera (`saved`, while it holds it) and
+/// Placing): the mode the game was in when this mode first took the camera (`saved`, while it holds it) and
 /// the frames left before it may ask again.
 #[derive(Clone, Copy, Debug)]
 pub struct Camera {
@@ -734,7 +749,7 @@ impl Camera {
             }
             (false, Some(back)) => {
                 self.saved = None;
-                (now == FIXED).then_some(back)
+                (now != back).then_some(back)
             }
             _ => None,
         }

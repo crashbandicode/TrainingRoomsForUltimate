@@ -389,6 +389,8 @@ fn build(stock_path: &str, out: &str, waiting: bool) -> Result<()> {
         let edit = PaneEdit { bind_material: Some(egg_picture_of(k).into()), ..Default::default() };
         layout.set_pane(panes::name_of(panes::IDX_EGG + k).as_str(), &edit).map_err(err("egg picture material"))?;
     }
+    layout.set_pane(panes::name_of(panes::IDX_BTT + 2).as_str(),
+        &PaneEdit { bind_material: Some(EGG_TEXTURE.into()), ..Default::default() }).map_err(err("target HUD chip"))?;
     // The floppy and the loop. The panes are white; the runtime tints them.
     import_recording_icons(&mut bntx)?;
     add_recording_icon_materials(&mut layout, waiting)?;

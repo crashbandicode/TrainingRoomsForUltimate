@@ -12,11 +12,11 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU8, Ordering};
 use hos_lock::{Mailbox, Mutex, Published};
 
 pub use crate::model::btt::LOOKS;
-use crate::model::btt::{self, Ask, Btt, Five, Hot, Pad, Phase, HEADER, HOT, NOTICE_ID};
+use crate::model::btt::{self, Ask, Btt, Five, Hot, Pad, Phase, HEADER, HOT};
 use crate::model::chords::{field, Sample};
 use crate::model::eggs::View;
-use crate::model::notify::DEFAULT_COLOR;
 use crate::model::panes::EggLook;
+use crate::model::notify::DEFAULT_COLOR;
 use crate::model::settings::Snapshot;
 use crate::model::storage::ROOT;
 use crate::runtime::diag_log::diagnostic;
@@ -29,6 +29,7 @@ use crate::runtime::{published, scene};
 static BTT: Mutex<Btt> = Mutex::new(Btt::IDLE);
 /// The `btt` row is On (every settings publish), the menu closed since the last pass, Place targets was chosen.
 static ON: AtomicBool = AtomicBool::new(false);
+static PROJECTILES: AtomicBool = AtomicBool::new(true);
 static START: AtomicBool = AtomicBool::new(false);
 static PLACE: AtomicBool = AtomicBool::new(false);
 /// The menu is open: the pass keeps the layout's stage and file current for the Saved layouts screen even with the row Off.
@@ -50,6 +51,12 @@ static ASKS: Mailbox<Ask, 4> = Mailbox::new();
 /// What the writer last listed (stage, its hot five, whether it answers a Save), and the last generation the game thread took.
 static RESULT: Published<(i32, Five, bool)> = Published::new((NONE, [None; HOT], false));
 static SEEN: AtomicU32 = AtomicU32::new(0);
+static HUD: Published<crate::model::storage::FixedPath<96>> = Published::new(crate::model::storage::FixedPath::new());
+
+/// The game-thread's one-line HUD copy; the layout tick never waits on the mode.
+pub fn hud() -> crate::model::storage::FixedPath<96> {
+    HUD.read()
+}
 
 /// The stage in play, `i32::MIN` before the first.
 pub fn stage() -> i32 {
@@ -72,6 +79,11 @@ pub fn stage_label(stage: i32) -> String {
 /// Every settings publish: whether Break the Targets is On.
 pub fn publish(snapshot: &Snapshot) {
     ON.store(btt::on(snapshot)[1], Ordering::Release);
+    PROJECTILES.store(snapshot.get("btt_projectiles").is_none_or(|r| r.get(1) == Some(&1)), Ordering::Release);
+}
+
+pub fn projectiles() -> bool {
+    PROJECTILES.load(Ordering::Acquire)
 }
 
 /// The menu opened (the menu worker; atomics only).
@@ -150,6 +162,7 @@ pub fn reset() {
 pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut([f32; 2]) -> bool) -> u8 {
     let facts = scene::facts();
     if facts.busy {
+        btt_camera::apply(false);
         return 0;
     }
     let on = ON.load(Ordering::Acquire);
@@ -188,16 +201,8 @@ pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut([f32; 2]) -> bool) 
     }
     let phase = mode.phase();
     PHASE.store(phase as u8, Ordering::Release);
-    // The standing notice sits in the top band while the mode is on (the operator, 11-14), so the targets keep the middle.
-    notices::raise(notices::RAISE_BTT, phase != Phase::Off);
-    // Asked on every pass, Off included: the text is empty exactly when the mode is Off, so the notice goes then, and the next
-    // text is posted again even when it is the one shown before the Off (Ready of the same layout).
     if let Some(text) = mode.notice() {
-        if text.as_str().is_empty() {
-            notices::clear(NOTICE_ID);
-        } else {
-            notices::upsert(NOTICE_ID, HEADER, text.as_str(), u16::MAX, DEFAULT_COLOR);
-        }
+        HUD.publish(text);
         // For the Eden rows: a line per change, and while Running (its clock changes every frame) every tenth, or on a break.
         #[cfg(feature = "diag")]
         if phase != Phase::Running || broken > 0 || DIAG.fetch_add(1, Ordering::Relaxed) % 10 == 0 {
@@ -206,8 +211,8 @@ pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut([f32; 2]) -> bool) 
         }
     }
     drop(mode);
-    // The fixed camera while the mode is on, except under the plugin's menu, the game's pause and the waiting room's UI.
-    btt_camera::apply(phase != Phase::Off && !owners.covers_strip() && btt::own_camera(facts));
+    // Placement alone owns Fixed; X start, Off and UI/scene ownership restore the saved native mode.
+    btt_camera::apply(btt::wants_camera(phase, owners.covers_strip(), facts));
     broken
 }
 

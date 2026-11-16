@@ -186,7 +186,7 @@ pub fn breaks(rule: u8, aerial: bool, hit: &Hit, egg: [f32; 2]) -> bool {
 }
 
 /// The pills of a fighter's live attack spheres (`hitbox::want_hitboxes`), each end placed by `place`, a capsule's two ends
-/// one pill; `power(slot)` is the slot's damage. Only attack slots: an article's or an item's hitbox never reaches here.
+/// one pill; `power(slot)` is the slot's damage. BTT also reads articles here; Eggs-ercise calls it only for fighters.
 pub fn pills<P, D>(spheres: &[Sphere], mut place: P, mut power: D, out: &mut [Hit]) -> usize
 where
     P: FnMut(&Sphere) -> Option<[f32; 3]>,

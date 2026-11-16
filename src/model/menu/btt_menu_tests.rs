@@ -78,6 +78,20 @@ fn target_speed_greys_while_the_targets_stay_still() {
     assert_eq!(m.grey(speed), None);
 }
 
+fn btt_projectiles_default_and_round_trip() {
+    let id = "btt_projectiles";
+    let mut m = menu();
+    assert_eq!(m.get(id), &[0, 1], "default On");
+    let old = settings::parse(r#"{"menu":{"btt":[0,1]}}"#).settings;
+    assert_eq!(old.menu.get(id), Some(&[0, 1][..]), "old files acquire the On default");
+    m.cycle(row(id), true);
+    assert_eq!(m.get(id), &[1, 0]);
+    let saved = m.commit_onto(&Settings::factory());
+    let json = saved.to_json();
+    let loaded = settings::parse(&json).settings;
+    assert_eq!(loaded.menu.get(id), Some(&[1, 0][..]));
+}
+
 /// The cases of this module in one table.
 #[test]
 fn case_table() {
@@ -85,6 +99,7 @@ fn case_table() {
         ("btt_and_eggsercise_exclude_each_other", btt_and_eggsercise_exclude_each_other as fn()),
         ("a_file_with_both_practice_games_on_keeps_eggsercise", a_file_with_both_practice_games_on_keeps_eggsercise as fn()),
         ("place_targets_closes_the_menu_with_a_request", place_targets_closes_the_menu_with_a_request as fn()),
+        ("btt_projectiles_default_and_round_trip", btt_projectiles_default_and_round_trip as fn()),
         ("target_speed_greys_while_the_targets_stay_still", target_speed_greys_while_the_targets_stay_still as fn()),
     ]);
 }
