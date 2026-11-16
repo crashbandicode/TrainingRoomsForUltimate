@@ -397,3 +397,39 @@ fn native_entry_rejects_stale_attempt_and_reset() {
     assert_eq!(delivery.confirmed_decision(), None);
     assert!(delivery.observe_entered_status(sample.attempt + 1, Some(90), &[90]));
 }
+
+#[test]
+fn raw_contact_delivery_boundary_preserves_confirmed_and_unavailable_cases() {
+    use launch::DecisionDelivery;
+    // Resolved native IDs are supplied by the caller; no numeric game IDs guessed.
+    let [passive, roll, down] = [200, 201, 202];
+    for (requested, actual, stick) in [(down, passive, 0.0), (passive, roll, -1.0), (passive, roll, 1.0), (passive, down, 0.0)] {
+        let mut raw = unconfirmed_native_decision();
+        raw.contact.requested_status = requested;
+        raw.stick_x = Some(stick);
+        let mut delivery = DecisionDelivery::EMPTY;
+        delivery.capture_first(raw);
+        assert_eq!(delivery.confirmed_decision(), None);
+        assert!(delivery.observe_entered_status(raw.attempt, Some(actual), &[passive, roll, down]));
+        let delivered = delivery.confirmed_decision().unwrap();
+        assert_eq!(delivered.entered_status, Some(actual));
+        assert_eq!(delivered.contact.requested_status, requested);
+        assert_ne!(actual, requested);
+        assert_eq!(delivered.stick_x, Some(stick)); // Both roll directions preserved for UI mapping.
+        assert_eq!(delivery.pending_decision(), Some(delivered)); // Read-only query does not consume.
+        assert_eq!(delivery.confirmed_decision(), Some(delivered));
+    }
+    let raw = unconfirmed_native_decision();
+    // Ungranted status getter, unknown source, source still current, non-contact, no transition.
+    for (source, actual) in [(Some(81), None), (None, Some(passive)), (Some(passive), Some(passive)), (Some(81), Some(999)), (Some(81), Some(81))] {
+        let raw = launch::DecisionSnapshot { source_status: source, ..raw };
+        let mut delivery = DecisionDelivery::EMPTY;
+        delivery.capture_first(raw);
+        for _ in 0..45 {
+            assert!(!delivery.observe_entered_status(raw.attempt, actual, &[passive, roll, down]));
+            assert_eq!(delivery.confirmed_decision(), None);
+            assert_eq!(delivery.pending_decision(), Some(raw)); // UI can age exact contact to its existing hold.
+        }
+        assert_eq!(delivery.pending_decision().unwrap().entered_status, None);
+    }
+}

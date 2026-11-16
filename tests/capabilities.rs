@@ -49,6 +49,7 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "tech::frame", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::frame", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::di_before", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::pending_decision", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::confirm_decision", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::decision", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::place", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
@@ -818,4 +819,22 @@ fn unbound_native_hitlag_cannot_construct_launch_adapter() {
     assert!(at("let Some(hitlag) = HITLAG.get().copied() else { return; };") < at("Adapter::new(hitlag)"));
     let runtime = std::fs::read_to_string("src/runtime/features/tech.rs").unwrap();
     assert!(runtime.contains("static HITLAG: OnceLock<HitlagResolver> = OnceLock::new()"));
+}
+
+#[test]
+fn pending_snapshot_query_preserves_owner_and_contention_boundaries() {
+    let a = Analysis::new();
+    let body = &a.graph.funcs[a.graph.find("tech_adapter::pending_decision")[0]].body;
+    let at = |snippet: &str| {
+        let wanted = callgraph::lex(snippet);
+        body.windows(wanted.len()).position(|w| w == wanted.as_slice())
+            .unwrap_or_else(|| panic!("missing raw pending query invariant: {snippet}"))
+    };
+    assert!(at("OWNED.try_lock().ok_or(Error::Busy)?") < at("owned.owner == self.owner"));
+    assert!(at("owned.owner == self.owner") < at("current(*owned)"));
+    assert!(at("current(*owned)") < at("owned.decision.pending_decision()"));
+    at("s.attempt == owned.attempt.id");
+    for forbidden in ["lock", "capture_first", "acknowledge_decision", "observe_entered_status", "tech_decision", "observer", "elapsed", "HOLD"] {
+        assert!(!body.iter().any(|t| matches!(t, Tok::Ident(name) if name == forbidden)), "query must be read-only, nonblocking and clock-free: {forbidden}");
+    }
 }

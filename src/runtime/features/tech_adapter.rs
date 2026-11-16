@@ -100,6 +100,31 @@ pub struct Adapter {
     _game_thread: PhantomData<Rc<()>>,
 }
 impl Adapter {
+    /// Read-only retained raw contact for the existing UI hold/unavailable path.
+    /// None is no retained observation, never a miss or NoContact. Busy defers.
+    /// Does not sample native status, acknowledge delivery, or start a core clock.
+    pub fn pending_decision(&self) -> Result<Option<DecisionSnapshot>, Error> {
+        if !tech_ready() {
+            return Err(Error::Guards);
+        }
+        if !super::cpu_common::contact_ready() {
+            return Err(Error::Guards);
+        }
+        let slot = OWNED.try_lock().ok_or(Error::Busy)?;
+        let Some(owned) = slot.as_ref().filter(|owned| owned.owner == self.owner) else {
+            return Ok(None);
+        };
+        if owned.phase == Phase::Yielded
+            || RESTORE.load(Ordering::Acquire) == self.owner
+            || super::states::is_loading()
+        {
+            return Err(Error::Busy);
+        }
+        // SAFETY: the game-thread adapter re-resolves current receipt/body identity.
+        unsafe { current(*owned) }?;
+        Ok(owned.decision.pending_decision().filter(|s| s.attempt == owned.attempt.id))
+    }
+
     /// Caller must be on the game thread and supply the core's verified hitlag resolver.
     pub unsafe fn new(hitlag: HitlagResolver) -> Self {
         Self {
