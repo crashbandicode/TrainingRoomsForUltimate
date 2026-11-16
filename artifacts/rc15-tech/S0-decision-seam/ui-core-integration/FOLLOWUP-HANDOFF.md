@@ -4,6 +4,8 @@ Implemented: only the three TechPractice CROSS_NEEDS omissions identified by can
 
 Worktree `/home/intpa/tr-fixes-20261113/rc15-tech-seam`, branch `rc15/tech-seam`, base `f84e0de44317e6d9f2e84e6e1dabe7734e65f821`. Main V9 worktree untouched. Compiler/build admission remains primary-owned; Rust tests added, not run by this worker. Full previous SSBU playbook read remains valid at `f0dbc0b`; current pull returned already up to date. Exact-thread model/effort reverified Sol medium; watcher rearmed for this task and reaped before completion.
 
+Source fix commit: `bd5306934304b47d89fee6c81c0969872e087169`. `FOLLOWUP-SOURCE.json` passed exact comparison against the primary's closure receipt (three additions, zero removals) and verifies no UI/runtime source changed. `git diff --check` passed. Own `compliance.py` completed under 2 GiB/180 s/nice19/ionice3: native_exit=1, sole machine failure working tree dirty during report/receipt generation; all 36 manual rows are disposed in `FOLLOWUP-COMPLIANCE.md`. Retained limitations: no canonical gates here, initializer unresolved, inherited NRO/profile measurements unverified, and not every initial read-only/git command had the resource wrapper. Watcher PID1437382 reaped; changed-pair marker absent.
+
 ## Init ordering is not implemented
 
 Primary requires initialization after Lua constants ready and before P1 hooks, never in on_frame. Current source has no proven event satisfying both:
