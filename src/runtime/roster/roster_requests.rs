@@ -64,6 +64,8 @@ pub(crate) fn service() {
             }
         }
     }
+    #[cfg(feature = "diag")]
+    crate::runtime::features::tech_spike::service_reference_cpu();
     let dropped = REQUESTS.take_dropped();
     if dropped != 0 {
         crate::engine::compat::logging::diagnostic(format_args!("[CharacterRoster] worker requests dropped={dropped} (a full ring)"));

@@ -1,6 +1,8 @@
 //! S0 direct launcher: retain native post-init residual, add the launch, same callback.
 //! diag-tech-s0.req: direct-v3 | ordinary | walk | off | inspect.
-//! No product mode, heap, blocking lock or new hook.
+//! No product mode or new hook; P1 capture uses try_lock, roster requests reuse its game-thread service.
+#[path = "tech_reference.rs"]
+mod reference;
 use super::tech_spike_guards;
 use crate::model::cpu::hash::lua_bind_hash;
 use crate::model::cpu::role::FrameReceipt;
@@ -8,6 +10,7 @@ use crate::model::tech_launch::{self as math, Vec2};
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::game::{self, natives};
 use crate::runtime::state_natives::{self as state, Vector3f};
+use reference::{Identity as ReferenceIdentity, Tracker as ReferenceTracker};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 
 static REQUEST: AtomicU8 = AtomicU8::new(0);
@@ -17,8 +20,71 @@ static V3_GUARDED: AtomicU8 = AtomicU8::new(0);
 static OBSERVING: AtomicBool = AtomicBool::new(false);
 static NEXT_ATTEMPT: AtomicU32 = AtomicU32::new(1);
 static RUN: hos_lock::Mutex<Spike> = hos_lock::Mutex::new(Spike::new());
+// TR roster table: model/swap/trio.rs (0x15, "Marth"); one body, ordinary forward smash.
+// A separate diag producer uses this mailbox, never the menu's SPSC request ring.
+const REFERENCE_CPU_KIND: u32 = 0x15;
+static REFERENCE_CPU: AtomicU8 = AtomicU8::new(0);
+
+/// Existing MainThread roster service seam, before the diagnostic RUN lock.
+pub(crate) fn service_reference_cpu() {
+    use crate::runtime::roster::character_roster as roster;
+    let phase = REFERENCE_CPU.load(Ordering::Acquire);
+    if phase == 0 || !roster::cpu_reload_ready() {
+        return;
+    }
+    // Same already-guarded native reads as the existing diagnostic frame.
+    let actual = unsafe {
+        if !guarded() {
+            REFERENCE_CPU.store(0, Ordering::Release);
+            diagnostic(format_args!(
+                "[TechDirect] reference_cpu_invalid reason=guards"
+            ));
+            return;
+        }
+        natives::module_accessor(1).and_then(|a| natives::fighter_kind(a))
+    };
+    if phase == 1 && actual != Some(REFERENCE_CPU_KIND as i32) {
+        let accepted = roster::request_cpu_kind(REFERENCE_CPU_KIND);
+        diagnostic(format_args!(
+            "[TechDirect] reference_cpu_accepted kind={REFERENCE_CPU_KIND} accepted={accepted}"
+        ));
+        REFERENCE_CPU.store(if accepted { 2 } else { 0 }, Ordering::Release);
+        if !accepted {
+            diagnostic(format_args!(
+                "[TechDirect] reference_cpu_invalid reason=admission"
+            ));
+        }
+        return;
+    }
+    REFERENCE_CPU.store(0, Ordering::Release);
+    if actual == Some(REFERENCE_CPU_KIND as i32) {
+        diagnostic(format_args!(
+            "[TechDirect] reference_cpu_ready kind={REFERENCE_CPU_KIND} quiescent=true changed={}",
+            phase == 2
+        ));
+    } else {
+        diagnostic(format_args!(
+            "[TechDirect] reference_cpu_invalid reason=completed_wrong_kind actual={actual:?}"
+        ));
+    }
+}
 
 pub fn request(text: &str) {
+    if text == "reference-cpu" {
+        if REFERENCE_CPU
+            .compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+        {
+            diagnostic(format_args!(
+                "[TechDirect] reference_cpu_requested kind={REFERENCE_CPU_KIND}"
+            ));
+        } else {
+            diagnostic(format_args!(
+                "[TechDirect] reference_cpu_invalid reason=pending"
+            ));
+        }
+        return;
+    }
     let command = match text {
         "ordinary" => 1,
         "walk" => 4,
@@ -67,6 +133,10 @@ struct Baseline {
     attempt: u32,
     scope: FrameReceipt,
     complete: bool,
+    capture_age: u32,
+    capture_status: i32,
+    capture_grounded: bool,
+    identity: ReferenceIdentity,
 }
 /// Owned 13.0.5 energy layout and runtime-resolved work keys; no DamageInfo bytes are copied.
 #[derive(Clone, Copy)]
@@ -194,6 +264,26 @@ unsafe fn hidden(accessor: usize) -> Option<Hidden> {
 }
 unsafe fn log_hidden(run: &Spike, accessor: usize, moment: &str) -> Option<Hidden> {
     let h = hidden(accessor)?;
+    log_hidden_snapshot(
+        run,
+        h,
+        moment,
+        run.age,
+        natives::status_kind(accessor),
+        natives::is_grounded(accessor),
+        natives::is_stop(accessor),
+    );
+    Some(h)
+}
+fn log_hidden_snapshot(
+    run: &Spike,
+    h: Hidden,
+    moment: &str,
+    age: u32,
+    status: i32,
+    grounded: bool,
+    stopped: bool,
+) {
     let kind = match run.mode {
         1 => "ordinary",
         _ => "fresh",
@@ -201,21 +291,20 @@ unsafe fn log_hidden(run: &Spike, accessor: usize, moment: &str) -> Option<Hidde
     let (alternate_speed, alternate_frames) = h.alternate.unwrap_or(([0; 2], 0));
     diagnostic(format_args!(
         "[TechDirect] hidden attempt={} mode={} kind={kind} moment={moment} frame={} age={} vptr=0x{:x} vptr_offset=0x{:x} reset={} enabled={} b4={:08x} b8={:04x} ba={:02x} bb={:02x} speed=({:08x},{:08x}) accel=({:08x},{:08x}) brake=({:08x},{:08x}) limit=({:08x},{:08x}) alt_present={} alt_speed=({:08x},{:08x}) alt_frames={} reaction={:08x} reaction_last={:08x} speed_up={} speed_up_max={:08x} fly_air={} end_reaction={} ground={} status={} grounded={}",
-        run.attempt,run.mode_name(),run.sample,run.age,h.vptr,h.vptr.wrapping_sub(game::text_base()),
+        run.attempt,run.mode_name(),run.sample,age,h.vptr,h.vptr.wrapping_sub(game::text_base()),
         h.reset_type,h.enabled,h.counter,h.b8,h.ba,h.bb,
         h.speed[0],h.speed[1],h.accel[0],h.accel[1],h.brake[0],h.brake[1],h.limit[0],h.limit[1],
         h.alternate.is_some(),alternate_speed[0],alternate_speed[1],alternate_frames,
         h.floats[0].to_bits(),h.floats[1].to_bits(),h.flags[0],h.floats[2].to_bits(),
-        h.flags[1],h.flags[2],h.flags[3],natives::status_kind(accessor),natives::is_grounded(accessor)
+        h.flags[1],h.flags[2],h.flags[3],status,grounded
     ));
     let m = h.motion;
     diagnostic(format_args!(
         "[TechDirect] context attempt={} mode={} kind={kind} moment={moment} frame={} age={} motion_actual={:016x} motion_pending={:016x} motion_frame={:08x} motion_rate={:08x} damage_motion_rate={:08x} init_reaction={:08x} rotation={:08x} roll_set_angle={} pierce_ground={} stopped_damage={} stopped={} cursor={} cursor_frame={} paralyze_frame={} paths=fe844/ffd90/fe99c/feb84/fef5c path_execution=UNOBSERVED reset_type={} type5_info_read=UNOBSERVED",
-        run.attempt,run.mode_name(),run.sample,run.age,m.actual,m.pending,m.frame,m.rate,
+        run.attempt,run.mode_name(),run.sample,age,m.actual,m.pending,m.frame,m.rate,
         m.damage_rate,m.init_reaction,m.rotation,m.roll_set_angle,m.pierce_ground,m.stopped_damage,
-        natives::is_stop(accessor),m.cursor,m.cursor_frame,m.paralyze_frame,h.reset_type
+        stopped,m.cursor,m.cursor_frame,m.paralyze_frame,h.reset_type
     ));
-    Some(h)
 }
 struct Spike {
     active: bool,
@@ -233,6 +322,8 @@ struct Spike {
     player_scope: Option<FrameReceipt>,
     input: Input,
     baseline: Option<Baseline>,
+    reference: ReferenceTracker,
+    reference_last: Option<(bool, ReferenceIdentity)>,
 }
 impl Spike {
     const fn new() -> Self {
@@ -252,6 +343,8 @@ impl Spike {
             player_scope: None,
             input: Input::empty(),
             baseline: None,
+            reference: ReferenceTracker::new(),
+            reference_last: None,
         }
     }
     fn mode_name(&self) -> &'static str {
@@ -332,6 +425,8 @@ unsafe fn guarded() -> bool {
         crate::model::sites_pkg4::POSTURE_LR_OFFSET,
         crate::model::sites_pkg4::STOP_IS_STOP_OFFSET,
         crate::model::sites_hitbox::HITBOX_DAMAGE_REACTION_OFFSET,
+        crate::model::sites_hitbox::DAMAGE_RECORD_OFFSET,
+        crate::model::sites_hitbox::DAMAGE_HIT_IDS_OFFSET,
         crate::model::sites_hitbox::HITBOX_ACCESSOR_OFFSET,
         crate::model::sites_hitbox::HITBOX_IS_ATTACK_OFFSET,
         crate::model::sites_hitbox::HITBOX_ATTACK_DATA_OFFSET,
@@ -401,6 +496,40 @@ fn complete_baseline(run: &mut Spike) {
     diagnostic(format_args!("[TechDirect] baseline_complete attempt={} command={} kb={:08x} direction_x={:08x} direction_y={:08x} percent={:08x} weight={:08x} start_x={:08x} start_y={:08x} lr={:08x} ground_at_hit={} hitlag_vx={:08x} hitlag_vy={:08x}",
         baseline.attempt,run.mode,input.kb.to_bits(),input.direction.x.to_bits(),input.direction.y.to_bits(),
         input.percent.to_bits(),input.weight.to_bits(),input.origin.x.to_bits(),input.origin.y.to_bits(),input.lr.to_bits(),baseline.hidden.flags[3],baseline.hitlag_velocity.x.to_bits(),baseline.hitlag_velocity.y.to_bits()));
+}
+
+/// Same guarded record layout as input_display::struck/probe_damage. Raw reads only.
+unsafe fn reference_identity(accessor: usize) -> Option<ReferenceIdentity> {
+    use crate::model::sites_hitbox::damage_record as r;
+    if !v1_guarded() || v1_damage_module(accessor).is_none() {
+        return None;
+    }
+    let pointer = |p: usize| p >= 0x1000 && p & 7 == 0 && p >> 47 == 0;
+    if !pointer(accessor) {
+        return None;
+    }
+    let module = ((accessor + r::MODULE) as *const usize).read();
+    if !pointer(module) {
+        return None;
+    }
+    let record = ((module + r::RECORDS) as *const usize).read();
+    if !pointer(record) {
+        return None;
+    }
+    Some(ReferenceIdentity {
+        attacker: ((record + r::ATTACKER) as *const u32).read(),
+        slot: ((record + r::SLOT) as *const u8).read(),
+        damage: natives::damage(accessor, 0).to_bits(),
+        kb: ((record + 0x10) as *const u32).read(),
+    })
+}
+fn invalid_reference(run: &mut Spike, field: &str) {
+    diagnostic(format_args!(
+        "[TechDirect] reference_invalid attempt={} age={} field={field}",
+        run.attempt, run.age
+    ));
+    run.baseline = None;
+    run.stop();
 }
 
 unsafe fn energy(accessor: usize) -> Option<usize> {
@@ -1013,52 +1142,103 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
     }
     run.age = run.age.saturating_add(1);
     let status = natives::status_kind(accessor);
-    if run.mode == 1 && !run.started && tumble(status) {
-        if natives::is_stop(accessor) && run.baseline.is_none() {
-            if let Some(v) = velocity(accessor) {
-                let speed = (v.x * v.x + v.y * v.y).sqrt();
-                let kb = natives::damage_reaction(accessor);
-                if speed > 0.0 && kb > 0.0 {
-                    run.input = Input {
-                        origin: Vec2 {
-                            x: natives::pos_x(accessor),
-                            y: natives::pos_y(accessor),
-                        },
-                        direction: Vec2 {
-                            x: v.x / speed,
-                            y: v.y / speed,
-                        },
-                        kb,
-                        angle: v.y.atan2(v.x).to_degrees(),
-                        percent: natives::damage(accessor, 0),
-                        weight: natives::weight(accessor),
-                        lr: natives::lr(accessor),
-                    };
-                    let Some(observed) = log_hidden(&run, accessor, "real_hitlag") else {
-                        diagnostic(format_args!("[TechDirect] fault=real_hidden"));
-                        run.stop();
-                        return;
-                    };
-                    run.baseline = Some(Baseline {
-                        input: run.input,
-                        hidden: observed,
-                        hitlag_velocity: v,
-                        attempt: run.attempt,
-                        scope: receipt.unwrap(),
-                        complete: false,
-                    });
-                    setup(&run, accessor);
-                }
-            }
+    if run.mode == 1 && !run.started && (tumble(status) || run.baseline.is_some()) {
+        if natives::module_accessor(1).and_then(|a| natives::fighter_kind(a))
+            != Some(REFERENCE_CPU_KIND as i32)
+        {
+            invalid_reference(&mut run, "cpu_kind");
+            return;
         }
-        if !natives::is_stop(accessor) {
-            if run.baseline.is_none() {
-                diagnostic(format_args!(
-                    "[TechDirect] fault=no_stopped_launch_snapshot"
-                ));
-                run.stop();
+        let Some(record) = reference_identity(accessor) else {
+            invalid_reference(&mut run, "record_unreadable");
+            return;
+        };
+        let stopped = natives::is_stop(accessor);
+        if run.reference_last != Some((stopped, record)) {
+            diagnostic(format_args!("[TechDirect] reference_record attempt={} age={} stopped={stopped} attacker={:08x} slot={} damage={:08x} kb={:08x}",
+                run.attempt, run.age, record.attacker, record.slot, record.damage, record.kb));
+            run.reference_last = Some((stopped, record));
+        }
+        if stopped {
+            let identity = match run.reference.stopped(record) {
+                Ok(value) => value,
+                Err(reason) => {
+                    invalid_reference(&mut run, reason.field());
+                    return;
+                }
+            };
+            let Some(v) = velocity(accessor) else {
+                invalid_reference(&mut run, "velocity_unreadable");
+                return;
+            };
+            let speed = (v.x * v.x + v.y * v.y).sqrt();
+            if !speed.is_finite() || speed <= 0.0 || !f32::from_bits(identity.damage).is_finite() {
+                invalid_reference(&mut run, "launch_values");
                 return;
             }
+            run.input = Input {
+                origin: Vec2 {
+                    x: natives::pos_x(accessor),
+                    y: natives::pos_y(accessor),
+                },
+                direction: Vec2 {
+                    x: v.x / speed,
+                    y: v.y / speed,
+                },
+                kb: f32::from_bits(identity.kb),
+                angle: v.y.atan2(v.x).to_degrees(),
+                percent: f32::from_bits(identity.damage),
+                weight: natives::weight(accessor),
+                lr: natives::lr(accessor),
+            };
+            let Some(observed) = hidden(accessor) else {
+                invalid_reference(&mut run, "hidden_unreadable");
+                return;
+            };
+            // Refresh every stopped callback, including after native record KB clears.
+            // Emit only the selected final snapshot at the first non-stop boundary.
+            run.baseline = Some(Baseline {
+                input: run.input,
+                hidden: observed,
+                hitlag_velocity: v,
+                attempt: run.attempt,
+                scope: receipt.unwrap(),
+                complete: false,
+                capture_age: run.age,
+                capture_status: status,
+                capture_grounded: natives::is_grounded(accessor),
+                identity,
+            });
+        } else {
+            let Some(baseline) = run.baseline else {
+                invalid_reference(&mut run, "no_stopped_launch_snapshot");
+                return;
+            };
+            if !tumble(status) {
+                invalid_reference(&mut run, "status");
+                return;
+            }
+            if let Err(reason) = run.reference.validate(record) {
+                invalid_reference(&mut run, reason.field());
+                return;
+            }
+            if baseline.capture_age.checked_add(1) != Some(run.age) {
+                invalid_reference(&mut run, "nonadjacent_snapshot");
+                return;
+            }
+            let i = baseline.identity;
+            diagnostic(format_args!("[TechDirect] reference_final attempt={} capture_age={} k0_age={} attacker={:08x} slot={} damage={:08x} kb={:08x} record_kb={:08x} valid=true",
+                run.attempt, baseline.capture_age, run.age, i.attacker, i.slot, i.damage, i.kb, record.kb));
+            log_hidden_snapshot(
+                &run,
+                baseline.hidden,
+                "real_hitlag",
+                baseline.capture_age,
+                baseline.capture_status,
+                baseline.capture_grounded,
+                true,
+            );
+            setup(&run, accessor);
             run.started = true;
         }
     }
