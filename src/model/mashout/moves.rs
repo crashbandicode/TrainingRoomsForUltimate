@@ -1,8 +1,7 @@
 //! Move selection uses the existing roster and menu indices; initialized native records supply the mechanics.
 use crate::model::settings::Snapshot;
 
-#[path = "../swap/choices.rs"]
-mod choices;
+use crate::model::fighter_choices as choices;
 pub const ATTACKERS: &[(u32, &str)] = choices::CHOICES;
 pub const ROW: &str = "mashout";
 pub const STATE_ROW: &str = "mashout_state";

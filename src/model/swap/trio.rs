@@ -8,9 +8,7 @@ pub(crate) const PRE_MII_CHOICE_COUNT: usize = 86;
 pub(crate) const MII_ALPHA_CHOICE_COUNT: usize = 87; // Existing Sword-only envelope.
 pub(crate) const MII_CLASSES_CHOICE_COUNT: usize = 89;
 
-#[path = "choices.rs"]
-mod choices;
-pub(crate) use choices::CHOICES;
+pub(crate) use crate::model::fighter_choices::CHOICES;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TrioFighter(u32);

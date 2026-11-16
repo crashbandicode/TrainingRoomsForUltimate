@@ -107,6 +107,8 @@ pub mod recording_menu;
 pub mod ordered_ids;
 #[path = "model/pause_helper.rs"]
 pub mod pause_helper;
+#[path = "model/swap/choices.rs"]
+pub(crate) mod fighter_choices;
 #[path = "model/mashout.rs"]
 pub mod mashout;
 #[path = "model/practice_games.rs"]
