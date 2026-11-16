@@ -307,7 +307,10 @@ fn notice(run: &Practice, text: Option<&str>) {
 /// P1 post-native pass. The caller supplies the live fighter; no pointer survives
 /// this call. Ice Climbers' secondary body is excluded by the native partner id.
 pub unsafe fn frame(fighter: usize) {
-    if !super::tech_adapter::tech_ready() || !super::cpu::TECH_INIT.ready() || TUMBLE_IDS.get().is_none() {
+    if !super::tech_adapter::tech_ready() {
+        return;
+    }
+    if !super::cpu::TECH_INIT.ready() || TUMBLE_IDS.get().is_none() {
         return;
     }
     let facts = scene::facts();
