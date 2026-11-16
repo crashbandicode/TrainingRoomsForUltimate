@@ -49,6 +49,13 @@ static CPU: Mutex<Option<Cpu>> = Mutex::new(None);
 
 // The few resolved constants a hook compares before it takes the lock.
 static CONSTS_READY: AtomicBool = AtomicBool::new(false);
+/// Separate from capability admission: enabled only after non-hook UI initialization.
+pub(super) static TECH_INIT: crate::model::cpu::tech_init::Init = crate::model::cpu::tech_init::Init::new();
+
+/// Existing heartbeat callback: no native lookup and no wait for game readiness.
+pub fn service_tech_init() {
+    TECH_INIT.service(|ids| unsafe { super::tech::init(ids) });
+}
 static CONST_ATTEMPTS: AtomicU32 = AtomicU32::new(0);
 /// Every game constant the hooks read, by `C`: filled by `ensure_consts`, `UNRESOLVED` until then.
 static CONSTS: [AtomicI32; ids::COUNT] = [const { AtomicI32::new(UNRESOLVED) }; ids::COUNT];
@@ -443,6 +450,7 @@ fn ensure_consts() -> bool {
             diagnostic(format_args!("[TrainingRooms] cpu_ids {}", line.as_str()));
         }
     }
+    TECH_INIT.publish(&table);
     with(|cpu| cpu.ids = table);
     CONSTS_READY.store(true, Ordering::Release);
     true

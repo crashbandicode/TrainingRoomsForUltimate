@@ -52,6 +52,9 @@ fn run_inner() {
     diag_log::set_tick(crate::runtime::seams::seam_install::report_late);
     // The CPU-as-P1 fallback's file work (its request.json read and its receipts): on the heartbeat, never in its hooks.
     diag_log::set_tick(p1::service);
+    if !diag_log::set_tick(cpu::service_tech_init) {
+        diagnostic(format_args!("[TrainingRooms] Tech unavailable: heartbeat capacity"));
+    }
     diag_log::start_drain_thread();
 
     // 1. The version guard: nothing else runs on another game.

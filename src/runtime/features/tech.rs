@@ -250,25 +250,15 @@ pub fn look(active: bool) -> [Option<([f32; 2], EggLook)>; LOOKS] {
     }
     out
 }
-/// Resolve Lua constants during plugin initialization, before installing the P1 hook.
+/// Initialize from the CPU resolver's complete status array, in `tech_init::STATUS_IDS` order.
 /// # Safety
-/// The game's Lua constant table is initialized; this must never run from a hook.
-pub unsafe fn init() -> Option<()> {
-    if !tech_surfaces::init() {
+/// Only the non-hook heartbeat may call this, after guarded game-table resolution.
+pub unsafe fn init(ids: [i32; 7]) -> Option<()> {
+    if ids.contains(&crate::model::cpu::ids::UNRESOLVED) {
         return None;
     }
-    let names = [
-        "FIGHTER_STATUS_KIND_DAMAGE_FLY",
-        "FIGHTER_STATUS_KIND_DAMAGE_FLY_ROLL",
-        "FIGHTER_STATUS_KIND_DAMAGE_FLY_METEOR",
-        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_D",
-        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_U",
-        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_LR",
-        "FIGHTER_STATUS_KIND_DAMAGE_FALL",
-    ];
-    let mut ids = [0; 7];
-    for (slot, name) in ids.iter_mut().zip(names) {
-        *slot = super::tech_native::id(name)?;
+    if !tech_surfaces::init() {
+        return None;
     }
     TUMBLE_IDS.set(ids).ok()
 }
@@ -317,7 +307,7 @@ fn notice(run: &Practice, text: Option<&str>) {
 /// P1 post-native pass. The caller supplies the live fighter; no pointer survives
 /// this call. Ice Climbers' secondary body is excluded by the native partner id.
 pub unsafe fn frame(fighter: usize) {
-    if !super::tech_adapter::tech_ready() || TUMBLE_IDS.get().is_none() {
+    if !super::tech_adapter::tech_ready() || !super::cpu::TECH_INIT.ready() || TUMBLE_IDS.get().is_none() {
         return;
     }
     let facts = scene::facts();

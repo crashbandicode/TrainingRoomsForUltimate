@@ -393,6 +393,53 @@ fn tech_receipt_busy_preserves_the_current_owned_generation() {
     assert!(!state.lock().as_ref().unwrap().roles.current(receipt));
 }
 
+#[test]
+fn tech_init_waits_for_all_seven_resolved_ids_and_success() {
+    use model::cpu::tech_init::{Init, STATUS_IDS};
+    let init = Init::new();
+    init.service(|_| panic!("no initializer before resolution"));
+    assert!(!init.ready());
+    let pairs: Vec<_> = STATUS_IDS.iter().enumerate().map(|(i, &c)| (c, 100 + i as i32)).collect();
+    for missing in 0..7 {
+        let partial: Vec<_> = pairs.iter().enumerate().filter(|(i, _)| *i != missing).map(|(_, &p)| p).collect();
+        assert!(!init.publish(&Table::with(&partial)));
+        init.service(|_| panic!("partial status array must remain unavailable"));
+        assert!(!init.ready());
+    }
+    assert!(init.publish(&Table::with(&pairs)));
+    init.service(|ids| { assert_eq!(ids, [100, 101, 102, 103, 104, 105, 106]); Some(()) });
+    assert!(init.ready());
+    init.service(|_| panic!("initializer must run only once"));
+    let failed = Init::new();
+    assert!(failed.publish(&Table::with(&pairs)));
+    failed.service(|_| None);
+    assert!(!failed.ready());
+    failed.service(|_| panic!("failed initialization must remain unavailable"));
+}
+
+#[test]
+fn tech_init_uses_resolved_ids_on_the_existing_nonhook_heartbeat() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let cpu = std::fs::read_to_string(root.join("features/cpu.rs")).unwrap();
+    let boot = std::fs::read_to_string(root.join("boot.rs")).unwrap();
+    let drain = std::fs::read_to_string(root.join("diag_log.rs")).unwrap();
+    let tech = std::fs::read_to_string(root.join("features/tech.rs")).unwrap();
+    let service = &cpu[cpu.find("pub fn service_tech_init()").unwrap()..cpu.find("static CONST_ATTEMPTS").unwrap()];
+    assert!(service.contains("TECH_INIT.service(|ids| unsafe { super::tech::init(ids) })"));
+    assert!(!service.contains("lua_const") && !service.contains("tech_native::id"));
+    assert!(cpu.contains("TECH_INIT.publish(&table);"));
+    assert!(boot.find("set_tick(cpu::service_tech_init)").unwrap() < boot.find("diag_log::start_drain_thread()").unwrap());
+    assert!(drain.contains("OnceLock<fn()>; 4]"));
+    assert_eq!(boot.matches("diag_log::set_tick(").count(), 3);
+    assert!(drain.contains("threads::spawn(crate::model::thread_stacks::ThreadId::Heartbeat"));
+    assert!(drain.contains("for tick in TICKS.iter().filter_map(|slot| slot.get()) {\n                tick();"));
+    let init = &tech[tech.find("pub unsafe fn init(ids: [i32; 7])").unwrap()..tech.find("unsafe fn still_tumbling").unwrap()];
+    assert!(!init.contains("tech_native::id") && !init.contains("lua_const"));
+    let frame = &tech[tech.find("pub unsafe fn frame(fighter").unwrap()..];
+    assert!(frame.find("!super::cpu::TECH_INIT.ready()").unwrap() < frame.find("VIEW.try_lock()").unwrap());
+    assert!(frame.contains("TUMBLE_IDS.get().is_none()"));
+}
+
 /// B4: under the P1 pilot the CPU settings can never write entry 0. The role table is the one place a
 /// body becomes a CPU role (every consumer resolves bodies through it), and `set` refuses entry 0 even
 /// with a current receipt and an AI-operated scene — so nothing downstream can resolve or write it.
