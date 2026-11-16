@@ -203,16 +203,86 @@ fn relative_pointer(owned: &common::OwnedMain, slot: usize) -> usize {
 mod info_guards;
 #[test]
 fn damage_info_fields_match_owned_lua_reader_mapping() {
-    let Some(owned) = common::owned_main("damage_info_fields_match_owned_lua_reader_mapping") else { return; };
+    let Some(owned) = common::owned_main("damage_info_fields_match_owned_lua_reader_mapping")
+    else {
+        return;
+    };
     for &(name, address, expected) in info_guards::DAMAGE_INFO_LAYOUT_GUARDS {
         assert_eq!(expected, owned.window(address), "{name}: all64 owned bytes");
     }
     // Native Lua hash dispatch loads from Info x20. Pin opcode, destination and offset.
-    for (address, instruction) in [(0x227f1c4,0xb9800a88u32), (0x227f2d0,0xbd401280), (0x227f0a8,0xbd401680), (0x227f2c0,0xb9404288)] {
-        let bytes=owned.window(address);
-        assert_eq!(u32::from_le_bytes(bytes[..4].try_into().unwrap()),instruction,"mapping instruction {address:x}");
+    for (address, instruction) in [
+        (0x227f1c4, 0xb9800a88u32),
+        (0x227f2d0, 0xbd401280),
+        (0x227f0a8, 0xbd401680),
+        (0x227f2c0, 0xb9404288),
+    ] {
+        let bytes = owned.window(address);
+        assert_eq!(
+            u32::from_le_bytes(bytes[..4].try_into().unwrap()),
+            instruction,
+            "mapping instruction {address:x}"
+        );
     }
-    let bytes=owned.window(0x3ffdc0);
-    assert_eq!(u32::from_le_bytes(bytes[..4].try_into().unwrap()),0x91020000,"Info is inline DamageModule+0x80");
-    assert_eq!(u32::from_le_bytes(bytes[4..8].try_into().unwrap()),0xd65f03c0);
+    let bytes = owned.window(0x3ffdc0);
+    assert_eq!(
+        u32::from_le_bytes(bytes[..4].try_into().unwrap()),
+        0x91020000,
+        "Info is inline DamageModule+0x80"
+    );
+    assert_eq!(
+        u32::from_le_bytes(bytes[4..8].try_into().unwrap()),
+        0xd65f03c0
+    );
+}
+#[path = "../src/runtime/features/tech_stop_guards.rs"]
+mod stop_guards;
+#[test]
+fn damage_stop_guards_match_owned_export_and_concrete_body() {
+    let Some(owned) = common::owned_main("damage_stop_guards_match_owned_export_and_concrete_body")
+    else {
+        return;
+    };
+    for &(address, expected) in stop_guards::STOP_GUARDS {
+        assert_eq!(expected, owned.window(address), "stop guard {address:x}");
+    }
+    let export = owned.window(0x2089260);
+    assert_eq!(native_module_offset(&export), 0x90);
+    assert_eq!(
+        u32::from_le_bytes(export[8..12].try_into().unwrap()),
+        0xf9406903,
+        "export dispatches slot0xd0 into x3"
+    );
+    assert_eq!(
+        u32::from_le_bytes(export[12..16].try_into().unwrap()),
+        0x12000042,
+        "bool argument is w2 bit0"
+    );
+    let setter = owned.window(0x4df690);
+    assert_eq!(
+        u32::from_le_bytes(setter[24..28].try_into().unwrap()),
+        0x3900f808,
+        "concrete setter stores bool at Stop+0x3e"
+    );
+}
+#[test]
+fn info_launch_has_no_post_init_energy_rewrite_or_lr_clear() {
+    let source = include_str!("../src/runtime/features/tech_spike.rs");
+    let launch = source
+        .split("unsafe fn launch(run:")
+        .nth(1)
+        .unwrap()
+        .split("/// Existing common hook")
+        .next()
+        .unwrap();
+    assert!(!launch.contains("write_speed("));
+    assert!(!launch.contains("0x20f8320"));
+    assert!(!launch.contains("0x20f6560"));
+    assert!(!launch.contains("set_float(accessor, 0.0, reserve_key)"));
+    assert!(launch
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>()
+        .contains("set_stop(accessor,frames,true)"));
+    assert!(launch.contains("fixed9_fixture"));
 }

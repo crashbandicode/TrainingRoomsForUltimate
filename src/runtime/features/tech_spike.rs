@@ -1,4 +1,4 @@
-//! S0 direct launcher: retain native post-init residual, add the launch, same callback.
+//! S0 direct launcher: seed Info, then let native init and damage-stop release launch P1.
 //! diag-tech-s0.req: direct-v3 | ordinary | walk | off | inspect.
 //! No product mode or new hook; P1 capture uses try_lock, roster requests reuse its game-thread service.
 #[path = "tech_reference.rs"]
@@ -7,6 +7,10 @@ mod reference;
 mod info_seed;
 #[path = "tech_info_guards.rs"]
 mod info_guards;
+#[path = "tech_stop_guards.rs"]
+mod stop_guards;
+#[path = "tech_stop_span.rs"]
+mod stop_span;
 use super::tech_spike_guards;
 use crate::model::cpu::hash::lua_bind_hash;
 use crate::model::cpu::role::FrameReceipt;
@@ -21,6 +25,7 @@ static REQUEST: AtomicU8 = AtomicU8::new(0);
 static GUARDED: AtomicU8 = AtomicU8::new(0);
 static V1_GUARDED: AtomicU8 = AtomicU8::new(0);
 static V3_GUARDED: AtomicU8 = AtomicU8::new(0);
+static STOP_GUARDED: AtomicU8 = AtomicU8::new(0);
 static INFO_GUARDED: AtomicU8 = AtomicU8::new(0);
 static OBSERVING: AtomicBool = AtomicBool::new(false);
 static NEXT_ATTEMPT: AtomicU32 = AtomicU32::new(1);
@@ -141,6 +146,7 @@ struct Baseline {
     scope: FrameReceipt,
     complete: bool,
     capture_age: u32,
+    stop_frames: u32,
     capture_status: i32,
     capture_grounded: bool,
     identity: ReferenceIdentity,
@@ -357,6 +363,8 @@ struct Spike {
     baseline: Option<Baseline>,
     reference: ReferenceTracker,
     reference_last: Option<(bool, ReferenceIdentity)>,
+    stopped_span: stop_span::Span,
+    stop_released: bool,
 }
 impl Spike {
     const fn new() -> Self {
@@ -378,6 +386,8 @@ impl Spike {
             baseline: None,
             reference: ReferenceTracker::new(),
             reference_last: None,
+            stopped_span: stop_span::Span::new(),
+            stop_released: false,
         }
     }
     fn ordinary(&self) -> bool {
@@ -739,73 +749,49 @@ unsafe fn native_direction(degrees: f32) -> Option<(Vec2, f32)> {
     (v.x.is_finite() && v.y.is_finite()).then_some((v, radians))
 }
 struct LaunchVector {
-    residual: Vec2,
-    component: Vec2,
-    wanted: Vec2,
     magnitude: f32,
-    radians: f32,
     direction: Vec2,
-    matched: bool,
 }
-unsafe fn launch_vector(run: &Spike, residual: Vec2) -> Option<LaunchVector> {
-    let (direction, radians) = native_direction(run.input.angle)?;
-    // The helper consumes w2/w3 and s0/s1/s2. Separate AAPCS integer/FP banks need
-    // two unused integer placeholders. Angle id0 selects the ordinary multiplier,
-    // excluding its361/367 special paths; the chosen direction is applied below.
+unsafe fn launch_vector(run: &Spike) -> Option<LaunchVector> {
+    let (direction, _) = native_direction(run.input.angle)?;
+    // Separate AAPCS integer/FP banks; angle id0 excludes361/367 special cases.
     let speed: extern "C" fn(usize, usize, i32, i32, f32, f32, f32) -> f32 =
         std::mem::transmute(game::text_base() + 0x403a20);
     let magnitude = speed(0, 0, 0, 0, run.input.kb, 0.0, 0.0);
-    if !magnitude.is_finite() || magnitude < 0.0 {
+    (magnitude.is_finite() && magnitude >= 0.0).then_some(LaunchVector { magnitude, direction })
+}
+/// Only the concrete Fighter StopModule is accepted. Raw observations add no game call.
+unsafe fn stop_module(accessor: usize) -> Option<usize> {
+    let base = game::text_base();
+    if STOP_GUARDED.load(Ordering::Acquire) == 0 {
+        let mut ok = base != 0;
+        if ok {
+            for &(offset, expected) in stop_guards::STOP_GUARDS {
+                let equal = std::slice::from_raw_parts((base + offset) as *const u8, 64) == expected;
+                diagnostic(format_args!("[TechDirect] stop_guard offset={offset:x} ok={equal}"));
+                ok &= equal;
+            }
+        }
+        STOP_GUARDED.store(if ok { 1 } else { 2 }, Ordering::Release);
+    }
+    if STOP_GUARDED.load(Ordering::Acquire) != 1
+        || accessor < 0x1000 || accessor & 7 != 0 || accessor >> 47 != 0 {
         return None;
     }
-    let baseline = run.baseline.filter(|b| b.complete);
-    // Only the matched diagnostic imports a real-hit vector. Cold/product inputs
-    // use the native magnitude and trig, without a hardcoded speed multiplier.
-    let component = baseline.map_or(
-        Vec2 {
-            x: magnitude * direction.x,
-            y: magnitude * direction.y,
-        },
-        |b| Vec2 {
-            x: b.hitlag_velocity.x - residual.x,
-            y: b.hitlag_velocity.y - residual.y,
-        },
-    );
-    let wanted = Vec2 {
-        x: residual.x + component.x,
-        y: residual.y + component.y,
-    };
-    (wanted.x.is_finite() && wanted.y.is_finite()).then_some(LaunchVector {
-        residual,
-        component,
-        wanted,
-        magnitude,
-        radians,
-        direction,
-        matched: baseline.is_some(),
-    })
+    let module = ((accessor + 0x90) as *const usize).read();
+    if module < 0x1000 || module & 7 != 0 || module >> 47 != 0 { return None; }
+    let vptr = (module as *const usize).read();
+    if vptr != base + 0x4f8a0e0 { return None; }
+    for (slot, target) in [(0xd0,0x4df690),(0xc0,0x6ebb20),(0x100,0x6ebd50)] {
+        if ((vptr + slot) as *const usize).read() != base + target { return None; }
+    }
+    Some(module)
 }
-unsafe fn write_speed(run: &Spike, accessor: usize, vector: &LaunchVector) -> Option<()> {
-    let damage = energy(accessor)?;
-    let wanted = vector.wanted;
-    diagnostic(format_args!("[TechDirect] residual_launch attempt={} command={} age={} baseline_attempt={} source={} r_vx={:08x} r_vy={:08x} magnitude={:08x} angle={:08x} radians={:08x} direction_x={:08x} direction_y={:08x} launch_vx={:08x} launch_vy={:08x} wanted_vx={:08x} wanted_vy={:08x}",
-        run.attempt,run.mode,run.age,run.baseline.map_or(0,|b|b.attempt),if vector.matched {"baseline_vector"} else {"native_formula"},
-        vector.residual.x.to_bits(),vector.residual.y.to_bits(),vector.magnitude.to_bits(),run.input.angle.to_bits(),vector.radians.to_bits(),vector.direction.x.to_bits(),vector.direction.y.to_bits(),vector.component.x.to_bits(),vector.component.y.to_bits(),wanted.x.to_bits(),wanted.y.to_bits()));
-    #[repr(C, align(16))]
-    struct NativeVector([f32; 4]);
-    let set: extern "C" fn(usize, *const NativeVector) =
-        std::mem::transmute(game::text_base() + 0x20f8320);
-    let enable: extern "C" fn(usize) = std::mem::transmute(game::text_base() + 0x20f6560);
-    set(damage, &NativeVector([wanted.x, wanted.y, 0.0, 0.0]));
-    enable(damage);
-    log_hidden(run, accessor, "post_init_write")?;
-    let actual = velocity(accessor);
-    diagnostic(format_args!(
-        "[TechDirect] speed_write attempt={} command={} age={} timing=same_callback",
-        run.attempt, run.mode, run.age
-    ));
-    diagnostic(format_args!("[TechDirect] post_init_speed attempt={} age={} before_vx={:08x} before_vy={:08x} vx={:08x} vy={:08x} requested_vx={:08x} requested_vy={:08x}",
-        run.attempt,run.age,vector.residual.x.to_bits(),vector.residual.y.to_bits(),actual.map_or(u32::MAX,|v|v.x.to_bits()),actual.map_or(u32::MAX,|v|v.y.to_bits()),wanted.x.to_bits(),wanted.y.to_bits()));
+unsafe fn log_stop(run: &Spike, accessor: usize, moment: &str) -> Option<()> {
+    let module = stop_module(accessor)?;
+    diagnostic(format_args!("[TechDirect] stop_state attempt={} mode={} moment={moment} age={} frames={} stopped={} damage_stop={} observed={}",
+        run.attempt,run.mode_name(),run.age,((module+0x10) as *const i32).read(),
+        natives::is_stop(accessor),((module+0x3e) as *const u8).read()!=0,run.stopped_span.count()));
     Some(())
 }
 /// Mapping guards supplement the typed DamageModule slot guard; no new native call.
@@ -836,7 +822,7 @@ unsafe fn seed_info(run: &Spike, accessor: usize) -> Option<()> {
     let seed = if let Some(baseline) = baseline {
         info_seed::Seed::from_info(&baseline.damage_info)
     } else {
-        let vector = launch_vector(run, Vec2 { x: 0.0, y: 0.0 })?;
+        let vector = launch_vector(run)?;
         info_seed::Seed::derived(heights[1], vector.magnitude, [vector.direction.x, vector.direction.y], run.input.angle)
     };
     if !seed.valid(heights) { return None; }
@@ -851,7 +837,7 @@ unsafe fn seed_info(run: &Spike, accessor: usize) -> Option<()> {
     Some(())
 }
 unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
-    if !v1_guarded() || !v3_guarded() {
+    if !v1_guarded() || !v3_guarded() || stop_module(accessor).is_none() {
         return None;
     }
     let input = run.input;
@@ -904,9 +890,8 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
     let damage_fly = id("FIGHTER_STATUS_KIND_DAMAGE_FLY")?;
     let reserve_key = id("FIGHTER_STATUS_WORK_ID_FLOAT_RESERVE_DAMAGE_LR")?;
     natives::change_status_force(accessor, damage_fly, false);
-    natives::set_float(accessor, 0.0, reserve_key);
     diagnostic(format_args!(
-        "[TechDirect] reserve_lr_consumed attempt={} command={} seeded={} actual={:08x} motion={:016x} after_status=true",
+        "[TechDirect] reserve_lr_after_init attempt={} command={} seeded={} actual={:08x} motion={:016x} after_status=true",
         run.attempt, run.mode, reserve.is_some(),
         natives::get_float(accessor, reserve_key).to_bits(), natives::motion_kind(accessor)
     ));
@@ -920,14 +905,35 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
     log_hidden(run, accessor, "cold_launch")?;
     log_damage_info(run, "cold_launch", run.age, &damage_info(accessor)?);
     let actual = velocity(accessor)?;
-    let vector = launch_vector(run, actual)?;
-    let wanted = vector.wanted;
+    let baseline = run.baseline.filter(|b| b.complete);
+    let equal = baseline.map(|b| actual.x.to_bits() == b.hitlag_velocity.x.to_bits()
+        && actual.y.to_bits() == b.hitlag_velocity.y.to_bits());
+    diagnostic(format_args!("[TechDirect] native_init_speed attempt={} command={} age={} baseline_attempt={} r_vx={:08x} r_vy={:08x} matched_equal={} mutation=none",
+        run.attempt,run.mode,run.age,baseline.map_or(0,|b|b.attempt),actual.x.to_bits(),actual.y.to_bits(),
+        equal.map_or("not_applicable",|v|if v {"true"}else{"false"})));
+    if equal == Some(false) { return None; }
+    let action_key = id("FIGHTER_STATUS_DAMAGE_WORK_INT_STOP_RELEASE_ACTION")?;
+    let action = if baseline.is_some_and(|b| b.capture_grounded) {
+        let value = id("FIGHTER_STATUS_DAMAGE_STOP_RELEASE_ACTION_GROUND_TO_AIR")?;
+        natives::set_int(accessor,value,action_key);
+        Some(value)
+    } else { None };
+    diagnostic(format_args!("[TechDirect] release_action attempt={} command={} written={} value={} readback={}",
+        run.attempt,run.mode,action.is_some(),action.unwrap_or(-1),natives::get_int(accessor,action_key)));
+    let frames = baseline.map_or(Some(9), |b| i32::try_from(b.stop_frames).ok()).filter(|n|*n>0)?;
+    let set_stop: extern "C" fn(usize, i32, bool) = std::mem::transmute(game::text_base()+0x2089260);
+    set_stop(accessor,frames,true);
+    diagnostic(format_args!("[TechDirect] native_stop attempt={} command={} age={} frames={frames} damage=true source={} c0_stop={} product_native_hitlag=OUTSTANDING",
+        run.attempt,run.mode,run.age,if baseline.is_some() {"same_boot_reference"}else{"diag_fixture"},
+        if baseline.is_some() {"not_applicable"}else{"fixed9_fixture"}));
+    if !natives::is_stop(accessor) { return None; }
+    run.stopped_span.observe(run.age)?;
+    log_stop(run,accessor,"armed")?;
     diagnostic(format_args!(
         "[TechDirect] launched attempt={} mode=direct vx={:08x} vy={:08x} reaction={:08x} age={} requested_vx={:08x} requested_vy={:08x} requested_reaction={:08x}",
-        run.attempt, actual.x.to_bits(), actual.y.to_bits(), reaction(accessor)?.to_bits(), run.age,
-        wanted.x.to_bits(), wanted.y.to_bits(), native_reaction.to_bits()
+        run.attempt,actual.x.to_bits(),actual.y.to_bits(),reaction(accessor)?.to_bits(),run.age,
+        actual.x.to_bits(),actual.y.to_bits(),native_reaction.to_bits()
     ));
-    write_speed(run, accessor, &vector)?;
     run.started = true;
     run.phase = 2;
     Some(())
@@ -1357,6 +1363,9 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             run.reference_last = Some((stopped, record));
         }
         if stopped {
+            if run.stopped_span.observe(run.age).is_none() || log_stop(&run,accessor,"reference").is_none() {
+                invalid_reference(&mut run,"stop_interval"); return;
+            }
             let identity = match run.reference.stopped(record) {
                 Ok(value) => value,
                 Err(reason) => {
@@ -1406,6 +1415,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
                 scope: receipt.unwrap(),
                 complete: false,
                 capture_age: run.age,
+                stop_frames: run.stopped_span.count(),
                 capture_status: status,
                 capture_grounded: natives::is_grounded(accessor),
                 identity,
@@ -1428,6 +1438,8 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
                 invalid_reference(&mut run, "nonadjacent_snapshot");
                 return;
             }
+            diagnostic(format_args!("[TechDirect] reference_stop attempt={} frames={} first_age={} final_age={} k0_age={}",
+                run.attempt,baseline.stop_frames,run.stopped_span.first().unwrap(),baseline.capture_age,run.age));
             let i = baseline.identity;
             diagnostic(format_args!("[TechDirect] reference_final attempt={} capture_age={} k0_age={} attacker={:08x} slot={} damage={:08x} kb={:08x} record_kb={:08x} valid=true",
                 run.attempt, baseline.capture_age, run.age, i.attacker, i.slot, i.damage, i.kb, record.kb));
@@ -1481,6 +1493,27 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
         }
     }
     if run.started && !just_launched {
+        if !run.ordinary() && !run.stop_released {
+            if natives::is_stop(accessor) {
+                if run.stopped_span.observe(run.age).is_none() || log_stop(&run,accessor,"stopped").is_none() {
+                    diagnostic(format_args!("[TechDirect] fault=stop_interval")); run.stop();
+                }
+                return;
+            }
+            if log_stop(&run,accessor,"released").is_none() {
+                diagnostic(format_args!("[TechDirect] fault=stop_release_read")); run.stop(); return;
+            }
+            let (Some(release_lr),Some(release_action)) = (
+                id("FIGHTER_STATUS_WORK_ID_FLOAT_RESERVE_DAMAGE_LR"),
+                id("FIGHTER_STATUS_DAMAGE_WORK_INT_STOP_RELEASE_ACTION")) else {
+                diagnostic(format_args!("[TechDirect] fault=stop_release_keys")); run.stop(); return;
+            };
+            diagnostic(format_args!("[TechDirect] stop_release attempt={} command={} age={} observed={} reserve_damage_lr={:08x} motion={:016x} action={}",
+                run.attempt,run.mode,run.age,run.stopped_span.count(),
+                natives::get_float(accessor,release_lr).to_bits(),
+                natives::motion_kind(accessor),natives::get_int(accessor,release_action)));
+            run.stop_released = true;
+        }
         let (Some(v), Some(reaction)) = (velocity(accessor), reaction(accessor)) else {
             diagnostic(format_args!("[TechDirect] fault=frame_read"));
             run.stop();
