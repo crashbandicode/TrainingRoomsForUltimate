@@ -47,12 +47,18 @@ fn actual_runtime_reload_waits_without_weakening_active_attempt_identity() {
         "if matches!(game.step, Step::Held | Step::Entering | Step::Result)",
     );
     let reload = block(source, "Step::Reload => {");
+    let choose = block(source, "if kind != request.attacker_kind {");
+    let restore = block(source, "Step::Restore => {");
+    let end = block(source, "fn end_practice(&mut self) {");
     assert!(source.find(missing).unwrap() < source.find(identity).unwrap());
     assert!(source.find(identity).unwrap() < source.find("SEEDS.drain(").unwrap());
     let fixture = FIXTURE
         .replace("// MISSING", &format!("{missing};"))
         .replace("// IDENTITY", identity)
-        .replace("// RELOAD", reload);
+        .replace("// RELOAD", reload)
+        .replace("// CHOOSE", choose)
+        .replace("// RESTORE", restore)
+        .replace("// END_PRACTICE", end);
     let unique = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -87,6 +93,7 @@ fn actual_runtime_reload_waits_without_weakening_active_attempt_identity() {
         .args(["--test-threads=1", "--nocapture"])
         .output()
         .unwrap();
+    print!("{}", String::from_utf8_lossy(&run.stdout));
     assert!(
         run.status.success(),
         "actual runtime regression failed:\n{}\n{}",

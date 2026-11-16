@@ -370,8 +370,8 @@ pub unsafe fn frame(fighter: usize) {
         revoke();
         OWN_CPU.store(0, Ordering::Release);
         // Our loader removes the old body before publishing its replacement.
-        // Reload is still setup: keep inputs revoked and wait for the real body.
-        if game.generation != 0 && game.step != Step::Reload {
+        // Setup and restore wait with inputs revoked until the real body returns.
+        if game.generation != 0 && !matches!(game.step, Step::Reload | Step::Restore) {
             game.fail("Practice CPU changed · no grade");
         }
         return;
@@ -533,9 +533,12 @@ pub unsafe fn frame(fighter: usize) {
             if kind != request.attacker_kind {
                 if crate::runtime::roster::character_roster::cpu_reload_ready() {
                     TEMP_KIND.store(request.attacker_kind, Ordering::Release);
-                    crate::runtime::roster::character_roster::request_cpu_kind(
+                    if !crate::runtime::roster::character_roster::request_cpu_kind(
                         request.attacker_kind,
-                    );
+                    ) {
+                        // restriction: MASH-M1-MISMATCH
+                        game.fail("Attacker unavailable");
+                    }
                 } else {
                     game.step = Step::Choose;
                 }
@@ -544,10 +547,12 @@ pub unsafe fn frame(fighter: usize) {
         Step::Reload => {
             let body = natives::entry_active_body(natives::fighter_entry(cpu_entry));
             let wanted = game.requested.map(|r| r.attacker_kind);
-            if body != 0
-                && wanted == Some(((body + 0xc) as *const u32).read())
-                && crate::runtime::roster::character_roster::cpu_reload_ready()
-            {
+            if body != 0 && crate::runtime::roster::character_roster::cpu_reload_ready() {
+                if wanted != Some(((body + 0xc) as *const u32).read()) {
+                    // restriction: MASH-M1-MISMATCH
+                    game.fail("Attacker unavailable");
+                    return;
+                }
                 game.p1 = p1;
                 game.cpu = cpu;
                 CPU_ENTRY.store(cpu_entry, Ordering::Release);
