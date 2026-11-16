@@ -377,7 +377,10 @@ fn cycle_step(m: &TrainingModpackMenu, role: Role, current: u32, cursor: Option<
 /// speculative helper loads, hat-source loads and group prefetches take it without (and a hat
 /// request is asset work), so they never read as a pause (C116.2 console "Paused 2/3").
 pub(crate) fn notice_blocked() -> bool {
-    if mii_auto_init::initializing() && unsafe {mii_backend::ready()} {return true;}
+    notice_blocked_with(|| unsafe {mii_backend::ready()})
+}
+fn notice_blocked_with(backend_ready: impl FnOnce() -> bool) -> bool {
+    if mii_auto_init::initializing() && backend_ready() {return true;}
     if INSTALL.suspends_practice()
         || STATES.iter().any(|s| {let s=s.lock();
             s.pending.is_some() || s.active.is_some()}) {return true;}
@@ -752,10 +755,10 @@ fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: 
 
 /// True when visible loaders have finished and a CPU request can be queued.
 pub fn cpu_reload_ready() -> bool {
-    cpu_reload_ready_with(|| scope(Role::Cpu))
+    cpu_reload_ready_with(|| scope(Role::Cpu), notice_blocked)
 }
-fn cpu_reload_ready_with(read_scope: impl FnOnce() -> Option<Scope>) -> bool {
-    if notice_blocked()
+fn cpu_reload_ready_with(read_scope: impl FnOnce() -> Option<Scope>, blocked: impl FnOnce() -> bool) -> bool {
+    if blocked()
         || training::recording_or_playback()
         || training::save_states::is_loading()
         || lobby::native_ui_busy()
@@ -772,14 +775,15 @@ fn cpu_reload_ready_with(read_scope: impl FnOnce() -> Option<Scope>) -> bool {
 pub struct CpuRequestContext {
     pub menu: TrainingModpackMenu,
     scope: Option<Scope>,
+    active: bool,
 }
 pub fn try_cpu_request_context() -> Result<CpuRequestContext, crate::runtime::compat::menu::MenuBusy> {
     let menu = crate::runtime::compat::menu::try_current_menu()?;
     let active = lobby::try_active()?;
-    Ok(CpuRequestContext { menu, scope: scope_with(Role::Cpu, || active) })
+    Ok(CpuRequestContext { menu, scope: scope_with(Role::Cpu, || active), active })
 }
 pub fn cpu_reload_ready_in(context: &CpuRequestContext) -> bool {
-    cpu_reload_ready_with(|| context.scope)
+    cpu_reload_ready_with(|| context.scope, || notice_blocked_with(|| unsafe { mii_backend::ready_with(context.active) }))
 }
 
 /// Ask the existing loader to change the CPU to `kind`. Values only.

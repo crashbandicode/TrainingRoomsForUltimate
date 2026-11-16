@@ -3,9 +3,11 @@
 //! backends share one PracticeScene shape and one live-shape gate).
 pub(super) use crate::engine::mii::backend::Layout;
 pub(super) fn current()->Option<Layout> {
+    current_with(super::lobby::active())
+}
+pub(super) fn current_with(active:bool)->Option<Layout> {
     let mode=crate::runtime::lobby::game_mode::current()?;
-    Layout::scene(mode.initialized,mode.melee,mode.mode,
-        super::lobby::active())
+    Layout::scene(mode.initialized,mode.melee,mode.mode,active)
 }
 pub(super) fn cpu()->Option<u32> {Some(current()?.visible()[1])}
 /// Registered created entries (value copy) that Mii owner checks may accept beside
@@ -27,7 +29,10 @@ pub(super) unsafe fn extra_facts(table:usize,slot:usize,fe:usize,e:usize,d:usize
     }
 }
 pub(super) unsafe fn ready()->bool {
-    let Some(layout)=current() else{return false;};
+    ready_with(super::lobby::active())
+}
+pub(super) unsafe fn ready_with(active:bool)->bool {
+    let Some(layout)=current_with(active) else{return false;};
     if !layout.quantity(super::native_source::training_cpu_quantity()) {return false;}
     if layout==Layout::Training {return true;}
     let Some(helper)=super::native_source::entry(5) else{return false;};

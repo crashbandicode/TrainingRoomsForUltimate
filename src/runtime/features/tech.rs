@@ -16,12 +16,12 @@ use crate::model::tech::{
     controller::{Controller, Event, Outcome, Setup},
     picker::{self, Pick, Picker},
     planner,
-    session::{Bests, Length, Phase},
+    session::{Bests, Length, Phase, HOLD},
     solver,
     surface::{Kind, StageEpoch, Surfaces, Walk},
     Vec2,
 };
-use crate::model::tech_launch::{FlightParams, Launcher};
+use crate::model::tech_launch::{DecisionSnapshot, FlightParams, Launcher};
 use crate::model::tech_settings::{self, Config};
 use crate::runtime::game::natives;
 use crate::runtime::{published, scene};
@@ -41,6 +41,8 @@ static PLACING: AtomicBool = AtomicBool::new(false);
 static GUARD_PRESS: AtomicBool = AtomicBool::new(false);
 static HITLAG: OnceLock<HitlagResolver> = OnceLock::new();
 static TUMBLE_IDS: OnceLock<[i32; 7]> = OnceLock::new();
+static DECISIONS: Mailbox<DecisionSnapshot, 4> = Mailbox::new();
+static GRADING_IDS: OnceLock<[i32; 11]> = OnceLock::new();
 static OUTCOMES: Mailbox<Outcome, 4> = Mailbox::new();
 struct ViewState {
     picker: Picker,
@@ -69,6 +71,7 @@ struct Practice {
     rng: Rng,
     after_reaction: u16,
     planning_failed: bool,
+    decision: Option<(DecisionSnapshot, u16)>,
 }
 thread_local! {
     static LIVE: RefCell<Option<Practice>> = const { RefCell::new(None) };
@@ -106,6 +109,9 @@ pub fn placing() -> bool {
 }
 /// Native decision seam posts the exact attempt-tagged snapshot, before status
 /// mutation. ContactReceipt alone deliberately cannot synthesize this snapshot.
+fn observe_decision(snapshot: DecisionSnapshot) -> bool {
+    DECISIONS.post(snapshot)
+}
 pub fn observe(outcome: Outcome) -> bool {
     OUTCOMES.post(outcome)
 }
@@ -260,6 +266,25 @@ pub unsafe fn init(ids: [i32; 7]) -> Option<()> {
     if !tech_surfaces::init() {
         return None;
     }
+    let names = [
+        "FIGHTER_STATUS_KIND_PASSIVE",
+        "FIGHTER_STATUS_KIND_PASSIVE_FB",
+        "FIGHTER_STATUS_KIND_DOWN",
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_D",
+        "FIGHTER_STATUS_KIND_PASSIVE_CEIL",
+        "FIGHTER_STATUS_KIND_STOP_CEIL",
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_U",
+        "FIGHTER_STATUS_KIND_PASSIVE_WALL",
+        "FIGHTER_STATUS_KIND_PASSIVE_WALL_JUMP",
+        "FIGHTER_STATUS_KIND_STOP_WALL",
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_LR",
+    ];
+    let mut grading = [0; 11];
+    for (slot, name) in grading.iter_mut().zip(names) {
+        *slot = super::tech_native::id(name)?;
+    }
+    GRADING_IDS.set(grading).ok()?;
+    super::tech_adapter::bind_decision_observer(observe_decision).ok()?;
     TUMBLE_IDS.set(ids).ok()
 }
 unsafe fn still_tumbling(accessor: usize) -> Option<bool> {
@@ -399,6 +424,7 @@ pub unsafe fn frame(fighter: usize) {
                 )),
                 after_reaction: 0,
                 planning_failed: false,
+                decision: None,
             });
         }
         let run = slot.as_mut().unwrap();
@@ -426,6 +452,7 @@ pub unsafe fn frame(fighter: usize) {
             run.controller.stop(&mut run.adapter);
             run.epoch = Some(epoch);
             run.sampled = None;
+            run.decision = None;
             run.pending = false;
             run.planning_failed = false;
             PLACING.store(false, Ordering::Release);
@@ -495,6 +522,7 @@ pub unsafe fn frame(fighter: usize) {
             run.fighter_kind = fighter_kind;
             run.config = config;
             run.controller.start(length(config));
+            run.decision = None;
             run.pending = true;
             run.reroll = true;
             run.sampled = None;
@@ -513,6 +541,30 @@ pub unsafe fn frame(fighter: usize) {
             view.start = false;
             PLACING.store(false, Ordering::Release);
         }
+        let Ok(attempt) = run.adapter.attempt() else {
+            return;
+        };
+        DECISIONS.drain(|snapshot| {
+            if attempt.id == snapshot.attempt && run.decision.is_none() {
+                run.decision = Some((snapshot, 0));
+            }
+        });
+        if let Some((snapshot, age)) = run.decision {
+            let status = natives::status_kind(at);
+            let accepted = GRADING_IDS.get().and_then(|ids| {
+                crate::model::tech::session::accepted_status(snapshot, status, *ids)
+            });
+            let event = if accepted.is_some() {
+                run.controller.snapshot_at(snapshot, accepted, age)
+            } else if age >= HOLD {
+                run.controller.snapshot_unavailable(snapshot, age)
+            } else {
+                Event::None
+            };
+            if event == Event::Graded {
+                run.decision = None;
+            }
+        }
         OUTCOMES.drain(|outcome| {
             run.controller.outcome(outcome);
         });
@@ -520,8 +572,11 @@ pub unsafe fn frame(fighter: usize) {
             &mut run.controller,
             &mut run.adapter,
             false,
-            GUARD_PRESS.swap(false, Ordering::AcqRel),
+            GUARD_PRESS.swap(false, Ordering::AcqRel).then_some(true),
         ) {
+            if let Some((snapshot, age)) = run.decision {
+                run.decision = Some((snapshot, age.saturating_add(1)));
+            }
             if event == Event::Summary {
                 run.pending = false;
                 run.planning_failed = false;

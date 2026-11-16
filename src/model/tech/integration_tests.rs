@@ -91,19 +91,19 @@ fn launcher_receipt_busy_never_fabricates_contact_or_grade() {
     );
     assert_eq!(c.place(&mut f, setup()), Ok(Event::Placed));
     f.busy = true;
-    assert_eq!(c.tick(&mut f, false, false), Err(()));
+    assert_eq!(c.tick(&mut f, false, Some(false)), Err(()));
     assert_eq!(c.session.phase, Phase::Delay(2));
     assert_eq!(c.session.summary.attempts, 0);
     f.busy = false;
-    assert_eq!(c.tick(&mut f, false, false), Ok(Event::None));
-    assert_eq!(c.tick(&mut f, false, false), Ok(Event::Launched));
+    assert_eq!(c.tick(&mut f, false, Some(false)), Ok(Event::None));
+    assert_eq!(c.tick(&mut f, false, Some(false)), Ok(Event::Launched));
     f.attempt.record_contact(ContactReceipt {
         surface: Surface::Wall,
         requested_status: 999,
         passive_enabled: true,
         position: Vec2::default(),
     });
-    assert_eq!(c.tick(&mut f, false, false), Ok(Event::None));
+    assert_eq!(c.tick(&mut f, false, Some(false)), Ok(Event::None));
     assert!(c.awaiting_outcome());
     assert_eq!(
         c.session.summary.attempts, 0,
@@ -133,13 +133,13 @@ fn adapter_failures_do_not_reroll_or_duplicate_launch() {
     let mut f = Fake::new();
     c.start(Length::Free);
     c.place(&mut f, setup()).unwrap();
-    c.tick(&mut f, false, false).unwrap();
+    c.tick(&mut f, false, Some(false)).unwrap();
     f.reject_launch = true;
-    assert_eq!(c.tick(&mut f, false, false), Err(()));
+    assert_eq!(c.tick(&mut f, false, Some(false)), Err(()));
     f.reject_launch = false;
-    assert_eq!(c.tick(&mut f, true, false), Ok(Event::None));
-    assert_eq!(c.tick(&mut f, false, false), Ok(Event::Launched));
-    c.tick(&mut f, false, false).unwrap();
+    assert_eq!(c.tick(&mut f, true, Some(false)), Ok(Event::None));
+    assert_eq!(c.tick(&mut f, false, Some(false)), Ok(Event::Launched));
+    c.tick(&mut f, false, Some(false)).unwrap();
     assert_eq!((f.placements, f.launches), (1, 1));
     assert_eq!(c.sampled(), Some(setup()));
     assert_eq!(
@@ -158,28 +158,28 @@ fn receipt_driven_respawn_rerolls_only_counted_attempts() {
     let mut f = Fake::new();
     c.start(Length::Free);
     c.place(&mut f, setup()).unwrap();
-    c.tick(&mut f, false, false).unwrap();
-    c.tick(&mut f, false, false).unwrap();
+    c.tick(&mut f, false, Some(false)).unwrap();
+    c.tick(&mut f, false, Some(false)).unwrap();
     assert_eq!(c.abandon(), Event::NeedSetup { reroll: false });
     assert_eq!(c.session.summary.attempts, 0);
     c.place(&mut f, setup()).unwrap();
-    c.tick(&mut f, false, false).unwrap();
-    c.tick(&mut f, false, false).unwrap();
+    c.tick(&mut f, false, Some(false)).unwrap();
+    c.tick(&mut f, false, Some(false)).unwrap();
     c.outcome(Outcome {
         attempt: 2,
         decision: decision(),
     });
-    assert_eq!(c.tick(&mut f, false, true), Ok(Event::None));
+    assert_eq!(c.tick(&mut f, false, Some(true)), Ok(Event::None));
     assert_eq!(
         c.session.phase,
         Phase::Hold(0),
         "the decision frame is not late frame one"
     );
     for _ in 0..44 {
-        assert_eq!(c.tick(&mut f, false, false), Ok(Event::None));
+        assert_eq!(c.tick(&mut f, false, Some(false)), Ok(Event::None));
     }
     assert_eq!(
-        c.tick(&mut f, false, false),
+        c.tick(&mut f, false, Some(false)),
         Ok(Event::NeedSetup { reroll: true })
     );
 }
@@ -363,7 +363,7 @@ fn native_abandonment_while_held_retries_same_sample_uncounted() {
     c.place(&mut f, setup()).unwrap();
     f.attempt.mark_abandoned();
     assert_eq!(
-        c.tick(&mut f, false, false),
+        c.tick(&mut f, false, Some(false)),
         Ok(Event::NeedSetup { reroll: false })
     );
     assert_eq!(c.session.summary.attempts, 0);
@@ -397,7 +397,7 @@ fn placement_query_busy_then_abandoned_retries_without_counting_or_launching() {
     launcher.attempt.mark_abandoned();
     launcher.busy = false;
     assert_eq!(
-        controller.tick(&mut launcher, false, false),
+        controller.tick(&mut launcher, false, Some(false)),
         Ok(Event::NeedSetup { reroll: false })
     );
     assert_eq!(controller.session.phase, Phase::Place);
@@ -412,13 +412,13 @@ fn abandoned_attempt_cancels_pending_launch_retry() {
     let mut launcher = Fake::new();
     controller.start(Length::Free);
     controller.place(&mut launcher, setup()).unwrap();
-    controller.tick(&mut launcher, false, false).unwrap();
+    controller.tick(&mut launcher, false, Some(false)).unwrap();
     launcher.reject_launch = true;
-    assert_eq!(controller.tick(&mut launcher, false, false), Err(()));
+    assert_eq!(controller.tick(&mut launcher, false, Some(false)), Err(()));
     launcher.reject_launch = false;
     launcher.attempt.mark_abandoned();
     assert_eq!(
-        controller.tick(&mut launcher, false, false),
+        controller.tick(&mut launcher, false, Some(false)),
         Ok(Event::NeedSetup { reroll: false })
     );
     assert_eq!(
@@ -427,9 +427,9 @@ fn abandoned_attempt_cancels_pending_launch_retry() {
     );
     assert_eq!(controller.session.summary.attempts, 0);
     controller.place(&mut launcher, setup()).unwrap();
-    controller.tick(&mut launcher, false, false).unwrap();
+    controller.tick(&mut launcher, false, Some(false)).unwrap();
     assert_eq!(
-        controller.tick(&mut launcher, false, false),
+        controller.tick(&mut launcher, false, Some(false)),
         Ok(Event::Launched)
     );
     assert_eq!(launcher.launches, 1);
@@ -576,4 +576,376 @@ fn restoring_without_a_saved_point_does_not_choose_a_surface() {
     assert!(!picker.restore(&surfaces));
     assert_eq!(picker.cursor, here);
     assert!(picker.selected.is_none());
+}
+
+fn snapshot(attempt: u64) -> crate::model::tech_launch::DecisionSnapshot {
+    crate::model::tech_launch::DecisionSnapshot {
+        attempt,
+        contact: ContactReceipt {
+            surface: Surface::Wall,
+            requested_status: 999,
+            passive_enabled: true,
+            position: Vec2::default(),
+        },
+        source_status: Some(123),
+        guard_count: Some(254),
+        previous_guard_gap: Some(254),
+        guard_event: None,
+        window_base: Some(12),
+        window_multiplier: Some(1.0),
+        lockout: Some(28),
+        reaction: Some(20.),
+        damage_fall: Some(false),
+        stick_x: None,
+        press_frame_offset: None,
+    }
+}
+
+#[test]
+fn snapshot_requires_acceptance_and_rejects_stale_duplicate_delivery() {
+    use session::{Grade, NativeOutcome};
+    let mut c = Controller::IDLE;
+    let mut f = Fake::new();
+    c.start(Length::Free);
+    c.place(&mut f, setup()).unwrap();
+    c.tick(&mut f, false, None).unwrap();
+    c.tick(&mut f, false, None).unwrap();
+    let mut s = snapshot(f.attempt.id);
+    assert_eq!(c.snapshot(s, None), Event::None);
+    assert_eq!(c.session.phase, Phase::Flight);
+    s.attempt += 1;
+    assert_eq!(
+        c.snapshot(s, Some(NativeOutcome::Tech(Some(Direction::Wall)))),
+        Event::None
+    );
+    s.attempt -= 1;
+    assert_eq!(
+        c.snapshot(s, Some(NativeOutcome::Tech(Some(Direction::Wall)))),
+        Event::Graded
+    );
+    assert_eq!(c.session.result, Some(Grade::Perfect(None)));
+    assert_eq!(c.direction, Some(Direction::Wall));
+    assert_eq!(c.session.summary.attempts, 1);
+    assert_eq!(c.session.summary.average(), None);
+    assert_eq!(c.snapshot(s, Some(NativeOutcome::Miss)), Event::None);
+    assert_eq!(c.session.summary.attempts, 1);
+}
+
+#[test]
+fn snapshot_missing_inputs_stay_unavailable_without_substitutions() {
+    use session::{map_snapshot, Grade, NativeOutcome};
+    let s = snapshot(1);
+    let mut incomplete = Vec::new();
+    let mut v = s;
+    v.guard_count = None;
+    incomplete.push(v);
+    let mut v = s;
+    v.previous_guard_gap = None;
+    incomplete.push(v);
+    let mut v = s;
+    v.window_base = None;
+    incomplete.push(v);
+    let mut v = s;
+    v.window_multiplier = None;
+    incomplete.push(v);
+    let mut v = s;
+    v.lockout = None;
+    incomplete.push(v);
+    let mut v = s;
+    v.reaction = None;
+    incomplete.push(v);
+    let mut v = s;
+    v.damage_fall = None;
+    incomplete.push(v);
+    let mut v = s;
+    v.window_multiplier = Some(f32::NAN);
+    incomplete.push(v);
+    let mut v = s;
+    v.reaction = Some(f32::NAN);
+    incomplete.push(v);
+    let mut v = s;
+    v.lockout = Some(-1);
+    incomplete.push(v);
+    for v in incomplete {
+        assert_eq!(
+            map_snapshot(v, NativeOutcome::Miss),
+            Some(Grade::Unavailable)
+        );
+    }
+    assert_eq!(map_snapshot(s, NativeOutcome::Miss), None);
+    let mut held = s;
+    held.damage_fall = Some(true);
+    held.reaction = None;
+    assert_eq!(
+        map_snapshot(held, NativeOutcome::Tech(Some(Direction::Wall))),
+        Some(Grade::Held)
+    );
+    assert_eq!(
+        map_snapshot(held, NativeOutcome::Miss),
+        Some(Grade::AfterHitstun)
+    );
+    held.contact.passive_enabled = false;
+    assert_eq!(
+        map_snapshot(held, NativeOutcome::Miss),
+        Some(Grade::Untechable)
+    );
+}
+
+#[test]
+fn snapshot_fractional_window_and_calibration_are_preserved() {
+    use session::{map_snapshot, Grade, NativeOutcome};
+    let mut s = snapshot(1);
+    s.window_multiplier = Some(1.0416666);
+    s.guard_count = Some(12);
+    s.previous_guard_gap = Some(27);
+    assert_eq!(
+        map_snapshot(s, NativeOutcome::Miss),
+        Some(Grade::Locked(27))
+    );
+    s.guard_count = Some(13);
+    assert_eq!(map_snapshot(s, NativeOutcome::Miss), Some(Grade::Early(1)));
+    s.guard_count = Some(4);
+    assert_eq!(
+        map_snapshot(s, NativeOutcome::Tech(Some(Direction::Wall))),
+        Some(Grade::Perfect(None))
+    );
+    s.press_frame_offset = Some(1);
+    assert_eq!(
+        map_snapshot(s, NativeOutcome::Tech(Some(Direction::Wall))),
+        Some(Grade::Perfect(Some(5)))
+    );
+    s.guard_count = None;
+    assert_eq!(
+        map_snapshot(s, NativeOutcome::Tech(Some(Direction::Wall))),
+        Some(Grade::Perfect(None))
+    );
+    assert_eq!(
+        map_snapshot(s, NativeOutcome::Tech(None)),
+        Some(Grade::Perfect(None)),
+        "unavailable roll direction cannot erase a proven success"
+    );
+}
+
+#[test]
+fn unavailable_guard_window_never_fabricates_late_or_no_press() {
+    use session::{Action, Grade, Session};
+    for gap in [1, 15, 30] {
+        for press in [None, Some(30)] {
+            let mut s = Session::IDLE;
+            s.start(Length::Attempts(10));
+            s.placed(1);
+            s.tick(false, None);
+            s.contact_grade(None);
+            for age in 1..=30 {
+                let event = if age == gap {
+                    None
+                } else {
+                    Some(press == Some(age))
+                };
+                s.tick(false, event);
+            }
+            assert_eq!(s.result, Some(Grade::Unavailable));
+            assert_eq!(s.summary.attempts, 0);
+            for _ in 31..45 {
+                assert_eq!(s.tick(false, Some(false)), Action::None);
+            }
+            assert_eq!(s.tick(false, Some(false)), Action::Place { reroll: false });
+        }
+    }
+}
+
+#[test]
+fn unavailable_contact_holds_exactly_45_frames_and_reuses_sample() {
+    use session::{Grade, NativeOutcome};
+    let mut c = Controller::IDLE;
+    let mut f = Fake::new();
+    c.start(Length::Attempts(10));
+    c.place(&mut f, setup()).unwrap();
+    c.tick(&mut f, false, None).unwrap();
+    c.tick(&mut f, false, None).unwrap();
+    let mut s = snapshot(f.attempt.id);
+    s.guard_count = None;
+    assert_eq!(c.snapshot(s, Some(NativeOutcome::Miss)), Event::Graded);
+    assert_eq!(c.session.result, Some(Grade::Unavailable));
+    c.tick(&mut f, false, None).unwrap();
+    assert_eq!(
+        c.session.phase,
+        Phase::Hold(0),
+        "decision frame does not consume hold"
+    );
+    for _ in 0..5 {
+        c.tick(&mut f, true, None).unwrap();
+    }
+    for _ in 1..45 {
+        assert_eq!(c.tick(&mut f, false, None), Ok(Event::None));
+    }
+    assert_eq!(
+        c.tick(&mut f, false, None),
+        Ok(Event::NeedSetup { reroll: false })
+    );
+    assert_eq!(c.session.summary.attempts, 0);
+    assert_eq!(c.sampled(), Some(setup()));
+    assert_eq!(f.restores, 0);
+}
+
+#[test]
+fn paused_unavailable_guard_does_not_poison_proven_window() {
+    use session::{Grade, Session};
+    let mut s = Session::IDLE;
+    s.start(Length::Free);
+    s.placed(1);
+    s.tick(false, None);
+    s.contact_grade(None);
+    for _ in 0..40 {
+        s.tick(true, None);
+    }
+    for _ in 1..30 {
+        s.tick(false, Some(false));
+    }
+    s.tick(false, Some(true));
+    assert_eq!(s.result, Some(Grade::Late(30)));
+    assert_eq!(s.summary.attempts, 1);
+}
+
+#[test]
+fn unproven_acceptance_consumes_only_exact_snapshot_as_unavailable() {
+    use session::{Grade, NativeOutcome};
+    let mut c = Controller::IDLE;
+    let mut f = Fake::new();
+    c.start(Length::Free);
+    c.place(&mut f, setup()).unwrap();
+    c.tick(&mut f, false, None).unwrap();
+    c.tick(&mut f, false, None).unwrap();
+    let mut s = snapshot(f.attempt.id + 1);
+    assert_eq!(c.snapshot_unavailable(s, 45), Event::None);
+    assert_eq!(c.session.phase, Phase::Flight);
+    s.attempt -= 1;
+    assert_eq!(c.snapshot(s, None), Event::None);
+    assert_eq!(c.snapshot_unavailable(s, 45), Event::Graded);
+    assert_eq!(c.session.result, Some(Grade::Unavailable));
+    assert_eq!(c.session.summary.attempts, 0);
+    assert_eq!(c.direction, None);
+    assert_eq!(c.snapshot_unavailable(s, 45), Event::None);
+    assert_eq!(c.snapshot(s, Some(NativeOutcome::Miss)), Event::None);
+    for _ in 0..10 {
+        assert_eq!(c.tick(&mut f, true, None), Ok(Event::None));
+    }
+    assert_eq!(c.session.phase, Phase::Hold(44));
+    assert_eq!(
+        c.tick(&mut f, false, None),
+        Ok(Event::NeedSetup { reroll: false })
+    );
+}
+
+#[test]
+fn delayed_accepted_snapshot_keeps_original_contact_respawn_boundary() {
+    use session::NativeOutcome;
+    for age in [1, 17, 45] {
+        let mut c = Controller::IDLE;
+        let mut f = Fake::new();
+        c.start(Length::Free);
+        c.place(&mut f, setup()).unwrap();
+        c.tick(&mut f, false, None).unwrap();
+        c.tick(&mut f, false, None).unwrap();
+        let s = snapshot(f.attempt.id);
+        for _ in 1..age {
+            c.tick(&mut f, false, None).unwrap();
+        }
+        assert_eq!(
+            c.snapshot_at(s, Some(session::NativeOutcome::Tech(None)), age),
+            Event::Graded
+        );
+        let now = c.session.elapsed;
+        assert_eq!(c.tick(&mut f, true, None), Ok(Event::None));
+        assert_eq!(c.session.elapsed, now);
+        for _ in age..45 {
+            assert_eq!(c.tick(&mut f, false, None), Ok(Event::None));
+        }
+        assert_eq!(
+            c.tick(&mut f, false, None),
+            Ok(Event::NeedSetup { reroll: true })
+        );
+        assert_eq!(c.session.summary.attempts, 1);
+        assert_eq!(
+            c.snapshot_at(s, Some(NativeOutcome::Miss), age),
+            Event::None
+        );
+    }
+}
+
+#[test]
+fn delayed_miss_delivery_does_not_invent_past_guard_observations() {
+    use session::{Grade, NativeOutcome};
+    for age in [2, 30, 31, 45] {
+        let mut c = Controller::IDLE;
+        let mut f = Fake::new();
+        c.start(Length::Free);
+        c.place(&mut f, setup()).unwrap();
+        c.tick(&mut f, false, None).unwrap();
+        c.tick(&mut f, false, None).unwrap();
+        let s = snapshot(f.attempt.id);
+        assert_eq!(
+            c.snapshot_at(s, Some(NativeOutcome::Miss), age),
+            Event::Graded
+        );
+        c.tick(&mut f, false, Some(true)).unwrap();
+        assert_eq!(c.session.result, Some(Grade::Unavailable));
+        assert_eq!(c.session.summary.attempts, 0);
+    }
+}
+
+#[test]
+fn native_status_acceptance_requires_observed_transition_into_exact_request() {
+    use session::{accepted_status, NativeOutcome};
+    let ids = [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110];
+    for (index, expected) in [
+        NativeOutcome::Tech(Some(Direction::InPlace)),
+        NativeOutcome::Tech(None),
+        NativeOutcome::Miss,
+        NativeOutcome::Miss,
+        NativeOutcome::Tech(Some(Direction::Ceiling)),
+        NativeOutcome::Miss,
+        NativeOutcome::Miss,
+        NativeOutcome::Tech(Some(Direction::Wall)),
+        NativeOutcome::Tech(Some(Direction::WallJump)),
+        NativeOutcome::Miss,
+        NativeOutcome::Miss,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut s = snapshot(1);
+        s.source_status = Some(90);
+        s.contact.requested_status = ids[index];
+        assert_eq!(
+            accepted_status(s, 90, ids),
+            None,
+            "request alone is not acceptance"
+        );
+        assert_eq!(
+            accepted_status(s, 999, ids),
+            None,
+            "unrelated status is not acceptance"
+        );
+        assert_eq!(accepted_status(s, ids[index], ids), Some(expected));
+        s.source_status = Some(ids[index]);
+        assert_eq!(
+            accepted_status(s, ids[index], ids),
+            None,
+            "unchanged source is not a transition"
+        );
+        s.source_status = None;
+        assert_eq!(
+            accepted_status(s, ids[index], ids),
+            None,
+            "unavailable source is not a transition"
+        );
+    }
+    let mut s = snapshot(1);
+    s.source_status = Some(90);
+    assert_eq!(
+        accepted_status(s, 999, ids),
+        None,
+        "unknown requested status stays unavailable"
+    );
 }

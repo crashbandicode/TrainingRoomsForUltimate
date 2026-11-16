@@ -24,13 +24,14 @@ pub enum Grade {
     AfterHitstun,
     Untechable,
     NoContact,
+    Unavailable,
 }
 impl Grade {
     pub fn success(self) -> bool {
         matches!(self, Self::Perfect(_) | Self::Held)
     }
     pub fn counted(self) -> bool {
-        !matches!(self, Self::Untechable | Self::NoContact)
+        !matches!(self, Self::Untechable | Self::NoContact | Self::Unavailable)
     }
     pub fn write(self, out: &mut impl Write) -> fmt::Result {
         match self {
@@ -45,6 +46,8 @@ impl Grade {
             Self::AfterHitstun => out.write_str("Missed (after hitstun)"),
             Self::Untechable => out.write_str("Untechable (not counted)"),
             Self::NoContact => out.write_str("No contact (not counted)"),
+            // restriction: tech-native-observation-unavailable
+            Self::Unavailable => out.write_str("Grading unavailable (not counted)"),
         }
     }
 }
@@ -88,6 +91,93 @@ pub fn grade(d: Decision) -> Option<Grade> {
         return Some(Grade::Early((count - d.window.ceil()) as u16 + 1));
     }
     None
+}
+
+/// Proven accepted native result, supplied separately from a pre-status request.
+/// Neither requested_status nor passive eligibility establishes acceptance.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NativeOutcome {
+    /// Roll direction may be unavailable independently of accepted success.
+    Tech(Option<Direction>),
+    Miss,
+}
+
+/// Observe entry into the requested status after the pre-status snapshot.
+/// `ids` uses the core contact-status order: PASSIVE, PASSIVE_FB, DOWN,
+/// REFLECT_D, PASSIVE_CEIL, STOP_CEIL, REFLECT_U, PASSIVE_WALL,
+/// PASSIVE_WALL_JUMP, STOP_WALL, REFLECT_LR. A request or unchanged source
+/// status alone supplies no accepted-outcome evidence.
+pub fn accepted_status(
+    snapshot: super::super::tech_launch::DecisionSnapshot,
+    observed_status: i32,
+    ids: [i32; 11],
+) -> Option<NativeOutcome> {
+    let source = snapshot.source_status?;
+    if observed_status != snapshot.contact.requested_status || observed_status == source {
+        return None;
+    }
+    Some(match ids.iter().position(|&id| id == observed_status)? {
+        0 => NativeOutcome::Tech(Some(Direction::InPlace)),
+        // A pre-status stick value is not proof of the accepted roll direction.
+        1 => NativeOutcome::Tech(None),
+        4 => NativeOutcome::Tech(Some(Direction::Ceiling)),
+        7 => NativeOutcome::Tech(Some(Direction::Wall)),
+        8 => NativeOutcome::Tech(Some(Direction::WallJump)),
+        _ => NativeOutcome::Miss,
+    })
+}
+
+/// Map retained decision-frame observations without substituting missing values.
+/// None means a known miss waiting for its post-contact input window.
+pub fn map_snapshot(
+    s: super::super::tech_launch::DecisionSnapshot,
+    outcome: NativeOutcome,
+) -> Option<Grade> {
+    if outcome == NativeOutcome::Miss && !s.contact.passive_enabled {
+        return Some(Grade::Untechable);
+    }
+    let held = s.damage_fall == Some(true) || s.reaction.is_some_and(|r| r.is_finite() && r <= 0.0);
+    if held {
+        return Some(match outcome {
+            NativeOutcome::Tech(_) => Grade::Held,
+            NativeOutcome::Miss => Grade::AfterHitstun,
+        });
+    }
+    if s.damage_fall != Some(false) || !s.reaction.is_some_and(|r| r.is_finite() && r > 0.0) {
+        return Some(Grade::Unavailable);
+    }
+    if matches!(outcome, NativeOutcome::Tech(_)) {
+        return Some(Grade::Perfect(
+            s.guard_count
+                .zip(s.press_frame_offset)
+                .map(|(count, offset)| u16::from(count).saturating_add(offset)),
+        ));
+    }
+    let (Some(count), Some(previous), Some(base), Some(multiplier), Some(lockout)) = (
+        s.guard_count,
+        s.previous_guard_gap,
+        s.window_base,
+        s.window_multiplier,
+        s.lockout,
+    ) else {
+        return Some(Grade::Unavailable);
+    };
+    let window = base as f32 * multiplier;
+    let Ok(lockout) = u16::try_from(lockout) else {
+        return Some(Grade::Unavailable);
+    };
+    if base <= 0 || !window.is_finite() || window <= 0.0 {
+        return Some(Grade::Unavailable);
+    }
+    // Reaction/source-path checks above have already established timed grading.
+    // Reuse only the native comparison, without a synthetic counter/calibration.
+    if f32::from(count) < window && u16::from(previous) < lockout {
+        Some(Grade::Locked(u16::from(previous)))
+    } else if f32::from(count) >= window && f32::from(count) < window + f32::from(lockout) {
+        Some(Grade::Early((f32::from(count) - window.ceil()) as u16 + 1))
+    } else {
+        None
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -182,6 +272,7 @@ pub struct Session {
     pub elapsed: u32,
     delay: u16,
     pending: bool,
+    late_coverage: bool,
 }
 impl Session {
     pub const IDLE: Self = Self {
@@ -204,6 +295,7 @@ impl Session {
         elapsed: 0,
         delay: 30,
         pending: false,
+        late_coverage: true,
     };
     pub fn start(&mut self, length: Length) -> Action {
         *self = Self {
@@ -229,15 +321,34 @@ impl Session {
         }
     }
     pub fn contact(&mut self, d: Decision) {
+        self.contact_grade(grade(d));
+    }
+    pub fn contact_grade(&mut self, result: Option<Grade>) {
         if self.phase != Phase::Flight {
             return;
         }
-        self.result = grade(d);
+        self.result = result;
         self.pending = self.result.is_none();
+        self.late_coverage = true;
         if let Some(g) = self.result {
             self.summary.record(g);
         }
         self.phase = Phase::Hold(0);
+    }
+    /// Align delivery made before tick() in a later available P1 callback.
+    /// Skipped post-contact events were not observed by this session.
+    pub(super) fn contact_age(&mut self, age: u16) {
+        if age == 0 {
+            return;
+        }
+        if self.pending && age > 1 {
+            self.late_coverage = false;
+        }
+        if self.pending && age > LATE {
+            self.result = Some(Grade::Unavailable);
+            self.pending = false;
+        }
+        self.phase = Phase::Hold(age.min(HOLD) - 1);
     }
     /// No contact, KO or tumble escape repeats the same sampled setup immediately.
     pub fn abandon(&mut self) -> Action {
@@ -256,7 +367,9 @@ impl Session {
     /// Exactly one tick per P1 game frame. Menus pass paused=true.
     /// `new_guard_press` requires a separately proven native press event.
     /// A raw shoulder sample or counter decrease is not sufficient proof.
-    pub fn tick(&mut self, paused: bool, new_guard_press: bool) -> Action {
+    /// None is an unavailable observation and invalidates first-press/no-press
+    /// grading for this late window, without stopping its game-frame clock.
+    pub fn tick(&mut self, paused: bool, new_guard_press: Option<bool>) -> Action {
         if paused || matches!(self.phase, Phase::Off | Phase::Done) {
             return Action::None;
         }
@@ -281,11 +394,14 @@ impl Session {
             }
             Phase::Hold(n) => {
                 let age = n + 1;
-                if self.pending && (new_guard_press && age <= LATE || age == LATE) {
-                    let g = if new_guard_press {
-                        Grade::Late(age)
-                    } else {
-                        Grade::Missed
+                if self.pending && age <= LATE {
+                    self.late_coverage &= new_guard_press.is_some();
+                }
+                if self.pending && (new_guard_press == Some(true) && age <= LATE || age == LATE) {
+                    let g = match (self.late_coverage, new_guard_press) {
+                        (true, Some(true)) => Grade::Late(age),
+                        (true, Some(false)) => Grade::Missed,
+                        _ => Grade::Unavailable,
                     };
                     self.result = Some(g);
                     self.summary.record(g);

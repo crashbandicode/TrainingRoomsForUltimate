@@ -168,20 +168,20 @@ fn lockout_grade() {
 fn held_tech_is_untimed() {
     for d in [Decision{tech:Some(Direction::Wall),reaction:0.,..decision()},Decision{tech:Some(Direction::InPlace),damage_fall:true,..decision()}] {assert_eq!(grade(d),Some(Grade::Held));}
 }
-fn flying(length:Length)->Session{let mut s=Session::IDLE;s.start(length);s.placed(1);assert_eq!(s.tick(false,false),Action::Launch);s}
+fn flying(length:Length)->Session{let mut s=Session::IDLE;s.start(length);s.placed(1);assert_eq!(s.tick(false,Some(false)),Action::Launch);s}
 #[test]
 fn untechable_not_counted() {let mut s=flying(Length::Attempts(10));s.contact(Decision{enabled:false,..decision()});assert_eq!(s.result,Some(Grade::Untechable));assert_eq!(s.summary.attempts,0);}
 #[test]
 fn late_by_counts_frames_after_contact() {
-    for frame in [1,3,30,31] { let mut s=flying(Length::Free);s.contact(decision());for age in 1..=31{s.tick(false,age==frame);}
+    for frame in [1,3,30,31] { let mut s=flying(Length::Free);s.contact(decision());for age in 1..=31{s.tick(false,Some(age==frame));}
         assert_eq!(s.result,Some(if frame<=30{Grade::Late(frame)}else{Grade::Missed})); }
 }
 #[test]
 fn reset_schedule_after_tech_and_miss() {
     for tech in [Some(Direction::InPlace),None] {let mut s=flying(Length::Free);s.contact(Decision{tech,count:12,..decision()});
-        for _ in 1..45 {assert_eq!(s.tick(false,false),Action::None);}
-        assert_eq!(s.tick(false,false),Action::Place{reroll:true});s.placed(10);
-        for _ in 1..10{assert_eq!(s.tick(false,false),Action::None);}assert_eq!(s.tick(false,false),Action::Launch);
+        for _ in 1..45 {assert_eq!(s.tick(false,Some(false)),Action::None);}
+        assert_eq!(s.tick(false,Some(false)),Action::Place{reroll:true});s.placed(10);
+        for _ in 1..10{assert_eq!(s.tick(false,Some(false)),Action::None);}assert_eq!(s.tick(false,Some(false)),Action::Launch);
     }
 }
 #[test]
@@ -189,19 +189,19 @@ fn abandoned_attempt_relaunches_uncounted() {let mut s=flying(Length::Free);asse
 #[test]
 fn session_attempts_end_after_n() {
     for n in [10,20] {let mut s=flying(Length::Attempts(n));
-        for i in 0..n{s.contact(Decision{tech:Some(Direction::Wall),count:4,..decision()});for _ in 0..44{s.tick(false,false);}
-            let action=s.tick(false,false);assert_eq!(action,if i+1==n{Action::Summary}else{Action::Place{reroll:true}});
-            if i+1<n{s.placed(1);s.tick(false,false);}}
+        for i in 0..n{s.contact(Decision{tech:Some(Direction::Wall),count:4,..decision()});for _ in 0..44{s.tick(false,Some(false));}
+            let action=s.tick(false,Some(false));assert_eq!(action,if i+1==n{Action::Summary}else{Action::Place{reroll:true}});
+            if i+1<n{s.placed(1);s.tick(false,Some(false));}}
         assert_eq!(s.summary.attempts,u32::from(n));assert_eq!(s.phase,Phase::Done);
     }
 }
 #[test]
-fn session_time_ends_and_finishes_the_flight() {let mut s=flying(Length::Frames(60));for _ in 0..100{s.tick(false,false);}assert_eq!(s.phase,Phase::Flight);
-    s.contact(Decision{tech:Some(Direction::Ceiling),count:2,..decision()});for _ in 0..44{s.tick(false,false);}assert_eq!(s.tick(false,false),Action::Summary);assert_eq!(s.summary.attempts,1);
-    let mut s=flying(Length::Frames(3600));let now=s.elapsed;for _ in 0..100{s.tick(true,false);}assert_eq!(s.elapsed,now);
+fn session_time_ends_and_finishes_the_flight() {let mut s=flying(Length::Frames(60));for _ in 0..100{s.tick(false,Some(false));}assert_eq!(s.phase,Phase::Flight);
+    s.contact(Decision{tech:Some(Direction::Ceiling),count:2,..decision()});for _ in 0..44{s.tick(false,Some(false));}assert_eq!(s.tick(false,Some(false)),Action::Summary);assert_eq!(s.summary.attempts,1);
+    let mut s=flying(Length::Frames(3600));let now=s.elapsed;for _ in 0..100{s.tick(true,Some(false));}assert_eq!(s.elapsed,now);
 }
 #[test]
-fn free_practice_never_ends() {let mut s=flying(Length::Free);for _ in 0..20000{s.tick(false,false);}assert_eq!(s.phase,Phase::Flight);assert_eq!(s.stop(),Action::Summary);}
+fn free_practice_never_ends() {let mut s=flying(Length::Free);for _ in 0..20000{s.tick(false,Some(false));}assert_eq!(s.phase,Phase::Flight);assert_eq!(s.stop(),Action::Summary);}
 #[test]
 fn summary_counts_streak_and_average() {let mut s=Summary::default();for g in [Grade::Perfect(Some(2)),Grade::Perfect(Some(6)),Grade::Early(1),Grade::Held,Grade::Perfect(Some(4))]{s.record(g);}
     assert_eq!((s.attempts,s.streak,s.best,s.average()),(5,2,2,Some(4.)));let mut text=String::new();s.write(&mut text).unwrap();assert!(text.len()<=96,"{text}");

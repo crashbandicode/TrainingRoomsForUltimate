@@ -1,6 +1,8 @@
 //! Receipt-driven session owner. Native decision snapshots are supplied separately
 //! from contact receipts; a missing or busy observation never becomes a grade.
-use super::session::{Action, Decision, Direction, Length, Phase, Session};
+use super::session::{
+    self, Action, Decision, Direction, Grade, Length, NativeOutcome, Phase, Session,
+};
 use super::{AttemptState, Launch, Launcher};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -90,15 +92,78 @@ impl Controller {
     /// Decision snapshots are tagged by the adapter attempt id at the native
     /// status-decision seam. Stale or duplicate snapshots cannot count twice.
     pub fn outcome(&mut self, outcome: Outcome) -> Event {
+        self.accept_outcome(
+            outcome.attempt,
+            outcome.decision.tech,
+            session::grade(outcome.decision),
+        )
+    }
+    /// Acceptance proof must describe this exact retained native request. Returning
+    /// Event::None keeps the core delivery pending; Graded permits an exact-attempt ack.
+    pub fn snapshot(
+        &mut self,
+        snapshot: super::super::tech_launch::DecisionSnapshot,
+        accepted: Option<NativeOutcome>,
+    ) -> Event {
+        let Some(accepted) = accepted else {
+            return Event::None;
+        };
+        let direction = match accepted {
+            NativeOutcome::Tech(direction) => direction,
+            NativeOutcome::Miss => None,
+        };
+        self.accept_outcome(
+            snapshot.attempt,
+            direction,
+            session::map_snapshot(snapshot, accepted),
+        )
+    }
+    /// As snapshot(), with a contact age frozen during pauses/query unavailability.
+    /// Call before tick() in the same callback. Historical guard events that were
+    /// not delivered cannot become a first late press or a no-press grade.
+    pub fn snapshot_at(
+        &mut self,
+        snapshot: super::super::tech_launch::DecisionSnapshot,
+        accepted: Option<NativeOutcome>,
+        contact_age: u16,
+    ) -> Event {
+        let event = self.snapshot(snapshot, accepted);
+        self.align_contact_age(event, contact_age);
+        event
+    }
+    /// Retire an exact retained contact when accepted status cannot be proven.
+    /// This is explicitly ungraded, never a guessed miss or no-contact result.
+    /// Like snapshot(), Graded permits acknowledgement; stale delivery does not.
+    pub fn snapshot_unavailable(
+        &mut self,
+        snapshot: super::super::tech_launch::DecisionSnapshot,
+        contact_age: u16,
+    ) -> Event {
+        let event = self.accept_outcome(snapshot.attempt, None, Some(Grade::Unavailable));
+        self.align_contact_age(event, contact_age);
+        event
+    }
+    fn align_contact_age(&mut self, event: Event, age: u16) {
+        if event == Event::Graded && age > 0 {
+            self.session.contact_age(age);
+            self.fresh_outcome = false;
+        }
+    }
+    fn accept_outcome(
+        &mut self,
+        attempt: u64,
+        direction: Option<Direction>,
+        grade: Option<Grade>,
+    ) -> Event {
         if self.session.phase != Phase::Flight
-            || self.attempt != Some(outcome.attempt)
-            || self.last_contact == Some(outcome.attempt)
+            || self.attempt != Some(attempt)
+            || self.last_contact == Some(attempt)
         {
             return Event::None;
         }
-        self.direction = outcome.decision.tech;
-        self.session.contact(outcome.decision);
-        self.last_contact = Some(outcome.attempt);
+        self.direction = direction;
+        self.session.contact_grade(grade);
+        self.last_contact = Some(attempt);
         self.fresh_outcome = true;
         self.awaiting_outcome = false;
         Event::Graded
@@ -110,7 +175,7 @@ impl Controller {
         &mut self,
         launcher: &mut L,
         paused: bool,
-        new_guard_press: bool,
+        new_guard_press: Option<bool>,
     ) -> Result<Event, L::Error> {
         if paused || matches!(self.session.phase, Phase::Off | Phase::Done) {
             return Ok(Event::None);
