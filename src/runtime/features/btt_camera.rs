@@ -6,9 +6,9 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use hos_lock::Mutex;
+use std::cell::Cell;
 
-use crate::model::btt::{self as model, Camera};
+use crate::model::btt::{self as model, Camera, CameraRequests};
 use crate::model::sites_pkg2;
 use crate::runtime::game::{self, natives};
 use crate::runtime::scene;
@@ -17,8 +17,9 @@ use crate::runtime::scene;
 static USABLE: AtomicBool = AtomicBool::new(false);
 /// This mode holds the Fixed camera: the Hide Tech camera hooks put the game's own centre in, not Hide Tech's (`holding`).
 static HOLD: AtomicBool = AtomicBool::new(false);
-/// The camera's state between passes. Only the game thread's pass takes it, and never across a call into the game.
-static CAMERA: Mutex<Camera> = Mutex::new(Camera::IDLE);
+/// Owners publish atomically; only the game thread holds save/restore state.
+static OWNERS: CameraRequests = CameraRequests::IDLE;
+thread_local! { static CAMERA: Cell<Camera> = const { Cell::new(Camera::IDLE) }; }
 
 pub fn set_usable(on: bool) {
     USABLE.store(on, Ordering::Release);
@@ -54,24 +55,34 @@ pub unsafe fn apply(want: bool) {
 
 /// Shared placing camera: BTT bit 1, Tech bit 2. The last owner restores the first native mode.
 /// # Safety
-/// The game thread, in a battle scene; callers release their bit on every placing exit.
+/// Callers release their bit on every placing exit. The game thread applies requests in frame().
 pub unsafe fn request(owner_bit: u8, want: bool) {
     if !USABLE.load(Ordering::Acquire) {
         return;
     }
+    OWNERS.request(owner_bit, want);
+}
+
+/// Step once per game frame, after placing owners publish their requests.
+/// # Safety
+/// Player 1's non-Nana game-thread callback; no plugin lock is held.
+pub unsafe fn frame() {
+    if !USABLE.load(Ordering::Acquire) { return; }
     let manager = manager();
     let mode = (manager != 0 && scene::current().is_some()).then(|| ((manager + sites_pkg2::CAMERA_MODE_FIELD) as *const i32).read_volatile());
-    let act = {
-        let mut camera = CAMERA.lock();
-        let act = camera.request(owner_bit, want, mode);
+    let want = OWNERS.wanted();
+    let act = CAMERA.with(|state| {
+        let mut camera = state.get();
+        let act = camera.step(want, mode);
         HOLD.store(camera.holding(), Ordering::Release);
+        state.set(camera);
         act
-    };
+    });
     let Some(to) = act else { return };
     let changed = natives::change_active_camera(manager, to);
     #[cfg(feature = "diag")]
     crate::runtime::diag_log::diagnostic(format_args!(
-        "[Btt] camera want={want} mode_before={mode:?} mode_after={} changed={changed:?} owner={owner_bit}",
+        "[Btt] camera want={want} mode_before={mode:?} mode_after={} changed={changed:?}",
         ((manager + sites_pkg2::CAMERA_MODE_FIELD) as *const i32).read_volatile()
     ));
     #[cfg(not(feature = "diag"))]

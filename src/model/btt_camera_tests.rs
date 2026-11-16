@@ -94,38 +94,44 @@ fn btt_camera_manager_pointer_is_checked_before_it_is_read() {
     }
 }
 fn btt_camera_owners_preserve_mode_through_handover() {
-    fn call(cam: &mut Camera, mode: &mut i32, owner: u8, want: bool) -> Option<i32> {
-        let act = cam.request(owner, want, Some(*mode));
+    fn call(owners: &CameraRequests, cam: &mut Camera, mode: &mut i32, owner: u8, want: bool) -> Option<i32> {
+        owners.request(owner, want);
+        let act = cam.step(owners.wanted(), Some(*mode));
         if let Some(to) = act { *mode = to; }
         act
     }
     for before in [NORMAL, ZOOM, FIXED] {
         // BTT only, Tech only: stable requests never acquire a second time.
         for owner in [1, 2] {
+            let owners = CameraRequests::IDLE;
             let (mut cam, mut mode) = (Camera::IDLE, before);
-            assert_eq!(call(&mut cam, &mut mode, owner, true), (before != FIXED).then_some(FIXED));
-            for _ in 0..60 { assert_eq!(call(&mut cam, &mut mode, owner, true), None); }
-            call(&mut cam, &mut mode, owner, false);
+            assert_eq!(call(&owners, &mut cam, &mut mode, owner, true), (before != FIXED).then_some(FIXED));
+            for _ in 0..60 { assert_eq!(call(&owners, &mut cam, &mut mode, owner, true), None); }
+            call(&owners, &mut cam, &mut mode, owner, false);
             assert_eq!(mode, before);
             assert!(!cam.holding());
         }
         // Both, then each direction of handover: the remaining owner keeps Fixed and the first saved mode.
         for (first, second) in [(1, 2), (2, 1)] {
+            let owners = CameraRequests::IDLE;
             let (mut cam, mut mode) = (Camera::IDLE, before);
-            call(&mut cam, &mut mode, first, true);
-            assert_eq!(call(&mut cam, &mut mode, second, true), None);
-            assert_eq!(call(&mut cam, &mut mode, first, false), None);
+            call(&owners, &mut cam, &mut mode, first, true);
+            assert_eq!(call(&owners, &mut cam, &mut mode, second, true), None);
+            assert_eq!(call(&owners, &mut cam, &mut mode, first, false), None);
             assert_eq!(mode, FIXED);
             assert!(cam.holding());
-            for _ in 0..60 { assert_eq!(call(&mut cam, &mut mode, second, true), None); }
-            call(&mut cam, &mut mode, second, false);
+            for _ in 0..60 { assert_eq!(call(&owners, &mut cam, &mut mode, second, true), None); }
+            call(&owners, &mut cam, &mut mode, second, false);
             assert_eq!(mode, before);
             assert!(!cam.holding());
         }
     }
     let mut cam = Camera::IDLE;
-    assert_eq!(cam.request(1, true, Some(FIXED)), None);
-    assert_eq!(cam.request(1, false, Some(ZOOM)), Some(FIXED), "an original Fixed mode is preserved too");
+    let owners = CameraRequests::IDLE;
+    let mut mode = FIXED;
+    assert_eq!(call(&owners, &mut cam, &mut mode, 1, true), None);
+    mode = ZOOM;
+    assert_eq!(call(&owners, &mut cam, &mut mode, 1, false), Some(FIXED), "an original Fixed mode is preserved too");
 }
 
 /// The cases of this module in one table.

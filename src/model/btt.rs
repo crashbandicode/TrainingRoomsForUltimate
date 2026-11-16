@@ -729,21 +729,26 @@ pub const fn pointer_ok(p: usize) -> bool {
 /// The camera's state (`runtime::features::btt_camera`: the stage is shown by the game's own Training Fixed camera, mode 4, in
 /// Placing): the mode the game was in when this mode first took the camera (`saved`, while it holds it) and
 /// the frames left before it may ask again.
+/// Lock-free owner requests; the game thread alone steps the camera state.
+pub struct CameraRequests(std::sync::atomic::AtomicU8);
+impl CameraRequests {
+    pub const IDLE: Self = Self(std::sync::atomic::AtomicU8::new(0));
+    pub fn request(&self, owner: u8, want: bool) {
+        use std::sync::atomic::Ordering;
+        if want { self.0.fetch_or(owner, Ordering::AcqRel); }
+        else { self.0.fetch_and(!owner, Ordering::AcqRel); }
+    }
+    pub fn wanted(&self) -> bool { self.0.load(std::sync::atomic::Ordering::Acquire) != 0 }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Camera {
     saved: Option<i32>,
     cool: u32,
-    owners: u8,
 }
 
 impl Camera {
-    pub const IDLE: Camera = Camera { saved: None, cool: 0, owners: 0 };
-
-    /// BTT uses bit 1, Tech bit 2; a handover preserves the first native mode.
-    pub fn request(&mut self, owner_bit: u8, want: bool, mode: Option<i32>) -> Option<i32> {
-        self.owners = self.owners & !owner_bit | (owner_bit * u8::from(want));
-        self.step(self.owners != 0, mode)
-    }
+    pub const IDLE: Camera = Camera { saved: None, cool: 0 };
 
     /// The mode took the camera from the game and has not given it back: the Hide Tech camera hooks stand down.
     pub fn holding(&self) -> bool {

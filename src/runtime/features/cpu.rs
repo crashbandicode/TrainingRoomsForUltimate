@@ -468,7 +468,14 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         unsafe { fighter_frame(a0, receipt) };
         // SPEC-core-06: the hitbox visualizer's pass (a readiness boundary: nothing until boot installed it), after the combo and
         // before the save states (SPEC-core-01 §5.2).
+        unsafe { let _ = super::btt::frame(a0); }
         unsafe { crate::runtime::features::hitbox::frame(a0) };
+        if a0 != 0
+            && unsafe { ((a0 + FIGHTER_ENTRY_FIELD) as *const i32).read() } == 0
+            && unsafe { ((a0 + FIGHTER_KIND_FIELD) as *const i32).read() } != konst(C::KindNana)
+        {
+            unsafe { super::btt_camera::frame() };
+        }
         // The Eggs-ercise CPU target's player tag: the game turns its flag off for the placed CPU, so when the pass just run asked
         // for it (`hide_cpu::keep_cursor`) the flag is written on again, the one write after the placement.
         unsafe { hide_cpu::write_kept_cursor(a0, konst(C::WorkFlagCursor)) };

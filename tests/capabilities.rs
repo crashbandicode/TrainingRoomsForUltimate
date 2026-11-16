@@ -95,6 +95,9 @@ const BOUNDARIES: &[Boundary] = &[
     // row turns off only this camera, never the hitbox visualizer or Eggs-ercise that the pass belongs to.
     Boundary { function: "btt_camera::apply", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
     Boundary { function: "btt_camera::request", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
+    Boundary { function: "btt_camera::frame", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
+    Boundary { function: "btt::frame", owner: Some(Feature::Hitbox), gate: Gate::Flag("USABLE") },
+    Boundary { function: "btt_projectiles::hit", owner: Some(Feature::BttProjectiles), gate: Gate::Flag("READY") },
 ];
 
 /// Every entry point that is not a `#[skyline::hook]` function, with its install unit.
@@ -157,6 +160,9 @@ impl Analysis {
         // The shared production planner calls the runtime's AttackReader too (a fighter's pass and its articles').
         for to in ["hitbox::active", "hitbox::data", "hitbox::read_u64", "hitbox::read_f32", "hitbox::motion"] {
             graph.dynamic.push(("hitbox::frame".to_owned(), to.to_owned()));
+        }
+        for to in ["hitbox::active", "hitbox::data", "hitbox::read_u64", "hitbox::read_f32"] {
+            graph.dynamic.push(("hitbox::object_hits".to_owned(), to.to_owned()));
         }
         // rc.14 spots: the frame strip reads each fighter's attack slots through the same reader (hitbox::powers).
         for to in ["hitbox::active", "hitbox::data", "hitbox::read_f32"] {
@@ -590,4 +596,24 @@ fn the_input_display_degrades_apart_from_input_delay() {
 #[test]
 fn writing_sites_counts_every_row_that_writes_code() {
     assert_eq!(capabilities::all_sites().filter(|site| capabilities::writes_code(site)).count(), capabilities::WRITING_SITES);
+}
+
+
+#[test]
+fn projectile_accessor_failure_leaves_hitbox_and_btt_melee_installed() {
+    let a = Analysis::new();
+    let row = capabilities::find("state_object_module_accessor").unwrap();
+    let usable = |site: &model::sites::Site| site.name != row.name;
+    assert!(capabilities::unit_usable(Feature::CpuCore, &usable));
+    assert!(capabilities::unit_usable(Feature::Hitbox, &usable));
+    assert_eq!(capabilities::blocked_by(Feature::BttProjectiles, &usable), Some(row.name));
+    assert!(!Granted::from_usable(&usable).allows(row.offset));
+    for entry in ["hitbox::frame", "hitbox::draw_orbs", "btt::frame"] {
+        let start = a.graph.find(entry)[0];
+        assert!(!a.reach(start).0.contains(&row.offset), "{entry} reaches optional accessor");
+    }
+    let start = a.graph.find("btt_projectiles::hit")[0];
+    assert!(a.reach(start).0.contains(&row.offset));
+    let worker = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime/ui/worker.rs")).unwrap();
+    assert!(worker.contains("btt_projectiles_ready: crate::runtime::features::btt_projectiles::ready()"));
 }

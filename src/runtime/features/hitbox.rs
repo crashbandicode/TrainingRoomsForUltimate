@@ -256,11 +256,11 @@ unsafe fn eggs_cpu_diag(run: &eggs::Run, before: u32, at: usize, damage: f32, st
 
 /// What a practice game reads of Player 1: its top joint, its live attack pills and their number, whether it is in an aerial
 /// and its kind.
-type P1 = ([f32; 3], [eggs::Hit; hitbox::SLOTS as usize], usize, bool, i32);
+pub(crate) type P1 = ([f32; 3], [eggs::Hit; hitbox::SLOTS as usize], usize, bool, i32);
 
 /// # Safety
 /// `at` is a live fighter's accessor.
-unsafe fn p1_read(at: usize) -> P1 {
+pub(crate) unsafe fn p1_read(at: usize) -> P1 {
     let top = natives::joint_position(at, hash40("top"), &[0.0; 3]).unwrap_or_default();
     let (hits, n) = object_hits(at);
     let (aerial, kind) = (natives::status_kind(at) == eggs::ATTACK_AIR, natives::fighter_kind(at));
@@ -268,7 +268,7 @@ unsafe fn p1_read(at: usize) -> P1 {
 }
 
 /// Native attack pills of a live fighter or article, independent of visualizer settings.
-unsafe fn object_hits(at: usize) -> ([eggs::Hit; hitbox::SLOTS as usize], usize) {
+pub(crate) unsafe fn object_hits(at: usize) -> ([eggs::Hit; hitbox::SLOTS as usize], usize) {
     let (mut wants, mut len) = ([Sphere::NONE; 2 * hitbox::SLOTS as usize], 0);
     hitbox::want_hitboxes(&mut GameAttacks(at), &mut wants, &mut len);
     let mut hits = [eggs::Hit::default(); hitbox::SLOTS as usize];
@@ -276,43 +276,6 @@ unsafe fn object_hits(at: usize) -> ([eggs::Hit; hitbox::SLOTS as usize], usize)
     let power = |slot| GameAttacks(at).read_f32(GameAttacks(at).data(slot) + layout::POWER);
     let n = eggs::pills(&wants[..len], place, power, &mut hits);
     (hits, n)
-}
-
-unsafe fn btt_projectile_hit(owner: usize, spot: [f32; 2]) -> bool {
-    crate::model::btt::projectile_breaks(btt::projectiles(), spot,
-        |kind, ordinal| state_natives::article_get_from_no(owner, kind, ordinal),
-        |article| {
-            let id = state_natives::article_object_id(article);
-            if !state_natives::object_is_active(id) { return None; }
-            let at = state_natives::object_accessor(id);
-            if !crate::model::btt::pointer_ok(at) { return None; }
-            let (hits, n) = object_hits(at);
-            #[cfg(feature = "diag")]
-            if hits[..n].iter().any(|h| eggs::breaks(eggs::ANY, false, h, spot)) {
-                crate::runtime::diag_log::diagnostic(format_args!("[Btt] projectile id={id:#x} owner={owner:#x} at={at:#x} hits={n} target={spot:?}"));
-            }
-            Some((hits, n))
-        })
-}
-
-/// Break the Targets' pass (`runtime::features::btt`): Player 1's entry-0 fighters read the same pills Eggs-ercise does, while the mode
-/// needs them. Idle (the mode Off, no menu open) it does nothing; with a menu open and the row Off it only keeps the stage's layouts current.
-unsafe fn btt_pass(fighter: usize) -> Option<()> {
-    let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
-    (entry == 0 && !btt::idle()).then_some(())?;
-    let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
-    let (top, hits, n, aerial, _) = btt::reading().then(|| p1_read(at)).unwrap_or_default();
-    let rule = EGG_ROWS.load(Ordering::Acquire).to_le_bytes()[1];
-    let mut melee = false;
-    let broke = btt::pass(at, top, |spot| {
-        let hit = hits[..n].iter().any(|h| eggs::breaks(rule, aerial, h, spot));
-        melee |= hit;
-        hit || btt_projectile_hit(at, spot)
-    });
-    // V2.1: the fighter whose attack broke a target freezes, as on a hit.
-    let frames = (broke > 0 && melee).then(scene::facts).and_then(eggs::hitlag)?;
-    natives::set_hit_stop_frame(at, frames);
-    Some(())
 }
 
 /// The status ids and effect attributes, resolved once through the game's constant table (`None` until it answers; it may not be
@@ -864,7 +827,6 @@ pub unsafe fn frame(fighter: usize) {
     }
     let _scope = HookScope::enter_hook(HookId::HitboxFrame);
     eggs_pass(fighter);
-    btt_pass(fighter);
     #[cfg(feature = "diag")]
     stats::frame_begin();
     let enabled = SETTING.load(Ordering::Acquire);
@@ -1452,3 +1414,5 @@ mod stats {
     }
 
 }
+
+pub(crate) fn egg_rule() -> u8 { EGG_ROWS.load(Ordering::Acquire).to_le_bytes()[1] }
