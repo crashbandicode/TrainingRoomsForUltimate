@@ -394,20 +394,20 @@ fn tech_receipt_busy_preserves_the_current_owned_generation() {
 }
 
 #[test]
-fn tech_init_waits_for_all_seven_resolved_ids_and_success() {
+fn tech_init_waits_for_all_eighteen_resolved_ids_and_success() {
     use model::cpu::tech_init::{Init, STATUS_IDS};
     let init = Init::new();
     init.service(|_| panic!("no initializer before resolution"));
     assert!(!init.ready());
-    let pairs: Vec<_> = STATUS_IDS.iter().enumerate().map(|(i, &c)| (c, 100 + i as i32)).collect();
-    for missing in 0..7 {
-        let partial: Vec<_> = pairs.iter().enumerate().filter(|(i, _)| *i != missing).map(|(_, &p)| p).collect();
+    let pairs: Vec<_> = STATUS_IDS.iter().map(|&c| (c, 100 + c as i32)).collect();
+    for missing in STATUS_IDS {
+        let partial: Vec<_> = pairs.iter().copied().filter(|(c, _)| *c != missing).collect();
         assert!(!init.publish(&Table::with(&partial)));
         init.service(|_| panic!("partial status array must remain unavailable"));
         assert!(!init.ready());
     }
     assert!(init.publish(&Table::with(&pairs)));
-    init.service(|ids| { assert_eq!(ids, [100, 101, 102, 103, 104, 105, 106]); Some(()) });
+    init.service(|ids| { assert_eq!(ids, STATUS_IDS.map(|c| 100 + c as i32)); Some(()) });
     assert!(init.ready());
     init.service(|_| panic!("initializer must run only once"));
     let failed = Init::new();
@@ -433,7 +433,7 @@ fn tech_init_uses_resolved_ids_on_the_existing_nonhook_heartbeat() {
     assert_eq!(boot.matches("diag_log::set_tick(").count(), 3);
     assert!(drain.contains("threads::spawn(crate::model::thread_stacks::ThreadId::Heartbeat"));
     assert!(drain.contains("for tick in TICKS.iter().filter_map(|slot| slot.get()) {\n                tick();"));
-    let init = &tech[tech.find("pub unsafe fn init(ids: [i32; 7])").unwrap()..tech.find("unsafe fn still_tumbling").unwrap()];
+    let init = &tech[tech.find("pub unsafe fn init(ids: [i32; 18])").unwrap()..tech.find("unsafe fn still_tumbling").unwrap()];
     assert!(!init.contains("tech_native::id") && !init.contains("lua_const"));
     let frame = &tech[tech.find("pub unsafe fn frame(fighter").unwrap()..];
     assert!(frame.find("!super::cpu::TECH_INIT.ready()").unwrap() < frame.find("VIEW.try_lock()").unwrap());
@@ -772,4 +772,20 @@ fn eden_package_2_settings_files_parse_without_issues_and_change_the_rows_they_n
         seen += 1;
     }
     assert!(seen >= 10, "the package-2 settings files are missing");
+}
+
+#[test]
+fn tech_init_status_order_preserves_tumble_then_grading() {
+    use model::cpu::tech_init::STATUS_IDS;
+    assert_eq!(&STATUS_IDS[..7], &[
+        C::StatusDamageFly, C::StatusDamageFlyRoll, C::StatusDamageFlyMeteor,
+        C::StatusDamageFlyReflectD, C::StatusDamageFlyReflectU,
+        C::StatusDamageFlyReflectLr, C::StatusDamageFall,
+    ]);
+    assert_eq!(&STATUS_IDS[7..], &[
+        C::StatusPassive, C::StatusPassiveFb, C::StatusDown, C::StatusDamageFlyReflectD,
+        C::StatusPassiveCeil, C::StatusStopCeil, C::StatusDamageFlyReflectU,
+        C::StatusPassiveWall, C::StatusPassiveWallJump, C::StatusStopWall,
+        C::StatusDamageFlyReflectLr,
+    ]);
 }
