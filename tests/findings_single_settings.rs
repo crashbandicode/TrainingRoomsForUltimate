@@ -150,10 +150,17 @@ fn saved_defaults_continue_in_a_fresh_process() {
             menu.press(Button::X);
             // Leave current Off so the next process must actually restore saved On.
             menu.press(Button::A);
-            std::fs::write(file, menu.settings().to_json()).unwrap();
+            // Write the legacy bytes directly: saving through Snapshot would already repair them.
+            let mut old: serde_json::Value = serde_json::from_str(&menu.settings().to_json()).unwrap();
+            old["defaults_menu"]["trio_practice"] = json!([1, 1]);
+            std::fs::write(file, serde_json::to_string(&old).unwrap()).unwrap();
         } else {
             assert_eq!(stage, "restore");
-            let saved = settings::parse(&std::fs::read_to_string(file).unwrap());
+            let text = std::fs::read_to_string(file).unwrap();
+            let old: serde_json::Value = serde_json::from_str(&text).unwrap();
+            assert_eq!(old["defaults_menu"]["trio_practice"], json!([1, 1]));
+            let saved = settings::parse(&text);
+            assert_eq!(saved.settings.defaults.get("trio_practice").unwrap(), &[1, 0]);
             assert!(saved.issues.is_empty());
             let mut menu = Menu::new(saved.settings, Env::default());
             let row = swapping(&mut menu);
