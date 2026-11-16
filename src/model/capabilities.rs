@@ -194,6 +194,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 11] = [
             "state_status_request",
             "status_kind",
             "stop_is_stop",
+            "work_get_int",
         ],
     ),
     (Feature::P1Cpu, &["fighter_manager_get_entry", "situation_kind", "utility_get_category"]),

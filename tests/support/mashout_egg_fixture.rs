@@ -67,6 +67,7 @@ static THRESHOLD: AtomicU32 = AtomicU32::new(0);
 static ARMED: AtomicU64 = AtomicU64::new(0);
 static GENERATION: AtomicU64 = AtomicU64::new(5);
 static CPU_STATUS: AtomicU32 = AtomicU32::new(0);
+static FREEZE_NO_BANG: AtomicU32 = AtomicU32::new(1);
 static BODY: AtomicUsize = AtomicUsize::new(0);
 static FAULT: AtomicU64 = AtomicU64::new(0);
 static EPOCH: AtomicU64 = AtomicU64::new(0);
@@ -117,6 +118,10 @@ mod scene {
     }
 }
 mod natives {
+    pub fn get_int(_: usize, id: i32) -> i32 {
+        assert_eq!(id, 0x11000008); // Lucas work id, pinned01bf583/native table.
+        super::FREEZE_NO_BANG.load(super::Ordering::Relaxed) as i32
+    }
     pub fn module_accessor(_: i32) -> Option<usize> {
         Some(super::P1.load(super::Ordering::Relaxed))
     }
@@ -162,8 +167,14 @@ fn post(e: worker::Event, _: u64) {
     }
 }
 fn state_id(c: C) -> Option<i32> {
+    match model::cpu::ids::NAMES[c as usize] {
+        "FIGHTER_LUCAS_STATUS_KIND_SPECIAL_N_HOLD" => return Some(481),
+        "FIGHTER_LUCAS_STATUS_SPECIAL_N_WORK_INT_NOBANG_TIME" => return Some(0x11000008),
+        _ => (),
+    }
     Some(match c {
         C::ClatterCaptureYoshi => 243,
+        C::ClatterIce => 203,
         C::ClatterYoshiEgg => 244,
         C::ClatterCaptureWait => 66,
         C::ClatterBury => 75,
@@ -672,5 +683,64 @@ fn escape_status_and_already_exhausted_clock_take_precedence_over_end() {
             assert_eq!(g.failed, None);
             if status == 75 { assert!(g.clock.unwrap().exhausted()); }
         }
+    }
+}
+
+#[test]
+fn lucas_real_charge_releases_only_at_native_eligible_hold_and_uses_ice_seed() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut g = Game::new(Plan::Freeze, State::Frozen);
+        let request = g.requested.as_mut().unwrap();
+        request.id = 112;
+        request.attacker_kind = 40; // TR choices Lucas0x28.
+        m.body[3] = 40;
+        assert_eq!(entry::start(g.requested.unwrap()), Some("FIGHTER_STATUS_KIND_SPECIAL_N"));
+        startup(&mut g, m.p1());
+        assert_eq!(ARMED.load(Ordering::Relaxed), 5);
+        FREEZE_NO_BANG.store(1, Ordering::Relaxed);
+        CPU_STATUS.store(476, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        assert!(!g.followed);
+        assert_eq!(DRIVEN.with_borrow(|v| v.last().unwrap().buttons), 2);
+        CPU_STATUS.store(481, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        assert!(!g.followed);
+        FREEZE_NO_BANG.store(0, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        assert!(g.followed);
+        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
+        FREEZE_NO_BANG.store(20, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
+        m.seed(124.0, 4.0, 1);
+        let actual = reader::sample(m.p1(), 0.37).unwrap().seed();
+        m.start();
+        m.update(&mut g, 203);
+        assert_eq!(g.step, Step::Held);
+        assert_eq!(g.clock.unwrap().last(), actual.record);
+        assert_eq!(BEGINS.with_borrow(Vec::len), 1);
+    }
+}
+#[test]
+fn lucas_wait_without_ice_still_fails_and_wrong_victim_seed_never_grades() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut g = Game::new(Plan::Freeze, State::Frozen);
+        startup(&mut g, m.p1());
+        CPU_STATUS.store(481, Ordering::Relaxed);
+        FREEZE_NO_BANG.store(0, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        assert_eq!(g.failed, Some("Move did not capture · reopen menu to retry"));
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+        let mut g = Game::new(Plan::Freeze, State::Frozen);
+        startup(&mut g, m.p1());
+        m.seed(100.0, 4.0, 1);
+        m.start();
+        m.update(&mut g, 244);
+        assert_eq!(g.failed, Some("Move entry unconfirmed · no grade"));
+        assert!(BEGINS.with_borrow(Vec::is_empty));
     }
 }

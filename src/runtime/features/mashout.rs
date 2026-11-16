@@ -794,6 +794,20 @@ pub unsafe fn frame(fighter: usize) {
             };
             drive(entry::controls(request.plan, game.followed));
             game.saw_catch |= cpu_status != ids[0];
+            if request.plan == crate::model::mashout::moves::Plan::Freeze && !game.followed {
+                let Some((hold, no_bang)) = state_id(C::LucasFreezeHold)
+                    .zip(state_id(C::LucasFreezeNoBang))
+                else {
+                    game.fail(UNAVAILABLE_NOTICE);
+                    return;
+                };
+                // Native Lucas1f9c0: Special release shoots only after NOBANG_TIME<=0.
+                // Observe HOLD and the game's counter; never count callbacks or wall time.
+                if cpu_status == hold && natives::get_int(cpu, no_bang) <= 0 {
+                    game.followed = true;
+                    drive(entry::controls(request.plan, true));
+                }
+            }
             if request.plan == crate::model::mashout::moves::Plan::AirSideSpecial
                 && !game.followed
                 && state_id(C::SituationAir) == Some(natives::situation_kind(cpu))

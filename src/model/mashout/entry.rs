@@ -14,7 +14,7 @@ pub fn start(move_: Scenario) -> Option<&'static str> {
         Plan::SideSpecial | Plan::Cling | Plan::Drag | Plan::Whip => {
             "FIGHTER_STATUS_KIND_SPECIAL_S"
         }
-        Plan::Egg | Plan::Inhale | Plan::NeutralSpecial => "FIGHTER_STATUS_KIND_SPECIAL_N",
+        Plan::Egg | Plan::Inhale | Plan::NeutralSpecial | Plan::Freeze => "FIGHTER_STATUS_KIND_SPECIAL_N",
         Plan::Drain => "FIGHTER_STATUS_KIND_SPECIAL_LW",
         Plan::DownTilt => "FIGHTER_STATUS_KIND_ATTACK_LW3",
         Plan::DownSmash => "FIGHTER_STATUS_KIND_ATTACK_LW4_START",
@@ -45,6 +45,7 @@ pub fn controls(plan: Plan, caught: bool) -> MappedInputs {
     let (buttons, lstick_y) = match plan {
         Plan::DownThrow if caught => (1, -120),
         Plan::Inhale | Plan::NeutralSpecial => (2, 0),
+        Plan::Freeze if !caught => (2, 0),
         Plan::Jab3 => (1, 0),
         _ => (0, 0),
     };
