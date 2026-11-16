@@ -741,7 +741,7 @@ impl Camera {
 
     /// BTT uses bit 1, Tech bit 2; a handover preserves the first native mode.
     pub fn request(&mut self, owner_bit: u8, want: bool, mode: Option<i32>) -> Option<i32> {
-        self.owners = self.owners & !owner_bit | owner_bit * u8::from(want);
+        self.owners = self.owners & !owner_bit | (owner_bit * u8::from(want));
         self.step(self.owners != 0, mode)
     }
 
