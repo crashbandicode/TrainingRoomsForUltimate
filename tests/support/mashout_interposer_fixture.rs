@@ -12,11 +12,15 @@ static READY: AtomicBool = AtomicBool::new(false);
 static ARMED: AtomicU64 = AtomicU64::new(5);
 static START_DATA: AtomicUsize = AtomicUsize::new(0);
 static END_DATA: AtomicUsize = AtomicUsize::new(0);
+static RACE_ON_END: AtomicBool = AtomicBool::new(false);
 static PRACTICE: AtomicBool = AtomicBool::new(true);
 static OBSERVED: AtomicUsize = AtomicUsize::new(0);
 static ORIGINAL_CALLS: AtomicUsize = AtomicUsize::new(0);
 static END_OBSERVED: AtomicUsize = AtomicUsize::new(0);
 unsafe fn slot(offset: usize) -> &'static AtomicUsize {
+    if offset == END_SLOT && RACE_ON_END.swap(false, Ordering::Relaxed) {
+        START_DATA.store(0xbeef, Ordering::Relaxed);
+    }
     match offset {
         START_SLOT => &START_DATA,
         END_SLOT => &END_DATA,
@@ -55,6 +59,7 @@ unsafe fn end_after(control: usize, token: usize) {
 // STARTED
 // END
 fn reset() {
+    RACE_ON_END.store(false, Ordering::Relaxed);
     START_DATA.store(game::text_base() + 0x6b9150, Ordering::Relaxed);
     END_DATA.store(game::text_base() + 0x3f8230, Ordering::Relaxed);
     INSTALLED.store(false, Ordering::Relaxed);
@@ -160,4 +165,18 @@ fn saved_caller_filter_and_native_end_return_are_exact() {
         assert_eq!(ORIGINAL_CALLS.load(Ordering::Relaxed), 3);
         assert_eq!(END_OBSERVED.load(Ordering::Relaxed), 1);
     }
+}
+
+#[test]
+fn foreign_race_between_slot_installs_blocks_joint_admission() {
+    reset();
+    RACE_ON_END.store(true, Ordering::Relaxed);
+    service();
+    assert!(!READY.load(Ordering::Relaxed));
+    assert!(!INSTALLED.load(Ordering::Relaxed));
+    assert!(LOST.load(Ordering::Relaxed));
+    assert_eq!(START_DATA.load(Ordering::Relaxed), 0xbeef);
+    assert_eq!(END_DATA.load(Ordering::Relaxed), game::text_base() + 0x3f8230);
+    assert_eq!(ORIGINAL_START.load(Ordering::Relaxed), game::text_base() + 0x6b9150);
+    assert_eq!(ORIGINAL_END.load(Ordering::Relaxed), game::text_base() + 0x3f8230);
 }
