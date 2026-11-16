@@ -1,7 +1,7 @@
 use super::*;
 use crate::model::tech_launch::Surface;
 use controller::{Controller, Event, Outcome, Setup};
-use session::{Decision, Direction, Length, Phase};
+use session::{Decision, Direction, Grade, Length, Phase};
 use surface::{Kind, Line, Source, Surfaces};
 
 struct Fake {
@@ -1021,4 +1021,135 @@ fn abandonment_without_a_decision_never_invents_no_contact() {
     );
     assert_eq!(c.session.result, Some(Grade::Unavailable));
     assert_eq!(c.session.summary.attempts, 0);
+}
+
+#[test]
+fn retained_delivery_grades_actual_tech_roll_and_miss() {
+    use crate::model::tech_launch::DecisionDelivery;
+    let ids = [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110];
+    for (actual, stick, success, direction) in [
+        (100, 0., true, Some(Direction::InPlace)),
+        (101, -1., true, None),
+        (101, 1., true, None),
+        (102, 0., false, None),
+    ] {
+        let mut c = Controller::IDLE;
+        let mut f = Fake::new();
+        c.start(Length::Attempts(10));
+        c.place(&mut f, setup()).unwrap();
+        while c.session.phase != Phase::Flight {
+            c.tick(&mut f, false, None).unwrap();
+        }
+        let mut raw = snapshot(f.attempt.id);
+        raw.source_status = Some(90);
+        raw.contact.requested_status = 109; // actual outcome deliberately differs
+        raw.stick_x = Some(stick);
+        raw.guard_count = Some(13);
+        let mut delivery = DecisionDelivery::EMPTY;
+        assert!(delivery.capture_first(raw));
+        assert!(delivery.confirmed_decision().is_none());
+        assert!(delivery.observe_entered_status(raw.attempt, Some(actual), &ids));
+        let delivered = delivery.confirmed_decision().unwrap();
+        assert_eq!(delivered.contact, raw.contact);
+        assert_eq!(delivered.stick_x.unwrap().to_bits(), stick.to_bits());
+        assert_eq!(c.retained_snapshot(delivered, ids, 0), Event::Graded);
+        assert_eq!(c.session.summary.attempts, 1);
+        assert_eq!(
+            c.session.summary.perfect + c.session.summary.held,
+            u32::from(success)
+        );
+        assert_eq!(c.direction, direction);
+        assert_eq!(
+            c.session.result,
+            Some(if success {
+                Grade::Perfect(None)
+            } else {
+                Grade::Early(2)
+            })
+        );
+    }
+}
+
+#[test]
+fn retained_unconfirmed_query_expires_uncounted_at_45_and_continues() {
+    use crate::model::tech_launch::DecisionDelivery;
+    let ids = [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110];
+    // An ungranted read, an unknown source, an unchanged source, and an
+    // unrelated status all remain queryable without becoming a false miss.
+    for (source, actual) in [
+        (Some(90), None),
+        (None, Some(100)),
+        (Some(90), Some(90)),
+        (Some(90), Some(999)),
+    ] {
+        let mut c = Controller::IDLE;
+        let mut f = Fake::new();
+        let fixed = setup();
+        c.start(Length::Attempts(10));
+        c.place(&mut f, fixed).unwrap();
+        while c.session.phase != Phase::Flight {
+            c.tick(&mut f, false, None).unwrap();
+        }
+        let mut raw = snapshot(f.attempt.id);
+        raw.source_status = source;
+        let mut delivery = DecisionDelivery::EMPTY;
+        delivery.capture_first(raw);
+        assert!(!delivery.observe_entered_status(raw.attempt, actual, &ids));
+        assert!(delivery.confirmed_decision().is_none());
+        for age in 0..=session::HOLD {
+            let queried = delivery
+                .pending_decision()
+                .expect("unconfirmed snapshot is retained");
+            assert_eq!(queried.entered_status, None);
+            let event = c.retained_snapshot(queried, ids, age);
+            assert_eq!(
+                event,
+                if age == session::HOLD {
+                    Event::Graded
+                } else {
+                    Event::None
+                }
+            );
+            let tick = c.tick(&mut f, false, None).unwrap();
+            assert_eq!(
+                tick,
+                if age == session::HOLD {
+                    Event::NeedSetup { reroll: false }
+                } else {
+                    Event::None
+                }
+            );
+        }
+        assert_eq!(c.session.result, Some(Grade::Unavailable));
+        assert_eq!(c.session.summary.attempts, 0);
+        assert_eq!(c.sampled(), Some(fixed));
+        c.place(&mut f, fixed).unwrap();
+        assert_ne!(f.attempt.id, raw.attempt);
+    }
+}
+
+#[test]
+fn retained_confirmation_preserves_first_decision_and_contact_age() {
+    let mut c = Controller::IDLE;
+    let mut f = Fake::new();
+    c.start(Length::Free);
+    c.place(&mut f, setup()).unwrap();
+    while c.session.phase != Phase::Flight {
+        c.tick(&mut f, false, None).unwrap();
+    }
+    let original = snapshot(f.attempt.id);
+    let mut pending = None;
+    assert!(c.retain_snapshot(&mut pending, original));
+    pending.as_mut().unwrap().1 = 17;
+    let mut confirmed = original;
+    confirmed.entered_status = Some(100);
+    confirmed.guard_count = Some(1); // cannot resample the decision-frame counters
+    assert!(c.retain_snapshot(&mut pending, confirmed));
+    let (saved, age) = pending.unwrap();
+    assert_eq!(age, 17);
+    assert_eq!(saved.guard_count, original.guard_count);
+    assert_eq!(saved.entered_status, Some(100));
+    confirmed.entered_status = Some(101);
+    c.retain_snapshot(&mut pending, confirmed);
+    assert_eq!(pending.unwrap().0.entered_status, Some(100));
 }

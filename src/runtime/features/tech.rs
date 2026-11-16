@@ -16,7 +16,7 @@ use crate::model::tech::{
     controller::{Controller, Event, Outcome, Setup},
     picker::{self, Pick, Picker},
     planner,
-    session::{Bests, Length, Phase, HOLD},
+    session::{Bests, Length, Phase},
     solver,
     surface::{Kind, StageEpoch, Surfaces, Walk},
     Vec2,
@@ -87,6 +87,7 @@ pub fn publish(snapshot: &Snapshot) {
     CONFIG.publish(Some(tech_settings::read(snapshot)));
 }
 pub fn menu_opened() {
+    super::btt_camera::request(2, false);
     GUARD_PRESS.store(false, Ordering::Release);
     PLACING.store(false, Ordering::Release);
     OPEN.store(true, Ordering::Release);
@@ -259,33 +260,18 @@ pub fn look(active: bool) -> [Option<([f32; 2], EggLook)>; LOOKS] {
 /// Initialize from the CPU resolver's complete status array, in `tech_init::STATUS_IDS` order.
 /// # Safety
 /// Only the non-hook heartbeat may call this, after guarded game-table resolution.
-pub unsafe fn init(ids: [i32; 7]) -> Option<()> {
+pub unsafe fn init(ids: [i32; 18]) -> Option<()> {
     if ids.contains(&crate::model::cpu::ids::UNRESOLVED) {
         return None;
     }
     if !tech_surfaces::init() {
         return None;
     }
-    let names = [
-        "FIGHTER_STATUS_KIND_PASSIVE",
-        "FIGHTER_STATUS_KIND_PASSIVE_FB",
-        "FIGHTER_STATUS_KIND_DOWN",
-        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_D",
-        "FIGHTER_STATUS_KIND_PASSIVE_CEIL",
-        "FIGHTER_STATUS_KIND_STOP_CEIL",
-        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_U",
-        "FIGHTER_STATUS_KIND_PASSIVE_WALL",
-        "FIGHTER_STATUS_KIND_PASSIVE_WALL_JUMP",
-        "FIGHTER_STATUS_KIND_STOP_WALL",
-        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_LR",
-    ];
-    let mut grading = [0; 11];
-    for (slot, name) in grading.iter_mut().zip(names) {
-        *slot = super::tech_native::id(name)?;
-    }
+    let tumble: [i32; 7] = ids[..7].try_into().ok()?;
+    let grading: [i32; 11] = ids[7..].try_into().ok()?;
     GRADING_IDS.set(grading).ok()?;
     super::tech_adapter::bind_decision_observer(observe_decision).ok()?;
-    TUMBLE_IDS.set(ids).ok()
+    TUMBLE_IDS.set(tumble).ok()
 }
 unsafe fn still_tumbling(accessor: usize) -> Option<bool> {
     Some(TUMBLE_IDS.get()?.contains(&natives::status_kind(accessor)))
@@ -541,7 +527,12 @@ pub unsafe fn frame(fighter: usize) {
             view.start = false;
             PLACING.store(false, Ordering::Release);
         }
-        let Ok(_attempt) = run.adapter.attempt() else {
+        let Ok(attempt) = run.adapter.attempt() else {
+            return;
+        };
+        // Copy retained decision values, including unconfirmed native entry.
+        // Busy defers before recorder consumption or contact-clock advancement.
+        let Ok(raw) = run.adapter.pending_decision() else {
             return;
         };
         if run
@@ -551,21 +542,17 @@ pub unsafe fn frame(fighter: usize) {
             run.decision = None;
         }
         DECISIONS.drain(|snapshot| {
-            if run.controller.accepts_snapshot(snapshot.attempt) && run.decision.is_none() {
-                run.decision = Some((snapshot, 0));
+            if snapshot.attempt == attempt.id {
+                run.controller.retain_snapshot(&mut run.decision, snapshot);
             }
         });
+        if let Some(snapshot) = raw.filter(|s| s.attempt == attempt.id) {
+            run.controller.retain_snapshot(&mut run.decision, snapshot);
+        }
         if let Some((snapshot, age)) = run.decision {
-            let accepted = GRADING_IDS
-                .get()
-                .and_then(|ids| crate::model::tech::session::accepted_status(snapshot, *ids));
-            let event = if accepted.is_some() {
-                run.controller.snapshot_at(snapshot, accepted, age)
-            } else if age >= HOLD {
-                run.controller.snapshot_unavailable(snapshot, age)
-            } else {
-                Event::None
-            };
+            let event = GRADING_IDS.get().map_or(Event::None, |ids| {
+                run.controller.retained_snapshot(snapshot, *ids, age)
+            });
             if event == Event::Graded {
                 run.decision = None;
             }

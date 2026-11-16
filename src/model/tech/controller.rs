@@ -131,6 +131,44 @@ impl Controller {
         self.align_contact_age(event, contact_age);
         event
     }
+    /// First decision-frame values win; only the core's one-time confirmation
+    /// may fill entered_status. A duplicate cannot reset the contact clock.
+    pub fn retain_snapshot(
+        &self,
+        pending: &mut Option<(super::super::tech_launch::DecisionSnapshot, u16)>,
+        snapshot: super::super::tech_launch::DecisionSnapshot,
+    ) -> bool {
+        if !self.accepts_snapshot(snapshot.attempt) {
+            return false;
+        }
+        if let Some((saved, _)) = pending
+            .as_mut()
+            .filter(|(s, _)| s.attempt == snapshot.attempt)
+        {
+            if saved.entered_status.is_none() {
+                saved.entered_status = snapshot.entered_status;
+            }
+        } else {
+            *pending = Some((snapshot, 0));
+        }
+        true
+    }
+    /// Shared by the retained query and confirmed recorder delivery. Unknown
+    /// native entry expires as unavailable at the existing hold boundary.
+    pub fn retained_snapshot(
+        &mut self,
+        snapshot: super::super::tech_launch::DecisionSnapshot,
+        ids: [i32; 11],
+        contact_age: u16,
+    ) -> Event {
+        if let Some(accepted) = session::accepted_status(snapshot, ids) {
+            self.snapshot_at(snapshot, Some(accepted), contact_age)
+        } else if contact_age >= session::HOLD {
+            self.snapshot_unavailable(snapshot, contact_age)
+        } else {
+            Event::None
+        }
+    }
     /// Retire an exact retained contact when accepted status cannot be proven.
     /// This is explicitly ungraded, never a guessed miss or no-contact result.
     /// Like snapshot(), Graded permits acknowledgement; stale delivery does not.
