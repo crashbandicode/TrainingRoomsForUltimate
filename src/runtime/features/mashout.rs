@@ -762,20 +762,32 @@ pub unsafe fn frame(fighter: usize) {
             let Some(request) = game.requested else {
                 return;
             };
-            let Some(start) =
-                entry::start(request).and_then(|name| game::lua_const(lua_bind_hash(name)))
+            // One real Pluck prepares Olimar's ordinary grab. Native SPECIAL_N
+            // also owns its full-capacity failure motion; never synthesize Pikmin.
+            let pluck = request.attacker_kind == 43
+                && request.plan == crate::model::mashout::moves::Plan::Grab
+                && !game.followed;
+            let start_name = if pluck {
+                Some("FIGHTER_STATUS_KIND_SPECIAL_N")
+            } else {
+                entry::start(request)
+            };
+            let Some(start) = start_name.and_then(|name| game::lua_const(lua_bind_hash(name)))
             else {
                 // restriction: MASH-M1-MISMATCH
                 game.fail("Move sequence unavailable");
                 return;
             };
-            if !entry::preparatory(request.plan) && !arm(p1, game.generation) {
+            if !pluck && !entry::preparatory(request.plan) && !arm(p1, game.generation) {
                 game.fail(UNAVAILABLE_NOTICE);
                 return;
             }
             drive(entry::controls(request.plan, false));
             game.step(Step::Entering, "Mash out · Waiting for move");
             state_natives::status_request(cpu, start);
+            if pluck {
+                return;
+            }
             #[cfg(feature = "diag")]
             crate::runtime::diag_log::enqueue_diagnostic(format_args!(
                 "[Mashout] entry gen={} move={} state={:?} attacker={} plan={:?} variant={}",
@@ -792,11 +804,31 @@ pub unsafe fn frame(fighter: usize) {
             let Some(request) = game.requested else {
                 return;
             };
+            if request.attacker_kind == 43
+                && request.plan == crate::model::mashout::moves::Plan::Grab
+                && !game.followed
+            {
+                drive(MappedInputs::NEUTRAL);
+                // Unit-returning status_request is not an acceptance receipt.
+                // WAIT can complete Pluck only after actual SPECIAL_N was seen.
+                game.saw_catch |= state_id(C::StatusSpecialN) == Some(cpu_status);
+                if game.saw_catch && released {
+                    game.followed = true;
+                    game.saw_catch = false;
+                    game.step(Step::Place, "Mash out · Setting up move");
+                }
+                return;
+            }
             drive(entry::controls(request.plan, game.followed));
             game.saw_catch |= cpu_status != ids[0];
+            if request.plan == crate::model::mashout::moves::Plan::Roller {
+                let mut input = MappedInputs::NEUTRAL;
+                input.lstick_x = if natives::lr(cpu) > 0.0 { 120 } else { -120 };
+                drive(input);
+            }
             if request.plan == crate::model::mashout::moves::Plan::Freeze && !game.followed {
-                let Some((hold, no_bang)) = state_id(C::LucasFreezeHold)
-                    .zip(state_id(C::LucasFreezeNoBang))
+                let Some((hold, no_bang)) =
+                    state_id(C::LucasFreezeHold).zip(state_id(C::LucasFreezeNoBang))
                 else {
                     game.fail(UNAVAILABLE_NOTICE);
                     return;

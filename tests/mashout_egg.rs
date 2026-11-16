@@ -134,13 +134,38 @@ fn actual_runtime_egg_preparation_and_native_seed() {
         ),
         (
             "// START",
-            block(runtime, "if !entry::preparatory").to_string(),
+            block(
+                runtime,
+                if runtime.contains("if !pluck &&") {
+                    "if !pluck &&"
+                } else {
+                    "if !entry::preparatory"
+                },
+            )
+            .to_string(),
         ),
         (
             "// ENTERING",
             block(runtime, "Step::Entering => {").to_string(),
         ),
         ("// LINKS", linked),
+        ("// SETTLE", block(runtime, "Step::Settle => {").to_string()),
+        (
+            "// PLACE",
+            block(runtime, "Step::Place if !linked").to_string(),
+        ),
+        (
+            "// BODY_GUARD",
+            block(
+                runtime,
+                "if matches!(game.step, Step::Held | Step::Entering | Step::Result)",
+            )
+            .to_string(),
+        ),
+        ("// RELEASED", {
+            let a = runtime.find("let released =").unwrap();
+            runtime[a..=a + runtime[a..].find(';').unwrap()].to_string()
+        }),
         ("// SEEDS", seed),
         ("// ENDS", format!("{});", block(runtime, "ENDS.drain("))),
         ("// RESTART", block(runtime, "if restart {").to_string()),

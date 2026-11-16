@@ -67,7 +67,9 @@ static THRESHOLD: AtomicU32 = AtomicU32::new(0);
 static ARMED: AtomicU64 = AtomicU64::new(0);
 static GENERATION: AtomicU64 = AtomicU64::new(5);
 static CPU_STATUS: AtomicU32 = AtomicU32::new(0);
+static ROLLER_LR: AtomicU32 = AtomicU32::new(1.0f32.to_bits());
 static FREEZE_NO_BANG: AtomicU32 = AtomicU32::new(1);
+static AIR: AtomicBool = AtomicBool::new(false);
 static BODY: AtomicUsize = AtomicUsize::new(0);
 static FAULT: AtomicU64 = AtomicU64::new(0);
 static EPOCH: AtomicU64 = AtomicU64::new(0);
@@ -76,13 +78,16 @@ static QUEUE_FULL: AtomicBool = AtomicBool::new(false);
 thread_local! {
     static QUEUE: RefCell<Vec<NativeSeed>> = const { RefCell::new(Vec::new()) };
     static BEGINS: RefCell<Vec<(worker::Key, Seed, u64, SeedOrigin)>> = const { RefCell::new(Vec::new()) };
+    static REQUESTS: RefCell<Vec<(usize,i32)>> = const { RefCell::new(Vec::new()) };
     static DRIVEN: RefCell<Vec<MappedInputs>> = const { RefCell::new(Vec::new()) };
 }
 struct Mailbox;
 static SEEDS: Mailbox = Mailbox;
 impl Mailbox {
     fn post(&self, sample: NativeSeed) -> bool {
-        if QUEUE_FULL.load(Ordering::Relaxed) { return false; }
+        if QUEUE_FULL.load(Ordering::Relaxed) {
+            return false;
+        }
         QUEUE.with_borrow_mut(|q| q.push(sample));
         true
     }
@@ -129,7 +134,25 @@ mod natives {
         super::CPU_STATUS.load(super::Ordering::Relaxed) as i32
     }
     pub fn situation_kind(_: usize) -> i32 {
-        0
+        super::AIR.load(super::Ordering::Relaxed) as i32
+    }
+    pub fn is_stop(_: usize) -> bool {
+        false
+    }
+    pub fn pos_x(_: usize) -> f32 {
+        0.0
+    }
+    pub fn pos_y(_: usize) -> f32 {
+        0.0
+    }
+    pub fn pos_z(_: usize) -> f32 {
+        0.0
+    }
+    pub fn lr(_: usize) -> f32 {
+        f32::from_bits(super::ROLLER_LR.load(super::Ordering::Relaxed))
+    }
+    pub fn camera_limit_range() -> Option<[f32; 4]> {
+        Some([-50.0, 50.0, 0.0, 100.0])
     }
     pub fn fighter_entry(_: i32) -> usize {
         1
@@ -142,8 +165,17 @@ mod natives {
     }
 }
 mod state_natives {
-    pub fn status_request(_: usize, _: i32) {
-        panic!("unexpected air-special transition")
+    #[derive(Clone, Copy)]
+    pub struct Vector3f {
+        pub x: f32,
+        pub y: f32,
+        pub z: f32,
+    }
+    pub fn clear_speed_all(_: usize) {}
+    pub fn init_pos(_: usize, _: &Vector3f) {}
+    pub fn set_lr(_: usize, _: f32) {}
+    pub fn status_request(accessor: usize, status: i32) {
+        super::REQUESTS.with_borrow_mut(|v| v.push((accessor, status)));
     }
 }
 mod worker {
@@ -168,6 +200,7 @@ fn post(e: worker::Event, _: u64) {
 }
 fn state_id(c: C) -> Option<i32> {
     match model::cpu::ids::NAMES[c as usize] {
+        "FIGHTER_STATUS_KIND_SPECIAL_N" => return Some(476),
         "FIGHTER_LUCAS_STATUS_KIND_SPECIAL_N_HOLD" => return Some(481),
         "FIGHTER_LUCAS_STATUS_SPECIAL_N_WORK_INT_NOBANG_TIME" => return Some(0x11000008),
         _ => (),
@@ -187,6 +220,8 @@ fn holding(request: Option<Scenario>, status: i32) -> bool {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Step {
+    Settle,
+    Place,
     Entering,
     Held,
     Result,
@@ -196,6 +231,8 @@ enum Step {
     Restore,
 }
 struct Game {
+    p1: usize,
+    cpu: usize,
     generation: u64,
     epoch: u64,
     step: Step,
@@ -210,6 +247,8 @@ struct Game {
 impl Game {
     fn new(plan: Plan, state: State) -> Self {
         Self {
+            p1: P1.load(Ordering::Relaxed),
+            cpu: 2,
             generation: 5,
             epoch: 0,
             step: Step::Entering,
@@ -253,7 +292,8 @@ fn ids() -> [i32; 15] {
     [0, 50, 65, 66, 67, 68, 69, 0, 51, 52, 53, 70, 71, 72, 73]
 }
 unsafe fn startup(game: &mut Game, p1: usize) {
-    let request = game.requested.unwrap(); // START
+    let request = game.requested.unwrap();
+    let pluck = false; // START
 }
 unsafe fn update(game: &mut Game, p1: usize, status: i32, cpu: usize, fighter: usize) {
     let ids = ids();
@@ -261,7 +301,10 @@ unsafe fn update(game: &mut Game, p1: usize, status: i32, cpu: usize, fighter: u
     // LINKS
     // SEEDS
     // ENDS
+    // RELEASED
     match game.step {
+        // PLACE
+        // SETTLE
         // ENTERING
         _ => (),
     }
@@ -303,6 +346,9 @@ impl NativeMemory {
         READY.store(true, Ordering::Relaxed);
         SLOTS_READY.store(true, Ordering::Relaxed);
         CPU_STATUS.store(481, Ordering::Relaxed);
+        AIR.store(false, Ordering::Relaxed);
+        ROLLER_LR.store(1.0f32.to_bits(), Ordering::Relaxed);
+        REQUESTS.with_borrow_mut(Vec::clear);
         QUEUE.with_borrow_mut(Vec::clear);
         END_QUEUE.with_borrow_mut(Vec::clear);
         BEGINS.with_borrow_mut(Vec::clear);
@@ -517,7 +563,11 @@ fn tagged_held_bury_downthrow_reseeds_from_actual_native_record_and_history() {
                 assert_eq!(begins[1].2, g.epoch);
                 assert_eq!(begins[1].3, SeedOrigin::ThrowClatterStart);
                 assert_eq!(begins[1].0 .5, SeedOrigin::ThrowClatterStart);
-                assert_eq!((m.control, m.record), before, "observer must preserve native latches and input");
+                assert_eq!(
+                    (m.control, m.record),
+                    before,
+                    "observer must preserve native latches and input"
+                );
                 assert_eq!(actual.held, if history == 0 { 1 } else { 0x20 });
             }
         }
@@ -582,20 +632,25 @@ fn native_seed_mailbox_overflow_marks_attempt_incomplete() {
     }
 }
 
-
 // END_TYPE
 // END_TOKEN
 // END_AFTER
 struct EndMailbox;
 static ENDS: EndMailbox = EndMailbox;
 thread_local! { static END_QUEUE: RefCell<Vec<NativeEnd>> = const { RefCell::new(Vec::new()) }; }
-fn faulted(generation: u64, watermark: u64) -> bool { generation != 0 && watermark >= generation }
+fn faulted(generation: u64, watermark: u64) -> bool {
+    generation != 0 && watermark >= generation
+}
 impl EndMailbox {
     fn drain(&self, mut f: impl FnMut(NativeEnd)) {
-        for ended in END_QUEUE.with_borrow_mut(std::mem::take) { f(ended); }
+        for ended in END_QUEUE.with_borrow_mut(std::mem::take) {
+            f(ended);
+        }
     }
     fn post(&self, ended: NativeEnd) -> bool {
-        if QUEUE_FULL.load(Ordering::Relaxed) { return false; }
+        if QUEUE_FULL.load(Ordering::Relaxed) {
+            return false;
+        }
         END_QUEUE.with_borrow_mut(|q| q.push(ended));
         true
     }
@@ -611,7 +666,10 @@ fn native_end_requires_positive_pre_call_and_actual_post_zero() {
         end_after(control, token);
         assert!(END_QUEUE.with_borrow(Vec::is_empty));
         m.seed(0.0, 9.0, 1);
-        assert!(end_token(control, 0).is_none(), "normal exhaustion is not an interruption");
+        assert!(
+            end_token(control, 0).is_none(),
+            "normal exhaustion is not an interruption"
+        );
         end_after(control, token);
         let ends = END_QUEUE.with_borrow(Clone::clone);
         assert_eq!(ends.len(), 1);
@@ -675,13 +733,17 @@ fn escape_status_and_already_exhausted_clock_take_precedence_over_end() {
                 record.step(input);
                 clock.observe(record, input, false).unwrap();
             }
-            if status == 75 { g.clock = Some(clock); }
+            if status == 75 {
+                g.clock = Some(clock);
+            }
             END_QUEUE.with_borrow_mut(|q| q.push(token));
             m.update(&mut g, status);
             assert_eq!(g.step, Step::Held, "End must not replace a native escape");
             assert!(g.clock.is_some());
             assert_eq!(g.failed, None);
-            if status == 75 { assert!(g.clock.unwrap().exhausted()); }
+            if status == 75 {
+                assert!(g.clock.unwrap().exhausted());
+            }
         }
     }
 }
@@ -695,7 +757,10 @@ fn lucas_real_charge_releases_only_at_native_eligible_hold_and_uses_ice_seed() {
         request.id = 112;
         request.attacker_kind = 40; // TR choices Lucas0x28.
         m.body[3] = 40;
-        assert_eq!(entry::start(g.requested.unwrap()), Some("FIGHTER_STATUS_KIND_SPECIAL_N"));
+        assert_eq!(
+            entry::start(g.requested.unwrap()),
+            Some("FIGHTER_STATUS_KIND_SPECIAL_N")
+        );
         startup(&mut g, m.p1());
         assert_eq!(ARMED.load(Ordering::Relaxed), 5);
         FREEZE_NO_BANG.store(1, Ordering::Relaxed);
@@ -709,10 +774,16 @@ fn lucas_real_charge_releases_only_at_native_eligible_hold_and_uses_ice_seed() {
         FREEZE_NO_BANG.store(0, Ordering::Relaxed);
         m.update(&mut g, 0);
         assert!(g.followed);
-        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
+        assert_eq!(
+            DRIVEN.with_borrow(|v| *v.last().unwrap()),
+            MappedInputs::NEUTRAL
+        );
         FREEZE_NO_BANG.store(20, Ordering::Relaxed);
         m.update(&mut g, 0);
-        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
+        assert_eq!(
+            DRIVEN.with_borrow(|v| *v.last().unwrap()),
+            MappedInputs::NEUTRAL
+        );
         m.seed(124.0, 4.0, 1);
         let actual = reader::sample(m.p1(), 0.37).unwrap().seed();
         m.start();
@@ -733,7 +804,10 @@ fn lucas_wait_without_ice_still_fails_and_wrong_victim_seed_never_grades() {
         m.update(&mut g, 0);
         CPU_STATUS.store(0, Ordering::Relaxed);
         m.update(&mut g, 0);
-        assert_eq!(g.failed, Some("Move did not capture · reopen menu to retry"));
+        assert_eq!(
+            g.failed,
+            Some("Move did not capture · reopen menu to retry")
+        );
         assert!(BEGINS.with_borrow(Vec::is_empty));
         let mut g = Game::new(Plan::Freeze, State::Frozen);
         startup(&mut g, m.p1());
@@ -741,6 +815,231 @@ fn lucas_wait_without_ice_still_fails_and_wrong_victim_seed_never_grades() {
         m.start();
         m.update(&mut g, 244);
         assert_eq!(g.failed, Some("Move entry unconfirmed · no grade"));
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+    }
+}
+
+// Native status/position APIs are shims. Place, Settle, Entering, release
+// predicate, arming, native seed admission and cancellation are actual source.
+use model::cpu::hash::lua_bind_hash;
+mod game {
+    pub fn lua_const(hash: u64) -> Option<i32> {
+        for (name, id) in [
+            ("FIGHTER_STATUS_KIND_SPECIAL_N", 476),
+            ("FIGHTER_STATUS_KIND_CATCH", 50),
+            ("FIGHTER_STATUS_KIND_CATCH_DASH", 54),
+            ("FIGHTER_STATUS_KIND_CATCH_TURN", 55),
+        ] {
+            if super::lua_bind_hash(name) == hash {
+                return Some(id);
+            }
+        }
+        None
+    }
+}
+fn actual_body_guard(game: &mut Game, p1: usize, cpu: usize) {
+    // BODY_GUARD
+}
+fn olimar(m: &mut NativeMemory, grab: usize) -> Game {
+    let mut g = Game::new(Plan::Grab, State::Grab);
+    let q = g.requested.as_mut().unwrap();
+    q.id = 40;
+    q.attacker_kind = 43;
+    q.attacker_name = "Olimar";
+    q.grab = grab;
+    m.body[3] = 43;
+    g.step = Step::Settle;
+    CPU_STATUS.store(0, Ordering::Relaxed);
+    g
+}
+unsafe fn finish_pluck(m: &NativeMemory, g: &mut Game) {
+    CPU_STATUS.store(476, Ordering::Relaxed);
+    m.update(g, 0);
+    assert_eq!(g.step, Step::Entering);
+    CPU_STATUS.store(0, Ordering::Relaxed);
+    m.update(g, 0);
+    assert_eq!(g.step, Step::Place);
+    assert!(g.followed);
+    assert!(!g.saw_catch);
+    assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+    m.update(g, 0);
+    assert_eq!(g.step, Step::Settle);
+    m.update(g, 0);
+}
+#[test]
+fn olimar_real_pluck_then_configured_catch_once_and_actual_native_seed() {
+    unsafe {
+        for (grab, catch) in [(0, 50), (1, 54), (2, 55)] {
+            let mut m = NativeMemory::new();
+            let mut g = olimar(&mut m, grab);
+            m.update(&mut g, 0);
+            assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 476)]);
+            assert_eq!(g.step, Step::Entering);
+            assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+            assert!(seed_token(m.p1()).is_none());
+            finish_pluck(&m, &mut g);
+            assert_eq!(
+                REQUESTS.with_borrow(Clone::clone),
+                vec![(2, 476), (m.p1(), 0), (2, 0), (2, catch)]
+            );
+            assert_eq!(g.step, Step::Entering);
+            assert_eq!(ARMED.load(Ordering::Relaxed), g.generation);
+            CPU_STATUS.store(52, Ordering::Relaxed);
+            m.seed(60.0, 8.0, 1);
+            m.start();
+            m.update(&mut g, 66);
+            assert_eq!(g.step, Step::Held);
+            assert_eq!(BEGINS.with_borrow(Vec::len), 1);
+        }
+    }
+}
+#[test]
+fn olimar_already_wait_or_unrelated_status_cannot_complete_or_arm_pluck() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut g = olimar(&mut m, 0);
+        m.update(&mut g, 0);
+        for status in [0, 0, 14, 0, 0] {
+            CPU_STATUS.store(status, Ordering::Relaxed);
+            m.update(&mut g, 0);
+            assert_eq!(g.step, Step::Entering);
+            assert!(!g.followed);
+            assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+        }
+        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 476)]);
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+    }
+}
+#[test]
+fn olimar_existing_ground_readiness_applies_before_and_after_pluck() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut g = olimar(&mut m, 0);
+        AIR.store(true, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        assert_eq!(g.step, Step::Settle);
+        assert!(REQUESTS.with_borrow(Vec::is_empty));
+        AIR.store(false, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        CPU_STATUS.store(476, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        AIR.store(true, Ordering::Relaxed);
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        assert_eq!(g.step, Step::Entering);
+        assert!(!g.followed);
+        assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 476)]);
+    }
+}
+#[test]
+fn olimar_existing_cancel_and_body_guards_revoke_without_catch() {
+    unsafe {
+        for wrong_body in [false, true] {
+            let mut m = NativeMemory::new();
+            let mut g = olimar(&mut m, 0);
+            m.update(&mut g, 0);
+            if wrong_body {
+                actual_body_guard(&mut g, m.p1(), 3);
+                assert_eq!(g.step, Step::Failed);
+            } else {
+                cancel(&mut g, 0);
+                assert_eq!(g.step, Step::Restore);
+            }
+            assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+            assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 476)]);
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+        }
+    }
+}
+#[test]
+fn olimar_stale_seed_ignored_and_unconfirmed_seed_keeps_existing_refusal() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut g = olimar(&mut m, 0);
+        m.update(&mut g, 0);
+        m.seed(60.0, 8.0, 1);
+        QUEUE.with_borrow_mut(|q| {
+            q.push(NativeSeed {
+                generation: 4,
+                epoch: 1,
+                origin: SeedOrigin::Export,
+                sample: reader::sample(m.p1(), 0.37),
+            })
+        });
+        m.update(&mut g, 0);
+        assert_eq!(g.step, Step::Entering);
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+        QUEUE.with_borrow_mut(|q| {
+            q.push(NativeSeed {
+                generation: 5,
+                epoch: 1,
+                origin: SeedOrigin::Export,
+                sample: reader::sample(m.p1(), 0.37),
+            })
+        });
+        m.update(&mut g, 66);
+        assert_eq!(g.step, Step::Failed);
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+    }
+}
+#[test]
+fn olimar_ordinary_attacker_still_requests_configured_catch_immediately() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut g = olimar(&mut m, 0);
+        g.requested.as_mut().unwrap().attacker_kind = 42;
+        m.body[3] = 42;
+        m.update(&mut g, 0);
+        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 50)]);
+        assert_eq!(ARMED.load(Ordering::Relaxed), g.generation);
+    }
+}
+
+#[test]
+fn roller_starts_real_special_and_drives_forward_until_actual_bury_seed() {
+    unsafe {
+        for facing in [-1.0f32, 1.0] {
+            let mut m = NativeMemory::new();
+            let mut g = Game::new(Plan::Roller, State::Bury);
+            g.requested.as_mut().unwrap().id = 102;
+            g.requested.as_mut().unwrap().attacker_kind = 65;
+            m.body[3] = 65;
+            assert_eq!(entry::start(g.requested.unwrap()), Some("FIGHTER_STATUS_KIND_SPECIAL_S"));
+            startup(&mut g, m.p1());
+            assert_eq!(ARMED.load(Ordering::Relaxed), 5);
+            ROLLER_LR.store(facing.to_bits(), Ordering::Relaxed);
+            CPU_STATUS.store(477, Ordering::Relaxed);
+            m.update(&mut g, 0);
+            let input = DRIVEN.with_borrow(|v| *v.last().unwrap());
+            assert_eq!((input.buttons,input.lstick_x,input.lstick_y), (0,if facing>0.0 {120}else{-120},0));
+            assert!(g.clock.is_none());
+            CPU_STATUS.store(486, Ordering::Relaxed);
+            m.update(&mut g, 0);
+            m.seed(136.25, 9.0, 1);
+            let actual = reader::sample(m.p1(),0.37).unwrap().seed();
+            m.start();
+            m.update(&mut g,75);
+            assert_eq!(g.step,Step::Held);
+            assert_eq!(g.clock.unwrap().last(),actual.record);
+            assert_eq!(BEGINS.with_borrow(Vec::len),1);
+            assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()),MappedInputs::NEUTRAL);
+        }
+    }
+}
+#[test]
+fn roller_miss_and_nonbury_seed_still_fail() {
+    unsafe {
+        let mut m=NativeMemory::new();
+        let mut g=Game::new(Plan::Roller,State::Bury);
+        startup(&mut g,m.p1());
+        CPU_STATUS.store(477,Ordering::Relaxed);m.update(&mut g,0);
+        CPU_STATUS.store(0,Ordering::Relaxed);m.update(&mut g,0);
+        assert_eq!(g.failed,Some("Move did not capture · reopen menu to retry"));
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+        let mut g=Game::new(Plan::Roller,State::Bury);startup(&mut g,m.p1());
+        m.seed(100.0,9.0,1);m.start();m.update(&mut g,203);
+        assert_eq!(g.failed,Some("Move entry unconfirmed · no grade"));
         assert!(BEGINS.with_borrow(Vec::is_empty));
     }
 }

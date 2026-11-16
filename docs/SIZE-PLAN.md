@@ -353,3 +353,14 @@ such as `const X: [T; N] = …`, `-> [T; N] {` and `use a::{b};` was partly coun
 read like other code (a macro call's body stays opaque). 648 lines in 44 files left the count on each measured tree:
 `ed0d7a35` 141,975 → 141,327; `c5191271` 141,917 → 141,269; rc.14 integration `12dee86d` 143,828 → 143,180. Tests:
 `tools/test_size_gate.py` `TestAndSimulator`.
+
+### rc.15 Lucas112 native charge release (2026-11-16)
+
+The full canonical Surface gate measured f02e9790 at 150945 to 4ff7cf28 at 150963
+rustfmt-sloc4 lines (+18). The primary explicitly approved Lucas Frozen+18
+at 22:48Z under the operator rc.15 size ruling. The unchanged size gate still
+reports RED against 148194; counter, formatter rules and size-budget.toml remain
+unchanged. Final measured rc.15 ceiling adjustment belongs to final integration
+under operator approval. Evidence: lucas-gate-4ff7cf28-surface/BUDGET-ENTRY.md
+and its retained canonical gate receipts. This records the Lucas allowance only;
+Olimar40 and Inkling102 combined size/build/runtime gates are still pending.

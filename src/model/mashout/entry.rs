@@ -11,7 +11,7 @@ pub fn start(move_: Scenario) -> Option<&'static str> {
             _ => "FIGHTER_STATUS_KIND_CATCH",
         },
         Plan::AirSideSpecial => "FIGHTER_STATUS_KIND_JUMP_SQUAT",
-        Plan::SideSpecial | Plan::Cling | Plan::Drag | Plan::Whip => {
+        Plan::SideSpecial | Plan::Cling | Plan::Drag | Plan::Whip | Plan::Roller => {
             "FIGHTER_STATUS_KIND_SPECIAL_S"
         }
         Plan::Egg | Plan::Inhale | Plan::NeutralSpecial | Plan::Freeze => "FIGHTER_STATUS_KIND_SPECIAL_N",
