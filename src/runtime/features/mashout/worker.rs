@@ -77,6 +77,9 @@ fn show(worker: &mut Worker, text: &str) {
     let _ = core::fmt::Write::write_str(&mut worker.shown, text);
     if text.is_empty() {
         notices::clear(NOTICE_ID);
+    } else if worker.session.phase() == crate::model::mashout::run::Phase::Done {
+        // Reuse the foreground standing notice: queued roster toasts wait behind the result.
+        notices::show_now(NOTICE_ID, "Mash out", text, u16::MAX, DEFAULT_COLOR);
     } else {
         notices::upsert(NOTICE_ID, "Mash out", text, u16::MAX, DEFAULT_COLOR);
     }
