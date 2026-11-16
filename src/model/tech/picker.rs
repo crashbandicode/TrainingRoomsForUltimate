@@ -29,7 +29,9 @@ pub struct Picker {
     pub hovered: Option<Spot>,
     pub selected: Option<Spot>,
     stage: i32,
-    kept: [Option<(i32, Spot)>; 8],
+    // Only world data crosses stage lifetimes; native line ids never do.
+    kept: [Option<(i32, Vec2, Option<Kind>)>; 8],
+    restore: Option<(Vec2, Option<Kind>)>,
     previous: u16,
     repeat: u8,
 }
@@ -40,37 +42,51 @@ impl Picker {
         selected: None,
         stage: -1,
         kept: [None; 8],
+        restore: None,
         previous: 0,
         repeat: 0,
     };
+    /// Begin discovery for a stage lifetime, including reloads of the same id.
+    /// Save only world data and discard every borrowed native-line snapshot.
     pub fn enter(&mut self, stage: i32, here: Vec2) {
-        if stage == self.stage {
-            return;
-        }
         if let Some(spot) = self.selected {
+            let remembered = (self.stage, spot.point, spot.line.kind());
             if let Some(entry) = self
                 .kept
                 .iter_mut()
                 .flatten()
                 .find(|entry| entry.0 == self.stage)
             {
-                entry.1 = spot;
+                *entry = remembered;
             } else {
                 self.kept.rotate_left(1);
-                self.kept[7] = Some((self.stage, spot));
+                self.kept[7] = Some(remembered);
             }
         }
-        self.selected = self
+        self.restore = self
             .kept
             .iter()
             .flatten()
-            .find(|s| s.0 == stage)
-            .map(|s| s.1);
-        self.cursor = self.selected.map(|s| s.point).unwrap_or(here);
-        self.stage = stage;
+            .find(|entry| entry.0 == stage)
+            .map(|entry| (entry.1, entry.2));
+        self.cursor = self.restore.map(|(point, _)| point).unwrap_or(here);
+        self.selected = None;
         self.hovered = None;
+        self.stage = stage;
         self.previous = 0;
         self.repeat = 0;
+    }
+    /// One restoration attempt after current-stage surface discovery completes.
+    /// Bind the remembered world point to a fresh targetable line of its kind.
+    /// Further calls do not update a same-stage selection or drag a moved line.
+    pub fn restore(&mut self, surfaces: &Surfaces) -> bool {
+        let Some((point, kind)) = self.restore.take() else {
+            return false;
+        };
+        self.selected = surfaces
+            .nearest(point, kind)
+            .map(|(line, point)| Spot { line, point });
+        self.selected.is_some()
     }
     /// The full camera rectangle is [left,right,top,bottom]; unlike BTT targets,
     /// Tech points have no ground-minus-ten lower limit.

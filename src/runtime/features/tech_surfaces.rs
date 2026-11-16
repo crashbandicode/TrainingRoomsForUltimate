@@ -218,7 +218,7 @@ impl PlatformScan {
         };
         match unsafe { source.ray(ray.origin, ray.delta) } {
             Ok(Some((line, hit))) => {
-                if self.rays.hit(hit).is_err() {
+                if self.rays.hit(line, hit).is_err() {
                     return ScanState::Broken;
                 }
                 if line.passable && line.kind().is_some() && !surfaces.push(line) {

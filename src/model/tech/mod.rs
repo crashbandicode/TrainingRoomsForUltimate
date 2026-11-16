@@ -44,3 +44,6 @@ mod integration_tests;
 pub mod planner;
 
 mod placing;
+
+#[cfg(test)]
+mod epoch_tests;

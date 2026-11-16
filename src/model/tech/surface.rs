@@ -93,7 +93,16 @@ pub enum Walk {
     Full,
 }
 
+/// Borrowed line ids are scoped to the native stage/form and the owned Training
+/// receipt, which carries scene generation (and conservatively entry generation).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StageEpoch {
+    pub stage: i32,
+    pub form: u32,
+    pub training: crate::model::cpu::role::FrameReceipt,
+}
 pub struct Surfaces {
+    epoch: Option<StageEpoch>,
     lines: [Option<Line>; MAX_LINES],
     len: usize,
     cursor: Option<(usize, usize)>,
@@ -102,14 +111,27 @@ pub struct Surfaces {
 }
 impl Surfaces {
     pub const EMPTY: Self = Self {
+        epoch: None,
         lines: [None; MAX_LINES],
         len: 0,
         cursor: None,
         seed: 0,
         state: Walk::Broken,
     };
+    /// Clear walk, cursor, seed and every raw line id before using a new epoch.
+    pub fn bind(&mut self, epoch: StageEpoch) -> bool {
+        if self.epoch == Some(epoch) {
+            return false;
+        }
+        *self = Self {
+            epoch: Some(epoch),
+            ..Self::EMPTY
+        };
+        true
+    }
     pub fn begin(&mut self, seed: usize, far_end: usize) {
         *self = Self {
+            epoch: self.epoch,
             cursor: Some((seed, far_end)),
             seed,
             state: Walk::More,

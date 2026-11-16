@@ -18,7 +18,7 @@ use crate::model::tech::{
     planner,
     session::{Bests, Length, Phase},
     solver,
-    surface::{Kind, Surfaces, Walk},
+    surface::{Kind, StageEpoch, Surfaces, Walk},
     Vec2,
 };
 use crate::model::tech_launch::{FlightParams, Launcher};
@@ -63,9 +63,8 @@ struct Practice {
     approximate: bool,
     scan: Option<PlatformScan>,
     scan_done: bool,
-    stage: i32,
+    epoch: Option<StageEpoch>,
     fighter_kind: i32,
-    identity: crate::model::cpu::role::FrameReceipt,
     rng: Rng,
     after_reaction: u16,
     planning_failed: bool,
@@ -315,6 +314,13 @@ pub unsafe fn frame(fighter: usize) {
         return;
     }
     if !scene::is_native_training() {
+        {
+            let mut view = VIEW.lock();
+            view.picker.enter(-1, Vec2::default());
+            view.surfaces = Surfaces::EMPTY;
+            view.range = None;
+            view.start = false;
+        }
         LIVE.with(|slot| {
             if let Some(mut run) = slot.borrow_mut().take() {
                 run.controller.stop(&mut run.adapter);
@@ -378,9 +384,8 @@ pub unsafe fn frame(fighter: usize) {
                 approximate: false,
                 scan: None,
                 scan_done: false,
-                stage: -1,
+                epoch: None,
                 fighter_kind,
-                identity,
                 rng: Rng::new(Rng::seed_from(
                     skyline::nn::os::GetSystemTick() as u64,
                     at as u64,
@@ -402,16 +407,22 @@ pub unsafe fn frame(fighter: usize) {
             return;
         }
         let stage = natives::stage_id();
-        let Some(range) = natives::camera_limit_range() else {
+        let Some(form) = natives::stage_form(stage) else {
             return;
         };
-        let Some(mut source) = NativeSource::new(at) else {
-            return;
+        let epoch = StageEpoch {
+            stage,
+            form,
+            training: identity,
         };
-        if stage != run.stage {
+        if run.epoch != Some(epoch) {
             run.controller.stop(&mut run.adapter);
-            run.stage = stage;
-            run.scan = PlatformScan::new(range);
+            run.epoch = Some(epoch);
+            run.sampled = None;
+            run.pending = false;
+            run.planning_failed = false;
+            PLACING.store(false, Ordering::Release);
+            run.scan = None;
             run.scan_done = false;
             let mut view = VIEW.lock();
             view.picker.enter(
@@ -422,8 +433,17 @@ pub unsafe fn frame(fighter: usize) {
                 },
             );
             view.start = false;
-            view.surfaces = Surfaces::EMPTY;
+            Surfaces::bind(&mut view.surfaces, epoch);
         }
+        let Some(range) = natives::camera_limit_range() else {
+            return;
+        };
+        if run.scan.is_none() {
+            run.scan = PlatformScan::new(range);
+        }
+        let Some(mut source) = NativeSource::new(at) else {
+            return;
+        };
         {
             let mut view = VIEW.lock();
             view.range = Some(range);
@@ -451,9 +471,14 @@ pub unsafe fn frame(fighter: usize) {
                 return;
             }
         }
-        let owner_changed = run.identity != identity;
-        run.identity = identity;
-        if restart || owner_changed || run.controller.session.phase == Phase::Off {
+        {
+            let mut view = VIEW.lock();
+            let ViewState {
+                picker, surfaces, ..
+            } = &mut *view;
+            Picker::restore(picker, surfaces);
+        }
+        if restart || run.controller.session.phase == Phase::Off {
             START.store(false, Ordering::Release);
             RESET.store(false, Ordering::Release);
             if run.controller.session.phase != Phase::Off {

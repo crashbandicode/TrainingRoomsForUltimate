@@ -233,8 +233,19 @@ fn point_picker_reaches_underside_and_remembers_stage() {
     assert_eq!(arrow[1].y, -45.);
     picker.enter(4, Vec2::default());
     assert!(picker.selected.is_none());
+    assert!(picker.hovered.is_none());
     picker.enter(3, Vec2::default());
+    assert!(
+        picker.selected.is_none(),
+        "discovery must rebind the saved point"
+    );
+    assert_eq!(picker.cursor, Vec2 { x: 0., y: -40. });
+    let mut reloaded = Surfaces::EMPTY;
+    reloaded.push(ceiling(101, -40.));
+    assert!(picker.restore(&reloaded));
     assert_eq!(picker.selected.unwrap().point.y, -40.);
+    assert_eq!(picker.selected.unwrap().line.id, 101);
+    assert_ne!(picker.selected.unwrap().line.id, line.id);
 }
 #[test]
 fn random_spot_refreshes_lines_and_clips_camera_before_sampling() {
@@ -438,11 +449,34 @@ fn stage_point_cache_returns_the_latest_choice() {
     picker.enter(3, Vec2::default());
     picker.selected = Some(first);
     picker.enter(4, Vec2::default());
+    let other = picker::Spot {
+        line: ceiling(9, -60.),
+        point: Vec2 { x: -5., y: -60. },
+    };
+    picker.selected = Some(other);
     picker.enter(3, Vec2::default());
+    assert_eq!(picker.cursor, first.point);
+    let mut first_return = Surfaces::EMPTY;
+    first_return.push(ceiling(101, -40.));
+    assert!(picker.restore(&first_return));
     picker.selected = Some(second);
     picker.enter(4, Vec2::default());
+    assert_eq!(
+        picker.cursor, other.point,
+        "each stage keeps its own latest point"
+    );
+    assert!(picker.selected.is_none());
     picker.enter(3, Vec2::default());
-    assert_eq!(picker.selected, Some(second));
+    assert_eq!(picker.cursor, second.point);
+    assert!(picker.selected.is_none());
+    let mut second_return = Surfaces::EMPTY;
+    second_return.push(ceiling(201, -40.));
+    second_return.push(ceiling(202, -20.));
+    assert!(picker.restore(&second_return));
+    let restored = picker.selected.unwrap();
+    assert_eq!(restored.point, second.point);
+    assert_eq!(restored.line.id, 202);
+    assert_ne!(restored.line.id, second.line.id);
 }
 
 #[test]
@@ -491,4 +525,55 @@ fn unavailable_press_calibration_never_becomes_zero_or_an_average_sample() {
     let mut label = String::new();
     Grade::Perfect(None).write(&mut label).unwrap();
     assert_eq!(label, "Perfect · timing unavailable");
+}
+
+#[test]
+fn same_stage_rediscovery_rebinds_once_and_preserves_moved_line_refusal() {
+    let mut picker = picker::Picker::EMPTY;
+    let old = picker::Spot {
+        line: ceiling(7, -40.),
+        point: Vec2 { x: 10., y: -40. },
+    };
+    picker.enter(3, Vec2::default());
+    picker.selected = Some(old);
+    picker.hovered = Some(old);
+
+    // A new native scene may use the same stage id and completely new line ids.
+    picker.enter(3, Vec2 { x: 90., y: 90. });
+    assert_eq!(picker.cursor, old.point);
+    assert!(picker.selected.is_none());
+    assert!(picker.hovered.is_none());
+    let fresh = ceiling(8, -40.);
+    let mut surfaces = Surfaces::EMPTY;
+    surfaces.push(fresh);
+    assert!(picker.restore(&surfaces));
+    let restored = picker.selected.unwrap();
+    assert_eq!(restored.line, fresh);
+    assert_eq!(restored.point, old.point);
+    let mut source = Lines(vec![fresh]);
+    assert!(restored.current(&mut source));
+
+    source.0[0].ends[0].x += 0.001;
+    assert!(!restored.current(&mut source));
+    let mut moved_surfaces = Surfaces::EMPTY;
+    moved_surfaces.push(source.0[0]);
+    assert!(!picker.restore(&moved_surfaces), "restoration is one shot");
+    assert_eq!(
+        picker.selected,
+        Some(restored),
+        "never silently rebind a moved line"
+    );
+    assert!(!picker.selected.unwrap().current(&mut source));
+}
+
+#[test]
+fn restoring_without_a_saved_point_does_not_choose_a_surface() {
+    let mut picker = picker::Picker::EMPTY;
+    let here = Vec2 { x: 5., y: -39. };
+    picker.enter(3, here);
+    let mut surfaces = Surfaces::EMPTY;
+    surfaces.push(ceiling(1, -40.));
+    assert!(!picker.restore(&surfaces));
+    assert_eq!(picker.cursor, here);
+    assert!(picker.selected.is_none());
 }
