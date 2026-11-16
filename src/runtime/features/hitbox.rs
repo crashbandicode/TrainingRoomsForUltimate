@@ -1002,7 +1002,9 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
 #[skyline::hook(offset = sites_hitbox::HITBOX_ATTACK_OFFSET)]
 pub unsafe fn hitbox_attack_hook(lua_state: usize) {
     animation_command(lua_state, hitbox::ATTACK, false);
-    call_original!(lua_state)
+    call_original!(lua_state);
+    #[cfg(feature = "diag")]
+    super::tech_spike::attack(lua_state);
 }
 
 /// `sv_animcmd::CATCH`: the plugin part first, then the game's own command.
