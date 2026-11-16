@@ -263,14 +263,37 @@ type P1 = ([f32; 3], [eggs::Hit; hitbox::SLOTS as usize], usize, bool, i32);
 /// `at` is a live fighter's accessor.
 unsafe fn p1_read(at: usize) -> P1 {
     let top = natives::joint_position(at, hash40("top"), &[0.0; 3]).unwrap_or_default();
+    let (hits, n) = object_hits(at);
+    let (aerial, kind) = (natives::status_kind(at) == eggs::ATTACK_AIR, natives::fighter_kind(at));
+    (top, hits, n, aerial, kind.unwrap_or(-1))
+}
+
+/// Native attack pills of a live fighter or article, independent of visualizer settings.
+unsafe fn object_hits(at: usize) -> ([eggs::Hit; hitbox::SLOTS as usize], usize) {
     let (mut wants, mut len) = ([Sphere::NONE; 2 * hitbox::SLOTS as usize], 0);
     hitbox::want_hitboxes(&mut GameAttacks(at), &mut wants, &mut len);
     let mut hits = [eggs::Hit::default(); hitbox::SLOTS as usize];
     let place = |s: &Sphere| natives::joint_position(at, s.joint, &s.pos);
     let power = |slot| GameAttacks(at).read_f32(GameAttacks(at).data(slot) + layout::POWER);
     let n = eggs::pills(&wants[..len], place, power, &mut hits);
-    let (aerial, kind) = (natives::status_kind(at) == eggs::ATTACK_AIR, natives::fighter_kind(at));
-    (top, hits, n, aerial, kind.unwrap_or(-1))
+    (hits, n)
+}
+
+unsafe fn btt_projectile_hit(owner: usize, spot: [f32; 2]) -> bool {
+    crate::model::btt::projectile_breaks(btt::projectiles(), spot,
+        |kind, ordinal| state_natives::article_get_from_no(owner, kind, ordinal),
+        |article| {
+            let id = state_natives::article_object_id(article);
+            if !state_natives::object_is_active(id) { return None; }
+            let at = state_natives::object_accessor(id);
+            if !crate::model::btt::pointer_ok(at) { return None; }
+            let (hits, n) = object_hits(at);
+            #[cfg(feature = "diag")]
+            if hits[..n].iter().any(|h| eggs::breaks(eggs::ANY, false, h, spot)) {
+                crate::runtime::diag_log::diagnostic(format_args!("[Btt] projectile id={id:#x} owner={owner:#x} at={at:#x} hits={n} target={spot:?}"));
+            }
+            Some((hits, n))
+        })
 }
 
 /// Break the Targets' pass (`runtime::features::btt`): Player 1's entry-0 fighters read the same pills Eggs-ercise does, while the mode
@@ -281,9 +304,14 @@ unsafe fn btt_pass(fighter: usize) -> Option<()> {
     let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
     let (top, hits, n, aerial, _) = btt::reading().then(|| p1_read(at)).unwrap_or_default();
     let rule = EGG_ROWS.load(Ordering::Acquire).to_le_bytes()[1];
-    let broke = btt::pass(at, top, |spot| hits[..n].iter().any(|h| eggs::breaks(rule, aerial, h, spot)));
+    let mut melee = false;
+    let broke = btt::pass(at, top, |spot| {
+        let hit = hits[..n].iter().any(|h| eggs::breaks(rule, aerial, h, spot));
+        melee |= hit;
+        hit || btt_projectile_hit(at, spot)
+    });
     // V2.1: the fighter whose attack broke a target freezes, as on a hit.
-    let frames = (broke > 0).then(scene::facts).and_then(eggs::hitlag)?;
+    let frames = (broke > 0 && melee).then(scene::facts).and_then(eggs::hitlag)?;
     let _ = natives::set_hit_stop_frame(at, frames, false);
     Some(())
 }

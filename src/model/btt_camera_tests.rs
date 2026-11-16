@@ -64,6 +64,28 @@ fn btt_camera_stands_down_without_a_manager() {
     assert_eq!(cam.step(false, Some(FIXED)), None);
 }
 
+fn btt_camera_restores_each_placement_exit() {
+    use crate::model::scene::Facts;
+    let practice = Facts { native_training: true, ..Facts::default() };
+    for before in [NORMAL, ZOOM, FIXED] {
+        for phase in [Phase::Off, Phase::Ready, Phase::Running, Phase::Done] {
+            let mut cam = Camera::IDLE;
+            assert_eq!(cam.step(wants_camera(Phase::Placing, false, practice), Some(before)), (before != FIXED).then_some(FIXED));
+            assert_eq!(cam.step(wants_camera(phase, false, practice), Some(FIXED)), (before != FIXED).then_some(before));
+            assert!(!cam.holding(), "{phase:?}");
+        }
+        for (covered, facts) in [(true, practice), (false, Facts { busy: true, ..practice }), (false, Facts::default())] {
+            let mut cam = Camera::IDLE;
+            cam.step(true, Some(before));
+            assert_eq!(cam.step(wants_camera(Phase::Placing, covered, facts), Some(FIXED)), (before != FIXED).then_some(before));
+            assert!(!cam.holding());
+        }
+    }
+    let mut cam = Camera::IDLE;
+    cam.step(true, Some(NORMAL));
+    assert_eq!(cam.step(false, Some(ZOOM)), Some(NORMAL), "an intervening mode cannot replace the saved mode");
+}
+
 fn btt_camera_manager_pointer_is_checked_before_it_is_read() {
     // A manager pointer is aligned and not in the first pages.
     assert!(pointer_ok(0x0000_0042_1234_5678 & !7));
@@ -79,6 +101,7 @@ fn case_table() {
         ("btt_camera_switches_by_state", btt_camera_switches_by_state as fn()),
         ("btt_camera_reasserts_at_a_rate_and_keeps_the_first_mode", btt_camera_reasserts_at_a_rate_and_keeps_the_first_mode as fn()),
         ("btt_camera_stands_down_without_a_manager", btt_camera_stands_down_without_a_manager as fn()),
+        ("btt_camera_restores_each_placement_exit", btt_camera_restores_each_placement_exit as fn()),
         ("btt_camera_manager_pointer_is_checked_before_it_is_read", btt_camera_manager_pointer_is_checked_before_it_is_read as fn()),
     ]);
 }

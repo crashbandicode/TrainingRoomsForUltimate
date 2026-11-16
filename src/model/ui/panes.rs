@@ -444,9 +444,11 @@ pub const EGG_PANES: usize = EGGS + BURSTS + 1;
 pub const IDX_EGG: usize = IDX_ORB + ORBS;
 /// Each `EggPicture`'s panes: (first, count) after `IDX_EGG`.
 pub const EGG_POOLS: [(usize, usize); 3] = [(0, EGGS), (EGGS, BURSTS), (EGGS + BURSTS, 1)];
+/// Compact Break the Targets HUD: container, plate, existing target picture, one-line text.
+pub const IDX_BTT: usize = IDX_EGG + EGG_PANES;
 /// How many panes the plugin adds to the layout.
 #[cfg(test)]
-pub const COUNT: usize = IDX_EGG + EGG_PANES;
+pub const COUNT: usize = IDX_BTT + 4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EggPicture {
@@ -900,6 +902,10 @@ pub const fn name_of(index: usize) -> Name {
         i if i >= IDX_EGG && i < IDX_EGG + EGGS => Name::indexed("tr_egg_", i - IDX_EGG),
         i if i >= IDX_EGG + EGGS && i < IDX_EGG + EGGS + BURSTS => Name::indexed("tr_eggcr_", i - IDX_EGG - EGGS),
         i if i == IDX_EGG + EGGS + BURSTS => Name::new("tr_egg_cursor"),
+        IDX_BTT => Name::new("TrBtt"),
+        i if i == IDX_BTT + 1 => Name::new("TrBttPlate"),
+        i if i == IDX_BTT + 2 => Name::new("TrBttChip"),
+        i if i == IDX_BTT + 3 => Name::new("TrBttText"),
         IDX_MENU => ROOT,
         IDX_NOTICE => Name::new("TrModDisp0"),
         IDX_NOTICE_HEADER_PLATE => Name::new("TrModDisp0HdrPlate"),
@@ -1074,6 +1080,15 @@ pub const fn notice_y(raised: bool, strip: bool, bar: bool) -> f32 {
     [NOTICE_ORIGIN_Y, band][(raised && !bar) as usize]
 }
 
+/// Top-left compact HUD, in canvas units; the text and target chip stay on one line.
+pub fn btt_hud_box(body: &str, strip: bool, bar: bool) -> [f32; 4] {
+    let wide = body.chars().count() > 18;
+    let width = if wide { (body.chars().count() as f32 * 13.0 + 64.0).clamp(600.0, 1000.0) } else { 276.0 };
+    let y = if wide && bar { iv::STRIP_Y + cb::SEQ_BAR_Y - cb::BAR_H / 2.0 - 32.0 }
+        else if wide && strip { iv::STRIP_Y - iv::STRIP_H / 2.0 - 32.0 } else { 504.0 };
+    [-936.0, y, width, 48.0]
+}
+
 /// Pane `index`'s kind and place.
 pub const fn spec(index: usize) -> Spec {
     let name = name_of(index);
@@ -1082,6 +1097,10 @@ pub const fn spec(index: usize) -> Spec {
         IDX_ORBS => container(name, ROOT_PANE, [0.0, 0.0, 1920.0, 1080.0]),
         i if i >= IDX_ORB && i < IDX_ORB + ORBS => under(rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false), name_of(IDX_ORBS)),
         i if i >= IDX_EGG && i < IDX_EGG + EGG_PANES => under(rect(name, [0.0, 0.0, 64.0, 64.0], [255; 4], false), ROOT_PANE),
+        IDX_BTT => container(name, ROOT_PANE, [-936.0, 504.0, 1000.0, 48.0]),
+        i if i == IDX_BTT + 1 => under(rect(name, [138.0, 0.0, 276.0, 48.0], PANEL, true), name_of(IDX_BTT)),
+        i if i == IDX_BTT + 2 => under(rect(name, [26.0, 0.0, 32.0, 32.0], [255; 4], true), name_of(IDX_BTT)),
+        i if i == IDX_BTT + 3 => under(text(name, [158.0, 0.0, 212.0, 40.0], Align::Left, (13.0, 24.0), 96, TEXT), name_of(IDX_BTT)),
         IDX_MENU => container(name, ROOT_PANE, [0.0, 0.0, 1920.0, 1080.0]),
         IDX_NOTICE => container(name, ROOT_PANE, [0.0, NOTICE_ORIGIN_Y, 1920.0, 1080.0]),
         IDX_NOTICE_HEADER_PLATE => under(rect(name, padded(NOTICE_HEADER_BOX), NOTICE_PLATE, true), name_of(IDX_NOTICE)),

@@ -245,4 +245,5 @@ pub static DEFS: [Def; COUNT] = [
     Def { id: "tech_delay_range", kind: Kind::Slider, len: 2, default: &[20, 20] },
     row!("tech_camera", Single, 2, [0]),
 
+    row!("btt_projectiles", Single, 2, [1]),
 ];

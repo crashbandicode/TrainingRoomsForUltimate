@@ -169,7 +169,7 @@ fn btt_rows_and_help() {
 fn btt_placing_inputs() {
     let mut s = Sim::placing();
     assert_eq!((s.btt.phase(), s.btt.cursor()), (Phase::Placing, Some([0.0, 15.0])), "the stage centre, one fighter up");
-    assert_eq!(s.text(), "Place targets 0/10   A place  B undo  X start");
+    assert_eq!(s.text(), "0/10   A place  B undo  X start");
     assert!(s.frame(&[], [0.0; 2]), "Placing keeps P1's controller from the game");
     s.tap(&[A]);
     assert_eq!(s.btt.layout(), [[0.0, 15.0]]);
@@ -180,7 +180,7 @@ fn btt_placing_inputs() {
     s.push([1.0, 0.0], 6);
     assert_eq!(s.btt.cursor(), Some([12.0, 15.0]));
     s.tap(&[A]);
-    assert_eq!((s.btt.layout().len(), s.text()), (2, "Place targets 2/10   A place  B undo  X start".to_owned()));
+    assert_eq!((s.btt.layout().len(), s.text()), (2, "2/10   A place  B undo  X start".to_owned()));
     for (x, y) in [(-80.0, 15.0), (-40.0, 15.0), (40.0, 15.0), (80.0, 15.0), (-80.0, 55.0), (-40.0, 55.0), (0.0, 55.0), (40.0, 55.0)] {
         s.place_at(x, y);
     }
@@ -243,7 +243,7 @@ fn btt_overlap_rule_is_strict_at_apart() {
         (s.btt.layout().len() == 2, s.text())
     };
     let refused = "Too close to another target".to_owned();
-    let placed = "Place targets 2/10   A place  B undo  X start".to_owned();
+    let placed = "2/10   A place  B undo  X start".to_owned();
     assert_eq!(second(7, 0), (false, refused.clone()), "7.0 apart, along x");
     assert_eq!(second(8, 0), (true, placed.clone()), "exactly 8.0 apart, along x: accepted");
     assert_eq!(second(0, 7), (false, refused.clone()), "7.0 apart, along y");
@@ -374,13 +374,13 @@ fn btt_ready_waits_for_input() {
         s.place_at(x, 15.0);
     }
     s.tap(&[X]);
-    assert_eq!((s.btt.phase(), s.text()), (Phase::Ready, "Targets 0/3   0:00.00".to_owned()));
+    assert_eq!((s.btt.phase(), s.text()), (Phase::Ready, "0/3 0:00.00".to_owned()));
     assert!(!s.frame(&[], [0.0; 2]), "Ready gives P1's controller back");
     for _ in 0..200 {
         pass(&mut s.btt, &[]);
         s.frame(&[], [0.0; 2]);
     }
-    assert_eq!((s.btt.phase(), s.text()), (Phase::Ready, "Targets 0/3   0:00.00".to_owned()), "the clock waits");
+    assert_eq!((s.btt.phase(), s.text()), (Phase::Ready, "0/3 0:00.00".to_owned()), "the clock waits");
     // A stick inside the dead zone is not an input; a button is.
     s.frame(&[], [0.1, 0.1]);
     assert_eq!(s.btt.phase(), Phase::Ready);
@@ -389,7 +389,7 @@ fn btt_ready_waits_for_input() {
     for _ in 0..60 {
         pass(&mut s.btt, &[]);
     }
-    assert_eq!(s.text(), "Targets 0/3   0:01.00", "a second of game frames, in hundredths");
+    assert_eq!(s.text(), "0/3 0:01.00", "a second of game frames, in hundredths");
     // A stick out of its dead zone is an input, but one still tilted from the cursor when X was pressed is not.
     let mut s = Sim::placing();
     s.place_at(0.0, 15.0);
@@ -410,7 +410,7 @@ fn btt_run_and_best() {
         pass(&mut s.btt, &[]);
     }
     assert_eq!(pass(&mut s.btt, &[hit_at([-20.0, 15.0])]), [[-20.0, 15.0]]);
-    assert_eq!(s.text(), "Targets 1/3   0:00.51", "31 frames in");
+    assert_eq!(s.text(), "1/3 0:00.51", "31 frames in");
     // A hit that misses breaks nothing; a hit on two targets breaks both and tells the runtime twice (the hitlag).
     assert!(pass(&mut s.btt, &[hit_at([5.0, 40.0])]).is_empty());
     let both = [Hit([0.0, 15.0, 0.0], [20.0, 15.0, 0.0], 3.0, 0.0)];
@@ -425,7 +425,7 @@ fn btt_run_and_best() {
     for _ in 0..80 {
         pass(&mut s.btt, &[]);
     }
-    assert_eq!((s.btt.phase(), s.text(), count(&s.btt, EggPicture::Whole)), (Phase::Ready, "Targets 0/3   0:00.00".to_owned(), 3));
+    assert_eq!((s.btt.phase(), s.text(), count(&s.btt, EggPicture::Whole)), (Phase::Ready, "0/3 0:00.00".to_owned(), 3));
     // A faster run on the same layout replaces the best; a slower one does not.
     run_three(&mut s, 30);
     assert_eq!(s.text(), "Done! 3 in 0:00.50 (best 0:00.50)");
@@ -438,7 +438,7 @@ fn btt_run_and_best() {
     for _ in 0..50 {
         s.btt.pass(false, |_| false);
     }
-    assert_eq!(s.text(), "Targets 0/3   0:00.00");
+    assert_eq!(s.text(), "0/3 0:00.00");
     // Changing the layout starts a new best: a fourth target shows only its own time.
     s.btt.close_menu(true, true);
     s.place_at(40.0, 15.0);
@@ -460,9 +460,9 @@ fn btt_restart() {
         pass(&mut s.btt, &[]);
     }
     pass(&mut s.btt, &[hit_at([0.0, 15.0])]);
-    assert_eq!(s.text(), "Targets 1/3   0:00.35");
+    assert_eq!(s.text(), "1/3 0:00.35");
     s.btt.reset();
-    assert_eq!((s.btt.phase(), s.text(), count(&s.btt, EggPicture::Whole)), (Phase::Ready, "Targets 0/3   0:00.00".to_owned(), 3));
+    assert_eq!((s.btt.phase(), s.text(), count(&s.btt, EggPicture::Whole)), (Phase::Ready, "0/3 0:00.00".to_owned(), 3));
     // A finished run's best survives both.
     run_three(&mut s, 30);
     s.btt.reset();
@@ -556,7 +556,7 @@ fn layout_save_makes_a_new_file_never_overwrites() {
     s.btt.adopt(three(), true);
     assert_eq!(s.text(), "Saved: Layout 3 · Battlefield");
     s.idle(130);
-    assert_eq!(s.text(), "Place targets 3/10   1/3 Layout 3 · Battlefield: 1", "the new file is chosen, first of the five");
+    assert_eq!(s.text(), "3/10   1/3 Layout 3 · Battlefield: 1", "the new file is chosen, first of the five");
 }
 
 /// Row 42 (btt-5): the Load chord puts the chosen layout's targets back, still Placing, and uses its file (the writer moves
@@ -567,7 +567,7 @@ fn layout_load_puts_the_targets_back() {
     s.btt.adopt(three(), false);
     s.tap(&[ZL, DPAD_RIGHT]);
     s.tap(&[ZL, DPAD_RIGHT]);
-    assert_eq!(s.text(), "Place targets 1/10   2/3 Ledge trap: 2");
+    assert_eq!(s.text(), "1/10   2/3 Ledge trap: 2");
     s.chord(false);
     assert_eq!((s.btt.layout(), s.text()), (&[[-30.0, 21.0], [10.0, 21.0]][..], "Loaded: Ledge trap".to_owned()));
     assert!(matches!(s.btt.take_ask(), Some(Ask::Use(id)) if id.as_str() == "ledge-trap"));
@@ -576,7 +576,7 @@ fn layout_load_puts_the_targets_back() {
     let f = *s.btt.five();
     s.btt.adopt(five_of(&[f[1].unwrap(), f[0].unwrap(), f[2].unwrap()]), false);
     s.idle(130);
-    assert_eq!(s.text(), "Place targets 2/10   1/3 Ledge trap: 2");
+    assert_eq!(s.text(), "2/10   1/3 Ledge trap: 2");
     s.tap(&[X]);
     assert_eq!(s.btt.phase(), Phase::Ready);
     // The Saved layouts screen's Load (the menu worker posts the layout).
@@ -600,7 +600,7 @@ fn layout_chords_step_the_hot_five() {
     assert_eq!((s.text(), s.btt.take_ask().is_none()), ("No saved layouts on this stage yet".to_owned(), true));
     s.btt.adopt(three(), false);
     s.idle(130);
-    assert_eq!(s.text(), "Place targets 1/10   A place  B undo  X start", "nothing chosen yet");
+    assert_eq!(s.text(), "1/10   A place  B undo  X start", "nothing chosen yet");
     let mut seen = vec![];
     for k in [DPAD_RIGHT, DPAD_RIGHT, DPAD_RIGHT, DPAD_RIGHT, DPAD_LEFT, DPAD_LEFT] {
         s.tap(&[ZL, k]);
@@ -685,7 +685,7 @@ fn btt_notice_reposts_after_off() {
     let mut s = ready_with_three();
     s.btt.pass(true, |_| false);
     let text = s.text();
-    assert_eq!((s.btt.notice().is_some(), text.as_str()), (true, "Targets 0/3   0:00.00"), "Ready, posted");
+    assert_eq!((s.btt.notice().is_some(), text.as_str()), (true, "0/3 0:00.00"), "Ready, posted");
     s.btt.close_menu(false, false);
     assert_eq!((s.btt.phase(), s.btt.notice().is_some(), s.text()), (Phase::Off, true, String::new()), "Off: the empty text, once");
     assert!(s.btt.notice().is_none(), "Off, nothing new");
@@ -698,6 +698,53 @@ fn btt_clock_keeper() {
     let mut b = Btt::IDLE;
     assert_eq!([b.keeper(1), b.keeper(2), b.keeper(1), b.keeper(2)], [true, false, true, false], "P1 then Nana: one tick a frame");
     assert_eq!([b.keeper(3), b.keeper(3), b.keeper(3)], [false, true, true], "a swapped-in fighter takes it after two missed passes");
+}
+
+fn btt_compact_hud_geometry() {
+    use crate::model::panes::{self as p, cb, iv, Kind};
+    for (strip, bar) in [(false, false), (true, false), (true, true)] {
+        let [x, y, w, h] = p::btt_hud_box("10/10 0:07.12", strip, bar);
+        assert_eq!([x, y, w, h], [-936.0, 504.0, 276.0, 48.0]);
+        assert!(x + w <= -iv::STRIP_W / 2.0 - 12.0, "left gutter clears the default strip by 8px at 1280w");
+        assert!(y - h / 2.0 > iv::STRIP_Y + cb::SEQ_BAR_Y + cb::BAR_H / 2.0, "the helper bar is below the compact run box");
+        let [_, py, _, ph] = p::btt_hud_box("3/10   A place  B undo  X start", strip, bar);
+        if bar { assert!(py + ph / 2.0 <= iv::STRIP_Y + cb::SEQ_BAR_Y - cb::BAR_H / 2.0 - 8.0); }
+        else if strip { assert!(py + ph / 2.0 <= iv::STRIP_Y - iv::STRIP_H / 2.0 - 8.0); }
+    }
+    assert_eq!(p::spec(p::IDX_BTT + 2).parent, p::name_of(p::IDX_BTT));
+    assert!(matches!(p::spec(p::IDX_BTT + 3).kind, Kind::Text { chars: 96, .. }));
+}
+
+fn btt_compact_hud_text() {
+    let mut s = Sim::placing();
+    assert_eq!(s.text(), "0/10   A place  B undo  X start");
+    s.tap(&[A]);
+    s.tap(&[X]);
+    assert_eq!(s.text(), "0/1 0:00.00");
+    s.tap(&[A]);
+    pass(&mut s.btt, &[]);
+    assert_eq!(s.text(), "0/1 0:00.01");
+}
+
+fn btt_projectiles_use_owned_native_hits() {
+    use std::cell::Cell;
+    let calls = Cell::new(0);
+    let own = |kind, ordinal| {
+        calls.set(calls.get() + 1);
+        if kind == 2 && ordinal < 2 { 0x1_0000 + ordinal as usize * 8 } else { 0 }
+    };
+    let read = |article| {
+        let mut hits = [Hit::default(); crate::model::hitbox::SLOTS as usize];
+        // Native capsule endpoints and radius, with no padding. P1's second article supplies the hit.
+        hits[0] = Hit([20.0, 15.0, 0.0], [24.0, 15.0, 0.0], 1.0, 1.0);
+        Some((hits, usize::from(article == 0x1_0008)))
+    };
+    assert!(!projectile_breaks(false, [22.0, 15.0], own, |_| panic!("Off reads no article")));
+    assert_eq!(calls.get(), 0);
+    assert!(projectile_breaks(true, [22.0, 15.0], own, read));
+    assert!(!projectile_breaks(true, [22.0, 15.0 + eggs::RADIUS + 1.001], own, read), "outside the native radius is a miss");
+    assert!(!projectile_breaks(true, [22.0, 15.0], |_, _| 0, |_| panic!("another owner's article never enters the reader")));
+    assert!(!projectile_breaks(true, [22.0, 15.0], |_, n| if n == 0 { 3 } else { 0 }, |_| panic!("misaligned article")));
 }
 
 /// The cases of this module in one table.
@@ -721,6 +768,9 @@ fn case_table() {
         ("btt_notice_reports_each_change", btt_notice_reports_each_change as fn()),
         ("btt_notice_reposts_after_off", btt_notice_reposts_after_off as fn()),
         ("btt_clock_keeper", btt_clock_keeper as fn()),
+        ("btt_compact_hud_geometry", btt_compact_hud_geometry as fn()),
+        ("btt_compact_hud_text", btt_compact_hud_text as fn()),
+        ("btt_projectiles_use_owned_native_hits", btt_projectiles_use_owned_native_hits as fn()),
     ]);
 }
 }

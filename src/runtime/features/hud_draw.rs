@@ -114,6 +114,7 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     let menu_open = owners.covers_hud();
     let strip_shown = !menu_open && input_display::sampling();
     write_notice(notice, &notices::hud_tick(!waiting && !notice.is_null()), strip_shown);
+    write_btt(root, menu_open, strip_shown);
     if strip[iv::at::CONTAINER] != 0 {
         input_display::hud_tick(menu_open, |local, look, changed| {
             write_look(strip[local] as *mut Pane, p::IDX_IV + local, look, changed)
@@ -230,3 +231,27 @@ unsafe fn write_notice(container: *mut Pane, out: &TickOut, strip: bool) {
     ));
 }
 
+
+
+// Compact BTT HUD: existing builders/target material, independent of the transient notice queue.
+unsafe fn write_btt(root: *mut Pane, covered: bool, strip: bool) {
+    let container = pane::find_child(root, p::name_of(p::IDX_BTT).as_bytes());
+    if container.is_null() { return; }
+    let body = crate::runtime::features::btt::hud();
+    pane::set_visible(container, !covered && !body.as_str().is_empty());
+    let [x, y, w, _] = p::btt_hud_box(body.as_str(), strip, crate::runtime::features::combo::bar_shown());
+    pane::set_pos(container, x, y);
+    let plate = find(container, p::IDX_BTT + 1);
+    if !plate.is_null() {
+        pane::set_pos(plate, w / 2.0, 0.0);
+        pane::set_width(plate, w);
+    }
+    let text = find(container, p::IDX_BTT + 3);
+    if !text.is_null() {
+        pane::set_pos(text, 52.0 + (w - 64.0) / 2.0, 0.0);
+        pane::set_width(text, w - 64.0);
+        let mut buffer = [0; crate::model::notify::BODY_MAX];
+        let n = crate::model::boot_notices::notice_units(body.as_str(), &mut buffer);
+        pane::set_text(text, &buffer[..n]);
+    }
+}

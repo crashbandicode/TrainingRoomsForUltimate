@@ -462,6 +462,8 @@ pub static ROWS: [Row; 127] = [
       "Hide: the CPU is hidden while a practice game runs.\nAfterwards it's as Hide CPU says. Show: it stays."),
     r(GAMES, "Break the Targets", "btt", Control::Dropdown(&o::BTT),
       "Place targets, then break them all against the clock.\nClosing the menu with no targets opens the placing view."),
+    r(GAMES, "Projectiles break targets", "btt_projectiles", Control::Dropdown(&o::BTT),
+      "Your articles' native hitboxes break targets while On.\nOff: only your fighter's attacks break targets."),
     r(GAMES, "Place targets", "btt_place", Control::Editor(Editor::PlaceTargets),
       "Close the menu into the placing view, stage zoomed out.\nStick moves, A places, B removes the last, X starts."),
     r(GAMES, "Saved layouts", "btt_layouts", Control::Editor(Editor::Layouts),
