@@ -1697,3 +1697,10 @@ ceiling = 150210
 date = "2026-11-16"
 reason = "rc.15 Stage tech v9 measured total on 0938ec33: 150210, +2016 over 148194. Lead-approved FOR OPERATOR REVIEW; final total set at integration. No code-counting change or feature removal."
 approved_by = "Operator rc.15-update size approval: final total set at integration; primary 18:49Z, 2026-11-16, explicitly authorizes this measured-total budget entry FOR OPERATOR REVIEW."
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150214
+date = "2026-11-16"
+reason = "rc.15 Stage tech v10 d9907202 measured total 150214, +4 over the v9 150210 entry. Lead-approved under the same rc.15 ruling; final combined total set at integration. Counting and implementation unchanged by this entry."
+approved_by = "Primary approval 2026-11-16 following tech-direct V10 boot PASS: record the +4 under the same operator rc.15 size approval, FOR OPERATOR REVIEW."
