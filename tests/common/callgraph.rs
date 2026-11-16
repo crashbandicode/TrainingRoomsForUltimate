@@ -481,6 +481,9 @@ pub struct Graph {
     /// `file -> names its `use` statements import from outside the runtime (`crate::model`, `crate::engine`, `std`, external crates):
     /// such a bare name is that item, never a runtime function of the same name.
     foreign_imports: BTreeMap<String, BTreeSet<String>>,
+    /// Statics whose declared type is imported from outside the runtime.
+    foreign_statics: BTreeMap<String, BTreeSet<String>>,
+    foreign_lock_contents: BTreeMap<String, BTreeSet<String>>,
     /// Resolve a bare imported name precisely (`foreign_imports`), as Rust does. Off by default: the capability scan's declared
     /// closures were built on the over-approximation (every runtime function of an imported name).
     pub precise_imports: bool,
@@ -681,6 +684,8 @@ impl Graph {
         let mut imports: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         let mut path_mods_local: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         let mut foreign_imports: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        let mut foreign_statics: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        let mut foreign_lock_contents: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         let mut type_modules: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         for path in files {
             let rel = path.strip_prefix(runtime_dir).unwrap().to_string_lossy().replace('\\', "/");
@@ -729,6 +734,24 @@ impl Graph {
                 }
             }
             let mut parser = Parser { file: &rel, funcs: Vec::new(), in_macro: false };
+            for declaration in toks.windows(4) {
+                if let [Tok::Ident(keyword), Tok::Ident(name), Tok::Punct(':'), Tok::Ident(ty)] = declaration {
+                    if keyword == "static" && foreign_imports.get(&rel).is_some_and(|names| names.contains(ty)) {
+                        foreign_statics.entry(rel.clone()).or_default().insert(name.clone());
+                    }
+                }
+            }
+            for (at, token) in toks.iter().enumerate() {
+                if ident(token) != Some("static") { continue; }
+                let Some(name) = toks.get(at + 1).and_then(ident) else { continue };
+                let end = (at + 2..toks.len()).find(|&i| is_punct(&toks[i], '=')).unwrap_or(at + 2);
+                if toks[at + 2..end].windows(3).any(|w| matches!(w,
+                    [Tok::Ident(wrapper), Tok::Punct('<'), Tok::Ident(inner)]
+                        if ["Mutex", "RwLock"].contains(&wrapper.as_str())
+                            && foreign_imports.get(&rel).is_some_and(|names| names.contains(inner)))) {
+                    foreign_lock_contents.entry(rel.clone()).or_default().insert(name.to_owned());
+                }
+            }
             parser.items(&toks, &module_of_file(&rel));
             funcs.extend(parser.funcs);
         }
@@ -776,6 +799,8 @@ impl Graph {
             path_mods,
             parents,
             foreign_imports,
+            foreign_statics,
+            foreign_lock_contents,
             precise_imports: false,
             type_modules,
             by_name,
@@ -796,6 +821,35 @@ impl Graph {
     /// `use` statements say so.
     pub fn type_module(&self, file: &str, name: &str) -> Option<&str> {
         self.type_modules.get(file).and_then(|m| m.get(name)).map(String::as_str)
+    }
+
+    /// A bare static receiver with a source-proven foreign type cannot call a
+    /// runtime receiver method. Unknown types and locally shadowed names remain
+    /// conservative. This does not classify method names or exempt call paths.
+    pub fn foreign_static_receiver(&self, from: &Func, name: &str) -> bool {
+        self.foreign_statics.get(&from.file).is_some_and(|names| names.contains(name))
+            && !from.body.windows(2).any(|w| matches!(w,
+                [Tok::Ident(binding), Tok::Ident(local)] if ["let", "mut", "for"].contains(&binding.as_str()) && local == name))
+    }
+
+    /// A local guard obtained directly from a static Mutex/RwLock whose inner
+    /// type is imported from the model/engine/external code. Unknown bindings
+    /// remain conservative; no inference from the variable or method name.
+    pub fn foreign_guard_receiver(&self, from: &Func, name: &str) -> bool {
+        let mut proven = false;
+        for (at, token) in from.body.iter().enumerate() {
+            if ident(token) != Some("let") { continue; }
+            let Some(equal) = (at + 1..from.body.len()).take_while(|&i| !matches!(from.body[i], Tok::Punct(';' | '{')))
+                .find(|&i| is_punct(&from.body[i], '=')) else { continue };
+            if !from.body[at + 1..equal].iter().any(|t| ident(t) == Some(name)) { continue; }
+            let rhs = &from.body[equal + 1..];
+            let known = matches!(rhs, [Tok::Ident(source), Tok::Punct('.'), Tok::Ident(method), Tok::Punct('('), ..]
+                if ["lock", "try_lock", "read", "try_read", "write", "try_write"].contains(&method.as_str())
+                    && self.foreign_lock_contents.get(&from.file).is_some_and(|names| names.contains(source)));
+            if !known { return false; }
+            proven = true;
+        }
+        proven
     }
 
     /// The module a `name::` qualifier in `file` means when `name` is a `#[path]` module declared under another name.

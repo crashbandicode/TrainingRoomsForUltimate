@@ -203,6 +203,11 @@ impl<'g> Ctx<'g> {
         }
         let Some(all) = self.by_name.get(last) else { return Vec::new() };
         if call.method {
+            if call.receiver.as_deref().is_some_and(|receiver| {
+                self.graph.foreign_static_receiver(f, receiver) || self.graph.foreign_guard_receiver(f, receiver)
+            }) {
+                return Vec::new();
+            }
             let methods: Vec<usize> = all.iter().copied().filter(|&c| self.graph.funcs[c].has_receiver).collect();
             if methods.len() == 1 {
                 return if methods[0] != from { methods } else { Vec::new() };
@@ -1688,6 +1693,23 @@ fn the_shared_lock_check_sees_a_seeded_hazard() {
     assert!(hazards.contains("EDITED"), "the game-thread impl of a typed read waits on EDITED, the plugin one holds it: {hazards:?}");
     assert!(!hazards.contains("PUBLISHING"), "only the plugin impl takes PUBLISHING: {hazards:?}");
     assert!(hazards.contains("ROLES"), "one lock of a static array, taken by index on both sides: {hazards:?}");
+}
+
+#[test]
+fn statics_use_their_declared_foreign_or_runtime_receiver_type() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/lock_order_receiver");
+    let mut graph = Graph::scan(&dir, &[]);
+    graph.precise_imports = true;
+    let ctx = Ctx::new(&graph, Vec::new());
+    let reset = graph.find("lua_vm::reset")[0];
+    for (root, expected) in [
+        ("worker::foreign_static", false), ("worker::runtime_static", true), ("worker::unresolved_static", true),
+        ("worker::foreign_guard", false), ("worker::runtime_guard", true), ("worker::unresolved_guard", true),
+    ] {
+        let from = graph.find(root)[0];
+        let targets: BTreeSet<_> = calls(&graph.funcs[from].body).iter().flat_map(|call| ctx.resolve(from, call)).collect();
+        assert_eq!(targets.contains(&reset), expected, "{root}: {targets:?}");
+    }
 }
 
 /// The scan on a small fixture: a guard bound by `let` and held over a call, a temporary held over its statement, a
