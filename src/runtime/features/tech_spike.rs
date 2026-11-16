@@ -375,7 +375,7 @@ pub unsafe fn attack(lua_state: usize) {
         return;
     }
     let base = game::text_base();
-    let module = ((accessor + 0x50) as *const usize).read();
+    let module = ((accessor + 0xa0) as *const usize).read();
     if module == 0 {
         return;
     }
