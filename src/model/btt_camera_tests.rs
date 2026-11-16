@@ -103,7 +103,7 @@ fn btt_camera_owners_preserve_mode_through_handover() {
     for before in [NORMAL, ZOOM, FIXED] {
         // BTT only, Tech only: stable requests never acquire a second time.
         for owner in [1, 2] {
-            let owners = CameraRequests::IDLE;
+            let owners = CameraRequests::idle();
             let (mut cam, mut mode) = (Camera::IDLE, before);
             assert_eq!(call(&owners, &mut cam, &mut mode, owner, true), (before != FIXED).then_some(FIXED));
             for _ in 0..60 { assert_eq!(call(&owners, &mut cam, &mut mode, owner, true), None); }
@@ -113,7 +113,7 @@ fn btt_camera_owners_preserve_mode_through_handover() {
         }
         // Both, then each direction of handover: the remaining owner keeps Fixed and the first saved mode.
         for (first, second) in [(1, 2), (2, 1)] {
-            let owners = CameraRequests::IDLE;
+            let owners = CameraRequests::idle();
             let (mut cam, mut mode) = (Camera::IDLE, before);
             call(&owners, &mut cam, &mut mode, first, true);
             assert_eq!(call(&owners, &mut cam, &mut mode, second, true), None);
@@ -127,7 +127,7 @@ fn btt_camera_owners_preserve_mode_through_handover() {
         }
     }
     let mut cam = Camera::IDLE;
-    let owners = CameraRequests::IDLE;
+    let owners = CameraRequests::idle();
     let mut mode = FIXED;
     assert_eq!(call(&owners, &mut cam, &mut mode, 1, true), None);
     mode = ZOOM;

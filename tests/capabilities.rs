@@ -612,6 +612,9 @@ fn projectile_accessor_failure_leaves_hitbox_and_btt_melee_installed() {
         let start = a.graph.find(entry)[0];
         assert!(!a.reach(start).0.contains(&row.offset), "{entry} reaches optional accessor");
     }
+    let camera = a.graph.find("btt_camera::frame")[0];
+    let callers: Vec<_> = (0..a.graph.funcs.len()).filter(|&i| a.graph.callees(i).contains(&camera)).map(|i| a.graph.funcs[i].key()).collect();
+    assert_eq!(callers, ["cpu::on_frame"], "only the game callback accesses camera state");
     let start = a.graph.find("btt_projectiles::hit")[0];
     assert!(a.reach(start).0.contains(&row.offset));
     let worker = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime/ui/worker.rs")).unwrap();

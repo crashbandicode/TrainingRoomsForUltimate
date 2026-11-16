@@ -732,7 +732,7 @@ pub const fn pointer_ok(p: usize) -> bool {
 /// Lock-free owner requests; the game thread alone steps the camera state.
 pub struct CameraRequests(std::sync::atomic::AtomicU8);
 impl CameraRequests {
-    pub const IDLE: Self = Self(std::sync::atomic::AtomicU8::new(0));
+    pub const fn idle() -> Self { Self(std::sync::atomic::AtomicU8::new(0)) }
     pub fn request(&self, owner: u8, want: bool) {
         use std::sync::atomic::Ordering;
         if want { self.0.fetch_or(owner, Ordering::AcqRel); }
