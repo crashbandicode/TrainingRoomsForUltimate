@@ -739,12 +739,60 @@ fn btt_projectiles_use_owned_native_hits() {
         hits[0] = Hit([20.0, 15.0, 0.0], [24.0, 15.0, 0.0], 1.0, 1.0);
         Some((hits, usize::from(article == 0x1_0008)))
     };
-    assert!(!projectile_breaks(false, [22.0, 15.0], own, |_| panic!("Off reads no article")));
+    assert!(!projectile_breaks(false, [22.0, 15.0], std::iter::from_fn(|| panic!("Off polls no pool")), own, |_| panic!("Off reads no article")));
     assert_eq!(calls.get(), 0);
-    assert!(projectile_breaks(true, [22.0, 15.0], own, read));
-    assert!(!projectile_breaks(true, [22.0, 15.0 + eggs::RADIUS + 1.001], own, read), "outside the native radius is a miss");
-    assert!(!projectile_breaks(true, [22.0, 15.0], |_, _| 0, |_| panic!("another owner's article never enters the reader")));
-    assert!(!projectile_breaks(true, [22.0, 15.0], |_, n| if n == 0 { 3 } else { 0 }, |_| panic!("misaligned article")));
+    assert!(projectile_breaks(true, [22.0, 15.0], [], own, read));
+    assert!(!projectile_breaks(true, [22.0, 15.0 + eggs::RADIUS + 1.001], [], own, read), "outside the native radius is a miss");
+    assert!(!projectile_breaks(true, [22.0, 15.0], [], |_, _| 0, |_| panic!("another owner's article never enters the reader")));
+    assert!(!projectile_breaks(true, [22.0, 15.0], [], |_, n| if n == 0 { 3 } else { 0 }, |_| panic!("misaligned article")));
+}
+
+fn btt_fired_bullet_survives_an_empty_current_ring() {
+    use crate::engine::seams::article_pool::read as projectile_pool;
+    // Trace2 Fox: pool slot1 is active kind1/id10010000, absent from the current ring.
+    // Native constructor33b98b0 and post-ATTACK holder snapshot prove this inline layout.
+    let base = 0x8000_0000;
+    let mut owner = [0usize; 0xa0 / 8];
+    let mut module = [0usize; 0x248 / 8];
+    let mut holder = [0usize; 0x238 / 8];
+    let mut article = [base + 0x5186a58];
+    owner[0x98 / 8] = module.as_ptr() as usize;
+    module[0] = base + 0x4f6a230;
+    module[0x240 / 8] = holder.as_ptr() as usize;
+    holder[0] = base + 0x4f626e8;
+    holder[1] = 64;
+    holder[2] = 2;
+    holder[3] = holder.as_ptr() as usize + 0x20;
+    holder[5] = article.as_ptr() as usize; // slot0 empty, slot1 the fired bullet.
+    let owner_at = owner.as_ptr() as usize;
+    let pool = || unsafe { projectile_pool(owner_at, base) };
+    let read = |_: usize| {
+        let mut hits = [Hit::default(); crate::model::hitbox::SLOTS as usize];
+        hits[0] = Hit([20.0, 15.0, 0.0], [24.0, 15.0, 0.0], 1.0, 3.0);
+        Some((hits, 1))
+    };
+    assert!(!projectile_breaks(true, [22.0, 15.0], [], |_, _| 0, read), "the old ring-only census misses");
+    assert!(projectile_breaks(true, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, read));
+    assert!(!projectile_breaks(true, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, |_| None), "inactive pooled objects supply no attack");
+    assert!(!projectile_breaks(true, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, |at| {
+        let (mut hits, n) = read(at).unwrap();
+        hits[0].3 = 0.0;
+        Some((hits, n))
+    }), "a zero-damage windbox does not break targets");
+    for field in [0, 1, 2, 3] {
+        let saved = holder[field];
+        holder[field] = match field { 2 => 65, _ => 0 };
+        assert!(unsafe { projectile_pool(owner.as_ptr() as usize, base) }.iter().all(Option::is_none), "reject malformed holder field {field}");
+        holder[field] = saved;
+    }
+    article[0] ^= 1;
+    assert_ne!(article[0], base + 0x5186a58);
+    assert!(pool().iter().all(Option::is_none), "unknown article type is never handed to the native ID getter");
+    article[0] ^= 1;
+    assert!(pool().iter().any(Option::is_some));
+    module[0] ^= 1;
+    assert_ne!(module[0], base + 0x4f6a230);
+    assert!(pool().iter().all(Option::is_none), "wrong ArticleModule type is never followed");
 }
 
 /// Frozen ffd2f74a cursor arithmetic, independent of the extracted helper (including its addition order).
@@ -811,6 +859,7 @@ fn case_table() {
         ("btt_compact_hud_text", btt_compact_hud_text as fn()),
         ("btt_placing_motion_matches_original_bytes", btt_placing_motion_matches_original_bytes as fn()),
         ("btt_projectiles_use_owned_native_hits", btt_projectiles_use_owned_native_hits as fn()),
+        ("btt_fired_bullet_survives_an_empty_current_ring", btt_fired_bullet_survives_an_empty_current_ring as fn()),
     ]);
 }
 }

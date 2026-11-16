@@ -15,3 +15,6 @@ pub mod native_seams;
 /// The seam checks against this plugin's own writes, on the real rows (`model::own_patches`).
 #[cfg(test)]
 mod own_write_tests;
+/// TrainingRooms: read-only owned projectile pool, qualified through the shared field reader.
+#[cfg(any(test, target_os = "switch"))]
+pub mod article_pool;

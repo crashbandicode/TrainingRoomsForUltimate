@@ -530,8 +530,9 @@ turning one On turns the other Off.
 
 ### Projectiles break targets
 
-**On** by default. P1's projectiles and articles can break targets with their active hitboxes, including fireballs, arrows
-and charge shots. **Off** leaves target breaks to your fighter's attacks. This setting is independent of Hitbox Visualization.
+**On** by default. Any projectile that does damage breaks a target (Fox's blaster included), using P1's active projectile
+or article hitbox. It does not need to make a fighter flinch. **Off** leaves target breaks to your fighter's attacks.
+This setting is independent of Hitbox Visualization and **Breaks on**, which applies to fighter attacks.
 
 ### Place targets
 
