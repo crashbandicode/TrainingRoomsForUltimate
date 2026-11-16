@@ -27837,7 +27837,7 @@
    "dest": "src/runtime/lobby/training/lobby.rs",
    "crate": "root",
    "src_sha256": "1b98ab33c03afaacea5620a2702f868253cb0fd8f68046ad3cd838d172c03d78",
-   "dest_sha256": "9965f55dcce38ffc50411eb9891007739f1b3b740a312d50ba0842e903286d0b",
+   "dest_sha256": "1401e428821e6ea06ff4fbe99ba62873b79b9b796cf20763896c3ca10d3d974e",
    "edits": [
     {
      "old": "use {training_mod_consts::Action, crate::runtime::compat::consts::FighterId, training_mod_consts::LedgeOption, crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};",
@@ -27893,6 +27893,11 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "old": " })\n}\n\npub fn requested() -> bool {\n    read(&MENU).lobby_practice == OnOff::ON && is_waiting_scene()\n}\n\npub fn active() -> bool {\n    requested() && UI_READY.load(Ordering::Acquire)\n}\n\npub fn set_ui_",
+     "new": " })\n}\n\npub fn requested() -> bool {\n    read(&MENU).lobby_practice == OnOff::ON && is_waiting_scene()\n}\n\n/// Busy is unknown eligibility: callers must defer, not treat it as departure.\npub fn try_requested() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(crate::runtime::compat::menu::try_current_menu()?.lobby_practice == OnOff::ON && is_waiting_scene())\n}\n\n/// The same request and readiness facts as `active`, without waiting on menu edits.\npub fn try_active() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(try_requested()? && UI_READY.load(Ordering::Acquire))\n}\n\npub fn active() -> bool {\n    requested() && UI_READY.load(Ordering::Acquire)\n}\n\npub fn set_ui_",
+     "reason": "RC15 shared menu hook fix: add fallible eligibility using EDITED.try_lock; preserve successful scene semantics and distinguish Busy from false/departure. Existing blocking API retained for unmigrated owners."
     }
    ]
   },
@@ -27901,7 +27906,7 @@
    "dest": "src/runtime/lobby/training/practice.rs",
    "crate": "root",
    "src_sha256": "290e866742b0665a4d8b487a3c24f034adba166b43901e0bfd5e04a3769de49d",
-   "dest_sha256": "6b975823eaa2c38d5ae8201eb2db5fb8049bd0b37105937a7e52466a01cbf5b2",
+   "dest_sha256": "5cdbc7a7596ba0dae45af04755cdde82f5faa641fa65eb542ff63a00fe743bdd",
    "edits": [
     {
      "old": "    common::try_get_battle_object(owner).is_some_and(|body|\n        body.module_accessor.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
@@ -27957,6 +27962,11 @@
      "old": "        && common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)\n            .is_some_and(|cpu| common::operation_cpu(unsafe { &mut *cpu }) == Some(false))\n}\n\n",
      "new": "        && common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU)\n            .is_some_and(|cpu| common::operation_cpu(unsafe { &mut *cpu }) == Some(false))\n}\n",
      "reason": "RC7 practice boundary patch normalizes the final blank line; no behavior change."
+    },
+    {
+     "old": "initialized), mode.map_or(0, |m| m.melee),\n        mode.map_or(0, |m| m.mode), super::lobby::active())\n}\n\npub fn scene_enabled() -> bool { context().is_some() }\npub fn enabled() -> bool {\n    scene_en",
+     "new": "initialized), mode.map_or(0, |m| m.melee),\n        mode.map_or(0, |m| m.mode), super::lobby::active())\n}\n\n/// Fresh ownership context without waiting on a game-side menu edit.\n/// Native Training does not depend on a waiting-room menu request.\npub fn try_context() -> Result<Option<Context>, crate::runtime::compat::menu::MenuBusy> {\n    if unsafe { common::is_native_training_mode() } {\n        return Ok(Some(Context::Training));\n    }\n    let mode = common::game_mode::current();\n    Ok(practice_policy::context(false, mode.is_some_and(|m| m.initialized),\n        mode.map_or(0, |m| m.melee), mode.map_or(0, |m| m.mode), super::lobby::try_active()?))\n}\n\npub fn scene_enabled() -> bool { context().is_some() }\npub fn enabled() -> bool {\n    scene_en",
+     "reason": "RC15 shared menu hook fix: add fallible eligibility using EDITED.try_lock; preserve successful scene semantics and distinguish Busy from false/departure. Existing blocking API retained for unmigrated owners."
     }
    ]
   },
