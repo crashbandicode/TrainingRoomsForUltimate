@@ -1062,6 +1062,8 @@ mod receiver_tests {
             path_mods: BTreeMap::new(),
             parents: BTreeMap::new(),
             foreign_imports: BTreeMap::new(),
+            foreign_statics: BTreeMap::new(),
+            foreign_lock_contents: BTreeMap::new(),
             precise_imports: false,
             type_modules: BTreeMap::new(),
             by_name,
