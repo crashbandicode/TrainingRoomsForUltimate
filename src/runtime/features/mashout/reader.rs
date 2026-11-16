@@ -37,11 +37,11 @@ unsafe fn read<T: Copy>(base: usize, offset: usize) -> Option<T> {
 }
 
 /// A fresh live BOMA, checked against P1's current active body by the caller.
-unsafe fn control(accessor: usize) -> Option<usize> {
+pub(super) unsafe fn control(accessor: usize) -> Option<usize> {
     let control = read::<usize>(accessor, 0x48)?;
     let table = read::<usize>(control, 0)?;
     // Check the live concrete dispatch slot, rather than assuming every Control subclass has this layout.
-    (read::<usize>(table, 0x78)? == game::text_base().checked_add(0x6b9150)?).then_some(control)
+    super::interposer::reader_table(table).then_some(control)
 }
 
 /// Actual getter, sampled before arming; no stock 0.5 fallback. Called only on the game thread.

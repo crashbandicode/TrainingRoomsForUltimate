@@ -52,6 +52,12 @@ mod runtime {
 extern "C" fn threshold_getter(_: usize) -> f32 {
     0.37
 }
+// Allocation-backed reader fixture; real exact-vptr/slot policy has its own interposer tests.
+mod interposer {
+    pub unsafe fn reader_table(table: usize) -> bool {
+        *((table + 0x78) as *const usize) == super::runtime::game::text_base() + 0x6b9150
+    }
+}
 mod reader { // READER
 }
 static READY: AtomicBool = AtomicBool::new(true);
@@ -62,19 +68,23 @@ static GENERATION: AtomicU64 = AtomicU64::new(5);
 static CPU_STATUS: AtomicU32 = AtomicU32::new(0);
 static BODY: AtomicUsize = AtomicUsize::new(0);
 static FAULT: AtomicU64 = AtomicU64::new(0);
+static EPOCH: AtomicU64 = AtomicU64::new(0);
+static QUEUE_FULL: AtomicBool = AtomicBool::new(false);
+// NATIVE_SEED_TYPES
 thread_local! {
-    static QUEUE: RefCell<Vec<(u64, Option<reader::Sample>)>> = const { RefCell::new(Vec::new()) };
-    static BEGINS: RefCell<Vec<(worker::Key, Seed)>> = const { RefCell::new(Vec::new()) };
+    static QUEUE: RefCell<Vec<NativeSeed>> = const { RefCell::new(Vec::new()) };
+    static BEGINS: RefCell<Vec<(worker::Key, Seed, u64, SeedOrigin)>> = const { RefCell::new(Vec::new()) };
     static DRIVEN: RefCell<Vec<MappedInputs>> = const { RefCell::new(Vec::new()) };
 }
 struct Mailbox;
 static SEEDS: Mailbox = Mailbox;
 impl Mailbox {
-    fn post(&self, sample: (u64, Option<reader::Sample>)) -> bool {
+    fn post(&self, sample: NativeSeed) -> bool {
+        if QUEUE_FULL.load(Ordering::Relaxed) { return false; }
         QUEUE.with_borrow_mut(|q| q.push(sample));
         true
     }
-    fn drain(&self, mut f: impl FnMut((u64, Option<reader::Sample>))) {
+    fn drain(&self, mut f: impl FnMut(NativeSeed)) {
         let q = QUEUE.with_borrow_mut(std::mem::take);
         for s in q {
             f(s);
@@ -131,22 +141,23 @@ mod state_natives {
     }
 }
 mod worker {
-    use super::Seed;
+    use super::{Seed, SeedOrigin};
     #[derive(Clone, Copy, Debug, PartialEq)]
-    pub struct Key(pub u16, pub u32, pub u32, pub f32, pub Seed);
+    pub struct Key(pub u16, pub u32, pub u32, pub f32, pub Seed, pub SeedOrigin);
     impl Key {
-        pub fn new(id: u16, a: u32, v: u32, d: f32, s: Seed) -> Self {
-            Self(id, a, v, d, s)
+        pub fn new(id: u16, a: u32, v: u32, d: f32, s: Seed, origin: SeedOrigin) -> Self {
+            Self(id, a, v, d, s, origin)
         }
     }
     pub enum Event {
-        Begin(u64, Key, Seed),
+        Begin(u64, u64, Key, Seed, SeedOrigin),
         Cancel(u64),
+        NativeEnd(u64, u64),
     }
 }
 fn post(e: worker::Event, _: u64) {
-    if let worker::Event::Begin(_, k, s) = e {
-        BEGINS.with_borrow_mut(|b| b.push((k, s)));
+    if let worker::Event::Begin(_, epoch, k, s, origin) = e {
+        BEGINS.with_borrow_mut(|b| b.push((k, s, epoch, origin)));
     }
 }
 fn state_id(c: C) -> Option<i32> {
@@ -174,6 +185,7 @@ enum Step {
 }
 struct Game {
     generation: u64,
+    epoch: u64,
     step: Step,
     requested: Option<Scenario>,
     followed: bool,
@@ -187,6 +199,7 @@ impl Game {
     fn new(plan: Plan, state: State) -> Self {
         Self {
             generation: 5,
+            epoch: 0,
             step: Step::Entering,
             requested: Some(Scenario {
                 id: 117,
@@ -222,6 +235,8 @@ const UNAVAILABLE_NOTICE: &str = "unavailable";
 // TOKEN_TYPE
 // TOKEN
 // AFTER
+// THROW_AFTER
+// PUBLISH_SEED
 fn ids() -> [i32; 15] {
     [0, 50, 65, 66, 67, 68, 69, 0, 51, 52, 53, 70, 71, 72, 73]
 }
@@ -233,6 +248,7 @@ unsafe fn update(game: &mut Game, p1: usize, status: i32, cpu: usize, fighter: u
     let cpu_entry = 1;
     // LINKS
     // SEEDS
+    // ENDS
     match game.step {
         // ENTERING
         _ => (),
@@ -269,8 +285,13 @@ impl NativeMemory {
         P1.store(m.p1(), Ordering::Relaxed);
         BODY.store(m.body.as_ptr() as usize, Ordering::Relaxed);
         ARMED.store(0, Ordering::Relaxed);
+        EPOCH.store(0, Ordering::Relaxed);
+        FAULT.store(0, Ordering::Relaxed);
+        QUEUE_FULL.store(false, Ordering::Relaxed);
+        READY.store(true, Ordering::Relaxed);
         CPU_STATUS.store(481, Ordering::Relaxed);
         QUEUE.with_borrow_mut(Vec::clear);
+        END_QUEUE.with_borrow_mut(Vec::clear);
         BEGINS.with_borrow_mut(Vec::clear);
         DRIVEN.with_borrow_mut(Vec::clear);
         m
@@ -315,6 +336,9 @@ impl NativeMemory {
         if let Some(t) = seed_token(self.p1()) {
             seed_after(self.p1(), t, -1, 0, false, true);
         }
+    }
+    unsafe fn throw_start(&self) {
+        throw_seed_after(self.control.as_ptr() as usize);
     }
     unsafe fn update(&self, g: &mut Game, status: i32) {
         update(g, self.p1(), status, 2, self.body.as_ptr() as usize);
@@ -442,4 +466,184 @@ fn cancel_during_tongue_waits_for_release() {
     assert_eq!(g.step, Step::Release);
     assert!(g.clock.is_none());
     assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+}
+
+unsafe fn held_downthrow(m: &mut NativeMemory) -> Game {
+    let mut g = Game::new(Plan::DownThrow, State::Bury);
+    startup(&mut g, m.p1());
+    CPU_STATUS.store(52, Ordering::Relaxed);
+    m.update(&mut g, 66);
+    assert_eq!(ARMED.load(Ordering::Relaxed), g.generation);
+    m.seed(80.0, 7.0, 0);
+    m.start();
+    m.update(&mut g, 75);
+    assert_eq!(g.step, Step::Held);
+    assert_eq!(g.epoch, 1);
+    g
+}
+
+#[test]
+fn tagged_held_bury_downthrow_reseeds_from_actual_native_record_and_history() {
+    unsafe {
+        for history in [0, 1] {
+            for remaining in [34.0, 59.0, 29.0] {
+                let mut m = NativeMemory::new();
+                let mut g = held_downthrow(&mut m);
+                m.seed(remaining, 9.0, history);
+                let actual = reader::sample(m.p1(), 0.37).unwrap().seed();
+                let before = (m.control, m.record);
+                m.throw_start();
+                m.update(&mut g, 75);
+                assert_eq!(g.step, Step::Held);
+                assert_eq!(g.failed, None);
+                assert_eq!(g.epoch, 2);
+                assert_eq!(g.clock.unwrap().last(), actual.record);
+                let begins = BEGINS.with_borrow(Clone::clone);
+                assert_eq!(begins.len(), 2);
+                assert_eq!(begins[1].1, actual);
+                assert_eq!(begins[1].2, g.epoch);
+                assert_eq!(begins[1].3, SeedOrigin::ThrowClatterStart);
+                assert_eq!(begins[1].0 .5, SeedOrigin::ThrowClatterStart);
+                assert_eq!((m.control, m.record), before, "observer must preserve native latches and input");
+                assert_eq!(actual.held, if history == 0 { 1 } else { 0x20 });
+            }
+        }
+    }
+}
+
+#[test]
+fn export_held_and_tagged_result_restarts_still_fail() {
+    unsafe {
+        for tagged_result in [false, true] {
+            let mut m = NativeMemory::new();
+            let mut g = held_downthrow(&mut m);
+            m.seed(34.0, 9.0, 1);
+            if tagged_result {
+                g.step = Step::Result;
+                m.throw_start();
+            } else {
+                m.start();
+            }
+            m.update(&mut g, 75);
+            assert_eq!(g.failed, Some("Capture restarted · no grade"));
+            assert!(g.clock.is_none());
+            assert_eq!(BEGINS.with_borrow(Vec::len), 1);
+        }
+    }
+}
+
+#[test]
+fn identical_native_starts_get_distinct_epochs_and_wrong_control_is_ignored() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut g = held_downthrow(&mut m);
+        m.seed(34.0, 9.0, 1);
+        throw_seed_after(m.control.as_ptr() as usize + 8);
+        assert!(QUEUE.with_borrow(Vec::is_empty));
+        assert_eq!(EPOCH.load(Ordering::Relaxed), 1);
+        for epoch in [2, 3] {
+            m.throw_start();
+            m.update(&mut g, 75);
+            assert_eq!(g.step, Step::Held);
+            assert_eq!(g.epoch, epoch);
+        }
+        let begins = BEGINS.with_borrow(Clone::clone);
+        assert_eq!(begins.len(), 3);
+        assert_eq!(begins[1].1, begins[2].1);
+        assert_ne!(begins[1].2, begins[2].2);
+    }
+}
+
+#[test]
+fn native_seed_mailbox_overflow_marks_attempt_incomplete() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let g = held_downthrow(&mut m);
+        m.seed(34.0, 9.0, 1);
+        QUEUE_FULL.store(true, Ordering::Relaxed);
+        m.throw_start();
+        assert_eq!(EPOCH.load(Ordering::Relaxed), 2);
+        assert_eq!(FAULT.load(Ordering::Relaxed), g.generation);
+        assert!(QUEUE.with_borrow(Vec::is_empty));
+        assert_eq!(BEGINS.with_borrow(Vec::len), 1);
+    }
+}
+
+
+// END_TYPE
+// END_TOKEN
+// END_AFTER
+struct EndMailbox;
+static ENDS: EndMailbox = EndMailbox;
+thread_local! { static END_QUEUE: RefCell<Vec<NativeEnd>> = const { RefCell::new(Vec::new()) }; }
+fn faulted(generation: u64, watermark: u64) -> bool { generation != 0 && watermark >= generation }
+impl EndMailbox {
+    fn drain(&self, mut f: impl FnMut(NativeEnd)) {
+        for ended in END_QUEUE.with_borrow_mut(std::mem::take) { f(ended); }
+    }
+    fn post(&self, ended: NativeEnd) -> bool {
+        if QUEUE_FULL.load(Ordering::Relaxed) { return false; }
+        END_QUEUE.with_borrow_mut(|q| q.push(ended));
+        true
+    }
+}
+#[test]
+fn native_end_requires_positive_pre_call_and_actual_post_zero() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let g = held_downthrow(&mut m);
+        END_QUEUE.with_borrow_mut(Vec::clear);
+        let control = m.control.as_ptr() as usize;
+        let token = end_token(control, 0).unwrap();
+        end_after(control, token);
+        assert!(END_QUEUE.with_borrow(Vec::is_empty));
+        m.seed(0.0, 9.0, 1);
+        assert!(end_token(control, 0).is_none(), "normal exhaustion is not an interruption");
+        end_after(control, token);
+        let ends = END_QUEUE.with_borrow(Clone::clone);
+        assert_eq!(ends.len(), 1);
+        assert_eq!((ends[0].generation, ends[0].epoch), (g.generation, g.epoch));
+        assert_eq!(EPOCH.load(Ordering::Relaxed), g.epoch);
+    }
+}
+#[test]
+fn native_end_wrong_identity_epoch_index_and_overflow_fail_closed() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let g = held_downthrow(&mut m);
+        END_QUEUE.with_borrow_mut(Vec::clear);
+        let control = m.control.as_ptr() as usize;
+        assert!(end_token(control + 8, 0).is_none());
+        assert!(end_token(control, 1).is_none());
+        let token = end_token(control, 0).unwrap();
+        m.seed(0.0, 9.0, 1);
+        EPOCH.store(g.epoch + 1, Ordering::Relaxed);
+        end_after(control, token);
+        EPOCH.store(g.epoch, Ordering::Relaxed);
+        ARMED.store(g.generation + 1, Ordering::Relaxed);
+        end_after(control, token);
+        assert!(END_QUEUE.with_borrow(Vec::is_empty));
+        ARMED.store(g.generation, Ordering::Relaxed);
+        QUEUE_FULL.store(true, Ordering::Relaxed);
+        end_after(control, token);
+        assert!(END_QUEUE.with_borrow(Vec::is_empty));
+        assert_eq!(FAULT.load(Ordering::Relaxed), g.generation);
+    }
+}
+
+#[test]
+fn native_end_consumed_before_arithmetic_only_for_held_current_epoch() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut g = held_downthrow(&mut m);
+        END_QUEUE.with_borrow_mut(Vec::clear);
+        let token = end_token(m.control.as_ptr() as usize, 0).unwrap();
+        m.seed(0.0, 9.0, 1);
+        end_after(m.control.as_ptr() as usize, token);
+        m.update(&mut g, 75);
+        assert_eq!(g.step, Step::Result);
+        assert!(g.clock.is_none());
+        assert_eq!(g.failed, None);
+        assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+    }
 }

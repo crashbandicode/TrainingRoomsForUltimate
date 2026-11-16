@@ -27,6 +27,8 @@ use crate::runtime::{
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use hos_lock::{Mailbox, Mutex, Published};
 
+#[path = "mashout/interposer.rs"]
+mod interposer;
 #[path = "mashout/reader.rs"]
 mod reader;
 #[path = "mashout/worker.rs"]
@@ -34,6 +36,7 @@ mod worker;
 
 const NOTICE_ID: u8 = 0x30;
 const NOTICE_RAISE: u8 = 4;
+static BOOT_READY: AtomicBool = AtomicBool::new(false);
 static READY: AtomicBool = AtomicBool::new(false);
 static WANTED: AtomicBool = AtomicBool::new(false);
 static CONFIG: Published<Option<Config>> = Published::new(None);
@@ -47,12 +50,34 @@ static DRIVE: AtomicU64 = AtomicU64::new(0);
 static CPU_ENTRY: AtomicI32 = AtomicI32::new(-1);
 static TEMP_KIND: AtomicU32 = AtomicU32::new(u32::MAX);
 static FAULT: AtomicU64 = AtomicU64::new(0);
-static SEEDS: Mailbox<(u64, Option<reader::Sample>), 4> = Mailbox::new();
+// Independent serial: a native restart within an attempt invalidates its earlier solver.
+static EPOCH: AtomicU64 = AtomicU64::new(0);
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SeedOrigin {
+    Export,
+    ThrowClatterStart,
+}
+#[derive(Clone, Copy)]
+struct NativeSeed {
+    generation: u64,
+    epoch: u64,
+    origin: SeedOrigin,
+    sample: Option<reader::Sample>,
+}
+static SEEDS: Mailbox<NativeSeed, 4> = Mailbox::new();
+#[derive(Clone, Copy)]
+struct NativeEnd {
+    generation: u64,
+    epoch: u64,
+    accessor: usize,
+    threshold: f32,
+}
+static ENDS: Mailbox<NativeEnd, 4> = Mailbox::new();
 static EVENTS: Mailbox<worker::Event, 128> = Mailbox::new();
 static REPLIES: Mailbox<u64, 4> = Mailbox::new();
 
 pub fn set_admission(on: bool) {
-    READY.store(on, Ordering::Release);
+    BOOT_READY.store(on, Ordering::Release);
 }
 fn admission() -> Admission {
     Admission::new(READY.load(Ordering::Acquire))
@@ -74,6 +99,7 @@ pub fn reset() {
     start();
 }
 pub fn service() {
+    interposer::service();
     worker::service();
 }
 
@@ -172,8 +198,67 @@ pub(crate) unsafe fn seed_after(
                 .filter(|s| s.record.source == -1 && s.record.remaining > 0.0)
         })
         .flatten();
-    if !SEEDS.post((token.generation, sample)) {
+    publish_seed(token.generation, SeedOrigin::Export, sample);
+}
+
+/// Only the guarded native call-site observer uses this origin. It copies the
+/// post-call record before the caller's next instruction, including carried latches.
+pub(crate) unsafe fn throw_seed_after(control: usize) {
+    let accessor = P1.load(Ordering::Acquire);
+    let Some(token) = seed_token(accessor) else {
+        return;
+    };
+    if reader::control(accessor) != Some(control) {
+        return;
+    }
+    let sample = reader::sample(accessor, token.threshold)
+        .filter(|s| s.record.source == -1 && s.record.remaining > 0.0);
+    if seed_token(accessor).is_none_or(|fresh| fresh.generation != token.generation) {
+        return;
+    }
+    publish_seed(token.generation, SeedOrigin::ThrowClatterStart, sample);
+}
+
+/// A native end is a distinct outcome only when it clears a positive live hold.
+unsafe fn end_token(control: usize, index: i32) -> Option<NativeEnd> {
+    let accessor = P1.load(Ordering::Acquire);
+    let token = seed_token(accessor)?;
+    if index != 0
+        || reader::control(accessor) != Some(control)
+        || reader::sample(accessor, token.threshold)?.record.remaining <= 0.0
+    {
+        return None;
+    }
+    Some(NativeEnd {
+        generation: token.generation,
+        epoch: EPOCH.load(Ordering::Acquire),
+        accessor,
+        threshold: token.threshold,
+    })
+}
+unsafe fn end_after(control: usize, token: NativeEnd) {
+    if EPOCH.load(Ordering::Acquire) != token.epoch
+        || seed_token(token.accessor).is_none_or(|fresh| fresh.generation != token.generation)
+        || reader::control(token.accessor) != Some(control)
+        || reader::sample(token.accessor, token.threshold)
+            .is_none_or(|sample| sample.record.remaining != 0.0)
+    {
+        return;
+    }
+    if !ENDS.post(token) {
         fault(token.generation);
+    }
+}
+
+fn publish_seed(generation: u64, origin: SeedOrigin, sample: Option<reader::Sample>) {
+    let epoch = EPOCH.fetch_add(1, Ordering::AcqRel) + 1;
+    if !SEEDS.post(NativeSeed {
+        generation,
+        epoch,
+        origin,
+        sample,
+    }) {
+        fault(generation);
     }
 }
 
@@ -207,6 +292,7 @@ enum Step {
 struct Game {
     step: Step,
     generation: u64,
+    epoch: u64,
     config: Option<Config>,
     scene: Option<Scene>,
     requested: Option<Scenario>,
@@ -223,6 +309,7 @@ impl Game {
         Self {
             step: Step::Off,
             generation: 0,
+            epoch: 0,
             config: None,
             scene: None,
             requested: None,
@@ -272,7 +359,7 @@ impl Game {
 
 // Only fighter callbacks take this lock. Neither the settings nor diagnostic worker touches it.
 static GAME: Mutex<Game> = Mutex::new(Game::new());
-const NAMES: [&str; 15] = [
+const NAMES: [&str; 16] = [
     "FIGHTER_STATUS_KIND_WAIT",
     "FIGHTER_STATUS_KIND_CATCH",
     "FIGHTER_STATUS_KIND_CAPTURE_PULLED",
@@ -288,10 +375,11 @@ const NAMES: [&str; 15] = [
     "FIGHTER_STATUS_KIND_CAPTURE_WAIT_YOSHI",
     "FIGHTER_STATUS_KIND_CAPTURE_DAMAGE_YOSHI",
     "FIGHTER_STATUS_KIND_CAPTURE_PULLED_PICKEL",
+    "FIGHTER_STATUS_KIND_OTTOTTO_WAIT",
 ];
-static IDS: [AtomicI32; 15] = [const { AtomicI32::new(i32::MIN) }; 15];
-fn ids() -> Option<[i32; 15]> {
-    let mut values = [0; 15];
+static IDS: [AtomicI32; NAMES.len()] = [const { AtomicI32::new(i32::MIN) }; NAMES.len()];
+fn ids() -> Option<[i32; NAMES.len()]> {
+    let mut values = [0; NAMES.len()];
     for (index, name) in NAMES.iter().enumerate() {
         let mut value = IDS[index].load(Ordering::Acquire);
         if value == i32::MIN {
@@ -327,7 +415,7 @@ unsafe fn arm(p1: usize, generation: u64) -> bool {
 
 /// Existing P1 per-frame path. Entry0's current active body only, independent of frame-strip settings.
 pub unsafe fn frame(fighter: usize) {
-    if !READY.load(Ordering::Acquire) || fighter == 0 {
+    if !BOOT_READY.load(Ordering::Acquire) || fighter == 0 {
         return;
     }
     if ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read() != 0 {
@@ -343,6 +431,13 @@ pub unsafe fn frame(fighter: usize) {
         OWN_CPU.store(0, Ordering::Release);
         return;
     };
+    // Disabling restores the native slots immediately, but must still restore the
+    // temporary CPU through the existing frame path.
+    if WANTED.load(Ordering::Acquire) && !READY.load(Ordering::Acquire) {
+        revoke();
+        OWN_CPU.store(0, Ordering::Release);
+        return;
+    }
     let facts = scene::facts();
     if facts.busy {
         revoke();
@@ -389,9 +484,9 @@ pub unsafe fn frame(fighter: usize) {
             r.plan == crate::model::mashout::moves::Plan::Grab && status == ids[14]
         });
     let linked = scored
-        || game.requested.is_some_and(|r| {
-            entry::preparatory_holding(r.plan, |c| state_id(c) == Some(status))
-        });
+        || game
+            .requested
+            .is_some_and(|r| entry::preparatory_holding(r.plan, |c| state_id(c) == Some(status)));
     if restart {
         revoke();
         post(worker::Event::Cancel(game.generation), game.generation);
@@ -450,10 +545,20 @@ pub unsafe fn frame(fighter: usize) {
             );
         }
     });
-    SEEDS.drain(|(generation, sample)| {
+    SEEDS.drain(|NativeSeed { generation, epoch, origin, sample }| {
         if generation != game.generation { return; }
-        if matches!(game.step, Step::Held | Step::Result) { game.fail("Capture restarted · no grade"); return; }
-        if game.step != Step::Entering { return; }
+        let late_throw = origin == SeedOrigin::ThrowClatterStart
+            && game.step == Step::Held
+            && game.requested.is_some_and(|r| r.state == crate::model::mashout::moves::State::Bury
+                && r.plan == crate::model::mashout::moves::Plan::DownThrow);
+        // restriction: M3-T2-NATIVE-EPOCH — only the observed639d44 origin may replace a held seed.
+        if matches!(game.step, Step::Held | Step::Result) && !late_throw {
+            game.fail("Capture restarted · no grade"); return;
+        }
+        if !late_throw && game.step != Step::Entering { return; }
+        if origin == SeedOrigin::ThrowClatterStart && !late_throw {
+            game.fail("Capture restarted · no grade"); return;
+        }
         // restriction: M3-READER-GUARD
         let Some(sample) = sample else { game.fail("Native capture seed unavailable · no grade"); return; };
         let ordinary_catch = game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Grab);
@@ -472,13 +577,35 @@ pub unsafe fn frame(fighter: usize) {
         if cpu_body == 0 || ((cpu_body + 0xc) as *const u32).read() != request.attacker_kind {
             game.fail("Attacker changed · no grade"); return;
         }
-        let key = worker::Key::new(request.id, request.attacker_kind, ((fighter + 0xc) as *const u32).read(), natives::damage(p1, 0), seed);
+        let key = worker::Key::new(request.id, request.attacker_kind, ((fighter + 0xc) as *const u32).read(), natives::damage(p1, 0), seed, origin);
         drive(MappedInputs::NEUTRAL);
         game.clock = Some(clock);
+        game.epoch = epoch;
         game.step = Step::Held;
-        post(worker::Event::Begin(generation, key, seed), generation);
+        post(worker::Event::Begin(generation, epoch, key, seed, origin), generation);
         #[cfg(feature = "diag")]
-        crate::runtime::diag_log::enqueue_diagnostic(format_args!("[Mashout] seed gen={generation} key={key:?} seed={seed:?} input={:?} history={} current={:#x} previous={:#x} alternate={:#x}", sample.input, sample.history, sample.current, sample.previous, sample.alternate));
+        crate::runtime::diag_log::enqueue_diagnostic(format_args!("[Mashout] seed gen={generation} key={key:?} seed={seed:?} input={:?} history={} current={:#x} previous={:#x} alternate={:#x} epoch={epoch} origin={origin:?}", sample.input, sample.history, sample.current, sample.previous, sample.alternate));
+    });
+    ENDS.drain(|ended| {
+        if ended.generation == game.generation
+            && ended.epoch == game.epoch
+            && ended.accessor == p1
+            && game.step == Step::Held
+            && !faulted(game.generation, FAULT.load(Ordering::Acquire))
+        {
+            revoke();
+            game.clock = None;
+            game.step = Step::Result;
+            post(
+                worker::Event::NativeEnd(game.generation, game.epoch),
+                game.generation,
+            );
+            #[cfg(feature = "diag")]
+            crate::runtime::diag_log::enqueue_diagnostic(format_args!(
+                "[Mashout] native_end gen={} epoch={} outcome=ended_before_escape",
+                game.generation, game.epoch
+            ));
+        }
     });
     let released = status == ids[0]
         && natives::status_kind(cpu) == ids[0]
@@ -570,7 +697,7 @@ pub unsafe fn frame(fighter: usize) {
                 y: natives::pos_y(p1),
                 z: natives::pos_z(p1),
             };
-            let facing = natives::lr(p1);
+            let mut facing = natives::lr(p1);
             if ![position.x, position.y, position.z, facing]
                 .iter()
                 .all(|v| v.is_finite())
@@ -586,6 +713,20 @@ pub unsafe fn frame(fighter: usize) {
             let Some(request) = game.requested else {
                 return;
             };
+            if request.plan == crate::model::mashout::moves::Plan::Drag {
+                // Camera centre is a direction reference, never proof of collision floor/runway.
+                let Some([left, right, _, _]) = natives::camera_limit_range()
+                    .filter(|r| r.iter().all(|v| v.is_finite()) && r[0] < r[1])
+                else {
+                    // restriction: MASH-RIDLEY-FIXTURE
+                    game.fail("Stage direction unavailable · no grade");
+                    return;
+                };
+                let centre = left + (right - left) * 0.5;
+                if position.x != centre {
+                    facing = (position.x - centre).signum();
+                }
+            }
             // G&W down smash's bury hitbox is the native tip at x=±14.2 (MOVES B04).
             let spacing = if request.evidence == "B04" { 14.2 } else { 6.0 };
             state_natives::init_pos(
@@ -701,7 +842,12 @@ pub unsafe fn frame(fighter: usize) {
             }
             if clock.last() != before || escaped {
                 post(
-                    worker::Event::Observe(game.generation, clock.elapsed(), clock.exhausted()),
+                    worker::Event::Observe(
+                        game.generation,
+                        game.epoch,
+                        clock.elapsed(),
+                        clock.exhausted(),
+                    ),
                     game.generation,
                 );
                 #[cfg(feature = "diag")]
@@ -719,7 +865,11 @@ pub unsafe fn frame(fighter: usize) {
             game.clock = Some(clock);
         }
         Step::Result => post(
-            worker::Event::Pulse(game.generation, !covered && !natives::is_stop(p1)),
+            worker::Event::Pulse(
+                game.generation,
+                game.epoch,
+                !covered && !natives::is_stop(p1),
+            ),
             game.generation,
         ),
         Step::Failed => (),
@@ -728,11 +878,21 @@ pub unsafe fn frame(fighter: usize) {
                 game.end_practice();
                 return;
             }
-            if !released {
-                return;
-            }
+            // Restore owns no practice input, including while the original body is pending.
             revoke();
             OWN_CPU.store(0, Ordering::Release);
+            // Primary-approved Restore-only resting state: grounded teeter is not a capture.
+            if linked
+                || status != ids[0]
+                || ![ids[0], ids[15]].contains(&natives::status_kind(cpu))
+                || natives::situation_kind(p1) != ids[7]
+                || natives::situation_kind(cpu) != ids[7]
+                || natives::is_stop(p1)
+                || natives::is_stop(cpu)
+                || !crate::runtime::roster::character_roster::cpu_reload_ready()
+            {
+                return;
+            }
             let Some(original) = game.original else {
                 game.end_practice();
                 return;
@@ -743,9 +903,7 @@ pub unsafe fn frame(fighter: usize) {
             }
             if ((body + 0xc) as *const u32).read() == original {
                 game.end_practice();
-            } else if !game.restore_requested
-                && crate::runtime::roster::character_roster::cpu_reload_ready()
-            {
+            } else if !game.restore_requested {
                 TEMP_KIND.store(original, Ordering::Release);
                 game.restore_requested =
                     crate::runtime::roster::character_roster::request_cpu_kind(original);

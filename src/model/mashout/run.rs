@@ -30,6 +30,7 @@ pub struct Run<K: Copy + Eq> {
     elapsed: u32,
     escaped: bool,
     result: Option<Result>,
+    native_ended: bool,
     left: u16,
     bests: [Option<(K, u32)>; 16],
     generation: u64,
@@ -52,6 +53,7 @@ impl<K: Copy + Eq> Run<K> {
             elapsed: 0,
             escaped: false,
             result: None,
+            native_ended: false,
             left: 0,
             bests: [None; 16],
             generation: 0,
@@ -100,6 +102,7 @@ impl<K: Copy + Eq> Run<K> {
         self.elapsed = 0;
         self.escaped = false;
         self.result = None;
+        self.native_ended = false;
         self.left = 0;
         self.solver = None;
         self.error = None;
@@ -224,6 +227,19 @@ impl<K: Copy + Eq> Run<K> {
         self.escaped = escaped;
     }
 
+    /// Proven native end of a positive hold, never an inferred countdown mismatch.
+    /// Uses the ordinary result delay without a score, best or synthetic escape.
+    pub fn native_end(&mut self, generation: u64) {
+        if generation != self.generation || self.phase != Phase::Mashing || self.escaped {
+            return;
+        }
+        self.solver = None;
+        self.error = None;
+        self.native_ended = true;
+        self.phase = Phase::Done;
+        self.left = END_FRAMES;
+    }
+
     /// Commit only after the worker's final observation-admission check.
     pub fn finish(&mut self) {
         if self.phase != Phase::Mashing || !self.escaped {
@@ -271,6 +287,9 @@ impl<K: Copy + Eq> Run<K> {
                 write!(out, "Escaped · {}f · Calculating fastest", self.elapsed)
             }
             Phase::Mashing => write!(out, "Mash out · Mash! · {}f", self.elapsed),
+            Phase::Done if self.native_ended => {
+                out.write_str("Move ended before escape · no grade")
+            }
             Phase::Done => {
                 let Some(r) = self.result else {
                     return Ok(());

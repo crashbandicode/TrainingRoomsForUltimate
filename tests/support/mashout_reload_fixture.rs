@@ -9,6 +9,13 @@ static TEMP_KIND: AtomicU32 = AtomicU32::new(u32::MAX);
 static ACCEPT: AtomicBool = AtomicBool::new(false);
 static REQUESTED: AtomicU32 = AtomicU32::new(u32::MAX);
 static CANCELLED: AtomicUsize = AtomicUsize::new(0);
+static CPU_STATUS: AtomicU32 = AtomicU32::new(0);
+static P1_AIR: AtomicBool = AtomicBool::new(false);
+static CPU_AIR: AtomicBool = AtomicBool::new(false);
+static P1_STOP: AtomicBool = AtomicBool::new(false);
+static CPU_STOP: AtomicBool = AtomicBool::new(false);
+static LINKED: AtomicBool = AtomicBool::new(false);
+static REQUEST_COUNT: AtomicUsize = AtomicUsize::new(0);
 mod worker {
     pub enum Event {
         Cancel(u64),
@@ -23,6 +30,27 @@ fn revoke() {
     REVOKED.fetch_add(1, Ordering::Relaxed);
 }
 mod natives {
+    pub fn status_kind(_: usize) -> u32 {
+        super::CPU_STATUS.load(super::Ordering::Relaxed)
+    }
+    pub fn situation_kind(accessor: usize) -> u32 {
+        u32::from(
+            if accessor == 11 {
+                &super::P1_AIR
+            } else {
+                &super::CPU_AIR
+            }
+            .load(super::Ordering::Relaxed),
+        )
+    }
+    pub fn is_stop(accessor: usize) -> bool {
+        if accessor == 11 {
+            &super::P1_STOP
+        } else {
+            &super::CPU_STOP
+        }
+        .load(super::Ordering::Relaxed)
+    }
     pub fn module_accessor(_: usize) -> Option<usize> {
         let a = super::ACCESSOR.load(super::Ordering::Relaxed);
         (a != 0).then_some(a)
@@ -42,6 +70,7 @@ mod runtime {
             }
             pub fn request_cpu_kind(kind: u32) -> bool {
                 crate::REQUESTED.store(kind, crate::Ordering::Relaxed);
+                crate::REQUEST_COUNT.fetch_add(1, crate::Ordering::Relaxed);
                 crate::ACCEPT.load(crate::Ordering::Relaxed)
             }
         }
@@ -113,6 +142,12 @@ fn actual_choose_request(game: &mut Game, kind: u32, request: Request) {
     // CHOOSE
 }
 unsafe fn actual_restore(game: &mut Game, released: bool, cpu_entry: usize) {
+    let (p1, cpu) = (11, 22);
+    let status = if released { 0 } else { 5 };
+    let mut ids = [0u32; 16];
+    ids[15] = 127; // Exact pinned native OTTOTTO_WAIT; runtime resolves its symbol.
+    let linked = LINKED.load(Ordering::Relaxed);
+    let released = released && CPU_STATUS.load(Ordering::Relaxed) == 0;
     match game.step {
         // RESTORE
         _ => (),
@@ -129,6 +164,11 @@ fn reset() {
     ACCEPT.store(false, Ordering::Relaxed);
     REQUESTED.store(u32::MAX, Ordering::Relaxed);
     CANCELLED.store(0, Ordering::Relaxed);
+    CPU_STATUS.store(0, Ordering::Relaxed);
+    for value in [&P1_AIR, &CPU_AIR, &P1_STOP, &CPU_STOP, &LINKED] {
+        value.store(false, Ordering::Relaxed);
+    }
+    REQUEST_COUNT.store(0, Ordering::Relaxed);
 }
 #[test]
 fn reload_missing_cpu_waits_and_revokes() {
@@ -338,4 +378,81 @@ fn restore_waits_through_replacement_then_real_cleanup_clears_temporary_kind() {
     assert_eq!(TEMP_KIND.load(Ordering::Relaxed), u32::MAX);
     assert_eq!(OWN_CPU.load(Ordering::Relaxed), 0);
     assert_eq!(CANCELLED.load(Ordering::Relaxed), 1);
+}
+
+#[test]
+fn restore_grounded_teeter_releases_control_and_restores_original_once() {
+    reset();
+    let mut body = [0u32, 0, 0, 66]; // Observed Ridley, original34.
+    BODY.store(body.as_ptr() as usize, Ordering::Relaxed);
+    CPU_STATUS.store(127, Ordering::Relaxed);
+    READY.store(true, Ordering::Relaxed);
+    ACCEPT.store(true, Ordering::Relaxed);
+    let mut g = Game::at(Step::Restore);
+    g.original = Some(34);
+    unsafe {
+        actual_restore(&mut g, true, 1);
+    }
+    assert_eq!(
+        OWN_CPU.load(Ordering::Relaxed),
+        0,
+        "Off must relinquish neutral practice control"
+    );
+    assert_eq!(
+        REQUESTED.load(Ordering::Relaxed),
+        34,
+        "grounded teeter is a native resting state"
+    );
+    assert!(g.restore_requested);
+    unsafe {
+        actual_restore(&mut g, true, 1);
+    }
+    assert_eq!(REQUEST_COUNT.load(Ordering::Relaxed), 1);
+    body[3] = 34;
+    std::hint::black_box(&body);
+    CPU_STATUS.store(0, Ordering::Relaxed);
+    unsafe {
+        actual_restore(&mut g, true, 1);
+    }
+    assert_eq!(g.step, Step::Off);
+    assert_eq!(TEMP_KIND.load(Ordering::Relaxed), u32::MAX);
+    assert_eq!(CANCELLED.load(Ordering::Relaxed), 1);
+}
+
+#[test]
+fn restore_teeter_keeps_release_and_loader_guards() {
+    for blocked in 0..8 {
+        reset();
+        let body = [0u32, 0, 0, 66];
+        BODY.store(body.as_ptr() as usize, Ordering::Relaxed);
+        CPU_STATUS.store(127, Ordering::Relaxed);
+        READY.store(true, Ordering::Relaxed);
+        ACCEPT.store(true, Ordering::Relaxed);
+        match blocked {
+            0 => P1_AIR.store(true, Ordering::Relaxed),
+            1 => CPU_AIR.store(true, Ordering::Relaxed),
+            2 => P1_STOP.store(true, Ordering::Relaxed),
+            3 => CPU_STOP.store(true, Ordering::Relaxed),
+            4 => LINKED.store(true, Ordering::Relaxed),
+            5 => READY.store(false, Ordering::Relaxed),
+            6 => CPU_STATUS.store(119, Ordering::Relaxed), // Actual CLIFF_WAIT is not permitted.
+            _ => (),
+        }
+        let mut g = Game::at(Step::Restore);
+        unsafe {
+            actual_restore(&mut g, blocked != 7, 1);
+        }
+        assert_eq!(
+            OWN_CPU.load(Ordering::Relaxed),
+            0,
+            "ownership must release even while waiting"
+        );
+        assert_eq!(
+            REQUEST_COUNT.load(Ordering::Relaxed),
+            0,
+            "blocked case {blocked}"
+        );
+        assert_eq!(g.step, Step::Restore);
+        assert_eq!(g.failed, None);
+    }
 }

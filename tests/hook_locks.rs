@@ -484,6 +484,222 @@ fn a_typed_static_read_reaches_its_impl() {
             "read(&MENU) not followed to the impl: {:?}", result.violations);
 }
 
+/// Unlike HOOK_LOCKS (plugin/hook ownership), the native throw observer may take no lock at all, including a try.
+/// Reuse the runtime graph and its edge resolver; keep unresolved native/model/crate references visible in the report.
+struct ObserverScan {
+    reached: BTreeSet<usize>,
+    violations: BTreeSet<String>,
+    ambiguous: BTreeMap<String, usize>,
+    boundaries: BTreeSet<String>,
+}
+
+/// The scanner has no receiver types: an atomic's `.load()` otherwise reaches the UI's `Layout::load`.
+/// Mask only methods on these concrete, source-checked external statics, keeping calls on other receivers visible.
+fn throw_observer_graph(runtime: &Path) -> Graph {
+    let mut graph = Graph::scan(runtime, &[]);
+    graph.precise_imports = true;
+    let receivers = [
+        ("features/mashout.rs", "READY", "AtomicBool"),
+        ("features/mashout.rs", "EPOCH", "AtomicU64"),
+        ("features/mashout/interposer.rs", "INSTALLED", "AtomicBool"),
+        ("features/mashout/interposer.rs", "ORIGINAL_END", "AtomicUsize"),
+        ("features/mashout.rs", "P1", "AtomicUsize"),
+        ("features/mashout.rs", "ARMED", "AtomicU64"),
+        ("features/mashout.rs", "THRESHOLD", "AtomicU32"),
+        ("game.rs", "BASE", "AtomicUsize"),
+        ("game.rs", "GRANTED", "OnceLock<Granted>"),
+        ("game.rs", "TRAINING_PREDICATE_USABLE", "AtomicBool"),
+        ("game.rs", "ENTRY_NATIVES_USABLE", "AtomicBool"),
+        ("game.rs", "ACTIVE_CELL_GUARDED", "std::sync::atomic::AtomicBool"),
+        ("lobby/game_mode.rs", "BASE", "AtomicUsize"),
+        ("scene.rs", "LOBBY_ACTIVE", "AtomicBool"),
+        ("scene.rs", "HOT_SWAP_IN_PROGRESS", "AtomicBool"),
+    ];
+    for (file, receiver, ty) in receivers {
+        let declaration = if receiver == "HOT_SWAP_IN_PROGRESS" { "published.rs" } else { file };
+        let source = std::fs::read_to_string(runtime.join(declaration)).unwrap();
+        assert!(source.contains(&format!("static {receiver}: {ty}")), "external receiver changed: {file}::{receiver}");
+        for f in graph.funcs.iter_mut().filter(|f| f.file == file) {
+            for at in 2..f.body.len() {
+                if f.body[at - 2] == Tok::Ident(receiver.into()) && f.body[at - 1] == Tok::Punct('.') {
+                    if let Tok::Ident(method) = &mut f.body[at] {
+                        if (ty.starts_with("Atomic") || ty.ends_with("AtomicBool")) && matches!(method.as_str(), "load" | "store" | "fetch_max")
+                            || ty == "OnceLock<Granted>" && method == "get"
+                        {
+                            *method = format!("external_{receiver}_{method}");
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Admission::with is a model method, not diag_log::Probe::with. Mask that exact receiver expression only;
+    // the closure body remains in the graph. Any different `.with()` still goes through normal resolution.
+    let pattern = callgraph::lex("admission().with(");
+    for f in graph.funcs.iter_mut().filter(|f| f.file == "features/mashout.rs") {
+        for at in 0..f.body.len().saturating_sub(pattern.len()) + 1 {
+            if f.body[at..].starts_with(&pattern) {
+                f.body[at + 4] = Tok::Ident("external_Admission_with".into());
+            }
+        }
+    }
+    // slot() returns a concrete AtomicUsize; its load is not ui::layouts::load.
+    let slot_source = std::fs::read_to_string(runtime.join("features/mashout/interposer.rs")).unwrap();
+    assert!(slot_source.contains("unsafe fn slot(offset: usize) -> &'static AtomicUsize"));
+    for f in graph.funcs.iter_mut().filter(|f| f.file == "features/mashout/interposer.rs") {
+        for expression in ["slot(START_SLOT).load", "slot(END_SLOT).load"] {
+            let pattern = callgraph::lex(expression);
+            for at in 0..f.body.len().saturating_sub(pattern.len()) + 1 {
+                if f.body[at..].starts_with(&pattern) {
+                    f.body[at + pattern.len() - 1] = Tok::Ident("external_slot_atomic_load".into());
+                }
+            }
+        }
+    }
+    // The scanner flattens #[path] modules, so parent-super calls need explicit,
+    // source-checked edges (no function is excluded from the transitive scan).
+    for (from, target) in [("interposer::started", "throw_seed_after"),
+        ("interposer::end", "end_token"), ("interposer::end", "end_after")] {
+        let nodes = graph.find(from);
+        assert_eq!(nodes.len(), 1);
+        let call = callgraph::lex(&format!("super::{target}("));
+        assert!(graph.funcs[nodes[0]].body.windows(call.len()).any(|tokens| tokens == call));
+        graph.dynamic.push((from.to_owned(), format!("mashout::{target}")));
+    }
+    graph
+}
+
+fn scan_throw_observer(graph: &Graph, entry: &str, locks: &[(&str, &str)]) -> ObserverScan {
+    let mut by_name: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+    for (i, f) in graph.funcs.iter().enumerate() {
+        by_name.entry(f.name.clone()).or_default().push(i);
+    }
+    let mut result = ObserverScan {
+        reached: BTreeSet::new(),
+        violations: BTreeSet::new(),
+        ambiguous: BTreeMap::new(),
+        boundaries: BTreeSet::new(),
+    };
+    let mut pending = graph.find(entry);
+    assert_eq!(pending.len(), 1, "unique observer entry {entry} must exist");
+    while let Some(i) = pending.pop() {
+        if !result.reached.insert(i) {
+            continue;
+        }
+        let f = &graph.funcs[i];
+        let key = f.key();
+        for (file, lock) in locks {
+            if takes_lock(graph, i, file, lock) {
+                result.violations.insert(format!("{entry} -> {key} takes {file}::{lock}"));
+            }
+        }
+        for (at, token) in f.body.iter().enumerate() {
+            let Tok::Ident(name) = token else { continue };
+            let name = name.as_str();
+            // All lock/try methods are rejected even on an uninventoried receiver. A bare read/write can be
+            // a raw-pointer load or Published read; RwLock read/write are checked by the full static inventory above.
+            if matches!(name, "lock" | "try_lock" | "try_read" | "try_write")
+                && f.body.get(at + 1) == Some(&Tok::Punct('('))
+            {
+                result.violations.insert(format!("{entry} -> {key} lock operation {name}"));
+            }
+        }
+        // This is a source-level admission ratchet, not an allocator proof for external/native code. Catch the
+        // usual heap-owning constructors, macros, conversions and growth operations wherever the graph reaches.
+        for token in &f.body {
+            if let Tok::Ident(name) = token {
+                if ["Box", "Vec", "String", "VecDeque", "HashMap", "HashSet", "BTreeMap", "BTreeSet", "Rc", "Arc", "CString",
+                    "alloc", "alloc_zeroed", "realloc", "__rust_alloc", "malloc", "calloc", "vec", "format",
+                    "to_owned", "to_string", "to_vec", "into_boxed_slice", "collect", "reserve", "reserve_exact", "push", "push_str"]
+                    .contains(&name.as_str())
+                {
+                    result.violations.insert(format!("{entry} -> {key} allocation operation {name}"));
+                }
+            }
+        }
+        let mut next = edges(graph, i, &by_name, &mut result.ambiguous);
+        // edges() is normally used for plugin threads and prunes the game branch. This observer is native: follow
+        // both branches, and explicit dynamic edges, should either be introduced into its reach later.
+        if callgraph::thread_dispatch(&f.body).is_some() {
+            next.extend(graph.callees(i));
+        }
+        for (from, to) in &graph.dynamic {
+            if *from == key {
+                next.extend(graph.find(to));
+            }
+        }
+        for (segments, method) in Graph::references(f) {
+            let name = segments.last().unwrap();
+            if !next.iter().any(|&callee| graph.funcs[callee].name == *name) {
+                result.boundaries.insert(format!("{key}: {}{}", if method { "." } else { "" }, segments.join("::")));
+            }
+        }
+        pending.extend(next);
+    }
+    result
+}
+
+fn throw_observer_entries(graph: &Graph) -> Vec<String> {
+    let mut entries = vec!["mashout::throw_seed_after".to_owned()];
+    for name in ["started", "end"] {
+        let wrappers: Vec<_> = graph.funcs.iter().filter(|f|
+            f.file == "features/mashout/interposer.rs" && f.name == name).collect();
+        assert_eq!(wrappers.len(), 1, "the native slot bridge must exist exactly once");
+        entries.push(wrappers[0].key());
+    }
+    entries
+}
+
+#[test]
+fn native_throw_observer_reach_has_no_lock_or_allocation() {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let graph = throw_observer_graph(&runtime);
+    let locks = static_locks(&runtime);
+    let locks: Vec<_> = locks.iter().map(|(f, n)| (f.as_str(), n.as_str())).collect();
+    let observer = graph.find("mashout::throw_seed_after");
+    assert_eq!(observer.len(), 1);
+    for entry in throw_observer_entries(&graph) {
+        let result = scan_throw_observer(&graph, &entry, &locks);
+        let reached: Vec<_> = result.reached.iter().map(|&i| format!("{} ({})", graph.funcs[i].key(), graph.funcs[i].file)).collect();
+        println!("THROW-OBSERVER {entry}: {reached:?}");
+        println!("THROW-BOUNDARIES unresolved native/model/crate references: {:?}", result.boundaries);
+        println!("THROW-LIMITS: external native functions, model/crate method bodies, dyn/trait calls and stored function pointers/closures require separate review; supply known runtime pointer edges in Graph::dynamic");
+        assert!(result.ambiguous.is_empty(), "observer method edges need explicit resolution: {:?}", result.ambiguous);
+        if !entry.ends_with("::end") {
+            assert!(result.reached.contains(&observer[0]), "{entry} must reach the actual observer");
+        }
+        assert!(result.reached.iter().any(|&i| graph.funcs[i].file == "features/mashout/reader.rs" && graph.funcs[i].name == "sample"),
+            "{entry} must reach the real Control reader");
+        assert!(result.violations.is_empty(), "native throw observer reaches lock/allocation operations:\n{}", result.violations.into_iter().collect::<Vec<_>>().join("\n"));
+    }
+}
+
+#[test]
+fn native_throw_observer_scan_catches_transitive_lock_and_allocation_seeds() {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut graph = throw_observer_graph(&runtime);
+    let helper: Vec<_> = graph.funcs.iter().enumerate()
+        .filter(|(_, f)| f.file == "features/mashout/reader.rs" && f.name == "sample").map(|(i, _)| i).collect();
+    assert_eq!(helper.len(), 1);
+    let helper = helper[0];
+    let original = graph.funcs[helper].body.clone();
+    let entries = throw_observer_entries(&graph);
+    for (seed, expected) in [
+        ("UNINVENTORIED.lock();", "lock operation lock"),
+        ("UNINVENTORIED.try_lock();", "lock operation try_lock"),
+        ("let heap = Vec::with_capacity(1);", "allocation operation Vec"),
+        ("let heap = format!(\"seed\");", "allocation operation format"),
+    ] {
+        graph.funcs[helper].body = original.clone();
+        graph.funcs[helper].body.extend(callgraph::lex(seed));
+        for entry in &entries {
+            let result = scan_throw_observer(&graph, entry, &[]);
+            assert!(result.violations.iter().any(|v| v.contains("reader::sample") && v.contains(expected)),
+                "transitive {seed} seed escaped {entry}: {:?}", result.violations);
+        }
+    }
+}
+
 #[test]
 fn direct_free_function_calls_still_reach_the_hook_lock() {
     let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/hook_locks");

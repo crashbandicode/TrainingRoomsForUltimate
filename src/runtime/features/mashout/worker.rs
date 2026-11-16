@@ -9,12 +9,21 @@ pub(super) struct Key {
     victim: u32,
     damage: u32,
     seed: [u32; 9],
+    origin: SeedOrigin,
 }
 impl Key {
-    pub fn new(move_id: u16, attacker: u32, victim: u32, damage: f32, seed: Seed) -> Self {
+    pub fn new(
+        move_id: u16,
+        attacker: u32,
+        victim: u32,
+        damage: f32,
+        seed: Seed,
+        origin: SeedOrigin,
+    ) -> Self {
         let r = seed.record;
         Self {
             move_id,
+            origin,
             attacker,
             victim,
             damage: damage.to_bits(),
@@ -46,19 +55,24 @@ impl Key {
 #[derive(Clone, Copy)]
 pub(super) enum Event {
     Setup(u64, &'static str),
-    Begin(u64, Key, Seed),
-    Observe(u64, u32, bool),
-    Pulse(u64, bool),
+    Begin(u64, u64, Key, Seed, SeedOrigin),
+    Observe(u64, u64, u32, bool),
+    Pulse(u64, u64, bool),
+    NativeEnd(u64, u64),
     Failed(u64, &'static str),
     Cancel(u64),
 }
 struct Worker {
     generation: u64,
+    epoch: u64,
+    origin: SeedOrigin,
     session: Run<Key>,
     shown: crate::model::storage::FixedPath<256>,
 }
 static WORKER: Mutex<Worker> = Mutex::new(Worker {
     generation: 0,
+    epoch: 0,
+    origin: SeedOrigin::Export,
     session: Run::new(),
     shown: crate::model::storage::FixedPath::new(),
 });
@@ -112,31 +126,46 @@ pub(super) fn service() {
             worker.session.cancel();
             show(&mut worker, text);
         }
-        Event::Begin(generation, key, seed) => {
+        Event::Begin(generation, epoch, key, seed, origin) => {
             if generation < worker.generation {
                 return;
             }
             worker.generation = generation;
-            if worker.session.capture(generation, key, seed).is_err() {
+            worker.epoch = epoch;
+            worker.origin = origin;
+            if worker.session.capture(epoch, key, seed).is_err() {
                 worker.session.cancel();
                 // restriction: MASH-M1-MISMATCH
                 show(&mut worker, "Native model unavailable · no grade");
             }
         }
-        Event::Observe(generation, elapsed, escaped) => {
+        Event::Observe(generation, epoch, elapsed, escaped) => {
             if generation == worker.generation
+                && epoch == worker.epoch
+                && epoch == EPOCH.load(Ordering::Acquire)
                 && !faulted(generation, FAULT.load(Ordering::Acquire))
             {
-                worker
-                    .session
-                    .observe_generation(generation, elapsed, escaped);
+                worker.session.observe_generation(epoch, elapsed, escaped);
             }
         }
-        Event::Pulse(generation, tick) => {
-            if generation == worker.generation && worker.session.pass_generation(generation, tick) {
+        Event::Pulse(generation, epoch, tick) => {
+            if generation == worker.generation
+                && epoch == worker.epoch
+                && epoch == EPOCH.load(Ordering::Acquire)
+                && worker.session.pass_generation(epoch, tick)
+            {
                 if !REPLIES.post(generation) {
                     fault(generation);
                 }
+            }
+        }
+        Event::NativeEnd(generation, epoch) => {
+            if generation == worker.generation
+                && epoch == worker.epoch
+                && epoch == EPOCH.load(Ordering::Acquire)
+                && !faulted(generation, FAULT.load(Ordering::Acquire))
+            {
+                worker.session.native_end(epoch);
             }
         }
         Event::Failed(generation, reason) => {
@@ -160,6 +189,9 @@ pub(super) fn service() {
         worker.session.cancel();
         // restriction: MASH-M1-MISMATCH
         show(&mut worker, "Observation incomplete · no grade");
+    } else if worker.epoch != EPOCH.load(Ordering::Acquire) {
+        // A published native epoch supersedes this solver before any best/result publication.
+        worker.session.cancel();
     } else if let Some(error) = worker.session.error() {
         // restriction: MASH-M1-MISMATCH
         show(&mut worker, "Native model unavailable · no grade");
@@ -171,7 +203,11 @@ pub(super) fn service() {
     } else {
         worker.session.finish();
         if worker.session.phase() != crate::model::mashout::run::Phase::Off {
-            let text = worker.session.notice();
+            let mut text = crate::model::storage::FixedPath::<256>::new();
+            if worker.origin == SeedOrigin::ThrowClatterStart {
+                let _ = core::fmt::Write::write_str(&mut text, "from the throw's clatter start · ");
+            }
+            let _ = worker.session.write_notice(&mut text);
             show(&mut worker, text.as_str());
         }
     }

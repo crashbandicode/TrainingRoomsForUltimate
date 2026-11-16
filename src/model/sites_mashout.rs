@@ -1,10 +1,10 @@
 //! Approved M3 read-only reader dependencies, proposal3979f5d6 (2026-11-15).
-//! Existing Site guard policy applies; these rows install no hooks or patches.
+//! Adds two guarded Control data-slot interposers and their native/caller guards. No main TEXT patch.
 
-use super::guard::SeamKind;
+use super::guard::{HookForm, Placement, SeamKind};
 use super::sites::{Feature, Site};
 
-pub static SITES: [Site; 17] = include!(concat!(env!("OUT_DIR"), "/tables/sites_mashout.SITES.rs"));
+pub static SITES: [Site; 22] = include!(concat!(env!("OUT_DIR"), "/tables/sites_mashout.SITES.rs"));
 
 #[cfg(test)]
 lib_unit_tests! {
@@ -19,7 +19,7 @@ mod tests {
 
         #[test]
         fn mashout_reader_rows_match_approved_fixture() {
-            assert_eq!(SITES.len(), APPROVED.len());
+            assert_eq!(SITES.len(), APPROVED.len() + 5);
             for (site, (offset, called, hex)) in SITES.iter().zip(APPROVED) {
                 assert_eq!(site.offset, offset);
                 assert_eq!(site.feature, Feature::Mashout);
@@ -37,7 +37,7 @@ mod tests {
         #[test]
         fn mashout_reader_rows_match_owned_elf() {
             let Some(owned) = owned::owned_main("mashout_reader_rows_match_owned_elf") else { return };
-            for site in &SITES {
+            for site in SITES.iter().filter(|site| site.compared()) {
                 assert_eq!(owned.window(site.offset), site.guard, "{}", site.name);
             }
         }

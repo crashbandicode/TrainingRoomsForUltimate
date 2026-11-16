@@ -600,9 +600,9 @@ fn writing_sites_counts_every_row_that_writes_code() {
 fn mashout_rows_are_registered_without_new_writes() {
     use model::guard::SeamKind;
     let rows = &model::sites_mashout::SITES;
-    assert_eq!(rows.len(), 17);
-    assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Relied).count(), 16);
-    assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Called).count(), 1);
+    assert_eq!(rows.len(), 22);
+    assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Relied).count(), 17);
+    assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Called).count(), 3);
     for row in rows {
         assert_eq!(row.feature, Feature::Mashout);
         assert_eq!(capabilities::all_sites().filter(|site| site.name == row.name).count(), 1);
@@ -622,7 +622,7 @@ fn mashout_required_rows_disable_only_their_reachable_units() {
         grade::{grade, Bounds},
     };
     let calls = capabilities::CROSS_NEEDS.iter().find(|(unit, _)| *unit == Feature::Mashout).unwrap().1;
-    assert_eq!(calls.len(), 14);
+    assert_eq!(calls.len(), 15);
     let required = model::sites_mashout::SITES.iter().map(|row| row.name).chain(calls.iter().copied()).chain(["clatter_start_hook", "entry_active_cell", "is_training_mode"]);
     for name in required {
         let row = capabilities::find(name).unwrap();

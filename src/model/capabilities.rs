@@ -179,6 +179,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 11] = [
     (
         Feature::Mashout,
         &[
+            "camera_limit_range",
             "damage_of",
             "fighter_manager_get_entry",
             "lua_const_lookup",
