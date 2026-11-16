@@ -789,6 +789,7 @@ fn btt_fired_bullet_survives_an_empty_current_ring() {
     assert_ne!(article[0], base + 0x5186a58);
     assert!(pool().iter().all(Option::is_none), "unknown article type is never handed to the native ID getter");
     article[0] ^= 1;
+    assert_eq!(article[0], base + 0x5186a58);
     assert!(pool().iter().any(Option::is_some));
     module[0] ^= 1;
     assert_ne!(module[0], base + 0x4f6a230);
