@@ -178,7 +178,25 @@ struct MotionContext {
     paralyze_frame: i32,
     reserve_damage_lr: u32,
     lr: u32,
-    motion_speed: [u32; 2],
+    motion_speed: Option<[u32; 2]>,
+}
+/// Missing observation is not a missing damage/reference state.
+struct MotionSpeed(Option<[u32; 2]>);
+impl std::fmt::Display for MotionSpeed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            Some([x, y]) => write!(f, "({x:08x},{y:08x})"),
+            None => f.write_str("absent"),
+        }
+    }
+}
+fn motion_fault(reason: &str) {
+    static REPORTED: AtomicBool = AtomicBool::new(false);
+    if !REPORTED.swap(true, Ordering::Relaxed) {
+        diagnostic(format_args!(
+            "[TechDirect] observation=motion_speed_absent fault={reason}"
+        ));
+    }
 }
 unsafe fn motion_context(accessor: usize) -> Option<MotionContext> {
     let damage_stop: extern "C" fn(usize) -> bool =
@@ -219,10 +237,7 @@ unsafe fn motion_context(accessor: usize) -> Option<MotionContext> {
         )
         .to_bits(),
         lr: natives::lr(accessor).to_bits(),
-        motion_speed: {
-            let v = motion_velocity(accessor)?;
-            [v.x.to_bits(), v.y.to_bits()]
-        },
+        motion_speed: motion_velocity(accessor).map(|v| [v.x.to_bits(), v.y.to_bits()]),
         paralyze_frame: natives::get_int(
             accessor,
             id("FIGHTER_INSTANCE_WORK_ID_INT_INVALID_PARALYZE_FRAME")?,
@@ -312,10 +327,10 @@ fn log_hidden_snapshot(
     ));
     let m = h.motion;
     diagnostic(format_args!(
-        "[TechDirect] context attempt={} mode={} kind={kind} moment={moment} frame={} age={} motion_actual={:016x} motion_pending={:016x} motion_frame={:08x} motion_rate={:08x} damage_motion_rate={:08x} init_reaction={:08x} rotation={:08x} roll_set_angle={} pierce_ground={} stopped_damage={} stopped={} cursor={} cursor_frame={} paralyze_frame={} reserve_damage_lr={:08x} lr={:08x} motion_speed=({:08x},{:08x}) paths=fe844/ffd90/fe99c/feb84/fef5c path_execution=UNOBSERVED reset_type={} type5_info_read=UNOBSERVED",
+        "[TechDirect] context attempt={} mode={} kind={kind} moment={moment} frame={} age={} motion_actual={:016x} motion_pending={:016x} motion_frame={:08x} motion_rate={:08x} damage_motion_rate={:08x} init_reaction={:08x} rotation={:08x} roll_set_angle={} pierce_ground={} stopped_damage={} stopped={} cursor={} cursor_frame={} paralyze_frame={} reserve_damage_lr={:08x} lr={:08x} motion_speed={} paths=fe844/ffd90/fe99c/feb84/fef5c path_execution=UNOBSERVED reset_type={} type5_info_read=UNOBSERVED",
         run.attempt,run.mode_name(),run.sample,age,m.actual,m.pending,m.frame,m.rate,
         m.damage_rate,m.init_reaction,m.rotation,m.roll_set_angle,m.pierce_ground,m.stopped_damage,
-        stopped,m.cursor,m.cursor_frame,m.paralyze_frame,m.reserve_damage_lr,m.lr,m.motion_speed[0],m.motion_speed[1],h.reset_type
+        stopped,m.cursor,m.cursor_frame,m.paralyze_frame,m.reserve_damage_lr,m.lr,MotionSpeed(m.motion_speed),h.reset_type
     ));
 }
 struct Spike {
@@ -560,20 +575,28 @@ unsafe fn motion_velocity(accessor: usize) -> Option<Vec2> {
     let pointer = |p: usize| p >= 0x1000 && p & 7 == 0 && p >> 47 == 0;
     let module = ((accessor + 0x68) as *const usize).read();
     if !pointer(module) {
+        motion_fault("motion_module_pointer");
         return None;
     }
     let vptr = (module as *const usize).read();
     if vptr != base + 0x4f88568 || ((vptr + 0x60) as *const usize).read() != base + 0x479d40 {
-        diagnostic(format_args!("[TechDirect] fault=motion_module_type"));
+        motion_fault("motion_module_type");
         return None;
     }
-    let value = kinetic_energy(accessor, "FIGHTER_KINETIC_ENERGY_ID_MOTION")?;
+    let Some(value) = kinetic_energy(accessor, "FIGHTER_KINETIC_ENERGY_ID_MOTION") else {
+        motion_fault("motion_energy_absent");
+        return None;
+    };
     let vptr = (value as *const usize).read();
     if vptr != base + 0x4f888b8 || ((vptr + 0x20) as *const usize).read() != base + 0x3b3540 {
-        diagnostic(format_args!("[TechDirect] fault=motion_energy_type"));
+        motion_fault("motion_energy_type");
         return None;
     }
-    energy_velocity(value)
+    let velocity = energy_velocity(value);
+    if velocity.is_none() {
+        motion_fault("motion_speed_nonfinite");
+    }
+    velocity
 }
 unsafe fn energy(accessor: usize) -> Option<usize> {
     kinetic_energy(accessor, "FIGHTER_KINETIC_ENERGY_ID_DAMAGE")
