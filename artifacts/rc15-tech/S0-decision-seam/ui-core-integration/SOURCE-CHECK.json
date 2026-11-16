@@ -1,0 +1,20 @@
+{
+  "scope": "static source inspection only; no compiled tests",
+  "head": "fc266f47f8cc8754ec6790005110e0b4ffe46856",
+  "checks": {
+    "surface_table_17": true,
+    "all_sites_registered": true,
+    "compares_surface_table": true,
+    "grant_uses_surface_outcomes": true,
+    "surface_reports": true,
+    "ui_frame_once": true,
+    "ui_after_adapter": true,
+    "ui_files_untouched": true
+  },
+  "source_sha256": {
+    "src/model/capabilities.rs": "3477b36144d0686fc2e9fb903f62d7e1583709cfade0f7ece3fd6cdfb7814603",
+    "src/runtime/features/cpu.rs": "e7fe529e7aa0e2b034717463ef8d201ee45c803eff50ee1509ffd6e26dfbf23c",
+    "src/runtime/boot.rs": "811a990a02640a8e1fe904b18453f65d42724e37f1a37a5b06e5a2c25c869e39",
+    "tests/capabilities.rs": "21874b9ec6baf05d915b696b71b929918e1f69067494439fa9f8f1b45793232b"
+  }
+}

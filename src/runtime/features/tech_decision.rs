@@ -77,6 +77,7 @@ pub(super) unsafe fn snapshot(
         source_status,
         guard_count,
         previous_guard_gap,
+        guard_event: None,
         window_base,
         window_multiplier,
         lockout,

@@ -229,6 +229,8 @@ pub struct DecisionSnapshot {
     pub source_status: Option<i32>,
     pub guard_count: Option<u8>,
     pub previous_guard_gap: Option<u8>,
+    /// None means the native event stream is unbound/unproven, never no press.
+    pub guard_event: Option<bool>,
     pub window_base: Option<i32>,
     pub window_multiplier: Option<f32>,
     pub lockout: Option<i32>,

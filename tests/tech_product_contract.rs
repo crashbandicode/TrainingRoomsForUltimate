@@ -244,6 +244,7 @@ fn rejected_decision_delivery_retains_exact_native_snapshot_until_matching_ack()
         source_status: Some(81),
         guard_count: Some(12),
         previous_guard_gap: Some(254),
+        guard_event: None,
         window_base: Some(12),
         window_multiplier: Some(f32::from_bits(0x3f855555)),
         lockout: Some(28),
@@ -282,4 +283,39 @@ fn rejected_decision_delivery_retains_exact_native_snapshot_until_matching_ack()
         None,
         "fresh placement has no old decision"
     );
+}
+
+#[test]
+fn unavailable_guard_event_survives_delivery_distinct_from_no_press() {
+    use launch::{DecisionDelivery, DecisionSnapshot};
+    let sample = DecisionSnapshot {
+        attempt: 41,
+        contact: contact(false),
+        source_status: None,
+        guard_count: None,
+        previous_guard_gap: None,
+        guard_event: None,
+        window_base: None,
+        window_multiplier: None,
+        lockout: None,
+        reaction: None,
+        damage_fall: None,
+        stick_x: None,
+        press_frame_offset: None,
+    };
+    let mut observed = Vec::new();
+    for event in [None, Some(false), Some(true)] {
+        let mut delivery = DecisionDelivery::EMPTY;
+        assert!(delivery.capture_first(DecisionSnapshot {
+            guard_event: event,
+            ..sample
+        }));
+        for _ in 0..2 {
+            assert_eq!(delivery.pending_decision().unwrap().guard_event, event);
+        }
+        observed.push(delivery.pending_decision().unwrap().guard_event);
+        assert!(delivery.acknowledge_decision(sample.attempt));
+    }
+    assert_eq!(observed, [None, Some(false), Some(true)]);
+    assert_ne!(observed[0], observed[1]);
 }

@@ -1,6 +1,13 @@
+# CURRENT follow-up
+UI lock fix aa7e1da1 is integrated as01807de5. This follow-up adds DecisionSnapshot.guard_event:Option<bool>, None for the unverified/unbound native stream, plus retained-delivery distinction test againstSome(false)/Some(true). No native press inferred.
+Prior fc266f47 Surface gate was stopped during compilation before tests completed to incorporate the required UI/availability corrections. CanonicalStop18:46:02 releasedclaim; controllerinactive. No PASS claimed. Next canonicalcompiledtests/cross-needs/lock_order/hook_locks review remains required.
+FrozenV9main0938ec33/XPSgate continuesindependently. UI-owned native accepted-status mapping/event provider andverifiedHitlagResolver stillpending; no productrun authorized.
+Historical worker notes follow.
 # UI/core integration checkpoint — 2026-11-16
 
 Implemented; compiled tests and closure regeneration pending primary-owned gates. This is not build or runtime acceptance.
+
+Final worker checkpoint: source frozen at `fc266f47`; primary started canonical Surface unit `rc15-tech-seam-gates-fc266f47`, lane `rc15-tech-seam`, output `gates-surface/` beside this file. Primary owns its logs and integration fixes. Eight static checks passed in `SOURCE-CHECK.json`. The bounded compliance scan returned no report; `COMPLIANCE.md` records its exact output and all scoped dispositions. Watcher PID 1165452 was reaped with no changed-model marker. These final evidence files/handoff update are deliberately left uncommitted to preserve the frozen source commit and primary's gate identity.
 
 - Worktree: `/home/intpa/tr-fixes-20261113/rc15-tech-seam`, branch `rc15/tech-seam`, base `8b43bdf2`.
 - Playbook: full read, pull already current at `f0dbc0b67a9de08560276864dae3b0137338daa0`; routing read; live worker `gpt-6.1-sol` / `medium` verified in exact thread `01a1e59f-d6c0-7a12-ac5c-266258288a4c`.
