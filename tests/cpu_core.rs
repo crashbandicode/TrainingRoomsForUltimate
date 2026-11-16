@@ -380,16 +380,16 @@ fn tech_receipt_busy_preserves_the_current_owned_generation() {
     cpu.role_scene(Some(Scene::Lobby));
     let receipt = cpu.roles.receipt(0).unwrap();
     let state = hos_lock::Mutex::new(Some(cpu));
-    assert_eq!(role_adapter::try_player_receipt(&state, Err(())), Err(()));
+    assert_eq!(role_adapter::try_player_receipt(|| panic!("Busy must not acquire CPU state"), Err(())), Err(()));
     assert_eq!(state.lock().as_ref().unwrap().roles.receipt(0), Some(receipt));
     let held = state.lock();
-    assert_eq!(role_adapter::try_player_receipt(&state, Ok(Some(Scene::Lobby))), Err(()));
+    assert_eq!(role_adapter::try_player_receipt(|| state.try_lock(), Ok(Some(Scene::Lobby))), Err(()));
     assert_eq!(held.as_ref().unwrap().roles.receipt(0), Some(receipt));
     drop(held);
-    assert_eq!(role_adapter::try_player_receipt(&state, Ok(Some(Scene::Lobby))), Ok(Some(receipt)));
+    assert_eq!(role_adapter::try_player_receipt(|| state.try_lock(), Ok(Some(Scene::Lobby))), Ok(Some(receipt)));
     assert!(state.lock().as_ref().unwrap().roles.current(receipt));
     // A known departure, unlike Busy, follows the original receipt invalidation.
-    assert_eq!(role_adapter::try_player_receipt(&state, Ok(None)), Ok(None));
+    assert_eq!(role_adapter::try_player_receipt(|| state.try_lock(), Ok(None)), Ok(None));
     assert!(!state.lock().as_ref().unwrap().roles.current(receipt));
 }
 

@@ -26,12 +26,12 @@ pub fn current_frame(cpu: &mut Cpu, scene: Option<Scene>, receipt: FrameReceipt)
 /// Product receipt admission, shared with host probes. A Busy context returns
 /// before taking or mutating CPU state; successful admission keeps the original
 /// try-lock and current-frame receipt checks.
-pub fn try_player_receipt(
-    state: &hos_lock::Mutex<Option<Cpu>>,
+pub fn try_player_receipt<'a>(
+    lock: impl FnOnce() -> Option<hos_lock::MutexGuard<'a, Option<Cpu>>>,
     scene: Result<Option<Scene>, ()>,
 ) -> Result<Option<FrameReceipt>, ()> {
     let scene = scene?;
-    let mut guard = state.try_lock().ok_or(())?;
+    let mut guard = lock().ok_or(())?;
     let Some(cpu) = guard.as_mut() else { return Ok(None); };
     let Some(receipt) = cpu.roles.receipt(0) else { return Ok(None); };
     Ok(current_frame(cpu, scene, receipt).then_some(receipt))

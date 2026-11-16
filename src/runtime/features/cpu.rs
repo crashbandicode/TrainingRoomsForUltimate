@@ -243,7 +243,7 @@ fn with<R>(f: impl FnOnce(&mut Cpu) -> R) -> Option<R> {
 
 /// Product launch ownership: no wait on the CPU state from a hook.
 pub(super) fn tech_player_receipt() -> Result<Option<FrameReceipt>, ()> {
-    role_adapter::try_player_receipt(&CPU, try_role_scene().map_err(|_| ()))
+    role_adapter::try_player_receipt(|| CPU.try_lock(), try_role_scene().map_err(|_| ()))
 }
 
 /// Create the state (boot, before any hook is installed).
