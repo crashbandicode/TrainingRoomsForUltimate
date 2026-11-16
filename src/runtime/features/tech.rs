@@ -254,6 +254,9 @@ pub fn look(active: bool) -> [Option<([f32; 2], EggLook)>; LOOKS] {
 /// # Safety
 /// The game's Lua constant table is initialized; this must never run from a hook.
 pub unsafe fn init() -> Option<()> {
+    if !tech_surfaces::init() {
+        return None;
+    }
     let names = [
         "FIGHTER_STATUS_KIND_DAMAGE_FLY",
         "FIGHTER_STATUS_KIND_DAMAGE_FLY_ROLL",
@@ -547,7 +550,7 @@ pub unsafe fn frame(fighter: usize) {
                 attempt.state == crate::model::tech_launch::AttemptState::Flying
             }) && still_tumbling(at) == Some(false);
             if (run.after_reaction > 120 || left_tumble) && !run.controller.awaiting_outcome() {
-                match run.controller.abandon() {
+                match Controller::abandon(&mut run.controller) {
                     Event::NeedSetup { reroll } => {
                         run.pending = true;
                         run.reroll = reroll;

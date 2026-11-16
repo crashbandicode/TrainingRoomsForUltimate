@@ -8,6 +8,7 @@ use crate::model::tech::Vec2;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::game::{self, natives};
 use std::sync::OnceLock;
+static VERIFIED: OnceLock<bool> = OnceLock::new();
 
 #[repr(C, align(16))]
 struct NativePoint([f32; 4]);
@@ -47,8 +48,8 @@ unsafe fn readable(address: usize, size: usize) -> bool {
 unsafe fn pointer(address: usize) -> Option<usize> {
     (address & 7 == 0 && readable(address, 8)).then(|| (address as *const usize).read())
 }
-unsafe fn guarded() -> bool {
-    static VERIFIED: OnceLock<bool> = OnceLock::new();
+/// Verify immutable native code during initialization, before installing hooks.
+pub(super) unsafe fn init() -> bool {
     *VERIFIED.get_or_init(|| {
         if !game::display_version().starts_with(b"13.0.5\0") {
             return false;
@@ -74,6 +75,10 @@ unsafe fn guarded() -> bool {
         good
     })
 }
+unsafe fn guarded() -> bool {
+    VERIFIED.get().copied().unwrap_or(false)
+}
+
 unsafe fn point(line: usize, end: usize) -> Option<Vec2> {
     let vertex = pointer(line + [0x88, 0x90][end])?;
     if vertex & 7 != 0 || !readable(vertex, 0x18) {

@@ -536,27 +536,28 @@ fn tech_frame_waits(graph: &Graph, runtime: &Path) -> BTreeSet<String> {
     }
     let locks = static_locks(runtime);
     let cells = static_types(runtime, &["OnceLock<", "OnceCell<"]);
-    let mut stack = roots;
+    let mut stack: Vec<_> = roots.into_iter().map(|i| (i, String::new())).collect();
     let mut seen = BTreeSet::new();
     let mut violations = BTreeSet::new();
-    while let Some(i) = stack.pop() {
+    while let Some((i, via)) = stack.pop() {
         if !seen.insert(i) { continue; }
         let key = graph.funcs[i].key();
+        let path = if via.is_empty() { key.clone() } else { format!("{via} -> {key}") };
         for (file, name) in &locks {
             if takes_lock_methods(graph, i, file, name, &["lock", "read", "write"], true) {
-                violations.insert(format!("{key} blocks on {file}::{name}"));
+                violations.insert(format!("{path} blocks on {file}::{name}"));
             }
         }
         for (file, name) in &cells {
             if takes_lock_methods(graph, i, file, name, &["set", "get_or_init", "get_or_try_init", "wait"], false) {
-                violations.insert(format!("{key} initializes or waits on {file}::{name}"));
+                violations.insert(format!("{path} initializes or waits on {file}::{name}"));
             }
         }
         // Same explicit allocation spellings covered by the existing HUD audit.
         if graph.funcs[i].body.iter().any(|t| matches!(t, Tok::Ident(s) if ["Box", "Vec", "String", "alloc"].contains(&s.as_str()))) {
-            violations.insert(format!("{key} reaches an allocation spelling"));
+            violations.insert(format!("{path} reaches an allocation spelling"));
         }
-        stack.extend(edges(graph, i, &by_name, &mut BTreeMap::new()));
+        stack.extend(edges(graph, i, &by_name, &mut BTreeMap::new()).into_iter().map(|next| (next, path.clone())));
     }
     violations
 }
