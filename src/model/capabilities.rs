@@ -60,6 +60,7 @@ pub fn all_sites() -> impl Iterator<Item = &'static Site> {
         .chain(super::sites_hitbox::SITES.iter())
         .chain(super::developer_debug::SITES.iter())
         .chain(super::sites_tech_launch::SITES.iter())
+        .chain(super::sites_tech_surfaces::SITES.iter())
 }
 
 /// The install unit that owns a row: its feature's unit, except that the run-time texture helper's rows (they say `Ui` in their table)
@@ -135,7 +136,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 11] = [
     (Feature::P1Cpu, &["fighter_manager_get_entry", "situation_kind", "utility_get_category"]),
     (Feature::Recording, &["fighter_information", "is_operation_cpu", "pos_x", "pos_y", "situation_kind", "status_kind", "transition_term_hook", "work_get_int", "work_is_flag"]),
     (Feature::StateCore, &["change_status_force", "damage_of", "effect_req", "effect_req_follow", "effect_req_on_joint", "fighter_information", "is_operation_cpu", "lua_const_lookup", "pos_x", "prev_status_kind", "situation_kind", "status_kind", "work_get_param_float", "work_is_flag", "work_set_flag", "work_set_float"]),
-    (Feature::TechPractice, &["change_status_force", "damage_of", "fighter_manager_get_entry", "kinetic_get_energy", "lua_const_lookup", "pos_x", "pos_y", "situation_kind", "state_add_damage", "state_clear_speed_all", "state_get_param_int", "state_heal", "state_init_pos", "state_lr", "state_set_lr", "state_set_pos", "state_set_situation_kind", "state_set_sleep", "status_kind", "stop_is_stop", "stop_set_hit_stop_frame", "work_get_float", "work_get_int", "work_get_param_float", "work_set_float"]),
+    (Feature::TechPractice, &["change_status_force", "damage_of", "fighter_manager_get_entry", "kinetic_get_energy", "lua_const_lookup", "pos_x", "pos_y", "situation_kind", "state_add_damage", "state_clear_speed_all", "state_get_param_int", "state_heal", "state_init_pos", "state_lr", "state_set_lr", "state_set_pos", "state_set_situation_kind", "state_set_sleep", "state_work_set_int", "status_kind", "stop_is_stop", "stop_set_hit_stop_frame", "work_get_float", "work_get_int", "work_get_param_float", "work_set_float"]),
 ];
 
 fn cross_needs(unit: Feature) -> &'static [&'static str] {

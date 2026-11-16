@@ -46,6 +46,7 @@ struct Boundary {
 const BOUNDARIES: &[Boundary] = &[
     // Optional Stage tech owns all adapter native calls. These are real first-condition
     // checks of the flag boot sets only after its complete closure passed.
+    Boundary { function: "tech::frame", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::frame", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::di_before", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::decision", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
@@ -589,7 +590,8 @@ fn the_install_line_names_the_row_that_blocked_a_feature() {
 #[test]
 fn optional_tech_poison_preserves_existing_features() {
     use model::install_line::{FeatureReport, InstallLine};
-    for poison in ["tech_cos", "tech_magnitude", "state_set_sleep", "tech_guard_count"] {
+    for poison in ["tech_cos", "tech_magnitude", "state_set_sleep", "tech_guard_count"].into_iter()
+        .chain(model::sites_tech_surfaces::SITES.iter().map(|row| row.name)) {
         let row = capabilities::find(poison).expect("poison names a real guarded row");
         let usable = |s: &model::sites::Site| s.name != poison;
         for unit in [Feature::CpuCore, Feature::CpuCommon, Feature::Hitbox] {
@@ -605,6 +607,62 @@ fn optional_tech_poison_preserves_existing_features() {
             seams: None, developer: None, settings: None, migration: None, heap_allocations: Some(0),
         }.to_string();
         assert!(line.contains(&format!(" tech_practice=not_installed reason=site:{poison} ")), "{line}");
+    }
+}
+
+#[test]
+fn ui_tech_frame_is_once_after_adapter_and_independent_of_hitbox() {
+    let a = Analysis::new();
+    let frame = a.graph.find("cpu::on_frame")[0];
+    let body = &a.graph.funcs[frame].body;
+    let position = |snippet: &str| {
+        let wanted = callgraph::lex(snippet);
+        let positions: Vec<_> = body.windows(wanted.len()).enumerate()
+            .filter_map(|(i, w)| (w == wanted.as_slice()).then_some(i)).collect();
+        assert_eq!(positions.len(), 1, "one dispatch: {snippet}");
+        positions[0]
+    };
+    let hitbox = position("unsafe { crate::runtime::features::hitbox::frame(a0) };");
+    let adapter = position("unsafe { super::tech_adapter::frame(a0, receipt) };");
+    let ui = position("unsafe { crate::runtime::features::tech::frame(a0) };");
+    assert!(hitbox < adapter && adapter < ui);
+    // The calls are sibling statements: no Hitbox condition encloses either Tech pass.
+    // Checking the complete interval also rejects a newly inserted early return.
+    assert_eq!(&body[adapter..ui], callgraph::lex("unsafe { super::tech_adapter::frame(a0, receipt) };"));
+    assert_eq!(&body[hitbox..adapter], callgraph::lex("unsafe { crate::runtime::features::hitbox::frame(a0) };"));
+    let (_, reached) = a.reach(frame);
+    assert!(reached.contains("tech::frame"));
+    let boundary = BOUNDARIES.iter().find(|b| b.function == "tech::frame").unwrap();
+    assert_eq!(boundary.owner, Some(Feature::TechPractice));
+    assert_eq!(boundary.gate, Gate::Flag("tech_ready"));
+    let hitbox_only = model::sites_hitbox::SITES.iter()
+        .find(|row| row.name == "hitbox_attack").unwrap();
+    let usable = |row: &model::sites::Site| row.name != hitbox_only.name;
+    assert!(!capabilities::unit_usable(Feature::Hitbox, &usable));
+    assert!(capabilities::unit_usable(Feature::TechPractice, &usable), "Hitbox refusal must leave the Tech frame admitted");
+    let usable = |row: &model::sites::Site| row.name != "tech_cos";
+    assert!(!capabilities::unit_usable(boundary.owner.unwrap(), &usable), "tech_ready must stay false when its closure is refused");
+    let tech = &a.graph.funcs[a.graph.find("tech::frame")[0]].body;
+    let first = callgraph::lex("if !super::tech_adapter::tech_ready() { return; }");
+    assert!(tech.starts_with(&first), "refused Tech returns before any UI/native work");
+}
+
+#[test]
+fn surface_rows_are_registered_through_boot() {
+    let boot = include_str!("../src/runtime/boot.rs");
+    for step in [
+        "game::outcomes(&crate::model::sites_tech_surfaces::SITES)",
+        "crate::model::sites_tech_surfaces::SITES.iter().zip(tech_surfaces_found.iter_mut())",
+        "by_name(&crate::model::sites_tech_surfaces::SITES, &tech_surfaces_found)",
+        "crate::model::sites_tech_surfaces::SITES.iter().zip(tech_surfaces_found.iter())",
+        "crate::model::sites_tech_surfaces::SITES.iter().any(|row| row.name == name)",
+    ] {
+        assert!(boot.contains(step), "missing boot surface pipeline step: {step}");
+    }
+    let granted = Granted::from_usable(&|_| true);
+    for row in &model::sites_tech_surfaces::SITES {
+        assert!(capabilities::all_sites().any(|registered| registered.name == row.name));
+        assert!(granted.allows(row.offset), "stock surface row {} was not granted", row.name);
     }
 }
 
