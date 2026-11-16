@@ -691,12 +691,15 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
     if entry == 1 {
         if run.active && run.arrange_cpu {
             let input = Input {
-                origin: Vec2 { x: -52.0, y: 0.01 },
+                origin: Vec2 {
+                    x: run.input.origin.x - 12.0,
+                    y: run.input.origin.y,
+                },
                 ..Input::empty()
             };
             place(accessor, input);
             run.arrange_cpu = false;
-            diagnostic(format_args!("[TechDirect] ordinary_cpu_fixture x={:08x} y={:08x} lr={:08x} unmodified_move=true",(-52.0f32).to_bits(),0.01f32.to_bits(),1.0f32.to_bits()));
+            diagnostic(format_args!("[TechDirect] ordinary_cpu_fixture x={:08x} y={:08x} lr={:08x} unmodified_move=true",input.origin.x.to_bits(),input.origin.y.to_bits(),input.lr.to_bits()));
         }
         return;
     }
@@ -759,7 +762,8 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             return;
         }
         let stage = natives::stage_id();
-        if stage != 0 || natives::stage_form(stage) != Some(0) {
+        let form = natives::stage_form(stage).unwrap_or(u32::MAX);
+        if command == 4 && (stage != 0 || form != 0) {
             diagnostic(format_args!("[TechDirect] fault=Battlefield_Normal"));
             return;
         }
@@ -784,11 +788,12 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             run.stop();
             return;
         };
+        let origin = Vec2 {
+            x: natives::pos_x(accessor),
+            y: natives::pos_y(accessor) + if command == 1 { 0.0 } else { 30.0 },
+        };
         run.input = Input {
-            origin: Vec2 {
-                x: if command == 1 { -40.0 } else { 0.0 },
-                y: if command == 1 { 0.01 } else { 30.0 },
-            },
+            origin,
             direction,
             kb: 100.0,
             angle: 315.0,
@@ -841,7 +846,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
         } else {
             run.phase = 1;
         }
-        diagnostic(format_args!("[TechPractice] fixture p1_kind={} cpu_kind={} stage={stage} damage={:.3} weight={:.3} form=0",
+        diagnostic(format_args!("[TechPractice] fixture p1_kind={} cpu_kind={} stage={stage} damage={:.3} weight={:.3} form={form}",
             natives::fighter_kind(accessor).unwrap_or(-1),natives::module_accessor(1).and_then(|a|natives::fighter_kind(a)).unwrap_or(-1),natives::damage(accessor,0),natives::weight(accessor)));
     }
     if !run.active {
