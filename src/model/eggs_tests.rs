@@ -163,12 +163,13 @@ fn eggs_count_mode() {
 fn eggs_run_start() {
     let mut blind = Run::IDLE;
     blind.plan([TIMED, AERIALS, NORMAL, DISC], Some(7), 0, || TRAINING);
-    assert_eq!(blind.step(true, 0.0, &[], false, 7), None);
+    // The standing notice publishes before the camera, while the target still waits.
+    assert_eq!(blind.step(true, 0.0, &[], false, 7), Some(u16::MAX));
     assert!(target(&mut blind).is_none(), "no egg before the draw published the camera");
     assert!(blind.look(false, || panic!("another layout's tick reads nothing"))[0].is_none());
     assert!(blind.look(true, || Some(RESET_CENTRE))[0].is_none(), "the draw's tick takes the camera");
     settle(&mut blind, RESET_CENTRE);
-    assert_eq!(blind.step(true, 0.0, &[], false, 7), Some(u16::MAX));
+    assert_eq!(blind.step(true, 0.0, &[], false, 7), None, "the initial minute notice is already shown");
     assert!(target(&mut blind).is_some(), "the next pass spawns the egg");
     let mut run = started(TIMED, AERIALS, 7);
     assert!(target(&mut run).is_none(), "the first pass reads the ground before the egg spawns");
@@ -680,7 +681,8 @@ fn eggs_restart_waits_for_camera() {
             let mut run = started(FREE, ANY, seed);
             settle(&mut run, panned);
             restart(&mut run);
-            assert_eq!(pass(&mut run, &[], false), None, "seed {seed}: no target before the draw published the new camera");
+            // The notice resets immediately; the target still waits for the new camera.
+            assert_eq!(pass(&mut run, &[], false), Some(u16::MAX), "seed {seed}: no target before the draw published the new camera");
             assert!(target(&mut run).is_none());
             // The camera still shows the panned view for a draw, then glides to the default over a few more.
             for k in 0..7u8 {

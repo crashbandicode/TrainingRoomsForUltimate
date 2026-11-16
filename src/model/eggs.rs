@@ -443,23 +443,24 @@ impl Run {
         }
         // The pass that closes a run the CPU target's last hit ended: the clock stopped on that hit's frame.
         let dt = dt * u32::from(!self.ended());
-        let egg = self.egg_at()?;
-        if self.rows[3] == DISC && hits.iter().any(|h| breaks(self.rows[1], air, h, egg)) {
-            (self.score, self.bursts) = (self.score + 1, [Some((egg, 0)), self.bursts[0]]);
-            self.spawn(Some(egg));
-        }
-        // The flight holds while the CPU target is in a hit (its hitlag, then the placement): an uncounted hit puts it back
-        // where it was hit, and a counted one's next target flies from its start.
-        self.age += dt * u32::from(self.cpu < 3);
-        match self.rows[0] {
-            TIMED => self.frames -= dt,
-            _ => self.frames += dt * u32::from(self.goal() > 0),
-        }
-        if self.ended() {
-            let (k, m) = (kind as usize & 127, usize::from(self.rows[0] - TIMED));
-            self.best[k][m] = self.best[k][m].max(if m == 0 { self.score } else { !self.frames });
-            (self.best[128][m], self.egg) = (self.best[k][m], None);
-            return Some(END_FRAMES);
+        if let Some(egg) = self.egg_at() {
+            if self.rows[3] == DISC && hits.iter().any(|h| breaks(self.rows[1], air, h, egg)) {
+                (self.score, self.bursts) = (self.score + 1, [Some((egg, 0)), self.bursts[0]]);
+                self.spawn(Some(egg));
+            }
+            // The flight holds while the CPU target is in a hit (its hitlag, then the placement): an uncounted hit puts it back
+            // where it was hit, and a counted one's next target flies from its start.
+            self.age += dt * u32::from(self.cpu < 3);
+            match self.rows[0] {
+                TIMED => self.frames -= dt,
+                _ => self.frames += dt * u32::from(self.goal() > 0),
+            }
+            if self.ended() {
+                let (k, m) = (kind as usize & 127, usize::from(self.rows[0] - TIMED));
+                self.best[k][m] = self.best[k][m].max(if m == 0 { self.score } else { !self.frames });
+                (self.best[128][m], self.egg) = (self.best[k][m], None);
+                return Some(END_FRAMES);
+            }
         }
         // The 1-minute notice changes once a second, the N-target one every tick (hundredths).
         let time = [self.frames, self.frames.div_ceil(60)][usize::from(self.rows[0] == TIMED)];
@@ -533,3 +534,89 @@ impl Run {
 #[cfg(test)]
 #[path = "eggs_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod standing_notice_tests {
+    use super::*;
+
+    const TRAINING: Facts = Facts { native_training: true, lobby_active: false, waiting_room: false, busy: false };
+    const VIEW: View = View([14.0; 2], [0.0, -300.0], [-HALF_WIDTH, HALF_WIDTH]);
+
+    fn scored_cpu(score: u32) -> Run {
+        let mut run = Run::IDLE;
+        assert_eq!(run.plan([FREE, ANY, FAST, CPU], Some(7), 0, || TRAINING), Plan::Read);
+        for _ in 0..=SETTLE { run.look(true, || Some(VIEW)); }
+        run.step(true, 0.0, &[], false, 0);
+        for _ in 0..score {
+            run.cpu_pass(0.0, false);
+            run.cpu_pass(0.0, false);
+            run.cpu_pass(5.0, false);
+            run.cpu_pass(5.0, false);
+            run.step(true, 0.0, &[], false, 0);
+        }
+        assert_eq!(run.score, score);
+        let mut text = String::new();
+        run.write_notice(&mut text).unwrap();
+        assert_eq!(text, format!("Eggs {score}"));
+        run
+    }
+
+    fn published(run: &mut Run) -> Option<(u16, String)> {
+        assert_eq!(run.plan(run.rows, None, 0, || TRAINING), Plan::Read);
+        let tick = run.keeper(0x1000);
+        let length = run.step(tick, 0.0, &[], false, 0)?;
+        let mut text = String::new();
+        run.write_notice(&mut text).unwrap();
+        Some((length, text))
+    }
+
+    #[test]
+    fn fs57_menu_restart_publishes_zero_before_camera() {
+        let mut run = scored_cpu(4);
+        let rows = run.rows;
+        assert_eq!(run.plan(rows, Some(11), 0, || TRAINING), Plan::Read);
+        assert_eq!(published(&mut run), Some((u16::MAX, "Eggs 0".into())));
+        assert_eq!((run.egg_at(), run.view, run.frames, run.age), (None, None, 0, 0));
+        assert_eq!(published(&mut run), None, "no unchanged per-frame publication");
+        assert_eq!(run.cpu_pass(0.0, false), None, "notice does not place a CPU target");
+    }
+
+    #[test]
+    fn fs58_lra_reset_publishes_zero_before_camera() {
+        let mut run = scored_cpu(2);
+        run.reset(11);
+        assert_eq!(published(&mut run), Some((u16::MAX, "Eggs 0".into())));
+        for _ in 0..SETTLE {
+            run.look(true, || Some(VIEW));
+            assert_eq!(published(&mut run), None);
+            assert_eq!((run.egg_at(), run.frames, run.age), (None, 0, 0));
+        }
+        run.look(true, || Some(VIEW));
+        assert_eq!(published(&mut run), None, "same Free text when the first target appears");
+        assert!(run.egg_at().is_some());
+        assert_eq!(run.age, 1, "normal flight starts only after the camera settled");
+        assert!(matches!(run.cpu_pass(0.0, false), Some((_, Put::Fresh(true)))));
+    }
+
+    #[test]
+    fn fs54_mode_change_publishes_new_format_before_camera() {
+        let mut run = Run::IDLE;
+        for (mode, expected, initial_clock) in [
+            (TIMED, "Eggs 0   1:00", RUN_FRAMES),
+            (TEN, "Eggs 0/10   0:00.00", 0),
+            (TWENTY, "Eggs 0/20   0:00.00", 0),
+        ] {
+            assert_eq!(run.plan([mode, ANY, FAST, CPU], Some(11), 0, || TRAINING), Plan::Read);
+            assert_eq!(published(&mut run), Some((u16::MAX, expected.into())));
+            assert_eq!((run.egg_at(), run.view, run.frames, run.age), (None, None, initial_clock, 0));
+            assert_eq!(published(&mut run), None);
+            assert_eq!(run.frames, initial_clock, "no clock before the first target");
+            for _ in 0..=SETTLE { run.look(true, || Some(VIEW)); }
+            let first = published(&mut run);
+            assert!(run.egg_at().is_some());
+            assert_eq!(run.frames, if mode == TIMED { RUN_FRAMES - 1 } else { 1 });
+            if mode == TIMED { assert_eq!(first, None); }
+            else { assert!(first.unwrap().1.starts_with(if mode == TEN { "Eggs 0/10" } else { "Eggs 0/20" })); }
+        }
+    }
+}
