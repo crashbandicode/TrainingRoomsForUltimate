@@ -216,6 +216,8 @@ fn damage_info_fields_match_owned_lua_reader_mapping() {
         (0x227f2d0, 0xbd401280),
         (0x227f0a8, 0xbd401680),
         (0x227f2c0, 0xb9404288),
+        (0x227f318, 0xb9804e88), // signed Info hitstop_frame at+0x4c
+        (0x404940, 0xb9004d69),  // native transactor stores w9 at log+0x4c
     ] {
         let bytes = owned.window(address);
         assert_eq!(

@@ -1,4 +1,4 @@
-//! The one V9 mutation sequence used by both product and diagnostic launchers.
+//! The one V10 mutation sequence used by both product and diagnostic launchers.
 use super::{tech_info_seed::Seed, tech_native};
 use crate::model::tech_launch::Vec2;
 use crate::runtime::game::natives;
@@ -105,7 +105,10 @@ pub(super) unsafe fn launch(
     let before = tech_native::damage_info(accessor).ok_or(Error::Guard)?;
     observe(Moment::InfoBefore(before)).ok_or(Error::Observation)?;
     let module = ((accessor + 0xa8) as *const usize).read();
-    if !plan.seed.write((module + 0x80) as *mut u8, heights) {
+    if !plan
+        .seed
+        .write((module + 0x80) as *mut u8, heights, plan.frames)
+    {
         return Err(Error::Value);
     }
     observe(Moment::InfoAfter(

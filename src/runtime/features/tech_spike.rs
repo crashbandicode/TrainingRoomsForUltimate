@@ -695,9 +695,10 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
         None
     };
     let seed = launch_seed(run)?;
-    let frames = baseline
-        .map_or(Some(9), |b| i32::try_from(b.stop_frames).ok())
-        .filter(|n| *n > 0)?;
+    let frames = baseline.map_or(9, |b| info_seed::hitstop_frames(&b.damage_info));
+    if frames <= 0 {
+        return None;
+    }
     let plan = core::Plan {
         start: input.origin,
         facing: input.lr,
@@ -724,7 +725,7 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
             Moment::InfoBefore(bytes) => log_damage_info(run, "info_pre_write", run.age, &bytes),
             Moment::InfoAfter(bytes) => {
                 log_damage_info(run, "info_post_write", run.age, &bytes);
-                diagnostic(format_args!("[TechDirect] info_seed attempt={} mode={} source={} bytes=16 height={} speed_x={:08x} speed_y={:08x} angle={:08x} mirror_past_vertical=UNVERIFIED",
+                diagnostic(format_args!("[TechDirect] info_seed attempt={} mode={} source={} bytes=20 height={} speed_x={:08x} speed_y={:08x} angle={:08x} mirror_past_vertical=UNVERIFIED",
                     run.attempt, run.mode_name(), if baseline.is_some() { "baseline_fields" } else { "native_formula" },
                     seed.height, seed.speed[0].to_bits(), seed.speed[1].to_bits(), seed.angle.to_bits()));
             }

@@ -1,4 +1,4 @@
-//! Shared four-field DamageInfo seed. Offsets pinned against the owned 13.0.5 ELF.
+//! Shared DamageInfo seed and native stop-frame invariant. Offsets pinned against the owned 13.0.5 ELF.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Seed {
     pub height: i32,
@@ -30,15 +30,16 @@ impl Seed {
             && self.angle.is_finite()
     }
     /// Caller supplies the guarded inline Info pointer and SDK-resolved height constants.
-    /// Validate the complete seed before any mutation; write exactly four 32-bit fields.
-    pub unsafe fn write(self, info: *mut u8, heights: [i32; 3]) -> bool {
-        if info.is_null() || !self.valid(heights) {
+    /// Validate the complete seed before any mutation; write exactly five 32-bit fields.
+    pub unsafe fn write(self, info: *mut u8, heights: [i32; 3], frames: i32) -> bool {
+        if info.is_null() || !self.valid(heights) || frames <= 0 {
             return false;
         }
         (info.add(0x08) as *mut i32).write_unaligned(self.height);
         (info.add(0x10) as *mut f32).write_unaligned(self.speed[0]);
         (info.add(0x14) as *mut f32).write_unaligned(self.speed[1]);
         (info.add(0x40) as *mut f32).write_unaligned(self.angle);
+        (info.add(0x4c) as *mut i32).write_unaligned(frames);
         true
     }
 }
@@ -50,4 +51,10 @@ pub fn relative_angle(world_degrees: f32, toward_right: bool) -> f32 {
         180.0 - world_degrees
     };
     degrees * (std::f32::consts::PI / 180.0)
+}
+
+/// Native transactor input retained in Info, not the number of observed callbacks.
+#[cfg(any(test, feature = "diag"))]
+pub fn hitstop_frames(info: &[u8; 0xa0]) -> i32 {
+    i32::from_le_bytes([info[0x4c], info[0x4d], info[0x4e], info[0x4f]])
 }
