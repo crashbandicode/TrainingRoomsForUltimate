@@ -59,6 +59,16 @@ pub fn requested() -> bool {
     read(&MENU).lobby_practice == OnOff::ON && is_waiting_scene()
 }
 
+/// Busy is unknown eligibility: callers must defer, not treat it as departure.
+pub fn try_requested() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {
+    Ok(crate::runtime::compat::menu::try_current_menu()?.lobby_practice == OnOff::ON && is_waiting_scene())
+}
+
+/// The same request and readiness facts as `active`, without waiting on menu edits.
+pub fn try_active() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {
+    Ok(try_requested()? && UI_READY.load(Ordering::Acquire))
+}
+
 pub fn active() -> bool {
     requested() && UI_READY.load(Ordering::Acquire)
 }

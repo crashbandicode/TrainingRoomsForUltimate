@@ -1794,6 +1794,110 @@ fn statics_use_their_declared_foreign_or_runtime_receiver_type() {
     }
 }
 
+/// Strict root-to-EDITED check using the same resolver, typed-static, callback
+/// and thread-dispatch treatment as the shared-lock inventory above.
+fn menu_edit_wait_path(graph: &Graph, root: usize) -> Option<Vec<String>> {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let ctx = Ctx::new(graph, static_locks(&dir));
+    let edited = ctx.locks.iter().position(|(file, name)| file == "compat/menu.rs" && name == "EDITED").expect("EDITED lock");
+    let mut edges: Vec<Vec<(usize, usize)>> = (0..graph.funcs.len()).map(|f| {
+        let mut edges: Vec<_> = calls(&graph.funcs[f].body).iter()
+            .flat_map(|call| ctx.resolve(f, call).into_iter().map(move |to| (call.at, to))).collect();
+        edges.extend(typed_static_callees(graph, f));
+        edges
+    }).collect();
+    for (from, to) in callback_edges(graph) { edges[from].push((0, to)); }
+    for (from, at, to) in value_edges(graph) { edges[from].push((at, to)); }
+    let mut queue = std::collections::VecDeque::from([(root, vec![graph.funcs[root].key()])]);
+    let mut seen = BTreeSet::new();
+    while let Some((f, path)) = queue.pop_front() {
+        if !seen.insert(f) { continue; }
+        if takes(&ctx, f).iter().any(|take| take.lock == edited && on_this_thread(graph, f, take.at, false)) {
+            return Some(path);
+        }
+        for &(at, to) in &edges[f] {
+            if on_this_thread(graph, f, at, false) {
+                let mut next = path.clone();
+                next.push(graph.funcs[to].key());
+                queue.push_back((to, next));
+            }
+        }
+    }
+    None
+}
+
+#[test]
+fn layout_menu_reads_are_nonblocking_and_a_blocking_edit_seed_fails() {
+    let mut graph = runtime_graph();
+    let one = |g: &Graph, file: &str, key: &str| {
+        let found: Vec<_> = g.find(key).into_iter().filter(|&i| g.funcs[i].file == file).collect();
+        assert_eq!(found.len(), 1, "{file}::{key}");
+        found[0]
+    };
+    let roots = [
+        ("features/hitbox.rs", "hitbox::draw_orbs"),
+        ("features/hud_draw.rs", "hud_draw::draw"),
+        ("ui/native_pause.rs", "native_pause::observe"),
+        ("ui/tick.rs", "tick::tick"),
+    ];
+    for (file, key) in [
+        ("features/hitbox.rs", "hitbox::frame"),
+        ("features/hitbox.rs", "hitbox::eggs_pass"),
+        ("features/btt.rs", "btt::poll"),
+        ("features/btt.rs", "btt::pass"),
+        ("features/btt.rs", "btt::look"),
+    ] {
+        assert_eq!(menu_edit_wait_path(&graph, one(&graph, file, key)), None, "{key} waits on EDITED");
+    }
+    for (file, key) in roots {
+        assert_eq!(menu_edit_wait_path(&graph, one(&graph, file, key)), None, "{key} waits on EDITED");
+        let body = &graph.funcs[one(&graph, file, key)].body;
+        let read = body.iter().position(|t| *t == Tok::Ident("try_requested".into())).expect("fallible request");
+        let defer = body[read..].iter().position(|t| *t == Tok::Ident("return".into())).expect("Busy defers") + read;
+        for mutation in match key {
+            "hitbox::draw_orbs" => &["RUN", "ORB_PANES"][..],
+            "hud_draw::draw" => &["CONTAINERS"][..],
+            "native_pause::observe" => &["retire_pause_layout", "native_pause_sample"][..],
+            _ => &["renderer_lost", "set_visible"][..],
+        } {
+            assert!(defer < body.iter().position(|t| *t == Tok::Ident((*mutation).into())).unwrap(), "{key}: Busy mutates {mutation}");
+        }
+        if key == "tick::tick" {
+            assert!(body.iter().position(|t| *t == Tok::Ident("REGISTRATIONS".into())).unwrap() < read,
+                "deferred registration must invalidate old pane lifetimes");
+        }
+    }
+    let facts = &graph.funcs[one(&graph, "ui/facts.rs", "facts::try_publish_scene_facts")].body;
+    assert!(facts.iter().position(|t| *t == Tok::Ident("try_context".into())).unwrap()
+        < facts.iter().position(|t| *t == Tok::Ident("SCENE_ENABLED".into())).unwrap(),
+        "unavailable context must not publish a false scene departure");
+    let after = &graph.funcs[one(&graph, "macros/mod.rs", "macros::after_layout_draw")].body;
+    let admission = after.iter().position(|t| *t == Tok::Ident("try_publish_scene_facts".into())).unwrap();
+    let step = after.iter().position(|t| *t == Tok::Ident("post_clip_draw".into())).unwrap();
+    assert!(after[admission..step].iter().any(|t| *t == Tok::Ident("return".into())),
+        "Busy must defer clip stepping as well as fact publication");
+    let read = one(&graph, "compat/menu.rs", "menu::try_current_menu");
+    let at = graph.funcs[read].body.iter().position(|t| *t == Tok::Ident("try_lock".into())).expect("actual read uses try_lock");
+    graph.funcs[read].body[at] = Tok::Ident("lock".into());
+    for (file, key) in roots {
+        let witness = menu_edit_wait_path(&graph, one(&graph, file, key)).expect("seed must FAIL the same root check");
+        assert_eq!(witness.first().unwrap(), key);
+        assert_eq!(witness.last().unwrap(), "menu::try_current_menu");
+        assert!(witness.iter().any(|key| key == "lobby::try_requested"), "{witness:?}");
+    }
+    // Restore the reader and seed the exact card's direct requested edge at each
+    // changed root. It must still fail, independently of the try_lock mutation.
+    graph.funcs[read].body[at] = Tok::Ident("try_lock".into());
+    for (file, key) in roots {
+        let root = one(&graph, file, key);
+        let at = graph.funcs[root].body.iter().position(|t| *t == Tok::Ident("try_requested".into())).unwrap();
+        graph.funcs[root].body[at] = Tok::Ident("requested".into());
+        let witness = menu_edit_wait_path(&graph, root).expect("original card requested edge must FAIL");
+        assert_eq!(witness.last().unwrap(), "menu::current_menu");
+        graph.funcs[root].body[at] = Tok::Ident("try_requested".into());
+    }
+}
+
 /// The scan on a small fixture: a guard bound by `let` and held over a call, a temporary held over its statement, a
 /// guard dropped before the call, and an inversion between two threads.
 #[test]

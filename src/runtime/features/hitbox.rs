@@ -468,7 +468,12 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         return;
     }
     let waiting = name == b"info_waiting";
-    let active = if waiting { crate::runtime::lobby::training::lobby::requested() } else { name == b"info_training" && scene::is_training() };
+    let active = if waiting {
+        // An unavailable menu is not a scene departure. Preserve the Eggs/BTT run
+        // and its panes for this tick; retry before touching either on the next.
+        let Ok(active) = crate::runtime::lobby::training::lobby::try_requested() else { return; };
+        active
+    } else { name == b"info_training" && scene::is_training() };
     if layout.is_null() {
         return;
     }

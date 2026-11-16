@@ -85,6 +85,8 @@ pub mod macro_handoff;
 pub mod menu;
 #[path = "model/menu_shortcuts.rs"]
 pub mod menu_shortcuts;
+#[path = "model/menu_read.rs"]
+pub mod menu_read;
 #[path = "model/migration.rs"]
 pub mod migration;
 #[path = "model/scene.rs"]
