@@ -838,3 +838,21 @@ fn pending_snapshot_query_preserves_owner_and_contention_boundaries() {
         assert!(!body.iter().any(|t| matches!(t, Tok::Ident(name) if name == forbidden)), "query must be read-only, nonblocking and clock-free: {forbidden}");
     }
 }
+
+#[test]
+fn pending_query_busy_defers_ui_before_delivery_and_existing_hold_clock() {
+    let a = Analysis::new();
+    let body = &a.graph.funcs[a.graph.find("tech::frame")[0]].body;
+    let at = |snippet: &str| {
+        let wanted = callgraph::lex(snippet);
+        body.windows(wanted.len()).position(|w| w == wanted.as_slice())
+            .unwrap_or_else(|| panic!("missing retained UI delivery ordering: {snippet}"))
+    };
+    let query = at("let Ok(raw) = run.adapter.pending_decision() else { return; };");
+    assert!(query < at("DECISIONS.drain"));
+    assert!(query < at("run.controller.retained_snapshot(snapshot, *ids, age)"));
+    assert!(query < at("Controller::tick"));
+    assert!(at("Controller::tick") < at("age.saturating_add(1)"));
+    at("snapshot.attempt == attempt.id");
+    at("raw.filter(|s| s.attempt == attempt.id)");
+}

@@ -271,6 +271,6 @@ pub unsafe fn frame(fighter: usize) -> Option<()> {
     });
     // V2.1: the fighter whose attack broke a target freezes, as on a hit.
     let frames = (broke > 0 && melee).then(scene::facts).and_then(eggs::hitlag)?;
-    natives::set_hit_stop_frame(at, frames);
+    let _ = natives::set_hit_stop_frame(at, frames, false);
     Some(())
 }
