@@ -26,6 +26,8 @@ pub mod stage_hazards;
 #[cfg(feature = "diag")]
 mod tech_direct_v1_guards;
 #[cfg(feature = "diag")]
+mod tech_direct_v3_guards;
+#[cfg(feature = "diag")]
 pub mod tech_spike;
 #[cfg(feature = "diag")]
 mod tech_spike_guards;

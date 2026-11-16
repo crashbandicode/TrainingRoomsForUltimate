@@ -1,5 +1,5 @@
-//! S0 direct launcher: AIR and native log-reaction init, then damage speed.
-//! diag-tech-s0.req: direct-v2 | direct-v2-n1 | ordinary | walk | off | inspect.
+//! S0 direct launcher: retain native post-init residual, add the launch, same callback.
+//! diag-tech-s0.req: direct-v3 | ordinary | walk | off | inspect.
 //! No product mode, heap, blocking lock or new hook.
 use super::tech_spike_guards;
 use crate::model::cpu::hash::lua_bind_hash;
@@ -13,6 +13,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 static REQUEST: AtomicU8 = AtomicU8::new(0);
 static GUARDED: AtomicU8 = AtomicU8::new(0);
 static V1_GUARDED: AtomicU8 = AtomicU8::new(0);
+static V3_GUARDED: AtomicU8 = AtomicU8::new(0);
 static OBSERVING: AtomicBool = AtomicBool::new(false);
 static NEXT_ATTEMPT: AtomicU32 = AtomicU32::new(1);
 static RUN: hos_lock::Mutex<Spike> = hos_lock::Mutex::new(Spike::new());
@@ -23,8 +24,7 @@ pub fn request(text: &str) {
         "walk" => 4,
         "off" => 5,
         "inspect" => 6,
-        "direct-v2" => 11,
-        "direct-v2-n1" => 12,
+        "direct-v3" => 13,
         _ => {
             diagnostic(format_args!("[TechDirect] request invalid"));
             return;
@@ -63,6 +63,7 @@ impl Input {
 struct Baseline {
     input: Input,
     hidden: Hidden,
+    hitlag_velocity: Vec2,
     attempt: u32,
     scope: FrameReceipt,
     complete: bool,
@@ -397,9 +398,9 @@ fn complete_baseline(run: &mut Spike) {
     };
     baseline.complete = true;
     let input = baseline.input;
-    diagnostic(format_args!("[TechDirect] baseline_complete attempt={} command={} kb={:08x} direction_x={:08x} direction_y={:08x} percent={:08x} weight={:08x} start_x={:08x} start_y={:08x} lr={:08x} ground_at_hit={}",
+    diagnostic(format_args!("[TechDirect] baseline_complete attempt={} command={} kb={:08x} direction_x={:08x} direction_y={:08x} percent={:08x} weight={:08x} start_x={:08x} start_y={:08x} lr={:08x} ground_at_hit={} hitlag_vx={:08x} hitlag_vy={:08x}",
         baseline.attempt,run.mode,input.kb.to_bits(),input.direction.x.to_bits(),input.direction.y.to_bits(),
-        input.percent.to_bits(),input.weight.to_bits(),input.origin.x.to_bits(),input.origin.y.to_bits(),input.lr.to_bits(),baseline.hidden.flags[3]));
+        input.percent.to_bits(),input.weight.to_bits(),input.origin.x.to_bits(),input.origin.y.to_bits(),input.lr.to_bits(),baseline.hidden.flags[3],baseline.hitlag_velocity.x.to_bits(),baseline.hitlag_velocity.y.to_bits()));
 }
 
 unsafe fn energy(accessor: usize) -> Option<usize> {
@@ -445,10 +446,120 @@ unsafe fn setup(run: &Spike, accessor: usize) {
         run.attempt,run.mode_name(),natives::fighter_kind(accessor).unwrap_or(-1),input.kb.to_bits(),input.angle.to_bits(),
         input.percent.to_bits(),input.weight.to_bits(),input.origin.x.to_bits(),input.origin.y.to_bits(),input.lr.to_bits()));
 }
-unsafe fn write_speed(run: &Spike, accessor: usize, timing: &str) -> Option<()> {
+/// Guard the whole helper body and both PLT windows; reject unresolved/foreign main targets.
+unsafe fn v3_guarded() -> bool {
+    match V3_GUARDED.load(Ordering::Acquire) {
+        1 => return true,
+        2 => return false,
+        _ => {}
+    }
+    let base = game::text_base();
+    let mut ok = base != 0;
+    if ok {
+        for &(offset, expected) in super::tech_direct_v3_guards::DIRECT_V3_GUARDS {
+            let equal = std::slice::from_raw_parts((base + offset) as *const u8, 64) == expected;
+            diagnostic(format_args!(
+                "[TechDirect] v3_guard offset={offset:x} ok={equal}"
+            ));
+            ok &= equal;
+        }
+        for offset in [0x529f2c8, 0x529f2d0] {
+            let target = ((base + offset) as *const usize).read();
+            let outside = target != 0
+                && target & 3 == 0
+                && !(base..base + super::tech_direct_v3_guards::MAIN_IMAGE_END).contains(&target);
+            diagnostic(format_args!(
+                "[TechDirect] v3_import slot={offset:x} target={target:x} outside_main={outside}"
+            ));
+            ok &= outside;
+        }
+    }
+    if ok {
+        let first: extern "C" fn(f32) -> f32 = std::mem::transmute(base + 0x39c07d0);
+        let second: extern "C" fn(f32) -> f32 = std::mem::transmute(base + 0x39c07e0);
+        let (x0, y0) = (first(0.0), second(0.0));
+        let (x90, y90) = (
+            first(std::f32::consts::FRAC_PI_2),
+            second(std::f32::consts::FRAC_PI_2),
+        );
+        // Identify order at known inputs. The rounded quarter-turn has a small negative cosine;
+        // sign/order checks here are not a tolerance in the frame-by-frame fidelity comparison.
+        ok = x0.to_bits() == 1.0f32.to_bits()
+            && y0.to_bits() == 0
+            && y90.to_bits() == 1.0f32.to_bits()
+            && x90 < 0.0
+            && x90 > -1.0;
+        diagnostic(format_args!("[TechDirect] v3_trig_identity zero=({:08x},{:08x}) quarter=({:08x},{:08x}) cos_then_sin={ok} radians=true",x0.to_bits(),y0.to_bits(),x90.to_bits(),y90.to_bits()));
+    }
+    V3_GUARDED.store(if ok { 1 } else { 2 }, Ordering::Release);
+    ok
+}
+unsafe fn native_direction(degrees: f32) -> Option<(Vec2, f32)> {
+    if !degrees.is_finite() || !v3_guarded() {
+        return None;
+    }
+    let radians = degrees.to_radians();
+    let cos: extern "C" fn(f32) -> f32 = std::mem::transmute(game::text_base() + 0x39c07d0);
+    let sin: extern "C" fn(f32) -> f32 = std::mem::transmute(game::text_base() + 0x39c07e0);
+    let v = Vec2 {
+        x: cos(radians),
+        y: sin(radians),
+    };
+    (v.x.is_finite() && v.y.is_finite()).then_some((v, radians))
+}
+struct LaunchVector {
+    residual: Vec2,
+    component: Vec2,
+    wanted: Vec2,
+    magnitude: f32,
+    radians: f32,
+    direction: Vec2,
+    matched: bool,
+}
+unsafe fn launch_vector(run: &Spike, residual: Vec2) -> Option<LaunchVector> {
+    let (direction, radians) = native_direction(run.input.angle)?;
+    // The helper consumes w2/w3 and s0/s1/s2. Separate AAPCS integer/FP banks need
+    // two unused integer placeholders. Angle id0 selects the ordinary multiplier,
+    // excluding its361/367 special paths; the chosen direction is applied below.
+    let speed: extern "C" fn(usize, usize, i32, i32, f32, f32, f32) -> f32 =
+        std::mem::transmute(game::text_base() + 0x403a20);
+    let magnitude = speed(0, 0, 0, 0, run.input.kb, 0.0, 0.0);
+    if !magnitude.is_finite() || magnitude < 0.0 {
+        return None;
+    }
+    let baseline = run.baseline.filter(|b| b.complete);
+    // Only the matched diagnostic imports a real-hit vector. Cold/product inputs
+    // use the native magnitude and trig, without a hardcoded speed multiplier.
+    let component = baseline.map_or(
+        Vec2 {
+            x: magnitude * direction.x,
+            y: magnitude * direction.y,
+        },
+        |b| Vec2 {
+            x: b.hitlag_velocity.x - residual.x,
+            y: b.hitlag_velocity.y - residual.y,
+        },
+    );
+    let wanted = Vec2 {
+        x: residual.x + component.x,
+        y: residual.y + component.y,
+    };
+    (wanted.x.is_finite() && wanted.y.is_finite()).then_some(LaunchVector {
+        residual,
+        component,
+        wanted,
+        magnitude,
+        radians,
+        direction,
+        matched: baseline.is_some(),
+    })
+}
+unsafe fn write_speed(run: &Spike, accessor: usize, vector: &LaunchVector) -> Option<()> {
     let damage = energy(accessor)?;
-    let wanted = math::launch_velocity(run.input.kb, run.input.direction)?;
-    let before = velocity(accessor);
+    let wanted = vector.wanted;
+    diagnostic(format_args!("[TechDirect] residual_launch attempt={} command={} age={} baseline_attempt={} source={} r_vx={:08x} r_vy={:08x} magnitude={:08x} angle={:08x} radians={:08x} direction_x={:08x} direction_y={:08x} launch_vx={:08x} launch_vy={:08x} wanted_vx={:08x} wanted_vy={:08x}",
+        run.attempt,run.mode,run.age,run.baseline.map_or(0,|b|b.attempt),if vector.matched {"baseline_vector"} else {"native_formula"},
+        vector.residual.x.to_bits(),vector.residual.y.to_bits(),vector.magnitude.to_bits(),run.input.angle.to_bits(),vector.radians.to_bits(),vector.direction.x.to_bits(),vector.direction.y.to_bits(),vector.component.x.to_bits(),vector.component.y.to_bits(),wanted.x.to_bits(),wanted.y.to_bits()));
     #[repr(C, align(16))]
     struct NativeVector([f32; 4]);
     let set: extern "C" fn(usize, *const NativeVector) =
@@ -459,15 +570,15 @@ unsafe fn write_speed(run: &Spike, accessor: usize, timing: &str) -> Option<()> 
     log_hidden(run, accessor, "post_init_write")?;
     let actual = velocity(accessor);
     diagnostic(format_args!(
-        "[TechDirect] speed_write attempt={} command={} age={} timing={timing}",
+        "[TechDirect] speed_write attempt={} command={} age={} timing=same_callback",
         run.attempt, run.mode, run.age
     ));
     diagnostic(format_args!("[TechDirect] post_init_speed attempt={} age={} before_vx={:08x} before_vy={:08x} vx={:08x} vy={:08x} requested_vx={:08x} requested_vy={:08x}",
-        run.attempt,run.age,before.map_or(u32::MAX,|v|v.x.to_bits()),before.map_or(u32::MAX,|v|v.y.to_bits()),actual.map_or(u32::MAX,|v|v.x.to_bits()),actual.map_or(u32::MAX,|v|v.y.to_bits()),wanted.x.to_bits(),wanted.y.to_bits()));
+        run.attempt,run.age,vector.residual.x.to_bits(),vector.residual.y.to_bits(),actual.map_or(u32::MAX,|v|v.x.to_bits()),actual.map_or(u32::MAX,|v|v.y.to_bits()),wanted.x.to_bits(),wanted.y.to_bits()));
     Some(())
 }
 unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
-    if !v1_guarded() {
+    if !v1_guarded() || !v3_guarded() {
         return None;
     }
     let input = run.input;
@@ -508,19 +619,17 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
     }
     setup(run, accessor);
     log_hidden(run, accessor, "cold_launch")?;
-    let wanted = math::launch_velocity(input.kb, input.direction)?;
     let actual = velocity(accessor)?;
+    let vector = launch_vector(run, actual)?;
+    let wanted = vector.wanted;
     diagnostic(format_args!(
         "[TechDirect] launched attempt={} mode=direct vx={:08x} vy={:08x} reaction={:08x} age={} requested_vx={:08x} requested_vy={:08x} requested_reaction={:08x}",
         run.attempt, actual.x.to_bits(), actual.y.to_bits(), reaction(accessor)?.to_bits(), run.age,
         wanted.x.to_bits(), wanted.y.to_bits(), native_reaction.to_bits()
     ));
-    // E1 writes after synchronous status init; E2 measures the existing N+1 control.
-    if run.mode == 11 {
-        write_speed(run, accessor, "same_callback")?;
-    }
-    run.started = run.mode == 11;
-    run.phase = if run.started { 2 } else { 3 };
+    write_speed(run, accessor, &vector)?;
+    run.started = true;
+    run.phase = 2;
     Some(())
 }
 
@@ -819,7 +928,12 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             return;
         }
         let angle = 315.0;
-        let Some(direction) = math::direction_degrees(angle) else {
+        let direction = if command == 13 {
+            native_direction(angle).map(|v| v.0)
+        } else {
+            Some(Vec2::default())
+        };
+        let Some(direction) = direction else {
             diagnostic(format_args!("[TechDirect] fault=direction"));
             run.stop();
             return;
@@ -837,7 +951,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             weight: natives::weight(accessor),
             lr: 1.0,
         };
-        if matches!(command, 11 | 12) && baseline.is_some() {
+        if command == 13 && baseline.is_some() {
             let Some(baseline) = baseline.filter(|b| b.complete && Some(b.scope) == receipt) else {
                 diagnostic(format_args!("[TechDirect] fault=baseline_incomplete"));
                 run.stop();
@@ -850,10 +964,10 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             }
             run.input = baseline.input;
             let input = run.input;
-            diagnostic(format_args!("[TechDirect] baseline_adopted attempt={} command={} baseline_attempt={} kb={:08x} direction_x={:08x} direction_y={:08x} percent={:08x} weight={:08x} start_x={:08x} start_y={:08x} lr={:08x} ground_at_hit={}",
+            diagnostic(format_args!("[TechDirect] baseline_adopted attempt={} command={} baseline_attempt={} kb={:08x} direction_x={:08x} direction_y={:08x} percent={:08x} weight={:08x} start_x={:08x} start_y={:08x} lr={:08x} ground_at_hit={} hitlag_vx={:08x} hitlag_vy={:08x}",
                 run.attempt,command,baseline.attempt,input.kb.to_bits(),input.direction.x.to_bits(),input.direction.y.to_bits(),
-                input.percent.to_bits(),input.weight.to_bits(),input.origin.x.to_bits(),input.origin.y.to_bits(),input.lr.to_bits(),baseline.hidden.flags[3]));
-        } else if matches!(command, 11 | 12) {
+                input.percent.to_bits(),input.weight.to_bits(),input.origin.x.to_bits(),input.origin.y.to_bits(),input.lr.to_bits(),baseline.hidden.flags[3],baseline.hitlag_velocity.x.to_bits(),baseline.hitlag_velocity.y.to_bits()));
+        } else if command == 13 {
             let input = run.input;
             diagnostic(format_args!("[TechDirect] baseline_cold attempt={} command={} baseline_attempt=0 kb={:08x} direction_x={:08x} direction_y={:08x} percent={:08x} weight={:08x} start_x={:08x} start_y={:08x} lr={:08x} source=fixed",
                 run.attempt,command,input.kb.to_bits(),input.direction.x.to_bits(),input.direction.y.to_bits(),
@@ -862,7 +976,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
         place(accessor, run.input);
         state::heal(accessor, -natives::damage(accessor, 0));
         state::add_damage(accessor, run.input.percent);
-        if matches!(command, 1 | 11 | 12) {
+        if matches!(command, 1 | 13) {
             let (Some(ground), Some(wait)) =
                 (id("SITUATION_KIND_GROUND"), id("FIGHTER_STATUS_KIND_WAIT"))
             else {
@@ -928,6 +1042,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
                     run.baseline = Some(Baseline {
                         input: run.input,
                         hidden: observed,
+                        hitlag_velocity: v,
                         attempt: run.attempt,
                         scope: receipt.unwrap(),
                         complete: false,
@@ -957,17 +1072,8 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             }
             just_launched = true; // Sample0 follows the next original native integration; V1 still logs this frame.
         }
-    } else if run.phase == 3 {
-        // E2: this callback follows one original native frame after DAMAGE_FLY init.
-        if write_speed(&run, accessor, "next_callback").is_none() {
-            diagnostic(format_args!("[TechDirect] fault=post_init_speed"));
-            run.stop();
-            return;
-        }
-        run.started = true;
-        run.phase = 2;
-        just_launched = true;
     }
+
     let status = natives::status_kind(accessor);
     if let Some(button) = id("CONTROL_PAD_BUTTON_GUARD") {
         let count: extern "C" fn(usize, i32) -> u8 =

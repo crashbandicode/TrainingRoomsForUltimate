@@ -5,8 +5,11 @@ mod common;
 
 #[path = "../src/runtime/features/tech_direct_v1_guards.rs"]
 mod direct_guards;
+
 #[path = "../src/runtime/features/tech_spike_guards.rs"]
 mod guards;
+#[path = "../src/runtime/features/tech_direct_v3_guards.rs"]
+mod v3_guards;
 
 const SETTERS: [(&str, usize); 5] = [
     ("realhit_set_power", 0x1fd0270),
@@ -89,4 +92,28 @@ fn direct_v1_guards_match_owned_code_and_cover_the_virtual_targets() {
             );
         }
     }
+}
+
+#[test]
+fn direct_v3_windows_cover_owned_magnitude_body_and_trig_imports() {
+    let Some(owned) =
+        common::owned_main("direct_v3_windows_cover_owned_magnitude_body_and_trig_imports")
+    else {
+        return;
+    };
+    for &(address, expected) in v3_guards::DIRECT_V3_GUARDS {
+        assert_eq!(
+            expected,
+            owned.window(address),
+            "v3 main+{address:x}: all64 bytes"
+        );
+    }
+    // PLT LDR X17 loads the GOT slot scaled by8; pin actual native storage offsets.
+    for (address, slot) in [(0x39c07d0, 0x2c8), (0x39c07e0, 0x2d0)] {
+        let bytes = owned.window(address);
+        let ldr = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
+        assert_eq!(ldr & 0xffc003ff, 0xf9400211);
+        assert_eq!(((ldr >> 10) & 0xfff) as usize * 8, slot);
+    }
+    assert_eq!(v3_guards::MAIN_IMAGE_END, 0x4f17000 + 0x2530100);
 }
