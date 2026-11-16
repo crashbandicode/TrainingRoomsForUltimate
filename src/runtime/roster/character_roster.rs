@@ -177,7 +177,10 @@ impl Role {
         }
     }
     fn enabled(self) -> bool {
-        self == Self::Cpu || setting(&MENU).trio_practice == OnOff::ON
+        self.enabled_with(|| setting(&MENU))
+    }
+    fn enabled_with(self, read_menu: impl FnOnce() -> TrainingModpackMenu) -> bool {
+        self == Self::Cpu || read_menu().trio_practice == OnOff::ON
     }
     fn sync_selection(self, fighter: TrioFighter) {
         let mut m = lock_write(&MENU);
@@ -268,6 +271,9 @@ impl State {
 }
 
 fn scope(role: Role) -> Option<Scope> {
+    scope_with(role, || lobby::active())
+}
+fn scope_with(role: Role, read_active: impl FnOnce() -> bool) -> Option<Scope> {
     let mode = game_mode::current()?;
     if !mode.initialized {
         return None;
@@ -277,7 +283,7 @@ fn scope(role: Role) -> Option<Scope> {
             mode: mode.mode,
             owner: role as u32,
         })
-    } else if lobby::active() {
+    } else if read_active() {
         Some(Scope {
             mode: mode.mode,
             owner: if role == Role::Player { 0 } else { 4 },
@@ -638,10 +644,14 @@ fn queue_request(role: Role, selection: Selection, restoring: bool) {
 /// (Player Swapping) does not refuse it and is not changed by it.
 /// True only after the generic loader or an intercept accepted new intent.
 fn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool) -> bool {
+    queue_admitted_with(role, selection, restoring, once, || setting(&MENU), || scope(role))
+}
+fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: bool,
+    read_menu: impl Fn() -> TrainingModpackMenu, read_scope: impl FnOnce() -> Option<Scope>) -> bool {
     // FAIL 2: a user's request leaves one line on every path, including the ones that drop it.
     let refresh = matches!(selection, Selection::RefreshPartners);
     let user = !restoring && !refresh;
-    if !admitted(role.enabled(), once, refresh) {
+    if !admitted(role.enabled_with(&read_menu), once, refresh) {
         if user {
             trace!("[CharacterRoster] request ignored role={:?} selection={:?}: this role's roster cycle is off", role, selection);
         }
@@ -652,7 +662,7 @@ fn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool)
         notify(role, "Unavailable on this game version".into());
         return false;
     }
-    let Some(scope) = scope(role) else {
+    let Some(scope) = read_scope() else {
         if user {
             trace!("[CharacterRoster] request ignored role={:?} selection={:?}: not a practice scene", role, selection);
         }
@@ -682,17 +692,17 @@ fn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool)
     if crate::runtime::roster::cycle_preload_config::snapshot().measurements
         && !restoring && !matches!(selection,Selection::RefreshPartners) {
         let target=match selection {Selection::Direct(f)=>Some(crate::runtime::roster::cycle_preload::Target::fighter(f.kind())),Selection::Cycle=>
-            preload_targets(&setting(&MENU),role as usize)[0],_=>None};
+            preload_targets(&read_menu(),role as usize)[0],_=>None};
         if let Some(target)=target {crate::runtime::roster::cycle_preload::request(role as usize,false,target);}
     }
     let user_request=!restoring && !matches!(selection,Selection::RefreshPartners);
-    if let Some(accepted)=mii_ordinary_player::intercept(role,selection,user_request){
+    if let Some(accepted)=mii_ordinary_player::intercept_with(role,selection,user_request,&read_menu){
         if user {trace!("[CharacterRoster] request handed to the ordinary Mii owner role={:?} selection={:?}",role,selection);}
         return accepted;
     }
     // The CPU owner logs its own acceptance or refusal.
-    if let Some(accepted)=mii_ordinary_cpu::intercept(role,selection,user_request){return accepted;}
-    if let Some(accepted)=mii_saved_alpha::intercept(role,selection){
+    if let Some(accepted)=mii_ordinary_cpu::intercept_with(role,selection,user_request,&read_menu){return accepted;}
+    if let Some(accepted)=mii_saved_alpha::intercept_with(role,selection,&read_menu){
         if user {trace!("[CharacterRoster] request handed to the saved Mii owner role={:?} selection={:?}",role,selection);}
         return accepted;
     }
@@ -742,6 +752,9 @@ fn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool)
 
 /// True when visible loaders have finished and a CPU request can be queued.
 pub fn cpu_reload_ready() -> bool {
+    cpu_reload_ready_with(|| scope(Role::Cpu))
+}
+fn cpu_reload_ready_with(read_scope: impl FnOnce() -> Option<Scope>) -> bool {
     if notice_blocked()
         || training::recording_or_playback()
         || training::save_states::is_loading()
@@ -752,12 +765,33 @@ pub fn cpu_reload_ready() -> bool {
         return false;
     }
     let state = state_for(Role::Cpu).lock();
-    state.pending.is_none() && state.observed.is_some() && scope(Role::Cpu).is_some()
+    state.pending.is_none() && state.observed.is_some() && read_scope().is_some()
+}
+
+/// Fresh menu/scope values for this game callback; Busy is handled before a mailbox drains.
+pub struct CpuRequestContext {
+    pub menu: TrainingModpackMenu,
+    scope: Option<Scope>,
+}
+pub fn try_cpu_request_context() -> Result<CpuRequestContext, crate::runtime::compat::menu::MenuBusy> {
+    let menu = crate::runtime::compat::menu::try_current_menu()?;
+    let active = lobby::try_active()?;
+    Ok(CpuRequestContext { menu, scope: scope_with(Role::Cpu, || active) })
+}
+pub fn cpu_reload_ready_in(context: &CpuRequestContext) -> bool {
+    cpu_reload_ready_with(|| context.scope)
 }
 
 /// Ask the existing loader to change the CPU to `kind`. Values only.
 /// True when any loader accepted it. A kind outside the roster notifies once and does not queue.
 pub fn request_cpu_kind(kind: u32) -> bool {
+    request_cpu_kind_with(kind, |fighter| queue_admitted(Role::Cpu, Selection::Direct(fighter), false, false))
+}
+pub fn request_cpu_kind_in(context: &CpuRequestContext, kind: u32) -> bool {
+    request_cpu_kind_with(kind, |fighter| queue_admitted_with(Role::Cpu, Selection::Direct(fighter), false, false,
+        || context.menu, || context.scope))
+}
+fn request_cpu_kind_with(kind: u32, enqueue_fighter: impl FnOnce(TrioFighter) -> bool) -> bool {
     let Some(fighter) = TrioFighter::from_kind(kind) else {
         notify(Role::Cpu, "Named macro fighter is not available".into());
         return false;
@@ -765,7 +799,7 @@ pub fn request_cpu_kind(kind: u32) -> bool {
     if state_for(Role::Cpu).lock().pending.is_some() {
         return false;
     }
-    queue_admitted(Role::Cpu, Selection::Direct(fighter), false, false)
+    enqueue_fighter(fighter)
 }
 
 /// Player 1's fighter kind as the loader last observed it (None before a practice entry).

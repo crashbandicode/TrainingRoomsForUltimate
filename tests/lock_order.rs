@@ -1869,8 +1869,10 @@ fn layout_menu_reads_are_nonblocking_and_a_blocking_edit_seed_fails() {
     }
     let facts = &graph.funcs[one(&graph, "ui/facts.rs", "facts::try_publish_scene_facts")].body;
     assert!(facts.iter().position(|t| *t == Tok::Ident("try_context".into())).unwrap()
-        < facts.iter().position(|t| *t == Tok::Ident("SCENE_ENABLED".into())).unwrap(),
+        < facts.iter().position(|t| *t == Tok::Ident("publish_scene_context".into())).unwrap(),
         "unavailable context must not publish a false scene departure");
+    let publish = &graph.funcs[one(&graph, "ui/facts.rs", "facts::publish_scene_context")].body;
+    assert!(publish.iter().any(|t| *t == Tok::Ident("SCENE_ENABLED".into())));
     let after = &graph.funcs[one(&graph, "macros/mod.rs", "macros::after_layout_draw")].body;
     let admission = after.iter().position(|t| *t == Tok::Ident("try_publish_scene_facts".into())).unwrap();
     let step = after.iter().position(|t| *t == Tok::Ident("post_clip_draw".into())).unwrap();
@@ -1932,6 +1934,72 @@ fn tech_receipt_roots_do_not_wait_on_edits_and_busy_preserves_ownership() {
     let retire = frame.find("*slot = None;").unwrap();
     assert!(busy < retire && frame[busy..retire].contains("return;"), "frame must defer Busy before retiring its lease");
     assert!(source.contains("receipt == owned.receipt && accessor == owned.accessor_token"), "fresh success must preserve both identity checks");
+}
+
+#[test]
+fn frame_fact_publication_defers_busy_before_any_mutation() {
+    let graph = runtime_graph();
+    let one = |key: &str| {
+        let found = graph.find(key);
+        assert_eq!(found.len(), 1, "{key}");
+        &graph.funcs[found[0]].body
+    };
+    let preflight = callgraph::lex("let Ok(context) = crate::runtime::lobby::training::practice::try_context() else { return; }; let Ok(active) = crate::runtime::lobby::training::lobby::try_active() else { return; };");
+    let frame = one("facts::publish_frame_facts");
+    assert!(frame.starts_with(&preflight), "Busy must return before lease acquisition, scene flags, timestamp, counters or native frame reads");
+    assert!(!calls(frame).iter().any(|call| call.segments.last().is_some_and(|name| matches!(name.as_str(), "active" | "acquire"))),
+        "frame facts must use the preflight context and active values");
+    assert!(one("named_macros::hold_panel_fighter").starts_with(&callgraph::lex("let Ok(context) = practice::try_context() else { return; };")),
+        "panel contention must defer before stop-owner changes");
+    assert!(one("replay_preview::after_frame").starts_with(&callgraph::lex("let Ok(enabled) = practice::try_enabled() else { return; };")),
+        "preview contention must defer before session changes");
+    for key in ["named_macros::service_character_request", "replay_capture::service_reload_request", "recording_host::service_switch_request"] {
+        assert!(one(key).starts_with(&callgraph::lex("let Ok(context) = crate::runtime::roster::character_roster::try_cpu_request_context() else { return; };")),
+            "{key}: Busy must return before any request drain or result publication");
+    }
+    for key in ["practice::acquire_in", "practice::panel_entry_in", "practice::role_in", "practice::entries", "practice::enabled_in"] {
+        assert!(!calls(one(key)).iter().any(|call| call.segments.last().is_some_and(|name| matches!(name.as_str(), "context" | "entry" | "enabled"))),
+            "{key} must not re-read eligibility after a current context was supplied");
+    }
+}
+
+#[test]
+fn macro_frame_menu_reads_are_nonblocking_and_blocking_edit_seeds_fail() {
+    let mut graph = runtime_graph();
+    let one = |g: &Graph, key: &str| {
+        let found = g.find(key);
+        assert_eq!(found.len(), 1, "{key}");
+        found[0]
+    };
+    let root = one(&graph, "macros::frame_after");
+    assert_eq!(menu_edit_wait_path(&graph, root), None, "complete macro frame root waits on EDITED");
+    let read = one(&graph, "menu::try_current_menu");
+    let at = graph.funcs[read].body.iter().position(|t| *t == Tok::Ident("try_lock".into())).unwrap();
+    graph.funcs[read].body[at] = Tok::Ident("lock".into());
+    let witness = menu_edit_wait_path(&graph, root).expect("blocking EDITED seed must fail complete macro root");
+    assert_eq!(witness.last().unwrap(), "menu::try_current_menu");
+    graph.funcs[read].body[at] = Tok::Ident("try_lock".into());
+    let facts = one(&graph, "facts::publish_frame_facts");
+    let original = graph.funcs[facts].body.clone();
+    for seed in ["crate::runtime::lobby::training::lobby::active();", "crate::runtime::lobby::training::practice::acquire();"] {
+        graph.funcs[facts].body = callgraph::lex(seed);
+        let witness = menu_edit_wait_path(&graph, root).expect("original blocking fact read must fail complete macro root");
+        assert!(witness.iter().any(|key| key == "facts::publish_frame_facts"), "{witness:?}");
+        assert_eq!(witness.last().unwrap(), "menu::current_menu");
+    }
+    graph.funcs[facts].body = original;
+    for (key, safe, blocking) in [
+        ("named_macros::hold_panel_fighter", "panel_entry_in", "panel_entry"),
+        ("replay_preview::after_frame", "try_enabled", "enabled"),
+        ("replay_capture::browser_needs_native_update", "role_in", "role"),
+    ] {
+        let f = one(&graph, key);
+        let at = graph.funcs[f].body.iter().position(|t| *t == Tok::Ident(safe.into())).unwrap();
+        graph.funcs[f].body[at] = Tok::Ident(blocking.into());
+        let witness = menu_edit_wait_path(&graph, root).expect("original pre-facts blocking read must fail macro root");
+        assert!(witness.iter().any(|step| step == key), "{witness:?}");
+        graph.funcs[f].body[at] = Tok::Ident(safe.into());
+    }
 }
 
 /// The scan on a small fixture: a guard bound by `let` and held over a call, a temporary held over its statement, a

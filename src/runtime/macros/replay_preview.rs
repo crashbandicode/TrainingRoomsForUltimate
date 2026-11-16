@@ -217,7 +217,8 @@ pub unsafe fn before_frame(module: &mut BattleObjectModuleAccessor) {
 }
 
 pub unsafe fn after_frame(module: &mut BattleObjectModuleAccessor) {
-    if !practice::enabled() || !primary_cpu(module) { return; }
+    let Ok(enabled) = practice::try_enabled() else { return; };
+    if !enabled || !primary_cpu(module) { return; }
     let loading = save_states::is_loading();
     let action = {
         let mut session = SESSION.lock();

@@ -366,13 +366,14 @@ static SWITCH_MII: hos_lock::Mailbox<crate::engine::mii::replay::Target, 2> = ho
 /// request with the macro's `playback_target()` (primary 2026-11-08 #54 (a)). The Mii machinery is used through its API
 /// only; it waits while the CPU cannot reload, and the newest Switch wins.
 pub fn service_switch_request() {
-    if !crate::runtime::roster::character_roster::cpu_reload_ready() {
+    let Ok(context) = crate::runtime::roster::character_roster::try_cpu_request_context() else { return; };
+    if !crate::runtime::roster::character_roster::cpu_reload_ready_in(&context) {
         return;
     }
     let mut newest = None;
     SWITCH_MII.drain(|target| newest = Some(target));
     let Some(target) = newest else { return };
-    let accepted = crate::runtime::roster::character_roster::mii_replay::request_named(target);
+    let accepted = crate::runtime::roster::character_roster::mii_replay::request_named_in(&context, target);
     #[cfg(feature = "diag")]
     crate::runtime::diag_log::diagnostic(format_args!(
         "[PracticeRecording] screen=mismatch switch_mii=1 kind={} accepted={}",
