@@ -20,6 +20,7 @@ mod game;
 mod hub;
 mod import;
 mod install;
+mod log_file;
 mod lobby;
 mod macros;
 mod mii;
