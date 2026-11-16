@@ -307,6 +307,7 @@ impl Panes {
             self.hide(index);
         }
         let mut boxes = 0;
+        let mut swatches = 0;
         let mut ticks = 0;
         let mut last_child = None;
         for i in 0..CONN_LINES {
@@ -318,9 +319,17 @@ impl Panes {
             let units = frame.conn[i].units();
             let tone = tone_color(frame.conn_tone[i]);
             let (tag, child) = match frame.conn_kind[i] {
-                ConnKind::Swatch(colour) => {
-                    self.rect_at(IDX_CONN_BOX + i, CONN_LEFT + 12.0, y, 24.0, 24.0, colour);
-                    self.label(IDX_CONN + i, units, x + 20.0, y, w - 40.0, tone);
+                ConnKind::Swatch(swatch) => {
+                    let mut left = CONN_LEFT;
+                    let grouped = swatch == crate::model::legend::Swatch::HitboxShades;
+                    let size = if grouped { 12.0 } else { 24.0 };
+                    for colour in swatch.colours() {
+                        self.rect_at(IDX_CONN_BOX + swatches, left + size / 2.0, y, size, 24.0, colour);
+                        swatches += 1;
+                        left += size + 4.0;
+                    }
+                    left += 12.0;
+                    self.label(IDX_CONN + i, units, (left + CONN_RIGHT) / 2.0, y, CONN_RIGHT - left, tone);
                     continue;
                 }
                 ConnKind::Head(tag) => (Some(tag), false),

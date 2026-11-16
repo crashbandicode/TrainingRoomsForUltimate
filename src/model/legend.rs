@@ -324,31 +324,46 @@ pub fn area_orbs(area: &WindArea, index: usize, z: f32, colour: [u8; 4]) -> [Opt
 
 // ---- articles' and items' wind areas (rc.14 wind-articles) ----------------------------------------------------------------
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Swatch {
+    Colour([u8; 4]),
+    HitboxShades,
+}
+
+impl Swatch {
+    pub fn colours(self) -> impl Iterator<Item = [u8; 4]> {
+        (0..if self == Self::HitboxShades { 8 } else { 1 }).map(move |i| match self {
+            Self::Colour(colour) => colour,
+            Self::HitboxShades => super::hitbox_orbs::tint_colour(super::hitbox::TINTS[i], super::hitbox_orbs::ORB_ALPHA),
+        })
+    }
+}
+
 /// The current checklist's colour key, in sRGB (the UI converts once); only enabled drawing families appear.
-pub fn swatches(bits: u8) -> impl Iterator<Item = (&'static str, [u8; 4])> {
+pub fn swatches(bits: u8) -> impl Iterator<Item = (&'static str, Swatch)> {
     use super::hitbox as h;
     use super::hitbox_orbs::{tint_colour as rgba, ORB_ALPHA};
     let on = bits & COLOURS != 0;
     let hurt = bits & (HURTBOXES | ARTICLE_HURTBOXES) != 0;
     let wind = bits & WINDBOXES != 0;
     let (names, colours): (&[_], &[_]) = if on {
-        (&["Strong hitbox", "Weak hitbox"], &[h::STRONG_TINT, h::WEAK_TINT])
+        (&["Red — Strong hitbox", "Pink — Weak hitbox"], &[h::STRONG_TINT, h::WEAK_TINT])
     } else {
-        (&["Hitbox 1", "Hitbox 2", "Hitbox 3", "Hitbox 4", "Hitbox 5", "Hitbox 6", "Hitbox 7", "Hitbox 8"], &h::TINTS)
+        (&["Hitbox (attack) — each hitbox of a move gets its own shade"], &h::TINTS)
     };
-    let hits = (0..names.len()).filter(move |_| bits & HITBOXES != 0).map(move |i| (names[i], colours[i]));
+    let hits = (0..names.len()).filter(move |_| bits & HITBOXES != 0).map(move |i| (names[i], if on { Swatch::Colour(rgba(colours[i], ORB_ALPHA)) } else { Swatch::HitboxShades }));
     let c = |status| h::legend_colour(h::KIND_HURT, None, status, h::HURTBOX_TINT, on);
     let grab = h::legend_colour(h::KIND_GRAB, None, 0, h::GRAB_TINT, on);
     let other = [
-        (bits & GRABS != 0, "Grab box", grab),
-        (hurt, "Hurt / article: normal", c(0)),
-        (hurt && on, "Hurt: unhittable", c(INTANGIBLE)),
-        (hurt && on, "Hurt: no damage", c(INVINCIBLE)),
-        (wind || on && bits & HITBOXES != 0, "Windbox", WIND),
-        (wind, "Wind area (box / circle)", WIND),
-    ].into_iter().filter(|(show, ..)| *show).map(|(_, n, t)| (n, t));
-    hits.chain(other).map(|(n, t)| (n, rgba(t, ORB_ALPHA)))
-        .chain((bits & (ANGLES | WINDBOXES) != 0).then_some(("Launch / wind lines", DIRECTION_COLOUR)))
+        (bits & GRABS != 0, if on { "Purple — Grab box (grabs you)" } else { "Magenta — Grab box (grabs you)" }, grab),
+        (hurt, if on { "White — Hurtbox (can be hit)" } else { "Yellow — Hurtbox (can be hit)" }, c(0)),
+        (hurt && on, "Sky blue — Hurtbox (cannot be hit)", c(INTANGIBLE)),
+        (hurt && on, "Green — Hurtbox (takes no damage)", c(INVINCIBLE)),
+        (wind || on && bits & HITBOXES != 0, "Blue — Windbox (pushes without flinching)", WIND),
+        (wind, "Blue — Wind area (pushes in a box or circle)", WIND),
+    ].into_iter().filter(|(show, ..)| *show).map(|(_, n, t)| (n, Swatch::Colour(rgba(t, ORB_ALPHA))));
+    hits.chain(other)
+        .chain((bits & (ANGLES | WINDBOXES) != 0).then_some(("White — Launch / wind direction", Swatch::Colour(DIRECTION_COLOUR))))
 }
 
 /// A wind-area command (`AREA_WIND_2ND`, `_arg10`, `_RAD`, `_RAD_arg9`: `sites_hitbox`) tracks the object running it as an article,

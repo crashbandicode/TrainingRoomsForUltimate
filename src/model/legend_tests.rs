@@ -583,21 +583,21 @@ fn menu_swatches_match_the_renderer_in_both_schemes() {
     let rendered = |tint| orbs::orb_of(&Sphere { tint, ..Sphere::NONE }, [0.0; 3]).color;
     for on in [false, true] {
         let rows: Vec<_> = swatches(127 ^ if on { 0 } else { COLOURS }).collect();
-        let colour = |name| rows.iter().find(|(label, ..)| *label == name).unwrap().1;
+        let colour = |name| rows.iter().find(|(label, ..)| *label == name).unwrap().1.colours().next().unwrap();
         if on {
-            assert_eq!(crate::model::panes::linear(colour("Strong hitbox")), rendered(hitbox::legend_colour(KIND_HIT, None, 0, hitbox::TINTS[0], true)));
-            assert_eq!(crate::model::panes::linear(colour("Weak hitbox")), rendered(hitbox::legend_colour(KIND_HIT, Some(Spot::Late), 0, hitbox::TINTS[0], true)));
+            assert_eq!(crate::model::panes::linear(colour("Red — Strong hitbox")), rendered(hitbox::legend_colour(KIND_HIT, None, 0, hitbox::TINTS[0], true)));
+            assert_eq!(crate::model::panes::linear(colour("Pink — Weak hitbox")), rendered(hitbox::legend_colour(KIND_HIT, Some(Spot::Late), 0, hitbox::TINTS[0], true)));
         } else {
-            assert_eq!(rows[..8].iter().map(|r| crate::model::panes::linear(r.1)).collect::<Vec<_>>(), hitbox::TINTS.map(rendered));
+            assert_eq!(rows[0].1.colours().map(crate::model::panes::linear).collect::<Vec<_>>(), hitbox::TINTS.map(rendered));
         }
         for (name, kind, status, usual) in [
-            ("Grab box", KIND_GRAB, 0, hitbox::GRAB_TINT),
-            ("Hurt / article: normal", KIND_HURT, 0, hitbox::HURTBOX_TINT),
-            ("Windbox", KIND_WIND, 0, WIND),
+            (if on { "Purple — Grab box (grabs you)" } else { "Magenta — Grab box (grabs you)" }, KIND_GRAB, 0, hitbox::GRAB_TINT),
+            (if on { "White — Hurtbox (can be hit)" } else { "Yellow — Hurtbox (can be hit)" }, KIND_HURT, 0, hitbox::HURTBOX_TINT),
+            ("Blue — Windbox (pushes without flinching)", KIND_WIND, 0, WIND),
         ] {
             assert_eq!(crate::model::panes::linear(colour(name)), rendered(hitbox::legend_colour(kind, None, status, usual, on)));
         }
-        for (name, status) in [("Hurt: unhittable", INTANGIBLE), ("Hurt: no damage", INVINCIBLE)] {
+        for (name, status) in [("Sky blue — Hurtbox (cannot be hit)", INTANGIBLE), ("Green — Hurtbox (takes no damage)", INVINCIBLE)] {
             assert_eq!(rows.iter().any(|r| r.0 == name), on);
             if on {
                 for kind in [KIND_HURT, hitbox::KIND_ARTICLE_HURT] {
@@ -605,18 +605,21 @@ fn menu_swatches_match_the_renderer_in_both_schemes() {
                 }
             }
         }
-        assert_eq!(crate::model::panes::linear(colour("Wind area (box / circle)")), area_colour());
+        assert_eq!(crate::model::panes::linear(colour("Blue — Wind area (pushes in a box or circle)")), area_colour());
         let hit = orbs::Orb { radius: 1.0, ..orbs::Orb::NONE };
-        assert_eq!(colour("Launch / wind lines"), marks(&hit, 45, 1.0)[0].unwrap().color);
+        assert_eq!(colour("White — Launch / wind direction"), marks(&hit, 45, 1.0)[0].unwrap().color);
     }
     for bits in 0..=127 {
         let rows: Vec<_> = swatches(bits).collect();
-        assert!(rows.len() <= crate::model::panes::CONN_LINES.min(crate::model::panes::CONN_BOXES * 4));
+        assert!(rows.len() <= 9);
+        assert!(rows.iter().map(|r| r.1.colours().count()).sum::<usize>() <= crate::model::panes::CONN_BOXES * 4);
+        assert!(rows.iter().all(|(label, _)| label.encode_utf16().count() <= 72));
+        assert_eq!(rows.iter().filter(|r| r.1 == Swatch::HitboxShades).count(), usize::from(bits & (HITBOXES | COLOURS) == HITBOXES));
         assert_eq!(rows.is_empty(), !draws(bits));
-        assert_eq!(rows.iter().any(|r| r.0 == "Windbox"), bits & WINDBOXES != 0 || bits & (HITBOXES | COLOURS) == HITBOXES | COLOURS);
-        assert_eq!(rows.iter().any(|r| r.0 == "Wind area (box / circle)"), bits & WINDBOXES != 0);
-        assert_eq!(rows.iter().any(|r| r.0 == "Hurt / article: normal"), bits & (HURTBOXES | ARTICLE_HURTBOXES) != 0);
+        assert_eq!(rows.iter().any(|r| r.0 == "Blue — Windbox (pushes without flinching)"), bits & WINDBOXES != 0 || bits & (HITBOXES | COLOURS) == HITBOXES | COLOURS);
+        assert_eq!(rows.iter().any(|r| r.0 == "Blue — Wind area (pushes in a box or circle)"), bits & WINDBOXES != 0);
+        assert_eq!(rows.iter().any(|r| r.0.ends_with("— Hurtbox (can be hit)")), bits & (HURTBOXES | ARTICLE_HURTBOXES) != 0);
     }
-    assert_eq!(swatches(ANGLES).collect::<Vec<_>>(), [("Launch / wind lines", DIRECTION_COLOUR)]);
-    assert_eq!(swatches(ARTICLE_HURTBOXES).next().unwrap().1, orbs::tint_colour(hitbox::HURTBOX_TINT, 255));
+    assert_eq!(swatches(ANGLES).collect::<Vec<_>>(), [("White — Launch / wind direction", Swatch::Colour(DIRECTION_COLOUR))]);
+    assert_eq!(swatches(ARTICLE_HURTBOXES).next().unwrap().1.colours().next().unwrap(), orbs::tint_colour(hitbox::HURTBOX_TINT, 255));
 }

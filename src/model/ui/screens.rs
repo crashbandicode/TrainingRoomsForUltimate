@@ -781,16 +781,16 @@ mod tests {
         assert_eq!(frame(&m).conn_count, 0);
         m.press(Button::A);
         let first = frame(&m);
-        assert_eq!(first.conn_count, 8);
-        assert_eq!(first.conn[0].string_lossy(), "Hitbox 1");
-        assert!(matches!(first.conn_kind[0], super::super::recording_menu::ConnKind::Swatch([255, 0, 0, 255])));
+        assert_eq!(first.conn_count, 1);
+        assert_eq!(first.conn[0].string_lossy(), "Hitbox (attack) — each hitbox of a move gets its own shade");
+        assert!(matches!(first.conn_kind[0], super::super::recording_menu::ConnKind::Swatch(super::super::legend::Swatch::HitboxShades)));
         for _ in 0..3 { m.press(Button::Down); }
         m.press(Button::A);
         let coloured = frame(&m);
         assert_eq!(coloured.conn_count, 3);
-        assert_eq!(coloured.conn[0].string_lossy(), "Strong hitbox");
-        assert_eq!(coloured.conn[1].string_lossy(), "Weak hitbox");
-        assert_eq!(coloured.conn[2].string_lossy(), "Windbox");
+        assert_eq!(coloured.conn[0].string_lossy(), "Red — Strong hitbox");
+        assert_eq!(coloured.conn[1].string_lossy(), "Pink — Weak hitbox");
+        assert_eq!(coloured.conn[2].string_lossy(), "Blue — Windbox (pushes without flinching)");
         m.press(Button::B);
         let back = frame(&m);
         assert!(!back.popup && back.conn_count == 0);
