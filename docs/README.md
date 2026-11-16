@@ -40,6 +40,15 @@ Open the menu with B + D-pad Up (or Minus). L and R turn the pages.
 | [Waiting rooms](guide/waiting-rooms.md) | Practising in online and local waiting rooms: what works there and what doesn't. |
 | [Mii fighters](guide/mii.md) | Picking a saved Mii, making a new one, replay Miis. |
 
+## rc.15 features
+
+| Feature | Button or row | See it |
+| --- | --- | --- |
+| Crop macros, combos and input drills into new files while keeping the originals. | A on the file's Crop; L/R, Left/Right, A save. | [Macro GIF](media/rc15-crop-editor.gif), [drill GIF](media/rc15-input-drill.gif), [editor keys](menu/recording.md#replay-window). |
+| Record a no-hit movement drill or make one from a no-hit macro. | A on DRILLS > → + Record drill…, then the Record chord; or Make combo. | [Drill Crop GIF](media/rc15-input-drill.gif), [how to record](menu/recording.md#input-drills); no recording/conversion GIF yet. |
+| Draw the hurtboxes of hittable articles and items. | Hitbox Visualization → Article hurtboxes, A tick. | [Pikmin GIF](media/rc15-article-hurtboxes.gif), [drawing options](menu/display-and-controls.md#hitbox-visualization). |
+| Read a colour key that follows the checklist and Frame data colours. | A on Hitbox Visualization; A ticks Frame data colours. | [Normal still](media/rc15-colour-legend-normal.png), [frame-data still](media/rc15-colour-legend-frame-data.png); no GIF yet. |
+
 ## Reference
 
 - [Technical notes](TECHNICAL.md): how it's installed and built, how each feature works inside,
@@ -61,6 +70,7 @@ Kept for the history of decisions and measurements; they describe the build of t
 - [Decisions](DECISIONS.md) and [decisions/](decisions/), [design/](design/), [the menu redesign](menu-redesign.md),
   [the menu mockup](menu-mockup/), the [roadmap](ROADMAP.md).
 - [Mii developer notes](MII.md).
+- [Input drill acceptance](EVIDENCE-rc15-input-drill.md): native recording, cropping, no-hit conversion and grading on the rc.15 feature build.
 - [Indexed article native seam](native/article-hurtboxes.md): ABI, version and guard evidence.
 - Measurements: [code reduction (rc.10)](CODE-REDUCTION-rc10.md), [coverage (rc.9)](COVERAGE-rc9.md),
   [size plan](SIZE-PLAN.md), [test cuts (rc.9)](TEST-CUT-LEDGER-rc9.md), [resource costs](resource-costs.md),

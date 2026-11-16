@@ -29,7 +29,7 @@ practice fighters in a waiting room.
 - **How:** A opens the checklist; A ticks, ZL ticks all or none, B goes back. The row shows how many are ticked, such
   as "3 of 7".
 
-The checklist has a **Colour legend** beside it. Its swatches follow the current ticks, including the change to strong/weak and hurtbox status colours when Frame data colours is ticked. Fighter and article hurtboxes share the same key.
+Press **A** on **Hitbox Visualization** to read the **Colour legend** beside the checklist; **A** on **Frame data colours** changes its key along with the drawing. Its swatches follow the ticks, including strong/weak and hurtbox status colours. Fighter and article hurtboxes share the same key.
 
 ![Hitbox Visualization with Frame data colours unticked: the checklist beside thirteen labelled colour swatches](../media/rc15-colour-legend-normal.png)
 
@@ -189,7 +189,7 @@ frame its box appears, as Samus's tether does, shows its box for that frame only
 
 **Projectiles and thrown items.** A projectile, or a thrown item such as Link's bomb, Peach's turnip or Diddy Kong's
 banana, has its hitboxes drawn while its attack lasts. Up to four at a time; a fifth replaces the oldest. Olimar's Pikmin
-show their grab box. **Article hurtboxes** also draws the enabled hurtboxes the game gives articles and items, including
+show their grab box. **A** on **Article hurtboxes** ticks the row and draws the enabled hurtboxes the game gives articles and items, including
 objects without an active attack. It works in Training; waiting-room objects whose owner is unknown stay hidden.
 An object with no enabled hurtbox group draws none. These use the same discs, pills and status colours as fighters.
 At most eight endpoints per object and 24 together are admitted, always as complete shapes. They take spare object

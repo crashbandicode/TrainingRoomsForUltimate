@@ -90,7 +90,17 @@ grades each try.
 
 ![The combo helper grading a combo](docs/media/rc7-combo-helper.gif)<br>*Grading a combo*
 
-All the options: [the Recording page](docs/menu/recording.md).
+Cut failed attempts out of a macro, combo or input drill: open its **Crop** row with **A**, use **L/R** and **Left/Right** to pick what stays, then **A** saves a new named copy.
+
+![A macro start handle moves from frame 0 to 180](docs/media/rc15-crop-editor.gif)<br>
+*Macro Crop range selection. Eden, 2026-11-15, rc.15 `d520d325`; this clip shows the handles, with preview and save checked separately.*
+
+Practise movement without landing a hit: choose **Recording → Combos & Sequences → COMBOS → DRILLS > → + Record drill…**, press **A**, then use **ZR + D-pad Down** to start and stop; **Make combo** on a no-hit macro makes a drill too.
+
+![An input drill's Crop changes the kept range from four steps to three](docs/media/rc15-input-drill.gif)<br>
+*A drill's Crop selects whole steps (L/R, then Left/Right). Eden, 2026-11-15, rc.15 `2eb3903e`; this early build shows a helper overlap fixed before release. This clip shows cropping; recording and no-hit conversion have no GIF yet.*
+
+More: [Input drills](docs/guide/recording.md#input-drills), [Crop](docs/guide/recording.md#crop) and [the Recording page](docs/menu/recording.md).
 
 ### Fighters & Stages
 
@@ -115,6 +125,16 @@ See attack, hurt and grab boxes: in **Display & Controls → Hitbox Visualizatio
 
 ![Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked: the yellow hurtbox pills, then at 1/4 speed a neutral air's red hitbox](docs/media/rc14-hitbox.gif)<br>
 *Hitboxes, Grab boxes and Hurtboxes ticked: the hurtboxes are yellow pills, and at 1/4 speed Mario's neutral air shows its red hitbox. Eden, rc.14 (untested on hardware).*
+
+See where summoned objects and items can be hit: **Display & Controls → Hitbox Visualization → Article hurtboxes**, then **A** ticks it.
+
+![Olimar's Pikmin without hurtboxes, with yellow hurtbox pills, with status colours, then without](docs/media/rc15-article-hurtboxes.gif)<br>
+*Article hurtboxes Off → yellow pills → status colours → Off. Eden, 2026-11-15, rc.15 `6def8553`; Pikmin shown.*
+
+Read the colours beside the checklist: press **A** on **Hitbox Visualization**, then **A** on **Frame data colours** to see the **Colour legend** change with it.
+
+![The Hitbox Visualization checklist beside its labelled colour swatches](docs/media/rc15-colour-legend-normal.png)<br>
+*Colour legend, normal colours; [the Frame data colours view](docs/media/rc15-colour-legend-frame-data.png). Eden, 2026-11-15, rc.15 `35268287`. Stills only; no legend GIF yet.*
 
 The grab boxes are magenta:
 
