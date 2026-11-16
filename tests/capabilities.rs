@@ -94,6 +94,7 @@ const BOUNDARIES: &[Boundary] = &[
     // camera unit's `change_active_camera` row, so it stands behind its flag (boot sets it from that unit's closure) and a rejected
     // row turns off only this camera, never the hitbox visualizer or Eggs-ercise that the pass belongs to.
     Boundary { function: "btt_camera::apply", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
+    Boundary { function: "btt_camera::request", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
 ];
 
 /// Every entry point that is not a `#[skyline::hook]` function, with its install unit.

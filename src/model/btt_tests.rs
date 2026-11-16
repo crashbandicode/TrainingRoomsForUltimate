@@ -747,6 +747,45 @@ fn btt_projectiles_use_owned_native_hits() {
     assert!(!projectile_breaks(true, [22.0, 15.0], |_, n| if n == 0 { 3 } else { 0 }, |_| panic!("misaligned article")));
 }
 
+/// Frozen ffd2f74a cursor arithmetic, independent of the extracted helper (including its addition order).
+fn btt_placing_motion_matches_original_bytes() {
+    fn original(p: &Pad, was: u16, age: &mut u8) -> ([f32; 2], [f32; 2]) {
+        let down = |k: u8| p.held & bit(k) != 0;
+        let pad = p.held & DPAD;
+        *age = age.saturating_add(1) * u8::from(pad != 0 && pad == was & DPAD);
+        let repeat = *age == 0 || *age >= 15 && *age % 2 == 1;
+        let step = f32::from(pad != 0 && !down(ZL) && !down(B) && repeat);
+        let unit = [[DPAD_RIGHT, DPAD_LEFT], [DPAD_UP, DPAD_DOWN]].map(|[hi, lo]| step * (f32::from(down(hi)) - f32::from(down(lo))));
+        let tilt = [0, 1].map(|i| p.stick[i] * 2.0 * f32::from(p.stick[i].abs() >= 0.3));
+        (tilt, unit)
+    }
+    let bytes = |v: [f32; 2]| v.map(f32::to_bits);
+    for mask in 0..16 {
+        let pad = [DPAD_RIGHT, DPAD_LEFT, DPAD_UP, DPAD_DOWN].into_iter().enumerate()
+            .filter(|(i, _)| mask & (1 << i) != 0).fold(0, |held, (_, key)| held | bit(key));
+        for modifiers in [0, bit(B), bit(ZL), bit(B) | bit(ZL)] {
+            for was in [0, pad, DPAD] {
+                for age in 0..=u8::MAX {
+                    for stick in [[0.0, 0.0], [1.0, -1.0], [-0.3, 0.3], [-0.29999, 0.29999], [-0.0, 0.3], [0.2, -0.4]] {
+                        let p = Pad { held: pad | modifiers, stick, ..Pad::default() };
+                        let (mut expected_age, mut parts_age, mut motion_age) = (age, age, age);
+                        let (tilt, unit) = original(&p, was, &mut expected_age);
+                        let (actual_tilt, actual_unit) = placing_parts(&p, was, &mut parts_age);
+                        let motion = placing_motion(&p, was, &mut motion_age);
+                        assert_eq!((parts_age, motion_age), (expected_age, expected_age));
+                        assert_eq!((bytes(actual_tilt), bytes(actual_unit)), (bytes(tilt), bytes(unit)));
+                        assert_eq!(bytes(motion), bytes([0, 1].map(|i| tilt[i] + unit[i])));
+                        for cursor in [-0.0, 0.0, 10.1, 100.0] {
+                            assert_eq!(bytes([0, 1].map(|i| cursor + actual_tilt[i] + actual_unit[i])),
+                                bytes([0, 1].map(|i| cursor + tilt[i] + unit[i])));
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// The cases of this module in one table.
 #[test]
 fn case_table() {
@@ -770,6 +809,7 @@ fn case_table() {
         ("btt_clock_keeper", btt_clock_keeper as fn()),
         ("btt_compact_hud_geometry", btt_compact_hud_geometry as fn()),
         ("btt_compact_hud_text", btt_compact_hud_text as fn()),
+        ("btt_placing_motion_matches_original_bytes", btt_placing_motion_matches_original_bytes as fn()),
         ("btt_projectiles_use_owned_native_hits", btt_projectiles_use_owned_native_hits as fn()),
     ]);
 }
