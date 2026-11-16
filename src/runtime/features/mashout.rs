@@ -450,10 +450,13 @@ pub unsafe fn frame(fighter: usize) {
         if game.step != Step::Entering { return; }
         // restriction: M3-READER-GUARD
         let Some(sample) = sample else { game.fail("Native capture seed unavailable · no grade"); return; };
-        if !linked {
+        let ordinary_catch = game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Grab);
+        let cpu_status = natives::status_kind(cpu);
+        if !linked || (ordinary_catch && ![ids[1], ids[8], ids[9], ids[10]].contains(&cpu_status)) {
             game.fail("Move entry unconfirmed · no grade"); return;
         }
         if sample.record.automatic == 0.0 {
+            // restriction: MASH-M1-MISMATCH
             game.fail("Native tick observation unavailable for this hold"); return;
         }
         let seed = sample.seed();
@@ -599,6 +602,7 @@ pub unsafe fn frame(fighter: usize) {
             let Some(start) =
                 entry::start(request).and_then(|name| game::lua_const(lua_bind_hash(name)))
             else {
+                // restriction: MASH-M1-MISMATCH
                 game.fail("Move sequence unavailable");
                 return;
             };
@@ -632,6 +636,7 @@ pub unsafe fn frame(fighter: usize) {
                 && state_id(C::SituationAir) == Some(natives::situation_kind(cpu))
             {
                 let Some(special) = state_id(C::StatusSpecialS) else {
+                    // restriction: MASH-M1-MISMATCH
                     game.fail("Move status unavailable");
                     return;
                 };
