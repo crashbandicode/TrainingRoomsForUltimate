@@ -500,6 +500,7 @@ fn throw_observer_graph(runtime: &Path) -> Graph {
     graph.precise_imports = true;
     let receivers = [
         ("features/mashout.rs", "READY", "AtomicBool"),
+        ("features/mashout.rs", "SLOTS_READY", "AtomicBool"),
         ("features/mashout.rs", "EPOCH", "AtomicU64"),
         ("features/mashout/interposer.rs", "INSTALLED", "AtomicBool"),
         ("features/mashout/interposer.rs", "ORIGINAL_END", "AtomicUsize"),
@@ -542,29 +543,6 @@ fn throw_observer_graph(runtime: &Path) -> Graph {
                 f.body[at + 4] = Tok::Ident("external_Admission_with".into());
             }
         }
-    }
-    // slot() returns a concrete AtomicUsize; its load is not ui::layouts::load.
-    let slot_source = std::fs::read_to_string(runtime.join("features/mashout/interposer.rs")).unwrap();
-    assert!(slot_source.contains("unsafe fn slot(offset: usize) -> &'static AtomicUsize"));
-    for f in graph.funcs.iter_mut().filter(|f| f.file == "features/mashout/interposer.rs") {
-        for expression in ["slot(START_SLOT).load", "slot(END_SLOT).load"] {
-            let pattern = callgraph::lex(expression);
-            for at in 0..f.body.len().saturating_sub(pattern.len()) + 1 {
-                if f.body[at..].starts_with(&pattern) {
-                    f.body[at + pattern.len() - 1] = Tok::Ident("external_slot_atomic_load".into());
-                }
-            }
-        }
-    }
-    // The scanner flattens #[path] modules, so parent-super calls need explicit,
-    // source-checked edges (no function is excluded from the transitive scan).
-    for (from, target) in [("interposer::started", "throw_seed_after"),
-        ("interposer::end", "end_token"), ("interposer::end", "end_after")] {
-        let nodes = graph.find(from);
-        assert_eq!(nodes.len(), 1);
-        let call = callgraph::lex(&format!("super::{target}("));
-        assert!(graph.funcs[nodes[0]].body.windows(call.len()).any(|tokens| tokens == call));
-        graph.dynamic.push((from.to_owned(), format!("mashout::{target}")));
     }
     graph
 }

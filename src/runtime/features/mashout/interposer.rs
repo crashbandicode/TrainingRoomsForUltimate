@@ -1,5 +1,6 @@
 //! Guarded FighterControl data slots. Only the existing worker installs/restores.
 use super::*;
+use crate::runtime::features::mashout;
 
 const TABLE: usize = 0x4f85de0;
 const START_SLOT: usize = 0x4f85e58;
@@ -18,20 +19,20 @@ fn targets() -> [usize; 2] {
 pub(super) unsafe fn reader_table(table: usize) -> bool {
     table == game::text_base() + TABLE
         && INSTALLED.load(Ordering::Acquire)
-        && slot(START_SLOT).load(Ordering::Acquire) == targets()[0]
-        && slot(END_SLOT).load(Ordering::Acquire) == targets()[1]
+        && AtomicUsize::load(slot(START_SLOT), Ordering::Acquire) == targets()[0]
+        && AtomicUsize::load(slot(END_SLOT), Ordering::Acquire) == targets()[1]
 }
 
 /// Called outside every hook, before the worker lock. Foreign values are never overwritten.
 pub(super) fn service() {
     let wanted = WANTED.load(Ordering::Acquire)
-        && BOOT_READY.load(Ordering::Acquire)
+        && READY.load(Ordering::Acquire)
         && scene::current().is_some();
     let originals = [game::text_base() + 0x6b9150, game::text_base() + 0x3f8230];
     let wrappers = targets();
     let offsets = [START_SLOT, END_SLOT];
     if !wanted || LOST.load(Ordering::Acquire) {
-        READY.store(false, Ordering::Release);
+        SLOTS_READY.store(false, Ordering::Release);
         ARMED.store(0, Ordering::Release);
         if INSTALLED.swap(false, Ordering::AcqRel) {
             for i in 0..2 {
@@ -52,8 +53,8 @@ pub(super) fn service() {
             crate::runtime::diag_log::diagnostic(format_args!(
                 "[Mashout] slots restored={} start={:#x} end={:#x}",
                 !LOST.load(Ordering::Acquire),
-                unsafe { slot(START_SLOT).load(Ordering::Acquire) },
-                unsafe { slot(END_SLOT).load(Ordering::Acquire) }
+                unsafe { AtomicUsize::load(slot(START_SLOT), Ordering::Acquire) },
+                unsafe { AtomicUsize::load(slot(END_SLOT), Ordering::Acquire) }
             ));
         }
         return;
@@ -62,7 +63,7 @@ pub(super) fn service() {
         if unsafe { reader_table(game::text_base() + TABLE) } {
             return;
         }
-        READY.store(false, Ordering::Release);
+        SLOTS_READY.store(false, Ordering::Release);
         ARMED.store(0, Ordering::Release);
         LOST.store(true, Ordering::Release);
         // Next service restores any still-owned slot, preserving the foreign replacement.
@@ -115,11 +116,11 @@ pub(super) fn service() {
         LOST.store(true, Ordering::Release);
     }
     INSTALLED.store(ready, Ordering::Release);
-    READY.store(ready, Ordering::Release);
+    SLOTS_READY.store(ready, Ordering::Release);
     crate::runtime::diag_log::diagnostic(format_args!(
         "[Mashout] slots installed={ready} start={:#x} end={:#x}",
-        unsafe { slot(START_SLOT).load(Ordering::Acquire) },
-        unsafe { slot(END_SLOT).load(Ordering::Acquire) }
+        unsafe { AtomicUsize::load(slot(START_SLOT), Ordering::Acquire) },
+        unsafe { AtomicUsize::load(slot(END_SLOT), Ordering::Acquire) }
     ));
 }
 
@@ -164,17 +165,17 @@ unsafe extern "C" fn start(
 }
 unsafe extern "C" fn started(control: usize, caller: usize) {
     if caller == game::text_base() + 0x639d44 {
-        super::throw_seed_after(control);
+        mashout::throw_seed_after(control);
     }
 }
 
 unsafe extern "C" fn end(control: usize, index: i32) -> u64 {
-    let token = super::end_token(control, index);
+    let token = mashout::end_token(control, index);
     let original: unsafe extern "C" fn(usize, i32) -> u64 =
         core::mem::transmute(ORIGINAL_END.load(Ordering::Acquire));
     let result = original(control, index);
     if let Some(token) = token {
-        super::end_after(control, token);
+        mashout::end_after(control, token);
     }
     result
 }

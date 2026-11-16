@@ -28,6 +28,7 @@ const NOTICE_RAISE: u8 = 4;
 const DEFAULT_COLOR: u32 = 0;
 const UNAVAILABLE_NOTICE: &str = "Mash out unavailable";
 static READY: AtomicBool = AtomicBool::new(true);
+static SLOTS_READY: AtomicBool = AtomicBool::new(true);
 static WANTED: AtomicBool = AtomicBool::new(true);
 static EPOCH: AtomicU64 = AtomicU64::new(0);
 static FAULT: AtomicU64 = AtomicU64::new(0);

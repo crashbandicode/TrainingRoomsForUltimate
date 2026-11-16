@@ -7,8 +7,8 @@ static ORIGINAL_END: AtomicUsize = AtomicUsize::new(0);
 static INSTALLED: AtomicBool = AtomicBool::new(false);
 static LOST: AtomicBool = AtomicBool::new(false);
 static WANTED: AtomicBool = AtomicBool::new(true);
-static BOOT_READY: AtomicBool = AtomicBool::new(true);
-static READY: AtomicBool = AtomicBool::new(false);
+static READY: AtomicBool = AtomicBool::new(true);
+static SLOTS_READY: AtomicBool = AtomicBool::new(false);
 static ARMED: AtomicU64 = AtomicU64::new(5);
 static START_DATA: AtomicUsize = AtomicUsize::new(0);
 static END_DATA: AtomicUsize = AtomicUsize::new(0);
@@ -65,8 +65,8 @@ fn reset() {
     INSTALLED.store(false, Ordering::Relaxed);
     LOST.store(false, Ordering::Relaxed);
     WANTED.store(true, Ordering::Relaxed);
-    BOOT_READY.store(true, Ordering::Relaxed);
-    READY.store(false, Ordering::Relaxed);
+    READY.store(true, Ordering::Relaxed);
+    SLOTS_READY.store(false, Ordering::Relaxed);
     PRACTICE.store(true, Ordering::Relaxed);
     ARMED.store(5, Ordering::Relaxed);
     OBSERVED.store(0, Ordering::Relaxed);
@@ -75,7 +75,7 @@ fn reset() {
 fn enable_repeat_disable_restores_both_slots() {
     reset();
     service();
-    assert!(READY.load(Ordering::Relaxed));
+    assert!(SLOTS_READY.load(Ordering::Relaxed));
     unsafe {
         assert!(reader_table(game::text_base() + TABLE));
         assert!(!reader_table(game::text_base() + TABLE + 8));
@@ -84,7 +84,7 @@ fn enable_repeat_disable_restores_both_slots() {
     assert_eq!(START_DATA.load(Ordering::Relaxed), targets()[0]);
     WANTED.store(false, Ordering::Relaxed);
     service();
-    assert!(!READY.load(Ordering::Relaxed));
+    assert!(!SLOTS_READY.load(Ordering::Relaxed));
     assert_eq!(ARMED.load(Ordering::Relaxed), 0);
     assert_eq!(
         START_DATA.load(Ordering::Relaxed),
@@ -96,10 +96,10 @@ fn enable_repeat_disable_restores_both_slots() {
     );
     WANTED.store(true, Ordering::Relaxed);
     service();
-    assert!(READY.load(Ordering::Relaxed));
+    assert!(SLOTS_READY.load(Ordering::Relaxed));
     PRACTICE.store(false, Ordering::Relaxed);
     service();
-    assert!(!READY.load(Ordering::Relaxed));
+    assert!(!SLOTS_READY.load(Ordering::Relaxed));
 }
 #[test]
 fn foreign_start_or_end_is_preserved_and_partial_install_rolls_back() {
@@ -107,7 +107,7 @@ fn foreign_start_or_end_is_preserved_and_partial_install_rolls_back() {
         reset();
         unsafe { slot(offset) }.store(0xbeef, Ordering::Relaxed);
         service();
-        assert!(!READY.load(Ordering::Relaxed));
+        assert!(!SLOTS_READY.load(Ordering::Relaxed));
         assert!(LOST.load(Ordering::Relaxed));
         assert_eq!(unsafe { slot(offset) }.load(Ordering::Relaxed), 0xbeef);
         if offset == END_SLOT {
@@ -124,7 +124,7 @@ fn foreign_takeover_revokes_and_preserves_foreign_pointer() {
     service();
     END_DATA.store(0xbeef, Ordering::Relaxed);
     service();
-    assert!(!READY.load(Ordering::Relaxed));
+    assert!(!SLOTS_READY.load(Ordering::Relaxed));
     assert_eq!(ARMED.load(Ordering::Relaxed), 0);
     service();
     assert_eq!(END_DATA.load(Ordering::Relaxed), 0xbeef);
@@ -136,9 +136,9 @@ fn foreign_takeover_revokes_and_preserves_foreign_pointer() {
 #[test]
 fn guard_miss_never_installs() {
     reset();
-    BOOT_READY.store(false, Ordering::Relaxed);
+    READY.store(false, Ordering::Relaxed);
     service();
-    assert!(!READY.load(Ordering::Relaxed));
+    assert!(!SLOTS_READY.load(Ordering::Relaxed));
     assert_eq!(
         START_DATA.load(Ordering::Relaxed),
         game::text_base() + 0x6b9150
@@ -172,7 +172,7 @@ fn foreign_race_between_slot_installs_blocks_joint_admission() {
     reset();
     RACE_ON_END.store(true, Ordering::Relaxed);
     service();
-    assert!(!READY.load(Ordering::Relaxed));
+    assert!(!SLOTS_READY.load(Ordering::Relaxed));
     assert!(!INSTALLED.load(Ordering::Relaxed));
     assert!(LOST.load(Ordering::Relaxed));
     assert_eq!(START_DATA.load(Ordering::Relaxed), 0xbeef);

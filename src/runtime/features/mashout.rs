@@ -36,8 +36,8 @@ mod worker;
 
 const NOTICE_ID: u8 = 0x30;
 const NOTICE_RAISE: u8 = 4;
-static BOOT_READY: AtomicBool = AtomicBool::new(false);
 static READY: AtomicBool = AtomicBool::new(false);
+static SLOTS_READY: AtomicBool = AtomicBool::new(false);
 static WANTED: AtomicBool = AtomicBool::new(false);
 static CONFIG: Published<Option<Config>> = Published::new(None);
 static START: AtomicBool = AtomicBool::new(false);
@@ -77,10 +77,10 @@ static EVENTS: Mailbox<worker::Event, 128> = Mailbox::new();
 static REPLIES: Mailbox<u64, 4> = Mailbox::new();
 
 pub fn set_admission(on: bool) {
-    BOOT_READY.store(on, Ordering::Release);
+    READY.store(on, Ordering::Release);
 }
 fn admission() -> Admission {
-    Admission::new(READY.load(Ordering::Acquire))
+    Admission::new(READY.load(Ordering::Acquire) && SLOTS_READY.load(Ordering::Acquire))
 }
 
 pub fn publish(rows: &Snapshot) {
@@ -157,7 +157,11 @@ pub(crate) struct SeedToken {
 
 /// Before role_of/CPU.lock in the existing clatter-start wrapper. No plugin lock or allocation.
 pub(crate) unsafe fn seed_token(accessor: usize) -> Option<SeedToken> {
-    if !READY.load(Ordering::Acquire) || accessor == 0 || P1.load(Ordering::Acquire) != accessor {
+    if !READY.load(Ordering::Acquire)
+        || !SLOTS_READY.load(Ordering::Acquire)
+        || accessor == 0
+        || P1.load(Ordering::Acquire) != accessor
+    {
         return None;
     }
     let generation = ARMED.load(Ordering::Acquire);
@@ -184,6 +188,7 @@ pub(crate) unsafe fn seed_after(
     _d: bool,
 ) {
     if !READY.load(Ordering::Acquire)
+        || !SLOTS_READY.load(Ordering::Acquire)
         || seed_token(accessor).is_none_or(|fresh| fresh.generation != token.generation)
     {
         return;
@@ -265,6 +270,7 @@ fn publish_seed(generation: u64, origin: SeedOrigin, sample: Option<reader::Samp
 /// Existing CPU hooks and AI epilogue yield only the freshly resolved, selected CPU body.
 pub(crate) unsafe fn owns_cpu(accessor: usize) -> bool {
     if !READY.load(Ordering::Acquire)
+        || !SLOTS_READY.load(Ordering::Acquire)
         || accessor == 0
         || OWN_CPU.load(Ordering::Acquire) != accessor
     {
@@ -415,7 +421,7 @@ unsafe fn arm(p1: usize, generation: u64) -> bool {
 
 /// Existing P1 per-frame path. Entry0's current active body only, independent of frame-strip settings.
 pub unsafe fn frame(fighter: usize) {
-    if !BOOT_READY.load(Ordering::Acquire) || fighter == 0 {
+    if !READY.load(Ordering::Acquire) || fighter == 0 {
         return;
     }
     if ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read() != 0 {
@@ -433,7 +439,7 @@ pub unsafe fn frame(fighter: usize) {
     };
     // Disabling restores the native slots immediately, but must still restore the
     // temporary CPU through the existing frame path.
-    if WANTED.load(Ordering::Acquire) && !READY.load(Ordering::Acquire) {
+    if WANTED.load(Ordering::Acquire) && !SLOTS_READY.load(Ordering::Acquire) {
         revoke();
         OWN_CPU.store(0, Ordering::Release);
         return;

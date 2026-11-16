@@ -61,6 +61,7 @@ mod interposer {
 mod reader { // READER
 }
 static READY: AtomicBool = AtomicBool::new(true);
+static SLOTS_READY: AtomicBool = AtomicBool::new(true);
 static P1: AtomicUsize = AtomicUsize::new(0);
 static THRESHOLD: AtomicU32 = AtomicU32::new(0);
 static ARMED: AtomicU64 = AtomicU64::new(0);
@@ -289,6 +290,7 @@ impl NativeMemory {
         FAULT.store(0, Ordering::Relaxed);
         QUEUE_FULL.store(false, Ordering::Relaxed);
         READY.store(true, Ordering::Relaxed);
+        SLOTS_READY.store(true, Ordering::Relaxed);
         CPU_STATUS.store(481, Ordering::Relaxed);
         QUEUE.with_borrow_mut(Vec::clear);
         END_QUEUE.with_borrow_mut(Vec::clear);

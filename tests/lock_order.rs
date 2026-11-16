@@ -938,6 +938,9 @@ const TYPED_STATIC_CALLS: &[(&str, &str, &str)] = &[
 /// the game's on-init callback (`reset_hub::on_init`), Skyline's NRO-load hooks, and the exported trace control.
 /// `every_function_handed_to_the_game_is_listed` keeps this complete.
 const GAME_ENTRIES: &[&str] = &[
+    "interposer::start",
+    "interposer::started",
+    "interposer::end",
     "cpu::on_frame",
     "cpu_common::di_hook",
     "cpu_common::change_status_hook",

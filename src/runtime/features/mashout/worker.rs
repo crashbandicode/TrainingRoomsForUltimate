@@ -111,7 +111,10 @@ pub(super) fn service() {
         return;
     }
     notices::raise(NOTICE_RAISE, true);
-    if !READY.load(Ordering::Acquire) || CONFIG.read().is_none() {
+    if !READY.load(Ordering::Acquire)
+        || !SLOTS_READY.load(Ordering::Acquire)
+        || CONFIG.read().is_none()
+    {
         worker.session.cancel();
         EVENTS.drain(|_| ());
         show(&mut worker, UNAVAILABLE_NOTICE);

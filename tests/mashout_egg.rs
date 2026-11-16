@@ -242,9 +242,9 @@ fn actual_interposer_install_restore_and_foreign_slot_refusal() {
     }
     run_fixture(
         fixture
-            .replace("super::throw_seed_after", "throw_seed_after")
-            .replace("super::end_token", "end_token")
-            .replace("super::end_after", "end_after"),
+            .replace("mashout::throw_seed_after", "throw_seed_after")
+            .replace("mashout::end_token", "end_token")
+            .replace("mashout::end_after", "end_after"),
         "interposer",
     );
 }
