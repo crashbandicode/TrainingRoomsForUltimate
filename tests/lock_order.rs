@@ -724,6 +724,9 @@ fn scan_mode(graph: &Graph, include_try: bool) -> (Ctx<'_>, Scan) {
             entries.push((vec![i], "game-hook".to_owned()));
         }
     }
+    for key in GAME_ENTRIES {
+        entries.push((graph.find(key), "game-hook".to_owned()));
+    }
     for (key, name, module) in plugin_entries() {
         let found = entry_starts(graph, &key, &module);
         if !found.is_empty() {
@@ -938,6 +941,8 @@ const TYPED_STATIC_CALLS: &[(&str, &str, &str)] = &[
 /// the game's on-init callback (`reset_hub::on_init`), Skyline's NRO-load hooks, and the exported trace control.
 /// `every_function_handed_to_the_game_is_listed` keeps this complete.
 const GAME_ENTRIES: &[&str] = &[
+    // Audit the staged fighter pass even before the launch adapter is bound.
+    "tech::frame",
     "cpu::on_frame",
     "cpu_common::di_hook",
     "cpu_common::change_status_hook",
@@ -1688,6 +1693,24 @@ fn the_shared_lock_check_sees_a_seeded_hazard() {
     assert!(hazards.contains("EDITED"), "the game-thread impl of a typed read waits on EDITED, the plugin one holds it: {hazards:?}");
     assert!(!hazards.contains("PUBLISHING"), "only the plugin impl takes PUBLISHING: {hazards:?}");
     assert!(hazards.contains("ROLES"), "one lock of a static array, taken by index on both sides: {hazards:?}");
+}
+
+#[test]
+fn tech_frame_is_a_game_root_before_binding_and_reaches_seeded_helper_lock() {
+    let mut graph = runtime_graph();
+    assert!(GAME_ENTRIES.contains(&"tech::frame"));
+    let roots = graph.find("tech::frame");
+    assert_eq!(roots.len(), 1);
+    let helper = graph.find("tech::still_tumbling")[0];
+    // No launch binding or native hook registration is needed to audit this pass.
+    graph.funcs[roots[0]].body = callgraph::lex("still_tumbling(0);");
+    graph.funcs[helper].body = callgraph::lex("VIEW.lock();");
+    let (ctx, s) = scan(&graph);
+    let shared = shared_locks(&ctx, &s);
+    let view = ctx.locks.iter().position(|(file, name)| file == "features/tech.rs" && name == "VIEW").unwrap();
+    assert!(s.roles[helper].contains("game-hook"), "Tech helper lost its game-thread role");
+    assert!(shared.game_hooks.get(&view).is_some_and(|hooks| hooks.contains("tech::frame")),
+        "reachable blocking VIEW seed escaped game-root inventory");
 }
 
 /// The scan on a small fixture: a guard bound by `let` and held over a call, a temporary held over its statement, a

@@ -65,6 +65,7 @@ const HOOK_LOCKS: &[(&str, &str)] = &[
     // rc.14 Break the Targets: P1's poll (the input thread), P1's pass (the game thread) and the layout tick take it; the menu worker
     // reaches it only through atomics and a mailbox.
     ("features/btt.rs", "BTT"),
+    ("features/tech.rs", "VIEW"),
     ("compat/menu.rs", "EDITED"),
     ("ui/input.rs", "ADAPTER"),
     ("ui/menu_app.rs", "QUICK_MENU_APP"),
@@ -127,6 +128,10 @@ const ALIASES: &[(&str, &str)] = &[("ui/menu_app.rs", "menu"), ("ui/menu_app.rs"
 
 /// Whether function `index` takes the lock `name` of `file` (see the module comment).
 fn takes_lock(graph: &Graph, index: usize, file: &str, name: &str) -> bool {
+    takes_lock_methods(graph, index, file, name, LOCK_METHODS, true)
+}
+
+fn takes_lock_methods(graph: &Graph, index: usize, file: &str, name: &str, methods: &[&str], by_reference: bool) -> bool {
     let f = &graph.funcs[index];
     let module = Path::new(file).file_stem().unwrap().to_string_lossy().into_owned();
     let toks = &f.body;
@@ -159,9 +164,9 @@ fn takes_lock(graph: &Graph, index: usize, file: &str, name: &str) -> bool {
             }
             dot += 1;
         }
-        let method = punct(dot, '.') && LOCK_METHODS.iter().any(|m| ident(dot + 1, m)) && punct(dot + 2, '(');
+        let method = punct(dot, '.') && methods.iter().any(|m| ident(dot + 1, m)) && punct(dot + 2, '(');
         let start = if qualified { i - 2 } else { i };
-        let by_ref = start >= 1 && punct(start - 1, '&');
+        let by_ref = by_reference && start >= 1 && punct(start - 1, '&');
         if method || by_ref {
             return true;
         }
@@ -491,12 +496,16 @@ fn direct_free_function_calls_still_reach_the_hook_lock() {
 
 /// Every `static NAME: …Mutex<…>` / `…RwLock<…>` of the runtime (ours and carried package-6 code, std or hos-lock).
 fn static_locks(root: &Path) -> Vec<(String, String)> {
-    fn walk(dir: &Path, root: &Path, out: &mut Vec<(String, String)>) {
+    static_types(root, &["Mutex<", "RwLock<"])
+}
+
+fn static_types(root: &Path, types: &[&str]) -> Vec<(String, String)> {
+    fn walk(dir: &Path, root: &Path, types: &[&str], out: &mut Vec<(String, String)>) {
         let mut entries: Vec<_> = std::fs::read_dir(dir).unwrap().map(|e| e.unwrap().path()).collect();
         entries.sort();
         for path in entries {
             if path.is_dir() {
-                walk(&path, root, out);
+                walk(&path, root, types, out);
             } else if path.extension().is_some_and(|e| e == "rs") {
                 let rel = path.strip_prefix(root).unwrap().to_string_lossy().replace('\\', "/");
                 for line in std::fs::read_to_string(&path).unwrap().lines() {
@@ -504,7 +513,7 @@ fn static_locks(root: &Path) -> Vec<(String, String)> {
                     let rest = line.strip_prefix("pub ").or_else(|| line.strip_prefix("pub(crate) ")).unwrap_or(line);
                     let Some(rest) = rest.strip_prefix("static ") else { continue };
                     let Some((name, ty)) = rest.split_once(':') else { continue };
-                    if ty.contains("Mutex<") || ty.contains("RwLock<") {
+                    if types.iter().any(|ty_name| ty.contains(ty_name)) {
                         out.push((rel.clone(), name.trim().to_owned()));
                     }
                 }
@@ -512,8 +521,75 @@ fn static_locks(root: &Path) -> Vec<(String, String)> {
         }
     }
     let mut out = Vec::new();
-    walk(root, root, &mut out);
+    walk(root, root, types, &mut out);
     out
+}
+
+/// The staged Tech pass is a hook root before the launch binding exists. Walk
+/// its helpers too: a hidden blocking initializer is as unsafe as VIEW.lock().
+fn tech_frame_waits(graph: &Graph, runtime: &Path) -> BTreeSet<String> {
+    let roots = graph.find("tech::frame");
+    assert_eq!(roots.len(), 1, "Tech fighter pass must remain an explicit audit root");
+    let mut by_name: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+    for (i, f) in graph.funcs.iter().enumerate() {
+        by_name.entry(f.name.clone()).or_default().push(i);
+    }
+    let locks = static_locks(runtime);
+    let cells = static_types(runtime, &["OnceLock<", "OnceCell<"]);
+    let mut stack = roots;
+    let mut seen = BTreeSet::new();
+    let mut violations = BTreeSet::new();
+    while let Some(i) = stack.pop() {
+        if !seen.insert(i) { continue; }
+        let key = graph.funcs[i].key();
+        for (file, name) in &locks {
+            if takes_lock_methods(graph, i, file, name, &["lock", "read", "write"], true) {
+                violations.insert(format!("{key} blocks on {file}::{name}"));
+            }
+        }
+        for (file, name) in &cells {
+            if takes_lock_methods(graph, i, file, name, &["set", "get_or_init", "get_or_try_init", "wait"], false) {
+                violations.insert(format!("{key} initializes or waits on {file}::{name}"));
+            }
+        }
+        // Same explicit allocation spellings covered by the existing HUD audit.
+        if graph.funcs[i].body.iter().any(|t| matches!(t, Tok::Ident(s) if ["Box", "Vec", "String", "alloc"].contains(&s.as_str()))) {
+            violations.insert(format!("{key} reaches an allocation spelling"));
+        }
+        stack.extend(edges(graph, i, &by_name, &mut BTreeMap::new()));
+    }
+    violations
+}
+
+#[test]
+fn tech_frame_has_no_blocking_lock_initialization_or_allocation() {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut graph = Graph::scan(&runtime, &[]);
+    graph.precise_imports = true;
+    let violations = tech_frame_waits(&graph, &runtime);
+    assert!(violations.is_empty(), "Tech frame hook can wait or allocate:\n{}", violations.into_iter().collect::<Vec<_>>().join("\n"));
+}
+
+#[test]
+fn tech_frame_audit_rejects_reachable_lock_initialization_and_allocation_seeds() {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut graph = Graph::scan(&runtime, &[]);
+    graph.precise_imports = true;
+    let frame = graph.find("tech::frame")[0];
+    let helper = graph.find("tech::still_tumbling")[0];
+    // Remove the binding path: the root itself must retain this coverage.
+    graph.funcs[frame].body = callgraph::lex("still_tumbling(0);");
+    for (seed, expected) in [
+        ("VIEW.lock();", "blocks on features/tech.rs::VIEW"),
+        ("TUMBLE_IDS.set([0; 7]);", "initializes or waits on features/tech.rs::TUMBLE_IDS"),
+        ("let allocated = Vec::new();", "reaches an allocation spelling"),
+    ] {
+        graph.funcs[helper].body = callgraph::lex(seed);
+        let found = tech_frame_waits(&graph, &runtime);
+        assert!(found.iter().any(|v| v.contains(expected)), "reachable seed escaped: {seed}: {found:?}");
+    }
+    graph.funcs[helper].body = callgraph::lex("VIEW.try_lock(); TUMBLE_IDS.get();");
+    assert!(tech_frame_waits(&graph, &runtime).is_empty(), "nonblocking access was rejected");
 }
 
 /// The audit's raw material (IMPLEMENTATION-PROGRESS-sync.md (removed after v0.2.0-rc.1; see that tag)): every static lock (ours and carried package-6 code, std or hos-lock)
