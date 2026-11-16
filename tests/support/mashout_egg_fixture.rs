@@ -827,6 +827,7 @@ mod game {
         for (name, id) in [
             ("FIGHTER_STATUS_KIND_SPECIAL_N", 476),
             ("FIGHTER_STATUS_KIND_SPECIAL_HI", 478),
+            ("FIGHTER_STATUS_KIND_SPECIAL_LW", 479),
             ("FIGHTER_STATUS_KIND_CATCH", 50),
             ("FIGHTER_STATUS_KIND_CATCH_DASH", 54),
             ("FIGHTER_STATUS_KIND_CATCH_TURN", 55),
@@ -1131,5 +1132,87 @@ fn dedede_up_special_miss_and_nonbury_seed_keep_existing_refusals() {
         assert_eq!(g.failed, Some("Move entry unconfirmed · no grade"));
         assert!(g.clock.is_none());
         assert!(BEGINS.with_borrow(Vec::is_empty));
+    }
+}
+
+#[test]
+fn ice_climbers_real_special_entries_require_actual_ice_seed() {
+    for (id, plan, start) in [(113, Plan::Blizzard, 479), (114, Plan::IceShot, 476)] {
+        unsafe {
+            let mut m = NativeMemory::new();
+            let mut g = Game::new(plan, State::Frozen);
+            let q = g.requested.as_mut().unwrap();
+            q.id = id;
+            q.attacker_kind = 75;
+            q.attacker_name = "Ice Climbers";
+            m.body[3] = 75;
+            g.step = Step::Settle;
+            CPU_STATUS.store(0, Ordering::Relaxed);
+            m.update(&mut g, 0);
+            assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, start)]);
+            assert_eq!(g.step, Step::Entering);
+            assert_eq!(ARMED.load(Ordering::Relaxed), g.generation);
+            CPU_STATUS.store(start as u32, Ordering::Relaxed);
+            for _ in 0..4 {
+                m.update(&mut g, 0);
+                assert_eq!(g.step, Step::Entering);
+                assert!(g.clock.is_none());
+                assert_eq!(
+                    DRIVEN.with_borrow(|v| *v.last().unwrap()),
+                    MappedInputs::NEUTRAL
+                );
+            }
+            m.seed(73.25, 1.75, 2);
+            let actual = reader::sample(m.p1(), 0.37).unwrap().seed();
+            let before = (m.control, m.record);
+            m.start();
+            m.update(&mut g, 203);
+            assert_eq!(g.step, Step::Held);
+            assert_eq!(g.clock.unwrap().last(), actual.record);
+            assert_eq!((m.control, m.record), before);
+            let begins = BEGINS.with_borrow(Clone::clone);
+            assert_eq!(begins.len(), 1);
+            assert_eq!(begins[0].1, actual);
+            assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, start)]);
+            assert_eq!(entry::controls(plan, false), MappedInputs::NEUTRAL);
+            assert_eq!(entry::controls(plan, true), MappedInputs::NEUTRAL);
+        }
+    }
+}
+#[test]
+fn ice_climbers_miss_and_nonice_seed_keep_existing_refusals() {
+    for (id, plan, start) in [(113, Plan::Blizzard, 479), (114, Plan::IceShot, 476)] {
+        unsafe {
+            let mut m = NativeMemory::new();
+            let mut g = Game::new(plan, State::Frozen);
+            let q = g.requested.as_mut().unwrap();
+            q.id = id;
+            q.attacker_kind = 75;
+            q.attacker_name = "Ice Climbers";
+            m.body[3] = 75;
+            startup(&mut g, m.p1());
+            CPU_STATUS.store(start as u32, Ordering::Relaxed);
+            m.update(&mut g, 0);
+            CPU_STATUS.store(0, Ordering::Relaxed);
+            m.update(&mut g, 0);
+            assert_eq!(
+                g.failed,
+                Some("Move did not capture · reopen menu to retry")
+            );
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+            let mut g = Game::new(plan, State::Frozen);
+            let q = g.requested.as_mut().unwrap();
+            q.id = id;
+            q.attacker_kind = 75;
+            q.attacker_name = "Ice Climbers";
+            startup(&mut g, m.p1());
+            CPU_STATUS.store(start as u32, Ordering::Relaxed);
+            m.seed(73.25, 1.75, 2);
+            m.start();
+            m.update(&mut g, 75);
+            assert_eq!(g.failed, Some("Move entry unconfirmed · no grade"));
+            assert!(g.clock.is_none());
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+        }
     }
 }

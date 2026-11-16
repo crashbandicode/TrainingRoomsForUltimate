@@ -14,9 +14,11 @@ pub fn start(move_: Scenario) -> Option<&'static str> {
         Plan::SideSpecial | Plan::Cling | Plan::Drag | Plan::Whip | Plan::Roller => {
             "FIGHTER_STATUS_KIND_SPECIAL_S"
         }
-        Plan::Egg | Plan::Inhale | Plan::NeutralSpecial | Plan::Freeze => "FIGHTER_STATUS_KIND_SPECIAL_N",
+        Plan::Egg | Plan::Inhale | Plan::NeutralSpecial | Plan::Freeze | Plan::IceShot => {
+            "FIGHTER_STATUS_KIND_SPECIAL_N"
+        }
         Plan::UpSpecial => "FIGHTER_STATUS_KIND_SPECIAL_HI",
-        Plan::Drain => "FIGHTER_STATUS_KIND_SPECIAL_LW",
+        Plan::Drain | Plan::Blizzard => "FIGHTER_STATUS_KIND_SPECIAL_LW",
         Plan::DownTilt => "FIGHTER_STATUS_KIND_ATTACK_LW3",
         Plan::DownSmash => "FIGHTER_STATUS_KIND_ATTACK_LW4_START",
         Plan::Jab3 => "FIGHTER_STATUS_KIND_ATTACK",

@@ -368,3 +368,12 @@ Olimar40 and Inkling102 canonical build gates subsequently completed on 3fd57e54
 release and diagnostic builds successful. Runtime acceptance remains pending.
 Evidence: combined-gate-3fd57e54-surface/SUMMARY.md. The same operator final-total
 approval applies; the ceiling remains unchanged.
+
+### rc.15 Dedede99 real up-special entry (2026-11-16)
+
+The full canonical Surface gate measured 3fd57e54 at150991 to bd7f4d90
+at150992 (+1). The operator rc.15 final-total size approval applies; the
+ceiling file and evaluator remain unchanged. Primary code review and Eden
+contact/escape proof are pending. Evidence:
+dedede99-gate-bd7f4d90-surface/SUMMARY.md, BUDGET-ENTRY.md and retained
+compliance-v2.log (corrected trace test references, no product/gate change).
