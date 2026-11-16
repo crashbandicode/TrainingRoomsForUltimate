@@ -40,6 +40,7 @@ static RUNNING: AtomicBool = AtomicBool::new(false);
 static PLACING: AtomicBool = AtomicBool::new(false);
 static GUARD_PRESS: AtomicBool = AtomicBool::new(false);
 static HITLAG: OnceLock<HitlagResolver> = OnceLock::new();
+static TUMBLE_IDS: OnceLock<[i32; 7]> = OnceLock::new();
 static OUTCOMES: Mailbox<Outcome, 4> = Mailbox::new();
 struct ViewState {
     picker: Picker,
@@ -155,7 +156,9 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
     let Some(config) = CONFIG.read() else {
         return false;
     };
-    let mut view = VIEW.lock();
+    let Some(mut view) = VIEW.try_lock() else {
+        return true;
+    };
     let Some(range) = view.range else {
         return true;
     };
@@ -189,7 +192,9 @@ pub fn look(active: bool) -> [Option<([f32; 2], EggLook)>; LOOKS] {
     if !active || !running() {
         return out;
     }
-    let view = VIEW.lock();
+    let Some(view) = VIEW.try_lock() else {
+        return out;
+    };
     let spot = if placing() {
         view.picker.hovered
     } else {
@@ -245,25 +250,27 @@ pub fn look(active: bool) -> [Option<([f32; 2], EggLook)>; LOOKS] {
     }
     out
 }
-unsafe fn still_tumbling(accessor: usize) -> Option<bool> {
-    static IDS: OnceLock<[i32; 7]> = OnceLock::new();
-    if IDS.get().is_none() {
-        let names = [
-            "FIGHTER_STATUS_KIND_DAMAGE_FLY",
-            "FIGHTER_STATUS_KIND_DAMAGE_FLY_ROLL",
-            "FIGHTER_STATUS_KIND_DAMAGE_FLY_METEOR",
-            "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_D",
-            "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_U",
-            "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_LR",
-            "FIGHTER_STATUS_KIND_DAMAGE_FALL",
-        ];
-        let mut ids = [0; 7];
-        for (slot, name) in ids.iter_mut().zip(names) {
-            *slot = super::tech_native::id(name)?;
-        }
-        IDS.set(ids).ok();
+/// Resolve Lua constants during plugin initialization, before installing the P1 hook.
+/// # Safety
+/// The game's Lua constant table is initialized; this must never run from a hook.
+pub unsafe fn init() -> Option<()> {
+    let names = [
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY",
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY_ROLL",
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY_METEOR",
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_D",
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_U",
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_LR",
+        "FIGHTER_STATUS_KIND_DAMAGE_FALL",
+    ];
+    let mut ids = [0; 7];
+    for (slot, name) in ids.iter_mut().zip(names) {
+        *slot = super::tech_native::id(name)?;
     }
-    Some(IDS.get()?.contains(&natives::status_kind(accessor)))
+    TUMBLE_IDS.set(ids).ok()
+}
+unsafe fn still_tumbling(accessor: usize) -> Option<bool> {
+    Some(TUMBLE_IDS.get()?.contains(&natives::status_kind(accessor)))
 }
 fn notice(run: &Practice, text: Option<&str>) {
     use core::fmt::Write;
@@ -310,9 +317,11 @@ pub unsafe fn frame(fighter: usize) {
     if !super::tech_adapter::tech_ready() {
         return;
     }
+    let Some(mut view) = VIEW.try_lock() else {
+        return;
+    };
     if !scene::is_native_training() {
         {
-            let mut view = VIEW.lock();
             view.picker.enter(-1, Vec2::default());
             view.surfaces = Surfaces::EMPTY;
             view.range = None;
@@ -327,6 +336,7 @@ pub unsafe fn frame(fighter: usize) {
         PLACING.store(false, Ordering::Release);
         notices::clear(NOTICE);
         notices::raise(notices::RAISE_TECH, false);
+        drop(view);
         super::btt_camera::request(2, false);
         return;
     }
@@ -352,7 +362,7 @@ pub unsafe fn frame(fighter: usize) {
     LIVE.with(|cell| {
         let mut slot = cell.borrow_mut();
         if stop {
-            VIEW.lock().start = false;
+            view.start = false;
             if let Some(run) = slot.as_mut() {
                 run.controller.stop(&mut run.adapter);
                 if !open {
@@ -421,7 +431,6 @@ pub unsafe fn frame(fighter: usize) {
             PLACING.store(false, Ordering::Release);
             run.scan = None;
             run.scan_done = false;
-            let mut view = VIEW.lock();
             view.picker.enter(
                 stage,
                 Vec2 {
@@ -442,7 +451,6 @@ pub unsafe fn frame(fighter: usize) {
             return;
         };
         {
-            let mut view = VIEW.lock();
             view.range = Some(range);
             if view.surfaces.state == Walk::Broken && view.surfaces.lines().next().is_none() {
                 if let Some((seed, end)) = source.seed() {
@@ -469,7 +477,6 @@ pub unsafe fn frame(fighter: usize) {
             }
         }
         {
-            let mut view = VIEW.lock();
             let ViewState {
                 picker, surfaces, ..
             } = &mut *view;
@@ -481,7 +488,7 @@ pub unsafe fn frame(fighter: usize) {
             if run.controller.session.phase != Phase::Off {
                 run.controller.stop(&mut run.adapter);
             }
-            VIEW.lock().start = false;
+            view.start = false;
             let Some(fighter_kind) = natives::fighter_kind(at) else {
                 return;
             };
@@ -494,14 +501,12 @@ pub unsafe fn frame(fighter: usize) {
             run.planning_failed = false;
             PLACING.store(
                 EDIT.swap(false, Ordering::AcqRel)
-                    || config.surface == 4 && VIEW.lock().picker.selected.is_none(),
+                    || config.surface == 4 && view.picker.selected.is_none(),
                 Ordering::Release,
             );
         }
         if placing() {
-            let mut view = VIEW.lock();
             if !view.start {
-                drop(view);
                 notice(run, None);
                 return;
             }
@@ -569,7 +574,6 @@ pub unsafe fn frame(fighter: usize) {
                 if !gravity.is_finite() || gravity <= 0. || !cap.is_finite() || cap <= 0. {
                     return;
                 }
-                let mut view = VIEW.lock();
                 let spot = if run.config.surface == 4 {
                     view.picker.selected.filter(|s| s.current(&mut source))
                 } else {
@@ -582,7 +586,6 @@ pub unsafe fn frame(fighter: usize) {
                     )
                 };
                 let Some(spot) = spot else {
-                    drop(view);
                     notice(run, Some("Choose a stage surface"));
                     return;
                 };
@@ -604,7 +607,6 @@ pub unsafe fn frame(fighter: usize) {
                 );
                 let Some(plan) = result else {
                     run.planning_failed = true;
-                    drop(view);
                     notice(
                         run,
                         Some("Approximate aim has no solution for these values"),
@@ -630,6 +632,7 @@ pub unsafe fn frame(fighter: usize) {
         }
         notice(run, None);
     });
+    drop(view);
     super::btt_camera::request(
         2,
         running()
