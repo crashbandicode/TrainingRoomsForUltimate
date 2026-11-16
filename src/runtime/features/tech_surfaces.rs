@@ -109,7 +109,7 @@ pub struct NativeSource {
 impl NativeSource {
     /// Caller owns this P1 accessor for the current native game-thread pass.
     pub unsafe fn new(accessor: usize) -> Option<Self> {
-        (crate::runtime::scene::is_native_training()
+        (crate::model::scene::scene(crate::runtime::scene::facts()).is_some()
             && guarded()
             && accessor & 7 == 0
             && readable(accessor, 0x60)
