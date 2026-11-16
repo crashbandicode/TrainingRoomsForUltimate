@@ -139,8 +139,9 @@ struct Baseline {
     capture_status: i32,
     capture_grounded: bool,
     identity: ReferenceIdentity,
+    damage_info: [u8; 0xa0],
 }
-/// Owned 13.0.5 energy layout and runtime-resolved work keys; no DamageInfo bytes are copied.
+/// Owned 13.0.5 energy layout and runtime-resolved work keys; observations only.
 #[derive(Clone, Copy)]
 struct Hidden {
     vptr: usize,
@@ -514,6 +515,37 @@ unsafe fn v1_damage_module(accessor: usize) -> Option<()> {
     Some(())
 }
 
+/// Raw observation of the inline Info returned by the guarded slot 0x188.
+/// No game call or write: the concrete target is add x0,x0,#0x80; ret.
+unsafe fn damage_info(accessor: usize) -> Option<[u8; 0xa0]> {
+    if !v1_guarded() || accessor < 0x1000 || accessor & 7 != 0 || accessor >> 47 != 0 {
+        return None;
+    }
+    let module = ((accessor + 0xa8) as *const usize).read();
+    if module < 0x1000 || module & 7 != 0 || module >> 47 != 0 {
+        return None;
+    }
+    v1_damage_module(accessor)?;
+    Some(((module + 0x80) as *const [u8; 0xa0]).read_unaligned())
+}
+struct DamageInfoHex<'a>(&'a [u8; 0xa0]);
+impl std::fmt::Display for DamageInfoHex<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for byte in self.0 {
+            write!(f, "{byte:02x}")?;
+        }
+        Ok(())
+    }
+}
+fn log_damage_info(run: &Spike, moment: &str, age: u32, bytes: &[u8; 0xa0]) {
+    diagnostic(format_args!(
+        "[TechDirect] damage_info attempt={} mode={} moment={moment} age={age} size=a0 raw={}",
+        run.attempt,
+        run.mode_name(),
+        DamageInfoHex(bytes)
+    ));
+}
+
 fn complete_baseline(run: &mut Spike) {
     if !run.ordinary() || run.sample < 20 || !run.contact {
         return;
@@ -795,6 +827,7 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
     // The first native energy update must take its air branch, even for a grounded real hit.
     state::set_situation_kind(accessor, id("SITUATION_KIND_AIR")?);
     log_hidden(run, accessor, "cold_pre")?;
+    log_damage_info(run, "cold_pre", run.age, &damage_info(accessor)?);
     v1_damage_module(accessor)?;
     let overwrite: extern "C" fn(usize, f32) = std::mem::transmute(game::text_base() + 0x200b8b0);
     overwrite(accessor, native_reaction);
@@ -820,16 +853,15 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
     } else {
         None
     };
-    natives::change_status_force(accessor, id("FIGHTER_STATUS_KIND_DAMAGE_FLY")?, false);
-    if let Some(written) = reserve {
-        let actual = natives::get_float(
-            accessor,
-            id("FIGHTER_STATUS_WORK_ID_FLOAT_RESERVE_DAMAGE_LR")?,
-        )
-        .to_bits();
-        diagnostic(format_args!("[TechDirect] reserve_lr_after attempt={} command={} written={written:08x} actual={actual:08x} survives={} motion={:016x}",
-            run.attempt,run.mode,written==actual,natives::motion_kind(accessor)));
-    }
+    let damage_fly = id("FIGHTER_STATUS_KIND_DAMAGE_FLY")?;
+    let reserve_key = id("FIGHTER_STATUS_WORK_ID_FLOAT_RESERVE_DAMAGE_LR")?;
+    natives::change_status_force(accessor, damage_fly, false);
+    natives::set_float(accessor, 0.0, reserve_key);
+    diagnostic(format_args!(
+        "[TechDirect] reserve_lr_consumed attempt={} command={} seeded={} actual={:08x} motion={:016x} after_status=true",
+        run.attempt, run.mode, reserve.is_some(),
+        natives::get_float(accessor, reserve_key).to_bits(), natives::motion_kind(accessor)
+    ));
     if !is_status(
         natives::status_kind(accessor),
         "FIGHTER_STATUS_KIND_DAMAGE_FLY",
@@ -838,6 +870,7 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
     }
     setup(run, accessor);
     log_hidden(run, accessor, "cold_launch")?;
+    log_damage_info(run, "cold_launch", run.age, &damage_info(accessor)?);
     let actual = velocity(accessor)?;
     let vector = launch_vector(run, actual)?;
     let wanted = vector.wanted;
@@ -916,8 +949,14 @@ pub unsafe fn decision(accessor: usize, status: i32, passive: bool) {
         run.stop();
         return;
     }
-    diagnostic(format_args!("[TechDirect] contact attempt={} mode={} frame={} surface={surface} line=0x{line:x} x={:08x} y={:08x} nx={:08x} ny={:08x} passive={passive} status={status}",
-        run.attempt,run.mode_name(),run.sample,natives::pos_x(accessor).to_bits(),natives::pos_y(accessor).to_bits(),normal[0].to_bits(),normal[1].to_bits()));
+    let (Some(left), Some(right)) = (point(line, false), point(line, true)) else {
+        diagnostic(format_args!("[TechDirect] fault=contact_endpoints"));
+        run.stop();
+        return;
+    };
+    diagnostic(format_args!("[TechDirect] contact attempt={} mode={} frame={} surface={surface} line=0x{line:x} x={:08x} y={:08x} nx={:08x} ny={:08x} left_x={:08x} left_y={:08x} right_x={:08x} right_y={:08x} passive={passive} status={status}",
+        run.attempt,run.mode_name(),run.sample,natives::pos_x(accessor).to_bits(),natives::pos_y(accessor).to_bits(),normal[0].to_bits(),normal[1].to_bits(),
+        left[0].to_bits(),left[1].to_bits(),right[0].to_bits(),right[1].to_bits()));
     run.contact = true;
     complete_baseline(&mut run);
 }
@@ -1305,6 +1344,10 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
                 invalid_reference(&mut run, "hidden_unreadable");
                 return;
             };
+            let Some(info) = damage_info(accessor) else {
+                invalid_reference(&mut run, "damage_info_unreadable");
+                return;
+            };
             // Refresh every stopped callback, including after native record KB clears.
             // Emit only the selected final snapshot at the first non-stop boundary.
             run.baseline = Some(Baseline {
@@ -1318,6 +1361,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
                 capture_status: status,
                 capture_grounded: natives::is_grounded(accessor),
                 identity,
+                damage_info: info,
             });
         } else {
             let Some(baseline) = run.baseline else {
@@ -1339,6 +1383,12 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             let i = baseline.identity;
             diagnostic(format_args!("[TechDirect] reference_final attempt={} capture_age={} k0_age={} attacker={:08x} slot={} damage={:08x} kb={:08x} record_kb={:08x} valid=true",
                 run.attempt, baseline.capture_age, run.age, i.attacker, i.slot, i.damage, i.kb, record.kb));
+            log_damage_info(
+                &run,
+                "reference_final",
+                baseline.capture_age,
+                &baseline.damage_info,
+            );
             log_hidden_snapshot(
                 &run,
                 baseline.hidden,
