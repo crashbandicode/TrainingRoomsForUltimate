@@ -1689,3 +1689,11 @@ ceiling = 148236
 date = "2026-11-16"
 reason = "rc.15 shared nonblocking menu fix measured total 148236, +42 over 148194. Lead-approved FOR OPERATOR REVIEW; hardware-reship integration records the combined total. Counting rules and features unchanged."
 approved_by = "Operator rc.15 size approval; primary 20:08Z, rc.15 approval, 2026-11-16: explicitly authorizes this measured-total entry FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 148508
+date = "2026-11-16"
+reason = "rc.15 hardware reship: exact combined implementation measured 148508 after reviewed CPU/Eggs, Player Swapping Single, menu through e78bbab4 and BTT through dbe9edc7. Delta +341 from card ffd2f74a (148167), +272 from the standalone menu ceiling 148236. No events-log changes, diagnostic-only shipping change, counting change or gate change."
+approved_by = "Operator rc.15 size approval relayed by primary 2026-11-16 20:08Z; BTT exact 148407 / 148194 (+213) explicitly approved by primary 20:44Z; latest primary release-only reship ruling explicitly orders the combined measured total recorded under that approval."
