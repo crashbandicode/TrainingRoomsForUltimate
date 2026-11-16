@@ -12338,7 +12338,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "c70857e361938e4247b7dd1dfde080d290aaa946ad2ec6b853dd5f906cfc8ffd",
+   "dest_sha256": "7bcbbeb1f12357ab6d00de22249b74d90308e95de222fbd7a002113e37697fc7",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -13611,6 +13611,61 @@
      "old": "        skyline::install_hooks!(load_local_waiting_icons, load_online_waiting_icons);\n        trace!",
      "new": "        skyline::install_hooks!(load_local_waiting_icons, load_online_waiting_icons);\n        MASHOUT_READY.store(true, Ordering::Release);\n        trace!",
      "reason": "rc.15 Mash out approved M3 reader admission: publish positive readiness only after native service, body bank, Mii owners and icon hooks have reached successful installation end."
+    },
+    {
+     "old": "\n/// `once`: one explicit Direct load outside the cycle; the role's cycle setting\n/// (Player Swapping) does not refuse it and is not changed by it.\nfn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool) {\n    // FAIL 2: a user's request leaves one line on every path, including the ones that drop it.\n    let refresh = matches!(selection, Selection::RefreshPartners);\n    let user = !restoring && !refresh;\n",
+     "new": "\n/// `once`: one explicit Direct load outside the cycle; the role's cycle setting\n/// (Player Swapping) does not refuse it and is not changed by it.\n/// True only after the generic loader or an intercept accepted new intent.\nfn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool) -> bool {\n    // FAIL 2: a user's request leaves one line on every path, including the ones that drop it.\n    let refresh = matches!(selection, Selection::RefreshPartners);\n    let user = !restoring && !refresh;\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "        if user {\n            trace!(\"[CharacterRoster] request ignored role={:?} selection={:?}: this role's roster cycle is off\", role, selection);\n        }\n        return;\n    }\n    if BASE.load(Ordering::Acquire) == 0 || !crate::runtime::roster::character_lifecycle::native_hooks_ready() {\n        trace!(\"[CharacterRoster] request ignored role={:?} selection={:?}: native hooks unavailable\", role, selection);\n        notify(role, \"Unavailable on this game version\".into());\n        return;\n    }\n    let Some(scope) = scope(role) else {\n        if user {\n            trace!(\"[CharacterRoster] request ignored role={:?} selection={:?}: not a practice scene\", role, selection);\n        }\n        return;\n    };\n    let occupied = if busy() {\n        Some(\"Wait for the character swap to finish\")\n",
+     "new": "        if user {\n            trace!(\"[CharacterRoster] request ignored role={:?} selection={:?}: this role's roster cycle is off\", role, selection);\n        }\n        return false;\n    }\n    if BASE.load(Ordering::Acquire) == 0 || !crate::runtime::roster::character_lifecycle::native_hooks_ready() {\n        trace!(\"[CharacterRoster] request ignored role={:?} selection={:?}: native hooks unavailable\", role, selection);\n        notify(role, \"Unavailable on this game version\".into());\n        return false;\n    }\n    let Some(scope) = scope(role) else {\n        if user {\n            trace!(\"[CharacterRoster] request ignored role={:?} selection={:?}: not a practice scene\", role, selection);\n        }\n        return false;\n    };\n    let occupied = if busy() {\n        Some(\"Wait for the character swap to finish\")\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "            trace!(\"[CharacterRoster] request rejected: {}\", reason);\n            notify(role, reason.into());\n        }\n        return;\n    }\n    sources::pause_preload();\n    if crate::runtime::roster::cycle_preload_config::snapshot().measurements\n",
+     "new": "            trace!(\"[CharacterRoster] request rejected: {}\", reason);\n            notify(role, reason.into());\n        }\n        return false;\n    }\n    sources::pause_preload();\n    if crate::runtime::roster::cycle_preload_config::snapshot().measurements\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "        if let Some(target)=target {crate::runtime::roster::cycle_preload::request(role as usize,false,target);}\n    }\n    let user_request=!restoring && !matches!(selection,Selection::RefreshPartners);\n    if mii_ordinary_player::intercept(role,selection,user_request)==Some(true){\n        if user {trace!(\"[CharacterRoster] request handed to the ordinary Mii owner role={:?} selection={:?}\",role,selection);}\n        return;\n    }\n    // The CPU owner logs its own acceptance or refusal.\n    if mii_ordinary_cpu::intercept(role,selection,user_request)==Some(true){return;}\n    if mii_saved_alpha::intercept(role,selection){\n        if user {trace!(\"[CharacterRoster] request handed to the saved Mii owner role={:?} selection={:?}\",role,selection);}\n        return;\n    }\n    let mut state = state_for(role).lock();\n    // The callback's restore peek may race a manual request. The role lock also\n",
+     "new": "        if let Some(target)=target {crate::runtime::roster::cycle_preload::request(role as usize,false,target);}\n    }\n    let user_request=!restoring && !matches!(selection,Selection::RefreshPartners);\n    if let Some(accepted)=mii_ordinary_player::intercept(role,selection,user_request){\n        if user {trace!(\"[CharacterRoster] request handed to the ordinary Mii owner role={:?} selection={:?}\",role,selection);}\n        return accepted;\n    }\n    // The CPU owner logs its own acceptance or refusal.\n    if let Some(accepted)=mii_ordinary_cpu::intercept(role,selection,user_request){return accepted;}\n    if let Some(accepted)=mii_saved_alpha::intercept(role,selection){\n        if user {trace!(\"[CharacterRoster] request handed to the saved Mii owner role={:?} selection={:?}\",role,selection);}\n        return accepted;\n    }\n    let mut state = state_for(role).lock();\n    // The callback's restore peek may race a manual request. The role lock also\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "            || !matches!(selection, Selection::Direct(target)\n                if WAITING_MEMORY.lock().restore_target(role as usize).is_some_and(|v|!v.owned && v.fighter==target)))\n    {\n        return;\n    }\n    let Some((entry, _)) = state.observed else {\n        drop(state);\n",
+     "new": "            || !matches!(selection, Selection::Direct(target)\n                if WAITING_MEMORY.lock().restore_target(role as usize).is_some_and(|v|!v.owned && v.fighter==target)))\n    {\n        return false;\n    }\n    let Some((entry, _)) = state.observed else {\n        drop(state);\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "                \"Wait for the practice character to finish loading\".into(),\n            );\n        }\n        return;\n    };\n    state.pending = Some(Request {\n        scope,\n",
+     "new": "                \"Wait for the practice character to finish loading\".into(),\n            );\n        }\n        return false;\n    };\n    state.pending = Some(Request {\n        scope,\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "        state.epoch,\n        selection\n    );\n}\n\n/// True when a CPU kind request can be queued without the rejection notice.\npub fn cpu_reload_ready() -> bool {\n    if busy()\n        || training::recording_or_playback()\n        || training::save_states::is_loading()\n        || lobby::native_ui_busy()\n",
+     "new": "        state.epoch,\n        selection\n    );\n    true\n}\n\n/// True when visible loaders have finished and a CPU request can be queued.\npub fn cpu_reload_ready() -> bool {\n    if notice_blocked()\n        || training::recording_or_playback()\n        || training::save_states::is_loading()\n        || lobby::native_ui_busy()\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "}\n\n/// Ask the existing loader to change the CPU to `kind`. Values only.\n/// A kind outside the roster notifies once and does not queue.\npub fn request_cpu_kind(kind: u32) -> bool {\n    let Some(fighter) = TrioFighter::from_kind(kind) else {\n        notify(Role::Cpu, \"Named macro fighter is not available\".into());\n",
+     "new": "}\n\n/// Ask the existing loader to change the CPU to `kind`. Values only.\n/// True when any loader accepted it. A kind outside the roster notifies once and does not queue.\npub fn request_cpu_kind(kind: u32) -> bool {\n    let Some(fighter) = TrioFighter::from_kind(kind) else {\n        notify(Role::Cpu, \"Named macro fighter is not available\".into());\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "    if state_for(Role::Cpu).lock().pending.is_some() {\n        return false;\n    }\n    queue(Role::Cpu, Selection::Direct(fighter));\n    state_for(Role::Cpu).lock().pending.is_some_and(\n        |request| matches!(request.selection, Selection::Direct(target) if target == fighter),\n    )\n}\n\n/// Player 1's fighter kind as the loader last observed it (None before a practice entry).\n",
+     "new": "    if state_for(Role::Cpu).lock().pending.is_some() {\n        return false;\n    }\n    queue_admitted(Role::Cpu, Selection::Direct(fighter), false, false)\n}\n\n/// Player 1's fighter kind as the loader last observed it (None before a practice entry).\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "/// fighter, SPEC-input-07 \u00a74a): the Direct request a Player Character pick makes,\n/// as one explicit load the user chose, so Player Swapping Off does not refuse it\n/// (that setting keeps the plugin from cycling P1 on its own; it is not changed).\n/// False when nothing was queued; the loader's notice says why.\npub fn request_player_kind(kind: u32) -> bool {\n    let Some(fighter) = TrioFighter::from_kind(kind) else {\n        return false;\n",
+     "new": "/// fighter, SPEC-input-07 \u00a74a): the Direct request a Player Character pick makes,\n/// as one explicit load the user chose, so Player Swapping Off does not refuse it\n/// (that setting keeps the plugin from cycling P1 on its own; it is not changed).\n/// True when a loader accepted the request; otherwise its notice says why.\npub fn request_player_kind(kind: u32) -> bool {\n    let Some(fighter) = TrioFighter::from_kind(kind) else {\n        return false;\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "    if state_for(Role::Player).lock().pending.is_some() {\n        return false;\n    }\n    queue_admitted(Role::Player, Selection::Direct(fighter), false, true);\n    state_for(Role::Player).lock().pending.is_some_and(\n        |request| matches!(request.selection, Selection::Direct(target) if target == fighter),\n    )\n}\n\n/// Runs before the delay queue. Consume only our request, giving conflicting\n",
+     "new": "    if state_for(Role::Player).lock().pending.is_some() {\n        return false;\n    }\n    queue_admitted(Role::Player, Selection::Direct(fighter), false, true)\n}\n\n/// Runs before the delay queue. Consume only our request, giving conflicting\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
     }
    ]
   },
@@ -22882,7 +22937,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "1aa4ab14efd281ff3cdd07e780255dcae28f657a62b8fa86f66e75220025d007",
+   "dest_sha256": "1c7d99109c75c0e60341ff1182603a89d2bfa2b9203e4e24619692f07782afe0",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -23720,6 +23775,36 @@
      "old": "    if !reuse && request.replay().is_none() && !request.refresh_partners() && same_class.is_none() && !hat_change {\n        let kind=descriptor_kind(&descriptor);\n        let configuration=match destination.target.kind() {\n            TargetKind::Fighter(_)=>Some(None),\n            TargetKind::Original if origin_saved.is_none()=>Some(None),\n            TargetKind::Saved=>publish.filter(|_|MiiClass::from_kind(kind).is_some()).map(Some),\n            _=>None,\n        };\n",
      "new": "    // rc.14 mii-freed: a saved Mii whose hat differs from the CPU's (`hat_change`) waits for its own Mii group too; that\n    // group's plan carries the configuration's hat (`demand_gate`). Eden rr2-n3 #880-#900: the Reload instead.\n    let kind=descriptor_kind(&descriptor);\n    let configuration=match destination.target.kind() {\n        TargetKind::Fighter(_)=>Some(None),\n        TargetKind::Original if origin_saved.is_none()=>Some(None),\n        TargetKind::Saved=>publish.filter(|_|MiiClass::from_kind(kind).is_some()).map(Some),\n        _=>None,\n    };\n    if crate::engine::mii::ordinary_cpu::demand_gate(reuse,request.replay().is_some(),request.refresh_partners(),\n        same_class.is_some(),hat_change,matches!(configuration,Some(Some(_)))) {\n",
      "reason": "rc.14 mii-freed fail-first: rc.14 mii-freed: demand_gate stub (today's gate) and its fail-first case; the CPU demand gate calls it"
+    },
+    {
+     "old": "    s.restore=Some(value);s.request=Some(Request::CYCLE);\n    true\n}\npub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option<bool> {\n    if role!=Role::Cpu || !ENABLED.load(Ordering::Acquire) {return None;}\n    let mut s=STATE.lock();\n",
+     "new": "    s.restore=Some(value);s.request=Some(Request::CYCLE);\n    true\n}\n/// None leaves routing to the roster; Some reports a consumed request's acceptance.\npub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option<bool> {\n    if role!=Role::Cpu || !ENABLED.load(Ordering::Acquire) {return None;}\n    let mut s=STATE.lock();\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "        if unsafe {super::mii_auto_init::origin_capture_pending(Role::Cpu,false,s.capture)} {\n            drop(s);\n            if user_request {notify(Role::Cpu,\"Wait for the practice character to finish loading\".into());}\n            return Some(true);\n        }\n        let wants_mii=setting(&MENU).cpu_roster.fighters_excluding_fixed(None).iter()\n            .any(|f|MiiClass::from_kind(f.kind()).is_some());\n",
+     "new": "        if unsafe {super::mii_auto_init::origin_capture_pending(Role::Cpu,false,s.capture)} {\n            drop(s);\n            if user_request {notify(Role::Cpu,\"Wait for the practice character to finish loading\".into());}\n            return Some(false);\n        }\n        let wants_mii=setting(&MENU).cpu_roster.fighters_excluding_fixed(None).iter()\n            .any(|f|MiiClass::from_kind(f.kind()).is_some());\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "            if user_request && mii_backend::current().is_some() {\n                notify(Role::Cpu,\"Wait for the practice character to finish loading\".into());\n            }\n            return Some(true);\n        }\n        return None;\n    };\n",
+     "new": "            if user_request && mii_backend::current().is_some() {\n                notify(Role::Cpu,\"Wait for the practice character to finish loading\".into());\n            }\n            return Some(false);\n        }\n        return None;\n    };\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "    // Automatic partner reconciliation may repeat while an owned operation\n    // waits. Coalesce it without a per-frame synchronous diagnostic write.\n    if matches!(selection,Selection::RefreshPartners)\n        && (s.departed || s.request.is_some() || s.busy()) {return Some(true);}\n    // Reservation starts at the INSTALL ticket, never at this menu/catalog capture.\n    let request=match selection {\n        Selection::Cycle=>Some(Request::CYCLE),\n",
+     "new": "    // Automatic partner reconciliation may repeat while an owned operation\n    // waits. Coalesce it without a per-frame synchronous diagnostic write.\n    if matches!(selection,Selection::RefreshPartners)\n        && (s.departed || s.request.is_some() || s.busy()) {return Some(false);}\n    // Reservation starts at the INSTALL ticket, never at this menu/catalog capture.\n    let request=match selection {\n        Selection::Cycle=>Some(Request::CYCLE),\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "    let manual_direct=user_request && matches!(selection,Selection::Direct(_));\n    // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.\n    let replace_restore=manual_direct && s.restore.is_some();\n    if !s.departed && !s.busy() && (s.request.is_none() || replace_restore) && request.is_some() {\n        s.restore=None;\n        if user_request {WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);}\n        s.request=request;\n",
+     "new": "    let manual_direct=user_request && matches!(selection,Selection::Direct(_));\n    // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.\n    let replace_restore=manual_direct && s.restore.is_some();\n    let accepted=!s.departed && !s.busy() && (s.request.is_none() || replace_restore) && request.is_some();\n    if accepted {\n        s.restore=None;\n        if user_request {WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);}\n        s.request=request;\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "        drop(s);note(\"request refused: owned CPU request busy or unsupported\");\n        if manual_direct {notify(Role::Cpu,\"Finish the current practice action first\".into());}\n    }\n    Some(true)\n}\n\n/// What `begin` waits on, in `permitted()`'s order.\n",
+     "new": "        drop(s);note(\"request refused: owned CPU request busy or unsupported\");\n        if manual_direct {notify(Role::Cpu,\"Finish the current practice action first\".into());}\n    }\n    Some(accepted)\n}\n\n/// What `begin` waits on, in `permitted()`'s order.\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
     }
    ]
   },
@@ -24638,7 +24723,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "ae009bf882fbec5676abbc7ab5067e74c55cec5ae6eeeb946769210caa6ae6b3",
+   "dest_sha256": "d0289180c78d903ed17c7207665f827a371f00fd74fdace9d51a05cd88cf8fcc",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -25456,6 +25541,36 @@
      "old": "        let waits=configuration.is_some_and(|c|super::body_bank::demand(0,kind,c));\n",
      "new": "        let waits=configuration.is_some_and(|c|super::body_bank::demand(0,kind,c,exit));\n",
      "reason": "rc.14 cycle fix 8: Gap 1: lowering Ready Fighters frees the farthest groups; Gap 3: a press out of a live Mii group waits for its own group's background build (Eden cf-p3-y2)"
+    },
+    {
+     "old": "    s.restore=Some(value);s.request=Some(Request::CYCLE);\n    true\n}\npub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option<bool> {\n    if role!=Role::Player || !ENABLED.load(Ordering::Acquire) {return None;}\n    let mut s=STATE.lock();\n",
+     "new": "    s.restore=Some(value);s.request=Some(Request::CYCLE);\n    true\n}\n/// None leaves routing to the roster; Some reports a consumed request's acceptance.\npub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option<bool> {\n    if role!=Role::Player || !ENABLED.load(Ordering::Acquire) {return None;}\n    let mut s=STATE.lock();\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "        if unsafe {super::mii_auto_init::origin_capture_pending(Role::Player,false,s.capture)} {\n            drop(s);\n            if user_request {notify(Role::Player,\"Wait for the practice character to finish loading\".into());}\n            return Some(true);\n        }\n        let automatic=super::mii_auto_init::pending();\n        let qualifying=unsafe {mii_backend::ready()} && (automatic || s.capture);\n",
+     "new": "        if unsafe {super::mii_auto_init::origin_capture_pending(Role::Player,false,s.capture)} {\n            drop(s);\n            if user_request {notify(Role::Player,\"Wait for the practice character to finish loading\".into());}\n            return Some(false);\n        }\n        let automatic=super::mii_auto_init::pending();\n        let qualifying=unsafe {mii_backend::ready()} && (automatic || s.capture);\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "            if user_request && mii_backend::current().is_some() {\n                notify(Role::Player,\"Wait for the practice character to finish loading\".into());\n            }\n            return Some(true);\n        }\n        return None;\n    };\n",
+     "new": "            if user_request && mii_backend::current().is_some() {\n                notify(Role::Player,\"Wait for the practice character to finish loading\".into());\n            }\n            return Some(false);\n        }\n        return None;\n    };\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "    // The roster reconciles partner count every frame. Coalesce that automatic\n    // request while an owned operation is pending; do not sync a refusal to SD.\n    if matches!(selection,Selection::RefreshPartners) && (s.request.is_some() || s.busy()) {\n        return Some(true);\n    }\n    let request=match selection {\n        Selection::Cycle=>Some(Request::CYCLE),\n",
+     "new": "    // The roster reconciles partner count every frame. Coalesce that automatic\n    // request while an owned operation is pending; do not sync a refusal to SD.\n    if matches!(selection,Selection::RefreshPartners) && (s.request.is_some() || s.busy()) {\n        return Some(false);\n    }\n    let request=match selection {\n        Selection::Cycle=>Some(Request::CYCLE),\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "    let manual_direct=user_request && matches!(selection,Selection::Direct(_));\n    // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.\n    let replace_restore=manual_direct && s.restore.is_some();\n    if !s.busy() && (s.request.is_none() || replace_restore) && request.is_some() {\n        s.restore=None;\n        if user_request {WAITING_MEMORY.lock().manual_request(Role::Player as usize);}\n        s.request=request;\n",
+     "new": "    let manual_direct=user_request && matches!(selection,Selection::Direct(_));\n    // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.\n    let replace_restore=manual_direct && s.restore.is_some();\n    let accepted=!s.busy() && (s.request.is_none() || replace_restore) && request.is_some();\n    if accepted {\n        s.restore=None;\n        if user_request {WAITING_MEMORY.lock().manual_request(Role::Player as usize);}\n        s.request=request;\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "        drop(s);note(\"request refused: owned Player request busy or unsupported\");\n        if manual_direct {notify(Role::Player,\"Finish the current practice action first\".into());}\n    }\n    Some(true)\n}\n\nunsafe fn permitted()->bool {permitted_but_install() && !INSTALL.active()}\n",
+     "new": "        drop(s);note(\"request refused: owned Player request busy or unsupported\");\n        if manual_direct {notify(Role::Player,\"Finish the current practice action first\".into());}\n    }\n    Some(accepted)\n}\n\nunsafe fn permitted()->bool {permitted_but_install() && !INSTALL.active()}\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
     }
    ]
   },
@@ -25493,7 +25608,7 @@
    "dest": "src/runtime/mii/mii_saved_alpha.rs",
    "crate": "root",
    "src_sha256": "11c19c8277d129eeb64184454664d43c1a1fa00a2ea086c79667923de78649a8",
-   "dest_sha256": "602f12161f30973825138255241b899932047146c367411a9a00d3a150c11436",
+   "dest_sha256": "139f8a209741c1fe687def3637e17f4adb0dd9dfce9579b865b83d5be28578da",
    "edits": [
     {
      "old": "pub(super) fn init(base: usize) {",
@@ -25798,6 +25913,26 @@
       ]
      ],
      "reason": "rc.10 S4 (docs/CODE-REDUCTION-rc10.md): the probes nothing used are deleted (operator 2026-11-12): mii-ldn-qualification-probe, native-unlink-probe, texture-probe, console-swap-trace, automation-results-native"
+    },
+    {
+     "old": "\n/// A captured saved-original same-class origin cannot leave for an unqualified ordinary\u2192Mii return.\n/// Its Player cycle is exactly slot0 \u2192 selected distinct saved Mii \u2192 slot0.\npub(super) fn intercept(roster_role: Role, selection: Selection) -> bool {\n    if !ENABLED.load(Ordering::Acquire) {\n        // The feature adds saved-Mii roster values, but a failed native contract must never\n        // forward that value (or strand a native saved origin) through the ordinary loader.\n        return original_kind(roster_role).is_some_and(|k| (0x48..=0x4a).contains(&k))\n            || matches!(selection, Selection::Direct(f) if (0x48..=0x4a).contains(&f.kind()));\n    }\n    let i = usize::from(roster_role == Role::Cpu);\n    if unified(i) {\n        return original_kind(roster_role).is_some_and(|k|MiiClass::from_kind(k).is_some())\n            || matches!(selection,Selection::Direct(f) if MiiClass::from_kind(f.kind()).is_some());\n    }\n    let mut state = ALPHA.lock();\n    let Some(owner) = state.owner[i].as_ref() else {\n",
+     "new": "\n/// A captured saved-original same-class origin cannot leave for an unqualified ordinary\u2192Mii return.\n/// Its Player cycle is exactly slot0 \u2192 selected distinct saved Mii \u2192 slot0.\npub(super) fn intercept(roster_role: Role, selection: Selection) -> Option<bool> {\n    if !ENABLED.load(Ordering::Acquire) {\n        // The feature adds saved-Mii roster values, but a failed native contract must never\n        // forward that value (or strand a native saved origin) through the ordinary loader.\n        return (original_kind(roster_role).is_some_and(|k| (0x48..=0x4a).contains(&k))\n            || matches!(selection, Selection::Direct(f) if (0x48..=0x4a).contains(&f.kind()))).then_some(false);\n    }\n    let i = usize::from(roster_role == Role::Cpu);\n    if unified(i) {\n        return (original_kind(roster_role).is_some_and(|k|MiiClass::from_kind(k).is_some())\n            || matches!(selection,Selection::Direct(f) if MiiClass::from_kind(f.kind()).is_some())).then_some(false);\n    }\n    let mut state = ALPHA.lock();\n    let Some(owner) = state.owner[i].as_ref() else {\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "        if protected {\n            notice(\"saved Mii cycle unavailable until the current menu catalog/owner is qualified; other Mii transitions remain unsupported\");\n        }\n        return protected;\n    };\n    if super::mii_ordinary_cpu::writers_reserved(i,i as u16) {\n        drop(state);notice(\"saved Mii cycle refused: ordinary CPU retains its destination\");return true;\n    }\n    if i == 0\n        && matches!(selection, Selection::Cycle)\n        && owner.state.phase() == Phase::Ready\n        && (owner.cycled\n",
+     "new": "        if protected {\n            notice(\"saved Mii cycle unavailable until the current menu catalog/owner is qualified; other Mii transitions remain unsupported\");\n        }\n        return protected.then_some(false);\n    };\n    if super::mii_ordinary_cpu::writers_reserved(i,i as u16) {\n        drop(state);notice(\"saved Mii cycle refused: ordinary CPU retains its destination\");return Some(false);\n    }\n    let accepted = i == 0\n        && matches!(selection, Selection::Cycle)\n        && owner.state.phase() == Phase::Ready\n        && (owner.cycled\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "                .player_roster\n                .fighters()\n                .iter()\n                .any(|f| f.kind() == owner.state.original().canonical().class as u32))\n    {\n        state.intent[i] = Some(Intent::Cycle);\n        WORK.store(true, Ordering::Release);\n    } else {\n",
+     "new": "                .player_roster\n                .fighters()\n                .iter()\n                .any(|f| f.kind() == owner.state.original().canonical().class as u32));\n    if accepted {\n        state.intent[i] = Some(Intent::Cycle);\n        WORK.store(true, Ordering::Release);\n    } else {\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
+    },
+    {
+     "old": "            \"outbound character change refused: alpha preserves the saved-original same-class origin round trip\",\n        );\n    }\n    true\n}\n\nfn refresh_work(s: &Alpha) {\n",
+     "new": "            \"outbound character change refused: alpha preserves the saved-original same-class origin round trip\",\n        );\n    }\n    Some(accepted)\n}\n\nfn refresh_work(s: &Alpha) {\n",
+     "reason": "rc.15 Mash out shared API root fix, primary 2026-11-16: report actual accepted intent from every existing roster loader; consumed refusals never fall through; CPU/Player public facades propagate acceptance. Existing visible-operation quiescence covers alternate-owner cold demand before reload completion. Native guards, loader predicates and completed wrong-body checks unchanged."
     }
    ]
   },
