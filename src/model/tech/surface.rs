@@ -22,6 +22,13 @@ pub struct Line {
 }
 
 impl Line {
+    /// Geometry validity is independent of whether a line can be targeted.
+    pub fn valid(self) -> bool {
+        self.ends.into_iter().all(finite)
+            && finite(self.normal)
+            && self.length().is_finite()
+            && self.length() > 0.0
+    }
     pub fn kind(self) -> Option<Kind> {
         if !self.ends.into_iter().all(finite) || !finite(self.normal) {
             return None;
@@ -44,7 +51,7 @@ impl Line {
     pub fn snap(self, cursor: Vec2) -> Option<Vec2> {
         let d = sub(self.ends[1], self.ends[0]);
         let n = dot(d, d);
-        (finite(cursor) && self.kind().is_some() && n > 0.0 && n.is_finite()).then(|| {
+        (finite(cursor) && self.valid() && n > 0.0 && n.is_finite()).then(|| {
             add(
                 self.ends[0],
                 scale(d, (dot(sub(cursor, self.ends[0]), d) / n).clamp(0.0, 1.0)),
@@ -116,11 +123,7 @@ impl Surfaces {
         if self.lines().any(|l| l.id == line.id) {
             return true;
         }
-        if self.len == MAX_LINES
-            || line.kind().is_none()
-            || !line.length().is_finite()
-            || line.length() <= 0.0
-        {
+        if self.len == MAX_LINES || !line.valid() {
             return false;
         }
         self.lines[self.len] = Some(line);
@@ -138,11 +141,7 @@ impl Surfaces {
                 return None;
             }
             let line = source.read(id)?;
-            if line.id != id
-                || line.kind().is_none()
-                || !line.length().is_finite()
-                || line.length() <= 0.0
-            {
+            if line.id != id || !line.valid() {
                 return None;
             }
             if !self.push(line) {
@@ -167,7 +166,7 @@ impl Surfaces {
     }
     pub fn nearest(&self, cursor: Vec2, kind: Option<Kind>) -> Option<(Line, Vec2)> {
         self.lines()
-            .filter(|l| kind.is_none() || l.kind() == kind)
+            .filter(|l| l.kind().is_some() && (kind.is_none() || l.kind() == kind))
             .filter_map(|l| l.snap(cursor).map(|p| (l, p)))
             .min_by(|a, b| {
                 dot(sub(a.1, cursor), sub(a.1, cursor))

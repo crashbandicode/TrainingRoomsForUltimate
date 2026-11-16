@@ -57,6 +57,22 @@ fn surface_walk_closes_the_outline() {
     assert_eq!((full.state,full.lines().count()),(Walk::Full,64));
 }
 #[test]
+fn unclassified_solid_line_keeps_outline_closed() {
+    let mut stage=Stage::fixture();
+    stage.lines[1]=line(1,v(40.,0.),v(50.,-20.),v(0.8944272,0.4472136));
+    stage.lines[2].ends[0]=v(50.,-20.);
+    let slope=stage.lines[1];
+    assert_eq!(slope.kind(),None);
+    let s=stage.walk();
+    assert_eq!((s.state,s.lines().count()),(Walk::Closed,4));
+    assert!(solver::inside(&s,v(44.,-10.)));
+    assert!(solver::inside(&s,v(45.,-10.))); // boundary is retained geometry
+    assert!(!solver::inside(&s,v(46.,-10.)));
+    assert_eq!(surface::crossing(v(44.,-10.),v(46.,-10.),slope),Some(0.5));
+    assert_ne!(s.nearest(v(45.,-10.),None).unwrap().0.id,slope.id);
+    assert_eq!(slope.random_point(slope,0.5),None);
+}
+#[test]
 fn point_snaps_to_nearest_surface() {
     let mut stage=Stage::fixture(); let s=stage.walk();
     assert_eq!(s.nearest(v(45.,-10.),None).map(|(_,p)|p),Some(v(40.,-10.)));
@@ -193,7 +209,7 @@ fn summary_counts_streak_and_average() {let mut s=Summary::default();for g in [G
 #[test]
 fn hit_damage_range_and_default() {assert_eq!(HIT_DAMAGE_DEFAULT,12.);assert_eq!(HIT_DAMAGE_RANGE,[1.,30.]);}
 #[test]
-fn presets_only_set_damage_and_height() {let mut l=Launch {start:v(2.,3.),target:v(4.,5.),angle:90.,knockback:100.,percent:60.,hit_damage:12.,height:HitHeight::Middle,facing:1.,di:Some(v(0.,0.))};let old=l;
+fn presets_only_set_damage_and_height() {let mut l=Launch {start:v(2.,3.),target:v(4.,5.),angle:90.,knockback:100.,percent:60.,hit_damage:12.,height:HitHeight::Middle,hit_from_behind:false,facing:1.,di:Some(v(0.,0.))};let old=l;
     preset(&mut l,30.,HitHeight::High);assert_eq!(l,Launch {hit_damage:30.,height:HitHeight::High,..old});
 }
 }

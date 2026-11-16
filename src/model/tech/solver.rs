@@ -57,6 +57,7 @@ impl Aim<'_> {
     /// start, an out-of-bounds path or a contact outside the timed passive regime.
     pub fn at(&self, angle: f32, frames: u16) -> Option<Solution> {
         if self.surfaces.state != Walk::Closed
+            || self.line.kind().is_none()
             || self.line.snap(self.target)? != self.target
             || !(10..=60).contains(&frames)
             || f32::from(frames) > self.knockback * 0.4 - 2.0
