@@ -320,10 +320,15 @@ pub unsafe fn frame(fighter: usize) {
     if !super::tech_adapter::tech_ready() {
         return;
     }
+    let facts = scene::facts();
+    if facts.busy {
+        super::btt_camera::request(2, false);
+        return;
+    }
     let Some(mut view) = VIEW.try_lock() else {
         return;
     };
-    if !scene::is_native_training() {
+    if crate::model::scene::scene(facts).is_none() {
         {
             view.picker.enter(-1, Vec2::default());
             view.surfaces = Surfaces::EMPTY;
@@ -358,7 +363,6 @@ pub unsafe fn frame(fighter: usize) {
     let Some(config) = CONFIG.read() else {
         return;
     };
-    let facts = scene::facts();
     let stop = config.session == 0;
     let restart = START.load(Ordering::Acquire) | RESET.load(Ordering::Acquire);
     let open = OPEN.load(Ordering::Acquire);
