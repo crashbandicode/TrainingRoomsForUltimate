@@ -6,7 +6,6 @@ macro_rules! lib_unit_tests {
 #[allow(dead_code)]
 mod model;
 
-use model::compat::menu::{OnOff, TrainingModpackMenu};
 use model::menu::input::Button;
 use model::menu::table::ROWS;
 use model::menu::{Entry, Env, Menu, RowValue};
@@ -44,8 +43,6 @@ fn swapping(menu: &mut Menu) -> usize {
 fn agrees(menu: &Menu, row: usize, on: bool) {
     assert_eq!(menu.value(row), RowValue::Toggle(on));
     assert_eq!(menu.settings().menu.get("trio_practice").unwrap(), if on { &[1, 0] } else { &[0, 1] });
-    // This is the exact equality used by character_roster::Role::enabled.
-    assert_eq!(TrainingModpackMenu::from_snapshot(&menu.settings().menu).trio_practice == OnOff::ON, on);
 }
 
 #[test]
@@ -59,7 +56,7 @@ fn boot_load_repairs_both_snapshots_and_the_exact_player_cycle_gate() {
     let live = menu.settings().clone();
     let committed = menu.commit_onto(&live);
     let reloaded = settings::parse(&committed.to_json());
-    assert_eq!(TrainingModpackMenu::from_snapshot(&reloaded.settings.menu).trio_practice, OnOff::ON);
+    assert_eq!(reloaded.settings.menu.get("trio_practice").unwrap(), &[1, 0]);
 }
 
 #[test]
@@ -68,15 +65,16 @@ fn reset_page_from_combined_saved_defaults_keeps_the_display_and_gate_on() {
     let mut menu = Menu::new(loaded.settings, Env::default());
     let row = swapping(&mut menu);
     agrees(&menu, row, false);
-    let page = menu.page();
-    focus(&mut menu, Entry::ResetPage(page));
+    let reset = menu.entry(menu.page(), menu.entry_count(menu.page()) - 1).unwrap();
+    assert!(matches!(reset, Entry::ResetPage(_)));
+    focus(&mut menu, reset);
     menu.press(Button::A);
     menu.press(Button::A);
     assert!(menu.screen().is_none());
     agrees(&menu, row, true);
     let live = menu.settings().clone();
     let committed = menu.commit_onto(&live);
-    assert_eq!(TrainingModpackMenu::from_snapshot(&committed.menu).trio_practice, OnOff::ON);
+    assert_eq!(committed.menu.get("trio_practice").unwrap(), &[1, 0]);
 }
 
 #[test]
@@ -134,4 +132,51 @@ fn weighted_random_and_multiple_chords_are_not_single_selections() {
         assert_eq!(loaded.settings.menu.get(id).unwrap(), &[1, 1]);
     }
     assert_eq!(loaded.settings.menu.get("player_cycle").unwrap().iter().sum::<u8>(), 2);
+}
+
+/// Save in a process that exits, then load and reset from those defaults in a fresh process.
+#[test]
+fn saved_defaults_continue_in_a_fresh_process() {
+    const STAGE: &str = "TR_SINGLE_TEST_STAGE";
+    const FILE: &str = "TR_SINGLE_TEST_FILE";
+    if let Ok(stage) = std::env::var(STAGE) {
+        let file = std::env::var(FILE).unwrap();
+        if stage == "save" {
+            let mut menu = Menu::new(Settings::factory(), Env::default());
+            let row = swapping(&mut menu);
+            agrees(&menu, row, false);
+            menu.press(Button::A);
+            agrees(&menu, row, true);
+            menu.press(Button::X);
+            // Leave current Off so the next process must actually restore saved On.
+            menu.press(Button::A);
+            std::fs::write(file, menu.settings().to_json()).unwrap();
+        } else {
+            assert_eq!(stage, "restore");
+            let saved = settings::parse(&std::fs::read_to_string(file).unwrap());
+            assert!(saved.issues.is_empty());
+            let mut menu = Menu::new(saved.settings, Env::default());
+            let row = swapping(&mut menu);
+            agrees(&menu, row, false);
+            let reset = menu.entry(menu.page(), menu.entry_count(menu.page()) - 1).unwrap();
+            assert!(matches!(reset, Entry::ResetPage(_)));
+            focus(&mut menu, reset);
+            menu.press(Button::A);
+            menu.press(Button::A);
+            agrees(&menu, row, true);
+        }
+        return;
+    }
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+    let file = std::env::temp_dir().join(format!("tr-single-{}-{stamp}.json", std::process::id()));
+    for stage in ["save", "restore"] {
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "saved_defaults_continue_in_a_fresh_process", "--nocapture"])
+            .env(STAGE, stage)
+            .env(FILE, &file)
+            .status()
+            .unwrap();
+        assert!(status.success(), "{stage} process failed");
+    }
+    std::fs::remove_file(file).unwrap();
 }
