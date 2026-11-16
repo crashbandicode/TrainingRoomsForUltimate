@@ -160,7 +160,7 @@ impl Grey {
             Grey::NeedsThreeBodies => "Needs Ready Fighter Bodies set to 3",
             Grey::RangeSet => "A range is set: clear it first (Y)",
             Grey::ChecklistSet => "Values are ticked: clear them first (Y)",
-            Grey::ProjectilesUnavailable => "Projectile detection unavailable",
+            Grey::ProjectilesUnavailable => "Projectile detection unavailable", // restriction: btt-projectile-guard
             Grey::TargetsStill => "Targets stay still",
         }
     }
