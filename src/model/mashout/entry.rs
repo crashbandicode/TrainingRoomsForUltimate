@@ -29,6 +29,16 @@ pub fn preparatory_grab(plan: Plan) -> bool {
     plan == Plan::DownThrow
 }
 
+/// A preparatory native capture initializes its own timer before the selected scoring phase.
+pub fn preparatory(plan: Plan) -> bool {
+    preparatory_grab(plan) || plan == Plan::Egg
+}
+
+/// Keep ownership of Egg's tongue capture while waiting for its separate native egg initializer.
+pub fn preparatory_holding(plan: Plan, is: impl Fn(C) -> bool) -> bool {
+    plan == Plan::Egg && is(C::ClatterCaptureYoshi)
+}
+
 /// Full mapped records reuse recording::inject_values and the guarded AI controller writer.
 /// These are mapped ATTACK/SPECIAL bits, not physical Joy-Con button masks.
 pub fn controls(plan: Plan, caught: bool) -> MappedInputs {
@@ -72,7 +82,7 @@ pub fn holding(state: State, is: impl Fn(C) -> bool) -> bool {
         ],
         State::Bury => &[ClatterBury, ClatterBuryWait],
         State::Frozen => &[ClatterIce],
-        State::Egg => &[ClatterCaptureYoshi, ClatterYoshiEgg],
+        State::Egg => &[ClatterYoshiEgg],
         State::Inhale => &[ClatterSwallowed, ClatterSwallowedCapture],
     };
     statuses.iter().copied().any(is)

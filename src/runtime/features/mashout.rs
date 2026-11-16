@@ -384,9 +384,13 @@ pub unsafe fn frame(fighter: usize) {
     let config = CONFIG.read().filter(|_| WANTED.load(Ordering::Acquire));
     let restart = START.swap(false, Ordering::AcqRel) || game.config != config;
     let status = natives::status_kind(p1);
-    let linked = holding(game.requested, status)
+    let scored = holding(game.requested, status)
         || game.requested.is_some_and(|r| {
             r.plan == crate::model::mashout::moves::Plan::Grab && status == ids[14]
+        });
+    let linked = scored
+        || game.requested.is_some_and(|r| {
+            entry::preparatory_holding(r.plan, |c| state_id(c) == Some(status))
         });
     if restart {
         revoke();
@@ -454,7 +458,7 @@ pub unsafe fn frame(fighter: usize) {
         let Some(sample) = sample else { game.fail("Native capture seed unavailable · no grade"); return; };
         let ordinary_catch = game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Grab);
         let cpu_status = natives::status_kind(cpu);
-        if !linked || (ordinary_catch && ![ids[1], ids[8], ids[9], ids[10]].contains(&cpu_status)) {
+        if !scored || (ordinary_catch && ![ids[1], ids[8], ids[9], ids[10]].contains(&cpu_status)) {
             game.fail("Move entry unconfirmed · no grade"); return;
         }
         if sample.record.automatic == 0.0 {
@@ -616,7 +620,7 @@ pub unsafe fn frame(fighter: usize) {
                 game.fail("Move sequence unavailable");
                 return;
             };
-            if !entry::preparatory_grab(request.plan) && !arm(p1, game.generation) {
+            if !entry::preparatory(request.plan) && !arm(p1, game.generation) {
                 game.fail(UNAVAILABLE_NOTICE);
                 return;
             }
@@ -653,7 +657,10 @@ pub unsafe fn frame(fighter: usize) {
                 game.followed = true;
                 state_natives::status_request(cpu, special);
             }
-            if entry::preparatory_grab(request.plan) && !game.followed && cpu_status == ids[9] {
+            if !game.followed
+                && ((entry::preparatory_grab(request.plan) && cpu_status == ids[9])
+                    || entry::preparatory_holding(request.plan, |c| state_id(c) == Some(status)))
+            {
                 if !arm(p1, game.generation) {
                     game.fail(UNAVAILABLE_NOTICE);
                     return;
