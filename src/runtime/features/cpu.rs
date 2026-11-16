@@ -225,6 +225,11 @@ fn bump(_which: usize) {
 /// The last published settings generation the CPU adopted (only read and written under `CPU`).
 static ADOPTED: AtomicU32 = AtomicU32::new(0);
 
+#[cfg(feature = "diag")]
+pub fn adopted_settings_generation() -> u32 {
+    ADOPTED.load(Ordering::Acquire)
+}
+
 /// Run `f` on the CPU state; a newly published value (`published::Live`) is adopted first. `CPU` is taken by game threads only
 /// (stream/sync): the menu worker publishes through `published`, never through this lock.
 fn with<R>(f: impl FnOnce(&mut Cpu) -> R) -> Option<R> {
@@ -473,9 +478,10 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         #[cfg(feature = "diag")]
         unsafe {
             let scene = role_scene();
-            let fresh = receipt.filter(|&r| with(|cpu| role_adapter::current_frame(cpu, scene, r)).unwrap_or(false));
-            let launcher = role_of(natives::fighter_accessor(a0)).is_some_and(|key| key.entry == 1 && !key.partner);
-            crate::runtime::features::tech_spike::frame(a0, fresh, launcher);
+            let fresh = receipt.filter(|&r| {
+                with(|cpu| role_adapter::current_frame(cpu, scene, r)).unwrap_or(false)
+            });
+            crate::runtime::features::tech_spike::frame(a0, fresh);
         }
         // The Eggs-ercise CPU target's player tag: the game turns its flag off for the placed CPU, so when the pass just run asked
         // for it (`hide_cpu::keep_cursor`) the flag is written on again, the one write after the placement.

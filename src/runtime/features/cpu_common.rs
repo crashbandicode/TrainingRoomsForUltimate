@@ -69,6 +69,11 @@ type ChangeStatusFn = extern "C" fn(usize, L2CValue, L2CValue) -> L2CValue;
 type SubGuardContFn = extern "C" fn(usize) -> L2CValue;
 type IsEnablePassiveFn = extern "C" fn(usize) -> L2CValue;
 
+#[cfg(feature = "diag")]
+pub fn passive_ready() -> bool {
+    IS_ENABLE_PASSIVE.load(Ordering::Acquire) != 0
+}
+
 extern "C" fn di_hook(fighter: usize, value: L2CValue) -> L2CValue {
     let _scope = HookScope::enter();
     // SAFETY: `fighter` is the script object the game is running; the accessor is only used when it is
@@ -89,6 +94,13 @@ extern "C" fn change_status_hook(fighter: usize, status: L2CValue, unk: L2CValue
             // SAFETY: the function passed its guard; it takes the script object and returns a value.
             address != 0 && unsafe { std::mem::transmute::<usize, IsEnablePassiveFn>(address)(fighter) }.as_bool()
         };
+        #[cfg(feature = "diag")]
+        unsafe {
+            let accessor = cpu::script_accessor(fighter);
+            if super::tech_spike::watches_player(accessor) {
+                super::tech_spike::decision(accessor, requested, passive());
+            }
+        }
         // SAFETY: as in `di_hook`.
         if let Some(new_status) = unsafe { cpu::tech_request(cpu::script_accessor(fighter), requested, passive) } {
             status = L2CValue::int(new_status);

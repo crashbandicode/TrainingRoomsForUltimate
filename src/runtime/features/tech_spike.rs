@@ -1,66 +1,133 @@
-//! S0 only: real hidden-CPU hit, plugin-observed diag counters, and a bounded ground walk.
-//! Not a product mode or a product Training-only restriction. No hook, worker, or blocking lock added.
-//! `diag-tech-s0.req`: hidden | invisible | camera | walk | off. Each launch fixture is 60%, (0,30).
-
-use std::sync::atomic::{AtomicU8, Ordering};
-
-use crate::model::cpu::hash::{hash40, lua_bind_hash};
+//! S0 DIRECT only. Native status/energy launch; fidelity is an explicit runtime comparison.
+//! diag-tech-s0.req: ordinary | direct-match | direct | walk | off | inspect.
+//! No product mode, CPU launcher, heap, blocking lock or new hook.
+use super::tech_spike_guards;
+use crate::model::cpu::hash::lua_bind_hash;
 use crate::model::cpu::role::FrameReceipt;
+use crate::model::tech_launch::{self as math, Vec2};
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::game::{self, natives};
 use crate::runtime::state_natives::{self as state, Vector3f};
-
-use super::{hide_cpu, tech_spike_guards};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 
 static REQUEST: AtomicU8 = AtomicU8::new(0);
 static GUARDED: AtomicU8 = AtomicU8::new(0);
+static OBSERVING: AtomicBool = AtomicBool::new(false);
+static NEXT_ATTEMPT: AtomicU32 = AtomicU32::new(1);
 static RUN: hos_lock::Mutex<Spike> = hos_lock::Mutex::new(Spike::new());
 
-/// Called only by the existing diag file-poll thread; hooks consume the atomic, never its lock.
 pub fn request(text: &str) {
     let command = match text {
-        "hidden" => 1,
-        "invisible" => 2,
-        "camera" => 3,
+        "ordinary" => 1,
+        "direct-match" => 2,
+        "direct" => 3,
         "walk" => 4,
         "off" => 5,
+        "inspect" => 6,
         _ => {
-            diagnostic(format_args!("[TrainingRooms] tech_s0_request invalid"));
+            diagnostic(format_args!("[TechDirect] request invalid"));
             return;
         }
     };
     REQUEST.store(command, Ordering::Release);
-    diagnostic(format_args!("[TrainingRooms] tech_s0_request command={command}"));
+    diagnostic(format_args!(
+        "[TrainingRooms] tech_s0_request command={command}"
+    ));
 }
 
+#[derive(Clone, Copy)]
+struct Input {
+    origin: Vec2,
+    direction: Vec2,
+    kb: f32,
+    angle: f32,
+    percent: f32,
+    weight: f32,
+    lr: f32,
+}
+impl Input {
+    const fn empty() -> Self {
+        Self {
+            origin: Vec2 { x: 0.0, y: 0.0 },
+            direction: Vec2 { x: 0.0, y: 0.0 },
+            kb: 0.0,
+            angle: 0.0,
+            percent: 0.0,
+            weight: 0.0,
+            lr: 1.0,
+        }
+    }
+}
+#[derive(Clone, Copy)]
+struct Baseline {
+    input: Input,
+    attempt: u32,
+    scope: FrameReceipt,
+    complete: bool,
+}
 struct Spike {
     active: bool,
     mode: u8,
-    phase: u8,
     age: u32,
-    weight: f32,
+    phase: u8,
+    attempt: u32,
+    sample: u32,
+    started: bool,
+    arrange_cpu: bool,
+    contact: bool,
+    inspecting: bool,
     player_scope: Option<FrameReceipt>,
-    cpu_scope: Option<FrameReceipt>,
-    status_before: i32,
-    launch_left: u8,
+    input: Input,
+    baseline: Option<Baseline>,
 }
-
 impl Spike {
     const fn new() -> Self {
         Self {
             active: false,
             mode: 0,
-            phase: 0,
             age: 0,
-            weight: 0.0,
+            phase: 0,
+            attempt: 0,
+            sample: 0,
+            started: false,
+            arrange_cpu: false,
+            contact: false,
+            inspecting: false,
             player_scope: None,
-            cpu_scope: None,
-            status_before: -1,
-            launch_left: 0,
+            input: Input::empty(),
+            baseline: None,
         }
     }
+    fn mode_name(&self) -> &'static str {
+        if self.mode == 1 {
+            "ordinary"
+        } else {
+            "direct"
+        }
+    }
+    fn stop(&mut self) {
+        self.active = false;
+        OBSERVING.store(false, Ordering::Release);
+    }
 }
-
+unsafe fn id(name: &str) -> Option<i32> {
+    game::lua_const(lua_bind_hash(name))
+}
+unsafe fn is_status(status: i32, name: &str) -> bool {
+    id(name) == Some(status)
+}
+unsafe fn tumble(status: i32) -> bool {
+    [
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY",
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY_ROLL",
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY_METEOR",
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_D",
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_U",
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_LR",
+    ]
+    .iter()
+    .any(|name| is_status(status, name))
+}
 unsafe fn guarded() -> bool {
     match GUARDED.load(Ordering::Acquire) {
         1 => return true,
@@ -71,110 +138,212 @@ unsafe fn guarded() -> bool {
     let mut all = base != 0;
     if all {
         for &(name, offset, expected) in tech_spike_guards::SITES {
-            let actual = std::slice::from_raw_parts((base + offset) as *const u8, 64);
-            let ok = actual == expected;
-            diagnostic(format_args!("[TrainingRooms] tech_s0_guard site={name} ok={ok}"));
+            let ok = std::slice::from_raw_parts((base + offset) as *const u8, 64) == expected;
+            diagnostic(format_args!(
+                "[TrainingRooms] tech_s0_guard site={name} ok={ok}"
+            ));
             all &= ok;
         }
     }
+    // Existing native wrappers must also be granted; none silently substitutes a missing writer.
+    for offset in [
+        crate::model::sites_pkg3::STATE_CLEAR_SPEED_ALL_OFFSET,
+        crate::model::sites_pkg3::STATE_INIT_POS_OFFSET,
+        crate::model::sites_pkg3::STATE_SET_LR_OFFSET,
+        crate::model::sites_pkg3::STATE_HEAL_OFFSET,
+        crate::model::sites_pkg3::STATE_ADD_DAMAGE_OFFSET,
+        crate::model::sites_pkg3::STATE_SET_SITUATION_KIND_OFFSET,
+        crate::model::sites_pkg2::CHANGE_STATUS_FORCE_OFFSET,
+        crate::model::sites_pkg2::WORK_SET_FLOAT_OFFSET,
+        crate::model::sites_pkg2::WORK_GET_FLOAT_OFFSET,
+        crate::model::sites_pkg2::STAGE_ID_CALL_OFFSET,
+        crate::model::sites_pkg2::STAGE_TABLE_OFFSET,
+        crate::model::sites_pkg2::STATUS_KIND_OFFSET,
+        crate::model::sites_pkg2::SITUATION_KIND_OFFSET,
+        crate::model::sites_pkg2::POS_X_OFFSET,
+        crate::model::sites_pkg2::POS_Y_OFFSET,
+        crate::model::sites_pkg2::WORK_GET_PARAM_FLOAT_OFFSET,
+        crate::model::sites_pkg2::DAMAGE_OF_OFFSET,
+        crate::model::sites_pkg2::UTILITY_GET_KIND_OFFSET,
+        crate::model::sites_pkg2::CHECK_BUTTON_ON_HOOK_OFFSET,
+        crate::model::sites_pkg4::POSTURE_LR_OFFSET,
+        crate::model::sites_pkg4::STOP_IS_STOP_OFFSET,
+        crate::model::sites_hitbox::HITBOX_DAMAGE_REACTION_OFFSET,
+    ] {
+        all &= game::granted(offset);
+    }
+    all &= super::cpu_common::passive_ready();
     GUARDED.store(if all { 1 } else { 2 }, Ordering::Release);
     all
 }
-
-unsafe fn id(name: &str) -> Option<i32> {
-    game::lua_const(lua_bind_hash(name))
+unsafe fn energy(accessor: usize) -> Option<usize> {
+    let get: extern "C" fn(usize, i32) -> usize =
+        std::mem::transmute(game::text_base() + 0x2043970);
+    let value = get(accessor, id("FIGHTER_KINETIC_ENERGY_ID_DAMAGE")?);
+    (value != 0 && value & 7 == 0).then_some(value)
 }
-
-/// Native ATTACK body main+2284b80 constructs at sp+20, passes x3=sp+20 at 2285ba4.
-/// Its last store is sp+11a; this is the 0x100-byte INPUT, not the 0x130-byte attack slot.
-/// Constructor defaults: 2284ba4..2284c9c. Argument stores: 2284ca0..2285ad0.
-#[repr(C, align(16))]
-struct AttackData([u8; 0x100]);
-
-impl AttackData {
-    fn word(&mut self, at: usize, value: u32) {
-        self.0[at..at + 4].copy_from_slice(&value.to_le_bytes());
-    }
-
-    fn float(&mut self, at: usize, value: f32) {
-        self.word(at, value.to_bits());
-    }
-
-    fn hash(&mut self, at: usize, value: u64) {
-        self.0[at..at + 8].copy_from_slice(&value.to_le_bytes());
-    }
-
-    unsafe fn new(weight: f32) -> Option<Self> {
-        if !weight.is_finite() || weight <= 0.0 {
-            return None;
-        }
-        // Vanilla KB formula at 60%, damage .1, target KB 100; BKB and FKB zero.
-        let growth = (10_000.0 / ((6.0 + 60.0 * 0.1 / 20.0) * 200.0 / (weight + 100.0) * 1.4 + 18.0)).round() as u32;
-        let mut data = Self([0; 0x100]);
-        data.float(0x04, 6.0); // top-relative sphere center; radius 10 reaches P1's hurtboxes.
-        data.float(0x20, 0.1);
-        data.float(0x24, 10.0);
-        data.word(0x28, 45);
-        data.word(0x2c, growth);
-        data.float(0x40, 1.0); // SDI; hitlag at +3c stays zero, internal hitlag<=0 flag below.
-        data.hash(0x48, hash40("top"));
-        let category = id("COLLISION_CATEGORY_MASK_FIGHTER")? as u16;
-        data.0[0x50..0x52].copy_from_slice(&category.to_le_bytes());
-        data.0[0x52] = id("COLLISION_SITUATION_MASK_GA")? as u8;
-        data.0[0x54] = id("COLLISION_PART_MASK_ALL")? as u8;
-        data.hash(0x58, hash40("collision_attr_normal"));
-        data.0[0x60] = id("ATTACK_SOUND_LEVEL_S")? as u8;
-        data.0[0x61] = id("COLLISION_SOUND_ATTR_NONE")? as u8;
-        data.0[0x62] = id("ATTACK_SETOFF_KIND_OFF")? as u8;
-        // Shield damage 0: ATTACK writes flag sp+84=1 AND amount i16 at sp+94 (2285554..557c).
-        data.0[0x64] = 1;
-        data.0[0x67] = 1; // direct; reflectable/absorbable/flinchless/disable-hitlag remain false.
-        data.0[0x6a] = id("ATTACK_LR_CHECK_POS")? as u8;
-        data.0[0x6d] = 1; // hitlag multiplier <= 0 (2285474..548c).
-        data.0[0x71] = id("ATTACK_REGION_NONE")? as u8;
-        data.0[0x76] = 0x0e;
-        // Arg20=set_weight false is sp+9e (+7e), not +63; the zero default preserves it.
-        data.hash(0x88, hash40("top"));
-        // +90 is nn::util::Vector4f::ConstantZero, the imported constructor vector.
-        data.float(0xa8, 1.0);
-        data.float(0xac, 1.0);
-        data.hash(0xb8, 0x425cbfc4f);
-        data.hash(0xc0, 0x7fb997a80);
-        data.float(0xd0, -1.0);
-        data.word(0xec, u32::MAX);
-        data.0[0xf0] = 3;
-        data.float(0xf4, 1.0);
-        Some(data)
-    }
+unsafe fn velocity(accessor: usize) -> Option<Vec2> {
+    let energy = energy(accessor)?;
+    let x: extern "C" fn(usize) -> f32 = std::mem::transmute(game::text_base() + 0x20f6460);
+    let y: extern "C" fn(usize) -> f32 = std::mem::transmute(game::text_base() + 0x20f6480);
+    let v = Vec2 {
+        x: x(energy),
+        y: y(energy),
+    };
+    (v.x.is_finite() && v.y.is_finite()).then_some(v)
 }
-
-unsafe fn place(accessor: usize, x: f32, y: f32) {
+unsafe fn reaction(accessor: usize) -> Option<f32> {
+    Some(natives::get_float(
+        accessor,
+        id("FIGHTER_INSTANCE_WORK_ID_FLOAT_DAMAGE_REACTION_FRAME")?,
+    ))
+}
+unsafe fn place(accessor: usize, input: Input) {
     state::clear_speed_all(accessor);
-    state::init_pos(accessor, &Vector3f { x, y, z: 0.0 });
+    state::init_pos(
+        accessor,
+        &Vector3f {
+            x: input.origin.x,
+            y: input.origin.y,
+            z: 0.0,
+        },
+    );
+    state::set_lr(accessor, input.lr);
 }
-
-/// Use the existing guarded, installed button-on seam, including TR's own pass-through hook for P1.
-unsafe fn guard_on(accessor: usize, button: i32) -> Option<bool> {
-    let offset = crate::model::sites_pkg2::CHECK_BUTTON_ON_HOOK_OFFSET;
-    if !game::granted(offset) {
+unsafe fn setup(run: &Spike, accessor: usize) {
+    let stage = natives::stage_id();
+    let form = natives::stage_form(stage).unwrap_or(u32::MAX);
+    let input = run.input;
+    let baseline_attempt = run.baseline.map_or(0, |b| b.attempt);
+    diagnostic(format_args!("[TechDirect] setup attempt={} mode={} baseline_attempt={baseline_attempt} p1_kind={} stage={stage} form={form} kb={:08x} angle={:08x} percent={:08x} weight={:08x} start_x={:08x} start_y={:08x} lr={:08x}",
+        run.attempt,run.mode_name(),natives::fighter_kind(accessor).unwrap_or(-1),input.kb.to_bits(),input.angle.to_bits(),
+        input.percent.to_bits(),input.weight.to_bits(),input.origin.x.to_bits(),input.origin.y.to_bits(),input.lr.to_bits()));
+}
+unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
+    let input = run.input;
+    let calc: extern "C" fn(f32) -> f32 = std::mem::transmute(game::text_base() + 0x404ec0);
+    let native_reaction = calc(input.kb);
+    let reference =
+        math::reaction_frames(input.kb, math::DAMAGE_FRAME_MUL, math::DAMAGE_FRAME_MIN)?;
+    diagnostic(format_args!(
+        "[TechDirect] reaction native={:08x} reference={:08x} equal={}",
+        native_reaction.to_bits(),
+        reference.to_bits(),
+        native_reaction.to_bits() == reference.to_bits()
+    ));
+    if native_reaction.to_bits() != reference.to_bits() {
         return None;
     }
-    let on: extern "C" fn(usize, i32) -> bool = std::mem::transmute(game::text_base() + offset);
-    Some(on(accessor, button))
+    let reaction_id = id("FIGHTER_INSTANCE_WORK_ID_FLOAT_DAMAGE_REACTION_FRAME")?;
+    place(accessor, input);
+    state::heal(accessor, -natives::damage(accessor, 0));
+    state::add_damage(accessor, input.percent);
+    state::set_situation_kind(accessor, id("SITUATION_KIND_AIR")?);
+    natives::set_float(accessor, native_reaction, reaction_id);
+    natives::change_status_force(accessor, id("FIGHTER_STATUS_KIND_DAMAGE_FLY")?, false);
+    // The native status initializes first. No DamageInfo/energy bytes from the reference hit are cloned.
+    if !is_status(
+        natives::status_kind(accessor),
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY",
+    ) {
+        return None;
+    }
+    let velocity = math::launch_velocity(input.kb, input.direction)?;
+    #[repr(C, align(16))]
+    struct NativeVector([f32; 4]);
+    let set: extern "C" fn(usize, *const NativeVector) =
+        std::mem::transmute(game::text_base() + 0x20f8320);
+    let enable: extern "C" fn(usize) = std::mem::transmute(game::text_base() + 0x20f6560);
+    let damage = energy(accessor)?;
+    // Owned full-body proof: this setter's only write is the same speed store as Damage's own setter.
+    set(damage, &NativeVector([velocity.x, velocity.y, 0.0, 0.0]));
+    enable(damage);
+    natives::set_float(accessor, native_reaction, reaction_id);
+    setup(run, accessor);
+    diagnostic(format_args!(
+        "[TechDirect] launched attempt={} mode=direct vx={:08x} vy={:08x} reaction={:08x}",
+        run.attempt,
+        velocity.x.to_bits(),
+        velocity.y.to_bits(),
+        native_reaction.to_bits()
+    ));
+    run.started = true;
+    run.phase = 2;
+    Some(())
 }
 
-/// The immediate post-call sample and the next three native P1 frame observations. No retained accessor.
-unsafe fn launch_sample(run: &Spike, player: usize, sample: u8) {
-    let Some(all) = id("KINETIC_ENERGY_RESERVE_ATTRIBUTE_ALL") else {
-        diagnostic(format_args!("[TechPractice] launch unavailable=energy_id"));
+/// Existing common hook asks only for a fresh P1 accessor; no script/accessor pointer is retained.
+pub unsafe fn watches_player(accessor: usize) -> bool {
+    OBSERVING.load(Ordering::Acquire) && natives::module_accessor(0) == Some(accessor)
+}
+/// Called at the existing native status-decision seam, before the game's original status change.
+pub unsafe fn decision(accessor: usize, status: i32, passive: bool) {
+    let Some(mut run) = RUN.try_lock() else {
         return;
     };
-    let speed_x: extern "C" fn(usize, i32) -> f32 = std::mem::transmute(game::text_base() + 0x2043a00);
-    diagnostic(format_args!(
-        "[TechPractice] launch cpu_hidden={} set_attack=ok p1_status_before={} p1_status_after={} reaction={:.3} speed=({:.5},{:.5}) frame={} sample={sample} mode={}",
-        hide_cpu::hidden(), run.status_before, natives::status_kind(player), natives::damage_reaction(player),
-        speed_x(player, all), natives::sum_speed_y(player, all), run.age, run.mode
-    ));
+    if !run.active || !run.started || run.contact {
+        return;
+    }
+    let (surface, touch) = if [
+        "FIGHTER_STATUS_KIND_PASSIVE",
+        "FIGHTER_STATUS_KIND_PASSIVE_FB",
+        "FIGHTER_STATUS_KIND_DOWN",
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_D",
+    ]
+    .iter()
+    .any(|n| is_status(status, n))
+    {
+        ("floor", "GROUND_TOUCH_ID_DOWN")
+    } else if [
+        "FIGHTER_STATUS_KIND_PASSIVE_CEIL",
+        "FIGHTER_STATUS_KIND_STOP_CEIL",
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_U",
+    ]
+    .iter()
+    .any(|n| is_status(status, n))
+    {
+        ("ceiling", "GROUND_TOUCH_ID_UP")
+    } else if [
+        "FIGHTER_STATUS_KIND_PASSIVE_WALL",
+        "FIGHTER_STATUS_KIND_PASSIVE_WALL_JUMP",
+        "FIGHTER_STATUS_KIND_STOP_WALL",
+        "FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_LR",
+    ]
+    .iter()
+    .any(|n| is_status(status, n))
+    {
+        ("wall", "GROUND_TOUCH_ID_LEFT")
+    } else {
+        return;
+    };
+    let Some(touch) = id(touch) else { return };
+    let get: extern "C" fn(usize, i32) -> usize =
+        std::mem::transmute(game::text_base() + 0x2029fb0);
+    let mut line = get(accessor, touch);
+    if line == 0 && surface == "wall" {
+        if let Some(right) = id("GROUND_TOUCH_ID_RIGHT") {
+            line = get(accessor, right);
+        }
+    }
+    if line == 0 || line & 7 != 0 {
+        diagnostic(format_args!("[TechDirect] fault=contact_line"));
+        run.stop();
+        return;
+    }
+    let normal = ((line + 0xa0) as *const [f32; 2]).read_unaligned();
+    if !normal.iter().all(|v| v.is_finite()) || normal == [0.0, 0.0] {
+        diagnostic(format_args!("[TechDirect] fault=contact_normal"));
+        run.stop();
+        return;
+    }
+    diagnostic(format_args!("[TechDirect] contact attempt={} mode={} frame={} surface={surface} line=0x{line:x} x={:08x} y={:08x} nx={:08x} ny={:08x} passive={passive} status={status}",
+        run.attempt,run.mode_name(),run.sample,natives::pos_x(accessor).to_bits(),natives::pos_y(accessor).to_bits(),normal[0].to_bits(),normal[1].to_bits()));
+    run.contact = true;
+    if run.mode == 1 && run.sample >= 20 {
+        if let Some(b) = &mut run.baseline {
+            b.complete = true;
+        }
+    }
 }
 
 /// Layout reads are independently guarded by the exact native accessors' 64-byte windows.
@@ -189,20 +358,38 @@ unsafe fn point(line: usize, right: bool) -> Option<[f32; 2]> {
 }
 
 unsafe fn walk(accessor: usize) {
-    let Some(down) = id("GROUND_TOUCH_ID_DOWN") else { return };
+    let Some(down) = id("GROUND_TOUCH_ID_DOWN") else {
+        return;
+    };
     // Owned main+15cbc88/15cbcdc load q1 from the Vector2f reference (16 bytes),
     // though the following distance reduction uses XY. Provide its complete native storage.
     #[repr(C, align(16))]
     struct NativePoint([f32; 4]);
-    let touch: extern "C" fn(usize, i32) -> usize = std::mem::transmute(game::text_base() + 0x2029fb0);
-    let next: extern "C" fn(usize, *const NativePoint) -> usize = std::mem::transmute(game::text_base() + 0x15cbc60);
+    let touch: extern "C" fn(usize, i32) -> usize =
+        std::mem::transmute(game::text_base() + 0x2029fb0);
+    let next: extern "C" fn(usize, *const NativePoint) -> usize =
+        std::mem::transmute(game::text_base() + 0x15cbc60);
     let mut line = touch(accessor, down);
     let seed = line;
+    if !natives::is_grounded(accessor)
+        || seed == 0
+        || seed & 7 != 0
+        || ((seed + 0xc5) as *const u8).read() & 0x20 != 0
+    {
+        diagnostic(format_args!("[TechDirect] fault=main_floor_seed"));
+        diagnostic(format_args!("[TechPractice] walk closed=false count=0"));
+        return;
+    }
+    diagnostic(format_args!(
+        "[TechDirect] walk_seed line=0x{seed:x} passable=false grounded=true"
+    ));
     let mut seen = [0usize; 64];
     let mut end = [0.0; 2];
     for index in 0..seen.len() {
         if line == 0 || line & 7 != 0 || seen[..index].contains(&line) {
-            diagnostic(format_args!("[TrainingRooms] tech_s0_walk end index={index} line=0x{line:x}"));
+            diagnostic(format_args!(
+                "[TrainingRooms] tech_s0_walk end index={index} line=0x{line:x}"
+            ));
             diagnostic(format_args!(
                 "[TechPractice] walk closed={} count={index}",
                 line != 0 && line == seed && index > 0
@@ -211,7 +398,9 @@ unsafe fn walk(accessor: usize) {
         }
         seen[index] = line;
         let (Some(left), Some(right)) = (point(line, false), point(line, true)) else {
-            diagnostic(format_args!("[TechPractice] walk closed=false count={index} invalid_vertex=true"));
+            diagnostic(format_args!(
+                "[TechPractice] walk closed=false count={index} invalid_vertex=true"
+            ));
             return;
         };
         let normal = ((line + 0xa0) as *const [f32; 2]).read_unaligned();
@@ -243,180 +432,244 @@ unsafe fn walk(accessor: usize) {
         line = next(line, &NativePoint([end[0], end[1], 0.0, 0.0]));
     }
     diagnostic(format_args!("[TrainingRooms] tech_s0_walk cap=64"));
-    diagnostic(format_args!("[TechPractice] walk closed={} count=64", line == seed));
+    diagnostic(format_args!(
+        "[TechPractice] walk closed={} count=64",
+        line == seed
+    ));
 }
 
-/// Game thread only, from the existing CPU frame after Hide CPU and Eggs/BTT. No accessor is retained across frames.
-pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>, launcher: bool) {
-    let Some(mut run) = RUN.try_lock() else { return };
+/// Existing post-native fighter frame, P1 only except one ordinary-hit fixture placement.
+pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
+    let Some(mut run) = RUN.try_lock() else {
+        return;
+    };
     if !crate::runtime::scene::is_native_training() {
-        if run.active {
-            hide_cpu::restore();
-        }
         *run = Spike::new();
+        OBSERVING.store(false, Ordering::Release);
         return;
     }
     if fighter == 0 {
         return;
     }
     let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
-    // Eggs publishes its request on every body's pass, including parked helper bodies.
-    // Reassert this research owner after each pass without admitting those helpers as launchers.
-    if run.active && run.mode != 4 {
-        hide_cpu::hide(true);
-    }
-    if !(0..=1).contains(&entry) {
+    let accessor = natives::fighter_accessor(fighter);
+    if accessor == 0 {
         return;
     }
-    if receipt.is_none()
-        || (entry == 0 && run.active && run.player_scope != receipt)
-        || (entry == 1 && run.active && run.cpu_scope.is_some() && run.cpu_scope != receipt)
-    {
-        if run.active {
-            hide_cpu::restore();
-        }
-        *run = Spike::new();
-        return;
-    }
-    let at = natives::fighter_accessor(fighter);
-    if at == 0 {
-        return;
-    }
-    if entry == 0 {
-        let command = REQUEST.swap(0, Ordering::AcqRel);
-        if command == 5 {
-            hide_cpu::restore();
-            *run = Spike::new();
-            diagnostic(format_args!("[TrainingRooms] tech_s0_off"));
-        } else if command != 0 && guarded() {
-            walk(at); // Seed while P1 still touches the fixture's floor.
-            *run = Spike {
-                active: true,
-                mode: command,
-                phase: if command <= 2 { 1 } else { 4 },
-                age: 0,
-                weight: natives::weight(at),
-                player_scope: receipt,
-                cpu_scope: None,
-                status_before: -1,
-                launch_left: 0,
+    if entry == 1 {
+        if run.active && run.arrange_cpu {
+            let input = Input {
+                origin: Vec2 { x: -12.0, y: 0.01 },
+                ..Input::empty()
             };
-            if command <= 2 {
-                state::heal(at, -natives::damage(at, 0));
-                state::add_damage(at, 60.0);
-                if let Some(fall) = id("FIGHTER_STATUS_KIND_FALL") {
-                    state::status_request(at, fall);
-                }
-                place(at, 0.0, 30.0);
-            }
-            diagnostic(format_args!(
-                "[TrainingRooms] tech_s0_prepared mode={command} p1={:.3},{:.3} damage={:.3} weight={:.3}",
-                natives::pos_x(at),
-                natives::pos_y(at),
-                natives::damage(at, 0),
-                natives::weight(at)
-            ));
-            let cpu_kind = natives::module_accessor(1).and_then(|cpu| natives::fighter_kind(cpu)).unwrap_or(-1);
-            diagnostic(format_args!(
-                "[TechPractice] fixture p1_kind={} cpu_kind={cpu_kind} stage={} damage={:.3} weight={:.3}",
-                natives::fighter_kind(at).unwrap_or(-1),
-                natives::stage_id(),
-                natives::damage(at, 0),
-                natives::weight(at)
-            ));
+            place(accessor, input);
+            run.arrange_cpu = false;
+            diagnostic(format_args!("[TechDirect] ordinary_cpu_fixture x={:08x} y={:08x} lr={:08x} unmodified_move=true",(-12.0f32).to_bits(),0.01f32.to_bits(),1.0f32.to_bits()));
         }
-        if run.active {
-            run.age = run.age.saturating_add(1);
-            if run.launch_left > 0 {
-                launch_sample(&run, at, 4 - run.launch_left);
-                run.launch_left -= 1;
-            }
-            if run.phase <= 2 {
-                place(at, 0.0, 30.0);
-            }
-            if let Some(guard) = id("CONTROL_PAD_BUTTON_GUARD") {
-                let count: extern "C" fn(usize, i32) -> u8 = std::mem::transmute(game::text_base() + 0x20013c0);
-                let previous: extern "C" fn(usize, i32) -> u8 = std::mem::transmute(game::text_base() + 0x20013d0);
-                let (c, p) = (count(at, guard), previous(at, guard));
-                if let Some(guard_on) = guard_on(at, guard) {
-                    diagnostic(format_args!(
-                        "[TechPractice] v1 frame={} c={c} p={p} guard_on={guard_on} status={} grounded={} reaction={:.3} pos=({:.3},{:.3})",
-                        run.age,
-                        natives::status_kind(at),
-                        natives::is_grounded(at),
-                        natives::damage_reaction(at),
-                        natives::pos_x(at),
-                        natives::pos_y(at)
-                    ));
-                } else {
-                    diagnostic(format_args!("[TechPractice] v1 unavailable=button_guard frame={}", run.age));
-                }
-                if run.age <= 40 || c <= 3 || run.age % 60 == 0 {
-                    diagnostic(format_args!(
-                        "[TrainingRooms] tech_s0_p1 age={} c={c} p={p} status={} damage={:.3} pos={:.3},{:.3} reaction={:.3}",
-                        run.age,
-                        natives::status_kind(at),
-                        natives::damage(at, 0),
-                        natives::pos_x(at),
-                        natives::pos_y(at),
-                        natives::damage_reaction(at)
-                    ));
-                }
-            }
+        return;
+    }
+    if entry != 0 {
+        return;
+    }
+    if receipt.is_none() || (run.active && run.player_scope != receipt) {
+        *run = Spike::new();
+        OBSERVING.store(false, Ordering::Release);
+        return;
+    }
+    let command = REQUEST.swap(0, Ordering::AcqRel);
+    if command == 6 {
+        if !guarded() {
+            diagnostic(format_args!("[TechDirect] fault=guards"));
+            return;
         }
-    } else if run.active && launcher {
-        run.cpu_scope = receipt;
-        let clear: extern "C" fn(usize) = std::mem::transmute(game::text_base() + 0x1fd00c0);
-        match run.phase {
-            1 => run.phase = 2, // First let the ordinary hidden-body step run once.
-            2 => {
-                place(at, 0.0, 30.0);
-                state::set_lr(at, 1.0);
-                state::heal(at, -natives::damage(at, 0));
-                if let Some(data) = AttackData::new(run.weight) {
-                    let Some(player) = natives::module_accessor(0) else {
-                        diagnostic(format_args!("[TechPractice] launch unavailable=player"));
-                        run.phase = 4;
-                        return;
-                    };
-                    run.status_before = natives::status_kind(player);
-                    if run.mode == 2 {
-                        // Approved DESIGN §8 variant: still invisible, but not frozen for this launch frame.
-                        let stop: extern "C" fn(usize, i32, bool) = std::mem::transmute(game::text_base() + 0x2089260);
-                        stop(at, 0, false);
-                    }
-                    let set: extern "C" fn(usize, i32, i32, *const AttackData) = std::mem::transmute(game::text_base() + 0x1fd0110);
-                    set(at, 0, 0, &data);
-                    launch_sample(&run, player, 0);
-                    run.launch_left = 3;
-                    diagnostic(format_args!(
-                        "[TrainingRooms] tech_s0_launch mode={} age={} cpu={:.3},{:.3} stop={}",
-                        run.mode,
-                        run.age,
-                        natives::pos_x(at),
-                        natives::pos_y(at),
-                        natives::is_stop(at)
-                    ));
-                } else {
-                    diagnostic(format_args!("[TrainingRooms] tech_s0_launch unavailable constants_or_weight"));
-                }
-                run.phase = 3;
+        run.inspecting = true;
+    }
+    if run.inspecting {
+        let generation = crate::runtime::published::live_generation();
+        if let Some(live) = crate::runtime::published::live() {
+            if generation == crate::runtime::published::live_generation() {
+                let cpu_status =
+                    natives::module_accessor(1).map_or(-1, |a| natives::status_kind(a));
+                let cpu_wait = id("FIGHTER_STATUS_KIND_WAIT") == Some(cpu_status);
+                let adopted = super::cpu::adopted_settings_generation();
+                diagnostic(format_args!("[TechDirect] settings generation={generation} adopted={adopted} mash_state={:?} mash_triggers={} cpu_status={cpu_status} cpu_wait={cpu_wait}",live.cpu.mash_state.0,live.cpu.mash_triggers));
             }
-            3 => {
-                clear(at);
-                place(at, 35.0, -15.0);
-                run.phase = 4;
-                diagnostic(format_args!(
-                    "[TrainingRooms] tech_s0_park cpu={:.3},{:.3}",
-                    natives::pos_x(at),
-                    natives::pos_y(at)
-                ));
-            }
-            _ if run.mode == 3 => place(at, 70.0, -15.0),
-            _ => {}
         }
     }
-    if run.active && run.mode != 4 {
-        hide_cpu::hide(true);
+    if command == 5 {
+        let baseline = run.baseline;
+        *run = Spike::new();
+        run.baseline = baseline;
+        OBSERVING.store(false, Ordering::Release);
+        diagnostic(format_args!("[TrainingRooms] tech_s0_off"));
+        return;
+    }
+    if command != 0 && command != 6 {
+        if !guarded() {
+            diagnostic(format_args!("[TechDirect] fault=guards"));
+            return;
+        }
+        let stage = natives::stage_id();
+        if stage != 0 || natives::stage_form(stage) != Some(0) {
+            diagnostic(format_args!("[TechDirect] fault=Battlefield_Normal"));
+            return;
+        }
+        let baseline = run.baseline;
+        *run = Spike {
+            active: true,
+            mode: command,
+            attempt: NEXT_ATTEMPT.fetch_add(1, Ordering::Relaxed),
+            player_scope: receipt,
+            baseline,
+            ..Spike::new()
+        };
+        OBSERVING.store(true, Ordering::Release);
+        if command == 4 {
+            diagnostic(format_args!("[TechPractice] fixture p1_kind={} cpu_kind={} stage={stage} damage={:.3} weight={:.3} form=0",
+                natives::fighter_kind(accessor).unwrap_or(-1),natives::module_accessor(1).and_then(|a|natives::fighter_kind(a)).unwrap_or(-1),natives::damage(accessor,0),natives::weight(accessor)));
+            walk(accessor);
+            return;
+        }
+        run.input = Input {
+            origin: Vec2 {
+                x: 0.0,
+                y: if command == 1 { 0.01 } else { 30.0 },
+            },
+            direction: Vec2 { x: 0.0, y: -1.0 },
+            kb: 100.0,
+            angle: 270.0,
+            percent: 60.0,
+            weight: natives::weight(accessor),
+            lr: 1.0,
+        };
+        if command == 2 {
+            let Some(baseline) = baseline.filter(|b| b.complete && Some(b.scope) == receipt) else {
+                diagnostic(format_args!("[TechDirect] fault=baseline_incomplete"));
+                run.stop();
+                return;
+            };
+            if baseline.input.weight.to_bits() != natives::weight(accessor).to_bits() {
+                diagnostic(format_args!("[TechDirect] fault=weight_changed"));
+                run.stop();
+                return;
+            }
+            run.input = baseline.input;
+        }
+        place(accessor, run.input);
+        state::heal(accessor, -natives::damage(accessor, 0));
+        state::add_damage(accessor, run.input.percent);
+        if command == 1 {
+            let (Some(ground), Some(wait)) =
+                (id("SITUATION_KIND_GROUND"), id("FIGHTER_STATUS_KIND_WAIT"))
+            else {
+                diagnostic(format_args!("[TechDirect] fault=ordinary_constants"));
+                run.stop();
+                return;
+            };
+            state::set_situation_kind(accessor, ground);
+            natives::change_status_force(accessor, wait, false);
+            run.baseline = None;
+            run.arrange_cpu = true;
+            diagnostic(format_args!(
+                "[TechDirect] ordinary_armed attempt={}",
+                run.attempt
+            ));
+        } else {
+            run.phase = 1;
+        }
+        diagnostic(format_args!("[TechPractice] fixture p1_kind={} cpu_kind={} stage={stage} damage={:.3} weight={:.3} form=0",
+            natives::fighter_kind(accessor).unwrap_or(-1),natives::module_accessor(1).and_then(|a|natives::fighter_kind(a)).unwrap_or(-1),natives::damage(accessor,0),natives::weight(accessor)));
+    }
+    if !run.active {
+        return;
+    }
+    run.age = run.age.saturating_add(1);
+    let status = natives::status_kind(accessor);
+    if run.mode == 1 && !run.started && tumble(status) {
+        if natives::is_stop(accessor) && run.baseline.is_none() {
+            if let Some(v) = velocity(accessor) {
+                let speed = (v.x * v.x + v.y * v.y).sqrt();
+                let kb = natives::damage_reaction(accessor);
+                if speed > 0.0 && kb > 0.0 {
+                    run.input = Input {
+                        origin: Vec2 {
+                            x: natives::pos_x(accessor),
+                            y: natives::pos_y(accessor),
+                        },
+                        direction: Vec2 {
+                            x: v.x / speed,
+                            y: v.y / speed,
+                        },
+                        kb,
+                        angle: v.y.atan2(v.x).to_degrees(),
+                        percent: natives::damage(accessor, 0),
+                        weight: natives::weight(accessor),
+                        lr: natives::lr(accessor),
+                    };
+                    run.baseline = Some(Baseline {
+                        input: run.input,
+                        attempt: run.attempt,
+                        scope: receipt.unwrap(),
+                        complete: false,
+                    });
+                    setup(&run, accessor);
+                }
+            }
+        }
+        if !natives::is_stop(accessor) {
+            if run.baseline.is_none() {
+                diagnostic(format_args!(
+                    "[TechDirect] fault=no_stopped_launch_snapshot"
+                ));
+                run.stop();
+                return;
+            }
+            run.started = true;
+        }
+    }
+    let mut just_launched = false;
+    if run.phase == 1 {
+        place(accessor, run.input);
+        if run.age >= 30 {
+            if launch(&mut run, accessor).is_none() {
+                diagnostic(format_args!("[TechDirect] fault=native_launch"));
+                run.stop();
+            }
+            just_launched = true; // Sample0 follows the next original native integration; V1 still logs this frame.
+        }
+    }
+    let status = natives::status_kind(accessor);
+    if let Some(button) = id("CONTROL_PAD_BUTTON_GUARD") {
+        let count: extern "C" fn(usize, i32) -> u8 =
+            std::mem::transmute(game::text_base() + 0x20013c0);
+        let previous: extern "C" fn(usize, i32) -> u8 =
+            std::mem::transmute(game::text_base() + 0x20013d0);
+        let check: extern "C" fn(usize, i32) -> bool = std::mem::transmute(
+            game::text_base() + crate::model::sites_pkg2::CHECK_BUTTON_ON_HOOK_OFFSET,
+        );
+        if game::granted(crate::model::sites_pkg2::CHECK_BUTTON_ON_HOOK_OFFSET) {
+            let (c, p, guard_on) = (
+                count(accessor, button),
+                previous(accessor, button),
+                check(accessor, button),
+            );
+            diagnostic(format_args!("[TechPractice] v1 frame={} c={c} p={p} guard_on={guard_on} status={status} grounded={} reaction={:.3} pos=({:.3},{:.3})",run.age,natives::is_grounded(accessor),reaction(accessor).unwrap_or(f32::NAN),natives::pos_x(accessor),natives::pos_y(accessor)));
+        }
+    }
+    if run.started && !just_launched {
+        let (Some(v), Some(reaction)) = (velocity(accessor), reaction(accessor)) else {
+            diagnostic(format_args!("[TechDirect] fault=frame_read"));
+            run.stop();
+            return;
+        };
+        let input = run.input;
+        diagnostic(format_args!("[TechDirect] frame attempt={} mode={} frame={} vx={:08x} vy={:08x} reaction={:08x} hitstun={:08x} status={status} tumble={} kb={:08x} angle={:08x} percent={:08x} weight={:08x} x={:08x} y={:08x}",
+            run.attempt,run.mode_name(),run.sample,v.x.to_bits(),v.y.to_bits(),reaction.to_bits(),reaction.to_bits(),tumble(status),input.kb.to_bits(),input.angle.to_bits(),input.percent.to_bits(),input.weight.to_bits(),natives::pos_x(accessor).to_bits(),natives::pos_y(accessor).to_bits()));
+        run.sample = run.sample.saturating_add(1);
+        if run.mode == 1 && run.sample >= 20 && run.contact {
+            if let Some(b) = &mut run.baseline {
+                b.complete = true;
+            }
+        }
     }
 }
