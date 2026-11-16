@@ -32,6 +32,7 @@ mod tech_info_seed;
 mod tech_native;
 mod tech_launch_native;
 pub mod tech_adapter;
+mod tech_decision;
 pub mod writer;
 
 pub mod tech;

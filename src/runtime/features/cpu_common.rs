@@ -73,6 +73,11 @@ pub(super) fn di_ready() -> bool {
     ORIGINAL_DI.load(Ordering::Acquire) != 0
 }
 
+pub(super) fn contact_ready() -> bool {
+    ORIGINAL_CHANGE_STATUS.load(Ordering::Acquire) != 0
+        && IS_ENABLE_PASSIVE.load(Ordering::Acquire) != 0
+}
+
 #[cfg(feature = "diag")]
 pub fn passive_ready() -> bool {
     IS_ENABLE_PASSIVE.load(Ordering::Acquire) != 0

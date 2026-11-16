@@ -219,6 +219,25 @@ pub struct ContactReceipt {
     pub position: Vec2,
 }
 
+/// Exact pre-status native observations for the first contact of an owned attempt.
+/// None is unavailable, never zero/default. Window inputs stay in native types;
+/// the collector must not invent the game's conversion or press-frame calibration.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DecisionSnapshot {
+    pub attempt: u64,
+    pub contact: ContactReceipt,
+    pub source_status: Option<i32>,
+    pub guard_count: Option<u8>,
+    pub previous_guard_gap: Option<u8>,
+    pub window_base: Option<i32>,
+    pub window_multiplier: Option<f32>,
+    pub lockout: Option<i32>,
+    pub reaction: Option<f32>,
+    pub damage_fall: Option<bool>,
+    pub stick_x: Option<f32>,
+    pub press_frame_offset: Option<u16>,
+}
+
 /// Fresh per accepted placement. Missing contact stays missing until the native seam observes it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Attempt {

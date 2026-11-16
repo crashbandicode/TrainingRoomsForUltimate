@@ -589,7 +589,7 @@ fn the_install_line_names_the_row_that_blocked_a_feature() {
 #[test]
 fn optional_tech_poison_preserves_existing_features() {
     use model::install_line::{FeatureReport, InstallLine};
-    for poison in ["tech_cos", "tech_magnitude", "state_set_sleep"] {
+    for poison in ["tech_cos", "tech_magnitude", "state_set_sleep", "tech_guard_count"] {
         let row = capabilities::find(poison).expect("poison names a real guarded row");
         let usable = |s: &model::sites::Site| s.name != poison;
         for unit in [Feature::CpuCore, Feature::CpuCommon, Feature::Hitbox] {
@@ -606,6 +606,40 @@ fn optional_tech_poison_preserves_existing_features() {
         }.to_string();
         assert!(line.contains(&format!(" tech_practice=not_installed reason=site:{poison} ")), "{line}");
     }
+}
+
+#[test]
+fn contact_query_requires_both_installed_observer_prerequisites() {
+    let a = Analysis::new();
+    let body = |key: &str| a.graph.funcs[a.graph.find(key)[0]].body.clone();
+    assert_eq!(body("cpu_common::contact_ready"), callgraph::lex(
+        "ORIGINAL_CHANGE_STATUS.load(Ordering::Acquire) != 0 && IS_ENABLE_PASSIVE.load(Ordering::Acquire) != 0"
+    ));
+    let query = body("tech_adapter::attempt");
+    let required = callgraph::lex("if !super::cpu_common::contact_ready() { return Err(Error::Guards); }");
+    let at = query.windows(required.len()).position(|w| w == required.as_slice()).expect("query refuses unavailable provider");
+    let ownership = query.iter().position(|t| matches!(t, Tok::Ident(s) if s == "OWNED")).unwrap();
+    assert!(at < ownership, "provider refusal precedes ownership/native reads");
+    assert!(!query.iter().any(|t| matches!(t, Tok::Ident(s) if s == "DECISION_OBSERVER" || s == "decision_observer_ready")), "contact query does not require optional UI recorder");
+    for key in ["tech_adapter::place", "tech_adapter::launch"] {
+        assert!(!body(key).iter().any(|t| matches!(t, Tok::Ident(s) if s == "contact_ready")), "observer installation is not launch admission");
+    }
+}
+
+#[test]
+fn decision_recorder_runs_after_ownership_release_on_first_contact_only() {
+    let a = Analysis::new();
+    let body = &a.graph.funcs[a.graph.find("tech_adapter::decision")[0]].body;
+    let position = |snippet: &str| {
+        let wanted = callgraph::lex(snippet);
+        body.windows(wanted.len()).position(|w| w == wanted.as_slice()).unwrap_or_else(|| panic!("missing decision invariant: {snippet}"))
+    };
+    let state = position("matches!(owned.attempt.state, AttemptState::Stopped | AttemptState::Flying");
+    let record = position("owned.attempt.record_contact(contact)");
+    let released = position("drop(slot)");
+    let recorder = position("observer(super::tech_decision::snapshot(accessor, attempt, contact))");
+    assert!(state < record && record < released && released < recorder);
+    assert_eq!(body.iter().filter(|t| matches!(t, Tok::Ident(s) if s == "observer")).count(), 2, "one binding and one recorder invocation");
 }
 
 /// Input Delay installs on its own rows: the input display's reads in its hook are behind the display's flag

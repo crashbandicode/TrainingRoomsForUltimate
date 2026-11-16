@@ -4,13 +4,15 @@ use super::tech_info_seed as info_seed;
 use super::tech_native;
 use crate::model::cpu::role::FrameReceipt;
 use crate::model::tech_launch::{
-    Attempt, ContactReceipt, HitHeight, Launch, Launcher, Surface, Vec2,
+    Attempt, AttemptState, ContactReceipt, DecisionSnapshot, HitHeight, Launch, Launcher, Surface,
+    Vec2,
 };
 use crate::runtime::game::natives;
 use crate::runtime::state_natives::{self, Vector3f};
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::OnceLock;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error {
@@ -24,6 +26,17 @@ pub enum Error {
 }
 /// Core-owned runtime native-param calculation. It must validate its own native calls.
 pub type HitlagResolver = unsafe fn(usize, f32) -> Result<i32, Error>;
+/// Game-thread recorder: must not block, allocate or mutate native state.
+pub type DecisionObserver = fn(DecisionSnapshot);
+static DECISION_OBSERVER: OnceLock<DecisionObserver> = OnceLock::new();
+/// Bind outside hooks, before starting a session. No observer/calibration default exists.
+pub fn bind_decision_observer(observer: DecisionObserver) -> Result<(), DecisionObserver> {
+    DECISION_OBSERVER.set(observer)
+}
+/// Separate from launch readiness: both common observation prerequisites must be installed.
+pub fn decision_observer_ready() -> bool {
+    tech_ready() && super::cpu_common::contact_ready() && DECISION_OBSERVER.get().is_some()
+}
 #[derive(Clone, Copy)]
 struct Saved {
     position: Vec2,
@@ -343,6 +356,9 @@ impl Launcher for Adapter {
         if !tech_ready() {
             return Err(Error::Guards);
         }
+        if !super::cpu_common::contact_ready() {
+            return Err(Error::Guards);
+        }
         let slot = OWNED.try_lock().ok_or(Error::Busy)?;
         if let Some(active) = slot.filter(|x| x.owner == self.owner) {
             match unsafe { current(active) } {
@@ -517,7 +533,13 @@ pub(super) unsafe fn decision(accessor: usize, status: i32, passive: impl FnOnce
         return;
     };
     let Some(owned) = slot.as_mut() else { return };
-    if owned.phase != Phase::Flying || current(*owned) != Ok(accessor) {
+    if owned.phase != Phase::Flying
+        || !matches!(
+            owned.attempt.state,
+            AttemptState::Stopped | AttemptState::Flying
+        )
+        || current(*owned) != Ok(accessor)
+    {
         return;
     }
     let Some(index) = owned
@@ -543,4 +565,12 @@ pub(super) unsafe fn decision(accessor: usize, status: i32, passive: impl FnOnce
         },
     };
     owned.attempt.record_contact(contact);
+    if owned.attempt.contact != Some(contact) {
+        return;
+    }
+    let attempt = owned.attempt.id;
+    drop(slot);
+    if let Some(observer) = DECISION_OBSERVER.get() {
+        observer(super::tech_decision::snapshot(accessor, attempt, contact));
+    }
 }

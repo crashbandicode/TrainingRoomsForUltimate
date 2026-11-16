@@ -347,6 +347,17 @@ pub mod natives {
         at::<extern "C" fn(usize, i32) -> f32>(sites_pkg2::WORK_GET_FLOAT_OFFSET).map_or_else(Default::default, |f| f(accessor, id))
     }
 
+    /// Concrete ControlModule ABI, after the caller verifies its vtable/dispatch slot.
+    pub unsafe fn tech_guard_count(module: usize, button: i32) -> Option<u8> {
+        at::<extern "C" fn(usize, i32) -> u8>(crate::model::sites_tech_launch::GUARD_COUNT_OFFSET).map(|f| f(module, button))
+    }
+    pub unsafe fn tech_guard_previous(module: usize, button: i32) -> Option<u8> {
+        at::<extern "C" fn(usize, i32) -> u8>(crate::model::sites_tech_launch::GUARD_PREVIOUS_OFFSET).map(|f| f(module, button))
+    }
+    pub unsafe fn tech_stick_x(module: usize) -> Option<f32> {
+        at::<extern "C" fn(usize) -> f32>(crate::model::sites_tech_launch::STICK_X_OFFSET).map(|f| f(module))
+    }
+
     pub unsafe fn set_float(accessor: usize, value: f32, id: i32) {
         at::<extern "C" fn(usize, f32, i32)>(sites_pkg2::WORK_SET_FLOAT_OFFSET).map_or_else(Default::default, |f| f(accessor, value, id))
     }

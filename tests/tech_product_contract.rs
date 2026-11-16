@@ -2,6 +2,10 @@
 #[path = "../src/model/tech_launch.rs"]
 mod launch;
 use launch::{Attempt, AttemptState, ContactReceipt, HitHeight, Launch, Surface, Vec2};
+#[path = "common/mod.rs"]
+mod common;
+#[path = "../src/runtime/features/tech_decision_guards.rs"]
+mod decision_guards;
 fn request() -> Launch {
     Launch {
         start: Vec2 { x: -30.0, y: 20.0 },
@@ -178,4 +182,55 @@ fn contact_receipt_is_first_native_decision() {
         assert_eq!(attempt.state, AttemptState::Abandoned);
         assert_eq!(attempt.contact, Some(contact(false)));
     }
+}
+
+#[test]
+fn decision_readers_match_owned_native_byte_and_float_abis() {
+    let Some(owned) = common::owned_main("decision_readers_match_owned_native_byte_and_float_abis")
+    else {
+        return;
+    };
+    for &(offset, bytes) in decision_guards::GUARDS {
+        assert_eq!(
+            bytes,
+            owned.window(offset),
+            "full64-byte concrete reader guard at {offset:x}"
+        );
+    }
+    let words = |offset| {
+        let bytes = owned.window(offset);
+        let (chunks, _) = bytes.as_chunks::<4>();
+        chunks
+            .iter()
+            .map(|w| u32::from_le_bytes(*w))
+            .collect::<Vec<_>>()
+    };
+    // Both thunks load ControlModule from accessor+48 then dispatch slots228/230.
+    for (offset, slot_word, load_word) in [
+        (0x20013c0, 0xf9411502, 0x39424500),
+        (0x20013d0, 0xf9411902, 0x39424100),
+    ] {
+        assert_eq!(
+            &words(offset)[..4],
+            &[0xf9402400, 0xf9400008, slot_word, 0xd61f0040]
+        );
+        let concrete = if offset == 0x20013c0 {
+            0x3f8620
+        } else {
+            0x3f8630
+        };
+        // uxtb button, read one byte, return zero-extended value. No u16 narrowing.
+        assert_eq!(
+            &words(concrete)[..4],
+            &[0xf9408808, 0x8b210508, load_word, 0xd65f03c0]
+        );
+    }
+    assert_eq!(
+        &words(0x2001260)[..4],
+        &[0xf9402400, 0xf9400008, 0xf940bd01, 0xd61f0020]
+    );
+    assert_eq!(
+        &words(0x3f84a0)[..7],
+        &[0xf9408809, 0xbd401120, 0xb9412008, 0x7100011f, 0x1e214001, 0x1e210c00, 0xd65f03c0]
+    );
 }
