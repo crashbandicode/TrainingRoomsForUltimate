@@ -234,3 +234,52 @@ fn decision_readers_match_owned_native_byte_and_float_abis() {
         &[0xf9408809, 0xbd401120, 0xb9412008, 0x7100011f, 0x1e214001, 0x1e210c00, 0xd65f03c0]
     );
 }
+
+#[test]
+fn rejected_decision_delivery_retains_exact_native_snapshot_until_matching_ack() {
+    use launch::{DecisionDelivery, DecisionSnapshot};
+    let native = DecisionSnapshot {
+        attempt: 17,
+        contact: contact(false),
+        source_status: Some(81),
+        guard_count: Some(12),
+        previous_guard_gap: Some(254),
+        window_base: Some(12),
+        window_multiplier: Some(f32::from_bits(0x3f855555)),
+        lockout: Some(28),
+        reaction: Some(f32::from_bits(0x41880001)),
+        damage_fall: Some(false),
+        stick_x: Some(-0.75),
+        press_frame_offset: None,
+    };
+    let mut delivery = DecisionDelivery::EMPTY;
+    assert!(delivery.capture_first(native));
+    // Later native state cannot replace the exact decision while the mailbox is busy.
+    assert!(!delivery.capture_first(DecisionSnapshot {
+        guard_count: Some(13),
+        reaction: Some(0.0),
+        ..native
+    }));
+    for accepted in [false, false, true] {
+        let sent = delivery
+            .pending_decision()
+            .expect("busy must retain decision");
+        assert_eq!(sent, native);
+        assert_eq!(sent.window_multiplier.unwrap().to_bits(), 0x3f855555);
+        assert_eq!(sent.reaction.unwrap().to_bits(), 0x41880001);
+        assert!(
+            !delivery.acknowledge_decision(18),
+            "stale/wrong attempt cannot clear it"
+        );
+        if accepted {
+            assert!(delivery.acknowledge_decision(sent.attempt));
+        }
+    }
+    assert_eq!(delivery.pending_decision(), None);
+    assert!(!delivery.acknowledge_decision(17));
+    assert_eq!(
+        DecisionDelivery::EMPTY.pending_decision(),
+        None,
+        "fresh placement has no old decision"
+    );
+}

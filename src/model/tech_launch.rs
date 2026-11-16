@@ -238,6 +238,32 @@ pub struct DecisionSnapshot {
     pub press_frame_offset: Option<u16>,
 }
 
+/// One immutable native decision, retained until its exact attempt is accepted.
+/// Construct a fresh delivery with each placement; no previous attempt is reused.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DecisionDelivery(Option<DecisionSnapshot>);
+impl DecisionDelivery {
+    pub const EMPTY: Self = Self(None);
+    pub fn capture_first(&mut self, snapshot: DecisionSnapshot) -> bool {
+        if self.0.is_some() {
+            return false;
+        }
+        self.0 = Some(snapshot);
+        true
+    }
+    pub fn pending_decision(self) -> Option<DecisionSnapshot> {
+        self.0
+    }
+    pub fn acknowledge_decision(&mut self, attempt: u64) -> bool {
+        if self.0.is_some_and(|snapshot| snapshot.attempt == attempt) {
+            self.0 = None;
+            true
+        } else {
+            false
+        }
+    }
+}
+
 /// Fresh per accepted placement. Missing contact stays missing until the native seam observes it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Attempt {

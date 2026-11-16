@@ -637,9 +637,31 @@ fn decision_recorder_runs_after_ownership_release_on_first_contact_only() {
     let state = position("matches!(owned.attempt.state, AttemptState::Stopped | AttemptState::Flying");
     let record = position("owned.attempt.record_contact(contact)");
     let released = position("drop(slot)");
-    let recorder = position("observer(super::tech_decision::snapshot(accessor, attempt, contact))");
-    assert!(state < record && record < released && released < recorder);
-    assert_eq!(body.iter().filter(|t| matches!(t, Tok::Ident(s) if s == "observer")).count(), 2, "one binding and one recorder invocation");
+    let retained = position("owned.decision.capture_first(super::tech_decision::snapshot(accessor, owned.attempt.id, contact");
+    let deliver = position("deliver_decision()");
+    assert!(state < record && record < retained && retained < released && released < deliver);
+    let delivery = &a.graph.funcs[a.graph.find("tech_adapter::deliver_decision")[0]].body;
+    let at = |snippet: &str| {
+        let wanted = callgraph::lex(snippet);
+        delivery.windows(wanted.len()).position(|w| w == wanted.as_slice()).unwrap_or_else(|| panic!("missing delivery invariant: {snippet}"))
+    };
+    assert!(at("drop(slot)") < at("if observer(snapshot)"));
+    assert!(at("if observer(snapshot)") < at("active.decision.acknowledge_decision(snapshot.attempt)"));
+    assert!(!delivery.iter().any(|t| matches!(t, Tok::Ident(s) if s == "tech_decision")), "delivery retry never resamples native fields");
+}
+
+#[test]
+fn grounded_launch_refusal_precedes_publication_and_wake() {
+    let a = Analysis::new();
+    let body = &a.graph.funcs[a.graph.find("tech_adapter::launch")[0]].body;
+    let at = |snippet: &str| {
+        let wanted = callgraph::lex(snippet);
+        body.windows(wanted.len()).position(|w| w == wanted.as_slice()).unwrap_or_else(|| panic!("missing grounded admission invariant: {snippet}"))
+    };
+    let grounded = at("if owned.launch.grounded_hit && (natives::situation_kind(accessor) != owned.prepared.ground || !natives::is_grounded(accessor)) { return Err(Error::NativeValue); }");
+    assert!(grounded < at("owned.phase = Phase::Flying"));
+    assert!(grounded < at("*slot = Some(owned)"));
+    assert!(grounded < at("state_natives::set_sleep(accessor, false)"));
 }
 
 /// Input Delay installs on its own rows: the input display's reads in its hook are behind the display's flag

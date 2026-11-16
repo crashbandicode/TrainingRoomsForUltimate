@@ -4,8 +4,8 @@ use super::tech_info_seed as info_seed;
 use super::tech_native;
 use crate::model::cpu::role::FrameReceipt;
 use crate::model::tech_launch::{
-    Attempt, AttemptState, ContactReceipt, DecisionSnapshot, HitHeight, Launch, Launcher, Surface,
-    Vec2,
+    Attempt, AttemptState, ContactReceipt, DecisionDelivery, DecisionSnapshot, HitHeight, Launch,
+    Launcher, Surface, Vec2,
 };
 use crate::runtime::game::natives;
 use crate::runtime::state_natives::{self, Vector3f};
@@ -27,7 +27,8 @@ pub enum Error {
 /// Core-owned runtime native-param calculation. It must validate its own native calls.
 pub type HitlagResolver = unsafe fn(usize, f32) -> Result<i32, Error>;
 /// Game-thread recorder: must not block, allocate or mutate native state.
-pub type DecisionObserver = fn(DecisionSnapshot);
+/// Return true only after accepting this exact snapshot; false retains it for retry.
+pub type DecisionObserver = fn(DecisionSnapshot) -> bool;
 static DECISION_OBSERVER: OnceLock<DecisionObserver> = OnceLock::new();
 /// Bind outside hooks, before starting a session. No observer/calibration default exists.
 pub fn bind_decision_observer(observer: DecisionObserver) -> Result<(), DecisionObserver> {
@@ -73,6 +74,7 @@ struct Owned {
     prepared: Prepared,
     phase: Phase,
     attempt: Attempt,
+    decision: DecisionDelivery,
 }
 static OWNED: hos_lock::Mutex<Option<Owned>> = hos_lock::Mutex::new(None);
 static NEXT: AtomicU64 = AtomicU64::new(1);
@@ -262,6 +264,7 @@ impl Launcher for Adapter {
                 prepared,
                 phase: Phase::Held,
                 attempt: Attempt::held(NEXT.fetch_add(1, Ordering::Relaxed)),
+                decision: DecisionDelivery::EMPTY,
             };
             *slot = Some(owned);
             drop(slot);
@@ -290,6 +293,12 @@ impl Launcher for Adapter {
             let accessor = current(owned)?;
             if !tech_native::launch_ready(accessor) {
                 return Err(Error::Guards);
+            }
+            if owned.launch.grounded_hit
+                && (natives::situation_kind(accessor) != owned.prepared.ground
+                    || !natives::is_grounded(accessor))
+            {
+                return Err(Error::NativeValue);
             }
             owned.phase = Phase::Flying;
             *slot = Some(owned);
@@ -499,6 +508,38 @@ pub(super) unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
     } else if owned.phase == Phase::Held {
         hold(natives::fighter_accessor(fighter), owned);
     }
+    deliver_decision();
+}
+
+/// Retry the retained bytes, never the native reads. The recorder runs without OWNED.
+unsafe fn deliver_decision() {
+    let Some(observer) = DECISION_OBSERVER.get() else {
+        return;
+    };
+    let Some(slot) = OWNED.try_lock() else { return };
+    let Some(owned) = *slot else { return };
+    if owned.phase != Phase::Flying
+        || RESTORE.load(Ordering::Acquire) == owned.owner
+        || super::states::is_loading()
+        || current(owned).is_err()
+    {
+        return;
+    }
+    let Some(snapshot) = owned.decision.pending_decision() else {
+        return;
+    };
+    drop(slot);
+    if observer(snapshot) {
+        let Some(mut slot) = OWNED.try_lock() else {
+            return;
+        };
+        if let Some(active) = slot
+            .as_mut()
+            .filter(|x| x.owner == owned.owner && x.attempt.id == snapshot.attempt)
+        {
+            active.decision.acknowledge_decision(snapshot.attempt);
+        }
+    }
 }
 /// Existing DI hook calls this before its CPU role gate. None preserves player DI.
 pub(super) unsafe fn di_before(accessor: usize) -> bool {
@@ -568,9 +609,11 @@ pub(super) unsafe fn decision(accessor: usize, status: i32, passive: impl FnOnce
     if owned.attempt.contact != Some(contact) {
         return;
     }
-    let attempt = owned.attempt.id;
+    owned.decision.capture_first(super::tech_decision::snapshot(
+        accessor,
+        owned.attempt.id,
+        contact,
+    ));
     drop(slot);
-    if let Some(observer) = DECISION_OBSERVER.get() {
-        observer(super::tech_decision::snapshot(accessor, attempt, contact));
-    }
+    deliver_decision();
 }
