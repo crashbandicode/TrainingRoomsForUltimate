@@ -54,7 +54,8 @@ const TEXT_UNITS: usize = 48;
 pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     let waiting = name == INFO_WAITING;
     let active = if waiting {
-        crate::runtime::lobby::training::lobby::requested()
+        let Ok(active) = crate::runtime::lobby::training::lobby::try_requested() else { return; };
+        active
     } else {
         name == INFO_TRAINING && scene::is_training()
     };

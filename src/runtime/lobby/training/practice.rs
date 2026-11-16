@@ -14,6 +14,17 @@ pub fn context() -> Option<Context> {
         mode.map_or(0, |m| m.mode), super::lobby::active())
 }
 
+/// Fresh ownership context without waiting on a game-side menu edit.
+/// Native Training does not depend on a waiting-room menu request.
+pub fn try_context() -> Result<Option<Context>, crate::runtime::compat::menu::MenuBusy> {
+    if unsafe { common::is_native_training_mode() } {
+        return Ok(Some(Context::Training));
+    }
+    let mode = common::game_mode::current();
+    Ok(practice_policy::context(false, mode.is_some_and(|m| m.initialized),
+        mode.map_or(0, |m| m.melee), mode.map_or(0, |m| m.mode), super::lobby::try_active()?))
+}
+
 pub fn scene_enabled() -> bool { context().is_some() }
 pub fn enabled() -> bool {
     scene_enabled() && !crate::runtime::roster::character_roster::busy() && !super::lobby::native_ui_busy()

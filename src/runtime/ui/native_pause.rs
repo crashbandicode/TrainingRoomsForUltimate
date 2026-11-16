@@ -16,7 +16,10 @@ pub unsafe fn observe(layout: *mut Layout, registration: bool) {
     let Some(name) = registry::layout_name(layout) else { return };
     let waiting = name == b"info_waiting";
     if name != b"info_training" && !waiting { return; }
-    let active = if waiting { crate::runtime::lobby::training::lobby::requested() }
+    let active = if waiting {
+        let Ok(active) = crate::runtime::lobby::training::lobby::try_requested() else { return; };
+        active
+    }
         else { crate::runtime::game::is_training_mode() };
     if !active {
         input_delay::retire_pause_layout(epoch, layout as usize);

@@ -71,6 +71,12 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
         INVALIDATE.store(true, Ordering::Release);
         REGISTRATIONS.fetch_add(1, Ordering::AcqRel);
     }
+    // Registration invalidation above must survive a deferred initial calculate:
+    // the next regular pass must never use panes from a previous layout lifetime.
+    let lobby = if waiting {
+        let Ok(active) = crate::runtime::lobby::training::lobby::try_requested() else { return; };
+        active
+    } else { false };
     hud::run(layout, name);
     hud::hud_rule(layout, name);
     hud::cpu_panels(layout, name);
@@ -79,7 +85,6 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     }
     // Attribution (lead, 2026-11-02): the menu's own allocations inside the UI tick are charged here (thumbnails apart).
     let _scope = crate::runtime::alloc::HookScope::enter_hook(crate::runtime::alloc::HookId::MenuDraw);
-    let lobby = crate::runtime::lobby::training::lobby::requested();
     if waiting {
         // The waiting layout can outlive a practice request. Hide its whole
         // plugin host when that request ends, even though the layout remains.

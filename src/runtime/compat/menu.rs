@@ -45,16 +45,26 @@ static EDIT_HANDOFF: hos_lock::TripleBuffer<Option<(u32, TrainingModpackMenu)>> 
 pub struct Menu;
 pub static MENU: Menu = Menu;
 
+pub use crate::model::menu_read::MenuBusy;
+
+/// A game-thread menu read that defers on contention instead of waiting or guessing.
+/// A successful read preserves the current publish-generation/edit precedence.
+pub fn try_current_menu() -> Result<TrainingModpackMenu, MenuBusy> {
+    let generation = crate::runtime::published::live_generation();
+    let edit = EDITED.try_lock().map(|edit| *edit);
+    crate::model::menu_read::try_current(generation, edit, || {
+        crate::runtime::published::live().map_or(BASE_MENU, |live| live.menu)
+    })
+}
+
 /// The typed menu now: a game-side edit made since the last publish, else the published rows (`published::Live`), else the factory
 /// values. The published value is read wait-free (stream/sync).
 fn current_menu() -> TrainingModpackMenu {
     let generation = crate::runtime::published::live_generation();
-    if let Some((at, menu)) = *EDITED.lock() {
-        if at == generation {
-            return menu;
-        }
-    }
-    crate::runtime::published::live().map_or(BASE_MENU, |live| live.menu)
+    let edit = *EDITED.lock();
+    crate::model::menu_read::current(generation, edit, || {
+        crate::runtime::published::live().map_or(BASE_MENU, |live| live.menu)
+    })
 }
 
 /// The typed menu on a plugin thread: the view [`current_menu`] gives, read the way the publishing path reads it (the edit handoff and
