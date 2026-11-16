@@ -1363,7 +1363,8 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             run.reference_last = Some((stopped, record));
         }
         if stopped {
-            if run.stopped_span.observe(run.age).is_none() || log_stop(&run,accessor,"reference").is_none() {
+            let stop_age = run.age;
+            if run.stopped_span.observe(stop_age).is_none() || log_stop(&run,accessor,"reference").is_none() {
                 invalid_reference(&mut run,"stop_interval"); return;
             }
             let identity = match run.reference.stopped(record) {
@@ -1495,7 +1496,8 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
     if run.started && !just_launched {
         if !run.ordinary() && !run.stop_released {
             if natives::is_stop(accessor) {
-                if run.stopped_span.observe(run.age).is_none() || log_stop(&run,accessor,"stopped").is_none() {
+                let stop_age = run.age;
+                if run.stopped_span.observe(stop_age).is_none() || log_stop(&run,accessor,"stopped").is_none() {
                     diagnostic(format_args!("[TechDirect] fault=stop_interval")); run.stop();
                 }
                 return;
