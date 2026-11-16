@@ -87,10 +87,12 @@ pub fn request(text: &str) {
     }
     let command = match text {
         "ordinary" => 1,
+        "ordinary-front" => 14,
         "walk" => 4,
         "off" => 5,
         "inspect" => 6,
         "direct-v3" => 13,
+        "direct-v4-behind" => 15,
         _ => {
             diagnostic(format_args!("[TechDirect] request invalid"));
             return;
@@ -174,6 +176,9 @@ struct MotionContext {
     cursor: bool,
     cursor_frame: i32,
     paralyze_frame: i32,
+    reserve_damage_lr: u32,
+    lr: u32,
+    motion_speed: [u32; 2],
 }
 unsafe fn motion_context(accessor: usize) -> Option<MotionContext> {
     let damage_stop: extern "C" fn(usize) -> bool =
@@ -208,6 +213,16 @@ unsafe fn motion_context(accessor: usize) -> Option<MotionContext> {
         stopped_damage: damage_stop(accessor),
         cursor: natives::is_flag(accessor, id("FIGHTER_INSTANCE_WORK_ID_FLAG_CURSOR")?),
         cursor_frame: natives::get_int(accessor, id("FIGHTER_INSTANCE_WORK_ID_INT_CURSOR_FRAME")?),
+        reserve_damage_lr: natives::get_float(
+            accessor,
+            id("FIGHTER_STATUS_WORK_ID_FLOAT_RESERVE_DAMAGE_LR")?,
+        )
+        .to_bits(),
+        lr: natives::lr(accessor).to_bits(),
+        motion_speed: {
+            let v = motion_velocity(accessor)?;
+            [v.x.to_bits(), v.y.to_bits()]
+        },
         paralyze_frame: natives::get_int(
             accessor,
             id("FIGHTER_INSTANCE_WORK_ID_INT_INVALID_PARALYZE_FRAME")?,
@@ -284,10 +299,7 @@ fn log_hidden_snapshot(
     grounded: bool,
     stopped: bool,
 ) {
-    let kind = match run.mode {
-        1 => "ordinary",
-        _ => "fresh",
-    };
+    let kind = if run.ordinary() { "ordinary" } else { "fresh" };
     let (alternate_speed, alternate_frames) = h.alternate.unwrap_or(([0; 2], 0));
     diagnostic(format_args!(
         "[TechDirect] hidden attempt={} mode={} kind={kind} moment={moment} frame={} age={} vptr=0x{:x} vptr_offset=0x{:x} reset={} enabled={} b4={:08x} b8={:04x} ba={:02x} bb={:02x} speed=({:08x},{:08x}) accel=({:08x},{:08x}) brake=({:08x},{:08x}) limit=({:08x},{:08x}) alt_present={} alt_speed=({:08x},{:08x}) alt_frames={} reaction={:08x} reaction_last={:08x} speed_up={} speed_up_max={:08x} fly_air={} end_reaction={} ground={} status={} grounded={}",
@@ -300,10 +312,10 @@ fn log_hidden_snapshot(
     ));
     let m = h.motion;
     diagnostic(format_args!(
-        "[TechDirect] context attempt={} mode={} kind={kind} moment={moment} frame={} age={} motion_actual={:016x} motion_pending={:016x} motion_frame={:08x} motion_rate={:08x} damage_motion_rate={:08x} init_reaction={:08x} rotation={:08x} roll_set_angle={} pierce_ground={} stopped_damage={} stopped={} cursor={} cursor_frame={} paralyze_frame={} paths=fe844/ffd90/fe99c/feb84/fef5c path_execution=UNOBSERVED reset_type={} type5_info_read=UNOBSERVED",
+        "[TechDirect] context attempt={} mode={} kind={kind} moment={moment} frame={} age={} motion_actual={:016x} motion_pending={:016x} motion_frame={:08x} motion_rate={:08x} damage_motion_rate={:08x} init_reaction={:08x} rotation={:08x} roll_set_angle={} pierce_ground={} stopped_damage={} stopped={} cursor={} cursor_frame={} paralyze_frame={} reserve_damage_lr={:08x} lr={:08x} motion_speed=({:08x},{:08x}) paths=fe844/ffd90/fe99c/feb84/fef5c path_execution=UNOBSERVED reset_type={} type5_info_read=UNOBSERVED",
         run.attempt,run.mode_name(),run.sample,age,m.actual,m.pending,m.frame,m.rate,
         m.damage_rate,m.init_reaction,m.rotation,m.roll_set_angle,m.pierce_ground,m.stopped_damage,
-        stopped,m.cursor,m.cursor_frame,m.paralyze_frame,h.reset_type
+        stopped,m.cursor,m.cursor_frame,m.paralyze_frame,m.reserve_damage_lr,m.lr,m.motion_speed[0],m.motion_speed[1],h.reset_type
     ));
 }
 struct Spike {
@@ -347,8 +359,11 @@ impl Spike {
             reference_last: None,
         }
     }
+    fn ordinary(&self) -> bool {
+        matches!(self.mode, 1 | 14)
+    }
     fn mode_name(&self) -> &'static str {
-        if self.mode == 1 {
+        if self.ordinary() {
             "ordinary"
         } else {
             "direct"
@@ -485,7 +500,7 @@ unsafe fn v1_damage_module(accessor: usize) -> Option<()> {
 }
 
 fn complete_baseline(run: &mut Spike) {
-    if run.mode != 1 || run.sample < 20 || !run.contact {
+    if !run.ordinary() || run.sample < 20 || !run.contact {
         return;
     }
     let Some(baseline) = run.baseline.as_mut().filter(|b| !b.complete) else {
@@ -532,14 +547,41 @@ fn invalid_reference(run: &mut Spike, field: &str) {
     run.stop();
 }
 
-unsafe fn energy(accessor: usize) -> Option<usize> {
+unsafe fn kinetic_energy(accessor: usize, name: &str) -> Option<usize> {
     let get: extern "C" fn(usize, i32) -> usize =
         std::mem::transmute(game::text_base() + 0x2043970);
-    let value = get(accessor, id("FIGHTER_KINETIC_ENERGY_ID_DAMAGE")?);
+    let value = get(accessor, id(name)?);
     (value != 0 && value & 7 == 0).then_some(value)
 }
+/// Native constructor registers this concrete energy as id0; reject other virtual layouts.
+/// Owned ELF constructor6887d4, module table4f88568 and energy table4f888b8.
+unsafe fn motion_velocity(accessor: usize) -> Option<Vec2> {
+    let base = game::text_base();
+    let pointer = |p: usize| p >= 0x1000 && p & 7 == 0 && p >> 47 == 0;
+    let module = ((accessor + 0x68) as *const usize).read();
+    if !pointer(module) {
+        return None;
+    }
+    let vptr = (module as *const usize).read();
+    if vptr != base + 0x4f88568 || ((vptr + 0x60) as *const usize).read() != base + 0x479d40 {
+        diagnostic(format_args!("[TechDirect] fault=motion_module_type"));
+        return None;
+    }
+    let value = kinetic_energy(accessor, "FIGHTER_KINETIC_ENERGY_ID_MOTION")?;
+    let vptr = (value as *const usize).read();
+    if vptr != base + 0x4f888b8 || ((vptr + 0x20) as *const usize).read() != base + 0x3b3540 {
+        diagnostic(format_args!("[TechDirect] fault=motion_energy_type"));
+        return None;
+    }
+    energy_velocity(value)
+}
+unsafe fn energy(accessor: usize) -> Option<usize> {
+    kinetic_energy(accessor, "FIGHTER_KINETIC_ENERGY_ID_DAMAGE")
+}
 unsafe fn velocity(accessor: usize) -> Option<Vec2> {
-    let energy = energy(accessor)?;
+    energy_velocity(energy(accessor)?)
+}
+unsafe fn energy_velocity(energy: usize) -> Option<Vec2> {
     let x: extern "C" fn(usize) -> f32 = std::mem::transmute(game::text_base() + 0x20f6460);
     let y: extern "C" fn(usize) -> f32 = std::mem::transmute(game::text_base() + 0x20f6480);
     let v = Vec2 {
@@ -739,7 +781,32 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
         run.mode,
         native_reaction.to_bits()
     ));
+    // v4 behind diagnostic only: observe whether the native status init retains this input.
+    let reserve = if run.mode == 15 {
+        let baseline = run.baseline.filter(|b| b.complete)?;
+        let value = f32::from_bits(baseline.hidden.motion.reserve_damage_lr);
+        natives::set_float(
+            accessor,
+            value,
+            id("FIGHTER_STATUS_WORK_ID_FLOAT_RESERVE_DAMAGE_LR")?,
+        );
+        diagnostic(format_args!("[TechDirect] reserve_lr_write attempt={} command={} baseline_attempt={} value={:08x} readback={:08x} before_status=true",
+            run.attempt,run.mode,baseline.attempt,value.to_bits(),
+            natives::get_float(accessor,id("FIGHTER_STATUS_WORK_ID_FLOAT_RESERVE_DAMAGE_LR")?).to_bits()));
+        Some(value.to_bits())
+    } else {
+        None
+    };
     natives::change_status_force(accessor, id("FIGHTER_STATUS_KIND_DAMAGE_FLY")?, false);
+    if let Some(written) = reserve {
+        let actual = natives::get_float(
+            accessor,
+            id("FIGHTER_STATUS_WORK_ID_FLOAT_RESERVE_DAMAGE_LR")?,
+        )
+        .to_bits();
+        diagnostic(format_args!("[TechDirect] reserve_lr_after attempt={} command={} written={written:08x} actual={actual:08x} survives={} motion={:016x}",
+            run.attempt,run.mode,written==actual,natives::motion_kind(accessor)));
+    }
     if !is_status(
         natives::status_kind(accessor),
         "FIGHTER_STATUS_KIND_DAMAGE_FLY",
@@ -946,13 +1013,29 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
         if run.active && run.arrange_cpu {
             let input = Input {
                 origin: Vec2 {
-                    x: run.input.origin.x - 12.0,
+                    x: run.input.origin.x
+                        + if run.mode == 14 {
+                            12.0 * run.input.lr
+                        } else {
+                            -12.0 * run.input.lr
+                        },
                     y: run.input.origin.y,
+                },
+                lr: if run.mode == 14 {
+                    -run.input.lr
+                } else {
+                    run.input.lr
                 },
                 ..Input::empty()
             };
             place(accessor, input);
             run.arrange_cpu = false;
+            if let Some(p1) = natives::module_accessor(0) {
+                diagnostic(format_args!("[TechDirect] reference_side attempt={} command={} side={} p1_x={:08x} p1_y={:08x} p1_lr={:08x} cpu_x={:08x} cpu_y={:08x} cpu_lr={:08x}",
+                    run.attempt,run.mode,if run.mode == 14 {"front"} else {"behind"},
+                    natives::pos_x(p1).to_bits(),natives::pos_y(p1).to_bits(),natives::lr(p1).to_bits(),
+                    natives::pos_x(accessor).to_bits(),natives::pos_y(accessor).to_bits(),natives::lr(accessor).to_bits()));
+            }
             diagnostic(format_args!(
                 "[TechDirect] ordinary_cpu_fixture x={:08x} y={:08x} lr={:08x} unmodified_move=true",
                 input.origin.x.to_bits(),
@@ -1057,7 +1140,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             return;
         }
         let angle = 315.0;
-        let direction = if command == 13 {
+        let direction = if matches!(command, 13 | 15) {
             native_direction(angle).map(|v| v.0)
         } else {
             Some(Vec2::default())
@@ -1069,18 +1152,22 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
         };
         let origin = Vec2 {
             x: natives::pos_x(accessor),
-            y: natives::pos_y(accessor) + if command == 1 { 0.0 } else { 30.0 },
+            y: natives::pos_y(accessor) + if matches!(command, 1 | 14) { 0.0 } else { 30.0 },
         };
         run.input = Input {
             origin,
             direction,
             kb: 100.0,
             angle,
-            percent: if command == 1 { 20.0 } else { 60.0 },
+            percent: if matches!(command, 1 | 14) {
+                20.0
+            } else {
+                60.0
+            },
             weight: natives::weight(accessor),
             lr: 1.0,
         };
-        if command == 13 && baseline.is_some() {
+        if matches!(command, 13 | 15) && baseline.is_some() {
             let Some(baseline) = baseline.filter(|b| b.complete && Some(b.scope) == receipt) else {
                 diagnostic(format_args!("[TechDirect] fault=baseline_incomplete"));
                 run.stop();
@@ -1096,7 +1183,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             diagnostic(format_args!("[TechDirect] baseline_adopted attempt={} command={} baseline_attempt={} kb={:08x} direction_x={:08x} direction_y={:08x} percent={:08x} weight={:08x} start_x={:08x} start_y={:08x} lr={:08x} ground_at_hit={} hitlag_vx={:08x} hitlag_vy={:08x}",
                 run.attempt,command,baseline.attempt,input.kb.to_bits(),input.direction.x.to_bits(),input.direction.y.to_bits(),
                 input.percent.to_bits(),input.weight.to_bits(),input.origin.x.to_bits(),input.origin.y.to_bits(),input.lr.to_bits(),baseline.hidden.flags[3],baseline.hitlag_velocity.x.to_bits(),baseline.hitlag_velocity.y.to_bits()));
-        } else if command == 13 {
+        } else if matches!(command, 13 | 15) {
             let input = run.input;
             diagnostic(format_args!("[TechDirect] baseline_cold attempt={} command={} baseline_attempt=0 kb={:08x} direction_x={:08x} direction_y={:08x} percent={:08x} weight={:08x} start_x={:08x} start_y={:08x} lr={:08x} source=fixed",
                 run.attempt,command,input.kb.to_bits(),input.direction.x.to_bits(),input.direction.y.to_bits(),
@@ -1105,7 +1192,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
         place(accessor, run.input);
         state::heal(accessor, -natives::damage(accessor, 0));
         state::add_damage(accessor, run.input.percent);
-        if matches!(command, 1 | 13) {
+        if matches!(command, 1 | 13 | 14 | 15) {
             let (Some(ground), Some(wait)) =
                 (id("SITUATION_KIND_GROUND"), id("FIGHTER_STATUS_KIND_WAIT"))
             else {
@@ -1115,7 +1202,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
             };
             state::set_situation_kind(accessor, ground);
             natives::change_status_force(accessor, wait, false);
-            if command == 1 {
+            if run.ordinary() {
                 run.baseline = None;
                 run.arrange_cpu = true;
                 diagnostic(format_args!(
@@ -1142,7 +1229,7 @@ pub unsafe fn frame(fighter: usize, receipt: Option<FrameReceipt>) {
     }
     run.age = run.age.saturating_add(1);
     let status = natives::status_kind(accessor);
-    if run.mode == 1 && !run.started && (tumble(status) || run.baseline.is_some()) {
+    if run.ordinary() && !run.started && (tumble(status) || run.baseline.is_some()) {
         if natives::module_accessor(1).and_then(|a| natives::fighter_kind(a))
             != Some(REFERENCE_CPU_KIND as i32)
         {

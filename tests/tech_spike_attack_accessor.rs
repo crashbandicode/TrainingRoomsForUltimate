@@ -117,3 +117,84 @@ fn direct_v3_windows_cover_owned_magnitude_body_and_trig_imports() {
     }
     assert_eq!(v3_guards::MAIN_IMAGE_END, 0x4f17000 + 0x2530100);
 }
+
+#[test]
+fn motion_getter_virtual_targets_match_owned_code() {
+    let Some(owned) = common::owned_main("motion_getter_virtual_targets_match_owned_code") else {
+        return;
+    };
+    for (name, address) in [
+        ("motion_speed_virtual_target", 0x3b3540),
+        ("kinetic_get_energy_virtual_target", 0x479d40),
+    ] {
+        assert_eq!(
+            *setter_guard(name, address),
+            owned.window(address),
+            "{name}: all64 guarded bytes match the owned ELF"
+        );
+    }
+    // These are relocated native virtual slots, not the ELF's zero placeholders.
+    assert_eq!(relative_pointer(&owned, 0x4f88568 + 0x60), 0x479d40);
+    assert_eq!(relative_pointer(&owned, 0x4f888b8 + 0x20), 0x3b3540);
+    // The shared native speed getter returns the vector stored at energy+0x10.
+    let bytes = owned.window(0x3b3540);
+    assert_eq!(
+        u32::from_le_bytes(bytes[..4].try_into().unwrap()),
+        0x91004000
+    );
+    assert_eq!(
+        u32::from_le_bytes(bytes[4..8].try_into().unwrap()),
+        0xd65f03c0
+    );
+}
+
+fn relative_pointer(owned: &common::OwnedMain, slot: usize) -> usize {
+    let b = &owned.bytes;
+    let u16_at = |i: usize| u16::from_le_bytes(b[i..i + 2].try_into().unwrap()) as usize;
+    let u32_at = |i: usize| u32::from_le_bytes(b[i..i + 4].try_into().unwrap()) as usize;
+    let u64_at = |i: usize| u64::from_le_bytes(b[i..i + 8].try_into().unwrap()) as usize;
+    let phoff = u64_at(32);
+    let phentsize = u16_at(54);
+    let phnum = u16_at(56);
+    let file_at = |va: usize, size: usize| {
+        (0..phnum)
+            .find_map(|i| {
+                let h = phoff + i * phentsize;
+                let start = u64_at(h + 16);
+                let end = start.checked_add(u64_at(h + 32))?;
+                (u32_at(h) == 1 && va >= start && va.checked_add(size)? <= end)
+                    .then(|| u64_at(h + 8) + va - start)
+            })
+            .unwrap_or_else(|| panic!("unmapped owned VA {va:#x}"))
+    };
+    let word = |va: usize| u64_at(file_at(va, 8));
+    let mod0 = u32_at(file_at(4, 4));
+    assert_eq!(&b[file_at(mod0, 4)..file_at(mod0, 4) + 4], b"MOD0");
+    let dyn_rel = u32_at(file_at(mod0 + 4, 4)) as u32 as i32;
+    let mut at = mod0.checked_add_signed(dyn_rel as isize).unwrap();
+    let (mut rela, mut relasz) = (None, None);
+    loop {
+        let (tag, value) = (word(at), word(at + 8));
+        at += 16;
+        match tag {
+            0 => break,
+            7 => rela = Some(value),
+            8 => relasz = Some(value),
+            _ => {}
+        }
+    }
+    let rela = rela.unwrap();
+    let relasz = relasz.unwrap();
+    assert_eq!(relasz % 24, 0);
+    let mut found = None;
+    for at in (rela..rela + relasz).step_by(24) {
+        if word(at) == slot {
+            assert_eq!(word(at + 8) & 0xffff_ffff, 0x403);
+            assert!(
+                found.replace(word(at + 16)).is_none(),
+                "duplicate slot relocation"
+            );
+        }
+    }
+    found.unwrap_or_else(|| panic!("no RELATIVE relocation for {slot:#x}"))
+}
