@@ -363,4 +363,8 @@ reports RED against 148194; counter, formatter rules and size-budget.toml remain
 unchanged. Final measured rc.15 ceiling adjustment belongs to final integration
 under operator approval. Evidence: lucas-gate-4ff7cf28-surface/BUDGET-ENTRY.md
 and its retained canonical gate receipts. This records the Lucas allowance only;
-Olimar40 and Inkling102 combined size/build/runtime gates are still pending.
+Olimar40 and Inkling102 canonical build gates subsequently completed on 3fd57e54:
+150991 (+28 over Lucas; +46 over f02), clippy and no-default-features clean,
+release and diagnostic builds successful. Runtime acceptance remains pending.
+Evidence: combined-gate-3fd57e54-surface/SUMMARY.md. The same operator final-total
+approval applies; the ceiling remains unchanged.

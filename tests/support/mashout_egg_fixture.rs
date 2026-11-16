@@ -826,6 +826,7 @@ mod game {
     pub fn lua_const(hash: u64) -> Option<i32> {
         for (name, id) in [
             ("FIGHTER_STATUS_KIND_SPECIAL_N", 476),
+            ("FIGHTER_STATUS_KIND_SPECIAL_HI", 478),
             ("FIGHTER_STATUS_KIND_CATCH", 50),
             ("FIGHTER_STATUS_KIND_CATCH_DASH", 54),
             ("FIGHTER_STATUS_KIND_CATCH_TURN", 55),
@@ -1040,6 +1041,95 @@ fn roller_miss_and_nonbury_seed_still_fail() {
         let mut g=Game::new(Plan::Roller,State::Bury);startup(&mut g,m.p1());
         m.seed(100.0,9.0,1);m.start();m.update(&mut g,203);
         assert_eq!(g.failed,Some("Move entry unconfirmed · no grade"));
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+    }
+}
+
+#[test]
+fn dedede_up_special_requests_native_start_and_uses_actual_bury_seed() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut g = Game::new(Plan::UpSpecial, State::Bury);
+        let request = g.requested.as_mut().unwrap();
+        request.id = 99;
+        request.attacker_kind = 42;
+        request.attacker_name = "King Dedede";
+        m.body[3] = 42;
+        g.step = Step::Settle;
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 478)]);
+        assert_eq!(g.step, Step::Entering);
+        assert_eq!(ARMED.load(Ordering::Relaxed), g.generation);
+        for cpu_status in [478, 502, 503] {
+            CPU_STATUS.store(cpu_status, Ordering::Relaxed);
+            m.update(&mut g, 0);
+            assert_eq!(g.step, Step::Entering);
+            assert_eq!(
+                DRIVEN.with_borrow(|v| *v.last().unwrap()),
+                MappedInputs::NEUTRAL
+            );
+            assert!(g.clock.is_none());
+        }
+        m.seed(136.25, 9.0, 1);
+        let actual = reader::sample(m.p1(), 0.37).unwrap().seed();
+        let before = (m.control, m.record);
+        m.start();
+        m.update(&mut g, 75);
+        assert_eq!(g.step, Step::Held);
+        assert_eq!(g.clock.unwrap().last(), actual.record);
+        let begins = BEGINS.with_borrow(Clone::clone);
+        assert_eq!(begins.len(), 1);
+        assert_eq!(begins[0].1, actual);
+        assert_eq!((m.control, m.record), before);
+        assert_eq!(
+            DRIVEN.with_borrow(|v| *v.last().unwrap()),
+            MappedInputs::NEUTRAL
+        );
+        assert_eq!(
+            entry::controls(Plan::UpSpecial, false),
+            MappedInputs::NEUTRAL
+        );
+        assert_eq!(
+            entry::controls(Plan::UpSpecial, true),
+            MappedInputs::NEUTRAL
+        );
+        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 478)]);
+    }
+}
+#[test]
+fn dedede_up_special_miss_and_nonbury_seed_keep_existing_refusals() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut g = Game::new(Plan::UpSpecial, State::Bury);
+        let q = g.requested.as_mut().unwrap();
+        q.id = 99;
+        q.attacker_kind = 42;
+        q.attacker_name = "King Dedede";
+        m.body[3] = 42;
+        startup(&mut g, m.p1());
+        CPU_STATUS.store(478, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        assert_eq!(
+            g.failed,
+            Some("Move did not capture · reopen menu to retry")
+        );
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+        let mut g = Game::new(Plan::UpSpecial, State::Bury);
+        let q = g.requested.as_mut().unwrap();
+        q.id = 99;
+        q.attacker_kind = 42;
+        q.attacker_name = "King Dedede";
+        m.body[3] = 42;
+        startup(&mut g, m.p1());
+        CPU_STATUS.store(502, Ordering::Relaxed);
+        m.seed(100.0, 9.0, 1);
+        m.start();
+        m.update(&mut g, 203);
+        assert_eq!(g.failed, Some("Move entry unconfirmed · no grade"));
+        assert!(g.clock.is_none());
         assert!(BEGINS.with_borrow(Vec::is_empty));
     }
 }
