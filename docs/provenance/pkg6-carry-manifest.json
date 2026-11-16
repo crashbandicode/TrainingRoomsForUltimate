@@ -2678,7 +2678,7 @@
    "dest": "src/model/mii/ordinary_cpu.rs",
    "crate": "mii",
    "src_sha256": "e4628b4e3e7a00dc2c29d715b9755284f5afa3446513824912066178f0cc6caf",
-   "dest_sha256": "bd29e7177fa178d3828ab0bd0facc6f07f62f172f74c901f4bad74b7d45a865d",
+   "dest_sha256": "7bef3b1296cc8cf9f668ad6aa1298675f60dee1920e7a79705126f721849e936",
    "edits": [
     {
      "old": "/// and an extra index/selector equal to the destination refuses. A protected set\n/// that cannot fit the fixed record table refuses instead of truncating.\npub fn assignment_with(layout:crate::engine::mii::backend::Layout,extras:crate::engine::mii::capacity::Extras,\n    destination:usize,owners:&[Option<Owner>;8])->Option<[Option<u16>;8]> {\n    if !layout.selector(destination) || extras.entry(destination).is_some() {return None;}\n    if !layout.shape_with(&owners.map(|o|o.map_or(0,|o|o.entry)),extras) {\n        return None;\n    }\n    let mut protected = [None; 8];\n    let mut used = 0;\n",
@@ -2971,6 +2971,16 @@
      "old": "/// rc.14 mii-freed (the primary 2026-11-15 ~11:40Z): fail-first stub, today's gate (a hat change always Reloads).\npub fn demand_gate(reuse:bool,replay:bool,refresh_partners:bool,same_class:bool,hat_change:bool,mii_group:bool)->bool {\n    let _=mii_group;\n    !reuse && !replay && !refresh_partners && !same_class && !hat_change\n",
      "new": "/// rc.14 mii-freed (the primary 2026-11-15 ~11:40Z): a hat change used to send every such press to the Reload, so a\n/// Mii whose group a shrink (or any release) had freed came back canonically when its hat differed from the CPU's\n/// (Eden rr2-n3 #880-#900). A saved Mii's group carries its own hat, so only a non-Mii hat change keeps the Reload.\npub fn demand_gate(reuse:bool,replay:bool,refresh_partners:bool,same_class:bool,hat_change:bool,mii_group:bool)->bool {\n    !reuse && !replay && !refresh_partners && !same_class && (!hat_change || mii_group)\n",
      "reason": "rc.14 mii-freed fix: rc.14 mii-freed: a saved Mii served by its own group waits for it even with a hat change (demand_gate)"
+    },
+    {
+     "old": "pub const OWNER: usize = 1;\n#[cfg(test)]\npub const DESTINATION: u16 = 1;\n\n/// Exact native CPU descriptor receipts qualify all three classes. Runtime adapter acceptance is separate.\npub fn supported_kind(kind: u32) -> bool { matches!(kind, 0x48..=0x4a) }\n",
+     "new": "pub const OWNER: usize = 1;\n#[cfg(test)]\npub const DESTINATION: u16 = 1;\n\n// restriction: character-swap-busy\npub const SWAP_BUSY_NOTICE: &str = \"Wait for the character swap to finish\";\n\n/// The ordinary CPU owner's existing admission predicate and shared Cycle refusal.\npub fn cpu_intercept_admission(\n    departed: bool, busy: bool, pending: bool, replace_restore: bool,\n    request_supported: bool, user_cycle: bool,\n) -> (bool, Option<&'static str>) {\n    let admitted = !departed && !busy && (!pending || replace_restore) && request_supported;\n    (admitted, (!admitted && user_cycle && (busy || pending)).then_some(SWAP_BUSY_NOTICE))\n}\n\n/// Exact native CPU descriptor receipts qualify all three classes. Runtime adapter acceptance is separate.\npub fn supported_kind(kind: u32) -> bool { matches!(kind, 0x48..=0x4a) }\n",
+     "reason": "FS04: shared ordinary CPU Cycle pending-refusal notice; preserve Direct admission and notifier."
+    },
+    {
+     "old": "#[cfg(test)]\n#[path=\"created_destination_tests.rs\"]\nmod created_destination_tests;\n",
+     "new": "#[cfg(test)]\n#[path=\"created_destination_tests.rs\"]\nmod created_destination_tests;\n\n#[cfg(test)]\nmod cpu_intercept_notice_tests {\n    use super::{cpu_intercept_admission, SWAP_BUSY_NOTICE};\n\n    #[test]\n    fn cpu_pending_cycle_is_consumed_with_shared_notice() {\n        // The first request remains pending: the second detected Cycle is consumed,\n        // rather than queued over it, and selects the generic roster's exact notice.\n        let pending_cycle = cpu_intercept_admission(false, false, true, false, true, true);\n        assert_eq!(pending_cycle, (false, Some(SWAP_BUSY_NOTICE)));\n        assert_eq!(pending_cycle.1, Some(SWAP_BUSY_NOTICE));\n        assert_eq!(cpu_intercept_admission(false, true, false, false, true, true), (false, Some(SWAP_BUSY_NOTICE)));\n        assert_eq!(SWAP_BUSY_NOTICE, \"Wait for the character swap to finish\");\n        // An automatic request has no user-facing refusal.\n        let automatic = cpu_intercept_admission(false, false, true, false, true, false);\n        assert_eq!(automatic, (false, None));\n        assert_eq!(automatic.1, None);\n    }\n\n    #[test]\n    fn cpu_direct_refusal_and_restore_replacement_are_unchanged() {\n        // Manual Direct does not become Cycle's busy-notice path. Runtime retains\n        // its existing \"Finish the current practice action first\" notifier.\n        let direct = cpu_intercept_admission(false, false, true, false, true, false);\n        assert_eq!(direct, (false, None));\n        assert_eq!(direct.1, None);\n        assert_eq!(cpu_intercept_admission(false, true, false, false, true, false), (false, None));\n        // Before INSTALL, the explicit Direct pick still supersedes its pending restore.\n        assert_eq!(cpu_intercept_admission(false, false, true, true, true, false), (true, None));\n        assert_eq!(cpu_intercept_admission(false, true, true, true, true, false), (false, None));\n    }\n\n    #[test]\n    fn cpu_intercept_preserves_admission_boundaries() {\n        assert_eq!(cpu_intercept_admission(false, false, false, false, true, true), (true, None));\n        assert_eq!(cpu_intercept_admission(true, false, false, false, true, true), (false, None));\n        assert_eq!(cpu_intercept_admission(false, false, false, false, false, true), (false, None));\n        assert_eq!(cpu_intercept_admission(true, false, true, true, true, false), (false, None));\n        assert_eq!(cpu_intercept_admission(false, false, true, true, false, false), (false, None));\n    }\n}\n",
+     "reason": "FS04: shared ordinary CPU Cycle pending-refusal notice; preserve Direct admission and notifier."
     }
    ]
   },
@@ -12333,7 +12343,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "fcd0b5888ef014f5dbdf3c60fd9eacfabfd17722711a29ca4abbccf009db49d7",
+   "dest_sha256": "8563fce77fa0679502fe9bb449e2f992c057cfc47a67b2429123343070be82c5",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -13591,6 +13601,11 @@
      "old": "    waiting_icon_source(base).map(|(_, pane)| pane)\n}\n",
      "new": "    waiting_icon_source(base).map(|(_, pane)| pane)\n}\n\n/// Hide CPU in a waiting room: CPU4's partner card in `info_waiting` (`tp_0N`: window, damage, portrait), the parent of\n/// the partner portrait `waiting_partner_icon` resolves as the game's damage setters do. Read fresh each time, only a\n/// pane named like a partner card is returned (`hide::room_card`), nothing is cached and nothing is allocated. `None` until\n/// the roster's own seam gate passed (`BASE`), so the waiting-UI natives are only called on a checked game.\npub(crate) unsafe fn waiting_cpu_card() -> Option<*mut skyline::nn::ui2d::Pane> {\n    use skyline::nn::ui2d::Pane;\n    let base = BASE.load(Ordering::Acquire);\n    if base == 0 {\n        return None;\n    }\n    let picture = pointer_chain(waiting_icon_pane(base, 4)?, &[8])?;\n    let card = pointer_chain(picture, &[core::mem::offset_of!(Pane, parent)])?;\n    let name = read::<[u8; 25]>(card, core::mem::offset_of!(Pane, name));\n    crate::model::cpu::hide::room_card(&name).then_some(card as *mut Pane)\n}\n",
      "reason": "rc.14 hide-room-panel (the primary 2026-11-15 ~12:58Z): Hide CPU in a waiting room hides CPU4's info_waiting partner card (tp_0N), found as the parent of the partner portrait waiting_partner_icon resolves"
+    },
+    {
+     "old": "        return;\n    };\n    let occupied = if busy() {\n        Some(\"Wait for the character swap to finish\")\n    } else if training::recording_or_playback() {\n        Some(\"Finish recording or playback before swapping\")\n    } else if training::save_states::is_loading() {\n",
+     "new": "        return;\n    };\n    let occupied = if busy() {\n        Some(crate::engine::mii::ordinary_cpu::SWAP_BUSY_NOTICE)\n    } else if training::recording_or_playback() {\n        Some(\"Finish recording or playback before swapping\")\n    } else if training::save_states::is_loading() {\n",
+     "reason": "FS04: shared ordinary CPU Cycle pending-refusal notice; preserve Direct admission and notifier."
     }
    ]
   },
@@ -22862,7 +22877,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "1aa4ab14efd281ff3cdd07e780255dcae28f657a62b8fa86f66e75220025d007",
+   "dest_sha256": "eb9f646deecbd7353a486841c80cc43885884d8620e3dcdbbf5e7d8c98b458a7",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -23700,6 +23715,16 @@
      "old": "    if !reuse && request.replay().is_none() && !request.refresh_partners() && same_class.is_none() && !hat_change {\n        let kind=descriptor_kind(&descriptor);\n        let configuration=match destination.target.kind() {\n            TargetKind::Fighter(_)=>Some(None),\n            TargetKind::Original if origin_saved.is_none()=>Some(None),\n            TargetKind::Saved=>publish.filter(|_|MiiClass::from_kind(kind).is_some()).map(Some),\n            _=>None,\n        };\n",
      "new": "    // rc.14 mii-freed: a saved Mii whose hat differs from the CPU's (`hat_change`) waits for its own Mii group too; that\n    // group's plan carries the configuration's hat (`demand_gate`). Eden rr2-n3 #880-#900: the Reload instead.\n    let kind=descriptor_kind(&descriptor);\n    let configuration=match destination.target.kind() {\n        TargetKind::Fighter(_)=>Some(None),\n        TargetKind::Original if origin_saved.is_none()=>Some(None),\n        TargetKind::Saved=>publish.filter(|_|MiiClass::from_kind(kind).is_some()).map(Some),\n        _=>None,\n    };\n    if crate::engine::mii::ordinary_cpu::demand_gate(reuse,request.replay().is_some(),request.refresh_partners(),\n        same_class.is_some(),hat_change,matches!(configuration,Some(Some(_)))) {\n",
      "reason": "rc.14 mii-freed fail-first: rc.14 mii-freed: demand_gate stub (today's gate) and its fail-first case; the CPU demand gate calls it"
+    },
+    {
+     "old": "    let manual_direct=user_request && matches!(selection,Selection::Direct(_));\n    // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.\n    let replace_restore=manual_direct && s.restore.is_some();\n    if !s.departed && !s.busy() && (s.request.is_none() || replace_restore) && request.is_some() {\n        s.restore=None;\n        if user_request {WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);}\n        s.request=request;\n",
+     "new": "    let manual_direct=user_request && matches!(selection,Selection::Direct(_));\n    // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.\n    let replace_restore=manual_direct && s.restore.is_some();\n    let (admitted,notice)=crate::engine::mii::ordinary_cpu::cpu_intercept_admission(\n        s.departed,s.busy(),s.request.is_some(),replace_restore,request.is_some(),\n        user_request && matches!(selection,Selection::Cycle));\n    if admitted {\n        s.restore=None;\n        if user_request {WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);}\n        s.request=request;\n",
+     "reason": "FS04: shared ordinary CPU Cycle pending-refusal notice; preserve Direct admission and notifier."
+    },
+    {
+     "old": "    } else {\n        drop(s);note(\"request refused: owned CPU request busy or unsupported\");\n        if manual_direct {notify(Role::Cpu,\"Finish the current practice action first\".into());}\n    }\n    Some(true)\n}\n",
+     "new": "    } else {\n        drop(s);note(\"request refused: owned CPU request busy or unsupported\");\n        if manual_direct {notify(Role::Cpu,\"Finish the current practice action first\".into());}\n        else if let Some(message)=notice {\n            notify(Role::Cpu,message.into());\n        }\n    }\n    Some(true)\n}\n",
+     "reason": "FS04: shared ordinary CPU Cycle pending-refusal notice; preserve Direct admission and notifier."
     }
    ]
   },
