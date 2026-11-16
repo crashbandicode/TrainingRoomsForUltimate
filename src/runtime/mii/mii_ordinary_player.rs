@@ -351,7 +351,7 @@ pub(super) fn request_restore(value:WaitingValue)->bool {
     s.restore=Some(value);s.request=Some(Request::CYCLE);
     true
 }
-pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option<bool> {
+pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<bool> {
     if role!=Role::Player || !ENABLED.load(Ordering::Acquire) {return None;}
     let mut s=STATE.lock();
     let Some(owner)=s.owner.as_ref() else {
@@ -365,7 +365,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
         }
         let automatic=super::mii_auto_init::pending();
         let qualifying=unsafe {mii_backend::ready()} && (automatic || s.capture);
-        let roster=qualifying && matches!(selection,Selection::Cycle) && setting(&MENU).player_roster.fighters_excluding_fixed(None).iter()
+        let roster=qualifying && matches!(selection,Selection::Cycle) && read_menu().player_roster.fighters_excluding_fixed(None).iter()
             .any(|f|MiiClass::from_kind(f.kind()).is_some());
         let direct=if let Selection::Direct(f)=selection {Some(f.kind())} else {None};
         if crate::engine::mii::auto_init::requires_owner(original_kind(Role::Player),roster,direct) {
@@ -378,7 +378,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
         return None;
     };
     // A captured mixed roster remains in this adapter, including its ordinary entries.
-    let has_mii=setting(&MENU).player_roster.fighters_excluding_fixed(None).iter()
+    let has_mii=read_menu().player_roster.fighters_excluding_fixed(None).iter()
         .any(|f|MiiClass::from_kind(f.kind()).is_some());
     // Same-entry banks: a qualified, captured owner (current epoch, valid menu and
     // catalog, no capture pending) also keeps ordinary-only cycles and direct picks,

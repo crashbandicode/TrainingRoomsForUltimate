@@ -192,10 +192,10 @@ pub(crate) fn named_refusal(target: Target) -> Option<&'static str> {
     mii_ordinary_cpu::replay_refusal(named_selection(target))
 }
 pub(crate) fn request_named(target: Target) -> bool {
-    if mii_ordinary_cpu::replay_catalog().is_some() {
-        mii_ordinary_cpu::request_replay(named_selection(target))
-    } else if target.configuration().is_none() { request_cpu_kind(target.kind()) }
-    else { false }
+    request_with(named_selection(target), request_cpu_kind)
+}
+pub(crate) fn request_named_in(context: &CpuRequestContext, target: Target) -> bool {
+    request_with(named_selection(target), |kind| request_cpu_kind_in(context, kind))
 }
 pub(crate) fn refusal(target: Target, revision: u64) -> Option<&'static str> {
     mii_ordinary_cpu::replay_refusal(selected(target, revision))
@@ -211,10 +211,16 @@ pub(crate) fn ready(target: Target, kind: u32) -> bool {
     }
 }
 pub(crate) fn request(target: Target, revision: u64) -> bool {
+    request_with(selected(target, revision), request_cpu_kind)
+}
+pub(crate) fn request_in(context: &CpuRequestContext, target: Target, revision: u64) -> bool {
+    request_with(selected(target, revision), |kind| request_cpu_kind_in(context, kind))
+}
+fn request_with(selection: Selection, ordinary_request: impl FnOnce(u32) -> bool) -> bool {
     if mii_ordinary_cpu::replay_catalog().is_some() {
-        mii_ordinary_cpu::request_replay(selected(target, revision))
-    } else if target.configuration().is_none() {
-        request_cpu_kind(target.kind())
+        mii_ordinary_cpu::request_replay(selection)
+    } else if selection.target.configuration().is_none() {
+        ordinary_request(selection.target.kind())
     } else {
         false
     }

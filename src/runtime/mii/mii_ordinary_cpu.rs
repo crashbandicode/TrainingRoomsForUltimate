@@ -487,7 +487,7 @@ pub(super) fn request_restore(value:WaitingValue)->bool {
     s.restore=Some(value);s.request=Some(Request::CYCLE);
     true
 }
-pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option<bool> {
+pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<bool> {
     if role!=Role::Cpu || !ENABLED.load(Ordering::Acquire) {return None;}
     let mut s=STATE.lock();
     let Some(owner)=s.owner.as_ref() else {
@@ -499,7 +499,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
             if user_request {notify(Role::Cpu,"Wait for the practice character to finish loading".into());}
             return Some(true);
         }
-        let wants_mii=setting(&MENU).cpu_roster.fighters_excluding_fixed(None).iter()
+        let wants_mii=read_menu().cpu_roster.fighters_excluding_fixed(None).iter()
             .any(|f|MiiClass::from_kind(f.kind()).is_some());
         let direct=if let Selection::Direct(f)=selection {Some(f.kind())} else {None};
         if crate::engine::mii::auto_init::requires_owner(original_kind(Role::Cpu),wants_mii,direct) {
@@ -516,7 +516,7 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option
     // missing or unqualified owner still takes the fallback above or the roster.
     let ordinary_cycle=matches!(selection,Selection::Cycle) && !s.departed && s.menu_valid && !s.capture
         && s.catalog.is_some() && owner.origin.binding.epoch==epoch();
-    let requested=setting(&MENU).cpu_roster.fighters_excluding_fixed(None).iter()
+    let requested=read_menu().cpu_roster.fighters_excluding_fixed(None).iter()
         .any(|f|MiiClass::from_kind(f.kind()).is_some())
         || ordinary_cycle
         || matches!(selection,Selection::Direct(f) if MiiClass::from_kind(f.kind()).is_some());

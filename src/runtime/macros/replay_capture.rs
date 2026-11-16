@@ -516,8 +516,8 @@ pub fn quiescing_capture() -> bool {
         && crate::runtime::scene::current() == Some(crate::model::scene::Scene::Lobby)
 }
 
-pub unsafe fn browser_needs_native_update(module: &mut BattleObjectModuleAccessor) -> bool {
-    if !quiescing_capture() || crate::runtime::lobby::training::practice::role(module) != Some(1) { return false; }
+pub unsafe fn browser_needs_native_update(context: Option<crate::engine::lobby::practice_policy::Context>, module: &mut BattleObjectModuleAccessor) -> bool {
+    if !quiescing_capture() || crate::runtime::lobby::training::practice::role_in(context, module) != Some(1) { return false; }
     let clean = clean_statuses().contains(&StatusModule::status_kind(module));
     crate::runtime::macros::named_macros::hook_queries().browser_release && !clean
 }
@@ -611,10 +611,11 @@ fn queue_reload(target: Target, revision: u64) {
 
 /// Game callback: the roster owns native admission and loading.
 pub fn service_reload_request() {
+    let Ok(context) = crate::runtime::roster::character_roster::try_cpu_request_context() else { return; };
     RELOAD_REQUEST.drain(|(target, revision)| {
         let eligible = revision == selection_revision()
-            && crate::runtime::roster::character_roster::cpu_reload_ready();
-        let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request(target, revision);
+            && crate::runtime::roster::character_roster::cpu_reload_ready_in(&context);
+        let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request_in(&context, target, revision);
         let posted = RELOAD_RESULT.post((revision, accepted));
         debug_assert!(posted, "one outstanding clip character result");
         crate::runtime::ui::worker::wake();
