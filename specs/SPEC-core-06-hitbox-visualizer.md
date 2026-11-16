@@ -106,14 +106,14 @@ the checklist migrates (`legend::migrate`): On becomes the three boxes, Off none
 *Frame data colours* recolours what is drawn through one function, `hitbox::legend_colour`: a hitbox red when it is the strongest of its
 frame or cannot be ranked and pink when it is weaker (the spots lane's rule, by `AttackData` damage); a grab box purple; a hurtbox by the
 game's own status of its part (`legend::part_status`, as `HitModule::get_status` at `main+0x46a800`: the highest of the part's word, the
-group's whole status `+0x1c` taken as at least 0, and the group's global status `+0x20`): 0 white, 1 (invincible) green, 2 (intangible)
+group's whole status `+0x1c` taken as at least 0, and the group's global status `+0x20`): 0 white, 1 (invincible) teal (HB-PALETTE, 2026-11-16), 2 (intangible)
 and 3 (the whole group off: the revival platform) sky blue. Eden `hbl-trace-8fadea57-1`: a spot dodge sets whole 2, the revival platform
 whole 3, the time after it global 1, with every part word 0. **Windboxes keep the hit colours:** `ATTACK` has no windbox argument; the
 attribute rule was refuted (F.L.U.D.D.'s water push is `collision_attr_water`); two bool arguments (26 at `+0x70`, 27 at `+0x6e`) are set on
 both known windboxes and on neither Sing nor seven damaging hits, but the game's use of `+0x6e` (skipping a hit-feedback block of sound and
 effect calls) does not define "pushes without hurting", so no rule is wired.
 
-*Launch angles* adds white marks of a hitbox's own orbs, from `AttackData +0x28` (i32 degrees counter-clockwise from forward, mirrored by
+*Launch angles* adds silver marks of a hitbox's own orbs, from `AttackData +0x28` (i32 degrees counter-clockwise from forward, mirrored by
 `PostureModule::lr`): a line from the centre to the edge for 0 to 360; two dashes for 361 at 38 degrees (the launch the trace measured on a
 target in the air, `t-hbl-361b`); a centre dot for 362 and above. Up to two marks per hitbox (`BOARD_ORBS`); drawn last, cut first.
 ## 3. Inputs

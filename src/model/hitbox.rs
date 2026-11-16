@@ -588,7 +588,7 @@ pub const WEAK_TINT: [f32; 3] = [1.0, 0.56, 0.78];
 /// The one place the *Frame data colours* row chooses a sphere's tint: `kind` is `KIND_HIT`, `KIND_HURT` or `KIND_GRAB`, `spot` the hitbox's
 /// spot (`None` for any other kind and for a hitbox that cannot be ranked), `usual` today's tint. Off is `usual`. On, a hitbox is red unless
 /// it is Sour or Late, which are pink (Ultimate Frame Data draws a lone hitbox as strong and has no late colour). The rest of the legend
-/// (`legend`): a hurtbox by its `status` (white, green invincible, sky blue intangible), a grab box purple.
+/// (`legend`): a hurtbox by its `status` (white, teal invincible, sky blue intangible; HB-PALETTE, 2026-11-16), a grab box purple.
 pub fn legend_colour(kind: u32, spot: Option<super::spots::Spot>, status: i32, usual: [f32; 3], on: bool) -> [f32; 3] {
     use super::{legend, spots::Spot};
     match (on, kind, spot) {

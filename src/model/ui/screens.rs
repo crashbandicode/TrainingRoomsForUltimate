@@ -782,7 +782,8 @@ mod tests {
         m.press(Button::A);
         let first = frame(&m);
         assert_eq!(first.conn_count, 1);
-        assert_eq!(first.conn[0].string_lossy(), "Hitbox (attack) — each hitbox of a move gets its own shade");
+        assert!(first.rows.iter().all(|row| row.sub.is_empty()), "legend colour names reuse only empty checklist sublines");
+        assert_eq!(first.conn[0].string_lossy(), "Multi-colour — Hitbox (attack): one shade per hitbox");
         assert!(matches!(first.conn_kind[0], super::super::recording_menu::ConnKind::Swatch(super::super::legend::Swatch::HitboxShades)));
         for _ in 0..3 { m.press(Button::Down); }
         m.press(Button::A);

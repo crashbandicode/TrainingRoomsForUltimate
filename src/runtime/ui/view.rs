@@ -328,8 +328,13 @@ impl Panes {
                         swatches += 1;
                         left += size + 4.0;
                     }
-                    left += 12.0;
-                    self.label(IDX_CONN + i, units, (left + CONN_RIGHT) / 2.0, y, CONN_RIGHT - left, tone);
+                    // The checklist has no sublines: reuse those text panes for a fixed colour column.
+                    // All legend rows, including the eight-shade row, share the same meaning start.
+                    let split = units.iter().position(|u| *u == 0x2014).map_or(0, |i| i + 2);
+                    let (colour, meaning) = units.split_at(split);
+                    let [(cx, cw), (mx, mw)] = crate::model::legend::swatch_columns(CONN_LEFT, CONN_RIGHT);
+                    self.label(IDX_SUB + i, colour, cx + cw / 2.0, y, cw, tone);
+                    self.label(IDX_CONN + i, meaning, mx + mw / 2.0, y, mw, tone);
                     continue;
                 }
                 ConnKind::Head(tag) => (Some(tag), false),

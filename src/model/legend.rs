@@ -1,7 +1,7 @@
 //! The rest of Ultimate Frame Data's legend for Hitbox Visualization (rc.14; the spots lane owns strong and weak): grab boxes
 //! and the hurtboxes' states while *Frame data colours* is On, each hitbox's launch direction while *Launch angles* is On, and
 //! the windboxes (`is_windbox`: a hitbox with knockback whose hit causes no hitstun, by the game's own no-reaction flag) in deep
-//! blue. Pure and host-tested; the offsets and values are the owned 13.0.5 ELF's (`tests/core06_hitbox.rs`
+//! blue, with orange wind areas and silver direction lines. Pure and host-tested; the offsets and values are the owned 13.0.5 ELF's (`tests/core06_hitbox.rs`
 //! `legend_facts_match_the_owned_elf`) and Eden's (the design report).
 
 use super::hitbox::sphere_key;
@@ -42,6 +42,8 @@ pub fn shows(bits: u8, kind: u32) -> bool {
 pub const KIND_WIND: u32 = 5;
 /// Windboxes: deep blue (Ultimate Frame Data's legend), apart from the intangible hurtboxes' sky blue.
 pub const WIND: [f32; 3] = [0.0, 0.15, 1.0];
+/// Burnt orange separates wind areas from blue windboxes in both colour modes.
+pub const WIND_AREA: [f32; 3] = [0.68, 0.30, 0.0];
 /// `AttackData`'s no-reaction flag (ATTACK argument 26, a byte; `sv_animcmd::ATTACK` stores it at `main+0x2285880`). The
 /// defender's DamageModule hit handler (`main+0x402cc0`) reads it; a hit with it set leaves the target out of hitstun (Eden,
 /// the design report).
@@ -73,8 +75,8 @@ pub const OFF: i32 = 3;
 
 /// Frame data colours On: grab boxes purple.
 pub const GRAB: [f32; 3] = [0.6, 0.2, 1.0];
-/// Hurtboxes: normal white, invincible green, intangible sky blue (by status).
-pub const HURT: [[f32; 3]; 3] = [[1.0; 3], [0.2, 1.0, 0.2], [0.45, 0.8, 1.0]];
+/// Hurtboxes: white normal, dark teal invincible, light sky blue intangible. Teal avoids a red/green-only distinction.
+pub const HURT: [[f32; 3]; 3] = [[1.0; 3], [0.0, 0.5, 0.375], [0.45, 0.8, 1.0]];
 
 /// A part's status as the game reads it (`HitModule::get_status`, `main+0x46a800`): the highest of its own word, the
 /// group's whole status (at least 0) and the group's global status.
@@ -82,7 +84,7 @@ pub fn part_status(part: i32, whole: i32, global: i32) -> i32 {
     part.max(global.max(whole.max(0)))
 }
 
-/// A hurtbox's tint for its status: invincible green; intangible sky blue, and so is a part the whole group switched off (OFF,
+/// A hurtbox's tint for its status: invincible teal; intangible sky blue, and so is a part the whole group switched off (OFF,
 /// the revival platform: nothing hits it); any other white.
 pub fn hurt_tint(status: i32) -> [f32; 3] {
     HURT[usize::try_from(status).ok().and_then(|s| [0, 1, 2, 2].get(s).copied()).unwrap_or(0)]
@@ -100,8 +102,8 @@ pub fn direction(degrees: f32, lr: f32) -> [f32; 2] {
 
 /// The marks' orb kind (after `hitbox::KIND_GRAB`); their sphere numbers start at 0x10, so `Board::publish` never pairs them.
 pub const KIND_MARK: u32 = 4;
-/// White for launch marks and wind direction lines.
-pub const DIRECTION_COLOUR: [u8; 4] = [255; 4];
+/// Silver launch/wind lines, distinct from white normal hurtboxes in frame-data mode.
+pub const DIRECTION_COLOUR: [u8; 4] = [176, 176, 176, 255];
 /// A line's or dash's radius and a dot's, as fractions of the hitbox's.
 pub const LINE: f32 = 0.1;
 pub const DOT: f32 = 0.25;
@@ -114,7 +116,7 @@ pub fn marks(hit: &Orb, angle: i32, lr: f32) -> [Option<Orb>; 2] {
     let [x, y, z] = hit.centre;
     let seg = |n: usize, [dx, dy]: [f32; 2], from: f32, to: f32| {
         let at = |t: f32| [x + dx * hit.radius * t, y + dy * hit.radius * t, z];
-        Orb { centre: at(from), tail: at(to), radius: hit.radius * LINE, color: DIRECTION_COLOUR, key: sphere_key(KIND_MARK, index, 0x10 + n) }
+        Orb { centre: at(from), tail: at(to), radius: hit.radius * LINE, color: super::panes::linear(DIRECTION_COLOUR), key: sphere_key(KIND_MARK, index, 0x10 + n) }
     };
     let dashes = direction(SAKURAI_SHOWN, lr);
     match angle {
@@ -128,7 +130,7 @@ pub fn marks(hit: &Orb, angle: i32, lr: f32) -> [Option<Orb>; 2] {
 
 /// A fighter's wind areas: the game's `AREA_WIND_2ND*` animation commands add them to the fighter's AreaModule
 /// (`add_wind_area_2nd` / `_rad`, vtable slots 0x158 / 0x160 of `FighterAreaModuleImpl`, `main+0x3d03e0` / `+0x3d0680`), and the
-/// wind manager pushes every fighter inside one. Drawn deep blue under *Windboxes*, with a white line along the wind.
+/// wind manager pushes every fighter inside one. Drawn orange under *Windboxes*, with a silver line along the wind.
 pub mod area {
     /// The accessor's AreaModule.
     pub const MODULE: usize = 0xc0;
@@ -268,22 +270,22 @@ pub const AREA_BOX: u32 = 0x20;
 pub const AREA_CIRCLE: u32 = 0x21;
 pub const AREA_LINE: u32 = 0x22;
 pub const AREA_SHADOW: u32 = 0x23;
-/// Translucent deep blue: the windboxes' colour, at full pane alpha like every other orb. The band texture is only 0.30 opaque in
+/// Orange wind areas, at full pane alpha like every other orb. The band texture is only 0.30 opaque in
 /// its middle (`tools/layout-builder` `orb_texture`), so the fighters inside stay visible; at 110 Eden showed (226, 226, 242) over
 /// the Training grid's 240 white, too pale to read (hb-legend-finish, 2026-11-15).
 pub const AREA_ALPHA: u8 = 255;
-/// The wind line's shadow: the line's pill `SHADOW_GROW` times as wide, near-black navy and opaque, drawn under the white line.
+/// The wind line's shadow: the line's pill `SHADOW_GROW` times as wide, near-black navy and opaque, drawn under the silver line.
 pub const SHADOW: [u8; 3] = [0, 0, 40];
 pub const SHADOW_GROW: f32 = 1.6;
 
-/// The areas' pane colour: `WIND` as the layout takes it (linear light), at `AREA_ALPHA`.
+/// The areas' pane colour: `WIND_AREA` as the layout takes it (linear light), at `AREA_ALPHA`.
 pub fn area_colour() -> [u8; 4] {
-    super::panes::linear(super::hitbox_orbs::tint_colour(WIND, AREA_ALPHA))
+    super::panes::linear(super::hitbox_orbs::tint_colour(WIND_AREA, AREA_ALPHA))
 }
 
 /// Area `index`'s orbs at depth `z`, in the order they draw (a later pane draws over an earlier one): its shape (a box as a band from
 /// its left to its right edge, as tall as the box; a circle as a disc) in translucent `colour`, the dark shadow of its line (a wider
-/// pill under it, so the white line keeps an outline over a pale or a dark background) and a white line from its centre to its edge
+/// pill under it, so the silver line keeps an outline over a pale or a dark background) and a silver line from its centre to its edge
 /// along the wind (none, and no shadow, without an angle).
 pub fn area_orbs(area: &WindArea, index: usize, z: f32, colour: [u8; 4]) -> [Option<Orb>; 3] {
     let (centre, shape, reach) = match area.shape {
@@ -302,7 +304,7 @@ pub fn area_orbs(area: &WindArea, index: usize, z: f32, colour: [u8; 4]) -> [Opt
             // 361: the wind has no one direction (Eden: Meta Knight's Mach Tornado, Mewtwo's Shadow Ball, Wario Waft's circles): a
             // centre dot, as the launch angles mark a hit with no fixed direction.
             let at = [centre[0], centre[1], z];
-            return Orb { centre: at, tail: at, radius: reach[0].min(reach[1]) * DOT, color: DIRECTION_COLOUR, key: sphere_key(KIND_AREA, index, AREA_LINE as usize) };
+            return Orb { centre: at, tail: at, radius: reach[0].min(reach[1]) * DOT, color: super::panes::linear(DIRECTION_COLOUR), key: sphere_key(KIND_AREA, index, AREA_LINE as usize) };
         }
         let [dx, dy] = direction(degrees, 1.0);
         // To the edge: a circle's radius; a box's nearest side along the direction.
@@ -311,7 +313,7 @@ pub fn area_orbs(area: &WindArea, index: usize, z: f32, colour: [u8; 4]) -> [Opt
             AreaShape::Box { .. } => [(reach[0], dx), (reach[1], dy)].iter().filter(|(_, d)| d.abs() > 1e-6).map(|(h, d)| h / d.abs()).fold(f32::MAX, f32::min),
         };
         let thick = reach[0].min(reach[1]) * LINE;
-        Orb { centre: [centre[0], centre[1], z], tail: [centre[0] + dx * t, centre[1] + dy * t, z], radius: thick, color: DIRECTION_COLOUR, key: sphere_key(KIND_AREA, index, AREA_LINE as usize) }
+        Orb { centre: [centre[0], centre[1], z], tail: [centre[0] + dx * t, centre[1] + dy * t, z], radius: thick, color: super::panes::linear(DIRECTION_COLOUR), key: sphere_key(KIND_AREA, index, AREA_LINE as usize) }
     });
     let shadow = line.map(|l| Orb {
         radius: l.radius * SHADOW_GROW,
@@ -339,6 +341,11 @@ impl Swatch {
     }
 }
 
+/// Fixed colour-name and meaning columns after the shared 128-unit swatch column.
+pub fn swatch_columns(left: f32, right: f32) -> [(f32, f32); 2] {
+    [(left + 140.0, 132.0), (left + 284.0, right - left - 284.0)]
+}
+
 /// The current checklist's colour key, in sRGB (the UI converts once); only enabled drawing families appear.
 pub fn swatches(bits: u8) -> impl Iterator<Item = (&'static str, Swatch)> {
     use super::hitbox as h;
@@ -349,7 +356,7 @@ pub fn swatches(bits: u8) -> impl Iterator<Item = (&'static str, Swatch)> {
     let (names, colours): (&[_], &[_]) = if on {
         (&["Red — Strong hitbox", "Pink — Weak hitbox"], &[h::STRONG_TINT, h::WEAK_TINT])
     } else {
-        (&["Hitbox (attack) — each hitbox of a move gets its own shade"], &h::TINTS)
+        (&["Multi-colour — Hitbox (attack): one shade per hitbox"], &h::TINTS)
     };
     let hits = (0..names.len()).filter(move |_| bits & HITBOXES != 0).map(move |i| (names[i], if on { Swatch::Colour(rgba(colours[i], ORB_ALPHA)) } else { Swatch::HitboxShades }));
     let c = |status| h::legend_colour(h::KIND_HURT, None, status, h::HURTBOX_TINT, on);
@@ -358,12 +365,12 @@ pub fn swatches(bits: u8) -> impl Iterator<Item = (&'static str, Swatch)> {
         (bits & GRABS != 0, if on { "Purple — Grab box (grabs you)" } else { "Magenta — Grab box (grabs you)" }, grab),
         (hurt, if on { "White — Hurtbox (can be hit)" } else { "Yellow — Hurtbox (can be hit)" }, c(0)),
         (hurt && on, "Sky blue — Hurtbox (cannot be hit)", c(INTANGIBLE)),
-        (hurt && on, "Green — Hurtbox (takes no damage)", c(INVINCIBLE)),
+        (hurt && on, "Teal — Hurtbox (takes no damage)", c(INVINCIBLE)),
         (wind || on && bits & HITBOXES != 0, "Blue — Windbox (pushes without flinching)", WIND),
-        (wind, "Blue — Wind area (pushes in a box or circle)", WIND),
+        (wind, "Burnt orange — Wind area (pushes in a box or circle)", WIND_AREA),
     ].into_iter().filter(|(show, ..)| *show).map(|(_, n, t)| (n, Swatch::Colour(rgba(t, ORB_ALPHA))));
     hits.chain(other)
-        .chain((bits & (ANGLES | WINDBOXES) != 0).then_some(("White — Launch / wind direction", Swatch::Colour(DIRECTION_COLOUR))))
+        .chain((bits & (ANGLES | WINDBOXES) != 0).then_some(("Silver — Launch / wind direction", Swatch::Colour(DIRECTION_COLOUR))))
 }
 
 /// A wind-area command (`AREA_WIND_2ND`, `_arg10`, `_RAD`, `_RAD_arg9`: `sites_hitbox`) tracks the object running it as an article,

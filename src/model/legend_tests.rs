@@ -29,7 +29,7 @@ fn legend_part_status_is_the_games_max() {
 #[test]
 fn legend_hurtbox_status_colours() {
     assert_eq!(hurt_tint(0), [1.0, 1.0, 1.0], "normal: white");
-    assert_eq!(hurt_tint(INVINCIBLE), [0.2, 1.0, 0.2], "invincible: green");
+    assert_eq!(hurt_tint(INVINCIBLE), [0.0, 0.5, 0.375], "invincible: teal");
     assert_eq!(hurt_tint(INTANGIBLE), [0.45, 0.8, 1.0], "intangible: sky blue");
     assert_eq!(hurt_tint(OFF), [0.45, 0.8, 1.0], "switched off as a whole (the revival platform): nothing hits it, drawn as intangible");
     assert_eq!(hurt_tint(-1), [1.0, 1.0, 1.0]);
@@ -195,7 +195,7 @@ fn legend_angle_line_points_along_the_angle_mirrored_by_facing() {
         assert!(close(line.centre, [10.0, 5.0, 1.0]) && close(line.tail, end), "angle {angle} lr {lr}: {line:?}");
         assert_eq!((line.key >> 24, (line.key >> 8) & 0xffff), (KIND_MARK, 3), "its own kind, the hitbox's slot");
         assert_ne!(line.key & 0xff, 1, "never paired as a capsule end");
-        assert!(line.radius < hit(3).radius && line.color == [255; 4]);
+        assert!(line.radius < hit(3).radius && line.color == crate::model::panes::linear(DIRECTION_COLOUR));
     }
 }
 
@@ -463,7 +463,7 @@ fn legend_wind_area_orbs_are_a_band_or_a_disc_with_a_line() {
     let [Some(band), Some(_), Some(line)] = area_orbs(&boxed, 1, 0.5, colour) else { panic!("a band, a shadow and a line") };
     assert_eq!((band.centre, band.tail, band.radius, band.color), ([-10.0, 7.0, 0.5], [10.0, 7.0, 0.5], 5.0, colour), "left edge to right edge, as tall as the box");
     assert_eq!((band.kind(), band.key & 0xff, (band.key >> 8) & 0xffff), (KIND_AREA, AREA_BOX, 1));
-    assert!(close(line.centre, [0.0, 7.0, 0.5]) && close(line.tail, [10.0, 7.0, 0.5]) && line.color == [255; 4], "{line:?}");
+    assert!(close(line.centre, [0.0, 7.0, 0.5]) && close(line.tail, [10.0, 7.0, 0.5]) && line.color == crate::model::panes::linear(DIRECTION_COLOUR), "{line:?}");
     assert_eq!(line.key & 0xff, AREA_LINE);
     let up = area_orbs(&WindArea { angle: Some(90.0), ..boxed }, 1, 0.0, colour)[2].unwrap();
     assert!(close(up.tail, [0.0, 12.0, 0.0]), "to the top edge: {up:?}");
@@ -511,8 +511,8 @@ fn legend_wind_area_fill_reads_over_light_and_dark_backgrounds() {
     };
     assert!(ratio(240) <= 0.75, "over the Training grid's white the fill darkens it by a quarter or more: {}", ratio(240));
     assert!(ratio(30) >= 2.5, "over a dark stage the fill lifts its luminance 2.5 times or more: {}", ratio(30));
-    // Still the windboxes' deep blue, as the windbox discs are tinted.
-    assert_eq!(colour[..3], crate::model::panes::linear([0, 38, 255, 255])[..3]);
+    // Burnt orange differs from the blue windbox discs without weakening either background-contrast bound.
+    assert_eq!(colour[..3], crate::model::panes::linear([173, 77, 0, 255])[..3]);
 }
 
 #[test]
@@ -521,12 +521,12 @@ fn legend_wind_line_has_a_dark_shadow_under_it() {
     let boxed = WindArea { shape: AreaShape::Box { min: [-10.0, 2.0], max: [10.0, 12.0] }, angle: Some(0.0) };
     let [Some(band), Some(shadow), Some(line)] = area_orbs(&boxed, 1, 0.5, colour) else { panic!("a band, a shadow and a line") };
     // The shadow is the line's own pill, wider, dark and opaque; it comes between the band and the line (a later pane draws over
-    // an earlier one), so the white line keeps a dark outline over a pale or a dark background.
+    // an earlier one), so the silver line keeps a dark outline over a pale or a dark background.
     assert_eq!((shadow.centre, shadow.tail, shadow.kind(), shadow.key & 0xff, (shadow.key >> 8) & 0xffff), (line.centre, line.tail, KIND_AREA, AREA_SHADOW, 1));
     assert!(SHADOW_GROW > 1.0 && (shadow.radius - line.radius * SHADOW_GROW).abs() < 1e-5, "{shadow:?} {line:?}");
-    assert!(luminance(rgb(shadow.color)) < 0.01 && shadow.color[3] == 255 && luminance(rgb(line.color)) > 0.99 && line.color[3] == 255, "{shadow:?}");
+    assert!(luminance(rgb(shadow.color)) < 0.01 && shadow.color[3] == 255 && line.color[3] == 255, "{shadow:?}");
     assert_ne!(shadow.key, line.key);
-    assert_eq!((band.color, line.color), (colour, [255; 4]), "the fill and the white line are as before");
+    assert_eq!((band.color, line.color), (colour, crate::model::panes::linear(DIRECTION_COLOUR)), "area fill and silver line share their menu colours");
     // A centre dot (361) is outlined too; a wind with no angle has no line and no shadow.
     let circle = WindArea { shape: AreaShape::Circle { centre: [5.0, 8.0], radius: 6.0 }, angle: Some(361.0) };
     let [_, Some(ring), Some(dot)] = area_orbs(&circle, 0, 0.0, colour) else { panic!("a disc, a ring and a dot") };
@@ -597,7 +597,7 @@ fn menu_swatches_match_the_renderer_in_both_schemes() {
         ] {
             assert_eq!(crate::model::panes::linear(colour(name)), rendered(hitbox::legend_colour(kind, None, status, usual, on)));
         }
-        for (name, status) in [("Sky blue — Hurtbox (cannot be hit)", INTANGIBLE), ("Green — Hurtbox (takes no damage)", INVINCIBLE)] {
+        for (name, status) in [("Sky blue — Hurtbox (cannot be hit)", INTANGIBLE), ("Teal — Hurtbox (takes no damage)", INVINCIBLE)] {
             assert_eq!(rows.iter().any(|r| r.0 == name), on);
             if on {
                 for kind in [KIND_HURT, hitbox::KIND_ARTICLE_HURT] {
@@ -605,9 +605,9 @@ fn menu_swatches_match_the_renderer_in_both_schemes() {
                 }
             }
         }
-        assert_eq!(crate::model::panes::linear(colour("Blue — Wind area (pushes in a box or circle)")), area_colour());
+        assert_eq!(crate::model::panes::linear(colour("Burnt orange — Wind area (pushes in a box or circle)")), area_colour());
         let hit = orbs::Orb { radius: 1.0, ..orbs::Orb::NONE };
-        assert_eq!(colour("White — Launch / wind direction"), marks(&hit, 45, 1.0)[0].unwrap().color);
+        assert_eq!(crate::model::panes::linear(colour("Silver — Launch / wind direction")), marks(&hit, 45, 1.0)[0].unwrap().color);
     }
     for bits in 0..=127 {
         let rows: Vec<_> = swatches(bits).collect();
@@ -617,9 +617,45 @@ fn menu_swatches_match_the_renderer_in_both_schemes() {
         assert_eq!(rows.iter().filter(|r| r.1 == Swatch::HitboxShades).count(), usize::from(bits & (HITBOXES | COLOURS) == HITBOXES));
         assert_eq!(rows.is_empty(), !draws(bits));
         assert_eq!(rows.iter().any(|r| r.0 == "Blue — Windbox (pushes without flinching)"), bits & WINDBOXES != 0 || bits & (HITBOXES | COLOURS) == HITBOXES | COLOURS);
-        assert_eq!(rows.iter().any(|r| r.0 == "Blue — Wind area (pushes in a box or circle)"), bits & WINDBOXES != 0);
+        assert_eq!(rows.iter().any(|r| r.0 == "Burnt orange — Wind area (pushes in a box or circle)"), bits & WINDBOXES != 0);
         assert_eq!(rows.iter().any(|r| r.0.ends_with("— Hurtbox (can be hit)")), bits & (HURTBOXES | ARTICLE_HURTBOXES) != 0);
     }
-    assert_eq!(swatches(ANGLES).collect::<Vec<_>>(), [("White — Launch / wind direction", Swatch::Colour(DIRECTION_COLOUR))]);
+    assert_eq!(swatches(ANGLES).collect::<Vec<_>>(), [("Silver — Launch / wind direction", Swatch::Colour(DIRECTION_COLOUR))]);
     assert_eq!(swatches(ARTICLE_HURTBOXES).next().unwrap().1.colours().next().unwrap(), orbs::tint_colour(hitbox::HURTBOX_TINT, 255));
+}
+
+/// Every single-colour family has its own key; the attack-ID group intentionally shows all eight shades.
+#[test]
+fn legend_families_have_distinct_colours_in_every_checklist() {
+    for bits in 0..=127 {
+        let colours: Vec<_> = swatches(bits).filter_map(|(_, swatch)| match swatch {
+            Swatch::Colour(c) => Some(c),
+            Swatch::HitboxShades => None,
+        }).collect();
+        for (i, c) in colours.iter().enumerate() {
+            assert!(!colours[i + 1..].contains(c), "duplicate colour {c:?} for checklist {bits}");
+        }
+    }
+    let area = WindArea { shape: AreaShape::Circle { centre: [0.0; 2], radius: 2.0 }, angle: Some(0.0) };
+    let drawn = area_orbs(&area, 0, 0.0, area_colour());
+    assert_eq!(drawn[0].unwrap().color, crate::model::panes::linear(orbs::tint_colour(WIND_AREA, AREA_ALPHA)));
+    assert_eq!(drawn[2].unwrap().color, crate::model::panes::linear(DIRECTION_COLOUR));
+    assert_ne!(area_colour(), crate::model::panes::linear(orbs::tint_colour(WIND, AREA_ALPHA)));
+    assert_ne!(DIRECTION_COLOUR, crate::model::panes::linear(orbs::tint_colour(HURT[0], 255)));
+}
+
+#[test]
+fn legend_columns_fit_and_preserve_the_checklist() {
+    use crate::model::panes as p;
+    let [(cx, cw), (mx, mw)] = swatch_columns(p::CONN_LEFT, p::CONN_RIGHT);
+    assert!(cx >= p::CONN_LEFT + 128.0 && cx + cw < mx && mw > 0.0);
+    assert_eq!(mx + mw, p::CONN_RIGHT);
+    for bits in 0..=127 {
+        let rows: Vec<_> = swatches(bits).collect();
+        assert!(rows.len() <= p::ROWS, "the checklist's unused subline pool fits every colour name");
+        for (name, _) in rows {
+            let (colour, meaning) = name.split_once(" — ").expect("a colour name and meaning in every row");
+            assert!(colour.len() <= 12 && !meaning.is_empty());
+        }
+    }
 }

@@ -39,6 +39,8 @@ Press **A** on **Hitbox Visualization** to read the **Colour legend** beside the
 
 *The same checklist with Frame data colours On: the legend changes as the tick changes. Eden, 2026-11-15, rc.15 source `35268287`, diag `1660a9e4`; untested on hardware.*
 
+The current menu names each colour and explains it. The older captures above and below show the previous palette: wind areas are now burnt orange, direction lines silver, and invulnerable hurtboxes teal.
+
 A settings file from before this checklist keeps what it showed: On ticks Hitboxes, Grab boxes and Hurtboxes, and Off
 ticks none. Existing checklists keep their choices; Article hurtboxes starts unticked.
 
@@ -46,15 +48,17 @@ ticks none. Existing checklists keep their choices; Article hurtboxes starts unt
 | --- | --- | --- | --- |
 | Hitbox | Each hitbox of a move gets its own colour; the first is red | Red when strong, pink when weak | The attack |
 | Grab box | Always magenta, a colour no hitbox uses | Purple | The grab |
-| Hurtbox | Yellow | White; blue while nothing can hit it; green while hits do no damage | Where a fighter can be hit |
+| Hurtbox | Yellow | White; sky blue while nothing can hit it; teal while hits do no damage | Where a fighter can be hit |
 | Article hurtbox | Yellow | The same status colours as a fighter's hurtbox | Where an article or item can be hit |
 | Windbox | Its hitbox colour; deep blue with Windboxes ticked | Deep blue | A hitbox that pushes or pulls without hitstun |
+| Wind area | Burnt orange | Burnt orange | A box or circle that pushes fighters |
+| Launch / wind direction | Silver | Silver | The direction of a launch or push |
 
-**Frame data colours** recolours whatever is ticked in the colours of Ultimate Frame Data. A hitbox is strong when it
+**Frame data colours** gives strong and weak hitboxes different colours, and shows whether a hurtbox can be hit. A hitbox is strong when it
 is the strongest one out on that frame, such as a sword's tip, and weak when another hitbox out on the same frame is
 stronger, or when it is weaker than the strongest hitbox earlier in the same move, as the late frames of a knee are.
 A hitbox that cannot be ranked, such as a jab's single hitbox, is red. A hurtbox is blue during a spot dodge or a roll,
-and on the revival platform; it is green for the moments after leaving the platform. The plugin reads all of this from
+and on the revival platform; it is teal for the moments after leaving the platform. The plugin reads all of this from
 the game every frame, so no list of fighters is needed. Ticked alone, it draws nothing.
 
 **Windboxes** draws the windboxes in deep blue. A windbox pushes or pulls without hitstun: the fighter it lands on is
@@ -110,8 +114,8 @@ windbox on his arm while he throws the crown. Palutena's Counter and Greninja's 
 | Wii Fit Trainer | neutral special (while charging) |
 | Zelda | down special (the Phantom) |
 
-Some moves push through a wind area instead of a hitbox. Windboxes draws those too: a see-through deep blue box or
-circle where the wind blows, with a white line, edged in dark so it shows on a pale stage, pointing the way it pushes. A
+Some moves push through a wind area instead of a hitbox. Windboxes draws those too: a see-through burnt-orange box or
+circle where the wind blows, with a silver line, edged in dark so it shows on a pale stage, pointing the way it pushes. A
 dot in the middle means the wind has no one direction. The wind areas of what a fighter throws or summons are drawn too,
 such as the pillar of Ness's PK Fire, Samus's bomb and Palutena's Explosive Flame. Zelda's Triforce of Wisdom, which
 pulls, and Hero's Kaboom make theirs the same way: they take the same path, but were not filmed on their own. An item's
@@ -155,7 +159,7 @@ have one.
 | Shulk | forward smash, up smash |
 | Wario | down special |
 
-**Launch angles** draws a white line inside each hitbox, pointing where the hit sends the fighter it lands on. The line
+**Launch angles** draws a silver line inside each hitbox, pointing where the hit sends the fighter it lands on. The line
 mirrors when the attacker turns around. Two dashes mean the game picks the angle when the hit lands, from how hard it
 hits and whether the target is on the ground; they point at 38 degrees, where such a hit sends a fighter in the air.
 A dot means the hit carries the fighter along with the attack. With Hitboxes not ticked, the lines are drawn alone.
