@@ -369,7 +369,9 @@ pub unsafe fn frame(fighter: usize) {
     let Some(cpu) = natives::module_accessor(cpu_entry) else {
         revoke();
         OWN_CPU.store(0, Ordering::Release);
-        if game.generation != 0 {
+        // Our loader removes the old body before publishing its replacement.
+        // Reload is still setup: keep inputs revoked and wait for the real body.
+        if game.generation != 0 && game.step != Step::Reload {
             game.fail("Practice CPU changed · no grade");
         }
         return;
@@ -542,7 +544,10 @@ pub unsafe fn frame(fighter: usize) {
         Step::Reload => {
             let body = natives::entry_active_body(natives::fighter_entry(cpu_entry));
             let wanted = game.requested.map(|r| r.attacker_kind);
-            if body != 0 && wanted == Some(((body + 0xc) as *const u32).read()) {
+            if body != 0
+                && wanted == Some(((body + 0xc) as *const u32).read())
+                && crate::runtime::roster::character_roster::cpu_reload_ready()
+            {
                 game.p1 = p1;
                 game.cpu = cpu;
                 CPU_ENTRY.store(cpu_entry, Ordering::Release);
