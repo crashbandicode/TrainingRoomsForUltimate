@@ -18,8 +18,12 @@ static USABLE: AtomicBool = AtomicBool::new(false);
 /// This mode holds the Fixed camera: the Hide Tech camera hooks put the game's own centre in, not Hide Tech's (`holding`).
 static HOLD: AtomicBool = AtomicBool::new(false);
 /// Owners publish atomically; only the game thread holds save/restore state.
-static OWNERS: CameraRequests = CameraRequests::IDLE;
-thread_local! { static CAMERA: Cell<Camera> = const { Cell::new(Camera::IDLE) }; }
+static OWNERS: CameraRequests = CameraRequests::idle();
+struct GameCamera(Cell<Camera>);
+// SAFETY: only frame(), on the game thread, accesses this cell; state is copied and committed before native calls.
+// Switch std thread_local! allocates TLS boxes, so the single game-thread state stays in static storage.
+unsafe impl Sync for GameCamera {}
+static CAMERA: GameCamera = GameCamera(Cell::new(Camera::IDLE));
 
 pub fn set_usable(on: bool) {
     USABLE.store(on, Ordering::Release);
@@ -71,17 +75,14 @@ pub unsafe fn frame() {
     let manager = manager();
     let mode = (manager != 0 && scene::current().is_some()).then(|| ((manager + sites_pkg2::CAMERA_MODE_FIELD) as *const i32).read_volatile());
     let want = OWNERS.wanted();
-    let act = CAMERA.with(|state| {
-        let mut camera = state.get();
-        let act = camera.step(want, mode);
-        HOLD.store(camera.holding(), Ordering::Release);
-        state.set(camera);
-        act
-    });
+    let mut camera = CAMERA.0.get();
+    let act = camera.step(want, mode);
+    HOLD.store(camera.holding(), Ordering::Release);
+    CAMERA.0.set(camera);
     let Some(to) = act else { return };
     let changed = natives::change_active_camera(manager, to);
     #[cfg(feature = "diag")]
-    crate::runtime::diag_log::diagnostic(format_args!(
+    crate::runtime::diag_log::enqueue_diagnostic(format_args!(
         "[Btt] camera want={want} mode_before={mode:?} mode_after={} changed={changed:?}",
         ((manager + sites_pkg2::CAMERA_MODE_FIELD) as *const i32).read_volatile()
     ));

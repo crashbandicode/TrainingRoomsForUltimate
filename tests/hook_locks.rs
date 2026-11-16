@@ -461,6 +461,8 @@ fn combo_hud_has_no_wait_or_native_apply_under_helper_and_seeds_fail() {
 fn btt_camera_callbacks_take_no_lock_and_camera_lock_seeds_fail() {
     let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
     let mut graph = Graph::scan(&runtime, &[]);
+    // A scene read imports the engine's read_unchecked as `read`, not the compat menu's typed read.
+    graph.precise_imports = true;
     let entries = ["btt_camera::apply", "btt_camera::request", "btt_camera::frame"];
     let mut locks = static_locks(&runtime);
     let camera = ("features/btt_camera.rs".to_owned(), "CAMERA".to_owned());

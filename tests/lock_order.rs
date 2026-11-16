@@ -1037,6 +1037,11 @@ const MODEL_CALLBACKS: &[(&str, &str)] = &[
     ("hitbox::frame", "hitbox::read_u64"),
     ("hitbox::frame", "hitbox::read_f32"),
     ("hitbox::frame", "hitbox::motion"),
+    // BTT and Eggs-ercise share the model planner through object_hits' AttackReader.
+    ("hitbox::object_hits", "hitbox::active"),
+    ("hitbox::object_hits", "hitbox::data"),
+    ("hitbox::object_hits", "hitbox::read_u64"),
+    ("hitbox::object_hits", "hitbox::read_f32"),
     // rc.14 spots: the frame strip reads both fighters' attack slots through the same reader (hitbox::powers).
     ("input_display::sample", "hitbox::active"),
     ("input_display::sample", "hitbox::data"),
