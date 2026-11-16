@@ -1704,3 +1704,11 @@ ceiling = 150214
 date = "2026-11-16"
 reason = "rc.15 Stage tech v10 d9907202 measured total 150214, +4 over the v9 150210 entry. Lead-approved under the same rc.15 ruling; final combined total set at integration. Counting and implementation unchanged by this entry."
 approved_by = "Primary approval 2026-11-16 following tech-direct V10 boot PASS: record the +4 under the same operator rc.15 size approval, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 153962
+date = "2026-11-16"
+reason = "rc.15 Tech UI final seam integration measured 153962 on 072f5ee0, with no headroom. Includes final reviewed BTT/menu seams and retained native grading availability. FOR OPERATOR REVIEW; counting, guards and gate enforcement unchanged."
+approved_by = "Operator rc.15 size approval; primary 2026-11-16 22:47Z explicitly approves this exact measured TechUI total tied to 072f5ee0, FOR OPERATOR REVIEW."
