@@ -87,7 +87,8 @@ pub fn publish(snapshot: &Snapshot) {
     CONFIG.publish(Some(tech_settings::read(snapshot)));
 }
 pub fn menu_opened() {
-    super::btt_camera::request(2, false);
+    // SAFETY: atomic owner-bit release; every placing exit also releases bit 2.
+    unsafe { super::btt_camera::request(2, false) };
     GUARD_PRESS.store(false, Ordering::Release);
     PLACING.store(false, Ordering::Release);
     OPEN.store(true, Ordering::Release);
