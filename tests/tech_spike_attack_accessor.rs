@@ -198,3 +198,21 @@ fn relative_pointer(owned: &common::OwnedMain, slot: usize) -> usize {
     }
     found.unwrap_or_else(|| panic!("no RELATIVE relocation for {slot:#x}"))
 }
+
+#[path = "../src/runtime/features/tech_info_guards.rs"]
+mod info_guards;
+#[test]
+fn damage_info_fields_match_owned_lua_reader_mapping() {
+    let Some(owned) = common::owned_main("damage_info_fields_match_owned_lua_reader_mapping") else { return; };
+    for &(name, address, expected) in info_guards::DAMAGE_INFO_LAYOUT_GUARDS {
+        assert_eq!(expected, owned.window(address), "{name}: all64 owned bytes");
+    }
+    // Native Lua hash dispatch loads from Info x20. Pin opcode, destination and offset.
+    for (address, instruction) in [(0x227f1c4,0xb9800a88u32), (0x227f2d0,0xbd401280), (0x227f0a8,0xbd401680), (0x227f2c0,0xb9404288)] {
+        let bytes=owned.window(address);
+        assert_eq!(u32::from_le_bytes(bytes[..4].try_into().unwrap()),instruction,"mapping instruction {address:x}");
+    }
+    let bytes=owned.window(0x3ffdc0);
+    assert_eq!(u32::from_le_bytes(bytes[..4].try_into().unwrap()),0x91020000,"Info is inline DamageModule+0x80");
+    assert_eq!(u32::from_le_bytes(bytes[4..8].try_into().unwrap()),0xd65f03c0);
+}

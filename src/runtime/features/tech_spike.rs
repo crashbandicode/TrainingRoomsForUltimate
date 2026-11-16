@@ -3,6 +3,10 @@
 //! No product mode or new hook; P1 capture uses try_lock, roster requests reuse its game-thread service.
 #[path = "tech_reference.rs"]
 mod reference;
+#[path = "tech_info_seed.rs"]
+mod info_seed;
+#[path = "tech_info_guards.rs"]
+mod info_guards;
 use super::tech_spike_guards;
 use crate::model::cpu::hash::lua_bind_hash;
 use crate::model::cpu::role::FrameReceipt;
@@ -17,6 +21,7 @@ static REQUEST: AtomicU8 = AtomicU8::new(0);
 static GUARDED: AtomicU8 = AtomicU8::new(0);
 static V1_GUARDED: AtomicU8 = AtomicU8::new(0);
 static V3_GUARDED: AtomicU8 = AtomicU8::new(0);
+static INFO_GUARDED: AtomicU8 = AtomicU8::new(0);
 static OBSERVING: AtomicBool = AtomicBool::new(false);
 static NEXT_ATTEMPT: AtomicU32 = AtomicU32::new(1);
 static RUN: hos_lock::Mutex<Spike> = hos_lock::Mutex::new(Spike::new());
@@ -803,6 +808,48 @@ unsafe fn write_speed(run: &Spike, accessor: usize, vector: &LaunchVector) -> Op
         run.attempt,run.age,vector.residual.x.to_bits(),vector.residual.y.to_bits(),actual.map_or(u32::MAX,|v|v.x.to_bits()),actual.map_or(u32::MAX,|v|v.y.to_bits()),wanted.x.to_bits(),wanted.y.to_bits()));
     Some(())
 }
+/// Mapping guards supplement the typed DamageModule slot guard; no new native call.
+unsafe fn info_guarded() -> bool {
+    match INFO_GUARDED.load(Ordering::Acquire) {
+        1 => return true,
+        2 => return false,
+        _ => {}
+    }
+    let base = game::text_base();
+    let mut ok = base != 0;
+    if ok {
+        for &(name, offset, expected) in info_guards::DAMAGE_INFO_LAYOUT_GUARDS {
+            let equal = std::slice::from_raw_parts((base + offset) as *const u8, 64) == expected;
+            diagnostic(format_args!("[TechDirect] info_guard name={name} offset={offset:x} ok={equal}"));
+            ok &= equal;
+        }
+    }
+    INFO_GUARDED.store(if ok { 1 } else { 2 }, Ordering::Release);
+    ok
+}
+unsafe fn seed_info(run: &Spike, accessor: usize) -> Option<()> {
+    if !info_guarded() { return None; }
+    // damage_info validates the accessor, module pointer and concrete slot188 target.
+    let before = damage_info(accessor)?;
+    let heights = [id("HIT_HEIGHT_LOW")?, id("HIT_HEIGHT_CENTER")?, id("HIT_HEIGHT_HIGH")?];
+    let baseline = run.baseline.filter(|b| b.complete);
+    let seed = if let Some(baseline) = baseline {
+        info_seed::Seed::from_info(&baseline.damage_info)
+    } else {
+        let vector = launch_vector(run, Vec2 { x: 0.0, y: 0.0 })?;
+        info_seed::Seed::derived(heights[1], vector.magnitude, [vector.direction.x, vector.direction.y], run.input.angle)
+    };
+    if !seed.valid(heights) { return None; }
+    log_damage_info(run, "info_pre_write", run.age, &before);
+    let module = ((accessor + 0xa8) as *const usize).read();
+    if !seed.write((module + 0x80) as *mut u8, heights) { return None; }
+    let after = damage_info(accessor)?;
+    log_damage_info(run, "info_post_write", run.age, &after);
+    diagnostic(format_args!("[TechDirect] info_seed attempt={} mode={} source={} bytes=16 height={} speed_x={:08x} speed_y={:08x} angle={:08x} mirror_past_vertical=UNVERIFIED",
+        run.attempt,run.mode_name(),if baseline.is_some() { "baseline_fields" } else { "native_formula" },
+        seed.height,seed.speed[0].to_bits(),seed.speed[1].to_bits(),seed.angle.to_bits()));
+    Some(())
+}
 unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
     if !v1_guarded() || !v3_guarded() {
         return None;
@@ -853,6 +900,7 @@ unsafe fn launch(run: &mut Spike, accessor: usize) -> Option<()> {
     } else {
         None
     };
+    seed_info(run, accessor)?;
     let damage_fly = id("FIGHTER_STATUS_KIND_DAMAGE_FLY")?;
     let reserve_key = id("FIGHTER_STATUS_WORK_ID_FLOAT_RESERVE_DAMAGE_LR")?;
     natives::change_status_force(accessor, damage_fly, false);
