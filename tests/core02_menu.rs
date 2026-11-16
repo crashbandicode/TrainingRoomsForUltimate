@@ -145,11 +145,11 @@ fn layout_row_counts_match_the_rc_freeze() {
     // rc.14 SL4: the Setup library group gained Save setup here (10 → 11).
     // rc.14: Display & Controls gained Frame data colours and Spot labels, Recording gained Match sweet/sour spot (the operator, 2026-11-14,
     // SP1 to SP5; 11 → 13 and 12 → 13). rc.14 hb-legend: Frame data colours and Launch angles became items of the Hitbox Visualization checklist (13 → 12).
-    // rc.15 Mash out adds its toggle, state and attacker to Practice games.
-    assert_eq!(counts(false), [34, 11, 13, 35, 12, 3]);
-    assert_eq!(counts(true), [33, 11, 13, 35, 12, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 105);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 104);
+    // rc.15 Mash out adds its toggle, state, attacker and ordinary grab type to Practice games.
+    assert_eq!(counts(false), [34, 11, 13, 36, 12, 3]);
+    assert_eq!(counts(true), [33, 11, 13, 36, 12, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 106);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 105);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 4);
@@ -160,7 +160,7 @@ fn layout_row_counts_match_the_rc_freeze() {
     // Nothing is deferred any more (operator 2026-11-05): every editor has its row, and every group has rows.
     // (104: Lobby Items, Phase 2 N11; 105: Ready Hats, P-HOT; rc.6: CPU Level; rc.13: Aerial Drift, Taunts; rc.14: Hide CPU and the
     // seven Practice games rows; Save setup here; two spots rows.)
-    assert_eq!(ROWS.len(), 109);
+    assert_eq!(ROWS.len(), 110);
     for editor in [Editor::SetupSave, Editor::SetupSaveHere, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }
@@ -1004,6 +1004,78 @@ fn grid_screen_pages_with_l_r_and_keeps_the_cursor_on_a_tile() {
     assert!(m.screen().is_none());
 }
 
+// rc.15: edit through real menu inputs, then check both the page and popup renderers.
+fn filtered_menu_counts_cycles_and_renders() {
+    use model::mashout::moves::{self, Config, State};
+    use model::frame::{Frame, Text, write_value};
+    let cases = [
+        (0, 99, 0, "Mario · Grab"),
+        (1, 13, 99, "Banjo & Kazooie · Down throw"),
+        (2, 8, 111, "Hero · Command18"),
+        (3, 2, 118, "Yoshi · Egg Lay"),
+        (4, 4, 119, "Kirby · Inhale"),
+        (5, 1, 89, "Random"),
+    ];
+    for (state, count, first, label) in cases {
+        let mut m = menu();
+        goto(&mut m, moves::STATE_ROW);
+        m.press(Button::A);
+        for _ in 0..state { m.press(Button::Down); }
+        m.press(Button::A);
+        let attacker = goto(&mut m, moves::ATTACKER_ROW);
+        assert_eq!(m.option_count(attacker), count);
+        assert_eq!(get(&m, moves::ATTACKER_ROW).iter().position(|v| *v != 0), Some(first));
+        assert_eq!(m.value(attacker), RowValue::Choice(Some(0)));
+        let mut value = Text::<72>::new();
+        write_value(&m, attacker, &mut value);
+        assert_eq!(String::from_utf16(value.units()).unwrap(), format!("<  {label}  >"));
+        m.press(Button::A);
+        let mut frame = Frame::new();
+        model::screens::frame_of(&m, &mut frame, |_| "Stage");
+        assert_eq!(String::from_utf16(frame.rows[0].label.units()).unwrap(), label);
+        assert_eq!(String::from_utf16(frame.rows[0].value.units()).unwrap(), "(current)");
+        press(&mut m, &[Button::Up, Button::A]);
+        assert_eq!(m.value(attacker), RowValue::Choice(Some(count - 1)));
+        assert!(matches!(m.focus(), Some(Entry::Row(row)) if row == attacker));
+        m.press(Button::Right);
+        assert_eq!(m.value(attacker), RowValue::Choice(Some(0)));
+        for _ in 0..count {
+            let resolved = Config::from_snapshot(&m.settings().menu).unwrap().resolve(0, 0).unwrap();
+            if state != 5 { assert_eq!(resolved.state, State::ALL[state]); }
+            m.press(Button::Right);
+            assert_eq!(m.focus(), Some(Entry::Row(attacker)));
+        }
+        assert_eq!(m.value(attacker), RowValue::Choice(Some(0)));
+    }
+}
+
+fn state_change_resets_invalid_move_and_config_rejects_conflict() {
+    use model::mashout::moves::{self, Config};
+    let mut m = menu();
+    let grab = goto(&mut m, moves::GRAB_ROW);
+    assert_eq!(m.option_count(grab), 4);
+    m.press(Button::Left);
+    assert_eq!(Config::from_snapshot(&m.settings().menu).unwrap().grab, 3);
+    goto(&mut m, moves::STATE_ROW);
+    m.press(Button::Right);
+    assert_eq!(Config::from_snapshot(&m.settings().menu).unwrap().attacker, 99);
+    assert!(!(0..m.entry_count(m.page())).any(|i| m.entry(m.page(), i) == Some(Entry::Row(grab))));
+    let attacker = goto(&mut m, moves::ATTACKER_ROW);
+    m.press(Button::Left);
+    assert_eq!(Config::from_snapshot(&m.settings().menu).unwrap().attacker, 89);
+    m.press(Button::Right);
+    assert_eq!(m.value(attacker), RowValue::Choice(Some(0)));
+    // Structurally valid edited Bury+Mario is rejected, not mapped to another state.
+    let mut bad = Settings::factory();
+    bad.menu.set(moves::STATE_ROW, &[0,1,0,0,0,0]).unwrap();
+    assert_eq!(Config::from_snapshot(&bad.menu), None);
+    let invalid = Menu::new(bad, Env::default());
+    assert_eq!(invalid.value(attacker), RowValue::Choice(None));
+    let mut value = model::frame::Text::<72>::new();
+    model::frame::write_value(&invalid, attacker, &mut value);
+    assert_eq!(String::from_utf16(value.units()).unwrap(), "<  -  >");
+}
+
 // ---- cross-checks --------------------------------------------------------------------------------
 
 
@@ -1033,6 +1105,8 @@ fn core03_shortcut_rows_open_editor() {
 fn case_table() {
     crate::test_table::run(&[
         ("layout_row_counts_match_the_rc_freeze", layout_row_counts_match_the_rc_freeze as fn()),
+        ("filtered_menu_counts_cycles_and_renders", filtered_menu_counts_cycles_and_renders as fn()),
+        ("state_change_resets_invalid_move_and_config_rejects_conflict", state_change_resets_invalid_move_and_config_rejects_conflict as fn()),
         ("the_spot_rows_sit_next_to_their_features", the_spot_rows_sit_next_to_their_features as fn()),
         ("legend_hitbox_visualization_is_one_checklist", legend_hitbox_visualization_is_one_checklist as fn()),
         ("core02_table_carriage_return", core02_table_carriage_return as fn()),

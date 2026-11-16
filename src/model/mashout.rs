@@ -10,3 +10,6 @@ pub mod moves;
 pub mod native;
 #[path = "mashout/run.rs"]
 pub mod run;
+
+#[path = "mashout/entry.rs"]
+pub mod entry;

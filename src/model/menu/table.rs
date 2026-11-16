@@ -230,7 +230,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 109] = [
+pub static ROWS: [Row; 110] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -465,9 +465,11 @@ pub static ROWS: [Row; 109] = [
     r(GAMES, "Mash out", "mashout", Control::Dropdown(&super::super::mashout::moves::ON_OFF_LABELS),
       "Practice escaping a capture.\nStarts when the menu closes."),
     r(GAMES, "State", "mashout_state", Control::Dropdown(&super::super::mashout::moves::STATE_LABELS),
-      "The capture to practice.\nGrab: escape an ordinary grab."),
+      "The state to escape.\nRandom state includes every reviewed attacker move."),
     r(GAMES, "Attacker move", "mashout_attacker", Control::Dropdown(&super::super::mashout::moves::ATTACKER_LABELS),
-      "The fighter whose standing grab to practice.\nRandom chooses from every ordinary fighter."),
+      "Choose a fighter move for the selected state.\nRandom chooses from that state; Random state includes all."),
+    r(GAMES, "Grab type", "mashout_grab", Control::Dropdown(&super::super::mashout::moves::GRAB_LABELS),
+      "Standing, dash or pivot for an ordinary grab.\nRandom chooses one of the three each attempt."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

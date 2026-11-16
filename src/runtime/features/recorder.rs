@@ -308,7 +308,7 @@ unsafe fn on_ai_frame(ai: usize) {
         return;
     }
     if super::mashout::owns_cpu(body.accessor) {
-        write_controller(controller, Inject::NEUTRAL);
+        write_controller(controller, super::mashout::control());
         return;
     }
     bump(COUNT_AI_FRAME);

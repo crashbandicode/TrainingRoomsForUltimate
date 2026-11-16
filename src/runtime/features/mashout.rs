@@ -2,13 +2,24 @@
 //! Hooks publish values only; the existing diagnostic worker owns solver, grading and bests.
 
 use super::{notices, recorder, states};
-use crate::model::cpu::{hash::lua_bind_hash, role::LOBBY_CPU_ENTRY};
+use crate::model::cpu::{
+    hash::lua_bind_hash,
+    ids::{C, COUNT, NAMES as CPU_NAMES},
+    role::LOBBY_CPU_ENTRY,
+};
 use crate::model::mashout::{
     admission::{faulted, Admission, UNAVAILABLE_NOTICE},
-    moves::{Config, OrdinaryGrab},
+    entry,
+    moves::{Config, Scenario},
     native::Clock,
 };
-use crate::model::{notify::DEFAULT_COLOR, scene::Scene, settings::Snapshot};
+use crate::model::{
+    input_delay::MappedInputs,
+    notify::DEFAULT_COLOR,
+    recording::{inject_values, Inject},
+    scene::Scene,
+    settings::Snapshot,
+};
 use crate::runtime::{
     game::{self, natives},
     published, scene, state_natives,
@@ -32,6 +43,7 @@ static ARMED: AtomicU64 = AtomicU64::new(0);
 static P1: AtomicUsize = AtomicUsize::new(0);
 static THRESHOLD: AtomicU32 = AtomicU32::new(0);
 static OWN_CPU: AtomicUsize = AtomicUsize::new(0);
+static DRIVE: AtomicU64 = AtomicU64::new(0);
 static CPU_ENTRY: AtomicI32 = AtomicI32::new(-1);
 static TEMP_KIND: AtomicU32 = AtomicU32::new(u32::MAX);
 static FAULT: AtomicU64 = AtomicU64::new(0);
@@ -82,6 +94,33 @@ fn fault(generation: u64) {
 
 fn revoke() {
     ARMED.store(0, Ordering::Release);
+    drive(MappedInputs::NEUTRAL);
+}
+
+// One coherent mapped sample, through the recorder writer already guarded for this CPU.
+fn drive(value: MappedInputs) {
+    let mut bytes = [0; 8];
+    bytes[..4].copy_from_slice(&value.buttons.to_le_bytes());
+    bytes[4..].copy_from_slice(&[
+        value.lstick_x as u8,
+        value.lstick_y as u8,
+        value.rstick_x as u8,
+        value.rstick_y as u8,
+    ]);
+    DRIVE.store(u64::from_le_bytes(bytes), Ordering::Release);
+}
+pub(crate) fn control() -> Inject {
+    let bytes = DRIVE.load(Ordering::Acquire).to_le_bytes();
+    inject_values(
+        MappedInputs {
+            buttons: u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            lstick_x: bytes[4] as i8,
+            lstick_y: bytes[5] as i8,
+            rstick_x: bytes[6] as i8,
+            rstick_y: bytes[7] as i8,
+        },
+        1,
+    )
 }
 
 #[derive(Clone, Copy)]
@@ -116,7 +155,7 @@ pub(crate) unsafe fn seed_after(
     source: i8,
     index: i32,
     c: bool,
-    d: bool,
+    _d: bool,
 ) {
     if !READY.load(Ordering::Acquire)
         || seed_token(accessor).is_none_or(|fresh| fresh.generation != token.generation)
@@ -125,7 +164,9 @@ pub(crate) unsafe fn seed_after(
     }
     let sample = admission()
         .with(|| {
-            (source == -1 && index == 0 && !c && !d)
+            // Stock common initializers use both d values (Egg/Ridley/Corrin use true).
+            // The initialized record carries those latch/reload values; never substitute defaults.
+            (source == -1 && index == 0 && !c)
                 .then(|| reader::sample(accessor, token.threshold))
                 .flatten()
                 .filter(|s| s.record.source == -1 && s.record.remaining > 0.0)
@@ -168,12 +209,13 @@ struct Game {
     generation: u64,
     config: Option<Config>,
     scene: Option<Scene>,
-    requested: Option<OrdinaryGrab>,
+    requested: Option<Scenario>,
     original: Option<u32>,
     p1: usize,
     cpu: usize,
     clock: Option<Clock>,
     saw_catch: bool,
+    followed: bool,
     restore_requested: bool,
 }
 impl Game {
@@ -189,6 +231,7 @@ impl Game {
             cpu: 0,
             clock: None,
             saw_catch: false,
+            followed: false,
             restore_requested: false,
         }
     }
@@ -259,8 +302,27 @@ fn ids() -> Option<[i32; 15]> {
     }
     Some(values)
 }
-fn captured(status: i32, ids: &[i32; 15]) -> bool {
-    ids[2..5].contains(&status) || ids[11..15].contains(&status)
+static STATE_IDS: [AtomicI32; COUNT] = [const { AtomicI32::new(i32::MIN) }; COUNT];
+fn state_id(c: C) -> Option<i32> {
+    let slot = &STATE_IDS[c as usize];
+    let mut value = slot.load(Ordering::Acquire);
+    if value == i32::MIN {
+        value = unsafe { game::lua_const(lua_bind_hash(CPU_NAMES[c as usize])) }?;
+        slot.store(value, Ordering::Release);
+    }
+    Some(value)
+}
+fn holding(request: Option<Scenario>, status: i32) -> bool {
+    request.is_some_and(|r| entry::holding(r.state, |c| state_id(c) == Some(status)))
+}
+unsafe fn arm(p1: usize, generation: u64) -> bool {
+    let Some(threshold) = admission().with(|| reader::threshold(p1)).flatten() else {
+        return false;
+    };
+    P1.store(p1, Ordering::Release);
+    THRESHOLD.store(threshold.to_bits(), Ordering::Release);
+    ARMED.store(generation, Ordering::Release);
+    true
 }
 
 /// Existing P1 per-frame path. Entry0's current active body only, independent of frame-strip settings.
@@ -320,7 +382,10 @@ pub unsafe fn frame(fighter: usize) {
     let config = CONFIG.read().filter(|_| WANTED.load(Ordering::Acquire));
     let restart = START.swap(false, Ordering::AcqRel) || game.config != config;
     let status = natives::status_kind(p1);
-    let linked = captured(status, &ids);
+    let linked = holding(game.requested, status)
+        || game.requested.is_some_and(|r| {
+            r.plan == crate::model::mashout::moves::Plan::Grab && status == ids[14]
+        });
     if restart {
         revoke();
         post(worker::Event::Cancel(game.generation), game.generation);
@@ -385,9 +450,11 @@ pub unsafe fn frame(fighter: usize) {
         if game.step != Step::Entering { return; }
         // restriction: M3-READER-GUARD
         let Some(sample) = sample else { game.fail("Native capture seed unavailable · no grade"); return; };
-        let cpu_status = natives::status_kind(cpu);
-        if !linked || ![ids[1], ids[8], ids[9], ids[10]].contains(&cpu_status) || sample.record.automatic <= 0.0 {
-            game.fail("Grab entry unconfirmed · no grade"); return;
+        if !linked {
+            game.fail("Move entry unconfirmed · no grade"); return;
+        }
+        if sample.record.automatic == 0.0 {
+            game.fail("Native tick observation unavailable for this hold"); return;
         }
         let seed = sample.seed();
         let Ok(clock) = Clock::new(seed.record) else { game.fail("Invalid native capture seed · no grade"); return; };
@@ -396,7 +463,8 @@ pub unsafe fn frame(fighter: usize) {
         if cpu_body == 0 || ((cpu_body + 0xc) as *const u32).read() != request.attacker_kind {
             game.fail("Attacker changed · no grade"); return;
         }
-        let key = worker::Key::new(request.attacker_kind, ((fighter + 0xc) as *const u32).read(), natives::damage(p1, 0), seed);
+        let key = worker::Key::new(request.id, request.attacker_kind, ((fighter + 0xc) as *const u32).read(), natives::damage(p1, 0), seed);
+        drive(MappedInputs::NEUTRAL);
         game.clock = Some(clock);
         game.step = Step::Held;
         post(worker::Event::Begin(generation, key, seed), generation);
@@ -412,6 +480,7 @@ pub unsafe fn frame(fighter: usize) {
     // Observe a live hold even under menus: only an actual native decrease counts.
     // Setup and the result delay wait for the same input owners as the other games.
     if covered && !matches!(game.step, Step::Held | Step::Result) {
+        drive(MappedInputs::NEUTRAL);
         return;
     }
     match game.step {
@@ -449,6 +518,8 @@ pub unsafe fn frame(fighter: usize) {
             game.p1 = p1;
             game.cpu = cpu;
             game.saw_catch = false;
+            game.followed = false;
+            revoke();
             game.step = Step::Reload;
             post(
                 worker::Event::Setup(game.generation, "Mash out · Loading attacker"),
@@ -473,7 +544,7 @@ pub unsafe fn frame(fighter: usize) {
                 game.cpu = cpu;
                 CPU_ENTRY.store(cpu_entry, Ordering::Release);
                 OWN_CPU.store(cpu, Ordering::Release);
-                game.step(Step::Place, "Mash out · Setting up Grab");
+                game.step(Step::Place, "Mash out · Setting up move");
             }
         }
         Step::Place if !linked && natives::situation_kind(p1) == ids[7] => {
@@ -495,11 +566,15 @@ pub unsafe fn frame(fighter: usize) {
             state_natives::clear_speed_all(p1);
             state_natives::status_request(p1, ids[0]);
             state_natives::clear_speed_all(cpu);
-            // Initial standing-grab fixture: first Eden entry must prove its spacing/floor and real capture.
+            let Some(request) = game.requested else {
+                return;
+            };
+            // G&W down smash's bury hitbox is the native tip at x=±14.2 (MOVES B04).
+            let spacing = if request.evidence == "B04" { 14.2 } else { 6.0 };
             state_natives::init_pos(
                 cpu,
                 &state_natives::Vector3f {
-                    x: position.x + 6.0 * facing.signum(),
+                    x: position.x + spacing * facing.signum(),
                     ..position
                 },
             );
@@ -518,21 +593,61 @@ pub unsafe fn frame(fighter: usize) {
             {
                 return;
             }
-            let Some(threshold) = admission().with(|| reader::threshold(p1)).flatten() else {
-                game.fail(UNAVAILABLE_NOTICE);
+            let Some(request) = game.requested else {
                 return;
             };
-            P1.store(p1, Ordering::Release);
-            THRESHOLD.store(threshold.to_bits(), Ordering::Release);
-            ARMED.store(game.generation, Ordering::Release);
-            game.step(Step::Entering, "Mash out · Waiting for Grab");
-            state_natives::status_request(cpu, ids[1]);
+            let Some(start) =
+                entry::start(request).and_then(|name| game::lua_const(lua_bind_hash(name)))
+            else {
+                game.fail("Move sequence unavailable");
+                return;
+            };
+            if !entry::preparatory_grab(request.plan) && !arm(p1, game.generation) {
+                game.fail(UNAVAILABLE_NOTICE);
+                return;
+            }
+            drive(entry::controls(request.plan, false));
+            game.step(Step::Entering, "Mash out · Waiting for move");
+            state_natives::status_request(cpu, start);
+            #[cfg(feature = "diag")]
+            crate::runtime::diag_log::enqueue_diagnostic(format_args!(
+                "[Mashout] entry gen={} move={} state={:?} attacker={} plan={:?} variant={}",
+                game.generation,
+                request.id,
+                request.state,
+                request.attacker_kind,
+                request.plan,
+                request.grab
+            ));
         }
         Step::Entering => {
-            let status = natives::status_kind(cpu);
-            game.saw_catch |= [ids[1], ids[8], ids[9], ids[10]].contains(&status);
-            if game.saw_catch && status == ids[0] && !linked {
-                game.fail("Grab did not capture · reopen menu to retry");
+            let cpu_status = natives::status_kind(cpu);
+            let Some(request) = game.requested else {
+                return;
+            };
+            drive(entry::controls(request.plan, game.followed));
+            game.saw_catch |= cpu_status != ids[0];
+            if request.plan == crate::model::mashout::moves::Plan::AirSideSpecial
+                && !game.followed
+                && state_id(C::SituationAir) == Some(natives::situation_kind(cpu))
+            {
+                let Some(special) = state_id(C::StatusSpecialS) else {
+                    game.fail("Move status unavailable");
+                    return;
+                };
+                game.followed = true;
+                state_natives::status_request(cpu, special);
+            }
+            if entry::preparatory_grab(request.plan) && !game.followed && cpu_status == ids[9] {
+                if !arm(p1, game.generation) {
+                    game.fail(UNAVAILABLE_NOTICE);
+                    return;
+                }
+                game.followed = true;
+                drive(entry::controls(request.plan, true));
+            }
+            if game.saw_catch && cpu_status == ids[0] && !linked {
+                game.fail("Move did not capture · reopen menu to retry");
             }
         }
         Step::Held => {

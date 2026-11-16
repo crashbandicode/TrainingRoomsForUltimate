@@ -4,15 +4,17 @@ use crate::model::mashout::{native::Seed, run::Run};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Key {
+    move_id: u16,
     attacker: u32,
     victim: u32,
     damage: u32,
     seed: [u32; 9],
 }
 impl Key {
-    pub fn new(attacker: u32, victim: u32, damage: f32, seed: Seed) -> Self {
+    pub fn new(move_id: u16, attacker: u32, victim: u32, damage: f32, seed: Seed) -> Self {
         let r = seed.record;
         Self {
+            move_id,
             attacker,
             victim,
             damage: damage.to_bits(),
