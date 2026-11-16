@@ -69,6 +69,10 @@ type ChangeStatusFn = extern "C" fn(usize, L2CValue, L2CValue) -> L2CValue;
 type SubGuardContFn = extern "C" fn(usize) -> L2CValue;
 type IsEnablePassiveFn = extern "C" fn(usize) -> L2CValue;
 
+pub(super) fn di_ready() -> bool {
+    ORIGINAL_DI.load(Ordering::Acquire) != 0
+}
+
 #[cfg(feature = "diag")]
 pub fn passive_ready() -> bool {
     IS_ENABLE_PASSIVE.load(Ordering::Acquire) != 0

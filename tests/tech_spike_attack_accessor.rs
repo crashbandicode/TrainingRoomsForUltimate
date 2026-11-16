@@ -266,23 +266,62 @@ fn damage_stop_guards_match_owned_export_and_concrete_body() {
     );
 }
 #[test]
-fn info_launch_has_no_post_init_energy_rewrite_or_lr_clear() {
-    let source = include_str!("../src/runtime/features/tech_spike.rs");
-    let launch = source
-        .split("unsafe fn launch(run:")
-        .nth(1)
-        .unwrap()
-        .split("/// Existing common hook")
-        .next()
+fn info_launch_uses_one_pre_init_damage_stop_without_energy_rewrite() {
+    let core = include_str!("../src/runtime/features/tech_launch_native.rs");
+    let diag = include_str!("../src/runtime/features/tech_spike.rs");
+    let product = include_str!("../src/runtime/features/tech_adapter.rs");
+    assert!(diag.contains("core::launch(accessor, plan,"));
+    assert!(product.contains("tech_launch_native::launch(accessor, plan,"));
+    for source in [core, product] {
+        assert!(!source.contains("0x20f8320"));
+        assert!(!source.contains("0x20f6560"));
+    }
+    let arm = core.find("stop(accessor, plan.frames, true)").unwrap();
+    let verify = core.find("if !stopped || !damage").unwrap();
+    let init = core
+        .find("natives::change_status_force(accessor, fly, false)")
         .unwrap();
-    assert!(!launch.contains("write_speed("));
-    assert!(!launch.contains("0x20f8320"));
-    assert!(!launch.contains("0x20f6560"));
-    assert!(!launch.contains("set_float(accessor, 0.0, reserve_key)"));
-    assert!(launch
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect::<String>()
-        .contains("set_stop(accessor,frames,true)"));
-    assert!(launch.contains("fixed9_fixture"));
+    assert!(arm < verify && verify < init);
+    assert!(core.contains("is_damage(accessor)"));
+    assert!(diag.contains("fixed9_fixture"));
+    assert!(!product.contains("fixed9"));
+}
+
+#[path = "../src/runtime/features/tech_reaction_guard.rs"]
+mod reaction_guard;
+#[test]
+fn product_reaction_guard_matches_owned_and_diag_window() {
+    let guard = guards::SITES.iter().find(|x| x.1 == 0x404ec0).unwrap();
+    assert_eq!(reaction_guard::REACTION_GUARD, guard.2);
+    let Some(owned) = common::owned_main("product_reaction_guard_matches_owned_and_diag_window")
+    else {
+        return;
+    };
+    assert_eq!(reaction_guard::REACTION_GUARD, owned.window(0x404ec0));
+    for &(offset, expected) in reaction_guard::CORE_GUARDS {
+        assert_eq!(expected, owned.window(offset));
+        if offset != 0x4df440 {
+            assert_eq!(
+                expected,
+                guards::SITES.iter().find(|x| x.1 == offset).unwrap().2
+            );
+        }
+    }
+}
+
+#[test]
+fn shared_launch_virtual_targets_match_owned_relocations() {
+    let Some(owned) = common::owned_main("shared_launch_virtual_targets_match_owned_relocations")
+    else {
+        return;
+    };
+    for (slot, target) in [
+        (0x4f8a0e0 + 0xa0, 0x4df440),
+        (0x4f88568 + 0x60, 0x479d40),
+        (0x4f88968 + 0x20, 0x3b3540),
+        (0x4f88a18 + 0x20, 0x6d8cc0),
+    ] {
+        assert_eq!(relative_pointer(&owned, slot), target);
+        assert!(reaction_guard::CORE_GUARDS.iter().any(|x| x.0 == target));
+    }
 }

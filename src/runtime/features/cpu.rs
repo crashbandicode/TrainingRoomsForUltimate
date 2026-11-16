@@ -241,6 +241,15 @@ fn with<R>(f: impl FnOnce(&mut Cpu) -> R) -> Option<R> {
     Some(f(cpu))
 }
 
+/// Product launch ownership: no wait on the CPU state from a hook.
+pub(super) fn tech_player_receipt() -> Result<Option<FrameReceipt>, ()> {
+    let scene = role_scene();
+    let mut guard = CPU.try_lock().ok_or(())?;
+    let Some(cpu) = guard.as_mut() else { return Ok(None); };
+    let Some(receipt) = cpu.roles.receipt(0) else { return Ok(None); };
+    Ok(role_adapter::current_frame(cpu, scene, receipt).then_some(receipt))
+}
+
 /// Create the state (boot, before any hook is installed).
 pub fn init(settings: CpuSettings, seed: u64) {
     *CPU.lock() = Some(Cpu::new(settings, seed));
@@ -474,6 +483,8 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         // SPEC-core-06: the hitbox visualizer's pass (a readiness boundary: nothing until boot installed it), after the combo and
         // before the save states (SPEC-core-01 §5.2).
         unsafe { crate::runtime::features::hitbox::frame(a0) };
+        // Product hold/restore uses the existing post-native seam and fresh lifetime receipt.
+        unsafe { super::tech_adapter::frame(a0, receipt) };
         // S0 research only, after the ordinary hide and practice-game passes.
         #[cfg(feature = "diag")]
         unsafe {
@@ -1270,6 +1281,7 @@ pub(crate) unsafe fn script_accessor(fighter: usize) -> usize {
 
 /// DI: before the game corrects a damage vector, write the DI stick floats for a CPU body.
 pub(crate) unsafe fn di_before(accessor: usize) {
+    if super::tech_adapter::di_before(accessor) { return; }
     cpu_event_on_change!(ev::DI_CALL, 0, Some(accessor as u64), "di_before accessor={accessor:#x} role={}", role_of(accessor).is_some());
     let Some(key) = role_of(accessor) else { return };
     let (x, y) = (konst(C::WorkFloatVecorCorrectStickX), konst(C::WorkFloatVecorCorrectStickY));

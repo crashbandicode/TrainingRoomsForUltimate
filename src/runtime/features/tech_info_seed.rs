@@ -1,4 +1,4 @@
-//! S0-only, four-field DamageInfo seed. Offsets pinned against the owned 13.0.5 ELF.
+//! Shared four-field DamageInfo seed. Offsets pinned against the owned 13.0.5 ELF.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Seed {
     pub height: i32,
@@ -7,6 +7,7 @@ pub struct Seed {
 }
 impl Seed {
     /// Magnitude and trig are supplied by the guarded native functions in the hook.
+    #[cfg(any(test, feature = "diag"))]
     pub fn derived(height: i32, magnitude: f32, direction: [f32; 2], world_degrees: f32) -> Self {
         Self {
             height,
@@ -14,6 +15,7 @@ impl Seed {
             angle: relative_angle(world_degrees, direction[0] >= 0.0),
         }
     }
+    #[cfg(any(test, feature = "diag"))]
     pub fn from_info(info: &[u8; 0xa0]) -> Self {
         let word = |offset| u32::from_le_bytes(info[offset..offset + 4].try_into().unwrap());
         Self {

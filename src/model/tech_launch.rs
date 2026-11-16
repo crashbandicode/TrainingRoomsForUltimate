@@ -161,3 +161,68 @@ pub fn solve_start(
     };
     start.finite().then_some(start)
 }
+
+/// The UI-to-core boundary. Percent is the desired displayed pre-flight percent;
+/// hit_damage shapes hitlag and must not be added to percent by the adapter.
+/// The core derives theta_rel, speed_vec, native hit height, hitlag and LR seed.
+/// KB-to-speed conversion belongs exclusively to the core's native 0x403a20 call;
+/// the approximate host solver does not supply a speed vector to this interface.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Launch {
+    pub start: Vec2,
+    pub target: Vec2,
+    /// WORLD angle in degrees; the core derives the hit-side-relative angle.
+    pub angle: f32,
+    pub knockback: f32,
+    pub percent: f32,
+    pub hit_damage: f32,
+    pub height: HitHeight,
+    pub facing: f32,
+    pub hit_from_behind: bool,
+    pub di: Option<Vec2>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HitHeight {
+    Low,
+    Middle,
+    High,
+}
+
+/// Native calls and guards belong to the core, which owns sleep/placement/release.
+/// A rejected request does not begin or count an attempt.
+pub trait Launcher {
+    type Error;
+    fn place(&mut self, launch: Launch) -> Result<(), Self::Error>;
+    fn launch(&mut self) -> Result<(), Self::Error>;
+    fn restore(&mut self);
+}
+
+impl Launch {
+    /// Validate the whole request before holding or mutating the owned player.
+    pub fn valid(self) -> bool {
+        self.start.finite()
+            && self.target.finite()
+            && self.angle.is_finite()
+            && self.knockback.is_finite()
+            && self.knockback > 0.0
+            && self.percent.is_finite()
+            && self.percent >= 0.0
+            && (1.0..=30.0).contains(&self.hit_damage)
+            && matches!(self.facing, -1.0 | 1.0)
+            && self
+                .di
+                .is_none_or(|v| v.finite() && v.x.abs() <= 1.0 && v.y.abs() <= 1.0)
+    }
+    /// Hit side is independent of world trajectory (including reverse-angle launches).
+    pub fn reserve_damage_lr(self) -> f32 {
+        if self.hit_from_behind {
+            -self.facing
+        } else {
+            self.facing
+        }
+    }
+    pub fn away_from_hit_toward_right(self) -> bool {
+        self.reserve_damage_lr() < 0.0
+    }
+}
