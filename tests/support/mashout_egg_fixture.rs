@@ -1924,7 +1924,7 @@ fn shoulder_seed(m: &mut NativeMemory, automatic: f32) {
     unsafe { (m.record.as_mut_ptr().cast::<u8>().add(4) as *mut f32).write(automatic) };
 }
 #[test]
-fn cargo_real_catch_then_forward_only_in_catch_wait_until_native_shoulder_seed() {
+fn cargo_real_catch_then_forward_only_in_catch_wait_and_no_shoulder_seed_begins() {
     unsafe {
         for facing in [-1.0f32, 1.0] {
             let mut m = NativeMemory::new();
@@ -1951,13 +1951,15 @@ fn cargo_real_catch_then_forward_only_in_catch_wait_until_native_shoulder_seed()
                 assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
                 assert_eq!(g.step, Step::Entering);
             }
+            // Even a non-zero automatic shoulder seed is refused before Begin until a Cargo
+            // grading rule is proven and reviewed (OPUS-REVIEW-84e9b33b §1).
             shoulder_seed(&mut m, 1.0);
-            let actual = reader::sample(m.p1(), 0.37).unwrap().seed();
+            let before = (m.control, m.record);
             m.start();
             m.update(&mut g, 0xC6);
-            assert_eq!(g.step, Step::Held);
-            assert_eq!(g.clock.unwrap().last(), actual.record);
-            assert_eq!(BEGINS.with_borrow(|v| (v.len(), v[0].0.0, v[0].1)), (1, 89, actual));
+            assert_eq!(g.failed, Some("Native tick observation unavailable for this hold"));
+            assert!(g.clock.is_none() && BEGINS.with_borrow(Vec::is_empty));
+            assert_eq!((m.control, m.record), before);
             assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
         }
     }

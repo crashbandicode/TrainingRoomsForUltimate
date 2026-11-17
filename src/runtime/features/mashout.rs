@@ -793,7 +793,12 @@ pub unsafe fn frame(fighter: usize) {
         if !scored || (ordinary_catch && ![ids[1], ids[8], ids[9], ids[10]].contains(&cpu_status)) {
             game.fail("Move entry unconfirmed · no grade"); return;
         }
-        if sample.record.automatic == 0.0 {
+        // Cargo's native shoulder EXEC (common0x25b878/0x25b894) later rewrites automatic and
+        // manual decay; until that order against the first eligible tick is proven and a
+        // Cargo grading rule is reviewed, no Cargo seed may begin a grade (OPUS-REVIEW-84e9b33b §1).
+        if sample.record.automatic == 0.0
+            || game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Cargo)
+        {
             // restriction: MASH-M1-MISMATCH
             game.fail("Native tick observation unavailable for this hold"); return;
         }
