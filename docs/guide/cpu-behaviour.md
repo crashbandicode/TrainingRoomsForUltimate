@@ -62,8 +62,9 @@ How they combine:
   Hitstun, Parry, Footstool, Ledge Trump, Landing, then the general ones (Grounded, Airborne, the distances, Always).
 - While the CPU is in one of the first eight, only that one counts. With Hitstun unticked, Always doesn't fire during
   hitstun; Hitstun doesn't fire during tumble.
-- Grounded, Airborne, the distances and Always work as one situation. While any of them holds, the CPU mashes once.
-  It mashes again after none of them held for a moment, or after something else happened in between (a hit, a reset).
+- Grounded, Airborne, the distances and Always work as one situation, and they repeat: while any of them holds, the CPU
+  mashes, and once that action and its Followup are done it mashes again. A CPU on Always with Spot Dodge keeps
+  spot-dodging. The other situations pick once each time they start.
 - Shieldstun, Ledge Option and Mistech Option are moments: the CPU mashes right then.
 - After a throw, the CPU always does its Mash action, whatever is ticked here.
 
