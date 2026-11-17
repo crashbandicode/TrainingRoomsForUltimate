@@ -49,6 +49,8 @@ pub mod guard;
 pub mod own_patches;
 #[path = "model/hook_stats.rs"]
 pub mod hook_stats;
+#[path = "model/kirby_copy_pair.rs"]
+pub mod kirby_copy_pair;
 #[path = "model/input_adapter.rs"]
 pub mod input_adapter;
 #[path = "model/input_pending.rs"]

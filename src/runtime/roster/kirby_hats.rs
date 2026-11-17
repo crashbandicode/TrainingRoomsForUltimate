@@ -132,6 +132,30 @@ unsafe fn role_lookup(role: usize) -> RoleLookup {
     lookup
 }
 
+/// SOL-R23: the native hat pair `copy_setup` will read for this Kirby and `kind` (`model::kirby_copy_pair`). Game thread
+/// only (Kirby's frame callback, like the copy itself); read-only, no pointer kept.
+unsafe fn copy_pair(body: *mut app::BattleObjectModuleAccessor, kind: u32) -> crate::model::kirby_copy_pair::Pair {
+    use crate::model::kirby_copy_pair::{self as pair, Pair};
+    if !pair::needs_pair(kind) {
+        return Pair::NotNeeded;
+    }
+    let read_word = |at: usize| if at == 0 { 0 } else { (at as *const usize).read_volatile() };
+    let entry = WorkModule::get_int(body, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
+    let entry_ptr = crate::runtime::game::natives::fighter_entry(entry);
+    let table = read_word(crate::runtime::game::text_base() + crate::runtime::mii::mii_native_access::OWNER_TABLE);
+    if entry_ptr == 0 || table == 0 {
+        return Pair::Unreadable;
+    }
+    let manager = read_word(table + pair::MANAGER_FIELD);
+    let costume = ((entry_ptr + pair::COSTUME_FIELD) as *const u8).read_volatile();
+    let Some(offset) = pair::pair_offset(costume, entry as u32).filter(|_| manager != 0) else {
+        return Pair::Unreadable;
+    };
+    let record = (0..pair::RECORDS).filter_map(pair::record_offset).map(|at| manager + at)
+        .find(|record| (*record as *const u32).read_volatile() == kind);
+    record.map_or(Pair::NoRecord, |record| Pair::Object(read_word(record + offset)))
+}
+
 unsafe fn equipped(body: *mut app::BattleObjectModuleAccessor) -> Option<u32> {
     WorkModule::is_flag(body, *FIGHTER_KIRBY_INSTANCE_WORK_ID_FLAG_COPY)
         .then(|| WorkModule::get_int(body, *FIGHTER_KIRBY_INSTANCE_WORK_ID_INT_COPY_CHARA) as u32)
@@ -350,6 +374,11 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
                 return;
             }
             pending.leases_released = true;
+            // SOL-R23: the native copy reads this kind's hat pair for this Kirby with no null check; wait until it exists.
+            if !crate::model::kirby_copy_pair::copy_ready(copy_pair(body, pending.kind)) {
+                state.pending = Some(pending);
+                return;
+            }
             match sources::prepare(role, pending.kind,
                 Holder { category: 1, id: u64::from(pending.body_id) }) {
                 Ok(Some(lease)) => {
