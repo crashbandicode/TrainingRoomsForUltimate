@@ -51,11 +51,6 @@ pub const fn availability(id: u16) -> MoveAvailability {
     }
 }
 
-/// Whether a menu option of the filtered attacker list may be confirmed: listed
-/// NotMashable rows are shown but never offered.
-pub fn attacker_offered(state: usize, option: usize) -> bool {
-    attacker_index(state, option).is_some_and(|index| attacker_valid(state, index))
-}
 
 /// Available AND startable now: `entry::start` is a pure plan-table match (no native call,
 /// no allocation), so a row becomes selectable by itself once its plan gains a start.
@@ -199,6 +194,12 @@ pub fn attacker_index(state: usize, option: usize) -> Option<usize> {
 
 pub fn attacker_option(state: usize, attacker: usize) -> Option<usize> {
     options(state).position(|i| i == attacker)
+}
+
+/// Whether a menu option of the filtered attacker list may be confirmed: listed
+/// NotMashable rows are shown but never offered.
+pub fn attacker_offered(state: usize, option: usize) -> bool {
+    attacker_index(state, option).is_some_and(|index| attacker_valid(state, index))
 }
 
 pub fn attacker_count(state: usize) -> usize {
