@@ -21,6 +21,8 @@ macro_rules! callgraph_self_tests {
 }
 #[path = "common/callgraph.rs"]
 mod callgraph;
+#[path = "common/tech_callbacks.rs"]
+mod tech_callbacks;
 
 #[path = "../src/model/thread_stacks.rs"]
 #[allow(dead_code)]
@@ -1105,7 +1107,7 @@ fn callback_edges(graph: &Graph) -> Vec<(usize, usize)> {
             }
         }
     }
-    for (from, to) in MODEL_CALLBACKS {
+    for (from, to) in MODEL_CALLBACKS.iter().chain(tech_callbacks::EDGES) {
         for a in graph.find(from) {
             out.extend(graph.find(to).into_iter().map(|b| (a, b)));
         }
@@ -1666,6 +1668,9 @@ fn the_callback_edges_cover_the_capability_scan() {
         callback_edges(&graph).into_iter().map(|(a, b)| (graph.funcs[a].key(), graph.funcs[b].key())).collect();
     for want in [("hud::run", "hud_draw::draw"), ("hud::run", "hitbox::draw_orbs"), ("diag_log::start_drain_thread", "p1::service")] {
         assert!(edges.contains(&(want.0.to_owned(), want.1.to_owned())), "{want:?} not followed: {edges:?}");
+    }
+    for &(from,to) in tech_callbacks::EDGES {
+        assert!(edges.contains(&(from.to_owned(),to.to_owned())), "Tech callback not followed: {from} -> {to}");
     }
     let text = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/capabilities.rs")).unwrap();
     let start = text.find("fn new() -> Analysis").expect("capabilities.rs Analysis::new");

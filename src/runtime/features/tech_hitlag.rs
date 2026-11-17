@@ -1,5 +1,5 @@
 //! Live native hitlag reader. See S0-hitlag-resolver/native-audit/NATIVE-CALL-MANIFEST.json.
-use super::{tech_adapter::{self, Error}, tech_hitlag_read::{self as reader, Native, ParamPair}};
+use super::{tech_adapter::{self, Error}, tech_hitlag_read::{self, Native, ParamPair}};
 use crate::model::sites_tech_hitlag as sites;
 use crate::runtime::game::{self,natives};
 #[repr(C)]
@@ -40,6 +40,8 @@ unsafe fn pointer(address: usize) -> Option<usize> {
 }
 
 
+/// Registration data only; native execution is the adapter launch callback.
+pub const PROVIDER: tech_adapter::HitlagResolver = resolve;
 struct Live(usize);
 impl Native for Live {
     type Context=tech_adapter::HeldContext;
@@ -62,11 +64,11 @@ impl Native for Live {
 /// Separate live G.f0 query for future UI conversion. Game thread, fresh eligible P1 context.
 pub unsafe fn live_multiplier(accessor: usize) -> Result<f32,Error> {
     let receipt=tech_adapter::player_context(accessor)?;
-    let value=reader::multiplier(&mut Live(accessor)).ok_or(Error::HitlagUnavailable)?;
+    let value=tech_hitlag_read::multiplier(&mut Live(accessor)).ok_or(Error::HitlagUnavailable)?;
     if tech_adapter::player_context(accessor)? != receipt { return Err(Error::NoPlayer); }
     Ok(value)
 }
 /// BASE damage, before percent-display multiplier. No cached k/G values or fallback.
 pub unsafe fn resolve(accessor: usize,base_damage:f32) -> Result<i32,Error> {
-    reader::resolve(&mut Live(accessor),base_damage)
+    tech_hitlag_read::resolve(&mut Live(accessor),base_damage)
 }

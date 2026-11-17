@@ -123,3 +123,16 @@ fn actual_reader_preserves_busy_and_rejects_stale_held_identity() {
     assert_eq!(reader::resolve(&mut n,12.0),Err(Error::NotPlaced));
     assert_eq!(n.held_calls,2);
 }
+
+#[test]
+fn actual_reader_refuses_malformed_g_and_map_pointer_values() {
+    for (slot,good) in [(ROOT,GLOBAL),(HOLDER+0x20,MAP)] {
+        for bad in [0,good+4,0x1_0000_0000_0000,usize::MAX] {
+            let mut n=Mock::valid();n.words.insert(slot,bad);
+            // A readable four-aligned float cannot establish a valid G pointer.
+            n.floats.insert(bad.wrapping_add(0xf0),1.2);
+            assert_eq!(reader::resolve(&mut n,12.0),Err(Error::HitlagUnavailable),"slot={slot:x} bad={bad:x}");
+            if slot==HOLDER+0x20 {assert_eq!(n.k_calls,0);}
+        }
+    }
+}

@@ -55,7 +55,7 @@ pub(super) static TECH_INIT: crate::model::cpu::tech_init::Init = crate::model::
 /// Existing heartbeat callback: no native lookup and no wait for game readiness.
 pub fn service_tech_init() {
     static HITLAG_BINDING: crate::model::tech_hitlag::Binding = crate::model::tech_hitlag::Binding::new();
-    if !HITLAG_BINDING.ready(|| super::tech::bind_hitlag(super::tech_hitlag::resolve)) {
+    if !HITLAG_BINDING.ready(|| super::tech::bind_hitlag(super::tech_hitlag::PROVIDER)) {
         return;
     }
     TECH_INIT.service(|ids| unsafe { super::tech::init(ids) });

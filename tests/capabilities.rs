@@ -20,6 +20,8 @@ macro_rules! callgraph_self_tests {
 }
 #[path = "common/callgraph.rs"]
 mod callgraph;
+#[path = "common/tech_callbacks.rs"]
+mod tech_callbacks;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -166,6 +168,7 @@ impl Analysis {
         // `model::seams`, `seam_install::gate`) and are not part of this model; what they call through `game::natives` and
         // `state_natives` is still behind the grant check.
         let mut graph = Graph::scan(&root.join("src/runtime"), &["lobby", "mii", "roster", "seams"]);
+        graph.dynamic.extend(tech_callbacks::EDGES.iter().map(|&(from,to)| (from.to_owned(),to.to_owned())));
         // Function-pointer tables the text cannot show: the layout tick runs the registered draw callbacks.
         graph.dynamic.push(("hud::run".to_owned(), "hud_draw::draw".to_owned()));
         graph.dynamic.push(("hud::run".to_owned(), "hitbox::draw_orbs".to_owned()));
@@ -856,4 +859,17 @@ fn pending_query_busy_defers_ui_before_delivery_and_existing_hold_clock() {
     assert!(at("Controller::tick") < at("age.saturating_add(1)"));
     at("snapshot.attempt == attempt.id");
     at("raw.filter(|s| s.attempt == attempt.id)");
+}
+
+#[test]
+fn injected_hitlag_callback_reaches_all_four_guarded_native_readers() {
+    let a=Analysis::new();
+    let launch=a.graph.find("tech_adapter::launch")[0];
+    let boundary=BOUNDARIES.iter().find(|b| b.function=="tech_adapter::launch").unwrap();
+    assert_eq!(boundary.owner,Some(Feature::TechPractice));
+    for row in &model::sites_tech_hitlag::SITES[..4] {
+        let chain=witness(&a,launch,row.offset);
+        assert!(chain.iter().any(|key|key=="tech_hitlag::resolve"),"{} missing production provider: {chain:?}",row.name);
+        assert!(chain.iter().any(|key|key=="tech_hitlag_read::resolve"),"{} missing actual shared reader: {chain:?}",row.name);
+    }
 }

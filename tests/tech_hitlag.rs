@@ -55,7 +55,7 @@ fn hitlag_refuses_invalid_params_damage_and_results() {
         let mut p=parameters(1.0); p.threshold=threshold;
         assert_eq!(frames(12.0, 1.0, p), None);
     }
-    let mut p=parameters(1.0); p.add=-100.0;
+    let mut p=parameters(1.0); p.add= -100.0;
     assert_eq!(frames(12.0, 1.0, p), None);
     p=parameters(1.0); p.maximum=2147483648.0; p.add=p.maximum;
     assert_eq!(frames(12.0, 1.0, p), None);
@@ -87,10 +87,12 @@ fn resolver_is_live_guarded_owned_and_bound_off_hook() {
     for witness in ["table != base+0x4f69b78", "pair.ops != base+ops", "pair.value != object.checked_add(field)?", "slot(n,table,0x10,base+0x3bd350)"] {
         assert!(source.contains(witness), "{witness}");
     }
+    let native=include_str!("../src/runtime/features/tech_hitlag.rs");
+    assert!(native.contains("pub const PROVIDER: tech_adapter::HitlagResolver = resolve;"));
     let cpu=include_str!("../src/runtime/features/cpu.rs");
     let service=&cpu[cpu.find("pub fn service_tech_init()").unwrap()..cpu.find("static CONST_ATTEMPTS").unwrap()];
     assert!(service.find("HITLAG_BINDING.ready").unwrap()<service.find("TECH_INIT.service").unwrap());
-    assert!(service.contains("super::tech::bind_hitlag(super::tech_hitlag::resolve)"));
+    assert!(service.contains("super::tech::bind_hitlag(super::tech_hitlag::PROVIDER)"));
     assert!(!service.contains("parameters()") && !service.contains("live_multiplier("));
 }
 #[test]

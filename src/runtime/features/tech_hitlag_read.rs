@@ -18,6 +18,10 @@ pub trait Native {
     fn hitlag_get_int(&mut self, pair: &ParamPair) -> Option<i32>;
     fn hitlag_k(&mut self, map: usize, hash: u64) -> Option<f32>;
 }
+fn checked_pointer(n: &mut impl Native, address: usize) -> Option<usize> {
+    let value=n.hitlag_word(address)?;
+    (value>=0x10000 && value&7==0 && value>>47==0).then_some(value)
+}
 fn slot(n: &mut impl Native, table: usize, offset: usize, expected: usize) -> Option<()> {
     (n.hitlag_word(table.checked_add(offset)?)? == expected).then_some(())
 }
@@ -35,24 +39,24 @@ fn checked_pair(n: &mut impl Native, object: usize, hash: u64, field: usize, int
 pub fn multiplier(n: &mut impl Native) -> Option<f32> {
     let base=n.hitlag_base();
     if base==0 || !n.hitlag_admitted() { return None; }
-    let root=n.hitlag_word(base+0x52b94f8)?;
-    let global=n.hitlag_word(root)?;
+    let root=checked_pointer(n,base+0x52b94f8)?;
+    let global=checked_pointer(n,root)?;
     let value=n.hitlag_float(global.checked_add(0xf0)?)?;
     (value.is_finite() && value>0.0).then_some(value)
 }
 fn parameters(n: &mut impl Native) -> Option<Parameters> {
     let base=n.hitlag_base();
     if base==0 || !n.hitlag_admitted() || n.hitlag_byte(base+0x52c51d8)? != 0 { return None; }
-    let holder=n.hitlag_word(base+0x52b8540)?;
-    let object=n.hitlag_word(holder)?;
-    let table=n.hitlag_word(object)?;
+    let holder=checked_pointer(n,base+0x52b8540)?;
+    let object=checked_pointer(n,holder)?;
+    let table=checked_pointer(n,object)?;
     if table != base+0x4f69b78 { return None; }
     slot(n,table,0x10,base+0x3bd350)?;
     let max=checked_pair(n,object,0x11cc94003c,0x108,false)?;
     let mul=checked_pair(n,object,0x11f8e00314,0x110,false)?;
     let add=checked_pair(n,object,0x11acf85152,0x10c,false)?;
     let threshold=checked_pair(n,object,0x23d2d966eb,0x16c,true)?;
-    let map=n.hitlag_word(holder.checked_add(0x20)?)?;
+    let map=checked_pointer(n,holder.checked_add(0x20)?)?;
     if !n.hitlag_readable(map,0x20) { return None; }
     Some(Parameters {
         maximum:n.hitlag_get_float(&max)?, multiplier:n.hitlag_get_float(&mul)?, add:n.hitlag_get_float(&add)?,

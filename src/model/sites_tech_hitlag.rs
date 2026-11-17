@@ -14,7 +14,7 @@ const fn sites() -> [Site; 5] {
         let (name,offset,guard)=guards::HITLAG_GUARDS[i];
         result[i]=Site { name, feature: Feature::TechPractice, offset,
             kind: if i==4 {SeamKind::Relied} else {SeamKind::Called}, guard,
-            note: "Read-only dispatch requires exact live object/pair/slot checks" };
+            note: "Audited live object/pair/slot identity" };
         i+=1;
     }
     result

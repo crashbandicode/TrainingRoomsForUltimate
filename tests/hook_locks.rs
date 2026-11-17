@@ -26,6 +26,8 @@ macro_rules! callgraph_self_tests {
 }
 #[path = "common/callgraph.rs"]
 mod callgraph;
+#[path = "common/tech_callbacks.rs"]
+mod tech_callbacks;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -582,6 +584,9 @@ fn non_switch_only(f: &callgraph::Func, runtime: &Path) -> bool {
 }
 
 fn tech_frame_waits(graph: &Graph, runtime: &Path) -> BTreeSet<String> {
+    tech_frame_waits_with_callbacks(graph,runtime,tech_callbacks::EDGES)
+}
+fn tech_frame_waits_with_callbacks(graph: &Graph, runtime: &Path, callbacks:&[(&str,&str)]) -> BTreeSet<String> {
     let roots = graph.find("tech::frame");
     assert_eq!(roots.len(), 1, "Tech fighter pass must remain an explicit audit root");
     let mut by_name: BTreeMap<String, Vec<usize>> = BTreeMap::new();
@@ -615,6 +620,8 @@ fn tech_frame_waits(graph: &Graph, runtime: &Path) -> BTreeSet<String> {
             violations.insert(format!("{path} reaches an allocation spelling"));
         }
         stack.extend(edges_on_thread(graph, i, &by_name, &mut BTreeMap::new(), false).into_iter().map(|next| (next, path.clone())));
+        stack.extend(callbacks.iter().filter(|(from,_)| *from==key).flat_map(|(_,to)| graph.find(to))
+            .map(|next| (next,path.clone())));
     }
     violations
 }
@@ -784,4 +791,53 @@ fn diag_only_modules(runtime: &Path) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
     walk(runtime, &mut out);
     out
+}
+
+#[test]
+fn tech_callbacks_match_production_binding_and_model_calls() {
+    let root=Path::new(env!("CARGO_MANIFEST_DIR"));
+    let graph=Graph::scan(&root.join("src/runtime"),&[]);
+    for &(from,to) in tech_callbacks::EDGES {
+        assert_eq!(graph.find(from).len(),1,"callback source {from}");
+        assert_eq!(graph.find(to).len(),1,"callback target {to}");
+    }
+    let compact=|s:String| s.split_whitespace().collect::<String>();
+    let ui=compact(std::fs::read_to_string(root.join("src/runtime/features/tech.rs")).unwrap());
+    let controller=compact(std::fs::read_to_string(root.join("src/model/tech/controller.rs")).unwrap());
+    let cpu=compact(std::fs::read_to_string(root.join("src/runtime/features/cpu.rs")).unwrap());
+    let adapter=compact(std::fs::read_to_string(root.join("src/runtime/features/tech_adapter.rs")).unwrap());
+    for call in ["Controller::tick(&mutrun.controller,&mutrun.adapter,", "run.controller.place(&mutrun.adapter,setup)", "run.controller.stop(&mutrun.adapter)", "Adapter::new(hitlag)", "HITLAG.get().copied()", "HITLAG.set(resolver)"] {
+        assert!(ui.contains(call),"production callback mapping changed: {call}");
+    }
+    for call in ["launcher.place(setup.launch)?", "launcher.attempt()", "launcher.restore()", "launcher.launch()?"] {
+        assert!(controller.contains(call),"model callback changed: {call}");
+    }
+    assert!(cpu.contains("super::tech::bind_hitlag(super::tech_hitlag::PROVIDER)"));
+    let native=compact(std::fs::read_to_string(root.join("src/runtime/features/tech_hitlag.rs")).unwrap());
+    assert!(native.contains("pubconstPROVIDER:tech_adapter::HitlagResolver=resolve;"));
+    assert!(adapter.contains("(self.hitlag)(accessor,owned.launch.hit_damage)?"));
+}
+#[test]
+fn tech_frame_audit_follows_model_launcher_and_injected_provider_callbacks() {
+    let runtime=Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut graph=Graph::scan(&runtime,&[]);graph.precise_imports=true;
+    let resolver=graph.find("tech_hitlag::resolve")[0];
+    let original=graph.funcs[resolver].body.clone();
+    graph.funcs[resolver].body=callgraph::lex("tech_adapter::OWNED.lock();");
+    // Negative controls reproduce both missing links; production uses the complete table.
+    assert!(tech_frame_waits_with_callbacks(&graph,&runtime,&[]).is_empty());
+    assert!(tech_frame_waits_with_callbacks(&graph,&runtime,&[("tech_adapter::launch","tech_hitlag::resolve")]).is_empty());
+    let found=tech_frame_waits(&graph,&runtime);
+    assert!(found.iter().any(|v|v.contains("tech_adapter::launch -> tech_hitlag::resolve blocks on features/tech_adapter.rs::OWNED")),"provider blocking seed escaped: {found:?}");
+    for callback in ["tech_adapter::place","tech_adapter::attempt","tech_adapter::restore","tech_adapter::launch"] {
+        let target=graph.find(callback)[0];
+        let old=graph.funcs[target].body.clone();
+        graph.funcs[target].body=callgraph::lex("OWNED.lock();");
+        assert!(tech_frame_waits(&graph,&runtime).iter().any(|v|v.contains(&format!("{callback} blocks on features/tech_adapter.rs::OWNED"))),"model callback seed escaped: {callback}");
+        graph.funcs[target].body=old;
+    }
+    graph.funcs[resolver].body=callgraph::lex("tech_adapter::OWNED.try_lock();");
+    assert!(tech_frame_waits(&graph,&runtime).is_empty());
+    graph.funcs[resolver].body=original;
+    assert!(tech_frame_waits(&graph,&runtime).is_empty());
 }
