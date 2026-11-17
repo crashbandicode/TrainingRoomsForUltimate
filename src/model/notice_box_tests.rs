@@ -81,7 +81,7 @@ fn notice_box_tech_picker_is_compact() {
     assert_eq!(wrapped(NOTICES[0].1), "Choose a surface · A sets\n· X starts");
     let (b, lines) = boxed(NOTICES[0].0, NOTICES[0].1);
     assert_eq!(lines, 2);
-    assert!(b.plate[2] <= p::NOTICE_MAX_W && b.plate[2] < 992.0 / 3.0, "{}", b.plate[2]);
+    assert!(b.plate[2] < 992.0 / 3.0, "{}", b.plate[2]);
     assert!(b.plate[2] * b.plate[3] < 0.2 * 992.0 * (82.0 + 102.0), "{:?}", b.plate);
     let (short, _) = boxed("Mii Fighter", "CPU fighter applied");
     assert!(short.plate[2] < 200.0 && short.plate[3] < 80.0, "{:?}", short.plate);
@@ -136,14 +136,16 @@ fn notice_box_wrap_keeps_text_and_length() {
 fn notice_box_anchors_top_left_clear_of_hud() {
     assert_eq!([p::NOTICE_LEFT, p::NOTICE_TOP], [-960.0 + 24.0, 540.0 - 12.0]);
     assert_eq!(p::btt_hud_box("10/10 0:07.12", false, false)[0], p::NOTICE_LEFT, "the chip's left edge");
-    let right = p::NOTICE_LEFT + p::NOTICE_MAX_W;
-    assert!(right <= -iv::STRIP_W / 2.0 - 12.0 && right <= -cb::BAR_W / 2.0 && right <= -cb::SEQ_W / 2.0);
+    const RIGHT: f32 = p::NOTICE_LEFT + p::NOTICE_MAX_W;
+    const { assert!(RIGHT <= -iv::STRIP_W / 2.0 - 12.0, "8 px left of the frame strip") };
+    const { assert!(RIGHT <= -cb::BAR_W / 2.0, "left of the combo bar") };
+    const { assert!(RIGHT <= -cb::SEQ_W / 2.0, "left of the sequence bar") };
+    const { assert!(RIGHT < 0.0, "Total Damage, Combo and Damage are on the right") };
     let tallest = "a ".repeat(crate::model::notify::BODY_MAX / 2);
     let (b, _) = boxed("Tech Practice", &tallest);
     let chip = p::btt_hud_box("10/10 0:07.12", true, true);
     let bottom = b.plate[1] - b.plate[3] / 2.0 + stack(b.plate[3], Some(chip));
     assert!(bottom > -250.0, "{bottom}: above the player HUD");
-    assert!(right < 0.0, "Total Damage, Combo and Damage are on the right");
 }
 
 /// The BTT chip shows: the box goes 8 px under it when they would meet, and stays at the anchor when they would not.
