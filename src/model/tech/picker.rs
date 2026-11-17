@@ -100,7 +100,7 @@ impl Picker {
         if !range.into_iter().all(f32::is_finite) || range[0] >= range[1] || range[3] >= range[2] {
             return Pick::None;
         }
-        let motion = self.motion(&pad);
+        let motion = self.placing_motion(&pad);
         self.cursor.x = (self.cursor.x + motion[0]).clamp(range[0], range[1]);
         self.cursor.y = (self.cursor.y + motion[1]).clamp(range[3], range[2]);
         self.hovered = surfaces
@@ -124,7 +124,7 @@ impl Picker {
         Pick::None
     }
     /// The wizard's value steps use the same stick deadzone and D-pad repeat.
-    pub fn motion(&mut self, pad: &Pad) -> [f32; 2] {
+    pub fn placing_motion(&mut self, pad: &Pad) -> [f32; 2] {
         let motion = placing_motion(pad, self.previous, &mut self.repeat);
         self.previous = pad.held;
         motion

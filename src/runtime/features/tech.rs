@@ -249,7 +249,7 @@ fn wizard_poll(view: &mut ViewState, sample: Sample, stick: [f32; 2], range: [f3
             wizard.set_spot(spot);
         }
     } else {
-        let motion = view.picker.motion(&pad);
+        let motion = view.picker.placing_motion(&pad);
         wizard.adjust(motion[0], motion[1]);
     }
     // One action per edge, with Back taking priority over confirmation.
