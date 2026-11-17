@@ -8,6 +8,9 @@ pub mod solver;
 pub mod surface;
 pub mod variables;
 pub mod wizard;
+pub mod wizard_marks;
+#[cfg(test)]
+mod wizard_marks_tests;
 
 pub use super::tech_launch::{Attempt, AttemptState, ContactReceipt, HitHeight, Launch, Launcher, Vec2};
 

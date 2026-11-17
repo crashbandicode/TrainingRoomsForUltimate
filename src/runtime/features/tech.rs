@@ -58,8 +58,6 @@ struct ViewState {
     wizard: Option<Wizard>,
     wizard_config: Option<Config>,
     cancelled: bool,
-    was: u16,
-    repeat: u8,
     preview_params: Option<FlightParams>,
     preview_blocked: Option<bool>,
 }
@@ -71,8 +69,6 @@ static VIEW: Mutex<ViewState> = Mutex::new(ViewState {
     wizard: None,
     wizard_config: None,
     cancelled: false,
-    was: 0,
-    repeat: 0,
     preview_params: None,
     preview_blocked: None,
 });
@@ -200,6 +196,35 @@ fn draw(rng: &mut Rng, n: u32) -> u32 {
         }
     }
 }
+unsafe fn plan_context(
+    view: &ViewState,
+    spot: picker::Spot,
+    config: Config,
+    at: usize,
+    multiplier: f32,
+) -> Option<planner::Context<'_>> {
+    let gravity = natives::get_param_float(at, hash40("air_accel_y"), 0);
+    let cap = natives::get_param_float(at, hash40("air_speed_y_stable"), 0);
+    if !gravity.is_finite() || gravity <= 0. || !cap.is_finite() || cap <= 0. {
+        return None;
+    }
+    Some(planner::Context {
+        surfaces: &view.surfaces,
+        spot,
+        params: FlightParams {
+            brake: 0.051,
+            gravity,
+            fall_speed_cap: cap,
+        },
+        blast: solver::editor_bounds(tech_surfaces::blast_bounds()?),
+        view: if config.camera == 1 {
+            Some(solver::editor_bounds(view.range?))
+        } else {
+            None
+        },
+        damage_multiplier: Some(multiplier),
+    })
+}
 fn wizard_poll(view: &mut ViewState, sample: Sample, stick: [f32; 2], range: [f32; 4]) {
     use crate::model::chords::logical::{A, B, PLUS, X};
     let Some(wizard) = view.wizard.as_mut() else {
@@ -212,11 +237,9 @@ fn wizard_poll(view: &mut ViewState, sample: Sample, stick: [f32; 2], range: [f3
         save: false,
         load: false,
     };
-    let motion = crate::model::btt::placing_motion(&pad, view.was, &mut view.repeat);
-    if sample.pressed != 0 || motion != [0., 0.] {
+    if sample.pressed != 0 || stick != [0., 0.] {
         view.preview_blocked = None;
     }
-    view.was = sample.held;
     if wizard.step == Step::Spot {
         // X belongs to Defaults here, rather than the full editor's Start.
         let mut picker_pad = pad;
@@ -226,6 +249,7 @@ fn wizard_poll(view: &mut ViewState, sample: Sample, stick: [f32; 2], range: [f3
             wizard.set_spot(spot);
         }
     } else {
+        let motion = view.picker.motion(&pad);
         wizard.adjust(motion[0], motion[1]);
     }
     // One action per edge, with Back taking priority over confirmation.
@@ -261,46 +285,50 @@ fn wizard_poll(view: &mut ViewState, sample: Sample, stick: [f32; 2], range: [f3
 /// renderer without a second layout or new panes in the game hook.
 fn wizard_notice(wizard: &Wizard, blocked: Option<bool>) {
     use core::fmt::Write;
-    let mut text = FixedPath::<256>::EMPTY;
-    let header = match wizard.step {
-        Step::Spot => {
-            let _ = text.write_str(
-                "Move the cursor onto a surface\nA next · X defaults → preview · + start",
-            );
-            "Tech · 1/5 Spot"
-        }
-        Step::Angle => {
-            let _ = write!(text, "Surface angle {:.0}° · world {:.1}°\n← → adjust · A next · B back\nX defaults → preview · + start", wizard.degrees, wizard.world_angle().unwrap_or(0.));
-            "Tech · 2/5 Angle"
-        }
-        Step::Distance => {
-            let _ = write!(text, "Distance {:.0} units from surface\n← → adjust · A next · B back\nX defaults → preview · + start", wizard.distance);
-            "Tech · 3/5 Distance"
-        }
-        Step::Hit => {
-            let _ = write!(text, "{} Speed {:.0} KB\n{} Hit damage {:.0}% added\n↑ ↓ choose · ← → adjust\nA next · B back · X defaults · + start", if wizard.hit_focus { " " } else { ">" }, wizard.speed, if wizard.hit_focus { ">" } else { " " }, wizard.hit);
-            "Tech · 4/5 Hit"
-        }
-        Step::Preview => {
-            let _ = write!(
-                text,
-                "{:.0}° · {:.0} units · {:.0} KB · +{:.0}%\n{}\nA / + start · B back",
-                wizard.degrees,
-                wizard.distance,
-                wizard.speed,
-                wizard.hit,
-                match blocked {
-                    Some(true) => "Start blocked / outside bounds — adjust values",
-                    Some(false) => "Dotted path is approximate",
-                    None => "Preview unavailable",
-                }
-            );
-            "Tech · 5/5 Preview"
-        }
+    let mut text = FixedPath::<256>::new();
+    let _ = match wizard.step {
+        Step::Spot => text.write_str("Move the cursor onto a surface"),
+        Step::Angle => write!(
+            text,
+            "Surface angle {:.0}° · world {:.1}°\n← → adjust",
+            wizard.degrees,
+            wizard.world_angle().unwrap_or(0.)
+        ),
+        Step::Distance => write!(
+            text,
+            "Distance {:.0} units from surface\n← → adjust",
+            wizard.distance
+        ),
+        Step::Hit => write!(
+            text,
+            "{} Speed {:.0} KB\n{} Hit damage {:.0}% added\n↑ ↓ choose · ← → adjust",
+            if wizard.hit_focus { " " } else { ">" },
+            wizard.speed,
+            if wizard.hit_focus { ">" } else { " " },
+            wizard.hit
+        ),
+        Step::Preview => write!(
+            text,
+            "{:.0}° · {:.0} units · {:.0} KB · +{:.0}%\n{}",
+            wizard.degrees,
+            wizard.distance,
+            wizard.speed,
+            wizard.hit,
+            match blocked {
+                Some(true) => "Start blocked / outside bounds — adjust values",
+                Some(false) => "Dotted path is approximate",
+                None => "Preview unavailable",
+            }
+        ),
     };
+    let _ = text.write_str(if wizard.step == Step::Preview {
+        "\nA / + start · B back"
+    } else {
+        "\nA next · B back\nX defaults → preview · + start"
+    });
     notices::upsert(
         NOTICE,
-        header,
+        wizard.step.title(),
         text.as_str(),
         u16::MAX,
         crate::model::notify::DEFAULT_COLOR,
@@ -363,8 +391,12 @@ pub fn look(active: bool) -> [Option<([f32; 2], EggLook)>; LOOKS] {
     };
     if wizard_active() {
         if let Some(wizard) = &view.wizard {
-            wizard_look(&view, wizard, &mut out);
-            return out;
+            return crate::model::tech::wizard_marks::marks(
+                wizard,
+                view.picker.cursor,
+                view.preview_params,
+                view.preview_blocked == Some(false),
+            );
         }
     }
     let spot = if placing() {
@@ -385,21 +417,8 @@ pub fn look(active: bool) -> [Option<([f32; 2], EggLook)>; LOOKS] {
                 spot.point,
                 crate::model::tech::scale(spot.line.normal, 5.),
             );
-            let side = Vec2 {
-                x: -spot.line.normal.y,
-                y: spot.line.normal.x,
-            };
-            let back =
-                crate::model::tech::add(tip, crate::model::tech::scale(spot.line.normal, -1.5));
-            let points = [
-                crate::model::tech::add(
-                    spot.point,
-                    crate::model::tech::scale(spot.line.normal, 2.5),
-                ),
-                tip,
-                crate::model::tech::add(back, side),
-                crate::model::tech::add(back, crate::model::tech::scale(side, -1.)),
-            ];
+            let mut points = picker::arrow_points(tip, spot.line.normal, 2.5, 1.5);
+            points[0] = crate::model::tech::add(spot.point, crate::model::tech::scale(spot.line.normal, 2.5));
             for (slot, p) in out[1..5].iter_mut().zip(points) {
                 *slot = Some((
                     [p.x, p.y],
@@ -421,90 +440,6 @@ pub fn look(active: bool) -> [Option<([f32; 2], EggLook)>; LOOKS] {
         ));
     }
     out
-}
-fn wizard_look(view: &ViewState, wizard: &Wizard, out: &mut [Option<([f32; 2], EggLook)>; LOOKS]) {
-    use crate::model::tech::{add, scale};
-    let Some(spot) = wizard.selected else { return };
-    let marker = |p: Vec2, size, alpha| {
-        Some((
-            [p.x, p.y],
-            EggLook {
-                scale: size,
-                alpha,
-                ..EGG_WHOLE
-            },
-        ))
-    };
-    out[0] = marker(spot.point, 0.3, 255);
-    let Some(angle) = wizard.world_angle() else {
-        return;
-    };
-    let radians = angle.to_radians();
-    let direction = Vec2 {
-        x: radians.cos(),
-        y: radians.sin(),
-    };
-    let tail = if matches!(wizard.step, Step::Distance | Step::Hit | Step::Preview) {
-        wizard.start_marker().unwrap_or(spot.point)
-    } else {
-        add(spot.point, scale(direction, -7.))
-    };
-    let tip = add(tail, scale(direction, 7.));
-    let neck = add(tip, scale(direction, -2.));
-    let side = Vec2 {
-        x: -direction.y,
-        y: direction.x,
-    };
-    for (slot, p) in
-        out[1..5]
-            .iter_mut()
-            .zip([tail, tip, add(neck, side), add(neck, scale(side, -1.))])
-    {
-        *slot = marker(p, 0.12, 255);
-    }
-    if matches!(wizard.step, Step::Distance | Step::Hit | Step::Preview) {
-        if let Some(start) = wizard.start_marker() {
-            out[5] = marker(start, 0.65, 110);
-            if wizard.step == Step::Preview && view.preview_blocked == Some(false) {
-                // Drawing only: this provisional flight never supplies a native
-                // launch speed. Ten Whole panes total, within BTT's typed pool.
-                if let Some(params) = view.preview_params {
-                    let d = crate::model::tech_launch::Vec2 {
-                        x: direction.x,
-                        y: direction.y,
-                    };
-                    if let Some(v) = crate::model::tech_launch::launch_velocity(wizard.speed, d) {
-                        for (slot, frame) in out[6..10].iter_mut().zip([3, 6, 9, 12]) {
-                            if let Some(flight) =
-                                crate::model::tech_launch::flight(v, params, frame)
-                            {
-                                *slot = marker(
-                                    add(
-                                        start,
-                                        Vec2 {
-                                            x: flight.displacement.x,
-                                            y: flight.displacement.y,
-                                        },
-                                    ),
-                                    0.1,
-                                    160,
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    if wizard.step == Step::Spot {
-        out[LOOKS - 1] = Some((
-            [view.picker.cursor.x, view.picker.cursor.y],
-            EggLook {
-                picture: EggPicture::Cursor,
-                ..EGG_WHOLE
-            },
-        ));
-    }
 }
 /// Initialize from the CPU resolver's complete status array, in `tech_init::STATUS_IDS` order.
 /// # Safety
@@ -590,6 +525,9 @@ fn rebuild(run: &mut Practice, view: &mut ViewState) {
     view.surfaces.discard();
     view.picker.selected = None;
     view.picker.hovered = None;
+    if let Some(wizard) = &mut view.wizard {
+        wizard.selected = None;
+    }
     notice(run, Some("Finding stage surfaces…"));
 }
 
@@ -727,8 +665,6 @@ pub unsafe fn frame(fighter: usize) {
         if requested {
             view.cancelled = false;
             view.wizard_config = None;
-            view.was = 0;
-            view.repeat = 0;
             view.wizard = if WIZARD_REQUEST.swap(false, Ordering::AcqRel) {
                 Some(Wizard::begin(config, WIZARD_SKIP.load(Ordering::Acquire)))
             } else {
@@ -739,14 +675,6 @@ pub unsafe fn frame(fighter: usize) {
             run.restart_pending = true;
             run.recovery_error = None;
             run.recovering = false;
-        }
-        if view.cancelled {
-            run.pending = false;
-            if run.controller.session.phase != Phase::Off {
-                run.controller.stop(&mut run.adapter);
-            }
-            PLACING.store(false, Ordering::Release);
-            return;
         }
         if run.epoch != Some(epoch) || reset {
             if wizard_active() && (run.epoch.is_some() || reset) {
@@ -802,6 +730,14 @@ pub unsafe fn frame(fighter: usize) {
             view.start = false;
             view.surfaces = Surfaces::EMPTY;
             Surfaces::bind(&mut view.surfaces, epoch);
+        }
+        if view.cancelled {
+            run.pending = false;
+            if run.controller.session.phase != Phase::Off {
+                run.controller.stop(&mut run.adapter);
+            }
+            PLACING.store(false, Ordering::Release);
+            return;
         }
         if let Some(message) = run.recovery_error {
             notice(run, Some(message));
@@ -926,53 +862,26 @@ pub unsafe fn frame(fighter: usize) {
                 Ordering::Release,
             );
         }
-        if view.cancelled {
-            run.pending = false;
-            run.controller.stop(&mut run.adapter);
-            PLACING.store(false, Ordering::Release);
-            return;
-        }
         if placing() {
             if !view.start {
                 if wizard_active() {
-                    let gravity = natives::get_param_float(at, hash40("air_accel_y"), 0);
-                    let cap = natives::get_param_float(at, hash40("air_speed_y_stable"), 0);
-                    view.preview_params =
-                        (gravity.is_finite() && gravity > 0. && cap.is_finite() && cap > 0.)
-                            .then_some(FlightParams {
-                                brake: 0.051,
-                                gravity,
-                                fall_speed_cap: cap,
-                            });
                     if let Some(wizard) = &view.wizard {
-                        let blocked = (|| {
-                            let params = view.preview_params?;
-                            let draft = wizard.config()?;
-                            let spot = wizard.selected?;
+                        let preview = (|| {
+                            if wizard.step != Step::Preview {
+                                return None;
+                            }
+                            let (draft, spot) = (wizard.config()?, wizard.selected?);
                             if !spot.current(&mut source) {
                                 return None;
                             }
-                            let blast = tech_surfaces::blast_bounds()?;
                             let multiplier = super::tech_hitlag::live_multiplier(at).ok()?;
-                            Some(
-                                planner::plan(
-                                    draft,
-                                    planner::Context {
-                                        surfaces: &view.surfaces,
-                                        spot,
-                                        params,
-                                        blast: solver::editor_bounds(blast),
-                                        view: (draft.camera == 1)
-                                            .then(|| solver::editor_bounds(range)),
-                                        damage_multiplier: Some(multiplier),
-                                    },
-                                    &mut |_| 0,
-                                )
-                                .is_none(),
-                            )
+                            let context = plan_context(&view, spot, draft, at, multiplier)?;
+                            let params = context.params;
+                            Some((planner::plan(draft, context, &mut |_| 0).is_none(), params))
                         })();
-                        wizard_notice(wizard, blocked);
-                        view.preview_blocked = blocked;
+                        wizard_notice(wizard, preview.map(|p| p.0));
+                        view.preview_blocked = preview.map(|p| p.0);
+                        view.preview_params = preview.map(|p| p.1);
                     }
                 } else {
                     notice(run, None);
@@ -1076,14 +985,6 @@ pub unsafe fn frame(fighter: usize) {
                 return;
             };
             if run.reroll && run.sampled.is_none() {
-                let Some(blast) = tech_surfaces::blast_bounds() else {
-                    return;
-                };
-                let gravity = natives::get_param_float(at, hash40("air_accel_y"), 0);
-                let cap = natives::get_param_float(at, hash40("air_speed_y_stable"), 0);
-                if !gravity.is_finite() || gravity <= 0. || !cap.is_finite() || cap <= 0. {
-                    return;
-                }
                 let spot = if run.config.surface == 4 {
                     if view
                         .picker
@@ -1112,22 +1013,10 @@ pub unsafe fn frame(fighter: usize) {
                     return;
                 };
                 view.picker.selected = Some(spot);
-                let result = planner::plan(
-                    run.config,
-                    planner::Context {
-                        surfaces: &view.surfaces,
-                        spot,
-                        params: FlightParams {
-                            brake: 0.051,
-                            gravity,
-                            fall_speed_cap: cap,
-                        },
-                        blast: solver::editor_bounds(blast),
-                        view: (run.config.camera == 1).then(|| solver::editor_bounds(range)),
-                        damage_multiplier: Some(multiplier),
-                    },
-                    &mut |n| draw(&mut run.rng, n),
-                );
+                let Some(context) = plan_context(&view, spot, run.config, at, multiplier) else {
+                    return;
+                };
+                let result = planner::plan(run.config, context, &mut |n| draw(&mut run.rng, n));
                 let Some(plan) = result else {
                     run.planning_failed = true;
                     notice(

@@ -5,12 +5,29 @@ use super::{add, dot, finite, scale, Vec2};
 use crate::model::tech_settings::{Config, Mode, Numeric};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
 pub enum Step {
     Spot,
     Angle,
     Distance,
     Hit,
     Preview,
+}
+/// Shared navigation order and notice headings; no second title/order table.
+pub const STEPS: [(Step, &str); 5] = [
+    (Step::Spot, "Tech · 1/5 Spot"),
+    (Step::Angle, "Tech · 2/5 Angle"),
+    (Step::Distance, "Tech · 3/5 Distance"),
+    (Step::Hit, "Tech · 4/5 Hit"),
+    (Step::Preview, "Tech · 5/5 Preview"),
+];
+impl Step {
+    pub const fn index(self) -> usize {
+        self as usize
+    }
+    pub fn title(self) -> &'static str {
+        STEPS[self.index()].1
+    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
@@ -86,18 +103,11 @@ impl Wizard {
         if !self.degrees.is_finite() || !(0. ..=360.).contains(&self.degrees) {
             return None;
         }
-        let a = self.degrees.rem_euclid(360.);
-        let (sin, cos) = match a {
-            0. => (0., 1.),
-            90. => (1., 0.),
-            180. => (0., -1.),
-            270. => (-1., 0.),
-            _ => a.to_radians().sin_cos(),
-        };
+        let direction = crate::model::tech_launch::direction_degrees(self.degrees)?;
         let n = spot.line.normal;
         let d = Vec2 {
-            x: n.y * cos - n.x * sin,
-            y: -n.x * cos - n.y * sin,
+            x: n.y * direction.x - n.x * direction.y,
+            y: -n.x * direction.x - n.y * direction.y,
         };
         Some(d.y.atan2(d.x).to_degrees().rem_euclid(360.))
     }
@@ -157,54 +167,41 @@ impl Wizard {
     pub fn action(&mut self, action: Action) -> Outcome {
         match action {
             Action::Back => {
-                self.step = match self.step {
-                    Step::Spot => return Outcome::Cancelled,
-                    Step::Angle => Step::Spot,
-                    Step::Distance => Step::Angle,
-                    Step::Hit => Step::Distance,
-                    Step::Preview => Step::Hit,
-                }
+                let Some(previous) = self.step.index().checked_sub(1) else {
+                    return Outcome::Cancelled;
+                };
+                self.step = STEPS[previous].0;
             }
             Action::Defaults => {
-                match self.step {
-                    Step::Spot | Step::Angle => {
-                        self.degrees = 90.;
-                        self.distance = 30.;
-                        self.speed = 100.;
-                        self.hit = 12.;
-                    }
-                    Step::Distance => {
-                        self.distance = 30.;
-                        self.speed = 100.;
-                        self.hit = 12.;
-                    }
-                    Step::Hit => {
-                        self.speed = 100.;
-                        self.hit = 12.;
-                    }
-                    Step::Preview => {}
+                let current = self.step.index();
+                if current <= Step::Angle.index() {
+                    self.degrees = 90.;
+                }
+                if current <= Step::Distance.index() {
+                    self.distance = 30.;
+                }
+                if current <= Step::Hit.index() {
+                    self.speed = 100.;
+                    self.hit = 12.;
                 }
                 if self.config().is_some() {
                     self.step = Step::Preview;
                 }
             }
-            Action::Start => {
-                if self.config().is_some() {
-                    return Outcome::Start;
-                }
-            }
-            Action::Next => {
+            Action::Next | Action::Start => {
                 if self.config().is_none() {
                     return Outcome::None;
                 }
-                self.step = match self.step {
-                    Step::Spot => Step::Angle,
-                    Step::Angle => Step::Distance,
-                    Step::Distance => Step::Hit,
-                    Step::Hit if self.skip_preview => return Outcome::Start,
-                    Step::Hit => Step::Preview,
-                    Step::Preview => return Outcome::Start,
+                if action == Action::Start {
+                    return Outcome::Start;
+                }
+                let Some(next) = STEPS.get(self.step.index() + 1) else {
+                    return Outcome::Start;
                 };
+                if self.skip_preview && next.0 == Step::Preview {
+                    return Outcome::Start;
+                }
+                self.step = next.0;
             }
         }
         Outcome::None

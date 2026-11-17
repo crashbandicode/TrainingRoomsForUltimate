@@ -1,8 +1,21 @@
+lib_unit_tests! {
 use super::picker::Spot;
 use super::surface::Line;
 use super::wizard::{Action, Outcome, Step, Wizard};
 use super::Vec2;
 use crate::model::tech_settings::{Config, Mode, Numeric};
+
+#[test]
+fn wizard_step_metadata_has_one_complete_order_and_notice_heading() {
+    use super::wizard::STEPS;
+    assert_eq!(STEPS.len(), 5);
+    for (index, (step, title)) in STEPS.iter().enumerate() {
+        assert_eq!(step.index(), index);
+        assert_eq!(step.title(), *title);
+        assert!(title.starts_with("Tech · "));
+        assert!(title.contains(&format!("{}/5 ", index + 1)));
+    }
+}
 
 fn seed() -> Config {
     let random = Numeric {
@@ -409,4 +422,6 @@ fn wizard_adjust_hit_vertical_focus_and_horizontal_steps_are_independent() {
     }
     assert_eq!((w.speed, w.hit), (80., 1.));
     assert_eq!(w.step, Step::Hit);
+}
+
 }

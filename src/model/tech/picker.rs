@@ -1,7 +1,7 @@
 //! BTT placing controls over the complete camera rectangle, including undersides.
-use crate::model::btt::placing_motion;
 use super::surface::{Kind, Line, Source, Surfaces, END_MARGIN};
 use super::{add, dot, finite, scale, sub, Vec2};
+use crate::model::btt::placing_motion;
 use crate::model::btt::Pad;
 use crate::model::chords::logical::{A, X, ZL};
 
@@ -100,8 +100,7 @@ impl Picker {
         if !range.into_iter().all(f32::is_finite) || range[0] >= range[1] || range[3] >= range[2] {
             return Pick::None;
         }
-        let motion = placing_motion(&pad, self.previous, &mut self.repeat);
-        self.previous = pad.held;
+        let motion = self.motion(&pad);
         self.cursor.x = (self.cursor.x + motion[0]).clamp(range[0], range[1]);
         self.cursor.y = (self.cursor.y + motion[1]).clamp(range[3], range[2]);
         self.hovered = surfaces
@@ -124,10 +123,31 @@ impl Picker {
         }
         Pick::None
     }
+    /// The wizard's value steps use the same stick deadzone and D-pad repeat.
+    pub fn motion(&mut self, pad: &Pad) -> [f32; 2] {
+        let motion = placing_motion(pad, self.previous, &mut self.repeat);
+        self.previous = pad.held;
+        motion
+    }
     pub fn normal_arrow(&self) -> Option<[Vec2; 2]> {
         self.hovered
             .map(|s| [s.point, add(s.point, scale(s.line.normal, 5.0))])
     }
+}
+
+/// Shared four-marker arrow for the full picker and free-form wizard.
+pub fn arrow_points(tip: Vec2, direction: Vec2, stem: f32, head: f32) -> [Vec2; 4] {
+    let side = Vec2 {
+        x: -direction.y,
+        y: direction.x,
+    };
+    let back = add(tip, scale(direction, -head));
+    [
+        add(tip, scale(direction, -stem)),
+        tip,
+        add(back, side),
+        add(back, scale(side, -1.)),
+    ]
 }
 
 /// Draw a line uniformly among currently eligible stationary lines, then a point
