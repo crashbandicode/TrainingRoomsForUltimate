@@ -915,6 +915,14 @@ pub unsafe fn frame(fighter: usize) {
             if clock.exhausted() {
                 revoke();
                 game.step = Step::Result;
+            } else if !game.followed
+                && game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::UpSpecial)
+                && !natives::is_stop(cpu)
+            {
+                // Native Dedede279d0: Special triggers TURN only when the game's term permits it.
+                // Wait through hitstop so the input edge reaches the live native move loop.
+                game.followed = true;
+                drive(entry::controls(crate::model::mashout::moves::Plan::UpSpecial, true));
             }
             game.clock = Some(clock);
         }

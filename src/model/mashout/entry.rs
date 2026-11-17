@@ -47,6 +47,7 @@ pub fn preparatory_holding(plan: Plan, is: impl Fn(C) -> bool) -> bool {
 pub fn controls(plan: Plan, caught: bool) -> MappedInputs {
     let (buttons, lstick_y) = match plan {
         Plan::DownThrow if caught => (1, -120),
+        Plan::UpSpecial if caught => (2, 0),
         Plan::Inhale | Plan::NeutralSpecial => (2, 0),
         Plan::Freeze if !caught => (2, 0),
         Plan::Jab3 => (1, 0),

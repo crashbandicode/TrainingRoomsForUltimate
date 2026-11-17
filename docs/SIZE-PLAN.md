@@ -385,3 +385,6 @@ The primary explicitly approved that size with the IC113/114 Opus PASS.
 The next Flip stomp108 entry reuses SPECIAL_LW admission and native Bury
 observation; its canonical measurement is pending. No ceiling or counter
 change: final integration owns the approved final-total adjustment.
+
+### rc15 Mash out Dedede99 native cancel continuation
+Observed real Bury interrupted by native landing hit: add native SPECIAL input once in Held after CPU hitstop using existing followed/controls/drive/revoke. No reader/hook/model/clock/guard changes/new constants. Actual Held probes cover seed/stop/one edge/escape/other plan. Normalized size pending canonical gate; ceiling unchanged, operator final-total approval applies. Native evidence/RED/GREEN in lane artifacts dedede99-interruption.

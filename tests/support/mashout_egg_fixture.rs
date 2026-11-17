@@ -69,6 +69,9 @@ static GENERATION: AtomicU64 = AtomicU64::new(5);
 static CPU_STATUS: AtomicU32 = AtomicU32::new(0);
 static ROLLER_LR: AtomicU32 = AtomicU32::new(1.0f32.to_bits());
 static FREEZE_NO_BANG: AtomicU32 = AtomicU32::new(1);
+// Existing tests stop at seed/end publication; new continuation probes opt into the actual Held arm.
+static EXECUTE_HELD: AtomicBool = AtomicBool::new(false);
+static CPU_STOP: AtomicBool = AtomicBool::new(false);
 static AIR: AtomicBool = AtomicBool::new(false);
 static BODY: AtomicUsize = AtomicUsize::new(0);
 static FAULT: AtomicU64 = AtomicU64::new(0);
@@ -137,7 +140,7 @@ mod natives {
         super::AIR.load(super::Ordering::Relaxed) as i32
     }
     pub fn is_stop(_: usize) -> bool {
-        false
+        super::CPU_STOP.load(super::Ordering::Relaxed)
     }
     pub fn pos_x(_: usize) -> f32 {
         0.0
@@ -189,6 +192,7 @@ mod worker {
     }
     pub enum Event {
         Begin(u64, u64, Key, Seed, SeedOrigin),
+        Observe(u64, u64, u32, bool),
         Cancel(u64),
         NativeEnd(u64, u64),
     }
@@ -306,6 +310,7 @@ unsafe fn update(game: &mut Game, p1: usize, status: i32, cpu: usize, fighter: u
         // PLACE
         // SETTLE
         // ENTERING
+        // HELD
         _ => (),
     }
 }
@@ -346,6 +351,8 @@ impl NativeMemory {
         READY.store(true, Ordering::Relaxed);
         SLOTS_READY.store(true, Ordering::Relaxed);
         CPU_STATUS.store(481, Ordering::Relaxed);
+        EXECUTE_HELD.store(false, Ordering::Relaxed);
+        CPU_STOP.store(false, Ordering::Relaxed);
         AIR.store(false, Ordering::Relaxed);
         ROLLER_LR.store(1.0f32.to_bits(), Ordering::Relaxed);
         REQUESTS.with_borrow_mut(Vec::clear);
@@ -1096,8 +1103,8 @@ fn bury_specials_request_native_start_and_use_actual_bury_seed() {
                 MappedInputs::NEUTRAL
             );
             assert_eq!(
-                entry::controls(plan, true),
-                MappedInputs::NEUTRAL
+                entry::controls(plan, true).buttons,
+                if plan == Plan::UpSpecial { 2 } else { 0 }
             );
             assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, start)]);
         }
@@ -1223,6 +1230,71 @@ fn ice_climbers_miss_and_nonice_seed_keep_existing_refusals() {
             assert_eq!(g.failed, Some("Move entry unconfirmed · no grade"));
             assert!(g.clock.is_none());
             assert!(BEGINS.with_borrow(Vec::is_empty));
+        }
+    }
+}
+
+#[test]
+fn dedede_bury_cancel_waits_for_confirmed_hold_and_end_of_stop() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        EXECUTE_HELD.store(true, Ordering::Relaxed);
+        let mut g = Game::new(Plan::UpSpecial, State::Bury);
+        m.body[3] = 42;
+        let r = g.requested.as_mut().unwrap();
+        r.id = 99;
+        r.attacker_kind = 42;
+        g.step = Step::Settle;
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        assert_eq!(g.step, Step::Entering);
+        CPU_STATUS.store(502, Ordering::Relaxed);
+        CPU_STOP.store(true, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        assert!(DRIVEN.with_borrow(|v| v.iter().all(|i| i.buttons == 0)));
+        m.seed(204.38725, 8.0, 1);
+        m.start();
+        m.update(&mut g, 75);
+        assert_eq!(g.step, Step::Held);
+        assert!(!g.followed);
+        assert_eq!(DRIVEN.with_borrow(|v| v.last().unwrap().buttons), 0);
+        let n = DRIVEN.with_borrow(Vec::len);
+        m.update(&mut g, 75);
+        assert_eq!(DRIVEN.with_borrow(Vec::len), n);
+        CPU_STOP.store(false, Ordering::Relaxed);
+        m.update(&mut g, 75);
+        assert_eq!(DRIVEN.with_borrow(|v| v.last().unwrap().buttons), 2);
+        assert!(g.followed);
+        let n = DRIVEN.with_borrow(Vec::len);
+        m.update(&mut g, 75);
+        assert_eq!(DRIVEN.with_borrow(Vec::len), n, "one native input edge");
+        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 478)]);
+        assert_eq!(BEGINS.with_borrow(Vec::len), 1);
+    }
+}
+#[test]
+fn dedede_bury_cancel_never_runs_for_other_plans_or_exhausted_hold() {
+    unsafe {
+        for (plan, remaining) in [(Plan::UpSpecial, 0.0), (Plan::Flip, 90.0)] {
+            let mut m = NativeMemory::new();
+            EXECUTE_HELD.store(true, Ordering::Relaxed);
+            let mut g = Game::new(plan, State::Bury);
+            m.seed(90.0, 8.0, 1);
+            startup(&mut g, m.p1());
+            CPU_STOP.store(true, Ordering::Relaxed);
+            m.start();
+            m.update(&mut g, 75);
+            assert_eq!(g.step, Step::Held);
+            CPU_STOP.store(false, Ordering::Relaxed);
+            if remaining == 0.0 {
+                // A native escape status exhausts the real clock; no cancel is emitted.
+                m.update(&mut g, 68);
+                assert_eq!(g.step, Step::Result);
+            } else {
+                m.update(&mut g, 75);
+            }
+            assert!(DRIVEN.with_borrow(|v| v.iter().all(|i| i.buttons == 0)));
+            assert!(!g.followed);
         }
     }
 }

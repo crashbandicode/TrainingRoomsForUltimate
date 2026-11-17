@@ -166,6 +166,7 @@ fn actual_runtime_egg_preparation_and_native_seed() {
             let a = runtime.find("let released =").unwrap();
             runtime[a..=a + runtime[a..].find(';').unwrap()].to_string()
         }),
+        ("// HELD", block(runtime, "Step::Held => {").replacen("Step::Held =>", "Step::Held if EXECUTE_HELD.load(Ordering::Relaxed) =>", 1)),
         ("// SEEDS", seed),
         ("// ENDS", format!("{});", block(runtime, "ENDS.drain("))),
         ("// RESTART", block(runtime, "if restart {").to_string()),
