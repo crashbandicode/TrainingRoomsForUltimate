@@ -622,7 +622,7 @@ fn mashout_required_rows_disable_only_their_reachable_units() {
         grade::{grade, Bounds},
     };
     let calls = capabilities::CROSS_NEEDS.iter().find(|(unit, _)| *unit == Feature::Mashout).unwrap().1;
-    assert_eq!(calls.len(), 23);
+    assert_eq!(calls.len(), 28);
     assert!(calls.contains(&"work_get_int"), "Lucas release counter must fail closed with its existing native guard");
     assert!(calls.contains(&"work_is_flag"), "Corrin attack window must fail closed with its existing native guard");
     let required = model::sites_mashout::SITES.iter().map(|row| row.name).chain(calls.iter().copied()).chain(["clatter_start_hook", "entry_active_cell", "is_training_mode"]);
