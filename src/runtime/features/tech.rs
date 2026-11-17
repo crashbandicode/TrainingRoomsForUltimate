@@ -79,6 +79,7 @@ struct Practice {
     recovering: bool,
     recovery_error: Option<&'static str>,
     restart_pending: bool,
+    retained_sample: Option<(Setup, [f32; 2])>,
 }
 thread_local! {
     static LIVE: RefCell<Option<Practice>> = const { RefCell::new(None) };
@@ -333,12 +334,12 @@ fn rebuild(run: &mut Practice, view: &mut ViewState) {
         notice(run, Some(message));
         return;
     }
-    run.remembered = (run.config.surface == 4)
-        .then(|| view.picker.selected.and_then(|s| RememberedSpot::capture(s.line, s.point)))
-        .flatten();
+    let sampled = run.sampled.take();
+    run.remembered = sampled.map(|(_, spot, _)| spot)
+        .or_else(|| (run.config.surface == 4).then_some(view.picker.selected).flatten())
+        .and_then(|spot| RememberedSpot::capture(spot.line, spot.point));
+    run.retained_sample = sampled.map(|(setup, _, percent)| (setup, percent));
     run.recovering = true;
-    run.sampled = None;
-    run.reroll = true;
     run.scan = None;
     run.scan_done = false;
     run.bootstrap = None;
@@ -449,6 +450,7 @@ pub unsafe fn frame(fighter: usize) {
                 recovering: false,
                 recovery_error: None,
                 restart_pending: false,
+                retained_sample: None,
             });
         }
         let run = slot.as_mut().unwrap();
@@ -490,6 +492,7 @@ pub unsafe fn frame(fighter: usize) {
             run.controller.stop(&mut run.adapter);
             run.epoch = Some(epoch);
             run.sampled = None;
+            run.retained_sample = None;
             run.decision = None;
             run.pending = false;
             run.planning_failed = false;
@@ -593,7 +596,13 @@ pub unsafe fn frame(fighter: usize) {
         }
         if let Some(remembered) = run.remembered.take() {
             match remembered.resolve(&view.surfaces) {
-                Ok((line, point)) => view.picker.selected = Some(picker::Spot { line, point }),
+                Ok((line, point)) => {
+                    let spot = picker::Spot { line, point };
+                    view.picker.selected = Some(spot);
+                    if let Some((setup, percent)) = run.retained_sample.take() {
+                        run.sampled = Some((setup, spot, percent));
+                    }
+                }
                 Err(error) => {
                     view.picker.selected = None;
                     run.recovery_error = Some(error.message());

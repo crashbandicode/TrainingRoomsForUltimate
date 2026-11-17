@@ -1731,7 +1731,7 @@ approved_by = "Operator rc.15 size approval; primary 2026-11-17 03:20Z explicitl
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 154707
+ceiling = 154717
 date = "2026-11-17"
-reason = "TechUI collision-lifetime recovery measured 154707: +138 over 154569, within approved +300. Pure world selection rebinds to freshly discovered geometry after reset; strict native lifetime guards and exact matching remain. One combined exact total, no headroom. FOR OPERATOR REVIEW; counting and gates unchanged."
+reason = "TechUI collision-lifetime recovery measured 154717: +148 over 154569, within approved +300. Pure world selection rebinds to freshly discovered geometry after reset; strict native lifetime guards and exact matching remain. One combined exact total, no headroom. FOR OPERATOR REVIEW; counting and gates unchanged."
 approved_by = "Operator rc.15 size approval; primary 2026-11-17 04:38Z explicitly authorizes growth up to +300 over154569 FOR OPERATOR REVIEW."
