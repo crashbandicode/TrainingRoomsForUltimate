@@ -396,29 +396,32 @@ impl Frame {
         if !self.dialog && !self.popup {
             return None;
         }
-        let right_of = |text: &[u16], font: (f32, f32)| LEFT + measure(text.iter().copied(), font.0).0;
+        // The menu fonts render up to ~6 % wider than the notice-calibrated estimate (Eden, notice-compact-72451433-yoga-1).
+        let width = |text: &[u16], font: (f32, f32)| 1.1 * measure(text.iter().copied(), font.0).0;
         let (mut right, mut bottom) = if self.view == View::Tiles {
-            let (cols, rows, count) = (usize::from(self.tile_cols.max(1)), usize::from(self.tile_rows.max(1)), usize::from(self.tile_count));
+            let (cols, rows) = (usize::from(self.tile_cols.max(1)), usize::from(self.tile_rows.max(1)));
+            // A panel's page carries all its cells; the empty ones draw nothing, so the box ends at the last label.
+            let count = self.tiles[..usize::from(self.tile_count)].iter().rposition(|t| !t.units().is_empty()).map_or(0, |i| i + 1);
             let cell_w = (p::ROW_RIGHT - p::ROW_LEFT) / cols as f32;
             (p::ROW_LEFT + count.min(cols) as f32 * cell_w, 320.0 - count.div_ceil(cols) as f32 * p::TILE_AREA_H / rows as f32)
         } else {
             let (x, w) = p::row_label_box(self.popup);
             let rows = &self.rows[..usize::from(self.row_count)];
-            let widest = rows.iter().map(|r| measure(r.label.units().iter().copied(), p::FONT.0).0).fold(0.0, f32::max);
+            let widest = rows.iter().map(|r| width(r.label.units(), p::FONT)).fold(0.0, f32::max);
             (x - w / 2.0 + widest, p::row_y(rows.len().max(1) - 1) - p::ROW_H / 2.0)
         };
         if self.popup && self.conn_count > 0 {
             right = right.max(p::CONN_RIGHT);
             bottom = bottom.min(p::conn_y(usize::from(self.conn_count) - 1) - p::CONN_LINE_H / 2.0);
         }
-        right = right.max(right_of(self.crumb.units(), p::FONT));
+        right = right.max(LEFT + width(self.crumb.units(), p::FONT));
         let (mut y, mut help_y) = (bottom - 8.0, p::HELP_Y);
         for (at, line) in help_y.iter_mut().zip(&self.help).filter(|(_, line)| !line.units().is_empty()) {
             (y, *at) = (y - 48.0, y - 48.0);
-            right = right.max(right_of(line.units(), p::FONT_SMALL));
+            right = right.max(LEFT + width(line.units(), p::FONT_SMALL));
         }
         let hint_y = y - 52.0;
-        right = right.max(right_of(self.hint.units(), p::FONT_SMALL)) + PAD;
+        right = right.max(LEFT + width(self.hint.units(), p::FONT_SMALL)) + PAD;
         let top = if self.popup { p::TAB_Y } else { p::CRUMB_Y } + 28.0 + PAD;
         let (left, bottom) = (LEFT - PAD, hint_y - 22.0 - PAD);
         Some(([(left + right) / 2.0, (top + bottom) / 2.0, right - left, top - bottom], help_y, hint_y))

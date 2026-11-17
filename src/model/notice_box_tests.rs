@@ -238,7 +238,8 @@ fn dialog_box_fits_its_content() {
         assert!(w < 0.7 * p::PANEL_W && h < 0.5 * p::PANEL_H, "{:?} is not compact", d);
     };
     let mut delete = Frame::new();
-    (delete.view, delete.dialog, delete.tile_cols, delete.tile_rows, delete.tile_count) = (View::Tiles, true, 4, 8, 2);
+    // The layer hands over its whole 4 x 8 page; only the first two cells carry labels (Eden, notice-compact-72451433).
+    (delete.view, delete.dialog, delete.tile_cols, delete.tile_rows, delete.tile_count) = (View::Tiles, true, 4, 8, 32);
     for (tile, label) in delete.tiles.iter_mut().zip(["Keep it", "Delete it"]) {
         let _ = tile.write_str(label);
     }

@@ -173,7 +173,9 @@ impl Panes {
                 self.text(p::row_value_index(i), &[], TEXT);
             }
         }
-        let (left, right) = p::row_span(frame.popup);
+        // A dialog's cursor spans its box, not the page's row width.
+        let edge = |(bg, _, _): ([f32; 4], [f32; 2], f32)| (p::row_span(false).0, bg[0] + bg[2] / 2.0 - 27.0);
+        let (left, right) = frame.dialog_box().filter(|_| !frame.popup).map_or(p::row_span(frame.popup), edge);
         match frame.focus.filter(|_| list) {
             Some(row) => {
                 self.show(IDX_ROW_HI, true);
