@@ -671,8 +671,9 @@ fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: 
     }
     if BASE.load(Ordering::Acquire) == 0 || !crate::runtime::roster::character_lifecycle::native_hooks_ready() {
         trace!("[CharacterRoster] request ignored role={:?} selection={:?}: native hooks unavailable", role, selection);
-        notify(role, "Unavailable on this game version".into());
-        return Admission::Unavailable("Unavailable on this game version");
+        let reason = "Unavailable on this game version";
+        notify(role, reason.into());
+        return Admission::Unavailable(reason);
     }
     let Some(scope) = read_scope() else {
         if user {
@@ -733,13 +734,11 @@ fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: 
     let Some((entry, _)) = state.observed else {
         drop(state);
         trace!("[CharacterRoster] request rejected: no current practice entry");
+        let reason = "Wait for the practice character to finish loading";
         if !matches!(selection, Selection::RefreshPartners) {
-            notify(
-                role,
-                "Wait for the practice character to finish loading".into(),
-            );
+            notify(role, reason.into());
         }
-        return Admission::Unavailable("Wait for the practice character to finish loading");
+        return Admission::Unavailable(reason);
     };
     // LEAD-1 review F4: a load the user chose never silently replaces a user's load still waiting; an automatic one (a
     // restore, a partner refresh) it supersedes.
