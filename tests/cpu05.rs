@@ -22,7 +22,7 @@ use model::cpu::playback::PlaybackState;
 use model::cpu::role::FighterKey;
 use model::cpu::settings::{CpuSettings, DelayRow, ShieldMode};
 use model::cpu::shield::{
-    damage_multiplier, decay_override_active, guard_button, queue_requests_shield, should_hold, ButtonAnswer, HoldFacts, OosFacts,
+    damage_multiplier, decay_override_active, guard_button, needs_native_drop, queue_requests_shield, should_hold, ButtonAnswer, HoldFacts, OosFacts,
     SHIELD_DECAY_OVERRIDE, SHIELD_RECOVERY_OVERRIDE,
 };
 use model::cpu::state::Cpu;
@@ -121,10 +121,20 @@ fn cpu05_should_hold_shield() {
     assert!(!queue_requests_shield(Some(Action::AIR_DODGE), false));
     assert!(!queue_requests_shield(Some(Action::JAB), true) && !queue_requests_shield(None, true));
     // The button hooks: held and not released while holding and not suspended; no opinion otherwise.
-    assert_eq!(guard_button(true, true, false), ButtonAnswer::Held(true));
-    assert_eq!(guard_button(false, true, false), ButtonAnswer::Held(false));
-    assert_eq!(guard_button(true, true, true), ButtonAnswer::Original);
-    assert_eq!(guard_button(true, false, false), ButtonAnswer::Original);
+    assert_eq!(guard_button(true, true, false, false), ButtonAnswer::Held(true));
+    assert_eq!(guard_button(false, true, false, false), ButtonAnswer::Held(false));
+    assert_eq!(guard_button(true, true, true, false), ButtonAnswer::Original);
+    assert_eq!(guard_button(true, false, false, false), ButtonAnswer::Original);
+    // A current action that needs a native shield drop: `off` is the original, `on` is unchanged (CPU-040/066).
+    assert_eq!(guard_button(false, true, false, true), ButtonAnswer::Original);
+    assert_eq!(guard_button(true, true, false, true), ButtonAnswer::Held(true));
+    for action in [Action::JUMP, Action::NAIR, Action::DAIR, Action::UP_B, Action::U_SMASH] {
+        assert!(needs_native_drop(Some(action)), "{action:?}");
+    }
+    for action in [Action::SHIELD, Action::GRAB, Action::AIR_DODGE, Action::SPOT_DODGE, Action::JAB] {
+        assert!(!needs_native_drop(Some(action)), "{action:?}");
+    }
+    assert!(!needs_native_drop(None));
     // Through the state: Hold On, a grounded body that was not airborne.
     let (mut cpu, key) = cpu_with(&[mode(2)]);
     frame(&mut cpu, key, WAIT, WAIT);
@@ -323,6 +333,31 @@ fn cpu05_oos_action_table() {
     }
 }
 
+fn cpu05_shieldstun_native_drop_releases_the_guard_button() {
+    // Phase 3 CPU-040 / CPU-066 (TRIAGE-CPU-5): SPEC-cpu-05 Hooks "Shield button held": `off` answers the original
+    // while the current mash action needs a native shield drop, so the game performs the out-of-shield option
+    // (§5 step 7: jump, any aerial, up special, up smash). `on` is unchanged. Every holding mode.
+    for state in [1usize, 2, 3] {
+        for action in [Action::JUMP, Action::NAIR, Action::FAIR, Action::BAIR, Action::UAIR, Action::DAIR, Action::UP_B, Action::U_SMASH] {
+            let (mut cpu, key) = cpu_with(&[mode(state), ("mash_state", actions(&[usize::from(action.0)])), ("mash_triggers", shieldstun_triggers())]);
+            frame(&mut cpu, key, WAIT, WAIT);
+            hit_and_decide(&mut cpu, key, OosFacts::default());
+            assert_eq!(cpu.fighters[key.index()].mash.queue.current(), Some(action), "mode {state} {action:?} buffered");
+            assert_eq!(cpu.guard_button(key, false), ButtonAnswer::Original, "mode {state} {action:?}: released natively");
+            assert_eq!(cpu.guard_button(key, true), ButtonAnswer::Held(true), "mode {state} {action:?}: on unchanged");
+        }
+        // A non-drop action keeps the shield held: Shield stays up, Grab works from the shield.
+        for action in [Action::SHIELD, Action::GRAB] {
+            let (mut cpu, key) = cpu_with(&[mode(state), ("mash_state", actions(&[usize::from(action.0)])), ("mash_triggers", shieldstun_triggers())]);
+            frame(&mut cpu, key, WAIT, WAIT);
+            hit_and_decide(&mut cpu, key, OosFacts::default());
+            assert_eq!(cpu.fighters[key.index()].mash.queue.current(), Some(action), "mode {state} {action:?} buffered");
+            assert_eq!(cpu.guard_button(key, false), ButtonAnswer::Held(false), "mode {state} {action:?}: shield stays held");
+            assert_eq!(cpu.guard_button(key, true), ButtonAnswer::Held(true), "mode {state} {action:?}: on unchanged");
+        }
+    }
+}
+
 fn cpu05_shieldstun_override() {
     // The shieldstun override replaces mash_state; without it the trigger buffers mash_state; with
     // neither nothing is buffered.
@@ -447,6 +482,7 @@ fn case_table() {
         ("cpu05_oos_offset_count", cpu05_oos_offset_count as fn()),
         ("cpu05_reaction_time", cpu05_reaction_time as fn()),
         ("cpu05_oos_action_table", cpu05_oos_action_table as fn()),
+        ("cpu05_shieldstun_native_drop_releases_the_guard_button", cpu05_shieldstun_native_drop_releases_the_guard_button as fn()),
         ("cpu05_shieldstun_override", cpu05_shieldstun_override as fn()),
         ("cpu05_shield_tilt", cpu05_shield_tilt as fn()),
         ("cpu05_shield_tilt_applies_next_frame", cpu05_shield_tilt_applies_next_frame as fn()),

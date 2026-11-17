@@ -478,8 +478,9 @@ impl Cpu {
     /// The guard-button hook for the body `key`; `on_query` is true for `check_button_on` and false
     /// for `check_button_off`.
     pub fn guard_button(&self, key: FighterKey, on_query: bool) -> ButtonAnswer {
-        let suspended = self.fighters[key.index()].shield.suspended;
-        shield::guard_button(on_query, self.hold_for(key), suspended)
+        let fighter = &self.fighters[key.index()];
+        let native_drop = shield::needs_native_drop(fighter.mash.queue.current());
+        shield::guard_button(on_query, self.hold_for(key), fighter.shield.suspended, native_drop)
     }
 
     /// The parameter hook: the value to answer for `shield_dec1` / `shield_recovery1`, or `None` for

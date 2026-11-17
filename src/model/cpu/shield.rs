@@ -71,11 +71,18 @@ pub enum ButtonAnswer {
     Held(bool),
 }
 
+/// The actions the game performs from the shield itself once the guard button reads released (SPEC-cpu-05 §5 step 7):
+/// jump, any aerial, up special, up smash.
+pub fn needs_native_drop(action: Option<Action>) -> bool {
+    action.is_some_and(|a| a == Action::JUMP || a.is_aerial() || a == Action::UP_B || a == Action::U_SMASH)
+}
+
 /// The guard-button hook for a CPU body: `on` is the `check_button_on` query, `off` the
 /// `check_button_off` one. While the CPU should hold the shield and it is not suspended, `on` reports
-/// true and `off` reports false, except when the current mash action needs a native shield drop.
-pub fn guard_button(on_query: bool, hold: bool, suspended: bool) -> ButtonAnswer {
-    if !hold || suspended {
+/// true and `off` reports false, except when the current mash action needs a native shield drop
+/// (`native_drop`): then `off` is the original (SPEC-cpu-05 Hooks; Phase 3 CPU-040/066).
+pub fn guard_button(on_query: bool, hold: bool, suspended: bool, native_drop: bool) -> ButtonAnswer {
+    if !hold || suspended || (native_drop && !on_query) {
         return ButtonAnswer::Original;
     }
     ButtonAnswer::Held(on_query)
@@ -205,8 +212,8 @@ impl Shield {
             });
             return out;
         }
-        if action == Action::JUMP || action.is_aerial() || action == Action::UP_B || action == Action::U_SMASH {
-            // The button-off hook reports the shield released natively, so the game performs it.
+        if needs_native_drop(Some(action)) {
+            // The button-off hook reports the shield released natively (`guard_button`), so the game performs it.
             return out;
         }
         if action == Action::AIR_DODGE {
