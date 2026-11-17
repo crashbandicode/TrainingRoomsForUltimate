@@ -676,11 +676,11 @@ pub unsafe fn frame(fighter: usize) {
         let Some(request) = game.requested else { return; };
         if request.plan == crate::model::mashout::moves::Plan::Hero {
             let [Some(brave), Some(special_lw), Some(select), Some(cancel), Some(start), Some(failure),
-                Some(window_open), Some(ice_sword), Some(index), Some(decide), Some(window),
+                Some(window_open), Some(ice_sword), Some(index), Some(active), Some(window),
                 Some(command1), Some(command2), Some(command3), Some(command4), Some(success)] = [
                 C::KindBrave, C::StatusSpecialLw, C::HeroSelect, C::HeroCancel, C::HeroStart,
                 C::HeroFailure, C::HeroWindowOpen, C::HeroIceSwordCommand, C::HeroSelectIndex,
-                C::HeroDecideCommand, C::HeroWindowState, C::HeroCommand1, C::HeroCommand2,
+                C::HeroActiveCommand, C::HeroWindowState, C::HeroCommand1, C::HeroCommand2,
                 C::HeroCommand3, C::HeroCommand4, C::HeroSuccessSp,
             ].map(state_id) else {
                 game.fail(UNAVAILABLE_NOTICE);
@@ -721,7 +721,7 @@ pub unsafe fn frame(fighter: usize) {
                 index: None,
                 commands: None,
                 success_sp: None,
-                decide_command: None,
+                active_command: None,
             };
             if status == entry::HeroStatus::Select {
                 let window_state = natives::get_int(cpu, window);
@@ -738,7 +738,8 @@ pub unsafe fn frame(fighter: usize) {
             }
             if status == entry::HeroStatus::Start {
                 read.success_sp = Some(natives::is_flag(cpu, success));
-                read.decide_command = Some(natives::get_int(cpu, decide));
+                // Native START consumes pending DECIDE_COMMAND; ACTIVE_COMMAND is its current command.
+                read.active_command = Some(natives::get_int(cpu, active));
             }
             let Some(mut actor) = game.hero.or_else(|| entry::HeroEntry::new(cpu)) else {
                 game.fail(UNAVAILABLE_NOTICE);

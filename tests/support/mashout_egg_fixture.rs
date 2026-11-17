@@ -98,6 +98,7 @@ static HERO_WINDOW_STATE: AtomicU32 = AtomicU32::new(0);
 static HERO_INDEX: AtomicU32 = AtomicU32::new(0);
 static HERO_COMMANDS: [AtomicU32; 4] = [const { AtomicU32::new(0) }; 4];
 static HERO_DECIDE: AtomicU32 = AtomicU32::new(17);
+static HERO_ACTIVE: AtomicU32 = AtomicU32::new(17);
 static HERO_SUCCESS_SP: AtomicBool = AtomicBool::new(false);
 static HERO_INT_READS: AtomicUsize = AtomicUsize::new(0);
 static HERO_FLAG_READS: AtomicUsize = AtomicUsize::new(0);
@@ -202,6 +203,11 @@ mod natives {
             assert_eq!(cpu, 2);
             super::HERO_INT_READS.fetch_add(1, super::Ordering::Relaxed);
             return super::HERO_INDEX.load(super::Ordering::Relaxed) as i32;
+        }
+        if id == 0x11000005 {
+            assert_eq!(cpu, 2);
+            super::HERO_INT_READS.fetch_add(1, super::Ordering::Relaxed);
+            return super::HERO_ACTIVE.load(super::Ordering::Relaxed) as i32;
         }
         if Some(id) == super::state_id(super::C::HeroDecideCommand) {
             assert_eq!(cpu, 2);
@@ -360,6 +366,7 @@ fn state_id(c: C) -> Option<i32> {
         C::HeroWindowOpen => 3,
         C::HeroSelectIndex => 0x100000c8,
         C::HeroDecideCommand => 0x100000c9,
+        C::HeroActiveCommand => 0x11000005,
         C::HeroWindowState => 0x100000d1,
         C::HeroCommand1 => 0x100000d4,
         C::HeroCommand2 => 0x100000d5,
@@ -555,6 +562,7 @@ impl NativeMemory {
         HERO_COMMANDS[2].store(7, Ordering::Relaxed);
         HERO_COMMANDS[3].store(12, Ordering::Relaxed);
         HERO_DECIDE.store(17, Ordering::Relaxed);
+        HERO_ACTIVE.store(17, Ordering::Relaxed);
         HERO_SUCCESS_SP.store(false, Ordering::Relaxed);
         HERO_INT_READS.store(0, Ordering::Relaxed);
         HERO_FLAG_READS.store(0, Ordering::Relaxed);
@@ -2189,7 +2197,7 @@ fn hero_read(
     index: Option<i32>,
     commands: Option<[i32; 4]>,
     success_sp: Option<bool>,
-    decide_command: Option<i32>,
+    active_command: Option<i32>,
 ) -> entry::HeroRead {
     entry::HeroRead {
         readers_ready: true,
@@ -2200,7 +2208,7 @@ fn hero_read(
         index,
         commands,
         success_sp,
-        decide_command,
+        active_command,
     }
 }
 
@@ -2275,14 +2283,14 @@ fn hero_actor_refuses_invalid_menu_and_requires_native_success_and_command17() {
     );
     assert_eq!(actor.observe(invalid), Err(entry::HeroError::Unavailable));
 
-    for (success_sp, decide) in [(false, 17), (true, 18)] {
+    for (success_sp, active) in [(false, 17), (true, 18)] {
         let mut actor = entry::HeroEntry::new(2).unwrap();
         let (special, _) = actor.observe(hero_read(
             2, entry::HeroStatus::Select, Some(1), Some([4, 17, 8, 12]), None, None,
         )).unwrap();
         assert_eq!(special.buttons, 0x2);
         let (neutral, outcome) = actor.observe(hero_read(
-            2, entry::HeroStatus::Start, None, None, Some(success_sp), Some(decide),
+            2, entry::HeroStatus::Start, None, None, Some(success_sp), Some(active),
         )).unwrap();
         assert_eq!(neutral, MappedInputs::NEUTRAL);
         assert_eq!(outcome, entry::HeroOutcome::Rejected);
@@ -2318,7 +2326,7 @@ fn hero_menu(index: u32, commands: [u32; 4]) {
 }
 
 #[test]
-fn hero_runtime_reads_only_open3_mirrors_and_accepts_actual_success_start_decide17_seed() {
+fn hero_runtime_reads_only_open3_mirrors_and_accepts_consumed_c9_active17_success_seed() {
     unsafe {
         let mut m = NativeMemory::new();
         let mut game = hero(&mut m);
@@ -2350,7 +2358,9 @@ fn hero_runtime_reads_only_open3_mirrors_and_accepts_actual_success_start_decide
         assert!(!game.hero.unwrap().confirmed(), "closed menu is not native confirmation");
 
         HERO_SUCCESS_SP.store(true, Ordering::Relaxed);
-        HERO_DECIDE.store(17, Ordering::Relaxed);
+        // Native START copied command17 to ACTIVE, then consumed pending C9.
+        HERO_DECIDE.store(u32::MAX, Ordering::Relaxed);
+        HERO_ACTIVE.store(17, Ordering::Relaxed);
         CPU_STATUS.store(497, Ordering::Relaxed);
         m.seed(73.25, 1.75, 2);
         m.start();
@@ -2377,6 +2387,9 @@ fn hero_closed_confirm_window_does_not_accept_premature_seed() {
 
         let reads_before_closed_window = HERO_INT_READS.load(Ordering::Relaxed);
         HERO_WINDOW_STATE.store(4, Ordering::Relaxed);
+        HERO_SUCCESS_SP.store(true, Ordering::Relaxed);
+        HERO_ACTIVE.store(17, Ordering::Relaxed);
+        HERO_DECIDE.store(u32::MAX, Ordering::Relaxed);
         m.seed(73.25, 1.75, 2);
         m.start();
         m.update(&mut game, 203);
@@ -2472,19 +2485,22 @@ fn hero_absent_command18_is_not_icesword_guard_cancel_ack_retries_selected110() 
 #[test]
 fn hero_native_failure_wrong_body_and_missing_work_grants_never_begin() {
     unsafe {
-        for (case, value) in [("sp", 496u32), ("wrong-decide", 497u32)] {
+        for (case, active, success, status) in [
+            ("native-failure", 17, true, 496u32),
+            ("wrong-active", 18, true, 497),
+            ("missing-active", u32::MAX, true, 497),
+            ("no-success-sp", 17, false, 497),
+        ] {
             let mut m = NativeMemory::new();
             let mut game = hero(&mut m);
             CPU_STATUS.store(493, Ordering::Relaxed);
             hero_menu(1, [4, 17, 8, 12]);
             m.update(&mut game, 0);
-            if case == "sp" {
-                CPU_STATUS.store(value, Ordering::Relaxed);
-            } else {
-                HERO_SUCCESS_SP.store(true, Ordering::Relaxed);
-                HERO_DECIDE.store(18, Ordering::Relaxed);
-                CPU_STATUS.store(value, Ordering::Relaxed);
-            }
+            // A stale pending C9=17 must not substitute for the active START command.
+            HERO_DECIDE.store(17, Ordering::Relaxed);
+            HERO_ACTIVE.store(active, Ordering::Relaxed);
+            HERO_SUCCESS_SP.store(success, Ordering::Relaxed);
+            CPU_STATUS.store(status, Ordering::Relaxed);
             m.seed(73.25, 1.75, 2);
             m.start();
             m.update(&mut game, 203);
@@ -2526,5 +2542,39 @@ fn hero_native_failure_wrong_body_and_missing_work_grants_never_begin() {
         assert_eq!(game.failed, Some("Attacker changed · no grade"));
         assert_eq!(HERO_INT_READS.load(Ordering::Relaxed), 0);
         assert!(BEGINS.with_borrow(Vec::is_empty));
+    }
+}
+
+
+#[test]
+fn hero_start_missing_getter_or_changed_body_cannot_admit_native_ice() {
+    unsafe {
+        for changed_body in [false, true] {
+            let mut m = NativeMemory::new();
+            let mut game = hero(&mut m);
+            CPU_STATUS.store(493, Ordering::Relaxed);
+            hero_menu(1, [4, 17, 8, 12]);
+            m.update(&mut game, 0);
+            HERO_SUCCESS_SP.store(true, Ordering::Relaxed);
+            HERO_ACTIVE.store(17, Ordering::Relaxed);
+            HERO_DECIDE.store(u32::MAX, Ordering::Relaxed);
+            CPU_STATUS.store(497, Ordering::Relaxed);
+            if changed_body {
+                m.body[3] = 0x1c;
+            } else {
+                WORK_GET_INT_GRANTED.store(false, Ordering::Relaxed);
+            }
+            let reads_before = HERO_INT_READS.load(Ordering::Relaxed);
+            m.seed(73.25, 1.75, 2);
+            m.start();
+            m.update(&mut game, 203);
+            assert_eq!(game.failed, Some(if changed_body {
+                "Attacker changed · no grade"
+            } else { UNAVAILABLE_NOTICE }));
+            assert_eq!(HERO_INT_READS.load(Ordering::Relaxed), reads_before);
+            assert_eq!(HERO_FLAG_READS.load(Ordering::Relaxed), 0);
+            assert!(game.hero.is_some_and(|actor| !actor.confirmed()));
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+        }
     }
 }

@@ -130,7 +130,9 @@ fn cpu_ids_resolve_asks_by_hash_and_lists_the_missing() {
 #[test]
 fn mash_entry_constants_resolve_against_pinned_native_names() {
     // Native lua_const.rs bindings; Hero110 values are retained in
-    // artifacts/rc15-mashout/hero110-native-entry/CONSTANTS.json. Fixtures use synthetic ids.
+    // artifacts/rc15-mashout/hero110-native-entry/CONSTANTS.json. START ACTIVE_COMMAND
+    // is also bound by main85a834 and Brave native table+c830 (hero110-start-failure).
+    // Fixtures use synthetic ids.
     let native = [
         (C::KindBrave, "FIGHTER_KIND_BRAVE", 0x53),
         (C::StatusSpecialLw, "FIGHTER_STATUS_KIND_SPECIAL_LW", 479),
@@ -142,6 +144,7 @@ fn mash_entry_constants_resolve_against_pinned_native_names() {
         (C::HeroWindowOpen, "FIGHTER_BRAVE_COMMAND_WINDOW_STATE_OPEN", 3),
         (C::HeroSelectIndex, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_SELECT_INDEX", 0x100000c8),
         (C::HeroDecideCommand, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_DECIDE_COMMAND", 0x100000c9),
+        (C::HeroActiveCommand, "FIGHTER_BRAVE_STATUS_SPECIAL_LW_START_INT_ACTIVE_COMMAND", 0x11000005),
         (C::HeroWindowState, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_WINDOW_STATE", 0x100000d1),
         (C::HeroCommand1, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_COMMAND_LIST_01_FOR_AI", 0x100000d4),
         (C::HeroCommand2, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_COMMAND_LIST_02_FOR_AI", 0x100000d5),

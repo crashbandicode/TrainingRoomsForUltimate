@@ -66,7 +66,7 @@ pub struct HeroRead {
     pub index: Option<i32>,
     pub commands: Option<[i32; 4]>,
     pub success_sp: Option<bool>,
-    pub decide_command: Option<i32>,
+    pub active_command: Option<i32>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -134,7 +134,7 @@ impl HeroEntry {
     }
 
     /// Return exactly one mapped record and an outcome backed by native status,
-    /// menu, success flag and selected command observations.
+    /// menu, success flag and current START active-command observations.
     pub fn observe(&mut self, read: HeroRead) -> Result<(MappedInputs, HeroOutcome), HeroError> {
         if !read.readers_ready || read.cpu != self.cpu
             || !(0..HERO_COMMAND_COUNT).contains(&read.ice_sword_command)
@@ -208,7 +208,7 @@ impl HeroEntry {
                 }
                 Start => {
                     if read.success_sp == Some(true)
-                        && read.decide_command == Some(read.ice_sword_command)
+                        && read.active_command == Some(read.ice_sword_command)
                     {
                         self.phase = Confirmed;
                         Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Confirmed)
