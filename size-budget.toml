@@ -1712,3 +1712,11 @@ ceiling = 153962
 date = "2026-11-16"
 reason = "rc.15 Tech UI final seam integration measured 153962 on 072f5ee0, with no headroom. Includes final reviewed BTT/menu seams and retained native grading availability. FOR OPERATOR REVIEW; counting, guards and gate enforcement unchanged."
 approved_by = "Operator rc.15 size approval; primary 2026-11-16 22:47Z explicitly approves this exact measured TechUI total tied to 072f5ee0, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 154445
+date = "2026-11-17"
+reason = "rc.15 TechUI combined bound resolver and visible Hit damage UI measured 154445 on ef726118; ONE exact combined ceiling, no headroom. The approved arithmetic bound was 153962+461+26=154449; separate V10 sync +4 is already present in the UI baseline, so the actual integrated total is four lower. FOR OPERATOR REVIEW; no counting, guard or gate change."
+approved_by = "Operator rc.15 size approval; primary 2026-11-17 01:06Z approves UI +26 and core +461 above exact153962, requiring ONE measured combined total without headroom."
