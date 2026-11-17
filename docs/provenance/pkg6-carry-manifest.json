@@ -12343,7 +12343,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "f90316b2a8c03ec7ccf402d9c4d17906fc55b75e86e52d062f5c5adce8f02450",
+   "dest_sha256": "3a17464ff10baf9dc0aae820d8229f7b1a41d636336b4a0e6e1e624ce4d8dc16",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -13751,6 +13751,96 @@
      "old": "}\npub fn request_cpu_kind_in(context: &CpuRequestContext, kind: u32) -> bool {\n    request_cpu_kind_with(kind, |fighter| queue_admitted_with(Role::Cpu, Selection::Direct(fighter), false, false,\n        || context.menu, || context.scope))\n}\nfn request_cpu_kind_with(kind: u32, enqueue_fighter: impl FnOnce(TrioFighter)) -> bool {\n",
      "new": "}\npub fn request_cpu_kind_in(context: &CpuRequestContext, kind: u32) -> bool {\n    request_cpu_kind_with(kind, |fighter| {\n        queue_admitted_with(Role::Cpu, Selection::Direct(fighter), false, false, || context.menu, || context.scope);\n    })\n}\nfn request_cpu_kind_with(kind: u32, enqueue_fighter: impl FnOnce(TrioFighter)) -> bool {\n",
      "reason": "LEAD-1 review rework: settings_changed decides each role's one load from the settings change, Player Swapping turning On and the menu close's explicit pick (PickCoverage); queue_admitted reports an Admission and never silently replaces a user's waiting load. No upstream-source change."
+    },
+    {
+     "old": "\nimpl Role {\n    fn selected(self, m: &TrainingModpackMenu) -> TrioFighter {\n        match self {\n            Self::Player => m.player_character,\n            Self::Cpu => m.cpu_character,\n        }\n    }\n    fn enabled(self) -> bool {\n        self.enabled_with(|| setting(&MENU))\n",
+     "new": "\nimpl Role {\n    fn enabled(self) -> bool {\n        self.enabled_with(|| setting(&MENU))\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "}\n\n/// LEAD-1: per role, the live generation the role's last load request from `settings_changed` compared against (game frame only).\nstatic PICK_COVERAGE: crate::engine::swap::cycle_members::PickCoverage = crate::engine::swap::cycle_members::PickCoverage::new();\n\n/// Called after committing menu values. Editing an unrelated option must not\n/// replace a fighter, and navigating/highlighting a fighter is not a request.\n",
+     "new": "}\n\n/// Called after committing menu values. Editing an unrelated option must not\n/// replace a fighter, and navigating/highlighting a fighter is not a request.\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "/// Called after committing menu values. Editing an unrelated option must not\n/// replace a fighter, and navigating/highlighting a fighter is not a request.\n/// `previous`: the menu before the earliest publish this frame applies (None: only picks arrived). `picks` (LEAD-1): the menu\n/// close's last Player / CPU Character pick per role, which loads even when it did not change the stored pick.\npub fn settings_changed(previous: Option<&TrainingModpackMenu>, picks: [Option<crate::engine::swap::cycle_members::Pick>; 2]) {\n    let current = setting(&MENU);\n    if let Some(previous) = previous {\n",
+     "new": "/// Called after committing menu values. Editing an unrelated option must not\n/// replace a fighter, and navigating/highlighting a fighter is not a request.\n/// LEAD-1: this is the roster lists' re-plan only; fighter loads come from the versioned dispatch record ([`menu_dispatch`]).\npub fn settings_changed(previous: &TrainingModpackMenu) {\n    let current = setting(&MENU);\n    if let Some(previous) = previous {\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "pub fn settings_changed(previous: &TrainingModpackMenu) {\n    let current = setting(&MENU);\n    if let Some(previous) = previous {\n        roster_settings_changed(previous, &current);\n    }\n    // One decision per role (LEAD-1 review F2): the selection the publish changed, Player Swapping turning On and the explicit\n    // pick, together; a pick whose publish this role's last request already covered is not asked for twice.\n    let live_generation = crate::runtime::published::live_generation();\n    let now = crate::engine::swap::cycle_members::role_views(&current);\n    let before = previous.map(crate::engine::swap::cycle_members::role_views);\n    for role in [Role::Player, Role::Cpu] {\n        let index = role as usize;\n",
+     "new": "pub fn settings_changed(previous: &TrainingModpackMenu) {\n    let current = setting(&MENU);\n    roster_settings_changed(previous, &current);\n}\n\n/// LEAD-1 (review R1/R2): the fighter loads one publication caused (a changed selection, Player Swapping turning On, the menu\n/// close's explicit pick), at most one per role per cause (`compat::menu::DISPATCH`). The target is the record's, the committed\n/// pick, never a later game-side writeback of the live menu, so a load completing after the publish cannot erase the pick.\npub fn menu_dispatch(due: [Option<crate::engine::swap::cycle_members::RoleDispatch>; 2]) {\n    for role in [Role::Player, Role::Cpu] {\n        let index = role as usize;\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "pub fn menu_dispatch(due: [Option<crate::engine::swap::cycle_members::RoleDispatch>; 2]) {\n    for role in [Role::Player, Role::Cpu] {\n        let index = role as usize;\n        if let Some(once) = PICK_COVERAGE.decide(index, before.map(|views| views[index]), now[index], picks[index], live_generation) {\n            let admission = queue_admitted(role, Selection::Direct(role.selected(&current)), false, once);\n            trace!(\"[CharacterRoster] menu dispatch role={:?} kind=0x{:x} once={} pick={:?} admission={:?}\",\n                role, now[index].selected, once, picks[index], admission);\n        }\n    }\n}\n",
+     "new": "pub fn menu_dispatch(due: [Option<crate::engine::swap::cycle_members::RoleDispatch>; 2]) {\n    for role in [Role::Player, Role::Cpu] {\n        let Some(cause) = due[role as usize] else { continue };\n        let Some(fighter) = TrioFighter::from_kind(cause.target) else {\n            trace!(\"[CharacterRoster] menu dispatch role={:?} kind=0x{:x}: not a roster fighter\", role, cause.target);\n            continue;\n        };\n        let admission = queue_admitted(role, Selection::Direct(fighter), false, cause.once);\n        trace!(\"[CharacterRoster] menu dispatch role={:?} kind=0x{:x} once={} cause={} admission={:?}\",\n            role, cause.target, cause.once, cause.cause, admission);\n    }\n}\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "            trace!(\"[CharacterRoster] request ignored role={:?} selection={:?}: this role's roster cycle is off\", role, selection);\n        }\n        return Admission::Unavailable(\"Player Swapping is Off\");\n    }\n    if BASE.load(Ordering::Acquire) == 0 || !crate::runtime::roster::character_lifecycle::native_hooks_ready() {\n",
+     "new": "            trace!(\"[CharacterRoster] request ignored role={:?} selection={:?}: this role's roster cycle is off\", role, selection);\n        }\n        return Admission::Unavailable;\n    }\n    if BASE.load(Ordering::Acquire) == 0 || !crate::runtime::roster::character_lifecycle::native_hooks_ready() {\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "    if BASE.load(Ordering::Acquire) == 0 || !crate::runtime::roster::character_lifecycle::native_hooks_ready() {\n        trace!(\"[CharacterRoster] request ignored role={:?} selection={:?}: native hooks unavailable\", role, selection);\n        let reason = \"Unavailable on this game version\";\n        notify(role, reason.into());\n        return Admission::Unavailable(reason);\n    }\n    let Some(scope) = read_scope() else {\n",
+     "new": "    if BASE.load(Ordering::Acquire) == 0 || !crate::runtime::roster::character_lifecycle::native_hooks_ready() {\n        trace!(\"[CharacterRoster] request ignored role={:?} selection={:?}: native hooks unavailable\", role, selection);\n        notify(role, \"Unavailable on this game version\".into());\n        return Admission::Unavailable;\n    }\n    let Some(scope) = read_scope() else {\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "        if user {\n            trace!(\"[CharacterRoster] request ignored role={:?} selection={:?}: not a practice scene\", role, selection);\n        }\n        return Admission::Unavailable(\"Not a practice scene\");\n",
+     "new": "        if user {\n            trace!(\"[CharacterRoster] request ignored role={:?} selection={:?}: not a practice scene\", role, selection);\n            // LEAD-1 review R3a: a user's request outside practice is told, never dropped silently.\n            notify(role, \"Not a practice scene\".into());\n        }\n        return Admission::Unavailable(\"Not a practice scene\");\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "            notify(role, \"Not a practice scene\".into());\n        }\n        return Admission::Unavailable(\"Not a practice scene\");\n    };\n    let occupied = if busy() {\n",
+     "new": "            notify(role, \"Not a practice scene\".into());\n        }\n        return Admission::Unavailable;\n    };\n    let occupied = if busy() {\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "            notify(role, reason.into());\n        }\n        return Admission::Busy(reason);\n    }\n    sources::pause_preload();\n",
+     "new": "            notify(role, reason.into());\n        }\n        return Admission::Busy;\n    }\n    sources::pause_preload();\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "    }\n    let user_request=!restoring && !matches!(selection,Selection::RefreshPartners);\n    if mii_ordinary_player::intercept_with(role,selection,user_request,&read_menu)==Some(true){\n        if user {trace!(\"[CharacterRoster] request handed to the ordinary Mii owner role={:?} selection={:?}\",role,selection);}\n        // The owner holds it without the roster's pending request, or refused it with its own notice.\n        return Admission::Accepted;\n    }\n    // The CPU owner logs its own acceptance or refusal.\n",
+     "new": "    }\n    let user_request=!restoring && !matches!(selection,Selection::RefreshPartners);\n    // LEAD-1 review R3c: an ordinary Mii owner reports what it did (admitted, refused as busy with its own notice, unavailable\n    // with its own notice, or a coalesced refresh); `None` leaves the request to the next owner.\n    if let Some(admission)=mii_ordinary_player::intercept_with(role,selection,user_request,&read_menu){\n        if user {trace!(\"[CharacterRoster] request handed to the ordinary Mii owner role={:?} selection={:?} admission={:?}\",role,selection,admission);}\n        return admission;\n    }\n    // The CPU owner logs its own acceptance or refusal.\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "    }\n    // The CPU owner logs its own acceptance or refusal.\n    if mii_ordinary_cpu::intercept_with(role,selection,user_request,&read_menu)==Some(true){return Admission::Accepted;}\n    if mii_saved_alpha::intercept_with(role,selection,&read_menu){\n        if user {trace!(\"[CharacterRoster] request handed to the saved Mii owner role={:?} selection={:?}\",role,selection);}\n",
+     "new": "    }\n    // The CPU owner logs its own acceptance or refusal.\n    if let Some(admission)=mii_ordinary_cpu::intercept_with(role,selection,user_request,&read_menu){return admission;}\n    if mii_saved_alpha::intercept_with(role,selection,&read_menu){\n        if user {trace!(\"[CharacterRoster] request handed to the saved Mii owner role={:?} selection={:?}\",role,selection);}\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "    if mii_saved_alpha::intercept_with(role,selection,&read_menu){\n        if user {trace!(\"[CharacterRoster] request handed to the saved Mii owner role={:?} selection={:?}\",role,selection);}\n        return Admission::Accepted;\n    }\n    let mut state = state_for(role).lock();\n",
+     "new": "    if mii_saved_alpha::intercept_with(role,selection,&read_menu){\n        if user {trace!(\"[CharacterRoster] request handed to the saved Mii owner role={:?} selection={:?}\",role,selection);}\n        return Admission::Owned;\n    }\n    let mut state = state_for(role).lock();\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "        drop(state);\n        trace!(\"[CharacterRoster] request rejected: no current practice entry\");\n        let reason = \"Wait for the practice character to finish loading\";\n        if !matches!(selection, Selection::RefreshPartners) {\n            notify(role, reason.into());\n",
+     "new": "        drop(state);\n        trace!(\"[CharacterRoster] request rejected: no current practice entry\");\n        if !matches!(selection, Selection::RefreshPartners) {\n            notify(role, reason.into());\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "        trace!(\"[CharacterRoster] request rejected: no current practice entry\");\n        if !matches!(selection, Selection::RefreshPartners) {\n            notify(role, reason.into());\n        }\n        return Admission::Unavailable(reason);\n",
+     "new": "        trace!(\"[CharacterRoster] request rejected: no current practice entry\");\n        if !matches!(selection, Selection::RefreshPartners) {\n            notify(\n                role,\n                \"Wait for the practice character to finish loading\".into(),\n            );\n        }\n        return Admission::Unavailable(reason);\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "            );\n        }\n        return Admission::Unavailable(reason);\n    };\n    // LEAD-1 review F4: a load the user chose never silently replaces a user's load still waiting; an automatic one (a\n",
+     "new": "            );\n        }\n        return Admission::Unavailable;\n    };\n    // LEAD-1 review F4: a load the user chose never silently replaces a user's load still waiting; an automatic one (a\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "        Admission::Accepted\n    };\n    if let Admission::Busy(reason) = admission {\n        drop(state);\n        trace!(\"[CharacterRoster] request rejected: {}\", reason);\n",
+     "new": "        Admission::Accepted\n    };\n    if admission == Admission::Busy {\n        drop(state);\n        trace!(\"[CharacterRoster] request rejected: {}\", reason);\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "    if admission == Admission::Busy {\n        drop(state);\n        trace!(\"[CharacterRoster] request rejected: {}\", reason);\n        notify(role, reason.into());\n        return admission;\n    }\n",
+     "new": "    if admission == Admission::Busy {\n        drop(state);\n        trace!(\"[CharacterRoster] request rejected: {}\", crate::engine::swap::cycle_members::FIGHTER_STILL_LOADING);\n        notify(role, crate::engine::swap::cycle_members::FIGHTER_STILL_LOADING.into());\n        return admission;\n    }\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
     }
    ]
   },
@@ -23022,7 +23112,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "1ca1f5135bf02c3dfa7cc7fbbadb4424107d4a7ff526b32c0365952542c6d83e",
+   "dest_sha256": "996f9428d3b6ed5c4fed7c6b9f4a1a0d252c32441da0f1293cb9aecdaef1cff6",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -23885,6 +23975,41 @@
      "old": "    // catalog, no capture pending, not departed) also keeps ordinary-only cycles. A\n    // missing or unqualified owner still takes the fallback above or the roster.\n    let ordinary_cycle=matches!(selection,Selection::Cycle) && !s.departed && s.menu_valid && !s.capture\n        && s.catalog.is_some() && owner.origin.binding.epoch==epoch();\n    let requested=setting(&MENU).cpu_roster.fighters_excluding_fixed(None).iter()\n        .any(|f|MiiClass::from_kind(f.kind()).is_some())\n        || ordinary_cycle\n        || matches!(selection,Selection::Direct(f) if MiiClass::from_kind(f.kind()).is_some());\n    if !s.reservation.routes(requested,owner.origin_saved.is_some() || owner.live.target.saved().is_some()) {return None;}\n",
      "new": "    // catalog, no capture pending, not departed) also keeps ordinary-only cycles. A\n    // missing or unqualified owner still takes the fallback above or the roster.\n    let ordinary_cycle=matches!(selection,Selection::Cycle) && !s.departed && s.menu_valid && !s.capture\n        && s.catalog.is_some() && owner.origin.binding.epoch==epoch();\n    let requested=read_menu().cpu_roster.fighters_excluding_fixed(None).iter()\n        .any(|f|MiiClass::from_kind(f.kind()).is_some())\n        || ordinary_cycle\n        || matches!(selection,Selection::Direct(f) if MiiClass::from_kind(f.kind()).is_some());\n    if !s.reservation.routes(requested,owner.origin_saved.is_some() || owner.live.target.saved().is_some()) {return None;}\n",
      "reason": "RC15 macro frame menu root fix: preserve Busy before fact, lease, panel, session or request mutation; pass freshly resolved context/menu/scope through shared existing implementations. Legacy request guards and lazy reader order retained; no upstream-source change."
+    },
+    {
+     "old": "    true\n}\npub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<bool> {\n    if role!=Role::Cpu || !ENABLED.load(Ordering::Acquire) {return None;}\n    let mut s=STATE.lock();\n",
+     "new": "    true\n}\n/// LEAD-1 review R3c: `Some` is what became of the request (each refusal shows its notice here), `None` leaves it to the next owner.\npub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<crate::engine::swap::cycle_members::Admission> {\n    if role!=Role::Cpu || !ENABLED.load(Ordering::Acquire) {return None;}\n    let mut s=STATE.lock();\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "            drop(s);\n            if user_request {notify(Role::Cpu,\"Wait for the practice character to finish loading\".into());}\n            return Some(true);\n        }\n        let wants_mii=read_menu().cpu_roster.fighters_excluding_fixed(None).iter()\n",
+     "new": "            drop(s);\n            if user_request {notify(Role::Cpu,\"Wait for the practice character to finish loading\".into());}\n            return Some(crate::engine::swap::cycle_members::Admission::Unavailable);\n        }\n        let wants_mii=read_menu().cpu_roster.fighters_excluding_fixed(None).iter()\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "                notify(Role::Cpu,\"Wait for the practice character to finish loading\".into());\n            }\n            return Some(true);\n        }\n        return None;\n",
+     "new": "                notify(Role::Cpu,\"Wait for the practice character to finish loading\".into());\n            }\n            return Some(crate::engine::swap::cycle_members::Admission::Unavailable);\n        }\n        return None;\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "    // waits. Coalesce it without a per-frame synchronous diagnostic write.\n    if matches!(selection,Selection::RefreshPartners)\n        && (s.departed || s.request.is_some() || s.busy()) {return Some(true);}\n    // Reservation starts at the INSTALL ticket, never at this menu/catalog capture.\n    let request=match selection {\n",
+     "new": "    // waits. Coalesce it without a per-frame synchronous diagnostic write.\n    if matches!(selection,Selection::RefreshPartners)\n        && (s.departed || s.request.is_some() || s.busy()) {return Some(crate::engine::swap::cycle_members::Admission::Superseded);}\n    // Reservation starts at the INSTALL ticket, never at this menu/catalog capture.\n    let request=match selection {\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "                selection,user_request,INSTALL.active());\n        }\n    } else {\n        drop(s);note(\"request refused: owned CPU request busy or unsupported\");\n",
+     "new": "                selection,user_request,INSTALL.active());\n        }\n        Some(crate::engine::swap::cycle_members::Admission::Accepted)\n    } else {\n        drop(s);note(\"request refused: owned CPU request busy or unsupported\");\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "            notify(Role::Cpu,message.into());\n        }\n    }\n    Some(true)\n",
+     "new": "            notify(Role::Cpu,message.into());\n        }\n        Some(crate::engine::swap::cycle_members::Admission::Busy)\n    }\n    Some(true)\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "        Some(crate::engine::swap::cycle_members::Admission::Busy)\n    }\n    Some(true)\n}\n\n",
+     "new": "        Some(crate::engine::swap::cycle_members::Admission::Busy)\n    }\n}\n\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
     }
    ]
   },
@@ -24803,7 +24928,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "582f92f2127fef81d5876b9c4ab00ff30a6a4bd03b62598ef525125da088e63e",
+   "dest_sha256": "38be29d41a6760317a8af586b00081a59e40c166998d6bd58ea488b3c4769c7c",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -25636,6 +25761,41 @@
      "old": "        }\n        return None;\n    };\n    // A captured mixed roster remains in this adapter, including its ordinary entries.\n    let has_mii=setting(&MENU).player_roster.fighters_excluding_fixed(None).iter()\n        .any(|f|MiiClass::from_kind(f.kind()).is_some());\n    // Same-entry banks: a qualified, captured owner (current epoch, valid menu and\n    // catalog, no capture pending) also keeps ordinary-only cycles and direct picks,\n    // so one adapter owns the physical receipt, the bank switch and the cursor. A\n",
      "new": "        }\n        return None;\n    };\n    // A captured mixed roster remains in this adapter, including its ordinary entries.\n    let has_mii=read_menu().player_roster.fighters_excluding_fixed(None).iter()\n        .any(|f|MiiClass::from_kind(f.kind()).is_some());\n    // Same-entry banks: a qualified, captured owner (current epoch, valid menu and\n    // catalog, no capture pending) also keeps ordinary-only cycles and direct picks,\n    // so one adapter owns the physical receipt, the bank switch and the cursor. A\n",
      "reason": "RC15 macro frame menu root fix: preserve Busy before fact, lease, panel, session or request mutation; pass freshly resolved context/menu/scope through shared existing implementations. Legacy request guards and lazy reader order retained; no upstream-source change."
+    },
+    {
+     "old": "    true\n}\npub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<bool> {\n    if role!=Role::Player || !ENABLED.load(Ordering::Acquire) {return None;}\n    let mut s=STATE.lock();\n",
+     "new": "    true\n}\n/// LEAD-1 review R3c: `Some` is what became of the request (each refusal shows its notice here), `None` leaves it to the next owner.\npub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<crate::engine::swap::cycle_members::Admission> {\n    if role!=Role::Player || !ENABLED.load(Ordering::Acquire) {return None;}\n    let mut s=STATE.lock();\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "            drop(s);\n            if user_request {notify(Role::Player,\"Wait for the practice character to finish loading\".into());}\n            return Some(true);\n        }\n        let automatic=super::mii_auto_init::pending();\n",
+     "new": "            drop(s);\n            if user_request {notify(Role::Player,\"Wait for the practice character to finish loading\".into());}\n            return Some(crate::engine::swap::cycle_members::Admission::Unavailable);\n        }\n        let automatic=super::mii_auto_init::pending();\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "                notify(Role::Player,\"Wait for the practice character to finish loading\".into());\n            }\n            return Some(true);\n        }\n        return None;\n",
+     "new": "                notify(Role::Player,\"Wait for the practice character to finish loading\".into());\n            }\n            return Some(crate::engine::swap::cycle_members::Admission::Unavailable);\n        }\n        return None;\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "    // request while an owned operation is pending; do not sync a refusal to SD.\n    if matches!(selection,Selection::RefreshPartners) && (s.request.is_some() || s.busy()) {\n        return Some(true);\n    }\n    let request=match selection {\n",
+     "new": "    // request while an owned operation is pending; do not sync a refusal to SD.\n    if matches!(selection,Selection::RefreshPartners) && (s.request.is_some() || s.busy()) {\n        return Some(crate::engine::swap::cycle_members::Admission::Superseded);\n    }\n    let request=match selection {\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "        if user_request {WAITING_MEMORY.lock().manual_request(Role::Player as usize);}\n        s.request=request;\n    } else {\n        drop(s);note(\"request refused: owned Player request busy or unsupported\");\n",
+     "new": "        if user_request {WAITING_MEMORY.lock().manual_request(Role::Player as usize);}\n        s.request=request;\n        Some(crate::engine::swap::cycle_members::Admission::Accepted)\n    } else {\n        drop(s);note(\"request refused: owned Player request busy or unsupported\");\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "        drop(s);note(\"request refused: owned Player request busy or unsupported\");\n        if manual_direct {notify(Role::Player,\"Finish the current practice action first\".into());}\n    }\n    Some(true)\n",
+     "new": "        drop(s);note(\"request refused: owned Player request busy or unsupported\");\n        if manual_direct {notify(Role::Player,\"Finish the current practice action first\".into());}\n        Some(crate::engine::swap::cycle_members::Admission::Busy)\n    }\n    Some(true)\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
+    },
+    {
+     "old": "        Some(crate::engine::swap::cycle_members::Admission::Busy)\n    }\n    Some(true)\n}\n\n",
+     "new": "        Some(crate::engine::swap::cycle_members::Admission::Busy)\n    }\n}\n\n",
+     "reason": "LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change."
     }
    ]
   },

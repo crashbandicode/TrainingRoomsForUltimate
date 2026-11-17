@@ -212,8 +212,9 @@ pub(crate) fn before_publish(published: TrainingModpackMenu, previous: Option<Tr
 /// written back into the settings the menu opens on. When a live menu changed, package 6's roster re-plan is only *noted* here: the
 /// game frame runs it ([`service_roster_change`], where the roster's locks are taken: the lock-free runtime), so a publish does only
 /// the publish (stream/stack: run here, the planner sat under boot's frame on Skyline's 64 KiB thread). The first publish of a run
-/// has nothing to compare with. `picks` (LEAD-1): the menu close's last pick per role, posted after the re-plan note so the game frame
-/// that takes them also sees this publish's change; it decides each role's one load from both (`character_roster::settings_changed`).
+/// has nothing to compare with. LEAD-1: every publish also folds its fighter-load causes (a changed selection, Player Swapping turning
+/// On, the menu close's explicit `picks`) into the versioned dispatch record ([`DISPATCH`]), from its own `previous` and committed
+/// `next`, under `PUBLISHING`.
 pub(crate) fn after_publish(published: TrainingModpackMenu, next: TrainingModpackMenu, previous: Option<TrainingModpackMenu>,
     picks: [Option<u32>; 2]) {
     if next != published {
@@ -223,18 +224,21 @@ pub(crate) fn after_publish(published: TrainingModpackMenu, next: TrainingModpac
     if let Some(previous) = previous.filter(|previous| *previous != next) {
         note_roster_change(previous);
     }
-    PICKS.post(picks, crate::runtime::published::live_generation());
+    use crate::engine::swap::cycle_members::role_views;
+    DISPATCH.publish(previous.as_ref().map(role_views), role_views(&next), picks);
 }
 
-/// LEAD-1: the menu close's Player / CPU Character picks on their way to the game frame (written under `PUBLISHING` by
-/// `after_publish`, taken by `service_roster_change`; the last pick per role wins).
-static PICKS: crate::engine::swap::cycle_members::PickSlots = crate::engine::swap::cycle_members::PickSlots::new();
+/// LEAD-1 (review R1/R2): the fighter-load transaction between the publisher and the game frame. One record per publication, folded
+/// under `PUBLISHING`; the game frame loads each role once per cause sequence, with the target the record carries. Lock-free for the
+/// frame (`cycle_members::DispatchChannel`).
+static DISPATCH: crate::engine::swap::cycle_members::DispatchChannel = crate::engine::swap::cycle_members::DispatchChannel::new();
 
 /// The roster's pending re-plan: the menu as it was before the earliest publish the game frame has not applied yet (several
 /// publishes before its next frame are compared once, earliest against live). The publishing path writes it (one publisher at a
 /// time, under `published::PUBLISHING`) and the game frame takes it ([`service_roster_change`]): a plugin thread never takes the
 /// roster's locks, which the game's hooks wait on (the lock-free runtime, `artifacts/phase23/TASK-OPUS-rc6-lockfree.md`). Neither
-/// side waits on the other: `Published` readers never wait, and its writer here is a plugin thread.
+/// side waits on the other: `Published` readers never wait, and its writer here is a plugin thread. LEAD-1: this re-plan is the
+/// roster lists' only (cursor, revision, preload grace); fighter loads come from [`DISPATCH`].
 static ROSTER_CHANGE: hos_lock::Published<Option<TrainingModpackMenu>> = hos_lock::Published::new(None);
 /// The `ROSTER_CHANGE` generation the game frame applied last.
 static ROSTER_APPLIED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
@@ -247,25 +251,24 @@ fn note_roster_change(previous: TrainingModpackMenu) {
 }
 
 /// The game frame (`lobby::update`: the input poll and the fighter frame, on MainThread): the roster re-plans for a noted settings
-/// change, once per change (two atomic loads and two swaps when nothing changed). It lands at the game's next poll after the publish,
-/// where the menu worker ran it right after the publish before; nothing the worker does next reads its outcome
-/// (`tests/lockfree_wiring.rs`). LEAD-1: the picks are taken first. The publisher posts them after it noted the change, so a frame that
-/// holds a pick also sees its publish's change, and the roster decides each role's one load from both.
+/// change, once per change, and loads each role a publication caused, once per cause (three atomic loads when nothing changed). It
+/// lands at the game's next poll after the publish; nothing the worker does next reads its outcome (`tests/lockfree_wiring.rs`).
 pub(crate) fn service_roster_change() {
     use std::sync::atomic::Ordering;
-    let picks = PICKS.take();
+    let due = DISPATCH.take();
     let generation = ROSTER_CHANGE.generation();
     let applied = ROSTER_APPLIED.load(Ordering::Acquire);
-    let mut previous = None;
     if generation != applied {
         // The publisher writes again only once this generation is applied, so this read is exactly that generation's value.
-        let noted = ROSTER_CHANGE.read();
+        let previous = ROSTER_CHANGE.read();
         if ROSTER_APPLIED.compare_exchange(applied, generation, Ordering::AcqRel, Ordering::Acquire).is_ok() {
-            previous = noted;
+            if let Some(previous) = previous {
+                crate::runtime::roster::character_roster::settings_changed(&previous);
+            }
         }
     }
-    if previous.is_some() || picks.iter().any(Option::is_some) {
-        crate::runtime::roster::character_roster::settings_changed(previous.as_ref(), picks);
+    if due.iter().any(Option::is_some) {
+        crate::runtime::roster::character_roster::menu_dispatch(due);
     }
 }
 /// The settings-only part of the typed view: the two kept keys (`stage_preferences`, `mii_preferences`), which

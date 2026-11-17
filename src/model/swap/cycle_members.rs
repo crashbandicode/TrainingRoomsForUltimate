@@ -133,61 +133,24 @@ pub fn admitted(cycle_on: bool, once: bool, refresh: bool) -> bool {
 
 // ---------------------------------------------------------------------------------------------------------------------
 // LEAD-1: explicit Player / CPU Character picks. A pick of the fighter a role already stores (a pick that never loaded,
-// or the stored pick a cycle left behind) changed no setting, so nothing dispatched it. Now the close carries each role's
-// pick through the settings publish to the game frame, which makes ONE decision per role from the settings change, Player
-// Swapping turning On and the pick together (`role_dispatch`).
+// or the stored pick a cycle left behind) changed no setting, so nothing dispatched it.
+//
+// The dispatch is one versioned transaction (review R1/R2):
+// - Every settings publish folds its own causes into one cumulative `DispatchRecord`, under `published::PUBLISHING`
+//   (`DispatchChannel::publish`). The causes, per role, are the selection the publish changed, Player Swapping turning On
+//   and the menu close's explicit pick. The record keeps the committed TARGET of each role and the publication sequence
+//   number of that role's latest cause.
+// - The game frame reads the record as one coherent copy (`hos_lock::Published`) and loads a role once per cause sequence
+//   (`DispatchChannel::take`). The target comes from the record, not from the live typed menu, so a load completion that
+//   writes a game-side edit after the publish cannot erase the pick (R1). A record re-read or re-noted never loads twice,
+//   and an overlapping older publication cannot add a second load (R2), because a role loads only when its cause sequence
+//   is newer than the one it last loaded.
 //
 // Contract: the LAST pick per role per menu visit wins. Earlier presses of the same role in the same visit are
 // superseded (the menu's outbox keeps one value per role, `model::menu::Outbox::picks`); there is no per-press stream.
+// A later publication's cause for the same role supersedes an earlier one the frame has not taken (the newest target
+// loads).
 // ---------------------------------------------------------------------------------------------------------------------
-
-/// One role's portrait pick on its way to the game frame: the fighter, and the live settings generation of the publish
-/// that carried it. That publish is live before the pick is posted, so the generation is at least 1 and a posted word is
-/// never 0.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Pick {
-    pub kind: u32,
-    pub generation: u32,
-}
-
-impl Pick {
-    /// The handoff word (`PickSlots`); 0 is empty.
-    pub const fn encode(self) -> u64 {
-        ((self.generation as u64) << 32) | self.kind as u64
-    }
-    pub const fn decode(word: u64) -> Option<Self> {
-        if word == 0 { None } else { Some(Self { kind: word as u32, generation: (word >> 32) as u32 }) }
-    }
-}
-
-/// The publish → game frame handoff of the two roles' picks: one word per role, written by the publishing path under
-/// `published::PUBLISHING` (a later pick of the same role replaces one not taken yet: the last pick wins) and taken by
-/// the game frame (`compat::menu::service_roster_change`) with one swap per role. Never waits, no heap.
-pub struct PickSlots([core::sync::atomic::AtomicU64; 2]);
-
-impl Default for PickSlots {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl PickSlots {
-    pub const fn new() -> Self {
-        Self([core::sync::atomic::AtomicU64::new(0), core::sync::atomic::AtomicU64::new(0)])
-    }
-    /// The publishing path, after the publish went live at `generation` (and after it noted any roster re-plan).
-    pub fn post(&self, picks: [Option<u32>; 2], generation: u32) {
-        for (slot, pick) in self.0.iter().zip(picks) {
-            if let Some(kind) = pick {
-                slot.store(Pick { kind, generation }.encode(), core::sync::atomic::Ordering::Release);
-            }
-        }
-    }
-    /// The game frame: the picks posted since the last take, `[Player, CPU]`.
-    pub fn take(&self) -> [Option<Pick>; 2] {
-        [0, 1].map(|role| Pick::decode(self.0[role].swap(0, core::sync::atomic::Ordering::AcqRel)))
-    }
-}
 
 /// What one role's selection looks like in a typed menu: its picked fighter and (Player 1) whether Player Swapping is on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -204,46 +167,93 @@ pub fn role_views(menu: &crate::engine::compat::menu::TrainingModpackMenu) -> [R
     ]
 }
 
-/// The one per-role dispatch decision of a game frame (review F2/F3). A selection the settings change changed, Player
-/// Swapping just turning On (Player 1) and an explicit pick the frame took are decided together, so a role loads at most
-/// once for them.
-/// - `previous`: the role before the earliest publish the game frame had not applied (None: no settings change this frame).
-/// - `current`: the role in the committed, live settings.
-/// - `pick`: the role's pick this frame took. It counts only while it still names the committed selection (a later
-///   selection supersedes it and loads through its own change) and while its publish is newer than `covered`.
-/// - `covered`: the live generation the role's last load request compared against. The pick of a publish that request
-///   already covered is not asked for twice, whichever frame the change and the pick reached.
-///
-/// `Some(once)`: queue one load of `current.selected` (`once`: a load the user chose, which Player Swapping Off does not
-/// refuse).
-pub fn role_dispatch(player: bool, previous: Option<RoleView>, current: RoleView, pick: Option<Pick>, covered: u32) -> Option<bool> {
-    let changed = previous.is_some_and(|previous| previous.selected != current.selected);
-    let cycle_turned_on = player && previous.is_some_and(|previous| !previous.cycle_on) && current.cycle_on;
-    let pressed = pick.is_some_and(|pick| pick.generation > covered && pick.kind == current.selected);
-    menu_request(pressed, changed, cycle_turned_on)
+/// One publication's dispatch cause for one role (review F2): the selection it changed, Player Swapping turning On
+/// (Player 1) and the close's explicit pick, decided together. `previous`: the role in the view the publish replaced
+/// (None at boot: nothing to compare with); `next`: the committed role. `Some(once)`: one load (`once`: a load the user
+/// chose, which Player Swapping Off does not refuse).
+pub fn role_dispatch(player: bool, previous: Option<RoleView>, next: RoleView, picked: bool) -> Option<bool> {
+    let changed = previous.is_some_and(|previous| previous.selected != next.selected);
+    let cycle_turned_on = player && previous.is_some_and(|previous| !previous.cycle_on) && next.cycle_on;
+    menu_request(picked, changed, cycle_turned_on)
 }
 
-/// The game frame's per-role record of what its last load request covered (`role_dispatch`'s `covered`). Game thread only.
-pub struct PickCoverage([core::sync::atomic::AtomicU32; 2]);
+/// One role's latest dispatch cause in the record: the fighter to load, whether it is a load the user chose, and the
+/// publication sequence number of the cause (0: none yet).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RoleDispatch {
+    pub target: u32,
+    pub once: bool,
+    pub cause: u64,
+}
 
-impl Default for PickCoverage {
+/// The cumulative dispatch record: the last publication's sequence number and each role's latest cause.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DispatchRecord {
+    pub seq: u64,
+    pub roles: [RoleDispatch; 2],
+}
+
+impl DispatchRecord {
+    /// The record after one more publication. An explicit pick names its own target (it is the committed pick: the close
+    /// marks the pick key as the player's edit); otherwise the target is the committed selection.
+    pub fn fold(self, previous: Option<[RoleView; 2]>, next: [RoleView; 2], picks: [Option<u32>; 2]) -> Self {
+        let seq = self.seq + 1;
+        let mut roles = self.roles;
+        for (role, slot) in roles.iter_mut().enumerate() {
+            if let Some(once) = role_dispatch(role == 0, previous.map(|views| views[role]), next[role], picks[role].is_some()) {
+                *slot = RoleDispatch { target: picks[role].unwrap_or(next[role].selected), once, cause: seq };
+            }
+        }
+        Self { seq, roles }
+    }
+}
+
+/// The publish → game frame dispatch transaction (one per runtime, `compat::menu::DISPATCH`). The publisher folds and
+/// publishes under `published::PUBLISHING` (one writer); the game frame reads a coherent copy and records, per role, the
+/// cause sequence it last loaded. Neither side takes a lock the other holds: `Published` readers never wait, and the frame's
+/// receipts are atomics only it writes.
+pub struct DispatchChannel {
+    record: hos_lock::Published<DispatchRecord>,
+    seen: core::sync::atomic::AtomicU32,
+    loaded: [core::sync::atomic::AtomicU64; 2],
+}
+
+impl Default for DispatchChannel {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl PickCoverage {
+impl DispatchChannel {
     pub const fn new() -> Self {
-        Self([core::sync::atomic::AtomicU32::new(0), core::sync::atomic::AtomicU32::new(0)])
-    }
-    /// `role_dispatch` for `role` (0 Player, 1 CPU), recording `live_generation` when it asks for a load.
-    pub fn decide(&self, role: usize, previous: Option<RoleView>, current: RoleView, pick: Option<Pick>, live_generation: u32) -> Option<bool> {
-        let covered = self.0[role].load(core::sync::atomic::Ordering::Acquire);
-        let once = role_dispatch(role == 0, previous, current, pick, covered);
-        if once.is_some() {
-            self.0[role].store(live_generation.max(covered), core::sync::atomic::Ordering::Release);
+        Self {
+            record: hos_lock::Published::new(DispatchRecord { seq: 0, roles: [RoleDispatch { target: 0, once: false, cause: 0 }; 2] }),
+            seen: core::sync::atomic::AtomicU32::new(0),
+            loaded: [core::sync::atomic::AtomicU64::new(0), core::sync::atomic::AtomicU64::new(0)],
         }
-        once
+    }
+
+    /// The publisher (`compat::menu::after_publish`, under `PUBLISHING`): fold this publication into the record and publish
+    /// it. Returns the record it published.
+    pub fn publish(&self, previous: Option<[RoleView; 2]>, next: [RoleView; 2], picks: [Option<u32>; 2]) -> DispatchRecord {
+        let record = self.record.read().fold(previous, next, picks);
+        self.record.publish(record);
+        record
+    }
+
+    /// The game frame (`compat::menu::service_roster_change`): each role's load this frame owes, from one coherent record,
+    /// at most once per cause. One atomic load when nothing was published.
+    pub fn take(&self) -> [Option<RoleDispatch>; 2] {
+        let Some(record) = self.record.read_if_newer(&self.seen) else { return [None; 2] };
+        let mut due = [None; 2];
+        for (role, slot) in due.iter_mut().enumerate() {
+            let cause = record.roles[role];
+            if cause.cause > self.loaded[role].load(core::sync::atomic::Ordering::Acquire) {
+                self.loaded[role].store(cause.cause, core::sync::atomic::Ordering::Release);
+                *slot = Some(cause);
+            }
+        }
+        due
     }
 }
 
@@ -257,27 +267,20 @@ pub fn close_picked(changed: [bool; 2], picks: [Option<u32>; 2]) -> [bool; 2] {
 /// The notice a user's pick shows when the role's own load request is still waiting (review F4: never silence).
 pub const FIGHTER_STILL_LOADING: &str = "Fighter still loading - pick it again when it is ready";
 
-/// What became of a role's load request at admission (review F4).
+/// What became of a role's load request at admission (review F4/R3). Every non-admission outcome a user's request reaches
+/// shows its notice at the site that decides it (the roster's `notify`, the Mii owners' existing notices).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Admission {
-    /// Queued, or taken by the role's Mii owner (which may hold it without the roster's pending request).
+    /// Queued by the roster, or admitted by the role's ordinary Mii owner (which holds it without the roster's pending).
     Accepted,
-    /// Queued over an older automatic request (a lobby restore, a partner refresh), which it replaces.
+    /// Queued over an older automatic request (a lobby restore, a partner refresh), or an automatic request coalesced.
     Superseded,
-    /// Not now: a load or another practice action is in progress. The player is told.
-    Busy(&'static str),
-    /// Not here: unavailable on this game version, or no practice entry yet. The player is told.
-    Unavailable(&'static str),
-}
-
-impl Admission {
-    /// The notice the player sees for this outcome, if any.
-    pub const fn notice(self) -> Option<&'static str> {
-        match self {
-            Self::Busy(text) | Self::Unavailable(text) => Some(text),
-            Self::Accepted | Self::Superseded => None,
-        }
-    }
+    /// Not now: a load or another practice action is in progress, or an owner refused it as busy.
+    Busy,
+    /// Not here: the game version, not a practice scene, the cycle off, or no practice entry or captured owner yet.
+    Unavailable,
+    /// Taken by the saved-Mii owner, which reports its own outcome.
+    Owned,
 }
 
 /// A load the user chose (`once`) meeting the role's own pending request: `Some(true)` a user's request still waiting
@@ -285,7 +288,7 @@ impl Admission {
 /// replaced), `None` nothing pending.
 pub const fn over_pending(pending_user: Option<bool>) -> Admission {
     match pending_user {
-        Some(true) => Admission::Busy(FIGHTER_STILL_LOADING),
+        Some(true) => Admission::Busy,
         Some(false) => Admission::Superseded,
         None => Admission::Accepted,
     }
@@ -310,23 +313,25 @@ mod tests {
         assert!(admitted(false, false, true), "a partner refresh is always taken");
     }
 
-    fn a_pick_word_round_trips_and_the_slots_keep_the_last_pick() {
-        let pick = Pick { kind: 0x07, generation: 3 };
-        assert_eq!(Pick::decode(pick.encode()), Some(pick));
-        assert_eq!(Pick::decode(0), None);
-        let slots = PickSlots::new();
-        slots.post([Some(0x07), None], 3);
-        slots.post([Some(0x58), Some(0x00)], 4);
-        assert_eq!(slots.take(), [Some(Pick { kind: 0x58, generation: 4 }), Some(Pick { kind: 0x00, generation: 4 })]);
-        assert_eq!(slots.take(), [None, None], "taken once");
+    fn a_record_folds_each_cause_once_and_keeps_the_newest_target() {
+        let views = |player: u32, on: bool| [RoleView { selected: player, cycle_on: on }, RoleView { selected: 0x00, cycle_on: true }];
+        let record = DispatchRecord::default();
+        let boot = record.fold(None, views(0x07, true), [None; 2]);
+        assert_eq!(boot.roles, [RoleDispatch::default(); 2], "boot has nothing to compare with");
+        let repick = boot.fold(Some(views(0x07, true)), views(0x07, true), [Some(0x07), None]);
+        assert_eq!(repick.roles[0], RoleDispatch { target: 0x07, once: true, cause: 2 });
+        let unrelated = repick.fold(Some(views(0x07, true)), views(0x07, true), [None; 2]);
+        assert_eq!(unrelated.roles[0].cause, 2, "a publication without a cause keeps the role's last cause");
+        let on = unrelated.fold(Some(views(0x07, false)), views(0x07, true), [None; 2]);
+        assert_eq!(on.roles[0], RoleDispatch { target: 0x07, once: false, cause: 4 }, "Player Swapping turning On");
+        assert_eq!(on.roles[1].cause, 0, "the CPU had no cause");
     }
 
-    fn admission_outcomes_always_tell_the_player_when_not_accepted() {
+    fn admission_outcomes_are_distinct() {
         assert_eq!(over_pending(None), Admission::Accepted);
         assert_eq!(over_pending(Some(false)), Admission::Superseded);
-        assert_eq!(over_pending(Some(true)).notice(), Some(FIGHTER_STILL_LOADING), "a waiting user load: a notice, never silence");
-        assert_eq!(Admission::Unavailable("x").notice(), Some("x"));
-        assert_eq!(Admission::Accepted.notice(), None);
+        assert_eq!(over_pending(Some(true)), Admission::Busy, "a waiting user load is busy: its site notifies");
+        assert!(!FIGHTER_STILL_LOADING.is_empty());
     }
 
     /// This module's cases in one table. Each case runs on its own thread, as the test harness ran it.
@@ -334,8 +339,8 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("a_player_character_pick_loads_with_player_swapping_off", a_player_character_pick_loads_with_player_swapping_off as fn()),
-            ("a_pick_word_round_trips_and_the_slots_keep_the_last_pick", a_pick_word_round_trips_and_the_slots_keep_the_last_pick as fn()),
-            ("admission_outcomes_always_tell_the_player_when_not_accepted", admission_outcomes_always_tell_the_player_when_not_accepted as fn()),
+            ("a_record_folds_each_cause_once_and_keeps_the_newest_target", a_record_folds_each_cause_once_and_keeps_the_newest_target as fn()),
+            ("admission_outcomes_are_distinct", admission_outcomes_are_distinct as fn()),
         ]);
     }
     }

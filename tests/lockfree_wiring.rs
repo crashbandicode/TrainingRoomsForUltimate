@@ -78,10 +78,14 @@ fn a_settings_publish_hands_the_re_plans_to_the_game_frame() {
     let menu = include_str!("../src/runtime/compat/menu.rs");
     let note = body(menu, "note_roster_change");
     assert!(!note.contains(".lock()"), "the publish takes a lock to note the re-plan: {note}");
-    // LEAD-1: the picks are taken before the change (the publisher posts them after it noted the change), then one call decides.
-    ordered(body(menu, "service_roster_change"), &["PICKS.take()", "ROSTER_CHANGE.read()", "compare_exchange",
-        "settings_changed(previous.as_ref(), picks)"]);
-    ordered(body(menu, "after_publish"), &["note_roster_change(previous)", "PICKS.post(picks"]);
+    // LEAD-1 (review R1/R2/R4): fighter loads are one versioned transaction. The publisher folds each publication's causes into the
+    // dispatch record (`cycle_members::DispatchChannel::publish`) under PUBLISHING; the frame takes it (`take`) and queues each due
+    // load with the record's target (`menu_dispatch`). The roster lists' re-plan stays on ROSTER_CHANGE.
+    ordered(body(menu, "service_roster_change"), &["DISPATCH.take()", "ROSTER_CHANGE.read()", "compare_exchange",
+        "settings_changed(&previous)", "menu_dispatch(due)"]);
+    ordered(body(menu, "after_publish"), &["note_roster_change(previous)", "DISPATCH.publish(previous.as_ref().map(role_views), role_views(&next), picks)"]);
+    assert!(menu.contains("static DISPATCH: crate::engine::swap::cycle_members::DispatchChannel"), "one dispatch transaction");
+    assert!(!menu.contains("PICKS"), "the split pick slots are gone");
     let config = include_str!("../src/runtime/roster/cycle_preload_config.rs");
     assert!(!body(config, "store").contains("cycle_preload::settings_changed"), "the publish resets the planner itself again");
     let worker = include_str!("../src/runtime/ui/worker.rs");
@@ -93,7 +97,7 @@ fn a_settings_publish_hands_the_re_plans_to_the_game_frame() {
 #[test]
 fn the_roster_re_plan_allocates_nothing() {
     let roster = include_str!("../src/runtime/roster/character_roster.rs");
-    for name in ["settings_changed", "roster_settings_changed", "locate"] {
+    for name in ["settings_changed", "roster_settings_changed", "menu_dispatch", "locate"] {
         let f = body(roster, name);
         for heap in ["roster(", "collect", "Vec", "format!", "to_string", "to_owned"] {
             let hits: Vec<&str> = f.match_indices(heap).filter(|(at, _)| heap != "roster(" || !f[..*at].ends_with('_')).map(|(_, s)| s).collect();

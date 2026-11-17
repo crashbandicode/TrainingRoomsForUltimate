@@ -1,18 +1,20 @@
 //! LEAD-1 (hardware ccd9befd): a Player / CPU Character pick of the fighter a role already stores was a silent no-op. These run
 //! the production path a pick takes:
 //! - the portrait editor (`RosterEditor::apply`) and the menu's outbox and close commit (`Menu::take_outbox`, `commit_onto`);
-//! - the typed view a publish makes (`TrainingModpackMenu::from_snapshot`);
-//! - the publish → game frame pick handoff (`PickSlots`) and the game frame's one decision per role (`PickCoverage::decide`
-//!   over `role_views`);
+//! - the typed views a publish compares (`TrainingModpackMenu::from_snapshot`, `role_views`);
+//! - the versioned dispatch transaction (`DispatchChannel`): `publish` is what `compat::menu::after_publish` calls under
+//!   `PUBLISHING`, and `take` is what `compat::menu::service_roster_change` calls on the game frame before
+//!   `character_roster::menu_dispatch` queues each due load;
 //! - the Mii close's reload suppression (`close_picked` into `MiiList::close_for`) and the admission outcome (`over_pending`).
 //!
-//! [`Pipeline`] only sequences them as `ui::worker::close`, `published::publish` / `compat::menu::after_publish` and
-//! `compat::menu::service_roster_change` do. The runtime itself is Switch-only.
+//! [`Pipeline`] only sequences them as the runtime does: a close publishes once, and a frame takes once. Each test chooses when
+//! frames run and when a game-side selection edit (a load completing: `Role::sync_selection`) lands. The runtime itself is
+//! Switch-only.
 
 lib_unit_tests! {
 use crate::editors::roster::{MiiTiles, RosterEditor};
 use crate::engine::compat::menu::TrainingModpackMenu;
-use crate::engine::swap::cycle_members::{close_picked, over_pending, role_views, Admission, PickCoverage, PickSlots, FIGHTER_STILL_LOADING};
+use crate::engine::swap::cycle_members::{close_picked, over_pending, role_views, Admission, DispatchChannel};
 use crate::engine::swap::roster_grid::{Role as GridRole, RosterGrid, CELLS};
 use crate::model::menu::grid::RosterUse;
 use crate::model::menu::input::Button;
@@ -54,27 +56,33 @@ struct Pipeline {
     live: Settings,
     /// The typed view readers have: the last publish, or a game-side edit made since (`compat::menu::view_before_publish`).
     view: TrainingModpackMenu,
-    generation: u32,
-    /// The earliest unapplied `previous` (`compat::menu::ROSTER_CHANGE`, coalesced).
-    change: Option<TrainingModpackMenu>,
-    slots: PickSlots,
-    coverage: PickCoverage,
-    /// Every load request the frames made: `(role, kind, once)`.
+    channel: DispatchChannel,
+    /// Every load the frames queued: `(role, kind, once)`.
     loads: Vec<(usize, u32, bool)>,
 }
 
 impl Pipeline {
     fn new(live: Settings) -> Self {
         let view = TrainingModpackMenu::from_snapshot(&live.menu);
-        Self { live, view, generation: 1, change: None, slots: PickSlots::new(), coverage: PickCoverage::new(), loads: Vec::new() }
+        let channel = DispatchChannel::new();
+        channel.publish(None, role_views(&view), [None; 2]); // boot: nothing to compare with
+        Self { live, view, channel, loads: Vec::new() }
     }
     fn open(&self) -> Menu {
         Menu::new(self.live.clone(), Env::default())
     }
-    /// A game-side selection change while the menu is open (`Role::sync_selection` → `store` → the worker's writeback).
-    fn game_selects(&mut self, player: u32) {
-        self.live.menu.set_kept("player_character", pick_value(player)).unwrap();
+    /// A game-side selection change (a load completing: `Role::sync_selection` → `store` → the worker's writeback).
+    fn game_selects(&mut self, cpu: bool, kind: u32) {
+        self.live.menu.set_kept(if cpu { "cpu_character" } else { "player_character" }, pick_value(kind)).unwrap();
         self.view = TrainingModpackMenu::from_snapshot(&self.live.menu);
+    }
+    /// A publish without a menu close (the input display bind, `ui::worker::toggle_input_display`): `[None; 2]` picks.
+    fn publish_unrelated(&mut self) {
+        let previous = self.view;
+        let (next, _) = crate::model::frame_strip::toggled(self.live.menu.get(crate::model::frame_strip::ROW));
+        self.live.menu.set(crate::model::frame_strip::ROW, &next).unwrap();
+        self.view = TrainingModpackMenu::from_snapshot(&self.live.menu);
+        self.channel.publish(Some(role_views(&previous)), role_views(&self.view), [None; 2]);
     }
     /// `ui::worker::close` → `published::publish` → `compat::menu::after_publish`.
     fn close(&mut self, menu: &mut Menu) {
@@ -82,26 +90,15 @@ impl Pipeline {
         let settings = menu.commit_onto(&self.live);
         let next = TrainingModpackMenu::from_snapshot(&settings.menu);
         let previous = self.view;
-        self.generation += 1;
-        if previous != next && self.change.is_none() {
-            self.change = Some(previous);
-        }
-        self.slots.post(outbox.picks, self.generation);
         self.live = settings;
         self.view = next;
+        self.channel.publish(Some(role_views(&previous)), role_views(&next), outbox.picks);
     }
-    /// `compat::menu::service_roster_change` → `character_roster::settings_changed`'s per-role decision.
+    /// `compat::menu::service_roster_change` → `character_roster::menu_dispatch`.
     fn frame(&mut self) {
-        let picks = self.slots.take();
-        let previous = self.change.take();
-        if previous.is_none() && picks.iter().all(Option::is_none) {
-            return;
-        }
-        let now = role_views(&self.view);
-        let before = previous.as_ref().map(role_views);
-        for role in 0..2 {
-            if let Some(once) = self.coverage.decide(role, before.map(|b| b[role]), now[role], picks[role], self.generation) {
-                self.loads.push((role, now[role].selected, once));
+        for (role, due) in self.channel.take().into_iter().enumerate() {
+            if let Some(cause) = due {
+                self.loads.push((role, cause.target, cause.once));
             }
         }
     }
@@ -124,31 +121,61 @@ fn an_idle_repick_loads_the_stored_fighter_once() {
     assert_eq!(p.loads, vec![(0, FOX, true)], "one load the user chose, with Player Swapping Off");
 }
 
-fn a_changed_pick_loads_exactly_once_in_either_frame_order() {
-    // Same frame: the change and the pick together.
+fn a_changed_pick_loads_exactly_once() {
     let mut p = Pipeline::new(settings_with(GAME_AND_WATCH, MARIO, true));
     let mut menu = p.open();
     pick(&mut menu, false, FOX);
     p.close(&mut menu);
     p.frame();
     p.frame();
+    p.publish_unrelated();
+    p.frame();
     assert_eq!(p.loads, vec![(0, FOX, true)]);
-    // The change reaches a frame before its pick (the publisher posts the pick after it notes the change).
+}
+
+/// Review R1: an earlier load completes and writes its fighter after the close published the repick, before the frame took it.
+/// ca50f990 decided against the live typed menu (now the completion's fighter) and loaded nothing for the pick.
+fn a_completion_after_the_publish_keeps_the_pick_for_both_roles() {
+    let mut p = Pipeline::new(settings_with(FOX, STEVE, true));
+    let mut menu = p.open();
+    pick(&mut menu, false, FOX); // a repick
+    pick(&mut menu, true, STEVE); // a repick
+    p.close(&mut menu);
+    p.game_selects(false, PIKACHU); // the earlier Player load completes
+    p.game_selects(true, MARIO); // and the CPU's
+    p.frame();
+    p.frame();
+    assert_eq!(p.loads, vec![(0, FOX, true), (1, STEVE, true)], "the picks' own targets load, once each");
+}
+
+/// Review R2: an earlier publication is still unconsumed when a close publishes a changed pick, and the frame runs between them
+/// (and again after). ca50f990 re-compared the re-noted older change against the live menu and loaded the pick twice.
+fn an_overlapping_publication_loads_the_pick_once() {
     let mut p = Pipeline::new(settings_with(GAME_AND_WATCH, MARIO, true));
+    p.publish_unrelated(); // A: the input display bind, no fighter cause
     let mut menu = p.open();
     pick(&mut menu, false, FOX);
-    let held = {
-        p.close(&mut menu);
-        p.slots.take()
-    };
+    p.frame(); // the frame takes A before the close publishes B
+    p.close(&mut menu); // B
     p.frame();
-    p.slots.post(held.map(|pick| pick.map(|pick| pick.kind)), held[0].unwrap().generation);
+    p.publish_unrelated(); // C, after B, with the same previous selection already loaded
     p.frame();
-    assert_eq!(p.loads, vec![(0, FOX, true)], "the pick its change already covered is not asked for twice");
+    p.frame();
+    assert_eq!(p.loads, vec![(0, FOX, true)]);
+    // Two closes before one frame: the newer cause supersedes the older (the newest target loads, once).
+    let mut menu = p.open();
+    pick(&mut menu, false, STEVE);
+    p.close(&mut menu);
+    let mut menu = p.open();
+    pick(&mut menu, false, MARIO);
+    p.close(&mut menu);
+    p.frame();
+    p.frame();
+    assert_eq!(p.loads, vec![(0, FOX, true), (0, MARIO, true)]);
 }
 
 fn player_swapping_turned_on_with_a_repick_loads_once() {
-    // Review F2: Off→On re-queues the stored pick; with a repick in the same visit that is still one load.
+    // Review F2: Off→On loads the stored pick; with a repick in the same visit that is still one load.
     let mut p = Pipeline::new(settings_with(FOX, MARIO, false));
     let mut menu = p.open();
     menu.bulk_update(&[("trio_practice", &[1, 0])]);
@@ -157,14 +184,13 @@ fn player_swapping_turned_on_with_a_repick_loads_once() {
     p.frame();
     p.frame();
     assert_eq!(p.loads, vec![(0, FOX, true)]);
-    assert_eq!(over_pending(None), Admission::Accepted, "nothing else pending: no busy notice");
 }
 
-fn a_repick_survives_a_live_selection_writeback() {
+fn a_repick_survives_a_live_selection_writeback_before_the_close() {
     // Review F3: the menu opened on Fox; a swap finishing while it is open writes Pikachu back; A on "> Fox".
     let mut p = Pipeline::new(settings_with(FOX, MARIO, true));
     let mut menu = p.open();
-    p.game_selects(PIKACHU);
+    p.game_selects(false, PIKACHU);
     pick(&mut menu, false, FOX);
     p.close(&mut menu);
     assert_eq!(p.live.menu.extra().get("player_character"), Some(&pick_value(FOX)), "the player's pick wins the merge");
@@ -210,11 +236,11 @@ fn a_close_without_a_pick_loads_nothing() {
     assert!(p.loads.is_empty());
 }
 
-fn a_waiting_user_load_gets_a_notice_never_silence() {
-    // Review F4: a pick meeting the role's own user load still waiting is refused with a notice; an automatic one is replaced.
-    assert_eq!(over_pending(Some(true)), Admission::Busy(FIGHTER_STILL_LOADING));
-    assert_eq!(over_pending(Some(true)).notice(), Some(FIGHTER_STILL_LOADING));
+fn a_waiting_user_load_is_busy_and_an_automatic_one_is_superseded() {
+    // Review F4: a pick meeting the role's own user load still waiting is refused (its site notifies); an automatic one is replaced.
+    assert_eq!(over_pending(Some(true)), Admission::Busy);
     assert_eq!(over_pending(Some(false)), Admission::Superseded);
+    assert_eq!(over_pending(None), Admission::Accepted);
 }
 
 fn a_mii_preference_reload_and_a_repick_have_one_owner() {
@@ -259,13 +285,15 @@ fn a_mii_preference_reload_and_a_repick_have_one_owner() {
 fn case_table() {
     crate::test_table::run(&[
         ("an_idle_repick_loads_the_stored_fighter_once", an_idle_repick_loads_the_stored_fighter_once as fn()),
-        ("a_changed_pick_loads_exactly_once_in_either_frame_order", a_changed_pick_loads_exactly_once_in_either_frame_order as fn()),
+        ("a_changed_pick_loads_exactly_once", a_changed_pick_loads_exactly_once as fn()),
+        ("a_completion_after_the_publish_keeps_the_pick_for_both_roles", a_completion_after_the_publish_keeps_the_pick_for_both_roles as fn()),
+        ("an_overlapping_publication_loads_the_pick_once", an_overlapping_publication_loads_the_pick_once as fn()),
         ("player_swapping_turned_on_with_a_repick_loads_once", player_swapping_turned_on_with_a_repick_loads_once as fn()),
-        ("a_repick_survives_a_live_selection_writeback", a_repick_survives_a_live_selection_writeback as fn()),
+        ("a_repick_survives_a_live_selection_writeback_before_the_close", a_repick_survives_a_live_selection_writeback_before_the_close as fn()),
         ("two_presses_in_one_visit_load_the_last", two_presses_in_one_visit_load_the_last as fn()),
         ("both_roles_in_one_visit_load_once_each", both_roles_in_one_visit_load_once_each as fn()),
         ("a_close_without_a_pick_loads_nothing", a_close_without_a_pick_loads_nothing as fn()),
-        ("a_waiting_user_load_gets_a_notice_never_silence", a_waiting_user_load_gets_a_notice_never_silence as fn()),
+        ("a_waiting_user_load_is_busy_and_an_automatic_one_is_superseded", a_waiting_user_load_is_busy_and_an_automatic_one_is_superseded as fn()),
         ("a_mii_preference_reload_and_a_repick_have_one_owner", a_mii_preference_reload_and_a_repick_have_one_owner as fn()),
     ]);
 }
