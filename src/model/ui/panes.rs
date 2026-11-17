@@ -1010,6 +1010,10 @@ pub const NOTICE_HEADER: [u8; 4] = TEXT;
 pub const NOTICE_LEFT: f32 = -936.0;
 pub const NOTICE_TOP: f32 = 528.0;
 pub const NOTICE_MAX_W: f32 = -iv::STRIP_W / 2.0 - 12.0 - NOTICE_LEFT;
+/// Lobby practice (`Scene::Lobby`, the Local Wireless waiting room): the native "Leave Battle" panel (top left) and the
+/// "Waiting…" / "L+R Start" pill (top right) reach down to y ≈ 447, so the frame strip, the BTT chip and the notice
+/// anchor move down by this there and end 15 units under them (2026-11-17). Training is unchanged.
+pub const LOBBY_DROP: f32 = 96.0;
 pub const NOTICE_HEADER_FONT: (f32, f32) = (15.0, 24.0);
 pub const NOTICE_BODY_FONT: (f32, f32) = (17.0, 26.0);
 /// Where the notice panes start, before the HUD draw sizes them to the notice.

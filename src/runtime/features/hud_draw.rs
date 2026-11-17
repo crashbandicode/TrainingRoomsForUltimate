@@ -115,12 +115,22 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     let btt = crate::runtime::features::btt::hud();
     let chip = (!menu_open && !btt.as_str().is_empty())
         .then(|| p::btt_hud_box(btt.as_str(), strip_shown, crate::runtime::features::combo::bar_shown()));
-    write_notice(notice, &notices::hud_tick(!waiting && !notice.is_null()), chip);
-    write_btt(root, btt.as_str(), chip);
+    // Lobby practice: the native top panels hold the top band, so the strip, the chip and the notice move down there.
+    let drop = if crate::runtime::scene::current() == Some(crate::model::scene::Scene::Lobby) { p::LOBBY_DROP } else { 0.0 };
+    #[cfg(feature = "diag")]
+    {
+        static LAST_DROP: AtomicU32 = AtomicU32::new(u32::MAX);
+        if LAST_DROP.swap(drop.to_bits(), Ordering::AcqRel) != drop.to_bits() {
+            diagnostic(format_args!("[FrameStrip] top_offset drop={drop} strip_y={} waiting_layout={waiting}", iv::STRIP_Y - drop));
+        }
+    }
+    write_notice(notice, &notices::hud_tick(!waiting && !notice.is_null()), chip, drop);
+    write_btt(root, btt.as_str(), chip.map(|[x, y, w, h]| [x, y - drop, w, h]));
     if strip[iv::at::CONTAINER] != 0 {
         input_display::hud_tick(menu_open, |local, look, changed| {
             write_look(strip[local] as *mut Pane, p::IDX_IV + local, look, changed)
         });
+        pane::set_pos(strip[iv::at::CONTAINER] as *mut Pane, 0.0, iv::STRIP_Y - drop);
     }
     if bar[cb::at::CONTAINER] != 0 {
         crate::runtime::features::combo::hud_tick(strip_shown, |local, look, changed| {
@@ -176,7 +186,7 @@ static NOTICE_H: AtomicU32 = AtomicU32::new(0);
 
 /// The compact notice box (`model::notice_box`): sized to the notice when it is drawn, at the top left, under the BTT
 /// chip (`chip`, `panes::btt_hud_box`) while that shows.
-unsafe fn write_notice(container: *mut Pane, out: &TickOut, chip: Option<[f32; 4]>) {
+unsafe fn write_notice(container: *mut Pane, out: &TickOut, chip: Option<[f32; 4]>, drop: f32) {
     if container.is_null() {
         return;
     }
@@ -212,7 +222,7 @@ unsafe fn write_notice(container: *mut Pane, out: &TickOut, chip: Option<[f32; 4
             placed.plate
         ));
     }
-    pane::set_pos(container, 0.0, notice_box::stack(f32::from_bits(NOTICE_H.load(Ordering::Acquire)), chip));
+    pane::set_pos(container, 0.0, notice_box::stack(f32::from_bits(NOTICE_H.load(Ordering::Acquire)), chip) - drop);
 }
 
 /// A notice pane shown or hidden, and when shown placed at `[centre x, centre y, w, h]`.

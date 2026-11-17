@@ -264,6 +264,48 @@ fn dialog_box_fits_its_content() {
     assert_eq!(Frame::new().dialog_box(), None, "a page keeps the full panel");
 }
 
+/// `[left, bottom, right, top]` boxes overlap.
+fn meet(a: [f32; 4], b: [f32; 4]) -> bool {
+    a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]
+}
+
+/// A `[centre x, centre y, w, h]` box as `[left, bottom, right, top]`.
+fn edges([x, y, w, h]: [f32; 4]) -> [f32; 4] {
+    [x - w / 2.0, y - h / 2.0, x + w / 2.0, y + h / 2.0]
+}
+
+/// The primary 2026-11-17 16:24Z / 17:48Z: in lobby practice the strip, a notice and the BTT chip keep clear of the
+/// native waiting-room HUD; in Training of the native damage panels. The native boxes are measured on Eden frames
+/// (`docs/media/rc6-waiting-partners.gif`, `rc11-waiting-reentry.gif` and the notice-compact stills), canvas units.
+fn lobby_drop_clears_native_waiting_hud() {
+    let leave_battle = [-960.0, 447.0, -543.0, 540.0];
+    let waiting_pill = [588.0, 450.0, 937.0, 522.0];
+    let right_column = [697.0, -30.0, 930.0, 184.0];
+    let damage_panels = [685.0, 12.0, 925.0, 331.0];
+    let (compact, wide) = ("10/10 0:07.12", "3/10   A place  B undo  X start");
+    for (drop, native) in [(p::LOBBY_DROP, vec![leave_battle, waiting_pill, right_column]), (0.0, vec![damage_panels])] {
+        let strip = edges([0.0, iv::STRIP_Y - drop, iv::STRIP_W, iv::STRIP_H]);
+        let mut boxes = vec![("strip", strip)];
+        for (header, body) in NOTICES {
+            let (b, _, _) = boxed(header, body);
+            let plate = edges(b.plate);
+            boxes.push((body, [plate[0], plate[1] - drop, plate[2], plate[3] - drop]));
+        }
+        for (body, strip_shown) in [(compact, true), (compact, false), (wide, false)] {
+            let chip = p::btt_hud_box(body, strip_shown, false);
+            let chip = [chip[0], chip[1] - chip[3] / 2.0 - drop, chip[0] + chip[2], chip[1] + chip[3] / 2.0 - drop];
+            assert!(!strip_shown || !meet(chip, strip), "{body}: the chip meets the shown strip");
+            boxes.push((body, chip));
+        }
+        for (name, b) in boxes {
+            for n in &native {
+                assert!(!meet(b, *n), "drop {drop}: {name} {b:?} meets the native box {n:?}");
+            }
+        }
+    }
+    assert_eq!((iv::STRIP_Y, p::NOTICE_TOP), (420.0, 528.0), "Training positions are unchanged");
+}
+
 #[test]
 fn case_table() {
     crate::test_table::run(&[
@@ -279,6 +321,7 @@ fn case_table() {
         ("notice_box_anchors_top_left_clear_of_hud", notice_box_anchors_top_left_clear_of_hud as fn()),
         ("notice_box_stacks_below_btt_chip", notice_box_stacks_below_btt_chip as fn()),
         ("dialog_box_fits_its_content", dialog_box_fits_its_content as fn()),
+        ("lobby_drop_clears_native_waiting_hud", lobby_drop_clears_native_waiting_hud as fn()),
     ]);
 }
 }

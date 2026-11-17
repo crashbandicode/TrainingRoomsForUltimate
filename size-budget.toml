@@ -1789,3 +1789,11 @@ ceiling = 155376
 date = "2026-11-17"
 reason = "Compact notice box and content-sized dialogs (rc15/notice-compact, review 2 R2 fixed) rebased onto main 458c0636 (155228): composed measured 155376 = +148, within the approved +150 for the notice part. Recording pop-up box spans its key caps, row bands and CONNECTIONS divider; the help rule hides under dialogs. Exact total, no headroom. Counting and gates unchanged."
 approved_by = "Primary 14:11Z and 17:54Z (notice-ui-devin-opus): the +150 approval stands for the notice part, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155392
+date = "2026-11-17"
+reason = "Lobby strip clear stacked on notice-compact 92d666f5 (155376): composed measured 155392 = +16, within the approved +30. Exact total, no headroom. Counting and gates unchanged."
+approved_by = "Primary 17:48Z (notice-ui-devin-opus, lobby strip-clear): up to +30, FOR OPERATOR REVIEW."
