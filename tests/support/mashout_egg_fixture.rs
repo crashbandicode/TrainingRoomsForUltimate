@@ -4,6 +4,7 @@ use std::{
     sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
 };
 mod model {
+    pub mod sites_pkg2 { pub const WORK_IS_FLAG_OFFSET: usize = 0x208dc80; }
     pub mod hash40 { // HASH40
     }
     pub mod cpu {
@@ -126,6 +127,7 @@ mod scene {
     }
 }
 mod natives {
+    pub fn is_flag(_: usize, _: i32) -> bool { panic!("Pin flag read is outside this Egg fixture") }
     pub fn get_int(_: usize, id: i32) -> i32 {
         assert_eq!(id, 0x11000008); // Lucas work id, pinned01bf583/native table.
         super::FREEZE_NO_BANG.load(super::Ordering::Relaxed) as i32
@@ -830,6 +832,10 @@ fn lucas_wait_without_ice_still_fails_and_wrong_victim_seed_never_grades() {
 // predicate, arming, native seed admission and cancellation are actual source.
 use model::cpu::hash::lua_bind_hash;
 mod game {
+    pub fn granted(offset: usize) -> bool {
+        assert_eq!(offset, crate::model::sites_pkg2::WORK_IS_FLAG_OFFSET);
+        true
+    }
     pub fn lua_const(hash: u64) -> Option<i32> {
         for (name, id) in [
             ("FIGHTER_STATUS_KIND_SPECIAL_N", 476),
