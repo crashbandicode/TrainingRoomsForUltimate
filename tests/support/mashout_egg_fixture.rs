@@ -118,6 +118,15 @@ static HERO_INT_READS: AtomicUsize = AtomicUsize::new(0);
 static HERO_FLAG_READS: AtomicUsize = AtomicUsize::new(0);
 static TRAIL_MAGIC_KIND_VALUE: AtomicU32 = AtomicU32::new(0);
 static TRAIL_MAGIC_KIND_RESOLVED: AtomicBool = AtomicBool::new(true);
+// Sora116 F2: CPU x (P1 is at 0), P1 damage bits, live preparatory articles (None = reader unavailable), set_lr calls.
+static CPU_X: AtomicU32 = AtomicU32::new(0x40c00000);
+static P1_DAMAGE: AtomicU32 = AtomicU32::new(0x41bc0000);
+static PREP_ARTICLE: AtomicU32 = AtomicU32::new(0);
+thread_local! { static LR_SETS: RefCell<Vec<(usize, f32)>> = const { RefCell::new(Vec::new()) }; }
+unsafe fn trail_prep_article_live(cpu: usize) -> Result<bool, ()> {
+    assert_eq!(cpu, 2);
+    match PREP_ARTICLE.load(Ordering::Relaxed) { 0 => Ok(false), 1 => Ok(true), _ => Err(()) }
+}
 static TRAIL_MAGIC_READS: AtomicUsize = AtomicUsize::new(0);
 static COVERED: AtomicBool = AtomicBool::new(false);
 static P1_AIR: AtomicBool = AtomicBool::new(false);
@@ -282,8 +291,9 @@ mod natives {
             super::P1_STOP.load(super::Ordering::Relaxed)
         } else { super::CPU_STOP.load(super::Ordering::Relaxed) }
     }
-    pub fn pos_x(_: usize) -> f32 {
-        f32::from_bits(super::P1_X.load(super::Ordering::Relaxed))
+    pub fn pos_x(actor: usize) -> f32 {
+        let x = if actor == 2 { &super::CPU_X } else { &super::P1_X };
+        f32::from_bits(x.load(super::Ordering::Relaxed))
     }
     pub fn pos_y(_: usize) -> f32 {
         0.0
@@ -304,7 +314,7 @@ mod natives {
         super::BODY.load(super::Ordering::Relaxed)
     }
     pub fn damage(_: usize, _: usize) -> f32 {
-        23.5
+        f32::from_bits(super::P1_DAMAGE.load(super::Ordering::Relaxed))
     }
 }
 mod state_natives {
@@ -337,7 +347,9 @@ mod state_natives {
         super::INIT_POS_X.store(position.x.to_bits(), super::Ordering::Relaxed);
         super::INIT_POS_CALLS.fetch_add(1, super::Ordering::Relaxed);
     }
-    pub fn set_lr(_: usize, _: f32) {}
+    pub fn set_lr(actor: usize, lr: f32) {
+        super::LR_SETS.with_borrow_mut(|v| v.push((actor, lr)));
+    }
     pub fn status_request(accessor: usize, status: i32) {
         super::REQUESTS.with_borrow_mut(|v| v.push((accessor, status)));
     }
@@ -467,6 +479,7 @@ struct Game {
     trolley: Option<entry::TrolleyEntry>,
     hero: Option<entry::HeroEntry>,
     trail_magic: Option<entry::TrailMagicEntry>,
+    prep_damage: Option<u32>,
 }
 impl Game {
     fn new(plan: Plan, state: State) -> Self {
@@ -497,6 +510,7 @@ impl Game {
             trolley: None,
             hero: None,
             trail_magic: None,
+            prep_damage: None,
         }
     }
     fn fail(&mut self, s: &'static str) {
@@ -611,6 +625,10 @@ impl NativeMemory {
         HERO_FLAG_READS.store(0, Ordering::Relaxed);
         TRAIL_MAGIC_KIND_VALUE.store(0, Ordering::Relaxed);
         TRAIL_MAGIC_KIND_RESOLVED.store(true, Ordering::Relaxed);
+        CPU_X.store(6.0f32.to_bits(), Ordering::Relaxed);
+        P1_DAMAGE.store(23.5f32.to_bits(), Ordering::Relaxed);
+        PREP_ARTICLE.store(0, Ordering::Relaxed);
+        LR_SETS.with_borrow_mut(Vec::clear);
         TRAIL_MAGIC_READS.store(0, Ordering::Relaxed);
         COVERED.store(false, Ordering::Relaxed);
         AIR.store(false, Ordering::Relaxed);
@@ -2861,5 +2879,70 @@ fn sora_thunder_prepares_once_and_unseen_or_unresolved_magic_fails_closed() {
         actual_body_guard(&mut game, m.p1(), 3);
         assert_eq!(game.failed, Some("Fighter changed · no grade"));
         assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+    }
+}
+
+// Sora116 F2 (b)+(a): drive a Thunder preparation to its Place, then the Blizzard Settle.
+unsafe fn sora_thunder_to_blizzard_settle(m: &NativeMemory, game: &mut Game) {
+    m.update(game, 0);
+    for status in [476, 487] {
+        CPU_STATUS.store(status, Ordering::Relaxed);
+        m.update(game, 0);
+    }
+    CPU_STATUS.store(0, Ordering::Relaxed);
+    TRAIL_MAGIC_KIND_VALUE.store(1, Ordering::Relaxed);
+    m.update(game, 0);
+    assert_eq!(game.step, Step::Place, "{:?}", game.failed);
+    m.update(game, 0);
+    assert_eq!(game.step, Step::Settle);
+}
+#[test]
+fn sora_prep_casts_face_away_then_blizzard_arms_only_with_unchanged_damage_and_no_article() {
+    unsafe {
+        for (cpu_x, away) in [(6.0f32, 1.0f32), (-6.0, -1.0)] {
+            let mut m = NativeMemory::new();
+            CPU_X.store(cpu_x.to_bits(), Ordering::Relaxed);
+            let mut game = sora_game(2);
+            m.update(&mut game, 0);
+            assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 476)]);
+            assert_eq!(LR_SETS.with_borrow(Clone::clone), vec![(2, away)], "the preparatory cast faces away from P1");
+            assert_eq!(game.prep_damage, Some(23.5f32.to_bits()));
+        }
+        let m = NativeMemory::new();
+        let mut game = sora_game(2);
+        sora_thunder_to_blizzard_settle(&m, &mut game);
+        m.update(&mut game, 0);
+        assert_eq!((game.step, game.failed), (Step::Entering, None));
+        assert_eq!(ARMED.load(Ordering::Relaxed), 5, "Blizzard arms after an unchanged preparation");
+        assert_eq!((game.trail_magic, game.prep_damage), (None, None));
+        // Place faced the CPU back toward P1 (P1 lr 1 -> CPU -1) after the away-facing preparation.
+        assert_eq!(LR_SETS.with_borrow(|v| v.iter().map(|s| s.1).collect::<Vec<_>>()), vec![1.0, -1.0]);
+    }
+}
+#[test]
+fn sora_prep_that_changed_damage_or_left_an_article_never_arms() {
+    unsafe {
+        for case in ["damage", "article", "reader-unavailable"] {
+            let m = NativeMemory::new();
+            let mut game = sora_game(2);
+            sora_thunder_to_blizzard_settle(&m, &mut game);
+            match case {
+                "damage" => P1_DAMAGE.store(30.556f32.to_bits(), Ordering::Relaxed),
+                "article" => PREP_ARTICLE.store(1, Ordering::Relaxed),
+                _ => PREP_ARTICLE.store(2, Ordering::Relaxed),
+            }
+            m.update(&mut game, 0);
+            let want = if case == "reader-unavailable" { UNAVAILABLE_NOTICE } else { "Setup hit you · no grade" };
+            assert_eq!((game.step, game.failed), (Step::Failed, Some(want)), "{case}");
+            assert_eq!(ARMED.load(Ordering::Relaxed), 0, "{case}");
+            assert_eq!(REQUESTS.with_borrow(|v| v.iter().filter(|r| r.1 == 476).count()), 1, "{case}: no Blizzard cast");
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+        }
+        let m = NativeMemory::new();
+        CPU_X.store(0.0f32.to_bits(), Ordering::Relaxed);
+        let mut game = sora_game(0);
+        m.update(&mut game, 0);
+        assert_eq!(game.failed, Some("Position unavailable"), "no facing reference: fail before any cast");
+        assert!(REQUESTS.with_borrow(Vec::is_empty));
     }
 }

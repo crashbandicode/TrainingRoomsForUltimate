@@ -328,6 +328,8 @@ struct Game {
     trolley: Option<entry::TrolleyEntry>,
     hero: Option<entry::HeroEntry>,
     trail_magic: Option<entry::TrailMagicEntry>,
+    /// P1's damage bits when the first preparatory magic cast began (Sora116 setup backstop).
+    prep_damage: Option<u32>,
 }
 impl Game {
     const fn new() -> Self {
@@ -350,6 +352,7 @@ impl Game {
             trolley: None,
             hero: None,
             trail_magic: None,
+            prep_damage: None,
         }
     }
     fn step(&mut self, next: Step, text: &'static str) {
@@ -541,6 +544,17 @@ unsafe fn trail_magic_kind(cpu: usize) -> Result<entry::TrailMagicKind, ()> {
     }
 }
 
+/// Whether a preparatory Fire or Thunder (cloud) article is still live, through the guarded article reader.
+unsafe fn trail_prep_article_live(cpu: usize) -> Result<bool, ()> {
+    if !game::granted(crate::model::sites_pkg3::STATE_ARTICLE_IS_EXIST_OFFSET) {
+        return Err(());
+    }
+    let [Some(fire), Some(cloud)] = [C::TrailArticleFire, C::TrailArticleCloud].map(state_id) else {
+        return Err(());
+    };
+    Ok(state_natives::article_is_exist(cpu, fire) || state_natives::article_is_exist(cpu, cloud))
+}
+
 fn trail_magic_status(status: i32, wait: i32) -> Result<entry::TrailMagicStatus, ()> {
     let [Some(special), Some(n1), Some(n1_shoot), Some(n1_end), Some(n3)] = [
         C::StatusSpecialN,
@@ -687,6 +701,7 @@ pub unsafe fn frame(fighter: usize) {
         game.clock = None;
         game.hero = None;
         game.trail_magic = None;
+        game.prep_damage = None;
         game.restore_requested = false;
         game.step(
             if linked {
@@ -987,6 +1002,7 @@ pub unsafe fn frame(fighter: usize) {
             game.trolley = None;
             game.hero = None;
             game.trail_magic = None;
+            game.prep_damage = None;
             game.step(Step::Reload, "Mash out · Setting up");
         }
         Step::Retry => (),
@@ -1018,6 +1034,7 @@ pub unsafe fn frame(fighter: usize) {
             game.trolley = None;
             game.hero = None;
             game.trail_magic = None;
+            game.prep_damage = None;
             revoke();
             game.step = Step::Reload;
             post(
@@ -1146,6 +1163,7 @@ pub unsafe fn frame(fighter: usize) {
                     None => match entry::TrailMagicEntry::new(kind) {
                         Ok(actor) => {
                             game.trail_magic = Some(actor);
+                            game.prep_damage = Some(natives::damage(p1, 0).to_bits());
                             preparing = true;
                         }
                         Err(entry::TrailMagicError::Unavailable) => {
@@ -1154,7 +1172,19 @@ pub unsafe fn frame(fighter: usize) {
                         }
                     },
                     Some(actor) if actor.prepared() && kind == entry::TrailMagicKind::Blizzard => {
+                        // Backstop (OPUS-REVIEW-sora116-45c1f9d6 F2 (a)): the preparation must have left P1's
+                        // damage bit-equal and no live Fire/Thunder article before the Blizzard cast arms.
+                        let Ok(live) = trail_prep_article_live(cpu) else {
+                            game.fail(UNAVAILABLE_NOTICE);
+                            return;
+                        };
+                        if live || game.prep_damage != Some(natives::damage(p1, 0).to_bits()) {
+                            // restriction: mashout-sora-prep
+                            game.fail("Setup hit you · no grade");
+                            return;
+                        }
                         game.trail_magic = None;
+                        game.prep_damage = None;
                     }
                     Some(mut actor) => {
                         if actor.begin_thunder(kind).is_err() {
@@ -1164,6 +1194,17 @@ pub unsafe fn frame(fighter: usize) {
                         game.trail_magic = Some(actor);
                         preparing = true;
                     }
+                }
+                if preparing {
+                    // OPUS-REVIEW-sora116-45c1f9d6 F2 (b): preparatory casts face away from P1; the existing
+                    // Place faces the CPU back toward P1 before the Blizzard cast.
+                    let away = natives::pos_x(cpu) - natives::pos_x(p1);
+                    if !away.is_finite() || away == 0.0 {
+                        // restriction: MASH-M1-MISMATCH
+                        game.fail("Position unavailable");
+                        return;
+                    }
+                    state_natives::set_lr(cpu, away.signum());
                 }
             }
             let Some(start) = entry::start(request).and_then(|name| game::lua_const(lua_bind_hash(name)))
