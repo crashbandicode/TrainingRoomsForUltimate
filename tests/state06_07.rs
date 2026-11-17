@@ -166,9 +166,10 @@ fn crash0900_r3_a_lifecycle_exit_drops_a_waiting_reset() {
     assert_eq!((step.write, pending.map(|p| p.generation)), (Some(0), Some(11)));
     assert!(defer_step(&mut pending, at(0, false, 900, 11)).fired);
     // The runtime counter: a lifecycle exit raises it (other tests may raise it too, never lower it).
-    let before = lra_reset::generation();
+    let generation = || lra_reset::GENERATION.load(std::sync::atomic::Ordering::Acquire);
+    let before = generation();
     lra_reset::lifecycle_exit();
-    assert_ne!(lra_reset::generation(), before);
+    assert_ne!(generation(), before);
 }
 
 #[test]
@@ -177,7 +178,7 @@ fn crash0900_r3_every_lifecycle_exit_raises_the_generation() {
     // mode-key change, leaving Training included) and the P1 entry's destruction (same-mode departure) raise it.
     let root = env!("CARGO_MANIFEST_DIR");
     let hook = std::fs::read_to_string(format!("{root}/src/runtime/features/lra_reset.rs")).unwrap();
-    assert!(hook.contains("generation: lra_reset::generation(),"));
+    assert!(hook.contains("generation: lra_reset::GENERATION.load(Ordering::Acquire),"));
     assert!(hook.contains("PENDING_GENERATION.store(p.generation, Ordering::Release);"));
     let roster = std::fs::read_to_string(format!("{root}/src/runtime/roster/character_roster.rs")).unwrap();
     let scene = roster.split("pub fn scene_changed(mode: game_mode::Mode) {").nth(1).expect("scene_changed");

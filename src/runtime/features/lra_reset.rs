@@ -30,7 +30,7 @@ pub unsafe fn reset_check(ctx: &mut InlineCtx) {
         menu_open: published::input_owners().contains(crate::model::input_delay::Owners::MENU),
         save_state_loading: super::states::is_loading(),
         install_aborts: crate::runtime::roster::character_roster::install_aborts(),
-        generation: lra_reset::generation(),
+        generation: lra_reset::GENERATION.load(Ordering::Acquire),
         now_ms: crate::runtime::clock::uptime_ms(),
     };
     let since = PENDING_SINCE.load(Ordering::Acquire);
@@ -45,9 +45,7 @@ pub unsafe fn reset_check(ctx: &mut InlineCtx) {
         // A required notice (review R2): Combo Display Off does not clear it. Marked sent only once the mailbox took
         // it, so a full mailbox is retried on the next check.
         let sent = super::notices::post_required(lra_reset::DEFERRED_HEADER, lra_reset::DEFERRED_BODY, 120, crate::model::notify::DEFAULT_COLOR);
-        if let Some(p) = pending.as_mut() {
-            p.notified = sent;
-        }
+        pending.iter_mut().for_each(|p| p.notified = sent);
     }
     match pending {
         Some(p) => {

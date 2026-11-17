@@ -54,17 +54,12 @@ pub fn install_ended_ok(reason: &str) -> bool {
 /// (Training -> CSS -> Training keeps the same mode key; the P1 entry identity ends there) and the Training session
 /// clear. A deferred reset keeps the generation of its press and fires only while it is unchanged, so a lifecycle
 /// exit between two reset checks, or at the settling check itself, drops it. Raised from any thread; the reset hook
-/// stays the deferred record's only reader and writer.
-static GENERATION: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+/// stays the deferred record's only reader and writer (it reads the count with `Acquire`).
+pub static GENERATION: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
 
 /// A lifecycle exit: every deferred reset asked for before it is dropped.
 pub fn lifecycle_exit() {
     GENERATION.fetch_add(1, core::sync::atomic::Ordering::AcqRel);
-}
-
-/// The current lifecycle generation.
-pub fn generation() -> u32 {
-    GENERATION.load(core::sync::atomic::Ordering::Acquire)
 }
 
 /// One deferred reset waiting for the load: when it was asked for, the abort count and lifecycle generation then,
@@ -102,7 +97,7 @@ pub struct Facts {
     pub save_state_loading: bool,
     /// Suspending installs ended without the fighter applied, so far.
     pub install_aborts: u32,
-    /// [`generation`] at this check.
+    /// [`GENERATION`] at this check.
     pub generation: u32,
     pub now_ms: u64,
 }
