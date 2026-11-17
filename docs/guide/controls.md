@@ -92,7 +92,8 @@ On a GameCube controller the plugin reads these buttons in place of the Switch o
 | --- | --- |
 | Save, Load | L + D-pad Down / Up |
 | Record, Play, Recording pop-up | R + D-pad |
-| Cycle Player, Cycle CPU | L + D-pad Left / Right |
+| Cycle Player | L + D-pad Right |
+| Cycle CPU | L + D-pad Left |
 | Input display | Z + D-pad Down |
 | Game speed | Z + D-pad Up |
 
