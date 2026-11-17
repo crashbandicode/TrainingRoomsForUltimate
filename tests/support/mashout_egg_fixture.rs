@@ -90,6 +90,16 @@ static JUDGE_GETTER_GRANTED: AtomicBool = AtomicBool::new(true);
 static JUDGE_FLAG_GRANTED: AtomicBool = AtomicBool::new(true);
 static JUDGE_INT_READS: AtomicUsize = AtomicUsize::new(0);
 static JUDGE_FLAG_READS: AtomicUsize = AtomicUsize::new(0);
+static WORK_GET_INT_GRANTED: AtomicBool = AtomicBool::new(true);
+static WORK_IS_FLAG_GRANTED: AtomicBool = AtomicBool::new(true);
+static HERO_WINDOW_STATE: AtomicU32 = AtomicU32::new(0);
+static HERO_INDEX: AtomicU32 = AtomicU32::new(0);
+static HERO_COMMANDS: [AtomicU32; 4] = [const { AtomicU32::new(0) }; 4];
+static HERO_DECIDE: AtomicU32 = AtomicU32::new(17);
+static HERO_SUCCESS_SP: AtomicBool = AtomicBool::new(false);
+static HERO_INT_READS: AtomicUsize = AtomicUsize::new(0);
+static HERO_FLAG_READS: AtomicUsize = AtomicUsize::new(0);
+static COVERED: AtomicBool = AtomicBool::new(false);
 static P1_AIR: AtomicBool = AtomicBool::new(false);
 static CPU_AIR: AtomicBool = AtomicBool::new(false);
 static P1_STOP: AtomicBool = AtomicBool::new(false);
@@ -151,12 +161,41 @@ mod scene {
 }
 mod natives {
     pub fn is_flag(cpu: usize, id: i32) -> bool {
+        if Some(id) == super::state_id(super::C::HeroSuccessSp) {
+            assert_eq!(cpu, 2);
+            super::HERO_FLAG_READS.fetch_add(1, super::Ordering::Relaxed);
+            return super::HERO_SUCCESS_SP.load(super::Ordering::Relaxed);
+        }
         assert_eq!(cpu, 2);
         assert_eq!(Some(id), super::state_id(super::C::JudgeFixed));
         super::JUDGE_FLAG_READS.fetch_add(1, super::Ordering::Relaxed);
         super::JUDGE_FIXED.load(super::Ordering::Relaxed)
     }
     pub fn get_int(cpu: usize, id: i32) -> i32 {
+        if Some(id) == super::state_id(super::C::HeroWindowState) {
+            assert_eq!(cpu, 2);
+            super::HERO_INT_READS.fetch_add(1, super::Ordering::Relaxed);
+            return super::HERO_WINDOW_STATE.load(super::Ordering::Relaxed) as i32;
+        }
+        if Some(id) == super::state_id(super::C::HeroSelectIndex) {
+            assert_eq!(cpu, 2);
+            super::HERO_INT_READS.fetch_add(1, super::Ordering::Relaxed);
+            return super::HERO_INDEX.load(super::Ordering::Relaxed) as i32;
+        }
+        if Some(id) == super::state_id(super::C::HeroDecideCommand) {
+            assert_eq!(cpu, 2);
+            super::HERO_INT_READS.fetch_add(1, super::Ordering::Relaxed);
+            return super::HERO_DECIDE.load(super::Ordering::Relaxed) as i32;
+        }
+        for (index, command) in [super::C::HeroCommand1, super::C::HeroCommand2,
+            super::C::HeroCommand3, super::C::HeroCommand4].into_iter().enumerate()
+        {
+            if Some(id) == super::state_id(command) {
+                assert_eq!(cpu, 2);
+                super::HERO_INT_READS.fetch_add(1, super::Ordering::Relaxed);
+                return super::HERO_COMMANDS[index].load(super::Ordering::Relaxed) as i32;
+            }
+        }
         if Some(id) == super::state_id(super::C::PickelTrolleyJumpDisable) {
             super::TROLLEY_NATIVE_CALLS.fetch_add(1, super::Ordering::Relaxed);
             super::TROLLEY_INT_READS.fetch_add(1, super::Ordering::Relaxed);
@@ -273,6 +312,12 @@ fn post(e: worker::Event, _: u64) {
 }
 fn state_id(c: C) -> Option<i32> {
     match model::cpu::ids::NAMES[c as usize] {
+        "FIGHTER_KIND_BRAVE" => return Some(0x53),
+        "FIGHTER_STATUS_KIND_SPECIAL_LW" => return Some(479),
+        "FIGHTER_BRAVE_STATUS_KIND_SPECIAL_LW_SELECT" => return Some(493),
+        "FIGHTER_BRAVE_STATUS_KIND_SPECIAL_LW_CANCEL" => return Some(494),
+        "FIGHTER_BRAVE_STATUS_KIND_SPECIAL_LW_FAILURE" => return Some(496),
+        "FIGHTER_BRAVE_STATUS_KIND_SPECIAL_LW_START" => return Some(497),
         "FIGHTER_STATUS_KIND_SPECIAL_N" => return Some(476),
         "FIGHTER_STATUS_KIND_SPECIAL_S" => return Some(477),
         "FIGHTER_LUCAS_STATUS_KIND_SPECIAL_N_HOLD" => return Some(481),
@@ -282,6 +327,16 @@ fn state_id(c: C) -> Option<i32> {
         _ => (),
     }
     Some(match c {
+        C::HeroIceSwordCommand => 17,
+        C::HeroWindowOpen => 3,
+        C::HeroSelectIndex => 0x100000c8,
+        C::HeroDecideCommand => 0x100000c9,
+        C::HeroWindowState => 0x100000d1,
+        C::HeroCommand1 => 0x100000d4,
+        C::HeroCommand2 => 0x100000d5,
+        C::HeroCommand3 => 0x100000d6,
+        C::HeroCommand4 => 0x100000d7,
+        C::HeroSuccessSp => 0x2100000c,
         C::PickelTrolleyFailed => 518,
         C::PickelTrolleyRide => 519,
         C::PickelTrolleyDrive => 520,
@@ -330,6 +385,7 @@ struct Game {
     restore_requested: bool,
     failed: Option<&'static str>,
     trolley: Option<entry::TrolleyEntry>,
+    hero: Option<entry::HeroEntry>,
 }
 impl Game {
     fn new(plan: Plan, state: State) -> Self {
@@ -356,6 +412,7 @@ impl Game {
             restore_requested: false,
             failed: None,
             trolley: None,
+            hero: None,
         }
     }
     fn fail(&mut self, s: &'static str) {
@@ -388,8 +445,9 @@ unsafe fn startup(game: &mut Game, p1: usize) {
 unsafe fn update(game: &mut Game, p1: usize, status: i32, cpu: usize, fighter: usize) {
     let ids = ids();
     let cpu_entry = 1;
+    let covered = COVERED.load(Ordering::Relaxed);
     // LINKS
-    // JUDGE_ADMISSION
+    // ENTRY_ADMISSION
     // SEEDS
     // ENDS
     // RELEASED
@@ -451,6 +509,19 @@ impl NativeMemory {
         JUDGE_FLAG_GRANTED.store(true, Ordering::Relaxed);
         JUDGE_INT_READS.store(0, Ordering::Relaxed);
         JUDGE_FLAG_READS.store(0, Ordering::Relaxed);
+        WORK_GET_INT_GRANTED.store(true, Ordering::Relaxed);
+        WORK_IS_FLAG_GRANTED.store(true, Ordering::Relaxed);
+        HERO_WINDOW_STATE.store(0, Ordering::Relaxed);
+        HERO_INDEX.store(0, Ordering::Relaxed);
+        HERO_COMMANDS[0].store(4, Ordering::Relaxed);
+        HERO_COMMANDS[1].store(17, Ordering::Relaxed);
+        HERO_COMMANDS[2].store(7, Ordering::Relaxed);
+        HERO_COMMANDS[3].store(12, Ordering::Relaxed);
+        HERO_DECIDE.store(17, Ordering::Relaxed);
+        HERO_SUCCESS_SP.store(false, Ordering::Relaxed);
+        HERO_INT_READS.store(0, Ordering::Relaxed);
+        HERO_FLAG_READS.store(0, Ordering::Relaxed);
+        COVERED.store(false, Ordering::Relaxed);
         AIR.store(false, Ordering::Relaxed);
         ROLLER_LR.store(1.0f32.to_bits(), Ordering::Relaxed);
         REQUESTS.with_borrow_mut(Vec::clear);
@@ -932,9 +1003,11 @@ mod game {
         if super::TROLLEY_MISSING_GRANT.load(super::Ordering::Relaxed) == offset { return false; }
         match offset {
             crate::model::sites_pkg2::WORK_IS_FLAG_OFFSET =>
-                super::JUDGE_FLAG_GRANTED.load(super::Ordering::Relaxed),
+                super::WORK_IS_FLAG_GRANTED.load(super::Ordering::Relaxed)
+                    && super::JUDGE_FLAG_GRANTED.load(super::Ordering::Relaxed),
             crate::model::sites_pkg2::WORK_GET_INT_OFFSET =>
-                super::JUDGE_GETTER_GRANTED.load(super::Ordering::Relaxed),
+                super::WORK_GET_INT_GRANTED.load(super::Ordering::Relaxed)
+                    && super::JUDGE_GETTER_GRANTED.load(super::Ordering::Relaxed),
             crate::model::sites_pkg3::STATE_ARTICLE_IS_EXIST_OFFSET
             | crate::model::sites_pkg3::STATE_ARTICLE_GET_ARTICLE_OFFSET
             | crate::model::sites_pkg3::STATE_ARTICLE_OBJECT_ID_OFFSET
@@ -1755,5 +1828,351 @@ fn trolley_actual_victim446_and_positive_native_seed_are_both_required() {
             } else { assert!(g.clock.is_none()); }
             assert_eq!(DRIVEN.with_borrow(|v|*v.last().unwrap()),MappedInputs::NEUTRAL);
         }
+    }
+}
+
+fn hero_read(
+    cpu: usize,
+    status: entry::HeroStatus,
+    index: Option<i32>,
+    commands: Option<[i32; 4]>,
+    success_sp: Option<bool>,
+    decide_command: Option<i32>,
+) -> entry::HeroRead {
+    entry::HeroRead {
+        readers_ready: true,
+        cpu,
+        status,
+        ice_sword_command: 17,
+        window_state: Some(3),
+        index,
+        commands,
+        success_sp,
+        decide_command,
+    }
+}
+
+#[test]
+fn hero_actor_navigates_all_four_slots_with_down_ack_neutral_and_one_confirm() {
+    for target in 0..4 {
+        for start in 0usize..4 {
+            let mut commands = [2, 5, 9, 14];
+            commands[target] = 17;
+            let mut actor = entry::HeroEntry::new(2).unwrap();
+            let (first, _) = actor.observe(hero_read(
+                2, entry::HeroStatus::Select, Some(start as i32), Some(commands), None, None,
+            )).unwrap();
+            let mut downs = 0;
+            let mut index = start;
+            if start == target {
+                assert_eq!((first.buttons, first.lstick_y), (0x2, 0));
+            } else {
+                assert_eq!((first.buttons, first.lstick_y), (0, -120));
+                downs += 1;
+                loop {
+                    let (neutral, _) = actor.observe(hero_read(
+                        2, entry::HeroStatus::Select, Some(index as i32), Some(commands), None, None,
+                    )).unwrap();
+                    assert_eq!(neutral, MappedInputs::NEUTRAL, "old index waits for native ack");
+                    index = (index + 1) % 4;
+                    let (neutral, _) = actor.observe(hero_read(
+                        2, entry::HeroStatus::Select, Some(index as i32), Some(commands), None, None,
+                    )).unwrap();
+                    assert_eq!(neutral, MappedInputs::NEUTRAL, "fresh down edge is released");
+                    if index == target {
+                        let (confirm, _) = actor.observe(hero_read(
+                            2, entry::HeroStatus::Select, Some(index as i32), Some(commands), None, None,
+                        )).unwrap();
+                        assert_eq!((confirm.buttons, confirm.lstick_y), (0x2, 0));
+                        break;
+                    }
+                    let (down, _) = actor.observe(hero_read(
+                        2, entry::HeroStatus::Select, Some(index as i32), Some(commands), None, None,
+                    )).unwrap();
+                    assert_eq!((down.buttons, down.lstick_y), (0, -120));
+                    downs += 1;
+                }
+            }
+            assert_eq!(downs, (target + 4 - start) % 4);
+            let (neutral, outcome) = actor.observe(hero_read(
+                2, entry::HeroStatus::Start, None, None, Some(true), Some(17),
+            )).unwrap();
+            assert_eq!(neutral, MappedInputs::NEUTRAL);
+            assert_eq!(outcome, entry::HeroOutcome::Confirmed);
+            assert!(actor.confirmed());
+            let (neutral, outcome) = actor.observe(hero_read(
+                2, entry::HeroStatus::Other, None, None, None, None,
+            )).unwrap();
+            assert_eq!(neutral, MappedInputs::NEUTRAL);
+            assert_eq!(outcome, entry::HeroOutcome::Confirmed);
+        }
+    }
+}
+
+#[test]
+fn hero_actor_refuses_invalid_menu_and_requires_native_success_and_command17() {
+    let mut actor = entry::HeroEntry::new(2).unwrap();
+    let mut invalid_window = hero_read(
+        2, entry::HeroStatus::Select, None, None, None, None,
+    );
+    invalid_window.window_state = Some(-99);
+    assert_eq!(actor.observe(invalid_window), Err(entry::HeroError::Unavailable));
+
+    let invalid = hero_read(
+        2, entry::HeroStatus::Select, Some(0), Some([1, 2, 21, 4]), None, None,
+    );
+    assert_eq!(actor.observe(invalid), Err(entry::HeroError::Unavailable));
+
+    for (success_sp, decide) in [(false, 17), (true, 18)] {
+        let mut actor = entry::HeroEntry::new(2).unwrap();
+        let (special, _) = actor.observe(hero_read(
+            2, entry::HeroStatus::Select, Some(1), Some([4, 17, 8, 12]), None, None,
+        )).unwrap();
+        assert_eq!(special.buttons, 0x2);
+        let (neutral, outcome) = actor.observe(hero_read(
+            2, entry::HeroStatus::Start, None, None, Some(success_sp), Some(decide),
+        )).unwrap();
+        assert_eq!(neutral, MappedInputs::NEUTRAL);
+        assert_eq!(outcome, entry::HeroOutcome::Rejected);
+        assert!(!actor.confirmed());
+    }
+}
+
+unsafe fn hero(m: &mut NativeMemory) -> Game {
+    let mut game = Game::new(Plan::Hero, State::Frozen);
+    let request = game.requested.as_mut().unwrap();
+    request.id = 110;
+    request.attacker_kind = 0x53;
+    request.attacker_name = "Hero";
+    request.name = "Command18";
+    request.evidence = "F01";
+    m.body[3] = 0x53;
+    game.step = Step::Settle;
+    CPU_STATUS.store(0, Ordering::Relaxed);
+    m.update(&mut game, 0);
+    assert_eq!(game.step, Step::Entering);
+    assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 479)]);
+    CPU_STATUS.store(479, Ordering::Relaxed);
+    m.update(&mut game, 0);
+    game
+}
+
+fn hero_menu(index: u32, commands: [u32; 4]) {
+    HERO_WINDOW_STATE.store(3, Ordering::Relaxed);
+    HERO_INDEX.store(index, Ordering::Relaxed);
+    for (slot, value) in HERO_COMMANDS.iter().zip(commands) {
+        slot.store(value, Ordering::Relaxed);
+    }
+}
+
+#[test]
+fn hero_runtime_reads_only_open3_mirrors_and_accepts_actual_success_start_decide17_seed() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut game = hero(&mut m);
+        assert_eq!(HERO_INT_READS.load(Ordering::Relaxed), 0);
+        CPU_STATUS.store(493, Ordering::Relaxed);
+        HERO_WINDOW_STATE.store(2, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(HERO_INT_READS.load(Ordering::Relaxed), 1, "only WINDOW_STATE before OPEN3");
+        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
+
+        hero_menu(3, [17, 5, 9, 14]);
+        m.update(&mut game, 0);
+        assert_eq!(HERO_INT_READS.load(Ordering::Relaxed), 7, "window, index, and all four native mirrors");
+        let down = DRIVEN.with_borrow(|v| *v.last().unwrap());
+        assert_eq!((down.buttons, down.lstick_y), (0, -120));
+        HERO_INDEX.store(0, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
+        m.update(&mut game, 0);
+        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs { buttons: 2, ..MappedInputs::NEUTRAL });
+        assert_eq!(DRIVEN.with_borrow(|v| v.iter().filter(|i| i.buttons == 2).count()), 1);
+
+        let reads_before_closed_window = HERO_INT_READS.load(Ordering::Relaxed);
+        HERO_WINDOW_STATE.store(4, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(HERO_INT_READS.load(Ordering::Relaxed), reads_before_closed_window + 1,
+            "closed window reads only WINDOW_STATE, not index or command mirrors");
+        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
+        assert!(!game.hero.unwrap().confirmed(), "closed menu is not native confirmation");
+
+        HERO_SUCCESS_SP.store(true, Ordering::Relaxed);
+        HERO_DECIDE.store(17, Ordering::Relaxed);
+        CPU_STATUS.store(497, Ordering::Relaxed);
+        m.seed(73.25, 1.75, 2);
+        m.start();
+        m.update(&mut game, 203);
+        assert_eq!(game.step, Step::Held);
+        assert!(game.followed);
+        assert!(game.hero.is_some_and(|actor| actor.confirmed()));
+        assert_eq!(HERO_FLAG_READS.load(Ordering::Relaxed), 1);
+        assert_eq!(BEGINS.with_borrow(|v| v.len()), 1);
+        assert_eq!(BEGINS.with_borrow(|v| v[0].0.0), 110);
+        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
+    }
+}
+
+#[test]
+fn hero_closed_confirm_window_does_not_accept_premature_seed() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut game = hero(&mut m);
+        CPU_STATUS.store(493, Ordering::Relaxed);
+        hero_menu(1, [4, 17, 8, 12]);
+        m.update(&mut game, 0);
+        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()).buttons, 2);
+
+        let reads_before_closed_window = HERO_INT_READS.load(Ordering::Relaxed);
+        HERO_WINDOW_STATE.store(4, Ordering::Relaxed);
+        m.seed(73.25, 1.75, 2);
+        m.start();
+        m.update(&mut game, 203);
+        assert_eq!(HERO_INT_READS.load(Ordering::Relaxed), reads_before_closed_window + 1,
+            "closed confirmation window reads no index or command mirrors");
+        assert_eq!(game.failed, Some("Move entry unconfirmed · no grade"));
+        assert!(game.hero.is_some_and(|actor| !actor.confirmed()));
+        assert!(QUEUE.with_borrow(Vec::is_empty));
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+    }
+}
+
+#[test]
+fn hero_covered_edge_neutralizes_without_advancing_and_retries_same_edge() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut game = hero(&mut m);
+        CPU_STATUS.store(493, Ordering::Relaxed);
+        hero_menu(3, [17, 5, 9, 14]);
+        DRIVEN.with_borrow_mut(|v| v.push(MappedInputs { buttons: 2, ..MappedInputs::NEUTRAL }));
+
+        COVERED.store(true, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL,
+            "covered proposed Down edge must release the prior CPU input");
+        assert!(game.hero.is_some(), "the previously committed actor remains available");
+        assert_eq!(game.failed, None);
+
+        COVERED.store(false, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs { lstick_y: -120, ..MappedInputs::NEUTRAL },
+            "same native menu retries the first Down edge, proving blocked observation did not advance the actor");
+        assert!(game.hero.is_some());
+    }
+}
+
+#[test]
+fn hero_covered_edge_still_drains_and_refuses_unconfirmed_seed() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut game = hero(&mut m);
+        CPU_STATUS.store(493, Ordering::Relaxed);
+        hero_menu(3, [17, 5, 9, 14]);
+        COVERED.store(true, Ordering::Relaxed);
+        m.seed(73.25, 1.75, 2);
+        m.start();
+        assert_eq!(QUEUE.with_borrow(Vec::len), 1);
+
+        m.update(&mut game, 203);
+        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
+        assert!(game.hero.is_some_and(|actor| !actor.confirmed()), "unissued edge cannot confirm the actor");
+        assert_eq!(game.failed, Some("Move entry unconfirmed · no grade"),
+            "covered admission must continue into the existing seed refusal");
+        assert!(QUEUE.with_borrow(Vec::is_empty), "queued seed was drained");
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+    }
+}
+
+#[test]
+fn hero_absent_command18_is_not_icesword_guard_cancel_ack_retries_selected110() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut game = hero(&mut m);
+        CPU_STATUS.store(493, Ordering::Relaxed);
+        hero_menu(3, [18, 5, 9, 14]);
+        m.update(&mut game, 0);
+        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs { buttons: 0x8, ..MappedInputs::NEUTRAL });
+        assert_eq!(game.step, Step::Entering);
+        let reads_before_closed_window = HERO_INT_READS.load(Ordering::Relaxed);
+        HERO_WINDOW_STATE.store(1, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(HERO_INT_READS.load(Ordering::Relaxed), reads_before_closed_window + 1,
+            "CancelPending CLOSING reads no menu mirrors");
+        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
+        assert_eq!(game.step, Step::Entering, "closed window is not cancel acknowledgment");
+        assert_eq!(game.failed, None);
+
+        CPU_STATUS.store(494, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(game.step, Step::Retry);
+        assert_eq!(game.failed, None);
+        assert_eq!(game.requested.unwrap().id, 110);
+        assert_eq!(BEGINS.with_borrow(Vec::len), 0);
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(game.step, Step::Reload);
+        assert_eq!(game.requested.unwrap().id, 110);
+        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 479)]);
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+    }
+}
+
+#[test]
+fn hero_native_failure_wrong_body_and_missing_work_grants_never_begin() {
+    unsafe {
+        for (case, value) in [("sp", 496u32), ("wrong-decide", 497u32)] {
+            let mut m = NativeMemory::new();
+            let mut game = hero(&mut m);
+            CPU_STATUS.store(493, Ordering::Relaxed);
+            hero_menu(1, [4, 17, 8, 12]);
+            m.update(&mut game, 0);
+            if case == "sp" {
+                CPU_STATUS.store(value, Ordering::Relaxed);
+            } else {
+                HERO_SUCCESS_SP.store(true, Ordering::Relaxed);
+                HERO_DECIDE.store(18, Ordering::Relaxed);
+                CPU_STATUS.store(value, Ordering::Relaxed);
+            }
+            m.seed(73.25, 1.75, 2);
+            m.start();
+            m.update(&mut game, 203);
+            assert_eq!(game.failed, Some("Move entry unconfirmed · no grade"), "{case}");
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+        }
+
+        let mut m = NativeMemory::new();
+        let mut game = hero(&mut m);
+        CPU_STATUS.store(493, Ordering::Relaxed);
+        hero_menu(1, [4, 17, 8, 12]);
+        WORK_GET_INT_GRANTED.store(false, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(game.failed, Some(UNAVAILABLE_NOTICE));
+        assert_eq!(HERO_INT_READS.load(Ordering::Relaxed), 0);
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+
+        let mut m = NativeMemory::new();
+        let mut game = hero(&mut m);
+        CPU_STATUS.store(493, Ordering::Relaxed);
+        hero_menu(1, [4, 17, 8, 12]);
+        m.update(&mut game, 0);
+        WORK_IS_FLAG_GRANTED.store(false, Ordering::Relaxed);
+        HERO_SUCCESS_SP.store(true, Ordering::Relaxed);
+        CPU_STATUS.store(497, Ordering::Relaxed);
+        m.seed(73.25, 1.75, 2);
+        m.start();
+        m.update(&mut game, 203);
+        assert_eq!(game.failed, Some(UNAVAILABLE_NOTICE));
+        assert_eq!(HERO_FLAG_READS.load(Ordering::Relaxed), 0);
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+
+        let mut m = NativeMemory::new();
+        let mut game = hero(&mut m);
+        m.body[3] = 0x1c;
+        CPU_STATUS.store(493, Ordering::Relaxed);
+        hero_menu(1, [4, 17, 8, 12]);
+        m.update(&mut game, 0);
+        assert_eq!(game.failed, Some("Attacker changed · no grade"));
+        assert_eq!(HERO_INT_READS.load(Ordering::Relaxed), 0);
+        assert!(BEGINS.with_borrow(Vec::is_empty));
     }
 }

@@ -129,9 +129,25 @@ fn cpu_ids_resolve_asks_by_hash_and_lists_the_missing() {
 
 #[test]
 fn mash_entry_constants_resolve_against_pinned_native_names() {
-    // Native lua_const.rs bindings, independently frozen in rc15-mashout/trolley97-implementation/
-    // CODE-REVIEW-BINDINGS.json; runtime fixtures deliberately use synthetic ids.
+    // Native lua_const.rs bindings; Hero110 values are retained in
+    // artifacts/rc15-mashout/hero110-native-entry/CONSTANTS.json. Fixtures use synthetic ids.
     let native = [
+        (C::KindBrave, "FIGHTER_KIND_BRAVE", 0x53),
+        (C::StatusSpecialLw, "FIGHTER_STATUS_KIND_SPECIAL_LW", 479),
+        (C::HeroIceSwordCommand, "FIGHTER_BRAVE_SPECIAL_LW_COMMAND18_ICESWORD", 0x11),
+        (C::HeroSelect, "FIGHTER_BRAVE_STATUS_KIND_SPECIAL_LW_SELECT", 493),
+        (C::HeroCancel, "FIGHTER_BRAVE_STATUS_KIND_SPECIAL_LW_CANCEL", 494),
+        (C::HeroFailure, "FIGHTER_BRAVE_STATUS_KIND_SPECIAL_LW_FAILURE", 496),
+        (C::HeroStart, "FIGHTER_BRAVE_STATUS_KIND_SPECIAL_LW_START", 497),
+        (C::HeroWindowOpen, "FIGHTER_BRAVE_COMMAND_WINDOW_STATE_OPEN", 3),
+        (C::HeroSelectIndex, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_SELECT_INDEX", 0x100000c8),
+        (C::HeroDecideCommand, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_DECIDE_COMMAND", 0x100000c9),
+        (C::HeroWindowState, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_WINDOW_STATE", 0x100000d1),
+        (C::HeroCommand1, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_COMMAND_LIST_01_FOR_AI", 0x100000d4),
+        (C::HeroCommand2, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_COMMAND_LIST_02_FOR_AI", 0x100000d5),
+        (C::HeroCommand3, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_COMMAND_LIST_03_FOR_AI", 0x100000d6),
+        (C::HeroCommand4, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_COMMAND_LIST_04_FOR_AI", 0x100000d7),
+        (C::HeroSuccessSp, "FIGHTER_BRAVE_STATUS_SPECIAL_LW_FLAG_SUCCESS_SP", 0x2100000c),
         (C::PickelTrolleyFailed, "FIGHTER_PICKEL_STATUS_KIND_SPECIAL_S_FAILED", 0x206),
         (C::PickelTrolleyRide, "FIGHTER_PICKEL_STATUS_KIND_SPECIAL_S_RIDE", 0x207),
         (C::PickelTrolleyDrive, "FIGHTER_PICKEL_STATUS_KIND_SPECIAL_S_DRIVE", 0x208),
@@ -151,6 +167,7 @@ fn mash_entry_constants_resolve_against_pinned_native_names() {
         assert!(table.resolved(constant), "{name}");
         assert_eq!(table.get(constant), value, "{name}");
     }
+    assert_eq!(model::mashout::entry::HERO_COMMAND_COUNT, 0x15);
     // The previously authored spelling must not resolve to the native counter.
     assert_ne!(lua_bind_hash("WEAPON_PICKEL_TROLLEY_INSTANCE_WORK_ID_INT_JUMP_DISABLE_FRAME"),
         lua_bind_hash(ids::NAMES[C::PickelTrolleyJumpDisable as usize]));

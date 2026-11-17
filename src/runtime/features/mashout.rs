@@ -311,6 +311,7 @@ struct Game {
     followed: bool,
     restore_requested: bool,
     trolley: Option<entry::TrolleyEntry>,
+    hero: Option<entry::HeroEntry>,
 }
 impl Game {
     const fn new() -> Self {
@@ -329,6 +330,7 @@ impl Game {
             followed: false,
             restore_requested: false,
             trolley: None,
+            hero: None,
         }
     }
     fn step(&mut self, next: Step, text: &'static str) {
@@ -573,6 +575,7 @@ pub unsafe fn frame(fighter: usize) {
         game.generation = GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
         game.config = config;
         game.clock = None;
+        game.hero = None;
         game.restore_requested = false;
         game.step(
             if linked {
@@ -625,24 +628,128 @@ pub unsafe fn frame(fighter: usize) {
             );
         }
     });
-    if game.step == Step::Entering
-        && game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Judge)
-    {
-        match judge_choice(cpu, &mut game.followed) {
-            Err(_) => { game.fail(UNAVAILABLE_NOTICE); return; }
-            Ok(Some(false)) => {
-                // A positively observed other roll is uncounted. Keep this selected
-                // move through native release, including when catalog Random chose it.
-                revoke();
-                game.clock = None;
-                game.step(Step::Retry, "Mash out · Waiting for release");
-                #[cfg(feature = "diag")]
-                crate::runtime::diag_log::enqueue_diagnostic(format_args!(
-                    "[Mashout] outcome=other gen={} move=111", game.generation
-                ));
+    if game.step == Step::Entering {
+        if game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Judge) {
+            match judge_choice(cpu, &mut game.followed) {
+                Err(_) => { game.fail(UNAVAILABLE_NOTICE); return; }
+                Ok(Some(false)) => {
+                    // A positively observed other roll is uncounted. Keep this selected
+                    // move through native release, including when catalog Random chose it.
+                    revoke();
+                    game.clock = None;
+                    game.step(Step::Retry, "Mash out · Waiting for release");
+                    #[cfg(feature = "diag")]
+                    crate::runtime::diag_log::enqueue_diagnostic(format_args!(
+                        "[Mashout] outcome=other gen={} move=111", game.generation
+                    ));
+                    return;
+                }
+                _ => (),
+            }
+        }
+        let Some(request) = game.requested else { return; };
+        if request.plan == crate::model::mashout::moves::Plan::Hero {
+            let [Some(brave), Some(special_lw), Some(select), Some(cancel), Some(start), Some(failure),
+                Some(window_open), Some(ice_sword), Some(index), Some(decide), Some(window),
+                Some(command1), Some(command2), Some(command3), Some(command4), Some(success)] = [
+                C::KindBrave, C::StatusSpecialLw, C::HeroSelect, C::HeroCancel, C::HeroStart,
+                C::HeroFailure, C::HeroWindowOpen, C::HeroIceSwordCommand, C::HeroSelectIndex,
+                C::HeroDecideCommand, C::HeroWindowState, C::HeroCommand1, C::HeroCommand2,
+                C::HeroCommand3, C::HeroCommand4, C::HeroSuccessSp,
+            ].map(state_id) else {
+                game.fail(UNAVAILABLE_NOTICE);
+                return;
+            };
+            let body = natives::entry_active_body(natives::fighter_entry(cpu_entry));
+            if body == 0
+                || ((body + 0xc) as *const u32).read() != request.attacker_kind
+                || request.attacker_kind != brave as u32
+            {
+                game.fail("Attacker changed · no grade");
                 return;
             }
-            _ => (),
+            let cpu_status = natives::status_kind(cpu);
+            let status = if cpu_status == special_lw { entry::HeroStatus::SpecialLw }
+                else if cpu_status == select { entry::HeroStatus::Select }
+                else if cpu_status == cancel { entry::HeroStatus::Cancel }
+                else if cpu_status == start { entry::HeroStatus::Start }
+                else if cpu_status == failure { entry::HeroStatus::Failure }
+                else { entry::HeroStatus::Other };
+            let reads_int = status == entry::HeroStatus::Select || status == entry::HeroStatus::Start;
+            if reads_int && !game::granted(crate::model::sites_pkg2::WORK_GET_INT_OFFSET) {
+                game.fail(UNAVAILABLE_NOTICE);
+                return;
+            }
+            if status == entry::HeroStatus::Start
+                && !game::granted(crate::model::sites_pkg2::WORK_IS_FLAG_OFFSET)
+            {
+                game.fail(UNAVAILABLE_NOTICE);
+                return;
+            }
+            let mut read = entry::HeroRead {
+                readers_ready: true,
+                cpu,
+                status,
+                ice_sword_command: ice_sword,
+                window_state: None,
+                index: None,
+                commands: None,
+                success_sp: None,
+                decide_command: None,
+            };
+            if status == entry::HeroStatus::Select {
+                let window_state = natives::get_int(cpu, window);
+                read.window_state = Some(window_state);
+                if window_state == window_open {
+                    read.index = Some(natives::get_int(cpu, index));
+                    read.commands = Some([
+                        natives::get_int(cpu, command1),
+                        natives::get_int(cpu, command2),
+                        natives::get_int(cpu, command3),
+                        natives::get_int(cpu, command4),
+                    ]);
+                }
+            }
+            if status == entry::HeroStatus::Start {
+                read.success_sp = Some(natives::is_flag(cpu, success));
+                read.decide_command = Some(natives::get_int(cpu, decide));
+            }
+            let Some(mut actor) = game.hero.or_else(|| entry::HeroEntry::new(cpu)) else {
+                game.fail(UNAVAILABLE_NOTICE);
+                return;
+            };
+            match actor.observe(read) {
+                Err(_) => { game.fail(UNAVAILABLE_NOTICE); return; }
+                Ok((input, outcome)) => {
+                    // The existing setup coverage gate replaces blocked inputs with
+                    // neutral later in this frame. Keep the actor uncommitted until
+                    // its proposed edge can actually be sent, but still drain seeds/ends.
+                    if covered && input != MappedInputs::NEUTRAL {
+                        drive(MappedInputs::NEUTRAL);
+                    } else {
+                        game.hero = Some(actor);
+                        drive(input);
+                        match outcome {
+                            entry::HeroOutcome::Pending => (),
+                            entry::HeroOutcome::Confirmed => game.followed = true,
+                            entry::HeroOutcome::Cancelled => {
+                                revoke();
+                                game.clock = None;
+                                game.step(Step::Retry, "Mash out · Waiting for release");
+                                #[cfg(feature = "diag")]
+                                crate::runtime::diag_log::enqueue_diagnostic(format_args!(
+                                    "[Mashout] outcome=other gen={} move=110", game.generation
+                                ));
+                                return;
+                            }
+                            entry::HeroOutcome::Rejected => {
+                                game.fail("Move entry unconfirmed · no grade");
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     SEEDS.drain(|NativeSeed { generation, epoch, origin, sample }| {
@@ -663,6 +770,11 @@ pub unsafe fn frame(fighter: usize) {
         let Some(sample) = sample else { game.fail("Native capture seed unavailable · no grade"); return; };
         if game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Judge)
             && judge_choice(cpu, &mut game.followed) != Ok(Some(true))
+        {
+            game.fail("Move entry unconfirmed · no grade"); return;
+        }
+        if game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Hero)
+            && !game.hero.is_some_and(|actor| actor.confirmed())
         {
             game.fail("Move entry unconfirmed · no grade"); return;
         }
@@ -748,6 +860,7 @@ pub unsafe fn frame(fighter: usize) {
             game.saw_catch = false;
             game.followed = false;
             game.trolley = None;
+            game.hero = None;
             game.step(Step::Reload, "Mash out · Setting up");
         }
         Step::Retry => (),
@@ -777,6 +890,7 @@ pub unsafe fn frame(fighter: usize) {
             game.saw_catch = false;
             game.followed = false;
             game.trolley = None;
+            game.hero = None;
             revoke();
             game.step = Step::Reload;
             post(
@@ -933,7 +1047,9 @@ pub unsafe fn frame(fighter: usize) {
                 }
                 return;
             }
-            drive(entry::controls(request.plan, game.followed));
+            if request.plan != crate::model::mashout::moves::Plan::Hero {
+                drive(entry::controls(request.plan, game.followed));
+            }
             game.saw_catch |= cpu_status != ids[0];
             if request.plan == crate::model::mashout::moves::Plan::Roller {
                 let mut input = MappedInputs::NEUTRAL;

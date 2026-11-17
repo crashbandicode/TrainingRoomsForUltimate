@@ -18,13 +18,209 @@ pub fn start(move_: Scenario) -> Option<&'static str> {
             "FIGHTER_STATUS_KIND_SPECIAL_N"
         }
         Plan::UpSpecial => "FIGHTER_STATUS_KIND_SPECIAL_HI",
-        Plan::Drain | Plan::Blizzard | Plan::Flip => "FIGHTER_STATUS_KIND_SPECIAL_LW",
+        Plan::Drain | Plan::Blizzard | Plan::Flip | Plan::Hero => "FIGHTER_STATUS_KIND_SPECIAL_LW",
         Plan::DownTilt => "FIGHTER_STATUS_KIND_ATTACK_LW3",
         Plan::DownSmash => "FIGHTER_STATUS_KIND_ATTACK_LW4_START",
         Plan::Jab3 => "FIGHTER_STATUS_KIND_ATTACK",
         // These need their verified native sequence, loadout or meter setup before admission.
         _ => return None,
     })
+}
+
+// The stock Brave menu mirrors four native command enums into work IDs. The
+// value named COMMAND18_ICESWORD is 17; COMMAND_NUM is 21, so valid entries are
+// 0..20 and the native COMMAND_NONE sentinel is not a menu choice.
+pub const HERO_COMMAND_COUNT: i32 = 0x15;
+const HERO_WINDOW_OPEN: i32 = 3;
+const HERO_INPUT_SPECIAL: u32 = 0x2;
+// src/runtime/compat/input.rs documents the mapped guard bit as 0x8.
+const HERO_INPUT_GUARD: u32 = 0x8;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HeroStatus { SpecialLw, Select, Cancel, Start, Failure, Other }
+
+/// Only populated from granted native reads on the current CPU body. Menu
+/// fields are read only when the observed window is OPEN3.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HeroRead {
+    pub readers_ready: bool,
+    pub cpu: usize,
+    pub status: HeroStatus,
+    pub ice_sword_command: i32,
+    pub window_state: Option<i32>,
+    pub index: Option<i32>,
+    pub commands: Option<[i32; 4]>,
+    pub success_sp: Option<bool>,
+    pub decide_command: Option<i32>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HeroOutcome { Pending, Confirmed, Cancelled, Rejected }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HeroError { Unavailable }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum HeroPhase {
+    AwaitMenu,
+    Navigating { target: usize, commands: [i32; 4], from: usize },
+    AfterMove { target: usize, commands: [i32; 4], index: usize },
+    ConfirmPending { target: usize, commands: [i32; 4] },
+    CancelPending,
+    Confirmed,
+    Rejected,
+}
+
+/// Follows the stock Brave menu using observed SELECT state and mapped input.
+/// It never writes status, work values, resources or a victim state.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HeroEntry {
+    cpu: usize,
+    phase: HeroPhase,
+}
+
+impl HeroEntry {
+    pub fn new(cpu: usize) -> Option<Self> {
+        (cpu != 0).then_some(Self { cpu, phase: HeroPhase::AwaitMenu })
+    }
+
+    pub fn confirmed(&self) -> bool { self.phase == HeroPhase::Confirmed }
+
+    fn menu(read: HeroRead) -> Result<Option<(usize, [i32; 4])>, HeroError> {
+        let window = read.window_state.ok_or(HeroError::Unavailable)?;
+        if !(0..=4).contains(&window) { return Err(HeroError::Unavailable); }
+        if window != HERO_WINDOW_OPEN { return Ok(None); }
+        let index = read.index.ok_or(HeroError::Unavailable)?;
+        let commands = read.commands.ok_or(HeroError::Unavailable)?;
+        if !(0..4).contains(&index)
+            || commands.iter().any(|command| !(0..HERO_COMMAND_COUNT).contains(command))
+        { return Err(HeroError::Unavailable); }
+        Ok(Some((index as usize, commands)))
+    }
+
+    fn input(buttons: u32, lstick_y: i8) -> MappedInputs {
+        MappedInputs { buttons, lstick_y, ..MappedInputs::NEUTRAL }
+    }
+
+    fn answer(input: MappedInputs, outcome: HeroOutcome) -> Result<(MappedInputs, HeroOutcome), HeroError> {
+        Ok((input, outcome))
+    }
+
+    fn reject(&mut self) -> Result<(MappedInputs, HeroOutcome), HeroError> {
+        self.phase = HeroPhase::Rejected;
+        Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Rejected)
+    }
+
+    fn checked_menu(read: HeroRead, commands: [i32; 4]) -> Result<usize, HeroError> {
+        if read.status != HeroStatus::Select { return Err(HeroError::Unavailable); }
+        let Some((index, observed)) = Self::menu(read)? else { return Err(HeroError::Unavailable); };
+        if observed != commands { return Err(HeroError::Unavailable); }
+        Ok(index)
+    }
+
+    /// Return exactly one mapped record and an outcome backed by native status,
+    /// menu, success flag and selected command observations.
+    pub fn observe(&mut self, read: HeroRead) -> Result<(MappedInputs, HeroOutcome), HeroError> {
+        if !read.readers_ready || read.cpu != self.cpu
+            || !(0..HERO_COMMAND_COUNT).contains(&read.ice_sword_command)
+        { return Err(HeroError::Unavailable); }
+        use HeroPhase::*;
+        use HeroStatus::*;
+        match self.phase {
+            Confirmed => Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Confirmed),
+            Rejected => Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Rejected),
+            AwaitMenu => match read.status {
+                SpecialLw | Other => Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Pending),
+                Failure => self.reject(),
+                Cancel => Err(HeroError::Unavailable),
+                Start => self.reject(),
+                Select => {
+                    let Some((index, commands)) = Self::menu(read)? else {
+                        return Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Pending);
+                    };
+                    let Some(target) = commands.iter().position(|command| *command == read.ice_sword_command) else {
+                        self.phase = CancelPending;
+                        return Self::answer(Self::input(HERO_INPUT_GUARD, 0), HeroOutcome::Pending);
+                    };
+                    if index == target {
+                        self.phase = ConfirmPending { target, commands };
+                        Self::answer(Self::input(HERO_INPUT_SPECIAL, 0), HeroOutcome::Pending)
+                    } else {
+                        self.phase = Navigating { target, commands, from: index };
+                        Self::answer(Self::input(0, -120), HeroOutcome::Pending)
+                    }
+                }
+            },
+            Navigating { target, commands, from } => match read.status {
+                Failure => self.reject(),
+                Select => {
+                    let index = Self::checked_menu(read, commands)?;
+                    if index == from {
+                        Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Pending)
+                    } else if index == (from + 1) % 4 {
+                        self.phase = AfterMove { target, commands, index };
+                        Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Pending)
+                    } else {
+                        Err(HeroError::Unavailable)
+                    }
+                }
+                _ => Err(HeroError::Unavailable),
+            },
+            AfterMove { target, commands, index: expected } => match read.status {
+                Failure => self.reject(),
+                Select => {
+                    let index = Self::checked_menu(read, commands)?;
+                    if index != expected { return Err(HeroError::Unavailable); }
+                    if index == target {
+                        self.phase = ConfirmPending { target, commands };
+                        Self::answer(Self::input(HERO_INPUT_SPECIAL, 0), HeroOutcome::Pending)
+                    } else {
+                        self.phase = Navigating { target, commands, from: index };
+                        Self::answer(Self::input(0, -120), HeroOutcome::Pending)
+                    }
+                }
+                _ => Err(HeroError::Unavailable),
+            },
+            ConfirmPending { target, commands } => match read.status {
+                Failure => self.reject(),
+                Select => {
+                    if read.window_state == Some(4) {
+                        return Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Pending);
+                    }
+                    let index = Self::checked_menu(read, commands)?;
+                    if index != target { return Err(HeroError::Unavailable); }
+                    Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Pending)
+                }
+                Start => {
+                    if read.success_sp == Some(true)
+                        && read.decide_command == Some(read.ice_sword_command)
+                    {
+                        self.phase = Confirmed;
+                        Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Confirmed)
+                    } else {
+                        self.reject()
+                    }
+                }
+                Other => Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Pending),
+                _ => Err(HeroError::Unavailable),
+            },
+            CancelPending => match read.status {
+                Cancel => Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Cancelled),
+                Failure => self.reject(),
+                Select => {
+                    match read.window_state {
+                        Some(1) => Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Pending),
+                        Some(HERO_WINDOW_OPEN) => {
+                            let _ = Self::menu(read)?;
+                            Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Pending)
+                        }
+                        _ => Err(HeroError::Unavailable),
+                    }
+                }
+                _ => Err(HeroError::Unavailable),
+            },
+        }
+    }
 }
 
 /// Judge INIT clears FIX_PANEL; ACMD fixes the natural choice at frame16.

@@ -114,7 +114,7 @@ fn actual_runtime_egg_preparation_and_native_seed() {
         }),
         ("// JUDGE_CHOICE", block(runtime, "unsafe fn judge_choice(").to_string()),
         ("// TROLLEY_INPUT", block(runtime, "unsafe fn trolley_input(").to_string()),
-        ("// JUDGE_ADMISSION", block(runtime, "if game.step == Step::Entering").to_string()),
+        ("// ENTRY_ADMISSION", block(runtime, "if game.step == Step::Entering").to_string()),
         ("// RETRY", {
             let start = runtime.find("Step::Retry if released => {").unwrap();
             let end = start + runtime[start..].find("Step::Choose => {").unwrap();
