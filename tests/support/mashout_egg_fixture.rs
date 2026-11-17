@@ -119,6 +119,25 @@ thread_local! {
     static BEGINS: RefCell<Vec<(worker::Key, Seed, u64, SeedOrigin)>> = const { RefCell::new(Vec::new()) };
     static REQUESTS: RefCell<Vec<(usize,i32)>> = const { RefCell::new(Vec::new()) };
     static DRIVEN: RefCell<Vec<MappedInputs>> = const { RefCell::new(Vec::new()) };
+    // Shim of the runtime's olimar_pikmin (Save-State respawn/line natives); None models an unavailable native or constant.
+    static PIKMIN_LINE: RefCell<Option<[Option<i32>; 3]>> = const { RefCell::new(Some([Some(1), Some(2), Some(3)])) };
+    static PIKMIN_READS: RefCell<Vec<[Option<i32>; 3]>> = const { RefCell::new(Vec::new()) };
+    static RESPAWNS: RefCell<Vec<[Option<i32>; 3]>> = const { RefCell::new(Vec::new()) };
+}
+static LINE_READS: AtomicUsize = AtomicUsize::new(0);
+unsafe fn olimar_pikmin(cpu: usize, line: Option<[Option<i32>; 3]>) -> Option<[Option<i32>; 3]> {
+    assert_eq!(cpu, 2);
+    PIKMIN_LINE.with_borrow(|l| *l)?;
+    if let Some(line) = line {
+        RESPAWNS.with_borrow_mut(|r| r.push(line));
+        PIKMIN_LINE.set(Some(line));
+    } else {
+        LINE_READS.fetch_add(1, Ordering::Relaxed);
+        if let Some(forced) = PIKMIN_READS.with_borrow_mut(|q| (!q.is_empty()).then(|| q.remove(0))) {
+            return Some(forced);
+        }
+    }
+    PIKMIN_LINE.with_borrow(|l| *l)
 }
 struct Mailbox;
 static SEEDS: Mailbox = Mailbox;
@@ -458,7 +477,7 @@ fn ids() -> [i32; 15] {
 }
 unsafe fn startup(game: &mut Game, p1: usize) {
     let request = game.requested.unwrap();
-    let pluck = false; // START
+    // START
 }
 unsafe fn update(game: &mut Game, p1: usize, status: i32, cpu: usize, fighter: usize) {
     let ids = ids();
@@ -550,6 +569,10 @@ impl NativeMemory {
         BEGINS.with_borrow_mut(Vec::clear);
         NATIVE_ENDS.with_borrow_mut(Vec::clear);
         DRIVEN.with_borrow_mut(Vec::clear);
+        PIKMIN_LINE.set(Some([Some(1), Some(2), Some(3)]));
+        PIKMIN_READS.with_borrow_mut(Vec::clear);
+        RESPAWNS.with_borrow_mut(Vec::clear);
+        LINE_READS.store(0, Ordering::Relaxed);
         m
     }
     fn p1(&self) -> usize {
@@ -1070,36 +1093,42 @@ fn olimar(m: &mut NativeMemory, grab: usize) -> Game {
     CPU_STATUS.store(0, Ordering::Relaxed);
     g
 }
-unsafe fn finish_pluck(m: &NativeMemory, g: &mut Game) {
-    CPU_STATUS.store(476, Ordering::Relaxed);
+fn requests() -> Vec<(usize, i32)> {
+    REQUESTS.with_borrow(Clone::clone)
+}
+fn respawns() -> Vec<[Option<i32>; 3]> {
+    RESPAWNS.with_borrow(Clone::clone)
+}
+// Two released reads, each exactly one Pikmin, then the existing Place and Settle.
+unsafe fn finish_line(m: &NativeMemory, g: &mut Game) {
     m.update(g, 0);
-    assert_eq!(g.step, Step::Entering);
-    CPU_STATUS.store(0, Ordering::Relaxed);
+    assert_eq!((g.step, g.followed, LINE_READS.load(Ordering::Relaxed)), (Step::Entering, false, 1));
+    assert_eq!(ARMED.load(Ordering::Relaxed), 0);
     m.update(g, 0);
-    assert_eq!(g.step, Step::Place);
-    assert!(g.followed);
-    assert!(!g.saw_catch);
+    assert_eq!((g.step, g.followed, g.saw_catch), (Step::Place, true, false));
+    assert_eq!(LINE_READS.load(Ordering::Relaxed), 2);
     assert_eq!(ARMED.load(Ordering::Relaxed), 0);
     m.update(g, 0);
     assert_eq!(g.step, Step::Settle);
     m.update(g, 0);
 }
 #[test]
-fn olimar_real_pluck_then_configured_catch_once_and_actual_native_seed() {
+fn olimar_one_pikmin_line_then_configured_catch_once_and_actual_native_seed() {
     unsafe {
+        assert_eq!(entry::ONE_PIKMIN, [Some(0), None, None]);
         for (grab, catch) in [(0, 50), (1, 54), (2, 55)] {
             let mut m = NativeMemory::new();
             let mut g = olimar(&mut m, grab);
             m.update(&mut g, 0);
-            assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 476)]);
+            assert_eq!(respawns(), vec![entry::ONE_PIKMIN]);
+            assert!(requests().is_empty(), "no Pluck or other status request");
             assert_eq!(g.step, Step::Entering);
             assert_eq!(ARMED.load(Ordering::Relaxed), 0);
             assert!(seed_token(m.p1()).is_none());
-            finish_pluck(&m, &mut g);
-            assert_eq!(
-                REQUESTS.with_borrow(Clone::clone),
-                vec![(2, 476), (m.p1(), 0), (2, 0), (2, catch)]
-            );
+            assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
+            finish_line(&m, &mut g);
+            assert_eq!(requests(), vec![(m.p1(), 0), (2, 0), (2, catch)]);
+            assert_eq!(respawns().len(), 1, "one line per attempt");
             assert_eq!(g.step, Step::Entering);
             assert_eq!(ARMED.load(Ordering::Relaxed), g.generation);
             CPU_STATUS.store(52, Ordering::Relaxed);
@@ -1108,46 +1137,91 @@ fn olimar_real_pluck_then_configured_catch_once_and_actual_native_seed() {
             m.update(&mut g, 66);
             assert_eq!(g.step, Step::Held);
             assert_eq!(BEGINS.with_borrow(Vec::len), 1);
+            assert_eq!(LINE_READS.load(Ordering::Relaxed), 2);
         }
     }
 }
 #[test]
-fn olimar_already_wait_or_unrelated_status_cannot_complete_or_arm_pluck() {
+fn olimar_line_other_than_one_pikmin_fails_closed_unavailable() {
     unsafe {
-        let mut m = NativeMemory::new();
-        let mut g = olimar(&mut m, 0);
-        m.update(&mut g, 0);
-        for status in [0, 0, 14, 0, 0] {
-            CPU_STATUS.store(status, Ordering::Relaxed);
+        let one = Some(entry::ONE_PIKMIN);
+        for (first, second) in [
+            ([Some(0), Some(0), None], None),
+            ([Some(0), Some(1), Some(2)], None),
+            ([None; 3], None),
+            ([None, Some(0), None], None),
+            (entry::ONE_PIKMIN, Some([Some(0), Some(1), None])),
+            (entry::ONE_PIKMIN, Some([None; 3])),
+        ] {
+            let mut m = NativeMemory::new();
+            let mut g = olimar(&mut m, 0);
             m.update(&mut g, 0);
-            assert_eq!(g.step, Step::Entering);
+            assert_eq!(PIKMIN_LINE.with_borrow(|l| *l), one);
+            PIKMIN_READS.with_borrow_mut(|q| q.extend([first].into_iter().chain(second)));
+            m.update(&mut g, 0);
+            if second.is_some() {
+                assert_eq!(g.step, Step::Entering, "{first:?}");
+                m.update(&mut g, 0);
+            }
+            assert_eq!((g.step, g.failed), (Step::Failed, Some(UNAVAILABLE_NOTICE)), "{first:?} {second:?}");
             assert!(!g.followed);
+            assert!(requests().is_empty(), "never placed or caught");
             assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+            m.update(&mut g, 0);
+            assert_eq!((g.step, respawns().len()), (Step::Failed, 1), "no retry or second line");
         }
-        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 476)]);
-        assert!(BEGINS.with_borrow(Vec::is_empty));
     }
 }
 #[test]
-fn olimar_existing_ground_readiness_applies_before_and_after_pluck() {
+fn olimar_unavailable_line_natives_fail_closed_before_respawn() {
+    unsafe {
+        for later in [false, true] {
+            let mut m = NativeMemory::new();
+            let mut g = olimar(&mut m, 0);
+            if later {
+                m.update(&mut g, 0);
+                assert_eq!(respawns().len(), 1);
+            }
+            PIKMIN_LINE.set(None);
+            m.update(&mut g, 0);
+            assert_eq!((g.step, g.failed), (Step::Failed, Some(UNAVAILABLE_NOTICE)));
+            assert_eq!(respawns().len(), usize::from(later));
+            assert!(requests().is_empty());
+            assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+        }
+    }
+}
+#[test]
+fn olimar_existing_ground_readiness_applies_before_and_after_line() {
     unsafe {
         let mut m = NativeMemory::new();
         let mut g = olimar(&mut m, 0);
         AIR.store(true, Ordering::Relaxed);
         m.update(&mut g, 0);
         assert_eq!(g.step, Step::Settle);
-        assert!(REQUESTS.with_borrow(Vec::is_empty));
+        assert!(respawns().is_empty() && requests().is_empty());
         AIR.store(false, Ordering::Relaxed);
         m.update(&mut g, 0);
-        CPU_STATUS.store(476, Ordering::Relaxed);
-        m.update(&mut g, 0);
+        assert_eq!((g.step, respawns().len()), (Step::Entering, 1));
+        // Reads count only on released (grounded WAIT, not stopped) frames.
         AIR.store(true, Ordering::Relaxed);
-        CPU_STATUS.store(0, Ordering::Relaxed);
         m.update(&mut g, 0);
-        assert_eq!(g.step, Step::Entering);
-        assert!(!g.followed);
+        AIR.store(false, Ordering::Relaxed);
+        for status in [14, 476] {
+            CPU_STATUS.store(status, Ordering::Relaxed);
+            m.update(&mut g, 0);
+        }
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        CPU_STOP.store(true, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        CPU_STOP.store(false, Ordering::Relaxed);
+        assert_eq!((g.step, g.followed, LINE_READS.load(Ordering::Relaxed)), (Step::Entering, false, 0));
         assert_eq!(ARMED.load(Ordering::Relaxed), 0);
-        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 476)]);
+        finish_line(&m, &mut g);
+        assert_eq!(requests(), vec![(m.p1(), 0), (2, 0), (2, 50)]);
+        assert_eq!(respawns().len(), 1);
     }
 }
 #[test]
@@ -1165,7 +1239,8 @@ fn olimar_existing_cancel_and_body_guards_revoke_without_catch() {
                 assert_eq!(g.step, Step::Restore);
             }
             assert_eq!(ARMED.load(Ordering::Relaxed), 0);
-            assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 476)]);
+            assert_eq!(respawns(), vec![entry::ONE_PIKMIN]);
+            assert!(requests().is_empty());
             assert!(BEGINS.with_borrow(Vec::is_empty));
         }
     }
@@ -1198,6 +1273,7 @@ fn olimar_stale_seed_ignored_and_unconfirmed_seed_keeps_existing_refusal() {
         });
         m.update(&mut g, 66);
         assert_eq!(g.step, Step::Failed);
+        assert_eq!(g.failed, Some("Move entry unconfirmed · no grade"));
         assert!(BEGINS.with_borrow(Vec::is_empty));
     }
 }
@@ -1209,7 +1285,8 @@ fn olimar_ordinary_attacker_still_requests_configured_catch_immediately() {
         g.requested.as_mut().unwrap().attacker_kind = 42;
         m.body[3] = 42;
         m.update(&mut g, 0);
-        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 50)]);
+        assert_eq!(requests(), vec![(2, 50)]);
+        assert!(respawns().is_empty());
         assert_eq!(ARMED.load(Ordering::Relaxed), g.generation);
     }
 }

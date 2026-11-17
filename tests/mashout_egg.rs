@@ -150,15 +150,7 @@ fn actual_runtime_egg_preparation_and_native_seed() {
         ),
         (
             "// START",
-            block(
-                runtime,
-                if runtime.contains("if !pluck &&") {
-                    "if !pluck &&"
-                } else {
-                    "if !entry::preparatory"
-                },
-            )
-            .to_string(),
+            block(runtime, "if !entry::preparatory").to_string(),
         ),
         (
             "// ENTERING",

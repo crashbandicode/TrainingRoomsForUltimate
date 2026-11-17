@@ -485,6 +485,32 @@ unsafe fn trolley_input(cpu: usize, status: i32, actor: &mut Option<entry::Troll
     }).map_err(|_| ())
 }
 
+/// Olimar's Pikmin line through the Save-State helpers: respawn `line` first when given, then read it.
+/// None, with nothing called, when a native or constant those helpers use is unavailable.
+unsafe fn olimar_pikmin(cpu: usize, line: Option<[Option<i32>; 3]>) -> Option<[Option<i32>; 3]> {
+    use crate::model::state::ids::{Table, C as S, NAMES as STATE_NAMES};
+    use crate::model::{sites_pkg2 as p2, sites_pkg3 as p3, sites_pkg4 as p4};
+    use crate::runtime::features::state_restore;
+    if ![
+        p3::STATE_WORK_GET_INT64_OFFSET, p3::STATE_OBJECT_IS_ACTIVE_OFFSET,
+        p3::STATE_OBJECT_MODULE_ACCESSOR_OFFSET, p3::STATE_ARTICLE_REMOVE_EXIST_OFFSET,
+        p3::STATE_ARTICLE_ACTIVE_NUM_OFFSET, p3::STATE_ARTICLE_GENERATE_OFFSET,
+        p3::STATE_STATUS_REQUEST_OFFSET, p2::WORK_GET_INT_OFFSET, p4::WORK_SET_INT_OFFSET,
+    ].into_iter().all(game::granted) { return None; }
+    let mut values = [(S::OlimarHold0, 0); 9];
+    for (slot, c) in values.iter_mut().zip([
+        S::OlimarHold0, S::OlimarHold1, S::OlimarHold2, S::PikminVariation, S::ArticleOlimarPikmin,
+        S::ArticleAllTarget, S::OlimarPreVariation, S::OlimarBeforePreVariation, S::PikminStatusAirFollow,
+    ]) {
+        *slot = (c, game::lua_const(lua_bind_hash(STATE_NAMES[c as usize]))?);
+    }
+    let ids = Table::with(&values);
+    if let Some(line) = line {
+        state_restore::olimar_respawn(cpu, &ids, &line);
+    }
+    Some(state_restore::olimar_line(cpu, &ids))
+}
+
 unsafe fn arm(p1: usize, generation: u64) -> bool {
     let Some(threshold) = admission().with(|| reader::threshold(p1)).flatten() else {
         return false;
@@ -999,32 +1025,31 @@ pub unsafe fn frame(fighter: usize) {
             let Some(request) = game.requested else {
                 return;
             };
-            // One real Pluck prepares Olimar's ordinary grab. Native SPECIAL_N
-            // also owns its full-capacity failure motion; never synthesize Pikmin.
-            let pluck = request.attacker_kind == 43
-                && request.plan == crate::model::mashout::moves::Plan::Grab
-                && !game.followed;
-            let start_name = if pluck {
-                Some("FIGHTER_STATUS_KIND_SPECIAL_N")
-            } else {
-                entry::start(request)
-            };
-            let Some(start) = start_name.and_then(|name| game::lua_const(lua_bind_hash(name)))
+            // Olimar's ordinary grab is set up with exactly one Pikmin through the Save-State
+            // respawn (OPUS-DESIGN-REVIEW-M3-row40-delegates §3 F1), replacing the real Pluck.
+            if entry::one_pikmin_grab(request) && !game.followed {
+                if olimar_pikmin(cpu, Some(entry::ONE_PIKMIN)).is_none() {
+                    game.fail(UNAVAILABLE_NOTICE);
+                    return;
+                }
+                drive(MappedInputs::NEUTRAL);
+                game.saw_catch = false;
+                game.step(Step::Entering, "Mash out · Waiting for move");
+                return;
+            }
+            let Some(start) = entry::start(request).and_then(|name| game::lua_const(lua_bind_hash(name)))
             else {
                 // restriction: MASH-M1-MISMATCH
                 game.fail("Move sequence unavailable");
                 return;
             };
-            if !pluck && !entry::preparatory(request.plan) && !arm(p1, game.generation) {
+            if !entry::preparatory(request.plan) && !arm(p1, game.generation) {
                 game.fail(UNAVAILABLE_NOTICE);
                 return;
             }
             drive(entry::controls(request.plan, false));
             game.step(Step::Entering, "Mash out · Waiting for move");
             state_natives::status_request(cpu, start);
-            if pluck {
-                return;
-            }
             #[cfg(feature = "diag")]
             crate::runtime::diag_log::enqueue_diagnostic(format_args!(
                 "[Mashout] entry gen={} move={} state={:?} attacker={} plan={:?} variant={}",
@@ -1041,18 +1066,26 @@ pub unsafe fn frame(fighter: usize) {
             let Some(request) = game.requested else {
                 return;
             };
-            if request.attacker_kind == 43
-                && request.plan == crate::model::mashout::moves::Plan::Grab
-                && !game.followed
-            {
+            if entry::one_pikmin_grab(request) && !game.followed {
                 drive(MappedInputs::NEUTRAL);
-                // Unit-returning status_request is not an acceptance receipt.
-                // WAIT can complete Pluck only after actual SPECIAL_N was seen.
-                game.saw_catch |= state_id(C::StatusSpecialN) == Some(cpu_status);
-                if game.saw_catch && released {
-                    game.followed = true;
-                    game.saw_catch = false;
-                    game.step(Step::Place, "Mash out · Setting up move");
+                // Two settled reads must each show exactly one Pikmin before the configured Catch arms.
+                if released {
+                    let line = olimar_pikmin(cpu, None);
+                    #[cfg(feature = "diag")]
+                    crate::runtime::diag_log::enqueue_diagnostic(format_args!(
+                        "[Mashout] olimar gen={} line={line:?}", game.generation
+                    ));
+                    if !line.is_some_and(entry::one_pikmin) {
+                        game.fail(UNAVAILABLE_NOTICE);
+                        return;
+                    }
+                    if game.saw_catch {
+                        game.followed = true;
+                        game.saw_catch = false;
+                        game.step(Step::Place, "Mash out · Setting up move");
+                    } else {
+                        game.saw_catch = true;
+                    }
                 }
                 return;
             }

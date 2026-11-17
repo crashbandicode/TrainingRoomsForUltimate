@@ -372,6 +372,20 @@ pub fn preparatory(plan: Plan) -> bool {
     preparatory_grab(plan) || plan == Plan::Egg
 }
 
+/// Row 40 (Olimar's ordinary grab) is graded with exactly one Pikmin: the native add-clatter
+/// callback needs HOLD_NUM > 1 (OPUS-DESIGN-REVIEW-M3-row40-delegates §2), so this line adds none.
+/// The colour is a fixed one (red).
+pub const ONE_PIKMIN: [Option<i32>; 3] = [Some(0), None, None];
+
+pub fn one_pikmin_grab(scenario: Scenario) -> bool {
+    scenario.attacker_kind == super::moves::OLIMAR && scenario.plan == Plan::Grab
+}
+
+/// A settled read of Olimar's line (held first, then following) shows exactly one Pikmin.
+pub fn one_pikmin(line: [Option<i32>; 3]) -> bool {
+    matches!(line, [Some(_), None, None])
+}
+
 /// Keep ownership of Egg's tongue capture while waiting for its separate native egg initializer.
 pub fn preparatory_holding(plan: Plan, is: impl Fn(C) -> bool) -> bool {
     plan == Plan::Egg && is(C::ClatterCaptureYoshi)
@@ -434,6 +448,22 @@ mod tests {
     lib_unit_tests! {
         use super::*;
         use crate::model::mashout::moves::Config;
+
+        #[test]
+        fn one_pikmin_line_is_exactly_one_held_or_following() {
+            assert!(one_pikmin(ONE_PIKMIN));
+            for colour in 0..5 {
+                assert!(one_pikmin([Some(colour), None, None]));
+                for other in [[Some(colour), Some(colour), None], [Some(colour), Some(0), Some(1)],
+                    [None, Some(colour), None], [None, None, Some(colour)], [Some(colour), None, Some(colour)]] {
+                    assert!(!one_pikmin(other), "{other:?}");
+                }
+            }
+            assert!(!one_pikmin([None; 3]));
+            let olimar = super::super::moves::CATALOG[40];
+            assert!(one_pikmin_grab(olimar));
+            assert!(super::super::moves::CATALOG.iter().filter(|s| one_pikmin_grab(**s)).map(|s| s.id).eq([40]));
+        }
 
         #[test]
         fn throw_setup_is_not_the_scored_state() {

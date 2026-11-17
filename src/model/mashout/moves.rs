@@ -73,6 +73,9 @@ pub struct Scenario {
     pub evidence: &'static str,
 }
 
+/// TR choices Olimar (0x2b). Its ordinary grab row is graded with one Pikmin (`entry::ONE_PIKMIN`).
+pub const OLIMAR: u32 = 0x2b;
+
 const fn entry(id: u16, state: State, kind: u32, name: &'static str, plan: Plan, evidence: &'static str) -> Scenario {
     let mut i = 0;
     while i < ATTACKERS.len() {
@@ -127,7 +130,8 @@ const fn catalog() -> [Scenario; 121] {
     let mut rows = [first; 121];
     let mut i = 0;
     while i < ATTACKERS.len() {
-        rows[i] = entry(i as u16, State::Grab, ATTACKERS[i].0, "Grab", Plan::Grab, "ordinary G");
+        let name = if ATTACKERS[i].0 == OLIMAR { "Grab (1 Pikmin)" } else { "Grab" };
+        rows[i] = entry(i as u16, State::Grab, ATTACKERS[i].0, name, Plan::Grab, "ordinary G");
         i += 1;
     }
     let mut j = 0;
@@ -301,6 +305,16 @@ mod tests {
                 let Control::Dropdown(actual) = ROWS.iter().find(|row| row.id == id).unwrap().control else { panic!("dropdown {id}") };
                 assert_eq!(actual, labels);
             }
+        }
+
+        #[test]
+        fn olimar_row_label_names_one_pikmin() {
+            for s in CATALOG.iter().filter(|s| s.plan == Plan::Grab) {
+                assert_eq!(s.name, if s.id == 40 { "Grab (1 Pikmin)" } else { "Grab" }, "id {}", s.id);
+            }
+            assert_eq!((CATALOG[40].attacker_kind, CATALOG[40].attacker_name), (OLIMAR, "Olimar"));
+            let option = attacker_option(0, 40).unwrap();
+            assert_eq!(attacker_label(0, option), Some(("Olimar", "Grab (1 Pikmin)")));
         }
 
         #[test]
