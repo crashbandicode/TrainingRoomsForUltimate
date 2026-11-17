@@ -12,7 +12,7 @@ fn pointer(value: usize) -> bool {
     value >= 0x1000 && value & 7 == 0 && value >> 47 == 0
 }
 /// Export thunks at2001260/20013c0/20013d0 load accessor+48 then slots178/228/230.
-/// Owned relocated Control vtable and all three concrete64-byte windows are pinned.
+/// Fighter constructor address point and every concrete reader window are pinned.
 unsafe fn control(accessor: usize) -> Option<usize> {
     if !pointer(accessor) {
         return None;
@@ -23,19 +23,28 @@ unsafe fn control(accessor: usize) -> Option<usize> {
     }
     let vptr = (module as *const usize).read();
     let base = game::text_base();
-    if vptr != base + 0x4f6bd90 {
+    if vptr != base + sites::decision::CONTROL_VTABLE_OFFSET {
         return None;
     }
     for (slot, target) in [
         (0x178, sites::STICK_X_OFFSET),
         (0x228, sites::GUARD_COUNT_OFFSET),
         (0x230, sites::GUARD_PREVIOUS_OFFSET),
+        (0x220, sites::TRIGGER_WORD_OFFSET),
+        (0x250, sites::GUARD_TRIGGER_OFFSET),
     ] {
         if !game::granted(target) || ((vptr + slot) as *const usize).read() != base + target {
             return None;
         }
     }
     pointer(((module + 0x110) as *const usize).read()).then_some(module)
+}
+
+/// Native positive-edge mask, not a shoulder sample or a count decrease.
+pub(super) unsafe fn guard_event(accessor: usize) -> Option<bool> {
+    let module = control(accessor)?;
+    let button = tech_native::id("CONTROL_PAD_BUTTON_GUARD").filter(|b| (0..18).contains(b))?;
+    natives::tech_guard_trigger(module, button)
 }
 
 /// Existing guarded status accessor; caller first proves a fresh owned player.
@@ -68,7 +77,7 @@ pub(super) unsafe fn snapshot(
     let lockout =
         params.then(|| state_natives::get_param_int(accessor, hash40("common"), 0x14459066dd));
     let module = control(accessor);
-    let button = tech_native::id("CONTROL_PAD_BUTTON_GUARD");
+    let button = tech_native::id("CONTROL_PAD_BUTTON_GUARD").filter(|b| (0..18).contains(b));
     let guard_count = module
         .zip(button)
         .and_then(|(m, b)| natives::tech_guard_count(m, b));
@@ -83,13 +92,14 @@ pub(super) unsafe fn snapshot(
         entered_status: None,
         guard_count,
         previous_guard_gap,
-        guard_event: None,
+        guard_event: module.zip(button).and_then(|(m, b)| natives::tech_guard_trigger(m, b)),
         window_base,
         window_multiplier,
         lockout,
         reaction,
         damage_fall,
         stick_x,
-        press_frame_offset: None,
+        // Native update3f9554/6c stores zero on the press and increments only otherwise.
+        press_frame_offset: guard_count.map(|_| 0),
     }
 }

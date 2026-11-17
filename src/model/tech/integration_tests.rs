@@ -1083,7 +1083,7 @@ fn snapshot_fractional_window_and_calibration_are_preserved() {
 }
 
 #[test]
-fn unavailable_guard_window_never_fabricates_late_or_no_press() {
+fn known_miss_with_unavailable_guard_window_never_fabricates_a_timing_reason() {
     use session::{Action, Grade, Session};
     for gap in [1, 15, 30] {
         for press in [None, Some(30)] {
@@ -1100,12 +1100,12 @@ fn unavailable_guard_window_never_fabricates_late_or_no_press() {
                 };
                 s.tick(false, event);
             }
-            assert_eq!(s.result, Some(Grade::Unavailable));
-            assert_eq!(s.summary.attempts, 0);
+            assert_eq!(s.result, Some(Grade::Missed));
+            assert_eq!(s.summary.attempts, 1);
             for _ in 31..45 {
                 assert_eq!(s.tick(false, Some(false)), Action::None);
             }
-            assert_eq!(s.tick(false, Some(false)), Action::Place { reroll: false });
+            assert_eq!(s.tick(false, Some(false)), Action::Place { reroll: true });
         }
     }
 }
@@ -1245,8 +1245,8 @@ fn delayed_miss_delivery_does_not_invent_past_guard_observations() {
             Event::Graded
         );
         c.tick(&mut f, false, Some(true)).unwrap();
-        assert_eq!(c.session.result, Some(Grade::Unavailable));
-        assert_eq!(c.session.summary.attempts, 0);
+        assert_eq!(c.session.result, Some(Grade::Missed));
+        assert_eq!(c.session.summary.attempts, 1);
     }
 }
 
@@ -1995,4 +1995,133 @@ fn recovery_capture_rejects_invalid_or_untargetable_world_data() {
     unflagged.normal = Vec2 { x: 0.8, y: 0.6 };
     assert_eq!(unflagged.kind(), None);
     assert!(RememberedSpot::capture(unflagged, old.ends[0]).is_none());
+}
+
+#[test]
+fn native_timing_grade_labels_state_before_without_inventing_press_coverage() {
+    for (grade, expected) in [
+        (Grade::Perfect(Some(0)), "Perfect · 0f before"),
+        (Grade::Perfect(Some(7)), "Perfect · 7f before"),
+        (Grade::Perfect(None), "Perfect · timing unavailable"),
+        (Grade::Locked(9), "Locked out (2nd press 10f after 1st)"),
+        (Grade::Missed, "Missed"),
+        (Grade::Unavailable, "Grading unavailable (not counted)"),
+    ] {
+        let mut label = String::new();
+        grade.write(&mut label).unwrap();
+        assert_eq!(label, expected);
+    }
+}
+
+#[test]
+fn native_timing_summary_averages_only_known_perfect_samples() {
+    let mut summary = session::Summary::default();
+    for grade in [
+        Grade::Perfect(None),
+        Grade::Perfect(Some(2)),
+        Grade::Perfect(Some(5)),
+        Grade::Held,
+        Grade::Early(1),
+        Grade::Late(1),
+        Grade::Locked(2),
+        Grade::Missed,
+        Grade::Unavailable,
+    ] {
+        summary.record(grade);
+    }
+    assert_eq!(summary.attempts, 8);
+    assert_eq!(summary.timed_perfect, 2);
+    assert_eq!(summary.average(), Some(3.5));
+    let mut label = String::new();
+    summary.write(&mut label).unwrap();
+    assert_eq!(
+        label,
+        "Done! 8: 3 Perfect · 1 Held · 1 Early · 1 Late · 2 Missed · best 4 · avg 3.5f before"
+    );
+}
+
+#[test]
+fn native_timing_summary_without_calibrated_samples_omits_average() {
+    let mut summary = session::Summary::default();
+    for grade in [Grade::Perfect(None), Grade::Held, Grade::Unavailable] {
+        summary.record(grade);
+    }
+    assert_eq!(summary.attempts, 2);
+    assert_eq!(summary.timed_perfect, 0);
+    assert_eq!(summary.average(), None);
+    let mut label = String::new();
+    summary.write(&mut label).unwrap();
+    assert_eq!(
+        label,
+        "Done! 2: 1 Perfect · 1 Held · 0 Early · 0 Late · 0 Missed · best 2"
+    );
+}
+
+fn assert_native_no_tech_counted(surface: Surface, entered: i32) {
+    // Native constant order used by the guarded adapter; requested status alone is insufficient.
+    let ids = [103, 104, 80, 78, 107, 109, 77, 105, 106, 108, 76];
+    let mut controller = Controller::IDLE;
+    let mut launcher = Fake::new();
+    controller.start(Length::Free);
+    controller.place(&mut launcher, setup()).unwrap();
+    controller.tick(&mut launcher, false, None).unwrap();
+    controller.tick(&mut launcher, false, None).unwrap();
+    controller.session.summary.record(Grade::Perfect(Some(3)));
+    let mut observed = snapshot(launcher.attempt.id);
+    observed.contact.surface = surface;
+    observed.contact.requested_status = entered;
+    observed.source_status = Some(73);
+    observed.entered_status = Some(entered);
+    assert_eq!(
+        session::accepted_status(observed, ids),
+        Some(session::NativeOutcome::Miss)
+    );
+    assert_eq!(controller.retained_snapshot(observed, ids, 0), Event::Graded);
+    for _ in 0..=session::LATE {
+        controller.tick(&mut launcher, false, None).unwrap();
+    }
+    assert_eq!(controller.session.result, Some(Grade::Missed));
+    assert_eq!(controller.session.summary.attempts, 2);
+    assert_eq!(controller.session.summary.missed, 1);
+    assert_eq!(controller.session.summary.streak, 0);
+    // An unreadable late-input reason cannot erase a proven native no-tech result.
+}
+
+#[test]
+fn native_floor_no_tech_is_counted_even_without_a_late_press_reason() {
+    assert_native_no_tech_counted(Surface::Floor, 78);
+}
+#[test]
+fn native_wall_no_tech_is_counted_even_without_a_late_press_reason() {
+    assert_native_no_tech_counted(Surface::Wall, 76);
+}
+#[test]
+fn native_ceiling_no_tech_is_counted_even_without_a_late_press_reason() {
+    assert_native_no_tech_counted(Surface::Ceiling, 77);
+}
+
+#[test]
+fn ten_native_misses_advance_and_finish_the_session() {
+    let mut session = session::Session::IDLE;
+    session.start(Length::Attempts(10));
+    for attempt in 1..=10 {
+        session.placed(1);
+        assert_eq!(session.tick(false, Some(false)), session::Action::Launch);
+        session.contact_grade(None);
+        for _ in 0..session::LATE {
+            session.tick(false, Some(false));
+        }
+        assert_eq!(session.result, Some(Grade::Missed));
+        assert_eq!(session.summary.attempts, attempt);
+        assert_eq!(session.summary.streak, 0);
+        let mut action = session::Action::None;
+        for _ in session::LATE..session::HOLD {
+            action = session.tick(false, Some(false));
+        }
+        assert_eq!(action, if attempt == 10 { session::Action::Summary } else {
+            session::Action::Place { reroll: true }
+        });
+    }
+    assert_eq!(session.phase, session::Phase::Done);
+    assert_eq!(session.summary.missed, 10);
 }

@@ -24,6 +24,8 @@ pub const GET_ENERGY_OFFSET: usize = 0x2043970; // Existing NamedMacros grant.
 pub const GUARD_COUNT_OFFSET: usize = 0x3f8620;
 pub const GUARD_PREVIOUS_OFFSET: usize = 0x3f8630;
 pub const STICK_X_OFFSET: usize = 0x3f84a0;
+pub const TRIGGER_WORD_OFFSET: usize = 0x3f8610;
+pub const GUARD_TRIGGER_OFFSET: usize = 0x3f8670;
 const fn window(offset: usize) -> [u8; 64] {
     let groups = [
         v1::DIRECT_V1_GUARDS,
@@ -54,7 +56,7 @@ const fn site(name: &'static str, offset: usize) -> Site {
         note: "Shared tech launch native; concrete type checks remain mandatory.",
     }
 }
-pub const SITES: [Site; 11] = [
+pub const SITES: [Site; 13] = [
     site("tech_magnitude", MAGNITUDE_OFFSET),
     site("tech_reaction", REACTION_OFFSET),
     site("tech_cos", COS_OFFSET),
@@ -66,4 +68,6 @@ pub const SITES: [Site; 11] = [
     site("tech_guard_count", GUARD_COUNT_OFFSET),
     site("tech_guard_previous", GUARD_PREVIOUS_OFFSET),
     site("tech_stick_x", STICK_X_OFFSET),
+    site("tech_trigger_word", TRIGGER_WORD_OFFSET),
+    site("tech_guard_trigger", GUARD_TRIGGER_OFFSET),
 ];

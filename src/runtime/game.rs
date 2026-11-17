@@ -371,6 +371,9 @@ pub mod natives {
     pub unsafe fn tech_stick_x(module: usize) -> Option<f32> {
         at::<extern "C" fn(usize) -> f32>(crate::model::sites_tech_launch::STICK_X_OFFSET).map(|f| f(module))
     }
+    pub unsafe fn tech_guard_trigger(module: usize, button: i32) -> Option<bool> {
+        at::<extern "C" fn(usize, i32) -> bool>(crate::model::sites_tech_launch::GUARD_TRIGGER_OFFSET).map(|f| f(module, button))
+    }
 
     pub unsafe fn set_float(accessor: usize, value: f32, id: i32) {
         at::<extern "C" fn(usize, f32, i32)>(sites_pkg2::WORK_SET_FLOAT_OFFSET).map_or_else(Default::default, |f| f(accessor, value, id))

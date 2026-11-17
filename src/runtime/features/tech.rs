@@ -125,7 +125,7 @@ fn observe_decision(snapshot: DecisionSnapshot) -> bool {
 pub fn observe(outcome: Outcome) -> bool {
     OUTCOMES.post(outcome)
 }
-/// Reserved for a proven native guard press after contact. Currently unbound:
+/// Additional proven native guard edge. The live native reader supplies availability;
 /// neither raw shoulder input nor a trigger-count decrease proves a new press.
 pub fn guard_press() {
     if !OPEN.load(Ordering::Acquire)
@@ -675,11 +675,13 @@ pub unsafe fn frame(fighter: usize) {
         OUTCOMES.drain(|outcome| {
             run.controller.outcome(outcome);
         });
+        let posted_press = GUARD_PRESS.swap(false, Ordering::AcqRel);
+        let guard_press = super::tech_decision::guard_event(at).map(|native| native || posted_press);
         if let Ok(event) = Controller::tick(
             &mut run.controller,
             &mut run.adapter,
             false,
-            GUARD_PRESS.swap(false, Ordering::AcqRel).then_some(true),
+            guard_press,
         ) {
             if let Some((snapshot, age)) = run.decision {
                 run.decision = Some((snapshot, age.saturating_add(1)));

@@ -35,14 +35,15 @@ impl Grade {
     }
     pub fn write(self, out: &mut impl Write) -> fmt::Result {
         match self {
-            Self::Perfect(Some(n)) => write!(out, "Perfect · {n}f"),
-            // restriction: tech-calibration-unmeasured
+            Self::Perfect(Some(n)) => write!(out, "Perfect · {n}f before"),
+            // restriction: tech-native-observation-unavailable
             Self::Perfect(None) => out.write_str("Perfect · timing unavailable"),
             Self::Held => out.write_str("Tech (held)"),
             Self::Early(n) => write!(out, "Early by {n}f"),
-            Self::Locked(n) => write!(out, "Locked out (2nd press {n}f after 1st)"),
+            // Native previous stores the age before this input update, one less than the gap.
+            Self::Locked(n) => write!(out, "Locked out (2nd press {}f after 1st)", n.saturating_add(1)),
             Self::Late(n) => write!(out, "Late by {n}f"),
-            Self::Missed => out.write_str("Missed · no press"),
+            Self::Missed => out.write_str("Missed"),
             Self::AfterHitstun => out.write_str("Missed (after hitstun)"),
             Self::Untechable => out.write_str("Untechable (not counted)"),
             Self::NoContact => out.write_str("No contact (not counted)"),
@@ -259,7 +260,7 @@ impl Summary {
             self.best
         )?;
         if let Some(avg) = self.average() {
-            write!(out, " · avg {avg:.1}f")?;
+            write!(out, " · avg {avg:.1}f before")?;
         }
         Ok(())
     }
@@ -345,7 +346,8 @@ impl Session {
             self.late_coverage = false;
         }
         if self.pending && age > LATE {
-            self.result = Some(Grade::Unavailable);
+            self.result = Some(Grade::Missed);
+            self.summary.record(Grade::Missed);
             self.pending = false;
         }
         self.phase = Phase::Hold(age.min(HOLD) - 1);
@@ -367,8 +369,8 @@ impl Session {
     /// Exactly one tick per P1 game frame. Menus pass paused=true.
     /// `new_guard_press` requires a separately proven native press event.
     /// A raw shoulder sample or counter decrease is not sufficient proof.
-    /// None is an unavailable observation and invalidates first-press/no-press
-    /// grading for this late window, without stopping its game-frame clock.
+    /// None invalidates a late-input reason, but not the already proven native
+    /// miss. The neutral Missed label makes no unobserved no-press claim.
     pub fn tick(&mut self, paused: bool, new_guard_press: Option<bool>) -> Action {
         if paused || matches!(self.phase, Phase::Off | Phase::Done) {
             return Action::None;
@@ -401,7 +403,7 @@ impl Session {
                     let g = match (self.late_coverage, new_guard_press) {
                         (true, Some(true)) => Grade::Late(age),
                         (true, Some(false)) => Grade::Missed,
-                        _ => Grade::Unavailable,
+                        _ => Grade::Missed,
                     };
                     self.result = Some(g);
                     self.summary.record(g);

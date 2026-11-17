@@ -1757,3 +1757,19 @@ ceiling = 155171
 date = "2026-11-17"
 reason = "RESHIP-4 = RESHIP-3 (154972) + CRASH-0900 deferred L+R+A reset with the review-R3 lifecycle generation (rc15/crash0900-lra-gate 568203ff), measured 155171: +199 over 154972, within the approved +200. Exact total, no headroom. Counting and gates unchanged."
 approved_by = "Primary 2026-11-17 11:40Z approves cumulative growth up to +200 over 154972 FOR OPERATOR REVIEW; primary 12:56Z keeps the +200 bound for the R3 fix."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155017
+date = "2026-11-17"
+reason = "Native Tech timing and counted native misses measured 155017: +45 over154972, within approved +250. One exact combined total, no headroom. Native guards, counting basis and gate enforcement unchanged. FOR OPERATOR REVIEW."
+approved_by = "Operator rc.15 size approval; primary2026-11-17 12:25Z explicitly approves up to +250 total for timing plus Missed, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155216
+date = "2026-11-17"
+reason = "Native Tech timing plus counted Missed rebased onto RESHIP-4 ffdc7d48: base155171 plus timing45 =155216, exact combined total with no headroom. Both reviewed behaviours are preserved; counting, guards and gate enforcement unchanged. FOR OPERATOR REVIEW."
+approved_by = "Primary2026-11-17 15:30Z orders timing integration onto ffdc7d48; timing growth45 remains within primary12:25Z approved +250 for timing plus Missed, combined with the separately approved RESHIP-4 baseline."

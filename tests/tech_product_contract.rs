@@ -22,6 +22,59 @@ fn request() -> Launch {
     }
 }
 #[test]
+fn fighter_control_reader_accepts_the_native_constructed_address_point() {
+    let Some(main) = common::owned_main("fighter ControlModule address point") else {
+        return;
+    };
+    let bytes = main.window(0x6b8598);
+    let word = |n: usize| u32::from_le_bytes(bytes[n..n + 4].try_into().unwrap());
+    // Native Fighter Control constructor materializes its vptr and stores it to this.
+    assert_eq!(word(0), 0xb0024669); // ADRP x9
+    assert_eq!(word(4), 0x91378129); // ADD x9,x9,#de0
+    assert_eq!(word(20), 0xf9000009); // STR x9,[x0]
+    let instruction = word(0);
+    let pages = (((instruction >> 5) & 0x7ffff) << 2) | ((instruction >> 29) & 3);
+    let pages = ((pages << 11) as i32 >> 11) as isize;
+    let constructed = (0x6b8000isize + (pages << 12)) as usize
+        + ((word(4) >> 10) & 0xfff) as usize;
+    assert_eq!(
+        decision_guards::CONTROL_VTABLE_OFFSET,
+        constructed,
+        "The guarded reader must accept the Fighter instance, whose native slots are checked separately"
+    );
+    let u64_at = |at: usize| u64::from_le_bytes(main.window(at)[..8].try_into().unwrap()) as usize;
+    let module = u32::from_le_bytes(main.window(0)[4..8].try_into().unwrap()) as usize;
+    assert_eq!(&main.window(module)[..4], b"MOD0");
+    let delta = i32::from_le_bytes(main.window(module)[4..8].try_into().unwrap());
+    let mut entry = module.wrapping_add_signed(delta as isize);
+    let mut dynamic = std::collections::BTreeMap::new();
+    while u64_at(entry) != 0 {
+        dynamic.insert(u64_at(entry), u64_at(entry + 8));
+        entry += 16;
+    }
+    let mut targets = std::collections::BTreeMap::new();
+    for at in (dynamic[&7]..dynamic[&7] + dynamic[&8]).step_by(24) {
+        if u64_at(at + 8) & 0xffff_ffff == 1027 && (constructed..constructed + 0x258).contains(&u64_at(at)) {
+            targets.insert(u64_at(at), u64_at(at + 16));
+        }
+    }
+    for (slot, target) in [(0x178, 0x3f84a0), (0x220, 0x3f8610), (0x228, 0x3f8620), (0x230, 0x3f8630), (0x250, 0x3f8670)] {
+        assert_eq!(targets.get(&(constructed + slot)), Some(&target));
+    }
+}
+
+#[test]
+fn native_press_counter_zeroes_only_on_the_native_positive_edge() {
+    let Some(main) = common::owned_main("native tech press counter update") else { return; };
+    let bytes = main.window(0x3f9544);
+    let words: Vec<u32> = bytes.chunks_exact(4).map(|b| u32::from_le_bytes(b.try_into().unwrap())).collect();
+    assert_eq!(&words[..11], &[
+        0xb868696c, 0x3940014d, 0x6a09019f, 0x54000080,
+        0x2a1f03ec, 0x381ff14d, 0x14000004, 0x7103f5bf,
+        0x54000068, 0x110005ac, 0x3900014c,
+    ]); // Edge copies old count to previous and writes zero; only the other branch increments.
+}
+#[test]
 fn product_request_rejects_nonfinite_fields_before_native_mutation() {
     let good = request();
     assert!(good.valid());
