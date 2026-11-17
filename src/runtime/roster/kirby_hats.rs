@@ -132,28 +132,19 @@ unsafe fn role_lookup(role: usize) -> RoleLookup {
     lookup
 }
 
-/// SOL-R23: the native hat pair `copy_setup` will read for this Kirby and `kind` (`model::kirby_copy_pair`). Game thread
-/// only (Kirby's frame callback, like the copy itself); read-only, no pointer kept.
-unsafe fn copy_pair(body: *mut app::BattleObjectModuleAccessor, kind: u32) -> crate::model::kirby_copy_pair::Pair {
-    use crate::model::kirby_copy_pair::{self as pair, Pair};
-    if !pair::needs_pair(kind) {
-        return Pair::NotNeeded;
-    }
-    let read_word = |at: usize| if at == 0 { 0 } else { (at as *const usize).read_volatile() };
+/// SOL-R23: the object word of the native hat pair `copy_setup` will read for this Kirby and `kind`
+/// (`model::kirby_copy_pair`), or None. Game thread only (Kirby's frame callback, like the copy); read-only.
+unsafe fn copy_pair(body: *mut app::BattleObjectModuleAccessor, kind: u32) -> Option<usize> {
+    use crate::model::kirby_copy_pair as pair;
+    let word = |at: usize| Some((at as *const usize).read_volatile()).filter(|word| *word != 0);
     let entry = WorkModule::get_int(body, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
-    let entry_ptr = crate::runtime::game::natives::fighter_entry(entry);
-    let table = read_word(crate::runtime::game::text_base() + crate::runtime::mii::mii_native_access::OWNER_TABLE);
-    if entry_ptr == 0 || table == 0 {
-        return Pair::Unreadable;
-    }
-    let manager = read_word(table + pair::MANAGER_FIELD);
-    let costume = ((entry_ptr + pair::COSTUME_FIELD) as *const u8).read_volatile();
-    let Some(offset) = pair::pair_offset(costume, entry as u32).filter(|_| manager != 0) else {
-        return Pair::Unreadable;
-    };
-    let record = (0..pair::RECORDS).filter_map(pair::record_offset).map(|at| manager + at)
-        .find(|record| (*record as *const u32).read_volatile() == kind);
-    record.map_or(Pair::NoRecord, |record| Pair::Object(read_word(record + offset)))
+    let entry_ptr = Some(crate::runtime::game::natives::fighter_entry(entry)).filter(|at| *at != 0)?;
+    let table = word(crate::runtime::game::text_base() + crate::runtime::mii::mii_native_access::OWNER_TABLE)?;
+    let manager = word(table + pair::MANAGER_FIELD)?;
+    let offset = pair::pair_offset(((entry_ptr + pair::COSTUME_FIELD) as *const u8).read_volatile(), entry as u32)?;
+    let record = (0..pair::RECORDS).map(|index| manager + pair::record_offset(index))
+        .find(|record| (*record as *const u32).read_volatile() == kind)?;
+    Some(((record + offset) as *const usize).read_volatile())
 }
 
 unsafe fn equipped(body: *mut app::BattleObjectModuleAccessor) -> Option<u32> {
@@ -375,7 +366,9 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
             }
             pending.leases_released = true;
             // SOL-R23: the native copy reads this kind's hat pair for this Kirby with no null check; wait until it exists.
-            if !crate::model::kirby_copy_pair::copy_ready(copy_pair(body, pending.kind)) {
+            use crate::model::kirby_copy_pair::{copy_ready, PAIR_KINDS};
+            let kind = pending.kind;
+            if !copy_ready(kind, PAIR_KINDS.contains(&kind).then(|| copy_pair(body, kind)).flatten()) {
                 state.pending = Some(pending);
                 return;
             }

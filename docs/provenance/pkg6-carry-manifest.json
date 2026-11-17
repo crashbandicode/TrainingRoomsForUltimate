@@ -14217,7 +14217,7 @@
    "dest": "src/runtime/roster/kirby_hats.rs",
    "crate": "root",
    "src_sha256": "3e2e73f9157b54434492472cf64ae8993af5f508e47fbc67c944667da95d6f52",
-   "dest_sha256": "2b5ad03bda6675f4d588dc1cf3e25db9428b4d4ea98bf3575cad1fd2f5d9e1a6",
+   "dest_sha256": "d1f0b0d344020674a6b20ed3f15e8c84bd5b863926ac8a4417b0911176de09d7",
    "edits": [
     {
      "old": "fn notice(role: usize, text: String) {",
@@ -14462,6 +14462,16 @@
       ]
      ],
      "reason": "rc.10 S2 (docs/CODE-REDUCTION-rc10.md; docs/DECISIONS.md, D11 superseded): the always-on Cargo features are not switches; their cfg gates are removed and the code that compiled only with one off is deleted"
+    },
+    {
+     "old": "unsafe fn equipped(body: *mut app::BattleObjectModuleAccessor) -> Option<u32> {\n",
+     "new": "/// SOL-R23: the object word of the native hat pair `copy_setup` will read for this Kirby and `kind`\n/// (`model::kirby_copy_pair`), or None. Game thread only (Kirby's frame callback, like the copy); read-only.\nunsafe fn copy_pair(body: *mut app::BattleObjectModuleAccessor, kind: u32) -> Option<usize> {\n    use crate::model::kirby_copy_pair as pair;\n    let word = |at: usize| Some((at as *const usize).read_volatile()).filter(|word| *word != 0);\n    let entry = WorkModule::get_int(body, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);\n    let entry_ptr = Some(crate::runtime::game::natives::fighter_entry(entry)).filter(|at| *at != 0)?;\n    let table = word(crate::runtime::game::text_base() + crate::runtime::mii::mii_native_access::OWNER_TABLE)?;\n    let manager = word(table + pair::MANAGER_FIELD)?;\n    let offset = pair::pair_offset(((entry_ptr + pair::COSTUME_FIELD) as *const u8).read_volatile(), entry as u32)?;\n    let record = (0..pair::RECORDS).map(|index| manager + pair::record_offset(index))\n        .find(|record| (*record as *const u32).read_volatile() == kind)?;\n    Some(((record + offset) as *const usize).read_volatile())\n}\n\nunsafe fn equipped(body: *mut app::BattleObjectModuleAccessor) -> Option<u32> {\n",
+     "reason": "SOL-R23 (kh2-repro-xps-1, 2026-11-17): copy_setup reads the copied kind's native hat pair for this Kirby with no null check (main+0x6de830 -> vtbl[0x58] main+0x491e00); after the quiet preload released the pair while slot 7 stayed a ready Falco source, a hat request jumped to 0. on_frame reads the pair (model::kirby_copy_pair) before the lease and the copy and keeps the request pending without it (the existing timeout ends it). Part 1: the read."
+    },
+    {
+     "old": "            pending.leases_released = true;\n            match sources::prepare(role, pending.kind,\n",
+     "new": "            pending.leases_released = true;\n            // SOL-R23: the native copy reads this kind's hat pair for this Kirby with no null check; wait until it exists.\n            use crate::model::kirby_copy_pair::{copy_ready, PAIR_KINDS};\n            let kind = pending.kind;\n            if !copy_ready(kind, PAIR_KINDS.contains(&kind).then(|| copy_pair(body, kind)).flatten()) {\n                state.pending = Some(pending);\n                return;\n            }\n            match sources::prepare(role, pending.kind,\n",
+     "reason": "SOL-R23 (kh2-repro-xps-1, 2026-11-17): copy_setup reads the copied kind's native hat pair for this Kirby with no null check (main+0x6de830 -> vtbl[0x58] main+0x491e00); after the quiet preload released the pair while slot 7 stayed a ready Falco source, a hat request jumped to 0. on_frame reads the pair (model::kirby_copy_pair) before the lease and the copy and keeps the request pending without it (the existing timeout ends it). Part 2: the gate."
     }
    ]
   },
