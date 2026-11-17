@@ -55,7 +55,7 @@ mod tests {
         assert!(!copy_ready(0x14, Some(0)));
         assert!(!copy_ready(0x1c, None));
         // frame 24604: pair object 0x11fcc99400 -> the hat applied.
-        assert!(copy_ready(0x14, Some(0x11fc_c994_00)));
+        assert!(copy_ready(0x14, Some(0x0011_fcc9_9400)));
         // Mario and Luigi never read the pair.
         assert!(copy_ready(0x00, None) && copy_ready(0x09, Some(0)));
     }

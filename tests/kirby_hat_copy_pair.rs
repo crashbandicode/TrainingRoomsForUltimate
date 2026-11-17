@@ -18,7 +18,7 @@ fn hats_source() -> String {
 fn the_crash_state_waits() {
     // frame 43268: Falco from source slot 7, record found, pair {0, 0}.
     assert!(!copy_ready(0x14, Some(0)));
-    assert!(copy_ready(0x14, Some(0x11fc_c994_00)));
+    assert!(copy_ready(0x14, Some(0x0011_fcc9_9400)));
 }
 
 #[test]
