@@ -385,6 +385,20 @@ impl Clock {
         self.exhausted |= escaped;
         Ok(())
     }
+
+    /// M3 G1: adopt an observed native write between ticks only when its `old` is bit-equal to the model's
+    /// remaining; continue from `new`. Anything else is the existing mismatch (no adjustment is inferred).
+    pub fn rebase(&mut self, old: u32, new: u32) -> Result<(), ClockError> {
+        if self.exhausted || self.last.remaining.to_bits() != old {
+            return Err(ClockError::TransitionMismatch);
+        }
+        let new = f32::from_bits(new);
+        if !new.is_finite() || new <= 0.0 {
+            return Err(ClockError::InvalidRecord);
+        }
+        self.last.remaining = new;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
