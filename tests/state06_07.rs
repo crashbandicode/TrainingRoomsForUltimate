@@ -23,19 +23,58 @@ fn words_of(guard: &[u8; 64]) -> Vec<u32> {
 #[test]
 fn state06_lra_register_rule() {
     // Off in native Training: x8 is cleared so the game's check fails. On: untouched.
-    assert_eq!(lra_reset::x8_write(false, true), Some(0));
-    assert_eq!(lra_reset::x8_write(true, true), None);
+    assert_eq!(lra_reset::x8_write(false, true, false), Some(0));
+    assert_eq!(lra_reset::x8_write(true, true, false), None);
     // Outside native Training the register is never touched (the fork's early return).
-    assert_eq!(lra_reset::x8_write(false, false), None);
-    assert_eq!(lra_reset::x8_write(true, false), None);
+    assert_eq!(lra_reset::x8_write(false, false, false), None);
+    assert_eq!(lra_reset::x8_write(true, false, false), None);
     // The setting decodes from the file: [1,0] On, [0,1] Off.
     let mut s = model::settings::Snapshot::factory();
     assert!(s.lra_reset());
     s.set("lra_reset", &[0, 1]).unwrap();
     assert!(!s.lra_reset());
-    assert_eq!(lra_reset::x8_write(s.lra_reset(), true), Some(0));
+    assert_eq!(lra_reset::x8_write(s.lra_reset(), true, false), Some(0));
     // The inverted upstream gate is not adopted: the hub never runs outside Training.
     assert!(!lra_reset::hub_should_run(true, false, false));
+}
+
+#[test]
+fn crash0900_no_native_reset_while_a_practice_fighter_loads() {
+    // Hardware 2026-11-17 (reship-3): L+R+A during a Player Character pick's load; Eden
+    // `crash0900-*-reship34`/`b-card4`: P1's loader stayed at 13 and the install never finished.
+    // Mid-load the game's reset check fails even with the setting On ...
+    assert_eq!(lra_reset::x8_write(true, true, true), Some(0));
+    assert_eq!(lra_reset::x8_write(false, true, true), Some(0));
+    // ... and outside native Training nothing changes.
+    assert_eq!(lra_reset::x8_write(true, false, true), None);
+    // The loader byte: 14 is rest; 13 (the parked Reload / group-swap commit), 12, and an
+    // unreadable byte are not.
+    assert_eq!(lra_reset::LOADER_STATE_FIELD, 0x591c);
+    assert!(lra_reset::loader_resting(Some(14)));
+    for state in [Some(13u8), Some(12), Some(0), Some(0xff), None] {
+        assert!(!lra_reset::loader_resting(state), "{state:?}");
+    }
+}
+
+#[test]
+fn crash0900_a_refused_reset_is_never_silent() {
+    use lra_reset::{gate, RESET_REQUESTED};
+    // The player's L+R+A mid-load: refused, and the notice is posted once (the existing swap-busy text).
+    assert_eq!(gate(RESET_REQUESTED, true, true, true, false), (Some(0), true, true));
+    assert_eq!(lra_reset::REFUSED_BODY, "Wait for the character swap to finish");
+    assert_eq!(lra_reset::REFUSED_HEADER, "L+R+A Reset");
+    // Held (or kept by the game): still refused, no second notice.
+    assert_eq!(gate(RESET_REQUESTED, true, true, true, true), (Some(0), true, false));
+    // A check that requests nothing mid-load: the register is cleared (harmless), nothing is shown.
+    assert_eq!(gate(0, true, true, true, false), (Some(0), false, false));
+    // The load settled: the request resets as before, and the next refusal notifies again.
+    assert_eq!(gate(RESET_REQUESTED, true, true, false, true), (None, false, false));
+    assert_eq!(gate(RESET_REQUESTED, true, true, true, false).2, true);
+    // The setting Off is the player's own choice: refused as before, no notice.
+    assert_eq!(gate(RESET_REQUESTED, false, true, true, false), (Some(0), false, false));
+    assert_eq!(gate(RESET_REQUESTED, false, true, false, false), (Some(0), false, false));
+    // Outside native Training: untouched, nothing shown.
+    assert_eq!(gate(RESET_REQUESTED, true, false, true, false), (None, false, false));
 }
 
 #[test]

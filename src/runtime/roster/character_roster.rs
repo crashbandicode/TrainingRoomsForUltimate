@@ -291,6 +291,12 @@ pub fn busy() -> bool {
     INSTALL.suspends_practice()
 }
 
+/// The live native entry of practice slot `slot` (0 Player 1, 1 the CPU), for a reader in the current native callback
+/// (`lra_reset::reset_check`, CRASH-0900). Never saved.
+pub(crate) unsafe fn practice_entry(slot: u32) -> Option<*const u8> {
+    native_source::entry(slot)
+}
+
 /// Speculation cannot take the installer ahead of an accepted visible operation.
 pub(crate) fn preload_blocked() -> bool {
     preload_blocked_reason().is_some()

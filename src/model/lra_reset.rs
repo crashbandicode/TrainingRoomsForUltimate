@@ -8,12 +8,55 @@
 /// What the inline hook inside the game's reset check does to register `x8`: when the setting is
 /// Off, and only in native Training, the register is cleared so the game's check fails and no reset
 /// happens (SPEC-state-06 §4). `None` leaves the register alone.
-pub const fn x8_write(lra_reset_on: bool, native_training: bool) -> Option<u64> {
-    if native_training && !lra_reset_on {
+///
+/// `fighter_loading` (CRASH-0900, reship-3 hardware 2026-11-17): a practice fighter is mid-load,
+/// either the roster's install suspends practice or a practice entry's native loader is away from
+/// its resting state ([`loader_resting`]). Vanilla Training never resets while a fighter loads; a
+/// reset there left P1's loader parked in state 13 (Eden `crash0900-a-reship34`/`b-card4`: the
+/// install never finished, every later pick refused) and on the console the state-13 commit
+/// activation later read a null `cell[+0x5918]` (Data Abort at 0x10, PC main+0x628b40, LR
+/// main+0x656f40 from `0x656644`). The reset is refused until the load settles; the player
+/// presses L+R+A again.
+pub const fn x8_write(lra_reset_on: bool, native_training: bool, fighter_loading: bool) -> Option<u64> {
+    if native_training && (!lra_reset_on || fighter_loading) {
         Some(0)
     } else {
         None
     }
+}
+
+/// A fighter entry's native loader state byte (`entry+0x591c`; `0x655f60` dispatches on it).
+pub const LOADER_STATE_FIELD: usize = 0x591c;
+/// The loader's resting state for a live practice fighter (14): Eden `trace.*` on `main+0x656ee0`
+/// (`crash0900-*`) reads 14 on both entries between loads and 13 (or lower) during a Reload or a
+/// group-swap commit.
+pub const LOADER_RESTING: u8 = 14;
+
+/// Whether an entry's loader is at rest. An unreadable byte is not at rest (fail closed: the
+/// reset waits); an absent entry is decided by the caller (no entry, nothing loading).
+pub const fn loader_resting(state: Option<u8>) -> bool {
+    matches!(state, Some(LOADER_RESTING))
+}
+
+/// The value `x8` holds at the hook when the game is about to reset: the site is
+/// `cmp w8, #0x2; b.ne <no reset>` (`main+0x1378e50`, `w8 = [x8+0x240]`).
+pub const RESET_REQUESTED: u64 = 2;
+
+/// The notice a refused reset shows (never silent; primary 2026-11-17 09:55Z): the existing swap-busy text
+/// (`mii::ordinary_cpu::SWAP_BUSY_NOTICE`, the roster's refusal of a pick during the same load), under the
+/// setting's own menu label.
+pub const REFUSED_HEADER: &str = "L+R+A Reset";
+pub const REFUSED_BODY: &str = "Wait for the character swap to finish";
+
+/// One reset check: the register write ([`x8_write`]), whether this check is a reset refused because a
+/// fighter loads, and whether to post [`REFUSED_BODY`] now. The notice is posted once per refusal (the
+/// first check of a run of refused requests: a held L+R+A, or a request the game keeps), never when the
+/// setting itself is Off (the player turned the reset off) and never for a check that requests nothing.
+pub const fn gate(x8: u64, lra_reset_on: bool, native_training: bool, fighter_loading: bool, was_refused: bool)
+    -> (Option<u64>, bool, bool) {
+    let write = x8_write(lra_reset_on, native_training, fighter_loading);
+    let refused = x8 == RESET_REQUESTED && native_training && lra_reset_on && fighter_loading;
+    (write, refused, refused && !was_refused)
 }
 
 /// Whether the fighter on-init wrapper runs the hub after the game's own on-init (SPEC-state-06
@@ -136,9 +179,12 @@ mod tests {
     }
 
     fn off_clears_x8_in_training_only() {
-        assert_eq!(x8_write(false, true), Some(0));
-        assert_eq!(x8_write(false, false), None);
-        assert_eq!(x8_write(true, true), None);
+        assert_eq!(x8_write(false, true, false), Some(0));
+        assert_eq!(x8_write(false, false, false), None);
+        assert_eq!(x8_write(true, true, false), None);
+        // CRASH-0900: a practice fighter mid-load refuses the reset even with the setting On.
+        assert_eq!(x8_write(true, true, true), Some(0));
+        assert_eq!(x8_write(true, false, true), None);
     }
 
     fn the_hub_runs_every_step_in_order() {
