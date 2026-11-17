@@ -610,7 +610,7 @@ Use **Left / Right** on a setting to choose its mode, or **A** to open its list.
 **A** on its range row opens the slider, **Left / Right**
 chooses a handle, **A** picks it up, the **D-pad** changes it, and **A** puts it down.
 Auto is available for **Angle** and **Start position**; the other ranges use Set or Random.
-On floors and platform tops Auto lands on your spot; on walls and undersides it may land a few units off.
+Auto lands on your spot on floors and platform tops; on walls it can land off your spot or find no solution, and under the stage it can miss by a lot, so use Set or Random there.
 If the chosen values cannot make a launch, the message asks for a different setup.
 
 ### Launch settings
