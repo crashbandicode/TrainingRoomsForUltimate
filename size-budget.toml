@@ -1750,3 +1750,10 @@ ceiling = 154972
 date = "2026-11-17"
 reason = "RESHIP-3 final Tech plus LEAD-1 integrated source measured154972, no headroom. Within combined approval envelope148683+(154717-148194)+207=155413, with441 overlap saved. Includes reviewed versioned repick dispatch and typed admission composed with Tech nonblocking context and exact acceptance. Counting and gates unchanged."
 approved_by = "Operator rc.15 size approval; primary2026-11-17 06:23Z combines card and Tech approvals, primary06:29Z adds approved LEAD-1 +207. Exact combined measured total, FOR OPERATOR REVIEW."
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155171
+date = "2026-11-17"
+reason = "RESHIP-4 = RESHIP-3 (154972) + CRASH-0900 deferred L+R+A reset with the review-R3 lifecycle generation (rc15/crash0900-lra-gate 568203ff), measured 155171: +199 over 154972, within the approved +200. Exact total, no headroom. Counting and gates unchanged."
+approved_by = "Primary 2026-11-17 11:40Z approves cumulative growth up to +200 over 154972 FOR OPERATOR REVIEW; primary 12:56Z keeps the +200 bound for the R3 fix."
