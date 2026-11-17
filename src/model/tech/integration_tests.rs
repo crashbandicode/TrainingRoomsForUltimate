@@ -326,6 +326,7 @@ fn all_fixed_attempt_values_stay_and_random_rerolls_only_on_request() {
         },
         blast: bounds,
         view: None,
+        damage_multiplier: Some(1.),
     };
     let a = planner::plan(config, context(), &mut |_| {
         panic!("fixed values must not draw randomness")
@@ -341,6 +342,34 @@ fn all_fixed_attempt_values_stay_and_random_rerolls_only_on_request() {
     assert_eq!(a.setup.launch.hit_damage, 12.);
     assert_eq!(a.setup.launch.di, Some(Vec2::default()));
     assert!(!a.approximate);
+    let converted = planner::plan(
+        config,
+        planner::Context {
+            damage_multiplier: Some(1.2),
+            ..context()
+        },
+        &mut |_| panic!("fixed values must not draw randomness"),
+    )
+    .unwrap();
+    assert_eq!(converted.visible_hit_damage, 12.);
+    assert_eq!(converted.setup.launch.hit_damage, 10.);
+    for damage_multiplier in [
+        None,
+        Some(0.),
+        Some(-1.),
+        Some(f32::NAN),
+        Some(f32::INFINITY),
+    ] {
+        assert!(planner::plan(
+            config,
+            planner::Context {
+                damage_multiplier,
+                ..context()
+            },
+            &mut |_| panic!("unavailable multiplier must not sample an attempt")
+        )
+        .is_none());
+    }
     config.speed = Numeric {
         mode: Mode::Random,
         lo: 80.,
@@ -354,6 +383,36 @@ fn all_fixed_attempt_values_stay_and_random_rerolls_only_on_request() {
     );
     assert_eq!(low.setup.launch.percent, high.setup.launch.percent);
     assert_eq!(low.setup.launch.start, high.setup.launch.start);
+}
+#[test]
+fn visible_hit_damage_uses_only_the_supplied_live_multiplier() {
+    let base = planner::base_hit_damage(16.38, Some(1.2)).unwrap();
+    // Decimal input and the observed native percent delta differ by one ULP.
+    // Keep the requested f32 division, without fitting either result.
+    assert_eq!(base.to_bits(), 0x415a6665);
+    assert_eq!(format!("{base:.2}"), "13.65");
+    assert_eq!(
+        planner::base_hit_damage(f32::from_bits(0x41830a3e), Some(1.2))
+            .unwrap()
+            .to_bits(),
+        0x415a6667
+    );
+    assert_eq!(planner::base_hit_damage(16.38, Some(1.)), Some(16.38));
+    assert_eq!(planner::base_hit_damage(1., Some(1.2)), Some(1. / 1.2));
+    assert_eq!(planner::base_hit_damage(30., Some(1.)), Some(30.));
+    for multiplier in [
+        None,
+        Some(0.),
+        Some(-1.),
+        Some(f32::NAN),
+        Some(f32::INFINITY),
+        Some(f32::MIN_POSITIVE),
+    ] {
+        assert_eq!(planner::base_hit_damage(16.38, multiplier), None);
+    }
+    for visible in [0., 30.01, -1., f32::NAN, f32::INFINITY] {
+        assert_eq!(planner::base_hit_damage(visible, Some(1.2)), None);
+    }
 }
 #[test]
 fn native_abandonment_while_held_retries_same_sample_uncounted() {

@@ -15,11 +15,23 @@ pub struct Context<'a> {
     pub params: FlightParams,
     pub blast: Box2,
     pub view: Option<Box2>,
+    /// Fresh native percent multiplier; absence never supplies a default.
+    pub damage_multiplier: Option<f32>,
 }
 pub struct Plan {
     pub setup: Setup,
     pub approximate: bool,
     pub contact_frames: u16,
+    pub visible_hit_damage: f32,
+}
+/// UI Hit damage is the visible added percent; the core accepts base damage.
+pub fn base_hit_damage(visible: f32, multiplier: Option<f32>) -> Option<f32> {
+    let multiplier = multiplier.filter(|m| m.is_finite() && *m > 0.)?;
+    if !visible.is_finite() || !(1. ..=30.).contains(&visible) {
+        return None;
+    }
+    let base = visible / multiplier;
+    (base.is_finite() && base > 0.).then_some(base)
 }
 fn sample(n: Numeric, step: f32, draw: &mut impl FnMut(u32) -> u32) -> Option<f32> {
     Variable {
@@ -39,9 +51,13 @@ pub fn plan(
     context: Context<'_>,
     draw: &mut impl FnMut(u32) -> u32,
 ) -> Option<Plan> {
+    let multiplier = context
+        .damage_multiplier
+        .filter(|m| m.is_finite() && *m > 0.)?;
     let knockback = sample(config.speed, 10., draw)?;
     let percent = sample(config.damage, 5., draw)?;
-    let hit_damage = sample(config.hit_damage, 1., draw)?;
+    let visible_hit_damage = sample(config.hit_damage, 1., draw)?;
+    let hit_damage = base_hit_damage(visible_hit_damage, Some(multiplier))?;
     let frames = sample(config.time, 1., draw)? as u16;
     let delay = sample(config.delay, 1., draw)? as u16;
     let angle = sample(config.angle, 5., draw);
@@ -132,5 +148,6 @@ pub fn plan(
         setup: Setup { launch, delay },
         approximate,
         contact_frames: frames,
+        visible_hit_damage,
     })
 }

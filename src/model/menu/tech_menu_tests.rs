@@ -67,6 +67,21 @@ fn tech_ranges_use_public_units_and_native_kb() {
 }
 
 #[test]
+fn tech_hit_damage_help_uses_visible_added_percent() {
+    let help = ROWS[row("tech_hit_damage")].help;
+    assert!(help.contains("Percent the hit adds to your damage."));
+    assert!(help.contains("pause before you launch"));
+    let range = ROWS[row("tech_hit_damage_range")].help;
+    assert!(range.contains("Added percent from 1 to 30, default 12."));
+    assert!(range.contains("Set uses the low handle; Random uses both."));
+    for text in [help, range] {
+        for internal in ["not added", "multiplier", "resolver", "hitlag"] {
+            assert!(!text.contains(internal), "unexpected help wording: {text}");
+        }
+    }
+}
+
+#[test]
 fn tech_set_random_auto_controls_ranges() {
     let mut m=menu();
     for id in ["tech_angle_range","tech_start_range"] { assert_eq!(m.grey(row(id)),Some(Grey::TechAuto)); }

@@ -62,7 +62,7 @@ struct Practice {
     config: Config,
     pending: bool,
     reroll: bool,
-    sampled: Option<(Setup, picker::Spot)>,
+    sampled: Option<(Setup, picker::Spot, f32)>,
     approximate: bool,
     scan: Option<PlatformScan>,
     scan_done: bool,
@@ -613,6 +613,10 @@ pub unsafe fn frame(fighter: usize) {
             return;
         }
         if run.pending {
+            let Ok(multiplier) = super::tech_hitlag::live_multiplier(at) else {
+                notice(run, Some("Hit damage unavailable"));
+                return;
+            };
             if run.reroll && run.sampled.is_none() {
                 let Some(blast) = tech_surfaces::blast_bounds() else {
                     return;
@@ -650,6 +654,7 @@ pub unsafe fn frame(fighter: usize) {
                         },
                         blast: solver::editor_bounds(blast),
                         view: (run.config.camera == 1).then(|| solver::editor_bounds(range)),
+                        damage_multiplier: Some(multiplier),
                     },
                     &mut |n| draw(&mut run.rng, n),
                 );
@@ -661,10 +666,16 @@ pub unsafe fn frame(fighter: usize) {
                     );
                     return;
                 };
-                run.sampled = Some((plan.setup, spot));
+                run.sampled = Some((plan.setup, spot, plan.visible_hit_damage));
                 run.approximate = plan.approximate;
             }
-            if let Some((setup, spot)) = run.sampled {
+            if let Some((mut setup, spot, visible_hit_damage)) = run.sampled {
+                let Some(base) = planner::base_hit_damage(visible_hit_damage, Some(multiplier))
+                else {
+                    notice(run, Some("Hit damage unavailable"));
+                    return;
+                };
+                setup.launch.hit_damage = base;
                 if !spot.current(&mut source) {
                     notice(run, Some("Selected surface moved; choose a stage point"));
                     return;
