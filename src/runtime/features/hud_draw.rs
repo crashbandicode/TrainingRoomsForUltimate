@@ -45,9 +45,6 @@ struct Containers {
 static CONTAINERS: Mutex<Containers> =
     Mutex::new(Containers { layout: 0, registrations: 0, notice: 0, strip: [0; iv::COUNT], bar: [0; cb::COUNT] });
 
-/// The longest text written to one pane (the notice header's 24 units).
-const TEXT_UNITS: usize = 48;
-
 /// `ui::hud::HudDraw`: `layout` is the layout being ticked and `name` its name.
 ///
 /// # Safety
@@ -172,25 +169,6 @@ unsafe fn write_look(target: *mut Pane, index: usize, look: &Look, changed: Chan
     }
 }
 
-/// UTF-16 units of `text` (cut to `TEXT_UNITS`) in `out`; returns how many.
-fn units(text: &str, out: &mut [u16; TEXT_UNITS]) -> usize {
-    let mut len = 0;
-    for unit in text.encode_utf16() {
-        if len == out.len() {
-            break;
-        }
-        out[len] = unit;
-        len += 1;
-    }
-    len
-}
-
-unsafe fn set_text(target: *mut Pane, text: &str) {
-    let mut buffer = [0u16; TEXT_UNITS];
-    let len = units(text, &mut buffer);
-    pane::set_text(target, &buffer[..len]);
-}
-
 // ---- the notice slot ----------------------------------------------------------------------------------
 
 /// The height of the notice box drawn last (`f32` bits), which `notice_box::stack` keeps clear of the BTT chip each tick.
@@ -206,7 +184,8 @@ unsafe fn write_notice(container: *mut Pane, out: &TickOut, chip: Option<[f32; 4
     if let Some(draw) = out.draw {
         let mut buffer = [0u16; crate::model::notify::BODY_MAX];
         let len = crate::model::boot_notices::notice_units(draw.body.as_str(), &mut buffer);
-        let placed = notice_box::layout(draw.header, &mut buffer[..len]);
+        let mut heading = [0u16; notice_box::HEADER_UNITS];
+        let (placed, header_len, len) = notice_box::layout(draw.header, &mut heading, &mut buffer, len);
         NOTICE_H.store(placed.plate[3].to_bits(), Ordering::Release);
         let long = len > crate::model::boot_notices::SHORT_UNITS;
         let face = p::notice_faces(out.visible, long);
@@ -217,7 +196,7 @@ unsafe fn write_notice(container: *mut Pane, out: &TickOut, chip: Option<[f32; 4
         place(text, placed.body, face.body);
         place(long_text, placed.body, face.long_body);
         if !header.is_null() {
-            set_text(header, draw.header);
+            pane::set_text(header, &heading[..header_len]);
         }
         let target = if long { long_text } else { text };
         if !target.is_null() {

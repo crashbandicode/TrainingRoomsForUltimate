@@ -15,6 +15,12 @@ pub const LINE_GAP: f32 = 2.0;
 pub const GAP: f32 = 12.0;
 /// The widest a wrapped line may be.
 pub const MAX_TEXT_W: f32 = NOTICE_MAX_W - 2.0 * PAD_X;
+/// The most body lines a notice keeps (a longer text ends in `…`): with the wide BTT chip over it, the tallest box still
+/// ends above the player HUD.
+pub const MAX_LINES: usize = 14;
+/// The header pane's capacity (`panes::spec(IDX_NOTICE_HEADER)`).
+pub const HEADER_UNITS: usize = 24;
+const ELLIPSIS: u16 = 0x2026;
 const NEWLINE: u16 = b'\n' as u16;
 const SPACE: u16 = b' ' as u16;
 const SEPARATOR: u16 = 0xb7;
@@ -51,24 +57,50 @@ pub fn measure(units: impl IntoIterator<Item = u16>, font: f32) -> (f32, usize) 
     (widest, lines)
 }
 
-/// Wraps `units` in place at `max`: a line that would pass it breaks at its last space before a `·` separator, else at
-/// its last space. Only spaces become newlines, so the text and its length stay; a word wider than `max` stays whole.
-pub fn wrap(units: &mut [u16], max: f32, font: f32) {
-    let (mut start, mut width, mut i) = (0, 0.0, 0);
-    while i < units.len() {
+/// Wraps `units[..len]` in place so no line is wider than `max` and at most `max_lines` lines remain; returns the new
+/// length (at most `units.len()`). A line that would pass `max` breaks at its last space before a `·` separator, else at
+/// its last space; a word wider than `max` breaks inside it (a newline is inserted). When the buffer has no room for that
+/// newline, or the lines run out, the last line ends in `…` within `max` and the rest is dropped.
+pub fn wrap(units: &mut [u16], mut len: usize, max: f32, font: f32, max_lines: usize) -> usize {
+    let (mut start, mut width, mut lines, mut i) = (0, 0.0, 1, 0);
+    while i < len {
         if units[i] == NEWLINE {
-            (start, width) = (i + 1, 0.0);
-        } else {
-            width += advance(units[i]) * font;
-            let space = |sep: bool| (start + 1..i).rev().find(|&k| units[k] == SPACE && (!sep || units[k + 1] == SEPARATOR));
-            if let Some(at) = (width > max).then(|| space(true).or_else(|| space(false))).flatten() {
-                units[at] = NEWLINE;
-                i = at;
-                continue;
+            if lines == max_lines {
+                return ellipsis(units, start, i, max, font);
             }
+            (start, width, lines, i) = (i + 1, 0.0, lines + 1, i + 1);
+            continue;
         }
+        let w = advance(units[i]) * font;
+        if width + w > max && i > start {
+            let space = |sep: bool| {
+                (start + 1..=i).rev().find(|&k| units[k] == SPACE && (!sep || (k + 1 < len && units[k + 1] == SEPARATOR)))
+            };
+            if let Some(at) = space(true).or_else(|| space(false)) {
+                (units[at], i) = (NEWLINE, at);
+            } else if len < units.len() {
+                units.copy_within(i..len, i + 1);
+                (units[i], len) = (NEWLINE, len + 1);
+            } else {
+                return ellipsis(units, start, i, max, font);
+            }
+            continue;
+        }
+        width += w;
         i += 1;
     }
+    len
+}
+
+/// The line `units[start..end]` (no wider than `max`) ends in `…` within `max`; returns the new text length.
+fn ellipsis(units: &mut [u16], start: usize, mut end: usize, max: f32, font: f32) -> usize {
+    let mut width: f32 = units[start..end].iter().map(|&u| advance(u) * font).sum();
+    while end > start && width + advance(ELLIPSIS) * font > max {
+        end -= 1;
+        width -= advance(units[end]) * font;
+    }
+    units[end] = ELLIPSIS;
+    end + 1
 }
 
 /// The panes of one notice at the anchor (the plate's top-left corner at `NOTICE_LEFT`, `NOTICE_TOP`).
@@ -79,21 +111,28 @@ pub struct NoticeBox {
     pub body: [f32; 4],
 }
 
-/// `body` (the UTF-16 notice body) is wrapped in place at `MAX_TEXT_W`; the plate fits the wider of the two texts.
-pub fn layout(header: &str, body: &mut [u16]) -> NoticeBox {
+/// The notice's header fitted into `heading` (one line) and its UTF-16 body `body[..len]` wrapped in place, both within
+/// `MAX_TEXT_W`, so the plate is never wider than `NOTICE_MAX_W`. Returns the boxes and the two texts' lengths.
+pub fn layout(header: &str, heading: &mut [u16; HEADER_UNITS], body: &mut [u16], len: usize) -> (NoticeBox, usize, usize) {
     let [head, text] = [NOTICE_HEADER_FONT, NOTICE_BODY_FONT];
-    wrap(body, MAX_TEXT_W, text.0);
-    let (header_w, _) = measure(header.encode_utf16(), head.0);
-    let (body_w, lines) = measure(body.iter().copied(), text.0);
-    let (w, body_h) = (header_w.max(body_w), lines as f32 * text.1);
+    let mut header_len = 0;
+    for (slot, unit) in heading.iter_mut().zip(header.encode_utf16()) {
+        (*slot, header_len) = (unit, header_len + 1);
+    }
+    let header_len = wrap(heading, header_len, MAX_TEXT_W, head.0, 1);
+    let len = wrap(body, len, MAX_TEXT_W, text.0, MAX_LINES);
+    let (header_w, _) = measure(heading[..header_len].iter().copied(), head.0);
+    let (body_w, lines) = measure(body[..len].iter().copied(), text.0);
+    let (w, body_h) = (header_w.max(body_w).min(MAX_TEXT_W), lines as f32 * text.1);
     let gap = if lines == 0 { 0.0 } else { LINE_GAP };
     let h = 2.0 * PAD_Y + head.1 + gap + body_h;
     let (x, header_y) = (NOTICE_LEFT + PAD_X + w / 2.0, NOTICE_TOP - PAD_Y - head.1 / 2.0);
-    NoticeBox {
+    let boxes = NoticeBox {
         plate: [x, NOTICE_TOP - h / 2.0, w + 2.0 * PAD_X, h],
         header: [x, header_y, w, head.1],
         body: [x, header_y - head.1 / 2.0 - gap - body_h / 2.0, w, body_h],
-    }
+    };
+    (boxes, header_len, len)
 }
 
 /// The notice container's y offset for a box `h` high: 0 at the anchor, or `GAP` under the BTT compact chip

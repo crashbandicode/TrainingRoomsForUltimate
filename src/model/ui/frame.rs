@@ -208,6 +208,8 @@ pub struct Frame {
     pub icons: [MarkIcon; super::panes::FLOPPIES + super::panes::LOOPS],
     /// The recording pop-up is the window. The background shrinks so the match HUD stays visible.
     pub popup: bool,
+    /// A dialog (a confirmation, the Fighter Mismatch question, a panel): drawn in a box sized to it (`dialog_box`).
+    pub dialog: bool,
     /// Green plate behind a recording row (the active file or the bound save).
     pub green: [bool; ROW_LINES],
     /// White cursor border and left bar, instead of the dark highlight, on a recording screen.
@@ -292,6 +294,7 @@ impl Frame {
         self.hint.clear();
         self.icons = [MarkIcon::HIDDEN; super::panes::FLOPPIES + super::panes::LOOPS];
         self.popup = false;
+        self.dialog = false;
         self.green = [false; ROW_LINES];
         self.white_cursor = false;
         self.hairline = None;
@@ -355,6 +358,7 @@ impl Frame {
             hint: Text::new(),
             icons: [MarkIcon::HIDDEN; super::panes::FLOPPIES + super::panes::LOOPS],
             popup: false,
+            dialog: false,
             green: [false; ROW_LINES],
             white_cursor: false,
             hairline: None,
@@ -377,6 +381,54 @@ impl Frame {
 impl Default for Frame {
     fn default() -> Self {
         Frame::new()
+    }
+}
+
+/// A dialog's box (2026-11-17: every dialog takes only the space it needs): the background `[x, y, w, h]` around the
+/// crumb, the content and the help and hint lines, which follow the content instead of the page's foot.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DialogBox {
+    pub bg: [f32; 4],
+    pub help_y: [f32; 2],
+    pub hint_y: f32,
+}
+
+impl Frame {
+    /// The box of a dialog (`dialog`) or the recording pop-up (`popup`); `None` for a page, which keeps the full panel.
+    pub fn dialog_box(&self) -> Option<DialogBox> {
+        use super::notice_box::measure;
+        use super::panes as p;
+        const LEFT: f32 = -880.0;
+        const PAD: f32 = 24.0;
+        if !self.dialog && !self.popup {
+            return None;
+        }
+        let right_of = |text: &[u16], font: (f32, f32)| LEFT + measure(text.iter().copied(), font.0).0;
+        let (mut right, mut bottom) = if self.view == View::Tiles {
+            let (cols, rows, count) = (usize::from(self.tile_cols.max(1)), usize::from(self.tile_rows.max(1)), usize::from(self.tile_count));
+            let cell_w = (p::ROW_RIGHT - p::ROW_LEFT) / cols as f32;
+            (p::ROW_LEFT + count.min(cols) as f32 * cell_w, 320.0 - count.div_ceil(cols) as f32 * p::TILE_AREA_H / rows as f32)
+        } else {
+            let (x, w) = p::row_label_box(self.popup);
+            let rows = &self.rows[..usize::from(self.row_count)];
+            let widest = rows.iter().map(|r| measure(r.label.units().iter().copied(), p::FONT.0).0).fold(0.0, f32::max);
+            (x - w / 2.0 + widest, p::row_y(rows.len().max(1) - 1) - p::ROW_H / 2.0)
+        };
+        if self.popup && self.conn_count > 0 {
+            right = right.max(p::CONN_RIGHT);
+            bottom = bottom.min(p::conn_y(usize::from(self.conn_count) - 1) - p::CONN_LINE_H / 2.0);
+        }
+        right = right.max(right_of(self.crumb.units(), p::FONT));
+        let (mut y, mut help_y) = (bottom - 8.0, p::HELP_Y);
+        for (at, line) in help_y.iter_mut().zip(&self.help).filter(|(_, line)| !line.units().is_empty()) {
+            (y, *at) = (y - 48.0, y - 48.0);
+            right = right.max(right_of(line.units(), p::FONT_SMALL));
+        }
+        let hint_y = y - 52.0;
+        right = right.max(right_of(self.hint.units(), p::FONT_SMALL)) + PAD;
+        let top = if self.popup { p::TAB_Y } else { p::CRUMB_Y } + 28.0 + PAD;
+        let (left, bottom) = (LEFT - PAD, hint_y - 22.0 - PAD);
+        Some(DialogBox { bg: [(left + right) / 2.0, (top + bottom) / 2.0, right - left, top - bottom], help_y, hint_y })
     }
 }
 

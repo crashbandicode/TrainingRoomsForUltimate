@@ -387,6 +387,7 @@ pub fn panel_frame<S: AsRef<str>>(menu: &Menu, title: &str, footer: &str, labels
     cleared_page(menu, frame);
     let _ = write!(frame.crumb, "{}  >  {title}", menu.page().title());
     frame.view = View::Tiles;
+    frame.dialog = true;
     frame.tile_cols = PANEL_COLS as u8;
     frame.tile_rows = PANEL_ROWS as u8;
     let count = labels.len().min(PANEL_CELLS);
@@ -528,6 +529,7 @@ fn confirm_reset_frame(menu: &Menu, screen: &Screen, frame: &mut Frame) {
     push(frame, "A  reset", "", Tone::On);
     push(frame, "B  cancel", "", Tone::Normal);
     frame.focus = Some(1);
+    frame.dialog = true;
     let _ = write!(frame.help[0], "Every setting on {} goes back to your saved defaults.", menu.page().title());
     // The menu shortcuts are not settings of the page (they live in the shortcuts file), so the reset leaves them.
     let shortcuts = ROWS.iter().any(|r| {

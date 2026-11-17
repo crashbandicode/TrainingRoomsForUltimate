@@ -4,12 +4,12 @@
 use skyline::nn::ui2d::Pane;
 
 use crate::model::effect_chips::Placement;
-use crate::model::frame::{Frame, Tone, View};
+use crate::model::frame::{DialogBox, Frame, Tone, View};
 use crate::model::menu::options::DIRECTIONS;
 use crate::model::menu::CHIP_POS;
 use crate::model::screens::{TILE_GREYED, TILE_HIDDEN};
 use crate::model::panes as p;
-use crate::model::panes::{ACCENT, ACCENT_RING, BADGE_W, BADGE_X, BAND, CHIPS, CHIP_LAYERS, CHIP_SIZE, CONN_BOXES, CONN_BOX_H, CONN_INDENT, CONN_LEFT, CONN_LINES, CONN_RIGHT, CONN_STEM_X, CONN_TREE, CRUMB_Y, CURSOR_WHITE, GREEN_ROW, GROUPS, GROUP_X, HEAD_MARK_X, HEAD_SQ, HIGHLIGHT, IDX_BADGE, IDX_BADGE_NUM, IDX_BG, IDX_CHIP, IDX_CHIP_BADGE, IDX_CHIP_HI, IDX_CHIP_LABEL, IDX_CHIP_NEEDLE, IDX_CONN, IDX_CONN_BOX, IDX_CONN_DIV, IDX_CONN_HEAD, IDX_CONN_PILL, IDX_CONN_PILL_TEXT, IDX_CONN_TREE, IDX_CRUMB, IDX_CURSOR, IDX_DIVIDER, IDX_GREEN, IDX_GROUP_HI, IDX_HAIRLINE, IDX_HEAD_SQ, IDX_HELP, IDX_HINT, IDX_ITEM_ICON, IDX_OUTLINE, IDX_ROLE, IDX_ROLE_BG, IDX_ROLE_CAP, IDX_ROLE_HI, IDX_ROLE_KEY, IDX_ROW, IDX_ROW_HI, IDX_SEP, IDX_SUB, IDX_TAB_BOX, IDX_TAB_HI, IDX_TILE, IDX_TILE_BADGE, IDX_TILE_HI, IDX_TILE_LABEL, IDX_TILE_SOLO, IDX_TILE_STRIPE, IDX_TITLE, ITEM_ICONS, KIND_COMBO, KIND_MACRO, KIND_SEQUENCE, MENU_COUNT, PANEL_H, PANEL_W, PILL_H, POPUP_H, POPUP_W, POP_TAB_Y, ROLE_CAP, ROLE_CAP_X, ROLE_H, ROLE_TAB_W, ROLE_X, ROWS, ROW_FIRST_Y, ROW_H, ROW_LEFT, ROW_RIGHT, RULE, SUB_DROP, SUB_RISE, TAB_BOXES, TAB_BOX_W, TAB_H, TAB_Y, TEXT, TEXT_DIM, TEXT_OFF, TEXT_ON, TILES, TILE_AREA_H, VALUE_DROP};
+use crate::model::panes::{ACCENT, ACCENT_RING, BADGE_W, BADGE_X, BAND, CHIPS, CHIP_LAYERS, CHIP_SIZE, CONN_BOXES, CONN_BOX_H, CONN_INDENT, CONN_LEFT, CONN_LINES, CONN_RIGHT, CONN_STEM_X, CONN_TREE, CRUMB_Y, CURSOR_WHITE, GREEN_ROW, GROUPS, GROUP_X, HEAD_MARK_X, HEAD_SQ, HIGHLIGHT, IDX_BADGE, IDX_BADGE_NUM, IDX_BG, IDX_CHIP, IDX_CHIP_BADGE, IDX_CHIP_HI, IDX_CHIP_LABEL, IDX_CHIP_NEEDLE, IDX_CONN, IDX_CONN_BOX, IDX_CONN_DIV, IDX_CONN_HEAD, IDX_CONN_PILL, IDX_CONN_PILL_TEXT, IDX_CONN_TREE, IDX_CRUMB, IDX_CURSOR, IDX_DIVIDER, IDX_GREEN, IDX_GROUP_HI, IDX_HAIRLINE, IDX_HEAD_SQ, IDX_HELP, IDX_HINT, IDX_ITEM_ICON, IDX_OUTLINE, IDX_ROLE, IDX_ROLE_BG, IDX_ROLE_CAP, IDX_ROLE_HI, IDX_ROLE_KEY, IDX_ROW, IDX_ROW_HI, IDX_SEP, IDX_SUB, IDX_TAB_BOX, IDX_TAB_HI, IDX_TILE, IDX_TILE_BADGE, IDX_TILE_HI, IDX_TILE_LABEL, IDX_TILE_SOLO, IDX_TILE_STRIPE, IDX_TITLE, ITEM_ICONS, KIND_COMBO, KIND_MACRO, KIND_SEQUENCE, MENU_COUNT, PANEL_H, PANEL_W, PILL_H, POP_TAB_Y, ROLE_CAP, ROLE_CAP_X, ROLE_H, ROLE_TAB_W, ROLE_X, ROWS, ROW_FIRST_Y, ROW_H, ROW_LEFT, ROW_RIGHT, RULE, SUB_DROP, SUB_RISE, TAB_BOXES, TAB_BOX_W, TAB_H, TAB_Y, TEXT, TEXT_DIM, TEXT_OFF, TEXT_ON, TILES, TILE_AREA_H, VALUE_DROP};
 
 /// The fork's role colours (`src/training/ui/roster_grid.rs:9-10`): the roster grid's Player and CPU badges, stripes,
 /// Solo Popo markers and cursor tint.
@@ -417,9 +417,25 @@ impl Panes {
                 }
             }
         }
+        // Dialogs take only the space they need (2026-11-17): a box around their content, and no page chrome around it.
+        let dialog = frame.dialog_box();
+        let chrome = dialog.is_none() || frame.popup;
+        for index in (0..p::TABS).map(p::tab_index).chain((0..GROUPS).map(p::group_index)).chain([p::IDX_SEP_HELP]) {
+            self.show(index, chrome);
+        }
+        if !chrome {
+            for index in [IDX_TAB_HI, IDX_TITLE, IDX_SEP, IDX_DIVIDER, IDX_GROUP_HI].into_iter().chain(IDX_TAB_BOX..IDX_TAB_BOX + 4 * TAB_BOXES) {
+                self.hide(index);
+            }
+        }
+        let page = DialogBox { bg: [0.0, 0.0, PANEL_W, PANEL_H], help_y: p::HELP_Y, hint_y: p::HINT_Y };
+        let DialogBox { bg: [x, y, w, h], help_y, hint_y } = dialog.unwrap_or(page);
+        self.at(IDX_HELP, p::HELP_X, help_y[0]);
+        self.at(IDX_HELP + 1, p::HELP_X, help_y[1]);
+        self.at(IDX_HINT, p::HELP_X, hint_y);
         let bg = self.all[IDX_BG];
         if !bg.is_null() {
-            let (w, h) = if frame.popup { (POPUP_W, POPUP_H) } else { (PANEL_W, PANEL_H) };
+            pane::set_pos(bg, x, y);
             pane::set_width(bg, w);
             pane::set_height(bg, h);
         }

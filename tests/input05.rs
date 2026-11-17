@@ -88,7 +88,9 @@ fn longest_chords_survive_queue_utf16_wrap_and_preallocated_pane_boundaries() {
             let mut units = [0; BODY_MAX];
             let len = boot_notices::notice_units(draw.body.as_str(), &mut units);
             assert_eq!(len, expected.len());
-            let placed = notice_box::layout(draw.header, &mut units[..len]);
+            let mut heading = [0u16; notice_box::HEADER_UNITS];
+            let (placed, _, wrapped) = notice_box::layout(draw.header, &mut heading, &mut units, len);
+            assert_eq!(wrapped, len, "the chord bodies wrap at spaces only");
             for (&unit, byte) in units[..len].iter().zip(expected.bytes()) {
                 assert!(unit == u16::from(byte) || (byte == b' ' && unit == u16::from(b'\n')));
             }
