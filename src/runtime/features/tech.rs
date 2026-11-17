@@ -614,6 +614,7 @@ pub unsafe fn frame(fighter: usize) {
         }
         if run.pending {
             let Ok(multiplier) = super::tech_hitlag::live_multiplier(at) else {
+                // restriction: tech-hit-damage-multiplier-unavailable
                 notice(run, Some("Hit damage unavailable"));
                 return;
             };
@@ -672,6 +673,7 @@ pub unsafe fn frame(fighter: usize) {
             if let Some((mut setup, spot, visible_hit_damage)) = run.sampled {
                 let Some(base) = planner::base_hit_damage(visible_hit_damage, Some(multiplier))
                 else {
+                    // restriction: tech-hit-damage-multiplier-unavailable
                     notice(run, Some("Hit damage unavailable"));
                     return;
                 };
