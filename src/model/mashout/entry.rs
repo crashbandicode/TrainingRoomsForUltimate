@@ -11,7 +11,7 @@ pub fn start(move_: Scenario) -> Option<&'static str> {
             _ => "FIGHTER_STATUS_KIND_CATCH",
         },
         Plan::AirSideSpecial => "FIGHTER_STATUS_KIND_JUMP_SQUAT",
-        Plan::SideSpecial | Plan::Cling | Plan::Drag | Plan::Whip | Plan::Roller | Plan::Pin => {
+        Plan::SideSpecial | Plan::Cling | Plan::Drag | Plan::Whip | Plan::Roller | Plan::Pin | Plan::Judge => {
             "FIGHTER_STATUS_KIND_SPECIAL_S"
         }
         Plan::Egg | Plan::Inhale | Plan::NeutralSpecial | Plan::Freeze | Plan::IceShot => {
@@ -25,6 +25,14 @@ pub fn start(move_: Scenario) -> Option<&'static str> {
         // These need their verified native sequence, loadout or meter setup before admission.
         _ => return None,
     })
+}
+
+/// Judge INIT clears FIX_PANEL; ACMD fixes the natural choice at frame16.
+/// A stale fixed flag or an unguarded/default read never classifies an outcome.
+pub fn judge_outcome(saw_unfixed: bool, fixed: bool, kind: i32) -> Result<Option<bool>, &'static str> {
+    if !saw_unfixed || !fixed { return Ok(None); }
+    if !(0..=8).contains(&kind) { return Err("invalid native Judge choice"); }
+    Ok(Some(kind == 7))
 }
 
 /// Only down throws first acquire an ordinary grab, without grading that preparatory hold.
@@ -130,6 +138,21 @@ mod tests {
             assert_eq!((strike.lstick_x, strike.lstick_y, strike.rstick_x, strike.rstick_y), (0, 0, 0, 0));
             assert!(holding(State::Grab, |c| c == C::ClatterKamuiPierce));
             assert!(!holding(State::Grab, |c| c == C::StatusSpecialS));
+        }
+
+        #[test]
+        fn judge_requires_a_fresh_fixed_natural_choice() {
+            let judge = super::super::moves::CATALOG[111];
+            assert_eq!(start(judge), Some("FIGHTER_STATUS_KIND_SPECIAL_S"));
+            assert_eq!(controls(Plan::Judge, false), MappedInputs::NEUTRAL);
+            assert_eq!(controls(Plan::Judge, true), MappedInputs::NEUTRAL);
+            assert_eq!(judge_outcome(false, true, 7), Ok(None));
+            assert_eq!(judge_outcome(true, false, 7), Ok(None));
+            for kind in 0..=8 {
+                assert_eq!(judge_outcome(true, true, kind), Ok(Some(kind == 7)));
+            }
+            assert!(judge_outcome(true, true, -1).is_err());
+            assert!(judge_outcome(true, true, 9).is_err());
         }
 
         #[test]

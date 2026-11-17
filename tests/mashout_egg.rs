@@ -104,6 +104,13 @@ fn actual_runtime_egg_preparation_and_native_seed() {
             block(runtime, "unsafe fn end_after(").to_string(),
         ),
         ("// ARM", block(runtime, "unsafe fn arm(").to_string()),
+        ("// JUDGE_CHOICE", block(runtime, "unsafe fn judge_choice(").to_string()),
+        ("// JUDGE_ADMISSION", block(runtime, "if game.step == Step::Entering").to_string()),
+        ("// RETRY", {
+            let start = runtime.find("Step::Retry if released => {").unwrap();
+            let end = start + runtime[start..].find("Step::Choose => {").unwrap();
+            runtime[start..end].to_string()
+        }),
         (
             "// TOKEN_TYPE",
             block(runtime, "pub(crate) struct SeedToken").to_string(),

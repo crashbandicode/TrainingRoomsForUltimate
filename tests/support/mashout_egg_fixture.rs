@@ -4,7 +4,7 @@ use std::{
     sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
 };
 mod model {
-    pub mod sites_pkg2 { pub const WORK_IS_FLAG_OFFSET: usize = 0x208dc80; }
+    pub mod sites_pkg2 { pub const WORK_IS_FLAG_OFFSET: usize = 0x208dc80; pub const WORK_GET_INT_OFFSET: usize = 0x208dbc0; }
     pub mod hash40 { // HASH40
     }
     pub mod cpu {
@@ -70,6 +70,15 @@ static GENERATION: AtomicU64 = AtomicU64::new(5);
 static CPU_STATUS: AtomicU32 = AtomicU32::new(0);
 static ROLLER_LR: AtomicU32 = AtomicU32::new(1.0f32.to_bits());
 static FREEZE_NO_BANG: AtomicU32 = AtomicU32::new(1);
+static JUDGE_FIXED: AtomicBool = AtomicBool::new(false);
+static JUDGE_KIND: AtomicU32 = AtomicU32::new(7);
+static JUDGE_GETTER_GRANTED: AtomicBool = AtomicBool::new(true);
+static JUDGE_FLAG_GRANTED: AtomicBool = AtomicBool::new(true);
+static JUDGE_INT_READS: AtomicUsize = AtomicUsize::new(0);
+static JUDGE_FLAG_READS: AtomicUsize = AtomicUsize::new(0);
+static P1_AIR: AtomicBool = AtomicBool::new(false);
+static CPU_AIR: AtomicBool = AtomicBool::new(false);
+static P1_STOP: AtomicBool = AtomicBool::new(false);
 // Existing tests stop at seed/end publication; new continuation probes opt into the actual Held arm.
 static EXECUTE_HELD: AtomicBool = AtomicBool::new(false);
 static CPU_STOP: AtomicBool = AtomicBool::new(false);
@@ -127,8 +136,22 @@ mod scene {
     }
 }
 mod natives {
-    pub fn is_flag(_: usize, _: i32) -> bool { panic!("Pin flag read is outside this Egg fixture") }
-    pub fn get_int(_: usize, id: i32) -> i32 {
+    pub fn is_flag(cpu: usize, id: i32) -> bool {
+        assert_eq!(cpu, 2);
+        assert_eq!(Some(id), super::state_id(super::C::JudgeFixed));
+        super::JUDGE_FLAG_READS.fetch_add(1, super::Ordering::Relaxed);
+        super::JUDGE_FIXED.load(super::Ordering::Relaxed)
+    }
+    pub fn get_int(cpu: usize, id: i32) -> i32 {
+        if Some(id) == super::state_id(super::C::JudgeKind) {
+            assert_eq!(cpu, 2);
+            super::JUDGE_INT_READS.fetch_add(1, super::Ordering::Relaxed);
+            // The real native shim defaults to0 when unavailable; this must
+            // never be mistaken for a positively observed other Judge roll.
+            return if super::JUDGE_GETTER_GRANTED.load(super::Ordering::Relaxed) {
+                super::JUDGE_KIND.load(super::Ordering::Relaxed) as i32
+            } else { 0 };
+        }
         assert_eq!(id, 0x11000008); // Lucas work id, pinned01bf583/native table.
         super::FREEZE_NO_BANG.load(super::Ordering::Relaxed) as i32
     }
@@ -138,11 +161,16 @@ mod natives {
     pub fn status_kind(_: usize) -> i32 {
         super::CPU_STATUS.load(super::Ordering::Relaxed) as i32
     }
-    pub fn situation_kind(_: usize) -> i32 {
-        super::AIR.load(super::Ordering::Relaxed) as i32
+    pub fn situation_kind(actor: usize) -> i32 {
+        (super::AIR.load(super::Ordering::Relaxed) ||
+            if actor == super::P1.load(super::Ordering::Relaxed) {
+                super::P1_AIR.load(super::Ordering::Relaxed)
+            } else { super::CPU_AIR.load(super::Ordering::Relaxed) }) as i32
     }
-    pub fn is_stop(_: usize) -> bool {
-        super::CPU_STOP.load(super::Ordering::Relaxed)
+    pub fn is_stop(actor: usize) -> bool {
+        if actor == super::P1.load(super::Ordering::Relaxed) {
+            super::P1_STOP.load(super::Ordering::Relaxed)
+        } else { super::CPU_STOP.load(super::Ordering::Relaxed) }
     }
     pub fn pos_x(_: usize) -> f32 {
         0.0
@@ -207,6 +235,7 @@ fn post(e: worker::Event, _: u64) {
 fn state_id(c: C) -> Option<i32> {
     match model::cpu::ids::NAMES[c as usize] {
         "FIGHTER_STATUS_KIND_SPECIAL_N" => return Some(476),
+        "FIGHTER_STATUS_KIND_SPECIAL_S" => return Some(477),
         "FIGHTER_LUCAS_STATUS_KIND_SPECIAL_N_HOLD" => return Some(481),
         "FIGHTER_LUCAS_STATUS_SPECIAL_N_WORK_INT_NOBANG_TIME" => return Some(0x11000008),
         _ => (),
@@ -235,6 +264,8 @@ enum Step {
     Release,
     Choose,
     Restore,
+    Retry,
+    Reload,
 }
 struct Game {
     p1: usize,
@@ -287,6 +318,7 @@ impl Game {
     }
 }
 const UNAVAILABLE_NOTICE: &str = "unavailable";
+// JUDGE_CHOICE
 // ARM
 #[derive(Clone, Copy)]
 // TOKEN_TYPE
@@ -305,10 +337,12 @@ unsafe fn update(game: &mut Game, p1: usize, status: i32, cpu: usize, fighter: u
     let ids = ids();
     let cpu_entry = 1;
     // LINKS
+    // JUDGE_ADMISSION
     // SEEDS
     // ENDS
     // RELEASED
     match game.step {
+        // RETRY
         // PLACE
         // SETTLE
         // ENTERING
@@ -355,6 +389,15 @@ impl NativeMemory {
         CPU_STATUS.store(481, Ordering::Relaxed);
         EXECUTE_HELD.store(false, Ordering::Relaxed);
         CPU_STOP.store(false, Ordering::Relaxed);
+        P1_STOP.store(false, Ordering::Relaxed);
+        P1_AIR.store(false, Ordering::Relaxed);
+        CPU_AIR.store(false, Ordering::Relaxed);
+        JUDGE_FIXED.store(false, Ordering::Relaxed);
+        JUDGE_KIND.store(7, Ordering::Relaxed);
+        JUDGE_GETTER_GRANTED.store(true, Ordering::Relaxed);
+        JUDGE_FLAG_GRANTED.store(true, Ordering::Relaxed);
+        JUDGE_INT_READS.store(0, Ordering::Relaxed);
+        JUDGE_FLAG_READS.store(0, Ordering::Relaxed);
         AIR.store(false, Ordering::Relaxed);
         ROLLER_LR.store(1.0f32.to_bits(), Ordering::Relaxed);
         REQUESTS.with_borrow_mut(Vec::clear);
@@ -833,12 +876,18 @@ fn lucas_wait_without_ice_still_fails_and_wrong_victim_seed_never_grades() {
 use model::cpu::hash::lua_bind_hash;
 mod game {
     pub fn granted(offset: usize) -> bool {
-        assert_eq!(offset, crate::model::sites_pkg2::WORK_IS_FLAG_OFFSET);
-        true
+        match offset {
+            crate::model::sites_pkg2::WORK_IS_FLAG_OFFSET =>
+                super::JUDGE_FLAG_GRANTED.load(super::Ordering::Relaxed),
+            crate::model::sites_pkg2::WORK_GET_INT_OFFSET =>
+                super::JUDGE_GETTER_GRANTED.load(super::Ordering::Relaxed),
+            _ => panic!("unexpected Judge reader guard: {offset:x}"),
+        }
     }
     pub fn lua_const(hash: u64) -> Option<i32> {
         for (name, id) in [
             ("FIGHTER_STATUS_KIND_SPECIAL_N", 476),
+            ("FIGHTER_STATUS_KIND_SPECIAL_S", 477),
             ("FIGHTER_STATUS_KIND_SPECIAL_HI", 478),
             ("FIGHTER_STATUS_KIND_SPECIAL_LW", 479),
             ("FIGHTER_STATUS_KIND_CATCH", 50),
@@ -1301,6 +1350,205 @@ fn dedede_bury_cancel_never_runs_for_other_plans_or_exhausted_hold() {
             }
             assert!(DRIVEN.with_borrow(|v| v.iter().all(|i| i.buttons == 0)));
             assert!(!g.followed);
+        }
+    }
+}
+
+
+// The receiver functions and pre-seed/retry decisions above are extracted
+// directly from runtime mashout.rs. Only native reads/requests are shims.
+unsafe fn judge(m: &mut NativeMemory) -> Game {
+    let mut g = Game::new(Plan::Judge, State::Frozen);
+    let r = g.requested.as_mut().unwrap();
+    r.id = 111;
+    r.attacker_kind = 28;
+    r.attacker_name = "Mr. Game & Watch";
+    m.body[3] = 28;
+    g.step = Step::Settle;
+    CPU_STATUS.store(0, Ordering::Relaxed);
+    m.update(&mut g, 0);
+    assert_eq!(g.step, Step::Entering);
+    assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 477)]);
+    CPU_STATUS.store(477, Ordering::Relaxed);
+    g
+}
+unsafe fn observe_unfixed_judge(m: &NativeMemory, g: &mut Game) {
+    JUDGE_FIXED.store(false, Ordering::Relaxed);
+    m.update(g, 0);
+    assert_eq!(g.step, Step::Entering);
+    assert!(g.followed, "actual native false flag observed for this attempt");
+}
+#[test]
+fn judge_fresh_false_to_true_kind7_accepts_only_actual_ice_seed() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut g = judge(&mut m);
+        observe_unfixed_judge(&m, &mut g);
+        JUDGE_KIND.store(7, Ordering::Relaxed);
+        JUDGE_FIXED.store(true, Ordering::Relaxed);
+        m.seed(73.25, 1.75, 2);
+        let actual = reader::sample(m.p1(), 0.37).unwrap().seed();
+        let before = (m.control, m.record);
+        m.start();
+        m.update(&mut g, 203);
+        assert_eq!(g.step, Step::Held);
+        assert_eq!(g.clock.unwrap().last(), actual.record);
+        assert_eq!((m.control, m.record), before);
+        let begins = BEGINS.with_borrow(Clone::clone);
+        assert_eq!(begins.len(), 1);
+        assert_eq!(begins[0].0.0, 111);
+        assert_eq!(begins[0].1, actual);
+        assert_eq!(begins[0].2, g.epoch);
+        assert!(DRIVEN.with_borrow(|v| v.iter().all(|i| *i == MappedInputs::NEUTRAL)));
+        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 477)]);
+    }
+}
+#[test]
+fn judge_stale_true_never_confirms_a_positive_ice_seed() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut g = judge(&mut m);
+        JUDGE_FIXED.store(true, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        assert_eq!(g.step, Step::Entering);
+        assert!(!g.followed);
+        m.seed(73.25, 1.75, 2);
+        m.start();
+        m.update(&mut g, 203);
+        assert_eq!(g.failed, Some("Move entry unconfirmed · no grade"));
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+    }
+}
+#[test]
+fn judge_missing_native_read_guards_refuse_without_default_zero_other_roll() {
+    unsafe {
+        for missing_getter in [true, false] {
+            let mut m = NativeMemory::new();
+            let mut g = judge(&mut m);
+            observe_unfixed_judge(&m, &mut g);
+            JUDGE_FIXED.store(true, Ordering::Relaxed);
+            JUDGE_KIND.store(7, Ordering::Relaxed);
+            JUDGE_INT_READS.store(0, Ordering::Relaxed);
+            JUDGE_FLAG_READS.store(0, Ordering::Relaxed);
+            if missing_getter { JUDGE_GETTER_GRANTED.store(false, Ordering::Relaxed); }
+            else { JUDGE_FLAG_GRANTED.store(false, Ordering::Relaxed); }
+            m.update(&mut g, 0);
+            assert_eq!(g.failed, Some(UNAVAILABLE_NOTICE));
+            assert_ne!(g.step, Step::Retry);
+            assert_eq!(JUDGE_INT_READS.load(Ordering::Relaxed), 0);
+            assert_eq!(JUDGE_FLAG_READS.load(Ordering::Relaxed), 0);
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+            assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+        }
+    }
+}
+#[test]
+fn judge_every_positively_observed_other_choice_is_uncounted_retry() {
+    unsafe {
+        for kind in (0..=8).filter(|k| *k != 7) {
+            let mut m = NativeMemory::new();
+            let mut g = judge(&mut m);
+            observe_unfixed_judge(&m, &mut g);
+            let requested = g.requested;
+            JUDGE_KIND.store(kind, Ordering::Relaxed);
+            JUDGE_FIXED.store(true, Ordering::Relaxed);
+            // Even a queued old/foreign-looking positive record cannot turn
+            // a proved other roll into a scored Judge8 attempt.
+            m.seed(73.25, 1.75, 2);
+            m.start();
+            m.update(&mut g, 203);
+            assert_eq!(g.step, Step::Retry, "kind={kind}");
+            assert_eq!(g.failed, None);
+            assert!(g.clock.is_none());
+            assert_eq!(g.requested, requested);
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+            assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+            m.update(&mut g, 0); // queued seed drains while Retry; never Begin
+            assert_eq!(g.step, Step::Retry);
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+            assert!(DRIVEN.with_borrow(|v| v.iter().all(|i| *i == MappedInputs::NEUTRAL)));
+        }
+    }
+}
+#[test]
+fn judge_invalid_native_choice_refuses_instead_of_retry_or_begin() {
+    unsafe {
+        for kind in [-1i32, 9, i32::MIN, i32::MAX] {
+            let mut m = NativeMemory::new();
+            let mut g = judge(&mut m);
+            observe_unfixed_judge(&m, &mut g);
+            JUDGE_KIND.store(kind as u32, Ordering::Relaxed);
+            JUDGE_FIXED.store(true, Ordering::Relaxed);
+            m.update(&mut g, 0);
+            assert_eq!(g.failed, Some(UNAVAILABLE_NOTICE));
+            assert_ne!(g.step, Step::Retry);
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+        }
+    }
+}
+#[test]
+fn judge8_natural_choice_miss_and_wrong_victim_seed_still_fail() {
+    unsafe {
+        for wrong_victim in [false, true] {
+            let mut m = NativeMemory::new();
+            let mut g = judge(&mut m);
+            observe_unfixed_judge(&m, &mut g);
+            JUDGE_FIXED.store(true, Ordering::Relaxed);
+            m.update(&mut g, 0); // native KIND7 fixed, no victim capture yet
+            assert_eq!(g.step, Step::Entering);
+            if wrong_victim {
+                m.seed(73.25, 1.75, 2);
+                m.start();
+                m.update(&mut g, 75);
+                assert_eq!(g.failed, Some("Move entry unconfirmed · no grade"));
+            } else {
+                CPU_STATUS.store(0, Ordering::Relaxed);
+                m.update(&mut g, 0);
+                assert_eq!(g.failed, Some("Move did not capture · reopen menu to retry"));
+            }
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+        }
+    }
+}
+#[test]
+fn judge_retry_waits_for_both_native_resting_bodies_then_reloads_same_selected_move() {
+    unsafe {
+        for blocked in ["p1-status", "cpu-status", "p1-air", "cpu-air", "p1-stop", "cpu-stop"] {
+            let mut m = NativeMemory::new();
+            let mut g = judge(&mut m);
+            observe_unfixed_judge(&m, &mut g);
+            JUDGE_KIND.store(0, Ordering::Relaxed);
+            JUDGE_FIXED.store(true, Ordering::Relaxed);
+            m.update(&mut g, 0);
+            assert_eq!(g.step, Step::Retry);
+            let request = g.requested;
+            let generation = g.generation;
+            GENERATION.store(generation, Ordering::Relaxed);
+            CPU_STATUS.store(if blocked == "cpu-status" { 477 } else { 0 }, Ordering::Relaxed);
+            P1_AIR.store(blocked == "p1-air", Ordering::Relaxed);
+            CPU_AIR.store(blocked == "cpu-air", Ordering::Relaxed);
+            P1_STOP.store(blocked == "p1-stop", Ordering::Relaxed);
+            CPU_STOP.store(blocked == "cpu-stop", Ordering::Relaxed);
+            m.update(&mut g, if blocked == "p1-status" { 75 } else { 0 });
+            assert_eq!(g.step, Step::Retry, "{blocked}");
+            assert_eq!(g.generation, generation);
+            assert_eq!(g.requested, request);
+            CPU_STATUS.store(0, Ordering::Relaxed);
+            P1_AIR.store(false, Ordering::Relaxed);
+            CPU_AIR.store(false, Ordering::Relaxed);
+            P1_STOP.store(false, Ordering::Relaxed);
+            CPU_STOP.store(false, Ordering::Relaxed);
+            m.update(&mut g, 0);
+            assert_eq!(g.step, Step::Reload);
+            assert_eq!(g.requested, request, "selected111 must survive, never Choose/Random");
+            assert_eq!(g.requested.unwrap().id, 111);
+            assert_eq!(g.generation, generation + 1);
+            assert!(!g.saw_catch);
+            assert!(!g.followed);
+            assert!(g.clock.is_none());
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+            assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 477)]);
+            assert!(DRIVEN.with_borrow(|v| v.iter().all(|i| *i == MappedInputs::NEUTRAL)));
         }
     }
 }

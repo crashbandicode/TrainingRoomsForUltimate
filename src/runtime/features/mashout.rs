@@ -292,6 +292,7 @@ enum Step {
     Result,
     Failed,
     Release,
+    Retry,
     Restore,
 }
 
@@ -409,6 +410,22 @@ fn state_id(c: C) -> Option<i32> {
 fn holding(request: Option<Scenario>, status: i32) -> bool {
     request.is_some_and(|r| entry::holding(r.state, |c| state_id(c) == Some(status)))
 }
+/// Current owned Judge only: native INIT clears the flag before ACMD fixes the choice.
+unsafe fn judge_choice(cpu: usize, saw_unfixed: &mut bool) -> Result<Option<bool>, &'static str> {
+    if !game::granted(crate::model::sites_pkg2::WORK_GET_INT_OFFSET)
+        || !game::granted(crate::model::sites_pkg2::WORK_IS_FLAG_OFFSET)
+    {
+        return Err("native Judge readers unavailable");
+    }
+    let Some(((special, fixed), kind)) = state_id(C::StatusSpecialS)
+        .zip(state_id(C::JudgeFixed)).zip(state_id(C::JudgeKind))
+    else { return Err("native Judge constants unavailable"); };
+    if natives::status_kind(cpu) != special { return Ok(None); }
+    let fixed = natives::is_flag(cpu, fixed);
+    *saw_unfixed |= !fixed;
+    entry::judge_outcome(*saw_unfixed, fixed, natives::get_int(cpu, kind))
+}
+
 unsafe fn arm(p1: usize, generation: u64) -> bool {
     let Some(threshold) = admission().with(|| reader::threshold(p1)).flatten() else {
         return false;
@@ -551,6 +568,26 @@ pub unsafe fn frame(fighter: usize) {
             );
         }
     });
+    if game.step == Step::Entering
+        && game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Judge)
+    {
+        match judge_choice(cpu, &mut game.followed) {
+            Err(_) => { game.fail(UNAVAILABLE_NOTICE); return; }
+            Ok(Some(false)) => {
+                // A positively observed other roll is uncounted. Keep this selected
+                // move through native release, including when catalog Random chose it.
+                revoke();
+                game.clock = None;
+                game.step(Step::Retry, "Mash out · Waiting for release");
+                #[cfg(feature = "diag")]
+                crate::runtime::diag_log::enqueue_diagnostic(format_args!(
+                    "[Mashout] outcome=other gen={} move=111", game.generation
+                ));
+                return;
+            }
+            _ => (),
+        }
+    }
     SEEDS.drain(|NativeSeed { generation, epoch, origin, sample }| {
         if generation != game.generation { return; }
         let late_throw = origin == SeedOrigin::ThrowClatterStart
@@ -567,6 +604,11 @@ pub unsafe fn frame(fighter: usize) {
         }
         // restriction: M3-READER-GUARD
         let Some(sample) = sample else { game.fail("Native capture seed unavailable · no grade"); return; };
+        if game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Judge)
+            && judge_choice(cpu, &mut game.followed) != Ok(Some(true))
+        {
+            game.fail("Move entry unconfirmed · no grade"); return;
+        }
         let ordinary_catch = game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Grab);
         let cpu_status = natives::status_kind(cpu);
         if !scored || (ordinary_catch && ![ids[1], ids[8], ids[9], ids[10]].contains(&cpu_status)) {
@@ -638,6 +680,14 @@ pub unsafe fn frame(fighter: usize) {
             "Mash out · Setting up",
         ),
         Step::Release => (),
+        Step::Retry if released => {
+            post(worker::Event::Cancel(game.generation), game.generation);
+            game.generation = GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
+            game.saw_catch = false;
+            game.followed = false;
+            game.step(Step::Reload, "Mash out · Setting up");
+        }
+        Step::Retry => (),
         Step::Choose => {
             if !released {
                 return;
