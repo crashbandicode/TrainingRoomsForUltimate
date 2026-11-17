@@ -555,6 +555,17 @@ unsafe fn trail_prep_article_live(cpu: usize) -> Result<bool, ()> {
     Ok(state_natives::article_is_exist(cpu, fire) || state_natives::article_is_exist(cpu, cloud))
 }
 
+/// G3 S1 (116) through the guarded article reader: the CPU left Blizzard and no Ice article is live.
+unsafe fn trail_blizzard_closed(cpu: usize) -> Result<bool, ()> {
+    if !game::granted(crate::model::sites_pkg3::STATE_ARTICLE_IS_EXIST_OFFSET) {
+        return Err(());
+    }
+    let [Some(blizzard), Some(ice)] = [C::TrailSpecialN2, C::TrailArticleIce].map(state_id) else {
+        return Err(());
+    };
+    Ok(entry::trail_blizzard_closed(natives::status_kind(cpu), blizzard, state_natives::article_is_exist(cpu, ice)))
+}
+
 fn trail_magic_status(status: i32, wait: i32) -> Result<entry::TrailMagicStatus, ()> {
     let [Some(special), Some(n1), Some(n1_shoot), Some(n1_end), Some(n3)] = [
         C::StatusSpecialN,
@@ -1499,6 +1510,20 @@ pub unsafe fn frame(fighter: usize) {
                 ));
             }
             if clock.exhausted() {
+                if game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::IceMagic) {
+                    match trail_blizzard_closed(cpu) {
+                        Ok(true) => (),
+                        Ok(false) => {
+                            // restriction: MASH-M1-MISMATCH
+                            game.fail("Native tick mismatch · no grade");
+                            return;
+                        }
+                        Err(()) => {
+                            game.fail(UNAVAILABLE_NOTICE);
+                            return;
+                        }
+                    }
+                }
                 revoke();
                 game.step = Step::Result;
             } else if !game.followed

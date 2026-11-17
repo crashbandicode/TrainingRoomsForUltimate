@@ -200,6 +200,13 @@ impl TrailMagicEntry {
     }
 }
 
+/// OPUS-DESIGN-REVIEW-sora116-refreeze G3 S1 (116): at the escape or Result, the Blizzard provider is closed only
+/// once the CPU has left the Blizzard status (SPECIAL_N2) and no Ice article is live, so no unobserved shard can
+/// extend the hold.
+pub fn trail_blizzard_closed(cpu_status: i32, blizzard_status: i32, ice_live: bool) -> bool {
+    cpu_status != blizzard_status && !ice_live
+}
+
 // The stock Brave menu mirrors four native command enums into work IDs. The
 // value named COMMAND18_ICESWORD is 17; COMMAND_NUM is 21, so valid entries are
 // 0..20 and the native COMMAND_NONE sentinel is not a menu choice.
@@ -620,6 +627,14 @@ mod tests {
             let olimar = super::super::moves::CATALOG[40];
             assert!(one_pikmin_grab(olimar));
             assert!(super::super::moves::CATALOG.iter().filter(|s| one_pikmin_grab(**s)).map(|s| s.id).eq([40]));
+        }
+
+        #[test]
+        fn trail_blizzard_provider_is_closed_only_after_n2_with_no_live_ice() {
+            assert!(trail_blizzard_closed(0, 486, false));
+            assert!(!trail_blizzard_closed(486, 486, false), "still casting Blizzard");
+            assert!(!trail_blizzard_closed(0, 486, true), "a live Ice shard can still re-freeze");
+            assert!(!trail_blizzard_closed(486, 486, true));
         }
 
         #[test]
