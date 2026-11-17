@@ -986,8 +986,11 @@ pub unsafe fn frame(fighter: usize) {
             let Some(request) = game.requested else {
                 return;
             };
-            if request.plan == crate::model::mashout::moves::Plan::Drag {
+            let drag = request.plan == crate::model::mashout::moves::Plan::Drag;
+            if drag || request.plan == crate::model::mashout::moves::Plan::Flip {
                 // Camera centre is a direction reference, never proof of collision floor/runway.
+                // Flip faces P1 from the stage interior: P1's own facing is incidental after an
+                // attempt and once put the measured 41-unit CPU off the stage (GEN11-DIAGNOSIS).
                 let Some([left, right, _, _]) = natives::camera_limit_range()
                     .filter(|r| r.iter().all(|v| v.is_finite()) && r[0] < r[1])
                 else {
@@ -997,7 +1000,8 @@ pub unsafe fn frame(fighter: usize) {
                 };
                 let centre = left + (right - left) * 0.5;
                 if position.x != centre {
-                    facing = (position.x - centre).signum();
+                    let outward = (position.x - centre).signum();
+                    facing = if drag { outward } else { -outward };
                 }
             }
             let spacing = entry::placement_spacing(request);
