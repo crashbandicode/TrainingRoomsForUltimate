@@ -361,7 +361,7 @@ impl Launch {
             && self.knockback > 0.0
             && self.percent.is_finite()
             && self.percent >= 0.0
-            && (1.0..=30.0).contains(&self.hit_damage)
+            && self.hit_damage.is_finite() && self.hit_damage > 0.0
             && matches!(self.facing, -1.0 | 1.0)
             && self
                 .di

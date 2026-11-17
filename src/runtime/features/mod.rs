@@ -38,3 +38,5 @@ pub mod writer;
 pub mod tech;
 pub mod tech_surfaces;
 
+pub mod tech_hitlag;
+pub(crate) mod tech_hitlag_read;

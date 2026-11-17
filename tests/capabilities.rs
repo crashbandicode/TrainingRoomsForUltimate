@@ -593,7 +593,8 @@ fn the_install_line_names_the_row_that_blocked_a_feature() {
 fn optional_tech_poison_preserves_existing_features() {
     use model::install_line::{FeatureReport, InstallLine};
     for poison in ["tech_cos", "tech_magnitude", "state_set_sleep", "tech_guard_count"].into_iter()
-        .chain(model::sites_tech_surfaces::SITES.iter().map(|row| row.name)) {
+        .chain(model::sites_tech_surfaces::SITES.iter().map(|row| row.name))
+        .chain(model::sites_tech_hitlag::SITES.iter().map(|row| row.name)) {
         let row = capabilities::find(poison).expect("poison names a real guarded row");
         let usable = |s: &model::sites::Site| s.name != poison;
         for unit in [Feature::CpuCore, Feature::CpuCommon, Feature::Hitbox] {

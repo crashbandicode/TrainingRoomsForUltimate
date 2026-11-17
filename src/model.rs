@@ -253,3 +253,9 @@ pub mod tech_launch;
 pub mod sites_tech_launch;
 #[path = "model/sites_tech_surfaces.rs"]
 pub mod sites_tech_surfaces;
+
+#[path = "model/tech_hitlag.rs"]
+pub mod tech_hitlag;
+
+#[path = "model/sites_tech_hitlag.rs"]
+pub mod sites_tech_hitlag;

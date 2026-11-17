@@ -60,6 +60,7 @@ pub fn all_sites() -> impl Iterator<Item = &'static Site> {
         .chain(super::sites_hitbox::SITES.iter())
         .chain(super::developer_debug::SITES.iter())
         .chain(super::sites_tech_launch::SITES.iter())
+        .chain(super::sites_tech_hitlag::SITES.iter())
         .chain(super::sites_tech_surfaces::SITES.iter())
 }
 

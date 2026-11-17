@@ -55,7 +55,6 @@ enum Phase {
 struct Prepared {
     seed: info_seed::Seed,
     reaction: f32,
-    stop: i32,
     air: i32,
     ground: i32,
     wait: i32,
@@ -152,10 +151,41 @@ unsafe fn current(owned: Owned) -> Result<usize, Error> {
         .then_some(accessor)
         .ok_or(Error::NoPlayer)
 }
+/// Opaque equality token, never a retained live pointer.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) struct HeldContext {
+    owner: u64,
+    attempt: u64,
+    receipt: FrameReceipt,
+    accessor_token: usize,
+}
+impl Owned {
+    fn held_context(self) -> HeldContext {
+        HeldContext { owner: self.owner, attempt: self.attempt.id,
+            receipt: self.receipt, accessor_token: self.accessor_token }
+    }
+}
+/// Read-only live P1 context for the separate multiplier query.
+pub(super) unsafe fn player_context(accessor: usize) -> Result<FrameReceipt, Error> {
+    if !tech_ready() { return Err(Error::Guards); }
+    if super::states::is_loading() || YIELD_TO_STATE.load(Ordering::Acquire) {
+        return Err(Error::Busy);
+    }
+    let (live, receipt) = player()?;
+    (live == accessor).then_some(receipt).ok_or(Error::NoPlayer)
+}
+/// Resolve only while the actual placed body remains Held; callers must hold no OWNED guard.
+pub(super) unsafe fn held_context(accessor: usize) -> Result<HeldContext, Error> {
+    let receipt = player_context(accessor)?;
+    let slot = OWNED.try_lock().ok_or(Error::Busy)?;
+    let owned = slot.as_ref().filter(|o| o.phase == Phase::Held
+        && o.receipt == receipt && o.accessor_token == accessor
+        && RESTORE.load(Ordering::Acquire) != o.owner).ok_or(Error::NotPlaced)?;
+    Ok(owned.held_context())
+}
 unsafe fn prepare(
     accessor: usize,
     launch: Launch,
-    hitlag: HitlagResolver,
 ) -> Result<Prepared, Error> {
     if !launch.valid() {
         return Err(Error::InvalidInput);
@@ -180,7 +210,6 @@ unsafe fn prepare(
     let (direction, _) = tech_native::native_direction(angle).ok_or(Error::NativeValue)?;
     let magnitude = natives::tech_magnitude(launch.knockback).ok_or(Error::Guards)?;
     let reaction = natives::tech_reaction(launch.knockback).ok_or(Error::Guards)?;
-    let stop = hitlag(accessor, launch.hit_damage)?;
     let seed = info_seed::Seed {
         height,
         speed: [magnitude * direction.x, magnitude * direction.y],
@@ -190,7 +219,6 @@ unsafe fn prepare(
         || magnitude < 0.0
         || !reaction.is_finite()
         || reaction <= 0.0
-        || stop <= 0
         || !seed.valid(heights)
     {
         return Err(Error::NativeValue);
@@ -198,7 +226,6 @@ unsafe fn prepare(
     Ok(Prepared {
         seed,
         reaction,
-        stop,
         air: id("SITUATION_KIND_AIR")?,
         ground: id("SITUATION_KIND_GROUND")?,
         wait: id("FIGHTER_STATUS_KIND_WAIT")?,
@@ -256,7 +283,7 @@ impl Launcher for Adapter {
                 return Err(Error::Busy);
             }
             let (accessor, receipt) = player()?;
-            let prepared = prepare(accessor, launch, self.hitlag)?;
+            let prepared = prepare(accessor, launch)?;
             let mut slot = OWNED.try_lock().ok_or(Error::Busy)?;
             let saved = match *slot {
                 Some(old) if old.owner != self.owner || old.phase == Phase::Yielded => {
@@ -311,7 +338,7 @@ impl Launcher for Adapter {
             if super::states::is_loading() || YIELD_TO_STATE.load(Ordering::Acquire) {
                 return Err(Error::Busy);
             }
-            let mut slot = OWNED.try_lock().ok_or(Error::Busy)?;
+            let slot = OWNED.try_lock().ok_or(Error::Busy)?;
             let mut owned = slot
                 .filter(|x| x.owner == self.owner && x.phase == Phase::Held)
                 .ok_or(Error::NotPlaced)?;
@@ -325,6 +352,17 @@ impl Launcher for Adapter {
             {
                 return Err(Error::NativeValue);
             }
+            let context = owned.held_context();
+            drop(slot); // Resolver reads Held ownership and native params without any OWNED guard.
+            let frames = (self.hitlag)(accessor, owned.launch.hit_damage)?;
+            if frames <= 0 { return Err(Error::HitlagUnavailable); }
+            if held_context(accessor)? != context { return Err(Error::NotPlaced); }
+            let mut slot = OWNED.try_lock().ok_or(Error::Busy)?;
+            if !slot.as_ref().is_some_and(|o| o.phase == Phase::Held
+                && o.held_context() == context)
+                || RESTORE.load(Ordering::Acquire) == self.owner
+                || super::states::is_loading() || YIELD_TO_STATE.load(Ordering::Acquire)
+            { return Err(Error::Busy); }
             owned.phase = Phase::Flying;
             *slot = Some(owned);
             drop(slot); // DI hook can read ownership during native init/release.
@@ -335,7 +373,7 @@ impl Launcher for Adapter {
                 percent: owned.launch.percent,
                 reaction: owned.prepared.reaction,
                 seed: owned.prepared.seed,
-                frames: owned.prepared.stop,
+                frames,
                 reserve_lr: Some(owned.launch.reserve_damage_lr()),
                 ground_to_air: owned.launch.ground_to_air(),
             };

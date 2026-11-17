@@ -164,6 +164,20 @@ pub mod natives {
         Some(std::mem::transmute_copy(&(text_base() + offset)))
     }
 
+    /// Native two-register pair return (AAPCS64 x0/x1), not a hidden sret.
+    pub use crate::runtime::features::tech_hitlag_read::ParamPair as HitlagParamPair;
+    pub unsafe fn tech_hitlag_param_pair(object: usize, hash: u64) -> Option<HitlagParamPair> {
+        Some(at::<extern "C" fn(usize,u64)->HitlagParamPair>(crate::model::sites_tech_hitlag::PAIR_OFFSET)?(object,hash))
+    }
+    pub unsafe fn tech_hitlag_param_float(pair: &HitlagParamPair) -> Option<f32> {
+        Some(at::<extern "C" fn(*const HitlagParamPair)->f32>(crate::model::sites_tech_hitlag::FLOAT_OFFSET)?(pair))
+    }
+    pub unsafe fn tech_hitlag_param_int(pair: &HitlagParamPair) -> Option<i32> {
+        Some(at::<extern "C" fn(*const HitlagParamPair)->i32>(crate::model::sites_tech_hitlag::INT_OFFSET)?(pair))
+    }
+    pub unsafe fn tech_hitlag_k_lookup(map: usize, hash: u64) -> Option<f32> {
+        Some(at::<extern "C" fn(usize,u64)->f32>(crate::model::sites_tech_hitlag::K_OFFSET)?(map,hash))
+    }
     pub unsafe fn tech_magnitude(kb: f32) -> Option<f32> {
         let f = at::<extern "C" fn(usize,usize,i32,i32,f32,f32,f32)->f32>(crate::model::sites_tech_launch::MAGNITUDE_OFFSET)?;
         Some(f(0,0,0,0,kb,0.0,0.0))

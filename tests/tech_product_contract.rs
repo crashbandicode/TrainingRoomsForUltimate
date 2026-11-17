@@ -433,3 +433,14 @@ fn raw_contact_delivery_boundary_preserves_confirmed_and_unavailable_cases() {
         assert_eq!(delivery.pending_decision().unwrap().entered_status, None);
     }
 }
+
+#[test]
+fn converted_base_damage_is_positive_without_reapplying_visible_ui_range() {
+    for visible in [1.0f32,30.0] {
+        let base_damage=visible/1.2f32;
+        assert!(Launch {hit_damage:base_damage,..request()}.valid());
+    }
+    for invalid in [0.0,-1.0,f32::NAN,f32::INFINITY] {
+        assert!(!Launch {hit_damage:invalid,..request()}.valid());
+    }
+}
