@@ -19,7 +19,7 @@ use crate::model::tech::{
     planner,
     session::{Bests, Length, Phase},
     solver,
-    surface::{Kind, StageEpoch, Surfaces, Walk},
+    surface::{Kind, RememberedSpot, StageEpoch, Surfaces, Walk},
     Vec2,
 };
 use crate::model::tech_launch::{DecisionSnapshot, FlightParams, Launcher};
@@ -75,6 +75,10 @@ struct Practice {
     after_reaction: u16,
     planning_failed: bool,
     decision: Option<(DecisionSnapshot, u16)>,
+    remembered: Option<RememberedSpot>,
+    recovering: bool,
+    recovery_error: Option<&'static str>,
+    restart_pending: bool,
 }
 thread_local! {
     static LIVE: RefCell<Option<Practice>> = const { RefCell::new(None) };
@@ -319,6 +323,31 @@ fn notice(run: &Practice, text: Option<&str>) {
         crate::model::notify::DEFAULT_COLOR,
     );
 }
+/// Discard borrowed identities once, then resolve the same geometry after the
+/// bounded walk. A second invalid result is a specific failure, never a retry loop.
+fn rebuild(run: &mut Practice, view: &mut ViewState) {
+    if run.recovering {
+        // restriction: tech-surface-unavailable-after-rebuild
+        let message = "Selected surface unavailable after rebuild";
+        run.recovery_error = Some(message);
+        notice(run, Some(message));
+        return;
+    }
+    run.remembered = (run.config.surface == 4)
+        .then(|| view.picker.selected.and_then(|s| RememberedSpot::capture(s.line, s.point)))
+        .flatten();
+    run.recovering = true;
+    run.sampled = None;
+    run.reroll = true;
+    run.scan = None;
+    run.scan_done = false;
+    run.bootstrap = None;
+    view.surfaces.discard();
+    view.picker.selected = None;
+    view.picker.hovered = None;
+    notice(run, Some("Finding stage surfaces…"));
+}
+
 /// P1 post-native pass. The caller supplies the live fighter; no pointer survives
 /// this call. Ice Climbers' secondary body is excluded by the native partner id.
 pub unsafe fn frame(fighter: usize) {
@@ -372,7 +401,6 @@ pub unsafe fn frame(fighter: usize) {
         return;
     };
     let stop = config.session == 0;
-    let restart = START.load(Ordering::Acquire) | RESET.load(Ordering::Acquire);
     let open = OPEN.load(Ordering::Acquire);
     LIVE.with(|cell| {
         let mut slot = cell.borrow_mut();
@@ -417,6 +445,10 @@ pub unsafe fn frame(fighter: usize) {
                 after_reaction: 0,
                 planning_failed: false,
                 decision: None,
+                remembered: None,
+                recovering: false,
+                recovery_error: None,
+                restart_pending: false,
             });
         }
         let run = slot.as_mut().unwrap();
@@ -440,7 +472,21 @@ pub unsafe fn frame(fighter: usize) {
             form,
             training: identity,
         };
-        if run.epoch != Some(epoch) {
+        let reset = RESET.swap(false, Ordering::AcqRel);
+        if START.swap(false, Ordering::AcqRel) || reset {
+            run.restart_pending = true;
+            run.recovery_error = None;
+            run.recovering = false;
+        }
+        if run.epoch != Some(epoch) || reset {
+            // A native Training reset can rebuild collision without changing
+            // stage/form/scene identity. Only world geometry survives it.
+            run.remembered = (config.surface == 4
+                && view.surfaces.epoch().is_some_and(|old| old.stage == stage && old.form == form))
+                .then(|| view.picker.selected.and_then(|s| RememberedSpot::capture(s.line, s.point)))
+                .flatten();
+            run.recovering = false;
+            run.recovery_error = None;
             run.controller.stop(&mut run.adapter);
             run.epoch = Some(epoch);
             run.sampled = None;
@@ -460,7 +506,12 @@ pub unsafe fn frame(fighter: usize) {
                 },
             );
             view.start = false;
+            view.surfaces = Surfaces::EMPTY;
             Surfaces::bind(&mut view.surfaces, epoch);
+        }
+        if let Some(message) = run.recovery_error {
+            notice(run, Some(message));
+            return;
         }
         if run.discovery_failed {
             notice(run, Some("Surface discovery incomplete"));
@@ -540,9 +591,19 @@ pub unsafe fn frame(fighter: usize) {
             } = &mut *view;
             Picker::restore(picker, surfaces);
         }
-        if restart || run.controller.session.phase == Phase::Off {
-            START.store(false, Ordering::Release);
-            RESET.store(false, Ordering::Release);
+        if let Some(remembered) = run.remembered.take() {
+            match remembered.resolve(&view.surfaces) {
+                Ok((line, point)) => view.picker.selected = Some(picker::Spot { line, point }),
+                Err(error) => {
+                    view.picker.selected = None;
+                    run.recovery_error = Some(error.message());
+                    notice(run, Some(error.message()));
+                    return;
+                }
+            }
+        }
+        if run.restart_pending || run.controller.session.phase == Phase::Off {
+            run.restart_pending = false;
             if run.controller.session.phase != Phase::Off {
                 run.controller.stop(&mut run.adapter);
             }
@@ -672,7 +733,11 @@ pub unsafe fn frame(fighter: usize) {
                     return;
                 }
                 let spot = if run.config.surface == 4 {
-                    view.picker.selected.filter(|s| s.current(&mut source))
+                    if view.picker.selected.is_some_and(|s| !s.current(&mut source)) {
+                        rebuild(run, &mut view);
+                        return;
+                    }
+                    view.picker.selected
                 } else {
                     picker::random_spot(
                         &view.surfaces,
@@ -683,7 +748,11 @@ pub unsafe fn frame(fighter: usize) {
                     )
                 };
                 let Some(spot) = spot else {
-                    notice(run, Some("Choose a stage surface"));
+                    if run.config.surface == 4 {
+                        notice(run, Some("Choose a stage surface"));
+                    } else {
+                        rebuild(run, &mut view);
+                    }
                     return;
                 };
                 view.picker.selected = Some(spot);
@@ -724,7 +793,7 @@ pub unsafe fn frame(fighter: usize) {
                 setup.launch.hit_damage = base;
                 setup.launch.percent = percent + base * multiplier;
                 if !spot.current(&mut source) {
-                    notice(run, Some("Selected surface moved; choose a stage point"));
+                    rebuild(run, &mut view);
                     return;
                 }
                 if matches!(
@@ -734,6 +803,7 @@ pub unsafe fn frame(fighter: usize) {
                     run.pending = false;
                     run.decision = None;
                     run.after_reaction = 0;
+                    run.recovering = false;
                 }
             }
         }

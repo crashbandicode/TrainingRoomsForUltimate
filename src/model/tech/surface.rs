@@ -78,6 +78,60 @@ impl Line {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecoverError {
+    Incomplete,
+    MissingSurface,
+}
+impl RecoverError {
+    pub const fn message(self) -> &'static str {
+        match self {
+            Self::Incomplete => "Surface discovery incomplete",
+            Self::MissingSurface => "Selected surface no longer exists",
+        }
+    }
+}
+
+/// Pure world geometry only: no borrowed collision id survives rediscovery.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RememberedSpot {
+    point: Vec2,
+    ends: [Vec2; 2],
+    normal: Vec2,
+    floor: bool,
+    wall: bool,
+    passable: bool,
+}
+impl RememberedSpot {
+    pub fn capture(line: Line, point: Vec2) -> Option<Self> {
+        (line.valid() && line.kind().is_some() && finite(point)).then_some(Self {
+            point,
+            ends: line.ends,
+            normal: line.normal,
+            floor: line.floor,
+            wall: line.wall,
+            passable: line.passable,
+        })
+    }
+    /// Exact geometry/kind rebinding after fresh discovery; never nearest.
+    pub fn resolve(self, surfaces: &Surfaces) -> Result<(Line, Vec2), RecoverError> {
+        if surfaces.state != Walk::Closed {
+            return Err(RecoverError::Incomplete);
+        }
+        let line = surfaces
+            .lines()
+            .find(|line| {
+                (line.ends == self.ends || line.ends == [self.ends[1], self.ends[0]])
+                    && line.normal == self.normal
+                    && line.floor == self.floor
+                    && line.wall == self.wall
+                    && line.passable == self.passable
+            })
+            .ok_or(RecoverError::MissingSurface)?;
+        Ok((line, self.point))
+    }
+}
+
 /// `next` follows the native neighbour at the far endpoint. The adapter resolves
 /// which endpoint of the returned line is shared and returns its *far* end.
 pub trait Source {
@@ -128,6 +182,17 @@ impl Surfaces {
             ..Self::EMPTY
         };
         true
+    }
+
+    pub const fn epoch(&self) -> Option<StageEpoch> {
+        self.epoch
+    }
+    /// Explicit Training reset can retire collision ids within the same epoch.
+    pub fn discard(&mut self) {
+        *self = Self {
+            epoch: self.epoch,
+            ..Self::EMPTY
+        };
     }
     pub fn begin(&mut self, seed: usize, far_end: usize) {
         *self = Self {

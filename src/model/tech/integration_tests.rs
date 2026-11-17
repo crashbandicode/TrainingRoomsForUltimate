@@ -1790,3 +1790,209 @@ fn bootstrap_ray_can_seed_an_unflagged_solid_outline_line() {
     assert_eq!(bootstrap.seed(), Some((line.id, 1)));
     assert!(bootstrap.current().is_none());
 }
+
+#[test]
+fn recovery_discards_same_epoch_dead_ids_then_rebinds_and_allows_launch() {
+    use crate::model::cpu::role::{RoleTable, Scene};
+    use surface::{RememberedSpot, StageEpoch, Walk};
+    let mut roles = RoleTable::new();
+    roles.observe_scene(Some(Scene::Training));
+    let epoch = StageEpoch {
+        stage: 3,
+        form: 0,
+        training: roles.receipt(0).unwrap(),
+    };
+    let mut source = BootstrapStage::fixture();
+    let mut surfaces = Surfaces::EMPTY;
+    surfaces.bind(epoch);
+    surfaces.begin(100, 1);
+    for _ in 0..4 {
+        surfaces.step(&mut source);
+    }
+    assert_eq!(surfaces.state, Walk::Closed);
+    let old = picker::Spot {
+        line: source.read(101).unwrap(),
+        point: Vec2 { x: 80., y: -10. },
+    };
+    let saved = RememberedSpot::capture(old.line, old.point).unwrap();
+    for line in &mut source.lines {
+        line.id += 1000;
+    }
+    // Source::read(None) is the adapter's unchanged result for inactive raw lines.
+    assert!(!old.current(&mut source));
+    assert!(
+        !surfaces.bind(epoch),
+        "Training reset can keep the same epoch"
+    );
+    assert_eq!(surfaces.lines().next().unwrap().id, 100);
+    surfaces.discard();
+    assert_eq!(surfaces.state, Walk::Broken);
+    assert_eq!(surfaces.lines().count(), 0);
+    assert!(
+        !surfaces.bind(epoch),
+        "discard must preserve the current epoch"
+    );
+    assert_eq!(surfaces.epoch(), Some(epoch));
+    assert_eq!(surfaces.step(&mut Lines(vec![])), Walk::Broken);
+    assert_eq!(
+        saved.resolve(&surfaces),
+        Err(surface::RecoverError::Incomplete)
+    );
+    surfaces.begin(1100, 1);
+    for _ in 0..4 {
+        surfaces.step(&mut source);
+    }
+    assert_eq!(surfaces.state, Walk::Closed);
+    let (line, point) = saved.resolve(&surfaces).unwrap();
+    assert_eq!(line.id, 1101);
+    assert_eq!(point, old.point);
+    assert!(picker::Spot { line, point }.current(&mut source));
+    assert!(source.read(old.line.id).is_none());
+    struct Guarded<'a> {
+        native: Fake,
+        spot: picker::Spot,
+        source: &'a mut BootstrapStage,
+        placed_id: Option<usize>,
+    }
+    impl Launcher for Guarded<'_> {
+        type Error = ();
+        fn place(&mut self, launch: Launch) -> Result<(), ()> {
+            if !self.spot.current(self.source) {
+                return Err(());
+            }
+            assert_eq!(launch.target, self.spot.point);
+            self.placed_id = Some(self.spot.line.id);
+            self.native.place(launch)
+        }
+        fn launch(&mut self) -> Result<(), ()> {
+            self.native.launch()
+        }
+        fn attempt(&self) -> Result<Attempt, ()> {
+            self.native.attempt()
+        }
+        fn restore(&mut self) {
+            self.native.restore();
+        }
+    }
+    let mut controller = Controller::IDLE;
+    controller.start(Length::Free);
+    let mut accepted = setup();
+    accepted.launch.target = point;
+    {
+        let mut retired = Guarded {
+            native: Fake::new(),
+            spot: old,
+            source: &mut source,
+            placed_id: None,
+        };
+        assert_eq!(controller.place(&mut retired, accepted), Err(()));
+        assert_eq!(retired.placed_id, None);
+        assert_eq!(retired.native.placements, 0);
+    }
+    let mut launcher = Guarded {
+        native: Fake::new(),
+        spot: picker::Spot { line, point },
+        source: &mut source,
+        placed_id: None,
+    };
+    assert_eq!(controller.place(&mut launcher, accepted), Ok(Event::Placed));
+    assert_eq!(launcher.placed_id, Some(1101));
+    assert_eq!(
+        controller.tick(&mut launcher, false, Some(false)),
+        Ok(Event::None)
+    );
+    assert_eq!(
+        controller.tick(&mut launcher, false, Some(false)),
+        Ok(Event::Launched)
+    );
+    assert_eq!(
+        (launcher.native.placements, launcher.native.launches),
+        (1, 1)
+    );
+}
+
+#[test]
+fn recovery_missing_geometry_reports_specific_failure_without_nearest_substitution() {
+    use surface::{RecoverError, RememberedSpot, Walk};
+    let old = ceiling(1, -40.);
+    let saved = RememberedSpot::capture(old, Vec2 { x: 0., y: -40. }).unwrap();
+    let mut fresh = Surfaces::EMPTY;
+    fresh.push(ceiling(2, -39.));
+    fresh.state = Walk::Closed;
+    assert!(fresh
+        .nearest(Vec2 { x: 0., y: -40. }, Some(Kind::Ceiling))
+        .is_some());
+    assert_eq!(saved.resolve(&fresh), Err(RecoverError::MissingSurface));
+    assert_eq!(
+        RecoverError::MissingSurface.message(),
+        "Selected surface no longer exists"
+    );
+    assert_eq!(
+        RecoverError::Incomplete.message(),
+        "Surface discovery incomplete"
+    );
+}
+
+#[test]
+fn recovery_requires_exact_normal_flags_and_unmoved_endpoints() {
+    use surface::{RecoverError, RememberedSpot, Walk};
+    let old = ceiling(1, -40.);
+    let saved = RememberedSpot::capture(old, Vec2 { x: 0., y: -40. }).unwrap();
+    let mut shifted = old;
+    shifted.ends[0].x = f32::from_bits(old.ends[0].x.to_bits() + 1);
+    let mut normal = old;
+    normal.normal.x = 0.01;
+    let mut floor = old;
+    floor.floor = true;
+    let mut wall = old;
+    wall.wall = true;
+    let mut passable = old;
+    passable.passable = true;
+    for mut changed in [shifted, normal, floor, wall, passable] {
+        changed.id = 99;
+        let mut fresh = Surfaces::EMPTY;
+        assert!(fresh.push(changed));
+        fresh.state = Walk::Closed;
+        assert_eq!(
+            saved.resolve(&fresh),
+            Err(RecoverError::MissingSurface),
+            "{changed:?}"
+        );
+    }
+}
+
+#[test]
+fn recovery_accepts_reversed_endpoints_with_same_normal_kind_and_point() {
+    use surface::{RememberedSpot, Walk};
+    let old = ceiling(1, -40.);
+    let point = Vec2 { x: 7., y: -40. };
+    let saved = RememberedSpot::capture(old, point).unwrap();
+    let mut reversed = old;
+    reversed.id = 7;
+    reversed.ends.swap(0, 1);
+    let mut fresh = Surfaces::EMPTY;
+    fresh.push(reversed);
+    fresh.state = Walk::Closed;
+    assert_eq!(saved.resolve(&fresh), Ok((reversed, point)));
+}
+
+#[test]
+fn recovery_capture_rejects_invalid_or_untargetable_world_data() {
+    use surface::RememberedSpot;
+    let old = ceiling(1, -40.);
+    assert!(RememberedSpot::capture(
+        old,
+        Vec2 {
+            x: f32::NAN,
+            y: -40.
+        }
+    )
+    .is_none());
+    let mut invalid = old;
+    invalid.ends[1] = invalid.ends[0];
+    assert!(RememberedSpot::capture(invalid, old.ends[0]).is_none());
+    let mut unflagged = old;
+    unflagged.normal = Vec2 { x: 0.8, y: 0.6 };
+    assert_eq!(unflagged.kind(), None);
+    assert!(RememberedSpot::capture(unflagged, old.ends[0]).is_none());
+}
