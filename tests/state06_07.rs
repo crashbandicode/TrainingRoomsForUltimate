@@ -59,9 +59,9 @@ fn crash0900_no_native_reset_while_a_practice_fighter_loads() {
 #[test]
 fn crash0900_a_refused_reset_is_never_silent() {
     use lra_reset::{gate, RESET_REQUESTED};
-    // The player's L+R+A mid-load: refused, and the notice is posted once (the existing swap-busy text).
+    // The player's L+R+A mid-load: refused, and the notice is posted once (header the setting's label; body the
+    // existing swap-busy text, `SWAP_BUSY_NOTICE`, pinned by its own test in `model/mii/ordinary_cpu.rs`).
     assert_eq!(gate(RESET_REQUESTED, true, true, true, false), (Some(0), true, true));
-    assert_eq!(lra_reset::REFUSED_BODY, "Wait for the character swap to finish");
     assert_eq!(lra_reset::REFUSED_HEADER, "L+R+A Reset");
     // Held (or kept by the game): still refused, no second notice.
     assert_eq!(gate(RESET_REQUESTED, true, true, true, true), (Some(0), true, false));

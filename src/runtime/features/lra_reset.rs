@@ -25,7 +25,9 @@ pub unsafe fn reset_check(ctx: &mut InlineCtx) {
     REFUSED.store(refused, Ordering::Release);
     if notice {
         // The notice mailbox: allocation-free, any thread (`notices::post`).
-        super::notices::post(lra_reset::REFUSED_HEADER, lra_reset::REFUSED_BODY, 120, crate::model::notify::DEFAULT_COLOR);
+        // restriction: character-swap-busy (the same load refuses a pick with this text)
+        let body = crate::engine::mii::ordinary_cpu::SWAP_BUSY_NOTICE;
+        super::notices::post(lra_reset::REFUSED_HEADER, body, 120, crate::model::notify::DEFAULT_COLOR);
     }
     if let Some(value) = write {
         ctx.registers[8].set_x(value);

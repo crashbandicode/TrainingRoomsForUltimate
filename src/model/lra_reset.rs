@@ -42,14 +42,13 @@ pub const fn loader_resting(state: Option<u8>) -> bool {
 /// `cmp w8, #0x2; b.ne <no reset>` (`main+0x1378e50`, `w8 = [x8+0x240]`).
 pub const RESET_REQUESTED: u64 = 2;
 
-/// The notice a refused reset shows (never silent; primary 2026-11-17 09:55Z): the existing swap-busy text
-/// (`mii::ordinary_cpu::SWAP_BUSY_NOTICE`, the roster's refusal of a pick during the same load), under the
-/// setting's own menu label.
+/// The header of the notice a refused reset shows (never silent; primary 2026-11-17 09:55Z): the setting's own
+/// menu label. The body is the existing swap-busy text (`mii::ordinary_cpu::SWAP_BUSY_NOTICE`, restriction
+/// `character-swap-busy`: the roster's refusal of a pick during the same load).
 pub const REFUSED_HEADER: &str = "L+R+A Reset";
-pub const REFUSED_BODY: &str = "Wait for the character swap to finish";
 
 /// One reset check: the register write ([`x8_write`]), whether this check is a reset refused because a
-/// fighter loads, and whether to post [`REFUSED_BODY`] now. The notice is posted once per refusal (the
+/// fighter loads, and whether to post the refusal notice now. The notice is posted once per refusal (the
 /// first check of a run of refused requests: a held L+R+A, or a request the game keeps), never when the
 /// setting itself is Off (the player turned the reset off) and never for a check that requests nothing.
 pub const fn gate(x8: u64, lra_reset_on: bool, native_training: bool, fighter_loading: bool, was_refused: bool)
