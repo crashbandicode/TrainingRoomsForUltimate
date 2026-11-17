@@ -569,6 +569,84 @@ positions belong to their stage.
 ![The Saved layouts list and a layout's own screen: the five used last outlined, A opens Load, Rename, Duplicate, Delete; Load puts the targets on the stage](../media/rc14-btt-layouts-list.gif)<br>
 *Fighters & Stages > Practice games > Saved layouts, A: Battlefield's layouts, the five used last in the green outline and a thin line under the fifth (Layout 7 to Layout 3, then Layout 1 and 2). A on Layout 7 opens its own screen; A on Load turns Break the Targets On and the menu closes onto the zoomed-out stage with the three targets: "Loaded Layout 7 · Battlefield: close the menu to start". Eden, rc.14 (untested on hardware).*
 
+## Stage tech practice
+
+Practice your techs by being launched at a spot on the stage, then try to tech when you touch it.
+Open **Fighters & Stages > Practice games > Tech practice** to choose a session; the **Tech practice** section
+below holds the point picker and launch settings.
+
+### Tech practice
+
+Repeats the launch for **10 attempts**, **20 attempts**, **1 minute**, **3 minutes** or **Free practice**.
+
+- **Values:** Off, 20 attempts, 10 attempts, 1 minute, 3 minutes, Free practice
+- **Default:** Off
+- **How:** Left / Right chooses the session, or **A** opens the list, **Up / Down** chooses and **A** sets it;
+  close the menu with **B** to begin, and choose **Off** to stop Free practice.
+
+### Tech point
+
+Choose the spot you want to tech: **A** on this row opens a crosshair over the stage, the **left stick** or
+**D-pad** moves it, **A** sets the nearest surface point, and **X** starts the launches.
+
+The view zooms out while you aim; the marked point snaps to a floor, wall or underside near the crosshair.
+Use **Camera > Follow** to follow your fighter during the run, or **Whole stage** to keep the stage in view.
+
+![Stage tech: the crosshair moves onto a floor spot, the launch starts, and the tech grade appears](../media/rc15-stage-tech.gif)<br>
+*Move the crosshair onto a floor spot, A sets it, X starts, then a shield press techs the landing and the grade appears.
+Eden, 2026-11-17, rc.15 build 55b20f59; untested on hardware in this capture.*
+
+### Surface
+
+Chooses a new random spot each attempt on **Any**, **Floor**, **Wall** or **Ceiling (underside)**, or keeps your
+**Chosen point**; use **Left / Right** to choose, or **A** to open its list.
+
+### Set, Random and Auto
+
+**Set** keeps the value at the lower handle of its range; **Random** chooses again between the two handles each
+attempt; **Auto (approximate)** works out the angle or start position for your spot.
+
+Use **Left / Right** on a setting to choose its mode, or **A** to open its list.
+**A** on its range row opens the slider, **Left / Right**
+chooses a handle, **A** picks it up, the **D-pad** changes it, and **A** puts it down.
+Auto is available for **Angle** and **Start position**; the other ranges use Set or Random.
+On floors and platform tops Auto lands on your spot; on walls and undersides it may land a few units off.
+If the chosen values cannot make a launch, the message asks for a different setup.
+
+### Launch settings
+
+Each range has the mode row above it: choose **Set** or **Random** with **Left / Right**, then edit the range with
+**A** and the **D-pad** as above.
+
+| Option | What it does and how to use it |
+| --- | --- |
+| Damage | Your percent before the hit; set it with **Damage range**. |
+| Hit damage | The percent you see added on hit, which also sets how long the freeze lasts; choose 1–30 with **Hit damage range**. |
+| Launch speed | The knockback strength; a larger value launches you faster, and **Launch speed range** sets it. |
+| Angle | The launch direction: 0° is right, 90° up, 180° left and 270° down; use **Angle range**, or choose **Auto (approximate)**. |
+| Start position | How far from the spot you start; use **Start range**, or choose **Auto (approximate)**. |
+| Time to contact | The travel time Auto aims for; edit **Time range**. |
+| DI | **Off** leaves the launch alone, **Player** uses your stick, **Set** uses **DI direction** (**A**, D-pad, **A**), and **Random** picks a direction each attempt; **Left / Right** chooses the mode. |
+| Facing | Which way you face at the start: **Toward the point**, **Left**, **Right** or **Random**; choose with **Left / Right**. |
+| Delay before launch | How long you wait at the start before each launch; edit **Delay range**. |
+| Camera | **Follow** follows your fighter and **Whole stage** keeps the stage in view; choose with **Left / Right**. |
+
+For example, **Damage 20** and **Hit damage 12** launch you at **32%**.
+
+### Grade, streak and summary
+
+Press your **shield button** just before touching the surface to tech; each landing shows its grade, the attempt
+count and your current streak, then puts you back for the next attempt.
+
+A successful tech adds to the streak; a miss ends it, and wall techs, wall jumps and ceiling techs are named when
+recognized. If timing or grading cannot be read, the message says it is unavailable; an ungraded attempt is not
+counted. At the end of a counted or timed session, **Done!** shows the results and best streak; a timing average
+appears only when timing is available. Choose another session with **Left / Right** on **Tech practice** to go again.
+
+<!-- CAPTURE-REQUEST rc15-stage-tech-options: the shared clip above shows the picker, launch and grade.
+Dedicated session-list, Surface Random, launch-setting/Set-Random-Auto edits and Done summary clips are not in
+this capture; do not describe the shared GIF as showing them. Use the retained 55b20f59 run if those views exist. -->
+
 ### CPU during a game
 
 Whether the CPU is hidden for as long as a practice game runs (a game runs from the menu close that starts a mode until
