@@ -1716,7 +1716,7 @@ approved_by = "Operator rc.15 size approval; primary 2026-11-16 22:47Z explicitl
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 154445
+ceiling = 154452
 date = "2026-11-17"
-reason = "rc.15 TechUI combined bound resolver and visible Hit damage UI measured 154445 on ef726118; ONE exact combined ceiling, no headroom. The approved arithmetic bound was 153962+461+26=154449; separate V10 sync +4 is already present in the UI baseline, so the actual integrated total is four lower. FOR OPERATOR REVIEW; no counting, guard or gate change."
-approved_by = "Operator rc.15 size approval; primary 2026-11-17 01:06Z approves UI +26 and core +461 above exact153962, requiring ONE measured combined total without headroom."
+reason = "rc.15 TechUI final combined implementation measured 154452 on reviewed 02fdb3cb: 153962 + core463 + UI27. Core467 includes V10+4 already in the UI baseline. ONE exact combined ceiling, no headroom; boundary/determinism additions are host tests only. FOR OPERATOR REVIEW; no counting, guard or gate change."
+approved_by = "Operator rc.15 size approval; primary exact +7 ruling 2026-11-17 01:50Z confirmed by tech-direct FINAL 02:10Z and rc15-tech reconciliation 02:15Z; supersedes the earlier +461/+26 arithmetic estimate."

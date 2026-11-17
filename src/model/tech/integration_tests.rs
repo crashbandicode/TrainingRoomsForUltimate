@@ -544,11 +544,6 @@ fn visible_hit_damage_uses_only_the_supplied_live_multiplier() {
     }
     for visible in [16.38, f32::from_bits(0x41830a3e)] {
         let base = planner::base_hit_damage(visible, Some(1.2)).unwrap();
-        // Captured Marth reference only: its native attack factor is 0.7.
-        assert_eq!(
-            crate::model::tech_hitlag::frames(base, 0.7, hitlag_parameters(1., 1.2)),
-            Some(10)
-        );
         // The product defines a generic attack factor of 1, not Marth's move.
         assert_eq!(
             crate::model::tech_hitlag::frames(base, 1., hitlag_parameters(1., 1.2)),
@@ -570,12 +565,13 @@ fn hitlag_parameters(k: f32, percent_multiplier: f32) -> crate::model::tech_hitl
 fn inverse_roundtrip_can_cross_a_native_hitlag_floor() {
     use crate::model::tech_hitlag::frames;
     let p = hitlag_parameters(1., 1.2);
-    let original = f32::from_bits(0x415d89d9);
-    let visible = original * p.percent_multiplier;
+    // A hypothetical other hit is not an original base for a player-set p.
+    let other_hit = f32::from_bits(0x415d89d9);
+    let visible = other_hit * p.percent_multiplier;
     assert_eq!(visible.to_bits(), 0x4184ec4f);
     let inverse = planner::base_hit_damage(visible, Some(p.percent_multiplier)).unwrap();
     assert_eq!(inverse.to_bits(), 0x415d89d8);
-    assert_eq!(frames(original, 1., p), Some(15));
+    assert_eq!(frames(other_hit, 1., p), Some(15));
     assert_eq!(frames(inverse, 1., p), Some(14));
     for (bits, expected) in [(0x4184ec4e, 14), (0x4184ec4f, 14), (0x4184ec50, 15)] {
         let base =
@@ -583,6 +579,66 @@ fn inverse_roundtrip_can_cross_a_native_hitlag_floor() {
         assert_eq!(frames(base, 1., p), Some(expected));
     }
 }
+#[test]
+fn canonical_visible_damage_is_deterministic_for_the_same_live_inputs() {
+    use crate::model::tech_hitlag::frames;
+    let mut visible: Vec<f32> = (10..=300).map(|tenths| tenths as f32 / 10.).collect();
+    visible.extend([16.38, f32::from_bits(0x4184ec4e),
+        f32::from_bits(0x4184ec4f), f32::from_bits(0x4184ec50)]);
+    // Determinism includes the live multiplier and native hitlag parameters;
+    // changing either intentionally changes the hit rather than recovering one.
+    for multiplier in [1., 1.2] {
+        for k in [1., 0.925] {
+            let parameters = hitlag_parameters(k, multiplier);
+            for &p in &visible {
+                let d = planner::base_hit_damage(p, Some(multiplier)).unwrap();
+                let expected = frames(d, 1., parameters).unwrap();
+                for _ in 0..8 {
+                    let again = planner::base_hit_damage(p, Some(multiplier)).unwrap();
+                    assert_eq!(again.to_bits(), d.to_bits());
+                    assert_eq!(frames(again, 1., parameters), Some(expected));
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn canonical_native_forward_preserves_tenth_percent_display() {
+    let visible = (10..=300).map(|tenths| tenths as f32 / 10.).chain([
+        16.38, f32::from_bits(0x4184ec4e),
+        f32::from_bits(0x4184ec4f), f32::from_bits(0x4184ec50),
+    ]);
+    for p in visible {
+        for multiplier in [1., 1.2] {
+            let speed = crate::model::tech_settings::Numeric {
+                mode: crate::model::tech_settings::Mode::Set, lo: 100., hi: 100.,
+            };
+            let launch = percent_fixture(0., p, multiplier, speed, 0).setup.launch;
+            let d = planner::base_hit_damage(p, Some(multiplier)).unwrap();
+            assert_eq!(launch.hit_damage.to_bits(), d.to_bits());
+            let native_added = launch.hit_damage * multiplier;
+            assert_eq!(launch.percent.to_bits(), native_added.to_bits());
+            // Display projection only; no rounding is added to product arithmetic.
+            assert_eq!(format!("{native_added:.1}"), format!("{p:.1}"),
+                "p={p:?}, multiplier={multiplier:?}, d={d:?}");
+        }
+    }
+    let d = planner::base_hit_damage(15., Some(1.2)).unwrap();
+    assert_eq!((d * 1.2).to_bits(), 0x416fffff);
+    assert_eq!(format!("{:.1}", d * 1.2), "15.0");
+}
+
+#[test]
+fn native_reference_hitlag_uses_its_own_base_damage() {
+    // R1 captured base damage, not the inverse of its displayed percent delta.
+    let reference_d = f32::from_bits(0x415a6666);
+    assert_eq!(crate::model::tech_hitlag::frames(
+        reference_d, 0.7, hitlag_parameters(1., 1.2)), Some(10));
+    assert_ne!(planner::base_hit_damage(16.38, Some(1.2)).unwrap().to_bits(),
+        reference_d.to_bits());
+}
+
 #[test]
 fn integer_visible_ui_grid_preimages_keep_the_native_hitlag_floor() {
     use crate::model::tech_hitlag::frames;
