@@ -40,6 +40,17 @@ pub enum MoveAvailability {
     Hidden,
 }
 
+/// Operator ruling 11-17 ("Go with option b for the ice shot answer"): 114 Ice Shot freezes natively only above
+/// about 190%, past the 150% damage-on-load maximum (frozen-cluster-devin/frozen114-measure-xps-1/RESULT.md), so it
+/// runs as practice and never grades: its miss and any real freeze end with this notice.
+pub const fn practice_only(id: u16) -> Option<&'static str> {
+    match id {
+        // restriction: mashout-iceshot-practice
+        114 => Some("Ice Shot freezes only above about 190% · practice only, no grade"),
+        _ => None,
+    }
+}
+
 pub const fn availability(id: u16) -> MoveAvailability {
     match id {
         106 | 115 => MoveAvailability::Hidden,
@@ -264,6 +275,15 @@ mod tests {
     lib_unit_tests! {
         use super::*;
         use crate::model::{menu::table::{Control, ROWS}, settings::{self, Settings}};
+
+        #[test]
+        fn ice_shot_is_practice_only_with_the_approved_text() {
+            // restriction: mashout-iceshot-practice (operator 11-17): only 114, and it stays selectable.
+            assert_eq!(practice_only(114), Some("Ice Shot freezes only above about 190% · practice only, no grade"));
+            assert_eq!(CATALOG.iter().filter(|s| practice_only(s.id).is_some()).map(|s| s.id).collect::<Vec<_>>(), [114]);
+            assert_eq!(availability(114), MoveAvailability::Available);
+            assert!(practice_only(113).is_none() && practice_only(112).is_none());
+        }
 
         #[test]
         fn reviewed_catalog_has_exact_state_counts_and_unique_ids() {

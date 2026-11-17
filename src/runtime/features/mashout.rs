@@ -951,6 +951,9 @@ pub unsafe fn frame(fighter: usize) {
         let seed = sample.seed();
         let Ok(clock) = Clock::new(seed.record) else { game.fail("Invalid native capture seed · no grade"); return; };
         let Some(request) = game.requested else { return; };
+        if let Some(text) = crate::model::mashout::moves::practice_only(request.id) {
+            game.fail(text); return;
+        }
         let cpu_body = natives::entry_active_body(natives::fighter_entry(cpu_entry));
         if cpu_body == 0 || ((cpu_body + 0xc) as *const u32).read() != request.attacker_kind {
             game.fail("Attacker changed · no grade"); return;
@@ -1419,7 +1422,8 @@ pub unsafe fn frame(fighter: usize) {
                 drive(input);
             }
             if game.saw_catch && cpu_status == ids[0] && !linked {
-                game.fail("Move did not capture · reopen menu to retry");
+                let practice = game.requested.and_then(|r| crate::model::mashout::moves::practice_only(r.id));
+                game.fail(practice.unwrap_or("Move did not capture · reopen menu to retry"));
             }
         }
         Step::Held => {
