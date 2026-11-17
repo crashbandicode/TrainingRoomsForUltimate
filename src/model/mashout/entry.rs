@@ -337,6 +337,15 @@ impl TrolleyEntry {
     }
 }
 
+/// Ganondorf's aerial side special never calls end_clatter. On landing the attacker's fall
+/// (ganon 0x150fc→0x15124) enters SPECIAL_AIR_S_END and the victim leaves the clatter hold
+/// for CATCHED_AIR_END_GANON, whose Main (common 0xd7aa0) reads no clatter and only falls.
+/// Exactly that pair is the native end before escape; the caller keeps escape and
+/// exhaustion first, and every other unlinked status stays an interruption.
+pub fn native_landing_end(plan: Plan, is_victim: impl Fn(C) -> bool, is_attacker: impl Fn(C) -> bool) -> bool {
+    plan == Plan::AirSideSpecial && is_victim(C::CatchedAirEndGanon) && is_attacker(C::GanonSpecialAirSEnd)
+}
+
 /// Down throws and Cargo first acquire an ordinary grab, without grading that preparatory hold.
 pub fn preparatory_grab(plan: Plan) -> bool {
     matches!(plan, Plan::DownThrow | Plan::Cargo)
@@ -462,6 +471,25 @@ mod tests {
             for plan in [Plan::Grab, Plan::Whip, Plan::AirSideSpecial, Plan::Inhale] {
                 assert!(!preparatory_grab(plan));
             }
+        }
+
+        #[test]
+        fn ganon_native_landing_end_needs_the_exact_pair_and_plan() {
+            let victim = |want: C| move |c: C| c == want;
+            assert!(native_landing_end(Plan::AirSideSpecial, victim(C::CatchedAirEndGanon), victim(C::GanonSpecialAirSEnd)));
+            for (v, a) in [
+                (C::ClatterCatchedAirFallGanon, C::GanonSpecialAirSEnd),
+                (C::CatchedAirEndGanon, C::StatusSpecialS),
+                (C::ClatterCaptureWait, C::GanonSpecialAirSEnd),
+            ] {
+                assert!(!native_landing_end(Plan::AirSideSpecial, victim(v), victim(a)), "{v:?} {a:?}");
+            }
+            for plan in [Plan::Grab, Plan::Drag, Plan::Cargo, Plan::Whip, Plan::Inhale] {
+                assert!(!native_landing_end(plan, victim(C::CatchedAirEndGanon), victim(C::GanonSpecialAirSEnd)));
+            }
+            // The after-landing status is not a clatter hold.
+            assert!(!holding(State::Grab, |c| c == C::CatchedAirEndGanon));
+            assert!(holding(State::Grab, |c| c == C::ClatterCatchedAirFallGanon));
         }
 
         #[test]

@@ -315,7 +315,11 @@ fn post(e: worker::Event, _: u64) {
     if let worker::Event::Begin(_, epoch, k, s, origin) = e {
         BEGINS.with_borrow_mut(|b| b.push((k, s, epoch, origin)));
     }
+    if let worker::Event::NativeEnd(generation, epoch) = e {
+        NATIVE_ENDS.with_borrow_mut(|v| v.push((generation, epoch)));
+    }
 }
+thread_local! { static NATIVE_ENDS: RefCell<Vec<(u64, u64)>> = const { RefCell::new(Vec::new()) }; }
 fn state_id(c: C) -> Option<i32> {
     match model::cpu::ids::NAMES[c as usize] {
         "FIGHTER_KIND_BRAVE" => return Some(0x53),
@@ -354,6 +358,11 @@ fn state_id(c: C) -> Option<i32> {
         // Pinned skyline_smash lua_const.rs:19102/19104.
         C::ClatterShoulderedDonkeyStart => 0xC5,
         C::ClatterShoulderedDonkey => 0xC6,
+        // Pinned lua_const.rs:18800-18802 / 5449.
+        C::ClatterCatchedAirGanon => 0xBF,
+        C::ClatterCatchedAirFallGanon => 0xC0,
+        C::CatchedAirEndGanon => 0xC1,
+        C::GanonSpecialAirSEnd => 0x1E5,
         C::ClatterCaptureYoshi => 243,
         C::ClatterIce => 203,
         C::ClatterYoshiEgg => 244,
@@ -539,6 +548,7 @@ impl NativeMemory {
         QUEUE.with_borrow_mut(Vec::clear);
         END_QUEUE.with_borrow_mut(Vec::clear);
         BEGINS.with_borrow_mut(Vec::clear);
+        NATIVE_ENDS.with_borrow_mut(Vec::clear);
         DRIVEN.with_borrow_mut(Vec::clear);
         m
     }
@@ -2020,6 +2030,77 @@ fn cargo_never_drives_forward_before_catch_wait_or_for_other_plans() {
         CPU_STATUS.store(52, Ordering::Relaxed);
         m.update(&mut g, 66);
         assert!(DRIVEN.with_borrow(|v| v.iter().all(|i| i.lstick_x == 0)));
+    }
+}
+
+// Move90 Ganondorf aerial side special: victim 0xBF/0xC0 hold, landing pair victim 0xC1 + attacker 0x1E5.
+unsafe fn held_ganon(m: &mut NativeMemory, plan: Plan) -> Game {
+    EXECUTE_HELD.store(true, Ordering::Relaxed);
+    let mut g = Game::new(plan, State::Grab);
+    let r = g.requested.as_mut().unwrap();
+    r.id = 90;
+    r.attacker_kind = 0x18;
+    m.body[3] = 0x18;
+    startup(&mut g, m.p1());
+    assert_eq!(ARMED.load(Ordering::Relaxed), g.generation);
+    // An ordinary grab seed is only admitted from the attacker's catch statuses (fixture 52).
+    CPU_STATUS.store(if plan == Plan::Grab { 52 } else { 0x1E3 }, Ordering::Relaxed);
+    m.seed(100.0, 4.0, 1);
+    m.start();
+    m.update(&mut g, 0xBF);
+    assert_eq!(g.step, Step::Held);
+    CPU_STATUS.store(0x1E4, Ordering::Relaxed);
+    m.update(&mut g, 0xC0);
+    assert_eq!(g.step, Step::Held, "the record carries from 191 into 192");
+    g
+}
+#[test]
+fn ganon_landing_pair_is_the_existing_native_end_outcome() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut g = held_ganon(&mut m, Plan::AirSideSpecial);
+        CPU_STATUS.store(0x1E5, Ordering::Relaxed);
+        m.update(&mut g, 0xC1);
+        assert_eq!(g.step, Step::Result);
+        assert_eq!(g.failed, None);
+        assert!(g.clock.is_none());
+        assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+        assert_eq!(NATIVE_ENDS.with_borrow(Clone::clone), vec![(g.generation, g.epoch)]);
+        assert_eq!(BEGINS.with_borrow(Vec::len), 1);
+    }
+}
+#[test]
+fn ganon_other_unlinked_statuses_and_plans_stay_interruptions() {
+    unsafe {
+        for (plan, victim, attacker) in [
+            (Plan::AirSideSpecial, 0xC1, 0x1E4), // victim ended while the attacker still falls
+            (Plan::AirSideSpecial, 0xC1, 0),
+            (Plan::AirSideSpecial, 79, 0x1E5),   // DAMAGE_FALL is not the landing pair
+            (Plan::AirSideSpecial, 0, 0x1E5),
+            (Plan::Grab, 0xC1, 0x1E5),           // only move90's plan owns the pair
+            (Plan::Drag, 0xC1, 0x1E5),
+        ] {
+            let mut m = NativeMemory::new();
+            let mut g = held_ganon(&mut m, plan);
+            CPU_STATUS.store(attacker, Ordering::Relaxed);
+            m.update(&mut g, victim);
+            assert_eq!(g.failed, Some("Capture interrupted · no grade"), "{plan:?} {victim:#x} {attacker:#x}");
+            assert!(NATIVE_ENDS.with_borrow(Vec::is_empty));
+        }
+    }
+}
+#[test]
+fn ganon_escape_status_keeps_precedence_over_the_landing_pair() {
+    unsafe {
+        // An escape status in the same frame as the landing pair's attacker status.
+        for escape in [68, 69] {
+            let mut m = NativeMemory::new();
+            let mut g = held_ganon(&mut m, Plan::AirSideSpecial);
+            CPU_STATUS.store(0x1E5, Ordering::Relaxed);
+            m.update(&mut g, escape);
+            assert_ne!(g.failed, Some("Capture interrupted · no grade"));
+            assert!(NATIVE_ENDS.with_borrow(Vec::is_empty), "escape={escape}");
+        }
     }
 }
 

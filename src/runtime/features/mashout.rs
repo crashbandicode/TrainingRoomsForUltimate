@@ -1161,6 +1161,24 @@ pub unsafe fn frame(fighter: usize) {
                 return;
             }
             if !linked && !escaped && !clock.exhausted() {
+                let cpu_status = natives::status_kind(cpu);
+                if game.requested.is_some_and(|r| entry::native_landing_end(
+                    r.plan,
+                    |c| state_id(c) == Some(status),
+                    |c| state_id(c) == Some(cpu_status),
+                )) {
+                    // The same informational outcome as an observed native end_clatter.
+                    revoke();
+                    game.clock = None;
+                    game.step = Step::Result;
+                    post(worker::Event::NativeEnd(game.generation, game.epoch), game.generation);
+                    #[cfg(feature = "diag")]
+                    crate::runtime::diag_log::enqueue_diagnostic(format_args!(
+                        "[Mashout] native_end gen={} epoch={} outcome=ended_before_escape source=landing t={}",
+                        game.generation, game.epoch, clock.elapsed()
+                    ));
+                    return;
+                }
                 game.fail("Capture interrupted · no grade");
                 return;
             }

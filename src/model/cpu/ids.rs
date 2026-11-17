@@ -294,6 +294,10 @@ game_constants! {
     ClatterSwallowedCapture = "FIGHTER_STATUS_KIND_SWALLOWED_CAPTURE",
     ClatterCatchedAirGanon = "FIGHTER_STATUS_KIND_CATCHED_AIR_GANON",
     ClatterCatchedAirFallGanon = "FIGHTER_STATUS_KIND_CATCHED_AIR_FALL_GANON",
+    // Mash out move90's native landing end (not clatter statuses): the victim's
+    // after-landing status and Ganondorf's landing status.
+    CatchedAirEndGanon = "FIGHTER_STATUS_KIND_CATCHED_AIR_END_GANON",
+    GanonSpecialAirSEnd = "FIGHTER_GANON_STATUS_KIND_SPECIAL_AIR_S_END",
     ClatterBind = "FIGHTER_STATUS_KIND_BIND",
     ClatterDamageSong = "FIGHTER_STATUS_KIND_DAMAGE_SONG",
     ClatterBittenWario = "FIGHTER_STATUS_KIND_BITTEN_WARIO",
