@@ -1047,91 +1047,101 @@ fn roller_miss_and_nonbury_seed_still_fail() {
 }
 
 #[test]
-fn dedede_up_special_requests_native_start_and_uses_actual_bury_seed() {
-    unsafe {
-        let mut m = NativeMemory::new();
-        let mut g = Game::new(Plan::UpSpecial, State::Bury);
-        let request = g.requested.as_mut().unwrap();
-        request.id = 99;
-        request.attacker_kind = 42;
-        request.attacker_name = "King Dedede";
-        m.body[3] = 42;
-        g.step = Step::Settle;
-        CPU_STATUS.store(0, Ordering::Relaxed);
-        m.update(&mut g, 0);
-        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 478)]);
-        assert_eq!(g.step, Step::Entering);
-        assert_eq!(ARMED.load(Ordering::Relaxed), g.generation);
-        for cpu_status in [478, 502, 503] {
-            CPU_STATUS.store(cpu_status, Ordering::Relaxed);
+fn bury_specials_request_native_start_and_use_actual_bury_seed() {
+    for (id, plan, kind, name, start, statuses) in [
+        (99, Plan::UpSpecial, 42, "King Dedede", 478, &[478, 502, 503][..]),
+        (108, Plan::Flip, 32, "Zero Suit Samus", 479, &[479, 484, 486, 487][..]),
+    ] {
+        unsafe {
+            let mut m = NativeMemory::new();
+            let mut g = Game::new(plan, State::Bury);
+            let request = g.requested.as_mut().unwrap();
+            request.id = id;
+            request.attacker_kind = kind;
+            request.attacker_name = name;
+            m.body[3] = kind;
+            g.step = Step::Settle;
+            CPU_STATUS.store(0, Ordering::Relaxed);
             m.update(&mut g, 0);
+            assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, start)]);
             assert_eq!(g.step, Step::Entering);
+            assert_eq!(ARMED.load(Ordering::Relaxed), g.generation);
+            for &cpu_status in statuses {
+                CPU_STATUS.store(cpu_status, Ordering::Relaxed);
+                m.update(&mut g, 0);
+                assert_eq!(g.step, Step::Entering);
+                assert_eq!(
+                    DRIVEN.with_borrow(|v| *v.last().unwrap()),
+                    MappedInputs::NEUTRAL
+                );
+                assert!(g.clock.is_none());
+            }
+            m.seed(136.25, 9.0, 1);
+            let actual = reader::sample(m.p1(), 0.37).unwrap().seed();
+            let before = (m.control, m.record);
+            m.start();
+            m.update(&mut g, 75);
+            assert_eq!(g.step, Step::Held);
+            assert_eq!(g.clock.unwrap().last(), actual.record);
+            let begins = BEGINS.with_borrow(Clone::clone);
+            assert_eq!(begins.len(), 1);
+            assert_eq!(begins[0].1, actual);
+            assert_eq!((m.control, m.record), before);
             assert_eq!(
                 DRIVEN.with_borrow(|v| *v.last().unwrap()),
                 MappedInputs::NEUTRAL
             );
-            assert!(g.clock.is_none());
+            assert_eq!(
+                entry::controls(plan, false),
+                MappedInputs::NEUTRAL
+            );
+            assert_eq!(
+                entry::controls(plan, true),
+                MappedInputs::NEUTRAL
+            );
+            assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, start)]);
         }
-        m.seed(136.25, 9.0, 1);
-        let actual = reader::sample(m.p1(), 0.37).unwrap().seed();
-        let before = (m.control, m.record);
-        m.start();
-        m.update(&mut g, 75);
-        assert_eq!(g.step, Step::Held);
-        assert_eq!(g.clock.unwrap().last(), actual.record);
-        let begins = BEGINS.with_borrow(Clone::clone);
-        assert_eq!(begins.len(), 1);
-        assert_eq!(begins[0].1, actual);
-        assert_eq!((m.control, m.record), before);
-        assert_eq!(
-            DRIVEN.with_borrow(|v| *v.last().unwrap()),
-            MappedInputs::NEUTRAL
-        );
-        assert_eq!(
-            entry::controls(Plan::UpSpecial, false),
-            MappedInputs::NEUTRAL
-        );
-        assert_eq!(
-            entry::controls(Plan::UpSpecial, true),
-            MappedInputs::NEUTRAL
-        );
-        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 478)]);
     }
 }
 #[test]
-fn dedede_up_special_miss_and_nonbury_seed_keep_existing_refusals() {
-    unsafe {
-        let mut m = NativeMemory::new();
-        let mut g = Game::new(Plan::UpSpecial, State::Bury);
-        let q = g.requested.as_mut().unwrap();
-        q.id = 99;
-        q.attacker_kind = 42;
-        q.attacker_name = "King Dedede";
-        m.body[3] = 42;
-        startup(&mut g, m.p1());
-        CPU_STATUS.store(478, Ordering::Relaxed);
-        m.update(&mut g, 0);
-        CPU_STATUS.store(0, Ordering::Relaxed);
-        m.update(&mut g, 0);
-        assert_eq!(
-            g.failed,
-            Some("Move did not capture · reopen menu to retry")
-        );
-        assert!(BEGINS.with_borrow(Vec::is_empty));
-        let mut g = Game::new(Plan::UpSpecial, State::Bury);
-        let q = g.requested.as_mut().unwrap();
-        q.id = 99;
-        q.attacker_kind = 42;
-        q.attacker_name = "King Dedede";
-        m.body[3] = 42;
-        startup(&mut g, m.p1());
-        CPU_STATUS.store(502, Ordering::Relaxed);
-        m.seed(100.0, 9.0, 1);
-        m.start();
-        m.update(&mut g, 203);
-        assert_eq!(g.failed, Some("Move entry unconfirmed · no grade"));
-        assert!(g.clock.is_none());
-        assert!(BEGINS.with_borrow(Vec::is_empty));
+fn bury_specials_miss_and_nonbury_seed_keep_existing_refusals() {
+    for (id, plan, kind, name, start, statuses) in [
+        (99, Plan::UpSpecial, 42, "King Dedede", 478, &[478, 502, 503][..]),
+        (108, Plan::Flip, 32, "Zero Suit Samus", 479, &[479, 484, 486, 487][..]),
+    ] {
+        unsafe {
+            let mut m = NativeMemory::new();
+            let mut g = Game::new(plan, State::Bury);
+            let q = g.requested.as_mut().unwrap();
+            q.id = id;
+            q.attacker_kind = kind;
+            q.attacker_name = name;
+            m.body[3] = kind;
+            startup(&mut g, m.p1());
+            CPU_STATUS.store(start as u32, Ordering::Relaxed);
+            m.update(&mut g, 0);
+            CPU_STATUS.store(0, Ordering::Relaxed);
+            m.update(&mut g, 0);
+            assert_eq!(
+                g.failed,
+                Some("Move did not capture · reopen menu to retry")
+            );
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+            let mut g = Game::new(plan, State::Bury);
+            let q = g.requested.as_mut().unwrap();
+            q.id = id;
+            q.attacker_kind = kind;
+            q.attacker_name = name;
+            m.body[3] = kind;
+            startup(&mut g, m.p1());
+            CPU_STATUS.store(*statuses.last().unwrap(), Ordering::Relaxed);
+            m.seed(100.0, 9.0, 1);
+            m.start();
+            m.update(&mut g, 203);
+            assert_eq!(g.failed, Some("Move entry unconfirmed · no grade"));
+            assert!(g.clock.is_none());
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+        }
     }
 }
 

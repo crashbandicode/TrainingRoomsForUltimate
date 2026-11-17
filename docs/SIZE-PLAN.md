@@ -377,3 +377,11 @@ ceiling file and evaluator remain unchanged. Primary code review and Eden
 contact/escape proof are pending. Evidence:
 dedede99-gate-bd7f4d90-surface/SUMMARY.md, BUDGET-ENTRY.md and retained
 compliance-v2.log (corrected trace test references, no product/gate change).
+
+### rc.15 Ice Climbers113/114 and ZSS108 (2026-11-17)
+
+The canonical2e36e0bd gate measured150992, unchanged from bd7f4d90.
+The primary explicitly approved that size with the IC113/114 Opus PASS.
+The next Flip stomp108 entry reuses SPECIAL_LW admission and native Bury
+observation; its canonical measurement is pending. No ceiling or counter
+change: final integration owns the approved final-total adjustment.
