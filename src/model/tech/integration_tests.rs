@@ -338,7 +338,7 @@ fn all_fixed_attempt_values_stay_and_random_rerolls_only_on_request() {
     .unwrap();
     assert_eq!(a.setup, b.setup);
     assert_eq!(a.setup.launch.start, Vec2 { x: 0., y: 30. });
-    assert_eq!(a.setup.launch.percent, 40.);
+    assert_eq!(a.setup.launch.percent, 52.);
     assert_eq!(a.setup.launch.hit_damage, 12.);
     assert_eq!(a.setup.launch.di, Some(Vec2::default()));
     assert!(!a.approximate);
@@ -412,6 +412,71 @@ fn visible_hit_damage_uses_only_the_supplied_live_multiplier() {
     }
     for visible in [0., 30.01, -1., f32::NAN, f32::INFINITY] {
         assert_eq!(planner::base_hit_damage(visible, Some(1.2)), None);
+    }
+    for visible in [16.38, f32::from_bits(0x41830a3e)] {
+        let base = planner::base_hit_damage(visible, Some(1.2)).unwrap();
+        // Captured Marth reference only: its native attack factor is 0.7.
+        assert_eq!(
+            crate::model::tech_hitlag::frames(base, 0.7, hitlag_parameters(1., 1.2)),
+            Some(10)
+        );
+        // The product defines a generic attack factor of 1, not Marth's move.
+        assert_eq!(
+            crate::model::tech_hitlag::frames(base, 1., hitlag_parameters(1., 1.2)),
+            Some(14)
+        );
+    }
+}
+fn hitlag_parameters(k: f32, percent_multiplier: f32) -> crate::model::tech_hitlag::Parameters {
+    crate::model::tech_hitlag::Parameters {
+        maximum: 30.,
+        multiplier: 0.65,
+        add: 6.,
+        threshold: 10,
+        object_multiplier: k,
+        percent_multiplier,
+    }
+}
+#[test]
+fn inverse_roundtrip_can_cross_a_native_hitlag_floor() {
+    use crate::model::tech_hitlag::frames;
+    let p = hitlag_parameters(1., 1.2);
+    let original = f32::from_bits(0x415d89d9);
+    let visible = original * p.percent_multiplier;
+    assert_eq!(visible.to_bits(), 0x4184ec4f);
+    let inverse = planner::base_hit_damage(visible, Some(p.percent_multiplier)).unwrap();
+    assert_eq!(inverse.to_bits(), 0x415d89d8);
+    assert_eq!(frames(original, 1., p), Some(15));
+    assert_eq!(frames(inverse, 1., p), Some(14));
+    for (bits, expected) in [(0x4184ec4e, 14), (0x4184ec4f, 14), (0x4184ec50, 15)] {
+        let base =
+            planner::base_hit_damage(f32::from_bits(bits), Some(p.percent_multiplier)).unwrap();
+        assert_eq!(frames(base, 1., p), Some(expected));
+    }
+}
+#[test]
+fn integer_visible_ui_grid_preimages_keep_the_native_hitlag_floor() {
+    use crate::model::tech_hitlag::frames;
+    // Current visible slider emits integers only. This is a bounded domain
+    // check, not a stability claim for arbitrary fractional input or parameters.
+    for multiplier in [1., 1.2] {
+        for k in [1., 0.925] {
+            let p = hitlag_parameters(k, multiplier);
+            for visible in 1..=30 {
+                let visible = visible as f32;
+                let base = planner::base_hit_damage(visible, Some(multiplier)).unwrap();
+                for bits in base.to_bits() - 2..=base.to_bits() + 2 {
+                    let candidate = f32::from_bits(bits);
+                    if (candidate * multiplier).to_bits() == visible.to_bits() {
+                        assert_eq!(
+                            frames(candidate, 1., p),
+                            frames(base, 1., p),
+                            "visible={visible}, multiplier={multiplier}, k={k}"
+                        );
+                    }
+                }
+            }
+        }
     }
 }
 #[test]

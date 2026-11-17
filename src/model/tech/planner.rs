@@ -136,7 +136,7 @@ pub fn plan(
         target: context.spot.point,
         angle,
         knockback,
-        percent,
+        percent: percent + visible_hit_damage,
         hit_damage,
         height: HitHeight::Middle,
         facing,
