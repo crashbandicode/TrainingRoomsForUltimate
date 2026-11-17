@@ -470,6 +470,7 @@ fn wizard_ownership_is_bound_before_native_mapping_and_combined_with_placing() {
     let runtime = include_str!("../src/runtime/features/chords.rs");
     assert!(runtime.contains("detector.poll_owned(set, sample, block, wizard)"));
     assert!(runtime.contains("let chord_bits = chord_bits | if hide && wizard"), "placing must preserve retained Plus ownership");
+    assert!(runtime.contains("clear_plus_bits(modal || wizard || chord_bits & chords::bit::PLUS_MASK != 0, accepted)"), "later native UI must not see a restored consumed Plus");
     let boundary = include_str!("../src/runtime/features/input_delay.rs");
     assert!(boundary.find("chords::on_poll(controller)").unwrap() < boundary.find("pub unsafe fn caller_a_note").unwrap());
     assert!(boundary.contains("chords::after_mapping()"));
