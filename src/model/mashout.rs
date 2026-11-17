@@ -2,6 +2,8 @@
 
 #[path = "mashout/admission.rs"]
 pub mod admission;
+#[path = "mashout/clatter_write.rs"]
+pub mod clatter_write;
 #[path = "mashout/grade.rs"]
 pub mod grade;
 #[path = "mashout/moves.rs"]
