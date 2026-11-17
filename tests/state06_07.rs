@@ -69,7 +69,7 @@ fn crash0900_a_refused_reset_is_never_silent() {
     assert_eq!(gate(0, true, true, true, false), (Some(0), false, false));
     // The load settled: the request resets as before, and the next refusal notifies again.
     assert_eq!(gate(RESET_REQUESTED, true, true, false, true), (None, false, false));
-    assert_eq!(gate(RESET_REQUESTED, true, true, true, false).2, true);
+    assert!(gate(RESET_REQUESTED, true, true, true, false).2);
     // The setting Off is the player's own choice: refused as before, no notice.
     assert_eq!(gate(RESET_REQUESTED, false, true, true, false), (Some(0), false, false));
     assert_eq!(gate(RESET_REQUESTED, false, true, false, false), (Some(0), false, false));
