@@ -1813,3 +1813,11 @@ ceiling = 155446
 date = "2026-11-17"
 reason = "SOL-R23 Kirby hat copy precondition (rc15/kirby-hat-copy-ready e9b7f682): the hat request reads the native per-kind hat pair copy_setup uses (model::kirby_copy_pair, read-only) and waits without it, so a released pair no longer crashes (main+0x491e20, execute at 0). Measured 155274 on 458c0636 (155228, +46); rebased onto main 56923ec9 (155400): composed measured 155446 = the same +46. Already compacted from +110. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
 approved_by = "devin-primary 22:40Z, operator review pending."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155719
+date = "2026-11-17"
+reason = "Free-form Tech wizard measured155719 at source8f33103b: +503 over timing155216, exact total with no headroom. Shared picker marks, menu motion, planner and notice writer; one ordered step table. FOR OPERATOR REVIEW; counting, guards and gate enforcement unchanged."
+approved_by = "Primary2026-11-17 16:46Z provisionally approves wizard +503 (155719), FOR OPERATOR REVIEW. Operator rejection requires further slimming before merge."
