@@ -133,6 +133,8 @@ pub struct Outbox {
     pub place_targets: bool,
     /// Stage tech: close into the surface picker.
     pub tech_point: bool,
+    /// Stage tech: close into the guided exercise draft.
+    pub tech_wizard: bool,
 }
 
 /// Why a row or entry is greyed (it shows dimmed with this reason and ignores A).
@@ -1260,6 +1262,14 @@ impl Menu {
                 }
                 self.put_one_hot("tech_surface", 4);
                 (self.outbox.tech_point, self.closed) = (true, true);
+                return;
+            }
+            Editor::TechWizard => {
+                if super::tech_settings::selected(&self.settings.menu, "tech_practice") == 0 {
+                    self.put_one_hot("tech_practice", 2);
+                }
+                self.put_one_hot("tech_surface", 4);
+                (self.outbox.tech_wizard, self.closed) = (true, true);
                 return;
             }
             other => Screen::External(other),

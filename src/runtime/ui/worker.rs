@@ -1229,6 +1229,9 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     // rc.14 Break the Targets: Place targets asks for the placing view; every close tells the mode (after the publish above).
     crate::runtime::features::btt::menu_closed(outbox.place_targets);
     crate::runtime::features::tech::menu_closed(outbox.tech_point);
+    if outbox.tech_wizard {
+        crate::runtime::features::tech::open_wizard();
+    }
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(10);
     // The carried engines read the typed view of the committed settings (decision D1).

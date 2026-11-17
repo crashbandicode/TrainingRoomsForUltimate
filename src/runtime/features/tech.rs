@@ -20,6 +20,7 @@ use crate::model::tech::{
     session::{Bests, Length, Phase},
     solver,
     surface::{Kind, RememberedSpot, StageEpoch, Surfaces, Walk},
+    wizard::{Action as WizardAction, Outcome as WizardOutcome, Step, Wizard},
     Vec2,
 };
 use crate::model::tech_launch::{DecisionSnapshot, FlightParams, Launcher};
@@ -40,6 +41,10 @@ static RESET: AtomicBool = AtomicBool::new(false);
 static RUNNING: AtomicBool = AtomicBool::new(false);
 static PLACING: AtomicBool = AtomicBool::new(false);
 static GUARD_PRESS: AtomicBool = AtomicBool::new(false);
+static WIZARD_REQUEST: AtomicBool = AtomicBool::new(false);
+static WIZARD_ACTIVE: AtomicBool = AtomicBool::new(false);
+static WIZARD_SKIP: AtomicBool = AtomicBool::new(false);
+static BACK_MENU: AtomicBool = AtomicBool::new(false);
 static HITLAG: OnceLock<HitlagResolver> = OnceLock::new();
 static TUMBLE_IDS: OnceLock<[i32; 7]> = OnceLock::new();
 static DECISIONS: Mailbox<DecisionSnapshot, 4> = Mailbox::new();
@@ -50,12 +55,26 @@ struct ViewState {
     surfaces: Surfaces,
     range: Option<[f32; 4]>,
     start: bool,
+    wizard: Option<Wizard>,
+    wizard_config: Option<Config>,
+    cancelled: bool,
+    was: u16,
+    repeat: u8,
+    preview_params: Option<FlightParams>,
+    preview_blocked: Option<bool>,
 }
 static VIEW: Mutex<ViewState> = Mutex::new(ViewState {
     picker: Picker::EMPTY,
     surfaces: Surfaces::EMPTY,
     range: None,
     start: false,
+    wizard: None,
+    wizard_config: None,
+    cancelled: false,
+    was: 0,
+    repeat: 0,
+    preview_params: None,
+    preview_blocked: None,
 });
 struct Practice {
     adapter: Adapter,
@@ -93,12 +112,30 @@ pub fn bind_hitlag(resolver: HitlagResolver) -> Result<(), HitlagResolver> {
 }
 pub fn publish(snapshot: &Snapshot) {
     CONFIG.publish(Some(tech_settings::read(snapshot)));
+    WIZARD_SKIP.store(
+        tech_settings::selected(snapshot, "tech_wizard_skip") == 0,
+        Ordering::Release,
+    );
+}
+pub fn open_wizard() {
+    WIZARD_REQUEST.store(true, Ordering::Release);
+    WIZARD_ACTIVE.store(true, Ordering::Release);
+    // Publish the complete request even if the game consumed menu_closed's
+    // earlier restart between the worker's two calls.
+    START.store(true, Ordering::Release);
+}
+pub fn wizard_active() -> bool {
+    WIZARD_ACTIVE.load(Ordering::Acquire)
+}
+pub fn take_menu_request() -> bool {
+    BACK_MENU.swap(false, Ordering::AcqRel)
 }
 pub fn menu_opened() {
     // SAFETY: atomic owner-bit release; every placing exit also releases bit 2.
     unsafe { super::btt_camera::request(2, false) };
     GUARD_PRESS.store(false, Ordering::Release);
     PLACING.store(false, Ordering::Release);
+    WIZARD_ACTIVE.store(false, Ordering::Release);
     OPEN.store(true, Ordering::Release);
     notices::clear(NOTICE);
 }
@@ -163,10 +200,120 @@ fn draw(rng: &mut Rng, n: u32) -> u32 {
         }
     }
 }
+fn wizard_poll(view: &mut ViewState, sample: Sample, stick: [f32; 2], range: [f32; 4]) {
+    use crate::model::chords::logical::{A, B, PLUS, X};
+    let Some(wizard) = view.wizard.as_mut() else {
+        return;
+    };
+    let pad = Pad {
+        stick,
+        held: sample.held,
+        pressed: sample.pressed,
+        save: false,
+        load: false,
+    };
+    let motion = crate::model::btt::placing_motion(&pad, view.was, &mut view.repeat);
+    if sample.pressed != 0 || motion != [0., 0.] {
+        view.preview_blocked = None;
+    }
+    view.was = sample.held;
+    if wizard.step == Step::Spot {
+        // X belongs to Defaults here, rather than the full editor's Start.
+        let mut picker_pad = pad;
+        picker_pad.pressed &= !(1 << X);
+        view.picker.feed(picker_pad, &view.surfaces, range, None);
+        if let Some(spot) = view.picker.hovered {
+            wizard.set_spot(spot);
+        }
+    } else {
+        wizard.adjust(motion[0], motion[1]);
+    }
+    // One action per edge, with Back taking priority over confirmation.
+    let action = if sample.pressed & (1 << B) != 0 {
+        Some(WizardAction::Back)
+    } else if sample.pressed & (1 << X) != 0 {
+        Some(WizardAction::Defaults)
+    } else if sample.pressed & (1 << PLUS) != 0 {
+        Some(WizardAction::Start)
+    } else if sample.pressed & (1 << A) != 0 {
+        Some(WizardAction::Next)
+    } else {
+        None
+    };
+    match action.map(|a| wizard.action(a)) {
+        Some(WizardOutcome::Start) => {
+            view.wizard_config = wizard.config();
+            view.picker.selected = wizard.selected;
+            view.start = true;
+            WIZARD_ACTIVE.store(false, Ordering::Release);
+        }
+        Some(WizardOutcome::Cancelled) => {
+            view.cancelled = true;
+            WIZARD_ACTIVE.store(false, Ordering::Release);
+            BACK_MENU.store(true, Ordering::Release);
+        }
+        _ => {}
+    }
+}
+
+/// The shared notice writer owns compact measurement, wrapping and placement.
+/// Keeping the wizard at this one adapter lets notice-compact replace that
+/// renderer without a second layout or new panes in the game hook.
+fn wizard_notice(wizard: &Wizard, blocked: Option<bool>) {
+    use core::fmt::Write;
+    let mut text = FixedPath::<256>::EMPTY;
+    let header = match wizard.step {
+        Step::Spot => {
+            let _ = text.write_str(
+                "Move the cursor onto a surface\nA next · X defaults → preview · + start",
+            );
+            "Tech · 1/5 Spot"
+        }
+        Step::Angle => {
+            let _ = write!(text, "Surface angle {:.0}° · world {:.1}°\n← → adjust · A next · B back\nX defaults → preview · + start", wizard.degrees, wizard.world_angle().unwrap_or(0.));
+            "Tech · 2/5 Angle"
+        }
+        Step::Distance => {
+            let _ = write!(text, "Distance {:.0} units from surface\n← → adjust · A next · B back\nX defaults → preview · + start", wizard.distance);
+            "Tech · 3/5 Distance"
+        }
+        Step::Hit => {
+            let _ = write!(text, "{} Speed {:.0} KB\n{} Hit damage {:.0}% added\n↑ ↓ choose · ← → adjust\nA next · B back · X defaults · + start", if wizard.hit_focus { " " } else { ">" }, wizard.speed, if wizard.hit_focus { ">" } else { " " }, wizard.hit);
+            "Tech · 4/5 Hit"
+        }
+        Step::Preview => {
+            let _ = write!(
+                text,
+                "{:.0}° · {:.0} units · {:.0} KB · +{:.0}%\n{}\nA / + start · B back",
+                wizard.degrees,
+                wizard.distance,
+                wizard.speed,
+                wizard.hit,
+                match blocked {
+                    Some(true) => "Start blocked / outside bounds — adjust values",
+                    Some(false) => "Dotted path is approximate",
+                    None => "Preview unavailable",
+                }
+            );
+            "Tech · 5/5 Preview"
+        }
+    };
+    notices::upsert(
+        NOTICE,
+        header,
+        text.as_str(),
+        u16::MAX,
+        crate::model::notify::DEFAULT_COLOR,
+    );
+    notices::raise(notices::RAISE_TECH, true);
+}
 /// Owned P1 poll, shared BTT logical controls. Only the editor consumes input.
 pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
+    if WIZARD_REQUEST.load(Ordering::Acquire) && !OPEN.load(Ordering::Acquire) {
+        return true;
+    }
     if !placing() || OPEN.load(Ordering::Acquire) {
-        return false;
+        return wizard_active() && !OPEN.load(Ordering::Acquire);
     }
     let Some(config) = CONFIG.read() else {
         return false;
@@ -178,6 +325,10 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
         return true;
     };
     let stick = [0, 1].map(|i| ((controller + field::STICKS[i]) as *const f32).read_volatile());
+    if wizard_active() {
+        wizard_poll(&mut view, sample, stick, range);
+        return true;
+    }
     let ViewState {
         picker,
         surfaces,
@@ -210,6 +361,12 @@ pub fn look(active: bool) -> [Option<([f32; 2], EggLook)>; LOOKS] {
     let Some(view) = VIEW.try_lock() else {
         return out;
     };
+    if wizard_active() {
+        if let Some(wizard) = &view.wizard {
+            wizard_look(&view, wizard, &mut out);
+            return out;
+        }
+    }
     let spot = if placing() {
         view.picker.hovered
     } else {
@@ -264,6 +421,90 @@ pub fn look(active: bool) -> [Option<([f32; 2], EggLook)>; LOOKS] {
         ));
     }
     out
+}
+fn wizard_look(view: &ViewState, wizard: &Wizard, out: &mut [Option<([f32; 2], EggLook)>; LOOKS]) {
+    use crate::model::tech::{add, scale};
+    let Some(spot) = wizard.selected else { return };
+    let marker = |p: Vec2, size, alpha| {
+        Some((
+            [p.x, p.y],
+            EggLook {
+                scale: size,
+                alpha,
+                ..EGG_WHOLE
+            },
+        ))
+    };
+    out[0] = marker(spot.point, 0.3, 255);
+    let Some(angle) = wizard.world_angle() else {
+        return;
+    };
+    let radians = angle.to_radians();
+    let direction = Vec2 {
+        x: radians.cos(),
+        y: radians.sin(),
+    };
+    let tail = if matches!(wizard.step, Step::Distance | Step::Hit | Step::Preview) {
+        wizard.start_marker().unwrap_or(spot.point)
+    } else {
+        add(spot.point, scale(direction, -7.))
+    };
+    let tip = add(tail, scale(direction, 7.));
+    let neck = add(tip, scale(direction, -2.));
+    let side = Vec2 {
+        x: -direction.y,
+        y: direction.x,
+    };
+    for (slot, p) in
+        out[1..5]
+            .iter_mut()
+            .zip([tail, tip, add(neck, side), add(neck, scale(side, -1.))])
+    {
+        *slot = marker(p, 0.12, 255);
+    }
+    if matches!(wizard.step, Step::Distance | Step::Hit | Step::Preview) {
+        if let Some(start) = wizard.start_marker() {
+            out[5] = marker(start, 0.65, 110);
+            if wizard.step == Step::Preview && view.preview_blocked == Some(false) {
+                // Drawing only: this provisional flight never supplies a native
+                // launch speed. Ten Whole panes total, within BTT's typed pool.
+                if let Some(params) = view.preview_params {
+                    let d = crate::model::tech_launch::Vec2 {
+                        x: direction.x,
+                        y: direction.y,
+                    };
+                    if let Some(v) = crate::model::tech_launch::launch_velocity(wizard.speed, d) {
+                        for (slot, frame) in out[6..10].iter_mut().zip([3, 6, 9, 12]) {
+                            if let Some(flight) =
+                                crate::model::tech_launch::flight(v, params, frame)
+                            {
+                                *slot = marker(
+                                    add(
+                                        start,
+                                        Vec2 {
+                                            x: flight.displacement.x,
+                                            y: flight.displacement.y,
+                                        },
+                                    ),
+                                    0.1,
+                                    160,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if wizard.step == Step::Spot {
+        out[LOOKS - 1] = Some((
+            [view.picker.cursor.x, view.picker.cursor.y],
+            EggLook {
+                picture: EggPicture::Cursor,
+                ..EGG_WHOLE
+            },
+        ));
+    }
 }
 /// Initialize from the CPU resolver's complete status array, in `tech_init::STATUS_IDS` order.
 /// # Safety
@@ -333,8 +574,13 @@ fn rebuild(run: &mut Practice, view: &mut ViewState) {
         return;
     }
     let sampled = run.sampled.take();
-    run.remembered = sampled.map(|(_, spot, _)| spot)
-        .or_else(|| (run.config.surface == 4).then_some(view.picker.selected).flatten())
+    run.remembered = sampled
+        .map(|(_, spot, _)| spot)
+        .or_else(|| {
+            (run.config.surface == 4)
+                .then_some(view.picker.selected)
+                .flatten()
+        })
         .and_then(|spot| RememberedSpot::capture(spot.line, spot.point));
     run.retained_sample = sampled.map(|(setup, _, percent)| (setup, percent));
     run.recovering = true;
@@ -370,6 +616,10 @@ pub unsafe fn frame(fighter: usize) {
             view.surfaces = Surfaces::EMPTY;
             view.range = None;
             view.start = false;
+            view.wizard = None;
+            view.wizard_config = None;
+            view.preview_params = None;
+            view.preview_blocked = None;
         }
         LIVE.with(|slot| {
             if let Some(mut run) = slot.borrow_mut().take() {
@@ -378,6 +628,7 @@ pub unsafe fn frame(fighter: usize) {
         });
         RUNNING.store(false, Ordering::Release);
         PLACING.store(false, Ordering::Release);
+        WIZARD_ACTIVE.store(false, Ordering::Release);
         notices::clear(NOTICE);
         drop(view);
         super::btt_camera::request(2, false);
@@ -472,18 +723,54 @@ pub unsafe fn frame(fighter: usize) {
             training: identity,
         };
         let reset = RESET.swap(false, Ordering::AcqRel);
-        if START.swap(false, Ordering::AcqRel) || reset {
+        let requested = START.swap(false, Ordering::AcqRel);
+        if requested {
+            view.cancelled = false;
+            view.wizard_config = None;
+            view.was = 0;
+            view.repeat = 0;
+            view.wizard = if WIZARD_REQUEST.swap(false, Ordering::AcqRel) {
+                Some(Wizard::begin(config, WIZARD_SKIP.load(Ordering::Acquire)))
+            } else {
+                None
+            };
+        }
+        if requested || reset {
             run.restart_pending = true;
             run.recovery_error = None;
             run.recovering = false;
         }
+        if view.cancelled {
+            run.pending = false;
+            if run.controller.session.phase != Phase::Off {
+                run.controller.stop(&mut run.adapter);
+            }
+            PLACING.store(false, Ordering::Release);
+            return;
+        }
         if run.epoch != Some(epoch) || reset {
+            if wizard_active() && (run.epoch.is_some() || reset) {
+                // A draft never retains a borrowed line across collision or
+                // scene lifetimes. Return to the full menu on interruption.
+                view.wizard = None;
+                view.wizard_config = None;
+                view.cancelled = true;
+                WIZARD_ACTIVE.store(false, Ordering::Release);
+                BACK_MENU.store(true, Ordering::Release);
+            }
             // A native Training reset can rebuild collision without changing
             // stage/form/scene identity. Only world geometry survives it.
             run.remembered = (config.surface == 4
-                && view.surfaces.epoch().is_some_and(|old| old.stage == stage && old.form == form))
-                .then(|| view.picker.selected.and_then(|s| RememberedSpot::capture(s.line, s.point)))
-                .flatten();
+                && view
+                    .surfaces
+                    .epoch()
+                    .is_some_and(|old| old.stage == stage && old.form == form))
+            .then(|| {
+                view.picker
+                    .selected
+                    .and_then(|s| RememberedSpot::capture(s.line, s.point))
+            })
+            .flatten();
             run.recovering = false;
             run.recovery_error = None;
             run.controller.stop(&mut run.adapter);
@@ -498,6 +785,13 @@ pub unsafe fn frame(fighter: usize) {
             run.scan_done = false;
             run.bootstrap = None;
             run.discovery_failed = false;
+            view.preview_params = None;
+            if let Some(wizard) = view.wizard.as_mut() {
+                wizard.selected = None;
+                if wizard_active() {
+                    wizard.step = Step::Spot;
+                }
+            }
             view.picker.enter(
                 stage,
                 Vec2 {
@@ -618,8 +912,8 @@ pub unsafe fn frame(fighter: usize) {
                 return;
             };
             run.fighter_kind = fighter_kind;
-            run.config = config;
-            run.controller.start(length(config));
+            run.config = view.wizard_config.unwrap_or(config);
+            run.controller.start(length(run.config));
             run.decision = None;
             run.pending = true;
             run.reroll = true;
@@ -627,16 +921,68 @@ pub unsafe fn frame(fighter: usize) {
             run.planning_failed = false;
             PLACING.store(
                 EDIT.swap(false, Ordering::AcqRel)
+                    || wizard_active()
                     || config.surface == 4 && view.picker.selected.is_none(),
                 Ordering::Release,
             );
         }
+        if view.cancelled {
+            run.pending = false;
+            run.controller.stop(&mut run.adapter);
+            PLACING.store(false, Ordering::Release);
+            return;
+        }
         if placing() {
             if !view.start {
-                notice(run, None);
+                if wizard_active() {
+                    let gravity = natives::get_param_float(at, hash40("air_accel_y"), 0);
+                    let cap = natives::get_param_float(at, hash40("air_speed_y_stable"), 0);
+                    view.preview_params =
+                        (gravity.is_finite() && gravity > 0. && cap.is_finite() && cap > 0.)
+                            .then_some(FlightParams {
+                                brake: 0.051,
+                                gravity,
+                                fall_speed_cap: cap,
+                            });
+                    if let Some(wizard) = &view.wizard {
+                        let blocked = (|| {
+                            let params = view.preview_params?;
+                            let draft = wizard.config()?;
+                            let spot = wizard.selected?;
+                            if !spot.current(&mut source) {
+                                return None;
+                            }
+                            let blast = tech_surfaces::blast_bounds()?;
+                            let multiplier = super::tech_hitlag::live_multiplier(at).ok()?;
+                            Some(
+                                planner::plan(
+                                    draft,
+                                    planner::Context {
+                                        surfaces: &view.surfaces,
+                                        spot,
+                                        params,
+                                        blast: solver::editor_bounds(blast),
+                                        view: (draft.camera == 1)
+                                            .then(|| solver::editor_bounds(range)),
+                                        damage_multiplier: Some(multiplier),
+                                    },
+                                    &mut |_| 0,
+                                )
+                                .is_none(),
+                            )
+                        })();
+                        wizard_notice(wizard, blocked);
+                        view.preview_blocked = blocked;
+                    }
+                } else {
+                    notice(run, None);
+                }
                 return;
             }
             view.start = false;
+            if let Some(draft) = view.wizard_config {
+                run.config = draft;
+            }
             PLACING.store(false, Ordering::Release);
         }
         let Ok(attempt) = run.adapter.attempt() else {
@@ -673,13 +1019,11 @@ pub unsafe fn frame(fighter: usize) {
             run.controller.outcome(outcome);
         });
         let posted_press = GUARD_PRESS.swap(false, Ordering::AcqRel);
-        let guard_press = super::tech_decision::guard_event(at).map(|native| native || posted_press);
-        if let Ok(event) = Controller::tick(
-            &mut run.controller,
-            &mut run.adapter,
-            false,
-            guard_press,
-        ) {
+        let guard_press =
+            super::tech_decision::guard_event(at).map(|native| native || posted_press);
+        if let Ok(event) =
+            Controller::tick(&mut run.controller, &mut run.adapter, false, guard_press)
+        {
             if let Some((snapshot, age)) = run.decision {
                 run.decision = Some((snapshot, age.saturating_add(1)));
             }
@@ -741,7 +1085,11 @@ pub unsafe fn frame(fighter: usize) {
                     return;
                 }
                 let spot = if run.config.surface == 4 {
-                    if view.picker.selected.is_some_and(|s| !s.current(&mut source)) {
+                    if view
+                        .picker
+                        .selected
+                        .is_some_and(|s| !s.current(&mut source))
+                    {
                         rebuild(run, &mut view);
                         return;
                     }
