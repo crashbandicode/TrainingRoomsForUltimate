@@ -147,6 +147,9 @@ fn list_frame(menu: &Menu, screen: &Screen, row: usize, cursor: usize, frame: &m
     lines_window(frame, cursor, total, |i, line| {
         let label = option_label(menu, row, i, first, step);
         line.label = label;
+        if !menu.option_offered(row, i) {
+            line.label_tone = Tone::Off;
+        }
         let chosen = if let Some(at) = loop_at {
             i == at
         } else if yes_no {

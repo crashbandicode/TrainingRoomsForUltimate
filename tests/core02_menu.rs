@@ -1011,17 +1011,20 @@ fn filtered_menu_counts_cycles_and_renders() {
     // Expected values come from the catalog and `selectable()` (Available and startable now),
     // independently of the menu's own option list. Hidden Final rows 106/115 and rows without
     // a start yet are never listed; the listed rows grow by themselves as plans gain a start.
-    let mut cases: Vec<(usize, usize, usize, String)> = (0..State::ALL.len())
+    // NotMashable rows (primary 14:00Z) are listed greyed but never offered or cycled to.
+    let mut cases: Vec<(usize, usize, usize, usize, String)> = (0..State::ALL.len())
         .map(|state| {
             let rows: Vec<_> = moves::CATALOG.iter()
                 .filter(|s| s.state == State::ALL[state] && moves::selectable(**s)).collect();
             let first = if state == 0 { 0 } else { rows[0].id as usize + 1 };
-            (state, rows.len() + 1, first, format!("{} · {}", rows[0].attacker_name, rows[0].name))
+            let greyed = moves::CATALOG.iter()
+                .filter(|s| s.state == State::ALL[state] && moves::availability(s.id) == moves::MoveAvailability::NotMashable).count();
+            (state, rows.len() + greyed + 1, rows.len() + 1, first, format!("{} · {}", rows[0].attacker_name, rows[0].name))
         })
         .collect();
-    cases.push((5, 1, 89, "Random".to_string()));
-    assert_eq!(cases[0].3, "Mario · Grab");
-    for (state, count, first, label) in cases {
+    cases.push((5, 1, 1, 89, "Random".to_string()));
+    assert_eq!(cases[0].4, "Mario · Grab");
+    for (state, count, offered, first, label) in cases {
         let mut m = menu();
         goto(&mut m, moves::STATE_ROW);
         m.press(Button::A);
@@ -1044,7 +1047,7 @@ fn filtered_menu_counts_cycles_and_renders() {
         assert!(matches!(m.focus(), Some(Entry::Row(row)) if row == attacker));
         m.press(Button::Right);
         assert_eq!(m.value(attacker), RowValue::Choice(Some(0)));
-        for _ in 0..count {
+        for _ in 0..offered {
             let resolved = Config::from_snapshot(&m.settings().menu).unwrap().resolve(0, 0).unwrap();
             if state != 5 { assert_eq!(resolved.state, State::ALL[state]); }
             m.press(Button::Right);
@@ -1105,6 +1108,51 @@ fn core03_shortcut_rows_open_editor() {
     assert!(matches!(ROWS[one].control, Control::Editor(Editor::ShortcutSlot(0))));
 }
 
+/// Primary 14:00Z: NotMashable rows (89, 90, 96, 120) are listed greyed, the cursor and the page
+/// cycle skip them, and a confirm on one never writes it.
+fn not_mashable_rows_are_greyed_skipped_and_never_confirmed() {
+    use model::frame::{Frame, Tone};
+    use model::mashout::moves;
+    let inhale = 4;
+    let mut m = menu();
+    goto(&mut m, moves::STATE_ROW);
+    m.press(Button::A);
+    for _ in 0..inhale { m.press(Button::Down); }
+    m.press(Button::A);
+    let attacker = goto(&mut m, moves::ATTACKER_ROW);
+    // Kirby 118 (index 119), Dedede 119 (120), K. Rool 120 (121, greyed), Random (89).
+    let listed: Vec<_> = (0..m.option_count(attacker)).map(|o| m.option_value(attacker, o).unwrap()).collect();
+    assert_eq!(listed, [119, 120, 121, 89]);
+    assert_eq!((0..4).map(|o| m.option_offered(attacker, o)).collect::<Vec<_>>(), [true, true, false, true]);
+    // The list popup: the greyed row keeps its name; the cursor steps over it both ways.
+    m.press(Button::A);
+    let mut frame = Frame::new();
+    model::screens::frame_of(&m, &mut frame, |_| "Stage");
+    assert_eq!(String::from_utf16(frame.rows[2].label.units()).unwrap(), "King K. Rool · Blunderbuss suction");
+    assert_eq!(frame.rows[2].label_tone, Tone::Off);
+    assert_ne!(frame.rows[1].label_tone, Tone::Off);
+    press(&mut m, &[Button::Down, Button::Down]);
+    assert!(matches!(m.screen(), Some(Screen::List { cursor: 3, .. })), "Down skips 120 to Random");
+    m.press(Button::Up);
+    assert!(matches!(m.screen(), Some(Screen::List { cursor: 1, .. })), "Up skips 120 back to Dedede");
+    m.press(Button::A);
+    assert_eq!(get(&m, moves::ATTACKER_ROW).iter().position(|v| *v != 0), Some(120));
+    // Page cycling from Dedede skips K. Rool in both directions.
+    m.press(Button::Right);
+    assert_eq!(get(&m, moves::ATTACKER_ROW).iter().position(|v| *v != 0), Some(89));
+    m.press(Button::Left);
+    assert_eq!(get(&m, moves::ATTACKER_ROW).iter().position(|v| *v != 0), Some(120));
+    // Every Mash out state: no listed NotMashable option is ever written by any input path.
+    for state in 0..moves::STATE_LABELS.len() {
+        for option in 0..moves::attacker_count(state) {
+            let index = moves::attacker_index(state, option).unwrap();
+            let not_mashable = moves::scenario(index)
+                .is_some_and(|s| moves::availability(s.id) == moves::MoveAvailability::NotMashable);
+            assert_eq!(moves::attacker_offered(state, option), !not_mashable);
+        }
+    }
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -1112,6 +1160,7 @@ fn case_table() {
         ("layout_row_counts_match_the_rc_freeze", layout_row_counts_match_the_rc_freeze as fn()),
         ("filtered_menu_counts_cycles_and_renders", filtered_menu_counts_cycles_and_renders as fn()),
         ("state_change_resets_invalid_move_and_config_rejects_conflict", state_change_resets_invalid_move_and_config_rejects_conflict as fn()),
+        ("not_mashable_rows_are_greyed_skipped_and_never_confirmed", not_mashable_rows_are_greyed_skipped_and_never_confirmed as fn()),
         ("the_spot_rows_sit_next_to_their_features", the_spot_rows_sit_next_to_their_features as fn()),
         ("legend_hitbox_visualization_is_one_checklist", legend_hitbox_visualization_is_one_checklist as fn()),
         ("core02_table_carriage_return", core02_table_carriage_return as fn()),

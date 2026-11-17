@@ -840,6 +840,25 @@ impl Menu {
         }
     }
 
+    /// Whether a list option may be confirmed. Mash out's NotMashable rows (primary
+    /// 14:00Z 2026-11-17) are listed greyed but never offered; every other row is.
+    pub fn option_offered(&self, row: usize, option: usize) -> bool {
+        ROWS[row].id != moves::ATTACKER_ROW || moves::attacker_offered(self.mashout_state(), option)
+    }
+
+    /// The first offered option from `start` (inclusive), stepping forward or back.
+    fn offered_from(&self, row: usize, start: usize, forward: bool) -> usize {
+        let len = self.option_count(row);
+        let mut at = start;
+        for _ in 0..len {
+            if self.option_offered(row, at) {
+                return at;
+            }
+            at = if forward { (at + 1) % len } else { (at + len - 1) % len };
+        }
+        start
+    }
+
     /// Shared label resolver for the page value and popup. The second part is a
     /// move qualifier; ordinary dropdowns return an empty second part.
     pub fn dropdown_label(&self, row: usize, option: usize) -> Option<(&'static str, &'static str)> {
@@ -1244,6 +1263,7 @@ impl Menu {
                     _ => self.get(r.id).iter().position(|v| *v != 0),
                 }
                 .unwrap_or(0);
+                let cursor = self.offered_from(row, cursor, true);
                 self.stack.push(Screen::List { row, cursor });
             }
             Control::MultiSelect(_) => self.stack.push(Screen::Checklist { row, cursor: 0 }),
@@ -1300,10 +1320,13 @@ impl Menu {
                 let len = self.option_count(row);
                 let at = self.dropdown_choice(row);
                 let next = match at {
-                    None => 0,
-                    Some(i) if forward => (i + 1) % len,
-                    Some(i) => (i + len - 1) % len,
+                    None => self.offered_from(row, 0, true),
+                    Some(i) if forward => self.offered_from(row, (i + 1) % len, true),
+                    Some(i) => self.offered_from(row, (i + len - 1) % len, false),
                 };
+                if !self.option_offered(row, next) {
+                    return;
+                }
                 if let Some(value) = self.option_value(row, next) {
                     self.put_one_hot(r.id, value);
                 }
@@ -1449,10 +1472,17 @@ impl Menu {
     fn press_list(&mut self, button: Button, row: usize, cursor: usize) {
         let len = self.option_count(row);
         match button {
-            Button::Up => self.top(Screen::List { row, cursor: (cursor + len - 1) % len }),
-            Button::Down => self.top(Screen::List { row, cursor: (cursor + 1) % len }),
-            Button::JumpUp | Button::JumpDown => self.top(Screen::List { row, cursor: jumped(cursor, len, button == Button::JumpDown) }),
+            Button::Up => self.top(Screen::List { row, cursor: self.offered_from(row, (cursor + len - 1) % len, false) }),
+            Button::Down => self.top(Screen::List { row, cursor: self.offered_from(row, (cursor + 1) % len, true) }),
+            Button::JumpUp | Button::JumpDown => {
+                let down = button == Button::JumpDown;
+                self.top(Screen::List { row, cursor: self.offered_from(row, jumped(cursor, len, down), down) })
+            }
             Button::A => {
+                // A NotMashable row is never written; the list stays open.
+                if !self.option_offered(row, cursor) {
+                    return;
+                }
                 match ROWS[row].control {
                     _ if ROWS[row].id == LOOP_ROW => self.recording.set_loop_row(cursor),
                     Control::YesNoRandom => self.put_yes_no_random(ROWS[row].id, cursor),

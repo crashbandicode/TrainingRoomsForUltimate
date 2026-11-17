@@ -43,8 +43,18 @@ pub enum MoveAvailability {
 pub const fn availability(id: u16) -> MoveAvailability {
     match id {
         106 | 115 => MoveAvailability::Hidden,
+        // Primary ruling 14:00Z 2026-11-17 (capture lane evidence, capture-lane/runtime/OUTCOMES.md):
+        // 89 Cargo and 96 Whip hold with automatic decay 0 and no product tick source; 90 lands
+        // after ~26 ticks, shorter than any authored cadence; 120's victim is never mashable.
+        89 | 90 | 96 | 120 => MoveAvailability::NotMashable,
         _ => MoveAvailability::Available,
     }
+}
+
+/// Whether a menu option of the filtered attacker list may be confirmed: listed
+/// NotMashable rows are shown but never offered.
+pub fn attacker_offered(state: usize, option: usize) -> bool {
+    attacker_index(state, option).is_some_and(|index| attacker_valid(state, index))
 }
 
 /// Available AND startable now: `entry::start` is a pure plan-table match (no native call,
@@ -343,11 +353,53 @@ mod tests {
         }
 
         #[test]
+        fn not_mashable_rows_are_listed_but_never_valid_offered_rolled_or_restored() {
+            let not_mashable: Vec<_> = CATALOG.iter()
+                .filter(|s| availability(s.id) == MoveAvailability::NotMashable).map(|s| s.id).collect();
+            assert_eq!(not_mashable, [89, 90, 96, 120]);
+            for id in [89u16, 90, 96, 120] {
+                let s = CATALOG[id as usize];
+                // Gaining or having a start never enables them (89 has one on this branch).
+                assert!(super::super::entry::start(s).is_some(), "id {id} has a real start");
+                assert!(!selectable(s));
+                let index = id as usize + 1; // extras sit after Random at89
+                let own = State::ALL.iter().position(|&st| st == s.state).unwrap();
+                let option = attacker_option(own, index).expect("listed in its own state");
+                assert!(!attacker_offered(own, option));
+                assert_eq!(attacker_label(own, option), Some((s.attacker_name, s.name)));
+                for state in 0..STATE_LABELS.len() {
+                    assert!(!attacker_valid(state, index));
+                    assert_eq!(Config { state, attacker: index, grab: 0 }.resolve(0, 0), None);
+                    if state != own { assert_eq!(attacker_option(state, index), None); }
+                }
+                for roll in 0..512 {
+                    for state in [own, RANDOM_STATE] {
+                        assert_ne!(Config { state, attacker: RANDOM_ATTACKER, grab: 0 }.resolve(roll, 0).map(|r| r.id), Some(id));
+                    }
+                }
+                let mut row = vec![0; ATTACKER_LABELS.len()];
+                row[index] = 1;
+                let parsed = settings::parse(&serde_json::json!({"menu":{"mashout_attacker":row}}).to_string());
+                assert_eq!(Config::from_snapshot(&parsed.settings.menu), None);
+            }
+            // Every other listed option is offered, and Random stays offered.
+            for state in 0..STATE_LABELS.len() {
+                for option in 0..attacker_count(state) {
+                    let index = attacker_index(state, option).unwrap();
+                    let blocked = scenario(index).is_some_and(|s| availability(s.id) == MoveAvailability::NotMashable)
+                        || scenario(index).is_some_and(|s| !selectable(s));
+                    assert_eq!(attacker_offered(state, option), !blocked, "state {state} option {option}");
+                }
+            }
+        }
+
+        #[test]
         fn unstartable_rows_are_never_picked_or_rolled() {
             let unstartable: Vec<_> = CATALOG.iter()
                 .filter(|s| availability(s.id) == MoveAvailability::Available && super::super::entry::start(**s).is_none())
                 .map(|s| s.id).collect();
-            assert!(unstartable.contains(&89), "DK Cargo has no start yet");
+            assert!(unstartable.contains(&116), "Sora Ice magic has no start yet");
+            assert!(!unstartable.contains(&89), "Cargo has a start here but is NotMashable, not merely unstartable");
             for id in unstartable {
                 let index = if (id as usize) < RANDOM_ATTACKER { id as usize } else { id as usize + 1 };
                 for state in 0..STATE_LABELS.len() {
@@ -384,14 +436,14 @@ mod tests {
             value.menu.set("cpu_level", &[0,0,0,1]).unwrap();
             let cpu_before = value.menu.extra().get("cpu_character").cloned();
             let level_before = value.menu.get("cpu_level").unwrap().to_vec();
-            let mut attacker = vec![0; 122]; attacker[121] = 1;
+            let mut attacker = vec![0; 122]; attacker[120] = 1; // Dedede Inhale; 120 is NotMashable
             value.menu.set(ATTACKER_ROW, &attacker).unwrap();
             value.menu.set(STATE_ROW, &[0,0,0,0,1,0]).unwrap();
             let after = settings::parse(&value.to_json());
             assert!(after.issues.is_empty());
             assert_eq!(after.settings.menu.extra().get("cpu_character").cloned(), cpu_before);
             assert_eq!(after.settings.menu.get("cpu_level"), Some(level_before.as_slice()));
-            assert_eq!(Config::from_snapshot(&after.settings.menu).unwrap().resolve(0,0).unwrap().id,120);
+            assert_eq!(Config::from_snapshot(&after.settings.menu).unwrap().resolve(0,0).unwrap().id,119);
         }
     }
 }
