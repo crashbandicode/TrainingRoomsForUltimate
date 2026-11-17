@@ -393,7 +393,7 @@ impl Frame {
         use super::panes as p;
         const LEFT: f32 = -880.0;
         const PAD: f32 = 24.0;
-        (self.dialog || self.popup).then_some(())?;
+        (self.dialog || self.popup || self.view == View::Delay).then_some(())?;
         // The menu fonts render wider than the notice-calibrated estimate: ~6 % for prose, ~14 % for a 48-W crumb (Eden,
         // notice-compact-72451433 and -9f90e741), so a dialog measures its text with a 1.2 margin.
         let width = |text: &[u16], font: (f32, f32)| 1.2 * measure(text.iter().copied(), font.0).0;
@@ -403,11 +403,17 @@ impl Frame {
             let count = self.tiles[..usize::from(self.tile_count)].iter().rposition(|t| !t.units().is_empty()).map_or(0, |i| i + 1);
             let cell_w = (p::ROW_RIGHT - p::ROW_LEFT) / cols as f32;
             (p::ROW_LEFT + count.min(cols) as f32 * cell_w, 320.0 - count.div_ceil(cols) as f32 * p::TILE_AREA_H / rows as f32)
+        } else if self.view == View::Delay {
+            // The delay pop-up: eight tile columns across the rows and the range bar, its handle labels lowest (y -165,
+            // the view's DELAY_HANDLE_LABEL_Y).
+            (p::ROW_RIGHT, -165.0 - p::ROW_H / 2.0)
         } else {
             let (x, w) = p::row_label_box(self.popup);
             let rows = &self.rows[..usize::from(self.row_count)];
             let widest = rows.iter().map(|r| width(r.label.units(), p::FONT)).fold(0.0, f32::max);
-            (x - w / 2.0 + widest, p::row_y(rows.len().max(1) - 1) - p::ROW_H / 2.0)
+            // A row's value is right-aligned in the value column (Chord Entry's chord), so a valued row spans to it.
+            let valued = rows.iter().any(|r| !r.value.units().is_empty());
+            (if valued { p::row_value_right(self.popup) } else { x - w / 2.0 + widest }, p::row_y(rows.len().max(1) - 1) - p::ROW_H / 2.0)
         };
         // Every pop-up draws its role tabs and L/R key caps (x ≤ 836), the row bands and the CONNECTIONS divider (review 2);
         // its connection lines end above the divider's foot and left of CONN_RIGHT, so the box spans to both.

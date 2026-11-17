@@ -1797,3 +1797,11 @@ ceiling = 155392
 date = "2026-11-17"
 reason = "Lobby strip clear stacked on notice-compact 92d666f5 (155376): composed measured 155392 = +16, within the approved +30. Exact total, no headroom. Counting and gates unchanged."
 approved_by = "Primary 17:48Z (notice-ui-devin-opus, lobby strip-clear): up to +30, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155400
+date = "2026-11-17"
+reason = "Delay and Chord Entry as content-sized dialogs on main b22480f2 (notice+strip, 155392): measured 155400 = +8, the primary-approved +8. Exact total, no headroom. Counting and gates unchanged."
+approved_by = "Primary 20:56Z and 21:05Z (notice-ui-devin-opus): +8 for Delay and Chord Entry, FOR OPERATOR REVIEW."

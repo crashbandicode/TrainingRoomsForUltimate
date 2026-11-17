@@ -502,6 +502,7 @@ fn chord_entry_frame(menu: &Menu, screen: &Screen, captured: Chord, frame: &mut 
     base(menu, screen, frame);
     push(frame, "Chord", &format!("{captured}"), Tone::On);
     frame.focus = Some(0);
+    frame.dialog = true;
     let _ = frame.help[0].write_str("X starts capture: release all, hold the chord, then release all to preview.");
     let _ = frame.help[1].write_str("An empty chord never passes (a menu shortcut with none is disabled).");
     let hint = match menu.chord_capture() {
@@ -798,10 +799,31 @@ mod tests {
         assert!(back.conn_kind.iter().all(|kind| *kind == super::super::recording_menu::ConnKind::Detail));
     }
 
+    /// Primary 20:56Z: Delay and Chord Entry are content-sized dialogs; each real frame's box holds what it draws.
+    fn delay_and_chord_entry_dialogs_hold_their_content() {
+        use crate::model::panes as p;
+        let mut m = menu();
+        open(&mut m, "Ledge Delay");
+        let f = frame(&m);
+        let ([x, y, w, h], _, hint_y) = f.dialog_box().expect("the delay pop-up is a dialog");
+        let [left, bottom, right] = [x - w / 2.0, y - h / 2.0, x + w / 2.0];
+        // Tiles span the rows; the range bar ends at x 700 and its handle labels (110 wide) sit at y -165.
+        assert!(left <= p::ROW_LEFT && right >= p::ROW_RIGHT.max(700.0 + 110.0), "{:?}", [left, right]);
+        assert!(bottom <= -165.0 - 12.0 && bottom <= hint_y - 22.0 && h < p::PANEL_H, "{bottom} {h}");
+        let mut m = menu();
+        open(&mut m, "Menu shortcut 1");
+        let f = frame(&m);
+        let ([x, y, w, h], help_y, hint_y) = f.dialog_box().expect("Chord Entry is a dialog");
+        let [right, bottom] = [x + w / 2.0, y - h / 2.0];
+        assert!(right >= p::row_value_right(false) && bottom <= hint_y - 22.0 && help_y[0] < p::row_y(0), "{right} {bottom}");
+        assert!(h < 600.0 && w <= p::PANEL_W, "{w} x {h}: the chord dialog is compact");
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("delay_and_chord_entry_dialogs_hold_their_content", delay_and_chord_entry_dialogs_hold_their_content as fn()),
             ("hitbox_checklist_colour_key_updates_and_clears_with_the_screen", hitbox_checklist_colour_key_updates_and_clears_with_the_screen as fn()),
             ("a_library_tile_cut_at_sixteen_characters_ends_in_an_ellipsis", a_library_tile_cut_at_sixteen_characters_ends_in_an_ellipsis as fn()),
             ("the_delay_popup_greys_the_checklist_once_a_range_is_set_and_says_why",the_delay_popup_greys_the_checklist_once_a_range_is_set_and_says_why as fn()),
