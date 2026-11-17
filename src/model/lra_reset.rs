@@ -8,12 +8,162 @@
 /// What the inline hook inside the game's reset check does to register `x8`: when the setting is
 /// Off, and only in native Training, the register is cleared so the game's check fails and no reset
 /// happens (SPEC-state-06 §4). `None` leaves the register alone.
-pub const fn x8_write(lra_reset_on: bool, native_training: bool) -> Option<u64> {
-    if native_training && !lra_reset_on {
+///
+/// `fighter_loading` (CRASH-0900, reship-3 hardware 2026-11-17): the roster's suspending INSTALL token
+/// (`character_roster::busy`), an atomic and no native call. Every TR Player/CPU load takes it before its native
+/// submission and keeps it through settlement, including the cold group swap's cleared window and its
+/// asynchronous construction (Astra review 2026-11-17, "Cold construction"). Vanilla Training never resets while a
+/// fighter loads; a reset there left P1's loader parked in state 13 (Eden `crash0900-a-reship34`/`b-card4`: the
+/// install never finished, every later pick refused) and on the console the state-13 commit activation later
+/// read a null `cell[+0x5918]` (Data Abort at 0x10, PC main+0x628b40, LR main+0x656f40 from `0x656644`). The reset
+/// is not run then: [`defer_step`] holds one reset and fires it once the load settles. Review R1: the gate reads no
+/// fighter entry, so it depends on no native row (a rejected entry lookup would otherwise uninstall the gate,
+/// `CROSS_NEEDS`).
+pub const fn x8_write(lra_reset_on: bool, native_training: bool, fighter_loading: bool) -> Option<u64> {
+    if native_training && (!lra_reset_on || fighter_loading) {
         Some(0)
     } else {
         None
     }
+}
+
+/// The value `x8` holds at the hook when the game is about to reset: the site is
+/// `cmp w8, #0x2; b.ne <no reset>` (`main+0x1378e50`, `w8 = [x8+0x240]`). Writing it makes that check reset.
+pub const RESET_REQUESTED: u64 = 2;
+
+/// The deferred reset's notice (operator 2026-11-17 11:40Z: defer, never silent; new text FOR OPERATOR REVIEW).
+pub const DEFERRED_HEADER: &str = "L+R+A Reset";
+pub const DEFERRED_BODY: &str = "Resetting when the fighter finishes loading";
+
+/// How long a deferred reset may wait for the load to settle. Eden cold loads (Reload published to applied:
+/// `crash0900-v6/v9/v13`) took 2.5-2.7 s; 10 s leaves the slower console about 3.7x that, and a load that has not
+/// settled by then cancels the reset (no reset, the safe outcome) rather than firing one much later.
+pub const DEFER_TIMEOUT_MS: u64 = 10_000;
+
+/// The roster's suspending install ended with the fighter applied in the scene that asked for it
+/// (`character_roster::finish_install` reasons): the Player track's `Applied`, the roster's own completion, the CPU
+/// Mii publication. Any other end (refused, destroyed, recovered to another member, settled unowned, and a departed
+/// load completing after its scene ended: review R3) is an aborted load; an unlisted success also reads as aborted,
+/// which only cancels a deferred reset (fails safe).
+pub fn install_ended_ok(reason: &str) -> bool {
+    matches!(reason, "Applied" | "roster ready" | "CPU Mii group record publication")
+}
+
+/// The lifecycle generation (review R3): one count, raised by every lifecycle exit a deferred reset must not
+/// outlive. The roster's scene change (every mode-key change, so also leaving Training), the P1 entry's destruction
+/// (Training -> CSS -> Training keeps the same mode key; the P1 entry identity ends there) and the Training session
+/// clear. A deferred reset keeps the generation of its press and fires only while it is unchanged, so a lifecycle
+/// exit between two reset checks, or at the settling check itself, drops it. Raised from any thread; the reset hook
+/// stays the deferred record's only reader and writer (it reads the count with `Acquire`).
+pub static GENERATION: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+
+/// A lifecycle exit: every deferred reset asked for before it is dropped.
+pub fn lifecycle_exit() {
+    GENERATION.fetch_add(1, core::sync::atomic::Ordering::AcqRel);
+}
+
+/// One deferred reset waiting for the load: when it was asked for, the abort count and lifecycle generation then,
+/// and whether its notice was accepted by the mailbox.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Pending {
+    pub since_ms: u64,
+    pub aborts: u32,
+    pub generation: u32,
+    pub notified: bool,
+}
+
+/// Why a deferred reset was dropped without resetting.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cancel {
+    /// The scene, the Training session or the P1 entry ended after the press ([`lifecycle_exit`]).
+    LifecycleEnded,
+    LeftTraining,
+    SettingOff,
+    MenuOpened,
+    SaveStateLoad,
+    LoadAborted,
+    TimedOut,
+}
+
+/// What the reset check sees (atomics only on the hook side; review R1: no native lookup).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Facts {
+    pub x8: u64,
+    pub lra_reset_on: bool,
+    pub native_training: bool,
+    /// `character_roster::busy()`: the suspending INSTALL token.
+    pub loading: bool,
+    pub menu_open: bool,
+    pub save_state_loading: bool,
+    /// Suspending installs ended without the fighter applied, so far.
+    pub install_aborts: u32,
+    /// [`GENERATION`] at this check.
+    pub generation: u32,
+    pub now_ms: u64,
+}
+
+/// One check's outcome: the register write, whether to post the notice, whether the deferred reset fired, and a
+/// cancel.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Step {
+    pub write: Option<u64>,
+    pub post_notice: bool,
+    pub fired: bool,
+    pub cancelled: Option<Cancel>,
+}
+
+/// CRASH-0900, deferred (operator 2026-11-17 11:40Z). A reset requested while a fighter loads is not run then
+/// (Eden: a reset inside the load parked P1's loader at 13 and the console later faulted); one reset waits and
+/// fires through this same check on the first check after the load settles, exactly once. A second press while one
+/// waits changes nothing. A lifecycle exit since the press, the menu opening (also every Change Stage), a save-state
+/// load, leaving Training, the setting turned Off, an aborted load or [`DEFER_TIMEOUT_MS`] drops it without
+/// resetting; every cancel is checked before the settled fire, so a cancel seen at the settling check wins.
+pub fn defer_step(pending: &mut Option<Pending>, f: Facts) -> Step {
+    let mut step = Step::default();
+    if let Some(p) = *pending {
+        let cancel = if f.generation != p.generation {
+            Some(Cancel::LifecycleEnded)
+        } else if !f.native_training {
+            Some(Cancel::LeftTraining)
+        } else if !f.lra_reset_on {
+            Some(Cancel::SettingOff)
+        } else if f.menu_open {
+            Some(Cancel::MenuOpened)
+        } else if f.save_state_loading {
+            Some(Cancel::SaveStateLoad)
+        } else if f.install_aborts != p.aborts {
+            Some(Cancel::LoadAborted)
+        } else if f.now_ms.saturating_sub(p.since_ms) >= DEFER_TIMEOUT_MS {
+            Some(Cancel::TimedOut)
+        } else {
+            None
+        };
+        if cancel.is_some() {
+            *pending = None;
+            step.cancelled = cancel;
+        }
+    }
+    let requested = f.x8 == RESET_REQUESTED && f.native_training && f.lra_reset_on;
+    match *pending {
+        Some(_) if !f.loading => {
+            *pending = None;
+            step.write = Some(RESET_REQUESTED);
+            step.fired = true;
+        }
+        Some(p) => {
+            if requested {
+                step.write = Some(0);
+            }
+            step.post_notice = !p.notified;
+        }
+        None if requested && f.loading && step.cancelled.is_none() => {
+            *pending = Some(Pending { since_ms: f.now_ms, aborts: f.install_aborts, generation: f.generation, notified: false });
+            step.write = Some(0);
+            step.post_notice = true;
+        }
+        None => step.write = x8_write(f.lra_reset_on, f.native_training, f.loading && requested),
+    }
+    step
 }
 
 /// Whether the fighter on-init wrapper runs the hub after the game's own on-init (SPEC-state-06
@@ -136,9 +286,12 @@ mod tests {
     }
 
     fn off_clears_x8_in_training_only() {
-        assert_eq!(x8_write(false, true), Some(0));
-        assert_eq!(x8_write(false, false), None);
-        assert_eq!(x8_write(true, true), None);
+        assert_eq!(x8_write(false, true, false), Some(0));
+        assert_eq!(x8_write(false, false, false), None);
+        assert_eq!(x8_write(true, true, false), None);
+        // CRASH-0900: a practice fighter mid-load refuses the reset even with the setting On.
+        assert_eq!(x8_write(true, true, true), Some(0));
+        assert_eq!(x8_write(true, false, true), None);
     }
 
     fn the_hub_runs_every_step_in_order() {

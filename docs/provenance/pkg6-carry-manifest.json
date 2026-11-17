@@ -12398,7 +12398,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "3b7bc91f77aa7153c9ec1eaaee7d3bb5ec6c48fe7486c62bb630cdf6e204156e",
+   "dest_sha256": "0faf04467eb8cb7300902e731aff8cb62962d6e744f9bc6988acb8e187f40234",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -13936,6 +13936,21 @@
      "old": "    queue_admitted(Role::Player, Selection::Direct(fighter), false, true)\n",
      "new": "    matches!(queue_admitted(Role::Player, Selection::Direct(fighter), false, true), Admission::Accepted | Admission::Superseded)\n",
      "reason": "RESHIP-3 typed LEAD admission to existing boolean callback: only actual Accepted/Superseded requests report success; consumed refusals never do. Primary combined integration2026-11-17."
+    },
+    {
+     "old": "fn finish_install(token: InstallToken, reason: &str) -> bool {\n    let finished = INSTALL.finish(token);\n",
+     "new": "/// Suspending installs that ended without the fighter applied (CRASH-0900: a deferred L+R+A reset is cancelled\n/// when this moves; `lra_reset::install_ended_ok`).\nstatic INSTALL_ABORTS: AtomicU32 = AtomicU32::new(0);\npub(crate) fn install_aborts() -> u32 {\n    INSTALL_ABORTS.load(Ordering::Acquire)\n}\nfn finish_install(token: InstallToken, reason: &str) -> bool {\n    let suspending = INSTALL.owns(token) && INSTALL.suspends_practice();\n    let finished = INSTALL.finish(token);\n    if finished && suspending && !crate::model::lra_reset::install_ended_ok(reason) {\n        INSTALL_ABORTS.fetch_add(1, Ordering::AcqRel);\n    }\n",
+     "reason": "CRASH-0900 deferred L+R+A reset (operator 2026-11-17 11:40Z): the single INSTALL release site counts suspending installs that end without the fighter applied, so a deferred reset is cancelled on an aborted load; atomics only, no behaviour change to the install itself."
+    },
+    {
+     "old": "pub fn scene_changed(mode: game_mode::Mode) {\n    body_bank::scene_changed();\n",
+     "new": "pub fn scene_changed(mode: game_mode::Mode) {\n    // CRASH-0900 review R3: a deferred L+R+A reset never outlives its scene.\n    crate::model::lra_reset::lifecycle_exit();\n    body_bank::scene_changed();\n",
+     "reason": "CRASH-0900 review R3 (2026-11-17): the roster scene change and the P1 entry destruction raise the deferred-reset lifecycle generation, so a deferred L+R+A reset never fires after its scene, Training session or P1 entry ended; one atomic increment, no behaviour change to the roster itself."
+    },
+    {
+     "old": "        // actual P1 entry destructor is also a scene boundary for plugin intent.\n        sources::scene_changed();\n",
+     "new": "        // actual P1 entry destructor is also a scene boundary for plugin intent.\n        crate::model::lra_reset::lifecycle_exit();\n        sources::scene_changed();\n",
+     "reason": "CRASH-0900 review R3 (2026-11-17): the roster scene change and the P1 entry destruction raise the deferred-reset lifecycle generation, so a deferred L+R+A reset never fires after its scene, Training session or P1 entry ended; one atomic increment, no behaviour change to the roster itself."
     }
    ]
   },

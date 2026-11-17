@@ -439,8 +439,18 @@ pub fn waiting_drafts_ready() -> bool {
         .restoration_pending([Role::Player.enabled(), Role::Cpu.enabled()])
 }
 
+/// Suspending installs that ended without the fighter applied (CRASH-0900: a deferred L+R+A reset is cancelled
+/// when this moves; `lra_reset::install_ended_ok`).
+static INSTALL_ABORTS: AtomicU32 = AtomicU32::new(0);
+pub(crate) fn install_aborts() -> u32 {
+    INSTALL_ABORTS.load(Ordering::Acquire)
+}
 fn finish_install(token: InstallToken, reason: &str) -> bool {
+    let suspending = INSTALL.owns(token) && INSTALL.suspends_practice();
     let finished = INSTALL.finish(token);
+    if finished && suspending && !crate::model::lra_reset::install_ended_ok(reason) {
+        INSTALL_ABORTS.fetch_add(1, Ordering::AcqRel);
+    }
     if reason == "managed source destroyed" {
         trace!(
             "[NativeInstall] managed destructor token={:?} finished={} gate_active_after={}",
@@ -928,6 +938,8 @@ fn operator_buttons(player_idx: i32, buttons: u32) -> u64 {
 /// Cancel plugin intent immediately. An already installed native reload belongs
 /// to the native scene teardown; never clear its flags or force its state ahead.
 pub fn scene_changed(mode: game_mode::Mode) {
+    // CRASH-0900 review R3: a deferred L+R+A reset never outlives its scene.
+    crate::model::lra_reset::lifecycle_exit();
     body_bank::scene_changed();
     mii_saved_alpha::scene_changed();
     body_bank::adopt_scene_generation();
@@ -1561,6 +1573,7 @@ pub unsafe fn on_destroy(entry: *const u8) {
     if practice_departure {
         // Native Training -> CSS -> Training retains the same mode tuple. The
         // actual P1 entry destructor is also a scene boundary for plugin intent.
+        crate::model::lra_reset::lifecycle_exit();
         sources::scene_changed();
         mii_hud_portrait::scene_changed();
         crate::runtime::roster::kirby_hats::practice_departed(lobby::is_waiting_scene());
