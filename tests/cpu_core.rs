@@ -17,7 +17,6 @@ use std::cell::Cell;
 use model::cpu::counter::{CounterId, Counters};
 use model::cpu::facts::FrameFacts;
 use model::cpu::hash::{hash40, lua_bind_hash, xxh64, SEED};
-use model::hash40::crc32;
 use model::cpu::ids::{self, Table, C, UNRESOLVED};
 use model::cpu::mash::{Action, BufferContext, Buffered, Mash};
 use model::cpu::playback::{covered_setting_applies, PlaybackState};
@@ -26,6 +25,7 @@ use model::cpu::role::{is_cpu_role, FighterKey, RoleTable, Scene, LOBBY_CPU_ENTR
 use model::cpu::settings::{CpuSettings, DelayRow, Strength, Weights};
 use model::cpu::state::Cpu;
 use model::cpu::status::{self, Situation};
+use model::hash40::crc32;
 use model::lra_reset::HubStep;
 use model::menu::reroll;
 use model::settings::Snapshot;
@@ -157,9 +157,66 @@ fn mash_entry_constants_resolve_against_pinned_native_names() {
         (C::PickelTrolleyJump, "FIGHTER_PICKEL_STATUS_KIND_SPECIAL_S_JUMP", 0x209),
         (C::PickelTrolleyArticle, "FIGHTER_PICKEL_GENERATE_ARTICLE_TROLLEY", 2),
         (C::PickelTrolleyLink, "FIGHTER_PICKEL_LINK_NO_TROLLEY", 0x1c),
-        (C::PickelTrolleyJumpDisable, "WEAPON_PICKEL_TROLLEY_INSTANCE_WORK_ID_INT_PICKEL_JUMP_DISABLE_FRAME", 0x10000021),
-        (C::JudgeFixed, "FIGHTER_GAMEWATCH_STATUS_SPECIAL_S_FLAG_FIX_PANEL", 0x2100000d),
-        (C::JudgeKind, "FIGHTER_GAMEWATCH_INSTANCE_WORK_ID_INT_SPECIAL_S_PREV_KIND", 0x100000c1),
+        (
+            C::PickelTrolleyJumpDisable,
+            "WEAPON_PICKEL_TROLLEY_INSTANCE_WORK_ID_INT_PICKEL_JUMP_DISABLE_FRAME",
+            0x10000021,
+        ),
+        (
+            C::JudgeFixed,
+            "FIGHTER_GAMEWATCH_STATUS_SPECIAL_S_FLAG_FIX_PANEL",
+            0x2100000d,
+        ),
+        (
+            C::JudgeKind,
+            "FIGHTER_GAMEWATCH_INSTANCE_WORK_ID_INT_SPECIAL_S_PREV_KIND",
+            0x100000c1,
+        ),
+        (
+            C::TrailSpecialN1,
+            "FIGHTER_TRAIL_STATUS_KIND_SPECIAL_N1",
+            483,
+        ),
+        (
+            C::TrailSpecialN1Shoot,
+            "FIGHTER_TRAIL_STATUS_KIND_SPECIAL_N1_SHOOT",
+            484,
+        ),
+        (
+            C::TrailSpecialN1End,
+            "FIGHTER_TRAIL_STATUS_KIND_SPECIAL_N1_END",
+            485,
+        ),
+        (
+            C::TrailSpecialN2,
+            "FIGHTER_TRAIL_STATUS_KIND_SPECIAL_N2",
+            486,
+        ),
+        (
+            C::TrailSpecialN3,
+            "FIGHTER_TRAIL_STATUS_KIND_SPECIAL_N3",
+            487,
+        ),
+        (
+            C::TrailMagicKind,
+            "FIGHTER_TRAIL_INSTANCE_WORK_ID_INT_SPECIAL_N_MAGIC_KIND",
+            0x100000bf,
+        ),
+        (
+            C::TrailMagicFire,
+            "FIGHTER_TRAIL_SPECIAL_N_MAGIC_KIND_FIRE",
+            0,
+        ),
+        (
+            C::TrailMagicBlizzard,
+            "FIGHTER_TRAIL_SPECIAL_N_MAGIC_KIND_BLIZZARD",
+            1,
+        ),
+        (
+            C::TrailMagicThunder,
+            "FIGHTER_TRAIL_SPECIAL_N_MAGIC_KIND_THUNDER",
+            2,
+        ),
     ];
     let mut table = Table::unresolved();
     assert_eq!(table.resolve(|key| native.iter().find_map(|(_, name, value)| {

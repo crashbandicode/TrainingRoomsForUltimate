@@ -327,6 +327,7 @@ struct Game {
     restore_requested: bool,
     trolley: Option<entry::TrolleyEntry>,
     hero: Option<entry::HeroEntry>,
+    trail_magic: Option<entry::TrailMagicEntry>,
 }
 impl Game {
     const fn new() -> Self {
@@ -348,6 +349,7 @@ impl Game {
             restore_requested: false,
             trolley: None,
             hero: None,
+            trail_magic: None,
         }
     }
     fn step(&mut self, next: Step, text: &'static str) {
@@ -500,10 +502,71 @@ unsafe fn trolley_input(cpu: usize, status: i32, actor: &mut Option<entry::Troll
         { return Err(()); }
         cart = Some(entry::OwnedTrolley { cpu, article: object, object_id, accessor });
     }
-    if actor.is_none() { *actor = entry::TrolleyEntry::new(cpu); }
-    actor.as_mut().ok_or(())?.observe(phase, entry::TrolleyRead {
-        readers_ready: true, cpu, cart, jump_disable,
-    }).map_err(|_| ())
+    if actor.is_none() {
+        *actor = entry::TrolleyEntry::new(cpu);
+    }
+    actor
+        .as_mut()
+        .ok_or(())?
+        .observe(
+            phase,
+            entry::TrolleyRead {
+                readers_ready: true,
+                cpu,
+                cart,
+                jump_disable,
+            },
+        )
+        .map_err(|_| ())
+}
+
+unsafe fn trail_magic_kind(cpu: usize) -> Result<entry::TrailMagicKind, ()> {
+    if !game::granted(crate::model::sites_pkg2::WORK_GET_INT_OFFSET) {
+        return Err(());
+    }
+    let [Some(work), Some(fire), Some(blizzard), Some(thunder)] = [
+        C::TrailMagicKind,
+        C::TrailMagicFire,
+        C::TrailMagicBlizzard,
+        C::TrailMagicThunder,
+    ]
+    .map(state_id) else {
+        return Err(());
+    };
+    match natives::get_int(cpu, work) {
+        kind if kind == fire => Ok(entry::TrailMagicKind::Fire),
+        kind if kind == blizzard => Ok(entry::TrailMagicKind::Blizzard),
+        kind if kind == thunder => Ok(entry::TrailMagicKind::Thunder),
+        _ => Err(()),
+    }
+}
+
+fn trail_magic_status(status: i32, wait: i32) -> Result<entry::TrailMagicStatus, ()> {
+    let [Some(special), Some(n1), Some(n1_shoot), Some(n1_end), Some(n3)] = [
+        C::StatusSpecialN,
+        C::TrailSpecialN1,
+        C::TrailSpecialN1Shoot,
+        C::TrailSpecialN1End,
+        C::TrailSpecialN3,
+    ]
+    .map(state_id) else {
+        return Err(());
+    };
+    Ok(if status == wait {
+        entry::TrailMagicStatus::Wait
+    } else if status == special {
+        entry::TrailMagicStatus::SpecialN
+    } else if status == n1 {
+        entry::TrailMagicStatus::N1
+    } else if status == n1_shoot {
+        entry::TrailMagicStatus::N1Shoot
+    } else if status == n1_end {
+        entry::TrailMagicStatus::N1End
+    } else if status == n3 {
+        entry::TrailMagicStatus::N3
+    } else {
+        entry::TrailMagicStatus::Other
+    })
 }
 
 /// Olimar's Pikmin line through the Save-State helpers: respawn `line` first when given, then read it.
@@ -623,6 +686,7 @@ pub unsafe fn frame(fighter: usize) {
         game.config = config;
         game.clock = None;
         game.hero = None;
+        game.trail_magic = None;
         game.restore_requested = false;
         game.step(
             if linked {
@@ -802,6 +866,9 @@ pub unsafe fn frame(fighter: usize) {
     }
     SEEDS.drain(|NativeSeed { generation, epoch, origin, sample }| {
         if generation != game.generation { return; }
+        if game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::IceMagic)
+            && game.trail_magic.is_some_and(|actor| actor.preparing())
+        { return; }
         let late_throw = origin == SeedOrigin::ThrowClatterStart
             && game.step == Step::Held
             && game.requested.is_some_and(|r| r.state == crate::model::mashout::moves::State::Bury
@@ -919,6 +986,7 @@ pub unsafe fn frame(fighter: usize) {
             game.followed = false;
             game.trolley = None;
             game.hero = None;
+            game.trail_magic = None;
             game.step(Step::Reload, "Mash out · Setting up");
         }
         Step::Retry => (),
@@ -949,6 +1017,7 @@ pub unsafe fn frame(fighter: usize) {
             game.followed = false;
             game.trolley = None;
             game.hero = None;
+            game.trail_magic = None;
             revoke();
             game.step = Step::Reload;
             post(
@@ -1063,15 +1132,52 @@ pub unsafe fn frame(fighter: usize) {
                 game.step(Step::Entering, "Mash out · Waiting for move");
                 return;
             }
+            let mut preparing = false;
+            if request.plan == crate::model::mashout::moves::Plan::IceMagic {
+                let kind = match trail_magic_kind(cpu) {
+                    Ok(kind) => kind,
+                    Err(()) => {
+                        game.fail(UNAVAILABLE_NOTICE);
+                        return;
+                    }
+                };
+                match game.trail_magic {
+                    None if kind == entry::TrailMagicKind::Blizzard => (),
+                    None => match entry::TrailMagicEntry::new(kind) {
+                        Ok(actor) => {
+                            game.trail_magic = Some(actor);
+                            preparing = true;
+                        }
+                        Err(()) => {
+                            game.fail(UNAVAILABLE_NOTICE);
+                            return;
+                        }
+                    },
+                    Some(actor) if actor.prepared() && kind == entry::TrailMagicKind::Blizzard => {
+                        game.trail_magic = None;
+                    }
+                    Some(mut actor) => {
+                        if actor.begin_thunder(kind).is_err() {
+                            game.fail(UNAVAILABLE_NOTICE);
+                            return;
+                        }
+                        game.trail_magic = Some(actor);
+                        preparing = true;
+                    }
+                }
+            }
             let Some(start) = entry::start(request).and_then(|name| game::lua_const(lua_bind_hash(name)))
             else {
                 // restriction: MASH-M1-MISMATCH
                 game.fail("Move sequence unavailable");
                 return;
             };
-            if !entry::preparatory(request.plan) && !arm(p1, game.generation) {
+            if !preparing && !entry::preparatory(request.plan) && !arm(p1, game.generation) {
                 game.fail(UNAVAILABLE_NOTICE);
                 return;
+            }
+            if preparing {
+                revoke();
             }
             drive(entry::controls(request.plan, false));
             game.writes = None;
@@ -1130,8 +1236,49 @@ pub unsafe fn frame(fighter: usize) {
                 }
                 return;
             }
+            if request.plan == crate::model::mashout::moves::Plan::IceMagic {
+                drive(MappedInputs::NEUTRAL);
+                if let Some(mut actor) = game.trail_magic {
+                    let kind = match trail_magic_kind(cpu) {
+                        Ok(kind) => kind,
+                        Err(()) => {
+                            game.fail(UNAVAILABLE_NOTICE);
+                            return;
+                        }
+                    };
+                    let phase = match trail_magic_status(cpu_status, ids[0]) {
+                        Ok(phase) => phase,
+                        Err(()) => {
+                            game.fail(UNAVAILABLE_NOTICE);
+                            return;
+                        }
+                    };
+                    match actor.observe(phase, kind, released) {
+                        Ok(entry::TrailMagicProgress::Pending) => {
+                            game.trail_magic = Some(actor);
+                            return;
+                        }
+                        Ok(entry::TrailMagicProgress::StartThunder) => {
+                            game.trail_magic = Some(actor);
+                            game.step(Step::Settle, "Mash out · Waiting for grounded fighters");
+                            return;
+                        }
+                        Ok(entry::TrailMagicProgress::Prepared) => {
+                            game.trail_magic = Some(actor);
+                            game.step(Step::Place, "Mash out · Setting up move");
+                            return;
+                        }
+                        Err(()) => {
+                            game.fail(UNAVAILABLE_NOTICE);
+                            return;
+                        }
+                    }
+                }
+            }
             if request.plan != crate::model::mashout::moves::Plan::Hero {
-                drive(entry::controls(request.plan, game.followed));
+                if request.plan != crate::model::mashout::moves::Plan::IceMagic {
+                    drive(entry::controls(request.plan, game.followed));
+                }
             }
             game.saw_catch |= cpu_status != ids[0];
             if request.plan == crate::model::mashout::moves::Plan::Roller {

@@ -110,15 +110,42 @@ fn actual_runtime_egg_preparation_and_native_seed() {
         ("// ARM", block(runtime, "unsafe fn arm(").to_string()),
         ("// TROLLEY_SITES", {
             let sites = include_str!("../src/model/sites_pkg3.rs");
-            ["STATE_ARTICLE_IS_EXIST_OFFSET", "STATE_ARTICLE_GET_ARTICLE_OFFSET",
-             "STATE_ARTICLE_OBJECT_ID_OFFSET", "STATE_OBJECT_IS_ACTIVE_OFFSET",
-             "STATE_OBJECT_MODULE_ACCESSOR_OFFSET", "STATE_LINK_PARENT_OBJECT_ID_OFFSET"]
-                .map(|name| sites.lines().find(|line| line.starts_with(&format!("pub const {name}:"))).unwrap())
-                .join("\n")
+            [
+                "STATE_ARTICLE_IS_EXIST_OFFSET",
+                "STATE_ARTICLE_GET_ARTICLE_OFFSET",
+                "STATE_ARTICLE_OBJECT_ID_OFFSET",
+                "STATE_OBJECT_IS_ACTIVE_OFFSET",
+                "STATE_OBJECT_MODULE_ACCESSOR_OFFSET",
+                "STATE_LINK_PARENT_OBJECT_ID_OFFSET",
+            ]
+            .map(|name| {
+                sites
+                    .lines()
+                    .find(|line| line.starts_with(&format!("pub const {name}:")))
+                    .unwrap()
+            })
+            .join("\n")
         }),
-        ("// JUDGE_CHOICE", block(runtime, "unsafe fn judge_choice(").to_string()),
-        ("// TROLLEY_INPUT", block(runtime, "unsafe fn trolley_input(").to_string()),
-        ("// ENTRY_ADMISSION", block(runtime, "if game.step == Step::Entering").to_string()),
+        (
+            "// JUDGE_CHOICE",
+            block(runtime, "unsafe fn judge_choice(").to_string(),
+        ),
+        (
+            "// TROLLEY_INPUT",
+            block(runtime, "unsafe fn trolley_input(").to_string(),
+        ),
+        (
+            "// TRAIL_MAGIC_KIND",
+            block(runtime, "unsafe fn trail_magic_kind(").to_string(),
+        ),
+        (
+            "// TRAIL_MAGIC_STATUS",
+            block(runtime, "fn trail_magic_status(").to_string(),
+        ),
+        (
+            "// ENTRY_ADMISSION",
+            block(runtime, "if game.step == Step::Entering").to_string(),
+        ),
         ("// RETRY", {
             let start = runtime.find("Step::Retry if released => {").unwrap();
             let end = start + runtime[start..].find("Step::Choose => {").unwrap();
@@ -154,7 +181,7 @@ fn actual_runtime_egg_preparation_and_native_seed() {
         ),
         (
             "// START",
-            block(runtime, "if !entry::preparatory").to_string(),
+            block(runtime, "if !preparing && !entry::preparatory").to_string(),
         ),
         (
             "// ENTERING",
@@ -178,7 +205,22 @@ fn actual_runtime_egg_preparation_and_native_seed() {
             let a = runtime.find("let released =").unwrap();
             runtime[a..=a + runtime[a..].find(';').unwrap()].to_string()
         }),
-        ("// HELD", block(runtime, "Step::Held => {").replacen("Step::Held =>", "Step::Held if EXECUTE_HELD.load(Ordering::Relaxed) =>", 1)),
+        (
+            "// COVERED",
+            block(
+                runtime,
+                "if covered && !matches!(game.step, Step::Held | Step::Result)",
+            )
+            .to_string(),
+        ),
+        (
+            "// HELD",
+            block(runtime, "Step::Held => {").replacen(
+                "Step::Held =>",
+                "Step::Held if EXECUTE_HELD.load(Ordering::Relaxed) =>",
+                1,
+            ),
+        ),
         ("// SEEDS", seed),
         ("// ENDS", format!("{});", block(runtime, "ENDS.drain("))),
         ("// RESTART", block(runtime, "if restart {").to_string()),

@@ -59,8 +59,9 @@ mod runtime {
         pub fn text_base() -> usize {
             super::super::threshold_getter as *const () as usize - 0x6ba1e0
         }
-        pub fn granted(_: usize) -> bool {
-            true
+        pub fn granted(offset: usize) -> bool {
+            offset != super::super::model::sites_pkg2::WORK_GET_INT_OFFSET
+                || super::super::WORK_GET_INT_GRANTED.load(super::super::Ordering::Relaxed)
         }
     }
 }
@@ -115,6 +116,9 @@ static HERO_ACTIVE: AtomicU32 = AtomicU32::new(17);
 static HERO_SUCCESS_SP: AtomicBool = AtomicBool::new(false);
 static HERO_INT_READS: AtomicUsize = AtomicUsize::new(0);
 static HERO_FLAG_READS: AtomicUsize = AtomicUsize::new(0);
+static TRAIL_MAGIC_KIND_VALUE: AtomicU32 = AtomicU32::new(0);
+static TRAIL_MAGIC_KIND_RESOLVED: AtomicBool = AtomicBool::new(true);
+static TRAIL_MAGIC_READS: AtomicUsize = AtomicUsize::new(0);
 static COVERED: AtomicBool = AtomicBool::new(false);
 static P1_AIR: AtomicBool = AtomicBool::new(false);
 static CPU_AIR: AtomicBool = AtomicBool::new(false);
@@ -207,6 +211,11 @@ mod natives {
         super::JUDGE_FIXED.load(super::Ordering::Relaxed)
     }
     pub fn get_int(cpu: usize, id: i32) -> i32 {
+        if id == 0x100000bf {
+            assert_eq!(cpu, 2);
+            super::TRAIL_MAGIC_READS.fetch_add(1, super::Ordering::Relaxed);
+            return super::TRAIL_MAGIC_KIND_VALUE.load(super::Ordering::Relaxed) as i32;
+        }
         if Some(id) == super::state_id(super::C::HeroWindowState) {
             assert_eq!(cpu, 2);
             super::HERO_INT_READS.fetch_add(1, super::Ordering::Relaxed);
@@ -359,6 +368,9 @@ fn post(e: worker::Event, _: u64) {
 }
 thread_local! { static NATIVE_ENDS: RefCell<Vec<(u64, u64)>> = const { RefCell::new(Vec::new()) }; }
 fn state_id(c: C) -> Option<i32> {
+    if c == C::TrailMagicKind && !TRAIL_MAGIC_KIND_RESOLVED.load(Ordering::Relaxed) {
+        return None;
+    }
     match model::cpu::ids::NAMES[c as usize] {
         "FIGHTER_KIND_BRAVE" => return Some(0x53),
         "FIGHTER_STATUS_KIND_SPECIAL_LW" => return Some(479),
@@ -386,6 +398,15 @@ fn state_id(c: C) -> Option<i32> {
         C::HeroCommand3 => 0x100000d6,
         C::HeroCommand4 => 0x100000d7,
         C::HeroSuccessSp => 0x2100000c,
+        C::TrailSpecialN1 => 483,
+        C::TrailSpecialN1Shoot => 484,
+        C::TrailSpecialN1End => 485,
+        C::TrailSpecialN2 => 486,
+        C::TrailSpecialN3 => 487,
+        C::TrailMagicKind => 0x100000bf,
+        C::TrailMagicFire => 0,
+        C::TrailMagicBlizzard => 1,
+        C::TrailMagicThunder => 2,
         C::PickelTrolleyFailed => 518,
         C::PickelTrolleyRide => 519,
         C::PickelTrolleyDrive => 520,
@@ -445,6 +466,7 @@ struct Game {
     failed: Option<&'static str>,
     trolley: Option<entry::TrolleyEntry>,
     hero: Option<entry::HeroEntry>,
+    trail_magic: Option<entry::TrailMagicEntry>,
 }
 impl Game {
     fn new(plan: Plan, state: State) -> Self {
@@ -474,6 +496,7 @@ impl Game {
             failed: None,
             trolley: None,
             hero: None,
+            trail_magic: None,
         }
     }
     fn fail(&mut self, s: &'static str) {
@@ -489,6 +512,8 @@ impl Game {
 const UNAVAILABLE_NOTICE: &str = "unavailable";
 // JUDGE_CHOICE
 // TROLLEY_INPUT
+// TRAIL_MAGIC_KIND
+// TRAIL_MAGIC_STATUS
 // ARM
 #[derive(Clone, Copy)]
 // TOKEN_TYPE
@@ -501,7 +526,7 @@ fn ids() -> [i32; 15] {
 }
 unsafe fn startup(game: &mut Game, p1: usize) {
     let request = game.requested.unwrap();
-    // START
+    let preparing = false; // START
 }
 unsafe fn update(game: &mut Game, p1: usize, status: i32, cpu: usize, fighter: usize) {
     let ids = ids();
@@ -512,6 +537,7 @@ unsafe fn update(game: &mut Game, p1: usize, status: i32, cpu: usize, fighter: u
     // SEEDS
     // ENDS
     // RELEASED
+    // COVERED
     match game.step {
         // RETRY
         // PLACE
@@ -583,6 +609,9 @@ impl NativeMemory {
         HERO_SUCCESS_SP.store(false, Ordering::Relaxed);
         HERO_INT_READS.store(0, Ordering::Relaxed);
         HERO_FLAG_READS.store(0, Ordering::Relaxed);
+        TRAIL_MAGIC_KIND_VALUE.store(0, Ordering::Relaxed);
+        TRAIL_MAGIC_KIND_RESOLVED.store(true, Ordering::Relaxed);
+        TRAIL_MAGIC_READS.store(0, Ordering::Relaxed);
         COVERED.store(false, Ordering::Relaxed);
         AIR.store(false, Ordering::Relaxed);
         ROLLER_LR.store(1.0f32.to_bits(), Ordering::Relaxed);
@@ -2624,5 +2653,213 @@ fn hero_start_missing_getter_or_changed_body_cannot_admit_native_ice() {
             assert!(game.hero.is_some_and(|actor| !actor.confirmed()));
             assert!(BEGINS.with_borrow(Vec::is_empty));
         }
+#[test]
+fn sora_ice_magic_uses_the_generic_native_special_n_dispatch() {
+    let scenario = Scenario {
+        id: 116,
+        state: State::Frozen,
+        attacker_kind: 0x5d,
+        attacker_name: "Sora",
+        name: "Ice magic",
+        plan: Plan::IceMagic,
+        grab: 0,
+        evidence: "F07",
+    };
+    assert_eq!(
+        entry::start(scenario),
+        Some("FIGHTER_STATUS_KIND_SPECIAL_N")
+    );
+}
+
+fn sora_game(kind: u32) -> Game {
+    TRAIL_MAGIC_KIND_VALUE.store(kind, Ordering::Relaxed);
+    let mut game = Game::new(Plan::IceMagic, State::Frozen);
+    game.requested = Some(Scenario {
+        id: 116,
+        state: State::Frozen,
+        attacker_kind: 0x5d,
+        attacker_name: "Sora",
+        name: "Ice magic",
+        plan: Plan::IceMagic,
+        grab: 0,
+        evidence: "F07",
+    });
+    game.step = Step::Settle;
+    CPU_STATUS.store(0, Ordering::Relaxed);
+    game
+}
+
+#[test]
+fn sora_blizzard_starts_real_special_n_and_only_actual_ice_seed_begins() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        m.body[3] = 0x5d;
+        let mut game = sora_game(1);
+        m.update(&mut game, 0);
+        assert_eq!(game.step, Step::Entering);
+        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 476)]);
+        assert_eq!(ARMED.load(Ordering::Relaxed), 5);
+        assert_eq!(game.trail_magic, None, "Blizzard starts directly without preparatory casts");
+        assert_eq!(DRIVEN.with_borrow(|v| v.last().unwrap().buttons), 2);
+
+        CPU_STATUS.store(476, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL,
+            "the generic Special N edge is not repeated while entering");
+        assert_eq!(REQUESTS.with_borrow(Vec::len), 1);
+
+        CPU_STATUS.store(486, Ordering::Relaxed);
+        m.seed(142.3, 7.0, 1);
+        m.start();
+        m.update(&mut game, 203);
+        assert_eq!(game.step, Step::Held);
+        assert_eq!(BEGINS.with_borrow(Vec::len), 1);
+        assert!(game.clock.is_some());
+    }
+}
+
+#[test]
+fn sora_fire_observes_n1_cycle_then_thunder_and_blizzard_before_arming() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut game = sora_game(0);
+        COVERED.store(true, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(game.step, Step::Settle);
+        assert!(REQUESTS.with_borrow(Vec::is_empty));
+        assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
+
+        COVERED.store(false, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(game.step, Step::Entering);
+        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 476)]);
+        assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+        assert_eq!(DRIVEN.with_borrow(|v| v.last().unwrap().buttons), 2);
+
+        SEEDS.post(NativeSeed {
+            generation: 5,
+            epoch: 0,
+            origin: SeedOrigin::Export,
+            sample: None,
+        });
+        CPU_STATUS.store(476, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(game.failed, None, "preparatory seed is discarded before seed validation");
+        assert!(game.clock.is_none());
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+        assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+        assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
+
+        for status in [483, 483, 484, 484] {
+            CPU_STATUS.store(status, Ordering::Relaxed);
+            m.update(&mut game, 0);
+            assert_eq!(game.failed, None);
+            assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+        }
+        TRAIL_MAGIC_KIND_VALUE.store(2, Ordering::Relaxed);
+        CPU_STATUS.store(485, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(trail_magic_kind(2), Ok(entry::TrailMagicKind::Thunder));
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(game.step, Step::Settle, "native N1 end and fresh Thunder readback are required: {:?}", game.failed);
+        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 476)]);
+        assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+
+        m.update(&mut game, 0);
+        assert_eq!(game.step, Step::Entering);
+        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 476), (2, 476)]);
+        assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+        CPU_STATUS.store(476, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        CPU_STATUS.store(487, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        CPU_STATUS.store(487, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        TRAIL_MAGIC_KIND_VALUE.store(1, Ordering::Relaxed);
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(game.step, Step::Place, "real N3 completion and Blizzard kind are required");
+        assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+
+        m.update(&mut game, 0);
+        assert_eq!(game.step, Step::Settle);
+        m.update(&mut game, 0);
+        assert_eq!(game.step, Step::Entering);
+        assert_eq!(game.trail_magic, None);
+        // Place requests WAIT on P1 and on the prepared CPU before the actual Blizzard cast.
+        assert_eq!(
+            REQUESTS.with_borrow(Clone::clone),
+            vec![(2, 476), (2, 476), (m.p1(), 0), (2, 0), (2, 476)]
+        );
+        assert_eq!(ARMED.load(Ordering::Relaxed), 5, "arming begins only for the actual Blizzard cast");
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+    }
+}
+
+#[test]
+fn sora_thunder_prepares_once_and_unseen_or_unresolved_magic_fails_closed() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut game = sora_game(2);
+        m.update(&mut game, 0);
+        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 476)]);
+        assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+        CPU_STATUS.store(476, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        CPU_STATUS.store(487, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        assert_eq!(ids()[0], 0);
+        assert_eq!(natives::status_kind(2), 0);
+        assert_eq!(natives::situation_kind(m.p1()), ids()[7]);
+        assert_eq!(natives::situation_kind(2), ids()[7]);
+        assert!(!natives::is_stop(m.p1()) && !natives::is_stop(2));
+        m.update(&mut game, 0);
+        assert_eq!(game.step, Step::Entering, "Thunder cannot finish without fresh Blizzard kind: {:?}", game.failed);
+        assert_eq!(REQUESTS.with_borrow(Vec::len), 1, "no repeated Special N edge while waiting");
+        assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+        TRAIL_MAGIC_KIND_VALUE.store(1, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(game.step, Step::Place);
+
+        for case in ["invalid-kind", "missing-grant", "unresolved-work-id"] {
+            let mut m = NativeMemory::new();
+            let kind = if case == "invalid-kind" { 9 } else { 0 };
+            let mut game = sora_game(kind);
+            if case == "missing-grant" {
+                WORK_GET_INT_GRANTED.store(false, Ordering::Relaxed);
+            } else if case == "unresolved-work-id" {
+                TRAIL_MAGIC_KIND_RESOLVED.store(false, Ordering::Relaxed);
+            }
+            m.update(&mut game, 0);
+            assert_eq!(game.failed, Some(UNAVAILABLE_NOTICE), "{case}");
+            assert_eq!(game.step, Step::Failed, "{case}");
+            assert_eq!(ARMED.load(Ordering::Relaxed), 0, "{case}");
+            assert!(REQUESTS.with_borrow(Vec::is_empty), "{case}");
+            if case != "invalid-kind" {
+                assert_eq!(TRAIL_MAGIC_READS.load(Ordering::Relaxed), 0, "{case}");
+            }
+        }
+
+        let mut m = NativeMemory::new();
+        let mut game = sora_game(0);
+        m.update(&mut game, 0);
+        TRAIL_MAGIC_KIND_VALUE.store(2, Ordering::Relaxed);
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(game.failed, Some(UNAVAILABLE_NOTICE), "magic change without N1 phases is refused");
+        assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 476)]);
+        assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+
+        let mut m = NativeMemory::new();
+        let mut game = sora_game(0);
+        m.update(&mut game, 0);
+        actual_body_guard(&mut game, m.p1(), 3);
+        assert_eq!(game.failed, Some("Fighter changed · no grade"));
+        assert_eq!(ARMED.load(Ordering::Relaxed), 0);
     }
 }

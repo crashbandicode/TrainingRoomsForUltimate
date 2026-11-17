@@ -26,12 +26,20 @@ pub fn start(move_: Scenario) -> Option<&'static str> {
             _ => "FIGHTER_STATUS_KIND_CATCH",
         },
         Plan::AirSideSpecial => "FIGHTER_STATUS_KIND_JUMP_SQUAT",
-        Plan::SideSpecial | Plan::Cling | Plan::Drag | Plan::Whip | Plan::Roller | Plan::Pin | Plan::Judge | Plan::Trolley => {
-            "FIGHTER_STATUS_KIND_SPECIAL_S"
-        }
-        Plan::Egg | Plan::Inhale | Plan::NeutralSpecial | Plan::Freeze | Plan::IceShot => {
-            "FIGHTER_STATUS_KIND_SPECIAL_N"
-        }
+        Plan::SideSpecial
+        | Plan::Cling
+        | Plan::Drag
+        | Plan::Whip
+        | Plan::Roller
+        | Plan::Pin
+        | Plan::Judge
+        | Plan::Trolley => "FIGHTER_STATUS_KIND_SPECIAL_S",
+        Plan::Egg
+        | Plan::Inhale
+        | Plan::NeutralSpecial
+        | Plan::Freeze
+        | Plan::IceShot
+        | Plan::IceMagic => "FIGHTER_STATUS_KIND_SPECIAL_N",
         Plan::UpSpecial => "FIGHTER_STATUS_KIND_SPECIAL_HI",
         Plan::Drain | Plan::Blizzard | Plan::Flip | Plan::Hero => "FIGHTER_STATUS_KIND_SPECIAL_LW",
         Plan::DownTilt => "FIGHTER_STATUS_KIND_ATTACK_LW3",
@@ -40,6 +48,152 @@ pub fn start(move_: Scenario) -> Option<&'static str> {
         // These need their verified native sequence, loadout or meter setup before admission.
         _ => return None,
     })
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TrailMagicKind {
+    Fire,
+    Blizzard,
+    Thunder,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TrailMagicStatus {
+    Wait,
+    SpecialN,
+    N1,
+    N1Shoot,
+    N1End,
+    N3,
+    Other,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TrailMagicProgress {
+    Pending,
+    StartThunder,
+    Prepared,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TrailFirePhase {
+    Start,
+    N1,
+    Shoot,
+    End,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TrailMagicPhase {
+    Fire(TrailFirePhase),
+    AwaitThunder,
+    Thunder { saw_n3: bool },
+    Prepared,
+}
+
+/// Observes Trail's real N1/N3 status phases before allowing the next magic kind.
+/// The actor never requests status or changes Trail's native work values.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TrailMagicEntry {
+    phase: TrailMagicPhase,
+}
+
+impl TrailMagicEntry {
+    pub fn new(kind: TrailMagicKind) -> Result<Self, ()> {
+        let phase = match kind {
+            TrailMagicKind::Fire => TrailMagicPhase::Fire(TrailFirePhase::Start),
+            TrailMagicKind::Thunder => TrailMagicPhase::Thunder { saw_n3: false },
+            TrailMagicKind::Blizzard => return Err(()),
+        };
+        Ok(Self { phase })
+    }
+
+    pub fn preparing(self) -> bool {
+        true
+    }
+
+    pub fn prepared(self) -> bool {
+        self.phase == TrailMagicPhase::Prepared
+    }
+
+    pub fn begin_thunder(&mut self, kind: TrailMagicKind) -> Result<(), ()> {
+        if self.phase != TrailMagicPhase::AwaitThunder || kind != TrailMagicKind::Thunder {
+            return Err(());
+        }
+        self.phase = TrailMagicPhase::Thunder { saw_n3: false };
+        Ok(())
+    }
+
+    pub fn observe(
+        &mut self,
+        status: TrailMagicStatus,
+        kind: TrailMagicKind,
+        released: bool,
+    ) -> Result<TrailMagicProgress, ()> {
+        let progress = match self.phase {
+            TrailMagicPhase::Fire(phase) => {
+                if !matches!(kind, TrailMagicKind::Fire | TrailMagicKind::Thunder) {
+                    return Err(());
+                }
+                match (phase, status) {
+                    (TrailFirePhase::Start, TrailMagicStatus::SpecialN) => {
+                        TrailMagicProgress::Pending
+                    }
+                    (TrailFirePhase::Start, TrailMagicStatus::N1) => {
+                        self.phase = TrailMagicPhase::Fire(TrailFirePhase::N1);
+                        TrailMagicProgress::Pending
+                    }
+                    (TrailFirePhase::N1, TrailMagicStatus::N1) => TrailMagicProgress::Pending,
+                    (TrailFirePhase::N1, TrailMagicStatus::N1Shoot) => {
+                        self.phase = TrailMagicPhase::Fire(TrailFirePhase::Shoot);
+                        TrailMagicProgress::Pending
+                    }
+                    (TrailFirePhase::Shoot, TrailMagicStatus::N1Shoot) => {
+                        TrailMagicProgress::Pending
+                    }
+                    (TrailFirePhase::Shoot, TrailMagicStatus::N1End) => {
+                        self.phase = TrailMagicPhase::Fire(TrailFirePhase::End);
+                        TrailMagicProgress::Pending
+                    }
+                    (TrailFirePhase::End, TrailMagicStatus::N1End) => TrailMagicProgress::Pending,
+                    (TrailFirePhase::End, TrailMagicStatus::Wait) => match kind {
+                        TrailMagicKind::Fire => TrailMagicProgress::Pending,
+                        TrailMagicKind::Thunder if released => {
+                            self.phase = TrailMagicPhase::AwaitThunder;
+                            TrailMagicProgress::StartThunder
+                        }
+                        TrailMagicKind::Thunder => TrailMagicProgress::Pending,
+                        TrailMagicKind::Blizzard => unreachable!(),
+                    },
+                    _ => return Err(()),
+                }
+            }
+            TrailMagicPhase::Thunder { saw_n3 } => {
+                if !matches!(kind, TrailMagicKind::Thunder | TrailMagicKind::Blizzard) {
+                    return Err(());
+                }
+                match (saw_n3, status) {
+                    (false, TrailMagicStatus::SpecialN) => TrailMagicProgress::Pending,
+                    (false, TrailMagicStatus::N3) => {
+                        self.phase = TrailMagicPhase::Thunder { saw_n3: true };
+                        TrailMagicProgress::Pending
+                    }
+                    (true, TrailMagicStatus::N3) => TrailMagicProgress::Pending,
+                    (true, TrailMagicStatus::Wait) if kind == TrailMagicKind::Thunder => {
+                        TrailMagicProgress::Pending
+                    }
+                    (true, TrailMagicStatus::Wait) if released => {
+                        self.phase = TrailMagicPhase::Prepared;
+                        TrailMagicProgress::Prepared
+                    }
+                    (true, TrailMagicStatus::Wait) => TrailMagicProgress::Pending,
+                    _ => return Err(()),
+                }
+            }
+            TrailMagicPhase::AwaitThunder | TrailMagicPhase::Prepared => return Err(()),
+        };
+        Ok(progress)
+    }
 }
 
 // The stock Brave menu mirrors four native command enums into work IDs. The
@@ -222,16 +376,14 @@ impl HeroEntry {
             CancelPending => match read.status {
                 Cancel => Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Cancelled),
                 Failure => self.reject(),
-                Select => {
-                    match read.window_state {
-                        Some(1) => Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Pending),
-                        Some(HERO_WINDOW_OPEN) => {
-                            let _ = Self::menu(read)?;
-                            Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Pending)
-                        }
-                        _ => Err(HeroError::Unavailable),
+                Select => match read.window_state {
+                    Some(1) => Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Pending),
+                    Some(HERO_WINDOW_OPEN) => {
+                        let _ = Self::menu(read)?;
+                        Self::answer(MappedInputs::NEUTRAL, HeroOutcome::Pending)
                     }
-                }
+                    _ => Err(HeroError::Unavailable),
+                },
                 _ => Err(HeroError::Unavailable),
             },
         }
@@ -318,8 +470,9 @@ impl TrolleyEntry {
         if read.cpu != self.cpu { return Err(TrolleyError::Unavailable); }
         if status == TrolleyStatus::Failed { return Err(TrolleyError::Unavailable); }
         match (self.phase, status) {
-            (TrolleyPhase::AwaitRide, TrolleyStatus::Special | TrolleyStatus::Other) =>
-                Ok(MappedInputs::NEUTRAL),
+            (TrolleyPhase::AwaitRide, TrolleyStatus::Special | TrolleyStatus::Other) => {
+                Ok(MappedInputs::NEUTRAL)
+            }
             (TrolleyPhase::AwaitRide | TrolleyPhase::Ride, TrolleyStatus::Ride) => {
                 self.phase = TrolleyPhase::Ride;
                 Ok(MappedInputs::NEUTRAL)
@@ -398,7 +551,7 @@ pub fn controls(plan: Plan, caught: bool) -> MappedInputs {
         Plan::DownThrow if caught => (1, -120),
         Plan::UpSpecial if caught => (2, 0),
         Plan::Pin if caught => (1, 0),
-        Plan::Inhale | Plan::NeutralSpecial => (2, 0),
+        Plan::Inhale | Plan::NeutralSpecial | Plan::IceMagic => (2, 0),
         Plan::Freeze if !caught => (2, 0),
         Plan::Jab3 => (1, 0),
         _ => (0, 0),
