@@ -27,16 +27,16 @@ const SEPARATOR: u16 = 0xb7;
 
 /// One UTF-16 unit's advance in ems of the font's x size. The classes are calibrated on four `nintendo64` strings
 /// measured on Eden stills (design report: within -1.7 % to +4.2 %); any other non-ASCII unit, such as a button
-/// glyph, counts a full em.
+/// glyph, counts a full em, and so do `M` and `W` (a 48-W name renders 1.08 em a W in the menu font, Eden 2026-11-17).
 pub fn advance(unit: u16) -> f32 {
     match char::from_u32(u32::from(unit)).unwrap_or('\u{fffd}') {
         ' ' => 0.32,
         'i' | 'l' | 'j' | '.' | ',' | ':' | ';' | '\'' | '!' | '|' | '·' => 0.30,
         'f' | 'r' | 't' | 'I' | '(' | ')' | '[' | ']' | '/' | '-' => 0.38,
-        'm' | 'w' | 'M' | 'W' => 0.82,
-        'A'..='Z' => 0.72,
+        'm' | 'w' => 0.82,
+        'A'..='L' | 'N'..='V' | 'X'..='Z' => 0.72,
         '0'..='9' => 0.58,
-        c if c.is_ascii() => 0.55,
+        c if c.is_ascii() && !matches!(c, 'M' | 'W') => 0.55,
         _ => 1.0,
     }
 }
