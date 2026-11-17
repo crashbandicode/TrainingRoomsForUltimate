@@ -1819,5 +1819,5 @@ scope = "total"
 basis = "rustfmt-sloc4"
 ceiling = 155719
 date = "2026-11-17"
-reason = "Free-form Tech wizard measured155719 at source8f33103b: +503 over timing155216, exact total with no headroom. Shared picker marks, menu motion, planner and notice writer; one ordered step table. FOR OPERATOR REVIEW; counting, guards and gate enforcement unchanged."
-approved_by = "Primary2026-11-17 16:46Z provisionally approves wizard +503 (155719), FOR OPERATOR REVIEW. Operator rejection requires further slimming before merge."
+reason = "Free-form Tech wizard measured155719 at source8f33103b: +503 over timing155216, exact total with no headroom. Shared picker marks, menu motion, planner and notice writer; one ordered step table. Counting, guards and gate enforcement unchanged."
+approved_by = "Operator explicitly approved: approve the +503 for the wizard; relayed by primary2026-11-17 16:52Z. Exact approved combined total155719; no headroom."
