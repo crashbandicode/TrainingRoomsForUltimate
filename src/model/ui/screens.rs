@@ -123,6 +123,18 @@ fn option_label(menu: &Menu, row: usize, i: usize, first: u16, step: u16) -> Tex
     label
 }
 
+/// One list-popup row: its label and tone. A row the list never offers (Mash out's
+/// NotMashable moves) keeps its name, gains the approved suffix and is greyed.
+pub fn list_option(menu: &Menu, row: usize, i: usize, first: u16, step: u16) -> (Text<80>, Tone) {
+    let mut label = option_label(menu, row, i, first, step);
+    if menu.option_offered(row, i) {
+        return (label, Tone::Normal);
+    }
+    // restriction: mashout-not-mashable
+    let _ = label.write_str(" - not mashable");
+    (label, Tone::Off)
+}
+
 fn lines_window(frame: &mut Frame, cursor: usize, total: usize, mut line: impl FnMut(usize, &mut RowLine)) {
     let first = window_start(cursor, total);
     for i in first..total.min(first + ROW_LINES) {
@@ -145,11 +157,9 @@ fn list_frame(menu: &Menu, screen: &Screen, row: usize, cursor: usize, frame: &m
     let yes_no = matches!(r.control, Control::YesNoRandom);
     let loop_at = (r.id == LOOP_ROW).then(|| menu.recording().loop_row_index());
     lines_window(frame, cursor, total, |i, line| {
-        let label = option_label(menu, row, i, first, step);
+        let (label, tone) = list_option(menu, row, i, first, step);
         line.label = label;
-        if !menu.option_offered(row, i) {
-            line.label_tone = Tone::Off;
-        }
+        line.label_tone = tone;
         let chosen = if let Some(at) = loop_at {
             i == at
         } else if yes_no {

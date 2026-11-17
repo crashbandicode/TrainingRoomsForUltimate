@@ -1128,7 +1128,8 @@ fn not_mashable_rows_are_greyed_skipped_and_never_confirmed() {
     m.press(Button::A);
     let mut frame = Frame::new();
     model::screens::frame_of(&m, &mut frame, |_| "Stage");
-    assert_eq!(String::from_utf16(frame.rows[2].label.units()).unwrap(), "King K. Rool · Blunderbuss suction");
+    assert_eq!(String::from_utf16(frame.rows[2].label.units()).unwrap(), "King K. Rool · Blunderbuss suction - not mashable");
+    assert_eq!(String::from_utf16(frame.rows[1].label.units()).unwrap(), "King Dedede · Inhale");
     assert_eq!(frame.rows[2].label_tone, Tone::Off);
     assert_ne!(frame.rows[1].label_tone, Tone::Off);
     press(&mut m, &[Button::Down, Button::Down]);
@@ -1142,6 +1143,31 @@ fn not_mashable_rows_are_greyed_skipped_and_never_confirmed() {
     assert_eq!(get(&m, moves::ATTACKER_ROW).iter().position(|v| *v != 0), Some(89));
     m.press(Button::Left);
     assert_eq!(get(&m, moves::ATTACKER_ROW).iter().position(|v| *v != 0), Some(120));
+    // The approved label (restriction mashout-not-mashable): the four rows, and only they, read
+    // "<name> - not mashable" in greyed tone, in every Mash out state.
+    let mut labelled = Vec::new();
+    for state in 0..moves::STATE_LABELS.len() {
+        let mut m = menu();
+        goto(&mut m, moves::STATE_ROW);
+        m.press(Button::A);
+        for _ in 0..state { m.press(Button::Down); }
+        m.press(Button::A);
+        let attacker = goto(&mut m, moves::ATTACKER_ROW);
+        for option in 0..m.option_count(attacker) {
+            let (text, tone) = model::screens::list_option(&m, attacker, option, 0, 1);
+            let text = String::from_utf16(text.units()).unwrap();
+            let offered = m.option_offered(attacker, option);
+            assert_eq!(text.ends_with(" - not mashable"), !offered, "state {state} option {option}: {text}");
+            assert_eq!(tone == Tone::Off, !offered);
+            if !offered {
+                let s = moves::scenario(m.option_value(attacker, option).unwrap()).unwrap();
+                assert_eq!(text, format!("{} · {} - not mashable", s.attacker_name, s.name));
+                labelled.push(s.id);
+            }
+        }
+    }
+    labelled.sort_unstable();
+    assert_eq!(labelled, [89, 90, 96, 120]);
     // Every Mash out state: no listed NotMashable option is ever written by any input path.
     for state in 0..moves::STATE_LABELS.len() {
         for option in 0..moves::attacker_count(state) {
