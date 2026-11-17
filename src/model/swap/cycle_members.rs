@@ -131,6 +131,14 @@ pub fn admitted(cycle_on: bool, once: bool, refresh: bool) -> bool {
     cycle_on || once || refresh
 }
 
+/// LEAD-1: whether the menu close must ask the roster itself for a portrait pick of `picked`. The publish dispatches a
+/// pick only when it changes the role's stored pick (`menu_request`'s `changed`); a pick of the fighter already stored
+/// (a pick that never loaded, or the stored pick a cycle left behind) changes nothing, so nothing else asks for it.
+/// `stored`: the role's pick in the view the publish replaces (None before the first publish, which dispatches nothing).
+pub fn undispatched_pick(picked: u32, stored: Option<u32>) -> bool {
+    stored.is_none_or(|stored| stored == picked)
+}
+
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
@@ -150,11 +158,20 @@ mod tests {
         assert!(admitted(false, false, true), "a partner refresh is always taken");
     }
 
+    fn a_pick_of_the_stored_fighter_is_asked_for_at_close() {
+        // LEAD-1: the publish dispatches only a changed pick; the close asks for one that changed nothing.
+        assert!(undispatched_pick(0x07, Some(0x07)), "stored Fox picked again (P1 G&W after a cycle): the close asks");
+        assert!(!undispatched_pick(0x07, Some(0x1a)), "a changed pick: the publish dispatches it, not twice");
+        assert!(undispatched_pick(0x07, None), "before the first publish nothing else dispatches it");
+        assert!(admitted(false, true, false), "it is one load the user chose: Player Swapping Off does not refuse it");
+    }
+
     /// This module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("a_player_character_pick_loads_with_player_swapping_off", a_player_character_pick_loads_with_player_swapping_off as fn()),
+            ("a_pick_of_the_stored_fighter_is_asked_for_at_close", a_pick_of_the_stored_fighter_is_asked_for_at_close as fn()),
         ]);
     }
     }

@@ -124,6 +124,9 @@ pub struct Outbox {
     /// A, X, Y, ZR on the portrait roster grid: the tile and the button; the roster editor (package 6's roster rules) applies it.
     /// Taken at once with Menu::take_roster_press.
     pub roster_press: Option<(u16, Button)>,
+    /// `[Player, CPU]`: the fighter an A on the Player / CPU Character grid asked for this opening, also when it was
+    /// already the stored pick. The close asks the roster for it when the publish will not (LEAD-1).
+    pub picks: [Option<u32>; 2],
     /// Place targets (Break the Targets): the menu closes into the placing view.
     pub place_targets: bool,
 }
@@ -1829,6 +1832,11 @@ impl Menu {
     /// The roster grid's press since the last call, if any.
     pub fn take_roster_press(&mut self) -> Option<(u16, Button)> {
         self.outbox.roster_press.take()
+    }
+
+    /// The roster editor: an A on a Player (`cpu` false) or CPU Character tile asked for `kind` (`Outbox::picks`).
+    pub fn note_pick(&mut self, cpu: bool, kind: u32) {
+        self.outbox.picks[usize::from(cpu)] = Some(kind);
     }
 
     /// The portrait roster grid (one page, the same in both console modes).

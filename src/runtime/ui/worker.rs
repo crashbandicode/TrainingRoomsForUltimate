@@ -1219,7 +1219,21 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     };
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(7);
+    // LEAD-1: each role's stored pick in the view this publish replaces, read before it goes live.
+    let stored_picks = crate::runtime::compat::menu::view_before_publish()
+        .map(|view| [view.player_character.kind(), view.cpu_character.kind()]);
     published::publish(&settings.menu, outbox.rerolls);
+    // A pick the publish does not dispatch (it leaves that role's stored pick as it was) is still one load the player
+    // asked for: hand it to the game frame the way a combo's Switch does (`roster_requests`, lock-free).
+    for (role, kind) in outbox.picks.iter().enumerate().filter_map(|(role, kind)| kind.map(|kind| (role, kind))) {
+        if crate::engine::swap::cycle_members::undispatched_pick(kind, stored_picks.map(|picks| picks[role])) {
+            if role == 0 {
+                crate::runtime::roster::roster_requests::request_player_kind(kind);
+            } else {
+                crate::runtime::roster::roster_requests::request_cpu_kind(kind);
+            }
+        }
+    }
     // rc.14: every close with Eggs-ercise on starts a fresh run.
     crate::runtime::features::hitbox::eggs_start();
     // rc.14 Break the Targets: Place targets asks for the placing view; every close tells the mode (after the publish above).
