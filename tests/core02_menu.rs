@@ -1010,8 +1010,9 @@ fn filtered_menu_counts_cycles_and_renders() {
     use model::frame::{Frame, Text, write_value};
     let cases = [
         (0, 99, 0, "Mario · Grab"),
-        (1, 13, 99, "Banjo & Kazooie · Down throw"),
-        (2, 8, 111, "Hero · Command18"),
+        // Final Smash rows 106 (Bury) and 115 (Frozen) are MoveAvailability::Hidden.
+        (1, 12, 99, "Banjo & Kazooie · Down throw"),
+        (2, 7, 111, "Hero · Command18"),
         (3, 2, 118, "Yoshi · Egg Lay"),
         (4, 4, 119, "Kirby · Inhale"),
         (5, 1, 89, "Random"),
