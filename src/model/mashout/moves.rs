@@ -47,8 +47,10 @@ pub const fn availability(id: u16) -> MoveAvailability {
     }
 }
 
+/// Available AND startable now: `entry::start` is a pure plan-table match (no native call,
+/// no allocation), so a row becomes selectable by itself once its plan gains a start.
 pub fn selectable(s: Scenario) -> bool {
-    availability(s.id) == MoveAvailability::Available
+    availability(s.id) == MoveAvailability::Available && super::entry::start(s).is_some()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -328,13 +330,36 @@ mod tests {
                 let parsed = settings::parse(&serde_json::json!({"menu":{"mashout_attacker":row}}).to_string());
                 assert_eq!(Config::from_snapshot(&parsed.settings.menu), None);
             }
-            // Random pool sizes: Bury 12-1, Frozen 7-1, Random state 121-2; never a hidden row.
-            for (state, size) in [(1usize, 11usize), (2, 6), (5, 119)] {
+            // Random pools equal exactly the selectable (Available and startable) rows; never hidden or unstartable.
+            for state in [1usize, 2, 5] {
+                let pool: std::collections::BTreeSet<_> = CATALOG.iter()
+                    .filter(|s| (state == 5 || s.state == State::ALL[state]) && selectable(**s)).map(|s| s.id).collect();
                 let config = Config { state, attacker: RANDOM_ATTACKER, grab: 0 };
-                let rolled: std::collections::BTreeSet<_> = (0..size as u64 * 4).map(|r| config.resolve(r, 0).unwrap().id).collect();
-                assert_eq!(rolled.len(), size, "state {state}");
+                let rolled: std::collections::BTreeSet<_> = (0..pool.len() as u64 * 4).map(|r| config.resolve(r, 0).unwrap().id).collect();
+                assert_eq!(rolled, pool, "state {state}");
                 assert!(!rolled.contains(&106) && !rolled.contains(&115));
+                assert!(rolled.iter().all(|&id| super::super::entry::start(CATALOG[id as usize]).is_some()));
             }
+        }
+
+        #[test]
+        fn unstartable_rows_are_never_picked_or_rolled() {
+            let unstartable: Vec<_> = CATALOG.iter()
+                .filter(|s| availability(s.id) == MoveAvailability::Available && super::super::entry::start(**s).is_none())
+                .map(|s| s.id).collect();
+            assert!(unstartable.contains(&89), "DK Cargo has no start yet");
+            for id in unstartable {
+                let index = if (id as usize) < RANDOM_ATTACKER { id as usize } else { id as usize + 1 };
+                for state in 0..STATE_LABELS.len() {
+                    assert!(!attacker_valid(state, index), "id {id}");
+                    assert_eq!(Config { state, attacker: index, grab: 0 }.resolve(0, 0), None);
+                }
+                for roll in 0..512 {
+                    assert_ne!(Config { state: RANDOM_STATE, attacker: RANDOM_ATTACKER, grab: 0 }.resolve(roll, 0).unwrap().id, id);
+                }
+            }
+            // Egg has one row; it is startable, so its pool is non-empty. An empty pool resolves None (not panics).
+            assert!(Config { state: 3, attacker: RANDOM_ATTACKER, grab: 0 }.resolve(0, 0).is_some());
         }
 
         #[test]
@@ -345,8 +370,10 @@ mod tests {
             for config in [Config { state: 6, ..Config::default() }, Config { attacker: 122, ..Config::default() }, Config { grab: 4, ..Config::default() }, Config { state: 1, ..Config::default() }] {
                 assert_eq!(config.resolve(0, 0), None);
             }
-            assert!(!uses_grab(Config { attacker: 90, ..Config::default() }));
-            assert_eq!(Config { attacker: 90, grab: 3, ..Config::default() }.resolve(0, 2).unwrap().grab, 0);
+            // The first selectable non-grab Grab-state extra (index = id + 1 after Random at89).
+            let extra = CATALOG.iter().find(|s| s.state == State::Grab && s.plan != Plan::Grab && selectable(**s)).unwrap().id as usize + 1;
+            assert!(!uses_grab(Config { attacker: extra, ..Config::default() }));
+            assert_eq!(Config { attacker: extra, grab: 3, ..Config::default() }.resolve(0, 2).unwrap().grab, 0);
         }
 
         #[test]
