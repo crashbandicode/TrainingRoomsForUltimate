@@ -1,5 +1,12 @@
 use runtime::lobby::training::{self, lobby};
 type Request = GenericRequest;
+/// Who asked for a CPU change (src/model/mii/ordinary_player.rs `Requester`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(dead_code)]
+enum Requester {
+    User,
+    Practice,
+}
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
@@ -340,6 +347,9 @@ mod mii_ordinary_cpu {
                 selection: Selection::Direct(Fighter(kind)),
             })
         }
+        fn owned(self, _: Requester) -> Self {
+            self
+        }
     }
     struct Waiting;
     impl Waiting {
@@ -431,6 +441,7 @@ mod mii_ordinary_cpu {
 
 // NOTICE_BLOCKED
 // QUEUE_ADMITTED
+// QUEUE_OWNED
 // CPU_RELOAD_READY
 // REQUEST_CPU_KIND
 
@@ -471,7 +482,7 @@ fn cold_owner_request_blocks_reload_until_its_native_work_settles() {
     mii_ordinary_cpu::reset(true);
     // Seed through the actual intercept so old facade failure cannot preempt this independent case.
     assert_eq!(
-        mii_ordinary_cpu::intercept(Role::Cpu, Selection::Direct(Fighter(0x54)), true),
+        mii_ordinary_cpu::intercept(Role::Cpu, Selection::Direct(Fighter(0x54)), true, Requester::User),
         Some(true)
     );
     assert!(mii_ordinary_cpu::request_pending());

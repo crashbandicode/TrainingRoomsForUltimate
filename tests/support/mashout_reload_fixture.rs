@@ -68,7 +68,7 @@ mod runtime {
             pub fn cpu_reload_ready() -> bool {
                 crate::READY.load(crate::Ordering::Relaxed)
             }
-            pub fn request_cpu_kind(kind: u32) -> bool {
+            pub fn request_practice_cpu_kind(kind: u32) -> bool {
                 crate::REQUESTED.store(kind, crate::Ordering::Relaxed);
                 crate::REQUEST_COUNT.fetch_add(1, crate::Ordering::Relaxed);
                 crate::ACCEPT.load(crate::Ordering::Relaxed)

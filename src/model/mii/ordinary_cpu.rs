@@ -423,11 +423,16 @@ pub struct Destination {pub target:Target,pub cursor:Option<usize>}
 
 /// Epoch-bound same-class menu intent. CPU original identity remains outside SavedRole.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Request {selection:Option<MenuSelection>,replay:Option<crate::engine::mii::replay::Selection>,receipt_only:bool,direct:Option<(u64,u32)>,refresh_partners:bool}
+pub struct Request {selection:Option<MenuSelection>,replay:Option<crate::engine::mii::replay::Selection>,receipt_only:bool,direct:Option<(u64,u32)>,refresh_partners:bool,
+    owner:crate::engine::mii::ordinary_player::Requester}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct MenuSelection {epoch:u64,active:crate::engine::mii::inventory::Canonical,choice:crate::engine::mii::selection::Choice}
 impl Request {
-    pub const CYCLE:Self=Self {selection:None,replay:None,receipt_only:false,direct:None,refresh_partners:false};
+    pub const CYCLE:Self=Self {selection:None,replay:None,receipt_only:false,direct:None,refresh_partners:false,
+        owner:crate::engine::mii::ordinary_player::Requester::User};
+    /// The same request on behalf of `owner` (a practice game's own temporary fighter, or the user).
+    pub fn owned(self,owner:crate::engine::mii::ordinary_player::Requester)->Self {Self {owner,..self}}
+    pub fn owner(self)->crate::engine::mii::ordinary_player::Requester {self.owner}
     pub const REFRESH_PARTNERS:Self=Self {refresh_partners:true,..Self::CYCLE};
     pub fn refresh_partners(self)->bool {self.refresh_partners}
     pub fn direct(epoch:u64,kind:u32)->Option<Self> {

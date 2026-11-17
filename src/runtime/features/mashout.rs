@@ -937,7 +937,7 @@ pub unsafe fn frame(fighter: usize) {
             if kind != request.attacker_kind {
                 if crate::runtime::roster::character_roster::cpu_reload_ready() {
                     TEMP_KIND.store(request.attacker_kind, Ordering::Release);
-                    if !crate::runtime::roster::character_roster::request_cpu_kind(
+                    if !crate::runtime::roster::character_roster::request_practice_cpu_kind(
                         request.attacker_kind,
                     ) {
                         // restriction: MASH-M1-MISMATCH
@@ -1299,7 +1299,7 @@ pub unsafe fn frame(fighter: usize) {
             } else if !game.restore_requested {
                 TEMP_KIND.store(original, Ordering::Release);
                 game.restore_requested =
-                    crate::runtime::roster::character_roster::request_cpu_kind(original);
+                    crate::runtime::roster::character_roster::request_practice_cpu_kind(original);
             }
         }
     }

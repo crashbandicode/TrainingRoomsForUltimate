@@ -164,13 +164,17 @@ fn actual_cpu_request_handoff_and_reload_readiness() {
         roster,
         "fn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool)",
     );
+    let owned = block(
+        roster,
+        "fn queue_owned(role: Role, selection: Selection, restoring: bool, once: bool, owner: Requester)",
+    );
     let request = block(roster, "pub fn request_cpu_kind(kind: u32)");
     let readiness = block(roster, "pub fn cpu_reload_ready() -> bool");
     let notice = block(roster, "pub(crate) fn notice_blocked() -> bool");
     let preload_pending = block(cpu, "pub(super) fn preload_pending()->bool");
     let intercept = block(
         cpu,
-        "pub(super) fn intercept(role:Role,selection:Selection,user_request:bool)->Option<bool>",
+        "pub(super) fn intercept(role:Role,selection:Selection,user_request:bool,requester:Requester)->Option<bool>",
     );
 
     assert!(player.contains(
@@ -192,6 +196,7 @@ fn actual_cpu_request_handoff_and_reload_readiness() {
     fixture = replace_once(fixture, "// CPU_INTERCEPT", intercept);
     fixture = replace_once(fixture, "// NOTICE_BLOCKED", notice);
     fixture = replace_once(fixture, "// QUEUE_ADMITTED", queue);
+    fixture = replace_once(fixture, "// QUEUE_OWNED", owned);
     fixture = replace_once(fixture, "// CPU_RELOAD_READY", readiness);
     fixture = replace_once(fixture, "// REQUEST_CPU_KIND", request);
     fixture = replace_once(fixture, "// PLAYER_INTERCEPT_STUB", player_stub);

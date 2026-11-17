@@ -275,6 +275,26 @@ pub fn bank_notice(player:bool,publish:bool,original:bool)->&'static str {
     }
 }
 
+/// Who asked for a CPU change. `Practice` is a practice game's own temporary fighter (Mash out's attacker and its
+/// restore of the original CPU), never the user's CPU Character choice.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Requester {
+    #[default]
+    User,
+    Practice,
+}
+
+/// The CPU Character receipt of an applied CPU change: the user's choice is confirmed; a practice game's own load
+/// reports itself and gets none (it would wait behind the practice notice and show over the drill).
+pub fn cpu_receipt(original:bool,publish:bool,owner:Requester)->Option<&'static str> {
+    (owner==Requester::User).then(||bank_notice(false,publish,original))
+}
+
+/// Whether an applied CPU change becomes the persisted CPU Character choice: the same owner rule as the receipt.
+pub fn persists_selection(owner:Requester)->bool {
+    owner==Requester::User
+}
+
 /// Copied values from the ordinary adapter's CURRENT all-owner/G critical section.
 /// This is not pointer or write authority; native glue must supply spans, exact protected
 /// owners, current thread/epoch, INSTALL and the executing ticket before publication.
