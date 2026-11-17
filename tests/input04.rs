@@ -443,3 +443,34 @@ fn the_button_set_reads_the_dpad_and_both_sticks_digital_directions() {
     assert!(Buttons(bit::REAL_DIGITAL_L).real_digital_l() && !Buttons(bit::REAL_DIGITAL_L).real_digital_r());
     assert!(!Buttons(0).l_left());
 }
+
+/// b669 loop3: the consumed wizard Start reached native Training pause on a later poll.
+#[test]
+fn wizard_plus_held_across_handoff_is_owned_until_release() {
+    let set = ChordSet::factory();
+    for style in [0, 3, 5, STYLE_GAMECUBE] {
+        let plus = physical_mask(style, 1 << logical::PLUS);
+        let mut detector = Detector::new();
+        let pressed = Sample::of(style, plus, plus);
+        detector.poll_owned(&set, pressed, false, true);
+        assert_ne!(physical_mask(style, detector.hidden()) & plus, 0, "Start poll");
+        for blocked in [false, true, false] {
+            detector.poll_owned(&set, Sample::of(style, plus, 0), blocked, false);
+            assert_ne!(physical_mask(style, detector.hidden()) & plus, 0, "held after wizard exits");
+        }
+        detector.poll_owned(&set, Sample::of(style, 0, 0), false, false);
+        assert_ne!(physical_mask(style, detector.hidden()) & plus, 0, "release edge belongs to wizard");
+        detector.poll_owned(&set, pressed, false, false);
+        assert_eq!(physical_mask(style, detector.hidden()) & plus, 0, "fresh Plus reaches native");
+    }
+}
+
+#[test]
+fn wizard_ownership_is_bound_before_native_mapping_and_combined_with_placing() {
+    let runtime = include_str!("../src/runtime/features/chords.rs");
+    assert!(runtime.contains("detector.poll_owned(set, sample, block, wizard)"));
+    assert!(runtime.contains("let chord_bits = chord_bits | if hide && wizard"), "placing must preserve retained Plus ownership");
+    let boundary = include_str!("../src/runtime/features/input_delay.rs");
+    assert!(boundary.find("chords::on_poll(controller)").unwrap() < boundary.find("pub unsafe fn caller_a_note").unwrap());
+    assert!(boundary.contains("chords::after_mapping()"));
+}

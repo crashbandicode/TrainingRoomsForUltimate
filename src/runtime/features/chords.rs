@@ -80,7 +80,7 @@ pub unsafe fn on_poll(controller: usize) {
         state.style = style;
         let block = blocked();
         let State { chords: set, detector, .. } = &mut *state;
-        let passed = detector.poll(set, sample, block || wizard);
+        let passed = detector.poll_owned(set, sample, block, wizard);
         // Break the Targets: while Placing the Save and Load chords are the layout's and the other chords stand down.
         let keys = (!block && btt::placing()).then(|| detector.take_placing());
         // rc.8: the game speed hold's event and the input display toggle are acted on once `STATE` is released.
@@ -102,7 +102,7 @@ pub unsafe fn on_poll(controller: usize) {
     // Placing keeps all of P1's controller from the game (the cursor has it); Ready waits for its first input.
     // SAFETY: controller is the live Controller of this poll.
     let hide = !block && unsafe { super::tech::poll(controller, sample) || btt::poll(controller, sample, keys) };
-    let chord_bits = if hide && wizard { u32::MAX } else if hide { !chords::bit::PLUS_MASK } else { chord_bits };
+    let chord_bits = chord_bits | if hide && wizard { u32::MAX } else if hide { !chords::bit::PLUS_MASK } else { 0 };
     // rc.12: a Save or Load press the chords stood down says why (an owner or the speed hold: logged only).
     if let Some((action, why)) = refused {
         crate::runtime::features::notices::save_state_refused(action, why);

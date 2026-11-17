@@ -420,6 +420,15 @@ impl Detector {
         self.swallow = self.hidden & sample.held;
     }
 
+    /// Modal wizard input uses the same per-button ownership as accepted chords.
+    pub fn poll_owned(&mut self, chords: &ChordSet, sample: Sample, blocked: bool, wizard: bool) -> u16 {
+        let passed = self.poll(chords, sample, blocked || wizard);
+        if wizard {
+            self.hold_back(self.hidden | sample.held & (1 << logical::PLUS), sample);
+        }
+        passed
+    }
+
     /// One P1 poll. `blocked` is true while any input owner other than this stage's own is active (the
     /// vanilla pause menu, the plugin menu and its 15-frame grace, a modal panel, the replay editor, the
     /// native waiting-room UI): no request is raised then, and requests already pending stay
