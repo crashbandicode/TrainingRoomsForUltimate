@@ -469,7 +469,7 @@ mod tests {
         if text.contains("input_delay::applies") {
             return Some("input_delay");
         }
-        if text.contains("x8_write") || text.contains("lra_reset::gate(") {
+        if text.contains("x8_write") || (file.ends_with("features/lra_reset.rs") && text.starts_with("native_training: scene::is_training()")) {
             return Some("lra_reset");
         }
         if text.contains("is_fighter") {

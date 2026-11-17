@@ -27,23 +27,120 @@ pub const fn x8_write(lra_reset_on: bool, native_training: bool, fighter_loading
 }
 
 /// The value `x8` holds at the hook when the game is about to reset: the site is
-/// `cmp w8, #0x2; b.ne <no reset>` (`main+0x1378e50`, `w8 = [x8+0x240]`).
+/// `cmp w8, #0x2; b.ne <no reset>` (`main+0x1378e50`, `w8 = [x8+0x240]`). Writing it makes that check reset.
 pub const RESET_REQUESTED: u64 = 2;
 
-/// The header of the notice a refused reset shows (never silent; primary 2026-11-17 09:55Z): the setting's own
-/// menu label. The body is the existing swap-busy text (`mii::ordinary_cpu::SWAP_BUSY_NOTICE`, restriction
-/// `character-swap-busy`: the roster's refusal of a pick during the same load).
-pub const REFUSED_HEADER: &str = "L+R+A Reset";
+/// The deferred reset's notice (operator 2026-11-17 11:40Z: defer, never silent; new text FOR OPERATOR REVIEW).
+pub const DEFERRED_HEADER: &str = "L+R+A Reset";
+pub const DEFERRED_BODY: &str = "Resetting when the fighter finishes loading";
 
-/// One reset check: the register write ([`x8_write`]), whether this check is a reset refused because a
-/// fighter loads, and whether to post the refusal notice now. The notice is posted once per refusal (the
-/// first check of a run of refused requests: a held L+R+A, or a request the game keeps), never when the
-/// setting itself is Off (the player turned the reset off) and never for a check that requests nothing.
-pub const fn gate(x8: u64, lra_reset_on: bool, native_training: bool, fighter_loading: bool, was_refused: bool)
-    -> (Option<u64>, bool, bool) {
-    let write = x8_write(lra_reset_on, native_training, fighter_loading);
-    let refused = x8 == RESET_REQUESTED && native_training && lra_reset_on && fighter_loading;
-    (write, refused, refused && !was_refused)
+/// How long a deferred reset may wait for the load to settle. Eden cold loads (Reload published to applied:
+/// `crash0900-v6/v9/v13`) took 2.5-2.7 s; 10 s leaves the slower console about 3.7x that, and a load that has not
+/// settled by then cancels the reset (no reset, the safe outcome) rather than firing one much later.
+pub const DEFER_TIMEOUT_MS: u64 = 10_000;
+
+/// The roster's suspending install ended with the fighter applied (`character_roster::finish_install` reasons): the
+/// Player track's `Applied`, the roster's own completion, the CPU Mii publication. Any other end (refused, destroyed,
+/// recovered to another member, settled unowned) is an aborted load; an unlisted success also reads as aborted,
+/// which only cancels a deferred reset (fails safe).
+pub fn install_ended_ok(reason: &str) -> bool {
+    matches!(reason, "Applied" | "roster ready" | "departed roster completed" | "CPU Mii group record publication")
+}
+
+/// One deferred reset waiting for the load: when it was asked for, the abort count then, and whether its notice
+/// was accepted by the mailbox.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Pending {
+    pub since_ms: u64,
+    pub aborts: u32,
+    pub notified: bool,
+}
+
+/// Why a deferred reset was dropped without resetting.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cancel {
+    LeftTraining,
+    SettingOff,
+    MenuOpened,
+    SaveStateLoad,
+    LoadAborted,
+    TimedOut,
+}
+
+/// What the reset check sees (atomics only on the hook side; review R1: no native lookup).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Facts {
+    pub x8: u64,
+    pub lra_reset_on: bool,
+    pub native_training: bool,
+    /// `character_roster::busy()`: the suspending INSTALL token.
+    pub loading: bool,
+    pub menu_open: bool,
+    pub save_state_loading: bool,
+    /// Suspending installs ended without the fighter applied, so far.
+    pub install_aborts: u32,
+    pub now_ms: u64,
+}
+
+/// One check's outcome: the register write, whether to post the notice, whether the deferred reset fired, and a
+/// cancel.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Step {
+    pub write: Option<u64>,
+    pub post_notice: bool,
+    pub fired: bool,
+    pub cancelled: Option<Cancel>,
+}
+
+/// CRASH-0900, deferred (operator 2026-11-17 11:40Z). A reset requested while a fighter loads is not run then
+/// (Eden: a reset inside the load parked P1's loader at 13 and the console later faulted); one reset waits and
+/// fires through this same check on the first check after the load settles, exactly once. A second press while one
+/// waits changes nothing. The menu opening (also every Change Stage), a save-state load, leaving Training, the
+/// setting turned Off, an aborted load or [`DEFER_TIMEOUT_MS`] drops it without resetting.
+pub fn defer_step(pending: &mut Option<Pending>, f: Facts) -> Step {
+    let mut step = Step::default();
+    if let Some(p) = *pending {
+        let cancel = if !f.native_training {
+            Some(Cancel::LeftTraining)
+        } else if !f.lra_reset_on {
+            Some(Cancel::SettingOff)
+        } else if f.menu_open {
+            Some(Cancel::MenuOpened)
+        } else if f.save_state_loading {
+            Some(Cancel::SaveStateLoad)
+        } else if f.install_aborts != p.aborts {
+            Some(Cancel::LoadAborted)
+        } else if f.now_ms.saturating_sub(p.since_ms) >= DEFER_TIMEOUT_MS {
+            Some(Cancel::TimedOut)
+        } else {
+            None
+        };
+        if cancel.is_some() {
+            *pending = None;
+            step.cancelled = cancel;
+        }
+    }
+    let requested = f.x8 == RESET_REQUESTED && f.native_training && f.lra_reset_on;
+    match *pending {
+        Some(_) if !f.loading => {
+            *pending = None;
+            step.write = Some(RESET_REQUESTED);
+            step.fired = true;
+        }
+        Some(p) => {
+            if requested {
+                step.write = Some(0);
+            }
+            step.post_notice = !p.notified;
+        }
+        None if requested && f.loading && step.cancelled.is_none() => {
+            *pending = Some(Pending { since_ms: f.now_ms, aborts: f.install_aborts, notified: false });
+            step.write = Some(0);
+            step.post_notice = true;
+        }
+        None => step.write = x8_write(f.lra_reset_on, f.native_training, f.loading && requested),
+    }
+    step
 }
 
 /// Whether the fighter on-init wrapper runs the hub after the game's own on-init (SPEC-state-06

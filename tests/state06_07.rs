@@ -49,6 +49,78 @@ fn crash0900_no_native_reset_while_a_practice_fighter_loads() {
     assert_eq!(lra_reset::x8_write(true, false, true), None);
 }
 
+fn facts(x8: u64, loading: bool, now_ms: u64) -> lra_reset::Facts {
+    lra_reset::Facts { x8, lra_reset_on: true, native_training: true, loading, now_ms, ..Default::default() }
+}
+
+#[test]
+fn crash0900_a_reset_pressed_mid_load_fires_once_after_the_load_settles() {
+    use lra_reset::{defer_step, RESET_REQUESTED};
+    let mut pending = None;
+    // The press mid-load: no reset now (x8 cleared), one reset waits, its notice is asked for.
+    let step = defer_step(&mut pending, facts(RESET_REQUESTED, true, 1_000));
+    assert_eq!((step.write, step.post_notice, step.fired), (Some(0), true, false));
+    assert!(pending.is_some());
+    pending.as_mut().unwrap().notified = true;
+    // Still loading, nothing asked: nothing happens and the notice is not asked for again.
+    let step = defer_step(&mut pending, facts(0, true, 1_500));
+    assert_eq!((step.write, step.post_notice, step.fired), (None, false, false));
+    // A second press while one waits changes nothing (still one reset).
+    let step = defer_step(&mut pending, facts(RESET_REQUESTED, true, 2_000));
+    assert_eq!((step.write, step.post_notice, step.fired), (Some(0), false, false));
+    // The first check after the load settles makes the game's own check reset, exactly once.
+    let step = defer_step(&mut pending, facts(0, false, 3_000));
+    assert_eq!((step.write, step.fired), (Some(RESET_REQUESTED), true));
+    assert!(pending.is_none());
+    let step = defer_step(&mut pending, facts(0, false, 3_016));
+    assert_eq!((step.write, step.fired), (None, false));
+    // A notice the mailbox dropped is asked for again on the next check.
+    let mut pending = None;
+    defer_step(&mut pending, facts(RESET_REQUESTED, true, 0));
+    assert!(defer_step(&mut pending, facts(0, true, 16)).post_notice);
+    // No load: a press resets at once, as before; L+R+A Reset Off stays silent.
+    let mut none = None;
+    assert_eq!(defer_step(&mut none, facts(RESET_REQUESTED, false, 0)), lra_reset::Step::default());
+    let off = lra_reset::Facts { lra_reset_on: false, ..facts(RESET_REQUESTED, true, 0) };
+    let step = defer_step(&mut none, off);
+    assert_eq!((step.write, step.post_notice, none), (Some(0), false, None));
+}
+
+#[test]
+fn crash0900_each_cancel_drops_the_reset_without_resetting() {
+    use lra_reset::{defer_step, Cancel, Facts, RESET_REQUESTED, DEFER_TIMEOUT_MS};
+    let base = facts(0, true, 1_000);
+    let cases: [(Facts, Cancel); 6] = [
+        (Facts { native_training: false, ..base }, Cancel::LeftTraining),
+        (Facts { lra_reset_on: false, ..base }, Cancel::SettingOff),
+        (Facts { menu_open: true, ..base }, Cancel::MenuOpened),
+        (Facts { save_state_loading: true, ..base }, Cancel::SaveStateLoad),
+        (Facts { install_aborts: 1, ..base }, Cancel::LoadAborted),
+        (Facts { now_ms: DEFER_TIMEOUT_MS, ..base }, Cancel::TimedOut),
+    ];
+    for (f, cause) in cases {
+        let mut pending = None;
+        defer_step(&mut pending, facts(RESET_REQUESTED, true, 0));
+        let step = defer_step(&mut pending, f);
+        assert_eq!((step.cancelled, step.fired, pending), (Some(cause), false, None), "{cause:?}");
+        assert_ne!(step.write, Some(RESET_REQUESTED), "{cause:?}");
+        // The load settling afterwards resets nothing.
+        assert!(!defer_step(&mut pending, facts(0, false, 20_000)).fired, "{cause:?}");
+    }
+    // Just inside the bound it still waits, and fires on settle.
+    let mut pending = None;
+    defer_step(&mut pending, facts(RESET_REQUESTED, true, 0));
+    assert_eq!(defer_step(&mut pending, facts(0, true, DEFER_TIMEOUT_MS - 1)).cancelled, None);
+    assert!(defer_step(&mut pending, facts(0, false, DEFER_TIMEOUT_MS - 1)).fired);
+    // The success reasons the roster releases INSTALL with; anything else is an aborted load.
+    for ok in ["Applied", "roster ready", "departed roster completed", "CPU Mii group record publication"] {
+        assert!(lra_reset::install_ended_ok(ok), "{ok}");
+    }
+    for aborted in ["Destroyed", "RecoveredKnownMember", "NativeSettledUnowned", "roster destroyed", "preflight refused"] {
+        assert!(!lra_reset::install_ended_ok(aborted), "{aborted}");
+    }
+}
+
 #[test]
 fn crash0900_r1_the_reset_gate_calls_no_native_entry_lookup() {
     // Review R1: the gate's loading signal is the roster's INSTALL token (an atomic), so the reset hook reaches no
@@ -60,56 +132,30 @@ fn crash0900_r1_the_reset_gate_calls_no_native_entry_lookup() {
     for native in ["native_source", "get_fighter_entry", "fighter_entry(", "FighterManager", "natives::", "native_fields"] {
         assert!(!hook.contains(native), "the reset hook must not reach `{native}`");
     }
-    assert!(hook.contains("let loading = crate::runtime::roster::character_roster::busy();"));
+    assert!(hook.contains("loading: crate::runtime::roster::character_roster::busy(),"));
     let busy = std::fs::read_to_string(format!("{root}/src/runtime/roster/character_roster.rs")).unwrap();
     assert!(busy.contains("pub fn busy() -> bool {\n    INSTALL.suspends_practice()\n}"), "busy() is the install token alone");
 }
 
 #[test]
-fn crash0900_r2_the_refusal_is_drawn_with_combo_display_off() {
-    use lra_reset::{gate, RESET_REQUESTED};
+fn crash0900_r2_the_notice_is_drawn_with_combo_display_off() {
+    use lra_reset::{defer_step, RESET_REQUESTED};
     use model::notify::{Body, Queue, DEFAULT_COLOR};
-    const BUSY: &str = "Wait for the character swap to finish";
-    // The runtime's path: the gate asks for the notice, which is posted required; the HUD tick runs with the game's
-    // Combo Display Off (`tick(false, ..)`), which clears every other notice.
+    // The runtime's path: the press mid-load asks for the notice, which is posted required; the HUD tick runs with
+    // the game's Combo Display Off (`tick(false, ..)`), which clears every other notice.
     let mut queue = Queue::new();
     queue.post_static("Other", "a plain notice", 60, DEFAULT_COLOR);
-    let (_, refused, notice) = gate(RESET_REQUESTED, true, true, true, false);
-    assert!(refused && notice);
-    queue.post_required(lra_reset::REFUSED_HEADER, Body::copied(BUSY), 120, DEFAULT_COLOR);
+    let mut pending = None;
+    assert!(defer_step(&mut pending, facts(RESET_REQUESTED, true, 0)).post_notice);
+    queue.post_required(lra_reset::DEFERRED_HEADER, Body::copied(lra_reset::DEFERRED_BODY), 120, DEFAULT_COLOR);
     let out = queue.tick(false, false);
     assert!(out.visible);
-    let draw = out.draw.expect("the refusal is drawn");
-    assert_eq!((draw.header, draw.body.as_str()), (lra_reset::REFUSED_HEADER, BUSY));
+    let draw = out.draw.expect("the notice is drawn");
+    assert_eq!((draw.header, draw.body.as_str()), ("L+R+A Reset", "Resetting when the fighter finishes loading"));
     // Other notices keep their rule: Combo Display Off clears a plain one.
     let mut plain = Queue::new();
     plain.post_static("Other", "a plain notice", 60, DEFAULT_COLOR);
     assert!(!plain.tick(false, false).visible);
-    // L+R+A Reset Off stays silent: no notice is asked for, so nothing is posted or drawn.
-    let (write, refused, notice) = gate(RESET_REQUESTED, false, true, true, false);
-    assert_eq!((write, refused, notice), (Some(0), false, false));
-    assert!(!Queue::new().tick(false, false).visible);
-}
-
-#[test]
-fn crash0900_a_refused_reset_is_never_silent() {
-    use lra_reset::{gate, RESET_REQUESTED};
-    // The player's L+R+A mid-load: refused, and the notice is posted once (header the setting's label; body the
-    // existing swap-busy text, `SWAP_BUSY_NOTICE`, pinned by its own test in `model/mii/ordinary_cpu.rs`).
-    assert_eq!(gate(RESET_REQUESTED, true, true, true, false), (Some(0), true, true));
-    assert_eq!(lra_reset::REFUSED_HEADER, "L+R+A Reset");
-    // Held (or kept by the game): still refused, no second notice.
-    assert_eq!(gate(RESET_REQUESTED, true, true, true, true), (Some(0), true, false));
-    // A check that requests nothing mid-load: the register is cleared (harmless), nothing is shown.
-    assert_eq!(gate(0, true, true, true, false), (Some(0), false, false));
-    // The load settled: the request resets as before, and the next refusal notifies again.
-    assert_eq!(gate(RESET_REQUESTED, true, true, false, true), (None, false, false));
-    assert!(gate(RESET_REQUESTED, true, true, true, false).2);
-    // The setting Off is the player's own choice: refused as before, no notice.
-    assert_eq!(gate(RESET_REQUESTED, false, true, true, false), (Some(0), false, false));
-    assert_eq!(gate(RESET_REQUESTED, false, true, false, false), (Some(0), false, false));
-    // Outside native Training: untouched, nothing shown.
-    assert_eq!(gate(RESET_REQUESTED, true, false, true, false), (None, false, false));
 }
 
 #[test]

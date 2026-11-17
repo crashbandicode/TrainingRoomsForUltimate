@@ -439,8 +439,18 @@ pub fn waiting_drafts_ready() -> bool {
         .restoration_pending([Role::Player.enabled(), Role::Cpu.enabled()])
 }
 
+/// Suspending installs that ended without the fighter applied (CRASH-0900: a deferred L+R+A reset is cancelled
+/// when this moves; `lra_reset::install_ended_ok`).
+static INSTALL_ABORTS: AtomicU32 = AtomicU32::new(0);
+pub(crate) fn install_aborts() -> u32 {
+    INSTALL_ABORTS.load(Ordering::Acquire)
+}
 fn finish_install(token: InstallToken, reason: &str) -> bool {
+    let suspending = INSTALL.owns(token) && INSTALL.suspends_practice();
     let finished = INSTALL.finish(token);
+    if finished && suspending && !crate::model::lra_reset::install_ended_ok(reason) {
+        INSTALL_ABORTS.fetch_add(1, Ordering::AcqRel);
+    }
     if reason == "managed source destroyed" {
         trace!(
             "[NativeInstall] managed destructor token={:?} finished={} gate_active_after={}",
