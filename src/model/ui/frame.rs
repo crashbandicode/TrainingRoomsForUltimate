@@ -396,8 +396,9 @@ impl Frame {
         if !self.dialog && !self.popup {
             return None;
         }
-        // The menu fonts render up to ~6 % wider than the notice-calibrated estimate (Eden, notice-compact-72451433-yoga-1).
-        let width = |text: &[u16], font: (f32, f32)| 1.1 * measure(text.iter().copied(), font.0).0;
+        // The menu fonts render wider than the notice-calibrated estimate: ~6 % for prose, ~14 % for a 48-W crumb (Eden,
+        // notice-compact-72451433 and -9f90e741), so a dialog measures its text with a 1.2 margin.
+        let width = |text: &[u16], font: (f32, f32)| 1.2 * measure(text.iter().copied(), font.0).0;
         let (mut right, mut bottom) = if self.view == View::Tiles {
             let (cols, rows) = (usize::from(self.tile_cols.max(1)), usize::from(self.tile_rows.max(1)));
             // A panel's page carries all its cells; the empty ones draw nothing, so the box ends at the last label.
