@@ -112,7 +112,7 @@ pub unsafe fn on_poll(controller: usize) {
     if display {
         crate::runtime::ui::worker::request_input_display_toggle();
     }
-    if chords::clear_plus_bits(modal || wizard || chord_bits & chords::bit::PLUS_MASK != 0, accepted) {
+    if chords::clear_plus_bits(modal, accepted) || chord_bits & chords::bit::PLUS_MASK != 0 {
         for offset in FIELDS {
             let at = (controller + offset) as *mut u32;
             at.write_volatile(at.read_volatile() & !chords::bit::PLUS_MASK);

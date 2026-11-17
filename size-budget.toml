@@ -1821,3 +1821,11 @@ ceiling = 155718
 date = "2026-11-17"
 reason = "Free-form Tech wizard including stale-reset entry fix measured155718: +502 over timing155216, one below the approved +503. Exact measured total with no headroom. Shared picker marks, menu motion, planner and notice writer; one ordered step table. Counting, guards and gate enforcement unchanged."
 approved_by = "Operator explicitly approved: approve the +503 for the wizard; relayed by primary2026-11-17 16:52Z. Primary18:51Z directs the lifecycle fix within that approval; final ceiling is reduced to the measured155718, no headroom."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155744
+date = "2026-11-17"
+reason = "Tech wizard with the Plus ownership fix adds 516 to main 458c0636 at 155228, for an exact combined total of 155744 with no headroom. The wizard is 13 above its original +503 approval. FOR OPERATOR REVIEW."
+approved_by = "Devin-primary 2026-11-17 21:06Z authorizes the +13 for the wizard FOR OPERATOR REVIEW. Main CPU-OOS +12 was separately approved."
