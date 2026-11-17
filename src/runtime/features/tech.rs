@@ -277,9 +277,8 @@ fn wizard_poll(view: &mut ViewState, sample: Sample, stick: [f32; 2], range: [f3
     }
 }
 
-/// The shared notice writer owns compact measurement, wrapping and placement.
-/// Keeping the wizard at this one adapter lets notice-compact replace that
-/// renderer without a second layout or new panes in the game hook.
+/// The wizard uses the shared notice writer and compact HUD. Measurement,
+/// wrapping and placement belong to the common renderer and existing panes.
 fn wizard_notice(run: &Practice, wizard: &Wizard, blocked: Option<bool>) {
     use core::fmt::Write;
     let mut text = FixedPath::<256>::new();

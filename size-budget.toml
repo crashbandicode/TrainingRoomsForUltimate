@@ -1825,7 +1825,7 @@ approved_by = "Operator explicitly approved: approve the +503 for the wizard; re
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 155744
+ceiling = 155908
 date = "2026-11-17"
-reason = "Tech wizard with the Plus ownership fix adds 516 to main 458c0636 at 155228, for an exact combined total of 155744 with no headroom. The wizard is 13 above its original +503 approval. FOR OPERATOR REVIEW."
-approved_by = "Devin-primary 2026-11-17 21:06Z authorizes the +13 for the wizard FOR OPERATOR REVIEW. Main CPU-OOS +12 was separately approved."
+reason = "Free-form Tech wizard, stale-reset and Plus-ownership fixes rebased onto reviewed compact notices and lobby strip (b22480f2, 155392). Exact measured total 155908, wizard +516. No headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "Operator 16:52Z approved wizard +503. Devin-primary 21:06Z approved the additional +13 FOR OPERATOR REVIEW. The separately approved notice and lobby strip budgets are included in main's 155392."
