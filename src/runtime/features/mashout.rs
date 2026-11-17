@@ -415,11 +415,15 @@ unsafe fn judge_choice(cpu: usize, saw_unfixed: &mut bool) -> Result<Option<bool
     if !game::granted(crate::model::sites_pkg2::WORK_GET_INT_OFFSET)
         || !game::granted(crate::model::sites_pkg2::WORK_IS_FLAG_OFFSET)
     {
-        return Err("native Judge readers unavailable");
+        // restriction: M3-READER-GUARD
+        return Err("Mash out unavailable");
     }
     let Some(((special, fixed), kind)) = state_id(C::StatusSpecialS)
         .zip(state_id(C::JudgeFixed)).zip(state_id(C::JudgeKind))
-    else { return Err("native Judge constants unavailable"); };
+    else {
+        // restriction: M3-READER-GUARD
+        return Err("Mash out unavailable");
+    };
     if natives::status_kind(cpu) != special { return Ok(None); }
     let fixed = natives::is_flag(cpu, fixed);
     *saw_unfixed |= !fixed;
