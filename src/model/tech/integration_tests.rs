@@ -640,6 +640,27 @@ fn native_reference_hitlag_uses_its_own_base_damage() {
 }
 
 #[test]
+fn pre_hit_twenty_plus_visible_hit_displays_thirty_six_point_three_eight() {
+    use crate::model::tech_settings::{Mode, Numeric};
+    let speed = Numeric { mode: Mode::Set, lo: 100., hi: 100. };
+    let launch = percent_fixture(20., 16.38, 1.2, speed, 0).setup.launch;
+    assert_eq!(launch.hit_damage.to_bits(), 0x415a6665);
+    assert_eq!(launch.percent.to_bits(), 0x4211851e);
+    assert_eq!(format!("{:.2}", launch.percent), "36.38");
+    // Generic product AttackData is 1.0. Do not fit it to Marth reference hitlag.
+    assert_eq!(crate::model::tech_hitlag::frames(
+        launch.hit_damage, 1., hitlag_parameters(1., 1.2)), Some(14));
+
+    // R1 uses its OWN captured base and AttackData, never inverse(visible p).
+    let reference_d = f32::from_bits(0x415a6666);
+    let reference_post = 20.0f32 + reference_d * 1.2f32;
+    assert_eq!(reference_post.to_bits(), 0x4211851f);
+    assert_eq!(format!("{reference_post:.2}"), "36.38");
+    assert_eq!(crate::model::tech_hitlag::frames(
+        reference_d, 0.7, hitlag_parameters(1., 1.2)), Some(10));
+}
+
+#[test]
 fn integer_visible_ui_grid_preimages_keep_the_native_hitlag_floor() {
     use crate::model::tech_hitlag::frames;
     // Current visible slider emits integers only. This is a bounded domain

@@ -483,7 +483,7 @@ pub static ROWS: [Row; 128] = [
     r(TECH, "Launch speed range", "tech_speed_range", Control::Slider,
       "Knockback 80 to 250; the speed label is in units per frame.\nThe native launch core converts knockback to speed."),
     r(TECH, "Hit damage", "tech_hit_damage", Control::Dropdown(&o::TECH_MODE),
-      "Percent the hit adds to your damage.\nChanges the pause before you launch."),
+      "The percent the hit adds;\nit also sets how long the freeze lasts."),
     r(TECH, "Hit damage range", "tech_hit_damage_range", Control::Slider,
       "Added percent from 1 to 30, default 12.\nSet uses the low handle; Random uses both."),
     r(TECH, "Angle", "tech_angle", Control::Dropdown(&o::TECH_AUTO_MODE),

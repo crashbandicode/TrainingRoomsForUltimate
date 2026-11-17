@@ -69,8 +69,8 @@ fn tech_ranges_use_public_units_and_native_kb() {
 #[test]
 fn tech_hit_damage_help_uses_visible_added_percent() {
     let help = ROWS[row("tech_hit_damage")].help;
-    assert!(help.contains("Percent the hit adds to your damage."));
-    assert!(help.contains("pause before you launch"));
+    assert_eq!(help, "The percent the hit adds;\nit also sets how long the freeze lasts.");
+    assert!(ROWS[row("tech_damage")].help.starts_with("Your percent before the hit."));
     let range = ROWS[row("tech_hit_damage_range")].help;
     assert!(range.contains("Added percent from 1 to 30, default 12."));
     assert!(range.contains("Set uses the low handle; Random uses both."));
