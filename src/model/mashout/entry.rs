@@ -98,12 +98,15 @@ pub struct TrailMagicEntry {
     phase: TrailMagicPhase,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TrailMagicError { Unavailable }
+
 impl TrailMagicEntry {
-    pub fn new(kind: TrailMagicKind) -> Result<Self, ()> {
+    pub fn new(kind: TrailMagicKind) -> Result<Self, TrailMagicError> {
         let phase = match kind {
             TrailMagicKind::Fire => TrailMagicPhase::Fire(TrailFirePhase::Start),
             TrailMagicKind::Thunder => TrailMagicPhase::Thunder { saw_n3: false },
-            TrailMagicKind::Blizzard => return Err(()),
+            TrailMagicKind::Blizzard => return Err(TrailMagicError::Unavailable),
         };
         Ok(Self { phase })
     }
@@ -116,9 +119,9 @@ impl TrailMagicEntry {
         self.phase == TrailMagicPhase::Prepared
     }
 
-    pub fn begin_thunder(&mut self, kind: TrailMagicKind) -> Result<(), ()> {
+    pub fn begin_thunder(&mut self, kind: TrailMagicKind) -> Result<(), TrailMagicError> {
         if self.phase != TrailMagicPhase::AwaitThunder || kind != TrailMagicKind::Thunder {
-            return Err(());
+            return Err(TrailMagicError::Unavailable);
         }
         self.phase = TrailMagicPhase::Thunder { saw_n3: false };
         Ok(())
@@ -129,11 +132,11 @@ impl TrailMagicEntry {
         status: TrailMagicStatus,
         kind: TrailMagicKind,
         released: bool,
-    ) -> Result<TrailMagicProgress, ()> {
+    ) -> Result<TrailMagicProgress, TrailMagicError> {
         let progress = match self.phase {
             TrailMagicPhase::Fire(phase) => {
                 if !matches!(kind, TrailMagicKind::Fire | TrailMagicKind::Thunder) {
-                    return Err(());
+                    return Err(TrailMagicError::Unavailable);
                 }
                 match (phase, status) {
                     (TrailFirePhase::Start, TrailMagicStatus::SpecialN) => {
@@ -165,12 +168,12 @@ impl TrailMagicEntry {
                         TrailMagicKind::Thunder => TrailMagicProgress::Pending,
                         TrailMagicKind::Blizzard => unreachable!(),
                     },
-                    _ => return Err(()),
+                    _ => return Err(TrailMagicError::Unavailable),
                 }
             }
             TrailMagicPhase::Thunder { saw_n3 } => {
                 if !matches!(kind, TrailMagicKind::Thunder | TrailMagicKind::Blizzard) {
-                    return Err(());
+                    return Err(TrailMagicError::Unavailable);
                 }
                 match (saw_n3, status) {
                     (false, TrailMagicStatus::SpecialN) => TrailMagicProgress::Pending,
@@ -187,10 +190,10 @@ impl TrailMagicEntry {
                         TrailMagicProgress::Prepared
                     }
                     (true, TrailMagicStatus::Wait) => TrailMagicProgress::Pending,
-                    _ => return Err(()),
+                    _ => return Err(TrailMagicError::Unavailable),
                 }
             }
-            TrailMagicPhase::AwaitThunder | TrailMagicPhase::Prepared => return Err(()),
+            TrailMagicPhase::AwaitThunder | TrailMagicPhase::Prepared => return Err(TrailMagicError::Unavailable),
         };
         Ok(progress)
     }

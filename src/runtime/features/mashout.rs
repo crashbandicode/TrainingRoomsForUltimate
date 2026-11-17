@@ -1148,7 +1148,7 @@ pub unsafe fn frame(fighter: usize) {
                             game.trail_magic = Some(actor);
                             preparing = true;
                         }
-                        Err(()) => {
+                        Err(entry::TrailMagicError::Unavailable) => {
                             game.fail(UNAVAILABLE_NOTICE);
                             return;
                         }
@@ -1268,7 +1268,7 @@ pub unsafe fn frame(fighter: usize) {
                             game.step(Step::Place, "Mash out · Setting up move");
                             return;
                         }
-                        Err(()) => {
+                        Err(entry::TrailMagicError::Unavailable) => {
                             game.fail(UNAVAILABLE_NOTICE);
                             return;
                         }
