@@ -351,8 +351,8 @@ pub(super) fn request_restore(value:WaitingValue)->bool {
     s.restore=Some(value);s.request=Some(Request::CYCLE);
     true
 }
-/// None leaves routing to the roster; Some reports a consumed request's acceptance.
-pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<bool> {
+/// LEAD-1 review R3c: `Some` is what became of the request (each refusal shows its notice here), `None` leaves it to the next owner.
+pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<crate::engine::swap::cycle_members::Admission> {
     if role!=Role::Player || !ENABLED.load(Ordering::Acquire) {return None;}
     let mut s=STATE.lock();
     let Some(owner)=s.owner.as_ref() else {
@@ -362,7 +362,7 @@ pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,rea
         if unsafe {super::mii_auto_init::origin_capture_pending(Role::Player,false,s.capture)} {
             drop(s);
             if user_request {notify(Role::Player,"Wait for the practice character to finish loading".into());}
-            return Some(false);
+            return Some(crate::engine::swap::cycle_members::Admission::Unavailable);
         }
         let automatic=super::mii_auto_init::pending();
         let qualifying=unsafe {mii_backend::ready()} && (automatic || s.capture);
@@ -374,7 +374,7 @@ pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,rea
             if user_request && mii_backend::current().is_some() {
                 notify(Role::Player,"Wait for the practice character to finish loading".into());
             }
-            return Some(false);
+            return Some(crate::engine::swap::cycle_members::Admission::Unavailable);
         }
         return None;
     };
@@ -397,7 +397,7 @@ pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,rea
     // The roster reconciles partner count every frame. Coalesce that automatic
     // request while an owned operation is pending; do not sync a refusal to SD.
     if matches!(selection,Selection::RefreshPartners) && (s.request.is_some() || s.busy()) {
-        return Some(false);
+        return Some(crate::engine::swap::cycle_members::Admission::Superseded);
     }
     let request=match selection {
         Selection::Cycle=>Some(Request::CYCLE),
@@ -407,16 +407,16 @@ pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,rea
     let manual_direct=user_request && matches!(selection,Selection::Direct(_));
     // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.
     let replace_restore=manual_direct && s.restore.is_some();
-    let accepted=!s.busy() && (s.request.is_none() || replace_restore) && request.is_some();
-    if accepted {
+    if !s.busy() && (s.request.is_none() || replace_restore) && request.is_some() {
         s.restore=None;
         if user_request {WAITING_MEMORY.lock().manual_request(Role::Player as usize);}
         s.request=request;
+        Some(crate::engine::swap::cycle_members::Admission::Accepted)
     } else {
         drop(s);note("request refused: owned Player request busy or unsupported");
         if manual_direct {notify(Role::Player,"Finish the current practice action first".into());}
+        Some(crate::engine::swap::cycle_members::Admission::Busy)
     }
-    Some(accepted)
 }
 
 unsafe fn permitted()->bool {permitted_but_install() && !INSTALL.active()}

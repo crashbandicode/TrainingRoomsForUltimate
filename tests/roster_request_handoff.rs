@@ -172,41 +172,51 @@ fn actual_cpu_request_handoff_and_reload_readiness() {
     let request_with = block(roster, "fn request_cpu_kind_with(kind: u32,");
     let readiness = block(roster, "pub fn cpu_reload_ready() -> bool");
     let readiness_with = block(roster, "fn cpu_reload_ready_with(read_scope:");
-    let notice = block(roster, "pub(crate) fn notice_blocked() -> bool");
+    let notice_blocked = block(roster, "pub(crate) fn notice_blocked() -> bool");
     let notice_with = block(roster, "fn notice_blocked_with(backend_ready:");
     let preload_pending = block(cpu, "pub(super) fn preload_pending()->bool");
     let intercept = block(cpu,
-        "pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<bool>");
+        "pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<crate::engine::swap::cycle_members::Admission>");
 
     assert!(player.contains(
-        "pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<bool>"
+        "pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<crate::engine::swap::cycle_members::Admission>"
     ));
-    let player_stub = "pub fn intercept_with(_: Role, _: Selection, _: bool, _: impl Fn() -> super::TrainingModpackMenu) -> Option<bool> { None }";
+    let player_stub = "pub fn intercept_with(_: Role, _: Selection, _: bool, _: impl Fn() -> super::TrainingModpackMenu) -> Option<super::Admission> { None }";
     assert!(saved_alpha.contains(
         "pub(super) fn intercept_with(roster_role: Role, selection: Selection, read_menu: impl Fn() -> TrainingModpackMenu) -> Option<bool>"
     ));
-    let saved_stub = "pub fn intercept_with(_: Role, _: Selection, _: impl Fn() -> super::TrainingModpackMenu) -> Option<bool> { None }";
+    let saved_stub = "pub fn intercept_with(_: Role, _: Selection, _: impl Fn() -> super::TrainingModpackMenu) -> Option<bool> { *super::SAVED_RESULT.lock() }";
 
     let mut fixture = FIXTURE.to_owned();
     // RESHIP-3: the card moved admission and its notice into one pure owner.
     // Execute that production dependency along with the extracted runtime caller.
     let ordinary_cpu = include_str!("../src/model/mii/ordinary_cpu.rs");
     let admission = block(ordinary_cpu, "pub fn cpu_intercept_admission(");
-    let notice = ordinary_cpu.lines()
+    let busy_notice = ordinary_cpu.lines()
         .find(|line| line.starts_with("pub const SWAP_BUSY_NOTICE:"))
         .expect("the production admission notice");
     fixture = replace_once(fixture, "pub mod mii {", &format!(
-        "pub mod mii {{ pub mod ordinary_cpu {{ {notice}\n{admission} }}"
+        "pub mod mii {{ pub mod ordinary_cpu {{ {busy_notice}\n{admission} }}"
+    ));
+    let cycle_members = include_str!("../src/model/swap/cycle_members.rs");
+    let admission_type = block(cycle_members, "pub enum Admission {");
+    let over_pending = block(cycle_members, "pub const fn over_pending(");
+    let admitted = block(cycle_members, "pub fn admitted(");
+    let loading_notice = cycle_members.lines()
+        .find(|line| line.starts_with("pub const FIGHTER_STILL_LOADING:"))
+        .expect("the production pending-request notice");
+    fixture = replace_once(fixture, "// ADMISSION_MODEL", &format!(
+        "#[derive(Clone, Copy, Debug, PartialEq, Eq)]\n{admission_type}\n{over_pending}\n{admitted}\n{loading_notice}"
     ));
     fixture = replace_once(fixture, "// CPU_PRELOAD_PENDING", preload_pending);
     // Existing fixture assertions call the wrapper; routing executes the exact
     // closure-based native-owner implementation extracted above.
-    let cpu_intercept = format!("{intercept}\npub fn intercept(role: Role, selection: Selection, user_request: bool) -> Option<bool> {{ intercept_with(role, selection, user_request, || setting(&MENU)) }}");
+    let cpu_intercept = format!("{intercept}\npub fn intercept(role: Role, selection: Selection, user_request: bool) -> Option<Admission> {{ intercept_with(role, selection, user_request, || setting(&MENU)) }}");
     fixture = replace_once(fixture, "// CPU_INTERCEPT", &cpu_intercept);
     fixture = replace_once(
         fixture,
         "// NOTICE_BLOCKED",
-        &format!("{notice}\n{notice_with}"),
+        &format!("{notice_blocked}\n{notice_with}"),
     );
     fixture = replace_once(
         fixture,

@@ -10,7 +10,7 @@ use {crate::engine::compat::menu::OnOff, crate::engine::compat::menu::TrainingMo
 use {crate::runtime::compat::sync::lock_write, crate::runtime::compat::sync::read as setting};
 
 use crate::engine::swap::character_memory::WaitingSession;
-use crate::engine::swap::cycle_members::{admitted, menu_request};
+use crate::engine::swap::cycle_members::{admitted, over_pending, Admission};
 use crate::runtime::compat::common::{
     button_config, game_mode,
     input::{Buttons, MappedInputs},
@@ -170,12 +170,6 @@ enum Role {
 }
 
 impl Role {
-    fn selected(self, m: &TrainingModpackMenu) -> TrioFighter {
-        match self {
-            Self::Player => m.player_character,
-            Self::Cpu => m.cpu_character,
-        }
-    }
     fn enabled(self) -> bool {
         self.enabled_with(|| setting(&MENU))
     }
@@ -585,9 +579,31 @@ fn notify(role: Role, message: std::borrow::Cow<'static, str>) {
 
 /// Called after committing menu values. Editing an unrelated option must not
 /// replace a fighter, and navigating/highlighting a fighter is not a request.
-pub fn settings_changed(previous: &TrainingModpackMenu,
-    manual: Option<(crate::engine::swap::roster_grid::Role, u32)>) {
+/// LEAD-1: this is the roster lists' re-plan only; fighter loads come from the versioned dispatch record ([`menu_dispatch`]).
+pub fn settings_changed(previous: &TrainingModpackMenu) {
     let current = setting(&MENU);
+    roster_settings_changed(previous, &current);
+}
+
+/// LEAD-1 (review R1/R2): the fighter loads one publication caused (a changed selection, Player Swapping turning On, the menu
+/// close's explicit pick), at most one per role per cause (`compat::menu::DISPATCH`). The target is the record's, the committed
+/// pick, never a later game-side writeback of the live menu, so a load completing after the publish cannot erase the pick.
+pub fn menu_dispatch(due: [Option<crate::engine::swap::cycle_members::RoleDispatch>; 2]) {
+    for role in [Role::Player, Role::Cpu] {
+        let Some(cause) = due[role as usize] else { continue };
+        let Some(fighter) = TrioFighter::from_kind(cause.target) else {
+            trace!("[CharacterRoster] menu dispatch role={:?} kind=0x{:x}: not a roster fighter", role, cause.target);
+            continue;
+        };
+        let admission = queue_admitted(role, Selection::Direct(fighter), false, cause.once);
+        trace!("[CharacterRoster] menu dispatch role={:?} kind=0x{:x} once={} cause={} admission={:?}",
+            role, cause.target, cause.once, cause.cause, admission);
+    }
+}
+
+/// The roster-list part of a settings change: the preload grace and each role's numbered cursor (no fighter request).
+fn roster_settings_changed(previous: &TrainingModpackMenu, current: &TrainingModpackMenu) {
+    let current = *current;
     if previous.player_roster != current.player_roster
         || previous.cpu_roster != current.cpu_roster
         || previous.player_kirby_hats != current.player_kirby_hats
@@ -618,20 +634,6 @@ pub fn settings_changed(previous: &TrainingModpackMenu,
                 crate::engine::compat::fixed::DebugIter(roster_fixed(&current, role).iter().map(|f| f.kind()))
             );
         }
-        let player_just_enabled = role == Role::Player
-            && previous.trio_practice != OnOff::ON
-            && current.trio_practice == OnOff::ON;
-        // A portrait press is an action even when its one-hot setting is unchanged
-        // (e.g. retrying a previously refused request). Dispatch it exactly once.
-        let explicit = manual.is_some_and(|(picked_role, kind)|
-            (picked_role == crate::engine::swap::roster_grid::Role::Player) == (role == Role::Player)
-                && kind == role.selected(&current).kind());
-        // A pick is one load the user chose (`once`): it loads whatever Player Swapping says (operator 2026-11-13, TR8).
-        let selected = role.selected(&current);
-        let changed = role.selected(previous) != selected;
-        if let Some(once) = menu_request(explicit, changed, player_just_enabled) {
-            queue_admitted(role, Selection::Direct(selected), false, once);
-        }
     }
 }
 
@@ -645,12 +647,13 @@ fn queue_request(role: Role, selection: Selection, restoring: bool) {
 
 /// `once`: one explicit Direct load outside the cycle; the role's cycle setting
 /// (Player Swapping) does not refuse it and is not changed by it.
-/// True only after the generic loader or an intercept accepted new intent.
-fn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool) -> bool {
+/// The result says what became of the request (LEAD-1 review F4); every outcome a user's request can see that is not
+/// Accepted or Superseded has already shown its notice.
+fn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool) -> Admission {
     queue_admitted_with(role, selection, restoring, once, || setting(&MENU), || scope(role))
 }
 fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: bool,
-    read_menu: impl Fn() -> TrainingModpackMenu, read_scope: impl FnOnce() -> Option<Scope>) -> bool {
+    read_menu: impl Fn() -> TrainingModpackMenu, read_scope: impl FnOnce() -> Option<Scope>) -> Admission {
     // FAIL 2: a user's request leaves one line on every path, including the ones that drop it.
     let refresh = matches!(selection, Selection::RefreshPartners);
     let user = !restoring && !refresh;
@@ -658,18 +661,20 @@ fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: 
         if user {
             trace!("[CharacterRoster] request ignored role={:?} selection={:?}: this role's roster cycle is off", role, selection);
         }
-        return false;
+        return Admission::Unavailable;
     }
     if BASE.load(Ordering::Acquire) == 0 || !crate::runtime::roster::character_lifecycle::native_hooks_ready() {
         trace!("[CharacterRoster] request ignored role={:?} selection={:?}: native hooks unavailable", role, selection);
         notify(role, "Unavailable on this game version".into());
-        return false;
+        return Admission::Unavailable;
     }
     let Some(scope) = read_scope() else {
         if user {
             trace!("[CharacterRoster] request ignored role={:?} selection={:?}: not a practice scene", role, selection);
+            // LEAD-1 review R3a: a user's request outside practice is told, never dropped silently.
+            notify(role, "Not a practice scene".into());
         }
-        return false;
+        return Admission::Unavailable;
     };
     let occupied = if busy() {
         Some(crate::engine::mii::ordinary_cpu::SWAP_BUSY_NOTICE)
@@ -689,7 +694,7 @@ fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: 
             trace!("[CharacterRoster] request rejected: {}", reason);
             notify(role, reason.into());
         }
-        return false;
+        return Admission::Busy;
     }
     sources::pause_preload();
     if crate::runtime::roster::cycle_preload_config::snapshot().measurements
@@ -699,15 +704,17 @@ fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: 
         if let Some(target)=target {crate::runtime::roster::cycle_preload::request(role as usize,false,target);}
     }
     let user_request=!restoring && !matches!(selection,Selection::RefreshPartners);
-    if let Some(accepted)=mii_ordinary_player::intercept_with(role,selection,user_request,&read_menu){
-        if user {trace!("[CharacterRoster] request handed to the ordinary Mii owner role={:?} selection={:?}",role,selection);}
-        return accepted;
+    // LEAD-1 review R3c: an ordinary Mii owner reports what it did (admitted, refused as busy with its own notice, unavailable
+    // with its own notice, or a coalesced refresh); `None` leaves the request to the next owner.
+    if let Some(admission)=mii_ordinary_player::intercept_with(role,selection,user_request,&read_menu){
+        if user {trace!("[CharacterRoster] request handed to the ordinary Mii owner role={:?} selection={:?} admission={:?}",role,selection,admission);}
+        return admission;
     }
     // The CPU owner logs its own acceptance or refusal.
-    if let Some(accepted)=mii_ordinary_cpu::intercept_with(role,selection,user_request,&read_menu){return accepted;}
+    if let Some(admission)=mii_ordinary_cpu::intercept_with(role,selection,user_request,&read_menu){return admission;}
     if let Some(accepted)=mii_saved_alpha::intercept_with(role,selection,&read_menu){
         if user {trace!("[CharacterRoster] request handed to the saved Mii owner role={:?} selection={:?}",role,selection);}
-        return accepted;
+        return if accepted { Admission::Accepted } else { Admission::Owned };
     }
     let mut state = state_for(role).lock();
     // The callback's restore peek may race a manual request. The role lock also
@@ -718,7 +725,7 @@ fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: 
             || !matches!(selection, Selection::Direct(target)
                 if WAITING_MEMORY.lock().restore_target(role as usize).is_some_and(|v|!v.owned && v.fighter==target)))
     {
-        return false;
+        return Admission::Superseded;
     }
     let Some((entry, _)) = state.observed else {
         drop(state);
@@ -729,8 +736,21 @@ fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: 
                 "Wait for the practice character to finish loading".into(),
             );
         }
-        return false;
+        return Admission::Unavailable;
     };
+    // LEAD-1 review F4: a load the user chose never silently replaces a user's load still waiting; an automatic one (a
+    // restore, a partner refresh) it supersedes.
+    let admission = if once && user {
+        over_pending(state.pending.map(|p| !p.restoring && !matches!(p.selection, Selection::RefreshPartners)))
+    } else {
+        Admission::Accepted
+    };
+    if admission == Admission::Busy {
+        drop(state);
+        trace!("[CharacterRoster] request rejected: {}", crate::engine::swap::cycle_members::FIGHTER_STILL_LOADING);
+        notify(role, crate::engine::swap::cycle_members::FIGHTER_STILL_LOADING.into());
+        return admission;
+    }
     state.pending = Some(Request {
         scope,
         epoch: state.epoch,
@@ -750,7 +770,7 @@ fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: 
         state.epoch,
         selection
     );
-    true
+    admission
 }
 
 /// True when visible loaders have finished and a CPU request can be queued.
@@ -792,10 +812,11 @@ pub fn request_cpu_kind(kind: u32) -> bool {
     request_cpu_kind_with(kind, |fighter| queue_admitted(Role::Cpu, Selection::Direct(fighter), false, false))
 }
 pub fn request_cpu_kind_in(context: &CpuRequestContext, kind: u32) -> bool {
-    request_cpu_kind_with(kind, |fighter| queue_admitted_with(Role::Cpu, Selection::Direct(fighter), false, false,
-        || context.menu, || context.scope))
+    request_cpu_kind_with(kind, |fighter| {
+        queue_admitted_with(Role::Cpu, Selection::Direct(fighter), false, false, || context.menu, || context.scope)
+    })
 }
-fn request_cpu_kind_with(kind: u32, enqueue_fighter: impl FnOnce(TrioFighter) -> bool) -> bool {
+fn request_cpu_kind_with(kind: u32, enqueue_fighter: impl FnOnce(TrioFighter) -> Admission) -> bool {
     let Some(fighter) = TrioFighter::from_kind(kind) else {
         notify(Role::Cpu, "Named macro fighter is not available".into());
         return false;
@@ -803,7 +824,7 @@ fn request_cpu_kind_with(kind: u32, enqueue_fighter: impl FnOnce(TrioFighter) ->
     if state_for(Role::Cpu).lock().pending.is_some() {
         return false;
     }
-    enqueue_fighter(fighter)
+    matches!(enqueue_fighter(fighter), Admission::Accepted | Admission::Superseded)
 }
 
 /// Player 1's fighter kind as the loader last observed it (None before a practice entry).
@@ -823,7 +844,7 @@ pub fn request_player_kind(kind: u32) -> bool {
     if state_for(Role::Player).lock().pending.is_some() {
         return false;
     }
-    queue_admitted(Role::Player, Selection::Direct(fighter), false, true)
+    matches!(queue_admitted(Role::Player, Selection::Direct(fighter), false, true), Admission::Accepted | Admission::Superseded)
 }
 
 /// Runs before the delay queue. Consume only our request, giving conflicting

@@ -21,3 +21,6 @@ mod cycle_members_tests;
 // P1-CYCLE: the Player grid numbers the Player walk, and a missing roster key is one value.
 #[cfg(test)]
 mod player_cycle_tests;
+// LEAD-1: a portrait pick, also of the stored fighter, through the close, the publish and the game frame's one decision per role.
+#[cfg(test)]
+mod lead1_pick_tests;

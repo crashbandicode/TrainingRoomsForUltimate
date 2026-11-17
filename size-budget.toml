@@ -1742,3 +1742,11 @@ ceiling = 154757
 date = "2026-11-17"
 reason = "RESHIP-3 approved envelope: card148683 + (Tech154717 - common148194) =155206. Final combined measured total154757 is recorded here, no headroom (449 below the envelope). Shared seam overlap is counted once in measurement; counting and gates unchanged."
 approved_by = "Primary 2026-11-17 06:23Z integration order: combined ceiling is card approved total plus Tech approved growth, under operator rc.15 size approval, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 154972
+date = "2026-11-17"
+reason = "RESHIP-3 final Tech plus LEAD-1 integrated source measured154972, no headroom. Within combined approval envelope148683+(154717-148194)+207=155413, with441 overlap saved. Includes reviewed versioned repick dispatch and typed admission composed with Tech nonblocking context and exact acceptance. Counting and gates unchanged."
+approved_by = "Operator rc.15 size approval; primary2026-11-17 06:23Z combines card and Tech approvals, primary06:29Z adds approved LEAD-1 +207. Exact combined measured total, FOR OPERATOR REVIEW."

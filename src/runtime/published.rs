@@ -71,12 +71,14 @@ pub(crate) fn take_rerolls() -> u8 {
 /// holds this (hos-lock locks are not reentrant).
 pub(crate) static PUBLISHING: hos_lock::Mutex<()> = hos_lock::Mutex::new(());
 
-pub fn publish(snapshot: &Snapshot, rerolls: u8) {
+/// `picks`: the menu close's last Player / CPU Character pick per role (LEAD-1; `[None; 2]` for every other publisher). They
+/// go to the game frame with this publish's roster re-plan (`compat::menu::after_publish`).
+pub fn publish(snapshot: &Snapshot, rerolls: u8, picks: [Option<u32>; 2]) {
     let _turn = PUBLISHING.lock();
     #[cfg(feature = "diag")]
     crate::runtime::diag_reload::remember(snapshot);
     let published_menu = crate::engine::compat::menu::TrainingModpackMenu::from_snapshot(snapshot);
-    let previous_menu = crate::runtime::compat::menu::view_before_publish();
+    let previous_menu = crate::runtime::compat::menu::view_before_publish(&_turn);
     let menu = crate::runtime::compat::menu::before_publish(published_menu, previous_menu);
     let live = Live {
         cpu: crate::model::cpu::settings::CpuSettings::from_snapshot(snapshot),
@@ -90,7 +92,7 @@ pub fn publish(snapshot: &Snapshot, rerolls: u8) {
     crate::runtime::features::states::set_flags(&live.states);
     REROLLS.fetch_or(rerolls, Ordering::AcqRel);
     LIVE.publish(Some(live));
-    crate::runtime::compat::menu::after_publish(published_menu, menu, previous_menu);
+    crate::runtime::compat::menu::after_publish(published_menu, menu, previous_menu, picks);
     // P1 CPU control: the pilot takes it through an atomic (cpu_pilot::menu_settings_changed), no lock.
     crate::runtime::p1::publish(snapshot);
     crate::runtime::features::hitbox::publish(snapshot);

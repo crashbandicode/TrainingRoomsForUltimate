@@ -124,6 +124,11 @@ pub struct Outbox {
     /// A, X, Y, ZR on the portrait roster grid: the tile and the button; the roster editor (package 6's roster rules) applies it.
     /// Taken at once with Menu::take_roster_press.
     pub roster_press: Option<(u16, Button)>,
+    /// `[Player, CPU]`: the fighter an A on the Player / CPU Character grid asked for this opening, also when it was
+    /// already the stored pick (LEAD-1). The LAST pick per role per visit wins: an earlier press of the same role in the
+    /// same visit is superseded. The close hands it to the settings publish (`published::publish`), and the game frame
+    /// decides the role's one load from it, the settings change and Player Swapping together (`cycle_members::role_dispatch`).
+    pub picks: [Option<u32>; 2],
     /// Place targets (Break the Targets): the menu closes into the placing view.
     pub place_targets: bool,
     /// Stage tech: close into the surface picker.
@@ -1859,6 +1864,21 @@ impl Menu {
     /// The roster grid's press since the last call, if any.
     pub fn take_roster_press(&mut self) -> Option<(u16, Button)> {
         self.outbox.roster_press.take()
+    }
+
+    /// The roster editor: an A on a Player (`cpu` false) or CPU Character tile asked for `kind` (`Outbox::picks`; the last
+    /// pick of the visit wins). The pick key counts as the player's edit even when its value did not change, so the close
+    /// commit keeps the picked fighter over a live selection written back while the menu was open (MENU-CLOSE: the
+    /// player's edit wins; review F3).
+    pub fn note_pick(&mut self, cpu: bool, kind: u32) {
+        self.outbox.picks[usize::from(cpu)] = Some(kind);
+        self.outbox.changed = true;
+        self.note_edit(if cpu { "cpu_character" } else { "player_character" });
+    }
+
+    /// The picks this visit has made so far, `[Player, CPU]` (read by the close before it takes the outbox).
+    pub fn picks(&self) -> [Option<u32>; 2] {
+        self.outbox.picks
     }
 
     /// The portrait roster grid (one page, the same in both console modes).

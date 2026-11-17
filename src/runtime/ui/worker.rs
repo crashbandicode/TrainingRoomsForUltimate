@@ -91,7 +91,7 @@ fn toggle_input_display(presses: u32) {
             return;
         }
         on = now_on;
-        published::publish(&settings.menu, 0);
+        published::publish(&settings.menu, 0, [None; 2]);
         *SETTINGS.lock() = Some(settings);
         writer::request_settings();
     }
@@ -1170,7 +1170,9 @@ fn begin_close(
         let picked = s.menu.as_ref().map_or([false; 2], |menu| {
             let live = SETTINGS.lock();
             let changed = |key: &str| live.as_ref().is_some_and(|live| live.menu.extra().get(key) != menu.kept(key));
-            [changed("player_character"), changed("cpu_character")]
+            // LEAD-1 (review F2): a repick of the stored fighter is a pick too, so its role's reload is dropped here.
+            crate::engine::swap::cycle_members::close_picked(
+                [changed("player_character"), changed("cpu_character")], menu.picks())
         });
         s.pending_close = Some(crate::runtime::mii::menu_handoff::CloseIntent {
             opening: s.opening,
@@ -1220,7 +1222,8 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     };
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(7);
-    published::publish(&settings.menu, outbox.rerolls);
+    // LEAD-1: the visit's last pick per role rides in the publish; the game frame decides each role's one load.
+    published::publish(&settings.menu, outbox.rerolls, outbox.picks);
     // rc.14: every close with Eggs-ercise on starts a fresh run.
     crate::runtime::features::hitbox::eggs_start();
     // rc.14 Break the Targets: Place targets asks for the placing view; every close tells the mode (after the publish above).
