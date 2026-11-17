@@ -29,6 +29,28 @@ pub enum Plan {
     Final, Flip, Jab3, Hero, Judge, Freeze, Blizzard, IceShot, IceMagic, Inhale, Egg,
 }
 
+/// The one per-move availability path for the menu, concrete picks and the Random drill.
+/// Rows keep their CATALOG index and id either way, so saved settings never shift.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MoveAvailability {
+    Available,
+    /// Listed greyed and never selectable or rolled.
+    NotMashable,
+    /// Not listed at all (operator 2026-11-17: Final Smash rows 106 and 115 dropped).
+    Hidden,
+}
+
+pub const fn availability(id: u16) -> MoveAvailability {
+    match id {
+        106 | 115 => MoveAvailability::Hidden,
+        _ => MoveAvailability::Available,
+    }
+}
+
+pub fn selectable(s: Scenario) -> bool {
+    availability(s.id) == MoveAvailability::Available
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Scenario {
     /// Stable move identity, independent of the menu's Random hole at index89.
@@ -139,13 +161,21 @@ fn matches_state(state: usize, value: Scenario) -> bool {
 
 pub fn attacker_valid(state: usize, attacker: usize) -> bool {
     state < STATE_LABELS.len() && (attacker == RANDOM_ATTACKER
-        || state != RANDOM_STATE && scenario(attacker).is_some_and(|s| matches_state(state, s)))
+        || state != RANDOM_STATE && scenario(attacker).is_some_and(|s| matches_state(state, s) && selectable(s)))
+}
+
+/// Listed rows: every valid pick plus NotMashable rows, which show greyed but stay invalid.
+fn listed(state: usize, attacker: usize) -> bool {
+    attacker_valid(state, attacker)
+        || state < STATE_LABELS.len() && state != RANDOM_STATE && scenario(attacker).is_some_and(|s| {
+            matches_state(state, s) && availability(s.id) == MoveAvailability::NotMashable
+        })
 }
 
 fn options(state: usize) -> impl Iterator<Item = usize> {
     let random_last = state != 0 && state != RANDOM_STATE && state < STATE_LABELS.len();
     (0..ATTACKER_LABELS.len())
-        .filter(move |&i| attacker_valid(state, i) && (!random_last || i != RANDOM_ATTACKER))
+        .filter(move |&i| listed(state, i) && (!random_last || i != RANDOM_ATTACKER))
         .chain(random_last.then_some(RANDOM_ATTACKER))
 }
 
@@ -194,12 +224,14 @@ impl Config {
     }
 
     /// Resolve once from external rolls only. Random state with Random attacker
-    /// covers all121 reviewed rows. A concrete conflicting pair is rejected.
+    /// covers every selectable reviewed row. A concrete conflicting pair is rejected.
     pub fn resolve(self, attacker_roll: u64, grab_roll: u64) -> Option<Scenario> {
         if !attacker_valid(self.state, self.attacker) || self.grab >= GRAB_LABELS.len() { return None; }
         let mut value = if self.attacker == RANDOM_ATTACKER {
-            let count = CATALOG.iter().filter(|&&s| matches_state(self.state, s)).count();
-            *CATALOG.iter().filter(|&&s| matches_state(self.state, s)).nth((attacker_roll % count as u64) as usize)?
+            let pool = |s: &&Scenario| matches_state(self.state, **s) && selectable(**s);
+            let count = CATALOG.iter().filter(pool).count();
+            if count == 0 { return None; }
+            *CATALOG.iter().filter(pool).nth((attacker_roll % count as u64) as usize)?
         } else {
             scenario(self.attacker)?
         };
@@ -262,7 +294,7 @@ mod tests {
         fn random_selection_covers_each_state_and_all_rows() {
             for state in 0..STATE_LABELS.len() {
                 let config = Config { state, attacker: 89, grab: 3 };
-                let expected: Vec<_> = CATALOG.iter().filter(|s| state == 5 || s.state == State::ALL[state]).map(|s| s.id).collect();
+                let expected: Vec<_> = CATALOG.iter().filter(|s| (state == 5 || s.state == State::ALL[state]) && selectable(**s)).map(|s| s.id).collect();
                 let seen: Vec<_> = (0..expected.len()).map(|roll| config.resolve(roll as u64, 0).unwrap().id).collect();
                 assert_eq!(seen, expected);
                 assert_eq!(config.resolve(expected.len() as u64, 0).unwrap().id, expected[0]);
@@ -274,6 +306,34 @@ mod tests {
                 if index != 89 {
                     assert_eq!(Config { state: 5, attacker: index, grab: 0 }.resolve(0, 0), None);
                 }
+            }
+        }
+
+        #[test]
+        fn hidden_final_rows_are_never_offered_picked_or_rolled() {
+            let hidden: Vec<_> = CATALOG.iter().filter(|s| availability(s.id) == MoveAvailability::Hidden).map(|s| s.id).collect();
+            assert_eq!(hidden, [106, 115]);
+            assert!(CATALOG.iter().filter(|s| s.plan == Plan::Final).all(|s| !selectable(*s)));
+            for id in [106usize, 115] {
+                let index = id + 1; // extras sit after Random at89
+                assert_eq!(scenario(index).unwrap().id as usize, id, "index and id stay stable");
+                for state in 0..STATE_LABELS.len() {
+                    assert!(!attacker_valid(state, index));
+                    assert_eq!(attacker_option(state, index), None);
+                    assert_eq!(Config { state, attacker: index, grab: 0 }.resolve(0, 0), None);
+                }
+                // A saved index pointing at a hidden row falls back through the existing invalid path.
+                let mut row = vec![0; ATTACKER_LABELS.len()];
+                row[index] = 1;
+                let parsed = settings::parse(&serde_json::json!({"menu":{"mashout_attacker":row}}).to_string());
+                assert_eq!(Config::from_snapshot(&parsed.settings.menu), None);
+            }
+            // Random pool sizes: Bury 12-1, Frozen 7-1, Random state 121-2; never a hidden row.
+            for (state, size) in [(1usize, 11usize), (2, 6), (5, 119)] {
+                let config = Config { state, attacker: RANDOM_ATTACKER, grab: 0 };
+                let rolled: std::collections::BTreeSet<_> = (0..size as u64 * 4).map(|r| config.resolve(r, 0).unwrap().id).collect();
+                assert_eq!(rolled.len(), size, "state {state}");
+                assert!(!rolled.contains(&106) && !rolled.contains(&115));
             }
         }
 
