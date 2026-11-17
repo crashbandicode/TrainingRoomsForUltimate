@@ -880,7 +880,6 @@ fn operator_buttons(player_idx: i32, buttons: u32) -> u64 {
 pub fn scene_changed(mode: game_mode::Mode) {
     // M3 Set observer C9/O4: retract the common qualifier word and close the gate before anything re-publishes.
     crate::runtime::features::mashout::clatter_set::retract_common();
-    crate::runtime::features::mashout::clatter_set::release();
     body_bank::scene_changed();
     mii_saved_alpha::scene_changed();
     body_bank::adopt_scene_generation();

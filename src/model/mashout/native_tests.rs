@@ -306,13 +306,3 @@ fn native_zero_auto_without_input_is_not_observable_from_decreases() {
     assert_eq!(clock.elapsed(), 0);
 }
 }
-
-#[test]
-fn rebase_adopts_only_a_bit_equal_old() {
-    // E-A rc15-frozen113-measure-xps-2: Set old 49.545795 -> new 83.052353.
-    let mut clock = Clock::new(record(49.545_795)).unwrap();
-    assert!(clock.rebase(49.545_795_f32.to_bits() + 1, 83.052_353_f32.to_bits()).is_err());
-    assert!(clock.rebase(49.545_795_f32.to_bits(), 83.052_353_f32.to_bits()).is_ok());
-    assert_eq!(clock.last().remaining, 83.052_353);
-    assert!(clock.rebase(83.052_353_f32.to_bits(), 0.0_f32.to_bits()).is_err());
-}

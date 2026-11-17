@@ -327,6 +327,8 @@ pub enum ClockError {
     TransitionMismatch,
     Ambiguous,
     TickRange,
+    /// A published native write was poisoned, stale, out of order or not bit-exact against the model (G1).
+    WriteRefused,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -386,17 +388,13 @@ impl Clock {
         Ok(())
     }
 
-    /// M3 G1: adopt an observed native write between ticks only when its `old` is bit-equal to the model's
-    /// remaining; continue from `new`. Anything else is the existing mismatch (no adjustment is inferred).
-    pub fn rebase(&mut self, old: u32, new: u32) -> Result<(), ClockError> {
-        if self.exhausted || self.last.remaining.to_bits() != old {
-            return Err(ClockError::TransitionMismatch);
+    /// Commit a frame validated against observed native writes (`clatter`, `Clock::observe_writes`).
+    pub(super) fn rebase(&mut self, live: Record, ticked: bool, escaped: bool) -> Result<(), ClockError> {
+        if ticked {
+            self.elapsed = self.elapsed.checked_add(1).ok_or(ClockError::TickRange)?;
         }
-        let new = f32::from_bits(new);
-        if !new.is_finite() || new <= 0.0 {
-            return Err(ClockError::InvalidRecord);
-        }
-        self.last.remaining = new;
+        self.exhausted = live.remaining <= 0.0 || escaped;
+        self.last = live;
         Ok(())
     }
 }

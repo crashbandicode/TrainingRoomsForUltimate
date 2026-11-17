@@ -311,6 +311,10 @@ struct Game {
     p1: usize,
     cpu: usize,
     clock: Option<Clock>,
+    /// M3 Set observer consumer for a 113/116 attempt (armed at Settle).
+    writes: Option<crate::model::mashout::clatter::Writes>,
+    /// An observed write was applied this attempt: no grade until G2 replays them in the bounds.
+    applied: bool,
     saw_catch: bool,
     followed: bool,
     restore_requested: bool,
@@ -330,6 +334,8 @@ impl Game {
             p1: 0,
             cpu: 0,
             clock: None,
+            writes: None,
+            applied: false,
             saw_catch: false,
             followed: false,
             restore_requested: false,
@@ -1057,12 +1063,20 @@ pub unsafe fn frame(fighter: usize) {
                 return;
             }
             drive(entry::controls(request.plan, false));
+            game.writes = None;
+            game.applied = false;
             if matches!(request.id, 113 | 116) {
-                // M3 Set observer: installed by the owner site from here until this attempt's exit (O5).
-                clatter_set::reset_ring();
+                // M3 Set observer (O5): installed and read back here, at Settle, until this attempt's exit.
                 // SAFETY: p1 is the live P1 BOMA; +0x48 is its ControlModule (lua_bind ldr x0,[x0,#72]).
                 let control = unsafe { *((p1 + 0x48) as *const usize) };
-                clatter_set::request(game.generation as u32, request.id as u16, control);
+                let generation = game.generation as u32;
+                let armed = clatter_set::arm(generation, request.id, control).ok();
+                game.writes = armed.and_then(|g| crate::model::mashout::clatter::Writes::new(g, request.id));
+                if game.writes.is_none() {
+                    // restriction: MASH-NATIVE-SLOT
+                    game.fail(UNAVAILABLE_NOTICE);
+                    return;
+                }
             }
             game.step(Step::Entering, "Mash out · Waiting for move");
             state_natives::status_request(cpu, start);
@@ -1204,13 +1218,44 @@ pub unsafe fn frame(fighter: usize) {
                 return;
             };
             let escaped = [ids[5], ids[6]].contains(&status);
-            if clock.observe(live.record, live.input, escaped).is_err() {
+            // M3 G1: this frame's published Set writes (seq order, validated) before the tick check.
+            let mut writes = [crate::model::mashout::clatter::ClatterWrite {
+                generation: 0, seq: 0, slot: crate::model::mashout::clatter::Slot::Set, tag: 0,
+                old: 0, operand: 0, new: 0, frame: 0,
+            }; clatter_set::RING];
+            let mut count = 0;
+            let mut refused = false;
+            let generation = game.generation as u32;
+            if let Some(consumer) = game.writes.as_mut() {
+                while count < clatter_set::RING {
+                    let seq = consumer.next_seq();
+                    match consumer.accept(clatter_set::poll(generation, seq)) {
+                        Ok(Some(write)) => {
+                            writes[count] = write;
+                            count += 1;
+                        }
+                        Ok(None) => break,
+                        Err(_) => {
+                            refused = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            game.applied |= count > 0;
+            if refused || clock.observe_writes(live.record, live.input, escaped, &writes[..count]).is_err() {
                 #[cfg(feature = "diag")]
                 crate::runtime::diag_log::enqueue_diagnostic(format_args!(
                     "[Mashout] mismatch gen={} t={} before={before:?} live={live:?}",
                     game.generation,
                     clock.elapsed()
                 ));
+                game.fail("Native tick mismatch · no grade");
+                return;
+            }
+            if game.applied && (escaped || clock.exhausted()) {
+                // restriction: MASH-M1-MISMATCH — observed writes kept the clock exact, but the F/T bounds don't
+                // replay them yet (G2), so the attempt stays unscored.
                 game.fail("Native tick mismatch · no grade");
                 return;
             }

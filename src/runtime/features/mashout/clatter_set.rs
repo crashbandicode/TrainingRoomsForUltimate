@@ -1,35 +1,60 @@
-//! M3 Set observer (frozen v1 interface; OPUS-DESIGN-REVIEW-sora116-refreeze.md). FighterControl vtable +0x90
-//! (main+0x4f85e70) → main+0x3f81a0, installed only from Settle to Entering of a 113/116 attempt by the existing
-//! owner site (`interposer::service`). Unqualified calls touch x16/x17 only and branch to the original. Qualified
-//! calls (LR == the verified common+0x111f80 word, x0 == the armed P1 Control, w1 == 0) read record 0 before and
-//! after ONE original call and publish `{generation, seq, tag, old, operand, new}` to an 8-entry ring.
-//! No lock, heap, formatting or I/O on the call path; no stack reads.
+//! M3 Set observer (event interface v1.1; OPUS-DESIGN-REVIEW-sora116-refreeze.md, rulings 20:49Z/22:38Z).
+//! FighterControl vtable +0x90 (main+0x4f85e70) → main+0x3f81a0. `arm` runs at Settle on the owner thread and
+//! returns only after the physical CAS and readback; every exit closes the gate and restores first.
+//! Unqualified calls touch x16/x17 only and branch to the original. Qualified calls (LR == the verified
+//! common+0x111f80 word, x0 == the armed P1 Control, w1 == 0) read record 0 before and after ONE original call and
+//! publish `{generation, seq, tag, old, operand, new}` to an 8-entry ring. No lock, heap, formatting or I/O on the
+//! call path; no stack reads.
 use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
-use crate::model::mashout::clatter_write::{ClatterWrite, Poison, Slot};
+use crate::model::mashout::clatter::{slot_for, ClatterWrite, Poison, Poll, Slot};
 use crate::runtime::game;
 
 const TABLE: usize = 0x4f85de0;
 const SET_SLOT: usize = 0x4f85e70;
 const SET_ORIGINAL: usize = 0x3f81a0;
 const COMMON_SET_RETURN: usize = 0x111f80;
+/// lua2cpp_common 13.0.5 build id (NRO header +0x40), nro:13f5177a7e86f0150f1a22aa9e611eacd010397c.
+const COMMON_BUILD_ID: [u8; 20] = [
+    0x13, 0xf5, 0x17, 0x7a, 0x7e, 0x86, 0xf0, 0x15, 0x0f, 0x1a, 0x22, 0xaa, 0x9e, 0x61, 0x1e, 0xac, 0xd0, 0x10,
+    0x39, 0x7c,
+];
 pub const RING: usize = 8;
+
+/// v1.1 (b): every refusal maps to "Mash out unavailable". NotOwnerThread (O2) and PageCheck (C5) are added with
+/// their checks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Refusal {
+    WrongPhase,
+    AlreadyArmed,
+    ForeignSlot,
+    CommonUnverified,
+    VtableMismatch,
+}
 
 static ORIGINAL: AtomicUsize = AtomicUsize::new(0);
 /// C9: common base + 0x111f80 while the verified common module is mapped; 0 otherwise (never equals an LR).
 static COMMON_LR: AtomicUsize = AtomicUsize::new(0);
+static COMMON_BASE: AtomicUsize = AtomicUsize::new(0);
+static COMMON_GENERATION: AtomicU32 = AtomicU32::new(0);
+static ARMED_COMMON_GENERATION: AtomicU32 = AtomicU32::new(0);
 /// The armed P1 Control; 0 when no attempt owns the observer.
 static P1_CONTROL: AtomicUsize = AtomicUsize::new(0);
 static GENERATION: AtomicU32 = AtomicU32::new(0);
 static TAG: AtomicU32 = AtomicU32::new(0);
-static WANT: AtomicBool = AtomicBool::new(false);
+static ARMED: AtomicBool = AtomicBool::new(false);
 static INSTALLED: AtomicBool = AtomicBool::new(false);
 static LOST: AtomicBool = AtomicBool::new(false);
 static IN_CALL: AtomicBool = AtomicBool::new(false);
+/// 0 = none, else Poison as u32 + 1. Latched until the next arm.
 static POISON: AtomicU32 = AtomicU32::new(0);
 static COUNT: AtomicU32 = AtomicU32::new(0);
 /// Per entry: [generation << 32 | seq (published last, Release)], [tag], [old << 32 | operand], [new].
 static ENTRIES: [[AtomicU64; 4]; RING] = [const { [const { AtomicU64::new(0) }; 4] }; RING];
+
+fn poison(why: Poison) {
+    let _ = POISON.compare_exchange(0, why as u32 + 1, Ordering::AcqRel, Ordering::Acquire);
+}
 
 unsafe fn slot() -> &'static AtomicUsize {
     &*((game::text_base() + SET_SLOT) as *const AtomicUsize)
@@ -39,75 +64,109 @@ fn wrapper() -> usize {
     set_wrapper as *const () as usize
 }
 
-/// C9: called from the common-module load callback with the module's base.
+/// C9 (a)/(d): called from the common-module load callback with the module's base. A load while armed poisons the
+/// attempt; the word is re-published only after zeroing, with a new common generation.
 pub fn publish_common(base: usize) {
+    COMMON_LR.store(0, Ordering::Release);
+    if ARMED.load(Ordering::Acquire) {
+        poison(Poison::Lost);
+    }
+    // SAFETY: the loader just mapped this module; the NRO header (and its build id at +0x40) is readable text.
+    let id = unsafe { core::ptr::read_unaligned((base + 0x40) as *const [u8; 20]) };
+    if id != COMMON_BUILD_ID {
+        return;
+    }
+    COMMON_BASE.store(base, Ordering::Release);
+    COMMON_GENERATION.fetch_add(1, Ordering::AcqRel);
     COMMON_LR.store(base + COMMON_SET_RETURN, Ordering::Release);
 }
 
-/// C9: called synchronously on every scene change before any re-publication.
+/// C9 (b): every scope loss zeroes the word FIRST, then closes the gate (restore at the owner site, O4 order).
 pub fn retract_common() {
     COMMON_LR.store(0, Ordering::Release);
+    release();
 }
 
-/// Settle → Entering of a 113/116 attempt: request the install for this generation (the owner site performs it).
-pub fn request(generation: u32, tag: u16, p1_control: usize) {
-    if crate::model::mashout::clatter_write::slot_for(tag) != Some(Slot::Set) {
-        return;
+/// Settle on the owner thread (O5): install over the exact original and read it back before returning the
+/// generation. Only 113/116 (the Set tags) and only the concrete FighterControl table.
+pub fn arm(generation: u32, tag: u16, p1_control: usize) -> Result<u32, Refusal> {
+    if slot_for(tag) != Some(Slot::Set) {
+        return Err(Refusal::WrongPhase);
+    }
+    if ARMED.load(Ordering::Acquire) {
+        return Err(Refusal::AlreadyArmed);
+    }
+    if LOST.load(Ordering::Acquire) {
+        return Err(Refusal::ForeignSlot);
+    }
+    if p1_control == 0 || unsafe { *(p1_control as *const usize) } != game::text_base() + TABLE {
+        return Err(Refusal::VtableMismatch);
+    }
+    // C9 (c): the module at the published base still carries the verified build id and generation.
+    let base = COMMON_BASE.load(Ordering::Acquire);
+    let common_generation = COMMON_GENERATION.load(Ordering::Acquire);
+    if COMMON_LR.load(Ordering::Acquire) != base + COMMON_SET_RETURN
+        || base == 0
+        || unsafe { core::ptr::read_unaligned((base + 0x40) as *const [u8; 20]) } != COMMON_BUILD_ID
+    {
+        return Err(Refusal::CommonUnverified);
+    }
+    let original = game::text_base() + SET_ORIGINAL;
+    let found = unsafe { slot() };
+    if found.load(Ordering::Acquire) != original {
+        LOST.store(true, Ordering::Release);
+        return Err(Refusal::ForeignSlot);
+    }
+    for entry in &ENTRIES {
+        entry[0].store(0, Ordering::Release);
     }
     COUNT.store(0, Ordering::Release);
     POISON.store(0, Ordering::Release);
     GENERATION.store(generation, Ordering::Release);
     TAG.store(u32::from(tag), Ordering::Release);
-    P1_CONTROL.store(p1_control, Ordering::Release);
-    WANT.store(true, Ordering::Release);
-}
-
-/// Every exit (Result, Retry, Choose, fail, Off, scene change, body/CPU change): the gate closes now; the owner
-/// site restores the slot on its next call (O4 two-phase rule).
-pub fn release() {
-    WANT.store(false, Ordering::Release);
-    P1_CONTROL.store(0, Ordering::Release);
-}
-
-pub fn installed() -> bool {
-    INSTALLED.load(Ordering::Acquire) && !LOST.load(Ordering::Acquire)
-}
-
-/// Owner site (main thread, outside hooks): install over the exact original or restore TR's own value only (O8).
-pub fn service(scene_active: bool) {
-    let original = game::text_base() + SET_ORIGINAL;
-    let found = unsafe { slot() };
-    let wanted = WANT.load(Ordering::Acquire) && scene_active && COMMON_LR.load(Ordering::Acquire) != 0;
-    if !wanted || LOST.load(Ordering::Acquire) {
-        if INSTALLED.swap(false, Ordering::AcqRel)
-            && (found.compare_exchange(wrapper(), original, Ordering::AcqRel, Ordering::Acquire).is_err()
-                || found.load(Ordering::Acquire) != original)
-        {
-            LOST.store(true, Ordering::Release);
-        }
-        return;
-    }
-    if INSTALLED.load(Ordering::Acquire) {
-        if found.load(Ordering::Acquire) != wrapper() {
-            LOST.store(true, Ordering::Release);
-            POISON.compare_exchange(0, Poison::Lost as u32 + 1, Ordering::AcqRel, Ordering::Acquire).ok();
-        }
-        return;
-    }
+    ARMED_COMMON_GENERATION.store(common_generation, Ordering::Release);
     ORIGINAL.store(original, Ordering::Release);
     if found.compare_exchange(original, wrapper(), Ordering::AcqRel, Ordering::Acquire).is_err()
         || found.load(Ordering::Acquire) != wrapper()
     {
         let _ = found.compare_exchange(wrapper(), original, Ordering::AcqRel, Ordering::Acquire);
         LOST.store(true, Ordering::Release);
-        return;
+        return Err(Refusal::ForeignSlot);
     }
     INSTALLED.store(true, Ordering::Release);
+    ARMED.store(true, Ordering::Release);
+    P1_CONTROL.store(p1_control, Ordering::Release);
+    Ok(generation)
 }
 
-/// Table identity used by guards and readers: the concrete FighterControl table.
-pub fn table() -> usize {
-    game::text_base() + TABLE
+/// Every exit (Result, Retry, Choose, fail, Off, scene change, body/CPU change): the gate closes now; the owner
+/// site restores the slot on its next call (O4 two-phase rule; at most one frame of forward-only calls).
+pub fn release() {
+    P1_CONTROL.store(0, Ordering::Release);
+    ARMED.store(false, Ordering::Release);
+}
+
+/// Owner site (main thread, outside hooks): restore TR's own value only (O8); verify an armed install each frame.
+pub fn service() {
+    let original = game::text_base() + SET_ORIGINAL;
+    let found = unsafe { slot() };
+    if ARMED.load(Ordering::Acquire) {
+        if found.load(Ordering::Acquire) != wrapper()
+            || COMMON_GENERATION.load(Ordering::Acquire) != ARMED_COMMON_GENERATION.load(Ordering::Acquire)
+            || COMMON_LR.load(Ordering::Acquire) == 0
+        {
+            poison(Poison::Lost);
+            release();
+        } else {
+            return;
+        }
+    }
+    if INSTALLED.swap(false, Ordering::AcqRel)
+        && (found.compare_exchange(wrapper(), original, Ordering::AcqRel, Ordering::Acquire).is_err()
+            || found.load(Ordering::Acquire) != original)
+    {
+        LOST.store(true, Ordering::Release);
+    }
 }
 
 // Unqualified: x16/x17 only, then the original through an acquire load. Qualified: tail-branch to `qualified`
@@ -144,10 +203,9 @@ unsafe fn record0(control: usize) -> *const f32 {
 }
 
 unsafe extern "C" fn qualified(control: usize, index: i32, operand: f32) {
-    let original: unsafe extern "C" fn(usize, i32, f32) =
-        core::mem::transmute(ORIGINAL.load(Ordering::Acquire));
+    let original: unsafe extern "C" fn(usize, i32, f32) = core::mem::transmute(ORIGINAL.load(Ordering::Acquire));
     if IN_CALL.swap(true, Ordering::AcqRel) {
-        POISON.compare_exchange(0, Poison::Nested as u32 + 1, Ordering::AcqRel, Ordering::Acquire).ok();
+        poison(Poison::Nested);
         original(control, index, operand);
         return;
     }
@@ -156,7 +214,7 @@ unsafe extern "C" fn qualified(control: usize, index: i32, operand: f32) {
     let new = record0(control).read_volatile();
     let seq = COUNT.fetch_add(1, Ordering::AcqRel) + 1;
     if seq as usize > RING {
-        POISON.compare_exchange(0, Poison::Overflow as u32 + 1, Ordering::AcqRel, Ordering::Acquire).ok();
+        poison(Poison::Overflow);
     } else {
         let entry = &ENTRIES[seq as usize - 1];
         entry[1].store(u64::from(TAG.load(Ordering::Acquire)), Ordering::Relaxed);
@@ -167,23 +225,27 @@ unsafe extern "C" fn qualified(control: usize, index: i32, operand: f32) {
     IN_CALL.store(false, Ordering::Release);
 }
 
-/// Consumer (main thread): the published event `seq` (1-based) if complete, a poison, or nothing yet.
-pub fn poll(seq: u32) -> Result<Option<ClatterWrite>, Poison> {
+/// Consumer (owner thread): the published event `seq` (1-based) of `generation`, a poison, or nothing yet.
+pub fn poll(generation: u32, seq: u32) -> Poll {
     match POISON.load(Ordering::Acquire) {
         0 => {}
-        p => return Err(poison_from(p - 1)),
+        p => return Poll::Poisoned(poison_from(p - 1)),
+    }
+    if generation != GENERATION.load(Ordering::Acquire) {
+        // v1.1 Stale: polling another generation is refused without poisoning the current attempt.
+        return Poll::Empty;
     }
     if seq == 0 || seq as usize > RING {
-        return Err(Poison::Overflow);
+        return if COUNT.load(Ordering::Acquire) >= seq { Poll::Poisoned(Poison::Overflow) } else { Poll::Empty };
     }
     let entry = &ENTRIES[seq as usize - 1];
     let head = entry[0].load(Ordering::Acquire);
-    if head as u32 != seq {
-        return Ok(None);
+    if head as u32 != seq || (head >> 32) as u32 != generation {
+        return Poll::Empty;
     }
     let pair = entry[2].load(Ordering::Relaxed);
-    Ok(Some(ClatterWrite {
-        generation: (head >> 32) as u32,
+    Poll::Event(ClatterWrite {
+        generation,
         seq,
         slot: Slot::Set,
         tag: entry[1].load(Ordering::Relaxed) as u16,
@@ -191,7 +253,7 @@ pub fn poll(seq: u32) -> Result<Option<ClatterWrite>, Poison> {
         operand: pair as u32,
         new: entry[3].load(Ordering::Relaxed) as u32,
         frame: 0,
-    }))
+    })
 }
 
 fn poison_from(code: u32) -> Poison {
@@ -201,15 +263,6 @@ fn poison_from(code: u32) -> Poison {
         2 => Poison::Nested,
         3 => Poison::WrongSlot,
         4 => Poison::Stale,
-        5 => Poison::Lost,
-        _ => Poison::SequenceGap,
+        _ => Poison::Lost,
     }
-}
-
-/// A new attempt reuses slots; entries of an older generation are stale to its Stream and refused there.
-pub fn reset_ring() {
-    for entry in &ENTRIES {
-        entry[0].store(0, Ordering::Release);
-    }
-    COUNT.store(0, Ordering::Release);
 }
