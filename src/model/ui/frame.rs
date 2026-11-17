@@ -393,9 +393,7 @@ impl Frame {
         use super::panes as p;
         const LEFT: f32 = -880.0;
         const PAD: f32 = 24.0;
-        if !self.dialog && !self.popup {
-            return None;
-        }
+        (self.dialog || self.popup).then_some(())?;
         // The menu fonts render wider than the notice-calibrated estimate: ~6 % for prose, ~14 % for a 48-W crumb (Eden,
         // notice-compact-72451433 and -9f90e741), so a dialog measures its text with a 1.2 margin.
         let width = |text: &[u16], font: (f32, f32)| 1.2 * measure(text.iter().copied(), font.0).0;
@@ -411,9 +409,11 @@ impl Frame {
             let widest = rows.iter().map(|r| width(r.label.units(), p::FONT)).fold(0.0, f32::max);
             (x - w / 2.0 + widest, p::row_y(rows.len().max(1) - 1) - p::ROW_H / 2.0)
         };
-        if self.popup && self.conn_count > 0 {
-            right = right.max(p::CONN_RIGHT);
-            bottom = bottom.min(p::conn_y(usize::from(self.conn_count) - 1) - p::CONN_LINE_H / 2.0);
+        // Every pop-up draws its role tabs and L/R key caps (x ≤ 836), the row bands and the CONNECTIONS divider (review 2);
+        // its connection lines end above the divider's foot and left of CONN_RIGHT, so the box spans to both.
+        let div = p::spec(p::IDX_CONN_DIV);
+        if self.popup {
+            (right, bottom) = (right.max(p::CONN_RIGHT), bottom.min(div.y - div.h / 2.0));
         }
         right = right.max(LEFT + width(self.crumb.units(), p::FONT));
         let (mut y, mut help_y) = (bottom - 8.0, p::HELP_Y);

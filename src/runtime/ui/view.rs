@@ -422,9 +422,11 @@ impl Panes {
         // Dialogs take only the space they need (2026-11-17): a box around their content, and no page chrome around it.
         let dialog = frame.dialog_box();
         let chrome = dialog.is_none() || frame.popup;
-        for index in (0..p::TABS).map(p::tab_index).chain((0..GROUPS).map(p::group_index)).chain([p::IDX_SEP_HELP]) {
+        for index in (0..p::TABS).map(p::tab_index).chain((0..GROUPS).map(p::group_index)) {
             self.show(index, chrome);
         }
+        // The page's fixed help rule (y −324, 1760 wide) would cross under a dialog's box: help follows the content.
+        self.show(p::IDX_SEP_HELP, dialog.is_none());
         if !chrome {
             for index in [IDX_TAB_HI, IDX_TITLE, IDX_SEP, IDX_DIVIDER, IDX_GROUP_HI].into_iter().chain(IDX_TAB_BOX..IDX_TAB_BOX + 4 * TAB_BOXES) {
                 self.hide(index);

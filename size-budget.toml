@@ -1781,3 +1781,11 @@ ceiling = 155228
 date = "2026-11-17"
 reason = "CPU out-of-shield native shield drop (Phase 3 CPU-040/066, rc15/cpu-oos-shield-drop 1b5e5c75) measured 155228 on the Surface gate: +12 over 155216 (a9938105). One shared needs_native_drop predicate and the guard_button off-query clause of SPEC-cpu-05. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
 approved_by = "Primary 2026-11-17 tr-fix-devin brief approves the +12 for CPU-OOS, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155376
+date = "2026-11-17"
+reason = "Compact notice box and content-sized dialogs (rc15/notice-compact, review 2 R2 fixed) rebased onto main 458c0636 (155228): composed measured 155376 = +148, within the approved +150 for the notice part. Recording pop-up box spans its key caps, row bands and CONNECTIONS divider; the help rule hides under dialogs. Exact total, no headroom. Counting and gates unchanged."
+approved_by = "Primary 14:11Z and 17:54Z (notice-ui-devin-opus): the +150 approval stands for the notice part, FOR OPERATOR REVIEW."
