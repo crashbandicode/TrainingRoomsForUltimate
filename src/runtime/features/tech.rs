@@ -313,8 +313,10 @@ fn wizard_notice(run: &Practice, wizard: &Wizard, blocked: Option<bool>) {
             wizard.speed,
             wizard.hit,
             match blocked {
+                // restriction: tech-wizard-preview-blocked
                 Some(true) => "Start blocked / outside bounds — adjust values",
                 Some(false) => "Dotted path is approximate",
+                // restriction: tech-wizard-preview-unavailable
                 None => "Preview unavailable",
             }
         ),
