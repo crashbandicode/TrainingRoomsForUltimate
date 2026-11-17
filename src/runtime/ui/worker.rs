@@ -1138,6 +1138,11 @@ pub fn adopt_typed(defaults: bool, rows: &[(&'static str, Vec<u8>)], kept: &[(&'
 /// A publish made outside the menu (the diag reload, diag builds; the hardware bridge's settings apply): the committed settings the
 /// menu opens on take the published rows and top-level keys, so a close keeps them (decision MENU-CLOSE).
 /// The saved defaults are the player's and stay.
+/// The committed menu rows (what a settings apply's re-rolls are computed against). Plugin threads only.
+pub fn committed_menu() -> Option<crate::model::settings::Snapshot> {
+    SETTINGS.lock().as_ref().map(|current| current.menu.clone())
+}
+
 pub fn adopt_published(settings: &Settings) {
     let mut guard = SETTINGS.lock();
     if let Some(current) = guard.as_mut() {

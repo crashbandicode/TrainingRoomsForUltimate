@@ -1,9 +1,11 @@
 //! TrainingRooms state export v1: the table a test-only reader (ssbu-hw-bridge) subscribes through, and the line
 //! ring the reader owns (TR keeps no buffer). The same layout is in the bridge's `src/abi.rs`; both pin it in a host test.
-//! Producers take a ticket with one `fetch_add` and publish the slot with its sequence word, so a hook never waits on the
-//! reader's thread; the reader validates the sequence and counts a lapped slot as lost.
+//! Every slot is owned by one side at a time through its state word (`WRITING` by the producer that claimed it with a
+//! compare-and-swap, `READING` by the reader that claimed it the same way). A producer that finds its slot owned (a
+//! writer one lap away, or the reader copying it) drops its line and counts it: a hook never waits on the reader's thread.
+//! A ready line the reader has not taken yet may be overwritten by a later lap; the reader counts it as lost.
 
-use core::sync::atomic::{fence, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicU64, Ordering};
 
 pub const ABI: u32 = 1;
 /// Bytes of one exported line (the diag ring's stack line).
@@ -16,10 +18,22 @@ pub const REQ_ITEM: u32 = 4;
 pub const OK: i32 = 0;
 pub const REFUSED_SCENE: i32 = -1;
 pub const BAD_REQUEST: i32 = -2;
+/// A settings file that does not read cleanly: nothing was applied.
+pub const REFUSED_SETTINGS: i32 = -3;
+
+/// Slot phases (the low two bits of `Slot::state`; the rest is the line's ticket + 1, 0 for a slot never written).
+pub const FREE: u64 = 0;
+pub const WRITING: u64 = 1;
+pub const READY: u64 = 2;
+pub const READING: u64 = 3;
+
+pub const fn state(ticket: u64, phase: u64) -> u64 {
+    ((ticket + 1) << 2) | phase
+}
 
 #[repr(C)]
 pub struct Slot {
-    pub seq: AtomicU64,
+    pub state: AtomicU64,
     pub frame: u64,
     pub uptime_ms: u64,
     pub len: u32,
@@ -34,6 +48,8 @@ pub struct Ring {
     pub head: AtomicU64,
     /// The reader's game-frame counter; each line carries the value it had when the line was pushed.
     pub frame: AtomicU64,
+    /// Lines a producer dropped because its slot was owned.
+    pub dropped: AtomicU64,
     pub slots: *mut Slot,
 }
 
@@ -109,32 +125,49 @@ pub enum Pop {
 }
 
 impl Ring {
-    /// Producer side.
+    /// The slot of `ticket`.
     ///
     /// # Safety
     /// `slots` points at `slot_count` slots that live as long as the process.
-    pub unsafe fn push(&self, uptime_ms: u64, text: &[u8], truncated: bool) {
-        let count = u64::from(self.slot_count);
-        if count == 0 || self.slots.is_null() {
-            return;
-        }
-        let ticket = self.head.fetch_add(1, Ordering::AcqRel);
-        let slot = self.slots.add((ticket % count) as usize);
-        (*slot).seq.store(2 * ticket + 1, Ordering::Release);
-        fence(Ordering::Release);
-        let len = text.len().min(SLOT_BYTES);
-        core::ptr::copy_nonoverlapping(text.as_ptr(), core::ptr::addr_of_mut!((*slot).bytes).cast::<u8>(), len);
-        core::ptr::write_volatile(core::ptr::addr_of_mut!((*slot).frame), self.frame.load(Ordering::Relaxed));
-        core::ptr::write_volatile(core::ptr::addr_of_mut!((*slot).uptime_ms), uptime_ms);
-        core::ptr::write_volatile(core::ptr::addr_of_mut!((*slot).len), len as u32);
-        core::ptr::write_volatile(core::ptr::addr_of_mut!((*slot).truncated), u32::from(truncated || len < text.len()));
-        (*slot).seq.store(2 * ticket + 2, Ordering::Release);
+    unsafe fn slot(&self, ticket: u64) -> *mut Slot {
+        self.slots.add((ticket % u64::from(self.slot_count)) as usize)
     }
 
-    /// Reader side: the line of ticket `*next` into `out`, or why not.
+    /// Producer side: wait-free; the line is dropped (and counted) when its slot is owned.
     ///
     /// # Safety
-    /// As `push`.
+    /// As `slot`.
+    pub unsafe fn push(&self, uptime_ms: u64, text: &[u8], truncated: bool) -> bool {
+        if self.slot_count == 0 || self.slots.is_null() {
+            return false;
+        }
+        let ticket = self.head.fetch_add(1, Ordering::AcqRel);
+        let slot = self.slot(ticket);
+        let seen = (*slot).state.load(Ordering::Acquire);
+        let older = (seen >> 2) <= ticket;
+        let claimable = older && matches!(seen & 3, FREE | READY);
+        if !claimable
+            || (*slot).state.compare_exchange(seen, state(ticket, WRITING), Ordering::Acquire, Ordering::Relaxed).is_err()
+        {
+            self.dropped.fetch_add(1, Ordering::Relaxed);
+            return false;
+        }
+        // Owned: no other producer and no reader touches these fields until the release below (`state` stays shared).
+        let len = text.len().min(SLOT_BYTES);
+        (*slot).bytes[..len].copy_from_slice(&text[..len]);
+        (*slot).frame = self.frame.load(Ordering::Relaxed);
+        (*slot).uptime_ms = uptime_ms;
+        (*slot).len = len as u32;
+        (*slot).truncated = u32::from(truncated || len < text.len());
+        (*slot).state.store(state(ticket, READY), Ordering::Release);
+        true
+    }
+
+    /// Reader side: the line of ticket `*next` into `out`, or why not. A ticket whose producer dropped its line stays
+    /// `Empty`; the reader skips it after its own deadline (`skip`).
+    ///
+    /// # Safety
+    /// As `slot`.
     pub unsafe fn pop(&self, next: &mut u64, out: &mut [u8; SLOT_BYTES]) -> Pop {
         let count = u64::from(self.slot_count);
         let head = self.head.load(Ordering::Acquire);
@@ -146,24 +179,30 @@ impl Ring {
             *next = head - count;
             return Pop::Lost(lost);
         }
-        let slot = self.slots.add((*next % count) as usize);
-        let want = 2 * *next + 2;
-        let seq = (*slot).seq.load(Ordering::Acquire);
-        if seq < want {
-            return Pop::Empty;
-        }
-        let len = (core::ptr::read_volatile(core::ptr::addr_of!((*slot).len)) as usize).min(SLOT_BYTES);
-        core::ptr::copy_nonoverlapping(core::ptr::addr_of!((*slot).bytes).cast::<u8>(), out.as_mut_ptr(), len);
-        let frame = core::ptr::read_volatile(core::ptr::addr_of!((*slot).frame));
-        let uptime_ms = core::ptr::read_volatile(core::ptr::addr_of!((*slot).uptime_ms));
-        let truncated = core::ptr::read_volatile(core::ptr::addr_of!((*slot).truncated)) != 0;
-        fence(Ordering::Acquire);
-        let again = (*slot).seq.load(Ordering::Relaxed);
-        *next += 1;
-        if seq != want || again != want {
+        let slot = self.slot(*next);
+        let seen = (*slot).state.load(Ordering::Acquire);
+        let ticket = (seen >> 2).wrapping_sub(1);
+        if seen >> 2 > *next + 1 {
+            *next += 1;
             return Pop::Lost(1);
         }
-        Pop::Line { len, frame, uptime_ms, truncated }
+        if ticket != *next || seen & 3 != READY
+            || (*slot).state.compare_exchange(seen, state(*next, READING), Ordering::Acquire, Ordering::Relaxed).is_err()
+        {
+            return Pop::Empty;
+        }
+        // Owned by the reader: producers drop rather than write a READING slot.
+        let len = ((*slot).len as usize).min(SLOT_BYTES);
+        out[..len].copy_from_slice(&(*slot).bytes[..len]);
+        let line = Pop::Line { len, frame: (*slot).frame, uptime_ms: (*slot).uptime_ms, truncated: (*slot).truncated != 0 };
+        (*slot).state.store(state(*next, FREE), Ordering::Release);
+        *next += 1;
+        line
+    }
+
+    /// The reader gives up on ticket `*next` (its producer dropped the line).
+    pub fn skip(&self, next: &mut u64) {
+        *next += 1;
     }
 }
 
