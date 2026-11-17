@@ -1015,19 +1015,6 @@ pub const NOTICE_BODY_FONT: (f32, f32) = (17.0, 26.0);
 /// Where the notice panes start, before the HUD draw sizes them to the notice.
 const NOTICE_BOX: [f32; 4] = [NOTICE_LEFT + NOTICE_MAX_W / 2.0, NOTICE_TOP - 40.0, NOTICE_MAX_W, 80.0];
 
-/// Which notice texts are shown. The one plate, `TrModDisp0HdrPlate`, behind both texts, uses the header's flag.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NoticeFaces {
-    pub header: bool,
-    pub body: bool,
-    pub long_body: bool,
-}
-
-/// `shown` is the notice container. A long body uses the long text and hides the short one.
-pub const fn notice_faces(shown: bool, long_body: bool) -> NoticeFaces {
-    NoticeFaces { header: shown, body: shown && !long_body, long_body: shown && long_body }
-}
-
 /// `[x, y, w, h]`: a pane's place and size, the order `Spec` keeps them in.
 const fn rect(name: Name, [x, y, w, h]: [f32; 4], color: [u8; 4], visible: bool) -> Spec {
     Spec { name, parent: ROOT, kind: Kind::Rect { color }, x, y, w, h, visible }

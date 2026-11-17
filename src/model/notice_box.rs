@@ -115,10 +115,7 @@ pub struct NoticeBox {
 /// `MAX_TEXT_W`, so the plate is never wider than `NOTICE_MAX_W`. Returns the boxes and the two texts' lengths.
 pub fn layout(header: &str, heading: &mut [u16; HEADER_UNITS], body: &mut [u16], len: usize) -> (NoticeBox, usize, usize) {
     let [head, text] = [NOTICE_HEADER_FONT, NOTICE_BODY_FONT];
-    let mut header_len = 0;
-    for (slot, unit) in heading.iter_mut().zip(header.encode_utf16()) {
-        (*slot, header_len) = (unit, header_len + 1);
-    }
+    let header_len = heading.iter_mut().zip(header.encode_utf16()).map(|(slot, unit)| *slot = unit).count();
     let header_len = wrap(heading, header_len, MAX_TEXT_W, head.0, 1);
     let len = wrap(body, len, MAX_TEXT_W, text.0, MAX_LINES);
     let (header_w, _) = measure(heading[..header_len].iter().copied(), head.0);

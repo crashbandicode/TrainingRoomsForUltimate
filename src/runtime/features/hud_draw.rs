@@ -188,13 +188,14 @@ unsafe fn write_notice(container: *mut Pane, out: &TickOut, chip: Option<[f32; 4
         let (placed, header_len, len) = notice_box::layout(draw.header, &mut heading, &mut buffer, len);
         NOTICE_H.store(placed.plate[3].to_bits(), Ordering::Release);
         let long = len > crate::model::boot_notices::SHORT_UNITS;
-        let face = p::notice_faces(out.visible, long);
+        // The one plate behind both texts shows with the header; a long body uses the long text and hides the short one.
+        let shown = out.visible;
         let [header, plate, text, long_text] =
             [p::IDX_NOTICE_HEADER, p::IDX_NOTICE_HEADER_PLATE, p::IDX_NOTICE_TEXT, p::IDX_NOTICE_LONG].map(|i| find(container, i));
-        place(plate, placed.plate, face.header);
-        place(header, placed.header, face.header);
-        place(text, placed.body, face.body);
-        place(long_text, placed.body, face.long_body);
+        place(plate, placed.plate, shown);
+        place(header, placed.header, shown);
+        place(text, placed.body, shown && !long);
+        place(long_text, placed.body, shown && long);
         if !header.is_null() {
             pane::set_text(header, &heading[..header_len]);
         }

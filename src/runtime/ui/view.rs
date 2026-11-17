@@ -4,7 +4,7 @@
 use skyline::nn::ui2d::Pane;
 
 use crate::model::effect_chips::Placement;
-use crate::model::frame::{DialogBox, Frame, Tone, View};
+use crate::model::frame::{Frame, Tone, View};
 use crate::model::menu::options::DIRECTIONS;
 use crate::model::menu::CHIP_POS;
 use crate::model::screens::{TILE_GREYED, TILE_HIDDEN};
@@ -428,17 +428,11 @@ impl Panes {
                 self.hide(index);
             }
         }
-        let page = DialogBox { bg: [0.0, 0.0, PANEL_W, PANEL_H], help_y: p::HELP_Y, hint_y: p::HINT_Y };
-        let DialogBox { bg: [x, y, w, h], help_y, hint_y } = dialog.unwrap_or(page);
+        let ([x, y, w, h], help_y, hint_y) = dialog.unwrap_or(([0.0, 0.0, PANEL_W, PANEL_H], p::HELP_Y, p::HINT_Y));
         self.at(IDX_HELP, p::HELP_X, help_y[0]);
         self.at(IDX_HELP + 1, p::HELP_X, help_y[1]);
         self.at(IDX_HINT, p::HELP_X, hint_y);
-        let bg = self.all[IDX_BG];
-        if !bg.is_null() {
-            pane::set_pos(bg, x, y);
-            pane::set_width(bg, w);
-            pane::set_height(bg, h);
-        }
+        self.rect_at(IDX_BG, x, y, w, h, p::PANEL);
     }
 }
 

@@ -384,18 +384,11 @@ impl Default for Frame {
     }
 }
 
-/// A dialog's box (2026-11-17: every dialog takes only the space it needs): the background `[x, y, w, h]` around the
-/// crumb, the content and the help and hint lines, which follow the content instead of the page's foot.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct DialogBox {
-    pub bg: [f32; 4],
-    pub help_y: [f32; 2],
-    pub hint_y: f32,
-}
-
 impl Frame {
-    /// The box of a dialog (`dialog`) or the recording pop-up (`popup`); `None` for a page, which keeps the full panel.
-    pub fn dialog_box(&self) -> Option<DialogBox> {
+    /// A dialog's box (2026-11-17: every dialog takes only the space it needs), for a dialog (`dialog`) or the recording
+    /// pop-up (`popup`): the background `[x, y, w, h]` around the crumb, the content and the help and hint lines, and the
+    /// help lines' and hint's y, which follow the content instead of the page's foot. `None` for a page (the full panel).
+    pub fn dialog_box(&self) -> Option<([f32; 4], [f32; 2], f32)> {
         use super::notice_box::measure;
         use super::panes as p;
         const LEFT: f32 = -880.0;
@@ -428,7 +421,7 @@ impl Frame {
         right = right.max(right_of(self.hint.units(), p::FONT_SMALL)) + PAD;
         let top = if self.popup { p::TAB_Y } else { p::CRUMB_Y } + 28.0 + PAD;
         let (left, bottom) = (LEFT - PAD, hint_y - 22.0 - PAD);
-        Some(DialogBox { bg: [(left + right) / 2.0, (top + bottom) / 2.0, right - left, top - bottom], help_y, hint_y })
+        Some(([(left + right) / 2.0, (top + bottom) / 2.0, right - left, top - bottom], help_y, hint_y))
     }
 }
 

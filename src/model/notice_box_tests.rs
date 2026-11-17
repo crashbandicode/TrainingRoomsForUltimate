@@ -154,8 +154,9 @@ fn notice_box_long_name_is_hard_broken_within_bounds() {
         assert_eq!(kept, body.replace(' ', ""), "every character is kept");
     }
     let word = "W".repeat(40);
-    assert_eq!(wrapped(&word).replace('\n', ""), word);
-    assert!(wrapped(&word).contains('\n'));
+    let (_, lines, text) = boxed("Saved layouts", &word);
+    let text = String::from_utf16(&text).unwrap();
+    assert!(lines == 3 && text.replace('\n', "") == word, "{text}");
 }
 
 /// Review R1: no room to insert a break, or more than `MAX_LINES` lines: the text ends in `…`, still within bounds; a
@@ -231,9 +232,9 @@ fn dialog_box_fits_its_content() {
     use core::fmt::Write;
     let inside = |frame: &Frame, right: f32, bottom: f32| {
         let d = frame.dialog_box().expect("a dialog");
-        let [x, y, w, h] = d.bg;
+        let ([x, y, w, h], help_y, hint_y) = d;
         assert!(x - w / 2.0 <= -880.0 && x + w / 2.0 >= right && y + h / 2.0 >= p::CRUMB_Y + 28.0, "{:?}", d);
-        assert!(y - h / 2.0 <= d.hint_y - 22.0 && d.hint_y < bottom && d.help_y[0] < bottom, "{:?}", d);
+        assert!(y - h / 2.0 <= hint_y - 22.0 && hint_y < bottom && help_y[0] < bottom, "{:?}", d);
         assert!(w < 0.7 * p::PANEL_W && h < 0.5 * p::PANEL_H, "{:?} is not compact", d);
     };
     let mut delete = Frame::new();
@@ -257,8 +258,8 @@ fn dialog_box_fits_its_content() {
     inside(&reset, p::row_label_box(false).0, p::row_y(2) - p::ROW_H / 2.0);
     let mut popup = Frame::new();
     (popup.popup, popup.row_count, popup.conn_count) = (true, 4, 3);
-    let d = popup.dialog_box().expect("the recording pop-up");
-    assert!(d.bg[0] + d.bg[2] / 2.0 >= p::CONN_RIGHT && d.bg[3] < p::PANEL_H, "{d:?}");
+    let (bg, _, _) = popup.dialog_box().expect("the recording pop-up");
+    assert!(bg[0] + bg[2] / 2.0 >= p::CONN_RIGHT && bg[3] < p::PANEL_H, "{bg:?}");
     assert_eq!(Frame::new().dialog_box(), None, "a page keeps the full panel");
 }
 
