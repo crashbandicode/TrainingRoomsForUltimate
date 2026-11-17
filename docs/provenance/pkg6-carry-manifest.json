@@ -12398,7 +12398,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "63625a30db3789c3d9c8c59b189b3483a04c3baaf38818e0f9204d5359717220",
+   "dest_sha256": "3b7bc91f77aa7153c9ec1eaaee7d3bb5ec6c48fe7486c62bb630cdf6e204156e",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -13936,11 +13936,6 @@
      "old": "    queue_admitted(Role::Player, Selection::Direct(fighter), false, true)\n",
      "new": "    matches!(queue_admitted(Role::Player, Selection::Direct(fighter), false, true), Admission::Accepted | Admission::Superseded)\n",
      "reason": "RESHIP-3 typed LEAD admission to existing boolean callback: only actual Accepted/Superseded requests report success; consumed refusals never do. Primary combined integration2026-11-17."
-    },
-    {
-     "old": "pub fn busy() -> bool {\n    INSTALL.suspends_practice()\n}\n",
-     "new": "pub fn busy() -> bool {\n    INSTALL.suspends_practice()\n}\n\n/// The live native entry of practice slot `slot` (0 Player 1, 1 the CPU), for a reader in the current native callback\n/// (`lra_reset::reset_check`, CRASH-0900). Never saved.\npub(crate) unsafe fn practice_entry(slot: u32) -> Option<*const u8> {\n    native_source::entry(slot)\n}\n",
-     "reason": "CRASH-0900 (primary 2026-11-17 09:55Z): the L+R+A reset gate reads practice entries 0/1 through the private native_source::entry; no behaviour change here."
     }
    ]
   },

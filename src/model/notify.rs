@@ -78,6 +78,8 @@ struct Entry {
     drawn: bool,
     /// The id of a standing notice (`upsert`), `None` for a plain one.
     standing: Option<u8>,
+    /// A required refusal (`post_required`): Combo Display Off does not clear it (CRASH-0900 review R2).
+    required: bool,
 }
 
 /// What the pane writer writes when a notice is drawn for the first time.
@@ -166,7 +168,17 @@ impl Queue {
             return;
         }
         let at = self.plain_position();
-        self.insert(at, Entry { header, body, length: length.max(1), color, drawn: false, standing: None });
+        self.insert(at, Entry { header, body, length: length.max(1), color, drawn: false, standing: None, required: false });
+    }
+
+    /// Append a required plain notice: a refusal the player must see even with the game's Combo Display Off, which
+    /// clears every other notice (`tick`). Placed and dropped as a plain notice otherwise.
+    pub fn post_required(&mut self, header: &'static str, body: Body, length: u16, color: [u8; 4]) {
+        if !self.make_room() {
+            return;
+        }
+        let at = self.plain_position();
+        self.insert(at, Entry { header, body, length: length.max(1), color, drawn: false, standing: None, required: true });
     }
 
     pub fn post_static(&mut self, header: &'static str, body: &'static str, length: u16, color: [u8; 4]) {
@@ -216,7 +228,7 @@ impl Queue {
     /// no plain notice to drop ignores a new id (an existing one is always updated).
     pub fn upsert(&mut self, id: u8, header: &'static str, body: Body, length: u16, color: [u8; 4]) {
         self.forget_delivery(id);
-        let entry = Entry { header, body, length: length.max(1), color, drawn: false, standing: Some(id) };
+        let entry = Entry { header, body, length: length.max(1), color, drawn: false, standing: Some(id), required: false };
         if let Some(at) = (0..self.len).find(|&i| self.entries[i].is_some_and(|e| e.standing == Some(id))) {
             self.entries[at] = Some(entry);
         } else if self.make_room() {
@@ -237,7 +249,7 @@ impl Queue {
         if let Some(first) = self.entries[0].as_mut() {
             first.drawn = false;
         }
-        self.insert(0, Entry { header, body, length: length.max(1), color, drawn: false, standing: Some(id) });
+        self.insert(0, Entry { header, body, length: length.max(1), color, drawn: false, standing: Some(id), required: false });
     }
 
     /// Remove the standing notice `id` (queued or on screen) and its delivery record.
@@ -289,7 +301,15 @@ impl Queue {
     /// `menu_open` hides the slot and, by decision B8, stops the countdown.
     pub fn tick(&mut self, combo_display: bool, menu_open: bool) -> TickOut {
         if !combo_display {
-            self.clear();
+            // Every notice but a required refusal (`post_required`); delivery records stay, as in `clear`.
+            let mut i = 0;
+            while i < self.len {
+                if self.entries[i].is_some_and(|e| e.required) {
+                    i += 1;
+                } else {
+                    self.remove(i);
+                }
+            }
         }
         let Some(mut first) = self.entries[0] else {
             return TickOut { visible: false, draw: None };

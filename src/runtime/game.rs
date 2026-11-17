@@ -116,6 +116,13 @@ pub fn allow_natives(group: NativeGroup) {
     .store(true, Ordering::Release);
 }
 
+/// The entry lookup (`fighter_manager_get_entry`) passed its guard and `natives::fighter_entry` may call it
+/// (`NativeGroup::Entry`, granted by boot only on success). CRASH-0900 R1: the L+R+A gate asks this before it
+/// reads any entry.
+pub fn entry_lookup_usable() -> bool {
+    ENTRY_NATIVES_USABLE.load(Ordering::Acquire)
+}
+
 /// The game's constant table lookup `lib::lua_bind_get_value<int>(key, out)` (`main+0x3728e10`), asked
 /// for one constant's key (`model::cpu::hash::lua_bind_hash` of its identifier). `None` when the game
 /// does not know the key (or its table is not built yet).

@@ -38,6 +38,27 @@ pub const fn loader_resting(state: Option<u8>) -> bool {
     matches!(state, Some(LOADER_RESTING))
 }
 
+/// Whether a practice fighter loads, for the reset gate (CRASH-0900; review R1 2026-11-17).
+///
+/// - `install_busy` (the roster's suspending INSTALL token) decides first, with no native call: every TR
+///   Player/CPU load takes it before its native submission and keeps it through settlement, including the cold
+///   group swap's cleared window and its asynchronous construction (Astra review, "Cold construction").
+/// - Only when the entry lookup passed its guard (`lookup_usable`, `NativeGroup::Entry`) is `loader_state(slot)`
+///   asked for entries 0 and 1: `None` no such entry, `Some(byte)` its `+0x591c` (or `Some(None)` unreadable,
+///   not at rest). A loader away from rest is a native transition the token does not own.
+/// - With the lookup unavailable `loader_state` is never called. The answer is then the token alone: that is
+///   not "unavailable means nothing loads", it is the authoritative TR ownership signal without the native
+///   cross-check. Refusing every reset instead would take a vanilla feature away on a version mismatch.
+pub fn fighter_loading(install_busy: bool, lookup_usable: bool, mut loader_state: impl FnMut(u32) -> Option<Option<u8>>) -> bool {
+    if install_busy {
+        return true;
+    }
+    if !lookup_usable {
+        return false;
+    }
+    [0u32, 1].into_iter().any(|slot| loader_state(slot).is_some_and(|state| !loader_resting(state)))
+}
+
 /// The value `x8` holds at the hook when the game is about to reset: the site is
 /// `cmp w8, #0x2; b.ne <no reset>` (`main+0x1378e50`, `w8 = [x8+0x240]`).
 pub const RESET_REQUESTED: u64 = 2;

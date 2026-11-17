@@ -57,6 +57,64 @@ fn crash0900_no_native_reset_while_a_practice_fighter_loads() {
 }
 
 #[test]
+fn crash0900_r1_a_rejected_entry_lookup_is_never_called() {
+    let never = |_slot: u32| -> Option<Option<u8>> { panic!("the rejected entry lookup was called") };
+    // The lookup row failed its guard (`NativeGroup::Entry` not granted): the reset path never calls it, and the
+    // answer is the install token alone (not "nothing loads": a busy token still refuses).
+    assert!(!lra_reset::fighter_loading(false, false, never));
+    assert!(lra_reset::fighter_loading(true, false, never));
+    // The install token decides first, with no native call even when the lookup is usable.
+    assert!(lra_reset::fighter_loading(true, true, never));
+    // Usable lookup, no token: entries 0 and 1 are asked; a loader away from rest (or unreadable) loads.
+    let mut asked = Vec::new();
+    assert!(lra_reset::fighter_loading(false, true, |slot| { asked.push(slot); if slot == 0 { Some(Some(13)) } else { Some(Some(14)) } }));
+    assert_eq!(asked, vec![0]);
+    assert!(lra_reset::fighter_loading(false, true, |slot| if slot == 1 { Some(None) } else { Some(Some(14)) }));
+    assert!(!lra_reset::fighter_loading(false, true, |_| Some(Some(14))));
+    assert!(!lra_reset::fighter_loading(false, true, |_| None));
+}
+
+#[test]
+fn crash0900_r1_the_reset_hook_reads_entries_only_through_the_guarded_lookup() {
+    let root = env!("CARGO_MANIFEST_DIR");
+    let hook = std::fs::read_to_string(format!("{root}/src/runtime/features/lra_reset.rs")).unwrap();
+    for raw in ["native_source", "get_fighter_entry", "FighterManager::", "practice_entry"] {
+        assert!(!hook.contains(raw), "the reset hook must not reach `{raw}` (an unguarded entry lookup)");
+    }
+    assert!(hook.contains("game::entry_lookup_usable()") && hook.contains("game::natives::fighter_entry("));
+    let game = std::fs::read_to_string(format!("{root}/src/runtime/game.rs")).unwrap();
+    let body = &game[game.find("pub unsafe fn fighter_entry(").unwrap()..];
+    let body = &body[..body.find("\n    }\n").unwrap()];
+    assert!(body.contains("ENTRY_NATIVES_USABLE.load"), "the guarded lookup answers 0 until its row passed");
+}
+
+#[test]
+fn crash0900_r2_the_refusal_is_drawn_with_combo_display_off() {
+    use lra_reset::{gate, RESET_REQUESTED};
+    use model::notify::{Body, Queue, DEFAULT_COLOR};
+    const BUSY: &str = "Wait for the character swap to finish";
+    // The runtime's path: the gate asks for the notice, which is posted required; the HUD tick runs with the game's
+    // Combo Display Off (`tick(false, ..)`), which clears every other notice.
+    let mut queue = Queue::new();
+    queue.post_static("Other", "a plain notice", 60, DEFAULT_COLOR);
+    let (_, refused, notice) = gate(RESET_REQUESTED, true, true, true, false);
+    assert!(refused && notice);
+    queue.post_required(lra_reset::REFUSED_HEADER, Body::copied(BUSY), 120, DEFAULT_COLOR);
+    let out = queue.tick(false, false);
+    assert!(out.visible);
+    let draw = out.draw.expect("the refusal is drawn");
+    assert_eq!((draw.header, draw.body.as_str()), (lra_reset::REFUSED_HEADER, BUSY));
+    // Other notices keep their rule: Combo Display Off clears a plain one.
+    let mut plain = Queue::new();
+    plain.post_static("Other", "a plain notice", 60, DEFAULT_COLOR);
+    assert!(!plain.tick(false, false).visible);
+    // L+R+A Reset Off stays silent: no notice is asked for, so nothing is posted or drawn.
+    let (write, refused, notice) = gate(RESET_REQUESTED, false, true, true, false);
+    assert_eq!((write, refused, notice), (Some(0), false, false));
+    assert!(!Queue::new().tick(false, false).visible);
+}
+
+#[test]
 fn crash0900_a_refused_reset_is_never_silent() {
     use lra_reset::{gate, RESET_REQUESTED};
     // The player's L+R+A mid-load: refused, and the notice is posted once (header the setting's label; body the
