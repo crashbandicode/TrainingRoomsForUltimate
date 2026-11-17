@@ -1705,3 +1705,11 @@ ceiling = 148646
 date = "2026-11-16"
 reason = "rc.15 hardware reship-2: exact combined implementation 148646, +138 from card-verified 9f683363 (148508), after reviewed menu frame_after follow-up through 4e972211 and docs/tests-only Loop d03c9e60. No counting, guard, gate or feature change."
 approved_by = "Operator rc.15 size approval; primary 2026-11-16 reship-2 instruction explicitly approves menu frame_after +138 under rc.15, opus-review PASS 21:21Z, and orders the combined size recorded."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 148683
+date = "2026-11-17"
+reason = "RESHIP-2 projectile rebuild: exact combined implementation 148683, +37 from prior reship-2 148646 and +175 from card base9f683363 (148508). Includes reviewed menu frame_after, Loop docs/tests and BTT owned64-slot article pool through cf999194. Counting rules, guards and gates unchanged."
+approved_by = "Operator rc.15 size approval; primary latest rebuild direction explicitly orders the combined size recorded under rc.15 approval after stacking reviewed BTTdbe9edc7..cf999194 (opus-review PASS2026-11-16 23:56Z)."
