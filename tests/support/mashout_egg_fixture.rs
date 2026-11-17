@@ -83,6 +83,8 @@ static ARMED: AtomicU64 = AtomicU64::new(0);
 static GENERATION: AtomicU64 = AtomicU64::new(5);
 static CPU_STATUS: AtomicU32 = AtomicU32::new(0);
 static ROLLER_LR: AtomicU32 = AtomicU32::new(1.0f32.to_bits());
+static INIT_POS_X: AtomicU32 = AtomicU32::new(0);
+static INIT_POS_CALLS: AtomicUsize = AtomicUsize::new(0);
 static FREEZE_NO_BANG: AtomicU32 = AtomicU32::new(1);
 static JUDGE_FIXED: AtomicBool = AtomicBool::new(false);
 static JUDGE_KIND: AtomicU32 = AtomicU32::new(7);
@@ -283,7 +285,11 @@ mod state_natives {
         pub z: f32,
     }
     pub fn clear_speed_all(_: usize) {}
-    pub fn init_pos(_: usize, _: &Vector3f) {}
+    pub fn init_pos(actor: usize, position: &Vector3f) {
+        assert_eq!(actor, 2);
+        super::INIT_POS_X.store(position.x.to_bits(), super::Ordering::Relaxed);
+        super::INIT_POS_CALLS.fetch_add(1, super::Ordering::Relaxed);
+    }
     pub fn set_lr(_: usize, _: f32) {}
     pub fn status_request(accessor: usize, status: i32) {
         super::REQUESTS.with_borrow_mut(|v| v.push((accessor, status)));
@@ -524,6 +530,8 @@ impl NativeMemory {
         COVERED.store(false, Ordering::Relaxed);
         AIR.store(false, Ordering::Relaxed);
         ROLLER_LR.store(1.0f32.to_bits(), Ordering::Relaxed);
+        INIT_POS_X.store(0, Ordering::Relaxed);
+        INIT_POS_CALLS.store(0, Ordering::Relaxed);
         REQUESTS.with_borrow_mut(Vec::clear);
         QUEUE.with_borrow_mut(Vec::clear);
         END_QUEUE.with_borrow_mut(Vec::clear);
@@ -1298,6 +1306,56 @@ fn bury_specials_request_native_start_and_use_actual_bury_seed() {
         }
     }
 }
+#[test]
+fn actual_place_uses_measured_flip_spacing_and_preserves_other_plans() {
+    for (id, plan, kind, name, evidence, expected_spacing) in [
+        (
+            108,
+            Plan::Flip,
+            32,
+            "Zero Suit Samus",
+            "B11",
+            41.123188019_f32,
+        ),
+        (
+            101,
+            Plan::DownSmash,
+            28,
+            "Mr. Game & Watch",
+            "B04",
+            14.2_f32,
+        ),
+        (99, Plan::UpSpecial, 42, "King Dedede", "B02", 6.0_f32),
+    ] {
+        unsafe {
+            let mut m = NativeMemory::new();
+            let mut g = Game::new(plan, State::Bury);
+            let request = g.requested.as_mut().unwrap();
+            request.id = id;
+            request.attacker_kind = kind;
+            request.attacker_name = name;
+            request.evidence = evidence;
+            m.body[3] = kind;
+            g.step = Step::Place;
+            CPU_STATUS.store(0, Ordering::Relaxed);
+
+            m.update(&mut g, 0);
+
+            assert_eq!(g.step, Step::Settle);
+            assert_eq!(INIT_POS_CALLS.load(Ordering::Relaxed), 1);
+            let placed_x = f32::from_bits(INIT_POS_X.load(Ordering::Relaxed));
+            assert_eq!(placed_x, expected_spacing);
+            if plan == Plan::Flip {
+                let displacements = [35.235_488_892_f32, 36.510_887_146_f32];
+                assert!(displacements.iter().all(|d| 6.0_f32 - d < 0.0));
+                assert!(displacements
+                    .iter()
+                    .all(|d| (0.0_f32..=10.5_f32).contains(&(placed_x - d))));
+            }
+        }
+    }
+}
+
 #[test]
 fn bury_specials_miss_and_nonbury_seed_keep_existing_refusals() {
     for (id, plan, kind, name, start, statuses) in [

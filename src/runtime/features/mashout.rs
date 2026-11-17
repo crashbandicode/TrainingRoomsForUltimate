@@ -963,8 +963,7 @@ pub unsafe fn frame(fighter: usize) {
                     facing = (position.x - centre).signum();
                 }
             }
-            // G&W down smash's bury hitbox is the native tip at x=±14.2 (MOVES B04).
-            let spacing = if request.evidence == "B04" { 14.2 } else { 6.0 };
+            let spacing = entry::placement_spacing(request);
             state_natives::init_pos(
                 cpu,
                 &state_natives::Vector3f {

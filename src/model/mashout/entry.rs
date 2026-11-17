@@ -2,6 +2,19 @@
 use super::moves::{Plan, Scenario, State};
 use crate::model::{cpu::ids::C, input_delay::MappedInputs};
 
+/// B04 keeps G&W's 14.2 tip spacing. Move108's Flip value is the midpoint
+/// from native frames30/31 in artifacts/rc15-mashout/MEASURED-FIXTURES-108-95.md;
+/// it is translation evidence, not collision or floor-contact proof.
+pub fn placement_spacing(scenario: Scenario) -> f32 {
+    if scenario.evidence == "B04" {
+        14.2
+    } else if scenario.plan == Plan::Flip {
+        41.123_188
+    } else {
+        6.0
+    }
+}
+
 /// The original move status is requested on the attacker only. Victim statuses and links are native.
 pub fn start(move_: Scenario) -> Option<&'static str> {
     Some(match move_.plan {
