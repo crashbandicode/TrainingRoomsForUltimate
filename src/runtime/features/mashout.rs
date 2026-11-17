@@ -310,6 +310,7 @@ struct Game {
     saw_catch: bool,
     followed: bool,
     restore_requested: bool,
+    trolley: Option<entry::TrolleyEntry>,
 }
 impl Game {
     const fn new() -> Self {
@@ -327,6 +328,7 @@ impl Game {
             saw_catch: false,
             followed: false,
             restore_requested: false,
+            trolley: None,
         }
     }
     fn step(&mut self, next: Step, text: &'static str) {
@@ -428,6 +430,56 @@ unsafe fn judge_choice(cpu: usize, saw_unfixed: &mut bool) -> Result<Option<bool
     let fixed = natives::is_flag(cpu, fixed);
     *saw_unfixed |= !fixed;
     entry::judge_outcome(*saw_unfixed, fixed, natives::get_int(cpu, kind))
+}
+
+/// Native owned-cart read only; the move creates and ejects its own article.
+unsafe fn trolley_input(cpu: usize, status: i32, actor: &mut Option<entry::TrolleyEntry>)
+    -> Result<MappedInputs, ()>
+{
+    use crate::model::sites_pkg3 as sites;
+    if ![
+        sites::STATE_ARTICLE_IS_EXIST_OFFSET, sites::STATE_ARTICLE_GET_ARTICLE_OFFSET,
+        sites::STATE_ARTICLE_OBJECT_ID_OFFSET, sites::STATE_OBJECT_IS_ACTIVE_OFFSET,
+        sites::STATE_OBJECT_MODULE_ACCESSOR_OFFSET, sites::STATE_LINK_PARENT_OBJECT_ID_OFFSET,
+        crate::model::sites_pkg2::WORK_GET_INT_OFFSET,
+    ].into_iter().all(game::granted) { return Err(()); }
+    let [Some(special), Some(failed), Some(ride), Some(drive), Some(jump), Some(article),
+        Some(link), Some(counter)] = [
+        C::StatusSpecialS, C::PickelTrolleyFailed, C::PickelTrolleyRide,
+        C::PickelTrolleyDrive, C::PickelTrolleyJump, C::PickelTrolleyArticle,
+        C::PickelTrolleyLink, C::PickelTrolleyJumpDisable,
+    ].map(state_id) else { return Err(()); };
+    let phase = if status == failed { entry::TrolleyStatus::Failed }
+        else if status == ride { entry::TrolleyStatus::Ride }
+        else if status == drive { entry::TrolleyStatus::Drive }
+        else if status == jump { entry::TrolleyStatus::Jump }
+        else if status == special { entry::TrolleyStatus::Special }
+        else { entry::TrolleyStatus::Other };
+    let mut cart = None;
+    let mut jump_disable = None;
+    if state_natives::article_is_exist(cpu, article) {
+        let object = state_natives::article_get(cpu, article);
+        if object == 0 { return Err(()); }
+        let object_id = state_natives::article_object_id(object);
+        if !state_natives::object_is_active(object_id) { return Err(()); }
+        let accessor = state_natives::object_accessor(object_id);
+        if accessor == 0 { return Err(()); }
+        if phase == entry::TrolleyStatus::Drive {
+            if state_natives::link_parent_object_id(cpu, link) as u32 != object_id {
+                return Err(());
+            }
+            jump_disable = Some(natives::get_int(accessor, counter));
+        }
+        if state_natives::article_get(cpu, article) != object
+            || !state_natives::object_is_active(object_id)
+            || state_natives::object_accessor(object_id) != accessor
+        { return Err(()); }
+        cart = Some(entry::OwnedTrolley { cpu, article: object, object_id, accessor });
+    }
+    if actor.is_none() { *actor = entry::TrolleyEntry::new(cpu); }
+    actor.as_mut().ok_or(())?.observe(phase, entry::TrolleyRead {
+        readers_ready: true, cpu, cart, jump_disable,
+    }).map_err(|_| ())
 }
 
 unsafe fn arm(p1: usize, generation: u64) -> bool {
@@ -613,6 +665,11 @@ pub unsafe fn frame(fighter: usize) {
         {
             game.fail("Move entry unconfirmed · no grade"); return;
         }
+        if game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Trolley)
+            && state_id(C::ClatterCatchedPickelTrolley) != Some(status)
+        {
+            game.fail("Move entry unconfirmed · no grade"); return;
+        }
         let ordinary_catch = game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Grab);
         let cpu_status = natives::status_kind(cpu);
         if !scored || (ordinary_catch && ![ids[1], ids[8], ids[9], ids[10]].contains(&cpu_status)) {
@@ -689,6 +746,7 @@ pub unsafe fn frame(fighter: usize) {
             game.generation = GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
             game.saw_catch = false;
             game.followed = false;
+            game.trolley = None;
             game.step(Step::Reload, "Mash out · Setting up");
         }
         Step::Retry => (),
@@ -717,6 +775,7 @@ pub unsafe fn frame(fighter: usize) {
             game.cpu = cpu;
             game.saw_catch = false;
             game.followed = false;
+            game.trolley = None;
             revoke();
             game.step = Step::Reload;
             post(
@@ -879,6 +938,12 @@ pub unsafe fn frame(fighter: usize) {
                 let mut input = MappedInputs::NEUTRAL;
                 input.lstick_x = if natives::lr(cpu) > 0.0 { 120 } else { -120 };
                 drive(input);
+            }
+            if request.plan == crate::model::mashout::moves::Plan::Trolley {
+                match trolley_input(cpu, cpu_status, &mut game.trolley) {
+                    Ok(input) => drive(input),
+                    Err(()) => { game.fail(UNAVAILABLE_NOTICE); return; }
+                }
             }
             if request.plan == crate::model::mashout::moves::Plan::Pin && !game.followed {
                 let Some((special, attack)) =

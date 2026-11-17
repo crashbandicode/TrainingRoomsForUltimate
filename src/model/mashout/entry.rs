@@ -11,7 +11,7 @@ pub fn start(move_: Scenario) -> Option<&'static str> {
             _ => "FIGHTER_STATUS_KIND_CATCH",
         },
         Plan::AirSideSpecial => "FIGHTER_STATUS_KIND_JUMP_SQUAT",
-        Plan::SideSpecial | Plan::Cling | Plan::Drag | Plan::Whip | Plan::Roller | Plan::Pin | Plan::Judge => {
+        Plan::SideSpecial | Plan::Cling | Plan::Drag | Plan::Whip | Plan::Roller | Plan::Pin | Plan::Judge | Plan::Trolley => {
             "FIGHTER_STATUS_KIND_SPECIAL_S"
         }
         Plan::Egg | Plan::Inhale | Plan::NeutralSpecial | Plan::Freeze | Plan::IceShot => {
@@ -33,6 +33,97 @@ pub fn judge_outcome(saw_unfixed: bool, fixed: bool, kind: i32) -> Result<Option
     if !saw_unfixed || !fixed { return Ok(None); }
     if !(0..=8).contains(&kind) { return Err("invalid native Judge choice"); }
     Ok(Some(kind == 7))
+}
+
+/// Native Pickel entry phases, not elapsed-frame or capture predictions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TrolleyStatus { Special, Ride, Drive, Jump, Failed, Other }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TrolleyPhase { AwaitRide, Ride, Drive, JumpRequested, Ejected }
+
+/// The current CPU-owned article -> object id -> active BOMA chain.
+/// Runtime must obtain all fields through granted native reads; Article* is not BOMA.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OwnedTrolley {
+    pub cpu: usize,
+    pub article: usize,
+    pub object_id: u32,
+    pub accessor: usize,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TrolleyRead {
+    /// All native grants/constants and the CPU-owned active article chain were checked.
+    pub readers_ready: bool,
+    pub cpu: usize,
+    pub cart: Option<OwnedTrolley>,
+    /// None means no guarded native read, never an inferred/default zero.
+    pub jump_disable: Option<i32>,
+}
+
+/// Per-attempt state. It supplies only mapped input: no article/resource/status writes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TrolleyEntry {
+    cpu: usize,
+    phase: TrolleyPhase,
+    cart: Option<OwnedTrolley>,
+}
+impl TrolleyEntry {
+    pub fn new(cpu: usize) -> Option<Self> {
+        (cpu != 0).then_some(Self { cpu, phase: TrolleyPhase::AwaitRide, cart: None })
+    }
+    #[cfg(test)]
+    pub fn phase(&self) -> TrolleyPhase { self.phase }
+    fn owned(&self, read: TrolleyRead) -> Result<OwnedTrolley, &'static str> {
+        let cart = read.cart.ok_or("native Trolley unavailable")?;
+        if cart.cpu != self.cpu || cart.article == 0 || cart.accessor == 0
+            || self.cart.is_some_and(|old| old != cart)
+        { return Err("native Trolley identity changed"); }
+        Ok(cart)
+    }
+    fn drive(&mut self, read: TrolleyRead) -> Result<MappedInputs, &'static str> {
+        let cart = self.owned(read)?;
+        let counter = read.jump_disable.ok_or("native Trolley counter unavailable")?;
+        if self.phase == TrolleyPhase::JumpRequested && counter != 0 {
+            return Err("native Trolley jump eligibility changed");
+        }
+        self.cart = Some(cart);
+        if counter == 0 {
+            self.phase = TrolleyPhase::JumpRequested;
+            // pickel4a340..4a3b8 consumes JumpButton only at native exact zero.
+            // Keep one held edge until actual JUMP; never pulse by callback count.
+            Ok(MappedInputs { buttons: 0x4, ..MappedInputs::NEUTRAL })
+        } else {
+            self.phase = TrolleyPhase::Drive;
+            Ok(MappedInputs::NEUTRAL)
+        }
+    }
+    /// Call only for the selected current CPU. Err requires ordinary revoke/failure.
+    /// Ejected confirms native JUMP only; it is not empty-cart contact or a seed.
+    /// This does not extend the runtime's existing WAIT-without-capture policy.
+    pub fn observe(&mut self, status: TrolleyStatus, read: TrolleyRead)
+        -> Result<MappedInputs, &'static str>
+    {
+        if !read.readers_ready { return Err("native Trolley readers unavailable"); }
+        if read.cpu != self.cpu { return Err("native Trolley CPU changed"); }
+        if status == TrolleyStatus::Failed { return Err("native Trolley creation failed"); }
+        match (self.phase, status) {
+            (TrolleyPhase::AwaitRide, TrolleyStatus::Special | TrolleyStatus::Other) =>
+                Ok(MappedInputs::NEUTRAL),
+            (TrolleyPhase::AwaitRide | TrolleyPhase::Ride, TrolleyStatus::Ride) => {
+                self.phase = TrolleyPhase::Ride;
+                Ok(MappedInputs::NEUTRAL)
+            }
+            (TrolleyPhase::Ride | TrolleyPhase::Drive | TrolleyPhase::JumpRequested,
+                TrolleyStatus::Drive) => self.drive(read),
+            (TrolleyPhase::JumpRequested, TrolleyStatus::Jump) => {
+                self.owned(read)?;
+                self.phase = TrolleyPhase::Ejected;
+                Ok(MappedInputs::NEUTRAL)
+            }
+            (TrolleyPhase::Ejected, _) => Ok(MappedInputs::NEUTRAL),
+            _ => Err("native Trolley phase unconfirmed"),
+        }
+    }
 }
 
 /// Only down throws first acquire an ordinary grab, without grading that preparatory hold.
@@ -153,6 +244,129 @@ mod tests {
             }
             assert!(judge_outcome(true, true, -1).is_err());
             assert!(judge_outcome(true, true, 9).is_err());
+        }
+
+        fn trolley_read(counter: Option<i32>) -> TrolleyRead {
+            TrolleyRead { readers_ready: true, cpu: 10,
+                cart: Some(OwnedTrolley { cpu: 10, article: 20, object_id: 30, accessor: 40 }),
+                jump_disable: counter }
+        }
+        fn trolley_riding() -> TrolleyEntry {
+            let mut entry = TrolleyEntry::new(10).unwrap();
+            assert_eq!(entry.observe(TrolleyStatus::Ride, trolley_read(None)), Ok(MappedInputs::NEUTRAL));
+            entry
+        }
+        #[test]
+        fn trolley_start_is_real_side_special_and_only_victim_status_can_hold() {
+            let cart = super::super::moves::CATALOG[97];
+            assert_eq!(cart.attacker_kind, 0x58);
+            assert_eq!(cart.plan, Plan::Trolley);
+            assert_eq!(start(cart), Some("FIGHTER_STATUS_KIND_SPECIAL_S"));
+            assert_eq!(controls(Plan::Trolley, false), MappedInputs::NEUTRAL);
+            assert_eq!(controls(Plan::Trolley, true), MappedInputs::NEUTRAL);
+            assert!(holding(State::Grab, |c| c == C::ClatterCatchedPickelTrolley));
+            assert!(!holding(State::Grab, |c| c == C::PickelTrolleyRide));
+            assert!(!holding(State::Grab, |c| c == C::PickelTrolleyJump));
+        }
+        #[test]
+        fn trolley_real_phases_supply_one_jump_edge_then_release_on_actual_jump() {
+            let mut entry = TrolleyEntry::new(10).unwrap();
+            let mut inputs = Vec::new();
+            let mut pending = trolley_read(None);
+            pending.cart = None; // native creation need not have produced it yet
+            inputs.push(entry.observe(TrolleyStatus::Special, pending).unwrap());
+            inputs.push(entry.observe(TrolleyStatus::Ride, pending).unwrap());
+            inputs.push(entry.observe(TrolleyStatus::Drive, trolley_read(Some(2))).unwrap());
+            assert_eq!(entry.phase(), TrolleyPhase::Drive);
+            for _ in 0..3 {
+                inputs.push(entry.observe(TrolleyStatus::Drive, trolley_read(Some(0))).unwrap());
+            }
+            assert_eq!(entry.phase(), TrolleyPhase::JumpRequested);
+            inputs.push(entry.observe(TrolleyStatus::Jump, trolley_read(None)).unwrap());
+            assert_eq!(entry.phase(), TrolleyPhase::Ejected);
+            inputs.push(entry.observe(TrolleyStatus::Other, trolley_read(None)).unwrap());
+            assert_eq!(inputs.iter().map(|i| i.buttons).collect::<Vec<_>>(), vec![0,0,0,4,4,4,0,0]);
+            assert_eq!(inputs.windows(2).filter(|w| w[0].buttons == 0 && w[1].buttons == 4).count(), 1);
+            assert!(inputs.iter().all(|i| {
+                let neutral = MappedInputs { buttons: i.buttons, ..MappedInputs::NEUTRAL };
+                *i == neutral
+            }));
+        }
+        #[test]
+        fn trolley_never_jumps_in_ride_or_without_observed_ride() {
+            let mut entry = TrolleyEntry::new(10).unwrap();
+            for _ in 0..3 {
+                assert_eq!(entry.observe(TrolleyStatus::Ride, trolley_read(Some(0))), Ok(MappedInputs::NEUTRAL));
+            }
+            let mut entry = TrolleyEntry::new(10).unwrap();
+            assert!(entry.observe(TrolleyStatus::Drive, trolley_read(Some(0))).is_err());
+            assert!(entry.observe(TrolleyStatus::Jump, trolley_read(Some(0))).is_err());
+            assert!(TrolleyEntry::new(0).is_none());
+        }
+        #[test]
+        fn trolley_zero_is_exact_and_missing_read_is_not_a_zero() {
+            let mut entry = trolley_riding();
+            for counter in [1, -1, i32::MIN, i32::MAX] {
+                assert_eq!(entry.observe(TrolleyStatus::Drive, trolley_read(Some(counter))), Ok(MappedInputs::NEUTRAL));
+            }
+            let before = entry;
+            assert!(entry.observe(TrolleyStatus::Drive, trolley_read(None)).is_err());
+            assert_eq!(entry, before);
+            assert_eq!(entry.observe(TrolleyStatus::Drive, trolley_read(Some(0))).unwrap().buttons, 4);
+        }
+        #[test]
+        fn trolley_missing_grant_cpu_or_owned_cart_refuses_before_jump() {
+            for bad in 0..6 {
+                let mut entry = trolley_riding();
+                let mut read = trolley_read(Some(0));
+                match bad {
+                    0 => read.readers_ready = false,
+                    1 => read.cpu = 11,
+                    2 => read.cart = None,
+                    3 => read.cart.as_mut().unwrap().cpu = 11,
+                    4 => read.cart.as_mut().unwrap().article = 0,
+                    _ => read.cart.as_mut().unwrap().accessor = 0,
+                }
+                let before = entry;
+                assert!(entry.observe(TrolleyStatus::Drive, read).is_err());
+                assert_eq!(entry, before);
+            }
+        }
+        #[test]
+        fn trolley_replaced_identity_or_changed_gate_cannot_issue_another_edge() {
+            for requested in [false, true] {
+                for field in 0..4 {
+                    let mut entry = trolley_riding();
+                    entry.observe(TrolleyStatus::Drive, trolley_read(Some(if requested {0} else {2}))).unwrap();
+                    let mut replaced = trolley_read(Some(0));
+                    let cart = replaced.cart.as_mut().unwrap();
+                    match field {
+                        0 => cart.cpu += 1,
+                        1 => cart.article += 1,
+                        2 => cart.object_id += 1,
+                        _ => cart.accessor += 1,
+                    }
+                    let before = entry;
+                    assert!(entry.observe(TrolleyStatus::Drive, replaced).is_err());
+                    assert_eq!(entry, before);
+                }
+            }
+            let mut entry = trolley_riding();
+            entry.observe(TrolleyStatus::Drive, trolley_read(Some(0))).unwrap();
+            let before = entry;
+            assert!(entry.observe(TrolleyStatus::Drive, trolley_read(Some(1))).is_err());
+            assert_eq!(entry, before);
+            let mut missing = trolley_read(Some(0)); missing.readers_ready = false;
+            assert!(entry.observe(TrolleyStatus::Drive, missing).is_err());
+        }
+        #[test]
+        fn trolley_creation_failure_and_unconfirmed_exit_keep_failure_boundary() {
+            let mut entry = trolley_riding();
+            assert!(entry.observe(TrolleyStatus::Failed, trolley_read(None)).is_err());
+            entry.observe(TrolleyStatus::Drive, trolley_read(Some(2))).unwrap();
+            assert!(entry.observe(TrolleyStatus::Other, trolley_read(Some(0))).is_err());
+            assert!(entry.observe(TrolleyStatus::Jump, trolley_read(Some(0))).is_err());
+            assert_eq!(entry.phase(), TrolleyPhase::Drive);
         }
 
         #[test]

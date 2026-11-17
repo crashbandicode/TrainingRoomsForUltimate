@@ -104,7 +104,16 @@ fn actual_runtime_egg_preparation_and_native_seed() {
             block(runtime, "unsafe fn end_after(").to_string(),
         ),
         ("// ARM", block(runtime, "unsafe fn arm(").to_string()),
+        ("// TROLLEY_SITES", {
+            let sites = include_str!("../src/model/sites_pkg3.rs");
+            ["STATE_ARTICLE_IS_EXIST_OFFSET", "STATE_ARTICLE_GET_ARTICLE_OFFSET",
+             "STATE_ARTICLE_OBJECT_ID_OFFSET", "STATE_OBJECT_IS_ACTIVE_OFFSET",
+             "STATE_OBJECT_MODULE_ACCESSOR_OFFSET", "STATE_LINK_PARENT_OBJECT_ID_OFFSET"]
+                .map(|name| sites.lines().find(|line| line.starts_with(&format!("pub const {name}:"))).unwrap())
+                .join("\n")
+        }),
         ("// JUDGE_CHOICE", block(runtime, "unsafe fn judge_choice(").to_string()),
+        ("// TROLLEY_INPUT", block(runtime, "unsafe fn trolley_input(").to_string()),
         ("// JUDGE_ADMISSION", block(runtime, "if game.step == Step::Entering").to_string()),
         ("// RETRY", {
             let start = runtime.find("Step::Retry if released => {").unwrap();

@@ -4,6 +4,8 @@ use std::{
     sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
 };
 mod model {
+    pub mod sites_pkg3 { // TROLLEY_SITES
+    }
     pub mod sites_pkg2 { pub const WORK_IS_FLAG_OFFSET: usize = 0x208dc80; pub const WORK_GET_INT_OFFSET: usize = 0x208dbc0; }
     pub mod hash40 { // HASH40
     }
@@ -61,6 +63,18 @@ mod interposer {
 }
 mod reader { // READER
 }
+static TROLLEY_MISSING_GRANT: AtomicUsize = AtomicUsize::new(0);
+static TROLLEY_NATIVE_CALLS: AtomicUsize = AtomicUsize::new(0);
+static TROLLEY_INT_READS: AtomicUsize = AtomicUsize::new(0);
+static CART_EXISTS: AtomicBool = AtomicBool::new(true);
+static CART_ACTIVE: AtomicBool = AtomicBool::new(true);
+static CART_ARTICLE: AtomicUsize = AtomicUsize::new(0x100);
+static CART_BOID: AtomicU32 = AtomicU32::new(0x200);
+static CART_BOMA: AtomicUsize = AtomicUsize::new(0x300);
+static CART_PARENT: AtomicU32 = AtomicU32::new(0x200);
+static CART_COUNTER: AtomicU32 = AtomicU32::new(0);
+static CART_GET_COUNT: AtomicUsize = AtomicUsize::new(0);
+static CART_REPLACE_SECOND_READ: AtomicBool = AtomicBool::new(false);
 static READY: AtomicBool = AtomicBool::new(true);
 static SLOTS_READY: AtomicBool = AtomicBool::new(true);
 static P1: AtomicUsize = AtomicUsize::new(0);
@@ -143,6 +157,12 @@ mod natives {
         super::JUDGE_FIXED.load(super::Ordering::Relaxed)
     }
     pub fn get_int(cpu: usize, id: i32) -> i32 {
+        if Some(id) == super::state_id(super::C::PickelTrolleyJumpDisable) {
+            super::TROLLEY_NATIVE_CALLS.fetch_add(1, super::Ordering::Relaxed);
+            super::TROLLEY_INT_READS.fetch_add(1, super::Ordering::Relaxed);
+            assert_eq!(cpu, super::CART_BOMA.load(super::Ordering::Relaxed));
+            return super::CART_COUNTER.load(super::Ordering::Relaxed) as i32;
+        }
         if Some(id) == super::state_id(super::C::JudgeKind) {
             assert_eq!(cpu, 2);
             super::JUDGE_INT_READS.fetch_add(1, super::Ordering::Relaxed);
@@ -198,6 +218,23 @@ mod natives {
     }
 }
 mod state_natives {
+    fn read() { super::TROLLEY_NATIVE_CALLS.fetch_add(1, super::Ordering::Relaxed); }
+    pub fn article_is_exist(cpu: usize, article: i32) -> bool {
+        read(); assert_ne!(cpu,0); assert_eq!(article,2);
+        super::CART_EXISTS.load(super::Ordering::Relaxed)
+    }
+    pub fn article_get(_: usize, _: i32) -> usize {
+        read();
+        let n=super::CART_GET_COUNT.fetch_add(1,super::Ordering::Relaxed);
+        super::CART_ARTICLE.load(super::Ordering::Relaxed)
+            + usize::from(super::CART_REPLACE_SECOND_READ.load(super::Ordering::Relaxed) && n%2==1)
+    }
+    pub fn article_object_id(_: usize) -> u32 { read(); super::CART_BOID.load(super::Ordering::Relaxed) }
+    pub fn object_is_active(_: u32) -> bool { read(); super::CART_ACTIVE.load(super::Ordering::Relaxed) }
+    pub fn object_accessor(_: u32) -> usize { read(); super::CART_BOMA.load(super::Ordering::Relaxed) }
+    pub fn link_parent_object_id(_: usize, link:i32) -> u64 {
+        read(); assert_eq!(link,28); super::CART_PARENT.load(super::Ordering::Relaxed) as u64
+    }
     #[derive(Clone, Copy)]
     pub struct Vector3f {
         pub x: f32,
@@ -241,6 +278,14 @@ fn state_id(c: C) -> Option<i32> {
         _ => (),
     }
     Some(match c {
+        C::PickelTrolleyFailed => 518,
+        C::PickelTrolleyRide => 519,
+        C::PickelTrolleyDrive => 520,
+        C::PickelTrolleyJump => 521,
+        C::PickelTrolleyArticle => 2,
+        C::PickelTrolleyLink => 28,
+        C::PickelTrolleyJumpDisable => 0x10000021,
+        C::ClatterCatchedPickelTrolley => 446,
         C::ClatterCaptureYoshi => 243,
         C::ClatterIce => 203,
         C::ClatterYoshiEgg => 244,
@@ -280,6 +325,7 @@ struct Game {
     config: Option<()>,
     restore_requested: bool,
     failed: Option<&'static str>,
+    trolley: Option<entry::TrolleyEntry>,
 }
 impl Game {
     fn new(plan: Plan, state: State) -> Self {
@@ -305,6 +351,7 @@ impl Game {
             config: Some(()),
             restore_requested: false,
             failed: None,
+            trolley: None,
         }
     }
     fn fail(&mut self, s: &'static str) {
@@ -319,6 +366,7 @@ impl Game {
 }
 const UNAVAILABLE_NOTICE: &str = "unavailable";
 // JUDGE_CHOICE
+// TROLLEY_INPUT
 // ARM
 #[derive(Clone, Copy)]
 // TOKEN_TYPE
@@ -380,6 +428,7 @@ impl NativeMemory {
         m.control[0x18 / 8] = m.record.as_ptr() as u64;
         P1.store(m.p1(), Ordering::Relaxed);
         BODY.store(m.body.as_ptr() as usize, Ordering::Relaxed);
+        reset_cart();
         ARMED.store(0, Ordering::Relaxed);
         EPOCH.store(0, Ordering::Relaxed);
         FAULT.store(0, Ordering::Relaxed);
@@ -876,12 +925,19 @@ fn lucas_wait_without_ice_still_fails_and_wrong_victim_seed_never_grades() {
 use model::cpu::hash::lua_bind_hash;
 mod game {
     pub fn granted(offset: usize) -> bool {
+        if super::TROLLEY_MISSING_GRANT.load(super::Ordering::Relaxed) == offset { return false; }
         match offset {
             crate::model::sites_pkg2::WORK_IS_FLAG_OFFSET =>
                 super::JUDGE_FLAG_GRANTED.load(super::Ordering::Relaxed),
             crate::model::sites_pkg2::WORK_GET_INT_OFFSET =>
                 super::JUDGE_GETTER_GRANTED.load(super::Ordering::Relaxed),
-            _ => panic!("unexpected Judge reader guard: {offset:x}"),
+            crate::model::sites_pkg3::STATE_ARTICLE_IS_EXIST_OFFSET
+            | crate::model::sites_pkg3::STATE_ARTICLE_GET_ARTICLE_OFFSET
+            | crate::model::sites_pkg3::STATE_ARTICLE_OBJECT_ID_OFFSET
+            | crate::model::sites_pkg3::STATE_OBJECT_IS_ACTIVE_OFFSET
+            | crate::model::sites_pkg3::STATE_OBJECT_MODULE_ACCESSOR_OFFSET
+            | crate::model::sites_pkg3::STATE_LINK_PARENT_OBJECT_ID_OFFSET => true,
+            _ => panic!("unexpected reader guard: {offset:x}"),
         }
     }
     pub fn lua_const(hash: u64) -> Option<i32> {
@@ -1549,6 +1605,151 @@ fn judge_retry_waits_for_both_native_resting_bodies_then_reloads_same_selected_m
             assert!(BEGINS.with_borrow(Vec::is_empty));
             assert_eq!(REQUESTS.with_borrow(Clone::clone), vec![(2, 477)]);
             assert!(DRIVEN.with_borrow(|v| v.iter().all(|i| *i == MappedInputs::NEUTRAL)));
+        }
+    }
+}
+
+fn reset_cart() {
+    TROLLEY_MISSING_GRANT.store(0,Ordering::Relaxed);
+    TROLLEY_NATIVE_CALLS.store(0,Ordering::Relaxed);
+    TROLLEY_INT_READS.store(0,Ordering::Relaxed);
+    CART_EXISTS.store(true,Ordering::Relaxed);
+    CART_ACTIVE.store(true,Ordering::Relaxed);
+    CART_ARTICLE.store(0x100,Ordering::Relaxed);
+    CART_BOID.store(0x200,Ordering::Relaxed);
+    CART_BOMA.store(0x300,Ordering::Relaxed);
+    CART_PARENT.store(0x200,Ordering::Relaxed);
+    CART_COUNTER.store(0,Ordering::Relaxed);
+    CART_GET_COUNT.store(0,Ordering::Relaxed);
+    CART_REPLACE_SECOND_READ.store(false,Ordering::Relaxed);
+}
+unsafe fn trolley(m: &mut NativeMemory) -> Game {
+    let mut g=Game::new(Plan::Trolley,State::Grab);
+    let r=g.requested.as_mut().unwrap();
+    r.id=97; r.attacker_kind=0x58; r.attacker_name="Steve";
+    m.body[3]=0x58;
+    g.step=Step::Settle;
+    CPU_STATUS.store(0,Ordering::Relaxed);
+    m.update(&mut g,0);
+    assert_eq!(g.step,Step::Entering);
+    assert_eq!(REQUESTS.with_borrow(Clone::clone),vec![(2,477)]);
+    CPU_STATUS.store(477,Ordering::Relaxed);
+    g
+}
+#[test]
+fn trolley_actual_runtime_ride_drive_exact_zero_single_jump_then_native_release() {
+    unsafe {
+        let mut m=NativeMemory::new(); let mut g=trolley(&mut m);
+        let mut inputs=Vec::new();
+        for (status,counter) in [(477,0),(519,0),(520,3),(520,1),(520,0),(520,0),(520,0),(521,0)] {
+            CPU_STATUS.store(status,Ordering::Relaxed);
+            CART_COUNTER.store(counter,Ordering::Relaxed);
+            m.update(&mut g,0);
+            assert_eq!(g.step,Step::Entering);
+            inputs.push(DRIVEN.with_borrow(|v|v.last().unwrap().buttons));
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+        }
+        assert_eq!(inputs,vec![0,0,0,0,4,4,4,0]);
+        assert_eq!(inputs.windows(2).filter(|v|v[0]==0 && v[1]==4).count(),1);
+        assert!(DRIVEN.with_borrow(|v|v.iter().all(|i|i.lstick_x==0 && i.lstick_y==0)));
+    }
+}
+#[test]
+fn trolley_each_missing_grant_refuses_before_any_native_read_or_default_zero() {
+    unsafe {
+        use model::sites_pkg3 as s;
+        for grant in [s::STATE_ARTICLE_IS_EXIST_OFFSET,s::STATE_ARTICLE_GET_ARTICLE_OFFSET,
+            s::STATE_ARTICLE_OBJECT_ID_OFFSET,s::STATE_OBJECT_IS_ACTIVE_OFFSET,
+            s::STATE_OBJECT_MODULE_ACCESSOR_OFFSET,s::STATE_LINK_PARENT_OBJECT_ID_OFFSET,
+            model::sites_pkg2::WORK_GET_INT_OFFSET] {
+            let _m=NativeMemory::new(); let mut actor=None;
+            assert!(trolley_input(2,519,&mut actor).is_ok());
+            TROLLEY_NATIVE_CALLS.store(0,Ordering::Relaxed);
+            TROLLEY_INT_READS.store(0,Ordering::Relaxed);
+            TROLLEY_MISSING_GRANT.store(grant,Ordering::Relaxed);
+            let before=actor;
+            assert_eq!(trolley_input(2,520,&mut actor),Err(()));
+            assert_eq!(actor,before);
+            assert_eq!(TROLLEY_NATIVE_CALLS.load(Ordering::Relaxed),0);
+            assert_eq!(TROLLEY_INT_READS.load(Ordering::Relaxed),0);
+        }
+    }
+}
+#[test]
+fn trolley_runtime_replaced_owner_or_cart_identity_and_parent_refuse() {
+    unsafe {
+        for field in ["cpu","article","boid","boma","parent","midread","inactive","nullarticle","nullboma"] {
+            let _m=NativeMemory::new(); let mut actor=None;
+            trolley_input(2,519,&mut actor).unwrap();
+            CART_COUNTER.store(2,Ordering::Relaxed);
+            trolley_input(2,520,&mut actor).unwrap();
+            let before=actor;
+            match field {
+                "article"=>CART_ARTICLE.store(0x101,Ordering::Relaxed),
+                "boid"=>{CART_BOID.store(0x201,Ordering::Relaxed);CART_PARENT.store(0x201,Ordering::Relaxed);},
+                "boma"=>CART_BOMA.store(0x301,Ordering::Relaxed),
+                "parent"=>CART_PARENT.store(0x201,Ordering::Relaxed),
+                "midread"=>CART_REPLACE_SECOND_READ.store(true,Ordering::Relaxed),
+                "inactive"=>CART_ACTIVE.store(false,Ordering::Relaxed),
+                "nullarticle"=>CART_ARTICLE.store(0,Ordering::Relaxed),
+                "nullboma"=>CART_BOMA.store(0,Ordering::Relaxed),
+                _=>(),
+            }
+            CART_COUNTER.store(0,Ordering::Relaxed);
+            assert_eq!(trolley_input(if field=="cpu"{3}else{2},520,&mut actor),Err(()),"{field}");
+            assert_eq!(actor,before,"{field}");
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+        }
+    }
+}
+#[test]
+fn trolley_runtime_failed_missing_cart_and_unobserved_ride_cannot_begin() {
+    unsafe {
+        for case in ["failed","missing","no-ride"] {
+            let mut m=NativeMemory::new(); let mut g=trolley(&mut m);
+            if case!="no-ride" { CPU_STATUS.store(519,Ordering::Relaxed);m.update(&mut g,0); }
+            if case=="missing" { CART_EXISTS.store(false,Ordering::Relaxed); }
+            CPU_STATUS.store(if case=="failed"{518}else{520},Ordering::Relaxed);
+            m.update(&mut g,0);
+            assert_eq!(g.failed,Some(UNAVAILABLE_NOTICE),"{case}");
+            assert_eq!(ARMED.load(Ordering::Relaxed),0);
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+            assert_eq!(DRIVEN.with_borrow(|v|*v.last().unwrap()),MappedInputs::NEUTRAL);
+        }
+    }
+}
+#[test]
+fn trolley_runtime_wait_still_fails_after_native_entry_without_capture() {
+    unsafe {
+        let mut m=NativeMemory::new();let mut g=trolley(&mut m);
+        CPU_STATUS.store(519,Ordering::Relaxed);m.update(&mut g,0);
+        CPU_STATUS.store(520,Ordering::Relaxed);m.update(&mut g,0);
+        CPU_STATUS.store(521,Ordering::Relaxed);m.update(&mut g,0);
+        CPU_STATUS.store(0,Ordering::Relaxed);m.update(&mut g,0);
+        assert_eq!(g.failed,Some("Move did not capture · reopen menu to retry"));
+        assert!(BEGINS.with_borrow(Vec::is_empty));
+    }
+}
+#[test]
+fn trolley_actual_victim446_and_positive_native_seed_are_both_required() {
+    unsafe {
+        for (victim,remaining,accepted) in [(446,75.0,true),(446,0.0,false),(66,75.0,false),(0,75.0,false)] {
+            let mut m=NativeMemory::new();let mut g=trolley(&mut m);
+            CPU_STATUS.store(519,Ordering::Relaxed);m.update(&mut g,0);
+            CPU_STATUS.store(520,Ordering::Relaxed);m.update(&mut g,0);
+            CPU_STATUS.store(521,Ordering::Relaxed);m.update(&mut g,0);
+            m.seed(remaining,9.0,1);
+            let before=(m.control,m.record);
+            let actual=reader::sample(m.p1(),0.37).map(|s|s.seed());
+            m.start();m.update(&mut g,victim);
+            assert_eq!(BEGINS.with_borrow(Vec::len),usize::from(accepted), "victim={victim} remaining={remaining}");
+            assert_eq!((m.control,m.record),before);
+            if accepted {
+                assert_eq!(g.step,Step::Held);
+                assert_eq!(BEGINS.with_borrow(|v|v[0].1),actual.unwrap());
+                assert_eq!(BEGINS.with_borrow(|v|v[0].0.0),97);
+            } else { assert!(g.clock.is_none()); }
+            assert_eq!(DRIVEN.with_borrow(|v|*v.last().unwrap()),MappedInputs::NEUTRAL);
         }
     }
 }

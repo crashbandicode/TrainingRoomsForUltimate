@@ -128,6 +128,35 @@ fn cpu_ids_resolve_asks_by_hash_and_lists_the_missing() {
 }
 
 #[test]
+fn mash_entry_constants_resolve_against_pinned_native_names() {
+    // Native lua_const.rs bindings, independently frozen in rc15-mashout/trolley97-implementation/
+    // CODE-REVIEW-BINDINGS.json; runtime fixtures deliberately use synthetic ids.
+    let native = [
+        (C::PickelTrolleyFailed, "FIGHTER_PICKEL_STATUS_KIND_SPECIAL_S_FAILED", 0x206),
+        (C::PickelTrolleyRide, "FIGHTER_PICKEL_STATUS_KIND_SPECIAL_S_RIDE", 0x207),
+        (C::PickelTrolleyDrive, "FIGHTER_PICKEL_STATUS_KIND_SPECIAL_S_DRIVE", 0x208),
+        (C::PickelTrolleyJump, "FIGHTER_PICKEL_STATUS_KIND_SPECIAL_S_JUMP", 0x209),
+        (C::PickelTrolleyArticle, "FIGHTER_PICKEL_GENERATE_ARTICLE_TROLLEY", 2),
+        (C::PickelTrolleyLink, "FIGHTER_PICKEL_LINK_NO_TROLLEY", 0x1c),
+        (C::PickelTrolleyJumpDisable, "WEAPON_PICKEL_TROLLEY_INSTANCE_WORK_ID_INT_PICKEL_JUMP_DISABLE_FRAME", 0x10000021),
+        (C::JudgeFixed, "FIGHTER_GAMEWATCH_STATUS_SPECIAL_S_FLAG_FIX_PANEL", 0x2100000d),
+        (C::JudgeKind, "FIGHTER_GAMEWATCH_INSTANCE_WORK_ID_INT_SPECIAL_S_KIND", 0x100000c2),
+    ];
+    let mut table = Table::unresolved();
+    assert_eq!(table.resolve(|key| native.iter().find_map(|(_, name, value)| {
+        (lua_bind_hash(name) == key).then_some(*value)
+    })), ids::COUNT - native.len());
+    for (constant, name, value) in native {
+        assert_eq!(ids::NAMES[constant as usize], name);
+        assert!(table.resolved(constant), "{name}");
+        assert_eq!(table.get(constant), value, "{name}");
+    }
+    // The previously authored spelling must not resolve to the native counter.
+    assert_ne!(lua_bind_hash("WEAPON_PICKEL_TROLLEY_INSTANCE_WORK_ID_INT_JUMP_DISABLE_FRAME"),
+        lua_bind_hash(ids::NAMES[C::PickelTrolleyJumpDisable as usize]));
+}
+
+#[test]
 fn cpu01_situation_predicates() {
     // Synthetic numbering: ranges follow the declaration order of the table, so a status is "in a
     // range" exactly when its constants say so; the predicates are the spec's definitions.
