@@ -22,7 +22,8 @@ pub struct Plan {
     pub setup: Setup,
     pub approximate: bool,
     pub contact_frames: u16,
-    pub visible_hit_damage: f32,
+    /// Sampled [pre-hit percent, visible added percent], retained for fresh retries.
+    pub sampled_percent: [f32; 2],
 }
 /// UI Hit damage is the visible added percent; the core accepts base damage.
 pub fn base_hit_damage(visible: f32, multiplier: Option<f32>) -> Option<f32> {
@@ -136,7 +137,7 @@ pub fn plan(
         target: context.spot.point,
         angle,
         knockback,
-        percent: percent + visible_hit_damage,
+        percent: percent + hit_damage * multiplier,
         hit_damage,
         height: HitHeight::Middle,
         facing,
@@ -148,6 +149,6 @@ pub fn plan(
         setup: Setup { launch, delay },
         approximate,
         contact_frames: frames,
-        visible_hit_damage,
+        sampled_percent: [percent, visible_hit_damage],
     })
 }

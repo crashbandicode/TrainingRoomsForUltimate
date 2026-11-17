@@ -62,7 +62,7 @@ struct Practice {
     config: Config,
     pending: bool,
     reroll: bool,
-    sampled: Option<(Setup, picker::Spot, f32)>,
+    sampled: Option<(Setup, picker::Spot, [f32; 2])>,
     approximate: bool,
     scan: Option<PlatformScan>,
     scan_done: bool,
@@ -667,10 +667,10 @@ pub unsafe fn frame(fighter: usize) {
                     );
                     return;
                 };
-                run.sampled = Some((plan.setup, spot, plan.visible_hit_damage));
+                run.sampled = Some((plan.setup, spot, plan.sampled_percent));
                 run.approximate = plan.approximate;
             }
-            if let Some((mut setup, spot, visible_hit_damage)) = run.sampled {
+            if let Some((mut setup, spot, [percent, visible_hit_damage])) = run.sampled {
                 let Some(base) = planner::base_hit_damage(visible_hit_damage, Some(multiplier))
                 else {
                     // restriction: tech-hit-damage-multiplier-unavailable
@@ -678,6 +678,7 @@ pub unsafe fn frame(fighter: usize) {
                     return;
                 };
                 setup.launch.hit_damage = base;
+                setup.launch.percent = percent + base * multiplier;
                 if !spot.current(&mut source) {
                     notice(run, Some("Selected surface moved; choose a stage point"));
                     return;

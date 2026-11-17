@@ -351,7 +351,7 @@ fn all_fixed_attempt_values_stay_and_random_rerolls_only_on_request() {
         &mut |_| panic!("fixed values must not draw randomness"),
     )
     .unwrap();
-    assert_eq!(converted.visible_hit_damage, 12.);
+    assert_eq!(converted.sampled_percent, [40., 12.]);
     assert_eq!(converted.setup.launch.hit_damage, 10.);
     for damage_multiplier in [
         None,
@@ -383,6 +383,135 @@ fn all_fixed_attempt_values_stay_and_random_rerolls_only_on_request() {
     );
     assert_eq!(low.setup.launch.percent, high.setup.launch.percent);
     assert_eq!(low.setup.launch.start, high.setup.launch.start);
+}
+#[test]
+fn launch_percent_is_pre_hit_plus_native_forward_hit() {
+    use crate::model::tech_settings::{Mode, Numeric};
+    let speed = Numeric {
+        mode: Mode::Set,
+        lo: 100.,
+        hi: 100.,
+    };
+    for (pre, visible, expected) in [
+        (0., 15., 0x416fffff),
+        (0., 27., 0x41d80001),
+        (0., 30., 0x41efffff),
+        (20., 16.38, 0x4211851e),
+        (20., f32::from_bits(0x41830a3e), 0x4211851f),
+    ] {
+        let plan = percent_fixture(pre, visible, 1.2, speed, 0);
+        assert_eq!(plan.setup.launch.percent.to_bits(), expected);
+        assert_eq!(plan.sampled_percent, [pre, visible]);
+    }
+    // Recompute from retained original samples under a fresh multiplier;
+    // neither a prior quotient nor a prior rounded post-percent is reused.
+    let first = percent_fixture(20., 15., 1.2, speed, 0);
+    let [pre, visible] = first.sampled_percent;
+    let retry = percent_fixture(pre, visible, 1., speed, 0);
+    assert_eq!(retry.setup.launch.hit_damage, 15.);
+    assert_eq!(retry.setup.launch.percent, 35.);
+    assert_eq!(
+        crate::model::tech_hitlag::frames(
+            planner::base_hit_damage(12., Some(1.2)).unwrap(),
+            1.,
+            hitlag_parameters(1., 1.2)
+        ),
+        Some(12)
+    );
+}
+#[test]
+fn knockback_range_stays_in_tumble() {
+    use crate::model::tech_settings::{self, Mode, Numeric};
+    let range = tech_settings::scale("tech_speed_range").unwrap();
+    assert_eq!((range.value(0), range.value(range.max)), (80., 250.));
+    // Checks the configured tumble-floor domain, independently of percent.
+    // Actual native tumble/contact acceptance remains a separate runtime gate.
+    for pre in (0..=150).step_by(5) {
+        for index in 0..=range.max {
+            for multiplier in [1., 1.2] {
+                for mode in [Mode::Set, Mode::Random] {
+                    let kb = range.value(index);
+                    let speed = if mode == Mode::Set {
+                        Numeric {
+                            mode,
+                            lo: kb,
+                            hi: kb,
+                        }
+                    } else {
+                        Numeric {
+                            mode,
+                            lo: range.value(0),
+                            hi: range.value(range.max),
+                        }
+                    };
+                    let plan =
+                        percent_fixture(pre as f32, 12., multiplier, speed, u32::from(index));
+                    assert_eq!(plan.setup.launch.knockback, kb);
+                    assert!(plan.setup.launch.knockback >= 80.);
+                }
+            }
+        }
+    }
+}
+fn percent_fixture(
+    pre: f32,
+    visible: f32,
+    multiplier: f32,
+    speed: crate::model::tech_settings::Numeric,
+    draw: u32,
+) -> planner::Plan {
+    use crate::model::{
+        settings::Settings,
+        tech_settings::{self, Mode, Numeric},
+    };
+    let set = |n| Numeric {
+        mode: Mode::Set,
+        lo: n,
+        hi: n,
+    };
+    let mut config = tech_settings::read(&Settings::factory().menu);
+    config.speed = speed;
+    config.damage = set(pre);
+    config.hit_damage = set(visible);
+    config.angle = set(270.);
+    config.start = set(30.);
+    config.time = set(20.);
+    config.delay = set(30.);
+    config.facing = 2;
+    config.di = 0;
+    let line = Line {
+        id: 9,
+        ends: [Vec2 { x: -50., y: 0. }, Vec2 { x: 50., y: 0. }],
+        normal: Vec2 { x: 0., y: 1. },
+        floor: true,
+        wall: false,
+        passable: false,
+    };
+    let mut surfaces = Surfaces::EMPTY;
+    surfaces.push(line);
+    planner::plan(
+        config,
+        planner::Context {
+            surfaces: &surfaces,
+            spot: picker::Spot {
+                line,
+                point: Vec2::default(),
+            },
+            params: crate::model::tech_launch::FlightParams {
+                brake: 0.051,
+                gravity: 0.087,
+                fall_speed_cap: 1.5,
+            },
+            blast: solver::Box2 {
+                min: Vec2 { x: -200., y: -200. },
+                max: Vec2 { x: 200., y: 200. },
+            },
+            view: None,
+            damage_multiplier: Some(multiplier),
+        },
+        &mut |n| draw % n,
+    )
+    .unwrap()
 }
 #[test]
 fn visible_hit_damage_uses_only_the_supplied_live_multiplier() {
