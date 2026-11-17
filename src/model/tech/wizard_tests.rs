@@ -424,4 +424,46 @@ fn wizard_adjust_hit_vertical_focus_and_horizontal_steps_are_independent() {
     assert_eq!(w.step, Step::Hit);
 }
 
+#[test]
+fn wizard_rebind_fresh_entry_ignores_latched_reset_but_clears_borrowed_ids() {
+    for had_epoch in [false, true] {
+        let mut w = ready();
+        w.step = Step::Preview;
+        w.degrees = 37.;
+        let cancel = w.wizard_rebind_geometry(true, had_epoch, true);
+        assert!(w.selected.is_none());
+        assert_eq!(w.step, Step::Spot);
+        assert_eq!(w.degrees, 37.);
+        assert!(!cancel, "a reset predating this fresh draft must not cancel it");
+        let mut rebuilt = spot(Vec2 { x: 0., y: 1. });
+        rebuilt.line.id = 99;
+        assert!(w.set_spot(rebuilt));
+        assert_eq!(w.selected.unwrap().line.id, 99);
+        assert_eq!(w.action(Action::Next), Outcome::None);
+        assert_eq!(w.step, Step::Angle);
+    }
+}
+
+#[test]
+fn wizard_rebind_live_reset_or_epoch_change_cancels_and_invalidates_geometry() {
+    for (had_epoch, reset) in [(true, true), (true, false), (false, true)] {
+        let mut w = ready();
+        w.step = Step::Hit;
+        assert!(w.wizard_rebind_geometry(false, had_epoch, reset));
+        assert!(w.selected.is_none());
+        assert_eq!(w.step, Step::Spot);
+        assert!(w.config().is_none());
+    }
+}
+
+#[test]
+fn wizard_rebind_initial_epoch_does_not_cancel_and_still_requires_fresh_spot() {
+    let mut w = ready();
+    w.step = Step::Distance;
+    assert!(!w.wizard_rebind_geometry(false, false, false));
+    assert!(w.selected.is_none());
+    assert_eq!(w.step, Step::Spot);
+    assert_eq!(w.action(Action::Start), Outcome::None);
+}
+
 }

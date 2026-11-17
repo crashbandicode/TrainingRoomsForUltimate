@@ -549,6 +549,7 @@ pub unsafe fn frame(fighter: usize) {
     LIVE.with(|cell| {
         let mut slot = cell.borrow_mut();
         if stop {
+            RESET.store(false, Ordering::Release);
             view.start = false;
             if let Some(run) = slot.as_mut() {
                 run.controller.stop(&mut run.adapter);
@@ -634,7 +635,10 @@ pub unsafe fn frame(fighter: usize) {
             run.recovering = false;
         }
         if run.epoch != Some(epoch) || reset {
-            if wizard_active() && (run.epoch.is_some() || reset) {
+            let interrupted = view.wizard.as_mut().is_some_and(|wizard| {
+                wizard.wizard_rebind_geometry(requested, run.epoch.is_some(), reset)
+            });
+            if wizard_active() && interrupted {
                 // A draft never retains a borrowed line across collision or
                 // scene lifetimes. Return to the full menu on interruption.
                 view.wizard = None;
@@ -671,12 +675,6 @@ pub unsafe fn frame(fighter: usize) {
             run.bootstrap = None;
             run.discovery_failed = false;
             view.preview_params = None;
-            if let Some(wizard) = view.wizard.as_mut() {
-                wizard.selected = None;
-                if wizard_active() {
-                    wizard.step = Step::Spot;
-                }
-            }
             view.picker.enter(
                 stage,
                 Vec2 {

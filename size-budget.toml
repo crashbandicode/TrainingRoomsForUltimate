@@ -1817,7 +1817,7 @@ approved_by = "devin-primary 22:40Z, operator review pending."
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 155719
+ceiling = 155718
 date = "2026-11-17"
-reason = "Free-form Tech wizard measured155719 at source8f33103b: +503 over timing155216, exact total with no headroom. Shared picker marks, menu motion, planner and notice writer; one ordered step table. Counting, guards and gate enforcement unchanged."
-approved_by = "Operator explicitly approved: approve the +503 for the wizard; relayed by primary2026-11-17 16:52Z. Exact approved combined total155719; no headroom."
+reason = "Free-form Tech wizard including stale-reset entry fix measured155718: +502 over timing155216, one below the approved +503. Exact measured total with no headroom. Shared picker marks, menu motion, planner and notice writer; one ordered step table. Counting, guards and gate enforcement unchanged."
+approved_by = "Operator explicitly approved: approve the +503 for the wizard; relayed by primary2026-11-17 16:52Z. Primary18:51Z directs the lifecycle fix within that approval; final ceiling is reduced to the measured155718, no headroom."

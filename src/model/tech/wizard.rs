@@ -76,6 +76,12 @@ fn set(value: f32) -> Numeric {
     }
 }
 impl Wizard {
+    /// Called only on epoch change/reset; borrowed geometry never survives it.
+    pub fn wizard_rebind_geometry(&mut self, entering: bool, had_epoch: bool, reset: bool) -> bool {
+        self.selected = None;
+        self.step = Step::Spot;
+        !entering && (had_epoch || reset)
+    }
     pub fn begin(seed: Config, skip_preview: bool) -> Self {
         Self {
             seed,
@@ -145,12 +151,8 @@ impl Wizard {
     /// One bounded edit per placing-motion repeat. Zero is neutral; the caller
     /// supplies the existing editor's deadzone/repeat-filtered motion.
     pub fn adjust(&mut self, horizontal: f32, vertical: f32) {
-        if self.step == Step::Hit && vertical.is_finite() {
-            if vertical > 0. {
-                self.hit_focus = false;
-            } else if vertical < 0. {
-                self.hit_focus = true;
-            }
+        if self.step == Step::Hit && vertical.is_finite() && vertical != 0. {
+            self.hit_focus = vertical < 0.;
         }
         if !horizontal.is_finite() || horizontal == 0. {
             return;
