@@ -1,6 +1,6 @@
 //! Owned13.0.5 concrete ControlModule readers; ELF/relocated NSO proof in grader handoff.
 /// Fighter Control constructor main+6b8598/9c/ac installs this address point.
-pub const CONTROL_VTABLE_OFFSET: usize = 0x4f85de0;
+pub const CONTROL_VTABLE: usize = 0x4f85de0;
 pub const GUARDS: &[(usize, [u8; 64])] = &[
     (
         0x3f8610,

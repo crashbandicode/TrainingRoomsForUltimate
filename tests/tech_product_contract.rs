@@ -38,7 +38,7 @@ fn fighter_control_reader_accepts_the_native_constructed_address_point() {
     let constructed = (0x6b8000isize + (pages << 12)) as usize
         + ((word(4) >> 10) & 0xfff) as usize;
     assert_eq!(
-        decision_guards::CONTROL_VTABLE_OFFSET,
+        decision_guards::CONTROL_VTABLE,
         constructed,
         "The guarded reader must accept the Fighter instance, whose native slots are checked separately"
     );
@@ -67,7 +67,7 @@ fn fighter_control_reader_accepts_the_native_constructed_address_point() {
 fn native_press_counter_zeroes_only_on_the_native_positive_edge() {
     let Some(main) = common::owned_main("native tech press counter update") else { return; };
     let bytes = main.window(0x3f9544);
-    let words: Vec<u32> = bytes.chunks_exact(4).map(|b| u32::from_le_bytes(b.try_into().unwrap())).collect();
+    let words: Vec<u32> = bytes.as_chunks::<4>().0.iter().map(|b| u32::from_le_bytes(*b)).collect();
     assert_eq!(&words[..11], &[
         0xb868696c, 0x3940014d, 0x6a09019f, 0x54000080,
         0x2a1f03ec, 0x381ff14d, 0x14000004, 0x7103f5bf,

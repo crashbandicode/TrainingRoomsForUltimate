@@ -23,7 +23,7 @@ unsafe fn control(accessor: usize) -> Option<usize> {
     }
     let vptr = (module as *const usize).read();
     let base = game::text_base();
-    if vptr != base + sites::decision::CONTROL_VTABLE_OFFSET {
+    if vptr != base + sites::decision::CONTROL_VTABLE {
         return None;
     }
     for (slot, target) in [
