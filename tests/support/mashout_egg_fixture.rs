@@ -351,6 +351,9 @@ fn state_id(c: C) -> Option<i32> {
         C::PickelTrolleyLink => 28,
         C::PickelTrolleyJumpDisable => 0x10000021,
         C::ClatterCatchedPickelTrolley => 446,
+        // Pinned skyline_smash lua_const.rs:19102/19104.
+        C::ClatterShoulderedDonkeyStart => 0xC5,
+        C::ClatterShoulderedDonkey => 0xC6,
         C::ClatterCaptureYoshi => 243,
         C::ClatterIce => 203,
         C::ClatterYoshiEgg => 244,
@@ -1886,6 +1889,137 @@ fn trolley_actual_victim446_and_positive_native_seed_are_both_required() {
             } else { assert!(g.clock.is_none()); }
             assert_eq!(DRIVEN.with_borrow(|v|*v.last().unwrap()),MappedInputs::NEUTRAL);
         }
+    }
+}
+
+// Cargo89 (Plan::Cargo): CATCH 50, CATCH_WAIT 52 (fixture ids), Donkey SHOULDER_START 0x1EA /
+// SHOULDER_WAIT 0x1EB (lua_const.rs:4055/4057); victim SHOULDERED_DONKEY_START 0xC5 / SHOULDERED_DONKEY 0xC6.
+unsafe fn cargo(m: &mut NativeMemory, facing: f32) -> Game {
+    let mut g = Game::new(Plan::Cargo, State::Grab);
+    let request = g.requested.as_mut().unwrap();
+    request.id = 89;
+    request.attacker_kind = 1;
+    m.body[3] = 1;
+    assert_eq!(entry::start(g.requested.unwrap()), Some("FIGHTER_STATUS_KIND_CATCH"));
+    startup(&mut g, m.p1());
+    assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+    ROLLER_LR.store(facing.to_bits(), Ordering::Relaxed);
+    g
+}
+fn cargo_forward(facing: f32) -> MappedInputs {
+    MappedInputs { lstick_x: if facing > 0.0 { 120 } else { -120 }, ..MappedInputs::NEUTRAL }
+}
+fn shoulder_seed(m: &mut NativeMemory, automatic: f32) {
+    m.seed(119.5, 10.0, 1);
+    unsafe { (m.record.as_mut_ptr().cast::<u8>().add(4) as *mut f32).write(automatic) };
+}
+#[test]
+fn cargo_real_catch_then_forward_only_in_catch_wait_until_native_shoulder_seed() {
+    unsafe {
+        for facing in [-1.0f32, 1.0] {
+            let mut m = NativeMemory::new();
+            let mut g = cargo(&mut m, facing);
+            CPU_STATUS.store(50, Ordering::Relaxed);
+            m.update(&mut g, 0);
+            assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
+            // The preparatory grab's own start is never armed or scored.
+            m.seed(90.0, 8.0, 1);
+            m.start();
+            m.update(&mut g, 66);
+            assert!(g.clock.is_none() && BEGINS.with_borrow(Vec::is_empty));
+            assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+            CPU_STATUS.store(52, Ordering::Relaxed);
+            for _ in 0..2 {
+                m.update(&mut g, 66);
+                assert_eq!(ARMED.load(Ordering::Relaxed), g.generation);
+                assert!(g.followed);
+                assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), cargo_forward(facing));
+            }
+            for attacker in [0x1EA, 0x1EB] {
+                CPU_STATUS.store(attacker, Ordering::Relaxed);
+                m.update(&mut g, 0xC5);
+                assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
+                assert_eq!(g.step, Step::Entering);
+            }
+            shoulder_seed(&mut m, 1.0);
+            let actual = reader::sample(m.p1(), 0.37).unwrap().seed();
+            m.start();
+            m.update(&mut g, 0xC6);
+            assert_eq!(g.step, Step::Held);
+            assert_eq!(g.clock.unwrap().last(), actual.record);
+            assert_eq!(BEGINS.with_borrow(|v| (v.len(), v[0].0.0, v[0].1)), (1, 89, actual));
+            assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL);
+        }
+    }
+}
+#[test]
+fn cargo_zero_automatic_shoulder_seed_keeps_the_existing_observation_refusal() {
+    unsafe {
+        for victim in [0xC5, 0xC6] {
+            let mut m = NativeMemory::new();
+            let mut g = cargo(&mut m, 1.0);
+            CPU_STATUS.store(52, Ordering::Relaxed);
+            m.update(&mut g, 66);
+            CPU_STATUS.store(0x1EA, Ordering::Relaxed);
+            m.update(&mut g, victim);
+            shoulder_seed(&mut m, 0.0);
+            m.start();
+            m.update(&mut g, victim);
+            assert_eq!(g.failed, Some("Native tick observation unavailable for this hold"));
+            assert!(g.clock.is_none() && BEGINS.with_borrow(Vec::is_empty));
+        }
+    }
+}
+#[test]
+fn cargo_capture_seed_miss_and_unusable_facing_fail_closed() {
+    unsafe {
+        // An armed seed while the victim is still in an ordinary capture status is not Cargo.
+        for victim in [66, 67, 0] {
+            let mut m = NativeMemory::new();
+            let mut g = cargo(&mut m, 1.0);
+            CPU_STATUS.store(52, Ordering::Relaxed);
+            m.update(&mut g, 66);
+            shoulder_seed(&mut m, 1.0);
+            m.start();
+            m.update(&mut g, victim);
+            assert_eq!(g.failed, Some("Move entry unconfirmed · no grade"), "victim={victim}");
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+        }
+        let mut m = NativeMemory::new();
+        let mut g = cargo(&mut m, 1.0);
+        CPU_STATUS.store(50, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        m.update(&mut g, 0);
+        assert_eq!(g.failed, Some("Move did not capture · reopen menu to retry"));
+        for facing in [0.0f32, f32::NAN, f32::INFINITY] {
+            let mut m = NativeMemory::new();
+            let mut g = cargo(&mut m, facing);
+            CPU_STATUS.store(52, Ordering::Relaxed);
+            m.update(&mut g, 66);
+            assert_eq!(g.failed, Some(UNAVAILABLE_NOTICE), "facing={facing}");
+            assert!(DRIVEN.with_borrow(|v| v.iter().all(|i| i.lstick_x == 0)));
+        }
+    }
+}
+#[test]
+fn cargo_never_drives_forward_before_catch_wait_or_for_other_plans() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut g = cargo(&mut m, 1.0);
+        for attacker in [0, 50, 51, 53] {
+            CPU_STATUS.store(attacker, Ordering::Relaxed);
+            m.update(&mut g, 66);
+            if g.step == Step::Failed { break; }
+            assert_eq!(DRIVEN.with_borrow(|v| *v.last().unwrap()), MappedInputs::NEUTRAL, "attacker={attacker}");
+        }
+        let mut m = NativeMemory::new();
+        let mut g = held_downthrow(&mut m);
+        assert_eq!(g.step, Step::Held);
+        g.step = Step::Entering;
+        CPU_STATUS.store(52, Ordering::Relaxed);
+        m.update(&mut g, 66);
+        assert!(DRIVEN.with_borrow(|v| v.iter().all(|i| i.lstick_x == 0)));
     }
 }
 

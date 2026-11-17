@@ -18,7 +18,9 @@ pub fn placement_spacing(scenario: Scenario) -> f32 {
 /// The original move status is requested on the attacker only. Victim statuses and links are native.
 pub fn start(move_: Scenario) -> Option<&'static str> {
     Some(match move_.plan {
-        Plan::Grab | Plan::DownThrow => match move_.grab {
+        // Cargo is common CatchWaitMain0xcee30's forward continuation of a real
+        // ordinary catch (Donkey slot0x45 = SHOULDER_START); its catalog grab is0.
+        Plan::Grab | Plan::DownThrow | Plan::Cargo => match move_.grab {
             1 => "FIGHTER_STATUS_KIND_CATCH_DASH",
             2 => "FIGHTER_STATUS_KIND_CATCH_TURN",
             _ => "FIGHTER_STATUS_KIND_CATCH",
@@ -335,9 +337,25 @@ impl TrolleyEntry {
     }
 }
 
-/// Only down throws first acquire an ordinary grab, without grading that preparatory hold.
+/// Down throws and Cargo first acquire an ordinary grab, without grading that preparatory hold.
 pub fn preparatory_grab(plan: Plan) -> bool {
-    plan == Plan::DownThrow
+    matches!(plan, Plan::DownThrow | Plan::Cargo)
+}
+
+/// Cargo's one forward command while the attacker is in actual CATCH_WAIT: a full
+/// left-stick tilt toward the attacker's native facing, nothing else. An unusable
+/// facing is not guessed.
+pub fn cargo_throw(attacker_lr: f32) -> Option<MappedInputs> {
+    if !attacker_lr.is_finite() || attacker_lr == 0.0 {
+        return None;
+    }
+    Some(MappedInputs { lstick_x: if attacker_lr > 0.0 { 120 } else { -120 }, ..MappedInputs::NEUTRAL })
+}
+
+/// Cargo's scoring seed must come from the victim's native shouldered statuses, never
+/// from the preparatory grab's capture statuses, which State::Grab also holds.
+pub fn cargo_holding(is: impl Fn(C) -> bool) -> bool {
+    is(C::ClatterShoulderedDonkeyStart) || is(C::ClatterShoulderedDonkey)
 }
 
 /// A preparatory native capture initializes its own timer before the selected scoring phase.
@@ -417,6 +435,33 @@ mod tests {
             let input = controls(Plan::DownThrow, true);
             assert_eq!((input.buttons, input.lstick_x, input.lstick_y), (1, 0, -120));
             assert_eq!(controls(Plan::DownThrow, false), MappedInputs::NEUTRAL);
+        }
+
+        #[test]
+        fn cargo_is_a_preparatory_real_catch_with_one_facing_forward_command() {
+            let cargo = super::super::moves::CATALOG[89];
+            assert_eq!((cargo.id, cargo.attacker_kind, cargo.plan, cargo.grab), (89, 0x01, Plan::Cargo, 0));
+            assert_eq!(start(cargo), Some("FIGHTER_STATUS_KIND_CATCH"));
+            assert!(preparatory_grab(Plan::Cargo) && preparatory(Plan::Cargo));
+            assert!(!preparatory_holding(Plan::Cargo, |_| true));
+            assert_eq!(controls(Plan::Cargo, false), MappedInputs::NEUTRAL);
+            assert_eq!(controls(Plan::Cargo, true), MappedInputs::NEUTRAL);
+            for (lr, x) in [(1.0, 120), (-1.0, -120), (0.25, 120), (-0.25, -120)] {
+                assert_eq!(cargo_throw(lr), Some(MappedInputs { lstick_x: x, ..MappedInputs::NEUTRAL }));
+            }
+            for lr in [0.0, -0.0, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+                assert_eq!(cargo_throw(lr), None);
+            }
+            assert!(cargo_holding(|c| c == C::ClatterShoulderedDonkeyStart));
+            assert!(cargo_holding(|c| c == C::ClatterShoulderedDonkey));
+            for capture in [C::ClatterCapturePulled, C::ClatterCaptureWait, C::ClatterCaptureDamage] {
+                assert!(holding(State::Grab, |c| c == capture));
+                assert!(!cargo_holding(|c| c == capture));
+            }
+            // Other plans keep their entries.
+            for plan in [Plan::Grab, Plan::Whip, Plan::AirSideSpecial, Plan::Inhale] {
+                assert!(!preparatory_grab(plan));
+            }
         }
 
         #[test]

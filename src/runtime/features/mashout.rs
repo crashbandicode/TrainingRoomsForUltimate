@@ -783,6 +783,11 @@ pub unsafe fn frame(fighter: usize) {
         {
             game.fail("Move entry unconfirmed · no grade"); return;
         }
+        if game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Cargo)
+            && !entry::cargo_holding(|c| state_id(c) == Some(status))
+        {
+            game.fail("Move entry unconfirmed · no grade"); return;
+        }
         let ordinary_catch = game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Grab);
         let cpu_status = natives::status_kind(cpu);
         if !scored || (ordinary_catch && ![ids[1], ids[8], ids[9], ids[10]].contains(&cpu_status)) {
@@ -1115,6 +1120,18 @@ pub unsafe fn frame(fighter: usize) {
                 }
                 game.followed = true;
                 drive(entry::controls(request.plan, true));
+            }
+            if request.plan == crate::model::mashout::moves::Plan::Cargo
+                && game.followed
+                && cpu_status == ids[9]
+            {
+                // Native CatchCont0xca4d0 takes Cat2 THROW_F only from CATCH_WAIT; any
+                // later attacker status (SHOULDER_START onward) keeps the neutral above.
+                let Some(input) = entry::cargo_throw(natives::lr(cpu)) else {
+                    game.fail(UNAVAILABLE_NOTICE);
+                    return;
+                };
+                drive(input);
             }
             if game.saw_catch && cpu_status == ids[0] && !linked {
                 game.fail("Move did not capture · reopen menu to retry");
