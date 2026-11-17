@@ -1805,3 +1805,11 @@ ceiling = 155400
 date = "2026-11-17"
 reason = "Delay and Chord Entry as content-sized dialogs on main b22480f2 (notice+strip, 155392): measured 155400 = +8, the primary-approved +8. Exact total, no headroom. Counting and gates unchanged."
 approved_by = "Primary 20:56Z and 21:05Z (notice-ui-devin-opus): +8 for Delay and Chord Entry, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155446
+date = "2026-11-17"
+reason = "SOL-R23 Kirby hat copy precondition (rc15/kirby-hat-copy-ready e9b7f682): the hat request reads the native per-kind hat pair copy_setup uses (model::kirby_copy_pair, read-only) and waits without it, so a released pair no longer crashes (main+0x491e20, execute at 0). Measured 155274 on 458c0636 (155228, +46); rebased onto main 56923ec9 (155400): composed measured 155446 = the same +46. Already compacted from +110. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "devin-primary 22:40Z, operator review pending."
