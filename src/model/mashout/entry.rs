@@ -166,7 +166,8 @@ impl TrailMagicEntry {
                             TrailMagicProgress::StartThunder
                         }
                         TrailMagicKind::Thunder => TrailMagicProgress::Pending,
-                        TrailMagicKind::Blizzard => unreachable!(),
+                        // Fire must cycle to Thunder; a Blizzard kind here is unexpected native state: fail closed.
+                        TrailMagicKind::Blizzard => return Err(TrailMagicError::Unavailable),
                     },
                     _ => return Err(TrailMagicError::Unavailable),
                 }
@@ -619,6 +620,17 @@ mod tests {
             let olimar = super::super::moves::CATALOG[40];
             assert!(one_pikmin_grab(olimar));
             assert!(super::super::moves::CATALOG.iter().filter(|s| one_pikmin_grab(**s)).map(|s| s.id).eq([40]));
+        }
+
+        #[test]
+        fn trail_fire_cycle_fails_closed_on_unexpected_blizzard_without_panicking() {
+            let mut actor = TrailMagicEntry::new(TrailMagicKind::Fire).unwrap();
+            for status in [TrailMagicStatus::SpecialN, TrailMagicStatus::N1, TrailMagicStatus::N1Shoot, TrailMagicStatus::N1End] {
+                assert_eq!(actor.observe(status, TrailMagicKind::Fire, false), Ok(TrailMagicProgress::Pending));
+            }
+            // A Blizzard kind at the end of the Fire cast is unexpected native state: an error, never a panic.
+            assert_eq!(actor.observe(TrailMagicStatus::Wait, TrailMagicKind::Blizzard, true), Err(TrailMagicError::Unavailable));
+            assert_eq!(TrailMagicEntry::new(TrailMagicKind::Blizzard), Err(TrailMagicError::Unavailable));
         }
 
         #[test]
