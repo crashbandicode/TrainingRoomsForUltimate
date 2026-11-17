@@ -36,7 +36,7 @@ use callgraph::{Graph, Tok};
 const LOCK_METHODS: &[&str] = &["lock", "read", "write"];
 const GUARD_HELPERS: &[&str] = &["lock_write", "lock_read"];
 const WAITS: &[&str] = &["sleep", "park", "park_timeout", "recv", "recv_timeout", "join", "wait", "wait_timeout", "wait_while"];
-const PUBLISHING_ENTRIES: &[&str] = &["published::publish", "menu::apply_kept"];
+const PUBLISHING_ENTRIES: &[&str] = &["published::publish", "menu::apply_kept", "export::request"];
 const ALIASES: &[(&str, &str)] = &[("ui/menu_app.rs", "menu"), ("ui/menu_app.rs", "menu_app")];
 
 /// `(function, via)` edges the scan reports that the code does not have, each with the reason (read in the source).
@@ -1013,7 +1013,13 @@ const NOT_GAME_ENTRIES: &[(&str, &str)] = &[
     ("combo::tr_combo_fighter_v1", "a trace-point anchor our own code calls (its callers are walked)"),
     ("notices::tr_intro_posted_v1", "a trace-point anchor our own code calls (its callers are walked)"),
     ("worker::tr_cycle_badges_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("export::training_rooms_state_export_v1", BRIDGE_CALL),
+    ("export::subscribe", BRIDGE_CALL),
+    ("export::request", "the hardware bridge's request, on the bridge's own thread: walked as a plugin entry (PUBLISHING_ENTRIES)"),
 ];
+
+/// The test-only hardware bridge calls these from its own plugin thread (state export v1), never from a game hook.
+const BRIDGE_CALL: &str = "called by the hardware bridge on its own thread (runtime::export); takes no lock";
 
 /// Listed entries the call graph does not contain, and why (docs lane review R2, finding 5: a key that resolves to nothing is not
 /// skipped silently). Every other `GAME_ENTRIES` key and every plugin entry resolves (`every_listed_entry_resolves`).

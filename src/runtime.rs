@@ -15,6 +15,7 @@ pub(crate) mod diag_log;
 mod diag_reload;
 mod deluxe_overlay;
 mod deluxe_row;
+pub(crate) mod export;
 mod features;
 mod game;
 mod hub;

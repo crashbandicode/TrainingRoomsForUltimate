@@ -16,7 +16,6 @@ use skyline::nn::ui2d::{Layout, Pane};
 use crate::model::frame_strip_plan::{Changed, Look};
 use crate::model::notify::TickOut;
 use crate::model::panes::{self as p, cb, iv};
-#[cfg(feature = "diag")]
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::{input_display, notices};
 use crate::runtime::ui::{pane, tick};
@@ -223,13 +222,14 @@ unsafe fn write_notice(container: *mut Pane, out: &TickOut, strip: bool) {
         pane::set_text(target, &buffer[..len]);
         pane::set_text_color(target, p::linear(draw.color));
     }
-    #[cfg(feature = "diag")]
-    diagnostic(format_args!(
-        "[TrainingRooms] notice_draw header={:?} body={:?} color={:?}",
-        draw.header,
-        draw.body.as_str(),
-        draw.color
-    ));
+    if crate::runtime::export::wanted() {
+        diagnostic(format_args!(
+            "[TrainingRooms] notice_draw header={:?} body={:?} color={:?}",
+            draw.header,
+            draw.body.as_str(),
+            draw.color
+        ));
+    }
 }
 
 

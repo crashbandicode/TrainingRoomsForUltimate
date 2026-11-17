@@ -1781,3 +1781,11 @@ ceiling = 155228
 date = "2026-11-17"
 reason = "CPU out-of-shield native shield drop (Phase 3 CPU-040/066, rc15/cpu-oos-shield-drop 1b5e5c75) measured 155228 on the Surface gate: +12 over 155216 (a9938105). One shared needs_native_drop predicate and the guard_button off-query clause of SPEC-cpu-05. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
 approved_by = "Primary 2026-11-17 tr-fix-devin brief approves the +12 for CPU-OOS, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155743
+date = "2026-11-17"
+reason = "State export v1 for the test-only hardware bridge (rc15/hw-bridge-export from 458c0636): +515 over 155228. The export table and its wait-free line ring (model::state_export, runtime::export), the settings apply moved out of the diag reload into one release path, and the CPU, notice, menu and save-state oracle sites that were cfg(diag) now formatted when a bridge subscribes (one relaxed load otherwise). No behaviour change without a bridge. FOR OPERATOR REVIEW."
+approved_by = "Primary 2026-11-17 bridge-devin brief (operator 19:42Z/19:55Z: slice 1 and 2 together, export table approved 14:07Z) orders the export; size delta reported for review. FOR OPERATOR REVIEW."

@@ -222,11 +222,13 @@ mod counts_index {
     pub const COPY_HOOK: usize = 12;
 }
 
-/// A line for the diag build only: the shipped NRO writes the install line and nothing else.
+/// A line for the diag build, or for a subscribed hardware bridge (`export::wanted`): otherwise the shipped NRO writes the
+/// install line and nothing else.
 macro_rules! state_diag {
     ($($arg:tt)*) => {
-        #[cfg(feature = "diag")]
-        diagnostic(format_args!($($arg)*));
+        if crate::runtime::export::wanted() {
+            diagnostic(format_args!($($arg)*));
+        }
     };
 }
 
@@ -572,6 +574,9 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
         situation: natives::situation_kind(accessor),
         fighter,
     };
+    use crate::model::state_export::{FRAME_NANA, FRAME_PLAYER};
+    let flags = if nana { FRAME_NANA } else { 0 } | if role == Role::Player { FRAME_PLAYER } else { 0 };
+    crate::runtime::export::fighter_frame(entry, kind, raw.status, raw.situation, flags, accessor, fighter);
     quick_reset::observe(&raw, nana);
     if role == Role::Player && !nana { setups::service(); }
     if !ENABLE.load(Ordering::Acquire) && !TEMPORARY.load(Ordering::Acquire) {

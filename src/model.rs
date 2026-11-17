@@ -241,6 +241,9 @@ pub mod drop_ring;
 pub mod box_handoff;
 #[path = "model/owned_ring.rs"]
 pub mod owned_ring;
+/// The test-only reader's export table and line ring (ssbu-hw-bridge).
+#[path = "model/state_export.rs"]
+pub mod state_export;
 
 #[path = "model/boot_notices.rs"]
 pub mod boot_notices;
