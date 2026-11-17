@@ -67,24 +67,24 @@ pub struct TrolleyEntry {
     phase: TrolleyPhase,
     cart: Option<OwnedTrolley>,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TrolleyError { Unavailable }
 impl TrolleyEntry {
     pub fn new(cpu: usize) -> Option<Self> {
         (cpu != 0).then_some(Self { cpu, phase: TrolleyPhase::AwaitRide, cart: None })
     }
-    #[cfg(test)]
-    pub fn phase(&self) -> TrolleyPhase { self.phase }
-    fn owned(&self, read: TrolleyRead) -> Result<OwnedTrolley, &'static str> {
-        let cart = read.cart.ok_or("native Trolley unavailable")?;
+    fn owned(&self, read: TrolleyRead) -> Result<OwnedTrolley, TrolleyError> {
+        let cart = read.cart.ok_or(TrolleyError::Unavailable)?;
         if cart.cpu != self.cpu || cart.article == 0 || cart.accessor == 0
             || self.cart.is_some_and(|old| old != cart)
-        { return Err("native Trolley identity changed"); }
+        { return Err(TrolleyError::Unavailable); }
         Ok(cart)
     }
-    fn drive(&mut self, read: TrolleyRead) -> Result<MappedInputs, &'static str> {
+    fn drive(&mut self, read: TrolleyRead) -> Result<MappedInputs, TrolleyError> {
         let cart = self.owned(read)?;
-        let counter = read.jump_disable.ok_or("native Trolley counter unavailable")?;
+        let counter = read.jump_disable.ok_or(TrolleyError::Unavailable)?;
         if self.phase == TrolleyPhase::JumpRequested && counter != 0 {
-            return Err("native Trolley jump eligibility changed");
+            return Err(TrolleyError::Unavailable);
         }
         self.cart = Some(cart);
         if counter == 0 {
@@ -101,11 +101,11 @@ impl TrolleyEntry {
     /// Ejected confirms native JUMP only; it is not empty-cart contact or a seed.
     /// This does not extend the runtime's existing WAIT-without-capture policy.
     pub fn observe(&mut self, status: TrolleyStatus, read: TrolleyRead)
-        -> Result<MappedInputs, &'static str>
+        -> Result<MappedInputs, TrolleyError>
     {
-        if !read.readers_ready { return Err("native Trolley readers unavailable"); }
-        if read.cpu != self.cpu { return Err("native Trolley CPU changed"); }
-        if status == TrolleyStatus::Failed { return Err("native Trolley creation failed"); }
+        if !read.readers_ready { return Err(TrolleyError::Unavailable); }
+        if read.cpu != self.cpu { return Err(TrolleyError::Unavailable); }
+        if status == TrolleyStatus::Failed { return Err(TrolleyError::Unavailable); }
         match (self.phase, status) {
             (TrolleyPhase::AwaitRide, TrolleyStatus::Special | TrolleyStatus::Other) =>
                 Ok(MappedInputs::NEUTRAL),
@@ -121,7 +121,7 @@ impl TrolleyEntry {
                 Ok(MappedInputs::NEUTRAL)
             }
             (TrolleyPhase::Ejected, _) => Ok(MappedInputs::NEUTRAL),
-            _ => Err("native Trolley phase unconfirmed"),
+            _ => Err(TrolleyError::Unavailable),
         }
     }
 }
@@ -277,13 +277,13 @@ mod tests {
             inputs.push(entry.observe(TrolleyStatus::Special, pending).unwrap());
             inputs.push(entry.observe(TrolleyStatus::Ride, pending).unwrap());
             inputs.push(entry.observe(TrolleyStatus::Drive, trolley_read(Some(2))).unwrap());
-            assert_eq!(entry.phase(), TrolleyPhase::Drive);
+            assert_eq!(entry.phase, TrolleyPhase::Drive);
             for _ in 0..3 {
                 inputs.push(entry.observe(TrolleyStatus::Drive, trolley_read(Some(0))).unwrap());
             }
-            assert_eq!(entry.phase(), TrolleyPhase::JumpRequested);
+            assert_eq!(entry.phase, TrolleyPhase::JumpRequested);
             inputs.push(entry.observe(TrolleyStatus::Jump, trolley_read(None)).unwrap());
-            assert_eq!(entry.phase(), TrolleyPhase::Ejected);
+            assert_eq!(entry.phase, TrolleyPhase::Ejected);
             inputs.push(entry.observe(TrolleyStatus::Other, trolley_read(None)).unwrap());
             assert_eq!(inputs.iter().map(|i| i.buttons).collect::<Vec<_>>(), vec![0,0,0,4,4,4,0,0]);
             assert_eq!(inputs.windows(2).filter(|w| w[0].buttons == 0 && w[1].buttons == 4).count(), 1);
@@ -366,7 +366,7 @@ mod tests {
             entry.observe(TrolleyStatus::Drive, trolley_read(Some(2))).unwrap();
             assert!(entry.observe(TrolleyStatus::Other, trolley_read(Some(0))).is_err());
             assert!(entry.observe(TrolleyStatus::Jump, trolley_read(Some(0))).is_err());
-            assert_eq!(entry.phase(), TrolleyPhase::Drive);
+            assert_eq!(entry.phase, TrolleyPhase::Drive);
         }
 
         #[test]
