@@ -123,6 +123,32 @@ pub enum Error {
     InvalidSeed,
     NeverEscapes,
     TickRange,
+    /// More writes than the observer ring, an unordered boundary, a non-finite operand, or writes on a seed the
+    /// solver answers without ticking.
+    InvalidSchedule,
+    /// A replayed write ended a cadence by itself; its escape timing is not proven, so there are no bounds.
+    ScheduleEscape,
+}
+
+/// The M3 observer's ring capacity per attempt (M3-EVENT-INTERFACE).
+pub const SCHEDULE: usize = 8;
+
+/// G2: an observed native Add replayed in every cadence still holding. `boundary` is the number of ticks the
+/// actual clock had completed when G1 applied the write; `operand` is the native delta.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Scheduled {
+    pub boundary: u32,
+    pub operand: f32,
+}
+
+/// The Add callee in binary32: `FMAX(remaining + operand, +0.0)` (a NaN stays NaN).
+pub fn add(remaining: f32, operand: f32) -> f32 {
+    let sum = remaining + operand;
+    if sum.is_nan() || sum > 0.0 {
+        sum
+    } else {
+        0.0
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -178,6 +204,10 @@ pub struct Solver {
     baseline: f32,
     no_input: Option<Option<u32>>,
     result: Option<Result<Bounds, Error>>,
+    start: f32,
+    schedule: [Scheduled; SCHEDULE],
+    scheduled: usize,
+    applied: usize,
 }
 
 impl Solver {
@@ -217,7 +247,50 @@ impl Solver {
             baseline: r.remaining,
             no_input,
             result,
+            start: r.remaining,
+            schedule: [Scheduled { boundary: 0, operand: 0.0 }; SCHEDULE],
+            scheduled: 0,
+            applied: 0,
         })
+    }
+
+    /// The bounds with the attempt's observed writes replayed (G2). An empty schedule is `new`.
+    pub fn scheduled(seed: Seed, writes: &[Scheduled]) -> Result<Self, Error> {
+        let mut solver = Self::new(seed)?;
+        if writes.len() > SCHEDULE
+            || writes.windows(2).any(|w| w[1].boundary < w[0].boundary)
+            || writes.iter().any(|w| !w.operand.is_finite())
+            || (!writes.is_empty() && (solver.result.is_some() || solver.no_input.is_some()))
+        {
+            return Err(Error::InvalidSchedule);
+        }
+        solver.schedule[..writes.len()].copy_from_slice(writes);
+        solver.scheduled = writes.len();
+        Ok(solver)
+    }
+
+    /// Applies the writes observed after `boundary` ticks to each cadence that still holds.
+    fn apply_writes(&mut self, boundary: u32) -> Result<(), Error> {
+        while self.applied < self.scheduled && self.schedule[self.applied].boundary == boundary {
+            let operand = self.schedule[self.applied].operand;
+            self.applied += 1;
+            if self.fastest.is_none() {
+                let states = if boundary == 0 { core::slice::from_mut(&mut self.start) } else { &mut self.frontier[..] };
+                for remaining in states.iter_mut().filter(|r| r.is_finite()) {
+                    *remaining = add(*remaining, operand);
+                    if *remaining <= 0.0 {
+                        return Err(Error::ScheduleEscape);
+                    }
+                }
+            }
+            if self.no_input.is_none() {
+                self.baseline = add(self.baseline, operand);
+                if self.baseline <= 0.0 {
+                    return Err(Error::ScheduleEscape);
+                }
+            }
+        }
+        Ok(())
     }
 
     fn put(&mut self, controls: Controls, remaining: f32) {
@@ -284,14 +357,14 @@ impl Solver {
                 break;
             };
             self.ticks = ticks;
+            if let Err(error) = self.apply_writes(ticks - 1) {
+                self.result = Some(Err(error));
+                break;
+            }
             if self.fastest.is_none() {
                 self.next.fill(f32::INFINITY);
                 if ticks == 1 {
-                    self.expand(
-                        Controls::from_record(self.seed.record),
-                        self.seed.record.remaining,
-                        true,
-                    );
+                    self.expand(Controls::from_record(self.seed.record), self.start, true);
                 } else {
                     for i in 0..STATES {
                         let remaining = self.frontier[i];

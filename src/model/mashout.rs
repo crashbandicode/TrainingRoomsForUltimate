@@ -4,6 +4,8 @@
 pub mod admission;
 #[path = "mashout/clatter.rs"]
 pub mod clatter;
+#[path = "mashout/egg117.rs"]
+pub mod egg117;
 #[path = "mashout/grade.rs"]
 pub mod grade;
 #[path = "mashout/moves.rs"]
