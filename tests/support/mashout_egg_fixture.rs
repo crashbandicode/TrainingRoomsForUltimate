@@ -122,6 +122,12 @@ static TRAIL_MAGIC_KIND_RESOLVED: AtomicBool = AtomicBool::new(true);
 static CPU_X: AtomicU32 = AtomicU32::new(0x40c00000);
 static P1_DAMAGE: AtomicU32 = AtomicU32::new(0x41bc0000);
 static PREP_ARTICLE: AtomicU32 = AtomicU32::new(0);
+// S1 (116): 0 = Blizzard provider closed, 1 = still open (N2 or live Ice), else reader unavailable.
+static BLIZZARD_PROVIDER: AtomicU32 = AtomicU32::new(0);
+unsafe fn trail_blizzard_closed(cpu: usize) -> Result<bool, ()> {
+    assert_eq!(cpu, 2);
+    match BLIZZARD_PROVIDER.load(Ordering::Relaxed) { 0 => Ok(true), 1 => Ok(false), _ => Err(()) }
+}
 thread_local! { static LR_SETS: RefCell<Vec<(usize, f32)>> = const { RefCell::new(Vec::new()) }; }
 unsafe fn trail_prep_article_live(cpu: usize) -> Result<bool, ()> {
     assert_eq!(cpu, 2);
@@ -628,6 +634,7 @@ impl NativeMemory {
         CPU_X.store(6.0f32.to_bits(), Ordering::Relaxed);
         P1_DAMAGE.store(23.5f32.to_bits(), Ordering::Relaxed);
         PREP_ARTICLE.store(0, Ordering::Relaxed);
+        BLIZZARD_PROVIDER.store(0, Ordering::Relaxed);
         LR_SETS.with_borrow_mut(Vec::clear);
         TRAIL_MAGIC_READS.store(0, Ordering::Relaxed);
         COVERED.store(false, Ordering::Relaxed);
@@ -2944,5 +2951,27 @@ fn sora_prep_that_changed_damage_or_left_an_article_never_arms() {
         m.update(&mut game, 0);
         assert_eq!(game.failed, Some("Position unavailable"), "no facing reference: fail before any cast");
         assert!(REQUESTS.with_borrow(Vec::is_empty));
+    }
+}
+
+#[test]
+fn sora_blizzard_escape_grades_only_when_the_provider_is_closed() {
+    unsafe {
+        for (provider, want) in [(0u32, None), (1, Some("Native tick mismatch · no grade")), (2, Some(UNAVAILABLE_NOTICE))] {
+            let mut m = NativeMemory::new();
+            m.body[3] = 0x5d;
+            let mut game = sora_game(1);
+            m.update(&mut game, 0);
+            CPU_STATUS.store(486, Ordering::Relaxed);
+            m.seed(142.3, 7.0, 1);
+            m.start();
+            m.update(&mut game, 203);
+            assert_eq!(game.step, Step::Held);
+            EXECUTE_HELD.store(true, Ordering::Relaxed);
+            BLIZZARD_PROVIDER.store(provider, Ordering::Relaxed);
+            m.update(&mut game, 68);
+            assert_eq!(game.failed, want, "provider {provider}");
+            assert_eq!(game.step, if want.is_none() { Step::Result } else { Step::Failed }, "provider {provider}");
+        }
     }
 }
