@@ -402,10 +402,10 @@ pub const IDX_TAB_BOX: usize = IDX_BADGE_NUM + BADGES;
 /// the renderer writes is below it. The panes after these (the notification panel and the frame strip) belong to the
 /// input package, which finds them by name when it draws.
 pub const MENU_COUNT: usize = IDX_TAB_BOX + 4 * TAB_BOXES;
-/// The notification panel (SPEC-input-05): its own container under `RootPane`. Each of its texts (header, short
-/// body, long body) has a dark plate behind it. The three plates come first and the three texts after them: a padded
-/// body plate reaches into the header's box, and drawn after the header it covered the header's lower half (Eden
-/// covrest-02, 2026-11-08). Written by the notices code of the input package.
+/// The notification panel (SPEC-input-05): its own container under `RootPane`. Since 2026-11-17 (`model::notice_box`) the
+/// first plate is the one dark plate behind the header and the body, sized to them; the other two stay hidden. The
+/// plates come first and the three texts after them: a plate drawn after a text covers it (Eden covrest-02,
+/// 2026-11-08). Written by the notices code of the input package.
 pub const IDX_NOTICE: usize = MENU_COUNT;
 pub const IDX_NOTICE_HEADER_PLATE: usize = IDX_NOTICE + 1;
 pub const IDX_NOTICE_TEXT_PLATE: usize = IDX_NOTICE + 2;
@@ -1004,11 +1004,18 @@ pub const TEXT_OFF: [u8; 4] = [110, 116, 128, 255];
 /// Opaque dark plate behind each notice text. A white plate disappeared on a bright stage; black body text
 /// on this plate is the UI20 failure (about 1.06:1), so the body colours are the light ones.
 pub const NOTICE_PLATE: [u8; 4] = PANEL;
-/// Padding, in canvas units, on every side of a notice text when its plate is sized.
-pub const NOTICE_PLATE_PAD: f32 = 16.0;
 pub const NOTICE_HEADER: [u8; 4] = TEXT;
+/// The compact notice box (2026-11-17, `model::notice_box`): the plate's top-left corner, 16 px from the left and 8 px
+/// from the top at 1280 × 720 (the BTT chip's corner); its widest, 8 px short of the frame strip; and its two fonts.
+pub const NOTICE_LEFT: f32 = -936.0;
+pub const NOTICE_TOP: f32 = 528.0;
+pub const NOTICE_MAX_W: f32 = -iv::STRIP_W / 2.0 - 12.0 - NOTICE_LEFT;
+pub const NOTICE_HEADER_FONT: (f32, f32) = (15.0, 24.0);
+pub const NOTICE_BODY_FONT: (f32, f32) = (17.0, 26.0);
+/// Where the notice panes start, before the HUD draw sizes them to the notice.
+const NOTICE_BOX: [f32; 4] = [NOTICE_LEFT + NOTICE_MAX_W / 2.0, NOTICE_TOP - 40.0, NOTICE_MAX_W, 80.0];
 
-/// Which notice texts are shown. Each plate uses the same flag as its text.
+/// Which notice texts are shown. The one plate, `TrModDisp0HdrPlate`, behind both texts, uses the header's flag.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NoticeFaces {
     pub header: bool,
@@ -1020,14 +1027,6 @@ pub struct NoticeFaces {
 pub const fn notice_faces(shown: bool, long_body: bool) -> NoticeFaces {
     NoticeFaces { header: shown, body: shown && !long_body, long_body: shown && long_body }
 }
-
-const fn padded([x, y, w, h]: [f32; 4]) -> [f32; 4] {
-    [x, y, w + 2.0 * NOTICE_PLATE_PAD, h + 2.0 * NOTICE_PLATE_PAD]
-}
-
-const NOTICE_HEADER_BOX: [f32; 4] = [0.0, 445.0, 960.0, 50.0];
-const NOTICE_TEXT_BOX: [f32; 4] = [0.0, 390.0, 960.0, 70.0];
-const NOTICE_LONG_BOX: [f32; 4] = [0.0, 325.0, 960.0, 180.0];
 
 /// `[x, y, w, h]`: a pane's place and size, the order `Spec` keeps them in.
 const fn rect(name: Name, [x, y, w, h]: [f32; 4], color: [u8; 4], visible: bool) -> Spec {
@@ -1053,33 +1052,6 @@ const fn hidden(spec: Spec) -> Spec {
     Spec { visible: false, ..spec }
 }
 
-/// Centre of `TrModDisp0`, below the combo bar. The header box is the highest notice text
-/// (local y 445, height 50). Sixteen units are the plate padding `p23/notice-plates` draws
-/// around that text. The combo bar's lowest bottom is a drilled sequence's, `STRIP_Y + SEQ_BAR_Y - BAR_H / 2` (the
-/// sequence band moves the bar down), and 8 units stay clear of it.
-pub const NOTICE_ORIGIN_Y: f32 = {
-    let header_top = 445.0 + 50.0 / 2.0;
-    let plate_pad = 16.0;
-    let bar_bottom = iv::STRIP_Y + cb::SEQ_BAR_Y - cb::BAR_H / 2.0;
-    let gap = 8.0;
-    bar_bottom - gap - (header_top + plate_pad)
-};
-
-/// The notice slot's y while a practice game's notice stands (the operator, 11-14: "a, move the notice to the top"): the
-/// header plate's top edge 24 units under the top of the canvas, so the middle of the screen is free for the targets.
-pub const NOTICE_TOP_Y: f32 = 540.0 - 24.0 - (445.0 + 50.0 / 2.0 + NOTICE_PLATE_PAD);
-
-/// The top band with the frame strip drawn at the top: the plates' top edge 8 units under the strip's bottom edge.
-const NOTICE_UNDER_STRIP_Y: f32 = iv::STRIP_Y - iv::STRIP_H / 2.0 - 8.0 - (445.0 + 50.0 / 2.0 + NOTICE_PLATE_PAD);
-
-/// The notice slot's y: its old place; while a practice game's notice stands (`raised`) the top band, under the frame strip
-/// (`strip`, drawn at the top) when that is up, and under the combo bar (`bar`, which hangs from the strip) when that shows:
-/// the old place is already 8 units under the bar's lowest bottom, a drilled sequence's.
-pub const fn notice_y(raised: bool, strip: bool, bar: bool) -> f32 {
-    let band = [NOTICE_TOP_Y, NOTICE_UNDER_STRIP_Y][strip as usize];
-    [NOTICE_ORIGIN_Y, band][(raised && !bar) as usize]
-}
-
 /// Top-left compact HUD, in canvas units; the text and target chip stay on one line.
 pub fn btt_hud_box(body: &str, strip: bool, bar: bool) -> [f32; 4] {
     let wide = body.chars().count() > 18;
@@ -1102,13 +1074,13 @@ pub const fn spec(index: usize) -> Spec {
         i if i == IDX_BTT + 2 => under(rect(name, [26.0, 0.0, 32.0, 32.0], [255; 4], true), name_of(IDX_BTT)),
         i if i == IDX_BTT + 3 => under(text(name, [158.0, 0.0, 212.0, 40.0], Align::Left, (13.0, 24.0), 96, TEXT), name_of(IDX_BTT)),
         IDX_MENU => container(name, ROOT_PANE, [0.0, 0.0, 1920.0, 1080.0]),
-        IDX_NOTICE => container(name, ROOT_PANE, [0.0, NOTICE_ORIGIN_Y, 1920.0, 1080.0]),
-        IDX_NOTICE_HEADER_PLATE => under(rect(name, padded(NOTICE_HEADER_BOX), NOTICE_PLATE, true), name_of(IDX_NOTICE)),
-        IDX_NOTICE_HEADER => under(text(name, NOTICE_HEADER_BOX, Align::Center, FONT_SMALL, 24, NOTICE_HEADER), name_of(IDX_NOTICE)),
-        IDX_NOTICE_TEXT_PLATE => under(rect(name, padded(NOTICE_TEXT_BOX), NOTICE_PLATE, true), name_of(IDX_NOTICE)),
-        IDX_NOTICE_TEXT => under(text(name, NOTICE_TEXT_BOX, Align::Center, FONT, 48, TEXT), name_of(IDX_NOTICE)),
-        IDX_NOTICE_LONG_PLATE => under(rect(name, padded(NOTICE_LONG_BOX), NOTICE_PLATE, false), name_of(IDX_NOTICE)),
-        IDX_NOTICE_LONG => under(hidden(text(name, NOTICE_LONG_BOX, Align::Center, (14.0, 24.0), NOTICE_LONG_UNITS, TEXT)), name_of(IDX_NOTICE)),
+        IDX_NOTICE => container(name, ROOT_PANE, [0.0, 0.0, 1920.0, 1080.0]),
+        IDX_NOTICE_HEADER_PLATE => under(rect(name, NOTICE_BOX, NOTICE_PLATE, true), name_of(IDX_NOTICE)),
+        IDX_NOTICE_HEADER => under(text(name, NOTICE_BOX, Align::Left, NOTICE_HEADER_FONT, 24, NOTICE_HEADER), name_of(IDX_NOTICE)),
+        IDX_NOTICE_TEXT_PLATE => under(rect(name, NOTICE_BOX, NOTICE_PLATE, false), name_of(IDX_NOTICE)),
+        IDX_NOTICE_TEXT => under(text(name, NOTICE_BOX, Align::Left, NOTICE_BODY_FONT, 48, TEXT), name_of(IDX_NOTICE)),
+        IDX_NOTICE_LONG_PLATE => under(rect(name, NOTICE_BOX, NOTICE_PLATE, false), name_of(IDX_NOTICE)),
+        IDX_NOTICE_LONG => under(hidden(text(name, NOTICE_BOX, Align::Left, NOTICE_BODY_FONT, NOTICE_LONG_UNITS, TEXT)), name_of(IDX_NOTICE)),
         IDX_BG => rect(name, [0.0, 0.0, PANEL_W, PANEL_H], PANEL, true),
         i if i >= IDX_IV && i < IDX_CB => iv_spec(i - IDX_IV, name),
         i if i >= IDX_CB && i < IDX_ORBS => cb_spec(i - IDX_CB, name),

@@ -14,6 +14,7 @@ use hos_lock::Mutex;
 use skyline::nn::ui2d::{Layout, Pane};
 
 use crate::model::frame_strip_plan::{Changed, Look};
+use crate::model::notice_box;
 use crate::model::notify::TickOut;
 use crate::model::panes::{self as p, cb, iv};
 #[cfg(feature = "diag")]
@@ -114,8 +115,11 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     let owners = published::input_owners();
     let menu_open = owners.covers_hud();
     let strip_shown = !menu_open && input_display::sampling();
-    write_notice(notice, &notices::hud_tick(!waiting && !notice.is_null()), strip_shown);
-    write_btt(root, menu_open, strip_shown);
+    let btt = crate::runtime::features::btt::hud();
+    let chip = (!menu_open && !btt.as_str().is_empty())
+        .then(|| p::btt_hud_box(btt.as_str(), strip_shown, crate::runtime::features::combo::bar_shown()));
+    write_notice(notice, &notices::hud_tick(!waiting && !notice.is_null()), chip);
+    write_btt(root, btt.as_str(), chip);
     if strip[iv::at::CONTAINER] != 0 {
         input_display::hud_tick(menu_open, |local, look, changed| {
             write_look(strip[local] as *mut Pane, p::IDX_IV + local, look, changed)
@@ -189,57 +193,68 @@ unsafe fn set_text(target: *mut Pane, text: &str) {
 
 // ---- the notice slot ----------------------------------------------------------------------------------
 
-unsafe fn write_notice(container: *mut Pane, out: &TickOut, strip: bool) {
+/// The height of the notice box drawn last (`f32` bits), which `notice_box::stack` keeps clear of the BTT chip each tick.
+static NOTICE_H: AtomicU32 = AtomicU32::new(0);
+
+/// The compact notice box (`model::notice_box`): sized to the notice when it is drawn, at the top left, under the BTT
+/// chip (`chip`, `panes::btt_hud_box`) while that shows.
+unsafe fn write_notice(container: *mut Pane, out: &TickOut, chip: Option<[f32; 4]>) {
     if container.is_null() {
         return;
     }
     pane::set_visible(container, out.visible);
-    // A practice game's notice stands in the top band, under the frame strip when that is drawn and under the combo bar when
-    // that shows (the operator, 11-14); every other notice keeps its place.
-    let bar = crate::runtime::features::combo::bar_shown();
-    pane::set_pos(container, 0.0, p::notice_y(notices::raised(), strip, bar));
-    let Some(draw) = out.draw else { return };
-    let header = find(container, p::IDX_NOTICE_HEADER);
-    let header_plate = find(container, p::IDX_NOTICE_HEADER_PLATE);
-    let text = find(container, p::IDX_NOTICE_TEXT);
-    let text_plate = find(container, p::IDX_NOTICE_TEXT_PLATE);
-    let long_text = find(container, p::IDX_NOTICE_LONG);
-    let long_plate = find(container, p::IDX_NOTICE_LONG_PLATE);
-    if !header.is_null() {
-        set_text(header, draw.header);
+    if let Some(draw) = out.draw {
+        let mut buffer = [0u16; crate::model::notify::BODY_MAX];
+        let len = crate::model::boot_notices::notice_units(draw.body.as_str(), &mut buffer);
+        let placed = notice_box::layout(draw.header, &mut buffer[..len]);
+        NOTICE_H.store(placed.plate[3].to_bits(), Ordering::Release);
+        let long = len > crate::model::boot_notices::SHORT_UNITS;
+        let face = p::notice_faces(out.visible, long);
+        let [header, plate, text, long_text] =
+            [p::IDX_NOTICE_HEADER, p::IDX_NOTICE_HEADER_PLATE, p::IDX_NOTICE_TEXT, p::IDX_NOTICE_LONG].map(|i| find(container, i));
+        place(plate, placed.plate, face.header);
+        place(header, placed.header, face.header);
+        place(text, placed.body, face.body);
+        place(long_text, placed.body, face.long_body);
+        if !header.is_null() {
+            set_text(header, draw.header);
+        }
+        let target = if long { long_text } else { text };
+        if !target.is_null() {
+            pane::set_text(target, &buffer[..len]);
+            pane::set_text_color(target, p::linear(draw.color));
+        }
+        #[cfg(feature = "diag")]
+        diagnostic(format_args!(
+            "[TrainingRooms] notice_draw header={:?} body={:?} color={:?} plate={:?}",
+            draw.header,
+            draw.body.as_str(),
+            draw.color,
+            placed.plate
+        ));
     }
-    let mut buffer = [0u16; crate::model::notify::BODY_MAX];
-    let len = crate::model::boot_notices::notice_units(draw.body.as_str(), &mut buffer);
-    let long = len > crate::model::boot_notices::SHORT_UNITS;
-    let face = p::notice_faces(out.visible, long);
-    if !header.is_null() { pane::set_visible(header, face.header); }
-    if !header_plate.is_null() { pane::set_visible(header_plate, face.header); }
-    if !text.is_null() { pane::set_visible(text, face.body); }
-    if !text_plate.is_null() { pane::set_visible(text_plate, face.body); }
-    if !long_text.is_null() { pane::set_visible(long_text, face.long_body); }
-    if !long_plate.is_null() { pane::set_visible(long_plate, face.long_body); }
-    let target = if long { long_text } else { text };
-    if !target.is_null() {
-        pane::set_text(target, &buffer[..len]);
-        pane::set_text_color(target, p::linear(draw.color));
-    }
-    #[cfg(feature = "diag")]
-    diagnostic(format_args!(
-        "[TrainingRooms] notice_draw header={:?} body={:?} color={:?}",
-        draw.header,
-        draw.body.as_str(),
-        draw.color
-    ));
+    pane::set_pos(container, 0.0, notice_box::stack(f32::from_bits(NOTICE_H.load(Ordering::Acquire)), chip));
 }
 
+/// A notice pane shown or hidden, and when shown placed at `[centre x, centre y, w, h]`.
+unsafe fn place(target: *mut Pane, [x, y, w, h]: [f32; 4], shown: bool) {
+    if target.is_null() {
+        return;
+    }
+    pane::set_visible(target, shown);
+    if shown {
+        pane::set_pos(target, x, y);
+        pane::set_width(target, w);
+        pane::set_height(target, h);
+    }
+}
 
 // Compact BTT HUD: existing builders/target material, independent of the transient notice queue.
-unsafe fn write_btt(root: *mut Pane, covered: bool, strip: bool) {
+unsafe fn write_btt(root: *mut Pane, body: &str, chip: Option<[f32; 4]>) {
     let container = pane::find_child(root, p::name_of(p::IDX_BTT).as_bytes());
     if container.is_null() { return; }
-    let body = crate::runtime::features::btt::hud();
-    pane::set_visible(container, !covered && !body.as_str().is_empty());
-    let [x, y, w, _] = p::btt_hud_box(body.as_str(), strip, crate::runtime::features::combo::bar_shown());
+    pane::set_visible(container, chip.is_some());
+    let Some([x, y, w, _]) = chip else { return };
     pane::set_pos(container, x, y);
     let plate = find(container, p::IDX_BTT + 1);
     if !plate.is_null() {
@@ -251,7 +266,7 @@ unsafe fn write_btt(root: *mut Pane, covered: bool, strip: bool) {
         pane::set_pos(text, 52.0 + (w - 64.0) / 2.0, 0.0);
         pane::set_width(text, w - 64.0);
         let mut buffer = [0; crate::model::notify::BODY_MAX];
-        let n = crate::model::boot_notices::notice_units(body.as_str(), &mut buffer);
+        let n = crate::model::boot_notices::notice_units(body, &mut buffer);
         pane::set_text(text, &buffer[..n]);
     }
 }

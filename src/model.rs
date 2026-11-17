@@ -244,6 +244,8 @@ pub mod owned_ring;
 
 #[path = "model/boot_notices.rs"]
 pub mod boot_notices;
+#[path = "model/notice_box.rs"]
+pub mod notice_box;
 
 /// S0 direct-launch reference; native fidelity is still an explicit DIAG acceptance gate.
 #[path = "model/tech_launch.rs"]

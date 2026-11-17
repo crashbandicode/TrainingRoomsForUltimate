@@ -64,7 +64,7 @@ fn startup_displays_current_chords_in_order_for_exact_visible_durations() {
 }
 
 fn longest_chords_survive_queue_utf16_wrap_and_preallocated_pane_boundaries() {
-    use model::{boot_notices, menu::chord::Chord, panes};
+    use model::{boot_notices, menu::chord::Chord, notice_box, panes};
     // The review counterexample exceeds the former 48-unit queue and writer
     // limits; both maximal shortcuts also exceeded the former 256-byte builder.
     for chord in [Chord(0xc1c0), Chord(u16::MAX)] {
@@ -88,15 +88,16 @@ fn longest_chords_survive_queue_utf16_wrap_and_preallocated_pane_boundaries() {
             let mut units = [0; BODY_MAX];
             let len = boot_notices::notice_units(draw.body.as_str(), &mut units);
             assert_eq!(len, expected.len());
+            let placed = notice_box::layout(draw.header, &mut units[..len]);
             for (&unit, byte) in units[..len].iter().zip(expected.bytes()) {
                 assert!(unit == u16::from(byte) || (byte == b' ' && unit == u16::from(b'\n')));
             }
-            let mut lines = 0;
             for line in units[..len].split(|unit| *unit == u16::from(b'\n')) {
-                assert!(line.len() <= boot_notices::LONG_COLUMNS);
-                lines += 1;
+                let (width, _) = notice_box::measure(line.iter().copied(), panes::NOTICE_BODY_FONT.0);
+                assert!(width <= notice_box::MAX_TEXT_W, "every chord line fits the compact box");
             }
-            assert!(lines <= 7, "all lines must fit the 180-unit pane at 24-unit font height");
+            assert!(placed.plate[0] + placed.plate[2] / 2.0 <= panes::NOTICE_LEFT + panes::NOTICE_MAX_W);
+            assert!(placed.plate[1] - placed.plate[3] / 2.0 > 0.0, "the box stays in the top half");
             for _ in 1..120 { assert!(queue.tick(true, false).visible); }
         }
         assert!(!queue.tick(true, false).visible);
@@ -105,8 +106,7 @@ fn longest_chords_survive_queue_utf16_wrap_and_preallocated_pane_boundaries() {
     let pane = panes::spec(panes::IDX_NOTICE_LONG);
     let panes::Kind::Text { chars, font, .. } = pane.kind else { panic!("notice must be text") };
     assert!(usize::from(chars) > BODY_MAX, "preallocate the complete body and terminator");
-    assert!(font.0 * boot_notices::LONG_COLUMNS as f32 <= pane.w);
-    assert!(font.1 * 7.0 <= pane.h);
+    assert_eq!(font, panes::NOTICE_BODY_FONT, "the long body draws like the short one");
 }
 
 thread_local! {

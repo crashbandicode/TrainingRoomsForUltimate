@@ -133,8 +133,6 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     // (`eggs::hides_cpu`). The CPU's body, its tag and its panel follow this one request (`cpu::hide::step`).
     let running = run.running();
     super::hide_cpu::hide(super::tech::running() || eggs::hides_cpu(PRACTICE_HIDE.load(Ordering::Acquire), running, run.cpu_target(), btt::running()));
-    // The standing notice sits in the top band while the game runs (the operator, 11-14).
-    super::notices::raise(super::notices::RAISE_EGGS, running);
     if plan == eggs::Plan::Clear {
         super::notices::clear(NOTICE_ID);
     }

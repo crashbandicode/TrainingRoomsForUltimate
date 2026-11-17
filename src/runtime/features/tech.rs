@@ -101,7 +101,6 @@ pub fn menu_opened() {
     PLACING.store(false, Ordering::Release);
     OPEN.store(true, Ordering::Release);
     notices::clear(NOTICE);
-    notices::raise(notices::RAISE_TECH, false);
 }
 pub fn menu_closed(edit: bool) {
     OPEN.store(false, Ordering::Release);
@@ -315,7 +314,6 @@ fn notice(run: &Practice, text: Option<&str>) {
             let _ = message.write_str(" · Auto approximate");
         }
     }
-    notices::raise(notices::RAISE_TECH, true);
     notices::upsert(
         NOTICE,
         "Tech Practice",
@@ -381,7 +379,6 @@ pub unsafe fn frame(fighter: usize) {
         RUNNING.store(false, Ordering::Release);
         PLACING.store(false, Ordering::Release);
         notices::clear(NOTICE);
-        notices::raise(notices::RAISE_TECH, false);
         drop(view);
         super::btt_camera::request(2, false);
         return;
