@@ -143,6 +143,13 @@ fn is_common(name: &str) -> bool {
 
 extern "Rust" fn on_nro_load(info: &skyline::nro::NroInfo) {
     if is_common(info.name) {
+        // M3 Set observer C9: the qualifier word follows the mapped common module (retracted on scene change).
+        let object = info.module.ModuleObject;
+        if !object.is_null() {
+            // SAFETY: the loader's module object for the module it just mapped.
+            let base = unsafe { (*object).module_base as usize };
+            crate::runtime::features::mashout::clatter_set::publish_common(base);
+        }
         install(info);
     }
 }

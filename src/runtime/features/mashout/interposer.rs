@@ -25,6 +25,8 @@ pub(super) unsafe fn reader_table(table: usize) -> bool {
 
 /// Called outside every hook, before the worker lock. Foreign values are never overwritten.
 pub(super) fn service() {
+    // M3 Set observer: same owner site, restore-first when its gate is closed.
+    super::clatter_set::service(scene::current().is_some());
     let wanted = WANTED.load(Ordering::Acquire)
         && READY.load(Ordering::Acquire)
         && scene::current().is_some();

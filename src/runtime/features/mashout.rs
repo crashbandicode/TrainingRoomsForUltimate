@@ -27,6 +27,8 @@ use crate::runtime::{
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use hos_lock::{Mailbox, Mutex, Published};
 
+#[path = "mashout/clatter_set.rs"]
+pub(crate) mod clatter_set;
 #[path = "mashout/interposer.rs"]
 mod interposer;
 #[path = "mashout/reader.rs"]
@@ -94,6 +96,7 @@ pub fn start() {
     START.store(true, Ordering::Release);
 }
 pub fn reset() {
+    clatter_set::release();
     ARMED.store(0, Ordering::Release);
     OWN_CPU.store(0, Ordering::Release);
     start();
@@ -119,6 +122,7 @@ fn fault(generation: u64) {
 }
 
 fn revoke() {
+    clatter_set::release();
     ARMED.store(0, Ordering::Release);
     drive(MappedInputs::NEUTRAL);
 }
@@ -1053,6 +1057,13 @@ pub unsafe fn frame(fighter: usize) {
                 return;
             }
             drive(entry::controls(request.plan, false));
+            if matches!(request.id, 113 | 116) {
+                // M3 Set observer: installed by the owner site from here until this attempt's exit (O5).
+                clatter_set::reset_ring();
+                // SAFETY: p1 is the live P1 BOMA; +0x48 is its ControlModule (lua_bind ldr x0,[x0,#72]).
+                let control = unsafe { *((p1 + 0x48) as *const usize) };
+                clatter_set::request(game.generation as u32, request.id as u16, control);
+            }
             game.step(Step::Entering, "Mash out · Waiting for move");
             state_natives::status_request(cpu, start);
             #[cfg(feature = "diag")]
