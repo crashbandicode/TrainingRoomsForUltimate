@@ -24,6 +24,9 @@ fn applied(boundary: u32, old: f32, operand: f32) -> Applied {
     Applied { boundary, old: old.to_bits(), operand: operand.to_bits(), new: add(old, operand).to_bits() }
 }
 
+/// eb755 generation 23: the printed Add operand -17.639999389648438 is the binary32 nearest -17.64 (bits 0xc18d1eb8).
+const EB755_OPERAND: f32 = -17.64;
+
 fn at(boundary: u32, operand: f32) -> Scheduled {
     Scheduled { boundary, operand }
 }
@@ -73,12 +76,13 @@ fn no_input(seed: Seed, writes: &[Scheduled]) -> u32 {
 fn egg117_eb755_callback_is_reproduced_bit_exact() {
     // 113-117-eb755-ally-canonical generation 23: Add -17.639999389648438 at index 0 turns 100 into 82.36000061035156,
     // and the next eligible tick gives 81.36000061035156.
-    let operand = -17.639_999_389_648_438_f32;
+    let operand = EB755_OPERAND;
+    assert_eq!(operand.to_bits(), 0xc18d_1eb8);
     let new = add(100.0, operand);
-    assert_eq!(new.to_bits(), 82.360_000_610_351_56_f32.to_bits());
+    assert_eq!(new.to_bits(), 82.36_f32.to_bits());
     let mut r = record(new);
     r.step(Input::default());
-    assert_eq!(r.remaining.to_bits(), 81.360_000_610_351_56_f32.to_bits());
+    assert_eq!(r.remaining.to_bits(), 81.36_f32.to_bits());
     let solver = replay(seed(100.0), &[applied(0, 100.0, operand)]).unwrap();
     let bounds = finish(solver, 7).unwrap();
     assert_eq!(bounds.no_input, Some(no_input(seed(100.0), &[at(0, operand)])));
@@ -153,7 +157,7 @@ fn egg117_a_write_that_ends_a_cadence_is_unscored() {
 
 #[test]
 fn egg117_s3_refuses_writes_the_callee_cannot_have_stored() {
-    let ok = applied(0, 100.0, -17.639_999);
+    let ok = applied(0, 100.0, EB755_OPERAND);
     let nine = [ok; SCHEDULE + 1];
     assert!(matches!(replay(seed(100.0), &nine), Err(Unscored::Writes)));
     assert!(matches!(replay(seed(100.0), &[applied(3, 100.0, -1.0), applied(2, 99.0, -1.0)]), Err(Unscored::Writes)));
@@ -175,9 +179,47 @@ fn egg117_s3_refuses_writes_the_callee_cannot_have_stored() {
     assert!(matches!(replay(constant, &[applied(0, 90.0, -1.0)]), Err(Unscored::Writes)), "answered without ticking");
 }
 
+/// A native no-input attempt with Adds before or after a frame's tick, observed under clatter.rs's G1 rule (a write
+/// applies before the frame's tick when its old is bit-equal to the model, else after it): the boundaries G1 records
+/// replay the actual run exactly, so the no-input bound equals the actual escape tick.
+#[test]
+fn egg117_g1_bit_equal_boundaries_replay_the_actual_run_exactly() {
+    // (frame, before the frame's tick, operand)
+    let natives = [(0, true, EB755_OPERAND), (5, false, 3.25), (9, true, -1.5), (20, false, 0.125)];
+    let (mut live, mut model) = (record(100.0), record(100.0));
+    let (mut elapsed, mut writes) = (0_u32, Vec::new());
+    while live.remaining > 0.0 {
+        let mut published = Vec::new();
+        for before in [true, false] {
+            if !before { live.step(Input::default()); }
+            for &(_, _, operand) in natives.iter().filter(|n| n.0 == elapsed && n.1 == before) {
+                published.push((live.remaining, operand));
+                live.remaining = add(live.remaining, operand);
+            }
+        }
+        let mut ticked = false;
+        for (old, operand) in published {
+            if model.remaining.to_bits() != old.to_bits() && !ticked {
+                model.step(Input::default());
+                ticked = true;
+            }
+            assert_eq!(model.remaining.to_bits(), old.to_bits(), "G1 finds the bit-equal boundary");
+            writes.push(applied(elapsed + u32::from(ticked), old, operand));
+            model.remaining = add(model.remaining, operand);
+        }
+        if !ticked { model.step(Input::default()); }
+        assert_eq!(model, live);
+        elapsed += 1;
+    }
+    assert_eq!(writes.iter().map(|w| w.boundary).collect::<Vec<_>>(), [0, 6, 9, 21]);
+    let bounds = finish(replay(seed(100.0), &writes).unwrap(), 5).unwrap();
+    assert_eq!(bounds.no_input, Some(elapsed));
+    assert_eq!(judge(Ok(bounds), elapsed, true), Ok(Outcome::Graded(Grade::Poor)));
+}
+
 #[test]
 fn egg117_grades_only_with_the_provider_closed() {
-    let operand = -17.639_999_389_648_438_f32;
+    let operand = EB755_OPERAND;
     let bounds = finish(replay(seed(100.0), &[applied(0, 100.0, operand)]).unwrap(), 11);
     let b = bounds.unwrap();
     assert_eq!(judge(bounds, b.fastest, false), Err(Unscored::ProviderOpen));
