@@ -1008,15 +1008,19 @@ fn grid_screen_pages_with_l_r_and_keeps_the_cursor_on_a_tile() {
 fn filtered_menu_counts_cycles_and_renders() {
     use model::mashout::moves::{self, Config, State};
     use model::frame::{Frame, Text, write_value};
-    let cases = [
-        (0, 99, 0, "Mario · Grab"),
-        // Final Smash rows 106 (Bury) and 115 (Frozen) are MoveAvailability::Hidden.
-        (1, 12, 99, "Banjo & Kazooie · Down throw"),
-        (2, 7, 111, "Hero · Command18"),
-        (3, 2, 118, "Yoshi · Egg Lay"),
-        (4, 4, 119, "Kirby · Inhale"),
-        (5, 1, 89, "Random"),
-    ];
+    // Expected values come from the catalog and `selectable()` (Available and startable now),
+    // independently of the menu's own option list. Hidden Final rows 106/115 and rows without
+    // a start yet are never listed; the listed rows grow by themselves as plans gain a start.
+    let mut cases: Vec<(usize, usize, usize, String)> = (0..State::ALL.len())
+        .map(|state| {
+            let rows: Vec<_> = moves::CATALOG.iter()
+                .filter(|s| s.state == State::ALL[state] && moves::selectable(**s)).collect();
+            let first = if state == 0 { 0 } else { rows[0].id as usize + 1 };
+            (state, rows.len() + 1, first, format!("{} · {}", rows[0].attacker_name, rows[0].name))
+        })
+        .collect();
+    cases.push((5, 1, 89, "Random".to_string()));
+    assert_eq!(cases[0].3, "Mario · Grab");
     for (state, count, first, label) in cases {
         let mut m = menu();
         goto(&mut m, moves::STATE_ROW);
