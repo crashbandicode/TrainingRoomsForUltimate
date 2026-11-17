@@ -9,7 +9,7 @@ use crate::model::btt::{Pad, LOOKS};
 use crate::model::chords::{field, Sample};
 use crate::model::cpu::hash::hash40;
 use crate::model::cpu::rng::Rng;
-use crate::model::panes::{EggLook, EggPicture, EGG_WHOLE};
+use crate::model::panes::EggLook;
 use crate::model::settings::Snapshot;
 use crate::model::storage::FixedPath;
 use crate::model::tech::{
@@ -253,17 +253,14 @@ fn wizard_poll(view: &mut ViewState, sample: Sample, stick: [f32; 2], range: [f3
         wizard.adjust(motion[0], motion[1]);
     }
     // One action per edge, with Back taking priority over confirmation.
-    let action = if sample.pressed & (1 << B) != 0 {
-        Some(WizardAction::Back)
-    } else if sample.pressed & (1 << X) != 0 {
-        Some(WizardAction::Defaults)
-    } else if sample.pressed & (1 << PLUS) != 0 {
-        Some(WizardAction::Start)
-    } else if sample.pressed & (1 << A) != 0 {
-        Some(WizardAction::Next)
-    } else {
-        None
-    };
+    let action = [
+        (B, WizardAction::Back),
+        (X, WizardAction::Defaults),
+        (PLUS, WizardAction::Start),
+        (A, WizardAction::Next),
+    ]
+    .into_iter()
+    .find_map(|(key, action)| (sample.pressed & (1 << key) != 0).then_some(action));
     match action.map(|a| wizard.action(a)) {
         Some(WizardOutcome::Start) => {
             view.wizard_config = wizard.config();
@@ -283,9 +280,10 @@ fn wizard_poll(view: &mut ViewState, sample: Sample, stick: [f32; 2], range: [f3
 /// The shared notice writer owns compact measurement, wrapping and placement.
 /// Keeping the wizard at this one adapter lets notice-compact replace that
 /// renderer without a second layout or new panes in the game hook.
-fn wizard_notice(wizard: &Wizard, blocked: Option<bool>) {
+fn wizard_notice(run: &Practice, wizard: &Wizard, blocked: Option<bool>) {
     use core::fmt::Write;
     let mut text = FixedPath::<256>::new();
+    let _ = writeln!(text, "{}", wizard.step.title());
     let _ = match wizard.step {
         Step::Spot => text.write_str("Move the cursor onto a surface"),
         Step::Angle => write!(
@@ -326,14 +324,7 @@ fn wizard_notice(wizard: &Wizard, blocked: Option<bool>) {
     } else {
         "\nA next · B back\nX defaults → preview · + start"
     });
-    notices::upsert(
-        NOTICE,
-        wizard.step.title(),
-        text.as_str(),
-        u16::MAX,
-        crate::model::notify::DEFAULT_COLOR,
-    );
-    notices::raise(notices::RAISE_TECH, true);
+    notice(run, Some(text.as_str()));
 }
 /// Owned P1 poll, shared BTT logical controls. Only the editor consumes input.
 pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
@@ -382,64 +373,28 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
 }
 /// BTT's existing egg/cursor pane pool draws the selected point and its normal.
 pub fn look(active: bool) -> [Option<([f32; 2], EggLook)>; LOOKS] {
-    let mut out = [None; LOOKS];
     if !active || !running() {
-        return out;
+        return [None; LOOKS];
     }
     let Some(view) = VIEW.try_lock() else {
-        return out;
+        return [None; LOOKS];
     };
-    if wizard_active() {
-        if let Some(wizard) = &view.wizard {
-            return crate::model::tech::wizard_marks::marks(
-                wizard,
-                view.picker.cursor,
-                view.preview_params,
-                view.preview_blocked == Some(false),
-            );
-        }
-    }
-    let spot = if placing() {
-        view.picker.hovered
-    } else {
-        view.picker.selected
+    let placing = placing();
+    let wizard = view.wizard.as_ref().filter(|_| wizard_active());
+    let spot = match wizard {
+        Some(wizard) => wizard.selected,
+        None if placing => view.picker.hovered,
+        None => view.picker.selected,
     };
-    if let Some(spot) = spot {
-        out[0] = Some((
-            [spot.point.x, spot.point.y],
-            EggLook {
-                scale: 0.3,
-                ..EGG_WHOLE
-            },
-        ));
-        if placing() {
-            let tip = crate::model::tech::add(
-                spot.point,
-                crate::model::tech::scale(spot.line.normal, 5.),
-            );
-            let mut points = picker::arrow_points(tip, spot.line.normal, 2.5, 1.5);
-            points[0] = crate::model::tech::add(spot.point, crate::model::tech::scale(spot.line.normal, 2.5));
-            for (slot, p) in out[1..5].iter_mut().zip(points) {
-                *slot = Some((
-                    [p.x, p.y],
-                    EggLook {
-                        scale: 0.12,
-                        ..EGG_WHOLE
-                    },
-                ));
-            }
-        }
-    }
-    if placing() {
-        out[LOOKS - 1] = Some((
-            [view.picker.cursor.x, view.picker.cursor.y],
-            EggLook {
-                picture: EggPicture::Cursor,
-                ..EGG_WHOLE
-            },
-        ));
-    }
-    out
+    let cursor =
+        (placing && wizard.is_none_or(|w| w.step == Step::Spot)).then_some(view.picker.cursor);
+    crate::model::tech::wizard_marks::marks(
+        spot,
+        cursor,
+        wizard,
+        view.preview_params,
+        view.preview_blocked == Some(false),
+    )
 }
 /// Initialize from the CPU resolver's complete status array, in `tech_init::STATUS_IDS` order.
 /// # Safety
@@ -879,7 +834,7 @@ pub unsafe fn frame(fighter: usize) {
                             let params = context.params;
                             Some((planner::plan(draft, context, &mut |_| 0).is_none(), params))
                         })();
-                        wizard_notice(wizard, preview.map(|p| p.0));
+                        wizard_notice(run, wizard, preview.map(|p| p.0));
                         view.preview_blocked = preview.map(|p| p.0);
                         view.preview_params = preview.map(|p| p.1);
                     }

@@ -2,13 +2,17 @@ lib_unit_tests! {
 use super::picker::Spot;
 use super::surface::Line;
 use super::wizard::{Step, Wizard};
-use super::wizard_marks::marks;
 use super::Vec2;
 use crate::model::btt::LOOKS;
-use crate::model::panes::EggPicture;
+use crate::model::panes::{EggLook, EggPicture, EGG_WHOLE};
 use crate::model::tech_launch::FlightParams;
 
 const CURSOR: Vec2 = Vec2 { x: 19., y: -7. };
+// Preserve the six wizard presentation regressions through the shared API.
+fn marks(wizard: &Wizard, cursor: Vec2, params: Option<FlightParams>, admitted: bool)
+    -> [Option<([f32;2], EggLook)>; LOOKS] {
+    super::wizard_marks::marks(wizard.selected, (wizard.step==Step::Spot).then_some(cursor), Some(wizard), params, admitted)
+}
 fn params() -> FlightParams {
     FlightParams {
         brake: 0.051,
@@ -38,6 +42,31 @@ fn spot(normal: Vec2) -> Spot {
             passable: false,
         },
     }
+}
+
+#[test]
+fn wizard_marks_full_picker_matches_original_normal_arrow_bit_exactly() {
+    use super::{add,scale};
+    for normal in [Vec2{x:0.,y:1.},Vec2{x:0.,y:-1.},Vec2{x:-1.,y:0.},Vec2{x:1.,y:0.},Vec2{x:0.6,y:0.8}] {
+        let s=spot(normal);
+        let out=super::wizard_marks::marks(Some(s),Some(CURSOR),None,Some(params()),true);
+        let tip=add(s.point,scale(normal,5.));
+        let side=Vec2{x:-normal.y,y:normal.x};
+        let back=add(tip,scale(normal,-1.5));
+        let expected=[add(s.point,scale(normal,2.5)),tip,add(back,side),add(back,scale(side,-1.))];
+        assert_eq!(out[0],Some(([s.point.x,s.point.y],EggLook{scale:0.3,..EGG_WHOLE})));
+        for (slot,point) in out[1..5].iter().zip(expected) {
+            assert_eq!(*slot,Some(([point.x,point.y],EggLook{scale:0.12,..EGG_WHOLE})));
+        }
+        assert!(out[5..LOOKS-1].iter().all(Option::is_none));
+        assert_eq!(out[LOOKS-1].unwrap().1.picture,EggPicture::Cursor);
+        let running=super::wizard_marks::marks(Some(s),None,None,None,false);
+        assert_eq!(running[0],out[0]);
+        assert!(running[1..].iter().all(Option::is_none));
+    }
+    let no_selection=super::wizard_marks::marks(None,Some(CURSOR),None,None,false);
+    assert!(no_selection[..LOOKS-1].iter().all(Option::is_none));
+    assert_eq!(no_selection[LOOKS-1].unwrap().0,[CURSOR.x,CURSOR.y]);
 }
 
 #[test]
