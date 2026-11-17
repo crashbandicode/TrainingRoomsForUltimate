@@ -10,8 +10,7 @@ macro_rules! lib_unit_tests {
 }
 
 #[path = "../src/model/hook_stats.rs"]
-#[allow(dead_code)]
-mod hook_stats;
+pub mod hook_stats;
 
 use hook_stats::{heap_bytes, CountingAllocator};
 
