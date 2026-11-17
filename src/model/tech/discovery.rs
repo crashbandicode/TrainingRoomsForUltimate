@@ -2,6 +2,70 @@
 use super::surface::Line;
 use super::{finite, Vec2};
 
+/// Outline bootstrap, separate from the fighter's touched platform.
+pub struct Bootstrap {
+    rays: Option<Rays>,
+    seed: Option<(usize, usize)>,
+    remaining: u32,
+}
+impl Bootstrap {
+    pub fn new(range: [f32; 4], touched: Option<Line>) -> Option<Self> {
+        let rays = Rays::new(range)?;
+        let columns = ((range[1] - range[0]) / 10.0).ceil();
+        if !columns.is_finite() || columns < 0.0 {
+            return None;
+        }
+        // One bootstrap and one platform pass, at most MAX_LINES hits plus a
+        // miss per column, and at most MAX_LINES outline steps.
+        let remaining = (columns as u32)
+            .checked_add(1)?
+            .checked_mul(2 * (super::surface::MAX_LINES as u32 + 1))?
+            .checked_add(super::surface::MAX_LINES as u32)?;
+        let seed = touched
+            .filter(|line| line.valid() && !line.passable)
+            .map(|line| (line.id, 1));
+        Some(Self {
+            rays: seed.is_none().then_some(rays),
+            seed,
+            remaining,
+        })
+    }
+    /// Charge actual discovery work, not elapsed time or skipped checks.
+    pub fn tick(&mut self) -> bool {
+        let Some(left) = self.remaining.checked_sub(1) else {
+            return false;
+        };
+        self.remaining = left;
+        true
+    }
+    pub fn seed(&self) -> Option<(usize, usize)> {
+        self.seed
+    }
+    pub fn current(&self) -> Option<Ray> {
+        self.rays.as_ref()?.current()
+    }
+    pub fn hit(&mut self, line: Line, point: Vec2) -> Result<(), RayError> {
+        self.rays.as_mut().ok_or(RayError)?.hit(line, point)?;
+        if !line.passable && (line.floor || line.normal.y >= 0.7) {
+            self.seed = Some((line.id, 1));
+            self.rays = None;
+        }
+        Ok(())
+    }
+    pub fn miss(&mut self) {
+        if let Some(rays) = self.rays.as_mut() {
+            rays.miss();
+        }
+    }
+    pub fn finished(&self) -> bool {
+        self.seed.is_some()
+            || self
+                .rays
+                .as_ref()
+                .is_some_and(|rays| rays.current().is_none())
+    }
+}
+
 /// 13.0.5 app::ground::{is_floor,is_wall,is_passable}, byte +0xc5.
 pub fn decode(id: usize, ends: [Vec2; 2], normal: Vec2, flags: u8) -> Option<Line> {
     let line = Line {

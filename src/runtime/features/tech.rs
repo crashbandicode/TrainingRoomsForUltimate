@@ -14,6 +14,7 @@ use crate::model::settings::Snapshot;
 use crate::model::storage::FixedPath;
 use crate::model::tech::{
     controller::{Controller, Event, Outcome, Setup},
+    discovery::Bootstrap,
     picker::{self, Pick, Picker},
     planner,
     session::{Bests, Length, Phase},
@@ -66,6 +67,8 @@ struct Practice {
     approximate: bool,
     scan: Option<PlatformScan>,
     scan_done: bool,
+    bootstrap: Option<Bootstrap>,
+    discovery_failed: bool,
     epoch: Option<StageEpoch>,
     fighter_kind: i32,
     rng: Rng,
@@ -403,6 +406,8 @@ pub unsafe fn frame(fighter: usize) {
                 approximate: false,
                 scan: None,
                 scan_done: false,
+                bootstrap: None,
+                discovery_failed: false,
                 epoch: None,
                 fighter_kind,
                 rng: Rng::new(Rng::seed_from(
@@ -445,6 +450,8 @@ pub unsafe fn frame(fighter: usize) {
             PLACING.store(false, Ordering::Release);
             run.scan = None;
             run.scan_done = false;
+            run.bootstrap = None;
+            run.discovery_failed = false;
             view.picker.enter(
                 stage,
                 Vec2 {
@@ -455,20 +462,49 @@ pub unsafe fn frame(fighter: usize) {
             view.start = false;
             Surfaces::bind(&mut view.surfaces, epoch);
         }
+        if run.discovery_failed {
+            notice(run, Some("Surface discovery incomplete"));
+            return;
+        }
         let Some(range) = natives::camera_limit_range() else {
+            run.discovery_failed = true;
+            notice(run, Some("Surface discovery incomplete"));
             return;
         };
         if run.scan.is_none() {
             run.scan = PlatformScan::new(range);
         }
         let Some(mut source) = NativeSource::new(at) else {
+            run.discovery_failed = true;
+            notice(run, Some("Surface discovery incomplete"));
             return;
         };
+        if run.bootstrap.is_none() {
+            run.bootstrap = Bootstrap::new(range, source.touched());
+        }
         {
             view.range = Some(range);
+            if (view.surfaces.state != Walk::Closed || !run.scan_done)
+                && !run.bootstrap.as_mut().is_some_and(Bootstrap::tick)
+            {
+                run.discovery_failed = true;
+                notice(run, Some("Surface discovery incomplete"));
+                return;
+            }
             if view.surfaces.state == Walk::Broken && view.surfaces.lines().next().is_none() {
-                if let Some((seed, end)) = source.seed() {
-                    view.surfaces.begin(seed, end);
+                match run
+                    .bootstrap
+                    .as_mut()
+                    .ok_or(())
+                    .and_then(|search| source.find_seed(search))
+                {
+                    Ok(Some((seed, end))) => view.surfaces.begin(seed, end),
+                    Ok(None) => {}
+                    Err(()) => {
+                        run.discovery_failed = true;
+                        notice(run, Some("Surface discovery incomplete"));
+                        return;
+                    }
                 }
             }
             if view.surfaces.state == Walk::More {
@@ -479,11 +515,19 @@ pub unsafe fn frame(fighter: usize) {
                         ScanState::More => {}
                         ScanState::Done => run.scan_done = true,
                         ScanState::Broken | ScanState::Full => {
+                            run.discovery_failed = true;
                             notice(run, Some("Surface discovery incomplete"));
                             return;
                         }
                     }
                 }
+            }
+            if matches!(view.surfaces.state, Walk::Full)
+                || (view.surfaces.state == Walk::Broken && view.surfaces.lines().next().is_some())
+            {
+                run.discovery_failed = true;
+                notice(run, Some("Surface discovery incomplete"));
+                return;
             }
             if view.surfaces.state != Walk::Closed || !run.scan_done {
                 notice(run, Some("Finding stage surfaces…"));

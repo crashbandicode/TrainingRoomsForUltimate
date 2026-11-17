@@ -583,8 +583,12 @@ fn inverse_roundtrip_can_cross_a_native_hitlag_floor() {
 fn canonical_visible_damage_is_deterministic_for_the_same_live_inputs() {
     use crate::model::tech_hitlag::frames;
     let mut visible: Vec<f32> = (10..=300).map(|tenths| tenths as f32 / 10.).collect();
-    visible.extend([16.38, f32::from_bits(0x4184ec4e),
-        f32::from_bits(0x4184ec4f), f32::from_bits(0x4184ec50)]);
+    visible.extend([
+        16.38,
+        f32::from_bits(0x4184ec4e),
+        f32::from_bits(0x4184ec4f),
+        f32::from_bits(0x4184ec50),
+    ]);
     // Determinism includes the live multiplier and native hitlag parameters;
     // changing either intentionally changes the hit rather than recovering one.
     for multiplier in [1., 1.2] {
@@ -606,13 +610,17 @@ fn canonical_visible_damage_is_deterministic_for_the_same_live_inputs() {
 #[test]
 fn canonical_native_forward_preserves_tenth_percent_display() {
     let visible = (10..=300).map(|tenths| tenths as f32 / 10.).chain([
-        16.38, f32::from_bits(0x4184ec4e),
-        f32::from_bits(0x4184ec4f), f32::from_bits(0x4184ec50),
+        16.38,
+        f32::from_bits(0x4184ec4e),
+        f32::from_bits(0x4184ec4f),
+        f32::from_bits(0x4184ec50),
     ]);
     for p in visible {
         for multiplier in [1., 1.2] {
             let speed = crate::model::tech_settings::Numeric {
-                mode: crate::model::tech_settings::Mode::Set, lo: 100., hi: 100.,
+                mode: crate::model::tech_settings::Mode::Set,
+                lo: 100.,
+                hi: 100.,
             };
             let launch = percent_fixture(0., p, multiplier, speed, 0).setup.launch;
             let d = planner::base_hit_damage(p, Some(multiplier)).unwrap();
@@ -620,8 +628,11 @@ fn canonical_native_forward_preserves_tenth_percent_display() {
             let native_added = launch.hit_damage * multiplier;
             assert_eq!(launch.percent.to_bits(), native_added.to_bits());
             // Display projection only; no rounding is added to product arithmetic.
-            assert_eq!(format!("{native_added:.1}"), format!("{p:.1}"),
-                "p={p:?}, multiplier={multiplier:?}, d={d:?}");
+            assert_eq!(
+                format!("{native_added:.1}"),
+                format!("{p:.1}"),
+                "p={p:?}, multiplier={multiplier:?}, d={d:?}"
+            );
         }
     }
     let d = planner::base_hit_damage(15., Some(1.2)).unwrap();
@@ -633,31 +644,45 @@ fn canonical_native_forward_preserves_tenth_percent_display() {
 fn native_reference_hitlag_uses_its_own_base_damage() {
     // R1 captured base damage, not the inverse of its displayed percent delta.
     let reference_d = f32::from_bits(0x415a6666);
-    assert_eq!(crate::model::tech_hitlag::frames(
-        reference_d, 0.7, hitlag_parameters(1., 1.2)), Some(10));
-    assert_ne!(planner::base_hit_damage(16.38, Some(1.2)).unwrap().to_bits(),
-        reference_d.to_bits());
+    assert_eq!(
+        crate::model::tech_hitlag::frames(reference_d, 0.7, hitlag_parameters(1., 1.2)),
+        Some(10)
+    );
+    assert_ne!(
+        planner::base_hit_damage(16.38, Some(1.2))
+            .unwrap()
+            .to_bits(),
+        reference_d.to_bits()
+    );
 }
 
 #[test]
 fn pre_hit_twenty_plus_visible_hit_displays_thirty_six_point_three_eight() {
     use crate::model::tech_settings::{Mode, Numeric};
-    let speed = Numeric { mode: Mode::Set, lo: 100., hi: 100. };
+    let speed = Numeric {
+        mode: Mode::Set,
+        lo: 100.,
+        hi: 100.,
+    };
     let launch = percent_fixture(20., 16.38, 1.2, speed, 0).setup.launch;
     assert_eq!(launch.hit_damage.to_bits(), 0x415a6665);
     assert_eq!(launch.percent.to_bits(), 0x4211851e);
     assert_eq!(format!("{:.2}", launch.percent), "36.38");
     // Generic product AttackData is 1.0. Do not fit it to Marth reference hitlag.
-    assert_eq!(crate::model::tech_hitlag::frames(
-        launch.hit_damage, 1., hitlag_parameters(1., 1.2)), Some(14));
+    assert_eq!(
+        crate::model::tech_hitlag::frames(launch.hit_damage, 1., hitlag_parameters(1., 1.2)),
+        Some(14)
+    );
 
     // R1 uses its OWN captured base and AttackData, never inverse(visible p).
     let reference_d = f32::from_bits(0x415a6666);
     let reference_post = 20.0f32 + reference_d * 1.2f32;
     assert_eq!(reference_post.to_bits(), 0x4211851f);
     assert_eq!(format!("{reference_post:.2}"), "36.38");
-    assert_eq!(crate::model::tech_hitlag::frames(
-        reference_d, 0.7, hitlag_parameters(1., 1.2)), Some(10));
+    assert_eq!(
+        crate::model::tech_hitlag::frames(reference_d, 0.7, hitlag_parameters(1., 1.2)),
+        Some(10)
+    );
 }
 
 #[test]
@@ -1482,4 +1507,273 @@ fn retained_confirmation_preserves_first_decision_and_contact_age() {
     confirmed.entered_status = Some(101);
     c.retain_snapshot(&mut pending, confirmed);
     assert_eq!(pending.unwrap().0.entered_status, Some(100));
+}
+
+// Bootstrap regression: this harness drives production Bootstrap/Rays/Surfaces.
+// Only the stage's native ray/read/neighbour observations are faked.
+struct BootstrapStage {
+    lines: Vec<Line>,
+    ray_calls: usize,
+    hits: Vec<usize>,
+}
+impl BootstrapStage {
+    fn fixture() -> Self {
+        let p = |x, y| Vec2 { x, y };
+        let line = |id, a, b, normal, floor, wall, passable| Line {
+            id,
+            ends: [a, b],
+            normal,
+            floor,
+            wall,
+            passable,
+        };
+        Self {
+            lines: vec![
+                line(100, p(-80., 0.), p(80., 0.), p(0., 1.), true, false, false),
+                line(101, p(80., 0.), p(80., -30.), p(1., 0.), false, true, false),
+                line(
+                    102,
+                    p(80., -30.),
+                    p(-80., -30.),
+                    p(0., -1.),
+                    false,
+                    false,
+                    false,
+                ),
+                line(
+                    103,
+                    p(-80., -30.),
+                    p(-80., 0.),
+                    p(-1., 0.),
+                    false,
+                    true,
+                    false,
+                ),
+                line(
+                    104,
+                    p(-60., 24.129),
+                    p(60., 24.129),
+                    p(0., 1.),
+                    true,
+                    false,
+                    true,
+                ),
+            ],
+            ray_calls: 0,
+            hits: Vec::new(),
+        }
+    }
+    /// Native vertical intersections, including its shortened/origin output.
+    /// This contains no seed-selection, bootstrap state or continuation policy.
+    fn ray(&mut self, ray: discovery::Ray) -> Option<(Line, Vec2)> {
+        self.ray_calls += 1;
+        assert_eq!(ray.delta.x, 0.);
+        assert!(ray.delta.y < 0.);
+        let mut nearest = f32::INFINITY;
+        let mut chosen = None;
+        for line in &self.lines {
+            let dx = line.ends[1].x - line.ends[0].x;
+            if dx == 0. {
+                continue;
+            }
+            let u = (ray.origin.x - line.ends[0].x) / dx;
+            let y = line.ends[0].y + u * (line.ends[1].y - line.ends[0].y);
+            let t = (y - ray.origin.y) / ray.delta.y;
+            if !(-1e-5..=1.00001).contains(&u) || !(-1e-5..=1.00001).contains(&t) {
+                continue;
+            }
+            if t < nearest {
+                nearest = t;
+                let fraction = if t < 0. { 0. } else { t.min(1.) * 0.99 };
+                chosen = Some((
+                    *line,
+                    Vec2 {
+                        x: ray.origin.x,
+                        y: ray.origin.y + ray.delta.y * fraction,
+                    },
+                ));
+            }
+        }
+        if let Some((line, _)) = chosen {
+            self.hits.push(line.id);
+        }
+        chosen
+    }
+}
+impl Source for BootstrapStage {
+    fn read(&mut self, id: usize) -> Option<Line> {
+        self.lines.iter().copied().find(|line| line.id == id)
+    }
+    fn next(&mut self, line: Line, end: usize) -> Option<(usize, usize)> {
+        let shared = *line.ends.get(end)?;
+        self.lines
+            .iter()
+            .copied()
+            .filter(|next| next.id != line.id && !next.passable)
+            .find_map(|next| discovery::far_end(shared, next).map(|far| (next.id, far)))
+    }
+}
+fn bootstrap_closed_outline(touched: Option<usize>) -> (Surfaces, BootstrapStage) {
+    let mut stage = BootstrapStage::fixture();
+    let touch = touched.and_then(|id| stage.read(id));
+    let mut bootstrap = discovery::Bootstrap::new([-40., 40., 70., -60.], touch).unwrap();
+    for _ in 0..32 {
+        if bootstrap.seed().is_some() || bootstrap.finished() {
+            break;
+        }
+        let ray = bootstrap
+            .current()
+            .expect("unfinished bootstrap must offer one ray");
+        match stage.ray(ray) {
+            Some((line, point)) => bootstrap.hit(line, point).unwrap(),
+            None => bootstrap.miss(),
+        }
+    }
+    let (seed, end) = bootstrap
+        .seed()
+        .expect("a solid main floor must be found without a grounded solid P1 touch");
+    let mut surfaces = Surfaces::EMPTY;
+    surfaces.begin(seed, end);
+    for _ in 0..4 {
+        surfaces.step(&mut stage);
+    }
+    assert_eq!(surfaces.state, surface::Walk::Closed);
+    assert_eq!(surfaces.lines().count(), 4);
+    assert_eq!(
+        surfaces
+            .lines()
+            .filter(|line| line.kind() == Some(Kind::Wall))
+            .count(),
+        2
+    );
+    assert_eq!(
+        surfaces
+            .lines()
+            .filter(|line| line.kind() == Some(Kind::Ceiling))
+            .count(),
+        1
+    );
+    assert!(surfaces.lines().all(|line| !line.passable));
+    // Complete the same per-column production schedule used for platforms.
+    let mut rays = discovery::Rays::new([-40., 40., 70., -60.]).unwrap();
+    for _ in 0..40 {
+        let Some(ray) = rays.current() else { break };
+        match stage.ray(ray) {
+            Some((line, point)) => {
+                rays.hit(line, point).unwrap();
+                if line.passable {
+                    assert!(surfaces.push(line));
+                }
+            }
+            None => rays.miss(),
+        }
+    }
+    assert!(
+        rays.current().is_none(),
+        "platform discovery must terminate"
+    );
+    assert_eq!(surfaces.lines().filter(|line| line.passable).count(), 1);
+    (surfaces, stage)
+}
+#[test]
+fn bootstrap_from_passable_p1_touch_discovers_main_outline_and_platform() {
+    // Loop1: Mario is at (-40,24.129) on the separate Battlefield platform.
+    let (_, stage) = bootstrap_closed_outline(Some(104));
+    assert_eq!(
+        &stage.hits[..2],
+        &[104, 100],
+        "bootstrap must progress past the biased passable hit to the solid floor"
+    );
+    assert!(stage.ray_calls <= 38);
+}
+#[test]
+fn bootstrap_airborne_without_p1_touch_completes_discovery() {
+    let (_, stage) = bootstrap_closed_outline(None);
+    assert_eq!(&stage.hits[..2], &[104, 100]);
+    assert!(stage.ray_calls <= 38);
+}
+#[test]
+fn bootstrap_main_floor_touch_preserves_immediate_seed() {
+    let stage = BootstrapStage::fixture();
+    let bootstrap =
+        discovery::Bootstrap::new([-40., 40., 70., -60.], Some(stage.lines[0])).unwrap();
+    assert_eq!(bootstrap.seed(), Some((100, 1)));
+    assert!(
+        bootstrap.current().is_none(),
+        "solid touch needs no bootstrap ray"
+    );
+    bootstrap_closed_outline(Some(100));
+}
+#[test]
+fn bootstrap_empty_stage_finishes_with_bounded_native_work() {
+    let mut stage = BootstrapStage::fixture();
+    stage.lines.clear();
+    let mut bootstrap = discovery::Bootstrap::new([-20., 20., 50., -50.], None).unwrap();
+    for _ in 0..6 {
+        if bootstrap.finished() {
+            break;
+        }
+        let ray = bootstrap
+            .current()
+            .expect("unfinished bootstrap must offer a ray");
+        assert!(stage.ray(ray).is_none());
+        bootstrap.miss();
+    }
+    assert!(
+        bootstrap.finished(),
+        "five empty columns must end bootstrap"
+    );
+    assert_eq!(bootstrap.seed(), None);
+    assert!(bootstrap.current().is_none());
+    assert_eq!(
+        stage.ray_calls, 5,
+        "one ray per ten-unit column, including both edges"
+    );
+    for _ in 0..3 {
+        bootstrap.miss();
+        assert!(bootstrap.finished());
+        assert!(bootstrap.current().is_none());
+    }
+    assert_eq!(stage.ray_calls, 5);
+}
+
+#[test]
+fn bootstrap_operation_budget_is_exact_finite_and_sticky() {
+    // Five ten-unit columns, at most two visits per retained line plus miss,
+    // and the existing maximum outline-walk work. This is an operation bound,
+    // not an elapsed-frame deadline or a larger native geometry tolerance.
+    assert_eq!(surface::MAX_LINES, 64);
+    // The second width needs ceil(41/10), not truncation to four intervals.
+    for (right, operations) in [(20., 714), (21., 844)] {
+        let mut bootstrap = discovery::Bootstrap::new([-20., right, 50., -50.], None).unwrap();
+        for _ in 0..operations {
+            assert!(
+                bootstrap.tick(),
+                "budget expired before its exact work allowance"
+            );
+        }
+        assert!(
+            !bootstrap.tick(),
+            "a stalled source cannot get unbounded native work"
+        );
+        for _ in 0..8 {
+            assert!(!bootstrap.tick(), "budget exhaustion is terminal");
+        }
+    }
+}
+
+#[test]
+fn bootstrap_operation_budget_rejects_invalid_or_overflowing_camera_ranges() {
+    for range in [
+        [f32::NAN, 20., 50., -50.],
+        [20., -20., 50., -50.],
+        [-20., 20., -50., -50.],
+        [-f32::MAX, f32::MAX, 50., -50.],
+        [0., f32::MAX, 50., -50.],
+    ] {
+        assert!(
+            discovery::Bootstrap::new(range, None).is_none(),
+            "{range:?}"
+        );
+    }
 }

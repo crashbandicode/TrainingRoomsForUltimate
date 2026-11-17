@@ -1720,3 +1720,11 @@ ceiling = 154452
 date = "2026-11-17"
 reason = "rc.15 TechUI final combined implementation measured 154452 on reviewed 02fdb3cb: 153962 + core463 + UI27. Core467 includes V10+4 already in the UI baseline. ONE exact combined ceiling, no headroom; boundary/determinism additions are host tests only. FOR OPERATOR REVIEW; no counting, guard or gate change."
 approved_by = "Operator rc.15 size approval; primary exact +7 ruling 2026-11-17 01:50Z confirmed by tech-direct FINAL 02:10Z and rc15-tech reconciliation 02:15Z; supersedes the earlier +461/+26 arithmetic estimate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 154569
+date = "2026-11-17"
+reason = "TechUI stage-surface bootstrap root fix measured 154569: +117 over final combined 154452, within the approved +300. Exact total, no headroom. Platform and airborne discovery share native stage rays; finite work ends in completion or explicit failure. FOR OPERATOR REVIEW; counting and gates unchanged."
+approved_by = "Operator rc.15 size approval; primary 2026-11-17 03:20Z explicitly approves growth up to +300 over 154452 FOR OPERATOR REVIEW."

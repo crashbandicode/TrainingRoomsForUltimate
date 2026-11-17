@@ -2,7 +2,7 @@
 //! Field/call evidence: DESIGN §4 and TECH-UI-SURFACE-GUARDS.json (owned 13.0.5).
 use crate::model::guard::{guard_outcome, SeamKind};
 use crate::model::sites_tech_surfaces::windows as guards;
-use crate::model::tech::discovery::{decode, far_end, Rays};
+use crate::model::tech::discovery::{decode, far_end, Bootstrap, Rays};
 use crate::model::tech::surface::{Line, Source, Surfaces};
 use crate::model::tech::Vec2;
 use crate::runtime::diag_log::diagnostic;
@@ -116,7 +116,7 @@ impl NativeSource {
             && ground_contract(accessor))
         .then_some(Self { accessor })
     }
-    pub fn seed(&mut self) -> Option<(usize, usize)> {
+    pub fn touched(&mut self) -> Option<Line> {
         unsafe {
             if !game::granted(0x2029fb0) || !natives::is_grounded(self.accessor) {
                 return None;
@@ -125,9 +125,24 @@ impl NativeSource {
             let touch: extern "C" fn(usize, i32) -> usize =
                 std::mem::transmute(game::text_base() + 0x2029fb0);
             let id = touch(self.accessor, down);
-            let line = self.read(id)?;
-            (!line.passable).then_some((id, 1))
+            self.read(id)
         }
+    }
+    /// One stage collision query per invocation, independent of P1's footing.
+    pub fn find_seed(&mut self, search: &mut Bootstrap) -> Result<Option<(usize, usize)>, ()> {
+        if let Some(seed) = search.seed() {
+            return Ok(Some(seed));
+        }
+        if let Some(ray) = search.current() {
+            match unsafe { self.ray(ray.origin, ray.delta) }? {
+                Some((line, point)) => search.hit(line, point).map_err(|_| ())?,
+                None => search.miss(),
+            }
+        }
+        if search.finished() && search.seed().is_none() {
+            return Err(());
+        }
+        Ok(search.seed())
     }
     /// Reviewed 0x4658b0 → 0x5266c0 returns a borrowed raw line or zero.
     /// The second vector is a displacement; true leaves exclusion bit 0x2000 clear.
