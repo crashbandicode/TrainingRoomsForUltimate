@@ -28,4 +28,5 @@ pub mod shield;
 pub mod state;
 pub mod status;
 pub mod tech;
+pub mod tech_init;
 pub mod throw;

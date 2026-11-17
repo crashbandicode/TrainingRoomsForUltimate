@@ -111,6 +111,8 @@ pub mod ordered_ids;
 pub mod pause_helper;
 #[path = "model/settings.rs"]
 pub mod settings;
+#[path = "model/tech_settings.rs"]
+pub mod tech_settings;
 #[path = "model/settings_file.rs"]
 pub mod settings_file;
 #[path = "model/sha256.rs"]
@@ -129,6 +131,8 @@ pub mod legend;
 pub mod eggs;
 #[path = "model/btt.rs"]
 pub mod btt;
+#[path = "model/tech/mod.rs"]
+pub mod tech;
 #[path = "model/sites_hitbox.rs"]
 pub mod sites_hitbox;
 #[path = "model/sites_u4.rs"]
@@ -240,3 +244,18 @@ pub mod owned_ring;
 
 #[path = "model/boot_notices.rs"]
 pub mod boot_notices;
+
+/// S0 direct-launch reference; native fidelity is still an explicit DIAG acceptance gate.
+#[path = "model/tech_launch.rs"]
+pub mod tech_launch;
+
+#[path = "model/sites_tech_launch.rs"]
+pub mod sites_tech_launch;
+#[path = "model/sites_tech_surfaces.rs"]
+pub mod sites_tech_surfaces;
+
+#[path = "model/tech_hitlag.rs"]
+pub mod tech_hitlag;
+
+#[path = "model/sites_tech_hitlag.rs"]
+pub mod sites_tech_hitlag;

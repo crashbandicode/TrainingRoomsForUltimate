@@ -52,6 +52,7 @@ fn run_inner() {
     diag_log::set_tick(crate::runtime::seams::seam_install::report_late);
     // The CPU-as-P1 fallback's file work (its request.json read and its receipts): on the heartbeat, never in its hooks.
     diag_log::set_tick(p1::service);
+    diag_log::set_tick(cpu::service_tech_init);
     diag_log::start_drain_thread();
 
     // 1. The version guard: nothing else runs on another game.
@@ -181,6 +182,24 @@ fn run_inner() {
     let poison_text = String::new();
     let hb_found = hitbox::check(&|name| poison_text.split(|c: char| c.is_whitespace() || c == ',').any(|n| n == name));
     let developer_found = crate::runtime::developer::check();
+    let mut tech_found = game::outcomes(&crate::model::sites_tech_launch::SITES);
+    for (row, outcome) in crate::model::sites_tech_launch::SITES.iter().zip(tech_found.iter_mut()) {
+        if poison_text.split(|c: char| c.is_whitespace() || c == ',').any(|n| n == row.name) {
+            *outcome = GuardOutcome::Foreign { first_diff: 0 };
+        }
+    }
+    let mut tech_surfaces_found = game::outcomes(&crate::model::sites_tech_surfaces::SITES);
+    for (row, outcome) in crate::model::sites_tech_surfaces::SITES.iter().zip(tech_surfaces_found.iter_mut()) {
+        if poison_text.split(|c: char| c.is_whitespace() || c == ',').any(|n| n == row.name) {
+            *outcome = GuardOutcome::Foreign { first_diff: 0 };
+        }
+    }
+    let mut tech_hitlag_found = game::outcomes(&crate::model::sites_tech_hitlag::SITES);
+    for (row, outcome) in crate::model::sites_tech_hitlag::SITES.iter().zip(tech_hitlag_found.iter_mut()) {
+        if poison_text.split(|c: char| c.is_whitespace() || c == ',').any(|n| n == row.name) {
+            *outcome = GuardOutcome::Foreign { first_diff: 0 };
+        }
+    }
     let u4_found = game::outcomes(&sites_u4::SITES);
     let u4b_found = game::outcomes(&sites_u4b::SITES);
     // A row of any table by name (names are unique across the tables, `tests/capabilities.rs`).
@@ -195,6 +214,9 @@ fn run_inner() {
             .or_else(|| by_name(&sites_u4b::SITES, &u4b_found))
             .or_else(|| by_name(&sites_hitbox::SITES, &hb_found))
             .or_else(|| by_name(&crate::model::developer_debug::SITES, &developer_found))
+            .or_else(|| by_name(&crate::model::sites_tech_launch::SITES, &tech_found))
+            .or_else(|| by_name(&crate::model::sites_tech_surfaces::SITES, &tech_surfaces_found))
+            .or_else(|| by_name(&crate::model::sites_tech_hitlag::SITES, &tech_hitlag_found))
             .unwrap_or(false)
     };
     // The native-call layer calls only what passed (`game::natives` and `state_natives` refuse the rest).
@@ -267,6 +289,8 @@ fn run_inner() {
     }
     let hazards_on = install_hazards(&usable, &mut mark);
     let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on, cpu_common_reason, cpu_shield_damage_on, cpu_camera_on) = install_cpu(&usable, &mut mark);
+    let tech_practice_on = cpu_core_on && capabilities::unit_usable(Feature::TechPractice, &usable);
+    crate::runtime::features::tech_adapter::set_ready(tech_practice_on);
     // Break the Targets' camera asks the game through the camera unit's change_active_camera row: behind the unit's closure, apart from the other features.
     crate::runtime::features::btt_camera::set_usable(cpu_camera_on);
     let cpu_mash_on = cpu_core_on && install_cpu_mash(&usable, &mut mark);
@@ -368,6 +392,15 @@ fn run_inner() {
     reports.extend(p1::reports(&found6, &written6));
     reports.extend(hitbox::reports(&hb_found, &hb_written));
     reports.extend(crate::runtime::developer::reports(&developer_found, developer_debug_on));
+    reports.extend(crate::model::sites_tech_launch::SITES.iter().zip(tech_found.iter()).map(|(row, &outcome)| SiteReport {
+        site: row.name, found: outcome, written: if outcome.usable() { Written::Checked } else { Written::Skipped },
+    }));
+    reports.extend(crate::model::sites_tech_surfaces::SITES.iter().zip(tech_surfaces_found.iter()).map(|(row, &outcome)| SiteReport {
+        site: row.name, found: outcome, written: if outcome.usable() { Written::Checked } else { Written::Skipped },
+    }));
+    reports.extend(crate::model::sites_tech_hitlag::SITES.iter().zip(tech_hitlag_found.iter()).map(|(row, &outcome)| SiteReport {
+        site: row.name, found: outcome, written: if outcome.usable() { Written::Checked } else { Written::Skipped },
+    }));
     // A feature that is not installed names the first row of its closure that was rejected, when there is one.
     let blocked = |feature: Feature| capabilities::blocked_by(feature, &usable);
     let report = |feature: Feature, installed: bool, reason: Option<&'static str>| FeatureReport {
@@ -389,6 +422,7 @@ fn run_inner() {
         report(Feature::CpuDefence, cpu_defence_on, None),
         report(Feature::CpuLedge, cpu_ledge_on, None),
         report(Feature::CpuTech, cpu_tech_on, None),
+        report(Feature::TechPractice, tech_practice_on, (!cpu_core_on).then_some("cpu_core_not_installed")),
         report(Feature::CpuShield, cpu_shield_on, None),
         report(Feature::CpuMash, cpu_mash_on, None),
         report(Feature::CpuShieldDamage, cpu_shield_damage_on, None),
@@ -464,7 +498,7 @@ fn apply_diag_poison(found: &mut [GuardOutcome], state: &mut [GuardOutcome], fou
         }
     };
     for name in text.split(|c: char| c.is_whitespace() || c == ',').filter(|n| !n.is_empty()) {
-        let hit = poison(&SITES, found, name) || poison(&STATE_SITES, state, name) || poison(&sites_pkg4::SITES, found4, name) || poison(&UI_SITES, ui, name) || sites_hitbox::SITES.iter().any(|row| row.name == name);
+        let hit = poison(&SITES, found, name) || poison(&STATE_SITES, state, name) || poison(&sites_pkg4::SITES, found4, name) || poison(&UI_SITES, ui, name) || sites_hitbox::SITES.iter().any(|row| row.name == name) || crate::model::sites_tech_launch::SITES.iter().any(|row| row.name == name) || crate::model::sites_tech_surfaces::SITES.iter().any(|row| row.name == name) || crate::model::sites_tech_hitlag::SITES.iter().any(|row| row.name == name);
         diagnostic(format_args!("[TrainingRooms] diag_poison {name} found={hit}"));
     }
 }

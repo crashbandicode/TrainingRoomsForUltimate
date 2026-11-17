@@ -88,6 +88,7 @@ pub fn publish(snapshot: &Snapshot) {
     let hide = eggs::choice(snapshot, eggs::ROW_PRACTICE_CPU) == 0;
     PRACTICE_HIDE.store(hide, Ordering::Release);
     btt::publish(snapshot);
+    super::tech::publish(snapshot);
 }
 
 // ---- Eggs-ercise (rc.14, `model::eggs`) -------------------------------------------------------------------------------
@@ -131,7 +132,7 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     // V2.6: the CPU is hidden while a practice game runs and `CPU during a game` says Hide, unless it is the target
     // (`eggs::hides_cpu`). The CPU's body, its tag and its panel follow this one request (`cpu::hide::step`).
     let running = run.running();
-    super::hide_cpu::hide(eggs::hides_cpu(PRACTICE_HIDE.load(Ordering::Acquire), running, run.cpu_target(), btt::running()));
+    super::hide_cpu::hide(super::tech::running() || eggs::hides_cpu(PRACTICE_HIDE.load(Ordering::Acquire), running, run.cpu_target(), btt::running()));
     // The standing notice sits in the top band while the game runs (the operator, 11-14).
     super::notices::raise(super::notices::RAISE_EGGS, running);
     if plan == eggs::Plan::Clear {
@@ -174,7 +175,7 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     // V2.1: the fighter whose attack broke it (Ice Climbers: that climber) freezes, as on a hit.
     let broke = run.score > score;
     if let Some(frames) = broke.then(scene::facts).and_then(eggs::hitlag) {
-        natives::set_hit_stop_frame(at, frames);
+        let _ = natives::set_hit_stop_frame(at, frames, false);
     }
     let length = length?;
     let mut text = crate::model::storage::FixedPath::<48>::new();
@@ -480,6 +481,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     let (eggs_orbs, marks) = (RUN.lock().look(active, || view()), btt::look(active, || view()));
     let mut own = [None; 3 + btt::LOOKS];
     own[..3].copy_from_slice(&eggs_orbs);
+    let marks = if super::tech::running() { super::tech::look(active) } else { marks };
     own[3..].copy_from_slice(&marks);
     let mut cache = ORB_PANES.lock();
     let registrations = tick::REGISTRATIONS.load(Ordering::Acquire);
@@ -993,7 +995,7 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
 #[skyline::hook(offset = sites_hitbox::HITBOX_ATTACK_OFFSET)]
 pub unsafe fn hitbox_attack_hook(lua_state: usize) {
     animation_command(lua_state, hitbox::ATTACK, false);
-    call_original!(lua_state)
+    call_original!(lua_state);
 }
 
 /// `sv_animcmd::CATCH`: the plugin part first, then the game's own command.

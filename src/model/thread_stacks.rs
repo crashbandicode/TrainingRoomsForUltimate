@@ -100,7 +100,7 @@ pub const THREADS: [ThreadStack; 18] = [
     // x8-x17 across them, and the static path grew from 50,208 to 50,368 B (diag ELF of p23/rc7-svc-clobber).
     row(ThreadId::Menu, c"tr-menu", 88 * KIB, 53_888, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
-    row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_672, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
+    row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_704, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified
     // external path is separate from the owned-ELF scan; see docs/UI16-PROBE-STACK-FAULT.md (removed after v0.2.0-rc.1; see that tag).
     row(ThreadId::Probe, c"tr-probe", 204 * KIB, 3_440, 151_920, "Eden ui-17 same ARC92171b2f full probe", "ui::probe::install::{closure#0}").with_external(143_376),
@@ -233,7 +233,7 @@ pub const SERVICE_STACK: CallbackStack = CallbackStack {
     name: "native-service",
     bytes: 236 * KIB,
     count: 2,
-    static_bound: 177_200,
+    static_bound: 177_696,
     native_room: 63_728,
     native_bound: 1_936,
     measured_in: "Eden final-surface-acc-d8679593-r2 ([HookStack] site=native_service min_free=63728)",

@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 127;
+pub const COUNT: usize = 147;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -223,5 +223,27 @@ pub static DEFS: [Def; COUNT] = [
     // appended like lobby_items.
     row!("spots_strip", Single, 2, [1]),
     row!("spots_combo", Single, 2, [1]),
+    // rc.15 Tech practice: one session row and per-attempt settings.
+    row!("tech_practice", Single, 6, [0]),
+    row!("tech_surface", Single, 5, [0]),
+    row!("tech_damage", Single, 2, [0]),
+    Def { id: "tech_damage_range", kind: Kind::Slider, len: 2, default: &[12, 12] },
+    row!("tech_speed", Single, 2, [0]),
+    Def { id: "tech_speed_range", kind: Kind::Slider, len: 2, default: &[2, 2] },
+    row!("tech_hit_damage", Single, 2, [0]),
+    Def { id: "tech_hit_damage_range", kind: Kind::Slider, len: 2, default: &[11, 11] },
+    row!("tech_angle", Single, 3, [0]),
+    Def { id: "tech_angle_range", kind: Kind::Slider, len: 2, default: &[0, 71] },
+    row!("tech_start", Single, 3, [0]),
+    Def { id: "tech_start_range", kind: Kind::Slider, len: 2, default: &[80, 160] },
+    row!("tech_time", Single, 2, [1]),
+    Def { id: "tech_time_range", kind: Kind::Slider, len: 2, default: &[10, 30] },
+    row!("tech_di", Single, 4, [0]),
+    row!("tech_di_direction", Single, 11, [8]),
+    row!("tech_facing", Single, 4, [0]),
+    row!("tech_delay", Single, 2, [0]),
+    Def { id: "tech_delay_range", kind: Kind::Slider, len: 2, default: &[20, 20] },
+    row!("tech_camera", Single, 2, [0]),
+
     row!("btt_projectiles", Single, 2, [1]),
 ];

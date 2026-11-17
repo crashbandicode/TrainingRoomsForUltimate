@@ -24,4 +24,19 @@ pub mod state_effects;
 pub mod state_restore;
 pub mod states;
 pub mod stage_hazards;
+#[cfg(feature = "diag")]
+pub mod tech_spike;
+#[cfg(feature = "diag")]
+mod tech_spike_guards;
+mod tech_info_seed;
+mod tech_native;
+mod tech_launch_native;
+pub mod tech_adapter;
+mod tech_decision;
 pub mod writer;
+
+pub mod tech;
+pub mod tech_surfaces;
+
+pub mod tech_hitlag;
+pub(crate) mod tech_hitlag_read;

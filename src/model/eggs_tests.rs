@@ -66,7 +66,8 @@ fn eggs_rows_and_help() {
     let rows = [&ROWS[mode], &ROWS[at(ROW_BREAK)], &ROWS[at(ROW_TARGET)], &ROWS[at(ROW_SPEED)], &ROWS[at(ROW_PRACTICE_CPU)]];
     // D7 (b), the operator 2026-11-14: their own group, appended to `GROUPS` so no group index moves.
     let g = usize::from(rows[0].group);
-    assert_eq!(g, GROUPS.len() - 1, "the last group");
+    assert_eq!(g + 2, GROUPS.len(), "only Tech follows the original practice group");
+    assert_eq!(GROUPS[g + 1].title, "Tech practice");
     assert_eq!((GROUPS[g].title, GROUPS[g].page, GROUPS[g].advanced), ("Practice games", Page::FightersStages, false));
     assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).map(|r| r.id).take(5).eq([ROW, ROW_BREAK, ROW_TARGET, ROW_SPEED, ROW_PRACTICE_CPU]), "the five rows come first, in order");
     let values = |r: &crate::model::menu::table::Row| match r.control {

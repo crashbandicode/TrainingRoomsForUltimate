@@ -126,6 +126,8 @@ pub struct Outbox {
     pub roster_press: Option<(u16, Button)>,
     /// Place targets (Break the Targets): the menu closes into the placing view.
     pub place_targets: bool,
+    /// Stage tech: close into the surface picker.
+    pub tech_point: bool,
 }
 
 /// Why a row or entry is greyed (it shows dimmed with this reason and ignores A).
@@ -147,6 +149,12 @@ pub enum Grey {
     ChecklistSet,
     /// Target speed while Break the Targets is On (SPEC V2.5): the targets do not move.
     TargetsStill,
+    /// The Auto solver supplies this value.
+    TechAuto,
+    /// DI direction is read by DI Set.
+    TechDiSet,
+    /// Tech practice always hides the CPU.
+    TechCpu,
     ProjectilesUnavailable,
 }
 
@@ -162,6 +170,9 @@ impl Grey {
             Grey::ChecklistSet => "Values are ticked: clear them first (Y)",
             Grey::ProjectilesUnavailable => "Projectile detection unavailable", // restriction: btt-projectile-guard
             Grey::TargetsStill => "Targets stay still",
+            Grey::TechAuto => "Auto chooses this value",
+            Grey::TechDiSet => "Used by DI Set",
+            Grey::TechCpu => "Tech practice hides the CPU",
         }
     }
 }
@@ -831,7 +842,16 @@ impl Menu {
 
     /// Why the row is greyed, if it is.
     pub fn grey(&self, row: usize) -> Option<Grey> {
-        match ROWS[row].id {
+        let id = ROWS[row].id;
+        if super::tech_settings::scale(id).is_some_and(|spec| {
+            super::tech_settings::mode(&self.settings.menu, spec.mode) == super::tech_settings::Mode::Auto
+        }) {
+            return Some(Grey::TechAuto);
+        }
+        if id == "tech_di_direction" && super::tech_settings::selected(&self.settings.menu, "tech_di") != 2 {
+            return Some(Grey::TechDiSet);
+        }
+        match id {
             "respawn_invincibility" if self.toggle_by_id("save_state_enable") && self.toggle_by_id("save_state_autoload") => {
                 Some(Grey::AutoLoadOn)
             }
@@ -841,6 +861,7 @@ impl Menu {
             "save_damage_limits_cpu" if self.get("save_damage_cpu").get(2).copied().unwrap_or(0) == 0 => {
                 Some(Grey::DamageNotRandom)
             }
+            "practice_cpu" if super::tech_settings::selected(&self.settings.menu, "tech_practice") > 0 => Some(Grey::TechCpu),
             "btt_projectiles" if !self.env.btt_projectiles_ready => Some(Grey::ProjectilesUnavailable),
             "eggsercise_speed" if self.get("btt").get(1).is_some_and(|v| *v != 0) => Some(Grey::TargetsStill),
             _ => None,
@@ -885,9 +906,10 @@ impl Menu {
                 self.outbox.rerolls |= bit;
             }
         }
-        // The two practice games exclude each other: the one turned On last wins (tt::exclusive).
-        if matches!(id, "eggsercise" | "btt") && super::btt::on(&self.settings.menu) == [true; 2] {
-            self.put_one_hot(if id == "btt" { "eggsercise" } else { "btt" }, 0);
+        // Changing any practice game to On switches the other games Off; all edits are committed together.
+        let ids = ["eggsercise", "btt", "tech_practice"];
+        if ids.iter().position(|v| *v == id).is_some_and(|chosen| super::tech_settings::practice(&self.settings.menu)[chosen]) {
+            for other in ids { if other != id { self.put_one_hot(other, 0); } }
         }
     }
 
@@ -1227,6 +1249,14 @@ impl Menu {
                 (self.outbox.place_targets, self.closed) = (true, true);
                 return;
             }
+            Editor::TechPoint => {
+                if super::tech_settings::selected(&self.settings.menu, "tech_practice") == 0 {
+                    self.put_one_hot("tech_practice", 1);
+                }
+                self.put_one_hot("tech_surface", 4);
+                (self.outbox.tech_point, self.closed) = (true, true);
+                return;
+            }
             other => Screen::External(other),
         };
         self.stack.push(screen);
@@ -1550,7 +1580,7 @@ impl Menu {
             if lower_handle {
                 [apply(lower, 0, i16::from(upper)), upper]
             } else {
-                [lower, apply(upper, i16::from(lower), i16::from(settings::SLIDER_MAX))]
+                [lower, apply(upper, i16::from(lower), i16::from(super::tech_settings::scale(id).map_or(settings::SLIDER_MAX, |s| s.max)))]
             }
         };
         match button {
@@ -1917,3 +1947,7 @@ fn yes_no_random(array: &[u8]) -> Option<usize> {
 #[cfg(test)]
 #[path = "btt_menu_tests.rs"]
 mod btt_menu_tests;
+
+#[cfg(test)]
+#[path = "tech_menu_tests.rs"]
+mod tech_menu_tests;

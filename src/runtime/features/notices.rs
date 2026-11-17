@@ -51,6 +51,7 @@ pub fn clear_intro_store() {
 /// any is, the notice slot sits in the top band (`panes::NOTICE_TOP_Y`), so the targets keep the middle of the screen.
 static RAISED: AtomicU8 = AtomicU8::new(0);
 pub const RAISE_EGGS: u8 = 1;
+pub const RAISE_TECH: u8 = 4;
 
 /// A practice game's bit: its notice stands (`on`) or is gone.
 pub fn raise(mode: u8, on: bool) {

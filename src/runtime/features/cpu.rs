@@ -49,6 +49,17 @@ static CPU: Mutex<Option<Cpu>> = Mutex::new(None);
 
 // The few resolved constants a hook compares before it takes the lock.
 static CONSTS_READY: AtomicBool = AtomicBool::new(false);
+/// Separate from capability admission: enabled only after non-hook UI initialization.
+pub(super) static TECH_INIT: crate::model::cpu::tech_init::Init = crate::model::cpu::tech_init::Init::new();
+
+/// Existing heartbeat callback: no native lookup and no wait for game readiness.
+pub fn service_tech_init() {
+    static HITLAG_BINDING: crate::model::tech_hitlag::Binding = crate::model::tech_hitlag::Binding::new();
+    if !HITLAG_BINDING.ready(|| super::tech::bind_hitlag(super::tech_hitlag::PROVIDER)) {
+        return;
+    }
+    TECH_INIT.service(|ids| unsafe { super::tech::init(ids) });
+}
 static CONST_ATTEMPTS: AtomicU32 = AtomicU32::new(0);
 /// Every game constant the hooks read, by `C`: filled by `ensure_consts`, `UNRESOLVED` until then.
 static CONSTS: [AtomicI32; ids::COUNT] = [const { AtomicI32::new(UNRESOLVED) }; ids::COUNT];
@@ -225,6 +236,11 @@ fn bump(_which: usize) {
 /// The last published settings generation the CPU adopted (only read and written under `CPU`).
 static ADOPTED: AtomicU32 = AtomicU32::new(0);
 
+#[cfg(feature = "diag")]
+pub fn adopted_settings_generation() -> u32 {
+    ADOPTED.load(Ordering::Acquire)
+}
+
 /// Run `f` on the CPU state; a newly published value (`published::Live`) is adopted first. `CPU` is taken by game threads only
 /// (stream/sync): the menu worker publishes through `published`, never through this lock.
 fn with<R>(f: impl FnOnce(&mut Cpu) -> R) -> Option<R> {
@@ -234,6 +250,11 @@ fn with<R>(f: impl FnOnce(&mut Cpu) -> R) -> Option<R> {
         cpu.publish(live.cpu, crate::runtime::published::take_rerolls());
     }
     Some(f(cpu))
+}
+
+/// Product launch ownership: no wait on the CPU state from a hook.
+pub(super) fn tech_player_receipt() -> Result<Option<FrameReceipt>, ()> {
+    role_adapter::try_player_receipt(|| CPU.try_lock(), try_role_scene().map_err(|_| ()))
 }
 
 /// Create the state (boot, before any hook is installed).
@@ -358,6 +379,20 @@ fn role_scene() -> Option<Scene> {
     scene
 }
 
+/// Unknown menu eligibility is Busy, never a scene departure or a new receipt.
+fn try_role_scene() -> Result<Option<Scene>, crate::runtime::compat::menu::MenuBusy> {
+    use crate::engine::lobby::practice_policy::Context;
+    let scene = crate::runtime::scene::current();
+    let context = crate::runtime::lobby::training::practice::try_context()?;
+    let scene = match (scene, context) {
+        (Some(Scene::Training), Some(Context::Training)) => Some(Scene::Training),
+        (Some(Scene::Lobby), Some(Context::Waiting)) => Some(Scene::Lobby),
+        _ => None,
+    };
+    if scene.is_none() { forget_player_position(); }
+    Ok(scene)
+}
+
 /// All accessor-only hooks pass through current scene AND generation admission.
 fn role_of(accessor: usize) -> Option<FighterKey> {
     let scene = role_scene();
@@ -419,6 +454,7 @@ fn ensure_consts() -> bool {
             diagnostic(format_args!("[TrainingRooms] cpu_ids {}", line.as_str()));
         }
     }
+    TECH_INIT.publish(&table);
     with(|cpu| cpu.ids = table);
     CONSTS_READY.store(true, Ordering::Release);
     true
@@ -470,6 +506,18 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         // before the save states (SPEC-core-01 §5.2).
         unsafe { let _ = super::btt::frame(a0); }
         unsafe { crate::runtime::features::hitbox::frame(a0) };
+        // Product hold/restore uses the existing post-native seam and fresh lifetime receipt.
+        unsafe { super::tech_adapter::frame(a0, receipt) };
+        unsafe { crate::runtime::features::tech::frame(a0) };
+        // S0 research only, after the ordinary hide and practice-game passes.
+        #[cfg(feature = "diag")]
+        unsafe {
+            let scene = role_scene();
+            let fresh = receipt.filter(|&r| {
+                with(|cpu| role_adapter::current_frame(cpu, scene, r)).unwrap_or(false)
+            });
+            crate::runtime::features::tech_spike::frame(a0, fresh);
+        }
         if a0 != 0
             && unsafe { ((a0 + FIGHTER_ENTRY_FIELD) as *const i32).read() } == 0
             && unsafe { ((a0 + FIGHTER_KIND_FIELD) as *const i32).read() } != konst(C::KindNana)
@@ -1263,6 +1311,7 @@ pub(crate) unsafe fn script_accessor(fighter: usize) -> usize {
 
 /// DI: before the game corrects a damage vector, write the DI stick floats for a CPU body.
 pub(crate) unsafe fn di_before(accessor: usize) {
+    if super::tech_adapter::di_before(accessor) { return; }
     cpu_event_on_change!(ev::DI_CALL, 0, Some(accessor as u64), "di_before accessor={accessor:#x} role={}", role_of(accessor).is_some());
     let Some(key) = role_of(accessor) else { return };
     let (x, y) = (konst(C::WorkFloatVecorCorrectStickX), konst(C::WorkFloatVecorCorrectStickY));

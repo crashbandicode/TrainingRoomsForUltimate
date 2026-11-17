@@ -26,6 +26,8 @@ macro_rules! callgraph_self_tests {
 }
 #[path = "common/callgraph.rs"]
 mod callgraph;
+#[path = "common/tech_callbacks.rs"]
+mod tech_callbacks;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -65,6 +67,7 @@ const HOOK_LOCKS: &[(&str, &str)] = &[
     // rc.14 Break the Targets: P1's poll (the input thread), P1's pass (the game thread) and the layout tick take it; the menu worker
     // reaches it only through atomics and a mailbox.
     ("features/btt.rs", "BTT"),
+    ("features/tech.rs", "VIEW"),
     ("compat/menu.rs", "EDITED"),
     ("ui/input.rs", "ADAPTER"),
     ("ui/menu_app.rs", "QUICK_MENU_APP"),
@@ -127,12 +130,22 @@ const ALIASES: &[(&str, &str)] = &[("ui/menu_app.rs", "menu"), ("ui/menu_app.rs"
 
 /// Whether function `index` takes the lock `name` of `file` (see the module comment).
 fn takes_lock(graph: &Graph, index: usize, file: &str, name: &str) -> bool {
+    takes_lock_methods(graph, index, file, name, LOCK_METHODS, true)
+}
+
+fn takes_lock_methods(graph: &Graph, index: usize, file: &str, name: &str, methods: &[&str], by_reference: bool) -> bool {
+    takes_lock_on_thread(graph, index, file, name, methods, by_reference, None)
+}
+
+fn takes_lock_on_thread(graph: &Graph, index: usize, file: &str, name: &str, methods: &[&str], by_reference: bool, plugin: Option<bool>) -> bool {
     let f = &graph.funcs[index];
     let module = Path::new(file).file_stem().unwrap().to_string_lossy().into_owned();
     let toks = &f.body;
     let ident = |k: usize, s: &str| matches!(toks.get(k), Some(Tok::Ident(t)) if t == s);
     let punct = |k: usize, c: char| matches!(toks.get(k), Some(Tok::Punct(p)) if *p == c);
+    let excluded = plugin.and_then(|plugin| callgraph::thread_dispatch(toks).map(|(p, g)| if plugin { g } else { p }));
     for i in 0..toks.len() {
+        if excluded.as_ref().is_some_and(|range| range.contains(&i)) { continue; }
         if !ident(i, name) {
             continue;
         }
@@ -159,9 +172,9 @@ fn takes_lock(graph: &Graph, index: usize, file: &str, name: &str) -> bool {
             }
             dot += 1;
         }
-        let method = punct(dot, '.') && LOCK_METHODS.iter().any(|m| ident(dot + 1, m)) && punct(dot + 2, '(');
+        let method = punct(dot, '.') && methods.iter().any(|m| ident(dot + 1, m)) && punct(dot + 2, '(');
         let start = if qualified { i - 2 } else { i };
-        let by_ref = start >= 1 && punct(start - 1, '&');
+        let by_ref = by_reference && start >= 1 && punct(start - 1, '&');
         if method || by_ref {
             return true;
         }
@@ -186,9 +199,10 @@ const TYPED_STATIC_CALLS: &[(&str, &str, &str)] = &[
 ];
 
 /// The names `index` calls only inside the game-thread branch of an `on_plugin_thread()` dispatch: not followed on a plugin thread.
-fn game_branch_only(graph: &Graph, index: usize) -> BTreeSet<String> {
+fn other_thread_branch_only(graph: &Graph, index: usize, plugin: bool) -> BTreeSet<String> {
     let body = &graph.funcs[index].body;
-    let Some((_, game)) = callgraph::thread_dispatch(body) else { return BTreeSet::new() };
+    let Some((p, g)) = callgraph::thread_dispatch(body) else { return BTreeSet::new() };
+    let game = if plugin { g } else { p };
     let called = |k: usize| match (body.get(k), body.get(k + 1)) {
         (Some(Tok::Ident(name)), Some(Tok::Punct('('))) => Some(name.clone()),
         _ => None,
@@ -251,6 +265,10 @@ fn typed_static_callees(graph: &Graph, from: usize) -> BTreeSet<usize> {
 /// Callees of `index`: path calls, plus method calls whose name is unique among scanned receiver methods. Ambiguous method names
 /// are recorded in `ambiguous` (name -> how many functions carry it).
 fn edges(graph: &Graph, index: usize, by_name: &BTreeMap<String, Vec<usize>>, ambiguous: &mut BTreeMap<String, usize>) -> BTreeSet<usize> {
+    edges_on_thread(graph, index, by_name, ambiguous, true)
+}
+
+fn edges_on_thread(graph: &Graph, index: usize, by_name: &BTreeMap<String, Vec<usize>>, ambiguous: &mut BTreeMap<String, usize>, plugin: bool) -> BTreeSet<usize> {
     let from = &graph.funcs[index];
     let refs = Graph::references(from);
     // A path edge keeps the module qualifier: `p1::publish(..)` reaches the `publish` of module `p1` only (the capability resolver's rule;
@@ -298,7 +316,7 @@ fn edges(graph: &Graph, index: usize, by_name: &BTreeMap<String, Vec<usize>>, am
             _ => {}
         }
     }
-    let game_only = game_branch_only(graph, index);
+    let game_only = other_thread_branch_only(graph, index, plugin);
     out.retain(|&c| !game_only.contains(&graph.funcs[c].name));
     out
 }
@@ -521,12 +539,16 @@ fn direct_free_function_calls_still_reach_the_hook_lock() {
 
 /// Every `static NAME: …Mutex<…>` / `…RwLock<…>` of the runtime (ours and carried package-6 code, std or hos-lock).
 fn static_locks(root: &Path) -> Vec<(String, String)> {
-    fn walk(dir: &Path, root: &Path, out: &mut Vec<(String, String)>) {
+    static_types(root, &["Mutex<", "RwLock<"])
+}
+
+fn static_types(root: &Path, types: &[&str]) -> Vec<(String, String)> {
+    fn walk(dir: &Path, root: &Path, types: &[&str], out: &mut Vec<(String, String)>) {
         let mut entries: Vec<_> = std::fs::read_dir(dir).unwrap().map(|e| e.unwrap().path()).collect();
         entries.sort();
         for path in entries {
             if path.is_dir() {
-                walk(&path, root, out);
+                walk(&path, root, types, out);
             } else if path.extension().is_some_and(|e| e == "rs") {
                 let rel = path.strip_prefix(root).unwrap().to_string_lossy().replace('\\', "/");
                 for line in std::fs::read_to_string(&path).unwrap().lines() {
@@ -534,7 +556,7 @@ fn static_locks(root: &Path) -> Vec<(String, String)> {
                     let rest = line.strip_prefix("pub ").or_else(|| line.strip_prefix("pub(crate) ")).unwrap_or(line);
                     let Some(rest) = rest.strip_prefix("static ") else { continue };
                     let Some((name, ty)) = rest.split_once(':') else { continue };
-                    if ty.contains("Mutex<") || ty.contains("RwLock<") {
+                    if types.iter().any(|ty_name| ty.contains(ty_name)) {
                         out.push((rel.clone(), name.trim().to_owned()));
                     }
                 }
@@ -542,8 +564,123 @@ fn static_locks(root: &Path) -> Vec<(String, String)> {
         }
     }
     let mut out = Vec::new();
-    walk(root, root, &mut out);
+    walk(root, root, types, &mut out);
     out
+}
+
+/// The staged Tech pass is a hook root before the launch binding exists. Walk
+/// its helpers too: a hidden blocking initializer is as unsafe as VIEW.lock().
+fn non_switch_only(f: &callgraph::Func, runtime: &Path) -> bool {
+    // The shared lexer removes string contents from attributes. Require both
+    // its exact negative target predicate and the original attached predicate;
+    // unsupported cfg syntax remains audited rather than silently skipped.
+    let attrs: String = f.attrs.split_whitespace().collect();
+    if !attrs.contains("cfg(not(target_os=))") { return false; }
+    let source = std::fs::read_to_string(runtime.join(&f.file)).unwrap();
+    let compact: String = source.split_whitespace().collect();
+    ["", "pub", "pub(crate)", "unsafe", "pubunsafe", "pub(crate)unsafe"].iter().any(|prefix| {
+        compact.contains(&format!("#[cfg(not(target_os=\"switch\"))]{prefix}fn{}(", f.name))
+    })
+}
+
+fn tech_frame_waits(graph: &Graph, runtime: &Path) -> BTreeSet<String> {
+    tech_frame_waits_with_callbacks(graph,runtime,tech_callbacks::EDGES)
+}
+fn tech_frame_waits_with_callbacks(graph: &Graph, runtime: &Path, callbacks:&[(&str,&str)]) -> BTreeSet<String> {
+    let roots = graph.find("tech::frame");
+    assert_eq!(roots.len(), 1, "Tech fighter pass must remain an explicit audit root");
+    let mut by_name: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+    for (i, f) in graph.funcs.iter().enumerate() {
+        by_name.entry(f.name.clone()).or_default().push(i);
+    }
+    let locks = static_locks(runtime);
+    let cells = static_types(runtime, &["OnceLock<", "OnceCell<"]);
+    let mut stack: Vec<_> = roots.into_iter().map(|i| (i, String::new())).collect();
+    let mut seen = BTreeSet::new();
+    let mut violations = BTreeSet::new();
+    while let Some((i, via)) = stack.pop() {
+        if !seen.insert(i) { continue; }
+        if non_switch_only(&graph.funcs[i], runtime) { continue; }
+        let key = graph.funcs[i].key();
+        let path = if via.is_empty() { key.clone() } else { format!("{via} -> {key}") };
+        for (file, name) in &locks {
+            if takes_lock_on_thread(graph, i, file, name, &["lock", "read", "write"], true, Some(false)) {
+                violations.insert(format!("{path} blocks on {file}::{name}"));
+            }
+        }
+        for (file, name) in &cells {
+            if takes_lock_on_thread(graph, i, file, name, &["set", "get_or_init", "get_or_try_init", "wait"], false, Some(false)) {
+                violations.insert(format!("{path} initializes or waits on {file}::{name}"));
+            }
+        }
+        // Same explicit allocation spellings covered by the existing HUD audit.
+        let plugin_range = callgraph::thread_dispatch(&graph.funcs[i].body).map(|(p, _)| p);
+        if graph.funcs[i].body.iter().enumerate().any(|(at, t)| !plugin_range.as_ref().is_some_and(|p| p.contains(&at))
+            && matches!(t, Tok::Ident(s) if ["Box", "Vec", "String", "alloc"].contains(&s.as_str()))) {
+            violations.insert(format!("{path} reaches an allocation spelling"));
+        }
+        stack.extend(edges_on_thread(graph, i, &by_name, &mut BTreeMap::new(), false).into_iter().map(|next| (next, path.clone())));
+        stack.extend(callbacks.iter().filter(|(from,_)| *from==key).flat_map(|(_,to)| graph.find(to))
+            .map(|next| (next,path.clone())));
+    }
+    violations
+}
+
+#[test]
+fn tech_frame_has_no_blocking_lock_initialization_or_allocation() {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut graph = Graph::scan(&runtime, &[]);
+    graph.precise_imports = true;
+    let violations = tech_frame_waits(&graph, &runtime);
+    assert!(violations.is_empty(), "Tech frame hook can wait or allocate:\n{}", violations.into_iter().collect::<Vec<_>>().join("\n"));
+}
+
+#[test]
+fn tech_frame_audit_rejects_reachable_lock_initialization_and_allocation_seeds() {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut graph = Graph::scan(&runtime, &[]);
+    graph.precise_imports = true;
+    let frame = graph.find("tech::frame")[0];
+    let helper = graph.find("tech::still_tumbling")[0];
+    // Remove the binding path: the root itself must retain this coverage.
+    graph.funcs[frame].body = callgraph::lex("still_tumbling(0);");
+    for (seed, expected) in [
+        ("VIEW.lock();", "blocks on features/tech.rs::VIEW"),
+        ("TUMBLE_IDS.set([0; 7]);", "initializes or waits on features/tech.rs::TUMBLE_IDS"),
+        ("let allocated = Vec::new();", "reaches an allocation spelling"),
+    ] {
+        graph.funcs[helper].body = callgraph::lex(seed);
+        let found = tech_frame_waits(&graph, &runtime);
+        assert!(found.iter().any(|v| v.contains(expected)), "reachable seed escaped: {seed}: {found:?}");
+    }
+    graph.funcs[helper].body = callgraph::lex("VIEW.try_lock(); TUMBLE_IDS.get();");
+    assert!(tech_frame_waits(&graph, &runtime).is_empty(), "nonblocking access was rejected");
+}
+
+#[test]
+fn tech_frame_audit_follows_game_branch_and_switch_implementation() {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut graph = Graph::scan(&runtime, &[]);
+    graph.precise_imports = true;
+    let frame = graph.find("tech::frame")[0];
+    let helper = graph.find("tech::still_tumbling")[0];
+    graph.funcs[frame].body = callgraph::lex("still_tumbling(0);");
+    graph.funcs[helper].body = callgraph::lex("if threads::on_plugin_thread() { VIEW.lock(); } else { VIEW.try_lock(); }");
+    assert!(tech_frame_waits(&graph, &runtime).is_empty(), "plugin branch was walked as a game hook");
+    graph.funcs[helper].body = callgraph::lex("if threads::on_plugin_thread() { VIEW.try_lock(); } else { VIEW.lock(); }");
+    assert!(tech_frame_waits(&graph, &runtime).iter().any(|v| v.contains("blocks on features/tech.rs::VIEW")), "game branch wait escaped");
+    // Use real target attributes, not a function-name exemption. A wait seeded
+    // into the host fallback is irrelevant; the Switch implementation must fail.
+    let variants = graph.find("clock::uptime_ms");
+    assert_eq!(variants.len(), 2);
+    let host = *variants.iter().find(|&&i| non_switch_only(&graph.funcs[i], &runtime)).unwrap();
+    let switch = *variants.iter().find(|&&i| i != host).unwrap();
+    graph.funcs[frame].body = callgraph::lex("clock::uptime_ms();");
+    graph.funcs[host].body = callgraph::lex("tech::VIEW.lock();");
+    graph.funcs[switch].body.clear();
+    assert!(tech_frame_waits(&graph, &runtime).is_empty(), "host-only fallback was walked as Switch code");
+    graph.funcs[switch].body = callgraph::lex("tech::VIEW.lock();");
+    assert!(tech_frame_waits(&graph, &runtime).iter().any(|v| v.contains("blocks on features/tech.rs::VIEW")), "Switch wait escaped");
 }
 
 /// The audit's raw material (IMPLEMENTATION-PROGRESS-sync.md (removed after v0.2.0-rc.1; see that tag)): every static lock (ours and carried package-6 code, std or hos-lock)
@@ -654,4 +791,53 @@ fn diag_only_modules(runtime: &Path) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
     walk(runtime, &mut out);
     out
+}
+
+#[test]
+fn tech_callbacks_match_production_binding_and_model_calls() {
+    let root=Path::new(env!("CARGO_MANIFEST_DIR"));
+    let graph=Graph::scan(&root.join("src/runtime"),&[]);
+    for &(from,to) in tech_callbacks::EDGES {
+        assert_eq!(graph.find(from).len(),1,"callback source {from}");
+        assert_eq!(graph.find(to).len(),1,"callback target {to}");
+    }
+    let compact=|s:String| s.split_whitespace().collect::<String>();
+    let ui=compact(std::fs::read_to_string(root.join("src/runtime/features/tech.rs")).unwrap());
+    let controller=compact(std::fs::read_to_string(root.join("src/model/tech/controller.rs")).unwrap());
+    let cpu=compact(std::fs::read_to_string(root.join("src/runtime/features/cpu.rs")).unwrap());
+    let adapter=compact(std::fs::read_to_string(root.join("src/runtime/features/tech_adapter.rs")).unwrap());
+    for call in ["Controller::tick(&mutrun.controller,&mutrun.adapter,", "run.controller.place(&mutrun.adapter,setup)", "run.controller.stop(&mutrun.adapter)", "Adapter::new(hitlag)", "HITLAG.get().copied()", "HITLAG.set(resolver)"] {
+        assert!(ui.contains(call),"production callback mapping changed: {call}");
+    }
+    for call in ["launcher.place(setup.launch)?", "launcher.attempt()", "launcher.restore()", "launcher.launch()?"] {
+        assert!(controller.contains(call),"model callback changed: {call}");
+    }
+    assert!(cpu.contains("super::tech::bind_hitlag(super::tech_hitlag::PROVIDER)"));
+    let native=compact(std::fs::read_to_string(root.join("src/runtime/features/tech_hitlag.rs")).unwrap());
+    assert!(native.contains("pubconstPROVIDER:tech_adapter::HitlagResolver=resolve;"));
+    assert!(adapter.contains("(self.hitlag)(accessor,owned.launch.hit_damage)?"));
+}
+#[test]
+fn tech_frame_audit_follows_model_launcher_and_injected_provider_callbacks() {
+    let runtime=Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut graph=Graph::scan(&runtime,&[]);graph.precise_imports=true;
+    let resolver=graph.find("tech_hitlag::resolve")[0];
+    let original=graph.funcs[resolver].body.clone();
+    graph.funcs[resolver].body=callgraph::lex("tech_adapter::OWNED.lock();");
+    // Negative controls reproduce both missing links; production uses the complete table.
+    assert!(tech_frame_waits_with_callbacks(&graph,&runtime,&[]).is_empty());
+    assert!(tech_frame_waits_with_callbacks(&graph,&runtime,&[("tech_adapter::launch","tech_hitlag::resolve")]).is_empty());
+    let found=tech_frame_waits(&graph,&runtime);
+    assert!(found.iter().any(|v|v.contains("tech_adapter::launch -> tech_hitlag::resolve blocks on features/tech_adapter.rs::OWNED")),"provider blocking seed escaped: {found:?}");
+    for callback in ["tech_adapter::place","tech_adapter::attempt","tech_adapter::restore","tech_adapter::launch"] {
+        let target=graph.find(callback)[0];
+        let old=graph.funcs[target].body.clone();
+        graph.funcs[target].body=callgraph::lex("OWNED.lock();");
+        assert!(tech_frame_waits(&graph,&runtime).iter().any(|v|v.contains(&format!("{callback} blocks on features/tech_adapter.rs::OWNED"))),"model callback seed escaped: {callback}");
+        graph.funcs[target].body=old;
+    }
+    graph.funcs[resolver].body=callgraph::lex("tech_adapter::OWNED.try_lock();");
+    assert!(tech_frame_waits(&graph,&runtime).is_empty());
+    graph.funcs[resolver].body=original;
+    assert!(tech_frame_waits(&graph,&runtime).is_empty());
 }

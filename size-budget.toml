@@ -1693,23 +1693,52 @@ approved_by = "Operator rc.15 size approval; primary 20:08Z, rc.15 approval, 202
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 148508
+ceiling = 150210
 date = "2026-11-16"
-reason = "rc.15 hardware reship: exact combined implementation measured 148508 after reviewed CPU/Eggs, Player Swapping Single, menu through e78bbab4 and BTT through dbe9edc7. Delta +341 from card ffd2f74a (148167), +272 from the standalone menu ceiling 148236. No events-log changes, diagnostic-only shipping change, counting change or gate change."
-approved_by = "Operator rc.15 size approval relayed by primary 2026-11-16 20:08Z; BTT exact 148407 / 148194 (+213) explicitly approved by primary 20:44Z; latest primary release-only reship ruling explicitly orders the combined measured total recorded under that approval."
+reason = "rc.15 Stage tech v9 measured total on 0938ec33: 150210, +2016 over 148194. Lead-approved FOR OPERATOR REVIEW; final total set at integration. No code-counting change or feature removal."
+approved_by = "Operator rc.15-update size approval: final total set at integration; primary 18:49Z, 2026-11-16, explicitly authorizes this measured-total budget entry FOR OPERATOR REVIEW."
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150214
+date = "2026-11-16"
+reason = "rc.15 Stage tech v10 d9907202 measured total 150214, +4 over the v9 150210 entry. Lead-approved under the same rc.15 ruling; final combined total set at integration. Counting and implementation unchanged by this entry."
+approved_by = "Primary approval 2026-11-16 following tech-direct V10 boot PASS: record the +4 under the same operator rc.15 size approval, FOR OPERATOR REVIEW."
 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 148646
+ceiling = 153962
 date = "2026-11-16"
-reason = "rc.15 hardware reship-2: exact combined implementation 148646, +138 from card-verified 9f683363 (148508), after reviewed menu frame_after follow-up through 4e972211 and docs/tests-only Loop d03c9e60. No counting, guard, gate or feature change."
-approved_by = "Operator rc.15 size approval; primary 2026-11-16 reship-2 instruction explicitly approves menu frame_after +138 under rc.15, opus-review PASS 21:21Z, and orders the combined size recorded."
+reason = "rc.15 Tech UI final seam integration measured 153962 on 072f5ee0, with no headroom. Includes final reviewed BTT/menu seams and retained native grading availability. FOR OPERATOR REVIEW; counting, guards and gate enforcement unchanged."
+approved_by = "Operator rc.15 size approval; primary 2026-11-16 22:47Z explicitly approves this exact measured TechUI total tied to 072f5ee0, FOR OPERATOR REVIEW."
 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 148683
+ceiling = 154452
 date = "2026-11-17"
-reason = "RESHIP-2 projectile rebuild: exact combined implementation 148683, +37 from prior reship-2 148646 and +175 from card base9f683363 (148508). Includes reviewed menu frame_after, Loop docs/tests and BTT owned64-slot article pool through cf999194. Counting rules, guards and gates unchanged."
-approved_by = "Operator rc.15 size approval; primary latest rebuild direction explicitly orders the combined size recorded under rc.15 approval after stacking reviewed BTTdbe9edc7..cf999194 (opus-review PASS2026-11-16 23:56Z)."
+reason = "rc.15 TechUI final combined implementation measured 154452 on reviewed 02fdb3cb: 153962 + core463 + UI27. Core467 includes V10+4 already in the UI baseline. ONE exact combined ceiling, no headroom; boundary/determinism additions are host tests only. FOR OPERATOR REVIEW; no counting, guard or gate change."
+approved_by = "Operator rc.15 size approval; primary exact +7 ruling 2026-11-17 01:50Z confirmed by tech-direct FINAL 02:10Z and rc15-tech reconciliation 02:15Z; supersedes the earlier +461/+26 arithmetic estimate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 154569
+date = "2026-11-17"
+reason = "TechUI stage-surface bootstrap root fix measured 154569: +117 over final combined 154452, within the approved +300. Exact total, no headroom. Platform and airborne discovery share native stage rays; finite work ends in completion or explicit failure. FOR OPERATOR REVIEW; counting and gates unchanged."
+approved_by = "Operator rc.15 size approval; primary 2026-11-17 03:20Z explicitly approves growth up to +300 over 154452 FOR OPERATOR REVIEW."
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 154717
+date = "2026-11-17"
+reason = "TechUI collision-lifetime recovery measured 154717: +148 over 154569, within approved +300. Pure world selection rebinds to freshly discovered geometry after reset; strict native lifetime guards and exact matching remain. One combined exact total, no headroom. FOR OPERATOR REVIEW; counting and gates unchanged."
+approved_by = "Operator rc.15 size approval; primary 2026-11-17 04:38Z explicitly authorizes growth up to +300 over154569 FOR OPERATOR REVIEW."
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 154757
+date = "2026-11-17"
+reason = "RESHIP-3 approved envelope: card148683 + (Tech154717 - common148194) =155206. Final combined measured total154757 is recorded here, no headroom (449 below the envelope). Shared seam overlap is counted once in measurement; counting and gates unchanged."
+approved_by = "Primary 2026-11-17 06:23Z integration order: combined ceiling is card approved total plus Tech approved growth, under operator rc.15 size approval, FOR OPERATOR REVIEW."

@@ -103,3 +103,12 @@ pub static CHORD_ROWS: [(&str, &str); 10] = [
     ("Input display", "input_display_toggle"),
     ("Game speed", "game_speed"),
 ];
+
+/// Stage tech practicer choices (DESIGN §5/7).
+pub static TECH_SESSION: [&str; 6] = ["Off", "20 attempts", "10 attempts", "1 minute", "3 minutes", "Free practice"];
+pub static TECH_SURFACE: [&str; 5] = ["Any", "Floor", "Wall", "Ceiling (underside)", "Chosen point"];
+pub static TECH_MODE: [&str; 2] = ["Set", "Random"];
+pub static TECH_AUTO_MODE: [&str; 3] = ["Auto (approximate)", "Set", "Random"];
+pub static TECH_DI: [&str; 4] = ["Off", "Player", "Set", "Random"];
+pub static TECH_FACING: [&str; 4] = ["Toward the point", "Left", "Right", "Random"];
+pub static TECH_CAMERA: [&str; 2] = ["Follow", "Whole stage"];

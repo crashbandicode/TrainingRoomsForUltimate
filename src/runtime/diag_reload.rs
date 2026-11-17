@@ -129,6 +129,9 @@ fn poll() {
     poll_egg_request();
     poll_pause_dump();
     poll_cycle();
+    if let Some(text) = request("diag-tech-s0.req") {
+        crate::runtime::features::tech_spike::request(text.trim());
+    }
     let Some(path) = FixedPath::<128>::in_root(NAME) else { return };
     let Ok(bytes) = fs::read(path.as_str()) else { return };
     let _ = fs::remove_file(path.as_str());

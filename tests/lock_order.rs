@@ -21,6 +21,8 @@ macro_rules! callgraph_self_tests {
 }
 #[path = "common/callgraph.rs"]
 mod callgraph;
+#[path = "common/tech_callbacks.rs"]
+mod tech_callbacks;
 
 #[path = "../src/model/thread_stacks.rs"]
 #[allow(dead_code)]
@@ -733,6 +735,9 @@ fn scan_with_locks(graph: &Graph, locks: Vec<(String, String)>, include_try: boo
             entries.push((vec![i], "game-hook".to_owned()));
         }
     }
+    for key in game_root_keys() {
+        entries.push((graph.find(key), "game-hook".to_owned()));
+    }
     for (key, name, module) in plugin_entries() {
         let found = entry_starts(graph, &key, &module);
         if !found.is_empty() {
@@ -977,6 +982,15 @@ const GAME_ENTRIES: &[&str] = &[
     "probe::mounted",
 ];
 
+/// Staged game-thread passes are audited even before their native callback is
+/// bound. They are not claims of a registered handoff: GAME_ENTRIES stays the
+/// exact callback inventory checked by every_function_handed_to_the_game_is_listed.
+const STAGED_GAME_ROOTS: &[&str] = &["tech::frame"];
+
+fn game_root_keys() -> impl Iterator<Item = &'static str> {
+    GAME_ENTRIES.iter().chain(STAGED_GAME_ROOTS).copied()
+}
+
 /// Functions whose address is handed out (`extern "C"`, `as *const ()`) that are not game entry points, and why.
 const NOT_GAME_ENTRIES: &[(&str, &str)] = &[
     ("imp::detached", "a plugin thread's start (runtime::threads); its thread is walked from model::thread_stacks"),
@@ -1093,7 +1107,7 @@ fn callback_edges(graph: &Graph) -> Vec<(usize, usize)> {
             }
         }
     }
-    for (from, to) in MODEL_CALLBACKS {
+    for (from, to) in MODEL_CALLBACKS.iter().chain(tech_callbacks::EDGES) {
         for a in graph.find(from) {
             out.extend(graph.find(to).into_iter().map(|b| (a, b)));
         }
@@ -1220,7 +1234,7 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
         seen
     };
     let mut hooks: Vec<usize> = (0..n).filter(|&f| graph.funcs[f].attrs.contains("skyline::hook")).collect();
-    hooks.extend(GAME_ENTRIES.iter().flat_map(|key| graph.find(key)));
+    hooks.extend(game_root_keys().flat_map(|key| graph.find(key)));
     let mut out = Shared {
         game_waits: BTreeMap::new(),
         game_hooks: BTreeMap::new(),
@@ -1257,7 +1271,7 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
 /// `artifacts/phase23/TASK-OPUS-rc6-lockfree.md`): no lock that a game entry point waits on is held by a plugin thread. There is no
 /// exception: no list of locks shared on purpose, no hooks excepted because a run measured them on MainThread
 /// (`artifacts/phase23/hook-threads/TABLE.md` keeps those measurements). It walks the shipped build and the diag build (the Eden
-/// runs': its own modules, threads and hooks too), every `#[skyline::hook]` and `GAME_ENTRIES`, the callback tables and bare-name
+/// runs': its own modules, threads and hooks too), every `#[skyline::hook]`, `GAME_ENTRIES` and `STAGED_GAME_ROOTS`, the callback tables and bare-name
 /// function values; `the_shared_lock_check_sees_a_seeded_hazard` runs the same predicate on a seeded fixture.
 #[test]
 fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
@@ -1593,6 +1607,9 @@ fn the_native_service_poll_is_walked_from_its_dispatch() {
 #[test]
 fn every_listed_entry_resolves() {
     let graph = runtime_graph();
+    for key in STAGED_GAME_ROOTS {
+        assert!(!graph.find(key).is_empty(), "staged game root {key} resolves to no function");
+    }
     let unscanned = |key: &str| UNSCANNED_ENTRIES.iter().any(|(k, _)| *k == key);
     let mut keys: Vec<(String, Vec<usize>)> = GAME_ENTRIES.iter().map(|k| ((*k).to_owned(), graph.find(k))).collect();
     for (key, _, module) in plugin_entries() {
@@ -1651,6 +1668,9 @@ fn the_callback_edges_cover_the_capability_scan() {
         callback_edges(&graph).into_iter().map(|(a, b)| (graph.funcs[a].key(), graph.funcs[b].key())).collect();
     for want in [("hud::run", "hud_draw::draw"), ("hud::run", "hitbox::draw_orbs"), ("diag_log::start_drain_thread", "p1::service")] {
         assert!(edges.contains(&(want.0.to_owned(), want.1.to_owned())), "{want:?} not followed: {edges:?}");
+    }
+    for &(from,to) in tech_callbacks::EDGES {
+        assert!(edges.contains(&(from.to_owned(),to.to_owned())), "Tech callback not followed: {from} -> {to}");
     }
     let text = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/capabilities.rs")).unwrap();
     let start = text.find("fn new() -> Analysis").expect("capabilities.rs Analysis::new");
@@ -1741,6 +1761,25 @@ fn the_shared_lock_check_sees_a_seeded_hazard() {
     assert!(hazards.contains("EDITED"), "the game-thread impl of a typed read waits on EDITED, the plugin one holds it: {hazards:?}");
     assert!(!hazards.contains("PUBLISHING"), "only the plugin impl takes PUBLISHING: {hazards:?}");
     assert!(hazards.contains("ROLES"), "one lock of a static array, taken by index on both sides: {hazards:?}");
+}
+
+#[test]
+fn tech_frame_is_a_game_root_before_binding_and_reaches_seeded_helper_lock() {
+    let mut graph = runtime_graph();
+    assert!(STAGED_GAME_ROOTS.contains(&"tech::frame"));
+    assert!(!GAME_ENTRIES.contains(&"tech::frame"), "an unbound staged root is not a registered callback");
+    let roots = graph.find("tech::frame");
+    assert_eq!(roots.len(), 1);
+    let helper = graph.find("tech::still_tumbling")[0];
+    // No launch binding or native hook registration is needed to audit this pass.
+    graph.funcs[roots[0]].body = callgraph::lex("still_tumbling(0);");
+    graph.funcs[helper].body = callgraph::lex("VIEW.lock();");
+    let (ctx, s) = scan(&graph);
+    let shared = shared_locks(&ctx, &s);
+    let view = ctx.locks.iter().position(|(file, name)| file == "features/tech.rs" && name == "VIEW").unwrap();
+    assert!(s.roles[helper].contains("game-hook"), "Tech helper lost its game-thread role");
+    assert!(shared.game_hooks.get(&view).is_some_and(|hooks| hooks.contains("tech::frame")),
+        "reachable blocking VIEW seed escaped game-root inventory");
 }
 
 #[test]
@@ -1867,6 +1906,42 @@ fn layout_menu_reads_are_nonblocking_and_a_blocking_edit_seed_fails() {
 }
 
 #[test]
+fn tech_receipt_roots_do_not_wait_on_edits_and_busy_preserves_ownership() {
+    let mut graph = runtime_graph();
+    let one = |g: &Graph, file: &str, key: &str| {
+        let found: Vec<_> = g.find(key).into_iter().filter(|&i| g.funcs[i].file == file).collect();
+        assert_eq!(found.len(), 1, "{file}::{key}");
+        found[0]
+    };
+    let roots = [
+        ("features/tech.rs", "tech::frame"),
+        ("features/tech_adapter.rs", "tech_adapter::attempt"),
+        ("features/tech_adapter.rs", "tech_adapter::frame"),
+        ("features/cpu.rs", "cpu::tech_player_receipt"),
+    ];
+    for (file, key) in roots {
+        assert_eq!(menu_edit_wait_path(&graph, one(&graph, file, key)), None, "{key} waits on EDITED");
+    }
+    let read = one(&graph, "compat/menu.rs", "menu::try_current_menu");
+    let at = graph.funcs[read].body.iter().position(|t| *t == Tok::Ident("try_lock".into())).unwrap();
+    graph.funcs[read].body[at] = Tok::Ident("lock".into());
+    for (file, key) in roots {
+        let witness = menu_edit_wait_path(&graph, one(&graph, file, key)).expect("seeded blocking edit must FAIL the complete Tech root");
+        assert!(witness.iter().any(|key| key == "practice::try_context"), "{witness:?}");
+        assert!(witness.iter().any(|key| key == "cpu::try_role_scene"), "{witness:?}");
+        assert_eq!(witness.last().unwrap(), "menu::try_current_menu");
+    }
+    let source = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime/features/tech_adapter.rs")).unwrap();
+    assert!(source.contains(".map_err(|_| Error::Busy)?"), "receipt unavailability must stay Busy");
+    assert!(source.contains("Err(Error::Busy) => return Err(Error::Busy)"), "attempt must retain ownership on Busy");
+    let frame = &source[source.find("pub(super) unsafe fn frame(").unwrap()..];
+    let busy = frame.find("if fresh == Err(Error::Busy)").unwrap();
+    let retire = frame.find("*slot = None;").unwrap();
+    assert!(busy < retire && frame[busy..retire].contains("return;"), "frame must defer Busy before retiring its lease");
+    assert!(source.contains("receipt == owned.receipt && accessor == owned.accessor_token"), "fresh success must preserve both identity checks");
+}
+
+#[test]
 fn frame_fact_publication_defers_busy_before_any_mutation() {
     let graph = runtime_graph();
     let one = |key: &str| {
@@ -1922,6 +1997,7 @@ fn macro_frame_menu_reads_are_nonblocking_and_blocking_edit_seeds_fail() {
         ("named_macros::hold_panel_fighter", "panel_entry_in", "panel_entry"),
         ("replay_preview::after_frame", "try_enabled", "enabled"),
         ("replay_capture::browser_needs_native_update", "role_in", "role"),
+        ("mii_backend::ready_with", "current_with", "current"),
     ] {
         let f = one(&graph, key);
         let at = graph.funcs[f].body.iter().position(|t| *t == Tok::Ident(safe.into())).unwrap();

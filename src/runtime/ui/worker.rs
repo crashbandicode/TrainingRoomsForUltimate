@@ -349,6 +349,7 @@ fn handle(event: Event, s: &mut Session) {
         }
         CLOSING.store(false, Ordering::Release);
         crate::runtime::features::btt::menu_opened();
+        crate::runtime::features::tech::menu_opened();
         crate::runtime::ui::menu_app::note_open();
         { s.opening = crate::runtime::ui::menu_app::sequence(); }
         publish_frame(s);
@@ -1224,6 +1225,7 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     crate::runtime::features::hitbox::eggs_start();
     // rc.14 Break the Targets: Place targets asks for the placing view; every close tells the mode (after the publish above).
     crate::runtime::features::btt::menu_closed(outbox.place_targets);
+    crate::runtime::features::tech::menu_closed(outbox.tech_point);
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(10);
     // The carried engines read the typed view of the committed settings (decision D1).

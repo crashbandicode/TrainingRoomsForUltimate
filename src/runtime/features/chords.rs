@@ -100,7 +100,7 @@ pub unsafe fn on_poll(controller: usize) {
     let (accepted, chord_bits, hold, display, refused, keys, block) = accepted;
     // Placing keeps all of P1's controller from the game (the cursor has it); Ready waits for its first input.
     // SAFETY: controller is the live Controller of this poll.
-    let hide = !block && unsafe { btt::poll(controller, sample, keys) };
+    let hide = !block && unsafe { super::tech::poll(controller, sample) || btt::poll(controller, sample, keys) };
     let chord_bits = if hide { !chords::bit::PLUS_MASK } else { chord_bits };
     // rc.12: a Save or Load press the chords stood down says why (an owner or the speed hold: logged only).
     if let Some((action, why)) = refused {

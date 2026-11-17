@@ -164,6 +164,48 @@ pub mod natives {
         Some(std::mem::transmute_copy(&(text_base() + offset)))
     }
 
+    /// Native two-register pair return (AAPCS64 x0/x1), not a hidden sret.
+    pub use crate::runtime::features::tech_hitlag_read::ParamPair as HitlagParamPair;
+    pub unsafe fn tech_hitlag_param_pair(object: usize, hash: u64) -> Option<HitlagParamPair> {
+        Some(at::<extern "C" fn(usize,u64)->HitlagParamPair>(crate::model::sites_tech_hitlag::PAIR_OFFSET)?(object,hash))
+    }
+    pub unsafe fn tech_hitlag_param_float(pair: &HitlagParamPair) -> Option<f32> {
+        Some(at::<extern "C" fn(*const HitlagParamPair)->f32>(crate::model::sites_tech_hitlag::FLOAT_OFFSET)?(pair))
+    }
+    pub unsafe fn tech_hitlag_param_int(pair: &HitlagParamPair) -> Option<i32> {
+        Some(at::<extern "C" fn(*const HitlagParamPair)->i32>(crate::model::sites_tech_hitlag::INT_OFFSET)?(pair))
+    }
+    pub unsafe fn tech_hitlag_k_lookup(map: usize, hash: u64) -> Option<f32> {
+        Some(at::<extern "C" fn(usize,u64)->f32>(crate::model::sites_tech_hitlag::K_OFFSET)?(map,hash))
+    }
+    pub unsafe fn tech_magnitude(kb: f32) -> Option<f32> {
+        let f = at::<extern "C" fn(usize,usize,i32,i32,f32,f32,f32)->f32>(crate::model::sites_tech_launch::MAGNITUDE_OFFSET)?;
+        Some(f(0,0,0,0,kb,0.0,0.0))
+    }
+    pub unsafe fn tech_reaction(kb: f32) -> Option<f32> {
+        Some(at::<extern "C" fn(f32)->f32>(crate::model::sites_tech_launch::REACTION_OFFSET)?(kb))
+    }
+    pub unsafe fn tech_cos(angle: f32) -> Option<f32> {
+        Some(at::<extern "C" fn(f32)->f32>(crate::model::sites_tech_launch::COS_OFFSET)?(angle))
+    }
+    pub unsafe fn tech_sin(angle: f32) -> Option<f32> {
+        Some(at::<extern "C" fn(f32)->f32>(crate::model::sites_tech_launch::SIN_OFFSET)?(angle))
+    }
+    pub unsafe fn tech_overwrite_reaction(accessor: usize, frames: f32) -> Option<()> {
+        at::<extern "C" fn(usize,f32)>(crate::model::sites_tech_launch::OVERWRITE_REACTION_OFFSET)?(accessor,frames); Some(())
+    }
+    pub unsafe fn tech_is_damage(accessor: usize) -> Option<bool> {
+        Some(at::<extern "C" fn(usize)->bool>(crate::model::sites_tech_launch::IS_DAMAGE_OFFSET)?(accessor))
+    }
+    pub unsafe fn tech_energy(accessor: usize, id: i32) -> Option<usize> {
+        Some(at::<extern "C" fn(usize,i32)->usize>(crate::model::sites_tech_launch::GET_ENERGY_OFFSET)?(accessor,id))
+    }
+    pub unsafe fn tech_speed(energy: usize) -> Option<(f32,f32)> {
+        let x = at::<extern "C" fn(usize)->f32>(crate::model::sites_tech_launch::SPEED_X_OFFSET)?(energy);
+        let y = at::<extern "C" fn(usize)->f32>(crate::model::sites_tech_launch::SPEED_Y_OFFSET)?(energy);
+        Some((x,y))
+    }
+
     pub unsafe fn status_kind(accessor: usize) -> i32 {
         at::<extern "C" fn(usize) -> i32>(sites_pkg2::STATUS_KIND_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
@@ -319,6 +361,17 @@ pub mod natives {
         at::<extern "C" fn(usize, i32) -> f32>(sites_pkg2::WORK_GET_FLOAT_OFFSET).map_or_else(Default::default, |f| f(accessor, id))
     }
 
+    /// Concrete ControlModule ABI, after the caller verifies its vtable/dispatch slot.
+    pub unsafe fn tech_guard_count(module: usize, button: i32) -> Option<u8> {
+        at::<extern "C" fn(usize, i32) -> u8>(crate::model::sites_tech_launch::GUARD_COUNT_OFFSET).map(|f| f(module, button))
+    }
+    pub unsafe fn tech_guard_previous(module: usize, button: i32) -> Option<u8> {
+        at::<extern "C" fn(usize, i32) -> u8>(crate::model::sites_tech_launch::GUARD_PREVIOUS_OFFSET).map(|f| f(module, button))
+    }
+    pub unsafe fn tech_stick_x(module: usize) -> Option<f32> {
+        at::<extern "C" fn(usize) -> f32>(crate::model::sites_tech_launch::STICK_X_OFFSET).map(|f| f(module))
+    }
+
     pub unsafe fn set_float(accessor: usize, value: f32, id: i32) {
         at::<extern "C" fn(usize, f32, i32)>(sites_pkg2::WORK_SET_FLOAT_OFFSET).map_or_else(Default::default, |f| f(accessor, value, id))
     }
@@ -363,9 +416,10 @@ pub mod natives {
         at::<extern "C" fn(usize) -> bool>(sites_pkg4::STOP_IS_STOP_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
-    /// `StopModule::set_hit_stop_frame(accessor, frames, false)`: the body is in hitstop for `frames` ticks, as after a hit.
-    pub unsafe fn set_hit_stop_frame(accessor: usize, frames: i32) {
-        at::<extern "C" fn(usize, i32, bool)>(crate::model::sites_hitbox::HITBOX_HIT_STOP_OFFSET).map_or_else(Default::default, |f| f(accessor, frames, false))
+    /// `StopModule::set_hit_stop_frame(accessor, frames, damage)`: the body is in hitstop for `frames` ticks, as after a hit.
+    pub unsafe fn set_hit_stop_frame(accessor: usize, frames: i32, damage: bool) -> Option<()> {
+        at::<extern "C" fn(usize, i32, bool)>(crate::model::sites_hitbox::HITBOX_HIT_STOP_OFFSET)?(accessor, frames, damage);
+        Some(())
     }
 
     /// `WorkModule::set_int(accessor, value, id)`.

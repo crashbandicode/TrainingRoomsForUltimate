@@ -69,6 +69,20 @@ type ChangeStatusFn = extern "C" fn(usize, L2CValue, L2CValue) -> L2CValue;
 type SubGuardContFn = extern "C" fn(usize) -> L2CValue;
 type IsEnablePassiveFn = extern "C" fn(usize) -> L2CValue;
 
+pub(super) fn di_ready() -> bool {
+    ORIGINAL_DI.load(Ordering::Acquire) != 0
+}
+
+pub(super) fn contact_ready() -> bool {
+    ORIGINAL_CHANGE_STATUS.load(Ordering::Acquire) != 0
+        && IS_ENABLE_PASSIVE.load(Ordering::Acquire) != 0
+}
+
+#[cfg(feature = "diag")]
+pub fn passive_ready() -> bool {
+    IS_ENABLE_PASSIVE.load(Ordering::Acquire) != 0
+}
+
 extern "C" fn di_hook(fighter: usize, value: L2CValue) -> L2CValue {
     let _scope = HookScope::enter();
     // SAFETY: `fighter` is the script object the game is running; the accessor is only used when it is
@@ -83,12 +97,24 @@ extern "C" fn change_status_hook(fighter: usize, status: L2CValue, unk: L2CValue
     let _scope = HookScope::enter();
     let mut status = status;
     let mut unk = unk;
+    let mut decision = None;
     if let Some(requested) = status.as_int() {
         let passive = || {
             let address = IS_ENABLE_PASSIVE.load(Ordering::Acquire);
             // SAFETY: the function passed its guard; it takes the script object and returns a value.
             address != 0 && unsafe { std::mem::transmute::<usize, IsEnablePassiveFn>(address)(fighter) }.as_bool()
         };
+        // Optional Stage tech observes the same native decision, before CPU substitution.
+        let accessor = unsafe { cpu::script_accessor(fighter) };
+        decision = unsafe { super::tech_adapter::decision(accessor, requested, passive) }
+            .map(|attempt| (accessor, attempt));
+        #[cfg(feature = "diag")]
+        unsafe {
+            let accessor = cpu::script_accessor(fighter);
+            if super::tech_spike::watches_player(accessor) {
+                super::tech_spike::decision(accessor, requested, passive());
+            }
+        }
         // SAFETY: as in `di_hook`.
         if let Some(new_status) = unsafe { cpu::tech_request(cpu::script_accessor(fighter), requested, passive) } {
             status = L2CValue::int(new_status);
@@ -97,7 +123,12 @@ extern "C" fn change_status_hook(fighter: usize, status: L2CValue, unk: L2CValue
     }
     // SAFETY: set by `install`.
     let original: ChangeStatusFn = unsafe { std::mem::transmute(ORIGINAL_CHANGE_STATUS.load(Ordering::Acquire)) };
-    original(fighter, status, unk)
+    let result = original(fighter, status, unk);
+    if let Some((accessor, attempt)) = decision {
+        // Re-resolves fresh ownership; the pre-call accessor is only an identity token.
+        unsafe { super::tech_adapter::confirm_decision(accessor, attempt) };
+    }
+    result
 }
 
 extern "C" fn sub_guard_cont_hook(fighter: usize) -> L2CValue {
