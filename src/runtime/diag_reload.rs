@@ -137,7 +137,7 @@ fn poll() {
     let old = CURRENT.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone().unwrap_or_else(Snapshot::factory);
     let rerolls = menu::rerolls_between(&old, &next);
     diagnostic(format_args!("[TrainingRooms] diag_settings_reload rerolls={rerolls:#x} issues={}", loaded.issues.len()));
-    published::publish(&next, rerolls);
+    published::publish(&next, rerolls, [None; 2]);
     crate::runtime::compat::menu::apply_kept(&loaded.settings);
     // The published settings are what a menu close keeps now (decision MENU-CLOSE).
     crate::runtime::ui::worker::adopt_published(&loaded.settings);

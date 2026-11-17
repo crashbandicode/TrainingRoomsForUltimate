@@ -541,6 +541,26 @@ mod tests {
         assert_eq!(menu.take_outbox().picks, [None, None], "X previews a form, it picks nothing");
     }
 
+    /// LEAD-1 review F3: a repick is the player's edit of the pick key. The menu opened on Fox; a swap finishing while it is
+    /// open writes Pikachu into the live settings; A on "> Fox" must commit Fox (MENU-CLOSE: the player's edit wins).
+    fn a_repick_is_the_players_edit_over_a_live_writeback() {
+        use crate::model::{menu::{Env, Menu}, settings::Settings};
+        let mut fox = RosterEditor::new(RosterUse::PlayerPick);
+        let mut values = fox.values(None);
+        fox.press(cell_of(0x07), Button::A, &mut values);
+        let mut opened = Settings::factory();
+        opened.menu.set_kept("player_character", RosterEditor::value_of(&values)).unwrap();
+        let mut menu = Menu::new(opened.clone(), Env::default());
+        let mut live = opened;
+        let mut pikachu = vec![0u8; values.len()];
+        pikachu[CHOICES.iter().position(|(k, _)| *k == 0x08).unwrap()] = 1;
+        live.menu.set_kept("player_character", RosterEditor::value_of(&pikachu)).unwrap();
+        RosterEditor::new(RosterUse::PlayerPick).apply(&mut menu, cell_of(0x07), Button::A);
+        let committed = menu.commit_onto(&live);
+        assert_eq!(committed.menu.extra().get("player_character"), Some(&RosterEditor::value_of(&values)),
+            "the repicked Fox, not the written-back Pikachu");
+    }
+
     /// A minimal menu stub for decorate_badges: the kept keys as JSON arrays.
     fn menu_with_kept(kept: &[(&'static str, &[u8])]) -> crate::model::menu::Menu {
         use crate::model::{menu::{Env, Menu}, settings::Settings};
@@ -562,6 +582,7 @@ mod tests {
             ("mii_tiles_follow_the_catalog_admission", mii_tiles_follow_the_catalog_admission as fn()),
             ("a_pick_of_the_stored_fighter_still_asks_for_that_load", a_pick_of_the_stored_fighter_still_asks_for_that_load as fn()),
             ("every_pick_press_is_noted_for_the_close", every_pick_press_is_noted_for_the_close as fn()),
+            ("a_repick_is_the_players_edit_over_a_live_writeback", a_repick_is_the_players_edit_over_a_live_writeback as fn()),
         ]);
     }
     }

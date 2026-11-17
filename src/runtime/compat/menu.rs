@@ -182,8 +182,9 @@ fn kept<T: serde::de::DeserializeOwned + Default>(settings: &Settings, key: &str
 }
 
 /// The typed menu a publish replaces: the view readers had (a game-side edit or the published rows), or None before the first publish
-/// of the run (boot). Read wait-free on the publishing thread.
-pub(crate) fn view_before_publish() -> Option<TrainingModpackMenu> {
+/// of the run (boot). Read wait-free on the publishing thread. `_turn` is the publisher's `published::PUBLISHING` guard: the edit
+/// handoff is a one-reader triple buffer, so it is read only by the publisher holding its turn (LEAD-1 review F1).
+pub(crate) fn view_before_publish(_turn: &hos_lock::MutexGuard<'_, ()>) -> Option<TrainingModpackMenu> {
     let generation = crate::runtime::published::live_generation();
     if generation == 0 {
         return None;
@@ -211,8 +212,10 @@ pub(crate) fn before_publish(published: TrainingModpackMenu, previous: Option<Tr
 /// written back into the settings the menu opens on. When a live menu changed, package 6's roster re-plan is only *noted* here: the
 /// game frame runs it ([`service_roster_change`], where the roster's locks are taken: the lock-free runtime), so a publish does only
 /// the publish (stream/stack: run here, the planner sat under boot's frame on Skyline's 64 KiB thread). The first publish of a run
-/// has nothing to compare with.
-pub(crate) fn after_publish(published: TrainingModpackMenu, next: TrainingModpackMenu, previous: Option<TrainingModpackMenu>) {
+/// has nothing to compare with. `picks` (LEAD-1): the menu close's last pick per role, posted after the re-plan note so the game frame
+/// that takes them also sees this publish's change; it decides each role's one load from both (`character_roster::settings_changed`).
+pub(crate) fn after_publish(published: TrainingModpackMenu, next: TrainingModpackMenu, previous: Option<TrainingModpackMenu>,
+    picks: [Option<u32>; 2]) {
     if next != published {
         PUBLISH_WRITEBACK.write(Some((writeback_stamp(), next)));
         crate::runtime::ui::worker::request_writeback();
@@ -220,7 +223,12 @@ pub(crate) fn after_publish(published: TrainingModpackMenu, next: TrainingModpac
     if let Some(previous) = previous.filter(|previous| *previous != next) {
         note_roster_change(previous);
     }
+    PICKS.post(picks, crate::runtime::published::live_generation());
 }
+
+/// LEAD-1: the menu close's Player / CPU Character picks on their way to the game frame (written under `PUBLISHING` by
+/// `after_publish`, taken by `service_roster_change`; the last pick per role wins).
+static PICKS: crate::engine::swap::cycle_members::PickSlots = crate::engine::swap::cycle_members::PickSlots::new();
 
 /// The roster's pending re-plan: the menu as it was before the earliest publish the game frame has not applied yet (several
 /// publishes before its next frame are compared once, earliest against live). The publishing path writes it (one publisher at a
@@ -239,22 +247,25 @@ fn note_roster_change(previous: TrainingModpackMenu) {
 }
 
 /// The game frame (`lobby::update`: the input poll and the fighter frame, on MainThread): the roster re-plans for a noted settings
-/// change, once per change (two atomic loads when nothing changed). It lands at the game's next poll after the publish, where the
-/// menu worker ran it right after the publish before; nothing the worker does next reads its outcome (`tests/lockfree_wiring.rs`).
+/// change, once per change (two atomic loads and two swaps when nothing changed). It lands at the game's next poll after the publish,
+/// where the menu worker ran it right after the publish before; nothing the worker does next reads its outcome
+/// (`tests/lockfree_wiring.rs`). LEAD-1: the picks are taken first. The publisher posts them after it noted the change, so a frame that
+/// holds a pick also sees its publish's change, and the roster decides each role's one load from both.
 pub(crate) fn service_roster_change() {
     use std::sync::atomic::Ordering;
+    let picks = PICKS.take();
     let generation = ROSTER_CHANGE.generation();
     let applied = ROSTER_APPLIED.load(Ordering::Acquire);
-    if generation == applied {
-        return;
+    let mut previous = None;
+    if generation != applied {
+        // The publisher writes again only once this generation is applied, so this read is exactly that generation's value.
+        let noted = ROSTER_CHANGE.read();
+        if ROSTER_APPLIED.compare_exchange(applied, generation, Ordering::AcqRel, Ordering::Acquire).is_ok() {
+            previous = noted;
+        }
     }
-    // The publisher writes again only once this generation is applied, so this read is exactly that generation's value.
-    let previous = ROSTER_CHANGE.read();
-    if ROSTER_APPLIED.compare_exchange(applied, generation, Ordering::AcqRel, Ordering::Acquire).is_err() {
-        return;
-    }
-    if let Some(previous) = previous {
-        crate::runtime::roster::character_roster::settings_changed(&previous, None);
+    if previous.is_some() || picks.iter().any(Option::is_some) {
+        crate::runtime::roster::character_roster::settings_changed(previous.as_ref(), picks);
     }
 }
 /// The settings-only part of the typed view: the two kept keys (`stage_preferences`, `mii_preferences`), which

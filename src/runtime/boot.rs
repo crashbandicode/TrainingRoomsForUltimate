@@ -142,7 +142,7 @@ fn run_inner() {
     chords::load_ini();
     writer::load_replay_capture();
     writer::start();
-    published::publish(&loaded.menu, 0);
+    published::publish(&loaded.menu, 0, [None; 2]);
     // Package 6: the typed view the carried engines read (decision D1); the settings are loaded and published first.
     crate::runtime::compat::menu::apply_kept(&*loaded);
     #[cfg(feature = "diag")]
