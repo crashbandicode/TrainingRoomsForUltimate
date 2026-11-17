@@ -154,7 +154,7 @@ impl Ring {
         }
         // Owned: no other producer and no reader touches these fields until the release below (`state` stays shared).
         let len = text.len().min(SLOT_BYTES);
-        (*slot).bytes[..len].copy_from_slice(&text[..len]);
+        (&mut (*slot).bytes)[..len].copy_from_slice(&text[..len]);
         (*slot).frame = self.frame.load(Ordering::Relaxed);
         (*slot).uptime_ms = uptime_ms;
         (*slot).len = len as u32;
@@ -193,7 +193,7 @@ impl Ring {
         }
         // Owned by the reader: producers drop rather than write a READING slot.
         let len = ((*slot).len as usize).min(SLOT_BYTES);
-        out[..len].copy_from_slice(&(*slot).bytes[..len]);
+        out[..len].copy_from_slice(&(&(*slot).bytes)[..len]);
         let line = Pop::Line { len, frame: (*slot).frame, uptime_ms: (*slot).uptime_ms, truncated: (*slot).truncated != 0 };
         (*slot).state.store(state(*next, FREE), Ordering::Release);
         *next += 1;
