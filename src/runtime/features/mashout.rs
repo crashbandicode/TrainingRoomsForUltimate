@@ -826,6 +826,24 @@ pub unsafe fn frame(fighter: usize) {
                 input.lstick_x = if natives::lr(cpu) > 0.0 { 120 } else { -120 };
                 drive(input);
             }
+            if request.plan == crate::model::mashout::moves::Plan::Pin && !game.followed {
+                let Some((special, attack)) =
+                    state_id(C::StatusSpecialS).zip(state_id(C::KamuiPinAttack))
+                else {
+                    game.fail(UNAVAILABLE_NOTICE);
+                    return;
+                };
+                if !game::granted(crate::model::sites_pkg2::WORK_IS_FLAG_OFFSET) {
+                    game.fail(UNAVAILABLE_NOTICE);
+                    return;
+                }
+                // Native Kamui d1f74 opens the attack window; 1d410 consumes an
+                // ordinary trigger there. Never request the spear or victim status.
+                if cpu_status == special && natives::is_flag(cpu, attack) {
+                    game.followed = true;
+                    drive(entry::controls(request.plan, true));
+                }
+            }
             if request.plan == crate::model::mashout::moves::Plan::Freeze && !game.followed {
                 let Some((hold, no_bang)) =
                     state_id(C::LucasFreezeHold).zip(state_id(C::LucasFreezeNoBang))

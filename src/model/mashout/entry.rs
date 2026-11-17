@@ -11,7 +11,7 @@ pub fn start(move_: Scenario) -> Option<&'static str> {
             _ => "FIGHTER_STATUS_KIND_CATCH",
         },
         Plan::AirSideSpecial => "FIGHTER_STATUS_KIND_JUMP_SQUAT",
-        Plan::SideSpecial | Plan::Cling | Plan::Drag | Plan::Whip | Plan::Roller => {
+        Plan::SideSpecial | Plan::Cling | Plan::Drag | Plan::Whip | Plan::Roller | Plan::Pin => {
             "FIGHTER_STATUS_KIND_SPECIAL_S"
         }
         Plan::Egg | Plan::Inhale | Plan::NeutralSpecial | Plan::Freeze | Plan::IceShot => {
@@ -48,6 +48,7 @@ pub fn controls(plan: Plan, caught: bool) -> MappedInputs {
     let (buttons, lstick_y) = match plan {
         Plan::DownThrow if caught => (1, -120),
         Plan::UpSpecial if caught => (2, 0),
+        Plan::Pin if caught => (1, 0),
         Plan::Inhale | Plan::NeutralSpecial => (2, 0),
         Plan::Freeze if !caught => (2, 0),
         Plan::Jab3 => (1, 0),
@@ -117,6 +118,18 @@ mod tests {
                 move_.grab = grab;
                 assert_eq!(start(move_).unwrap(), format!("FIGHTER_STATUS_KIND_{status}"));
             }
+        }
+
+        #[test]
+        fn pin_uses_real_side_special_then_an_attack_edge_without_direction() {
+            let pin = super::super::moves::CATALOG[94];
+            assert_eq!(start(pin), Some("FIGHTER_STATUS_KIND_SPECIAL_S"));
+            assert_eq!(controls(pin.plan, false), MappedInputs::NEUTRAL);
+            let strike = controls(pin.plan, true);
+            assert_eq!(strike.buttons, 1);
+            assert_eq!((strike.lstick_x, strike.lstick_y, strike.rstick_x, strike.rstick_y), (0, 0, 0, 0));
+            assert!(holding(State::Grab, |c| c == C::ClatterKamuiPierce));
+            assert!(!holding(State::Grab, |c| c == C::StatusSpecialS));
         }
 
         #[test]
