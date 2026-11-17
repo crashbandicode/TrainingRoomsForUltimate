@@ -23,7 +23,9 @@ after it.
 - It presses the first action as soon as the game lets it, for example the first frame after hitstun. Once that
   action has started, the follow-up comes next, again as soon as it can.
 - With several actions ticked, the pick is random and each has the same chance. The CPU picks once when a situation
-  starts, not on every frame of it, and a new situation replaces anything still waiting.
+  starts, not on every frame of it, and a new situation replaces anything still waiting. The general triggers
+  (Grounded, Airborne, the distances, Always) pick again once the last action is done: see
+  [Mash Triggers](#mash-triggers).
 - The rows under Attacks & Movement are picked along with the action: [Attack Angle](../menu/cpu.md#attack-angle) for
   an angled attack; [Full Hop](../menu/cpu.md#full-hop), [Falling Aerials](../menu/cpu.md#falling-aerials) and
   [Aerial Delay](../menu/cpu.md#aerial-delay) for an aerial; [Fast Fall](../menu/cpu.md#fast-fall) for the fall
