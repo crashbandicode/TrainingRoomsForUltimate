@@ -16,8 +16,9 @@
 /// fighter loads; a reset there left P1's loader parked in state 13 (Eden `crash0900-a-reship34`/`b-card4`: the
 /// install never finished, every later pick refused) and on the console the state-13 commit activation later
 /// read a null `cell[+0x5918]` (Data Abort at 0x10, PC main+0x628b40, LR main+0x656f40 from `0x656644`). The reset
-/// is refused until the load settles; the player presses L+R+A again. Review R1: the gate reads no fighter entry,
-/// so it depends on no native row (a rejected entry lookup would otherwise uninstall the gate, `CROSS_NEEDS`).
+/// is not run then: [`defer_step`] holds one reset and fires it once the load settles. Review R1: the gate reads no
+/// fighter entry, so it depends on no native row (a rejected entry lookup would otherwise uninstall the gate,
+/// `CROSS_NEEDS`).
 pub const fn x8_write(lra_reset_on: bool, native_training: bool, fighter_loading: bool) -> Option<u64> {
     if native_training && (!lra_reset_on || fighter_loading) {
         Some(0)
@@ -39,26 +40,48 @@ pub const DEFERRED_BODY: &str = "Resetting when the fighter finishes loading";
 /// settled by then cancels the reset (no reset, the safe outcome) rather than firing one much later.
 pub const DEFER_TIMEOUT_MS: u64 = 10_000;
 
-/// The roster's suspending install ended with the fighter applied (`character_roster::finish_install` reasons): the
-/// Player track's `Applied`, the roster's own completion, the CPU Mii publication. Any other end (refused, destroyed,
-/// recovered to another member, settled unowned) is an aborted load; an unlisted success also reads as aborted,
+/// The roster's suspending install ended with the fighter applied in the scene that asked for it
+/// (`character_roster::finish_install` reasons): the Player track's `Applied`, the roster's own completion, the CPU
+/// Mii publication. Any other end (refused, destroyed, recovered to another member, settled unowned, and a departed
+/// load completing after its scene ended: review R3) is an aborted load; an unlisted success also reads as aborted,
 /// which only cancels a deferred reset (fails safe).
 pub fn install_ended_ok(reason: &str) -> bool {
-    matches!(reason, "Applied" | "roster ready" | "departed roster completed" | "CPU Mii group record publication")
+    matches!(reason, "Applied" | "roster ready" | "CPU Mii group record publication")
 }
 
-/// One deferred reset waiting for the load: when it was asked for, the abort count then, and whether its notice
-/// was accepted by the mailbox.
+/// The lifecycle generation (review R3): one count, raised by every lifecycle exit a deferred reset must not
+/// outlive. The roster's scene change (every mode-key change, so also leaving Training), the P1 entry's destruction
+/// (Training -> CSS -> Training keeps the same mode key; the P1 entry identity ends there) and the Training session
+/// clear. A deferred reset keeps the generation of its press and fires only while it is unchanged, so a lifecycle
+/// exit between two reset checks, or at the settling check itself, drops it. Raised from any thread; the reset hook
+/// stays the deferred record's only reader and writer.
+static GENERATION: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+
+/// A lifecycle exit: every deferred reset asked for before it is dropped.
+pub fn lifecycle_exit() {
+    GENERATION.fetch_add(1, core::sync::atomic::Ordering::AcqRel);
+}
+
+/// The current lifecycle generation.
+pub fn generation() -> u32 {
+    GENERATION.load(core::sync::atomic::Ordering::Acquire)
+}
+
+/// One deferred reset waiting for the load: when it was asked for, the abort count and lifecycle generation then,
+/// and whether its notice was accepted by the mailbox.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Pending {
     pub since_ms: u64,
     pub aborts: u32,
+    pub generation: u32,
     pub notified: bool,
 }
 
 /// Why a deferred reset was dropped without resetting.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Cancel {
+    /// The scene, the Training session or the P1 entry ended after the press ([`lifecycle_exit`]).
+    LifecycleEnded,
     LeftTraining,
     SettingOff,
     MenuOpened,
@@ -79,6 +102,8 @@ pub struct Facts {
     pub save_state_loading: bool,
     /// Suspending installs ended without the fighter applied, so far.
     pub install_aborts: u32,
+    /// [`generation`] at this check.
+    pub generation: u32,
     pub now_ms: u64,
 }
 
@@ -95,12 +120,15 @@ pub struct Step {
 /// CRASH-0900, deferred (operator 2026-11-17 11:40Z). A reset requested while a fighter loads is not run then
 /// (Eden: a reset inside the load parked P1's loader at 13 and the console later faulted); one reset waits and
 /// fires through this same check on the first check after the load settles, exactly once. A second press while one
-/// waits changes nothing. The menu opening (also every Change Stage), a save-state load, leaving Training, the
-/// setting turned Off, an aborted load or [`DEFER_TIMEOUT_MS`] drops it without resetting.
+/// waits changes nothing. A lifecycle exit since the press, the menu opening (also every Change Stage), a save-state
+/// load, leaving Training, the setting turned Off, an aborted load or [`DEFER_TIMEOUT_MS`] drops it without
+/// resetting; every cancel is checked before the settled fire, so a cancel seen at the settling check wins.
 pub fn defer_step(pending: &mut Option<Pending>, f: Facts) -> Step {
     let mut step = Step::default();
     if let Some(p) = *pending {
-        let cancel = if !f.native_training {
+        let cancel = if f.generation != p.generation {
+            Some(Cancel::LifecycleEnded)
+        } else if !f.native_training {
             Some(Cancel::LeftTraining)
         } else if !f.lra_reset_on {
             Some(Cancel::SettingOff)
@@ -134,7 +162,7 @@ pub fn defer_step(pending: &mut Option<Pending>, f: Facts) -> Step {
             step.post_notice = !p.notified;
         }
         None if requested && f.loading && step.cancelled.is_none() => {
-            *pending = Some(Pending { since_ms: f.now_ms, aborts: f.install_aborts, notified: false });
+            *pending = Some(Pending { since_ms: f.now_ms, aborts: f.install_aborts, generation: f.generation, notified: false });
             step.write = Some(0);
             step.post_notice = true;
         }

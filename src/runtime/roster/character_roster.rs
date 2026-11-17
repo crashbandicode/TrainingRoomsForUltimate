@@ -938,6 +938,8 @@ fn operator_buttons(player_idx: i32, buttons: u32) -> u64 {
 /// Cancel plugin intent immediately. An already installed native reload belongs
 /// to the native scene teardown; never clear its flags or force its state ahead.
 pub fn scene_changed(mode: game_mode::Mode) {
+    // CRASH-0900 review R3: a deferred L+R+A reset never outlives its scene.
+    crate::model::lra_reset::lifecycle_exit();
     body_bank::scene_changed();
     mii_saved_alpha::scene_changed();
     body_bank::adopt_scene_generation();
@@ -1571,6 +1573,7 @@ pub unsafe fn on_destroy(entry: *const u8) {
     if practice_departure {
         // Native Training -> CSS -> Training retains the same mode tuple. The
         // actual P1 entry destructor is also a scene boundary for plugin intent.
+        crate::model::lra_reset::lifecycle_exit();
         sources::scene_changed();
         mii_hud_portrait::scene_changed();
         crate::runtime::roster::kirby_hats::practice_departed(lobby::is_waiting_scene());

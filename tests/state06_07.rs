@@ -113,12 +113,77 @@ fn crash0900_each_cancel_drops_the_reset_without_resetting() {
     assert_eq!(defer_step(&mut pending, facts(0, true, DEFER_TIMEOUT_MS - 1)).cancelled, None);
     assert!(defer_step(&mut pending, facts(0, false, DEFER_TIMEOUT_MS - 1)).fired);
     // The success reasons the roster releases INSTALL with; anything else is an aborted load.
-    for ok in ["Applied", "roster ready", "departed roster completed", "CPU Mii group record publication"] {
+    for ok in ["Applied", "roster ready", "CPU Mii group record publication"] {
         assert!(lra_reset::install_ended_ok(ok), "{ok}");
     }
-    for aborted in ["Destroyed", "RecoveredKnownMember", "NativeSettledUnowned", "roster destroyed", "preflight refused"] {
+    // Review R3: a departed load completing after its scene ended is not the asked-for fighter applied.
+    for aborted in ["departed roster completed", "Destroyed", "RecoveredKnownMember", "NativeSettledUnowned", "roster destroyed", "preflight refused"] {
         assert!(!lra_reset::install_ended_ok(aborted), "{aborted}");
     }
+}
+
+fn at(x8: u64, loading: bool, now_ms: u64, generation: u32) -> lra_reset::Facts {
+    lra_reset::Facts { generation, ..facts(x8, loading, now_ms) }
+}
+
+#[test]
+fn crash0900_r3_a_lifecycle_exit_drops_a_waiting_reset() {
+    use lra_reset::{defer_step, Cancel, RESET_REQUESTED};
+    // Departure between checks: armed in scene A (generation 7); the scene departs with no reset check in between
+    // and the departed load completes successfully (abort count unchanged). The first check in scene B, settled,
+    // Training, On, menu closed, before the deadline, resets nothing.
+    let mut pending = None;
+    defer_step(&mut pending, at(RESET_REQUESTED, true, 0, 7));
+    let step = defer_step(&mut pending, at(0, false, 1_200, 8));
+    assert_eq!((step.cancelled, step.fired, pending), (Some(Cancel::LifecycleEnded), false, None));
+    assert_eq!(step.write, None, "the game's own value stays (no forced reset)");
+    // Same-mode departure (Training -> CSS -> Training keeps the mode key; the P1 entry's destruction raises the
+    // generation): every other fact is identical to a valid fire, only the generation differs.
+    let mut pending = None;
+    defer_step(&mut pending, at(RESET_REQUESTED, true, 0, 3));
+    assert!(!defer_step(&mut pending, at(0, false, 500, 4)).fired);
+    // Cancel exactly at settlement: the exit and the load settling are seen by the same check; the cancel wins.
+    for f in [
+        at(0, false, 900, 1),
+        lra_reset::Facts { menu_open: true, ..at(0, false, 900, 0) },
+        lra_reset::Facts { save_state_loading: true, ..at(0, false, 900, 0) },
+        lra_reset::Facts { install_aborts: 1, ..at(0, false, 900, 0) },
+    ] {
+        let mut pending = None;
+        defer_step(&mut pending, at(RESET_REQUESTED, true, 0, 0));
+        let step = defer_step(&mut pending, f);
+        assert!(!step.fired && step.cancelled.is_some() && pending.is_none(), "{f:?}");
+        assert_ne!(step.write, Some(RESET_REQUESTED), "{f:?}");
+    }
+    // Re-entry with a stale pending reset: B's own press with no load resets once, natively (the hook leaves x8),
+    // and no stale reset follows; a press in B mid-load arms B's own reset with B's generation.
+    let mut pending = None;
+    defer_step(&mut pending, at(RESET_REQUESTED, true, 0, 10));
+    assert_eq!(defer_step(&mut pending, at(RESET_REQUESTED, false, 300, 11)).write, None);
+    assert!(pending.is_none());
+    assert!(!defer_step(&mut pending, at(0, false, 316, 11)).fired);
+    let step = defer_step(&mut pending, at(RESET_REQUESTED, true, 400, 11));
+    assert_eq!((step.write, pending.map(|p| p.generation)), (Some(0), Some(11)));
+    assert!(defer_step(&mut pending, at(0, false, 900, 11)).fired);
+    // The runtime counter: a lifecycle exit raises it (other tests may raise it too, never lower it).
+    let before = lra_reset::generation();
+    lra_reset::lifecycle_exit();
+    assert_ne!(lra_reset::generation(), before);
+}
+
+#[test]
+fn crash0900_r3_every_lifecycle_exit_raises_the_generation() {
+    // The wiring the model case relies on: the hook samples the generation, and the roster's scene change (every
+    // mode-key change, leaving Training included) and the P1 entry's destruction (same-mode departure) raise it.
+    let root = env!("CARGO_MANIFEST_DIR");
+    let hook = std::fs::read_to_string(format!("{root}/src/runtime/features/lra_reset.rs")).unwrap();
+    assert!(hook.contains("generation: lra_reset::generation(),"));
+    assert!(hook.contains("PENDING_GENERATION.store(p.generation, Ordering::Release);"));
+    let roster = std::fs::read_to_string(format!("{root}/src/runtime/roster/character_roster.rs")).unwrap();
+    let scene = roster.split("pub fn scene_changed(mode: game_mode::Mode) {").nth(1).expect("scene_changed");
+    assert!(scene[..200].contains("crate::model::lra_reset::lifecycle_exit();"), "scene change raises it first");
+    let departure = roster.split("if practice_departure {").nth(1).expect("the P1 departure block");
+    assert!(departure[..400].contains("crate::model::lra_reset::lifecycle_exit();"), "P1 entry destruction raises it");
 }
 
 #[test]
