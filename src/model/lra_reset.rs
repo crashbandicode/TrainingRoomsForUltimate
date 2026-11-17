@@ -9,54 +9,21 @@
 /// Off, and only in native Training, the register is cleared so the game's check fails and no reset
 /// happens (SPEC-state-06 §4). `None` leaves the register alone.
 ///
-/// `fighter_loading` (CRASH-0900, reship-3 hardware 2026-11-17): a practice fighter is mid-load,
-/// either the roster's install suspends practice or a practice entry's native loader is away from
-/// its resting state ([`loader_resting`]). Vanilla Training never resets while a fighter loads; a
-/// reset there left P1's loader parked in state 13 (Eden `crash0900-a-reship34`/`b-card4`: the
-/// install never finished, every later pick refused) and on the console the state-13 commit
-/// activation later read a null `cell[+0x5918]` (Data Abort at 0x10, PC main+0x628b40, LR
-/// main+0x656f40 from `0x656644`). The reset is refused until the load settles; the player
-/// presses L+R+A again.
+/// `fighter_loading` (CRASH-0900, reship-3 hardware 2026-11-17): the roster's suspending INSTALL token
+/// (`character_roster::busy`), an atomic and no native call. Every TR Player/CPU load takes it before its native
+/// submission and keeps it through settlement, including the cold group swap's cleared window and its
+/// asynchronous construction (Astra review 2026-11-17, "Cold construction"). Vanilla Training never resets while a
+/// fighter loads; a reset there left P1's loader parked in state 13 (Eden `crash0900-a-reship34`/`b-card4`: the
+/// install never finished, every later pick refused) and on the console the state-13 commit activation later
+/// read a null `cell[+0x5918]` (Data Abort at 0x10, PC main+0x628b40, LR main+0x656f40 from `0x656644`). The reset
+/// is refused until the load settles; the player presses L+R+A again. Review R1: the gate reads no fighter entry,
+/// so it depends on no native row (a rejected entry lookup would otherwise uninstall the gate, `CROSS_NEEDS`).
 pub const fn x8_write(lra_reset_on: bool, native_training: bool, fighter_loading: bool) -> Option<u64> {
     if native_training && (!lra_reset_on || fighter_loading) {
         Some(0)
     } else {
         None
     }
-}
-
-/// A fighter entry's native loader state byte (`entry+0x591c`; `0x655f60` dispatches on it).
-pub const LOADER_STATE_FIELD: usize = 0x591c;
-/// The loader's resting state for a live practice fighter (14): Eden `trace.*` on `main+0x656ee0`
-/// (`crash0900-*`) reads 14 on both entries between loads and 13 (or lower) during a Reload or a
-/// group-swap commit.
-pub const LOADER_RESTING: u8 = 14;
-
-/// Whether an entry's loader is at rest. An unreadable byte is not at rest (fail closed: the
-/// reset waits); an absent entry is decided by the caller (no entry, nothing loading).
-pub const fn loader_resting(state: Option<u8>) -> bool {
-    matches!(state, Some(LOADER_RESTING))
-}
-
-/// Whether a practice fighter loads, for the reset gate (CRASH-0900; review R1 2026-11-17).
-///
-/// - `install_busy` (the roster's suspending INSTALL token) decides first, with no native call: every TR
-///   Player/CPU load takes it before its native submission and keeps it through settlement, including the cold
-///   group swap's cleared window and its asynchronous construction (Astra review, "Cold construction").
-/// - Only when the entry lookup passed its guard (`lookup_usable`, `NativeGroup::Entry`) is `loader_state(slot)`
-///   asked for entries 0 and 1: `None` no such entry, `Some(byte)` its `+0x591c` (or `Some(None)` unreadable,
-///   not at rest). A loader away from rest is a native transition the token does not own.
-/// - With the lookup unavailable `loader_state` is never called. The answer is then the token alone: that is
-///   not "unavailable means nothing loads", it is the authoritative TR ownership signal without the native
-///   cross-check. Refusing every reset instead would take a vanilla feature away on a version mismatch.
-pub fn fighter_loading(install_busy: bool, lookup_usable: bool, mut loader_state: impl FnMut(u32) -> Option<Option<u8>>) -> bool {
-    if install_busy {
-        return true;
-    }
-    if !lookup_usable {
-        return false;
-    }
-    [0u32, 1].into_iter().any(|slot| loader_state(slot).is_some_and(|state| !loader_resting(state)))
 }
 
 /// The value `x8` holds at the hook when the game is about to reset: the site is

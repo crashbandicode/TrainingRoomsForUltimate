@@ -47,45 +47,22 @@ fn crash0900_no_native_reset_while_a_practice_fighter_loads() {
     assert_eq!(lra_reset::x8_write(false, true, true), Some(0));
     // ... and outside native Training nothing changes.
     assert_eq!(lra_reset::x8_write(true, false, true), None);
-    // The loader byte: 14 is rest; 13 (the parked Reload / group-swap commit), 12, and an
-    // unreadable byte are not.
-    assert_eq!(lra_reset::LOADER_STATE_FIELD, 0x591c);
-    assert!(lra_reset::loader_resting(Some(14)));
-    for state in [Some(13u8), Some(12), Some(0), Some(0xff), None] {
-        assert!(!lra_reset::loader_resting(state), "{state:?}");
-    }
 }
 
 #[test]
-fn crash0900_r1_a_rejected_entry_lookup_is_never_called() {
-    let never = |_slot: u32| -> Option<Option<u8>> { panic!("the rejected entry lookup was called") };
-    // The lookup row failed its guard (`NativeGroup::Entry` not granted): the reset path never calls it, and the
-    // answer is the install token alone (not "nothing loads": a busy token still refuses).
-    assert!(!lra_reset::fighter_loading(false, false, never));
-    assert!(lra_reset::fighter_loading(true, false, never));
-    // The install token decides first, with no native call even when the lookup is usable.
-    assert!(lra_reset::fighter_loading(true, true, never));
-    // Usable lookup, no token: entries 0 and 1 are asked; a loader away from rest (or unreadable) loads.
-    let mut asked = Vec::new();
-    assert!(lra_reset::fighter_loading(false, true, |slot| { asked.push(slot); if slot == 0 { Some(Some(13)) } else { Some(Some(14)) } }));
-    assert_eq!(asked, vec![0]);
-    assert!(lra_reset::fighter_loading(false, true, |slot| if slot == 1 { Some(None) } else { Some(Some(14)) }));
-    assert!(!lra_reset::fighter_loading(false, true, |_| Some(Some(14))));
-    assert!(!lra_reset::fighter_loading(false, true, |_| None));
-}
-
-#[test]
-fn crash0900_r1_the_reset_hook_reads_entries_only_through_the_guarded_lookup() {
+fn crash0900_r1_the_reset_gate_calls_no_native_entry_lookup() {
+    // Review R1: the gate's loading signal is the roster's INSTALL token (an atomic), so the reset hook reaches no
+    // native row: a rejected `fighter_manager_get_entry` is never called from it, and the L+R+A unit keeps no
+    // dependency that a rejected row would uninstall (`tests/capabilities.rs`: `CROSS_NEEDS` has no `lra_reset`
+    // entry; `a_poisoned_row_disables_every_entry_point_that_can_reach_it_and_no_installed_one_calls_it`).
     let root = env!("CARGO_MANIFEST_DIR");
     let hook = std::fs::read_to_string(format!("{root}/src/runtime/features/lra_reset.rs")).unwrap();
-    for raw in ["native_source", "get_fighter_entry", "FighterManager::", "practice_entry"] {
-        assert!(!hook.contains(raw), "the reset hook must not reach `{raw}` (an unguarded entry lookup)");
+    for native in ["native_source", "get_fighter_entry", "fighter_entry(", "FighterManager", "natives::", "native_fields"] {
+        assert!(!hook.contains(native), "the reset hook must not reach `{native}`");
     }
-    assert!(hook.contains("game::entry_lookup_usable()") && hook.contains("game::natives::fighter_entry("));
-    let game = std::fs::read_to_string(format!("{root}/src/runtime/game.rs")).unwrap();
-    let body = &game[game.find("pub unsafe fn fighter_entry(").unwrap()..];
-    let body = &body[..body.find("\n    }\n").unwrap()];
-    assert!(body.contains("ENTRY_NATIVES_USABLE.load"), "the guarded lookup answers 0 until its row passed");
+    assert!(hook.contains("let loading = crate::runtime::roster::character_roster::busy();"));
+    let busy = std::fs::read_to_string(format!("{root}/src/runtime/roster/character_roster.rs")).unwrap();
+    assert!(busy.contains("pub fn busy() -> bool {\n    INSTALL.suspends_practice()\n}"), "busy() is the install token alone");
 }
 
 #[test]
