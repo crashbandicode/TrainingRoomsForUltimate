@@ -1773,3 +1773,11 @@ ceiling = 155216
 date = "2026-11-17"
 reason = "Native Tech timing plus counted Missed rebased onto RESHIP-4 ffdc7d48: base155171 plus timing45 =155216, exact combined total with no headroom. Both reviewed behaviours are preserved; counting, guards and gate enforcement unchanged. FOR OPERATOR REVIEW."
 approved_by = "Primary2026-11-17 15:30Z orders timing integration onto ffdc7d48; timing growth45 remains within primary12:25Z approved +250 for timing plus Missed, combined with the separately approved RESHIP-4 baseline."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155228
+date = "2026-11-17"
+reason = "CPU out-of-shield native shield drop (Phase 3 CPU-040/066, rc15/cpu-oos-shield-drop 1b5e5c75) measured 155228 on the Surface gate: +12 over 155216 (a9938105). One shared needs_native_drop predicate and the guard_button off-query clause of SPEC-cpu-05. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "Primary 2026-11-17 tr-fix-devin brief approves the +12 for CPU-OOS, FOR OPERATOR REVIEW."
