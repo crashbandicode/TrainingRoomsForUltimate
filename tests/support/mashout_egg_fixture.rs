@@ -163,13 +163,15 @@ mod natives {
             assert_eq!(cpu, super::CART_BOMA.load(super::Ordering::Relaxed));
             return super::CART_COUNTER.load(super::Ordering::Relaxed) as i32;
         }
-        if Some(id) == super::state_id(super::C::JudgeKind) {
+        if id == 0x100000c1 || id == 0x100000c2 {
             assert_eq!(cpu, 2);
             super::JUDGE_INT_READS.fetch_add(1, super::Ordering::Relaxed);
             // The real native shim defaults to0 when unavailable; this must
             // never be mistaken for a positively observed other Judge roll.
             return if super::JUDGE_GETTER_GRANTED.load(super::Ordering::Relaxed) {
-                super::JUDGE_KIND.load(super::Ordering::Relaxed) as i32
+                // Native init_panel commits this roll to PREV_KIND, then clears KIND.
+                if id == 0x100000c1 { super::JUDGE_KIND.load(super::Ordering::Relaxed) as i32 }
+                else { -1 }
             } else { 0 };
         }
         assert_eq!(id, 0x11000008); // Lucas work id, pinned01bf583/native table.
@@ -275,6 +277,8 @@ fn state_id(c: C) -> Option<i32> {
         "FIGHTER_STATUS_KIND_SPECIAL_S" => return Some(477),
         "FIGHTER_LUCAS_STATUS_KIND_SPECIAL_N_HOLD" => return Some(481),
         "FIGHTER_LUCAS_STATUS_SPECIAL_N_WORK_INT_NOBANG_TIME" => return Some(0x11000008),
+        "FIGHTER_GAMEWATCH_INSTANCE_WORK_ID_INT_SPECIAL_S_KIND" => return Some(0x100000c2),
+        "FIGHTER_GAMEWATCH_INSTANCE_WORK_ID_INT_SPECIAL_S_PREV_KIND" => return Some(0x100000c1),
         _ => (),
     }
     Some(match c {

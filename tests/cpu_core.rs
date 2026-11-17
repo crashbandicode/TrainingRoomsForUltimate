@@ -140,7 +140,7 @@ fn mash_entry_constants_resolve_against_pinned_native_names() {
         (C::PickelTrolleyLink, "FIGHTER_PICKEL_LINK_NO_TROLLEY", 0x1c),
         (C::PickelTrolleyJumpDisable, "WEAPON_PICKEL_TROLLEY_INSTANCE_WORK_ID_INT_PICKEL_JUMP_DISABLE_FRAME", 0x10000021),
         (C::JudgeFixed, "FIGHTER_GAMEWATCH_STATUS_SPECIAL_S_FLAG_FIX_PANEL", 0x2100000d),
-        (C::JudgeKind, "FIGHTER_GAMEWATCH_INSTANCE_WORK_ID_INT_SPECIAL_S_KIND", 0x100000c2),
+        (C::JudgeKind, "FIGHTER_GAMEWATCH_INSTANCE_WORK_ID_INT_SPECIAL_S_PREV_KIND", 0x100000c1),
     ];
     let mut table = Table::unresolved();
     assert_eq!(table.resolve(|key| native.iter().find_map(|(_, name, value)| {

@@ -412,7 +412,8 @@ fn state_id(c: C) -> Option<i32> {
 fn holding(request: Option<Scenario>, status: i32) -> bool {
     request.is_some_and(|r| entry::holding(r.state, |c| state_id(c) == Some(status)))
 }
-/// Current owned Judge only: native INIT clears the flag before ACMD fixes the choice.
+/// Native init_panel moves this roll from KIND into PREV_KIND, then clears KIND.
+/// INIT also clears FIX before ACMD fixes it; that fresh edge makes PREV current.
 unsafe fn judge_choice(cpu: usize, saw_unfixed: &mut bool) -> Result<Option<bool>, &'static str> {
     if !game::granted(crate::model::sites_pkg2::WORK_GET_INT_OFFSET)
         || !game::granted(crate::model::sites_pkg2::WORK_IS_FLAG_OFFSET)
