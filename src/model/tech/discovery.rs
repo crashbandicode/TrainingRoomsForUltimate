@@ -46,7 +46,7 @@ impl Bootstrap {
     }
     pub fn hit(&mut self, line: Line, point: Vec2) -> Result<(), RayError> {
         self.rays.as_mut().ok_or(RayError)?.hit(line, point)?;
-        if !line.passable && (line.floor || line.normal.y >= 0.7) {
+        if !line.passable {
             self.seed = Some((line.id, 1));
             self.rays = None;
         }

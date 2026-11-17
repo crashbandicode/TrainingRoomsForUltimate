@@ -1777,3 +1777,16 @@ fn bootstrap_operation_budget_rejects_invalid_or_overflowing_camera_ranges() {
         );
     }
 }
+
+#[test]
+fn bootstrap_ray_can_seed_an_unflagged_solid_outline_line() {
+    let mut line = BootstrapStage::fixture().lines[0];
+    line.floor = false;
+    line.normal = Vec2 { x: 0.8, y: 0.6 };
+    assert!(line.valid());
+    assert_eq!(line.kind(), None);
+    let mut bootstrap = discovery::Bootstrap::new([-20., 20., 50., -50.], None).unwrap();
+    bootstrap.hit(line, Vec2 { x: -20., y: 0.5 }).unwrap();
+    assert_eq!(bootstrap.seed(), Some((line.id, 1)));
+    assert!(bootstrap.current().is_none());
+}
