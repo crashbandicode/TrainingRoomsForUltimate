@@ -188,6 +188,16 @@ fn actual_cpu_request_handoff_and_reload_readiness() {
     let saved_stub = "pub fn intercept_with(_: Role, _: Selection, _: impl Fn() -> super::TrainingModpackMenu) -> Option<bool> { None }";
 
     let mut fixture = FIXTURE.to_owned();
+    // RESHIP-3: the card moved admission and its notice into one pure owner.
+    // Execute that production dependency along with the extracted runtime caller.
+    let ordinary_cpu = include_str!("../src/model/mii/ordinary_cpu.rs");
+    let admission = block(ordinary_cpu, "pub fn cpu_intercept_admission(");
+    let notice = ordinary_cpu.lines()
+        .find(|line| line.starts_with("pub const SWAP_BUSY_NOTICE:"))
+        .expect("the production admission notice");
+    fixture = replace_once(fixture, "pub mod mii {", &format!(
+        "pub mod mii {{ pub mod ordinary_cpu {{ {notice}\n{admission} }}"
+    ));
     fixture = replace_once(fixture, "// CPU_PRELOAD_PENDING", preload_pending);
     // Existing fixture assertions call the wrapper; routing executes the exact
     // closure-based native-owner implementation extracted above.
