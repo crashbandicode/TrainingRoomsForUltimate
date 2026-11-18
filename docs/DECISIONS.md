@@ -655,6 +655,24 @@ Display is On), and the docs GIFs are shot on the final rc.14 build. Untested on
 
 *A run: Targets 0/3 0:00.00 → 2/3 → "Done! 3 in 0:04.08 (best 0:04.06)".*
 
+## rc.15 practice menu (2026-11-18): decided
+
+**Decided 2026-11-18 (~14:58Z).** The operator approved the practice-games mockup with the four recommended answers
+(`artifacts/rc15-practice-menu/mockup/README.md`, not in this repo). Branch `rc15/practice-menu`.
+
+| # | Decided |
+| --- | --- |
+| PM | Fighters & Stages › Practice games is one row per game: Eggs-ercise, Break the Targets, Tech practice and, since its integration landed on main, Mash out (its Off / On row is Start / Stop; Parry practice joins when its branch lands). A opens the game's sub-screen; its rows are the game's rows of today, same labels, controls and order. The separate Tech practice section is the Tech practice sub-screen |
+| Q1 | **A:** only Start starts a game. Closing the menu starts, restarts and stops nothing; a running game keeps running. L+R+A still restarts a run. This reverses rc14-eggs-D9 (c), "reopening the menu and closing it" restarts Eggs-ercise (2026-11-14) |
+| Q2 | **A:** no Off choices. Start / Stop is the switch: Start closes the menu and starts the game (and stops any other); Stop ends it and the menu stays open. The setting keys stay: a stored Off reads as the first mode, and the Break the Targets Off / On row is gone while its `btt` key stays in the file. Saved settings, defaults and layouts load as they are |
+| Q3 | **A:** CPU during a game is shown in the Eggs-ercise and the Break the Targets sub-screens, one setting (`practice_cpu`) |
+| Q4 | **A:** Start is the first row of each sub-screen and the cursor opens on it. While the game runs it reads Stop, with "Running" in green, and the games list shows "Running" on that game's row |
+
+Also changed with it: Target speed greys while Break the Targets runs and CPU during a game greys while Tech practice
+runs (they read the running game, no longer another game's row); Tech point and Tech wizard start Tech practice with
+the mode the row shows; Saved layouts' Load no longer turns Break the Targets on (Start plays the course). This replaces
+rc14-eggs-D7 (b)'s single Practice games list of every game's rows.
+
 ## rc.14 sweet and sour spots (2026-11-14): decided
 
 The operator, ~17:55Z: "Can we add a sour spot and sweet spot visualization in the hitbox visualizer as a togglable
@@ -754,9 +772,9 @@ recommended option has a **green outline**. The pictures are drawn by `tools/ren
 | rc14-eggs-D5 | Eggs-ercise: the HUD | **Decided 11-14: (a)**, TR's standing notice |
 | rc14-eggs-D6 | Eggs-ercise: the CPU | **Decided 11-14: (a)**, with Hide CPU (D6.5) |
 | rc14-eggs-D6.5 | (new) Hide CPU | **Decided 11-14: a general Hide CPU**, plus a setting that hides it during a practice game (13:19Z) |
-| rc14-eggs-D7 | Eggs-ercise: the menu place | **Decided 11-14: (b)**, a new group "Practice games" |
+| rc14-eggs-D7 | Eggs-ercise: the menu place | **Decided 11-14: (b)**, a new group "Practice games"; since 11-18 one row per game, each with its sub-screen (rc.15 practice menu) |
 | rc14-eggs-D8 | Eggs-ercise: where it works | **Decided 11-14: (a)**, Training and waiting-room practice |
-| rc14-eggs-D9 | Eggs-ercise: restart | **Decided 11-14: (a) and (c)**, L+R+A and reopening the menu |
+| rc14-eggs-D9 | Eggs-ercise: restart | **Decided 11-14: (a) and (c)**, L+R+A and reopening the menu. **(c) reversed 11-18** by the rc.15 practice menu (Q1 A): only Start and Stop act; a close restarts no game, Break the Targets included |
 | OP1 | Push the held doc fixes | **Decided 11-13: A, done 11-13**: Deluxe `5f9759f`, worker A's 17 commits, the four copies reconciled |
 | OP2 | The standalone `libimgui_smash.nro` on the card | **Decided 11-13: A, removed 11-13** (`removed_verified` 11:55:06Z); the standalone updated as imgui-smash 1.2.0 |
 | OP3 | Deluxe's hidden Stages + Counterpick page | **Decided 11-14: B, keep it hidden** (11-13 had said A); the card already has it hidden |
@@ -1305,6 +1323,13 @@ a training game"). When the CPU is the target (D1), a practice game never hides 
 - **(c) Reopening the menu and closing it.**
 
 **Recommendation: (a)**, and (c) always works, also with L+R+A Reset Off. A save-state load keeps the run going.
+
+**2026-11-18: (c) is reversed** by the rc.15 practice menu (Q1 A, above): closing the menu no longer starts or
+restarts any practice game, and B leaves a running game running. Start in a game's sub-screen starts it (with the game
+running it reads Stop) and Stop ends it: these are the only places a game starts and stops. L+R+A still restarts.
+The same holds for Break the Targets, which (c) had carried too: a close no longer puts its course back to Ready or
+resets its clock. Loading a saved layout while it runs is the one other change to a running course: the Load replaces
+the course and goes back to Ready with it.
 
 ![rc14-eggs D9: L+R+A starts a fresh run, "Eggs 0   1:00"](decisions/rc14-eggs-D9-restart.png)
 

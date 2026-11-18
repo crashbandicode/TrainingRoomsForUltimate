@@ -64,23 +64,25 @@ fn eggs_rows_and_help() {
     let at = |id: &str| ROWS.iter().position(|r| r.id == id).unwrap_or_else(|| panic!("row {id}"));
     let mode = at(ROW);
     let rows = [&ROWS[mode], &ROWS[at(ROW_BREAK)], &ROWS[at(ROW_TARGET)], &ROWS[at(ROW_SPEED)], &ROWS[at(ROW_PRACTICE_CPU)]];
-    // D7 (b), the operator 2026-11-14: their own group, appended to `GROUPS` so no group index moves.
+    // D7 (b), the operator 2026-11-14: their own group, appended to `GROUPS` so no group index moves. rc.15 practice menu
+    // (2026-11-18): the Eggs-ercise sub-screen's group (`sub`), after its Start row; Practice games lists the game.
     let g = usize::from(rows[0].group);
-    assert_eq!(g + 2, GROUPS.len(), "only Tech follows the original practice group");
-    assert_eq!(GROUPS[g + 1].title, "Tech practice");
-    assert_eq!((GROUPS[g].title, GROUPS[g].page, GROUPS[g].advanced), ("Practice games", Page::FightersStages, false));
-    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).map(|r| r.id).take(5).eq([ROW, ROW_BREAK, ROW_TARGET, ROW_SPEED, ROW_PRACTICE_CPU]), "the five rows come first, in order");
+    assert_eq!((GROUPS[g].title, GROUPS[g].page, GROUPS[g].advanced, GROUPS[g].sub), ("Eggs-ercise", Page::FightersStages, false, true));
+    assert_eq!(GROUPS[usize::from(crate::model::menu::table::GAMES)].title, "Practice games");
+    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).map(|r| r.title).eq(["Start", "Eggs-ercise", "Breaks on", "Target", "Target speed", "CPU during a game"]));
+    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).skip(1).map(|r| r.id).eq([ROW, ROW_BREAK, ROW_TARGET, ROW_SPEED, ROW_PRACTICE_CPU]), "the five rows follow Start, in order");
     let values = |r: &crate::model::menu::table::Row| match r.control {
         Control::Dropdown(v) => v.to_vec(),
         _ => panic!("{} is not a dropdown", r.title),
     };
-    // SPEC V2.4 (D4 a + c) and V2.3 (D3 b: Any attack first, the default); V2.7's rows and help.
-    let modes = vec!["Off", "1 minute", "10 targets", "20 targets", "Free practice"];
+    // SPEC V2.4 (D4 a + c) and V2.3 (D3 b: Any attack first, the default); V2.7's rows and help. rc.15 (Q2 A): no Off; the
+    // stored row keeps its Off at index 0.
+    let modes = vec!["1 minute", "10 targets", "20 targets", "Free practice"];
     assert_eq!((rows[0].title, values(rows[0])), ("Eggs-ercise", modes));
     assert_eq!((rows[1].title, values(rows[1])), ("Breaks on", vec!["Any attack", "Aerials", "Hits of 12%+"]));
     assert_eq!(
         rows[0].help_lines(),
-        ("Break the targets that appear. Starts when the menu closes.", "Timed: 60 s, or break 10 or 20 fastest. Free practice: no timer.")
+        ("1 minute: break as many as you can. 10 or 20 targets: fastest.", "Free practice: no timer.")
     );
     assert_eq!(rows[1].help_lines(), ("Which of your hits break a target. Projectiles never do.", "12%+: only attacks that deal 12% or more."));
     // §2.3b's speed row, renamed by V2.2.

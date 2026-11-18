@@ -7,6 +7,10 @@ static ORIGINAL_END: AtomicUsize = AtomicUsize::new(0);
 static INSTALLED: AtomicBool = AtomicBool::new(false);
 static LOST: AtomicBool = AtomicBool::new(false);
 static WANTED: AtomicBool = AtomicBool::new(true);
+/// The runtime reads the running game through `wanted()` (rc.15 practice menu); the fixture keeps its own flag.
+fn wanted() -> bool {
+    WANTED.load(Ordering::Acquire)
+}
 static READY: AtomicBool = AtomicBool::new(true);
 static SLOTS_READY: AtomicBool = AtomicBool::new(false);
 static ARMED: AtomicU64 = AtomicU64::new(5);

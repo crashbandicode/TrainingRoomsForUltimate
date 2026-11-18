@@ -1,0 +1,160 @@
+{
+  "game_id": "01006A800016E000",
+  "start": "frontend",
+  "early_stop": false,
+  "on_failure": "continue",
+  "recover": [
+    {
+      "run": "practice_steps.py:recover",
+      "check": true
+    }
+  ],
+  "segments": {},
+  "gates": {
+    "training": {
+      "library": "training-hud-unpaused"
+    }
+  },
+  "setup": [
+    {
+      "state": "Muted frontend, stub off, trace configured with the gate diag ELF before the single game.load",
+      "via": "hook",
+      "ref": "routes:configure_boot; practice_steps.py:trace_setup"
+    },
+    {
+      "state": "Training, Battlefield, P1 Fox (a straight blaster for the projectiles row); the pre-change (c212bc50) settings.json fixture: Tech 3 minutes, Eggs 10 targets, Projectiles Off",
+      "via": "fixture",
+      "ref": "routes:pick_stage/pick_fighters/fixture; files: TrainingRooms/settings.json = eden/rc15-practice-menu/settings-c212bc50.json"
+    },
+    {
+      "state": "tr-review-astra-3 16:37Z: a Tech session survives a menu visit + B; a running games option edits apply at its next Start (Eggs mode, BTT projectiles)",
+      "via": "hook",
+      "ref": "practice_steps.py:tech_menu_visit_keeps_session, eggs_mode_applies_at_next_start, btt_projectiles_apply_at_next_start"
+    }
+  ],
+  "rows": [
+    {
+      "id": "r00-boot-training",
+      "start": "frontend",
+      "end": "training",
+      "on_failure": "stop",
+      "budget_min": 10,
+      "steps": [
+        {
+          "run": "routes:configure_boot",
+          "check": true
+        },
+        {
+          "run": "practice_steps.py:trace_setup",
+          "check": true
+        },
+        {
+          "run": "routes:load_game",
+          "check": true
+        },
+        {
+          "run": "routes:wait_lines",
+          "check": true,
+          "args": {
+            "lines": [
+              [
+                "events_log",
+                "plugin=training_rooms/.*game=13[.]0[.]5 .*result=installed heap_allocations=0"
+              ]
+            ]
+          }
+        },
+        {
+          "run": "routes:to_main",
+          "check": true
+        },
+        {
+          "run": "routes:main_to_stage",
+          "check": true
+        },
+        {
+          "run": "routes:pick_stage",
+          "check": true,
+          "args": {
+            "stage": "Battlefield"
+          }
+        },
+        {
+          "run": "routes:pick_fighters",
+          "check": true,
+          "args": {
+            "p1": "Fox"
+          }
+        },
+        {
+          "run": "routes:enter_training",
+          "check": true
+        },
+        {
+          "run": "routes:preload_clear",
+          "check": true
+        },
+        {
+          "run": "routes:fixture",
+          "check": true,
+          "args": {
+            "p1": "Fox",
+            "stage": "Battlefield",
+            "damage": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "r20-tech-menu-visit-keeps-session",
+      "start": "training",
+      "end": "training",
+      "start_gate": "training",
+      "budget_min": 6,
+      "steps": [
+        {
+          "run": "practice_steps.py:tech_menu_visit_keeps_session",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "r21-eggs-mode-applies-at-next-start",
+      "start": "training",
+      "end": "training",
+      "start_gate": "training",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "practice_steps.py:eggs_mode_applies_at_next_start",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "r22-btt-projectiles-apply-at-next-start",
+      "start": "training",
+      "end": "training",
+      "start_gate": "training",
+      "budget_min": 4,
+      "steps": [
+        {
+          "run": "practice_steps.py:btt_projectiles_apply_at_next_start",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "r09-console-scan",
+      "start": "training",
+      "end": "training",
+      "budget_min": 1,
+      "steps": [
+        {
+          "run": "practice_steps.py:console_scan",
+          "check": true
+        }
+      ]
+    }
+  ]
+}

@@ -135,18 +135,21 @@ fn run_three(s: &mut Sim, frames: u32) {
 }
 
 fn btt_rows_and_help() {
+    use crate::model::practice_games::Game;
     let at = |id: &str| ROWS.iter().position(|r| r.id == id).unwrap_or_else(|| panic!("row {id}"));
-    let (on, place, layouts) = (at(ROW), at(ROW_PLACE), at(ROW_LAYOUTS));
-    // V2.7: in Practice games, after the Eggs-ercise rows, in V2.5's order.
+    // rc.15 practice menu (Q2 A): the Off / On row is the sub-screen's Start / Stop; the `btt` key stays in the file.
+    let on = ROWS.iter().position(|r| matches!(r.control, Control::Start(Game::Btt))).expect("the Start row");
+    let (place, layouts) = (at(ROW_PLACE), at(ROW_LAYOUTS));
+    assert!(ROWS.iter().all(|r| r.id != ROW));
+    // V2.7, rc.15: the Break the Targets sub-screen, after the Eggs-ercise rows, in V2.5's order.
     let g = usize::from(ROWS[on].group);
-    assert_eq!(GROUPS[g].title, "Practice games");
+    assert_eq!((GROUPS[g].title, GROUPS[g].sub), ("Break the Targets", true));
     assert!(ROWS[place].group == ROWS[on].group && ROWS[layouts].group == ROWS[on].group);
     assert!(at(eggs::ROW_SPEED) < on && on < place && place < layouts);
-    assert_eq!((ROWS[on].title, ROWS[place].title, ROWS[layouts].title), ("Break the Targets", "Place targets", "Saved layouts"));
-    assert!(matches!(ROWS[on].control, Control::Dropdown(["Off", "On"])));
+    assert_eq!((ROWS[on].title, ROWS[place].title, ROWS[layouts].title), ("Start", "Place targets", "Saved layouts"));
     assert_eq!(
         ROWS[on].help_lines(),
-        ("Place targets, then break them all against the clock.", "Closing the menu with no targets opens the placing view.")
+        ("Closes the menu and starts Break the Targets on this stage.", "With no targets placed here, the placing view opens first.")
     );
     assert_eq!(
         ROWS[place].help_lines(),

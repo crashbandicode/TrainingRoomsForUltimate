@@ -5,45 +5,46 @@ use crate::model::tech_settings::{self, Mode};
 fn row(id: &str) -> usize { ROWS.iter().position(|r| r.id == id).unwrap() }
 fn menu() -> Menu { Menu::new(Settings::factory(), Env::default()) }
 
+/// rc.15 practice menu: the Tech practice section is the Tech practice game's sub-screen (its group, now `sub`), after its
+/// Start row and the two rows that were in Practice games; Break the Targets' sub-screen rows end before it.
 #[test]
 fn tech_rows_follow_break_the_targets() {
-    let layouts = row("btt_layouts");
-    assert_eq!(ROWS[layouts + 1].id, "tech_practice");
-    assert_eq!(ROWS[layouts + 1].page(), Page::FightersStages);
-    assert_eq!(ROWS[layouts + 2].id, "tech_wizard");
-    assert_eq!(ROWS[layouts + 2].page(), Page::FightersStages);
-    let group = GROUPS.last().unwrap();
-    assert_eq!((group.title, group.page), ("Tech practice", Page::FightersStages));
+    let start = ROWS.iter().position(|r| matches!(r.control, Control::Start(Game::Tech))).unwrap();
+    assert!(row("btt_layouts") < start, "Tech's rows follow Break the Targets'");
+    assert_eq!(ROWS[start + 1].id, "tech_practice");
+    assert_eq!(ROWS[start + 2].id, "tech_wizard");
+    let group = &GROUPS[usize::from(ROWS[start].group)];
+    assert_eq!((group.title, group.page, group.sub), ("Tech practice", Page::FightersStages, true));
     let expected = ["tech_surface", "tech_point", "tech_damage", "tech_damage_range", "tech_speed", "tech_speed_range", "tech_hit_damage", "tech_hit_damage_range", "tech_angle", "tech_angle_range", "tech_start", "tech_start_range", "tech_time", "tech_time_range", "tech_di", "tech_di_direction", "tech_facing", "tech_delay", "tech_delay_range", "tech_camera", "tech_wizard_skip"];
-    // rc15/mashout integration: Mash out's four Practice games rows follow Tech practice's rows; rc.15 Parry practice's
-    // three rows are appended after them (artifacts/rc15-parry/DESIGN.md §2.1).
-    let mash = ["mashout", "mashout_state", "mashout_attacker", "mashout_grab"];
-    let parry = ["parry_practice", "parry_saved", "parry_save"];
-    assert_eq!(&ROWS[layouts + 3..layouts + 3 + expected.len()].iter().map(|r| r.id).collect::<Vec<_>>(), &expected);
-    let after = layouts + 3 + expected.len();
-    assert_eq!(&ROWS[after..after + mash.len()].iter().map(|r| r.id).collect::<Vec<_>>(), &mash);
-    assert_eq!(&ROWS[after + mash.len()..].iter().map(|r| r.id).collect::<Vec<_>>(), &parry);
-    for r in &ROWS[layouts + 1..] { assert!(r.help.contains('\n')); }
+    let end = start + 3 + expected.len();
+    assert_eq!(&ROWS[start + 3..end].iter().map(|r| r.id).collect::<Vec<_>>(), &expected);
+    for r in &ROWS[start..end] { assert!(r.help.contains('\n') && r.group == ROWS[start].group); }
+    // Mash out's sub-screen follows (rc15/mashout-int): Start, then its three rows.
+    let mash: Vec<_> = ROWS[end..].iter().take_while(|r| r.group == table::game_group(Game::Mashout)).map(|r| (r.title, r.id)).collect();
+    assert_eq!(mash, [("Start", ""), ("State", "mashout_state"), ("Attacker move", "mashout_attacker"), ("Grab type", "mashout_grab")]);
 }
 
+/// rc.15: one practice game at a time is the running game, not the rows. Every pair of modes can be stored together, and
+/// the engines read Off for every game but the running one.
 #[test]
 fn one_practice_game_at_a_time() {
-    let ids = ["eggsercise", "btt", "tech_practice", "parry_practice"];
+    use crate::model::practice_games::effective;
+    let ids = ["eggsercise", "tech_practice"];
     for first in ids { for second in ids {
         let mut m = menu();
-        m.put_one_hot(first, 1);
-        m.put_one_hot(second, 1);
-        assert_eq!(tech_settings::practice(&m.settings.menu).iter().filter(|v| **v).count(), 1);
-        assert_eq!(tech_settings::selected(&m.settings.menu, second), 1);
+        m.put_one_hot(first, 2);
+        m.put_one_hot(second, 3);
         let committed = m.commit_onto(&Settings::factory());
-        assert_eq!(tech_settings::practice(&committed.menu).iter().filter(|v| **v).count(), 1);
+        assert_eq!(tech_settings::selected(&committed.menu, second), 3);
+        assert_eq!(tech_settings::selected(&committed.menu, first), if first == second { 3 } else { 2 });
     } }
+    for active in [Some(Game::Eggs), Some(Game::Tech), Some(Game::Btt), None] {
+        let on = [Game::Eggs, Game::Btt, Game::Tech].map(|g| effective(g, 2, active) != 0);
+        assert_eq!(on.iter().filter(|v| **v).count(), usize::from(active.is_some()));
+    }
     let mut m = menu();
     m.cycle(row("tech_practice"), true);
-    assert_eq!(tech_settings::read(&m.settings.menu).session, 1);
-    m.put("tech_practice", &[0,0,0,0,0,1]);
-    m.put("btt", &[0,1]);
-    assert_eq!(tech_settings::read(&m.settings.menu).session, 0);
+    assert_eq!(tech_settings::read(&m.settings.menu).session, 2, "Right from 20 attempts is 10 attempts");
 }
 
 #[test]
@@ -52,31 +53,31 @@ fn tech_point_closes_into_surface_picker() {
     m.put_one_hot("eggsercise", 1);
     m.activate(row("tech_point"));
     assert!(m.is_closed());
-    assert_eq!(tech_settings::practice(&m.settings.menu), [false, false, true, false]);
     assert_eq!(tech_settings::read(&m.settings.menu).surface, 4);
-    assert_eq!(tech_settings::read(&m.settings.menu).session, 1);
+    assert_eq!(tech_settings::read(&m.settings.menu).session, 0, "the stored mode is left: a stored Off runs 20 attempts");
+    assert_eq!(tech_settings::selected(&m.settings.menu, "eggsercise"), 1, "no other game's row is touched");
     let out=m.take_outbox();
-    assert!(out.tech_point);
+    assert!(out.tech_point && out.start == Some(Game::Tech));
     assert!(!out.tech_wizard);
     assert!(!m.take_outbox().tech_point);
 }
 
+/// rc.15: the wizard runs the mode the Tech practice row shows (a stored Off is 20 attempts); it starts Tech practice, so
+/// the other games stop. It no longer turns a stored Off into 10 attempts.
 #[test]
-fn tech_wizard_off_starts_ten_attempts_and_excludes_other_games() {
-    for game in ["eggsercise", "btt"] {
-        let mut m=menu();
-        m.put_one_hot(game,1);
+fn tech_wizard_runs_the_shown_mode_and_starts_tech() {
+    for running in [Game::Eggs, Game::Btt] {
+        let mut m=Menu::new(Settings::factory(), Env { running: Some(running), ..Env::default() });
         m.activate(row("tech_wizard"));
         assert!(m.is_closed());
         let effective=tech_settings::read(&m.settings.menu);
-        assert_eq!((effective.session,effective.surface),(2,4));
-        assert_eq!(tech_settings::practice(&m.settings.menu),[false,false,true,false]);
+        assert_eq!((effective.session,effective.surface),(0,4));
         let out=m.take_outbox();
-        assert!(out.tech_wizard && out.changed);
+        assert!(out.tech_wizard && out.changed && out.start == Some(Game::Tech));
         assert!(!out.tech_point && !out.place_targets);
         assert!(!m.take_outbox().tech_wizard);
         let committed=m.commit_onto(&Settings::factory());
-        assert_eq!(tech_settings::read(&committed.menu).session,2);
+        assert_eq!(tech_settings::read(&committed.menu).session,0);
         assert_eq!(tech_settings::read(&committed.menu).surface,4);
     }
 }
@@ -161,11 +162,14 @@ fn tech_set_random_auto_controls_ranges() {
     assert_eq!(m.grey(row("tech_di_direction")),None);
 }
 
+/// rc.15: a file with several games "on" (from before the practice menu) loads as it is, current and defaults: the rows
+/// are modes now, so nothing is normalised away.
 #[test]
-fn tech_file_conflicts_normalize_current_and_defaults() {
+fn tech_file_conflicts_load_as_they_are() {
     let loaded=settings::parse(r#"{"menu":{"eggsercise":[0,1,0,0,0],"btt":[0,1],"tech_practice":[0,1,0,0,0,0]},"defaults_menu":{"btt":[0,1],"tech_practice":[0,0,0,0,0,1]}}"#);
-    assert_eq!(tech_settings::practice(&loaded.settings.menu),[true,false,false,false]);
-    assert_eq!(tech_settings::practice(&loaded.settings.defaults),[false,true,false,false]);
+    let s=&loaded.settings;
+    assert_eq!((s.menu.get("eggsercise"),s.menu.get("btt"),s.menu.get("tech_practice")),(Some(&[0,1,0,0,0][..]),Some(&[0,1][..]),Some(&[0,1,0,0,0,0][..])));
+    assert_eq!((s.defaults.get("btt"),s.defaults.get("tech_practice")),(Some(&[0,1][..]),Some(&[0,0,0,0,0,1][..])));
 }
 #[test]
 fn tech_slider_edits_and_draws_public_units() {

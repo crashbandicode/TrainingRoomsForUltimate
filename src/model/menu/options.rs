@@ -41,7 +41,9 @@ pub static HITBOX_ITEMS: [&str; 6] = ["Hitboxes", "Grab boxes", "Hurtboxes", "La
 pub static COMBO_TOLERANCE: [&str; 3] = ["Exact", "1 frame", "2 frames"];
 pub static COMBO_AFTER: [&str; 2] = ["Keep playing", "Load save state"];
 const FREE: &str = "Free practice";
-pub static EGGSERCISE: [&str; 5] = ["Off", "1 minute", "10 targets", "20 targets", FREE];
+/// rc.15 practice menu: the game modes have no Off (Start / Stop is the switch). The stored row keeps its Off at index 0
+/// (`practice_games::retired`), so these labels are the stored options from index 1.
+pub static EGGSERCISE: [&str; 4] = ["1 minute", "10 targets", "20 targets", FREE];
 pub static EGGS_BREAK: [&str; 3] = ["Any attack", "Aerials", "Hits of 12%+"];
 pub static EGGS_SPEED: [&str; 3] = ["Normal", "Slow", "Fast"];
 pub static EGGS_TARGET: [&str; 2] = ["Disc", "CPU"];
@@ -104,10 +106,11 @@ pub static CHORD_ROWS: [(&str, &str); 10] = [
     ("Game speed", "game_speed"),
 ];
 
-/// Stage tech practicer choices (DESIGN §5/7).
-/// rc.15 Parry practice: sets of ten with a summary, or a running total only.
+/// Parry practice runs sets of ten or keeps a total.
 pub static PARRY_SESSION: [&str; 3] = ["Off", "10 attempts", "Free practice"];
-pub static TECH_SESSION: [&str; 6] = ["Off", "20 attempts", "10 attempts", "1 minute", "3 minutes", "Free practice"];
+
+/// Stage tech practicer choices (DESIGN §5/7).
+pub static TECH_SESSION: [&str; 5] = ["20 attempts", "10 attempts", "1 minute", "3 minutes", "Free practice"];
 pub static TECH_SURFACE: [&str; 5] = ["Any", "Floor", "Wall", "Ceiling (underside)", "Chosen point"];
 pub static TECH_MODE: [&str; 2] = ["Set", "Random"];
 pub static TECH_AUTO_MODE: [&str; 3] = ["Auto (approximate)", "Set", "Random"];

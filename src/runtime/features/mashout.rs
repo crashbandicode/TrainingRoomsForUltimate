@@ -13,6 +13,7 @@ use crate::model::mashout::{
     moves::{Config, Scenario},
     native::Clock,
 };
+use crate::model::practice_games::Game as PracticeGame;
 use crate::model::sites_mashout::{self, TROLLEY_FLOOR_RAY, TROLLEY_FLOOR_RAY_IMPL};
 use crate::model::{
     input_delay::MappedInputs,
@@ -86,7 +87,6 @@ const NOTICE_ID: u8 = 0x30;
 const EGG_CLOSE_FRAMES: u8 = 60;
 static READY: AtomicBool = AtomicBool::new(false);
 static SLOTS_READY: AtomicBool = AtomicBool::new(false);
-static WANTED: AtomicBool = AtomicBool::new(false);
 static CONFIG: Published<Option<Config>> = Published::new(None);
 static START: AtomicBool = AtomicBool::new(false);
 static GENERATION: AtomicU64 = AtomicU64::new(0);
@@ -131,12 +131,13 @@ fn admission() -> Admission {
     Admission::new(READY.load(Ordering::Acquire) && SLOTS_READY.load(Ordering::Acquire))
 }
 
+/// rc.15 practice menu: Mash out runs while it is the running game (Start to Stop), no longer while its row is On.
+fn wanted() -> bool {
+    super::practice::is(PracticeGame::Mashout)
+}
+
 pub fn publish(rows: &Snapshot) {
     CONFIG.publish(Config::from_snapshot(rows));
-    WANTED.store(
-        crate::model::practice_games::is_on(rows, "mashout"),
-        Ordering::Release,
-    );
 }
 pub fn start() {
     START.store(true, Ordering::Release);
@@ -796,7 +797,9 @@ pub unsafe fn frame(fighter: usize) {
     };
     // Disabling restores the native slots immediately, but must still restore the
     // temporary CPU through the existing frame path.
-    if WANTED.load(Ordering::Acquire) && !SLOTS_READY.load(Ordering::Acquire) {
+    // rc.15 practice menu: Mash out runs while it is the running game (Start and Stop), no longer while its row is On.
+    let wanted = wanted();
+    if wanted && !SLOTS_READY.load(Ordering::Acquire) {
         revoke();
         OWN_CPU.store(0, Ordering::Release);
         return;
@@ -839,8 +842,12 @@ pub unsafe fn frame(fighter: usize) {
         OWN_CPU.store(0, Ordering::Release);
         return;
     }
-    let config = CONFIG.read().filter(|_| WANTED.load(Ordering::Acquire));
-    let restart = START.swap(false, Ordering::AcqRel) || game.config != config;
+    // A running game's settings apply at its next Start: the run keeps the config its Start latched; Stop (no longer the
+    // running game) ends it.
+    let published = CONFIG.read().filter(|_| wanted);
+    let start = START.swap(false, Ordering::AcqRel);
+    let config = if start || published.is_none() || game.config.is_none() { published } else { game.config };
+    let restart = start || game.config != config;
     let status = natives::status_kind(p1);
     let scored = holding(game.requested, status)
         || game.requested.is_some_and(|r| {

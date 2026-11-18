@@ -566,12 +566,8 @@ pub fn parse(text: &str) -> Loaded {
     for key in &top.others.duplicates {
         issues.push(Issue { at: key.clone(), reason: Reason::DuplicateKey });
     }
-    let mut menu = snapshot_from("menu", top.menu, &mut issues);
-    let mut defaults = snapshot_from("defaults_menu", top.defaults, &mut issues);
-    // Restored snapshots have no edit order: keep the first active registered practice game.
-    for rows in [&mut menu, &mut defaults] {
-        super::practice_games::normalize(rows);
-    }
+    let menu = snapshot_from("menu", top.menu, &mut issues);
+    let defaults = snapshot_from("defaults_menu", top.defaults, &mut issues);
     let mut extra = Map::new();
     for (key, value) in top.others.items {
         if !RETIRED.contains(&key.as_str()) {

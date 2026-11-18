@@ -243,13 +243,6 @@ pub fn list_footer(rows: &[(String, Layout)], cursor: usize, skipped: usize) -> 
     format!("{first}\nA open   B back{note}")
 }
 
-/// Whether `[Eggs-ercise, Break the Targets]` are the effective practice game. The shared registry
-/// resolves conflicting snapshots, preserving Eggs-ercise's precedence over Break the Targets.
-pub fn on(rows: &super::settings::Snapshot) -> [bool; 2] {
-    let active = super::practice_games::active(rows);
-    ["eggsercise", ROW].map(|id| active == Some(id))
-}
-
 /// Only P1's owned pool and ArticleModule supply objects; Off performs no discovery or hit reads.
 pub fn projectile_breaks(
     enabled: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,

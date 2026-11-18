@@ -7,7 +7,7 @@
 use core::fmt::{self, Write};
 use super::recording_menu::{Face, Floppy, RecordingScreens};
 
-use super::menu::table::{Control, Editor, Info, Row, GROUPS, ROWS};
+use super::menu::table::{Control, Editor, Info, GROUPS, ROWS};
 use super::menu::{group_of, Entry, Grey, Menu, RowValue, LOOP_ROW};
 use super::panes::{text_width, GROUPS as GROUP_LINES, ROWS as ROW_LINES, TABS};
 
@@ -522,6 +522,7 @@ pub fn write_value(menu: &Menu, row: usize, out: &mut Text<72>) {
                 Control::Info(Info::PilotControl) => out.write_str("CPU pilot plugin"),
                 Control::Editor(Editor::ComboTarget) => named(out, menu.env().combo_target.as_str()),
                 Control::Editor(Editor::ComboName) => named(out, menu.env().combo_draft.as_str()),
+                Control::Game(game) | Control::Start(game) if menu.running() == Some(game) => out.write_str("Running  >"),
                 _ => out.write_str(">"),
             };
         }
@@ -535,10 +536,70 @@ fn value_tone(menu: &Menu, row: usize) -> Tone {
     if menu.grey(row).is_some() {
         return Tone::Off;
     }
-    match menu.value(row) {
-        RowValue::Toggle(true) => Tone::On,
-        RowValue::Toggle(false) => Tone::Off,
+    match (menu.value(row), ROWS[row].control) {
+        (RowValue::Toggle(true), _) => Tone::On,
+        (RowValue::Toggle(false), _) => Tone::Off,
+        // rc.15 practice menu: "Running" in green.
+        (_, Control::Game(game) | Control::Start(game)) if menu.running() == Some(game) => Tone::On,
         _ => Tone::Normal,
+    }
+}
+
+/// A row's label: its title, except that a game's Start row reads Stop while that game runs.
+pub fn row_title(menu: &Menu, row: usize) -> &'static str {
+    match ROWS[row].control {
+        Control::Start(game) if menu.running() == Some(game) => "Stop",
+        _ => ROWS[row].title,
+    }
+}
+
+/// The two help lines of a row: its own, the running game's for a game's rows while it runs, and a greyed row's reason
+/// on the second line.
+fn write_help(menu: &Menu, row: usize, help: &mut [Text<160>; 2]) {
+    help.iter_mut().for_each(Text::clear);
+    let r = &ROWS[row];
+    let _ = match r.control {
+        Control::Game(game) if menu.running() == Some(game) => {
+            write!(help[0], "{} is running. A opens it to stop it or change it.", game.title())
+                .and_then(|()| help[1].write_str("Closing the menu (B) leaves it running."))
+        }
+        Control::Start(game) if menu.running() == Some(game) => {
+            write!(help[0], "{} is running. A stops it, and the row reads Start.", game.title())
+                .and_then(|()| help[1].write_str("Changed settings apply at the next Start. B leaves it running."))
+        }
+        _ => {
+            let (one, two) = r.help_lines();
+            help[0].write_str(one).and_then(|()| help[1].write_str(two))
+        }
+    };
+    if let Some(grey) = menu.grey(row) {
+        help[1].clear();
+        let _ = help[1].write_str(Grey::text(grey));
+    }
+}
+
+/// One row of a list of rows, as the page and a game's sub-screen draw it.
+fn row_line(menu: &Menu, row: usize, line: &mut RowLine) {
+    let _ = line.label.write_str(row_title(menu, row));
+    if ROWS[row].advanced {
+        let _ = line.label.write_str("  (advanced)");
+    }
+    write_value(menu, row, &mut line.value);
+    line.value_tone = value_tone(menu, row);
+    line.label_tone = if menu.grey(row).is_some() { Tone::Off } else { Tone::Normal };
+}
+
+/// The rows of a game's sub-screen (`Screen::Rows`): the focused one is `cursor`. The help panel is that row's.
+pub(crate) fn rows_lines(menu: &Menu, group: u8, cursor: usize, frame: &mut Frame) {
+    let total = menu.sub_rows(group).count();
+    let first = super::screens::window_start(cursor, total);
+    for (slot, row) in menu.sub_rows(group).skip(first).take(ROW_LINES).enumerate() {
+        row_line(menu, row, &mut frame.rows[slot]);
+        frame.row_count += 1;
+    }
+    frame.focus = Some((cursor.saturating_sub(first)) as u8);
+    if let Some(row) = menu.sub_rows(group).nth(cursor) {
+        write_help(menu, row, &mut frame.help);
     }
 }
 
@@ -631,16 +692,7 @@ pub fn page_frame(menu: &Menu, frame: &mut Frame) {
                 let _ = write!(line.label, "{marker} {} (advanced)", GROUPS[*g].title);
                 line.label_tone = Tone::Dim;
             }
-            Some(Entry::Row(r)) => {
-                let row: &Row = &ROWS[*r];
-                let _ = line.label.write_str(row.title);
-                if row.advanced {
-                    let _ = line.label.write_str("  (advanced)");
-                }
-                write_value(menu, *r, &mut line.value);
-                line.value_tone = value_tone(menu, *r);
-                line.label_tone = if menu.grey(*r).is_some() { Tone::Off } else { Tone::Normal };
-            }
+            Some(Entry::Row(r)) => row_line(menu, *r, line),
             Some(Entry::ResetPage(_)) => {
                 let _ = line.label.write_str(RESET_LABEL);
                 let _ = line.value.write_str(">");
@@ -651,16 +703,8 @@ pub fn page_frame(menu: &Menu, frame: &mut Frame) {
     }
     frame.focus = focus_line.map(|f| (f - first) as u8);
 
-    match menu.help_row() {
-        Some(row) => {
-            let (one, two) = row.help_lines();
-            let _ = frame.help[0].write_str(one);
-            let _ = frame.help[1].write_str(two);
-            if let Some(grey) = menu.focused_row().and_then(|r| menu.grey(r)) {
-                frame.help[1].clear();
-                let _ = frame.help[1].write_str(Grey::text(grey));
-            }
-        }
+    match menu.focused_row() {
+        Some(row) => write_help(menu, row, &mut frame.help),
         None if matches!(menu.focus(), Some(Entry::ResetPage(_))) => {
             let _ = frame.help[0].write_str("Puts every setting of this page back to your saved defaults (X saves them).");
             let _ = frame.help[1].write_str("A asks first. On Fighters & Stages, both fighter picks reset and load on close.");

@@ -108,7 +108,7 @@ fn show(worker: &mut Worker, text: &str) {
 pub(super) fn service() {
     // Worker-only lock; no hook ever takes WORKER or a Session reference.
     let mut worker = WORKER.lock();
-    let wanted = WANTED.load(Ordering::Acquire);
+    let wanted = wanted();
     if !wanted {
         worker.session.cancel();
         EVENTS.drain(|_| ());

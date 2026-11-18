@@ -71,6 +71,23 @@ fn goto(m: &mut Menu, key: &str) -> usize {
     }
     assert_eq!(m.page(), page, "page of {key} is in the ring");
     let g = usize::from(ROWS[r].group);
+    // rc.15 practice menu: a game's rows live in its sub-screen; open it from its Practice games row.
+    if GROUPS[g].sub {
+        let game = model::menu::table::Game::ALL.into_iter()
+            .find(|game| usize::from(model::menu::table::game_group(*game)) == g).expect("the sub-screen's game");
+        let list = ROWS.iter().position(|row| matches!(row.control, Control::Game(x) if x == game)).expect("its list row");
+        if m.screen().is_none() {
+            goto_entry(m, Entry::Row(list));
+            m.press(Button::A);
+        }
+        for _ in 0..ROWS.len() {
+            if m.help_row().is_some_and(|row| std::ptr::eq(row, &ROWS[r])) {
+                return r;
+            }
+            m.press(Button::Down);
+        }
+        panic!("could not focus {key} in its sub-screen");
+    }
     if !m.group_is_open(g) {
         goto_entry(m, Entry::Group(g));
         m.press(Button::A);
@@ -167,13 +184,14 @@ fn layout_row_counts_match_the_rc_freeze() {
     // rc.14 SL4: the Setup library group gained Save setup here (10 → 11).
     // rc.14: Display & Controls gained Frame data colours and Spot labels, Recording gained Match sweet/sour spot (the operator, 2026-11-14,
     // SP1 to SP5; 11 → 13 and 12 → 13). rc.14 hb-legend: Frame data colours and Launch angles became items of the Hitbox Visualization checklist (13 → 12).
-    // rc.15 Mash out adds its toggle, state, attacker and ordinary grab type to Practice games, and Tech practice
-    // its session row and variable/editor rows (DESIGN §7). rc.15 Parry practice adds Parry practice and its two
-    // saved-practice rows (the operator approved DESIGN rev 2, 2026-11-17 18:15Z): 56 + 4 + 3 = 63.
-    assert_eq!(counts(false), [34, 11, 13, 63, 12, 3]);
-    assert_eq!(counts(true), [33, 11, 13, 63, 12, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 133);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 132);
+    // rc.15 practice menu (the operator's approval of the mockup, 2026-11-18 ~14:58Z): Practice games is one row per game
+    // (3), each game's sub-screen starts with Start (3), CPU during a game is a row of two sub-screens (1), and the Break
+    // the Targets Off / On row is Start / Stop now (-1): 56 → 62. The sub-screen rows stay rows of Fighters & Stages.
+    // Mash out (rc15/mashout-int) joins as the fourth game: its list row, Start and three rows (its Off / On row is Start / Stop): 62 → 67.
+    assert_eq!(counts(false), [34, 11, 13, 70, 12, 3]);
+    assert_eq!(counts(true), [33, 11, 13, 70, 12, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 140);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 139);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 5);
@@ -185,9 +203,11 @@ fn layout_row_counts_match_the_rc_freeze() {
     // (104: Lobby Items, Phase 2 N11; 105: Ready Hats, P-HOT; rc.6: CPU Level; rc.13: Aerial Drift, Taunts; rc.14: Hide CPU and the
     // seven Practice games rows; Save setup here; two spots rows.)
     // rc.15 DESIGN §7: session row and twenty variable/editor rows follow BTT.
-    // The free-form wizard and its optional preview setting add two rows; Mash out adds four; rc.15 Parry practice
-    // adds three (artifacts/rc15-parry/DESIGN.md §2.1).
-    assert_eq!(ROWS.len(), 137);
+    // The free-form wizard and its optional preview setting add two rows.
+    // rc.15 practice menu: three game rows, three Start rows and a second CPU during a game row, less the btt row (130 → 136).
+    // Mash out: its list row, Start and three rows (136 → 141).
+    // Parry keeps its three controls as a separate group.
+    assert_eq!(ROWS.len(), 144);
     for editor in [Editor::SetupSave, Editor::SetupSaveHere, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }
@@ -205,9 +225,11 @@ fn layout_row_counts_match_the_rc_freeze() {
         assert!(ROWS.iter().any(|r| usize::from(r.group) == g), "{}", group.title);
     }
     assert!(ROWS.iter().all(|r| usize::from(r.group) < GROUPS.len()));
-    // Appended groups (rc.6 Level, rc.14 Practice games): the earlier indices hold.
+    // Appended groups (rc.6 Level, rc.14 Practice games, rc.15 the Eggs-ercise and Break the Targets sub-screens): the
+    // earlier indices hold.
     let titles: Vec<&str> = GROUPS.iter().map(|g| g.title).collect();
-    assert_eq!((titles.len(), titles[13], titles[19], titles[20]), (22, "Extras", "Level", "Practice games"));
+    assert_eq!((titles.len(), titles[13], titles[19], titles[20], titles[25]), (26, "Extras", "Level", "Practice games", "Parry practice"));
+    assert_eq!(&titles[21..25], ["Tech practice", "Eggs-ercise", "Break the Targets", "Mash out"]);
     for pilot_present in [false, true] {
         let m = menu_with(Env { pilot_present, ..Env::default() });
         assert!((0..m.entry_count(Page::Saves)).any(|i| m.entry(Page::Saves, i) == Some(Entry::Group(7))), "the Setup library section shows");
@@ -1071,14 +1093,15 @@ fn filtered_menu_counts_cycles_and_renders() {
         assert_eq!(String::from_utf16(frame.rows[0].value.units()).unwrap(), "(current)");
         press(&mut m, &[Button::Up, Button::A]);
         assert_eq!(m.value(attacker), RowValue::Choice(Some(count - 1)));
-        assert!(matches!(m.focus(), Some(Entry::Row(row)) if row == attacker));
+        // rc.15 practice menu: the row is focused in Mash out's sub-screen, not on the page.
+        assert!(m.help_row().is_some_and(|row| std::ptr::eq(row, &ROWS[attacker])));
         m.press(Button::Right);
         assert_eq!(m.value(attacker), RowValue::Choice(Some(0)));
         for _ in 0..offered {
             let resolved = Config::from_snapshot(&m.settings().menu).unwrap().resolve(0, 0).unwrap();
             if state != 5 { assert_eq!(resolved.state, State::ALL[state]); }
             m.press(Button::Right);
-            assert_eq!(m.focus(), Some(Entry::Row(attacker)));
+            assert!(m.help_row().is_some_and(|row| std::ptr::eq(row, &ROWS[attacker])));
         }
         assert_eq!(m.value(attacker), RowValue::Choice(Some(0)));
     }

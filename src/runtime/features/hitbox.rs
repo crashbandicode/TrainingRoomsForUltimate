@@ -42,6 +42,7 @@ use crate::model::panes::EggLook;
 use crate::model::hitbox_orbs::{self as orbs, Board, Orb, OrbSink};
 use crate::model::install_line::{SiteReport, Written};
 use crate::model::legend;
+use crate::model::practice_games::{self, Game};
 use crate::model::scene::Scene;
 use crate::model::settings::Snapshot;
 use crate::model::sites_hitbox;
@@ -97,22 +98,39 @@ pub fn publish(snapshot: &Snapshot) {
 // The rows reach the game thread as atomics (a publish runs on a plugin thread); the run is game-thread state, read by the
 // layout tick for the egg's orb like `BOARD`.
 
-/// The rows (`eggs::choices`, little-endian).
+/// The rows (`eggs::choices`, little-endian), as every settings publish leaves them.
 static EGG_ROWS: AtomicU32 = AtomicU32::new(0);
+/// The rows of the run: latched when a Start reaches the pass (rc.15 practice menu: a running game's settings apply at
+/// its next Start). The run and its Breaks on rule read these.
+static EGG_LIVE: AtomicU32 = AtomicU32::new(0);
 /// CPU during a game: Hide (the first option).
 static PRACTICE_HIDE: AtomicBool = AtomicBool::new(true);
-/// The menu closed: the next pass starts a run if the row is on (D9: reopening the menu restarts it).
+/// CPU during a game for the running game, latched by its Start.
+static PRACTICE_HIDE_RUN: AtomicBool = AtomicBool::new(true);
+/// Start (rc.15 practice menu; D9 (c) is reversed: a close no longer restarts it): the next pass starts a run.
 static EGG_START: AtomicBool = AtomicBool::new(false);
 static RUN: Mutex<eggs::Run> = Mutex::new(eggs::Run::IDLE);
+/// The run is armed (`Run::running`), for the menu worker, which never takes `RUN`.
+static EGG_RUNNING: AtomicBool = AtomicBool::new(false);
 
 fn seed() -> u32 {
     // SAFETY: `GetSystemTick` has no preconditions.
     unsafe { skyline::nn::os::GetSystemTick() as u32 }
 }
 
-/// The menu closed (the menu worker; an atomic only).
+/// Start (the menu worker, `practice::start`; an atomic only).
 pub fn eggs_start() {
     EGG_START.store(true, Ordering::Release);
+}
+
+/// Any practice game's Start (the menu worker; atomics only): CPU during a game is the one the menu showed at the Start.
+pub fn practice_started() {
+    PRACTICE_HIDE_RUN.store(PRACTICE_HIDE.load(Ordering::Acquire), Ordering::Release);
+}
+
+/// An Eggs-ercise run is armed, or a Start is on its way to the next pass (the menu worker; atomics only).
+pub fn eggs_running() -> bool {
+    EGG_RUNNING.load(Ordering::Acquire) || EGG_START.load(Ordering::Acquire)
 }
 
 /// The reset hub ran (L+R+A, Change Stage): an armed run starts over. Game thread.
@@ -125,7 +143,12 @@ pub fn eggs_reset() {
 /// other fighter make no game call.
 unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     let seed = EGG_START.swap(false, Ordering::AcqRel).then(seed);
-    let rows = EGG_ROWS.load(Ordering::Acquire).to_le_bytes();
+    if seed.is_some() {
+        EGG_LIVE.store(EGG_ROWS.load(Ordering::Acquire), Ordering::Release);
+    }
+    let mut rows = EGG_LIVE.load(Ordering::Acquire).to_le_bytes();
+    // rc.15 practice menu: the mode while Eggs-ercise is the running game, Off otherwise.
+    rows[0] = practice_games::effective(Game::Eggs, rows[0], super::practice::active());
     // The fighter object's own entry field, as the reset hub reads it: not a game call.
     let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
     let mut run = RUN.lock();
@@ -133,7 +156,8 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     // V2.6: the CPU is hidden while a practice game runs and `CPU during a game` says Hide, unless it is the target
     // (`eggs::hides_cpu`). The CPU's body, its tag and its panel follow this one request (`cpu::hide::step`).
     let running = run.running();
-    super::hide_cpu::hide(super::tech::running() || eggs::hides_cpu(PRACTICE_HIDE.load(Ordering::Acquire), running, run.cpu_target(), btt::running()));
+    EGG_RUNNING.store(running, Ordering::Release);
+    super::hide_cpu::hide(super::tech::running() || eggs::hides_cpu(PRACTICE_HIDE_RUN.load(Ordering::Acquire), running, run.cpu_target(), btt::running()));
     if plan == eggs::Plan::Clear {
         super::notices::clear(NOTICE_ID);
     }
@@ -1416,4 +1440,4 @@ mod stats {
 
 }
 
-pub(crate) fn egg_rule() -> u8 { EGG_ROWS.load(Ordering::Acquire).to_le_bytes()[1] }
+pub(crate) fn egg_rule() -> u8 { EGG_LIVE.load(Ordering::Acquire).to_le_bytes()[1] }

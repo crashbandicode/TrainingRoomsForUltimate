@@ -34,6 +34,10 @@ static STATE: Mutex<State> = Mutex::new(State { detector: Detector::new(), view:
 /// Every settings publish.
 pub fn publish(snapshot: &Snapshot) {
     let session = crate::model::tech_settings::selected(snapshot, "parry_practice").min(2) as u8;
+    // The legacy Parry session choice still selects the only running practice.
+    if session != 0 && super::practice::active().is_some() {
+        super::practice::stop();
+    }
     SESSION.store(session, Ordering::Release);
     crate::engine::rr_host::set_parry(session != 0);
 }

@@ -1,38 +1,71 @@
-//! Practice-game identity, bounded results and restored-settings precedence. The menu's last On choice wins;
-//! snapshots without edit history keep the first enabled row in this registry.
+//! rc.15 practice menu (`docs/DECISIONS.md`, "rc.15 practice menu", 2026-11-18): the practice games of Fighters & Stages ›
+//! Practice games, each with its own sub-screen and Start first. Which game runs is not a setting: Start and Stop are menu
+//! actions, and the runtime keeps the one running game (`runtime::features::practice`). A game's settings row holds only
+//! its mode now; the key and the stored length are unchanged, and the Off an older file stored reads as the first mode.
+//! Also the games' bounded results (`best_time`, `record_time`, `result_tick`).
 
-use super::settings::Snapshot;
-
-/// Register each practice game's settings row here once. `stage_tech` is the reserved Stage tech
-/// integration key; this reservation creates no settings/menu row. Keep Eggs-ercise before BTT
-/// to preserve existing hand-edited-file precedence.
-pub const ROWS: &[&str] = &["eggsercise", "btt", "tech_practice", "mashout", "parry_practice", "stage_tech"];
-
-fn enabled(rows: &Snapshot, id: &str) -> bool {
-    rows.get(id).is_some_and(|row| row.iter().skip(1).any(|value| *value != 0))
+/// The practice games, in the order of the Practice games list.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Game {
+    Eggs,
+    Btt,
+    Tech,
+    Mashout,
 }
 
-/// The effective game, including for directly constructed conflicting snapshots. Missing and
-/// Off-only rows do not participate. No allocation: runtime publication can use this.
-pub fn active(rows: &Snapshot) -> Option<&'static str> {
-    ROWS.iter().copied().find(|id| enabled(rows, id))
-}
+impl Game {
+    pub const ALL: [Game; 4] = [Game::Eggs, Game::Btt, Game::Tech, Game::Mashout];
 
-/// Whether this registered game is the effective winner, rather than merely stored as On.
-pub fn is_on(rows: &Snapshot, id: &str) -> bool {
-    active(rows) == Some(id)
-}
-
-/// Normalize restored settings, preserving the winning option and unrelated rows. Unknown
-/// future rows stay untouched until their settings definition exists.
-pub fn normalize(rows: &mut Snapshot) {
-    let winner = active(rows);
-    for &id in ROWS {
-        if Some(id) != winner && enabled(rows, id) {
-            let mut off = vec![0; rows.get(id).map_or(0, <[u8]>::len)];
-            off[0] = 1;
-            let _ = rows.set(id, &off);
+    pub const fn title(self) -> &'static str {
+        match self {
+            Game::Eggs => "Eggs-ercise",
+            Game::Btt => "Break the Targets",
+            Game::Tech => "Tech practice",
+            Game::Mashout => "Mash out",
         }
+    }
+
+    /// The game in an atomic: 0 is none.
+    pub const fn code(self) -> u8 {
+        self as u8 + 1
+    }
+
+    pub fn from_code(code: u8) -> Option<Game> {
+        Game::ALL.into_iter().find(|game| game.code() == code)
+    }
+
+    /// The settings row of the game's mode, whose option 0 is the Off older files stored. Break the Targets and Mash out
+    /// have none: their Off / On rows are Start / Stop now, and their `btt` / `mashout` keys stay in the file unread.
+    pub const fn mode_row(self) -> Option<&'static str> {
+        match self {
+            Game::Eggs => Some("eggsercise"),
+            Game::Btt | Game::Mashout => None,
+            Game::Tech => Some("tech_practice"),
+        }
+    }
+}
+
+/// How many stored options of row `id` come before the ones the menu lists: 1 for a game's mode (its retired Off).
+pub fn retired(id: &str) -> usize {
+    usize::from(Game::ALL.iter().any(|game| game.mode_row() == Some(id)))
+}
+
+/// The mode a game runs with, from its row's stored option: an older file's Off (0) is the first mode.
+pub const fn mode(stored: u8) -> u8 {
+    if stored == 0 {
+        1
+    } else {
+        stored
+    }
+}
+
+/// What a game's engine reads as its mode now: its mode while it is the running game (`active`), Off (0) for every other
+/// game. One value names the running game, so one game runs at a time.
+pub fn effective(game: Game, stored: u8, active: Option<Game>) -> u8 {
+    if active == Some(game) {
+        mode(stored)
+    } else {
+        0
     }
 }
 
@@ -64,88 +97,52 @@ pub fn result_tick(left: &mut u16, tick: bool) -> bool {
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
-        use super::*;
-        use crate::model::{btt, settings::{self, Settings}};
+    use super::*;
 
-        #[test]
-        fn registry_covers_six_games() {
-            assert_eq!(ROWS, &["eggsercise", "btt", "tech_practice", "mashout", "parry_practice", "stage_tech"]);
-            for (index, id) in ROWS.iter().enumerate() {
-                assert!(!ROWS[index + 1..].contains(id));
+    #[test]
+    fn one_game_runs_at_a_time() {
+        let mut every = vec![None];
+        every.extend(Game::ALL.map(Some));
+        for active in every {
+            for stored in 0..6 {
+                let on: Vec<Game> = Game::ALL.into_iter().filter(|g| effective(*g, stored, active) != 0).collect();
+                assert_eq!(on, active.into_iter().collect::<Vec<_>>(), "active {active:?} stored {stored}");
             }
         }
-
-        #[test]
-        fn effective_reads_resolve_direct_snapshot_conflicts() {
-            let mut rows = Snapshot::factory();
-            assert_eq!(active(&rows), None);
-            assert!(!is_on(&rows, "not_a_game"));
-            rows.set("btt", &[0, 1]).unwrap();
-            assert_eq!(btt::on(&rows), [false, true]);
-            rows.set("eggsercise", &[0, 0, 0, 0, 1]).unwrap();
-            assert_eq!(active(&rows), Some("eggsercise"));
-            assert_eq!(btt::on(&rows), [true, false]);
-            assert!(!is_on(&rows, "btt"));
-            normalize(&mut rows);
-            assert_eq!(rows.get("eggsercise"), Some(&[0, 0, 0, 0, 1][..]));
-            assert_eq!(rows.get("btt"), Some(&[1, 0][..]));
-            let once = rows.clone();
-            normalize(&mut rows);
-            assert_eq!(rows, once);
+        for game in Game::ALL {
+            assert_eq!(Game::from_code(game.code()), Some(game));
         }
+        assert_eq!(Game::from_code(0), None);
+    }
 
-        #[test]
-        fn restored_conflicts_follow_registry_order() {
-            // Reserved keys join these real parse/serialize probes once their settings row lands.
-            let known: Vec<_> = ROWS.iter().copied().filter(|id| settings::def(id).is_some()).collect();
-            for (index, &first) in known.iter().enumerate() {
-                for &second in &known[index + 1..] {
-                    let mut dirty = Settings::factory();
-                    for rows in [&mut dirty.menu, &mut dirty.defaults] {
-                        rows.set(first, &[0, 1]).unwrap();
-                        rows.set(second, &[0, 1]).unwrap();
-                    }
-                    let loaded = settings::parse(&dirty.to_json());
-                    assert!(loaded.issues.is_empty(), "{first}, {second}");
-                    for rows in [&loaded.settings.menu, &loaded.settings.defaults] {
-                        assert_eq!(active(rows), Some(first));
-                        assert!(rows.get(second).unwrap().iter().skip(1).all(|value| *value == 0));
-                    }
-                    assert_eq!(settings::parse(&loaded.settings.to_json()).settings, loaded.settings);
-                }
-            }
-        }
+    #[test]
+    fn a_stored_off_runs_the_first_mode() {
+        assert_eq!((mode(0), mode(1), mode(4)), (1, 1, 4));
+        assert_eq!(effective(Game::Eggs, 0, Some(Game::Eggs)), 1, "a file's Off plays 1 minute");
+        assert_eq!(effective(Game::Tech, 3, Some(Game::Tech)), 3);
+        assert_eq!((retired("eggsercise"), retired("tech_practice"), retired("btt"), retired("mashout")), (1, 1, 0, 0));
+        assert_eq!(retired("eggsercise_break"), 0);
+    }
 
-        #[test]
-        fn off_rows_and_unknown_keys_survive_normalization() {
-            let mut rows = Snapshot::factory();
-            rows.set("eggsercise", &[0, 0, 0, 0, 0]).unwrap();
-            rows.set_kept("future_practice_game", serde_json::json!([0, 1])).unwrap();
-            let before = rows.clone();
-            normalize(&mut rows);
-            assert_eq!(rows, before);
-            assert_eq!(active(&rows), None);
-        }
-
-        #[test]
-        fn best_time_pool_keeps_exact_keys_and_fifo() {
-            // Keys share their first component; the complete identity must remain distinct.
-            let mut pool = [None; 3];
-            assert_eq!(best_time(&pool, (0, 0)), None);
-            assert_eq!(record_time(&mut pool, (0, 0), 40), 40);
-            assert_eq!(record_time(&mut pool, (0, 1), 30), 30);
-            assert_eq!(record_time(&mut pool, (0, 2), 20), 20);
-            let order = pool.map(|entry| entry.map(|(key, _)| key));
-            assert_eq!(record_time(&mut pool, (0, 0), 0), 0);
-            assert_eq!(record_time(&mut pool, (0, 0), u32::MAX), 0);
-            assert_eq!(pool.map(|entry| entry.map(|(key, _)| key)), order, "updates never refresh eviction order");
-            assert_eq!([best_time(&pool, (0, 0)), best_time(&pool, (0, 1)), best_time(&pool, (0, 2))], [Some(0), Some(30), Some(20)]);
-            record_time(&mut pool, (0, 3), 10);
-            assert_eq!(best_time(&pool, (0, 0)), None, "even an improved key is evicted in insertion order");
-            assert_eq!(pool, [Some(((0, 1), 30)), Some(((0, 2), 20)), Some(((0, 3), 10))]);
-            let mut empty = [None; 0];
-            assert_eq!(record_time(&mut empty, 0u8, 5), 5);
-            assert_eq!(best_time(&empty, 0), None);
-        }
+    #[test]
+    fn best_time_pool_keeps_exact_keys_and_fifo() {
+        // Keys share their first component; the complete identity must remain distinct.
+        let mut pool = [None; 3];
+        assert_eq!(best_time(&pool, (0, 0)), None);
+        assert_eq!(record_time(&mut pool, (0, 0), 40), 40);
+        assert_eq!(record_time(&mut pool, (0, 1), 30), 30);
+        assert_eq!(record_time(&mut pool, (0, 2), 20), 20);
+        let order = pool.map(|entry| entry.map(|(key, _)| key));
+        assert_eq!(record_time(&mut pool, (0, 0), 0), 0);
+        assert_eq!(record_time(&mut pool, (0, 0), u32::MAX), 0);
+        assert_eq!(pool.map(|entry| entry.map(|(key, _)| key)), order, "updates never refresh eviction order");
+        assert_eq!([best_time(&pool, (0, 0)), best_time(&pool, (0, 1)), best_time(&pool, (0, 2))], [Some(0), Some(30), Some(20)]);
+        record_time(&mut pool, (0, 3), 10);
+        assert_eq!(best_time(&pool, (0, 0)), None, "even an improved key is evicted in insertion order");
+        assert_eq!(pool, [Some(((0, 1), 30)), Some(((0, 2), 20)), Some(((0, 3), 10))]);
+        let mut empty = [None; 0];
+        assert_eq!(record_time(&mut empty, 0u8, 5), 5);
+        assert_eq!(best_time(&empty, 0), None);
+    }
     }
 }

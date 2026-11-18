@@ -162,6 +162,7 @@ fn env() -> Env {
         // rc.14: the save's Stage Builder stages are tiles after the catalog on both stage grids.
         custom_stages: crate::runtime::lobby::custom_stages::published()
             .map_or(0, |p| u16::try_from(p.customs.len()).unwrap_or(u16::MAX)),
+        running: crate::runtime::features::practice::running(),
         ..Env::default()
     }
 }
@@ -510,6 +511,10 @@ fn press(button: Button, s: &mut Session) {
             }
             if let Some(item) = m.take_give_item() {
                 requests::give_item(item);
+            }
+            // rc.15 practice menu: Stop ends the running game now; the menu stays open.
+            if m.take_stop() {
+                crate::runtime::features::practice::stop();
             }
             if let Some((tile, button)) = m.take_stage_press() {
                 s.stage_close = stage_press(m, tile, button);
@@ -1230,14 +1235,13 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     crate::runtime::stall_watch::worker_step(7);
     // LEAD-1: the visit's last pick per role rides in the publish; the game frame decides each role's one load.
     published::publish(&settings.menu, outbox.rerolls, outbox.picks);
-    // rc.14: every close with Eggs-ercise on starts a fresh run.
-    crate::runtime::features::hitbox::eggs_start();
-    crate::runtime::features::mashout::start();
-    // rc.14 Break the Targets: Place targets asks for the placing view; every close tells the mode (after the publish above).
-    crate::runtime::features::btt::menu_closed(outbox.place_targets);
-    crate::runtime::features::tech::menu_closed(outbox.tech_point);
-    if outbox.tech_wizard {
-        crate::runtime::features::tech::open_wizard();
+    // rc.15 practice menu (Q1): a close starts, restarts and stops no game. Start, Place targets, Tech point and Tech wizard
+    // start theirs (after the publish above), which stops any other.
+    crate::runtime::features::btt::menu_closed();
+    crate::runtime::features::tech::menu_closed();
+    if let Some(game) = outbox.start {
+        use crate::runtime::features::practice;
+        practice::start(game, practice::How { place_targets: outbox.place_targets, tech_point: outbox.tech_point, tech_wizard: outbox.tech_wizard });
     }
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(10);

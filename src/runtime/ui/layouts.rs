@@ -104,16 +104,14 @@ impl SavedList for BttLayouts {
         btt::library(root).delete(id).map(|()| format!("Deleted {name}")).map_err(|e| e.to_string())
     }
 
-    /// Load: the game thread takes the targets, the file is used (top of the five), and Break the Targets turns On, so
-    /// closing the menu opens it at Ready.
+    /// Load stages the layout for Start, or puts a running course back at Ready.
     fn saved_use(&mut self, root: &Path, id: &str, menu: Option<&mut Menu>) -> Result<String, String> {
         let layout = self.rows.iter().find(|r| r.0 == id).map(|r| r.1.clone()).ok_or_else(|| format!("No layout {id}"))?;
         let hot = btt::five(&[(id.to_owned(), layout.clone())], 1)[0].ok_or_else(|| format!("No layout {id}"))?;
         CMDS.post(hot);
-        if let Some(menu) = menu {
-            menu.btt_on();
-        }
-        btt::use_file(root, id, None).map(|()| format!("Loaded {}: close the menu to start", layout.name)).map_err(|e| e.to_string())
+        let running = menu.is_some_and(|m| m.btt_running());
+        let next = if running { "back to Ready with it" } else { "Start plays it" };
+        btt::use_file(root, id, None).map(|()| format!("Loaded {}: {next}", layout.name)).map_err(|e| e.to_string())
     }
 }
 

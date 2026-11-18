@@ -17,6 +17,7 @@ use crate::model::chords::{field, Sample};
 use crate::model::eggs::{self, View};
 use crate::model::panes::EggLook;
 use crate::model::notify::DEFAULT_COLOR;
+use crate::model::practice_games::Game;
 use crate::model::settings::Snapshot;
 use crate::model::storage::ROOT;
 use crate::runtime::diag_log::diagnostic;
@@ -27,9 +28,12 @@ use crate::runtime::{published, scene};
 /// The mode's state: taken by P1's poll (the game's input thread), P1's pass (the game thread) and the layout tick. No plugin
 /// thread takes it; they use the atomics and the mailboxes below.
 static BTT: Mutex<Btt> = Mutex::new(Btt::IDLE);
-/// The `btt` row is On (every settings publish), the menu closed since the last pass, Place targets was chosen.
-static ON: AtomicBool = AtomicBool::new(false);
+/// Projectiles break targets (every settings publish), a Start since the last pass, and whether it was Place targets. Whether
+/// the mode is on is the running game (`practice::is`, rc.15 practice menu), no longer the `btt` row.
 static PROJECTILES: AtomicBool = AtomicBool::new(true);
+/// The projectiles rule of the run: latched by Start (rc.15 practice menu: a running game's settings apply at its next
+/// Start), read by the hit path.
+static PROJECTILES_RUN: AtomicBool = AtomicBool::new(true);
 static START: AtomicBool = AtomicBool::new(false);
 static PLACE: AtomicBool = AtomicBool::new(false);
 /// The menu is open: the pass keeps the layout's stage and file current for the Saved layouts screen even with the row Off.
@@ -76,14 +80,18 @@ pub fn stage_label(stage: i32) -> String {
     }
 }
 
-/// Every settings publish: whether Break the Targets is On.
+/// Every settings publish: whether projectiles break targets.
 pub fn publish(snapshot: &Snapshot) {
-    ON.store(btt::on(snapshot)[1], Ordering::Release);
     PROJECTILES.store(snapshot.get("btt_projectiles").is_none_or(|r| r.get(1) == Some(&1)), Ordering::Release);
 }
 
+/// Break the Targets is the running game.
+fn on() -> bool {
+    super::practice::is(Game::Btt)
+}
+
 pub fn projectiles() -> bool {
-    PROJECTILES.load(Ordering::Acquire)
+    PROJECTILES_RUN.load(Ordering::Acquire)
 }
 
 /// The menu opened (the menu worker; atomics only).
@@ -91,11 +99,22 @@ pub fn menu_opened() {
     OPEN.store(true, Ordering::Release);
 }
 
-/// The menu closed (the menu worker; atomics only); `place`: it closed on Place targets.
-pub fn menu_closed(place: bool) {
+/// The menu closed (the menu worker; atomics only). A close alone starts nothing (rc.15 practice menu, Q1).
+pub fn menu_closed() {
     OPEN.store(false, Ordering::Release);
+}
+
+/// Start (the menu worker, `practice::start`; atomics only): `place`, it was Place targets. With no targets placed the
+/// placing view opens, else Ready with every target back.
+pub fn start(place: bool) {
+    PROJECTILES_RUN.store(PROJECTILES.load(Ordering::Acquire), Ordering::Release);
     PLACE.store(place, Ordering::Release);
     START.store(true, Ordering::Release);
+}
+
+/// A Start is on its way to the next pass.
+pub fn starting() -> bool {
+    START.load(Ordering::Acquire)
 }
 
 /// Placing: the save-state chords are the layout's and P1's controller is the cursor's (the chords' poll asks).
@@ -108,12 +127,12 @@ pub fn running() -> bool {
     PHASE.load(Ordering::Acquire) != Phase::Off as u8
 }
 
-/// The mode needs P1's pills: the row is On, the mode is running, or a menu close is waiting to start it.
+/// The mode needs P1's pills: it is the running game, its phase is not Off, or a Start is waiting.
 pub fn reading() -> bool {
-    ON.load(Ordering::Acquire) || START.load(Ordering::Acquire) || running()
+    on() || START.load(Ordering::Acquire) || running()
 }
 
-/// Nothing to do: the row is Off, the mode is not running and no menu is open.
+/// Nothing to do: it is not the running game, the mode is not running and no menu is open.
 pub fn idle() -> bool {
     !reading() && !OPEN.load(Ordering::Acquire)
 }
@@ -165,7 +184,7 @@ pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut([f32; 2]) -> bool) 
         btt_camera::apply(false);
         return 0;
     }
-    let on = ON.load(Ordering::Acquire);
+    let on = on();
     let start = START.swap(false, Ordering::AcqRel);
     let place = start && PLACE.swap(false, Ordering::AcqRel);
     let owners = published::input_owners();
@@ -190,7 +209,15 @@ pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut([f32; 2]) -> bool) 
         if start || !on && mode.phase() != Phase::Off {
             mode.close_menu(on, place);
         }
-        CMDS.drain(|hot| mode.apply(hot));
+        // A layout loaded on the Saved layouts screen replaces the course; a run on the old one goes back to Ready with
+        // every new target up, so no broken mark of the old course carries over. Placing and Off stay. (`close_menu`, not
+        // `Btt::reset`: tests/lock_order.rs resolves calls by name, and a `reset` here reads as `lua_vm::reset`.)
+        CMDS.drain(|hot| {
+            mode.apply(hot);
+            if matches!(mode.phase(), Phase::Ready | Phase::Running | Phase::Done) {
+                mode.close_menu(true, false);
+            }
+        });
         if on {
             let tick = mode.keeper(at) && !owners.covers_strip();
             broken = mode.pass(tick, hit);

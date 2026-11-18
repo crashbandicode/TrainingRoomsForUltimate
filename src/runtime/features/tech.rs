@@ -24,6 +24,7 @@ use crate::model::tech::{
     Vec2,
 };
 use crate::model::tech_launch::{DecisionSnapshot, FlightParams, Launcher};
+use crate::model::practice_games::{self, Game};
 use crate::model::tech_settings::{self, Config};
 use crate::runtime::game::natives;
 use crate::runtime::{published, scene};
@@ -135,10 +136,18 @@ pub fn menu_opened() {
     OPEN.store(true, Ordering::Release);
     notices::clear(NOTICE);
 }
-pub fn menu_closed(edit: bool) {
+/// The menu closed: a close alone starts nothing (rc.15 practice menu, Q1).
+pub fn menu_closed() {
     OPEN.store(false, Ordering::Release);
+}
+/// Start (the menu worker, `practice::start`): `edit`, it was Tech point (the surface placing view).
+pub fn start(edit: bool) {
     EDIT.store(edit, Ordering::Release);
     START.store(true, Ordering::Release);
+}
+/// A Start is on its way to the next frame.
+pub fn starting() -> bool {
+    START.load(Ordering::Acquire)
 }
 pub fn reset() {
     RESET.store(true, Ordering::Release);
@@ -540,11 +549,16 @@ pub unsafe fn frame(fighter: usize) {
     let Some(identity) = super::cpu::tech_player_receipt().ok().flatten() else {
         return;
     };
-    let Some(config) = CONFIG.read() else {
+    let Some(mut config) = CONFIG.read() else {
         return;
     };
+    // rc.15 practice menu: the session while Tech practice is the running game, Off otherwise.
+    let stored = u8::try_from(config.session).unwrap_or(u8::MAX);
+    config.session = usize::from(practice_games::effective(Game::Tech, stored, super::practice::active()));
     let stop = config.session == 0;
     let open = OPEN.load(Ordering::Acquire);
+    // The running session's camera (latched at its Start, like every other setting), the published one before a run.
+    let mut camera = config.camera;
     LIVE.with(|cell| {
         let mut slot = cell.borrow_mut();
         if stop {
@@ -597,10 +611,19 @@ pub unsafe fn frame(fighter: usize) {
             });
         }
         let run = slot.as_mut().unwrap();
+        camera = run.config.camera;
         RUNNING.store(true, Ordering::Release);
+        // rc.15 practice menu (Q1, tr-review-astra-3 16:37Z): a menu visit suspends the session, it never stops it. The
+        // attempt in flight is cut and the fighter released; after B the session goes on with its count, streak and
+        // clock. Only Start restarts it and only Stop ends it.
         if open {
-            if !matches!(run.controller.session.phase, Phase::Off | Phase::Done) {
-                run.controller.stop(&mut run.adapter);
+            if let Event::NeedSetup { reroll } = run.controller.pause_for_menu(&mut run.adapter) {
+                run.pending = true;
+                run.reroll = reroll;
+                run.decision = None;
+                if reroll {
+                    run.sampled = None;
+                }
             }
             return;
         }
@@ -648,7 +671,7 @@ pub unsafe fn frame(fighter: usize) {
             }
             // A native Training reset can rebuild collision without changing
             // stage/form/scene identity. Only world geometry survives it.
-            run.remembered = (config.surface == 4
+            run.remembered = (run.config.surface == 4
                 && view
                     .surfaces
                     .epoch()
@@ -803,6 +826,7 @@ pub unsafe fn frame(fighter: usize) {
             };
             run.fighter_kind = fighter_kind;
             run.config = view.wizard_config.unwrap_or(config);
+            camera = run.config.camera;
             run.controller.start(length(run.config));
             run.decision = None;
             run.pending = true;
@@ -1014,6 +1038,6 @@ pub unsafe fn frame(fighter: usize) {
         running()
             && !open
             && !published::input_owners().covers_strip()
-            && (placing() || config.camera == 1),
+            && (placing() || camera == 1),
     );
 }

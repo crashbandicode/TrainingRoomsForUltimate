@@ -89,6 +89,24 @@ impl Controller {
         self.fresh_outcome = false;
         Event::Summary
     }
+    /// rc.15 practice menu: the menu opened while the session runs. The attempt in flight is cut (it never counts), the
+    /// fighter is released and the session waits in Place with its count, streak, clock and length; the close resumes
+    /// it with a new attempt, the same setup when the cut came before its grade. Once per visit; nothing before a start
+    /// or after the summary.
+    pub fn pause_for_menu<L: Launcher>(&mut self, launcher: &mut L) -> Event {
+        let reroll = match self.session.phase {
+            Phase::Delay(_) | Phase::Flight => false,
+            Phase::Hold(_) => self.session.result.is_some_and(Grade::counted),
+            Phase::Off | Phase::Place | Phase::Done => return Event::None,
+        };
+        launcher.restore();
+        self.session.phase = Phase::Place;
+        self.attempt = None;
+        self.launch_pending = false;
+        self.awaiting_outcome = false;
+        self.fresh_outcome = false;
+        Event::NeedSetup { reroll }
+    }
     /// Decision snapshots are tagged by the adapter attempt id at the native
     /// status-decision seam. Stale or duplicate snapshots cannot count twice.
     pub fn outcome(&mut self, outcome: Outcome) -> Event {
