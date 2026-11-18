@@ -1072,7 +1072,7 @@ pub unsafe fn frame(fighter: usize) {
             drive(entry::controls(request.plan, false));
             game.writes = None;
             game.applied = false;
-            if matches!(request.id, 113 | 116) {
+            if matches!(request.id, 113 | 116 | 117) {
                 // M3 Set observer (O5): installed and read back here, at Settle, until this attempt's exit.
                 // SAFETY: p1 is the live P1 BOMA; +0x48 is its ControlModule (lua_bind ldr x0,[x0,#72]).
                 let control = unsafe { *((p1 + 0x48) as *const usize) };

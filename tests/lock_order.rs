@@ -943,6 +943,8 @@ const GAME_ENTRIES: &[&str] = &[
     "interposer::end",
     "clatter_set::set_wrapper",
     "clatter_set::qualified",
+    "clatter_set::add_wrapper",
+    "clatter_set::qualified_add",
     "cpu::on_frame",
     "cpu_common::di_hook",
     "cpu_common::change_status_hook",

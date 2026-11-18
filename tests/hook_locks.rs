@@ -672,14 +672,16 @@ fn native_clatter_set_observer_reach_has_no_lock_or_allocation() {
     }
     let locks = static_locks(&runtime);
     let locks: Vec<_> = locks.iter().map(|(f, n)| (f.as_str(), n.as_str())).collect();
-    let entry = graph.funcs.iter().find(|f| f.file == "features/mashout/clatter_set.rs" && f.name == "qualified")
-        .expect("the qualified Set path must exist exactly once").key();
-    let result = scan_throw_observer(&graph, &entry, &locks);
-    let reached: Vec<_> = result.reached.iter().map(|&i| graph.funcs[i].key()).collect();
-    println!("CLATTER-SET-OBSERVER {entry}: {reached:?}; boundaries {:?}", result.boundaries);
-    assert!(result.ambiguous.is_empty(), "observer method edges need explicit resolution: {:?}", result.ambiguous);
-    assert!(result.violations.is_empty(), "Set observer reaches lock/allocation operations:\n{}",
-        result.violations.into_iter().collect::<Vec<_>>().join("\n"));
+    for name in ["qualified", "qualified_add"] {
+        let entry = graph.funcs.iter().find(|f| f.file == "features/mashout/clatter_set.rs" && f.name == name)
+            .expect("each qualified path (Set, Add) must exist").key();
+        let result = scan_throw_observer(&graph, &entry, &locks);
+        let reached: Vec<_> = result.reached.iter().map(|&i| graph.funcs[i].key()).collect();
+        println!("CLATTER-SET-OBSERVER {entry}: {reached:?}; boundaries {:?}", result.boundaries);
+        assert!(result.ambiguous.is_empty(), "observer method edges need explicit resolution: {:?}", result.ambiguous);
+        assert!(result.violations.is_empty(), "M3 observer reaches lock/allocation operations:\n{}",
+            result.violations.into_iter().collect::<Vec<_>>().join("\n"));
+    }
 }
 
 /// Every function a plugin-thread entry reaches (the same edges as the lock scan).

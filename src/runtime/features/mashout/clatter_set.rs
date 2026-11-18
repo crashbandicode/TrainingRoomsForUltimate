@@ -14,6 +14,19 @@ const TABLE: usize = 0x4f85de0;
 const SET_SLOT: usize = 0x4f85e70;
 const SET_ORIGINAL: usize = 0x3f81a0;
 const COMMON_SET_RETURN: usize = 0x111f80;
+/// Add instance (tag 117; egg117-consumer/C1-S0-STATIC.md): +0x98 → main+0x3f81c0, called from common+0xc5b2c..b38
+/// through main+0x20010d0 (`ldr x2,[x8,#0x98]; br x2`), so LR == common+0xc5b38.
+const ADD_SLOT: usize = 0x4f85e78;
+const ADD_ORIGINAL: usize = 0x3f81c0;
+const COMMON_ADD_RETURN: usize = 0xc5b38;
+
+/// (vtable slot, original, wrapper) of one instance; Set and Add are exclusive per scenario (C4).
+fn layout(slot: Slot) -> (usize, usize, usize) {
+    match slot {
+        Slot::Set => (SET_SLOT, SET_ORIGINAL, set_wrapper as *const () as usize),
+        Slot::Add => (ADD_SLOT, ADD_ORIGINAL, add_wrapper as *const () as usize),
+    }
+}
 /// lua2cpp_common 13.0.5 build id (NRO header +0x40), nro:13f5177a7e86f0150f1a22aa9e611eacd010397c.
 const COMMON_BUILD_ID: [u8; 20] = [
     0x13, 0xf5, 0x17, 0x7a, 0x7e, 0x86, 0xf0, 0x15, 0x0f, 0x1a, 0x22, 0xaa, 0x9e, 0x61, 0x1e, 0xac, 0xd0, 0x10,
@@ -60,8 +73,12 @@ unsafe fn permission(address: usize) -> Option<u32> {
 }
 
 static ORIGINAL: AtomicUsize = AtomicUsize::new(0);
-/// C9: common base + 0x111f80 while the verified common module is mapped; 0 otherwise (never equals an LR).
+/// C9: common base + 0x111f80 (Set) / + 0xc5b38 (Add) while the verified common module is mapped; 0 otherwise
+/// (never equals an LR).
 static COMMON_LR: AtomicUsize = AtomicUsize::new(0);
+static COMMON_ADD_LR: AtomicUsize = AtomicUsize::new(0);
+/// The installed instance's vtable offset (0x90 / 0x98), so the owner site restores exactly what it installed.
+static INSTALLED_SLOT: AtomicU32 = AtomicU32::new(0);
 static COMMON_BASE: AtomicUsize = AtomicUsize::new(0);
 static COMMON_GENERATION: AtomicU32 = AtomicU32::new(0);
 static ARMED_COMMON_GENERATION: AtomicU32 = AtomicU32::new(0);
@@ -90,18 +107,15 @@ fn poison(why: Poison) {
     let _ = POISON.compare_exchange(0, why as u32 + 1, Ordering::AcqRel, Ordering::Acquire);
 }
 
-unsafe fn slot() -> &'static AtomicUsize {
-    &*((game::text_base() + SET_SLOT) as *const AtomicUsize)
-}
-
-fn wrapper() -> usize {
-    set_wrapper as *const () as usize
+unsafe fn slot_at(offset: usize) -> &'static AtomicUsize {
+    &*((game::text_base() + offset) as *const AtomicUsize)
 }
 
 /// C9 (a)/(d): called from the common-module load callback with the module's base. A load while armed poisons the
-/// attempt; the word is re-published only after zeroing, with a new common generation.
+/// attempt; the words are re-published only after zeroing, with a new common generation.
 pub fn publish_common(base: usize) {
     COMMON_LR.store(0, Ordering::Release);
+    COMMON_ADD_LR.store(0, Ordering::Release);
     if ARMED.load(Ordering::Acquire) {
         poison(Poison::Lost);
     }
@@ -113,11 +127,13 @@ pub fn publish_common(base: usize) {
     COMMON_BASE.store(base, Ordering::Release);
     COMMON_GENERATION.fetch_add(1, Ordering::AcqRel);
     COMMON_LR.store(base + COMMON_SET_RETURN, Ordering::Release);
+    COMMON_ADD_LR.store(base + COMMON_ADD_RETURN, Ordering::Release);
 }
 
-/// C9 (b): every scope loss zeroes the word FIRST, then closes the gate (restore at the owner site, O4 order).
+/// C9 (b): every scope loss zeroes the words FIRST, then closes the gate (restore at the owner site, O4 order).
 pub fn retract_common() {
     COMMON_LR.store(0, Ordering::Release);
+    COMMON_ADD_LR.store(0, Ordering::Release);
     release();
 }
 
@@ -131,16 +147,21 @@ pub fn scene(active: bool) {
     }
 }
 
-/// Settle on the owner thread (O5): install over the exact original and read it back before returning the
-/// generation. Only 113/116 (the Set tags) and only the concrete FighterControl table.
+/// Settle on the owner thread (O5): install the tag's one instance (113/116 → Set +0x90, 117 → Add +0x98) over the
+/// exact original and read it back before returning the generation. Only the concrete FighterControl table.
 pub fn arm(generation: u32, tag: u16, p1_control: usize) -> Result<u32, Refusal> {
     let owner = OWNER_THREAD.load(Ordering::Acquire);
     if owner == 0 || owner != current_thread() {
         return Err(Refusal::NotOwnerThread);
     }
-    if slot_for(tag) != Some(Slot::Set) {
+    let Some(kind) = slot_for(tag) else {
         return Err(Refusal::WrongPhase);
-    }
+    };
+    let (slot_offset, original_offset, wrapper) = layout(kind);
+    let (word, ret) = match kind {
+        Slot::Set => (&COMMON_LR, COMMON_SET_RETURN),
+        Slot::Add => (&COMMON_ADD_LR, COMMON_ADD_RETURN),
+    };
     if ARMED.load(Ordering::Acquire) {
         return Err(Refusal::AlreadyArmed);
     }
@@ -153,18 +174,18 @@ pub fn arm(generation: u32, tag: u16, p1_control: usize) -> Result<u32, Refusal>
     // C9 (c): the module at the published base still carries the verified build id and generation.
     let base = COMMON_BASE.load(Ordering::Acquire);
     let common_generation = COMMON_GENERATION.load(Ordering::Acquire);
-    if COMMON_LR.load(Ordering::Acquire) != base + COMMON_SET_RETURN
+    if word.load(Ordering::Acquire) != base + ret
         || base == 0
         || unsafe { core::ptr::read_unaligned((base + 0x40) as *const [u8; 20]) } != COMMON_BUILD_ID
     {
         return Err(Refusal::CommonUnverified);
     }
-    let set_page = unsafe { permission(game::text_base() + SET_SLOT) };
-    if set_page.is_none() || set_page != unsafe { permission(game::text_base() + START_SLOT) } {
+    let page = unsafe { permission(game::text_base() + slot_offset) };
+    if page.is_none() || page != unsafe { permission(game::text_base() + START_SLOT) } {
         return Err(Refusal::PageCheck);
     }
-    let original = game::text_base() + SET_ORIGINAL;
-    let found = unsafe { slot() };
+    let original = game::text_base() + original_offset;
+    let found = unsafe { slot_at(slot_offset) };
     if found.load(Ordering::Acquire) != original {
         LOST.store(true, Ordering::Release);
         return Err(Refusal::ForeignSlot);
@@ -178,10 +199,11 @@ pub fn arm(generation: u32, tag: u16, p1_control: usize) -> Result<u32, Refusal>
     TAG.store(u32::from(tag), Ordering::Release);
     ARMED_COMMON_GENERATION.store(common_generation, Ordering::Release);
     ORIGINAL.store(original, Ordering::Release);
-    if found.compare_exchange(original, wrapper(), Ordering::AcqRel, Ordering::Acquire).is_err()
-        || found.load(Ordering::Acquire) != wrapper()
+    INSTALLED_SLOT.store(kind as u32, Ordering::Release);
+    if found.compare_exchange(original, wrapper, Ordering::AcqRel, Ordering::Acquire).is_err()
+        || found.load(Ordering::Acquire) != wrapper
     {
-        let _ = found.compare_exchange(wrapper(), original, Ordering::AcqRel, Ordering::Acquire);
+        let _ = found.compare_exchange(wrapper, original, Ordering::AcqRel, Ordering::Acquire);
         LOST.store(true, Ordering::Release);
         return Err(Refusal::ForeignSlot);
     }
@@ -202,12 +224,15 @@ pub fn release() {
 pub fn service() {
     OWNER_THREAD.store(current_thread(), Ordering::Release);
     FRAME.fetch_add(1, Ordering::AcqRel);
-    let original = game::text_base() + SET_ORIGINAL;
-    let found = unsafe { slot() };
+    let kind = if INSTALLED_SLOT.load(Ordering::Acquire) == Slot::Add as u32 { Slot::Add } else { Slot::Set };
+    let (slot_offset, original_offset, wrapper) = layout(kind);
+    let word = if kind == Slot::Add { &COMMON_ADD_LR } else { &COMMON_LR };
+    let original = game::text_base() + original_offset;
+    let found = unsafe { slot_at(slot_offset) };
     if ARMED.load(Ordering::Acquire) {
-        if found.load(Ordering::Acquire) != wrapper()
+        if found.load(Ordering::Acquire) != wrapper
             || COMMON_GENERATION.load(Ordering::Acquire) != ARMED_COMMON_GENERATION.load(Ordering::Acquire)
-            || COMMON_LR.load(Ordering::Acquire) == 0
+            || word.load(Ordering::Acquire) == 0
         {
             poison(Poison::Lost);
             release();
@@ -216,11 +241,40 @@ pub fn service() {
         }
     }
     if INSTALLED.swap(false, Ordering::AcqRel)
-        && (found.compare_exchange(wrapper(), original, Ordering::AcqRel, Ordering::Acquire).is_err()
+        && (found.compare_exchange(wrapper, original, Ordering::AcqRel, Ordering::Acquire).is_err()
             || found.load(Ordering::Acquire) != original)
     {
         LOST.store(true, Ordering::Release);
     }
+}
+
+// The Add instance (117): the same x16/x17-only unqualified path against its own C9 word; no d_max (Add's operand is
+// the native delta, v1.2 publishes 0).
+#[unsafe(naked)]
+unsafe extern "C" fn add_wrapper(_control: usize, _index: i32, _operand: f32) {
+    core::arch::naked_asm!(
+        "adrp x16, {lr}",
+        "add x16, x16, :lo12:{lr}",
+        "ldar x16, [x16]",
+        "cmp x16, x30",
+        "b.ne 1f",
+        "adrp x16, {p1}",
+        "add x16, x16, :lo12:{p1}",
+        "ldar x16, [x16]",
+        "cmp x16, x0",
+        "b.ne 1f",
+        "cbnz w1, 1f",
+        "b {qualified}",
+        "1:",
+        "adrp x16, {original}",
+        "add x16, x16, :lo12:{original}",
+        "ldar x16, [x16]",
+        "br x16",
+        lr = sym COMMON_ADD_LR,
+        p1 = sym P1_CONTROL,
+        original = sym ORIGINAL,
+        qualified = sym qualified_add,
+    )
 }
 
 // Unqualified: x16/x17 only, then the original through an acquire load. Qualified: tail-branch to `qualified`
@@ -270,13 +324,22 @@ unsafe fn d_max(fp: usize) -> u32 {
 }
 
 unsafe extern "C" fn qualified(control: usize, index: i32, fp: usize, operand: f32) {
+    observe(control, index, operand, Some(fp));
+}
+
+unsafe extern "C" fn qualified_add(control: usize, index: i32, operand: f32) {
+    observe(control, index, operand, None);
+}
+
+/// One qualified call: record 0 before and after ONE original call, published to the ring (d_max only for Set).
+unsafe fn observe(control: usize, index: i32, operand: f32, fp: Option<usize>) {
     let original: unsafe extern "C" fn(usize, i32, f32) = core::mem::transmute(ORIGINAL.load(Ordering::Acquire));
     if IN_CALL.swap(true, Ordering::AcqRel) {
         poison(Poison::Nested);
         original(control, index, operand);
         return;
     }
-    let cap = d_max(fp);
+    let cap = fp.map_or(0, |fp| d_max(fp));
     let old = record0(control).read_volatile();
     original(control, index, operand);
     let new = record0(control).read_volatile();
@@ -315,7 +378,7 @@ pub fn poll(generation: u32, seq: u32) -> Poll {
     Poll::Event(ClatterWrite {
         generation,
         seq,
-        slot: Slot::Set,
+        slot: if INSTALLED_SLOT.load(Ordering::Acquire) == Slot::Add as u32 { Slot::Add } else { Slot::Set },
         tag: meta as u16,
         old: (pair >> 32) as u32,
         operand: pair as u32,
