@@ -632,8 +632,8 @@ unsafe fn trail_blizzard_closed(cpu: usize) -> Result<bool, ()> {
 }
 
 /// SPECIAL_N can issue an Ice Shot at frame 18, and the projectile owns the hitboxes.
-/// Both climbers' casts and their Ice Shot article lists must be clear.
-unsafe fn ice_shot_provider_closed(cpu: usize, cpu_entry: i32) -> Result<bool, ()> {
+/// Once P1 escapes, a live shot makes the counterfactual bounds unknowable.
+unsafe fn ice_shot_provider_closed(cpu: usize, cpu_entry: i32) -> Result<bool, &'static str> {
     use crate::model::{sites_pkg2, sites_pkg3};
     if ![
         sites_pkg2::STATUS_KIND_OFFSET,
@@ -643,35 +643,36 @@ unsafe fn ice_shot_provider_closed(cpu: usize, cpu_entry: i32) -> Result<bool, (
         sites_pkg3::STATE_OBJECT_IS_ACTIVE_OFFSET,
         sites_pkg3::STATE_OBJECT_MODULE_ACCESSOR_OFFSET,
     ].into_iter().all(game::granted) {
-        return Err(());
+        return Err(UNAVAILABLE_NOTICE);
     }
     let [Some(special), Some(article), Some(partner), Some(nana_kind), Some(entry_id), Some(invalid)] = [
         C::StatusSpecialN, C::PopoArticleIceShot, C::PopoPartnerObjectId,
         C::KindNana, C::WorkIntEntryId, C::InvalidBattleObjectId,
     ].map(state_id) else {
-        return Err(());
+        return Err(UNAVAILABLE_NOTICE);
     };
     let closed = |body| {
-        let status = natives::status_kind(body);
-        status >= 0 && status != special && !state_natives::article_is_exist(body, article)
+        if state_natives::article_is_exist(body, article) {
+            // restriction: MASH-M1-MISMATCH
+            return Err("Native tick mismatch · no grade");
+        }
+        Ok(matches!(natives::status_kind(body), status if status >= 0 && status != special))
     };
-    if !closed(cpu) {
-        return Ok(false);
-    }
+    let popo_closed = closed(cpu)?;
     let id = natives::get_int(cpu, partner) as u32;
     if id == invalid as u32 && crate::runtime::roster::character_roster::solo_popo_active(true) {
-        return Ok(true);
+        return Ok(popo_closed);
     }
     if id >> 28 != 0 || !state_natives::object_is_active(id) {
-        return Err(());
+        return Err(UNAVAILABLE_NOTICE);
     }
     let nana = state_natives::object_accessor(id);
     if nana == 0 || nana == cpu || natives::fighter_kind(nana) != Some(nana_kind)
         || natives::get_int(nana, entry_id) != cpu_entry
     {
-        return Err(());
+        return Err(UNAVAILABLE_NOTICE);
     }
-    Ok(closed(nana))
+    Ok(closed(nana)? && popo_closed)
 }
 
 /// Positive Egg Lay completion on the selected live CPU. A canceled N2
@@ -1783,8 +1784,8 @@ pub unsafe fn frame(fighter: usize) {
                         game.fail("Native tick mismatch · no grade");
                         return;
                     }
-                    Err(()) => {
-                        game.fail(UNAVAILABLE_NOTICE);
+                    Err(reason) => {
+                        game.fail(reason);
                         return;
                     }
                 }

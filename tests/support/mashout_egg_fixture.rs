@@ -3278,22 +3278,47 @@ fn ice_shot_waits_for_both_providers_before_posting_a_grade() {
         assert_eq!(FINISHED.get(), 0);
         let frozen = game.clock.unwrap().elapsed();
 
+        m.update(&mut game, 0);
+        assert_eq!(game.clock.unwrap().elapsed(), frozen);
+        assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
+
         NANA_STATUS.store(0, Ordering::Relaxed);
-        for live in [1, 2] {
-            ICE_SHOT_ARTICLES.store(live, Ordering::Relaxed);
-            m.update(&mut game, 0);
-            assert_eq!(game.step, Step::Held, "live article mask {live}");
-            assert_eq!(game.clock.unwrap().elapsed(), frozen);
-            assert_eq!(FINISHED.get(), 0);
-            assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
-        }
-        ICE_SHOT_ARTICLES.store(0, Ordering::Relaxed);
         m.update(&mut game, 0);
         assert_eq!(game.step, Step::Result);
         assert_eq!(game.clock.unwrap().elapsed(), frozen);
         assert_eq!(FINISHED.get(), 1);
         let posted = WRITES_POSTED.with_borrow(Clone::clone);
         assert_eq!((posted.len(), posted[0].0, posted[0].1[0].boundary), (1, 1, 0));
+    }
+}
+
+#[test]
+fn ice_shot_refuses_either_live_article_on_escape_or_during_wait() {
+    unsafe {
+        for live in [1, 2] {
+            for during_wait in [true, false] {
+                let (m, mut game) = live_ice_shot();
+                if during_wait {
+                    m.update(&mut game, 68);
+                    assert_eq!(game.step, Step::Held, "bare SPECIAL_N can wait");
+                    assert_eq!(FINISHED.get(), 0);
+                }
+                ICE_SHOT_ARTICLES.store(live, Ordering::Relaxed);
+                m.update(&mut game, if during_wait { 0 } else { 68 });
+                let on_live_article = (game.step, game.failed);
+                ICE_SHOT_ARTICLES.store(0, Ordering::Relaxed);
+                CPU_STATUS.store(0, Ordering::Relaxed);
+                m.update(&mut game, 0);
+                assert_eq!(
+                    on_live_article,
+                    (Step::Failed, Some("Native tick mismatch · no grade")),
+                    "live article mask {live}, during_wait {during_wait}"
+                );
+                assert_eq!(game.step, Step::Failed);
+                assert_eq!(FINISHED.get(), 0);
+                assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
+            }
+        }
     }
 }
 
