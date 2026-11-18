@@ -81,9 +81,21 @@ pub const RADIUS: f32 = 4.0;
 /// all.
 pub const LAUNCH: f32 = 1.44;
 pub const GRAVITY: f32 = 0.048;
+/// The flight's apex above its spawn, the same at every speed (`LAUNCH² / 2 GRAVITY`: 21.6).
+pub const APEX: f32 = LAUNCH * LAUNCH / (2.0 * GRAVITY);
 pub const BOUNCE: f32 = 0.6;
 pub const DRIFT_SPEED: f32 = 0.1;
 pub const DRIFT: f32 = 10.0;
+/// rc.15 (the operator's card report, 11-18; the primary's ruling 15:30Z): targets appear at random places across the stage,
+/// like Melee's Eggs-ercise, not on Player 1's ground alone. A spawn takes a random point of one of the stage's floors (its
+/// main-stage tops and platforms, read from the game's collision: `set_floors`), chosen by length, and rests on it or in the
+/// air above it, up to `REACH` (within a jump).
+pub type Floor = [[f32; 2]; 2];
+pub const FLOORS: usize = 24;
+pub const REACH: f32 = 25.0;
+/// A new target keeps this far from Player 1's body centre (`BODY` above its `top` joint): never inside P1.
+pub const P1_GAP: f32 = 16.0;
+pub const BODY: f32 = 8.0;
 /// A break freezes the fighter that broke it for `HITLAG` ticks (V2.1: no native gives an attack's own hitlag, so the
 /// spec's fixed 6).
 pub const HITLAG: i32 = 6;
@@ -242,6 +254,15 @@ pub struct Run {
     /// The session's bests per fighter kind (`& 127`), and the last run's at 128, per mode (`TIMED` to `TWENTY`, from 0):
     /// the 1-minute score, and the fastest 10 and 20 as `!frames`, so the larger is the better in all three.
     best: [[u32; 3]; 129],
+    /// The stage's floors (`set_floors`), whether this run has asked for them, Player 1's spot (`sense`), and whether the last
+    /// break was the fighter's own attack (not an article's: only then does it freeze, `melee`).
+    floors: [Option<Floor>; FLOORS],
+    scanned: bool,
+    pending: bool,
+    p1: [f32; 2],
+    melee: bool,
+    /// The target rests in the air above its floor (the CPU target stays in its fall there, never stood up mid-air).
+    perch: bool,
 }
 
 impl Run {
@@ -263,7 +284,53 @@ impl Run {
         cpu: 0,
         aloft: false,
         best: [[0; 3]; 129],
+        floors: [None; FLOORS],
+        scanned: false,
+        pending: false,
+        p1: [0.0; 2],
+        melee: false,
+        perch: false,
     };
+
+    /// The runtime is to read the stage's floors for this run (once per start: a reset may have changed the stage).
+    pub fn floors_wanted(&self) -> bool {
+        self.running() && !self.scanned
+    }
+
+    /// The runtime began reading the floors: the first target waits for them (`set_floors`), so it is never put by the
+    /// fallback ground while the read is on its way.
+    pub fn want_floors(&mut self) {
+        self.pending = true;
+    }
+
+    /// The read `want_floors` began is still on its way.
+    pub fn pending(&self) -> bool {
+        self.pending
+    }
+
+    /// The stage's floors, as the game's collision has them (none when it could not be read: the run's ground is used).
+    pub fn set_floors(&mut self, floors: &[Floor]) {
+        self.floors = [None; FLOORS];
+        for (slot, f) in self.floors.iter_mut().zip(floors) {
+            *slot = Some(*f);
+        }
+        (self.scanned, self.pending) = (true, false);
+    }
+
+    /// Player 1's `top` joint this pass (each pass, before `step`).
+    pub fn sense(&mut self, p1: [f32; 2]) {
+        self.p1 = p1;
+    }
+
+    /// Whether the last break was Player 1's own attack (the fighter freezes), not one of its articles'.
+    pub fn melee(&self) -> bool {
+        self.melee
+    }
+
+    /// The `Breaks on` option of this run.
+    pub fn rule(&self) -> u8 {
+        self.rows[1]
+    }
 
     /// The N of `10 targets` and `20 targets`, 0 in the other modes.
     fn goal(&self) -> u32 {
@@ -358,37 +425,73 @@ impl Run {
         self.owner.1 == 0
     }
 
-    /// A new target on the ground, launched (§2.3b): x in the stage's range cut to the screen (its radius and `DRIFT` in from the
-    /// edges), the apex under the screen's top (a lower launch otherwise) and `MIN_GAP` from `last`; none before the draw
-    /// published the camera (a run's first one, with no `last`, waits for it to hold still). The notice sits in a top band
-    /// during a practice game (the operator, 11-14), so a target may rest anywhere on screen.
+    /// A new target, launched (§2.3b) from a random spot of the stage in view (rc.15; the operator, 11-18: targets stay in
+    /// view, the player's own camera): a point of one of the stage's floors (`set_floors`; the run's ground when none was
+    /// read), chosen by length, inside the stage's range and the screen with its radius and `DRIFT` in from the edges, on the
+    /// floor or up to `REACH` above it (a lower launch keeps the flight under the screen's top). It keeps `spacing` from `last` and `P1_GAP` from Player 1; when sixteen tries all fall short, the try that
+    /// falls least short (a random spot, never a fixed side). The apex stays under the screen's top (a lower launch otherwise).
+    /// None before the draw published the camera (a run's first one, with no `last`, waits for it to hold still).
     fn spawn(&mut self, last: Option<[f32; 2]>) -> Option<()> {
-        let ready = last.is_some() || self.still >= SETTLE;
+        let ready = (last.is_some() || self.still >= SETTLE) && !self.pending;
         let View(s, o, range) = self.view.filter(|_| ready)?;
         let edge = |i: usize, c: f32| (c * CANVAS_HALF[i] - o[i]) / s[i] - c * RADIUS;
-        let [x0, x1] = range.map(|v| v.max(edge(0, -1.0)).min(edge(0, 1.0)));
-        // The disc's centre is `RADIUS` above the ground; the CPU target's feet are on it, and it flies the disc's flight
+        let [sx0, sx1] = range.map(|v| v.max(edge(0, -1.0)).min(edge(0, 1.0)));
+        let (x0, x1, top, bottom) = (sx0 + DRIFT, sx1 - DRIFT, edge(1, 1.0), edge(1, -1.0));
+        // The disc's centre is `RADIUS` above its floor; the CPU target's feet are on it, and it flies the disc's flight
         // (the operator, 11-15): its feet trace the disc's bottom edge.
-        let disc = self.ground + RADIUS;
-        let (x0, x1, y) = (x0 + DRIFT, x1 - DRIFT, [disc, self.ground][usize::from(self.rows[3] == CPU)]);
+        let lift = [0.0, -RADIUS][usize::from(self.rows[3] == CPU)];
+        let flat = [Some([[sx0, self.ground], [sx1, self.ground]])];
+        let known = self.floors.iter().any(Option::is_some);
+        let mut spans = [([0.0f32; 2], [[0.0f32; 2]; 2]); FLOORS];
+        let mut total = 0.0;
+        let floors = if known { &self.floors[..] } else { &flat[..] };
+        let mut n = 0;
+        for f in floors.iter().flatten() {
+            let [a, b] = if f[0][0] <= f[1][0] { *f } else { [f[1], f[0]] };
+            let (lo, hi) = ((a[0] + DRIFT).max(x0), (b[0] - DRIFT).min(x1));
+            let height = a[1].max(b[1]) + RADIUS;
+            if hi > lo && height >= bottom && height <= top {
+                (spans[n], total, n) = (([lo, hi], [a, b]), total + hi - lo, n + 1);
+            }
+        }
+        if n == 0 {
+            // Nothing of the stage on screen, or no floor read: the run's ground across the screen.
+            (spans[0], total, n) = (([x0, x1.max(x0)], flat[0]?), (x1 - x0).max(0.0), 1);
+        }
+        let spans = &spans[..n];
         let speed = SPEEDS[usize::from(self.rows[2].min(FAST))];
         let g = GRAVITY * speed * speed;
-        let launch = (LAUNCH * speed).min((2.0 * g * (edge(1, 1.0) - disc).max(0.0)).sqrt());
-        let gap = |at: [f32; 2]| last.is_none_or(|[x, y]| (at[0] - x).hypot(at[1] - y) >= MIN_GAP);
+        // A gap that cannot push every target to the other side of a narrow view: at most a third of its floors' length (a
+        // spot a third in from either end still has room on its own side), `MIN_GAP` where there is room.
+        let spacing = MIN_GAP.min((total - 2.0 * P1_GAP).max(0.0) / 3.0);
+        let body = [self.p1[0], self.p1[1] + BODY];
         let mut random = || {
             self.rng = 1_013_904_223u32.wrapping_add(self.rng.wrapping_mul(1_664_525));
             (self.rng >> 8) as f32 / (1u32 << 24) as f32
         };
         let mut pick = || {
-            let x = x0 + random() * (x1 - x0);
-            (x, (2.0 * random() - 1.0) * DRIFT_SPEED * speed)
+            let mut u = random() * total;
+            let ([lo, hi], [a, b]) = *spans.iter().find(|s| {
+                let fits = u <= s.0[1] - s.0[0];
+                u -= (s.0[1] - s.0[0]) * f32::from(!fits);
+                fits
+            }).unwrap_or(&spans[n - 1]);
+            let x = (lo + u).min(hi);
+            let on = a[1] + (b[1] - a[1]) * ((x - a[0]) / (b[0] - a[0]).max(1e-6)).clamp(0.0, 1.0);
+            // In the air half the time, the disc kept a radius under the screen's top (its launch is lowered to fit below).
+            let room = (top - on - 2.0 * RADIUS).max(0.0);
+            let air = if room < 2.0 * RADIUS || random() < 0.5 { 0.0 } else { random() * REACH.min(room) };
+            ([x, on + RADIUS + air], air > 0.0, (2.0 * random() - 1.0) * DRIFT_SPEED * speed)
         };
-        let tries = [(); 16].map(|_| pick());
-        // Sixteen misses in a row: the end farther from the broken target, straight up.
-        let far = last.map_or(x0, |[x, _]| if x - x0 > x1 - x { x0 } else { x1 });
-        let fits = |&(x, _): &(f32, f32)| gap([x, y]);
-        let (x, vx) = tries.into_iter().find(fits).unwrap_or((far, 0.0));
-        (self.egg, self.age, self.fly) = (Some([x, y]), 0, [launch, vx, g]);
+        let tries = [(); 32].map(|_| pick());
+        let dist = |p: [f32; 2], q: [f32; 2]| (p[0] - q[0]).hypot(p[1] - q[1]);
+        let short = |disc: [f32; 2]| {
+            let from_last = last.map_or(0.0, |l| spacing - dist([disc[0], disc[1] + lift], l));
+            from_last.max(P1_GAP - dist(disc, body)).max(0.0)
+        };
+        let (disc, perch, vx) = tries.into_iter().min_by(|a, b| short(a.0).total_cmp(&short(b.0)))?;
+        let launch = (LAUNCH * speed).min((2.0 * g * (top - disc[1]).max(0.0)).sqrt());
+        (self.egg, self.age, self.fly, self.perch) = (Some([disc[0], disc[1] + lift]), 0, [launch, vx, g], perch);
         Some(())
     }
 
@@ -398,7 +501,7 @@ impl Run {
     pub fn place(&mut self, at: [f32; 2]) {
         let speed = SPEEDS[usize::from(self.rows[2].min(FAST))];
         let v = LAUNCH * speed * f32::from(u8::from(self.rows[3] == CPU));
-        (self.egg, self.age, self.fly, self.cpu) = (Some(at), 0, [v, 0.0, GRAVITY * speed * speed], 0);
+        (self.egg, self.age, self.fly, self.cpu, self.perch) = (Some(at), 0, [v, 0.0, GRAVITY * speed * speed], 0, false);
     }
 
     /// Diag only: the target's spawn point, its ticks since and its flight (launch speed, sideways speed, gravity).
@@ -429,6 +532,13 @@ impl Run {
     /// the ground of a run's first egg), its pills, whether it is in an aerial (`air`) and its kind (the session's best when the
     /// minute ends). The notice's length when its text changed (`write_notice`).
     pub fn step(&mut self, tick: bool, y: f32, hits: &[Hit], air: bool, kind: i32) -> Option<u16> {
+        self.step_with(tick, y, hits, |_| false, air, kind)
+    }
+
+    /// `step`, where `articles(spot)` also says whether one of Player 1's articles (projectiles, explosions, thrown items)
+    /// breaks the target there under this run's `Breaks on` (rc.15: they count in both practice games; SPEC V2.3 superseded,
+    /// docs/DECISIONS.md). A break by an article alone does not freeze the fighter (`melee`).
+    pub fn step_with(&mut self, tick: bool, y: f32, hits: &[Hit], mut articles: impl FnMut([f32; 2]) -> bool, air: bool, kind: i32) -> Option<u16> {
         // The break animations run on the clock's ticks (pause freezes them); an ended run only finishes them.
         let dt = u32::from(tick);
         age(&mut self.bursts, tick);
@@ -444,8 +554,9 @@ impl Run {
         // The pass that closes a run the CPU target's last hit ended: the clock stopped on that hit's frame.
         let dt = dt * u32::from(!self.ended());
         if let Some(egg) = self.egg_at() {
-            if self.rows[3] == DISC && hits.iter().any(|h| breaks(self.rows[1], air, h, egg)) {
-                (self.score, self.bursts) = (self.score + 1, [Some((egg, 0)), self.bursts[0]]);
+            let melee = self.rows[3] == DISC && hits.iter().any(|h| breaks(self.rows[1], air, h, egg));
+            if melee || self.rows[3] == DISC && articles(egg) {
+                (self.score, self.bursts, self.melee) = (self.score + 1, [Some((egg, 0)), self.bursts[0]], melee);
                 self.spawn(Some(egg));
             }
             // The flight holds while the CPU target is in a hit (its hitlag, then the placement): an uncounted hit puts it back
@@ -499,7 +610,7 @@ impl Run {
             _ => false,
         };
         self.cpu = 1 + u8::from(!fresh);
-        let ([x, y], [_, ground], aloft) = (self.egg_at()?, self.egg?, self.flying());
+        let ([x, y], [_, ground], aloft) = (self.egg_at()?, self.egg?, self.flying() || self.perch);
         let put = match (fresh, self.aloft && !aloft) {
             (true, _) => Put::Fresh(aloft),
             (false, true) => Put::Land,

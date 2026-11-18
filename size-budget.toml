@@ -1945,7 +1945,23 @@ approved_by = "operator 2026-11-18: yes additional lines are ok; primary c07b344
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 162626
+ceiling = 156904
 date = "2026-11-18"
-reason = "Mash out row 121, Ganondorf grounded Flame Choke graded by the Tech grader (rc15/mashout-ganon-tech on rc15/mashout-int 6f564b86): measured 162626 = 162291 + 335 (catalog row, CatchedGanon name and contact predicate, the entered-status wait, Tech-session attempt with the late window, Tech-owned tech_adapter boundaries, status-hook seam, worker result text). Exact total, no headroom. Counting and gates unchanged."
+reason = "Practice games fix (rc15/games-fix on main af72b7ba, 156721): Eggs-ercise targets across the stage's native floors with the Fixed camera, and P1's articles break targets in both games under Breaks on (docs/DECISIONS.md TR15-GAMES). Measured 156904 = +183 counted lines. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "Pending: requested of the operator through the primary in games-fix-devin's GAMES FIX READY (primary c07b3449 15:30Z rulings ordered the work; the size is reported there)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162471
+date = "2026-11-18"
+reason = "Practice games fix (rc15/games-fix e19eb61a, tr-review-astra-3 PASS 22:30Z; Eden games-fix-xps-5 14/14) on main 6f564b86 (162291): +180 (Eggs-ercise targets across the stage's native floors in the player's view; P1's articles break targets in both games under Breaks on; docs/DECISIONS.md TR15-GAMES). Exact total, no headroom. Counting and gates unchanged."
+approved_by = "operator 2026-11-18: yes additional lines are ok (+183 allowance, primary 18:13Z; reviewer 22:30Z: +180 within it); primary c07b3449 22:31Z: land games-fix on local main."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162806
+date = "2026-11-18"
+reason = "Mash out row 121, Ganondorf grounded Flame Choke graded by the Tech grader (rc15/mashout-ganon-tech b8402e03, PASS mashout-review-devin 23:05Z / tr-review-astra-3 23:01Z, merged onto main cf6ec3cd 162471): measured 162806 = 162471 + 335 (catalog row, CatchedGanon name and contact predicate, the entered-status wait, Tech-session attempt with the late window, Tech-owned tech_adapter boundaries, status-hook seam, worker result text). Exact total, no headroom. Counting and gates unchanged."
 approved_by = "operator 2026-11-18 via primary c07b3449 (goal to mashout-demo-devin-2: \"Size growth is approved\" for the Ganon Flame Choke tech row)"
