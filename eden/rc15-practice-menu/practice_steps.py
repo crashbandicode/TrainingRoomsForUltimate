@@ -18,7 +18,7 @@ UI = re.compile(r'\[Ui\] press (?P<button>\w+) page=(?P<page>\S+) cursor=(?P<cur
                 r'screen=(?P<screen>.*?) row=(?:Some\("(?P<row>[^"]*)"\)|None)')
 DRAW = r'\[TrainingRooms\] notice_draw header="(?P<header>{header})" body="(?P<body>{body})" '
 OPENED = re.compile(r'\[Ui\] menu opened page=(?P<page>\S+) cursor=\d+ depth=(?P<depth>\d+) screen=(?P<screen>.*)')
-GROUPS = {'Tech practice': 21, 'Eggs-ercise': 22, 'Break the Targets': 23}
+GROUPS = {'Tech practice': 21, 'Eggs-ercise': 22, 'Break the Targets': 23, 'Mash out': 24}
 
 
 def save(ctx, name, value):
@@ -239,7 +239,7 @@ def start(ctx, game, expect):
         line = log.wait(expect, 20, ctx).group(0)
     finally:
         log.close()
-    if started != {'Eggs-ercise': 'Eggs', 'Break the Targets': 'Btt', 'Tech practice': 'Tech'}[game]:
+    if started != {'Eggs-ercise': 'Eggs', 'Break the Targets': 'Btt', 'Tech practice': 'Tech', 'Mash out': 'Mashout'}[game]:
         raise RuntimeError(f'started {started}')
     return {'started': started, 'line': line[:200]}
 

@@ -35,6 +35,10 @@ const UNAVAILABLE_NOTICE: &str = "Mash out unavailable";
 static READY: AtomicBool = AtomicBool::new(true);
 static SLOTS_READY: AtomicBool = AtomicBool::new(true);
 static WANTED: AtomicBool = AtomicBool::new(true);
+/// The runtime reads the running game through `wanted()` (rc.15 practice menu); the fixture keeps its own flag.
+fn wanted() -> bool {
+    WANTED.load(Ordering::Acquire)
+}
 static EPOCH: AtomicU64 = AtomicU64::new(0);
 static FAULT: AtomicU64 = AtomicU64::new(0);
 static SWITCH_AFTER_DRAIN: AtomicU64 = AtomicU64::new(0);
