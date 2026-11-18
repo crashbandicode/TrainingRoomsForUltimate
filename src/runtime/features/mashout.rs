@@ -1470,7 +1470,8 @@ pub unsafe fn frame(fighter: usize) {
                     refused = true;
                     break;
                 }
-                game.sets[game.set_count] = crate::model::mashout::ice116::Applied {
+                let index = game.set_count;
+                game.sets[index] = crate::model::mashout::ice116::Applied {
                     boundary: clock.elapsed() + u32::from(ticked),
                     old: write.old,
                     operand: write.operand,
