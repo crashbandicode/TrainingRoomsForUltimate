@@ -50,11 +50,28 @@ pub struct Ledge {
     pub playback_started: bool,
     /// This grab rolled an empty effective set: the CPU behaves natively (CPU-091: unlike a case not rolled yet).
     pub native_grab: bool,
+    /// CPU-091: hanging frames since the held performing case could act and TR has not requested it; `None` once requested.
+    pub unrequested: Option<u16>,
 }
+
+/// CPU-091 safety bound: TR requests a performing case on its first actionable frame after the delay (at the latest the
+/// buffered motion frame 19). If no request came within 30 such frames (half a second), the native climb is no longer
+/// held back, so a fault can never park the CPU on the ledge.
+pub const UNREQUESTED_BOUND: u16 = 30;
 
 impl Ledge {
     pub const fn new() -> Self {
-        Self { case: None, delay: None, playback_started: false, native_grab: false }
+        Self { case: None, delay: None, playback_started: false, native_grab: false, unrequested: Some(0) }
+    }
+
+    /// The native climb is still held back for a performing case TR has not requested yet (and within the bound).
+    pub fn awaits_request(&self) -> bool {
+        self.case.is_some_and(|case| case <= option::ATTACK) && self.unrequested.is_some_and(|n| n < UNREQUESTED_BOUND)
+    }
+
+    /// The bound released the native climb for a case TR never requested (the runtime logs it).
+    pub fn bound_released(&self) -> bool {
+        self.case.is_some_and(|case| case <= option::ATTACK) && self.unrequested.is_some_and(|n| n >= UNREQUESTED_BOUND)
     }
 
     /// Decision B11: drop the held case so the next hanging frame rolls again. The delay and its
@@ -63,6 +80,7 @@ impl Ledge {
         self.case = None;
         self.playback_started = false;
         self.native_grab = false;
+        self.unrequested = Some(0);
     }
 
     /// The reset bundle's "reset the ledge delay" (the case clears by itself through step 1).
@@ -71,8 +89,9 @@ impl Ledge {
     }
 
     /// The game's question `q` for this body (`WorkModule::is_enable_transition_term`). SPEC-cpu-03 §4: deny the
-    /// native automatic climb while the CPU waits, delays, or waits for its playback to start; otherwise the
-    /// original answer.
+    /// native automatic climb while the CPU waits, delays, or waits for its playback to start, and (CPU-091,
+    /// DECISIONS B11a) while TR holds a case it performs itself and has not requested yet, for at most
+    /// `UNREQUESTED_BOUND` frames; otherwise the original answer.
     pub fn transition_term(&self, t: &Table, s: &CpuSettings, counters: &Counters, playback_running: bool, q: TermQuery) -> bool {
         let TermQuery { status, term, original } = q;
         let on_ledge_wait = t.is(C::StatusCliffWait, status);
@@ -88,7 +107,10 @@ impl Ledge {
         let waiting = if playback_running {
             hold_for_playback
         } else {
-            case == option::WAIT || counters.count(CounterId::Ledge) < u32::from(self.delay.unwrap_or(0)) || hold_for_playback
+            case == option::WAIT
+                || counters.count(CounterId::Ledge) < u32::from(self.delay.unwrap_or(0))
+                || hold_for_playback
+                || self.awaits_request()
         };
         !waiting
     }
@@ -118,6 +140,10 @@ impl Ledge {
             }
         }
         let Some(case) = self.case else { return out };
+        // CPU-091 bound: count the frames on which TR could already act on its case without having requested it.
+        if counters.count(CounterId::Ledge) >= u32::from(delay) {
+            self.unrequested = self.unrequested.map(|n| n.saturating_add(1));
+        }
         // 3. The buffered frames.
         let after_catch = t.is(C::StatusCliffCatch, f.prev_status);
         let waiting_status = t.is(C::StatusCliffWait, f.status);
@@ -151,6 +177,7 @@ impl Ledge {
         if counters.get(CounterId::Ledge).should_delay(delay) {
             return out;
         }
+        self.unrequested = None;
         // 7. Perform.
         let (status, over) = match case {
             option::NEUTRAL => (Some(C::StatusCliffClimb), Some(situation::LEDGE_NEUTRAL)),

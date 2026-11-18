@@ -993,7 +993,9 @@ pub unsafe fn cpu_transition_term_hook(accessor: usize, term: i32) -> bool {
     let Some(key) = role_of(accessor) else { return original };
     let status = natives::status_kind(accessor);
     let answer = with(|cpu| cpu.ledge_transition_term(key, status, term, original)).unwrap_or(original);
-    if answer {
+    if answer && with(|cpu| cpu.fighters[key.index()].ledge.bound_released()).unwrap_or(false) {
+        cpu_event_on_change!(ev::CLIMB_DENIED, key.index(), Some(2), "climb_bound_release entry={} status={status}", key.entry);
+    } else if answer {
         cpu_event_rearm!(ev::CLIMB_DENIED, key.index());
     } else {
         cpu_event_on_change!(ev::CLIMB_DENIED, key.index(), Some(1), "climb_denied entry={} status={status}", key.entry);
