@@ -38,6 +38,8 @@ mod worker;
 
 const NOTICE_ID: u8 = 0x30;
 const NOTICE_RAISE: u8 = 4;
+// Only bounds how long a frozen Egg result may wait for positive closure.
+const EGG_CLOSE_FRAMES: u8 = 60;
 static READY: AtomicBool = AtomicBool::new(false);
 static SLOTS_READY: AtomicBool = AtomicBool::new(false);
 static WANTED: AtomicBool = AtomicBool::new(false);
@@ -325,6 +327,8 @@ struct Game {
     /// 116: the attempt's applied Sets with their G1 boundaries, for the G2 bounds (ice116::bounds).
     sets: [crate::model::mashout::ice116::Applied; 8],
     set_count: usize,
+    egg_spat: bool,
+    egg_close_frames: u8,
     saw_catch: bool,
     followed: bool,
     restore_requested: bool,
@@ -351,6 +355,8 @@ impl Game {
             applied: false,
             sets: [crate::model::mashout::ice116::Applied { boundary: 0, old: 0, operand: 0, new: 0, d_max: 0 }; 8],
             set_count: 0,
+            egg_spat: false,
+            egg_close_frames: 0,
             saw_catch: false,
             followed: false,
             restore_requested: false,
@@ -569,6 +575,40 @@ unsafe fn trail_blizzard_closed(cpu: usize) -> Result<bool, ()> {
         return Err(());
     };
     Ok(entry::trail_blizzard_closed(natives::status_kind(cpu), blizzard, state_natives::article_is_exist(cpu, ice)))
+}
+
+/// Positive Egg Lay completion on the selected live CPU. A canceled N2
+/// alone does not prove its last hit ran. N2 MAIN clears SPITED (Yoshi
+/// +0x11560) and the SPIT helper sets it after the absolute hit (+0x28650).
+unsafe fn egg_provider_closed(cpu: usize, spat: &mut bool, finished: bool) -> Result<bool, ()> {
+    use crate::model::{sites_pkg2, sites_pkg3};
+    if !game::granted(sites_pkg2::STATUS_KIND_OFFSET)
+        || !game::granted(sites_pkg2::WORK_IS_FLAG_OFFSET)
+    {
+        return Err(());
+    }
+    let [Some(n), Some(n1), Some(n2), Some(spited)] = [
+        C::StatusSpecialN, C::YoshiSpecialN1, C::YoshiSpecialN2, C::YoshiSpited,
+    ].map(state_id) else {
+        return Err(());
+    };
+    let status = natives::status_kind(cpu);
+    if status == n2 && !*spat {
+        *spat = natives::is_flag(cpu, spited);
+    }
+    if !finished || !*spat || status < 0 || [n, n1, n2].contains(&status) {
+        return Ok(false);
+    }
+    if !game::granted(sites_pkg3::STATE_ARTICLE_IS_EXIST_OFFSET) {
+        return Err(());
+    }
+    let articles = [
+        C::YoshiArticleStar, C::YoshiArticleTamago, C::YoshiArticleMob, C::YoshiArticleBg,
+    ].map(state_id);
+    let [Some(star), Some(tamago), Some(mob), Some(bg)] = articles else {
+        return Err(());
+    };
+    Ok(![star, tamago, mob, bg].into_iter().any(|id| state_natives::article_is_exist(cpu, id)))
 }
 
 fn trail_magic_status(status: i32, wait: i32) -> Result<entry::TrailMagicStatus, ()> {
@@ -1243,6 +1283,8 @@ pub unsafe fn frame(fighter: usize) {
             game.writes = None;
             game.applied = false;
             game.set_count = 0;
+            game.egg_spat = false;
+            game.egg_close_frames = 0;
             // 116: only the real Blizzard cast installs the observer, never a preparatory Fire/Thunder cast.
             if matches!(request.id, 113 | 116 | 117) && !preparing {
                 // M3 Set observer (O5): installed and read back here, at Settle, until this attempt's exit.
@@ -1430,16 +1472,24 @@ pub unsafe fn frame(fighter: usize) {
             let Some(mut clock) = game.clock else {
                 return;
             };
+            let egg = game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Egg);
+            let waiting_for_egg = egg && clock.exhausted();
             let before = clock.last();
-            let Some(live) = admission()
-                .with(|| reader::threshold(p1).and_then(|threshold| reader::sample(p1, threshold)))
-                .flatten()
-            else {
-                game.fail(UNAVAILABLE_NOTICE);
-                return;
+            let elapsed_before = clock.elapsed();
+            let live = if waiting_for_egg {
+                None
+            } else {
+                let Some(live) = admission()
+                    .with(|| reader::threshold(p1).and_then(|threshold| reader::sample(p1, threshold)))
+                    .flatten()
+                else {
+                    game.fail(UNAVAILABLE_NOTICE);
+                    return;
+                };
+                Some(live)
             };
             let escaped = [ids[5], ids[6]].contains(&status);
-            // M3 G1: this frame's published Set writes (seq order, validated) before the tick check.
+            // M3 G1: validate this frame against its ordered native writes before publishing.
             let mut writes = [crate::model::mashout::clatter::ClatterWrite {
                 generation: 0, seq: 0, slot: crate::model::mashout::clatter::Slot::Set, tag: 0,
                 old: 0, operand: 0, new: 0, frame: 0, d_max: 0,
@@ -1463,34 +1513,9 @@ pub unsafe fn frame(fighter: usize) {
                     }
                 }
             }
-            game.applied |= count > 0;
-            // G1 boundary of each write: before this frame's tick while its old is the model value, else after it.
-            let mut model = before.remaining.to_bits();
-            let mut ticked = false;
-            for write in &writes[..count] {
-                ticked |= write.old != model;
-                model = write.new;
-                if game.set_count == game.sets.len() {
-                    refused = true;
-                    break;
-                }
-                let index = game.set_count;
-                game.sets[index] = crate::model::mashout::ice116::Applied {
-                    boundary: clock.elapsed() + u32::from(ticked),
-                    old: write.old,
-                    operand: write.operand,
-                    new: write.new,
-                    d_max: write.d_max,
-                };
-                game.set_count += 1;
-                #[cfg(feature = "diag")]
-                crate::runtime::diag_log::enqueue_diagnostic(format_args!(
-                    "[Mashout] write gen={} seq={} boundary={} old={:#x} operand={:#x} new={:#x} d_max={:#x}",
-                    game.generation, write.seq, clock.elapsed() + u32::from(ticked), write.old, write.operand,
-                    write.new, write.d_max
-                ));
-            }
-            if refused || clock.observe_writes(live.record, live.input, escaped, &writes[..count]).is_err() {
+            if refused
+                || live.is_some_and(|live| clock.observe_writes(live.record, live.input, escaped, &writes[..count]).is_err())
+            {
                 #[cfg(feature = "diag")]
                 crate::runtime::diag_log::enqueue_diagnostic(format_args!(
                     "[Mashout] mismatch gen={} t={} before={before:?} live={live:?}",
@@ -1500,8 +1525,90 @@ pub unsafe fn frame(fighter: usize) {
                 game.fail("Native tick mismatch · no grade");
                 return;
             }
+            game.applied |= count > 0;
+            // G1 boundary of each write: before this frame's tick while its old is the model value, else after it.
+            let mut model = before.remaining.to_bits();
+            let mut ticked = false;
+            for write in &writes[..count] {
+                ticked |= write.old != model;
+                model = write.new;
+                let boundary = elapsed_before + u32::from(ticked);
+                if egg && (boundary != 0 || waiting_for_egg) {
+                    #[cfg(feature = "diag")]
+                    crate::runtime::diag_log::enqueue_diagnostic(format_args!(
+                        "[Mashout] egg_provider_open gen={} late_add_boundary={boundary}", game.generation
+                    ));
+                    // restriction: MASH-M1-MISMATCH
+                    game.fail("Native tick mismatch · no grade");
+                    return;
+                }
+                if game.set_count == game.sets.len() {
+                    // restriction: MASH-M1-MISMATCH
+                    game.fail("Native tick mismatch · no grade");
+                    return;
+                }
+                let index = game.set_count;
+                game.sets[index] = crate::model::mashout::ice116::Applied {
+                    boundary,
+                    old: write.old,
+                    operand: write.operand,
+                    new: write.new,
+                    d_max: write.d_max,
+                };
+                game.set_count += 1;
+                #[cfg(feature = "diag")]
+                crate::runtime::diag_log::enqueue_diagnostic(format_args!(
+                    "[Mashout] write gen={} seq={} boundary={} old={:#x} operand={:#x} new={:#x} d_max={:#x}",
+                    game.generation, write.seq, boundary, write.old, write.operand,
+                    write.new, write.d_max
+                ));
+            }
+            let changed = clock.last() != before || escaped;
+            #[cfg(feature = "diag")]
+            if let Some(live) = live.filter(|_| changed) {
+                crate::runtime::diag_log::enqueue_diagnostic(format_args!(
+                    "[Mashout] tick gen={} t={} before={before:?} live={live:?} exhausted={}",
+                    game.generation,
+                    clock.elapsed(),
+                    clock.exhausted()
+                ));
+            }
+            if egg && (!game.egg_spat || clock.exhausted()) {
+                match egg_provider_closed(cpu, &mut game.egg_spat, clock.exhausted()) {
+                    Ok(true) => {
+                        #[cfg(feature = "diag")]
+                        crate::runtime::diag_log::enqueue_diagnostic(format_args!(
+                            "[Mashout] egg_provider_closed gen={} t={}", game.generation, clock.elapsed()
+                        ));
+                    }
+                    Ok(false) if clock.exhausted() => {
+                        if game.egg_spat && game.egg_close_frames < EGG_CLOSE_FRAMES {
+                            // The fast arm can escape before N2 finishes. Retain the
+                            // measured clock and Add observer while the CPU stays neutral.
+                            game.egg_close_frames += 1;
+                            game.clock = Some(clock);
+                        } else {
+                            #[cfg(feature = "diag")]
+                            crate::runtime::diag_log::enqueue_diagnostic(format_args!(
+                                "[Mashout] egg_provider_open gen={} t={} spat={}",
+                                game.generation, clock.elapsed(), game.egg_spat
+                            ));
+                            // restriction: MASH-M1-MISMATCH
+                            game.fail("Native tick mismatch · no grade");
+                        }
+                        return;
+                    }
+                    Ok(false) => (),
+                    Err(()) => {
+                        game.fail(UNAVAILABLE_NOTICE);
+                        return;
+                    }
+                }
+            }
             if game.applied && (escaped || clock.exhausted()) {
-                if game.requested.is_some_and(|r| r.id == crate::model::mashout::ice116::TAG) {
+                if egg {
+                    post(worker::Event::EggWrites(game.generation, game.epoch, game.sets, game.set_count as u8), game.generation);
+                } else if game.requested.is_some_and(|r| r.id == crate::model::mashout::ice116::TAG) {
                     // G2 (116): the worker replays the applied Sets in the bounds before the final Observe.
                     post(worker::Event::Writes(game.generation, game.epoch, game.sets, game.set_count as u8), game.generation);
                 } else {
@@ -1533,7 +1640,7 @@ pub unsafe fn frame(fighter: usize) {
                 game.fail("Capture interrupted · no grade");
                 return;
             }
-            if clock.last() != before || escaped {
+            if changed || waiting_for_egg {
                 post(
                     worker::Event::Observe(
                         game.generation,
@@ -1543,13 +1650,6 @@ pub unsafe fn frame(fighter: usize) {
                     ),
                     game.generation,
                 );
-                #[cfg(feature = "diag")]
-                crate::runtime::diag_log::enqueue_diagnostic(format_args!(
-                    "[Mashout] tick gen={} t={} before={before:?} live={live:?} exhausted={}",
-                    game.generation,
-                    clock.elapsed(),
-                    clock.exhausted()
-                ));
             }
             if clock.exhausted() {
                 if game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::IceMagic) {

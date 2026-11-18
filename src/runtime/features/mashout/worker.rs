@@ -59,6 +59,8 @@ pub(super) enum Event {
     Observe(u64, u64, u32, bool),
     /// 116: the attempt's applied Sets (G1 boundaries), replayed in the bounds by ice116::bounds.
     Writes(u64, u64, [crate::model::mashout::ice116::Applied; 8], u8),
+    /// 117: boundary-zero Adds after the native provider has been closed.
+    EggWrites(u64, u64, [crate::model::mashout::ice116::Applied; 8], u8),
     Pulse(u64, u64, bool),
     NativeEnd(u64, u64),
     Failed(u64, &'static str),
@@ -170,6 +172,38 @@ pub(super) fn service() {
                         // restriction: MASH-M1-MISMATCH
                         show(&mut worker, "Native tick mismatch · no grade");
                     }
+                }
+            }
+        }
+        Event::EggWrites(generation, epoch, writes, count) => {
+            if generation == worker.generation
+                && epoch == worker.epoch
+                && epoch == EPOCH.load(Ordering::Acquire)
+                && !faulted(generation, FAULT.load(Ordering::Acquire))
+            {
+                use crate::model::mashout::egg117;
+                let adds = writes.map(|write| egg117::Applied {
+                    boundary: write.boundary,
+                    old: write.old,
+                    operand: write.operand,
+                    new: write.new,
+                });
+                let replay = adds.get(..usize::from(count)).and_then(|adds| {
+                    let (seed, final_add) = worker.seed.zip(adds.last())?;
+                    if !adds.iter().all(|write| write.boundary == 0) {
+                        return None;
+                    }
+                    egg117::replay(seed, adds).ok().map(|solver| (solver, final_add.new))
+                });
+                if let Some((solver, remaining)) = replay {
+                    worker.session.replay_opening(epoch, solver, |mut key| {
+                        key.seed[0] = remaining;
+                        key
+                    });
+                } else {
+                    worker.session.cancel();
+                    // restriction: MASH-M1-MISMATCH
+                    show(&mut worker, "Native tick mismatch · no grade");
                 }
             }
         }

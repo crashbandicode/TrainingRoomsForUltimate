@@ -135,6 +135,13 @@ fn actual_runtime_egg_preparation_and_native_seed() {
             block(runtime, "unsafe fn trolley_input(").to_string(),
         ),
         (
+            "// EGG_CLOSURE",
+            [
+                runtime.lines().find(|line| line.starts_with("const EGG_CLOSE_FRAMES:")).unwrap(),
+                block(runtime, "unsafe fn egg_provider_closed("),
+            ].join("\n"),
+        ),
+        (
             "// TRAIL_MAGIC_KIND",
             block(runtime, "unsafe fn trail_magic_kind(").to_string(),
         ),
@@ -256,6 +263,10 @@ fn actual_runtime_worker_native_epoch_admission_and_bests() {
         (
             "// ICE116",
             production(include_str!("../src/model/mashout/ice116.rs")).to_owned(),
+        ),
+        (
+            "// EGG117",
+            production(include_str!("../src/model/mashout/egg117.rs")).to_owned(),
         ),
         (
             "// RUN",

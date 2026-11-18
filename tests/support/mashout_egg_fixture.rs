@@ -6,7 +6,7 @@ use std::{
 mod model {
     pub mod sites_pkg3 { // TROLLEY_SITES
     }
-    pub mod sites_pkg2 { pub const WORK_IS_FLAG_OFFSET: usize = 0x208dc80; pub const WORK_GET_INT_OFFSET: usize = 0x208dbc0; }
+    pub mod sites_pkg2 { pub const STATUS_KIND_OFFSET: usize = 0x208_7720; pub const WORK_IS_FLAG_OFFSET: usize = 0x208dc80; pub const WORK_GET_INT_OFFSET: usize = 0x208dbc0; }
     pub mod hash40 { // HASH40
     }
     pub mod cpu {
@@ -136,6 +136,10 @@ static CPU_X: AtomicU32 = AtomicU32::new(0x40c00000);
 static P1_DAMAGE: AtomicU32 = AtomicU32::new(0x41bc0000);
 static PREP_ARTICLE: AtomicU32 = AtomicU32::new(0);
 // S1 (116): 0 = Blizzard provider closed, 1 = still open (N2 or live Ice), else reader unavailable.
+static EGG_SPITED: AtomicBool = AtomicBool::new(false);
+static YOSHI_PROVIDER_FIXTURE: AtomicBool = AtomicBool::new(false);
+static YOSHI_ARTICLES: AtomicU32 = AtomicU32::new(0);
+static EGG_PROVIDER_READER: AtomicUsize = AtomicUsize::new(0);
 static BLIZZARD_PROVIDER: AtomicU32 = AtomicU32::new(0);
 unsafe fn trail_blizzard_closed(cpu: usize) -> Result<bool, ()> {
     assert_eq!(cpu, 2);
@@ -228,6 +232,10 @@ mod scene {
 }
 mod natives {
     pub fn is_flag(cpu: usize, id: i32) -> bool {
+        if id == 0x21000010 {
+            assert_eq!(cpu, 2);
+            return super::EGG_SPITED.load(super::Ordering::Relaxed);
+        }
         if Some(id) == super::state_id(super::C::HeroSuccessSp) {
             assert_eq!(cpu, 2);
             super::HERO_FLAG_READS.fetch_add(1, super::Ordering::Relaxed);
@@ -339,8 +347,13 @@ mod natives {
 mod state_natives {
     fn read() { super::TROLLEY_NATIVE_CALLS.fetch_add(1, super::Ordering::Relaxed); }
     pub fn article_is_exist(cpu: usize, article: i32) -> bool {
-        read(); assert_ne!(cpu,0); assert_eq!(article,2);
-        super::CART_EXISTS.load(super::Ordering::Relaxed)
+        assert_ne!(cpu, 0);
+        if super::YOSHI_PROVIDER_FIXTURE.load(super::Ordering::Relaxed) {
+            assert_eq!(cpu, 2);
+            return super::YOSHI_ARTICLES.load(super::Ordering::Relaxed) & (1 << article) != 0;
+        }
+        read();
+        article == 2 && super::CART_EXISTS.load(super::Ordering::Relaxed)
     }
     pub fn article_get(_: usize, _: i32) -> usize {
         read();
@@ -388,11 +401,12 @@ mod worker {
         Cancel(u64),
         NativeEnd(u64, u64),
         Writes(u64, u64, [crate::model::mashout::ice116::Applied; 8], u8),
+        EggWrites(u64, u64, [crate::model::mashout::ice116::Applied; 8], u8),
     }
 }
 thread_local! { static WRITES_POSTED: RefCell<Vec<(usize, [model::mashout::ice116::Applied; 8])>> = const { RefCell::new(Vec::new()) }; }
 fn post(e: worker::Event, _: u64) {
-    if let worker::Event::Writes(_, _, sets, n) = e {
+    if let worker::Event::Writes(_, _, sets, n) | worker::Event::EggWrites(_, _, sets, n) = e {
         WRITES_POSTED.with_borrow_mut(|w| w.push((usize::from(n), sets)));
     }
     if let worker::Event::Begin(_, epoch, k, s, origin) = e {
@@ -462,6 +476,13 @@ fn state_id(c: C) -> Option<i32> {
         C::ClatterCaptureYoshi => 243,
         C::ClatterIce => 203,
         C::ClatterYoshiEgg => 244,
+        C::YoshiSpecialN1 => 481,
+        C::YoshiSpecialN2 => 482,
+        C::YoshiSpited => 0x21000010,
+        C::YoshiArticleStar => 0,
+        C::YoshiArticleTamago => 1,
+        C::YoshiArticleMob => 2,
+        C::YoshiArticleBg => 3,
         C::ClatterCaptureWait => 66,
         C::ClatterBury => 75,
         C::SituationAir => 1,
@@ -499,6 +520,8 @@ struct Game {
     applied: bool,
     sets: [crate::model::mashout::ice116::Applied; 8],
     set_count: usize,
+    egg_spat: bool,
+    egg_close_frames: u8,
     config: Option<()>,
     restore_requested: bool,
     failed: Option<&'static str>,
@@ -532,6 +555,8 @@ impl Game {
             applied: false,
             sets: [crate::model::mashout::ice116::Applied { boundary: 0, old: 0, operand: 0, new: 0, d_max: 0 }; 8],
             set_count: 0,
+            egg_spat: false,
+            egg_close_frames: 0,
             config: Some(()),
             restore_requested: false,
             failed: None,
@@ -554,6 +579,7 @@ impl Game {
 const UNAVAILABLE_NOTICE: &str = "unavailable";
 // JUDGE_CHOICE
 // TROLLEY_INPUT
+// EGG_CLOSURE
 // TRAIL_MAGIC_KIND
 // TRAIL_MAGIC_STATUS
 // ARM
@@ -627,6 +653,10 @@ impl NativeMemory {
         READY.store(true, Ordering::Relaxed);
         SLOTS_READY.store(true, Ordering::Relaxed);
         CPU_STATUS.store(481, Ordering::Relaxed);
+        EGG_SPITED.store(false, Ordering::Relaxed);
+        YOSHI_PROVIDER_FIXTURE.store(false, Ordering::Relaxed);
+        YOSHI_ARTICLES.store(0, Ordering::Relaxed);
+        EGG_PROVIDER_READER.store(0, Ordering::Relaxed);
         EXECUTE_HELD.store(false, Ordering::Relaxed);
         CPU_STOP.store(false, Ordering::Relaxed);
         P1_STOP.store(false, Ordering::Relaxed);
@@ -1147,7 +1177,9 @@ use model::cpu::hash::lua_bind_hash;
 mod game {
     pub fn granted(offset: usize) -> bool {
         if super::TROLLEY_MISSING_GRANT.load(super::Ordering::Relaxed) == offset { return false; }
+        if super::EGG_PROVIDER_READER.load(super::Ordering::Relaxed) == offset { return false; }
         match offset {
+            0x208_7720 => true,
             crate::model::sites_pkg2::WORK_IS_FLAG_OFFSET =>
                 super::WORK_IS_FLAG_GRANTED.load(super::Ordering::Relaxed)
                     && super::JUDGE_FLAG_GRANTED.load(super::Ordering::Relaxed),
@@ -3060,5 +3092,149 @@ fn sora_blizzard_arms_the_set_observer_only_for_the_real_cast_and_posts_its_writ
         let posted = WRITES_POSTED.with_borrow(Clone::clone);
         assert_eq!(posted.len(), 1, "G2 writes posted at the escape");
         assert_eq!((posted[0].0, posted[0].1[0].boundary, posted[0].1[0].old), (1, 0, old.to_bits()));
+    }
+}
+
+
+unsafe fn live_egg(observed_spit: bool) -> (Box<NativeMemory>, Game) {
+    let mut m = NativeMemory::new();
+    let mut game = Game::new(Plan::Egg, State::Egg);
+    YOSHI_PROVIDER_FIXTURE.store(true, Ordering::Relaxed);
+    clatter_set::PUBLISHED.with_borrow_mut(Vec::clear);
+    WRITES_POSTED.with_borrow_mut(Vec::clear);
+    startup(&mut game, m.p1());
+    m.update(&mut game, 243);
+    game.writes = model::mashout::clatter::Writes::new(game.generation as u32, 117);
+    m.seed(100.0, 7.0, 1);
+    CPU_STATUS.store(482, Ordering::Relaxed);
+    EGG_SPITED.store(observed_spit, Ordering::Relaxed);
+    EXECUTE_HELD.store(true, Ordering::Relaxed);
+    m.start();
+    m.update(&mut game, 244);
+    assert_eq!(game.step, Step::Held);
+    (m, game)
+}
+
+fn publish_egg_add(game: &Game, old: f32, operand: f32) -> f32 {
+    let new = (old + operand).max(0.0);
+    clatter_set::PUBLISHED.with_borrow_mut(|events| {
+        events.push(model::mashout::clatter::ClatterWrite {
+            generation: game.generation as u32,
+            seq: 1,
+            slot: model::mashout::clatter::Slot::Add,
+            tag: 117,
+            old: old.to_bits(),
+            operand: operand.to_bits(),
+            new: new.to_bits(),
+            frame: 1,
+            d_max: 0,
+        });
+    });
+    new
+}
+
+#[test]
+fn egg_completion_requires_same_move_spit_and_exit() {
+    unsafe {
+        for (spat, end_status) in [(false, 0), (true, 476), (true, 481), (true, 482)] {
+            let (m, mut g) = live_egg(spat);
+            CPU_STATUS.store(end_status, Ordering::Relaxed);
+            m.update(&mut g, 68);
+            assert_eq!(
+                g.step,
+                if spat { Step::Held } else { Step::Failed },
+                "spat={spat}, status={end_status}"
+            );
+            assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
+            if spat {
+                let frozen = g.clock.unwrap().elapsed();
+                CPU_STATUS.store(0, Ordering::Relaxed);
+                m.update(&mut g, 68);
+                assert_eq!(g.step, Step::Result);
+                assert_eq!(g.clock.unwrap().elapsed(), frozen);
+            }
+        }
+        let (m, mut g) = live_egg(true);
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        m.update(&mut g, 68);
+        assert_eq!(g.step, Step::Result);
+        assert!(DRIVEN.with_borrow(|samples| samples.iter().all(|v| *v == MappedInputs::NEUTRAL)));
+    }
+}
+
+#[test]
+fn egg_checks_all_provider_articles_and_fails_closed_on_unavailable_readers() {
+    unsafe {
+        for article in 0..4 {
+            let (m, mut g) = live_egg(true);
+            CPU_STATUS.store(0, Ordering::Relaxed);
+            YOSHI_ARTICLES.store(1 << article, Ordering::Relaxed);
+            m.update(&mut g, 68);
+            assert_eq!(g.step, Step::Held, "live article {article}");
+            assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
+            for _ in 0..EGG_CLOSE_FRAMES {
+                m.update(&mut g, 68);
+            }
+            assert_eq!(g.step, Step::Failed, "provider did not clear: {article}");
+        }
+        for reader in [
+            0x208_7720,
+            model::sites_pkg2::WORK_IS_FLAG_OFFSET,
+            model::sites_pkg3::STATE_ARTICLE_IS_EXIST_OFFSET,
+        ] {
+            let (m, mut g) = live_egg(true);
+            CPU_STATUS.store(0, Ordering::Relaxed);
+            EGG_PROVIDER_READER.store(reader, Ordering::Relaxed);
+            m.update(&mut g, 68);
+            assert_eq!((g.step, g.failed), (Step::Failed, Some(UNAVAILABLE_NOTICE)), "reader {reader:#x}");
+        }
+    }
+}
+
+#[test]
+fn egg_boundary_zero_replays() {
+    unsafe {
+        let (mut m, mut g) = live_egg(true);
+        let new = publish_egg_add(&g, 100.0, -17.64);
+        m.seed(new, 7.0, 1);
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        m.update(&mut g, 68);
+        assert_eq!(g.step, Step::Result, "boundary zero: {:?}", g.failed);
+        let posted = WRITES_POSTED.with_borrow(Clone::clone);
+        assert_eq!((posted.len(), posted[0].0, posted[0].1[0].boundary), (1, 1, 0));
+    }
+}
+
+#[test]
+fn egg_late_add_refuses_only_its_attempt() {
+    unsafe {
+        let (mut m, mut g) = live_egg(true);
+        let sample = reader::sample(m.p1(), 0.37).unwrap();
+        let mut active = sample.record;
+        active.step(sample.input);
+        let mut clock = g.clock.unwrap();
+        clock.observe(active, sample.input, false).unwrap();
+        assert_eq!(clock.elapsed(), 1);
+        g.clock = Some(clock);
+        let new = publish_egg_add(&g, active.remaining, -17.64);
+        m.seed(new, 7.0, 1);
+        // Transfer the previous tick's finished record latches so this is an exact Add-only frame.
+        let data = m.record.as_mut_ptr().cast::<i8>();
+        for (offset, byte) in [
+            (0x10, active.source), (0x11, active.sign[0]), (0x12, active.sign[1]),
+            (0x13, active.stick_block as i8), (0x14, active.button_block as i8),
+            (0x15, active.accepted as i8), (0x16, active.other_block as i8),
+            (0x17, active.cross_reload as i8), (0x18, active.other_reload as i8),
+        ] {
+            data.add(offset).write(byte);
+        }
+        m.update(&mut g, 244);
+        assert_eq!(g.step, Step::Failed, "Add after the first active tick");
+        assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
+
+        let (m, mut g) = live_egg(true);
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        m.update(&mut g, 68);
+        assert_eq!(g.step, Step::Result, "no-Add attempt after a refusal");
     }
 }
