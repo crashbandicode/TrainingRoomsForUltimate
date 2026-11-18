@@ -1221,7 +1221,7 @@ pub unsafe fn frame(fighter: usize) {
             // M3 G1: this frame's published Set writes (seq order, validated) before the tick check.
             let mut writes = [crate::model::mashout::clatter::ClatterWrite {
                 generation: 0, seq: 0, slot: crate::model::mashout::clatter::Slot::Set, tag: 0,
-                old: 0, operand: 0, new: 0, frame: 0,
+                old: 0, operand: 0, new: 0, frame: 0, d_max: 0,
             }; clatter_set::RING];
             let mut count = 0;
             let mut refused = false;

@@ -8,9 +8,11 @@ fn record(remaining: f32) -> Record {
         cross_reload: 4, other_reload: 3 }
 }
 
+const D_MAX: f32 = 120.0;
+
 fn set(seq: u32, old: f32, new: f32) -> ClatterWrite {
     ClatterWrite { generation: 7, seq, slot: Slot::Set, tag: TAG_ICE_MAGIC_116, old: old.to_bits(),
-        operand: new.to_bits(), new: new.to_bits(), frame: 14395 }
+        operand: new.to_bits(), new: new.to_bits(), frame: 14395, d_max: D_MAX.to_bits() }
 }
 
 fn held_to_first_set() -> Clock {
@@ -122,5 +124,78 @@ fn new_mismatch_uses_arm_fmax_exactly() {
 fn tags_map_to_exactly_one_slot() {
     assert_eq!([113, 116, 117, 40].map(slot_for), [Some(Slot::Set), Some(Slot::Set), Some(Slot::Add), None]);
     assert_eq!(Writes::new(1, 40), None);
+}
+
+#[test]
+fn d_max_must_be_a_valid_constant_cap_aux_invalid() {
+    let good = set(1, 15.648_001, 24.09);
+    assert_eq!(Writes::new(7, TAG_ICE_MAGIC_116).unwrap().accept(Poll::Poisoned(Poison::AuxInvalid)), Err(ClockError::WriteRefused));
+    for d_max in [f32::NAN, f32::INFINITY, 0.0, -0.0, -1.0, 24.0] {
+        let mut writes = Writes::new(7, TAG_ICE_MAGIC_116).unwrap();
+        assert_eq!(writes.accept(Poll::Event(ClatterWrite { d_max: d_max.to_bits(), ..good })), Err(ClockError::WriteRefused), "{d_max}");
+    }
+    let mut writes = Writes::new(7, TAG_ICE_MAGIC_116).unwrap();
+    assert!(writes.accept(Poll::Event(good)).is_ok());
+    let second = ClatterWrite { seq: 2, old: 22.09f32.to_bits(), operand: 28.085_51f32.to_bits(), new: 28.085_51f32.to_bits(), ..good };
+    assert_eq!(writes.accept(Poll::Event(ClatterWrite { d_max: 121.0f32.to_bits(), ..second })), Err(ClockError::WriteRefused),
+        "d_max changing within an attempt");
+    assert!(writes.accept(Poll::Event(second)).is_ok());
+    // An operand at the cap is a real native write for G1, but G2 cannot bracket it: UNSCORED.
+    let capped = ClatterWrite { operand: D_MAX.to_bits(), new: D_MAX.to_bits(), ..good };
+    assert!(Writes::new(7, TAG_ICE_MAGIC_116).unwrap().accept(Poll::Event(capped)).is_ok());
+    assert_eq!(g2::Schedule::new(&[capped]), None);
+}
+
+#[test]
+fn recorded_sets_bracket_their_native_ice_frames() {
+    // DECODE.json gen 10 (116): (old, operand, get_ice_frame) per Set, and 113's E-A Set (C1-RESULT −3/−5).
+    let sets = [(15.648_001f32, 24.09f32, 8.442_f32), (22.09, 28.085_51, 5.995_509), (25.085_51, 29.329_878, 4.244_367_6),
+        (27.329_878, 30.325_947, 2.996_069), (27.325_947, 29.435_383, 2.109_435_8), (34.278_004, 57.555_145, 23.277_143)];
+    for (old, operand, ice) in sets {
+        assert_eq!((old + ice).to_bits(), operand.to_bits(), "fixture: binary32 old + ice == operand");
+        let (lo, hi) = g2::admissible(old, operand).unwrap();
+        assert!(lo <= ice && ice <= hi, "{old} {operand}: [{lo}, {hi}] brackets {ice}");
+        for f in [lo, hi] {
+            assert_eq!((old + f).to_bits(), operand.to_bits());
+        }
+        assert_ne!((old + f32::from_bits(lo.to_bits() - 1)).to_bits(), operand.to_bits(), "lo is the lowest");
+        assert_ne!((old + f32::from_bits(hi.to_bits() + 1)).to_bits(), operand.to_bits(), "hi is the highest");
+    }
+    assert_eq!(g2::admissible(24.0, 24.0), None, "no positive F leaves the value unchanged");
+    assert_eq!(g2::admissible(24.0, 20.0), None);
+    let writes: Vec<_> = sets[..5].iter().enumerate()
+        .map(|(k, &(old, operand, _))| ClatterWrite { seq: k as u32 + 1, frame: 14395 + k as u32, ..set(1, old, operand) })
+        .collect();
+    let schedule = g2::Schedule::new(&writes).unwrap();
+    assert_eq!((schedule.len, schedule.frames[4]), (5, 14399));
+}
+
+#[test]
+fn g2_grades_only_when_both_range_ends_agree_and_no_cap_binds() {
+    let writes: Vec<_> = [(15.648_001f32, 24.09f32), (22.09, 28.085_51)].iter().enumerate()
+        .map(|(k, &(old, operand))| ClatterWrite { seq: k as u32 + 1, ..set(1, old, operand) }).collect();
+    let schedule = g2::Schedule::new(&writes).unwrap();
+    // A cadence with 1/frame automatic decay that receives every Set: its tick count is insensitive to F's ulps.
+    let ticks = |s: &g2::Schedule, f: &[f32]| {
+        let mut cf = 18.648f32;
+        let mut n = 0u32;
+        for &fk in f {
+            cf = s.apply(fk, cf)?;
+        }
+        while cf > 0.0 {
+            cf = (cf - 1.0).max(0.0);
+            n += 1;
+        }
+        Some(n)
+    };
+    assert!(schedule.replay(ticks).is_some(), "insensitive -> graded");
+    assert_eq!(schedule.replay(|_, f: &[f32]| Some(f[0].to_bits())), None, "sensitive -> unscored");
+    // Counterfactual cap: a sum at or above d_max is UNSCORED; an escaped cadence (<= 0) is never extended.
+    assert_eq!(schedule.apply(schedule.lo[0], D_MAX - 1.0), None);
+    assert_eq!(schedule.apply(schedule.lo[0], 0.0), Some(0.0));
+    assert_eq!(schedule.replay(|s, f: &[f32]| s.apply(f[0], D_MAX - 1.0)), None);
+    assert_eq!(g2::Schedule::new(&[]), None);
+    let mismatched = [writes[0], ClatterWrite { d_max: 121.0f32.to_bits(), ..writes[1] }];
+    assert_eq!(g2::Schedule::new(&mismatched), None);
 }
 }

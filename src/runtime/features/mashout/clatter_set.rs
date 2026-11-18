@@ -76,7 +76,14 @@ static IN_CALL: AtomicBool = AtomicBool::new(false);
 /// 0 = none, else Poison as u32 + 1. Latched until the next arm.
 static POISON: AtomicU32 = AtomicU32::new(0);
 static COUNT: AtomicU32 = AtomicU32::new(0);
-/// Per entry: [generation << 32 | seq (published last, Release)], [tag], [old << 32 | operand], [new].
+/// Owner-site frame counter: the `frame` of each published write (G2 timing only).
+static FRAME: AtomicU32 = AtomicU32::new(0);
+/// v1.2: the L2CValue number tag; `d_max` lives at [caller x29 − 0xc0] (tag at +0, f32 at +8) at Set entry,
+/// written at common+0x111e64 from get_param_float(damage_ice_frame_max) (V2-FINDING.md).
+const L2C_NUMBER: u32 = 3;
+const D_MAX_SLOT: usize = 0xc0;
+/// Per entry: [generation << 32 | seq (published last, Release)], [d_max << 32 | tag], [old << 32 | operand],
+/// [frame << 32 | new].
 static ENTRIES: [[AtomicU64; 4]; RING] = [const { [const { AtomicU64::new(0) }; 4] }; RING];
 
 fn poison(why: Poison) {
@@ -184,6 +191,7 @@ pub fn release() {
 /// Owner site (main thread, outside hooks): restore TR's own value only (O8); verify an armed install each frame.
 pub fn service() {
     OWNER_THREAD.store(current_thread(), Ordering::Release);
+    FRAME.fetch_add(1, Ordering::AcqRel);
     let original = game::text_base() + SET_ORIGINAL;
     let found = unsafe { slot() };
     if ARMED.load(Ordering::Acquire) {
@@ -221,6 +229,8 @@ unsafe extern "C" fn set_wrapper(_control: usize, _index: i32, _operand: f32) {
         "cmp x16, x0",
         "b.ne 1f",
         "cbnz w1, 1f",
+        // v1.2: the caller's frame pointer (PLT and the lua_bind wrapper are frame-less) for the d_max read.
+        "mov x2, x29",
         "b {qualified}",
         "1:",
         "adrp x16, {original}",
@@ -238,13 +248,25 @@ unsafe fn record0(control: usize) -> *const f32 {
     *((control + 0x18) as *const *const f32)
 }
 
-unsafe extern "C" fn qualified(control: usize, index: i32, operand: f32) {
+/// v1.2 `d_max` bits from the qualified caller's live frame; anything but an L2C number publishes NaN, which the
+/// consumer refuses as AuxInvalid.
+unsafe fn d_max(fp: usize) -> u32 {
+    let slot = fp - D_MAX_SLOT;
+    if (slot as *const u32).read_volatile() == L2C_NUMBER {
+        ((slot + 8) as *const u32).read_volatile()
+    } else {
+        f32::NAN.to_bits()
+    }
+}
+
+unsafe extern "C" fn qualified(control: usize, index: i32, fp: usize, operand: f32) {
     let original: unsafe extern "C" fn(usize, i32, f32) = core::mem::transmute(ORIGINAL.load(Ordering::Acquire));
     if IN_CALL.swap(true, Ordering::AcqRel) {
         poison(Poison::Nested);
         original(control, index, operand);
         return;
     }
+    let cap = d_max(fp);
     let old = record0(control).read_volatile();
     original(control, index, operand);
     let new = record0(control).read_volatile();
@@ -253,9 +275,9 @@ unsafe extern "C" fn qualified(control: usize, index: i32, operand: f32) {
         poison(Poison::Overflow);
     } else {
         let entry = &ENTRIES[seq as usize - 1];
-        entry[1].store(u64::from(TAG.load(Ordering::Acquire)), Ordering::Relaxed);
+        entry[1].store(u64::from(TAG.load(Ordering::Acquire)) | (u64::from(cap) << 32), Ordering::Relaxed);
         entry[2].store((u64::from(old.to_bits()) << 32) | u64::from(operand.to_bits()), Ordering::Relaxed);
-        entry[3].store(u64::from(new.to_bits()), Ordering::Relaxed);
+        entry[3].store(u64::from(new.to_bits()) | (u64::from(FRAME.load(Ordering::Acquire)) << 32), Ordering::Relaxed);
         entry[0].store((u64::from(GENERATION.load(Ordering::Acquire)) << 32) | u64::from(seq), Ordering::Release);
     }
     IN_CALL.store(false, Ordering::Release);
@@ -279,16 +301,17 @@ pub fn poll(generation: u32, seq: u32) -> Poll {
     if head as u32 != seq || (head >> 32) as u32 != generation {
         return Poll::Empty;
     }
-    let pair = entry[2].load(Ordering::Relaxed);
+    let (meta, pair, last) = (entry[1].load(Ordering::Relaxed), entry[2].load(Ordering::Relaxed), entry[3].load(Ordering::Relaxed));
     Poll::Event(ClatterWrite {
         generation,
         seq,
         slot: Slot::Set,
-        tag: entry[1].load(Ordering::Relaxed) as u16,
+        tag: meta as u16,
         old: (pair >> 32) as u32,
         operand: pair as u32,
-        new: entry[3].load(Ordering::Relaxed) as u32,
-        frame: 0,
+        new: last as u32,
+        frame: (last >> 32) as u32,
+        d_max: (meta >> 32) as u32,
     })
 }
 
@@ -299,6 +322,7 @@ fn poison_from(code: u32) -> Poison {
         2 => Poison::Nested,
         3 => Poison::WrongSlot,
         4 => Poison::Stale,
+        6 => Poison::AuxInvalid,
         _ => Poison::Lost,
     }
 }
