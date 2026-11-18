@@ -23,8 +23,9 @@ use delay::DelaySpec;
 use grid::{ConsoleMode, GridKind, GridLayout, Move, RosterUse};
 use input::Button;
 use options::{CHORD_ROWS, SITUATIONS, SWAP_GROUP_IDS};
-use table::{Control, Editor, Page, Row, GROUPS, ROWS};
+use table::{game_group, Control, Editor, Game, Page, Row, GROUPS, ROWS};
 
+use super::practice_games::retired;
 use super::settings::{self, Settings};
 
 /// The id of Recording › Options › Loop. The row shows, cycles, lists and resets the page role's loop count, the count Play
@@ -55,6 +56,8 @@ pub struct Env {
     pub btt_projectiles_ready: bool,
     /// rc.14: how many Stage Builder stages the save holds (extra tiles after the catalog on the stage grids).
     pub custom_stages: u16,
+    /// rc.15 practice menu: the practice game running when the menu opened (Stop clears it).
+    pub running: Option<Game>,
 }
 
 impl Default for Env {
@@ -73,6 +76,7 @@ impl Default for Env {
             waiting_room: false,
             btt_projectiles_ready: true,
             custom_stages: 0,
+            running: None,
         }
     }
 }
@@ -135,6 +139,13 @@ pub struct Outbox {
     pub tech_point: bool,
     /// Stage tech: close into the guided exercise draft.
     pub tech_wizard: bool,
+    /// rc.15 practice menu: the game the close starts (Start, Place targets, Tech point, Tech wizard). Only these start a
+    /// game; a plain close starts and stops nothing (Q1).
+    pub start: Option<Game>,
+    /// Stop: the running game ends now and the menu stays open. Taken at once with `Menu::take_stop`.
+    pub stop: bool,
+    /// A saved layout was loaded while Break the Targets runs: the close puts the course back to Ready with it.
+    pub btt_ready: bool,
 }
 
 /// Why a row or entry is greyed (it shows dimmed with this reason and ignores A).
@@ -154,7 +165,7 @@ pub enum Grey {
     RangeSet,
     /// The range of a delay row while the checklist holds a value.
     ChecklistSet,
-    /// Target speed while Break the Targets is On (SPEC V2.5): the targets do not move.
+    /// Target speed while Break the Targets runs (SPEC V2.5; rc.15: the running game): the targets do not move.
     TargetsStill,
     /// The Auto solver supplies this value.
     TechAuto,
@@ -277,6 +288,9 @@ pub enum Screen {
     External(Editor),
     /// *Reset page to defaults?*: A resets the page, B cancels.
     ConfirmReset,
+    /// A practice game's sub-screen (rc.15 practice menu): the visible rows of the sub group `group`, `cursor` one of them.
+    /// Its keys are the page's: Left / Right, A, Y and the help panel act on the row under the cursor.
+    Rows { group: u8, cursor: usize },
 }
 
 /// Where the menu was when it closed (`Menu::place`): kept by the runtime outside the model for the rest of the boot.
@@ -358,7 +372,8 @@ fn resumable(screen: Screen) -> Option<Screen> {
         | Screen::Directions { .. }
         | Screen::SwapGroups { .. }
         | Screen::Overrides { .. }
-        | Screen::Chords { .. } => Some(screen),
+        | Screen::Chords { .. }
+        | Screen::Rows { .. } => Some(screen),
         Screen::ChordEntry { .. } | Screen::Grid { .. } | Screen::External(_) | Screen::ConfirmReset => None,
     }
 }
@@ -537,6 +552,9 @@ impl Menu {
             Screen::Chords { cursor } => {
                 matches!(control, Control::Editor(Editor::ButtonChords)) && cursor < CHORD_ROWS.len()
             }
+            Screen::Rows { group, cursor } => {
+                matches!(control, Control::Game(game) if game_group(game) == group) && cursor < self.sub_rows(group).count()
+            }
             Screen::ChordEntry { .. } | Screen::Grid { .. } | Screen::External(_) | Screen::ConfirmReset => false,
         }
     }
@@ -608,7 +626,8 @@ impl Menu {
         let mut n = 0;
         let mut last = None;
         for (g, group) in GROUPS.iter().enumerate() {
-            if group.page != page || !self.group_visible(g) {
+            // A sub group is a game's sub-screen (`Screen::Rows`), not a section of the page.
+            if group.page != page || group.sub || !self.group_visible(g) {
                 continue;
             }
             last = Some(g);
@@ -776,7 +795,8 @@ impl Menu {
                 let at = array.iter().position(|v| *v != 0);
                 match row.control {
                     Control::Number { first, step } => RowValue::Number(at.map(|i| first + step * i as u16)),
-                    _ => RowValue::Choice(at),
+                    // A game's mode: the stored Off of an older file reads as the first mode.
+                    _ => RowValue::Choice(at.map(|i| i.saturating_sub(retired(row.id)))),
                 }
             }
             Control::YesNoRandom => RowValue::Choice(yes_no_random(array)),
@@ -807,8 +827,23 @@ impl Menu {
                 SITUATIONS.iter().filter(|(_, id)| self.get(id).iter().any(|v| *v != 0)).count(),
             ),
             Control::Editor(Editor::ShortcutSlot(slot)) => RowValue::Chord(self.env.shortcuts[usize::from(slot & 1)]),
-            Control::Editor(_) | Control::Info(_) => RowValue::None,
+            Control::Editor(_) | Control::Info(_) | Control::Game(_) | Control::Start(_) => RowValue::None,
         }
+    }
+
+    /// rc.15 practice menu: the practice game running now (when the menu opened, until a Stop).
+    pub fn running(&self) -> Option<Game> {
+        self.env.running
+    }
+
+    /// The visible rows of sub group `group` (a game's sub-screen), in table order.
+    pub fn sub_rows(&self, group: u8) -> impl Iterator<Item = usize> + '_ {
+        let pilot = self.env.pilot_present;
+        ROWS.iter().enumerate().filter(move |(_, row)| row.group == group && row.visible(pilot)).map(|(i, _)| i)
+    }
+
+    fn sub_row(&self, group: u8, cursor: usize) -> Option<usize> {
+        self.sub_rows(group).nth(cursor)
     }
 
     fn range_of(&self, range_id: &str, first: u16, step: u16) -> Option<DelayRange> {
@@ -868,9 +903,10 @@ impl Menu {
             "save_damage_limits_cpu" if self.get("save_damage_cpu").get(2).copied().unwrap_or(0) == 0 => {
                 Some(Grey::DamageNotRandom)
             }
-            "practice_cpu" if super::tech_settings::selected(&self.settings.menu, "tech_practice") > 0 => Some(Grey::TechCpu),
+            // rc.15 practice menu: these read the running game, no longer another game's row.
+            "practice_cpu" if self.env.running == Some(Game::Tech) => Some(Grey::TechCpu),
             "btt_projectiles" if !self.env.btt_projectiles_ready => Some(Grey::ProjectilesUnavailable),
-            "eggsercise_speed" if self.get("btt").get(1).is_some_and(|v| *v != 0) => Some(Grey::TargetsStill),
+            "eggsercise_speed" if self.env.running == Some(Game::Btt) => Some(Grey::TargetsStill),
             _ => None,
         }
     }
@@ -912,11 +948,6 @@ impl Menu {
             if reroll_id == id {
                 self.outbox.rerolls |= bit;
             }
-        }
-        // Changing any practice game to On switches the other games Off; all edits are committed together.
-        let ids = ["eggsercise", "btt", "tech_practice"];
-        if ids.iter().position(|v| *v == id).is_some_and(|chosen| super::tech_settings::practice(&self.settings.menu)[chosen]) {
-            for other in ids { if other != id { self.put_one_hot(other, 0); } }
         }
     }
 
@@ -1023,6 +1054,7 @@ impl Menu {
             | Some(Screen::Delay { row, .. })
             | Some(Screen::Slider { row, .. })
             | Some(Screen::Directions { row, .. }) => *row,
+            Some(Screen::Rows { group, cursor }) => self.sub_row(*group, *cursor)?,
             Some(_) => return None,
         };
         Some(&ROWS[row])
@@ -1037,7 +1069,7 @@ impl Menu {
     pub fn takes_jumps(&self) -> bool {
         match self.stack.last() {
             None => true,
-            Some(Screen::List { .. } | Screen::Checklist { .. } | Screen::SwapGroups { .. } | Screen::Overrides { .. } | Screen::Chords { .. }) => true,
+            Some(Screen::List { .. } | Screen::Checklist { .. } | Screen::SwapGroups { .. } | Screen::Overrides { .. } | Screen::Chords { .. } | Screen::Rows { .. }) => true,
             Some(Screen::Delay { editing, .. }) => !editing,
             Some(_) => false,
         }
@@ -1083,6 +1115,28 @@ impl Menu {
                 Button::B => _ = self.stack.pop(),
                 _ => {}
             },
+            Some(Screen::Rows { group, cursor }) => self.press_rows(button, group, cursor),
+        }
+    }
+
+    /// A game's sub-screen (rc.15 practice menu) takes the page's keys for the row under the cursor: Up / Down move (and
+    /// wrap), ZL + Up / Down jump a window, Left / Right change the row, A acts on it, Y resets it, B goes back.
+    fn press_rows(&mut self, button: Button, group: u8, cursor: usize) {
+        let len = self.sub_rows(group).count();
+        let Some(row) = self.sub_row(group, cursor) else {
+            self.stack.pop();
+            return;
+        };
+        let screen = |cursor: usize| Screen::Rows { group, cursor };
+        match button {
+            Button::Up => self.top(screen((cursor + len - 1) % len)),
+            Button::Down => self.top(screen((cursor + 1) % len)),
+            Button::JumpUp | Button::JumpDown => self.top(screen(jumped(cursor, len, button == Button::JumpDown))),
+            Button::Left | Button::Right => self.cycle(row, button == Button::Right),
+            Button::A => self.activate(row),
+            Button::Y => _ = self.reset_setting(&ROWS[row]),
+            Button::B => _ = self.stack.pop(),
+            _ => {}
         }
     }
 
@@ -1218,7 +1272,7 @@ impl Menu {
                 let cursor = match r.control {
                     _ if r.id == LOOP_ROW => Some(self.recording.loop_row_index()),
                     Control::YesNoRandom => yes_no_random(self.get(r.id)),
-                    _ => self.get(r.id).iter().position(|v| *v != 0),
+                    _ => self.get(r.id).iter().position(|v| *v != 0).map(|i| i.saturating_sub(retired(r.id))),
                 }
                 .unwrap_or(0);
                 self.stack.push(Screen::List { row, cursor });
@@ -1230,7 +1284,24 @@ impl Menu {
             Control::SwapGroups => self.stack.push(Screen::SwapGroups { cursor: 0 }),
             Control::Editor(editor) => self.open_editor(editor),
             Control::Info(_) => {}
+            // Q4: the sub-screen opens on its first row, Start.
+            Control::Game(game) => self.stack.push(Screen::Rows { group: game_group(game), cursor: 0 }),
+            // Stop ends the running game and the menu stays open; Start closes it and the close starts the game (Q1).
+            Control::Start(game) if self.env.running == Some(game) => {
+                (self.outbox.stop, self.env.running) = (true, None);
+            }
+            Control::Start(game) => self.start(game),
         }
+    }
+
+    /// The close starts `game` (and so stops any other game).
+    fn start(&mut self, game: Game) {
+        (self.outbox.start, self.closed) = (Some(game), true);
+    }
+
+    /// Stop was chosen since the last call: the worker ends the running game now.
+    pub fn take_stop(&mut self) -> bool {
+        core::mem::take(&mut self.outbox.stop)
     }
 
     fn open_editor(&mut self, editor: Editor) {
@@ -1249,27 +1320,24 @@ impl Menu {
             Editor::PortraitCpu => self.roster_screen(RosterUse::CpuPick),
             Editor::CharacterCycles => self.roster_screen(RosterUse::Cycles),
             Editor::KirbyHats => self.roster_screen(RosterUse::Hats),
-            // Place targets is an action: it turns Break the Targets On (so Eggs-ercise goes Off), the menu closes and the
+            // Place targets is an action: it starts Break the Targets (so any other game stops), the menu closes and the
             // runtime opens the placing view.
             Editor::PlaceTargets => {
-                self.put("btt", &[0, 1]);
-                (self.outbox.place_targets, self.closed) = (true, true);
+                self.outbox.place_targets = true;
+                self.start(Game::Btt);
                 return;
             }
+            // Tech point and Tech wizard start Tech practice in their own view, with the mode the Tech practice row shows.
             Editor::TechPoint => {
-                if super::tech_settings::selected(&self.settings.menu, "tech_practice") == 0 {
-                    self.put_one_hot("tech_practice", 1);
-                }
                 self.put_one_hot("tech_surface", 4);
-                (self.outbox.tech_point, self.closed) = (true, true);
+                self.outbox.tech_point = true;
+                self.start(Game::Tech);
                 return;
             }
             Editor::TechWizard => {
-                if super::tech_settings::selected(&self.settings.menu, "tech_practice") == 0 {
-                    self.put_one_hot("tech_practice", 2);
-                }
                 self.put_one_hot("tech_surface", 4);
-                (self.outbox.tech_wizard, self.closed) = (true, true);
+                self.outbox.tech_wizard = true;
+                self.start(Game::Tech);
                 return;
             }
             other => Screen::External(other),
@@ -1290,14 +1358,14 @@ impl Menu {
         }
         match r.control {
             Control::Dropdown(labels) => {
-                let len = labels.len();
-                let at = self.get(r.id).iter().position(|v| *v != 0);
+                let (len, skip) = (labels.len(), retired(r.id));
+                let at = self.get(r.id).iter().position(|v| *v != 0).map(|i| i.saturating_sub(skip));
                 let next = match at {
                     None => 0,
                     Some(i) if forward => (i + 1) % len,
                     Some(i) => (i + len - 1) % len,
                 };
-                self.put_one_hot(r.id, next);
+                self.put_one_hot(r.id, next + skip);
             }
             Control::YesNoRandom => {
                 let next = match yes_no_random(self.get(r.id)) {
@@ -1447,7 +1515,7 @@ impl Menu {
                 match ROWS[row].control {
                     _ if ROWS[row].id == LOOP_ROW => self.recording.set_loop_row(cursor),
                     Control::YesNoRandom => self.put_yes_no_random(ROWS[row].id, cursor),
-                    _ => self.put_one_hot(ROWS[row].id, cursor),
+                    _ => self.put_one_hot(ROWS[row].id, cursor + retired(ROWS[row].id)),
                 }
                 self.stack.pop();
             }
@@ -1855,10 +1923,12 @@ impl Menu {
         }
     }
 
-    /// Break the Targets On, as a row change (so Eggs-ercise goes Off): a layout loaded from the Saved layouts screen opens its
-    /// Ready view when the menu closes.
-    pub fn btt_on(&mut self) {
-        self.put("btt", &[0, 1]);
+    /// A layout was loaded from the Saved layouts screen: while Break the Targets runs, the close puts the course back to
+    /// Ready with it; otherwise Start plays it. True while it runs.
+    pub fn layout_loaded(&mut self) -> bool {
+        let running = self.env.running == Some(Game::Btt);
+        self.outbox.btt_ready |= running;
+        running
     }
 
     /// The item the player chose on the Give item grid since the last call, if any.
@@ -1981,3 +2051,7 @@ mod btt_menu_tests;
 #[cfg(test)]
 #[path = "tech_menu_tests.rs"]
 mod tech_menu_tests;
+
+#[cfg(test)]
+#[path = "practice_menu_tests.rs"]
+mod practice_menu_tests;

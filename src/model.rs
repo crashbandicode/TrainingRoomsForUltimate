@@ -115,6 +115,9 @@ pub mod pause_helper;
 pub mod settings;
 #[path = "model/tech_settings.rs"]
 pub mod tech_settings;
+/// rc.15 practice menu: the practice games, and which one runs.
+#[path = "model/practice_games.rs"]
+pub mod practice_games;
 #[path = "model/settings_file.rs"]
 pub mod settings_file;
 #[path = "model/sha256.rs"]

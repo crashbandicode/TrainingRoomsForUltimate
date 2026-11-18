@@ -4,6 +4,7 @@
 //! as a sub-screen. Everything is `'static`: the model allocates nothing to know its layout.
 
 use super::options as o;
+pub use crate::model::practice_games::Game;
 
 /// The pages, in ring order. `Developer` is in the ring only while `developer.ini` enables it (N1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -53,19 +54,25 @@ impl Page {
     }
 }
 
-/// A section header on a page. An `advanced` group is collapsed until the player opens it.
+/// A section header on a page. An `advanced` group is collapsed until the player opens it. A `sub` group is not a section
+/// of the page: it is the sub-screen a practice game's row opens (rc.15 practice menu), and its rows stay rows of the page.
 #[derive(Clone, Copy, Debug)]
 pub struct Group {
     pub page: Page,
     pub title: &'static str,
     pub advanced: bool,
+    pub sub: bool,
 }
 
 const fn g(page: Page, title: &'static str) -> Group {
-    Group { page, title, advanced: false }
+    Group { page, title, advanced: false, sub: false }
 }
 
-pub static GROUPS: [Group; 22] = [
+const fn sub(page: Page, title: &'static str) -> Group {
+    Group { sub: true, ..g(page, title) }
+}
+
+pub static GROUPS: [Group; 24] = [
     g(Page::Cpu, "Reactions"),
     g(Page::Cpu, "Defence"),
     g(Page::Cpu, "Ledge & Tech"),
@@ -82,7 +89,7 @@ pub static GROUPS: [Group; 22] = [
     g(Page::FightersStages, "Player 1 and CPU"),
     g(Page::FightersStages, "Extras"),
     g(Page::FightersStages, "Stages"),
-    Group { page: Page::FightersStages, title: "Loading", advanced: true },
+    Group { advanced: true, ..g(Page::FightersStages, "Loading") },
     g(Page::DisplayControls, "On screen"),
     g(Page::DisplayControls, "Controls"),
     g(Page::Developer, "Developer"),
@@ -90,7 +97,10 @@ pub static GROUPS: [Group; 22] = [
     g(Page::Cpu, "Level"),
     // rc.14, appended the same way: it follows Loading on Fighters & Stages.
     g(Page::FightersStages, "Practice games"),
-    g(Page::FightersStages, "Tech practice"),
+    // rc.15 practice menu: Tech practice became its game's sub-screen; the other two games' sub-screens are appended.
+    sub(Page::FightersStages, "Tech practice"),
+    sub(Page::FightersStages, "Eggs-ercise"),
+    sub(Page::FightersStages, "Break the Targets"),
 ];
 
 // Group indices, for the rows below.
@@ -116,8 +126,20 @@ const SCREEN: u8 = 16;
 const CONTROLS: u8 = 17;
 const DEV: u8 = 18;
 const LEVEL: u8 = 19;
-const GAMES: u8 = 20;
+/// Practice games: the list a game's sub-screen opens from.
+pub const GAMES: u8 = 20;
 const TECH: u8 = 21;
+const EGGS: u8 = 22;
+const BTT: u8 = 23;
+
+/// The sub-screen group of a practice game (rc.15 practice menu).
+pub const fn game_group(game: Game) -> u8 {
+    match game {
+        Game::Eggs => EGGS,
+        Game::Btt => BTT,
+        Game::Tech => TECH,
+    }
+}
 
 /// The sub-screens that edit something the model does not own the content of (the fork's grids,
 /// lists and panels arrive with package 6; the libraries and the replay window with package 4).
@@ -197,6 +219,10 @@ pub enum Control {
     ReplayCapture,
     Editor(Editor),
     Info(Info),
+    /// A practice game on the Practice games list: A opens its sub-screen (rc.15 practice menu).
+    Game(Game),
+    /// The first row of a game's sub-screen: Start, or Stop while that game runs.
+    Start(Game),
 }
 
 /// When a row exists.
@@ -236,7 +262,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 130] = [
+pub static ROWS: [Row; 136] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -451,28 +477,45 @@ pub static ROWS: [Row; 130] = [
     // rc.14 Hide CPU (SPEC-eggsercise V2.6): after CPU Level, the last row of the last group of GROUPS.
     r(LEVEL, "Hide CPU", "hide_cpu", TOGGLE,
       "On: the CPU is invisible, takes no hits and doesn't move.\nIts tag and panel hide too. Off: it's back where it was."),
-    // Fighters & Stages > Practice games (rc.14, appended like Level)
-    r(GAMES, "Eggs-ercise", "eggsercise", Control::Dropdown(&o::EGGSERCISE),
-      "Break the targets that appear. Starts when the menu closes.\nTimed: 60 s, or break 10 or 20 fastest. Free practice: no timer."),
-    r(GAMES, "Breaks on", "eggsercise_break", Control::Dropdown(&o::EGGS_BREAK),
+    // Fighters & Stages > Practice games (rc.14, appended like Level). rc.15 practice menu (docs/DECISIONS.md, 2026-11-18):
+    // one row per game; each opens its sub-screen, a group of its own (`Group::sub`) whose first row is Start.
+    r(GAMES, "Eggs-ercise", "", Control::Game(Game::Eggs),
+      "Break the targets that appear, against the clock or freely.\nA opens its settings and Start."),
+    r(GAMES, "Break the Targets", "", Control::Game(Game::Btt),
+      "Place targets, then break them all against the clock.\nA opens its settings and Start."),
+    r(GAMES, "Tech practice", "", Control::Game(Game::Tech),
+      "Practice techs at a chosen or random stage surface.\nA opens its settings and Start."),
+    // Practice games > Eggs-ercise
+    r(EGGS, "Start", "", Control::Start(Game::Eggs),
+      "Closes the menu and starts Eggs-ercise with the settings below.\nWhile it runs, this row reads Stop."),
+    r(EGGS, "Eggs-ercise", "eggsercise", Control::Dropdown(&o::EGGSERCISE),
+      "1 minute: break as many as you can. 10 or 20 targets: fastest.\nFree practice: no timer."),
+    r(EGGS, "Breaks on", "eggsercise_break", Control::Dropdown(&o::EGGS_BREAK),
       "Which of your hits break a target. Projectiles never do.\n12%+: only attacks that deal 12% or more."),
-    r(GAMES, "Target", "eggsercise_target", Control::Dropdown(&o::EGGS_TARGET),
+    r(EGGS, "Target", "eggsercise_target", Control::Dropdown(&o::EGGS_TARGET),
       "Disc: a target appears. CPU: the CPU is the target.\nThe CPU flies like the disc and is reset after each hit."),
-    r(GAMES, "Target speed", "eggsercise_speed", Control::Dropdown(&o::EGGS_SPEED),
+    r(EGGS, "Target speed", "eggsercise_speed", Control::Dropdown(&o::EGGS_SPEED),
       "How fast targets fly. Normal is Melee's Eggs-ercise speed.\nSlow: half speed. Fast: one and a half times as fast."),
-    r(GAMES, "CPU during a game", "practice_cpu", Control::Dropdown(&o::PRACTICE_CPU),
+    r(EGGS, "CPU during a game", "practice_cpu", Control::Dropdown(&o::PRACTICE_CPU),
       "Hide: the CPU is hidden while a practice game runs.\nAfterwards it's as Hide CPU says. Show: it stays."),
-    r(GAMES, "Break the Targets", "btt", Control::Dropdown(&o::BTT),
-      "Place targets, then break them all against the clock.\nClosing the menu with no targets opens the placing view."),
-    r(GAMES, "Projectiles break targets", "btt_projectiles", Control::Dropdown(&o::BTT),
+    // Practice games > Break the Targets. Its Off / On row is Start / Stop now; the `btt` key stays in the file.
+    r(BTT, "Start", "", Control::Start(Game::Btt),
+      "Closes the menu and starts Break the Targets on this stage.\nWith no targets placed here, the placing view opens first."),
+    r(BTT, "Projectiles break targets", "btt_projectiles", Control::Dropdown(&o::BTT),
       "Your articles' native hitboxes break targets while On.\nOff: only your fighter's attacks break targets."),
-    r(GAMES, "Place targets", "btt_place", Control::Editor(Editor::PlaceTargets),
+    r(BTT, "Place targets", "btt_place", Control::Editor(Editor::PlaceTargets),
       "Close the menu into the placing view, stage zoomed out.\nStick moves, A places, B removes the last, X starts."),
-    r(GAMES, "Saved layouts", "btt_layouts", Control::Editor(Editor::Layouts),
+    r(BTT, "Saved layouts", "btt_layouts", Control::Editor(Editor::Layouts),
       "This stage's saved layouts, the five used last first.\nPlacing: ZL + Left/Right picks, ZL + Down saves, ZL + Up loads."),
-    r(GAMES, "Tech practice", "tech_practice", Control::Dropdown(&o::TECH_SESSION),
-      "Practice techs at a chosen or random stage surface.\nStarts when the menu closes; Auto aim is approximate."),
-    r(GAMES, "Tech wizard", "tech_wizard", Control::Editor(Editor::TechWizard),
+    // The same setting as in Eggs-ercise (Q3): one key, two rows.
+    r(BTT, "CPU during a game", "practice_cpu", Control::Dropdown(&o::PRACTICE_CPU),
+      "Hide: the CPU is hidden while a practice game runs.\nAfterwards it's as Hide CPU says. Show: it stays."),
+    // Practice games > Tech practice: today's Tech practice section, after Start and the two rows that were in Practice games.
+    r(TECH, "Start", "", Control::Start(Game::Tech),
+      "Closes the menu and starts Tech practice with the settings below.\nTech wizard and Tech point close into their own views first."),
+    r(TECH, "Tech practice", "tech_practice", Control::Dropdown(&o::TECH_SESSION),
+      "How long a session lasts: 20 or 10 attempts, 1 or 3 minutes,\nor free practice with no end. Auto aim is approximate."),
+    r(TECH, "Tech wizard", "tech_wizard", Control::Editor(Editor::TechWizard),
       "Choose a spot, angle, start distance and hit.\nBack edits each step; preview before starting."),
     r(TECH, "Surface", "tech_surface", Control::Dropdown(&o::TECH_SURFACE),
       "Pick a random floor, wall or underside, or use your point.\nAny chooses among the available surface kinds."),

@@ -24,6 +24,7 @@ use crate::model::tech::{
     Vec2,
 };
 use crate::model::tech_launch::{DecisionSnapshot, FlightParams, Launcher};
+use crate::model::practice_games::{self, Game};
 use crate::model::tech_settings::{self, Config};
 use crate::runtime::game::natives;
 use crate::runtime::{published, scene};
@@ -135,10 +136,18 @@ pub fn menu_opened() {
     OPEN.store(true, Ordering::Release);
     notices::clear(NOTICE);
 }
-pub fn menu_closed(edit: bool) {
+/// The menu closed: a close alone starts nothing (rc.15 practice menu, Q1).
+pub fn menu_closed() {
     OPEN.store(false, Ordering::Release);
+}
+/// Start (the menu worker, `practice::start`): `edit`, it was Tech point (the surface placing view).
+pub fn start(edit: bool) {
     EDIT.store(edit, Ordering::Release);
     START.store(true, Ordering::Release);
+}
+/// A Start is on its way to the next frame.
+pub fn starting() -> bool {
+    START.load(Ordering::Acquire)
 }
 pub fn reset() {
     RESET.store(true, Ordering::Release);
@@ -540,9 +549,12 @@ pub unsafe fn frame(fighter: usize) {
     let Some(identity) = super::cpu::tech_player_receipt().ok().flatten() else {
         return;
     };
-    let Some(config) = CONFIG.read() else {
+    let Some(mut config) = CONFIG.read() else {
         return;
     };
+    // rc.15 practice menu: the session while Tech practice is the running game, Off otherwise.
+    let stored = u8::try_from(config.session).unwrap_or(u8::MAX);
+    config.session = usize::from(practice_games::effective(Game::Tech, stored, super::practice::active()));
     let stop = config.session == 0;
     let open = OPEN.load(Ordering::Acquire);
     LIVE.with(|cell| {

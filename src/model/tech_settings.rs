@@ -117,15 +117,6 @@ pub fn read(s: &Snapshot) -> Config {
         camera: selected(s, "tech_camera"),
     }
 }
-/// Menu changes are last-choice-wins; file normalization keeps the older practice game first.
-pub fn practice(s: &Snapshot) -> [bool; 3] {
-    [
-        selected(s, "eggsercise") > 0,
-        selected(s, "btt") > 0,
-        selected(s, "tech_practice") > 0,
-    ]
-}
-
 /// Canonical DirectionGrid vector before target-relative mirroring. Left/Right
 /// remain absolute; callers mirror x for indices 0..=7 when the point is right.
 pub fn di_vector(index: usize) -> super::tech_launch::Vec2 {

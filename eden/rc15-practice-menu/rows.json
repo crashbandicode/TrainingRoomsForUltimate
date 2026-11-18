@@ -1,0 +1,70 @@
+{
+  "game_id": "01006A800016E000",
+  "start": "frontend",
+  "early_stop": false,
+  "on_failure": "continue",
+  "recover": [{"run": "practice_steps.py:recover", "check": true}],
+  "segments": {},
+  "gates": {
+    "training": {
+      "library": "training-hud-unpaused"
+    }
+  },
+  "setup": [
+    {
+      "state": "Muted frontend, stub off, trace configured with the gate diag ELF before the single game.load",
+      "via": "hook",
+      "ref": "routes:configure_boot; practice_steps.py:trace_setup"
+    },
+    {
+      "state": "Training, Battlefield, P1 Mario; a pre-change (c212bc50) settings.json with Eggs-ercise 10 targets, Break the Targets On and Tech practice 3 minutes stored",
+      "via": "fixture",
+      "ref": "routes:pick_stage/pick_fighters/fixture; files: TrainingRooms/settings.json = eden/rc15-practice-menu/settings-c212bc50.json"
+    },
+    {
+      "state": "Every menu step is real input gated on the DIAG's [Ui]/[Practice]/[Eggs]/[Btt]/notice_draw lines",
+      "via": "hook",
+      "ref": "practice_steps.py"
+    }
+  ],
+  "rows": [
+    {
+      "id": "r00-boot-training",
+      "start": "frontend",
+      "end": "training",
+      "on_failure": "stop",
+      "budget_min": 10,
+      "steps": [
+        {"run": "routes:configure_boot", "check": true},
+        {"run": "practice_steps.py:trace_setup", "check": true},
+        {"run": "routes:load_game", "check": true},
+        {"run": "routes:wait_lines", "check": true, "args": {"lines": [["events_log", "plugin=training_rooms/.*game=13[.]0[.]5 .*result=installed heap_allocations=0"]]}},
+        {"run": "routes:to_main", "check": true},
+        {"run": "routes:main_to_stage", "check": true},
+        {"run": "routes:pick_stage", "check": true, "args": {"stage": "Battlefield"}},
+        {"run": "routes:pick_fighters", "check": true, "args": {"p1": "Mario"}},
+        {"run": "routes:enter_training", "check": true},
+        {"run": "routes:preload_clear", "check": true},
+        {"run": "routes:fixture", "check": true, "args": {"p1": "Mario", "stage": "Battlefield", "damage": 0}}
+      ]
+    },
+    {"id": "r01-old-settings", "start": "training", "end": "training", "start_gate": "training", "budget_min": 3,
+     "steps": [{"run": "practice_steps.py:old_settings", "check": true}]},
+    {"id": "r02-eggs-start", "start": "training", "end": "training", "start_gate": "training", "budget_min": 2,
+     "steps": [{"run": "practice_steps.py:eggs_start", "check": true}]},
+    {"id": "r03-running-and-b", "start": "training", "end": "training", "budget_min": 2,
+     "steps": [{"run": "practice_steps.py:running_and_b", "check": true}]},
+    {"id": "r04-lra-restart", "start": "training", "end": "training", "budget_min": 1,
+     "steps": [{"run": "practice_steps.py:lra_restart", "check": true}]},
+    {"id": "r05-stop-keeps-open", "start": "training", "end": "training", "budget_min": 2,
+     "steps": [{"run": "practice_steps.py:stop_keeps_open", "check": true}]},
+    {"id": "r06-start-other-stops-first", "start": "training", "end": "training", "budget_min": 3,
+     "steps": [{"run": "practice_steps.py:start_other_stops_first", "check": true}]},
+    {"id": "r07-tech-views", "start": "training", "end": "training", "budget_min": 4,
+     "steps": [{"run": "practice_steps.py:tech_views", "check": true}]},
+    {"id": "r08-docs-gifs", "start": "training", "end": "training", "start_gate": "training", "budget_min": 3,
+     "steps": [{"run": "practice_steps.py:docs_gifs", "check": true}]},
+    {"id": "r09-console-scan", "start": "training", "end": "training", "budget_min": 1,
+     "steps": [{"run": "practice_steps.py:console_scan", "check": true}]}
+  ]
+}

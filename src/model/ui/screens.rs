@@ -21,6 +21,7 @@ const HINT_DELAY: &str = "Up/Down move   ZL+Up/Down jump   A tick or edit the ha
 const HINT_SLIDER: &str = "Left/Right other handle   A pick up or put down   Up/Down/Left/Right change   B back";
 const HINT_DIRECTIONS: &str = "Up/Down move   A add one weight   Y clear   ZL all or none   B back";
 const HINT_CHORD: &str = "X capture   A confirm   Y empty   B cancel";
+const HINT_ROWS: &str = "Up/Down move   ZL+Up/Down jump   Left/Right change   A open   Y reset row   B back";
 
 /// First line of a window of `ROW_LINES` rows over `total` that keeps `cursor` in view.
 pub fn window_start(cursor: usize, total: usize) -> usize {
@@ -57,6 +58,10 @@ fn crumb(menu: &Menu, screen: &Screen, out: &mut Text<120>) {
         Screen::ChordEntry { target: ChordTarget::Row(i), .. } => write!(out, "  >  {}", CHORD_ROWS[usize::from(*i)].0),
         Screen::External(editor) => write!(out, "  >  {editor:?}"),
         Screen::ConfirmReset => write!(out, "  >  {RESET_LABEL}"),
+        // A game's sub-screen sits under the Practice games list: the page, the list, the game.
+        Screen::Rows { group, .. } => {
+            write!(out, "  >  {}  >  {}", GROUPS[usize::from(super::menu::table::GAMES)].title, GROUPS[usize::from(*group)].title)
+        }
         Screen::Grid { .. } => Ok(()),
         _ => Ok(()),
     };
@@ -139,11 +144,15 @@ fn list_frame(menu: &Menu, screen: &Screen, row: usize, cursor: usize, frame: &m
     };
     let yes_no = matches!(r.control, Control::YesNoRandom);
     let loop_at = (r.id == LOOP_ROW).then(|| menu.recording().loop_row_index());
+    // A game's mode lists its stored options from index 1; a stored Off is the first mode.
+    let mode_at = (super::practice_games::retired(r.id) > 0).then(|| menu.value(row));
     lines_window(frame, cursor, total, |i, line| {
         let label = option_label(r, i, first, step);
         line.label = label;
         let chosen = if let Some(at) = loop_at {
             i == at
+        } else if let Some(value) = mode_at {
+            value == super::menu::RowValue::Choice(Some(i))
         } else if yes_no {
             // Yes = [1,0], No = [0,1], Random = [1,1].
             matches!((i, current.first().copied().unwrap_or(0) != 0, current.get(1).copied().unwrap_or(0) != 0), (0, true, false) | (1, false, true) | (2, true, true))
@@ -563,7 +572,16 @@ pub fn frame_of(menu: &Menu, frame: &mut Frame, stage: StageLabel) {
         Screen::Grid { layout, page, cell } => grid_frame(menu, &screen, layout, page, cell, stage, frame),
         Screen::External(_) => external_frame(menu, &screen, frame),
         Screen::ConfirmReset => confirm_reset_frame(menu, &screen, frame),
+        Screen::Rows { group, cursor } => rows_frame(menu, &screen, group, cursor, frame),
     }
+}
+
+/// A game's sub-screen (rc.15 practice menu): laid out like Button chords (the breadcrumb, no left column), its rows drawn
+/// as the page draws them, the focused row's help.
+fn rows_frame(menu: &Menu, screen: &Screen, group: u8, cursor: usize, frame: &mut Frame) {
+    base(menu, screen, frame);
+    super::frame::rows_lines(menu, group, cursor, frame);
+    let _ = frame.hint.write_str(HINT_ROWS);
 }
 #[cfg(test)]
 mod tests {

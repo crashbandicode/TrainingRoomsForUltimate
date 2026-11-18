@@ -424,6 +424,19 @@ list doesn't grey them for that.
 
 ## Practice games
 
+**Practice games** lists one row per game: **Eggs-ercise**, **Break the Targets** and **Tech practice**. **A** on a game
+opens its own screen, laid out like **Button chords**: the path at the top (Fighters & Stages > Practice games > the
+game), then **Start** and the game's settings. The keys are the page's: Up/Down move, Left/Right change a setting, **A**
+opens it, **Y** resets it, **B** goes back to the list.
+
+- **Start** (the first row; the cursor opens on it) closes the menu and starts the game with the settings shown. Only
+  Start starts a game: closing the menu with **B** starts nothing and stops nothing.
+- One game runs at a time: starting one stops the one that was running.
+- While a game runs, its row on the list shows **Running** in green, and the first row of its screen reads **Stop**.
+  **A** on Stop ends the game and the menu stays open; the row reads Start again. **B** closes the menu and the game
+  keeps running. Settings you change for a running game apply at its next Start.
+- **Reset page to defaults** (the page's last line) also resets the settings inside the games' screens.
+
 ### Eggs-ercise
 
 A practice game for your attacks. A target pops up from the ground. Hit it and it breaks, and the next one pops up
@@ -432,11 +445,12 @@ falls back, bounces once and then rests on the ground until you hit it; it may d
 through platforms. Break as many as you can in one minute, break 10 or 20 as fast as you can, or practise without a
 timer.
 
-- **Values:** Off, 1 minute, 10 targets, 20 targets, Free practice
-- **Default:** Off
-- **How:** pick a mode and close the menu: the first target appears and the notice shows the count, in a band at the
-  top, under Input Display's strip and the combo bar when they show, so the targets keep the middle of the screen.
-  The clock runs while the game runs; pausing or opening the menu stops it.
+- **Where:** Practice games > Eggs-ercise > the **Eggs-ercise** row (the mode)
+- **Values:** 1 minute, 10 targets, 20 targets, Free practice
+- **Default:** 1 minute
+- **How:** pick a mode and choose **Start**: the menu closes, the first target appears and the notice shows the count,
+  in a band at the top, under Input Display's strip and the combo bar when they show, so the targets keep the middle of
+  the screen. The clock runs while the game runs; pausing or opening the menu stops it.
   - **1 minute:** the notice reads "Eggs 0   1:00" and the clock counts down. At 0:00 the targets stop and the notice
     reads "Time! 12 eggs (best 15)" for three seconds.
   - **10 targets, 20 targets:** the notice reads "Eggs 0/10   0:00.00" and the clock counts up in hundredths. The last
@@ -450,10 +464,9 @@ timer.
 ![Eggs-ercise 10 targets: the row set from Off to 10 targets, the menu closed, Fox breaks the targets one after another and the count climbs from 0/10 to 9/10; the tenth break stops the clock: Done! 10 in 0:16.96](../media/rc14-eggs-n-targets.gif)<br>
 *Practice games > Eggs-ercise: Right twice turns Off into 10 targets and the menu closes. The notice reads "Eggs 0/10   0:00.00" and the clock counts up in hundredths; Fox chases each target and breaks it, and the count climbs: 3/10, 7/10, 9/10. The tenth break stops the clock: "Done! 10 in 0:16.96 (best 0:16.96)". Eden, rc.14 (untested on hardware).*
 
-To go again, press L+R+A in Training (with **L+R+A Reset** On), or open and close the menu: either one starts a new run
-from 0.
-Changing the stage starts a new run too. A fighter cycle or a save-state load keeps the run going. Off removes the
-target and the notice, and the notices are back where they were.
+To go again, press L+R+A in Training (with **L+R+A Reset** On): it starts a new run from 0. Opening and closing the menu
+keeps the run going. Changing the stage starts a new run too. A fighter cycle or a save-state load keeps the run going.
+**Stop** removes the target and the notice, and the notices are back where they were.
 
 The target is drawn by the plugin, so Hitbox Visualization can be On or Off: with it On you see your hitboxes meet the
 target. Nothing changes in the game. It works in the waiting room's practice as in Training, a break's freeze included, and only your own screen shows the target. The CPU keeps
@@ -467,7 +480,7 @@ as Player 1.
 - **Values:** Any attack, Aerials, Hits of 12%+
 - **Default:** Any attack
 - **How:** Any attack: any hitbox of Player 1. Aerials: only while Player 1 is in an aerial. Hits of 12%+: only hitboxes
-  that deal 12% or more, so most jabs and tilts don't. The rule applies from the next time the menu closes.
+  that deal 12% or more, so most jabs and tilts don't. The rule applies from the next Start.
 
 ### Target
 
@@ -480,7 +493,7 @@ What the target is. Disc: the plugin's target, as above. CPU: the CPU itself is 
   falling pose. **Target speed** applies to it as to the disc. A hit that the game registers on it, in the air or on the
   ground, and that **Breaks on** lets count breaks the target: the game plays its own hitlag and knockback, then the CPU
   goes back to 0% at the next spot and flies again. A hit that doesn't count puts it back on its flight. It applies from
-  the next time the menu closes. In the waiting room's practice the CPU is moved too.
+  the next Start. In the waiting room's practice the CPU is moved too.
 
 ![Target set to CPU: the CPU flies up and down with its CPU tag on, rests, and Fox's neutral air hits it in the air; the count goes up and the CPU is put back at 0% at a new spot](../media/rc14-eggs-cpu-target.gif)<br>
 *Practice games, Eggs-ercise on Free practice with Breaks on Aerials and Target speed Slow: Target reads Disc, then CPU, and the menu closes. The CPU (Mario) is launched, flies up and falls back with its "CPU" tag on, and stands where it lands. Fox takes a full hop and a neutral air hits it in the air: the count goes up, the CPU is put back at 0% at a new spot and flies again, and no disc target appears. Eden, rc.14 (untested on hardware).*
@@ -493,7 +506,8 @@ spot.
 - **Values:** Normal, Slow, Fast
 - **Default:** Normal
 - **How:** Normal: up for half a second, at rest after about 1.6 s. Slow: half as fast (at rest after about 3.2 s).
-  Fast: one and a half times as fast (at rest after about 1.1 s). It applies from the next time the menu closes.
+  Fast: one and a half times as fast (at rest after about 1.1 s). It applies from the next Start. While Break the
+  Targets runs it is greyed ("Targets stay still").
 
 ![Side by side, Target speed Slow (left) and Fast (right): the Fast target is at rest on the ground within about a second while the Slow one is still in the air](../media/rc14-eggs-speed.gif)<br>
 *Target speed Slow (left) and Fast (right), each from the first moment its target is launched: the Fast target flies up, falls, bounces and rests on the ground within about a second; the Slow one is still in the air after three seconds. Eden, rc.14 (untested on hardware).*
@@ -501,13 +515,13 @@ spot.
 ### Break the Targets
 
 A practice game where you choose where the targets go. The stage zooms out while you place up to 10 targets, then
-returns to your previous camera mode when you start. Break them all against the clock. It can't run together with Eggs-ercise:
-turning one On turns the other Off.
+returns to your previous camera mode when you start. Break them all against the clock. Like every practice game it
+runs alone: starting it stops the game that was running.
 
-- **Values:** Off, On
-- **Default:** Off
-- **How:** turn it On and close the menu. With no targets placed yet the placing view opens; with a layout it opens at
-  Ready. The Place targets row below goes straight to the placing view.
+- **Where:** Practice games > Break the Targets: Start, Projectiles break targets, Place targets, Saved layouts and
+  CPU during a game
+- **How:** choose **Start**. With no targets placed yet the placing view opens; with a layout it opens at Ready. The
+  Place targets row below goes straight to the placing view.
   - **Placing:** the left stick moves a crosshair (up to 2 units a frame), the D-pad moves it one unit a press (held, it
     repeats). **A** places a target at the crosshair, and the compact box shows "3/10". A target can't go on top of
     another, and 10 is the most. **B** removes the last target when you let go of it: B + D-pad Up still opens the menu and
@@ -518,10 +532,11 @@ turning one On turns the other Off.
   - **Running:** a small target chip, "4/10" and "0:07.12" share one line at the top-left, clear of the frame strip. Breaking the last target stops the clock and the notice reads
     "Done! 10 in 0:18.27 (best 0:16.90)" for three seconds, then Ready again with every target back.
   - The best time is per fighter and per layout, and lasts until the game closes.
-  - Targets stay where you put them: **Target speed** is greyed ("Targets stay still"). **Breaks on** applies to your fighter's attacks,
-    which briefly freeze your fighter on a break. Projectile hits use their native attack shapes and play the same break animation.
-  - To go again, press L+R+A in Training (with **L+R+A Reset** On), or open and close the menu. Each stage keeps its own
-    layout until the game closes.
+  - Targets stay where you put them: while it runs, Eggs-ercise's **Target speed** is greyed ("Targets stay still").
+    **Breaks on** applies to your fighter's attacks, which briefly freeze your fighter on a break. Projectile hits use
+    their native attack shapes and play the same break animation.
+  - To go again, press L+R+A in Training (with **L+R+A Reset** On), or choose **Stop** and **Start**. Opening and closing
+    the menu keeps the run and its clock going. Each stage keeps its own layout until the game closes.
   - In the waiting room's practice it works as in Training: the camera zooms out while placing and returns on start. The
     targets and the camera are on your own screen only.
 
@@ -536,8 +551,8 @@ This setting is independent of Hitbox Visualization and **Breaks on**, which app
 
 ### Place targets
 
-Closes the menu into the placing view and turns Break the Targets On (and Eggs-ercise Off), without a visit to the
-Break the Targets row. Your layout stays: place more, remove some, or press X to start.
+Closes the menu into the placing view and starts Break the Targets there (any other game stops). Your layout stays:
+place more, remove some, or press X to start.
 
 ![Place targets: the menu closes into the zoomed-out placing view, the crosshair moves and A places three targets, B removes the last, X starts](../media/rc14-btt-place.gif)<br>
 *Practice games > Place targets, A: the menu closes into the placing view ("Place targets 0/10"). The crosshair moves and A places three targets ("Place targets 3/10"); B removes the last one ("2/10"); X starts: Ready, "Targets 0/2   0:00.00". Eden, rc.14 (untested on hardware).*
@@ -552,8 +567,8 @@ positions belong to their stage.
   line after the fifth; the rest follow by name, as in the Recording lists. Saving, loading, duplicating and renaming
   count as a use, and a sixth use pushes the oldest out of the five (its file stays). Up/Down move, **A** opens the
   layout's own screen, **B** goes back.
-- **A layout's own screen:** **Load** puts its targets on the stage and turns Break the Targets On: close the menu to start
-  at Ready. **Rename** opens the Switch keyboard (B keeps the old name). **Duplicate** saves a copy as a new layout, at the
+- **A layout's own screen:** **Load** puts its targets on the stage: **Start** plays them from Ready. While Break the
+  Targets runs, closing the menu puts it back to Ready with them. **Rename** opens the Switch keyboard (B keeps the old name). **Duplicate** saves a copy as a new layout, at the
   top of the list. **Delete** asks once: Keep it or Delete it.
 - **While placing:** the Save State chords work on the layout. **Save State Save** (ZL + D-pad Down by default) saves it as
   a new layout, named like "Layout 2 · Battlefield" (the lowest number free on that stage); a save never replaces another
@@ -572,17 +587,18 @@ positions belong to their stage.
 ## Stage tech practice
 
 Practice your techs by being launched at a spot on the stage, then try to tech when you touch it.
-Open **Fighters & Stages > Practice games > Tech practice** to choose a session; the **Tech practice** section
-below holds the point picker and launch settings.
+Open **Fighters & Stages > Practice games > Tech practice**: its screen holds **Start**, the session, the wizard, the
+point picker and the launch settings.
 
 ### Tech practice
 
 Repeats the launch for **10 attempts**, **20 attempts**, **1 minute**, **3 minutes** or **Free practice**.
 
-- **Values:** Off, 20 attempts, 10 attempts, 1 minute, 3 minutes, Free practice
-- **Default:** Off
+- **Values:** 20 attempts, 10 attempts, 1 minute, 3 minutes, Free practice
+- **Default:** 20 attempts
 - **How:** Left / Right chooses the session, or **A** opens the list, **Up / Down** chooses and **A** sets it;
-  close the menu with **B** to begin, and choose **Off** to stop Free practice.
+  choose **Start** to begin, and **Stop** to end it. **Tech wizard** and **Tech point** start it in their own views.
+  Opening the menu pauses the attempt in flight; after **B** the practice carries on with a new set of attempts.
 
 ### Tech point
 
@@ -641,7 +657,7 @@ count and your current streak, then puts you back for the next attempt.
 A successful tech adds to the streak; a miss ends it, and wall techs, wall jumps and ceiling techs are named when
 recognized. If timing or grading cannot be read, the message says it is unavailable; an ungraded attempt is not
 counted. At the end of a counted or timed session, **Done!** shows the results and best streak; a timing average
-appears only when timing is available. Choose another session with **Left / Right** on **Tech practice** to go again.
+appears only when timing is available. To go again, choose **Stop** and **Start** (another session first, if you like).
 
 <!-- CAPTURE-REQUEST rc15-stage-tech-options: the shared clip above shows the picker, launch and grade.
 Dedicated session-list, Surface Random, launch-setting/Set-Random-Auto edits and Done summary clips are not in
@@ -649,9 +665,11 @@ this capture; do not describe the shared GIF as showing them. Use the retained 5
 
 ### CPU during a game
 
-Whether the CPU is hidden for as long as a practice game runs (a game runs from the menu close that starts a mode until
-the mode is Off; "Time!", the end notice and the wait between runs count as running).
+Whether the CPU is hidden for as long as a practice game runs (a game runs from its Start until its Stop; "Time!", the
+end notice and the wait between runs count as running).
 
+- **Where:** in the Eggs-ercise and the Break the Targets screens. It is one setting: a change in one shows in the
+  other. Tech practice always hides the CPU, so it is greyed while Tech practice runs.
 - **Values:** Hide, Show
 - **Default:** Hide
 - **How:** Hide: the CPU is hidden while a game runs, and afterwards it is as **Hide CPU** says. Show: the CPU stays as

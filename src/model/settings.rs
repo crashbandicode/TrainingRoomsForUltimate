@@ -566,14 +566,8 @@ pub fn parse(text: &str) -> Loaded {
     for key in &top.others.duplicates {
         issues.push(Issue { at: key.clone(), reason: Reason::DuplicateKey });
     }
-    let mut menu = snapshot_from("menu", top.menu, &mut issues);
-    let mut defaults = snapshot_from("defaults_menu", top.defaults, &mut issues);
-    // A hand-edited conflict keeps the earlier practice game: Eggs-ercise, then BTT, then Tech.
-    for rows in [&mut menu, &mut defaults] {
-        let on = super::tech_settings::practice(rows);
-        if on[0] && on[1] { let _ = rows.set("btt", &[1, 0]); }
-        if (on[0] || on[1]) && on[2] { let _ = rows.set("tech_practice", &[1, 0, 0, 0, 0, 0]); }
-    }
+    let menu = snapshot_from("menu", top.menu, &mut issues);
+    let defaults = snapshot_from("defaults_menu", top.defaults, &mut issues);
     let mut extra = Map::new();
     for (key, value) in top.others.items {
         if !RETIRED.contains(&key.as_str()) {

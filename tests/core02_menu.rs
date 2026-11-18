@@ -167,10 +167,13 @@ fn layout_row_counts_match_the_rc_freeze() {
     // rc.14 SL4: the Setup library group gained Save setup here (10 → 11).
     // rc.14: Display & Controls gained Frame data colours and Spot labels, Recording gained Match sweet/sour spot (the operator, 2026-11-14,
     // SP1 to SP5; 11 → 13 and 12 → 13). rc.14 hb-legend: Frame data colours and Launch angles became items of the Hitbox Visualization checklist (13 → 12).
-    assert_eq!(counts(false), [34, 11, 13, 56, 12, 3]);
-    assert_eq!(counts(true), [33, 11, 13, 56, 12, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 126);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 125);
+    // rc.15 practice menu (the operator's approval of the mockup, 2026-11-18 ~14:58Z): Practice games is one row per game
+    // (3), each game's sub-screen starts with Start (3), CPU during a game is a row of two sub-screens (1), and the Break
+    // the Targets Off / On row is Start / Stop now (-1): 56 → 62. The sub-screen rows stay rows of Fighters & Stages.
+    assert_eq!(counts(false), [34, 11, 13, 62, 12, 3]);
+    assert_eq!(counts(true), [33, 11, 13, 62, 12, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 132);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 131);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 5);
@@ -183,7 +186,8 @@ fn layout_row_counts_match_the_rc_freeze() {
     // seven Practice games rows; Save setup here; two spots rows.)
     // rc.15 DESIGN §7: session row and twenty variable/editor rows follow BTT.
     // The free-form wizard and its optional preview setting add two rows.
-    assert_eq!(ROWS.len(), 130);
+    // rc.15 practice menu: three game rows, three Start rows and a second CPU during a game row, less the btt row (130 → 136).
+    assert_eq!(ROWS.len(), 136);
     for editor in [Editor::SetupSave, Editor::SetupSaveHere, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }
@@ -201,9 +205,11 @@ fn layout_row_counts_match_the_rc_freeze() {
         assert!(ROWS.iter().any(|r| usize::from(r.group) == g), "{}", group.title);
     }
     assert!(ROWS.iter().all(|r| usize::from(r.group) < GROUPS.len()));
-    // Appended groups (rc.6 Level, rc.14 Practice games): the earlier indices hold.
+    // Appended groups (rc.6 Level, rc.14 Practice games, rc.15 the Eggs-ercise and Break the Targets sub-screens): the
+    // earlier indices hold.
     let titles: Vec<&str> = GROUPS.iter().map(|g| g.title).collect();
-    assert_eq!((titles.len(), titles[13], titles[19], titles[20]), (22, "Extras", "Level", "Practice games"));
+    assert_eq!((titles.len(), titles[13], titles[19], titles[20]), (24, "Extras", "Level", "Practice games"));
+    assert_eq!(&titles[21..], ["Tech practice", "Eggs-ercise", "Break the Targets"]);
     for pilot_present in [false, true] {
         let m = menu_with(Env { pilot_present, ..Env::default() });
         assert!((0..m.entry_count(Page::Saves)).any(|i| m.entry(Page::Saves, i) == Some(Entry::Group(7))), "the Setup library section shows");
