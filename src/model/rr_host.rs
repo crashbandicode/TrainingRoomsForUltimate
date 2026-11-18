@@ -104,6 +104,8 @@ static RECORD_EDGE: AtomicU8 = AtomicU8::new(0);
 static PLAY_PLAYER: AtomicBool = AtomicBool::new(false);
 static PLAY_CPU: AtomicBool = AtomicBool::new(false);
 static MASH: AtomicBool = AtomicBool::new(false);
+/// SAV-002: a save-state load stops both roles' runs (save-states.md: "Load only warps … it stops one that is playing").
+static LOAD: AtomicBool = AtomicBool::new(false);
 static MIGRATED: AtomicBool = AtomicBool::new(false);
 /// Played frames, filled ahead by the worker and taken one per game frame by Player 1's poll and the
 /// CPU's AI epilogue. One slot lost frames: the worker is not tied to the game's frames (Eden
@@ -237,6 +239,7 @@ pub fn pending() -> bool {
         || PLAY_PLAYER.load(Ordering::Acquire)
         || PLAY_CPU.load(Ordering::Acquire)
         || MASH.load(Ordering::Acquire)
+        || LOAD.load(Ordering::Acquire)
         || menu_pending()
         || playing()
         || waiting_work()
@@ -387,6 +390,11 @@ pub fn on_chords(record: bool, play_player: bool, play_cpu: bool) {
 
 pub fn note_mash() {
     MASH.store(true, Ordering::Release);
+}
+
+/// A save-state load was accepted. A Play's own warp (`WARP_HOLD`) is the start of that playback, not a stop.
+pub fn note_load() {
+    LOAD.fetch_or(!WARP_HOLD.load(Ordering::Acquire), Ordering::AcqRel);
 }
 
 /// What the CPU's behaviours see of playback (B5 / N4, Mash interrupts playback): the old recorder's state, with a
@@ -566,6 +574,7 @@ pub fn service_at(
     let mut play_player = PLAY_PLAYER.swap(false, Ordering::AcqRel);
     let mut play_cpu = PLAY_CPU.swap(false, Ordering::AcqRel);
     let mash = MASH.swap(false, Ordering::AcqRel);
+    let load = LOAD.swap(false, Ordering::AcqRel);
     if edge == 1 {
         let role = if LAST_ROLE.load(Ordering::Acquire) == ROLE_CPU {
             "cpu"
@@ -629,6 +638,16 @@ pub fn service_at(
         RUN_CPU.store(false, Ordering::Release);
         drop_frames(Role::Cpu);
         tick.diags.push("screen=playback mash=1".to_string());
+    }
+    if load {
+        // The load starts nothing either: a Play press waiting in this tick goes too.
+        (play_player, play_cpu) = (false, false);
+        for role in [Role::Player, Role::Cpu] {
+            drive_mash(machine, role, true);
+            run_flag(role).store(false, Ordering::Release);
+            drop_frames(role);
+        }
+        tick.diags.push("screen=playback load=1".to_string());
     }
     release_held(&mut play_player, &mut play_cpu);
     if play_player {
@@ -1694,6 +1713,7 @@ fn reset_host() {
     PLAY_PLAYER.store(false, Ordering::Release);
     PLAY_CPU.store(false, Ordering::Release);
     MASH.store(false, Ordering::Release);
+    LOAD.store(false, Ordering::Release);
     MIGRATED.store(false, Ordering::Release);
     PLAYER_FRAMES.lock().clear();
     CPU_FRAMES.lock().clear();
@@ -2302,6 +2322,34 @@ mod tests {
         tick(&root);
         assert!(take_cpu_frame().is_none(), "the mash stopped the CPU's run");
         assert!(!cpu_playback(idle).running);
+    }
+
+    /// SAV-002 (p3-rec-xps-6 rows 20/21): a save-state load stops both roles' runs and starts nothing; a Play's own warp
+    /// (WARP_HOLD) is that playback's start and is not stopped.
+    fn a_load_stops_both_runs_but_not_a_plays_own_warp() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("load-stops");
+        let idle = PlaybackState::default();
+        active_plain_macro(&root, Role::Cpu, 30);
+        on_chords(false, false, true);
+        tick(&root);
+        assert!(take_cpu_frame().is_some(), "the CPU's run plays");
+        note_load();
+        let t = service_at(&root, &none(), "2026-11-08", state(8), state(7));
+        assert!(t.diags.iter().any(|l| l == "screen=playback load=1"), "{:?}", t.diags);
+        assert!(take_cpu_frame().is_none(), "the load stopped the CPU's run");
+        assert!(!cpu_playback(idle).running && !playing());
+        // A Play pressed with the load in the same tick starts nothing.
+        on_chords(false, false, true);
+        note_load();
+        tick(&root);
+        assert!(!playing(), "the load starts nothing");
+        // The Play's own warp: WARP_HOLD is up while its restore runs, so that load does not stop it.
+        WARP_HOLD.store(true, Ordering::Release);
+        note_load();
+        assert!(!LOAD.load(Ordering::Acquire), "a Play's own warp is not a stop");
+        WARP_HOLD.store(false, Ordering::Release);
     }
 
     /// A file of `n` distinct frames (buttons 1..=n), active on `role`, with no start save.
@@ -3511,6 +3559,7 @@ mod tests {
             ("a_warped_cpu_play_feeds_its_first_frame_after_the_restore", a_warped_cpu_play_feeds_its_first_frame_after_the_restore as fn()),
             ("a_cpu_play_without_a_start_save_feeds_at_once", a_cpu_play_without_a_start_save_feeds_at_once as fn()),
             ("a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see", a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see as fn()),
+            ("a_load_stops_both_runs_but_not_a_plays_own_warp", a_load_stops_both_runs_but_not_a_plays_own_warp as fn()),
             ("cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing", cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing as fn()),
             ("player_frames_reach_the_poll_once_each_whatever_the_worker_timing", player_frames_reach_the_poll_once_each_whatever_the_worker_timing as fn()),
             ("a_stopped_cpu_run_feeds_nothing_more", a_stopped_cpu_run_feeds_nothing_more as fn()),

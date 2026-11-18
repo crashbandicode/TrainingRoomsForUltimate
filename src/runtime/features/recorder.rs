@@ -710,6 +710,8 @@ pub fn stop() {
 /// playback after both fighters are back).
 pub fn on_load_request() {
     stop();
+    // SAV-002: the Recording pages macros play in rr_host, which stop does not reach.
+    recording_host::note_load();
     let _scope = HookScope::enter_hook(HookId::NamedRestore);
     named_macros::begin_restore();
 }

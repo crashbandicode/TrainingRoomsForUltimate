@@ -152,7 +152,7 @@ unsafe fn set_normal_speed(module: *mut smash::app::BattleObjectModuleAccessor, 
     }
 }
 
-pub use rr_host::{cpu_playback, cpu_role_after_chord, cpu_role_control, cpu_role_phase, note_mash, playback_controller};
+pub use rr_host::{cpu_playback, cpu_role_after_chord, cpu_role_control, cpu_role_phase, note_load, note_mash, playback_controller};
 
 /// # Safety
 /// `out` is null or the live mapped-input record for this poll.
