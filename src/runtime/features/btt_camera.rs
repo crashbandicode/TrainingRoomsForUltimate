@@ -57,8 +57,7 @@ pub unsafe fn apply(want: bool) {
     request(1, want);
 }
 
-/// Shared placing camera: BTT bit 1, Tech bit 2, Eggs-ercise bit 4 (rc.15: while a run is on). The last owner restores the
-/// first native mode.
+/// Shared placing camera: BTT bit 1, Tech bit 2. The last owner restores the first native mode.
 /// # Safety
 /// Callers release their bit on every placing exit. The game thread applies requests in frame().
 pub unsafe fn request(owner_bit: u8, want: bool) {

@@ -56,6 +56,16 @@ fn restart(run: &mut Run, seed: u32) {
     settle(run, RESET_CENTRE);
 }
 
+/// rc.15: the first seed from 0 whose first target spawns on the ground (targets may also spawn perched in the air), for
+/// the rows that measure the whole Melee flight from the ground.
+fn ground_seed(target: u8, speed: u8, view: View) -> u32 {
+    (0..).find(|&s| {
+        let mut run = started_with(FREE, ANY, speed, target, s, view);
+        run.step(false, 0.0, &[], false, 0);
+        run.egg.is_some() && !run.perch
+    }).unwrap()
+}
+
 fn gap(a: [f32; 2], b: [f32; 2]) -> f32 {
     (a[0] - b[0]).hypot(a[1] - b[1])
 }
@@ -325,6 +335,31 @@ fn eggs_spawn_covers_the_stage() {
     assert!(flips * 10 < total * 7, "no forced side: {flips} of {total} switched");
 }
 
+/// The operator, 11-18 (in view, the player's camera): at the camera Eden measured in Training the targets cover the
+/// visible band, rest on the ground or in the air within reach, and each one's whole flight stays on screen.
+fn eggs_spawn_in_view_heights() {
+    let (mut columns, mut air, mut ground) = (std::collections::BTreeSet::new(), 0, 0);
+    for seed in 0..20 {
+        let mut run = started(FREE, ANY, seed);
+        // Player 1 just right of the band, so the band's whole width is open (ggs_spawn_not_alternating covers P1 in it).
+        run.sense([20.0, 0.0]);
+        run.step(false, 0.0, &[], false, 0);
+        for _ in 0..30 {
+            let egg = run.egg_at().unwrap();
+            columns.insert((egg[0] / 5.0).floor() as i32);
+            if egg[1] - RADIUS > 1.0 { air += 1 } else { ground += 1 }
+            let [v, _, g] = run.fly;
+            let top = egg[1] + v * v / (2.0 * g);
+            let [cx, cy] = [0, 1].map(|i| [egg[0], top][i] * RESET_CENTRE.0[i] + RESET_CENTRE.1[i]);
+            assert!(cx.abs() <= 960.0 && cy <= 540.0 - RADIUS * RESET_CENTRE.0[1] + 0.5, "seed {seed}: {egg:?} apex {top} off screen");
+            assert!(egg[1] - RADIUS <= REACH + 1e-3, "seed {seed}: {egg:?} out of reach");
+            run.step(false, 0.0, &[hit(egg, 0.0)], false, 0);
+        }
+    }
+    assert!(columns.len() >= 7, "the visible band, not two spots: {columns:?}");
+    assert!(air >= 100 && ground >= 100, "both on the ground and in the air: {air} air, {ground} ground");
+}
+
 /// A stage with a pit (two islands): no target is put over it, nor off the stage.
 fn eggs_spawn_skips_pits() {
     let islands = [[[-80.0, 0.0], [-30.0, 0.0]], [[30.0, 0.0], [80.0, 0.0]]];
@@ -405,12 +440,12 @@ fn apex(heights: &[[f32; 2]]) -> (usize, f32) {
 /// §2.3b row 20: Normal launches straight up, apex at frame 30 21.6 above, back at spawn height at 60, one bounce of at
 /// most 8, at rest from 96.
 fn eggs_motion_normal() {
-    let mut run = started(FREE, ANY, 7);
+    let seed = ground_seed(DISC, NORMAL, RESET_CENTRE);
+    let mut run = started(FREE, ANY, seed);
     pass(&mut run, &[], false);
     let y = run.egg_at().unwrap()[1];
-    // Reset-center's view has no room for the whole flight above an air spawn: on the ground (rc.15).
     assert!((y - (RADIUS + 1.44 - 0.024)).abs() < 1e-4, "spawned on the ground and launched: {y}");
-    let mut run = started(FREE, ANY, 7);
+    let mut run = started(FREE, ANY, seed);
     run.step(false, 0.0, &[], false, 7);
     let h = path(&mut run, 200);
     let (frame, top) = apex(&h);
@@ -617,7 +652,7 @@ fn eggs_cpu_flies_like_the_disc() {
 /// once, held without a pose request through the flight, stood up once when the flight comes to rest, then held.
 fn eggs_cpu_pass_follows_the_flight() {
     for speed in [NORMAL, SLOW, FAST] {
-        let mut run = started_with(FREE, ANY, speed, CPU, 7, RESET_CENTRE);
+        let mut run = started_with(FREE, ANY, speed, CPU, ground_seed(CPU, speed, RESET_CENTRE), RESET_CENTRE);
         pass(&mut run, &[], false);
         let ground = run.egg.unwrap()[1];
         let (mut top, mut puts) = (0.0f32, vec![]);
@@ -653,7 +688,7 @@ fn eggs_cpu_pass_follows_the_flight() {
 /// owns the CPU (the hit, its hitlag, a run that ended: no position) the tag stays the game's business, and a hidden body's
 /// off-write wins.
 fn eggs_cpu_target_keeps_its_cursor() {
-    let mut run = started_with(FREE, ANY, NORMAL, CPU, 7, RESET_CENTRE);
+    let mut run = started_with(FREE, ANY, NORMAL, CPU, ground_seed(CPU, NORMAL, RESET_CENTRE), RESET_CENTRE);
     assert!(!keeps_cursor(run.cpu_pass(0.0, false), false), "nothing placed before the first target");
     pass(&mut run, &[], false);
     let mut puts = vec![];
@@ -1158,6 +1193,7 @@ fn case_table() {
         ("eggs_spawn_not_alternating", eggs_spawn_not_alternating as fn()),
         ("eggs_spawn_covers_the_stage", eggs_spawn_covers_the_stage as fn()),
         ("eggs_spawn_skips_pits", eggs_spawn_skips_pits as fn()),
+        ("eggs_spawn_in_view_heights", eggs_spawn_in_view_heights as fn()),
         ("eggs_first_target_waits_for_floors", eggs_first_target_waits_for_floors as fn()),
         ("eggs_articles_break", eggs_articles_break as fn()),
         ("eggs_spawn_ignores_the_notice", eggs_spawn_ignores_the_notice as fn()),

@@ -143,10 +143,6 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     // it: Eden wa-eggs-07bae4c1-1, E11) and the waiting room's busy native UI.
     let owners = crate::runtime::published::input_owners();
     let held = owners.covers_strip();
-    // rc.15 (the primary's ruling 15:30Z): while a game runs the game's own Fixed camera shows the whole stage, where the
-    // targets appear; every stop, a menu over it and the scene's end give the player's camera back (`btt_camera`, owner 4).
-    let camera = running && !held && crate::model::btt::own_camera(scene::facts());
-    super::btt_camera::request(EGGS_CAMERA, camera);
     (plan == eggs::Plan::Read).then_some(())?;
     let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
     if run.floors_wanted() {
@@ -200,8 +196,6 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     Some(())
 }
 
-/// Eggs-ercise's owner bit of the shared Fixed camera (`btt_camera::request`: Break the Targets 1, Tech 2).
-const EGGS_CAMERA: u8 = 4;
 /// Native rays of the floor read a pass (`eggs_floors`): Training's stage, the widest, takes about a hundred.
 const RAYS_PER_PASS: usize = 12;
 

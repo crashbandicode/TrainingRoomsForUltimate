@@ -1467,17 +1467,17 @@ Crop on macros and combos uses the Replay window clip editor and keyboard save-a
 
 ### TR15-GAMES — Practice games: targets across the stage, P1's articles break them (2026-11-18)
 
-Ruling by the primary (2026-11-18 15:30Z) on the operator's card report against reship-4 `8100b5e9`. It supersedes SPEC
+Operator rulings relayed by the primary (2026-11-18 15:40Z, replacing the 15:30Z ones) on the card report against reship-4 `8100b5e9`. It supersedes SPEC
 `rc14-eggsercise` V2.2 and §2.3b (targets on screen, on Player 1's ground only, `MIN_GAP` 30) and V2.3 (projectiles never
-break a target, except under Hits of 12%+), and it extends rc15 BTT's camera ruling (Fixed for placing only) to Eggs-ercise.
+break a target, except under Hits of 12%+). V2.2's on-screen rule stays: targets appear in view, with the player's own camera.
 
-- **Spawns:** a random point of the stage's floors (main-stage tops and platforms, read once per run start from the game's
-  collision with Tech's column rays), chosen by length, on the floor or up to 25 units above it (within a jump). Each
+- **Spawns:** a random point of the stage's floors in view (main-stage tops and platforms, read once per run start from the
+  game's collision with Tech's column rays, cut to the screen), chosen by length, on the floor or up to 25 units above it (within
+  a jump; the launch is lowered so the flight stays on screen). Each
   target keeps at least 16 units from Player 1's body. It also keeps a spacing from the previous target: `MIN_GAP` where
   the floors are long, and a third of what is left beside Player 1 where they are not, so no target is ever pushed to a
   fixed side. With no floor read, the run's ground is used.
-- **Camera:** while Eggs-ercise runs, it holds the game's Fixed camera through the shared `btt_camera` owner bits
-  (owner 4). Any menu over the game, Off and the scene's end give the player's camera back.
+- **Camera:** unchanged; the player's own camera. (A Fixed camera during Eggs-ercise was tried and withdrawn, 15:40Z.)
 - **Articles:** in both games, P1-owned articles (projectiles, explosions, thrown items) break targets as `Breaks on`
   allows that hit (Any attack; Aerials while P1 is in an aerial; Hits of 12%+ by the article hit's damage). Break the
   Targets keeps its `Projectiles break targets` toggle. An article's break does not freeze the fighter.

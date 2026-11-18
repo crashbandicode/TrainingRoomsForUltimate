@@ -425,10 +425,10 @@ impl Run {
         self.owner.1 == 0
     }
 
-    /// A new target, launched (§2.3b) from a random spot of the stage (rc.15): a point of one of the stage's floors (`set_floors`;
-    /// the run's ground when none was read), chosen by length, inside the stage's range and the screen (the Fixed camera shows
-    /// the stage while a game runs: `wants_camera`) with its radius and `DRIFT` in from the edges, on the floor or up to `REACH`
-    /// above it. It keeps `spacing` from `last` and `P1_GAP` from Player 1; when sixteen tries all fall short, the try that
+    /// A new target, launched (§2.3b) from a random spot of the stage in view (rc.15; the operator, 11-18: targets stay in
+    /// view, the player's own camera): a point of one of the stage's floors (`set_floors`; the run's ground when none was
+    /// read), chosen by length, inside the stage's range and the screen with its radius and `DRIFT` in from the edges, on the
+    /// floor or up to `REACH` above it (a lower launch keeps the flight under the screen's top). It keeps `spacing` from `last` and `P1_GAP` from Player 1; when sixteen tries all fall short, the try that
     /// falls least short (a random spot, never a fixed side). The apex stays under the screen's top (a lower launch otherwise).
     /// None before the draw published the camera (a run's first one, with no `last`, waits for it to hold still).
     fn spawn(&mut self, last: Option<[f32; 2]>) -> Option<()> {
@@ -478,8 +478,8 @@ impl Run {
             }).unwrap_or(&spans[n - 1]);
             let x = (lo + u).min(hi);
             let on = a[1] + (b[1] - a[1]) * ((x - a[0]) / (b[0] - a[0]).max(1e-6)).clamp(0.0, 1.0);
-            // In the air (half the time) only where the whole Melee flight (`APEX` above it) still fits under the screen's top.
-            let room = (top - on - RADIUS - APEX).max(0.0);
+            // In the air half the time, the disc kept a radius under the screen's top (its launch is lowered to fit below).
+            let room = (top - on - 2.0 * RADIUS).max(0.0);
             let air = if room < 2.0 * RADIUS || random() < 0.5 { 0.0 } else { random() * REACH.min(room) };
             ([x, on + RADIUS + air], air > 0.0, (2.0 * random() - 1.0) * DRIFT_SPEED * speed)
         };
