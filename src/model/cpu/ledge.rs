@@ -48,11 +48,31 @@ pub struct Ledge {
     pub delay: Option<u16>,
     /// The playback of a playback case has been started (the climb stays denied until it is).
     pub playback_started: bool,
+    /// This grab rolled an empty effective set: the CPU behaves natively (CPU-091: unlike a case not rolled yet).
+    pub native_grab: bool,
+    /// CPU-091: hanging frames since the held case could act (its delay over); the bound releases the climb after them.
+    pub actionable_frames: u16,
 }
+
+/// CPU-091 safety bound: TR requests a performing case on its first actionable frame after the delay (at the latest the
+/// buffered motion frame 19) and the CPU leaves CliffWait on the next status change. If it still hangs 30 such frames
+/// (half a second) later, the native climb is no longer held back, so a fault can never park the CPU on the ledge.
+pub const UNREQUESTED_BOUND: u16 = 30;
 
 impl Ledge {
     pub const fn new() -> Self {
-        Self { case: None, delay: None, playback_started: false }
+        Self { case: None, delay: None, playback_started: false, native_grab: false, actionable_frames: 0 }
+    }
+
+    /// The native climb is still held back for a performing case while the CPU hangs, before and after TR's request (the
+    /// game's climb is decided in the same frame and would win, p3f-verify-yoga-3), within the bound.
+    pub fn awaits_request(&self) -> bool {
+        self.case.is_some_and(|case| case <= option::ATTACK) && self.actionable_frames < UNREQUESTED_BOUND
+    }
+
+    /// The bound released the native climb for a performing case that never took (the runtime logs it).
+    pub fn bound_released(&self) -> bool {
+        self.case.is_some_and(|case| case <= option::ATTACK) && self.actionable_frames >= UNREQUESTED_BOUND
     }
 
     /// Decision B11: drop the held case so the next hanging frame rolls again. The delay and its
@@ -60,6 +80,8 @@ impl Ledge {
     pub fn clear_case(&mut self) {
         self.case = None;
         self.playback_started = false;
+        self.native_grab = false;
+        self.actionable_frames = 0;
     }
 
     /// The reset bundle's "reset the ledge delay" (the case clears by itself through step 1).
@@ -68,22 +90,28 @@ impl Ledge {
     }
 
     /// The game's question `q` for this body (`WorkModule::is_enable_transition_term`). SPEC-cpu-03 §4: deny the
-    /// native automatic climb while the CPU waits, delays, or waits for its playback to start; otherwise the
-    /// original answer.
+    /// native automatic climb while the CPU waits, delays, or waits for its playback to start, and (CPU-091,
+    /// DECISIONS B11a) while TR holds a case it performs itself, before and after its request, for at most
+    /// `UNREQUESTED_BOUND` frames; otherwise the original answer.
     pub fn transition_term(&self, t: &Table, s: &CpuSettings, counters: &Counters, playback_running: bool, q: TermQuery) -> bool {
         let TermQuery { status, term, original } = q;
         let on_ledge_wait = t.is(C::StatusCliffWait, status);
         if !original || !on_ledge_wait || s.ledge_state.is_empty() || !t.is(C::TermContCliffClimb, term) {
             return original;
         }
-        let Some(case) = self.case else { return original };
+        // CPU-091: no case yet (B11 cleared it at the menu change) holds the climb until the next frame rolls.
+        // Another playback yields the feature entirely (its step does not roll), as before.
+        let Some(case) = self.case else { return (self.native_grab || playback_running) && original };
         let hold_for_playback = is_playback(case) && !self.playback_started;
         // While another playback runs the feature yields entirely, except the hold that keeps the CPU
         // on the ledge until its own playback has started.
         let waiting = if playback_running {
             hold_for_playback
         } else {
-            case == option::WAIT || counters.count(CounterId::Ledge) < u32::from(self.delay.unwrap_or(0)) || hold_for_playback
+            case == option::WAIT
+                || counters.count(CounterId::Ledge) < u32::from(self.delay.unwrap_or(0))
+                || hold_for_playback
+                || self.awaits_request()
         };
         !waiting
     }
@@ -98,9 +126,7 @@ impl Ledge {
         }
         // 1. Not hanging: forget the grab.
         if f.situation != Situation::Cliff {
-            self.case = None;
-            self.delay = None;
-            self.playback_started = false;
+            *self = Self::new();
             counters.get(CounterId::Ledge).full_reset();
             return out;
         }
@@ -108,12 +134,17 @@ impl Ledge {
         let delay = *self.delay.get_or_insert_with(|| s.ledge_delay.pick(rng));
         if self.case.is_none() {
             self.case = s.ledge_state.pick(rng).map(|i| i as u8);
-            if self.case.is_none() {
+            self.native_grab = self.case.is_none();
+            if self.native_grab {
                 // An empty effective set: the CPU behaves natively this grab, the climb is not denied.
                 return out;
             }
         }
         let Some(case) = self.case else { return out };
+        // CPU-091 bound: count the frames on which TR could already act on its case without having requested it.
+        if counters.count(CounterId::Ledge) >= u32::from(delay) {
+            self.actionable_frames = self.actionable_frames.saturating_add(1);
+        }
         // 3. The buffered frames.
         let after_catch = t.is(C::StatusCliffCatch, f.prev_status);
         let waiting_status = t.is(C::StatusCliffWait, f.status);

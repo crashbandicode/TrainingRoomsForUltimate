@@ -1865,7 +1865,79 @@ approved_by = "Operator approved the bridge TR +700 and the state-export-invalid
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 156723
+date = "2026-11-18"
+reason = "CPU-091 ledge re-roll window (rc15/phase3-fixes, rebased on main c212bc50 156023): a Ledge Options change while hanging (B11 clear_case) left no case until the next CPU frame, and the climb query fell back to the game, which climbed. Ledge::native_grab tells a case not rolled yet from an empty effective set; the climb stays denied until the roll. Measured 155448 = +2. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "devin-primary 04:01Z (up to +6-8 for CPU-091), operator review pending; rebased onto main af72b7ba."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156739
+date = "2026-11-18"
+reason = "SAV-002 load stops Recording playback (rc15/phase3-fixes, rebased on main c212bc50 156023): rr_host::note_load(), called by recorder::on_load_request, stops both rr_host roles and drops a Play press in the same tick; a Plays own warp (WARP_HOLD) is not stopped. Measured 155464 = +16 (compacted from +21). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "devin-primary 04:08Z approved about +10-14; the measured +16 is 2 over and is flagged for confirmation; operator review pending; rebased onto main af72b7ba."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156740
+date = "2026-11-18"
+reason = "REC-027 Mash interrupts playback (rc15/phase3-fixes, rebased on main c212bc50 156023): note_mash stops the CPUs rr_host run and its queued frames at once, and interrupt_playback republishes the CPUs playback state whenever it changed, so the re-armed mash acts inside its trigger. Measured 155465 = +1. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "devin-primary 04:13Z (about +4-6), operator review pending; rebased onto main af72b7ba."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156765
+date = "2026-11-18"
+reason = "CPU-091 climb race (SPEC-cpu-03 s4 / DECISIONS B11a): the native climb stays denied while TR holds a performing case it has not requested, with a 30-frame safety bound that releases and logs climb_bound_release. Measured 155490 = +25 on 155465. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "devin-primary 05:10Z GO (about +5 guidance, operator: additional lines); the measured +25 exceeds the guidance and is flagged for confirmation."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156771
+date = "2026-11-18"
+reason = "REC-027 race (tr-review-astra-2 08:38Z): rr_host publish reads the run flag under the frame-queue lock that note_mash clears it under, so an in-flight step_role producer cannot refill a cut CPU run. Measured 156073 = +6. Exact total. FOR OPERATOR REVIEW."
+approved_by = "devin-primary 09:38Z (fix the REC-027 race at the root); operator review pending; rebased onto main af72b7ba."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156779
+date = "2026-11-18"
+reason = "Eden p3f-verify-yoga-3 follow-ups on rc15/phase3-fixes (156073): SAV-002 load stops both rr_host runs at once (note_load), and B11a keeps the native climb denied after TRs request while the CPU still hangs (the bound counts through the request). Measured 156081 = +8. Exact total. FOR OPERATOR REVIEW."
+approved_by = "devin-primary 09:49Z (fix verify findings at the root before READY); operator review pending; rebased onto main af72b7ba."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156789
+date = "2026-11-18"
+reason = "tr-review-astra-3 14:34Z merge blocker: the hook-side cuts (note_mash from the CPU command hook, note_load from the load request) no longer take the frame-queue or start-speed locks the macros worker holds. Per-role atomic cut flags; take_frame, role_playing and publish honour them; the worker tick clears the queue then the flag. Measured 156091 = +10 on 156081. Exact total. FOR OPERATOR REVIEW."
+approved_by = "Review fix for an Astra merge blocker (primary 13:3xZ: the phase3 fixes land after PASS); the +10 is flagged for the primary/operator."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156795
+date = "2026-11-18"
+reason = "FS-027/FS-031 busy fix (rc15/busy-rr-host 4021e653, tr-review-astra-3 PASS 16:23Z; Eden verify PASS) on main 76a830ce (156789): +6 (the busy guards count a Recording-page take as busy; the test is not counted). Exact total, no headroom. Counting and gates unchanged."
+approved_by = "operator 2026-11-18: yes additional lines are ok; primary c07b3449 goal 18:36Z: land the busy fix on local main as planned."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 162217
 date = "2026-11-18"
 reason = "Mash out integration (rc15/mashout-int: merge of local main af72b7ba into rc15/mashout a7a6a327, gate ffb866a6): measured 162217 = main 156721 + 5496, the whole Mash out delta (native grading, moves catalog, M3 observer, rows 40/95/97/113/114/116/117, CPU-receipt owner). Exact total, no headroom. Counting and gates unchanged."
 approved_by = "operator 2026-11-18: yes additional lines are ok; primary c07b3449 approved 18:17Z"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162291
+date = "2026-11-18"
+reason = "Mash out integration forward merge (rc15/mashout-int 590133a1, 162217 on main af72b7ba) onto local main 6f7e0d63 (156795 = af72b7ba 156721 + 74 from the phase3 fixes and the busy fix): 162217 + 74 = 162291. Exact total, no headroom. Counting and gates unchanged."
+approved_by = "operator 2026-11-18: yes additional lines are ok; primary c07b3449 approved 18:17Z (Mash out +5496); main's entries carry their own approvals."
