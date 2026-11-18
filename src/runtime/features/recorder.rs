@@ -686,12 +686,12 @@ pub fn interrupt_playback() {
         let stopped = rec.interrupt_on_mash(&settings);
         (stopped, rec.playback_state(false))
     };
-    let state = recording_host::cpu_playback(state);
+    // The CPU sees the playback gone before the next injection, also when only the Recording page's run stopped (REC-027).
+    cpu::set_playback(recording_host::cpu_playback(state));
     if stopped {
-        // The same bookkeeping as `stop`, and the CPU sees the playback gone before the next injection.
+        // The same bookkeeping as `stop`.
         LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);
         notices::post_phase(Phase::Idle, 0);
-        cpu::set_playback(state);
         event("playback_interrupt", "mash", 1, "", 0);
     }
 }

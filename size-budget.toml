@@ -1874,3 +1874,11 @@ ceiling = 155464
 date = "2026-11-18"
 reason = "SAV-002 load stops Recording playback (rc15/phase3-fixes on CPU-091 155448): rr_host::note_load(), called by recorder::on_load_request, stops both rr_host roles and drops a Play press in the same tick; a Plays own warp (WARP_HOLD) is not stopped. Measured 155464 = +16 (compacted from +21). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
 approved_by = "devin-primary 04:08Z approved about +10-14; the measured +16 is 2 over and is flagged for confirmation; operator review pending."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155465
+date = "2026-11-18"
+reason = "REC-027 Mash interrupts playback (rc15/phase3-fixes on SAV-002 155464): note_mash stops the CPUs rr_host run and its queued frames at once, and interrupt_playback republishes the CPUs playback state whenever it changed, so the re-armed mash acts inside its trigger. Measured 155465 = +1. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "devin-primary 04:13Z (about +4-6), operator review pending."

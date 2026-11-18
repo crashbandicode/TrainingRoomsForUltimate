@@ -388,8 +388,12 @@ pub fn on_chords(record: bool, play_player: bool, play_cpu: bool) {
     }
 }
 
+/// REC-027: the CPU's run stops at once, so the CPU's next frame sees no playback and its mash acts inside the trigger;
+/// the tick still drives the machine's mash (`MASH`).
 pub fn note_mash() {
     MASH.store(true, Ordering::Release);
+    RUN_CPU.store(false, Ordering::Release);
+    drop_frames(Role::Cpu);
 }
 
 /// A save-state load was accepted. A Play's own warp (`WARP_HOLD`) is the start of that playback, not a stop.
@@ -2352,6 +2356,24 @@ mod tests {
         WARP_HOLD.store(false, Ordering::Release);
     }
 
+    /// REC-027 (p3-rec-xps-7 06e/06f): "the macro stops and the CPU does the mash action" (menu/recording.md:305). The
+    /// CPU's mash asks for the stop and waits for the playback to be gone before it acts; rr_host only stopped the run at
+    /// its next service tick, ~1 s later, so the Hitstun trigger had passed and no Mash Jump came. The CPU must see its
+    /// macro gone at once, before the tick.
+    fn the_mash_stop_is_seen_by_the_cpu_before_the_next_tick() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("cpu-mash-now");
+        let idle = PlaybackState::default();
+        active_plain_macro(&root, Role::Cpu, 30);
+        on_chords(false, false, true);
+        tick(&root);
+        assert!(cpu_playback(idle).running, "the CPU's run plays");
+        note_mash();
+        assert!(!cpu_playback(idle).running, "the CPU sees its macro stopped at once, so its mash can act in the trigger");
+        assert!(take_cpu_frame().is_none(), "no further macro frame reaches the CPU");
+    }
+
     /// A file of `n` distinct frames (buttons 1..=n), active on `role`, with no start save.
     fn active_plain_macro(root: &Path, role: Role, n: u32) -> Vec<u32> {
         let _ = service_at(root, &none(), "2026-11-08", state(8), state(7));
@@ -3560,6 +3582,7 @@ mod tests {
             ("a_cpu_play_without_a_start_save_feeds_at_once", a_cpu_play_without_a_start_save_feeds_at_once as fn()),
             ("a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see", a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see as fn()),
             ("a_load_stops_both_runs_but_not_a_plays_own_warp", a_load_stops_both_runs_but_not_a_plays_own_warp as fn()),
+            ("the_mash_stop_is_seen_by_the_cpu_before_the_next_tick", the_mash_stop_is_seen_by_the_cpu_before_the_next_tick as fn()),
             ("cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing", cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing as fn()),
             ("player_frames_reach_the_poll_once_each_whatever_the_worker_timing", player_frames_reach_the_poll_once_each_whatever_the_worker_timing as fn()),
             ("a_stopped_cpu_run_feeds_nothing_more", a_stopped_cpu_run_feeds_nothing_more as fn()),
