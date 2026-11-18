@@ -36,7 +36,7 @@ use callgraph::{Graph, Tok};
 const LOCK_METHODS: &[&str] = &["lock", "read", "write"];
 const GUARD_HELPERS: &[&str] = &["lock_write", "lock_read"];
 const WAITS: &[&str] = &["sleep", "park", "park_timeout", "recv", "recv_timeout", "join", "wait", "wait_timeout", "wait_while"];
-const PUBLISHING_ENTRIES: &[&str] = &["published::publish", "menu::apply_kept", "export::request"];
+const PUBLISHING_ENTRIES: &[&str] = &["published::publish", "menu::apply_kept", "export::request", "mashout::service"];
 const ALIASES: &[(&str, &str)] = &[("ui/menu_app.rs", "menu"), ("ui/menu_app.rs", "menu_app")];
 
 /// `(function, via)` edges the scan reports that the code does not have, each with the reason (read in the source).
@@ -952,6 +952,13 @@ const TYPED_STATIC_CALLS: &[(&str, &str, &str)] = &[
 /// the game's on-init callback (`reset_hub::on_init`), Skyline's NRO-load hooks, and the exported trace control.
 /// `every_function_handed_to_the_game_is_listed` keeps this complete.
 const GAME_ENTRIES: &[&str] = &[
+    "interposer::start",
+    "interposer::started",
+    "interposer::end",
+    "clatter_set::set_wrapper",
+    "clatter_set::qualified",
+    "clatter_set::add_wrapper",
+    "clatter_set::qualified_add",
     "cpu::on_frame",
     "cpu_common::di_hook",
     "cpu_common::change_status_hook",

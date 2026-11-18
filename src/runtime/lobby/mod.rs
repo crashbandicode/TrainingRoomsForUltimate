@@ -52,6 +52,8 @@ pub(crate) fn init() {
 
 /// Once per game frame, before the input processing (the input poll's note for Player 1).
 pub(crate) fn update() {
+    // The M3 Set observer's owner site: game thread, before the input processing and before any fighter's original frame.
+    crate::runtime::features::mashout::owner_site();
     // What a settings publish asked of the game (the lock-free runtime: the publish runs on plugin threads, which never take the
     // planner's or the roster's locks): the preload planner's reset, then the roster's re-plan, in the order the publish made them.
     crate::runtime::roster::cycle_preload_config::service();

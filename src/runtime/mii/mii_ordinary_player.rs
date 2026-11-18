@@ -407,7 +407,8 @@ pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,rea
     let manual_direct=user_request && matches!(selection,Selection::Direct(_));
     // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.
     let replace_restore=manual_direct && s.restore.is_some();
-    if !s.busy() && (s.request.is_none() || replace_restore) && request.is_some() {
+    let accepted=!s.busy() && (s.request.is_none() || replace_restore) && request.is_some();
+    if accepted {
         s.restore=None;
         if user_request {WAITING_MEMORY.lock().manual_request(Role::Player as usize);}
         s.request=request;
@@ -627,7 +628,7 @@ unsafe fn complete(entry:*const u8,t:&Track) {
                     remember_owned(Role::Player,t.ticket.epoch,target,forms,
                         t.publish,t.destination.cursor,t.destination.target==mii_cycle::Target::Original);
                     if let Some(fighter)=TrioFighter::from_kind(target) {
-                        Role::Player.sync_selection(fighter);
+                        Role::Player.sync_selection(fighter,crate::engine::mii::ordinary_player::Requester::User);
                     }
                     trace!("[MiiOrdinaryPlayer] ready ticket={:?} target={:#x} index={} resource={:02x?} released={} saved_files_written=false",
                         t.ticket,target,now.binding.record_index,
@@ -863,7 +864,7 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
                 remember_owned(Role::Player,current.binding.epoch,descriptor_kind(&descriptor),descriptor_forms(&descriptor),
                     active,destination.cursor,destination.target==mii_cycle::Target::Original);
                 if let Some(fighter)=TrioFighter::from_kind(descriptor_kind(&descriptor)) {
-                    Role::Player.sync_selection(fighter);
+                    Role::Player.sync_selection(fighter,crate::engine::mii::ordinary_player::Requester::User);
                 }
                 if !request.refresh_partners() {notify(Role::Player,"Player choice already active".into());}
             }
@@ -1134,7 +1135,7 @@ unsafe fn bank_applied(entry:*mut u8,b:&BankTrack,settled:&native::Settled,publi
     let original=b.destination.target==mii_cycle::Target::Original;
     publish_partners(Role::Player,forms);
     remember_owned(Role::Player,b.ticket.epoch,logical,forms,exact,b.destination.cursor,original);
-    if let Some(fighter)=TrioFighter::from_kind(logical) {Role::Player.sync_selection(fighter);}
+    if let Some(fighter)=TrioFighter::from_kind(logical) {Role::Player.sync_selection(fighter,crate::engine::mii::ordinary_player::Requester::User);}
     trace!("[MiiOrdinaryPlayer] bank ready ticket={:?} target={:#x} physical={:#x} index={} original={} mii={} resource_pair={:?} released={}",
         b.ticket,logical,descriptor_kind(&now.descriptor),now.binding.record_index,original,exact.is_some(),settled.resource_pair,released);
     notify(Role::Player,crate::engine::mii::ordinary_player::bank_notice(true,exact.is_some(),original).into());

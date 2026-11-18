@@ -1232,6 +1232,7 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     published::publish(&settings.menu, outbox.rerolls, outbox.picks);
     // rc.14: every close with Eggs-ercise on starts a fresh run.
     crate::runtime::features::hitbox::eggs_start();
+    crate::runtime::features::mashout::start();
     // rc.14 Break the Targets: Place targets asks for the placing view; every close tells the mode (after the publish above).
     crate::runtime::features::btt::menu_closed(outbox.place_targets);
     crate::runtime::features::tech::menu_closed(outbox.tech_point);

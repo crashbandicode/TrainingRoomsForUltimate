@@ -1,7 +1,16 @@
 use runtime::lobby::training::{self, lobby};
 type Request = GenericRequest;
 use engine::swap::cycle_members::{admitted, over_pending, Admission};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
+/// Who asked for a CPU change (src/model/mii/ordinary_player.rs `Requester`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(dead_code)]
+enum Requester {
+    User,
+    Practice,
+}
+/// Mash out's live temporary CPU fighter (features/mashout.rs TEMP_KIND), u32::MAX when none.
+static PRACTICE_KIND: AtomicU32 = AtomicU32::new(u32::MAX);
 use std::sync::{Mutex, MutexGuard};
 
 #[macro_export]
@@ -24,6 +33,9 @@ impl<T> Lock<T> {
 enum Role {
     Player = 0,
     Cpu = 1,
+}
+impl Role {
+    // SYNC_SELECTION
 }
 impl Role {
     fn enabled(self) -> bool {
@@ -168,6 +180,8 @@ fn queue(role: Role, selection: Selection) {
 #[derive(Clone, Copy)]
 struct TrainingModpackMenu {
     cpu_roster: CpuRoster,
+    player_character: Fighter,
+    cpu_character: Fighter,
 }
 #[derive(Clone, Copy)]
 struct CpuRoster;
@@ -176,11 +190,18 @@ impl CpuRoster {
         [Fighter(0x48)]
     }
 }
-static MENU: TrainingModpackMenu = TrainingModpackMenu {
+/// The user's persisted choices; Banjo (0x54) is the user's CPU Character pick.
+const USER_MENU: TrainingModpackMenu = TrainingModpackMenu {
     cpu_roster: CpuRoster,
+    player_character: Fighter(0),
+    cpu_character: Fighter(0x54),
 };
-fn setting(menu: &TrainingModpackMenu) -> TrainingModpackMenu {
-    *menu
+static MENU: Lock<TrainingModpackMenu> = Lock::new(USER_MENU);
+fn setting(menu: &Lock<TrainingModpackMenu>) -> TrainingModpackMenu {
+    *menu.lock()
+}
+fn lock_write(menu: &Lock<TrainingModpackMenu>) -> MutexGuard<'_, TrainingModpackMenu> {
+    menu.lock()
 }
 
 mod button_config {
@@ -198,6 +219,13 @@ mod sources {
 }
 
 mod runtime {
+    pub mod features {
+        pub mod mashout {
+            pub fn temporary_cpu_selection(kind: u32) -> bool {
+                crate::PRACTICE_KIND.load(crate::Ordering::Relaxed) == kind
+            }
+        }
+    }
     pub mod roster {
         pub mod character_lifecycle {
             pub fn native_hooks_ready() -> bool {
@@ -332,18 +360,26 @@ mod mii_ordinary_cpu {
     #[derive(Clone, Copy)]
     struct Request {
         selection: Selection,
+        owner: Requester,
     }
     impl Request {
         const CYCLE: Self = Self {
             selection: Selection::Cycle,
+            owner: Requester::User,
         };
         const REFRESH_PARTNERS: Self = Self {
             selection: Selection::RefreshPartners,
+            owner: Requester::User,
         };
         fn direct(_: u64, kind: u32) -> Option<Self> {
             Some(Self {
                 selection: Selection::Direct(Fighter(kind)),
+                owner: Requester::User,
             })
+        }
+        /// model/mii/ordinary_cpu.rs `Request::owned`: the request keeps its owner.
+        fn owned(self, owner: Requester) -> Self {
+            Self { owner, ..self }
         }
     }
     struct Waiting;
@@ -416,6 +452,9 @@ mod mii_ordinary_cpu {
     pub fn set_request(value: bool) {
         STATE.lock().request = value.then_some(Request::CYCLE);
     }
+    pub fn request_owner() -> Option<Requester> {
+        STATE.lock().request.map(|r| r.owner)
+    }
     pub fn request_pending() -> bool {
         STATE.lock().request.is_some()
     }
@@ -436,10 +475,15 @@ mod mii_ordinary_cpu {
 
 // NOTICE_BLOCKED
 // QUEUE_ADMITTED
+// QUEUE_OWNED
+// LIVE_OWNER
+// PERSISTS_SELECTION
 // CPU_RELOAD_READY
 // REQUEST_CPU_KIND
 
 fn reset_fixture() {
+    PRACTICE_KIND.store(u32::MAX, Ordering::Relaxed);
+    *MENU.lock() = USER_MENU;
     NOTICES.lock().clear();
     *SAVED_RESULT.lock() = None;
     BASE.store(1, Ordering::Relaxed);
@@ -632,4 +676,37 @@ fn explicit_pick_preserves_pending_user_but_replaces_automatic_request() {
             assert!(pending.once);
         }
     }
+}
+
+/// b444ba57: an automatic partner refresh of Mash out's temporary CPU fighter belongs to Practice; the completion's
+/// sync_selection leaves the user's CPU Character choice alone.
+#[test]
+fn practice_fighter_refresh_keeps_practice_owner_and_the_user_choice() {
+    reset_fixture();
+    mii_ordinary_cpu::reset(true);
+    state_for(Role::Cpu).lock().observed = Some((17, 0x4b));
+    PRACTICE_KIND.store(0x4b, Ordering::Relaxed);
+    queue(Role::Cpu, Selection::RefreshPartners);
+    let owner = mii_ordinary_cpu::request_owner();
+    assert_eq!(owner, Some(Requester::Practice), "the practice fighter's refresh must keep Practice");
+    Role::Cpu.sync_selection(Fighter(0x4b), owner.unwrap());
+    assert_eq!(setting(&MENU).cpu_character, Fighter(0x54), "the user's CPU Character choice was overwritten");
+}
+
+/// The user's own fighter keeps the User owner: its refresh and a user pick still persist (and get their receipt).
+#[test]
+fn user_refresh_and_user_pick_keep_the_user_owner() {
+    reset_fixture();
+    mii_ordinary_cpu::reset(true);
+    state_for(Role::Cpu).lock().observed = Some((17, 0x54));
+    queue(Role::Cpu, Selection::RefreshPartners);
+    assert_eq!(mii_ordinary_cpu::request_owner(), Some(Requester::User));
+
+    reset_fixture();
+    mii_ordinary_cpu::reset(true);
+    assert!(request_cpu_kind(0x48));
+    let owner = mii_ordinary_cpu::request_owner().unwrap();
+    assert_eq!(owner, Requester::User);
+    Role::Cpu.sync_selection(Fighter(0x48), owner);
+    assert_eq!(setting(&MENU).cpu_character, Fighter(0x48));
 }

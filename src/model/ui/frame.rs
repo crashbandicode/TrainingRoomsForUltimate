@@ -483,7 +483,12 @@ pub fn write_value(menu: &Menu, row: usize, out: &mut Text<72>) {
         RowValue::Toggle(on) => _ = out.write_str(if on { "[ON]" } else { "[OFF]" }),
         RowValue::Choice(at) => {
             let label = match (r.control, at) {
-                (Control::Dropdown(labels), Some(i)) => labels.get(i).copied().unwrap_or("-"),
+                (Control::Dropdown(_), Some(i)) => {
+                    let (name, qualifier) = menu.dropdown_label(row, i).unwrap_or(("-", ""));
+                    let _ = out.write_str(name);
+                    if !qualifier.is_empty() { let _ = write!(out, " · {qualifier}"); }
+                    ""
+                },
                 (Control::YesNoRandom, Some(i)) => super::menu::options::YES_NO_RANDOM.get(i).copied().unwrap_or("-"),
                 _ => "-",
             };
