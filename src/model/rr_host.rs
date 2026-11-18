@@ -392,8 +392,11 @@ pub fn on_chords(record: bool, play_player: bool, play_cpu: bool) {
 /// the tick still drives the machine's mash (`MASH`).
 pub fn note_mash() {
     MASH.store(true, Ordering::Release);
+    let mut frames = CPU_FRAMES.lock();
     RUN_CPU.store(false, Ordering::Release);
-    drop_frames(Role::Cpu);
+    frames.clear();
+    drop(frames);
+    owe_start_speed(Role::Cpu, None);
 }
 
 /// A save-state load was accepted. A Play's own warp (`WARP_HOLD`) is the start of that playback, not a stop.
@@ -1293,8 +1296,13 @@ fn resident_frame(root: &Path, played: &super::playback::Played) -> InputFrame {
         .unwrap_or(played.frame)
 }
 
+/// The run flag is read under the queue lock that a cut (`note_mash`) clears it under, so an in-flight producer cannot
+/// refill a run that was cut after it started stepping (Astra 08:38Z).
 fn publish(role: Role, frame: InputFrame) {
-    role_frames(role).lock().push(pack(frame));
+    let mut frames = role_frames(role).lock();
+    if run_flag(role).load(Ordering::Acquire) {
+        frames.push(pack(frame));
+    }
 }
 
 /// A run started, stopped or was cut by a mash: what it buffered is not played, and a start speed it still owed is not
@@ -2372,6 +2380,9 @@ mod tests {
         note_mash();
         assert!(!cpu_playback(idle).running, "the CPU sees its macro stopped at once, so its mash can act in the trigger");
         assert!(take_cpu_frame().is_none(), "no further macro frame reaches the CPU");
+        // Astra 08:38Z: a worker already inside step_role publishes its frame after the mash cut the run.
+        publish(Role::Cpu, InputFrame { buttons: 99, ..InputFrame::default() });
+        assert!(take_cpu_frame().is_none() && !cpu_playback(idle).running, "an in-flight producer cannot refill a cut run");
     }
 
     /// A file of `n` distinct frames (buttons 1..=n), active on `role`, with no start save.

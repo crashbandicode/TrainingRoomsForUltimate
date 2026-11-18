@@ -1892,3 +1892,11 @@ ceiling = 156067
 date = "2026-11-18"
 reason = "CPU-091 climb race (SPEC-cpu-03 s4 / DECISIONS B11a): the native climb stays denied while TR holds a performing case it has not requested, with a 30-frame safety bound that releases and logs climb_bound_release. Measured 155490 = +25 on 155465. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
 approved_by = "devin-primary 05:10Z GO (about +5 guidance, operator: additional lines); the measured +25 exceeds the guidance and is flagged for confirmation."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156073
+date = "2026-11-18"
+reason = "REC-027 race (tr-review-astra-2 08:38Z): rr_host publish reads the run flag under the frame-queue lock that note_mash clears it under, so an in-flight step_role producer cannot refill a cut CPU run. Measured 156073 = +6. Exact total. FOR OPERATOR REVIEW."
+approved_by = "devin-primary 09:38Z (fix the REC-027 race at the root); operator review pending."
