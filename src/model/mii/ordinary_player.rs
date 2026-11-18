@@ -290,6 +290,12 @@ pub fn cpu_receipt(original:bool,publish:bool,owner:Requester)->Option<&'static 
     (owner==Requester::User).then(||bank_notice(false,publish,original))
 }
 
+/// The notice of a CPU request that expired against a new menu epoch: the user's pick asks to be chosen again; a
+/// practice game's own request (Mash out's Mash Off restore) expires quietly, as its receipt does.
+pub fn expiry_notice(owner:Requester)->Option<&'static str> {
+    (owner==Requester::User).then_some("Character choice expired; select it again")
+}
+
 /// Whether an applied CPU change becomes the persisted CPU Character choice: the same owner rule as the receipt.
 pub fn persists_selection(owner:Requester)->bool {
     owner==Requester::User

@@ -2,7 +2,7 @@
 //! INSTALL submission and phase-time publication are distinct commits.
 use super::*;
 use std::sync::Arc;
-use crate::engine::mii::ordinary_player::{cpu_receipt,persists_selection,Requester};
+use crate::engine::mii::ordinary_player::{cpu_receipt,expiry_notice,persists_selection,Requester};
 use hos_lock::Mutex as OwnerMutex;
 use std::convert::TryInto;
 use crate::engine::mii::{
@@ -906,7 +906,7 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
     let active=live.target.publish(origin_saved);
     if !request_current(request,active) {
         clear_request(request);note("CPU request epoch/configuration changed");
-        if request.direct_kind().is_some() {notify(Role::Cpu,"Character choice expired; select it again".into());}
+        if let Some(text)=request.direct_kind().and(expiry_notice(request.owner())) {notify(Role::Cpu,text.into());}
         return false;
     }
     if !ready_descriptor(entry,&expected.descriptor) {return false;}

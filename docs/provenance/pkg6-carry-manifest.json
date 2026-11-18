@@ -2984,7 +2984,7 @@
    "dest": "src/model/mii/ordinary_player.rs",
    "crate": "mii",
    "src_sha256": "602bba789924053897d816ea58b838f135f8cec49c8e955a4249d5687cf9b7d6",
-   "dest_sha256": "413cd49e9f3cfa2c639f64211cc4d66a0991775eb06b0fb2985bca33356de473",
+   "dest_sha256": "ea1a49599302c27024cc4eb11a55a7ebdb0f09eb36f7c15ada15f6424bf9c8ff",
    "edits": [
     {
      "table_tests": true,
@@ -3088,6 +3088,11 @@
      "old": "        (true,false,false)=>\"Player fighter applied\",\n        (false,false,false)=>\"CPU fighter applied\",\n    }\n}\n\n/// Copied values from the ordinary adapter's CURRENT all-owner/G critical section.\n",
      "new": "        (true,false,false)=>\"Player fighter applied\",\n        (false,false,false)=>\"CPU fighter applied\",\n    }\n}\n\n/// Who asked for a CPU change. `Practice` is a practice game's own temporary fighter (Mash out's attacker and its\n/// restore of the original CPU), never the user's CPU Character choice.\n#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]\npub enum Requester {\n    #[default]\n    User,\n    Practice,\n}\n\n/// The CPU Character receipt of an applied CPU change: the user's choice is confirmed; a practice game's own load\n/// reports itself and gets none (it would wait behind the practice notice and show over the drill).\npub fn cpu_receipt(original:bool,publish:bool,owner:Requester)->Option<&'static str> {\n    (owner==Requester::User).then(||bank_notice(false,publish,original))\n}\n\n/// Whether an applied CPU change becomes the persisted CPU Character choice: the same owner rule as the receipt.\npub fn persists_selection(owner:Requester)->bool {\n    owner==Requester::User\n}\n\n/// Copied values from the ordinary adapter's CURRENT all-owner/G critical section.\n",
      "reason": "rc.15 CPU-receipt root fix (devin-primary GO 2026-11-17 22:04Z; mashout-demo-devin TRIAGE-CPU-APPLIED-NOTICE.md): a CPU change request carries its owner (Requester User or Practice); the CPU Character receipt and the persisted CPU choice follow it (cpu_receipt, persists_selection). Mash out's temporary attacker load and its restore are Practice and get no receipt, so none waits behind Mash out's standing notice to show over the drill. User requests, native guards and loader predicates unchanged."
+    },
+    {
+     "old": "/// reports itself and gets none (it would wait behind the practice notice and show over the drill).\npub fn cpu_receipt(original:bool,publish:bool,owner:Requester)->Option<&'static str> {\n    (owner==Requester::User).then(||bank_notice(false,publish,original))\n}\n\n/// Whether an applied CPU change becomes the persisted CPU Character choice: the same owner rule as the receipt.\n",
+     "new": "/// reports itself and gets none (it would wait behind the practice notice and show over the drill).\npub fn cpu_receipt(original:bool,publish:bool,owner:Requester)->Option<&'static str> {\n    (owner==Requester::User).then(||bank_notice(false,publish,original))\n}\n\n/// The notice of a CPU request that expired against a new menu epoch: the user's pick asks to be chosen again; a\n/// practice game's own request (Mash out's Mash Off restore) expires quietly, as its receipt does.\npub fn expiry_notice(owner:Requester)->Option<&'static str> {\n    (owner==Requester::User).then_some(\"Character choice expired; select it again\")\n}\n\n/// Whether an applied CPU change becomes the persisted CPU Character choice: the same owner rule as the receipt.\n",
+     "reason": "rc.15 CPU-receipt v3 (Astra review of 9cf8c0cf MED 1; devin-primary 11:10Z; operator 11-17 ~22:20Z the Mash Off restore is quiet): the expiry notice of a CPU request that expired against a new menu epoch follows the request owner (expiry_notice): Mash outs own request expires quietly; the users own pick still draws Character choice expired."
     }
    ]
   },
@@ -23012,7 +23017,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "78dd4abfc7d1526e559e9077f7994536ae96e2d5da6b74ac37d7caebb30660cf",
+   "dest_sha256": "621bc7b4697d8befd55be1e61cc64c10d1f9aa23552ff7b87b41dcfe1e1f57ff",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -23930,6 +23935,16 @@
      "old": "    // Reservation starts at the INSTALL ticket, never at this menu/catalog capture.\n    let request=match selection {\n        Selection::Cycle=>Some(Request::CYCLE),\n        Selection::Direct(f)=>Request::direct(mii_saved_alpha::menu_epoch(),f.kind()).map(|r|r.owned(requester)),\n        Selection::RefreshPartners=>Some(Request::REFRESH_PARTNERS),\n    };\n    let manual_direct=user_request && matches!(selection,Selection::Direct(_));\n    // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.\n    let replace_restore=manual_direct && s.restore.is_some();\n",
      "new": "    // Reservation starts at the INSTALL ticket, never at this menu/catalog capture.\n    let request=match selection {\n        Selection::Cycle=>Some(Request::CYCLE),\n        Selection::Direct(f)=>Request::direct(mii_saved_alpha::menu_epoch(),f.kind()),\n        Selection::RefreshPartners=>Some(Request::REFRESH_PARTNERS),\n    }.map(|r|r.owned(requester));\n    let manual_direct=user_request && matches!(selection,Selection::Direct(_));\n    // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.\n    let replace_restore=manual_direct && s.restore.is_some();\n",
      "reason": "rc.15 CPU-receipt v2 (Astra FAIL on b20930c6, ASTRA-REVIEW-b20930c6.md section 1; devin-primary 00:04Z): the automatic partner refresh (Solo Popo change) reconciles the live fighter, so it carries that fighters owner (live_owner: Mash outs temporary CPU is Practice) through queue_admitted and the CPU intercept, which now keeps the owner for every request kind; a practice fighters refresh never persists into the users CPU Character choice."
+    },
+    {
+     "old": "//! INSTALL submission and phase-time publication are distinct commits.\nuse super::*;\nuse std::sync::Arc;\nuse crate::engine::mii::ordinary_player::{cpu_receipt,persists_selection,Requester};\nuse hos_lock::Mutex as OwnerMutex;\nuse std::convert::TryInto;\nuse crate::engine::mii::{\n",
+     "new": "//! INSTALL submission and phase-time publication are distinct commits.\nuse super::*;\nuse std::sync::Arc;\nuse crate::engine::mii::ordinary_player::{cpu_receipt,expiry_notice,persists_selection,Requester};\nuse hos_lock::Mutex as OwnerMutex;\nuse std::convert::TryInto;\nuse crate::engine::mii::{\n",
+     "reason": "rc.15 CPU-receipt v3 (Astra review of 9cf8c0cf MED 1; devin-primary 11:10Z; operator 11-17 ~22:20Z the Mash Off restore is quiet): the expiry notice of a CPU request that expired against a new menu epoch follows the request owner (expiry_notice): Mash outs own request expires quietly; the users own pick still draws Character choice expired."
+    },
+    {
+     "old": "    let active=live.target.publish(origin_saved);\n    if !request_current(request,active) {\n        clear_request(request);note(\"CPU request epoch/configuration changed\");\n        if request.direct_kind().is_some() {notify(Role::Cpu,\"Character choice expired; select it again\".into());}\n        return false;\n    }\n    if !ready_descriptor(entry,&expected.descriptor) {return false;}\n",
+     "new": "    let active=live.target.publish(origin_saved);\n    if !request_current(request,active) {\n        clear_request(request);note(\"CPU request epoch/configuration changed\");\n        if let Some(text)=request.direct_kind().and(expiry_notice(request.owner())) {notify(Role::Cpu,text.into());}\n        return false;\n    }\n    if !ready_descriptor(entry,&expected.descriptor) {return false;}\n",
+     "reason": "rc.15 CPU-receipt v3 (Astra review of 9cf8c0cf MED 1; devin-primary 11:10Z; operator 11-17 ~22:20Z the Mash Off restore is quiet): the expiry notice of a CPU request that expired against a new menu epoch follows the request owner (expiry_notice): Mash outs own request expires quietly; the users own pick still draws Character choice expired."
     }
    ]
   },
