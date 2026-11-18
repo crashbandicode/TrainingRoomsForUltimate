@@ -90,6 +90,9 @@ fn state_export_producer_drops_instead_of_sharing_a_slot_with_a_writer() {
         r.head.store(2, core::sync::atomic::Ordering::Relaxed);
         assert!(!r.push(2, b"later lap", false));
         assert_eq!(s[0].state.load(core::sync::atomic::Ordering::Relaxed), state(0, WRITING));
+        assert_eq!(r.dropped.load(core::sync::atomic::Ordering::Relaxed), 1);
+        // Without a lap: the reader waits for the writer of its own ticket and never copies a slot being written.
+        r.head.store(1, core::sync::atomic::Ordering::Relaxed);
         let mut out = [0u8; SLOT_BYTES];
         let mut next = 0;
         assert!(matches!(r.pop(&mut next, &mut out), Pop::Empty), "the reader waits for the writer, it never copies");
