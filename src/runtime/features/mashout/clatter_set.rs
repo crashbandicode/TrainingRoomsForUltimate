@@ -147,7 +147,7 @@ pub fn scene(active: bool) {
     }
 }
 
-/// Settle on the owner thread (O5): install the tag's one instance (113/116 → Set +0x90, 117 → Add +0x98) over the
+/// Settle on the owner thread (O5): install the tag's one instance (113/114/116 → Set +0x90, 117 → Add +0x98) over the
 /// exact original and read it back before returning the generation. Only the concrete FighterControl table.
 pub fn arm(generation: u32, tag: u16, p1_control: usize) -> Result<u32, Refusal> {
     let owner = OWNER_THREAD.load(Ordering::Acquire);

@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
 };
 mod model {
@@ -78,6 +78,13 @@ mod runtime {
         pub fn granted(offset: usize) -> bool {
             offset != super::super::model::sites_pkg2::WORK_GET_INT_OFFSET
                 || super::super::WORK_GET_INT_GRANTED.load(super::super::Ordering::Relaxed)
+        }
+    }
+    pub mod roster {
+        pub mod character_roster {
+            pub fn solo_popo_active(_: bool) -> bool {
+                crate::SOLO_POPO.load(crate::Ordering::Relaxed)
+            }
         }
     }
 }
@@ -255,6 +262,15 @@ mod natives {
         super::JUDGE_FIXED.load(super::Ordering::Relaxed)
     }
     pub fn get_int(cpu: usize, id: i32) -> i32 {
+        if super::ICE_SHOT_FIXTURE.load(super::Ordering::Relaxed) {
+            if id == 0x1000_00be {
+                assert_eq!(cpu, 2);
+                return super::NANA_OBJECT.load(super::Ordering::Relaxed) as i32;
+            }
+            if cpu == super::NANA_BOMA && Some(id) == super::state_id(super::C::WorkIntEntryId) {
+                return super::NANA_ENTRY.load(super::Ordering::Relaxed) as i32;
+            }
+        }
         if id == 0x1000_0056 {
             assert_eq!(cpu, super::P1.load(super::Ordering::Relaxed));
             return super::EGG_VICTIM_SHELL.load(super::Ordering::Relaxed) as i32;
@@ -321,6 +337,9 @@ mod natives {
         Some(super::P1.load(super::Ordering::Relaxed))
     }
     pub fn fighter_kind(accessor: usize) -> Option<i32> {
+        if accessor == super::NANA_BOMA && super::ICE_SHOT_FIXTURE.load(super::Ordering::Relaxed) {
+            return Some(0x4c);
+        }
         assert_eq!(accessor, 0x200);
         Some(super::EGG_WEAPON_KIND.load(super::Ordering::Relaxed) as i32)
     }
@@ -330,6 +349,9 @@ mod natives {
         slot == 6 && super::EGG_WEAPON_ATTACK.load(super::Ordering::Relaxed)
     }
     pub fn status_kind(accessor: usize) -> i32 {
+        if accessor == super::NANA_BOMA {
+            return super::NANA_STATUS.load(super::Ordering::Relaxed) as i32;
+        }
         if accessor == 0x200 {
             return 2;
         }
@@ -381,6 +403,12 @@ mod state_natives {
     fn read() { super::TROLLEY_NATIVE_CALLS.fetch_add(1, super::Ordering::Relaxed); }
     pub fn article_is_exist(cpu: usize, article: i32) -> bool {
         assert_ne!(cpu, 0);
+        if super::ICE_SHOT_FIXTURE.load(super::Ordering::Relaxed) {
+            assert_eq!(article, 0);
+            assert!(matches!(cpu, 2 | super::NANA_BOMA));
+            let mask = if cpu == 2 { 1 } else { 2 };
+            return super::ICE_SHOT_ARTICLES.load(super::Ordering::Relaxed) & mask != 0;
+        }
         if super::YOSHI_PROVIDER_FIXTURE.load(super::Ordering::Relaxed) {
             assert_eq!(cpu, 2);
             return super::YOSHI_ARTICLES.load(super::Ordering::Relaxed) & (1 << article) != 0;
@@ -404,6 +432,9 @@ mod state_natives {
         read(); super::CART_BOID.load(super::Ordering::Relaxed)
     }
     pub fn object_is_active(id: u32) -> bool {
+        if super::ICE_SHOT_FIXTURE.load(super::Ordering::Relaxed) {
+            return id == 0x402;
+        }
         if super::YOSHI_PROVIDER_FIXTURE.load(super::Ordering::Relaxed) {
             assert_eq!(id, 0x1000_0402);
             return super::EGG_WEAPON_ACTIVE.load(super::Ordering::Relaxed);
@@ -411,6 +442,10 @@ mod state_natives {
         read(); super::CART_ACTIVE.load(super::Ordering::Relaxed)
     }
     pub fn object_accessor(id: u32) -> usize {
+        if super::ICE_SHOT_FIXTURE.load(super::Ordering::Relaxed) {
+            assert_eq!(id, 0x402);
+            return super::NANA_BOMA;
+        }
         if super::YOSHI_PROVIDER_FIXTURE.load(super::Ordering::Relaxed) {
             return match id {
                 0x400 => super::P1.load(super::Ordering::Relaxed),
@@ -462,7 +497,11 @@ mod worker {
     }
 }
 thread_local! { static WRITES_POSTED: RefCell<Vec<(usize, [model::mashout::ice116::Applied; 8])>> = const { RefCell::new(Vec::new()) }; }
+thread_local! { static FINISHED: Cell<usize> = const { Cell::new(0) }; }
 fn post(e: worker::Event, _: u64) {
+    if matches!(e, worker::Event::Observe(_, _, _, true)) {
+        FINISHED.set(FINISHED.get() + 1);
+    }
     if let worker::Event::Writes(_, _, sets, n) | worker::Event::EggWrites(_, _, sets, n) = e {
         WRITES_POSTED.with_borrow_mut(|w| w.push((usize::from(n), sets)));
     }
@@ -486,6 +525,11 @@ fn state_id(c: C) -> Option<i32> {
         "FIGHTER_BRAVE_STATUS_KIND_SPECIAL_LW_FAILURE" => return Some(496),
         "FIGHTER_BRAVE_STATUS_KIND_SPECIAL_LW_START" => return Some(497),
         "FIGHTER_STATUS_KIND_SPECIAL_N" => return Some(476),
+        "FIGHTER_POPO_GENERATE_ARTICLE_ICESHOT" => return Some(0),
+        "FIGHTER_POPO_INSTANCE_WORK_ID_INT_PARTNER_OBJECT_ID" => return Some(0x1000_00be),
+        "FIGHTER_KIND_NANA" => return Some(0x4c),
+        "BATTLE_OBJECT_ID_INVALID" => return Some(0x5000_0000),
+        "FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID" => return Some(0x1000_0000),
         "FIGHTER_STATUS_KIND_SPECIAL_S" => return Some(477),
         "FIGHTER_LUCAS_STATUS_KIND_SPECIAL_N_HOLD" => return Some(481),
         "FIGHTER_LUCAS_STATUS_SPECIAL_N_WORK_INT_NOBANG_TIME" => return Some(0x11000008),
@@ -584,7 +628,7 @@ struct Game {
     set_count: usize,
     egg_spat: bool,
     egg_shell: Option<u32>,
-    egg_close_frames: u8,
+    provider_close_frames: u8,
     config: Option<()>,
     restore_requested: bool,
     failed: Option<&'static str>,
@@ -621,7 +665,7 @@ impl Game {
             set_count: 0,
             egg_spat: false,
             egg_shell: None,
-            egg_close_frames: 0,
+            provider_close_frames: 0,
             config: Some(()),
             restore_requested: false,
             failed: None,
@@ -645,6 +689,7 @@ const UNAVAILABLE_NOTICE: &str = "unavailable";
 // JUDGE_CHOICE
 // TROLLEY_INPUT
 // EGG_CLOSURE
+// ICE_SHOT_CLOSURE
 // TRAIL_MAGIC_KIND
 // TRAIL_MAGIC_STATUS
 // ARM
@@ -759,6 +804,7 @@ impl NativeMemory {
         BLIZZARD_PROVIDER.store(0, Ordering::Relaxed);
         LR_SETS.with_borrow_mut(Vec::clear);
         TRAIL_MAGIC_READS.store(0, Ordering::Relaxed);
+        ICE_SHOT_FIXTURE.store(false, Ordering::Relaxed);
         COVERED.store(false, Ordering::Relaxed);
         AIR.store(false, Ordering::Relaxed);
         ROLLER_LR.store(1.0f32.to_bits(), Ordering::Relaxed);
@@ -3166,6 +3212,143 @@ fn sora_blizzard_arms_the_set_observer_only_for_the_real_cast_and_posts_its_writ
     }
 }
 
+
+
+static ICE_SHOT_FIXTURE: AtomicBool = AtomicBool::new(false);
+static ICE_SHOT_ARTICLES: AtomicU32 = AtomicU32::new(0);
+const NANA_BOMA: usize = 0x4010;
+static NANA_STATUS: AtomicU32 = AtomicU32::new(0);
+static NANA_OBJECT: AtomicU32 = AtomicU32::new(0x402);
+static NANA_ENTRY: AtomicU32 = AtomicU32::new(1);
+static SOLO_POPO: AtomicBool = AtomicBool::new(false);
+
+unsafe fn live_ice_shot() -> (Box<NativeMemory>, Game) {
+    let mut m = NativeMemory::new();
+    m.body[3] = 75;
+    let mut game = Game::new(Plan::IceShot, State::Frozen);
+    let request = game.requested.as_mut().unwrap();
+    request.id = 114;
+    request.attacker_kind = 75;
+    request.attacker_name = "Ice Climbers";
+    game.step = Step::Settle;
+    FINISHED.set(0);
+    WRITES_POSTED.with_borrow_mut(Vec::clear);
+    clatter_set::ARMS.with_borrow_mut(Vec::clear);
+    clatter_set::PUBLISHED.with_borrow_mut(Vec::clear);
+    ICE_SHOT_FIXTURE.store(true, Ordering::Relaxed);
+    ICE_SHOT_ARTICLES.store(0, Ordering::Relaxed);
+    NANA_STATUS.store(0, Ordering::Relaxed);
+    NANA_OBJECT.store(0x402, Ordering::Relaxed);
+    NANA_ENTRY.store(1, Ordering::Relaxed);
+    SOLO_POPO.store(false, Ordering::Relaxed);
+    CPU_STATUS.store(0, Ordering::Relaxed);
+    m.update(&mut game, 0);
+    assert_eq!(clatter_set::ARMS.with_borrow(Clone::clone), vec![(game.generation as u32, 114)]);
+    CPU_STATUS.store(476, Ordering::Relaxed);
+    m.seed(73.25, 7.0, 1);
+    m.start();
+    m.update(&mut game, 203);
+    assert_eq!(game.step, Step::Held, "{:?}", game.failed);
+    EXECUTE_HELD.store(true, Ordering::Relaxed);
+    (m, game)
+}
+
+fn publish_ice_shot_set(game: &Game, sequence: u32) -> f32 {
+    let old = game.clock.unwrap().last().remaining;
+    let new = old + 4.0;
+    clatter_set::PUBLISHED.with_borrow_mut(|writes| writes.push(model::mashout::clatter::ClatterWrite {
+        generation: game.generation as u32, seq: sequence, slot: model::mashout::clatter::Slot::Set, tag: 114,
+        old: old.to_bits(), operand: new.to_bits(), new: new.to_bits(), frame: 1, d_max: 250.0f32.to_bits(),
+    }));
+    new
+}
+
+#[test]
+fn ice_shot_waits_for_both_providers_before_posting_a_grade() {
+    unsafe {
+        let (mut m, mut game) = live_ice_shot();
+        let new = publish_ice_shot_set(&game, 1);
+        m.seed(new, 7.0, 1);
+        m.update(&mut game, 203);
+        assert_eq!(game.step, Step::Held, "{:?}", game.failed);
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        NANA_STATUS.store(476, Ordering::Relaxed);
+        m.update(&mut game, 68);
+        assert_eq!(game.step, Step::Held, "Nana can still shoot");
+        assert_eq!(FINISHED.get(), 0);
+        let frozen = game.clock.unwrap().elapsed();
+
+        NANA_STATUS.store(0, Ordering::Relaxed);
+        for live in [1, 2] {
+            ICE_SHOT_ARTICLES.store(live, Ordering::Relaxed);
+            m.update(&mut game, 0);
+            assert_eq!(game.step, Step::Held, "live article mask {live}");
+            assert_eq!(game.clock.unwrap().elapsed(), frozen);
+            assert_eq!(FINISHED.get(), 0);
+            assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
+        }
+        ICE_SHOT_ARTICLES.store(0, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(game.step, Step::Result);
+        assert_eq!(game.clock.unwrap().elapsed(), frozen);
+        assert_eq!(FINISHED.get(), 1);
+        let posted = WRITES_POSTED.with_borrow(Clone::clone);
+        assert_eq!((posted.len(), posted[0].0, posted[0].1[0].boundary), (1, 1, 0));
+    }
+}
+
+#[test]
+fn ice_shot_refuses_a_set_after_the_native_escape() {
+    unsafe {
+        let (m, mut game) = live_ice_shot();
+        m.update(&mut game, 68);
+        assert_eq!(game.step, Step::Held, "Popo can still shoot");
+        publish_ice_shot_set(&game, 1);
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        m.update(&mut game, 0);
+        assert_eq!(game.step, Step::Failed);
+        assert_eq!(FINISHED.get(), 0);
+        assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
+    }
+}
+
+#[test]
+fn ice_shot_refuses_unknown_provider_and_bounds_the_wait() {
+    unsafe {
+        for case in 0..4 {
+            let (m, mut game) = live_ice_shot();
+            CPU_STATUS.store(0, Ordering::Relaxed);
+            match case {
+                0 => EGG_PROVIDER_READER.store(model::sites_pkg2::WORK_GET_INT_OFFSET, Ordering::Relaxed),
+                1 => NANA_OBJECT.store(0x403, Ordering::Relaxed),
+                2 => NANA_OBJECT.store(0x5000_0000, Ordering::Relaxed),
+                _ => NANA_ENTRY.store(2, Ordering::Relaxed),
+            }
+            m.update(&mut game, 68);
+            assert_eq!((game.step, game.failed), (Step::Failed, Some(UNAVAILABLE_NOTICE)), "case {case}");
+            assert_eq!(FINISHED.get(), 0);
+        }
+        let (m, mut game) = live_ice_shot();
+        NANA_OBJECT.store(0x5000_0000, Ordering::Relaxed);
+        SOLO_POPO.store(true, Ordering::Relaxed);
+        m.update(&mut game, 68);
+        for _ in 1..PROVIDER_CLOSE_FRAMES {
+            m.update(&mut game, 0);
+            assert_eq!(game.step, Step::Held);
+        }
+        m.update(&mut game, 0);
+        assert_eq!(game.step, Step::Failed, "the cast never left SPECIAL_N");
+        assert_eq!(FINISHED.get(), 0);
+
+        let (m, mut game) = live_ice_shot();
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        NANA_OBJECT.store(0x5000_0000, Ordering::Relaxed);
+        SOLO_POPO.store(true, Ordering::Relaxed);
+        m.update(&mut game, 68);
+        assert_eq!(game.step, Step::Result, "the roster positively removed Nana");
+        assert_eq!(FINISHED.get(), 1);
+    }
+}
 
 unsafe fn live_egg(observed_spit: bool) -> (Box<NativeMemory>, Game) {
     let mut m = NativeMemory::new();

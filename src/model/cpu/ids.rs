@@ -102,6 +102,9 @@ game_constants! {
     SituationCliff = "SITUATION_KIND_CLIFF",
     // Fighter kinds (Ice Climbers: the second body is Nana).
     KindPopo = "FIGHTER_KIND_POPO",
+    PopoArticleIceShot = "FIGHTER_POPO_GENERATE_ARTICLE_ICESHOT",
+    PopoPartnerObjectId = "FIGHTER_POPO_INSTANCE_WORK_ID_INT_PARTNER_OBJECT_ID",
+    InvalidBattleObjectId = "BATTLE_OBJECT_ID_INVALID",
     KindNana = "FIGHTER_KIND_NANA",
     // Status kinds of the situation predicates (SPEC-cpu-01 §3).
     StatusNone = "FIGHTER_STATUS_KIND_NONE",
