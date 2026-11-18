@@ -231,7 +231,7 @@ fn sync_bound(root: &Path) {
     #[cfg(feature = "diag")]
     rr_host::write_saved_with(root, super::writer::diag_bound_hold);
     #[cfg(not(feature = "diag"))]
-    rr_host::write_saved(root);
+    rr_host::write_saved_with(root, || {});
     if let Some(pair) = rr_host::bound_sync(root) {
         super::states::post_bound(pair);
     }

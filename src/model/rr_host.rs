@@ -846,11 +846,7 @@ pub fn warp_pair(save: NamedSave, place: Option<(Role, Placement)>) -> [SavedSta
 }
 
 /// Save writes the one bound save, or a new bound Save N when none is bound (`rr_runtime::save_chord`). Worker side.
-pub fn write_saved(root: &Path) -> bool {
-    write_saved_with(root, || {})
-}
-
-/// `write_saved` with `after_take` run once the pair is taken and before it is written (a test holds the worker there;
+/// `after_take` runs once the pair is taken and before it is written (a test holds the worker there;
 /// the diag build can slow the write there). `BOUND_WRITING` covers it.
 pub fn write_saved_with(root: &Path, after_take: impl FnOnce()) -> bool {
     BOUND_WRITING.store(true, Ordering::Release);
@@ -3124,14 +3120,14 @@ mod tests {
         publish_selection(&root, &selection, None);
         assert_eq!(bound_sync(&root).unwrap().unwrap()[0].x, 40.0, "A on Right binds Right for Load");
         save_captured([at_x(5.0), at_x(6.0)]);
-        assert!(write_saved(&root));
+        assert!(write_saved_with(&root, || {}));
         let written = saves.load(&right).unwrap();
         assert_eq!((written.player.x, written.cpu.x), (5.0, 6.0), "Save writes the bound file");
         assert!(bound_sync(&root).is_none(), "the slot already holds what Save wrote");
         publish_selection(&root, &Selection { bound: None, ..selection }, None);
         assert_eq!(bound_sync(&root), Some(None), "nothing bound empties the slot");
         save_captured([at_x(1.0), at_x(2.0)]);
-        assert!(write_saved(&root));
+        assert!(write_saved_with(&root, || {}));
         let made = RecordingIndex::load(&root).unwrap().bound().unwrap().to_owned();
         assert_eq!(saves.load(&made).unwrap().name, "Save 1");
         assert_eq!(saves.load(&made).unwrap().player.x, 1.0);
@@ -3273,7 +3269,7 @@ mod tests {
         assert!(bound_sync(&root).is_some(), "the first sync");
         assert!(bound_sync(&root).is_none(), "nothing changed");
         setup_restored();
-        assert!(!write_saved(&root), "a setup restore hands the worker nothing to write");
+        assert!(!write_saved_with(&root, || {}), "a setup restore hands the worker nothing to write");
         assert_eq!(saves.load(&bound).unwrap(), before, "the bound save file is untouched");
         let again = bound_sync(&root).expect("the slot is given the bound save again").expect("Bound is bound");
         assert_eq!((again[0].x, again[1].x), (-70.0, -40.0));
@@ -3313,7 +3309,7 @@ mod tests {
 
         setup_bound(false);
         assert!(bound_sync(&root).is_none(), "Y: the setup stays in the slot, so Load returns to it");
-        assert!(!write_saved(&root), "Y hands the worker nothing to write");
+        assert!(!write_saved_with(&root, || {}), "Y hands the worker nothing to write");
         // A write elsewhere in the library (the menu close's index write) is not a bound-save change.
         bump_catalog();
         assert!(bound_sync(&root).is_none(), "the bound save did not change, so the setup stays");

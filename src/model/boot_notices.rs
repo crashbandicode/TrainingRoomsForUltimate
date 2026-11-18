@@ -86,7 +86,7 @@ impl BootNotices {
     }
 }
 
-/// Replace a previous save notice. Save writes the bound save (`rr_host::write_saved`), whatever its name, so the
+/// Replace a previous save notice. Save writes the bound save (`rr_host::write_saved_with`), whatever its name, so the
 /// notice names no slot; `slot` is the state writer's internal one, zero-based and below 5.
 pub fn saved(queue: &mut Queue, slot: usize) {
     if slot < 5 {

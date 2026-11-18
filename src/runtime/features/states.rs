@@ -1760,7 +1760,7 @@ fn take_captured(file: &mut SaveFile) {
         records[slot.min(records.len() - 1)] = state;
     }
     // The slot is the bound save: what Save put there is written into that file on the worker
-    // (`rr_host::write_saved`), with the Mii identities just attached.
+    // (`rr_host::write_saved_with`), with the Mii identities just attached.
     let saved_pair = saved.map(|slot| slot.min(SLOTS - 1)).map(|slot| [file.player[slot].clone(), file.cpu[slot].clone()]);
     if let Some(binding) = binding {
         setup = Some(setup.unwrap_or(false) || binding.restore());
