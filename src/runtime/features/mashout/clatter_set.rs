@@ -21,15 +21,42 @@ const COMMON_BUILD_ID: [u8; 20] = [
 ];
 pub const RING: usize = 8;
 
-/// v1.1 (b): every refusal maps to "Mash out unavailable". NotOwnerThread (O2) and PageCheck (C5) are added with
-/// their checks.
+/// The proven Start slot (interposer.rs): C5 requires the Set slot's page to carry its permission.
+const START_SLOT: usize = 0x4f85e58;
+
+/// v1.1 (b): every refusal maps to "Mash out unavailable" (MASH-NATIVE-SLOT).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Refusal {
+    NotOwnerThread,
     WrongPhase,
     AlreadyArmed,
     ForeignSlot,
+    PageCheck,
     CommonUnverified,
     VtableMismatch,
+}
+
+/// O2: the thread that runs the owner site (`interposer::service`); `arm` must run on it.
+static OWNER_THREAD: AtomicUsize = AtomicUsize::new(0);
+
+fn current_thread() -> usize {
+    // SAFETY: Horizon's current-thread query has no preconditions.
+    unsafe { skyline::nn::os::GetCurrentThread() as usize }
+}
+
+#[repr(C)]
+#[derive(Default)]
+struct MemoryInfo { address: u64, size: u64, kind: u32, attributes: u32, permission: u32, ipc: u32, device: u32, padding: u32 }
+
+/// C5: Horizon QueryMemory (pinned ABI reused from mii_ordinary_native::span): the region's permission bits.
+unsafe fn permission(address: usize) -> Option<u32> {
+    let mut info = MemoryInfo::default();
+    let result: u64;
+    core::arch::asm!("svc 0x6", inout("x0") &mut info as *mut MemoryInfo as u64 => result,
+        lateout("x1") _, in("x2") address as u64, clobber_abi("C"), options(nostack));
+    (result as u32 == 0 && info.address <= address as u64
+        && info.address.checked_add(info.size).is_some_and(|end| address as u64 + 8 <= end))
+        .then_some(info.permission)
 }
 
 static ORIGINAL: AtomicUsize = AtomicUsize::new(0);
@@ -90,6 +117,10 @@ pub fn retract_common() {
 /// Settle on the owner thread (O5): install over the exact original and read it back before returning the
 /// generation. Only 113/116 (the Set tags) and only the concrete FighterControl table.
 pub fn arm(generation: u32, tag: u16, p1_control: usize) -> Result<u32, Refusal> {
+    let owner = OWNER_THREAD.load(Ordering::Acquire);
+    if owner == 0 || owner != current_thread() {
+        return Err(Refusal::NotOwnerThread);
+    }
     if slot_for(tag) != Some(Slot::Set) {
         return Err(Refusal::WrongPhase);
     }
@@ -110,6 +141,10 @@ pub fn arm(generation: u32, tag: u16, p1_control: usize) -> Result<u32, Refusal>
         || unsafe { core::ptr::read_unaligned((base + 0x40) as *const [u8; 20]) } != COMMON_BUILD_ID
     {
         return Err(Refusal::CommonUnverified);
+    }
+    let set_page = unsafe { permission(game::text_base() + SET_SLOT) };
+    if set_page.is_none() || set_page != unsafe { permission(game::text_base() + START_SLOT) } {
+        return Err(Refusal::PageCheck);
     }
     let original = game::text_base() + SET_ORIGINAL;
     let found = unsafe { slot() };
@@ -148,6 +183,7 @@ pub fn release() {
 
 /// Owner site (main thread, outside hooks): restore TR's own value only (O8); verify an armed install each frame.
 pub fn service() {
+    OWNER_THREAD.store(current_thread(), Ordering::Release);
     let original = game::text_base() + SET_ORIGINAL;
     let found = unsafe { slot() };
     if ARMED.load(Ordering::Acquire) {
