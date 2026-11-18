@@ -1945,7 +1945,7 @@ approved_by = "operator 2026-11-18: yes additional lines are ok; primary c07b344
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 162560
+ceiling = 162626
 date = "2026-11-18"
-reason = "Mash out row 121, Ganondorf grounded Flame Choke graded by the Tech grader (rc15/mashout-ganon-tech on rc15/mashout-int 6f564b86): measured 162560 = 162291 + 269 (catalog row, CatchedGanon name and contact predicate, Tech-session attempt with the late window, Tech-owned tech_adapter boundaries, status-hook seam, worker result text). Exact total, no headroom. Counting and gates unchanged."
+reason = "Mash out row 121, Ganondorf grounded Flame Choke graded by the Tech grader (rc15/mashout-ganon-tech on rc15/mashout-int 6f564b86): measured 162626 = 162291 + 335 (catalog row, CatchedGanon name and contact predicate, the entered-status wait, Tech-session attempt with the late window, Tech-owned tech_adapter boundaries, status-hook seam, worker result text). Exact total, no headroom. Counting and gates unchanged."
 approved_by = "operator 2026-11-18 via primary c07b3449 (goal to mashout-demo-devin-2: \"Size growth is approved\" for the Ganon Flame Choke tech row)"

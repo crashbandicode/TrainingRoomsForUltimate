@@ -442,6 +442,8 @@ struct Game {
     tech_summary: crate::model::tech::session::Summary,
     /// Row 121's contact still in its late window, with its tech kind.
     tech_attempt: Option<(entry::TechAttempt, Option<bool>)>,
+    /// Row 121's contact snapshot waiting for the entered status.
+    tech_wait: Option<entry::TechContactWait>,
     /// P1's damage bits when the first preparatory magic cast began (Sora116 setup backstop).
     prep_damage: Option<u32>,
 }
@@ -477,6 +479,7 @@ impl Game {
                 offset_sum: 0, timed_perfect: 0,
             },
             tech_attempt: None,
+            tech_wait: None,
             prep_damage: None,
         }
     }
@@ -841,55 +844,78 @@ unsafe fn arm(p1: usize, generation: u64) -> bool {
 }
 
 impl Game {
-    /// Row 121 (mashout-ganon-tech) in Entering: publish the attempt for the status hook, grade its slam contact with
-    /// the Tech grader, then hold the late window. Outside the Entering block, which host fixtures compile.
+    /// Row 121 (mashout-ganon-tech) in Entering: publish the attempt for the status hook, hold its slam contact until the
+    /// game has entered the requested status (a request takes effect on a later frame), grade it with the Tech grader,
+    /// then hold the late window. Outside the Entering block, which host fixtures compile.
     unsafe fn tech_entering(&mut self, p1: usize) {
+        use crate::model::tech::session::{self, Direction, Grade, NativeOutcome};
         let game = self;
         let generation = game.generation;
+        // The late window reads Tech practice's native guard edge, never a raw shoulder sample.
+        let guard = super::tech_adapter::mash_guard(p1);
         if let Some((attempt, kind)) = game.tech_attempt.as_mut() {
-            // The late window reads Tech practice's native guard edge, never a raw shoulder sample.
-            if let Some(grade) = attempt.tick(super::tech_adapter::mash_guard(p1)) {
-                let (kind, summary) = (*kind, attempt.summary());
-                game.tech_attempt = None;
-                game.tech_summary = summary;
-                post(worker::Event::TechGrade(generation, grade, kind, summary.best), generation);
-                game.step = Step::Result;
+            if let Some(grade) = attempt.tick(guard) {
+                let kind = *kind;
+                game.tech_graded(grade, kind);
             }
             return;
         }
-        TECH_P1.store(p1, Ordering::Release);
-        TECH_GEN.store(generation, Ordering::Release);
-        let mut graded = None;
-        TECH.drain(|t| {
-            if t.generation == generation {
-                graded = Some(t.snapshot);
-            }
-        });
-        if let Some(snapshot) = graded {
-            TECH_P1.store(0, Ordering::Release);
-            use crate::model::tech::session;
-            let ids = [C::StatusPassive, C::StatusPassiveFb, C::StatusDown, C::StatusDamageFlyReflectD,
-                C::StatusPassiveCeil, C::StatusStopCeil, C::StatusDamageFlyReflectU, C::StatusPassiveWall,
-                C::StatusPassiveWallJump, C::StatusStopWall, C::StatusDamageFlyReflectLr]
-                .map(|c| state_id(c).unwrap_or(i32::MIN));
-            let outcome = session::accepted_status(snapshot, ids);
-            let kind = match outcome {
-                Some(session::NativeOutcome::Tech(Some(session::Direction::InPlace))) => Some(true),
-                Some(session::NativeOutcome::Tech(_)) => Some(false),
-                _ => None,
-            };
-            // An unproven accepted status is ungraded (Tech practice's snapshot_unavailable), never a guessed miss.
-            let grade = outcome.map_or(Some(session::Grade::Unavailable), |o| session::map_snapshot(snapshot, o));
-            let mut attempt = entry::TechAttempt::new(game.tech_summary);
-            match attempt.contact(grade) {
-                Some(grade) => {
-                    game.tech_summary = attempt.summary();
-                    post(worker::Event::TechGrade(generation, grade, kind, game.tech_summary.best), generation);
-                    game.step = Step::Result;
+        if game.tech_wait.is_none() {
+            TECH_P1.store(p1, Ordering::Release);
+            TECH_GEN.store(generation, Ordering::Release);
+            TECH.drain(|t| {
+                if t.generation == generation {
+                    game.tech_wait = Some(entry::TechContactWait::new(t.snapshot));
                 }
-                None => game.tech_attempt = Some((attempt, kind)),
+            });
+        }
+        let ids = [C::StatusPassive, C::StatusPassiveFb, C::StatusDown, C::StatusDamageFlyReflectD, C::StatusPassiveCeil,
+            C::StatusStopCeil, C::StatusDamageFlyReflectU, C::StatusPassiveWall, C::StatusPassiveWallJump, C::StatusStopWall,
+            C::StatusDamageFlyReflectLr]
+            .map(|c| state_id(c).unwrap_or(i32::MIN));
+        let step = match game.tech_wait.as_mut() {
+            Some(wait) => wait.next_frame(super::tech_adapter::mash_entered(p1), guard, ids),
+            None => return,
+        };
+        TECH_P1.store(0, Ordering::Release);
+        let outcome = match step {
+            entry::TechContactStep::Wait => return,
+            entry::TechContactStep::Proven(outcome) => Some(outcome),
+            entry::TechContactStep::Unproven => None,
+        };
+        let Some(wait) = game.tech_wait.take() else {
+            return;
+        };
+        let kind = match outcome {
+            Some(NativeOutcome::Tech(Some(Direction::InPlace))) => Some(true),
+            Some(NativeOutcome::Tech(_)) => Some(false),
+            _ => None,
+        };
+        // An unproven accepted status is ungraded (Tech practice's snapshot_unavailable), never a guessed miss.
+        let grade = outcome.map_or(Some(Grade::Unavailable), |o| session::map_snapshot(wait.snapshot(), o));
+        let mut attempt = entry::TechAttempt::new(game.tech_summary);
+        let mut result = attempt.contact(grade);
+        // The frames waited for the entered status are already part of the late window.
+        for &edge in wait.guards() {
+            if result.is_none() {
+                result = attempt.tick(edge);
             }
         }
+        match result {
+            Some(grade) => {
+                game.tech_summary = attempt.summary();
+                game.tech_graded(grade, kind);
+            }
+            None => game.tech_attempt = Some((attempt, kind)),
+        }
+    }
+
+    fn tech_graded(&mut self, grade: crate::model::tech::session::Grade, kind: Option<bool>) {
+        if let Some((attempt, _)) = self.tech_attempt.take() {
+            self.tech_summary = attempt.summary();
+        }
+        post(worker::Event::TechGrade(self.generation, grade, kind, self.tech_summary.best), self.generation);
+        self.step = Step::Result;
     }
 }
 
@@ -1269,6 +1295,7 @@ pub unsafe fn frame(fighter: usize) {
         TECH_GEN.store(0, Ordering::Release);
         TECH_P1.store(0, Ordering::Release);
         game.tech_attempt = None;
+        game.tech_wait = None;
     }
     match game.step {
         Step::Off => (),
