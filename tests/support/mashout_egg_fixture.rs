@@ -8,7 +8,8 @@ mod model {
     }
     pub mod sites_hitbox { // EGG_HITBOX_SITES
     }
-    pub mod sites_pkg2 { pub const STATUS_KIND_OFFSET: usize = 0x208_7720; pub const WORK_IS_FLAG_OFFSET: usize = 0x208dc80; pub const WORK_GET_INT_OFFSET: usize = 0x208dbc0; }
+    pub mod sites_pkg2 { // EGG_PKG2_SITES
+    }
     pub mod hash40 { // HASH40
     }
     pub mod cpu {
@@ -1241,7 +1242,7 @@ mod game {
         if super::TROLLEY_MISSING_GRANT.load(super::Ordering::Relaxed) == offset { return false; }
         if super::EGG_PROVIDER_READER.load(super::Ordering::Relaxed) == offset { return false; }
         match offset {
-            0x208_7720 => true,
+            crate::model::sites_pkg2::STATUS_KIND_OFFSET | crate::model::sites_pkg2::UTILITY_GET_KIND_OFFSET => true,
             crate::model::sites_pkg2::WORK_IS_FLAG_OFFSET =>
                 super::WORK_IS_FLAG_GRANTED.load(super::Ordering::Relaxed)
                     && super::JUDGE_FLAG_GRANTED.load(super::Ordering::Relaxed),
@@ -1254,7 +1255,6 @@ mod game {
             | crate::model::sites_pkg3::STATE_OBJECT_IS_ACTIVE_OFFSET
             | crate::model::sites_pkg3::STATE_OBJECT_MODULE_ACCESSOR_OFFSET
             | crate::model::sites_pkg3::STATE_LINK_PARENT_OBJECT_ID_OFFSET
-            | crate::model::sites_hitbox::HITBOX_ARTICLE_FROM_NO_OFFSET
             | crate::model::sites_hitbox::HITBOX_IS_ATTACK_OFFSET => true,
             _ => panic!("unexpected reader guard: {offset:x}"),
         }

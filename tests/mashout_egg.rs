@@ -108,14 +108,17 @@ fn actual_runtime_egg_preparation_and_native_seed() {
             block(runtime, "unsafe fn end_after(").to_string(),
         ),
         ("// ARM", block(runtime, "unsafe fn arm(").to_string()),
-        ("// EGG_HITBOX_SITES", {
-            let sites = include_str!("../src/model/sites_hitbox.rs");
-            ["HITBOX_IS_ATTACK_OFFSET", "HITBOX_ARTICLE_FROM_NO_OFFSET"]
+        ("// EGG_PKG2_SITES", {
+            let sites = include_str!("../src/model/sites_pkg2.rs");
+            ["STATUS_KIND_OFFSET", "WORK_IS_FLAG_OFFSET", "WORK_GET_INT_OFFSET", "UTILITY_GET_KIND_OFFSET"]
                 .map(|name| sites.lines()
                     .find(|line| line.starts_with(&format!("pub const {name}:")))
                     .unwrap())
                 .join("\n")
         }),
+        ("// EGG_HITBOX_SITES", include_str!("../src/model/sites_hitbox.rs").lines()
+            .find(|line| line.starts_with("pub const HITBOX_IS_ATTACK_OFFSET:"))
+            .unwrap().to_string()),
         ("// TROLLEY_SITES", {
             let sites = include_str!("../src/model/sites_pkg3.rs");
             [
