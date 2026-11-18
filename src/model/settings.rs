@@ -32,8 +32,6 @@ pub const LAST_PAGE_KEY: &str = "last_page";
 pub const MII_PREFERENCES_KEY: &str = "mii_preferences";
 /// Largest weight on a weighted row.
 pub const WEIGHT_MAX: u8 = 5;
-/// Largest slider value (the two damage ranges).
-pub const SLIDER_MAX: u8 = 150;
 /// Keys older builds wrote that nothing reads any more (SPEC-core-01 §6, SPEC-core-02 question 4;
 /// `character_item` since decision N6, converted once by the first-boot import).
 /// `input_display` and `input_display_status` since the frame strip replaced the input log (SPEC-input-06 §3.1;
@@ -50,8 +48,8 @@ pub enum Kind {
     Multiple,
     /// Each option `0..=WEIGHT_MAX`.
     Weighted,
-    /// `[lower, upper]`, `lower <= upper <= SLIDER_MAX`.
-    Slider,
+    /// `[lower, upper]`, `lower <= upper <= max`.
+    Slider { max: u8 },
     /// The optional range of a delay row (N3): empty (no range) or `[min, max]` as **option
     /// indices** of the row's own value set, `min <= max <= RANGE_INDEX_MAX`. Absent from the file
     /// while empty.
@@ -66,7 +64,7 @@ impl Kind {
         match self {
             Kind::Single | Kind::Multiple => 1,
             Kind::Weighted => WEIGHT_MAX,
-            Kind::Slider => SLIDER_MAX,
+            Kind::Slider { max } => max,
             Kind::Range => RANGE_INDEX_MAX,
         }
     }
@@ -107,7 +105,7 @@ pub enum Reason {
     ElementAboveMax,
     /// A slider array does not have exactly two elements.
     BadSliderLength,
-    /// A slider's `lower` is above its `upper` (or either is above `SLIDER_MAX`).
+    /// A slider's `lower` is above its `upper`.
     BadSliderRange,
     /// `Snapshot::set` was given an id this build has no row for.
     UnknownId,
@@ -124,7 +122,7 @@ impl fmt::Display for Reason {
             Reason::ElementNotAByte => f.write_str("element is not an integer 0..=255"),
             Reason::ElementAboveMax => f.write_str("element above the row's largest value"),
             Reason::BadSliderLength => f.write_str("slider needs exactly two elements"),
-            Reason::BadSliderRange => f.write_str("slider range is not lower <= upper <= 150"),
+            Reason::BadSliderRange => f.write_str("slider range is not lower <= upper"),
             Reason::UnknownId => f.write_str("no such setting"),
         }
     }
@@ -147,7 +145,7 @@ pub fn parse_row(def: &Def, value: &Value) -> Result<Vec<u8>, Reason> {
     if def.kind == Kind::Range && elements.is_empty() {
         return Ok(elements);
     }
-    if matches!(def.kind, Kind::Slider | Kind::Range) {
+    if matches!(def.kind, Kind::Slider { .. } | Kind::Range) {
         let &[lower, upper] = elements.as_slice() else {
             return Err(Reason::BadSliderLength);
         };

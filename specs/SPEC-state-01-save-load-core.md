@@ -22,7 +22,7 @@ The player presses a button chord to remember where both fighters are (position,
 | Save Dmg (CPU) | `save_damage_cpu` | single-choice | Default, Save State, Random Value | Default |
 | Dmg Range (CPU) | `save_damage_limits_cpu` | slider (two handles) | Lower 0–150, Upper 0–150 (percent) | 0 / 150 |
 | Save Dmg (Player) | `save_damage_player` | single-choice | Default, Save State, Random Value | Default |
-| Dmg Range (Player) | `save_damage_limits_player` | slider (two handles) | Lower 0–150, Upper 0–150 | 0 / 150 |
+| Dmg Range (Player) | `save_damage_limits_player` | slider (two handles) | Lower 0–255, Upper 0–255 (percent) | 0 / 150 |
 | Enable Save States | `save_state_enable` | toggle | On, Off | On |
 | Save State Slot | `save_state_slot` | single-choice | Slot 1 … Slot 5 | Slot 1 |
 | Randomize Slots | `randomize_slots` | multi-choice with weights (1–5 per slot) | Slot 1 … Slot 5 | none selected |
