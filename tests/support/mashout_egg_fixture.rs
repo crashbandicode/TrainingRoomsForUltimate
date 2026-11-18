@@ -286,6 +286,11 @@ mod natives {
         23.5
     }
 }
+// The native floor check belongs to Trolley. Egg preparation must never reach it.
+unsafe fn trolley_floor_allows(_: usize, _: f32, _: f32, _: f32, _: f32) -> bool {
+    panic!("Egg fixture reached the Trolley-only floor check")
+}
+
 mod state_natives {
     fn read() { super::TROLLEY_NATIVE_CALLS.fetch_add(1, super::Ordering::Relaxed); }
     pub fn article_is_exist(cpu: usize, article: i32) -> bool {
