@@ -410,7 +410,21 @@ def btt_clock(ctx, cap=10):
 def btt_running_course(ctx):
     """Start Break the Targets; with no target, place one; X; the first input starts the clock (`[Btt] phase=Running`)."""
     open_game(ctx, 'Break the Targets')
-    out = {'start': start(ctx, 'Break the Targets', r'\[Btt\] phase=(Placing|Ready) ')}
+    out = {}
+    # An earlier attempt may have left it running (its first row is then Stop): A stops it, the menu stays open, and the
+    # next A starts it. The expected line carries the target count (boot 2: the match alone had no `n=`).
+    ready = r'\[Btt\] phase=(Placing|Ready) n=\d+ '
+    log = cursor(ctx)
+    try:
+        ctx.press('a')
+        first = log.wait(r'\[Practice\] (start|stop) game=(\S+)', 4, ctx)
+        if first.group(1) == 'start':
+            out['start'] = {'started': first.group(2), 'line': log.wait(ready, 20, ctx).group(0)}
+    finally:
+        log.close()
+    if first.group(1) == 'stop':
+        out['stopped_first'] = first.group(0)
+        out['start'] = start(ctx, 'Break the Targets', ready)
     log = cursor(ctx)
     try:
         if 'phase=Placing' in out['start']['line']:
@@ -462,7 +476,11 @@ def btt_load_while_running(ctx):
     (folder / 'practice-menu-two.json').write_text(json.dumps(
         {'schema_version': 1, 'name': 'Practice two', 'stage': 0, 'used': 9,
          'targets': [[-30.0, 30.0], [30.0, 30.0]]}) + '\n')
-    out = {'running_before': btt_clock(ctx)[1]}
+    try:
+        out = {'running_before': btt_clock(ctx, 3)[1]}
+    except RuntimeError:
+        # A retry finds the course at Ready (attempt 1's Load): the first input starts the clock again.
+        out = {'running_before': waits(ctx, 'a', r'\[Btt\] phase=Running [^\n]*', 10).group(0)[:200]}
     open_game(ctx, 'Break the Targets')
     focus_sub(ctx, 'Break the Targets', 'Saved layouts')
     waits(ctx, 'a', r'\[Ui\] press A .*screen=Some\(External\(Layouts\)\)', 4)
@@ -471,18 +489,20 @@ def btt_load_while_running(ctx):
     time.sleep(0.6)
     ctx.press('a')
     time.sleep(0.6)
-    log, starts = cursor(ctx), cursor(ctx)
+    # Three cursors from the Load press: the game pass may write Ready before the screen's reread (boot 2 attempt 2).
+    log, ready, starts = cursor(ctx), cursor(ctx), cursor(ctx)
     try:
         ctx.press('a')
         out['reread'] = log.wait(r'\[Btt\] layouts stage=0 [^\n]*', 15, ctx).group(0)[:200]
         out['loaded_shot'] = shot(ctx, 'btt-layout-loaded-in-menu')
         close_all(ctx)
         # The game pass takes the layout (with the menu open or after the close): Ready with both targets up.
-        out['ready'] = log.wait(r'\[Btt\] phase=Ready n=2 ', 15, ctx).group(0)[:200]
+        out['ready'] = ready.wait(r'\[Btt\] phase=Ready n=2 [^\n]*', 15, ctx).group(0)[:200]
         time.sleep(1.0)
         none_since(ctx, starts, r'\[Practice\] (start|stop)')
     finally:
         log.close()
+        ready.close()
         starts.close()
     out['after_close'] = 'no [Practice] start or stop line from the Load to 1 s after Ready'
     # Stop: the only way it ends.

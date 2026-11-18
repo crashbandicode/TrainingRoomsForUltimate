@@ -1,0 +1,8 @@
+{
+  "head": "0952cd45",
+  "diag_nro": "/home/intpa/eden-runs/inputs-practice-menu-0952cd45/libtraining_rooms.nro",
+  "diag_sha256": "1f39017a56562b3f8c87dfbf861e6d3b5eae8dcbcd1b91adbf3c627caa9ac12c",
+  "diag_elf": "/home/intpa/eden-runs/inputs-practice-menu-0952cd45/libtraining_rooms-0952cd45-diag.elf",
+  "elf_sha256": "dc78167114cb6bc7fddaee8ca604cec6327911bc896dba2e172baa0022dfd584",
+  "set_text_symbol": "_RNvNtNtNtCsaEUZEvOrbU6_14training_rooms7runtime2ui4pane8set_text"
+}
