@@ -727,8 +727,11 @@ pub fn bound_sync(root: &Path) -> Option<Option<[SavedState; 2]>> {
 /// The state writer has a Save's two records for the active slot. The worker writes them into the bound save.
 /// No bound-save write waits for the worker (the bridge's fixture restore waits for this).
 pub fn bound_settled() -> bool {
-    lock(&SAVED_PAIR).is_none() && !BOUND_DIRTY.load(Ordering::Acquire)
+    !BOUND_WRITING.load(Ordering::Acquire) && lock(&SAVED_PAIR).is_none() && !BOUND_DIRTY.load(Ordering::Acquire)
 }
+
+/// The worker is writing a captured pair into the bound save (set before the pair is taken).
+static BOUND_WRITING: AtomicBool = AtomicBool::new(false);
 
 pub fn save_captured(pair: [SavedState; 2]) {
     *lock(&SAVED_PAIR) = Some(pair);
@@ -839,6 +842,13 @@ pub fn warp_pair(save: NamedSave, place: Option<(Role, Placement)>) -> [SavedSta
 
 /// Save writes the one bound save, or a new bound Save N when none is bound (`rr_runtime::save_chord`). Worker side.
 pub fn write_saved(root: &Path) -> bool {
+    BOUND_WRITING.store(true, Ordering::Release);
+    let wrote = write_saved_pair(root);
+    BOUND_WRITING.store(false, Ordering::Release);
+    wrote
+}
+
+fn write_saved_pair(root: &Path) -> bool {
     let Some([player, cpu]) = lock(&SAVED_PAIR).take() else {
         return false;
     };

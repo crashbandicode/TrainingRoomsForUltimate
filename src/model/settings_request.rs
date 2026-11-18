@@ -10,6 +10,11 @@ pub fn accept(bytes: &[u8]) -> Result<Loaded, usize> {
     if loaded.corrupt() { Err(loaded.issues.len()) } else { Ok(loaded) }
 }
 
+/// The live-restore readback: the committed menu rows are the file's.
+pub fn matches(bytes: &[u8], committed: Option<&settings::Snapshot>) -> bool {
+    accept(bytes).is_ok_and(|loaded| committed == Some(&loaded.settings.menu))
+}
+
 #[cfg(test)]
 #[path = "settings_request_tests.rs"]
 mod tests;

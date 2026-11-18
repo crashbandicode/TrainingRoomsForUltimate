@@ -434,6 +434,7 @@ pub(crate) fn clear_session() {
     quick_reset::clear();
     preview::clear();
     SAVE_REQUEST.store(false, Ordering::Release);
+    SAVE_IN_FLIGHT.store(false, Ordering::Release);
     LOAD_REQUEST.store(false, Ordering::Release);
     let _take = NAMED_TAKE.lock();
     NAMED_LOAD.discard();
@@ -693,6 +694,9 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     }
     if !nana && !reset_hub::cpu_operated(fighter) && chords::consume(crate::model::chords::Request::LoadState) {
         request_load();
+    }
+    if SAVE_REQUEST.load(Ordering::Relaxed) {
+        SAVE_IN_FLIGHT.store(true, Ordering::Release);
     }
     let save_chord = SAVE_REQUEST.swap(false, Ordering::AcqRel);
     // The Load chord is read only on a non-CPU-operated, non-Nana fighter's callback.
@@ -1238,6 +1242,11 @@ pub fn frame(fighter: usize) {
         return;
     }
     adopt_reload();
+    // The previous frames' captures are with the writer now: the Save is in flight while a marker is left.
+    if SAVE_IN_FLIGHT.load(Ordering::Relaxed) && !SAVE_REQUEST.load(Ordering::Acquire) {
+        let marked = with(|s| s.machine.save_marked()).unwrap_or(false);
+        SAVE_IN_FLIGHT.store(marked, Ordering::Release);
+    }
     // SAFETY: `fighter` is the object the game passed to its on-frame function.
     unsafe { on_fighter_frame(fighter) };
 }
@@ -1635,6 +1644,9 @@ pub fn load_file() -> SaveFile {
 static WRITER_FILE: Mutex<Option<SaveFile>> = Mutex::new(None);
 /// The writer is between taking the captures and finishing the file.
 static WRITING: AtomicBool = AtomicBool::new(false);
+/// A Save from its request until both bodies' captures are with the writer: set before the request is taken, cleared at
+/// a later frame's start once no Save marker is left. With the handoff, `DIRTY` and `WRITING` it leaves no gap.
+static SAVE_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
 /// The bridge's fixture restore (state export): the slots of the file as restored on disk, built on the plugin thread; the
 /// next practice frame swaps them in (`adopt_reload`, no allocation in the hook).
@@ -1648,7 +1660,7 @@ static RELOAD_DUE: AtomicBool = AtomicBool::new(false);
 /// Nothing accepted is still on its way to the slot file: no Save or Load waiting for its frame, no capture waiting for the
 /// writer, the writer not writing, no restored file waiting for its frame.
 pub fn settled() -> bool {
-    [&SAVE_REQUEST, &LOAD_REQUEST, &DIRTY, &WRITING, &RELOAD_DUE].iter().all(|flag| !flag.load(Ordering::Acquire))
+    [&SAVE_REQUEST, &SAVE_IN_FLIGHT, &LOAD_REQUEST, &DIRTY, &WRITING, &RELOAD_DUE].iter().all(|flag| !flag.load(Ordering::Acquire))
         && HANDOFF_STATE.iter().all(|cell| cell.load(Ordering::Acquire) == SLOT_EMPTY)
 }
 
@@ -1776,11 +1788,16 @@ fn take_captured(file: &mut SaveFile) {
 pub fn start_writer() {
     let spawned = crate::runtime::threads::spawn(crate::model::thread_stacks::ThreadId::StateWriter, || loop {
         std::thread::sleep(std::time::Duration::from_millis(200));
+        // WRITING before DIRTY is taken: the two overlap, so a pending write is never invisible.
+        WRITING.store(true, Ordering::Release);
         if !DIRTY.swap(false, Ordering::AcqRel) {
+            WRITING.store(false, Ordering::Release);
             continue;
         }
-        let Some(path) = save_path() else { continue };
-        WRITING.store(true, Ordering::Release);
+        let Some(path) = save_path() else {
+            WRITING.store(false, Ordering::Release);
+            continue;
+        };
         let mut mirror = WRITER_FILE.lock();
         let Some(file) = mirror.as_mut() else {
             WRITING.store(false, Ordering::Release);

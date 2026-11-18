@@ -135,6 +135,29 @@ fn imported_mii_json_stays_with_writer_when_game_records_are_copied() {
     assert_eq!(SaveFile::parse(bytes.as_bytes()).unwrap(), writer);
 }
 
+/// Astra 4ac6a3f 2: a Save stays in flight while any body still has its Save marker; the check allocates nothing (it
+/// runs in the practice frame).
+#[test]
+fn a_marked_save_is_in_flight_until_every_body_captured() {
+    use model::state::machine::{Machine, Role};
+    use model::state::record::Marker;
+    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let mut machine = Machine::default();
+    assert!(!machine.save_marked());
+    machine.set_marker(Role::Player, 2, Marker::Save);
+    machine.set_marker(Role::Cpu, 2, Marker::Save);
+    let before = hook_allocations();
+    {
+        let _scope = HookScope::enter_hook(HookId::StateFrame);
+        assert!(machine.save_marked());
+        machine.set_marker(Role::Player, 2, Marker::NoAction);
+        assert!(machine.save_marked(), "the CPU body has not captured yet");
+        machine.set_marker(Role::Cpu, 2, Marker::NoAction);
+        assert!(!machine.save_marked());
+    }
+    assert_eq!(hook_allocations(), before);
+}
+
 #[test]
 fn quick_reset_observation_and_temporary_restore_allocate_nothing() {
     use model::state::machine::{FrameIn, Machine, SituationIds, StatusNow};

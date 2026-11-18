@@ -25,7 +25,7 @@ fn state_export_layout_is_pinned() {
     assert_eq!((FRAME_NANA, FRAME_PLAYER), (1, 2));
     assert_eq!((FREE, WRITING, READY, READING, state(0, READY)), (0, 1, 2, 3, 6));
     assert_eq!((REQ_SET_APPLY, REQ_SAVE, REQ_LOAD, REQ_ITEM, OK, REFUSED_SCENE, BAD_REQUEST, REFUSED_SETTINGS), (1, 2, 3, 4, 0, -1, -2, -3));
-    assert_eq!((REQ_SETTLED, REQ_RELOAD_SAVES, BUSY), (5, 6, -4));
+    assert_eq!((REQ_SETTLED, REQ_RELOAD_SAVES, REQ_SETTINGS_MATCH, BUSY, MISMATCH), (5, 6, 7, -4, -5));
 }
 
 fn state_export_ring_passes_lines_in_order_with_the_frame() {

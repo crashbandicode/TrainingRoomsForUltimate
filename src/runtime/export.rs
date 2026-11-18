@@ -79,6 +79,12 @@ extern "C" fn request(kind: u32, data: *const u8, len: usize) -> i32 {
             crate::runtime::features::states::reload_from_disk();
             return abi::OK;
         }
+        abi::REQ_SETTINGS_MATCH if !data.is_null() => {
+            // SAFETY: the reader's buffer, live for this call.
+            let bytes = unsafe { std::slice::from_raw_parts(data, len) };
+            let committed = crate::runtime::ui::worker::committed_menu();
+            return if crate::model::settings_request::matches(bytes, committed.as_ref()) { abi::OK } else { abi::MISMATCH };
+        }
         _ => {}
     }
     if !crate::model::scene::is_training(crate::runtime::scene::facts()) {
