@@ -90,7 +90,7 @@ extern "C" fn request(kind: u32, data: *const u8, len: usize) -> i32 {
             match crate::model::settings_request::accept(unsafe { std::slice::from_raw_parts(data, len) }) {
                 Ok(loaded) => apply_loaded(loaded),
                 Err(issues) => {
-                    diagnostic(format_args!("[TrainingRooms] state_export set refused issues={issues}"));
+                    diagnostic(format_args!("[TrainingRooms] state_export set refused issues={issues}")); // restriction: state-export-invalid-settings
                     return abi::REFUSED_SETTINGS;
                 }
             }
