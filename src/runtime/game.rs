@@ -484,6 +484,22 @@ pub mod natives {
         at::<extern "C" fn(usize, i32, bool) -> bool>(crate::model::sites_hitbox::HITBOX_IS_ATTACK_OFFSET).map_or_else(Default::default, |f| f(accessor, slot, false))
     }
 
+    /// Number of normal AttackModule records on a live fighter accessor.
+    pub unsafe fn fighter_attack_count(accessor: usize) -> Option<i32> {
+        use crate::model::sites_mashout::{CLIMBER_ATTACK_COUNT, SITES};
+        let read_count = at::<extern "C" fn(usize) -> u64>(CLIMBER_ATTACK_COUNT)?;
+        let site = SITES.iter().find(|site| site.offset == CLIMBER_ATTACK_COUNT)?;
+        if super::read_window(site.offset) != site.guard { return None; }
+        let module = ((accessor + 0xa0) as *const usize).read();
+        if module == 0 || !module.is_multiple_of(8)
+            || (module as *const usize).read() != super::text_base() + 0x4f6a5b8
+        {
+            return None;
+        }
+        let count = read_count(module);
+        (1..=16).contains(&count).then_some(count as i32)
+    }
+
     /// `AttackModule::attack_data(accessor, slot, false)`: the slot's `AttackData` (layout in `model::hitbox::layout`), or 0.
     pub unsafe fn attack_data(accessor: usize, slot: i32) -> usize {
         at::<extern "C" fn(usize, i32, bool) -> usize>(crate::model::sites_hitbox::HITBOX_ATTACK_DATA_OFFSET).map_or_else(Default::default, |f| f(accessor, slot, false))

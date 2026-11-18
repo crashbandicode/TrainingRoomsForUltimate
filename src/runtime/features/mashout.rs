@@ -634,7 +634,7 @@ unsafe fn trail_blizzard_closed(cpu: usize) -> Result<bool, ()> {
 /// SPECIAL_N can issue an Ice Shot at frame 18, and the projectile owns the hitboxes.
 /// Once P1 escapes, a live shot makes the counterfactual bounds unknowable.
 unsafe fn ice_shot_provider_closed(cpu: usize, cpu_entry: i32) -> Result<bool, &'static str> {
-    use crate::model::{hitbox, sites_hitbox, sites_pkg2, sites_pkg3};
+    use crate::model::{sites_hitbox, sites_pkg2, sites_pkg3};
     if ![
         sites_hitbox::HITBOX_IS_ATTACK_OFFSET,
         sites_pkg2::STATUS_KIND_OFFSET,
@@ -653,8 +653,9 @@ unsafe fn ice_shot_provider_closed(cpu: usize, cpu_entry: i32) -> Result<bool, &
         return Err(UNAVAILABLE_NOTICE);
     };
     let closed = |body| {
+        let slots = natives::fighter_attack_count(body).ok_or(UNAVAILABLE_NOTICE)?;
         if state_natives::article_is_exist(body, article)
-            || (0..hitbox::SLOTS).any(|slot| natives::attack_is_attack(body, slot))
+            || (0..slots).any(|slot| natives::attack_is_attack(body, slot))
         {
             // restriction: MASH-M1-MISMATCH
             return Err("Native tick mismatch · no grade");

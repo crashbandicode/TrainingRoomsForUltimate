@@ -6,9 +6,6 @@ use std::{
 mod model {
     pub mod sites_pkg3 { // TROLLEY_SITES
     }
-    pub mod hitbox {
-        // FIGHTER_ATTACK_SLOTS
-    }
     pub mod sites_hitbox { // EGG_HITBOX_SITES
     }
     pub mod sites_pkg2 { // EGG_PKG2_SITES
@@ -346,15 +343,23 @@ mod natives {
         assert_eq!(accessor, 0x200);
         Some(super::EGG_WEAPON_KIND.load(super::Ordering::Relaxed) as i32)
     }
+    pub fn fighter_attack_count(accessor: usize) -> Option<i32> {
+        let count = super::ICE_ATTACK_COUNTS[match accessor {
+            2 => 0,
+            super::NANA_BOMA => 1,
+            _ => panic!("unexpected Ice Climbers accessor"),
+        }].load(super::Ordering::Relaxed);
+        (1..=16).contains(&count).then_some(count as i32)
+    }
     pub fn attack_is_attack(accessor: usize, slot: i32) -> bool {
         if super::ICE_SHOT_FIXTURE.load(super::Ordering::Relaxed) {
-            assert!((0..8).contains(&slot));
+            assert!((0..fighter_attack_count(accessor).unwrap()).contains(&slot));
             let mask = match accessor {
                 2 => 1,
                 super::NANA_BOMA => 2,
                 _ => panic!("unexpected Ice Climbers accessor"),
             };
-            return slot == 7 && super::ICE_SHOT_ATTACKS.load(super::Ordering::Relaxed) & mask != 0;
+            return slot == 9 && super::ICE_SHOT_ATTACKS.load(super::Ordering::Relaxed) & mask != 0;
         }
         assert_eq!(accessor, 0x200);
         assert!((0..7).contains(&slot));
@@ -3229,6 +3234,7 @@ fn sora_blizzard_arms_the_set_observer_only_for_the_real_cast_and_posts_its_writ
 static ICE_SHOT_FIXTURE: AtomicBool = AtomicBool::new(false);
 static ICE_SHOT_ARTICLES: AtomicU32 = AtomicU32::new(0);
 static ICE_SHOT_ATTACKS: AtomicU32 = AtomicU32::new(0);
+static ICE_ATTACK_COUNTS: [AtomicU32; 2] = [AtomicU32::new(10), AtomicU32::new(10)];
 const NANA_BOMA: usize = 0x4010;
 static NANA_STATUS: AtomicU32 = AtomicU32::new(0);
 static NANA_OBJECT: AtomicU32 = AtomicU32::new(0x402);
@@ -3251,6 +3257,7 @@ unsafe fn live_ice_shot() -> (Box<NativeMemory>, Game) {
     ICE_SHOT_FIXTURE.store(true, Ordering::Relaxed);
     ICE_SHOT_ARTICLES.store(0, Ordering::Relaxed);
     ICE_SHOT_ATTACKS.store(0, Ordering::Relaxed);
+    for count in &ICE_ATTACK_COUNTS { count.store(10, Ordering::Relaxed); }
     NANA_STATUS.store(0, Ordering::Relaxed);
     NANA_OBJECT.store(0x402, Ordering::Relaxed);
     NANA_ENTRY.store(1, Ordering::Relaxed);
@@ -3313,7 +3320,24 @@ fn ice_shot_refuses_either_live_article_on_escape_or_during_wait() {
 
 #[test]
 fn ice_shot_refuses_either_fighter_attack_on_escape_or_during_wait() {
-    unsafe { ice_shot_refuses_live_provider(&ICE_SHOT_ATTACKS, "attack slot 7") }
+    unsafe { ice_shot_refuses_live_provider(&ICE_SHOT_ATTACKS, "attack slot 9") }
+}
+
+#[test]
+fn ice_shot_uses_each_body_count_and_refuses_an_unreadable_bound() {
+    unsafe {
+        for rejected_body in 0..2 {
+            for invalid in [0, 17] {
+                let (m, mut game) = live_ice_shot();
+                ICE_ATTACK_COUNTS[1 - rejected_body].store(8, Ordering::Relaxed);
+                ICE_ATTACK_COUNTS[rejected_body].store(invalid, Ordering::Relaxed);
+                m.update(&mut game, 68);
+                assert_eq!((game.step, game.failed), (Step::Failed, Some(UNAVAILABLE_NOTICE)));
+                assert_eq!(FINISHED.get(), 0);
+                assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
+            }
+        }
+    }
 }
 
 unsafe fn ice_shot_refuses_live_provider(active: &AtomicU32, source: &str) {
