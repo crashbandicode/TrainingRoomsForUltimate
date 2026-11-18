@@ -243,6 +243,51 @@ fn deferred_cached_looks_match_direct_visible_writes() {
     }
 }
 
+/// rc.15 Parry practice: the PARRY and SET readouts replace LINK and INPUT, with Tech's words for the grade.
+fn parry_strip_readouts_show_grade_and_counter() {
+    use crate::model::parry::{Attempt, View};
+    use crate::model::tech::session::Grade;
+    let mut view = View::EMPTY;
+    view.last[0] = Some(Attempt { grade: Grade::Early(3), hit: 1, window: None });
+    view.set = Text::new("7/10");
+    let mut looks = vec![Look::HIDDEN; COUNT];
+    Renderer::new().draw_parry(&Tracker::new(), true, false, Some(&view), |i, look, _| looks[i] = *look);
+    assert_eq!(looks[at::READ_LABEL + 1].text, Text::new("PARRY"));
+    assert_eq!(looks[at::READ_LABEL + 2].text, Text::new("SET"));
+    assert_eq!(looks[at::READ_VALUE + 1].text, Text::new("-3"));
+    assert_eq!(looks[at::READ_SUB + 1].text, Text::new("Early by 3f"));
+    assert_eq!(looks[at::READ_VALUE + 2].text, Text::new("7/10"));
+    assert!(looks[at::PILL].visible, "the newest attempt's pill");
+}
+
+/// tr-review-astra-2 finding 2 (70bb16e9): with the strip already running, a parry window must be drawn on the strip's
+/// own frames (the detector shares the strip's frame numbers).
+fn parry_window_uses_the_strip_frames() {
+    use crate::model::parry::{Detector, Frame, View};
+    let mut tracker = Tracker::new();
+    // Busy fighters (not actionable): the strip keeps scrolling instead of freezing on a quiet stretch.
+    for _ in 0..100 {
+        tracker.step(Sample::default(), Sample::default(), NONE);
+    }
+    assert!(tracker.newest().is_some_and(|n| n >= 100), "the strip ran ahead of Parry practice");
+    let idle_p1 = Frame { armed: true, ..Frame::default() };
+    let held = Frame { shield_held: true, ..idle_p1 };
+    let off = Frame { guard_off: true, just_frame: Some(4), ..idle_p1 };
+    let parry = Frame { stop: true, guard_damage: true, just_shield: Some(true), ..idle_p1 };
+    let mut detector = Detector::new();
+    let mut view = View::EMPTY;
+    for f in [held, held, off, off, parry] {
+        tracker.step(Sample::default(), Sample::default(), NONE);
+        for a in detector.step(&f, tracker.newest().unwrap()).into_iter().flatten() {
+            view.last[0] = Some(a);
+        }
+    }
+    assert!(view.last[0].is_some(), "the parry is graded");
+    let mut looks = vec![Look::HIDDEN; COUNT];
+    Renderer::new().draw_parry(&tracker, true, false, Some(&view), |i, look, _| looks[i] = *look);
+    assert!(looks[at::WINDOW_BAR].visible, "the window bar is on the strip's frames");
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -252,6 +297,8 @@ fn case_table() {
         ("the_stick_row_scrolls_and_freezes_with_the_strip", the_stick_row_scrolls_and_freezes_with_the_strip as fn()),
         ("a_hit_block_carries_its_spot_label_when_the_row_is_on", a_hit_block_carries_its_spot_label_when_the_row_is_on as fn()),
         ("deferred_cached_looks_match_direct_visible_writes", deferred_cached_looks_match_direct_visible_writes as fn()),
+        ("parry_strip_readouts_show_grade_and_counter", parry_strip_readouts_show_grade_and_counter as fn()),
+        ("parry_window_uses_the_strip_frames", parry_window_uses_the_strip_frames as fn()),
     ]);
 }
 }

@@ -141,6 +141,9 @@ pub mod eggs;
 pub mod btt;
 #[path = "model/tech/mod.rs"]
 pub mod tech;
+/// rc.15 Parry practice: the attempt detector (artifacts/rc15-parry/DESIGN.md).
+#[path = "model/parry.rs"]
+pub mod parry;
 #[path = "model/sites_hitbox.rs"]
 pub mod sites_hitbox;
 #[path = "model/sites_mashout.rs"]

@@ -6,7 +6,7 @@ use super::settings::Snapshot;
 /// Register each practice game's settings row here once. `stage_tech` is the reserved Stage tech
 /// integration key; this reservation creates no settings/menu row. Keep Eggs-ercise before BTT
 /// to preserve existing hand-edited-file precedence.
-pub const ROWS: &[&str] = &["eggsercise", "btt", "tech_practice", "mashout", "stage_tech"];
+pub const ROWS: &[&str] = &["eggsercise", "btt", "tech_practice", "mashout", "parry_practice", "stage_tech"];
 
 fn enabled(rows: &Snapshot, id: &str) -> bool {
     rows.get(id).is_some_and(|row| row.iter().skip(1).any(|value| *value != 0))
@@ -68,8 +68,8 @@ mod tests {
         use crate::model::{btt, settings::{self, Settings}};
 
         #[test]
-        fn registry_covers_five_games() {
-            assert_eq!(ROWS, &["eggsercise", "btt", "tech_practice", "mashout", "stage_tech"]);
+        fn registry_covers_six_games() {
+            assert_eq!(ROWS, &["eggsercise", "btt", "tech_practice", "mashout", "parry_practice", "stage_tech"]);
             for (index, id) in ROWS.iter().enumerate() {
                 assert!(!ROWS[index + 1..].contains(id));
             }

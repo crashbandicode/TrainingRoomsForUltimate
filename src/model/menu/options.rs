@@ -105,6 +105,8 @@ pub static CHORD_ROWS: [(&str, &str); 10] = [
 ];
 
 /// Stage tech practicer choices (DESIGN §5/7).
+/// rc.15 Parry practice: sets of ten with a summary, or a running total only.
+pub static PARRY_SESSION: [&str; 3] = ["Off", "10 attempts", "Free practice"];
 pub static TECH_SESSION: [&str; 6] = ["Off", "20 attempts", "10 attempts", "1 minute", "3 minutes", "Free practice"];
 pub static TECH_SURFACE: [&str; 5] = ["Any", "Floor", "Wall", "Ceiling (underside)", "Chosen point"];
 pub static TECH_MODE: [&str; 2] = ["Set", "Random"];

@@ -62,6 +62,7 @@ extern "C" fn on_init(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5:
         crate::runtime::features::mashout::reset();
         crate::runtime::features::btt::reset();
         crate::runtime::features::tech::reset();
+        crate::runtime::features::parry::reset();
     }
     result
 }

@@ -89,6 +89,7 @@ pub fn publish(snapshot: &Snapshot) {
     PRACTICE_HIDE.store(hide, Ordering::Release);
     btt::publish(snapshot);
     super::tech::publish(snapshot);
+    super::parry::publish(snapshot);
 }
 
 // ---- Eggs-ercise (rc.14, `model::eggs`) -------------------------------------------------------------------------------

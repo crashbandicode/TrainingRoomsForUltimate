@@ -750,7 +750,7 @@ fn sync_panels(s: &mut Session) {
     }
     // rc.14 Break the Targets: the Saved layouts list's A and Y.
     if let Some(note) = s.layouts.tick(s.menu.as_mut()) {
-        layouts::note(&note);
+        s.layouts.note(&note);
     }
     // A keyboard name the frame wrapper confirmed: its library write is file I/O, done here.
     // Drawn only where a renderer exists, so Player 1 is never held by a question nobody can see (R2-2).
@@ -794,7 +794,7 @@ fn sync_panels(s: &mut Session) {
             }
         } else if let Some(editor) = entered.filter(|e| layouts::is_layouts(*e)) {
             // Break the Targets' Saved layouts (SPEC V2.5): a list panel, like the saved combos.
-            if s.layouts.open() {
+            if s.layouts.open(editor) {
                 (s.phase, s.panel) = (Phase::Panel, Some(editor));
             } else if let Some(m) = s.menu.as_mut() {
                 m.press(Button::B);

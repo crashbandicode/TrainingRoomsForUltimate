@@ -1957,6 +1957,11 @@ impl Menu {
         self.put("btt", &[0, 1]);
     }
 
+    /// A saved parry practice was used: Parry practice turns On with its set length (1 sets of ten, 2 free practice).
+    pub fn parry_on(&mut self, set: usize) {
+        self.put_one_hot("parry_practice", set.clamp(1, 2));
+    }
+
     /// The item the player chose on the Give item grid since the last call, if any.
     pub fn take_give_item(&mut self) -> Option<u8> {
         self.outbox.give_item.take()

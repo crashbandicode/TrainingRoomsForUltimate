@@ -852,6 +852,9 @@ pub mod ids {
         SpecialLw = "FIGHTER_STATUS_KIND_SPECIAL_LW",
         Final = "FIGHTER_STATUS_KIND_FINAL",
         SituationAir = "SITUATION_KIND_AIR",
+        // rc.15 Parry practice: the parry flag and the just-shield window (FACTS.md §4.1).
+        JustShield = "FIGHTER_STATUS_GUARD_ON_WORK_FLAG_JUST_SHIELD",
+        JustFrame = "FIGHTER_STATUS_GUARD_ON_WORK_INT_JUST_FRAME",
     }
 
     impl Table {

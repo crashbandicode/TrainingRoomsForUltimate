@@ -1,0 +1,105 @@
+//! Parry practice, the runtime glue (`artifacts/rc15-parry/DESIGN.md` rev 2, §3–4): the session row, the per-frame step of
+//! `model::parry::Detector` from the strip's P1 sample, Tech's `Summary`/`Bests` for the set and its Done line, and the
+//! strip's view. Game thread only, except `publish` (the settings publish) and `view` (the HUD tick).
+
+use std::sync::atomic::{AtomicU8, Ordering};
+
+use core::fmt::Write as _;
+
+use hos_lock::{Mutex, Published};
+
+use crate::model::parry::{Attempt, Detector, Frame, View};
+use crate::model::settings::Snapshot;
+use crate::model::storage::FixedPath;
+use crate::model::tech::session::{Bests, Grade, Summary};
+
+/// The session row: 0 Off, 1 sets of ten, 2 free practice.
+static SESSION: AtomicU8 = AtomicU8::new(0);
+static VIEW: Published<Option<View>> = Published::new(None);
+
+struct State {
+    detector: Detector,
+    view: View,
+    summary: Summary,
+    bests: Bests,
+    total: u32,
+    perfect: u32,
+    /// Frames since the parry pass ended (`None`: one plays, or none played yet).
+    since_end: Option<u32>,
+}
+
+const SUMMARY: Summary = Summary { attempts: 0, perfect: 0, held: 0, early: 0, late: 0, locked: 0, missed: 0, streak: 0, best: 0, offset_sum: 0, timed_perfect: 0 };
+static STATE: Mutex<State> = Mutex::new(State { detector: Detector::new(), view: View::EMPTY, summary: SUMMARY, bests: Bests::EMPTY, total: 0, perfect: 0, since_end: None });
+
+/// Every settings publish.
+pub fn publish(snapshot: &Snapshot) {
+    let session = crate::model::tech_settings::selected(snapshot, "parry_practice").min(2) as u8;
+    SESSION.store(session, Ordering::Release);
+    crate::engine::rr_host::set_parry(session != 0);
+}
+
+/// Parry practice is on: the strip shows even with Input Display Off (operator Q2, 2026-11-17).
+pub fn on() -> bool {
+    SESSION.load(Ordering::Acquire) != 0
+}
+
+/// Free practice: a running total, no sets.
+pub fn free() -> bool {
+    SESSION.load(Ordering::Acquire) == 2
+}
+
+/// The strip's view, for the HUD tick.
+pub fn view() -> Option<View> {
+    VIEW.read().filter(|_| on())
+}
+
+/// A load, an L+R+A reset, leaving the scene: an open attempt is dropped uncounted; the set and the totals stay.
+pub fn reset() {
+    if let Some(mut s) = STATE.try_lock() {
+        (s.detector, s.since_end) = (Detector::new(), None);
+    }
+    crate::engine::rr_host::set_parry_open(false);
+}
+
+fn record(s: &mut State, a: Attempt, fighter: Option<i32>) {
+    s.view.last.copy_within(0..3, 1);
+    s.view.last[0] = Some(a);
+    if !a.grade.counted() {
+        return;
+    }
+    s.total += 1;
+    s.perfect += u32::from(matches!(a.grade, Grade::Perfect(_)));
+    s.summary.record(a.grade);
+    let best = s.bests.record(fighter.unwrap_or(-1), s.summary.best);
+    if !free() && s.summary.attempts >= 10 {
+        // Tech's own Done line, in the compact top-left box once rc15/notice-compact merges.
+        let mut body = FixedPath::<192>::new();
+        let _ = s.summary.write(&mut body);
+        let _ = write!(body, " · total {} · fighter best {best}", s.total);
+        super::notices::upsert(0x33, "Parry Practice", body.as_str(), 300, crate::model::notify::DEFAULT_COLOR);
+        s.summary = SUMMARY;
+    }
+}
+
+/// One P1 game frame, after the strip stepped (`now`: the strip's frame number): `armed` is computed here from the CPU's
+/// parry pass.
+pub fn step(mut frame: Frame, fighter: Option<i32>, now: u32) {
+    let Some(mut s) = STATE.try_lock() else { return };
+    let playing = crate::engine::rr_host::cpu_run_active();
+    s.since_end = if playing { Some(0) } else { s.since_end.map(|n| n.saturating_add(1)) };
+    frame.armed = s.since_end.is_some_and(|n| n <= 60);
+    for a in s.detector.step(&frame, now).into_iter().flatten() {
+        record(&mut s, a, fighter);
+        #[cfg(feature = "diag")]
+        crate::runtime::diag_log::diagnostic(format_args!(
+            "[Parry] attempt grade={:?} hit={} window={:?} total={} set={}",
+            a.grade, a.hit, a.window, s.total, s.summary.attempts
+        ));
+    }
+    crate::engine::rr_host::set_parry_open(s.detector.busy());
+    let (mut set, mut line) = (crate::model::frame_strip_plan::Text::EMPTY, crate::model::frame_strip_plan::Text::EMPTY);
+    let _ = if free() { write!(set, "#{}", s.total) } else { write!(set, "{}/10", s.summary.attempts) };
+    let _ = write!(line, "streak {}, perfect {}/{}", s.summary.streak, s.perfect, s.total);
+    (s.view.set, s.view.set_line) = (set, line);
+    VIEW.publish(Some(s.view));
+}
