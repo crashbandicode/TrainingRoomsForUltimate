@@ -141,6 +141,9 @@ static PREP_ARTICLE: AtomicU32 = AtomicU32::new(0);
 static EGG_SPITED: AtomicBool = AtomicBool::new(false);
 static YOSHI_PROVIDER_FIXTURE: AtomicBool = AtomicBool::new(false);
 static YOSHI_ARTICLES: AtomicU32 = AtomicU32::new(0);
+static EGG_VICTIM_SHELL: AtomicU32 = AtomicU32::new(0x5000_0000);
+static EGG_WEAPON_KIND: AtomicU32 = AtomicU32::new(0x39);
+static EGG_WEAPON_OWNER: AtomicU32 = AtomicU32::new(0x400);
 static EGG_WEAPON_ACTIVE: AtomicBool = AtomicBool::new(false);
 static EGG_WEAPON_ATTACK: AtomicBool = AtomicBool::new(false);
 static EGG_PROVIDER_READER: AtomicUsize = AtomicUsize::new(0);
@@ -251,6 +254,14 @@ mod natives {
         super::JUDGE_FIXED.load(super::Ordering::Relaxed)
     }
     pub fn get_int(cpu: usize, id: i32) -> i32 {
+        if id == 0x1000_0056 {
+            assert_eq!(cpu, super::P1.load(super::Ordering::Relaxed));
+            return super::EGG_VICTIM_SHELL.load(super::Ordering::Relaxed) as i32;
+        }
+        if id == 0x1000_0000 && super::YOSHI_PROVIDER_FIXTURE.load(super::Ordering::Relaxed) {
+            assert_eq!(cpu, 0x200);
+            return super::EGG_WEAPON_OWNER.load(super::Ordering::Relaxed) as i32;
+        }
         if id == 0x100000bf {
             assert_eq!(cpu, 2);
             super::TRAIL_MAGIC_READS.fetch_add(1, super::Ordering::Relaxed);
@@ -307,6 +318,10 @@ mod natives {
     }
     pub fn module_accessor(_: i32) -> Option<usize> {
         Some(super::P1.load(super::Ordering::Relaxed))
+    }
+    pub fn fighter_kind(accessor: usize) -> Option<i32> {
+        assert_eq!(accessor, 0x200);
+        Some(super::EGG_WEAPON_KIND.load(super::Ordering::Relaxed) as i32)
     }
     pub fn attack_is_attack(accessor: usize, slot: i32) -> bool {
         assert_eq!(accessor, 0x200);
@@ -376,7 +391,6 @@ mod state_natives {
         super::CART_ARTICLE.load(super::Ordering::Relaxed)
             + usize::from(super::CART_REPLACE_SECOND_READ.load(super::Ordering::Relaxed) && n%2==1)
     }
-    pub fn article_get_from_no(_: usize, _: i32, ordinal: i32) -> usize { assert_eq!(ordinal, 1); 0 }
     pub fn article_object_id(_: usize) -> u32 {
         if super::YOSHI_PROVIDER_FIXTURE.load(super::Ordering::Relaxed) {
             return 0x1000_0402;
@@ -392,8 +406,12 @@ mod state_natives {
     }
     pub fn object_accessor(id: u32) -> usize {
         if super::YOSHI_PROVIDER_FIXTURE.load(super::Ordering::Relaxed) {
-            assert_eq!(id, 0x1000_0402);
-            return 0x200;
+            return match id {
+                0x400 => super::P1.load(super::Ordering::Relaxed),
+                0x401 => 2,
+                0x1000_0402 => 0x200,
+                _ => panic!("unexpected Egg Lay object: {id:#x}"),
+            };
         }
         read(); super::CART_BOMA.load(super::Ordering::Relaxed)
     }
@@ -517,6 +535,9 @@ fn state_id(c: C) -> Option<i32> {
         C::YoshiArticleMob => 2,
         C::YoshiArticleBg => 3,
         C::YoshiTamagoSpit => 2,
+        C::YoshiVictimEgg => 0x1000_0056,
+        C::YoshiTamagoKind => 0x39,
+        C::WeaponLinkOwner => 0x1000_0000,
         C::ClatterCaptureWait => 66,
         C::ClatterBury => 75,
         C::SituationAir => 1,
@@ -692,6 +713,9 @@ impl NativeMemory {
         EGG_SPITED.store(false, Ordering::Relaxed);
         YOSHI_PROVIDER_FIXTURE.store(false, Ordering::Relaxed);
         YOSHI_ARTICLES.store(0, Ordering::Relaxed);
+        EGG_VICTIM_SHELL.store(0x5000_0000, Ordering::Relaxed);
+        EGG_WEAPON_KIND.store(0x39, Ordering::Relaxed);
+        EGG_WEAPON_OWNER.store(0x400, Ordering::Relaxed);
         EGG_WEAPON_ACTIVE.store(false, Ordering::Relaxed);
         EGG_WEAPON_ATTACK.store(false, Ordering::Relaxed);
         EGG_PROVIDER_READER.store(0, Ordering::Relaxed);
@@ -3156,11 +3180,11 @@ unsafe fn live_egg(observed_spit: bool) -> (Box<NativeMemory>, Game) {
 }
 
 unsafe fn observe_egg_shell(m: &NativeMemory, game: &mut Game) {
-    YOSHI_ARTICLES.store(1 << 1, Ordering::Relaxed);
+    EGG_VICTIM_SHELL.store(0x1000_0402, Ordering::Relaxed);
     EGG_WEAPON_ACTIVE.store(true, Ordering::Relaxed);
     m.update(game, 244);
     assert_eq!(game.step, Step::Held);
-    YOSHI_ARTICLES.store(0, Ordering::Relaxed);
+    EGG_VICTIM_SHELL.store(0x5000_0000, Ordering::Relaxed);
     EGG_WEAPON_ACTIVE.store(false, Ordering::Relaxed);
 }
 
@@ -3221,21 +3245,18 @@ fn egg_checks_all_provider_articles_and_fails_closed_on_unavailable_readers() {
             CPU_STATUS.store(0, Ordering::Relaxed);
             YOSHI_ARTICLES.store(1 << article, Ordering::Relaxed);
             m.update(&mut g, 68);
-            if article == 1 {
-                assert_eq!(g.step, Step::Held, "the Egg Lay shell remains live");
-                for _ in 0..EGG_CLOSE_FRAMES {
-                    m.update(&mut g, 68);
-                }
-            }
             assert_eq!(g.step, Step::Failed, "provider did not clear: {article}");
             assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
         }
         for reader in [
             0x208_7720,
             model::sites_pkg2::WORK_IS_FLAG_OFFSET,
+            model::sites_pkg2::WORK_GET_INT_OFFSET,
+            model::sites_pkg2::UTILITY_GET_KIND_OFFSET,
             model::sites_pkg3::STATE_ARTICLE_IS_EXIST_OFFSET,
             model::sites_pkg3::STATE_OBJECT_IS_ACTIVE_OFFSET,
             model::sites_hitbox::HITBOX_IS_ATTACK_OFFSET,
+            model::sites_pkg3::STATE_OBJECT_MODULE_ACCESSOR_OFFSET,
         ] {
             let (m, mut g) = live_egg(true);
             CPU_STATUS.store(0, Ordering::Relaxed);
@@ -3305,7 +3326,7 @@ fn egg_late_add_refuses_only_its_attempt() {
 #[test]
 fn egg_refuses_an_article_that_appears_and_clears_during_the_wait() {
     unsafe {
-        for article in [0, 2, 3] {
+        for article in 0..4 {
             let (m, mut g) = live_egg(true);
             m.update(&mut g, 68);
             assert_eq!(g.step, Step::Held, "Yoshi is still in N2");
@@ -3325,19 +3346,57 @@ fn egg_refuses_an_article_that_appears_and_clears_during_the_wait() {
 fn egg_tracks_detached_tamago_and_refuses_its_attack() {
     unsafe {
         let (m, mut g) = live_egg(true);
-        YOSHI_ARTICLES.store(1 << 1, Ordering::Relaxed);
+        EGG_VICTIM_SHELL.store(0x1000_0402, Ordering::Relaxed);
         EGG_WEAPON_ACTIVE.store(true, Ordering::Relaxed);
         m.update(&mut g, 244);
-        assert_eq!(g.step, Step::Held, "the attached non-attacking shell is eligible");
+        assert_eq!(g.step, Step::Held, "the unlisted non-attacking shell is eligible");
 
-        YOSHI_ARTICLES.store(0, Ordering::Relaxed);
+        EGG_VICTIM_SHELL.store(0x5000_0000, Ordering::Relaxed);
         CPU_STATUS.store(0, Ordering::Relaxed);
         m.update(&mut g, 68);
-        assert_eq!(g.step, Step::Held, "the detached shell is still active");
+        assert_eq!(g.step, Step::Held, "the shell is still active after slot clear");
         assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
 
         EGG_WEAPON_ATTACK.store(true, Ordering::Relaxed);
         m.update(&mut g, 68);
         assert_eq!(g.step, Step::Failed, "the exact detached shell gained a hitbox");
+    }
+}
+
+#[test]
+fn egg_grades_after_the_stock_unlisted_shell_deactivates() {
+    unsafe {
+        let (m, mut g) = live_egg(true);
+        EGG_VICTIM_SHELL.store(0x1000_0402, Ordering::Relaxed);
+        EGG_WEAPON_ACTIVE.store(true, Ordering::Relaxed);
+        m.update(&mut g, 244);
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        m.update(&mut g, 68);
+        assert_eq!(g.step, Step::Held, "the unlisted shell is still live");
+        assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
+
+        EGG_VICTIM_SHELL.store(0x5000_0000, Ordering::Relaxed);
+        m.update(&mut g, 68);
+        assert_eq!(g.step, Step::Held, "clearing the slot does not deactivate the weapon");
+        EGG_WEAPON_ACTIVE.store(false, Ordering::Relaxed);
+        m.update(&mut g, 68);
+        assert_eq!(g.step, Step::Result, "the exact shell is now inactive");
+    }
+}
+
+
+#[test]
+fn egg_refuses_an_active_shell_with_wrong_kind_or_link_owner() {
+    unsafe {
+        for (kind, owner) in [(0x38, 0x400), (0x39, 0x401)] {
+            let (m, mut g) = live_egg(true);
+            EGG_VICTIM_SHELL.store(0x1000_0402, Ordering::Relaxed);
+            EGG_WEAPON_ACTIVE.store(true, Ordering::Relaxed);
+            EGG_WEAPON_KIND.store(kind, Ordering::Relaxed);
+            EGG_WEAPON_OWNER.store(owner, Ordering::Relaxed);
+            m.update(&mut g, 244);
+            assert_eq!(g.step, Step::Failed, "kind={kind:#x}, owner={owner:#x}");
+            assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
+        }
     }
 }

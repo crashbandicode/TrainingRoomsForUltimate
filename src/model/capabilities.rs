@@ -179,6 +179,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 11] = [
     (
         Feature::Mashout,
         &[
+            "attack_is_attack",
             "camera_limit_range",
             "damage_of",
             "fighter_manager_get_entry",
@@ -205,6 +206,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 11] = [
             "state_work_set_int",
             "status_kind",
             "stop_is_stop",
+            "utility_get_kind",
             "work_get_int",
             "work_is_flag",
         ],

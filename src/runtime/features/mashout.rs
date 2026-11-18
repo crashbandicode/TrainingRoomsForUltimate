@@ -582,17 +582,22 @@ unsafe fn trail_blizzard_closed(cpu: usize) -> Result<bool, ()> {
 /// Positive Egg Lay completion on the selected live CPU. A canceled N2
 /// alone does not prove its last hit ran. N2 MAIN clears SPITED (Yoshi
 /// +0x11560) and the SPIT helper sets it after the absolute hit (+0x28650).
-unsafe fn egg_provider_closed(cpu: usize, spat: &mut bool, shell: &mut Option<u32>, finished: bool) -> Result<bool, &'static str> {
+unsafe fn egg_provider_closed(
+    p1: usize,
+    cpu: usize,
+    spat: &mut bool,
+    shell: &mut Option<u32>,
+    finished: bool,
+) -> Result<bool, &'static str> {
     use crate::model::{sites_hitbox, sites_pkg2, sites_pkg3};
     if ![
         sites_pkg2::STATUS_KIND_OFFSET,
         sites_pkg2::WORK_IS_FLAG_OFFSET,
+        sites_pkg2::WORK_GET_INT_OFFSET,
+        sites_pkg2::UTILITY_GET_KIND_OFFSET,
         sites_pkg3::STATE_ARTICLE_IS_EXIST_OFFSET,
-        sites_pkg3::STATE_ARTICLE_GET_ARTICLE_OFFSET,
-        sites_pkg3::STATE_ARTICLE_OBJECT_ID_OFFSET,
         sites_pkg3::STATE_OBJECT_IS_ACTIVE_OFFSET,
         sites_pkg3::STATE_OBJECT_MODULE_ACCESSOR_OFFSET,
-        sites_hitbox::HITBOX_ARTICLE_FROM_NO_OFFSET,
         sites_hitbox::HITBOX_IS_ATTACK_OFFSET,
     ].into_iter().all(game::granted) {
         return Err(UNAVAILABLE_NOTICE);
@@ -609,55 +614,51 @@ unsafe fn egg_provider_closed(cpu: usize, spat: &mut bool, shell: &mut Option<u3
     if !*spat {
         return Ok(false);
     }
-    let [Some(star), Some(tamago), Some(mob), Some(bg), Some(spit)] = [
-        C::YoshiArticleStar, C::YoshiArticleTamago, C::YoshiArticleMob, C::YoshiArticleBg, C::YoshiTamagoSpit,
+    let [Some(star), Some(tamago), Some(mob), Some(bg), Some(victim_egg), Some(kind), Some(owner_work), Some(spit)] = [
+        C::YoshiArticleStar, C::YoshiArticleTamago, C::YoshiArticleMob, C::YoshiArticleBg,
+        C::YoshiVictimEgg, C::YoshiTamagoKind, C::WeaponLinkOwner, C::YoshiTamagoSpit,
     ].map(state_id) else {
         return Err(UNAVAILABLE_NOTICE);
     };
-    // Refuse a provider even if it would disappear before closure. TAMAGO
-    // shares its article ID with the up-special projectile, so qualify the
-    // N2 shell by its full ID, weapon status and empty attack slots.
-    if [star, mob, bg].into_iter().any(|id| state_natives::article_is_exist(cpu, id)) {
-        // restriction: MASH-M1-MISMATCH
-        return Err("Native tick mismatch · no grade");
+    // N2 activates its victim shell outside the owner list. Anything
+    // listed, including the up-special TAMAGO projectile, keeps the
+    // attempt open even if it would disappear before the victim escapes.
+    // restriction: MASH-M1-MISMATCH
+    let provider_open = "Native tick mismatch · no grade";
+    if [star, tamago, mob, bg].into_iter().any(|id| state_natives::article_is_exist(cpu, id)) {
+        return Err(provider_open);
     }
-    let listed = state_natives::article_is_exist(cpu, tamago);
-    if listed {
-        let article = state_natives::article_get(cpu, tamago);
-        if article == 0 {
-            return Err(UNAVAILABLE_NOTICE);
-        }
-        let id = state_natives::article_object_id(article);
-        if id == 0 || id == u32::MAX {
-            return Err(UNAVAILABLE_NOTICE);
-        }
-        if shell.is_some_and(|prior| prior != id) || state_natives::article_get_from_no(cpu, tamago, 1) != 0 {
-            // restriction: MASH-M1-MISMATCH
-            return Err("Native tick mismatch · no grade");
-        }
-        *shell = Some(id);
+    // The stock shell sends its full ID to the victim (main+0x12dd8d8).
+    // Keep that ID even if the Work field clears before deactivation.
+    let current = natives::get_int(p1, victim_egg) as u32;
+    let current = (current >> 28 == 1).then_some(current);
+    if shell.is_some_and(|prior| current.is_some_and(|id| prior != id)) {
+        return Err(provider_open);
     }
-    let Some(id) = *shell else {
+    let Some(id) = shell.or(current) else {
         return Ok(false);
     };
-    // An owner-link removal can drop the list entry while the weapon
-    // is active. Follow the exact ID until the manager reports inactivity.
     if state_natives::object_is_active(id) {
         let accessor = state_natives::object_accessor(id);
         if accessor == 0 {
             return Err(UNAVAILABLE_NOTICE);
         }
+        if natives::fighter_kind(accessor) != Some(kind) {
+            return Err(provider_open);
+        }
+        let owner = natives::get_int(accessor, owner_work) as u32;
         // The stock weapon initializer reserves seven normal attack
         // records. The native is_attack dispatch does not bound its index.
-        if natives::status_kind(accessor) != spit
+        if owner >> 28 != 0 || state_natives::object_accessor(owner) != p1
+            || natives::status_kind(accessor) != spit
             || (0..7).any(|slot| natives::attack_is_attack(accessor, slot))
         {
-            // restriction: MASH-M1-MISMATCH
-            return Err("Native tick mismatch · no grade");
+            return Err(provider_open);
         }
+        *shell = Some(id);
         return Ok(false);
     }
-    Ok(finished && !listed && status >= 0 && ![n, n1, n2].contains(&status))
+    Ok(shell.is_some() && finished && status >= 0 && ![n, n1, n2].contains(&status))
 }
 
 fn trail_magic_status(status: i32, wait: i32) -> Result<entry::TrailMagicStatus, ()> {
@@ -1625,7 +1626,7 @@ pub unsafe fn frame(fighter: usize) {
             }
             if egg {
                 let Game { egg_spat, egg_shell, .. } = &mut *game;
-                match egg_provider_closed(cpu, egg_spat, egg_shell, clock.exhausted()) {
+                match egg_provider_closed(p1, cpu, egg_spat, egg_shell, clock.exhausted()) {
                     Ok(true) => {
                         #[cfg(feature = "diag")]
                         crate::runtime::diag_log::enqueue_diagnostic(format_args!(
