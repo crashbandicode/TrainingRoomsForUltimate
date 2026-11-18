@@ -58,6 +58,10 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "tech_adapter::launch", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::restore", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::attempt", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    // Mash out row 121 (mashout-ganon-tech) reads Tech practice's decision snapshot and guard edge only through these.
+    Boundary { function: "tech_adapter::mash_snapshot", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::mash_entered", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::mash_guard", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     // The save-state step of the per-fighter frame wrapper: a no-op until boot activates package 3.
     Boundary { function: "states::frame", owner: Some(Feature::StateCore), gate: Gate::Flag("ACTIVE") },
     // The frame wrapper's per-feature facts and appliers: each checks its feature's install flag first.
@@ -113,6 +117,9 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "mashout::seed_token", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
     Boundary { function: "mashout::seed_after", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
     Boundary { function: "mashout::owns_cpu", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
+    // Row 121's status-change seam from cpu_common (mashout-ganon-tech).
+    Boundary { function: "mashout::tech_contact", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
+    Boundary { function: "mashout::tech_confirm", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
     Boundary { function: "btt_camera::request", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
     Boundary { function: "btt_camera::frame", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
     Boundary { function: "btt::frame", owner: Some(Feature::Hitbox), gate: Gate::Flag("USABLE") },
@@ -908,7 +915,8 @@ fn mashout_required_rows_disable_only_their_reachable_units() {
         grade::{grade, Bounds},
     };
     let calls = capabilities::CROSS_NEEDS.iter().find(|(unit, _)| *unit == Feature::Mashout).unwrap().1;
-    assert_eq!(calls.len(), 30);
+    assert_eq!(calls.len(), 31);
+    assert!(calls.contains(&"prev_status_kind"), "row 121 names its slam contact by the victim's previous statuses");
     assert!(calls.contains(&"work_get_int"), "Lucas release counter must fail closed with its existing native guard");
     assert!(calls.contains(&"work_is_flag"), "Corrin attack window must fail closed with its existing native guard");
     assert!(calls.contains(&"utility_get_kind"), "Egg Lay must qualify the victim's native shell");

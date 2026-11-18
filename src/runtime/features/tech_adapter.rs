@@ -89,6 +89,37 @@ pub(crate) fn tech_ready() -> bool {
     READY.load(Ordering::Acquire)
 }
 
+/// Mash out row 121 (mashout-ganon-tech): Tech practice's own decision snapshot of a floor contact Mash out identified,
+/// read only once the TechPractice closure passed; None leaves the attempt ungraded.
+pub(crate) unsafe fn mash_snapshot(accessor: usize, attempt: u64, requested: i32, passive_enabled: bool) -> Option<DecisionSnapshot> {
+    if !tech_ready() {
+        return None;
+    }
+    let contact = crate::model::tech_launch::ContactReceipt {
+        surface: crate::model::tech_launch::Surface::Floor,
+        requested_status: requested,
+        passive_enabled,
+        position: crate::model::tech_launch::Vec2 { x: natives::pos_x(accessor), y: natives::pos_y(accessor) },
+    };
+    Some(super::tech_decision::snapshot(accessor, attempt, contact))
+}
+
+/// Row 121: the entered status completing that snapshot, after the original status change.
+pub(crate) unsafe fn mash_entered(accessor: usize) -> Option<i32> {
+    if !tech_ready() {
+        return None;
+    }
+    super::tech_decision::entered_status(accessor)
+}
+
+/// Row 121's late window: Tech practice's native guard edge (None when unread or Tech is unavailable).
+pub(crate) unsafe fn mash_guard(accessor: usize) -> Option<bool> {
+    if !tech_ready() {
+        return None;
+    }
+    super::tech_decision::guard_event(accessor)
+}
+
 /// Construct and use only on the native game thread. Rc marker prevents thread transfer.
 /// place may replace a completed attempt; the first saved pose survives until restore.
 pub struct Adapter {

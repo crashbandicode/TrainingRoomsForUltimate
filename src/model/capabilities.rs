@@ -143,6 +143,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 13] = [
             "pos_x",
             "pos_y",
             "pos_z",
+            "prev_status_kind",
             "situation_kind",
             "state_article_active_num",
             "state_article_generate",

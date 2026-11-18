@@ -58,6 +58,14 @@ fn actual_runtime_egg_preparation_and_native_seed() {
             production(include_str!("../src/model/mashout/native.rs")).to_string(),
         ),
         (
+            "// TECH_SESSION",
+            production(include_str!("../src/model/tech/session.rs")).to_string(),
+        ),
+        (
+            "// TECH_LAUNCH",
+            production(include_str!("../src/model/tech_launch.rs")).to_string(),
+        ),
+        (
             "// CLATTER",
             production(include_str!("../src/model/mashout/clatter.rs")).to_string(),
         ),
@@ -266,6 +274,14 @@ fn actual_runtime_worker_native_epoch_admission_and_bests() {
         (
             "// GRADE",
             production(include_str!("../src/model/mashout/grade.rs")).to_owned(),
+        ),
+        (
+            "// TECH_SESSION",
+            production(include_str!("../src/model/tech/session.rs")).to_owned(),
+        ),
+        (
+            "// TECH_LAUNCH",
+            production(include_str!("../src/model/tech_launch.rs")).to_owned(),
         ),
         (
             "// CLATTER",

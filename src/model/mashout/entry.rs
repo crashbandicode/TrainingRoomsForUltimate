@@ -545,6 +545,41 @@ pub fn ganon_tech_contact(plan: Plan, is_prev: impl Fn(C) -> bool, is_second_pre
     plan == Plan::GroundSideSpecial && is_prev(C::CatchedAirEndGanon) && is_second_prev(C::CatchedGanon)
 }
 
+/// Row 121's one attempt, scored by Tech practice's own Session already in flight: its contact grade, then its late
+/// window (a proven new guard press within LATE frames is Late(n); none, or an unread frame, is Missed). The summary
+/// carries the streak and best across attempts.
+pub struct TechAttempt(crate::model::tech::session::Session);
+
+impl TechAttempt {
+    pub fn new(summary: crate::model::tech::session::Summary) -> Self {
+        use crate::model::tech::session::{Length, Session};
+        let mut session = Session::IDLE;
+        session.start(Length::Free);
+        session.placed(1);
+        session.tick(false, Some(false));
+        session.summary = summary;
+        Self(session)
+    }
+
+    /// The decision's grade; None waits for the late window.
+    pub fn contact(&mut self, grade: Option<crate::model::tech::session::Grade>) -> Option<crate::model::tech::session::Grade> {
+        self.0.contact_grade(grade);
+        self.0.result
+    }
+
+    /// One P1 game frame after contact with the native guard edge (None when unread).
+    pub fn tick(&mut self, guard_press: Option<bool>) -> Option<crate::model::tech::session::Grade> {
+        if self.0.result.is_none() {
+            self.0.tick(false, guard_press);
+        }
+        self.0.result
+    }
+
+    pub fn summary(&self) -> crate::model::tech::session::Summary {
+        self.0.summary
+    }
+}
+
 /// Down throws and Cargo first acquire an ordinary grab, without grading that preparatory hold.
 pub fn preparatory_grab(plan: Plan) -> bool {
     matches!(plan, Plan::DownThrow | Plan::Cargo)
@@ -776,6 +811,39 @@ mod tests {
             let name = |c: C| crate::model::cpu::ids::NAMES[c as usize];
             assert_ne!(name(C::CatchedGanon), name(C::ClatterCatchedAirFallGanon));
             assert_eq!(name(C::CatchedGanon), "FIGHTER_STATUS_KIND_CATCHED_GANON");
+        }
+
+        /// Reviewer G2/G5: row 121's attempt is Tech practice's own Session, so a timed tech, a late press and no press
+        /// get exactly the Tech grader's verdicts, and the best streak carries across attempts.
+        #[test]
+        fn ganon_tech_attempt_grades_timed_late_and_no_press_like_tech_practice() {
+            use crate::model::tech::session::{Grade, LATE};
+            let mut timed = TechAttempt::new(Default::default());
+            assert_eq!(timed.contact(Some(Grade::Perfect(Some(4)))), Some(Grade::Perfect(Some(4))));
+            assert_eq!(timed.summary().best, 1);
+            let mut late = TechAttempt::new(timed.summary());
+            assert_eq!(late.contact(None), None);
+            for _ in 1..7 {
+                assert_eq!(late.tick(Some(false)), None);
+            }
+            assert_eq!(late.tick(Some(true)), Some(Grade::Late(7)));
+            assert_eq!((late.summary().best, late.summary().streak, late.summary().late), (1, 0, 1));
+            let mut none = TechAttempt::new(late.summary());
+            assert_eq!(none.contact(None), None);
+            for _ in 1..LATE {
+                assert_eq!(none.tick(Some(false)), None);
+            }
+            assert_eq!(none.tick(Some(false)), Some(Grade::Missed));
+            assert_eq!(none.tick(Some(true)), Some(Grade::Missed), "a press after the late window changes nothing");
+            let mut blind = TechAttempt::new(Default::default());
+            blind.contact(None);
+            assert_eq!(blind.tick(None), None);
+            assert_eq!(blind.tick(Some(true)), Some(Grade::Missed), "an unread frame voids the late reason");
+            let mut again = TechAttempt::new(none.summary());
+            again.contact(Some(Grade::Held));
+            again = TechAttempt::new(again.summary());
+            again.contact(Some(Grade::Perfect(None)));
+            assert_eq!((again.summary().streak, again.summary().best, again.summary().attempts), (2, 2, 5));
         }
 
         /// Grounded Flame Choke starts with Ganondorf's grounded side special (no jump squat, unlike row 90).
