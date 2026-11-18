@@ -559,7 +559,7 @@ fn write_help(menu: &Menu, row: usize, help: &mut [Text<160>; 2]) {
                 .and_then(|()| help[1].write_str("Closing the menu (B) leaves it running."))
         }
         Control::Start(game) if menu.running() == Some(game) => {
-            write!(help[0], "{} is running. A stops it; the row reads Start again.", game.title())
+            write!(help[0], "{} is running. A stops it, and the row reads Start.", game.title())
                 .and_then(|()| help[1].write_str("Changed settings apply at the next Start. B leaves it running."))
         }
         _ => {

@@ -197,10 +197,10 @@ fn running_shows_in_green_on_the_list_and_stop_on_the_sub_screen() {
     m.press(Button::A);
     let f = frame(&m);
     assert_eq!((f.rows[0].label.string_lossy(), f.rows[0].value.string_lossy(), f.rows[0].value_tone), ("Stop".into(), "Running  >".into(), Tone::On));
-    assert_eq!(f.help[0].string_lossy(), "Eggs-ercise is running. A stops it; the row reads Start again.");
+    assert_eq!(f.help[0].string_lossy(), "Eggs-ercise is running. A stops it, and the row reads Start.");
     assert_eq!(f.help[1].string_lossy(), "Changed settings apply at the next Start. B leaves it running.");
     for game in Game::ALL {
-        for line in [format!("{} is running. A opens it to stop it or change it.", game.title()), format!("{} is running. A stops it; the row reads Start again.", game.title())] {
+        for line in [format!("{} is running. A opens it to stop it or change it.", game.title()), format!("{} is running. A stops it, and the row reads Start.", game.title())] {
             assert!(line.chars().count() <= 67, "{line}");
         }
     }

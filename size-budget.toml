@@ -1853,3 +1853,11 @@ ceiling = 156023
 date = "2026-11-18"
 reason = "Bounded events log made hook-safe (devin-primary 05:16Z GO): append_event_at uses try_lock on EVENTS, drops a contended line and reports it once as dropped N events. 156006 + 17 = 156023 (+62 counted over main 2322fae9). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
 approved_by = "Operator approved the bounded events log and its additional lines at 04:25Z; devin-primary 05:16Z: a small delta for the hook-safe fix is fine."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156292
+date = "2026-11-18"
+reason = "rc.15 practice menu (operator-approved mockup, 2026-11-18 ~14:58Z): one row per game, a generic sub-screen (Screen::Rows) with Start first, Start/Stop as menu actions with a Running label, and one runtime value for the running game (runtime::features::practice) replacing the three per-row exclusion sites. Measured 156292 = +269 counted lines over main c212bc50 (156023). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "PENDING: +269 reported to the primary for the operator by menu-games-devin (INBOX 2026-11-18); not yet approved."
