@@ -120,9 +120,7 @@ static PARRY: AtomicBool = AtomicBool::new(false);
 pub fn set_parry(on: bool) {
     PARRY.store(on, Ordering::Release);
     // Parry Off ends the practice: no pass stays owed for a later On (tr-review-astra-2, 703e3f8d finding 1).
-    if !on {
-        PARRY_PASSES.store(0, Ordering::Release);
-    }
+    PARRY_PASSES.fetch_min(if on { u32::MAX } else { 0 }, Ordering::AcqRel);
 }
 
 /// The CPU plays a library run now (the parry pass the detector arms on).
@@ -476,12 +474,12 @@ pub fn note_mash() {
 }
 
 /// What the CPU's behaviours see of playback (B5 / N4, Mash interrupts playback): the old recorder's state, with a
-/// library macro playing on the CPU counted as a running playback.
+/// library macro playing on the CPU counted as a running playback. A parry practice plays pass by pass: while passes
+/// are owed its playback runs between them too, so a configured Mash asks it to stop (Parry ignores that) instead of
+/// queueing an action on top of the replay (Eden accept-8, 26c93533). Atomics only: game hooks read this.
 pub fn cpu_playback(recorder: PlaybackState) -> PlaybackState {
-    PlaybackState {
-        running: recorder.running || role_playing(Role::Cpu),
-        ..recorder
-    }
+    let owed = PARRY.load(Ordering::Acquire) && PARRY_PASSES.load(Ordering::Acquire) > 0;
+    PlaybackState { running: recorder.running || role_playing(Role::Cpu) || owed, ..recorder }
 }
 
 /// The save-state restore a Play's warp asked for has placed both fighters (or the warp was
