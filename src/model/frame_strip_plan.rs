@@ -143,10 +143,12 @@ struct Layout<'a> {
     runs: [[Option<Run>; RUNS]; 2],
     /// Spot labels on the hit blocks (rc.14, SP3).
     spots: bool,
+    /// Parry practice (rc.15): the PARRY and SET readouts, its window and its LAST pills replace the link's.
+    parry: Option<&'a super::parry::View>,
 }
 
 impl<'a> Layout<'a> {
-    fn new(tracker: &'a Tracker, spots: bool) -> Self {
+    fn new(tracker: &'a Tracker, spots: bool, parry: Option<&'a super::parry::View>) -> Self {
         let mut frames = [0u32; WINDOW];
         let mut sticks = [None; WINDOW];
         let first_slot = WINDOW - tracker.len();
@@ -191,7 +193,7 @@ impl<'a> Layout<'a> {
                 }
             }
         }
-        Self { tracker, frames, sticks, first_slot, runs, spots }
+        Self { tracker, frames, sticks, first_slot, runs, spots, parry }
     }
 
     /// The slot a frame is drawn in; a frame after the newest counts on past the right edge (a predicted free frame).
@@ -244,7 +246,8 @@ impl<'a> Layout<'a> {
             NOW_TEXT => Look::text(NOW_X - 24.0, 84.0, Text::new("now"), MUTED),
             i if (READ_LABEL..READ_LABEL + 3).contains(&i) => {
                 let n = i - READ_LABEL;
-                Look::text(READ_X + 60.0, READ_LABEL_Y[n], Text::new(["ADVANTAGE", "LINK", "INPUT"][n]), MUTED)
+                let names = if self.parry.is_some() { ["ADVANTAGE", "PARRY", "SET"] } else { ["ADVANTAGE", "LINK", "INPUT"] };
+                Look::text(READ_X + 60.0, READ_LABEL_Y[n], Text::new(names[n]), MUTED)
             }
             i if (READ_VALUE..READ_SUB + 3).contains(&i) => self.readout((i - READ_VALUE) % 3, i >= READ_SUB),
             LAST_TEXT => Look::text(LABEL_X, LAST_Y, Text::new("LAST"), MUTED),
@@ -300,7 +303,11 @@ impl<'a> Layout<'a> {
     }
 
     fn window(&self, text: bool) -> Look {
-        let Some((from, to)) = self.tracker.latest_link().and_then(|l| l.window) else { return Look::HIDDEN };
+        let window = match self.parry {
+            Some(p) => p.last[0].and_then(|a| a.window).map(|(g, w)| (g, g + u32::from(w).max(1) - 1)),
+            None => self.tracker.latest_link().and_then(|l| l.window),
+        };
+        let Some((from, to)) = window else { return Look::HIDDEN };
         let (Some(a), Some(b)) = (self.slot(from).or(Some(0.0)), self.slot(to)) else { return Look::HIDDEN };
         let (a, b) = (a.min(WINDOW as f32), b.min(WINDOW as f32 - 1.0));
         if b < a {
@@ -318,6 +325,9 @@ impl<'a> Layout<'a> {
 
     /// Bracket `which` (0 link, 1 advantage): its part (left leg, bottom, right leg) or its text (`None`).
     fn bracket(&self, which: usize, part: Option<usize>) -> Look {
+        if self.parry.is_some() && which == 0 {
+            return Look::HIDDEN;
+        }
         let ends = if which == 0 {
             self.tracker.latest_link().and_then(|l| {
                 let free = l.free?;
@@ -348,7 +358,12 @@ impl<'a> Layout<'a> {
 
     /// Readout `n` (ADVANTAGE, LINK, INPUT): its value or its sub-line.
     fn readout(&self, n: usize, sub: bool) -> Look {
-        let (value, line, color) = match n {
+        let parry = self.parry.filter(|_| n > 0).map(|p| match (n, p.last[0]) {
+            (1, Some(a)) => graded(a.grade),
+            (1, None) => (Text::new("-"), Text::new("Parry the replay"), MUTED),
+            _ => (p.set, p.set_line, TEXT),
+        });
+        let (value, line, color) = if let Some(parry) = parry { parry } else { match n {
             0 => match self.tracker.advantage() {
                 Some(a) => (
                     signed("", a.value),
@@ -367,7 +382,7 @@ impl<'a> Layout<'a> {
                 Some(link) => (signed("", link.input), input_line(&link), WARN),
                 None => (Text::new("-"), Text::EMPTY, MUTED),
             },
-        };
+        } };
         if sub {
             Look::text(READ_SUB_X + 90.0, READ_VALUE_Y[n] - 1.5, line, TEXT)
         } else {
@@ -377,17 +392,24 @@ impl<'a> Layout<'a> {
 
     /// LAST row part (pill, pill text, moves) of the `n`th newest link.
     fn last(&self, part: usize, n: usize) -> Look {
-        let Some(link) = self.tracker.history().nth(n) else { return Look::HIDDEN };
         let x = PILL_X0 + n as f32 * PILL_STRIDE;
-        let (ok, label) = match link.verdict {
-            Verdict::True(Some(v)) => (true, signed("TRUE ", v)),
-            Verdict::True(None) => (true, Text::new("TRUE")),
-            Verdict::Drop(v) => (false, signed("DROP ", v)),
+        let (color, label, link) = if let Some(p) = self.parry {
+            let Some(a) = p.last[n] else { return Look::HIDDEN };
+            let (_, label, color) = graded(a.grade);
+            (color, label, None)
+        } else {
+            let Some(link) = self.tracker.history().nth(n) else { return Look::HIDDEN };
+            match link.verdict {
+                Verdict::True(Some(v)) => (GOOD, signed("TRUE ", v), Some(link)),
+                Verdict::True(None) => (GOOD, Text::new("TRUE"), Some(link)),
+                Verdict::Drop(v) => (BAD, signed("DROP ", v), Some(link)),
+            }
         };
-        match part {
-            0 => Look::rect(x, LAST_Y, PILL_W, if ok { GOOD } else { BAD }),
-            1 => Look::text(x, LAST_Y, label, [10, 14, 20, 255]),
-            _ => {
+        match (part, link) {
+            (0, _) => Look::rect(x, LAST_Y, PILL_W, color),
+            (1, _) => Look::text(x, LAST_Y, label, [10, 14, 20, 255]),
+            (_, None) => Look::HIDDEN,
+            (_, Some(link)) => {
                 let mut t = Text::EMPTY;
                 let _ = write!(t, "{} > {}", link.from.name(), link.to.name());
                 Look::text(x + PILL_W / 2.0 + 100.0, LAST_Y, t, TEXT)
@@ -407,6 +429,21 @@ const DIRECTION: [(f32, f32); 8] = [
     (0.0, -1.0),
     (0.707_106_77, -0.707_106_77),
 ];
+
+/// A parry attempt's readout (rc.15): the frames off (0 inside the window, - before it, + after the hit), Tech's own words for the
+/// grade (`Grade::write`), and its colour.
+fn graded(grade: super::tech::session::Grade) -> (Text, Text, [u8; 4]) {
+    use super::tech::session::Grade;
+    let mut label = Text::EMPTY;
+    let _ = grade.write(&mut label);
+    match grade {
+        Grade::Perfect(_) => (Text::new("0"), label, GOOD),
+        Grade::Early(n) => (signed("", -i32::from(n)), label, WARN),
+        Grade::Late(n) => (signed("", i32::from(n)), label, WARN),
+        Grade::Missed => (Text::new("-"), label, BAD),
+        _ => (Text::new("-"), label, MUTED),
+    }
+}
 
 /// `prefix` and a signed number: `+3`, `-3`, `0`.
 pub fn signed(prefix: &str, v: i32) -> Text {
@@ -494,10 +531,15 @@ impl Renderer {
 
     /// `draw`, with the spot labels on the hit blocks when `spots` (rc.14, SP3).
     pub fn draw_spots(&mut self, tracker: &Tracker, shown: bool, spots: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
+        self.draw_parry(tracker, shown, spots, None, apply)
+    }
+
+    /// `draw_spots`, with Parry practice's readouts, window and pills when `parry` (rc.15).
+    pub fn draw_parry(&mut self, tracker: &Tracker, shown: bool, spots: bool, parry: Option<&super::parry::View>, apply: impl FnMut(usize, &Look, Changed)) -> usize {
         if !shown {
             return self.hide(at::CONTAINER, Look { visible: false, ..Look::HIDDEN }, apply);
         }
-        let layout = Layout::new(tracker, spots);
+        let layout = Layout::new(tracker, spots, parry);
         self.show(|i| layout.look(i), apply)
     }
 }

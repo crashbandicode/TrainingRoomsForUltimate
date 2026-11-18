@@ -113,6 +113,92 @@ static CPU_FRAMES: hos_lock::Mutex<FrameQueue> = hos_lock::Mutex::new(FrameQueue
 static CURRENT_KIND: AtomicU32 = AtomicU32::new(u32::MAX);
 static RUN_PLAYER: AtomicBool = AtomicBool::new(false);
 static RUN_CPU: AtomicBool = AtomicBool::new(false);
+/// Parry practice is on (operator Q3, 2026-11-17: a CPU mash does not stop the parry replay).
+static PARRY: AtomicBool = AtomicBool::new(false);
+
+/// The settings publish: Parry practice On or Off.
+pub fn set_parry(on: bool) {
+    PARRY.store(on, Ordering::Release);
+    // Parry Off ends the practice: no pass stays owed for a later On (tr-review-astra-2, 703e3f8d finding 1).
+    if !on {
+        PARRY_PASSES.store(0, Ordering::Release);
+    }
+}
+
+/// The CPU plays a library run now (the parry pass the detector arms on).
+pub fn cpu_run_active() -> bool {
+    RUN_CPU.load(Ordering::Acquire)
+}
+
+/// Parry passes still to play after the current one (`u32::MAX`: the Loop is infinite), and the detector has an attempt open.
+static PARRY_PASSES: AtomicU32 = AtomicU32::new(0);
+static PARRY_OPEN: AtomicBool = AtomicBool::new(false);
+
+/// Play on CPU with Parry practice On and no CPU macro: how to record one (the existing recording flow).
+// restriction: parry-practice-no-recording
+pub const PARRY_NO_RECORDING: &str = "No CPU recording yet: open the Recording pop-up (ZR+Right) and choose CPU, then ZR+Down records and ZR+Down stops";
+
+// restriction: parry-practice-start-save-missing
+pub const PARRY_START_SAVE_MISSING: &str = "Can't start: its start save was deleted";
+// restriction: parry-practice-macro-missing
+pub const PARRY_MACRO_MISSING: &str = "Can't start: its macro was deleted";
+
+/// The game thread: an attempt is open, so the next pass waits (`parry::busy`).
+pub fn set_parry_open(open: bool) {
+    PARRY_OPEN.store(open, Ordering::Release);
+}
+
+/// Parry practice (DESIGN §2.3): Play on CPU plays the active macro once from its start save (Make combo's play-once
+/// `play_file`), and the Loop's count becomes passes, each warped again. A second Play stops it, as Play does.
+fn parry_play<'a>(machine: &mut Playback, role: Role, book: &'a Book, next: bool, tick: &mut Tick) -> Option<super::playback::Effect<'a>> {
+    if role != Role::Cpu || !PARRY.load(Ordering::Acquire) {
+        return None;
+    }
+    if !next {
+        let between = PARRY_PASSES.swap(0, Ordering::AcqRel) > 0;
+        if machine.playing(role) {
+            return None;
+        }
+        if between {
+            return Some(super::playback::Effect::default());
+        }
+    }
+    let id = book.index.active(role)?;
+    // A saved practice follows its macro's start-save link (operator Q5); a deleted link or macro cannot start.
+    if !book.has_plan(id) {
+        PARRY_PASSES.store(0, Ordering::Release);
+        tick.notices.push(PARRY_MACRO_MISSING);
+        return Some(super::playback::Effect::default());
+    }
+    if matches!(book.start_link(id), StartLink::Deleted) {
+        PARRY_PASSES.store(0, Ordering::Release);
+        tick.notices.push(PARRY_START_SAVE_MISSING);
+        return Some(super::playback::Effect::default());
+    }
+    if !next {
+        let passes = match book.index.loop_count(role) {
+            LoopCount::Infinite => u32::MAX,
+            LoopCount::Finite(n) => u32::from(n).saturating_sub(1),
+        };
+        PARRY_PASSES.store(passes, Ordering::Release);
+    }
+    Some(machine.play_file(role, book, id))
+}
+
+/// The next parry pass: the last one ended, none is open, and passes are left.
+fn parry_next_pass(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick) {
+    let left = PARRY_PASSES.load(Ordering::Acquire);
+    if !PARRY.load(Ordering::Acquire) || left == 0 || RUN_CPU.load(Ordering::Acquire) || PARRY_OPEN.load(Ordering::Acquire) {
+        return;
+    }
+    if !role_frames(Role::Cpu).lock().is_empty() {
+        return;
+    }
+    if left != u32::MAX {
+        PARRY_PASSES.store(left - 1, Ordering::Release);
+    }
+    play_role_with(root, machine, book, Role::Cpu, tick, true);
+}
 static MACHINE: Mutex<Option<Playback>> = Mutex::new(None);
 static RESIDENT: Mutex<Option<Resident>> = Mutex::new(None);
 static MENU_EFFECT: Mutex<Effect> = Mutex::new(Effect::None);
@@ -613,6 +699,7 @@ pub fn service_at(
         || mash
         || menu_pending()
         || playing()
+        || PARRY_PASSES.load(Ordering::Acquire) > 0
         || waiting_work();
     if !busy {
         return tick;
@@ -622,7 +709,8 @@ pub fn service_at(
     };
     let mut machine = lock(&MACHINE);
     let machine = machine.get_or_insert_with(Playback::new);
-    if mash {
+    // restriction: parry-mash-ignored
+    if mash && !PARRY.load(Ordering::Acquire) {
         // The mash is the CPU's (Mash Toggles), so it stops the macro the CPU plays; Player 1's keeps playing
         // (RECORDING.md: "stops the macro that role is playing"; primary 2026-11-08 13:05Z).
         drive_mash(machine, Role::Cpu, true);
@@ -641,6 +729,7 @@ pub fn service_at(
     } else if RUN_CPU.load(Ordering::Acquire) {
         step_role(root, machine, &book, Role::Cpu);
     }
+    parry_next_pass(root, machine, &book, &mut tick);
     if menu_pending() {
         apply_menu(root, machine, &book, &mut tick);
     }
@@ -1123,6 +1212,10 @@ fn release_held(play_player: &mut bool, play_cpu: &mut bool) {
 }
 
 fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick: &mut Tick) {
+    play_role_with(root, machine, book, role, tick, false);
+}
+
+fn play_role_with(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick: &mut Tick, next: bool) {
     show_chord_notice(root, tick);
     if let Some(ask) = mismatch_for(book, role) {
         // Ask before switching fighter Off (operator 2026-11-13, TR6): the current fighter stays, as Keep, unasked.
@@ -1167,9 +1260,19 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
         // that run, as it does while the machine still steps.
         drop_frames(role);
         run_flag(role).store(false, Ordering::Release);
+        // A parry practice stops with it: no pass stays owed for `parry_next_pass` (tr-review-astra-2, finding 1).
+        if role == Role::Cpu {
+            PARRY_PASSES.store(0, Ordering::Release);
+        }
         return;
     }
-    let effect = drive_play(machine, role, book);
+    if role == Role::Cpu && PARRY.load(Ordering::Acquire) && book.index.active(role).is_none() {
+        tick.notices.push(PARRY_NO_RECORDING);
+    }
+    let effect = match parry_play(machine, role, book, next, tick) {
+        Some(effect) => effect,
+        None => drive_play(machine, role, book),
+    };
     let word = if role == Role::Player {
         "player"
     } else {
@@ -1197,7 +1300,10 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
         }
         WARP_HOLD.store(true, Ordering::Release);
     }
-    note_missing_start(root, book, role, tick);
+    // A parry refusal and the deleted-save notice share Recording's standing notice: the refusal stays up.
+    if !tick.notices.contains(&PARRY_START_SAVE_MISSING) {
+        note_missing_start(root, book, role, tick);
+    }
     if effect.stopped || effect.started {
         drop_frames(role);
     }
@@ -1590,6 +1696,34 @@ fn show_chord_notice(root: &Path, tick: &mut Tick) {
     }
 }
 
+/// Parry practice's saved list (menu worker, DESIGN §5.2): whether macro `id` still opens, and its start-save link.
+pub fn parry_check(root: &Path, id: &str) -> (bool, super::library::StartSaveState) {
+    use super::library::StartSaveState;
+    let Ok(book) = load_book(root) else { return (false, StartSaveState::None) };
+    let start = match book.start_link(id) {
+        StartLink::Deleted => StartSaveState::Deleted,
+        StartLink::Linked(_) => StartSaveState::Linked,
+        StartLink::None => StartSaveState::None,
+    };
+    (book.has_plan(id), start)
+}
+
+/// Save this practice: the CPU's active macro and the CPU's Loop (`None` with no CPU macro).
+pub fn parry_wiring(root: &Path) -> Option<(String, LoopCount)> {
+    let index = RecordingIndex::load(root).ok()?;
+    Some((index.active(Role::Cpu)?.to_owned(), index.loop_count(Role::Cpu)))
+}
+
+/// Use a saved practice: its macro becomes the CPU's active macro and its Loop the CPU's (the existing operations).
+pub fn parry_use(root: &Path, id: &str, count: LoopCount) -> Result<(), String> {
+    let mut index = RecordingIndex::load(root).map_err(|e| e.to_string())?;
+    index.set_active(Role::Cpu, Some(id), unix_now()).map_err(|e| e.to_string())?;
+    index.set_loop(Role::Cpu, count);
+    index.save(root).map_err(|e| e.to_string())?;
+    bump_catalog();
+    Ok(())
+}
+
 fn load_book(root: &Path) -> Result<Book, ()> {
     let index = RecordingIndex::load(root).map_err(|_| ())?;
     let mut book = Book::new(index);
@@ -1694,6 +1828,9 @@ fn reset_host() {
     PLAY_PLAYER.store(false, Ordering::Release);
     PLAY_CPU.store(false, Ordering::Release);
     MASH.store(false, Ordering::Release);
+    PARRY.store(false, Ordering::Release);
+    PARRY_PASSES.store(0, Ordering::Release);
+    PARRY_OPEN.store(false, Ordering::Release);
     MIGRATED.store(false, Ordering::Release);
     PLAYER_FRAMES.lock().clear();
     CPU_FRAMES.lock().clear();
@@ -2259,6 +2396,139 @@ mod tests {
             fed.push(take_cpu_frame().expect("a frame after the restore").buttons);
         }
         assert_eq!(fed, jab, "the whole file, from its first press, reaches the CPU");
+    }
+
+    /// Parry practice (DESIGN rev 2 §2.3): each Loop pass is one play-once run warped to the macro's start save, and
+    /// the next pass starts only after the last one ended and no attempt is open.
+    fn parry_each_pass_warps_to_the_start_save() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("parry-passes");
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        let save = NamedSave::new("Parry start", state(8), state(7)).unwrap();
+        let save_id = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&save).unwrap();
+        let frames = vec![InputFrame { buttons: 2, ..InputFrame::default() }; 2];
+        let mut recording = super::super::macros::MacroRecording::new("Fireball", "13.0.5", StartState::neutral(7, 0, 1.0), frames).unwrap();
+        recording.set_start_save(Some(&save_id)).unwrap();
+        let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&id), 1).unwrap();
+        index.set_loop(Role::Cpu, LoopCount::Finite(2));
+        index.save(&root).unwrap();
+        set_parry(true);
+        on_chords(false, false, true);
+        let tick = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        assert_eq!(tick.warp.as_deref(), Some(save_id.as_str()), "the first pass warps");
+        warp_landed();
+        let mut warps = 0;
+        for _ in 0..8 {
+            let tick = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+            warps += usize::from(tick.warp.is_some());
+            if tick.warp.is_some() {
+                warp_landed();
+            }
+            let _ = take_cpu_frame();
+        }
+        assert_eq!(warps, 1, "Loop 2: one more pass, warped again");
+        assert_eq!(PARRY_PASSES.load(Ordering::Acquire), 0);
+        reset_host();
+    }
+
+    /// tr-review-astra-2 finding 1 (70bb16e9): a second Play while the last pass's frames are still queued stops the
+    /// practice; it must not leave a pass owed that `parry_next_pass` then starts.
+    fn parry_stop_during_buffered_playback_owes_no_pass() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("parry-stop-buffered");
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        let save = NamedSave::new("Parry start", state(8), state(7)).unwrap();
+        let save_id = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&save).unwrap();
+        let frames = vec![InputFrame { buttons: 2, ..InputFrame::default() }; 2];
+        let mut recording = super::super::macros::MacroRecording::new("Short", "13.0.5", StartState::neutral(7, 0, 1.0), frames).unwrap();
+        recording.set_start_save(Some(&save_id)).unwrap();
+        let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&id), 1).unwrap();
+        index.set_loop(Role::Cpu, LoopCount::Finite(2));
+        index.save(&root).unwrap();
+        set_parry(true);
+        on_chords(false, false, true);
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        warp_landed();
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        assert!(!role_frames(Role::Cpu).lock().is_empty(), "the short pass is queued for the hook");
+        assert!(!RUN_CPU.load(Ordering::Acquire), "the machine has handed over its last frames");
+        on_chords(false, false, true);
+        for _ in 0..4 {
+            let tick = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+            assert!(tick.warp.is_none(), "the stop must not warp into the next pass");
+        }
+        assert!(!RUN_CPU.load(Ordering::Acquire) && role_frames(Role::Cpu).lock().is_empty());
+        assert_eq!(PARRY_PASSES.load(Ordering::Acquire), 0, "no pass is owed after the stop");
+        reset_host();
+    }
+
+    /// tr-review-astra-2 703e3f8d finding 1: turning Parry Off with a pass still owed ends the practice; turning it On
+    /// again without Play must not resume the old passes.
+    fn parry_off_cancels_owed_passes() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("parry-off-owed");
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        let save = NamedSave::new("Parry start", state(8), state(7)).unwrap();
+        let save_id = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&save).unwrap();
+        let frames = vec![InputFrame { buttons: 2, ..InputFrame::default() }; 2];
+        let mut recording = super::super::macros::MacroRecording::new("Short", "13.0.5", StartState::neutral(7, 0, 1.0), frames).unwrap();
+        recording.set_start_save(Some(&save_id)).unwrap();
+        let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&id), 1).unwrap();
+        index.set_loop(Role::Cpu, LoopCount::Infinite);
+        index.save(&root).unwrap();
+        set_parry(true);
+        on_chords(false, false, true);
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        warp_landed();
+        set_parry(false);
+        for _ in 0..4 {
+            let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+            let _ = take_cpu_frame();
+        }
+        set_parry(true);
+        for _ in 0..4 {
+            let tick = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+            assert!(tick.warp.is_none(), "Parry On again must not resume the old practice");
+        }
+        assert!(!RUN_CPU.load(Ordering::Acquire) && role_frames(Role::Cpu).lock().is_empty());
+        assert_eq!(PARRY_PASSES.load(Ordering::Acquire), 0, "no pass is owed once Parry was Off");
+        reset_host();
+    }
+
+    /// Parry practice's refusals (approved rows parry-practice-no-recording and parry-practice-start-save-missing).
+    fn parry_refuses_without_a_recording_or_its_start_save() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("parry-refuse");
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        set_parry(true);
+        on_chords(false, false, true);
+        let tick = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        assert!(tick.notices.contains(&PARRY_NO_RECORDING), "{:?}", tick.notices);
+        let save = NamedSave::new("Gone", state(8), state(7)).unwrap();
+        let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+        let save_id = saves.save_new(&save).unwrap();
+        let mut recording = super::super::macros::MacroRecording::new("Jab", "13.0.5", StartState::neutral(7, 0, 1.0), vec![InputFrame::default()]).unwrap();
+        recording.set_start_save(Some(&save_id)).unwrap();
+        let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&id), 1).unwrap();
+        index.save(&root).unwrap();
+        saves.delete(&save_id).unwrap();
+        on_chords(false, false, true);
+        let tick = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        assert_eq!(tick.notices.last(), Some(&PARRY_START_SAVE_MISSING), "the refusal is the notice left up");
+        assert!(tick.warp.is_none() && !RUN_CPU.load(Ordering::Acquire), "nothing plays");
+        reset_host();
     }
 
     fn a_cpu_play_without_a_start_save_feeds_at_once() {
@@ -3510,6 +3780,10 @@ mod tests {
             ("cpu_role_record_stores_the_jab_and_plays_it_on_the_cpu", cpu_role_record_stores_the_jab_and_plays_it_on_the_cpu as fn()),
             ("a_warped_cpu_play_feeds_its_first_frame_after_the_restore", a_warped_cpu_play_feeds_its_first_frame_after_the_restore as fn()),
             ("a_cpu_play_without_a_start_save_feeds_at_once", a_cpu_play_without_a_start_save_feeds_at_once as fn()),
+            ("parry_each_pass_warps_to_the_start_save", parry_each_pass_warps_to_the_start_save as fn()),
+            ("parry_stop_during_buffered_playback_owes_no_pass", parry_stop_during_buffered_playback_owes_no_pass as fn()),
+            ("parry_off_cancels_owed_passes", parry_off_cancels_owed_passes as fn()),
+            ("parry_refuses_without_a_recording_or_its_start_save", parry_refuses_without_a_recording_or_its_start_save as fn()),
             ("a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see", a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see as fn()),
             ("cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing", cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing as fn()),
             ("player_frames_reach_the_poll_once_each_whatever_the_worker_timing", player_frames_reach_the_poll_once_each_whatever_the_worker_timing as fn()),

@@ -679,6 +679,10 @@ pub fn replay_capture_loading() -> bool {
 /// Playback Mash Interrupt (SPEC-cpu-01 §3, decision B5): the CPU's mash asked the running playback to stop. A
 /// recording in progress is not touched.
 pub fn interrupt_playback() {
+    // restriction: parry-mash-ignored
+    if super::parry::on() {
+        return;
+    }
     recording_host::note_mash();
     let settings = settings();
     let (stopped, state) = {
@@ -725,6 +729,7 @@ pub fn session_clear() {
     chords::session_clear();
     notices::session_clear();
     input_display::session_clear();
+    super::parry::reset();
     // The menu's session ends with the same departure (package 5; the fork cleared its menu and chord state together).
     crate::runtime::ui::clear_session_state();
 }

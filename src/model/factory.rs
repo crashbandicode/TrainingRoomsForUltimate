@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 148;
+pub const COUNT: usize = 149;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -225,6 +225,8 @@ pub static DEFS: [Def; COUNT] = [
     row!("spots_combo", Single, 2, [1]),
     // rc.15 Tech practice: one session row and per-attempt settings.
     row!("tech_practice", Single, 6, [0]),
+    // rc.15 Parry practice: the session row (artifacts/rc15-parry/DESIGN.md §2.1).
+    row!("parry_practice", Single, 3, [0]),
     row!("tech_surface", Single, 5, [0]),
     row!("tech_damage", Single, 2, [0]),
     Def { id: "tech_damage_range", kind: Kind::Slider, len: 2, default: &[12, 12] },

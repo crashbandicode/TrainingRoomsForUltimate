@@ -160,6 +160,9 @@ pub enum Editor {
     TechPoint,
     /// Stage tech: close into the guided exercise draft.
     TechWizard,
+    /// Parry practice: the saved practices (a file each, the hot five first), and saving the current wiring as one.
+    ParrySaved,
+    ParrySave,
 }
 
 /// A read-only row.
@@ -236,7 +239,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 130] = [
+pub static ROWS: [Row; 133] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -516,6 +519,14 @@ pub static ROWS: [Row; 130] = [
       "Follow the attempt or frame the whole stage.\nWhole stage uses the target placing camera."),
     r(TECH, "Skip wizard preview", "tech_wizard_skip", TOGGLE,
       "On: A after Hit starts immediately.\nOff: review the candidate preview before starting."),
+    // rc.15 Parry practice (artifacts/rc15-parry/DESIGN.md §2.1): appended like Level, the last row of Practice games.
+    r(GAMES, "Parry practice", "parry_practice", Control::Dropdown(&o::PARRY_SESSION),
+      "Parry the CPU's recorded move: play it with ZR+Up as usual.\nEvery hit is one attempt; 10 attempts ends a set with a summary."),
+    // restriction: parry-practice-start-save-missing
+    r(GAMES, "Saved parry practices", "parry_saved", Control::Editor(Editor::ParrySaved),
+      "Your saved parry practices: a CPU macro and its Loop each.\nA practice whose macro or start save was deleted can't start."),
+    r(GAMES, "Save this parry practice", "parry_save", Control::Editor(Editor::ParrySave),
+      "Saves the CPU's active macro and Loop as a practice.\nIts start save is the macro's own."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

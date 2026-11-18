@@ -13,6 +13,7 @@ pub mod archive;
 pub mod chips;
 pub mod combos;
 pub mod layouts;
+pub mod parry_saved;
 pub mod effect_texture;
 pub mod external;
 pub mod facts;

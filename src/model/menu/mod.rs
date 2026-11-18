@@ -914,7 +914,7 @@ impl Menu {
             }
         }
         // Changing any practice game to On switches the other games Off; all edits are committed together.
-        let ids = ["eggsercise", "btt", "tech_practice"];
+        let ids = ["eggsercise", "btt", "tech_practice", "parry_practice"];
         if ids.iter().position(|v| *v == id).is_some_and(|chosen| super::tech_settings::practice(&self.settings.menu)[chosen]) {
             for other in ids { if other != id { self.put_one_hot(other, 0); } }
         }
@@ -1859,6 +1859,11 @@ impl Menu {
     /// Ready view when the menu closes.
     pub fn btt_on(&mut self) {
         self.put("btt", &[0, 1]);
+    }
+
+    /// A saved parry practice was used: Parry practice turns On with its set length (1 sets of ten, 2 free practice).
+    pub fn parry_on(&mut self, set: usize) {
+        self.put_one_hot("parry_practice", set.clamp(1, 2));
     }
 
     /// The item the player chose on the Give item grid since the last call, if any.

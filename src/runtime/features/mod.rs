@@ -37,6 +37,8 @@ pub mod writer;
 
 pub mod tech;
 pub mod tech_surfaces;
+/// rc.15 Parry practice (artifacts/rc15-parry/DESIGN.md).
+pub mod parry;
 
 pub mod tech_hitlag;
 pub(crate) mod tech_hitlag_read;

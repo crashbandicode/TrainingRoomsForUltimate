@@ -71,6 +71,9 @@ pub mod rr_runtime;
 /// Hook atomics and the worker tick. No skyline, so the host tests compile it.
 #[path = "../model/rr_host.rs"]
 pub mod rr_host;
+/// rc.15 Parry practice's saved practices (artifacts/rc15-parry/DESIGN.md §5).
+#[path = "../model/parry_practice.rs"]
+pub mod parry_practice;
 /// The frames a playing role hands from the recording worker to its hook.
 #[path = "../model/frame_queue.rs"]
 pub mod frame_queue;

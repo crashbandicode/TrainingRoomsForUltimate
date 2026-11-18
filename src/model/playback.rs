@@ -171,6 +171,11 @@ impl Book {
         self.saves.insert(id.into());
     }
 
+    /// The file opens as a recording or a chain (Parry practice refuses a deleted macro).
+    pub fn has_plan(&self, id: &str) -> bool {
+        self.plan(id).is_some()
+    }
+
     fn plan(&self, id: &str) -> Option<Plan<'_>> {
         if let Some(chain) = self.chains.get(id) {
             let playable = chain

@@ -58,7 +58,38 @@ pub fn sampling() -> bool {
     if !ENABLED.load(Ordering::Acquire) {
         return false;
     }
-    crate::model::frame_strip::strip_owns_advantage(true, settings().on, PANES.load(Ordering::Acquire))
+    // rc.15 Parry practice: the strip shows while it runs, even with the Input Display row Off (operator Q2, 2026-11-17).
+    crate::model::frame_strip::strip_owns_advantage(true, settings().on || super::parry::on(), PANES.load(Ordering::Acquire))
+}
+
+/// P1's damage on the frame before (`f32` bits), for Parry practice's body-hit test.
+static P1_DAMAGE: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// Parry practice's frame (`model::parry::Frame`) from P1's strip sample: the parry flag only during GUARD_DAMAGE and the
+/// window only on GUARD_OFF frames, each through its guarded native (`None` when its row or id is unavailable).
+///
+/// # Safety
+/// `player` is P1's live accessor, on the game thread inside its frame.
+unsafe fn parry_frame(player: usize, ids: &Table, p1: &Sample, inputs: MappedInputs) -> crate::model::parry::Frame {
+    use crate::model::sites_pkg2::{WORK_GET_INT_OFFSET, WORK_IS_FLAG_OFFSET};
+    use crate::runtime::game::granted;
+    let before = f32::from_bits(P1_DAMAGE.swap(p1.damage.to_bits(), Ordering::AcqRel));
+    let guard_damage = ids.is(C::GuardDamage, p1.status);
+    let guard_off = ids.is(C::GuardOff, p1.status);
+    let just_shield = (guard_damage && granted(WORK_IS_FLAG_OFFSET) && ids.resolved(C::JustShield))
+        .then(|| natives::is_flag(player, ids.get(C::JustShield)));
+    let just_frame = (guard_off && granted(WORK_GET_INT_OFFSET) && ids.resolved(C::JustFrame))
+        .then(|| natives::get_int(player, ids.get(C::JustFrame)));
+    crate::model::parry::Frame {
+        stop: p1.stop,
+        gained: p1.damage > before,
+        guard_damage,
+        guard_off,
+        just_shield,
+        just_frame,
+        shield_held: inputs.buttons & (0x8 | 0x10000) != 0,
+        armed: false,
+    }
 }
 
 fn pack(m: MappedInputs) -> u64 {
@@ -225,6 +256,8 @@ pub unsafe fn sample_frame(player: usize) {
     if input_drill && published::input_owners().contains(Owners::MENU) { return; }
     if crate::runtime::features::states::is_loading() {
         TRACKER.lock().clear();
+        // The strip starts a new timeline: so does Parry practice's detector.
+        super::parry::reset();
         return;
     }
     let Some(cpu) = crate::runtime::features::cpu::strip_cpu(player) else { return };
@@ -271,6 +304,9 @@ pub unsafe fn sample_frame(player: usize) {
     if let Some(snap) = tracker.snaps().last() { crate::engine::rr_host::observe_input(snap, tracker.contact_now()); }
     // The combo helper reads the same step (SPEC-input-07 §3); lock order TRACKER, then the helper's.
     crate::runtime::features::combo::after_strip(&tracker, p1_kind);
+    if super::parry::on() {
+        super::parry::step(parry_frame(player, &ids, &p1, inputs), p1_kind, tracker.newest().unwrap_or(0));
+    }
     #[cfg(feature = "diag")]
     {
         let (check_now, link, advantage_now) = (tracker.stun_check, tracker.latest_link(), tracker.advantage());
@@ -456,7 +492,8 @@ pub fn on_layout_registered() {
 pub fn hud_tick(menu_open: bool, mut apply: impl FnMut(usize, &Look, Changed)) -> usize {
     let shown = !menu_open && sampling();
     let tracker = *TRACKER.lock();
-    RENDERER.lock().draw_spots(&tracker, shown, settings().spots, |local, look, changed| {
+    let parry = super::parry::view();
+    RENDERER.lock().draw_parry(&tracker, shown, settings().spots, parry.as_ref(), |local, look, changed| {
         // Diag build: every show or hide of the strip, with why (the menu, the vanilla pause, the row Off).
         #[cfg(feature = "diag")]
         if local == crate::model::frame_strip_plan::at::CONTAINER && changed.visible {

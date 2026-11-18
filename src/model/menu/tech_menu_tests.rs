@@ -15,13 +15,15 @@ fn tech_rows_follow_break_the_targets() {
     let group = GROUPS.last().unwrap();
     assert_eq!((group.title, group.page), ("Tech practice", Page::FightersStages));
     let expected = ["tech_surface", "tech_point", "tech_damage", "tech_damage_range", "tech_speed", "tech_speed_range", "tech_hit_damage", "tech_hit_damage_range", "tech_angle", "tech_angle_range", "tech_start", "tech_start_range", "tech_time", "tech_time_range", "tech_di", "tech_di_direction", "tech_facing", "tech_delay", "tech_delay_range", "tech_camera", "tech_wizard_skip"];
-    assert_eq!(&ROWS[layouts + 3..].iter().map(|r| r.id).collect::<Vec<_>>(), &expected);
+    // rc.15: Parry practice's three rows are appended after the Tech rows (artifacts/rc15-parry/DESIGN.md §2.1).
+    assert_eq!(ROWS[ROWS.len() - 3].id, "parry_practice");
+    assert_eq!(&ROWS[layouts + 3..ROWS.len() - 3].iter().map(|r| r.id).collect::<Vec<_>>(), &expected);
     for r in &ROWS[layouts + 1..] { assert!(r.help.contains('\n')); }
 }
 
 #[test]
 fn one_practice_game_at_a_time() {
-    let ids = ["eggsercise", "btt", "tech_practice"];
+    let ids = ["eggsercise", "btt", "tech_practice", "parry_practice"];
     for first in ids { for second in ids {
         let mut m = menu();
         m.put_one_hot(first, 1);
@@ -45,7 +47,7 @@ fn tech_point_closes_into_surface_picker() {
     m.put_one_hot("eggsercise", 1);
     m.activate(row("tech_point"));
     assert!(m.is_closed());
-    assert_eq!(tech_settings::practice(&m.settings.menu), [false, false, true]);
+    assert_eq!(tech_settings::practice(&m.settings.menu), [false, false, true, false]);
     assert_eq!(tech_settings::read(&m.settings.menu).surface, 4);
     assert_eq!(tech_settings::read(&m.settings.menu).session, 1);
     let out=m.take_outbox();
@@ -63,7 +65,7 @@ fn tech_wizard_off_starts_ten_attempts_and_excludes_other_games() {
         assert!(m.is_closed());
         let effective=tech_settings::read(&m.settings.menu);
         assert_eq!((effective.session,effective.surface),(2,4));
-        assert_eq!(tech_settings::practice(&m.settings.menu),[false,false,true]);
+        assert_eq!(tech_settings::practice(&m.settings.menu),[false,false,true,false]);
         let out=m.take_outbox();
         assert!(out.tech_wizard && out.changed);
         assert!(!out.tech_point && !out.place_targets);
@@ -157,8 +159,8 @@ fn tech_set_random_auto_controls_ranges() {
 #[test]
 fn tech_file_conflicts_normalize_current_and_defaults() {
     let loaded=settings::parse(r#"{"menu":{"eggsercise":[0,1,0,0,0],"btt":[0,1],"tech_practice":[0,1,0,0,0,0]},"defaults_menu":{"btt":[0,1],"tech_practice":[0,0,0,0,0,1]}}"#);
-    assert_eq!(tech_settings::practice(&loaded.settings.menu),[true,false,false]);
-    assert_eq!(tech_settings::practice(&loaded.settings.defaults),[false,true,false]);
+    assert_eq!(tech_settings::practice(&loaded.settings.menu),[true,false,false,false]);
+    assert_eq!(tech_settings::practice(&loaded.settings.defaults),[false,true,false,false]);
 }
 #[test]
 fn tech_slider_edits_and_draws_public_units() {

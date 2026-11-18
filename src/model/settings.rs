@@ -573,6 +573,7 @@ pub fn parse(text: &str) -> Loaded {
         let on = super::tech_settings::practice(rows);
         if on[0] && on[1] { let _ = rows.set("btt", &[1, 0]); }
         if (on[0] || on[1]) && on[2] { let _ = rows.set("tech_practice", &[1, 0, 0, 0, 0, 0]); }
+        if (on[0] || on[1] || on[2]) && on[3] { let _ = rows.set("parry_practice", &[1, 0, 0]); }
     }
     let mut extra = Map::new();
     for (key, value) in top.others.items {

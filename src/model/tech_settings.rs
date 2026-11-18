@@ -118,11 +118,12 @@ pub fn read(s: &Snapshot) -> Config {
     }
 }
 /// Menu changes are last-choice-wins; file normalization keeps the older practice game first.
-pub fn practice(s: &Snapshot) -> [bool; 3] {
+pub fn practice(s: &Snapshot) -> [bool; 4] {
     [
         selected(s, "eggsercise") > 0,
         selected(s, "btt") > 0,
         selected(s, "tech_practice") > 0,
+        selected(s, "parry_practice") > 0,
     ]
 }
 
