@@ -2783,9 +2783,29 @@ mod tests {
         }
     }
 
+    /// Review 2 (notice-compact R2): the real empty-library pop-up's compact background holds every element the view
+    /// draws in a pop-up: the role key caps, the row band, the CONNECTIONS divider, and the help and hint lines.
+    fn popup_background_holds_its_chrome() {
+        use crate::model::panes as p;
+        let mut m = menu();
+        open_popup(m.recording_mut());
+        let mut f = crate::model::frame::Frame::new();
+        crate::model::screens::frame_of(&m, &mut f, |_| "");
+        assert!(f.popup && f.conn_count == 0, "the empty-library default pop-up");
+        let ([x, y, w, h], help_y, hint_y) = f.dialog_box().expect("the pop-up is sized");
+        let [left, bottom, right, top] = [x - w / 2.0, y - h / 2.0, x + w / 2.0, y + h / 2.0];
+        let div = p::spec(p::IDX_CONN_DIV);
+        assert!(right >= p::ROLE_CAP_X[1] + p::ROLE_CAP / 2.0 && right >= p::row_span(true).1, "{right}: caps, rows");
+        assert!(bottom <= div.y - div.h / 2.0 && bottom <= hint_y - 22.0 && help_y[0] < div.y - div.h / 2.0, "{bottom}");
+        assert!(left <= p::row_span(true).0 && top >= p::TAB_Y + 28.0 && w <= p::PANEL_W, "{:?}", [left, top, w]);
+        // A pop-up with connections: its last line still ends above the divider's foot, inside the same box.
+        assert!(p::conn_y(p::CONN_LINES - 1) - p::CONN_LINE_H / 2.0 >= div.y - div.h / 2.0 && right >= p::CONN_RIGHT);
+    }
+
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("popup_background_holds_its_chrome", popup_background_holds_its_chrome as fn()),
             ("drills_are_a_filtered_combo_sublist_on_both_faces",drills_are_a_filtered_combo_sublist_on_both_faces as fn()),
             ("a_reopened_menu_loads_the_catalog_without_a_new_file", a_reopened_menu_loads_the_catalog_without_a_new_file as fn()),
             ("one_save_is_bound_and_the_page_opens_it", one_save_is_bound_and_the_page_opens_it as fn()),

@@ -109,23 +109,13 @@ fn report_failure(failures: &str, what: &str, error: &io::Error) {
     if failures.is_empty() {
         return;
     }
-    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(failures) {
-        let _ = writeln!(file, "{} diag_log {what}: {error}", clock::uptime_ms());
-    }
+    let _ = super::log_file::append_event_at(failures, format_args!("{} diag_log {what}: {error}", clock::uptime_ms()), false);
 }
 
 /// Start a new current file: the old one becomes the previous one, and an empty current file is
 /// created.
 fn rotate_diagnostics(log: &mut DiagnosticLog) -> io::Result<()> {
-    if fs::metadata(&log.current).is_ok() {
-        match fs::remove_file(&log.previous) {
-            Ok(()) => {}
-            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
-            Err(e) => return Err(e),
-        }
-        fs::rename(&log.current, &log.previous)?;
-    }
-    OpenOptions::new().create(true).append(true).open(&log.current)?;
+    super::log_file::rotate_log(&log.current, &log.previous)?;
     log.bytes = 0;
     Ok(())
 }

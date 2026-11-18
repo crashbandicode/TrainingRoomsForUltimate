@@ -10,10 +10,12 @@ fn tech_rows_follow_break_the_targets() {
     let layouts = row("btt_layouts");
     assert_eq!(ROWS[layouts + 1].id, "tech_practice");
     assert_eq!(ROWS[layouts + 1].page(), Page::FightersStages);
+    assert_eq!(ROWS[layouts + 2].id, "tech_wizard");
+    assert_eq!(ROWS[layouts + 2].page(), Page::FightersStages);
     let group = GROUPS.last().unwrap();
     assert_eq!((group.title, group.page), ("Tech practice", Page::FightersStages));
-    let expected = ["tech_surface", "tech_point", "tech_damage", "tech_damage_range", "tech_speed", "tech_speed_range", "tech_hit_damage", "tech_hit_damage_range", "tech_angle", "tech_angle_range", "tech_start", "tech_start_range", "tech_time", "tech_time_range", "tech_di", "tech_di_direction", "tech_facing", "tech_delay", "tech_delay_range", "tech_camera"];
-    assert_eq!(&ROWS[layouts + 2..].iter().map(|r| r.id).collect::<Vec<_>>(), &expected);
+    let expected = ["tech_surface", "tech_point", "tech_damage", "tech_damage_range", "tech_speed", "tech_speed_range", "tech_hit_damage", "tech_hit_damage_range", "tech_angle", "tech_angle_range", "tech_start", "tech_start_range", "tech_time", "tech_time_range", "tech_di", "tech_di_direction", "tech_facing", "tech_delay", "tech_delay_range", "tech_camera", "tech_wizard_skip"];
+    assert_eq!(&ROWS[layouts + 3..].iter().map(|r| r.id).collect::<Vec<_>>(), &expected);
     for r in &ROWS[layouts + 1..] { assert!(r.help.contains('\n')); }
 }
 
@@ -45,8 +47,65 @@ fn tech_point_closes_into_surface_picker() {
     assert!(m.is_closed());
     assert_eq!(tech_settings::practice(&m.settings.menu), [false, false, true]);
     assert_eq!(tech_settings::read(&m.settings.menu).surface, 4);
-    assert!(m.take_outbox().tech_point);
+    assert_eq!(tech_settings::read(&m.settings.menu).session, 1);
+    let out=m.take_outbox();
+    assert!(out.tech_point);
+    assert!(!out.tech_wizard);
     assert!(!m.take_outbox().tech_point);
+}
+
+#[test]
+fn tech_wizard_off_starts_ten_attempts_and_excludes_other_games() {
+    for game in ["eggsercise", "btt"] {
+        let mut m=menu();
+        m.put_one_hot(game,1);
+        m.activate(row("tech_wizard"));
+        assert!(m.is_closed());
+        let effective=tech_settings::read(&m.settings.menu);
+        assert_eq!((effective.session,effective.surface),(2,4));
+        assert_eq!(tech_settings::practice(&m.settings.menu),[false,false,true]);
+        let out=m.take_outbox();
+        assert!(out.tech_wizard && out.changed);
+        assert!(!out.tech_point && !out.place_targets);
+        assert!(!m.take_outbox().tech_wizard);
+        let committed=m.commit_onto(&Settings::factory());
+        assert_eq!(tech_settings::read(&committed.menu).session,2);
+        assert_eq!(tech_settings::read(&committed.menu).surface,4);
+    }
+}
+
+#[test]
+fn tech_wizard_preserves_active_session_and_advanced_variables() {
+    for session in 1..6 {
+        let mut m=menu();
+        m.put_one_hot("tech_practice",session);
+        m.put("tech_damage_range",&[4,8]);
+        m.put_one_hot("tech_di",3);
+        let mut expected=tech_settings::read(&m.settings.menu);
+        expected.surface=4;
+        m.activate(row("tech_wizard"));
+        assert_eq!(tech_settings::read(&m.settings.menu),expected);
+        assert!(m.is_closed());
+        let out=m.take_outbox();
+        assert!(out.tech_wizard);
+        assert!(!out.tech_point);
+    }
+}
+
+#[test]
+fn tech_wizard_skip_defaults_off_and_persists_without_opening_wizard() {
+    let mut m=menu();
+    assert_eq!(m.get("tech_wizard_skip"),&[0,1]);
+    m.activate(row("tech_wizard_skip"));
+    assert_eq!(m.get("tech_wizard_skip"),&[1,0]);
+    assert!(!m.is_closed());
+    let out=m.take_outbox();
+    assert!(out.changed);
+    assert!(!out.tech_point && !out.tech_wizard);
+    let committed=m.commit_onto(&Settings::factory());
+    let loaded=settings::parse(&committed.to_json()).settings;
+    assert_eq!(loaded.menu.get("tech_wizard_skip"),Some(&[1,0][..]));
+    assert_eq!(tech_settings::read(&loaded.menu).session,0);
 }
 
 #[test]

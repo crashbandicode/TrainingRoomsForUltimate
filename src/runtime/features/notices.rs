@@ -47,23 +47,6 @@ pub fn clear_intro_store() {
     INTRO_STORE_DUE.store(false, Ordering::Release);
 }
 
-/// The practice games whose standing notice is up, one bit each (`RAISE_EGGS`): while
-/// any is, the notice slot sits in the top band (`panes::NOTICE_TOP_Y`), so the targets keep the middle of the screen.
-static RAISED: AtomicU8 = AtomicU8::new(0);
-pub const RAISE_EGGS: u8 = 1;
-pub const RAISE_TECH: u8 = 4;
-
-/// A practice game's bit: its notice stands (`on`) or is gone.
-pub fn raise(mode: u8, on: bool) {
-    let set = |held: u8| Some(held & !mode | mode * u8::from(on));
-    let _ = RAISED.fetch_update(Ordering::AcqRel, Ordering::Acquire, set);
-}
-
-/// Some practice game's notice stands: the slot sits in the top band.
-pub fn raised() -> bool {
-    RAISED.load(Ordering::Acquire) != 0
-}
-
 /// Grouped-session trace point. It runs once, when this process posts the six intro notices.
 #[no_mangle]
 #[inline(never)]

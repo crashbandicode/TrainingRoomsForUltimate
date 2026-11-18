@@ -114,8 +114,8 @@ windbox on his arm while he throws the crown. Palutena's Counter and Greninja's 
 | Wii Fit Trainer | neutral special (while charging) |
 | Zelda | down special (the Phantom) |
 
-Some moves push through a wind area instead of a hitbox. Windboxes draws those too: a see-through burnt-orange box or
-circle where the wind blows, with a silver line, edged in dark so it shows on a pale stage, pointing the way it pushes. A
+Some moves push through a wind area instead of a hitbox. Windboxes draws those too: a see-through olive box or
+circle where the wind blows, with a white line, edged in dark so it shows on a pale stage, pointing the way it pushes. A
 dot in the middle means the wind has no one direction. The wind areas of what a fighter throws or summons are drawn too,
 such as the pillar of Ness's PK Fire, Samus's bomb and Palutena's Explosive Flame. Zelda's Triforce of Wisdom, which
 pulls, and Hero's Kaboom make theirs the same way: they take the same path, but were not filmed on their own. An item's
@@ -159,36 +159,36 @@ have one.
 | Shulk | forward smash, up smash |
 | Wario | down special |
 
-**Launch angles** draws a silver line inside each hitbox, pointing where the hit sends the fighter it lands on. The line
+**Launch angles** draws a white line inside each hitbox, pointing where the hit sends the fighter it lands on. The line
 mirrors when the attacker turns around. Two dashes mean the game picks the angle when the hit lands, from how hard it
 hits and whether the target is on the ground; they point at 38 degrees, where such a hit sends a fighter in the air.
 A dot means the hit carries the fighter along with the attack. With Hitboxes not ticked, the lines are drawn alone.
 
-![Windboxes ticked at 1/4 speed: F.L.U.D.D.'s water as a deep-blue disc pushing the CPU; Ganondorf's up tilt with deep-blue windboxes inside the see-through wind-area box and its white line; then the same up tilt with Hitboxes ticked too, the kick's hit drawn](../media/rc14-windboxes.gif)<br>
-*Windboxes on, at 1/4 speed: F.L.U.D.D.'s water and Ganondorf's up-tilt wind push without hitstun, drawn deep blue; the wind area is the see-through box with its white line. With Hitboxes ticked too, the kick's hit is drawn as well (the last frames). Eden, rc.14 (untested on hardware).*
+![Windboxes ticked at 1/4 speed: F.L.U.D.D.'s water as a windbox disc pushing the CPU; Ganondorf's up tilt with windboxes inside the see-through wind-area box and its white line; then the same up tilt with Hitboxes ticked too, the kick's hit drawn](../media/rc14-windboxes.gif)<br>
+*Windboxes on, at 1/4 speed: F.L.U.D.D.'s water and Ganondorf's up-tilt wind push without hitstun, drawn as windboxes; the wind area is the see-through box with its white line. Windboxes are sky blue and wind areas olive in the current colours; this clip predates them and draws both blue. With Hitboxes ticked too, the kick's hit is drawn as well (the last frames). Eden, rc.14 (untested on hardware).*
 
-![Windboxes only at 1/10 speed: King K. Rool holds B and the Blunderbuss becomes a vacuum; its deep-blue windbox pulls Mario in until he is caught](../media/rc14-windbox-krool-vacuum.gif)<br>
-*Windboxes only, 1/10 speed: after the cannonball hits, holding B turns the Blunderbuss into a vacuum. Its windbox (deep blue) pulls Mario in without damage until he's caught. Eden, rc.14 (untested on hardware).*
-<!-- CAPTURE-REQUEST hb-legend-v03: Windboxes alone, 1/4 speed: Mario's F.L.U.D.D. (the water deep blue, nothing else drawn), then Bowser's Fire Breath (only the flame that does not cause hitstun, deep blue), then Ganondorf's up tilt (its deep blue windbox discs and the see-through blue box with its white line, which shows where the wind blows), then Chrom's Flare Blade held to charge (the see-through blue box on him with its white line pointing up and to the left). Then Hitboxes alone on F.L.U.D.D. (the water in its hitbox colour). Shoot it over the white Training grid on the build with the stronger wind-area colour. See artifacts/rc14-hb-legend/. -->
+![Windboxes only at 1/10 speed: King K. Rool holds B and the Blunderbuss becomes a vacuum; its windbox pulls Mario in until he is caught](../media/rc14-windbox-krool-vacuum.gif)<br>
+*Windboxes only, 1/10 speed: after the cannonball hits, holding B turns the Blunderbuss into a vacuum. Its windbox (sky blue in the current colours; deep blue in this older clip) pulls Mario in without damage until he's caught. Eden, rc.14 (untested on hardware).*
+<!-- CAPTURE-REQUEST hb-legend-v03: Windboxes alone, 1/4 speed: Mario's F.L.U.D.D. (the water sky blue, nothing else drawn), then Bowser's Fire Breath (only the flame that does not cause hitstun, sky blue), then Ganondorf's up tilt (its sky-blue windbox discs and the see-through olive box with its white line, which shows where the wind blows), then Chrom's Flare Blade held to charge (the see-through olive box on him with its white line pointing up and to the left). Then Hitboxes alone on F.L.U.D.D. (the water in its hitbox colour). Shoot it over the white Training grid on the build with the stronger wind-area colour. See artifacts/rc14-hb-legend/. -->
 <!-- CAPTURE-REQUEST hb-legend-v02: Hitboxes and Launch angles ticked, 1/4 speed: Ganondorf's up tilt (the windbox lines, then the kick's dashes and its 70-degree line) facing right then left; Mario's jab (dashes). Then Hurtboxes alone: only the hurtboxes. See artifacts/rc14-hb-legend/. -->
 
 A round box is a disc; a long one, such as a sword's hitbox or an arm's hurtbox, is one pill. The shapes are flat and
 drawn over the stage and the fighters. While the camera pans they trail by a frame or two.
 
-![Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked: the yellow hurtbox pills, then at 1/4 speed a neutral air's red hitbox](../media/rc14-hitbox.gif)<br>
-*Display & Controls > On screen > Hitbox Visualization, A: the checklist (its help line: Tick what to draw. Windboxes: hits that push or pull without hitstun. Launch angles: where each hit sends.). A ticks Hitboxes, Grab boxes and Hurtboxes, B goes back, and the menu closes onto both fighters' hurtboxes as yellow pills, one pill for each long limb or the torso. At 1/4 speed Mario's short hop and neutral air show its red hitbox; the menu footer reads 0.2.0-rc.14 · rc14 17e50cd0. Eden, rc.14 (untested on hardware).*
+![Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked: the hurtbox pills, then at 1/4 speed a neutral air's red hitbox](../media/rc14-hitbox.gif)<br>
+*Display & Controls > On screen > Hitbox Visualization, A: the checklist (its help line: Tick what to draw. Windboxes: hits that push or pull without hitstun. Launch angles: where each hit sends.). A ticks Hitboxes, Grab boxes and Hurtboxes, B goes back, and the menu closes onto both fighters' hurtboxes as pills, one pill for each long limb or the torso (yellow in this clip; grey in the current colours). At 1/4 speed Mario's short hop and neutral air show its red hitbox; the menu footer reads 0.2.0-rc.14 · rc14 17e50cd0. Eden, rc.14 (untested on hardware).*
 
-![At 1/4 speed, Ridley's hurtboxes as yellow pills, and his tail attacks' hitbox as one red pill along the tail](../media/rc13-pills.gif)
+![At 1/4 speed, Ridley's hurtboxes as pills, and his tail attacks' hitbox as one red pill along the tail](../media/rc13-pills.gif)
 
-*Pills: at 1/4 speed, Ridley standing shows his hurtboxes as yellow pills; his forward tilt and down tilt draw their hitbox as one red pill along the tail. Eden, rc.13 (untested on hardware).*
+*Pills: at 1/4 speed, Ridley standing shows his hurtboxes as pills (yellow in this clip; grey in the current colours); his forward tilt and down tilt draw their hitbox as one red pill along the tail. Eden, rc.13 (untested on hardware).*
 
 **Shield and grab.** While a fighter shields nothing of it is drawn. While it is grabbing, its hurtboxes and grab box
 are, since a missed grab can be punished. Grab boxes show only in the grab's active frames: a grab that catches on the
 frame its box appears, as Samus's tether does, shows its box for that frame only, not through the pull.
 
-![At 1/4 speed, the magenta grab boxes of Mario's grab, Samus's tether and Olimar's Pikmin; each grabber keeps its yellow hurtboxes](../media/rc13-grab-boxes.gif)
+![At 1/4 speed, the grab boxes of Mario's grab, Samus's tether and Olimar's Pikmin; each grabber keeps its hurtboxes](../media/rc13-grab-boxes.gif)
 
-*Grab boxes: at 1/4 speed, Mario's standing grab, Samus's tether (a pill along the beam) and the Pikmin Olimar throws, each grab box in magenta; the grabber keeps its yellow hurtboxes through the grab. Eden, rc.13 (untested on hardware).*
+*Grab boxes: at 1/4 speed, Mario's standing grab, Samus's tether (a pill along the beam) and the Pikmin Olimar throws, each grab box drawn; the grabber keeps its hurtboxes through the grab. Grab boxes are purple and normal hurtboxes grey in the current colours; this clip predates them (magenta and yellow). Eden, rc.13 (untested on hardware).*
 
 **Projectiles and thrown items.** A projectile, or a thrown item such as Link's bomb, Peach's turnip or Diddy Kong's
 banana, has its hitboxes drawn while its attack lasts. Up to four at a time; a fifth replaces the oldest. Olimar's Pikmin
@@ -198,9 +198,9 @@ An object with no enabled hurtbox group draws none. These use the same discs, pi
 At most eight endpoints per object and 24 together are admitted, always as complete shapes. They take spare object
 slots and draw after the other boxes, so attacking objects and fighters keep priority.
 
-![Olimar's three Pikmin with Article hurtboxes off, yellow hurtbox pills on, status colours on, and off again](../media/rc15-article-hurtboxes.gif)
+![Olimar's three Pikmin with Article hurtboxes off, hurtbox pills on, status colours on, and off again](../media/rc15-article-hurtboxes.gif)
 
-*Article hurtboxes: Off, yellow pills, Frame data colours (blue for the Pikmin's current hit status), then Off again. Eden, 2026-11-15, rc.15 source `6def8553`, diag `48ea01d1`; untested on hardware.*
+*Article hurtboxes: Off, hurtbox pills, the older Frame data colours view (blue for the Pikmin's current hit status), then Off again. The current single palette draws a normal hurtbox grey, one that can't be hit yellow and one that takes no damage green; there is no Frame data colours view. Eden, 2026-11-15, rc.15 source `6def8553`, diag `48ea01d1`; untested on hardware.*
 
 ![At 1/4 speed, a red disc rides on Ridley's fireball, Link's arrow and Link's thrown bomb while each is in flight](../media/rc13-projectile-hitboxes.gif)
 

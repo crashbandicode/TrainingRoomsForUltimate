@@ -208,6 +208,8 @@ pub struct Frame {
     pub icons: [MarkIcon; super::panes::FLOPPIES + super::panes::LOOPS],
     /// The recording pop-up is the window. The background shrinks so the match HUD stays visible.
     pub popup: bool,
+    /// A dialog (a confirmation, the Fighter Mismatch question, a panel): drawn in a box sized to it (`dialog_box`).
+    pub dialog: bool,
     /// Green plate behind a recording row (the active file or the bound save).
     pub green: [bool; ROW_LINES],
     /// White cursor border and left bar, instead of the dark highlight, on a recording screen.
@@ -292,6 +294,7 @@ impl Frame {
         self.hint.clear();
         self.icons = [MarkIcon::HIDDEN; super::panes::FLOPPIES + super::panes::LOOPS];
         self.popup = false;
+        self.dialog = false;
         self.green = [false; ROW_LINES];
         self.white_cursor = false;
         self.hairline = None;
@@ -355,6 +358,7 @@ impl Frame {
             hint: Text::new(),
             icons: [MarkIcon::HIDDEN; super::panes::FLOPPIES + super::panes::LOOPS],
             popup: false,
+            dialog: false,
             green: [false; ROW_LINES],
             white_cursor: false,
             hairline: None,
@@ -377,6 +381,57 @@ impl Frame {
 impl Default for Frame {
     fn default() -> Self {
         Frame::new()
+    }
+}
+
+impl Frame {
+    /// A dialog's box (2026-11-17: every dialog takes only the space it needs), for a dialog (`dialog`) or the recording
+    /// pop-up (`popup`): the background `[x, y, w, h]` around the crumb, the content and the help and hint lines, and the
+    /// help lines' and hint's y, which follow the content instead of the page's foot. `None` for a page (the full panel).
+    pub fn dialog_box(&self) -> Option<([f32; 4], [f32; 2], f32)> {
+        use super::notice_box::measure;
+        use super::panes as p;
+        const LEFT: f32 = -880.0;
+        const PAD: f32 = 24.0;
+        (self.dialog || self.popup || self.view == View::Delay).then_some(())?;
+        // The menu fonts render wider than the notice-calibrated estimate: ~6 % for prose, ~14 % for a 48-W crumb (Eden,
+        // notice-compact-72451433 and -9f90e741), so a dialog measures its text with a 1.2 margin.
+        let width = |text: &[u16], font: (f32, f32)| 1.2 * measure(text.iter().copied(), font.0).0;
+        let (mut right, mut bottom) = if self.view == View::Tiles {
+            let (cols, rows) = (usize::from(self.tile_cols.max(1)), usize::from(self.tile_rows.max(1)));
+            // A panel's page carries all its cells; the empty ones draw nothing, so the box ends at the last label.
+            let count = self.tiles[..usize::from(self.tile_count)].iter().rposition(|t| !t.units().is_empty()).map_or(0, |i| i + 1);
+            let cell_w = (p::ROW_RIGHT - p::ROW_LEFT) / cols as f32;
+            (p::ROW_LEFT + count.min(cols) as f32 * cell_w, 320.0 - count.div_ceil(cols) as f32 * p::TILE_AREA_H / rows as f32)
+        } else if self.view == View::Delay {
+            // The delay pop-up: eight tile columns across the rows and the range bar, its handle labels lowest (y -165,
+            // the view's DELAY_HANDLE_LABEL_Y).
+            (p::ROW_RIGHT, -165.0 - p::ROW_H / 2.0)
+        } else {
+            let (x, w) = p::row_label_box(self.popup);
+            let rows = &self.rows[..usize::from(self.row_count)];
+            let widest = rows.iter().map(|r| width(r.label.units(), p::FONT)).fold(0.0, f32::max);
+            // A row's value is right-aligned in the value column (Chord Entry's chord), so a valued row spans to it.
+            let valued = rows.iter().any(|r| !r.value.units().is_empty());
+            (if valued { p::row_value_right(self.popup) } else { x - w / 2.0 + widest }, p::row_y(rows.len().max(1) - 1) - p::ROW_H / 2.0)
+        };
+        // Every pop-up draws its role tabs and L/R key caps (x ≤ 836), the row bands and the CONNECTIONS divider (review 2);
+        // its connection lines end above the divider's foot and left of CONN_RIGHT, so the box spans to both.
+        let div = p::spec(p::IDX_CONN_DIV);
+        if self.popup {
+            (right, bottom) = (right.max(p::CONN_RIGHT), bottom.min(div.y - div.h / 2.0));
+        }
+        right = right.max(LEFT + width(self.crumb.units(), p::FONT));
+        let (mut y, mut help_y) = (bottom - 8.0, p::HELP_Y);
+        for (at, line) in help_y.iter_mut().zip(&self.help).filter(|(_, line)| !line.units().is_empty()) {
+            (y, *at) = (y - 48.0, y - 48.0);
+            right = right.max(LEFT + width(line.units(), p::FONT_SMALL));
+        }
+        let hint_y = y - 52.0;
+        right = right.max(LEFT + width(self.hint.units(), p::FONT_SMALL)) + PAD;
+        let top = if self.popup { p::TAB_Y } else { p::CRUMB_Y } + 28.0 + PAD;
+        let (left, bottom) = (LEFT - PAD, hint_y - 22.0 - PAD);
+        Some(([(left + right) / 2.0, (top + bottom) / 2.0, right - left, top - bottom], help_y, hint_y))
     }
 }
 

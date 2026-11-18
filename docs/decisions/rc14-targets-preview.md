@@ -6,6 +6,11 @@ Test-run footage from Eden, 2026-11-14. Untested on hardware.
 
 The practice-game notice now sits in a band at the top.
 
+**Superseded 2026-11-17 (rc15/notice-compact):** every notice, the practice games' included, is now one compact
+box sized to its text, at the top left (16 px from the left and 8 px from the top at 1280 × 720). It wraps before it
+reaches the frame strip, and it stacks under the Break the Targets chip while that shows. The top band and the centred
+plates are gone. The box is still at the top, so the targets keep the middle of the screen.
+
 **Break the Targets, saved layouts (new):** on Battlefield, three targets are placed, and ZL + Down saves them as
 Layout 1. Y twice clears the stage. A second course is placed higher and saved as Layout 2. ZL + Right steps to the
 other layout, and ZL + Up loads Layout 1: its three targets are back where the first course was.

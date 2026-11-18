@@ -158,6 +158,8 @@ pub enum Editor {
     Layouts,
     /// Stage tech: close into the surface-snapping placing view.
     TechPoint,
+    /// Stage tech: close into the guided exercise draft.
+    TechWizard,
 }
 
 /// A read-only row.
@@ -234,7 +236,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 128] = [
+pub static ROWS: [Row; 130] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -470,6 +472,8 @@ pub static ROWS: [Row; 128] = [
       "This stage's saved layouts, the five used last first.\nPlacing: ZL + Left/Right picks, ZL + Down saves, ZL + Up loads."),
     r(GAMES, "Tech practice", "tech_practice", Control::Dropdown(&o::TECH_SESSION),
       "Practice techs at a chosen or random stage surface.\nStarts when the menu closes; Auto aim is approximate."),
+    r(GAMES, "Tech wizard", "tech_wizard", Control::Editor(Editor::TechWizard),
+      "Choose a spot, angle, start distance and hit.\nBack edits each step; preview before starting."),
     r(TECH, "Surface", "tech_surface", Control::Dropdown(&o::TECH_SURFACE),
       "Pick a random floor, wall or underside, or use your point.\nAny chooses among the available surface kinds."),
     r(TECH, "Tech point", "tech_point", Control::Editor(Editor::TechPoint),
@@ -510,6 +514,8 @@ pub static ROWS: [Row; 128] = [
       "Wait 10 to 90 frames, default 30.\nPlayer 1 is held at the start during the delay."),
     r(TECH, "Camera", "tech_camera", Control::Dropdown(&o::TECH_CAMERA),
       "Follow the attempt or frame the whole stage.\nWhole stage uses the target placing camera."),
+    r(TECH, "Skip wizard preview", "tech_wizard_skip", TOGGLE,
+      "On: A after Hit starts immediately.\nOff: review the candidate preview before starting."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

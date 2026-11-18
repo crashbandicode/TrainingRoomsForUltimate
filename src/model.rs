@@ -49,6 +49,8 @@ pub mod guard;
 pub mod own_patches;
 #[path = "model/hook_stats.rs"]
 pub mod hook_stats;
+#[path = "model/kirby_copy_pair.rs"]
+pub mod kirby_copy_pair;
 #[path = "model/input_adapter.rs"]
 pub mod input_adapter;
 #[path = "model/input_pending.rs"]
@@ -249,6 +251,8 @@ pub mod settings_request;
 
 #[path = "model/boot_notices.rs"]
 pub mod boot_notices;
+#[path = "model/notice_box.rs"]
+pub mod notice_box;
 
 /// S0 direct-launch reference; native fidelity is still an explicit DIAG acceptance gate.
 #[path = "model/tech_launch.rs"]

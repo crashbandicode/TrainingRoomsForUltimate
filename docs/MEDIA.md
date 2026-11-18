@@ -4,6 +4,25 @@ Every GIF in [`media/`](media) is actual Eden footage: whole screen, 1280×720, 
 game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
+## rc.15 Stage tech practice (2026-11-17)
+
+`media/rc15-stage-tech.gif` shows the crosshair on a floor spot, the launch, shield input on the frame strip,
+then "Perfect · timing unavailable · In place · 1/10 · streak 1". It is embedded in
+[Fighters & Stages](menu/fighters-and-stages.md#stage-tech-practice).
+
+- **Run/build:** `rc15-tech-ui-55b20f59-reset-v2-boot1`, rc.15 `55b20f59`; Eden, untested on hardware.
+- **Size:** 1280×720, 22 frames, 3.32 s, 4,396,682 bytes.
+- **Source:** the same native-resolution take as `tech-full-loop-55b20f59-v2-final.gif`,
+  `out-presentation-floor-stream/presentation-native-source/tech-full-loop-v2-native-source.gif`, 0–1.82 s.
+- **Edits:** final captured frame held an extra 1.5 s for reading; no crop, scaling or interior cuts.
+  Every decoded frame matches the source; start, action and result were visually checked.
+- **Source SHA256:** `778600bfe736b174d47d8c21a5a45b41f8e6ef92c937b592113480da98028918`.
+- **Docs GIF SHA256:** `a9b2ce87a670e7ab0e00502b76e07ddb8ba2e5dd884acdc9aae59e27715a6e6f`.
+
+The smaller evidence GIF was not enlarged. The raw take and review receipt stay outside git with the run.
+This shared preview does not show the session-choice list, Random surface selection, variable edits,
+Set / Random / Auto changes or the completed summary; dedicated per-option clips remain a capture gap.
+
 Since 2026-11-13 the README shows one GIF per menu page; the [menu docs](menu/) and [guides](guide/) embed the rest.
 The "Embedded in" column of the older sections records where a clip was placed when it was made.
 

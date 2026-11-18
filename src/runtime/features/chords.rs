@@ -3,8 +3,8 @@
 //! `model::ini_files`.
 //!
 //! Detection runs once per P1 poll, before the input delay (so a chord is never delayed), on the
-//! controller the game maps, read through the pointer the poll hook passes. The Plus bits are cleared
-//! only for a modal owner or an accepted Plus shortcut (SPEC-input-04 §4).
+//! controller the game maps, read through the pointer the poll hook passes. Consumed Plus edges
+//! stay cleared for the native pause query after mapping (SPEC-input-04 §4).
 //!
 //! NOT YET SWITCH-RUN.
 
@@ -67,6 +67,7 @@ pub unsafe fn on_poll(controller: usize) {
     let sample = Sample::of(style, read(field::CURRENT_BUTTONS), read(field::JUST_DOWN))
         .with_overlay(crate::runtime::deluxe_overlay::rows_page_visible());
     let modal = published::input_owners().contains(Owners::MENU) || recorder::replay_editor_occupied();
+    let wizard = super::tech::wizard_active();
     let accepted = {
         let mut state = STATE.lock();
         // A newly published value and the INI shortcuts (atomics) are adopted here, on the game's poll (stream/sync: no other
@@ -79,7 +80,7 @@ pub unsafe fn on_poll(controller: usize) {
         state.style = style;
         let block = blocked();
         let State { chords: set, detector, .. } = &mut *state;
-        let passed = detector.poll(set, sample, block);
+        let passed = detector.poll_owned(set, sample, block, wizard);
         // Break the Targets: while Placing the Save and Load chords are the layout's and the other chords stand down.
         let keys = (!block && btt::placing()).then(|| detector.take_placing());
         // rc.8: the game speed hold's event and the input display toggle are acted on once `STATE` is released.
@@ -95,13 +96,13 @@ pub unsafe fn on_poll(controller: usize) {
         }
         #[cfg(not(feature = "diag"))]
         let _ = passed;
-        (!block && chords::plus_shortcut_accepted(set, sample), chords::physical_mask(style, detector.hidden()), hold, display, refused, keys, block)
+        (!block && !wizard && chords::plus_shortcut_accepted(set, sample), chords::physical_mask(style, detector.hidden()), hold, display, refused, keys, block)
     };
     let (accepted, chord_bits, hold, display, refused, keys, block) = accepted;
     // Placing keeps all of P1's controller from the game (the cursor has it); Ready waits for its first input.
     // SAFETY: controller is the live Controller of this poll.
     let hide = !block && unsafe { super::tech::poll(controller, sample) || btt::poll(controller, sample, keys) };
-    let chord_bits = if hide { !chords::bit::PLUS_MASK } else { chord_bits };
+    let chord_bits = chord_bits | if hide && wizard { u32::MAX } else if hide { !chords::bit::PLUS_MASK } else { 0 };
     // rc.12: a Save or Load press the chords stood down says why (an owner or the speed hold: logged only).
     if let Some((action, why)) = refused {
         crate::runtime::features::notices::save_state_refused(action, why);
@@ -111,20 +112,18 @@ pub unsafe fn on_poll(controller: usize) {
     if display {
         crate::runtime::ui::worker::request_input_display_toggle();
     }
-    if chords::clear_plus_bits(modal, accepted) {
-        for offset in FIELDS {
-            let at = (controller + offset) as *mut u32;
-            at.write_volatile(at.read_volatile() & !chords::bit::PLUS_MASK);
-        }
+    for &offset in chords::persistent_plus_fields(modal, accepted, chord_bits) {
+        let at = (controller + offset) as *mut u32;
+        at.write_volatile(at.read_volatile() & !chords::bit::PLUS_MASK);
     }
     // A chord's buttons do not reach the game while they are held (the Play chord's ZR was a 10-frame shield): they are
     // cleared for this mapping call only and put back when it returns (`after_mapping`), so the controller's own
-    // previous/just-down bookkeeping, which the menu and the next poll read, is not changed.
+    // held-state bookkeeping, which the menu and the next poll read, stays intact for retained chords.
     if chord_bits != 0 {
         let kept = HIDDEN_FIELDS.map(|offset| ((controller + offset) as *const u32).read_volatile());
         for (i, (offset, value)) in HIDDEN_FIELDS.into_iter().zip(kept).enumerate() {
             // The four button sets lose the hidden buttons; the sticks go to 0.0 (centred) only when all of it is hidden.
-            let hidden = if i < FIELDS.len() { value & !chord_bits } else if hide { 0 } else { value };
+            let hidden = if i < field::BUTTONS.len() { value & !chord_bits } else if hide { 0 } else { value };
             ((controller + offset) as *mut u32).write_volatile(hidden);
         }
         *HIDDEN.lock() = Some((controller, kept));
@@ -134,11 +133,9 @@ pub unsafe fn on_poll(controller: usize) {
 /// The controller fields `on_poll` changed for the mapping call, to put back when it returns.
 static HIDDEN: Mutex<Option<(usize, [u32; 8])>> = Mutex::new(None);
 
-/// The controller's four button sets.
-const FIELDS: [usize; 4] = [field::CURRENT_BUTTONS, field::PREVIOUS_BUTTONS, field::JUST_DOWN, field::JUST_RELEASE];
 /// The button sets and the four stick axes on_poll may change for the mapping call.
 const HIDDEN_FIELDS: [usize; 8] = {
-    let [b, s] = [FIELDS, field::STICKS];
+    let [b, s] = [field::BUTTONS, field::STICKS];
     [b[0], b[1], b[2], b[3], s[0], s[1], s[2], s[3]]
 };
 

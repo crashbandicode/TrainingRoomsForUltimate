@@ -1785,39 +1785,79 @@ approved_by = "Primary 2026-11-17 tr-fix-devin brief approves the +12 for CPU-OO
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 155743
+ceiling = 155376
 date = "2026-11-17"
-reason = "State export v1 for the test-only hardware bridge (rc15/hw-bridge-export from 458c0636): +515 over 155228. The export table and its wait-free line ring (model::state_export, runtime::export), the settings apply moved out of the diag reload into one release path, and the CPU, notice, menu and save-state oracle sites that were cfg(diag) now formatted when a bridge subscribes (one relaxed load otherwise). No behaviour change without a bridge. FOR OPERATOR REVIEW."
-approved_by = "Primary 2026-11-17 bridge-devin brief (operator 19:42Z/19:55Z: slice 1 and 2 together, export table approved 14:07Z) orders the export; size delta reported for review. FOR OPERATOR REVIEW."
+reason = "Compact notice box and content-sized dialogs (rc15/notice-compact, review 2 R2 fixed) rebased onto main 458c0636 (155228): composed measured 155376 = +148, within the approved +150 for the notice part. Recording pop-up box spans its key caps, row bands and CONNECTIONS divider; the help rule hides under dialogs. Exact total, no headroom. Counting and gates unchanged."
+approved_by = "Primary 14:11Z and 17:54Z (notice-ui-devin-opus): the +150 approval stands for the notice part, FOR OPERATOR REVIEW."
 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 155795
-date = "2026-11-18"
-reason = "State export v2, the Astra review fixes (rc15/hw-bridge-export): +52 over the v1 entry 155743, +567 in all over 155228. Owned ring slots with a compare-and-swap state and drop-on-busy producers (finding 1), the settings request refused before any side effect (model::settings_request, finding 2), and no snapshot kept without a subscriber (finding 6). Measured on the Yoga gate 626d664e. FOR OPERATOR REVIEW."
-approved_by = "Primary 2026-11-17 22:37Z brief: size stays approved at about +515, any change reported; this +52 is reported for review. FOR OPERATOR REVIEW."
+ceiling = 155392
+date = "2026-11-17"
+reason = "Lobby strip clear stacked on notice-compact 92d666f5 (155376): composed measured 155392 = +16, within the approved +30. Exact total, no headroom. Counting and gates unchanged."
+approved_by = "Primary 17:48Z (notice-ui-devin-opus, lobby strip-clear): up to +30, FOR OPERATOR REVIEW."
 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 155874
-date = "2026-11-18"
-reason = "State export v2, the tr-review-astra-2 preliminary finding 1 (rc15/hw-bridge-export): +79 over 155795, +646 in all over 155228. REQ_SETTLED (pending Save/Load, writer handoff, slot writer, ini writer and bound-save writes) and REQ_RELOAD_SAVES (the writer's copy and the live slots follow a restored slot file), so the bridge's fixture restore can't be undone by a deferred write. Measured on the Surface gate d4b0b8fc. FOR OPERATOR REVIEW."
-approved_by = "Primary 2026-11-18 00:29Z brief orders the fix; size change reported for review. FOR OPERATOR REVIEW."
+ceiling = 155400
+date = "2026-11-17"
+reason = "Delay and Chord Entry as content-sized dialogs on main b22480f2 (notice+strip, 155392): measured 155400 = +8, the primary-approved +8. Exact total, no headroom. Counting and gates unchanged."
+approved_by = "Primary 20:56Z and 21:05Z (notice-ui-devin-opus): +8 for Delay and Chord Entry, FOR OPERATOR REVIEW."
 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 155922
-date = "2026-11-18"
-reason = "State export v2, tr-review-astra-2 follow-up on 4ac6a3f (rc15/hw-bridge-export): +48 over 155874, +694 in all over 155228. SAVE_IN_FLIGHT (a Save until every marked body captured, Machine::save_marked), WRITING before DIRTY, BOUND_WRITING around the bound-save write, and REQ_SETTINGS_MATCH (the live-settings readback), so a restore can't report success before a deferred Save lands or without its live settings. Measured on the Surface gate fab7e927. FOR OPERATOR REVIEW."
-approved_by = "Primary 2026-11-18 01:46Z brief orders the fix; size change reported for review. FOR OPERATOR REVIEW."
+ceiling = 155446
+date = "2026-11-17"
+reason = "SOL-R23 Kirby hat copy precondition (rc15/kirby-hat-copy-ready e9b7f682): the hat request reads the native per-kind hat pair copy_setup uses (model::kirby_copy_pair, read-only) and waits without it, so a released pair no longer crashes (main+0x491e20, execute at 0). Measured 155274 on 458c0636 (155228, +46); rebased onto main 56923ec9 (155400): composed measured 155446 = the same +46. Already compacted from +110. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "devin-primary 22:40Z, operator review pending."
 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 155928
+ceiling = 155718
+date = "2026-11-17"
+reason = "Free-form Tech wizard including stale-reset entry fix measured155718: +502 over timing155216, one below the approved +503. Exact measured total with no headroom. Shared picker marks, menu motion, planner and notice writer; one ordered step table. Counting, guards and gate enforcement unchanged."
+approved_by = "Operator explicitly approved: approve the +503 for the wizard; relayed by primary2026-11-17 16:52Z. Primary18:51Z directs the lifecycle fix within that approval; final ceiling is reduced to the measured155718, no headroom."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155907
+date = "2026-11-17"
+reason = "Free-form Tech wizard, stale-reset and Plus-ownership fixes rebased onto reviewed compact notices and lobby strip (b22480f2, 155392). Preserving raw Plus hold state reduces the measured total to 155907, wizard +515. No headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "Operator 16:52Z approved wizard +503. Devin-primary 21:06Z approved the additional +13 FOR OPERATOR REVIEW. The separately approved notice and lobby strip budgets are included in main's 155392."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155961
 date = "2026-11-18"
-reason = "State export v2, tr-review-astra-2 v2r finding 1 (rc15/hw-bridge-export): +6 over 155922, +700 in all over 155228. The rr_host write_saved_with seam (production write_saved runs through it) and pair_settled, so a regression can hold the bound-save worker after it took its pair. Measured on the Yoga gate da1fe099. FOR OPERATOR REVIEW."
-approved_by = "Primary 2026-11-18 08:07Z brief orders the regression; size change reported for review. FOR OPERATOR REVIEW."
+reason = "Rebase the reviewed Tech wizard (41ce6dad, +515) onto the reviewed Kirby hat fix (d7f2e656, 155446 = 155400 + 46). The integrated ceiling is 155961, the sum of the exact approved counts. No headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "Operator approved wizard +503 at 16:52Z; devin-primary approved up to +13 more at 21:06Z and the final +515 integration at 03:36Z on 2026-11-18. Kirby +46 approved by devin-primary at 22:40Z, with both budget entries retained."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156006
+date = "2026-11-18"
+reason = "Bounded install and failure events with shared log rotation (rc15/bounded-events-log, raw diff +263/-19) rebased onto main 2322fae9 (155961): measured 156006 = +45 counted lines. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "Operator approved the bounded events log and its additional lines at 04:25Z on 2026-11-18 (devin-primary 04:30Z brief)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156023
+date = "2026-11-18"
+reason = "Bounded events log made hook-safe (devin-primary 05:16Z GO): append_event_at uses try_lock on EVENTS, drops a contended line and reports it once as dropped N events. 156006 + 17 = 156023 (+62 counted over main 2322fae9). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "Operator approved the bounded events log and its additional lines at 04:25Z; devin-primary 05:16Z: a small delta for the hook-safe fix is fine."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156723
+date = "2026-11-18"
+reason = "State export for the test-only hardware bridge (rc15/hw-bridge-export a9537c89, +700 over its base 458c0636: v1 +515, ring/settings +52, settle/reload +79, restore barriers +48, bound-writer seam +6) merged onto main c212bc50 (156023): composed measured 156723. Bridge v3b PASS (tr-review-astra-3 14:31Z) and the hardware smoke PASS (15:16Z). Exact total, no headroom. Counting and gates unchanged."
+approved_by = "Operator approved the bridge TR +700 and the state-export-invalid-settings restriction (11:28Z, recorded by tr-review-astra-2/3); primary c07b3449 15:28Z orders the merge onto local main."

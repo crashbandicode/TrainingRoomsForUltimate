@@ -7,8 +7,10 @@ local play: hitboxes, save states, recordings, combo drills, game speed and more
 install it and what is known not to work are on that page. New here? Start with [Getting started](docs/guide/getting-started.md). Something not
 working? See [Troubleshooting](docs/guide/troubleshooting.md).
 
-![The menu's five pages, then Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked, both fighters' hurtboxes as yellow pills and a neutral air's red hitbox](docs/media/rc14-menu-tour.gif)<br>
-*The menu's five pages, then Hitbox Visualization: A ticks Hitboxes, Grab boxes and Hurtboxes, and both fighters are drawn as yellow pills. Eden, rc.14 (untested on hardware).*
+![The menu's five pages, then Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked, both fighters' hurtbox pills and a neutral air's red hitbox](docs/media/rc14-menu-tour.gif)<br>
+*The menu's five pages, then Hitbox Visualization: A ticks Hitboxes, Grab boxes and Hurtboxes, and both fighters are drawn as hurtbox pills (yellow in this clip; grey in the current colours). Eden, rc.14 (untested on hardware).*
+
+[Stage tech practice](docs/menu/fighters-and-stages.md#stage-tech-practice): pick a spot and practise techs with launch settings, grades and sessions.
 
 Every option is documented in the [docs](docs/README.md), one page per menu page.
 
@@ -121,26 +123,26 @@ All the options: [the Fighters & Stages page](docs/menu/fighters-and-stages.md).
 
 ### Display & Controls
 
-See attack, hurt and grab boxes: in **Display & Controls → Hitbox Visualization**, tick Hitboxes, Grab boxes and Hurtboxes.
+See attack, hurt and grab boxes: in **Display & Controls → Hitbox Visualization**, tick Hitboxes, Grab boxes and Hurtboxes. There is one colour scheme: attacks red (the strongest part) and pink (weaker or later parts), grabs purple, normal hurtboxes grey, hurtboxes that can't be hit yellow, hurtboxes that take no damage green, windboxes sky blue, wind areas olive, and launch and wind directions white.
 
-![Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked: the yellow hurtbox pills, then at 1/4 speed a neutral air's red hitbox](docs/media/rc14-hitbox.gif)<br>
-*Hitboxes, Grab boxes and Hurtboxes ticked: the hurtboxes are yellow pills, and at 1/4 speed Mario's neutral air shows its red hitbox. Eden, rc.14 (untested on hardware).*
+![Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked: the hurtbox pills, then at 1/4 speed a neutral air's red hitbox](docs/media/rc14-hitbox.gif)<br>
+*Hitboxes, Grab boxes and Hurtboxes ticked: the hurtbox pills, and at 1/4 speed Mario's neutral air shows its red hitbox. This rc.14 clip predates the current colours: its normal hurtboxes are yellow, which are grey now. Eden, rc.14 (untested on hardware).*
 
 See where summoned objects and items can be hit: **Display & Controls → Hitbox Visualization → Article hurtboxes**, then **A** ticks it.
 
-![Olimar's Pikmin without hurtboxes, with yellow hurtbox pills, with status colours, then without](docs/media/rc15-article-hurtboxes.gif)<br>
-*Article hurtboxes Off → yellow pills → status colours → Off. Eden, 2026-11-15, rc.15 `6def8553`; Pikmin shown.*
+![Olimar's Pikmin without hurtboxes, with hurtbox pills, with status colours, then without](docs/media/rc15-article-hurtboxes.gif)<br>
+*Article hurtboxes Off → hurtbox pills → status colours → Off. This earlier rc.15 clip draws normal pills yellow; the current colours are grey for normal, yellow for can't be hit and green for no damage. Eden, 2026-11-15, rc.15 `6def8553`; Pikmin shown.*
 
 Read what each colour means beside the checklist: press **A** on **Hitbox Visualization** to see the **Colour legend** for what you ticked.
 
 ![The Hitbox Visualization checklist beside its labelled colour swatches](docs/media/rc15-colour-legend-normal.png)<br>
 *Earlier two-scheme build, before the single-palette update; [the Frame data colours view](docs/media/rc15-colour-legend-frame-data.png). Eden, 2026-11-15, rc.15 `35268287`. Stills only; no legend GIF yet.*
 
-The grab boxes are magenta:
+The grab boxes are purple:
 
-![At 1/4 speed, the magenta grab boxes of Mario's grab, Samus's tether and Olimar's Pikmin; each grabber keeps its yellow hurtboxes](docs/media/rc13-grab-boxes.gif)<br>*Grab boxes in magenta. Eden, rc.13 (untested on hardware).*
+![At 1/4 speed, the grab boxes of Mario's grab, Samus's tether and Olimar's Pikmin; each grabber keeps its hurtboxes](docs/media/rc13-grab-boxes.gif)<br>*Grab boxes, purple in the current colours; this rc.13 clip predates them and shows magenta grab boxes and yellow hurtboxes. Eden, rc.13 (untested on hardware).*
 
-Tick **Windboxes** to see the pushes that cause no hitstun, such as F.L.U.D.D.'s water, in deep blue.
+Tick **Windboxes** to see the pushes that cause no hitstun, such as F.L.U.D.D.'s water, in sky blue; their wind areas are olive.
 
 <!-- CAPTURE-REQUEST hb-legend-v03 (README clip): the windbox clip described under hb-legend-v03 in docs/menu/display-and-controls.md, F.L.U.D.D. then Ganondorf's up tilt, one short clip with a one-line caption. -->
 
@@ -153,8 +155,8 @@ All the options: [the Display & Controls page](docs/menu/display-and-controls.md
 Practise while you wait for an online or local match: turn on **Fighters & Stages → Lobby Practice** first (it's Off at
 first), then open the room menu with **B + D-pad Up**.
 
-![In a local wireless waiting room: Display & Controls, Hitbox Visualization 0 of 6, its checklist with Hurtboxes ticked (1 of 6), and both practice fighters drawn as yellow pills with the Waiting and Ready signs still on screen](docs/media/rc14-waiting-menu.gif)<br>
-*The menu in a waiting room (B + D-pad Up): Hitbox Visualization with Hurtboxes ticked draws both practice fighters as yellow pills. The first second, the CPU page, is a separate recording cut in before Display & Controls. Eden, rc.14 (untested on hardware).*
+![In a local wireless waiting room: Display & Controls, Hitbox Visualization 0 of 6, its checklist with Hurtboxes ticked (1 of 6), and both practice fighters drawn as hurtbox pills with the Waiting and Ready signs still on screen](docs/media/rc14-waiting-menu.gif)<br>
+*The menu in a waiting room (B + D-pad Up): Hitbox Visualization with Hurtboxes ticked draws both practice fighters as hurtbox pills (yellow in this clip; grey in the current colours). The first second, the CPU page, is a separate recording cut in before Display & Controls. Eden, rc.14 (untested on hardware).*
 
 More: [the waiting rooms guide](docs/guide/waiting-rooms.md).
 

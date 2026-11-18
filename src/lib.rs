@@ -110,3 +110,7 @@ mod kirby_hat_cpu_tests;
 
 #[cfg(test)]
 mod numbered_picker_tests;
+
+#[cfg(test)]
+#[path = "runtime/log_file.rs"]
+mod log_file_tests;

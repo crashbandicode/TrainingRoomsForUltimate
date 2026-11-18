@@ -4,9 +4,6 @@
 //!
 //! Part of the Switch build.
 
-use std::fs::OpenOptions;
-use std::io::Write as _;
-
 use crate::install_capacity::INSTALL_LINE_CAPACITY;
 use crate::model::install_line::{render_into, InstallLine};
 use crate::model::storage;
@@ -22,8 +19,5 @@ pub fn write(line: &InstallLine<'_>) {
 /// `common` script module install when that module loads).
 pub fn write_text(text: &str) {
     skyline::logging::log(text);
-    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(storage::EVENTS_LOG_PATH) {
-        let _ = writeln!(file, "{text}");
-        let _ = file.sync_data();
-    }
+    let _ = super::log_file::append_event_at(storage::EVENTS_LOG_PATH, format_args!("{text}"), true);
 }

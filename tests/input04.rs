@@ -198,16 +198,16 @@ fn plus_passthrough_and_suppression() {
     d.poll(&set, plus, false);
     assert!(!d.is_pending(Request::OpenMenu));
     assert!(!plus_shortcut_accepted(&set, plus));
-    assert!(!clear_plus_bits(false, false));
+    assert!(persistent_plus_fields(false, false, 0).is_empty());
     // An explicit Plus shortcut consumes its pause press.
     let mut with_plus = set;
     with_plus.shortcuts = with_plus.shortcuts.with_slot(1, c(&[logical::PLUS]));
     assert!(plus_shortcut_accepted(&with_plus, plus));
     d.poll(&with_plus, plus, false);
     assert!(d.is_pending(Request::OpenMenu));
-    assert!(clear_plus_bits(false, true));
+    assert_eq!(persistent_plus_fields(false, true, 0), field::BUTTONS);
     // A modal owner clears the Plus bits.
-    assert!(clear_plus_bits(true, false));
+    assert_eq!(persistent_plus_fields(true, false, 0), field::BUTTONS);
 }
 
 #[test]
@@ -442,4 +442,86 @@ fn the_button_set_reads_the_dpad_and_both_sticks_digital_directions() {
     assert_eq!([bit::R_UP, bit::R_RIGHT, bit::R_DOWN, bit::R_LEFT], [1 << 24, 1 << 25, 1 << 26, 1 << 27]);
     assert!(Buttons(bit::REAL_DIGITAL_L).real_digital_l() && !Buttons(bit::REAL_DIGITAL_L).real_digital_r());
     assert!(!Buttons(0).l_left());
+}
+
+/// b669 loop3: the consumed wizard Start reached native Training pause on a later poll.
+#[test]
+fn wizard_plus_held_across_handoff_is_owned_until_release() {
+    let set = ChordSet::factory();
+    for style in [0, 3, 5, STYLE_GAMECUBE] {
+        let plus = physical_mask(style, 1 << logical::PLUS);
+        let mut detector = Detector::new();
+        let pressed = Sample::of(style, plus, plus);
+        detector.poll_owned(&set, pressed, false, true);
+        assert_ne!(physical_mask(style, detector.hidden()) & plus, 0, "Start poll");
+        for blocked in [false, true, false] {
+            detector.poll_owned(&set, Sample::of(style, plus, 0), blocked, false);
+            assert_ne!(physical_mask(style, detector.hidden()) & plus, 0, "held after wizard exits");
+        }
+        detector.poll_owned(&set, Sample::of(style, 0, 0), false, false);
+        assert_ne!(physical_mask(style, detector.hidden()) & plus, 0, "release edge belongs to wizard");
+        detector.poll_owned(&set, pressed, false, false);
+        assert_eq!(physical_mask(style, detector.hidden()) & plus, 0, "fresh Plus reaches native");
+    }
+}
+
+#[test]
+fn wizard_ownership_is_bound_before_native_mapping_and_combined_with_placing() {
+    let runtime = include_str!("../src/runtime/features/chords.rs");
+    assert!(runtime.contains("detector.poll_owned(set, sample, block, wizard)"));
+    assert!(runtime.contains("let chord_bits = chord_bits | if hide && wizard"), "placing must preserve retained Plus ownership");
+    assert!(runtime.contains("chords::persistent_plus_fields(modal, accepted, chord_bits)"), "later native UI must not see a restored consumed Plus");
+    let boundary = include_str!("../src/runtime/features/input_delay.rs");
+    assert!(boundary.find("chords::on_poll(controller)").unwrap() < boundary.find("pub unsafe fn caller_a_note").unwrap());
+    assert!(boundary.contains("chords::after_mapping()"));
+}
+
+/// ccc994bd, R01 take 6 (notice #1405, pause #1406). The trace repro showed
+/// two inactive-wizard P1 polls on the same controller before slot 0 accepted Plus.
+#[test]
+fn sixth_wizard_take_does_not_recreate_the_consumed_plus_edge() {
+    let chords = ChordSet::factory();
+    let mut detector = Detector::new();
+    let style = 5;
+    let plus = physical_mask(style, 1 << logical::PLUS);
+    let mut raw = [0u32; 0x90 / 4];
+    let current = field::CURRENT_BUTTONS / 4;
+    let previous = field::PREVIOUS_BUTTONS / 4;
+    let pressed = field::JUST_DOWN / 4;
+    let mut poll = |raw: &mut [u32], wizard| {
+        detector.poll_owned(&chords, Sample::of(style, raw[current], raw[pressed]), false, wizard);
+        let hidden = if wizard { u32::MAX } else { physical_mask(style, detector.hidden()) };
+        for &offset in persistent_plus_fields(false, false, hidden) {
+            raw[offset / 4] &= !plus;
+        }
+        hidden
+    };
+    let pause = |raw: &[u32]| raw[current] & raw[pressed] & plus != 0;
+    for take in 1..=6 {
+        poll(&mut raw, true);
+        if take < 6 {
+            poll(&mut raw, false);
+            assert!(!pause(&raw));
+            continue;
+        }
+        raw[current] = plus;
+        raw[pressed] = plus;
+        poll(&mut raw, true); // Preview Plus commits Start.
+        let refresh_held = |raw: &mut [u32]| {
+            raw[previous] = raw[current];
+            raw[current] = plus;
+            raw[pressed] = raw[current] & !raw[previous];
+        };
+        assert_ne!(poll(&mut raw, false) & plus, 0, "first post-Start P1 poll");
+        assert!(!pause(&raw));
+        poll(&mut raw, false); // Same controller reused before the next HID refresh.
+        refresh_held(&mut raw);
+        assert!(!pause(&raw), "held Start must not generate another native edge");
+        raw[current] = 0; // Physical release.
+        raw[pressed] = 0;
+        poll(&mut raw, false);
+        refresh_held(&mut raw);
+        assert_eq!(poll(&mut raw, false) & plus, 0);
+        assert!(pause(&raw), "a fresh Plus after release must reach native");
+    }
 }
