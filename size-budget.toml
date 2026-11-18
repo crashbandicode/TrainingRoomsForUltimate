@@ -1829,3 +1829,11 @@ ceiling = 155907
 date = "2026-11-17"
 reason = "Free-form Tech wizard, stale-reset and Plus-ownership fixes rebased onto reviewed compact notices and lobby strip (b22480f2, 155392). Preserving raw Plus hold state reduces the measured total to 155907, wizard +515. No headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
 approved_by = "Operator 16:52Z approved wizard +503. Devin-primary 21:06Z approved the additional +13 FOR OPERATOR REVIEW. The separately approved notice and lobby strip budgets are included in main's 155392."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155961
+date = "2026-11-18"
+reason = "Rebase the reviewed Tech wizard (41ce6dad, +515) onto the reviewed Kirby hat fix (d7f2e656, 155446 = 155400 + 46). The integrated ceiling is 155961, the sum of the exact approved counts. No headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "Operator approved wizard +503 at 16:52Z; devin-primary approved up to +13 more at 21:06Z and the final +515 integration at 03:36Z on 2026-11-18. Kirby +46 approved by devin-primary at 22:40Z, with both budget entries retained."
