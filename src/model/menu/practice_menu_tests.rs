@@ -320,7 +320,7 @@ fn sub_screen_keys_match_the_page() {
     m.press(Button::Right);
     assert_eq!(m.get("eggsercise_break"), &[0, 1, 0]);
     let f = frame(&m);
-    assert_eq!(f.help[0].string_lossy(), "Which of your hits break a target. Projectiles never do.");
+    assert_eq!(f.help[0].string_lossy(), "Which of your hits break a target, projectiles included.");
     assert_eq!(f.rows[2].value.string_lossy(), "<  Aerials  >");
     m.press(Button::Y);
     assert_eq!(m.get("eggsercise_break"), &[1, 0, 0]);
