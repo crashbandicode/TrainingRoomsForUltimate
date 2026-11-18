@@ -6,7 +6,6 @@ use std::{
 mod model {
     pub mod sites_pkg3 { // TROLLEY_SITES
     }
-    pub mod hitbox { pub const SLOTS: i32 = 8; }
     pub mod sites_hitbox { // EGG_HITBOX_SITES
     }
     pub mod sites_pkg2 { pub const STATUS_KIND_OFFSET: usize = 0x208_7720; pub const WORK_IS_FLAG_OFFSET: usize = 0x208dc80; pub const WORK_GET_INT_OFFSET: usize = 0x208dbc0; }
@@ -311,7 +310,8 @@ mod natives {
     }
     pub fn attack_is_attack(accessor: usize, slot: i32) -> bool {
         assert_eq!(accessor, 0x200);
-        slot == 7 && super::EGG_WEAPON_ATTACK.load(super::Ordering::Relaxed)
+        assert!((0..7).contains(&slot));
+        slot == 6 && super::EGG_WEAPON_ATTACK.load(super::Ordering::Relaxed)
     }
     pub fn status_kind(accessor: usize) -> i32 {
         if accessor == 0x200 {

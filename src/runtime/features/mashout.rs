@@ -583,7 +583,7 @@ unsafe fn trail_blizzard_closed(cpu: usize) -> Result<bool, ()> {
 /// alone does not prove its last hit ran. N2 MAIN clears SPITED (Yoshi
 /// +0x11560) and the SPIT helper sets it after the absolute hit (+0x28650).
 unsafe fn egg_provider_closed(cpu: usize, spat: &mut bool, shell: &mut Option<u32>, finished: bool) -> Result<bool, &'static str> {
-    use crate::model::{hitbox, sites_hitbox, sites_pkg2, sites_pkg3};
+    use crate::model::{sites_hitbox, sites_pkg2, sites_pkg3};
     if ![
         sites_pkg2::STATUS_KIND_OFFSET,
         sites_pkg2::WORK_IS_FLAG_OFFSET,
@@ -647,7 +647,11 @@ unsafe fn egg_provider_closed(cpu: usize, spat: &mut bool, shell: &mut Option<u3
         if accessor == 0 {
             return Err(UNAVAILABLE_NOTICE);
         }
-        if natives::status_kind(accessor) != spit || (0..hitbox::SLOTS).any(|slot| natives::attack_is_attack(accessor, slot)) {
+        // The stock weapon initializer reserves seven normal attack
+        // records. The native is_attack dispatch does not bound its index.
+        if natives::status_kind(accessor) != spit
+            || (0..7).any(|slot| natives::attack_is_attack(accessor, slot))
+        {
             // restriction: MASH-M1-MISMATCH
             return Err("Native tick mismatch · no grade");
         }
@@ -1620,7 +1624,8 @@ pub unsafe fn frame(fighter: usize) {
                 ));
             }
             if egg {
-                match egg_provider_closed(cpu, &mut game.egg_spat, &mut game.egg_shell, clock.exhausted()) {
+                let Game { egg_spat, egg_shell, .. } = &mut *game;
+                match egg_provider_closed(cpu, egg_spat, egg_shell, clock.exhausted()) {
                     Ok(true) => {
                         #[cfg(feature = "diag")]
                         crate::runtime::diag_log::enqueue_diagnostic(format_args!(
