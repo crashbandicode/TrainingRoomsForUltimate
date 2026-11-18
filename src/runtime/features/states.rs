@@ -1237,6 +1237,7 @@ pub fn frame(fighter: usize) {
     if !ACTIVE.load(Ordering::Acquire) || !ensure_consts() {
         return;
     }
+    adopt_reload();
     // SAFETY: `fighter` is the object the game passed to its on-frame function.
     unsafe { on_fighter_frame(fighter) };
 }
@@ -1632,6 +1633,50 @@ pub fn load_file() -> SaveFile {
 /// The writer thread's own copy of the save file (stream/sync, lead decision (a)): the file boot loaded, plus every record a Save
 /// captured, applied in capture order. Taken by boot and the writer thread only; the game's hooks never wait on it.
 static WRITER_FILE: Mutex<Option<SaveFile>> = Mutex::new(None);
+/// The writer is between taking the captures and finishing the file.
+static WRITING: AtomicBool = AtomicBool::new(false);
+
+/// The bridge's fixture restore (state export): the slots of the file as restored on disk, built on the plugin thread; the
+/// next practice frame swaps them in (`adopt_reload`, no allocation in the hook).
+struct Reload {
+    machine: Machine,
+    saved_miis: [[Option<Configuration>; 5]; 2],
+}
+static RELOAD: Mutex<Option<Reload>> = Mutex::new(None);
+static RELOAD_DUE: AtomicBool = AtomicBool::new(false);
+
+/// Nothing accepted is still on its way to the slot file: no Save or Load waiting for its frame, no capture waiting for the
+/// writer, the writer not writing, no restored file waiting for its frame.
+pub fn settled() -> bool {
+    [&SAVE_REQUEST, &LOAD_REQUEST, &DIRTY, &WRITING, &RELOAD_DUE].iter().all(|flag| !flag.load(Ordering::Acquire))
+        && HANDOFF_STATE.iter().all(|cell| cell.load(Ordering::Acquire) == SLOT_EMPTY)
+}
+
+/// The slot file was restored on disk (plugin thread): the writer's copy and, at the next practice frame, the live slots
+/// follow it, so a later Save can't write the session's captures back.
+pub fn reload_from_disk() {
+    let file = load_file();
+    *WRITER_FILE.lock() = Some(file.clone());
+    let saved_miis = setups::saved_identities(&file);
+    let old = RELOAD.lock().replace(Reload { machine: Machine::new(file.into_game_records()), saved_miis });
+    drop(old);
+    RELOAD_DUE.store(true, Ordering::Release);
+}
+
+fn adopt_reload() {
+    if !RELOAD_DUE.load(Ordering::Relaxed) {
+        return;
+    }
+    let Some(mut pending) = RELOAD.try_lock() else { return };
+    let Some(reload) = pending.as_mut() else { return };
+    let swapped = with(|s| {
+        core::mem::swap(&mut s.machine, &mut reload.machine);
+        core::mem::swap(&mut s.saved_miis, &mut reload.saved_miis);
+    });
+    if swapped.is_some() {
+        RELOAD_DUE.store(false, Ordering::Release);
+    }
+}
 
 const HANDOFF_SLOTS: usize = 8;
 const SLOT_EMPTY: u8 = 0;
@@ -1735,10 +1780,16 @@ pub fn start_writer() {
             continue;
         }
         let Some(path) = save_path() else { continue };
+        WRITING.store(true, Ordering::Release);
         let mut mirror = WRITER_FILE.lock();
-        let Some(file) = mirror.as_mut() else { continue };
+        let Some(file) = mirror.as_mut() else {
+            WRITING.store(false, Ordering::Release);
+            continue;
+        };
         take_captured(file);
-        if let Err(error) = persist::save(Path::new(path.as_str()), file) {
+        let written = persist::save(Path::new(path.as_str()), file);
+        WRITING.store(false, Ordering::Release);
+        if let Err(error) = written {
             DIRTY.store(true, Ordering::Release);
             diagnostic(format_args!("[TrainingRooms] save_states.json write failed: {error}; the old file stays"));
             std::thread::sleep(std::time::Duration::from_secs(5));

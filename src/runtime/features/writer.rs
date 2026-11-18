@@ -37,6 +37,16 @@ static SHORTCUTS: Mutex<Option<MenuShortcuts>> = Mutex::new(None);
 /// the newest preference whichever row (the menu, or the Deluxe Plugins page) changed it last.
 static REPLAY_CAPTURE_DUE: AtomicBool = AtomicBool::new(false);
 static SETTINGS_DUE: AtomicBool = AtomicBool::new(false);
+/// The thread is between its sleep and the end of a pass's writes.
+static BUSY: AtomicBool = AtomicBool::new(false);
+
+/// No settings, shortcut or capture write is due or being written (the bridge's fixture restore waits for this).
+pub fn settled() -> bool {
+    !BUSY.load(Ordering::Acquire)
+        && !SETTINGS_DUE.load(Ordering::Acquire)
+        && !REPLAY_CAPTURE_DUE.load(Ordering::Acquire)
+        && SHORTCUTS.try_lock().is_some_and(|pending| pending.is_none())
+}
 
 /// The Replay capture toggle as the file holds it (boot) or as the menu last set it; the preference itself once the capture
 /// adapter is ready (see [`replay_capture`]).
@@ -102,7 +112,9 @@ pub fn load_replay_capture() {
 
 fn run() {
     loop {
+        BUSY.store(false, Ordering::Release);
         std::thread::sleep(POLL);
+        BUSY.store(true, Ordering::Release);
         #[cfg(feature = "diag")]
         diag_requests();
         // rc.14 Break the Targets: the saved layouts' reads and writes (tt_files).

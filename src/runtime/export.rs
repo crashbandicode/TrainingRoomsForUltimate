@@ -73,6 +73,14 @@ extern "C" fn subscribe(ring: *mut Ring, on_frame: Option<abi::OnFrame>) -> i32 
 }
 
 extern "C" fn request(kind: u32, data: *const u8, len: usize) -> i32 {
+    match kind {
+        abi::REQ_SETTLED => return if settled() { abi::OK } else { abi::BUSY },
+        abi::REQ_RELOAD_SAVES => {
+            crate::runtime::features::states::reload_from_disk();
+            return abi::OK;
+        }
+        _ => {}
+    }
     if !crate::model::scene::is_training(crate::runtime::scene::facts()) {
         return abi::REFUSED_SCENE;
     }
@@ -93,6 +101,13 @@ extern "C" fn request(kind: u32, data: *const u8, len: usize) -> i32 {
         _ => return abi::BAD_REQUEST,
     }
     abi::OK
+}
+
+/// Every TR writer the bridge's fixture requests can reach is idle with nothing due (states, settings, bound save).
+fn settled() -> bool {
+    crate::runtime::features::states::settled()
+        && crate::runtime::features::writer::settled()
+        && crate::model::rr_host::bound_settled()
 }
 
 /// The diag reload's file, as boot reads one (recovered when it has issues).

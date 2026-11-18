@@ -15,11 +15,16 @@ pub const REQ_SET_APPLY: u32 = 1;
 pub const REQ_SAVE: u32 = 2;
 pub const REQ_LOAD: u32 = 3;
 pub const REQ_ITEM: u32 = 4;
+/// Read-only: `OK` once nothing accepted is still on its way to TR's files, else `BUSY`.
+pub const REQ_SETTLED: u32 = 5;
+/// TR's slot file was restored on disk: the writer's copy and the live slots follow it.
+pub const REQ_RELOAD_SAVES: u32 = 6;
 pub const OK: i32 = 0;
 pub const REFUSED_SCENE: i32 = -1;
 pub const BAD_REQUEST: i32 = -2;
 /// A settings file that does not read cleanly: nothing was applied.
 pub const REFUSED_SETTINGS: i32 = -3;
+pub const BUSY: i32 = -4;
 
 /// Slot phases (the low two bits of `Slot::state`; the rest is the line's ticket + 1, 0 for a slot never written).
 pub const FREE: u64 = 0;

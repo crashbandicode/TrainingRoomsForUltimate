@@ -725,6 +725,11 @@ pub fn bound_sync(root: &Path) -> Option<Option<[SavedState; 2]>> {
 }
 
 /// The state writer has a Save's two records for the active slot. The worker writes them into the bound save.
+/// No bound-save write waits for the worker (the bridge's fixture restore waits for this).
+pub fn bound_settled() -> bool {
+    lock(&SAVED_PAIR).is_none() && !BOUND_DIRTY.load(Ordering::Acquire)
+}
+
 pub fn save_captured(pair: [SavedState; 2]) {
     *lock(&SAVED_PAIR) = Some(pair);
 }
