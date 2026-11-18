@@ -216,7 +216,13 @@ fn cpu03_delay_and_climb_denial() {
     cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 3, false, false));
     assert!(!cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true), "denied until TR performs");
     assert_eq!(cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 30, true, false)).request_status, Some(CLIFF_ESCAPE));
-    assert!(cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true), "after the request the game answers");
+    // p3f-verify-yoga-3: the game's own climb is decided in the frame of TR's request and won; it stays denied while the
+    // CPU still hangs, until the bound.
+    assert!(!cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true), "still denied in the frame of the request");
+    for n in 0..UNREQUESTED_BOUND {
+        cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 31 + i32::from(n), true, false));
+    }
+    assert!(cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true), "a request that never took is released by the bound");
     // Wait holds: no request however long, the climb stays denied, the case is kept.
     let (mut cpu, key) = cpu_with(settings(&[("ledge_state", ledge_row(&[option::WAIT as usize]))]));
     for frame in 0..200 {

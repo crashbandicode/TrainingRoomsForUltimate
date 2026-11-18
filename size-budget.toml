@@ -1900,3 +1900,11 @@ ceiling = 156073
 date = "2026-11-18"
 reason = "REC-027 race (tr-review-astra-2 08:38Z): rr_host publish reads the run flag under the frame-queue lock that note_mash clears it under, so an in-flight step_role producer cannot refill a cut CPU run. Measured 156073 = +6. Exact total. FOR OPERATOR REVIEW."
 approved_by = "devin-primary 09:38Z (fix the REC-027 race at the root); operator review pending."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156081
+date = "2026-11-18"
+reason = "Eden p3f-verify-yoga-3 follow-ups on rc15/phase3-fixes (156073): SAV-002 load stops both rr_host runs at once (note_load), and B11a keeps the native climb denied after TRs request while the CPU still hangs (the bound counts through the request). Measured 156081 = +8. Exact total. FOR OPERATOR REVIEW."
+approved_by = "devin-primary 09:49Z (fix verify findings at the root before READY); operator review pending."
