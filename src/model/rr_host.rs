@@ -2504,6 +2504,41 @@ mod tests {
         reset_host();
     }
 
+    /// tr-review-astra-3 / the primary 18:19Z (Eden accept-8 on 26c93533): a parry practice plays pass by pass, and between
+    /// two passes (the last pass's frames are played, the next one waits for the open attempt) the CPU saw no playback.
+    /// A configured Mash then queued its action on top of the replay instead of asking the playback to stop, and the
+    /// queued action blocked every later request. Owed passes are part of the running CPU playback.
+    fn parry_passes_owed_are_a_running_cpu_playback() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("parry-mash-view");
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        let save = NamedSave::new("Parry start", state(8), state(7)).unwrap();
+        let save_id = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&save).unwrap();
+        let frames = vec![InputFrame { buttons: 2, ..InputFrame::default() }];
+        let mut recording = super::super::macros::MacroRecording::new("Reticle", "13.0.5", StartState::neutral(7, 0, 1.0), frames).unwrap();
+        recording.set_start_save(Some(&save_id)).unwrap();
+        let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&id), 1).unwrap();
+        index.set_loop(Role::Cpu, LoopCount::Finite(2));
+        index.save(&root).unwrap();
+        set_parry(true);
+        on_chords(false, false, true);
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        warp_landed();
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        assert!(take_cpu_frame().is_some(), "pass 1's only frame");
+        set_parry_open(true);
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        assert!(!RUN_CPU.load(Ordering::Acquire) && role_frames(Role::Cpu).lock().is_empty(), "between the passes");
+        assert_eq!(PARRY_PASSES.load(Ordering::Acquire), 1, "pass 2 is owed");
+        assert!(cpu_playback(PlaybackState::default()).running, "the CPU still sees the practice's playback running");
+        set_parry(false);
+        assert!(!cpu_playback(PlaybackState::default()).running, "Parry Off ends it");
+        reset_host();
+    }
+
     /// Parry practice's refusals (approved rows parry-practice-no-recording and parry-practice-start-save-missing).
     fn parry_refuses_without_a_recording_or_its_start_save() {
         let _hold = hold();
@@ -3783,6 +3818,7 @@ mod tests {
             ("parry_each_pass_warps_to_the_start_save", parry_each_pass_warps_to_the_start_save as fn()),
             ("parry_stop_during_buffered_playback_owes_no_pass", parry_stop_during_buffered_playback_owes_no_pass as fn()),
             ("parry_off_cancels_owed_passes", parry_off_cancels_owed_passes as fn()),
+            ("parry_passes_owed_are_a_running_cpu_playback", parry_passes_owed_are_a_running_cpu_playback as fn()),
             ("parry_refuses_without_a_recording_or_its_start_save", parry_refuses_without_a_recording_or_its_start_save as fn()),
             ("a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see", a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see as fn()),
             ("cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing", cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing as fn()),
