@@ -111,6 +111,12 @@ pub mod recording_menu;
 pub mod ordered_ids;
 #[path = "model/pause_helper.rs"]
 pub mod pause_helper;
+#[path = "model/swap/choices.rs"]
+pub(crate) mod fighter_choices;
+#[path = "model/mashout.rs"]
+pub mod mashout;
+#[path = "model/practice_games.rs"]
+pub mod practice_games;
 #[path = "model/settings.rs"]
 pub mod settings;
 #[path = "model/tech_settings.rs"]
@@ -137,6 +143,8 @@ pub mod btt;
 pub mod tech;
 #[path = "model/sites_hitbox.rs"]
 pub mod sites_hitbox;
+#[path = "model/sites_mashout.rs"]
+pub mod sites_mashout;
 #[path = "model/sites_u4.rs"]
 pub mod sites_u4;
 #[path = "model/sites_u4b.rs"]

@@ -176,7 +176,7 @@ fn actual_cpu_request_handoff_and_reload_readiness() {
     let notice_with = block(roster, "fn notice_blocked_with(backend_ready:");
     let preload_pending = block(cpu, "pub(super) fn preload_pending()->bool");
     let intercept = block(cpu,
-        "pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<crate::engine::swap::cycle_members::Admission>");
+        "pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,requester:Requester,read_menu:impl Fn()->TrainingModpackMenu)->Option<crate::engine::swap::cycle_members::Admission>");
 
     assert!(player.contains(
         "pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<crate::engine::swap::cycle_members::Admission>"
@@ -187,7 +187,19 @@ fn actual_cpu_request_handoff_and_reload_readiness() {
     ));
     let saved_stub = "pub fn intercept_with(_: Role, _: Selection, _: impl Fn() -> super::TrainingModpackMenu) -> Option<bool> { *super::SAVED_RESULT.lock() }";
 
+    let model_player = include_str!("../src/model/mii/ordinary_player.rs");
+    let owned = block(
+        roster,
+        "fn queue_owned(role: Role, selection: Selection, restoring: bool, once: bool, owner: Requester)",
+    );
+    let live_owner = block(roster, "fn live_owner(role: Role, kind: u32) -> Requester");
+    let sync_selection = block(roster, "fn sync_selection(self, fighter: TrioFighter, owner: Requester)");
+    let persists = block(model_player, "pub fn persists_selection(owner:Requester)->bool");
     let mut fixture = FIXTURE.to_owned();
+    fixture = replace_once(fixture, "// QUEUE_OWNED", owned);
+    fixture = replace_once(fixture, "// LIVE_OWNER", live_owner);
+    fixture = replace_once(fixture, "// SYNC_SELECTION", sync_selection);
+    fixture = replace_once(fixture, "// PERSISTS_SELECTION", persists);
     // RESHIP-3: the card moved admission and its notice into one pure owner.
     // Execute that production dependency along with the extracted runtime caller.
     let ordinary_cpu = include_str!("../src/model/mii/ordinary_cpu.rs");
@@ -211,7 +223,7 @@ fn actual_cpu_request_handoff_and_reload_readiness() {
     fixture = replace_once(fixture, "// CPU_PRELOAD_PENDING", preload_pending);
     // Existing fixture assertions call the wrapper; routing executes the exact
     // closure-based native-owner implementation extracted above.
-    let cpu_intercept = format!("{intercept}\npub fn intercept(role: Role, selection: Selection, user_request: bool) -> Option<Admission> {{ intercept_with(role, selection, user_request, || setting(&MENU)) }}");
+    let cpu_intercept = format!("{intercept}\npub fn intercept(role: Role, selection: Selection, user_request: bool) -> Option<Admission> {{ intercept_with(role, selection, user_request, Requester::User, || setting(&MENU)) }}");
     fixture = replace_once(fixture, "// CPU_INTERCEPT", &cpu_intercept);
     fixture = replace_once(
         fixture,

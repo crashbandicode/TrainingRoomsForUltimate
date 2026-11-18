@@ -20,7 +20,6 @@ use std::cell::Cell;
 use model::cpu::counter::{CounterId, Counters};
 use model::cpu::facts::FrameFacts;
 use model::cpu::hash::{hash40, lua_bind_hash, xxh64, SEED};
-use model::hash40::crc32;
 use model::cpu::ids::{self, Table, C, UNRESOLVED};
 use model::cpu::mash::{Action, BufferContext, Buffered, Mash};
 use model::cpu::playback::{covered_setting_applies, PlaybackState};
@@ -29,6 +28,7 @@ use model::cpu::role::{is_cpu_role, FighterKey, RoleTable, Scene, LOBBY_CPU_ENTR
 use model::cpu::settings::{CpuSettings, DelayRow, Strength, Weights};
 use model::cpu::state::Cpu;
 use model::cpu::status::{self, Situation};
+use model::hash40::crc32;
 use model::lra_reset::HubStep;
 use model::menu::reroll;
 use model::settings::Snapshot;
@@ -128,6 +128,112 @@ fn cpu_ids_resolve_asks_by_hash_and_lists_the_missing() {
     // An unresolved constant matches no status, whatever the status.
     assert!(!table.is(C::StatusDamage, UNRESOLVED));
     assert!(!status::in_hitstun(&table, 5));
+}
+
+#[test]
+fn mash_entry_constants_resolve_against_pinned_native_names() {
+    // Native lua_const.rs bindings; Hero110 values are retained in
+    // artifacts/rc15-mashout/hero110-native-entry/CONSTANTS.json. START ACTIVE_COMMAND
+    // is also bound by main85a834 and Brave native table+c830 (hero110-start-failure).
+    // Fixtures use synthetic ids.
+    let native = [
+        (C::KindBrave, "FIGHTER_KIND_BRAVE", 0x53),
+        (C::StatusSpecialLw, "FIGHTER_STATUS_KIND_SPECIAL_LW", 479),
+        (C::HeroIceSwordCommand, "FIGHTER_BRAVE_SPECIAL_LW_COMMAND18_ICESWORD", 0x11),
+        (C::HeroSelect, "FIGHTER_BRAVE_STATUS_KIND_SPECIAL_LW_SELECT", 493),
+        (C::HeroCancel, "FIGHTER_BRAVE_STATUS_KIND_SPECIAL_LW_CANCEL", 494),
+        (C::HeroFailure, "FIGHTER_BRAVE_STATUS_KIND_SPECIAL_LW_FAILURE", 496),
+        (C::HeroStart, "FIGHTER_BRAVE_STATUS_KIND_SPECIAL_LW_START", 497),
+        (C::HeroWindowOpen, "FIGHTER_BRAVE_COMMAND_WINDOW_STATE_OPEN", 3),
+        (C::HeroSelectIndex, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_SELECT_INDEX", 0x100000c8),
+        (C::HeroDecideCommand, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_DECIDE_COMMAND", 0x100000c9),
+        (C::HeroActiveCommand, "FIGHTER_BRAVE_STATUS_SPECIAL_LW_START_INT_ACTIVE_COMMAND", 0x11000005),
+        (C::HeroWindowState, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_WINDOW_STATE", 0x100000d1),
+        (C::HeroCommand1, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_COMMAND_LIST_01_FOR_AI", 0x100000d4),
+        (C::HeroCommand2, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_COMMAND_LIST_02_FOR_AI", 0x100000d5),
+        (C::HeroCommand3, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_COMMAND_LIST_03_FOR_AI", 0x100000d6),
+        (C::HeroCommand4, "FIGHTER_BRAVE_INSTANCE_WORK_ID_INT_SPECIAL_LW_COMMAND_LIST_04_FOR_AI", 0x100000d7),
+        (C::HeroSuccessSp, "FIGHTER_BRAVE_STATUS_SPECIAL_LW_FLAG_SUCCESS_SP", 0x2100000c),
+        (C::PickelTrolleyFailed, "FIGHTER_PICKEL_STATUS_KIND_SPECIAL_S_FAILED", 0x206),
+        (C::PickelTrolleyRide, "FIGHTER_PICKEL_STATUS_KIND_SPECIAL_S_RIDE", 0x207),
+        (C::PickelTrolleyDrive, "FIGHTER_PICKEL_STATUS_KIND_SPECIAL_S_DRIVE", 0x208),
+        (C::PickelTrolleyJump, "FIGHTER_PICKEL_STATUS_KIND_SPECIAL_S_JUMP", 0x209),
+        (C::PickelTrolleyArticle, "FIGHTER_PICKEL_GENERATE_ARTICLE_TROLLEY", 2),
+        (C::PickelTrolleyLink, "FIGHTER_PICKEL_LINK_NO_TROLLEY", 0x1c),
+        (
+            C::PickelTrolleyJumpDisable,
+            "WEAPON_PICKEL_TROLLEY_INSTANCE_WORK_ID_INT_PICKEL_JUMP_DISABLE_FRAME",
+            0x10000021,
+        ),
+        (
+            C::JudgeFixed,
+            "FIGHTER_GAMEWATCH_STATUS_SPECIAL_S_FLAG_FIX_PANEL",
+            0x2100000d,
+        ),
+        (
+            C::JudgeKind,
+            "FIGHTER_GAMEWATCH_INSTANCE_WORK_ID_INT_SPECIAL_S_PREV_KIND",
+            0x100000c1,
+        ),
+        (
+            C::TrailSpecialN1,
+            "FIGHTER_TRAIL_STATUS_KIND_SPECIAL_N1",
+            483,
+        ),
+        (
+            C::TrailSpecialN1Shoot,
+            "FIGHTER_TRAIL_STATUS_KIND_SPECIAL_N1_SHOOT",
+            484,
+        ),
+        (
+            C::TrailSpecialN1End,
+            "FIGHTER_TRAIL_STATUS_KIND_SPECIAL_N1_END",
+            485,
+        ),
+        (
+            C::TrailSpecialN2,
+            "FIGHTER_TRAIL_STATUS_KIND_SPECIAL_N2",
+            486,
+        ),
+        (
+            C::TrailSpecialN3,
+            "FIGHTER_TRAIL_STATUS_KIND_SPECIAL_N3",
+            487,
+        ),
+        (
+            C::TrailMagicKind,
+            "FIGHTER_TRAIL_INSTANCE_WORK_ID_INT_SPECIAL_N_MAGIC_KIND",
+            0x100000bf,
+        ),
+        (
+            C::TrailMagicFire,
+            "FIGHTER_TRAIL_SPECIAL_N_MAGIC_KIND_FIRE",
+            0,
+        ),
+        (
+            C::TrailMagicBlizzard,
+            "FIGHTER_TRAIL_SPECIAL_N_MAGIC_KIND_BLIZZARD",
+            1,
+        ),
+        (
+            C::TrailMagicThunder,
+            "FIGHTER_TRAIL_SPECIAL_N_MAGIC_KIND_THUNDER",
+            2,
+        ),
+    ];
+    let mut table = Table::unresolved();
+    assert_eq!(table.resolve(|key| native.iter().find_map(|(_, name, value)| {
+        (lua_bind_hash(name) == key).then_some(*value)
+    })), ids::COUNT - native.len());
+    for (constant, name, value) in native {
+        assert_eq!(ids::NAMES[constant as usize], name);
+        assert!(table.resolved(constant), "{name}");
+        assert_eq!(table.get(constant), value, "{name}");
+    }
+    assert_eq!(model::mashout::entry::HERO_COMMAND_COUNT, 0x15);
+    // The previously authored spelling must not resolve to the native counter.
+    assert_ne!(lua_bind_hash("WEAPON_PICKEL_TROLLEY_INSTANCE_WORK_ID_INT_JUMP_DISABLE_FRAME"),
+        lua_bind_hash(ids::NAMES[C::PickelTrolleyJumpDisable as usize]));
 }
 
 #[test]
@@ -430,7 +536,8 @@ fn tech_init_uses_resolved_ids_on_the_existing_nonhook_heartbeat() {
     assert!(cpu.contains("TECH_INIT.publish(&table);"));
     assert!(boot.find("set_tick(cpu::service_tech_init)").unwrap() < boot.find("diag_log::start_drain_thread()").unwrap());
     assert!(drain.contains("OnceLock<fn()>; 4]"));
-    assert_eq!(boot.matches("diag_log::set_tick(").count(), 3);
+    // Seam report, P1, Tech init and Mash out's solver service: all four drain slots.
+    assert_eq!(boot.matches("diag_log::set_tick(").count(), 4);
     assert!(drain.contains("threads::spawn(crate::model::thread_stacks::ThreadId::Heartbeat"));
     assert!(drain.contains("for tick in TICKS.iter().filter_map(|slot| slot.get()) {\n                tick();"));
     let init = &tech[tech.find("pub unsafe fn init(ids: [i32; 18])").unwrap()..tech.find("unsafe fn still_tumbling").unwrap()];

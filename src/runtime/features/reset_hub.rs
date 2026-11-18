@@ -45,10 +45,21 @@ extern "C" fn on_init(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5:
     // SAFETY: `a0` is the fighter object the game just initialised.
     let cpu = unsafe { cpu_operated(a0) };
     let hot_swap = published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire);
-    if lra_reset::hub_should_run(cpu, scene::is_native_training(), hot_swap) {
+    let training = scene::is_native_training();
+    let role_cpu = cpu && training && unsafe {
+        let entry = ((a0 + lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
+        crate::model::cpu::role::is_cpu_role(
+            crate::model::cpu::role::Scene::Training,
+            entry,
+            cpu,
+            crate::runtime::roster::character_roster::training_cpu_quantity(),
+        )
+    };
+    if lra_reset::hub_should_run(role_cpu, training, hot_swap) {
         hub::run(Clear::TrainingReset);
         // rc.14: L+R+A and Change Stage restart an Eggs-ercise run; a fighter swap (hot swap) does not.
         crate::runtime::features::hitbox::eggs_reset();
+        crate::runtime::features::mashout::reset();
         crate::runtime::features::btt::reset();
         crate::runtime::features::tech::reset();
     }

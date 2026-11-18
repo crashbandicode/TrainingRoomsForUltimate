@@ -366,6 +366,16 @@ moment the row changes; the fork keeps (b) until it gets the same change. Source
 
 ![B11 ledge change](decisions/B11-ledge-change.png)
 
+**B11a (2026-11-18, primary 05:10Z, CPU-091).** With (a) a CPU parked with Wait still climbed when the row changed to
+Jump: TR rolled Jump and requested it (`cpu_event request_status status=123 from=119`), but the game's own climb, held
+back by Wait and pending, won that frame (Eden `cpu091-verify-yoga-5`). `SPEC-cpu-03` §4 changes: the native climb is
+also denied while TR holds a case it performs itself (Neutral Getup, Roll, Jump, Getup Attack), before and after TR's
+request: the game's climb is decided in the frame of that request and won it (Eden `p3f-verify-yoga-3`), so the option
+TR just chose comes first. A safety bound releases that denial, with a `climb_bound_release` log line,
+after 30 frames on which the CPU could act and still hangs (TR requests on its first actionable frame, at the latest the
+buffered motion frame 19), so a fault can never hang the CPU on the ledge. A zero delay therefore no longer leaves the
+climb open until TR acts.
+
 **Decided 2026-11-02: (a), re-roll on menu change,** for the ledge options and the throw options, in both trees. The fork gets it in its next build; the clean room implements it from `SPEC-cpu-03` / `SPEC-cpu-06` in package 2.
 
 ## Already answered (not repeated above)

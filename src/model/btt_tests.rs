@@ -700,6 +700,93 @@ fn btt_clock_keeper() {
     assert_eq!([b.keeper(3), b.keeper(3), b.keeper(3)], [false, true, true], "a swapped-in fighter takes it after two missed passes");
 }
 
+fn result_clock_matches_btt_done_boundary_matrix() {
+    use crate::model::practice_games::result_tick;
+    // Expected values are the old BTT boundary behavior, including zero and a paused last frame.
+    for (left, tick, after, complete) in [
+        (0, false, 0, true), (0, true, 0, true), (1, false, 1, false), (1, true, 0, true),
+        (2, false, 2, false), (2, true, 1, false), (180, false, 180, false), (180, true, 179, false),
+        (u16::MAX, false, u16::MAX, false), (u16::MAX, true, u16::MAX - 1, false),
+    ] {
+        let mut shared = left;
+        assert_eq!((result_tick(&mut shared, tick), shared), (complete, after));
+        let mut s = ready_with_three();
+        run_three(&mut s, 3);
+        s.btt.left = left;
+        assert_eq!(s.btt.pass(tick, |_| panic!("Done must not test targets")), 0);
+        assert_eq!(s.btt.phase(), if complete { Phase::Ready } else { Phase::Done });
+        assert_eq!(s.btt.left, after);
+    }
+}
+
+fn btt_shared_countdown_holds_pauses_and_finishes_once() {
+    let mut s = ready_with_three();
+    run_three(&mut s, 3);
+    assert_eq!(END_FRAMES, 180);
+    assert!(s.btt.notice().is_some());
+    for elapsed in 0..179 {
+        s.btt.pass(false, |_| panic!("paused Done must not test targets"));
+        assert_eq!((s.btt.phase(), s.btt.left), (Phase::Done, 180 - elapsed));
+        assert!(s.btt.notice().is_none());
+        s.btt.pass(true, |_| false);
+    }
+    assert_eq!((s.btt.phase(), s.btt.left), (Phase::Done, 1));
+    for _ in 0..7 { s.btt.pass(false, |_| false); }
+    assert_eq!(s.btt.phase(), Phase::Done);
+    s.btt.pass(true, |_| false);
+    assert_eq!((s.btt.phase(), s.btt.left), (Phase::Ready, 0));
+    assert!(s.btt.notice().is_some(), "Ready is posted once");
+    for tick in [false, true, true, false] {
+        s.btt.pass(tick, |_| panic!("Ready must not test targets"));
+        assert_eq!(s.btt.phase(), Phase::Ready);
+        assert!(s.btt.notice().is_none());
+    }
+}
+
+fn btt_unfinished_attempt_does_not_create_best() {
+    use crate::model::practice_games::best_time;
+    let mut s = ready_with_three();
+    let layout = key(s.btt.layout());
+    assert_eq!(best_time(&s.btt.best, layout), None);
+    s.tap(&[A]);
+    pass(&mut s.btt, &[hit_at([0.0, 15.0])]);
+    s.btt.reset();
+    assert_eq!(best_time(&s.btt.best, layout), None, "an incomplete run is not a scored attempt");
+    run_three(&mut s, 30);
+    assert_eq!(best_time(&s.btt.best, layout), Some(30));
+    countdown(&mut s.btt);
+    s.tap(&[A]);
+    for _ in 0..5 { pass(&mut s.btt, &[]); }
+    s.btt.close_menu(false, false);
+    assert_eq!(best_time(&s.btt.best, layout), Some(30), "a faster cancelled attempt cannot replace a completed best");
+}
+
+fn btt_best_pool_retains_sixteen_fifo_layouts() {
+    use crate::model::practice_games::best_time;
+    fn finish(b: &mut Btt, x: f32, frames: u32) {
+        let mut at = [[0.0; 2]; MAX];
+        at[0] = [x, 15.0];
+        b.apply(Hot { id: FixedPath::new(), name: FixedPath::new(), n: 1, at });
+        b.close_menu(true, false);
+        b.feed(Pad { pressed: bit(A), ..Pad::default() });
+        for _ in 0..frames { b.pass(true, |_| false); }
+        assert_eq!(b.pass(false, |_| true), 1);
+        assert_eq!(b.phase(), Phase::Done);
+    }
+    let mut b = Btt::IDLE;
+    assert_eq!(BESTS, 16);
+    for x in 0..16 { finish(&mut b, x as f32, x + 10); }
+    let first = key(&[[0.0, 15.0]]);
+    let second = key(&[[1.0, 15.0]]);
+    assert_eq!(best_time(&b.best, first), Some(10));
+    finish(&mut b, 0.0, 1);
+    assert_eq!(best_time(&b.best, first), Some(1));
+    finish(&mut b, 16.0, 26);
+    assert_eq!(b.best.iter().flatten().count(), 16);
+    assert_eq!(best_time(&b.best, first), None, "improving the oldest layout does not make it newest");
+    assert_eq!(best_time(&b.best, second), Some(11));
+}
+
 fn btt_compact_hud_geometry() {
     use crate::model::panes::{self as p, cb, iv, Kind};
     for (strip, bar) in [(false, false), (true, false), (true, true)] {
@@ -867,6 +954,10 @@ fn case_table() {
         ("btt_notice_reports_each_change", btt_notice_reports_each_change as fn()),
         ("btt_notice_reposts_after_off", btt_notice_reposts_after_off as fn()),
         ("btt_clock_keeper", btt_clock_keeper as fn()),
+        ("result_clock_matches_btt_done_boundary_matrix", result_clock_matches_btt_done_boundary_matrix as fn()),
+        ("btt_shared_countdown_holds_pauses_and_finishes_once", btt_shared_countdown_holds_pauses_and_finishes_once as fn()),
+        ("btt_unfinished_attempt_does_not_create_best", btt_unfinished_attempt_does_not_create_best as fn()),
+        ("btt_best_pool_retains_sixteen_fifo_layouts", btt_best_pool_retains_sixteen_fifo_layouts as fn()),
         ("btt_compact_hud_geometry", btt_compact_hud_geometry as fn()),
         ("btt_compact_hud_text", btt_compact_hud_text as fn()),
         ("btt_placing_motion_matches_original_bytes", btt_placing_motion_matches_original_bytes as fn()),

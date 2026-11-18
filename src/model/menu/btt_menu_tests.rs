@@ -78,6 +78,52 @@ fn target_speed_greys_while_the_targets_stay_still() {
     assert_eq!(m.grey(speed), None);
 }
 
+/// Exercise every available registered pair in both directions, through real row writes and
+/// tracked commits. Stage tech joins this table when its settings/menu row is integrated.
+fn all_available_practice_games_follow_last_on() {
+    let games: Vec<_> = super::super::practice_games::ROWS.iter().copied()
+        .filter(|id| settings::def(id).is_some()).collect();
+    for &first in &games {
+        for &last in &games {
+            if first == last {
+                continue;
+            }
+            let mut m = menu();
+            m.put(first, &[0, 1]);
+            m.put(last, &[0, 1]);
+            assert!(super::super::practice_games::is_on(&m.settings.menu, last), "{first} then {last}");
+            for &other in &games {
+                if other != last {
+                    assert_eq!(m.get(other)[0], 1, "{other} Off after {last}");
+                    assert!(m.get(other).iter().skip(1).all(|value| *value == 0));
+                }
+            }
+            // Turning an already-Off peer Off again leaves the selected game alone.
+            m.put_one_hot(first, 0);
+            assert!(super::super::practice_games::is_on(&m.settings.menu, last));
+            m.save_defaults();
+            let merged = m.commit_onto(&Settings::factory());
+            assert!(super::super::practice_games::is_on(&merged.menu, last));
+            assert!(super::super::practice_games::is_on(&merged.defaults, last));
+            assert!(merged.menu.get(first).unwrap().iter().skip(1).all(|value| *value == 0));
+        }
+    }
+    // All enabled peers in a direct snapshot must be cleared even if no prior menu edit saw them.
+    let mut dirty = Settings::factory();
+    for &id in &games {
+        dirty.menu.set(id, &[0, 1]).unwrap();
+    }
+    let mut m = Menu::new(dirty, Env::default());
+    // Change Eggs-ercise to a different On choice so this is a real edit.
+    m.put("eggsercise", &[0, 0, 1, 0, 0]);
+    for &id in &games {
+        assert_eq!(super::super::practice_games::is_on(&m.settings.menu, id), id == "eggsercise");
+        if id != "eggsercise" {
+            assert!(m.get(id).iter().skip(1).all(|value| *value == 0));
+        }
+    }
+}
+
 fn btt_projectiles_default_and_round_trip() {
     let id = "btt_projectiles";
     let mut m = menu();
@@ -119,6 +165,7 @@ fn case_table() {
         ("unavailable_projectiles_leave_melee_and_placement_usable", unavailable_projectiles_leave_melee_and_placement_usable as fn()),
         ("btt_projectiles_default_and_round_trip", btt_projectiles_default_and_round_trip as fn()),
         ("target_speed_greys_while_the_targets_stay_still", target_speed_greys_while_the_targets_stay_still as fn()),
+        ("all_available_practice_games_follow_last_on", all_available_practice_games_follow_last_on as fn()),
     ]);
 }
 }

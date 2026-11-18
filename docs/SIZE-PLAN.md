@@ -353,3 +353,38 @@ such as `const X: [T; N] = …`, `-> [T; N] {` and `use a::{b};` was partly coun
 read like other code (a macro call's body stays opaque). 648 lines in 44 files left the count on each measured tree:
 `ed0d7a35` 141,975 → 141,327; `c5191271` 141,917 → 141,269; rc.14 integration `12dee86d` 143,828 → 143,180. Tests:
 `tools/test_size_gate.py` `TestAndSimulator`.
+
+### rc.15 Lucas112 native charge release (2026-11-16)
+
+The full canonical Surface gate measured f02e9790 at 150945 to 4ff7cf28 at 150963
+rustfmt-sloc4 lines (+18). The primary explicitly approved Lucas Frozen+18
+at 22:48Z under the operator rc.15 size ruling. The unchanged size gate still
+reports RED against 148194; counter, formatter rules and size-budget.toml remain
+unchanged. Final measured rc.15 ceiling adjustment belongs to final integration
+under operator approval. Evidence: lucas-gate-4ff7cf28-surface/BUDGET-ENTRY.md
+and its retained canonical gate receipts. This records the Lucas allowance only;
+Olimar40 and Inkling102 canonical build gates subsequently completed on 3fd57e54:
+150991 (+28 over Lucas; +46 over f02), clippy and no-default-features clean,
+release and diagnostic builds successful. Runtime acceptance remains pending.
+Evidence: combined-gate-3fd57e54-surface/SUMMARY.md. The same operator final-total
+approval applies; the ceiling remains unchanged.
+
+### rc.15 Dedede99 real up-special entry (2026-11-16)
+
+The full canonical Surface gate measured 3fd57e54 at150991 to bd7f4d90
+at150992 (+1). The operator rc.15 final-total size approval applies; the
+ceiling file and evaluator remain unchanged. Primary code review and Eden
+contact/escape proof are pending. Evidence:
+dedede99-gate-bd7f4d90-surface/SUMMARY.md, BUDGET-ENTRY.md and retained
+compliance-v2.log (corrected trace test references, no product/gate change).
+
+### rc.15 Ice Climbers113/114 and ZSS108 (2026-11-17)
+
+The canonical2e36e0bd gate measured150992, unchanged from bd7f4d90.
+The primary explicitly approved that size with the IC113/114 Opus PASS.
+The next Flip stomp108 entry reuses SPECIAL_LW admission and native Bury
+observation; its canonical measurement is pending. No ceiling or counter
+change: final integration owns the approved final-total adjustment.
+
+### rc15 Mash out Dedede99 native cancel continuation
+Observed real Bury interrupted by native landing hit: add native SPECIAL input once in Held after CPU hitstop using existing followed/controls/drive/revoke. No reader/hook/model/clock/guard changes/new constants. Actual Held probes cover seed/stop/one edge/escape/other plan. Normalized size pending canonical gate; ceiling unchanged, operator final-total approval applies. Native evidence/RED/GREEN in lane artifacts dedede99-interruption.

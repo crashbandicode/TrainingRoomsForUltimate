@@ -10,6 +10,7 @@ use {crate::engine::compat::menu::OnOff, crate::engine::compat::menu::TrainingMo
 use {crate::runtime::compat::sync::lock_write, crate::runtime::compat::sync::read as setting};
 
 use crate::engine::swap::character_memory::WaitingSession;
+use crate::engine::mii::ordinary_player::{persists_selection, Requester};
 use crate::engine::swap::cycle_members::{admitted, over_pending, Admission};
 use crate::runtime::compat::common::{
     button_config, game_mode,
@@ -100,6 +101,12 @@ fn settled_cpu_mii() -> Option<crate::engine::mii::lifetime::Configuration> {
 }
 
 static BASE: AtomicUsize = AtomicUsize::new(0);
+// Positive completion, unlike BASE (stored before later owners may refuse installation).
+static MASHOUT_READY: AtomicBool = AtomicBool::new(false);
+pub(crate) fn mashout_ready() -> bool {
+    MASHOUT_READY.load(Ordering::Acquire)
+        && crate::runtime::roster::character_lifecycle::native_hooks_ready()
+}
 /// The main image base this module installed with (0 before install); for the WP-P
 /// readback facade's lifecycle hooks outside this module (its only callers, in
 /// `training/save_states.rs`, are compiled with the same feature).
@@ -176,12 +183,27 @@ impl Role {
     fn enabled_with(self, read_menu: impl FnOnce() -> TrainingModpackMenu) -> bool {
         self == Self::Cpu || read_menu().trio_practice == OnOff::ON
     }
-    fn sync_selection(self, fighter: TrioFighter) {
+    /// The applied fighter becomes the role's persisted choice only for the user's own request
+    /// (`ordinary_player::persists_selection`; a practice game's temporary CPU fighter never does).
+    fn sync_selection(self, fighter: TrioFighter, owner: Requester) {
+        if !persists_selection(owner) {
+            return;
+        }
         let mut m = lock_write(&MENU);
         match self {
             Self::Player => m.player_character = fighter,
             Self::Cpu => m.cpu_character = fighter,
         }
+    }
+}
+
+/// Owner of a fighter the roster observes or settles without an ordinary-CPU request receipt: a practice game's live
+/// temporary CPU fighter is `Practice` (`mashout::temporary_cpu_selection`), everything else the user's.
+fn live_owner(role: Role, kind: u32) -> Requester {
+    if role == Role::Cpu && crate::runtime::features::mashout::temporary_cpu_selection(kind) {
+        Requester::Practice
+    } else {
+        Requester::User
     }
 }
 
@@ -660,9 +682,21 @@ fn queue_request(role: Role, selection: Selection, restoring: bool) {
 /// The result says what became of the request (LEAD-1 review F4); every outcome a user's request can see that is not
 /// Accepted or Superseded has already shown its notice.
 fn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool) -> Admission {
-    queue_admitted_with(role, selection, restoring, once, || setting(&MENU), || scope(role))
+    // An automatic partner refresh reconciles the live fighter, so it belongs to that fighter's owner (Mash out's
+    // temporary CPU is Practice): it never persists the practice fighter into the user's choice.
+    let owner = match selection {
+        Selection::RefreshPartners => state_for(role).lock().observed.map_or(Requester::User, |(_, kind)| live_owner(role, kind)),
+        _ => Requester::User,
+    };
+    queue_owned(role, selection, restoring, once, owner)
 }
-fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: bool,
+
+/// `queue_admitted` on behalf of `owner`: the ordinary CPU owner keeps it with the request, and the receipt and the
+/// persisted choice follow it at completion (`ordinary_player::cpu_receipt`).
+fn queue_owned(role: Role, selection: Selection, restoring: bool, once: bool, owner: Requester) -> Admission {
+    queue_admitted_with(role, selection, restoring, once, owner, || setting(&MENU), || scope(role))
+}
+fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: bool, owner: Requester,
     read_menu: impl Fn() -> TrainingModpackMenu, read_scope: impl FnOnce() -> Option<Scope>) -> Admission {
     // FAIL 2: a user's request leaves one line on every path, including the ones that drop it.
     let refresh = matches!(selection, Selection::RefreshPartners);
@@ -721,7 +755,7 @@ fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: 
         return admission;
     }
     // The CPU owner logs its own acceptance or refusal.
-    if let Some(admission)=mii_ordinary_cpu::intercept_with(role,selection,user_request,&read_menu){return admission;}
+    if let Some(admission)=mii_ordinary_cpu::intercept_with(role,selection,user_request,owner,&read_menu){return admission;}
     if let Some(accepted)=mii_saved_alpha::intercept_with(role,selection,&read_menu){
         if user {trace!("[CharacterRoster] request handed to the saved Mii owner role={:?} selection={:?}",role,selection);}
         return if accepted { Admission::Accepted } else { Admission::Owned };
@@ -823,7 +857,7 @@ pub fn request_cpu_kind(kind: u32) -> bool {
 }
 pub fn request_cpu_kind_in(context: &CpuRequestContext, kind: u32) -> bool {
     request_cpu_kind_with(kind, |fighter| {
-        queue_admitted_with(Role::Cpu, Selection::Direct(fighter), false, false, || context.menu, || context.scope)
+        queue_admitted_with(Role::Cpu, Selection::Direct(fighter), false, false, Requester::User, || context.menu, || context.scope)
     })
 }
 fn request_cpu_kind_with(kind: u32, enqueue_fighter: impl FnOnce(TrioFighter) -> Admission) -> bool {
@@ -835,6 +869,18 @@ fn request_cpu_kind_with(kind: u32, enqueue_fighter: impl FnOnce(TrioFighter) ->
         return false;
     }
     matches!(enqueue_fighter(fighter), Admission::Accepted | Admission::Superseded)
+}
+
+/// `request_cpu_kind` for a practice game's own temporary CPU fighter (Mash out's attacker and its restore): applied
+/// without the CPU Character receipt and never persisted as the user's choice.
+pub fn request_practice_cpu_kind(kind: u32) -> bool {
+    let Some(fighter) = TrioFighter::from_kind(kind) else {
+        return false;
+    };
+    if state_for(Role::Cpu).lock().pending.is_some() {
+        return false;
+    }
+    matches!(queue_owned(Role::Cpu, Selection::Direct(fighter), false, false, Requester::Practice), Admission::Accepted | Admission::Superseded)
 }
 
 /// Player 1's fighter kind as the loader last observed it (None before a practice entry).
@@ -1220,7 +1266,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                 crate::runtime::roster::kirby_hats::fighter_committed(role as usize, active.target.kind());
             }
             publish_partners(role, active.forms);
-            role.sync_selection(active.target);
+            role.sync_selection(active.target, live_owner(role, active.target.kind()));
             mii_hud_portrait::before_refresh(entry, owner, active.target.kind());
             refresh_hud(entry, owner, active.target.kind());
             if owner == 0 {
@@ -1235,7 +1281,9 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
             trace!("[CharacterRoster] complete owner={} target={} kind=0x{:x} slot={:?} ticks={} body_id=0x{:x}",
                 owner, active.target.name(), active.target.kind(), active.slot.map(|i| i+1),
                 active.ticks, read::<u32>(read::<*const u8>(entry, 0x4160), 8));
-            notify_selection(role, active.target, active.slot);
+            if persists_selection(live_owner(role, active.target.kind())) {
+                notify_selection(role, active.target, active.slot);
+            }
         } else {
             // Departure cancels plugin intent, but the native entry may finish
             // before it is destroyed. Release only serialization; never publish
@@ -1334,7 +1382,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                         crate::runtime::roster::kirby_hats::fresh_lobby();
                         training::named_macros::waiting_scene_changed(false);
                     }
-                    role.sync_selection(fighter);
+                    role.sync_selection(fighter, live_owner(role, fighter.kind()));
                 }
                 // A ready entry can precede the scene's first gameplay frame.
                 // Reloading it during stage initialization races the native
@@ -1355,7 +1403,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                             WAITING_MEMORY.lock().commit(role as usize, target);
                             crate::runtime::roster::kirby_hats::fighter_committed(role as usize, kind);
                             state_for(role).lock().cursor=target.cursor;
-                            role.sync_selection(target.fighter);
+                            role.sync_selection(target.fighter, live_owner(role, target.fighter.kind()));
                         } else {
                             queue_request(role, Selection::Direct(target.fighter), true);
                         }
@@ -1428,8 +1476,10 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
         if request.scope.waiting() {
             crate::runtime::roster::kirby_hats::fighter_committed(role as usize, target.kind());
         }
-        role.sync_selection(target);
-        notify_selection(role, target, slot);
+        role.sync_selection(target, live_owner(role, target.kind()));
+        if persists_selection(live_owner(role, target.kind())) {
+            notify_selection(role, target, slot);
+        }
         trace!(
             "[CharacterRoster] already active owner={} kind=0x{:x} slot={:?}",
             owner,
@@ -1628,7 +1678,7 @@ unsafe fn publish_mii_presentation(
     // This publication supersedes a reset deferred during its INSTALL.
     REBUILT[role as usize].store(false, Ordering::Release);
     drop(state);
-    role.sync_selection(fighter);
+    role.sync_selection(fighter, live_owner(role, fighter.kind()));
     if mii_hud_portrait::should_defer_hud(owner, kind, portrait) {
         // The exact texture does not exist yet. Keep the previous portrait and let the
         // service callback refresh and bind after the render proof. A rejected hold
@@ -2398,6 +2448,7 @@ pub fn init(load_contract: Option<VerifiedLoad>) {
         body_bank::install(base);
         mii_hud_portrait::init(base);
         skyline::install_hooks!(load_local_waiting_icons, load_online_waiting_icons);
+        MASHOUT_READY.store(true, Ordering::Release);
         trace!("[CharacterRoster] native async loader installed; ordinary P1/CPU1; waiting_enabled={}; one existing entry per role; no manual loader pumping", true);
     }
 }

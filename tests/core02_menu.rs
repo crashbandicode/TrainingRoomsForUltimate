@@ -167,10 +167,12 @@ fn layout_row_counts_match_the_rc_freeze() {
     // rc.14 SL4: the Setup library group gained Save setup here (10 → 11).
     // rc.14: Display & Controls gained Frame data colours and Spot labels, Recording gained Match sweet/sour spot (the operator, 2026-11-14,
     // SP1 to SP5; 11 → 13 and 12 → 13). rc.14 hb-legend: Frame data colours and Launch angles became items of the Hitbox Visualization checklist (13 → 12).
-    assert_eq!(counts(false), [34, 11, 13, 56, 12, 3]);
-    assert_eq!(counts(true), [33, 11, 13, 56, 12, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 126);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 125);
+    // rc.15 Mash out adds its toggle, state, attacker and ordinary grab type to Practice games, and Tech practice
+    // its session row and variable/editor rows (DESIGN §7).
+    assert_eq!(counts(false), [34, 11, 13, 60, 12, 3]);
+    assert_eq!(counts(true), [33, 11, 13, 60, 12, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 130);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 129);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 5);
@@ -182,8 +184,8 @@ fn layout_row_counts_match_the_rc_freeze() {
     // (104: Lobby Items, Phase 2 N11; 105: Ready Hats, P-HOT; rc.6: CPU Level; rc.13: Aerial Drift, Taunts; rc.14: Hide CPU and the
     // seven Practice games rows; Save setup here; two spots rows.)
     // rc.15 DESIGN §7: session row and twenty variable/editor rows follow BTT.
-    // The free-form wizard and its optional preview setting add two rows.
-    assert_eq!(ROWS.len(), 130);
+    // The free-form wizard and its optional preview setting add two rows; Mash out adds four.
+    assert_eq!(ROWS.len(), 134);
     for editor in [Editor::SetupSave, Editor::SetupSaveHere, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }
@@ -1027,6 +1029,86 @@ fn grid_screen_pages_with_l_r_and_keeps_the_cursor_on_a_tile() {
     assert!(m.screen().is_none());
 }
 
+// rc.15: edit through real menu inputs, then check both the page and popup renderers.
+fn filtered_menu_counts_cycles_and_renders() {
+    use model::mashout::moves::{self, Config, State};
+    use model::frame::{Frame, Text, write_value};
+    // Expected values come from the catalog and `selectable()` (Available and startable now),
+    // independently of the menu's own option list. Hidden Final rows 106/115 and rows without
+    // a start yet are never listed; the listed rows grow by themselves as plans gain a start.
+    // NotMashable rows (primary 14:00Z) are listed greyed but never offered or cycled to.
+    let mut cases: Vec<(usize, usize, usize, usize, String)> = (0..State::ALL.len())
+        .map(|state| {
+            let rows: Vec<_> = moves::CATALOG.iter()
+                .filter(|s| s.state == State::ALL[state] && moves::selectable(**s)).collect();
+            let first = if state == 0 { 0 } else { rows[0].id as usize + 1 };
+            let greyed = moves::CATALOG.iter()
+                .filter(|s| s.state == State::ALL[state] && moves::availability(s.id) == moves::MoveAvailability::NotMashable).count();
+            (state, rows.len() + greyed + 1, rows.len() + 1, first, format!("{} · {}", rows[0].attacker_name, rows[0].name))
+        })
+        .collect();
+    cases.push((5, 1, 1, 89, "Random".to_string()));
+    assert_eq!(cases[0].4, "Mario · Grab");
+    for (state, count, offered, first, label) in cases {
+        let mut m = menu();
+        goto(&mut m, moves::STATE_ROW);
+        m.press(Button::A);
+        for _ in 0..state { m.press(Button::Down); }
+        m.press(Button::A);
+        let attacker = goto(&mut m, moves::ATTACKER_ROW);
+        assert_eq!(m.option_count(attacker), count);
+        assert_eq!(get(&m, moves::ATTACKER_ROW).iter().position(|v| *v != 0), Some(first));
+        assert_eq!(m.value(attacker), RowValue::Choice(Some(0)));
+        let mut value = Text::<72>::new();
+        write_value(&m, attacker, &mut value);
+        assert_eq!(String::from_utf16(value.units()).unwrap(), format!("<  {label}  >"));
+        m.press(Button::A);
+        let mut frame = Frame::new();
+        model::screens::frame_of(&m, &mut frame, |_| "Stage");
+        assert_eq!(String::from_utf16(frame.rows[0].label.units()).unwrap(), label);
+        assert_eq!(String::from_utf16(frame.rows[0].value.units()).unwrap(), "(current)");
+        press(&mut m, &[Button::Up, Button::A]);
+        assert_eq!(m.value(attacker), RowValue::Choice(Some(count - 1)));
+        assert!(matches!(m.focus(), Some(Entry::Row(row)) if row == attacker));
+        m.press(Button::Right);
+        assert_eq!(m.value(attacker), RowValue::Choice(Some(0)));
+        for _ in 0..offered {
+            let resolved = Config::from_snapshot(&m.settings().menu).unwrap().resolve(0, 0).unwrap();
+            if state != 5 { assert_eq!(resolved.state, State::ALL[state]); }
+            m.press(Button::Right);
+            assert_eq!(m.focus(), Some(Entry::Row(attacker)));
+        }
+        assert_eq!(m.value(attacker), RowValue::Choice(Some(0)));
+    }
+}
+
+fn state_change_resets_invalid_move_and_config_rejects_conflict() {
+    use model::mashout::moves::{self, Config};
+    let mut m = menu();
+    let grab = goto(&mut m, moves::GRAB_ROW);
+    assert_eq!(m.option_count(grab), 4);
+    m.press(Button::Left);
+    assert_eq!(Config::from_snapshot(&m.settings().menu).unwrap().grab, 3);
+    goto(&mut m, moves::STATE_ROW);
+    m.press(Button::Right);
+    assert_eq!(Config::from_snapshot(&m.settings().menu).unwrap().attacker, 99);
+    assert!(!(0..m.entry_count(m.page())).any(|i| m.entry(m.page(), i) == Some(Entry::Row(grab))));
+    let attacker = goto(&mut m, moves::ATTACKER_ROW);
+    m.press(Button::Left);
+    assert_eq!(Config::from_snapshot(&m.settings().menu).unwrap().attacker, 89);
+    m.press(Button::Right);
+    assert_eq!(m.value(attacker), RowValue::Choice(Some(0)));
+    // Structurally valid edited Bury+Mario is rejected, not mapped to another state.
+    let mut bad = Settings::factory();
+    bad.menu.set(moves::STATE_ROW, &[0,1,0,0,0,0]).unwrap();
+    assert_eq!(Config::from_snapshot(&bad.menu), None);
+    let invalid = Menu::new(bad, Env::default());
+    assert_eq!(invalid.value(attacker), RowValue::Choice(None));
+    let mut value = model::frame::Text::<72>::new();
+    model::frame::write_value(&invalid, attacker, &mut value);
+    assert_eq!(String::from_utf16(value.units()).unwrap(), "<  -  >");
+}
+
 // ---- cross-checks --------------------------------------------------------------------------------
 
 
@@ -1051,11 +1133,85 @@ fn core03_shortcut_rows_open_editor() {
     assert!(matches!(ROWS[one].control, Control::Editor(Editor::ShortcutSlot(0))));
 }
 
+/// Primary 14:00Z: NotMashable rows (89, 90, 96, 120) are listed greyed, the cursor and the page
+/// cycle skip them, and a confirm on one never writes it.
+fn not_mashable_rows_are_greyed_skipped_and_never_confirmed() {
+    use model::frame::{Frame, Tone};
+    use model::mashout::moves;
+    let inhale = 4;
+    let mut m = menu();
+    goto(&mut m, moves::STATE_ROW);
+    m.press(Button::A);
+    for _ in 0..inhale { m.press(Button::Down); }
+    m.press(Button::A);
+    let attacker = goto(&mut m, moves::ATTACKER_ROW);
+    // Kirby 118 (index 119), Dedede 119 (120), K. Rool 120 (121, greyed), Random (89).
+    let listed: Vec<_> = (0..m.option_count(attacker)).map(|o| m.option_value(attacker, o).unwrap()).collect();
+    assert_eq!(listed, [119, 120, 121, 89]);
+    assert_eq!((0..4).map(|o| m.option_offered(attacker, o)).collect::<Vec<_>>(), [true, true, false, true]);
+    // The list popup: the greyed row keeps its name; the cursor steps over it both ways.
+    m.press(Button::A);
+    let mut frame = Frame::new();
+    model::screens::frame_of(&m, &mut frame, |_| "Stage");
+    assert_eq!(String::from_utf16(frame.rows[2].label.units()).unwrap(), "King K. Rool · Blunderbuss suction - not mashable");
+    assert_eq!(String::from_utf16(frame.rows[1].label.units()).unwrap(), "King Dedede · Inhale");
+    assert_eq!(frame.rows[2].label_tone, Tone::Off);
+    assert_ne!(frame.rows[1].label_tone, Tone::Off);
+    press(&mut m, &[Button::Down, Button::Down]);
+    assert!(matches!(m.screen(), Some(Screen::List { cursor: 3, .. })), "Down skips 120 to Random");
+    m.press(Button::Up);
+    assert!(matches!(m.screen(), Some(Screen::List { cursor: 1, .. })), "Up skips 120 back to Dedede");
+    m.press(Button::A);
+    assert_eq!(get(&m, moves::ATTACKER_ROW).iter().position(|v| *v != 0), Some(120));
+    // Page cycling from Dedede skips K. Rool in both directions.
+    m.press(Button::Right);
+    assert_eq!(get(&m, moves::ATTACKER_ROW).iter().position(|v| *v != 0), Some(89));
+    m.press(Button::Left);
+    assert_eq!(get(&m, moves::ATTACKER_ROW).iter().position(|v| *v != 0), Some(120));
+    // The approved label (restriction mashout-not-mashable): the four rows, and only they, read
+    // "<name> - not mashable" in greyed tone, in every Mash out state.
+    let mut labelled = Vec::new();
+    for state in 0..moves::STATE_LABELS.len() {
+        let mut m = menu();
+        goto(&mut m, moves::STATE_ROW);
+        m.press(Button::A);
+        for _ in 0..state { m.press(Button::Down); }
+        m.press(Button::A);
+        let attacker = goto(&mut m, moves::ATTACKER_ROW);
+        for option in 0..m.option_count(attacker) {
+            let (text, tone) = model::screens::list_option(&m, attacker, option, 0, 1);
+            let text = String::from_utf16(text.units()).unwrap();
+            let offered = m.option_offered(attacker, option);
+            assert_eq!(text.ends_with(" - not mashable"), !offered, "state {state} option {option}: {text}");
+            assert_eq!(tone == Tone::Off, !offered);
+            if !offered {
+                let s = moves::scenario(m.option_value(attacker, option).unwrap()).unwrap();
+                assert_eq!(text, format!("{} · {} - not mashable", s.attacker_name, s.name));
+                labelled.push(s.id);
+            }
+        }
+    }
+    labelled.sort_unstable();
+    assert_eq!(labelled, [89, 90, 96, 120]);
+    // Every Mash out state: no listed NotMashable option is ever written by any input path.
+    for state in 0..moves::STATE_LABELS.len() {
+        for option in 0..moves::attacker_count(state) {
+            let index = moves::attacker_index(state, option).unwrap();
+            let not_mashable = moves::scenario(index)
+                .is_some_and(|s| moves::availability(s.id) == moves::MoveAvailability::NotMashable);
+            assert_eq!(moves::attacker_offered(state, option), !not_mashable);
+        }
+    }
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
     crate::test_table::run(&[
         ("layout_row_counts_match_the_rc_freeze", layout_row_counts_match_the_rc_freeze as fn()),
+        ("filtered_menu_counts_cycles_and_renders", filtered_menu_counts_cycles_and_renders as fn()),
+        ("state_change_resets_invalid_move_and_config_rejects_conflict", state_change_resets_invalid_move_and_config_rejects_conflict as fn()),
+        ("not_mashable_rows_are_greyed_skipped_and_never_confirmed", not_mashable_rows_are_greyed_skipped_and_never_confirmed as fn()),
         ("the_spot_rows_sit_next_to_their_features", the_spot_rows_sit_next_to_their_features as fn()),
         ("legend_hitbox_visualization_is_one_checklist", legend_hitbox_visualization_is_one_checklist as fn()),
         ("hitbox_visible_options_keep_their_storage_bits_and_zl_toggles_all_six", hitbox_visible_options_keep_their_storage_bits_and_zl_toggles_all_six as fn()),

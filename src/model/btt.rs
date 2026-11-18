@@ -15,6 +15,7 @@ use super::chords::logical::{A, B, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT, DPAD_UP, X,
 use super::eggs::{self, Bursts, View, END_FRAMES, RADIUS};
 use super::hitbox_orbs::CANVAS_HALF;
 use super::panes::{EggLook, EggPicture, EGG_WHOLE};
+use super::practice_games::{record_time, result_tick};
 use super::recording_menu::{hot_five, ordered};
 use super::storage::FixedPath;
 use super::store::{lowest_free, Record, Store, StoreError};
@@ -242,10 +243,11 @@ pub fn list_footer(rows: &[(String, Layout)], cursor: usize, skipped: usize) -> 
     format!("{first}\nA open   B back{note}")
 }
 
-/// Whether `[Eggs-ercise, Break the Targets]` are On (any option but Off). The two cannot run together: the menu turns Off the
-/// one not turned On last, and a settings file with both On (hand-edited) keeps Eggs-ercise.
+/// Whether `[Eggs-ercise, Break the Targets]` are the effective practice game. The shared registry
+/// resolves conflicting snapshots, preserving Eggs-ercise's precedence over Break the Targets.
 pub fn on(rows: &super::settings::Snapshot) -> [bool; 2] {
-    ["eggsercise", ROW].map(|id| rows.get(id).is_some_and(|r| r.iter().skip(1).any(|v| *v != 0)))
+    let active = super::practice_games::active(rows);
+    ["eggsercise", ROW].map(|id| active == Some(id))
 }
 
 /// Only P1's owned pool and ArticleModule supply objects; Off performs no discovery or hit reads. An article's hit counts as
@@ -319,7 +321,7 @@ pub struct Btt {
     calm: u8,
     kept: [(i32, [[f32; 2]; MAX], usize); KEPT],
     /// The session's best per layout (its key, frames), and the one of the run just done.
-    best: [(u64, u32); BESTS],
+    best: [Option<(u64, u32)>; BESTS],
     top: u32,
     shown: FixedPath<96>,
     /// The clock keeper (`keeper`) and its rivals' passes since its last.
@@ -352,7 +354,7 @@ impl Btt {
         seen: [[0.0; 2]; 2],
         calm: 0,
         kept: [(i32::MIN, [[0.0; 2]; MAX], 0); KEPT],
-        best: [(0, 0); BESTS],
+        best: [None; BESTS],
         top: 0,
         shown: FixedPath::new(),
         owner: (0, 2),
@@ -647,12 +649,7 @@ impl Btt {
                     self.done();
                 }
             }
-            Phase::Done => {
-                self.left = self.left.saturating_sub(u16::from(tick));
-                if self.left == 0 {
-                    self.ready();
-                }
-            }
+            Phase::Done if result_tick(&mut self.left, tick) => self.ready(),
             _ => {}
         }
         (self.broken & !was).count_ones() as u8
@@ -662,13 +659,7 @@ impl Btt {
     fn done(&mut self) {
         (self.phase, self.left) = (Phase::Done, END_FRAMES);
         let k = key(self.layout());
-        let i = self.best.iter().position(|b| b.0 == k).unwrap_or_else(|| {
-            self.best.rotate_left(1);
-            self.best[BESTS - 1] = (k, u32::MAX);
-            BESTS - 1
-        });
-        self.top = self.best[i].1.min(self.frames);
-        self.best[i].1 = self.top;
+        self.top = record_time(&mut self.best, k, self.frames);
     }
 
     /// The notice's text when it changed since the last call (a standing notice: until the next change).
