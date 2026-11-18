@@ -27,6 +27,14 @@ pub enum Plan {
     Grab, Cargo, AirSideSpecial, NeutralSpecial, Cling, Drain, Pin, Drag, Whip,
     Trolley, DownThrow, UpSpecial, SideSpecial, DownSmash, Roller, DownTilt,
     Final, Flip, Jab3, Hero, Judge, Freeze, Blizzard, IceShot, IceMagic, Inhale, Egg,
+    /// Ganondorf's grounded Flame Choke: the slam ends in the ordinary ground-contact tech decision.
+    GroundSideSpecial,
+}
+
+/// Operator 11-18 (ganon-tech-row.md): the one row graded by the Tech practice grader instead of the mash grader.
+// restriction: mashout-ganon-tech
+pub const fn tech_graded(id: u16) -> bool {
+    id == 121
 }
 
 /// The one per-move availability path for the menu, concrete picks and the Random drill.
@@ -105,7 +113,7 @@ const fn entry(id: u16, state: State, kind: u32, name: &'static str, plan: Plan,
 // MOVES.md positive common-clatter table, then B01–B12/F01–F07/E01/I01–I03.
 // No additional14 capture candidates, Kirby copies or item entries are promoted.
 // Ground/air/phases remain variants of a move ID, not duplicated catalog rows.
-const EXTRA: [Scenario; 32] = [
+const EXTRA: [Scenario; 33] = [
     entry(89, State::Grab, 0x01, "Cargo shoulder", Plan::Cargo, "Grab DK / common25d720"),
     entry(90, State::Grab, 0x18, "Aerial side special", Plan::AirSideSpecial, "Grab Ganon / commond57d0"),
     entry(91, State::Grab, 0x21, "Chomp", Plan::NeutralSpecial, "Grab Wario / common9c740"),
@@ -138,11 +146,13 @@ const EXTRA: [Scenario; 32] = [
     entry(118, State::Inhale, 0x06, "Inhale", Plan::Inhale, "I01"),
     entry(119, State::Inhale, 0x2a, "Inhale", Plan::Inhale, "I02"),
     entry(120, State::Inhale, 0x45, "Blunderbuss suction", Plan::Inhale, "I03"),
+    // Appended (operator 11-18), so saved options keep their meaning; traced in ganon-tech/research/RESEARCH.md.
+    entry(121, State::Grab, 0x18, "Flame Choke (tech)", Plan::GroundSideSpecial, "Grab Ganon ground / tech"),
 ];
 
-const fn catalog() -> [Scenario; 121] {
+const fn catalog() -> [Scenario; 122] {
     let first = entry(0, State::Grab, ATTACKERS[0].0, "Grab", Plan::Grab, "ordinary G");
-    let mut rows = [first; 121];
+    let mut rows = [first; 122];
     let mut i = 0;
     while i < ATTACKERS.len() {
         let name = if ATTACKERS[i].0 == OLIMAR { "Grab (1 Pikmin)" } else { "Grab" };
@@ -156,7 +166,7 @@ const fn catalog() -> [Scenario; 121] {
     }
     rows
 }
-pub const CATALOG: [Scenario; 121] = catalog();
+pub const CATALOG: [Scenario; 122] = catalog();
 
 const fn attacker_labels() -> [&'static str; CATALOG.len() + 1] {
     let mut labels = ["Random"; CATALOG.len() + 1];
@@ -295,8 +305,8 @@ mod tests {
 
         #[test]
         fn reviewed_catalog_has_exact_state_counts_and_unique_ids() {
-            assert_eq!(CATALOG.len(), 121);
-            assert_eq!(State::ALL.map(|state| CATALOG.iter().filter(|s| s.state == state).count()), [98, 12, 7, 1, 3]);
+            assert_eq!(CATALOG.len(), 122);
+            assert_eq!(State::ALL.map(|state| CATALOG.iter().filter(|s| s.state == state).count()), [99, 12, 7, 1, 3]);
             for (i, s) in CATALOG.iter().enumerate() {
                 assert_eq!(s.id as usize, i);
                 assert!(choices::CHOICES.contains(&(s.attacker_kind, s.attacker_name)));
@@ -305,7 +315,7 @@ mod tests {
             }
             // Independent reviewed row/kind order from MOVES B01–B12/F01–F07/E01/I01–I03.
             assert_eq!(CATALOG[98..].iter().map(|s| s.attacker_kind).collect::<Vec<_>>(),
-                [0x54,0x2a,0x01,0x1c,0x41,0x45,0x45,0x30,0x2b,0x2d,0x20,0x32,0x53,0x1c,0x28,0x4b,0x4b,0x4b,0x5d,0x05,0x06,0x2a,0x45]);
+                [0x54,0x2a,0x01,0x1c,0x41,0x45,0x45,0x30,0x2b,0x2d,0x20,0x32,0x53,0x1c,0x28,0x4b,0x4b,0x4b,0x5d,0x05,0x06,0x2a,0x45,0x18]);
             assert_eq!(CATALOG.iter().filter(|s| s.plan == Plan::Grab).count(), 89);
             assert_eq!(CATALOG.iter().filter(|s| s.plan == Plan::Final).count(), 2);
             assert_eq!(CATALOG[104].plan, Plan::DownTilt);
@@ -325,7 +335,7 @@ mod tests {
             let mut old = vec![0; 90]; old[89] = 1;
             let parsed = settings::parse(&serde_json::json!({"menu":{"mashout_attacker":old}}).to_string());
             assert_eq!(Config::from_snapshot(&parsed.settings.menu).unwrap().attacker, 89);
-            assert_eq!(parsed.settings.menu.get(ATTACKER_ROW).unwrap().len(), 122);
+            assert_eq!(parsed.settings.menu.get(ATTACKER_ROW).unwrap().len(), 123);
             assert_eq!(Config::from_snapshot(&Snapshot::factory()), Some(Config::default()));
             assert_eq!(Config::default().resolve(0, 0).unwrap().attacker_name, "Mario");
             assert_eq!(Snapshot::factory().get(GRAB_ROW), Some(&[1,0,0,0][..]));
@@ -357,7 +367,7 @@ mod tests {
             }
             assert_eq!(attacker_count(RANDOM_STATE), 1);
             assert_eq!(attacker_index(RANDOM_STATE, 0), Some(89));
-            for index in 0..122 {
+            for index in 0..ATTACKER_LABELS.len() {
                 if index != 89 {
                     assert_eq!(Config { state: 5, attacker: index, grab: 0 }.resolve(0, 0), None);
                 }
@@ -462,7 +472,7 @@ mod tests {
             let config = Config { grab: 3, ..Config::default() };
             for roll in 0..9 { assert_eq!(config.resolve(0, roll).unwrap().grab, (roll % 3) as usize); }
             for grab in 0..3 { assert_eq!(Config { grab, ..Config::default() }.resolve(0, 0).unwrap().grab, grab); }
-            for config in [Config { state: 6, ..Config::default() }, Config { attacker: 122, ..Config::default() }, Config { grab: 4, ..Config::default() }, Config { state: 1, ..Config::default() }] {
+            for config in [Config { state: 6, ..Config::default() }, Config { attacker: ATTACKER_LABELS.len(), ..Config::default() }, Config { grab: 4, ..Config::default() }, Config { state: 1, ..Config::default() }] {
                 assert_eq!(config.resolve(0, 0), None);
             }
             // The first selectable non-grab Grab-state extra (index = id + 1 after Random at89).
@@ -479,7 +489,7 @@ mod tests {
             value.menu.set("cpu_level", &[0,0,0,1]).unwrap();
             let cpu_before = value.menu.extra().get("cpu_character").cloned();
             let level_before = value.menu.get("cpu_level").unwrap().to_vec();
-            let mut attacker = vec![0; 122]; attacker[120] = 1; // Dedede Inhale; 120 is NotMashable
+            let mut attacker = vec![0; ATTACKER_LABELS.len()]; attacker[120] = 1; // Dedede Inhale; 120 is NotMashable
             value.menu.set(ATTACKER_ROW, &attacker).unwrap();
             value.menu.set(STATE_ROW, &[0,0,0,0,1,0]).unwrap();
             let after = settings::parse(&value.to_json());
@@ -487,6 +497,36 @@ mod tests {
             assert_eq!(after.settings.menu.extra().get("cpu_character").cloned(), cpu_before);
             assert_eq!(after.settings.menu.get("cpu_level"), Some(level_before.as_slice()));
             assert_eq!(Config::from_snapshot(&after.settings.menu).unwrap().resolve(0,0).unwrap().id,119);
+        }
+
+        /// Operator 11-18 (ganon-tech-row.md): Ganondorf's grounded Flame Choke is one extra Grab row, graded as a
+        /// tech (`tech_graded`). It is appended, so every saved option keeps its meaning; row 90 is unchanged.
+        #[test]
+        fn ganon_flame_choke_tech_row_is_appended_and_old_saves_keep_their_pick() {
+            let row = CATALOG[121];
+            assert_eq!((row.id, row.state, row.attacker_kind, row.attacker_name, row.name, row.plan),
+                (121, State::Grab, 0x18, "Ganondorf", "Flame Choke (tech)", Plan::GroundSideSpecial));
+            assert_eq!(availability(121), MoveAvailability::Available);
+            assert!(selectable(row));
+            assert!(tech_graded(121));
+            assert!(CATALOG.iter().filter(|s| s.id != 121).all(|s| !tech_graded(s.id)));
+            assert_eq!((CATALOG[90].plan, availability(90)), (Plan::AirSideSpecial, MoveAvailability::NotMashable));
+            assert_eq!(ATTACKER_LABELS.len(), 123);
+            // Persisted index 122: row 121 sits after the Random hole at 89.
+            assert_eq!(scenario(122).map(|s| s.id), Some(121));
+            assert_eq!(attacker_option(0, 122).and_then(|o| attacker_label(0, o)), Some(("Ganondorf", "Flame Choke (tech)")));
+            // A save from before the row (122 options) is padded by the loader; its picks resolve as before.
+            for (option, id) in [(89, None), (90, Some(89)), (121, Some(120))] {
+                let mut old = vec![0; 122]; old[option] = 1;
+                let parsed = settings::parse(&serde_json::json!({"menu":{"mashout_attacker":old}}).to_string());
+                let row = parsed.settings.menu.get(ATTACKER_ROW).unwrap();
+                assert_eq!(row.len(), 123);
+                let kept = row.iter().position(|v| *v == 1).unwrap();
+                assert_eq!((kept, scenario(kept).map(|s| s.id)), (option, id));
+            }
+            let mut new = vec![0; 123]; new[122] = 1;
+            let parsed = settings::parse(&serde_json::json!({"menu":{"mashout_attacker":new}}).to_string());
+            assert_eq!(Config::from_snapshot(&parsed.settings.menu).unwrap().resolve(0, 0).unwrap().id, 121);
         }
     }
 }

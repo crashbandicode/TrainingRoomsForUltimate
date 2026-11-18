@@ -60,7 +60,8 @@ pub fn start(move_: Scenario) -> Option<&'static str> {
         | Plan::Roller
         | Plan::Pin
         | Plan::Judge
-        | Plan::Trolley => "FIGHTER_STATUS_KIND_SPECIAL_S",
+        | Plan::Trolley
+        | Plan::GroundSideSpecial => "FIGHTER_STATUS_KIND_SPECIAL_S",
         Plan::Egg
         | Plan::Inhale
         | Plan::NeutralSpecial
@@ -753,6 +754,14 @@ mod tests {
             for plan in [Plan::Grab, Plan::Whip, Plan::AirSideSpecial, Plan::Inhale] {
                 assert!(!preparatory_grab(plan));
             }
+        }
+
+        /// Grounded Flame Choke starts with Ganondorf's grounded side special (no jump squat, unlike row 90).
+        #[test]
+        fn ganon_grounded_flame_choke_starts_with_grounded_side_special() {
+            let row = super::super::moves::CATALOG[121];
+            assert_eq!(start(row), Some("FIGHTER_STATUS_KIND_SPECIAL_S"));
+            assert_eq!(start(super::super::moves::CATALOG[90]), Some("FIGHTER_STATUS_KIND_JUMP_SQUAT"));
         }
 
         #[test]
