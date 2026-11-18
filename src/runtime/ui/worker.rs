@@ -355,12 +355,13 @@ fn handle(event: Event, s: &mut Session) {
         { s.opening = crate::runtime::ui::menu_app::sequence(); }
         publish_frame(s);
         publish_jumps(s);
-        #[cfg(feature = "diag")]
-        if let Some(m) = s.menu.as_ref() {
-            diagnostic(format_args!("[Ui] menu opened page={} cursor={} depth={} screen={:?}", m.page().id(), m.cursor(), m.depth(), m.screen()));
+        if crate::runtime::export::wanted() {
+            if let Some(m) = s.menu.as_ref() {
+                diagnostic(format_args!("[Ui] menu opened page={} cursor={} depth={} screen={:?}", m.page().id(), m.cursor(), m.depth(), m.screen()));
+            }
+        } else {
+            diagnostic(format_args!("[Ui] menu opened"));
         }
-        #[cfg(not(feature = "diag"))]
-        diagnostic(format_args!("[Ui] menu opened"));
         return;
     }
     let Event::Poll(packet) = event else { return };
@@ -494,15 +495,16 @@ fn press(button: Button, s: &mut Session) {
         } else {
             m.press(button);
             // Eden reads where each press left the cursor (the section jump, the remembered place).
-            #[cfg(feature = "diag")]
-            diagnostic(format_args!("[Ui] press {button:?} page={} cursor={} depth={} screen={:?} row={:?} recording={}",
-                m.page().id(),
-                m.cursor(),
-                m.depth(),
-                m.screen(),
-                m.help_row().map(|r| r.title),
-                m.recording().focused_file_title().unwrap_or_default()
-            ));
+            if crate::runtime::export::wanted() {
+                diagnostic(format_args!("[Ui] press {button:?} page={} cursor={} depth={} screen={:?} row={:?} recording={}",
+                    m.page().id(),
+                    m.cursor(),
+                    m.depth(),
+                    m.screen(),
+                    m.help_row().map(|r| r.title),
+                    m.recording().focused_file_title().unwrap_or_default()
+                ));
+            }
             // Shipped builds write it too: a page reset is the player's explicit, confirmed choice.
             if let Some((page, changed)) = m.take_page_reset() {
                 diagnostic(format_args!("[TrainingRooms] page reset page={} rows={} changed={}", page.id(), changed.len(), changed.join(",")));
@@ -1138,10 +1140,14 @@ pub fn adopt_typed(defaults: bool, rows: &[(&'static str, Vec<u8>)], kept: &[(&'
     }
 }
 
-/// A publish made outside the menu (the diag reload, diag builds): the committed settings the menu
-/// opens on take the published rows and top-level keys, so a close keeps them (decision MENU-CLOSE).
+/// A publish made outside the menu (the diag reload, diag builds; the hardware bridge's settings apply): the committed settings the
+/// menu opens on take the published rows and top-level keys, so a close keeps them (decision MENU-CLOSE).
 /// The saved defaults are the player's and stay.
-#[cfg(feature = "diag")]
+/// The committed menu rows (what a settings apply's re-rolls are computed against). Plugin threads only.
+pub fn committed_menu() -> Option<crate::model::settings::Snapshot> {
+    SETTINGS.lock().as_ref().map(|current| current.menu.clone())
+}
+
 pub fn adopt_published(settings: &Settings) {
     let mut guard = SETTINGS.lock();
     if let Some(current) = guard.as_mut() {

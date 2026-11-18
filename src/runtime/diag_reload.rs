@@ -5,24 +5,12 @@
 //! (`menu::rerolls_between`) and logs one `diag_settings_reload` line. Never part of the shipped NRO.
 
 use std::fs;
-use std::sync::Mutex;
 use std::time::Duration;
 
-use crate::model::menu;
-use crate::model::settings::{self, Snapshot};
 use crate::model::storage::FixedPath;
 use crate::runtime::diag_log::diagnostic;
-use crate::runtime::published;
 
 const NAME: &str = "diag-settings-next.json";
-
-/// The settings last published (what a reload is compared with).
-static CURRENT: Mutex<Option<Snapshot>> = Mutex::new(None);
-
-/// `published::publish` calls this with every snapshot it makes live.
-pub fn remember(snapshot: &Snapshot) {
-    *CURRENT.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(snapshot.clone());
-}
 
 /// Start the poll thread (boot, after the first publish).
 pub fn start() {
@@ -40,13 +28,6 @@ pub fn start() {
 /// `character_items::request` exactly as the screen's A press will.
 const ITEM_NAME: &str = "diag-item.req";
 
-static ITEM_REQUEST: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
-
-/// The item choice Eden asked for, once.
-pub fn take_item_request() -> Option<usize> {
-    usize::try_from(ITEM_REQUEST.swap(-1, std::sync::atomic::Ordering::AcqRel)).ok()
-}
-
 /// A request file's text, once: read, then removed.
 fn request(name: &str) -> Option<String> {
     let path = FixedPath::<128>::in_root(name)?;
@@ -57,9 +38,7 @@ fn request(name: &str) -> Option<String> {
 
 fn poll_item_request() {
     let Some(text) = request(ITEM_NAME) else { return };
-    let choice = text.trim().parse::<i32>().unwrap_or(-1);
-    diagnostic(format_args!("[TrainingRooms] diag_item_request choice={choice}"));
-    ITEM_REQUEST.store(choice, std::sync::atomic::Ordering::Release);
+    crate::runtime::export::queue_item(text.trim().parse::<i32>().unwrap_or(-1));
 }
 
 /// `diag-egg.req`: two numbers, `dx dy`. The game thread moves the current Eggs-ercise egg to Player 1's position plus
@@ -135,13 +114,6 @@ fn poll() {
     let Some(path) = FixedPath::<128>::in_root(NAME) else { return };
     let Ok(bytes) = fs::read(path.as_str()) else { return };
     let _ = fs::remove_file(path.as_str());
-    let loaded = settings::parse_bytes(&bytes);
-    let next = loaded.settings.menu.clone();
-    let old = CURRENT.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone().unwrap_or_else(Snapshot::factory);
-    let rerolls = menu::rerolls_between(&old, &next);
-    diagnostic(format_args!("[TrainingRooms] diag_settings_reload rerolls={rerolls:#x} issues={}", loaded.issues.len()));
-    published::publish(&next, rerolls, [None; 2]);
-    crate::runtime::compat::menu::apply_kept(&loaded.settings);
-    // The published settings are what a menu close keeps now (decision MENU-CLOSE).
-    crate::runtime::ui::worker::adopt_published(&loaded.settings);
+    // The same path as the hardware bridge's settings apply (`export::apply_settings`).
+    crate::runtime::export::apply_settings(&bytes);
 }

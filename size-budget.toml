@@ -1857,7 +1857,15 @@ approved_by = "Operator approved the bounded events log and its additional lines
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 156289
+ceiling = 156721
 date = "2026-11-18"
-reason = "rc.15 practice menu (operator-approved mockup, 2026-11-18 ~14:58Z): one row per game, a generic sub-screen (Screen::Rows) with Start first, Start/Stop as menu actions with a Running label, and one runtime value for the running game (runtime::features::practice) replacing the three per-row exclusion sites. Measured 156289 = +266 counted lines over main c212bc50 (156023), after the Break the Targets close path lost its layout-load restart (primary 15:30Z). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+reason = "State export for the test-only hardware bridge (rc15/hw-bridge-export a9537c89, +700 over its base 458c0636: v1 +515, ring/settings +52, settle/reload +79, restore barriers +48, bound-writer seam +6) merged onto main c212bc50 (156023): composed measured 156721 (+698 over main; the merge measured 156724 before write_saved was folded into write_saved_with). Bridge v3b PASS (tr-review-astra-3 14:31Z) and the hardware smoke PASS (15:16Z). Exact total, no headroom. Counting and gates unchanged."
+approved_by = "Operator approved the bridge TR +700 and the state-export-invalid-settings restriction (11:28Z, recorded by tr-review-astra-2/3); primary c07b3449 15:28Z orders the merge onto local main."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156987
+date = "2026-11-18"
+reason = "rc.15 practice menu (operator-approved mockup, 2026-11-18 ~14:58Z): one row per game, a generic sub-screen (Screen::Rows) with Start first, Start/Stop as menu actions with a Running label, and one runtime value for the running game (runtime::features::practice) replacing the three per-row exclusion sites. Composed onto main f4c7e264 (156721): +266 counted lines over main (156289 on its old base c212bc50 = 156023 + 266), after the Break the Targets close path lost its layout-load restart (primary 15:30Z). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
 approved_by = "PENDING: +266 reported to the primary for the operator by menu-games-devin (INBOX 2026-11-18); not yet approved."

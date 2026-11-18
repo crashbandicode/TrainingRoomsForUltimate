@@ -178,6 +178,7 @@ pub(crate) fn enqueue_diagnostic(args: fmt::Arguments<'_>) {
 fn enqueue(args: fmt::Arguments<'_>) -> bool {
     let mut line = StackLine::new();
     let whole = line.format(args);
+    crate::runtime::export::offer(line.text(), whole);
     if !cfg!(feature = "diag") && !diag_ring::shipped(line.text()) {
         return false;
     }

@@ -156,9 +156,8 @@ pub(crate) unsafe fn frame(fighter: usize) {
             if let Some(choice) = crate::runtime::ui::requests::take_give_item() {
                 crate::runtime::roster::character_items::request(choice);
             }
-            // Diag build: an item grant Eden asked for in `diag-item.req` (the Give item screen is not built yet).
-            #[cfg(feature = "diag")]
-            if let Some(choice) = crate::runtime::diag_reload::take_item_request() {
+            // An item grant Eden asked for in `diag-item.req`, or the hardware bridge (`export::queue_item`).
+            if let Some(choice) = crate::runtime::export::take_item_request() {
                 crate::runtime::roster::character_items::request(choice);
             }
             crate::runtime::roster::character_items::on_frame(body);

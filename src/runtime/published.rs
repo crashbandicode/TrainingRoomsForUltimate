@@ -75,8 +75,6 @@ pub(crate) static PUBLISHING: hos_lock::Mutex<()> = hos_lock::Mutex::new(());
 /// go to the game frame with this publish's roster re-plan (`compat::menu::after_publish`).
 pub fn publish(snapshot: &Snapshot, rerolls: u8, picks: [Option<u32>; 2]) {
     let _turn = PUBLISHING.lock();
-    #[cfg(feature = "diag")]
-    crate::runtime::diag_reload::remember(snapshot);
     let published_menu = crate::engine::compat::menu::TrainingModpackMenu::from_snapshot(snapshot);
     let previous_menu = crate::runtime::compat::menu::view_before_publish(&_turn);
     let menu = crate::runtime::compat::menu::before_publish(published_menu, previous_menu);

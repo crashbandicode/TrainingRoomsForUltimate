@@ -281,6 +281,11 @@ impl Machine {
         }
     }
 
+    /// A Save is marked for a body that hasn't captured yet (any role, any slot).
+    pub fn save_marked(&self) -> bool {
+        [Role::Player, Role::Cpu].iter().any(|role| (0..SLOTS).any(|slot| self.marker(*role, slot) == Marker::Save))
+    }
+
     pub fn temporary_active(&self) -> bool {
         self.temporary.is_some()
     }

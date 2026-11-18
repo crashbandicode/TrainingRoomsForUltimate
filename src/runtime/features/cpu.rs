@@ -90,7 +90,6 @@ static PLAYER_Z: AtomicU32 = AtomicU32::new(0);
 static PLAYER_VALID: AtomicBool = AtomicBool::new(false);
 
 /// Diag: the save-state-loading fact the CPU last saw (logged on change).
-#[cfg(feature = "diag")]
 static LAST_SAVE_LOADING: AtomicBool = AtomicBool::new(false);
 
 /// The scene the behaviours are live in (decision B4; the waiting room is package 6's).
@@ -154,42 +153,36 @@ mod counts_index {
     pub const STICK_DIR: usize = 10;
 }
 
-/// One diag-build line for an answer a behaviour gave (the shipped build compiles the arguments away).
+/// One line for an answer a behaviour gave, in the diag build or for a subscribed hardware bridge (`export::wanted`).
 /// The line is formatted on the caller's stack into the fixed ring: nothing allocates.
 macro_rules! cpu_event {
     ($($arg:tt)*) => {{
-        #[cfg(feature = "diag")]
-        {
+        if crate::runtime::export::wanted() {
             diagnostic(format_args!("[TrainingRooms] cpu_event {}", format_args!($($arg)*)));
         }
     }};
 }
 
-/// Diag build: log an answer only when it differs from the last one logged for the same hook and body, so a
+/// Log an answer only when it differs from the last one logged for the same hook and body, so a
 /// per-frame hook costs one line per change. `None` (the hook gave no answer) re-arms the line.
 macro_rules! cpu_event_on_change {
     ($hook:expr, $body:expr, $value:expr, $($arg:tt)*) => {{
-        #[cfg(feature = "diag")]
-        {
-            if seen($hook, $body, $value) {
-                cpu_event!($($arg)*);
-            }
+        if crate::runtime::export::wanted() && seen($hook, $body, $value) {
+            cpu_event!($($arg)*);
         }
     }};
 }
 
-/// Diag build: the hook gave no answer for this body; the next answer is logged again.
+/// The hook gave no answer for this body; the next answer is logged again.
 macro_rules! cpu_event_rearm {
     ($hook:expr, $body:expr) => {{
-        #[cfg(feature = "diag")]
-        {
+        if crate::runtime::export::wanted() {
             let _ = seen($hook, $body, None);
         }
     }};
 }
 
 /// The hooks that log on change (an index into `LAST_SEEN`).
-#[cfg(feature = "diag")]
 mod ev {
     pub const AIRDODGE: usize = 0;
     pub const SDI_NONE: usize = 1;
@@ -216,11 +209,9 @@ mod ev {
     pub const COUNT: usize = 23;
 }
 
-#[cfg(feature = "diag")]
 static LAST_SEEN: [[AtomicU64; 16]; ev::COUNT] = [const { [const { AtomicU64::new(u64::MAX) }; 16] }; ev::COUNT];
 
 /// True when `value` is an answer and differs from the one logged last for (`hook`, `body`).
-#[cfg(feature = "diag")]
 fn seen(hook: usize, body: usize, value: Option<u64>) -> bool {
     let new = value.unwrap_or(u64::MAX);
     let old = LAST_SEEN[hook][body & 15].swap(new, Ordering::Relaxed);
@@ -437,8 +428,7 @@ fn ensure_consts() -> bool {
         }
         diagnostic(format_args!("[TrainingRooms] cpu constants missing={missing}: {}", names.as_str()));
     }
-    #[cfg(feature = "diag")]
-    {
+    if crate::runtime::export::wanted() {
         // The resolved table by name, so a log's status, term and work ids can be read by name.
         let mut line = FixedPath::<700>::new();
         let mut count = 0;
@@ -647,8 +637,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
         cpu.fighters[key.index()].kind = kind;
         // A save state loading is package 3's fact (`states::is_loading`, the load machine's own flag).
         cpu.save_loading = save_loading;
-        #[cfg(feature = "diag")]
-        if LAST_SAVE_LOADING.swap(save_loading, Ordering::AcqRel) != save_loading {
+        if crate::runtime::export::wanted() && LAST_SAVE_LOADING.swap(save_loading, Ordering::AcqRel) != save_loading {
             cpu_event!("save_loading={save_loading}");
         }
         if primary {
@@ -920,7 +909,6 @@ fn air_dodge_stick(accessor: usize) -> Option<(f32, f32)> {
     // SAFETY: `accessor` is a CPU body the frame wrapper registered; the native is a guarded site.
     let cpu_x = unsafe { natives::pos_x(accessor) };
     let answer = with(|cpu| cpu.air_dodge_stick(key, player_x(), cpu_x)).flatten();
-    #[cfg(feature = "diag")]
     match answer {
         Some((x, y)) => cpu_event_on_change!(
             ev::AIRDODGE,
@@ -957,7 +945,6 @@ pub unsafe fn cpu_stick_y_hook(accessor: usize) -> f32 {
     // Crouch answers when the air-dodge direction does not (SPEC-cpu-06 section 4).
     let Some(key) = role_of(accessor) else { return original };
     let crouch = with(|cpu| cpu.crouch_stick(key)).flatten();
-    #[cfg(feature = "diag")]
     match crouch {
         Some(y) => cpu_event_on_change!(ev::CROUCH, key.index(), Some(u64::from(y.to_bits())), "crouch entry={} y={y:.3}", key.entry),
         None => cpu_event_rearm!(ev::CROUCH, key.index()),
@@ -1190,7 +1177,6 @@ fn guard_button_answer(accessor: usize, button: i32, on_query: bool) -> Option<b
             ButtonAnswer::Held(value) => Some(value),
             ButtonAnswer::Original => None,
         };
-        #[cfg(feature = "diag")]
         match answer {
             Some(value) => cpu_event_on_change!(
                 if on_query { ev::GUARD_ON } else { ev::GUARD_OFF },
@@ -1204,7 +1190,6 @@ fn guard_button_answer(accessor: usize, button: i32, on_query: bool) -> Option<b
         answer
     } else {
         let answer = with(|cpu| cpu.full_hop_button(key, on_query)).flatten();
-        #[cfg(feature = "diag")]
         match answer {
             Some(value) => cpu_event_on_change!(ev::FULL_HOP, key.index(), Some(u64::from(value)), "full_hop_button entry={} on_query={on_query} held={value}", key.entry),
             None => cpu_event_rearm!(ev::FULL_HOP, key.index()),
@@ -1235,7 +1220,6 @@ fn shield_tilt(accessor: usize) -> Option<(f32, f32)> {
     // SAFETY: `accessor` is a CPU body the frame wrapper registered; the native is a guarded site.
     let cpu_x = unsafe { natives::pos_x(accessor) };
     let tilt = with(|cpu| cpu.shield_tilt_stick(key, player_x(), cpu_x)).flatten();
-    #[cfg(feature = "diag")]
     match tilt {
         Some((x, y)) => cpu_event_on_change!(
             ev::TILT,
@@ -1282,7 +1266,6 @@ pub unsafe fn cpu_shield_param_hook(accessor: usize, kind: u64, name: u64) -> f3
     }
     let Some(key) = role_of(accessor) else { return original };
     let value = with(|cpu| cpu.shield_param(key, decay)).flatten();
-    #[cfg(feature = "diag")]
     match value {
         Some(v) => cpu_event_on_change!(
             ev::SHIELD_PARAM,
@@ -1390,7 +1373,6 @@ pub(crate) unsafe fn oos_after(accessor: usize) -> Option<i32> {
         cpu.out_of_shield(key, &facts).escape_status
     })
     .flatten();
-    #[cfg(feature = "diag")]
     if let Some(status) = escape {
         cpu_event!("oos_escape entry={} status={status} from={status_now} prev={prev}", key.entry);
     }
@@ -1473,8 +1455,7 @@ pub unsafe fn cpu_command_flag_hook(accessor: usize, category: i32) -> u32 {
         // Playback Mash Interrupt: the running playback stops (package 4's recorder).
         recorder::interrupt_playback();
     }
-    #[cfg(feature = "diag")]
-    {
+    if crate::runtime::export::wanted() {
         let (queued, latched) = with(|cpu| cpu.mash_debug(key)).unwrap_or((false, false));
         let status = natives::status_kind(accessor);
         let state = (u64::from(status as u32) << 20) ^ (u64::from(out.bits) << 2) ^ (u64::from(queued) << 1) ^ u64::from(latched);
@@ -1501,7 +1482,6 @@ pub unsafe fn cpu_attack_air_kind_hook(accessor: usize) -> i32 {
     let original = call_original!(accessor);
     let Some(key) = role_of(accessor) else { return original };
     let kind = with(|cpu| cpu.attack_air_kind(key)).flatten();
-    #[cfg(feature = "diag")]
     match kind {
         Some(k) => cpu_event_on_change!(ev::AIR_KIND, key.index(), Some(k as u32 as u64), "attack_air_kind entry={} kind={k} original={original}", key.entry),
         None => cpu_event_rearm!(ev::AIR_KIND, key.index()),
@@ -1517,7 +1497,6 @@ pub unsafe fn cpu_stick_dir_hook(accessor: usize) -> f32 {
     let original = call_original!(accessor);
     let Some(key) = role_of(accessor) else { return original };
     let angle = with(|cpu| cpu.attack_angle(key)).flatten();
-    #[cfg(feature = "diag")]
     match angle {
         Some(a) => cpu_event_on_change!(ev::STICK_DIR, key.index(), Some(u64::from(a.to_bits())), "stick_dir entry={} angle={a:.3} original={original:.3}", key.entry),
         None => cpu_event_rearm!(ev::STICK_DIR, key.index()),
