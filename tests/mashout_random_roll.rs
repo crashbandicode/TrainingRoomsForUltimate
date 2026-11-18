@@ -55,8 +55,10 @@ mod runtime { pub mod roster { pub mod character_roster {
         true
     }
 } } }
+/// rc15/mashout's M3 observer gate (Game::step closes it on every exit from an attempt).
+mod clatter_set { pub fn release() {} }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Step { Off, Choose, Reload, Restore, Release, Place, Entering }
+enum Step { Off, Choose, Reload, Restore, Release, Place, Entering, Held }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Scenario { attacker_kind: u32 }
 /// The Random attacker: every roll may name another fighter (moves.rs Config::resolve, RANDOM_ATTACKER).
@@ -70,13 +72,14 @@ impl Config {
 struct Game {
     generation: u64, step: Step, requested: Option<Scenario>, roll: Option<Scenario>, p1: usize, cpu: usize, saw_catch: bool,
     followed: bool, trolley: Option<()>, hero: Option<()>, original: Option<u32>, config: Option<Config>,
-    clock: Option<()>, restore_requested: bool, failed: Option<&'static str>,
+    clock: Option<()>, restore_requested: bool, failed: Option<&'static str>, trail_magic: Option<()>,
+    prep_damage: Option<()>,
 }
 impl Game {
     fn new(config: Config) -> Self {
         Self { generation: 10, step: Step::Choose, requested: None, roll: None, p1: 11, cpu: 22, saw_catch: false,
                followed: false, trolley: None, hero: None, original: None, config: Some(config), clock: None,
-               restore_requested: false, failed: None }
+               restore_requested: false, failed: None, trail_magic: None, prep_damage: None }
     }
     // STEP
     fn fail(&mut self, text: &'static str) { self.failed = Some(text); }
