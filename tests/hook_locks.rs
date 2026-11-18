@@ -722,6 +722,15 @@ fn clatter_set_writers_run_only_at_game_thread_owner_sites() {
     let game = plugin_reach(&graph, &["cpu::on_frame"]);
     let missing: Vec<String> = writers.iter().filter(|w| !game.contains(w)).map(|&w| graph.funcs[w].key()).collect();
     assert!(missing.is_empty(), "cpu::on_frame must reach every Set slot writer: {missing:?}");
+    // O4 (review (c)): every attempt exit closes the gate. Each exit path runs one of these, and each releases.
+    for (file, name) in [("features/mashout.rs", "revoke"), ("features/mashout.rs", "reset"), ("features/mashout.rs", "step"),
+                         ("features/mashout/clatter_set.rs", "retract_common")] {
+        let f = graph.funcs.iter().find(|f| f.file == file && f.name == name).unwrap_or_else(|| panic!("{file}::{name}"));
+        assert!(f.body.windows(3).any(|w| w[0] == Tok::Ident("release".into()) && w[1] == Tok::Punct('(')
+            || w[1] == Tok::Ident("release".into()) && w[2] == Tok::Punct('(')), "{name} must call clatter_set::release");
+    }
+    let fail = graph.funcs.iter().find(|f| f.file == "features/mashout.rs" && f.name == "fail").unwrap();
+    assert!(fail.body.contains(&Tok::Ident("revoke".into())), "Game::fail must revoke (and so release)");
     let lobby = plugin_reach(&graph, &["lobby::update"]);
     for name in ["service", "scene"] {
         assert!(lobby.iter().any(|&i| graph.funcs[i].file == "features/mashout/clatter_set.rs" && graph.funcs[i].name == name),

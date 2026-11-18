@@ -354,6 +354,10 @@ impl Game {
         if self.step == next {
             return;
         }
+        if !matches!(next, Step::Entering | Step::Held) {
+            // O4: every exit from an attempt closes the M3 observer gate (restore at the next owner-site call).
+            clatter_set::release();
+        }
         self.step = next;
         post(worker::Event::Setup(self.generation, text), self.generation);
         #[cfg(feature = "diag")]
