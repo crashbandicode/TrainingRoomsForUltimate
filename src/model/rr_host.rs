@@ -115,6 +115,10 @@ static CPU_FRAMES: hos_lock::Mutex<FrameQueue> = hos_lock::Mutex::new(FrameQueue
 static CURRENT_KIND: AtomicU32 = AtomicU32::new(u32::MAX);
 static RUN_PLAYER: AtomicBool = AtomicBool::new(false);
 static RUN_CPU: AtomicBool = AtomicBool::new(false);
+/// A hook cut the role's run (mash, load): its queued frames are dead until the worker's tick clears them. Hooks only set
+/// these, so a cut never waits on the queue lock the worker holds (tr-review-astra-3 14:34Z).
+static CUT_PLAYER: AtomicBool = AtomicBool::new(false);
+static CUT_CPU: AtomicBool = AtomicBool::new(false);
 static MACHINE: Mutex<Option<Playback>> = Mutex::new(None);
 static RESIDENT: Mutex<Option<Resident>> = Mutex::new(None);
 static MENU_EFFECT: Mutex<Effect> = Mutex::new(Effect::None);
@@ -258,7 +262,7 @@ fn playing() -> bool {
 
 /// The machine still steps the role, or its hook still has frames of the run to play.
 fn role_playing(role: Role) -> bool {
-    run_flag(role).load(Ordering::Acquire) || !role_frames(role).lock().is_empty()
+    run_flag(role).load(Ordering::Acquire) || !cut_flag(role).load(Ordering::Acquire) && !role_frames(role).lock().is_empty()
 }
 
 fn run_flag(role: Role) -> &'static AtomicBool {
@@ -266,6 +270,25 @@ fn run_flag(role: Role) -> &'static AtomicBool {
         Role::Player => &RUN_PLAYER,
         Role::Cpu => &RUN_CPU,
     }
+}
+
+fn cut_flag(role: Role) -> &'static AtomicBool {
+    match role {
+        Role::Player => &CUT_PLAYER,
+        Role::Cpu => &CUT_CPU,
+    }
+}
+
+/// A hook's cut: atomics only (no lock); the worker's next tick clears the queue (`clear_cut`).
+fn cut(role: Role) {
+    cut_flag(role).store(true, Ordering::Release);
+    run_flag(role).store(false, Ordering::Release);
+}
+
+/// Worker side: the cut run's queue and owed start speed go, then its frames count again.
+fn clear_cut(role: Role) {
+    drop_frames(role);
+    cut_flag(role).store(false, Ordering::Release);
 }
 
 pub fn set_record_role(role: Role) {
@@ -392,11 +415,7 @@ pub fn on_chords(record: bool, play_player: bool, play_cpu: bool) {
 /// the tick still drives the machine's mash (`MASH`).
 pub fn note_mash() {
     MASH.store(true, Ordering::Release);
-    let mut frames = CPU_FRAMES.lock();
-    RUN_CPU.store(false, Ordering::Release);
-    frames.clear();
-    drop(frames);
-    owe_start_speed(Role::Cpu, None);
+    cut(Role::Cpu);
 }
 
 /// A save-state load was accepted. A Play's own warp (`WARP_HOLD`) is the start of that playback, not a stop.
@@ -406,11 +425,8 @@ pub fn note_load() {
         return;
     }
     LOAD.store(true, Ordering::Release);
-    for role in [Role::Player, Role::Cpu] {
-        let mut frames = role_frames(role).lock();
-        run_flag(role).store(false, Ordering::Release);
-        frames.clear();
-    }
+    cut(Role::Player);
+    cut(Role::Cpu);
 }
 
 /// What the CPU's behaviours see of playback (B5 / N4, Mash interrupts playback): the old recorder's state, with a
@@ -532,12 +548,12 @@ pub(crate) fn capture_role() -> u8 {
 }
 
 pub fn take_player_frame() -> Option<InputFrame> {
-    take_frame(&PLAYER_FRAMES)
+    take_frame(Role::Player)
 }
 
 #[cfg(any(test, target_os = "switch"))]
 pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
-    take_frame(&CPU_FRAMES)
+    take_frame(Role::Cpu)
 }
 
 /// Player 1's poll. Injects one posted frame, then stores the output when Player 1 is the recorded role. Returns whether
@@ -653,7 +669,7 @@ pub fn service_at(
         // (RECORDING.md: "stops the macro that role is playing"; primary 2026-11-08 13:05Z).
         drive_mash(machine, Role::Cpu, true);
         RUN_CPU.store(false, Ordering::Release);
-        drop_frames(Role::Cpu);
+        clear_cut(Role::Cpu);
         tick.diags.push("screen=playback mash=1".to_string());
     }
     if load {
@@ -662,7 +678,7 @@ pub fn service_at(
         for role in [Role::Player, Role::Cpu] {
             drive_mash(machine, role, true);
             run_flag(role).store(false, Ordering::Release);
-            drop_frames(role);
+            clear_cut(role);
         }
         tick.diags.push("screen=playback load=1".to_string());
     }
@@ -1676,11 +1692,11 @@ fn taken_frames() -> (Role, Vec<InputFrame>) {
 
 /// One frame for this game frame. Nothing while a warp's restore is pending: a frame fed before the
 /// restore is undone by it, so the run waits where it is.
-fn take_frame(frames: &hos_lock::Mutex<FrameQueue>) -> Option<InputFrame> {
-    if WARP_HOLD.load(Ordering::Acquire) {
+fn take_frame(role: Role) -> Option<InputFrame> {
+    if WARP_HOLD.load(Ordering::Acquire) || cut_flag(role).load(Ordering::Acquire) {
         return None;
     }
-    frames.lock().pop().map(unpack)
+    role_frames(role).lock().pop().map(unpack)
 }
 
 fn role_frames(role: Role) -> &'static hos_lock::Mutex<FrameQueue> {
@@ -1738,6 +1754,8 @@ fn reset_host() {
     PLAY_CPU.store(false, Ordering::Release);
     MASH.store(false, Ordering::Release);
     LOAD.store(false, Ordering::Release);
+    CUT_PLAYER.store(false, Ordering::Release);
+    CUT_CPU.store(false, Ordering::Release);
     MIGRATED.store(false, Ordering::Release);
     PLAYER_FRAMES.lock().clear();
     CPU_FRAMES.lock().clear();
@@ -2397,6 +2415,39 @@ mod tests {
         // Astra 08:38Z: a worker already inside step_role publishes its frame after the mash cut the run.
         publish(Role::Cpu, InputFrame { buttons: 99, ..InputFrame::default() });
         assert!(take_cpu_frame().is_none() && !cpu_playback(idle).running, "an in-flight producer cannot refill a cut run");
+    }
+
+    /// tr-review-astra-3 14:34Z: note_mash and note_load run in game hooks (CPU command hook, the load request). They must
+    /// not wait on a lock the macros worker holds (the frame queues, the start speeds). Hold them on another thread, as the
+    /// worker would, and the hook-side calls must still return.
+    fn the_hook_side_cuts_never_wait_on_worker_locks() {
+        let _hold = hold();
+        reset_host();
+        let (held_tx, held_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+        let worker = std::thread::spawn(move || {
+            let _cpu = CPU_FRAMES.lock();
+            let _player = PLAYER_FRAMES.lock();
+            let _speed = START_SPEED.lock();
+            let _ = held_tx.send(());
+            let _ = release_rx.recv_timeout(std::time::Duration::from_secs(10));
+        });
+        held_rx.recv().unwrap();
+        RUN_CPU.store(true, Ordering::Release);
+        RUN_PLAYER.store(true, Ordering::Release);
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let hook = std::thread::spawn(move || {
+            note_mash();
+            note_load();
+            let _ = done_tx.send(());
+        });
+        let returned = done_rx.recv_timeout(std::time::Duration::from_secs(2)).is_ok();
+        let _ = release_tx.send(());
+        let _ = worker.join();
+        let _ = hook.join();
+        assert!(returned, "a hook-side cut waited on a lock the worker held");
+        assert!(!RUN_CPU.load(Ordering::Acquire) && !RUN_PLAYER.load(Ordering::Acquire), "both runs are cut");
+        assert!(take_cpu_frame().is_none() && take_player_frame().is_none() && !playing(), "and nothing of them plays");
     }
 
     /// Astra 09:48Z: the worker inside `step_role` when a mash cuts an endless (Loop ∞) CPU run must return. `publish`
@@ -3637,6 +3688,7 @@ mod tests {
             ("a_load_stops_both_runs_but_not_a_plays_own_warp", a_load_stops_both_runs_but_not_a_plays_own_warp as fn()),
             ("the_mash_stop_is_seen_by_the_cpu_before_the_next_tick", the_mash_stop_is_seen_by_the_cpu_before_the_next_tick as fn()),
             ("a_cut_endless_run_does_not_spin_the_worker", a_cut_endless_run_does_not_spin_the_worker as fn()),
+            ("the_hook_side_cuts_never_wait_on_worker_locks", the_hook_side_cuts_never_wait_on_worker_locks as fn()),
             ("cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing", cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing as fn()),
             ("player_frames_reach_the_poll_once_each_whatever_the_worker_timing", player_frames_reach_the_poll_once_each_whatever_the_worker_timing as fn()),
             ("a_stopped_cpu_run_feeds_nothing_more", a_stopped_cpu_run_feeds_nothing_more as fn()),
