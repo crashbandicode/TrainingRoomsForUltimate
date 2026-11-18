@@ -421,7 +421,7 @@ mod state_natives {
     pub fn article_is_exist(cpu: usize, article: i32) -> bool {
         assert_ne!(cpu, 0);
         if super::ICE_SHOT_FIXTURE.load(super::Ordering::Relaxed) {
-            assert_eq!(article, 0);
+            assert_eq!(article, super::climber_article());
             assert!(matches!(cpu, 2 | super::NANA_BOMA));
             let mask = if cpu == 2 { 1 } else { 2 };
             return super::ICE_SHOT_ARTICLES.load(super::Ordering::Relaxed) & mask != 0;
@@ -543,6 +543,7 @@ fn state_id(c: C) -> Option<i32> {
         "FIGHTER_BRAVE_STATUS_KIND_SPECIAL_LW_START" => return Some(497),
         "FIGHTER_STATUS_KIND_SPECIAL_N" => return Some(476),
         "FIGHTER_POPO_GENERATE_ARTICLE_ICESHOT" => return Some(0),
+        "FIGHTER_POPO_GENERATE_ARTICLE_BLIZZARD" => return Some(1),
         "FIGHTER_POPO_INSTANCE_WORK_ID_INT_PARTNER_OBJECT_ID" => return Some(0x1000_00be),
         "FIGHTER_KIND_NANA" => return Some(0x4c),
         "BATTLE_OBJECT_ID_INVALID" => return Some(0x5000_0000),
@@ -3240,13 +3241,33 @@ static NANA_STATUS: AtomicU32 = AtomicU32::new(0);
 static NANA_OBJECT: AtomicU32 = AtomicU32::new(0x402);
 static NANA_ENTRY: AtomicU32 = AtomicU32::new(1);
 static SOLO_POPO: AtomicBool = AtomicBool::new(false);
+// The Ice Climbers row under test: 114 Ice Shot (SPECIAL_N, ICESHOT 0) or 113 Blizzard (SPECIAL_LW, BLIZZARD 1),
+// which share the per-climber closure (reviewer 17:42Z option (c)).
+static CLIMBER: AtomicU32 = AtomicU32::new(114);
+
+fn climber() -> u16 {
+    CLIMBER.load(Ordering::Relaxed) as u16
+}
+fn climber_cast() -> u32 {
+    if climber() == 113 { 479 } else { 476 }
+}
+fn climber_article() -> i32 {
+    i32::from(climber() == 113)
+}
+fn each_climber(case: impl Fn()) {
+    for id in [114, 113] {
+        CLIMBER.store(id, Ordering::Relaxed);
+        case();
+    }
+    CLIMBER.store(114, Ordering::Relaxed);
+}
 
 unsafe fn live_ice_shot() -> (Box<NativeMemory>, Game) {
     let mut m = NativeMemory::new();
     m.body[3] = 75;
-    let mut game = Game::new(Plan::IceShot, State::Frozen);
+    let mut game = Game::new(if climber() == 113 { Plan::Blizzard } else { Plan::IceShot }, State::Frozen);
     let request = game.requested.as_mut().unwrap();
-    request.id = 114;
+    request.id = climber();
     request.attacker_kind = 75;
     request.attacker_name = "Ice Climbers";
     game.step = Step::Settle;
@@ -3264,8 +3285,8 @@ unsafe fn live_ice_shot() -> (Box<NativeMemory>, Game) {
     SOLO_POPO.store(false, Ordering::Relaxed);
     CPU_STATUS.store(0, Ordering::Relaxed);
     m.update(&mut game, 0);
-    assert_eq!(clatter_set::ARMS.with_borrow(Clone::clone), vec![(game.generation as u32, 114)]);
-    CPU_STATUS.store(476, Ordering::Relaxed);
+    assert_eq!(clatter_set::ARMS.with_borrow(Clone::clone), vec![(game.generation as u32, climber())]);
+    CPU_STATUS.store(climber_cast(), Ordering::Relaxed);
     m.seed(73.25, 7.0, 1);
     m.start();
     m.update(&mut game, 203);
@@ -3278,7 +3299,7 @@ fn publish_ice_shot_set(game: &Game, sequence: u32) -> f32 {
     let old = game.clock.unwrap().last().remaining;
     let new = old + 4.0;
     clatter_set::PUBLISHED.with_borrow_mut(|writes| writes.push(model::mashout::clatter::ClatterWrite {
-        generation: game.generation as u32, seq: sequence, slot: model::mashout::clatter::Slot::Set, tag: 114,
+        generation: game.generation as u32, seq: sequence, slot: model::mashout::clatter::Slot::Set, tag: climber(),
         old: old.to_bits(), operand: new.to_bits(), new: new.to_bits(), frame: 1, d_max: 250.0f32.to_bits(),
     }));
     new
@@ -3286,6 +3307,10 @@ fn publish_ice_shot_set(game: &Game, sequence: u32) -> f32 {
 
 #[test]
 fn ice_shot_waits_for_both_providers_before_posting_a_grade() {
+    each_climber(|| ice_shot_waits_for_both_providers_before_posting_a_grade_case());
+}
+
+fn ice_shot_waits_for_both_providers_before_posting_a_grade_case() {
     unsafe {
         let (mut m, mut game) = live_ice_shot();
         let new = publish_ice_shot_set(&game, 1);
@@ -3293,7 +3318,7 @@ fn ice_shot_waits_for_both_providers_before_posting_a_grade() {
         m.update(&mut game, 203);
         assert_eq!(game.step, Step::Held, "{:?}", game.failed);
         CPU_STATUS.store(0, Ordering::Relaxed);
-        NANA_STATUS.store(476, Ordering::Relaxed);
+        NANA_STATUS.store(climber_cast(), Ordering::Relaxed);
         m.update(&mut game, 68);
         assert_eq!(game.step, Step::Held, "Nana can still shoot");
         assert_eq!(FINISHED.get(), 0);
@@ -3315,16 +3340,28 @@ fn ice_shot_waits_for_both_providers_before_posting_a_grade() {
 
 #[test]
 fn ice_shot_refuses_either_live_article_on_escape_or_during_wait() {
+    each_climber(|| ice_shot_refuses_either_live_article_on_escape_or_during_wait_case());
+}
+
+fn ice_shot_refuses_either_live_article_on_escape_or_during_wait_case() {
     unsafe { ice_shot_refuses_live_provider(&ICE_SHOT_ARTICLES, "article") }
 }
 
 #[test]
 fn ice_shot_refuses_either_fighter_attack_on_escape_or_during_wait() {
+    each_climber(|| ice_shot_refuses_either_fighter_attack_on_escape_or_during_wait_case());
+}
+
+fn ice_shot_refuses_either_fighter_attack_on_escape_or_during_wait_case() {
     unsafe { ice_shot_refuses_live_provider(&ICE_SHOT_ATTACKS, "attack slot 9") }
 }
 
 #[test]
 fn ice_shot_uses_each_body_count_and_refuses_an_unreadable_bound() {
+    each_climber(|| ice_shot_uses_each_body_count_and_refuses_an_unreadable_bound_case());
+}
+
+fn ice_shot_uses_each_body_count_and_refuses_an_unreadable_bound_case() {
     unsafe {
         for rejected_body in 0..2 {
             for invalid in [0, 17] {
@@ -3369,6 +3406,10 @@ unsafe fn ice_shot_refuses_live_provider(active: &AtomicU32, source: &str) {
 
 #[test]
 fn ice_shot_refuses_a_set_after_the_native_escape() {
+    each_climber(|| ice_shot_refuses_a_set_after_the_native_escape_case());
+}
+
+fn ice_shot_refuses_a_set_after_the_native_escape_case() {
     unsafe {
         let (m, mut game) = live_ice_shot();
         m.update(&mut game, 68);
@@ -3384,6 +3425,10 @@ fn ice_shot_refuses_a_set_after_the_native_escape() {
 
 #[test]
 fn ice_shot_refuses_unknown_provider_and_bounds_the_wait() {
+    each_climber(|| ice_shot_refuses_unknown_provider_and_bounds_the_wait_case());
+}
+
+fn ice_shot_refuses_unknown_provider_and_bounds_the_wait_case() {
     unsafe {
         for case in 0..5 {
             let (m, mut game) = live_ice_shot();

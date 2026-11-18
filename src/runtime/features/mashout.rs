@@ -633,7 +633,8 @@ unsafe fn trail_blizzard_closed(cpu: usize) -> Result<bool, ()> {
 
 /// SPECIAL_N can issue an Ice Shot at frame 18, and the projectile owns the hitboxes.
 /// Once P1 escapes, a live shot makes the counterfactual bounds unknowable.
-unsafe fn ice_shot_provider_closed(cpu: usize, cpu_entry: i32) -> Result<bool, &'static str> {
+/// 113 (reviewer 17:42Z option (c)): the same per-climber rule with SPECIAL_LW and the Blizzard article (id 1).
+unsafe fn climbers_provider_closed(cpu: usize, cpu_entry: i32, (cast, hitbox_article): (C, C)) -> Result<bool, &'static str> {
     use crate::model::{sites_hitbox, sites_pkg2, sites_pkg3};
     if ![
         sites_hitbox::HITBOX_IS_ATTACK_OFFSET,
@@ -647,7 +648,7 @@ unsafe fn ice_shot_provider_closed(cpu: usize, cpu_entry: i32) -> Result<bool, &
         return Err(UNAVAILABLE_NOTICE);
     }
     let [Some(special), Some(article), Some(partner), Some(nana_kind), Some(entry_id), Some(invalid)] = [
-        C::StatusSpecialN, C::PopoArticleIceShot, C::PopoPartnerObjectId,
+        cast, hitbox_article, C::PopoPartnerObjectId,
         C::KindNana, C::WorkIntEntryId, C::InvalidBattleObjectId,
     ].map(state_id) else {
         return Err(UNAVAILABLE_NOTICE);
@@ -1635,8 +1636,13 @@ pub unsafe fn frame(fighter: usize) {
                 return;
             };
             let egg = game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Egg);
-            let ice_shot = game.requested.is_some_and(|r| r.id == crate::model::mashout::clatter::TAG_ICE_SHOT_114);
-            let waiting_for_provider = (egg || ice_shot) && clock.exhausted();
+            // Ice Climbers rows whose provider closes per climber: (the cast status, its hitbox article).
+            let climbers = game.requested.and_then(|r| match r.id {
+                113 => Some((C::StatusSpecialLw, C::PopoArticleBlizzard)),
+                crate::model::mashout::clatter::TAG_ICE_SHOT_114 => Some((C::StatusSpecialN, C::PopoArticleIceShot)),
+                _ => None,
+            });
+            let waiting_for_provider = (egg || climbers.is_some()) && clock.exhausted();
             let before = clock.last();
             let elapsed_before = clock.elapsed();
             let live = if waiting_for_provider {
@@ -1677,7 +1683,7 @@ pub unsafe fn frame(fighter: usize) {
                 }
             }
             if refused
-                || (ice_shot && waiting_for_provider && count > 0)
+                || (climbers.is_some() && waiting_for_provider && count > 0)
                 || live.is_some_and(|live| clock.observe_writes(live.record, live.input, escaped, &writes[..count]).is_err())
             {
                 #[cfg(feature = "diag")]
@@ -1770,12 +1776,12 @@ pub unsafe fn frame(fighter: usize) {
                     }
                 }
             }
-            if ice_shot && clock.exhausted() {
-                match ice_shot_provider_closed(cpu, cpu_entry) {
+            if let Some(provider) = climbers.filter(|_| clock.exhausted()) {
+                match climbers_provider_closed(cpu, cpu_entry, provider) {
                     Ok(true) => {
                         #[cfg(feature = "diag")]
                         crate::runtime::diag_log::enqueue_diagnostic(format_args!(
-                            "[Mashout] ice_shot_provider_closed gen={} t={}", game.generation, clock.elapsed()
+                            "[Mashout] climbers_provider_closed gen={} t={}", game.generation, clock.elapsed()
                         ));
                     }
                     Ok(false) if game.provider_close_frames < PROVIDER_CLOSE_FRAMES => {
@@ -1794,8 +1800,9 @@ pub unsafe fn frame(fighter: usize) {
             if game.applied && (escaped || clock.exhausted()) {
                 if egg {
                     post(worker::Event::EggWrites(game.generation, game.epoch, game.sets, game.set_count as u8), game.generation);
-                } else if ice_shot || game.requested.is_some_and(|r| r.id == crate::model::mashout::ice116::TAG) {
-                    // G2: the worker replays the applied Sets in the bounds before the final Observe.
+                } else if climbers.is_some() || game.requested.is_some_and(|r| r.id == crate::model::mashout::ice116::TAG) {
+                    // G2 (113/114/116): the worker replays the applied Sets in the bounds before the final Observe
+                    // (ice116::bounds is a tag-agnostic Set replay; reviewer 10:55Z (A)).
                     post(worker::Event::Writes(game.generation, game.epoch, game.sets, game.set_count as u8), game.generation);
                 } else {
                     // restriction: MASH-M1-MISMATCH — observed writes kept the clock exact, but the F/T bounds don't
@@ -1838,8 +1845,12 @@ pub unsafe fn frame(fighter: usize) {
                 );
             }
             if clock.exhausted() {
-                if game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::IceMagic) {
-                    match trail_blizzard_closed(cpu) {
+                let closed = match game.requested.map(|r| r.plan) {
+                    Some(crate::model::mashout::moves::Plan::IceMagic) => Some(trail_blizzard_closed(cpu)),
+                    _ => None,
+                };
+                if let Some(closed) = closed {
+                    match closed {
                         Ok(true) => (),
                         Ok(false) => {
                             // restriction: MASH-M1-MISMATCH

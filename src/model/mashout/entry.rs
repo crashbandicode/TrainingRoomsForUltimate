@@ -707,6 +707,28 @@ mod tests {
         }
 
         #[test]
+        fn the_recorded_113_set_replays_through_the_shared_g2_and_extends_the_bounds() {
+            use super::super::ice116::{bounds, Applied};
+            use super::super::native::{Record, Seed, Solver};
+            // rc15-m3-l2b-restore-xps-3 gen 13 (fff850f7, 40%): the hold starts at remaining 39.278004 (tick t=1 before);
+            // the one qualified Set came 5 ticks in: old 0x42091cad (34.278004) -> new = operand 0x42663878 (57.555).
+            let seed = Seed { record: Record { remaining: 39.278_004, automatic: 1.0, manual: 4.0, button_mul: 1.8,
+                threshold: 0.5, sign: [0, 0], source: -1, stick_block: 0, button_block: 0, accepted: 0, other_block: 0,
+                cross_reload: 4, other_reload: 3 }, held: 0, deadline: None };
+            // d_max is published per Set at runtime; this host replay only needs a cap above the operand.
+            let set = Applied { boundary: 5, old: 0x4209_1cad, operand: 0x4266_3878, new: 0x4266_3878, d_max: 250f32.to_bits() };
+            assert_eq!(f32::from_bits(set.old), 39.278_004 - 5.0, "the Set's old is the clock after 5 ticks (G1 boundary 5)");
+            let mut plain = Solver::new(seed).unwrap();
+            let plain = loop {
+                if let Some(result) = plain.advance(64) {
+                    break result.unwrap();
+                }
+            };
+            let replayed = bounds(seed, &[set]).expect("one recorded 113 Set is insensitive to its unpublished ice frame");
+            assert!(replayed.fastest > plain.fastest && replayed.no_input > plain.no_input, "{replayed:?} vs {plain:?}");
+        }
+
+        #[test]
         fn trail_fire_cycle_fails_closed_on_unexpected_blizzard_without_panicking() {
             let mut actor = TrailMagicEntry::new(TrailMagicKind::Fire).unwrap();
             for status in [TrailMagicStatus::SpecialN, TrailMagicStatus::N1, TrailMagicStatus::N1Shoot, TrailMagicStatus::N1End] {

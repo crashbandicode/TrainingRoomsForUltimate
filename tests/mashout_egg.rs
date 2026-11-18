@@ -145,7 +145,7 @@ fn actual_runtime_egg_preparation_and_native_seed() {
             "// TROLLEY_INPUT",
             block(runtime, "unsafe fn trolley_input(").to_string(),
         ),
-        ("// ICE_SHOT_CLOSURE", block(runtime, "unsafe fn ice_shot_provider_closed(").to_string()),
+        ("// ICE_SHOT_CLOSURE", block(runtime, "unsafe fn climbers_provider_closed(").to_string()),
         (
             "// EGG_CLOSURE",
             [
