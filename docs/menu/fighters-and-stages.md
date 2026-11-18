@@ -437,6 +437,12 @@ opens it, **Y** resets it, **B** goes back to the list.
   keeps running. Settings you change for a running game apply at its next Start.
 - **Reset page to defaults** (the page's last line) also resets the settings inside the games' screens.
 
+![Practice games: A on Eggs-ercise opens its screen with Start first; A on Start closes the menu and the run begins](../media/rc15-practice-menu-start.gif)<br>
+*Fighters & Stages > Practice games: A on Eggs-ercise opens its screen (Start, then the mode 10 targets, Breaks on, Target, Target speed, CPU during a game); A on Start closes the menu, the first target pops up and the notice reads "Eggs 0/10". Eden, 2026-11-18, build 9aa51374 (untested on hardware).*
+
+![While Eggs-ercise runs: its screen's first row reads Stop with Running in green; A stops it and the row reads Start, the menu still open](../media/rc15-practice-menu-stop.gif)<br>
+*With Eggs-ercise running, the menu reopens on its screen: the first row reads Stop with "Running" in green. B goes back to the list, A opens the screen again, and A on Stop ends the game: the menu stays open and the row reads Start; then B closes the menu. Eden, 2026-11-18, build 9aa51374 (untested on hardware).*
+
 ### Eggs-ercise
 
 A practice game for your attacks. A target pops up from the ground. Hit it and it breaks, and the next one pops up
