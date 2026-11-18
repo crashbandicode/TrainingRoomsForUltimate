@@ -2659,6 +2659,24 @@ mod tests {
         reset_host();
     }
 
+    /// tr-review-astra-3 22:29Z (forward merge 7df21a40): the game hooks' per-frame pop never waits on the queue the
+    /// worker fills. While the worker holds it the hook takes no frame this game frame, and the frame stays pending.
+    fn the_frame_pop_never_waits_and_keeps_the_frame_on_contention() {
+        let _hold = hold();
+        reset_host();
+        let frame = InputFrame { buttons: 2, ..InputFrame::default() };
+        assert!(CPU_FRAMES.lock().push(pack(frame)));
+        let held = CPU_FRAMES.lock();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let hook = std::thread::spawn(move || tx.send(take_cpu_frame()).unwrap());
+        let got = rx.recv_timeout(std::time::Duration::from_millis(500));
+        drop(held);
+        hook.join().unwrap();
+        assert_eq!(got, Ok(None), "the hook's pop waited on the worker-held queue");
+        assert_eq!(take_cpu_frame(), Some(frame), "the frame stays pending for the next game frame");
+        reset_host();
+    }
+
     /// Parry practice's refusals (approved rows parry-practice-no-recording and parry-practice-start-save-missing).
     fn parry_refuses_without_a_recording_or_its_start_save() {
         let _hold = hold();
@@ -4068,6 +4086,7 @@ mod tests {
             ("parry_off_cancels_owed_passes", parry_off_cancels_owed_passes as fn()),
             ("parry_passes_owed_are_a_running_cpu_playback", parry_passes_owed_are_a_running_cpu_playback as fn()),
             ("parry_pass_mash_asks_to_stop_and_queues_nothing", parry_pass_mash_asks_to_stop_and_queues_nothing as fn()),
+            ("the_frame_pop_never_waits_and_keeps_the_frame_on_contention", the_frame_pop_never_waits_and_keeps_the_frame_on_contention as fn()),
             ("parry_refuses_without_a_recording_or_its_start_save", parry_refuses_without_a_recording_or_its_start_save as fn()),
             ("a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see", a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see as fn()),
             ("a_load_stops_both_runs_but_not_a_plays_own_warp", a_load_stops_both_runs_but_not_a_plays_own_warp as fn()),
