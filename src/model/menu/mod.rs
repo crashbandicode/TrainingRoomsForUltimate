@@ -144,8 +144,6 @@ pub struct Outbox {
     pub start: Option<Game>,
     /// Stop: the running game ends now and the menu stays open. Taken at once with `Menu::take_stop`.
     pub stop: bool,
-    /// A saved layout was loaded while Break the Targets runs: the close puts the course back to Ready with it.
-    pub btt_ready: bool,
 }
 
 /// Why a row or entry is greyed (it shows dimmed with this reason and ignores A).
@@ -1923,12 +1921,9 @@ impl Menu {
         }
     }
 
-    /// A layout was loaded from the Saved layouts screen: while Break the Targets runs, the close puts the course back to
-    /// Ready with it; otherwise Start plays it. True while it runs.
-    pub fn layout_loaded(&mut self) -> bool {
-        let running = self.env.running == Some(Game::Btt);
-        self.outbox.btt_ready |= running;
-        running
+    /// Break the Targets runs (the Saved layouts screen words its Load notice by it; the close starts nothing, Q1).
+    pub fn btt_running(&self) -> bool {
+        self.env.running == Some(Game::Btt)
     }
 
     /// The item the player chose on the Give item grid since the last call, if any.

@@ -121,6 +121,15 @@ def absent(ctx, pattern, window):
     raise RuntimeError(f'unexpected line: {pattern}')
 
 
+def none_since(ctx, log, pattern):
+    """No line matching `pattern` since `log` was opened (its earlier waits read past older lines only)."""
+    try:
+        found = log.wait(pattern, 0.5, ctx)
+    except RuntimeError:
+        return True
+    raise RuntimeError(f'unexpected line: {found.group(0)[:200]}')
+
+
 def open_menu(ctx):
     """Open the menu; returns its first state. It reopens where it was (`Place`): the page and any sub-screen."""
     # Boot 1 (r01 after a session clear, r06 right after a close): one chord was not taken and no opening line came, so the
@@ -388,6 +397,99 @@ def tech_views(ctx):
         log.close()
     close_all(ctx)
     return save(ctx, 'tech-views', out)
+
+
+CLOCK = r'\[Btt\] phase=Running n=\d+ .*?text="[^"]*?(\d+):(\d\d)\.(\d\d)'
+
+
+def btt_clock(ctx, cap=10):
+    found = waits(ctx, None, CLOCK, cap)
+    return int(found.group(1)) * 60 + int(found.group(2)) + int(found.group(3)) / 100, found.group(0)[:200]
+
+
+def btt_running_course(ctx):
+    """Start Break the Targets; with no target, place one; X; the first input starts the clock (`[Btt] phase=Running`)."""
+    open_game(ctx, 'Break the Targets')
+    out = {'start': start(ctx, 'Break the Targets', r'\[Btt\] phase=(Placing|Ready) ')}
+    log = cursor(ctx)
+    try:
+        if 'phase=Placing' in out['start']['line']:
+            if ' n=0 ' in out['start']['line']:
+                time.sleep(1.0)
+                ctx.press('a')
+                log.wait(r'\[Btt\] phase=Placing n=1 ', 10, ctx)
+            time.sleep(0.5)
+            ctx.press('x')
+            log.wait(r'\[Btt\] phase=Ready ', 15, ctx)
+        time.sleep(1.0)
+        ctx.press('a')
+        out['running'] = log.wait(r'\[Btt\] phase=Running ', 10, ctx).group(0)[:200]
+    finally:
+        log.close()
+    return out
+
+
+def btt_close_keeps_clock(ctx):
+    """Primary 15:30Z (Q1 for Break the Targets): opening and closing the menu neither restarts the run nor resets its
+    clock; only Start and Stop act."""
+    out = btt_running_course(ctx)
+    time.sleep(2.5)
+    before, out['before'] = btt_clock(ctx)
+    offset = trace_offset(ctx)
+    to_list(ctx)
+    focus(ctx, 'Break the Targets')
+    out['list'] = shot(ctx, 'btt-list-running', offset, ('Running',))
+    log = cursor(ctx)
+    try:
+        close_all(ctx)
+        time.sleep(3.0)
+        none_since(ctx, log, r'\[Practice\] (start|stop)|\[Btt\] phase=(Ready|Placing|Off) ')
+    finally:
+        log.close()
+    after, out['after'] = btt_clock(ctx)
+    if after < before:
+        raise RuntimeError(f'the clock went back: {before} -> {after}')
+    out['clock'] = {'before_open': before, 'after_close': after}
+    out['shot'] = shot(ctx, 'btt-running-after-close')
+    return save(ctx, 'btt-close-keeps-clock', out)
+
+
+def btt_load_while_running(ctx):
+    """A saved layout loaded while Break the Targets runs replaces the course and goes back to Ready with it (the Load's
+    own effect, in the game pass); the close after it starts nothing."""
+    folder = Path(ctx.instance['settings']).parent / 'layouts'
+    folder.mkdir(exist_ok=True)
+    (folder / 'practice-menu-two.json').write_text(json.dumps(
+        {'schema_version': 1, 'name': 'Practice two', 'stage': 0, 'used': 9,
+         'targets': [[-30.0, 30.0], [30.0, 30.0]]}) + '\n')
+    out = {'running_before': btt_clock(ctx)[1]}
+    open_game(ctx, 'Break the Targets')
+    focus_sub(ctx, 'Break the Targets', 'Saved layouts')
+    waits(ctx, 'a', r'\[Ui\] press A .*screen=Some\(External\(Layouts\)\)', 4)
+    # The Layouts screens are the external editor's: no `[Ui] press` lines, so its tile moves take short settles
+    # (MACROS: a fixed wait only where no state exists); the newest-used layout is the first entry.
+    time.sleep(0.6)
+    ctx.press('a')
+    time.sleep(0.6)
+    log, starts = cursor(ctx), cursor(ctx)
+    try:
+        ctx.press('a')
+        out['reread'] = log.wait(r'\[Btt\] layouts stage=0 [^\n]*', 15, ctx).group(0)[:200]
+        out['loaded_shot'] = shot(ctx, 'btt-layout-loaded-in-menu')
+        close_all(ctx)
+        # The game pass takes the layout (with the menu open or after the close): Ready with both targets up.
+        out['ready'] = log.wait(r'\[Btt\] phase=Ready n=2 ', 15, ctx).group(0)[:200]
+        time.sleep(1.0)
+        none_since(ctx, starts, r'\[Practice\] (start|stop)')
+    finally:
+        log.close()
+        starts.close()
+    out['after_close'] = 'no [Practice] start or stop line from the Load to 1 s after Ready'
+    # Stop: the only way it ends.
+    open_game(ctx, 'Break the Targets')
+    out['stop'] = waits(ctx, 'a', r'\[Practice\] stop game=Some\(Btt\)', 4).group(0)
+    close_all(ctx)
+    return save(ctx, 'btt-load-while-running', out)
 
 
 def gif(ctx, name, seconds, act):

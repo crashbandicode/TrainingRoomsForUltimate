@@ -1229,15 +1229,13 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     crate::runtime::stall_watch::worker_step(7);
     // LEAD-1: the visit's last pick per role rides in the publish; the game frame decides each role's one load.
     published::publish(&settings.menu, outbox.rerolls, outbox.picks);
-    // rc.15 practice menu (Q1): a close starts no game. Start, Place targets, Tech point and Tech wizard start theirs (after
-    // the publish above), which stops any other; a layout loaded while Break the Targets runs puts it back to Ready.
+    // rc.15 practice menu (Q1): a close starts, restarts and stops no game. Start, Place targets, Tech point and Tech wizard
+    // start theirs (after the publish above), which stops any other.
     crate::runtime::features::btt::menu_closed();
     crate::runtime::features::tech::menu_closed();
-    use crate::runtime::features::practice;
     if let Some(game) = outbox.start {
+        use crate::runtime::features::practice;
         practice::start(game, practice::How { place_targets: outbox.place_targets, tech_point: outbox.tech_point, tech_wizard: outbox.tech_wizard });
-    } else if outbox.btt_ready && practice::is(crate::model::practice_games::Game::Btt) {
-        practice::start(crate::model::practice_games::Game::Btt, practice::How::default());
     }
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(10);

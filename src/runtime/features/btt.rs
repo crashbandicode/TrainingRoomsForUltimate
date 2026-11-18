@@ -205,7 +205,12 @@ pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut([f32; 2]) -> bool) 
         if start || !on && mode.phase() != Phase::Off {
             mode.close_menu(on, place);
         }
-        CMDS.drain(|hot| mode.apply(hot));
+        // A layout loaded on the Saved layouts screen replaces the course; a run on the old one goes back to Ready with
+        // every new target up (`Btt::reset`), so no broken mark of the old course carries over. Placing stays Placing.
+        CMDS.drain(|hot| {
+            mode.apply(hot);
+            mode.reset();
+        });
         if on {
             let tick = mode.keeper(at) && !owners.covers_strip();
             broken = mode.pass(tick, hit);

@@ -574,7 +574,7 @@ positions belong to their stage.
   count as a use, and a sixth use pushes the oldest out of the five (its file stays). Up/Down move, **A** opens the
   layout's own screen, **B** goes back.
 - **A layout's own screen:** **Load** puts its targets on the stage: **Start** plays them from Ready. While Break the
-  Targets runs, closing the menu puts it back to Ready with them. **Rename** opens the Switch keyboard (B keeps the old name). **Duplicate** saves a copy as a new layout, at the
+  Targets runs, Load replaces the course at once and goes back to Ready with it. **Rename** opens the Switch keyboard (B keeps the old name). **Duplicate** saves a copy as a new layout, at the
   top of the list. **Delete** asks once: Keep it or Delete it.
 - **While placing:** the Save State chords work on the layout. **Save State Save** (ZL + D-pad Down by default) saves it as
   a new layout, named like "Layout 2 · Battlefield" (the lowest number free on that stage); a save never replaces another

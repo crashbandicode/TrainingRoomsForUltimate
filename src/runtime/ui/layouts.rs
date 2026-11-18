@@ -147,13 +147,13 @@ impl Ui {
     }
 
     /// Load: the game thread takes the targets and the file is used (top of the five). Start plays them; while Break the
-    /// Targets runs, closing the menu puts it back to Ready with them (rc.15 practice menu).
+    /// Targets runs, the loaded course replaces the run's at once, back at Ready (`btt::pass`). The close starts nothing.
     fn load(&mut self, id: &str, menu: Option<&mut Menu>) -> Option<String> {
         let layout = self.layout(id).ok()?.clone();
         let hot = btt::five(&[(id.to_owned(), layout.clone())], 1)[0]?;
         CMDS.post(hot);
-        let running = menu.is_some_and(Menu::layout_loaded);
-        let next = if running { "close the menu to play it" } else { "Start plays it" };
+        let running = menu.is_some_and(|m| m.btt_running());
+        let next = if running { "back to Ready with it" } else { "Start plays it" };
         let used = btt::use_file(root(), id, None).map(|()| format!("Loaded {}: {next}", layout.name));
         Some(self.changed(used))
     }
