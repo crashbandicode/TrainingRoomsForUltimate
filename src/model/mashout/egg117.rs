@@ -1,6 +1,6 @@
 //! Mash out 117 (Egg Lay) as a consumer of the M3 Add observer (M3-EVENT-INTERFACE v1.2: `Slot::Add`, FighterControl
 //! +0x98 → main+0x3f81c0, tag 117, qualifier LR common+0xc5b38, x0 the armed P1 Control, w1 0). Pure; the runtime
-//! wiring waits for the observer's gate and review, so nothing grades on observed writes yet.
+//! closes the provider and supplies the verified boundary-zero writes before grade publication.
 //!
 //! G1 (the actual clock) applies a write only at the tick boundary where its `old` is bit-equal to the model; this
 //! module takes the boundary G1 applied each write at. G2 replays every observed Add with its own operand, the native

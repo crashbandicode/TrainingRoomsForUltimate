@@ -228,6 +228,22 @@ impl<K: Copy + Eq> Run<K> {
         }
     }
 
+    /// Replace the preliminary bounds with the exact opening-write replay
+    /// before admitting the terminal observation.
+    pub fn replay_opening(
+        &mut self,
+        generation: u64,
+        solver: Solver,
+        update_key: impl FnOnce(K) -> K,
+    ) {
+        if generation == self.generation && self.phase == Phase::Mashing && !self.escaped {
+            self.key = self.key.map(update_key);
+            self.bounds = None;
+            self.error = None;
+            self.solver = Some(solver);
+        }
+    }
+
     pub fn observe(&mut self, elapsed: u32, escaped: bool) {
         if self.phase != Phase::Mashing || self.escaped {
             return;

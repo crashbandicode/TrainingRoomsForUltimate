@@ -18,6 +18,8 @@ mod model {
         }
         pub mod ice116 { // ICE116
         }
+        pub mod egg117 { // EGG117
+        }
     }
 }
 mod runtime {
@@ -250,6 +252,36 @@ mod worker {
                 "{text}"
             );
             assert!(text.contains("fastest") && text.contains("best"), "{text}");
+        }
+
+        #[test]
+        fn egg_opening_add_replaces_the_solver_and_partitions_the_best() {
+            reset();
+            begin(1, SeedOrigin::Export);
+            assert_eq!(solved().no_input, Some(8));
+            let mut writes = [crate::model::mashout::ice116::Applied {
+                boundary: 0, old: 0, operand: 0, new: 0, d_max: 0,
+            }; 8];
+            writes[0].old = 8.0f32.to_bits();
+            writes[0].operand = (-2.0f32).to_bits();
+            writes[0].new = 6.0f32.to_bits();
+            queue(Event::EggWrites(5, 1, writes, 1));
+            service();
+            assert_eq!(solved().no_input, Some(6));
+            finish(1);
+            {
+                let worker = WORKER.lock();
+                let original = key(SeedOrigin::Export);
+                let altered = worker.session.key().unwrap();
+                assert_eq!(worker.session.best(original), None);
+                assert_eq!(worker.session.best(altered), Some(worker.session.result().unwrap().bounds.fastest));
+            }
+
+            reset();
+            begin(1, SeedOrigin::Export);
+            queue(Event::EggWrites(5, 0, writes, 1));
+            service();
+            assert_eq!(solved().no_input, Some(8));
         }
 
         #[test]

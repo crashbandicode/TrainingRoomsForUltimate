@@ -108,6 +108,17 @@ fn actual_runtime_egg_preparation_and_native_seed() {
             block(runtime, "unsafe fn end_after(").to_string(),
         ),
         ("// ARM", block(runtime, "unsafe fn arm(").to_string()),
+        ("// EGG_PKG2_SITES", {
+            let sites = include_str!("../src/model/sites_pkg2.rs");
+            ["STATUS_KIND_OFFSET", "WORK_IS_FLAG_OFFSET", "WORK_GET_INT_OFFSET", "UTILITY_GET_KIND_OFFSET"]
+                .map(|name| sites.lines()
+                    .find(|line| line.starts_with(&format!("pub const {name}:")))
+                    .unwrap())
+                .join("\n")
+        }),
+        ("// EGG_HITBOX_SITES", include_str!("../src/model/sites_hitbox.rs").lines()
+            .find(|line| line.starts_with("pub const HITBOX_IS_ATTACK_OFFSET:"))
+            .unwrap().to_string()),
         ("// TROLLEY_SITES", {
             let sites = include_str!("../src/model/sites_pkg3.rs");
             [
@@ -133,6 +144,13 @@ fn actual_runtime_egg_preparation_and_native_seed() {
         (
             "// TROLLEY_INPUT",
             block(runtime, "unsafe fn trolley_input(").to_string(),
+        ),
+        (
+            "// EGG_CLOSURE",
+            [
+                runtime.lines().find(|line| line.starts_with("const EGG_CLOSE_FRAMES:")).unwrap(),
+                block(runtime, "unsafe fn egg_provider_closed("),
+            ].join("\n"),
         ),
         (
             "// TRAIL_MAGIC_KIND",
@@ -256,6 +274,10 @@ fn actual_runtime_worker_native_epoch_admission_and_bests() {
         (
             "// ICE116",
             production(include_str!("../src/model/mashout/ice116.rs")).to_owned(),
+        ),
+        (
+            "// EGG117",
+            production(include_str!("../src/model/mashout/egg117.rs")).to_owned(),
         ),
         (
             "// RUN",
