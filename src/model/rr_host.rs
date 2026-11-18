@@ -238,6 +238,13 @@ pub fn migrated() -> bool {
     MIGRATED.load(Ordering::Acquire)
 }
 
+/// FS-027 / FS-031: a Recording-page take is open, or its Record edge waits for the next service. The busy guards
+/// (`recorder::recording_or_playback`) read this, because the old recorder machine never sees rr_host's takes. Playback is
+/// left out on purpose: a fighter-mismatch Switch is admitted while its play has started, and must not refuse itself.
+pub fn taking() -> bool {
+    CAP_ROLE.load(Ordering::Acquire) != 0 || RECORD_EDGE.load(Ordering::Acquire) != 0
+}
+
 pub fn pending() -> bool {
     RECORD_EDGE.load(Ordering::Acquire) != 0
         || PLAY_PLAYER.load(Ordering::Acquire)
@@ -2810,6 +2817,22 @@ mod tests {
         assert!(names.iter().any(|name| name == "Combo 1"), "{names:?}");
     }
 
+    fn a_take_is_busy_from_its_record_edge_until_its_stop_is_serviced() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("taking");
+        assert!(!taking());
+        on_chords(true, false, false);
+        assert!(taking(), "the Record edge is busy before its service");
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        assert!(taking(), "an open take is busy");
+        on_chords(true, false, false);
+        assert!(taking(), "the stop edge is busy until it is serviced");
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        assert!(!taking(), "a serviced stop is idle");
+        on_chords(false, true, false);
+        assert!(!taking(), "a play is not a take: its own fighter Switch must stay admissible");
+    }
     fn mismatch_holds_playback_until_keep_or_switch() {
         let _hold = hold();
         reset_host();
@@ -3702,6 +3725,7 @@ mod tests {
             ("direct_drill_overflow_saves_nothing_and_reopening_cancels_arm",direct_drill_overflow_saves_nothing_and_reopening_cancels_arm as fn()),
             ("make_combo_no_hit_saves_input_drill_not_previous_exchange", make_combo_no_hit_saves_input_drill_not_previous_exchange as fn()),
             ("save_last_combo_writes_the_latest_exchange_names_it_and_drills_it", save_last_combo_writes_the_latest_exchange_names_it_and_drills_it as fn()),
+            ("a_take_is_busy_from_its_record_edge_until_its_stop_is_serviced", a_take_is_busy_from_its_record_edge_until_its_stop_is_serviced as fn()),
             ("mismatch_holds_playback_until_keep_or_switch", mismatch_holds_playback_until_keep_or_switch as fn()),
             ("an_answered_mismatch_wakes_the_service_gate_and_plays", an_answered_mismatch_wakes_the_service_gate_and_plays as fn()),
             ("the_mismatch_ask_names_the_side_that_plays", the_mismatch_ask_names_the_side_that_plays as fn()),

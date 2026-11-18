@@ -661,7 +661,7 @@ unsafe fn remember_named_pose() {
 
 /// The recorder is in a phase other than Idle (the record lockout, standby, recording or a playback).
 pub fn recording_or_playback() -> bool {
-    ACTIVE.load(Ordering::Acquire)
+    ACTIVE.load(Ordering::Acquire) || recording_host::taking()
 }
 
 /// The replay editor holds the input (`Owners::REPLAY_EDITOR`; the editor is the named-macro layer, S4-4, so
