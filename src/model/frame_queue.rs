@@ -7,55 +7,95 @@
 //! frame, so the macro advances with the game and not with the worker. Fixed storage: the hooks take
 //! from it without allocating.
 
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+
 /// Frames buffered ahead of the hook, about one second at 60 fps.
 pub const AHEAD: usize = 64;
 
-/// A ring of packed frames (`rr_host`'s `pack`) in the order the run plays them.
-#[derive(Clone, Copy, Debug)]
+/// One Menu worker publishes and clears. One game-thread hook consumes each role.
 pub struct FrameQueue {
-    words: [u64; AHEAD],
-    head: usize,
-    len: usize,
+    words: [AtomicU64; AHEAD],
+    head: AtomicUsize,
+    tail: AtomicUsize,
+    generation_start: AtomicUsize,
 }
 
 impl FrameQueue {
     pub(crate) const fn new() -> Self {
-        Self { words: [0; AHEAD], head: 0, len: 0 }
+        Self {
+            words: [const { AtomicU64::new(0) }; AHEAD],
+            head: AtomicUsize::new(0),
+            tail: AtomicUsize::new(0),
+            generation_start: AtomicUsize::new(0),
+        }
     }
 
-    pub const fn is_empty(&self) -> bool {
-        self.len == 0
+    pub fn is_empty(&self) -> bool {
+        let head = self.head.load(Ordering::Acquire);
+        let generation = self.generation_start.load(Ordering::Acquire);
+        Self::live_head(head, generation) == self.tail.load(Ordering::Acquire)
     }
 
-    pub const fn room(&self) -> usize {
-        AHEAD - self.len
+    /// The worker checks room before advancing playback. Only that worker fills it.
+    pub fn room(&self) -> usize {
+        let tail = self.tail.load(Ordering::Relaxed);
+        AHEAD - tail.wrapping_sub(self.producer_head())
     }
 
-    /// A new run, or a stopped one: drop what is buffered.
-    pub fn clear(&mut self) {
-        self.head = 0;
-        self.len = 0;
+    /// Start a new generation at the published tail. Only the hook writes head.
+    pub fn clear(&self) {
+        let tail = self.tail.load(Ordering::Relaxed);
+        self.generation_start.store(tail, Ordering::Release);
     }
 
-    /// Append the run's next frame. `false` when the queue is full: a frame is never written over.
-    pub fn push(&mut self, word: u64) -> bool {
-        if self.len == AHEAD {
+    /// Append the run's next frame. A full queue keeps every published frame.
+    pub fn push(&self, word: u64) -> bool {
+        let tail = self.tail.load(Ordering::Relaxed);
+        if tail.wrapping_sub(self.producer_head()) == AHEAD {
             return false;
         }
-        self.words[(self.head + self.len) % AHEAD] = word;
-        self.len += 1;
+        self.words[tail % AHEAD].store(word, Ordering::Release);
+        self.tail.store(tail.wrapping_add(1), Ordering::Release);
         true
     }
 
-    /// The oldest frame, once.
-    pub fn pop(&mut self) -> Option<u64> {
-        if self.len == 0 {
-            return None;
+    /// Take the oldest live frame once. Retry only when a clear invalidates the slot.
+    pub fn pop(&self) -> Option<u64> {
+        let head = self.head.load(Ordering::Relaxed);
+        loop {
+            let generation = self.generation_start.load(Ordering::Acquire);
+            let at = Self::live_head(head, generation);
+            if at == self.tail.load(Ordering::Acquire) {
+                return None;
+            }
+            if let Some(word) = self.read_live(at, generation) {
+                self.head.store(at.wrapping_add(1), Ordering::Release);
+                return Some(word);
+            }
         }
-        let word = self.words[self.head];
-        self.head = (self.head + 1) % AHEAD;
-        self.len -= 1;
-        Some(word)
+    }
+
+    fn producer_head(&self) -> usize {
+        let head = self.head.load(Ordering::Acquire);
+        let generation = self.generation_start.load(Ordering::Relaxed);
+        Self::live_head(head, generation)
+    }
+
+    fn live_head(head: usize, generation: usize) -> usize {
+        // Sequences are ordered across integer wrap. A generation lasts less than
+        // half the sequence space on the 64-bit targets.
+        if (generation.wrapping_sub(head) as isize) > 0 {
+            generation
+        } else {
+            head
+        }
+    }
+
+    fn read_live(&self, at: usize, generation: usize) -> Option<u64> {
+        let word = self.words[at % AHEAD].load(Ordering::Acquire);
+        // If this load sees a reused slot, it also sees the clear that preceded
+        // that slot's Release store. Recheck before committing the pop.
+        (self.generation_start.load(Ordering::Acquire) == generation).then_some(word)
     }
 }
 
@@ -65,7 +105,7 @@ mod tests {
     use super::*;
 
     fn frames_come_out_once_in_order() {
-        let mut q = FrameQueue::new();
+        let q = FrameQueue::new();
         for i in 0..10u64 {
             assert!(q.push(i + 100));
         }

@@ -110,8 +110,8 @@ static MIGRATED: AtomicBool = AtomicBool::new(false);
 /// Played frames, filled ahead by the worker and taken one per game frame by Player 1's poll and the
 /// CPU's AI epilogue. One slot lost frames: the worker is not tied to the game's frames (Eden
 /// `rc5-fid-measure1`, 2026-11-08: one CPU frame every three AI frames on a recorded play).
-static PLAYER_FRAMES: hos_lock::Mutex<FrameQueue> = hos_lock::Mutex::new(FrameQueue::new());
-static CPU_FRAMES: hos_lock::Mutex<FrameQueue> = hos_lock::Mutex::new(FrameQueue::new());
+static PLAYER_FRAMES: FrameQueue = FrameQueue::new();
+static CPU_FRAMES: FrameQueue = FrameQueue::new();
 static CURRENT_KIND: AtomicU32 = AtomicU32::new(u32::MAX);
 static RUN_PLAYER: AtomicBool = AtomicBool::new(false);
 static RUN_CPU: AtomicBool = AtomicBool::new(false);
@@ -269,7 +269,7 @@ fn playing() -> bool {
 
 /// The machine still steps the role, or its hook still has frames of the run to play.
 fn role_playing(role: Role) -> bool {
-    run_flag(role).load(Ordering::Acquire) || !cut_flag(role).load(Ordering::Acquire) && !role_frames(role).lock().is_empty()
+    run_flag(role).load(Ordering::Acquire) || !cut_flag(role).load(Ordering::Acquire) && !role_frames(role).is_empty()
 }
 
 fn run_flag(role: Role) -> &'static AtomicBool {
@@ -1221,7 +1221,7 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
         // The fighters match now: an answer to an earlier question applies to nothing and must not answer the next one.
         lock(&ANSWER).take();
     }
-    if !machine.playing(role) && !role_frames(role).lock().is_empty() {
+    if !machine.playing(role) && !role_frames(role).is_empty() {
         // The machine has handed over its last frames but the hook is still playing them: the chord stops
         // that run, as it does while the machine still steps.
         drop_frames(role);
@@ -1283,7 +1283,7 @@ fn step_role(root: &Path, machine: &mut Playback, book: &Book, role: Role) {
     }
     // A cut run (its flag cleared by a mash) stops here: `publish` refuses its frames, so an endless take would never
     // fill the queue (Astra 09:48Z).
-    while run_flag(role).load(Ordering::Acquire) && role_frames(role).lock().room() > 0 {
+    while run_flag(role).load(Ordering::Acquire) && role_frames(role).room() > 0 {
         match drive_step(machine, role, book) {
             Some(played) => publish(role, resident_frame(root, &played)),
             None => {
@@ -1331,19 +1331,20 @@ fn resident_frame(root: &Path, played: &super::playback::Played) -> InputFrame {
         .unwrap_or(played.frame)
 }
 
-/// The run flag is read under the queue lock that a cut (`note_mash`) clears it under, so an in-flight producer cannot
-/// refill a run that was cut after it started stepping (Astra 08:38Z).
+/// A cut clears the run flag. If it races this publish, the hook's cut flag still
+/// suppresses the old frame until the worker can clear the generation.
 fn publish(role: Role, frame: InputFrame) {
-    let mut frames = role_frames(role).lock();
     if run_flag(role).load(Ordering::Acquire) {
-        frames.push(pack(frame));
+        // The worker checked room before advancing playback. The hook can only free more room.
+        let queued = role_frames(role).push(pack(frame));
+        debug_assert!(queued, "replay advanced without room for its frame");
     }
 }
 
 /// A run started, stopped or was cut by a mash: what it buffered is not played, and a start speed it still owed is not
 /// given.
 fn drop_frames(role: Role) {
-    role_frames(role).lock().clear();
+    role_frames(role).clear();
     owe_start_speed(role, None);
 }
 
@@ -1703,10 +1704,10 @@ fn take_frame(role: Role) -> Option<InputFrame> {
     if WARP_HOLD.load(Ordering::Acquire) || cut_flag(role).load(Ordering::Acquire) {
         return None;
     }
-    role_frames(role).lock().pop().map(unpack)
+    role_frames(role).pop().map(unpack)
 }
 
-fn role_frames(role: Role) -> &'static hos_lock::Mutex<FrameQueue> {
+fn role_frames(role: Role) -> &'static FrameQueue {
     match role {
         Role::Player => &PLAYER_FRAMES,
         Role::Cpu => &CPU_FRAMES,
@@ -1764,8 +1765,8 @@ fn reset_host() {
     CUT_PLAYER.store(false, Ordering::Release);
     CUT_CPU.store(false, Ordering::Release);
     MIGRATED.store(false, Ordering::Release);
-    PLAYER_FRAMES.lock().clear();
-    CPU_FRAMES.lock().clear();
+    PLAYER_FRAMES.clear();
+    CPU_FRAMES.clear();
     CURRENT_KIND.store(u32::MAX, Ordering::Release);
     RUN_PLAYER.store(false, Ordering::Release);
     RUN_CPU.store(false, Ordering::Release);
@@ -2424,35 +2425,44 @@ mod tests {
         assert!(take_cpu_frame().is_none() && !cpu_playback(idle).running, "an in-flight producer cannot refill a cut run");
     }
 
-    /// A live CPU frame has to reach the hook on this game tick, even while the worker is stopped.
+    /// A live frame for either role reaches the hook on this tick while the worker holds the playback machine.
     fn the_frame_pop_never_waits_and_keeps_the_frame_on_contention() {
         let _hold = hold();
         reset_host();
         let frame = InputFrame { buttons: 2, ..InputFrame::default() };
-        assert!(CPU_FRAMES.lock().push(pack(frame)));
-        let held = CPU_FRAMES.lock();
+        let (held_tx, held_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let _machine = lock(&MACHINE);
+            for role in [Role::Player, Role::Cpu] {
+                run_flag(role).store(true, Ordering::Release);
+                publish(role, frame);
+            }
+            held_tx.send(()).unwrap();
+            let _ = release_rx.recv_timeout(std::time::Duration::from_secs(10));
+        });
+        held_rx.recv().unwrap();
+
         let (tx, rx) = std::sync::mpsc::channel();
-        let hook = std::thread::spawn(move || tx.send(take_cpu_frame()).unwrap());
-        let got = rx.recv_timeout(std::time::Duration::from_millis(500));
-        drop(held);
+        let hook = std::thread::spawn(move || tx.send((take_player_frame(), take_cpu_frame())).unwrap());
+        let got = rx.recv_timeout(std::time::Duration::from_secs(2));
+        let _ = release_tx.send(());
+        worker.join().unwrap();
         hook.join().unwrap();
 
-        assert_eq!(got, Ok(Some(frame)), "the hook must apply the pending frame on this tick");
-        assert_eq!(take_cpu_frame(), None, "the hook consumed the frame exactly once");
+        assert_eq!(got, Ok((Some(frame), Some(frame))), "both pending frames must reach this tick");
+        assert_eq!((take_player_frame(), take_cpu_frame()), (None, None), "each frame was consumed once");
         reset_host();
     }
 
-    /// tr-review-astra-3 14:34Z: note_mash and note_load run in game hooks (CPU command hook, the load request). They must
-    /// not wait on a lock the macros worker holds (the frame queues, the start speeds). Hold them on another thread, as the
-    /// worker would, and the hook-side calls must still return.
+    /// note_mash and note_load run in game hooks. A cut must return while the recording
+    /// worker holds the start-speed lock.
     fn the_hook_side_cuts_never_wait_on_worker_locks() {
         let _hold = hold();
         reset_host();
         let (held_tx, held_rx) = std::sync::mpsc::channel();
         let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
         let worker = std::thread::spawn(move || {
-            let _cpu = CPU_FRAMES.lock();
-            let _player = PLAYER_FRAMES.lock();
             let _speed = START_SPEED.lock();
             let _ = held_tx.send(());
             let _ = release_rx.recv_timeout(std::time::Duration::from_secs(10));
