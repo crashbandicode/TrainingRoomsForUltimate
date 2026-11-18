@@ -307,6 +307,10 @@ unsafe fn on_ai_frame(ai: usize) {
     if ((body.entry_ptr + ENTRY_CONTROLLER_FIELD) as *const usize).read() != controller || !load_consts() {
         return;
     }
+    if super::mashout::owns_cpu(body.accessor) {
+        write_controller(controller, super::mashout::control());
+        return;
+    }
     bump(COUNT_AI_FRAME);
     let settings = settings();
     let key = FighterKey::new(body.entry_id, false);
@@ -661,7 +665,7 @@ unsafe fn remember_named_pose() {
 
 /// The recorder is in a phase other than Idle (the record lockout, standby, recording or a playback).
 pub fn recording_or_playback() -> bool {
-    ACTIVE.load(Ordering::Acquire)
+    ACTIVE.load(Ordering::Acquire) || recording_host::taking()
 }
 
 /// The replay editor holds the input (`Owners::REPLAY_EDITOR`; the editor is the named-macro layer, S4-4, so
@@ -686,12 +690,12 @@ pub fn interrupt_playback() {
         let stopped = rec.interrupt_on_mash(&settings);
         (stopped, rec.playback_state(false))
     };
-    let state = recording_host::cpu_playback(state);
+    // The CPU sees the playback gone before the next injection, also when only the Recording page's run stopped (REC-027).
+    cpu::set_playback(recording_host::cpu_playback(state));
     if stopped {
-        // The same bookkeeping as `stop`, and the CPU sees the playback gone before the next injection.
+        // The same bookkeeping as `stop`.
         LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);
         notices::post_phase(Phase::Idle, 0);
-        cpu::set_playback(state);
         event("playback_interrupt", "mash", 1, "", 0);
     }
 }
@@ -710,6 +714,8 @@ pub fn stop() {
 /// playback after both fighters are back).
 pub fn on_load_request() {
     stop();
+    // SAV-002: the Recording pages macros play in rr_host, which stop does not reach.
+    recording_host::note_load();
     let _scope = HookScope::enter_hook(HookId::NamedRestore);
     named_macros::begin_restore();
 }

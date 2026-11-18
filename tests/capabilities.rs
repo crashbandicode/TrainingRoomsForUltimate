@@ -108,6 +108,11 @@ const BOUNDARIES: &[Boundary] = &[
     // camera unit's `change_active_camera` row, so it stands behind its flag (boot sets it from that unit's closure) and a rejected
     // row turns off only this camera, never the hitbox visualizer or Eggs-ercise that the pass belongs to.
     Boundary { function: "btt_camera::apply", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
+    // Mash's native-touching call-ins share the final boot admission, independent of CPU Defence.
+    Boundary { function: "mashout::frame", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
+    Boundary { function: "mashout::seed_token", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
+    Boundary { function: "mashout::seed_after", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
+    Boundary { function: "mashout::owns_cpu", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
     Boundary { function: "btt_camera::request", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
     Boundary { function: "btt_camera::frame", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
     Boundary { function: "btt::frame", owner: Some(Feature::Hitbox), gate: Gate::Flag("USABLE") },
@@ -130,7 +135,9 @@ fn unit_of_hook(f: &Func) -> Option<Feature> {
         "cpu::cpu_sdi_hook" | "cpu::cpu_stick_x_hook" | "cpu::cpu_stick_y_hook" | "cpu::cpu_clatter_start_hook" => Some(Feature::CpuDefence),
         "cpu::cpu_transition_term_hook" => Some(Feature::CpuLedge),
         "cpu::cpu_motion_change_hook" | "cpu::cpu_quake_pos_hook" => Some(Feature::CpuTech),
-        "cpu::cpu_check_button_on_hook" | "cpu::cpu_check_button_off_hook" | "cpu::cpu_stick_x_no_clamp_hook" | "cpu::cpu_stick_y_no_clamp_hook" | "cpu::cpu_shield_param_hook" => Some(Feature::CpuShield),
+        "cpu::cpu_check_button_on_hook" | "cpu::cpu_check_button_off_hook" | "cpu::cpu_stick_x_no_clamp_hook" | "cpu::cpu_stick_y_no_clamp_hook" | "cpu::cpu_shield_param_hook" => {
+            Some(Feature::CpuShield)
+        }
         "cpu::cpu_command_flag_hook" | "cpu::cpu_attack_air_kind_hook" | "cpu::cpu_stick_dir_hook" => Some(Feature::CpuMash),
         "cpu::cpu_common_params_hook" => Some(Feature::CpuShieldDamage),
         "cpu::cpu_camera_mode_hook" | "cpu::cpu_camera_setup_hook" => Some(Feature::CpuCamera),
@@ -249,13 +256,11 @@ impl Analysis {
     /// Whether every row a call of `offset` relies on belongs to `unit` (its own, Training's, or the core's for
     /// the CPU features), so it is not a cross-feature need.
     fn owned_by(&self, offset: usize, unit: Feature) -> bool {
-        let core = matches!(unit, Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon | Feature::CpuShieldDamage | Feature::CpuCamera);
+        let core =
+            matches!(unit, Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon | Feature::CpuShieldDamage | Feature::CpuCamera);
         // A call holds when every row naming the function passed: it is the unit's own only when they all are.
-        capabilities::call_rows(offset).all(|rep| {
-            capabilities::equivalent_rows(rep).any(|row| {
-                capabilities::unit_of_row(row) == unit || row.feature == Feature::Training || (core && row.feature == Feature::CpuCore)
-            })
-        })
+        capabilities::call_rows(offset)
+            .all(|rep| capabilities::equivalent_rows(rep).any(|row| capabilities::unit_of_row(row) == unit || row.feature == Feature::Training || (core && row.feature == Feature::CpuCore)))
     }
 
     /// The computed cross-feature closure of every unit: the call names of what its entry points reach (and what
@@ -283,7 +288,8 @@ impl Analysis {
                 let (offsets, _) = self.reach(start);
                 add(owner, &offsets);
             }
-        }        out
+        }
+        out
     }
 }
 
@@ -314,11 +320,8 @@ fn dump_reach() {
     for (i, unit) in a.entries() {
         let f = &a.graph.funcs[i];
         let (offsets, hit) = a.reach(i);
-        let rows: Vec<String> = offsets
-            .iter()
-            .filter(|&&o| capabilities::call_name(o).is_some())
-            .map(|&o| format!("{}{}", capabilities::call_name(o).unwrap(), if a.owned_by(o, unit) { "" } else { "*" }))
-            .collect();
+        let rows: Vec<String> =
+            offsets.iter().filter(|&&o| capabilities::call_name(o).is_some()).map(|&o| format!("{}{}", capabilities::call_name(o).unwrap(), if a.owned_by(o, unit) { "" } else { "*" })).collect();
         println!("{} [{}] hook={:?} boundaries={:?}\n    {}", f.key(), unit.name(), a.hook_offset(f).and_then(capabilities::call_name), hit, rows.join(" "));
     }
 }
@@ -352,7 +355,9 @@ fn witness(a: &Analysis, start: usize, offset: usize) -> Vec<String> {
 #[test]
 #[ignore]
 fn explain() {
-    let (Ok(entry), Ok(row)) = (std::env::var("ENTRY"), std::env::var("ROW")) else { return };
+    let (Ok(entry), Ok(row)) = (std::env::var("ENTRY"), std::env::var("ROW")) else {
+        return;
+    };
     let a = Analysis::new();
     let offset = capabilities::find(&row).expect("row").offset;
     for start in a.graph.find(&entry) {
@@ -599,7 +604,8 @@ fn optional_tech_poison_preserves_existing_features() {
         .chain(model::sites_tech_surfaces::SITES.iter().map(|row| row.name))
         .chain(model::sites_tech_hitlag::SITES.iter().map(|row| row.name)) {
         let row = capabilities::find(poison).expect("poison names a real guarded row");
-        let usable = |s: &model::sites::Site| s.name != poison;
+        let names: Vec<_> = capabilities::equivalent_rows(row).map(|site| site.name).collect();
+        let usable = |s: &model::sites::Site| !names.contains(&s.name);
         for unit in [Feature::CpuCore, Feature::CpuCommon, Feature::Hitbox] {
             assert!(capabilities::unit_usable(unit, &usable), "{poison} disabled {}", unit.name());
         }
@@ -872,4 +878,111 @@ fn injected_hitlag_callback_reaches_all_four_guarded_native_readers() {
         assert!(chain.iter().any(|key|key=="tech_hitlag::resolve"),"{} missing production provider: {chain:?}",row.name);
         assert!(chain.iter().any(|key|key=="tech_hitlag_read::resolve"),"{} missing actual shared reader: {chain:?}",row.name);
     }
+}
+
+#[test]
+fn mashout_rows_are_registered_without_new_writes() {
+    use model::guard::SeamKind;
+    let rows = &model::sites_mashout::SITES;
+    assert_eq!(rows.len(), 29);
+    assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Relied).count(), 24);
+    assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Called).count(), 3);
+    for row in rows {
+        assert_eq!(row.feature, Feature::Mashout);
+        assert_eq!(capabilities::all_sites().filter(|site| site.name == row.name).count(), 1);
+        assert!(!capabilities::writes_code(row));
+        let usable = |site: &model::sites::Site| site.name != row.name;
+        let floor_only = model::sites_mashout::trolley_floor_only(row);
+        assert_eq!(capabilities::blocked_by(Feature::Mashout, &usable), (!floor_only).then_some(row.name));
+        assert!(!Granted::from_usable(&usable).allows(row.offset));
+        for other in capabilities::all_sites().map(capabilities::unit_of_row).filter(|unit| *unit != Feature::Mashout) {
+            assert!(capabilities::unit_usable(other, &usable), "{} must not disable {}", row.name, other.name());
+        }
+    }
+}
+
+#[test]
+fn mashout_required_rows_disable_only_their_reachable_units() {
+    use model::mashout::{
+        admission::Admission,
+        grade::{grade, Bounds},
+    };
+    let calls = capabilities::CROSS_NEEDS.iter().find(|(unit, _)| *unit == Feature::Mashout).unwrap().1;
+    assert_eq!(calls.len(), 30);
+    assert!(calls.contains(&"work_get_int"), "Lucas release counter must fail closed with its existing native guard");
+    assert!(calls.contains(&"work_is_flag"), "Corrin attack window must fail closed with its existing native guard");
+    assert!(calls.contains(&"utility_get_kind"), "Egg Lay must qualify the victim's native shell");
+    assert!(calls.contains(&"attack_is_attack"), "Egg Lay must reject an active shell hitbox");
+    let required = model::sites_mashout::SITES.iter()
+        .filter(|row| !model::sites_mashout::trolley_floor_only(row))
+        .map(|row| row.name).chain(calls.iter().copied()).chain(["clatter_start_hook", "entry_active_cell", "is_training_mode"]);
+    for name in required {
+        let row = capabilities::find(name).unwrap();
+        let names: Vec<_> = capabilities::equivalent_rows(row).map(|site| site.name).collect();
+        let usable = |site: &model::sites::Site| !names.contains(&site.name);
+        assert!(capabilities::blocked_by(Feature::Mashout, &usable).is_some(), "{name}");
+        assert!(!Granted::from_usable(&usable).allows(row.offset), "rejected row {name} granted a thunk");
+        let admitted = capabilities::mashout_ready(capabilities::unit_usable(Feature::Mashout, &usable), true, true, true, true);
+        let admission = Admission::new(admitted);
+        let mut reads = 0;
+        let mut scores = 0;
+        assert_eq!(
+            admission.with(|| {
+                reads += 1;
+                Bounds { fastest: 10, no_input: Some(90) }
+            }),
+            None
+        );
+        assert_eq!(
+            admission.with(|| {
+                scores += 1;
+                grade(30, Bounds { fastest: 10, no_input: Some(90) })
+            }),
+            None
+        );
+        assert_eq!((reads, scores), (0, 0), "{name}");
+    }
+    // Exercise every installed prerequisite through the same production conjunction boot calls.
+    for missing in 0..5 {
+        let mut passed = [true; 5];
+        passed[missing] = false;
+        let admitted = capabilities::mashout_ready(passed[0], passed[1], passed[2], passed[3], passed[4]);
+        assert_eq!(Admission::new(admitted).with(|| panic!("missing prerequisite ran native/grade work")), None::<()>);
+    }
+    assert_eq!(Admission::new(capabilities::mashout_ready(true, true, true, true, true)).with(|| 7), Some(7));
+}
+
+#[test]
+fn mashout_closure_failures_do_not_broaden_cpu_defence() {
+    for name in ["sdi_hook", "stick_x_hook", "stick_y_hook"] {
+        let usable = |site: &model::sites::Site| site.name != name;
+        assert!(!capabilities::unit_usable(Feature::CpuDefence, &usable));
+        assert!(capabilities::unit_usable(Feature::Mashout, &usable), "{name} must not enter Mash closure");
+    }
+    for name in ["clatter_start_hook", "entry_active_cell", "state_set_lr", "mashout_threshold"] {
+        let usable = |site: &model::sites::Site| site.name != name;
+        assert!(!capabilities::unit_usable(Feature::Mashout, &usable));
+        assert_eq!(capabilities::unit_usable(Feature::CpuDefence, &usable), name != "clatter_start_hook");
+    }
+}
+
+#[test]
+fn mashout_boot_checks_rows_then_final_readiness_before_admission() {
+    let compact = |text: &str| text.split_whitespace().collect::<String>();
+    let boot = compact(include_str!("../src/runtime/boot.rs"));
+    let at = |text: &str| boot.find(&compact(text)).unwrap_or_else(|| panic!("missing boot wiring {text}"));
+    assert!(at("diag_log::set_tick(mashout::service)") < at("diag_log::start_drain_thread()"));
+    assert!(at("game::outcomes(&sites_mashout::SITES)") < at("game::grant(Granted::from_usable(&usable))"));
+    assert!(at("by_name(&sites_mashout::SITES, &mashout_found)") < at("game::grant(Granted::from_usable(&usable))"));
+    assert!(boot.contains(&compact("poison(&sites_mashout::SITES, mashout, name)")));
+    assert!(at("init_roster_cycle();") < at("let mashout_roster_ready = roster::character_roster::mashout_ready();"));
+    assert!(boot.contains(&compact("capabilities::mashout_ready(mashout_closure, cpu_core_on, recording_on, mashout_active_cell, roster_on && mashout_roster_ready)")));
+    let late = &boot[at("if mashout_on && !cpu_defence_on {")..at("mashout::set_admission(mashout_on);")];
+    assert!(late.contains("skyline::install_hook!(cpu::cpu_clatter_start_hook)"));
+    assert!(late.contains(&compact("mark(\"clatter_start_hook\", Written::Far)")));
+    assert_eq!(boot.matches("skyline::install_hook!(cpu::cpu_clatter_start_hook)").count(), 2, "existing defence plus mutually exclusive late Mash branch");
+    assert!(boot.contains(&compact("report(Feature::Mashout, mashout_on, mashout_reason)")));
+    let reports = &boot[at("reports.extend(sites_mashout::SITES.iter()")..at("let blocked = |feature:")];
+    assert!(reports.contains("Written::Checked") && reports.contains("Written::Skipped"));
+    assert!(!reports.contains("Written::Far") && !reports.contains("Written::Near"));
 }

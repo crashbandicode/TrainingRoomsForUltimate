@@ -16,7 +16,7 @@ mod model;
 use model::cpu::counter::CounterId;
 use model::cpu::facts::FrameFacts;
 use model::cpu::ids::{Table, C};
-use model::cpu::ledge::{option, BUFFER_PLAYBACK_FRAME, BUFFER_REGULAR_FRAME, BUFFER_TETHER_FRAME};
+use model::cpu::ledge::{option, UNREQUESTED_BOUND, BUFFER_PLAYBACK_FRAME, BUFFER_REGULAR_FRAME, BUFFER_TETHER_FRAME};
 use model::cpu::playback::PlaybackState;
 use model::cpu::role::FighterKey;
 use model::cpu::settings::{CpuSettings, DelayRow};
@@ -211,10 +211,18 @@ fn cpu03_delay_and_climb_denial() {
     assert!(cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_ATTACK, true), "other terms pass through");
     assert!(cpu.ledge_transition_term(key, WAIT, TERM_CLIMB, true), "other statuses pass through");
     assert!(!cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, false), "an original false stays false");
-    // Zero delay: the climb is not denied.
+    // Zero delay (CPU-091): the climb is denied until TR performs its case, then the game answers.
     let (mut cpu, key) = cpu_with(settings(&[("ledge_state", ledge_row(&[option::ROLL as usize]))]));
     cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 3, false, false));
-    assert!(cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true));
+    assert!(!cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true), "denied until TR performs");
+    assert_eq!(cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 30, true, false)).request_status, Some(CLIFF_ESCAPE));
+    // p3f-verify-yoga-3: the game's own climb is decided in the frame of TR's request and won; it stays denied while the
+    // CPU still hangs, until the bound.
+    assert!(!cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true), "still denied in the frame of the request");
+    for n in 0..UNREQUESTED_BOUND {
+        cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 31 + i32::from(n), true, false));
+    }
+    assert!(cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true), "a request that never took is released by the bound");
     // Wait holds: no request however long, the climb stays denied, the case is kept.
     let (mut cpu, key) = cpu_with(settings(&[("ledge_state", ledge_row(&[option::WAIT as usize]))]));
     for frame in 0..200 {
@@ -382,6 +390,36 @@ fn cpu03_ledge_options_change_rerolls_held_case() {
     assert_eq!(requested, Some(20));
 }
 
+fn cpu03_ledge_options_change_keeps_the_climb_denied_until_the_new_roll() {
+    // CPU-091 (p3-cpu-x7-1): parked with Wait, the row changes to Jump. B11 clears the held case at once
+    // (publish), but the game asks about its automatic climb before the CPU's next frame rolls again. With no
+    // held case that query returned the game's own answer, so the CPU climbed (status 121) instead of jumping.
+    let wait = settings(&[("ledge_state", ledge_row(&[option::WAIT as usize])), ("ledge_delay", delay_row(&[0]))]);
+    let (mut cpu, key) = cpu_with(wait);
+    for frame in 3..50 {
+        cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, frame, true, false));
+    }
+    assert!(!cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true), "Wait denies the climb");
+    let jump = settings(&[("ledge_state", ledge_row(&[option::JUMP as usize])), ("ledge_delay", delay_row(&[0]))]);
+    cpu.publish(jump, reroll::LEDGE_OPTIONS);
+    // The game's query between the change and the CPU's next frame: still hanging, a non-empty row, not rolled yet.
+    assert!(!cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true),
+        "the climb stays denied until the CPU rolls from the new set");
+    let out = cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 60, true, false));
+    assert_eq!(out.request_status, Some(CLIFF_JUMP1), "the next frame performs the new option");
+}
+
+fn cpu03_climb_denial_is_released_after_the_bound() {
+    // CPU-091 safety bound: a performing case TR never gets to request (here: never actionable, no buffered frame) holds
+    // the native climb back for at most UNREQUESTED_BOUND frames, then the game answers again.
+    let (mut cpu, key) = cpu_with(settings(&[("ledge_state", ledge_row(&[option::JUMP as usize]))]));
+    for n in 0..UNREQUESTED_BOUND {
+        assert!(!cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true) || n == 0, "held at frame {n}");
+        cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 40 + i32::from(n), false, false));
+    }
+    assert!(cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true), "released after the bound");
+}
+
 fn cpu03_ledge_options_emptied_clears_case() {
     let roll = settings(&[("ledge_state", ledge_row(&[option::ROLL as usize])), ("ledge_delay", delay_row(&[5]))]);
     let (mut cpu, key) = cpu_with(roll);
@@ -460,6 +498,8 @@ fn case_table() {
         ("cpu03_ledge_delay_range_pick", cpu03_ledge_delay_range_pick as fn()),
         ("cpu03_range_counts_as_nonempty_row", cpu03_range_counts_as_nonempty_row as fn()),
         ("cpu03_ledge_options_change_rerolls_held_case", cpu03_ledge_options_change_rerolls_held_case as fn()),
+        ("cpu03_ledge_options_change_keeps_the_climb_denied_until_the_new_roll", cpu03_ledge_options_change_keeps_the_climb_denied_until_the_new_roll as fn()),
+        ("cpu03_climb_denial_is_released_after_the_bound", cpu03_climb_denial_is_released_after_the_bound as fn()),
         ("cpu03_ledge_options_emptied_clears_case", cpu03_ledge_options_emptied_clears_case as fn()),
         ("cpu03_playback_yield_and_reset", cpu03_playback_yield_and_reset as fn()),
         ("cpu03_whole_settings_replacement_yields_the_menus_reroll_bits", cpu03_whole_settings_replacement_yields_the_menus_reroll_bits as fn()),

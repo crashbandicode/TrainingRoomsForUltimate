@@ -72,7 +72,7 @@ const fn sub(page: Page, title: &'static str) -> Group {
     Group { sub: true, ..g(page, title) }
 }
 
-pub static GROUPS: [Group; 24] = [
+pub static GROUPS: [Group; 25] = [
     g(Page::Cpu, "Reactions"),
     g(Page::Cpu, "Defence"),
     g(Page::Cpu, "Ledge & Tech"),
@@ -101,6 +101,8 @@ pub static GROUPS: [Group; 24] = [
     sub(Page::FightersStages, "Tech practice"),
     sub(Page::FightersStages, "Eggs-ercise"),
     sub(Page::FightersStages, "Break the Targets"),
+    // Mash out (rc.15 mashout integration) joined as the fourth game, its sub-screen appended the same way.
+    sub(Page::FightersStages, "Mash out"),
 ];
 
 // Group indices, for the rows below.
@@ -131,6 +133,7 @@ pub const GAMES: u8 = 20;
 const TECH: u8 = 21;
 const EGGS: u8 = 22;
 const BTT: u8 = 23;
+const MASHOUT: u8 = 24;
 
 /// The sub-screen group of a practice game (rc.15 practice menu).
 pub const fn game_group(game: Game) -> u8 {
@@ -138,6 +141,7 @@ pub const fn game_group(game: Game) -> u8 {
         Game::Eggs => EGGS,
         Game::Btt => BTT,
         Game::Tech => TECH,
+        Game::Mashout => MASHOUT,
     }
 }
 
@@ -262,7 +266,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 136] = [
+pub static ROWS: [Row; 141] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -485,6 +489,8 @@ pub static ROWS: [Row; 136] = [
       "Place targets, then break them all against the clock.\nA opens its settings and Start."),
     r(GAMES, "Tech practice", "", Control::Game(Game::Tech),
       "Practice techs at a chosen or random stage surface.\nA opens its settings and Start."),
+    r(GAMES, "Mash out", "", Control::Game(Game::Mashout),
+      "Practice escaping a capture.\nA opens its settings and Start."),
     // Practice games > Eggs-ercise
     r(EGGS, "Start", "", Control::Start(Game::Eggs),
       "Closes the menu and starts Eggs-ercise with the settings below.\nWhile it runs, this row reads Stop."),
@@ -559,6 +565,15 @@ pub static ROWS: [Row; 136] = [
       "Follow the attempt or frame the whole stage.\nWhole stage uses the target placing camera."),
     r(TECH, "Skip wizard preview", "tech_wizard_skip", TOGGLE,
       "On: A after Hit starts immediately.\nOff: review the candidate preview before starting."),
+    // Practice games > Mash out: its Off / On row is Start / Stop now; the `mashout` key stays in the file.
+    r(MASHOUT, "Start", "", Control::Start(Game::Mashout),
+      "Closes the menu and starts Mash out with the settings below.\nWhile it runs, this row reads Stop."),
+    r(MASHOUT, "State", "mashout_state", Control::Dropdown(&super::super::mashout::moves::STATE_LABELS),
+      "The state to escape.\nRandom state includes every reviewed attacker move."),
+    r(MASHOUT, "Attacker move", "mashout_attacker", Control::Dropdown(&super::super::mashout::moves::ATTACKER_LABELS),
+      "Choose a fighter move for the selected state.\nRandom chooses from that state; Random state includes all."),
+    r(MASHOUT, "Grab type", "mashout_grab", Control::Dropdown(&super::super::mashout::moves::GRAB_LABELS),
+      "Standing, dash or pivot for an ordinary grab.\nRandom chooses one of the three each attempt."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

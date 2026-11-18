@@ -88,7 +88,11 @@ pub fn read_window(offset: usize) -> [u8; GUARD_BYTES] {
 
 /// Every row's outcome against the 64 bytes now at its offset (an install's phase one: before anything is written).
 pub fn outcomes<const N: usize>(rows: &[sites::Site; N]) -> [GuardOutcome; N] {
-    std::array::from_fn(|i| rows[i].outcome(&read_window(rows[i].offset)))
+    std::array::from_fn(|i| {
+        let site = &rows[i];
+        if site.compared() { site.outcome(&read_window(site.offset)) }
+        else { site.slot_outcome(read_slot_target(site.offset)) }
+    })
 }
 
 /// The pointer-sized value now at `main+offset` (a vtable slot), as an offset from `.text`.

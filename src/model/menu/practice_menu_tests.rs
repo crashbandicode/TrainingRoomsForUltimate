@@ -60,7 +60,7 @@ fn games_list_is_one_row_per_game() {
     for (control, game) in list.iter().zip(Game::ALL) {
         assert!(matches!(control, Control::Game(g) if *g == game), "{control:?}");
     }
-    assert_eq!(titles(table::GAMES), ["Eggs-ercise", "Break the Targets", "Tech practice"]);
+    assert_eq!(titles(table::GAMES), ["Eggs-ercise", "Break the Targets", "Tech practice", "Mash out"]);
     // The games' sub groups are not sections of the page: the left column ends with Practice games.
     let m = menu();
     let groups: Vec<&str> = (0..m.entry_count(Page::FightersStages))

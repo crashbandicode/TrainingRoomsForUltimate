@@ -424,7 +424,8 @@ list doesn't grey them for that.
 
 ## Practice games
 
-**Practice games** lists one row per game: **Eggs-ercise**, **Break the Targets** and **Tech practice**. **A** on a game
+**Practice games** lists one row per game: **Eggs-ercise**, **Break the Targets**, **Tech practice** and **Mash out**
+(its screen: Start, then State, Attacker move and Grab type; it runs until Stop). **A** on a game
 opens its own screen, laid out like **Button chords**: the path at the top (Fighters & Stages > Practice games > the
 game), then **Start** and the game's settings. The keys are the page's: Up/Down move, Left/Right change a setting, **A**
 opens it, **Y** resets it, **B** goes back to the list.

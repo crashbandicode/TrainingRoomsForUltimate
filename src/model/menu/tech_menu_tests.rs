@@ -16,8 +16,12 @@ fn tech_rows_follow_break_the_targets() {
     let group = &GROUPS[usize::from(ROWS[start].group)];
     assert_eq!((group.title, group.page, group.sub), ("Tech practice", Page::FightersStages, true));
     let expected = ["tech_surface", "tech_point", "tech_damage", "tech_damage_range", "tech_speed", "tech_speed_range", "tech_hit_damage", "tech_hit_damage_range", "tech_angle", "tech_angle_range", "tech_start", "tech_start_range", "tech_time", "tech_time_range", "tech_di", "tech_di_direction", "tech_facing", "tech_delay", "tech_delay_range", "tech_camera", "tech_wizard_skip"];
-    assert_eq!(&ROWS[start + 3..].iter().map(|r| r.id).collect::<Vec<_>>(), &expected);
-    for r in &ROWS[start..] { assert!(r.help.contains('\n') && r.group == ROWS[start].group); }
+    let end = start + 3 + expected.len();
+    assert_eq!(&ROWS[start + 3..end].iter().map(|r| r.id).collect::<Vec<_>>(), &expected);
+    for r in &ROWS[start..end] { assert!(r.help.contains('\n') && r.group == ROWS[start].group); }
+    // Mash out's sub-screen follows (rc15/mashout-int): Start, then its three rows.
+    let mash: Vec<_> = ROWS[end..].iter().map(|r| (r.title, r.id)).collect();
+    assert_eq!(mash, [("Start", ""), ("State", "mashout_state"), ("Attacker move", "mashout_attacker"), ("Grab type", "mashout_grab")]);
 }
 
 /// rc.15: one practice game at a time is the running game, not the rows. Every pair of modes can be stored together, and

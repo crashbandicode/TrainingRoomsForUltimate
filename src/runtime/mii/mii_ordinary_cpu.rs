@@ -2,6 +2,7 @@
 //! INSTALL submission and phase-time publication are distinct commits.
 use super::*;
 use std::sync::Arc;
+use crate::engine::mii::ordinary_player::{cpu_receipt,expiry_notice,persists_selection,Requester};
 use hos_lock::Mutex as OwnerMutex;
 use std::convert::TryInto;
 use crate::engine::mii::{
@@ -59,6 +60,8 @@ struct Prepared {
     /// Physical same-entry bank build (the target at its own cell, `ReloadTarget`); see the
     /// Player adapter.
     bank:bool,
+    /// Who asked: the CPU Character receipt and the persisted choice follow it (`cpu_receipt`).
+    requester:Requester,
 }
 impl Prepared {
     /// The cell native activates at Ready and the logical target this transaction settles on.
@@ -84,6 +87,8 @@ struct BankTrack {
     published:Option<(Configuration,native::BankPublished)>,
     /// rc.6 warm exit: this switch leaves the live Mii group for the window it displaced (`MiiExit`).
     exit:bool,
+    /// Who asked: the CPU Character receipt and the persisted choice follow it (`cpu_receipt`).
+    requester:Requester,
 }
 /// rc.6 warm exit (operator decision 2026-11-08): a settled Mii group switch's publication, kept while the
 /// owner's receipt is the one that switch adopted, so the exit to the window it displaced can put it back
@@ -488,7 +493,7 @@ pub(super) fn request_restore(value:WaitingValue)->bool {
     true
 }
 /// LEAD-1 review R3c: `Some` is what became of the request (each refusal shows its notice here), `None` leaves it to the next owner.
-pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<crate::engine::swap::cycle_members::Admission> {
+pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,requester:Requester,read_menu:impl Fn()->TrainingModpackMenu)->Option<crate::engine::swap::cycle_members::Admission> {
     if role!=Role::Cpu || !ENABLED.load(Ordering::Acquire) {return None;}
     let mut s=STATE.lock();
     let Some(owner)=s.owner.as_ref() else {
@@ -531,7 +536,7 @@ pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,rea
         Selection::Cycle=>Some(Request::CYCLE),
         Selection::Direct(f)=>Request::direct(mii_saved_alpha::menu_epoch(),f.kind()),
         Selection::RefreshPartners=>Some(Request::REFRESH_PARTNERS),
-    };
+    }.map(|r|r.owned(requester));
     let manual_direct=user_request && matches!(selection,Selection::Direct(_));
     // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.
     let replace_restore=manual_direct && s.restore.is_some();
@@ -761,16 +766,18 @@ unsafe fn complete(entry:*const u8,t:&Track) {
                     if t.replay.is_none() {remember_owned(Role::Cpu,t.ticket.epoch,target,forms,
                         t.publish,t.destination.cursor,t.destination.target==Target::ORIGINAL);}
                     if let Some(fighter)=TrioFighter::from_kind(target).filter(|_|t.replay.is_none()) {
-                        Role::Cpu.sync_selection(fighter);
+                        Role::Cpu.sync_selection(fighter,t.requester);
                     }
                     crate::runtime::roster::cycle_preload::completed(1,false,target);
                     trace!("[MiiOrdinaryCpu] ready ticket={:?} target={:#x} index={} resource={:02x?} released={} saved_files_written=false",
                         t.ticket,target,now.index,
                         &now.record[88..104],released);
                     trace!("[MiiOrdinaryCpu] completion ticket={:?} current={:?}",t.ticket,now);
-                    notify(Role::Cpu,match t.destination.target.kind() {
-                        TargetKind::Saved=>"Saved Mii applied",TargetKind::Original=>"Original fighter restored",
-                        TargetKind::Fighter(_)=>"CPU fighter applied"}.into());
+                    let receipt=match t.destination.target.kind() {
+                        TargetKind::Saved=>persists_selection(t.requester).then_some("Saved Mii applied"),
+                        TargetKind::Original=>cpu_receipt(true,false,t.requester),
+                        TargetKind::Fighter(_)=>cpu_receipt(false,false,t.requester)};
+                    if let Some(text)=receipt {notify(Role::Cpu,text.into());}
                 }
                 _ if t.bank => {drop(s);bank_build_refused(t,"CPU terminal bank ready comparison refusal");}
                 other => {
@@ -905,7 +912,7 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
     let active=live.target.publish(origin_saved);
     if !request_current(request,active) {
         clear_request(request);note("CPU request epoch/configuration changed");
-        if request.direct_kind().is_some() {notify(Role::Cpu,"Character choice expired; select it again".into());}
+        if let Some(text)=request.direct_kind().and(expiry_notice(request.owner())) {notify(Role::Cpu,text.into());}
         return false;
     }
     if !ready_descriptor(entry,&expected.descriptor) {return false;}
@@ -1076,9 +1083,11 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
                 if request.replay().is_none() {remember_owned(Role::Cpu,current.binding.epoch,descriptor_kind(&descriptor),descriptor_forms(&descriptor),
                     active,destination.cursor,destination.target==Target::ORIGINAL);}
                 if let Some(fighter)=TrioFighter::from_kind(descriptor_kind(&descriptor)).filter(|_|request.replay().is_none()) {
-                    Role::Cpu.sync_selection(fighter);
+                    Role::Cpu.sync_selection(fighter,request.owner());
                 }
-                if !request.refresh_partners() {notify(Role::Cpu,"CPU choice already active".into());}
+                if !request.refresh_partners() && persists_selection(request.owner()) {
+                    notify(Role::Cpu,"CPU choice already active".into());
+                }
             }
         }
         return false;
@@ -1204,14 +1213,15 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
                 destination,retained:retained || active.is_some(),replay:request.replay(),
                 publish,descriptor,hat_change,origin_index:origin.index,
                 origin_record:crate::engine::mii::role_owner::current_record_claim(origin.original_kind,origin.index)
-                    .then_some(origin.current_record),published:None,exit:exit && reuse});}
+                    .then_some(origin.current_record),published:None,exit:exit && reuse,requester:request.owner()});}
             drop(registry);None
         } else {
             let t=Track {ticket,gate:Gate::new(ticket).unwrap(),token,installing:true,retained_o:false,recovering:None,
                 data:Arc::new(Prepared {before:current,origin_scalars:origin.scalars,hat_change,
                     origin_index:origin.index,origin_record:crate::engine::mii::role_owner::current_record_claim(origin.original_kind,origin.index)
                         .then_some(origin.current_record),
-                    descriptor:physical,publish,destination,same_class,replay:request.replay(),bank:bank_build})};
+                    descriptor:physical,publish,destination,same_class,replay:request.replay(),bank:bank_build,
+                    requester:request.owner()})};
             s.track=Some(t.clone());drop(registry);Some(t)
         }
     };
@@ -1356,12 +1366,12 @@ unsafe fn bank_applied(entry:*mut u8,b:&BankTrack,settled:&native::Settled,publi
     publish_partners(Role::Cpu,forms);
     if b.replay.is_none() {remember_owned(Role::Cpu,b.ticket.epoch,logical,forms,exact,b.destination.cursor,original);}
     if let Some(fighter)=TrioFighter::from_kind(logical).filter(|_|b.replay.is_none()) {
-        Role::Cpu.sync_selection(fighter);
+        Role::Cpu.sync_selection(fighter,b.requester);
     }
     crate::runtime::roster::cycle_preload::completed(1,false,logical);
-    trace!("[MiiOrdinaryCpu] bank ready ticket={:?} target={:#x} physical={:#x} index={} original={} mii={} resource_pair={:?} released={}",
-        b.ticket,logical,descriptor_kind(&now.descriptor),now.index,original,exact.is_some(),settled.resource_pair,released);
-    notify(Role::Cpu,crate::engine::mii::ordinary_player::bank_notice(false,exact.is_some(),original).into());
+    trace!("[MiiOrdinaryCpu] bank ready ticket={:?} target={:#x} physical={:#x} index={} original={} mii={} resource_pair={:?} released={} requester={:?}",
+        b.ticket,logical,descriptor_kind(&now.descriptor),now.index,original,exact.is_some(),settled.resource_pair,released,b.requester);
+    if let Some(text)=cpu_receipt(original,exact.is_some(),b.requester) {notify(Role::Cpu,text.into());}
 }
 
 /// Terminal BankTrack refusal. The pending track, request and restore go; the owner

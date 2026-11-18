@@ -104,6 +104,8 @@ static RECORD_EDGE: AtomicU8 = AtomicU8::new(0);
 static PLAY_PLAYER: AtomicBool = AtomicBool::new(false);
 static PLAY_CPU: AtomicBool = AtomicBool::new(false);
 static MASH: AtomicBool = AtomicBool::new(false);
+/// SAV-002: a save-state load stops both roles' runs (save-states.md: "Load only warps … it stops one that is playing").
+static LOAD: AtomicBool = AtomicBool::new(false);
 static MIGRATED: AtomicBool = AtomicBool::new(false);
 /// Played frames, filled ahead by the worker and taken one per game frame by Player 1's poll and the
 /// CPU's AI epilogue. One slot lost frames: the worker is not tied to the game's frames (Eden
@@ -113,6 +115,10 @@ static CPU_FRAMES: hos_lock::Mutex<FrameQueue> = hos_lock::Mutex::new(FrameQueue
 static CURRENT_KIND: AtomicU32 = AtomicU32::new(u32::MAX);
 static RUN_PLAYER: AtomicBool = AtomicBool::new(false);
 static RUN_CPU: AtomicBool = AtomicBool::new(false);
+/// A hook cut the role's run (mash, load): its queued frames are dead until the worker's tick clears them. Hooks only set
+/// these, so a cut never waits on the queue lock the worker holds (tr-review-astra-3 14:34Z).
+static CUT_PLAYER: AtomicBool = AtomicBool::new(false);
+static CUT_CPU: AtomicBool = AtomicBool::new(false);
 static MACHINE: Mutex<Option<Playback>> = Mutex::new(None);
 static RESIDENT: Mutex<Option<Resident>> = Mutex::new(None);
 static MENU_EFFECT: Mutex<Effect> = Mutex::new(Effect::None);
@@ -232,11 +238,19 @@ pub fn migrated() -> bool {
     MIGRATED.load(Ordering::Acquire)
 }
 
+/// FS-027 / FS-031: a Recording-page take is open, or its Record edge waits for the next service. The busy guards
+/// (`recorder::recording_or_playback`) read this, because the old recorder machine never sees rr_host's takes. Playback is
+/// left out on purpose: a fighter-mismatch Switch is admitted while its play has started, and must not refuse itself.
+pub fn taking() -> bool {
+    CAP_ROLE.load(Ordering::Acquire) != 0 || RECORD_EDGE.load(Ordering::Acquire) != 0
+}
+
 pub fn pending() -> bool {
     RECORD_EDGE.load(Ordering::Acquire) != 0
         || PLAY_PLAYER.load(Ordering::Acquire)
         || PLAY_CPU.load(Ordering::Acquire)
         || MASH.load(Ordering::Acquire)
+        || LOAD.load(Ordering::Acquire)
         || menu_pending()
         || playing()
         || waiting_work()
@@ -255,7 +269,7 @@ fn playing() -> bool {
 
 /// The machine still steps the role, or its hook still has frames of the run to play.
 fn role_playing(role: Role) -> bool {
-    run_flag(role).load(Ordering::Acquire) || !role_frames(role).lock().is_empty()
+    run_flag(role).load(Ordering::Acquire) || !cut_flag(role).load(Ordering::Acquire) && !role_frames(role).lock().is_empty()
 }
 
 fn run_flag(role: Role) -> &'static AtomicBool {
@@ -263,6 +277,25 @@ fn run_flag(role: Role) -> &'static AtomicBool {
         Role::Player => &RUN_PLAYER,
         Role::Cpu => &RUN_CPU,
     }
+}
+
+fn cut_flag(role: Role) -> &'static AtomicBool {
+    match role {
+        Role::Player => &CUT_PLAYER,
+        Role::Cpu => &CUT_CPU,
+    }
+}
+
+/// A hook's cut: atomics only (no lock); the worker's next tick clears the queue (`clear_cut`).
+fn cut(role: Role) {
+    cut_flag(role).store(true, Ordering::Release);
+    run_flag(role).store(false, Ordering::Release);
+}
+
+/// Worker side: the cut run's queue and owed start speed go, then its frames count again.
+fn clear_cut(role: Role) {
+    drop_frames(role);
+    cut_flag(role).store(false, Ordering::Release);
 }
 
 pub fn set_record_role(role: Role) {
@@ -385,8 +418,22 @@ pub fn on_chords(record: bool, play_player: bool, play_cpu: bool) {
     }
 }
 
+/// REC-027: the CPU's run stops at once, so the CPU's next frame sees no playback and its mash acts inside the trigger;
+/// the tick still drives the machine's mash (`MASH`).
 pub fn note_mash() {
     MASH.store(true, Ordering::Release);
+    cut(Role::Cpu);
+}
+
+/// A save-state load was accepted. A Play's own warp (`WARP_HOLD`) is the start of that playback, not a stop.
+/// Both runs stop at once, as for a mash (`note_mash`); the tick still drives the machine (`LOAD`).
+pub fn note_load() {
+    if WARP_HOLD.load(Ordering::Acquire) {
+        return;
+    }
+    LOAD.store(true, Ordering::Release);
+    cut(Role::Player);
+    cut(Role::Cpu);
 }
 
 /// What the CPU's behaviours see of playback (B5 / N4, Mash interrupts playback): the old recorder's state, with a
@@ -508,12 +555,12 @@ pub(crate) fn capture_role() -> u8 {
 }
 
 pub fn take_player_frame() -> Option<InputFrame> {
-    take_frame(&PLAYER_FRAMES)
+    take_frame(Role::Player)
 }
 
 #[cfg(any(test, target_os = "switch"))]
 pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
-    take_frame(&CPU_FRAMES)
+    take_frame(Role::Cpu)
 }
 
 /// Player 1's poll. Injects one posted frame, then stores the output when Player 1 is the recorded role. Returns whether
@@ -566,6 +613,7 @@ pub fn service_at(
     let mut play_player = PLAY_PLAYER.swap(false, Ordering::AcqRel);
     let mut play_cpu = PLAY_CPU.swap(false, Ordering::AcqRel);
     let mash = MASH.swap(false, Ordering::AcqRel);
+    let load = LOAD.swap(false, Ordering::AcqRel);
     if edge == 1 {
         let role = if LAST_ROLE.load(Ordering::Acquire) == ROLE_CPU {
             "cpu"
@@ -611,6 +659,7 @@ pub fn service_at(
     let busy = play_player
         || play_cpu
         || mash
+        || load
         || menu_pending()
         || playing()
         || waiting_work();
@@ -627,8 +676,18 @@ pub fn service_at(
         // (RECORDING.md: "stops the macro that role is playing"; primary 2026-11-08 13:05Z).
         drive_mash(machine, Role::Cpu, true);
         RUN_CPU.store(false, Ordering::Release);
-        drop_frames(Role::Cpu);
+        clear_cut(Role::Cpu);
         tick.diags.push("screen=playback mash=1".to_string());
+    }
+    if load {
+        // The load starts nothing either: a Play press waiting in this tick goes too.
+        (play_player, play_cpu) = (false, false);
+        for role in [Role::Player, Role::Cpu] {
+            drive_mash(machine, role, true);
+            run_flag(role).store(false, Ordering::Release);
+            clear_cut(role);
+        }
+        tick.diags.push("screen=playback load=1".to_string());
     }
     release_held(&mut play_player, &mut play_cpu);
     if play_player {
@@ -1222,7 +1281,9 @@ fn step_role(root: &Path, machine: &mut Playback, book: &Book, role: Role) {
     if WARP_HOLD.load(Ordering::Acquire) {
         return;
     }
-    while role_frames(role).lock().room() > 0 {
+    // A cut run (its flag cleared by a mash) stops here: `publish` refuses its frames, so an endless take would never
+    // fill the queue (Astra 09:48Z).
+    while run_flag(role).load(Ordering::Acquire) && role_frames(role).lock().room() > 0 {
         match drive_step(machine, role, book) {
             Some(played) => publish(role, resident_frame(root, &played)),
             None => {
@@ -1270,8 +1331,13 @@ fn resident_frame(root: &Path, played: &super::playback::Played) -> InputFrame {
         .unwrap_or(played.frame)
 }
 
+/// The run flag is read under the queue lock that a cut (`note_mash`) clears it under, so an in-flight producer cannot
+/// refill a run that was cut after it started stepping (Astra 08:38Z).
 fn publish(role: Role, frame: InputFrame) {
-    role_frames(role).lock().push(pack(frame));
+    let mut frames = role_frames(role).lock();
+    if run_flag(role).load(Ordering::Acquire) {
+        frames.push(pack(frame));
+    }
 }
 
 /// A run started, stopped or was cut by a mash: what it buffered is not played, and a start speed it still owed is not
@@ -1633,11 +1699,11 @@ fn taken_frames() -> (Role, Vec<InputFrame>) {
 
 /// One frame for this game frame. Nothing while a warp's restore is pending: a frame fed before the
 /// restore is undone by it, so the run waits where it is.
-fn take_frame(frames: &hos_lock::Mutex<FrameQueue>) -> Option<InputFrame> {
-    if WARP_HOLD.load(Ordering::Acquire) {
+fn take_frame(role: Role) -> Option<InputFrame> {
+    if WARP_HOLD.load(Ordering::Acquire) || cut_flag(role).load(Ordering::Acquire) {
         return None;
     }
-    frames.lock().pop().map(unpack)
+    role_frames(role).lock().pop().map(unpack)
 }
 
 fn role_frames(role: Role) -> &'static hos_lock::Mutex<FrameQueue> {
@@ -1694,6 +1760,9 @@ fn reset_host() {
     PLAY_PLAYER.store(false, Ordering::Release);
     PLAY_CPU.store(false, Ordering::Release);
     MASH.store(false, Ordering::Release);
+    LOAD.store(false, Ordering::Release);
+    CUT_PLAYER.store(false, Ordering::Release);
+    CUT_CPU.store(false, Ordering::Release);
     MIGRATED.store(false, Ordering::Release);
     PLAYER_FRAMES.lock().clear();
     CPU_FRAMES.lock().clear();
@@ -2304,6 +2373,118 @@ mod tests {
         assert!(!cpu_playback(idle).running);
     }
 
+    /// SAV-002 (p3-rec-xps-6 rows 20/21): a save-state load stops both roles' runs and starts nothing; a Play's own warp
+    /// (WARP_HOLD) is that playback's start and is not stopped.
+    fn a_load_stops_both_runs_but_not_a_plays_own_warp() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("load-stops");
+        let idle = PlaybackState::default();
+        active_plain_macro(&root, Role::Cpu, 30);
+        on_chords(false, false, true);
+        tick(&root);
+        assert!(take_cpu_frame().is_some(), "the CPU's run plays");
+        note_load();
+        // p3f-verify-yoga-3: the stop waited for the next service tick (~2 s), and the take kept playing after Load.
+        assert!(take_cpu_frame().is_none() && !playing(), "the load stops the runs at once, before the tick");
+        let t = service_at(&root, &none(), "2026-11-08", state(8), state(7));
+        assert!(t.diags.iter().any(|l| l == "screen=playback load=1"), "{:?}", t.diags);
+        assert!(take_cpu_frame().is_none(), "the load stopped the CPU's run");
+        assert!(!cpu_playback(idle).running && !playing());
+        // A Play pressed with the load in the same tick starts nothing.
+        on_chords(false, false, true);
+        note_load();
+        tick(&root);
+        assert!(!playing(), "the load starts nothing");
+        // The Play's own warp: WARP_HOLD is up while its restore runs, so that load does not stop it.
+        WARP_HOLD.store(true, Ordering::Release);
+        note_load();
+        assert!(!LOAD.load(Ordering::Acquire), "a Play's own warp is not a stop");
+        WARP_HOLD.store(false, Ordering::Release);
+    }
+
+    /// REC-027 (p3-rec-xps-7 06e/06f): "the macro stops and the CPU does the mash action" (menu/recording.md:305). The
+    /// CPU's mash asks for the stop and waits for the playback to be gone before it acts; rr_host only stopped the run at
+    /// its next service tick, ~1 s later, so the Hitstun trigger had passed and no Mash Jump came. The CPU must see its
+    /// macro gone at once, before the tick.
+    fn the_mash_stop_is_seen_by_the_cpu_before_the_next_tick() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("cpu-mash-now");
+        let idle = PlaybackState::default();
+        active_plain_macro(&root, Role::Cpu, 30);
+        on_chords(false, false, true);
+        tick(&root);
+        assert!(cpu_playback(idle).running, "the CPU's run plays");
+        note_mash();
+        assert!(!cpu_playback(idle).running, "the CPU sees its macro stopped at once, so its mash can act in the trigger");
+        assert!(take_cpu_frame().is_none(), "no further macro frame reaches the CPU");
+        // Astra 08:38Z: a worker already inside step_role publishes its frame after the mash cut the run.
+        publish(Role::Cpu, InputFrame { buttons: 99, ..InputFrame::default() });
+        assert!(take_cpu_frame().is_none() && !cpu_playback(idle).running, "an in-flight producer cannot refill a cut run");
+    }
+
+    /// tr-review-astra-3 14:34Z: note_mash and note_load run in game hooks (CPU command hook, the load request). They must
+    /// not wait on a lock the macros worker holds (the frame queues, the start speeds). Hold them on another thread, as the
+    /// worker would, and the hook-side calls must still return.
+    fn the_hook_side_cuts_never_wait_on_worker_locks() {
+        let _hold = hold();
+        reset_host();
+        let (held_tx, held_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+        let worker = std::thread::spawn(move || {
+            let _cpu = CPU_FRAMES.lock();
+            let _player = PLAYER_FRAMES.lock();
+            let _speed = START_SPEED.lock();
+            let _ = held_tx.send(());
+            let _ = release_rx.recv_timeout(std::time::Duration::from_secs(10));
+        });
+        held_rx.recv().unwrap();
+        RUN_CPU.store(true, Ordering::Release);
+        RUN_PLAYER.store(true, Ordering::Release);
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let hook = std::thread::spawn(move || {
+            note_mash();
+            note_load();
+            let _ = done_tx.send(());
+        });
+        let returned = done_rx.recv_timeout(std::time::Duration::from_secs(2)).is_ok();
+        let _ = release_tx.send(());
+        let _ = worker.join();
+        let _ = hook.join();
+        assert!(returned, "a hook-side cut waited on a lock the worker held");
+        assert!(!RUN_CPU.load(Ordering::Acquire) && !RUN_PLAYER.load(Ordering::Acquire), "both runs are cut");
+        assert!(take_cpu_frame().is_none() && take_player_frame().is_none() && !playing(), "and nothing of them plays");
+    }
+
+    /// Astra 09:48Z: the worker inside `step_role` when a mash cuts an endless (Loop ∞) CPU run must return. `publish`
+    /// refuses a cut run's frames, so the queue never fills and an endless take never ends by itself.
+    fn a_cut_endless_run_does_not_spin_the_worker() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("cut-endless");
+        active_plain_macro(&root, Role::Cpu, 30);
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_loop(Role::Cpu, LoopCount::Infinite);
+        index.save(&root).unwrap();
+        on_chords(false, false, true);
+        tick(&root);
+        assert!(take_cpu_frame().is_some(), "the endless CPU run plays");
+        note_mash();
+        // The worker's next fill, as the loop it was in continues after the cut.
+        let book = load_book(&root).unwrap();
+        let mut machine = lock(&MACHINE).take().expect("the machine holds the CPU run");
+        let (tx, rx) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            step_role(Path::new("/nonexistent"), &mut machine, &book, Role::Cpu);
+            let _ = tx.send(());
+        });
+        let returned = rx.recv_timeout(std::time::Duration::from_secs(5)).is_ok();
+        assert!(returned, "step_role spun on a cut endless run");
+        let _ = worker.join();
+        assert!(take_cpu_frame().is_none(), "nothing of the cut run is fed");
+    }
+
     /// A file of `n` distinct frames (buttons 1..=n), active on `role`, with no start save.
     fn active_plain_macro(root: &Path, role: Role, n: u32) -> Vec<u32> {
         let _ = service_at(root, &none(), "2026-11-08", state(8), state(7));
@@ -2636,6 +2817,22 @@ mod tests {
         assert!(names.iter().any(|name| name == "Combo 1"), "{names:?}");
     }
 
+    fn a_take_is_busy_from_its_record_edge_until_its_stop_is_serviced() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("taking");
+        assert!(!taking());
+        on_chords(true, false, false);
+        assert!(taking(), "the Record edge is busy before its service");
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        assert!(taking(), "an open take is busy");
+        on_chords(true, false, false);
+        assert!(taking(), "the stop edge is busy until it is serviced");
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        assert!(!taking(), "a serviced stop is idle");
+        on_chords(false, true, false);
+        assert!(!taking(), "a play is not a take: its own fighter Switch must stay admissible");
+    }
     fn mismatch_holds_playback_until_keep_or_switch() {
         let _hold = hold();
         reset_host();
@@ -3511,6 +3708,10 @@ mod tests {
             ("a_warped_cpu_play_feeds_its_first_frame_after_the_restore", a_warped_cpu_play_feeds_its_first_frame_after_the_restore as fn()),
             ("a_cpu_play_without_a_start_save_feeds_at_once", a_cpu_play_without_a_start_save_feeds_at_once as fn()),
             ("a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see", a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see as fn()),
+            ("a_load_stops_both_runs_but_not_a_plays_own_warp", a_load_stops_both_runs_but_not_a_plays_own_warp as fn()),
+            ("the_mash_stop_is_seen_by_the_cpu_before_the_next_tick", the_mash_stop_is_seen_by_the_cpu_before_the_next_tick as fn()),
+            ("a_cut_endless_run_does_not_spin_the_worker", a_cut_endless_run_does_not_spin_the_worker as fn()),
+            ("the_hook_side_cuts_never_wait_on_worker_locks", the_hook_side_cuts_never_wait_on_worker_locks as fn()),
             ("cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing", cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing as fn()),
             ("player_frames_reach_the_poll_once_each_whatever_the_worker_timing", player_frames_reach_the_poll_once_each_whatever_the_worker_timing as fn()),
             ("a_stopped_cpu_run_feeds_nothing_more", a_stopped_cpu_run_feeds_nothing_more as fn()),
@@ -3524,6 +3725,7 @@ mod tests {
             ("direct_drill_overflow_saves_nothing_and_reopening_cancels_arm",direct_drill_overflow_saves_nothing_and_reopening_cancels_arm as fn()),
             ("make_combo_no_hit_saves_input_drill_not_previous_exchange", make_combo_no_hit_saves_input_drill_not_previous_exchange as fn()),
             ("save_last_combo_writes_the_latest_exchange_names_it_and_drills_it", save_last_combo_writes_the_latest_exchange_names_it_and_drills_it as fn()),
+            ("a_take_is_busy_from_its_record_edge_until_its_stop_is_serviced", a_take_is_busy_from_its_record_edge_until_its_stop_is_serviced as fn()),
             ("mismatch_holds_playback_until_keep_or_switch", mismatch_holds_playback_until_keep_or_switch as fn()),
             ("an_answered_mismatch_wakes_the_service_gate_and_plays", an_answered_mismatch_wakes_the_service_gate_and_plays as fn()),
             ("the_mismatch_ask_names_the_side_that_plays", the_mismatch_ask_names_the_side_that_plays as fn()),

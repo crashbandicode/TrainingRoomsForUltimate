@@ -111,16 +111,33 @@ fn mark(on: bool) -> (&'static str, Tone) {
 }
 
 /// Options of a list-like row as one window of lines.
-fn option_label(row: &Row, i: usize, first: u16, step: u16) -> Text<80> {
+fn option_label(menu: &Menu, row: usize, i: usize, first: u16, step: u16) -> Text<80> {
     let mut label = Text::new();
-    let _ = match row.control {
-        Control::Dropdown(labels) | Control::MultiSelect(labels) => label.write_str(labels.get(i).copied().unwrap_or("-")),
+    let _ = match ROWS[row].control {
+        Control::Dropdown(_) => {
+            let (name, qualifier) = menu.dropdown_label(row, i).unwrap_or(("-", ""));
+            let _ = label.write_str(name);
+            if qualifier.is_empty() { Ok(()) } else { write!(label, " · {qualifier}") }
+        }
+        Control::MultiSelect(labels) => label.write_str(labels.get(i).copied().unwrap_or("-")),
         Control::YesNoRandom => label.write_str(YES_NO_RANDOM.get(i).copied().unwrap_or("-")),
         Control::Number { .. } => write!(label, "{}", first + step * i as u16),
         Control::MultiSelectRange { .. } => write!(label, "{}", first + step * i as u16),
         _ => Ok(()),
     };
     label
+}
+
+/// One list-popup row: its label and tone. A row the list never offers (Mash out's
+/// NotMashable moves) keeps its name, gains the approved suffix and is greyed.
+pub fn list_option(menu: &Menu, row: usize, i: usize, first: u16, step: u16) -> (Text<80>, Tone) {
+    let mut label = option_label(menu, row, i, first, step);
+    if menu.option_offered(row, i) {
+        return (label, Tone::Normal);
+    }
+    // restriction: mashout-not-mashable
+    let _ = label.write_str(" - not mashable");
+    (label, Tone::Off)
 }
 
 fn lines_window(frame: &mut Frame, cursor: usize, total: usize, mut line: impl FnMut(usize, &mut RowLine)) {
@@ -147,8 +164,9 @@ fn list_frame(menu: &Menu, screen: &Screen, row: usize, cursor: usize, frame: &m
     // A game's mode lists its stored options from index 1; a stored Off is the first mode.
     let mode_at = (super::practice_games::retired(r.id) > 0).then(|| menu.value(row));
     lines_window(frame, cursor, total, |i, line| {
-        let label = option_label(r, i, first, step);
+        let (label, tone) = list_option(menu, row, i, first, step);
         line.label = label;
+        line.label_tone = tone;
         let chosen = if let Some(at) = loop_at {
             i == at
         } else if let Some(value) = mode_at {
@@ -157,7 +175,7 @@ fn list_frame(menu: &Menu, screen: &Screen, row: usize, cursor: usize, frame: &m
             // Yes = [1,0], No = [0,1], Random = [1,1].
             matches!((i, current.first().copied().unwrap_or(0) != 0, current.get(1).copied().unwrap_or(0) != 0), (0, true, false) | (1, false, true) | (2, true, true))
         } else {
-            current.get(i).copied().unwrap_or(0) != 0
+            menu.option_value(row, i).and_then(|index| current.get(index)).copied().unwrap_or(0) != 0
         };
         if chosen {
             let _ = line.value.write_str("(current)");
@@ -173,7 +191,7 @@ fn checklist_frame(menu: &Menu, screen: &Screen, row: usize, cursor: usize, fram
     let total = menu.option_count(row);
     let current = menu.settings().menu.get(r.id).map(<[u8]>::to_vec).unwrap_or_default();
     lines_window(frame, cursor, total, |i, line| {
-        line.label = option_label(r, i, 0, 1);
+        line.label = option_label(menu, row, i, 0, 1);
         let weight = current.get(super::legend::option_slot(r.id, i)).copied().unwrap_or(0);
         let (text, tone) = mark(weight != 0);
         let _ = line.value.write_str(text);

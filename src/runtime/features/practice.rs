@@ -36,6 +36,7 @@ pub fn start(game: Game, how: How) {
     match game {
         Game::Eggs => super::hitbox::eggs_start(),
         Game::Btt => super::btt::start(how.place_targets),
+        Game::Mashout => super::mashout::start(),
         Game::Tech => {
             super::tech::start(how.tech_point);
             if how.tech_wizard {
@@ -59,6 +60,8 @@ pub fn running() -> Option<Game> {
         Game::Eggs => super::hitbox::eggs_running(),
         Game::Btt => super::btt::running() || super::btt::starting(),
         Game::Tech => super::tech::running() || super::tech::starting(),
+        // Mash out has no end of its own: each result re-arms the next attempt until Stop.
+        Game::Mashout => true,
     };
     live.then_some(game)
 }

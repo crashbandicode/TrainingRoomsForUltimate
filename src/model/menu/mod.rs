@@ -27,6 +27,7 @@ use table::{game_group, Control, Editor, Game, Page, Row, GROUPS, ROWS};
 
 use super::practice_games::retired;
 use super::settings::{self, Settings};
+use super::mashout::moves;
 
 /// The id of Recording › Options › Loop. The row shows, cycles, lists and resets the page role's loop count, the count Play
 /// reads (`RecordingScreens::loops`), not the old two-value setting stored under this id.
@@ -607,6 +608,11 @@ impl Menu {
         !GROUPS[group].advanced || self.expanded & (1 << group) != 0
     }
 
+    fn row_visible(&self, row: &Row) -> bool {
+        row.visible(self.env.pilot_present) && (row.id != moves::GRAB_ROW
+            || moves::Config::from_snapshot(&self.settings.menu).is_some_and(moves::uses_grab))
+    }
+
     fn group_visible(&self, group: usize) -> bool {
         if group == usize::from(table::COMBOS_SEQ) && self.recording.page_role() == super::recording_menu::ViewRole::Cpu {
             return false;
@@ -614,7 +620,7 @@ impl Menu {
         if group == usize::from(table::SAVES_MACROS) || group == usize::from(table::COMBOS_SEQ) {
             return true;
         }
-        ROWS.iter().any(|row| usize::from(row.group) == group && row.visible(self.env.pilot_present))
+        ROWS.iter().any(|row| usize::from(row.group) == group && self.row_visible(row))
     }
 
     /// Visit the entries of `page` in order: a header for each group with a visible row, then its
@@ -637,7 +643,7 @@ impl Menu {
                 continue;
             }
             for (r, row) in ROWS.iter().enumerate() {
-                if usize::from(row.group) == g && row.visible(self.env.pilot_present) {
+                if usize::from(row.group) == g && self.row_visible(row) {
                     if !visit(n, Entry::Row(r)) {
                         return;
                     }
@@ -784,18 +790,15 @@ impl Menu {
 
     /// The value of a row for the renderer.
     pub fn value(&self, row: usize) -> RowValue {
+        let row_index = row;
         let row = &ROWS[row];
         let array = self.get(row.id);
         match row.control {
             Control::Toggle => RowValue::Toggle(array.first().is_some_and(|v| *v != 0)),
             Control::ReplayCapture => RowValue::Toggle(self.env.replay_capture),
-            Control::Dropdown(_) | Control::Number { .. } => {
-                let at = array.iter().position(|v| *v != 0);
-                match row.control {
-                    Control::Number { first, step } => RowValue::Number(at.map(|i| first + step * i as u16)),
-                    // A game's mode: the stored Off of an older file reads as the first mode.
-                    _ => RowValue::Choice(at.map(|i| i.saturating_sub(retired(row.id)))),
-                }
+            Control::Dropdown(_) => RowValue::Choice(self.dropdown_choice(row_index)),
+            Control::Number { first, step } => {
+                RowValue::Number(array.iter().position(|v| *v != 0).map(|i| first + step * i as u16))
             }
             Control::YesNoRandom => RowValue::Choice(yes_no_random(array)),
             Control::MultiSelect(labels) => {
@@ -869,8 +872,67 @@ impl Menu {
         }
     }
 
+    fn mashout_state(&self) -> usize {
+        self.get(moves::STATE_ROW).iter().position(|v| *v != 0).unwrap_or(0)
+    }
+
+    /// Display position to persisted option. Most lists have an identity mapping; a practice game's mode lists its stored
+    /// options from index 1 (`practice_games::retired`: the retired Off).
+    pub fn option_value(&self, row: usize, option: usize) -> Option<usize> {
+        if ROWS[row].id == moves::ATTACKER_ROW {
+            moves::attacker_index(self.mashout_state(), option)
+        } else {
+            (option < self.option_count(row)).then_some(option + retired(ROWS[row].id))
+        }
+    }
+
+    /// Persisted option to display position; a game mode's stored Off reads as its first mode.
+    fn dropdown_choice(&self, row: usize) -> Option<usize> {
+        let index = self.get(ROWS[row].id).iter().position(|v| *v != 0)?;
+        if ROWS[row].id == moves::ATTACKER_ROW {
+            moves::attacker_option(self.mashout_state(), index)
+        } else {
+            let index = index.saturating_sub(retired(ROWS[row].id));
+            (index < self.option_count(row)).then_some(index)
+        }
+    }
+
+    /// Whether a list option may be confirmed. Mash out's NotMashable rows (primary
+    /// 14:00Z 2026-11-17) are listed greyed but never offered; every other row is.
+    pub fn option_offered(&self, row: usize, option: usize) -> bool {
+        ROWS[row].id != moves::ATTACKER_ROW || moves::attacker_offered(self.mashout_state(), option)
+    }
+
+    /// The first offered option from `start` (inclusive), stepping forward or back.
+    fn offered_from(&self, row: usize, start: usize, forward: bool) -> usize {
+        let len = self.option_count(row);
+        let mut at = start;
+        for _ in 0..len {
+            if self.option_offered(row, at) {
+                return at;
+            }
+            at = if forward { (at + 1) % len } else { (at + len - 1) % len };
+        }
+        start
+    }
+
+    /// Shared label resolver for the page value and popup. The second part is a
+    /// move qualifier; ordinary dropdowns return an empty second part.
+    pub fn dropdown_label(&self, row: usize, option: usize) -> Option<(&'static str, &'static str)> {
+        if ROWS[row].id == moves::ATTACKER_ROW {
+            moves::attacker_label(self.mashout_state(), option)
+        } else if let Control::Dropdown(labels) = ROWS[row].control {
+            labels.get(option).map(|label| (*label, ""))
+        } else {
+            None
+        }
+    }
+
     /// The number of options of a list-like row.
     pub fn option_count(&self, row: usize) -> usize {
+        if ROWS[row].id == moves::ATTACKER_ROW {
+            return moves::attacker_count(self.mashout_state());
+        }
         match ROWS[row].control {
             Control::Dropdown(labels) | Control::MultiSelect(labels) => labels.len(),
             Control::YesNoRandom => 3,
@@ -942,6 +1004,17 @@ impl Menu {
         }
         self.outbox.changed = true;
         self.note_edit(id);
+        if id == moves::STATE_ROW {
+            let state = self.mashout_state();
+            let attacker = self.get(moves::ATTACKER_ROW).iter().position(|v| *v != 0);
+            if let (false, Some(index)) = (
+                attacker.is_some_and(|index| moves::attacker_valid(state, index)),
+                moves::attacker_index(state, 0),
+            ) {
+                self.put_one_hot(moves::ATTACKER_ROW, index);
+            }
+            self.clamp_cursor();
+        }
         for (reroll_id, bit) in REROLL_IDS {
             if reroll_id == id {
                 self.outbox.rerolls |= bit;
@@ -1270,9 +1343,11 @@ impl Menu {
                 let cursor = match r.control {
                     _ if r.id == LOOP_ROW => Some(self.recording.loop_row_index()),
                     Control::YesNoRandom => yes_no_random(self.get(r.id)),
-                    _ => self.get(r.id).iter().position(|v| *v != 0).map(|i| i.saturating_sub(retired(r.id))),
+                    Control::Dropdown(_) => self.dropdown_choice(row),
+                    _ => self.get(r.id).iter().position(|v| *v != 0),
                 }
                 .unwrap_or(0);
+                let cursor = self.offered_from(row, cursor, true);
                 self.stack.push(Screen::List { row, cursor });
             }
             Control::MultiSelect(_) => self.stack.push(Screen::Checklist { row, cursor: 0 }),
@@ -1355,15 +1430,20 @@ impl Menu {
             return;
         }
         match r.control {
-            Control::Dropdown(labels) => {
-                let (len, skip) = (labels.len(), retired(r.id));
-                let at = self.get(r.id).iter().position(|v| *v != 0).map(|i| i.saturating_sub(skip));
+            Control::Dropdown(_) => {
+                let len = self.option_count(row);
+                let at = self.dropdown_choice(row);
                 let next = match at {
-                    None => 0,
-                    Some(i) if forward => (i + 1) % len,
-                    Some(i) => (i + len - 1) % len,
+                    None => self.offered_from(row, 0, true),
+                    Some(i) if forward => self.offered_from(row, (i + 1) % len, true),
+                    Some(i) => self.offered_from(row, (i + len - 1) % len, false),
                 };
-                self.put_one_hot(r.id, next + skip);
+                if !self.option_offered(row, next) {
+                    return;
+                }
+                if let Some(value) = self.option_value(row, next) {
+                    self.put_one_hot(r.id, value);
+                }
             }
             Control::YesNoRandom => {
                 let next = match yes_no_random(self.get(r.id)) {
@@ -1506,14 +1586,25 @@ impl Menu {
     fn press_list(&mut self, button: Button, row: usize, cursor: usize) {
         let len = self.option_count(row);
         match button {
-            Button::Up => self.top(Screen::List { row, cursor: (cursor + len - 1) % len }),
-            Button::Down => self.top(Screen::List { row, cursor: (cursor + 1) % len }),
-            Button::JumpUp | Button::JumpDown => self.top(Screen::List { row, cursor: jumped(cursor, len, button == Button::JumpDown) }),
+            Button::Up => self.top(Screen::List { row, cursor: self.offered_from(row, (cursor + len - 1) % len, false) }),
+            Button::Down => self.top(Screen::List { row, cursor: self.offered_from(row, (cursor + 1) % len, true) }),
+            Button::JumpUp | Button::JumpDown => {
+                let down = button == Button::JumpDown;
+                self.top(Screen::List { row, cursor: self.offered_from(row, jumped(cursor, len, down), down) })
+            }
             Button::A => {
+                // A NotMashable row is never written; the list stays open.
+                if !self.option_offered(row, cursor) {
+                    return;
+                }
                 match ROWS[row].control {
                     _ if ROWS[row].id == LOOP_ROW => self.recording.set_loop_row(cursor),
                     Control::YesNoRandom => self.put_yes_no_random(ROWS[row].id, cursor),
-                    _ => self.put_one_hot(ROWS[row].id, cursor + retired(ROWS[row].id)),
+                    _ => {
+                        if let Some(value) = self.option_value(row, cursor) {
+                            self.put_one_hot(ROWS[row].id, value);
+                        }
+                    },
                 }
                 self.stack.pop();
             }
