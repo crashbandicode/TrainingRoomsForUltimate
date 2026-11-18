@@ -62,7 +62,7 @@ unsafe fn trolley_floor_allows(p1: usize, x: f32, y: f32, spacing: f32, facing: 
         core::mem::transmute(base + TROLLEY_FLOOR_RAY);
     let mut hit = Ray([0.; 4]);
     let line = ray(p1, &Ray([x, y + 0.25, 0., 0.]), &Ray([0., -0.5, 0., 0.]), &mut hit, false);
-    if line == 0 || ((line + 0xc4) as *const u32).read() & 0x2800 != 0x0800 {
+    if line == 0 || !entry::trolley_solid_floor(((line + 0xc4) as *const u32).read()) {
         return false;
     }
     let [left, right] = ((line + 0x88) as *const [usize; 2]).read();

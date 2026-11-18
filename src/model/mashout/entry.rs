@@ -18,16 +18,22 @@ pub fn placement_spacing(scenario: Scenario) -> f32 {
     }
 }
 
-/// Require the current level floor line under P1 to cover Place and the full measured
-/// cart-centre path through the last active SEARCH sample (A2, both attempts).
+pub fn trolley_solid_floor(flags: u32) -> bool {
+    const FLOOR: u32 = 0x0800;
+    const PASS_THROUGH: u32 = 0x2000;
+    flags & (FLOOR | PASS_THROUGH) == FLOOR
+}
+
+/// Require floor from Place to P1 and one unit beyond the widest observed P1
+/// hurtbox on the capture side. The post-capture tail cannot affect admission.
 pub fn trolley_floor_runway(
     [p1_x, p1_y]: [f32; 2],
     place_x: f32,
     facing: f32,
     [[left_x, left_y], [right_x, right_y]]: [[f32; 2]; 2],
 ) -> bool {
-    const CART_TRAVEL: f32 = 85.400_024;
-    let end_x = place_x - facing * CART_TRAVEL;
+    const CAPTURE_MARGIN: f32 = 7.950_678; // A2 maximum idle hurt extent + 1, rounded up.
+    let end_x = p1_x - facing * CAPTURE_MARGIN;
     let low = left_x.min(right_x);
     let high = left_x.max(right_x);
     [left_x, left_y, right_x, right_y, p1_y].into_iter().all(f32::is_finite)
@@ -491,7 +497,12 @@ mod tests {
             assert!(place([-40., 0.], 1., floor));
             assert!(place([40., 0.], -1., [floor[1], floor[0]]));
             assert!(!place([60., 0.], 1., floor)); // CPU Place falls beyond the right edge.
-            assert!(!place([-50., 0.], 1., floor)); // SEARCH path falls beyond the left edge.
+            assert!(place([-50., 0.], 1., floor)); // The unused far cart tail can leave the floor.
+            assert!(!place([-80., 0.], 1., floor)); // Capture-side room ends before the margin.
+            assert!(trolley_solid_floor(0x0800));
+            for flags in [0x0000, 0x2000, 0x2800] {
+                assert!(!trolley_solid_floor(flags));
+            }
             assert!(!place([-40., 3.], 1., floor)); // A lower surface cannot support this pose.
             assert!(!place([-40., 0.], 1., [[-85., 0.], [85., 1.]]));
             assert!(!place([-40., 0.], 1., [[f32::NAN, 0.], [85., 0.]]));
