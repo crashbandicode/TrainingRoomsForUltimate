@@ -167,9 +167,8 @@ impl Clock {
 }
 
 /// G2 (Set, 113/116; OPUS-DESIGN-REVIEW-sora116-refreeze 23:00Z full-range method): the per-shard ice frame F is
-/// not published, only bracketed. `None` everywhere below means UNSCORED.
+/// not published, only bracketed (the bounds replay is `ice116::bounds` on the shared solver).
 pub mod g2 {
-    use super::{fmax_zero, ClatterWrite};
 
     /// Every finite F > 0 with `fadd_rne(old, F) == operand`, as `[F_lo, F_hi]` by ulp stepping; empty -> None.
     pub fn admissible(old: f32, operand: f32) -> Option<(f32, f32)> {
@@ -213,54 +212,6 @@ pub mod g2 {
             }
         }
         None
-    }
-
-    /// The observed schedule of one attempt: per Set its native frame and `[F_lo, F_hi]`, plus the constant d_max.
-    #[derive(Clone, Copy, Debug, PartialEq)]
-    pub struct Schedule {
-        pub frames: [u32; 8],
-        pub lo: [f32; 8],
-        pub hi: [f32; 8],
-        pub len: usize,
-        pub d_max: f32,
-    }
-
-    impl Schedule {
-        /// Steps (1)–(3): accepted Sets in seq order. An operand equal to d_max (the native `le` cap) or an empty
-        /// range is UNSCORED.
-        pub fn new(writes: &[ClatterWrite]) -> Option<Self> {
-            let d_max = f32::from_bits(writes.first()?.d_max);
-            let mut schedule = Self { frames: [0; 8], lo: [0.0; 8], hi: [0.0; 8], len: 0, d_max };
-            for write in writes {
-                if schedule.len == 8 || write.d_max != d_max.to_bits() || write.operand == write.d_max {
-                    return None;
-                }
-                let (lo, hi) = admissible(f32::from_bits(write.old), f32::from_bits(write.operand))?;
-                schedule.frames[schedule.len] = write.frame;
-                schedule.lo[schedule.len] = lo;
-                schedule.hi[schedule.len] = hi;
-                schedule.len += 1;
-            }
-            Some(schedule)
-        }
-
-        /// Step (5) for one counterfactual cadence: apply Set k only while `cf_remaining > 0`; a sum at or above
-        /// d_max is UNSCORED, otherwise the stored value is `fmax_arm(sum)`.
-        pub fn apply(&self, f: f32, cf_remaining: f32) -> Option<f32> {
-            if cf_remaining <= 0.0 {
-                return Some(cf_remaining);
-            }
-            let sum = cf_remaining + f;
-            (sum < self.d_max).then_some(fmax_zero(sum))
-        }
-
-        /// Step (6): run the counterfactual replay `cadence(schedule, F)` with every F at its low end and with
-        /// every F at its high end; any disagreement (ticks, cap tests, grade label) is UNSCORED.
-        pub fn replay<T: PartialEq>(&self, cadence: impl Fn(&Self, &[f32]) -> Option<T>) -> Option<T> {
-            let low = cadence(self, &self.lo[..self.len])?;
-            let high = cadence(self, &self.hi[..self.len])?;
-            (low == high).then_some(low)
-        }
     }
 }
 
