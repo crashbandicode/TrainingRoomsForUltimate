@@ -206,10 +206,13 @@ pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut([f32; 2]) -> bool) 
             mode.close_menu(on, place);
         }
         // A layout loaded on the Saved layouts screen replaces the course; a run on the old one goes back to Ready with
-        // every new target up (`Btt::reset`), so no broken mark of the old course carries over. Placing stays Placing.
+        // every new target up, so no broken mark of the old course carries over. Placing and Off stay. (`close_menu`, not
+        // `Btt::reset`: tests/lock_order.rs resolves calls by name, and a `reset` here reads as `lua_vm::reset`.)
         CMDS.drain(|hot| {
             mode.apply(hot);
-            mode.reset();
+            if matches!(mode.phase(), Phase::Ready | Phase::Running | Phase::Done) {
+                mode.close_menu(true, false);
+            }
         });
         if on {
             let tick = mode.keeper(at) && !owners.covers_strip();

@@ -1857,7 +1857,7 @@ approved_by = "Operator approved the bounded events log and its additional lines
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 156287
+ceiling = 156289
 date = "2026-11-18"
-reason = "rc.15 practice menu (operator-approved mockup, 2026-11-18 ~14:58Z): one row per game, a generic sub-screen (Screen::Rows) with Start first, Start/Stop as menu actions with a Running label, and one runtime value for the running game (runtime::features::practice) replacing the three per-row exclusion sites. Measured 156287 = +264 counted lines over main c212bc50 (156023), after the Break the Targets close path lost its layout-load restart (primary 15:30Z). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
-approved_by = "PENDING: +264 reported to the primary for the operator by menu-games-devin (INBOX 2026-11-18); not yet approved."
+reason = "rc.15 practice menu (operator-approved mockup, 2026-11-18 ~14:58Z): one row per game, a generic sub-screen (Screen::Rows) with Start first, Start/Stop as menu actions with a Running label, and one runtime value for the running game (runtime::features::practice) replacing the three per-row exclusion sites. Measured 156289 = +266 counted lines over main c212bc50 (156023), after the Break the Targets close path lost its layout-load restart (primary 15:30Z). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "PENDING: +266 reported to the primary for the operator by menu-games-devin (INBOX 2026-11-18); not yet approved."
