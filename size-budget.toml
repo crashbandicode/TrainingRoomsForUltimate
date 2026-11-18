@@ -1805,3 +1805,11 @@ ceiling = 155874
 date = "2026-11-18"
 reason = "State export v2, the tr-review-astra-2 preliminary finding 1 (rc15/hw-bridge-export): +79 over 155795, +646 in all over 155228. REQ_SETTLED (pending Save/Load, writer handoff, slot writer, ini writer and bound-save writes) and REQ_RELOAD_SAVES (the writer's copy and the live slots follow a restored slot file), so the bridge's fixture restore can't be undone by a deferred write. Measured on the Surface gate d4b0b8fc. FOR OPERATOR REVIEW."
 approved_by = "Primary 2026-11-18 00:29Z brief orders the fix; size change reported for review. FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155922
+date = "2026-11-18"
+reason = "State export v2, tr-review-astra-2 follow-up on 4ac6a3f (rc15/hw-bridge-export): +48 over 155874, +694 in all over 155228. SAVE_IN_FLIGHT (a Save until every marked body captured, Machine::save_marked), WRITING before DIRTY, BOUND_WRITING around the bound-save write, and REQ_SETTINGS_MATCH (the live-settings readback), so a restore can't report success before a deferred Save lands or without its live settings. Measured on the Surface gate fab7e927. FOR OPERATOR REVIEW."
+approved_by = "Primary 2026-11-18 01:46Z brief orders the fix; size change reported for review. FOR OPERATOR REVIEW."
