@@ -3170,12 +3170,14 @@ fn egg_checks_all_provider_articles_and_fails_closed_on_unavailable_readers() {
             CPU_STATUS.store(0, Ordering::Relaxed);
             YOSHI_ARTICLES.store(1 << article, Ordering::Relaxed);
             m.update(&mut g, 68);
-            assert_eq!(g.step, Step::Held, "live article {article}");
-            assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
-            for _ in 0..EGG_CLOSE_FRAMES {
-                m.update(&mut g, 68);
+            if article == 1 {
+                assert_eq!(g.step, Step::Held, "the Egg Lay shell remains live");
+                for _ in 0..EGG_CLOSE_FRAMES {
+                    m.update(&mut g, 68);
+                }
             }
             assert_eq!(g.step, Step::Failed, "provider did not clear: {article}");
+            assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
         }
         for reader in [
             0x208_7720,
@@ -3221,13 +3223,18 @@ fn egg_late_add_refuses_only_its_attempt() {
         // Transfer the previous tick's finished record latches so this is an exact Add-only frame.
         let data = m.record.as_mut_ptr().cast::<i8>();
         for (offset, byte) in [
-            (0x10, active.source), (0x11, active.sign[0]), (0x12, active.sign[1]),
+            (0x10, active.sign[0]), (0x11, active.sign[1]), (0x12, active.source),
             (0x13, active.stick_block as i8), (0x14, active.button_block as i8),
             (0x15, active.accepted as i8), (0x16, active.other_block as i8),
             (0x17, active.cross_reload as i8), (0x18, active.other_reload as i8),
         ] {
             data.add(offset).write(byte);
         }
+        let observed = reader::sample(m.p1(), 0.37).unwrap();
+        let mut verified = clock;
+        let write = clatter_set::PUBLISHED.with_borrow(|events| events[0]);
+        verified.observe_writes(observed.record, observed.input, false, &[write]).unwrap();
+        assert_eq!(verified.elapsed(), 1);
         m.update(&mut g, 244);
         assert_eq!(g.step, Step::Failed, "Add after the first active tick");
         assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
@@ -3236,5 +3243,24 @@ fn egg_late_add_refuses_only_its_attempt() {
         CPU_STATUS.store(0, Ordering::Relaxed);
         m.update(&mut g, 68);
         assert_eq!(g.step, Step::Result, "no-Add attempt after a refusal");
+    }
+}
+
+#[test]
+fn egg_refuses_an_article_that_appears_and_clears_during_the_wait() {
+    unsafe {
+        for article in [0, 2, 3] {
+            let (m, mut g) = live_egg(true);
+            m.update(&mut g, 68);
+            assert_eq!(g.step, Step::Held, "Yoshi is still in N2");
+            YOSHI_ARTICLES.store(1 << article, Ordering::Relaxed);
+            m.update(&mut g, 68);
+            assert_eq!(g.step, Step::Failed, "live article {article} in the post-escape wait");
+            YOSHI_ARTICLES.store(0, Ordering::Relaxed);
+            CPU_STATUS.store(0, Ordering::Relaxed);
+            m.update(&mut g, 68);
+            assert_eq!(g.step, Step::Failed, "live article {article} cleared");
+            assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
+        }
     }
 }

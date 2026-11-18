@@ -580,35 +580,41 @@ unsafe fn trail_blizzard_closed(cpu: usize) -> Result<bool, ()> {
 /// Positive Egg Lay completion on the selected live CPU. A canceled N2
 /// alone does not prove its last hit ran. N2 MAIN clears SPITED (Yoshi
 /// +0x11560) and the SPIT helper sets it after the absolute hit (+0x28650).
-unsafe fn egg_provider_closed(cpu: usize, spat: &mut bool, finished: bool) -> Result<bool, ()> {
+unsafe fn egg_provider_closed(cpu: usize, spat: &mut bool, finished: bool) -> Result<bool, &'static str> {
     use crate::model::{sites_pkg2, sites_pkg3};
-    if !game::granted(sites_pkg2::STATUS_KIND_OFFSET)
-        || !game::granted(sites_pkg2::WORK_IS_FLAG_OFFSET)
-    {
-        return Err(());
+    if ![
+        sites_pkg2::STATUS_KIND_OFFSET,
+        sites_pkg2::WORK_IS_FLAG_OFFSET,
+        sites_pkg3::STATE_ARTICLE_IS_EXIST_OFFSET,
+    ].into_iter().all(game::granted) {
+        return Err(UNAVAILABLE_NOTICE);
     }
     let [Some(n), Some(n1), Some(n2), Some(spited)] = [
         C::StatusSpecialN, C::YoshiSpecialN1, C::YoshiSpecialN2, C::YoshiSpited,
     ].map(state_id) else {
-        return Err(());
+        return Err(UNAVAILABLE_NOTICE);
     };
     let status = natives::status_kind(cpu);
     if status == n2 && !*spat {
         *spat = natives::is_flag(cpu, spited);
     }
-    if !finished || !*spat || status < 0 || [n, n1, n2].contains(&status) {
+    if !*spat {
         return Ok(false);
     }
-    if !game::granted(sites_pkg3::STATE_ARTICLE_IS_EXIST_OFFSET) {
-        return Err(());
-    }
-    let articles = [
+    let [Some(star), Some(tamago), Some(mob), Some(bg)] = [
         C::YoshiArticleStar, C::YoshiArticleTamago, C::YoshiArticleMob, C::YoshiArticleBg,
-    ].map(state_id);
-    let [Some(star), Some(tamago), Some(mob), Some(bg)] = articles else {
-        return Err(());
+    ].map(state_id) else {
+        return Err(UNAVAILABLE_NOTICE);
     };
-    Ok(![star, tamago, mob, bg].into_iter().any(|id| state_natives::article_is_exist(cpu, id)))
+    // From SPITED onward, reject any extra provider even if it vanishes
+    // before closure. N2's own TAMAGO is the victim shell. Require its
+    // absence at closure, after this move has left all three N statuses.
+    if [star, mob, bg].into_iter().any(|id| state_natives::article_is_exist(cpu, id)) {
+        // restriction: MASH-M1-MISMATCH
+        return Err("Native tick mismatch · no grade");
+    }
+    Ok(finished && status >= 0 && ![n, n1, n2].contains(&status)
+        && !state_natives::article_is_exist(cpu, tamago))
 }
 
 fn trail_magic_status(status: i32, wait: i32) -> Result<entry::TrailMagicStatus, ()> {
@@ -1573,7 +1579,7 @@ pub unsafe fn frame(fighter: usize) {
                     clock.exhausted()
                 ));
             }
-            if egg && (!game.egg_spat || clock.exhausted()) {
+            if egg {
                 match egg_provider_closed(cpu, &mut game.egg_spat, clock.exhausted()) {
                     Ok(true) => {
                         #[cfg(feature = "diag")]
@@ -1599,8 +1605,8 @@ pub unsafe fn frame(fighter: usize) {
                         return;
                     }
                     Ok(false) => (),
-                    Err(()) => {
-                        game.fail(UNAVAILABLE_NOTICE);
+                    Err(reason) => {
+                        game.fail(reason);
                         return;
                     }
                 }
