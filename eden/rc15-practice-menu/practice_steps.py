@@ -548,23 +548,150 @@ def set_row(ctx, game, title, presses, button):
     return [press(ctx, button) for _ in range(presses)][-1]
 
 
-def tech_menu_visit_keeps_session(ctx):
-    """Finding 1: a graded Tech session, a menu visit and B: the next grade continues the count (a fresh session would
-    show 1/20 again). Mode set to 20 attempts in the sub-screen first (the fixture stores 3 minutes)."""
+TECH_LEFT = (r'\[TrainingRooms\] notice_draw header="Tech Practice" body="[^"]* · (?P<m>\d+):(?P<s>\d\d) left · '
+             r'streak \d+')
+
+
+def tech_left(line):
+    return int(line.group('m')) * 60 + int(line.group('s'))
+
+
+def tech_menu_visit_keeps_clock(ctx):
+    """Finding 1, on the session clock (boot 3: every attempt there graded "unavailable (not counted)", so the count
+    could not move): a 1 minute session runs, the menu is visited and closed with B, and the time left goes on from
+    where it was; a fresh session would read 1:00 again."""
     open_game(ctx, 'Tech practice')
-    mode = set_row(ctx, 'Tech practice', 'Tech practice', 3, 'left')
-    back = press(ctx, 'up')
-    if back['row'] != 'Start':
-        raise RuntimeError(f'not back on Start: {back}')
-    out = {'mode_row': mode}
+    stored = json.loads(Path(ctx.instance['settings']).read_text())['menu']['tech_practice']
+    shown = max(next(i for i, v in enumerate(stored) if v) - 1, 0)
+    out = {'stored_mode': stored}
+    if shown != 2:
+        out['mode_row'] = set_row(ctx, 'Tech practice', 'Tech practice', (shown - 2) % 5, 'left')
+        back = press(ctx, 'up')
+        if back['row'] != 'Start':
+            raise RuntimeError(f'not back on Start: {back}')
     log = cursor(ctx)
     try:
         ctx.press('a')
         first = log.wait(r'\[Practice\] (start|stop) game=(\S+)', 4, ctx)
         if first.group(1) == 'stop':
-            raise RuntimeError('Tech was running at the row start')
+            out['stopped_first'] = first.group(0)
+            time.sleep(0.5)
+            ctx.press('a')
+            log.wait(r'\[Practice\] start game=Tech', 4, ctx)
         log.wait(r'\[Ui\] menu closed ', 4, ctx)
-        grade = log.wait(TECH_GRADE, 120, ctx)
+        deadline = time.monotonic() + 60
+        while True:
+            line = log.wait(TECH_LEFT, max(1.0, deadline - time.monotonic()), ctx)
+            if tech_left(line) <= 48 or time.monotonic() > deadline:
+                break
+    finally:
+        log.close()
+    before = tech_left(line)
+    if before > 48:
+        raise RuntimeError(f'the session clock did not run: {line.group(0)[-120:]}')
+    out['before'] = line.group(0)[-160:]
+    out['before_shot'] = shot(ctx, 'tech-clock-before-visit')
+    open_menu(ctx)
+    time.sleep(2.0)
+    log, starts = cursor(ctx), cursor(ctx)
+    try:
+        close_plain(ctx)
+        after = log.wait(TECH_LEFT, 30, ctx)
+        none_since(ctx, starts, r'\[Practice\] (start|stop)')
+    finally:
+        log.close()
+        starts.close()
+    left = tech_left(after)
+    if left > before:
+        raise RuntimeError(f'the session clock went back: {before} s left before the visit, {left} s after')
+    out.update(after=after.group(0)[-160:], seconds_left=[before, left], after_shot=shot(ctx, 'tech-clock-after-visit'))
+    open_game(ctx, 'Tech practice')
+    out['stop'] = waits(ctx, 'a', r'\[Practice\] stop game=Some\(Tech\)', 4).group(0)
+    close_all(ctx)
+    return save(ctx, 'tech-menu-visit-keeps-clock', out)
+
+
+def tech_grades_without_visit(ctx):
+    """Control for boot 3 (every attempt there graded "unavailable" after the first): a 20-attempt session with no menu
+    visit; every grade notice for up to 90 s is kept. PASS when one counted grade (n >= 1) is seen."""
+    open_game(ctx, 'Tech practice')
+    stored = json.loads(Path(ctx.instance['settings']).read_text())['menu']['tech_practice']
+    shown = max(next(i for i, v in enumerate(stored) if v) - 1, 0)
+    out = {'stored_mode': stored}
+    if shown:
+        out['mode_row'] = set_row(ctx, 'Tech practice', 'Tech practice', shown, 'left')
+        if press(ctx, 'up')['row'] != 'Start':
+            raise RuntimeError('not back on Start')
+    log, bodies = cursor(ctx), []
+    try:
+        ctx.press('a')
+        first = log.wait(r'\[Practice\] (start|stop) game=(\S+)', 4, ctx)
+        if first.group(1) == 'stop':
+            time.sleep(0.5)
+            ctx.press('a')
+            log.wait(r'\[Practice\] start game=Tech', 4, ctx)
+        log.wait(r'\[Ui\] menu closed ', 4, ctx)
+        deadline = time.monotonic() + 90
+        while time.monotonic() < deadline:
+            try:
+                line = log.wait(TECH_GRADE, max(1.0, deadline - time.monotonic()), ctx)
+            except RuntimeError:
+                break
+            body = line.group(0).split('body="', 1)[1]
+            if not bodies or bodies[-1] != body:
+                bodies.append(body)
+            if int(line.group('n')) >= 2:
+                break
+    finally:
+        log.close()
+    out['grades'] = bodies
+    out['shot'] = shot(ctx, 'tech-grades-without-visit')
+    open_game(ctx, 'Tech practice')
+    out['stop'] = waits(ctx, 'a', r'\[Practice\] stop game=Some\(Tech\)', 4).group(0)
+    close_plain(ctx)
+    save(ctx, 'tech-grades-without-visit', out)
+    if not any(re.search(r' · [1-9]\d*/20 · ', b) for b in bodies):
+        raise RuntimeError(f'no counted grade without a menu visit: {bodies[:6]}')
+    return out
+
+
+def tech_menu_visit_keeps_session(ctx):
+    """Finding 1 (row r20): the session clock check (`tech_menu_visit_keeps_clock`). Boot 3 graded every attempt
+    "unavailable (not counted)", so the attempt count could not move there; the count variant stays below."""
+    return tech_menu_visit_keeps_clock(ctx)
+
+
+def tech_menu_visit_keeps_count(ctx):
+    """Finding 1: a graded Tech session, a menu visit and B: the next grade continues the count (a fresh session would
+    show 1/20 again). Mode set to 20 attempts in the sub-screen first (the fixture stores 3 minutes)."""
+    open_game(ctx, 'Tech practice')
+    # The presses to 20 attempts (the first shown mode) come from the stored row: shown = stored - 1, a stored Off is
+    # the first mode (boot 3: a fixed count from the fixture's 3 minutes went wrong on a retry).
+    stored = json.loads(Path(ctx.instance['settings']).read_text())['menu']['tech_practice']
+    shown = max(next(i for i, v in enumerate(stored) if v) - 1, 0)
+    out = {'stored_mode': stored}
+    if shown:
+        out['mode_row'] = set_row(ctx, 'Tech practice', 'Tech practice', shown, 'left')
+        back = press(ctx, 'up')
+        if back['row'] != 'Start':
+            raise RuntimeError(f'not back on Start: {back}')
+    log = cursor(ctx)
+    try:
+        ctx.press('a')
+        first = log.wait(r'\[Practice\] (start|stop) game=(\S+)', 4, ctx)
+        if first.group(1) == 'stop':
+            # An earlier attempt left a session on (its first row reads Stop): A stopped it; A starts a fresh one.
+            out['stopped_first'] = first.group(0)
+            time.sleep(0.5)
+            ctx.press('a')
+            log.wait(r'\[Practice\] start game=Tech', 4, ctx)
+        log.wait(r'\[Ui\] menu closed ', 4, ctx)
+        # The first counted grade (an uncounted "Grading unavailable · 0/20" can come first; boot 3 retry 2).
+        deadline = time.monotonic() + 150
+        while True:
+            grade = log.wait(TECH_GRADE, max(1.0, deadline - time.monotonic()), ctx)
+            if int(grade.group('n')) >= 1 or time.monotonic() > deadline:
+                break
     finally:
         log.close()
     before, total = int(grade.group('n')), int(grade.group('of'))
@@ -574,19 +701,61 @@ def tech_menu_visit_keeps_session(ctx):
     out['before_shot'] = shot(ctx, 'tech-graded-before-visit')
     open_menu(ctx)
     time.sleep(1.0)
-    log = cursor(ctx)
+    # Boot 3: the Training HUD gate cannot pass while Tech practice launches the fighter, so the close is gated on the
+    # DIAG's closed line only. Every grade after B is read: none may go below the count before the visit (a fresh
+    # session would show 0 or 1/20 again), and one must go past it.
+    log, starts = cursor(ctx), cursor(ctx)
+    seen = []
     try:
-        close_all(ctx)
-        after = log.wait(TECH_GRADE, 120, ctx)
-        none_since(ctx, log, r'\[Practice\] (start|stop)')
+        close_plain(ctx)
+        deadline = time.monotonic() + 150
+        while time.monotonic() < deadline:
+            line = log.wait(TECH_GRADE, max(1.0, deadline - time.monotonic()), ctx)
+            n = int(line.group('n'))
+            seen.append(line.group(0)[-120:])
+            if n < before:
+                raise RuntimeError(f'the session restarted: {before}/20 before the visit, {n}/20 after: {seen}')
+            if n > before:
+                break
+        none_since(ctx, starts, r'\[Practice\] (start|stop)')
     finally:
         log.close()
-    n = int(after.group('n'))
-    if n <= before:
-        raise RuntimeError(f'the session restarted: {before}/20 before the visit, {n}/20 after')
-    out.update(after=after.group(0)[:220], counts=[before, n], after_shot=shot(ctx, 'tech-graded-after-visit'))
-    out['stop'] = stop_game(ctx, 'Tech practice', 'Tech')
+        starts.close()
+    out.update(after=seen, counts=[before, n], after_shot=shot(ctx, 'tech-graded-after-visit'))
+    open_game(ctx, 'Tech practice')
+    out['stop'] = waits(ctx, 'a', r'\[Practice\] stop game=Some\(Tech\)', 4).group(0)
+    close_all(ctx)
     return save(ctx, 'tech-menu-visit-keeps-session', out)
+
+
+def close_plain(ctx):
+    """B until the DIAG says the menu closed (at most four), with no HUD gate."""
+    for _ in range(4):
+        log = cursor(ctx)
+        try:
+            ctx.press('b')
+            try:
+                log.wait(r'\[Ui\] menu closed ', 1.5, ctx)
+                return
+            except RuntimeError:
+                continue
+        finally:
+            log.close()
+    raise RuntimeError('the menu did not close after four B')
+
+
+def stop_running_tech(ctx):
+    """Recovery: a running Tech practice keeps the HUD gate from passing. Its sub-screen draws Stop on its first row
+    (traced set_text); A stops it there."""
+    offset = trace_offset(ctx)
+    open_game(ctx, 'Tech practice')
+    time.sleep(0.8)
+    if not traced(ctx, offset, 'Stop'):
+        close_plain(ctx)
+        return False
+    waits(ctx, 'a', r'\[Practice\] stop game=Some\(Tech\)', 4)
+    close_plain(ctx)
+    return True
 
 
 EGGS_N = r'\[Eggs\] notice="Eggs \d+/10 '
@@ -635,14 +804,46 @@ def btt_projectiles_apply_at_next_start(ctx):
     """Finding 2 (Break the Targets): Projectiles Off at Start (the fixture), turned On while the run goes on, B: Fox's
     blaster still breaks nothing (no `[Btt] projectile` line). Stop and Start: the blaster breaks the target."""
     projectile = r'\[Btt\] projectile [^\n]*hits='
-    out = {'start': start_game(ctx, 'Break the Targets', r'\[Btt\] phase=(Placing|Ready) n=\d+ ')}
+    # Boot 3: Fox stood where Tech practice left him (p1=[0.0, 47.2]). L+R+A first puts him back at the spawn, on the
+    # ground at x -40 facing the CPU, so the target goes on the blaster's line in front of him.
+    routes.play(ctx, 'reset-lra')
+    time.sleep(2.0)
+    routes.gate(ctx, 'training')
+    out = {}
+    # The rule must be Off at this Start: the fixture stores Off, a retry may find the On an earlier attempt set.
+    stored = json.loads(Path(ctx.instance['settings']).read_text())['menu']['btt_projectiles']
+    if stored == [0, 1]:
+        open_game(ctx, 'Break the Targets')
+        out['rule_off'] = set_row(ctx, 'Break the Targets', 'Projectiles break targets', 1, 'right')
+        close_plain(ctx)
+        time.sleep(1.0)
+    out['start'] = start_game(ctx, 'Break the Targets', r'\[Btt\] phase=(Placing|Ready) n=\d+ ')
+    if 'phase=Placing n=0 ' not in out['start']['line']:
+        # An earlier attempt left a course: Place targets opens the placing view on it, and Y twice clears it.
+        open_game(ctx, 'Break the Targets')
+        focus_sub(ctx, 'Break the Targets', 'Place targets')
+        log = cursor(ctx)
+        try:
+            ctx.press('a')
+            log.wait(r'\[Btt\] phase=Placing n=\d+ ', 15, ctx)
+            time.sleep(1.0)
+            ctx.press('y')
+            time.sleep(0.4)
+            ctx.press('y')
+            out['cleared'] = log.wait(r'\[Btt\] phase=Placing n=0 [^\n]*', 10, ctx).group(0)[:200]
+        finally:
+            log.close()
+        out['start']['line'] = out['cleared']
+        time.sleep(0.8)
     log = cursor(ctx)
     try:
         if 'phase=Placing n=0 ' in out['start']['line']:
-            # One target at blaster height: the cursor starts 15 above the ground; 8 down puts it at the laser.
-            for _ in range(8):
-                ctx.press('down')
-                time.sleep(0.15)
+            # One target at blaster height in front of Fox: the cursor starts mid-stage 15 above the ground; 15 left
+            # and 8 down put it at x -15, about 7 above the ground.
+            for button, count in (('left', 15), ('down', 8)):
+                for _ in range(count):
+                    ctx.press(button)
+                    time.sleep(0.15)
             time.sleep(0.6)
             ctx.press('a')
             out['placed'] = log.wait(r'\[Btt\] phase=Placing n=1 [^\n]*', 10, ctx).group(0)[:200]
@@ -737,8 +938,11 @@ def recover(ctx):
             return {'recovered': True}
         ctx.press('b')
         time.sleep(0.5)
+    # Boot 3: a Tech practice left running by a failed row keeps launching the fighter; stop it, then gate.
+    stopped = stop_running_tech(ctx)
+    time.sleep(2.0)
     routes.gate(ctx, 'training')
-    return {'recovered': True}
+    return {'recovered': True, 'stopped_tech': stopped}
 
 
 def console_scan(ctx):
