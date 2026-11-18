@@ -13,7 +13,7 @@ use crate::model::mashout::{
     moves::{Config, Scenario},
     native::Clock,
 };
-use crate::model::practice_games::Game;
+use crate::model::practice_games::Game as PracticeGame;
 use crate::model::sites_mashout::{self, TROLLEY_FLOOR_RAY, TROLLEY_FLOOR_RAY_IMPL};
 use crate::model::{
     input_delay::MappedInputs,
@@ -129,6 +129,11 @@ pub fn set_admission(on: bool) {
 }
 fn admission() -> Admission {
     Admission::new(READY.load(Ordering::Acquire) && SLOTS_READY.load(Ordering::Acquire))
+}
+
+/// rc.15 practice menu: Mash out runs while it is the running game (Start to Stop), no longer while its row is On.
+fn wanted() -> bool {
+    super::practice::is(PracticeGame::Mashout)
 }
 
 pub fn publish(rows: &Snapshot) {
@@ -793,7 +798,7 @@ pub unsafe fn frame(fighter: usize) {
     // Disabling restores the native slots immediately, but must still restore the
     // temporary CPU through the existing frame path.
     // rc.15 practice menu: Mash out runs while it is the running game (Start and Stop), no longer while its row is On.
-    let wanted = super::practice::is(Game::Mashout);
+    let wanted = wanted();
     if wanted && !SLOTS_READY.load(Ordering::Acquire) {
         revoke();
         OWN_CPU.store(0, Ordering::Release);

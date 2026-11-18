@@ -62,3 +62,19 @@ fn the_tech_camera_follows_the_running_session() {
     assert!(!request.contains("config.camera"), "the camera is the running session's, not the published one:\n{request}");
     assert!(frame.contains("camera = run.config.camera"), "the session's camera comes from its latched config");
 }
+
+/// tr-review / gate ed64bb9d (release and DIAG exit 101): Mash out reads the running game through one function, its
+/// submodules included, and the models Game never shadows the runtime struct Game of mashout.rs.
+#[test]
+fn mash_out_runs_while_it_is_the_running_game() {
+    let root = src("src/runtime/features/mashout.rs");
+    assert!(root.contains("struct Game {"), "the runtime struct this import must not clash with");
+    assert!(!root.contains("use crate::model::practice_games::Game;"), "imported under another name");
+    assert!(item(&root, "fn wanted()").contains("super::practice::is(PracticeGame::Mashout)"));
+    for path in ["src/runtime/features/mashout.rs", "src/runtime/features/mashout/worker.rs", "src/runtime/features/mashout/interposer.rs"] {
+        let text = src(path);
+        assert!(!text.contains("WANTED"), "{path} still reads the removed row-On flag");
+    }
+    assert!(src("src/runtime/features/mashout/worker.rs").contains("let wanted = wanted();"));
+    assert!(src("src/runtime/features/mashout/interposer.rs").contains("let wanted = wanted()"));
+}
