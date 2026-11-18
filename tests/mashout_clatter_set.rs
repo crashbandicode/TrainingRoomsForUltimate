@@ -136,6 +136,26 @@ fn scope_loss_retracts_closes_and_restores_in_the_same_owner_call() {
     assert_eq!(CELLS[0].load(Ordering::Relaxed), game::text_base() + SET_ORIGINAL, "slot restored in the same call");
 }
 
+/// L2 (rc15-m3-l2-owner-xps-3): the owner site does not run on the main menu, so an exit must not leave the slot
+/// installed until the next Training frame. A release on the owner thread restores in the same call.
+#[test]
+fn release_on_the_owner_thread_restores_in_the_same_call() {
+    let f = fake();
+    reset();
+    owner(true);
+    publish_common(base(&f));
+    assert_eq!(arm(13, 113, ctl(&f)), Ok(13));
+    release();
+    assert_eq!(CELLS[0].load(Ordering::Relaxed), game::text_base() + SET_ORIGINAL, "restored without another owner call");
+    assert_eq!(arm(14, 117, ctl(&f)), Ok(14));
+    THREAD.store(2, Ordering::Relaxed);
+    release();
+    assert_eq!(CELLS[1].load(Ordering::Relaxed), add_wrapper as *const () as usize, "off the owner thread: gate only");
+    THREAD.store(1, Ordering::Relaxed);
+    owner(true);
+    assert_eq!(CELLS[1].load(Ordering::Relaxed), game::text_base() + ADD_ORIGINAL, "the owner site restores it");
+}
+
 #[test]
 fn a_common_load_while_armed_poisons_lost() {
     let f = fake();

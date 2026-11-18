@@ -213,11 +213,31 @@ pub fn arm(generation: u32, tag: u16, p1_control: usize) -> Result<u32, Refusal>
     Ok(generation)
 }
 
-/// Every exit (Result, Retry, Choose, fail, Off, scene change, body/CPU change): the gate closes now; the owner
-/// site restores the slot on its next call (O4 two-phase rule; at most one frame of forward-only calls).
+/// Every exit (Result, Retry, Choose, fail, Off, scene change, body/CPU change): the gate closes now and, on the
+/// owner thread, the slot is restored in the same call; elsewhere the owner site restores it (O4 backstop).
 pub fn release() {
     P1_CONTROL.store(0, Ordering::Release);
     ARMED.store(false, Ordering::Release);
+    // L2: the owner site does not run on the main menu, so on the owner thread the slot is restored now, not at the
+    // next Training frame. Off the owner thread only the gate closes (O3); service() restores.
+    let owner = OWNER_THREAD.load(Ordering::Acquire);
+    if owner != 0 && owner == current_thread() {
+        restore();
+    }
+}
+
+/// Owner thread only: put the original back over TR's own wrapper (O8); a foreign value latches LOST.
+fn restore() {
+    let kind = if INSTALLED_SLOT.load(Ordering::Acquire) == Slot::Add as u32 { Slot::Add } else { Slot::Set };
+    let (slot_offset, original_offset, wrapper) = layout(kind);
+    let original = game::text_base() + original_offset;
+    let found = unsafe { slot_at(slot_offset) };
+    if INSTALLED.swap(false, Ordering::AcqRel)
+        && (found.compare_exchange(wrapper, original, Ordering::AcqRel, Ordering::Acquire).is_err()
+            || found.load(Ordering::Acquire) != original)
+    {
+        LOST.store(true, Ordering::Release);
+    }
 }
 
 /// Owner site (main thread, outside hooks): restore TR's own value only (O8); verify an armed install each frame.
@@ -225,9 +245,8 @@ pub fn service() {
     OWNER_THREAD.store(current_thread(), Ordering::Release);
     FRAME.fetch_add(1, Ordering::AcqRel);
     let kind = if INSTALLED_SLOT.load(Ordering::Acquire) == Slot::Add as u32 { Slot::Add } else { Slot::Set };
-    let (slot_offset, original_offset, wrapper) = layout(kind);
+    let (slot_offset, _, wrapper) = layout(kind);
     let word = if kind == Slot::Add { &COMMON_ADD_LR } else { &COMMON_LR };
-    let original = game::text_base() + original_offset;
     let found = unsafe { slot_at(slot_offset) };
     if ARMED.load(Ordering::Acquire) {
         if found.load(Ordering::Acquire) != wrapper
@@ -240,12 +259,7 @@ pub fn service() {
             return;
         }
     }
-    if INSTALLED.swap(false, Ordering::AcqRel)
-        && (found.compare_exchange(wrapper, original, Ordering::AcqRel, Ordering::Acquire).is_err()
-            || found.load(Ordering::Acquire) != original)
-    {
-        LOST.store(true, Ordering::Release);
-    }
+    restore();
 }
 
 // The Add instance (117): the same x16/x17-only unqualified path against its own C9 word; no d_max (Add's operand is
