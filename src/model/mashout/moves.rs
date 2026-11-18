@@ -413,7 +413,7 @@ mod tests {
             let unstartable: Vec<_> = CATALOG.iter()
                 .filter(|s| availability(s.id) == MoveAvailability::Available && super::super::entry::start(**s).is_none())
                 .map(|s| s.id).collect();
-            assert!(unstartable.contains(&116), "Sora Ice magic has no start yet");
+            assert!(!unstartable.contains(&116), "Sora Ice magic starts through real magic casts (a11b194a)");
             assert!(!unstartable.contains(&89), "Cargo has a start here but is NotMashable, not merely unstartable");
             for id in unstartable {
                 let index = if (id as usize) < RANDOM_ATTACKER { id as usize } else { id as usize + 1 };
