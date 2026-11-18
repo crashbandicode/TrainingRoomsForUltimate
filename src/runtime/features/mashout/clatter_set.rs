@@ -121,6 +121,16 @@ pub fn retract_common() {
     release();
 }
 
+static SCENE_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+/// Owner site, every frame: the falling edge of an active scene (scene change, waiting-room exit, loading) retracts
+/// the common word before anything else runs. A common load published during loading survives until the next exit.
+pub fn scene(active: bool) {
+    if SCENE_ACTIVE.swap(active, Ordering::AcqRel) && !active {
+        retract_common();
+    }
+}
+
 /// Settle on the owner thread (O5): install over the exact original and read it back before returning the
 /// generation. Only 113/116 (the Set tags) and only the concrete FighterControl table.
 pub fn arm(generation: u32, tag: u16, p1_control: usize) -> Result<u32, Refusal> {

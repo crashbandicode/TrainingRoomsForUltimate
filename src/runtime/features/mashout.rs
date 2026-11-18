@@ -102,6 +102,9 @@ pub fn reset() {
     start();
 }
 pub fn service() {
+    // M3 Set observer at the same owner site: C9 retract on scope loss first, then restore/verify (O4 order).
+    clatter_set::scene(scene::current().is_some());
+    clatter_set::service();
     interposer::service();
     worker::service();
 }

@@ -29,8 +29,20 @@ mod model {
         }
         pub mod native { // NATIVE
         }
+        pub mod clatter { // CLATTER
+        }
         pub mod entry { // ENTRY
         }
+    }
+}
+// The M3 Set observer is not installed in this fixture (117 is not a Set tag): nothing is ever published.
+mod clatter_set {
+    pub const RING: usize = 8;
+    pub fn poll(_: u32, _: u32) -> crate::model::mashout::clatter::Poll {
+        crate::model::mashout::clatter::Poll::Empty
+    }
+    pub fn arm(generation: u32, _: u16, _: usize) -> Result<u32, ()> {
+        Ok(generation)
     }
 }
 use model::{
@@ -426,6 +438,8 @@ struct Game {
     followed: bool,
     saw_catch: bool,
     clock: Option<Clock>,
+    writes: Option<model::mashout::clatter::Writes>,
+    applied: bool,
     config: Option<()>,
     restore_requested: bool,
     failed: Option<&'static str>,
@@ -453,6 +467,8 @@ impl Game {
             followed: false,
             saw_catch: false,
             clock: None,
+            writes: None,
+            applied: false,
             config: Some(()),
             restore_requested: false,
             failed: None,

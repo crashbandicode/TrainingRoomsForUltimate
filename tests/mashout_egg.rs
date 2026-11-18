@@ -58,6 +58,10 @@ fn actual_runtime_egg_preparation_and_native_seed() {
             production(include_str!("../src/model/mashout/native.rs")).to_string(),
         ),
         (
+            "// CLATTER",
+            production(include_str!("../src/model/mashout/clatter.rs")).to_string(),
+        ),
+        (
             "// READER",
             production(include_str!("../src/runtime/features/mashout/reader.rs")).to_string(),
         ),
