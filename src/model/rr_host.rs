@@ -2424,6 +2424,24 @@ mod tests {
         assert!(take_cpu_frame().is_none() && !cpu_playback(idle).running, "an in-flight producer cannot refill a cut run");
     }
 
+    /// A live CPU frame has to reach the hook on this game tick, even while the worker is stopped.
+    fn the_frame_pop_never_waits_and_keeps_the_frame_on_contention() {
+        let _hold = hold();
+        reset_host();
+        let frame = InputFrame { buttons: 2, ..InputFrame::default() };
+        assert!(CPU_FRAMES.lock().push(pack(frame)));
+        let held = CPU_FRAMES.lock();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let hook = std::thread::spawn(move || tx.send(take_cpu_frame()).unwrap());
+        let got = rx.recv_timeout(std::time::Duration::from_millis(500));
+        drop(held);
+        hook.join().unwrap();
+
+        assert_eq!(got, Ok(Some(frame)), "the hook must apply the pending frame on this tick");
+        assert_eq!(take_cpu_frame(), None, "the hook consumed the frame exactly once");
+        reset_host();
+    }
+
     /// tr-review-astra-3 14:34Z: note_mash and note_load run in game hooks (CPU command hook, the load request). They must
     /// not wait on a lock the macros worker holds (the frame queues, the start speeds). Hold them on another thread, as the
     /// worker would, and the hook-side calls must still return.
@@ -3712,6 +3730,7 @@ mod tests {
             ("the_mash_stop_is_seen_by_the_cpu_before_the_next_tick", the_mash_stop_is_seen_by_the_cpu_before_the_next_tick as fn()),
             ("a_cut_endless_run_does_not_spin_the_worker", a_cut_endless_run_does_not_spin_the_worker as fn()),
             ("the_hook_side_cuts_never_wait_on_worker_locks", the_hook_side_cuts_never_wait_on_worker_locks as fn()),
+            ("the_frame_pop_never_waits_and_keeps_the_frame_on_contention", the_frame_pop_never_waits_and_keeps_the_frame_on_contention as fn()),
             ("cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing", cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing as fn()),
             ("player_frames_reach_the_poll_once_each_whatever_the_worker_timing", player_frames_reach_the_poll_once_each_whatever_the_worker_timing as fn()),
             ("a_stopped_cpu_run_feeds_nothing_more", a_stopped_cpu_run_feeds_nothing_more as fn()),
