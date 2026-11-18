@@ -682,6 +682,51 @@ fn native_clatter_set_observer_reach_has_no_lock_or_allocation() {
         result.violations.into_iter().collect::<Vec<_>>().join("\n"));
 }
 
+/// Every function a plugin-thread entry reaches (the same edges as the lock scan).
+fn plugin_reach(graph: &Graph, entries: &[&str]) -> BTreeSet<usize> {
+    let mut by_name: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+    for (i, f) in graph.funcs.iter().enumerate() {
+        by_name.entry(f.name.clone()).or_default().push(i);
+    }
+    let mut ambiguous = BTreeMap::new();
+    let mut seen = BTreeSet::new();
+    let mut stack: Vec<usize> = entries.iter().flat_map(|e| graph.find(e)).collect();
+    while let Some(i) = stack.pop() {
+        if seen.insert(i) {
+            stack.extend(edges(graph, i, &by_name, &mut ambiguous));
+        }
+    }
+    seen
+}
+
+/// M3 Set observer O2/O3 (review B1): the Set slot's writers (`clatter_set::{service, scene, arm}`) run only on the game
+/// thread — reached from the owner sites `cpu::on_frame` (and `lobby::update`), never from any plugin-thread entry
+/// (diag_log's drain tick runs `mashout::service`).
+#[test]
+fn clatter_set_writers_run_only_at_game_thread_owner_sites() {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let graph = Graph::scan(&runtime, &[]);
+    let writers: Vec<usize> = ["service", "scene", "arm"].iter().map(|name| {
+        let found: Vec<usize> = graph.funcs.iter().enumerate()
+            .filter(|(_, f)| f.file == "features/mashout/clatter_set.rs" && f.name == *name).map(|(i, _)| i).collect();
+        assert_eq!(found.len(), 1, "clatter_set::{name} must exist exactly once");
+        found[0]
+    }).collect();
+    let entries = plugin_thread_entries();
+    let entries: Vec<&str> = entries.iter().map(String::as_str).collect();
+    let plugin = plugin_reach(&graph, &entries);
+    let leaked: Vec<String> = writers.iter().filter(|w| plugin.contains(w)).map(|&w| graph.funcs[w].key()).collect();
+    assert!(leaked.is_empty(), "plugin threads reach the Set slot writers: {leaked:?}");
+    let game = plugin_reach(&graph, &["cpu::on_frame"]);
+    let missing: Vec<String> = writers.iter().filter(|w| !game.contains(w)).map(|&w| graph.funcs[w].key()).collect();
+    assert!(missing.is_empty(), "cpu::on_frame must reach every Set slot writer: {missing:?}");
+    let lobby = plugin_reach(&graph, &["lobby::update"]);
+    for name in ["service", "scene"] {
+        assert!(lobby.iter().any(|&i| graph.funcs[i].file == "features/mashout/clatter_set.rs" && graph.funcs[i].name == name),
+            "lobby::update must run clatter_set::{name} (restore/retract outside Training)");
+    }
+}
+
 #[test]
 fn native_throw_observer_scan_catches_transitive_lock_and_allocation_seeds() {
     let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");

@@ -102,11 +102,15 @@ pub fn reset() {
     start();
 }
 pub fn service() {
-    // M3 Set observer at the same owner site: C9 retract on scope loss first, then restore/verify (O4 order).
-    clatter_set::scene(scene::current().is_some());
-    clatter_set::service();
     interposer::service();
     worker::service();
+}
+
+/// M3 Set observer owner site (O2/O3): game thread only, from `lobby::update` (which `cpu::on_frame` runs first, before
+/// the original). C9 retract on scope loss first, then restore/verify (O4 order). Never from the diag drain tick.
+pub(crate) fn owner_site() {
+    clatter_set::scene(scene::current().is_some());
+    clatter_set::service();
 }
 
 /// Roster requests are temporary; its normal completion must not persist the practice attacker as the user's choice.
