@@ -400,8 +400,17 @@ pub fn note_mash() {
 }
 
 /// A save-state load was accepted. A Play's own warp (`WARP_HOLD`) is the start of that playback, not a stop.
+/// Both runs stop at once, as for a mash (`note_mash`); the tick still drives the machine (`LOAD`).
 pub fn note_load() {
-    LOAD.fetch_or(!WARP_HOLD.load(Ordering::Acquire), Ordering::AcqRel);
+    if WARP_HOLD.load(Ordering::Acquire) {
+        return;
+    }
+    LOAD.store(true, Ordering::Release);
+    for role in [Role::Player, Role::Cpu] {
+        let mut frames = role_frames(role).lock();
+        run_flag(role).store(false, Ordering::Release);
+        frames.clear();
+    }
 }
 
 /// What the CPU's behaviours see of playback (B5 / N4, Mash interrupts playback): the old recorder's state, with a
@@ -627,6 +636,7 @@ pub fn service_at(
     let busy = play_player
         || play_cpu
         || mash
+        || load
         || menu_pending()
         || playing()
         || waiting_work();
@@ -2350,6 +2360,8 @@ mod tests {
         tick(&root);
         assert!(take_cpu_frame().is_some(), "the CPU's run plays");
         note_load();
+        // p3f-verify-yoga-3: the stop waited for the next service tick (~2 s), and the take kept playing after Load.
+        assert!(take_cpu_frame().is_none() && !playing(), "the load stops the runs at once, before the tick");
         let t = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(t.diags.iter().any(|l| l == "screen=playback load=1"), "{:?}", t.diags);
         assert!(take_cpu_frame().is_none(), "the load stopped the CPU's run");
