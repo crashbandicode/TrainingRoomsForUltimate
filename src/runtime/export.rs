@@ -107,7 +107,7 @@ extern "C" fn request(kind: u32, data: *const u8, len: usize) -> i32 {
 fn settled() -> bool {
     crate::runtime::features::states::settled()
         && crate::runtime::features::writer::settled()
-        && crate::model::rr_host::bound_settled()
+        && crate::engine::rr_host::bound_settled()
 }
 
 /// The diag reload's file, as boot reads one (recovered when it has issues).

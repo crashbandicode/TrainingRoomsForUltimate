@@ -1797,3 +1797,11 @@ ceiling = 155795
 date = "2026-11-18"
 reason = "State export v2, the Astra review fixes (rc15/hw-bridge-export): +52 over the v1 entry 155743, +567 in all over 155228. Owned ring slots with a compare-and-swap state and drop-on-busy producers (finding 1), the settings request refused before any side effect (model::settings_request, finding 2), and no snapshot kept without a subscriber (finding 6). Measured on the Yoga gate 626d664e. FOR OPERATOR REVIEW."
 approved_by = "Primary 2026-11-17 22:37Z brief: size stays approved at about +515, any change reported; this +52 is reported for review. FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155874
+date = "2026-11-18"
+reason = "State export v2, the tr-review-astra-2 preliminary finding 1 (rc15/hw-bridge-export): +79 over 155795, +646 in all over 155228. REQ_SETTLED (pending Save/Load, writer handoff, slot writer, ini writer and bound-save writes) and REQ_RELOAD_SAVES (the writer's copy and the live slots follow a restored slot file), so the bridge's fixture restore can't be undone by a deferred write. Measured on the Surface gate d4b0b8fc. FOR OPERATOR REVIEW."
+approved_by = "Primary 2026-11-18 00:29Z brief orders the fix; size change reported for review. FOR OPERATOR REVIEW."
