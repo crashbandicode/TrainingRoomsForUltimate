@@ -328,6 +328,7 @@ struct Game {
     sets: [crate::model::mashout::ice116::Applied; 8],
     set_count: usize,
     egg_spat: bool,
+    egg_shell: Option<u32>,
     egg_close_frames: u8,
     saw_catch: bool,
     followed: bool,
@@ -356,6 +357,7 @@ impl Game {
             sets: [crate::model::mashout::ice116::Applied { boundary: 0, old: 0, operand: 0, new: 0, d_max: 0 }; 8],
             set_count: 0,
             egg_spat: false,
+            egg_shell: None,
             egg_close_frames: 0,
             saw_catch: false,
             followed: false,
@@ -580,12 +582,18 @@ unsafe fn trail_blizzard_closed(cpu: usize) -> Result<bool, ()> {
 /// Positive Egg Lay completion on the selected live CPU. A canceled N2
 /// alone does not prove its last hit ran. N2 MAIN clears SPITED (Yoshi
 /// +0x11560) and the SPIT helper sets it after the absolute hit (+0x28650).
-unsafe fn egg_provider_closed(cpu: usize, spat: &mut bool, finished: bool) -> Result<bool, &'static str> {
-    use crate::model::{sites_pkg2, sites_pkg3};
+unsafe fn egg_provider_closed(cpu: usize, spat: &mut bool, shell: &mut Option<u32>, finished: bool) -> Result<bool, &'static str> {
+    use crate::model::{hitbox, sites_hitbox, sites_pkg2, sites_pkg3};
     if ![
         sites_pkg2::STATUS_KIND_OFFSET,
         sites_pkg2::WORK_IS_FLAG_OFFSET,
         sites_pkg3::STATE_ARTICLE_IS_EXIST_OFFSET,
+        sites_pkg3::STATE_ARTICLE_GET_ARTICLE_OFFSET,
+        sites_pkg3::STATE_ARTICLE_OBJECT_ID_OFFSET,
+        sites_pkg3::STATE_OBJECT_IS_ACTIVE_OFFSET,
+        sites_pkg3::STATE_OBJECT_MODULE_ACCESSOR_OFFSET,
+        sites_hitbox::HITBOX_ARTICLE_FROM_NO_OFFSET,
+        sites_hitbox::HITBOX_IS_ATTACK_OFFSET,
     ].into_iter().all(game::granted) {
         return Err(UNAVAILABLE_NOTICE);
     }
@@ -601,20 +609,51 @@ unsafe fn egg_provider_closed(cpu: usize, spat: &mut bool, finished: bool) -> Re
     if !*spat {
         return Ok(false);
     }
-    let [Some(star), Some(tamago), Some(mob), Some(bg)] = [
-        C::YoshiArticleStar, C::YoshiArticleTamago, C::YoshiArticleMob, C::YoshiArticleBg,
+    let [Some(star), Some(tamago), Some(mob), Some(bg), Some(spit)] = [
+        C::YoshiArticleStar, C::YoshiArticleTamago, C::YoshiArticleMob, C::YoshiArticleBg, C::YoshiTamagoSpit,
     ].map(state_id) else {
         return Err(UNAVAILABLE_NOTICE);
     };
-    // From SPITED onward, reject any extra provider even if it vanishes
-    // before closure. N2's own TAMAGO is the victim shell. Require its
-    // absence at closure, after this move has left all three N statuses.
+    // Refuse a provider even if it would disappear before closure. TAMAGO
+    // shares its article ID with the up-special projectile, so qualify the
+    // N2 shell by its full ID, weapon status and empty attack slots.
     if [star, mob, bg].into_iter().any(|id| state_natives::article_is_exist(cpu, id)) {
         // restriction: MASH-M1-MISMATCH
         return Err("Native tick mismatch · no grade");
     }
-    Ok(finished && status >= 0 && ![n, n1, n2].contains(&status)
-        && !state_natives::article_is_exist(cpu, tamago))
+    let listed = state_natives::article_is_exist(cpu, tamago);
+    if listed {
+        let article = state_natives::article_get(cpu, tamago);
+        if article == 0 {
+            return Err(UNAVAILABLE_NOTICE);
+        }
+        let id = state_natives::article_object_id(article);
+        if id == 0 || id == u32::MAX {
+            return Err(UNAVAILABLE_NOTICE);
+        }
+        if shell.is_some_and(|prior| prior != id) || state_natives::article_get_from_no(cpu, tamago, 1) != 0 {
+            // restriction: MASH-M1-MISMATCH
+            return Err("Native tick mismatch · no grade");
+        }
+        *shell = Some(id);
+    }
+    let Some(id) = *shell else {
+        return Ok(false);
+    };
+    // An owner-link removal can drop the list entry while the weapon
+    // is active. Follow the exact ID until the manager reports inactivity.
+    if state_natives::object_is_active(id) {
+        let accessor = state_natives::object_accessor(id);
+        if accessor == 0 {
+            return Err(UNAVAILABLE_NOTICE);
+        }
+        if natives::status_kind(accessor) != spit || (0..hitbox::SLOTS).any(|slot| natives::attack_is_attack(accessor, slot)) {
+            // restriction: MASH-M1-MISMATCH
+            return Err("Native tick mismatch · no grade");
+        }
+        return Ok(false);
+    }
+    Ok(finished && !listed && status >= 0 && ![n, n1, n2].contains(&status))
 }
 
 fn trail_magic_status(status: i32, wait: i32) -> Result<entry::TrailMagicStatus, ()> {
@@ -1290,6 +1329,7 @@ pub unsafe fn frame(fighter: usize) {
             game.applied = false;
             game.set_count = 0;
             game.egg_spat = false;
+            game.egg_shell = None;
             game.egg_close_frames = 0;
             // 116: only the real Blizzard cast installs the observer, never a preparatory Fire/Thunder cast.
             if matches!(request.id, 113 | 116 | 117) && !preparing {
@@ -1580,7 +1620,7 @@ pub unsafe fn frame(fighter: usize) {
                 ));
             }
             if egg {
-                match egg_provider_closed(cpu, &mut game.egg_spat, clock.exhausted()) {
+                match egg_provider_closed(cpu, &mut game.egg_spat, &mut game.egg_shell, clock.exhausted()) {
                     Ok(true) => {
                         #[cfg(feature = "diag")]
                         crate::runtime::diag_log::enqueue_diagnostic(format_args!(
