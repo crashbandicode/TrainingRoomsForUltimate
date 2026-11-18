@@ -250,6 +250,14 @@ fn actual_runtime_worker_native_epoch_admission_and_bests() {
             production(include_str!("../src/model/mashout/grade.rs")).to_owned(),
         ),
         (
+            "// CLATTER",
+            production(include_str!("../src/model/mashout/clatter.rs")).to_owned(),
+        ),
+        (
+            "// ICE116",
+            production(include_str!("../src/model/mashout/ice116.rs")).to_owned(),
+        ),
+        (
             "// RUN",
             run.split("#[cfg(test)]\n#[path = \"session_tests.rs\"]")
                 .next()

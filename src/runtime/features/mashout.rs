@@ -322,6 +322,9 @@ struct Game {
     writes: Option<crate::model::mashout::clatter::Writes>,
     /// An observed write was applied this attempt: no grade until G2 replays them in the bounds.
     applied: bool,
+    /// 116: the attempt's applied Sets with their G1 boundaries, for the G2 bounds (ice116::bounds).
+    sets: [crate::model::mashout::ice116::Applied; 8],
+    set_count: usize,
     saw_catch: bool,
     followed: bool,
     restore_requested: bool,
@@ -346,6 +349,8 @@ impl Game {
             clock: None,
             writes: None,
             applied: false,
+            sets: [crate::model::mashout::ice116::Applied { boundary: 0, old: 0, operand: 0, new: 0, d_max: 0 }; 8],
+            set_count: 0,
             saw_catch: false,
             followed: false,
             restore_requested: false,
@@ -1234,7 +1239,9 @@ pub unsafe fn frame(fighter: usize) {
             drive(entry::controls(request.plan, false));
             game.writes = None;
             game.applied = false;
-            if matches!(request.id, 113 | 116 | 117) {
+            game.set_count = 0;
+            // 116: only the real Blizzard cast installs the observer, never a preparatory Fire/Thunder cast.
+            if matches!(request.id, 113 | 116 | 117) && !preparing {
                 // M3 Set observer (O5): installed and read back here, at Settle, until this attempt's exit.
                 // SAFETY: p1 is the live P1 BOMA; +0x48 is its ControlModule (lua_bind ldr x0,[x0,#72]).
                 let control = unsafe { *((p1 + 0x48) as *const usize) };
@@ -1453,6 +1460,31 @@ pub unsafe fn frame(fighter: usize) {
                 }
             }
             game.applied |= count > 0;
+            // G1 boundary of each write: before this frame's tick while its old is the model value, else after it.
+            let mut model = before.remaining.to_bits();
+            let mut ticked = false;
+            for write in &writes[..count] {
+                ticked |= write.old != model;
+                model = write.new;
+                if game.set_count == game.sets.len() {
+                    refused = true;
+                    break;
+                }
+                game.sets[game.set_count] = crate::model::mashout::ice116::Applied {
+                    boundary: clock.elapsed() + u32::from(ticked),
+                    old: write.old,
+                    operand: write.operand,
+                    new: write.new,
+                    d_max: write.d_max,
+                };
+                game.set_count += 1;
+                #[cfg(feature = "diag")]
+                crate::runtime::diag_log::enqueue_diagnostic(format_args!(
+                    "[Mashout] write gen={} seq={} boundary={} old={:#x} operand={:#x} new={:#x} d_max={:#x}",
+                    game.generation, write.seq, clock.elapsed() + u32::from(ticked), write.old, write.operand,
+                    write.new, write.d_max
+                ));
+            }
             if refused || clock.observe_writes(live.record, live.input, escaped, &writes[..count]).is_err() {
                 #[cfg(feature = "diag")]
                 crate::runtime::diag_log::enqueue_diagnostic(format_args!(
@@ -1464,10 +1496,15 @@ pub unsafe fn frame(fighter: usize) {
                 return;
             }
             if game.applied && (escaped || clock.exhausted()) {
-                // restriction: MASH-M1-MISMATCH — observed writes kept the clock exact, but the F/T bounds don't
-                // replay them yet (G2), so the attempt stays unscored.
-                game.fail("Native tick mismatch · no grade");
-                return;
+                if game.requested.is_some_and(|r| r.id == crate::model::mashout::ice116::TAG) {
+                    // G2 (116): the worker replays the applied Sets in the bounds before the final Observe.
+                    post(worker::Event::Writes(game.generation, game.epoch, game.sets, game.set_count as u8), game.generation);
+                } else {
+                    // restriction: MASH-M1-MISMATCH — observed writes kept the clock exact, but the F/T bounds don't
+                    // replay them yet (113's G2), so the attempt stays unscored.
+                    game.fail("Native tick mismatch · no grade");
+                    return;
+                }
             }
             if !linked && !escaped && !clock.exhausted() {
                 let cpu_status = natives::status_kind(cpu);

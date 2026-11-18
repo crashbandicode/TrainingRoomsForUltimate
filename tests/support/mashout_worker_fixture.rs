@@ -14,6 +14,10 @@ mod model {
         }
         pub mod run { // RUN
         }
+        pub mod clatter { // CLATTER
+        }
+        pub mod ice116 { // ICE116
+        }
     }
 }
 mod runtime {
@@ -102,6 +106,7 @@ mod worker {
                 generation: 0,
                 epoch: 0,
                 origin: SeedOrigin::Export,
+                seed: None,
                 session: Run::new(),
                 shown: crate::model::storage::FixedPath::new(),
             };

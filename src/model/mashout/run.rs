@@ -219,6 +219,15 @@ impl<K: Copy + Eq> Run<K> {
         }
     }
 
+    /// G2 (116): bounds solved with the attempt's observed native writes replace the plain solver's answer.
+    pub fn rebound(&mut self, generation: u64, bounds: Bounds) {
+        if generation == self.generation && self.phase == Phase::Mashing && !self.escaped {
+            self.solver = None;
+            self.error = None;
+            self.bounds = Some(bounds);
+        }
+    }
+
     pub fn observe(&mut self, elapsed: u32, escaped: bool) {
         if self.phase != Phase::Mashing || self.escaped {
             return;

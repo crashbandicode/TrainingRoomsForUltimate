@@ -33,15 +33,28 @@ mod model {
         }
         pub mod entry { // ENTRY
         }
+        /// The ice116 record the runtime collects (the G2 solve itself is model-tested in ice116_tests).
+        pub mod ice116 {
+            pub const TAG: u16 = 116;
+            #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+            pub struct Applied { pub boundary: u32, pub old: u32, pub operand: u32, pub new: u32, pub d_max: u32 }
+        }
     }
 }
-// The M3 Set observer is not installed in this fixture (117 is not a Set tag): nothing is ever published.
+// The M3 Set observer stand-in: tests queue published writes; arm() calls are recorded.
 mod clatter_set {
+    use std::cell::RefCell;
     pub const RING: usize = 8;
-    pub fn poll(_: u32, _: u32) -> crate::model::mashout::clatter::Poll {
-        crate::model::mashout::clatter::Poll::Empty
+    thread_local! {
+        pub static PUBLISHED: RefCell<Vec<crate::model::mashout::clatter::ClatterWrite>> = const { RefCell::new(Vec::new()) };
+        pub static ARMS: RefCell<Vec<(u32, u16)>> = const { RefCell::new(Vec::new()) };
     }
-    pub fn arm(generation: u32, _: u16, _: usize) -> Result<u32, ()> {
+    pub fn poll(generation: u32, seq: u32) -> crate::model::mashout::clatter::Poll {
+        PUBLISHED.with_borrow(|v| v.iter().copied().find(|w| w.generation == generation && w.seq == seq))
+            .map_or(crate::model::mashout::clatter::Poll::Empty, crate::model::mashout::clatter::Poll::Event)
+    }
+    pub fn arm(generation: u32, tag: u16, _: usize) -> Result<u32, ()> {
+        ARMS.with_borrow_mut(|v| v.push((generation, tag)));
         Ok(generation)
     }
 }
@@ -374,9 +387,14 @@ mod worker {
         Observe(u64, u64, u32, bool),
         Cancel(u64),
         NativeEnd(u64, u64),
+        Writes(u64, u64, [crate::model::mashout::ice116::Applied; 8], u8),
     }
 }
+thread_local! { static WRITES_POSTED: RefCell<Vec<(usize, [model::mashout::ice116::Applied; 8])>> = const { RefCell::new(Vec::new()) }; }
 fn post(e: worker::Event, _: u64) {
+    if let worker::Event::Writes(_, _, sets, n) = e {
+        WRITES_POSTED.with_borrow_mut(|w| w.push((usize::from(n), sets)));
+    }
     if let worker::Event::Begin(_, epoch, k, s, origin) = e {
         BEGINS.with_borrow_mut(|b| b.push((k, s, epoch, origin)));
     }
@@ -479,6 +497,8 @@ struct Game {
     clock: Option<Clock>,
     writes: Option<model::mashout::clatter::Writes>,
     applied: bool,
+    sets: [crate::model::mashout::ice116::Applied; 8],
+    set_count: usize,
     config: Option<()>,
     restore_requested: bool,
     failed: Option<&'static str>,
@@ -510,6 +530,8 @@ impl Game {
             clock: None,
             writes: None,
             applied: false,
+            sets: [crate::model::mashout::ice116::Applied { boundary: 0, old: 0, operand: 0, new: 0, d_max: 0 }; 8],
+            set_count: 0,
             config: Some(()),
             restore_requested: false,
             failed: None,
@@ -2678,6 +2700,9 @@ fn hero_start_missing_getter_or_changed_body_cannot_admit_native_ice() {
             assert!(game.hero.is_some_and(|actor| !actor.confirmed()));
             assert!(BEGINS.with_borrow(Vec::is_empty));
         }
+    }
+}
+
 #[test]
 fn sora_ice_magic_uses_the_generic_native_special_n_dispatch() {
     let scenario = Scenario {
@@ -2973,5 +2998,44 @@ fn sora_blizzard_escape_grades_only_when_the_provider_is_closed() {
             assert_eq!(game.failed, want, "provider {provider}");
             assert_eq!(game.step, if want.is_none() { Step::Result } else { Step::Failed }, "provider {provider}");
         }
+    }
+}
+
+#[test]
+fn sora_blizzard_arms_the_set_observer_only_for_the_real_cast_and_posts_its_writes() {
+    unsafe {
+        clatter_set::ARMS.with_borrow_mut(Vec::clear);
+        clatter_set::PUBLISHED.with_borrow_mut(Vec::clear);
+        WRITES_POSTED.with_borrow_mut(Vec::clear);
+        // Thunder preparation: no install during the preparatory cast.
+        let m = NativeMemory::new();
+        let mut game = sora_game(2);
+        sora_thunder_to_blizzard_settle(&m, &mut game);
+        assert!(clatter_set::ARMS.with_borrow(Vec::is_empty), "a preparatory cast never installs the observer");
+        m.update(&mut game, 0);
+        assert_eq!(game.step, Step::Entering);
+        assert_eq!(clatter_set::ARMS.with_borrow(Clone::clone), vec![(game.generation as u32, 116)]);
+        // Seed, then one published re-freeze Set on the held clock and an escape.
+        let mut m = NativeMemory::new();
+        m.body[3] = 0x5d;
+        let mut game = sora_game(1);
+        m.update(&mut game, 0);
+        CPU_STATUS.store(486, Ordering::Relaxed);
+        m.seed(142.3, 7.0, 1);
+        m.start();
+        m.update(&mut game, 203);
+        assert_eq!(game.step, Step::Held);
+        EXECUTE_HELD.store(true, Ordering::Relaxed);
+        let old = game.clock.unwrap().last().remaining;
+        let new = old + 8.442;
+        clatter_set::PUBLISHED.with_borrow_mut(|v| v.push(model::mashout::clatter::ClatterWrite {
+            generation: game.generation as u32, seq: 1, slot: model::mashout::clatter::Slot::Set, tag: 116,
+            old: old.to_bits(), operand: new.to_bits(), new: new.to_bits(), frame: 1, d_max: 1000.0f32.to_bits() }));
+        m.seed(new, 7.0, 1);
+        m.update(&mut game, 68);
+        assert_eq!(game.failed, None, "a bit-exact observed Set keeps the 116 attempt alive");
+        let posted = WRITES_POSTED.with_borrow(Clone::clone);
+        assert_eq!(posted.len(), 1, "G2 writes posted at the escape");
+        assert_eq!((posted[0].0, posted[0].1[0].boundary, posted[0].1[0].old), (1, 0, old.to_bits()));
     }
 }

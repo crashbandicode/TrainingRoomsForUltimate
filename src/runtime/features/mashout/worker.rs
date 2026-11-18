@@ -57,6 +57,8 @@ pub(super) enum Event {
     Setup(u64, &'static str),
     Begin(u64, u64, Key, Seed, SeedOrigin),
     Observe(u64, u64, u32, bool),
+    /// 116: the attempt's applied Sets (G1 boundaries), replayed in the bounds by ice116::bounds.
+    Writes(u64, u64, [crate::model::mashout::ice116::Applied; 8], u8),
     Pulse(u64, u64, bool),
     NativeEnd(u64, u64),
     Failed(u64, &'static str),
@@ -66,6 +68,7 @@ struct Worker {
     generation: u64,
     epoch: u64,
     origin: SeedOrigin,
+    seed: Option<Seed>,
     session: Run<Key>,
     shown: crate::model::storage::FixedPath<256>,
 }
@@ -73,6 +76,7 @@ static WORKER: Mutex<Worker> = Mutex::new(Worker {
     generation: 0,
     epoch: 0,
     origin: SeedOrigin::Export,
+    seed: None,
     session: Run::new(),
     shown: crate::model::storage::FixedPath::new(),
 });
@@ -136,6 +140,7 @@ pub(super) fn service() {
             worker.generation = generation;
             worker.epoch = epoch;
             worker.origin = origin;
+            worker.seed = Some(seed);
             if worker.session.capture(epoch, key, seed).is_err() {
                 worker.session.cancel();
                 // restriction: MASH-M1-MISMATCH
@@ -149,6 +154,23 @@ pub(super) fn service() {
                 && !faulted(generation, FAULT.load(Ordering::Acquire))
             {
                 worker.session.observe_generation(epoch, elapsed, escaped);
+            }
+        }
+        Event::Writes(generation, epoch, sets, count) => {
+            if generation == worker.generation
+                && epoch == worker.epoch
+                && epoch == EPOCH.load(Ordering::Acquire)
+                && !faulted(generation, FAULT.load(Ordering::Acquire))
+            {
+                let writes = &sets[..usize::from(count).min(sets.len())];
+                match worker.seed.ok_or(()).and_then(|seed| crate::model::mashout::ice116::bounds(seed, writes).map_err(|_| ())) {
+                    Ok(bounds) => worker.session.rebound(epoch, bounds),
+                    Err(()) => {
+                        worker.session.cancel();
+                        // restriction: MASH-M1-MISMATCH
+                        show(&mut worker, "Native tick mismatch · no grade");
+                    }
+                }
             }
         }
         Event::Pulse(generation, epoch, tick) => {
