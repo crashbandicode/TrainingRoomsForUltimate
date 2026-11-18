@@ -337,9 +337,10 @@ fn playing() -> bool {
     role_playing(Role::Player) || role_playing(Role::Cpu)
 }
 
-/// The machine still steps the role, or its hook still has frames of the run to play.
+/// The machine still steps the role, or its hook still has frames of the run to play. Game hooks read this (the CPU's
+/// playback view, `cpu_playback`), so it never waits on the queue the worker fills: a queue held right now counts as playing.
 fn role_playing(role: Role) -> bool {
-    run_flag(role).load(Ordering::Acquire) || !role_frames(role).lock().is_empty()
+    run_flag(role).load(Ordering::Acquire) || role_frames(role).try_lock().is_none_or(|q| !q.is_empty())
 }
 
 fn run_flag(role: Role) -> &'static AtomicBool {
@@ -476,7 +477,7 @@ pub fn note_mash() {
 /// What the CPU's behaviours see of playback (B5 / N4, Mash interrupts playback): the old recorder's state, with a
 /// library macro playing on the CPU counted as a running playback. A parry practice plays pass by pass: while passes
 /// are owed its playback runs between them too, so a configured Mash asks it to stop (Parry ignores that) instead of
-/// queueing an action on top of the replay (Eden accept-8, 26c93533). Atomics only: game hooks read this.
+/// queueing an action on top of the replay (Eden accept-8, 26c93533). Game hooks read this: atomics and a try_lock only.
 pub fn cpu_playback(recorder: PlaybackState) -> PlaybackState {
     let owed = PARRY.load(Ordering::Acquire) && PARRY_PASSES.load(Ordering::Acquire) > 0;
     PlaybackState { running: recorder.running || role_playing(Role::Cpu) || owed, ..recorder }
