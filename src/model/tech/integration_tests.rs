@@ -2125,3 +2125,38 @@ fn ten_native_misses_advance_and_finish_the_session() {
     assert_eq!(session.phase, session::Phase::Done);
     assert_eq!(session.summary.missed, 10);
 }
+
+/// rc.15 practice menu (tr-review-astra-3 16:37Z, finding 1): a menu visit during a running Tech practice suspends the
+/// attempt in flight and keeps the session. The count, the streak, the clock and the length survive; B resumes it with a
+/// new attempt (the same setup when the visit cut it before its grade).
+#[test]
+fn a_menu_visit_suspends_the_session_and_keeps_its_progress() {
+    let mut c = Controller::IDLE;
+    let mut f = Fake::new();
+    let contact = ContactReceipt { surface: Surface::Wall, requested_status: 999, passive_enabled: true, position: Vec2::default() };
+    c.start(Length::Attempts(20));
+    c.place(&mut f, setup()).unwrap();
+    c.tick(&mut f, false, Some(false)).unwrap();
+    assert_eq!(c.tick(&mut f, false, Some(false)), Ok(Event::Launched));
+    f.attempt.record_contact(contact);
+    c.tick(&mut f, false, Some(false)).unwrap();
+    assert_eq!(c.outcome(Outcome { attempt: 1, decision: decision() }), Event::Graded);
+    assert_eq!((c.session.summary.attempts, c.session.phase), (1, Phase::Hold(0)));
+    let elapsed = c.session.elapsed;
+    // The menu opens while the graded attempt holds: the next one is a new setup.
+    assert_eq!(c.pause_for_menu(&mut f), Event::NeedSetup { reroll: true });
+    assert_eq!((c.session.phase, c.session.summary.attempts, c.session.length), (Phase::Place, 1, Length::Attempts(20)));
+    assert_eq!((c.session.elapsed, f.restores), (elapsed, 1), "the clock stops and the fighter is released");
+    assert_eq!(c.pause_for_menu(&mut f), Event::None, "once per visit");
+    // B: the session goes on. The next attempt is placed and the menu opens again in its delay: the same setup repeats.
+    c.place(&mut f, setup()).unwrap();
+    assert_eq!(c.session.phase, Phase::Delay(2));
+    assert_eq!(c.pause_for_menu(&mut f), Event::NeedSetup { reroll: false });
+    assert_eq!((c.session.phase, c.session.summary.attempts, f.restores), (Phase::Place, 1, 2));
+    assert_eq!(c.tick(&mut f, false, Some(false)), Ok(Event::None));
+    assert_eq!(c.place(&mut f, setup()), Ok(Event::Placed), "the resumed session places its next attempt");
+    assert_eq!(c.session.summary.attempts, 1);
+    // Nothing to suspend before a start or after the summary.
+    let mut idle = Controller::IDLE;
+    assert_eq!((idle.pause_for_menu(&mut f), f.restores), (Event::None, 2));
+}

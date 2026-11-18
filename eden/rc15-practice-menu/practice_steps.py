@@ -512,6 +512,181 @@ def btt_load_while_running(ctx):
     return save(ctx, 'btt-load-while-running', out)
 
 
+# ---- tr-review-astra-3 16:37Z findings (boot 3) ------------------------------------------------------------------
+
+TECH_GRADE = (r'\[TrainingRooms\] notice_draw header="Tech Practice" body="(?!Choose a surface|Tech the selected|Finding)'
+              r'[^"]* · (?P<n>\d+)/(?P<of>\d+) · streak \d+')
+
+
+def start_game(ctx, game, expect, cap=20):
+    """The game's sub-screen, A on its first row: Start, or Stop then Start when an earlier attempt left it running."""
+    open_game(ctx, game)
+    out = {}
+    log = cursor(ctx)
+    try:
+        ctx.press('a')
+        first = log.wait(r'\[Practice\] (start|stop) game=(\S+)', 4, ctx)
+        if first.group(1) == 'start':
+            out = {'started': first.group(2), 'line': log.wait(expect, cap, ctx).group(0)[:200]}
+    finally:
+        log.close()
+    if first.group(1) == 'stop':
+        out = {'stopped_first': first.group(0), **start(ctx, game, expect)}
+    return out
+
+
+def stop_game(ctx, game, code):
+    open_game(ctx, game)
+    line = waits(ctx, 'a', r'\[Practice\] stop game=Some\(' + code + r'\)', 4).group(0)
+    close_all(ctx)
+    return line
+
+
+def set_row(ctx, game, title, presses, button):
+    """In the game's sub-screen (open), focus `title` and press Left or Right `presses` times (each gated on its line)."""
+    focus_sub(ctx, game, title)
+    return [press(ctx, button) for _ in range(presses)][-1]
+
+
+def tech_menu_visit_keeps_session(ctx):
+    """Finding 1: a graded Tech session, a menu visit and B: the next grade continues the count (a fresh session would
+    show 1/20 again). Mode set to 20 attempts in the sub-screen first (the fixture stores 3 minutes)."""
+    open_game(ctx, 'Tech practice')
+    mode = set_row(ctx, 'Tech practice', 'Tech practice', 3, 'left')
+    back = press(ctx, 'up')
+    if back['row'] != 'Start':
+        raise RuntimeError(f'not back on Start: {back}')
+    out = {'mode_row': mode}
+    log = cursor(ctx)
+    try:
+        ctx.press('a')
+        first = log.wait(r'\[Practice\] (start|stop) game=(\S+)', 4, ctx)
+        if first.group(1) == 'stop':
+            raise RuntimeError('Tech was running at the row start')
+        log.wait(r'\[Ui\] menu closed ', 4, ctx)
+        grade = log.wait(TECH_GRADE, 120, ctx)
+    finally:
+        log.close()
+    before, total = int(grade.group('n')), int(grade.group('of'))
+    if total != 20 or before < 1:
+        raise RuntimeError(f'expected a graded 20-attempt session: {grade.group(0)[:200]}')
+    out['before'] = grade.group(0)[:220]
+    out['before_shot'] = shot(ctx, 'tech-graded-before-visit')
+    open_menu(ctx)
+    time.sleep(1.0)
+    log = cursor(ctx)
+    try:
+        close_all(ctx)
+        after = log.wait(TECH_GRADE, 120, ctx)
+        none_since(ctx, log, r'\[Practice\] (start|stop)')
+    finally:
+        log.close()
+    n = int(after.group('n'))
+    if n <= before:
+        raise RuntimeError(f'the session restarted: {before}/20 before the visit, {n}/20 after')
+    out.update(after=after.group(0)[:220], counts=[before, n], after_shot=shot(ctx, 'tech-graded-after-visit'))
+    out['stop'] = stop_game(ctx, 'Tech practice', 'Tech')
+    return save(ctx, 'tech-menu-visit-keeps-session', out)
+
+
+EGGS_N = r'\[Eggs\] notice="Eggs \d+/10 '
+EGGS_MINUTE = r'\[Eggs\] notice="Eggs \d+ +\d:\d\d"'
+
+
+def eggs_mode_applies_at_next_start(ctx):
+    """Finding 2 (Eggs-ercise): the mode changed while 10 targets runs stays 10 targets after B; Stop and Start run the
+    new mode (1 minute)."""
+    out = {'start': start_game(ctx, 'Eggs-ercise', EGGS_N)}
+    time.sleep(1.0)
+    open_menu(ctx)
+    out['mode_row'] = set_row(ctx, 'Eggs-ercise', 'Eggs-ercise', 1, 'left')
+    log = cursor(ctx)
+    try:
+        close_all(ctx)
+        out['after_b'] = log.wait(EGGS_N, 10, ctx).group(0)[:160]
+        time.sleep(2.0)
+        none_since(ctx, log, EGGS_MINUTE + r'|\[Practice\] (start|stop)')
+    finally:
+        log.close()
+    out['after_b_shot'] = shot(ctx, 'eggs-mode-kept-after-b')
+    open_game(ctx, 'Eggs-ercise')
+    log = cursor(ctx)
+    try:
+        ctx.press('a')
+        out['stop'] = log.wait(r'\[Practice\] stop game=Some\(Eggs\)', 4, ctx).group(0)
+        time.sleep(0.5)
+        ctx.press('a')
+        log.wait(r'\[Practice\] start game=Eggs', 4, ctx)
+        out['next_start'] = log.wait(EGGS_MINUTE, 15, ctx).group(0)[:160]
+    finally:
+        log.close()
+    out['next_start_shot'] = shot(ctx, 'eggs-new-mode-at-next-start')
+    out['stop_end'] = stop_game(ctx, 'Eggs-ercise', 'Eggs')
+    return save(ctx, 'eggs-mode-applies-at-next-start', out)
+
+
+def blaster(ctx, shots=3):
+    for _ in range(shots):
+        ctx.press('b')
+        time.sleep(0.8)
+
+
+def btt_projectiles_apply_at_next_start(ctx):
+    """Finding 2 (Break the Targets): Projectiles Off at Start (the fixture), turned On while the run goes on, B: Fox's
+    blaster still breaks nothing (no `[Btt] projectile` line). Stop and Start: the blaster breaks the target."""
+    projectile = r'\[Btt\] projectile [^\n]*hits='
+    out = {'start': start_game(ctx, 'Break the Targets', r'\[Btt\] phase=(Placing|Ready) n=\d+ ')}
+    log = cursor(ctx)
+    try:
+        if 'phase=Placing n=0 ' in out['start']['line']:
+            # One target at blaster height: the cursor starts 15 above the ground; 8 down puts it at the laser.
+            for _ in range(8):
+                ctx.press('down')
+                time.sleep(0.15)
+            time.sleep(0.6)
+            ctx.press('a')
+            out['placed'] = log.wait(r'\[Btt\] phase=Placing n=1 [^\n]*', 10, ctx).group(0)[:200]
+            time.sleep(0.5)
+        ctx.press('x')
+        out['ready'] = log.wait(r'\[Btt\] phase=Ready n=1 [^\n]*', 15, ctx).group(0)[:200]
+        time.sleep(1.0)
+        blaster(ctx)
+        time.sleep(1.0)
+        none_since(ctx, log, projectile)
+    finally:
+        log.close()
+    out['off_shot'] = shot(ctx, 'btt-blaster-off-at-start')
+    open_game(ctx, 'Break the Targets')
+    out['rule_row'] = set_row(ctx, 'Break the Targets', 'Projectiles break targets', 1, 'right')
+    log = cursor(ctx)
+    try:
+        close_all(ctx)
+        time.sleep(1.0)
+        blaster(ctx)
+        time.sleep(1.0)
+        none_since(ctx, log, projectile + r'|\[Practice\] (start|stop)|\[Btt\] phase=(Ready|Done) ')
+    finally:
+        log.close()
+    out['on_after_b_shot'] = shot(ctx, 'btt-blaster-still-off-after-b')
+    open_game(ctx, 'Break the Targets')
+    log = cursor(ctx)
+    try:
+        ctx.press('a')
+        out['stop'] = log.wait(r'\[Practice\] stop game=Some\(Btt\)', 4, ctx).group(0)
+        time.sleep(0.5)
+        ctx.press('a')
+        log.wait(r'\[Practice\] start game=Btt', 4, ctx)
+        out['ready_again'] = log.wait(r'\[Btt\] phase=Ready n=1 [^\n]*', 15, ctx).group(0)[:200]
+        time.sleep(1.0)
+        blaster(ctx)
+        out['hit'] = log.wait(projectile, 10, ctx).group(0)[:220]
+    finally:
+        log.close()
+    out['hit_shot'] = shot(ctx, 'btt-blaster-breaks-at-next-start')
+    out['stop_end'] = stop_game(ctx, 'Break the Targets', 'Btt')
+    return save(ctx, 'btt-projectiles-apply-at-next-start', out)
+
+
 def gif(ctx, name, seconds, act):
     folder = Path(ctx.row_dir)
     path = folder / (name + '.gif')

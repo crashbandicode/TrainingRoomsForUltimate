@@ -553,7 +553,8 @@ runs alone: starting it stops the game that was running.
 
 **On** by default. Any projectile that does damage breaks a target (Fox's blaster included), using P1's active projectile
 or article hitbox. It does not need to make a fighter flinch. **Off** leaves target breaks to your fighter's attacks.
-This setting is independent of Hitbox Visualization and **Breaks on**, which applies to fighter attacks.
+This setting is independent of Hitbox Visualization and **Breaks on**, which applies to fighter attacks. A change made
+while Break the Targets runs applies at its next **Start**.
 
 ### Place targets
 
@@ -604,7 +605,8 @@ Repeats the launch for **10 attempts**, **20 attempts**, **1 minute**, **3 minut
 - **Default:** 20 attempts
 - **How:** Left / Right chooses the session, or **A** opens the list, **Up / Down** chooses and **A** sets it;
   choose **Start** to begin, and **Stop** to end it. **Tech wizard** and **Tech point** start it in their own views.
-  Opening the menu pauses the attempt in flight; after **B** the practice carries on with a new set of attempts.
+  Opening the menu cuts the attempt in flight (it does not count); after **B** the practice carries on with the next
+  attempt, and its count, streak and clock go on where they were. Settings changed meanwhile apply at the next **Start**.
 
 ### Tech point
 
@@ -679,7 +681,7 @@ end notice and the wait between runs count as running).
 - **Values:** Hide, Show
 - **Default:** Hide
 - **How:** Hide: the CPU is hidden while a game runs, and afterwards it is as **Hide CPU** says. Show: the CPU stays as
-  it is. It applies when the menu closes.
+  it is. It applies at the next **Start** of a game.
 - A hidden CPU's "CPU" tag and its panel at the bottom of the screen are hidden too. They always follow the CPU: shown
   when it is shown, hidden when it is hidden.
 - When the CPU is the Eggs-ercise target (**Target** reads CPU), the CPU is never hidden, so the setting changes nothing

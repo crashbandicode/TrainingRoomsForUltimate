@@ -557,6 +557,8 @@ pub unsafe fn frame(fighter: usize) {
     config.session = usize::from(practice_games::effective(Game::Tech, stored, super::practice::active()));
     let stop = config.session == 0;
     let open = OPEN.load(Ordering::Acquire);
+    // The running session's camera (latched at its Start, like every other setting), the published one before a run.
+    let mut camera = config.camera;
     LIVE.with(|cell| {
         let mut slot = cell.borrow_mut();
         if stop {
@@ -609,10 +611,19 @@ pub unsafe fn frame(fighter: usize) {
             });
         }
         let run = slot.as_mut().unwrap();
+        camera = run.config.camera;
         RUNNING.store(true, Ordering::Release);
+        // rc.15 practice menu (Q1, tr-review-astra-3 16:37Z): a menu visit suspends the session, it never stops it. The
+        // attempt in flight is cut and the fighter released; after B the session goes on with its count, streak and
+        // clock. Only Start restarts it and only Stop ends it.
         if open {
-            if !matches!(run.controller.session.phase, Phase::Off | Phase::Done) {
-                run.controller.stop(&mut run.adapter);
+            if let Event::NeedSetup { reroll } = run.controller.pause_for_menu(&mut run.adapter) {
+                run.pending = true;
+                run.reroll = reroll;
+                run.decision = None;
+                if reroll {
+                    run.sampled = None;
+                }
             }
             return;
         }
@@ -660,7 +671,7 @@ pub unsafe fn frame(fighter: usize) {
             }
             // A native Training reset can rebuild collision without changing
             // stage/form/scene identity. Only world geometry survives it.
-            run.remembered = (config.surface == 4
+            run.remembered = (run.config.surface == 4
                 && view
                     .surfaces
                     .epoch()
@@ -815,6 +826,7 @@ pub unsafe fn frame(fighter: usize) {
             };
             run.fighter_kind = fighter_kind;
             run.config = view.wizard_config.unwrap_or(config);
+            camera = run.config.camera;
             run.controller.start(length(run.config));
             run.decision = None;
             run.pending = true;
@@ -1026,6 +1038,6 @@ pub unsafe fn frame(fighter: usize) {
         running()
             && !open
             && !published::input_owners().covers_strip()
-            && (placing() || config.camera == 1),
+            && (placing() || camera == 1),
     );
 }

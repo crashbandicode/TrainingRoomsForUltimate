@@ -31,6 +31,9 @@ static BTT: Mutex<Btt> = Mutex::new(Btt::IDLE);
 /// Projectiles break targets (every settings publish), a Start since the last pass, and whether it was Place targets. Whether
 /// the mode is on is the running game (`practice::is`, rc.15 practice menu), no longer the `btt` row.
 static PROJECTILES: AtomicBool = AtomicBool::new(true);
+/// The projectiles rule of the run: latched by Start (rc.15 practice menu: a running game's settings apply at its next
+/// Start), read by the hit path.
+static PROJECTILES_RUN: AtomicBool = AtomicBool::new(true);
 static START: AtomicBool = AtomicBool::new(false);
 static PLACE: AtomicBool = AtomicBool::new(false);
 /// The menu is open: the pass keeps the layout's stage and file current for the Saved layouts screen even with the row Off.
@@ -88,7 +91,7 @@ fn on() -> bool {
 }
 
 pub fn projectiles() -> bool {
-    PROJECTILES.load(Ordering::Acquire)
+    PROJECTILES_RUN.load(Ordering::Acquire)
 }
 
 /// The menu opened (the menu worker; atomics only).
@@ -104,6 +107,7 @@ pub fn menu_closed() {
 /// Start (the menu worker, `practice::start`; atomics only): `place`, it was Place targets. With no targets placed the
 /// placing view opens, else Ready with every target back.
 pub fn start(place: bool) {
+    PROJECTILES_RUN.store(PROJECTILES.load(Ordering::Acquire), Ordering::Release);
     PLACE.store(place, Ordering::Release);
     START.store(true, Ordering::Release);
 }
