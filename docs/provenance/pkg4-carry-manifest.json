@@ -2267,7 +2267,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "9bb847668ddead65c8628949086f1c8b45060e7f72016c88f01ae0a32c55bfa4",
+   "dest_sha256": "b21bc6aa96c5bda42ff199eedb70b368802ea498b161f1912a2e56888b5bd087",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -3023,6 +3023,21 @@
      "old": "    let values = {\n        let ui = lock_read(&UI);\n        let title = ui.native_name_title().unwrap_or(MACRO_KEYBOARD_TITLE);\n        ui.name_prompt().zip(ui.native_name_cursor()).map(|(name, cursor)| {\n            (name.to_owned(), cursor, title)\n        })\n    };\n    let Some((name, cursor, title)) = values else { pending.take(); return };\n    let id = NAME_SERIAL.fetch_add(1, Ordering::Relaxed);\n    let opened = if job.waiting {\n        crate::runtime::mii::native_keyboard::request_inline(id, &name, cursor)\n    } else {\n        crate::runtime::mii::native_keyboard::request(id, title, &name)\n    };\n    match opened {\n        Ok(()) => {\n            job.id = id;\n",
      "new": "    let values = {\n        let ui = lock_read(&UI);\n        let title = ui.native_name_title().unwrap_or(MACRO_KEYBOARD_TITLE);\n        ui.name_prompt().zip(ui.native_name_cursor()).map(|(name, cursor)| {\n            (name.to_owned(), cursor, title, ui.native_name_allows_empty())\n        })\n    };\n    let Some((name, cursor, title, allow_empty)) = values else { pending.take(); return };\n    let id = NAME_SERIAL.fetch_add(1, Ordering::Relaxed);\n    let opened = if job.waiting {\n        crate::runtime::mii::native_keyboard::request_inline(id, &name, cursor, allow_empty)\n    } else {\n        crate::runtime::mii::native_keyboard::request(id, title, &name, allow_empty)\n    };\n    match opened {\n        Ok(()) => {\n            job.id = id;\n",
      "reason": "rc.15 operator-approved clip-only empty native name policy, retained across checkpoint/resume; all other owners keep minimum one."
+    },
+    {
+     "old": "}\n\n/// Game callback only. The roster remains the sole admission/loader provider.\npub fn service_character_request() {\n    CHARACTER_REQUEST.drain(|(target, revision)| {\n        let eligible = revision == selection_revision() && source_is_named()\n            && crate::runtime::roster::character_roster::cpu_reload_ready();\n        let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request_named(target);\n        let posted = CHARACTER_RESULT.post((revision, accepted));\n        debug_assert!(posted, \"one outstanding named character result\");\n        crate::runtime::ui::worker::wake();\n    });\n",
+     "new": "}\n\n/// Game callback only. The roster remains the sole admission/loader provider.\npub fn service_character_request() {\n    let Ok(context) = crate::runtime::roster::character_roster::try_cpu_request_context() else { return; };\n    CHARACTER_REQUEST.drain(|(target, revision)| {\n        let eligible = revision == selection_revision() && context.menu.macro_source == MacroSource::NAMED\n            && crate::runtime::roster::character_roster::cpu_reload_ready_in(&context);\n        let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request_named_in(&context, target);\n        let posted = CHARACTER_RESULT.post((revision, accepted));\n        debug_assert!(posted, \"one outstanding named character result\");\n        crate::runtime::ui::worker::wake();\n    });\n",
+     "reason": "RC15 macro frame shared menu fix 5fe28b1c: fresh fallible context before panel/session/mailbox mutation; pass resolved eligibility through original shared practice/roster/Mii implementations. Busy defers without consuming requests or publishing false scene. Original source hash retained."
+    },
+    {
+     "old": "    draw_cross(module_accessor, x, y);\n}\n\npub unsafe fn hold_panel_fighter(module_accessor: &mut BattleObjectModuleAccessor) {\n    let id = module_accessor.battle_object_id;\n    let pointer = module_accessor as *mut BattleObjectModuleAccessor as usize;\n    let mut owned = lock_write(&PANEL_STOPS);\n    let found = owned.iter().position(|&(object, address, _)| object == id && address == pointer);\n",
+     "new": "    draw_cross(module_accessor, x, y);\n}\n\npub unsafe fn hold_panel_fighter(module_accessor: &mut BattleObjectModuleAccessor) {\n    let Ok(context) = practice::try_context() else { return; };\n    let id = module_accessor.battle_object_id;\n    let pointer = module_accessor as *mut BattleObjectModuleAccessor as usize;\n    let mut owned = lock_write(&PANEL_STOPS);\n    let found = owned.iter().position(|&(object, address, _)| object == id && address == pointer);\n",
+     "reason": "RC15 macro frame shared menu fix 5fe28b1c: fresh fallible context before panel/session/mailbox mutation; pass resolved eligibility through original shared practice/roster/Mii implementations. Busy defers without consuming requests or publishing false scene. Original source hash retained."
+    },
+    {
+     "old": "    let hold_panel = hook_queries().panel_visible || (hook_queries().replay_loading\n        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID)\n            == FighterId::Player as i32);\n    let entry = if hold_panel && !crate::runtime::macros::replay_preview::needs_native_update(module_accessor)\n        && !crate::runtime::macros::replay_capture::browser_needs_native_update(module_accessor) {\n        practice::panel_entry(module_accessor)\n    } else { None };\n    if let Some(entry) = entry {\n        if found.is_none() && !StopModule::is_special_stop(module_accessor) {\n            StopModule::set_special_stop(module_accessor, true);\n",
+     "new": "    let hold_panel = hook_queries().panel_visible || (hook_queries().replay_loading\n        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID)\n            == FighterId::Player as i32);\n    let entry = if hold_panel && !crate::runtime::macros::replay_preview::needs_native_update(module_accessor)\n        && !crate::runtime::macros::replay_capture::browser_needs_native_update(context, module_accessor) {\n        practice::panel_entry_in(context, module_accessor)\n    } else { None };\n    if let Some(entry) = entry {\n        if found.is_none() && !StopModule::is_special_stop(module_accessor) {\n            StopModule::set_special_stop(module_accessor, true);\n",
+     "reason": "RC15 macro frame shared menu fix 5fe28b1c: fresh fallible context before panel/session/mailbox mutation; pass resolved eligibility through original shared practice/roster/Mii implementations. Busy defers without consuming requests or publishing false scene. Original source hash retained."
     }
    ]
   },
@@ -3235,7 +3250,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "72f8a3d42aa392a69af135454659e529f17b1611ba8ce0b0dc720a6064aeb78f",
+   "dest_sha256": "2005f91fdb4b277ade805c3646d5cc61ff293ec39e5c5159c19e7449c20475e6",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -3676,6 +3691,16 @@
      "old": "\nfn name_file(file: crate::engine::rr_runtime::ClipFile) {\n    let (title, name) = match &file {\n        crate::engine::rr_runtime::ClipFile::Macro(recording) => (\"Name macro\", recording.name.as_str()),\n        crate::engine::rr_runtime::ClipFile::Combo(recording) => (\"Name combo\", recording.name.as_str()),\n    };\n    crate::runtime::macros::named_macros::offer_external_name_titled(\n        crate::engine::macro_ui::macro_panel::CLIP_NAME_TOKEN, title, name, \"Save as a new file\");\n    *FILE_NAME.lock().unwrap() = Some(file);\n",
      "new": "\nfn name_file(file: crate::engine::rr_runtime::ClipFile) {\n    let (title, name) = match &file {\n        crate::engine::rr_runtime::ClipFile::Macro(recording) => (\"Name macro\", recording.name.as_str()),\n        crate::engine::rr_runtime::ClipFile::Combo(recording) => (match recording.unit_kind() {\n            crate::model::combo_record::UnitKind::Link => \"Name combo\",\n            crate::model::combo_record::UnitKind::Step => \"Name drill\",\n        }, recording.name.as_str()),\n    };\n    crate::runtime::macros::named_macros::offer_external_name_titled(\n        crate::engine::macro_ui::macro_panel::CLIP_NAME_TOKEN, title, name, \"Save as a new file\");\n    *FILE_NAME.lock().unwrap() = Some(file);\n",
      "reason": "rc.15 shared clip editor consumes the agreed opaque crop-unit API for hit combos and input drills; context supplies labels and default names, with no preview for either kind."
+    },
+    {
+     "old": "    pending && !crate::runtime::macros::named_macros::suspended()\n        && crate::runtime::scene::current() == Some(crate::model::scene::Scene::Lobby)\n}\n\npub unsafe fn browser_needs_native_update(module: &mut BattleObjectModuleAccessor) -> bool {\n    if !quiescing_capture() || crate::runtime::lobby::training::practice::role(module) != Some(1) { return false; }\n    let clean = clean_statuses().contains(&StatusModule::status_kind(module));\n    crate::runtime::macros::named_macros::hook_queries().browser_release && !clean\n}\n\n",
+     "new": "    pending && !crate::runtime::macros::named_macros::suspended()\n        && crate::runtime::scene::current() == Some(crate::model::scene::Scene::Lobby)\n}\n\npub unsafe fn browser_needs_native_update(context: Option<crate::engine::lobby::practice_policy::Context>, module: &mut BattleObjectModuleAccessor) -> bool {\n    if !quiescing_capture() || crate::runtime::lobby::training::practice::role_in(context, module) != Some(1) { return false; }\n    let clean = clean_statuses().contains(&StatusModule::status_kind(module));\n    crate::runtime::macros::named_macros::hook_queries().browser_release && !clean\n}\n\n",
+     "reason": "RC15 macro frame shared menu fix 5fe28b1c: fresh fallible context before panel/session/mailbox mutation; pass resolved eligibility through original shared practice/roster/Mii implementations. Busy defers without consuming requests or publishing false scene. Original source hash retained."
+    },
+    {
+     "old": "}\n\n/// Game callback: the roster owns native admission and loading.\npub fn service_reload_request() {\n    RELOAD_REQUEST.drain(|(target, revision)| {\n        let eligible = revision == selection_revision()\n            && crate::runtime::roster::character_roster::cpu_reload_ready();\n        let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request(target, revision);\n        let posted = RELOAD_RESULT.post((revision, accepted));\n        debug_assert!(posted, \"one outstanding clip character result\");\n        crate::runtime::ui::worker::wake();\n    });\n",
+     "new": "}\n\n/// Game callback: the roster owns native admission and loading.\npub fn service_reload_request() {\n    let Ok(context) = crate::runtime::roster::character_roster::try_cpu_request_context() else { return; };\n    RELOAD_REQUEST.drain(|(target, revision)| {\n        let eligible = revision == selection_revision()\n            && crate::runtime::roster::character_roster::cpu_reload_ready_in(&context);\n        let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request_in(&context, target, revision);\n        let posted = RELOAD_RESULT.post((revision, accepted));\n        debug_assert!(posted, \"one outstanding clip character result\");\n        crate::runtime::ui::worker::wake();\n    });\n",
+     "reason": "RC15 macro frame shared menu fix 5fe28b1c: fresh fallible context before panel/session/mailbox mutation; pass resolved eligibility through original shared practice/roster/Mii implementations. Busy defers without consuming requests or publishing false scene. Original source hash retained."
     }
    ]
   },
@@ -3684,7 +3709,7 @@
    "dest": "src/runtime/macros/replay_preview.rs",
    "crate": "root",
    "src_sha256": "5f07d12a75122ef21305ef72a4318fe0765b8dee2efa15b4662f915de7719cd2",
-   "dest_sha256": "a909bcdb9f28fee656d4b298e8607a32445e4ca499a338364f94260b1339676f",
+   "dest_sha256": "e43da06c47ae9e37f4a3d3a072d57e0e345866cc67fc9c73488f95a6860aa637",
    "edits": [
     {
      "old": "practice::primary_cpu(module)",
@@ -3890,6 +3915,11 @@
      "old": "pub fn status() -> &'static str {\n    match STATUS.load(Ordering::Relaxed) {\n        1 => \"Preparing the temporary preview setup...\",\n        2 => \"Native input preview: attacks and effects run normally\",\n        3 => \"Inputs complete; native effects finish normally. Y: restart\",\n        4 => \"Restoring the temporary preview setup...\",\n        // The editor keeps the actual failure in its full-width help strip.\n        5 => \"Preview stopped. Fix the issue above, then press X.\",\n        _ => \"\",\n    }\n}\n\n",
      "new": "",
      "reason": "RC zero-warning root: remove the unconsumed static-text preview facade. The canonical ClipView already publishes playing state and the exact worker-delivered failure text through clip_help; retain STATUS for actual preview state/recovery qualification."
+    },
+    {
+     "old": "    }\n}\n\npub unsafe fn after_frame(module: &mut BattleObjectModuleAccessor) {\n    if !practice::enabled() || !primary_cpu(module) { return; }\n    let loading = save_states::is_loading();\n    let action = {\n        let mut session = SESSION.lock();\n        let Some(s) = session.as_mut() else { return };\n",
+     "new": "    }\n}\n\npub unsafe fn after_frame(module: &mut BattleObjectModuleAccessor) {\n    let Ok(enabled) = practice::try_enabled() else { return; };\n    if !enabled || !primary_cpu(module) { return; }\n    let loading = save_states::is_loading();\n    let action = {\n        let mut session = SESSION.lock();\n        let Some(s) = session.as_mut() else { return };\n",
+     "reason": "RC15 macro frame shared menu fix 5fe28b1c: fresh fallible context before panel/session/mailbox mutation; pass resolved eligibility through original shared practice/roster/Mii implementations. Busy defers without consuming requests or publishing false scene. Original source hash retained."
     }
    ]
   },

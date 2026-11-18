@@ -1,15 +1,14 @@
 //! Break the Targets' camera (rc.14, `artifacts/rc14-eggsercise/SPEC.md` §V2.5 `camera`), the runtime half of
-//! `model::btt_camera`: the game's own Training Fixed camera (mode 4) shows the whole stage while the mode is Placing, Ready or
-//! Running, and the camera the game was in comes back when it ends. The switch is the game's own `change_active_camera`
+//! `model::btt_camera`: the game's own Training Fixed camera (mode 4) shows the whole stage while the mode is Placing, and the camera the game was in comes back on every placement exit. The switch is the game's own `change_active_camera`
 //! (`game::natives::change_active_camera`), asked from Player 1's pass on the game thread with no lock held (the camera hooks
 //! take the CPU lock). The row is the camera unit's: a rejected guard turns off this camera and nothing else (boundaries in
 //! `tests/capabilities.rs`). Eden evidence: `tmp-deluxe/btt-camera/FINDINGS.md`, run `d2-btt-cam-1`.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use hos_lock::Mutex;
+use std::cell::Cell;
 
-use crate::model::btt::{self as model, Camera};
+use crate::model::btt::{self as model, Camera, CameraRequests};
 use crate::model::sites_pkg2;
 use crate::runtime::game::{self, natives};
 use crate::runtime::scene;
@@ -18,8 +17,13 @@ use crate::runtime::scene;
 static USABLE: AtomicBool = AtomicBool::new(false);
 /// This mode holds the Fixed camera: the Hide Tech camera hooks put the game's own centre in, not Hide Tech's (`holding`).
 static HOLD: AtomicBool = AtomicBool::new(false);
-/// The camera's state between passes. Only the game thread's pass takes it, and never across a call into the game.
-static CAMERA: Mutex<Camera> = Mutex::new(Camera::IDLE);
+/// Owners publish atomically; only the game thread holds save/restore state.
+static OWNERS: CameraRequests = CameraRequests::idle();
+struct GameCamera(Cell<Camera>);
+// SAFETY: only frame(), on the game thread, accesses this cell; state is copied and committed before native calls.
+// Switch std thread_local! allocates TLS boxes, so the single game-thread state stays in static storage.
+unsafe impl Sync for GameCamera {}
+static CAMERA: GameCamera = GameCamera(Cell::new(Camera::IDLE));
 
 pub fn set_usable(on: bool) {
     USABLE.store(on, Ordering::Release);
@@ -49,21 +53,36 @@ unsafe fn manager() -> usize {
 /// # Safety
 /// The game thread, in a battle scene.
 pub unsafe fn apply(want: bool) {
+    if !USABLE.load(Ordering::Acquire) { return; }
+    request(1, want);
+}
+
+/// Shared placing camera: BTT bit 1, Tech bit 2. The last owner restores the first native mode.
+/// # Safety
+/// Callers release their bit on every placing exit. The game thread applies requests in frame().
+pub unsafe fn request(owner_bit: u8, want: bool) {
     if !USABLE.load(Ordering::Acquire) {
         return;
     }
+    OWNERS.request(owner_bit, want);
+}
+
+/// Step once per game frame, after placing owners publish their requests.
+/// # Safety
+/// Player 1's non-Nana game-thread callback; no plugin lock is held.
+pub unsafe fn frame() {
+    if !USABLE.load(Ordering::Acquire) { return; }
     let manager = manager();
     let mode = (manager != 0 && scene::current().is_some()).then(|| ((manager + sites_pkg2::CAMERA_MODE_FIELD) as *const i32).read_volatile());
-    let act = {
-        let mut camera = CAMERA.lock();
-        let act = camera.step(want, mode);
-        HOLD.store(camera.holding(), Ordering::Release);
-        act
-    };
+    let want = OWNERS.wanted();
+    let mut camera = CAMERA.0.get();
+    let act = camera.step(want, mode);
+    HOLD.store(camera.holding(), Ordering::Release);
+    CAMERA.0.set(camera);
     let Some(to) = act else { return };
     let changed = natives::change_active_camera(manager, to);
     #[cfg(feature = "diag")]
-    crate::runtime::diag_log::diagnostic(format_args!(
+    crate::runtime::diag_log::enqueue_diagnostic(format_args!(
         "[Btt] camera want={want} mode_before={mode:?} mode_after={} changed={changed:?}",
         ((manager + sites_pkg2::CAMERA_MODE_FIELD) as *const i32).read_volatile()
     ));

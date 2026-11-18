@@ -82,7 +82,6 @@ unsafe fn trolley_floor_allows(p1: usize, x: f32, y: f32, spacing: f32, facing: 
 }
 
 const NOTICE_ID: u8 = 0x30;
-const NOTICE_RAISE: u8 = 4;
 // Only bounds how long a frozen Egg result may wait for positive closure.
 const EGG_CLOSE_FRAMES: u8 = 60;
 static READY: AtomicBool = AtomicBool::new(false);

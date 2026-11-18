@@ -23,7 +23,9 @@ after it.
 - It presses the first action as soon as the game lets it, for example the first frame after hitstun. Once that
   action has started, the follow-up comes next, again as soon as it can.
 - With several actions ticked, the pick is random and each has the same chance. The CPU picks once when a situation
-  starts, not on every frame of it, and a new situation replaces anything still waiting.
+  starts, not on every frame of it, and a new situation replaces anything still waiting. The general triggers
+  (Grounded, Airborne, the distances, Always) pick again once the last action is done: see
+  [Mash Triggers](#mash-triggers).
 - The rows under Attacks & Movement are picked along with the action: [Attack Angle](../menu/cpu.md#attack-angle) for
   an angled attack; [Full Hop](../menu/cpu.md#full-hop), [Falling Aerials](../menu/cpu.md#falling-aerials) and
   [Aerial Delay](../menu/cpu.md#aerial-delay) for an aerial; [Fast Fall](../menu/cpu.md#fast-fall) for the fall
@@ -62,8 +64,9 @@ How they combine:
   Hitstun, Parry, Footstool, Ledge Trump, Landing, then the general ones (Grounded, Airborne, the distances, Always).
 - While the CPU is in one of the first eight, only that one counts. With Hitstun unticked, Always doesn't fire during
   hitstun; Hitstun doesn't fire during tumble.
-- Grounded, Airborne, the distances and Always work as one situation. While any of them holds, the CPU mashes once.
-  It mashes again after none of them held for a moment, or after something else happened in between (a hit, a reset).
+- Grounded, Airborne, the distances and Always work as one situation, and they repeat: while any of them holds, the CPU
+  mashes, and once that action and its Followup are done it mashes again. A CPU on Always with Spot Dodge keeps
+  spot-dodging. The other situations pick once each time they start.
 - Shieldstun, Ledge Option and Mistech Option are moments: the CPU mashes right then.
 - After a throw, the CPU always does its Mash action, whatever is ticked here.
 

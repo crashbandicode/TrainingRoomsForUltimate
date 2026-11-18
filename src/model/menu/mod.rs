@@ -52,6 +52,8 @@ pub struct Env {
     pub build_tag: &'static str,
     /// The menu opened in a waiting room's practice, where Hide CPU does nothing yet (SPEC-eggsercise V2.6).
     pub waiting_room: bool,
+    /// Optional native projectile boundary passed its guards.
+    pub btt_projectiles_ready: bool,
     /// rc.14: how many Stage Builder stages the save holds (extra tiles after the catalog on the stage grids).
     pub custom_stages: u16,
 }
@@ -70,6 +72,7 @@ impl Default for Env {
             combo_draft: super::combo::Label::EMPTY,
             build_tag: "",
             waiting_room: false,
+            btt_projectiles_ready: true,
             custom_stages: 0,
         }
     }
@@ -122,8 +125,17 @@ pub struct Outbox {
     /// A, X, Y, ZR on the portrait roster grid: the tile and the button; the roster editor (package 6's roster rules) applies it.
     /// Taken at once with Menu::take_roster_press.
     pub roster_press: Option<(u16, Button)>,
+    /// `[Player, CPU]`: the fighter an A on the Player / CPU Character grid asked for this opening, also when it was
+    /// already the stored pick (LEAD-1). The LAST pick per role per visit wins: an earlier press of the same role in the
+    /// same visit is superseded. The close hands it to the settings publish (`published::publish`), and the game frame
+    /// decides the role's one load from it, the settings change and Player Swapping together (`cycle_members::role_dispatch`).
+    pub picks: [Option<u32>; 2],
     /// Place targets (Break the Targets): the menu closes into the placing view.
     pub place_targets: bool,
+    /// Stage tech: close into the surface picker.
+    pub tech_point: bool,
+    /// Stage tech: close into the guided exercise draft.
+    pub tech_wizard: bool,
 }
 
 /// Why a row or entry is greyed (it shows dimmed with this reason and ignores A).
@@ -145,6 +157,13 @@ pub enum Grey {
     ChecklistSet,
     /// Target speed while Break the Targets is On (SPEC V2.5): the targets do not move.
     TargetsStill,
+    /// The Auto solver supplies this value.
+    TechAuto,
+    /// DI direction is read by DI Set.
+    TechDiSet,
+    /// Tech practice always hides the CPU.
+    TechCpu,
+    ProjectilesUnavailable,
 }
 
 impl Grey {
@@ -157,7 +176,11 @@ impl Grey {
             Grey::NeedsThreeBodies => "Needs Ready Fighter Bodies set to 3",
             Grey::RangeSet => "A range is set: clear it first (Y)",
             Grey::ChecklistSet => "Values are ticked: clear them first (Y)",
+            Grey::ProjectilesUnavailable => "Projectile detection unavailable", // restriction: btt-projectile-guard
             Grey::TargetsStill => "Targets stay still",
+            Grey::TechAuto => "Auto chooses this value",
+            Grey::TechDiSet => "Used by DI Set",
+            Grey::TechCpu => "Tech practice hides the CPU",
         }
     }
 }
@@ -766,7 +789,10 @@ impl Menu {
             }
             Control::YesNoRandom => RowValue::Choice(yes_no_random(array)),
             Control::MultiSelect(labels) => {
-                RowValue::Checklist { ticked: array.iter().filter(|v| **v != 0).count(), total: labels.len() }
+                RowValue::Checklist {
+                    ticked: (0..labels.len()).filter(|i| array.get(super::legend::option_slot(row.id, *i)).is_some_and(|v| *v != 0)).count(),
+                    total: labels.len(),
+                }
             }
             Control::MultiSelectRange { first, step, range_id } => {
                 RowValue::Delay(match self.range_of(range_id, first, step) {
@@ -887,7 +913,16 @@ impl Menu {
 
     /// Why the row is greyed, if it is.
     pub fn grey(&self, row: usize) -> Option<Grey> {
-        match ROWS[row].id {
+        let id = ROWS[row].id;
+        if super::tech_settings::scale(id).is_some_and(|spec| {
+            super::tech_settings::mode(&self.settings.menu, spec.mode) == super::tech_settings::Mode::Auto
+        }) {
+            return Some(Grey::TechAuto);
+        }
+        if id == "tech_di_direction" && super::tech_settings::selected(&self.settings.menu, "tech_di") != 2 {
+            return Some(Grey::TechDiSet);
+        }
+        match id {
             "respawn_invincibility" if self.toggle_by_id("save_state_enable") && self.toggle_by_id("save_state_autoload") => {
                 Some(Grey::AutoLoadOn)
             }
@@ -897,6 +932,8 @@ impl Menu {
             "save_damage_limits_cpu" if self.get("save_damage_cpu").get(2).copied().unwrap_or(0) == 0 => {
                 Some(Grey::DamageNotRandom)
             }
+            "practice_cpu" if super::tech_settings::selected(&self.settings.menu, "tech_practice") > 0 => Some(Grey::TechCpu),
+            "btt_projectiles" if !self.env.btt_projectiles_ready => Some(Grey::ProjectilesUnavailable),
             "eggsercise_speed" if self.get("btt").get(1).is_some_and(|v| *v != 0) => Some(Grey::TargetsStill),
             _ => None,
         }
@@ -1299,6 +1336,22 @@ impl Menu {
                 (self.outbox.place_targets, self.closed) = (true, true);
                 return;
             }
+            Editor::TechPoint => {
+                if super::tech_settings::selected(&self.settings.menu, "tech_practice") == 0 {
+                    self.put_one_hot("tech_practice", 1);
+                }
+                self.put_one_hot("tech_surface", 4);
+                (self.outbox.tech_point, self.closed) = (true, true);
+                return;
+            }
+            Editor::TechWizard => {
+                if super::tech_settings::selected(&self.settings.menu, "tech_practice") == 0 {
+                    self.put_one_hot("tech_practice", 2);
+                }
+                self.put_one_hot("tech_surface", 4);
+                (self.outbox.tech_wizard, self.closed) = (true, true);
+                return;
+            }
             other => Screen::External(other),
         };
         self.stack.push(screen);
@@ -1510,8 +1563,10 @@ impl Menu {
     /// ZL: tick all, or clear all when every entry is already ticked.
     fn all_or_none(&mut self, id: &str) {
         let mut array = self.get(id).to_vec();
-        let all = array.iter().all(|v| *v != 0);
-        for slot in &mut array {
+        let len = if id == super::legend::ROW { options::HITBOX_ITEMS.len() } else { array.len() };
+        let all = (0..len).all(|i| array[super::legend::option_slot(id, i)] != 0);
+        for i in 0..len {
+            let slot = &mut array[super::legend::option_slot(id, i)];
             *slot = if all { 0 } else { (*slot).max(1) };
         }
         self.put(id, &array);
@@ -1524,7 +1579,7 @@ impl Menu {
             Button::Up => self.top(Screen::Checklist { row, cursor: (cursor + len - 1) % len }),
             Button::Down => self.top(Screen::Checklist { row, cursor: (cursor + 1) % len }),
             Button::JumpUp | Button::JumpDown => self.top(Screen::Checklist { row, cursor: jumped(cursor, len, button == Button::JumpDown) }),
-            Button::A => self.toggle_entry(id, cursor),
+            Button::A => self.toggle_entry(id, super::legend::option_slot(id, cursor)),
             Button::ZL => self.all_or_none(id),
             Button::B => _ = self.stack.pop(),
             _ => {}
@@ -1636,7 +1691,7 @@ impl Menu {
             if lower_handle {
                 [apply(lower, 0, i16::from(upper)), upper]
             } else {
-                [lower, apply(upper, i16::from(lower), i16::from(settings::SLIDER_MAX))]
+                [lower, apply(upper, i16::from(lower), i16::from(super::tech_settings::scale(id).map_or(settings::SLIDER_MAX, |s| s.max)))]
             }
         };
         match button {
@@ -1917,6 +1972,21 @@ impl Menu {
         self.outbox.roster_press.take()
     }
 
+    /// The roster editor: an A on a Player (`cpu` false) or CPU Character tile asked for `kind` (`Outbox::picks`; the last
+    /// pick of the visit wins). The pick key counts as the player's edit even when its value did not change, so the close
+    /// commit keeps the picked fighter over a live selection written back while the menu was open (MENU-CLOSE: the
+    /// player's edit wins; review F3).
+    pub fn note_pick(&mut self, cpu: bool, kind: u32) {
+        self.outbox.picks[usize::from(cpu)] = Some(kind);
+        self.outbox.changed = true;
+        self.note_edit(if cpu { "cpu_character" } else { "player_character" });
+    }
+
+    /// The picks this visit has made so far, `[Player, CPU]` (read by the close before it takes the outbox).
+    pub fn picks(&self) -> [Option<u32>; 2] {
+        self.outbox.picks
+    }
+
     /// The portrait roster grid (one page, the same in both console modes).
     fn roster_screen(&self, use_: RosterUse) -> Screen {
         Screen::Grid { layout: GridLayout::new(GridKind::Roster(use_), self.env.console), page: 0, cell: 0 }
@@ -2003,3 +2073,7 @@ fn yes_no_random(array: &[u8]) -> Option<usize> {
 #[cfg(test)]
 #[path = "btt_menu_tests.rs"]
 mod btt_menu_tests;
+
+#[cfg(test)]
+#[path = "tech_menu_tests.rs"]
+mod tech_menu_tests;

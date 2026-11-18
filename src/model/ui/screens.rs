@@ -183,7 +183,7 @@ fn checklist_frame(menu: &Menu, screen: &Screen, row: usize, cursor: usize, fram
     let current = menu.settings().menu.get(r.id).map(<[u8]>::to_vec).unwrap_or_default();
     lines_window(frame, cursor, total, |i, line| {
         line.label = option_label(menu, row, i, 0, 1);
-        let weight = current.get(i).copied().unwrap_or(0);
+        let weight = current.get(super::legend::option_slot(r.id, i)).copied().unwrap_or(0);
         let (text, tone) = mark(weight != 0);
         let _ = line.value.write_str(text);
         line.value_tone = tone;
@@ -276,7 +276,10 @@ fn slider_frame(menu: &Menu, screen: &Screen, row: usize, state: SliderState, fr
     let lower = matches!(state, SliderState::LowerHover | SliderState::LowerSelected);
     for (i, name) in ["Min", "Max"].into_iter().enumerate() {
         let value = values.get(i).copied().unwrap_or(0);
-        push(frame, name, &format!("{value}%"), if selected && (i == 0) == lower { Tone::On } else { Tone::Normal });
+        let mut label = String::new();
+        if let Some(spec) = super::tech_settings::scale(ROWS[row].id) { let _ = spec.write(value, &mut label); }
+        else { let _ = write!(label, "{value}%"); }
+        push(frame, name, &label, if selected && (i == 0) == lower { Tone::On } else { Tone::Normal });
     }
     frame.focus = Some(u8::from(!lower));
     let _ = frame.hint.write_str(HINT_SLIDER);
@@ -291,7 +294,7 @@ fn directions_frame(menu: &Menu, screen: &Screen, row: usize, chip: usize, frame
     }
     frame.chip_focus = chip as u8;
     frame.chip_visual = match ROWS[row].id {
-        "di_state" => ChipVisual::Di,
+        "di_state" | "tech_di_direction" => ChipVisual::Di,
         "sdi_state" => ChipVisual::Sdi,
         _ => ChipVisual::None,
     };
@@ -402,6 +405,7 @@ pub fn panel_frame<S: AsRef<str>>(menu: &Menu, title: &str, footer: &str, labels
     cleared_page(menu, frame);
     let _ = write!(frame.crumb, "{}  >  {title}", menu.page().title());
     frame.view = View::Tiles;
+    frame.dialog = true;
     frame.tile_cols = PANEL_COLS as u8;
     frame.tile_rows = PANEL_ROWS as u8;
     let count = labels.len().min(PANEL_CELLS);
@@ -516,6 +520,7 @@ fn chord_entry_frame(menu: &Menu, screen: &Screen, captured: Chord, frame: &mut 
     base(menu, screen, frame);
     push(frame, "Chord", &format!("{captured}"), Tone::On);
     frame.focus = Some(0);
+    frame.dialog = true;
     let _ = frame.help[0].write_str("X starts capture: release all, hold the chord, then release all to preview.");
     let _ = frame.help[1].write_str("An empty chord never passes (a menu shortcut with none is disabled).");
     let hint = match menu.chord_capture() {
@@ -543,6 +548,7 @@ fn confirm_reset_frame(menu: &Menu, screen: &Screen, frame: &mut Frame) {
     push(frame, "A  reset", "", Tone::On);
     push(frame, "B  cancel", "", Tone::Normal);
     frame.focus = Some(1);
+    frame.dialog = true;
     let _ = write!(frame.help[0], "Every setting on {} goes back to your saved defaults.", menu.page().title());
     // The menu shortcuts are not settings of the page (they live in the shortcuts file), so the reset leaves them.
     let shortcuts = ROWS.iter().any(|r| {
@@ -799,26 +805,43 @@ mod tests {
         assert_eq!(frame(&m).conn_count, 0);
         m.press(Button::A);
         let first = frame(&m);
-        assert_eq!(first.conn_count, 8);
-        assert_eq!(first.conn[0].string_lossy(), "Hitbox 1");
-        assert!(matches!(first.conn_kind[0], super::super::recording_menu::ConnKind::Swatch([255, 0, 0, 255])));
-        for _ in 0..3 { m.press(Button::Down); }
-        m.press(Button::A);
-        let coloured = frame(&m);
-        assert_eq!(coloured.conn_count, 3);
-        assert_eq!(coloured.conn[0].string_lossy(), "Strong hitbox");
-        assert_eq!(coloured.conn[1].string_lossy(), "Weak hitbox");
-        assert_eq!(coloured.conn[2].string_lossy(), "Windbox");
+        assert_eq!(first.conn_count, 3);
+        assert!(first.rows.iter().all(|row| row.sub.is_empty()), "checklist sublines stay empty");
+        assert_eq!(first.conn[0].string_lossy(), "Red — Strong hitbox");
+        assert_eq!(first.conn[1].string_lossy(), "Pink — Weak hitbox");
+        assert_eq!(first.conn[2].string_lossy(), "Sky blue — Windbox (pushes without flinching)");
+        assert!(matches!(first.conn_kind[0], super::super::recording_menu::ConnKind::Swatch(_)));
         m.press(Button::B);
         let back = frame(&m);
         assert!(!back.popup && back.conn_count == 0);
         assert!(back.conn_kind.iter().all(|kind| *kind == super::super::recording_menu::ConnKind::Detail));
     }
 
+    /// Primary 20:56Z: Delay and Chord Entry are content-sized dialogs; each real frame's box holds what it draws.
+    fn delay_and_chord_entry_dialogs_hold_their_content() {
+        use crate::model::panes as p;
+        let mut m = menu();
+        open(&mut m, "Ledge Delay");
+        let f = frame(&m);
+        let ([x, y, w, h], _, hint_y) = f.dialog_box().expect("the delay pop-up is a dialog");
+        let [left, bottom, right] = [x - w / 2.0, y - h / 2.0, x + w / 2.0];
+        // Tiles span the rows; the range bar ends at x 700 and its handle labels (110 wide) sit at y -165.
+        assert!(left <= p::ROW_LEFT && right >= p::ROW_RIGHT.max(700.0 + 110.0), "{:?}", [left, right]);
+        assert!(bottom <= -165.0 - 12.0 && bottom <= hint_y - 22.0 && h < p::PANEL_H, "{bottom} {h}");
+        let mut m = menu();
+        open(&mut m, "Menu shortcut 1");
+        let f = frame(&m);
+        let ([x, y, w, h], help_y, hint_y) = f.dialog_box().expect("Chord Entry is a dialog");
+        let [right, bottom] = [x + w / 2.0, y - h / 2.0];
+        assert!(right >= p::row_value_right(false) && bottom <= hint_y - 22.0 && help_y[0] < p::row_y(0), "{right} {bottom}");
+        assert!(h < 600.0 && w <= p::PANEL_W, "{w} x {h}: the chord dialog is compact");
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("delay_and_chord_entry_dialogs_hold_their_content", delay_and_chord_entry_dialogs_hold_their_content as fn()),
             ("hitbox_checklist_colour_key_updates_and_clears_with_the_screen", hitbox_checklist_colour_key_updates_and_clears_with_the_screen as fn()),
             ("a_library_tile_cut_at_sixteen_characters_ends_in_an_ellipsis", a_library_tile_cut_at_sixteen_characters_ends_in_an_ellipsis as fn()),
             ("the_delay_popup_greys_the_checklist_once_a_range_is_set_and_says_why",the_delay_popup_greys_the_checklist_once_a_range_is_set_and_says_why as fn()),

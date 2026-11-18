@@ -95,7 +95,8 @@ fn callers(name: &str) -> Vec<(String, String)> {
 fn the_writeback_buffers_keep_one_reader_and_one_writer_at_a_time() {
     assert_eq!(callers("flush_writeback"), vec![("ui/worker.rs".to_owned(), "fn run() {".to_owned())],
         "the menu worker's loop is the one reader");
-    assert_eq!(callers("after_publish"), vec![("published.rs".to_owned(), "pub fn publish(snapshot: &Snapshot, rerolls: u8) {".to_owned())]);
+    assert_eq!(callers("after_publish"), vec![("published.rs".to_owned(),
+        "pub fn publish(snapshot: &Snapshot, rerolls: u8, picks: [Option<u32>; 2]) {".to_owned())]);
     let published = runtime_sources().into_iter().find(|(f, _)| f == "published.rs").unwrap().1;
     let publish = body(&published, "pub fn publish(");
     let turn = publish.find("let _turn = PUBLISHING.lock();").expect("the publisher's turn");
@@ -103,4 +104,33 @@ fn the_writeback_buffers_keep_one_reader_and_one_writer_at_a_time() {
     // `store`, the game side's writer, is reached only from the typed menu's guard and assign (serialised by EDITED).
     let menu_callers: Vec<String> = callers("store").into_iter().filter(|(f, _)| f == "compat/menu.rs").map(|(_, h)| h).collect();
     assert_eq!(menu_callers.len(), 2, "{menu_callers:?}");
+}
+
+/// LEAD-1 review F1: the edit handoff is a one-reader triple buffer (`hos_lock::TripleBuffer`), and its reader is whoever holds
+/// `published::PUBLISHING` (the publisher, or `read(&MENU)` on a plugin thread). Every `EDIT_HANDOFF.read()` is in one of the two
+/// readers: `plugin_view` takes the turn first, and `view_before_publish` takes the publisher's guard as a parameter, called only by
+/// `publish` after its turn. ff889cfe also read it from the menu worker's close without the turn, beside the diag reload's publisher.
+#[test]
+fn every_edit_handoff_read_holds_the_publishing_turn() {
+    let readers: Vec<&str> = MENU.match_indices("EDIT_HANDOFF.read()").map(|(at, _)| {
+        let header = MENU[..at].rfind("\nfn ").into_iter().chain(MENU[..at].rfind("\npub(crate) fn ")).max().expect("enclosing fn");
+        MENU[header + 1..].lines().next().unwrap()
+    }).collect();
+    assert_eq!(readers.len(), 2, "{readers:?}");
+    for header in &readers {
+        if header.starts_with("fn plugin_view(") {
+            let f = body(MENU, "fn plugin_view(");
+            let turn = f.find("crate::runtime::published::PUBLISHING.lock();").expect("plugin_view takes the turn");
+            assert!(turn < f.find("EDIT_HANDOFF.read()").unwrap(), "{f}");
+        } else {
+            assert!(header.starts_with("pub(crate) fn view_before_publish(_turn: &hos_lock::MutexGuard<'_, ()>)"),
+                "an EDIT_HANDOFF reader without the publishing turn: {header}");
+        }
+    }
+    assert_eq!(callers("view_before_publish"), vec![("published.rs".to_owned(),
+        "pub fn publish(snapshot: &Snapshot, rerolls: u8, picks: [Option<u32>; 2]) {".to_owned())],
+        "only the publisher reads the view before a publish");
+    let published = runtime_sources().into_iter().find(|(f, _)| f == "published.rs").unwrap().1;
+    let publish = body(&published, "pub fn publish(");
+    assert!(publish.find("let _turn = PUBLISHING.lock();").unwrap() < publish.find("view_before_publish(&_turn)").unwrap(), "{publish}");
 }

@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use smash::app::{lua_bind::StatusModule, utility, BattleObjectModuleAccessor, Fighter};
 
 use crate::runtime::clock;
+use crate::engine::lobby::practice_policy::Context;
 
 /// A fact older than this is stale (two UI polls of the menu worker, a few frames of the game).
 pub const FRESH_MS: u64 = 250;
@@ -29,7 +30,18 @@ static WAITING_READY: AtomicBool = AtomicBool::new(false);
 /// UI-layout/game-frame boundary only. These scene facts survive a modal applet
 /// pausing fighter frames; explicit session retirement invalidates them.
 pub fn publish_scene_facts() {
-    SCENE_ENABLED.store(crate::runtime::lobby::training::practice::scene_enabled(), Ordering::Release);
+    let _ = try_publish_scene_facts();
+}
+
+/// Defer unavailable eligibility without publishing a false scene departure.
+pub fn try_publish_scene_facts() -> Result<(), crate::runtime::compat::menu::MenuBusy> {
+    let context = crate::runtime::lobby::training::practice::try_context()?;
+    publish_scene_context(context);
+    Ok(())
+}
+
+fn publish_scene_context(context: Option<Context>) {
+    SCENE_ENABLED.store(context.is_some(), Ordering::Release);
     WAITING_SCENE.store(crate::runtime::lobby::training::lobby::is_waiting_scene(), Ordering::Release);
 }
 
@@ -39,15 +51,18 @@ pub fn publish_scene_facts() {
 /// # Safety
 /// Called from the frame wrapper of the primary CPU body (`cpu` is that body's live accessor), the game thread.
 pub unsafe fn publish_frame_facts(cpu: &mut BattleObjectModuleAccessor) {
-    publish_scene_facts();
+    let Ok(context) = crate::runtime::lobby::training::practice::try_context() else { return; };
+    let Ok(active) = crate::runtime::lobby::training::lobby::try_active() else { return; };
+    let present = crate::runtime::lobby::training::practice::acquire_in(context);
+    publish_scene_context(context);
     READY_GO.store(Fighter::is_ready_go(), Ordering::Release);
-    WAITING_READY.store(crate::runtime::lobby::training::lobby::active()
+    WAITING_READY.store(active
         && crate::runtime::roster::character_roster::waiting_drafts_ready(), Ordering::Release);
     CPU_STATUS.store(StatusModule::status_kind(cpu), Ordering::Release);
     CPU_SITUATION.store(StatusModule::situation_kind(cpu), Ordering::Release);
     // Package 6's provider is the one implementation of practice is acquired (both practice bodies present, native Training or lobby
     // practice): it reads the game here, on the game thread, and the worker reads the answer (lead, 2026-11-02 merge ruling).
-    PRESENT.store(crate::runtime::lobby::training::practice::acquire(), Ordering::Release);
+    PRESENT.store(present, Ordering::Release);
     CPU_KIND.store(utility::get_kind(cpu), Ordering::Release);
     STAMP_MS.store(clock::uptime_ms().max(1), Ordering::Release);
     FRAME_NUMBER.fetch_add(1, Ordering::Release);

@@ -1681,3 +1681,183 @@ ceiling = 148194
 date = "2026-11-15"
 reason = "rc.15 final merged implementation measured 148194 on dae81738 after the accepted feature heads, Phase3 reuse (-73), colour legend (+56), release identity and measured stack-bound refresh. This replaces the provisional 148075 ceiling with the exact final total; counting rules and gate enforcement are unchanged."
 approved_by = "Operator 2026-11-15 18:54Z via AskUserQuestion: 'Set limit to final total', relayed by the primary c07b3449. Supersedes the earlier about-20-lines-over allowance; exact measured final total 148194."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 148236
+date = "2026-11-16"
+reason = "rc.15 shared nonblocking menu fix measured total 148236, +42 over 148194. Lead-approved FOR OPERATOR REVIEW; hardware-reship integration records the combined total. Counting rules and features unchanged."
+approved_by = "Operator rc.15 size approval; primary 20:08Z, rc.15 approval, 2026-11-16: explicitly authorizes this measured-total entry FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150210
+date = "2026-11-16"
+reason = "rc.15 Stage tech v9 measured total on 0938ec33: 150210, +2016 over 148194. Lead-approved FOR OPERATOR REVIEW; final total set at integration. No code-counting change or feature removal."
+approved_by = "Operator rc.15-update size approval: final total set at integration; primary 18:49Z, 2026-11-16, explicitly authorizes this measured-total budget entry FOR OPERATOR REVIEW."
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 150214
+date = "2026-11-16"
+reason = "rc.15 Stage tech v10 d9907202 measured total 150214, +4 over the v9 150210 entry. Lead-approved under the same rc.15 ruling; final combined total set at integration. Counting and implementation unchanged by this entry."
+approved_by = "Primary approval 2026-11-16 following tech-direct V10 boot PASS: record the +4 under the same operator rc.15 size approval, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 153962
+date = "2026-11-16"
+reason = "rc.15 Tech UI final seam integration measured 153962 on 072f5ee0, with no headroom. Includes final reviewed BTT/menu seams and retained native grading availability. FOR OPERATOR REVIEW; counting, guards and gate enforcement unchanged."
+approved_by = "Operator rc.15 size approval; primary 2026-11-16 22:47Z explicitly approves this exact measured TechUI total tied to 072f5ee0, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 154452
+date = "2026-11-17"
+reason = "rc.15 TechUI final combined implementation measured 154452 on reviewed 02fdb3cb: 153962 + core463 + UI27. Core467 includes V10+4 already in the UI baseline. ONE exact combined ceiling, no headroom; boundary/determinism additions are host tests only. FOR OPERATOR REVIEW; no counting, guard or gate change."
+approved_by = "Operator rc.15 size approval; primary exact +7 ruling 2026-11-17 01:50Z confirmed by tech-direct FINAL 02:10Z and rc15-tech reconciliation 02:15Z; supersedes the earlier +461/+26 arithmetic estimate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 154569
+date = "2026-11-17"
+reason = "TechUI stage-surface bootstrap root fix measured 154569: +117 over final combined 154452, within the approved +300. Exact total, no headroom. Platform and airborne discovery share native stage rays; finite work ends in completion or explicit failure. FOR OPERATOR REVIEW; counting and gates unchanged."
+approved_by = "Operator rc.15 size approval; primary 2026-11-17 03:20Z explicitly approves growth up to +300 over 154452 FOR OPERATOR REVIEW."
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 154717
+date = "2026-11-17"
+reason = "TechUI collision-lifetime recovery measured 154717: +148 over 154569, within approved +300. Pure world selection rebinds to freshly discovered geometry after reset; strict native lifetime guards and exact matching remain. One combined exact total, no headroom. FOR OPERATOR REVIEW; counting and gates unchanged."
+approved_by = "Operator rc.15 size approval; primary 2026-11-17 04:38Z explicitly authorizes growth up to +300 over154569 FOR OPERATOR REVIEW."
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 154757
+date = "2026-11-17"
+reason = "RESHIP-3 approved envelope: card148683 + (Tech154717 - common148194) =155206. Final combined measured total154757 is recorded here, no headroom (449 below the envelope). Shared seam overlap is counted once in measurement; counting and gates unchanged."
+approved_by = "Primary 2026-11-17 06:23Z integration order: combined ceiling is card approved total plus Tech approved growth, under operator rc.15 size approval, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 154972
+date = "2026-11-17"
+reason = "RESHIP-3 final Tech plus LEAD-1 integrated source measured154972, no headroom. Within combined approval envelope148683+(154717-148194)+207=155413, with441 overlap saved. Includes reviewed versioned repick dispatch and typed admission composed with Tech nonblocking context and exact acceptance. Counting and gates unchanged."
+approved_by = "Operator rc.15 size approval; primary2026-11-17 06:23Z combines card and Tech approvals, primary06:29Z adds approved LEAD-1 +207. Exact combined measured total, FOR OPERATOR REVIEW."
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155171
+date = "2026-11-17"
+reason = "RESHIP-4 = RESHIP-3 (154972) + CRASH-0900 deferred L+R+A reset with the review-R3 lifecycle generation (rc15/crash0900-lra-gate 568203ff), measured 155171: +199 over 154972, within the approved +200. Exact total, no headroom. Counting and gates unchanged."
+approved_by = "Primary 2026-11-17 11:40Z approves cumulative growth up to +200 over 154972 FOR OPERATOR REVIEW; primary 12:56Z keeps the +200 bound for the R3 fix."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155017
+date = "2026-11-17"
+reason = "Native Tech timing and counted native misses measured 155017: +45 over154972, within approved +250. One exact combined total, no headroom. Native guards, counting basis and gate enforcement unchanged. FOR OPERATOR REVIEW."
+approved_by = "Operator rc.15 size approval; primary2026-11-17 12:25Z explicitly approves up to +250 total for timing plus Missed, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155216
+date = "2026-11-17"
+reason = "Native Tech timing plus counted Missed rebased onto RESHIP-4 ffdc7d48: base155171 plus timing45 =155216, exact combined total with no headroom. Both reviewed behaviours are preserved; counting, guards and gate enforcement unchanged. FOR OPERATOR REVIEW."
+approved_by = "Primary2026-11-17 15:30Z orders timing integration onto ffdc7d48; timing growth45 remains within primary12:25Z approved +250 for timing plus Missed, combined with the separately approved RESHIP-4 baseline."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155228
+date = "2026-11-17"
+reason = "CPU out-of-shield native shield drop (Phase 3 CPU-040/066, rc15/cpu-oos-shield-drop 1b5e5c75) measured 155228 on the Surface gate: +12 over 155216 (a9938105). One shared needs_native_drop predicate and the guard_button off-query clause of SPEC-cpu-05. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "Primary 2026-11-17 tr-fix-devin brief approves the +12 for CPU-OOS, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155376
+date = "2026-11-17"
+reason = "Compact notice box and content-sized dialogs (rc15/notice-compact, review 2 R2 fixed) rebased onto main 458c0636 (155228): composed measured 155376 = +148, within the approved +150 for the notice part. Recording pop-up box spans its key caps, row bands and CONNECTIONS divider; the help rule hides under dialogs. Exact total, no headroom. Counting and gates unchanged."
+approved_by = "Primary 14:11Z and 17:54Z (notice-ui-devin-opus): the +150 approval stands for the notice part, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155392
+date = "2026-11-17"
+reason = "Lobby strip clear stacked on notice-compact 92d666f5 (155376): composed measured 155392 = +16, within the approved +30. Exact total, no headroom. Counting and gates unchanged."
+approved_by = "Primary 17:48Z (notice-ui-devin-opus, lobby strip-clear): up to +30, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155400
+date = "2026-11-17"
+reason = "Delay and Chord Entry as content-sized dialogs on main b22480f2 (notice+strip, 155392): measured 155400 = +8, the primary-approved +8. Exact total, no headroom. Counting and gates unchanged."
+approved_by = "Primary 20:56Z and 21:05Z (notice-ui-devin-opus): +8 for Delay and Chord Entry, FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155446
+date = "2026-11-17"
+reason = "SOL-R23 Kirby hat copy precondition (rc15/kirby-hat-copy-ready e9b7f682): the hat request reads the native per-kind hat pair copy_setup uses (model::kirby_copy_pair, read-only) and waits without it, so a released pair no longer crashes (main+0x491e20, execute at 0). Measured 155274 on 458c0636 (155228, +46); rebased onto main 56923ec9 (155400): composed measured 155446 = the same +46. Already compacted from +110. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "devin-primary 22:40Z, operator review pending."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155718
+date = "2026-11-17"
+reason = "Free-form Tech wizard including stale-reset entry fix measured155718: +502 over timing155216, one below the approved +503. Exact measured total with no headroom. Shared picker marks, menu motion, planner and notice writer; one ordered step table. Counting, guards and gate enforcement unchanged."
+approved_by = "Operator explicitly approved: approve the +503 for the wizard; relayed by primary2026-11-17 16:52Z. Primary18:51Z directs the lifecycle fix within that approval; final ceiling is reduced to the measured155718, no headroom."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155907
+date = "2026-11-17"
+reason = "Free-form Tech wizard, stale-reset and Plus-ownership fixes rebased onto reviewed compact notices and lobby strip (b22480f2, 155392). Preserving raw Plus hold state reduces the measured total to 155907, wizard +515. No headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "Operator 16:52Z approved wizard +503. Devin-primary 21:06Z approved the additional +13 FOR OPERATOR REVIEW. The separately approved notice and lobby strip budgets are included in main's 155392."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155961
+date = "2026-11-18"
+reason = "Rebase the reviewed Tech wizard (41ce6dad, +515) onto the reviewed Kirby hat fix (d7f2e656, 155446 = 155400 + 46). The integrated ceiling is 155961, the sum of the exact approved counts. No headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "Operator approved wizard +503 at 16:52Z; devin-primary approved up to +13 more at 21:06Z and the final +515 integration at 03:36Z on 2026-11-18. Kirby +46 approved by devin-primary at 22:40Z, with both budget entries retained."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156006
+date = "2026-11-18"
+reason = "Bounded install and failure events with shared log rotation (rc15/bounded-events-log, raw diff +263/-19) rebased onto main 2322fae9 (155961): measured 156006 = +45 counted lines. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "Operator approved the bounded events log and its additional lines at 04:25Z on 2026-11-18 (devin-primary 04:30Z brief)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156023
+date = "2026-11-18"
+reason = "Bounded events log made hook-safe (devin-primary 05:16Z GO): append_event_at uses try_lock on EVENTS, drops a contended line and reports it once as dropped N events. 156006 + 17 = 156023 (+62 counted over main 2322fae9). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "Operator approved the bounded events log and its additional lines at 04:25Z; devin-primary 05:16Z: a small delta for the hook-safe fix is fine."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156721
+date = "2026-11-18"
+reason = "State export for the test-only hardware bridge (rc15/hw-bridge-export a9537c89, +700 over its base 458c0636: v1 +515, ring/settings +52, settle/reload +79, restore barriers +48, bound-writer seam +6) merged onto main c212bc50 (156023): composed measured 156721 (+698 over main; the merge measured 156724 before write_saved was folded into write_saved_with). Bridge v3b PASS (tr-review-astra-3 14:31Z) and the hardware smoke PASS (15:16Z). Exact total, no headroom. Counting and gates unchanged."
+approved_by = "Operator approved the bridge TR +700 and the state-export-invalid-settings restriction (11:28Z, recorded by tr-review-astra-2/3); primary c07b3449 15:28Z orders the merge onto local main."

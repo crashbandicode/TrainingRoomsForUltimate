@@ -35,8 +35,8 @@ pub static BUFFS: [&str; 18] = [
     "Jump", "Speed", "Shield", "Buster", "Smash", "Power Dragon", "Mini Waft", "Half Waft", "Full Waft",
 ];
 pub static INPUT_DISPLAY: [&str; 2] = ["Off", "Frame strip"];
-/// rc.14: Hitbox Visualization's checklist, in `legend::ITEMS` order.
-pub static HITBOX_ITEMS: [&str; 7] = ["Hitboxes", "Grab boxes", "Hurtboxes", "Frame data colours", "Launch angles", "Windboxes", "Article hurtboxes"];
+/// Visible checklist items; `legend::option_slot` skips the retired stored colour-mode slot.
+pub static HITBOX_ITEMS: [&str; 6] = ["Hitboxes", "Grab boxes", "Hurtboxes", "Launch angles", "Windboxes", "Article hurtboxes"];
 /// SPEC-input-07 §6: frames from the recorded press that still count as on time, and what follows an attempt.
 pub static COMBO_TOLERANCE: [&str; 3] = ["Exact", "1 frame", "2 frames"];
 pub static COMBO_AFTER: [&str; 2] = ["Keep playing", "Load save state"];
@@ -103,3 +103,12 @@ pub static CHORD_ROWS: [(&str, &str); 10] = [
     ("Input display", "input_display_toggle"),
     ("Game speed", "game_speed"),
 ];
+
+/// Stage tech practicer choices (DESIGN §5/7).
+pub static TECH_SESSION: [&str; 6] = ["Off", "20 attempts", "10 attempts", "1 minute", "3 minutes", "Free practice"];
+pub static TECH_SURFACE: [&str; 5] = ["Any", "Floor", "Wall", "Ceiling (underside)", "Chosen point"];
+pub static TECH_MODE: [&str; 2] = ["Set", "Random"];
+pub static TECH_AUTO_MODE: [&str; 3] = ["Auto (approximate)", "Set", "Random"];
+pub static TECH_DI: [&str; 4] = ["Off", "Player", "Set", "Random"];
+pub static TECH_FACING: [&str; 4] = ["Toward the point", "Left", "Right", "Random"];
+pub static TECH_CAMERA: [&str; 2] = ["Follow", "Whole stage"];

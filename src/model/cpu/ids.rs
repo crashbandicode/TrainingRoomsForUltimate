@@ -108,6 +108,8 @@ game_constants! {
     StatusWait = "FIGHTER_STATUS_KIND_WAIT",
     StatusDamage = "FIGHTER_STATUS_KIND_DAMAGE",
     StatusDamageFly = "FIGHTER_STATUS_KIND_DAMAGE_FLY",
+    StatusDamageFlyRoll = "FIGHTER_STATUS_KIND_DAMAGE_FLY_ROLL",
+    StatusDamageFlyMeteor = "FIGHTER_STATUS_KIND_DAMAGE_FLY_METEOR",
     StatusDamageFall = "FIGHTER_STATUS_KIND_DAMAGE_FALL",
     StatusTreadDamage = "FIGHTER_STATUS_KIND_TREAD_DAMAGE",
     StatusTreadFall = "FIGHTER_STATUS_KIND_TREAD_FALL",

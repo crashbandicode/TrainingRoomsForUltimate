@@ -113,10 +113,8 @@ pub(super) fn service() {
         worker.session.cancel();
         EVENTS.drain(|_| ());
         show(&mut worker, "");
-        notices::raise(NOTICE_RAISE, false);
         return;
     }
-    notices::raise(NOTICE_RAISE, true);
     if !READY.load(Ordering::Acquire)
         || !SLOTS_READY.load(Ordering::Acquire)
         || CONFIG.read().is_none()

@@ -6,6 +6,8 @@ change a row. What each row does is on the page's own doc, linked below.
 ![The menu's five pages, then Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked, both fighters' hurtboxes as yellow pills and a neutral air's red hitbox](../media/rc14-menu-tour.gif)<br>
 *The five pages in order; on Display & Controls, Hitbox Visualization opens a checklist: A ticks a row, Down moves, B goes back. Eden, rc.14 (untested on hardware).*
 
+Hitbox Visualization has one colour scheme: red and pink attacks, purple grabs, grey normal hurtboxes, yellow hurtboxes that cannot be hit, green hurtboxes that take no damage, sky-blue windboxes, olive wind areas and white direction lines. Open its checklist with **A** to read the aligned colour key; tick only the families you want. The older menu-tour GIF above predates this palette. [The colour table](../menu/display-and-controls.md#hitbox-visualization) explains each one.
+
 ## Opening and closing
 
 - **B + D-pad Up** opens the menu: hold B, then press Up. It always works and can't be changed.

@@ -49,6 +49,8 @@ pub mod guard;
 pub mod own_patches;
 #[path = "model/hook_stats.rs"]
 pub mod hook_stats;
+#[path = "model/kirby_copy_pair.rs"]
+pub mod kirby_copy_pair;
 #[path = "model/input_adapter.rs"]
 pub mod input_adapter;
 #[path = "model/input_pending.rs"]
@@ -85,6 +87,8 @@ pub mod macro_handoff;
 pub mod menu;
 #[path = "model/menu_shortcuts.rs"]
 pub mod menu_shortcuts;
+#[path = "model/menu_read.rs"]
+pub mod menu_read;
 #[path = "model/migration.rs"]
 pub mod migration;
 #[path = "model/scene.rs"]
@@ -115,6 +119,8 @@ pub mod mashout;
 pub mod practice_games;
 #[path = "model/settings.rs"]
 pub mod settings;
+#[path = "model/tech_settings.rs"]
+pub mod tech_settings;
 #[path = "model/settings_file.rs"]
 pub mod settings_file;
 #[path = "model/sha256.rs"]
@@ -133,6 +139,8 @@ pub mod legend;
 pub mod eggs;
 #[path = "model/btt.rs"]
 pub mod btt;
+#[path = "model/tech/mod.rs"]
+pub mod tech;
 #[path = "model/sites_hitbox.rs"]
 pub mod sites_hitbox;
 #[path = "model/sites_mashout.rs"]
@@ -243,6 +251,28 @@ pub mod drop_ring;
 pub mod box_handoff;
 #[path = "model/owned_ring.rs"]
 pub mod owned_ring;
+/// The test-only reader's export table and line ring (ssbu-hw-bridge).
+#[path = "model/state_export.rs"]
+pub mod state_export;
+#[path = "model/settings_request.rs"]
+pub mod settings_request;
 
 #[path = "model/boot_notices.rs"]
 pub mod boot_notices;
+#[path = "model/notice_box.rs"]
+pub mod notice_box;
+
+/// S0 direct-launch reference; native fidelity is still an explicit DIAG acceptance gate.
+#[path = "model/tech_launch.rs"]
+pub mod tech_launch;
+
+#[path = "model/sites_tech_launch.rs"]
+pub mod sites_tech_launch;
+#[path = "model/sites_tech_surfaces.rs"]
+pub mod sites_tech_surfaces;
+
+#[path = "model/tech_hitlag.rs"]
+pub mod tech_hitlag;
+
+#[path = "model/sites_tech_hitlag.rs"]
+pub mod sites_tech_hitlag;

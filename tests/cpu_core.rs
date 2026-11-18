@@ -10,6 +10,9 @@ macro_rules! lib_unit_tests {
 #[path = "../src/model.rs"]
 #[allow(dead_code)]
 mod model;
+#[path = "../src/runtime/features/cpu_role_adapter.rs"]
+#[allow(dead_code)]
+mod role_adapter;
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
@@ -477,6 +480,72 @@ fn cpu_core_role_table_finds_bodies_by_accessor() {
     assert_eq!(keys.len(), FighterKey::COUNT);
 }
 
+#[test]
+fn tech_receipt_busy_preserves_the_current_owned_generation() {
+    let mut cpu = Cpu::new(CpuSettings::from_snapshot(&Snapshot::factory()), 7);
+    cpu.role_scene(Some(Scene::Lobby));
+    let receipt = cpu.roles.receipt(0).unwrap();
+    let state = hos_lock::Mutex::new(Some(cpu));
+    assert_eq!(role_adapter::try_player_receipt(|| panic!("Busy must not acquire CPU state"), Err(())), Err(()));
+    assert_eq!(state.lock().as_ref().unwrap().roles.receipt(0), Some(receipt));
+    let held = state.lock();
+    assert_eq!(role_adapter::try_player_receipt(|| state.try_lock(), Ok(Some(Scene::Lobby))), Err(()));
+    assert_eq!(held.as_ref().unwrap().roles.receipt(0), Some(receipt));
+    drop(held);
+    assert_eq!(role_adapter::try_player_receipt(|| state.try_lock(), Ok(Some(Scene::Lobby))), Ok(Some(receipt)));
+    assert!(state.lock().as_ref().unwrap().roles.current(receipt));
+    // A known departure, unlike Busy, follows the original receipt invalidation.
+    assert_eq!(role_adapter::try_player_receipt(|| state.try_lock(), Ok(None)), Ok(None));
+    assert!(!state.lock().as_ref().unwrap().roles.current(receipt));
+}
+
+#[test]
+fn tech_init_waits_for_all_eighteen_resolved_ids_and_success() {
+    use model::cpu::tech_init::{Init, STATUS_IDS};
+    let init = Init::new();
+    init.service(|_| panic!("no initializer before resolution"));
+    assert!(!init.ready());
+    let pairs: Vec<_> = STATUS_IDS.iter().map(|&c| (c, 100 + c as i32)).collect();
+    for missing in STATUS_IDS {
+        let partial: Vec<_> = pairs.iter().copied().filter(|(c, _)| *c != missing).collect();
+        assert!(!init.publish(&Table::with(&partial)));
+        init.service(|_| panic!("partial status array must remain unavailable"));
+        assert!(!init.ready());
+    }
+    assert!(init.publish(&Table::with(&pairs)));
+    init.service(|ids| { assert_eq!(ids, STATUS_IDS.map(|c| 100 + c as i32)); Some(()) });
+    assert!(init.ready());
+    init.service(|_| panic!("initializer must run only once"));
+    let failed = Init::new();
+    assert!(failed.publish(&Table::with(&pairs)));
+    failed.service(|_| None);
+    assert!(!failed.ready());
+    failed.service(|_| panic!("failed initialization must remain unavailable"));
+}
+
+#[test]
+fn tech_init_uses_resolved_ids_on_the_existing_nonhook_heartbeat() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let cpu = std::fs::read_to_string(root.join("features/cpu.rs")).unwrap();
+    let boot = std::fs::read_to_string(root.join("boot.rs")).unwrap();
+    let drain = std::fs::read_to_string(root.join("diag_log.rs")).unwrap();
+    let tech = std::fs::read_to_string(root.join("features/tech.rs")).unwrap();
+    let service = &cpu[cpu.find("pub fn service_tech_init()").unwrap()..cpu.find("static CONST_ATTEMPTS").unwrap()];
+    assert!(service.contains("TECH_INIT.service(|ids| unsafe { super::tech::init(ids) })"));
+    assert!(!service.contains("lua_const") && !service.contains("tech_native::id"));
+    assert!(cpu.contains("TECH_INIT.publish(&table);"));
+    assert!(boot.find("set_tick(cpu::service_tech_init)").unwrap() < boot.find("diag_log::start_drain_thread()").unwrap());
+    assert!(drain.contains("OnceLock<fn()>; 4]"));
+    assert_eq!(boot.matches("diag_log::set_tick(").count(), 3);
+    assert!(drain.contains("threads::spawn(crate::model::thread_stacks::ThreadId::Heartbeat"));
+    assert!(drain.contains("for tick in TICKS.iter().filter_map(|slot| slot.get()) {\n                tick();"));
+    let init = &tech[tech.find("pub unsafe fn init(ids: [i32; 18])").unwrap()..tech.find("unsafe fn still_tumbling").unwrap()];
+    assert!(!init.contains("tech_native::id") && !init.contains("lua_const"));
+    let frame = &tech[tech.find("pub unsafe fn frame(fighter").unwrap()..];
+    assert!(frame.find("!super::cpu::TECH_INIT.ready()").unwrap() < frame.find("VIEW.try_lock()").unwrap());
+    assert!(frame.contains("TUMBLE_IDS.get().is_none()"));
+}
+
 /// B4: under the P1 pilot the CPU settings can never write entry 0. The role table is the one place a
 /// body becomes a CPU role (every consumer resolves bodies through it), and `set` refuses entry 0 even
 /// with a current receipt and an AI-operated scene — so nothing downstream can resolve or write it.
@@ -809,4 +878,20 @@ fn eden_package_2_settings_files_parse_without_issues_and_change_the_rows_they_n
         seen += 1;
     }
     assert!(seen >= 10, "the package-2 settings files are missing");
+}
+
+#[test]
+fn tech_init_status_order_preserves_tumble_then_grading() {
+    use model::cpu::tech_init::STATUS_IDS;
+    assert_eq!(&STATUS_IDS[..7], &[
+        C::StatusDamageFly, C::StatusDamageFlyRoll, C::StatusDamageFlyMeteor,
+        C::StatusDamageFlyReflectD, C::StatusDamageFlyReflectU,
+        C::StatusDamageFlyReflectLr, C::StatusDamageFall,
+    ]);
+    assert_eq!(&STATUS_IDS[7..], &[
+        C::StatusPassive, C::StatusPassiveFb, C::StatusDown, C::StatusDamageFlyReflectD,
+        C::StatusPassiveCeil, C::StatusStopCeil, C::StatusDamageFlyReflectU,
+        C::StatusPassiveWall, C::StatusPassiveWallJump, C::StatusStopWall,
+        C::StatusDamageFlyReflectLr,
+    ]);
 }

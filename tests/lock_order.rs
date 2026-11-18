@@ -21,6 +21,8 @@ macro_rules! callgraph_self_tests {
 }
 #[path = "common/callgraph.rs"]
 mod callgraph;
+#[path = "common/tech_callbacks.rs"]
+mod tech_callbacks;
 
 #[path = "../src/model/thread_stacks.rs"]
 #[allow(dead_code)]
@@ -34,7 +36,7 @@ use callgraph::{Graph, Tok};
 const LOCK_METHODS: &[&str] = &["lock", "read", "write"];
 const GUARD_HELPERS: &[&str] = &["lock_write", "lock_read"];
 const WAITS: &[&str] = &["sleep", "park", "park_timeout", "recv", "recv_timeout", "join", "wait", "wait_timeout", "wait_while"];
-const PUBLISHING_ENTRIES: &[&str] = &["published::publish", "menu::apply_kept", "mashout::service"];
+const PUBLISHING_ENTRIES: &[&str] = &["published::publish", "menu::apply_kept", "export::request", "mashout::service"];
 const ALIASES: &[(&str, &str)] = &[("ui/menu_app.rs", "menu"), ("ui/menu_app.rs", "menu_app")];
 
 /// `(function, via)` edges the scan reports that the code does not have, each with the reason (read in the source).
@@ -107,7 +109,7 @@ const FOREIGN_RECEIVERS: &[(&str, &[&str], &str)] = &[
     ("target", &["active", "cycle", "editor", "proof"], "combos::Ui::target is private to ui/combos.rs"),
     (
         "poll",
-        &["JOBS", "adapter", "clock", "detector", "gate", "guard", "model", "queue", "replies", "t"],
+        &["JOBS", "adapter", "clock", "gate", "guard", "model", "queue", "replies", "t"],
         "inline_keyboard::Keyboard is held only as `keyboard`, mii_catalog_request's private Broker only as `broker` \
          (RECEIVER_MODULES); these are engine exchanges and queues, input adapters",
     ),
@@ -203,6 +205,11 @@ impl<'g> Ctx<'g> {
         }
         let Some(all) = self.by_name.get(last) else { return Vec::new() };
         if call.method {
+            if call.receiver.as_deref().is_some_and(|receiver| {
+                self.graph.foreign_static_receiver(f, receiver) || self.graph.foreign_guard_receiver(f, receiver)
+            }) {
+                return Vec::new();
+            }
             let methods: Vec<usize> = all.iter().copied().filter(|&c| self.graph.funcs[c].has_receiver).collect();
             if methods.len() == 1 {
                 return if methods[0] != from { methods } else { Vec::new() };
@@ -683,7 +690,11 @@ fn scan(graph: &Graph) -> (Ctx<'_>, Scan) {
 
 fn scan_mode(graph: &Graph, include_try: bool) -> (Ctx<'_>, Scan) {
     let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
-    let ctx = Ctx::new(graph, static_locks(&runtime));
+    scan_with_locks(graph, static_locks(&runtime), include_try)
+}
+
+fn scan_with_locks(graph: &Graph, locks: Vec<(String, String)>, include_try: bool) -> (Ctx<'_>, Scan) {
+    let ctx = Ctx::new(graph, locks);
     let n = graph.funcs.len();
     let mut s = Scan {
         takes: (0..n).map(|f| takes_mode(&ctx, f, include_try)).collect(),
@@ -723,6 +734,9 @@ fn scan_mode(graph: &Graph, include_try: bool) -> (Ctx<'_>, Scan) {
         if f.attrs.contains("skyline::hook") {
             entries.push((vec![i], "game-hook".to_owned()));
         }
+    }
+    for key in game_root_keys() {
+        entries.push((graph.find(key), "game-hook".to_owned()));
     }
     for (key, name, module) in plugin_entries() {
         let found = entry_starts(graph, &key, &module);
@@ -975,6 +989,15 @@ const GAME_ENTRIES: &[&str] = &[
     "probe::mounted",
 ];
 
+/// Staged game-thread passes are audited even before their native callback is
+/// bound. They are not claims of a registered handoff: GAME_ENTRIES stays the
+/// exact callback inventory checked by every_function_handed_to_the_game_is_listed.
+const STAGED_GAME_ROOTS: &[&str] = &["tech::frame"];
+
+fn game_root_keys() -> impl Iterator<Item = &'static str> {
+    GAME_ENTRIES.iter().chain(STAGED_GAME_ROOTS).copied()
+}
+
 /// Functions whose address is handed out (`extern "C"`, `as *const ()`) that are not game entry points, and why.
 const NOT_GAME_ENTRIES: &[(&str, &str)] = &[
     ("imp::detached", "a plugin thread's start (runtime::threads); its thread is walked from model::thread_stacks"),
@@ -997,7 +1020,13 @@ const NOT_GAME_ENTRIES: &[(&str, &str)] = &[
     ("combo::tr_combo_fighter_v1", "a trace-point anchor our own code calls (its callers are walked)"),
     ("notices::tr_intro_posted_v1", "a trace-point anchor our own code calls (its callers are walked)"),
     ("worker::tr_cycle_badges_v1", "a trace-point anchor our own code calls (its callers are walked)"),
+    ("export::training_rooms_state_export_v1", BRIDGE_CALL),
+    ("export::subscribe", BRIDGE_CALL),
+    ("export::request", "the hardware bridge's request, on the bridge's own thread: walked as a plugin entry (PUBLISHING_ENTRIES)"),
 ];
+
+/// The test-only hardware bridge calls these from its own plugin thread (state export v1), never from a game hook.
+const BRIDGE_CALL: &str = "called by the hardware bridge on its own thread (runtime::export); takes no lock";
 
 /// Listed entries the call graph does not contain, and why (docs lane review R2, finding 5: a key that resolves to nothing is not
 /// skipped silently). Every other `GAME_ENTRIES` key and every plugin entry resolves (`every_listed_entry_resolves`).
@@ -1028,6 +1057,11 @@ const MODEL_CALLBACKS: &[(&str, &str)] = &[
     ("hitbox::frame", "hitbox::read_u64"),
     ("hitbox::frame", "hitbox::read_f32"),
     ("hitbox::frame", "hitbox::motion"),
+    // BTT and Eggs-ercise share the model planner through object_hits' AttackReader.
+    ("hitbox::object_hits", "hitbox::active"),
+    ("hitbox::object_hits", "hitbox::data"),
+    ("hitbox::object_hits", "hitbox::read_u64"),
+    ("hitbox::object_hits", "hitbox::read_f32"),
     // rc.14 spots: the frame strip reads both fighters' attack slots through the same reader (hitbox::powers).
     ("input_display::sample", "hitbox::active"),
     ("input_display::sample", "hitbox::data"),
@@ -1086,7 +1120,7 @@ fn callback_edges(graph: &Graph) -> Vec<(usize, usize)> {
             }
         }
     }
-    for (from, to) in MODEL_CALLBACKS {
+    for (from, to) in MODEL_CALLBACKS.iter().chain(tech_callbacks::EDGES) {
         for a in graph.find(from) {
             out.extend(graph.find(to).into_iter().map(|b| (a, b)));
         }
@@ -1213,7 +1247,7 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
         seen
     };
     let mut hooks: Vec<usize> = (0..n).filter(|&f| graph.funcs[f].attrs.contains("skyline::hook")).collect();
-    hooks.extend(GAME_ENTRIES.iter().flat_map(|key| graph.find(key)));
+    hooks.extend(game_root_keys().flat_map(|key| graph.find(key)));
     let mut out = Shared {
         game_waits: BTreeMap::new(),
         game_hooks: BTreeMap::new(),
@@ -1250,7 +1284,7 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
 /// `artifacts/phase23/TASK-OPUS-rc6-lockfree.md`): no lock that a game entry point waits on is held by a plugin thread. There is no
 /// exception: no list of locks shared on purpose, no hooks excepted because a run measured them on MainThread
 /// (`artifacts/phase23/hook-threads/TABLE.md` keeps those measurements). It walks the shipped build and the diag build (the Eden
-/// runs': its own modules, threads and hooks too), every `#[skyline::hook]` and `GAME_ENTRIES`, the callback tables and bare-name
+/// runs': its own modules, threads and hooks too), every `#[skyline::hook]`, `GAME_ENTRIES` and `STAGED_GAME_ROOTS`, the callback tables and bare-name
 /// function values; `the_shared_lock_check_sees_a_seeded_hazard` runs the same predicate on a seeded fixture.
 #[test]
 fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
@@ -1279,6 +1313,45 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// A camera mutex is forbidden even if no plugin thread holds it. Seed the real callbacks and require the normal
+/// game-entry walk to find each wait from cpu::on_frame; a disconnected camera callback cannot make this test pass.
+#[test]
+fn btt_camera_is_lock_free_and_cpu_frame_reaches_seeded_camera_waits() {
+    let mut graph = runtime_graph();
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut locks = static_locks(&runtime);
+    let camera = ("features/btt_camera.rs".to_owned(), "CAMERA".to_owned());
+    if !locks.contains(&camera) {
+        locks.push(camera.clone());
+    }
+    let camera_lock = locks.iter().position(|lock| lock == &camera).unwrap();
+    let callbacks: Vec<usize> = ["btt_camera::apply", "btt_camera::request", "btt_camera::frame"].iter().map(|entry| {
+        let found = graph.find(entry);
+        assert_eq!(found.len(), 1, "camera callback {entry}");
+        found[0]
+    }).collect();
+    {
+        let (ctx, scan) = scan_with_locks(&graph, locks.clone(), false);
+        for &at in &callbacks {
+            let reached: Vec<String> = scan.reach[at].iter().map(|&lock| lock_name(&ctx, lock)).collect();
+            assert!(reached.is_empty(), "{} reaches blocking locks: {reached:?}", graph.funcs[at].key());
+        }
+    }
+    for at in callbacks {
+        let original = graph.funcs[at].body.clone();
+        graph.funcs[at].body.extend(callgraph::lex("CAMERA.lock();"));
+        {
+            let (ctx, scan) = scan_with_locks(&graph, locks.clone(), false);
+            assert!(scan.reach[at].contains(&camera_lock), "camera lock seed was not parsed");
+            let shared = shared_locks(&ctx, &scan);
+            let want = format!("{} (hook cpu::on_frame)", graph.funcs[at].key());
+            assert!(shared.game_waits.get(&camera_lock).is_some_and(|waits| waits.contains(&want)),
+                    "CPU frame did not reach the camera seed: {want}");
+        }
+        graph.funcs[at].body = original;
+    }
 }
 
 /// The diag build's call graph (`runtime_graph` plus the `#[cfg(feature = "diag")]` modules).
@@ -1547,6 +1620,9 @@ fn the_native_service_poll_is_walked_from_its_dispatch() {
 #[test]
 fn every_listed_entry_resolves() {
     let graph = runtime_graph();
+    for key in STAGED_GAME_ROOTS {
+        assert!(!graph.find(key).is_empty(), "staged game root {key} resolves to no function");
+    }
     let unscanned = |key: &str| UNSCANNED_ENTRIES.iter().any(|(k, _)| *k == key);
     let mut keys: Vec<(String, Vec<usize>)> = GAME_ENTRIES.iter().map(|k| ((*k).to_owned(), graph.find(k))).collect();
     for (key, _, module) in plugin_entries() {
@@ -1605,6 +1681,9 @@ fn the_callback_edges_cover_the_capability_scan() {
         callback_edges(&graph).into_iter().map(|(a, b)| (graph.funcs[a].key(), graph.funcs[b].key())).collect();
     for want in [("hud::run", "hud_draw::draw"), ("hud::run", "hitbox::draw_orbs"), ("diag_log::start_drain_thread", "p1::service")] {
         assert!(edges.contains(&(want.0.to_owned(), want.1.to_owned())), "{want:?} not followed: {edges:?}");
+    }
+    for &(from,to) in tech_callbacks::EDGES {
+        assert!(edges.contains(&(from.to_owned(),to.to_owned())), "Tech callback not followed: {from} -> {to}");
     }
     let text = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/capabilities.rs")).unwrap();
     let start = text.find("fn new() -> Analysis").expect("capabilities.rs Analysis::new");
@@ -1695,6 +1774,251 @@ fn the_shared_lock_check_sees_a_seeded_hazard() {
     assert!(hazards.contains("EDITED"), "the game-thread impl of a typed read waits on EDITED, the plugin one holds it: {hazards:?}");
     assert!(!hazards.contains("PUBLISHING"), "only the plugin impl takes PUBLISHING: {hazards:?}");
     assert!(hazards.contains("ROLES"), "one lock of a static array, taken by index on both sides: {hazards:?}");
+}
+
+#[test]
+fn tech_frame_is_a_game_root_before_binding_and_reaches_seeded_helper_lock() {
+    let mut graph = runtime_graph();
+    assert!(STAGED_GAME_ROOTS.contains(&"tech::frame"));
+    assert!(!GAME_ENTRIES.contains(&"tech::frame"), "an unbound staged root is not a registered callback");
+    let roots = graph.find("tech::frame");
+    assert_eq!(roots.len(), 1);
+    let helper = graph.find("tech::still_tumbling")[0];
+    // No launch binding or native hook registration is needed to audit this pass.
+    graph.funcs[roots[0]].body = callgraph::lex("still_tumbling(0);");
+    graph.funcs[helper].body = callgraph::lex("VIEW.lock();");
+    let (ctx, s) = scan(&graph);
+    let shared = shared_locks(&ctx, &s);
+    let view = ctx.locks.iter().position(|(file, name)| file == "features/tech.rs" && name == "VIEW").unwrap();
+    assert!(s.roles[helper].contains("game-hook"), "Tech helper lost its game-thread role");
+    assert!(shared.game_hooks.get(&view).is_some_and(|hooks| hooks.contains("tech::frame")),
+        "reachable blocking VIEW seed escaped game-root inventory");
+}
+
+#[test]
+fn statics_use_their_declared_foreign_or_runtime_receiver_type() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/lock_order_receiver");
+    let mut graph = Graph::scan(&dir, &[]);
+    graph.precise_imports = true;
+    let ctx = Ctx::new(&graph, Vec::new());
+    let reset = graph.find("lua_vm::reset")[0];
+    for (root, expected) in [
+        ("worker::foreign_static", false), ("worker::runtime_static", true), ("worker::unresolved_static", true),
+        ("worker::foreign_guard", false), ("worker::runtime_guard", true), ("worker::unresolved_guard", true),
+    ] {
+        let from = graph.find(root)[0];
+        let targets: BTreeSet<_> = calls(&graph.funcs[from].body).iter().flat_map(|call| ctx.resolve(from, call)).collect();
+        assert_eq!(targets.contains(&reset), expected, "{root}: {targets:?}");
+    }
+}
+
+/// Strict root-to-EDITED check using the same resolver, typed-static, callback
+/// and thread-dispatch treatment as the shared-lock inventory above.
+fn menu_edit_wait_path(graph: &Graph, root: usize) -> Option<Vec<String>> {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let ctx = Ctx::new(graph, static_locks(&dir));
+    let edited = ctx.locks.iter().position(|(file, name)| file == "compat/menu.rs" && name == "EDITED").expect("EDITED lock");
+    let mut edges: Vec<Vec<(usize, usize)>> = (0..graph.funcs.len()).map(|f| {
+        let mut edges: Vec<_> = calls(&graph.funcs[f].body).iter()
+            .flat_map(|call| ctx.resolve(f, call).into_iter().map(move |to| (call.at, to))).collect();
+        edges.extend(typed_static_callees(graph, f));
+        edges
+    }).collect();
+    for (from, to) in callback_edges(graph) { edges[from].push((0, to)); }
+    for (from, at, to) in value_edges(graph) { edges[from].push((at, to)); }
+    let mut queue = std::collections::VecDeque::from([(root, vec![graph.funcs[root].key()])]);
+    let mut seen = BTreeSet::new();
+    while let Some((f, path)) = queue.pop_front() {
+        if !seen.insert(f) { continue; }
+        if takes(&ctx, f).iter().any(|take| take.lock == edited && on_this_thread(graph, f, take.at, false)) {
+            return Some(path);
+        }
+        for &(at, to) in &edges[f] {
+            if on_this_thread(graph, f, at, false) {
+                let mut next = path.clone();
+                next.push(graph.funcs[to].key());
+                queue.push_back((to, next));
+            }
+        }
+    }
+    None
+}
+
+#[test]
+fn layout_menu_reads_are_nonblocking_and_a_blocking_edit_seed_fails() {
+    let mut graph = runtime_graph();
+    let one = |g: &Graph, file: &str, key: &str| {
+        let found: Vec<_> = g.find(key).into_iter().filter(|&i| g.funcs[i].file == file).collect();
+        assert_eq!(found.len(), 1, "{file}::{key}");
+        found[0]
+    };
+    let roots = [
+        ("features/hitbox.rs", "hitbox::draw_orbs"),
+        ("features/hud_draw.rs", "hud_draw::draw"),
+        ("ui/native_pause.rs", "native_pause::observe"),
+        ("ui/tick.rs", "tick::tick"),
+    ];
+    for (file, key) in [
+        ("features/hitbox.rs", "hitbox::frame"),
+        ("features/hitbox.rs", "hitbox::eggs_pass"),
+        ("features/btt.rs", "btt::poll"),
+        ("features/btt.rs", "btt::pass"),
+        ("features/btt.rs", "btt::look"),
+    ] {
+        assert_eq!(menu_edit_wait_path(&graph, one(&graph, file, key)), None, "{key} waits on EDITED");
+    }
+    for (file, key) in roots {
+        assert_eq!(menu_edit_wait_path(&graph, one(&graph, file, key)), None, "{key} waits on EDITED");
+        let body = &graph.funcs[one(&graph, file, key)].body;
+        let read = body.iter().position(|t| *t == Tok::Ident("try_requested".into())).expect("fallible request");
+        let defer = body[read..].iter().position(|t| *t == Tok::Ident("return".into())).expect("Busy defers") + read;
+        for mutation in match key {
+            "hitbox::draw_orbs" => &["RUN", "ORB_PANES"][..],
+            "hud_draw::draw" => &["CONTAINERS"][..],
+            "native_pause::observe" => &["retire_pause_layout", "native_pause_sample"][..],
+            _ => &["renderer_lost", "set_visible"][..],
+        } {
+            assert!(defer < body.iter().position(|t| *t == Tok::Ident((*mutation).into())).unwrap(), "{key}: Busy mutates {mutation}");
+        }
+        if key == "tick::tick" {
+            assert!(body.iter().position(|t| *t == Tok::Ident("REGISTRATIONS".into())).unwrap() < read,
+                "deferred registration must invalidate old pane lifetimes");
+        }
+    }
+    let facts = &graph.funcs[one(&graph, "ui/facts.rs", "facts::try_publish_scene_facts")].body;
+    assert!(facts.iter().position(|t| *t == Tok::Ident("try_context".into())).unwrap()
+        < facts.iter().position(|t| *t == Tok::Ident("publish_scene_context".into())).unwrap(),
+        "unavailable context must not publish a false scene departure");
+    let publish = &graph.funcs[one(&graph, "ui/facts.rs", "facts::publish_scene_context")].body;
+    assert!(publish.iter().any(|t| *t == Tok::Ident("SCENE_ENABLED".into())));
+    let after = &graph.funcs[one(&graph, "macros/mod.rs", "macros::after_layout_draw")].body;
+    let admission = after.iter().position(|t| *t == Tok::Ident("try_publish_scene_facts".into())).unwrap();
+    let step = after.iter().position(|t| *t == Tok::Ident("post_clip_draw".into())).unwrap();
+    assert!(after[admission..step].iter().any(|t| *t == Tok::Ident("return".into())),
+        "Busy must defer clip stepping as well as fact publication");
+    let read = one(&graph, "compat/menu.rs", "menu::try_current_menu");
+    let at = graph.funcs[read].body.iter().position(|t| *t == Tok::Ident("try_lock".into())).expect("actual read uses try_lock");
+    graph.funcs[read].body[at] = Tok::Ident("lock".into());
+    for (file, key) in roots {
+        let witness = menu_edit_wait_path(&graph, one(&graph, file, key)).expect("seed must FAIL the same root check");
+        assert_eq!(witness.first().unwrap(), key);
+        assert_eq!(witness.last().unwrap(), "menu::try_current_menu");
+        assert!(witness.iter().any(|key| key == "lobby::try_requested"), "{witness:?}");
+    }
+    // Restore the reader and seed the exact card's direct requested edge at each
+    // changed root. It must still fail, independently of the try_lock mutation.
+    graph.funcs[read].body[at] = Tok::Ident("try_lock".into());
+    for (file, key) in roots {
+        let root = one(&graph, file, key);
+        let at = graph.funcs[root].body.iter().position(|t| *t == Tok::Ident("try_requested".into())).unwrap();
+        graph.funcs[root].body[at] = Tok::Ident("requested".into());
+        let witness = menu_edit_wait_path(&graph, root).expect("original card requested edge must FAIL");
+        assert_eq!(witness.last().unwrap(), "menu::current_menu");
+        graph.funcs[root].body[at] = Tok::Ident("try_requested".into());
+    }
+}
+
+#[test]
+fn tech_receipt_roots_do_not_wait_on_edits_and_busy_preserves_ownership() {
+    let mut graph = runtime_graph();
+    let one = |g: &Graph, file: &str, key: &str| {
+        let found: Vec<_> = g.find(key).into_iter().filter(|&i| g.funcs[i].file == file).collect();
+        assert_eq!(found.len(), 1, "{file}::{key}");
+        found[0]
+    };
+    let roots = [
+        ("features/tech.rs", "tech::frame"),
+        ("features/tech_adapter.rs", "tech_adapter::attempt"),
+        ("features/tech_adapter.rs", "tech_adapter::frame"),
+        ("features/cpu.rs", "cpu::tech_player_receipt"),
+    ];
+    for (file, key) in roots {
+        assert_eq!(menu_edit_wait_path(&graph, one(&graph, file, key)), None, "{key} waits on EDITED");
+    }
+    let read = one(&graph, "compat/menu.rs", "menu::try_current_menu");
+    let at = graph.funcs[read].body.iter().position(|t| *t == Tok::Ident("try_lock".into())).unwrap();
+    graph.funcs[read].body[at] = Tok::Ident("lock".into());
+    for (file, key) in roots {
+        let witness = menu_edit_wait_path(&graph, one(&graph, file, key)).expect("seeded blocking edit must FAIL the complete Tech root");
+        assert!(witness.iter().any(|key| key == "practice::try_context"), "{witness:?}");
+        assert!(witness.iter().any(|key| key == "cpu::try_role_scene"), "{witness:?}");
+        assert_eq!(witness.last().unwrap(), "menu::try_current_menu");
+    }
+    let source = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime/features/tech_adapter.rs")).unwrap();
+    assert!(source.contains(".map_err(|_| Error::Busy)?"), "receipt unavailability must stay Busy");
+    assert!(source.contains("Err(Error::Busy) => return Err(Error::Busy)"), "attempt must retain ownership on Busy");
+    let frame = &source[source.find("pub(super) unsafe fn frame(").unwrap()..];
+    let busy = frame.find("if fresh == Err(Error::Busy)").unwrap();
+    let retire = frame.find("*slot = None;").unwrap();
+    assert!(busy < retire && frame[busy..retire].contains("return;"), "frame must defer Busy before retiring its lease");
+    assert!(source.contains("receipt == owned.receipt && accessor == owned.accessor_token"), "fresh success must preserve both identity checks");
+}
+
+#[test]
+fn frame_fact_publication_defers_busy_before_any_mutation() {
+    let graph = runtime_graph();
+    let one = |key: &str| {
+        let found = graph.find(key);
+        assert_eq!(found.len(), 1, "{key}");
+        &graph.funcs[found[0]].body
+    };
+    let preflight = callgraph::lex("let Ok(context) = crate::runtime::lobby::training::practice::try_context() else { return; }; let Ok(active) = crate::runtime::lobby::training::lobby::try_active() else { return; };");
+    let frame = one("facts::publish_frame_facts");
+    assert!(frame.starts_with(&preflight), "Busy must return before lease acquisition, scene flags, timestamp, counters or native frame reads");
+    assert!(!calls(frame).iter().any(|call| call.segments.last().is_some_and(|name| matches!(name.as_str(), "active" | "acquire"))),
+        "frame facts must use the preflight context and active values");
+    assert!(one("named_macros::hold_panel_fighter").starts_with(&callgraph::lex("let Ok(context) = practice::try_context() else { return; };")),
+        "panel contention must defer before stop-owner changes");
+    assert!(one("replay_preview::after_frame").starts_with(&callgraph::lex("let Ok(enabled) = practice::try_enabled() else { return; };")),
+        "preview contention must defer before session changes");
+    for key in ["named_macros::service_character_request", "replay_capture::service_reload_request", "recording_host::service_switch_request"] {
+        assert!(one(key).starts_with(&callgraph::lex("let Ok(context) = crate::runtime::roster::character_roster::try_cpu_request_context() else { return; };")),
+            "{key}: Busy must return before any request drain or result publication");
+    }
+    for key in ["practice::acquire_in", "practice::panel_entry_in", "practice::role_in", "practice::entries", "practice::enabled_in"] {
+        assert!(!calls(one(key)).iter().any(|call| call.segments.last().is_some_and(|name| matches!(name.as_str(), "context" | "entry" | "enabled"))),
+            "{key} must not re-read eligibility after a current context was supplied");
+    }
+}
+
+#[test]
+fn macro_frame_menu_reads_are_nonblocking_and_blocking_edit_seeds_fail() {
+    let mut graph = runtime_graph();
+    let one = |g: &Graph, key: &str| {
+        let found = g.find(key);
+        assert_eq!(found.len(), 1, "{key}");
+        found[0]
+    };
+    let root = one(&graph, "macros::frame_after");
+    assert_eq!(menu_edit_wait_path(&graph, root), None, "complete macro frame root waits on EDITED");
+    let read = one(&graph, "menu::try_current_menu");
+    let at = graph.funcs[read].body.iter().position(|t| *t == Tok::Ident("try_lock".into())).unwrap();
+    graph.funcs[read].body[at] = Tok::Ident("lock".into());
+    let witness = menu_edit_wait_path(&graph, root).expect("blocking EDITED seed must fail complete macro root");
+    assert_eq!(witness.last().unwrap(), "menu::try_current_menu");
+    graph.funcs[read].body[at] = Tok::Ident("try_lock".into());
+    let facts = one(&graph, "facts::publish_frame_facts");
+    let original = graph.funcs[facts].body.clone();
+    for seed in ["crate::runtime::lobby::training::lobby::active();", "crate::runtime::lobby::training::practice::acquire();"] {
+        graph.funcs[facts].body = callgraph::lex(seed);
+        let witness = menu_edit_wait_path(&graph, root).expect("original blocking fact read must fail complete macro root");
+        assert!(witness.iter().any(|key| key == "facts::publish_frame_facts"), "{witness:?}");
+        assert_eq!(witness.last().unwrap(), "menu::current_menu");
+    }
+    graph.funcs[facts].body = original;
+    for (key, safe, blocking) in [
+        ("named_macros::hold_panel_fighter", "panel_entry_in", "panel_entry"),
+        ("replay_preview::after_frame", "try_enabled", "enabled"),
+        ("replay_capture::browser_needs_native_update", "role_in", "role"),
+        ("mii_backend::ready_with", "current_with", "current"),
+    ] {
+        let f = one(&graph, key);
+        let at = graph.funcs[f].body.iter().position(|t| *t == Tok::Ident(safe.into())).unwrap();
+        graph.funcs[f].body[at] = Tok::Ident(blocking.into());
+        let witness = menu_edit_wait_path(&graph, root).expect("original pre-facts blocking read must fail macro root");
+        assert!(witness.iter().any(|step| step == key), "{witness:?}");
+        graph.funcs[f].body[at] = Tok::Ident(safe.into());
+    }
 }
 
 /// The scan on a small fixture: a guard bound by `let` and held over a call, a temporary held over its statement, a

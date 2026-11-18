@@ -185,7 +185,7 @@ pub(crate) fn menu_close(pending: Option<PendingSelection>) {
 
 /// A captured saved-original same-class origin cannot leave for an unqualified ordinary→Mii return.
 /// Its Player cycle is exactly slot0 → selected distinct saved Mii → slot0.
-pub(super) fn intercept(roster_role: Role, selection: Selection) -> Option<bool> {
+pub(super) fn intercept_with(roster_role: Role, selection: Selection, read_menu: impl Fn() -> TrainingModpackMenu) -> Option<bool> {
     if !ENABLED.load(Ordering::Acquire) {
         // The feature adds saved-Mii roster values, but a failed native contract must never
         // forward that value (or strand a native saved origin) through the ordinary loader.
@@ -215,7 +215,7 @@ pub(super) fn intercept(roster_role: Role, selection: Selection) -> Option<bool>
         && matches!(selection, Selection::Cycle)
         && owner.state.phase() == Phase::Ready
         && (owner.cycled
-            || setting(&MENU)
+            || read_menu()
                 .player_roster
                 .fighters()
                 .iter()

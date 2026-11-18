@@ -20,6 +20,8 @@ macro_rules! callgraph_self_tests {
 }
 #[path = "common/callgraph.rs"]
 mod callgraph;
+#[path = "common/tech_callbacks.rs"]
+mod tech_callbacks;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -44,6 +46,18 @@ struct Boundary {
 }
 
 const BOUNDARIES: &[Boundary] = &[
+    // Optional Stage tech owns all adapter native calls. These are real first-condition
+    // checks of the flag boot sets only after its complete closure passed.
+    Boundary { function: "tech::frame", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::frame", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::di_before", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::pending_decision", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::confirm_decision", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::decision", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::place", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::launch", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::restore", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::attempt", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     // The save-state step of the per-fighter frame wrapper: a no-op until boot activates package 3.
     Boundary { function: "states::frame", owner: Some(Feature::StateCore), gate: Gate::Flag("ACTIVE") },
     // The frame wrapper's per-feature facts and appliers: each checks its feature's install flag first.
@@ -99,6 +113,10 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "mashout::seed_token", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
     Boundary { function: "mashout::seed_after", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
     Boundary { function: "mashout::owns_cpu", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
+    Boundary { function: "btt_camera::request", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
+    Boundary { function: "btt_camera::frame", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
+    Boundary { function: "btt::frame", owner: Some(Feature::Hitbox), gate: Gate::Flag("USABLE") },
+    Boundary { function: "btt_projectiles::hit", owner: Some(Feature::BttProjectiles), gate: Gate::Flag("READY") },
 ];
 
 /// Every entry point that is not a `#[skyline::hook]` function, with its install unit.
@@ -157,12 +175,16 @@ impl Analysis {
         // `model::seams`, `seam_install::gate`) and are not part of this model; what they call through `game::natives` and
         // `state_natives` is still behind the grant check.
         let mut graph = Graph::scan(&root.join("src/runtime"), &["lobby", "mii", "roster", "seams"]);
+        graph.dynamic.extend(tech_callbacks::EDGES.iter().map(|&(from,to)| (from.to_owned(),to.to_owned())));
         // Function-pointer tables the text cannot show: the layout tick runs the registered draw callbacks.
         graph.dynamic.push(("hud::run".to_owned(), "hud_draw::draw".to_owned()));
         graph.dynamic.push(("hud::run".to_owned(), "hitbox::draw_orbs".to_owned()));
         // The shared production planner calls the runtime's AttackReader too (a fighter's pass and its articles').
         for to in ["hitbox::active", "hitbox::data", "hitbox::read_u64", "hitbox::read_f32", "hitbox::motion"] {
             graph.dynamic.push(("hitbox::frame".to_owned(), to.to_owned()));
+        }
+        for to in ["hitbox::active", "hitbox::data", "hitbox::read_u64", "hitbox::read_f32"] {
+            graph.dynamic.push(("hitbox::object_hits".to_owned(), to.to_owned()));
         }
         // rc.14 spots: the frame strip reads each fighter's attack slots through the same reader (hitbox::powers).
         for to in ["hitbox::active", "hitbox::data", "hitbox::read_f32"] {
@@ -575,6 +597,156 @@ fn the_install_line_names_the_row_that_blocked_a_feature() {
     assert!(line.contains(" cpu_mash=not_installed reason=site:motion_kind "), "{line}");
 }
 
+#[test]
+fn optional_tech_poison_preserves_existing_features() {
+    use model::install_line::{FeatureReport, InstallLine};
+    for poison in ["tech_cos", "tech_magnitude", "state_set_sleep", "tech_guard_count"].into_iter()
+        .chain(model::sites_tech_surfaces::SITES.iter().map(|row| row.name))
+        .chain(model::sites_tech_hitlag::SITES.iter().map(|row| row.name)) {
+        let row = capabilities::find(poison).expect("poison names a real guarded row");
+        let usable = |s: &model::sites::Site| s.name != poison;
+        for unit in [Feature::CpuCore, Feature::CpuCommon, Feature::Hitbox] {
+            assert!(capabilities::unit_usable(unit, &usable), "{poison} disabled {}", unit.name());
+        }
+        assert!(!Granted::from_usable(&usable).allows(row.offset));
+        let site = capabilities::blocked_by(Feature::TechPractice, &usable);
+        assert_eq!(site, Some(poison));
+        let report = FeatureReport { feature: Feature::TechPractice.name(), installed: false, reason: None, site };
+        let line = InstallLine {
+            tick: 1, version: "test", display: b"13.0.5", build_id: None,
+            verdict: model::version::Verdict::Supported, sites: &[], features: &[report],
+            seams: None, developer: None, settings: None, migration: None, heap_allocations: Some(0),
+        }.to_string();
+        assert!(line.contains(&format!(" tech_practice=not_installed reason=site:{poison} ")), "{line}");
+    }
+}
+
+#[test]
+fn ui_tech_frame_is_once_after_adapter_and_independent_of_hitbox() {
+    let a = Analysis::new();
+    let frame = a.graph.find("cpu::on_frame")[0];
+    let body = &a.graph.funcs[frame].body;
+    let position = |snippet: &str| {
+        let wanted = callgraph::lex(snippet);
+        let positions: Vec<_> = body.windows(wanted.len()).enumerate()
+            .filter_map(|(i, w)| (w == wanted.as_slice()).then_some(i)).collect();
+        assert_eq!(positions.len(), 1, "one dispatch: {snippet}");
+        positions[0]
+    };
+    let hitbox = position("unsafe { crate::runtime::features::hitbox::frame(a0) };");
+    let adapter = position("unsafe { super::tech_adapter::frame(a0, receipt) };");
+    let ui = position("unsafe { crate::runtime::features::tech::frame(a0) };");
+    assert!(hitbox < adapter && adapter < ui);
+    // The calls are sibling statements: no Hitbox condition encloses either Tech pass.
+    // Checking the complete interval also rejects a newly inserted early return.
+    assert_eq!(&body[adapter..ui], callgraph::lex("unsafe { super::tech_adapter::frame(a0, receipt) };"));
+    assert_eq!(&body[hitbox..adapter], callgraph::lex("unsafe { crate::runtime::features::hitbox::frame(a0) };"));
+    let (_, reached) = a.reach(frame);
+    assert!(reached.contains("tech::frame"));
+    let boundary = BOUNDARIES.iter().find(|b| b.function == "tech::frame").unwrap();
+    assert_eq!(boundary.owner, Some(Feature::TechPractice));
+    assert_eq!(boundary.gate, Gate::Flag("tech_ready"));
+    let hitbox_only = model::sites_hitbox::SITES.iter()
+        .find(|row| row.name == "hitbox_attack").unwrap();
+    let usable = |row: &model::sites::Site| row.name != hitbox_only.name;
+    assert!(!capabilities::unit_usable(Feature::Hitbox, &usable));
+    assert!(capabilities::unit_usable(Feature::TechPractice, &usable), "Hitbox refusal must leave the Tech frame admitted");
+    let usable = |row: &model::sites::Site| row.name != "tech_cos";
+    assert!(!capabilities::unit_usable(boundary.owner.unwrap(), &usable), "tech_ready must stay false when its closure is refused");
+    let tech = &a.graph.funcs[a.graph.find("tech::frame")[0]].body;
+    let first = callgraph::lex("if !super::tech_adapter::tech_ready() { return; }");
+    assert!(tech.starts_with(&first), "refused Tech returns before any UI/native work");
+}
+
+#[test]
+fn surface_rows_are_registered_through_boot() {
+    let boot = include_str!("../src/runtime/boot.rs");
+    for step in [
+        "game::outcomes(&crate::model::sites_tech_surfaces::SITES)",
+        "crate::model::sites_tech_surfaces::SITES.iter().zip(tech_surfaces_found.iter_mut())",
+        "by_name(&crate::model::sites_tech_surfaces::SITES, &tech_surfaces_found)",
+        "crate::model::sites_tech_surfaces::SITES.iter().zip(tech_surfaces_found.iter())",
+        "crate::model::sites_tech_surfaces::SITES.iter().any(|row| row.name == name)",
+    ] {
+        assert!(boot.contains(step), "missing boot surface pipeline step: {step}");
+    }
+    let granted = Granted::from_usable(&|_| true);
+    for row in &model::sites_tech_surfaces::SITES {
+        assert!(capabilities::all_sites().any(|registered| registered.name == row.name));
+        assert!(granted.allows(row.offset), "stock surface row {} was not granted", row.name);
+    }
+}
+
+#[test]
+fn tech_stage_and_kind_dependencies_are_admission_requirements() {
+    let needed = capabilities::CROSS_NEEDS.iter()
+        .find(|(unit, _)| *unit == Feature::TechPractice).unwrap().1;
+    for name in ["camera_limit_range", "stage_id_call", "utility_get_kind"] {
+        assert!(needed.contains(&name), "actual Tech frame dependency {name}");
+        let row = capabilities::find(name).expect("existing guarded native");
+        let usable = |site: &model::sites::Site| site.name != name;
+        assert_eq!(capabilities::blocked_by(Feature::TechPractice, &usable), Some(name));
+        assert!(!capabilities::unit_usable(Feature::TechPractice, &usable));
+        assert!(!Granted::from_usable(&usable).allows(row.offset));
+    }
+}
+
+#[test]
+fn contact_query_requires_both_installed_observer_prerequisites() {
+    let a = Analysis::new();
+    let body = |key: &str| a.graph.funcs[a.graph.find(key)[0]].body.clone();
+    assert_eq!(body("cpu_common::contact_ready"), callgraph::lex(
+        "ORIGINAL_CHANGE_STATUS.load(Ordering::Acquire) != 0 && IS_ENABLE_PASSIVE.load(Ordering::Acquire) != 0"
+    ));
+    let query = body("tech_adapter::attempt");
+    let required = callgraph::lex("if !super::cpu_common::contact_ready() { return Err(Error::Guards); }");
+    let at = query.windows(required.len()).position(|w| w == required.as_slice()).expect("query refuses unavailable provider");
+    let ownership = query.iter().position(|t| matches!(t, Tok::Ident(s) if s == "OWNED")).unwrap();
+    assert!(at < ownership, "provider refusal precedes ownership/native reads");
+    assert!(!query.iter().any(|t| matches!(t, Tok::Ident(s) if s == "DECISION_OBSERVER" || s == "decision_observer_ready")), "contact query does not require optional UI recorder");
+    for key in ["tech_adapter::place", "tech_adapter::launch"] {
+        assert!(!body(key).iter().any(|t| matches!(t, Tok::Ident(s) if s == "contact_ready")), "observer installation is not launch admission");
+    }
+}
+
+#[test]
+fn decision_recorder_runs_after_ownership_release_on_first_contact_only() {
+    let a = Analysis::new();
+    let body = &a.graph.funcs[a.graph.find("tech_adapter::decision")[0]].body;
+    let position = |snippet: &str| {
+        let wanted = callgraph::lex(snippet);
+        body.windows(wanted.len()).position(|w| w == wanted.as_slice()).unwrap_or_else(|| panic!("missing decision invariant: {snippet}"))
+    };
+    let state = position("matches!(owned.attempt.state, AttemptState::Stopped | AttemptState::Flying");
+    let record = position("owned.attempt.record_contact(contact)");
+    let released = position("drop(slot)");
+    let retained = position("owned.decision.capture_first(super::tech_decision::snapshot(accessor, owned.attempt.id, contact");
+    let deliver = position("deliver_decision()");
+    assert!(state < record && record < retained && retained < released && released < deliver);
+    let delivery = &a.graph.funcs[a.graph.find("tech_adapter::deliver_decision")[0]].body;
+    let at = |snippet: &str| {
+        let wanted = callgraph::lex(snippet);
+        delivery.windows(wanted.len()).position(|w| w == wanted.as_slice()).unwrap_or_else(|| panic!("missing delivery invariant: {snippet}"))
+    };
+    assert!(at("drop(slot)") < at("if observer(snapshot)"));
+    assert!(at("if observer(snapshot)") < at("active.decision.acknowledge_decision(snapshot.attempt)"));
+    assert!(!delivery.iter().any(|t| matches!(t, Tok::Ident(s) if s == "tech_decision")), "delivery retry never resamples native fields");
+}
+
+#[test]
+fn grounded_launch_refusal_precedes_publication_and_wake() {
+    let a = Analysis::new();
+    let body = &a.graph.funcs[a.graph.find("tech_adapter::launch")[0]].body;
+    let at = |snippet: &str| {
+        let wanted = callgraph::lex(snippet);
+        body.windows(wanted.len()).position(|w| w == wanted.as_slice()).unwrap_or_else(|| panic!("missing grounded admission invariant: {snippet}"))
+    };
+    let grounded = at("if owned.launch.grounded_hit && (natives::situation_kind(accessor) != owned.prepared.ground || !natives::is_grounded(accessor)) { return Err(Error::NativeValue); }");
+    assert!(grounded < at("owned.phase = Phase::Flying"));
+    assert!(grounded < at("*slot = Some(owned)"));
+    assert!(grounded < at("state_natives::set_sleep(accessor, false)"));
+}
+
 /// Input Delay installs on its own rows: the input display's reads in its hook are behind the display's flag
 /// (lead ruling 2026-11-02), so rejecting `status_kind` or `fighter_manager_get_entry` turns the display off and
 /// leaves Input Delay installed.
@@ -594,6 +766,117 @@ fn the_input_display_degrades_apart_from_input_delay() {
 #[test]
 fn writing_sites_counts_every_row_that_writes_code() {
     assert_eq!(capabilities::all_sites().filter(|site| capabilities::writes_code(site)).count(), capabilities::WRITING_SITES);
+}
+
+
+#[test]
+fn projectile_accessor_failure_leaves_hitbox_and_btt_melee_installed() {
+    let a = Analysis::new();
+    let row = capabilities::find("state_object_module_accessor").unwrap();
+    let usable = |site: &model::sites::Site| site.name != row.name;
+    assert!(capabilities::unit_usable(Feature::CpuCore, &usable));
+    assert!(capabilities::unit_usable(Feature::Hitbox, &usable));
+    assert_eq!(capabilities::blocked_by(Feature::BttProjectiles, &usable), Some(row.name));
+    assert!(!Granted::from_usable(&usable).allows(row.offset));
+    for entry in ["hitbox::frame", "hitbox::draw_orbs", "btt::frame"] {
+        let start = a.graph.find(entry)[0];
+        assert!(!a.reach(start).0.contains(&row.offset), "{entry} reaches optional accessor");
+    }
+    let camera = a.graph.find("btt_camera::frame")[0];
+    let callers: Vec<_> = (0..a.graph.funcs.len()).filter(|&i| a.graph.callees(i).contains(&camera)).map(|i| a.graph.funcs[i].key()).collect();
+    assert_eq!(callers, ["cpu::on_frame"], "only the game callback accesses camera state");
+    let start = a.graph.find("btt_projectiles::hit")[0];
+    assert!(a.reach(start).0.contains(&row.offset));
+    let worker = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime/ui/worker.rs")).unwrap();
+    assert!(worker.contains("btt_projectiles_ready: crate::runtime::features::btt_projectiles::ready()"));
+}
+
+#[test]
+fn native_confirmation_is_after_original_and_retried_on_owned_frame() {
+    let a = Analysis::new();
+    let body = |name: &str| &a.graph.funcs[a.graph.find(name)[0]].body;
+    let at = |body: &[Tok], snippet: &str| {
+        let wanted = callgraph::lex(snippet);
+        body.windows(wanted.len()).position(|w| w == wanted.as_slice())
+            .unwrap_or_else(|| panic!("missing native confirmation invariant: {snippet}"))
+    };
+    let hook = body("cpu_common::change_status_hook");
+    assert!(at(hook, "tech_adapter::decision(accessor, requested, passive)") < at(hook, "original(fighter, status, unk)"));
+    assert!(at(hook, "original(fighter, status, unk)") < at(hook, "tech_adapter::confirm_decision(accessor, attempt)"));
+    let confirm = body("tech_adapter::confirm_decision");
+    assert!(at(confirm, "owned.attempt.id != attempt") < at(confirm, "current(*owned)"));
+    assert!(at(confirm, "current(*owned)") < at(confirm, "if fresh != accessor"));
+    assert!(at(confirm, "if fresh != accessor") < at(confirm, "observe_entry(owned, fresh)"));
+    assert!(at(confirm, "drop(slot)") < at(confirm, "deliver_decision()"));
+    let frame = body("tech_adapter::frame");
+    assert!(at(frame, "receipt != Some(owned.receipt) || fresh.is_err()") < at(frame, "observe_entry(&mut owned, accessor)"));
+    let delivery = body("tech_adapter::deliver_decision");
+    assert!(at(delivery, "owned.decision.confirmed_decision()") < at(delivery, "observer(snapshot)"));
+    let observed = body("tech_decision::entered_status");
+    assert!(at(observed, "game::granted(p2::STATUS_KIND_OFFSET)") < at(observed, "natives::status_kind(accessor)"));
+}
+
+#[test]
+fn unbound_native_hitlag_cannot_construct_launch_adapter() {
+    let a = Analysis::new();
+    let body = &a.graph.funcs[a.graph.find("tech::frame")[0]].body;
+    let at = |snippet: &str| {
+        let wanted = callgraph::lex(snippet);
+        body.windows(wanted.len()).position(|w| w == wanted.as_slice())
+            .unwrap_or_else(|| panic!("missing native hitlag admission: {snippet}"))
+    };
+    assert!(at("let Some(hitlag) = HITLAG.get().copied() else { return; };") < at("Adapter::new(hitlag)"));
+    let runtime = std::fs::read_to_string("src/runtime/features/tech.rs").unwrap();
+    assert!(runtime.contains("static HITLAG: OnceLock<HitlagResolver> = OnceLock::new()"));
+}
+
+#[test]
+fn pending_snapshot_query_preserves_owner_and_contention_boundaries() {
+    let a = Analysis::new();
+    let body = &a.graph.funcs[a.graph.find("tech_adapter::pending_decision")[0]].body;
+    let at = |snippet: &str| {
+        let wanted = callgraph::lex(snippet);
+        body.windows(wanted.len()).position(|w| w == wanted.as_slice())
+            .unwrap_or_else(|| panic!("missing raw pending query invariant: {snippet}"))
+    };
+    assert!(at("OWNED.try_lock().ok_or(Error::Busy)?") < at("owned.owner == self.owner"));
+    assert!(at("owned.owner == self.owner") < at("current(*owned)"));
+    assert!(at("current(*owned)") < at("owned.decision.pending_decision()"));
+    at("s.attempt == owned.attempt.id");
+    for forbidden in ["lock", "capture_first", "acknowledge_decision", "observe_entered_status", "tech_decision", "observer", "elapsed", "HOLD"] {
+        assert!(!body.iter().any(|t| matches!(t, Tok::Ident(name) if name == forbidden)), "query must be read-only, nonblocking and clock-free: {forbidden}");
+    }
+}
+
+#[test]
+fn pending_query_busy_defers_ui_before_delivery_and_existing_hold_clock() {
+    let a = Analysis::new();
+    let body = &a.graph.funcs[a.graph.find("tech::frame")[0]].body;
+    let at = |snippet: &str| {
+        let wanted = callgraph::lex(snippet);
+        body.windows(wanted.len()).position(|w| w == wanted.as_slice())
+            .unwrap_or_else(|| panic!("missing retained UI delivery ordering: {snippet}"))
+    };
+    let query = at("let Ok(raw) = run.adapter.pending_decision() else { return; };");
+    assert!(query < at("DECISIONS.drain"));
+    assert!(query < at("run.controller.retained_snapshot(snapshot, *ids, age)"));
+    assert!(query < at("Controller::tick"));
+    assert!(at("Controller::tick") < at("age.saturating_add(1)"));
+    at("snapshot.attempt == attempt.id");
+    at("raw.filter(|s| s.attempt == attempt.id)");
+}
+
+#[test]
+fn injected_hitlag_callback_reaches_all_four_guarded_native_readers() {
+    let a=Analysis::new();
+    let launch=a.graph.find("tech_adapter::launch")[0];
+    let boundary=BOUNDARIES.iter().find(|b| b.function=="tech_adapter::launch").unwrap();
+    assert_eq!(boundary.owner,Some(Feature::TechPractice));
+    for row in &model::sites_tech_hitlag::SITES[..4] {
+        let chain=witness(&a,launch,row.offset);
+        assert!(chain.iter().any(|key|key=="tech_hitlag::resolve"),"{} missing production provider: {chain:?}",row.name);
+        assert!(chain.iter().any(|key|key=="tech_hitlag_read::resolve"),"{} missing actual shared reader: {chain:?}",row.name);
+    }
 }
 
 #[test]

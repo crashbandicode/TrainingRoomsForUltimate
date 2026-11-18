@@ -71,15 +71,24 @@ fn an_orb_is_the_hitbox_size_in_the_spheres_tint() {
     assert_eq!(orb.centre, [1.0, 2.0, 3.0]);
     assert!((orb.radius - 4.5).abs() < 1e-5);
     assert_eq!(orb.color, [255, 0, 0, orbs::ORB_ALPHA]);
-    let yellow = orbs::orb_of(&sphere(2, 0.0, 1.0), [0.0; 3]);
-    assert_eq!(&yellow.color[..3], &[255, 255, 0]);
-    // The orb keeps its sphere's kind (the cut order, review HB-2).
-    for kind in [hitbox::KIND_HIT, hitbox::KIND_HURT, hitbox::KIND_GRAB] {
-        assert_eq!(orbs::orb_of(&sphere(hitbox::sphere_key(kind, 3, 1), 0.0, 1.0), [0.0; 3]).kind(), kind);
+    // Every sphere colour takes the same sRGB-to-linear path, including status and strength colours.
+    let cases = [
+        (hitbox::KIND_HIT, hitbox::STRONG_TINT, [255, 0, 0, orbs::ORB_ALPHA]),
+        (hitbox::KIND_HIT, hitbox::WEAK_TINT, [255, 143, 199, orbs::ORB_ALPHA]),
+        (hitbox::KIND_GRAB, hitbox::GRAB_TINT, [153, 51, 255, orbs::ORB_ALPHA]),
+        (hitbox::KIND_HURT, hitbox::HURTBOX_TINT, [153, 153, 153, orbs::ORB_ALPHA]),
+        (hitbox::KIND_ARTICLE_HURT, model::legend::hurt_tint(model::legend::INVINCIBLE), [51, 255, 51, orbs::ORB_ALPHA]),
+        (hitbox::KIND_HURT, model::legend::hurt_tint(model::legend::INTANGIBLE), [255, 255, 0, orbs::ORB_ALPHA]),
+        (model::legend::KIND_WIND, model::legend::WIND, [115, 204, 255, orbs::ORB_ALPHA]),
+        (model::legend::KIND_AREA, model::legend::WIND_AREA, [75, 85, 0, orbs::ORB_ALPHA]),
+        (model::legend::KIND_MARK, [1.0; 3], [255; 4]),
+    ];
+    for (kind, tint, srgb) in cases {
+        let key = hitbox::sphere_key(kind, 3, 1);
+        let orb = orbs::orb_of(&Sphere { key, tint, ..s }, [0.0; 3]);
+        assert_eq!(orb.color, model::panes::linear(srgb), "kind {kind}, tint {tint:?}");
+        assert_eq!(orb.kind(), kind, "the orb preserves its sphere kind for draw order");
     }
-    // The tints of the colour table go through the layout's linear-light encoding.
-    let orange = orbs::orb_of(&Sphere { tint: hitbox::tint(1), ..s }, [0.0; 3]);
-    assert_eq!(orange.color, model::panes::linear([255, 102, 0, orbs::ORB_ALPHA]));
 }
 
 fn orb(x: f32) -> Orb {
@@ -209,11 +218,22 @@ impl hitbox::AttackReader for Shot {
     fn data(&mut self, _slot: i32) -> usize {
         0x1000
     }
-    fn read_u64(&mut self, _at: usize) -> u64 {
-        0x3_1ed9_1fca
+    fn read_u64(&mut self, at: usize) -> u64 {
+        match at {
+            0x1048 => 0x3_1ed9_1fca,
+            0x1028 => (90u64 << 32) | 45,
+            0x1030 => 40u64 << 32,
+            0x1070 => 0,
+            _ => panic!("unexpected article attack word {at:#x}"),
+        }
     }
     fn read_f32(&mut self, at: usize) -> f32 {
-        if at == 0x1024 { 1.9 } else { 0.0 }
+        match at {
+            0x1020 => 10.0,
+            0x1024 => 1.9,
+            0x1000 | 0x1004 | 0x1008 | 0x1010 | 0x1014 | 0x1018 => 0.0,
+            _ => panic!("unexpected article attack scalar {at:#x}"),
+        }
     }
 }
 
@@ -265,7 +285,7 @@ fn an_articles_hitboxes_are_own_orbs_while_its_attack_lasts() {
 
 /// rc.13 (the primary 2026-11-14 06:10Z; Eden wa-grab-bfc1a3b9-6): Olimar's grab is a `CATCH` his Pikmin, an article, runs,
 /// and no grab box was drawn. The command's spheres wait in the article's own set with the status it ran in and are drawn
-/// as the fighters' are (deluxe-2's rule): magenta on the article's bone while it stays in that status, once when the
+/// as the fighters' are (deluxe-2's rule): purple on the article's bone while it stays in that status, once when the
 /// status already moved on, and the article stays tracked while it has one.
 fn an_articles_grab_box_is_an_own_orb_while_its_status_lasts() {
     let (id, key) = (0x102e_0001u32, 0xb000usize);
@@ -281,7 +301,7 @@ fn an_articles_grab_box_is_an_own_orb_while_its_status_lasts() {
         let grab: Vec<Orb> = board.live().copied().collect();
         assert_eq!(grab.len(), 1, "pass {pass}: the Pikmin's grab box");
         assert_eq!((grab[0].kind(), grab[0].centre), (hitbox::KIND_GRAB, [25.0, 4.0, 0.0]));
-        assert_eq!(&grab[0].color[..3], &model::panes::linear([255, 0, 255, 255])[..3], "magenta, as the fighters'");
+        assert_eq!(&grab[0].color[..3], &model::panes::linear([153, 51, 255, 255])[..3], "purple, as the fighters'");
         assert!((grab[0].radius - 3.0).abs() < 1e-5);
     }
     assert!(!orbs::article_pass(&mut board, set, key, 41, &mut Shot(false), on_bone, orbs::Extras::NONE), "its status ended: forgotten");

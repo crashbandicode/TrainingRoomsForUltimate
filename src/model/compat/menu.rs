@@ -407,6 +407,23 @@ mod tests {
         assert_eq!(missing, StagePreferences::default());
     }
 
+    fn combined_single_load_and_writeback_match_the_exact_player_cycle_gate() {
+        let loaded = crate::model::settings::parse(
+            r#"{"menu":{"trio_practice":[1,1]},"defaults_menu":{"trio_practice":[1,1]}}"#,
+        );
+        assert!(loaded.issues.is_empty());
+        for snapshot in [&loaded.settings.menu, &loaded.settings.defaults] {
+            assert_eq!(TrainingModpackMenu::from_snapshot(snapshot).trio_practice, OnOff::ON);
+        }
+        let mut snapshot = Snapshot::factory();
+        let mut typed = TrainingModpackMenu::from_snapshot(&snapshot);
+        typed.trio_practice = from_row(&[1, 1], &OnOff::ALL_CONSTS);
+        let (_, row) = typed.rows().into_iter().find(|(id, _)| *id == "trio_practice").unwrap();
+        snapshot.set("trio_practice", &row).unwrap();
+        assert_eq!(snapshot.get("trio_practice").unwrap(), &[1, 0]);
+        assert_eq!(TrainingModpackMenu::from_snapshot(&snapshot).trio_practice, OnOff::ON);
+    }
+
     fn one_bad_mii_selector_keeps_the_other_choices() {
         use crate::engine::mii::inventory::{build_snapshot, MiiClass, RawSlot, TaggedId, CHARINFO_LEN, TAG_CHARA, TAG_HAT, TAG_OUTFIT};
         use crate::engine::mii::selection::{Preferences as MiiPreferences, Role};
@@ -441,6 +458,7 @@ mod tests {
         crate::test_table::run(&[
             ("every_row_shaped_field_reaches_the_view_as_a_row_or_a_kept_key", every_row_shaped_field_reaches_the_view_as_a_row_or_a_kept_key as fn()),
             ("a_committed_snapshot_and_settings_reach_every_typed_view", a_committed_snapshot_and_settings_reach_every_typed_view as fn()),
+            ("combined_single_load_and_writeback_match_the_exact_player_cycle_gate", combined_single_load_and_writeback_match_the_exact_player_cycle_gate as fn()),
             ("one_bad_mii_selector_keeps_the_other_choices", one_bad_mii_selector_keeps_the_other_choices as fn()),
         ]);
     }

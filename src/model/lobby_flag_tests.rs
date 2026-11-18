@@ -333,7 +333,7 @@ mod tests {
             "score_aura" => training && hooks::score_aura_hidden(true),
             "hazards" => rule_byte(true, training).is_some(),
             "input_delay" => applies(0, training),
-            "lra_reset" => x8_write(false, training).is_some(),
+            "lra_reset" => x8_write(false, training, false).is_some(),
             "developer_reload" => qualifies(0, training, u32::MAX),
             "close_input" => {
                 let mut guard = CloseInputGuard::new();
@@ -469,7 +469,7 @@ mod tests {
         if text.contains("input_delay::applies") {
             return Some("input_delay");
         }
-        if text.contains("x8_write") {
+        if text.contains("x8_write") || (file.ends_with("features/lra_reset.rs") && text.starts_with("native_training: scene::is_training()")) {
             return Some("lra_reset");
         }
         if text.contains("is_fighter") {

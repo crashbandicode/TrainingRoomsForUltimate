@@ -15,8 +15,8 @@
 //! the knockback received over its knockback in `KB_LOW..=KB_HIGH`. Anything else has no label. The knockback carries the attacker's rage
 //! and the game's ceiling (`launched_by`), and past the damage cap the damage comes from the record (`added`), so no percent is out of range.
 
-/// The rows (decision SP5): the strip's labels and the combo's match, toggles Off by default. The hitbox visualizer's *Frame data colours*
-/// (`hitbox::legend_colour`) is an item of its checklist (`legend::COLOURS`).
+/// The rows (decision SP5): the strip's labels and the combo's match, toggles Off by default. The visualizer always
+/// uses strength colours (`hitbox::legend_colour`); these two label/match toggles stay independent.
 pub const ROW_STRIP: &str = "spots_strip";
 pub const ROW_COMBO: &str = "spots_combo";
 

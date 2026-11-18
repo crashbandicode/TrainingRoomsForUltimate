@@ -285,10 +285,11 @@ fn submit_loaded_character() {
 
 /// Game callback only. The roster remains the sole admission/loader provider.
 pub fn service_character_request() {
+    let Ok(context) = crate::runtime::roster::character_roster::try_cpu_request_context() else { return; };
     CHARACTER_REQUEST.drain(|(target, revision)| {
-        let eligible = revision == selection_revision() && source_is_named()
-            && crate::runtime::roster::character_roster::cpu_reload_ready();
-        let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request_named(target);
+        let eligible = revision == selection_revision() && context.menu.macro_source == MacroSource::NAMED
+            && crate::runtime::roster::character_roster::cpu_reload_ready_in(&context);
+        let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request_named_in(&context, target);
         let posted = CHARACTER_RESULT.post((revision, accepted));
         debug_assert!(posted, "one outstanding named character result");
         crate::runtime::ui::worker::wake();
@@ -1244,6 +1245,7 @@ pub unsafe fn preview(module_accessor: &mut BattleObjectModuleAccessor) {
 }
 
 pub unsafe fn hold_panel_fighter(module_accessor: &mut BattleObjectModuleAccessor) {
+    let Ok(context) = practice::try_context() else { return; };
     let id = module_accessor.battle_object_id;
     let pointer = module_accessor as *mut BattleObjectModuleAccessor as usize;
     let mut owned = lock_write(&PANEL_STOPS);
@@ -1254,8 +1256,8 @@ pub unsafe fn hold_panel_fighter(module_accessor: &mut BattleObjectModuleAccesso
         && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID)
             == FighterId::Player as i32);
     let entry = if hold_panel && !crate::runtime::macros::replay_preview::needs_native_update(module_accessor)
-        && !crate::runtime::macros::replay_capture::browser_needs_native_update(module_accessor) {
-        practice::panel_entry(module_accessor)
+        && !crate::runtime::macros::replay_capture::browser_needs_native_update(context, module_accessor) {
+        practice::panel_entry_in(context, module_accessor)
     } else { None };
     if let Some(entry) = entry {
         if found.is_none() && !StopModule::is_special_stop(module_accessor) {

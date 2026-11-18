@@ -324,7 +324,8 @@ impl AttackReader for Slots {
             0x28 => (growth as u32 as u64) << 32 | 45,
             0x30 => (base as u32 as u64) << 32 | fixed as u32 as u64,
             0x70 => 0,
-            _ => 7,
+            0x48 => 7,
+            _ => panic!("unexpected attack word {at:#x}"),
         }
     }
 
@@ -332,7 +333,8 @@ impl AttackReader for Slots {
         match at % 0x1000 {
             0x20 => self.0[at / 0x1000 - 1].expect("an active slot").0,
             0x24 => 2.0,
-            _ => 0.0,
+            0x00 | 0x04 | 0x08 | 0x10 | 0x14 | 0x18 => 0.0,
+            _ => panic!("unexpected attack scalar {at:#x}"),
         }
     }
 }
@@ -363,7 +365,6 @@ fn the_hit_spheres_take_the_frame_data_colours() {
     let (strong, weak) = (hitbox::STRONG_TINT, hitbox::WEAK_TINT);
     let (tip, blade) = (Some((16.0, 90, 0, 40)), Some((13.0, 90, 0, 40)));
     let mut set = HandleSet::new();
-    set.frame_data = true;
     // The swing's early frame: the tip (slot 0) is sweet, red; the blade (slots 1 and 2) is sour, pink.
     frame(&mut set, [tip, blade, blade, None, None, None, None, None], 20);
     assert_eq!(tints(&set, &[0, 1, 2]), [strong, weak, weak]);
@@ -379,24 +380,37 @@ fn the_hit_spheres_take_the_frame_data_colours() {
     assert_eq!(tints(&set, &[0, 1]), [strong, weak]);
 }
 
-fn off_is_exactly_the_old_drawing() {
-    let mut set = HandleSet::new();
-    frame(&mut set, [Some((16.0, 90, 0, 40)), Some((13.0, 90, 0, 40)), Some((13.0, 90, 0, 40)), None, None, None, None, None], 20);
-    assert_eq!(tints(&set, &[0, 1, 2]), [0, 1, 2].map(hitbox::hitbox_tint));
+fn strength_colours_apply_by_default_independently_of_slot_ids() {
+    let (tip, blade) = (Some((16.0, 90, 0, 40)), Some((13.0, 90, 0, 40)));
+    for (strong_id, weak_id) in [(0, 7), (7, 0), (2, 5), (5, 2)] {
+        let mut set = HandleSet::new();
+        let mut slots = [None; SLOTS];
+        slots[strong_id] = tip;
+        slots[weak_id] = blade;
+        frame(&mut set, slots, 20);
+        assert_eq!(tints(&set, &[strong_id as u32, weak_id as u32]), [[1.0, 0.0, 0.0], [1.0, 0.56, 0.78]]);
+        // The same action loses its tip: the remaining blade stays weak even at the lower ID.
+        slots[strong_id] = None;
+        frame(&mut set, slots, 20);
+        assert_eq!(tints(&set, &[weak_id as u32]), [[1.0, 0.56, 0.78]]);
+    }
 }
 
 fn one_function_chooses_every_tint() {
-    let usual = [0.1, 0.2, 0.3];
-    for kind in [hitbox::KIND_HIT, hitbox::KIND_HURT, hitbox::KIND_GRAB] {
-        for spot in [None, Some(Spot::Sweet), Some(Spot::Sour), Some(Spot::Late)] {
-            assert_eq!(hitbox::legend_colour(kind, spot, 0, usual, false), usual, "Off is today's tint");
+    use crate::model::legend;
+    let attack = |spot| hitbox::legend_colour(hitbox::KIND_HIT, spot, 0);
+    assert_eq!([None, Some(Spot::Sweet)].map(attack), [[1.0, 0.0, 0.0]; 2]);
+    assert_eq!([Some(Spot::Sour), Some(Spot::Late)].map(attack), [[1.0, 0.56, 0.78]; 2]);
+    for spot in [None, Some(Spot::Sweet), Some(Spot::Sour), Some(Spot::Late)] {
+        assert_eq!(hitbox::legend_colour(hitbox::KIND_GRAB, spot, 0), [0.6, 0.2, 1.0]);
+        assert_eq!(hitbox::legend_colour(legend::KIND_WIND, spot, 0), [0.45, 0.8, 1.0]);
+        for kind in [hitbox::KIND_HURT, hitbox::KIND_ARTICLE_HURT] {
+            for (status, expected) in [(0, [0.6; 3]), (legend::INVINCIBLE, [0.2, 1.0, 0.2]), (legend::INTANGIBLE, [1.0, 1.0, 0.0])] {
+                assert_eq!(hitbox::legend_colour(kind, spot, status), expected);
+            }
         }
     }
-    let on = |spot| hitbox::legend_colour(hitbox::KIND_HIT, spot, 0, usual, true);
-    assert_eq!([None, Some(Spot::Sweet)].map(on), [hitbox::STRONG_TINT; 2]);
-    assert_eq!([Some(Spot::Sour), Some(Spot::Late)].map(on), [hitbox::WEAK_TINT; 2]);
-    assert_ne!(hitbox::WEAK_TINT, hitbox::GRAB_TINT, "pink is not the grab boxes' magenta");
-    // The rest of the legend (hb-legend): `model::legend`'s tests.
+    assert_ne!(hitbox::WEAK_TINT, hitbox::GRAB_TINT, "pink and purple identify different box kinds");
 }
 
 fn the_spot_words_and_rows() {
@@ -441,7 +455,7 @@ fn case_table() {
         ("the_powers_of_a_fighter_are_read_from_its_active_slots_only", the_powers_of_a_fighter_are_read_from_its_active_slots_only as fn()),
         ("the_hit_spheres_take_the_frame_data_colours", the_hit_spheres_take_the_frame_data_colours as fn()),
         ("one_function_chooses_every_tint", one_function_chooses_every_tint as fn()),
-        ("off_is_exactly_the_old_drawing", off_is_exactly_the_old_drawing as fn()),
+        ("strength_colours_apply_by_default_independently_of_slot_ids", strength_colours_apply_by_default_independently_of_slot_ids as fn()),
         ("the_spot_words_and_rows", the_spot_words_and_rows as fn()),
     ]);
 }

@@ -181,7 +181,7 @@ pub(crate) fn after_layout_draw() {
     if !ready() {
         return;
     }
-    crate::runtime::ui::facts::publish_scene_facts();
+    if crate::runtime::ui::facts::try_publish_scene_facts().is_err() { return; }
     port::post_clip_draw();
 }
 

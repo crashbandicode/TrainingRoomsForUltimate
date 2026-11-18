@@ -32,7 +32,7 @@ pub const LAST_PAGE_KEY: &str = "last_page";
 pub const MII_PREFERENCES_KEY: &str = "mii_preferences";
 /// Largest weight on a weighted row.
 pub const WEIGHT_MAX: u8 = 5;
-/// Largest slider value (the two damage ranges).
+/// Largest legacy damage-slider value; Tech ranges use their declared index scale.
 pub const SLIDER_MAX: u8 = 150;
 /// Keys older builds wrote that nothing reads any more (SPEC-core-01 §6, SPEC-core-02 question 4;
 /// `character_item` since decision N6, converted once by the first-boot import).
@@ -50,7 +50,7 @@ pub enum Kind {
     Multiple,
     /// Each option `0..=WEIGHT_MAX`.
     Weighted,
-    /// `[lower, upper]`, `lower <= upper <= SLIDER_MAX`.
+    /// `[lower, upper]`, ordered and bounded by the declared row scale (legacy: SLIDER_MAX).
     Slider,
     /// The optional range of a delay row (N3): empty (no range) or `[min, max]` as **option
     /// indices** of the row's own value set, `min <= max <= RANGE_INDEX_MAX`. Absent from the file
@@ -107,7 +107,7 @@ pub enum Reason {
     ElementAboveMax,
     /// A slider array does not have exactly two elements.
     BadSliderLength,
-    /// A slider's `lower` is above its `upper` (or either is above `SLIDER_MAX`).
+    /// A slider's `lower` is above its `upper`.
     BadSliderRange,
     /// `Snapshot::set` was given an id this build has no row for.
     UnknownId,
@@ -137,9 +137,14 @@ pub fn parse_row(def: &Def, value: &Value) -> Result<Vec<u8>, Reason> {
         return Err(Reason::NotAnArray);
     };
     let mut elements = Vec::with_capacity(items.len());
-    for item in items {
+    for (index, item) in items.iter().enumerate() {
+        // rc.15: keep the seven-slot file layout; the retired colour-mode slot has no meaning.
+        if def.id == super::legend::ROW && index == 3 {
+            elements.push(0);
+            continue;
+        }
         let byte = item.as_u64().and_then(|n| u8::try_from(n).ok()).ok_or(Reason::ElementNotAByte)?;
-        if byte > def.kind.max() {
+        if byte > super::tech_settings::scale(def.id).map_or(def.kind.max(), |s| s.max) {
             return Err(Reason::ElementAboveMax);
         }
         elements.push(byte);
@@ -157,6 +162,14 @@ pub fn parse_row(def: &Def, value: &Value) -> Result<Vec<u8>, Reason> {
         return Ok(elements);
     }
     elements.resize(def.len, 0);
+    // Single rows use the first selected option, as the menu displays them. Old files may
+    // contain several; normalize at both file load and Snapshot::set so defaults/writeback
+    // cannot preserve a displayed On whose typed value also contains Off. Keep None intact.
+    if def.kind == Kind::Single {
+        if let Some(first) = elements.iter().position(|v| *v != 0) {
+            elements[first + 1..].fill(0);
+        }
+    }
     Ok(elements)
 }
 
@@ -650,11 +663,35 @@ mod tests {
         assert!(loaded.settings.menu.stage_hazards());
     }
 
+    fn retired_hitbox_colour_slot_is_ignored_in_both_snapshots_and_round_trips() {
+        for obsolete in [serde_json::json!(0), serde_json::json!(1), serde_json::json!(255), serde_json::json!(-1),
+                         serde_json::json!("obsolete"), Value::Null, serde_json::json!({}), serde_json::json!([])] {
+            let saved = serde_json::json!({
+                "menu": {"hitbox_vis": [1, 0, 1, obsolete.clone(), 1, 0, 1], "lra_reset": [0, 1]},
+                "defaults_menu": {"hitbox_vis": [0, 1, 0, obsolete, 0, 1, 0], "lra_reset": [1, 0]}
+            });
+            let loaded = parse(&saved.to_string());
+            assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+            assert_eq!(loaded.settings.menu.get("hitbox_vis"), Some([1, 0, 1, 0, 1, 0, 1].as_slice()));
+            assert_eq!(loaded.settings.defaults.get("hitbox_vis"), Some([0, 1, 0, 0, 0, 1, 0].as_slice()));
+            assert!(!loaded.settings.menu.lra_reset());
+            assert!(loaded.settings.defaults.lra_reset());
+            assert_eq!(parse(&loaded.settings.to_json()).settings, loaded.settings);
+        }
+        let mut snapshot = Snapshot::factory();
+        snapshot.set("hitbox_vis", &[1, 0, 1, 255, 1, 0, 1]).unwrap();
+        assert_eq!(snapshot.get("hitbox_vis"), Some([1, 0, 1, 0, 1, 0, 1].as_slice()));
+        assert_eq!(snapshot.set("hitbox_vis", &[1, 0, 1, 255, 2, 0, 1]), Err(Reason::ElementAboveMax));
+        let (_, def) = def("hitbox_vis").unwrap();
+        assert_eq!(parse_row(def, &serde_json::json!([1, 0, "bad", null, 1, 0, 1])), Err(Reason::ElementNotAByte));
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("factory_round_trips", factory_round_trips as fn()),
+            ("retired_hitbox_colour_slot_is_ignored_in_both_snapshots_and_round_trips", retired_hitbox_colour_slot_is_ignored_in_both_snapshots_and_round_trips as fn()),
             ("a_bad_row_defaults_and_is_reported", a_bad_row_defaults_and_is_reported as fn()),
         ]);
     }

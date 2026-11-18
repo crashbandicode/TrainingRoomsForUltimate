@@ -72,18 +72,9 @@ const fn longest_name(tables: &[&[Site]]) -> usize {
     longest
 }
 
-/// Every table whose rows the line reports, once each (base/packages, UI, Hitbox, Developer and Mash).
-const TABLES: [&[Site]; 9] = [
-    &sites::SITES,
-    &sites_pkg3::STATE_SITES,
-    &sites_pkg4::SITES,
-    &sites_ui::UI_SITES,
-    &sites_u4::SITES,
-    &sites_pkg6::SITES,
-    &crate::model::sites_hitbox::SITES,
-    &crate::model::developer_debug::SITES,
-    &crate::model::sites_mashout::SITES,
-];
+/// Every table whose rows the line reports, once each (base/packages, UI, Hitbox, Developer, Tech and Mash).
+const TABLES: [&[Site]; 10] =
+    [&sites::SITES, &sites_pkg3::STATE_SITES, &sites_pkg4::SITES, &sites_ui::UI_SITES, &sites_u4::SITES, &sites_pkg6::SITES, &crate::model::sites_hitbox::SITES, &crate::model::developer_debug::SITES, &crate::model::sites_tech_launch::SITES, &crate::model::sites_mashout::SITES];
 
 /// The site fields at their longest.
 pub const SITE_FIELDS: usize = site_fields(&TABLES);

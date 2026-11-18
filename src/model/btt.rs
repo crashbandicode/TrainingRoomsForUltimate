@@ -24,8 +24,7 @@ pub const ROW: &str = "btt";
 pub const ROW_PLACE: &str = "btt_place";
 pub const ROW_LAYOUTS: &str = "btt_layouts";
 pub const HEADER: &str = "Break the Targets";
-/// The standing notice's id (Eggs-ercise has 0x2E; the two modes are never on together, but each clears only its own).
-pub const NOTICE_ID: u8 = 0x2F;
+/// At most ten targets in one course.
 pub const MAX: usize = 10;
 /// The hot five: a stage's saved layouts used last (Recording's convention), which the chords step through.
 pub const HOT: usize = 5;
@@ -249,6 +248,34 @@ pub fn list_footer(rows: &[(String, Layout)], cursor: usize, skipped: usize) -> 
 pub fn on(rows: &super::settings::Snapshot) -> [bool; 2] {
     let active = super::practice_games::active(rows);
     ["eggsercise", ROW].map(|id| active == Some(id))
+}
+
+/// Only P1's owned pool and ArticleModule supply objects; Off performs no discovery or hit reads.
+pub fn projectile_breaks(
+    enabled: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,
+    mut read: impl FnMut(usize) -> Option<([eggs::Hit; super::hitbox::SLOTS as usize], usize)>,
+) -> bool {
+    enabled && pool.into_iter().chain(super::hitbox::article_instances(true, get)).filter(|a| pointer_ok(*a)).any(|article| {
+        read(article).is_some_and(|(hits, n)| hits[..n].iter().any(|h| h.3 > 0.0 && eggs::breaks(eggs::ANY, false, h, spot)))
+    })
+}
+
+/// Shared placing controls, without stage bounds or projection.
+pub fn placing_motion(p: &Pad, was: u16, repeat_age: &mut u8) -> [f32; 2] {
+    let (tilt, unit) = placing_parts(p, was, repeat_age);
+    [0, 1].map(|i| tilt[i] + unit[i])
+}
+
+// Keep the two terms so BTT retains its original (cursor + tilt) + unit rounding.
+fn placing_parts(p: &Pad, was: u16, repeat_age: &mut u8) -> ([f32; 2], [f32; 2]) {
+    let down = |k: u8| p.held & bit(k) != 0;
+    let pad = p.held & DPAD;
+    *repeat_age = repeat_age.saturating_add(1) * u8::from(pad != 0 && pad == was & DPAD);
+    let repeat = *repeat_age == 0 || *repeat_age >= 15 && *repeat_age % 2 == 1;
+    let step = f32::from(pad != 0 && !down(ZL) && !down(B) && repeat);
+    let unit = [[DPAD_RIGHT, DPAD_LEFT], [DPAD_UP, DPAD_DOWN]].map(|[hi, lo]| step * (f32::from(down(hi)) - f32::from(down(lo))));
+    let tilt = [0, 1].map(|i| p.stick[i] * SPEED * f32::from(p.stick[i].abs() >= DEAD));
+    (tilt, unit)
 }
 
 /// The layout's identity for the session's best: its target positions to half a unit, in no order.
@@ -495,15 +522,9 @@ impl Btt {
         let pressed = |k: u8| p.pressed & bit(k) != 0;
         let (zl, held_b, pick, count) = (down(ZL), down(B), self.pick.unwrap_or(0), self.count());
         self.msg.1 = self.msg.1.saturating_sub(1);
-        // The cursor: the stick, and the D-pad a unit a press, repeating from the 15th frame held (not with ZL or B: chords).
-        let pad = p.held & DPAD;
-        self.rep = self.rep.saturating_add(1) * u8::from(pad != 0 && pad == was & DPAD);
-        let repeat = self.rep == 0 || self.rep >= 15 && self.rep % 2 == 1;
-        let step = f32::from(pad != 0 && !zl && !held_b && repeat);
-        let unit = [[DPAD_RIGHT, DPAD_LEFT], [DPAD_UP, DPAD_DOWN]].map(|[hi, lo]| step * (f32::from(down(hi)) - f32::from(down(lo))));
+        let (tilt, unit) = placing_parts(&p, was, &mut self.rep);
         // A camera change alone never moves the cursor: it is kept in the box when it moves, and once the camera has settled, so
         // it never stays off screen either (btt-5, 11-15; Eden rc14-int3-rr2-f1 dragged an untouched cursor 100 units up).
-        let tilt = [0, 1].map(|i| p.stick[i] * SPEED * f32::from(p.stick[i].abs() >= DEAD));
         let clamp = tilt.iter().chain(&unit).any(|v| *v != 0.0) || self.calm >= CALM;
         for (i, range) in b.into_iter().enumerate() {
             let at = self.cursor[i] + tilt[i] + unit[i];
@@ -658,13 +679,13 @@ impl Btt {
             Phase::Off => Ok(()),
             Phase::Placing if self.msg.1 > 0 => out.write_str(self.msg.0.as_str()),
             Phase::Placing => {
-                write!(out, "Place targets {n}/{MAX}   ")?;
+                write!(out, "{n}/{MAX}   ")?;
                 match self.pick.and_then(|p| self.five[p].map(|h| (p + 1, h))) {
                     None => write!(out, "A place  B undo  X start"),
                     Some((i, h)) => write!(out, "{i}/{} {}: {}", self.count(), h.name.as_str(), h.n),
                 }
             }
-            Phase::Ready | Phase::Running => write!(out, "Targets {got}/{n}   {m}:{s:02}.{c:02}"),
+            Phase::Ready | Phase::Running => write!(out, "{got}/{n} {m}:{s:02}.{c:02}"),
             Phase::Done => {
                 let (bm, bs, bc) = clock(self.top);
                 write!(out, "Done! {n} in {m}:{s:02}.{c:02} ")?;
@@ -681,6 +702,11 @@ pub const fn own_camera(facts: super::scene::Facts) -> bool {
     super::scene::is_training(facts)
 }
 
+/// Placement alone owns the zoomed-out view; all exits restore the saved native mode.
+pub const fn wants_camera(phase: Phase, covered: bool, facts: super::scene::Facts) -> bool {
+    matches!(phase, Phase::Placing) && !covered && own_camera(facts)
+}
+
 /// The camera mode that is Training's Fixed camera (`cpu::tech::CAMERA_MODE_FIXED`).
 pub const FIXED: i32 = super::cpu::tech::CAMERA_MODE_FIXED;
 /// Frames between two asks while the game keeps taking the camera back (its own Training Camera option, a reset).
@@ -692,8 +718,20 @@ pub const fn pointer_ok(p: usize) -> bool {
 }
 
 /// The camera's state (`runtime::features::btt_camera`: the stage is shown by the game's own Training Fixed camera, mode 4, in
-/// Placing, Ready and Running): the mode the game was in when this mode first took the camera (`saved`, while it holds it) and
+/// Placing): the mode the game was in when this mode first took the camera (`saved`, while it holds it) and
 /// the frames left before it may ask again.
+/// Lock-free owner requests; the game thread alone steps the camera state.
+pub struct CameraRequests(std::sync::atomic::AtomicU8);
+impl CameraRequests {
+    pub const fn idle() -> Self { Self(std::sync::atomic::AtomicU8::new(0)) }
+    pub fn request(&self, owner: u8, want: bool) {
+        use std::sync::atomic::Ordering;
+        if want { self.0.fetch_or(owner, Ordering::AcqRel); }
+        else { self.0.fetch_and(!owner, Ordering::AcqRel); }
+    }
+    pub fn wanted(&self) -> bool { self.0.load(std::sync::atomic::Ordering::Acquire) != 0 }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Camera {
     saved: Option<i32>,
@@ -710,22 +748,22 @@ impl Camera {
 
     /// One pass of Player 1: `want` the Fixed camera, `mode` the game's now (`None`: no camera manager, the scene is over). It
     /// asks (`Some(mode)`) for the Fixed camera at most once in `RETRY` frames while the game is in another mode, and gives the camera back
-    /// at once, to the mode first seen, when it is not wanted. A mode the game was already in (the Fixed camera) is not held.
+    /// at once, to the mode first seen, when it is not wanted. The first mode is retained even when it was already Fixed.
     pub fn step(&mut self, want: bool, mode: Option<i32>) -> Option<i32> {
         self.cool = self.cool.saturating_sub(1);
         let Some(now) = mode else {
             self.saved = None;
             return None;
         };
+        if want { self.saved.get_or_insert(now); }
         match (want, self.saved) {
             (true, _) if now != FIXED && self.cool == 0 => {
-                self.saved.get_or_insert(now);
                 self.cool = RETRY;
                 Some(FIXED)
             }
             (false, Some(back)) => {
                 self.saved = None;
-                (now == FIXED).then_some(back)
+                (now != back).then_some(back)
             }
             _ => None,
         }

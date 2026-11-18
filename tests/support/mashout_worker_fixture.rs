@@ -30,7 +30,6 @@ mod runtime {
 // SEED_ORIGIN
 // FAULTED
 const NOTICE_ID: u8 = 48;
-const NOTICE_RAISE: u8 = 4;
 const DEFAULT_COLOR: u32 = 0;
 const UNAVAILABLE_NOTICE: &str = "Mash out unavailable";
 static READY: AtomicBool = AtomicBool::new(true);
@@ -86,7 +85,6 @@ mod notices {
     pub fn clear(_: u8) {
         LAST.lock().unwrap().clear();
     }
-    pub fn raise(_: u8, _: bool) {}
     pub fn show_now(_: u8, _: &str, text: &str, _: u16, _: u32) {
         *LAST.lock().unwrap() = text.to_owned();
     }

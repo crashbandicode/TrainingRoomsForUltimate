@@ -6,7 +6,7 @@ use super::settings::Snapshot;
 /// Register each practice game's settings row here once. `stage_tech` is the reserved Stage tech
 /// integration key; this reservation creates no settings/menu row. Keep Eggs-ercise before BTT
 /// to preserve existing hand-edited-file precedence.
-pub const ROWS: &[&str] = &["eggsercise", "btt", "mashout", "stage_tech"];
+pub const ROWS: &[&str] = &["eggsercise", "btt", "tech_practice", "mashout", "stage_tech"];
 
 fn enabled(rows: &Snapshot, id: &str) -> bool {
     rows.get(id).is_some_and(|row| row.iter().skip(1).any(|value| *value != 0))

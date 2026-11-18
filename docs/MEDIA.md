@@ -4,6 +4,25 @@ Every GIF in [`media/`](media) is actual Eden footage: whole screen, 1280×720, 
 game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
+## rc.15 Stage tech practice (2026-11-17)
+
+`media/rc15-stage-tech.gif` shows the crosshair on a floor spot, the launch, shield input on the frame strip,
+then "Perfect · timing unavailable · In place · 1/10 · streak 1". It is embedded in
+[Fighters & Stages](menu/fighters-and-stages.md#stage-tech-practice).
+
+- **Run/build:** `rc15-tech-ui-55b20f59-reset-v2-boot1`, rc.15 `55b20f59`; Eden, untested on hardware.
+- **Size:** 1280×720, 22 frames, 3.32 s, 4,396,682 bytes.
+- **Source:** the same native-resolution take as `tech-full-loop-55b20f59-v2-final.gif`,
+  `out-presentation-floor-stream/presentation-native-source/tech-full-loop-v2-native-source.gif`, 0–1.82 s.
+- **Edits:** final captured frame held an extra 1.5 s for reading; no crop, scaling or interior cuts.
+  Every decoded frame matches the source; start, action and result were visually checked.
+- **Source SHA256:** `778600bfe736b174d47d8c21a5a45b41f8e6ef92c937b592113480da98028918`.
+- **Docs GIF SHA256:** `a9b2ce87a670e7ab0e00502b76e07ddb8ba2e5dd884acdc9aae59e27715a6e6f`.
+
+The smaller evidence GIF was not enlarged. The raw take and review receipt stay outside git with the run.
+This shared preview does not show the session-choice list, Random surface selection, variable edits,
+Set / Random / Auto changes or the completed summary; dedicated per-option clips remain a capture gap.
+
 Since 2026-11-13 the README shows one GIF per menu page; the [menu docs](menu/) and [guides](guide/) embed the rest.
 The "Embedded in" column of the older sections records where a clip was placed when it was made.
 
@@ -793,3 +812,10 @@ their own claim: each half is read on the diag log, and both halves run against 
 | `media/rc14-menu-tour.gif` | `g5-rc14-xps-10`, `t-p2-hbp-tour` (gif-lane-5; the XPS; diag 17e50cd0, footer 0.2.0-rc.14 · rc14 17e50cd0) | README (top); guide/getting-started; guide/using-the-menu; DIFFERENCES-FROM-THE-FORK; TECHNICAL | 9.6 s, 4.3 MB | 3.81–4.31, 7.89–8.54, 9.49–10.14, 11.09–11.74, 12.69–13.34, 14.29–14.94, 21.76–22.86, 26.01–26.61, 28.91–29.71, 30.95–31.85, 34.56–35.26, 41.69–43.39 s | Mario vs Palutena in Training, nothing drawn. The menu opens on CPU; R steps Saves, Recording, Fighters & Stages, Display & Controls (the five pages in order); Hitbox Visualization on Display & Controls opens a six-row checklist (Hitboxes, Grab boxes, Hurtboxes, Frame data colours, Launch angles, Windboxes); A ticks Hitboxes, then Grab boxes, then Hurtboxes, Down moves between them; the row reads 3 of 6, the menu closes, and both fighters' hurtboxes are yellow pills (Mario's limbs, Palutena's torso, one pill each); at 1/4 speed Mario's short-hop neutral air shows its red hitbox. The footer of the menu pages reads 0.2.0-rc.14 · rc14 17e50cd0; the checklist's help line reads Tick what to draw. Windboxes: hits that push or pull without hitstun. Launch angles: where each hit sends. The take's `hitbox_vis_after` is [1, 1, 1, 0, 0, 0]; the log has `[GameSpeed] step … speed=1/4`. Replaces `rc11-menu-tour.gif` (rc.11 build 0c628724: the hurtboxes of the original were rows of discs). |
 | `media/rc14-hitbox.gif` | `g5-rc14-xps-10`, `t-p2-hbp-tour` (gif-lane-5; the XPS; diag 17e50cd0, footer 0.2.0-rc.14 · rc14 17e50cd0) | README (Display & Controls); menu/display-and-controls; TECHNICAL | 8.0 s, 4.7 MB | 3.81–4.31, 21.46–21.96, 22.46–23.36, 26.01–26.61, 28.91–29.71, 30.95–31.85, 34.56–35.36, 35.24–35.84, 38.64–39.14, 41.64–43.54 s | The same take, the hitbox part, with a title strip: Training with nothing drawn; the Display & Controls row, the checklist, A ticks Hitboxes, then Grab boxes, then Hurtboxes; the menu closes; the yellow hurtbox pills on both fighters; the Game speed pop-up at x1, then at 1/4; Mario's short hop and neutral air, its red hitbox held for over a second while the strip's lane turns red. Replaces `rc11-hitbox.gif`. |
 | `media/rc14-waiting-menu.gif` | `final400-waiting-pill` (Sol's room pass, `ldn-final/final-400e2c69`; the Ally guest's first practice on the boot; diag 400e2c69 `99feb831`, footer 0.2.0-rc.14 · rc14 400e2c69; clip `rc14-waiting-menu-pills-400e2c69.gif`, sha256 `9461ff2d…`) | README, Waiting rooms; TECHNICAL | 6.6 s, 7.2 MB | 0–1.0 s of the CPU-page recording, then 0–5.6 s of the Display & Controls recording (a hard cut between two recordings; the last 1.4 s of the second is left out) | A Local Wireless waiting room, the guest's first practice. The menu on the CPU page (Reactions), cut to Display & Controls with Hitbox Visualization 0 of 6; its checklist opens with nothing ticked; Hurtboxes is ticked and the row reads 1 of 6; the menu closes and both practice fighters show yellow hurtbox pills, with the Waiting and P1/P2 Ready signs on screen. Hurtboxes only: no Hitboxes or Grab boxes are ticked. No host, desync or hardware claim. Replaces `rc11-waiting-menu.gif` (rc.11 build 0c628724: the hurtboxes of the original were rows of discs). |
+
+
+## rc.15 input drill (2026-11-15)
+
+`rc15-input-drill.gif` is the byte-identical media restored from `3d36ca7d`, shot on rc.15 feature source `2eb3903e`, not the final integrated build. Full frame1280×720,3.78s, nine encoded frames from19 native frames at a5fps request; SHA256 `a7f8a550de084758ed076c81b4dff39bc4503b2eacc80a8b7c9bb317b4fa9ccc`. It shows Drill1's Crop range4→3→4→3. It does not show Record drill, Make combo, grading or save-as-new. The early build's helper overlaps the editor; the integrated build corrected that issue. The [dated evidence](EVIDENCE-rc15-input-drill.md) keeps the original limitations and separate runtime checks. Embedded in README, Recording guide and Recording menu.
+
+Remaining media gaps: no dedicated GIF for combo link Crop, Record drill, no-hit Make combo, drill grading or the colour legend. Macro and drill GIFs show range selection rather than the full preview/save flow; the article hurtbox GIF shows Pikmin, not every supported item. Colour legend has both native scheme stills. These are capture gaps, not claims of missing runtime functionality.

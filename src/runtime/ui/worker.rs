@@ -91,7 +91,7 @@ fn toggle_input_display(presses: u32) {
             return;
         }
         on = now_on;
-        published::publish(&settings.menu, 0);
+        published::publish(&settings.menu, 0, [None; 2]);
         *SETTINGS.lock() = Some(settings);
         writer::request_settings();
     }
@@ -158,6 +158,7 @@ fn env() -> Env {
         combo_draft: crate::runtime::features::combo::labels().1,
         build_tag: crate::model::frame::BUILD_TAG,
         waiting_room: crate::runtime::scene::lobby_active(),
+        btt_projectiles_ready: crate::runtime::features::btt_projectiles::ready(),
         // rc.14: the save's Stage Builder stages are tiles after the catalog on both stage grids.
         custom_stages: crate::runtime::lobby::custom_stages::published()
             .map_or(0, |p| u16::try_from(p.customs.len()).unwrap_or(u16::MAX)),
@@ -348,16 +349,18 @@ fn handle(event: Event, s: &mut Session) {
         }
         CLOSING.store(false, Ordering::Release);
         crate::runtime::features::btt::menu_opened();
+        crate::runtime::features::tech::menu_opened();
         crate::runtime::ui::menu_app::note_open();
         { s.opening = crate::runtime::ui::menu_app::sequence(); }
         publish_frame(s);
         publish_jumps(s);
-        #[cfg(feature = "diag")]
-        if let Some(m) = s.menu.as_ref() {
-            diagnostic(format_args!("[Ui] menu opened page={} cursor={} depth={} screen={:?}", m.page().id(), m.cursor(), m.depth(), m.screen()));
+        if crate::runtime::export::wanted() {
+            if let Some(m) = s.menu.as_ref() {
+                diagnostic(format_args!("[Ui] menu opened page={} cursor={} depth={} screen={:?}", m.page().id(), m.cursor(), m.depth(), m.screen()));
+            }
+        } else {
+            diagnostic(format_args!("[Ui] menu opened"));
         }
-        #[cfg(not(feature = "diag"))]
-        diagnostic(format_args!("[Ui] menu opened"));
         return;
     }
     let Event::Poll(packet) = event else { return };
@@ -491,15 +494,16 @@ fn press(button: Button, s: &mut Session) {
         } else {
             m.press(button);
             // Eden reads where each press left the cursor (the section jump, the remembered place).
-            #[cfg(feature = "diag")]
-            diagnostic(format_args!("[Ui] press {button:?} page={} cursor={} depth={} screen={:?} row={:?} recording={}",
-                m.page().id(),
-                m.cursor(),
-                m.depth(),
-                m.screen(),
-                m.help_row().map(|r| r.title),
-                m.recording().focused_file_title().unwrap_or_default()
-            ));
+            if crate::runtime::export::wanted() {
+                diagnostic(format_args!("[Ui] press {button:?} page={} cursor={} depth={} screen={:?} row={:?} recording={}",
+                    m.page().id(),
+                    m.cursor(),
+                    m.depth(),
+                    m.screen(),
+                    m.help_row().map(|r| r.title),
+                    m.recording().focused_file_title().unwrap_or_default()
+                ));
+            }
             // Shipped builds write it too: a page reset is the player's explicit, confirmed choice.
             if let Some((page, changed)) = m.take_page_reset() {
                 diagnostic(format_args!("[TrainingRooms] page reset page={} rows={} changed={}", page.id(), changed.len(), changed.join(",")));
@@ -1131,10 +1135,14 @@ pub fn adopt_typed(defaults: bool, rows: &[(&'static str, Vec<u8>)], kept: &[(&'
     }
 }
 
-/// A publish made outside the menu (the diag reload, diag builds): the committed settings the menu
-/// opens on take the published rows and top-level keys, so a close keeps them (decision MENU-CLOSE).
+/// A publish made outside the menu (the diag reload, diag builds; the hardware bridge's settings apply): the committed settings the
+/// menu opens on take the published rows and top-level keys, so a close keeps them (decision MENU-CLOSE).
 /// The saved defaults are the player's and stay.
-#[cfg(feature = "diag")]
+/// The committed menu rows (what a settings apply's re-rolls are computed against). Plugin threads only.
+pub fn committed_menu() -> Option<crate::model::settings::Snapshot> {
+    SETTINGS.lock().as_ref().map(|current| current.menu.clone())
+}
+
 pub fn adopt_published(settings: &Settings) {
     let mut guard = SETTINGS.lock();
     if let Some(current) = guard.as_mut() {
@@ -1168,7 +1176,9 @@ fn begin_close(
         let picked = s.menu.as_ref().map_or([false; 2], |menu| {
             let live = SETTINGS.lock();
             let changed = |key: &str| live.as_ref().is_some_and(|live| live.menu.extra().get(key) != menu.kept(key));
-            [changed("player_character"), changed("cpu_character")]
+            // LEAD-1 (review F2): a repick of the stored fighter is a pick too, so its role's reload is dropped here.
+            crate::engine::swap::cycle_members::close_picked(
+                [changed("player_character"), changed("cpu_character")], menu.picks())
         });
         s.pending_close = Some(crate::runtime::mii::menu_handoff::CloseIntent {
             opening: s.opening,
@@ -1218,12 +1228,17 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     };
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(7);
-    published::publish(&settings.menu, outbox.rerolls);
+    // LEAD-1: the visit's last pick per role rides in the publish; the game frame decides each role's one load.
+    published::publish(&settings.menu, outbox.rerolls, outbox.picks);
     // rc.14: every close with Eggs-ercise on starts a fresh run.
     crate::runtime::features::hitbox::eggs_start();
     crate::runtime::features::mashout::start();
     // rc.14 Break the Targets: Place targets asks for the placing view; every close tells the mode (after the publish above).
     crate::runtime::features::btt::menu_closed(outbox.place_targets);
+    crate::runtime::features::tech::menu_closed(outbox.tech_point);
+    if outbox.tech_wizard {
+        crate::runtime::features::tech::open_wizard();
+    }
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(10);
     // The carried engines read the typed view of the committed settings (decision D1).

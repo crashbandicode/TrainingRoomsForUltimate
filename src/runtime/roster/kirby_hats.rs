@@ -132,6 +132,21 @@ unsafe fn role_lookup(role: usize) -> RoleLookup {
     lookup
 }
 
+/// SOL-R23: the object word of the native hat pair `copy_setup` will read for this Kirby and `kind`
+/// (`model::kirby_copy_pair`), or None. Game thread only (Kirby's frame callback, like the copy); read-only.
+unsafe fn copy_pair(body: *mut app::BattleObjectModuleAccessor, kind: u32) -> Option<usize> {
+    use crate::model::kirby_copy_pair as pair;
+    let word = |at: usize| Some((at as *const usize).read_volatile()).filter(|word| *word != 0);
+    let entry = WorkModule::get_int(body, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
+    let entry_ptr = Some(crate::runtime::game::natives::fighter_entry(entry)).filter(|at| *at != 0)?;
+    let table = word(crate::runtime::game::text_base() + crate::runtime::mii::mii_native_access::OWNER_TABLE)?;
+    let manager = word(table + pair::MANAGER_FIELD)?;
+    let offset = pair::pair_offset(((entry_ptr + pair::COSTUME_FIELD) as *const u8).read_volatile(), entry as u32)?;
+    let record = (0..pair::RECORDS).map(|index| manager + pair::record_offset(index))
+        .find(|record| (*record as *const u32).read_volatile() == kind)?;
+    Some(((record + offset) as *const usize).read_volatile())
+}
+
 unsafe fn equipped(body: *mut app::BattleObjectModuleAccessor) -> Option<u32> {
     WorkModule::is_flag(body, *FIGHTER_KIRBY_INSTANCE_WORK_ID_FLAG_COPY)
         .then(|| WorkModule::get_int(body, *FIGHTER_KIRBY_INSTANCE_WORK_ID_INT_COPY_CHARA) as u32)
@@ -350,6 +365,13 @@ pub unsafe fn on_frame(body: *mut app::BattleObjectModuleAccessor) {
                 return;
             }
             pending.leases_released = true;
+            // SOL-R23: the native copy reads this kind's hat pair for this Kirby with no null check; wait until it exists.
+            use crate::model::kirby_copy_pair::{copy_ready, PAIR_KINDS};
+            let kind = pending.kind;
+            if !copy_ready(kind, PAIR_KINDS.contains(&kind).then(|| copy_pair(body, kind)).flatten()) {
+                state.pending = Some(pending);
+                return;
+            }
             match sources::prepare(role, pending.kind,
                 Holder { category: 1, id: u64::from(pending.body_id) }) {
                 Ok(Some(lease)) => {

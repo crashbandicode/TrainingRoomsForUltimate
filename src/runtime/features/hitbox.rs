@@ -1,7 +1,7 @@
 //! The hitbox visualizer, the runtime half (SPEC-core-06; the rules are `model::hitbox`).
 //!
 //! With items of the `hitbox_vis` checklist ticked (rc.14, `model::legend`), the ticked kinds of a fighter's boxes in Training (every
-//! active hitbox by id colour, every hurtbox, every grab box; the frame data colours and the launch-angle marks on request) are drawn with the plugin's own translucent panes (decision HB-OWN-ORBS, option 1, operator 2026-11-05: "go with
+//! active hitbox by strength, every hurtbox by status, every grab box; launch-angle marks on request) are drawn with the plugin's own translucent panes (decision HB-OWN-ORBS, option 1, operator 2026-11-05: "go with
 //! discs for all"), a capsule as one pill (decision HB-PILLS, 2026-11-14), placed on its bone and projected with the game's
 //! camera every layout tick. An article's hitboxes
 //! are own orbs too (rc.13, `draw_articles`): the game's effect sphere on a projectile lived its whole flight but never
@@ -88,6 +88,7 @@ pub fn publish(snapshot: &Snapshot) {
     let hide = eggs::choice(snapshot, eggs::ROW_PRACTICE_CPU) == 0;
     PRACTICE_HIDE.store(hide, Ordering::Release);
     btt::publish(snapshot);
+    super::tech::publish(snapshot);
 }
 
 // ---- Eggs-ercise (rc.14, `model::eggs`) -------------------------------------------------------------------------------
@@ -131,9 +132,7 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     // V2.6: the CPU is hidden while a practice game runs and `CPU during a game` says Hide, unless it is the target
     // (`eggs::hides_cpu`). The CPU's body, its tag and its panel follow this one request (`cpu::hide::step`).
     let running = run.running();
-    super::hide_cpu::hide(eggs::hides_cpu(PRACTICE_HIDE.load(Ordering::Acquire), running, run.cpu_target(), btt::running()));
-    // The standing notice sits in the top band while the game runs (the operator, 11-14).
-    super::notices::raise(super::notices::RAISE_EGGS, running);
+    super::hide_cpu::hide(super::tech::running() || eggs::hides_cpu(PRACTICE_HIDE.load(Ordering::Acquire), running, run.cpu_target(), btt::running()));
     if plan == eggs::Plan::Clear {
         super::notices::clear(NOTICE_ID);
     }
@@ -174,7 +173,7 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     // V2.1: the fighter whose attack broke it (Ice Climbers: that climber) freezes, as on a hit.
     let broke = run.score > score;
     if let Some(frames) = broke.then(scene::facts).and_then(eggs::hitlag) {
-        natives::set_hit_stop_frame(at, frames);
+        let _ = natives::set_hit_stop_frame(at, frames, false);
     }
     let length = length?;
     let mut text = crate::model::storage::FixedPath::<48>::new();
@@ -256,35 +255,26 @@ unsafe fn eggs_cpu_diag(run: &eggs::Run, before: u32, at: usize, damage: f32, st
 
 /// What a practice game reads of Player 1: its top joint, its live attack pills and their number, whether it is in an aerial
 /// and its kind.
-type P1 = ([f32; 3], [eggs::Hit; hitbox::SLOTS as usize], usize, bool, i32);
+pub(crate) type P1 = ([f32; 3], [eggs::Hit; hitbox::SLOTS as usize], usize, bool, i32);
 
 /// # Safety
 /// `at` is a live fighter's accessor.
-unsafe fn p1_read(at: usize) -> P1 {
+pub(crate) unsafe fn p1_read(at: usize) -> P1 {
     let top = natives::joint_position(at, hash40("top"), &[0.0; 3]).unwrap_or_default();
+    let (hits, n) = object_hits(at);
+    let (aerial, kind) = (natives::status_kind(at) == eggs::ATTACK_AIR, natives::fighter_kind(at));
+    (top, hits, n, aerial, kind.unwrap_or(-1))
+}
+
+/// Native attack pills of a live fighter or article, independent of visualizer settings.
+pub(crate) unsafe fn object_hits(at: usize) -> ([eggs::Hit; hitbox::SLOTS as usize], usize) {
     let (mut wants, mut len) = ([Sphere::NONE; 2 * hitbox::SLOTS as usize], 0);
     hitbox::want_hitboxes(&mut GameAttacks(at), &mut wants, &mut len);
     let mut hits = [eggs::Hit::default(); hitbox::SLOTS as usize];
     let place = |s: &Sphere| natives::joint_position(at, s.joint, &s.pos);
     let power = |slot| GameAttacks(at).read_f32(GameAttacks(at).data(slot) + layout::POWER);
     let n = eggs::pills(&wants[..len], place, power, &mut hits);
-    let (aerial, kind) = (natives::status_kind(at) == eggs::ATTACK_AIR, natives::fighter_kind(at));
-    (top, hits, n, aerial, kind.unwrap_or(-1))
-}
-
-/// Break the Targets' pass (`runtime::features::btt`): Player 1's entry-0 fighters read the same pills Eggs-ercise does, while the mode
-/// needs them. Idle (the mode Off, no menu open) it does nothing; with a menu open and the row Off it only keeps the stage's layouts current.
-unsafe fn btt_pass(fighter: usize) -> Option<()> {
-    let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
-    (entry == 0 && !btt::idle()).then_some(())?;
-    let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
-    let (top, hits, n, aerial, _) = btt::reading().then(|| p1_read(at)).unwrap_or_default();
-    let rule = EGG_ROWS.load(Ordering::Acquire).to_le_bytes()[1];
-    let broke = btt::pass(at, top, |spot| hits[..n].iter().any(|h| eggs::breaks(rule, aerial, h, spot)));
-    // V2.1: the fighter whose attack broke a target freezes, as on a hit.
-    let frames = (broke > 0).then(scene::facts).and_then(eggs::hitlag)?;
-    natives::set_hit_stop_frame(at, frames);
-    Some(())
+    (hits, n)
 }
 
 /// The status ids and effect attributes, resolved once through the game's constant table (`None` until it answers; it may not be
@@ -476,7 +466,12 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         return;
     }
     let waiting = name == b"info_waiting";
-    let active = if waiting { crate::runtime::lobby::training::lobby::requested() } else { name == b"info_training" && scene::is_training() };
+    let active = if waiting {
+        // An unavailable menu is not a scene departure. Preserve the Eggs/BTT run
+        // and its panes for this tick; retry before touching either on the next.
+        let Ok(active) = crate::runtime::lobby::training::lobby::try_requested() else { return; };
+        active
+    } else { name == b"info_training" && scene::is_training() };
     if layout.is_null() {
         return;
     }
@@ -484,6 +479,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     let (eggs_orbs, marks) = (RUN.lock().look(active, || view()), btt::look(active, || view()));
     let mut own = [None; 3 + btt::LOOKS];
     own[..3].copy_from_slice(&eggs_orbs);
+    let marks = if super::tech::running() { super::tech::look(active) } else { marks };
     own[3..].copy_from_slice(&marks);
     let mut cache = ORB_PANES.lock();
     let registrations = tick::REGISTRATIONS.load(Ordering::Acquire);
@@ -779,8 +775,6 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
         let live = smash::app::sv_battle_object::is_active(id) && smash::app::sv_battle_object::module_accessor(id) as usize == key;
         // `key` is the live article's accessor (checked above); the natives check their own grants. Tracked: its set.
         let Some((set, attacking)) = articles.track(id, key, &mut board, false) else { continue };
-        set.frame_data = shown(legend::COLOURS);
-        set.wind = wind;
         let place = |s: &Sphere| natives::joint_position(key, s.joint, &s.pos);
         // Only a live article is read: its areas, its facing and its status (`legend::keeps_article` inside the pass).
         let kept = live && {
@@ -789,7 +783,7 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
             stats::object(id, key, &areas[..found]);
             let mut len = 0;
             if let Some(mut reader) = hurt.then(|| hurt_reader(key)).flatten() {
-                let cut = hitbox::want_article_hurt(&mut reader, &mut hurts, &mut len, set.frame_data, &mut budget);
+                let cut = hitbox::want_article_hurt(&mut reader, &mut hurts, &mut len, true, &mut budget);
                 dropped += cut;
                 #[cfg(feature = "diag")]
                 stats::article_hurt(id, key, len, cut);
@@ -833,7 +827,6 @@ pub unsafe fn frame(fighter: usize) {
     }
     let _scope = HookScope::enter_hook(HookId::HitboxFrame);
     eggs_pass(fighter);
-    btt_pass(fighter);
     #[cfg(feature = "diag")]
     stats::frame_begin();
     let enabled = SETTING.load(Ordering::Acquire);
@@ -880,9 +873,7 @@ pub unsafe fn frame(fighter: usize) {
     }
     let Store { table, wants, .. } = &mut *store;
     let set = &mut table.sets[i];
-    set.frame_data = shown(legend::COLOURS);
-    set.wind = shown(legend::WINDBOXES);
-    if set.frame_data && enabled {
+    if enabled {
         set.launch = fighter_launch(accessor);
     }
     // Own orbs (decision HB-OWN-ORBS): while the setting is On the pass reads the HitModule (the relied `hurtbox_*` rows) and
@@ -978,7 +969,7 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     let Some(shape) = hitbox::parse(indices, |i| lua_cell(lua, i)) else { return };
     let mut wants = [Sphere::NONE; hitbox::SHAPE_SPHERES];
     let mut len = 0;
-    let tint = hitbox::legend_colour(hitbox::KIND_GRAB, None, 0, hitbox::GRAB_TINT, shown(legend::COLOURS));
+    let tint = hitbox::legend_colour(hitbox::KIND_GRAB, None, 0);
     hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_GRAB, shape.id as usize, &shape, tint);
     let status = Some(natives::status_kind(accessor));
     let (mut store, mut articles);
@@ -1002,7 +993,7 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
 #[skyline::hook(offset = sites_hitbox::HITBOX_ATTACK_OFFSET)]
 pub unsafe fn hitbox_attack_hook(lua_state: usize) {
     animation_command(lua_state, hitbox::ATTACK, false);
-    call_original!(lua_state)
+    call_original!(lua_state);
 }
 
 /// `sv_animcmd::CATCH`: the plugin part first, then the game's own command.
@@ -1423,3 +1414,5 @@ mod stats {
     }
 
 }
+
+pub(crate) fn egg_rule() -> u8 { EGG_ROWS.load(Ordering::Acquire).to_le_bytes()[1] }

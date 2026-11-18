@@ -47,23 +47,6 @@ pub fn clear_intro_store() {
     INTRO_STORE_DUE.store(false, Ordering::Release);
 }
 
-/// The practice games whose standing notice is up, one bit each (`RAISE_EGGS`; Break the Targets has its own): while
-/// any is, the notice slot sits in the top band (`panes::NOTICE_TOP_Y`), so the targets keep the middle of the screen.
-static RAISED: AtomicU8 = AtomicU8::new(0);
-pub const RAISE_EGGS: u8 = 1;
-pub const RAISE_BTT: u8 = 2;
-
-/// A practice game's bit: its notice stands (`on`) or is gone.
-pub fn raise(mode: u8, on: bool) {
-    let set = |held: u8| Some(held & !mode | mode * u8::from(on));
-    let _ = RAISED.fetch_update(Ordering::AcqRel, Ordering::Acquire, set);
-}
-
-/// Some practice game's notice stands: the slot sits in the top band.
-pub fn raised() -> bool {
-    RAISED.load(Ordering::Acquire) != 0
-}
-
 /// Grouped-session trace point. It runs once, when this process posts the six intro notices.
 #[no_mangle]
 #[inline(never)]
@@ -121,6 +104,13 @@ pub fn post(header: &'static str, body: &'static str, length: u16, color: [u8; 4
     send(Mail::Post(header, body, length, color));
 }
 
+/// Post a required notice with a static body: a refusal the player must see, which Combo Display Off does not clear
+/// (`Queue::post_required`; CRASH-0900 review R2). False when the mailbox was full and the post was dropped (the
+/// caller tries again). Allocation-free; any thread, including a game hook.
+pub fn post_required(header: &'static str, body: &'static str, length: u16, color: [u8; 4]) -> bool {
+    MAILBOX.post(Mail::PostRequired(header, body, length, color))
+}
+
 /// Post a plain notice whose body was copied into its fixed buffer (`Body`). Allocation-free; any thread.
 pub fn post_body(header: &'static str, body: Body, length: u16, color: [u8; 4]) {
     send(Mail::PostBody(header, body, length, color));
@@ -155,6 +145,7 @@ pub fn saved(slot: usize) {
 #[derive(Clone, Copy)]
 enum Mail {
     Post(&'static str, &'static str, u16, [u8; 4]),
+    PostRequired(&'static str, &'static str, u16, [u8; 4]),
     PostBody(&'static str, Body, u16, [u8; 4]),
     Upsert(u8, &'static str, Body, u16, [u8; 4]),
     ShowNow(u8, &'static str, Body, u16, [u8; 4]),
@@ -173,6 +164,7 @@ fn send(mail: Mail) {
 fn take_mail(queue: &mut Queue) {
     MAILBOX.drain(|mail| match mail {
         Mail::Post(header, body, length, color) => queue.post_static(header, body, length, color),
+        Mail::PostRequired(header, body, length, color) => queue.post_required(header, Body::copied(body), length, color),
         Mail::PostBody(header, body, length, color) => queue.post(header, body, length, color),
         Mail::Upsert(id, header, body, length, color) => queue.upsert(id, header, body, length, color),
         Mail::ShowNow(id, header, body, length, color) => queue.show_now(id, header, body, length, color),

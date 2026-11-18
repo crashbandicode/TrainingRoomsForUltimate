@@ -1,0 +1,17 @@
+{
+  "head": "bd5306934304b47d89fee6c81c0969872e087169",
+  "scope": "source-only, no compiled gates",
+  "added": [
+    "camera_limit_range",
+    "stage_id_call",
+    "utility_get_kind"
+  ],
+  "removed": [],
+  "ui_runtime_untouched": true,
+  "changed_files": [
+    "artifacts/rc15-tech/S0-decision-seam/ui-core-integration/FOLLOWUP-DESIGN.md",
+    "artifacts/rc15-tech/S0-decision-seam/ui-core-integration/FOLLOWUP-HANDOFF.md",
+    "src/model/capabilities.rs",
+    "tests/capabilities.rs"
+  ]
+}

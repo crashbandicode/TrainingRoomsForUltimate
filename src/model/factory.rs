@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 130;
+pub const COUNT: usize = 152;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -141,8 +141,8 @@ pub static DEFS: [Def; COUNT] = [
     row!("buff_state", Multiple, 18, []),
     // Misc Settings.
     row!("frame_advantage", Single, 2, [1]),
-    // rc.14: a checklist (`legend::ITEMS`: hitboxes, grab boxes, hurtboxes, frame data colours, launch angles), none ticked;
-    // an older file's two-option row is migrated (`legend::migrate`).
+    // Six visible checklist items, none ticked; seven stored slots retain the original bit positions.
+    // Slot 3 (the retired colour mode) is ignored; an older two-option row migrates (`legend::migrate`).
     row!("hitbox_vis", Multiple, 7, []),
     // Off, Frame strip: the frame strip (SPEC-input-06 §3.1; it replaced `input_display` and `input_display_status`).
     row!("input_display_strip", Single, 2, [1]),
@@ -220,7 +220,7 @@ pub static DEFS: [Def; COUNT] = [
     // §V2.5 Break the Targets: Off / On.
     row!("btt", Single, 2, [0]),
     // rc.14 sweet/sour spots (SP1 to SP5): the strip's spot labels and the combo's match, both Off by default ([On, Off], stored [0, 1]);
-    // appended like lobby_items. (Frame data colours is an item of `hitbox_vis`.)
+    // appended like lobby_items.
     row!("spots_strip", Single, 2, [1]),
     row!("spots_combo", Single, 2, [1]),
     // rc.15 Mash out: stable ordinary attacker indices and Random89; reviewed moves append.
@@ -233,4 +233,28 @@ pub static DEFS: [Def; COUNT] = [
         default: &ones::<{ super::mashout::moves::ATTACKER_LABELS.len() }>(&[0]),
     },
     row!("mashout_grab", Single, 4, [0]),
+    // rc.15 Tech practice: one session row and per-attempt settings.
+    row!("tech_practice", Single, 6, [0]),
+    row!("tech_surface", Single, 5, [0]),
+    row!("tech_damage", Single, 2, [0]),
+    Def { id: "tech_damage_range", kind: Kind::Slider, len: 2, default: &[12, 12] },
+    row!("tech_speed", Single, 2, [0]),
+    Def { id: "tech_speed_range", kind: Kind::Slider, len: 2, default: &[2, 2] },
+    row!("tech_hit_damage", Single, 2, [0]),
+    Def { id: "tech_hit_damage_range", kind: Kind::Slider, len: 2, default: &[11, 11] },
+    row!("tech_angle", Single, 3, [0]),
+    Def { id: "tech_angle_range", kind: Kind::Slider, len: 2, default: &[0, 71] },
+    row!("tech_start", Single, 3, [0]),
+    Def { id: "tech_start_range", kind: Kind::Slider, len: 2, default: &[80, 160] },
+    row!("tech_time", Single, 2, [1]),
+    Def { id: "tech_time_range", kind: Kind::Slider, len: 2, default: &[10, 30] },
+    row!("tech_di", Single, 4, [0]),
+    row!("tech_di_direction", Single, 11, [8]),
+    row!("tech_facing", Single, 4, [0]),
+    row!("tech_delay", Single, 2, [0]),
+    Def { id: "tech_delay_range", kind: Kind::Slider, len: 2, default: &[20, 20] },
+    row!("tech_camera", Single, 2, [0]),
+    row!("tech_wizard_skip", Single, 2, [1]),
+
+    row!("btt_projectiles", Single, 2, [1]),
 ];

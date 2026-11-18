@@ -14,9 +14,26 @@ pub fn context() -> Option<Context> {
         mode.map_or(0, |m| m.mode), super::lobby::active())
 }
 
+/// Fresh ownership context without waiting on a game-side menu edit.
+/// Native Training does not depend on a waiting-room menu request.
+pub fn try_context() -> Result<Option<Context>, crate::runtime::compat::menu::MenuBusy> {
+    if unsafe { common::is_native_training_mode() } {
+        return Ok(Some(Context::Training));
+    }
+    let mode = common::game_mode::current();
+    Ok(practice_policy::context(false, mode.is_some_and(|m| m.initialized),
+        mode.map_or(0, |m| m.melee), mode.map_or(0, |m| m.mode), super::lobby::try_active()?))
+}
+
 pub fn scene_enabled() -> bool { context().is_some() }
 pub fn enabled() -> bool {
-    scene_enabled() && !crate::runtime::roster::character_roster::busy() && !super::lobby::native_ui_busy()
+    enabled_in(context())
+}
+pub fn try_enabled() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {
+    Ok(enabled_in(try_context()?))
+}
+fn enabled_in(current_context: Option<Context>) -> bool {
+    current_context.is_some() && !crate::runtime::roster::character_roster::busy() && !super::lobby::native_ui_busy()
 }
 
 pub unsafe fn entry(role: usize) -> Option<usize> {
@@ -29,8 +46,11 @@ pub unsafe fn entry(role: usize) -> Option<usize> {
 /// Native Training panels also hold extra CPUs. They have entry receipts for
 /// releasing that stop, but never acquire either save/record slot.
 pub unsafe fn panel_entry(module: &BattleObjectModuleAccessor) -> Option<usize> {
-    if !enabled() || !common::is_fighter(module) { return None; }
-    let context = context()?;
+    panel_entry_in(context(), module)
+}
+pub unsafe fn panel_entry_in(current_context: Option<Context>, module: &BattleObjectModuleAccessor) -> Option<usize> {
+    if !enabled_in(current_context) || !common::is_fighter(module) { return None; }
+    let context = current_context?;
     let index = WorkModule::get_int(module as *const _ as *mut BattleObjectModuleAccessor,
         *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
     if !(0..8).contains(&index)
@@ -46,12 +66,19 @@ unsafe fn native_entry(index: i32) -> Option<usize> {
         && native_fields::read::<u32>(entry, 0xe0) == Some(index as u32)).then_some(entry)
 }
 
-unsafe fn entries() -> Option<Entries> {
-    Some(Entries { context: context()?, player: entry(0)?, cpu: entry(1)? })
+unsafe fn entries(current_context: Option<Context>) -> Option<Entries> {
+    if !enabled_in(current_context) { return None; }
+    let context = current_context?;
+    Some(Entries { context, player: native_entry(0)?, cpu: native_entry(context.cpu_entry())? })
 }
 
 pub unsafe fn acquire() -> bool {
-    let Some(current) = entries() else { return false; };
+    acquire_in(context())
+}
+
+/// Same lease acquisition using the caller's freshly resolved eligibility.
+pub unsafe fn acquire_in(current_context: Option<Context>) -> bool {
+    let Some(current) = entries(current_context) else { return false; };
     if common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::Player).is_none()
         || common::try_get_module_accessor(crate::runtime::compat::consts::FighterId::CPU).is_none() { return false; }
     OWNED.lock().acquire(current)
@@ -77,7 +104,7 @@ pub fn retire() {
 pub unsafe fn refresh() {
     if !enabled() { return; }
     if !OWNED.lock().active() && !super::named_macros::suspended() { return; }
-    let current = entries();
+    let current = entries(context());
     let replaced = OWNED.lock().replaced(current);
     if replaced { retire(); }
     if current.is_some() { super::named_macros::resume_waiting(); }
@@ -108,8 +135,11 @@ fn depart_session() {
 }
 
 pub unsafe fn role(module: &BattleObjectModuleAccessor) -> Option<usize> {
-    if !enabled() || !common::is_fighter(module) { return None; }
-    context()?.role(WorkModule::get_int(module as *const _ as *mut BattleObjectModuleAccessor,
+    role_in(context(), module)
+}
+pub unsafe fn role_in(current_context: Option<Context>, module: &BattleObjectModuleAccessor) -> Option<usize> {
+    if !enabled_in(current_context) || !common::is_fighter(module) { return None; }
+    current_context?.role(WorkModule::get_int(module as *const _ as *mut BattleObjectModuleAccessor,
         *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID))
 }
 

@@ -47,7 +47,7 @@ struct Sample {
 // Changed flags share the renderer's static ownership; native pane writes run after HELPER is dropped.
 static RENDERER: Mutex<(Renderer, [Option<Changed>; combo_plan::COUNT])> =
     Mutex::new((Renderer::new(), [None; combo_plan::COUNT]));
-/// The bar was drawn shown on the last HUD tick that got to it: a practice game's notice sits under it (`panes::notice_y`).
+/// The bar was drawn shown on the last HUD tick that got to it: the wide BTT chip sits under it (`panes::btt_hud_box`).
 static BAR_SHOWN: AtomicBool = AtomicBool::new(false);
 static INPUT_TARGET: AtomicBool = AtomicBool::new(false);
 pub fn input_observation_wanted() -> bool {

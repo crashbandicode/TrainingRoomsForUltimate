@@ -6,6 +6,11 @@ Test-run footage from Eden, 2026-11-14. Untested on hardware.
 
 The practice-game notice now sits in a band at the top.
 
+**Superseded 2026-11-17 (rc15/notice-compact):** every notice, the practice games' included, is now one compact
+box sized to its text, at the top left (16 px from the left and 8 px from the top at 1280 × 720). It wraps before it
+reaches the frame strip, and it stacks under the Break the Targets chip while that shows. The top band and the centred
+plates are gone. The box is still at the top, so the targets keep the middle of the screen.
+
 **Break the Targets, saved layouts (new):** on Battlefield, three targets are placed, and ZL + Down saves them as
 Layout 1. Y twice clears the stage. A second course is placed higher and saved as Layout 2. ZL + Right steps to the
 other layout, and ZL + Up loads Layout 1: its three targets are back where the first course was.
@@ -55,6 +60,22 @@ the two left ("Targets 0/2 0:00.00").
 
 Coming before release: when the CPU is hidden, its floating "CPU" tag and its HUD panel will be hidden too, and these
 clips will be re-shot. With Target set to CPU, the CPU will fly like the discs.
+
+## CPU tag under the notice band at the apex (for decision)
+
+Eden, 2026-11-15, the build where the CPU flies (diag `fa04daab`); cut from the existing take, no new run. The floating
+CPU tag is drawn above the CPU's head. Near the top of a flight the head is under the Eggs-ercise notice band, so the
+tag goes behind the band. Here Fox's short hop launches the CPU beside him: the tag shows while the CPU stands and as
+it starts to rise, disappears behind the band for about 0.9 s at the top, and comes back with the hit (the band's count
+goes to Eggs 1), then stays while the CPU falls to its next spot. The first flight, which puts the CPU high up, hides
+its tag the same way for about 0.8 s. The CPU itself is never hidden, only its tag. The inset in the lower right is
+the band area at 2x.
+
+![The CPU rises with its tag, the tag goes behind the Eggs notice band at the top, then returns with the hit and stays as the CPU falls](rc14-preview-cpu-tag-apex.gif)
+
+**Choice:** keep it as it is (the tag is gone for under a second at the top of a flight, the CPU stays in view, nothing
+to change), or lower the CPU target's flight peak so its tag always stays clear of the band (the tag never hides, but
+the CPU no longer flies exactly like the discs).
 
 ## Earlier takes (the draft build)
 

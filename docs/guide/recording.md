@@ -193,6 +193,11 @@ recorded one.
 - **Progress:** the bar shows steps, Best counts steps that counted, and the streak counts complete clean attempts. After an attempt, more than 20 idle frames allow a fresh attempt.
 - **Crop:** the shared clip editor's handles select whole steps. It saves a new Drill N and leaves the original; the retained first event becomes time zero. X has no preview, as for hit combos.
 
+![Drill 1 in the clip editor: four steps, then three selected whole steps](../media/rc15-input-drill.gif)<br>
+*A drill's Crop: L selects the start or R the end; Left/Right changes the kept steps (4 → 3 → 4 → 3). Eden, 2026-11-15, rc.15 `2eb3903e`. This early build's helper overlaps the editor; the overlap was fixed before the integrated release. The clip shows range selection, not recording or grading.*
+
+[Input drill acceptance evidence](../EVIDENCE-rc15-input-drill.md).
+
 Sequences in rc.15 offer hit combos only. Their continuation currently checks the hit connecting two combos, which an input drill does not have.
 
 ### Crop
@@ -205,6 +210,9 @@ Crop on a combo, drill or macro opens the Replay window's clip editor ([keys](..
 - X previews a macro's kept inputs on the CPU, including a Player 1 macro.
 - A combo crop keeps the links from the first handle through the last; a drill crop keeps the selected steps. The handles step by whole links or steps, and X is not offered.
 - A chain has no Crop row, because it has no frames of its own. The Replay window is a separate row under Replays.
+
+![A macro start handle moves from frame 0 to 180](../media/rc15-crop-editor.gif)<br>
+*Macro Crop range selection: L, then Left/Right moves the start handle. Eden, 2026-11-15, rc.15 `d520d325`. Preview and save-as-new were checked separately; this clip shows the selection.*
 
 
 ## Sequences and the one drill

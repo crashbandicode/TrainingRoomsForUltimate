@@ -37,6 +37,9 @@ pub enum Effect {
     Nothing,
     /// The values of the active key changed: write them back.
     Changed,
+    /// A on the fighter a pick already stores: no value changes, but it is still one load the player asked for (LEAD-1:
+    /// a stored pick that never loaded, or that a cycle left behind, must be pickable again).
+    Repicked,
     /// Toggle the active role's independent Ice Climbers preference.
     ToggleSolo,
     /// Only what is shown changed (a previewed form, the role).
@@ -141,13 +144,20 @@ impl RosterEditor {
     /// Apply one editor input to the menu snapshot, preserving the other role's settings.
     pub fn apply(&mut self, menu: &mut crate::model::menu::Menu, cell: usize, button: Button) {
         let mut values = self.values(menu.kept(self.key()));
-        match self.press(cell, button, &mut values) {
+        let effect = self.press(cell, button, &mut values);
+        match effect {
             Effect::Changed => menu.set_kept(self.key(), Self::value_of(&values)),
             Effect::ToggleSolo => {
                 let on = !self.solo_enabled(menu);
                 menu.set_kept(self.solo_key(), serde_json::json!([u8::from(on), u8::from(!on)]));
             }
-            Effect::Nothing | Effect::Shown => {}
+            Effect::Repicked | Effect::Nothing | Effect::Shown => {}
+        }
+        // A pick press is a request even when the stored value does not change; the close dispatches it (LEAD-1).
+        if self.pick() && matches!(effect, Effect::Changed | Effect::Repicked) {
+            if let Some(CellContent::Fighter(kind)) = self.grid.info(cell).map(|info| info.content) {
+                menu.note_pick(self.use_ == RosterUse::CpuPick, kind);
+            }
         }
     }
 
@@ -202,7 +212,7 @@ impl RosterEditor {
             (Button::A, CellContent::Fighter(kind)) if self.pick() => {
                 let Some(index) = CHOICES.iter().position(|(k, _)| *k == kind) else { return Effect::Nothing };
                 if values.get(index) == Some(&1) {
-                    return Effect::Nothing;
+                    return Effect::Repicked;
                 }
                 values.fill(0);
                 values[index] = 1;
@@ -385,7 +395,7 @@ mod tests {
         assert_eq!(values.len(), CHOICES.len());
         assert_eq!(editor.press(cell_of(0x58), Button::A, &mut values), Effect::Changed); // Steve
         assert_eq!(values.iter().filter(|v| **v == 1).count(), 1);
-        assert_eq!(editor.press(cell_of(0x58), Button::A, &mut values), Effect::Nothing);
+        assert_eq!(editor.press(cell_of(0x58), Button::A, &mut values), Effect::Repicked);
         assert_eq!(editor.press(cell_of(0x00), Button::A, &mut values), Effect::Changed); // Mario
         assert_eq!(values[CHOICES.iter().position(|(k, _)| *k == 0x00).unwrap()], 1);
         assert_eq!(editor.key(), "player_character");
@@ -498,6 +508,59 @@ mod tests {
         assert_eq!(hats.press(brawler, Button::A, &mut values), Effect::Changed);
     }
 
+    /// LEAD-1 (hardware ccd9befd, run-7 03:15Z / run-9 03:51Z): after a Player Swapping cycle P1 was Mr. Game & Watch
+    /// while the stored pick was still Fox. A on the "> Fox" tile did nothing, so the pick was dropped without a notice.
+    /// A pick of the stored fighter is still one load the player asked for.
+    fn a_pick_of_the_stored_fighter_still_asks_for_that_load() {
+        let mut editor = RosterEditor::new(RosterUse::PlayerPick);
+        let mut values = editor.values(None);
+        assert_eq!(editor.press(cell_of(0x07), Button::A, &mut values), Effect::Changed); // Fox stored
+        let stored = values.clone();
+        assert_ne!(editor.press(cell_of(0x07), Button::A, &mut values), Effect::Nothing,
+            "a pick of the stored fighter is a request, not nothing");
+        assert_eq!(values, stored, "the stored value itself does not change");
+    }
+
+    /// The pick reaches the close through the menu's outbox for both roles, the stored one included.
+    fn every_pick_press_is_noted_for_the_close() {
+        use crate::model::{menu::{Env, Menu}, settings::Settings};
+        let mut menu = Menu::new(Settings::factory(), Env::default());
+        let mut player = RosterEditor::new(RosterUse::PlayerPick);
+        player.apply(&mut menu, cell_of(0x07), Button::A);
+        assert_eq!(menu.take_outbox().picks, [Some(0x07), None], "a changed pick");
+        player.apply(&mut menu, cell_of(0x07), Button::A);
+        assert_eq!(menu.take_outbox().picks, [Some(0x07), None], "the stored pick again");
+        let mut cpu = RosterEditor::new(RosterUse::CpuPick);
+        cpu.apply(&mut menu, cell_of(0x58), Button::A);
+        cpu.apply(&mut menu, cell_of(0x58), Button::A);
+        assert_eq!(menu.take_outbox().picks, [None, Some(0x58)]);
+        let mut cycles = RosterEditor::new(RosterUse::Cycles);
+        cycles.apply(&mut menu, cell_of(0x07), Button::A);
+        assert_eq!(menu.take_outbox().picks, [None, None], "a cycle order edit is not a pick");
+        player.apply(&mut menu, cell_of(0x07), Button::X);
+        assert_eq!(menu.take_outbox().picks, [None, None], "X previews a form, it picks nothing");
+    }
+
+    /// LEAD-1 review F3: a repick is the player's edit of the pick key. The menu opened on Fox; a swap finishing while it is
+    /// open writes Pikachu into the live settings; A on "> Fox" must commit Fox (MENU-CLOSE: the player's edit wins).
+    fn a_repick_is_the_players_edit_over_a_live_writeback() {
+        use crate::model::{menu::{Env, Menu}, settings::Settings};
+        let mut fox = RosterEditor::new(RosterUse::PlayerPick);
+        let mut values = fox.values(None);
+        fox.press(cell_of(0x07), Button::A, &mut values);
+        let mut opened = Settings::factory();
+        opened.menu.set_kept("player_character", RosterEditor::value_of(&values)).unwrap();
+        let mut menu = Menu::new(opened.clone(), Env::default());
+        let mut live = opened;
+        let mut pikachu = vec![0u8; values.len()];
+        pikachu[CHOICES.iter().position(|(k, _)| *k == 0x08).unwrap()] = 1;
+        live.menu.set_kept("player_character", RosterEditor::value_of(&pikachu)).unwrap();
+        RosterEditor::new(RosterUse::PlayerPick).apply(&mut menu, cell_of(0x07), Button::A);
+        let committed = menu.commit_onto(&live);
+        assert_eq!(committed.menu.extra().get("player_character"), Some(&RosterEditor::value_of(&values)),
+            "the repicked Fox, not the written-back Pikachu");
+    }
+
     /// A minimal menu stub for decorate_badges: the kept keys as JSON arrays.
     fn menu_with_kept(kept: &[(&'static str, &[u8])]) -> crate::model::menu::Menu {
         use crate::model::{menu::{Env, Menu}, settings::Settings};
@@ -517,6 +580,9 @@ mod tests {
             ("solo_popo_persists_independently_for_each_role", solo_popo_persists_independently_for_each_role as fn()),
             ("hats_badge_the_hat_order_and_hide_the_solo_markers", hats_badge_the_hat_order_and_hide_the_solo_markers as fn()),
             ("mii_tiles_follow_the_catalog_admission", mii_tiles_follow_the_catalog_admission as fn()),
+            ("a_pick_of_the_stored_fighter_still_asks_for_that_load", a_pick_of_the_stored_fighter_still_asks_for_that_load as fn()),
+            ("every_pick_press_is_noted_for_the_close", every_pick_press_is_noted_for_the_close as fn()),
+            ("a_repick_is_the_players_edit_over_a_live_writeback", a_repick_is_the_players_edit_over_a_live_writeback as fn()),
         ]);
     }
     }

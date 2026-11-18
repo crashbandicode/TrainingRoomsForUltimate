@@ -76,6 +76,7 @@ don't turn the page while a file's screen is open.
 | Macro | Start save (only if it has one), Set active, Playback slot, Rename, Crop, Make combo, Delete |
 | Chain | Start save (only if its first macro has one), Set active, Edit chain, Rename, Make combo, Delete |
 | Combo | Drill, Made from (only if it was made from a macro), Rename, Crop, Delete |
+| Input drill | Drill, Made from (only if made from a macro or chain), Rename, Crop, Delete |
 | Sequence | Drill sequence, a row for each of its combos (A drills that combo alone), Edit combos, Rename, Delete |
 
 | Row | What it does |
@@ -87,7 +88,7 @@ don't turn the page while a file's screen is open.
 | Playback slot | None or Slot 1 to 5 (Left/Right, or A to step on). The CPU plays this macro when it picks that Playback Slot in Mash, Followup, the overrides or Ledge Options. One macro per slot: choosing a slot another macro holds takes it. A slot holds up to 600 frames (10 s), so crop a longer macro first. Kept with the library; deleting the macro empties its slot. |
 | Rename | Opens the Switch keyboard (up to 48 characters). B, or an empty name, keeps the old name. |
 | Crop | Opens the [clip editor](#replay-window). L picks In, R picks Out; Left/Right move it. Macros use frames and X previews on the CPU; combos use whole links and drills use whole steps, with no X action. A names and saves a new file of the same kind; the original stays. B leaves. |
-| Make combo | Plays the file once on Player 1 from its start save and saves the hits that land as a new combo. |
+| Make combo | Plays the file once on Player 1 from its start save: hits make a combo; a pass with no hits makes an input drill. |
 | Drill, Drill sequence | Makes this the one combo or sequence the combo helper grades. |
 | Edit chain, Edit combos | Opens the numbered picker. |
 | Delete | Removes the file at once, without asking. |
@@ -132,7 +133,8 @@ It is shown in the Player view only. The left column shows the number of files, 
 - **SEQUENCES** (the upper list) lists your sequences, each with its combos joined by arrows on the dim line. The last
   row is *+ New sequence*.
 - **COMBOS** lists your combos, each with "Recorded on" and the fighter. Its first row is *+ Save last combo…*.
-- **The drill:** the green row is the one combo or sequence the helper grades. There is only one, so choosing another
+- **DRILLS >** under COMBOS opens your no-hit input drills and **+ Record drill…** ([below](#input-drills)).
+- **The drill:** the green row is the one combo, input drill or sequence the helper grades. There is only one, so choosing another
   replaces it.
 - **The hot five** works as above. With the cursor on a sequence, its combos show their place in it; on a combo, the
   sequences it is in show where it comes.
@@ -155,6 +157,19 @@ It is shown in the Player view only. The left column shows the number of files, 
 More: [Combos](../guide/recording.md#combos),
 [Sequences and the one drill](../guide/recording.md#sequences-and-the-one-drill),
 [Combo files](../guide/combos.md)
+
+### Input drills
+
+Practise movement without hitting the opponent: **A** on **COMBOS → DRILLS > → + Record drill…** arms a Player 1 take, then **ZR + D-pad Down** starts and stops it with the default Record chord.
+
+The new drill becomes the helper's grading target; its bar counts steps and timing, with no TRUE verdict. To make one from a macro or chain, choose **Make combo**: a pass with no hits makes a drill. On a drill's own screen, **A** on **Crop** opens the same editor as a macro, with whole-step handles; **A** names and saves a new drill and keeps the original. Empty names use Drill N. **B** leaves, and there is no X preview.
+
+![Drill 1 in the clip editor: four steps, then three selected whole steps](../media/rc15-input-drill.gif)<br>
+*A drill's Crop: L selects the start or R the end; Left/Right changes the kept steps (4 → 3 → 4 → 3). Eden, 2026-11-15, rc.15 `2eb3903e`. This early build's helper overlaps the editor; the overlap was fixed before the integrated release. The clip shows range selection, not recording or grading.*
+
+[Input drill acceptance evidence](../EVIDENCE-rc15-input-drill.md).
+
+More: [Input drills](../guide/recording.md#input-drills).
 
 ## Replays
 
@@ -314,7 +329,7 @@ the first pass warps to the start save, and a chain repeats as a whole.
 - **Values:** ∞, 1, 2, 3, 5, 10
 - **Default:** 1, for Player 1 and for the CPU
 - **How:** Left/Right step through the counts (wrapping). X does the same with the cursor in MACROS, here or in the
-  pop-up. A opens the list of counts, but picking one there doesn't change the count in this build: use Left/Right.
+  pop-up. A opens the list: Up/Down picks a count, A applies it, and B cancels.
 
 The count is kept with your recordings (`recording-index.json`), not with your saved defaults, so X doesn't save it.
 *Reset page to defaults* puts both counts, Player 1's and the CPU's, back to 1. The MACROS header shows the count too.
@@ -337,9 +352,9 @@ More: [Recordings and the CPU settings](../guide/cpu-behaviour.md#recordings-and
 
 ### Combo helper
 
-On: while a combo or a sequence is the drill (see [Combos & Sequences](#combos-sequences)), a bar under the frame
+On: while a combo, input drill or sequence is the drill (see [Combos & Sequences](#combos-sequences)), a bar under the frame
 strip grades each attempt link by link: on time or how many frames early or late, the streak and the best. Off: no
-grading. The drill stays chosen either way.
+grading. Input drills grade input steps without needing a hit or a TRUE verdict. The drill stays chosen either way.
 
 ![The combo helper grading a jab into a jab: TRUE −5, on time](../media/rc7-combo-helper.gif)<br>*Grading a combo*
 

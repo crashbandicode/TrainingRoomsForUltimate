@@ -65,7 +65,7 @@ const fn g(page: Page, title: &'static str) -> Group {
     Group { page, title, advanced: false }
 }
 
-pub static GROUPS: [Group; 21] = [
+pub static GROUPS: [Group; 22] = [
     g(Page::Cpu, "Reactions"),
     g(Page::Cpu, "Defence"),
     g(Page::Cpu, "Ledge & Tech"),
@@ -90,6 +90,7 @@ pub static GROUPS: [Group; 21] = [
     g(Page::Cpu, "Level"),
     // rc.14, appended the same way: it follows Loading on Fighters & Stages.
     g(Page::FightersStages, "Practice games"),
+    g(Page::FightersStages, "Tech practice"),
 ];
 
 // Group indices, for the rows below.
@@ -116,6 +117,7 @@ const CONTROLS: u8 = 17;
 const DEV: u8 = 18;
 const LEVEL: u8 = 19;
 const GAMES: u8 = 20;
+const TECH: u8 = 21;
 
 /// The sub-screens that edit something the model does not own the content of (the fork's grids,
 /// lists and panels arrive with package 6; the libraries and the replay window with package 4).
@@ -154,6 +156,10 @@ pub enum Editor {
     PlaceTargets,
     /// Break the Targets: this stage's saved layouts (a file each, the hot five first).
     Layouts,
+    /// Stage tech: close into the surface-snapping placing view.
+    TechPoint,
+    /// Stage tech: close into the guided exercise draft.
+    TechWizard,
 }
 
 /// A read-only row.
@@ -181,7 +187,7 @@ pub enum Control {
     MultiSelect(&'static [&'static str]),
     /// A checklist and a range over the same values (N3); the other greys while one holds a value.
     MultiSelectRange { first: u16, step: u16, range_id: &'static str },
-    /// Two handles, `lower <= upper`, greyed unless the paired dropdown reads Random.
+    /// Two handles, `lower <= upper`; Tech uses Set/Random, legacy damage uses Random.
     Slider,
     /// Chips: 3 x 3 relative to the opponent plus Left / Right; `single` = exactly one chip.
     DirectionGrid { single: bool },
@@ -230,7 +236,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 110] = [
+pub static ROWS: [Row; 134] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -458,6 +464,8 @@ pub static ROWS: [Row; 110] = [
       "Hide: the CPU is hidden while a practice game runs.\nAfterwards it's as Hide CPU says. Show: it stays."),
     r(GAMES, "Break the Targets", "btt", Control::Dropdown(&o::BTT),
       "Place targets, then break them all against the clock.\nClosing the menu with no targets opens the placing view."),
+    r(GAMES, "Projectiles break targets", "btt_projectiles", Control::Dropdown(&o::BTT),
+      "Your articles' native hitboxes break targets while On.\nOff: only your fighter's attacks break targets."),
     r(GAMES, "Place targets", "btt_place", Control::Editor(Editor::PlaceTargets),
       "Close the menu into the placing view, stage zoomed out.\nStick moves, A places, B removes the last, X starts."),
     r(GAMES, "Saved layouts", "btt_layouts", Control::Editor(Editor::Layouts),
@@ -470,6 +478,52 @@ pub static ROWS: [Row; 110] = [
       "Choose a fighter move for the selected state.\nRandom chooses from that state; Random state includes all."),
     r(GAMES, "Grab type", "mashout_grab", Control::Dropdown(&super::super::mashout::moves::GRAB_LABELS),
       "Standing, dash or pivot for an ordinary grab.\nRandom chooses one of the three each attempt."),
+    r(GAMES, "Tech practice", "tech_practice", Control::Dropdown(&o::TECH_SESSION),
+      "Practice techs at a chosen or random stage surface.\nStarts when the menu closes; Auto aim is approximate."),
+    r(GAMES, "Tech wizard", "tech_wizard", Control::Editor(Editor::TechWizard),
+      "Choose a spot, angle, start distance and hit.\nBack edits each step; preview before starting."),
+    r(TECH, "Surface", "tech_surface", Control::Dropdown(&o::TECH_SURFACE),
+      "Pick a random floor, wall or underside, or use your point.\nAny chooses among the available surface kinds."),
+    r(TECH, "Tech point", "tech_point", Control::Editor(Editor::TechPoint),
+      "Close the menu into the surface placing view.\nStick moves, A sets the point, X starts."),
+    r(TECH, "Damage", "tech_damage", Control::Dropdown(&o::TECH_MODE),
+      "Your percent before the hit.\nSet uses the low handle; Random draws each attempt."),
+    r(TECH, "Damage range", "tech_damage_range", Control::Slider,
+      "Starting percent, from 0 to 150 in steps of 5.\nSet uses the low handle; Random uses both."),
+    r(TECH, "Launch speed", "tech_speed", Control::Dropdown(&o::TECH_MODE),
+      "Choose knockback; the game computes the launch speed.\nSet stays fixed; Random rerolls each attempt."),
+    r(TECH, "Launch speed range", "tech_speed_range", Control::Slider,
+      "Knockback 80 to 250; the speed label is in units per frame.\nThe native launch core converts knockback to speed."),
+    r(TECH, "Hit damage", "tech_hit_damage", Control::Dropdown(&o::TECH_MODE),
+      "The percent the hit adds;\nit also sets how long the freeze lasts."),
+    r(TECH, "Hit damage range", "tech_hit_damage_range", Control::Slider,
+      "Added percent from 1 to 30, default 12.\nSet uses the low handle; Random uses both."),
+    r(TECH, "Angle", "tech_angle", Control::Dropdown(&o::TECH_AUTO_MODE),
+      "World launch angle: right is 0°, up is 90°.\nAuto aim is approximate."),
+    r(TECH, "Angle range", "tech_angle_range", Control::Slider,
+      "World angle from 0 to 355 degrees in steps of 5.\nSet uses the low handle; Random uses both."),
+    r(TECH, "Start position", "tech_start", Control::Dropdown(&o::TECH_AUTO_MODE),
+      "Auto computes a candidate start; Set uses the offset.\nAuto aim is approximate."),
+    r(TECH, "Start range", "tech_start_range", Control::Slider,
+      "Start offset from the point, from -120 to 120 units.\nSet uses the low handle; Random uses both."),
+    r(TECH, "Time to contact", "tech_time", Control::Dropdown(&o::TECH_MODE),
+      "Candidate travel time to the chosen surface point.\nRandom rerolls each attempt; default range 20–40 frames."),
+    r(TECH, "Time range", "tech_time_range", Control::Slider,
+      "Candidate travel time from 10 to 60 frames.\nThe Auto trajectory remains approximate."),
+    r(TECH, "DI", "tech_di", Control::Dropdown(&o::TECH_DI),
+      "Off is neutral; Player reads your stick.\nSet uses the direction grid; Random chooses a chip."),
+    r(TECH, "DI direction", "tech_di_direction", Control::DirectionGrid { single: true },
+      "The direction used by DI Set.\nIn and Out are relative to the chosen tech point."),
+    r(TECH, "Facing", "tech_facing", Control::Dropdown(&o::TECH_FACING),
+      "Face the tech point, left, right or a random side.\nRandom chooses again for each attempt."),
+    r(TECH, "Delay before launch", "tech_delay", Control::Dropdown(&o::TECH_MODE),
+      "Frames to wait at the start before launching.\nSet stays fixed; Random rerolls each attempt."),
+    r(TECH, "Delay range", "tech_delay_range", Control::Slider,
+      "Wait 10 to 90 frames, default 30.\nPlayer 1 is held at the start during the delay."),
+    r(TECH, "Camera", "tech_camera", Control::Dropdown(&o::TECH_CAMERA),
+      "Follow the attempt or frame the whole stage.\nWhole stage uses the target placing camera."),
+    r(TECH, "Skip wizard preview", "tech_wizard_skip", TOGGLE,
+      "On: A after Hit starts immediately.\nOff: review the candidate preview before starting."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

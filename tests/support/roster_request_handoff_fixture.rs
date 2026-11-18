@@ -1,5 +1,7 @@
 use runtime::lobby::training::{self, lobby};
 type Request = GenericRequest;
+use engine::swap::cycle_members::{admitted, over_pending, Admission};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 /// Who asked for a CPU change (src/model/mii/ordinary_player.rs `Requester`).
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[allow(dead_code)]
@@ -7,7 +9,6 @@ enum Requester {
     User,
     Practice,
 }
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 /// Mash out's live temporary CPU fighter (features/mashout.rs TEMP_KIND), u32::MAX when none.
 static PRACTICE_KIND: AtomicU32 = AtomicU32::new(u32::MAX);
 use std::sync::{Mutex, MutexGuard};
@@ -34,12 +35,12 @@ enum Role {
     Cpu = 1,
 }
 impl Role {
+    // SYNC_SELECTION
+}
+impl Role {
     fn enabled(self) -> bool {
         true
     }
-}
-impl Role {
-    // SYNC_SELECTION
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -50,10 +51,10 @@ impl Fighter {
     }
 }
 
-type TrioFighter = Fighter;
-impl Fighter {
+struct TrioFighter;
+impl TrioFighter {
     fn from_kind(kind: u32) -> Option<Fighter> {
-        matches!(kind, 0 | 0x48 | 0x4b | 0x54).then_some(Fighter(kind))
+        matches!(kind, 0 | 0x48 | 0x54).then_some(Fighter(kind))
     }
 }
 
@@ -149,9 +150,6 @@ static SHORTCUT_PENDING: AtomicBool = AtomicBool::new(false);
 static MENU_CAPTURED: AtomicBool = AtomicBool::new(false);
 static SCOPE_ALLOWED: AtomicBool = AtomicBool::new(true);
 
-fn admitted(enabled: bool, once: bool, refresh: bool) -> bool {
-    enabled || once || refresh
-}
 fn original_kind(_: Role) -> Option<u32> {
     Some(0)
 }
@@ -166,7 +164,9 @@ fn scope(_: Role) -> Option<RequestScope> {
             waiting: false,
         })
 }
-fn notify(_: Role, _: String) {}
+static NOTICES: Lock<Vec<String>> = Lock::new(Vec::new());
+static SAVED_RESULT: Lock<Option<bool>> = Lock::new(None);
+fn notify(_: Role, message: String) { NOTICES.lock().push(message); }
 fn preload_targets(
     _: &TrainingModpackMenu,
     _: usize,
@@ -292,6 +292,11 @@ mod mii_backend {
     }
 }
 mod engine {
+    pub mod swap {
+        pub mod cycle_members {
+            // ADMISSION_MODEL
+        }
+    }
     pub mod mii {
         pub mod auto_init {
             pub fn requires_owner(_: Option<u32>, _: bool, _: Option<u32>) -> bool {
@@ -477,6 +482,10 @@ mod mii_ordinary_cpu {
 // REQUEST_CPU_KIND
 
 fn reset_fixture() {
+    PRACTICE_KIND.store(u32::MAX, Ordering::Relaxed);
+    *MENU.lock() = USER_MENU;
+    NOTICES.lock().clear();
+    *SAVED_RESULT.lock() = None;
     BASE.store(1, Ordering::Relaxed);
     GLOBAL_BUSY.store(false, Ordering::Relaxed);
     RECORDING.store(false, Ordering::Relaxed);
@@ -489,8 +498,6 @@ fn reset_fixture() {
     reset_roster(Role::Cpu, true);
     mii_ordinary_cpu::reset(false);
     *WAITING_MEMORY.lock() = WaitingMemory;
-    PRACTICE_KIND.store(u32::MAX, Ordering::Relaxed);
-    *MENU.lock() = USER_MENU;
 }
 
 // Kinds are from TR's fighter table: ordinary Banjo 0x54 and Mii Brawler 0x48.
@@ -515,8 +522,8 @@ fn cold_owner_request_blocks_reload_until_its_native_work_settles() {
     mii_ordinary_cpu::reset(true);
     // Seed through the actual intercept so old facade failure cannot preempt this independent case.
     assert_eq!(
-        mii_ordinary_cpu::intercept(Role::Cpu, Selection::Direct(Fighter(0x54)), true, Requester::User),
-        Some(true)
+        mii_ordinary_cpu::intercept(Role::Cpu, Selection::Direct(Fighter(0x54)), true),
+        Some(Admission::Accepted)
     );
     assert!(mii_ordinary_cpu::request_pending());
     assert!(!generic_pending(Role::Cpu));
@@ -606,9 +613,73 @@ fn generic_loader_acceptance_and_refusal_are_reported() {
     assert!(!generic_pending(Role::Cpu));
 }
 
-/// Astra FAIL on b20930c6 (ASTRA-REVIEW-b20930c6.md section 1): Mash out's temporary Ice Climbers (0x4b) is the live
-/// CPU and a Solo Popo change queues RefreshPartners. The refresh belongs to that practice fighter: the CPU owner keeps
-/// Practice with the request, and the completion's sync_selection leaves the user's CPU Character choice alone.
+#[test]
+fn cpu_facade_reports_only_admitted_outcomes() {
+    for (outcome, accepted) in [
+        (Admission::Accepted, true),
+        (Admission::Superseded, true),
+        (Admission::Busy, false),
+        (Admission::Unavailable, false),
+        (Admission::Owned, false),
+    ] {
+        reset_fixture();
+        let mut calls = 0;
+        assert_eq!(request_cpu_kind_with(0, |fighter| {
+            calls += 1;
+            assert_eq!(fighter, Fighter(0));
+            outcome
+        }), accepted, "{outcome:?}");
+        assert_eq!(calls, 1);
+        assert!(!generic_pending(Role::Cpu));
+    }
+}
+
+#[test]
+fn saved_mii_consumption_does_not_imply_acceptance_or_generic_fallback() {
+    for (saved, outcome, accepted) in [
+        (true, Admission::Accepted, true),
+        (false, Admission::Owned, false),
+    ] {
+        reset_fixture();
+        *SAVED_RESULT.lock() = Some(saved);
+        assert_eq!(queue_admitted(Role::Cpu, Selection::Direct(Fighter(0)), false, false), outcome);
+        assert!(!generic_pending(Role::Cpu));
+        assert_eq!(request_cpu_kind(0), accepted);
+        assert!(!generic_pending(Role::Cpu));
+    }
+}
+
+#[test]
+fn explicit_pick_preserves_pending_user_but_replaces_automatic_request() {
+    for (restoring, selection, expected) in [
+        (false, Selection::Direct(Fighter(0)), Admission::Busy),
+        (true, Selection::Direct(Fighter(0)), Admission::Superseded),
+        (false, Selection::RefreshPartners, Admission::Superseded),
+    ] {
+        reset_fixture();
+        state_for(Role::Cpu).lock().pending = Some(GenericRequest {
+            scope: scope(Role::Cpu).unwrap(), epoch: 1, entry: 17,
+            selection, age: 7, restoring, once: false,
+        });
+        let picked = Selection::Direct(Fighter(0x54));
+        assert_eq!(queue_admitted(Role::Cpu, picked, false, true), expected);
+        let pending = state_for(Role::Cpu).lock().pending.unwrap();
+        if expected == Admission::Busy {
+            assert_eq!(pending.selection, selection);
+            assert_eq!(pending.age, 7, "refusal preserves the original request");
+            assert_eq!(NOTICES.lock().last().map(String::as_str),
+                Some(engine::swap::cycle_members::FIGHTER_STILL_LOADING));
+        } else {
+            assert_eq!(pending.selection, picked);
+            assert_eq!(pending.age, 0);
+            assert!(!pending.restoring);
+            assert!(pending.once);
+        }
+    }
+}
+
+/// b444ba57: an automatic partner refresh of Mash out's temporary CPU fighter belongs to Practice; the completion's
+/// sync_selection leaves the user's CPU Character choice alone.
 #[test]
 fn practice_fighter_refresh_keeps_practice_owner_and_the_user_choice() {
     reset_fixture();

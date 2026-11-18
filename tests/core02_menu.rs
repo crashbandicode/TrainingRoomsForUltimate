@@ -110,17 +110,39 @@ fn the_spot_rows_sit_next_to_their_features() {
     }
 }
 
-/// rc.14 hb-legend (the operator, ~19:50Z, Windboxes ~21:28Z): Hitbox Visualization is one checklist of six items, nothing ticked by default; Frame
-/// data colours and Launch angles are its items, not rows.
+/// rc.15: six visible items retain seven stored slots; the colour-mode slot is retired.
 fn legend_hitbox_visualization_is_one_checklist() {
     let row = ROWS.iter().find(|r| r.id == "hitbox_vis").expect("the row");
     let Control::MultiSelect(items) = row.control else { panic!("a checklist") };
-    assert_eq!(items, ["Hitboxes", "Grab boxes", "Hurtboxes", "Frame data colours", "Launch angles", "Windboxes", "Article hurtboxes"]);
+    assert_eq!(items, ["Hitboxes", "Grab boxes", "Hurtboxes", "Launch angles", "Windboxes", "Article hurtboxes"]);
     assert_eq!((row.title, row.help.lines().count()), ("Hitbox Visualization", 2));
     assert!(ROWS.iter().all(|r| r.id != "frame_data_colours" && r.id != "launch_angles"));
     let def = model::factory::DEFS.iter().find(|d| d.id == "hitbox_vis").expect("a factory row");
     assert_eq!(def.default, [0u8; 7], "nothing ticked");
 }
+fn hitbox_visible_options_keep_their_storage_bits_and_zl_toggles_all_six() {
+    for (cursor, slot) in [0, 1, 2, 4, 5, 6].into_iter().enumerate() {
+        let mut m = menu();
+        let row = goto(&mut m, "hitbox_vis");
+        m.press(Button::A);
+        for _ in 0..cursor { m.press(Button::Down); }
+        m.press(Button::A);
+        let mut expected = [0; 7];
+        expected[slot] = 1;
+        assert_eq!(get(&m, "hitbox_vis"), expected, "visible option {cursor}");
+        assert_eq!(m.value(row), RowValue::Checklist { ticked: 1, total: 6 });
+    }
+    let mut m = menu();
+    let row = goto(&mut m, "hitbox_vis");
+    m.press(Button::A);
+    m.press(Button::ZL);
+    assert_eq!(get(&m, "hitbox_vis"), [1, 1, 1, 0, 1, 1, 1]);
+    assert_eq!(m.value(row), RowValue::Checklist { ticked: 6, total: 6 });
+    m.press(Button::ZL);
+    assert_eq!(get(&m, "hitbox_vis"), [0; 7]);
+    assert_eq!(m.value(row), RowValue::Checklist { ticked: 0, total: 6 });
+}
+
 fn layout_row_counts_match_the_rc_freeze() {
     let counts = |pilot| {
         [Page::Cpu, Page::Saves, Page::Recording, Page::FightersStages, Page::DisplayControls, Page::Developer]
@@ -145,22 +167,25 @@ fn layout_row_counts_match_the_rc_freeze() {
     // rc.14 SL4: the Setup library group gained Save setup here (10 → 11).
     // rc.14: Display & Controls gained Frame data colours and Spot labels, Recording gained Match sweet/sour spot (the operator, 2026-11-14,
     // SP1 to SP5; 11 → 13 and 12 → 13). rc.14 hb-legend: Frame data colours and Launch angles became items of the Hitbox Visualization checklist (13 → 12).
-    // rc.15 Mash out adds its toggle, state, attacker and ordinary grab type to Practice games.
-    assert_eq!(counts(false), [34, 11, 13, 36, 12, 3]);
-    assert_eq!(counts(true), [33, 11, 13, 36, 12, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 106);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 105);
+    // rc.15 Mash out adds its toggle, state, attacker and ordinary grab type to Practice games, and Tech practice
+    // its session row and variable/editor rows (DESIGN §7).
+    assert_eq!(counts(false), [34, 11, 13, 60, 12, 3]);
+    assert_eq!(counts(true), [33, 11, 13, 60, 12, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 130);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 129);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
-    assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 4);
+    assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 5);
     assert_eq!(n(&|c| matches!(c, Control::MultiSelectRange { .. })), 7);
     // Randomize slots, Button slots and Save-state slots left the menu (revision 8.2).
     assert_eq!(n(&|c| matches!(c, Control::MultiSelect(_) | Control::SwapGroups)), 12, "the checklists that stayed, Hitbox Visualization (rc.14) and Swap groups");
-    assert_eq!(n(&|c| matches!(c, Control::Slider)), 2);
+    assert_eq!(n(&|c| matches!(c, Control::Slider)), 9);
     // Nothing is deferred any more (operator 2026-11-05): every editor has its row, and every group has rows.
     // (104: Lobby Items, Phase 2 N11; 105: Ready Hats, P-HOT; rc.6: CPU Level; rc.13: Aerial Drift, Taunts; rc.14: Hide CPU and the
     // seven Practice games rows; Save setup here; two spots rows.)
-    assert_eq!(ROWS.len(), 110);
+    // rc.15 DESIGN §7: session row and twenty variable/editor rows follow BTT.
+    // The free-form wizard and its optional preview setting add two rows; Mash out adds four.
+    assert_eq!(ROWS.len(), 134);
     for editor in [Editor::SetupSave, Editor::SetupSaveHere, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }
@@ -180,7 +205,7 @@ fn layout_row_counts_match_the_rc_freeze() {
     assert!(ROWS.iter().all(|r| usize::from(r.group) < GROUPS.len()));
     // Appended groups (rc.6 Level, rc.14 Practice games): the earlier indices hold.
     let titles: Vec<&str> = GROUPS.iter().map(|g| g.title).collect();
-    assert_eq!((titles.len(), titles[13], titles[19], titles[20]), (21, "Extras", "Level", "Practice games"));
+    assert_eq!((titles.len(), titles[13], titles[19], titles[20]), (22, "Extras", "Level", "Practice games"));
     for pilot_present in [false, true] {
         let m = menu_with(Env { pilot_present, ..Env::default() });
         assert!((0..m.entry_count(Page::Saves)).any(|i| m.entry(Page::Saves, i) == Some(Entry::Group(7))), "the Setup library section shows");
@@ -1189,6 +1214,7 @@ fn case_table() {
         ("not_mashable_rows_are_greyed_skipped_and_never_confirmed", not_mashable_rows_are_greyed_skipped_and_never_confirmed as fn()),
         ("the_spot_rows_sit_next_to_their_features", the_spot_rows_sit_next_to_their_features as fn()),
         ("legend_hitbox_visualization_is_one_checklist", legend_hitbox_visualization_is_one_checklist as fn()),
+        ("hitbox_visible_options_keep_their_storage_bits_and_zl_toggles_all_six", hitbox_visible_options_keep_their_storage_bits_and_zl_toggles_all_six as fn()),
         ("core02_table_carriage_return", core02_table_carriage_return as fn()),
         ("core02_page_machine", core02_page_machine as fn()),
         ("core02_y_clears_weighted_only", core02_y_clears_weighted_only as fn()),

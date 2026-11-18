@@ -66,7 +66,8 @@ fn eggs_rows_and_help() {
     let rows = [&ROWS[mode], &ROWS[at(ROW_BREAK)], &ROWS[at(ROW_TARGET)], &ROWS[at(ROW_SPEED)], &ROWS[at(ROW_PRACTICE_CPU)]];
     // D7 (b), the operator 2026-11-14: their own group, appended to `GROUPS` so no group index moves.
     let g = usize::from(rows[0].group);
-    assert_eq!(g, GROUPS.len() - 1, "the last group");
+    assert_eq!(g + 2, GROUPS.len(), "only Tech follows the original practice group");
+    assert_eq!(GROUPS[g + 1].title, "Tech practice");
     assert_eq!((GROUPS[g].title, GROUPS[g].page, GROUPS[g].advanced), ("Practice games", Page::FightersStages, false));
     assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).map(|r| r.id).take(5).eq([ROW, ROW_BREAK, ROW_TARGET, ROW_SPEED, ROW_PRACTICE_CPU]), "the five rows come first, in order");
     let values = |r: &crate::model::menu::table::Row| match r.control {
@@ -163,12 +164,13 @@ fn eggs_count_mode() {
 fn eggs_run_start() {
     let mut blind = Run::IDLE;
     blind.plan([TIMED, AERIALS, NORMAL, DISC], Some(7), 0, || TRAINING);
-    assert_eq!(blind.step(true, 0.0, &[], false, 7), None);
+    // The standing notice publishes before the camera, while the target still waits.
+    assert_eq!(blind.step(true, 0.0, &[], false, 7), Some(u16::MAX));
     assert!(target(&mut blind).is_none(), "no egg before the draw published the camera");
     assert!(blind.look(false, || panic!("another layout's tick reads nothing"))[0].is_none());
     assert!(blind.look(true, || Some(RESET_CENTRE))[0].is_none(), "the draw's tick takes the camera");
     settle(&mut blind, RESET_CENTRE);
-    assert_eq!(blind.step(true, 0.0, &[], false, 7), Some(u16::MAX));
+    assert_eq!(blind.step(true, 0.0, &[], false, 7), None, "the initial minute notice is already shown");
     assert!(target(&mut blind).is_some(), "the next pass spawns the egg");
     let mut run = started(TIMED, AERIALS, 7);
     assert!(target(&mut run).is_none(), "the first pass reads the ground before the egg spawns");
@@ -258,25 +260,6 @@ fn eggs_spawn_ignores_the_notice() {
         middle += usize::from(run.egg_at().is_some_and(|egg| (egg[0] * view.0[0]).abs() < 400.0));
     }
     assert!(middle > 10, "{middle} of 40 targets rested in the middle of the screen");
-}
-
-/// The notice slot's y by state (the operator, 11-14): the old place with no practice game; the top band while one runs; and,
-/// with the frame strip drawn at the top, the band directly under the strip, and with the combo bar under the strip too, the
-/// band under the bar (its lowest place, a drilled sequence's), so none of them overlap.
-fn eggs_notice_band() {
-    use crate::model::panes::{cb, iv, notice_y, NOTICE_ORIGIN_Y, NOTICE_TOP_Y};
-    // The header plate's top edge above the slot's y: the box top 445 + 25, and the plate's 16 padding.
-    let plates_top = 486.0;
-    assert_eq!([notice_y(false, false, false), notice_y(false, true, false)], [NOTICE_ORIGIN_Y; 2], "no game: the old place");
-    assert_eq!(notice_y(true, false, false), NOTICE_TOP_Y, "a game and no strip: the top band");
-    let strip_bottom = iv::STRIP_Y - iv::STRIP_H / 2.0;
-    let under = notice_y(true, true, false) + plates_top;
-    assert!(under <= strip_bottom && under >= strip_bottom - 20.0, "the band's top {under} is not just under the strip's {strip_bottom}");
-    // The combo bar hangs from the strip: its lowest bottom is a drilled sequence's.
-    let bar_bottom = iv::STRIP_Y + cb::SEQ_BAR_Y - cb::BAR_H / 2.0;
-    let under_bar = notice_y(true, true, true) + plates_top;
-    assert!(under_bar <= bar_bottom && under_bar >= bar_bottom - 20.0, "the band's top {under_bar} is not just under the bar's {bar_bottom}");
-    assert!(NOTICE_TOP_Y + plates_top <= 540.0, "the top band is on screen");
 }
 
 /// The height of the target above its spawn point after each of `n` ticks, and its x.
@@ -680,7 +663,8 @@ fn eggs_restart_waits_for_camera() {
             let mut run = started(FREE, ANY, seed);
             settle(&mut run, panned);
             restart(&mut run);
-            assert_eq!(pass(&mut run, &[], false), None, "seed {seed}: no target before the draw published the new camera");
+            // The notice resets immediately; the target still waits for the new camera.
+            assert_eq!(pass(&mut run, &[], false), Some(u16::MAX), "seed {seed}: no target before the draw published the new camera");
             assert!(target(&mut run).is_none());
             // The camera still shows the panned view for a draw, then glides to the default over a few more.
             for k in 0..7u8 {
@@ -1043,7 +1027,6 @@ fn case_table() {
         ("eggs_respawn_distance", eggs_respawn_distance as fn()),
         ("eggs_on_screen", eggs_on_screen as fn()),
         ("eggs_spawn_ignores_the_notice", eggs_spawn_ignores_the_notice as fn()),
-        ("eggs_notice_band", eggs_notice_band as fn()),
         ("eggs_motion_normal", eggs_motion_normal as fn()),
         ("eggs_speed_scales_time", eggs_speed_scales_time as fn()),
         ("eggs_rest_and_pause", eggs_rest_and_pause as fn()),

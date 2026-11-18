@@ -66,30 +66,12 @@ pub mod layout {
     pub const TAG_FIELD: usize = 0x8;
 }
 
-/// The eight hitbox tints (RGB multipliers; at least one component is 1.0), by `id mod 8`. None is purple or pink: that
-/// colour is the grab boxes' (`GRAB_TINT`).
-pub const TINTS: [[f32; 3]; 8] = [
-    [1.0, 0.0, 0.0],
-    [1.0, 0.4, 0.0],
-    [0.8, 1.0, 0.0],
-    [0.2, 1.0, 0.2],
-    [0.0, 0.8, 1.0],
-    [0.0, 0.4, 1.0],
-    [0.0, 1.0, 0.6],
-    [1.0, 1.0, 1.0],
-];
+/// Every grab box is purple, whatever its id.
+pub const GRAB_TINT: [f32; 3] = super::legend::GRAB;
 
-/// Every grab box is magenta, whatever its id (operator, rc.13: "grabs being a different color").
-pub const GRAB_TINT: [f32; 3] = [1.0, 0.0, 1.0];
-
-/// The tint of colour index `index` (taken modulo 8, negatives wrap).
-pub fn tint(index: i32) -> [f32; 3] {
-    TINTS[index.rem_euclid(8) as usize]
-}
-
-/// A hitbox of id `id`.
-pub fn hitbox_tint(id: i32) -> [f32; 3] {
-    tint(id)
+/// Unranked hitboxes start strong; per-frame ranking supplies the weak colour independently of the id.
+pub fn hitbox_tint(_id: i32) -> [f32; 3] {
+    STRONG_TINT
 }
 
 /// The sphere scale for a hitbox size.
@@ -112,8 +94,8 @@ pub fn second_centre(b: [f32; 3]) -> Option<[f32; 3]> {
 // requests them through the same set and `Effects` interface as the hitboxes, and the runtime passes `Some(GameHurt { .. })`
 // while the setting is On (`docs/HB1-RENDER-ROUTES.md (removed after v0.2.0-rc.1; see that tag)`).
 
-/// Hurtboxes are drawn yellow.
-pub const HURTBOX_TINT: [f32; 3] = [1.0, 1.0, 0.0];
+/// A normal hurtbox is grey; the live status selects the other hurtbox colours.
+pub const HURTBOX_TINT: [f32; 3] = super::legend::HURT[0];
 /// The `HitStatus` of a part that is switched off (the game's part update skips its shape for it).
 pub const HIT_STATUS_OFF: u32 = 3;
 /// The hurtbox group the pass draws: group 0, the one the fighters' scripts address (`set_status_all(status, 0)`).
@@ -585,20 +567,15 @@ pub fn powers(reader: &mut impl AttackReader) -> (bool, super::spots::Powers) {
 pub const STRONG_TINT: [f32; 3] = [1.0, 0.0, 0.0];
 pub const WEAK_TINT: [f32; 3] = [1.0, 0.56, 0.78];
 
-/// The one place the *Frame data colours* row chooses a sphere's tint: `kind` is `KIND_HIT`, `KIND_HURT` or `KIND_GRAB`, `spot` the hitbox's
-/// spot (`None` for any other kind and for a hitbox that cannot be ranked), `usual` today's tint. Off is `usual`. On, a hitbox is red unless
-/// it is Sour or Late, which are pink (Ultimate Frame Data draws a lone hitbox as strong and has no late colour). The rest of the legend
-/// (`legend`): a hurtbox by its `status` (white, green invincible, sky blue intangible), a grab box purple.
-pub fn legend_colour(kind: u32, spot: Option<super::spots::Spot>, status: i32, usual: [f32; 3], on: bool) -> [f32; 3] {
+/// The single colour scheme: strength for attacks, status for hurtboxes, purple grabs and sky-blue windboxes.
+pub fn legend_colour(kind: u32, spot: Option<super::spots::Spot>, status: i32) -> [f32; 3] {
     use super::{legend, spots::Spot};
-    match (on, kind, spot) {
-        // A windbox is a windbox sphere only while the windboxes are asked for (`want_hits`): deep blue either way.
-        (_, legend::KIND_WIND, _) => legend::WIND,
-        (true, KIND_HIT, Some(Spot::Sour | Spot::Late)) => WEAK_TINT,
-        (true, KIND_HIT, _) => STRONG_TINT,
-        (true, KIND_HURT | KIND_ARTICLE_HURT, _) => legend::hurt_tint(status),
-        (true, KIND_GRAB, _) => legend::GRAB,
-        _ => usual,
+    match (kind, spot) {
+        (legend::KIND_WIND, _) => legend::WIND,
+        (KIND_HIT, Some(Spot::Sour | Spot::Late)) => WEAK_TINT,
+        (KIND_HURT | KIND_ARTICLE_HURT, _) => legend::hurt_tint(status),
+        (KIND_GRAB, _) => legend::GRAB,
+        _ => STRONG_TINT,
     }
 }
 
@@ -613,7 +590,7 @@ fn tint_legend(reader: &mut impl AttackReader, wants: &mut [Sphere], peak: &mut 
     for sphere in wants.iter_mut().filter(|s| s.key >> 24 != KIND_HURT) {
         let kind = sphere.key >> 24;
         let spot = if kind == KIND_HIT { classes[((sphere.key >> 8) & 0xffff) as usize % spots::SLOTS] } else { None };
-        sphere.tint = legend_colour(kind, spot, 0, sphere.tint, true);
+        sphere.tint = legend_colour(kind, spot, 0);
     }
     peak.fold(&active, launch);
 }
@@ -663,7 +640,7 @@ pub fn article_instances(enabled: bool, get: impl Fn(i32, i32) -> usize + Copy) 
 pub fn want_hurt(reader: &mut (impl HurtboxReader + ?Sized), out: &mut [Sphere], len: &mut usize, legend: bool, kind: u32) -> u32 {
     let mut left_out = 0;
     hurt_parts(reader, legend, |index, shape, status| {
-        let tint = legend_colour(kind, None, status, HURTBOX_TINT, legend);
+        let tint = legend_colour(kind, None, status);
         left_out += push_shape(out, len, kind, index, shape, tint) as usize
     });
     left_out as u32
@@ -861,14 +838,14 @@ pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphe
     let mut len = 0;
     if facts.ids.in_grab(facts.status) {
         // The grabber stays hittable through a grab: its hurt spheres stay, its hit spheres go (upstream's grab rule).
-        let left_out = hurt.map_or(0, |hurt| want_hurt(hurt, wants, &mut len, set.frame_data, KIND_HURT));
+        let left_out = hurt.map_or(0, |hurt| want_hurt(hurt, wants, &mut len, true, KIND_HURT));
         let mut counts = set.reconcile(&wants[..len], true, fx);
         counts.dropped += left_out;
         return (counts, len);
     }
-    let mut left_out = want_hits(reader, wants, &mut len, set.identifies_wind());
+    let mut left_out = want_hits(reader, wants, &mut len, true);
     if let Some(hurt) = hurt {
-        left_out += want_hurt(hurt, wants, &mut len, set.frame_data, KIND_HURT);
+        left_out += want_hurt(hurt, wants, &mut len, true, KIND_HURT);
     }
     set.tint(reader, &mut wants[..len], facts.status);
     let mut counts = set.reconcile(&wants[..len], true, fx);
@@ -919,12 +896,8 @@ pub struct HandleSet {
     /// Waiting grab spheres and the status their command ran in.
     pending: [(Sphere, Option<i32>); MAX_PENDING],
     pending_len: usize,
-    /// *Frame data colours* On: the spheres take `legend_colour`'s tints, `peak` being this fighter's action's strongest hitbox and `launch`
-    /// the defender its hitboxes are ranked against (the runtime's pass sets it; `Launch::STANDARD` otherwise).
-    pub frame_data: bool,
+    /// The defender's current launch facts, used by strength ranking.
     pub launch: super::spots::Launch,
-    /// *Windboxes* ticked: the windboxes are drawn deep blue (`want_hits`) whatever else is ticked.
-    pub wind: bool,
     peak: super::spots::Peak,
 }
 
@@ -941,9 +914,7 @@ impl HandleSet {
             len: 0,
             pending: [(Sphere::NONE, None); MAX_PENDING],
             pending_len: 0,
-            frame_data: false,
             launch: super::spots::Launch::STANDARD,
-            wind: false,
             peak: super::spots::Peak::new(),
         }
     }
@@ -1067,17 +1038,9 @@ impl HandleSet {
         self.peak = super::spots::Peak::new();
     }
 
-    /// Whether this pass tells the windboxes apart (`want_hits`): *Windboxes* ticked, or *Frame data colours* (its legend draws
-    /// them deep blue among the hitboxes). Otherwise a windbox is an ordinary hitbox in its per-id colour.
-    pub fn identifies_wind(&self) -> bool {
-        self.wind || self.frame_data
-    }
-
-    /// *Frame data colours* (`legend_colour`): the spheres of `wants` take their tints when the row is On, else nothing changes.
+    /// Apply the single strength/status scheme to the current attack spheres.
     pub fn tint(&mut self, reader: &mut impl AttackReader, wants: &mut [Sphere], status: i32) {
-        if self.frame_data {
-            tint_legend(reader, wants, &mut self.peak, self.launch, status);
-        }
+        tint_legend(reader, wants, &mut self.peak, self.launch, status);
     }
 }
 

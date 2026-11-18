@@ -49,6 +49,17 @@ static CPU: Mutex<Option<Cpu>> = Mutex::new(None);
 
 // The few resolved constants a hook compares before it takes the lock.
 static CONSTS_READY: AtomicBool = AtomicBool::new(false);
+/// Separate from capability admission: enabled only after non-hook UI initialization.
+pub(super) static TECH_INIT: crate::model::cpu::tech_init::Init = crate::model::cpu::tech_init::Init::new();
+
+/// Existing heartbeat callback: no native lookup and no wait for game readiness.
+pub fn service_tech_init() {
+    static HITLAG_BINDING: crate::model::tech_hitlag::Binding = crate::model::tech_hitlag::Binding::new();
+    if !HITLAG_BINDING.ready(|| super::tech::bind_hitlag(super::tech_hitlag::PROVIDER)) {
+        return;
+    }
+    TECH_INIT.service(|ids| unsafe { super::tech::init(ids) });
+}
 static CONST_ATTEMPTS: AtomicU32 = AtomicU32::new(0);
 /// Every game constant the hooks read, by `C`: filled by `ensure_consts`, `UNRESOLVED` until then.
 static CONSTS: [AtomicI32; ids::COUNT] = [const { AtomicI32::new(UNRESOLVED) }; ids::COUNT];
@@ -79,7 +90,6 @@ static PLAYER_Z: AtomicU32 = AtomicU32::new(0);
 static PLAYER_VALID: AtomicBool = AtomicBool::new(false);
 
 /// Diag: the save-state-loading fact the CPU last saw (logged on change).
-#[cfg(feature = "diag")]
 static LAST_SAVE_LOADING: AtomicBool = AtomicBool::new(false);
 
 /// The scene the behaviours are live in (decision B4; the waiting room is package 6's).
@@ -143,42 +153,36 @@ mod counts_index {
     pub const STICK_DIR: usize = 10;
 }
 
-/// One diag-build line for an answer a behaviour gave (the shipped build compiles the arguments away).
+/// One line for an answer a behaviour gave, in the diag build or for a subscribed hardware bridge (`export::wanted`).
 /// The line is formatted on the caller's stack into the fixed ring: nothing allocates.
 macro_rules! cpu_event {
     ($($arg:tt)*) => {{
-        #[cfg(feature = "diag")]
-        {
+        if crate::runtime::export::wanted() {
             diagnostic(format_args!("[TrainingRooms] cpu_event {}", format_args!($($arg)*)));
         }
     }};
 }
 
-/// Diag build: log an answer only when it differs from the last one logged for the same hook and body, so a
+/// Log an answer only when it differs from the last one logged for the same hook and body, so a
 /// per-frame hook costs one line per change. `None` (the hook gave no answer) re-arms the line.
 macro_rules! cpu_event_on_change {
     ($hook:expr, $body:expr, $value:expr, $($arg:tt)*) => {{
-        #[cfg(feature = "diag")]
-        {
-            if seen($hook, $body, $value) {
-                cpu_event!($($arg)*);
-            }
+        if crate::runtime::export::wanted() && seen($hook, $body, $value) {
+            cpu_event!($($arg)*);
         }
     }};
 }
 
-/// Diag build: the hook gave no answer for this body; the next answer is logged again.
+/// The hook gave no answer for this body; the next answer is logged again.
 macro_rules! cpu_event_rearm {
     ($hook:expr, $body:expr) => {{
-        #[cfg(feature = "diag")]
-        {
+        if crate::runtime::export::wanted() {
             let _ = seen($hook, $body, None);
         }
     }};
 }
 
 /// The hooks that log on change (an index into `LAST_SEEN`).
-#[cfg(feature = "diag")]
 mod ev {
     pub const AIRDODGE: usize = 0;
     pub const SDI_NONE: usize = 1;
@@ -205,11 +209,9 @@ mod ev {
     pub const COUNT: usize = 23;
 }
 
-#[cfg(feature = "diag")]
 static LAST_SEEN: [[AtomicU64; 16]; ev::COUNT] = [const { [const { AtomicU64::new(u64::MAX) }; 16] }; ev::COUNT];
 
 /// True when `value` is an answer and differs from the one logged last for (`hook`, `body`).
-#[cfg(feature = "diag")]
 fn seen(hook: usize, body: usize, value: Option<u64>) -> bool {
     let new = value.unwrap_or(u64::MAX);
     let old = LAST_SEEN[hook][body & 15].swap(new, Ordering::Relaxed);
@@ -225,6 +227,11 @@ fn bump(_which: usize) {
 /// The last published settings generation the CPU adopted (only read and written under `CPU`).
 static ADOPTED: AtomicU32 = AtomicU32::new(0);
 
+#[cfg(feature = "diag")]
+pub fn adopted_settings_generation() -> u32 {
+    ADOPTED.load(Ordering::Acquire)
+}
+
 /// Run `f` on the CPU state; a newly published value (`published::Live`) is adopted first. `CPU` is taken by game threads only
 /// (stream/sync): the menu worker publishes through `published`, never through this lock.
 fn with<R>(f: impl FnOnce(&mut Cpu) -> R) -> Option<R> {
@@ -234,6 +241,11 @@ fn with<R>(f: impl FnOnce(&mut Cpu) -> R) -> Option<R> {
         cpu.publish(live.cpu, crate::runtime::published::take_rerolls());
     }
     Some(f(cpu))
+}
+
+/// Product launch ownership: no wait on the CPU state from a hook.
+pub(super) fn tech_player_receipt() -> Result<Option<FrameReceipt>, ()> {
+    role_adapter::try_player_receipt(|| CPU.try_lock(), try_role_scene().map_err(|_| ()))
 }
 
 /// Create the state (boot, before any hook is installed).
@@ -358,6 +370,20 @@ fn role_scene() -> Option<Scene> {
     scene
 }
 
+/// Unknown menu eligibility is Busy, never a scene departure or a new receipt.
+fn try_role_scene() -> Result<Option<Scene>, crate::runtime::compat::menu::MenuBusy> {
+    use crate::engine::lobby::practice_policy::Context;
+    let scene = crate::runtime::scene::current();
+    let context = crate::runtime::lobby::training::practice::try_context()?;
+    let scene = match (scene, context) {
+        (Some(Scene::Training), Some(Context::Training)) => Some(Scene::Training),
+        (Some(Scene::Lobby), Some(Context::Waiting)) => Some(Scene::Lobby),
+        _ => None,
+    };
+    if scene.is_none() { forget_player_position(); }
+    Ok(scene)
+}
+
 /// All accessor-only hooks pass through current scene AND generation admission.
 fn role_of(accessor: usize) -> Option<FighterKey> {
     // The selected Mash attacker belongs to its real-move plan, including while it holds P1.
@@ -404,8 +430,7 @@ fn ensure_consts() -> bool {
         }
         diagnostic(format_args!("[TrainingRooms] cpu constants missing={missing}: {}", names.as_str()));
     }
-    #[cfg(feature = "diag")]
-    {
+    if crate::runtime::export::wanted() {
         // The resolved table by name, so a log's status, term and work ids can be read by name.
         let mut line = FixedPath::<700>::new();
         let mut count = 0;
@@ -421,6 +446,7 @@ fn ensure_consts() -> bool {
             diagnostic(format_args!("[TrainingRooms] cpu_ids {}", line.as_str()));
         }
     }
+    TECH_INIT.publish(&table);
     with(|cpu| cpu.ids = table);
     CONSTS_READY.store(true, Ordering::Release);
     true
@@ -471,7 +497,26 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         unsafe { crate::runtime::features::mashout::frame(a0) };
         // SPEC-core-06: the hitbox visualizer's pass (a readiness boundary: nothing until boot installed it), after the combo and
         // before the save states (SPEC-core-01 §5.2).
+        unsafe { let _ = super::btt::frame(a0); }
         unsafe { crate::runtime::features::hitbox::frame(a0) };
+        // Product hold/restore uses the existing post-native seam and fresh lifetime receipt.
+        unsafe { super::tech_adapter::frame(a0, receipt) };
+        unsafe { crate::runtime::features::tech::frame(a0) };
+        // S0 research only, after the ordinary hide and practice-game passes.
+        #[cfg(feature = "diag")]
+        unsafe {
+            let scene = role_scene();
+            let fresh = receipt.filter(|&r| {
+                with(|cpu| role_adapter::current_frame(cpu, scene, r)).unwrap_or(false)
+            });
+            crate::runtime::features::tech_spike::frame(a0, fresh);
+        }
+        if a0 != 0
+            && unsafe { ((a0 + FIGHTER_ENTRY_FIELD) as *const i32).read() } == 0
+            && unsafe { ((a0 + FIGHTER_KIND_FIELD) as *const i32).read() } != konst(C::KindNana)
+        {
+            unsafe { super::btt_camera::frame() };
+        }
         // The Eggs-ercise CPU target's player tag: the game turns its flag off for the placed CPU, so when the pass just run asked
         // for it (`hide_cpu::keep_cursor`) the flag is written on again, the one write after the placement.
         unsafe { hide_cpu::write_kept_cursor(a0, konst(C::WorkFlagCursor)) };
@@ -596,8 +641,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
         cpu.fighters[key.index()].kind = kind;
         // A save state loading is package 3's fact (`states::is_loading`, the load machine's own flag).
         cpu.save_loading = save_loading;
-        #[cfg(feature = "diag")]
-        if LAST_SAVE_LOADING.swap(save_loading, Ordering::AcqRel) != save_loading {
+        if crate::runtime::export::wanted() && LAST_SAVE_LOADING.swap(save_loading, Ordering::AcqRel) != save_loading {
             cpu_event!("save_loading={save_loading}");
         }
         if primary {
@@ -869,7 +913,6 @@ fn air_dodge_stick(accessor: usize) -> Option<(f32, f32)> {
     // SAFETY: `accessor` is a CPU body the frame wrapper registered; the native is a guarded site.
     let cpu_x = unsafe { natives::pos_x(accessor) };
     let answer = with(|cpu| cpu.air_dodge_stick(key, player_x(), cpu_x)).flatten();
-    #[cfg(feature = "diag")]
     match answer {
         Some((x, y)) => cpu_event_on_change!(
             ev::AIRDODGE,
@@ -906,7 +949,6 @@ pub unsafe fn cpu_stick_y_hook(accessor: usize) -> f32 {
     // Crouch answers when the air-dodge direction does not (SPEC-cpu-06 section 4).
     let Some(key) = role_of(accessor) else { return original };
     let crouch = with(|cpu| cpu.crouch_stick(key)).flatten();
-    #[cfg(feature = "diag")]
     match crouch {
         Some(y) => cpu_event_on_change!(ev::CROUCH, key.index(), Some(u64::from(y.to_bits())), "crouch entry={} y={y:.3}", key.entry),
         None => cpu_event_rearm!(ev::CROUCH, key.index()),
@@ -1150,7 +1192,6 @@ fn guard_button_answer(accessor: usize, button: i32, on_query: bool) -> Option<b
             ButtonAnswer::Held(value) => Some(value),
             ButtonAnswer::Original => None,
         };
-        #[cfg(feature = "diag")]
         match answer {
             Some(value) => cpu_event_on_change!(
                 if on_query { ev::GUARD_ON } else { ev::GUARD_OFF },
@@ -1164,7 +1205,6 @@ fn guard_button_answer(accessor: usize, button: i32, on_query: bool) -> Option<b
         answer
     } else {
         let answer = with(|cpu| cpu.full_hop_button(key, on_query)).flatten();
-        #[cfg(feature = "diag")]
         match answer {
             Some(value) => cpu_event_on_change!(ev::FULL_HOP, key.index(), Some(u64::from(value)), "full_hop_button entry={} on_query={on_query} held={value}", key.entry),
             None => cpu_event_rearm!(ev::FULL_HOP, key.index()),
@@ -1195,7 +1235,6 @@ fn shield_tilt(accessor: usize) -> Option<(f32, f32)> {
     // SAFETY: `accessor` is a CPU body the frame wrapper registered; the native is a guarded site.
     let cpu_x = unsafe { natives::pos_x(accessor) };
     let tilt = with(|cpu| cpu.shield_tilt_stick(key, player_x(), cpu_x)).flatten();
-    #[cfg(feature = "diag")]
     match tilt {
         Some((x, y)) => cpu_event_on_change!(
             ev::TILT,
@@ -1242,7 +1281,6 @@ pub unsafe fn cpu_shield_param_hook(accessor: usize, kind: u64, name: u64) -> f3
     }
     let Some(key) = role_of(accessor) else { return original };
     let value = with(|cpu| cpu.shield_param(key, decay)).flatten();
-    #[cfg(feature = "diag")]
     match value {
         Some(v) => cpu_event_on_change!(
             ev::SHIELD_PARAM,
@@ -1271,6 +1309,7 @@ pub(crate) unsafe fn script_accessor(fighter: usize) -> usize {
 
 /// DI: before the game corrects a damage vector, write the DI stick floats for a CPU body.
 pub(crate) unsafe fn di_before(accessor: usize) {
+    if super::tech_adapter::di_before(accessor) { return; }
     cpu_event_on_change!(ev::DI_CALL, 0, Some(accessor as u64), "di_before accessor={accessor:#x} role={}", role_of(accessor).is_some());
     let Some(key) = role_of(accessor) else { return };
     let (x, y) = (konst(C::WorkFloatVecorCorrectStickX), konst(C::WorkFloatVecorCorrectStickY));
@@ -1349,7 +1388,6 @@ pub(crate) unsafe fn oos_after(accessor: usize) -> Option<i32> {
         cpu.out_of_shield(key, &facts).escape_status
     })
     .flatten();
-    #[cfg(feature = "diag")]
     if let Some(status) = escape {
         cpu_event!("oos_escape entry={} status={status} from={status_now} prev={prev}", key.entry);
     }
@@ -1432,8 +1470,7 @@ pub unsafe fn cpu_command_flag_hook(accessor: usize, category: i32) -> u32 {
         // Playback Mash Interrupt: the running playback stops (package 4's recorder).
         recorder::interrupt_playback();
     }
-    #[cfg(feature = "diag")]
-    {
+    if crate::runtime::export::wanted() {
         let (queued, latched) = with(|cpu| cpu.mash_debug(key)).unwrap_or((false, false));
         let status = natives::status_kind(accessor);
         let state = (u64::from(status as u32) << 20) ^ (u64::from(out.bits) << 2) ^ (u64::from(queued) << 1) ^ u64::from(latched);
@@ -1460,7 +1497,6 @@ pub unsafe fn cpu_attack_air_kind_hook(accessor: usize) -> i32 {
     let original = call_original!(accessor);
     let Some(key) = role_of(accessor) else { return original };
     let kind = with(|cpu| cpu.attack_air_kind(key)).flatten();
-    #[cfg(feature = "diag")]
     match kind {
         Some(k) => cpu_event_on_change!(ev::AIR_KIND, key.index(), Some(k as u32 as u64), "attack_air_kind entry={} kind={k} original={original}", key.entry),
         None => cpu_event_rearm!(ev::AIR_KIND, key.index()),
@@ -1476,7 +1512,6 @@ pub unsafe fn cpu_stick_dir_hook(accessor: usize) -> f32 {
     let original = call_original!(accessor);
     let Some(key) = role_of(accessor) else { return original };
     let angle = with(|cpu| cpu.attack_angle(key)).flatten();
-    #[cfg(feature = "diag")]
     match angle {
         Some(a) => cpu_event_on_change!(ev::STICK_DIR, key.index(), Some(u64::from(a.to_bits())), "stick_dir entry={} angle={a:.3} original={original:.3}", key.entry),
         None => cpu_event_rearm!(ev::STICK_DIR, key.index()),
