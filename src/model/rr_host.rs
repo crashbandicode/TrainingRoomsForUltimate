@@ -1248,7 +1248,9 @@ fn step_role(root: &Path, machine: &mut Playback, book: &Book, role: Role) {
     if WARP_HOLD.load(Ordering::Acquire) {
         return;
     }
-    while role_frames(role).lock().room() > 0 {
+    // A cut run (its flag cleared by a mash) stops here: `publish` refuses its frames, so an endless take would never
+    // fill the queue (Astra 09:48Z).
+    while run_flag(role).load(Ordering::Acquire) && role_frames(role).lock().room() > 0 {
         match drive_step(machine, role, book) {
             Some(played) => publish(role, resident_frame(root, &played)),
             None => {
@@ -2383,6 +2385,34 @@ mod tests {
         // Astra 08:38Z: a worker already inside step_role publishes its frame after the mash cut the run.
         publish(Role::Cpu, InputFrame { buttons: 99, ..InputFrame::default() });
         assert!(take_cpu_frame().is_none() && !cpu_playback(idle).running, "an in-flight producer cannot refill a cut run");
+    }
+
+    /// Astra 09:48Z: the worker inside `step_role` when a mash cuts an endless (Loop ∞) CPU run must return. `publish`
+    /// refuses a cut run's frames, so the queue never fills and an endless take never ends by itself.
+    fn a_cut_endless_run_does_not_spin_the_worker() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("cut-endless");
+        active_plain_macro(&root, Role::Cpu, 30);
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_loop(Role::Cpu, LoopCount::Infinite);
+        index.save(&root).unwrap();
+        on_chords(false, false, true);
+        tick(&root);
+        assert!(take_cpu_frame().is_some(), "the endless CPU run plays");
+        note_mash();
+        // The worker's next fill, as the loop it was in continues after the cut.
+        let book = load_book(&root).unwrap();
+        let mut machine = lock(&MACHINE).take().expect("the machine holds the CPU run");
+        let (tx, rx) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            step_role(Path::new("/nonexistent"), &mut machine, &book, Role::Cpu);
+            let _ = tx.send(());
+        });
+        let returned = rx.recv_timeout(std::time::Duration::from_secs(5)).is_ok();
+        assert!(returned, "step_role spun on a cut endless run");
+        let _ = worker.join();
+        assert!(take_cpu_frame().is_none(), "nothing of the cut run is fed");
     }
 
     /// A file of `n` distinct frames (buttons 1..=n), active on `role`, with no start save.
@@ -3594,6 +3624,7 @@ mod tests {
             ("a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see", a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see as fn()),
             ("a_load_stops_both_runs_but_not_a_plays_own_warp", a_load_stops_both_runs_but_not_a_plays_own_warp as fn()),
             ("the_mash_stop_is_seen_by_the_cpu_before_the_next_tick", the_mash_stop_is_seen_by_the_cpu_before_the_next_tick as fn()),
+            ("a_cut_endless_run_does_not_spin_the_worker", a_cut_endless_run_does_not_spin_the_worker as fn()),
             ("cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing", cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing as fn()),
             ("player_frames_reach_the_poll_once_each_whatever_the_worker_timing", player_frames_reach_the_poll_once_each_whatever_the_worker_timing as fn()),
             ("a_stopped_cpu_run_feeds_nothing_more", a_stopped_cpu_run_feeds_nothing_more as fn()),
