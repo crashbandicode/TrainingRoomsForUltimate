@@ -1941,3 +1941,11 @@ ceiling = 162291
 date = "2026-11-18"
 reason = "Mash out integration forward merge (rc15/mashout-int 590133a1, 162217 on main af72b7ba) onto local main 6f7e0d63 (156795 = af72b7ba 156721 + 74 from the phase3 fixes and the busy fix): 162217 + 74 = 162291. Exact total, no headroom. Counting and gates unchanged."
 approved_by = "operator 2026-11-18: yes additional lines are ok; primary c07b3449 approved 18:17Z (Mash out +5496); main's entries carry their own approvals."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162560
+date = "2026-11-18"
+reason = "Mash out row 121, Ganondorf grounded Flame Choke graded by the Tech grader (rc15/mashout-ganon-tech on rc15/mashout-int 6f564b86): measured 162560 = 162291 + 269 (catalog row, CatchedGanon name and contact predicate, Tech-session attempt with the late window, Tech-owned tech_adapter boundaries, status-hook seam, worker result text). Exact total, no headroom. Counting and gates unchanged."
+approved_by = "operator 2026-11-18 via primary c07b3449 (goal to mashout-demo-devin-2: \"Size growth is approved\" for the Ganon Flame Choke tech row)"
