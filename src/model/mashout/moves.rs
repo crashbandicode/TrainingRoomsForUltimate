@@ -287,7 +287,7 @@ mod tests {
             assert_eq!(CATALOG.iter().filter(|s| practice_only(s.id).is_some()).map(|s| s.id).collect::<Vec<_>>(), [114, 116]);
             assert_eq!(availability(114), MoveAvailability::Available);
             assert!(practice_only(113).is_none() && practice_only(112).is_none());
-            // restriction: mashout-blizzard-practice (FOR OPERATOR APPROVAL): 116 stays selectable and in Random.
+            // restriction: mashout-blizzard-practice (operator 11-18): 116 stays selectable and in Random.
             assert_eq!(practice_only(116), Some("Sora's Blizzard re-freezes outlast the escape · practice only, no grade"));
             assert_eq!(availability(116), MoveAvailability::Available);
             assert!(selectable(CATALOG[116]));
