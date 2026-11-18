@@ -534,9 +534,9 @@ pub(super) fn intercept(role:Role,selection:Selection,user_request:bool,requeste
     // Reservation starts at the INSTALL ticket, never at this menu/catalog capture.
     let request=match selection {
         Selection::Cycle=>Some(Request::CYCLE),
-        Selection::Direct(f)=>Request::direct(mii_saved_alpha::menu_epoch(),f.kind()).map(|r|r.owned(requester)),
+        Selection::Direct(f)=>Request::direct(mii_saved_alpha::menu_epoch(),f.kind()),
         Selection::RefreshPartners=>Some(Request::REFRESH_PARTNERS),
-    };
+    }.map(|r|r.owned(requester));
     let manual_direct=user_request && matches!(selection,Selection::Direct(_));
     // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.
     let replace_restore=manual_direct && s.restore.is_some();

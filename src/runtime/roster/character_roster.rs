@@ -660,7 +660,13 @@ fn queue_request(role: Role, selection: Selection, restoring: bool) {
 /// (Player Swapping) does not refuse it and is not changed by it.
 /// True only after the generic loader or an intercept accepted new intent.
 fn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool) -> bool {
-    queue_owned(role, selection, restoring, once, Requester::User)
+    // An automatic partner refresh reconciles the live fighter, so it belongs to that fighter's owner (Mash out's
+    // temporary CPU is Practice): it never persists the practice fighter into the user's choice.
+    let owner = match selection {
+        Selection::RefreshPartners => state_for(role).lock().observed.map_or(Requester::User, |(_, kind)| live_owner(role, kind)),
+        _ => Requester::User,
+    };
+    queue_owned(role, selection, restoring, once, owner)
 }
 
 /// `queue_admitted` on behalf of `owner`: the ordinary CPU owner keeps it with the request, and the receipt and the

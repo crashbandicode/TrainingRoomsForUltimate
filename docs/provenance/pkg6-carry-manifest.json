@@ -12348,7 +12348,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "af7f6a53ebeee27787bd4709c6c01abcb1535ce49915630dae068ec3cd7a49bc",
+   "dest_sha256": "9791067d95eb0ab89317b79d4bb2d794a6fa9a7d3aad1090abbdc46307af04b6",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -13736,6 +13736,11 @@
      "old": "    // This publication supersedes a reset deferred during its INSTALL.\n    REBUILT[role as usize].store(false, Ordering::Release);\n    drop(state);\n    role.sync_selection(fighter);\n    if mii_hud_portrait::should_defer_hud(owner, kind, portrait) {\n        // The exact texture does not exist yet. Keep the previous portrait and let the\n        // service callback refresh and bind after the render proof. A rejected hold\n",
      "new": "    // This publication supersedes a reset deferred during its INSTALL.\n    REBUILT[role as usize].store(false, Ordering::Release);\n    drop(state);\n    role.sync_selection(fighter, live_owner(role, fighter.kind()));\n    if mii_hud_portrait::should_defer_hud(owner, kind, portrait) {\n        // The exact texture does not exist yet. Keep the previous portrait and let the\n        // service callback refresh and bind after the render proof. A rejected hold\n",
      "reason": "rc.15 CPU-receipt root fix (devin-primary GO 2026-11-17 22:04Z; mashout-demo-devin TRIAGE-CPU-APPLIED-NOTICE.md): a CPU change request carries its owner (Requester User or Practice); the CPU Character receipt and the persisted CPU choice follow it (cpu_receipt, persists_selection). Mash out's temporary attacker load and its restore are Practice and get no receipt, so none waits behind Mash out's standing notice to show over the drill. User requests, native guards and loader predicates unchanged."
+    },
+    {
+     "old": "/// (Player Swapping) does not refuse it and is not changed by it.\n/// True only after the generic loader or an intercept accepted new intent.\nfn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool) -> bool {\n    queue_owned(role, selection, restoring, once, Requester::User)\n}\n\n/// `queue_admitted` on behalf of `owner`: the ordinary CPU owner keeps it with the request, and the receipt and the\n",
+     "new": "/// (Player Swapping) does not refuse it and is not changed by it.\n/// True only after the generic loader or an intercept accepted new intent.\nfn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool) -> bool {\n    // An automatic partner refresh reconciles the live fighter, so it belongs to that fighter's owner (Mash out's\n    // temporary CPU is Practice): it never persists the practice fighter into the user's choice.\n    let owner = match selection {\n        Selection::RefreshPartners => state_for(role).lock().observed.map_or(Requester::User, |(_, kind)| live_owner(role, kind)),\n        _ => Requester::User,\n    };\n    queue_owned(role, selection, restoring, once, owner)\n}\n\n/// `queue_admitted` on behalf of `owner`: the ordinary CPU owner keeps it with the request, and the receipt and the\n",
+     "reason": "rc.15 CPU-receipt v2 (Astra FAIL on b20930c6, ASTRA-REVIEW-b20930c6.md section 1; devin-primary 00:04Z): the automatic partner refresh (Solo Popo change) reconciles the live fighter, so it carries that fighters owner (live_owner: Mash outs temporary CPU is Practice) through queue_admitted and the CPU intercept, which now keeps the owner for every request kind; a practice fighters refresh never persists into the users CPU Character choice."
     }
    ]
   },
@@ -23007,7 +23012,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "e7eeaa47ab96f0cb6598afd0a738c9b1ee2d334bea747aba7c15e3a8ffeaf333",
+   "dest_sha256": "78dd4abfc7d1526e559e9077f7994536ae96e2d5da6b74ac37d7caebb30660cf",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -23920,6 +23925,11 @@
      "old": "    publish_partners(Role::Cpu,forms);\n    if b.replay.is_none() {remember_owned(Role::Cpu,b.ticket.epoch,logical,forms,exact,b.destination.cursor,original);}\n    if let Some(fighter)=TrioFighter::from_kind(logical).filter(|_|b.replay.is_none()) {\n        Role::Cpu.sync_selection(fighter);\n    }\n    crate::runtime::roster::cycle_preload::completed(1,false,logical);\n    trace!(\"[MiiOrdinaryCpu] bank ready ticket={:?} target={:#x} physical={:#x} index={} original={} mii={} resource_pair={:?} released={}\",\n        b.ticket,logical,descriptor_kind(&now.descriptor),now.index,original,exact.is_some(),settled.resource_pair,released);\n    notify(Role::Cpu,crate::engine::mii::ordinary_player::bank_notice(false,exact.is_some(),original).into());\n}\n\n/// Terminal BankTrack refusal. The pending track, request and restore go; the owner\n",
      "new": "    publish_partners(Role::Cpu,forms);\n    if b.replay.is_none() {remember_owned(Role::Cpu,b.ticket.epoch,logical,forms,exact,b.destination.cursor,original);}\n    if let Some(fighter)=TrioFighter::from_kind(logical).filter(|_|b.replay.is_none()) {\n        Role::Cpu.sync_selection(fighter,b.requester);\n    }\n    crate::runtime::roster::cycle_preload::completed(1,false,logical);\n    trace!(\"[MiiOrdinaryCpu] bank ready ticket={:?} target={:#x} physical={:#x} index={} original={} mii={} resource_pair={:?} released={} requester={:?}\",\n        b.ticket,logical,descriptor_kind(&now.descriptor),now.index,original,exact.is_some(),settled.resource_pair,released,b.requester);\n    if let Some(text)=cpu_receipt(original,exact.is_some(),b.requester) {notify(Role::Cpu,text.into());}\n}\n\n/// Terminal BankTrack refusal. The pending track, request and restore go; the owner\n",
      "reason": "rc.15 CPU-receipt root fix (devin-primary GO 2026-11-17 22:04Z; mashout-demo-devin TRIAGE-CPU-APPLIED-NOTICE.md): a CPU change request carries its owner (Requester User or Practice); the CPU Character receipt and the persisted CPU choice follow it (cpu_receipt, persists_selection). Mash out's temporary attacker load and its restore are Practice and get no receipt, so none waits behind Mash out's standing notice to show over the drill. User requests, native guards and loader predicates unchanged."
+    },
+    {
+     "old": "    // Reservation starts at the INSTALL ticket, never at this menu/catalog capture.\n    let request=match selection {\n        Selection::Cycle=>Some(Request::CYCLE),\n        Selection::Direct(f)=>Request::direct(mii_saved_alpha::menu_epoch(),f.kind()).map(|r|r.owned(requester)),\n        Selection::RefreshPartners=>Some(Request::REFRESH_PARTNERS),\n    };\n    let manual_direct=user_request && matches!(selection,Selection::Direct(_));\n    // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.\n    let replace_restore=manual_direct && s.restore.is_some();\n",
+     "new": "    // Reservation starts at the INSTALL ticket, never at this menu/catalog capture.\n    let request=match selection {\n        Selection::Cycle=>Some(Request::CYCLE),\n        Selection::Direct(f)=>Request::direct(mii_saved_alpha::menu_epoch(),f.kind()),\n        Selection::RefreshPartners=>Some(Request::REFRESH_PARTNERS),\n    }.map(|r|r.owned(requester));\n    let manual_direct=user_request && matches!(selection,Selection::Direct(_));\n    // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.\n    let replace_restore=manual_direct && s.restore.is_some();\n",
+     "reason": "rc.15 CPU-receipt v2 (Astra FAIL on b20930c6, ASTRA-REVIEW-b20930c6.md section 1; devin-primary 00:04Z): the automatic partner refresh (Solo Popo change) reconciles the live fighter, so it carries that fighters owner (live_owner: Mash outs temporary CPU is Practice) through queue_admitted and the CPU intercept, which now keeps the owner for every request kind; a practice fighters refresh never persists into the users CPU Character choice."
     }
    ]
   },
