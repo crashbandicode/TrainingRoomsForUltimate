@@ -1845,3 +1845,11 @@ ceiling = 156006
 date = "2026-11-18"
 reason = "Bounded install and failure events with shared log rotation (rc15/bounded-events-log, raw diff +263/-19) rebased onto main 2322fae9 (155961): measured 156006 = +45 counted lines. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
 approved_by = "Operator approved the bounded events log and its additional lines at 04:25Z on 2026-11-18 (devin-primary 04:30Z brief)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156023
+date = "2026-11-18"
+reason = "Bounded events log made hook-safe (devin-primary 05:16Z GO): append_event_at uses try_lock on EVENTS, drops a contended line and reports it once as dropped N events. 156006 + 17 = 156023 (+62 counted over main 2322fae9). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "Operator approved the bounded events log and its additional lines at 04:25Z; devin-primary 05:16Z: a small delta for the hook-safe fix is fine."

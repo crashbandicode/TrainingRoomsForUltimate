@@ -3,10 +3,14 @@ use crate::model::storage;
 use std::fmt::{self, Write as _};
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write as _};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Mutex, TryLockError};
 
 // No path back to diagnostics: callers ignore an events error rather than reporting it recursively.
 static EVENTS: Mutex<()> = Mutex::new(());
+/// Lines a contended append skipped: a game hook (the Tech frame's diagnostics) never waits on EVENTS, so a busy
+/// writer drops its line and the next uncontended append writes one "dropped N events" line first.
+static DROPPED: AtomicU32 = AtomicU32::new(0);
 
 /// The existing DIAG rotation: replace the previous generation, then create an empty current file.
 /// A legacy oversized current file is retained whole as previous, not silently truncated.
@@ -46,7 +50,18 @@ pub(crate) fn append_event_at(
             "event line exceeds file cap",
         ));
     }
-    let _guard = EVENTS.lock().unwrap_or_else(|poison| poison.into_inner());
+    let _guard = match EVENTS.try_lock() {
+        Ok(guard) => guard,
+        Err(TryLockError::Poisoned(poison)) => poison.into_inner(),
+        Err(TryLockError::WouldBlock) => {
+            DROPPED.fetch_add(1, Ordering::Relaxed);
+            return Ok(());
+        }
+    };
+    let dropped = DROPPED.swap(0, Ordering::Relaxed);
+    if dropped > 0 {
+        writeln!(size, "dropped {dropped} events").map_err(|_| io::Error::other("event format failed"))?;
+    }
     let bytes = match fs::metadata(current) {
         Ok(metadata) => metadata.len(),
         Err(error) if error.kind() == io::ErrorKind::NotFound => 0,
@@ -63,6 +78,9 @@ pub(crate) fn append_event_at(
         rotate_log(current, previous.as_str())?;
     }
     let mut file = OpenOptions::new().create(true).append(true).open(current)?;
+    if dropped > 0 {
+        writeln!(file, "dropped {dropped} events")?;
+    }
     writeln!(file, "{args}")?;
     if sync {
         file.sync_data()?;
@@ -129,10 +147,7 @@ mod tests {
         ));
         assert!(diag.contains("log_file::append_event_at(failures, format_args!(\"{} diag_log {what}: {error}\", clock::uptime_ms()), false)"));
         assert!(diag.contains("log_file::rotate_log(&log.current, &log.previous)?;"));
-        assert!(
-            crate::install_capacity::INSTALL_LINE_CAPACITY + 1
-                <= storage::DIAGNOSTIC_LIMIT as usize
-        );
+        assert!(crate::install_capacity::INSTALL_LINE_CAPACITY < storage::DIAGNOSTIC_LIMIT as usize);
         let (root, current, _) = paths("format");
         append_event_at(
             &current,
@@ -172,10 +187,16 @@ mod tests {
             }
         });
         for path in [&current, &previous] {
-            assert!(fs::metadata(path).unwrap().len() <= storage::DIAGNOSTIC_LIMIT);
+            // Dropped contended lines can keep the total under one rotation, so only the current file must exist.
+            let Ok(metadata) = fs::metadata(path) else {
+                assert!(path == &previous, "the current events file is missing");
+                continue;
+            };
+            assert!(metadata.len() <= storage::DIAGNOSTIC_LIMIT);
             let text = fs::read_to_string(path).unwrap();
             assert!(text.ends_with('\n'));
-            for line in text.lines() {
+            // A contended writer never waits: it drops its line, and a later append reports the count first.
+            for line in text.lines().filter(|line| !(line.starts_with("dropped ") && line.ends_with(" events"))) {
                 assert_eq!(line.len(), 18);
                 assert!(line.starts_with("writer="));
                 assert!(line.contains(" line="));
@@ -206,6 +227,26 @@ mod tests {
         );
         assert_eq!(fs::read(&current).unwrap(), full);
         assert!(!std::path::Path::new(&previous).exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    /// devin-primary 2026-11-18 05:16Z: a hook-reachable append never waits on EVENTS. While the lock is held the
+    /// line is dropped at once; the next uncontended append writes one "dropped N events" line before its own.
+    fn contended_append_drops_without_waiting_and_reports_once() {
+        let (root, current, _) = paths("contended");
+        append_event_at(&current, format_args!("first"), false).unwrap();
+        {
+            let _held = EVENTS.lock().unwrap();
+            append_event_at(&current, format_args!("skipped"), false).unwrap();
+            assert_eq!(fs::read_to_string(&current).unwrap(), "first\n", "a contended append waits or writes");
+        }
+        append_event_at(&current, format_args!("next"), false).unwrap();
+        append_event_at(&current, format_args!("last"), false).unwrap();
+        let text = fs::read_to_string(&current).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!((lines[0], lines.last().copied()), ("first", Some("last")), "{text}");
+        assert!(lines[1].starts_with("dropped ") && lines[1].ends_with(" events") && lines[2] == "next", "{text}");
+        assert!(!text.contains("skipped") && lines.len() == 4, "the count is written once: {text}");
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -245,6 +286,10 @@ mod tests {
             (
                 "legacy_oversized_generation_is_not_truncated",
                 legacy_oversized_generation_is_not_truncated as fn(),
+            ),
+            (
+                "contended_append_drops_without_waiting_and_reports_once",
+                contended_append_drops_without_waiting_and_reports_once as fn(),
             ),
         ]);
     }
