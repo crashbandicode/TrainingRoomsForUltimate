@@ -74,29 +74,87 @@ mod tests {
         assert_eq!(q.pop(), None);
     }
 
-    fn a_full_queue_refuses_and_keeps_every_frame() {
-        let mut q = FrameQueue::new();
+    fn a_full_queue_refuses_and_wraps_in_order() {
+        let q = FrameQueue::new();
+        assert!(q.is_empty());
+        assert_eq!(q.pop(), None);
         for i in 0..AHEAD as u64 {
             assert!(q.push(i));
         }
-        assert!(!q.push(999), "full: refused, not written over");
+        assert_eq!(q.room(), 0);
+        assert!(!q.push(999), "a full queue must keep every published frame");
         assert_eq!(q.pop(), Some(0));
-        assert!(q.push(7));
+        assert!(q.push(AHEAD as u64));
         let out: Vec<u64> = std::iter::from_fn(|| q.pop()).collect();
-        assert_eq!(out.len(), AHEAD);
-        assert_eq!(out.first(), Some(&1));
-        assert_eq!(out.last(), Some(&7));
+        assert_eq!(out, (1..=AHEAD as u64).collect::<Vec<_>>());
+        assert!(q.is_empty());
     }
 
     fn clear_drops_the_buffered_frames() {
-        let mut q = FrameQueue::new();
-        assert!(q.push(1));
-        assert!(q.push(2));
+        let q = FrameQueue::new();
+        for i in 0..AHEAD as u64 {
+            assert!(q.push(i));
+        }
+        assert_eq!(q.pop(), Some(0));
+        assert!(q.push(AHEAD as u64));
+        let head = q.head.load(Ordering::Relaxed);
         q.clear();
+        assert_eq!(q.head.load(Ordering::Relaxed), head);
         assert!(q.is_empty());
         assert_eq!(q.room(), AHEAD);
-        assert!(q.push(9));
-        assert_eq!(q.pop(), Some(9));
+        for i in 0..AHEAD as u64 {
+            assert!(q.push(100 + i), "the new generation can use the whole ring");
+        }
+        let out: Vec<u64> = std::iter::from_fn(|| q.pop()).collect();
+        assert_eq!(out, (100..100 + AHEAD as u64).collect::<Vec<_>>());
+        assert_eq!(q.pop(), None);
+    }
+
+    fn an_interrupted_pop_rejects_the_reused_slot() {
+        let q = FrameQueue::new();
+        for i in 0..AHEAD as u64 {
+            assert!(q.push(i));
+        }
+        let at = q.head.load(Ordering::Relaxed);
+        let generation = q.generation_start.load(Ordering::Acquire);
+
+        // The hook selected the old slot. The worker clears and reuses that exact slot
+        // before the hook loads its payload.
+        q.clear();
+        assert!(q.push(900));
+        assert_eq!(q.read_live(at, generation), None);
+        assert_eq!(q.head.load(Ordering::Relaxed), at);
+        assert_eq!(q.pop(), Some(900));
+        assert_eq!(q.pop(), None);
+    }
+
+    fn the_producer_and_consumer_keep_every_frame_in_order() {
+        use std::time::{Duration, Instant};
+
+        const FRAMES: u64 = 30_000;
+        let q = FrameQueue::new();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                for i in 0..FRAMES {
+                    while !q.push(i) {
+                        assert!(Instant::now() < deadline, "producer stalled at {i}");
+                        std::thread::yield_now();
+                    }
+                }
+            });
+            for i in 0..FRAMES {
+                let frame = loop {
+                    if let Some(frame) = q.pop() {
+                        break frame;
+                    }
+                    assert!(Instant::now() < deadline, "consumer stalled at {i}");
+                    std::thread::yield_now();
+                };
+                assert_eq!(frame, i);
+            }
+        });
+        assert!(q.is_empty());
     }
 
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
@@ -104,8 +162,10 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("frames_come_out_once_in_order", frames_come_out_once_in_order as fn()),
-            ("a_full_queue_refuses_and_keeps_every_frame", a_full_queue_refuses_and_keeps_every_frame as fn()),
+            ("a_full_queue_refuses_and_wraps_in_order", a_full_queue_refuses_and_wraps_in_order as fn()),
             ("clear_drops_the_buffered_frames", clear_drops_the_buffered_frames as fn()),
+            ("an_interrupted_pop_rejects_the_reused_slot", an_interrupted_pop_rejects_the_reused_slot as fn()),
+            ("the_producer_and_consumer_keep_every_frame_in_order", the_producer_and_consumer_keep_every_frame_in_order as fn()),
         ]);
     }
     }
