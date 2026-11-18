@@ -2131,3 +2131,79 @@ fn combo_hud_borrows_helper_through_draw_and_try_order_seeds_are_detected() {
         "explicitly dropped guards were extended"
     );
 }
+
+fn copy_tree(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap() {
+        let path = entry.unwrap().path();
+        let dest = to.join(path.file_name().unwrap());
+        if path.is_dir() {
+            copy_tree(&path, &dest);
+        } else if path.extension().is_some_and(|e| e == "rs") {
+            std::fs::copy(&path, &dest).unwrap();
+        }
+    }
+}
+
+/// src/runtime plus the engine's `#[path]` mounts of model files (src/engine/mod.rs), laid out as `engine/<name>.rs` and
+/// `engine/<name>/…`, so `crate::engine::rr_host::…` resolves into them. The blind spot it closes (rc.15 parry,
+/// tr-review-astra-3 19:09Z): `runtime_graph` scans src/runtime only, so a game hook's call into an engine module ended at the
+/// module boundary: `recorder::ai_epilogue` → `recording_host::cpu_playback` → `rr_host::cpu_playback` →
+/// `role_frames(Cpu).lock()` never reached `rr_host.rs`, and its locks (CPU_FRAMES, which the menu worker's publish fills) were
+/// never in the table.
+fn engine_mirror() -> std::path::PathBuf {
+    let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join("lock-order-engine");
+    let _ = std::fs::remove_dir_all(&out);
+    copy_tree(&src.join("runtime"), &out);
+    let engine = out.join("engine");
+    std::fs::create_dir_all(&engine).unwrap();
+    let text = std::fs::read_to_string(src.join("engine/mod.rs")).unwrap();
+    let lines: Vec<&str> = text.lines().collect();
+    for (i, line) in lines.iter().enumerate() {
+        let Some(path) = line.trim().strip_prefix("#[path = \"").and_then(|r| r.strip_suffix("\"]")) else { continue };
+        let name = lines[i + 1..].iter().find_map(|l| {
+            let l = l.trim();
+            l.strip_prefix("pub mod ").or_else(|| l.strip_prefix("pub(crate) mod ")).or_else(|| l.strip_prefix("mod "))
+                .map(|n| n.trim_end_matches(';').trim().to_owned())
+        });
+        let Some(name) = name else { continue };
+        let from = src.join("engine").join(path);
+        if from.file_name().is_some_and(|f| f == "mod.rs") {
+            copy_tree(from.parent().unwrap(), &engine.join(&name));
+        } else if from.is_file() {
+            std::fs::copy(&from, engine.join(format!("{name}.rs"))).unwrap();
+        }
+    }
+    out
+}
+
+/// The rc.6 freeze class across the engine boundary: no lock of an engine-mounted model module that a game entry waits on is
+/// held by a plugin thread. Same predicate as `no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread`, on the graph that
+/// also contains the engine's mounts (`engine_mirror`).
+#[test]
+fn no_engine_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
+    let root = engine_mirror();
+    let mut graph = Graph::scan(&root, &[]);
+    graph.precise_imports = true;
+    assert!(!graph.find("rr_host::cpu_playback").is_empty(), "the engine mounts are not in the graph");
+    let (ctx, s) = scan_with_locks(&graph, static_locks(&root), false);
+    let shared = shared_locks(&ctx, &s);
+    let problems: Vec<String> = lockfree_inventory(&ctx, &shared)
+        .into_iter()
+        .filter(|(lock, _, _)| lock.contains("engine/"))
+        .map(|(lock, entries, holds)| {
+            format!(
+                "{lock}\n    game entries wait: {}\n    plugin threads hold: {}",
+                entries.into_iter().collect::<Vec<_>>().join(", "),
+                holds.into_iter().take(6).collect::<Vec<_>>().join(", ")
+            )
+        })
+        .collect();
+    println!("SHARED-ENGINE-LOCKS {}\n{}", problems.len(), problems.join("\n"));
+    // The frame queues the CPU's playback view reads (`role_playing`, from `ai_epilogue` and the command-flag hook through
+    // `rr_host::cpu_playback`). The other engine locks this graph newly sees (compat logging's LINES, rr_host's RECORD_START
+    // and START_SPEED) predate the parry change and are reported to the primary for a ruling (2026-11-18 PARRY READY).
+    let queues: Vec<&String> = problems.iter().filter(|p| p.starts_with("engine/rr_host.rs::CPU_FRAMES") || p.starts_with("engine/rr_host.rs::PLAYER_FRAMES")).collect();
+    assert!(queues.is_empty(), "a game entry waits on a playback frame queue the menu worker fills:\n{}", queues.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n"));
+}
