@@ -1917,3 +1917,11 @@ ceiling = 156789
 date = "2026-11-18"
 reason = "tr-review-astra-3 14:34Z merge blocker: the hook-side cuts (note_mash from the CPU command hook, note_load from the load request) no longer take the frame-queue or start-speed locks the macros worker holds. Per-role atomic cut flags; take_frame, role_playing and publish honour them; the worker tick clears the queue then the flag. Measured 156091 = +10 on 156081. Exact total. FOR OPERATOR REVIEW."
 approved_by = "Review fix for an Astra merge blocker (primary 13:3xZ: the phase3 fixes land after PASS); the +10 is flagged for the primary/operator."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 156795
+date = "2026-11-18"
+reason = "FS-027/FS-031 busy fix (rc15/busy-rr-host 4021e653, tr-review-astra-3 PASS 16:23Z; Eden verify PASS) on main 76a830ce (156789): +6 (the busy guards count a Recording-page take as busy; the test is not counted). Exact total, no headroom. Counting and gates unchanged."
+approved_by = "operator 2026-11-18: yes additional lines are ok; primary c07b3449 goal 18:36Z: land the busy fix on local main as planned."
