@@ -2538,6 +2538,57 @@ mod tests {
         reset_host();
     }
 
+    /// The primary 21:31Z (Eden accept-8 r05): Mash Always + Jump with Mash interrupts playback On, during a parry
+    /// practice. The CPU's mash asks the playback to stop and queues nothing, both while a pass plays and between passes.
+    fn parry_pass_mash_asks_to_stop_and_queues_nothing() {
+        use crate::model::cpu::mash::{Action, BufferContext, Buffered, Mash};
+        use crate::model::cpu::rng::Rng;
+        use crate::model::cpu::settings::CpuSettings;
+        let _hold = hold();
+        reset_host();
+        let mut snap = crate::model::settings::Snapshot::factory();
+        let mut always = vec![0u8; 17];
+        always[16] = 1;
+        let mut jump = vec![0u8; 30];
+        jump[usize::from(Action::JUMP.0)] = 1;
+        snap.set("mash_triggers", &always).unwrap();
+        snap.set("mash_state", &jump).unwrap();
+        snap.set("playback_mash", &[1, 0]).unwrap();
+        let s = CpuSettings::from_snapshot(&snap);
+        assert!(s.playback_mash, "Mash interrupts playback is On");
+        let mash_now = || {
+            let mut mash = Mash::new();
+            let ctx = BufferContext { playback: cpu_playback(PlaybackState::default()) };
+            let out = mash.buffer_menu_mash(&s, &mut Rng::new(7), ctx, Some(Action::JUMP));
+            (out, mash.queue.is_empty())
+        };
+        let root = scratch("parry-mash-stop");
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        let save = NamedSave::new("Parry start", state(8), state(7)).unwrap();
+        let save_id = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&save).unwrap();
+        let frames = vec![InputFrame { buttons: 2, ..InputFrame::default() }; 3];
+        let mut recording = super::super::macros::MacroRecording::new("Reticle", "13.0.5", StartState::neutral(7, 0, 1.0), frames).unwrap();
+        recording.set_start_save(Some(&save_id)).unwrap();
+        let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&id), 1).unwrap();
+        index.set_loop(Role::Cpu, LoopCount::Finite(2));
+        index.save(&root).unwrap();
+        set_parry(true);
+        on_chords(false, false, true);
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        warp_landed();
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        assert!(take_cpu_frame().is_some(), "pass 1 plays");
+        assert_eq!(mash_now(), (Buffered::StopPlayback, true), "during pass 1");
+        while take_cpu_frame().is_some() {}
+        set_parry_open(true);
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        assert_eq!(PARRY_PASSES.load(Ordering::Acquire), 1, "pass 2 is owed");
+        assert_eq!(mash_now(), (Buffered::StopPlayback, true), "between the passes");
+        reset_host();
+    }
+
     /// Parry practice's refusals (approved rows parry-practice-no-recording and parry-practice-start-save-missing).
     fn parry_refuses_without_a_recording_or_its_start_save() {
         let _hold = hold();
@@ -3818,6 +3869,7 @@ mod tests {
             ("parry_stop_during_buffered_playback_owes_no_pass", parry_stop_during_buffered_playback_owes_no_pass as fn()),
             ("parry_off_cancels_owed_passes", parry_off_cancels_owed_passes as fn()),
             ("parry_passes_owed_are_a_running_cpu_playback", parry_passes_owed_are_a_running_cpu_playback as fn()),
+            ("parry_pass_mash_asks_to_stop_and_queues_nothing", parry_pass_mash_asks_to_stop_and_queues_nothing as fn()),
             ("parry_refuses_without_a_recording_or_its_start_save", parry_refuses_without_a_recording_or_its_start_save as fn()),
             ("a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see", a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see as fn()),
             ("cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing", cpu_frames_reach_the_ai_once_each_whatever_the_worker_timing as fn()),
