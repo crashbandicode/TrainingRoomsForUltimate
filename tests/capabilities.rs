@@ -604,7 +604,8 @@ fn optional_tech_poison_preserves_existing_features() {
         .chain(model::sites_tech_surfaces::SITES.iter().map(|row| row.name))
         .chain(model::sites_tech_hitlag::SITES.iter().map(|row| row.name)) {
         let row = capabilities::find(poison).expect("poison names a real guarded row");
-        let usable = |s: &model::sites::Site| s.name != poison;
+        let names: Vec<_> = capabilities::equivalent_rows(row).map(|site| site.name).collect();
+        let usable = |s: &model::sites::Site| !names.contains(&s.name);
         for unit in [Feature::CpuCore, Feature::CpuCommon, Feature::Hitbox] {
             assert!(capabilities::unit_usable(unit, &usable), "{poison} disabled {}", unit.name());
         }

@@ -536,7 +536,8 @@ fn tech_init_uses_resolved_ids_on_the_existing_nonhook_heartbeat() {
     assert!(cpu.contains("TECH_INIT.publish(&table);"));
     assert!(boot.find("set_tick(cpu::service_tech_init)").unwrap() < boot.find("diag_log::start_drain_thread()").unwrap());
     assert!(drain.contains("OnceLock<fn()>; 4]"));
-    assert_eq!(boot.matches("diag_log::set_tick(").count(), 3);
+    // Seam report, P1, Tech init and Mash out's solver service: all four drain slots.
+    assert_eq!(boot.matches("diag_log::set_tick(").count(), 4);
     assert!(drain.contains("threads::spawn(crate::model::thread_stacks::ThreadId::Heartbeat"));
     assert!(drain.contains("for tick in TICKS.iter().filter_map(|slot| slot.get()) {\n                tick();"));
     let init = &tech[tech.find("pub unsafe fn init(ids: [i32; 18])").unwrap()..tech.find("unsafe fn still_tumbling").unwrap()];

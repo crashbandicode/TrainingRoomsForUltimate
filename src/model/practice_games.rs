@@ -68,8 +68,8 @@ mod tests {
         use crate::model::{btt, settings::{self, Settings}};
 
         #[test]
-        fn registry_covers_four_games() {
-            assert_eq!(ROWS, &["eggsercise", "btt", "mashout", "stage_tech"]);
+        fn registry_covers_five_games() {
+            assert_eq!(ROWS, &["eggsercise", "btt", "tech_practice", "mashout", "stage_tech"]);
             for (index, id) in ROWS.iter().enumerate() {
                 assert!(!ROWS[index + 1..].contains(id));
             }
