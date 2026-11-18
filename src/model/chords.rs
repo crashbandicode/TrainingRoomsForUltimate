@@ -117,6 +117,7 @@ pub mod field {
     pub const STICKS: [usize; 4] = [0x10, 0x14, 0x20, 0x24];
     pub const JUST_DOWN: usize = 0x88;
     pub const JUST_RELEASE: usize = 0x8c;
+    pub const BUTTONS: [usize; 4] = [CURRENT_BUTTONS, PREVIOUS_BUTTONS, JUST_DOWN, JUST_RELEASE];
     pub const STYLE: usize = 0x9c;
 }
 
@@ -532,11 +533,12 @@ impl Detector {
     }
 }
 
-/// Whether the Plus bits are cleared from this poll's controller (SPEC-input-04 §4, §6.1): never for a
-/// plain Plus (it goes to the game's pause), only while a modal panel owns the input or when an INI
-/// shortcut that includes Plus was accepted this poll.
-pub const fn clear_plus_bits(modal_owner: bool, plus_shortcut_accepted: bool) -> bool {
-    modal_owner || plus_shortcut_accepted
+/// An opaque modal or accepted menu shortcut clears all four fields (SPEC-input-04 §4).
+/// A retained chord clears only the edges so a repeated poll can still see the physical hold.
+pub fn persistent_plus_fields(modal: bool, accepted: bool, hidden: u32) -> &'static [usize] {
+    if modal || accepted { &field::BUTTONS }
+    else if hidden & bit::PLUS_MASK != 0 { &field::BUTTONS[2..] }
+    else { &[] }
 }
 
 /// Whether an accepted OpenMenu this poll came through a shortcut that contains Plus (the pause press
