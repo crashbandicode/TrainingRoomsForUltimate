@@ -152,6 +152,21 @@ fn run() {
 /// files in the data folder: `diag-shortcut.req` holds `<slot> <chord mask>` (decimal) and goes through
 /// `chords::commit_shortcut`; `diag-capture.req` holds `on` or `off` and goes through `request_replay_capture`.
 /// Not in the shipped NRO.
+/// Diag build: the next bound-save write waits this long after taking its pair (`diag-bound-hold.req`), so an Eden row
+/// can put a slow write in front of a restore.
+#[cfg(feature = "diag")]
+static BOUND_HOLD_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+#[cfg(feature = "diag")]
+pub fn diag_bound_hold() {
+    let ms = BOUND_HOLD_MS.swap(0, Ordering::AcqRel);
+    if ms > 0 {
+        diagnostic(format_args!("[TrainingRooms] diag_bound_hold start ms={ms}"));
+        std::thread::sleep(Duration::from_millis(ms));
+        diagnostic(format_args!("[TrainingRooms] diag_bound_hold done ms={ms}"));
+    }
+}
+
 #[cfg(feature = "diag")]
 fn diag_requests() {
     let read = |name: &str| {
@@ -166,6 +181,10 @@ fn diag_requests() {
             let result = crate::runtime::features::chords::commit_shortcut(usize::from(slot), crate::model::menu::chord::Chord(mask));
             diagnostic(format_args!("[TrainingRooms] diag_request shortcut slot={slot} mask={mask} result={result:?}"));
         }
+    }
+    if let Some(ms) = read("diag-bound-hold.req").and_then(|text| text.trim().parse::<u64>().ok()) {
+        BOUND_HOLD_MS.store(ms.min(10_000), Ordering::Release);
+        diagnostic(format_args!("[TrainingRooms] diag_request bound_hold ms={ms}"));
     }
     if let Some(text) = read("diag-capture.req") {
         let enabled = text.trim() == "on";

@@ -727,7 +727,12 @@ pub fn bound_sync(root: &Path) -> Option<Option<[SavedState; 2]>> {
 /// The state writer has a Save's two records for the active slot. The worker writes them into the bound save.
 /// No bound-save write waits for the worker (the bridge's fixture restore waits for this).
 pub fn bound_settled() -> bool {
-    !BOUND_WRITING.load(Ordering::Acquire) && lock(&SAVED_PAIR).is_none() && !BOUND_DIRTY.load(Ordering::Acquire)
+    pair_settled() && !BOUND_DIRTY.load(Ordering::Acquire)
+}
+
+/// No captured pair waits for the worker and none is being written.
+pub fn pair_settled() -> bool {
+    !BOUND_WRITING.load(Ordering::Acquire) && lock(&SAVED_PAIR).is_none()
 }
 
 /// The worker is writing a captured pair into the bound save (set before the pair is taken).
@@ -842,16 +847,23 @@ pub fn warp_pair(save: NamedSave, place: Option<(Role, Placement)>) -> [SavedSta
 
 /// Save writes the one bound save, or a new bound Save N when none is bound (`rr_runtime::save_chord`). Worker side.
 pub fn write_saved(root: &Path) -> bool {
+    write_saved_with(root, || {})
+}
+
+/// `write_saved` with `after_take` run once the pair is taken and before it is written (a test holds the worker there;
+/// the diag build can slow the write there). `BOUND_WRITING` covers it.
+pub fn write_saved_with(root: &Path, after_take: impl FnOnce()) -> bool {
     BOUND_WRITING.store(true, Ordering::Release);
-    let wrote = write_saved_pair(root);
+    let wrote = write_saved_pair(root, after_take);
     BOUND_WRITING.store(false, Ordering::Release);
     wrote
 }
 
-fn write_saved_pair(root: &Path) -> bool {
+fn write_saved_pair(root: &Path, after_take: impl FnOnce()) -> bool {
     let Some([player, cpu]) = lock(&SAVED_PAIR).take() else {
         return false;
     };
+    after_take();
     let Ok(id) = save_chord(root, player.clone(), cpu.clone(), unix_now()) else {
         return false;
     };
@@ -3044,6 +3056,37 @@ mod tests {
         assert_eq!(take_slots_dirty(), Some(false), "copied again, quietly");
     }
 
+    /// Astra v2r 1: the worker holds a taken pair (its bound save not written yet) for longer than the restore's six
+    /// settle samples; every sample must see it pending, and the pair is settled only once its write is done. RED before
+    /// 7651c6f2: with the pair taken, `SAVED_PAIR` was empty and nothing else marked the write.
+    fn a_taken_pair_stays_pending_until_its_write_is_done() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("held-pair");
+        migrate_at_boot(&root, &none(), "2026-11-18").unwrap();
+        save_captured([at_x(3.0), at_x(4.0)]);
+        assert!(!pair_settled(), "a captured pair waits for the worker");
+        let (taken_tx, taken_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+        let worker_root = root.clone();
+        let worker = std::thread::spawn(move || {
+            write_saved_with(&worker_root, move || {
+                taken_tx.send(()).unwrap();
+                release_rx.recv().unwrap();
+            })
+        });
+        taken_rx.recv().unwrap();
+        for sample in 0..6 {
+            assert!(!pair_settled(), "settle sample {sample}: the taken pair is still being written");
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        release_tx.send(()).unwrap();
+        assert!(worker.join().unwrap(), "the held write completes");
+        assert!(pair_settled(), "written: settled");
+        let made = RecordingIndex::load(&root).unwrap().bound().unwrap().to_owned();
+        assert_eq!(Store::<NamedSave>::new(root.join(SAVES_DIR)).load(&made).unwrap().player.x, 3.0);
+    }
+
     fn at_x(x: f32) -> SavedState {
         let mut state = state(0);
         state.x = x;
@@ -3457,6 +3500,7 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("posted_chords_reach_the_role_machines", posted_chords_reach_the_role_machines as fn()),
+            ("a_taken_pair_stays_pending_until_its_write_is_done", a_taken_pair_stays_pending_until_its_write_is_done as fn()),
             ("the_start_save_switch_reaches_the_file_and_the_play", the_start_save_switch_reaches_the_file_and_the_play as fn()),
             ("a_posted_record_stores_the_start_save", a_posted_record_stores_the_start_save as fn()),
             ("migration_from_the_worker_runs_once", migration_from_the_worker_runs_once as fn()),

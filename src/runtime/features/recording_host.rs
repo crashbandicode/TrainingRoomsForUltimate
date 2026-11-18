@@ -228,6 +228,9 @@ pub fn service() {
 /// Save writes the bound save; the save-state machine's active slot holds the bound save (RECORDING.md, "Save states
 /// only warp").
 fn sync_bound(root: &Path) {
+    #[cfg(feature = "diag")]
+    rr_host::write_saved_with(root, super::writer::diag_bound_hold);
+    #[cfg(not(feature = "diag"))]
     rr_host::write_saved(root);
     if let Some(pair) = rr_host::bound_sync(root) {
         super::states::post_bound(pair);
