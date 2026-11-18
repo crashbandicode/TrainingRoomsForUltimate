@@ -1949,3 +1949,11 @@ ceiling = 156904
 date = "2026-11-18"
 reason = "Practice games fix (rc15/games-fix on main af72b7ba, 156721): Eggs-ercise targets across the stage's native floors with the Fixed camera, and P1's articles break targets in both games under Breaks on (docs/DECISIONS.md TR15-GAMES). Measured 156904 = +183 counted lines. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
 approved_by = "Pending: requested of the operator through the primary in games-fix-devin's GAMES FIX READY (primary c07b3449 15:30Z rulings ordered the work; the size is reported there)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162471
+date = "2026-11-18"
+reason = "Practice games fix (rc15/games-fix e19eb61a, tr-review-astra-3 PASS 22:30Z; Eden games-fix-xps-5 14/14) on main 6f564b86 (162291): +180 (Eggs-ercise targets across the stage's native floors in the player's view; P1's articles break targets in both games under Breaks on; docs/DECISIONS.md TR15-GAMES). Exact total, no headroom. Counting and gates unchanged."
+approved_by = "operator 2026-11-18: yes additional lines are ok (+183 allowance, primary 18:13Z; reviewer 22:30Z: +180 within it); primary c07b3449 22:31Z: land games-fix on local main."
