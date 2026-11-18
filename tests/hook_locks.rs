@@ -729,6 +729,20 @@ fn clatter_set_writers_run_only_at_game_thread_owner_sites() {
         assert!(f.body.windows(3).any(|w| w[0] == Tok::Ident("release".into()) && w[1] == Tok::Punct('(')
             || w[1] == Tok::Ident("release".into()) && w[2] == Tok::Punct('(')), "{name} must call clatter_set::release");
     }
+    // L2b (2): restore()'s only callers are service() (the owner site) and release(), where it sits behind the
+    // owner-thread guard (`owner == current_thread()` before the call). Removing the guard fails this.
+    // clatter_set::restore is private, so only its own file can call it; other modules' `restore`s are unrelated.
+    let source = std::fs::read_to_string(runtime.join("features/mashout/clatter_set.rs")).unwrap();
+    assert!(source.contains("\nfn restore()"), "clatter_set::restore must stay private");
+    let callers: Vec<String> = graph.funcs.iter().filter(|f| f.file == "features/mashout/clatter_set.rs" && f.name != "restore"
+        && f.body.windows(2).any(|w| w[0] == Tok::Ident("restore".into()) && w[1] == Tok::Punct('(')))
+        .map(|f| format!("{}::{}", f.file, f.name)).collect();
+    assert_eq!(callers, ["features/mashout/clatter_set.rs::release", "features/mashout/clatter_set.rs::service"],
+        "restore must be reached only from release (guarded) and service");
+    let release = graph.funcs.iter().find(|f| f.file == "features/mashout/clatter_set.rs" && f.name == "release").unwrap();
+    let at = |name: &str| release.body.iter().position(|t| *t == Tok::Ident(name.into()));
+    assert!(matches!((at("current_thread"), at("restore")), (Some(g), Some(r)) if g < r),
+        "release must check the owner thread before restoring");
     let fail = graph.funcs.iter().find(|f| f.file == "features/mashout.rs" && f.name == "fail").unwrap();
     assert!(fail.body.contains(&Tok::Ident("revoke".into())), "Game::fail must revoke (and so release)");
     let lobby = plugin_reach(&graph, &["lobby::update"]);
