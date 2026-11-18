@@ -897,6 +897,56 @@ def btt_projectiles_apply_at_next_start(ctx):
     return save(ctx, 'btt-projectiles-apply-at-next-start', out)
 
 
+MASH_NOTICE = r'\[Mashout\] notice gen=(?P<gen>\d+) text=(?P<text>[^\n]+)'
+
+
+def mashout_start_stop(ctx):
+    """Mash out, the fourth game (main 6f564b86 merged): its Practice games row opens its sub-screen; Start runs it (a
+    notice); a menu visit with a State edit and B keeps the same run (same generation, no [Practice] line: the edit
+    waits for the next Start); Stop ends it (an empty notice)."""
+    out = {}
+    open_game(ctx, 'Mash out')
+    log = cursor(ctx)
+    try:
+        ctx.press('a')
+        first = log.wait(r'\[Practice\] (start|stop) game=(\S+)', 4, ctx)
+        if first.group(1) == 'stop':
+            out['stopped_first'] = first.group(0)
+            time.sleep(0.5)
+            ctx.press('a')
+            log.wait(r'\[Practice\] start game=Mashout', 4, ctx)
+        log.wait(r'\[Ui\] menu closed ', 4, ctx)
+        running = log.wait(MASH_NOTICE, 30, ctx)
+    finally:
+        log.close()
+    gen = int(running.group('gen'))
+    out['running'] = running.group(0)[:200]
+    out['running_shot'] = shot(ctx, 'mashout-running')
+    open_menu(ctx)
+    out['state_row'] = set_row(ctx, 'Mash out', 'State', 1, 'right')
+    log, starts = cursor(ctx), cursor(ctx)
+    try:
+        close_plain(ctx)
+        time.sleep(6.0)
+        # No Start or Stop, and no cancel (an empty notice): the run goes on with the State its Start latched.
+        none_since(ctx, starts, r'\[Practice\] (start|stop)|\[Mashout\] notice gen=\d+ text=\s*$')
+    finally:
+        log.close()
+        starts.close()
+    out['after_b_shot'] = shot(ctx, 'mashout-kept-after-b')
+    open_game(ctx, 'Mash out')
+    log = cursor(ctx)
+    try:
+        ctx.press('a')
+        out['stop'] = log.wait(r'\[Practice\] stop game=Some\(Mashout\)', 4, ctx).group(0)
+        close_plain(ctx)
+        out['stopped'] = log.wait(r'\[Mashout\] notice gen=\d+ text=\s*$', 10, ctx).group(0)[:160]
+    finally:
+        log.close()
+    out['generation'] = gen
+    return save(ctx, 'mashout-start-stop', out)
+
+
 def gif(ctx, name, seconds, act):
     folder = Path(ctx.row_dir)
     path = folder / (name + '.gif')
