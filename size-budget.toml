@@ -1945,7 +1945,23 @@ approved_by = "operator 2026-11-18: yes additional lines are ok; primary c07b344
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 162567
+ceiling = 156904
 date = "2026-11-18"
-reason = "rc.15 practice menu (operator-approved mockup, 2026-11-18 ~14:58Z): one row per game, a generic sub-screen (Screen::Rows) with Start first, Start/Stop as menu actions with a Running label, and one runtime value for the running game (runtime::features::practice) replacing the three per-row exclusion sites. Composed onto main 6f564b86 (162291, Mash out integration): measured 162567 = +276 counted lines over main, Mash out folded in as the fourth game (its row-on exclusion and normaliser removed) (+266 for the menu, +33 for tr-review-astra-3 16:37Z: a menu visit pauses Tech practice, and a running games settings are latched at its Start), after the Break the Targets close path lost its layout-load restart (primary 15:30Z). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
-approved_by = "PENDING: +276 reported to the primary for the operator by menu-games-devin (INBOX 2026-11-18); not yet approved."
+reason = "Practice games fix (rc15/games-fix on main af72b7ba, 156721): Eggs-ercise targets across the stage's native floors with the Fixed camera, and P1's articles break targets in both games under Breaks on (docs/DECISIONS.md TR15-GAMES). Measured 156904 = +183 counted lines. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "Pending: requested of the operator through the primary in games-fix-devin's GAMES FIX READY (primary c07b3449 15:30Z rulings ordered the work; the size is reported there)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162471
+date = "2026-11-18"
+reason = "Practice games fix (rc15/games-fix e19eb61a, tr-review-astra-3 PASS 22:30Z; Eden games-fix-xps-5 14/14) on main 6f564b86 (162291): +180 (Eggs-ercise targets across the stage's native floors in the player's view; P1's articles break targets in both games under Breaks on; docs/DECISIONS.md TR15-GAMES). Exact total, no headroom. Counting and gates unchanged."
+approved_by = "operator 2026-11-18: yes additional lines are ok (+183 allowance, primary 18:13Z; reviewer 22:30Z: +180 within it); primary c07b3449 22:31Z: land games-fix on local main."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162745
+date = "2026-11-18"
+reason = "rc.15 practice menu (operator-approved mockup, 2026-11-18 ~14:58Z): one row per game, a generic sub-screen (Screen::Rows) with Start first, Start/Stop as menu actions with a Running label, and one runtime value for the running game (runtime::features::practice) replacing the three per-row exclusion sites. Composed onto main cf6ec3cd (162471, games fix landed): measured 162745 = +274 counted lines over main (+276 on 6f564b86 162291), Mash out folded in as the fourth game (its row-on exclusion and normaliser removed) (+266 for the menu, +33 for tr-review-astra-3 16:37Z: a menu visit pauses Tech practice, and a running games settings are latched at its Start), after the Break the Targets close path lost its layout-load restart (primary 15:30Z). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "PENDING: +274 reported to the primary for the operator by menu-games-devin (INBOX 2026-11-18); not yet approved."

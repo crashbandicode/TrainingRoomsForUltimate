@@ -99,8 +99,8 @@ pub fn publish(snapshot: &Snapshot) {
 
 /// The rows (`eggs::choices`, little-endian), as every settings publish leaves them.
 static EGG_ROWS: AtomicU32 = AtomicU32::new(0);
-/// The rows of the run: latched when a Start reaches the pass (rc.15 practice menu: a running game's settings apply at
-/// its next Start). The run and its Breaks on rule read these.
+/// The rows of the run: latched by every practice game's Start (`practice_started`; rc.15 practice menu: a running
+/// game's settings apply at its next Start). The Eggs-ercise run and the Breaks on rule of both target games read these.
 static EGG_LIVE: AtomicU32 = AtomicU32::new(0);
 /// CPU during a game: Hide (the first option).
 static PRACTICE_HIDE: AtomicBool = AtomicBool::new(true);
@@ -122,9 +122,11 @@ pub fn eggs_start() {
     EGG_START.store(true, Ordering::Release);
 }
 
-/// Any practice game's Start (the menu worker; atomics only): CPU during a game is the one the menu showed at the Start.
+/// Any practice game's Start (the menu worker, after the close's publish; atomics only): CPU during a game and the
+/// Eggs-ercise rows are the ones the menu showed at the Start. Break the Targets reads Breaks on from these rows too.
 pub fn practice_started() {
     PRACTICE_HIDE_RUN.store(PRACTICE_HIDE.load(Ordering::Acquire), Ordering::Release);
+    EGG_LIVE.store(EGG_ROWS.load(Ordering::Acquire), Ordering::Release);
 }
 
 /// An Eggs-ercise run is armed, or a Start is on its way to the next pass (the menu worker; atomics only).
@@ -142,9 +144,6 @@ pub fn eggs_reset() {
 /// other fighter make no game call.
 unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     let seed = EGG_START.swap(false, Ordering::AcqRel).then(seed);
-    if seed.is_some() {
-        EGG_LIVE.store(EGG_ROWS.load(Ordering::Acquire), Ordering::Release);
-    }
     let mut rows = EGG_LIVE.load(Ordering::Acquire).to_le_bytes();
     // rc.15 practice menu: the mode while Eggs-ercise is the running game, Off otherwise.
     rows[0] = practice_games::effective(Game::Eggs, rows[0], super::practice::active());
@@ -163,12 +162,15 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     if entry != 0 {
         return eggs_cpu(&mut run, fighter, entry);
     }
-    (plan == eggs::Plan::Read).then_some(())?;
-    let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
     // Any menu over the game holds the clock: the plugin's, the game's own pause menu (the fighters' frames run on under
     // it: Eden wa-eggs-07bae4c1-1, E11) and the waiting room's busy native UI.
     let owners = crate::runtime::published::input_owners();
     let held = owners.covers_strip();
+    (plan == eggs::Plan::Read).then_some(())?;
+    let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
+    if run.floors_wanted() {
+        eggs_floors(&mut run, at);
+    }
     let tick = run.keeper(at) && !held;
     #[cfg(feature = "diag")]
     {
@@ -193,9 +195,12 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
             "[Eggs] pass at={at:#x} p1={top:?} egg={egg:?} overlap={overlap} air={aerial} score={score} hits={hits:?}"
         ));
     }
-    let length = run.step(tick, top[1], hits, aerial, kind);
-    // V2.1: the fighter whose attack broke it (Ice Climbers: that climber) freezes, as on a hit.
-    let broke = run.score > score;
+    run.sense([top[0], top[1]]);
+    // rc.15: Player 1's articles break the target too, as `Breaks on` allows (docs/DECISIONS.md).
+    let rule = run.rule();
+    let length = run.step_with(tick, top[1], hits, |egg| super::btt_projectiles::hit(at, egg, rule, aerial, true), aerial, kind);
+    // V2.1: the fighter whose attack broke it (Ice Climbers: that climber) freezes, as on a hit; an article's break does not.
+    let broke = run.score > score && run.melee();
     if let Some(frames) = broke.then(scene::facts).and_then(eggs::hitlag) {
         let _ = natives::set_hit_stop_frame(at, frames, false);
     }
@@ -212,6 +217,44 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
         run.view
     ));
     Some(())
+}
+
+/// Native rays of the floor read a pass (`eggs_floors`): Training's stage, the widest, takes about a hundred.
+const RAYS_PER_PASS: usize = 12;
+
+/// The floor read of the running game (rc.15): Tech's column walk (`Rays`, stacked platforms included) over the stage's
+/// camera range, at most `RAYS_PER_PASS` rays a pass, kept as world geometry. Only Player 1's pass on the game thread uses it.
+struct FloorRead(core::cell::RefCell<(Option<crate::model::tech::discovery::Rays>, [eggs::Floor; eggs::FLOORS], usize)>);
+// SAFETY: only `eggs_floors`, on the game thread's Player 1 pass, touches the cell; no borrow crosses a call that re-enters it.
+unsafe impl Sync for FloorRead {}
+static FLOOR_READ: FloorRead = FloorRead(core::cell::RefCell::new((None, [[[0.0; 2]; 2]; eggs::FLOORS], 0)));
+
+/// One pass of the floor read: a run that wants its floors starts it; done, broken or unusable (Tech's surface guards did not
+/// pass, no camera range) it hands the floors found so far to the run (none: the run's ground is used).
+unsafe fn eggs_floors(run: &mut eggs::Run, at: usize) {
+    use super::tech_surfaces::{FloorStep, NativeSource};
+    let Ok(mut read) = FLOOR_READ.0.try_borrow_mut() else { return };
+    let (rays, floors, n) = &mut *read;
+    if !run.pending() {
+        run.want_floors();
+        (*rays, *n) = (natives::camera_limit_range().and_then(crate::model::tech::discovery::Rays::new), 0);
+    }
+    let (Some(walk), Some(mut source)) = (rays.as_mut(), NativeSource::new(at)) else {
+        run.set_floors(&floors[..*n]);
+        return;
+    };
+    for _ in 0..RAYS_PER_PASS {
+        match source.floor_step(walk) {
+            FloorStep::Next(Some(f)) if *n < eggs::FLOORS && !floors[..*n].contains(&f) => (floors[*n], *n) = (f, *n + 1),
+            FloorStep::Next(_) => {}
+            FloorStep::Done | FloorStep::Broken => {
+                #[cfg(feature = "diag")]
+                crate::runtime::diag_log::diagnostic(format_args!("[Eggs] floors n={} {:?}", *n, &floors[..*n]));
+                run.set_floors(&floors[..*n]);
+                return;
+            }
+        }
+    }
 }
 
 /// The CPU target's pass (V2.1; the practice CPU's own frame, only while a run has it as the target): put it where the run

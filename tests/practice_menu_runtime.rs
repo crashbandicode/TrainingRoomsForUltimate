@@ -41,7 +41,11 @@ fn break_the_targets_projectiles_are_the_rule_latched_at_start() {
 fn eggsercise_rows_and_cpu_during_a_game_are_latched_at_start() {
     let hitbox = src("src/runtime/features/hitbox.rs");
     let pass = item(&hitbox, "unsafe fn eggs_pass(");
-    assert!(pass.contains("EGG_LIVE.store(EGG_ROWS.load"), "a Start latches the rows:\n{pass}");
+    // Every game's Start latches the rows (Break the Targets reads Breaks on too: btt.rs `egg_rule()`), in one place.
+    let started = item(&hitbox, "pub fn practice_started()");
+    assert!(started.contains("EGG_LIVE.store(EGG_ROWS.load"), "a Start latches the rows:\n{started}");
+    assert_eq!(hitbox.matches("EGG_LIVE.store").count(), 1, "one latch site");
+    assert!(src("src/runtime/features/btt.rs").contains("super::hitbox::egg_rule()"), "BTT's Breaks on is the latched one");
     assert!(pass.contains("EGG_LIVE.load"), "the run reads the latched rows");
     assert!(!pass.contains("EGG_ROWS.load(Ordering::Acquire).to_le_bytes()"), "never the published rows");
     assert!(pass.contains("PRACTICE_HIDE_RUN.load"), "CPU during a game is the Start's");

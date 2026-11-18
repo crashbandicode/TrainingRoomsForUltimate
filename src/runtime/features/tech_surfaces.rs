@@ -3,7 +3,7 @@
 use crate::model::guard::{guard_outcome, SeamKind};
 use crate::model::sites_tech_surfaces::windows as guards;
 use crate::model::tech::discovery::{decode, far_end, Bootstrap, Rays};
-use crate::model::tech::surface::{Line, Source, Surfaces};
+use crate::model::tech::surface::{Kind, Line, Source, Surfaces};
 use crate::model::tech::Vec2;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::game::{self, natives};
@@ -252,6 +252,32 @@ impl PlatformScan {
             ScanState::Done
         } else {
             ScanState::More
+        }
+    }
+}
+
+/// One step of a floor read (rc.15 Eggs-ercise, `hitbox::eggs_floors`): done, the next ray (and the floor it met), or broken.
+pub enum FloorStep {
+    Done,
+    Next(Option<[[f32; 2]; 2]>),
+    Broken,
+}
+impl NativeSource {
+    /// One native ray of `rays` (Tech's column walk, stacked platforms included), and the floor it met as world geometry
+    /// only: no borrowed line id survives the call.
+    pub fn floor_step(&mut self, rays: &mut Rays) -> FloorStep {
+        let Some(ray) = rays.current() else {
+            return FloorStep::Done;
+        };
+        match unsafe { self.ray(ray.origin, ray.delta) } {
+            Ok(Some((line, hit))) if rays.hit(line, hit).is_ok() => {
+                FloorStep::Next((line.kind() == Some(Kind::Floor)).then(|| line.ends.map(|e| [e.x, e.y])))
+            }
+            Ok(Some(_)) | Err(()) => FloorStep::Broken,
+            Ok(None) => {
+                rays.miss();
+                FloorStep::Next(None)
+            }
         }
     }
 }

@@ -829,12 +829,23 @@ fn btt_projectiles_use_owned_native_hits() {
         hits[0] = Hit([20.0, 15.0, 0.0], [24.0, 15.0, 0.0], 1.0, 1.0);
         Some((hits, usize::from(article == 0x1_0008)))
     };
-    assert!(!projectile_breaks(false, [22.0, 15.0], std::iter::from_fn(|| panic!("Off polls no pool")), own, |_| panic!("Off reads no article")));
+    assert!(!projectile_breaks(false, eggs::ANY, false, [22.0, 15.0], std::iter::from_fn(|| panic!("Off polls no pool")), own, |_| panic!("Off reads no article")));
     assert_eq!(calls.get(), 0);
-    assert!(projectile_breaks(true, [22.0, 15.0], [], own, read));
-    assert!(!projectile_breaks(true, [22.0, 15.0 + eggs::RADIUS + 1.001], [], own, read), "outside the native radius is a miss");
-    assert!(!projectile_breaks(true, [22.0, 15.0], [], |_, _| 0, |_| panic!("another owner's article never enters the reader")));
-    assert!(!projectile_breaks(true, [22.0, 15.0], [], |_, n| if n == 0 { 3 } else { 0 }, |_| panic!("misaligned article")));
+    assert!(projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], [], own, read));
+    assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0 + eggs::RADIUS + 1.001], [], own, read), "outside the native radius is a miss");
+    assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], [], |_, _| 0, |_| panic!("another owner's article never enters the reader")));
+    assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], [], |_, n| if n == 0 { 3 } else { 0 }, |_| panic!("misaligned article")));
+    // rc.15 (docs/DECISIONS.md): an article's hit obeys `Breaks on` like the fighter's own: 12%+ by the article hit's damage,
+    // Aerials only while Player 1 is in an aerial.
+    let strong = |damage: f32| move |article: usize| {
+        let mut hits = [Hit::default(); crate::model::hitbox::SLOTS as usize];
+        hits[0] = Hit([20.0, 15.0, 0.0], [24.0, 15.0, 0.0], 1.0, damage);
+        Some((hits, usize::from(article == 0x1_0008)))
+    };
+    assert!(!projectile_breaks(true, eggs::STRONG, false, [22.0, 15.0], [], own, strong(11.9)), "a weak article hit under 12%+");
+    assert!(projectile_breaks(true, eggs::STRONG, false, [22.0, 15.0], [], own, strong(12.0)), "a 12% article hit under 12%+");
+    assert!(!projectile_breaks(true, eggs::AERIALS, false, [22.0, 15.0], [], own, read), "Aerials, P1 grounded");
+    assert!(projectile_breaks(true, eggs::AERIALS, true, [22.0, 15.0], [], own, read), "Aerials, P1 in an aerial");
 }
 
 fn btt_fired_bullet_survives_an_empty_current_ring() {
@@ -861,10 +872,10 @@ fn btt_fired_bullet_survives_an_empty_current_ring() {
         hits[0] = Hit([20.0, 15.0, 0.0], [24.0, 15.0, 0.0], 1.0, 3.0);
         Some((hits, 1))
     };
-    assert!(!projectile_breaks(true, [22.0, 15.0], [], |_, _| 0, read), "the old ring-only census misses");
-    assert!(projectile_breaks(true, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, read));
-    assert!(!projectile_breaks(true, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, |_| None), "inactive pooled objects supply no attack");
-    assert!(!projectile_breaks(true, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, |at| {
+    assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], [], |_, _| 0, read), "the old ring-only census misses");
+    assert!(projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, read));
+    assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, |_| None), "inactive pooled objects supply no attack");
+    assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, |at| {
         let (mut hits, n) = read(at).unwrap();
         hits[0].3 = 0.0;
         Some((hits, n))
