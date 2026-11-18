@@ -672,9 +672,18 @@ def tech_menu_visit_keeps_count(ctx):
     out = {'stored_mode': stored}
     if shown:
         out['mode_row'] = set_row(ctx, 'Tech practice', 'Tech practice', shown, 'left')
+    # Boot 4: on Surface Any a fresh session drew a spot its launches never reached (every attempt abandoned, "Grading
+    # unavailable", before any menu visit). Floor gives contact; Surface is 2 rows below the mode row.
+    surface = json.loads(Path(ctx.instance['settings']).read_text())['menu']['tech_surface']
+    at = next(i for i, v in enumerate(surface) if v)
+    if at != 1:
+        out['surface_row'] = set_row(ctx, 'Tech practice', 'Surface', (1 - at) % 5, 'right')
+    for _ in range(6):
         back = press(ctx, 'up')
-        if back['row'] != 'Start':
-            raise RuntimeError(f'not back on Start: {back}')
+        if back['row'] == 'Start':
+            break
+    if back['row'] != 'Start':
+        raise RuntimeError(f'not back on Start: {back}')
     log = cursor(ctx)
     try:
         ctx.press('a')
