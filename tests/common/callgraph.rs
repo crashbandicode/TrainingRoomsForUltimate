@@ -469,6 +469,9 @@ pub struct Graph {
     pub funcs: Vec<Func>,
     /// `file -> (alias -> module name)` from `use ... as alias;`.
     aliases: BTreeMap<String, BTreeMap<String, String>>,
+    /// `module -> (name -> module it re-exports the name from)` from `pub use other::{name, …};` (rc.15 parry, 19:09Z:
+    /// `recording_host::cpu_playback` is `pub use rr_host::{cpu_playback, …}`; the call ended there and its locks were unseen).
+    reexports: BTreeMap<String, BTreeMap<String, String>>,
     /// `file -> names it imports by `use`` (any identifier in a `use` statement).
     imports: BTreeMap<String, BTreeSet<String>>,
     /// `#[path = "native_body_bank.rs"] mod body_bank;`: per declaring file, the declared module name -> the module its file is
@@ -681,6 +684,7 @@ impl Graph {
         }
         let mut funcs = Vec::new();
         let mut aliases: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
+        let mut reexports: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         let mut imports: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         let mut path_mods_local: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         let mut foreign_imports: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -699,6 +703,20 @@ impl Graph {
                 if ident(&toks[i]) == Some("use") {
                     let end = (i..toks.len()).find(|&k| is_punct(&toks[k], ';')).unwrap_or(toks.len() - 1);
                     let stmt = &toks[i + 1..end];
+                    if i > 0 && ident(&toks[i - 1]) == Some("pub") {
+                        // `pub use a::b::{x, y};` / `pub use a::b::x;`: the names this module re-exports, and the module they are from.
+                        let brace = stmt.iter().position(|t| is_punct(t, '{'));
+                        let (head, names): (&[Tok], Vec<&str>) = match brace {
+                            Some(b) => (&stmt[..b], stmt[b..].iter().filter_map(ident).filter(|n| *n != "self" && *n != "as").collect()),
+                            None => (&stmt[..stmt.len().saturating_sub(1)], stmt.last().and_then(ident).into_iter().collect()),
+                        };
+                        if let Some(from) = head.iter().rev().find_map(ident) {
+                            let module = module_of_file(&rel);
+                            for name in names {
+                                reexports.entry(module.clone()).or_default().insert(name.to_owned(), from.to_owned());
+                            }
+                        }
+                    }
                     // `use crate::model::x::{a, b}` / `use std::…`: one root outside the runtime; a `{…}` root mixes paths and
                     // is left to the over-approximation.
                     let root = ident(stmt.first().unwrap_or(&Tok::PathSep));
@@ -794,6 +812,7 @@ impl Graph {
         Graph {
             funcs,
             aliases,
+            reexports,
             imports,
             path_mods_local,
             path_mods,
@@ -882,7 +901,13 @@ impl Graph {
                 return candidates.iter().copied().filter(|&c| self.funcs[c].file == from.file).collect();
             }
             let module = self.declared_module(&from.file, module).unwrap_or(module);
-            return candidates.iter().copied().filter(|&c| self.funcs[c].module == module).collect();
+            let found: Vec<usize> = candidates.iter().copied().filter(|&c| self.funcs[c].module == module).collect();
+            if found.is_empty() {
+                if let Some(target) = self.reexports.get(module).and_then(|names| names.get(last)) {
+                    return candidates.iter().copied().filter(|&c| self.funcs[c].module == *target).collect();
+                }
+            }
+            return found;
         }
         let local: Vec<usize> = candidates.iter().copied().filter(|&c| self.funcs[c].file == from.file).collect();
         if !local.is_empty() {
@@ -1057,6 +1082,7 @@ mod receiver_tests {
         Graph {
             funcs: parser.funcs,
             aliases: BTreeMap::new(),
+            reexports: BTreeMap::new(),
             imports: BTreeMap::new(),
             path_mods_local: BTreeMap::new(),
             path_mods: BTreeMap::new(),
