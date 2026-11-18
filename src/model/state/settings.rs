@@ -120,7 +120,7 @@ fn damage(row: Option<&[u8]>) -> DamageMode {
 
 fn limits(row: Option<&[u8]>) -> (u8, u8) {
     match row {
-        Some(&[lower, upper]) => (lower.min(150), upper.min(150)),
+        Some(&[lower, upper]) => (lower, upper),
         _ => (0, 150),
     }
 }

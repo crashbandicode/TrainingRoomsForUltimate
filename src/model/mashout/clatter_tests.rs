@@ -122,7 +122,7 @@ fn new_mismatch_uses_arm_fmax_exactly() {
 
 #[test]
 fn tags_map_to_exactly_one_slot() {
-    assert_eq!([113, 116, 117, 40].map(slot_for), [Some(Slot::Set), Some(Slot::Set), Some(Slot::Add), None]);
+    assert_eq!([113, 114, 116, 117, 40].map(slot_for), [Some(Slot::Set), Some(Slot::Set), Some(Slot::Set), Some(Slot::Add), None]);
     assert_eq!(Writes::new(1, 40), None);
 }
 

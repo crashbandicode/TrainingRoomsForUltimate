@@ -86,7 +86,7 @@ The lowest and the highest damage Random Value can give Player 1.
 
 ![Random Value with both ranges 0-150 gives any damage (104% and 46%, then 113% and 31%); with Player damage range and CPU damage range set to 140-150, every load gives 140-150% (144% and 149%, then 149% and 141%)](../media/rc11-damage-range.gif)
 
-- **Values:** 0 to 150 for each end; the lower end stays at or below the upper
+- **Values** range from 0 to 255% for each end. The lower end stays at or below the upper.
 - **Default:** 0 to 150
 - **How:** A opens the slider. Left or Right chooses the lower or the upper handle, A picks it up, Left / Right move it
   by 1 and Up / Down by 10, A puts it down. B goes back. The row is greyed ("Only used when damage on load is Random

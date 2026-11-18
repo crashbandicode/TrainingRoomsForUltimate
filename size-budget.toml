@@ -1965,3 +1965,19 @@ ceiling = 162806
 date = "2026-11-18"
 reason = "Mash out row 121, Ganondorf grounded Flame Choke graded by the Tech grader (rc15/mashout-ganon-tech b8402e03, PASS mashout-review-devin 23:05Z / tr-review-astra-3 23:01Z, merged onto main cf6ec3cd 162471): measured 162806 = 162471 + 335 (catalog row, CatchedGanon name and contact predicate, the entered-status wait, Tech-session attempt with the late window, Tech-owned tech_adapter boundaries, status-hook seam, worker result text). Exact total, no headroom. Counting and gates unchanged."
 approved_by = "operator 2026-11-18 via primary c07b3449 (goal to mashout-demo-devin-2: \"Size growth is approved\" for the Ganon Flame Choke tech row)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162914
+date = "2026-11-18"
+reason = "Mash out row 114 Ice Shot graded (c5b9abaf: shared Set observer grading, Player-only 255% damage maximum, Ice Shot provider closure bounded by the native attack count): +108 (153805 vs its base a7a6a327 153697) on main 162806. Supersedes the branch-only +85 entry of 2313f591. Exact total, no headroom."
+approved_by = "operator 2026-11-18 ~19:38Z: size change approved (114 +108, 113 +12), recorded by primary c07b3449; C6/O7 PASS mashout-review-devin 23:12Z."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162926
+date = "2026-11-18"
+reason = "Mash out row 113 Blizzard graded through the shared climber closure (1a3ada5b): +12 (153817 vs c5b9abaf 153805). Exact total, no headroom."
+approved_by = "operator 2026-11-18 ~19:38Z: size change approved (114 +108, 113 +12), recorded by primary c07b3449; C6/O7 PASS mashout-review-devin 23:12Z."

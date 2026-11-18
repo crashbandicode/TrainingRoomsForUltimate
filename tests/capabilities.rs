@@ -891,16 +891,16 @@ fn injected_hitlag_callback_reaches_all_four_guarded_native_readers() {
 fn mashout_rows_are_registered_without_new_writes() {
     use model::guard::SeamKind;
     let rows = &model::sites_mashout::SITES;
-    assert_eq!(rows.len(), 29);
+    assert_eq!(rows.len(), 30);
     assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Relied).count(), 24);
-    assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Called).count(), 3);
+    assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Called).count(), 4);
     for row in rows {
         assert_eq!(row.feature, Feature::Mashout);
         assert_eq!(capabilities::all_sites().filter(|site| site.name == row.name).count(), 1);
         assert!(!capabilities::writes_code(row));
         let usable = |site: &model::sites::Site| site.name != row.name;
-        let floor_only = model::sites_mashout::trolley_floor_only(row);
-        assert_eq!(capabilities::blocked_by(Feature::Mashout, &usable), (!floor_only).then_some(row.name));
+        let move_specific = model::sites_mashout::move_specific(row);
+        assert_eq!(capabilities::blocked_by(Feature::Mashout, &usable), (!move_specific).then_some(row.name));
         assert!(!Granted::from_usable(&usable).allows(row.offset));
         for other in capabilities::all_sites().map(capabilities::unit_of_row).filter(|unit| *unit != Feature::Mashout) {
             assert!(capabilities::unit_usable(other, &usable), "{} must not disable {}", row.name, other.name());
@@ -922,7 +922,7 @@ fn mashout_required_rows_disable_only_their_reachable_units() {
     assert!(calls.contains(&"utility_get_kind"), "Egg Lay must qualify the victim's native shell");
     assert!(calls.contains(&"attack_is_attack"), "Egg Lay must reject an active shell hitbox");
     let required = model::sites_mashout::SITES.iter()
-        .filter(|row| !model::sites_mashout::trolley_floor_only(row))
+        .filter(|row| !model::sites_mashout::move_specific(row))
         .map(|row| row.name).chain(calls.iter().copied()).chain(["clatter_start_hook", "entry_active_cell", "is_training_mode"]);
     for name in required {
         let row = capabilities::find(name).unwrap();

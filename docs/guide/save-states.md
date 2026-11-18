@@ -102,7 +102,7 @@ Each fighter has its own row: Saves › [Player damage on load](../menu/saves.md
 | Save State | The damage the fighter had when you saved. |
 | Random Value | A random damage within that fighter's range: Player damage range or CPU damage range. |
 
-- The ranges go from 0 to 150, and are 0 to 150 by default. A range row is greyed unless its damage row reads Random
+- Player supports 0 to 255%. CPU supports 0 to 150%. Both default to 0 to 150%. A range row is greyed unless its damage row reads Random
   Value.
 - Random Value draws a new damage on every load.
 - With the defaults, every load puts both fighters at 0%, whatever the save holds.

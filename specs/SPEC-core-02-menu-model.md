@@ -51,7 +51,7 @@ Hold repeat: a direction held on either analog stick repeats every 21 frames (th
 
 ### 2.4 Slider rules
 
-- Fields: `state` ∈ {LowerHover, UpperHover, LowerSelected, UpperSelected, None}, `lower`, `upper`, `min`, `max`, `incr_slow`, `incr_fast`. Upstream constants: `min 0`, `max 150`, `slow 1`, `fast 10`; the only sliders are the two damage ranges, default `[0, 150]`.
+- Fields: `state` ∈ {LowerHover, UpperHover, LowerSelected, UpperSelected, None}, `lower`, `upper`, `min`, `max`, `incr_slow`, `incr_fast`. Upstream constants: `min 0`, `max 150`, `slow 1`, `fast 10`; the only sliders are the two damage ranges, default `[0, 150]`. TrainingRooms rc.15 raises the Player maximum to 255%.
 - Increments saturate and clamp: raising `lower` never passes `upper`; raising `upper` never passes `max`; lowering `lower` never passes `min`; lowering `upper` never passes `lower`.
 - A opens the slider page with `LowerHover`; A again selects the hovered handle (`*Selected`), A once more deselects; B deselects or leaves the page.
 

@@ -57,7 +57,7 @@ pub(super) enum Event {
     Setup(u64, &'static str),
     Begin(u64, u64, Key, Seed, SeedOrigin),
     Observe(u64, u64, u32, bool),
-    /// 116: the attempt's applied Sets (G1 boundaries), replayed in the bounds by ice116::bounds.
+    /// The attempt's applied Sets (G1 boundaries), replayed in the bounds by ice116::bounds.
     Writes(u64, u64, [crate::model::mashout::ice116::Applied; 8], u8),
     /// 117: boundary-zero Adds after the native provider has been closed.
     EggWrites(u64, u64, [crate::model::mashout::ice116::Applied; 8], u8),

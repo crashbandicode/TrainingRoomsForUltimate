@@ -439,24 +439,74 @@ fn core02_slider_clamp_steps() {
     assert_eq!(get(&m, "save_damage_limits_player"), [11, 150]);
     press(&mut m, &[Button::Down, Button::Down]);
     assert_eq!(get(&m, "save_damage_limits_player"), [0, 150], "clamped at the minimum");
-    // Lower the upper handle to 5, then try to push the lower one past it.
+    // Lower the upper handle to zero, then check its cap.
     press(&mut m, &[Button::A, Button::Right, Button::A]);
     for _ in 0..15 {
         m.press(Button::Down);
     }
     assert_eq!(get(&m, "save_damage_limits_player"), [0, 0], "the upper handle stops at the lower one");
-    for _ in 0..16 {
+    for _ in 0..26 {
         m.press(Button::Up);
     }
-    assert_eq!(get(&m, "save_damage_limits_player"), [0, 150], "and at the maximum");
+    assert_eq!(get(&m, "save_damage_limits_player"), [0, 255], "and at the maximum");
     m.press(Button::Left);
-    assert_eq!(get(&m, "save_damage_limits_player"), [0, 149]);
+    assert_eq!(get(&m, "save_damage_limits_player"), [0, 254]);
     // Lower handle again: it cannot pass the upper one.
     press(&mut m, &[Button::A, Button::Left, Button::A]);
-    for _ in 0..20 {
+    for _ in 0..26 {
         m.press(Button::Up);
     }
-    assert_eq!(get(&m, "save_damage_limits_player"), [149, 149]);
+    assert_eq!(get(&m, "save_damage_limits_player"), [254, 254]);
+}
+
+#[test]
+fn ice114_damage_cap_menu_and_commit() {
+    use model::{frame::Frame, screens::frame_of};
+    use serde_json::{json, Value};
+
+    let row = "save_damage_limits_player";
+    let mut m = menu();
+    set(&mut m, "save_damage_player", &[0, 0, 1]);
+    let row_index = goto(&mut m, row);
+    press(&mut m, &[Button::A, Button::Right, Button::A]);
+    for _ in 0..10 {
+        m.press(Button::Up);
+    }
+    for _ in 0..4 {
+        m.press(Button::Right);
+    }
+    let mut frame = Frame::new();
+    frame_of(&m, &mut frame, |_| "");
+    assert_eq!(frame.rows[1].value.string_lossy(), "254%");
+    press(&mut m, &[Button::Right, Button::Right, Button::Up]);
+    frame_of(&m, &mut frame, |_| "");
+    assert_eq!(frame.rows[1].value.string_lossy(), "255%");
+
+    press(&mut m, &[Button::A, Button::Left, Button::A]);
+    for _ in 0..26 {
+        m.press(Button::Up);
+    }
+    frame_of(&m, &mut frame, |_| "");
+    assert_eq!(frame.rows[0].value.string_lossy(), "255%");
+    press(&mut m, &[Button::B, Button::B]);
+    assert_eq!(m.value(row_index), RowValue::Slider { lower: 255, upper: 255 });
+
+    m.save_defaults();
+    press(&mut m, &[Button::A, Button::A, Button::Down, Button::B, Button::B]);
+    reset_page(&mut m);
+    let mut live = Settings::factory();
+    live.menu.set("hud", &[0, 1]).unwrap();
+    let persisted: Value = serde_json::from_str(&m.commit_onto(&live).to_json()).unwrap();
+    assert_eq!(persisted["menu"][row], json!([255, 255]));
+    assert_eq!(persisted["defaults_menu"][row], json!([255, 255]));
+    assert_eq!(persisted["menu"]["hud"], json!([0, 1]));
+
+    set(&mut m, "save_damage_cpu", &[0, 0, 1]);
+    let cpu = goto(&mut m, "save_damage_limits_cpu");
+    press(&mut m, &[Button::A, Button::Right, Button::A, Button::Right, Button::Up]);
+    frame_of(&m, &mut frame, |_| "");
+    assert_eq!(frame.rows[1].value.string_lossy(), "150%");
+    assert_eq!(m.value(cpu), RowValue::Slider { lower: 0, upper: 150 });
 }
 
 // ---- greyed rows ---------------------------------------------------------------------------------

@@ -131,7 +131,7 @@ checklists; the alternative is a three-value dropdown *Yes / No / Random*.
 | | Mirroring | dropdown | None, Alternate, Random / None | Save States |
 | | Auto-load on death | toggle | Off | Save States → Auto Save States |
 | | Player damage on load | dropdown | Default, Save State, Random / Default | Save States → Save Dmg (Player) |
-| | Player damage range | slider | 0–150 % | Save States |
+| | Player damage range | slider | 0–255 % | Save States |
 | | CPU damage on load | dropdown | Default, Save State, Random / Default | Save States |
 | | CPU damage range | slider | 0–150 % | Save States |
 | | Buffs on load | checklist | 9+ / none | Save States → Buff Options |
