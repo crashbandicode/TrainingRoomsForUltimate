@@ -1957,3 +1957,12 @@ ceiling = 162471
 date = "2026-11-18"
 reason = "Practice games fix (rc15/games-fix e19eb61a, tr-review-astra-3 PASS 22:30Z; Eden games-fix-xps-5 14/14) on main 6f564b86 (162291): +180 (Eggs-ercise targets across the stage's native floors in the player's view; P1's articles break targets in both games under Breaks on; docs/DECISIONS.md TR15-GAMES). Exact total, no headroom. Counting and gates unchanged."
 approved_by = "operator 2026-11-18: yes additional lines are ok (+183 allowance, primary 18:13Z; reviewer 22:30Z: +180 within it); primary c07b3449 22:31Z: land games-fix on local main."
+
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 163630
+date = "2026-11-18"
+reason = "Interim rc.15 Parry gate on main cf6ec3cd (162471) with the four-game menu cafc37e3 already composed for runtime. Measured 163630 (+1159 including the menu; the separate menu ledger is reconciled on actual local main before Parry lands). Exact total for the interim gate."
+approved_by = "Operator 2026-11-18: additional lines are ok for the shared SPSC ring and Parry (parry-sol brief and 22:11Z primary ruling); primary c07b3449 23:33Z ordered the early gate before the landing turn. Menu size remains the menu lane's approval."
