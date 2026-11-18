@@ -6,6 +6,9 @@ use std::{
 mod model {
     pub mod sites_pkg3 { // TROLLEY_SITES
     }
+    pub mod hitbox {
+        // FIGHTER_ATTACK_SLOTS
+    }
     pub mod sites_hitbox { // EGG_HITBOX_SITES
     }
     pub mod sites_pkg2 { // EGG_PKG2_SITES
@@ -344,6 +347,15 @@ mod natives {
         Some(super::EGG_WEAPON_KIND.load(super::Ordering::Relaxed) as i32)
     }
     pub fn attack_is_attack(accessor: usize, slot: i32) -> bool {
+        if super::ICE_SHOT_FIXTURE.load(super::Ordering::Relaxed) {
+            assert!((0..8).contains(&slot));
+            let mask = match accessor {
+                2 => 1,
+                super::NANA_BOMA => 2,
+                _ => panic!("unexpected Ice Climbers accessor"),
+            };
+            return slot == 7 && super::ICE_SHOT_ATTACKS.load(super::Ordering::Relaxed) & mask != 0;
+        }
         assert_eq!(accessor, 0x200);
         assert!((0..7).contains(&slot));
         slot == 6 && super::EGG_WEAPON_ATTACK.load(super::Ordering::Relaxed)
@@ -3216,6 +3228,7 @@ fn sora_blizzard_arms_the_set_observer_only_for_the_real_cast_and_posts_its_writ
 
 static ICE_SHOT_FIXTURE: AtomicBool = AtomicBool::new(false);
 static ICE_SHOT_ARTICLES: AtomicU32 = AtomicU32::new(0);
+static ICE_SHOT_ATTACKS: AtomicU32 = AtomicU32::new(0);
 const NANA_BOMA: usize = 0x4010;
 static NANA_STATUS: AtomicU32 = AtomicU32::new(0);
 static NANA_OBJECT: AtomicU32 = AtomicU32::new(0x402);
@@ -3237,6 +3250,7 @@ unsafe fn live_ice_shot() -> (Box<NativeMemory>, Game) {
     clatter_set::PUBLISHED.with_borrow_mut(Vec::clear);
     ICE_SHOT_FIXTURE.store(true, Ordering::Relaxed);
     ICE_SHOT_ARTICLES.store(0, Ordering::Relaxed);
+    ICE_SHOT_ATTACKS.store(0, Ordering::Relaxed);
     NANA_STATUS.store(0, Ordering::Relaxed);
     NANA_OBJECT.store(0x402, Ordering::Relaxed);
     NANA_ENTRY.store(1, Ordering::Relaxed);
@@ -3294,30 +3308,37 @@ fn ice_shot_waits_for_both_providers_before_posting_a_grade() {
 
 #[test]
 fn ice_shot_refuses_either_live_article_on_escape_or_during_wait() {
-    unsafe {
-        for live in [1, 2] {
-            for during_wait in [true, false] {
-                let (m, mut game) = live_ice_shot();
-                if during_wait {
-                    m.update(&mut game, 68);
-                    assert_eq!(game.step, Step::Held, "bare SPECIAL_N can wait");
-                    assert_eq!(FINISHED.get(), 0);
-                }
-                ICE_SHOT_ARTICLES.store(live, Ordering::Relaxed);
-                m.update(&mut game, if during_wait { 0 } else { 68 });
-                let on_live_article = (game.step, game.failed);
-                ICE_SHOT_ARTICLES.store(0, Ordering::Relaxed);
-                CPU_STATUS.store(0, Ordering::Relaxed);
-                m.update(&mut game, 0);
-                assert_eq!(
-                    on_live_article,
-                    (Step::Failed, Some("Native tick mismatch · no grade")),
-                    "live article mask {live}, during_wait {during_wait}"
-                );
-                assert_eq!(game.step, Step::Failed);
+    unsafe { ice_shot_refuses_live_provider(&ICE_SHOT_ARTICLES, "article") }
+}
+
+#[test]
+fn ice_shot_refuses_either_fighter_attack_on_escape_or_during_wait() {
+    unsafe { ice_shot_refuses_live_provider(&ICE_SHOT_ATTACKS, "attack slot 7") }
+}
+
+unsafe fn ice_shot_refuses_live_provider(active: &AtomicU32, source: &str) {
+    for live in [1, 2] {
+        for during_wait in [true, false] {
+            let (m, mut game) = live_ice_shot();
+            if during_wait {
+                m.update(&mut game, 68);
+                assert_eq!(game.step, Step::Held, "bare SPECIAL_N can wait");
                 assert_eq!(FINISHED.get(), 0);
-                assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
             }
+            active.store(live, Ordering::Relaxed);
+            m.update(&mut game, if during_wait { 0 } else { 68 });
+            let refused = (game.step, game.failed);
+            active.store(0, Ordering::Relaxed);
+            CPU_STATUS.store(0, Ordering::Relaxed);
+            m.update(&mut game, 0);
+            assert_eq!(
+                refused,
+                (Step::Failed, Some("Native tick mismatch · no grade")),
+                "{source} mask {live}, during_wait {during_wait}"
+            );
+            assert_eq!(game.step, Step::Failed);
+            assert_eq!(FINISHED.get(), 0);
+            assert!(WRITES_POSTED.with_borrow(Vec::is_empty));
         }
     }
 }
@@ -3340,14 +3361,15 @@ fn ice_shot_refuses_a_set_after_the_native_escape() {
 #[test]
 fn ice_shot_refuses_unknown_provider_and_bounds_the_wait() {
     unsafe {
-        for case in 0..4 {
+        for case in 0..5 {
             let (m, mut game) = live_ice_shot();
             CPU_STATUS.store(0, Ordering::Relaxed);
             match case {
                 0 => EGG_PROVIDER_READER.store(model::sites_pkg2::WORK_GET_INT_OFFSET, Ordering::Relaxed),
                 1 => NANA_OBJECT.store(0x403, Ordering::Relaxed),
                 2 => NANA_OBJECT.store(0x5000_0000, Ordering::Relaxed),
-                _ => NANA_ENTRY.store(2, Ordering::Relaxed),
+                3 => NANA_ENTRY.store(2, Ordering::Relaxed),
+                _ => EGG_PROVIDER_READER.store(model::sites_hitbox::HITBOX_IS_ATTACK_OFFSET, Ordering::Relaxed),
             }
             m.update(&mut game, 68);
             assert_eq!((game.step, game.failed), (Step::Failed, Some(UNAVAILABLE_NOTICE)), "case {case}");

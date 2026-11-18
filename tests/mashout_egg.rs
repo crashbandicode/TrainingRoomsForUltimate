@@ -116,6 +116,14 @@ fn actual_runtime_egg_preparation_and_native_seed() {
                     .unwrap())
                 .join("\n")
         }),
+        (
+            "// FIGHTER_ATTACK_SLOTS",
+            include_str!("../src/model/hitbox.rs")
+                .lines()
+                .find(|line| line.starts_with("pub const SLOTS:"))
+                .unwrap()
+                .to_string(),
+        ),
         ("// EGG_HITBOX_SITES", include_str!("../src/model/sites_hitbox.rs").lines()
             .find(|line| line.starts_with("pub const HITBOX_IS_ATTACK_OFFSET:"))
             .unwrap().to_string()),
