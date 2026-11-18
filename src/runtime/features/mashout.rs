@@ -303,6 +303,9 @@ struct Game {
     config: Option<Config>,
     scene: Option<Scene>,
     requested: Option<Scenario>,
+    /// The next attempt's roll: kept through a restart before that attempt starts (its own attacker load runs the
+    /// reset hub), consumed when the attempt starts, dropped when the settings change. One Random roll per attempt.
+    roll: Option<Scenario>,
     original: Option<u32>,
     p1: usize,
     cpu: usize,
@@ -322,6 +325,7 @@ impl Game {
             config: None,
             scene: None,
             requested: None,
+            roll: None,
             original: None,
             p1: 0,
             cpu: 0,
@@ -334,6 +338,9 @@ impl Game {
         }
     }
     fn step(&mut self, next: Step, text: &'static str) {
+        if next == Step::Entering {
+            self.roll = None;
+        }
         if self.step == next {
             return;
         }
@@ -599,6 +606,9 @@ pub unsafe fn frame(fighter: usize) {
         revoke();
         post(worker::Event::Cancel(game.generation), game.generation);
         game.generation = GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
+        if game.config != config {
+            game.roll = None;
+        }
         game.config = config;
         game.clock = None;
         game.hero = None;
@@ -909,7 +919,8 @@ pub unsafe fn frame(fighter: usize) {
                 return;
             };
             let roll = skyline::nn::os::GetSystemTick() as u64;
-            game.requested = config.resolve(roll, roll.rotate_left(17));
+            game.requested = game.roll.or_else(|| config.resolve(roll, roll.rotate_left(17)));
+            game.roll = game.requested;
             let Some(request) = game.requested else {
                 // restriction: MASH-M1-MISMATCH
                 game.fail("Attacker unavailable");
