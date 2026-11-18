@@ -123,6 +123,61 @@ struct NativeEnd {
 static ENDS: Mailbox<NativeEnd, 4> = Mailbox::new();
 static EVENTS: Mailbox<worker::Event, 128> = Mailbox::new();
 static REPLIES: Mailbox<u64, 4> = Mailbox::new();
+/// Row 121 (mashout-ganon-tech): the attempt waiting for its slam contact, published by the game loop for the status hook
+/// (never locked there): P1's accessor and the generation, 0 when none.
+static TECH_P1: AtomicUsize = AtomicUsize::new(0);
+static TECH_GEN: AtomicU64 = AtomicU64::new(0);
+#[derive(Clone, Copy)]
+struct TechContact {
+    generation: u64,
+    snapshot: crate::model::tech_launch::DecisionSnapshot,
+}
+static TECH: Mailbox<TechContact, 4> = Mailbox::new();
+static TECH_PENDING: std::sync::Mutex<Option<TechContact>> = std::sync::Mutex::new(None);
+
+/// cpu_common's status-change seam, before the original: P1's ground-contact request of the published row-121 attempt,
+/// identified by name (entry::ganon_tech_contact), with the Tech practice decision snapshot. try_lock only.
+pub(crate) unsafe fn tech_contact(accessor: usize, requested: i32, passive: impl FnOnce() -> bool) -> Option<u64> {
+    if !READY.load(Ordering::Acquire) || accessor == 0 || TECH_P1.load(Ordering::Acquire) != accessor {
+        return None;
+    }
+    let generation = TECH_GEN.load(Ordering::Acquire);
+    if generation == 0 {
+        return None;
+    }
+    let contact = [C::StatusDown, C::StatusPassive, C::StatusPassiveFb]
+        .into_iter()
+        .any(|c| state_id(c) == Some(requested));
+    let prev = natives::prev_status_kind(accessor, 0);
+    let second = natives::prev_status_kind(accessor, 1);
+    if !contact
+        || !entry::ganon_tech_contact(
+            crate::model::mashout::moves::Plan::GroundSideSpecial,
+            |c| state_id(c) == Some(prev),
+            |c| state_id(c) == Some(second),
+        )
+    {
+        return None;
+    }
+    let snapshot = super::tech_adapter::mash_snapshot(accessor, generation, requested, passive())?;
+    let mut slot = TECH_PENDING.try_lock().ok()?;
+    *slot = Some(TechContact { generation, snapshot });
+    TECH_GEN.store(0, Ordering::Release);
+    Some(generation)
+}
+
+/// After the original status change: the entered status completes the snapshot, then the game loop grades it.
+pub(crate) unsafe fn tech_confirm(accessor: usize, generation: u64) {
+    if !READY.load(Ordering::Acquire) {
+        return;
+    }
+    let Ok(mut slot) = TECH_PENDING.try_lock() else { return };
+    let Some(mut pending) = slot.take().filter(|p| p.generation == generation) else { return };
+    pending.snapshot.entered_status = super::tech_adapter::mash_entered(accessor);
+    if !TECH.post(pending) {
+        fault(generation);
+    }
+}
 
 pub fn set_admission(on: bool) {
     READY.store(on, Ordering::Release);
@@ -384,6 +439,12 @@ struct Game {
     trolley: Option<entry::TrolleyEntry>,
     hero: Option<entry::HeroEntry>,
     trail_magic: Option<entry::TrailMagicEntry>,
+    /// Row 121 (mashout-ganon-tech): Tech practice's own session summary; `best` is the longest success streak.
+    tech_summary: crate::model::tech::session::Summary,
+    /// Row 121's contact still in its late window, with its tech kind.
+    tech_attempt: Option<(entry::TechAttempt, Option<bool>)>,
+    /// Row 121's contact snapshot waiting for the entered status.
+    tech_wait: Option<entry::TechContactWait>,
     /// P1's damage bits when the first preparatory magic cast began (Sora116 setup backstop).
     prep_damage: Option<u32>,
 }
@@ -414,6 +475,12 @@ impl Game {
             trolley: None,
             hero: None,
             trail_magic: None,
+            tech_summary: crate::model::tech::session::Summary {
+                attempts: 0, perfect: 0, held: 0, early: 0, late: 0, locked: 0, missed: 0, streak: 0, best: 0,
+                offset_sum: 0, timed_perfect: 0,
+            },
+            tech_attempt: None,
+            tech_wait: None,
             prep_damage: None,
         }
     }
@@ -775,6 +842,82 @@ unsafe fn arm(p1: usize, generation: u64) -> bool {
     THRESHOLD.store(threshold.to_bits(), Ordering::Release);
     ARMED.store(generation, Ordering::Release);
     true
+}
+
+impl Game {
+    /// Row 121 (mashout-ganon-tech) in Entering: publish the attempt for the status hook, hold its slam contact until the
+    /// game has entered the requested status (a request takes effect on a later frame), grade it with the Tech grader,
+    /// then hold the late window. Outside the Entering block, which host fixtures compile.
+    unsafe fn tech_entering(&mut self, p1: usize) {
+        use crate::model::tech::session::{self, Direction, Grade, NativeOutcome};
+        let game = self;
+        let generation = game.generation;
+        // The late window reads Tech practice's native guard edge, never a raw shoulder sample.
+        let guard = super::tech_adapter::mash_guard(p1);
+        if let Some((attempt, kind)) = game.tech_attempt.as_mut() {
+            if let Some(grade) = attempt.tick(guard) {
+                let kind = *kind;
+                game.tech_graded(grade, kind);
+            }
+            return;
+        }
+        if game.tech_wait.is_none() {
+            TECH_P1.store(p1, Ordering::Release);
+            TECH_GEN.store(generation, Ordering::Release);
+            TECH.drain(|t| {
+                if t.generation == generation {
+                    game.tech_wait = Some(entry::TechContactWait::new(t.snapshot));
+                }
+            });
+        }
+        let ids = [C::StatusPassive, C::StatusPassiveFb, C::StatusDown, C::StatusDamageFlyReflectD, C::StatusPassiveCeil,
+            C::StatusStopCeil, C::StatusDamageFlyReflectU, C::StatusPassiveWall, C::StatusPassiveWallJump, C::StatusStopWall,
+            C::StatusDamageFlyReflectLr]
+            .map(|c| state_id(c).unwrap_or(i32::MIN));
+        let step = match game.tech_wait.as_mut() {
+            Some(wait) => wait.next_frame(super::tech_adapter::mash_entered(p1), guard, ids),
+            None => return,
+        };
+        TECH_P1.store(0, Ordering::Release);
+        let outcome = match step {
+            entry::TechContactStep::Wait => return,
+            entry::TechContactStep::Proven(outcome) => Some(outcome),
+            entry::TechContactStep::Unproven => None,
+        };
+        let Some(wait) = game.tech_wait.take() else {
+            return;
+        };
+        let kind = match outcome {
+            Some(NativeOutcome::Tech(Some(Direction::InPlace))) => Some(true),
+            Some(NativeOutcome::Tech(_)) => Some(false),
+            _ => None,
+        };
+        // An unproven accepted status is ungraded (Tech practice's snapshot_unavailable), never a guessed miss.
+        let grade = outcome.map_or(Some(Grade::Unavailable), |o| session::map_snapshot(wait.snapshot(), o));
+        let mut attempt = entry::TechAttempt::new(game.tech_summary);
+        let mut result = attempt.contact(grade);
+        // The frames waited for the entered status are already part of the late window.
+        for &edge in wait.guards() {
+            if result.is_none() {
+                result = attempt.tick(edge);
+            }
+        }
+        match result {
+            Some(grade) => {
+                game.tech_summary = attempt.summary();
+                game.tech_graded(grade, kind);
+            }
+            None => game.tech_attempt = Some((attempt, kind)),
+        }
+    }
+
+    fn tech_graded(&mut self, grade: crate::model::tech::session::Grade, kind: Option<bool>) {
+        if let Some((attempt, _)) = self.tech_attempt.take() {
+            self.tech_summary = attempt.summary();
+        }
+        post(worker::Event::TechGrade(self.generation, grade, kind, self.tech_summary.best), self.generation);
+        self.step = Step::Result;
+    }
 }
 
 /// Existing P1 per-frame path. Entry0's current active body only, independent of frame-strip settings.
@@ -1153,6 +1296,14 @@ pub unsafe fn frame(fighter: usize) {
         drive(MappedInputs::NEUTRAL);
         return;
     }
+    // Row 121: the status hook sees the attempt only while it waits in Entering (outside Game::step, which a host
+    // fixture compiles).
+    if game.step != Step::Entering || !game.requested.is_some_and(|r| crate::model::mashout::moves::tech_graded(r.id)) {
+        TECH_GEN.store(0, Ordering::Release);
+        TECH_P1.store(0, Ordering::Release);
+        game.tech_attempt = None;
+        game.tech_wait = None;
+    }
     match game.step {
         Step::Off => (),
         Step::Release if released => game.step(
@@ -1391,7 +1542,10 @@ pub unsafe fn frame(fighter: usize) {
                 game.fail("Move sequence unavailable");
                 return;
             };
-            if !preparing && !entry::preparatory(request.plan) && !arm(p1, game.generation) {
+            // restriction: mashout-ganon-tech (reviewer G3): row 121 is tech-graded, so its slam arms no mash clock/seed.
+            if !preparing && !entry::preparatory(request.plan) && !crate::model::mashout::moves::tech_graded(request.id)
+                && !arm(p1, game.generation)
+            {
                 game.fail(UNAVAILABLE_NOTICE);
                 return;
             }
@@ -1437,6 +1591,11 @@ pub unsafe fn frame(fighter: usize) {
             let Some(request) = game.requested else {
                 return;
             };
+            // restriction: mashout-ganon-tech: row 121 waits for its slam contact, graded by the Tech grader only.
+            if crate::model::mashout::moves::tech_graded(request.id) {
+                game.tech_entering(p1);
+                return;
+            }
             if entry::one_pikmin_grab(request) && !game.followed {
                 drive(MappedInputs::NEUTRAL);
                 // Two settled reads must each show exactly one Pikmin before the configured Catch arms.

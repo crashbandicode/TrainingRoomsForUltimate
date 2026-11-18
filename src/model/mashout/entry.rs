@@ -60,7 +60,8 @@ pub fn start(move_: Scenario) -> Option<&'static str> {
         | Plan::Roller
         | Plan::Pin
         | Plan::Judge
-        | Plan::Trolley => "FIGHTER_STATUS_KIND_SPECIAL_S",
+        | Plan::Trolley
+        | Plan::GroundSideSpecial => "FIGHTER_STATUS_KIND_SPECIAL_S",
         Plan::Egg
         | Plan::Inhale
         | Plan::NeutralSpecial
@@ -537,6 +538,97 @@ pub fn native_landing_end(plan: Plan, is_victim: impl Fn(C) -> bool, is_attacker
     plan == Plan::AirSideSpecial && is_victim(C::CatchedAirEndGanon) && is_attacker(C::GanonSpecialAirSEnd)
 }
 
+/// Row 121's tech contact (reviewer G1, ganon-tech-research-yoga-3): the victim's ground-contact request whose previous
+/// status is CATCHED_AIR_END_GANON and whose second-previous is the grounded catch CATCHED_GANON, both by name through
+/// the resolved ids table. Row 90's aerial slam (second-previous CATCHED_AIR_FALL_GANON) never matches.
+pub fn ganon_tech_contact(plan: Plan, is_prev: impl Fn(C) -> bool, is_second_prev: impl Fn(C) -> bool) -> bool {
+    plan == Plan::GroundSideSpecial && is_prev(C::CatchedAirEndGanon) && is_second_prev(C::CatchedGanon)
+}
+
+/// Row 121's one attempt, scored by Tech practice's own Session already in flight: its contact grade, then its late
+/// window (a proven new guard press within LATE frames is Late(n); none, or an unread frame, is Missed). The summary
+/// carries the streak and best across attempts.
+pub struct TechAttempt(crate::model::tech::session::Session);
+
+impl TechAttempt {
+    pub fn new(summary: crate::model::tech::session::Summary) -> Self {
+        use crate::model::tech::session::{Length, Session};
+        let mut session = Session::IDLE;
+        session.start(Length::Free);
+        session.placed(1);
+        session.tick(false, Some(false));
+        session.summary = summary;
+        Self(session)
+    }
+
+    /// The decision's grade; None waits for the late window.
+    pub fn contact(&mut self, grade: Option<crate::model::tech::session::Grade>) -> Option<crate::model::tech::session::Grade> {
+        self.0.contact_grade(grade);
+        self.0.result
+    }
+
+    /// One P1 game frame after contact with the native guard edge (None when unread).
+    pub fn tick(&mut self, guard_press: Option<bool>) -> Option<crate::model::tech::session::Grade> {
+        if self.0.result.is_none() {
+            self.0.tick(false, guard_press);
+        }
+        self.0.result
+    }
+
+    pub fn summary(&self) -> crate::model::tech::session::Summary {
+        self.0.summary
+    }
+}
+
+/// Row 121's contact snapshot until the game has entered the requested status. The contact is a status request that
+/// takes effect on a later frame (ganon-tech-pair-yoga-1), so, like Tech practice's retained snapshot, the entered
+/// status is re-read each P1 frame for up to HOLD frames; the guard edges of those frames feed the late window.
+pub struct TechContactWait {
+    snapshot: crate::model::tech_launch::DecisionSnapshot,
+    guards: [Option<bool>; crate::model::tech::session::HOLD as usize],
+    age: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TechContactStep {
+    Wait,
+    Proven(crate::model::tech::session::NativeOutcome),
+    /// No entered status proven within HOLD frames: ungraded, never a guessed miss.
+    Unproven,
+}
+
+impl TechContactWait {
+    pub fn new(snapshot: crate::model::tech_launch::DecisionSnapshot) -> Self {
+        Self { snapshot, guards: [None; crate::model::tech::session::HOLD as usize], age: 0 }
+    }
+
+    /// One P1 frame: the fresh status read (None when unread) and the native guard edge.
+    pub fn next_frame(&mut self, entered: Option<i32>, guard: Option<bool>, ids: [i32; 11]) -> TechContactStep {
+        if self.age >= self.guards.len() {
+            return TechContactStep::Unproven;
+        }
+        self.guards[self.age] = guard;
+        self.age += 1;
+        if entered.is_some() {
+            self.snapshot.entered_status = entered;
+        }
+        match crate::model::tech::session::accepted_status(self.snapshot, ids) {
+            Some(outcome) => TechContactStep::Proven(outcome),
+            None if self.age >= self.guards.len() => TechContactStep::Unproven,
+            None => TechContactStep::Wait,
+        }
+    }
+
+    pub fn snapshot(&self) -> crate::model::tech_launch::DecisionSnapshot {
+        self.snapshot
+    }
+
+    /// The guard edges of the frames waited, oldest first.
+    pub fn guards(&self) -> &[Option<bool>] {
+        &self.guards[..self.age]
+    }
+}
+
 /// Down throws and Cargo first acquire an ordinary grab, without grading that preparatory hold.
 pub fn preparatory_grab(plan: Plan) -> bool {
     matches!(plan, Plan::DownThrow | Plan::Cargo)
@@ -753,6 +845,94 @@ mod tests {
             for plan in [Plan::Grab, Plan::Whip, Plan::AirSideSpecial, Plan::Inhale] {
                 assert!(!preparatory_grab(plan));
             }
+        }
+
+        /// Reviewer G1: row 121 grades only the victim's contact after CATCHED_AIR_END_GANON whose second-previous status
+        /// is the grounded catch, by name. Row 90's aerial CATCHED_AIR_FALL_GANON and every other plan never match.
+        #[test]
+        fn ganon_tech_contact_needs_the_grounded_catch_sequence_by_name() {
+            let is = |want: C| move |c: C| c == want;
+            assert!(ganon_tech_contact(Plan::GroundSideSpecial, is(C::CatchedAirEndGanon), is(C::CatchedGanon)));
+            assert!(!ganon_tech_contact(Plan::GroundSideSpecial, is(C::CatchedAirEndGanon), is(C::ClatterCatchedAirFallGanon)));
+            assert!(!ganon_tech_contact(Plan::AirSideSpecial, is(C::CatchedAirEndGanon), is(C::CatchedGanon)));
+            assert!(!ganon_tech_contact(Plan::GroundSideSpecial, is(C::ClatterCatchedAirFallGanon), is(C::CatchedGanon)));
+            assert!(!ganon_tech_contact(Plan::Grab, is(C::CatchedAirEndGanon), is(C::CatchedGanon)));
+            let name = |c: C| crate::model::cpu::ids::NAMES[c as usize];
+            assert_ne!(name(C::CatchedGanon), name(C::ClatterCatchedAirFallGanon));
+            assert_eq!(name(C::CatchedGanon), "FIGHTER_STATUS_KIND_CATCHED_GANON");
+        }
+
+        /// Reviewer G2/G5: row 121's attempt is Tech practice's own Session, so a timed tech, a late press and no press
+        /// get exactly the Tech grader's verdicts, and the best streak carries across attempts.
+        #[test]
+        fn ganon_tech_attempt_grades_timed_late_and_no_press_like_tech_practice() {
+            use crate::model::tech::session::{Grade, LATE};
+            let mut timed = TechAttempt::new(Default::default());
+            assert_eq!(timed.contact(Some(Grade::Perfect(Some(4)))), Some(Grade::Perfect(Some(4))));
+            assert_eq!(timed.summary().best, 1);
+            let mut late = TechAttempt::new(timed.summary());
+            assert_eq!(late.contact(None), None);
+            for _ in 1..7 {
+                assert_eq!(late.tick(Some(false)), None);
+            }
+            assert_eq!(late.tick(Some(true)), Some(Grade::Late(7)));
+            assert_eq!((late.summary().best, late.summary().streak, late.summary().late), (1, 0, 1));
+            let mut none = TechAttempt::new(late.summary());
+            assert_eq!(none.contact(None), None);
+            for _ in 1..LATE {
+                assert_eq!(none.tick(Some(false)), None);
+            }
+            assert_eq!(none.tick(Some(false)), Some(Grade::Missed));
+            assert_eq!(none.tick(Some(true)), Some(Grade::Missed), "a press after the late window changes nothing");
+            let mut blind = TechAttempt::new(Default::default());
+            blind.contact(None);
+            assert_eq!(blind.tick(None), None);
+            assert_eq!(blind.tick(Some(true)), Some(Grade::Missed), "an unread frame voids the late reason");
+            let mut again = TechAttempt::new(none.summary());
+            again.contact(Some(Grade::Held));
+            again = TechAttempt::new(again.summary());
+            again.contact(Some(Grade::Perfect(None)));
+            assert_eq!((again.summary().streak, again.summary().best, again.summary().attempts), (2, 2, 5));
+        }
+
+        /// ganon-tech-pair-yoga-1: the contact is a status *request*; the game enters it on a later frame, so the status read
+        /// right after the request is still the source (every take graded Unavailable). Row 121 re-reads it each P1 frame
+        /// for up to HOLD frames, keeping that wait's guard edges for the late window; never proven is Unavailable.
+        #[test]
+        fn ganon_tech_contact_waits_for_the_entered_status() {
+            use crate::model::tech::session::{NativeOutcome, HOLD};
+            use crate::model::tech_launch::{ContactReceipt, DecisionSnapshot, Surface, Vec2};
+            let ids = [103, 104, 80, 1, 2, 3, 4, 5, 6, 7, 8];
+            let snapshot = DecisionSnapshot {
+                attempt: 9,
+                contact: ContactReceipt { surface: Surface::Floor, requested_status: 80, passive_enabled: true, position: Vec2 { x: 0.0, y: 0.0 } },
+                source_status: Some(40),
+                entered_status: Some(40),
+                guard_count: Some(254), previous_guard_gap: Some(254), guard_event: None, window_base: Some(20),
+                window_multiplier: Some(1.0), lockout: Some(40), reaction: Some(3.0), damage_fall: Some(false), stick_x: None,
+                press_frame_offset: None,
+            };
+            let mut wait = TechContactWait::new(snapshot);
+            assert_eq!(wait.next_frame(Some(40), Some(false), ids), TechContactStep::Wait);
+            assert_eq!(wait.next_frame(None, None, ids), TechContactStep::Wait);
+            assert_eq!(wait.next_frame(Some(80), Some(true), ids), TechContactStep::Proven(NativeOutcome::Miss));
+            assert_eq!(wait.snapshot().entered_status, Some(80));
+            assert_eq!(wait.guards(), &[Some(false), None, Some(true)]);
+            let mut never = TechContactWait::new(snapshot);
+            for _ in 1..HOLD {
+                assert_eq!(never.next_frame(Some(40), Some(false), ids), TechContactStep::Wait);
+            }
+            assert_eq!(never.next_frame(Some(40), Some(false), ids), TechContactStep::Unproven);
+            let mut teched = TechContactWait::new(snapshot);
+            assert_eq!(teched.next_frame(Some(104), Some(false), ids), TechContactStep::Proven(NativeOutcome::Tech(None)));
+        }
+
+        /// Grounded Flame Choke starts with Ganondorf's grounded side special (no jump squat, unlike row 90).
+        #[test]
+        fn ganon_grounded_flame_choke_starts_with_grounded_side_special() {
+            let row = super::super::moves::CATALOG[121];
+            assert_eq!(start(row), Some("FIGHTER_STATUS_KIND_SPECIAL_S"));
+            assert_eq!(start(super::super::moves::CATALOG[90]), Some("FIGHTER_STATUS_KIND_JUMP_SQUAT"));
         }
 
         #[test]

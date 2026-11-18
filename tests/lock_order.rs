@@ -104,6 +104,12 @@ const FOREIGN_RECEIVERS: &[(&str, &[&str], &str)] = &[
     ("assign_value", &["target"], "the compat Assignable impls: TYPED_STATIC_CALLS follows MENU's (assign -> store)"),
     ("open", &["?", "keeper", "list"], PANELS),
     ("tick", &["?", "queue", "ui"], PANELS),
+    (
+        "tick",
+        &["attempt"],
+        "Mash out row 121's model::mashout::entry::TechAttempt (mashout::tech_entering) wraps model::tech::session::Session::tick, \
+         which takes no lock",
+    ),
     ("press", &["editor", "list", "m", "menu"], PANELS),
     ("view", &["bundle", "editor", "extras", "ui"], PANELS),
     ("target", &["active", "cycle", "editor", "proof"], "combos::Ui::target is private to ui/combos.rs"),

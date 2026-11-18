@@ -43,6 +43,10 @@ mod model {
             pub struct Applied { pub boundary: u32, pub old: u32, pub operand: u32, pub new: u32, pub d_max: u32 }
         }
     }
+    pub mod tech { pub mod session { // TECH_SESSION
+    } }
+    pub mod tech_launch { // TECH_LAUNCH
+    }
 }
 // The M3 Set observer stand-in: tests queue published writes; arm() calls are recorded.
 mod clatter_set {
@@ -642,6 +646,12 @@ impl Game {
     }
 }
 const UNAVAILABLE_NOTICE: &str = "unavailable";
+// Row 121's Tech-graded Entering path is its own method, never reached by these Mash out rows.
+impl Game {
+    unsafe fn tech_entering(&mut self, _: usize) {
+        unreachable!("row 121 is not an egg fixture row")
+    }
+}
 // JUDGE_CHOICE
 // TROLLEY_INPUT
 // EGG_CLOSURE
@@ -869,6 +879,23 @@ fn tongue_is_native_unscored_and_egg_uses_actual_history() {
                 Some("FIGHTER_STATUS_KIND_SPECIAL_N")
             );
         }
+    }
+}
+/// Reviewer G3 (mashout-ganon-tech): the actual start block arms no mash clock or seed for row 121 alone; the same
+/// grounded-side-special plan under any other id still arms.
+#[test]
+fn tech_graded_row_121_never_arms_the_mash_clock() {
+    unsafe {
+        let m = NativeMemory::new();
+        let mut g = Game::new(Plan::GroundSideSpecial, State::Grab);
+        g.requested = g.requested.map(|r| Scenario { id: 121, ..r });
+        startup(&mut g, m.p1());
+        assert_eq!(ARMED.load(Ordering::Relaxed), 0);
+        assert_eq!((g.step, g.failed, g.clock.is_none()), (Step::Entering, None, true));
+        let mut other = Game::new(Plan::GroundSideSpecial, State::Grab);
+        other.requested = other.requested.map(|r| Scenario { id: 120, ..r });
+        startup(&mut other, m.p1());
+        assert_eq!(ARMED.load(Ordering::Relaxed), other.generation);
     }
 }
 #[test]

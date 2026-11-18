@@ -1961,7 +1961,15 @@ approved_by = "operator 2026-11-18: yes additional lines are ok (+183 allowance,
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 162745
+ceiling = 162806
 date = "2026-11-18"
-reason = "rc.15 practice menu (operator-approved mockup, 2026-11-18 ~14:58Z): one row per game, a generic sub-screen (Screen::Rows) with Start first, Start/Stop as menu actions with a Running label, and one runtime value for the running game (runtime::features::practice) replacing the three per-row exclusion sites. Composed onto main cf6ec3cd (162471, games fix landed): measured 162745 = +274 counted lines over main (+276 on 6f564b86 162291), Mash out folded in as the fourth game (its row-on exclusion and normaliser removed) (+266 for the menu, +33 for tr-review-astra-3 16:37Z: a menu visit pauses Tech practice, and a running games settings are latched at its Start), after the Break the Targets close path lost its layout-load restart (primary 15:30Z). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+reason = "Mash out row 121, Ganondorf grounded Flame Choke graded by the Tech grader (rc15/mashout-ganon-tech b8402e03, PASS mashout-review-devin 23:05Z / tr-review-astra-3 23:01Z, merged onto main cf6ec3cd 162471): measured 162806 = 162471 + 335 (catalog row, CatchedGanon name and contact predicate, the entered-status wait, Tech-session attempt with the late window, Tech-owned tech_adapter boundaries, status-hook seam, worker result text). Exact total, no headroom. Counting and gates unchanged."
+approved_by = "operator 2026-11-18 via primary c07b3449 (goal to mashout-demo-devin-2: \"Size growth is approved\" for the Ganon Flame Choke tech row)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 163080
+date = "2026-11-18"
+reason = "rc.15 practice menu (operator-approved mockup, 2026-11-18 ~14:58Z): one row per game, a generic sub-screen (Screen::Rows) with Start first, Start/Stop as menu actions with a Running label, and one runtime value for the running game (runtime::features::practice) replacing the three per-row exclusion sites. Composed onto main 0099f49e (Ganon row 121 landed): measured 163080 = +274 counted lines over main (162806) (+276 on 6f564b86 162291), Mash out folded in as the fourth game (its row-on exclusion and normaliser removed) (+266 for the menu, +33 for tr-review-astra-3 16:37Z: a menu visit pauses Tech practice, and a running games settings are latched at its Start), after the Break the Targets close path lost its layout-load restart (primary 15:30Z). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
 approved_by = "PENDING: +274 reported to the primary for the operator by menu-games-devin (INBOX 2026-11-18); not yet approved."
