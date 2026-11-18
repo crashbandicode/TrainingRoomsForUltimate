@@ -1461,3 +1461,24 @@ today.
 ### TR15 — One clip editor for saved files (2026-11-15)
 
 Crop on macros and combos uses the Replay window clip editor and keyboard save-as-new. Macro X previews kept inputs on the CPU, including a Player 1 macro. Combo handles select whole links; X is absent and has no action. Chains remain unchanged. This follows the operator ruling of 2026-11-15; no capture metadata, combo format or grader changes are part of it.
+
+## Open 2026-11-18
+
+### G1 · Lock-on moves at the practice targets (Autoreticle, Homing Attack)
+
+**What happens today (Eden, gated build 9c6d0bb0):** the Disc eggs in Eggs-ercise and the Break the Targets targets are
+pictures TrainingRooms draws on screen. The game has no object there, so a lock-on move's search finds nothing:
+Palutena's Autoreticle fires at nothing and Sonic's Homing Attack takes its no-target path. With **Target = CPU** (the
+practice CPU placed at the target spot) both moves lock on and hit, because the CPU is a real fighter.
+
+This is not a property we can switch on: the game's search only sees real game objects with a hurtbox.
+
+- **A · Keep the CPU target for lock-on practice:** works today, no new code. One target at a time; the CPU is a
+  fighter with its own hurtbox and knockback.
+- **B · Place a real game item at each target:** a separate research lane first (read-only analysis plus one Eden trace
+  boot) to prove that some item kind is found by both moves' searches, then about 220–320 lines of product code. Items
+  bring pickup, Lobby Items, save-state and waiting-room interactions to handle. Not yet proven possible.
+
+**Recommendation: A for rc.15; B only as its own approved research lane after rc.15.**
+
+![G1 lock-on](decisions/LOCKON-1.png)
