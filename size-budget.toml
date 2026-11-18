@@ -1813,3 +1813,11 @@ ceiling = 155922
 date = "2026-11-18"
 reason = "State export v2, tr-review-astra-2 follow-up on 4ac6a3f (rc15/hw-bridge-export): +48 over 155874, +694 in all over 155228. SAVE_IN_FLIGHT (a Save until every marked body captured, Machine::save_marked), WRITING before DIRTY, BOUND_WRITING around the bound-save write, and REQ_SETTINGS_MATCH (the live-settings readback), so a restore can't report success before a deferred Save lands or without its live settings. Measured on the Surface gate fab7e927. FOR OPERATOR REVIEW."
 approved_by = "Primary 2026-11-18 01:46Z brief orders the fix; size change reported for review. FOR OPERATOR REVIEW."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 155928
+date = "2026-11-18"
+reason = "State export v2, tr-review-astra-2 v2r finding 1 (rc15/hw-bridge-export): +6 over 155922, +700 in all over 155228. The rr_host write_saved_with seam (production write_saved runs through it) and pair_settled, so a regression can hold the bound-save worker after it took its pair. Measured on the Yoga gate da1fe099. FOR OPERATOR REVIEW."
+approved_by = "Primary 2026-11-18 08:07Z brief orders the regression; size change reported for review. FOR OPERATOR REVIEW."
