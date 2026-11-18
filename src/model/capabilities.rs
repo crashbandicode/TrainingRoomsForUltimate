@@ -244,7 +244,9 @@ fn cross_needs(unit: Feature) -> &'static [&'static str] {
 /// Training predicate, the CPU core's rows for the CPU features, and every row of each function in
 /// `CROSS_NEEDS`.
 pub fn blocked_by(unit: Feature, usable: &dyn Fn(&Site) -> bool) -> Option<&'static str> {
-    let own = all_sites().find(|s| unit_of_row(s) == unit && !usable(s));
+    let own = all_sites().find(|s| {
+        unit_of_row(s) == unit && !super::sites_mashout::trolley_floor_only(s) && !usable(s)
+    });
     if let Some(site) = own {
         return Some(site.name);
     }
