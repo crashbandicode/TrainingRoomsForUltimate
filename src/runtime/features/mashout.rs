@@ -314,6 +314,9 @@ struct Game {
     config: Option<Config>,
     scene: Option<Scene>,
     requested: Option<Scenario>,
+    /// The next attempt's roll: kept through a restart before that attempt starts (its own attacker load runs the
+    /// reset hub), consumed when the attempt starts, dropped when the settings change. One Random roll per attempt.
+    roll: Option<Scenario>,
     original: Option<u32>,
     p1: usize,
     cpu: usize,
@@ -343,6 +346,7 @@ impl Game {
             config: None,
             scene: None,
             requested: None,
+            roll: None,
             original: None,
             p1: 0,
             cpu: 0,
@@ -361,6 +365,9 @@ impl Game {
         }
     }
     fn step(&mut self, next: Step, text: &'static str) {
+        if next == Step::Entering {
+            self.roll = None;
+        }
         if self.step == next {
             return;
         }
@@ -713,6 +720,9 @@ pub unsafe fn frame(fighter: usize) {
         revoke();
         post(worker::Event::Cancel(game.generation), game.generation);
         game.generation = GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
+        if game.config != config {
+            game.roll = None;
+        }
         game.config = config;
         game.clock = None;
         game.hero = None;
@@ -1033,7 +1043,8 @@ pub unsafe fn frame(fighter: usize) {
                 return;
             };
             let roll = skyline::nn::os::GetSystemTick() as u64;
-            game.requested = config.resolve(roll, roll.rotate_left(17));
+            game.requested = game.roll.or_else(|| config.resolve(roll, roll.rotate_left(17)));
+            game.roll = game.requested;
             let Some(request) = game.requested else {
                 // restriction: MASH-M1-MISMATCH
                 game.fail("Attacker unavailable");
@@ -1063,7 +1074,7 @@ pub unsafe fn frame(fighter: usize) {
             if kind != request.attacker_kind {
                 if crate::runtime::roster::character_roster::cpu_reload_ready() {
                     TEMP_KIND.store(request.attacker_kind, Ordering::Release);
-                    if !crate::runtime::roster::character_roster::request_cpu_kind(
+                    if !crate::runtime::roster::character_roster::request_practice_cpu_kind(
                         request.attacker_kind,
                     ) {
                         // restriction: MASH-M1-MISMATCH
@@ -1621,7 +1632,7 @@ pub unsafe fn frame(fighter: usize) {
             } else if !game.restore_requested {
                 TEMP_KIND.store(original, Ordering::Release);
                 game.restore_requested =
-                    crate::runtime::roster::character_roster::request_cpu_kind(original);
+                    crate::runtime::roster::character_roster::request_practice_cpu_kind(original);
             }
         }
     }

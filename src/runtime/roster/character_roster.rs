@@ -10,6 +10,7 @@ use {crate::engine::compat::menu::OnOff, crate::engine::compat::menu::TrainingMo
 use {crate::runtime::compat::sync::lock_write, crate::runtime::compat::sync::read as setting};
 
 use crate::engine::swap::character_memory::WaitingSession;
+use crate::engine::mii::ordinary_player::{persists_selection, Requester};
 use crate::engine::swap::cycle_members::{admitted, menu_request};
 use crate::runtime::compat::common::{
     button_config, game_mode,
@@ -185,8 +186,10 @@ impl Role {
     fn enabled(self) -> bool {
         self == Self::Cpu || setting(&MENU).trio_practice == OnOff::ON
     }
-    fn sync_selection(self, fighter: TrioFighter) {
-        if self == Self::Cpu && crate::runtime::features::mashout::temporary_cpu_selection(fighter.kind()) {
+    /// The applied fighter becomes the role's persisted choice only for the user's own request
+    /// (`ordinary_player::persists_selection`; a practice game's temporary CPU fighter never does).
+    fn sync_selection(self, fighter: TrioFighter, owner: Requester) {
+        if !persists_selection(owner) {
             return;
         }
         let mut m = lock_write(&MENU);
@@ -194,6 +197,16 @@ impl Role {
             Self::Player => m.player_character = fighter,
             Self::Cpu => m.cpu_character = fighter,
         }
+    }
+}
+
+/// Owner of a fighter the roster observes or settles without an ordinary-CPU request receipt: a practice game's live
+/// temporary CPU fighter is `Practice` (`mashout::temporary_cpu_selection`), everything else the user's.
+fn live_owner(role: Role, kind: u32) -> Requester {
+    if role == Role::Cpu && crate::runtime::features::mashout::temporary_cpu_selection(kind) {
+        Requester::Practice
+    } else {
+        Requester::User
     }
 }
 
@@ -647,6 +660,18 @@ fn queue_request(role: Role, selection: Selection, restoring: bool) {
 /// (Player Swapping) does not refuse it and is not changed by it.
 /// True only after the generic loader or an intercept accepted new intent.
 fn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool) -> bool {
+    // An automatic partner refresh reconciles the live fighter, so it belongs to that fighter's owner (Mash out's
+    // temporary CPU is Practice): it never persists the practice fighter into the user's choice.
+    let owner = match selection {
+        Selection::RefreshPartners => state_for(role).lock().observed.map_or(Requester::User, |(_, kind)| live_owner(role, kind)),
+        _ => Requester::User,
+    };
+    queue_owned(role, selection, restoring, once, owner)
+}
+
+/// `queue_admitted` on behalf of `owner`: the ordinary CPU owner keeps it with the request, and the receipt and the
+/// persisted choice follow it at completion (`ordinary_player::cpu_receipt`).
+fn queue_owned(role: Role, selection: Selection, restoring: bool, once: bool, owner: Requester) -> bool {
     // FAIL 2: a user's request leaves one line on every path, including the ones that drop it.
     let refresh = matches!(selection, Selection::RefreshPartners);
     let user = !restoring && !refresh;
@@ -700,7 +725,7 @@ fn queue_admitted(role: Role, selection: Selection, restoring: bool, once: bool)
         return accepted;
     }
     // The CPU owner logs its own acceptance or refusal.
-    if let Some(accepted)=mii_ordinary_cpu::intercept(role,selection,user_request){return accepted;}
+    if let Some(accepted)=mii_ordinary_cpu::intercept(role,selection,user_request,owner){return accepted;}
     if let Some(accepted)=mii_saved_alpha::intercept(role,selection){
         if user {trace!("[CharacterRoster] request handed to the saved Mii owner role={:?} selection={:?}",role,selection);}
         return accepted;
@@ -775,6 +800,18 @@ pub fn request_cpu_kind(kind: u32) -> bool {
         return false;
     }
     queue_admitted(Role::Cpu, Selection::Direct(fighter), false, false)
+}
+
+/// `request_cpu_kind` for a practice game's own temporary CPU fighter (Mash out's attacker and its restore): applied
+/// without the CPU Character receipt and never persisted as the user's choice.
+pub fn request_practice_cpu_kind(kind: u32) -> bool {
+    let Some(fighter) = TrioFighter::from_kind(kind) else {
+        return false;
+    };
+    if state_for(Role::Cpu).lock().pending.is_some() {
+        return false;
+    }
+    queue_owned(Role::Cpu, Selection::Direct(fighter), false, false, Requester::Practice)
 }
 
 /// Player 1's fighter kind as the loader last observed it (None before a practice entry).
@@ -1158,7 +1195,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                 crate::runtime::roster::kirby_hats::fighter_committed(role as usize, active.target.kind());
             }
             publish_partners(role, active.forms);
-            role.sync_selection(active.target);
+            role.sync_selection(active.target, live_owner(role, active.target.kind()));
             mii_hud_portrait::before_refresh(entry, owner, active.target.kind());
             refresh_hud(entry, owner, active.target.kind());
             if owner == 0 {
@@ -1173,7 +1210,9 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
             trace!("[CharacterRoster] complete owner={} target={} kind=0x{:x} slot={:?} ticks={} body_id=0x{:x}",
                 owner, active.target.name(), active.target.kind(), active.slot.map(|i| i+1),
                 active.ticks, read::<u32>(read::<*const u8>(entry, 0x4160), 8));
-            notify_selection(role, active.target, active.slot);
+            if persists_selection(live_owner(role, active.target.kind())) {
+                notify_selection(role, active.target, active.slot);
+            }
         } else {
             // Departure cancels plugin intent, but the native entry may finish
             // before it is destroyed. Release only serialization; never publish
@@ -1272,7 +1311,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                         crate::runtime::roster::kirby_hats::fresh_lobby();
                         training::named_macros::waiting_scene_changed(false);
                     }
-                    role.sync_selection(fighter);
+                    role.sync_selection(fighter, live_owner(role, fighter.kind()));
                 }
                 // A ready entry can precede the scene's first gameplay frame.
                 // Reloading it during stage initialization races the native
@@ -1293,7 +1332,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                             WAITING_MEMORY.lock().commit(role as usize, target);
                             crate::runtime::roster::kirby_hats::fighter_committed(role as usize, kind);
                             state_for(role).lock().cursor=target.cursor;
-                            role.sync_selection(target.fighter);
+                            role.sync_selection(target.fighter, live_owner(role, target.fighter.kind()));
                         } else {
                             queue_request(role, Selection::Direct(target.fighter), true);
                         }
@@ -1366,8 +1405,10 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
         if request.scope.waiting() {
             crate::runtime::roster::kirby_hats::fighter_committed(role as usize, target.kind());
         }
-        role.sync_selection(target);
-        notify_selection(role, target, slot);
+        role.sync_selection(target, live_owner(role, target.kind()));
+        if persists_selection(live_owner(role, target.kind())) {
+            notify_selection(role, target, slot);
+        }
         trace!(
             "[CharacterRoster] already active owner={} kind=0x{:x} slot={:?}",
             owner,
@@ -1565,7 +1606,7 @@ unsafe fn publish_mii_presentation(
     // This publication supersedes a reset deferred during its INSTALL.
     REBUILT[role as usize].store(false, Ordering::Release);
     drop(state);
-    role.sync_selection(fighter);
+    role.sync_selection(fighter, live_owner(role, fighter.kind()));
     if mii_hud_portrait::should_defer_hud(owner, kind, portrait) {
         // The exact texture does not exist yet. Keep the previous portrait and let the
         // service callback refresh and bind after the render proof. A rejected hold
