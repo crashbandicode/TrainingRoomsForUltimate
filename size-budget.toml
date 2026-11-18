@@ -1681,3 +1681,11 @@ ceiling = 148194
 date = "2026-11-15"
 reason = "rc.15 final merged implementation measured 148194 on dae81738 after the accepted feature heads, Phase3 reuse (-73), colour legend (+56), release identity and measured stack-bound refresh. This replaces the provisional 148075 ceiling with the exact final total; counting rules and gate enforcement are unchanged."
 approved_by = "Operator 2026-11-15 18:54Z via AskUserQuestion: 'Set limit to final total', relayed by the primary c07b3449. Supersedes the earlier about-20-lines-over allowance; exact measured final total 148194."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 148279
+date = "2026-11-18"
+reason = "rc.15 Mash out row 114 Ice Shot grading and the Player-only 255% damage maximum. Measured 153782 on 45d3a802 against 153697 on its base a7a6a327. Increase the inherited 148194 ceiling by the approved 85 normalized implementation lines."
+approved_by = "Operator 2026-11-18 16:43Z: 'yes additional lines are ok'; the primary c07b3449 confirmed the exact +85 and requested the size entry at 16:55Z."
