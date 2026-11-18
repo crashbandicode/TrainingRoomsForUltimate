@@ -1861,3 +1861,8 @@ ceiling = 156721
 date = "2026-11-18"
 reason = "State export for the test-only hardware bridge (rc15/hw-bridge-export a9537c89, +700 over its base 458c0636: v1 +515, ring/settings +52, settle/reload +79, restore barriers +48, bound-writer seam +6) merged onto main c212bc50 (156023): composed measured 156721 (+698 over main; the merge measured 156724 before write_saved was folded into write_saved_with). Bridge v3b PASS (tr-review-astra-3 14:31Z) and the hardware smoke PASS (15:16Z). Exact total, no headroom. Counting and gates unchanged."
 approved_by = "Operator approved the bridge TR +700 and the state-export-invalid-settings restriction (11:28Z, recorded by tr-review-astra-2/3); primary c07b3449 15:28Z orders the merge onto local main."
+
+ceiling = 155448
+date = "2026-11-18"
+reason = "CPU-091 ledge re-roll window (rc15/cpu091-ledge-reroll on main d7f2e656, 155446): a Ledge Options change while hanging (B11 clear_case) left no case until the next CPU frame, and the climb query fell back to the game, which climbed. Ledge::native_grab tells a case not rolled yet from an empty effective set; the climb stays denied until the roll. Measured 155448 = +2. Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+approved_by = "devin-primary 04:01Z (up to +6-8 for CPU-091), operator review pending."

@@ -48,11 +48,13 @@ pub struct Ledge {
     pub delay: Option<u16>,
     /// The playback of a playback case has been started (the climb stays denied until it is).
     pub playback_started: bool,
+    /// This grab rolled an empty effective set: the CPU behaves natively (CPU-091: unlike a case not rolled yet).
+    pub native_grab: bool,
 }
 
 impl Ledge {
     pub const fn new() -> Self {
-        Self { case: None, delay: None, playback_started: false }
+        Self { case: None, delay: None, playback_started: false, native_grab: false }
     }
 
     /// Decision B11: drop the held case so the next hanging frame rolls again. The delay and its
@@ -60,6 +62,7 @@ impl Ledge {
     pub fn clear_case(&mut self) {
         self.case = None;
         self.playback_started = false;
+        self.native_grab = false;
     }
 
     /// The reset bundle's "reset the ledge delay" (the case clears by itself through step 1).
@@ -76,7 +79,9 @@ impl Ledge {
         if !original || !on_ledge_wait || s.ledge_state.is_empty() || !t.is(C::TermContCliffClimb, term) {
             return original;
         }
-        let Some(case) = self.case else { return original };
+        // CPU-091: no case yet (B11 cleared it at the menu change) holds the climb until the next frame rolls.
+        // Another playback yields the feature entirely (its step does not roll), as before.
+        let Some(case) = self.case else { return (self.native_grab || playback_running) && original };
         let hold_for_playback = is_playback(case) && !self.playback_started;
         // While another playback runs the feature yields entirely, except the hold that keeps the CPU
         // on the ledge until its own playback has started.
@@ -98,9 +103,7 @@ impl Ledge {
         }
         // 1. Not hanging: forget the grab.
         if f.situation != Situation::Cliff {
-            self.case = None;
-            self.delay = None;
-            self.playback_started = false;
+            *self = Self::new();
             counters.get(CounterId::Ledge).full_reset();
             return out;
         }
@@ -108,7 +111,8 @@ impl Ledge {
         let delay = *self.delay.get_or_insert_with(|| s.ledge_delay.pick(rng));
         if self.case.is_none() {
             self.case = s.ledge_state.pick(rng).map(|i| i as u8);
-            if self.case.is_none() {
+            self.native_grab = self.case.is_none();
+            if self.native_grab {
                 // An empty effective set: the CPU behaves natively this grab, the climb is not denied.
                 return out;
             }

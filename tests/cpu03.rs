@@ -382,6 +382,25 @@ fn cpu03_ledge_options_change_rerolls_held_case() {
     assert_eq!(requested, Some(20));
 }
 
+fn cpu03_ledge_options_change_keeps_the_climb_denied_until_the_new_roll() {
+    // CPU-091 (p3-cpu-x7-1): parked with Wait, the row changes to Jump. B11 clears the held case at once
+    // (publish), but the game asks about its automatic climb before the CPU's next frame rolls again. With no
+    // held case that query returned the game's own answer, so the CPU climbed (status 121) instead of jumping.
+    let wait = settings(&[("ledge_state", ledge_row(&[option::WAIT as usize])), ("ledge_delay", delay_row(&[0]))]);
+    let (mut cpu, key) = cpu_with(wait);
+    for frame in 3..50 {
+        cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, frame, true, false));
+    }
+    assert!(!cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true), "Wait denies the climb");
+    let jump = settings(&[("ledge_state", ledge_row(&[option::JUMP as usize])), ("ledge_delay", delay_row(&[0]))]);
+    cpu.publish(jump, reroll::LEDGE_OPTIONS);
+    // The game's query between the change and the CPU's next frame: still hanging, a non-empty row, not rolled yet.
+    assert!(!cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true),
+        "the climb stays denied until the CPU rolls from the new set");
+    let out = cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 60, true, false));
+    assert_eq!(out.request_status, Some(CLIFF_JUMP1), "the next frame performs the new option");
+}
+
 fn cpu03_ledge_options_emptied_clears_case() {
     let roll = settings(&[("ledge_state", ledge_row(&[option::ROLL as usize])), ("ledge_delay", delay_row(&[5]))]);
     let (mut cpu, key) = cpu_with(roll);
@@ -460,6 +479,7 @@ fn case_table() {
         ("cpu03_ledge_delay_range_pick", cpu03_ledge_delay_range_pick as fn()),
         ("cpu03_range_counts_as_nonempty_row", cpu03_range_counts_as_nonempty_row as fn()),
         ("cpu03_ledge_options_change_rerolls_held_case", cpu03_ledge_options_change_rerolls_held_case as fn()),
+        ("cpu03_ledge_options_change_keeps_the_climb_denied_until_the_new_roll", cpu03_ledge_options_change_keeps_the_climb_denied_until_the_new_roll as fn()),
         ("cpu03_ledge_options_emptied_clears_case", cpu03_ledge_options_emptied_clears_case as fn()),
         ("cpu03_playback_yield_and_reset", cpu03_playback_yield_and_reset as fn()),
         ("cpu03_whole_settings_replacement_yields_the_menus_reroll_bits", cpu03_whole_settings_replacement_yields_the_menus_reroll_bits as fn()),
