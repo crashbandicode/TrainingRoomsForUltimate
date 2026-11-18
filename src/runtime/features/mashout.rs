@@ -1384,7 +1384,9 @@ pub unsafe fn frame(fighter: usize) {
                 game.fail("Move sequence unavailable");
                 return;
             };
-            if !preparing && !entry::preparatory(request.plan) && !arm(p1, game.generation) {
+            // restriction: mashout-ganon-tech (reviewer G3): row 121 is tech-graded, so its slam arms no mash clock/seed.
+            let tech = crate::model::mashout::moves::tech_graded(request.id);
+            if !preparing && !entry::preparatory(request.plan) && !tech && !arm(p1, game.generation) {
                 game.fail(UNAVAILABLE_NOTICE);
                 return;
             }
