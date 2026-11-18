@@ -318,6 +318,9 @@ game_constants! {
     // Mash out move90's native landing end (not clatter statuses): the victim's
     // after-landing status and Ganondorf's landing status.
     CatchedAirEndGanon = "FIGHTER_STATUS_KIND_CATCHED_AIR_END_GANON",
+    // Mash out row 121 (reviewer G1, 11-18): the victim's grounded Flame Choke catch, the second-previous status at its
+    // slam's ground contact (190 in ganon-tech-research-yoga-3, to be confirmed by this build's own cpu_ids line).
+    CatchedGanon = "FIGHTER_STATUS_KIND_CATCHED_GANON",
     GanonSpecialAirSEnd = "FIGHTER_GANON_STATUS_KIND_SPECIAL_AIR_S_END",
     ClatterBind = "FIGHTER_STATUS_KIND_BIND",
     ClatterDamageSong = "FIGHTER_STATUS_KIND_DAMAGE_SONG",

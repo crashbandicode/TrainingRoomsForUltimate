@@ -538,6 +538,13 @@ pub fn native_landing_end(plan: Plan, is_victim: impl Fn(C) -> bool, is_attacker
     plan == Plan::AirSideSpecial && is_victim(C::CatchedAirEndGanon) && is_attacker(C::GanonSpecialAirSEnd)
 }
 
+/// Row 121's tech contact (reviewer G1, ganon-tech-research-yoga-3): the victim's ground-contact request whose previous
+/// status is CATCHED_AIR_END_GANON and whose second-previous is the grounded catch CATCHED_GANON, both by name through
+/// the resolved ids table. Row 90's aerial slam (second-previous CATCHED_AIR_FALL_GANON) never matches.
+pub fn ganon_tech_contact(plan: Plan, is_prev: impl Fn(C) -> bool, is_second_prev: impl Fn(C) -> bool) -> bool {
+    plan == Plan::GroundSideSpecial && is_prev(C::CatchedAirEndGanon) && is_second_prev(C::CatchedGanon)
+}
+
 /// Down throws and Cargo first acquire an ordinary grab, without grading that preparatory hold.
 pub fn preparatory_grab(plan: Plan) -> bool {
     matches!(plan, Plan::DownThrow | Plan::Cargo)
@@ -754,6 +761,21 @@ mod tests {
             for plan in [Plan::Grab, Plan::Whip, Plan::AirSideSpecial, Plan::Inhale] {
                 assert!(!preparatory_grab(plan));
             }
+        }
+
+        /// Reviewer G1: row 121 grades only the victim's contact after CATCHED_AIR_END_GANON whose second-previous status
+        /// is the grounded catch, by name. Row 90's aerial CATCHED_AIR_FALL_GANON and every other plan never match.
+        #[test]
+        fn ganon_tech_contact_needs_the_grounded_catch_sequence_by_name() {
+            let is = |want: C| move |c: C| c == want;
+            assert!(ganon_tech_contact(Plan::GroundSideSpecial, is(C::CatchedAirEndGanon), is(C::CatchedGanon)));
+            assert!(!ganon_tech_contact(Plan::GroundSideSpecial, is(C::CatchedAirEndGanon), is(C::ClatterCatchedAirFallGanon)));
+            assert!(!ganon_tech_contact(Plan::AirSideSpecial, is(C::CatchedAirEndGanon), is(C::CatchedGanon)));
+            assert!(!ganon_tech_contact(Plan::GroundSideSpecial, is(C::ClatterCatchedAirFallGanon), is(C::CatchedGanon)));
+            assert!(!ganon_tech_contact(Plan::Grab, is(C::CatchedAirEndGanon), is(C::CatchedGanon)));
+            let name = |c: C| crate::model::cpu::ids::NAMES[c as usize];
+            assert_ne!(name(C::CatchedGanon), name(C::ClatterCatchedAirFallGanon));
+            assert_eq!(name(C::CatchedGanon), "FIGHTER_STATUS_KIND_CATCHED_GANON");
         }
 
         /// Grounded Flame Choke starts with Ganondorf's grounded side special (no jump squat, unlike row 90).
