@@ -1652,6 +1652,11 @@ fn ice_climbers_real_special_entries_require_actual_ice_seed() {
             let before = (m.control, m.record);
             m.start();
             m.update(&mut g, 203);
+            if let Some(text) = crate::model::mashout::moves::practice_only(id) {
+                assert_eq!(g.failed, Some(text));
+                assert!(BEGINS.with_borrow(Vec::is_empty));
+                continue;
+            }
             assert_eq!(g.step, Step::Held);
             assert_eq!(g.clock.unwrap().last(), actual.record);
             assert_eq!((m.control, m.record), before);
@@ -1682,7 +1687,7 @@ fn ice_climbers_miss_and_nonice_seed_keep_existing_refusals() {
             m.update(&mut g, 0);
             assert_eq!(
                 g.failed,
-                Some("Move did not capture · reopen menu to retry")
+                Some(crate::model::mashout::moves::practice_only(id).unwrap_or("Move did not capture · reopen menu to retry"))
             );
             assert!(BEGINS.with_borrow(Vec::is_empty));
             let mut g = Game::new(plan, State::Frozen);
@@ -2762,6 +2767,12 @@ fn sora_blizzard_starts_real_special_n_and_only_actual_ice_seed_begins() {
         m.seed(142.3, 7.0, 1);
         m.start();
         m.update(&mut game, 203);
+        // restriction: mashout-blizzard-practice: 116 ends at the seed with the practice notice, no Begin.
+        if let Some(text) = crate::model::mashout::moves::practice_only(116) {
+            assert_eq!(game.failed, Some(text));
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+            return;
+        }
         assert_eq!(game.step, Step::Held);
         assert_eq!(BEGINS.with_borrow(Vec::len), 1);
         assert!(game.clock.is_some());
@@ -2991,6 +3002,12 @@ fn sora_blizzard_escape_grades_only_when_the_provider_is_closed() {
             m.seed(142.3, 7.0, 1);
             m.start();
             m.update(&mut game, 203);
+            // restriction: mashout-blizzard-practice: 116 ends at the seed with the practice notice, no Begin.
+            if let Some(text) = crate::model::mashout::moves::practice_only(116) {
+                assert_eq!(game.failed, Some(text));
+                assert!(BEGINS.with_borrow(Vec::is_empty));
+                continue;
+            }
             assert_eq!(game.step, Step::Held);
             EXECUTE_HELD.store(true, Ordering::Relaxed);
             BLIZZARD_PROVIDER.store(provider, Ordering::Relaxed);
@@ -3024,6 +3041,12 @@ fn sora_blizzard_arms_the_set_observer_only_for_the_real_cast_and_posts_its_writ
         m.seed(142.3, 7.0, 1);
         m.start();
         m.update(&mut game, 203);
+        // restriction: mashout-blizzard-practice: 116 ends at the seed with the practice notice, no Begin.
+        if let Some(text) = crate::model::mashout::moves::practice_only(116) {
+            assert_eq!(game.failed, Some(text));
+            assert!(BEGINS.with_borrow(Vec::is_empty));
+            return;
+        }
         assert_eq!(game.step, Step::Held);
         EXECUTE_HELD.store(true, Ordering::Relaxed);
         let old = game.clock.unwrap().last().remaining;

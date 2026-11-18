@@ -43,10 +43,14 @@ pub enum MoveAvailability {
 /// Operator ruling 11-17 ("Go with option b for the ice shot answer"): 114 Ice Shot freezes natively only above
 /// about 190%, past the 150% damage-on-load maximum (frozen-cluster-devin/frozen114-measure-xps-1/RESULT.md), so it
 /// runs as practice and never grades: its miss and any real freeze end with this notice.
+/// 116 Sora Ice magic (reviewer 08:37Z, option b): the Blizzard cast outlasts the hold and its last shard frame is
+/// not byte-provable, so S1 cannot close; it runs as practice and never grades (sora116-g2-pair-xps harvest-6).
 pub const fn practice_only(id: u16) -> Option<&'static str> {
     match id {
         // restriction: mashout-iceshot-practice
         114 => Some("Ice Shot freezes only above about 190% · practice only, no grade"),
+        // restriction: mashout-blizzard-practice
+        116 => Some("Sora's Blizzard re-freezes outlast the escape · practice only, no grade"),
         _ => None,
     }
 }
@@ -280,9 +284,13 @@ mod tests {
         fn ice_shot_is_practice_only_with_the_approved_text() {
             // restriction: mashout-iceshot-practice (operator 11-17): only 114, and it stays selectable.
             assert_eq!(practice_only(114), Some("Ice Shot freezes only above about 190% · practice only, no grade"));
-            assert_eq!(CATALOG.iter().filter(|s| practice_only(s.id).is_some()).map(|s| s.id).collect::<Vec<_>>(), [114]);
+            assert_eq!(CATALOG.iter().filter(|s| practice_only(s.id).is_some()).map(|s| s.id).collect::<Vec<_>>(), [114, 116]);
             assert_eq!(availability(114), MoveAvailability::Available);
             assert!(practice_only(113).is_none() && practice_only(112).is_none());
+            // restriction: mashout-blizzard-practice (FOR OPERATOR APPROVAL): 116 stays selectable and in Random.
+            assert_eq!(practice_only(116), Some("Sora's Blizzard re-freezes outlast the escape · practice only, no grade"));
+            assert_eq!(availability(116), MoveAvailability::Available);
+            assert!(selectable(CATALOG[116]));
         }
 
         #[test]
