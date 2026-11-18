@@ -652,6 +652,36 @@ fn native_throw_observer_reach_has_no_lock_or_allocation() {
     }
 }
 
+/// M3 Set observer (O9/C12): the qualified native path (`clatter_set::qualified`, entered from the naked +0x90
+/// wrapper) reaches no lock and no allocation. Only atomic/volatile method names inside clatter_set.rs are masked
+/// (the scanner has no receiver types); every other call stays visible.
+#[test]
+fn native_clatter_set_observer_reach_has_no_lock_or_allocation() {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut graph = throw_observer_graph(&runtime);
+    for f in graph.funcs.iter_mut().filter(|f| f.file == "features/mashout/clatter_set.rs") {
+        for at in 1..f.body.len() {
+            if f.body[at - 1] == Tok::Punct('.') {
+                if let Tok::Ident(method) = &mut f.body[at] {
+                    if matches!(method.as_str(), "load" | "store" | "swap" | "fetch_add" | "compare_exchange" | "read_volatile") {
+                        *method = format!("external_atomic_{method}");
+                    }
+                }
+            }
+        }
+    }
+    let locks = static_locks(&runtime);
+    let locks: Vec<_> = locks.iter().map(|(f, n)| (f.as_str(), n.as_str())).collect();
+    let entry = graph.funcs.iter().find(|f| f.file == "features/mashout/clatter_set.rs" && f.name == "qualified")
+        .expect("the qualified Set path must exist exactly once").key();
+    let result = scan_throw_observer(&graph, &entry, &locks);
+    let reached: Vec<_> = result.reached.iter().map(|&i| graph.funcs[i].key()).collect();
+    println!("CLATTER-SET-OBSERVER {entry}: {reached:?}; boundaries {:?}", result.boundaries);
+    assert!(result.ambiguous.is_empty(), "observer method edges need explicit resolution: {:?}", result.ambiguous);
+    assert!(result.violations.is_empty(), "Set observer reaches lock/allocation operations:\n{}",
+        result.violations.into_iter().collect::<Vec<_>>().join("\n"));
+}
+
 #[test]
 fn native_throw_observer_scan_catches_transitive_lock_and_allocation_seeds() {
     let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
