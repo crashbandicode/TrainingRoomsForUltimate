@@ -600,15 +600,17 @@ fn writing_sites_counts_every_row_that_writes_code() {
 fn mashout_rows_are_registered_without_new_writes() {
     use model::guard::SeamKind;
     let rows = &model::sites_mashout::SITES;
-    assert_eq!(rows.len(), 22);
-    assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Relied).count(), 17);
+    assert_eq!(rows.len(), 29);
+    assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Relied).count(), 24);
     assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Called).count(), 3);
     for row in rows {
         assert_eq!(row.feature, Feature::Mashout);
         assert_eq!(capabilities::all_sites().filter(|site| site.name == row.name).count(), 1);
         assert!(!capabilities::writes_code(row));
         let usable = |site: &model::sites::Site| site.name != row.name;
-        assert_eq!(capabilities::blocked_by(Feature::Mashout, &usable), Some(row.name));
+        let floor_only = model::sites_mashout::trolley_floor_only(row);
+        assert_eq!(capabilities::blocked_by(Feature::Mashout, &usable), (!floor_only).then_some(row.name));
+        assert!(!Granted::from_usable(&usable).allows(row.offset));
         for other in capabilities::all_sites().map(capabilities::unit_of_row).filter(|unit| *unit != Feature::Mashout) {
             assert!(capabilities::unit_usable(other, &usable), "{} must not disable {}", row.name, other.name());
         }
@@ -625,7 +627,9 @@ fn mashout_required_rows_disable_only_their_reachable_units() {
     assert_eq!(calls.len(), 28);
     assert!(calls.contains(&"work_get_int"), "Lucas release counter must fail closed with its existing native guard");
     assert!(calls.contains(&"work_is_flag"), "Corrin attack window must fail closed with its existing native guard");
-    let required = model::sites_mashout::SITES.iter().map(|row| row.name).chain(calls.iter().copied()).chain(["clatter_start_hook", "entry_active_cell", "is_training_mode"]);
+    let required = model::sites_mashout::SITES.iter()
+        .filter(|row| !model::sites_mashout::trolley_floor_only(row))
+        .map(|row| row.name).chain(calls.iter().copied()).chain(["clatter_start_hook", "entry_active_cell", "is_training_mode"]);
     for name in required {
         let row = capabilities::find(name).unwrap();
         let names: Vec<_> = capabilities::equivalent_rows(row).map(|site| site.name).collect();

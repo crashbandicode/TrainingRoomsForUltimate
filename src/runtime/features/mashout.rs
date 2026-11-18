@@ -13,6 +13,7 @@ use crate::model::mashout::{
     moves::{Config, Scenario},
     native::Clock,
 };
+use crate::model::sites_mashout::{self, TROLLEY_FLOOR_RAY, TROLLEY_FLOOR_RAY_IMPL};
 use crate::model::{
     input_delay::MappedInputs,
     notify::DEFAULT_COLOR,
@@ -33,6 +34,50 @@ mod interposer;
 mod reader;
 #[path = "mashout/worker.rs"]
 mod worker;
+
+/// One short ray identifies P1's present collision line. Read the borrowed line
+/// and its vertices synchronously on the game thread before Place mutates either body.
+unsafe fn trolley_floor_allows(p1: usize, x: f32, y: f32, spacing: f32, facing: f32) -> bool {
+    // The layout proof requires the exact instructions, including each reader's interior.
+    if !sites_mashout::SITES.iter().filter(|site| sites_mashout::trolley_floor_only(site))
+        .all(|site| game::granted(site.offset) && game::read_window(site.offset) == site.guard)
+    {
+        return false;
+    }
+    let base = game::text_base();
+    let ground = ((p1 + 0x58) as *const usize).read();
+    if ground == 0 {
+        return false;
+    }
+    let vtable = (ground as *const usize).read();
+    if (vtable != base + 0x4f87560 && vtable != base + 0x4f6d8b0)
+        || ((vtable + 0x668) as *const usize).read() != base + TROLLEY_FLOOR_RAY_IMPL
+    {
+        return false;
+    }
+    // The 13.0.5 function does 16-byte SIMD reads and writes for its Vector2f references.
+    #[repr(C, align(16))]
+    struct Ray([f32; 4]);
+    let ray: unsafe extern "C" fn(usize, *const Ray, *const Ray, *mut Ray, bool) -> usize =
+        core::mem::transmute(base + TROLLEY_FLOOR_RAY);
+    let mut hit = Ray([0.; 4]);
+    let line = ray(p1, &Ray([x, y + 0.25, 0., 0.]), &Ray([0., -0.5, 0., 0.]), &mut hit, false);
+    if line == 0 || ((line + 0xc4) as *const u32).read() & 0x2800 != 0x0800 {
+        return false;
+    }
+    let [left, right] = ((line + 0x88) as *const [usize; 2]).read();
+    if left == 0 || right == 0 {
+        return false;
+    }
+    let left_now = ((left + 0x10) as *const [f32; 2]).read();
+    let right_now = ((right + 0x10) as *const [f32; 2]).read();
+    if left_now != ((left + 0x20) as *const [f32; 2]).read()
+        || right_now != ((right + 0x20) as *const [f32; 2]).read()
+    {
+        return false;
+    }
+    entry::trolley_floor_runway([x, y], x + spacing * facing, facing, [left_now, right_now])
+}
 
 const NOTICE_ID: u8 = 0x30;
 const NOTICE_RAISE: u8 = 4;
@@ -980,12 +1025,20 @@ pub unsafe fn frame(fighter: usize) {
                 game.fail("Position unavailable");
                 return;
             }
-            state_natives::clear_speed_all(p1);
-            state_natives::status_request(p1, ids[0]);
-            state_natives::clear_speed_all(cpu);
             let Some(request) = game.requested else {
                 return;
             };
+            let spacing = entry::placement_spacing(request);
+            if request.plan == crate::model::mashout::moves::Plan::Trolley
+                && !trolley_floor_allows(p1, position.x, position.y, spacing, facing.signum())
+            {
+                // restriction: MASH-TROLLEY-FLOOR
+                game.fail("Trolley needs more stage floor · no grade");
+                return;
+            }
+            state_natives::clear_speed_all(p1);
+            state_natives::status_request(p1, ids[0]);
+            state_natives::clear_speed_all(cpu);
             let drag = request.plan == crate::model::mashout::moves::Plan::Drag;
             if drag || request.plan == crate::model::mashout::moves::Plan::Flip {
                 // Camera centre is a direction reference, never proof of collision floor/runway.
@@ -1004,7 +1057,6 @@ pub unsafe fn frame(fighter: usize) {
                     facing = if drag { outward } else { -outward };
                 }
             }
-            let spacing = entry::placement_spacing(request);
             state_natives::init_pos(
                 cpu,
                 &state_natives::Vector3f {

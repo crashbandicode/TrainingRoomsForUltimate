@@ -10,9 +10,30 @@ pub fn placement_spacing(scenario: Scenario) -> f32 {
         14.2
     } else if scenario.plan == Plan::Flip {
         41.123_188
+    } else if scenario.plan == Plan::Trolley {
+        // A2-GEOMETRY.md: occupied reach + widest idle hurtbox + 3, rounded up to f32.
+        45.150_684
     } else {
         6.0
     }
+}
+
+/// Require the current level floor line under P1 to cover Place and the full measured
+/// cart-centre path through the last active SEARCH sample (A2, both attempts).
+pub fn trolley_floor_runway(
+    [p1_x, p1_y]: [f32; 2],
+    place_x: f32,
+    facing: f32,
+    [[left_x, left_y], [right_x, right_y]]: [[f32; 2]; 2],
+) -> bool {
+    const CART_TRAVEL: f32 = 85.400_024;
+    let end_x = place_x - facing * CART_TRAVEL;
+    let low = left_x.min(right_x);
+    let high = left_x.max(right_x);
+    [left_x, left_y, right_x, right_y, p1_y].into_iter().all(f32::is_finite)
+        && left_y == right_y
+        && (p1_y - left_y).abs() <= 0.25
+        && [p1_x, place_x, end_x].into_iter().all(|x| low < x && x < high)
 }
 
 /// The original move status is requested on the attacker only. Victim statuses and links are native.
@@ -448,6 +469,43 @@ mod tests {
     lib_unit_tests! {
         use super::*;
         use crate::model::mashout::moves::Config;
+
+        #[test]
+        fn trolley_place_spacing_clears_occupied_and_reaches_vacant() {
+            let trolley = super::super::moves::CATALOG.iter().find(|row| row.id == 97).unwrap();
+            assert_eq!(trolley.plan, Plan::Trolley);
+            let occupied = 35.200_004_577_6_f64 + 6.950_677_514_1;
+            let vacant = 91.863_304_138_2_f64 + 4.326_402_187_3;
+            assert!(6.0 <= occupied, "the old placement must reproduce occupied overlap");
+            let spacing = f64::from(placement_spacing(*trolley));
+            assert!(spacing >= occupied + 3.0 && spacing <= vacant - 1.0,
+                "row 97 spacing {spacing} is outside the tolerated interval");
+        }
+
+        #[test]
+        fn trolley_place_refuses_incomplete_native_floor() {
+            let place = |p1, face, floor| {
+                trolley_floor_runway(p1, p1[0] + 45.150_684 * face, face, floor)
+            };
+            let floor = [[-85., 0.], [85., 0.]];
+            assert!(place([-40., 0.], 1., floor));
+            assert!(place([40., 0.], -1., [floor[1], floor[0]]));
+            assert!(!place([60., 0.], 1., floor)); // CPU Place falls beyond the right edge.
+            assert!(!place([-50., 0.], 1., floor)); // SEARCH path falls beyond the left edge.
+            assert!(!place([-40., 3.], 1., floor)); // A lower surface cannot support this pose.
+            assert!(!place([-40., 0.], 1., [[-85., 0.], [85., 1.]]));
+            assert!(!place([-40., 0.], 1., [[f32::NAN, 0.], [85., 0.]]));
+            for scenario in super::super::moves::CATALOG.iter().filter(|row| row.id != 97) {
+                let unchanged = if scenario.evidence == "B04" {
+                    14.2
+                } else if scenario.plan == Plan::Flip {
+                    41.123_188
+                } else {
+                    6.0
+                };
+                assert_eq!(placement_spacing(*scenario), unchanged, "row {}", scenario.id);
+            }
+        }
 
         #[test]
         fn one_pikmin_line_is_exactly_one_held_or_following() {

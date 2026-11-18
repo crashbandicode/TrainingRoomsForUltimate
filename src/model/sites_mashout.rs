@@ -4,7 +4,18 @@
 use super::guard::{HookForm, Placement, SeamKind};
 use super::sites::{Feature, Site};
 
-pub static SITES: [Site; 22] = include!(concat!(env!("OUT_DIR"), "/tables/sites_mashout.SITES.rs"));
+pub static SITES: [Site; 29] = include!(concat!(env!("OUT_DIR"), "/tables/sites_mashout.SITES.rs"));
+
+pub const TROLLEY_FLOOR_RAY: usize = 0x202a240;
+pub const TROLLEY_FLOOR_RAY_IMPL: usize = 0x4658b0;
+pub const TROLLEY_FLOOR_GUARDS: [usize; 7] = [
+    TROLLEY_FLOOR_RAY, TROLLEY_FLOOR_RAY_IMPL, 0x5266c0, 0x2284a30, 0x2284a50, 0x2284a90, 0x2284930,
+];
+
+/// These guarded reads are required only by Trolley Place.
+pub fn trolley_floor_only(site: &Site) -> bool {
+    site.feature == Feature::Mashout && TROLLEY_FLOOR_GUARDS.contains(&site.offset)
+}
 
 #[cfg(test)]
 lib_unit_tests! {
@@ -19,7 +30,14 @@ mod tests {
 
         #[test]
         fn mashout_reader_rows_match_approved_fixture() {
-            assert_eq!(SITES.len(), APPROVED.len() + 5);
+            assert_eq!(SITES.len(), APPROVED.len() + 5 + super::TROLLEY_FLOOR_GUARDS.len());
+            for offset in super::TROLLEY_FLOOR_GUARDS {
+                let mut rows = SITES.iter().filter(|site| site.offset == offset);
+                let site = rows.next().unwrap();
+                assert!(super::trolley_floor_only(site));
+                assert_eq!(site.kind, SeamKind::Relied);
+                assert!(rows.next().is_none());
+            }
             for (site, (offset, called, hex)) in SITES.iter().zip(APPROVED) {
                 assert_eq!(site.offset, offset);
                 assert_eq!(site.feature, Feature::Mashout);
