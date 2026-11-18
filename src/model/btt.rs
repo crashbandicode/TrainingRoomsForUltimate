@@ -248,13 +248,14 @@ pub fn on(rows: &super::settings::Snapshot) -> [bool; 2] {
     ["eggsercise", ROW].map(|id| rows.get(id).is_some_and(|r| r.iter().skip(1).any(|v| *v != 0)))
 }
 
-/// Only P1's owned pool and ArticleModule supply objects; Off performs no discovery or hit reads.
+/// Only P1's owned pool and ArticleModule supply objects; Off performs no discovery or hit reads. An article's hit counts as
+/// `Breaks on` (`rule`, with `aerial` Player 1's own status) allows that hit (rc.15, both practice games: docs/DECISIONS.md).
 pub fn projectile_breaks(
-    enabled: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,
+    enabled: bool, rule: u8, aerial: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,
     mut read: impl FnMut(usize) -> Option<([eggs::Hit; super::hitbox::SLOTS as usize], usize)>,
 ) -> bool {
     enabled && pool.into_iter().chain(super::hitbox::article_instances(true, get)).filter(|a| pointer_ok(*a)).any(|article| {
-        read(article).is_some_and(|(hits, n)| hits[..n].iter().any(|h| h.3 > 0.0 && eggs::breaks(eggs::ANY, false, h, spot)))
+        read(article).is_some_and(|(hits, n)| hits[..n].iter().any(|h| h.3 > 0.0 && eggs::breaks(rule, aerial, h, spot)))
     })
 }
 

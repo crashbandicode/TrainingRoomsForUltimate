@@ -82,7 +82,8 @@ fn eggs_rows_and_help() {
         rows[0].help_lines(),
         ("Break the targets that appear. Starts when the menu closes.", "Timed: 60 s, or break 10 or 20 fastest. Free practice: no timer.")
     );
-    assert_eq!(rows[1].help_lines(), ("Which of your hits break a target. Projectiles never do.", "12%+: only attacks that deal 12% or more."));
+    // rc.15 (docs/DECISIONS.md): projectiles count as Breaks on allows (SPEC V2.3 superseded).
+    assert_eq!(rows[1].help_lines(), ("Which of your hits break a target, projectiles included.", "12%+: only attacks that deal 12% or more."));
     // §2.3b's speed row, renamed by V2.2.
     assert_eq!((rows[2].title, values(rows[2])), ("Target", vec!["Disc", "CPU"]));
     assert_eq!(rows[2].help_lines(), ("Disc: a target appears. CPU: the CPU is the target.", "The CPU flies like the disc and is reset after each hit."));
@@ -177,7 +178,7 @@ fn eggs_run_start() {
     assert_eq!(pass(&mut run, &[], false), Some(u16::MAX), "the standing notice is shown");
     assert_eq!(notice(&run), "Eggs 0   1:00");
     let egg = target(&mut run).expect("one egg");
-    assert!(egg[0].abs() <= HALF_WIDTH && (RADIUS..=RADIUS + 2.0).contains(&egg[1]), "on the ground, launched: {egg:?}");
+    assert!(egg[0].abs() <= HALF_WIDTH && (RADIUS..=RADIUS + REACH + 2.0).contains(&egg[1]), "over the ground, launched: {egg:?}");
     assert_eq!(run.look(false, || None)[0], Some((egg, EGG_WHOLE)), "the whole target, full size");
     let changes = (0..60).filter(|_| pass(&mut run, &[], false).is_some()).count();
     assert_eq!((changes, notice(&run)), (1, "Eggs 0   0:59".to_owned()), "counts down, written once a second");
@@ -193,7 +194,9 @@ fn eggs_hit_overlap() {
     assert_eq!(pass(&mut run, &[hit([egg[0] + 6.9, egg[1]], 9.0)], false), Some(u16::MAX));
     assert_eq!((run.score, notice(&run).starts_with("Eggs 1 ")), (1, true));
     let next = run.egg_at().expect("the next egg spawns in the same pass");
-    assert!(gap(next, egg) >= MIN_GAP - 1.0, "{next:?} {egg:?}");
+    // rc.15: at reset-center's narrow view the spacing is a third of the floor left beside Player 1, not `MIN_GAP` (which
+    // forced every target to the other side: `eggs_spawn_not_alternating`).
+    assert!(gap(next, egg) >= 3.0 && next != egg, "{next:?} {egg:?}");
     let egg = next;
     let pill = Hit([egg[0] - 20.0, egg[1] + 5.0, 0.0], [egg[0] + 20.0, egg[1] + 5.0, 0.0], 2.0, 9.0);
     pass(&mut run, &[pill], false);
@@ -211,8 +214,10 @@ fn eggs_respawn_distance() {
             let last = run.egg_at().unwrap();
             run.step(false, 99.0, &[hit(last, 0.0)], false, 0);
             let next = run.egg_at().unwrap();
-            assert!(gap(next, last) >= MIN_GAP, "seed {seed}: {next:?} from {last:?}");
-            assert!(next[0].abs() <= HALF_WIDTH && next[1] == -10.0 + RADIUS, "seed {seed}: on the run's ground {next:?}");
+            // rc.15: a 100-unit floor beside Player 1 keeps the targets at least 20 apart (`MIN_GAP` where the floor is longer).
+            assert!(gap(next, last) >= 20.0, "seed {seed}: {next:?} from {last:?}");
+            // rc.15: on the run's ground (no floor read) or in the air above it, within `REACH`.
+            assert!(next[0].abs() <= HALF_WIDTH && (-10.0 + RADIUS..=-10.0 + RADIUS + REACH).contains(&next[1]), "seed {seed}: over the run's ground {next:?}");
         }
         assert_eq!(run.score, 20);
     }
@@ -242,6 +247,125 @@ fn eggs_on_screen() {
             }
         }
     }
+}
+
+/// rc.15 games-fix (card report on reship-4 `8100b5e9`): at the camera Eden measured in Training (`RESET_CENTRE`), a run of
+/// breaks must not just alternate between the band's two ends. RED on `c212bc50`: the ~39-unit band and `MIN_GAP` 30 left
+/// no room near the last target, so every spawn after the first was the `far` fallback, left, right, left.
+fn eggs_spawn_not_alternating() {
+    for seed in 0..40 {
+        let mut run = started(FREE, ANY, seed);
+        run.step(false, 0.0, &[], false, 0);
+        let mut xs = Vec::new();
+        for _ in 0..40 {
+            let egg = run.egg_at().unwrap();
+            xs.push(egg[0]);
+            run.step(false, 0.0, &[hit(egg, 0.0)], false, 0);
+        }
+        let bins: std::collections::BTreeSet<i32> = xs.iter().map(|x| (x / 5.0).floor() as i32).collect();
+        assert!(bins.len() >= 4, "seed {seed}: only {} 5-unit columns: {xs:?}", bins.len());
+        let mid = (xs.iter().copied().fold(f32::MAX, f32::min) + xs.iter().copied().fold(f32::MIN, f32::max)) / 2.0;
+        let flips = xs.windows(2).filter(|w| (w[0] < mid) != (w[1] < mid)).count();
+        assert!(flips < 34, "seed {seed}: {flips} of 39 spawns switched sides: {xs:?}");
+        let ends = xs.iter().filter(|x| xs.iter().filter(|y| (*y - *x).abs() < 0.01).count() > 3).count();
+        assert!(ends < 20, "seed {seed}: {ends} spawns repeat the same spot: {xs:?}");
+    }
+}
+
+/// A Battlefield-like stage (main floor ±70 at 0, side platforms at 27, the top one at 54), seen by the Fixed camera: the
+/// whole stage on screen, x ±160 and y −65 to 115.
+const STAGE: [Floor; 4] = [[[-70.0, 0.0], [70.0, 0.0]], [[-50.0, 27.0], [-20.0, 27.0]], [[20.0, 27.0], [50.0, 27.0]], [[-15.0, 54.0], [15.0, 54.0]]];
+const FIXED: View = View([6.0, 6.0], [0.0, -150.0], [-200.0, 200.0]);
+
+/// The spawns of `count` breaks in a row on `floors`, Player 1 at `p1`.
+fn spawns(seed: u32, floors: &[Floor], p1: [f32; 2], count: usize) -> Vec<[f32; 2]> {
+    let mut run = started(FREE, ANY, seed);
+    run.set_floors(floors);
+    run.sense(p1);
+    settle(&mut run, FIXED);
+    run.step(false, 0.0, &[], false, 0);
+    (0..count)
+        .map(|_| {
+            let egg = run.egg_at().unwrap();
+            run.step(false, 0.0, &[hit(egg, 0.0)], false, 0);
+            egg
+        })
+        .collect()
+}
+
+/// The floor a spawn stands over: within its x span, at most `REACH` below the disc's bottom.
+fn floor_under(at: [f32; 2], floors: &[Floor]) -> Option<f32> {
+    floors.iter().find(|f| (f[0][0]..=f[1][0]).contains(&at[0]) && (0.0..=REACH + 1e-3).contains(&(at[1] - RADIUS - f[0][1]))).map(|f| f[0][1])
+}
+
+/// rc.15 (the primary's ruling 15:30Z on the operator's card report): targets appear at random places across the stage:
+/// every 10-unit column of the main floor, the platforms' heights and the air above them, never inside Player 1, and no
+/// forced side.
+fn eggs_spawn_covers_the_stage() {
+    let mut columns = std::collections::BTreeSet::new();
+    let (mut heights, mut air, mut flips, mut total) = ([0usize; 3], 0, 0, 0);
+    for seed in 0..20 {
+        let xs = spawns(seed, &STAGE, [-30.0, 27.0], 60);
+        for at in &xs {
+            let floor = floor_under(*at, &STAGE).unwrap_or_else(|| panic!("seed {seed}: {at:?} over no floor"));
+            heights[[0.0, 27.0, 54.0].iter().position(|y| *y == floor).unwrap()] += 1;
+            air += usize::from(at[1] - RADIUS - floor > 1.0);
+            columns.insert((at[0] / 10.0).floor() as i32);
+            assert!((at[0] + 30.0).hypot(at[1] - 27.0 - BODY) >= P1_GAP, "seed {seed}: {at:?} inside Player 1");
+            let [cx, cy] = [0, 1].map(|i| at[i] * FIXED.0[i] + FIXED.1[i]);
+            assert!(cx.abs() <= 960.0 && cy.abs() <= 540.0, "seed {seed}: {at:?} off the Fixed view");
+        }
+        assert!(xs.windows(2).all(|w| gap(w[0], w[1]) >= MIN_GAP), "seed {seed}: the whole stage keeps `MIN_GAP`");
+        flips += xs.windows(2).filter(|w| (w[0][0] < 0.0) != (w[1][0] < 0.0)).count();
+        total += xs.len() - 1;
+    }
+    assert_eq!(columns, (-6..6).collect(), "every column of the main floor, the drift margin in from its ends");
+    assert!(heights.iter().all(|h| *h >= 60), "the ground and both platform heights: {heights:?}");
+    assert!((300..=900).contains(&air), "about half in the air above a floor: {air} of 1200");
+    assert!(flips * 10 < total * 7, "no forced side: {flips} of {total} switched");
+}
+
+/// A stage with a pit (two islands): no target is put over it, nor off the stage.
+fn eggs_spawn_skips_pits() {
+    let islands = [[[-80.0, 0.0], [-30.0, 0.0]], [[30.0, 0.0], [80.0, 0.0]]];
+    for seed in 0..20 {
+        for at in spawns(seed, &islands, [-60.0, 0.0], 40) {
+            assert!(floor_under(at, &islands).is_some() && at[0].abs() >= 40.0 && at[0].abs() <= 70.0, "seed {seed}: {at:?}");
+        }
+    }
+}
+
+/// The first target waits for the floor read the runtime began (`want_floors`), then stands on a floor it found.
+fn eggs_first_target_waits_for_floors() {
+    let mut run = started(FREE, ANY, 3);
+    assert!(run.floors_wanted());
+    run.want_floors();
+    settle(&mut run, FIXED);
+    run.step(false, 0.0, &[], false, 0);
+    assert!(run.egg_at().is_none() && run.pending(), "no target while the floors are read");
+    run.set_floors(&STAGE[3..]);
+    run.step(false, 0.0, &[], false, 0);
+    let egg = run.egg_at().expect("then the target");
+    assert_eq!((floor_under(egg, &STAGE[3..]), run.floors_wanted()), (Some(54.0), false), "on the only floor read: {egg:?}");
+    run.reset(4);
+    assert!(run.floors_wanted(), "a reset (Change Stage too) reads them again");
+}
+
+/// rc.15 (docs/DECISIONS.md, SPEC V2.3 superseded): one of Player 1's articles breaks the disc; only the fighter's own attack
+/// freezes it (`melee`).
+fn eggs_articles_break() {
+    let mut run = started(FREE, ANY, 7);
+    pass(&mut run, &[], false);
+    let egg = run.egg_at().unwrap();
+    run.step_with(false, 0.0, &[], |at| at == egg, false, 0);
+    assert_eq!((run.score, run.melee()), (1, false), "an article's break");
+    let egg = run.egg_at().unwrap();
+    run.step_with(false, 0.0, &[hit(egg, 0.0)], |_| panic!("the fighter's hit decides first"), false, 0);
+    assert_eq!((run.score, run.melee()), (2, true), "the fighter's own break");
+    let mut cpu = Run::IDLE;
+    cpu.plan([FREE, ANY, NORMAL, CPU], Some(7), 0, || TRAINING);
+    settle(&mut cpu, RESET_CENTRE);
+    cpu.step_with(false, 0.0, &[], |_| panic!("the CPU target counts its own damage"), false, 0);
 }
 
 /// The operator, 11-14 ("a, move the notice to the top"): a practice game's notice sits in a top band, so a target may
@@ -284,6 +408,7 @@ fn eggs_motion_normal() {
     let mut run = started(FREE, ANY, 7);
     pass(&mut run, &[], false);
     let y = run.egg_at().unwrap()[1];
+    // Reset-center's view has no room for the whole flight above an air spawn: on the ground (rc.15).
     assert!((y - (RADIUS + 1.44 - 0.024)).abs() < 1e-4, "spawned on the ground and launched: {y}");
     let mut run = started(FREE, ANY, 7);
     run.step(false, 0.0, &[], false, 7);
@@ -398,7 +523,9 @@ fn eggs_target_cpu() {
         run.cpu_pass(0.0, false);
     }
     let (spot, put) = run.cpu_pass(0.0, false).expect("at rest");
-    assert!(put == Put::Hold && spot[1].abs() < 1e-3, "at rest on the ground: {spot:?} {put:?}");
+    // rc.15: at rest where it spawned, on the ground or perched above it (held in its fall, `LIFT` up).
+    let rest = run.egg.unwrap()[1] + LIFT * f32::from(u8::from(run.perch));
+    assert!(put == Put::Hold && (spot[1] - rest).abs() < 1e-3, "at rest where it spawned: {spot:?} {put:?}");
     for _ in 0..30 {
         pass(&mut run, &[], false);
         assert_eq!(run.cpu_pass(0.0, false), Some((spot, Put::Hold)), "held at rest, tick after tick");
@@ -584,14 +711,16 @@ fn eggs_cpu_air_hits() {
         assert_eq!(run.cpu_pass(9.0, true), None, "in hitlag");
     }
     let (next, put) = run.cpu_pass(9.0, false).expect("the next spot");
-    assert!(next[1] <= ground + LIFT && gap(next, at) >= MIN_GAP - RADIUS, "0% at the next spot: {next:?} from {at:?}");
+    // rc.15: each spot has its own height (a floor, or perched above one), so the flight is measured from the new spawn.
+    let spawn = run.egg.unwrap()[1];
+    assert!(next[1] <= spawn + LIFT && gap(next, at) >= 20.0 - RADIUS, "0% at the next spot: {next:?} from {at:?} (first {ground})");
     assert_eq!(put, Put::Fresh(true), "afresh (0%), in the air");
     let mut top = next[1];
     for _ in 0..30 {
         pass(&mut run, &[], false);
         top = top.max(run.cpu_pass(0.0, false).expect("held").0[1]);
     }
-    assert!(top > ground + 15.0, "the next spot flies again: {top}");
+    assert!(top > spawn + 15.0, "the next spot flies again: {top} from {spawn}");
     // Aerials, and Player 1 not in an aerial: the hit does not count; after the hitlag the CPU is back where it was hit.
     let (mut run, _, at) = fly(AERIALS);
     let before = run.cpu_pass(0.0, false).expect("held").0;
@@ -1026,6 +1155,11 @@ fn case_table() {
         ("eggs_hit_overlap", eggs_hit_overlap as fn()),
         ("eggs_respawn_distance", eggs_respawn_distance as fn()),
         ("eggs_on_screen", eggs_on_screen as fn()),
+        ("eggs_spawn_not_alternating", eggs_spawn_not_alternating as fn()),
+        ("eggs_spawn_covers_the_stage", eggs_spawn_covers_the_stage as fn()),
+        ("eggs_spawn_skips_pits", eggs_spawn_skips_pits as fn()),
+        ("eggs_first_target_waits_for_floors", eggs_first_target_waits_for_floors as fn()),
+        ("eggs_articles_break", eggs_articles_break as fn()),
         ("eggs_spawn_ignores_the_notice", eggs_spawn_ignores_the_notice as fn()),
         ("eggs_motion_normal", eggs_motion_normal as fn()),
         ("eggs_speed_scales_time", eggs_speed_scales_time as fn()),

@@ -1464,3 +1464,22 @@ today.
 Crop on macros and combos uses the Replay window clip editor and keyboard save-as-new. Macro X previews kept inputs on the CPU, including a Player 1 macro. Combo handles select whole links; X is absent and has no action. Chains remain unchanged. This follows the operator ruling of 2026-11-15; no capture metadata, combo format or grader changes are part of it.
 
 | HB-PALETTE-ONLY | 2026-11-16, operator ruling via primary: remove normal per-ID colours and their toggle; strength colours are the only scheme. Strong red, weak pink, grabs purple, normal hurts grey, invulnerable hurts green, direction lines white. Intangible yellow is the primary default pending operator review. Sky-blue windboxes are retained. A primary-authorized systematic search selected olive wind areas (RGB75,85,0): the earlier deep blue was too close to purple under the approved all-pairs CIEDE2000 threshold20. Olive passes that threshold and the unchanged light/dark fill-contrast bounds. This supersedes HB-PALETTE. Keep seven saved slots with retired slot 3 ignored and zeroed; show six choices without shifting surviving saved values. Align colour names and meanings. No dedicated Eden boot: gated release NRO goes to the shared real Switch review session. |
+
+### TR15-GAMES — Practice games: targets across the stage, P1's articles break them (2026-11-18)
+
+Ruling by the primary (2026-11-18 15:30Z) on the operator's card report against reship-4 `8100b5e9`. It supersedes SPEC
+`rc14-eggsercise` V2.2 and §2.3b (targets on screen, on Player 1's ground only, `MIN_GAP` 30) and V2.3 (projectiles never
+break a target, except under Hits of 12%+), and it extends rc15 BTT's camera ruling (Fixed for placing only) to Eggs-ercise.
+
+- **Spawns:** a random point of the stage's floors (main-stage tops and platforms, read once per run start from the game's
+  collision with Tech's column rays), chosen by length, on the floor or up to 25 units above it (within a jump). Each
+  target keeps at least 16 units from Player 1's body. It also keeps a spacing from the previous target: `MIN_GAP` where
+  the floors are long, and a third of what is left beside Player 1 where they are not, so no target is ever pushed to a
+  fixed side. With no floor read, the run's ground is used.
+- **Camera:** while Eggs-ercise runs, it holds the game's Fixed camera through the shared `btt_camera` owner bits
+  (owner 4). Any menu over the game, Off and the scene's end give the player's camera back.
+- **Articles:** in both games, P1-owned articles (projectiles, explosions, thrown items) break targets as `Breaks on`
+  allows that hit (Any attack; Aerials while P1 is in an aerial; Hits of 12%+ by the article hit's damage). Break the
+  Targets keeps its `Projectiles break targets` toggle. An article's break does not freeze the fighter.
+- **D9 (a menu close restarts a game):** superseded by the operator-approved practice-games menu (Q1). menu-games-devin
+  implements that; this lane makes no D9 change.
