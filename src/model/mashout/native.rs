@@ -128,6 +128,8 @@ pub enum Error {
     InvalidSchedule,
     /// A replayed write ended a cadence by itself; its escape timing is not proven, so there are no bounds.
     ScheduleEscape,
+    /// Set (113/116): a replayed sum reached the native ice-frame cap `d_max`; the capped value is not proven.
+    ScheduleCap,
 }
 
 /// The M3 observer's ring capacity per attempt (M3-EVENT-INTERFACE).
@@ -208,6 +210,7 @@ pub struct Solver {
     schedule: [Scheduled; SCHEDULE],
     scheduled: usize,
     applied: usize,
+    cap: f32,
 }
 
 impl Solver {
@@ -251,6 +254,7 @@ impl Solver {
             schedule: [Scheduled { boundary: 0, operand: 0.0 }; SCHEDULE],
             scheduled: 0,
             applied: 0,
+            cap: f32::INFINITY,
         })
     }
 
@@ -269,6 +273,17 @@ impl Solver {
         Ok(solver)
     }
 
+    /// G2 for Set (113/116): `scheduled` with each write's `operand` a bracketing ice frame F, replayed as
+    /// `fmax_arm(fadd_rne(remaining, F))`, and any sum at or above the native cap `d_max` unscored.
+    pub fn scheduled_capped(seed: Seed, writes: &[Scheduled], d_max: f32) -> Result<Self, Error> {
+        if !d_max.is_finite() || d_max <= 0.0 || writes.iter().any(|w| w.operand <= 0.0) {
+            return Err(Error::InvalidSchedule);
+        }
+        let mut solver = Self::scheduled(seed, writes)?;
+        solver.cap = d_max;
+        Ok(solver)
+    }
+
     /// Applies the writes observed after `boundary` ticks to each cadence that still holds.
     fn apply_writes(&mut self, boundary: u32) -> Result<(), Error> {
         while self.applied < self.scheduled && self.schedule[self.applied].boundary == boundary {
@@ -277,6 +292,9 @@ impl Solver {
             if self.fastest.is_none() {
                 let states = if boundary == 0 { core::slice::from_mut(&mut self.start) } else { &mut self.frontier[..] };
                 for remaining in states.iter_mut().filter(|r| r.is_finite()) {
+                    if *remaining + operand >= self.cap {
+                        return Err(Error::ScheduleCap);
+                    }
                     *remaining = add(*remaining, operand);
                     if *remaining <= 0.0 {
                         return Err(Error::ScheduleEscape);
@@ -284,6 +302,9 @@ impl Solver {
                 }
             }
             if self.no_input.is_none() {
+                if self.baseline + operand >= self.cap {
+                    return Err(Error::ScheduleCap);
+                }
                 self.baseline = add(self.baseline, operand);
                 if self.baseline <= 0.0 {
                     return Err(Error::ScheduleEscape);
