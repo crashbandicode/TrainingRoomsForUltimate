@@ -2147,5 +2147,9 @@ mod btt_menu_tests;
 mod tech_menu_tests;
 
 #[cfg(test)]
+#[path = "mashout_picker_tests.rs"]
+mod mashout_picker_tests;
+
+#[cfg(test)]
 #[path = "practice_menu_tests.rs"]
 mod practice_menu_tests;
