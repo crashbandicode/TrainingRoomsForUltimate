@@ -96,7 +96,7 @@ fn a_game_row_opens_its_sub_screen_on_start() {
 /// Today's rows of each game, labels, controls and order, from `c212bc50`'s table: Start, then these.
 #[test]
 fn each_sub_screen_has_start_first_then_todays_rows() {
-    let eggs = ["Start", "Eggs-ercise", "Breaks on", "Target", "Target speed", "CPU during a game"];
+    let eggs = ["Start", "Eggs-ercise", "Breaks on", "Target", "Target speed", "Spawn area", "CPU during a game"];
     let btt = ["Start", "Projectiles break targets", "Place targets", "Saved layouts", "CPU during a game"];
     let tech = [
         "Start", "Tech practice", "Tech wizard", "Surface", "Tech point", "Damage", "Damage range", "Launch speed",
@@ -294,6 +294,31 @@ fn an_old_settings_file_loads_without_loss() {
     let m = Menu::new(off, Env::default());
     assert_eq!(m.value(row("Eggs-ercise", table::game_group(Game::Eggs))), RowValue::Choice(Some(0)));
     assert_eq!(crate::model::practice_games::effective(Game::Eggs, 0, Some(Game::Eggs)), 1);
+}
+
+#[test]
+fn spawn_area_round_trips() {
+    let mut settings = Settings::factory();
+    assert_eq!(settings.menu.get("eggsercise_area"), Some(&[1, 0][..]), "In view is the default");
+    settings.menu.set("eggsercise_area", &[0, 1]).unwrap();
+
+    let saved = settings::parse(&settings.to_json());
+    assert!(saved.issues.is_empty(), "{:?}", saved.issues);
+    assert_eq!(saved.settings.menu.get("eggsercise_area"), Some(&[0, 1][..]));
+    let mut snapshot = crate::model::settings::Snapshot::factory();
+    snapshot.set("eggsercise_area", saved.settings.menu.get("eggsercise_area").unwrap()).unwrap();
+    assert_eq!(crate::model::eggs::choices(&snapshot)[4], crate::model::eggs::WHOLE);
+
+    let loaded = settings::parse(&saved.settings.to_json());
+    assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+    assert_eq!(loaded.settings.menu.get("eggsercise_area"), Some(&[0, 1][..]));
+
+    let missing = settings::parse(r#"{"menu":{"eggsercise":[1,0,0,0,0]}}"#);
+    assert!(missing.issues.is_empty(), "{:?}", missing.issues);
+    assert_eq!(missing.settings.menu.get("eggsercise_area"), Some(&[1, 0][..]));
+    let mut snapshot = crate::model::settings::Snapshot::factory();
+    snapshot.set("eggsercise_area", missing.settings.menu.get("eggsercise_area").unwrap()).unwrap();
+    assert_eq!(crate::model::eggs::choices(&snapshot)[4], crate::model::eggs::IN_VIEW);
 }
 
 /// The Parry entry (slot 6): a used saved parry practice sets Parry's mode and asks for Parry's Start at the close (its

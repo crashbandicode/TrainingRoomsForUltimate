@@ -99,7 +99,7 @@ pub fn bounds(range: Option<[f32; 4]>, view: Option<View>, ground: f32) -> [[f32
         Some([l, r, t, _]) => [[l, r], [ground - 10.0, t]],
         None => [[-90.0, 90.0], [ground, ground + 80.0]],
     };
-    if let Some(View(s, o, _)) = view {
+    if let Some(View(s, o, _, _)) = view {
         for (i, r) in b.iter_mut().enumerate() {
             *r = [r[0].max((-CANVAS_HALF[i] - o[i]) / s[i] + RADIUS), r[1].min((CANVAS_HALF[i] - o[i]) / s[i] - RADIUS)];
             r[1] = r[1].max(r[0]);

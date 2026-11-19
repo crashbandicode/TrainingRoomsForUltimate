@@ -275,7 +275,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 144] = [
+pub static ROWS: [Row; 145] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -513,6 +513,8 @@ pub static ROWS: [Row; 144] = [
       "Disc: a target appears. CPU: the CPU is the target.\nThe CPU flies like the disc and is reset after each hit."),
     r(EGGS, "Target speed", "eggsercise_speed", Control::Dropdown(&o::EGGS_SPEED),
       "How fast targets fly. Normal is Melee's Eggs-ercise speed.\nSlow: half speed. Fast: one and a half times as fast."),
+    r(EGGS, "Spawn area", "eggsercise_area", Control::Dropdown(&o::EGGS_AREA),
+      "In view: targets appear on screen, with your camera.\nWhole stage: any stage floor, even off screen. From the next Start."),
     r(EGGS, "CPU during a game", "practice_cpu", Control::Dropdown(&o::PRACTICE_CPU),
       "Hide: the CPU is hidden while a practice game runs.\nAfterwards it's as Hide CPU says. Show: it stays."),
     // Practice games > Break the Targets. Its Off / On row is Start / Stop now; the `btt` key stays in the file.

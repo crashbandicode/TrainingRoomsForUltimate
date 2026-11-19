@@ -47,6 +47,7 @@ pub static EGGSERCISE: [&str; 4] = ["1 minute", "10 targets", "20 targets", FREE
 pub static EGGS_BREAK: [&str; 3] = ["Any attack", "Aerials", "Hits of 12%+"];
 pub static EGGS_SPEED: [&str; 3] = ["Normal", "Slow", "Fast"];
 pub static EGGS_TARGET: [&str; 2] = ["Disc", "CPU"];
+pub static EGGS_AREA: [&str; 2] = ["In view", "Whole stage"];
 pub static PRACTICE_CPU: [&str; 2] = ["Hide", "Show"];
 pub static BTT: [&str; 2] = ["Off", "On"];
 pub static CYCLE_SLOTS: [&str; 6] = ["Off", "1", "2", "3", "4", "5"];

@@ -27,7 +27,7 @@
 //! fighter per frame as the hurt census (`[Hitbox] hurt census`: the parts, the first pass and the read cost).
 //! No allocation: the spheres and the handle sets are fixed storage, the Lua stack and attack data are read in place, and
 //! every entry point counts under a `HookScope`. The pass and the hooks run on the game thread.
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU8, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicU8, AtomicUsize, Ordering};
 
 use hos_lock::Mutex;
 
@@ -84,7 +84,9 @@ pub fn publish(snapshot: &Snapshot) {
     let shown = hitbox::shown(snapshot);
     SHOWN.store(shown, Ordering::Release);
     SETTING.store(legend::draws(shown), Ordering::Release);
-    let rows = u32::from_le_bytes(eggs::choices(snapshot));
+    let mut row_bytes = [0; 8];
+    row_bytes[..5].copy_from_slice(&eggs::choices(snapshot));
+    let rows = u64::from_le_bytes(row_bytes);
     EGG_ROWS.store(rows, Ordering::Release);
     let hide = eggs::choice(snapshot, eggs::ROW_PRACTICE_CPU) == 0;
     PRACTICE_HIDE.store(hide, Ordering::Release);
@@ -99,10 +101,10 @@ pub fn publish(snapshot: &Snapshot) {
 // layout tick for the egg's orb like `BOARD`.
 
 /// The rows (`eggs::choices`, little-endian), as every settings publish leaves them.
-static EGG_ROWS: AtomicU32 = AtomicU32::new(0);
+static EGG_ROWS: AtomicU64 = AtomicU64::new(0);
 /// The rows of the run: latched by every practice game's Start (`practice_started`; rc.15 practice menu: a running
 /// game's settings apply at its next Start). The Eggs-ercise run and the Breaks on rule of both target games read these.
-static EGG_LIVE: AtomicU32 = AtomicU32::new(0);
+static EGG_LIVE: AtomicU64 = AtomicU64::new(0);
 /// CPU during a game: Hide (the first option).
 static PRACTICE_HIDE: AtomicBool = AtomicBool::new(true);
 /// CPU during a game for the running game, latched by its Start.
@@ -159,7 +161,8 @@ pub fn eggs_reset() {
 /// other fighter make no game call.
 unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     let seed = EGG_START.swap(false, Ordering::AcqRel).then(seed);
-    let mut rows = EGG_LIVE.load(Ordering::Acquire).to_le_bytes();
+    let bytes = EGG_LIVE.load(Ordering::Acquire).to_le_bytes();
+    let mut rows = [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4]];
     // rc.15 practice menu: the mode while Eggs-ercise is the running game, Off otherwise.
     rows[0] = practice_games::effective(Game::Eggs, rows[0], super::practice::active());
     // The fighter object's own entry field, as the reset hub reads it: not a game call.
@@ -711,7 +714,10 @@ unsafe fn view() -> Option<eggs::View> {
     let canvas = |p: [f32; 3]| Some(orbs::to_canvas(natives::world_to_screen(&p)?, half));
     let (a, b) = (canvas([0.0; 3])?, canvas([10.0, 10.0, 0.0])?);
     let scale = [(b[0] - a[0]) / 10.0, (b[1] - a[1]) / 10.0];
-    (scale[0] > 0.0 && scale[1] > 0.0).then(|| eggs::View(scale, a, eggs::range(natives::camera_limit_range())))
+    (scale[0] > 0.0 && scale[1] > 0.0).then(|| {
+        let limit = natives::camera_limit_range();
+        eggs::View(scale, a, eggs::range(limit), eggs::vertical(limit))
+    })
 }
 
 /// Show one cap or band picture (`target`, 0 when the layout lacks it) at `at`, `size` (width, height), turned by `rot`.

@@ -279,14 +279,14 @@ fn btt_cursor_clamp() {
     assert_eq!(bounds(None, None, 12.0)[1], [12.0, 92.0], "above the ground");
     // Battlefield in the fixed camera (Eden d2-btt-cam-1): 6.89 x and 6.80 y canvas units a world unit, world (0, 0) at
     // canvas (0, -172.26); its camera range [-170, 170, 130, -80]. On screen: x ±139.3, y -54.1 to 104.7.
-    let view = View([6.89, 6.80], [0.0, -172.26], [-170.0, 170.0]);
+    let view = View([6.89, 6.80], [0.0, -172.26], [-170.0, 170.0], None);
     let range = Some([-170.0, 170.0, 130.0, -80.0]);
     let b = bounds(range, Some(view), 0.0);
     let near = |a: [f32; 2], b: [f32; 2]| (a[0] - b[0]).abs() < 0.1 && (a[1] - b[1]).abs() < 0.1;
     assert!(near(b[0], [-135.3, 135.3]), "the view less a target's radius, inside the range: {:?}", b[0]);
     assert!(near(b[1], [-10.0, 100.7]), "10 under the ground up to the view's top: {:?}", b[1]);
     // A view wider than the range leaves the range.
-    let wide = bounds(Some([-100.0, 100.0, 60.0, -80.0]), Some(View([2.0, 2.0], [0.0, 0.0], [-100.0, 100.0])), 0.0);
+    let wide = bounds(Some([-100.0, 100.0, 60.0, -80.0]), Some(View([2.0, 2.0], [0.0, 0.0], [-100.0, 100.0], None)), 0.0);
     assert_eq!(wide, [[-100.0, 100.0], [-10.0, 60.0]]);
     for (range, view) in [(None, None), (range, Some(view))] {
         let (mut s, b) = (Sim::placing(), bounds(range, view, 0.0));
@@ -304,11 +304,11 @@ fn btt_cursor_clamp() {
 /// lower, so the placing box it gives starts high above the ground (Eden rc14-int3-rr2-f1: the mode took the camera and the
 /// cursor, untouched, went from (-47, 15) to (-40.1, 117.6)).
 fn fixed_view() -> View {
-    View([6.89, 6.80], [0.0, -172.26], [-170.0, 170.0])
+    View([6.89, 6.80], [0.0, -172.26], [-170.0, 170.0], None)
 }
 
 fn moving_view(lift: f32) -> View {
-    View([6.89, 6.80], [0.0, -172.26 - lift], [-170.0, 170.0])
+    View([6.89, 6.80], [0.0, -172.26 - lift], [-170.0, 170.0], None)
 }
 
 /// Placing on Battlefield with the fixed camera settled (three layout ticks of the same view): the cursor's start.
