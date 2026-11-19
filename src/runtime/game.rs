@@ -201,6 +201,14 @@ pub mod natives {
     pub unsafe fn tech_is_damage(accessor: usize) -> Option<bool> {
         Some(at::<extern "C" fn(usize)->bool>(crate::model::sites_tech_launch::IS_DAMAGE_OFFSET)?(accessor))
     }
+    pub unsafe fn tech_in_damage_stop(accessor: usize) -> Option<bool> {
+        let offset = crate::model::sites_tech_surfaces::DAMAGE_STOP_OFFSET;
+        Some(at::<extern "C" fn(usize) -> bool>(offset)?(accessor))
+    }
+    pub unsafe fn tech_passive_ground_touch(accessor: usize, direction: u32) -> Option<bool> {
+        let offset = crate::model::sites_tech_surfaces::PASSIVE_GROUND_OFFSET;
+        Some(at::<extern "C" fn(usize, u32) -> bool>(offset)?(accessor, direction))
+    }
     pub unsafe fn tech_energy(accessor: usize, id: i32) -> Option<usize> {
         Some(at::<extern "C" fn(usize,i32)->usize>(crate::model::sites_tech_launch::GET_ENERGY_OFFSET)?(accessor,id))
     }

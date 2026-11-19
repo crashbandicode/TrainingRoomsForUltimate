@@ -123,8 +123,7 @@ pub(super) unsafe fn passive_floor_touch(accessor: usize) -> Option<bool> {
     {
         return None;
     }
-    let touch: extern "C" fn(usize, u32) -> bool = std::mem::transmute(base + 0x696910);
-    Some(touch(accessor, 8))
+    natives::tech_passive_ground_touch(accessor, 8)
 }
 /// Ephemeral reader: construct per P1 pass and never retain a live accessor.
 /// Construction works while airborne; only initial seed acquisition needs ground.

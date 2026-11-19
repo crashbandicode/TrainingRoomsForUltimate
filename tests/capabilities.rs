@@ -54,6 +54,8 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "tech_adapter::pending_decision", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::confirm_decision", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::decision", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    // The advisory alone requires these extra readers, checked by its own stock flag.
+    Boundary { function: "tech_decision::passive_floor_speed", owner: None, gate: Gate::Flag("MAIN_SPEED_STOCK") },
     Boundary { function: "tech_adapter::place", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::launch", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::restore", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
@@ -632,6 +634,17 @@ fn optional_tech_poison_preserves_existing_features() {
         }.to_string();
         assert!(line.contains(&format!(" tech_practice=not_installed reason=site:{poison} ")), "{line}");
     }
+    for row in &model::sites_tech_surfaces::SPEED_NOTICE_SITES {
+        let usable = |site: &model::sites::Site| site.name != row.name;
+        assert!(!Granted::from_usable(&usable).allows(row.offset));
+        assert!(capabilities::unit_usable(Feature::TechPractice, &usable));
+    }
+    let a = Analysis::new();
+    let init = &a.graph.funcs[a.graph.find("tech_decision::init_passive_speed")[0]];
+    let (notice_offsets, _) = a.reach(a.graph.find("tech_decision::passive_floor_speed")[0]);
+    assert!(notice_offsets.is_subset(&a.own_offsets(init)));
+    let grants = callgraph::lex("].into_iter().all(game::granted)");
+    assert!(init.body.windows(grants.len()).any(|words| words == grants));
 }
 
 #[test]
@@ -733,9 +746,12 @@ fn decision_recorder_runs_after_ownership_release_on_first_contact_only() {
     let state = position("matches!(owned.attempt.state, AttemptState::Stopped | AttemptState::Flying");
     let record = position("owned.attempt.record_contact(contact)");
     let released = position("drop(slot)");
-    let retained = position("owned.decision.capture_first(super::tech_decision::snapshot(accessor, owned.attempt.id, contact");
+    let snapshot = position("let mut snapshot = super::tech_decision::snapshot(accessor, owned.attempt.id, contact");
+    let speed = position("snapshot.passive_speed = super::tech_decision::passive_floor_speed(accessor, snapshot)");
+    let retained = position("owned.decision.capture_first(snapshot)");
     let deliver = position("deliver_decision()");
-    assert!(state < record && record < retained && retained < released && released < deliver);
+    assert!(state < record && record < snapshot && snapshot < speed && speed < retained
+        && retained < released && released < deliver);
     let delivery = &a.graph.funcs[a.graph.find("tech_adapter::deliver_decision")[0]].body;
     let at = |snippet: &str| {
         let wanted = callgraph::lex(snippet);
@@ -832,8 +848,9 @@ fn native_confirmation_is_after_original_and_retried_on_owned_frame() {
         body.windows(wanted.len()).position(|w| w == wanted.as_slice())
             .unwrap_or_else(|| panic!("missing native confirmation invariant: {snippet}"))
     };
-    let hook = body("cpu_common::change_status_hook");
-    assert!(at(hook, "tech_adapter::decision(accessor, requested, passive)") < at(hook, "original(fighter, status, unk)"));
+    at(body("cpu_common::change_status_hook"), r#""b {body}", body = sym change_status_body"#);
+    let hook = body("cpu_common::change_status_body");
+    assert!(at(hook, "tech_adapter::decision(accessor, requested, passive, native_frame, native_return)") < at(hook, "original(fighter, status, unk)"));
     assert!(at(hook, "original(fighter, status, unk)") < at(hook, "tech_adapter::confirm_decision(accessor, attempt)"));
     let confirm = body("tech_adapter::confirm_decision");
     assert!(at(confirm, "owned.attempt.id != attempt") < at(confirm, "current(*owned)"));

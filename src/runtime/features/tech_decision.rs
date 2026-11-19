@@ -3,7 +3,10 @@ use super::tech_native;
 use crate::model::cpu::hash::hash40;
 use crate::model::tech::session::{timed_guard_would_pass, PASSIVE_SPEED_LIMIT};
 use crate::model::tech_launch::{ContactReceipt, DecisionSnapshot};
-use crate::model::{sites_pkg2 as p2, sites_pkg3 as p3, sites_tech_launch as sites};
+use crate::model::{
+    sites_pkg2 as p2, sites_pkg3 as p3, sites_tech_launch as sites,
+    sites_tech_surfaces::{DAMAGE_STOP_OFFSET, PASSIVE_GROUND_OFFSET},
+};
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::{
     game::{self, natives},
@@ -15,7 +18,6 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 mod speed_guards;
 
 const SPEED_GETTER: usize = 0x6d8cc0;
-const IS_DAMAGE_STOP: usize = 0x20ad720;
 static MAIN_SPEED_STOCK: AtomicBool = AtomicBool::new(false);
 static COMMON_SPEED_BASE: AtomicUsize = AtomicUsize::new(0);
 
@@ -32,8 +34,19 @@ unsafe fn stock(base: usize, offset: usize, words: &[u32]) -> bool {
 pub(super) unsafe fn init_passive_speed() {
     let base = game::text_base();
     let verified = base != 0
+        && [
+            DAMAGE_STOP_OFFSET,
+            PASSIVE_GROUND_OFFSET,
+            p2::WORK_IS_FLAG_OFFSET,
+            p2::WORK_GET_PARAM_FLOAT_OFFSET,
+            p2::SITUATION_KIND_OFFSET,
+            p2::TRANSITION_TERM_HOOK_OFFSET,
+            sites::GET_ENERGY_OFFSET,
+            sites::SPEED_X_OFFSET,
+            sites::SPEED_Y_OFFSET,
+        ].into_iter().all(game::granted)
         && stock(base, SPEED_GETTER, speed_guards::DAMAGE_ENERGY_GETTER)
-        && stock(base, IS_DAMAGE_STOP, speed_guards::DAMAGE_STOP)
+        && stock(base, DAMAGE_STOP_OFFSET, speed_guards::DAMAGE_STOP)
         && stock(base, 0x696950, speed_guards::PASSIVE_FLOOR_TAIL)
         && stock(base, 0x4635b0, speed_guards::GROUND_IS_TOUCH)
         && stock(base, 0x22779b0, speed_guards::NATIVE_LENGTH);
@@ -95,15 +108,9 @@ fn passive_length(x: f32, y: f32) -> f32 {
 /// The guarded ordinary DamageFly floor route reads the same energy at the
 /// passive check and pre-status seam, before DOWN or REFLECT_D mutates it.
 pub(super) unsafe fn passive_floor_speed(accessor: usize, s: DecisionSnapshot) -> Option<f32> {
-    if s.contact.passive_enabled || s.source_status != Some(0x49)
+    if !MAIN_SPEED_STOCK.load(Ordering::Acquire)
+        || s.contact.passive_enabled || s.source_status != Some(0x49)
         || !timed_guard_would_pass(s)
-        || !MAIN_SPEED_STOCK.load(Ordering::Acquire)
-        || ![
-            p2::WORK_IS_FLAG_OFFSET,
-            p2::WORK_GET_PARAM_FLOAT_OFFSET,
-            p2::SITUATION_KIND_OFFSET,
-            p2::TRANSITION_TERM_HOOK_OFFSET,
-        ].into_iter().all(game::granted)
     {
         return None;
     }
@@ -116,9 +123,9 @@ pub(super) unsafe fn passive_floor_speed(accessor: usize, s: DecisionSnapshot) -
     {
         return None;
     }
-    let base = game::text_base();
-    let stopped: extern "C" fn(usize) -> bool = std::mem::transmute(base + IS_DAMAGE_STOP);
-    if stopped(accessor) || super::tech_surfaces::passive_floor_touch(accessor) != Some(true) {
+    if natives::tech_in_damage_stop(accessor) != Some(false)
+        || super::tech_surfaces::passive_floor_touch(accessor) != Some(true)
+    {
         return None;
     }
     // Both axis exports dispatch slot +0x20, like stock get_speed_length.
@@ -128,7 +135,7 @@ pub(super) unsafe fn passive_floor_speed(accessor: usize, s: DecisionSnapshot) -
         return None;
     }
     let vptr = (energy as *const usize).read();
-    if !pointer(vptr) || ((vptr + 0x20) as *const usize).read() != base + SPEED_GETTER {
+    if !pointer(vptr) || ((vptr + 0x20) as *const usize).read() != game::text_base() + SPEED_GETTER {
         return None;
     }
     let (x, y) = natives::tech_speed(energy)?;

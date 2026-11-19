@@ -62,6 +62,7 @@ pub fn all_sites() -> impl Iterator<Item = &'static Site> {
         .chain(super::sites_tech_launch::SITES.iter())
         .chain(super::sites_tech_hitlag::SITES.iter())
         .chain(super::sites_tech_surfaces::SITES.iter())
+        .chain(super::sites_tech_surfaces::SPEED_NOTICE_SITES.iter())
         .chain(super::sites_lockon::CALLEES.iter())
 }
 
@@ -189,7 +190,10 @@ fn cross_needs(unit: Feature) -> &'static [&'static str] {
 /// `CROSS_NEEDS`.
 pub fn blocked_by(unit: Feature, usable: &dyn Fn(&Site) -> bool) -> Option<&'static str> {
     let own = all_sites().find(|s| {
-        unit_of_row(s) == unit && !super::sites_mashout::move_specific(s) && !usable(s)
+        unit_of_row(s) == unit
+            && !super::sites_mashout::move_specific(s)
+            && !super::sites_tech_surfaces::SPEED_NOTICE_SITES.iter().any(|row| row.name == s.name)
+            && !usable(s)
     });
     if let Some(site) = own {
         return Some(site.name);
