@@ -5,7 +5,10 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::engine::stages::catalog::{grid_display_index, grid_stage_index};
 use crate::engine::stages::lobby_stages::{LobbyStageOrder, STAGES};
+#[cfg(test)]
+use crate::engine::stages::catalog::GRID_ORDER;
 
 /// The native stage kind every custom stage loads as (`SP_Edit`, row 325 of the 13.0.5 stage table).
 pub const CUSTOM_STAGE_KIND: u32 = 325;
@@ -28,10 +31,10 @@ pub enum StageRef {
     Custom(u32),
 }
 
-/// What grid tile `tile` shows: tile 0 is All (`None`), tiles 1..=117 the catalog, then one tile per custom stage.
+/// What grid tile `tile` shows: tile 0 is All (`None`), the catalog in `GRID_ORDER`, then one tile per custom stage.
 pub fn tile_ref(tile: usize, customs: &[CustomStage]) -> Option<StageRef> {
     let index = tile.checked_sub(1)?;
-    if let Some((id, _)) = STAGES.get(index) {
+    if let Some((id, _)) = grid_stage_index(index).and_then(|index| STAGES.get(index)) {
         return Some(StageRef::Catalog(*id));
     }
     customs.get(index - STAGES.len()).map(|stage| StageRef::Custom(stage.id))
@@ -40,7 +43,8 @@ pub fn tile_ref(tile: usize, customs: &[CustomStage]) -> Option<StageRef> {
 /// The grid tile of a stage (the inverse of `tile_ref`); `None` for a custom stage the save no longer holds.
 pub fn tile_of(stage: StageRef, customs: &[CustomStage]) -> Option<usize> {
     match stage {
-        StageRef::Catalog(id) => STAGES.iter().position(|(s, _)| *s == id).map(|i| i + 1),
+        StageRef::Catalog(id) => STAGES.iter().position(|(s, _)| *s == id)
+            .and_then(grid_display_index).map(|i| i + 1),
         StageRef::Custom(id) => customs.iter().position(|s| s.id == id).map(|i| STAGES.len() + 1 + i),
     }
 }
@@ -691,8 +695,14 @@ mod tests {
         let customs = three();
         assert_eq!(tile_count(&customs), 1 + STAGES.len() + 3, "3 custom stages are 3 more tiles");
         assert_eq!(tile_ref(0, &customs), None, "tile 0 is All");
-        assert_eq!(tile_ref(1, &customs), Some(StageRef::Catalog(STAGES[0].0)));
-        assert_eq!(tile_ref(STAGES.len(), &customs), Some(StageRef::Catalog(STAGES[STAGES.len() - 1].0)));
+        assert_eq!(tile_ref(1, &customs), Some(StageRef::Catalog(STAGES[GRID_ORDER[0]].0)));
+        assert_eq!(tile_ref(2, &customs), Some(StageRef::Catalog(STAGES[GRID_ORDER[1]].0)));
+        assert_eq!(tile_ref(STAGES.len(), &customs), Some(StageRef::Catalog(STAGES[GRID_ORDER[STAGES.len() - 1]].0)));
+        for (display, storage) in GRID_ORDER.iter().enumerate() {
+            let stage = STAGES[*storage].0;
+            assert_eq!(tile_ref(display + 1, &customs), Some(StageRef::Catalog(stage)));
+            assert_eq!(tile_of(StageRef::Catalog(stage), &customs), Some(display + 1));
+        }
         for (i, s) in customs.iter().enumerate() {
             let tile = STAGES.len() + 1 + i;
             assert_eq!(tile_ref(tile, &customs), Some(StageRef::Custom(s.id)), "custom {i} at the end, in the save's order");

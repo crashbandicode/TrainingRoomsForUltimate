@@ -640,6 +640,7 @@ mod tests {
 
     fn training_tile_follows_the_waiting_room() {
         fn stage(index: usize) -> &'static str {
+            let Some(index) = crate::engine::stages::catalog::grid_stage_index(index) else { return "-" };
             crate::engine::stages::catalog::STAGES.get(index).map_or("-", |(_, label)| *label)
         }
 
@@ -648,6 +649,7 @@ mod tests {
         let mut expected: Vec<_> = (0..stages.len()).collect();
         let training = expected.remove(training);
         expected.insert(1, training);
+        assert_eq!(crate::engine::stages::catalog::GRID_ORDER.iter().copied().collect::<Vec<_>>(), expected);
 
         let mut all = Text::<28>::new();
         tile_label(GridKind::Stages, 0, false, stage, &mut all);

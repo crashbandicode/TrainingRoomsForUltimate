@@ -16,6 +16,9 @@ use core::fmt::Write;
 
 use serde_json::Value;
 
+use crate::engine::stages::catalog::grid_stage_index;
+#[cfg(test)]
+use crate::engine::stages::catalog::grid_display_index;
 use crate::engine::stages::custom_stages::{tile_ref, CustomStage, StageOrder, StageRef};
 use crate::engine::stages::lobby_stages::{native_forms, LobbyStageOrder, STAGES};
 use crate::engine::stages::stage_forms::{Form, Selection};
@@ -101,9 +104,9 @@ impl StageEditor {
         self.customs.iter().find(|s| s.id == id).map_or("", |s| s.name.as_str())
     }
 
-    /// The catalog index of grid tile `tile` (tile 0 is All).
+    /// The stable catalog index of grid tile `tile` (tile 0 is All).
     fn stage_of(tile: usize) -> Option<usize> {
-        tile.checked_sub(1).filter(|i| *i < STAGES.len())
+        tile.checked_sub(1).and_then(grid_stage_index)
     }
 
     fn form_of(&self, index: usize) -> Form {
@@ -302,6 +305,10 @@ mod tests {
         STAGES.iter().position(|(id, _)| *id == stage).unwrap()
     }
 
+    fn tile_of(stage: u32) -> usize {
+        grid_display_index(index_of(stage)).unwrap() + 1
+    }
+
     fn saved_stage_selections_keep_their_stages() {
         let mut legacy = vec![0u8; STAGES.len() + 1];
         legacy[1] = 1;
@@ -317,23 +324,38 @@ mod tests {
         assert_eq!(editor.change(2, Button::A), Effect::Request(Selection { stage: 308, form: Form::Normal }));
         assert_eq!(editor.order_value(), legacy, "the legacy catalog ranks do not move");
         assert_eq!(editor.stage_order_value(), modern, "the persisted stage IDs do not move");
+
+        let mut lobby = StageEditor::read_with(Some(&modern), Some(&legacy), None, None);
+        assert_eq!(lobby.press(2, Button::A), Effect::Changed);
+        assert_eq!(
+            lobby.stage_order_value()["entries"],
+            serde_json::json!([{"stage": 311}, {"stage": 3}, {"stage": 308}]),
+            "the Lobby Stages tile selects Training without changing the saved IDs"
+        );
+        let ranks: Vec<u64> = serde_json::from_value(lobby.order_value()).unwrap();
+        assert_eq!(
+            (ranks[0], ranks[index_of(311) + 1], ranks[index_of(3) + 1], ranks[index_of(308) + 1]),
+            (0, 1, 2, 3),
+            "legacy ranks remain indexed by stable STAGES positions"
+        );
     }
 
     fn y_cycles_only_the_forms_the_game_has_and_direct_requests_the_stage_with_its_form() {
         let mut e = StageEditor::read(None, None);
         let battlefield = index_of(0);
+        let battlefield_tile = tile_of(0);
         // Battlefield has Normal and Omega only (native_forms(0) = [0, 1, None]).
-        assert_eq!(e.press(battlefield + 1, Button::Y), Effect::Changed);
+        assert_eq!(e.press(battlefield_tile, Button::Y), Effect::Changed);
         assert_eq!(e.form_of(battlefield), Form::Omega);
-        e.press(battlefield + 1, Button::Y);
+        e.press(battlefield_tile, Button::Y);
         assert_eq!(e.form_of(battlefield), Form::Normal);
         // A single-form stage keeps Normal.
         let single = (0..STAGES.len()).find(|i| native_forms(STAGES[*i].0).iter().filter(|f| f.is_some()).count() == 1).unwrap();
-        assert_eq!(e.press(single + 1, Button::Y), Effect::Nothing);
+        assert_eq!(e.press(tile_of(STAGES[single].0), Button::Y), Effect::Nothing);
         assert_eq!(e.press(0, Button::X), Effect::Changed);
         assert_eq!(e.mode(), Mode::Direct);
-        e.press(battlefield + 1, Button::Y);
-        assert_eq!(e.press(battlefield + 1, Button::A), Effect::Request(Selection { stage: 0, form: Form::Omega }));
+        e.press(battlefield_tile, Button::Y);
+        assert_eq!(e.press(battlefield_tile, Button::A), Effect::Request(Selection { stage: 0, form: Form::Omega }));
         assert_eq!((e.preferences.direct_stage, e.preferences.direct_form), (0, Form::Omega));
         let prefs: Preferences = serde_json::from_value(e.preferences_value()).unwrap();
         assert_eq!(prefs.mode, Mode::Direct);
@@ -343,7 +365,7 @@ mod tests {
     fn change_stage_goes_to_the_stage_with_the_form_y_picked_and_keeps_the_rotation() {
         let mut e = StageEditor::read(None, None);
         let before = e.order_value();
-        let battlefield = index_of(0) + 1;
+        let battlefield = tile_of(0);
         assert_eq!(e.change(battlefield, Button::A), Effect::Request(Selection { stage: 0, form: Form::Normal }));
         assert_eq!(e.change(battlefield, Button::Y), Effect::Changed, "Y first picks the form");
         assert_eq!(e.change(battlefield, Button::A), Effect::Request(Selection { stage: 0, form: Form::Omega }));
@@ -357,13 +379,13 @@ mod tests {
 
     fn change_stage_tiles_show_the_form_tag_and_the_footer_shows_the_controls() {
         let mut e = StageEditor::read(None, None);
-        let battlefield = index_of(0) + 1;
+        let battlefield = tile_of(0);
         e.change(battlefield, Button::Y);
         let mut f = Frame::new();
         f.tile_count = 2;
         f.tile_n[0] = battlefield as u16;
-        f.tile_n[1] = (index_of(0) + 2) as u16;
-        let _ = f.tiles[0].write_str(STAGES[battlefield - 1].1);
+        f.tile_n[1] = (battlefield + 1) as u16;
+        let _ = f.tiles[0].write_str(STAGES[crate::engine::stages::catalog::GRID_ORDER[battlefield - 1]].1);
         e.decorate_change(&mut f, battlefield);
         assert!(f.tiles[0].string_lossy().ends_with(" [Ω]"), "{:?}", f.tiles[0]);
         assert!(f.hint.string_lossy().starts_with("Form: Omega   A change stage   Y form"), "{:?}", f.hint);
@@ -377,7 +399,7 @@ mod tests {
         f.tile_count = 5;
         for i in 0..5 {
             f.tile_n[i] = i as u16;
-            let _ = f.tiles[i].write_str(if i == 0 { "All" } else { STAGES[i - 1].1 });
+            let _ = f.tiles[i].write_str(if i == 0 { "All" } else { STAGES[crate::engine::stages::catalog::GRID_ORDER[i - 1]].1 });
         }
         e.decorate(&mut f, 1);
         assert_eq!(f.tiles[0].string_lossy(), "All");
@@ -439,7 +461,7 @@ mod tests {
         assert_eq!(e.change(first + 2, Button::A), Effect::RequestCustom(40));
         assert_eq!(e.change(first + 2, Button::Y), Effect::Nothing);
         assert_eq!(e.change(first + 3, Button::A), Effect::Nothing, "past the last custom stage");
-        assert_eq!(e.change(index_of(0) + 1, Button::A), Effect::Request(Selection { stage: 0, form: Form::Normal }));
+        assert_eq!(e.change(tile_of(0), Button::A), Effect::Request(Selection { stage: 0, form: Form::Normal }));
         let mut f = Frame::new();
         f.tile_count = 1;
         f.tile_n[0] = (first + 2) as u16;
