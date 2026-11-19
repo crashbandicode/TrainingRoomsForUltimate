@@ -7,6 +7,7 @@ use super::hitbox::{Sphere, KIND_HIT, SCALE};
 use super::hitbox_orbs::CANVAS_HALF;
 use super::panes::{EggLook, EggPicture, EGG_WHOLE};
 use super::scene::{scene, Facts};
+use super::spacing;
 
 pub const ROW: &str = "eggsercise";
 pub const ROW_BREAK: &str = "eggsercise_break";
@@ -198,22 +199,25 @@ pub(crate) fn counts(rule: u8, aerial: bool, power: f32) -> bool {
 
 /// Whether `hit` breaks the egg at `egg` (the fighters' plane): `rule` lets it count and the pill overlaps the egg.
 pub fn breaks(rule: u8, aerial: bool, hit: &Hit, egg: [f32; 2]) -> bool {
-    let Hit(a, b, radius, power) = *hit;
-    let counts = counts(rule, aerial, power);
-    let (dx, dy, px, py) = (b[0] - a[0], b[1] - a[1], egg[0] - a[0], egg[1] - a[1]);
-    // A point hitbox: 0 / epsilon is 0.
-    let t = ((px * dx + py * dy) / (dx * dx + dy * dy).max(1e-9)).clamp(0.0, 1.0);
-    counts && (px - t * dx).hypot(py - t * dy) <= radius + RADIUS
+    counts(rule, aerial, hit.3) && depth(hit, egg).is_some()
 }
 
 /// The hit's depth into the target disc, using the same pill-to-centre distance as `breaks`.
-pub fn depth(_hit: &Hit, _egg: [f32; 2]) -> Option<f32> {
-    None
+pub fn depth(hit: &Hit, egg: [f32; 2]) -> Option<f32> {
+    let Hit(a, b, radius, _) = *hit;
+    let (dx, dy, px, py) = (b[0] - a[0], b[1] - a[1], egg[0] - a[0], egg[1] - a[1]);
+    // A point hitbox: 0 / epsilon is 0.
+    let t = ((px * dx + py * dy) / (dx * dx + dy * dy).max(1e-9)).clamp(0.0, 1.0);
+    let d = (px - t * dx).hypot(py - t * dy);
+    spacing::depth(radius + RADIUS - d, RADIUS)
 }
 
 /// The deepest hit that counts under `rule` and overlaps the target.
-pub fn deepest(_rule: u8, _aerial: bool, _hits: &[Hit], _egg: [f32; 2]) -> Option<f32> {
-    None
+pub fn deepest(rule: u8, aerial: bool, hits: &[Hit], egg: [f32; 2]) -> Option<f32> {
+    hits.iter()
+        .filter(|hit| counts(rule, aerial, hit.3))
+        .filter_map(|hit| depth(hit, egg))
+        .reduce(f32::max)
 }
 
 /// The pills of a fighter's live attack spheres (`hitbox::want_hitboxes`), each end placed by `place`, a capsule's two ends

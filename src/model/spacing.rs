@@ -8,8 +8,14 @@ pub enum Grade {
 }
 
 impl Grade {
-    pub fn of(_depth: f32) -> Grade {
-        Grade::Ok
+    pub fn of(depth: f32) -> Grade {
+        if depth < 1.0 / 3.0 {
+            Grade::Excellent
+        } else if depth < 2.0 / 3.0 {
+            Grade::Good
+        } else {
+            Grade::Ok
+        }
     }
 
     pub const fn name(self) -> &'static str {
@@ -29,16 +35,28 @@ impl Grade {
     }
 }
 
-pub fn depth(_pen: f32, _radius: f32) -> Option<f32> {
-    None
+pub fn depth(pen: f32, radius: f32) -> Option<f32> {
+    if !pen.is_finite() || !radius.is_finite() || pen < 0.0 || radius <= 0.0 {
+        None
+    } else {
+        Some(pen.min(radius) / radius)
+    }
 }
 
-pub fn grade(_pen: f32, _radius: f32) -> Option<Grade> {
-    None
+pub fn grade(pen: f32, radius: f32) -> Option<Grade> {
+    depth(pen, radius).map(Grade::of)
 }
 
-pub fn native(_record_p: [f32; 3], _shape_p: [f32; 3], _pen: f32, _radius: f32) -> Option<Grade> {
-    None
+pub fn native(record_p: [f32; 3], shape_p: [f32; 3], pen: f32, radius: f32) -> Option<Grade> {
+    let same_contact = record_p
+        .iter()
+        .zip(shape_p.iter())
+        .all(|(record, shape)| record.to_bits() == shape.to_bits());
+    if same_contact {
+        grade(pen, radius)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
