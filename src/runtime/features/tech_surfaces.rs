@@ -10,6 +10,9 @@ use crate::runtime::game::{self, natives};
 use std::sync::OnceLock;
 static VERIFIED: OnceLock<bool> = OnceLock::new();
 static MATERIAL_VERIFIED: OnceLock<bool> = OnceLock::new();
+static PASSIVE_TABLES: OnceLock<[Option<usize>; 2]> = OnceLock::new();
+const GROUND_TABLES: [usize; 2] = [0x4f87560, 0x4f6d8b0];
+const GROUND_GEOMETRY: [(usize, usize); 2] = [(0x4d8, 0x463c40), (0x668, 0x4658b0)];
 
 #[repr(C, align(16))]
 struct NativePoint([f32; 4]);
@@ -73,8 +76,8 @@ pub(super) unsafe fn init() -> bool {
             ));
             good &= outcome.usable();
         }
-        if good {
-            MATERIAL_VERIFIED.get_or_init(|| {
+        if good
+            && *MATERIAL_VERIFIED.get_or_init(|| {
                 guards::MATERIAL.iter().all(|&(name, offset, expected)| {
                     let actual = ((base + offset) as *const [u8; 64]).read_unaligned();
                     let outcome = guard_outcome(&expected, &actual, SeamKind::Relied);
@@ -82,6 +85,15 @@ pub(super) unsafe fn init() -> bool {
                         "[TechPractice] material_guard site={name} outcome={outcome:?}"
                     ));
                     outcome == GuardOutcome::Stock
+                })
+            })
+        {
+            PASSIVE_TABLES.get_or_init(|| {
+                GROUND_TABLES.map(|offset| {
+                    let vptr = base + offset;
+                    (ground_slots(base, vptr, &GROUND_GEOMETRY)
+                        && ground_slots(base, vptr, &[(0x4a0, 0x4635b0), (0x478, 0x4628c0)]))
+                    .then_some(vptr)
                 })
             });
         }
@@ -102,28 +114,33 @@ unsafe fn point(line: usize, end: usize) -> Option<Vec2> {
 }
 
 /// The reviewed real GroundModule tables share these exact slot implementations.
+unsafe fn ground_slots(base: usize, vptr: usize, slots: &[(usize, usize)]) -> bool {
+    slots
+        .iter()
+        .all(|&(slot, target)| pointer(vptr + slot) == Some(base + target))
+}
+
 unsafe fn ground_contract(accessor: usize) -> Option<usize> {
     let base = game::text_base();
     let vptr = pointer(pointer(accessor + 0x58)?)?;
-    ([base + 0x4f87560, base + 0x4f6d8b0].contains(&vptr)
-        && pointer(vptr + 0x4d8) == Some(base + 0x463c40)
-        && pointer(vptr + 0x668) == Some(base + 0x4658b0))
-    .then_some(vptr)
+    (GROUND_TABLES.contains(&vptr.wrapping_sub(base)) && ground_slots(base, vptr, &GROUND_GEOMETRY))
+        .then_some(vptr)
 }
 
 /// Stock floor-touch eligibility includes the contact line's material.
+/// Caller has revalidated the live owned fighter on this game-thread pass.
 pub(super) unsafe fn passive_floor_touch(accessor: usize) -> Option<bool> {
-    if !MATERIAL_VERIFIED.get().copied().unwrap_or(false) {
+    let tables = PASSIVE_TABLES.get()?;
+    let module = ((accessor + 0x58) as *const usize).read();
+    if module < 0x10000 || module & 7 != 0 || module >> 47 != 0 {
         return None;
     }
-    let base = game::text_base();
-    let vptr = ground_contract(accessor)?;
-    if pointer(vptr + 0x4a0) != Some(base + 0x4635b0)
-        || pointer(vptr + 0x478) != Some(base + 0x4628c0)
-    {
-        return None;
+    let vptr = (module as *const usize).read();
+    if tables.contains(&Some(vptr)) {
+        natives::tech_passive_ground_touch(accessor, 8)
+    } else {
+        None
     }
-    natives::tech_passive_ground_touch(accessor, 8)
 }
 /// Ephemeral reader: construct per P1 pass and never retain a live accessor.
 /// Construction works while airborne; only initial seed acquisition needs ground.

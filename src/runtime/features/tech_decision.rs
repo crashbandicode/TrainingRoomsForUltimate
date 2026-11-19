@@ -1,6 +1,7 @@
 //! Read-only exact-decision snapshot. No calibration or grading policy lives here.
 use super::tech_native;
 use crate::model::cpu::hash::hash40;
+use crate::model::sha256::Sha256;
 use crate::model::tech::session::{timed_guard_would_pass, PASSIVE_SPEED_LIMIT};
 use crate::model::tech_launch::{ContactReceipt, DecisionSnapshot};
 use crate::model::{
@@ -21,13 +22,17 @@ const SPEED_GETTER: usize = 0x6d8cc0;
 static MAIN_SPEED_STOCK: AtomicBool = AtomicBool::new(false);
 static COMMON_SPEED_BASE: AtomicUsize = AtomicUsize::new(0);
 
-unsafe fn stock(base: usize, offset: usize, words: &[u32]) -> bool {
-    let actual = std::slice::from_raw_parts((base + offset) as *const u32, words.len());
-    let verified = actual == words;
-    if !verified {
-        diagnostic(format_args!("[TechPractice] speed_guard mismatch offset={offset:#x}"));
-    }
-    verified
+unsafe fn stock(base: usize, windows: &[speed_guards::Window]) -> bool {
+    windows.iter().all(|&(offset, len, expected)| {
+        let bytes = std::slice::from_raw_parts((base + offset) as *const u8, len);
+        let mut digest = Sha256::new();
+        digest.update(bytes);
+        let verified = digest.finish() == expected;
+        if !verified {
+            diagnostic(format_args!("[TechPractice] speed_guard mismatch offset={offset:#x}"));
+        }
+        verified
+    })
 }
 
 /// Non-hook initialization. Optional windows can disable only the extra notice.
@@ -45,21 +50,14 @@ pub(super) unsafe fn init_passive_speed() {
             sites::SPEED_X_OFFSET,
             sites::SPEED_Y_OFFSET,
         ].into_iter().all(game::granted)
-        && stock(base, SPEED_GETTER, speed_guards::DAMAGE_ENERGY_GETTER)
-        && stock(base, DAMAGE_STOP_OFFSET, speed_guards::DAMAGE_STOP)
-        && stock(base, 0x696950, speed_guards::PASSIVE_FLOOR_TAIL)
-        && stock(base, 0x4635b0, speed_guards::GROUND_IS_TOUCH)
-        && stock(base, 0x22779b0, speed_guards::NATIVE_LENGTH);
+        && stock(base, speed_guards::MAIN);
     MAIN_SPEED_STOCK.store(verified, Ordering::Release);
 }
 
 /// The existing loader verified the first 64 bytes of is_enable_passive.
 pub(super) unsafe fn verify_passive_speed_rule(address: usize) {
     let base = address - 0xed2a0;
-    let verified = stock(base, 0xed2e0, speed_guards::PASSIVE_SPEED_RULE)
-        && stock(base, 0xfd630, speed_guards::FLOOR_DECISION)
-        && stock(base, 0xfd8a0, speed_guards::FLOOR_PASSIVE_PREDICATE)
-        && stock(base, 0xfb4d0, speed_guards::FLOOR_REFLECT);
+    let verified = stock(base, speed_guards::COMMON);
     COMMON_SPEED_BASE.store(if verified { base } else { 0 }, Ordering::Release);
 }
 
@@ -107,6 +105,7 @@ fn passive_length(x: f32, y: f32) -> f32 {
 
 /// The guarded ordinary DamageFly floor route reads the same energy at the
 /// passive check and pre-status seam, before DOWN or REFLECT_D mutates it.
+/// The caller has revalidated the live owned fighter on this game-thread pass.
 pub(super) unsafe fn passive_floor_speed(accessor: usize, s: DecisionSnapshot) -> Option<f32> {
     if !MAIN_SPEED_STOCK.load(Ordering::Acquire)
         || s.contact.passive_enabled || s.source_status != Some(0x49)
