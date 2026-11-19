@@ -1,5 +1,16 @@
 //! Tracks the native item for each live target. The practice games own scoring.
 
+/// Address of the next 32-bit slot ID, if the game's free stack has an entry.
+pub fn free_slot_top([begin, end, capacity]: [usize; 3]) -> Option<usize> {
+    (begin != 0 && (begin | end | capacity) & 3 == 0 && begin < end && end <= capacity)
+        .then(|| end - 4)
+}
+
+/// Advance the consumed damage baseline even when the caller rejects the hit.
+pub fn take_damage(previous: &mut f32, current: f32) -> bool {
+    current.is_finite() && current > core::mem::replace(previous, current)
+}
+
 #[derive(Clone, Copy)]
 pub struct Target {
     pub key: u64,
@@ -36,6 +47,14 @@ impl<T: Copy, const N: usize> Tracker<T, N> {
 
     pub fn is_empty(&self) -> bool {
         self.items.iter().all(Option::is_none)
+    }
+
+    pub fn item_mut(&mut self, scene: u32, slot: usize, key: u64) -> Option<&mut T> {
+        if scene != self.scene {
+            return None;
+        }
+        let item = self.items.get_mut(slot)?.as_mut().filter(|item| item.key == key)?;
+        Some(&mut item.item)
     }
 
     pub fn update(

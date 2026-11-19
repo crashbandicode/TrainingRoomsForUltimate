@@ -113,9 +113,13 @@ static RUN: Mutex<eggs::Run> = Mutex::new(eggs::Run::IDLE);
 static EGG_RUNNING: AtomicBool = AtomicBool::new(false);
 static EGG_GENERATION: AtomicU32 = AtomicU32::new(0);
 
+fn lockon_key(score: u32) -> u64 {
+    (u64::from(EGG_GENERATION.load(Ordering::Relaxed)) << 32) | u64::from(score)
+}
+
 pub(crate) fn lockon_egg() -> Option<Option<crate::model::lockon::Target>> {
     let run = RUN.try_lock()?;
-    let key = (u64::from(EGG_GENERATION.load(Ordering::Relaxed)) << 32) | u64::from(run.score);
+    let key = lockon_key(run.score);
     let egg = run.egg_at().filter(|_| run.running() && !run.cpu_target());
     Some(egg.map(|at| crate::model::lockon::Target { key, at }))
 }
@@ -211,7 +215,10 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     run.sense([top[0], top[1]]);
     // rc.15: Player 1's articles break the target too, as `Breaks on` allows (docs/DECISIONS.md).
     let rule = run.rule();
-    let length = run.step_with(tick, top[1], hits, |egg| super::btt_projectiles::hit(at, egg, rule, aerial, true), aerial, kind);
+    let length = run.step_with(tick, top[1], hits, |egg| {
+        super::lockon::hit(at, 0, lockon_key(score), rule, aerial, true).is_some()
+            || super::btt_projectiles::hit(at, egg, rule, aerial, true)
+    }, aerial, kind);
     // V2.1: the fighter whose attack broke it (Ice Climbers: that climber) freezes, as on a hit; an article's break does not.
     let broke = run.score > score && run.melee();
     if let Some(frames) = broke.then(scene::facts).and_then(eggs::hitlag) {

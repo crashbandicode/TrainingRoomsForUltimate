@@ -7,12 +7,12 @@ use smash::lib::lua_const::*;
 use smash::phx::Vector3f;
 
 use crate::model::{
-    btt,
-    lockon::{ItemHost, Target, Tracker},
+    btt, eggs, hitbox,
+    lockon::{free_slot_top, take_damage, ItemHost, Target, Tracker},
     lra_reset,
     practice_games::Game,
-    sites_lockon::CALLEES,
-    sites_pkg3,
+    sites_lockon::{CALLEES, ITEM_FACTORY_OFFSET, OBJECT_POOLS_SLOT},
+    sites_hitbox, sites_pkg2, sites_pkg3,
 };
 use crate::runtime::{
     compat::common, compat::consts::FighterId, game, scene, state_natives as native,
@@ -28,6 +28,16 @@ static USABLE: AtomicBool = AtomicBool::new(false);
 struct Handle {
     id: u32,
     accessor: *mut Accessor,
+    damage: f32,
+}
+
+impl Handle {
+    unsafe fn live(self) -> bool {
+        sv_battle_object::is_active(self.id)
+            && sv_battle_object::module_accessor(self.id) == self.accessor
+            && app::utility::get_category(&mut *self.accessor) == *BATTLE_OBJECT_CATEGORY_ITEM
+            && app::utility::get_kind(&mut *self.accessor) == *ITEM_KIND_SANDBAG
+    }
 }
 
 struct GameItems(RefCell<Tracker<Handle, COUNT>>);
@@ -37,8 +47,14 @@ unsafe impl Sync for GameItems {}
 static LIVE: GameItems = GameItems(RefCell::new(Tracker::new()));
 
 pub fn init_practice_items() {
-    let mut usable = game::granted(sites_pkg3::STATE_ITEM_OBJECT_ID_OFFSET)
-        && game::granted(sites_pkg3::STATE_ITEM_REMOVE_OFFSET);
+    let mut usable = [
+        sites_pkg3::STATE_ITEM_OBJECT_ID_OFFSET,
+        sites_pkg3::STATE_ITEM_REMOVE_OFFSET,
+        sites_pkg2::DAMAGE_OF_OFFSET,
+        sites_hitbox::DAMAGE_RECORD_OFFSET,
+        sites_hitbox::DAMAGE_HIT_IDS_OFFSET,
+        sites_hitbox::HITBOX_ATTACK_DATA_OFFSET,
+    ].into_iter().all(game::granted);
     for (site, outcome) in CALLEES.iter().zip(game::outcomes(&CALLEES)) {
         if !outcome.usable() {
             usable = false;
@@ -52,17 +68,57 @@ pub fn init_practice_items() {
     USABLE.store(usable, Ordering::Release);
 }
 
-extern "C" {
-    #[link_name = "\u{1}_ZN3app7sv_item32create_item_init_normal_safe_posENS_8ItemKindEiiRKN3phx8Vector3fES5_fj"]
-    fn create_sandbag(
-        kind: app::ItemKind,
-        variation: i32,
-        owner: i32,
-        at: &[f32; 4],
-        speed: &[f32; 4],
-        lr: f32,
-        source: u32,
-    ) -> *mut app::Item;
+/// The native hurtbox can connect before the rendered target enters the attack.
+/// Use the owned item's damage once, with the same owner and break rule.
+/// # Safety
+/// Player 1's game-thread pass, with a live fighter accessor.
+pub unsafe fn hit(
+    owner: usize, slot: usize, key: u64, rule: u8, aerial: bool, projectiles: bool,
+) -> Option<()> {
+    if !USABLE.load(Ordering::Acquire) || super::states::is_loading() {
+        return None;
+    }
+    let mut tracker = LIVE.0.try_borrow_mut().ok()?;
+    let item = tracker.item_mut(lra_reset::GENERATION.load(Ordering::Acquire), slot, key)?;
+    item.live().then_some(())?;
+    let at = item.accessor as usize;
+    take_damage(&mut item.damage, game::natives::damage(at, 0)).then_some(())?;
+    use sites_hitbox::damage_record as record;
+    let module = ((at + record::MODULE) as *const usize).read();
+    btt::pointer_ok(module).then_some(())?;
+    // DamageModule keeps the source and its resolved native owner after the attack ends.
+    let source = ((module + 0x48) as *const u32).read();
+    let root = ((module + 0x54) as *const u32).read();
+    let p1 = (*(owner as *const Accessor)).battle_object_id;
+    (root == p1 && (source == p1 || projectiles && matches!(source >> 28, 1 | 4))).then_some(())?;
+    let power = if rule >= eggs::STRONG {
+        let (attacker, attack, _) = super::input_display::struck(at)?;
+        (attacker == source && i32::from(attack) < hitbox::SLOTS).then_some(())?;
+        native::object_is_active(source).then_some(())?;
+        let from = native::object_accessor(source);
+        btt::pointer_ok(from).then_some(())?;
+        let data = game::natives::attack_data(from, i32::from(attack));
+        btt::pointer_ok(data).then_some(())?;
+        ((data + hitbox::layout::POWER) as *const f32).read()
+    } else {
+        0.0
+    };
+    eggs::counts(rule, aerial, power).then_some(())
+}
+
+#[repr(C, align(16))]
+struct Spawn([u32; 20]);
+
+unsafe fn has_item_capacity(manager: usize) -> bool {
+    let registry = ((game::text_base() + OBJECT_POOLS_SLOT) as *const usize).read();
+    let slots = (manager as *const usize).read();
+    if registry == 0 || slots == 0 || ((manager + 0xd4) as *const u8).read() != 0 {
+        return false;
+    }
+    let pool = ((registry + 0x20) as *const usize).read();
+    pool != 0 && ((pool + 0x1c) as *const u16).read() != u16::MAX
+        && free_slot_top(((slots + 0x58) as *const [usize; 3]).read())
+            .is_some_and(|top| (top as *const i32).read() >= 0)
 }
 
 struct NativeItems {
@@ -83,31 +139,30 @@ impl ItemHost for NativeItems {
     type Handle = Handle;
 
     fn owns_live_item(&mut self, item: Handle) -> bool {
-        unsafe {
-            sv_battle_object::is_active(item.id)
-                && sv_battle_object::module_accessor(item.id) == item.accessor
-                && app::utility::get_category(&mut *item.accessor) == *BATTLE_OBJECT_CATEGORY_ITEM
-                && app::utility::get_kind(&mut *item.accessor) == *ITEM_KIND_SANDBAG
-        }
+        unsafe { item.live() }
     }
 
     fn create_target_item(&mut self, at: [f32; 2]) -> Option<Handle> {
-        let (team, owner) = self.team?;
+        let (_, owner) = self.team?;
         if !core::mem::take(&mut self.spawn) {
             return None; // Spread a full BTT layout's native creations across frames.
         }
         unsafe {
-            // The 13.0.5 wrapper loads 16 bytes from each native Vector3f reference.
+            // The ordinary item wrapper caps Sandbags at one. The factory's forced mode
+            // admits duplicates, with both free pools checked before it can evict an item.
+            if !has_item_capacity(self.manager) {
+                return None;
+            }
             let pos = position(at);
-            let item = create_sandbag(
-                app::ItemKind(*ITEM_KIND_SANDBAG),
-                0,
-                owner as i32,
-                &[pos.x, pos.y, pos.z, 0.0],
-                &[0.0; 4],
-                1.0,
-                owner,
-            );
+            let mut descriptor = Spawn([0; 20]);
+            descriptor.0[..3].copy_from_slice(&[pos.x, pos.y, pos.z].map(f32::to_bits));
+            descriptor.0[8..15].copy_from_slice(&[
+                *ITEM_KIND_SANDBAG as u32, owner, 0, 1.0f32.to_bits(), owner, 20, u32::MAX,
+            ]);
+            descriptor.0[18] = 1.0f32.to_bits();
+            let create: unsafe extern "C" fn(usize, &Spawn, u32, u32, u32) -> *mut app::Item =
+                core::mem::transmute(game::text_base() + ITEM_FACTORY_OFFSET);
+            let item = create(self.manager, &descriptor, 1, 0, 0);
             if item.is_null() {
                 return None;
             }
@@ -117,20 +172,23 @@ impl ItemHost for NativeItems {
                 native::item_remove(self.manager, id);
                 return None;
             }
-            TeamModule::set_team(accessor, team, true);
-            TeamModule::set_hit_team(accessor, team);
             WorkModule::on_flag(accessor, *ITEM_SANDBAG_INSTANCE_WORK_FLAG_NO_POCKET);
             WorkModule::on_flag(accessor, *ITEM_SANDBAG_INSTANCE_WORK_FLAG_NO_LANDING_SMOKE);
             WorkModule::on_flag(accessor, *ITEM_INSTANCE_WORK_FLAG_DISABLE_AUTO_GRAVITY_MOVE);
             JostleModule::set_status(accessor, false);
             PostureModule::set_scale(accessor, SCALE, false);
-            Some(Handle { id, accessor })
+            Some(Handle { id, accessor, damage: game::natives::damage(accessor as usize, 0) })
         }
     }
 
     fn place_target_item(&mut self, item: Handle, at: [f32; 2]) {
         unsafe {
             let accessor = item.accessor;
+            // Sandbag's native initialization can reset the team on a later frame.
+            if let Some((team, _)) = self.team.filter(|(team, _)| TeamModule::team_no(accessor) as i32 != *team) {
+                TeamModule::set_team(accessor, team, true);
+                TeamModule::set_hit_team(accessor, team);
+            }
             PostureModule::set_pos(accessor, &position(at));
             KineticModule::clear_speed_all(accessor);
             VisibilityModule::set_whole(accessor, false);

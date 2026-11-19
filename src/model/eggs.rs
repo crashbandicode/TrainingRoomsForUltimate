@@ -183,7 +183,7 @@ pub const fn hides_cpu(practice_hide: bool, running: bool, cpu_target: bool, btt
 pub struct Hit(pub [f32; 3], pub [f32; 3], pub f32, pub f32);
 
 /// Whether a hit of `power` counts under `rule`, `aerial` being whether the fighter is in an aerial.
-fn counts(rule: u8, aerial: bool, power: f32) -> bool {
+pub(crate) fn counts(rule: u8, aerial: bool, power: f32) -> bool {
     [true, aerial, power >= STRONG_DAMAGE][usize::from(rule.min(STRONG))]
 }
 

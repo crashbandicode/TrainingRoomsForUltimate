@@ -28,7 +28,11 @@ fn practice_lockon_native_windows_match_and_reject_foreign_code() {
     }
     let create = &model::sites_lockon::CALLEES[0];
     let symbol = "_ZN3app7sv_item32create_item_init_normal_safe_posENS_8ItemKindEiiRKN3phx8Vector3fES5_fj";
-    assert_eq!(owned.symbol(symbol), Some(create.offset));
+    let call = owned.symbol(symbol).unwrap() + 0x74;
+    let instruction = i32::from_le_bytes(owned.window(call)[..4].try_into().unwrap());
+    assert_eq!(instruction as u32 >> 26, 0b100101);
+    assert_eq!((call as isize + ((instruction << 6) >> 4) as isize) as usize, create.offset);
+    assert_eq!(create.offset, model::sites_lockon::ITEM_FACTORY_OFFSET);
 }
 
 /// Offsets of every site of `ssbu-cpu-pilot` (the list `tests/cpu_sites.rs` uses).

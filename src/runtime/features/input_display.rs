@@ -147,8 +147,8 @@ fn spots_wanted() -> bool {
 /// checked first (Eden answers 0 for an unmapped read).
 ///
 /// # Safety
-/// `accessor` is a live fighter's accessor, on the game thread inside its frame.
-unsafe fn struck(accessor: usize) -> Option<(u32, u8, f32)> {
+/// `accessor` is a live fighter or Sandbag accessor, on the game thread.
+pub(super) unsafe fn struck(accessor: usize) -> Option<(u32, u8, f32)> {
     use crate::model::sites_hitbox::{damage_record as r, DAMAGE_DEALT_OFFSET, DAMAGE_HIT_IDS_OFFSET, DAMAGE_RECORD_OFFSET};
     use crate::runtime::game::granted;
     if !granted(DAMAGE_RECORD_OFFSET) || !granted(DAMAGE_HIT_IDS_OFFSET) {

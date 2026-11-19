@@ -634,14 +634,19 @@ impl Btt {
     /// One pass of Player 1 (`tick`: the clock's frame): the clock runs while Running, and `hit(spot)` says whether a live hit of P1's
     /// breaks the unbroken target there (`eggs::breaks`; the caller also owns the hitlag and the break animation). The last target
     /// ends the run on that frame. The number of targets broken; the notice is the caller's to take (`notice`), after the pass.
+    #[cfg(test)]
     pub fn pass(&mut self, tick: bool, mut hit: impl FnMut([f32; 2]) -> bool) -> u8 {
+        self.pass_indexed(tick, |_, at| hit(at))
+    }
+
+    pub fn pass_indexed(&mut self, tick: bool, mut hit: impl FnMut(usize, [f32; 2]) -> bool) -> u8 {
         let was = self.broken;
         eggs::age(&mut self.bursts, tick);
         match self.phase {
             Phase::Running => {
                 self.frames += u32::from(tick);
                 for i in 0..self.n {
-                    if self.broken >> i & 1 == 0 && hit(self.at[i]) {
+                    if self.broken >> i & 1 == 0 && hit(i, self.at[i]) {
                         self.broken |= 1 << i;
                         self.bursts = [Some((self.at[i], 0)), self.bursts[0]];
                     }

@@ -138,3 +138,37 @@ fn invalid_handle_is_skipped_and_full_manager_retries_without_a_phantom_item() {
         ]
     );
 }
+
+#[test]
+fn forced_admission_requires_a_bounded_nonempty_slot_stack() {
+    assert_eq!(lockon::free_slot_top([0x100, 0x108, 0x120]), Some(0x104));
+    for invalid in [
+        [0, 0x108, 0x120],
+        [0x100, 0x100, 0x120],
+        [0x110, 0x108, 0x120],
+        [0x100, 0x108, 0x104],
+        [0x100, 0x107, 0x120],
+    ] {
+        assert_eq!(lockon::free_slot_top(invalid), None);
+    }
+}
+
+#[test]
+fn native_damage_is_consumed_only_for_the_matching_live_target() {
+    let mut field = Field::default();
+    let mut tracker = Tracker::new();
+    tracker.update(3, [target(7, [24., 8.]), target(8, [24., 8.])], &mut field);
+    assert!(tracker.item_mut(4, 0, 7).is_none());
+    assert!(tracker.item_mut(3, 1, 7).is_none());
+    assert_eq!(tracker.item_mut(3, 1, 8).copied(), Some(2));
+    tracker.update(3, [target(9, [24., 8.]), target(8, [24., 8.])], &mut field);
+    assert!(tracker.item_mut(3, 0, 7).is_none());
+    assert_eq!(tracker.item_mut(3, 0, 9).copied(), Some(3));
+
+    let mut damage = 0.;
+    assert!(lockon::take_damage(&mut damage, 20.));
+    assert!(!lockon::take_damage(&mut damage, 20.));
+    assert!(!lockon::take_damage(&mut damage, f32::NAN));
+    assert!(!lockon::take_damage(&mut damage, 0.));
+    assert!(lockon::take_damage(&mut damage, 5.));
+}
