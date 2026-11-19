@@ -282,44 +282,30 @@ impl<R: Record> Store<R> {
         Ok(ListCursor { store: self.clone(), names: names.into_iter(), entries: Vec::new(), skipped })
     }
 
-    /// The visible JSON files, for a catalog's background names-and-sizes scan.
-    /// Only the initial scan also recovers orphaned backups.
-    pub fn file_sizes(&self, recover: bool) -> Option<BTreeMap<String, u64>> {
-        let entries = match fs::read_dir(&self.dir) {
-            Ok(entries) => entries,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => return Some(BTreeMap::new()),
-            Err(_) => return None,
-        };
-        let mut names: Vec<_> = entries
-            .flatten()
-            .map(|entry| entry.file_name().to_string_lossy().into_owned())
-            .filter(|name| !name.starts_with('.'))
-            .collect();
-        if recover {
-            self.restore_orphaned_backups(&mut names);
-        }
-        Some(names.into_iter().filter_map(|name| {
-            let id = name.strip_suffix(".json")?;
-            #[cfg(test)]
-            count_catalog_metadata();
-            let meta = fs::metadata(self.dir.join(&name)).ok()?;
-            meta.is_file().then(|| (id.to_owned(), meta.len()))
-        }).collect())
-    }
-
-    /// Two record types share the directory. Read once and validate the owning type.
-    pub fn load_with_sibling<S: Record>(&self, id: &str) -> Option<Result<R, S>> {
+    /// Read once and validate the owning type. Invalid data is stable for the
+    /// catalog signature; an I/O error leaves the entry eligible to retry.
+    pub fn load_with_sibling<S: Record>(&self, id: &str) -> io::Result<Option<Result<R, S>>> {
         if !R::accepts_id(id) && !S::accepts_id(id) {
-            return None;
+            return Ok(None);
         }
-        let data = read_bounded(&self.file(id, "json"), R::MAX_FILE_BYTES.max(S::MAX_FILE_BYTES)).ok()?;
-        if R::accepts_id(id) && data.len() as u64 <= R::MAX_FILE_BYTES && R::owns(&data) {
+        let Some(data) = read_for_catalog(&self.file(id, "json"), R::MAX_FILE_BYTES.max(S::MAX_FILE_BYTES))? else {
+            return Ok(None);
+        };
+        Ok(if R::accepts_id(id) && data.len() as u64 <= R::MAX_FILE_BYTES && R::owns(&data) {
             decode::<R>(id, &data).ok().map(Ok)
         } else if S::accepts_id(id) && data.len() as u64 <= S::MAX_FILE_BYTES {
             decode::<S>(id, &data).ok().map(Err)
         } else {
             None
+        })
+    }
+
+    pub fn load_for_catalog(&self, id: &str) -> io::Result<Option<R>> {
+        if !R::accepts_id(id) {
+            return Ok(None);
         }
+        Ok(read_for_catalog(&self.file(id, "json"), R::MAX_FILE_BYTES)?
+            .and_then(|data| decode::<R>(id, &data).ok()))
     }
 
     /// Loads and fully validates the record with this id.
@@ -446,6 +432,80 @@ impl<R: Record> Store<R> {
                 names.push(format!("{id}.json"));
             }
         }
+    }
+}
+
+/// A resumable names-and-sizes scan. Ignored entries count toward the same
+/// budget as visible records, so a folder of non-records also yields to input.
+pub struct CatalogListing {
+    entries: Option<fs::ReadDir>,
+    files: Option<BTreeMap<String, u64>>,
+}
+
+impl CatalogListing {
+    pub fn open(path: &Path) -> Self {
+        match fs::read_dir(path) {
+            Ok(entries) => Self { entries: Some(entries), files: Some(BTreeMap::new()) },
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                Self { entries: None, files: Some(BTreeMap::new()) }
+            }
+            Err(_) => Self { entries: None, files: None },
+        }
+    }
+
+    /// Advance at most four directory entries. The caller holds the read guard.
+    pub fn step(&mut self, recover: Option<fn(&str) -> bool>) -> bool {
+        for _ in 0..4 {
+            let Some(entry) = self.entries.as_mut().and_then(Iterator::next) else { return false };
+            if entry.and_then(|entry| self.add(entry, recover)).is_err() {
+                self.files = None;
+                return false;
+            }
+        }
+        true
+    }
+
+    fn add(&mut self, entry: fs::DirEntry, recover: Option<fn(&str) -> bool>) -> io::Result<()> {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with('.') {
+            return Ok(());
+        }
+        let (id, path) = if let Some(id) = name.strip_suffix(".json") {
+            (id, entry.path())
+        } else if let Some(id) = name.strip_suffix(".json.bak").filter(|id| recover.is_some_and(|accepts| accepts(id))) {
+            let backup = entry.path();
+            let target = backup.with_extension("");
+            if !target.try_exists()? {
+                fs::rename(backup, &target)?;
+            }
+            (id, target)
+        } else {
+            return Ok(());
+        };
+        #[cfg(test)]
+        count_catalog_metadata();
+        match fs::metadata(path) {
+            Ok(meta) if meta.is_file() => {
+                self.files.as_mut().unwrap().insert(id.to_owned(), meta.len());
+            }
+            Ok(_) => {}
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {}
+            Err(err) => return Err(err),
+        }
+        Ok(())
+    }
+
+    pub fn finish(self) -> Option<BTreeMap<String, u64>> {
+        self.files
+    }
+}
+
+fn read_for_catalog(path: &Path, max: u64) -> io::Result<Option<Vec<u8>>> {
+    match read_bounded(path, max) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(StoreError::Io(err)) => Err(err),
+        Err(_) => Ok(None),
     }
 }
 

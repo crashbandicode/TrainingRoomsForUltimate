@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use crate::model::recording_menu::{Catalog, ComboFile, LoopMark, MacroFile, RecordingScreens, SaveFile, SequenceFile};
-use crate::model::store::{catalog_changes, CatalogSignatures, Store};
+use crate::model::store::{catalog_changes, try_recording_read, CatalogListing, CatalogSignatures, Record, Store, CATALOG_DIRS};
 
 use super::library::{
     migrate, Chain, Error, Kind, LegacySlot, LoopCount, NamedSave, RecordingIndex, Role, Sequence,
@@ -221,11 +221,12 @@ pub fn finish_recording(
     let mut recording = MacroRecording::new(&name, "13.0.5", start_state, frames).map_err(record)?;
     recording.set_start_save(Some(&start_id)).map_err(record)?;
     let id = macros.save_new(&recording).map_err(record)?;
-    let mut index = RecordingIndex::load(root)?;
-    index.note_use(Kind::Save, &start_id, Use::Recorded, at)?;
-    index.note_use(Kind::Macro, &id, Use::Recorded, at.saturating_add(1))?;
-    index.set_active(capture.role(), Some(&id), at.saturating_add(2))?;
-    index.save(root)?;
+    RecordingIndex::update(root, |index| {
+        index.note_use(Kind::Save, &start_id, Use::Recorded, at)?;
+        index.note_use(Kind::Macro, &id, Use::Recorded, at.saturating_add(1))?;
+        index.set_active(capture.role(), Some(&id), at.saturating_add(2))?;
+        Ok(true)
+    })?;
     Ok(RecordStop::Saved {
         id,
         start_save: start_id,
@@ -403,9 +404,10 @@ pub fn save_made_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Op
     let mut made = ComboRecord::new(name, *combo, recorded_on);
     if !source.is_empty() { made = made.with_made_from(source); }
     let id = library.save_new(&made).map_err(record)?;
-    let mut index = RecordingIndex::load(root)?;
-    index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
-    index.save(root)?;
+    RecordingIndex::update(root, |index| {
+        index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
+        Ok(true)
+    })?;
     Ok(id)
 }
 
@@ -418,10 +420,11 @@ pub fn save_last_combo(root: &Path, combo: &Combo, name: &str, recorded_on: Opti
         None => default_name(&library.list().map_err(record)?.entries),
     };
     let id = library.save_new(&ComboRecord::new(name, *combo, recorded_on)).map_err(record)?;
-    let mut index = RecordingIndex::load(root)?;
-    index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
-    index.set_drill(Some(super::library::Drill { kind: super::library::DrillKind::Combo, id: id.clone() }), at)?;
-    index.save(root)?;
+    RecordingIndex::update(root, |index| {
+        index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
+        index.set_drill(Some(super::library::Drill { kind: super::library::DrillKind::Combo, id: id.clone() }), at)?;
+        Ok(true)
+    })?;
     Ok(id)
 }
 
@@ -478,20 +481,23 @@ pub fn duplicate_save(root: &Path, id: &str, at: u64) -> Result<String, Error> {
         .collect::<Vec<_>>();
     let copy = NamedSave::new(unused_name("Save", &names), source.player, source.cpu)?;
     let copy_id = store.save_new(&copy)?;
-    let mut index = RecordingIndex::load(root)?;
-    index.note_use(Kind::Save, &copy_id, Use::Recorded, at)?;
-    index.save(root)?;
+    RecordingIndex::update(root, |index| {
+        index.note_use(Kind::Save, &copy_id, Use::Recorded, at)?;
+        Ok(true)
+    })?;
     Ok(copy_id)
 }
 
 pub fn delete_save(root: &Path, id: &str, at: u64) -> Result<(), Error> {
     let store = Store::<NamedSave>::new(root.join(SAVES_DIR));
     store.delete(id)?;
-    let mut index = RecordingIndex::load(root)?;
-    if index.bound() == Some(id) {
-        index.bind_save(None, at)?;
-    }
-    index.save(root)?;
+    RecordingIndex::update(root, |index| {
+        let was_bound = index.bound() == Some(id);
+        if was_bound {
+            index.bind_save(None, at)?;
+        }
+        Ok(was_bound)
+    })?;
     Ok(())
 }
 
@@ -503,15 +509,20 @@ pub fn save_chord(
     at: u64,
 ) -> Result<String, Error> {
     let store = Store::<NamedSave>::new(root.join(SAVES_DIR));
-    let mut index = RecordingIndex::load(root)?;
-    if let Some(id) = index.bound().map(str::to_owned) {
-        if let Ok(mut existing) = store.load(&id) {
+    let bound = {
+        let _guard = crate::model::store::recording_write_guard(root);
+        RecordingIndex::load(root)?.bound().map(str::to_owned)
+    };
+    if let Some(id) = bound.as_deref() {
+        if let Ok(mut existing) = store.load(id) {
             existing.player = player;
             existing.cpu = cpu;
-            store.overwrite(&id, &existing)?;
-            index.note_use(Kind::Save, &id, Use::Bound, at)?;
-            index.save(root)?;
-            return Ok(id);
+            store.overwrite(id, &existing)?;
+            RecordingIndex::update(root, |index| {
+                index.note_use(Kind::Save, id, Use::Bound, at)?;
+                Ok(true)
+            })?;
+            return Ok(id.to_owned());
         }
     }
     let names = store
@@ -522,8 +533,14 @@ pub fn save_chord(
         .collect::<Vec<_>>();
     let save = NamedSave::new(unused_name("Save", &names), player, cpu)?;
     let id = store.save_new(&save)?;
-    index.bind_save(Some(&id), at)?;
-    index.save(root)?;
+    RecordingIndex::update(root, |index| {
+        if index.bound() == bound.as_deref() {
+            index.bind_save(Some(&id), at)?;
+        } else {
+            index.note_use(Kind::Save, &id, Use::Recorded, at)?;
+        }
+        Ok(true)
+    })?;
     Ok(id)
 }
 
@@ -602,11 +619,12 @@ enum CatalogEntry {
     Sequence(SequenceFile),
 }
 
-fn catalog_entry(root: &Path, folder: usize, id: String) -> Option<CatalogEntry> {
-    let dir = root.join(crate::model::store::CATALOG_DIRS[folder]);
-    Some(match folder {
-        0 => CatalogEntry::Macro(
-            match Library::new(dir).load_with_sibling::<Chain>(&id)? {
+fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Option<CatalogEntry>> {
+    let dir = root.join(CATALOG_DIRS[folder]);
+    let entry = match folder {
+        0 => {
+            let Some(file) = Library::new(dir).load_with_sibling::<Chain>(&id)? else { return Ok(None) };
+            CatalogEntry::Macro(match file {
                 Ok(file) => MacroFile {
                     id,
                     name: file.name,
@@ -627,10 +645,10 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> Option<CatalogEntry>
                     recorded_on: String::new(),
                     span: 0,
                 },
-            },
-        ),
+            })
+        }
         1 => {
-            let save = Store::<NamedSave>::new(dir).load(&id).ok()?;
+            let Some(save) = Store::<NamedSave>::new(dir).load_for_catalog(&id)? else { return Ok(None) };
             let fighters = [&save.player, &save.cpu]
                 .into_iter()
                 .filter(|state| state.is_saved())
@@ -641,7 +659,7 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> Option<CatalogEntry>
             CatalogEntry::Save(SaveFile { id, name: save.name, fighters })
         }
         2 => {
-            let file = ComboLibrary::new(dir).load(&id).ok()?;
+            let Some(file) = ComboLibrary::new(dir).load_for_catalog(&id)? else { return Ok(None) };
             CatalogEntry::Combo(ComboFile {
                 id,
                 name: file.name,
@@ -653,7 +671,7 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> Option<CatalogEntry>
             })
         }
         _ => {
-            let file = Store::<Sequence>::new(dir).load(&id).ok()?;
+            let Some(file) = Store::<Sequence>::new(dir).load_for_catalog(&id)? else { return Ok(None) };
             CatalogEntry::Sequence(SequenceFile {
                 id,
                 name: file.name,
@@ -662,17 +680,25 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> Option<CatalogEntry>
                 best: file.best,
             })
         }
-    })
+    };
+    Ok(Some(entry))
+}
+
+fn accepts_macro_backup(id: &str) -> bool {
+    MacroRecording::accepts_id(id) || Chain::accepts_id(id)
 }
 
 struct CatalogFile {
     size: u64,
     entry: Option<CatalogEntry>,
+    retry: bool,
 }
 
 /// A names-and-sizes check is staged until all four folders are listed.
+#[derive(Default)]
 struct FolderCheck {
     at: usize,
+    listing: Option<CatalogListing>,
     changes: CatalogSignatures,
 }
 
@@ -684,7 +710,8 @@ pub struct CatalogCache {
     pending: BTreeSet<(usize, String)>,
     /// New entries finish their cold read before repeatedly rewritten entries.
     revised: BTreeSet<(usize, String)>,
-    at: usize,
+    cold: Option<FolderCheck>,
+    cold_writes: CatalogSignatures,
     check: Option<FolderCheck>,
     external: CatalogSignatures,
     external_changed: bool,
@@ -705,7 +732,8 @@ impl CatalogCache {
             files: BTreeMap::new(),
             pending: BTreeSet::new(),
             revised: BTreeSet::new(),
-            at: 0,
+            cold: Some(FolderCheck::default()),
+            cold_writes: CatalogSignatures::new(),
             check: None,
             external: CatalogSignatures::new(),
             external_changed: false,
@@ -721,9 +749,14 @@ impl CatalogCache {
         let external = core::mem::take(&mut self.external);
         self.apply_changes(external);
         // Committed writes also refresh an entry whose JSON length did not change.
-        self.apply_changes(catalog_changes(&self.root));
-        if self.check.is_some() {
-            self.check();
+        let writes = catalog_changes(&self.root);
+        if self.cold.is_some() {
+            self.cold_writes.extend(writes);
+        } else {
+            self.apply_changes(writes);
+            if self.check.is_some() {
+                self.check();
+            }
         }
     }
 
@@ -736,7 +769,7 @@ impl CatalogCache {
                         self.revised.insert(key);
                     }
                 } else {
-                    self.files.insert(key.clone(), CatalogFile { size, entry: None });
+                    self.files.insert(key.clone(), CatalogFile { size, entry: None, retry: false });
                     self.pending.insert(key);
                 }
             } else {
@@ -747,7 +780,7 @@ impl CatalogCache {
         }
     }
 
-    /// One folder listing or one file read between input passes.
+    /// One listing batch or one payload read between input passes.
     // Keep catalog scratch space out of the menu worker's other call paths.
     #[inline(never)]
     pub fn step(&mut self) -> bool {
@@ -755,17 +788,21 @@ impl CatalogCache {
         if self.ready.is_some() {
             return self.check_step();
         }
-        if self.at < crate::model::store::CATALOG_DIRS.len() {
-            let folder = self.at;
-            if let Some(changes) = self.list_changes(folder, true) {
-                self.apply_changes(changes);
+        if let Some(mut cold) = self.cold.take() {
+            if self.scan_step(&mut cold, true) {
+                self.cold = Some(cold);
+            } else {
+                // Writes observed during a cold scan win over its directory snapshots.
+                cold.changes.extend(core::mem::take(&mut self.cold_writes));
+                self.apply_changes(cold.changes);
             }
-            self.at += 1;
             return true;
         }
         if let Some(key) = self.pending.pop_first().or_else(|| self.revised.pop_first()) {
-            let id = key.1.clone();
-            self.files.get_mut(&key).unwrap().entry = catalog_entry(&self.root, key.0, id);
+            let outcome = catalog_entry(&self.root, key.0, key.1.clone());
+            let file = self.files.get_mut(&key).unwrap();
+            file.retry = outcome.is_err();
+            file.entry = outcome.ok().flatten();
             return true;
         }
         let mut catalog = Catalog::default();
@@ -785,41 +822,57 @@ impl CatalogCache {
         self.check.is_some()
     }
 
-    fn list_changes(&self, folder: usize, recover: bool) -> Option<CatalogSignatures> {
-        let dir = self.root.join(crate::model::store::CATALOG_DIRS[folder]);
-        let store_files = match folder {
-            0 => Library::new(dir).file_sizes(recover),
-            1 => Store::<NamedSave>::new(dir).file_sizes(recover),
-            2 => ComboLibrary::new(dir).file_sizes(recover),
-            _ => Store::<Sequence>::new(dir).file_sizes(recover),
-        }?;
-        let mut changes = CatalogSignatures::new();
-        for key in self.files.keys().filter(|key| key.0 == folder) {
-            if !store_files.contains_key(&key.1) {
-                changes.insert(key.clone(), None);
+    #[inline(never)]
+    fn start_listing(&self, folder: usize) -> CatalogListing {
+        CatalogListing::open(&self.root.join(CATALOG_DIRS[folder]))
+    }
+
+    fn scan_step(&self, check: &mut FolderCheck, cold: bool) -> bool {
+        let Some(guard) = try_recording_read() else { return true };
+        let Some(listing) = check.listing.as_mut() else {
+            check.listing = Some(self.start_listing(check.at));
+            return true;
+        };
+        let recover = cold.then_some(match check.at {
+            0 => accepts_macro_backup as fn(&str) -> bool,
+            1 => NamedSave::accepts_id,
+            2 => ComboRecord::accepts_id,
+            _ => Sequence::accepts_id,
+        });
+        if listing.step(recover) {
+            return true;
+        }
+        drop(guard);
+        let listing = check.listing.take().unwrap();
+        self.finish_listing(check, listing);
+        check.at += 1;
+        check.at < CATALOG_DIRS.len()
+    }
+
+    #[inline(never)]
+    fn finish_listing(&self, check: &mut FolderCheck, listing: CatalogListing) {
+        let Some(files) = listing.finish() else { return };
+        for key in self.files.keys().filter(|key| key.0 == check.at) {
+            if !files.contains_key(&key.1) {
+                check.changes.insert(key.clone(), None);
             }
         }
-        for (id, size) in store_files {
-            let key = (folder, id);
-            if self.files.get(&key).is_none_or(|file| file.size != size) {
-                changes.insert(key, Some(size));
+        for (id, size) in files {
+            let key = (check.at, id);
+            if self.files.get(&key).is_none_or(|file| file.size != size || file.retry) {
+                check.changes.insert(key, Some(size));
             }
         }
-        Some(changes)
     }
 
     /// Queue an external names-and-sizes check even if the cold catalog is building.
     pub fn check(&mut self) {
-        self.check = Some(FolderCheck { at: 0, changes: CatalogSignatures::new() });
+        self.check = Some(FolderCheck::default());
     }
 
     fn check_step(&mut self) -> bool {
         let Some(mut check) = self.check.take() else { return false };
-        if let Some(changes) = self.list_changes(check.at, false) {
-            check.changes.extend(changes);
-        }
-        check.at += 1;
-        if check.at < crate::model::store::CATALOG_DIRS.len() {
+        if self.scan_step(&mut check, false) {
             self.check = Some(check);
         } else if !check.changes.is_empty() {
             self.external = check.changes;
@@ -1699,10 +1752,13 @@ mod tests {
         let root = library_card("save-chord-slot-race", 1);
         let path = root.clone();
         before_next_store_list(move || {
-            let mut index = RecordingIndex::load(&path).unwrap();
+            let index = RecordingIndex::load(&path).unwrap();
             assert_eq!(index.bound(), None, "the save has not committed");
-            index.set_slots(&[Some("take-0".into()), None, None, None, None]).unwrap();
-            index.save(&path).unwrap();
+            let mut screens = RecordingScreens::new();
+            apply_index(&index, &mut screens);
+            screens.adopt_slots([Some("take-0".into()), None, None, None, None]);
+            super::super::rr_host::publish_selection(&path, &screens.selection(), None);
+            assert_eq!(RecordingIndex::load(&path).unwrap().slots()[0].as_deref(), Some("take-0"));
         });
 
         let id = save_chord(&root, state(8), state(7), 240).unwrap();

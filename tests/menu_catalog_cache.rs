@@ -25,7 +25,8 @@ fn a_menu_open_takes_the_kept_catalog_and_never_reads_the_card() {
     assert!(session.contains("catalog: CatalogCache"), "the cache outlives the menu model:\n{session}");
     let run = item(&worker, "fn run() {");
     assert!(run.contains("session.catalog.want(version.0)"), "{run}");
-    assert!(run.contains("session.catalog.step()"), "one file per pass, input drained between: {run}");
+    assert!(run.find("INPUT.pop()").unwrap() < run.find("session.catalog.step()").unwrap(),
+        "the worker drains input before each catalog batch");
     let handle = item(&worker, "fn handle(event: Event, s: &mut Session) {");
     let open = &handle[..handle.find("let Event::Poll").expect("the poll branch")];
     let refreshed = open.find("refresh_recording(s)").expect("an open adopts the kept catalog before its first frame");
@@ -65,12 +66,14 @@ fn recording_actions_and_writeback_require_the_current_generation() {
     assert!(check < effect.find("post_effect_at(").unwrap(), "check before dispatching a file effect");
     let host = src("src/model/rr_host.rs");
     let consume = item(&host, "fn apply_menu(");
-    assert!(consume.find("catalog_generation()").unwrap() < consume.find("match effect").unwrap(),
-        "recheck after taking a queued file action");
+    assert!(effect.contains("post_effect_at(effect, Some(version))"), "queue the full observed revision");
+    assert!(consume.find("recording_version()").unwrap() < consume.find("match effect").unwrap(),
+        "recheck both revisions after taking a queued file action");
     let index = src("src/model/library/hot.rs");
     let write = item(&index, "    pub fn save_at(");
     assert!(write.find("recording_write_guard(").unwrap() < write.find("catalog_generation()").unwrap());
-    assert!(write.find("catalog_generation()").unwrap() < write.find("write_replace(").unwrap());
+    assert!(write.find("catalog_generation()").unwrap() < write.find("write_locked(").unwrap());
+    assert!(item(&index, "    fn write_locked(").contains("write_replace("));
 }
 
 #[test]

@@ -29,7 +29,7 @@ pub struct LegacySlot {
 
 /// Turns today's slots into named files. Empty slots are skipped. No chain and no sequence is written.
 pub fn migrate(root: &Path, slots: &[Option<LegacySlot>; 5], date: &str) -> Result<MigrationReceipt, Error> {
-    let mut index = RecordingIndex::load(root)?;
+    let index = RecordingIndex::load(root)?;
     if index.migrated() {
         return Ok(index.receipt().cloned().unwrap_or_default());
     }
@@ -73,9 +73,7 @@ pub fn migrate(root: &Path, slots: &[Option<LegacySlot>; 5], date: &str) -> Resu
     }
 
     let active = selected_macro(root);
-    seed(&mut index, Kind::Macro, &recording_ids)?;
-    seed(&mut index, Kind::Save, &save_ids)?;
-    let receipt = MigrationReceipt {
+    let mut receipt = MigrationReceipt {
         recordings: recording_ids,
         saves: save_ids,
         bound_save: bound,
@@ -83,8 +81,16 @@ pub fn migrate(root: &Path, slots: &[Option<LegacySlot>; 5], date: &str) -> Resu
         loop_player: loops,
         loop_cpu: loops,
     };
-    index.apply_migration(&receipt);
-    index.save(root)?;
+    RecordingIndex::update(root, |index| {
+        if index.migrated() {
+            receipt = index.receipt().cloned().unwrap_or_default();
+            return Ok(false);
+        }
+        seed(index, Kind::Macro, &receipt.recordings)?;
+        seed(index, Kind::Save, &receipt.saves)?;
+        index.apply_migration(&receipt);
+        Ok(true)
+    })?;
     Ok(receipt)
 }
 

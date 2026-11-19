@@ -189,22 +189,40 @@ impl RecordingIndex {
         Ok(index)
     }
 
+    #[cfg(test)]
     pub fn save(&self, root: &Path) -> Result<(), Error> {
         self.save_at(root, None).map(|_| ())
     }
 
     /// A menu edit can write only against the file and index revisions it observed.
     pub fn save_at(&self, root: &Path, expected: Option<(u64, u64)>) -> Result<bool, Error> {
-        let mut bytes = serde_json::to_vec_pretty(self)?;
-        bytes.push(b'\n');
         let _guard = recording_write_guard(root);
         if expected.is_some_and(|version| version != (catalog_generation(), index_generation())) {
             return Ok(false);
         }
+        self.write_locked(root)?;
+        Ok(true)
+    }
+
+    /// Apply an index-only intent to the latest contents under the same lock as menu writeback.
+    pub fn update(root: &Path, edit: impl FnOnce(&mut Self) -> Result<bool, Error>) -> Result<bool, Error> {
+        let _guard = recording_write_guard(root);
+        let mut index = Self::load(root)?;
+        let changed = edit(&mut index)?;
+        if changed {
+            index.write_locked(root)?;
+        }
+        Ok(changed)
+    }
+
+    #[inline(never)]
+    fn write_locked(&self, root: &Path) -> Result<(), Error> {
+        let mut bytes = serde_json::to_vec_pretty(self)?;
+        bytes.push(b'\n');
         fs::create_dir_all(root)?;
         write_replace(&root.join(INDEX_FILE), &bytes)?;
         note_index_write(root);
-        Ok(true)
+        Ok(())
     }
 
     pub fn migrated(&self) -> bool {

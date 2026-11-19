@@ -28,6 +28,8 @@ const COUNTS: [(LoopMark, Option<usize>); 6] = [
     (LoopMark::Finite(10), Some(10)),
 ];
 
+static LOOP_TEST: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 fn focus(menu: &mut Menu, target: Entry) {
     for _ in 0..=menu.entry_count(menu.page()) {
         if menu.focus() == Some(target) { return; }
@@ -142,6 +144,7 @@ fn close_reopen(root: &Scratch, mut screen: Menu, role: ViewRole, mark: LoopMark
 
 #[test]
 fn loop_list_selection_is_published_and_used_by_playback() {
+    let _guard = LOOP_TEST.lock().unwrap_or_else(|err| err.into_inner());
     for role in [ViewRole::Player, ViewRole::Cpu] {
         for (index, (mark, passes)) in COUNTS.into_iter().enumerate() {
             let mut menu = menu(role);
@@ -159,6 +162,7 @@ fn loop_list_selection_is_published_and_used_by_playback() {
 
 #[test]
 fn loop_list_cancel_keeps_the_previous_playback_count() {
+    let _guard = LOOP_TEST.lock().unwrap_or_else(|err| err.into_inner());
     for (role, passes) in [(ViewRole::Player, 3), (ViewRole::Cpu, 5)] {
         let mut menu = menu(role);
         let before = menu.recording().selection();
@@ -175,6 +179,7 @@ fn loop_list_cancel_keeps_the_previous_playback_count() {
 
 #[test]
 fn loop_list_and_left_right_choose_the_same_counts() {
+    let _guard = LOOP_TEST.lock().unwrap_or_else(|err| err.into_inner());
     for role in [ViewRole::Player, ViewRole::Cpu] {
         for button in [Button::Left, Button::Right] {
             for (target, (mark, passes)) in COUNTS.into_iter().enumerate() {
@@ -198,6 +203,7 @@ fn loop_list_and_left_right_choose_the_same_counts() {
 
 #[test]
 fn resetting_loop_publishes_both_roles_once() {
+    let _guard = LOOP_TEST.lock().unwrap_or_else(|err| err.into_inner());
     let root = card();
     let mut screen = menu(ViewRole::Cpu);
     screen.press(Button::Y);

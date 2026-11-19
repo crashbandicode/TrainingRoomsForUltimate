@@ -593,13 +593,18 @@ impl RecordingScreens {
 
     /// The row's list pick (and Left / Right): the page role's count becomes `LoopMark::CYCLE[index]`.
     pub fn set_loop_row(&mut self, index: usize) {
-        self.loops[self.page_role.index()] = LoopMark::CYCLE.get(index).copied().unwrap_or_default();
+        let next = LoopMark::CYCLE.get(index).copied().unwrap_or_default();
+        let count = &mut self.loops[self.page_role.index()];
+        self.selection_changed |= *count != next;
+        *count = next;
     }
 
     /// The row's reset (Reset page to defaults): both roles' counts go back to 1, the count of a new index. True when one changed.
     pub fn reset_loops(&mut self) -> bool {
         let was = core::mem::take(&mut self.loops);
-        was != self.loops
+        let changed = was != self.loops;
+        self.selection_changed |= changed;
+        changed
     }
 
     pub fn tab_names(&self) -> &'static [&'static str] {
@@ -1613,7 +1618,7 @@ impl RecordingScreens {
         // Action rows that head the list (+ Save last combo…): the hot marks and the hairline count files only.
         let lead = items.iter().take_while(|item| item.kind.action()).count();
         let place = self.place(face, group);
-        let cursor = place.at[usize::from(section)];
+        let cursor = place.at[usize::from(section)].min(items.len().saturating_sub(1));
         let focused = self.focused(face, group);
         let role = self.role(face);
         let header = if group == COMBOS_SEQ && section == 1 && place.drills { "DRILLS" } else { header_of(group, section) };

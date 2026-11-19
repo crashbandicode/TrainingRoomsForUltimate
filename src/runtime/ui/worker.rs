@@ -610,7 +610,7 @@ fn post_recording_effect(menu: &mut Menu, observed: Option<(u64, u64)>) {
         }
         follow_recording_drill(menu);
     }
-    if version.0 != rr_host::catalog_generation() {
+    if version != rr_host::recording_version() {
         return;
     }
     if effect == Effect::RecordDrill {
@@ -621,7 +621,7 @@ fn post_recording_effect(menu: &mut Menu, observed: Option<(u64, u64)>) {
         Effect::OpenCrop { source, combo } => {
             crate::runtime::macros::replay_capture::open_file_editor(&source, combo);
         }
-        effect => rr_host::post_effect_at(effect, Some(version.0)),
+        effect => rr_host::post_effect_at(effect, Some(version)),
     }
 }
 
@@ -742,11 +742,15 @@ fn refresh_recording(s: &mut Session) -> bool {
     let Some(menu) = s.menu.as_mut() else { return false };
     let mut changed = false;
     if let (Some(catalog), Some(index)) = (s.catalog.ready(version.0), s.recording_index.ready(version)) {
+        let previous = s.catalog_watch.generation().zip(s.index_watch.generation());
         let (catalog_watch, files_due) = s.catalog_watch.take_load(version.0);
         let (index_watch, index_due) = s.index_watch.take_load(version.1);
         s.catalog_watch = catalog_watch;
         s.index_watch = index_watch;
         let screens = menu.recording_mut();
+        if previous.is_some_and(|previous| previous != version) {
+            screens.set_loading(); // Retire name/picker targets from the old revision.
+        }
         let was_loading = screens.loading();
         if files_due || index_due || was_loading {
             apply_catalog(catalog, index, screens);

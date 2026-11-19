@@ -91,9 +91,10 @@ fn save_input(root: &Path, source: &str, activate: bool, tick: &mut Tick) {
     let recorded_on = if activate { RECORD_START.lock().take().map(|s| super::rr_runtime::fighter_name(s.poses[0].fighter_kind)).filter(|s| !s.is_empty()) } else { None };
     if let Ok(id) = save_made_combo(root, &take.combo, source, recorded_on, unix_now()) {
         if activate {
-            if let Ok(mut index) = RecordingIndex::load(root) {
-                let _ = index.set_drill(Some(Drill { kind: DrillKind::Combo, id: id.clone() }), unix_now()); let _ = index.save(root);
-            }
+            let _ = RecordingIndex::update(root, |index| {
+                index.set_drill(Some(Drill { kind: DrillKind::Combo, id: id.clone() }), unix_now())?;
+                Ok(true)
+            });
             *lock(&SAVED_DRILL) = Some(id.clone());
         }
         tick.diags.push(format!("screen=input-drill saved={id} steps={}", take.combo.len()));
@@ -206,7 +207,8 @@ static CUT_PLAYER: AtomicBool = AtomicBool::new(false);
 static CUT_CPU: AtomicBool = AtomicBool::new(false);
 static MACHINE: Mutex<Option<Playback>> = Mutex::new(None);
 static RESIDENT: Mutex<Option<Resident>> = Mutex::new(None);
-static MENU_EFFECT: Mutex<Option<(Option<u64>, Effect)>> = Mutex::new(None);
+type MenuEffect = (Option<(u64, u64)>, Effect);
+static MENU_EFFECT: Mutex<Option<MenuEffect>> = Mutex::new(None);
 #[cfg(test)]
 static CROP: Mutex<Option<CropWindow>> = Mutex::new(None);
 static DEFER_MIGRATE: AtomicBool = AtomicBool::new(false);
@@ -470,8 +472,8 @@ pub fn post_effect(effect: Effect) {
     post_effect_at(effect, None);
 }
 
-pub fn post_effect_at(effect: Effect, expected: Option<u64>) {
-    if expected.is_some_and(|generation| generation != catalog_generation()) {
+pub fn post_effect_at(effect: Effect, expected: Option<(u64, u64)>) {
+    if expected.is_some_and(|version| version != recording_version()) {
         return;
     }
     if effect == Effect::RecordDrill { arm_drill_record(true); return; }
@@ -1563,7 +1565,7 @@ fn ask_drill(root: &Path, tick: &mut Tick) {
 
 fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick) {
     let Some((expected, effect)) = lock(&MENU_EFFECT).take() else { return };
-    if expected.is_some_and(|generation| generation != catalog_generation()) {
+    if expected.is_some_and(|version| version != recording_version()) {
         return;
     }
     match effect {
@@ -1641,24 +1643,25 @@ pub fn delete_file(root: &Path, kind: crate::model::recording_menu::FileKind, id
     if !deleted {
         return false;
     }
-    if let Ok(mut index) = RecordingIndex::load(root) {
+    let mut slots_changed = false;
+    let updated = RecordingIndex::update(root, |index| {
         let at = unix_now();
         let mut changed = false;
         for role in [Role::Player, Role::Cpu] {
             if index.active(role) == Some(id) {
-                changed |= index.set_active(role, None, at).is_ok();
+                index.set_active(role, None, at)?;
+                changed = true;
             }
         }
         if index.drill().is_some_and(|drill| drill.id == id) {
-            changed |= index.set_drill(None, at).is_ok();
-        }
-        if index.clear_slot_of(id) {
+            index.set_drill(None, at)?;
             changed = true;
-            note_slots_changed(false);
         }
-        if changed {
-            let _ = index.save(root);
-        }
+        slots_changed = index.clear_slot_of(id);
+        Ok(changed || slots_changed)
+    });
+    if updated.is_ok() && slots_changed {
+        note_slots_changed(false);
     }
     true
 }
@@ -1743,12 +1746,10 @@ fn finish_make(root: &Path, tick: &mut Tick) {
 }
 
 pub(crate) fn note_hot(root: &Path, kind: Kind, id: &str) {
-    let Ok(mut index) = RecordingIndex::load(root) else {
-        return;
-    };
-    if index.note_use(kind, id, Use::Recorded, unix_now()).is_ok() {
-        let _ = index.save(root);
-    }
+    let _ = RecordingIndex::update(root, |index| {
+        index.note_use(kind, id, Use::Recorded, unix_now())?;
+        Ok(true)
+    });
 }
 
 #[cfg(test)]
@@ -1770,13 +1771,12 @@ pub fn write_crop(root: &Path, source: &str, combo: bool) -> Option<String> {
 }
 
 fn show_chord_notice(root: &Path, tick: &mut Tick) {
-    let Ok(mut index) = RecordingIndex::load(root) else {
-        return;
-    };
-    let Some(text) = chord_notice(&mut index) else {
-        return;
-    };
-    if index.save(root).is_ok() {
+    let mut text = None;
+    if RecordingIndex::update(root, |index| {
+        text = chord_notice(index);
+        Ok(text.is_some())
+    }).is_ok() {
+        let Some(text) = text else { return };
         tick.notices.push(text);
         tick.diags.push("screen=notice kind=chord-once".to_string());
     }
@@ -1802,11 +1802,11 @@ pub fn parry_wiring(root: &Path) -> Option<(String, LoopCount)> {
 
 /// Use a saved practice: its macro becomes the CPU's active macro and its Loop the CPU's (the existing operations).
 pub fn parry_use(root: &Path, id: &str, count: LoopCount) -> Result<(), String> {
-    let mut index = RecordingIndex::load(root).map_err(|e| e.to_string())?;
-    index.set_active(Role::Cpu, Some(id), unix_now()).map_err(|e| e.to_string())?;
-    index.set_loop(Role::Cpu, count);
-    index.save(root).map_err(|e| e.to_string())?;
-    Ok(())
+    RecordingIndex::update(root, |index| {
+        index.set_active(Role::Cpu, Some(id), unix_now())?;
+        index.set_loop(Role::Cpu, count);
+        Ok(true)
+    }).map(|_| ()).map_err(|e| e.to_string())
 }
 
 fn load_book(root: &Path) -> Result<Book, ()> {
@@ -4124,10 +4124,12 @@ mod tests {
         let _guard = hold();
         reset_host();
         let root = scratch("rename-index-version");
+        // Hold off unrelated test writes while advancing only the index revision.
+        let _write = store::recording_write_guard(&root);
         let version = recording_version();
-        let offer = || Effect::Keyboard { header: "Rename macro".into(), draft: "Old".into() };
-        post_effect_at(offer(), Some(version.0));
-        parry_use(&root, "macro-1", LoopCount::Finite(3)).unwrap();
+        let offer = || Effect::Keyboard { header: "Rename macro", draft: "Old".into() };
+        post_effect_at(offer(), Some(version));
+        store::note_index_write(&root);
         assert_eq!(recording_version().0, version.0, "an index-only change");
         assert_ne!(recording_version().1, version.1);
         let book = Book::new(RecordingIndex::load(&root).unwrap());
@@ -4135,7 +4137,7 @@ mod tests {
         let mut tick = Tick::default();
         apply_menu(&root, &mut machine, &book, &mut tick);
         assert!(tick.keyboard.is_none(), "an obsolete Rename must not offer a keyboard");
-        post_effect_at(offer(), Some(recording_version().0));
+        post_effect_at(offer(), Some(recording_version()));
         apply_menu(&root, &mut machine, &book, &mut tick);
         assert_eq!(tick.keyboard.unwrap().header, "Rename macro");
     }
