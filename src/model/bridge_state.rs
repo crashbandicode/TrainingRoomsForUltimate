@@ -42,9 +42,75 @@ pub struct View<'a> {
 
 /// The snapshot into `out` (cleared first). Returns false when the rows did not all fit (`rows.complete=0`).
 pub fn snapshot(view: &View<'_>, out: &mut String) -> bool {
-    let _ = view;
+    use core::fmt::Write as _;
     out.clear();
-    true
+    let group = view.group.map_or(-1, i32::from);
+    let focus_group = view.group.map_or_else(|| "-".to_string(), |g| g.to_string());
+    let _ = writeln!(out, "schema=tr.menu/{SCHEMA_VERSION}");
+    let _ = writeln!(out, "ack={}", view.ack);
+    push_str(out, "ack.result", view.ack_result);
+    let _ = writeln!(out, "focus={}/{focus_group}/{}/{}", view.page, view.cursor, view.action);
+    let _ = writeln!(out, "open={}", u8::from(view.open));
+    push_str(out, "page", view.page);
+    let _ = writeln!(out, "depth={}", view.depth);
+    let _ = writeln!(out, "group={group}");
+    let _ = writeln!(out, "cursor={}", view.cursor);
+    push_str(out, "row", view.row.unwrap_or(""));
+    push_str(out, "row_id", view.row_id);
+    push_str(out, "action", view.action);
+    push_str(out, "editor", view.editor.unwrap_or(""));
+    let _ = writeln!(out, "editor.sel={}", view.editor_sel.unwrap_or(-1));
+    push_str(out, "editor.sel_key", view.editor_sel_key);
+    let _ = writeln!(out, "keyboard={}", u8::from(view.keyboard));
+    push_str(out, "game", view.game.unwrap_or(""));
+    let _ = writeln!(out, "game.running={}", u8::from(view.game_running));
+    let (header, body) = view.notice.unwrap_or(("", ""));
+    push_str(out, "notice.header", header);
+    push_str(out, "notice.body", body);
+    push_str(out, "scene", view.scene);
+    // The optional rows come last: as many as fit under the bound, and a mark when some did not.
+    let mut rows = String::new();
+    let mut shown = 0;
+    let fixed = out.len() + "rows.count=\nrows.complete=0\nrows=".len() + 8;
+    for row in view.rows {
+        let mut item = String::new();
+        if shown > 0 {
+            item.push(',');
+        }
+        quote(&mut item, row);
+        if fixed + rows.len() + item.len() > MAX {
+            break;
+        }
+        rows.push_str(&item);
+        shown += 1;
+    }
+    let complete = shown == view.rows.len();
+    let _ = writeln!(out, "rows.count={}", view.rows.len());
+    let _ = writeln!(out, "rows.complete={}", u8::from(complete));
+    let _ = write!(out, "rows={rows}");
+    complete
+}
+
+fn push_str(out: &mut String, key: &str, value: &str) {
+    out.push_str(key);
+    out.push('=');
+    quote(out, value);
+    out.push('\n');
+}
+
+/// `"…"` with `\"`, `\\` and `\n` escaped: one line whatever the text.
+fn quote(out: &mut String, value: &str) {
+    out.push('"');
+    for c in value.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => {}
+            c => out.push(c),
+        }
+    }
+    out.push('"');
 }
 
 /// The bridge lookup schedule: due at most once a second, and only in the first 30 s after the first look.
@@ -69,18 +135,33 @@ impl Discovery {
 
     /// A lookup is due now.
     pub fn due(&mut self, now_ms: u64) -> bool {
-        let _ = now_ms;
-        false
+        if self.state != Search::Searching {
+            return false;
+        }
+        let started = *self.started_ms.get_or_insert(now_ms);
+        if now_ms.saturating_sub(started) > Self::WINDOW_MS {
+            self.state = Search::Disabled;
+            return false;
+        }
+        if now_ms < self.next_ms {
+            return false;
+        }
+        self.next_ms = now_ms + Self::EVERY_MS;
+        true
     }
 
-    pub fn found(&mut self) {}
+    pub fn found(&mut self) {
+        self.state = Search::Found;
+    }
 
     /// The table was there but unusable (bad header, a null pointer, registration refused): off for the boot.
-    pub fn disable(&mut self) {}
+    pub fn disable(&mut self) {
+        self.state = Search::Disabled;
+    }
 
     /// Snapshot work is wanted (discovery still running, or the bridge was found).
     pub fn enabled(&self) -> bool {
-        false
+        self.state != Search::Disabled
     }
 }
 
@@ -93,13 +174,23 @@ pub struct Publisher {
 
 impl Publisher {
     pub fn wants(&self, snapshot: &[u8]) -> bool {
-        let _ = snapshot;
-        false
+        self.dirty || hash(snapshot) != self.last
     }
 
+    /// The bridge's answer to the publish of `snapshot`: 0 landed; anything else keeps it dirty for the next tick.
     pub fn published(&mut self, snapshot: &[u8], result: i32) {
-        let _ = (snapshot, result);
+        if result == 0 {
+            self.last = hash(snapshot);
+            self.dirty = false;
+        } else {
+            self.dirty = true;
+        }
     }
+}
+
+/// FNV-1a (0 is kept for "nothing published yet").
+fn hash(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325u64, |h, b| (h ^ u64::from(*b)).wrapping_mul(0x100_0000_01b3)) | 1
 }
 
 #[cfg(test)]
