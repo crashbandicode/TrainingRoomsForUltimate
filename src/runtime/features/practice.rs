@@ -32,11 +32,15 @@ pub struct How {
 pub fn start(game: Game, how: How) {
     // A running game's settings apply at its next Start: each game latches its own here or when the Start reaches it.
     super::hitbox::practice_started();
+    if game != Game::Parry {
+        super::parry::stopped();
+    }
     ACTIVE.store(game.code(), Ordering::Release);
     match game {
         Game::Eggs => super::hitbox::eggs_start(),
         Game::Btt => super::btt::start(how.place_targets),
         Game::Mashout => super::mashout::start(),
+        Game::Parry => super::parry::start(),
         Game::Tech => {
             super::tech::start(how.tech_point);
             if how.tech_wizard {
@@ -50,6 +54,7 @@ pub fn start(game: Game, how: How) {
 /// Stop the running game (the menu worker, Stop with the menu open).
 pub fn stop() {
     let was = Game::from_code(ACTIVE.swap(0, Ordering::AcqRel));
+    super::parry::stopped();
     diagnostic(format_args!("[Practice] stop game={was:?}"));
 }
 
@@ -62,6 +67,7 @@ pub fn running() -> Option<Game> {
         Game::Tech => super::tech::running() || super::tech::starting(),
         // Mash out has no end of its own: each result re-arms the next attempt until Stop.
         Game::Mashout => true,
+        Game::Parry => super::parry::on(),
     };
     live.then_some(game)
 }

@@ -2005,3 +2005,11 @@ ceiling = 164084
 date = "2026-11-18"
 reason = "rc.15 Parry practice, shared 64-frame SPSC replay rings and the final-pass publication fix, composed on local main 2517b3e5 (four-game Menu and earlier fixes). Gated source dfc234db measured 164084 = 163201 + 883. Exact total, no headroom."
 approved_by = "Operator 2026-11-18 ~19:38Z approved Parry growth, and the parry-sol brief includes the shared ring. Primary c07b3449 00:37Z approved the final-pass correction and replacement gate. Primary c07b3449 01:23Z confirmed operator approval for the landing size entry after the exact +883 report."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164115
+date = "2026-11-19"
+reason = "rc.15 practice menu, the Parry entry (primary 23:22Z slot 6) on main 298ac9ed (164084, Parry landed): Parry practice is the fifth game, its section a sub-screen with Start first (list row + Start), its Off retired (a stored Off reads as 10 attempts); runtime parry.rs records the published row, latches its session at Start and runs while it is the running game (practice::start/stop arm and disarm the replay host); a used saved practice asks for Parry's Start at the close. Measured 164115 = +31 over main."
+approved_by = "PENDING: +31 reported to the primary by menu-games-devin (INBOX 2026-11-19); not yet approved."

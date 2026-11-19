@@ -11,10 +11,11 @@ pub enum Game {
     Btt,
     Tech,
     Mashout,
+    Parry,
 }
 
 impl Game {
-    pub const ALL: [Game; 4] = [Game::Eggs, Game::Btt, Game::Tech, Game::Mashout];
+    pub const ALL: [Game; 5] = [Game::Eggs, Game::Btt, Game::Tech, Game::Mashout, Game::Parry];
 
     pub const fn title(self) -> &'static str {
         match self {
@@ -22,6 +23,7 @@ impl Game {
             Game::Btt => "Break the Targets",
             Game::Tech => "Tech practice",
             Game::Mashout => "Mash out",
+            Game::Parry => "Parry practice",
         }
     }
 
@@ -41,6 +43,7 @@ impl Game {
             Game::Eggs => Some("eggsercise"),
             Game::Btt | Game::Mashout => None,
             Game::Tech => Some("tech_practice"),
+            Game::Parry => Some("parry_practice"),
         }
     }
 }
@@ -122,6 +125,7 @@ mod tests {
         assert_eq!(effective(Game::Tech, 3, Some(Game::Tech)), 3);
         assert_eq!((retired("eggsercise"), retired("tech_practice"), retired("btt"), retired("mashout")), (1, 1, 0, 0));
         assert_eq!(retired("eggsercise_break"), 0);
+        assert_eq!((retired("parry_practice"), effective(Game::Parry, 0, Some(Game::Parry)), effective(Game::Parry, 2, None)), (1, 1, 0));
     }
 
     #[test]

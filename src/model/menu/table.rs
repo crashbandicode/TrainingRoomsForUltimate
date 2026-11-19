@@ -103,7 +103,8 @@ pub static GROUPS: [Group; 26] = [
     sub(Page::FightersStages, "Break the Targets"),
     // Mash out (rc.15 mashout integration) joined as the fourth game, its sub-screen appended the same way.
     sub(Page::FightersStages, "Mash out"),
-    g(Page::FightersStages, "Parry practice"),
+    // Parry practice (rc.15 Parry) joined as the fifth game: its section became its sub-screen.
+    sub(Page::FightersStages, "Parry practice"),
 ];
 
 // Group indices, for the rows below.
@@ -144,6 +145,7 @@ pub const fn game_group(game: Game) -> u8 {
         Game::Btt => BTT,
         Game::Tech => TECH,
         Game::Mashout => MASHOUT,
+        Game::Parry => PARRY,
     }
 }
 
@@ -271,7 +273,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 144] = [
+pub static ROWS: [Row; 146] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -496,6 +498,8 @@ pub static ROWS: [Row; 144] = [
       "Practice techs at a chosen or random stage surface.\nA opens its settings and Start."),
     r(GAMES, "Mash out", "", Control::Game(Game::Mashout),
       "Practice escaping a capture.\nA opens its settings and Start."),
+    r(GAMES, "Parry practice", "", Control::Game(Game::Parry),
+      "Parry the CPU's recorded move, in sets of ten or freely.\nA opens its settings and Start."),
     // Practice games > Eggs-ercise
     r(EGGS, "Start", "", Control::Start(Game::Eggs),
       "Closes the menu and starts Eggs-ercise with the settings below.\nWhile it runs, this row reads Stop."),
@@ -579,7 +583,9 @@ pub static ROWS: [Row; 144] = [
       "Choose a fighter move for the selected state.\nRandom chooses from that state; Random state includes all."),
     r(MASHOUT, "Grab type", "mashout_grab", Control::Dropdown(&super::super::mashout::moves::GRAB_LABELS),
       "Standing, dash or pivot for an ordinary grab.\nRandom chooses one of the three each attempt."),
-    // Parry keeps its original controls here until it has a practice-game sub-screen.
+    // Practice games > Parry practice: its Off is retired (a stored Off reads as 10 attempts); Start and Stop run it.
+    r(PARRY, "Start", "", Control::Start(Game::Parry),
+      "Closes the menu and starts Parry practice with the settings below.\nWhile it runs, this row reads Stop."),
     r(PARRY, "Parry practice", "parry_practice", Control::Dropdown(&o::PARRY_SESSION),
       "Parry the CPU's recorded move: play it with ZR+Up as usual.\nEvery hit is one attempt; 10 attempts ends a set with a summary."),
     // restriction: parry-practice-start-save-missing

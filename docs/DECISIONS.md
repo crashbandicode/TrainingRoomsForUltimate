@@ -662,7 +662,7 @@ Display is On), and the docs GIFs are shot on the final rc.14 build. Untested on
 
 | # | Decided |
 | --- | --- |
-| PM | Fighters & Stages › Practice games is one row per game: Eggs-ercise, Break the Targets, Tech practice and, since its integration landed on main, Mash out (its Off / On row is Start / Stop; Parry practice joins when its branch lands). A opens the game's sub-screen; its rows are the game's rows of today, same labels, controls and order. The separate Tech practice section is the Tech practice sub-screen |
+| PM | Fighters & Stages › Practice games is one row per game: Eggs-ercise, Break the Targets, Tech practice, Mash out (its Off / On row is Start / Stop) and Parry practice (its Off is retired: a stored Off reads as 10 attempts). A opens the game's sub-screen; its rows are the game's rows of today, same labels, controls and order. The separate Tech practice section is the Tech practice sub-screen |
 | Q1 | **A:** only Start starts a game. Closing the menu starts, restarts and stops nothing; a running game keeps running. L+R+A still restarts a run. This reverses rc14-eggs-D9 (c), "reopening the menu and closing it" restarts Eggs-ercise (2026-11-14) |
 | Q2 | **A:** no Off choices. Start / Stop is the switch: Start closes the menu and starts the game (and stops any other); Stop ends it and the menu stays open. The setting keys stay: a stored Off reads as the first mode, and the Break the Targets Off / On row is gone while its `btt` key stays in the file. Saved settings, defaults and layouts load as they are |
 | Q3 | **A:** CPU during a game is shown in the Eggs-ercise and the Break the Targets sub-screens, one setting (`practice_cpu`) |

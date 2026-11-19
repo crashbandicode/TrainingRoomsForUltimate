@@ -60,7 +60,7 @@ fn games_list_is_one_row_per_game() {
     for (control, game) in list.iter().zip(Game::ALL) {
         assert!(matches!(control, Control::Game(g) if *g == game), "{control:?}");
     }
-    assert_eq!(titles(table::GAMES), ["Eggs-ercise", "Break the Targets", "Tech practice", "Mash out"]);
+    assert_eq!(titles(table::GAMES), ["Eggs-ercise", "Break the Targets", "Tech practice", "Mash out", "Parry practice"]);
     // The games' sub groups are not sections of the page: the left column ends with Practice games.
     let m = menu();
     let groups: Vec<&str> = (0..m.entry_count(Page::FightersStages))
@@ -69,7 +69,8 @@ fn games_list_is_one_row_per_game() {
             _ => None,
         })
         .collect();
-    assert_eq!(groups, ["Player 1 and CPU", "Extras", "Stages", "Loading", "Practice games", "Parry practice"]);
+    // Parry practice (slot 6) left its temporary section for its own sub-screen.
+    assert_eq!(groups, ["Player 1 and CPU", "Extras", "Stages", "Loading", "Practice games"]);
     for game in Game::ALL {
         let g = usize::from(table::game_group(game));
         assert!(GROUPS[g].sub && GROUPS[g].page == Page::FightersStages && GROUPS[g].title == game.title());
@@ -295,15 +296,27 @@ fn an_old_settings_file_loads_without_loss() {
     assert_eq!(crate::model::practice_games::effective(Game::Eggs, 0, Some(Game::Eggs)), 1);
 }
 
+/// The Parry entry (slot 6): a used saved parry practice sets Parry's mode and asks for Parry's Start at the close (its
+/// "close the menu and press ZR+Up"); any game's Start replaces that request, and Parry's mode stays as chosen.
 #[test]
-fn starting_another_practice_turns_parry_off() {
+fn a_used_parry_practice_starts_parry_at_the_close() {
+    let mut m = menu();
+    m.parry_on(2);
+    assert_eq!(m.get("parry_practice"), &[0, 0, 1]);
+    assert!(!m.is_closed(), "the player closes the menu");
+    assert_eq!(m.take_outbox().start, Some(Game::Parry));
     for game in Game::ALL {
         let mut m = opened(game);
         m.parry_on(2);
         m.press(Button::A);
         assert_eq!(m.take_outbox().start, Some(game));
-        assert_eq!(m.get("parry_practice"), &[1, 0, 0]);
+        assert_eq!(m.get("parry_practice"), &[0, 0, 1], "Parry's mode stays");
     }
+    // The Parry sub-screen: Start, its mode (no Off), its saved practices.
+    assert_eq!(titles(table::game_group(Game::Parry)), ["Start", "Parry practice", "Saved parry practices", "Save this parry practice"]);
+    let off = settings::parse(r#"{"menu": {"parry_practice": [1,0,0]}}"#).settings;
+    let m = Menu::new(off, Env::default());
+    assert_eq!(m.value(row("Parry practice", table::game_group(Game::Parry))), RowValue::Choice(Some(0)), "a file's Off reads as 10 attempts");
 }
 
 #[test]

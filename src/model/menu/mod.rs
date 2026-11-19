@@ -1369,7 +1369,6 @@ impl Menu {
 
     /// The close starts `game` (and so stops any other game).
     fn start(&mut self, game: Game) {
-        self.put_one_hot("parry_practice", 0);
         (self.outbox.start, self.closed) = (Some(game), true);
     }
 
@@ -2019,9 +2018,11 @@ impl Menu {
         self.env.running == Some(Game::Btt)
     }
 
-    /// A saved parry practice was used: Parry practice turns On with its set length (1 sets of ten, 2 free practice).
+    /// A saved parry practice was used: Parry practice takes its set length (1 sets of ten, 2 free practice) and starts
+    /// when the player closes the menu (rc.15 practice menu: a Start at the close; another Start replaces it).
     pub fn parry_on(&mut self, set: usize) {
         self.put_one_hot("parry_practice", set.clamp(1, 2));
+        self.outbox.start = Some(Game::Parry);
     }
 
     /// The item the player chose on the Give item grid since the last call, if any.

@@ -118,7 +118,7 @@ impl SavedList for ParryPractices {
     /// Save this parry practice: the CPU's active macro and Loop, and the session row's set.
     fn saved_new(&mut self, root: &Path, name: &str) -> Option<Result<String, String>> {
         let Some((macro_id, loop_count)) = parry_wiring(root) else { return Some(Err(PARRY_NO_RECORDING.to_owned())) };
-        let set = if crate::runtime::features::parry::free() { 2 } else { 1 };
+        let set = if crate::runtime::features::parry::chosen_free() { 2 } else { 1 };
         let p = Practice { schema_version: 1, name: name.trim().to_owned(), macro_id, loop_count, set, used: 0 };
         let done = format!("Saved {}", p.name);
         Some(self.write(root, None, p, done))

@@ -82,3 +82,24 @@ fn mash_out_runs_while_it_is_the_running_game() {
     assert!(src("src/runtime/features/mashout/worker.rs").contains("let wanted = wanted();"));
     assert!(src("src/runtime/features/mashout/interposer.rs").contains("let wanted = wanted()"));
 }
+
+/// rc.15 practice menu, the Parry entry (primary 23:22Z slot 6): Parry practice runs while it is the running game. Its
+/// session row is its mode (latched at Start); a settings publish no longer starts it, stops another game or arms the
+/// replay host, and every other Start and every Stop disarms it.
+#[test]
+fn parry_practice_runs_while_it_is_the_running_game() {
+    let parry = src("src/runtime/features/parry.rs");
+    let publish = item(&parry, "pub fn publish(");
+    assert!(!publish.contains("practice::stop") && !publish.contains("set_parry"), "a publish only records the row:\n{publish}");
+    assert!(publish.contains("PUBLISHED.store("), "{publish}");
+    let start = item(&parry, "pub fn start()");
+    assert!(start.contains("SESSION.store(") && start.contains("PUBLISHED.load") && start.contains("set_parry(true)"), "{start}");
+    assert!(item(&parry, "pub fn stopped()").contains("set_parry(false)"));
+    assert!(item(&parry, "pub fn on()").contains("super::practice::is(PracticeGame::Parry)"));
+    let practice = src("src/runtime/features/practice.rs");
+    let begin = item(&practice, "pub fn start(");
+    assert!(begin.contains("Game::Parry => super::parry::start()"), "{begin}");
+    assert!(begin.contains("super::parry::stopped()"), "another game's Start disarms Parry:\n{begin}");
+    assert!(item(&practice, "pub fn stop()").contains("super::parry::stopped()"));
+    assert!(item(&practice, "pub fn running()").contains("Game::Parry => super::parry::on()"));
+}

@@ -18,7 +18,7 @@ UI = re.compile(r'\[Ui\] press (?P<button>\w+) page=(?P<page>\S+) cursor=(?P<cur
                 r'screen=(?P<screen>.*?) row=(?:Some\("(?P<row>[^"]*)"\)|None)')
 DRAW = r'\[TrainingRooms\] notice_draw header="(?P<header>{header})" body="(?P<body>{body})" '
 OPENED = re.compile(r'\[Ui\] menu opened page=(?P<page>\S+) cursor=\d+ depth=(?P<depth>\d+) screen=(?P<screen>.*)')
-GROUPS = {'Tech practice': 21, 'Eggs-ercise': 22, 'Break the Targets': 23, 'Mash out': 24}
+GROUPS = {'Tech practice': 21, 'Eggs-ercise': 22, 'Break the Targets': 23, 'Mash out': 24, 'Parry practice': 25}
 
 
 def save(ctx, name, value):
@@ -239,7 +239,8 @@ def start(ctx, game, expect):
         line = log.wait(expect, 20, ctx).group(0)
     finally:
         log.close()
-    if started != {'Eggs-ercise': 'Eggs', 'Break the Targets': 'Btt', 'Tech practice': 'Tech', 'Mash out': 'Mashout'}[game]:
+    if started != {'Eggs-ercise': 'Eggs', 'Break the Targets': 'Btt', 'Tech practice': 'Tech', 'Mash out': 'Mashout',
+                   'Parry practice': 'Parry'}[game]:
         raise RuntimeError(f'started {started}')
     return {'started': started, 'line': line[:200]}
 
@@ -945,6 +946,47 @@ def mashout_start_stop(ctx):
         log.close()
     out['generation'] = gen
     return save(ctx, 'mashout-start-stop', out)
+
+
+def parry_start_stop(ctx):
+    """Parry practice, the fifth game (main 298ac9ed): its Practice games row opens its sub-screen on Start; Start runs
+    it; reopened, the first row reads Stop (traced set_text); a mode edit and B start and stop nothing; Stop ends it."""
+    out = {}
+    open_game(ctx, 'Parry practice')
+    log = cursor(ctx)
+    try:
+        ctx.press('a')
+        first = log.wait(r'\[Practice\] (start|stop) game=(\S+)', 4, ctx)
+        if first.group(1) == 'stop':
+            out['stopped_first'] = first.group(0)
+            time.sleep(0.5)
+            ctx.press('a')
+            first = log.wait(r'\[Practice\] start game=Parry', 4, ctx)
+        out['start'] = first.group(0)
+        log.wait(r'\[Ui\] menu closed ', 4, ctx)
+    finally:
+        log.close()
+    time.sleep(1.5)
+    out['running_shot'] = shot(ctx, 'parry-running')
+    offset = trace_offset(ctx)
+    open_menu(ctx)
+    time.sleep(0.8)
+    out['reads_stop'] = traced(ctx, offset, 'Stop')
+    if not out['reads_stop']:
+        raise RuntimeError('the reopened Parry sub-screen does not read Stop')
+    out['mode_row'] = set_row(ctx, 'Parry practice', 'Parry practice', 1, 'right')
+    log = cursor(ctx)
+    try:
+        close_plain(ctx)
+        time.sleep(3.0)
+        none_since(ctx, log, r'\[Practice\] (start|stop)')
+    finally:
+        log.close()
+    out['after_b_shot'] = shot(ctx, 'parry-kept-after-b')
+    open_game(ctx, 'Parry practice')
+    out['stop'] = waits(ctx, 'a', r'\[Practice\] stop game=Some\(Parry\)', 4).group(0)
+    close_plain(ctx)
+    return save(ctx, 'parry-start-stop', out)
 
 
 def gif(ctx, name, seconds, act):

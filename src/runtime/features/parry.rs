@@ -9,6 +9,7 @@ use core::fmt::Write as _;
 use hos_lock::{Mutex, Published};
 
 use crate::model::parry::{Attempt, Detector, Frame, View};
+use crate::model::practice_games::{self, Game as PracticeGame};
 use crate::model::settings::Snapshot;
 use crate::model::storage::FixedPath;
 use crate::model::tech::session::{Bests, Grade, Summary};
@@ -31,25 +32,40 @@ struct State {
 const SUMMARY: Summary = Summary { attempts: 0, perfect: 0, held: 0, early: 0, late: 0, locked: 0, missed: 0, streak: 0, best: 0, offset_sum: 0, timed_perfect: 0 };
 static STATE: Mutex<State> = Mutex::new(State { detector: Detector::new(), view: View::EMPTY, summary: SUMMARY, bests: Bests::EMPTY, total: 0, perfect: 0, since_end: None });
 
-/// Every settings publish.
+/// The session row as the last settings publish left it (a stored Off reads as sets of ten, rc.15 practice menu).
+static PUBLISHED: AtomicU8 = AtomicU8::new(0);
+
+/// Every settings publish: the row only. The running practice is the menu's (Start and Stop), and its session is the
+/// one its Start latched.
 pub fn publish(snapshot: &Snapshot) {
     let session = crate::model::tech_settings::selected(snapshot, "parry_practice").min(2) as u8;
-    // The legacy Parry session choice still selects the only running practice.
-    if session != 0 && super::practice::active().is_some() {
-        super::practice::stop();
-    }
-    SESSION.store(session, Ordering::Release);
-    crate::engine::rr_host::set_parry(session != 0);
+    PUBLISHED.store(session, Ordering::Release);
+}
+
+/// Start (the menu worker, `practice::start`, after the close's publish): the session is the row's, the replay host arms.
+pub fn start() {
+    SESSION.store(practice_games::mode(PUBLISHED.load(Ordering::Acquire)), Ordering::Release);
+    crate::engine::rr_host::set_parry(true);
+}
+
+/// Another game's Start or Stop (the menu worker): the replay host disarms.
+pub fn stopped() {
+    crate::engine::rr_host::set_parry(false);
 }
 
 /// Parry practice is on: the strip shows even with Input Display Off (operator Q2, 2026-11-17).
 pub fn on() -> bool {
-    SESSION.load(Ordering::Acquire) != 0
+    super::practice::is(PracticeGame::Parry) && SESSION.load(Ordering::Acquire) != 0
 }
 
 /// Free practice: a running total, no sets.
 pub fn free() -> bool {
-    SESSION.load(Ordering::Acquire) == 2
+    on() && SESSION.load(Ordering::Acquire) == 2
+}
+
+/// The session the row shows, for saving a practice: free practice, else sets of ten.
+pub fn chosen_free() -> bool {
+    practice_games::mode(PUBLISHED.load(Ordering::Acquire)) == 2
 }
 
 /// The strip's view, for the HUD tick.
