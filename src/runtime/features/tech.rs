@@ -430,6 +430,7 @@ pub unsafe fn init(ids: [i32; 18]) -> Option<()> {
     if !tech_surfaces::init() {
         return None;
     }
+    super::tech_decision::init_passive_speed();
     let tumble: [i32; 7] = ids[..7].try_into().ok()?;
     let grading: [i32; 11] = ids[7..].try_into().ok()?;
     GRADING_IDS.set(grading).ok()?;

@@ -110,6 +110,22 @@ unsafe fn ground_contract(accessor: usize) -> Option<usize> {
         && pointer(vptr + 0x668) == Some(base + 0x4658b0))
     .then_some(vptr)
 }
+
+/// Stock floor-touch eligibility includes the contact line's material.
+pub(super) unsafe fn passive_floor_touch(accessor: usize) -> Option<bool> {
+    if !MATERIAL_VERIFIED.get().copied().unwrap_or(false) {
+        return None;
+    }
+    let base = game::text_base();
+    let vptr = ground_contract(accessor)?;
+    if pointer(vptr + 0x4a0) != Some(base + 0x4635b0)
+        || pointer(vptr + 0x478) != Some(base + 0x4628c0)
+    {
+        return None;
+    }
+    let touch: extern "C" fn(usize, u32) -> bool = std::mem::transmute(base + 0x696910);
+    Some(touch(accessor, 8))
+}
 /// Ephemeral reader: construct per P1 pass and never retain a live accessor.
 /// Construction works while airborne; only initial seed acquisition needs ground.
 pub struct NativeSource {

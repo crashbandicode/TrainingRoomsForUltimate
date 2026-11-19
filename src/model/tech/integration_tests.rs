@@ -2365,6 +2365,8 @@ fn tech_f006_set_time_and_non_auto_start_keep_their_sampling() {
 fn speed_refusal_snapshot() -> crate::model::tech_launch::DecisionSnapshot {
     let mut s = snapshot(1);
     s.contact.passive_enabled = false;
+    s.contact.surface = Surface::Floor;
+    s.entered_status = Some(s.contact.requested_status);
     s.guard_count = Some(4);
     s.passive_speed = Some(6.6087065);
     s
@@ -2403,6 +2405,9 @@ fn speed_refusal_omits_the_notice_for_missing_or_ineligible_guard_input() {
     }
     assert_eq!(refusal_text(super::super::tech_launch::DecisionSnapshot {
         previous_guard_gap: Some(27), ..s
+    }), "Untechable (not counted)");
+    assert_eq!(refusal_text(super::super::tech_launch::DecisionSnapshot {
+        entered_status: Some(s.contact.requested_status + 1), ..s
     }), "Untechable (not counted)");
 }
 

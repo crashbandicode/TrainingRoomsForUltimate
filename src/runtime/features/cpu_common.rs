@@ -93,7 +93,25 @@ extern "C" fn di_hook(fighter: usize, value: L2CValue) -> L2CValue {
     original(fighter, value)
 }
 
-extern "C" fn change_status_hook(fighter: usize, status: L2CValue, unk: L2CValue) -> L2CValue {
+// The replacement keeps the existing ABI and carries the native caller's
+// frame and return address into the same observation seam.
+#[unsafe(naked)]
+extern "C" fn change_status_hook(_fighter: usize, _status: L2CValue, _unk: L2CValue) -> L2CValue {
+    core::arch::naked_asm!(
+        "mov x3, x29",
+        "mov x4, x30",
+        "b {body}",
+        body = sym change_status_body,
+    )
+}
+
+extern "C" fn change_status_body(
+    fighter: usize,
+    status: L2CValue,
+    unk: L2CValue,
+    native_frame: usize,
+    native_return: usize,
+) -> L2CValue {
     let _scope = HookScope::enter();
     let mut status = status;
     let mut unk = unk;
@@ -107,7 +125,9 @@ extern "C" fn change_status_hook(fighter: usize, status: L2CValue, unk: L2CValue
         };
         // Optional Stage tech observes the same native decision, before CPU substitution.
         let accessor = unsafe { cpu::script_accessor(fighter) };
-        decision = unsafe { super::tech_adapter::decision(accessor, requested, passive) }
+        decision = unsafe {
+            super::tech_adapter::decision(accessor, requested, passive, native_frame, native_return)
+        }
             .map(|attempt| (accessor, attempt));
         // Mash out row 121 (mashout-ganon-tech) grades the same native decision with the same snapshot reader.
         mash_tech = unsafe { super::mashout::tech_contact(accessor, requested, passive) }.map(|g| (accessor, g));
@@ -222,6 +242,8 @@ fn install(info: &skyline::nro::NroInfo) {
         for (site, address) in COMMON_SITES.iter().zip(addresses) {
             if !site.hooked {
                 IS_ENABLE_PASSIVE.store(address, Ordering::Release);
+                // The notice additionally relies on the body of this stock predicate.
+                unsafe { super::tech_decision::verify_passive_speed_rule(address) };
             }
         }
         for (site, address) in COMMON_SITES.iter().zip(addresses) {
