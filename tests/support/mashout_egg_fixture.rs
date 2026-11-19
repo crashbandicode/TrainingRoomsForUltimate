@@ -1031,6 +1031,29 @@ fn ordinary_grab_and_downthrow_preserve_entry_semantics() {
     }
 }
 #[test]
+fn dash_grab_accepts_the_scored_native_dash_pull() {
+    unsafe {
+        let dash_pull = game::lua_const(lua_bind_hash("FIGHTER_STATUS_KIND_CATCH_DASH_PULL")).unwrap();
+        for (grab, expected) in [(1, Step::Held), (0, Step::Failed), (2, Step::Failed)] {
+            let mut m = NativeMemory::new();
+            let mut g = Game::new(Plan::Grab, State::Grab);
+            let requested = g.requested.as_mut().unwrap();
+            requested.id = 0;
+            requested.attacker_kind = 0;
+            requested.attacker_name = "Mario";
+            requested.grab = grab;
+            m.body[3] = requested.attacker_kind;
+            startup(&mut g, m.p1());
+            CPU_STATUS.store(u32::try_from(dash_pull).unwrap(), Ordering::Relaxed);
+            m.seed(60.0, 8.0, 1);
+            m.start();
+            m.update(&mut g, 66);
+            assert_eq!(g.step, expected, "grab={grab}, notice={:?}", g.failed);
+            assert_eq!(BEGINS.with_borrow(Vec::len), usize::from(grab == 1));
+        }
+    }
+}
+#[test]
 fn cancel_during_tongue_waits_for_release() {
     let _m = NativeMemory::new();
     let mut g = Game::new(Plan::Egg, State::Egg);
@@ -1366,6 +1389,7 @@ mod game {
             ("FIGHTER_STATUS_KIND_CATCH", 50),
             ("FIGHTER_STATUS_KIND_CATCH_DASH", 54),
             ("FIGHTER_STATUS_KIND_CATCH_TURN", 55),
+            ("FIGHTER_STATUS_KIND_CATCH_DASH_PULL", 58),
         ] {
             if super::lua_bind_hash(name) == hash {
                 return Some(id);
