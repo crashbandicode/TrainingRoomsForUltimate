@@ -2029,3 +2029,11 @@ ceiling = 164543
 date = "2026-11-19"
 reason = "Parry Start begins a fresh set (0e5b0554): 164542 normalized lines vs 164529 at 5b6ab8cc. Add the measured +13 to the existing 164530 ceiling."
 approved_by = "Operator Parry Start request recorded by primary c07b3449 at 14:17Z (2026-11-19); rc.15 change-set common brief authorizes a separate budget entry for the exact measured delta."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164549
+date = "2026-11-19"
+reason = "Parry Start view review (62f009af): add the measured +6 normalized lines to the previous 164543 ceiling. Cumulative Parry Start change +19 (164548 vs 164529 at 5b6ab8cc)."
+approved_by = "Operator Parry Start request recorded by primary c07b3449 at 14:17Z; same rc.15 change-set rule for its explicit-Start HUD review follow-up."
