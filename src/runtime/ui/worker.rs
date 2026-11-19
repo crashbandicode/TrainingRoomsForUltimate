@@ -248,6 +248,8 @@ struct Session {
     mii: Option<crate::editors::mii::MiiList>,
     opening: u32,
     pending_close: Option<crate::runtime::mii::menu_handoff::CloseIntent>,
+    /// The optional test bridge's state provider (off without the bridge).
+    bridge: crate::runtime::bridge_state::Provider,
 }
 
 impl Session {
@@ -323,14 +325,52 @@ fn run() {
         let developer_pending = developer_reload.step();
         #[cfg(feature = "diag")]
         crate::runtime::stall_watch::worker_step(0);
+        publish_bridge_state(&mut session);
         if building || (read_index && session.recording_index.ready(version).is_some()) {
             WAKE.wait(Some(std::time::Duration::ZERO));
         } else if read_index || session.watching() || developer_pending {
             WAKE.wait(Some(POLL));
         } else {
-            WAKE.wait(None);
+            // The bridge's lookup (once a second for 30 s) or its snapshots; nothing once it is off.
+            WAKE.wait(crate::runtime::bridge_state::poll_interval());
         }
     }
+}
+
+/// The `tr.menu/1` snapshot for the optional test bridge (`model::bridge_state`); one relaxed load when it is off.
+fn publish_bridge_state(s: &mut Session) {
+    if !crate::runtime::bridge_state::enabled() {
+        return;
+    }
+    let now = crate::runtime::clock::uptime_ms();
+    let Session { bridge, menu, panel, .. } = s;
+    bridge.tick(now, |notice, ack, out| {
+        let open = OPEN.load(Ordering::Acquire);
+        let m = menu.as_ref();
+        let row = m.and_then(|m| m.help_row());
+        let group = m.and_then(|m| match m.screen() { Some(Screen::Rows { group, .. }) => Some(*group), _ => None });
+        let editor = panel.map(|e| format!("{e:?}"));
+        let action = crate::runtime::bridge_state::action(row);
+        let active = crate::runtime::features::practice::active();
+        let view = crate::model::bridge_state::View {
+            open: open && m.is_some(),
+            page: m.map_or("", |m| m.page().id()),
+            depth: m.map_or(0, |m| m.depth()),
+            group,
+            cursor: m.map_or(0, |m| m.cursor()),
+            row: row.map(|r| r.title),
+            row_id: row.map_or("", |r| r.id),
+            action: &action,
+            editor: editor.as_deref(),
+            game: active.map(|g| g.title()),
+            game_running: crate::runtime::features::practice::running().is_some(),
+            notice: (!notice.0.is_empty()).then_some((notice.0.as_str(), notice.1.as_str())),
+            ack,
+            ack_result: "handled",
+            ..Default::default()
+        };
+        crate::model::bridge_state::snapshot(&view, out);
+    });
 }
 
 fn sync_input_generation(s: &mut Session) {
@@ -497,6 +537,7 @@ fn press(button: Button, s: &mut Session) {
         return;
     }
     if s.pending_close.is_some() { return; }
+    crate::runtime::bridge_state::note_ack();
     s.refusal = None;
     s.setup_note = None;
     let mut editor_request = None;
