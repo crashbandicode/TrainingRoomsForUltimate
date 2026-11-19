@@ -1,14 +1,15 @@
 //! Read-only native stage surfaces. Called only on the owned P1 game thread.
 //! Field/call evidence: DESIGN §4 and TECH-UI-SURFACE-GUARDS.json (owned 13.0.5).
-use crate::model::guard::{guard_outcome, SeamKind};
+use crate::model::guard::{guard_outcome, GuardOutcome, SeamKind};
 use crate::model::sites_tech_surfaces::windows as guards;
 use crate::model::tech::discovery::{decode, far_end, Bootstrap, Rays};
-use crate::model::tech::surface::{Kind, Line, Source, Surfaces};
+use crate::model::tech::surface::{damaging_material, Kind, Line, Source, Surfaces};
 use crate::model::tech::Vec2;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::game::{self, natives};
 use std::sync::OnceLock;
 static VERIFIED: OnceLock<bool> = OnceLock::new();
+static MATERIAL_VERIFIED: OnceLock<bool> = OnceLock::new();
 
 #[repr(C, align(16))]
 struct NativePoint([f32; 4]);
@@ -72,6 +73,18 @@ pub(super) unsafe fn init() -> bool {
             ));
             good &= outcome.usable();
         }
+        if good {
+            MATERIAL_VERIFIED.get_or_init(|| {
+                guards::MATERIAL.iter().all(|&(name, offset, expected)| {
+                    let actual = ((base + offset) as *const [u8; 64]).read_unaligned();
+                    let outcome = guard_outcome(&expected, &actual, SeamKind::Relied);
+                    diagnostic(format_args!(
+                        "[TechPractice] material_guard site={name} outcome={outcome:?}"
+                    ));
+                    outcome == GuardOutcome::Stock
+                })
+            });
+        }
         good
     })
 }
@@ -89,32 +102,55 @@ unsafe fn point(line: usize, end: usize) -> Option<Vec2> {
 }
 
 /// The reviewed real GroundModule tables share these exact slot implementations.
-unsafe fn ground_contract(accessor: usize) -> bool {
+unsafe fn ground_contract(accessor: usize) -> Option<usize> {
     let base = game::text_base();
-    let Some(module) = pointer(accessor + 0x58) else {
-        return false;
-    };
-    let Some(vptr) = pointer(module) else {
-        return false;
-    };
-    [base + 0x4f87560, base + 0x4f6d8b0].contains(&vptr)
+    let vptr = pointer(pointer(accessor + 0x58)?)?;
+    ([base + 0x4f87560, base + 0x4f6d8b0].contains(&vptr)
         && pointer(vptr + 0x4d8) == Some(base + 0x463c40)
-        && pointer(vptr + 0x668) == Some(base + 0x4658b0)
+        && pointer(vptr + 0x668) == Some(base + 0x4658b0))
+    .then_some(vptr)
 }
 /// Ephemeral reader: construct per P1 pass and never retain a live accessor.
 /// Construction works while airborne; only initial seed acquisition needs ground.
 pub struct NativeSource {
     accessor: usize,
+    ground_vptr: usize,
+    material_usable: Option<bool>,
 }
 impl NativeSource {
     /// Caller owns this P1 accessor for the current native game-thread pass.
     pub unsafe fn new(accessor: usize) -> Option<Self> {
-        (crate::model::scene::scene(crate::runtime::scene::facts()).is_some()
-            && guarded()
-            && accessor & 7 == 0
-            && readable(accessor, 0x60)
-            && ground_contract(accessor))
-        .then_some(Self { accessor })
+        if crate::model::scene::scene(crate::runtime::scene::facts()).is_none()
+            || !guarded()
+            || accessor & 7 != 0
+            || !readable(accessor, 0x60)
+        {
+            return None;
+        }
+        Some(Self {
+            accessor,
+            ground_vptr: ground_contract(accessor)?,
+            material_usable: None,
+        })
+    }
+    /// Use only after this source has validated the same live line in this pass.
+    pub(super) unsafe fn damaging_floor(&mut self, line: Line) -> bool {
+        let kind = line.kind();
+        if kind != Some(Kind::Floor) {
+            return false;
+        }
+        let vptr = self.ground_vptr;
+        if !*self.material_usable.get_or_insert_with(|| {
+            MATERIAL_VERIFIED.get().copied().unwrap_or(false)
+                && pointer(vptr + 0x478) == Some(game::text_base() + 0x4628c0)
+        }) {
+            return false;
+        }
+        damaging_material(
+            kind,
+            ((line.id + 0xc6) as *const u8).read(),
+            ((line.id + 0xd0) as *const u32).read(),
+        )
     }
     pub fn touched(&mut self) -> Option<Line> {
         unsafe {

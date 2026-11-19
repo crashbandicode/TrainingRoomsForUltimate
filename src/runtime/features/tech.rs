@@ -19,7 +19,7 @@ use crate::model::tech::{
     planner,
     session::{Bests, Length, Phase},
     solver,
-    surface::{Kind, RememberedSpot, StageEpoch, Surfaces, Walk},
+    surface::{Kind, MaterialDraws, MaterialHint, RememberedSpot, StageEpoch, Surfaces, Walk},
     wizard::{Action as WizardAction, Outcome as WizardOutcome, Step, Wizard},
     Vec2,
 };
@@ -73,6 +73,11 @@ static VIEW: Mutex<ViewState> = Mutex::new(ViewState {
     preview_params: None,
     preview_blocked: None,
 });
+enum StartHint {
+    Off,
+    Pending(MaterialDraws),
+    Visible(MaterialHint, u8),
+}
 struct Practice {
     adapter: Adapter,
     controller: Controller,
@@ -96,6 +101,7 @@ struct Practice {
     recovery_error: Option<&'static str>,
     restart_pending: bool,
     retained_sample: Option<(Setup, [f32; 2])>,
+    start_hint: StartHint,
 }
 thread_local! {
     static LIVE: RefCell<Option<Practice>> = const { RefCell::new(None) };
@@ -288,7 +294,12 @@ fn wizard_poll(view: &mut ViewState, sample: Sample, stick: [f32; 2], range: [f3
 
 /// The wizard uses the shared notice writer and compact HUD. Measurement,
 /// wrapping and placement belong to the common renderer and existing panes.
-fn wizard_notice(run: &Practice, wizard: &Wizard, blocked: Option<bool>) {
+fn wizard_notice(
+    run: &Practice,
+    wizard: &Wizard,
+    blocked: Option<bool>,
+    hint: Option<MaterialHint>,
+) {
     use core::fmt::Write;
     let mut text = FixedPath::<256>::new();
     let _ = writeln!(text, "{}", wizard.step.title());
@@ -329,6 +340,9 @@ fn wizard_notice(run: &Practice, wizard: &Wizard, blocked: Option<bool>) {
             }
         ),
     };
+    if let Some(hint) = hint {
+        let _ = write!(text, "\n{}", hint.text());
+    }
     let _ = text.write_str(if wizard.step == Step::Preview {
         "\nA / + start · B back"
     } else {
@@ -454,6 +468,9 @@ fn notice(run: &Practice, text: Option<&str>) {
         if run.approximate {
             let _ = message.write_str(" · Auto approximate");
         }
+        if let StartHint::Visible(hint, _) = run.start_hint {
+            let _ = write!(message, "\n{}", hint.text());
+        }
     }
     notices::upsert(
         NOTICE,
@@ -483,6 +500,9 @@ fn rebuild(run: &mut Practice, view: &mut ViewState) {
         })
         .and_then(|spot| RememberedSpot::capture(spot.line, spot.point));
     run.retained_sample = sampled.map(|(setup, _, percent)| (setup, percent));
+    if let StartHint::Pending(draws) = &mut run.start_hint {
+        *draws = MaterialDraws::default();
+    }
     run.recovering = true;
     run.scan = None;
     run.scan_done = false;
@@ -608,6 +628,7 @@ pub unsafe fn frame(fighter: usize) {
                 recovery_error: None,
                 restart_pending: false,
                 retained_sample: None,
+                start_hint: StartHint::Off,
             });
         }
         let run = slot.as_mut().unwrap();
@@ -828,6 +849,7 @@ pub unsafe fn frame(fighter: usize) {
             run.config = view.wizard_config.unwrap_or(config);
             camera = run.config.camera;
             run.controller.start(length(run.config));
+            run.start_hint = StartHint::Pending(MaterialDraws::default());
             run.decision = None;
             run.pending = true;
             run.reroll = true;
@@ -855,9 +877,19 @@ pub unsafe fn frame(fighter: usize) {
                             let multiplier = super::tech_hitlag::live_multiplier(at).ok()?;
                             let context = plan_context(&view, spot, draft, at, multiplier)?;
                             let params = context.params;
-                            Some((planner::plan(draft, context, &mut |_| 0).is_none(), params))
+                            let blocked = planner::plan(draft, context, &mut |_| 0).is_none();
+                            let mut draws = MaterialDraws::default();
+                            if !blocked {
+                                draws.observe(source.damaging_floor(spot.line));
+                            }
+                            Some((blocked, params, draws.hint(draft)))
                         })();
-                        wizard_notice(run, wizard, preview.map(|p| p.0));
+                        wizard_notice(
+                            run,
+                            wizard,
+                            preview.map(|p| p.0),
+                            preview.and_then(|p| p.2),
+                        );
                         view.preview_blocked = preview.map(|p| p.0);
                         view.preview_params = preview.map(|p| p.1);
                     }
@@ -980,6 +1012,11 @@ pub unsafe fn frame(fighter: usize) {
                         kind(run.config),
                         range,
                         &mut |n| draw(&mut run.rng, n),
+                        &mut |source, line| {
+                            if let StartHint::Pending(draws) = &mut run.start_hint {
+                                draws.observe(source.damaging_floor(line));
+                            }
+                        },
                     )
                 };
                 let Some(spot) = spot else {
@@ -1019,10 +1056,24 @@ pub unsafe fn frame(fighter: usize) {
                     rebuild(run, &mut view);
                     return;
                 }
+                let start_hint = if let StartHint::Pending(mut draws) = run.start_hint {
+                    if run.config.surface == 4 {
+                        draws.observe(source.damaging_floor(spot.line));
+                    }
+                    Some(draws.hint(run.config))
+                } else {
+                    None
+                };
                 if matches!(
                     run.controller.place(&mut run.adapter, setup),
                     Ok(Event::Placed)
                 ) {
+                    if let Some(hint) = start_hint {
+                        run.start_hint = hint.map_or(
+                            StartHint::Off,
+                            |hint| StartHint::Visible(hint, 90),
+                        );
+                    }
                     run.pending = false;
                     run.decision = None;
                     run.after_reaction = 0;
@@ -1031,6 +1082,13 @@ pub unsafe fn frame(fighter: usize) {
             }
         }
         notice(run, None);
+        if let StartHint::Visible(hint, left) = run.start_hint {
+            run.start_hint = if left > 1 {
+                StartHint::Visible(hint, left - 1)
+            } else {
+                StartHint::Off
+            };
+        }
     });
     drop(view);
     super::btt_camera::request(

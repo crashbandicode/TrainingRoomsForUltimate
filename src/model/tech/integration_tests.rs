@@ -261,6 +261,7 @@ fn random_spot_refreshes_lines_and_clips_camera_before_sampling() {
         Some(Kind::Ceiling),
         [-10., 10., 0., -100.],
         &mut |_| 0,
+        &mut |_, _| {},
     )
     .unwrap();
     assert_eq!(spot.line.id, 1);
@@ -273,7 +274,8 @@ fn random_spot_refreshes_lines_and_clips_camera_before_sampling() {
         &mut source,
         None,
         [-100., 100., 0., -100.],
-        &mut |_| 0
+        &mut |_| 0,
+        &mut |_, _| {},
     )
     .is_none());
 }
@@ -2254,19 +2256,32 @@ fn damage_surface_hint_observes_only_eligible_targets_without_changing_draws() {
     use surface::{MaterialDraws, MaterialHint};
 
     let (surfaces, _, mut config) = tech_f006_fixture();
-    let floor: Vec<_> = surfaces.lines().filter(|line| line.kind() == Some(Kind::Floor)).collect();
+    let floor: Vec<_> = surfaces
+        .lines()
+        .filter(|line| line.kind() == Some(Kind::Floor))
+        .collect();
     let mut source = Lines(floor);
     let mut draws = MaterialDraws::default();
     let mut bins = Vec::new();
     let mut observed = Vec::new();
     let picked = picker::random_spot(
-        &surfaces, &mut source, Some(Kind::Floor), [-295., 10., 30., -5.],
-        &mut |n| { bins.push(n); n - 1 },
-        &mut |_, line| { observed.push(line.id); draws.observe(line.id == 5); },
-    ).unwrap();
+        &surfaces,
+        &mut source,
+        Some(Kind::Floor),
+        [-240., 10., 30., -5.],
+        &mut |n| {
+            bins.push(n);
+            n - 1
+        },
+        &mut |_, line| {
+            observed.push(line.id);
+            draws.observe(line.id == 7);
+        },
+    )
+    .unwrap();
     assert_eq!((picked.line.id, picked.point.y), (1, 0.));
     assert_eq!(bins, [1, 2, 65536]);
-    assert_eq!(observed, [1, 5], "other passable platforms are outside this camera");
+    assert_eq!(observed, [1, 7], "other passable platforms are outside this camera");
     config.surface = 1;
     assert_eq!(draws.hint(config), Some(MaterialHint::Some));
 }

@@ -1,6 +1,8 @@
 //! Fixed-capacity surface snapshot; native discovery is spread over frames.
 use super::{add, dot, finite, scale, sub, Vec2};
 
+use crate::model::tech_settings::{Config, Mode};
+
 pub const MAX_LINES: usize = 64;
 pub const END_MARGIN: f32 = 5.0;
 
@@ -9,6 +11,63 @@ pub enum Kind {
     Floor,
     Wall,
     Ceiling,
+}
+
+/// Stock floor passive rejects these materials if the native line exposes its material.
+/// Scope this to floor contacts; other transition paths may use a different check.
+pub fn damaging_material(kind: Option<Kind>, flags: u8, material: u32) -> bool {
+    kind == Some(Kind::Floor)
+        && flags & 0x10 == 0
+        && matches!(material, 0x12..=0x14 | 0x1f | 0x24 | 0x25)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MaterialHint {
+    Here,
+    All,
+    Some,
+}
+
+impl MaterialHint {
+    pub const fn text(self) -> &'static str {
+        match self {
+            Self::Here => "Can't tech here: damaging surface",
+            Self::All => "All draws: can't tech on damaging surfaces",
+            Self::Some => "Some draws can target a surface you can't tech",
+        }
+    }
+}
+
+/// Every eligible target contributes, even when its material is unverified.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct MaterialDraws {
+    damaging: bool,
+    other: bool,
+}
+
+impl MaterialDraws {
+    pub fn observe(&mut self, damaging: bool) {
+        self.damaging |= damaging;
+        self.other |= !damaging;
+    }
+
+    pub fn hint(self, config: Config) -> Option<MaterialHint> {
+        if !self.damaging {
+            return None;
+        }
+        if self.other {
+            return Some(MaterialHint::Some);
+        }
+        let random = config.surface != 4
+            || config.start.mode == Mode::Random
+            || config.start.mode == Mode::Auto && config.time.mode == Mode::Random
+            || config.di == 3
+            || config.facing == 3
+            || [config.damage, config.speed, config.hit_damage, config.angle, config.delay]
+                .into_iter()
+                .any(|n| n.mode == Mode::Random && n.lo < n.hi);
+        Some(if random { MaterialHint::All } else { MaterialHint::Here })
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

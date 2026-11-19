@@ -152,12 +152,13 @@ pub fn arrow_points(tip: Vec2, direction: Vec2, stem: f32, head: f32) -> [Vec2; 
 
 /// Draw a line uniformly among currently eligible stationary lines, then a point
 /// within its five-unit end margins. Read every candidate fresh on each attempt.
-pub fn random_spot(
+pub fn random_spot<S: Source>(
     surfaces: &Surfaces,
-    source: &mut impl Source,
+    source: &mut S,
     kind: Option<Kind>,
     range: [f32; 4],
     draw: &mut impl FnMut(u32) -> u32,
+    observe: &mut impl FnMut(&mut S, Line),
 ) -> Option<Spot> {
     if !range.into_iter().all(f32::is_finite) {
         return None;
@@ -198,6 +199,7 @@ pub fn random_spot(
         if low > high {
             continue;
         }
+        observe(source, now);
         count += 1;
         let choice = draw(count);
         if choice >= count {
