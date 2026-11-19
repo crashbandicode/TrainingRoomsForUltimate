@@ -2222,6 +2222,56 @@ fn tech_f006_context(surfaces: &Surfaces, spot: picker::Spot) -> planner::Contex
 }
 
 #[test]
+fn damage_surface_hint_reports_fixed_and_random_targets() {
+    use crate::model::tech_settings::{Mode, Numeric};
+    use surface::{damaging_material, MaterialDraws, MaterialHint};
+
+    let (_, spot, mut config) = tech_f006_fixture();
+    let floor = spot.line.kind();
+    config.time.mode = Mode::Set;
+    let mut draws = MaterialDraws::default();
+    for material in [0x12, 0x13, 0x14, 0x1f, 0x24, 0x25] {
+        assert!(damaging_material(floor, 0, material));
+        assert!(!damaging_material(floor, 0x10, material));
+        assert!(!damaging_material(Some(Kind::Ceiling), 0, material));
+        draws.observe(damaging_material(floor, 0, material));
+    }
+    assert_eq!(draws.hint(config), Some(MaterialHint::Here));
+    config.speed = Numeric { mode: Mode::Random, lo: 100., hi: 250. };
+    assert_eq!(draws.hint(config), Some(MaterialHint::All));
+    config.surface = 1;
+    assert_eq!(draws.hint(config), Some(MaterialHint::All));
+    assert!(!damaging_material(floor, 0, 1));
+    draws.observe(false);
+    assert_eq!(draws.hint(config), Some(MaterialHint::Some));
+    let mut ordinary_or_unknown = MaterialDraws::default();
+    ordinary_or_unknown.observe(false);
+    assert_eq!(ordinary_or_unknown.hint(config), None);
+}
+
+#[test]
+fn damage_surface_hint_observes_only_eligible_targets_without_changing_draws() {
+    use surface::{MaterialDraws, MaterialHint};
+
+    let (surfaces, _, mut config) = tech_f006_fixture();
+    let floor: Vec<_> = surfaces.lines().filter(|line| line.kind() == Some(Kind::Floor)).collect();
+    let mut source = Lines(floor);
+    let mut draws = MaterialDraws::default();
+    let mut bins = Vec::new();
+    let mut observed = Vec::new();
+    let picked = picker::random_spot(
+        &surfaces, &mut source, Some(Kind::Floor), [-295., 10., 30., -5.],
+        &mut |n| { bins.push(n); n - 1 },
+        &mut |_, line| { observed.push(line.id); draws.observe(line.id == 5); },
+    ).unwrap();
+    assert_eq!((picked.line.id, picked.point.y), (1, 0.));
+    assert_eq!(bins, [1, 2, 65536]);
+    assert_eq!(observed, [1, 5], "other passable platforms are outside this camera");
+    config.surface = 1;
+    assert_eq!(draws.hint(config), Some(MaterialHint::Some));
+}
+
+#[test]
 fn tech_f006_largest_random_draw_still_finds_a_feasible_contact() {
     let (surfaces, spot, config) = tech_f006_fixture();
     let plan = planner::plan(config, tech_f006_context(&surfaces, spot), &mut |bins| bins - 1)
