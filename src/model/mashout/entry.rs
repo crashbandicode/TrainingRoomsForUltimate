@@ -1,6 +1,8 @@
 //! Native move entry, sharing the recorder's mapped-input format. No escape formula lives here.
 use super::moves::{Plan, Scenario, State};
-use crate::model::{cpu::ids::C, input_delay::MappedInputs};
+use crate::model::{cpu::ids::C, input_delay::MappedInputs, tech::surface::END_MARGIN};
+
+const FOOT_PROBE: f32 = 0.25;
 
 /// B04 keeps G&W's 14.2 tip spacing. Move108's Flip value is the midpoint
 /// from native frames30/31 in artifacts/rc15-mashout/MEASURED-FIXTURES-108-95.md;
@@ -62,12 +64,64 @@ impl PlacementFloor {
 
     fn supported_height(self, x: f32) -> Option<f32> {
         // Use the same five-unit end clearance as the native Tech surface picker.
-        use crate::model::tech::surface::END_MARGIN;
         let [a, b] = self.ends.map(|point| point[0]);
         if x - a.min(b) < END_MARGIN || a.max(b) - x < END_MARGIN {
             return None;
         }
         self.height(x)
+    }
+
+    fn ends_toward(self, right: bool) -> [[f32; 2]; 2] {
+        let [a, b] = self.ends;
+        if (a[0] < b[0]) == right { [a, b] } else { [b, a] }
+    }
+
+    fn clears_end(
+        mut self,
+        required: f32,
+        right: bool,
+        ray: &mut impl FnMut(f32, [f32; 2], bool) -> Option<Self>,
+    ) -> bool {
+        let reaches = |x: f32, limit: f32| if right { x >= limit } else { x <= limit };
+        // Bound synchronous native reads when a stage has many tiny collision lines.
+        for _ in 0..8 {
+            let [_, join] = self.ends_toward(right);
+            if reaches(join[0], required) {
+                return true;
+            }
+            if !self.stationary {
+                return false;
+            }
+            // First probe at the required clearance. If more lines intervene,
+            // take the next representable sample past this exact endpoint.
+            let past = if right { join[0].next_up() } else { join[0].next_down() };
+            let Some(next) = [required, past].into_iter().find_map(|x| {
+                let level = self.height(x)?;
+                let next = ray(x, [level + FOOT_PROBE, level - FOOT_PROBE], true)?;
+                let [near, far] = next.ends_toward(right);
+                (next.stationary && near == join && reaches(far[0], x))
+                    .then_some(next)
+                    .filter(|floor| floor.height(x).is_some())
+            }) else {
+                return false;
+            };
+            self = next;
+        }
+        reaches(self.ends_toward(right)[1][0], required)
+    }
+
+    fn placement_height(
+        self,
+        x: f32,
+        ray: &mut impl FnMut(f32, [f32; 2], bool) -> Option<Self>,
+    ) -> Option<f32> {
+        let height = self.height(x)?;
+        let [[left, _], [right, _]] = self.ends_toward(true);
+        if x < left || x > right {
+            return None;
+        }
+        (self.clears_end(x - END_MARGIN, false, ray) && self.clears_end(x + END_MARGIN, true, ray))
+            .then_some(height)
     }
 }
 
@@ -81,13 +135,12 @@ pub fn floor_placement(
     camera_bottom: Option<f32>,
     mut ray: impl FnMut(f32, [f32; 2], bool) -> Option<PlacementFloor>,
 ) -> Option<[f32; 3]> {
-    const FOOT_PROBE: f32 = 0.25;
     let spacing = placement_spacing(request);
     if request.plan == Plan::Flip {
         let target = x + spacing * preferred;
         let floor = ray(target, [y + FOOT_PROBE, camera_bottom?], true)?;
         // Let the same native fall settle on the proven landing line.
-        return floor.supported_height(target).map(|_| [target, y, preferred]);
+        return floor.placement_height(target, &mut ray).map(|_| [target, y, preferred]);
     }
 
     let trolley = request.plan == Plan::Trolley;
@@ -105,11 +158,11 @@ pub fn floor_placement(
                 return Some([target, y, side]);
             }
         } else {
-            let height = footing.supported_height(target).or_else(|| {
+            let height = footing.placement_height(target, &mut ray).or_else(|| {
                 // A different collision segment can support the same approach.
                 let level = footing.height(target)?;
                 ray(target, [level + FOOT_PROBE, level - FOOT_PROBE], true)?
-                    .supported_height(target)
+                    .placement_height(target, &mut ray)
             });
             if let Some(height) = height.map(|height| height + foot_offset).filter(|height| height.is_finite()) {
                 return Some([target, height, side]);

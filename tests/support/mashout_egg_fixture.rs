@@ -1261,6 +1261,21 @@ fn final_destination_lip_mirrors_across_an_exact_floor_join() {
 }
 
 #[test]
+fn floor_clearance_follows_each_join_in_a_chain() {
+    let request = Game::new(Plan::Grab, State::Grab).requested.unwrap();
+    let spans = [[-80.0, -75.0], [-75.0, -72.0], [-72.0, 75.0]];
+    let placement = entry::floor_placement(request, [-77.0, 0.0], -1.0, None, |x, _, _| {
+        spans.into_iter().find(|[left, right]| *left <= x && x <= *right).map(
+            |[left, right]| entry::PlacementFloor {
+                ends: [[right, 0.0], [left, 0.0]],
+                ..FIXTURE_FLOOR
+            },
+        )
+    });
+    assert_eq!(placement, Some([-71.0, 0.0, 1.0]));
+}
+
+#[test]
 fn floor_clearance_does_not_cross_a_gap_or_a_platform_end() {
     for detached_floor in [None, Some(entry::PlacementFloor {
         ends: [[-74.986_f32.next_up(), 0.0], [74.988, 0.0]],
