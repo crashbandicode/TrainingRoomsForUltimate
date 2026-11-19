@@ -2213,5 +2213,9 @@ mod tech_menu_tests;
 mod mashout_picker_tests;
 
 #[cfg(test)]
+#[path = "navigation_tests.rs"]
+mod navigation_tests;
+
+#[cfg(test)]
 #[path = "practice_menu_tests.rs"]
 mod practice_menu_tests;
