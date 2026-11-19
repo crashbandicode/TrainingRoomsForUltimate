@@ -2053,3 +2053,11 @@ ceiling = 165129
 date = "2026-11-19"
 reason = "Mash out run reliability on cda940b1. Yoga measured b41624b9 at 165128, up 93 from 165035. Raise the existing 165036 ceiling by 93 and retain one line of headroom."
 approved_by = "Operator 2026-11-19 approved the Mash out resource, Dash and Pivot fixes. Primary c07b3449 directed a separate increase by the measured delta only."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 165331
+date = "2026-11-19"
+reason = "Hidden CPU visualizer v2 (15eac65a) measured 165330 on 4f25a854, up 202 from 165128. Add the measured delta to the existing 165129 ceiling."
+approved_by = "Primary c07b3449 directed the lock-free hidden CPU visualizer revision and a separate exact size adjustment on 2026-11-19."
