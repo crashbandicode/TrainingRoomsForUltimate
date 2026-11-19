@@ -352,6 +352,14 @@ fn publish_bridge_state(s: &mut Session) {
         let row = m.and_then(|m| m.help_row());
         let group = m.and_then(|m| match m.screen() { Some(Screen::Rows { group, .. }) => Some(*group), _ => None });
         let editor = panel.map(|e| format!("{e:?}"));
+        // The selection inside the screen showing: the Mash out popup's line first, else the screen's own cursor/cell.
+        let editor_sel = m.and_then(|m| m.mashout_popup().or(match m.screen() {
+            Some(Screen::List { cursor, .. } | Screen::Checklist { cursor, .. } | Screen::Delay { cursor, .. }
+                | Screen::SwapGroups { cursor } | Screen::Overrides { cursor, .. } | Screen::Chords { cursor }) => Some(*cursor),
+            Some(Screen::Grid { cell, .. }) => Some(*cell),
+            _ => None,
+        })).map(|i| i as i64);
+        let keyboard = crate::runtime::macros::named_macros::naming_pending();
         let action = crate::runtime::bridge_state::action(row);
         let active = crate::runtime::features::practice::active();
         let view = crate::model::bridge_state::View {
@@ -364,6 +372,8 @@ fn publish_bridge_state(s: &mut Session) {
             row_id: row.map_or("", |r| r.id),
             action: &action,
             editor: editor.as_deref(),
+            editor_sel,
+            keyboard,
             game: active.map(|g| g.title()),
             game_running: crate::runtime::features::practice::running().is_some(),
             notice: (!notice.0.is_empty()).then_some((notice.0.as_str(), notice.1.as_str())),

@@ -1106,6 +1106,11 @@ impl Menu {
         )
     }
 
+    /// The Mash out picker's open popup line (its cursor), when the popup is up (the bridge state's `editor.sel`).
+    pub fn mashout_popup(&self) -> Option<usize> {
+        self.mashout_pop.map(|pop| pop.cursor)
+    }
+
     /// The menu was closed (B on the page); the runtime commits.
     pub fn is_closed(&self) -> bool {
         self.closed
