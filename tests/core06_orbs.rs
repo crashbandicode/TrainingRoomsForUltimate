@@ -99,6 +99,36 @@ fn orb_of_kind(x: f32, kind: u32) -> Orb {
     Orb { key: hitbox::sphere_key(kind, 0, 0), ..orb(x) }
 }
 
+fn hidden_fighter_and_owned_objects_leave_and_rejoin_the_draw_order() {
+    let mut board = Board::new();
+    let fighter = [hitbox::KIND_HIT, hitbox::KIND_HURT, hitbox::KIND_GRAB, model::legend::KIND_MARK];
+    let article = [hitbox::KIND_HIT, hitbox::KIND_ARTICLE_HURT, model::legend::KIND_WIND, model::legend::KIND_AREA];
+    let orbs = |x, kinds: [u32; 4]| kinds.into_iter().map(move |kind| orb_of_kind(x, kind));
+    board.publish(10, orbs(1.0, fighter));
+    board.publish(20, orbs(2.0, fighter));
+    board.publish_owned(30, 10, orbs(3.0, article));
+    board.publish_owned(40, 20, orbs(4.0, article));
+    board.publish_owned(50, 0, orbs(5.0, article));
+    let visible = |b: &Board, x| b.in_draw_order().filter(|orb| orb.centre[0] == x).count();
+    assert_eq!(visible(&board, 2.0), 4);
+    assert_eq!(visible(&board, 4.0), 4);
+
+    board.set_hidden(&[0, 20]);
+    assert_eq!(visible(&board, 2.0), 0, "the hidden CPU's overlays");
+    assert_eq!(visible(&board, 4.0), 0, "the hidden CPU's projectile and article overlays");
+    assert_eq!(visible(&board, 1.0), 4);
+    assert_eq!(visible(&board, 3.0), 4);
+    assert_eq!(visible(&board, 5.0), 4, "an unowned item");
+
+    board.publish_owned(40, 10, orbs(4.0, article));
+    assert_eq!(visible(&board, 4.0), 4, "an object whose owner changed");
+    board.publish_owned(40, 20, orbs(4.0, article));
+    assert_eq!(visible(&board, 4.0), 0);
+    board.set_hidden(&[]);
+    assert_eq!(visible(&board, 2.0), 4, "the CPU's existing overlays return");
+    assert_eq!(visible(&board, 4.0), 4, "a still-live article's overlays return");
+}
+
 /// Decision HB-PILLS: the 512 orb panes are 340 half-disc caps and 172 bands, so 170 pills. A pill takes two caps and,
 /// when it has a length, a band. A pill that does not get every pane it needs is cut whole, never a cap without its band,
 /// and the panes are taken in the board's draw order, so hurtboxes are cut first (review HB-2).
@@ -436,6 +466,7 @@ fn case_table() {
         ("own_orbs_are_never_refused_and_conclude_with_the_status", own_orbs_are_never_refused_and_conclude_with_the_status as fn()),
         ("a_grab_box_set_in_the_frame_it_connects_shows_once_not_through_the_pull", a_grab_box_set_in_the_frame_it_connects_shows_once_not_through_the_pull as fn()),
         ("an_orb_is_the_hitbox_size_in_the_spheres_tint", an_orb_is_the_hitbox_size_in_the_spheres_tint as fn()),
+        ("hidden_fighter_and_owned_objects_leave_and_rejoin_the_draw_order", hidden_fighter_and_owned_objects_leave_and_rejoin_the_draw_order as fn()),
         ("the_pill_panes_are_cut_whole_hurtboxes_first", the_pill_panes_are_cut_whole_hurtboxes_first as fn()),
         ("a_capsules_two_ends_are_one_orb", a_capsules_two_ends_are_one_orb as fn()),
         ("an_inactive_tick_hides_the_orbs_it_showed", an_inactive_tick_hides_the_orbs_it_showed as fn()),

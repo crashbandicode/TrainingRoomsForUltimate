@@ -146,6 +146,12 @@ impl Board {
         len
     }
 
+    pub fn publish_owned(&mut self, key: usize, _owner: usize, orbs: impl Iterator<Item = Orb>) -> usize {
+        self.publish(key, orbs)
+    }
+
+    pub fn set_hidden(&mut self, _accessors: &[usize]) {}
+
     /// `key` has no orbs now.
     pub fn clear(&mut self, key: usize) {
         if let Some(i) = self.keys.iter().position(|k| *k == key && key != 0) {
