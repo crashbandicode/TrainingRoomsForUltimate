@@ -592,6 +592,27 @@ fn state01_suppression_predicates() {
 }
 
 #[test]
+fn ice114_damage_cap_state_load() {
+    use model::settings::parse;
+    use serde_json::json;
+
+    for percent in [151u8, 254, 255] {
+        let loaded_settings = parse(&json!({
+            "menu": {
+                "save_damage_player": [0, 0, 1],
+                "save_damage_limits_player": [percent, percent],
+                "save_damage_cpu": [0, 0, 1],
+                "save_damage_limits_cpu": [150, 150],
+            },
+        }).to_string());
+        let settings = StateSettings::from_snapshot(&loaded_settings.settings.menu);
+        let (player, cpu) = run_ground_load(&mut loaded(), &settings, &mut rng());
+        assert_eq!(player.done.unwrap().damage, Some(f32::from(percent)), "{:?}", loaded_settings.issues);
+        assert_eq!(cpu.done.unwrap().damage, Some(150.0));
+    }
+}
+
+#[test]
 fn state01_settings_default_and_from_the_factory_snapshot() {
     use model::settings::Snapshot;
     let factory = StateSettings::from_snapshot(&Snapshot::factory());

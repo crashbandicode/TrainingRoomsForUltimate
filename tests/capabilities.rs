@@ -58,6 +58,10 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "tech_adapter::launch", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::restore", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::attempt", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    // Mash out row 121 (mashout-ganon-tech) reads Tech practice's decision snapshot and guard edge only through these.
+    Boundary { function: "tech_adapter::mash_snapshot", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::mash_entered", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    Boundary { function: "tech_adapter::mash_guard", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     // The save-state step of the per-fighter frame wrapper: a no-op until boot activates package 3.
     Boundary { function: "states::frame", owner: Some(Feature::StateCore), gate: Gate::Flag("ACTIVE") },
     // The frame wrapper's per-feature facts and appliers: each checks its feature's install flag first.
@@ -113,6 +117,9 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "mashout::seed_token", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
     Boundary { function: "mashout::seed_after", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
     Boundary { function: "mashout::owns_cpu", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
+    // Row 121's status-change seam from cpu_common (mashout-ganon-tech).
+    Boundary { function: "mashout::tech_contact", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
+    Boundary { function: "mashout::tech_confirm", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
     Boundary { function: "btt_camera::request", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
     Boundary { function: "btt_camera::frame", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
     Boundary { function: "btt::frame", owner: Some(Feature::Hitbox), gate: Gate::Flag("USABLE") },
@@ -884,16 +891,16 @@ fn injected_hitlag_callback_reaches_all_four_guarded_native_readers() {
 fn mashout_rows_are_registered_without_new_writes() {
     use model::guard::SeamKind;
     let rows = &model::sites_mashout::SITES;
-    assert_eq!(rows.len(), 29);
+    assert_eq!(rows.len(), 30);
     assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Relied).count(), 24);
-    assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Called).count(), 3);
+    assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Called).count(), 4);
     for row in rows {
         assert_eq!(row.feature, Feature::Mashout);
         assert_eq!(capabilities::all_sites().filter(|site| site.name == row.name).count(), 1);
         assert!(!capabilities::writes_code(row));
         let usable = |site: &model::sites::Site| site.name != row.name;
-        let floor_only = model::sites_mashout::trolley_floor_only(row);
-        assert_eq!(capabilities::blocked_by(Feature::Mashout, &usable), (!floor_only).then_some(row.name));
+        let move_specific = model::sites_mashout::move_specific(row);
+        assert_eq!(capabilities::blocked_by(Feature::Mashout, &usable), (!move_specific).then_some(row.name));
         assert!(!Granted::from_usable(&usable).allows(row.offset));
         for other in capabilities::all_sites().map(capabilities::unit_of_row).filter(|unit| *unit != Feature::Mashout) {
             assert!(capabilities::unit_usable(other, &usable), "{} must not disable {}", row.name, other.name());
@@ -908,13 +915,14 @@ fn mashout_required_rows_disable_only_their_reachable_units() {
         grade::{grade, Bounds},
     };
     let calls = capabilities::CROSS_NEEDS.iter().find(|(unit, _)| *unit == Feature::Mashout).unwrap().1;
-    assert_eq!(calls.len(), 30);
+    assert_eq!(calls.len(), 31);
+    assert!(calls.contains(&"prev_status_kind"), "row 121 names its slam contact by the victim's previous statuses");
     assert!(calls.contains(&"work_get_int"), "Lucas release counter must fail closed with its existing native guard");
     assert!(calls.contains(&"work_is_flag"), "Corrin attack window must fail closed with its existing native guard");
     assert!(calls.contains(&"utility_get_kind"), "Egg Lay must qualify the victim's native shell");
     assert!(calls.contains(&"attack_is_attack"), "Egg Lay must reject an active shell hitbox");
     let required = model::sites_mashout::SITES.iter()
-        .filter(|row| !model::sites_mashout::trolley_floor_only(row))
+        .filter(|row| !model::sites_mashout::move_specific(row))
         .map(|row| row.name).chain(calls.iter().copied()).chain(["clatter_start_hook", "entry_active_cell", "is_training_mode"]);
     for name in required {
         let row = capabilities::find(name).unwrap();

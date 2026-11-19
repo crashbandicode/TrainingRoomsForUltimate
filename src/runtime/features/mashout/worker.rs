@@ -57,13 +57,15 @@ pub(super) enum Event {
     Setup(u64, &'static str),
     Begin(u64, u64, Key, Seed, SeedOrigin),
     Observe(u64, u64, u32, bool),
-    /// 116: the attempt's applied Sets (G1 boundaries), replayed in the bounds by ice116::bounds.
+    /// The attempt's applied Sets (G1 boundaries), replayed in the bounds by ice116::bounds.
     Writes(u64, u64, [crate::model::mashout::ice116::Applied; 8], u8),
     /// 117: boundary-zero Adds after the native provider has been closed.
     EggWrites(u64, u64, [crate::model::mashout::ice116::Applied; 8], u8),
     Pulse(u64, u64, bool),
     NativeEnd(u64, u64),
     Failed(u64, &'static str),
+    /// Row 121 (mashout-ganon-tech): the Tech grader's verdict; kind Some(true) in place, Some(false) roll, None unproven.
+    TechGrade(u64, crate::model::tech::session::Grade, Option<bool>, u32),
     Cancel(u64),
 }
 struct Worker {
@@ -231,6 +233,18 @@ pub(super) fn service() {
             }
             worker.session.cancel();
             show(&mut worker, reason);
+        }
+        // restriction: mashout-ganon-tech: row 121's result is the Tech grader's own text, the tech kind and the best streak.
+        Event::TechGrade(generation, grade, kind, best) => {
+            if generation != worker.generation {
+                return;
+            }
+            worker.session.cancel();
+            let mut text = crate::model::storage::FixedPath::<96>::new();
+            let _ = grade.write(&mut text);
+            let _ = core::fmt::Write::write_str(&mut text, kind.map_or("", |k| if k { " · in place" } else { " · roll" }));
+            let _ = core::fmt::Write::write_fmt(&mut text, format_args!(" · best {best}"));
+            show(&mut worker, text.as_str());
         }
         Event::Cancel(generation) => {
             if generation != worker.generation {

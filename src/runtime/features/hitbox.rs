@@ -100,8 +100,8 @@ pub fn publish(snapshot: &Snapshot) {
 
 /// The rows (`eggs::choices`, little-endian), as every settings publish leaves them.
 static EGG_ROWS: AtomicU32 = AtomicU32::new(0);
-/// The rows of the run: latched when a Start reaches the pass (rc.15 practice menu: a running game's settings apply at
-/// its next Start). The run and its Breaks on rule read these.
+/// The rows of the run: latched by every practice game's Start (`practice_started`; rc.15 practice menu: a running
+/// game's settings apply at its next Start). The Eggs-ercise run and the Breaks on rule of both target games read these.
 static EGG_LIVE: AtomicU32 = AtomicU32::new(0);
 /// CPU during a game: Hide (the first option).
 static PRACTICE_HIDE: AtomicBool = AtomicBool::new(true);
@@ -123,9 +123,11 @@ pub fn eggs_start() {
     EGG_START.store(true, Ordering::Release);
 }
 
-/// Any practice game's Start (the menu worker; atomics only): CPU during a game is the one the menu showed at the Start.
+/// Any practice game's Start (the menu worker, after the close's publish; atomics only): CPU during a game and the
+/// Eggs-ercise rows are the ones the menu showed at the Start. Break the Targets reads Breaks on from these rows too.
 pub fn practice_started() {
     PRACTICE_HIDE_RUN.store(PRACTICE_HIDE.load(Ordering::Acquire), Ordering::Release);
+    EGG_LIVE.store(EGG_ROWS.load(Ordering::Acquire), Ordering::Release);
 }
 
 /// An Eggs-ercise run is armed, or a Start is on its way to the next pass (the menu worker; atomics only).
@@ -143,9 +145,6 @@ pub fn eggs_reset() {
 /// other fighter make no game call.
 unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     let seed = EGG_START.swap(false, Ordering::AcqRel).then(seed);
-    if seed.is_some() {
-        EGG_LIVE.store(EGG_ROWS.load(Ordering::Acquire), Ordering::Release);
-    }
     let mut rows = EGG_LIVE.load(Ordering::Acquire).to_le_bytes();
     // rc.15 practice menu: the mode while Eggs-ercise is the running game, Off otherwise.
     rows[0] = practice_games::effective(Game::Eggs, rows[0], super::practice::active());

@@ -143,6 +143,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 13] = [
             "pos_x",
             "pos_y",
             "pos_z",
+            "prev_status_kind",
             "situation_kind",
             "state_article_active_num",
             "state_article_generate",
@@ -182,7 +183,7 @@ fn cross_needs(unit: Feature) -> &'static [&'static str] {
 /// `CROSS_NEEDS`.
 pub fn blocked_by(unit: Feature, usable: &dyn Fn(&Site) -> bool) -> Option<&'static str> {
     let own = all_sites().find(|s| {
-        unit_of_row(s) == unit && !super::sites_mashout::trolley_floor_only(s) && !usable(s)
+        unit_of_row(s) == unit && !super::sites_mashout::move_specific(s) && !usable(s)
     });
     if let Some(site) = own {
         return Some(site.name);

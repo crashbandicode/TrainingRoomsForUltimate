@@ -513,7 +513,7 @@ pub static ROWS: [Row; 144] = [
     r(BTT, "Start", "", Control::Start(Game::Btt),
       "Closes the menu and starts Break the Targets on this stage.\nWith no targets placed here, the placing view opens first."),
     r(BTT, "Projectiles break targets", "btt_projectiles", Control::Dropdown(&o::BTT),
-      "Your articles' native hitboxes break targets while On.\nOff: only your fighter's attacks. Eggs-ercise uses Breaks on."),
+      "Break the Targets: your projectiles break targets while On.\nOff: only your fighter's attacks. Eggs-ercise uses Breaks on."),
     r(BTT, "Place targets", "btt_place", Control::Editor(Editor::PlaceTargets),
       "Close the menu into the placing view, stage zoomed out.\nStick moves, A places, B removes the last, X starts."),
     r(BTT, "Saved layouts", "btt_layouts", Control::Editor(Editor::Layouts),

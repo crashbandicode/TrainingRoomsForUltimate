@@ -261,7 +261,7 @@ fn core04_decoders() {
 
 #[test]
 fn core04_slider_rows() {
-    let def = settings::Def { id: "save_damage_limits_cpu", kind: settings::Kind::Slider, len: 2, default: &[0, 150] };
+    let def = settings::Def { id: "save_damage_limits_cpu", kind: settings::Kind::Slider { max: 150 }, len: 2, default: &[0, 150] };
     assert_eq!(settings::parse_row(&def, &json!([10, 20])), Ok(vec![10, 20]));
     assert_eq!(settings::parse_row(&def, &json!([0, 150])), Ok(vec![0, 150]));
     assert_eq!(settings::parse_row(&def, &json!([30, 20])), Err(Reason::BadSliderRange));
@@ -271,6 +271,57 @@ fn core04_slider_rows() {
     let weighted = settings::Def { id: "mash_state", kind: settings::Kind::Weighted, len: 3, default: &[0, 0, 0] };
     assert_eq!(settings::parse_row(&weighted, &json!([5, 2, 0])), Ok(vec![5, 2, 0]));
     assert_eq!(settings::parse_row(&weighted, &json!([6, 0, 0])), Err(Reason::ElementAboveMax));
+}
+
+#[test]
+fn ice114_damage_cap_settings_roundtrip() {
+    let player = "save_damage_limits_player";
+    let cpu = "save_damage_limits_cpu";
+    let input = json!({
+        "menu": {player: [254, 255], cpu: [6, 150]},
+        "defaults_menu": {player: [255, 255], cpu: [12, 148]},
+    });
+    let loaded = parse(&input.to_string());
+    assert!(!loaded.corrupt(), "{:?}", loaded.issues);
+    assert_eq!(loaded.settings.menu.get(player), Some(&[254, 255][..]));
+    assert_eq!(loaded.settings.defaults.get(player), Some(&[255, 255][..]));
+    let saved = loaded.settings.to_json();
+    let saved_json: Value = serde_json::from_str(&saved).unwrap();
+    for key in ["menu", "defaults_menu"] {
+        assert_eq!(saved_json[key][player], input[key][player]);
+        assert_eq!(saved_json[key][cpu], input[key][cpu]);
+    }
+    assert_eq!(parse(&saved), loaded);
+
+    for text in [OLD, NEW] {
+        let legacy: Value = serde_json::from_str(text).unwrap();
+        let loaded = parse(text);
+        assert!(!loaded.corrupt(), "{:?}", loaded.issues);
+        let saved: Value = serde_json::from_str(&loaded.settings.to_json()).unwrap();
+        for key in ["menu", "defaults_menu"] {
+            assert_eq!(saved[key][player], legacy[key][player]);
+            assert_eq!(saved[key][cpu], legacy[key][cpu]);
+        }
+    }
+
+    for (row, range, reason) in [
+        (player, json!([0, 256]), Reason::ElementNotAByte),
+        (player, json!([255, 254]), Reason::BadSliderRange),
+        (cpu, json!([0, 151]), Reason::ElementAboveMax),
+    ] {
+        let loaded = parse(&json!({
+            "menu": {row: range},
+            "defaults_menu": {row: range},
+        }).to_string());
+        assert_eq!(loaded.issues.len(), 2, "{row} {range}");
+        for (issue, key) in loaded.issues.iter().zip(["menu", "defaults_menu"]) {
+            assert_eq!(issue.at, format!("{key}.{row}"));
+            assert_eq!(issue.reason, reason);
+        }
+        assert_eq!(loaded.settings, Settings::factory());
+        assert_eq!(loaded.settings.menu.get(row), Some(&[0, 150][..]));
+        assert_eq!(loaded.settings.defaults.get(row), Some(&[0, 150][..]));
+    }
 }
 
 #[test]

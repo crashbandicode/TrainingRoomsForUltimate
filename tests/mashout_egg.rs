@@ -58,6 +58,14 @@ fn actual_runtime_egg_preparation_and_native_seed() {
             production(include_str!("../src/model/mashout/native.rs")).to_string(),
         ),
         (
+            "// TECH_SESSION",
+            production(include_str!("../src/model/tech/session.rs")).to_string(),
+        ),
+        (
+            "// TECH_LAUNCH",
+            production(include_str!("../src/model/tech_launch.rs")).to_string(),
+        ),
+        (
             "// CLATTER",
             production(include_str!("../src/model/mashout/clatter.rs")).to_string(),
         ),
@@ -145,10 +153,11 @@ fn actual_runtime_egg_preparation_and_native_seed() {
             "// TROLLEY_INPUT",
             block(runtime, "unsafe fn trolley_input(").to_string(),
         ),
+        ("// ICE_SHOT_CLOSURE", block(runtime, "unsafe fn climbers_provider_closed(").to_string()),
         (
             "// EGG_CLOSURE",
             [
-                runtime.lines().find(|line| line.starts_with("const EGG_CLOSE_FRAMES:")).unwrap(),
+                runtime.lines().find(|line| line.starts_with("const PROVIDER_CLOSE_FRAMES:")).unwrap(),
                 block(runtime, "unsafe fn egg_provider_closed("),
             ].join("\n"),
         ),
@@ -266,6 +275,14 @@ fn actual_runtime_worker_native_epoch_admission_and_bests() {
         (
             "// GRADE",
             production(include_str!("../src/model/mashout/grade.rs")).to_owned(),
+        ),
+        (
+            "// TECH_SESSION",
+            production(include_str!("../src/model/tech/session.rs")).to_owned(),
+        ),
+        (
+            "// TECH_LAUNCH",
+            production(include_str!("../src/model/tech_launch.rs")).to_owned(),
         ),
         (
             "// CLATTER",

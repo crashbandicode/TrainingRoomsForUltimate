@@ -98,6 +98,7 @@ extern "C" fn change_status_hook(fighter: usize, status: L2CValue, unk: L2CValue
     let mut status = status;
     let mut unk = unk;
     let mut decision = None;
+    let mut mash_tech = None;
     if let Some(requested) = status.as_int() {
         let passive = || {
             let address = IS_ENABLE_PASSIVE.load(Ordering::Acquire);
@@ -108,6 +109,8 @@ extern "C" fn change_status_hook(fighter: usize, status: L2CValue, unk: L2CValue
         let accessor = unsafe { cpu::script_accessor(fighter) };
         decision = unsafe { super::tech_adapter::decision(accessor, requested, passive) }
             .map(|attempt| (accessor, attempt));
+        // Mash out row 121 (mashout-ganon-tech) grades the same native decision with the same snapshot reader.
+        mash_tech = unsafe { super::mashout::tech_contact(accessor, requested, passive) }.map(|g| (accessor, g));
         #[cfg(feature = "diag")]
         unsafe {
             let accessor = cpu::script_accessor(fighter);
@@ -127,6 +130,9 @@ extern "C" fn change_status_hook(fighter: usize, status: L2CValue, unk: L2CValue
     if let Some((accessor, attempt)) = decision {
         // Re-resolves fresh ownership; the pre-call accessor is only an identity token.
         unsafe { super::tech_adapter::confirm_decision(accessor, attempt) };
+    }
+    if let Some((accessor, generation)) = mash_tech {
+        unsafe { super::mashout::tech_confirm(accessor, generation) };
     }
     result
 }

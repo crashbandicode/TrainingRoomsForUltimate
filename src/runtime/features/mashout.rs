@@ -83,8 +83,8 @@ unsafe fn trolley_floor_allows(p1: usize, x: f32, y: f32, spacing: f32, facing: 
 }
 
 const NOTICE_ID: u8 = 0x30;
-// Only bounds how long a frozen Egg result may wait for positive closure.
-const EGG_CLOSE_FRAMES: u8 = 60;
+// Maximum P1 frame callbacks to wait for a provider to close after native escape.
+const PROVIDER_CLOSE_FRAMES: u8 = 60;
 static READY: AtomicBool = AtomicBool::new(false);
 static SLOTS_READY: AtomicBool = AtomicBool::new(false);
 static CONFIG: Published<Option<Config>> = Published::new(None);
@@ -123,6 +123,61 @@ struct NativeEnd {
 static ENDS: Mailbox<NativeEnd, 4> = Mailbox::new();
 static EVENTS: Mailbox<worker::Event, 128> = Mailbox::new();
 static REPLIES: Mailbox<u64, 4> = Mailbox::new();
+/// Row 121 (mashout-ganon-tech): the attempt waiting for its slam contact, published by the game loop for the status hook
+/// (never locked there): P1's accessor and the generation, 0 when none.
+static TECH_P1: AtomicUsize = AtomicUsize::new(0);
+static TECH_GEN: AtomicU64 = AtomicU64::new(0);
+#[derive(Clone, Copy)]
+struct TechContact {
+    generation: u64,
+    snapshot: crate::model::tech_launch::DecisionSnapshot,
+}
+static TECH: Mailbox<TechContact, 4> = Mailbox::new();
+static TECH_PENDING: std::sync::Mutex<Option<TechContact>> = std::sync::Mutex::new(None);
+
+/// cpu_common's status-change seam, before the original: P1's ground-contact request of the published row-121 attempt,
+/// identified by name (entry::ganon_tech_contact), with the Tech practice decision snapshot. try_lock only.
+pub(crate) unsafe fn tech_contact(accessor: usize, requested: i32, passive: impl FnOnce() -> bool) -> Option<u64> {
+    if !READY.load(Ordering::Acquire) || accessor == 0 || TECH_P1.load(Ordering::Acquire) != accessor {
+        return None;
+    }
+    let generation = TECH_GEN.load(Ordering::Acquire);
+    if generation == 0 {
+        return None;
+    }
+    let contact = [C::StatusDown, C::StatusPassive, C::StatusPassiveFb]
+        .into_iter()
+        .any(|c| state_id(c) == Some(requested));
+    let prev = natives::prev_status_kind(accessor, 0);
+    let second = natives::prev_status_kind(accessor, 1);
+    if !contact
+        || !entry::ganon_tech_contact(
+            crate::model::mashout::moves::Plan::GroundSideSpecial,
+            |c| state_id(c) == Some(prev),
+            |c| state_id(c) == Some(second),
+        )
+    {
+        return None;
+    }
+    let snapshot = super::tech_adapter::mash_snapshot(accessor, generation, requested, passive())?;
+    let mut slot = TECH_PENDING.try_lock().ok()?;
+    *slot = Some(TechContact { generation, snapshot });
+    TECH_GEN.store(0, Ordering::Release);
+    Some(generation)
+}
+
+/// After the original status change: the entered status completes the snapshot, then the game loop grades it.
+pub(crate) unsafe fn tech_confirm(accessor: usize, generation: u64) {
+    if !READY.load(Ordering::Acquire) {
+        return;
+    }
+    let Ok(mut slot) = TECH_PENDING.try_lock() else { return };
+    let Some(mut pending) = slot.take().filter(|p| p.generation == generation) else { return };
+    pending.snapshot.entered_status = super::tech_adapter::mash_entered(accessor);
+    if !TECH.post(pending) {
+        fault(generation);
+    }
+}
 
 pub fn set_admission(on: bool) {
     READY.store(on, Ordering::Release);
@@ -368,22 +423,28 @@ struct Game {
     p1: usize,
     cpu: usize,
     clock: Option<Clock>,
-    /// M3 Set observer consumer for a 113/116 attempt (armed at Settle).
+    /// M3 observer consumer for a tagged attempt (armed at Settle).
     writes: Option<crate::model::mashout::clatter::Writes>,
     /// An observed write was applied this attempt: no grade until G2 replays them in the bounds.
     applied: bool,
-    /// 116: the attempt's applied Sets with their G1 boundaries, for the G2 bounds (ice116::bounds).
+    /// The attempt's applied Sets with their G1 boundaries, for the G2 bounds (ice116::bounds).
     sets: [crate::model::mashout::ice116::Applied; 8],
     set_count: usize,
     egg_spat: bool,
     egg_shell: Option<u32>,
-    egg_close_frames: u8,
+    provider_close_frames: u8,
     saw_catch: bool,
     followed: bool,
     restore_requested: bool,
     trolley: Option<entry::TrolleyEntry>,
     hero: Option<entry::HeroEntry>,
     trail_magic: Option<entry::TrailMagicEntry>,
+    /// Row 121 (mashout-ganon-tech): Tech practice's own session summary; `best` is the longest success streak.
+    tech_summary: crate::model::tech::session::Summary,
+    /// Row 121's contact still in its late window, with its tech kind.
+    tech_attempt: Option<(entry::TechAttempt, Option<bool>)>,
+    /// Row 121's contact snapshot waiting for the entered status.
+    tech_wait: Option<entry::TechContactWait>,
     /// P1's damage bits when the first preparatory magic cast began (Sora116 setup backstop).
     prep_damage: Option<u32>,
 }
@@ -407,13 +468,19 @@ impl Game {
             set_count: 0,
             egg_spat: false,
             egg_shell: None,
-            egg_close_frames: 0,
+            provider_close_frames: 0,
             saw_catch: false,
             followed: false,
             restore_requested: false,
             trolley: None,
             hero: None,
             trail_magic: None,
+            tech_summary: crate::model::tech::session::Summary {
+                attempts: 0, perfect: 0, held: 0, early: 0, late: 0, locked: 0, missed: 0, streak: 0, best: 0,
+                offset_sum: 0, timed_perfect: 0,
+            },
+            tech_attempt: None,
+            tech_wait: None,
             prep_damage: None,
         }
     }
@@ -631,6 +698,55 @@ unsafe fn trail_blizzard_closed(cpu: usize) -> Result<bool, ()> {
     Ok(entry::trail_blizzard_closed(natives::status_kind(cpu), blizzard, state_natives::article_is_exist(cpu, ice)))
 }
 
+/// SPECIAL_N can issue an Ice Shot at frame 18, and the projectile owns the hitboxes.
+/// Once P1 escapes, a live shot makes the counterfactual bounds unknowable.
+/// 113 (reviewer 17:42Z option (c)): the same per-climber rule with SPECIAL_LW and the Blizzard article (id 1).
+unsafe fn climbers_provider_closed(cpu: usize, cpu_entry: i32, (cast, hitbox_article): (C, C)) -> Result<bool, &'static str> {
+    use crate::model::{sites_hitbox, sites_pkg2, sites_pkg3};
+    if ![
+        sites_hitbox::HITBOX_IS_ATTACK_OFFSET,
+        sites_pkg2::STATUS_KIND_OFFSET,
+        sites_pkg2::WORK_GET_INT_OFFSET,
+        sites_pkg2::UTILITY_GET_KIND_OFFSET,
+        sites_pkg3::STATE_ARTICLE_IS_EXIST_OFFSET,
+        sites_pkg3::STATE_OBJECT_IS_ACTIVE_OFFSET,
+        sites_pkg3::STATE_OBJECT_MODULE_ACCESSOR_OFFSET,
+    ].into_iter().all(game::granted) {
+        return Err(UNAVAILABLE_NOTICE);
+    }
+    let [Some(special), Some(article), Some(partner), Some(nana_kind), Some(entry_id), Some(invalid)] = [
+        cast, hitbox_article, C::PopoPartnerObjectId,
+        C::KindNana, C::WorkIntEntryId, C::InvalidBattleObjectId,
+    ].map(state_id) else {
+        return Err(UNAVAILABLE_NOTICE);
+    };
+    let closed = |body| {
+        let slots = natives::fighter_attack_count(body).ok_or(UNAVAILABLE_NOTICE)?;
+        if state_natives::article_is_exist(body, article)
+            || (0..slots).any(|slot| natives::attack_is_attack(body, slot))
+        {
+            // restriction: MASH-M1-MISMATCH
+            return Err("Native tick mismatch · no grade");
+        }
+        Ok(matches!(natives::status_kind(body), status if status >= 0 && status != special))
+    };
+    let popo_closed = closed(cpu)?;
+    let id = natives::get_int(cpu, partner) as u32;
+    if id == invalid as u32 && crate::runtime::roster::character_roster::solo_popo_active(true) {
+        return Ok(popo_closed);
+    }
+    if id >> 28 != 0 || !state_natives::object_is_active(id) {
+        return Err(UNAVAILABLE_NOTICE);
+    }
+    let nana = state_natives::object_accessor(id);
+    if nana == 0 || nana == cpu || natives::fighter_kind(nana) != Some(nana_kind)
+        || natives::get_int(nana, entry_id) != cpu_entry
+    {
+        return Err(UNAVAILABLE_NOTICE);
+    }
+    Ok(closed(nana)? && popo_closed)
+}
+
 /// Positive Egg Lay completion on the selected live CPU. A canceled N2
 /// alone does not prove its last hit ran. N2 MAIN clears SPITED (Yoshi
 /// +0x11560) and the SPIT helper sets it after the absolute hit (+0x28650).
@@ -775,6 +891,82 @@ unsafe fn arm(p1: usize, generation: u64) -> bool {
     THRESHOLD.store(threshold.to_bits(), Ordering::Release);
     ARMED.store(generation, Ordering::Release);
     true
+}
+
+impl Game {
+    /// Row 121 (mashout-ganon-tech) in Entering: publish the attempt for the status hook, hold its slam contact until the
+    /// game has entered the requested status (a request takes effect on a later frame), grade it with the Tech grader,
+    /// then hold the late window. Outside the Entering block, which host fixtures compile.
+    unsafe fn tech_entering(&mut self, p1: usize) {
+        use crate::model::tech::session::{self, Direction, Grade, NativeOutcome};
+        let game = self;
+        let generation = game.generation;
+        // The late window reads Tech practice's native guard edge, never a raw shoulder sample.
+        let guard = super::tech_adapter::mash_guard(p1);
+        if let Some((attempt, kind)) = game.tech_attempt.as_mut() {
+            if let Some(grade) = attempt.tick(guard) {
+                let kind = *kind;
+                game.tech_graded(grade, kind);
+            }
+            return;
+        }
+        if game.tech_wait.is_none() {
+            TECH_P1.store(p1, Ordering::Release);
+            TECH_GEN.store(generation, Ordering::Release);
+            TECH.drain(|t| {
+                if t.generation == generation {
+                    game.tech_wait = Some(entry::TechContactWait::new(t.snapshot));
+                }
+            });
+        }
+        let ids = [C::StatusPassive, C::StatusPassiveFb, C::StatusDown, C::StatusDamageFlyReflectD, C::StatusPassiveCeil,
+            C::StatusStopCeil, C::StatusDamageFlyReflectU, C::StatusPassiveWall, C::StatusPassiveWallJump, C::StatusStopWall,
+            C::StatusDamageFlyReflectLr]
+            .map(|c| state_id(c).unwrap_or(i32::MIN));
+        let step = match game.tech_wait.as_mut() {
+            Some(wait) => wait.next_frame(super::tech_adapter::mash_entered(p1), guard, ids),
+            None => return,
+        };
+        TECH_P1.store(0, Ordering::Release);
+        let outcome = match step {
+            entry::TechContactStep::Wait => return,
+            entry::TechContactStep::Proven(outcome) => Some(outcome),
+            entry::TechContactStep::Unproven => None,
+        };
+        let Some(wait) = game.tech_wait.take() else {
+            return;
+        };
+        let kind = match outcome {
+            Some(NativeOutcome::Tech(Some(Direction::InPlace))) => Some(true),
+            Some(NativeOutcome::Tech(_)) => Some(false),
+            _ => None,
+        };
+        // An unproven accepted status is ungraded (Tech practice's snapshot_unavailable), never a guessed miss.
+        let grade = outcome.map_or(Some(Grade::Unavailable), |o| session::map_snapshot(wait.snapshot(), o));
+        let mut attempt = entry::TechAttempt::new(game.tech_summary);
+        let mut result = attempt.contact(grade);
+        // The frames waited for the entered status are already part of the late window.
+        for &edge in wait.guards() {
+            if result.is_none() {
+                result = attempt.tick(edge);
+            }
+        }
+        match result {
+            Some(grade) => {
+                game.tech_summary = attempt.summary();
+                game.tech_graded(grade, kind);
+            }
+            None => game.tech_attempt = Some((attempt, kind)),
+        }
+    }
+
+    fn tech_graded(&mut self, grade: crate::model::tech::session::Grade, kind: Option<bool>) {
+        if let Some((attempt, _)) = self.tech_attempt.take() {
+            self.tech_summary = attempt.summary();
+        }
+        post(worker::Event::TechGrade(self.generation, grade, kind, self.tech_summary.best), self.generation);
+        self.step = Step::Result;
+    }
 }
 
 /// Existing P1 per-frame path. Entry0's current active body only, independent of frame-strip settings.
@@ -1153,6 +1345,14 @@ pub unsafe fn frame(fighter: usize) {
         drive(MappedInputs::NEUTRAL);
         return;
     }
+    // Row 121: the status hook sees the attempt only while it waits in Entering (outside Game::step, which a host
+    // fixture compiles).
+    if game.step != Step::Entering || !game.requested.is_some_and(|r| crate::model::mashout::moves::tech_graded(r.id)) {
+        TECH_GEN.store(0, Ordering::Release);
+        TECH_P1.store(0, Ordering::Release);
+        game.tech_attempt = None;
+        game.tech_wait = None;
+    }
     match game.step {
         Step::Off => (),
         Step::Release if released => game.step(
@@ -1391,7 +1591,10 @@ pub unsafe fn frame(fighter: usize) {
                 game.fail("Move sequence unavailable");
                 return;
             };
-            if !preparing && !entry::preparatory(request.plan) && !arm(p1, game.generation) {
+            // restriction: mashout-ganon-tech (reviewer G3): row 121 is tech-graded, so its slam arms no mash clock/seed.
+            if !preparing && !entry::preparatory(request.plan) && !crate::model::mashout::moves::tech_graded(request.id)
+                && !arm(p1, game.generation)
+            {
                 game.fail(UNAVAILABLE_NOTICE);
                 return;
             }
@@ -1404,9 +1607,9 @@ pub unsafe fn frame(fighter: usize) {
             game.set_count = 0;
             game.egg_spat = false;
             game.egg_shell = None;
-            game.egg_close_frames = 0;
-            // 116: only the real Blizzard cast installs the observer, never a preparatory Fire/Thunder cast.
-            if matches!(request.id, 113 | 116 | 117) && !preparing {
+            game.provider_close_frames = 0;
+            // Only the real cast installs the observer, never a preparatory Fire/Thunder cast.
+            if crate::model::mashout::clatter::slot_for(request.id).is_some() && !preparing {
                 // M3 Set observer (O5): installed and read back here, at Settle, until this attempt's exit.
                 // SAFETY: p1 is the live P1 BOMA; +0x48 is its ControlModule (lua_bind ldr x0,[x0,#72]).
                 let control = unsafe { *((p1 + 0x48) as *const usize) };
@@ -1437,6 +1640,11 @@ pub unsafe fn frame(fighter: usize) {
             let Some(request) = game.requested else {
                 return;
             };
+            // restriction: mashout-ganon-tech: row 121 waits for its slam contact, graded by the Tech grader only.
+            if crate::model::mashout::moves::tech_graded(request.id) {
+                game.tech_entering(p1);
+                return;
+            }
             if entry::one_pikmin_grab(request) && !game.followed {
                 drive(MappedInputs::NEUTRAL);
                 // Two settled reads must each show exactly one Pikmin before the configured Catch arms.
@@ -1593,10 +1801,16 @@ pub unsafe fn frame(fighter: usize) {
                 return;
             };
             let egg = game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Egg);
-            let waiting_for_egg = egg && clock.exhausted();
+            // Ice Climbers rows whose provider closes per climber: (the cast status, its hitbox article).
+            let climbers = game.requested.and_then(|r| match r.id {
+                113 => Some((C::StatusSpecialLw, C::PopoArticleBlizzard)),
+                crate::model::mashout::clatter::TAG_ICE_SHOT_114 => Some((C::StatusSpecialN, C::PopoArticleIceShot)),
+                _ => None,
+            });
+            let waiting_for_provider = (egg || climbers.is_some()) && clock.exhausted();
             let before = clock.last();
             let elapsed_before = clock.elapsed();
-            let live = if waiting_for_egg {
+            let live = if waiting_for_provider {
                 None
             } else {
                 let Some(live) = admission()
@@ -1634,6 +1848,7 @@ pub unsafe fn frame(fighter: usize) {
                 }
             }
             if refused
+                || (climbers.is_some() && waiting_for_provider && count > 0)
                 || live.is_some_and(|live| clock.observe_writes(live.record, live.input, escaped, &writes[..count]).is_err())
             {
                 #[cfg(feature = "diag")]
@@ -1653,7 +1868,7 @@ pub unsafe fn frame(fighter: usize) {
                 ticked |= write.old != model;
                 model = write.new;
                 let boundary = elapsed_before + u32::from(ticked);
-                if egg && (boundary != 0 || waiting_for_egg) {
+                if egg && (boundary != 0 || waiting_for_provider) {
                     #[cfg(feature = "diag")]
                     crate::runtime::diag_log::enqueue_diagnostic(format_args!(
                         "[Mashout] egg_provider_open gen={} late_add_boundary={boundary}", game.generation
@@ -1703,10 +1918,10 @@ pub unsafe fn frame(fighter: usize) {
                         ));
                     }
                     Ok(false) if clock.exhausted() => {
-                        if game.egg_spat && game.egg_close_frames < EGG_CLOSE_FRAMES {
+                        if game.egg_spat && game.provider_close_frames < PROVIDER_CLOSE_FRAMES {
                             // The fast arm can escape before N2 finishes. Retain the
                             // measured clock and Add observer while the CPU stays neutral.
-                            game.egg_close_frames += 1;
+                            game.provider_close_frames += 1;
                             game.clock = Some(clock);
                         } else {
                             #[cfg(feature = "diag")]
@@ -1726,11 +1941,33 @@ pub unsafe fn frame(fighter: usize) {
                     }
                 }
             }
+            if let Some(provider) = climbers.filter(|_| clock.exhausted()) {
+                match climbers_provider_closed(cpu, cpu_entry, provider) {
+                    Ok(true) => {
+                        #[cfg(feature = "diag")]
+                        crate::runtime::diag_log::enqueue_diagnostic(format_args!(
+                            "[Mashout] climbers_provider_closed gen={} t={}", game.generation, clock.elapsed()
+                        ));
+                    }
+                    Ok(false) if game.provider_close_frames < PROVIDER_CLOSE_FRAMES => {
+                        game.provider_close_frames += 1;
+                        game.clock = Some(clock);
+                        return;
+                    }
+                    Ok(false) => {
+                        // restriction: MASH-M1-MISMATCH
+                        game.fail("Native tick mismatch · no grade");
+                        return;
+                    }
+                    Err(reason) => return game.fail(reason),
+                }
+            }
             if game.applied && (escaped || clock.exhausted()) {
                 if egg {
                     post(worker::Event::EggWrites(game.generation, game.epoch, game.sets, game.set_count as u8), game.generation);
-                } else if game.requested.is_some_and(|r| r.id == crate::model::mashout::ice116::TAG) {
-                    // G2 (116): the worker replays the applied Sets in the bounds before the final Observe.
+                } else if climbers.is_some() || game.requested.is_some_and(|r| r.id == crate::model::mashout::ice116::TAG) {
+                    // G2 (113/114/116): the worker replays the applied Sets in the bounds before the final Observe
+                    // (ice116::bounds is a tag-agnostic Set replay; reviewer 10:55Z (A)).
                     post(worker::Event::Writes(game.generation, game.epoch, game.sets, game.set_count as u8), game.generation);
                 } else {
                     // restriction: MASH-M1-MISMATCH — observed writes kept the clock exact, but the F/T bounds don't
@@ -1761,7 +1998,7 @@ pub unsafe fn frame(fighter: usize) {
                 game.fail("Capture interrupted · no grade");
                 return;
             }
-            if changed || waiting_for_egg {
+            if changed || waiting_for_provider {
                 post(
                     worker::Event::Observe(
                         game.generation,
@@ -1773,8 +2010,12 @@ pub unsafe fn frame(fighter: usize) {
                 );
             }
             if clock.exhausted() {
-                if game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::IceMagic) {
-                    match trail_blizzard_closed(cpu) {
+                let closed = match game.requested.map(|r| r.plan) {
+                    Some(crate::model::mashout::moves::Plan::IceMagic) => Some(trail_blizzard_closed(cpu)),
+                    _ => None,
+                };
+                if let Some(closed) = closed {
+                    match closed {
                         Ok(true) => (),
                         Ok(false) => {
                             // restriction: MASH-M1-MISMATCH

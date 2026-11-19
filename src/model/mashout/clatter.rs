@@ -58,12 +58,13 @@ pub enum Poll {
 
 /// Scenario tags and their slot (C4: exactly one slot per tag).
 pub const TAG_FROZEN_113: u16 = 113;
+pub const TAG_ICE_SHOT_114: u16 = 114;
 pub const TAG_ICE_MAGIC_116: u16 = 116;
 pub const TAG_EGG_117: u16 = 117;
 
 pub const fn slot_for(tag: u16) -> Option<Slot> {
     match tag {
-        TAG_FROZEN_113 | TAG_ICE_MAGIC_116 => Some(Slot::Set),
+        TAG_FROZEN_113 | TAG_ICE_SHOT_114 | TAG_ICE_MAGIC_116 => Some(Slot::Set),
         TAG_EGG_117 => Some(Slot::Add),
         _ => None,
     }
@@ -166,7 +167,7 @@ impl Clock {
     }
 }
 
-/// G2 (Set, 113/116; OPUS-DESIGN-REVIEW-sora116-refreeze 23:00Z full-range method): the per-shard ice frame F is
+/// G2 (Set, 113/114/116; OPUS-DESIGN-REVIEW-sora116-refreeze 23:00Z full-range method): the per-shard ice frame F is
 /// not published, only bracketed (the bounds replay is `ice116::bounds` on the shared solver).
 pub mod g2 {
 

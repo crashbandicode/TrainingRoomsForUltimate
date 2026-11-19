@@ -102,6 +102,9 @@ game_constants! {
     SituationCliff = "SITUATION_KIND_CLIFF",
     // Fighter kinds (Ice Climbers: the second body is Nana).
     KindPopo = "FIGHTER_KIND_POPO",
+    PopoArticleIceShot = "FIGHTER_POPO_GENERATE_ARTICLE_ICESHOT",
+    PopoPartnerObjectId = "FIGHTER_POPO_INSTANCE_WORK_ID_INT_PARTNER_OBJECT_ID",
+    InvalidBattleObjectId = "BATTLE_OBJECT_ID_INVALID",
     KindNana = "FIGHTER_KIND_NANA",
     // Status kinds of the situation predicates (SPEC-cpu-01 §3).
     StatusNone = "FIGHTER_STATUS_KIND_NONE",
@@ -290,6 +293,7 @@ game_constants! {
     TrailArticleFire = "FIGHTER_TRAIL_GENERATE_ARTICLE_FIRE",
     TrailArticleCloud = "FIGHTER_TRAIL_GENERATE_ARTICLE_CLOUD",
     TrailArticleIce = "FIGHTER_TRAIL_GENERATE_ARTICLE_ICE",
+    PopoArticleBlizzard = "FIGHTER_POPO_GENERATE_ARTICLE_BLIZZARD",
     TrailAttackAirN = "FIGHTER_TRAIL_STATUS_KIND_ATTACK_AIR_N",
     TrailAttackAirF = "FIGHTER_TRAIL_STATUS_KIND_ATTACK_AIR_F",
     KroolSpecialSThrow = "FIGHTER_KROOL_STATUS_KIND_SPECIAL_S_THROW",
@@ -318,6 +322,9 @@ game_constants! {
     // Mash out move90's native landing end (not clatter statuses): the victim's
     // after-landing status and Ganondorf's landing status.
     CatchedAirEndGanon = "FIGHTER_STATUS_KIND_CATCHED_AIR_END_GANON",
+    // Mash out row 121 (reviewer G1, 11-18): the victim's grounded Flame Choke catch, the second-previous status at its
+    // slam's ground contact (190 in ganon-tech-research-yoga-3, to be confirmed by this build's own cpu_ids line).
+    CatchedGanon = "FIGHTER_STATUS_KIND_CATCHED_GANON",
     GanonSpecialAirSEnd = "FIGHTER_GANON_STATUS_KIND_SPECIAL_AIR_S_END",
     ClatterBind = "FIGHTER_STATUS_KIND_BIND",
     ClatterDamageSong = "FIGHTER_STATUS_KIND_DAMAGE_SONG",

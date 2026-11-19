@@ -21,6 +21,10 @@ mod model {
         pub mod egg117 { // EGG117
         }
     }
+    pub mod tech { pub mod session { // TECH_SESSION
+    } }
+    pub mod tech_launch { // TECH_LAUNCH
+    }
 }
 mod runtime {
     pub mod diag_log {
