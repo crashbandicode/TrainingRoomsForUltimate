@@ -251,8 +251,17 @@ pub struct PopView {
     pub focus: u8,
 }
 
+/// The space between the popup's box and its widest line, on each side.
+pub const POP_PAD: f32 = 28.0;
+
 impl PopView {
     pub const EMPTY: PopView = PopView { anchor: None, lines: [Text::new(); super::mashout::picker::MAX], count: 0, focus: 0 };
+
+    /// The box's width: its widest line, measured as the dialogs measure the menu fonts (a 1.2 margin), plus the padding.
+    pub fn width(&self) -> f32 {
+        let line = |t: &Text<48>| 1.2 * super::notice_box::measure(t.units().iter().copied(), super::panes::FONT_SMALL.0).0;
+        self.lines[..usize::from(self.count)].iter().map(line).fold(0.0, f32::max) + 2.0 * POP_PAD
+    }
 }
 
 /// One floppy or loop mark. `color` is sRGB; the renderer converts it.

@@ -4,7 +4,7 @@
 use skyline::nn::ui2d::Pane;
 
 use crate::model::effect_chips::Placement;
-use crate::model::frame::{Frame, Tone, View};
+use crate::model::frame::{Frame, Tone, View, POP_PAD};
 use crate::model::menu::options::DIRECTIONS;
 use crate::model::menu::CHIP_POS;
 use crate::model::screens::{TILE_GREYED, TILE_HIDDEN};
@@ -684,7 +684,6 @@ fn tile_centre(frame: &Frame, i: usize) -> (f32, f32) {
 }
 
 /// Mash out's popup: its box and lines over the chip (the recording pop-up's CONNECTIONS panes, unused on a grid).
-const POP_W: f32 = 520.0;
 const POP_LINE_H: f32 = 46.0;
 
 impl Panes {
@@ -692,21 +691,22 @@ impl Panes {
         let Some(anchor) = frame.pop.anchor.filter(|_| frame.view == View::Tiles && frame.pop.count > 0) else { return };
         let count = usize::from(frame.pop.count).min(CONN_LINES);
         let (cx, cy) = tile_centre(frame, usize::from(anchor));
-        let h = count as f32 * POP_LINE_H + 24.0;
-        // Over the chip: the box's top at the chip's centre, kept inside the panel.
-        let x = cx.clamp(ROW_LEFT + POP_W / 2.0, ROW_RIGHT - POP_W / 2.0);
+        // Sized to its widest line (`PopView::width`), at most the grid's width.
+        let (w, h) = (frame.pop.width().min(ROW_RIGHT - ROW_LEFT), count as f32 * POP_LINE_H + 24.0);
+        // Over the chip: the box's top at the chip's centre, kept inside the grid area.
+        let x = cx.clamp(ROW_LEFT + w / 2.0, ROW_RIGHT - w / 2.0);
         let y = (cy - h / 2.0 + 20.0).clamp(-300.0 + h / 2.0, 330.0 - h / 2.0);
         let top = y + h / 2.0 - 12.0 - POP_LINE_H / 2.0;
-        self.rect_at(IDX_CONN_DIV, x, y, POP_W, h, [24, 24, 30, 255]);
+        self.rect_at(IDX_CONN_DIV, x, y, w, h, [24, 24, 30, 255]);
         for i in 0..count {
             let line_y = top - i as f32 * POP_LINE_H;
             let focused = i == usize::from(frame.pop.focus);
-            self.label(IDX_CONN + i, frame.pop.lines[i].units(), x + 8.0, line_y, POP_W - 40.0, if focused { TEXT } else { TEXT_DIM });
+            self.label(IDX_CONN + i, frame.pop.lines[i].units(), x, line_y, w - 2.0 * POP_PAD, if focused { TEXT } else { TEXT_DIM });
             if focused {
-                self.box_at(IDX_CONN_BOX, x, line_y, POP_W - 16.0, POP_LINE_H - 6.0, ACCENT);
+                self.box_at(IDX_CONN_BOX, x, line_y, w - 16.0, POP_LINE_H - 6.0, ACCENT);
             }
         }
-        self.box_at(IDX_CONN_BOX + 4, x, y, POP_W, h, ACCENT);
+        self.box_at(IDX_CONN_BOX + 4, x, y, w, h, ACCENT);
     }
 }
 
