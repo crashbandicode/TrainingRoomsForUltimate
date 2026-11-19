@@ -1241,7 +1241,7 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     crate::runtime::features::tech::menu_closed();
     if let Some(game) = outbox.start {
         use crate::runtime::features::practice;
-        practice::start(game, practice::How { place_targets: outbox.place_targets, tech_point: outbox.tech_point, tech_wizard: outbox.tech_wizard });
+        practice::start(game, practice::How { place_targets: outbox.place_targets, tech_point: outbox.tech_point, tech_wizard: outbox.tech_wizard, resume_parry: outbox.resume_parry });
     }
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(10);

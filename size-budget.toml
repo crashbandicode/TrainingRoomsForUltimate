@@ -2029,3 +2029,11 @@ ceiling = 164734
 date = "2026-11-19"
 reason = "Tech wizard damaging-surface hint and Preview default help on 5b6ab8cc. Measured 164733, +204 over 164529. Ceiling rises by exactly 204 from 164530, preserving one line of headroom."
 approved_by = "Primary c07b3449, rc.15 common change brief (measured feature delta) and 14:15Z approval for the optional material verification."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164753
+date = "2026-11-19"
+reason = "Parry Start begins a fresh set (0e5b0554, 62f009af; branch a4bb5cac gated at 164548 = +19 over 5b6ab8cc), merged onto main e2b722b9 (Tech hint, ceiling 164734). Ceiling 164734 + 19 = 164753; the combined main is verified by the integration gate."
+approved_by = "Operator Parry Start request recorded by primary c07b3449 at 14:17Z (2026-11-19); rc.15 change-set common brief: exact measured delta, summed by the primary at merge."

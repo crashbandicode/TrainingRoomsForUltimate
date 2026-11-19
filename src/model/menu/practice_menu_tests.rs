@@ -304,12 +304,16 @@ fn a_used_parry_practice_starts_parry_at_the_close() {
     m.parry_on(2);
     assert_eq!(m.get("parry_practice"), &[0, 0, 1]);
     assert!(!m.is_closed(), "the player closes the menu");
-    assert_eq!(m.take_outbox().start, Some(Game::Parry));
+    let loaded = m.take_outbox();
+    assert_eq!(loaded.start, Some(Game::Parry));
+    assert!(loaded.resume_parry);
     for game in Game::ALL {
         let mut m = opened(game);
         m.parry_on(2);
         m.press(Button::A);
-        assert_eq!(m.take_outbox().start, Some(game));
+        let start = m.take_outbox();
+        assert_eq!(start.start, Some(game));
+        assert!(!start.resume_parry);
         assert_eq!(m.get("parry_practice"), &[0, 0, 1], "Parry's mode stays");
     }
     // The Parry sub-screen: Start, its mode (no Off), its saved practices.

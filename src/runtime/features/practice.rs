@@ -25,6 +25,7 @@ pub struct How {
     pub place_targets: bool,
     pub tech_point: bool,
     pub tech_wizard: bool,
+    pub resume_parry: bool,
 }
 
 /// Start `game` (the menu worker, at the close): it becomes the running game before its start trigger, so the game thread
@@ -40,7 +41,7 @@ pub fn start(game: Game, how: How) {
         Game::Eggs => super::hitbox::eggs_start(),
         Game::Btt => super::btt::start(how.place_targets),
         Game::Mashout => super::mashout::start(),
-        Game::Parry => super::parry::start(),
+        Game::Parry => super::parry::start(how.resume_parry),
         Game::Tech => {
             super::tech::start(how.tech_point);
             if how.tech_wizard {

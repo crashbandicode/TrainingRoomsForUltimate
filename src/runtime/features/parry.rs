@@ -2,7 +2,7 @@
 //! `model::parry::Detector` from the strip's P1 sample, Tech's `Summary`/`Bests` for the set and its Done line, and the
 //! strip's view. Game thread only, except `publish` (the settings publish) and `view` (the HUD tick).
 
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU8, Ordering};
 
 use core::fmt::Write as _;
 
@@ -16,11 +16,15 @@ use crate::model::tech::session::{Bests, Grade, Summary};
 
 /// The session row: 0 Off, 1 sets of ten, 2 free practice.
 static SESSION: AtomicU8 = AtomicU8::new(0);
-static VIEW: Published<Option<View>> = Published::new(None);
+// Only an explicit Start advances the generation. Older HUD snapshots are hidden until P1 samples again.
+static SET_GENERATION: AtomicU32 = AtomicU32::new(0);
+const DONE_NOTICE: u8 = 0x33;
+static VIEW: Published<(u32, Option<View>)> = Published::new((0, None));
 
 struct State {
     detector: Detector,
     view: View,
+    set_generation: u32,
     summary: Summary,
     bests: Bests,
     total: u32,
@@ -30,7 +34,7 @@ struct State {
 }
 
 const SUMMARY: Summary = Summary { attempts: 0, perfect: 0, held: 0, early: 0, late: 0, locked: 0, missed: 0, streak: 0, best: 0, offset_sum: 0, timed_perfect: 0 };
-static STATE: Mutex<State> = Mutex::new(State { detector: Detector::new(), view: View::EMPTY, summary: SUMMARY, bests: Bests::EMPTY, total: 0, perfect: 0, since_end: None });
+static STATE: Mutex<State> = Mutex::new(State { detector: Detector::new(), view: View::EMPTY, set_generation: 0, summary: SUMMARY, bests: Bests::EMPTY, total: 0, perfect: 0, since_end: None });
 
 /// The session row as the last settings publish left it (a stored Off reads as sets of ten, rc.15 practice menu).
 static PUBLISHED: AtomicU8 = AtomicU8::new(0);
@@ -42,9 +46,12 @@ pub fn publish(snapshot: &Snapshot) {
     PUBLISHED.store(session, Ordering::Release);
 }
 
-/// Start (the menu worker, `practice::start`, after the close's publish): the session is the row's, the replay host arms.
-pub fn start() {
+/// Start latches the mode and arms replay. A saved practice resumes its current set.
+pub fn start(resume: bool) {
     SESSION.store(practice_games::mode(PUBLISHED.load(Ordering::Acquire)), Ordering::Release);
+    if !resume {
+        SET_GENERATION.fetch_add(1, Ordering::Release);
+    }
     crate::engine::rr_host::set_parry(true);
 }
 
@@ -70,7 +77,8 @@ pub fn chosen_free() -> bool {
 
 /// The strip's view, for the HUD tick.
 pub fn view() -> Option<View> {
-    VIEW.read().filter(|_| on())
+    let (generation, view) = VIEW.read();
+    view.filter(|_| on() && generation == SET_GENERATION.load(Ordering::Acquire))
 }
 
 /// A load, an L+R+A reset, leaving the scene: an open attempt is dropped uncounted; the set and the totals stay.
@@ -96,7 +104,7 @@ fn record(s: &mut State, a: Attempt, fighter: Option<i32>) {
         let mut body = FixedPath::<192>::new();
         let _ = s.summary.write(&mut body);
         let _ = write!(body, " · total {} · fighter best {best}", s.total);
-        super::notices::upsert(0x33, "Parry Practice", body.as_str(), 300, crate::model::notify::DEFAULT_COLOR);
+        super::notices::upsert(DONE_NOTICE, "Parry Practice", body.as_str(), 300, crate::model::notify::DEFAULT_COLOR);
         s.summary = SUMMARY;
     }
 }
@@ -105,9 +113,17 @@ fn record(s: &mut State, a: Attempt, fighter: Option<i32>) {
 /// parry pass.
 pub fn step(mut frame: Frame, fighter: Option<i32>, now: u32) {
     let Some(mut s) = STATE.try_lock() else { return };
+    let generation = SET_GENERATION.load(Ordering::Acquire);
+    let fresh = s.set_generation != generation;
+    if fresh {
+        s.set_generation = generation;
+        s.view = View::EMPTY;
+        (s.summary, s.detector, s.since_end) = (SUMMARY, Detector::new(), None);
+        super::notices::clear(DONE_NOTICE);
+    }
     let playing = crate::engine::rr_host::cpu_run_active();
     s.since_end = if playing { Some(0) } else { s.since_end.map(|n| n.saturating_add(1)) };
-    frame.armed = s.since_end.is_some_and(|n| n <= 60);
+    frame.armed = !fresh && s.since_end.is_some_and(|n| n <= 60);
     for a in s.detector.step(&frame, now).into_iter().flatten() {
         record(&mut s, a, fighter);
         #[cfg(feature = "diag")]
@@ -121,5 +137,5 @@ pub fn step(mut frame: Frame, fighter: Option<i32>, now: u32) {
     let _ = if free() { write!(set, "#{}", s.total) } else { write!(set, "{}/10", s.summary.attempts) };
     let _ = write!(line, "streak {}, perfect {}/{}", s.summary.streak, s.perfect, s.total);
     (s.view.set, s.view.set_line) = (set, line);
-    VIEW.publish(Some(s.view));
+    VIEW.publish((generation, Some(s.view)));
 }
