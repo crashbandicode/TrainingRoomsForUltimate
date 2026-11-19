@@ -41,3 +41,13 @@ The popup background is being made solid; for now the portraits show through. Th
 ![Mario: Grab only](rc15-changes/mashout-popup-mario.png)
 
 ![Steve: Grab and Empty minecart](rc15-changes/mashout-popup-steve.png)
+
+### Final version (READY, in review)
+
+The popup is now solid and only as wide as its longest line. Recorded in Eden on the gated build: Steve → **Empty minecart** → Start, and the CPU becomes Steve, lays the minecart and catches Mario (graded). Then Mario → **Grab < Dash >**.
+
+![Mash out picker run](rc15-changes/mashout-picker-720p.gif)
+
+![Steve: narrow popup, Empty minecart selected](rc15-changes/mashout-popup-steve-narrow.png)
+
+![Mario: Grab < Dash >](rc15-changes/mashout-popup-mario-dash.png)
