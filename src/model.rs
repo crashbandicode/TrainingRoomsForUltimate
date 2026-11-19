@@ -139,6 +139,7 @@ pub mod legend;
 pub mod eggs;
 #[path = "model/btt.rs"]
 pub mod btt;
+#[path = "model/lockon.rs"]
 pub mod lockon;
 #[path = "model/tech/mod.rs"]
 pub mod tech;
