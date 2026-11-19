@@ -86,7 +86,7 @@ fn a_game_row_opens_its_sub_screen_on_start() {
         let f = frame(&m);
         assert_eq!(f.rows[0].label.string_lossy(), "Start");
         assert_eq!(f.crumb.string_lossy(), format!("Fighters & Stages  >  Practice games  >  {}", game.title()));
-        assert_eq!(f.hint.string_lossy(), "Up/Down move   ZL+Up/Down jump   Left/Right change   A open   Y reset row   B back");
+        assert_eq!(f.hint.string_lossy(), "L/R page   Up/Down move   ZL+Up/Down jump   Left/Right change   A open   Y reset row   B back");
         assert_eq!(f.group_count, 0, "no left column");
         m.press(Button::B);
         assert_eq!((m.screen(), m.is_closed()), (None, false), "B goes back to the list");

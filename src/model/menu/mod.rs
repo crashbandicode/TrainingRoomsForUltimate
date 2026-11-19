@@ -1150,6 +1150,13 @@ impl Menu {
             self.recording.press_popup(button);
             return;
         }
+        // L / R step the page from a submenu as from the page itself (`press_page`), leaving the sub-screens.
+        if matches!(button, Button::L | Button::R) && self.stack.last().is_some_and(|s| self.switches_page(*s)) {
+            self.stack.clear();
+            self.mashout_pop = None;
+            self.change_page(button == Button::R);
+            return;
+        }
         match self.stack.last().copied() {
             None => self.press_page(button),
             Some(Screen::List { row, cursor }) => self.press_list(button, row, cursor),
@@ -1197,6 +1204,21 @@ impl Menu {
             Button::Y => _ = self.reset_setting(&ROWS[row]),
             Button::B => _ = self.stack.pop(),
             _ => {}
+        }
+    }
+
+    /// The submenus L / R leave for the previous or next page: a game's sub-screen, the pickers and the editor screens.
+    /// Popups, number editors, the chord editor, the reset dialog, the grids that page or order with L / R, the Mash
+    /// out popup and the runtime's panels keep their own buttons.
+    fn switches_page(&self, screen: Screen) -> bool {
+        match screen {
+            Screen::Rows { .. } | Screen::Directions { .. } | Screen::Overrides { .. } | Screen::Chords { .. } => true,
+            Screen::Grid { layout, .. } => match layout.kind {
+                GridKind::Roster(RosterUse::PlayerPick | RosterUse::CpuPick) => true,
+                GridKind::Roster(RosterUse::Mashout) => self.mashout_pop.is_none(),
+                _ => false,
+            },
+            _ => false,
         }
     }
 
