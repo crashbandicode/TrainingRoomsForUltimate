@@ -845,6 +845,7 @@ pub fn recording_version() -> (u64, u64) {
     (catalog_generation(), store::index_generation())
 }
 
+#[cfg(target_os = "switch")]
 pub(crate) fn bump_catalog() {
     store::advance_catalog();
     invalidate_bound();

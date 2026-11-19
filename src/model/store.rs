@@ -591,6 +591,83 @@ fn slug(name: &str) -> String {
     out
 }
 
+// Recording catalog invalidation happens at the committed Store operation,
+// including the standalone macro and combo editors. Other stores are independent.
+pub const CATALOG_DIRS: [&str; 4] = ["macros", "saves", "combos", "sequences"];
+pub type CatalogSignatures = BTreeMap<(usize, String), Option<u64>>;
+static CATALOG_WRITES: Mutex<BTreeMap<PathBuf, CatalogSignatures>> = Mutex::new(BTreeMap::new());
+static RECORDING_WRITE: Mutex<()> = Mutex::new(());
+static CATALOG_GEN: AtomicU64 = AtomicU64::new(0);
+static INDEX_GEN: AtomicU64 = AtomicU64::new(0);
+
+fn recording_root(root: &Path) -> bool {
+    cfg!(test) || root == Path::new(crate::model::storage::ROOT)
+}
+
+fn catalog_folder(dir: &Path) -> Option<(&Path, usize)> {
+    let root = dir.parent().filter(|path| recording_root(path))?;
+    let name = dir.file_name()?.to_str()?;
+    CATALOG_DIRS.iter().position(|&folder| folder == name).map(|folder| (root, folder))
+}
+
+pub fn recording_write_guard(root: &Path) -> Option<MutexGuard<'static, ()>> {
+    recording_root(root).then(|| RECORDING_WRITE.lock().unwrap_or_else(|err| err.into_inner()))
+}
+
+/// The background worker can defer a read while an atomic replacement is in progress.
+pub fn try_recording_read() -> Option<MutexGuard<'static, ()>> {
+    if cfg!(test) {
+        return Some(RECORDING_WRITE.lock().unwrap_or_else(|err| err.into_inner()));
+    }
+    match RECORDING_WRITE.try_lock() {
+        Ok(lock) => Some(lock),
+        Err(TryLockError::Poisoned(err)) => Some(err.into_inner()),
+        Err(TryLockError::WouldBlock) => None,
+    }
+}
+
+fn note_catalog_write(dir: &Path, id: &str, size: Option<u64>) {
+    let Some((root, folder)) = catalog_folder(dir) else { return };
+    let mut writes = CATALOG_WRITES.lock().unwrap_or_else(|err| err.into_inner());
+    writes.entry(root.to_path_buf()).or_default().insert((folder, id.to_owned()), size);
+    CATALOG_GEN.fetch_add(1, Ordering::Release);
+    drop(writes);
+    #[cfg(target_os = "switch")]
+    if folder == 1 {
+        crate::engine::rr_host::invalidate_bound();
+    }
+    wake_catalog();
+}
+
+pub fn catalog_changes(root: &Path) -> CatalogSignatures {
+    CATALOG_WRITES.lock().unwrap_or_else(|err| err.into_inner()).remove(root).unwrap_or_default()
+}
+
+pub fn catalog_generation() -> u64 {
+    CATALOG_GEN.load(Ordering::Acquire)
+}
+
+pub fn advance_catalog() {
+    CATALOG_GEN.fetch_add(1, Ordering::Release);
+    wake_catalog();
+}
+
+pub fn index_generation() -> u64 {
+    INDEX_GEN.load(Ordering::Acquire)
+}
+
+pub fn note_index_write(root: &Path) {
+    if recording_root(root) {
+        INDEX_GEN.fetch_add(1, Ordering::Release);
+        wake_catalog();
+    }
+}
+
+fn wake_catalog() {
+    #[cfg(target_os = "switch")]
+    crate::runtime::wake_recording_menu();
+}
+
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
@@ -759,81 +836,4 @@ mod tests {
         ]);
     }
     }
-}
-
-// Recording catalog invalidation happens at the committed Store operation,
-// including the standalone macro and combo editors. Other stores are independent.
-pub const CATALOG_DIRS: [&str; 4] = ["macros", "saves", "combos", "sequences"];
-pub type CatalogSignatures = BTreeMap<(usize, String), Option<u64>>;
-static CATALOG_WRITES: Mutex<BTreeMap<PathBuf, CatalogSignatures>> = Mutex::new(BTreeMap::new());
-static RECORDING_WRITE: Mutex<()> = Mutex::new(());
-static CATALOG_GEN: AtomicU64 = AtomicU64::new(0);
-static INDEX_GEN: AtomicU64 = AtomicU64::new(0);
-
-fn recording_root(root: &Path) -> bool {
-    cfg!(test) || root == Path::new(crate::model::storage::ROOT)
-}
-
-fn catalog_folder(dir: &Path) -> Option<(&Path, usize)> {
-    let root = dir.parent().filter(|path| recording_root(path))?;
-    let name = dir.file_name()?.to_str()?;
-    CATALOG_DIRS.iter().position(|&folder| folder == name).map(|folder| (root, folder))
-}
-
-pub fn recording_write_guard(root: &Path) -> Option<MutexGuard<'static, ()>> {
-    recording_root(root).then(|| RECORDING_WRITE.lock().unwrap_or_else(|err| err.into_inner()))
-}
-
-/// The background worker can defer a read while an atomic replacement is in progress.
-pub fn try_recording_read() -> Option<MutexGuard<'static, ()>> {
-    if cfg!(test) {
-        return Some(RECORDING_WRITE.lock().unwrap_or_else(|err| err.into_inner()));
-    }
-    match RECORDING_WRITE.try_lock() {
-        Ok(lock) => Some(lock),
-        Err(TryLockError::Poisoned(err)) => Some(err.into_inner()),
-        Err(TryLockError::WouldBlock) => None,
-    }
-}
-
-fn note_catalog_write(dir: &Path, id: &str, size: Option<u64>) {
-    let Some((root, folder)) = catalog_folder(dir) else { return };
-    let mut writes = CATALOG_WRITES.lock().unwrap_or_else(|err| err.into_inner());
-    writes.entry(root.to_path_buf()).or_default().insert((folder, id.to_owned()), size);
-    CATALOG_GEN.fetch_add(1, Ordering::Release);
-    drop(writes);
-    #[cfg(target_os = "switch")]
-    if folder == 1 {
-        crate::engine::rr_host::invalidate_bound();
-    }
-    wake_catalog();
-}
-
-pub fn catalog_changes(root: &Path) -> CatalogSignatures {
-    CATALOG_WRITES.lock().unwrap_or_else(|err| err.into_inner()).remove(root).unwrap_or_default()
-}
-
-pub fn catalog_generation() -> u64 {
-    CATALOG_GEN.load(Ordering::Acquire)
-}
-
-pub fn advance_catalog() {
-    CATALOG_GEN.fetch_add(1, Ordering::Release);
-    wake_catalog();
-}
-
-pub fn index_generation() -> u64 {
-    INDEX_GEN.load(Ordering::Acquire)
-}
-
-pub fn note_index_write(root: &Path) {
-    if recording_root(root) {
-        INDEX_GEN.fetch_add(1, Ordering::Release);
-        wake_catalog();
-    }
-}
-
-fn wake_catalog() {
-    #[cfg(target_os = "switch")]
-    crate::runtime::wake_recording_menu();
 }
