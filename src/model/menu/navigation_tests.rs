@@ -1,5 +1,5 @@
 //! rc15/submenu-page-switch: L / R step the page from a submenu as from the page itself (popups and editors keep their
-//! own buttons).
+//! own buttons), and ZL + Up / Down wrap at the first and last section or entry, as Up / Down do.
 lib_unit_tests! {
 use super::*;
 use core::mem::discriminant;
@@ -113,5 +113,55 @@ fn page_switch_keeps_popup_and_editor_buttons() {
         assert_eq!(m.page(), Page::FightersStages);
         assert!(m.mashout_pop().is_some() && matches!(m.screen(), Some(Screen::Grid { .. })));
     }
+}
+
+/// The first focusable entry of each section of `page`, in order.
+fn section_starts(m: &Menu, page: Page) -> Vec<usize> {
+    let mut starts: Vec<usize> = Vec::new();
+    let mut last = None;
+    for i in 0..m.entry_count(page) {
+        let Some(e) = m.entry(page, i) else { continue };
+        if m.focusable(e) && last != Some(group_of(e)) {
+            last = Some(group_of(e));
+            starts.push(i);
+        }
+    }
+    starts
+}
+
+#[test]
+fn page_jump_wraps_at_the_edges() {
+    // A page: ZL + Up from the first section goes to the last, ZL + Down from the last to the first.
+    let mut m = on_page(Page::FightersStages);
+    let starts = section_starts(&m, Page::FightersStages);
+    assert!(starts.len() > 2);
+    m.cursor[Page::FightersStages.index()] = starts[0];
+    m.press(Button::JumpUp);
+    assert_eq!(m.cursor[Page::FightersStages.index()], *starts.last().unwrap(), "ZL + Up wraps to the last section");
+    m.press(Button::JumpDown);
+    assert_eq!(m.cursor[Page::FightersStages.index()], starts[0], "ZL + Down wraps to the first section");
+    m.press(Button::JumpDown);
+    assert_eq!(m.cursor[Page::FightersStages.index()], starts[1], "inside the page a jump is one section");
+    // A game's sub-screen (Tech practice, longer than a window): the window stops on the last row, then wraps.
+    let tech = table::game_group(Game::Tech);
+    let len = menu().sub_rows(tech).count();
+    assert!(len > LIST_JUMP);
+    let mut m = on_page(Page::FightersStages);
+    m.stack.push(Screen::Rows { group: tech, cursor: len - 1 });
+    m.press(Button::JumpDown);
+    assert_eq!(m.screen().copied(), Some(Screen::Rows { group: tech, cursor: 0 }), "ZL + Down wraps to the first row");
+    m.press(Button::JumpUp);
+    assert_eq!(m.screen().copied(), Some(Screen::Rows { group: tech, cursor: len - 1 }), "ZL + Up wraps to the last row");
+    m.press(Button::JumpUp);
+    assert_eq!(m.screen().copied(), Some(Screen::Rows { group: tech, cursor: len - 1 - LIST_JUMP }), "one window up");
+    // A dropdown list: the same at both ends.
+    let row = row_where(|r| matches!(r.control, Control::Dropdown(labels) if labels.len() > 2));
+    let n = menu().option_count(row);
+    let mut m = on_page(Page::FightersStages);
+    m.stack.push(Screen::List { row, cursor: n - 1 });
+    m.press(Button::JumpDown);
+    assert_eq!(m.screen().copied(), Some(Screen::List { row, cursor: 0 }));
+    m.press(Button::JumpUp);
+    assert_eq!(m.screen().copied(), Some(Screen::List { row, cursor: n - 1 }));
 }
 }
