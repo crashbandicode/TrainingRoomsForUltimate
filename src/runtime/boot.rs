@@ -211,6 +211,7 @@ fn run_inner() {
     };
     // The native-call layer calls only what passed (`game::natives` and `state_natives` refuse the rest).
     game::grant(Granted::from_usable(&usable));
+    crate::runtime::features::lockon::init_practice_items();
     // The shared fighter natives of `game::natives`, each group once the rows it calls passed their guards.
     let row_usable = |name: &str| sites::find(name).is_some_and(usable);
     let row4_usable = |name: &str| sites_pkg4::SITES.iter().position(|s| s.name == name).is_some_and(|i| found4[i].usable());

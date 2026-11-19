@@ -141,6 +141,8 @@ pub mod eggs;
 pub mod btt;
 #[path = "model/lockon.rs"]
 pub mod lockon;
+#[path = "model/sites_lockon.rs"]
+pub mod sites_lockon;
 #[path = "model/tech/mod.rs"]
 pub mod tech;
 #[path = "model/sites_hitbox.rs"]

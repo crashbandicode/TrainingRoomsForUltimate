@@ -1,7 +1,7 @@
 //! A native search target for each breakable target in ordinary Training.
 
 use core::cell::RefCell;
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::{AtomicBool, Ordering};
 use smash::app::{self, lua_bind::*, sv_battle_object, BattleObjectModuleAccessor as Accessor};
 use smash::lib::lua_const::*;
 use smash::phx::Vector3f;
@@ -9,7 +9,9 @@ use smash::phx::Vector3f;
 use crate::model::{
     btt,
     lockon::{ItemHost, Target, Tracker},
+    lra_reset,
     practice_games::Game,
+    sites_lockon::CALLEES,
     sites_pkg3,
 };
 use crate::runtime::{
@@ -20,7 +22,7 @@ const COUNT: usize = 1 + btt::MAX;
 const SCALE: f32 = 0.6;
 const CENTER_HEIGHT: f32 = 4.0;
 
-static SCENE: AtomicU32 = AtomicU32::new(0);
+static USABLE: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy)]
 struct Handle {
@@ -34,9 +36,20 @@ struct GameItems(RefCell<Tracker<Handle, COUNT>>);
 unsafe impl Sync for GameItems {}
 static LIVE: GameItems = GameItems(RefCell::new(Tracker::new()));
 
-/// The scene clock runs from more than one caller. Only the game thread owns the items.
-pub fn scene_changed() {
-    SCENE.fetch_add(1, Ordering::AcqRel);
+pub fn init_practice_items() {
+    let mut usable = game::granted(sites_pkg3::STATE_ITEM_OBJECT_ID_OFFSET)
+        && game::granted(sites_pkg3::STATE_ITEM_REMOVE_OFFSET);
+    for (site, outcome) in CALLEES.iter().zip(game::outcomes(&CALLEES)) {
+        if !outcome.usable() {
+            usable = false;
+            crate::runtime::diag_log::diagnostic(format_args!(
+                "[TrainingRooms] lock_on guard={} outcome={}",
+                site.name,
+                outcome.code()
+            ));
+        }
+    }
+    USABLE.store(usable, Ordering::Release);
 }
 
 extern "C" {
@@ -69,7 +82,7 @@ fn position([x, y]: [f32; 2]) -> Vector3f {
 impl ItemHost for NativeItems {
     type Handle = Handle;
 
-    fn valid(&mut self, item: Handle) -> bool {
+    fn owns_live_item(&mut self, item: Handle) -> bool {
         unsafe {
             sv_battle_object::is_active(item.id)
                 && sv_battle_object::module_accessor(item.id) == item.accessor
@@ -78,7 +91,7 @@ impl ItemHost for NativeItems {
         }
     }
 
-    fn create(&mut self, at: [f32; 2]) -> Option<Handle> {
+    fn create_target_item(&mut self, at: [f32; 2]) -> Option<Handle> {
         let (team, owner) = self.team?;
         if !core::mem::take(&mut self.spawn) {
             return None; // Spread a full BTT layout's native creations across frames.
@@ -118,7 +131,7 @@ impl ItemHost for NativeItems {
         }
     }
 
-    fn place(&mut self, item: Handle, at: [f32; 2]) {
+    fn place_target_item(&mut self, item: Handle, at: [f32; 2]) {
         unsafe {
             let accessor = item.accessor;
             PostureModule::set_pos(accessor, &position(at));
@@ -129,7 +142,7 @@ impl ItemHost for NativeItems {
         }
     }
 
-    fn remove(&mut self, item: Handle) {
+    fn retire_target_item(&mut self, item: Handle) {
         unsafe { native::item_remove(self.manager, item.id) };
     }
 }
@@ -148,7 +161,10 @@ fn wanted(game: Option<Game>) -> Option<[Option<Target>; COUNT]> {
 ///
 /// # Safety
 /// P1's non-Nana game-thread pass, after the practice games and save-state step.
-pub unsafe fn frame(fighter: usize) {
+pub unsafe fn update_practice_items(fighter: usize) {
+    if !USABLE.load(Ordering::Acquire) {
+        return;
+    }
     let active = super::practice::active().filter(|g| matches!(g, Game::Eggs | Game::Btt));
     let Ok(mut tracker) = LIVE.0.try_borrow_mut() else {
         return;
@@ -158,11 +174,6 @@ pub unsafe fn frame(fighter: usize) {
     }
     let facts = scene::facts();
     if !facts.native_training || facts.busy || facts.waiting_room {
-        return;
-    }
-    if !game::granted(sites_pkg3::STATE_ITEM_OBJECT_ID_OFFSET)
-        || !game::granted(sites_pkg3::STATE_ITEM_REMOVE_OFFSET)
-    {
         return;
     }
     let targets = if super::states::is_loading() {
@@ -189,7 +200,7 @@ pub unsafe fn frame(fighter: usize) {
         None
     };
     tracker.update(
-        SCENE.load(Ordering::Acquire),
+        lra_reset::GENERATION.load(Ordering::Acquire),
         targets,
         &mut NativeItems {
             manager,

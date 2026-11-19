@@ -9,10 +9,10 @@ pub struct Target {
 pub trait ItemHost {
     type Handle: Copy;
 
-    fn valid(&mut self, item: Self::Handle) -> bool;
-    fn create(&mut self, at: [f32; 2]) -> Option<Self::Handle>;
-    fn place(&mut self, item: Self::Handle, at: [f32; 2]);
-    fn remove(&mut self, item: Self::Handle);
+    fn owns_live_item(&mut self, item: Self::Handle) -> bool;
+    fn create_target_item(&mut self, at: [f32; 2]) -> Option<Self::Handle>;
+    fn place_target_item(&mut self, item: Self::Handle, at: [f32; 2]);
+    fn retire_target_item(&mut self, item: Self::Handle);
 }
 
 #[derive(Clone, Copy)]
@@ -53,17 +53,17 @@ impl<T: Copy, const N: usize> Tracker<T, N> {
         }
         for (slot, target) in self.items.iter_mut().zip(targets) {
             let target = target.filter(|t| t.at.iter().all(|value| value.is_finite()));
-            let mut keep = slot.take().filter(|owned| host.valid(owned.item));
+            let mut keep = slot.take().filter(|owned| host.owns_live_item(owned.item));
             if let Some(old) = keep.filter(|owned| target.is_none_or(|new| new.key != owned.key)) {
-                host.remove(old.item);
+                host.retire_target_item(old.item);
                 keep = None;
             }
             let Some(target) = target else { continue };
             if let Some(item) = keep
                 .map(|owned| owned.item)
-                .or_else(|| host.create(target.at))
+                .or_else(|| host.create_target_item(target.at))
             {
-                host.place(item, target.at);
+                host.place_target_item(item, target.at);
                 *slot = Some(Owned {
                     key: target.key,
                     item,

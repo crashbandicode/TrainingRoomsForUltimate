@@ -526,7 +526,7 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
             crate::runtime::features::states::frame(a0);
         }
         if primary_p1 {
-            unsafe { super::lockon::frame(a0) };
+            unsafe { super::lockon::update_practice_items(a0) };
         }
         // Package 6: the CPU-as-P1 fallback's step (nothing when the pilot is absent-and-not-installed or present).
         unsafe { crate::runtime::p1::frame(a0) };

@@ -21,11 +21,11 @@ struct Field {
 impl ItemHost for Field {
     type Handle = u32;
 
-    fn valid(&mut self, item: u32) -> bool {
+    fn owns_live_item(&mut self, item: u32) -> bool {
         self.live.contains(&item)
     }
 
-    fn create(&mut self, at: [f32; 2]) -> Option<u32> {
+    fn create_target_item(&mut self, at: [f32; 2]) -> Option<u32> {
         self.calls.push(Call::Create(at));
         if self.full {
             return None;
@@ -35,12 +35,12 @@ impl ItemHost for Field {
         Some(self.next)
     }
 
-    fn place(&mut self, item: u32, at: [f32; 2]) {
+    fn place_target_item(&mut self, item: u32, at: [f32; 2]) {
         assert!(self.live.contains(&item));
         self.calls.push(Call::Move(item, at));
     }
 
-    fn remove(&mut self, item: u32) {
+    fn retire_target_item(&mut self, item: u32) {
         assert!(self.live.contains(&item));
         self.live.retain(|&id| id != item);
         self.calls.push(Call::Remove(item));
