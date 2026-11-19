@@ -1490,7 +1490,7 @@ mod tests {
             assert!(steps < 100, "the build ends");
         }
         // The index, each recording listed (one read) and loaded (one read), and the four other stores' listings.
-        assert!(steps >= 1 + 2 * 4, "one file per step: {steps} steps for 4 recordings");
+        assert!(steps > 2 * 4, "one file per step: {steps} steps for 4 recordings");
         assert_eq!(build.finish(), load_catalog(&root).unwrap());
         assert_eq!(load_catalog(&root).unwrap().catalog.macros.len(), 4);
     }
