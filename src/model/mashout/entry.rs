@@ -932,6 +932,7 @@ mod tests {
                 entered_status: Some(40),
                 guard_count: Some(254), previous_guard_gap: Some(254), guard_event: None, window_base: Some(20),
                 window_multiplier: Some(1.0), lockout: Some(40), reaction: Some(3.0), damage_fall: Some(false), stick_x: None,
+                passive_speed: None,
                 press_frame_offset: None,
             };
             let mut wait = TechContactWait::new(snapshot);

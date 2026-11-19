@@ -100,6 +100,7 @@ pub(super) unsafe fn snapshot(
         damage_fall,
         stick_x,
         // Native update3f9554/6c stores zero on the press and increments only otherwise.
+        passive_speed: None,
         press_frame_offset: guard_count.map(|_| 0),
     }
 }
