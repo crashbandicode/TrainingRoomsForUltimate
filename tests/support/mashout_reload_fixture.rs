@@ -141,6 +141,41 @@ unsafe fn actual_reload(game: &mut Game, p1: usize, cpu: usize, cpu_entry: usize
 fn actual_choose_request(game: &mut Game, kind: u32, request: Request) {
     // CHOOSE
 }
+fn actual_choose_gate(status: u32, admitted: &mut bool) {
+    let (p1, cpu) = (11, 22);
+    let mut ids = [0u32; 16];
+    ids[15] = 0x7f;
+    let linked = LINKED.load(Ordering::Relaxed);
+    // RELEASE_CHECK
+    // ADMISSION_GATE
+    *admitted = true;
+}
+
+#[test]
+fn choose_recovers_an_unlinked_grounded_cpu_teeter_only() {
+    for (p1_status, cpu_status, blocker, expected) in [
+        (0, 0, None, true),
+        (0, 0x7f, None, true),
+        (0x7f, 0x7f, None, false),
+        (0, 0x7e, None, false),
+        (0, 0x41, None, false),
+        (0, 0x7f, Some(&LINKED), false),
+        (0, 0x7f, Some(&P1_AIR), false),
+        (0, 0x7f, Some(&CPU_AIR), false),
+        (0, 0x7f, Some(&P1_STOP), false),
+        (0, 0x7f, Some(&CPU_STOP), false),
+    ] {
+        reset();
+        CPU_STATUS.store(cpu_status, Ordering::Relaxed);
+        if let Some(blocker) = blocker {
+            blocker.store(true, Ordering::Relaxed);
+        }
+        let mut admitted = false;
+        actual_choose_gate(p1_status, &mut admitted);
+        assert_eq!(admitted, expected, "P1={p1_status:#x}, CPU={cpu_status:#x}, blocked={}", blocker.is_some());
+    }
+}
+
 unsafe fn actual_restore(game: &mut Game, released: bool, cpu_entry: usize) {
     let (p1, cpu) = (11, 22);
     let status = if released { 0 } else { 5 };

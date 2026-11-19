@@ -48,6 +48,9 @@ fn actual_runtime_reload_waits_without_weakening_active_attempt_identity() {
     );
     let reload = block(source, "Step::Reload => {");
     let choose = block(source, "if kind != request.attacker_kind {");
+    let choose_gate = block(block(source, "Step::Choose => {"), "if !released");
+    let release_start = source.find("let released =").unwrap();
+    let release = &source[release_start..=release_start + source[release_start..].find(';').unwrap()];
     let restore = block(source, "Step::Restore => {");
     let end = block(source, "fn end_practice(&mut self) {");
     assert!(source.find(missing).unwrap() < source.find(identity).unwrap());
@@ -57,6 +60,8 @@ fn actual_runtime_reload_waits_without_weakening_active_attempt_identity() {
         .replace("// IDENTITY", identity)
         .replace("// RELOAD", reload)
         .replace("// CHOOSE", choose)
+        .replace("// RELEASE_CHECK", release)
+        .replace("// ADMISSION_GATE", choose_gate)
         .replace("// RESTORE", restore)
         .replace("// END_PRACTICE", end);
     let unique = std::time::SystemTime::now()
