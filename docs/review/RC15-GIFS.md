@@ -18,6 +18,41 @@ Zoom on the grade and the set count:
 
 ![Parry grade zoom](rc15-gifs/parry-zoom.gif)
 
+## Eggs-ercise: random spawns, projectile break
+
+Ten targets. A on Start, eggs pop up at random spots in view, and Palutena's Autoreticle shots break them: 0/10 → 2/10 →
+4/10, and each break respawns the egg elsewhere. Recorded on the rc.15 `6c87a895` release; the Eggs code is unchanged in
+the final `21ec1896`.
+
+![Eggs-ercise](rc15-gifs/eggs-spawn-projectile.gif)
+
+![Eggs count zoom](rc15-gifs/eggs-count-zoom.gif)
+
+## Break the Targets: projectile break, then the timer reset
+
+Ready 0/6. Explosive Flame breaks targets and the clock runs (5/6). Then the menu opens on Break the Targets; A on Stop, A
+on Start, and it's back to Ready 0/6 0:00.00 with all six targets.
+
+![Break the Targets](rc15-gifs/btt-flame-break-reset.gif)
+
+![BTT count and clock zoom](rc15-gifs/btt-flame-break-reset-zoom.gif)
+
+## Lock-on: Palutena's Autoreticle in Break the Targets
+
+Ready 0/2. Neutral B is the first input: the reticle locks onto the near target, the shots break it, and the count reads 1/2.
+
+![Autoreticle lock-on](rc15-gifs/btt-lockon-autoreticle.gif)
+
+![Autoreticle zoom](rc15-gifs/btt-lockon-autoreticle-zoom.gif)
+
+## Lock-on: Sonic's Homing Attack in Eggs-ercise
+
+Ten targets. The Homing Attack locks onto the egg and breaks it, 0/10 → 1/10; a second one gives 2/10.
+
+![Homing Attack lock-on](rc15-gifs/eggs-lockon-homing-attack.gif)
+
+![Homing Attack zoom](rc15-gifs/eggs-lockon-homing-attack-zoom.gif)
+
 ## Mash out
 
 The path is Fighters & Stages > Practice games > Mash out > Start.
