@@ -19,9 +19,9 @@ fn tech_rows_follow_break_the_targets() {
     let end = start + 3 + expected.len();
     assert_eq!(&ROWS[start + 3..end].iter().map(|r| r.id).collect::<Vec<_>>(), &expected);
     for r in &ROWS[start..end] { assert!(r.help.contains('\n') && r.group == ROWS[start].group); }
-    // Mash out's sub-screen follows (rc15/mashout-int): Start, then its three rows.
+    // Mash out's sub-screen follows (rc15/mashout-int): Start, then the fighter grid picker (rc15/mashout-grid-picker).
     let mash: Vec<_> = ROWS[end..].iter().take_while(|r| r.group == table::game_group(Game::Mashout)).map(|r| (r.title, r.id)).collect();
-    assert_eq!(mash, [("Start", ""), ("State", "mashout_state"), ("Attacker move", "mashout_attacker"), ("Grab type", "mashout_grab")]);
+    assert_eq!(mash, [("Start", ""), ("Fighter and move", "")]);
 }
 
 /// rc.15: one practice game at a time is the running game, not the rows. Every pair of modes can be stored together, and

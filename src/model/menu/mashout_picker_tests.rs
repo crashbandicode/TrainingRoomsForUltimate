@@ -41,6 +41,14 @@ fn one(m: &Menu, id: &str) -> Option<usize> {
     m.settings().menu.get(id).and_then(|row| row.iter().position(|v| *v != 0))
 }
 
+/// Open the picker as the worker does: the open asks the roster editor (MASHOUT_SEEK) to put the cursor on the saved chip.
+fn open(m: &mut Menu) {
+    m.open_editor(Editor::MashoutPicker);
+    let (tile, button) = m.take_roster_press().expect("the seek");
+    assert_eq!(tile, MASHOUT_SEEK);
+    RosterEditor::new(RosterUse::Mashout).apply(m, usize::from(tile), button);
+}
+
 fn picker_row() -> usize {
     ROWS.iter().position(|r| matches!(r.control, Control::Editor(Editor::MashoutPicker))).expect("the picker row")
 }
@@ -86,7 +94,7 @@ fn mashout_row_opens_the_portrait_grid() {
     let titles: Vec<_> = ROWS.iter().filter(|r| r.group == group).map(|r| r.title).collect();
     assert_eq!(titles, ["Start", "Fighter and move"]);
     let mut m = menu();
-    m.open_editor(Editor::MashoutPicker);
+    open(&mut m);
     let Some(Screen::Grid { layout, page, .. }) = m.screen().copied() else { panic!("a grid") };
     assert_eq!((layout.kind, page), (GridKind::Roster(RosterUse::Mashout), 0));
     // The character select grid of the Player / CPU Character picks: the same layout, cells and stepping.
@@ -121,7 +129,7 @@ fn mashout_popup_options_equal_the_move_table() {
 #[test]
 fn mashout_popup_opens_over_the_chip() {
     let mut m = menu();
-    m.open_editor(Editor::MashoutPicker);
+    open(&mut m);
     let steve = a_on(&mut m, STEVE);
     let pop = m.mashout_pop().expect("Steve's popup");
     assert_eq!((pop.chip, pop.cell), (Chip::Fighter(STEVE), steve));
@@ -150,7 +158,7 @@ fn mashout_greyed_fighters_cannot_be_picked() {
         assert_eq!(f.tile_state[cell] == TILE_GREYED, !pickable, "cell {cell}");
         if !pickable {
             let mut m = menu();
-            m.open_editor(Editor::MashoutPicker);
+            open(&mut m);
             RosterEditor::new(RosterUse::Mashout).apply(&mut m, cell, Button::A);
             assert!(m.mashout_pop().is_none(), "a greyed chip opens nothing");
         }
@@ -168,7 +176,7 @@ fn mashout_greyed_fighters_cannot_be_picked() {
 #[test]
 fn mashout_grab_line_keeps_the_grab_type() {
     let mut m = menu();
-    m.open_editor(Editor::MashoutPicker);
+    open(&mut m);
     a_on(&mut m, MARIO);
     m.press(Button::Right);
     assert_eq!(popup_lines(&m), ["Grab  <  Dash  >"]);
@@ -186,7 +194,7 @@ fn mashout_grab_line_keeps_the_grab_type() {
     assert_eq!((one(&m, moves::STATE_ROW), one(&m, moves::ATTACKER_ROW), one(&m, moves::GRAB_ROW)), (Some(0), Some(0), Some(2)));
     // Left / Right on a line without a grab type change nothing.
     let mut m = menu();
-    m.open_editor(Editor::MashoutPicker);
+    open(&mut m);
     a_on(&mut m, STEVE);
     m.press(Button::Down);
     m.press(Button::Right);
@@ -207,7 +215,7 @@ fn mashout_random_chip_keeps_every_random_choice() {
         assert!(random.iter().any(|(s, _, _)| *s == state));
     }
     let mut m = menu();
-    m.open_editor(Editor::MashoutPicker);
+    open(&mut m);
     let mut f = Frame::new();
     RosterEditor::new(RosterUse::Mashout).decorate_mashout(&mut f, &m);
     assert_eq!(text(&f.tiles[RANDOM_CELL]), "Random");
@@ -249,7 +257,7 @@ fn mashout_picker_writes_the_same_keys_as_the_dropdowns() {
     for want in cases {
         let mut m = menu();
         let factory = m.settings().menu.clone();
-        m.open_editor(Editor::MashoutPicker);
+        open(&mut m);
         match picker::chip_of(want).expect("a chip") {
             Chip::Random => RosterEditor::new(RosterUse::Mashout).apply(&mut m, RANDOM_CELL, Button::A),
             Chip::Fighter(kind) => _ = a_on(&mut m, kind),
@@ -274,23 +282,23 @@ fn mashout_picker_writes_the_same_keys_as_the_dropdowns() {
 fn mashout_old_setting_opens_on_its_chip_and_option() {
     // A saved Steve minecart with a Pivot grab type: the grid opens on Steve, his popup on the minecart line.
     let mut m = with(0, 98, 2);
-    m.open_editor(Editor::MashoutPicker);
+    open(&mut m);
     assert!(matches!(m.screen(), Some(Screen::Grid { cell, .. }) if *cell == home(STEVE)));
     a_on(&mut m, STEVE);
     let pop = m.mashout_pop().unwrap();
     assert_eq!((pop.cursor, pop.grab), (1, 2));
     // Mario's grab with the Dash type.
     let mut m = with(0, 0, 1);
-    m.open_editor(Editor::MashoutPicker);
+    open(&mut m);
     assert!(matches!(m.screen(), Some(Screen::Grid { cell, .. }) if *cell == home(MARIO)));
     a_on(&mut m, MARIO);
     assert_eq!(popup_lines(&m), ["Grab  <  Dash  >"]);
     // Random within Bury: the grid opens on the Random chip, its popup on Random Bury.
     let mut m = with(1, moves::RANDOM_ATTACKER, 0);
-    m.open_editor(Editor::MashoutPicker);
+    open(&mut m);
     assert!(matches!(m.screen(), Some(Screen::Grid { cell, .. }) if *cell == RANDOM_CELL));
     RosterEditor::new(RosterUse::Mashout).apply(&mut m, RANDOM_CELL, Button::A);
-    assert_eq!(m.mashout_pop().unwrap().cursor, 3);
+    assert_eq!(m.mashout_pop().unwrap().cursor, 2, "Random state, Random Grab, then Random Bury");
     // Every valid saved setting maps back to the chip and line that write it.
     for (kind, _) in moves::ATTACKERS {
         for (line, c) in picker::choices(Chip::Fighter(*kind)).enumerate() {

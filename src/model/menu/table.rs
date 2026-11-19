@@ -193,6 +193,8 @@ pub enum Editor {
     /// Parry practice: the saved practices (a file each, the hot five first), and saving the current wiring as one.
     ParrySaved,
     ParrySave,
+    /// Mash out: the portrait grid of fighters, a popup of each fighter's moves over its chip.
+    MashoutPicker,
 }
 
 /// A read-only row.
@@ -273,7 +275,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 146] = [
+pub static ROWS: [Row; 144] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -577,12 +579,8 @@ pub static ROWS: [Row; 146] = [
     // Practice games > Mash out: its Off / On row is Start / Stop now; the `mashout` key stays in the file.
     r(MASHOUT, "Start", "", Control::Start(Game::Mashout),
       "Closes the menu and starts Mash out with the settings below.\nWhile it runs, this row reads Stop."),
-    r(MASHOUT, "State", "mashout_state", Control::Dropdown(&super::super::mashout::moves::STATE_LABELS),
-      "The state to escape.\nRandom state includes every reviewed attacker move."),
-    r(MASHOUT, "Attacker move", "mashout_attacker", Control::Dropdown(&super::super::mashout::moves::ATTACKER_LABELS),
-      "Choose a fighter move for the selected state.\nRandom chooses from that state; Random state includes all."),
-    r(MASHOUT, "Grab type", "mashout_grab", Control::Dropdown(&super::super::mashout::moves::GRAB_LABELS),
-      "Standing, dash or pivot for an ordinary grab.\nRandom chooses one of the three each attempt."),
+    r(MASHOUT, "Fighter and move", "", Control::Editor(Editor::MashoutPicker),
+      "A opens the fighters; A on one lists its moves to escape.\nThe Random chip picks a random state or a random move of one."),
     // Practice games > Parry practice: its Off is retired (a stored Off reads as 10 attempts); Start and Stop run it.
     r(PARRY, "Start", "", Control::Start(Game::Parry),
       "Closes the menu and starts Parry practice with the settings below.\nWhile it runs, this row reads Stop."),

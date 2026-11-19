@@ -12,6 +12,8 @@ pub mod ice116;
 pub mod grade;
 #[path = "mashout/moves.rs"]
 pub mod moves;
+#[path = "mashout/picker.rs"]
+pub mod picker;
 #[path = "mashout/native.rs"]
 pub mod native;
 #[path = "mashout/run.rs"]

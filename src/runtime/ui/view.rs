@@ -199,6 +199,7 @@ impl Panes {
         self.text(IDX_HELP + 1, frame.help[1].units(), TEXT);
         self.text(IDX_HINT, frame.hint.units(), TEXT_DIM);
         self.draw_marks(frame);
+        self.draw_mashout_pop(frame);
     }
 
     /// Green row plates, the hot outline, the hairline and the white cursor. Hidden until a recording screen asks.
@@ -572,17 +573,8 @@ impl Panes {
             self.hide(IDX_ITEM_ICON + i);
         }
         let shown = frame.view == View::Tiles;
-        let (cols, rows) = (f32::from(frame.tile_cols.max(1)), f32::from(frame.tile_rows.max(1)));
-        let (cell_w, cell_h) = ((ROW_RIGHT - ROW_LEFT) / cols, TILE_AREA_H / rows);
-        let centre = |i: usize| {
-            let per_row = usize::from(frame.tile_cols.max(1));
-            let (c, r) = (i % per_row, i / per_row);
-            // The roster's short last row sits centred under the full rows (the character select's own layout).
-            let count = usize::from(frame.tile_count);
-            let last_len = count - (count.saturating_sub(1) / per_row) * per_row;
-            let shift = if frame.tile_centre_last && r == count.saturating_sub(1) / per_row { (per_row - last_len) as f32 / 2.0 } else { 0.0 };
-            (ROW_LEFT + (c as f32 + shift + 0.5) * cell_w, 320.0 - (r as f32 + 0.5) * cell_h)
-        };
+        let (cell_w, cell_h) = tile_cell(frame);
+        let centre = |i: usize| tile_centre(frame, i);
         for i in 0..TILES {
             if !shown || i >= usize::from(frame.tile_count) || frame.tile_state[i] == TILE_HIDDEN {
                 self.hide(IDX_TILE + i);
@@ -670,6 +662,51 @@ impl Panes {
             self.label(solo, &[83], x + mark.x, y + mark.y, mark.w, colour); // "S"
             self.show(solo, ic.is_some() && frame.tile_solo[r]);
         }
+    }
+}
+
+/// A tile's width and height on the current grid.
+fn tile_cell(frame: &Frame) -> (f32, f32) {
+    let (cols, rows) = (f32::from(frame.tile_cols.max(1)), f32::from(frame.tile_rows.max(1)));
+    ((ROW_RIGHT - ROW_LEFT) / cols, TILE_AREA_H / rows)
+}
+
+/// The centre of tile `i`.
+fn tile_centre(frame: &Frame, i: usize) -> (f32, f32) {
+    let (cell_w, cell_h) = tile_cell(frame);
+    let per_row = usize::from(frame.tile_cols.max(1));
+    let (c, r) = (i % per_row, i / per_row);
+    // The roster's short last row sits centred under the full rows (the character select's own layout).
+    let count = usize::from(frame.tile_count);
+    let last_len = count - (count.saturating_sub(1) / per_row) * per_row;
+    let shift = if frame.tile_centre_last && r == count.saturating_sub(1) / per_row { (per_row - last_len) as f32 / 2.0 } else { 0.0 };
+    (ROW_LEFT + (c as f32 + shift + 0.5) * cell_w, 320.0 - (r as f32 + 0.5) * cell_h)
+}
+
+/// Mash out's popup: its box and lines over the chip (the recording pop-up's CONNECTIONS panes, unused on a grid).
+const POP_W: f32 = 520.0;
+const POP_LINE_H: f32 = 46.0;
+
+impl Panes {
+    unsafe fn draw_mashout_pop(&self, frame: &Frame) {
+        let Some(anchor) = frame.pop.anchor.filter(|_| frame.view == View::Tiles && frame.pop.count > 0) else { return };
+        let count = usize::from(frame.pop.count).min(CONN_LINES);
+        let (cx, cy) = tile_centre(frame, usize::from(anchor));
+        let h = count as f32 * POP_LINE_H + 24.0;
+        // Over the chip: the box's top at the chip's centre, kept inside the panel.
+        let x = cx.clamp(ROW_LEFT + POP_W / 2.0, ROW_RIGHT - POP_W / 2.0);
+        let y = (cy - h / 2.0 + 20.0).clamp(-300.0 + h / 2.0, 330.0 - h / 2.0);
+        let top = y + h / 2.0 - 12.0 - POP_LINE_H / 2.0;
+        self.rect_at(IDX_CONN_DIV, x, y, POP_W, h, [24, 24, 30, 245]);
+        for i in 0..count {
+            let line_y = top - i as f32 * POP_LINE_H;
+            let focused = i == usize::from(frame.pop.focus);
+            self.label(IDX_CONN + i, frame.pop.lines[i].units(), x + 8.0, line_y, POP_W - 40.0, if focused { TEXT } else { TEXT_DIM });
+            if focused {
+                self.box_at(IDX_CONN_BOX, x, line_y, POP_W - 16.0, POP_LINE_H - 6.0, ACCENT);
+            }
+        }
+        self.box_at(IDX_CONN_BOX + 4, x, y, POP_W, h, ACCENT);
     }
 }
 

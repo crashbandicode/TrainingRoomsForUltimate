@@ -377,6 +377,7 @@ fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cel
         GridKind::Roster(RosterUse::CpuPick) => "CPU Character",
         GridKind::Roster(RosterUse::Cycles) => "Character Cycles",
         GridKind::Roster(RosterUse::Hats) => "Kirby Hats",
+        GridKind::Roster(RosterUse::Mashout) => "Mash out fighter",
     };
     let _ = write!(frame.crumb, "  >  {title}   page {} of {}", page + 1, layout.pages());
     let _ = frame.help[0].write_str(match layout.kind {
@@ -386,13 +387,30 @@ fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cel
         GridKind::Roster(RosterUse::PlayerPick | RosterUse::CpuPick) => "A picks the fighter; X shows the next form of a shared slot.",
         GridKind::Roster(RosterUse::Cycles) => "A adds in order, R removes, Y marks Solo Popo on Ice Climbers, X previews forms, ZR switches role.",
         GridKind::Roster(RosterUse::Hats) => "A adds in order (All takes everyone), R removes, X previews forms, ZR switches role.",
+        GridKind::Roster(RosterUse::Mashout) if menu.mashout_pop().is_some() => "Up / Down choose the move; Left / Right change the grab type.",
+        GridKind::Roster(RosterUse::Mashout) => "A lists the fighter's moves to escape; X shows the next form of a shared slot.",
     });
     let _ = frame.hint.write_str(match layout.kind {
-        GridKind::Roster(RosterUse::PlayerPick | RosterUse::CpuPick) => "D-pad move   A pick   X form   B back",
+        GridKind::Roster(RosterUse::Mashout) if menu.mashout_pop().is_some() => "D-pad choose   Left/Right grab type   A confirm   B back",
+        GridKind::Roster(RosterUse::PlayerPick | RosterUse::CpuPick | RosterUse::Mashout) => "D-pad move   A pick   X form   B back",
         GridKind::Roster(RosterUse::Cycles) => "D-pad move   A pick   R remove   Y Solo Popo   X form   ZR role   B back",
         GridKind::Roster(RosterUse::Hats) => "D-pad move   A pick   R remove   X form   ZR role   B back",
         _ => "D-pad move   L/R page   B back",
     });
+    // Mash out's popup over its chip: one line per option, a grab line with its type.
+    if let Some(pop) = menu.mashout_pop().filter(|_| layout.kind == GridKind::Roster(RosterUse::Mashout)) {
+        use super::mashout::picker;
+        frame.pop.anchor = u8::try_from(pop.cell).ok();
+        frame.pop.focus = pop.cursor as u8;
+        for (i, line) in picker::choices(pop.chip).take(picker::MAX).enumerate() {
+            let out = &mut frame.pop.lines[i];
+            let _ = picker::write_name(line, false, out);
+            if line.grab {
+                let _ = write!(out, "  <  {}  >", picker::grab_label(pop.grab));
+            }
+            frame.pop.count = i as u8 + 1;
+        }
+    }
 }
 /// Cells of a panel of the named-macro / replay layer: 4 columns by 8 rows (the layer's own page, `NX_SUBMENU_*`).
 pub const PANEL_COLS: usize = 4;

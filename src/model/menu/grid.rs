@@ -34,6 +34,8 @@ pub enum RosterUse {
     Cycles,
     /// Kirby Hats: the ordered hat lists (`player_kirby_hats`, `cpu_kirby_hats`; ZR switches).
     Hats,
+    /// Mash out's fighter and move (`mashout_state`, `mashout_attacker`, `mashout_grab`): A opens the chip's popup.
+    Mashout,
 }
 
 /// The give-item grid's tiles (`ITEM_NAMES`: 39 items, turnip faces included).
