@@ -649,7 +649,7 @@ mod tests {
         let mut expected: Vec<_> = (0..stages.len()).collect();
         let training = expected.remove(training);
         expected.insert(1, training);
-        assert_eq!(crate::engine::stages::catalog::GRID_ORDER.iter().copied().collect::<Vec<_>>(), expected);
+        assert_eq!(&crate::engine::stages::catalog::GRID_ORDER[..], expected.as_slice());
 
         let mut all = Text::<28>::new();
         tile_label(GridKind::Stages, 0, false, stage, &mut all);
