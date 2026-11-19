@@ -32,7 +32,7 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU8, AtomicUsize,
 use hos_lock::Mutex;
 
 use crate::model::cpu::hash::{hash40, lua_bind_hash};
-use crate::model::cpu::role::LOBBY_CPU_ENTRY;
+use crate::model::cpu::role::{FighterKey, LOBBY_CPU_ENTRY};
 use crate::model::eggs::{self, HEADER, NOTICE_ID};
 use crate::runtime::features::btt;
 use crate::model::notify::DEFAULT_COLOR;
@@ -454,6 +454,11 @@ static STORE: Mutex<Store> =
 
 static BOARD: Mutex<Board> = Mutex::new(Board::new());
 
+/// The same per-body hide state that drives native visibility and the damage panels.
+pub(super) fn update_hidden_bodies(bodies: [Option<u32>; FighterKey::COUNT]) {
+    BOARD.lock().set_hidden(bodies);
+}
+
 /// Clear set `i`; its orbs go too. Nothing is asked of the game.
 fn clear_set(store: &mut Store, i: usize, accessor: usize) -> Counts {
     BOARD.lock().clear(accessor);
@@ -473,7 +478,7 @@ unsafe fn publish_orbs(accessor: usize, set: &hitbox::HandleSet, areas: &[legend
             (placed[len], len) = (orb, len + 1);
         }
     }
-    BOARD.lock().publish(accessor, placed[..len].iter().copied())
+    BOARD.lock().publish_owned(accessor, Some(natives::battle_object_id(accessor)), placed[..len].iter().copied())
 }
 
 /// One raw game-memory read for `GameArea`, the wind-area reader: the pass (`frame`) runs it only behind `enabled` with Windboxes
@@ -876,7 +881,12 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
                 #[cfg(feature = "diag")]
                 stats::article_hurt(id, key, len, cut);
             }
-            let extras = orbs::Extras { lr: shown(legend::ANGLES).then(|| natives::lr(key)), areas: &areas[..found], hurt: &hurts[..len] };
+            let extras = orbs::Extras {
+                lr: shown(legend::ANGLES).then(|| natives::lr(key)),
+                areas: &areas[..found],
+                hurt: &hurts[..len],
+                owner: article_owner(id, key),
+            };
             let kept = orbs::article_pass(&mut board, set, key, natives::status_kind(key), &mut GameAttacks(key), place, extras);
             *attacking = found != 0 || set.spheres().any(|s| s.key >> 24 != hitbox::KIND_ARTICLE_HURT);
             kept
@@ -886,6 +896,15 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
         }
     }
     dropped
+}
+
+/// The combat owner of a validated live item or weapon, when it is still a live fighter.
+unsafe fn article_owner(id: u32, key: usize) -> Option<u32> {
+    if !matches!(id >> 28, 1 | 4) {
+        return None;
+    }
+    let owner = natives::team_owner_id(key)?;
+    (owner >> 28 == 0 && state_natives::object_is_active(owner)).then_some(owner)
 }
 
 /// *Frame data colours* (spots-3): what this fighter's hitboxes launch, by which they rank: its own damage multiplier (the smash charge) and

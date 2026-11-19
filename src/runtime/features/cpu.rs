@@ -271,13 +271,19 @@ pub fn forget_hidden_scene() {
 
 /// Numeric native owner id, captured BEFORE any nested entry/body destruction.
 pub fn entry_departed(owner: u32) {
-    with(|cpu| role_adapter::entry_departed(cpu, owner));
+    with(|cpu| {
+        role_adapter::entry_departed(cpu, owner);
+        hide_cpu::publish(cpu);
+    });
     if owner == 0 { forget_player_position(); unsafe { taunt_frame(0, 0, false) }; }
 }
 
 /// Unconditional scene retirement, including when no save/record lease exists.
 pub fn scene_departed() {
-    with(role_adapter::scene_departed);
+    with(|cpu| {
+        role_adapter::scene_departed(cpu);
+        hide_cpu::publish(cpu);
+    });
     hide_cpu::restore();
     forget_player_position();
     // SAFETY: fighter 0 and accessor 0 read nothing; they clear Player 1's taunt slots.
@@ -579,7 +585,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
             let any = cpu.roles.any();
             if any {
                 cpu.clear_session();
-                hide_cpu::publish_panels(cpu.hidden_panels());
+                hide_cpu::publish(cpu);
             }
             any
         });
@@ -623,6 +629,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
     let speed = crate::runtime::features::game_speed::current();
     let practice_owned = crate::runtime::features::mashout::owns_cpu(accessor);
 
+    let object_id = natives::battle_object_id(accessor);
     let out = with(|cpu| {
         if !cpu.roles.set(receipt, accessor, key) { return None; }
         let facts = FrameFacts {
@@ -642,6 +649,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
             request: hide_cpu::REQUEST.load(Ordering::Acquire),
         };
         cpu.fighters[key.index()].kind = kind;
+        cpu.fighters[key.index()].object_id = Some(object_id);
         // A save state loading is package 3's fact (`states::is_loading`, the load machine's own flag).
         cpu.save_loading = save_loading;
         if crate::runtime::export::wanted() && LAST_SAVE_LOADING.swap(save_loading, Ordering::AcqRel) != save_loading {
@@ -655,7 +663,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
             }
         }
         let out = if practice_owned { cpu.practice_frame(key) } else { cpu.frame(key, &facts) };
-        hide_cpu::publish_panels(cpu.hidden_panels());
+        hide_cpu::publish(cpu);
         Some(out)
     }).flatten();
     cpu_event_on_change!(

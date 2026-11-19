@@ -104,27 +104,29 @@ fn hidden_fighter_and_owned_objects_leave_and_rejoin_the_draw_order() {
     let fighter = [hitbox::KIND_HIT, hitbox::KIND_HURT, hitbox::KIND_GRAB, model::legend::KIND_MARK];
     let article = [hitbox::KIND_HIT, hitbox::KIND_ARTICLE_HURT, model::legend::KIND_WIND, model::legend::KIND_AREA];
     let orbs = |x, kinds: [u32; 4]| kinds.into_iter().map(move |kind| orb_of_kind(x, kind));
-    board.publish(10, orbs(1.0, fighter));
-    board.publish(20, orbs(2.0, fighter));
-    board.publish_owned(30, 10, orbs(3.0, article));
-    board.publish_owned(40, 20, orbs(4.0, article));
-    board.publish_owned(50, 0, orbs(5.0, article));
+    board.publish_owned(10, Some(10), orbs(1.0, fighter));
+    board.publish_owned(20, Some(0), orbs(2.0, fighter));
+    board.publish_owned(30, Some(10), orbs(3.0, article));
+    board.publish_owned(40, Some(0), orbs(4.0, article));
+    board.publish_owned(50, None, orbs(5.0, article));
     let visible = |b: &Board, x| b.in_draw_order().filter(|orb| orb.centre[0] == x).count();
     assert_eq!(visible(&board, 2.0), 4);
     assert_eq!(visible(&board, 4.0), 4);
 
-    board.set_hidden(&[0, 20]);
+    let mut hidden = [None; model::cpu::role::FighterKey::COUNT];
+    hidden[1] = Some(0);
+    board.set_hidden(hidden);
     assert_eq!(visible(&board, 2.0), 0, "the hidden CPU's overlays");
     assert_eq!(visible(&board, 4.0), 0, "the hidden CPU's projectile and article overlays");
     assert_eq!(visible(&board, 1.0), 4);
     assert_eq!(visible(&board, 3.0), 4);
     assert_eq!(visible(&board, 5.0), 4, "an unowned item");
 
-    board.publish_owned(40, 10, orbs(4.0, article));
+    board.publish_owned(40, Some(10), orbs(4.0, article));
     assert_eq!(visible(&board, 4.0), 4, "an object whose owner changed");
-    board.publish_owned(40, 20, orbs(4.0, article));
+    board.publish_owned(40, Some(0), orbs(4.0, article));
     assert_eq!(visible(&board, 4.0), 0);
-    board.set_hidden(&[]);
+    board.set_hidden([None; model::cpu::role::FighterKey::COUNT]);
     assert_eq!(visible(&board, 2.0), 4, "the CPU's existing overlays return");
     assert_eq!(visible(&board, 4.0), 4, "a still-live article's overlays return");
 }

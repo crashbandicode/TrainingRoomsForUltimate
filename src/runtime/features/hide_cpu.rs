@@ -7,7 +7,7 @@
 //! and the body goes on from the same spot and status. The practice games ask through `hide` and `restore`.
 //!
 //! The player tag goes with the body: the game's two per-fighter cursor flags (`hide::tag`), written through package 2's
-//! guarded `WorkModule::set_flag`. The HUD panel too: the wrapper publishes the hidden entries (`publish_panels`) and the
+//! guarded `WorkModule::set_flag`. The HUD panel too: the wrapper publishes the hidden entries (`publish`) and the
 //! `info_melee` tick hides those parts (`runtime::ui::hud::cpu_panels`); in a waiting room the `info_waiting` tick hides
 //! the CPU's partner card instead (`room_card`).
 
@@ -15,6 +15,8 @@ use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
 
 use crate::model::cpu::hide;
 use crate::model::cpu::ids::UNRESOLVED;
+use crate::model::cpu::role::FighterKey;
+use crate::model::cpu::state::Cpu;
 use crate::runtime::features::notices;
 use crate::runtime::game::{self, natives};
 use crate::runtime::seams::seam_install::gate;
@@ -43,10 +45,22 @@ static HIDDEN: AtomicBool = AtomicBool::new(false);
 /// The entries whose HUD panel is hidden, one bit each (`Cpu::hidden_panels`), for the `info_melee` tick.
 static PANELS: AtomicU8 = AtomicU8::new(0);
 
-/// From the CPU frame wrapper after each body frame and on a session clear: the entries whose panel is hidden.
-pub(crate) fn publish_panels(bits: u8) {
-    let bits = bits * u8::from(BASE.load(Ordering::Acquire) != 0);
-    PANELS.store(bits, Ordering::Release);
+/// Publish the admitted hide state to the HUD and the visualizer after each body frame or retirement.
+pub(crate) fn publish(cpu: &Cpu) {
+    let bits = cpu.hidden_panels() * u8::from(BASE.load(Ordering::Acquire) != 0);
+    let previous = PANELS.swap(bits, Ordering::AcqRel);
+    if (previous | bits) != 0 {
+        let bodies = std::array::from_fn(|i| {
+            let key = FighterKey { entry: (i / 2) as u8, partner: (i & 1) != 0 };
+            let body = &cpu.fighters[i];
+            if bits != 0 && body.away && cpu.roles.accessor_of(Some(cpu.scene), key).is_some() {
+                body.object_id
+            } else {
+                None
+            }
+        });
+        super::hitbox::update_hidden_bodies(bodies);
+    }
 }
 
 /// The entries whose HUD panel is hidden.

@@ -13,6 +13,7 @@
 //! fighter's orbs on the `Board`; the layout tick projects them with the game's own `world_to_screen` and plans each
 //! orb's pill (`plan_pill`). Pure and host-tested (`tests/core06_orbs.rs`).
 
+use super::cpu::role::FighterKey;
 use super::hitbox::{want_hits, AttackReader, Effects, HandleSet, Sphere, FIGHTER_SETS, KIND_ARTICLE_HURT, KIND_HIT, KIND_HURT, MAX_HELD, SCALE, SLOTS};
 use super::legend::{self, KIND_MARK, KIND_WIND};
 
@@ -91,6 +92,8 @@ pub const STALE_PUBLISHES: u32 = 2 * FIGHTER_SETS as u32;
 /// Every fighter's orbs of its last pass: fixed storage, one slot per fighter (by accessor address).
 pub struct Board {
     keys: [usize; FIGHTER_SETS],
+    owners: [Option<u32>; FIGHTER_SETS],
+    hidden: [Option<u32>; FighterKey::COUNT],
     stamps: [u32; FIGHTER_SETS],
     lens: [usize; FIGHTER_SETS],
     orbs: [[Orb; BOARD_ORBS]; FIGHTER_SETS],
@@ -105,12 +108,18 @@ impl Default for Board {
 
 impl Board {
     pub const fn new() -> Board {
-        Board { keys: [0; FIGHTER_SETS], stamps: [0; FIGHTER_SETS], lens: [0; FIGHTER_SETS], orbs: [[Orb::NONE; BOARD_ORBS]; FIGHTER_SETS], clock: 0 }
+        Board { keys: [0; FIGHTER_SETS], owners: [None; FIGHTER_SETS], hidden: [None; FighterKey::COUNT], stamps: [0; FIGHTER_SETS], lens: [0; FIGHTER_SETS], orbs: [[Orb::NONE; BOARD_ORBS]; FIGHTER_SETS], clock: 0 }
     }
 
     /// Replace `key`'s orbs (at most `BOARD_ORBS`; a new key takes a free or the stalest slot). A capsule's second end
     /// (sphere 1 of its shape) becomes the tail of its first (sphere 0). Returns how many were kept.
+    #[cfg(test)]
     pub fn publish(&mut self, key: usize, orbs: impl Iterator<Item = Orb>) -> usize {
+        self.publish_owned(key, None, orbs)
+    }
+
+    /// Fighter orbs name their own battle object. An article shares its current fighter owner's visibility.
+    pub fn publish_owned(&mut self, key: usize, owner: Option<u32>, orbs: impl Iterator<Item = Orb>) -> usize {
         if key == 0 {
             return 0;
         }
@@ -122,6 +131,7 @@ impl Board {
                 .unwrap_or(0),
         };
         self.keys[i] = key;
+        self.owners[i] = owner;
         self.stamps[i] = self.clock;
         let mut len = 0;
         for orb in orbs.take(BOARD_ORBS) {
@@ -146,11 +156,10 @@ impl Board {
         len
     }
 
-    pub fn publish_owned(&mut self, key: usize, _owner: usize, orbs: impl Iterator<Item = Orb>) -> usize {
-        self.publish(key, orbs)
+    /// Update presentation only. A still-live object can show again without respawning its orbs.
+    pub fn set_hidden(&mut self, bodies: [Option<u32>; FighterKey::COUNT]) {
+        self.hidden = bodies;
     }
-
-    pub fn set_hidden(&mut self, _accessors: &[usize]) {}
 
     /// `key` has no orbs now.
     pub fn clear(&mut self, key: usize) {
@@ -166,10 +175,13 @@ impl Board {
         self.lens = [0; FIGHTER_SETS];
     }
 
-    /// The orbs to draw: every slot published within the last `STALE_PUBLISHES` publishes.
+    /// The visible orbs: every slot published within the last `STALE_PUBLISHES` publishes.
     pub fn live(&self) -> impl Iterator<Item = &Orb> + '_ {
         (0..FIGHTER_SETS)
-            .filter(move |&i| self.keys[i] != 0 && self.clock.wrapping_sub(self.stamps[i]) < STALE_PUBLISHES)
+            .filter(move |&i| {
+                self.keys[i] != 0 && self.clock.wrapping_sub(self.stamps[i]) < STALE_PUBLISHES
+                    && self.owners[i].is_none_or(|owner| !self.hidden.contains(&Some(owner)))
+            })
             .flat_map(move |i| self.orbs[i][..self.lens[i]].iter())
     }
 
@@ -265,10 +277,11 @@ pub struct Extras<'a> {
     pub lr: Option<f32>,
     pub areas: &'a [legend::WindArea],
     pub hurt: &'a [Sphere],
+    pub owner: Option<u32>,
 }
 
 impl Extras<'_> {
-    pub const NONE: Extras<'static> = Extras { lr: None, areas: &[], hurt: &[] };
+    pub const NONE: Extras<'static> = Extras { lr: None, areas: &[], hurt: &[], owner: None };
 }
 
 /// One article's pass in `status`: its live attack slots' spheres and its grab spheres (held as a fighter's), placed on its
@@ -276,7 +289,7 @@ impl Extras<'_> {
 /// AreaModule while *Windboxes* is ticked). False when it holds none and has no area: its attack, grab and wind ended, its orbs
 /// went, and it is forgotten (`legend::keeps_article`).
 pub fn article_pass(board: &mut Board, set: &mut HandleSet, key: usize, status: i32, attacks: &mut impl AttackReader, place: impl FnMut(&Sphere) -> Option<[f32; 3]>, extras: Extras<'_>) -> bool {
-    let Extras { lr, areas, hurt } = extras;
+    let Extras { lr, areas, hurt, owner } = extras;
     let mut wants = [Sphere::NONE; MAX_HELD];
     let mut len = 0;
     want_hits(attacks, &mut wants, &mut len, true);
@@ -294,7 +307,7 @@ pub fn article_pass(board: &mut Board, set: &mut HandleSet, key: usize, status: 
             (orbs[n], n) = (orb, n + 1);
         }
     }
-    board.publish(key, orbs[..n].iter().copied());
+    board.publish_owned(key, owner, orbs[..n].iter().copied());
     legend::keeps_article(!set.is_empty(), areas.len())
 }
 
