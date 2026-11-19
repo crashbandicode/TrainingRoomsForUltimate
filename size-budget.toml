@@ -1995,13 +1995,13 @@ scope = "total"
 basis = "rustfmt-sloc4"
 ceiling = 163201
 date = "2026-11-18"
-reason = "rc.15 practice menu (operator-approved mockup, 2026-11-18 ~14:58Z): one row per game, a generic sub-screen (Screen::Rows) with Start first, Start/Stop as menu actions with a Running label, and one runtime value for the running game (runtime::features::practice) replacing the three per-row exclusion sites. Composed onto main 2e62e485 (113/114 landed, 162927): measured 163201 = +274 counted lines over main (162927) (+276 on 6f564b86 162291), Mash out folded in as the fourth game (its row-on exclusion and normaliser removed) (+266 for the menu, +33 for tr-review-astra-3 16:37Z: a menu visit pauses Tech practice, and a running games settings are latched at its Start), after the Break the Targets close path lost its layout-load restart (primary 15:30Z). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
-approved_by = "PENDING: +274 reported to the primary for the operator by menu-games-devin (INBOX 2026-11-18); not yet approved."
+reason = "rc.15 practice menu (operator-approved mockup, 2026-11-18 ~14:58Z): one row per game, a generic sub-screen (Screen::Rows) with Start first, Start/Stop as menu actions with a Running label, and one runtime value for the running game (runtime::features::practice) replacing the three per-row exclusion sites. Composed onto main 2e62e485 (113/114 landed, 162927): measured 163201 = +274 counted lines over main (162927) (+276 on 6f564b86 162291), Mash out folded in as the fourth game (its row-on exclusion and normaliser removed) (+266 for the menu, +33 for tr-review-astra-3 16:37Z: a menu visit pauses Tech practice, and a running games settings are latched at its Start), after the Break the Targets close path lost its layout-load restart (primary 15:30Z). Exact total, no headroom. Counting and gates unchanged. Approved."
+approved_by = "operator 2026-11-18: yes additional lines are ok / ~19:38Z: size change approved; primary c07b3449 00:55Z (11-19): approved 163201 = +274 over main 162927."
 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
 ceiling = 164084
 date = "2026-11-18"
-reason = "rc.15 Parry practice with the shared 64-frame SPSC replay queues and the final-pass publication fix, composed with four-game Menu dd5a8fa5 on top of the landed Ganon and 113/114 fixes. Measured 164084 = 163201 + 883. Exact replacement-gate ceiling."
-approved_by = "Operator 2026-11-18 ~19:38Z approved +855 for Parry. The parry-sol brief permits additional lines for the shared ring (+27 on its base). Primary c07b3449 00:37Z authorized the final-pass fix and replacement gate. The exact forward composition is one counted line above +855 and +27 combined and is reported to the primary for landing approval."
+reason = "rc.15 Parry practice, shared 64-frame SPSC replay rings and the final-pass publication fix, composed on local main 2517b3e5 (four-game Menu and earlier fixes). Gated source dfc234db measured 164084 = 163201 + 883. Exact total, no headroom."
+approved_by = "Operator 2026-11-18 ~19:38Z approved Parry growth, and the parry-sol brief includes the shared ring. Primary c07b3449 00:37Z approved the final-pass correction and replacement gate. Primary c07b3449 01:23Z confirmed operator approval for the landing size entry after the exact +883 report."
