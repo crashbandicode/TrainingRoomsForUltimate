@@ -4,6 +4,7 @@ use crate::model::cpu::hash::hash40;
 use crate::model::tech::session::{timed_guard_would_pass, PASSIVE_SPEED_LIMIT};
 use crate::model::tech_launch::{ContactReceipt, DecisionSnapshot};
 use crate::model::{sites_pkg2 as p2, sites_pkg3 as p3, sites_tech_launch as sites};
+use crate::runtime::diag_log::diagnostic;
 use crate::runtime::{
     game::{self, natives},
     state_natives,
@@ -18,27 +19,33 @@ const IS_DAMAGE_STOP: usize = 0x20ad720;
 static MAIN_SPEED_STOCK: AtomicBool = AtomicBool::new(false);
 static COMMON_SPEED_BASE: AtomicUsize = AtomicUsize::new(0);
 
-unsafe fn stock(address: usize, words: &[u32]) -> bool {
-    std::slice::from_raw_parts(address as *const u32, words.len()) == words
+unsafe fn stock(base: usize, offset: usize, words: &[u32]) -> bool {
+    let actual = std::slice::from_raw_parts((base + offset) as *const u32, words.len());
+    let verified = actual == words;
+    if !verified {
+        diagnostic(format_args!("[TechPractice] speed_guard mismatch offset={offset:#x}"));
+    }
+    verified
 }
 
 /// Non-hook initialization. Optional windows can disable only the extra notice.
 pub(super) unsafe fn init_passive_speed() {
     let base = game::text_base();
     let verified = base != 0
-        && stock(base + SPEED_GETTER, speed_guards::DAMAGE_ENERGY_GETTER)
-        && stock(base + IS_DAMAGE_STOP, speed_guards::DAMAGE_STOP)
-        && stock(base + 0x696990, speed_guards::PASSIVE_FLOOR_TAIL);
+        && stock(base, SPEED_GETTER, speed_guards::DAMAGE_ENERGY_GETTER)
+        && stock(base, IS_DAMAGE_STOP, speed_guards::DAMAGE_STOP)
+        && stock(base, 0x696950, speed_guards::PASSIVE_FLOOR_TAIL)
+        && stock(base, 0x4635b0, speed_guards::GROUND_IS_TOUCH);
     MAIN_SPEED_STOCK.store(verified, Ordering::Release);
 }
 
 /// The existing loader verified the first 64 bytes of is_enable_passive.
 pub(super) unsafe fn verify_passive_speed_rule(address: usize) {
     let base = address - 0xed2a0;
-    let verified = stock(address + 0x40, speed_guards::PASSIVE_SPEED_RULE)
-        && stock(base + 0xfb4d0, speed_guards::FLOOR_REFLECT_FRAME)
-        && stock(base + 0xfb7e8, &[0x9410d29a])
-        && stock(base + 0xfd7d4, &[0x9410ca9f]);
+    let verified = stock(base, 0xed2e0, speed_guards::PASSIVE_SPEED_RULE)
+        && stock(base, 0xfd630, speed_guards::FLOOR_DECISION)
+        && stock(base, 0xfd8a0, speed_guards::FLOOR_PASSIVE_PREDICATE)
+        && stock(base, 0xfb4d0, speed_guards::FLOOR_REFLECT);
     COMMON_SPEED_BASE.store(if verified { base } else { 0 }, Ordering::Release);
 }
 
