@@ -143,6 +143,28 @@ fn mashout_popup_opens_over_the_chip() {
     assert_eq!(popup_lines(&m), ["Grab  <  Standing  >"]);
 }
 
+/// Operator review of the preview (primary 15:49Z): the popup is sized to its content, its widest line plus the padding.
+#[test]
+fn mashout_popup_box_fits_its_widest_line() {
+    use crate::model::frame::{PopView, POP_PAD};
+    let measured = |pop: &PopView| (0..usize::from(pop.count))
+        .map(|i| 1.2 * crate::model::notice_box::measure(pop.lines[i].units().iter().copied(), crate::model::panes::FONT_SMALL.0).0)
+        .fold(0.0, f32::max);
+    let mut widths = Vec::new();
+    for kind in [MARIO, STEVE] {
+        let mut m = menu();
+        open(&mut m);
+        a_on(&mut m, kind);
+        let pop = frame(&m).pop;
+        assert_eq!(pop.width(), measured(&pop) + 2.0 * POP_PAD, "{kind:#x}");
+        assert!(pop.width() < 400.0, "{kind:#x}: {} is not the old 520-wide box", pop.width());
+        widths.push(pop.width());
+    }
+    // Steve's lines are Mario's Grab line and "Empty minecart": the same widest line, the same box.
+    assert_eq!(widths[0], widths[1]);
+    assert_eq!(PopView::EMPTY.width(), 2.0 * POP_PAD);
+}
+
 #[test]
 fn mashout_greyed_fighters_cannot_be_picked() {
     let m = menu();
