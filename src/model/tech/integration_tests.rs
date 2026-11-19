@@ -2160,3 +2160,138 @@ fn a_menu_visit_suspends_the_session_and_keeps_its_progress() {
     let mut idle = Controller::IDLE;
     assert_eq!((idle.pause_for_menu(&mut f), f.restores), (Event::None, 2));
 }
+
+
+fn tech_f006_fixture() -> (Surfaces, picker::Spot, crate::model::tech_settings::Config) {
+    let v = |x, y| Vec2 { x, y };
+    // Training stage 308, stock 13.0.5 main outline and passable platforms.
+    let vertices = [v(620., 0.), v(-80., 0.), v(-80., -340.), v(620., -340.)];
+    let normals = [v(0., 1.), v(-1., 0.), v(0., -1.), v(1., 0.)];
+    let mut surfaces = Surfaces::EMPTY;
+    for i in 0..4 {
+        assert!(surfaces.push(Line {
+            id: i + 1,
+            ends: [vertices[i], vertices[(i + 1) % 4]],
+            normal: normals[i],
+            floor: i == 0,
+            wall: i == 1 || i == 3,
+            passable: false,
+        }));
+    }
+    for (i, (left, right, y)) in [
+        (-309.422, -274.789, 24.119),
+        (-267.3165, -232.6835, 47.189003),
+        (-225.211, -190.578, 24.119),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        assert!(surfaces.push(Line {
+            id: i + 5,
+            ends: [v(left, y), v(right, y)],
+            normal: v(0., 1.),
+            floor: true,
+            wall: false,
+            passable: true,
+        }));
+    }
+    surfaces.state = surface::Walk::Closed;
+    let (line, point) = surfaces.nearest(v(-63.36, 0.), Some(Kind::Floor)).unwrap();
+    assert_eq!((line.id, point.y), (1, 0.));
+
+    let snapshot = crate::model::settings::Settings::factory().menu;
+    let mut config = crate::model::tech_settings::read(&snapshot);
+    config.surface = 4;
+    config.camera = 1;
+    (surfaces, picker::Spot { line, point }, config)
+}
+
+fn tech_f006_context(surfaces: &Surfaces, spot: picker::Spot) -> planner::Context<'_> {
+    planner::Context {
+        surfaces,
+        spot,
+        params: crate::model::tech_launch::FlightParams {
+            brake: 0.051,
+            gravity: 0.085,
+            fall_speed_cap: 1.85,
+        },
+        blast: solver::editor_bounds([-589.9998, 500., 360.00015, -137.85207]),
+        view: Some(solver::editor_bounds([-509.99976, 420., 280.00003, -39.864185])),
+        damage_multiplier: Some(1.2),
+    }
+}
+
+#[test]
+fn tech_f006_largest_random_draw_still_finds_a_feasible_contact() {
+    let (surfaces, spot, config) = tech_f006_fixture();
+    let plan = planner::plan(config, tech_f006_context(&surfaces, spot), &mut |bins| bins - 1)
+        .expect("Auto should offer a feasible contact for the default random range");
+    assert_eq!((plan.contact_frames, plan.setup.launch.angle), (38, 270.));
+}
+
+#[test]
+fn tech_f006_every_default_auto_draw_has_a_solution() {
+    let (surfaces, spot, config) = tech_f006_fixture();
+    for frame in 20..=38 {
+        let mut draws = 0;
+        let plan = planner::plan(config, tech_f006_context(&surfaces, spot), &mut |bins| {
+            draws += 1;
+            assert_eq!(bins, 19, "the original 39f and 40f draws must be absent");
+            u32::from(frame - 20)
+        })
+        .expect("each admissible default contact time has a floor solution");
+        assert_eq!((draws, plan.contact_frames), (1, frame));
+        assert_eq!(plan.setup.launch.angle, 270.);
+    }
+}
+
+#[test]
+fn tech_f006_auto_clamp_uses_sampled_speed_and_rejects_empty_intersections() {
+    use crate::model::tech_settings::{Mode, Numeric};
+
+    let (surfaces, spot, mut config) = tech_f006_fixture();
+    let context = || tech_f006_context(&surfaces, spot);
+    config.speed = Numeric { mode: Mode::Random, lo: 80., hi: 100. };
+    for (speed_draw, last_frame) in [(0, 30), (1, 34), (2, 38)] {
+        let mut choices = [(3, speed_draw), (last_frame - 19, last_frame - 20)].into_iter();
+        let plan = planner::plan(config, context(), &mut |bins| {
+            let (expected, index) = choices.next().expect("only speed and time draw");
+            assert_eq!(bins, expected);
+            index
+        })
+        .unwrap();
+        assert!(choices.next().is_none());
+        assert_eq!(u32::from(plan.contact_frames), last_frame);
+    }
+    config.speed.mode = Mode::Set;
+    config.time.lo = 31.;
+    assert!(planner::plan(config, context(), &mut |_| panic!("the time interval is empty")).is_none());
+}
+
+#[test]
+fn tech_f006_set_time_and_non_auto_start_keep_their_sampling() {
+    use crate::model::tech_settings::{Mode, Numeric};
+
+    let (surfaces, spot, mut config) = tech_f006_fixture();
+    let context = || tech_f006_context(&surfaces, spot);
+    config.time = Numeric { mode: Mode::Set, lo: 39., hi: 40. };
+    assert!(planner::plan(config, context(), &mut |_| panic!("Set time never draws")).is_none());
+    config.time.lo = 38.;
+    let fixed = planner::plan(config, context(), &mut |_| panic!("Set time never draws")).unwrap();
+    assert_eq!(fixed.contact_frames, 38);
+
+    config.time = Numeric { mode: Mode::Random, lo: 20., hi: 40. };
+    for (start_mode, tail) in [(Mode::Set, &[][..]), (Mode::Random, &[(1, 0), (360, 90)][..])] {
+        config.start = Numeric { mode: start_mode, lo: 30., hi: 30. };
+        let mut choices = std::iter::once((21, 20)).chain(tail.iter().copied());
+        let plan = planner::plan(config, context(), &mut |bins| {
+            let (expected, index) = choices.next().expect("only configured random values draw");
+            assert_eq!(bins, expected);
+            index
+        })
+        .unwrap();
+        assert!(choices.next().is_none());
+        assert_eq!(plan.contact_frames, 40);
+        assert_eq!(plan.setup.launch.start, Vec2 { x: spot.point.x, y: 30. });
+    }
+}
