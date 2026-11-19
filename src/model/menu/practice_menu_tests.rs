@@ -431,4 +431,51 @@ fn reset_page_covers_the_sub_screen_rows() {
     assert_eq!(changed.iter().filter(|id| **id == "practice_cpu").count(), 1, "one key, reset once");
     assert!(changed.contains(&"eggsercise") && changed.contains(&"tech_camera"));
 }
+
+/// parry-label-fix (2026-11-19): every practice game's mode row lists exactly the stored options after its retired Off,
+/// each under its own name. A display index shows the label of the stored option it maps to, the counts match, the
+/// list never offers "Off", and an older file's stored Off shows the first mode. The stored format does not change.
+#[test]
+fn every_mode_row_labels_the_stored_option_it_writes() {
+    use crate::model::frame::{write_value, Text};
+    // Each mode row's stored options by stored index, as the engines read them (index 0 is the retired Off).
+    let named: [(&str, &[&str]); 3] = [
+        ("eggsercise", &["Off", "1 minute", "10 targets", "20 targets", "Free practice"]),
+        ("tech_practice", &["Off", "20 attempts", "10 attempts", "1 minute", "3 minutes", "Free practice"]),
+        ("parry_practice", &["Off", "10 attempts", "Free practice"]),
+    ];
+    let rows: Vec<&str> = Game::ALL.iter().filter_map(|g| g.mode_row()).collect();
+    assert_eq!(rows, named.map(|(id, _)| id), "every mode row is covered");
+    for (id, names) in named {
+        let r = ROWS.iter().position(|row| row.id == id).unwrap();
+        let skip = crate::model::practice_games::retired(id);
+        let stored = Settings::factory().menu.get(id).unwrap().len();
+        assert_eq!((skip, stored), (1, names.len()), "{id}: one retired Off, then the modes");
+        let m = menu();
+        assert_eq!(m.option_count(r), stored - skip, "{id}: one display option per stored mode");
+        for shown in 0..m.option_count(r) {
+            let value = m.option_value(r, shown).unwrap();
+            assert_eq!(value, shown + skip, "{id}");
+            assert_eq!(m.dropdown_label(r, shown).map(|(label, _)| label), Some(names[value]), "{id}: display {shown} is stored {value}");
+            let mut file = vec![0u8; stored];
+            file[value] = 1;
+            let mut settings = Settings::factory();
+            settings.menu.set(id, &file).unwrap();
+            let m = Menu::new(settings, Env::default());
+            assert_eq!(m.value(r), RowValue::Choice(Some(shown)), "{id}: stored {value} reads back");
+            let mut text = Text::<72>::new();
+            write_value(&m, r, &mut text);
+            assert_eq!(String::from_utf16(text.units()).unwrap(), format!("<  {}  >", names[value]), "{id}: stored {value}");
+        }
+        assert!((0..m.option_count(r)).all(|i| m.dropdown_label(r, i).is_some_and(|(label, _)| label != "Off")), "{id}");
+        let mut off = vec![0u8; stored];
+        off[0] = 1;
+        let mut settings = Settings::factory();
+        settings.menu.set(id, &off).unwrap();
+        let m = Menu::new(settings, Env::default());
+        let mut text = Text::<72>::new();
+        write_value(&m, r, &mut text);
+        assert_eq!(String::from_utf16(text.units()).unwrap(), format!("<  {}  >", names[1]), "{id}: a stored Off shows the first mode");
+    }
+}
 }

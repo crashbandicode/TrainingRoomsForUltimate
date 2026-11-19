@@ -106,8 +106,9 @@ pub static CHORD_ROWS: [(&str, &str); 10] = [
     ("Game speed", "game_speed"),
 ];
 
-/// Parry practice runs sets of ten or keeps a total.
-pub static PARRY_SESSION: [&str; 3] = ["Off", "10 attempts", "Free practice"];
+/// Parry practice runs sets of ten or keeps a total. Stored options from index 1 (`practice_games::retired`: the retired
+/// Off of a game's mode; rc.15 practice menu): 1 sets of ten, 2 free practice.
+pub static PARRY_SESSION: [&str; 2] = ["10 attempts", "Free practice"];
 
 /// Stage tech practicer choices (DESIGN §5/7).
 pub static TECH_SESSION: [&str; 5] = ["20 attempts", "10 attempts", "1 minute", "3 minutes", "Free practice"];
