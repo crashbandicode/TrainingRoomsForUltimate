@@ -100,6 +100,8 @@ fn explicit_start_clears_the_set_and_preserves_lifetime_results() {
 
     attempts(3, true, &mut clock);
     assert_readout("3/10", "streak 3, perfect 3/3");
+    let earlier_grades = parry::view().unwrap().last;
+    assert_eq!(earlier_grades.iter().flatten().count(), 3);
 
     // L+R+A and state Load both use reset. An open attempt is dropped without counting it.
     step(Frame {
@@ -113,13 +115,16 @@ fn explicit_start_clears_the_set_and_preserves_lifetime_results() {
     step(Frame::default(), &mut clock);
     assert_readout("3/10", "streak 3, perfect 3/3");
 
+    assert_eq!(parry::view().unwrap().last, earlier_grades);
     practice::start(Game::Parry, practice::How { resume_parry: true, ..Default::default() });
     step(Frame::default(), &mut clock);
     assert_readout("3/10", "streak 3, perfect 3/3");
+    assert_eq!(parry::view().unwrap().last, earlier_grades);
 
     practice::stop();
     assert!(parry::view().is_none());
     practice::start(Game::Parry, practice::How::default());
+    let before_first_sample = parry::view().map(|view| String::from_utf16_lossy(view.set.units()));
     // The first resumed frame can still show the previous run's guard hitstop.
     step(Frame {
         stop: true,
@@ -128,6 +133,7 @@ fn explicit_start_clears_the_set_and_preserves_lifetime_results() {
         ..Frame::default()
     }, &mut clock);
     assert_readout("0/10", "streak 0, perfect 3/3");
+    assert_eq!((before_first_sample, parry::view().unwrap().last), (None, [None; 4]));
     step(Frame::default(), &mut clock);
 
     attempts(9, false, &mut clock);
