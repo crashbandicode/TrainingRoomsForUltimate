@@ -379,6 +379,8 @@ fn publish_bridge_state(s: &mut Session) {
             notice: (!notice.0.is_empty()).then_some((notice.0.as_str(), notice.1.as_str())),
             ack,
             ack_result: "handled",
+            scene: crate::runtime::bridge_state::scene(now),
+            rows_omitted: true,
             ..Default::default()
         };
         crate::model::bridge_state::snapshot(&view, out);

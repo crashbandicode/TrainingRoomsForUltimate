@@ -30,6 +30,22 @@ const SYMBOL: &[u8] = b"ssbu_hw_bridge_state_api_v1\0";
 /// Off once the lookup window ended without a bridge (or its table was unusable): every entry point returns at once.
 static ENABLED: AtomicBool = AtomicBool::new(true);
 static FOUND: AtomicBool = AtomicBool::new(false);
+/// The practice layout's last regular pass (the snapshot's `scene`): `uptime_ms << 2 | kind` (1 Training, 2 lobby
+/// practice), one atomic store from the UI tick (never a lock), read by the worker; older than `SCENE_FRESH_MS` is gone.
+static SCENE_AT: AtomicU64 = AtomicU64::new(0);
+const SCENE_FRESH_MS: u64 = 500;
+
+/// The UI tick passed its practice-layout check (`lobby` for the waiting room's practice).
+pub fn note_scene(lobby: bool) {
+    if ENABLED.load(Ordering::Relaxed) {
+        SCENE_AT.store(crate::runtime::clock::uptime_ms() << 2 | if lobby { 2 } else { 1 }, Ordering::Relaxed);
+    }
+}
+
+pub fn scene(now_ms: u64) -> &'static str {
+    m::scene_name(SCENE_AT.load(Ordering::Relaxed), now_ms, SCENE_FRESH_MS)
+}
+
 /// Inputs the menu handled this boot (the snapshot's `ack`).
 static ACK: AtomicU64 = AtomicU64::new(0);
 

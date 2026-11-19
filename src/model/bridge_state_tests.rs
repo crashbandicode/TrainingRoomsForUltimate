@@ -121,3 +121,19 @@ fn a_changed_snapshot_is_wanted_and_a_dropped_publish_stays_dirty_until_it_lands
     p.published(b"a=2", 0);
     assert!(!p.wants(b"a=2"));
 }
+
+#[test]
+fn scene_is_the_practice_layouts_fresh_pass_only() {
+    assert_eq!(scene_name(1000 << 2 | 1, 1200, 500), "training");
+    assert_eq!(scene_name(1000 << 2 | 2, 1500, 500), "lobby");
+    assert_eq!(scene_name(1000 << 2 | 1, 1501, 500), "", "a stale pass is no scene");
+    assert_eq!(scene_name(0, 10, 500), "", "never passed");
+}
+
+#[test]
+fn omitted_rows_are_marked_incomplete() {
+    let mut out = String::new();
+    let view = View { rows: &[], rows_omitted: true, ..eggs_start() };
+    assert!(!snapshot(&view, &mut out));
+    assert!(out.contains("rows.count=0\nrows.complete=0\nrows="), "{out}");
+}

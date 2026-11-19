@@ -38,6 +38,8 @@ pub struct View<'a> {
     pub scene: &'a str,
     /// The visible rows of the screen showing (optional, sent last).
     pub rows: &'a [&'a str],
+    /// The publisher does not list the rows (the v1 limit): `rows.complete=0` whatever `rows` holds.
+    pub rows_omitted: bool,
 }
 
 /// The snapshot into `out` (cleared first). Returns false when the rows did not all fit (`rows.complete=0`).
@@ -84,11 +86,24 @@ pub fn snapshot(view: &View<'_>, out: &mut String) -> bool {
         rows.push_str(&item);
         shown += 1;
     }
-    let complete = shown == view.rows.len();
+    let complete = !view.rows_omitted && shown == view.rows.len();
     let _ = writeln!(out, "rows.count={}", view.rows.len());
     let _ = writeln!(out, "rows.complete={}", u8::from(complete));
     let _ = write!(out, "rows={rows}");
     complete
+}
+
+/// `scene` from the UI tick's stamp (`uptime_ms << 2 | kind`): "training", "lobby", or "" when the practice layout has
+/// not passed for more than `fresh_ms`.
+pub fn scene_name(stamp: u64, now_ms: u64, fresh_ms: u64) -> &'static str {
+    if stamp == 0 || now_ms.saturating_sub(stamp >> 2) > fresh_ms {
+        return "";
+    }
+    match stamp & 3 {
+        1 => "training",
+        2 => "lobby",
+        _ => "",
+    }
 }
 
 fn push_str(out: &mut String, key: &str, value: &str) {
