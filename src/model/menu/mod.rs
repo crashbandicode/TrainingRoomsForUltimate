@@ -1496,6 +1496,10 @@ impl Menu {
         if matches!(row.control, Control::Editor(Editor::ButtonChords)) {
             for (_, id) in CHORD_ROWS { changed |= self.reset_row(id); }
         }
+        // Mash out's picker row owns the three keys its popup writes.
+        if matches!(row.control, Control::Editor(Editor::MashoutPicker)) {
+            for id in [moves::STATE_ROW, moves::ATTACKER_ROW, moves::GRAB_ROW] { changed |= self.reset_row(id); }
+        }
         // One row, two kept keys. The row id is the Player key; the CPU key is the sibling.
         if matches!(row.control, Control::Editor(Editor::CharacterCycles)) {
             changed |= self.reset_row("cpu_roster");
