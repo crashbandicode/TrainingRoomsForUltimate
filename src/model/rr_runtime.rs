@@ -552,6 +552,7 @@ pub fn unused_name(prefix: &str, names: &[String]) -> String {
 }
 
 /// The card, as the pop-up lists it. Hot lists and the selection come from the index.
+#[derive(Clone, Debug, PartialEq)]
 pub struct CatalogLoad {
     pub catalog: crate::model::recording_menu::Catalog,
     pub bound: Option<String>,
@@ -665,6 +666,67 @@ pub fn load_catalog(root: &Path) -> Result<CatalogLoad, Error> {
         drill: index.drill().map(|drill| drill.id.clone()),
         slots: index.slots().clone(),
     })
+}
+
+fn empty_load() -> CatalogLoad {
+    CatalogLoad {
+        catalog: crate::model::recording_menu::Catalog::default(),
+        bound: None,
+        active: [None, None],
+        loops: Default::default(),
+        drill: None,
+        slots: Default::default(),
+    }
+}
+
+/// [`load_catalog`] a file at a time (menu-speed fix, 2026-11-19): the menu worker steps it between its input passes, so a
+/// menu open never waits for the card.
+pub struct CatalogBuild {
+    root: std::path::PathBuf,
+}
+
+impl CatalogBuild {
+    pub fn new(root: &Path) -> Self {
+        Self { root: root.to_path_buf() }
+    }
+
+    /// One step: at most one file read. `Ok(true)` while the build goes on.
+    pub fn step(&mut self) -> Result<bool, Error> {
+        let _ = &self.root;
+        Ok(false)
+    }
+
+    pub fn finish(self) -> CatalogLoad {
+        empty_load()
+    }
+}
+
+/// The menu worker's catalog, kept across menu opens: built once after boot and again after each change of TR's catalog
+/// generation (a file TR saved, renamed, deleted, imported or duplicated), always a file at a time.
+pub struct CatalogCache {
+    root: std::path::PathBuf,
+}
+
+impl CatalogCache {
+    pub fn new(root: &Path) -> Self {
+        Self { root: root.to_path_buf() }
+    }
+
+    /// The card is at `generation`: build it unless the ready catalog or the running build is that generation's.
+    pub fn want(&mut self, generation: u64) {
+        let _ = (generation, &self.root);
+    }
+
+    /// One build step (at most one file read). `true` while the build goes on.
+    pub fn step(&mut self) -> bool {
+        false
+    }
+
+    /// The catalog of `generation`, when it is built.
+    pub fn ready(&self, generation: u64) -> Option<&CatalogLoad> {
+        let _ = generation;
+        None
+    }
 }
 
 // The fighter table is the switch (and test) roster. A host library build has no names.
@@ -1292,10 +1354,67 @@ mod tests {
         assert_eq!(after.active(Role::Cpu), Some("macro-1"), "the menu published a selection older than the index");
     }
 
+    /// A card with `files` recordings and its index, as the menu lists it.
+    fn library_card(tag: &str, files: usize) -> std::path::PathBuf {
+        let root = scratch(tag);
+        RecordingIndex::load(&root).unwrap().save(&root).unwrap();
+        let macros = Library::new(root.join(MACROS_DIR));
+        for i in 0..files {
+            macros.save_new(&recording(&format!("Take {i}"), &[0, 1, 0], None)).unwrap();
+        }
+        root
+    }
+
+    /// Menu speed (Switch 2026-11-19: a menu's first page waited 0.4–1.2 s on 30 macros and 25 saves): the catalog is
+    /// built a file at a time and ends exactly as `load_catalog`.
+    fn a_stepped_catalog_build_is_load_catalog_a_file_at_a_time() {
+        let root = library_card("build-steps", 4);
+        let mut build = CatalogBuild::new(&root);
+        let mut steps = 0;
+        while build.step().unwrap() {
+            steps += 1;
+            assert!(steps < 100, "the build ends");
+        }
+        // The index, each recording listed (one read) and loaded (one read), and the four other stores' listings.
+        assert!(steps >= 1 + 2 * 4, "one file per step: {steps} steps for 4 recordings");
+        assert_eq!(build.finish(), load_catalog(&root).unwrap());
+        assert_eq!(load_catalog(&root).unwrap().catalog.macros.len(), 4);
+    }
+
+    /// The cache serves only the catalog of the generation asked for; a change mid-build starts the build again.
+    fn the_catalog_cache_serves_only_a_fresh_catalog() {
+        let root = library_card("cache-fresh", 2);
+        let mut cache = CatalogCache::new(&root);
+        assert!(cache.ready(0).is_none(), "nothing before a build");
+        cache.want(0);
+        assert!(cache.ready(0).is_none(), "not before the build ends");
+        while cache.step() {}
+        assert_eq!(cache.ready(0), Some(&load_catalog(&root).unwrap()));
+        assert!(!cache.step(), "built: no more work until the generation moves");
+        // TR saves a file: generation 1. The old catalog is not served for it.
+        Library::new(root.join(MACROS_DIR)).save_new(&recording("Take new", &[0, 2, 0], None)).unwrap();
+        cache.want(1);
+        assert!(cache.ready(1).is_none());
+        assert!(cache.step());
+        // Another save mid-build: generation 2 restarts the build from the card as it is now.
+        Library::new(root.join(MACROS_DIR)).save_new(&recording("Take newer", &[0, 4, 0], None)).unwrap();
+        cache.want(2);
+        while cache.step() {}
+        assert!(cache.ready(1).is_none(), "a superseded generation is never served");
+        let fresh = cache.ready(2).expect("generation 2 built");
+        assert_eq!(fresh, &load_catalog(&root).unwrap());
+        assert_eq!(fresh.catalog.macros.len(), 4);
+        // Asking again for the generation it has costs nothing.
+        cache.want(2);
+        assert!(!cache.step());
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_stepped_catalog_build_is_load_catalog_a_file_at_a_time", a_stepped_catalog_build_is_load_catalog_a_file_at_a_time as fn()),
+            ("the_catalog_cache_serves_only_a_fresh_catalog", the_catalog_cache_serves_only_a_fresh_catalog as fn()),
             ("record_follows_the_popup_role", record_follows_the_popup_role as fn()),
             ("a_long_macro_plays_from_a_600_frame_window", a_long_macro_plays_from_a_600_frame_window as fn()),
             ("the_play_chords_drive_the_role_machines", the_play_chords_drive_the_role_machines as fn()),

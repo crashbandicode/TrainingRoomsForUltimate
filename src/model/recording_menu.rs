@@ -266,6 +266,8 @@ pub struct SectionView {
     pub cursor: usize,
     /// Files in the section (action rows apart), beside its header in the r8 mockup.
     pub files: usize,
+    /// The card's catalog is still being read (menu-speed fix): the header says so instead of a file count.
+    pub loading: bool,
 }
 
 /// One Connections line.
@@ -505,6 +507,13 @@ impl RecordingScreens {
 
     pub fn set_catalog(&mut self, catalog: Catalog) {
         self.catalog = catalog;
+    }
+
+    /// The menu worker has no catalog for the card yet (menu-speed fix): the lists say "loading" until `set_catalog`.
+    pub fn set_loading(&mut self) {}
+
+    pub fn loading(&self) -> bool {
+        false
     }
 
     pub fn catalog(&self) -> &Catalog {
@@ -1576,6 +1585,7 @@ impl RecordingScreens {
             rows,
             cursor,
             files: file_count,
+            loading: false,
         }
     }
 
@@ -2182,6 +2192,25 @@ mod tests {
 
     fn link(from: Move, to: Move, tru: bool) -> LinkRec {
         LinkRec::presses(from, to, if tru { Verdict::True(None) } else { Verdict::Drop(1) }, None, &[])
+    }
+
+    /// Menu speed: a menu opened before the worker's catalog is built lists no files and says so in each header; the
+    /// catalog's arrival ends it. A model that was never told is not loading (tests, the pop-up's own model).
+    fn the_lists_say_loading_until_the_catalog_arrives() {
+        let mut screens = RecordingScreens::new();
+        assert!(!screens.loading());
+        assert!(!screens.section(Face::Page, SAVES_MACROS, 1).loading);
+        screens.set_loading();
+        assert!(screens.loading());
+        for (group, section) in [(SAVES_MACROS, 0), (SAVES_MACROS, 1), (COMBOS_SEQ, 0), (COMBOS_SEQ, 1)] {
+            let view = screens.section(Face::Page, group, section);
+            assert!(view.loading && view.files == 0, "{group}/{section}");
+            assert!(screens.section(Face::Popup, group, section).loading);
+        }
+        screens.set_catalog(example());
+        assert!(!screens.loading());
+        let view = screens.section(Face::Page, SAVES_MACROS, 0);
+        assert!(!view.loading && view.files > 0);
     }
 
     fn a_reopened_menu_loads_the_catalog_without_a_new_file() {
@@ -2808,6 +2837,7 @@ mod tests {
             ("popup_background_holds_its_chrome", popup_background_holds_its_chrome as fn()),
             ("drills_are_a_filtered_combo_sublist_on_both_faces",drills_are_a_filtered_combo_sublist_on_both_faces as fn()),
             ("a_reopened_menu_loads_the_catalog_without_a_new_file", a_reopened_menu_loads_the_catalog_without_a_new_file as fn()),
+            ("the_lists_say_loading_until_the_catalog_arrives", the_lists_say_loading_until_the_catalog_arrives as fn()),
             ("one_save_is_bound_and_the_page_opens_it", one_save_is_bound_and_the_page_opens_it as fn()),
             ("popup_buttons_match_q11", popup_buttons_match_q11 as fn()),
             ("paging_moves_one_section_by_twelve", paging_moves_one_section_by_twelve as fn()),
