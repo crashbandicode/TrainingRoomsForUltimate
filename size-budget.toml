@@ -1981,3 +1981,11 @@ ceiling = 162926
 date = "2026-11-18"
 reason = "Mash out row 113 Blizzard graded through the shared climber closure (1a3ada5b): +12 (153817 vs c5b9abaf 153805). Exact total, no headroom."
 approved_by = "operator 2026-11-18 ~19:38Z: size change approved (114 +108, 113 +12), recorded by primary c07b3449; C6/O7 PASS mashout-review-devin 23:12Z."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162927
+date = "2026-11-18"
+reason = "113/114 landing composition cb1530f7: measured 162927, +1 over 114 +108 and 113 +12 on main 0099f49e. The one line is the conflict resolution in Menu::press_slider (Tech's declared scale first, else 114's per-row slider max). Exact total, no headroom. FLAGGED for the primary."
+approved_by = "operator 2026-11-18: yes additional lines are ok (size change approved ~19:38Z); the +1 integration line is flagged to primary c07b3449."
