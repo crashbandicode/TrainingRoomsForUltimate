@@ -939,7 +939,10 @@ fn mashout_required_rows_disable_only_their_reachable_units() {
         grade::{grade, Bounds},
     };
     let calls = capabilities::CROSS_NEEDS.iter().find(|(unit, _)| *unit == Feature::Mashout).unwrap().1;
-    assert_eq!(calls.len(), 31);
+    assert_eq!(calls.len(), 35);
+    for name in ["state_get_param_int", "work_get_float", "work_get_param_float", "work_set_float"] {
+        assert!(calls.contains(&name), "attacker resource refill must fail closed with {name}");
+    }
     assert!(calls.contains(&"prev_status_kind"), "row 121 names its slam contact by the victim's previous statuses");
     assert!(calls.contains(&"work_get_int"), "Lucas release counter must fail closed with its existing native guard");
     assert!(calls.contains(&"work_is_flag"), "Corrin attack window must fail closed with its existing native guard");

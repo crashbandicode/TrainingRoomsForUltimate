@@ -6,6 +6,8 @@ use std::{
 mod model {
     pub mod sites_pkg3 { // TROLLEY_SITES
     }
+    pub mod sites_pkg4 { // RESOURCE_WRITE_SITES
+    }
     pub mod sites_hitbox { // EGG_HITBOX_SITES
     }
     pub mod sites_pkg2 { // EGG_PKG2_SITES
@@ -106,6 +108,14 @@ mod reader { // READER
 static TROLLEY_MISSING_GRANT: AtomicUsize = AtomicUsize::new(0);
 static TROLLEY_NATIVE_CALLS: AtomicUsize = AtomicUsize::new(0);
 static TROLLEY_INT_READS: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+    static PICKEL_RESOURCES: Cell<Option<(i32, i32)>> = const { Cell::new(None) };
+    static PICKEL_IRON_AT_REQUEST: RefCell<Vec<i32>> = const { RefCell::new(Vec::new()) };
+    static ROBIN_NOSFERATU_USES: Cell<Option<i32>> = const { Cell::new(None) };
+    static ATTACKER_METER: Cell<Option<(Plan, f32, f32)>> = const { Cell::new(None) };
+    static WORK_FLOAT_WRITES: RefCell<Vec<(usize, i32, f32)>> = const { RefCell::new(Vec::new()) };
+    static WORK_INT_WRITES: RefCell<Vec<(usize, i32, i32)>> = const { RefCell::new(Vec::new()) };
+}
 static CART_EXISTS: AtomicBool = AtomicBool::new(true);
 static CART_ACTIVE: AtomicBool = AtomicBool::new(true);
 static CART_ARTICLE: AtomicUsize = AtomicUsize::new(0x100);
@@ -266,6 +276,13 @@ mod natives {
         super::JUDGE_FIXED.load(super::Ordering::Relaxed)
     }
     pub fn get_int(cpu: usize, id: i32) -> i32 {
+        if id == 0x1000_00c0 {
+            assert_eq!(cpu, 2);
+            if let Some(uses) = super::ROBIN_NOSFERATU_USES.get() {
+                return uses;
+            }
+            return super::PICKEL_RESOURCES.get().map_or(3, |(iron, _)| iron);
+        }
         if super::ICE_SHOT_FIXTURE.load(super::Ordering::Relaxed) {
             if id == 0x1000_00be {
                 assert_eq!(cpu, 2);
@@ -336,6 +353,39 @@ mod natives {
         }
         assert_eq!(id, 0x11000008); // Lucas work id, pinned01bf583/native table.
         super::FREEZE_NO_BANG.load(super::Ordering::Relaxed) as i32
+    }
+    pub fn set_int(cpu: usize, value: i32, id: i32) {
+        assert_eq!((cpu, id), (2, 0x1000_00c0));
+        super::WORK_INT_WRITES.with_borrow_mut(|writes| writes.push((cpu, id, value)));
+        if super::ROBIN_NOSFERATU_USES.get().is_some() {
+            super::ROBIN_NOSFERATU_USES.set(Some(value));
+        }
+        if let Some((_, cost)) = super::PICKEL_RESOURCES.get() {
+            super::PICKEL_RESOURCES.set(Some((value, cost)));
+        }
+    }
+    pub fn get_float(cpu: usize, id: i32) -> f32 {
+        assert_eq!(cpu, 2);
+        let Some((plan, current, max)) = super::ATTACKER_METER.get() else { return 150.0; };
+        match (plan, id) {
+            (super::Plan::Roller, 0x52) | (super::Plan::Hero, 0x53) => current,
+            (super::Plan::Hero, 0x52) => max,
+            _ => panic!("unexpected meter read: {plan:?}, {id:x}"),
+        }
+    }
+    pub fn set_float(cpu: usize, value: f32, id: i32) {
+        assert_eq!(cpu, 2);
+        super::WORK_FLOAT_WRITES.with_borrow_mut(|writes| writes.push((cpu, id, value)));
+        if let Some((plan, _, max)) = super::ATTACKER_METER.get() {
+            super::ATTACKER_METER.set(Some((plan, value, max)));
+        }
+    }
+    pub fn get_param_float(cpu: usize, kind: u64, name: u64) -> f32 {
+        assert_eq!((cpu, kind, name), (2, 0x0d_f05c_072b, 0x07_ae07_1a51));
+        super::ATTACKER_METER.get().map_or(150.0, |(plan, _, max)| {
+            assert_eq!(plan, super::Plan::Roller);
+            max
+        })
     }
     pub fn module_accessor(_: i32) -> Option<usize> {
         Some(super::P1.load(super::Ordering::Relaxed))
@@ -422,6 +472,10 @@ unsafe fn trolley_floor_allows(_: usize, _: f32, _: f32, _: f32, _: f32) -> bool
 
 mod state_natives {
     fn read() { super::TROLLEY_NATIVE_CALLS.fetch_add(1, super::Ordering::Relaxed); }
+    pub fn get_param_int(cpu: usize, parameter: u64, field: u64) -> i32 {
+        assert_eq!((cpu, parameter, field), (2, 0x0f_ea97_fe73, 0x1d_0963_3b0f));
+        super::PICKEL_RESOURCES.get().map_or(1, |(_, cost)| cost)
+    }
     pub fn article_is_exist(cpu: usize, article: i32) -> bool {
         assert_ne!(cpu, 0);
         if super::ICE_SHOT_FIXTURE.load(super::Ordering::Relaxed) {
@@ -497,6 +551,11 @@ mod state_natives {
     }
     pub fn status_request(accessor: usize, status: i32) {
         super::REQUESTS.with_borrow_mut(|v| v.push((accessor, status)));
+        if (accessor, status) == (2, 477) {
+            if let Some((iron, _)) = super::PICKEL_RESOURCES.get() {
+                super::PICKEL_IRON_AT_REQUEST.with_borrow_mut(|values| values.push(iron));
+            }
+        }
     }
 }
 mod worker {
@@ -784,6 +843,12 @@ impl NativeMemory {
         P1.store(m.p1(), Ordering::Relaxed);
         BODY.store(m.body.as_ptr() as usize, Ordering::Relaxed);
         reset_cart();
+        PICKEL_RESOURCES.set(None);
+        PICKEL_IRON_AT_REQUEST.with_borrow_mut(Vec::clear);
+        ROBIN_NOSFERATU_USES.set(None);
+        ATTACKER_METER.set(None);
+        WORK_FLOAT_WRITES.with_borrow_mut(Vec::clear);
+        WORK_INT_WRITES.with_borrow_mut(Vec::clear);
         ARMED.store(0, Ordering::Relaxed);
         EPOCH.store(0, Ordering::Relaxed);
         FAULT.store(0, Ordering::Relaxed);
@@ -1028,6 +1093,58 @@ fn ordinary_grab_and_downthrow_preserve_entry_semantics() {
         m.update(&mut g, 75);
         assert_eq!(g.step, Step::Held);
         assert_eq!(entry::controls(Plan::DownThrow, true).lstick_y, -120);
+    }
+}
+#[test]
+fn dash_grab_accepts_the_scored_native_dash_pull() {
+    unsafe {
+        let dash_pull = game::lua_const(lua_bind_hash("FIGHTER_STATUS_KIND_CATCH_DASH_PULL")).unwrap();
+        for (grab, expected) in [(1, Step::Held), (0, Step::Failed), (2, Step::Failed)] {
+            let mut m = NativeMemory::new();
+            let mut g = Game::new(Plan::Grab, State::Grab);
+            let requested = g.requested.as_mut().unwrap();
+            requested.id = 0;
+            requested.attacker_kind = 0;
+            requested.attacker_name = "Mario";
+            requested.grab = grab;
+            m.body[3] = requested.attacker_kind;
+            startup(&mut g, m.p1());
+            CPU_STATUS.store(u32::try_from(dash_pull).unwrap(), Ordering::Relaxed);
+            m.seed(60.0, 8.0, 1);
+            m.start();
+            m.update(&mut g, 66);
+            assert_eq!(g.step, expected, "grab={grab}, notice={:?}", g.failed);
+            assert_eq!(BEGINS.with_borrow(Vec::len), usize::from(grab == 1));
+        }
+    }
+}
+
+#[test]
+fn pivot_grab_places_the_cpu_facing_away_before_the_native_turn() {
+    unsafe {
+        for facing in [-1.0_f32, 1.0] {
+            for (grab, expected_lr, start) in [(2, facing, 55), (0, -facing, 50), (1, -facing, 54)] {
+                let mut m = NativeMemory::new();
+                let mut g = Game::new(Plan::Grab, State::Grab);
+                let requested = g.requested.as_mut().unwrap();
+                requested.id = 0;
+                requested.attacker_kind = 0;
+                requested.attacker_name = "Mario";
+                requested.grab = grab;
+                m.body[3] = 0;
+                ROLLER_LR.store(facing.to_bits(), Ordering::Relaxed);
+                CPU_STATUS.store(0, Ordering::Relaxed);
+                g.step = Step::Place;
+
+                m.update(&mut g, 0);
+
+                assert_eq!(g.step, Step::Settle);
+                assert_eq!(f32::from_bits(INIT_POS_X.load(Ordering::Relaxed)), 6.0 * facing);
+                assert_eq!(LR_SETS.with_borrow(Clone::clone), vec![(2, expected_lr)], "grab={grab}");
+                m.update(&mut g, 0);
+                assert_eq!(requests().last(), Some(&(2, start)));
+            }
+        }
     }
 }
 #[test]
@@ -1335,6 +1452,7 @@ fn lucas_wait_without_ice_still_fails_and_wrong_victim_seed_never_grades() {
 // Native status/position APIs are shims. Place, Settle, Entering, release
 // predicate, arming, native seed admission and cancellation are actual source.
 use model::cpu::hash::lua_bind_hash;
+// RESOURCE_REFILL
 mod game {
     pub fn granted(offset: usize) -> bool {
         if super::TROLLEY_MISSING_GRANT.load(super::Ordering::Relaxed) == offset { return false; }
@@ -1353,6 +1471,11 @@ mod game {
             | crate::model::sites_pkg3::STATE_OBJECT_IS_ACTIVE_OFFSET
             | crate::model::sites_pkg3::STATE_OBJECT_MODULE_ACCESSOR_OFFSET
             | crate::model::sites_pkg3::STATE_LINK_PARENT_OBJECT_ID_OFFSET
+            | crate::model::sites_pkg3::STATE_GET_PARAM_INT_OFFSET
+            | crate::model::sites_pkg4::WORK_SET_INT_OFFSET
+            | crate::model::sites_pkg2::WORK_GET_FLOAT_OFFSET
+            | crate::model::sites_pkg2::WORK_SET_FLOAT_OFFSET
+            | crate::model::sites_pkg2::WORK_GET_PARAM_FLOAT_OFFSET
             | crate::model::sites_hitbox::HITBOX_IS_ATTACK_OFFSET => true,
             _ => panic!("unexpected reader guard: {offset:x}"),
         }
@@ -1366,6 +1489,12 @@ mod game {
             ("FIGHTER_STATUS_KIND_CATCH", 50),
             ("FIGHTER_STATUS_KIND_CATCH_DASH", 54),
             ("FIGHTER_STATUS_KIND_CATCH_TURN", 55),
+            ("FIGHTER_STATUS_KIND_CATCH_DASH_PULL", 58),
+            ("FIGHTER_PICKEL_INSTANCE_WORK_ID_INT_MATERIAL_NUM_IRON", 0x1000_00c0),
+            ("FIGHTER_REFLET_INSTANCE_WORK_ID_INT_SPECIAL_LW_CURRENT_POINT", 0x1000_00c0),
+            ("FIGHTER_INKLING_INSTANCE_WORK_ID_FLOAT_INK", 0x52),
+            ("FIGHTER_BRAVE_INSTANCE_WORK_ID_FLOAT_MAX_SP", 0x52),
+            ("FIGHTER_BRAVE_INSTANCE_WORK_ID_FLOAT_SP", 0x53),
         ] {
             if super::lua_bind_hash(name) == hash {
                 return Some(id);
@@ -2210,6 +2339,92 @@ fn trolley_actual_runtime_ride_drive_exact_zero_single_jump_then_native_release(
         assert!(DRIVEN.with_borrow(|v|v.iter().all(|i|i.lstick_x==0 && i.lstick_y==0)));
     }
 }
+
+#[test]
+fn trolley_refills_only_insufficient_iron_before_each_native_request() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        PICKEL_RESOURCES.set(Some((0, 1)));
+        let mut g = trolley(&mut m);
+        assert_eq!(PICKEL_IRON_AT_REQUEST.with_borrow(Clone::clone), vec![1]);
+
+        for (starting_iron, cost) in [(0, 3), (5, 2)] {
+            PICKEL_RESOURCES.set(Some((starting_iron, cost)));
+            CPU_STATUS.store(0, Ordering::Relaxed);
+            g.step = Step::Settle;
+            m.update(&mut g, 0);
+            assert_eq!(g.step, Step::Entering);
+        }
+        assert_eq!(PICKEL_IRON_AT_REQUEST.with_borrow(Clone::clone), vec![1, 3, 5]);
+        assert_eq!(
+            WORK_INT_WRITES.with_borrow(Clone::clone),
+            vec![(2, 0x1000_00c0, 1), (2, 0x1000_00c0, 3)]
+        );
+    }
+}
+unsafe fn resource_start(m: &mut NativeMemory, plan: Plan, state: State, row: u16, kind: u32, status: i32) {
+    let mut game = Game::new(plan, state);
+    let request = game.requested.as_mut().unwrap();
+    request.id = row;
+    request.attacker_kind = kind;
+    m.body[3] = kind;
+    game.step = Step::Settle;
+    CPU_STATUS.store(0, Ordering::Relaxed);
+    m.update(&mut game, 0);
+    assert_eq!(game.step, Step::Entering);
+    assert_eq!(requests(), vec![(2, status)]);
+}
+
+#[test]
+fn roller_fills_only_the_cpu_ink_meter_to_the_live_cap() {
+    unsafe {
+        for (current, expected_writes) in [(0.0, vec![(2, 0x52, 123.0)]), (123.0, vec![])] {
+            let mut m = NativeMemory::new();
+            ATTACKER_METER.set(Some((Plan::Roller, current, 123.0)));
+            resource_start(&mut m, Plan::Roller, State::Bury, 102, 0x41, 477);
+            assert_eq!(ATTACKER_METER.get(), Some((Plan::Roller, 123.0, 123.0)));
+            assert_eq!(WORK_FLOAT_WRITES.with_borrow(Clone::clone), expected_writes);
+            assert!(WORK_INT_WRITES.with_borrow(Vec::is_empty));
+        }
+    }
+}
+
+#[test]
+fn ice_sword_fills_only_the_cpu_sp_to_the_command_cost() {
+    unsafe {
+        for (current, expected, expected_writes) in [
+            (0.0, 11.0, vec![(2, 0x53, 11.0)]),
+            (33.0, 33.0, vec![]),
+        ] {
+            let mut m = NativeMemory::new();
+            ATTACKER_METER.set(Some((Plan::Hero, current, 100.0)));
+            resource_start(&mut m, Plan::Hero, State::Frozen, 110, 0x53, 479);
+            assert_eq!(ATTACKER_METER.get(), Some((Plan::Hero, expected, 100.0)));
+            assert_eq!(WORK_FLOAT_WRITES.with_borrow(Clone::clone), expected_writes);
+            assert!(WORK_INT_WRITES.with_borrow(Vec::is_empty));
+        }
+    }
+}
+
+#[test]
+fn nosferatu_refills_one_use_only_when_the_cpu_is_out() {
+    unsafe {
+        for (current, expected) in [(0, 1), (2, 2)] {
+            let mut m = NativeMemory::new();
+            ROBIN_NOSFERATU_USES.set(Some(current));
+            resource_start(&mut m, Plan::Drain, State::Grab, 93, 0x38, 479);
+            assert_eq!(ROBIN_NOSFERATU_USES.get(), Some(expected));
+            let writes = WORK_INT_WRITES.with_borrow(Clone::clone);
+            if current == 0 {
+                assert_eq!(writes, vec![(2, 0x1000_00c0, 1)]);
+            } else {
+                assert!(writes.is_empty());
+            }
+            assert!(WORK_FLOAT_WRITES.with_borrow(Vec::is_empty));
+        }
+    }
+}
+
 #[test]
 fn trolley_each_missing_grant_refuses_before_any_native_read_or_default_zero() {
     unsafe {
