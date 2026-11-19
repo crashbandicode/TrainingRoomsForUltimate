@@ -1666,7 +1666,9 @@ mod tests {
         let mut generation = 0;
         for change in ["add", "delete", "rename"] {
             match change {
-                "add" => drop(std::fs::copy(macros.join(format!("{first}.json")), macros.join("copied-in.json")).unwrap()),
+                "add" => {
+                    std::fs::copy(macros.join(format!("{first}.json")), macros.join("copied-in.json")).unwrap();
+                }
                 "delete" => std::fs::remove_file(macros.join("copied-in.json")).unwrap(),
                 _ => std::fs::rename(macros.join(format!("{first}.json")), macros.join("renamed-in.json")).unwrap(),
             }
