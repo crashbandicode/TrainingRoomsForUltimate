@@ -1991,6 +1991,38 @@ fn tech_receipt_roots_do_not_wait_on_edits_and_busy_preserves_ownership() {
 }
 
 #[test]
+fn tech_status_contact_cannot_query_memory() {
+    let graph = runtime_graph();
+    let ctx = Ctx::new(&graph, Vec::new());
+    let one = |key| {
+        let found = graph.find(key);
+        assert_eq!(found.len(), 1, "{key}");
+        found[0]
+    };
+    let reachable = |root: usize| {
+        let mut visited = BTreeSet::new();
+        let mut pending = vec![root];
+        while let Some(function) = pending.pop() {
+            if visited.insert(function) {
+                // Follow the free functions in this native path. A raw pointer's
+                // .read() is unrelated to NativeSource's geometry trait method.
+                pending.extend(calls(&graph.funcs[function].body).iter()
+                    .filter(|call| !call.method)
+                    .flat_map(|call| ctx.resolve(function, call)));
+            }
+        }
+        visited
+    };
+    let decision = one("tech_adapter::decision");
+    let touch = one("tech_surfaces::passive_floor_touch");
+    let query = one("tech_surfaces::readable");
+    let status_path = reachable(decision);
+    assert!(status_path.contains(&touch), "the status observer lost its floor-touch path");
+    assert!(!status_path.contains(&query), "the contact path reaches GroundModule QueryMemory");
+    assert!(reachable(one("tech_surfaces::init")).contains(&query), "the initialization probe escaped the resolver");
+}
+
+#[test]
 fn frame_fact_publication_defers_busy_before_any_mutation() {
     let graph = runtime_graph();
     let one = |key: &str| {

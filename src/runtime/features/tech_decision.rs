@@ -23,11 +23,12 @@ static MAIN_SPEED_STOCK: AtomicBool = AtomicBool::new(false);
 static COMMON_SPEED_BASE: AtomicUsize = AtomicUsize::new(0);
 
 unsafe fn stock(base: usize, windows: &[speed_guards::Window]) -> bool {
-    windows.iter().all(|&(offset, len, expected)| {
+    windows.iter().all(|&(offset, len, high, low)| {
         let bytes = std::slice::from_raw_parts((base + offset) as *const u8, len);
         let mut digest = Sha256::new();
         digest.update(bytes);
-        let verified = digest.finish() == expected;
+        let actual = digest.finish();
+        let verified = actual[..16] == high.to_be_bytes() && actual[16..] == low.to_be_bytes();
         if !verified {
             diagnostic(format_args!("[TechPractice] speed_guard mismatch offset={offset:#x}"));
         }
