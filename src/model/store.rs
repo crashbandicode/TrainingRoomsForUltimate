@@ -243,6 +243,10 @@ impl<R: Record> Store<R> {
     /// Corrupt or invalid files are reported in `skipped` and left untouched.
     /// Files are decoded one at a time; only each summary is retained.
     pub fn list(&self) -> Result<Listing<R::Summary>, R::Error> {
+        #[cfg(test)]
+        if let Some(action) = BEFORE_LIST.with(|next| next.borrow_mut().take()) {
+            action();
+        }
         let mut cursor = self.list_cursor()?;
         while cursor.step() {}
         Ok(cursor.finish())
@@ -296,6 +300,8 @@ impl<R: Record> Store<R> {
         }
         Some(names.into_iter().filter_map(|name| {
             let id = name.strip_suffix(".json")?;
+            #[cfg(test)]
+            count_catalog_metadata();
             let meta = fs::metadata(self.dir.join(&name)).ok()?;
             meta.is_file().then(|| (id.to_owned(), meta.len()))
         }).collect())
@@ -456,6 +462,9 @@ fn encode<R: Record>(rec: &R) -> Result<Vec<u8>, R::Error> {
 #[cfg(test)]
 thread_local! {
     static FILE_READS: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
+    static METADATA_READS: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
+    static FAIL_PAYLOAD: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
+    static BEFORE_LIST: core::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { core::cell::RefCell::new(None) };
 }
 
 /// Files this thread has read through a store (tests: a check that must read none).
@@ -464,10 +473,34 @@ pub(crate) fn file_reads() -> usize {
     FILE_READS.with(|reads| reads.get())
 }
 
+#[cfg(test)]
+pub(crate) fn before_next_store_list(action: impl FnOnce() + 'static) {
+    BEFORE_LIST.with(|next| next.replace(Some(Box::new(action))));
+}
+
+#[cfg(test)]
+pub(crate) fn fail_next_payload_read() {
+    FAIL_PAYLOAD.with(|fail| fail.set(true));
+}
+
+#[cfg(test)]
+fn count_catalog_metadata() {
+    METADATA_READS.with(|reads| reads.set(reads.get() + 1));
+}
+
+#[cfg(test)]
+pub(crate) fn catalog_metadata_reads() -> usize {
+    METADATA_READS.with(core::cell::Cell::get)
+}
+
 /// Reads a whole file after checking its size against `max`.
 fn read_bounded(path: &Path, max: u64) -> Result<Vec<u8>, StoreError> {
     #[cfg(test)]
     FILE_READS.with(|reads| reads.set(reads.get() + 1));
+    #[cfg(test)]
+    if FAIL_PAYLOAD.with(|fail| fail.replace(false)) {
+        return Err(io::Error::from(io::ErrorKind::Interrupted).into());
+    }
     let bytes = fs::metadata(path)?.len();
     if bytes > max {
         return Err(StoreError::FileTooLarge { bytes, max });

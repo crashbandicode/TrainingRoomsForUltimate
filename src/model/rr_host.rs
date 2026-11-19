@@ -4120,10 +4120,31 @@ mod tests {
         }
     }
 
+    fn queued_rename_checks_the_originating_index_revision() {
+        let _guard = hold();
+        reset_host();
+        let root = scratch("rename-index-version");
+        let version = recording_version();
+        let offer = || Effect::Keyboard { header: "Rename macro".into(), draft: "Old".into() };
+        post_effect_at(offer(), Some(version.0));
+        parry_use(&root, "macro-1", LoopCount::Finite(3)).unwrap();
+        assert_eq!(recording_version().0, version.0, "an index-only change");
+        assert_ne!(recording_version().1, version.1);
+        let book = Book::new(RecordingIndex::load(&root).unwrap());
+        let mut machine = Playback::new();
+        let mut tick = Tick::default();
+        apply_menu(&root, &mut machine, &book, &mut tick);
+        assert!(tick.keyboard.is_none(), "an obsolete Rename must not offer a keyboard");
+        post_effect_at(offer(), Some(recording_version().0));
+        apply_menu(&root, &mut machine, &book, &mut tick);
+        assert_eq!(tick.keyboard.unwrap().header, "Rename macro");
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("queued_rename_checks_the_originating_index_revision", queued_rename_checks_the_originating_index_revision as fn()),
             ("posted_chords_reach_the_role_machines", posted_chords_reach_the_role_machines as fn()),
             ("a_taken_pair_stays_pending_until_its_write_is_done", a_taken_pair_stays_pending_until_its_write_is_done as fn()),
             ("the_start_save_switch_reaches_the_file_and_the_play", the_start_save_switch_reaches_the_file_and_the_play as fn()),

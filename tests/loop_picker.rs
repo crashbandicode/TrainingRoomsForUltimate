@@ -86,22 +86,13 @@ impl Drop for Scratch {
 }
 
 /// Use the worker's real publication seam, reload its index, then execute the real playback machine.
-fn assert_playback(menu: &Menu, role: ViewRole, expected: Option<usize>) {
-    let root = Scratch::new();
-    engine::rr_host::publish_selection(&root.0, &menu.recording().selection(), None);
+fn assert_playback(root: &Scratch, role: ViewRole, expected: Option<usize>) {
     let index = RecordingIndex::load(&root.0).unwrap();
     let role = if role == ViewRole::Player { Role::Player } else { Role::Cpu };
     assert_eq!(
         index.loop_count(role),
         expected.map_or(LoopCount::Infinite, |n| LoopCount::Finite(n as u8)),
     );
-    let other = if role == Role::Player { Role::Cpu } else { Role::Player };
-    let other_view = if role == Role::Player { ViewRole::Cpu } else { ViewRole::Player };
-    let other_count = match menu.recording().loop_of(other_view) {
-        LoopMark::Infinite => LoopCount::Infinite,
-        LoopMark::Finite(n) => LoopCount::Finite(n),
-    };
-    assert_eq!(index.loop_count(other), other_count);
     let mut book = Book::new(index);
     let frames = [0x10, 0x20].map(|buttons| InputFrame { buttons, ..InputFrame::default() }).to_vec();
     book.add_recording("macro-a", MacroRecording::new("Two frames", "13.0.5", StartState::neutral(0, 0, 1.0), frames).unwrap());
@@ -118,6 +109,37 @@ fn assert_playback(menu: &Menu, role: ViewRole, expected: Option<usize>) {
     assert!(!playback.playing(role));
 }
 
+
+fn card() -> Scratch {
+    let root = Scratch::new();
+    let mut index = RecordingIndex::fresh();
+    for role in [Role::Player, Role::Cpu] {
+        index.set_active(role, Some("macro-a"), 1).unwrap();
+    }
+    index.set_loop(Role::Player, LoopCount::Finite(3));
+    index.set_loop(Role::Cpu, LoopCount::Finite(5));
+    index.save(&root.0).unwrap();
+    root
+}
+
+fn publish_if_changed(root: &Scratch, screen: &mut Menu) -> bool {
+    // This is the dirty-state decision in worker::post_recording_effect.
+    if !screen.recording_mut().take_selection_change() {
+        return false;
+    }
+    let version = engine::rr_host::recording_version();
+    assert!(engine::rr_host::publish_selection_at(&root.0, &screen.recording().selection(), None, Some(version)));
+    true
+}
+
+fn close_reopen(root: &Scratch, mut screen: Menu, role: ViewRole, mark: LoopMark) {
+    screen.press(Button::B);
+    drop(screen);
+    let mut reopened = menu(role);
+    engine::rr_runtime::apply_index(&RecordingIndex::load(&root.0).unwrap(), reopened.recording_mut());
+    assert_eq!(reopened.recording().loop_of(role), mark, "the reopened Options row reflects the index");
+}
+
 #[test]
 fn loop_list_selection_is_published_and_used_by_playback() {
     for role in [ViewRole::Player, ViewRole::Cpu] {
@@ -127,7 +149,10 @@ fn loop_list_selection_is_published_and_used_by_playback() {
             pick(&mut menu, index);
             assert_eq!(menu.recording().loop_of(role), mark);
             assert_eq!(menu.recording().loop_of(role.other()), other);
-            assert_playback(&menu, role, passes);
+            let root = card();
+            assert_eq!(publish_if_changed(&root, &mut menu), mark != if role == ViewRole::Player { LoopMark::Finite(3) } else { LoopMark::Finite(5) });
+            assert_playback(&root, role, passes);
+            close_reopen(&root, menu, role, mark);
         }
     }
 }
@@ -142,7 +167,9 @@ fn loop_list_cancel_keeps_the_previous_playback_count() {
         menu.press(Button::B);
         assert!(menu.screen().is_none());
         assert_eq!(menu.recording().selection(), before);
-        assert_playback(&menu, role, Some(passes));
+        let root = card();
+        assert!(!publish_if_changed(&root, &mut menu), "cancel does not write the index");
+        assert_playback(&root, role, Some(passes));
     }
 }
 
@@ -160,8 +187,27 @@ fn loop_list_and_left_right_choose_the_same_counts() {
                 }
                 assert_eq!(cycled.recording().loop_of(role), mark);
                 assert_eq!(cycled.recording().selection(), listed.recording().selection());
-                assert_playback(&cycled, role, passes);
+                let root = card();
+                let _ = publish_if_changed(&root, &mut cycled);
+                assert_playback(&root, role, passes);
+                close_reopen(&root, cycled, role, mark);
             }
         }
+    }
+}
+
+#[test]
+fn resetting_loop_publishes_both_roles_once() {
+    let root = card();
+    let mut screen = menu(ViewRole::Cpu);
+    screen.press(Button::Y);
+    assert!(publish_if_changed(&root, &mut screen), "reset changed both saved counts");
+    screen.press(Button::Y);
+    assert!(!publish_if_changed(&root, &mut screen), "the unchanged reset does not write");
+    for role in [ViewRole::Player, ViewRole::Cpu] {
+        assert_playback(&root, role, Some(1));
+        let mut reopened = menu(role);
+        engine::rr_runtime::apply_index(&RecordingIndex::load(&root.0).unwrap(), reopened.recording_mut());
+        assert_eq!(reopened.recording().loop_of(role), LoopMark::Finite(1));
     }
 }

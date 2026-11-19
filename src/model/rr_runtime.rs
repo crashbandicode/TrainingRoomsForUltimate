@@ -1692,10 +1692,102 @@ mod tests {
         assert!(cache.ready(generation).unwrap().macros.iter().any(|file| file.id == "renamed-in"));
     }
 
+
+    fn save_chord_preserves_a_slot_written_after_its_initial_index_read() {
+        use crate::model::store::before_next_store_list;
+
+        let root = library_card("save-chord-slot-race", 1);
+        let path = root.clone();
+        before_next_store_list(move || {
+            let mut index = RecordingIndex::load(&path).unwrap();
+            assert_eq!(index.bound(), None, "the save has not committed");
+            index.set_slots(&[Some("take-0".into()), None, None, None, None]).unwrap();
+            index.save(&path).unwrap();
+        });
+
+        let id = save_chord(&root, state(8), state(7), 240).unwrap();
+        let index = RecordingIndex::load(&root).unwrap();
+        assert_eq!(index.bound(), Some(id.as_str()));
+        assert!(Store::<NamedSave>::new(root.join(SAVES_DIR)).load(&id).is_ok());
+        assert_eq!(index.slots()[0].as_deref(), Some("take-0"), "the accepted slot must survive the Save chord");
+    }
+
+    fn discovery_yields_between_small_batches_and_keeps_menu_input_available() {
+        use crate::model::menu::table::Page;
+        use crate::model::menu::{Env, Menu};
+        use crate::model::settings::Settings;
+        use crate::model::store::catalog_metadata_reads;
+
+        let root = library_card("bounded-discovery", 60);
+        let mut cache = CatalogCache::new(&root);
+        cache.want(0);
+        while cache.step() {}
+        let mut menu = Menu::new(Settings::factory(), Env::default());
+        while menu.page() != Page::Recording { menu.press(MenuButton::R); }
+        let index = RecordingIndex::load(&root).unwrap();
+        apply_catalog(cache.ready(0).unwrap(), &index, menu.recording_mut());
+        let focused = menu.focus();
+        let before = catalog_metadata_reads();
+        cache.check();
+        assert!(cache.step(), "the first discovery batch should run");
+        assert!(catalog_metadata_reads() - before <= 4, "one input drain cannot wait behind an entire folder");
+        assert!(cache.ready(0).is_some(), "an unchanged open continues with the current catalog");
+        menu.press(MenuButton::Down);
+        assert_ne!(menu.focus(), focused, "ordinary navigation remains available during the scan");
+
+        let mut steps = 1;
+        loop {
+            let last = catalog_metadata_reads();
+            let work = cache.step();
+            assert!(catalog_metadata_reads() - last <= 4, "metadata calls per drain remain bounded");
+            if !work { break; }
+            steps += 1;
+            assert!(steps <= 80);
+        }
+        assert_eq!(catalog_metadata_reads() - before, 60);
+        assert!(steps >= 15);
+        assert!(!cache.take_external_change(), "the check found the same names and sizes");
+    }
+
+    fn a_failed_payload_retries_without_a_signature_change() {
+        use crate::model::store::{fail_next_payload_read, file_reads};
+
+        let root = library_card("payload-retry", 1);
+        let entry = root.join(MACROS_DIR).join("take-0.json");
+        let contents = std::fs::read(&entry).unwrap();
+        // A second bad file has a stable name and size but is permanently invalid.
+        std::fs::write(root.join(MACROS_DIR).join("zzz-bad.json"), b"not json").unwrap();
+        let mut cache = CatalogCache::new(&root);
+        cache.want(0);
+        fail_next_payload_read();
+        for _ in 0..20 {
+            if !cache.step() { break; }
+        }
+        assert!(cache.ready(0).is_some(), "payload failures must not stall the catalog");
+        let before = file_reads();
+
+        cache.check();
+        for _ in 0..20 {
+            let step = cache.step();
+            if cache.take_external_change() {
+                cache.want(1);
+            } else if !step {
+                break;
+            }
+        }
+        let catalog = cache.ready(1).or_else(|| cache.ready(0)).expect("retry completed");
+        assert_eq!(catalog.macros.iter().map(|file| file.id.as_str()).collect::<Vec<_>>(), ["take-0"]);
+        assert_eq!(file_reads() - before, 1, "retry the I/O failure only");
+        assert_eq!(std::fs::read(entry).unwrap(), contents, "the same file recovered");
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("save_chord_preserves_a_slot_written_after_its_initial_index_read", save_chord_preserves_a_slot_written_after_its_initial_index_read as fn()),
+            ("discovery_yields_between_small_batches_and_keeps_menu_input_available", discovery_yields_between_small_batches_and_keeps_menu_input_available as fn()),
+            ("a_failed_payload_retries_without_a_signature_change", a_failed_payload_retries_without_a_signature_change as fn()),
             ("a_slot_assignment_survives_close_reopen_and_next_press", a_slot_assignment_survives_close_reopen_and_next_press as fn()),
             ("a_superseded_catalog_cannot_open_a_file_action", a_superseded_catalog_cannot_open_a_file_action as fn()),
             ("an_index_read_failure_stays_unready_and_retries", an_index_read_failure_stays_unready_and_retries as fn()),
