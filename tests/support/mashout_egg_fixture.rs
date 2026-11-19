@@ -134,6 +134,7 @@ static GENERATION: AtomicU64 = AtomicU64::new(5);
 static CPU_STATUS: AtomicU32 = AtomicU32::new(0);
 static ROLLER_LR: AtomicU32 = AtomicU32::new(1.0f32.to_bits());
 static INIT_POS_X: AtomicU32 = AtomicU32::new(0);
+static TEETER_AT_STAGE_LIP: AtomicBool = AtomicBool::new(false);
 static P1_X: AtomicU32 = AtomicU32::new(0);
 static INIT_POS_CALLS: AtomicUsize = AtomicUsize::new(0);
 static FREEZE_NO_BANG: AtomicU32 = AtomicU32::new(1);
@@ -545,6 +546,12 @@ mod state_natives {
         assert_eq!(actor, 2);
         super::INIT_POS_X.store(position.x.to_bits(), super::Ordering::Relaxed);
         super::INIT_POS_CALLS.fetch_add(1, super::Ordering::Relaxed);
+        if super::TEETER_AT_STAGE_LIP.load(super::Ordering::Relaxed)
+            && position.x.abs() >= 49.0
+        {
+            // Stock CPU OTTOTTO_WAIT at the lip on the fixture's [-50, 50] collision floor.
+            super::CPU_STATUS.store(0x7f, super::Ordering::Relaxed);
+        }
     }
     pub fn set_lr(actor: usize, lr: f32) {
         super::LR_SETS.with_borrow_mut(|v| v.push((actor, lr)));
@@ -902,6 +909,7 @@ impl NativeMemory {
         AIR.store(false, Ordering::Relaxed);
         ROLLER_LR.store(1.0f32.to_bits(), Ordering::Relaxed);
         INIT_POS_X.store(0, Ordering::Relaxed);
+        TEETER_AT_STAGE_LIP.store(false, Ordering::Relaxed);
         INIT_POS_CALLS.store(0, Ordering::Relaxed);
         P1_X.store(0.0_f32.to_bits(), Ordering::Relaxed);
         REQUESTS.with_borrow_mut(Vec::clear);
@@ -1142,6 +1150,41 @@ fn pivot_grab_places_the_cpu_facing_away_before_the_native_turn() {
                 assert_eq!(f32::from_bits(INIT_POS_X.load(Ordering::Relaxed)), 6.0 * facing);
                 assert_eq!(LR_SETS.with_borrow(Clone::clone), vec![(2, expected_lr)], "grab={grab}");
                 m.update(&mut g, 0);
+                assert_eq!(requests().last(), Some(&(2, start)));
+            }
+        }
+    }
+}
+
+#[test]
+fn outward_grabs_place_inside_both_ledges_and_start() {
+    unsafe {
+        for (grab, start) in [(0, 50), (1, 54), (2, 55)] {
+            for outward in [-1.0_f32, 1.0] {
+                let mut m = NativeMemory::new();
+                let mut g = Game::new(Plan::Grab, State::Grab);
+                let request = g.requested.as_mut().unwrap();
+                request.id = 0;
+                request.attacker_kind = 0;
+                request.attacker_name = "Mario";
+                request.grab = grab;
+                m.body[3] = 0;
+                g.step = Step::Place;
+                CPU_STATUS.store(0, Ordering::Relaxed);
+                P1_X.store((43.75 * outward).to_bits(), Ordering::Relaxed);
+                ROLLER_LR.store(outward.to_bits(), Ordering::Relaxed);
+                TEETER_AT_STAGE_LIP.store(true, Ordering::Relaxed);
+
+                m.update(&mut g, 0);
+
+                assert_eq!(g.step, Step::Settle);
+                assert_eq!(CPU_STATUS.load(Ordering::Relaxed), 0,
+                    "grab {grab} with P1 facing {outward} teetered after the CPU warp");
+                assert_eq!(f32::from_bits(INIT_POS_X.load(Ordering::Relaxed)), 37.75 * outward);
+                let expected_lr = if grab == 2 { -outward } else { outward };
+                assert_eq!(LR_SETS.with_borrow(Clone::clone), vec![(2, expected_lr)]);
+                m.update(&mut g, 0);
+                assert_eq!(g.step, Step::Entering);
                 assert_eq!(requests().last(), Some(&(2, start)));
             }
         }
