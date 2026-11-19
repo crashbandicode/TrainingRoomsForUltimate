@@ -190,10 +190,11 @@ fn layout_row_counts_match_the_rc_freeze() {
     // Mash out (rc15/mashout-int) joins as the fourth game: its list row, Start and three rows (its Off / On row is Start / Stop): 62 → 67.
     // Parry practice joins as the fifth game: its list row and Start, its three controls in its sub-screen: 70 → 72.
     // rc15/mashout-grid-picker: Mash out's three rows are one picker row: 72 → 70.
-    assert_eq!(counts(false), [34, 11, 13, 70, 12, 3]);
-    assert_eq!(counts(true), [33, 11, 13, 70, 12, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 140);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 139);
+    // Eggs spawn area adds the "Spawn area" setting row to Eggs-ercise: 70 → 71.
+    assert_eq!(counts(false), [34, 11, 13, 71, 12, 3]);
+    assert_eq!(counts(true), [33, 11, 13, 71, 12, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 141);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 140);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 5);
@@ -210,7 +211,8 @@ fn layout_row_counts_match_the_rc_freeze() {
     // Mash out: its list row, Start and three rows (136 → 141).
     // Parry's three controls (rc.15 Parry, 141 → 144), then its list row and Start as the fifth game (144 → 146).
     // rc15/mashout-grid-picker: Mash out's State, Attacker move and Grab type are one picker row (146 → 144).
-    assert_eq!(ROWS.len(), 144);
+    // Eggs spawn area adds one existing-group setting row (144 → 145).
+    assert_eq!(ROWS.len(), 145);
     for editor in [Editor::SetupSave, Editor::SetupSaveHere, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }
