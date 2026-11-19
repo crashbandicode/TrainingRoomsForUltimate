@@ -62,6 +62,12 @@ fn actual_runtime_egg_preparation_and_native_seed() {
             production(include_str!("../src/model/tech/session.rs")).to_string(),
         ),
         (
+            "// TECH_EDGE_MARGIN",
+            include_str!("../src/model/tech/surface.rs").lines()
+                .find(|line| line.starts_with("pub const END_MARGIN:"))
+                .unwrap().to_owned(),
+        ),
+        (
             "// TECH_LAUNCH",
             production(include_str!("../src/model/tech_launch.rs")).to_string(),
         ),

@@ -45,8 +45,12 @@ mod model {
             pub struct Applied { pub boundary: u32, pub old: u32, pub operand: u32, pub new: u32, pub d_max: u32 }
         }
     }
-    pub mod tech { pub mod session { // TECH_SESSION
-    } }
+    pub mod tech {
+        pub mod session { // TECH_SESSION
+        }
+        pub mod surface { // TECH_EDGE_MARGIN
+        }
+    }
     pub mod tech_launch { // TECH_LAUNCH
     }
 }
@@ -134,8 +138,10 @@ static GENERATION: AtomicU64 = AtomicU64::new(5);
 static CPU_STATUS: AtomicU32 = AtomicU32::new(0);
 static ROLLER_LR: AtomicU32 = AtomicU32::new(1.0f32.to_bits());
 static INIT_POS_X: AtomicU32 = AtomicU32::new(0);
+static INIT_POS_Y: AtomicU32 = AtomicU32::new(0);
 static TEETER_AT_STAGE_LIP: AtomicBool = AtomicBool::new(false);
 static P1_X: AtomicU32 = AtomicU32::new(0);
+static P1_Y: AtomicU32 = AtomicU32::new(0);
 static INIT_POS_CALLS: AtomicUsize = AtomicUsize::new(0);
 static FREEZE_NO_BANG: AtomicU32 = AtomicU32::new(1);
 static JUDGE_FIXED: AtomicBool = AtomicBool::new(false);
@@ -444,8 +450,12 @@ mod natives {
         let x = if actor == 2 { &super::CPU_X } else { &super::P1_X };
         f32::from_bits(x.load(super::Ordering::Relaxed))
     }
-    pub fn pos_y(_: usize) -> f32 {
-        0.0
+    pub fn pos_y(actor: usize) -> f32 {
+        if actor == super::P1.load(super::Ordering::Relaxed) {
+            f32::from_bits(super::P1_Y.load(super::Ordering::Relaxed))
+        } else {
+            0.0
+        }
     }
     pub fn pos_z(_: usize) -> f32 {
         0.0
@@ -454,7 +464,7 @@ mod natives {
         f32::from_bits(super::ROLLER_LR.load(super::Ordering::Relaxed))
     }
     pub fn camera_limit_range() -> Option<[f32; 4]> {
-        Some([-50.0, 50.0, 0.0, 100.0])
+        Some([-50.0, 50.0, 100.0, -100.0])
     }
     pub fn fighter_entry(_: i32) -> usize {
         1
@@ -466,9 +476,32 @@ mod natives {
         f32::from_bits(super::P1_DAMAGE.load(super::Ordering::Relaxed))
     }
 }
-// The native floor check belongs to Trolley. Egg preparation must never reach it.
-unsafe fn trolley_floor_allows(_: usize, _: f32, _: f32, _: f32, _: f32) -> bool {
-    panic!("Egg fixture reached the Trolley-only floor check")
+const FIXTURE_FLOOR: entry::PlacementFloor = entry::PlacementFloor {
+    ends: [[-60.0, 0.0], [60.0, 0.0]],
+    stationary: true,
+    flags: 0x0800,
+};
+thread_local! {
+    static FLOORS: Cell<[Option<entry::PlacementFloor>; 2]> =
+        const { Cell::new([Some(FIXTURE_FLOOR), None]) };
+}
+struct FloorRay;
+impl FloorRay {
+    fn new(p1: usize) -> Option<Self> {
+        assert_eq!(p1, P1.load(Ordering::Relaxed));
+        Some(Self)
+    }
+
+    fn floor(&self, x: f32, [top, bottom]: [f32; 2], platforms: bool) -> Option<entry::PlacementFloor> {
+        FLOORS.get().into_iter().flatten().filter_map(|floor| {
+            let [[a, y], [b, z]] = floor.ends;
+            if x < a || x > b || (!platforms && floor.flags & 0x2000 != 0) {
+                return None;
+            }
+            let height = y + (z - y) * ((x - a) / (b - a));
+            (top >= height && height >= bottom).then_some((height, floor))
+        }).max_by(|(a, _), (b, _)| a.total_cmp(b)).map(|(_, floor)| floor)
+    }
 }
 
 mod state_natives {
@@ -545,6 +578,7 @@ mod state_natives {
     pub fn init_pos(actor: usize, position: &Vector3f) {
         assert_eq!(actor, 2);
         super::INIT_POS_X.store(position.x.to_bits(), super::Ordering::Relaxed);
+        super::INIT_POS_Y.store(position.y.to_bits(), super::Ordering::Relaxed);
         super::INIT_POS_CALLS.fetch_add(1, super::Ordering::Relaxed);
         if super::TEETER_AT_STAGE_LIP.load(super::Ordering::Relaxed)
             && position.x.abs() >= 49.0
@@ -909,9 +943,12 @@ impl NativeMemory {
         AIR.store(false, Ordering::Relaxed);
         ROLLER_LR.store(1.0f32.to_bits(), Ordering::Relaxed);
         INIT_POS_X.store(0, Ordering::Relaxed);
+        INIT_POS_Y.store(0, Ordering::Relaxed);
         TEETER_AT_STAGE_LIP.store(false, Ordering::Relaxed);
+        FLOORS.set([Some(FIXTURE_FLOOR), None]);
         INIT_POS_CALLS.store(0, Ordering::Relaxed);
         P1_X.store(0.0_f32.to_bits(), Ordering::Relaxed);
+        P1_Y.store(0.0_f32.to_bits(), Ordering::Relaxed);
         REQUESTS.with_borrow_mut(Vec::clear);
         QUEUE.with_borrow_mut(Vec::clear);
         END_QUEUE.with_borrow_mut(Vec::clear);
@@ -1174,6 +1211,10 @@ fn outward_grabs_place_inside_both_ledges_and_start() {
                 P1_X.store((43.75 * outward).to_bits(), Ordering::Relaxed);
                 ROLLER_LR.store(outward.to_bits(), Ordering::Relaxed);
                 TEETER_AT_STAGE_LIP.store(true, Ordering::Relaxed);
+                FLOORS.set([Some(entry::PlacementFloor {
+                    ends: [[-50.0, 0.0], [50.0, 0.0]],
+                    ..FIXTURE_FLOOR
+                }), None]);
 
                 m.update(&mut g, 0);
 
@@ -1190,6 +1231,94 @@ fn outward_grabs_place_inside_both_ledges_and_start() {
         }
     }
 }
+
+#[test]
+fn shared_cpu_placement_makes_no_writes_when_floor_is_unavailable() {
+    unsafe {
+        for plan in [Plan::Grab, Plan::Roller, Plan::DownSmash, Plan::Trolley, Plan::Drag, Plan::Flip] {
+            let mut m = NativeMemory::new();
+            let mut game = Game::new(plan, State::Grab);
+            m.body[3] = game.requested.unwrap().attacker_kind;
+            game.step = Step::Place;
+            CPU_STATUS.store(0, Ordering::Relaxed);
+            FLOORS.set([None, None]);
+
+            m.update(&mut game, 0);
+
+            assert_eq!(game.step, Step::Failed, "{plan:?}");
+            assert_eq!(INIT_POS_CALLS.load(Ordering::Relaxed), 0, "{plan:?}");
+            assert!(requests().is_empty(), "{plan:?}");
+            assert!(LR_SETS.with_borrow(Vec::is_empty), "{plan:?}");
+        }
+    }
+}
+
+#[test]
+fn native_floor_height_preserves_slope_and_flip_keeps_the_lower_landing() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        let mut grab = Game::new(Plan::Grab, State::Grab);
+        m.body[3] = grab.requested.unwrap().attacker_kind;
+        grab.step = Step::Place;
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        P1_Y.store(0.125_f32.to_bits(), Ordering::Relaxed);
+        FLOORS.set([Some(entry::PlacementFloor {
+            ends: [[-30.0, -15.0], [30.0, 15.0]],
+            ..FIXTURE_FLOOR
+        }), None]);
+        m.update(&mut grab, 0);
+        assert_eq!(grab.step, Step::Settle);
+        assert_eq!(f32::from_bits(INIT_POS_X.load(Ordering::Relaxed)), 6.0);
+        assert_eq!(f32::from_bits(INIT_POS_Y.load(Ordering::Relaxed)), 3.125);
+
+        let mut m = NativeMemory::new();
+        let mut flip = Game::new(Plan::Flip, State::Bury);
+        m.body[3] = flip.requested.unwrap().attacker_kind;
+        flip.step = Step::Place;
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        P1_X.store((-40.0_f32).to_bits(), Ordering::Relaxed);
+        P1_Y.store(24.125_f32.to_bits(), Ordering::Relaxed);
+        FLOORS.set([Some(FIXTURE_FLOOR), Some(entry::PlacementFloor {
+            ends: [[-55.0, 24.125], [-25.0, 24.125]],
+            flags: 0x2800,
+            ..FIXTURE_FLOOR
+        })]);
+        m.update(&mut flip, 0);
+        assert_eq!(flip.step, Step::Settle);
+        assert_eq!(f32::from_bits(INIT_POS_X.load(Ordering::Relaxed)), -40.0 + 41.123_188);
+        assert_eq!(f32::from_bits(INIT_POS_Y.load(Ordering::Relaxed)), 24.125);
+        assert_eq!(LR_SETS.with_borrow(Clone::clone), vec![(2, -1.0)]);
+    }
+}
+
+#[test]
+fn trolley_mirrors_only_with_its_complete_stationary_runway() {
+    unsafe {
+        for (stationary, expected) in [(false, Step::Failed), (true, Step::Settle)] {
+            let mut m = NativeMemory::new();
+            let mut cart = Game::new(Plan::Trolley, State::Grab);
+            m.body[3] = cart.requested.unwrap().attacker_kind;
+            cart.step = Step::Place;
+            CPU_STATUS.store(0, Ordering::Relaxed);
+            P1_X.store(38.0_f32.to_bits(), Ordering::Relaxed);
+            FLOORS.set([Some(entry::PlacementFloor {
+                ends: [[-55.0, 0.0], [55.0, 0.0]],
+                stationary,
+                ..FIXTURE_FLOOR
+            }), None]);
+            m.update(&mut cart, 0);
+            assert_eq!(cart.step, expected);
+            if stationary {
+                assert_eq!(f32::from_bits(INIT_POS_X.load(Ordering::Relaxed)), 38.0 - 45.150_684);
+                assert_eq!(LR_SETS.with_borrow(Clone::clone), vec![(2, 1.0)]);
+            } else {
+                assert_eq!(INIT_POS_CALLS.load(Ordering::Relaxed), 0);
+                assert!(requests().is_empty());
+            }
+        }
+    }
+}
+
 #[test]
 fn cancel_during_tongue_waits_for_release() {
     let _m = NativeMemory::new();

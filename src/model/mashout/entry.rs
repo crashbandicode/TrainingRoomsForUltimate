@@ -42,6 +42,86 @@ pub fn trolley_floor_runway(
         && [p1_x, place_x, end_x].into_iter().all(|x| low < x && x < high)
 }
 
+/// Collision geometry copied from one native ray on the game thread.
+#[derive(Clone, Copy)]
+pub struct PlacementFloor {
+    pub ends: [[f32; 2]; 2],
+    pub stationary: bool,
+    pub flags: u32,
+}
+
+impl PlacementFloor {
+    fn height(self, x: f32) -> Option<f32> {
+        let [[a, y], [b, z]] = self.ends;
+        if ![a, y, b, z, x].into_iter().all(f32::is_finite) || a == b {
+            return None;
+        }
+        let height = y + (z - y) * ((x - a) / (b - a));
+        height.is_finite().then_some(height)
+    }
+
+    fn supported_height(self, x: f32) -> Option<f32> {
+        // Use the same five-unit end clearance as the native Tech surface picker.
+        use crate::model::tech::surface::END_MARGIN;
+        let [a, b] = self.ends.map(|point| point[0]);
+        if x - a.min(b) < END_MARGIN || a.max(b) - x < END_MARGIN {
+            return None;
+        }
+        self.height(x)
+    }
+}
+
+/// Preserve the measured spacing. Ordinary moves mirror when their usual side
+/// is unavailable. Drag keeps its inward launch and Flip keeps its lower landing.
+/// Result is the CPU's x/y and its side relative to P1.
+pub fn floor_placement(
+    request: Scenario,
+    [x, y]: [f32; 2],
+    preferred: f32,
+    camera_bottom: Option<f32>,
+    mut ray: impl FnMut(f32, [f32; 2], bool) -> Option<PlacementFloor>,
+) -> Option<[f32; 3]> {
+    const FOOT_PROBE: f32 = 0.25;
+    let spacing = placement_spacing(request);
+    if request.plan == Plan::Flip {
+        let target = x + spacing * preferred;
+        let floor = ray(target, [y + FOOT_PROBE, camera_bottom?], true)?;
+        // Let the same native fall settle on the proven landing line.
+        return floor.supported_height(target).map(|_| [target, y, preferred]);
+    }
+
+    let trolley = request.plan == Plan::Trolley;
+    let footing = ray(x, [y + FOOT_PROBE, y - FOOT_PROBE], !trolley)?;
+    if trolley && (!footing.stationary || !trolley_solid_floor(footing.flags)) {
+        return None;
+    }
+    let foot_offset = y - footing.height(x)?;
+    for side in [preferred, -preferred] {
+        let target = x + spacing * side;
+        if trolley {
+            if footing.supported_height(target).is_some()
+                && trolley_floor_runway([x, y], target, side, footing.ends)
+            {
+                return Some([target, y, side]);
+            }
+        } else {
+            let height = footing.supported_height(target).or_else(|| {
+                // A different collision segment can support the same approach.
+                let level = footing.height(target)?;
+                ray(target, [level + FOOT_PROBE, level - FOOT_PROBE], true)?
+                    .supported_height(target)
+            });
+            if let Some(height) = height.map(|height| height + foot_offset).filter(|height| height.is_finite()) {
+                return Some([target, height, side]);
+            }
+        }
+        if request.plan == Plan::Drag {
+            break;
+        }
+    }
+    None
+}
+
 /// The original move status is requested on the attacker only. Victim statuses and links are native.
 pub fn start(move_: Scenario) -> Option<&'static str> {
     Some(match move_.plan {
