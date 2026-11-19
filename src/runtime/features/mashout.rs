@@ -1474,7 +1474,17 @@ pub unsafe fn frame(fighter: usize) {
         }
         Step::Retry => (),
         Step::Choose => {
-            if !released {
+            // A grounded CPU can teeter after native move travel. Only Choose may
+            // carry that resting CPU into a fresh placement. Settle still needs WAIT.
+            if !released
+                && (linked
+                    || status != ids[0]
+                    || natives::status_kind(cpu) != ids[15]
+                    || natives::situation_kind(p1) != ids[7]
+                    || natives::situation_kind(cpu) != ids[7]
+                    || natives::is_stop(p1)
+                    || natives::is_stop(cpu))
+            {
                 return;
             }
             let Some(config) = config else {
@@ -2173,7 +2183,7 @@ pub unsafe fn frame(fighter: usize) {
             // Restore owns no practice input, including while the original body is pending.
             revoke();
             OWN_CPU.store(0, Ordering::Release);
-            // Primary-approved Restore-only resting state: grounded teeter is not a capture.
+            // Grounded teeter is a resting state for Restore as it is for Choose.
             if linked
                 || status != ids[0]
                 || ![ids[0], ids[15]].contains(&natives::status_kind(cpu))
