@@ -2021,3 +2021,11 @@ ceiling = 164530
 date = "2026-11-19"
 reason = "rc.15 option B: one guarded native Sandbag per active Disc egg or BTT target. Both native item pools are checked before duplicate allocation. Owned native damage enters the existing break rules once. The optional capability declares and enforces its native closure. Composed on five-game main 2172cfd9 (164115), +415 normalized lines, exact ceiling with no headroom."
 approved_by = "Operator 2026-11-18: yes additional lines are ok / about 19:38Z: size change approved. Primary c07b3449 02:14Z (2026-11-19): approved +392, reported to the operator. Primary c07b3449 02:25Z approved the capability audit registration increase (+23)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164800
+date = "2026-11-19"
+reason = "rc.15 mashout-grid-picker: Mash out picks its fighter and move on the portrait grid (model::mashout::picker, the roster editor's Mash out use, the popup over the chip in Frame and view.rs), replacing the three dropdown rows; the dropdowns' dead menu special cases removed and their list helpers test-only. Measured 164800 = +271 over main 5b6ab8cc (164529)."
+approved_by = "primary c07b3449, RC15-CHANGES-COMMON (2026-11-19 13:45Z): raise the budget by exactly the measured delta in a separate commit; the delta (+271) is reported for the operator."
