@@ -697,7 +697,7 @@ impl Panes {
         let x = cx.clamp(ROW_LEFT + POP_W / 2.0, ROW_RIGHT - POP_W / 2.0);
         let y = (cy - h / 2.0 + 20.0).clamp(-300.0 + h / 2.0, 330.0 - h / 2.0);
         let top = y + h / 2.0 - 12.0 - POP_LINE_H / 2.0;
-        self.rect_at(IDX_CONN_DIV, x, y, POP_W, h, [24, 24, 30, 245]);
+        self.rect_at(IDX_CONN_DIV, x, y, POP_W, h, [24, 24, 30, 255]);
         for i in 0..count {
             let line_y = top - i as f32 * POP_LINE_H;
             let focused = i == usize::from(frame.pop.focus);
