@@ -2037,3 +2037,11 @@ ceiling = 164807
 date = "2026-11-19"
 reason = "rc.15 mashout-grid-picker, operator review of the preview (primary 15:49Z): the popup sized to its widest line (PopView::width, POP_PAD). Measured 164807 = +7 over 164800; the item's total is +278 over main 5b6ab8cc (164529)."
 approved_by = "primary c07b3449, RC15-CHANGES-COMMON (2026-11-19 13:45Z): raise the budget by exactly the measured delta in a separate commit; the delta (+7, item total +278) is reported for the operator."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164812
+date = "2026-11-19"
+reason = "rc.15 mashout-grid-picker, review 17:01Z #1: the picker row resets its three keys (mashout_state, mashout_attacker, mashout_grab) on Y and on Reset page to defaults. Measured 164812 = +5 over 164807; the item's total is +283 over main 5b6ab8cc (164529)."
+approved_by = "primary c07b3449, RC15-CHANGES-COMMON (2026-11-19 13:45Z) and the 17:01Z fix order: raise the budget by exactly the measured delta in a separate commit; the delta (+5, item total +283) is reported for the operator."
