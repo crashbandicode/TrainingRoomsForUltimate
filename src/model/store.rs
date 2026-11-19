@@ -835,5 +835,5 @@ pub fn note_index_write(root: &Path) {
 
 fn wake_catalog() {
     #[cfg(target_os = "switch")]
-    crate::runtime::ui::worker::wake();
+    crate::runtime::wake_recording_menu();
 }

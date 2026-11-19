@@ -2,14 +2,14 @@
 //! Card IO and allocation stay on the worker.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::model::recording_menu::{Catalog, ComboFile, LoopMark, MacroFile, RecordingScreens, SaveFile, SequenceFile};
-use crate::model::store::{catalog_changes, CatalogSignatures};
+use crate::model::store::{catalog_changes, CatalogSignatures, Store};
 
 use super::library::{
     migrate, Chain, Error, Kind, LegacySlot, LoopCount, NamedSave, RecordingIndex, Role, Sequence,
-    StartSaveState, Use, MACROS_DIR, SAVES_DIR, SEQUENCES_DIR,
+    StartSaveState, Use, MACROS_DIR, SAVES_DIR,
 };
 #[cfg(test)]
 use super::macro_ui::macro_panel::{fighter_gate, FighterGate, FighterOrigin};
@@ -20,7 +20,6 @@ use super::playback::{Book, Playback};
 use crate::model::combo::Combo;
 use crate::model::combo_record::{clean_name, default_name, ComboLibrary, ComboRecord};
 use crate::model::state::record::SavedState;
-use crate::model::store::Store;
 
 /// One minute at 60 fps. Five hot macros stay resident.
 pub const RESIDENT_FRAMES: usize = 3_600;
@@ -886,7 +885,7 @@ fn record(err: impl ToString) -> Error {
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
-    use super::super::library::{Drill, DrillKind};
+    use super::super::library::{Drill, DrillKind, SEQUENCES_DIR};
     use super::*;
     use crate::model::combo::{Aim, Event, LinkRec};
     use crate::model::frame_strip::{Button, Move, Verdict};
