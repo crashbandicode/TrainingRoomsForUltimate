@@ -481,3 +481,12 @@ fn case_table() {
         ("projected_orbs_map_onto_the_layout_canvas", projected_orbs_map_onto_the_layout_canvas as fn()),
     ]);
 }
+
+#[test]
+fn visible_frame_native_reads_are_lazy() {
+    let runtime = include_str!("../src/runtime/features/hitbox.rs");
+    let cpu = include_str!("../src/runtime/features/cpu.rs");
+    assert!(!runtime.contains("Some(natives::battle_object_id(accessor))"), "every visible fighter reads its object ID");
+    assert!(!cpu.contains("let object_id = natives::battle_object_id(accessor);"), "the visible CPU reads its object ID");
+    assert!(!runtime.contains("owner: article_owner(id, key),"), "every live visible article queries its owner");
+}

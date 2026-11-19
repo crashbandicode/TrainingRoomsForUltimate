@@ -1326,6 +1326,30 @@ fn no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
+/// The UI job can hold the orb board while projecting panes. All native game entry points must leave it wait-free.
+#[test]
+fn hitbox_board_never_blocks_a_game_hook() {
+    let mut graph = runtime_graph();
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let locks = static_locks(&runtime);
+    let board = locks.iter().position(|(file, name)| file == "features/hitbox.rs" && name == "BOARD").unwrap();
+    let check = |graph: &Graph| {
+        let (ctx, scan) = scan_with_locks(graph, locks.clone(), false);
+        shared_locks(&ctx, &scan).game_waits.remove(&board).unwrap_or_default()
+    };
+    let waits = check(&graph);
+    assert!(waits.is_empty(), "game entry waits on the orb board: {waits:?}");
+    for (key, hook) in [("hitbox::draw_articles", "cpu::on_frame"), ("hitbox::wind_command", "hitbox::hitbox_area_wind_hook")] {
+        let found = graph.find(key);
+        assert_eq!(found.len(), 1, "{key}");
+        let f = found[0];
+        let original = graph.funcs[f].body.clone();
+        graph.funcs[f].body.extend(callgraph::lex("BOARD.lock();"));
+        assert!(check(&graph).iter().any(|wait| wait.contains(hook)), "seeded wait from {hook}");
+        graph.funcs[f].body = original;
+    }
+}
+
 /// A camera mutex is forbidden even if no plugin thread holds it. Seed the real callbacks and require the normal
 /// game-entry walk to find each wait from cpu::on_frame; a disconnected camera callback cannot make this test pass.
 #[test]
