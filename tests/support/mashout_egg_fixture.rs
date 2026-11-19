@@ -106,6 +106,11 @@ mod reader { // READER
 static TROLLEY_MISSING_GRANT: AtomicUsize = AtomicUsize::new(0);
 static TROLLEY_NATIVE_CALLS: AtomicUsize = AtomicUsize::new(0);
 static TROLLEY_INT_READS: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+    static PICKEL_RESOURCES: Cell<Option<(i32, i32)>> = const { Cell::new(None) };
+    static PICKEL_IRON_AT_REQUEST: RefCell<Vec<i32>> = const { RefCell::new(Vec::new()) };
+    static WORK_INT_WRITES: RefCell<Vec<(usize, i32, i32)>> = const { RefCell::new(Vec::new()) };
+}
 static CART_EXISTS: AtomicBool = AtomicBool::new(true);
 static CART_ACTIVE: AtomicBool = AtomicBool::new(true);
 static CART_ARTICLE: AtomicUsize = AtomicUsize::new(0x100);
@@ -266,6 +271,10 @@ mod natives {
         super::JUDGE_FIXED.load(super::Ordering::Relaxed)
     }
     pub fn get_int(cpu: usize, id: i32) -> i32 {
+        if id == 0x1000_00c0 {
+            assert_eq!(cpu, 2);
+            return super::PICKEL_RESOURCES.get().map_or(3, |(iron, _)| iron);
+        }
         if super::ICE_SHOT_FIXTURE.load(super::Ordering::Relaxed) {
             if id == 0x1000_00be {
                 assert_eq!(cpu, 2);
@@ -336,6 +345,13 @@ mod natives {
         }
         assert_eq!(id, 0x11000008); // Lucas work id, pinned01bf583/native table.
         super::FREEZE_NO_BANG.load(super::Ordering::Relaxed) as i32
+    }
+    pub fn set_int(cpu: usize, value: i32, id: i32) {
+        assert_eq!((cpu, id), (2, 0x1000_00c0));
+        super::WORK_INT_WRITES.with_borrow_mut(|writes| writes.push((cpu, id, value)));
+        if let Some((_, cost)) = super::PICKEL_RESOURCES.get() {
+            super::PICKEL_RESOURCES.set(Some((value, cost)));
+        }
     }
     pub fn module_accessor(_: i32) -> Option<usize> {
         Some(super::P1.load(super::Ordering::Relaxed))
@@ -422,6 +438,10 @@ unsafe fn trolley_floor_allows(_: usize, _: f32, _: f32, _: f32, _: f32) -> bool
 
 mod state_natives {
     fn read() { super::TROLLEY_NATIVE_CALLS.fetch_add(1, super::Ordering::Relaxed); }
+    pub fn get_param_int(cpu: usize, parameter: u64, field: u64) -> i32 {
+        assert_eq!((cpu, parameter, field), (2, 0x0f_ea97_fe73, 0x1d_0963_3b0f));
+        super::PICKEL_RESOURCES.get().map_or(1, |(_, cost)| cost)
+    }
     pub fn article_is_exist(cpu: usize, article: i32) -> bool {
         assert_ne!(cpu, 0);
         if super::ICE_SHOT_FIXTURE.load(super::Ordering::Relaxed) {
@@ -497,6 +517,11 @@ mod state_natives {
     }
     pub fn status_request(accessor: usize, status: i32) {
         super::REQUESTS.with_borrow_mut(|v| v.push((accessor, status)));
+        if (accessor, status) == (2, 477) {
+            if let Some((iron, _)) = super::PICKEL_RESOURCES.get() {
+                super::PICKEL_IRON_AT_REQUEST.with_borrow_mut(|values| values.push(iron));
+            }
+        }
     }
 }
 mod worker {
@@ -784,6 +809,9 @@ impl NativeMemory {
         P1.store(m.p1(), Ordering::Relaxed);
         BODY.store(m.body.as_ptr() as usize, Ordering::Relaxed);
         reset_cart();
+        PICKEL_RESOURCES.set(None);
+        PICKEL_IRON_AT_REQUEST.with_borrow_mut(Vec::clear);
+        WORK_INT_WRITES.with_borrow_mut(Vec::clear);
         ARMED.store(0, Ordering::Relaxed);
         EPOCH.store(0, Ordering::Relaxed);
         FAULT.store(0, Ordering::Relaxed);
@@ -1050,6 +1078,35 @@ fn dash_grab_accepts_the_scored_native_dash_pull() {
             m.update(&mut g, 66);
             assert_eq!(g.step, expected, "grab={grab}, notice={:?}", g.failed);
             assert_eq!(BEGINS.with_borrow(Vec::len), usize::from(grab == 1));
+        }
+    }
+}
+
+#[test]
+fn pivot_grab_places_the_cpu_facing_away_before_the_native_turn() {
+    unsafe {
+        for facing in [-1.0_f32, 1.0] {
+            for (grab, expected_lr, start) in [(2, facing, 55), (0, -facing, 50), (1, -facing, 54)] {
+                let mut m = NativeMemory::new();
+                let mut g = Game::new(Plan::Grab, State::Grab);
+                let requested = g.requested.as_mut().unwrap();
+                requested.id = 0;
+                requested.attacker_kind = 0;
+                requested.attacker_name = "Mario";
+                requested.grab = grab;
+                m.body[3] = 0;
+                ROLLER_LR.store(facing.to_bits(), Ordering::Relaxed);
+                CPU_STATUS.store(0, Ordering::Relaxed);
+                g.step = Step::Place;
+
+                m.update(&mut g, 0);
+
+                assert_eq!(g.step, Step::Settle);
+                assert_eq!(f32::from_bits(INIT_POS_X.load(Ordering::Relaxed)), 6.0 * facing);
+                assert_eq!(LR_SETS.with_borrow(Clone::clone), vec![(2, expected_lr)], "grab={grab}");
+                m.update(&mut g, 0);
+                assert_eq!(requests().last(), Some(&(2, start)));
+            }
         }
     }
 }
@@ -1390,6 +1447,7 @@ mod game {
             ("FIGHTER_STATUS_KIND_CATCH_DASH", 54),
             ("FIGHTER_STATUS_KIND_CATCH_TURN", 55),
             ("FIGHTER_STATUS_KIND_CATCH_DASH_PULL", 58),
+            ("FIGHTER_PICKEL_INSTANCE_WORK_ID_INT_MATERIAL_NUM_IRON", 0x1000_00c0),
         ] {
             if super::lua_bind_hash(name) == hash {
                 return Some(id);
@@ -2232,6 +2290,29 @@ fn trolley_actual_runtime_ride_drive_exact_zero_single_jump_then_native_release(
         assert_eq!(inputs,vec![0,0,0,0,4,4,4,0]);
         assert_eq!(inputs.windows(2).filter(|v|v[0]==0 && v[1]==4).count(),1);
         assert!(DRIVEN.with_borrow(|v|v.iter().all(|i|i.lstick_x==0 && i.lstick_y==0)));
+    }
+}
+
+#[test]
+fn trolley_refills_only_insufficient_iron_before_each_native_request() {
+    unsafe {
+        let mut m = NativeMemory::new();
+        PICKEL_RESOURCES.set(Some((0, 1)));
+        let mut g = trolley(&mut m);
+        assert_eq!(PICKEL_IRON_AT_REQUEST.with_borrow(Clone::clone), vec![1]);
+
+        for (starting_iron, cost) in [(0, 3), (5, 2)] {
+            PICKEL_RESOURCES.set(Some((starting_iron, cost)));
+            CPU_STATUS.store(0, Ordering::Relaxed);
+            g.step = Step::Settle;
+            m.update(&mut g, 0);
+            assert_eq!(g.step, Step::Entering);
+        }
+        assert_eq!(PICKEL_IRON_AT_REQUEST.with_borrow(Clone::clone), vec![1, 3, 5]);
+        assert_eq!(
+            WORK_INT_WRITES.with_borrow(Clone::clone),
+            vec![(2, 0x1000_00c0, 1), (2, 0x1000_00c0, 3)]
+        );
     }
 }
 #[test]
