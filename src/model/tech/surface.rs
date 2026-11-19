@@ -31,9 +31,9 @@ pub enum MaterialHint {
 impl MaterialHint {
     pub const fn text(self) -> &'static str {
         match self {
-            Self::Here => "Can't tech here: damaging surface",
-            Self::All => "All draws: can't tech on damaging surfaces",
-            Self::Some => "Some draws can target a surface you can't tech",
+            Self::Here => "Damaging surface: tech fails",
+            Self::All => "All draws: tech fails on damaging surfaces",
+            Self::Some => "Some draws: tech fails on damaging surfaces",
         }
     }
 }

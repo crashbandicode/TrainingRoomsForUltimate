@@ -2238,14 +2238,14 @@ fn damage_surface_hint_reports_fixed_and_random_targets() {
         assert!(!damaging_material(Some(Kind::Ceiling), 0, material));
         draws.observe(damaging_material(floor, 0, material));
     }
-    assert_eq!(draws.hint(config), Some(MaterialHint::Here));
+    assert_eq!(draws.hint(config).map(MaterialHint::text), Some("Damaging surface: tech fails"));
     config.speed = Numeric { mode: Mode::Random, lo: 100., hi: 250. };
-    assert_eq!(draws.hint(config), Some(MaterialHint::All));
+    assert_eq!(draws.hint(config).map(MaterialHint::text), Some("All draws: tech fails on damaging surfaces"));
     config.surface = 1;
     assert_eq!(draws.hint(config), Some(MaterialHint::All));
     assert!(!damaging_material(floor, 0, 1));
     draws.observe(false);
-    assert_eq!(draws.hint(config), Some(MaterialHint::Some));
+    assert_eq!(draws.hint(config).map(MaterialHint::text), Some("Some draws: tech fails on damaging surfaces"));
     let mut ordinary_or_unknown = MaterialDraws::default();
     ordinary_or_unknown.observe(false);
     assert_eq!(ordinary_or_unknown.hint(config), None);
