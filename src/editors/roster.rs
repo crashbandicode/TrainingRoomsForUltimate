@@ -84,13 +84,15 @@ fn mii_class(kind: u32) -> Option<usize> {
 impl MiiTiles {
     /// Whether a Mii class tile may be chosen for this use and role; `None` for every other tile.
     pub fn admitted(&self, use_: RosterUse, role: Role, kind: u32) -> Option<bool> {
-        let k = mii_class(kind)?;
+        let k = mii_class(kind).filter(|_| use_ != RosterUse::Mashout)?;
         Some(match (use_, role) {
             (RosterUse::Hats, _) => self.hat[k],
             (RosterUse::PlayerPick, _) => self.player[k],
             (RosterUse::Cycles, Role::Player) => self.player_cycle[k],
             (RosterUse::CpuPick, _) => self.cpu[k],
             (RosterUse::Cycles, Role::Cpu) => self.cpu_cycle[k],
+            // Mash out admits every fighter the move table lists (the filter above returns first).
+            (RosterUse::Mashout, _) => true,
         })
     }
 
@@ -143,6 +145,9 @@ impl RosterEditor {
 
     /// Apply one editor input to the menu snapshot, preserving the other role's settings.
     pub fn apply(&mut self, menu: &mut crate::model::menu::Menu, cell: usize, button: Button) {
+        if self.use_ == RosterUse::Mashout {
+            return self.apply_mashout(menu, cell, button);
+        }
         let mut values = self.values(menu.kept(self.key()));
         let effect = self.press(cell, button, &mut values);
         match effect {
@@ -170,6 +175,61 @@ impl RosterEditor {
             (RosterUse::Cycles, Role::Cpu) => "cpu_roster",
             (RosterUse::Hats, Role::Player) => "player_kirby_hats",
             (RosterUse::Hats, Role::Cpu) => "cpu_kirby_hats",
+            // Mash out keeps no roster key: its popup writes the three Mash out rows.
+            (RosterUse::Mashout, _) => "",
+        }
+    }
+
+    /// Mash out's grid: the open puts the cursor on the saved choice's chip (`MASHOUT_SEEK`), X previews a shared slot's
+    /// next form, and A on a chip opens its popup (the All cell is the Random chip).
+    fn apply_mashout(&mut self, menu: &mut crate::model::menu::Menu, cell: usize, button: Button) {
+        use crate::model::mashout::picker::{self, Chip};
+        if cell == usize::from(crate::model::menu::MASHOUT_SEEK) {
+            let home = match menu.mashout_config().and_then(picker::chip_of) {
+                Some(Chip::Fighter(kind)) => {
+                    self.grid.focus_kind(kind);
+                    (0..CELLS).find(|c| self.grid.info(*c).and_then(|i| i.kind()) == Some(kind))
+                }
+                _ => None,
+            };
+            return menu.mashout_focus(home.unwrap_or(CELLS - 1));
+        }
+        let Some(info) = self.grid.info(cell) else { return };
+        match (button, info.content) {
+            (Button::X, CellContent::Fighter(kind)) => {
+                self.grid.focus_kind(kind);
+                self.grid.cycle_form();
+            }
+            (Button::A, CellContent::Fighter(kind)) => menu.mashout_open(Chip::Fighter(kind), cell),
+            (Button::A, CellContent::All) => menu.mashout_open(Chip::Random, cell),
+            _ => {}
+        }
+    }
+
+    /// Mash out's tiles: the fighter's name ("> " on the saved choice's chip), "Random" on the All cell, and every chip
+    /// with no valid option greyed (`picker::pickable`).
+    pub fn decorate_mashout(&self, frame: &mut Frame, menu: &Menu) {
+        use crate::model::mashout::picker::{self, Chip};
+        frame.tile_roster_grid = true;
+        frame.tile_cpu = true;
+        frame.tile_sig = 0x8000_0002;
+        let saved = menu.mashout_config().and_then(picker::chip_of);
+        for cell in 0..CELLS.min(frame.tiles.len()) {
+            let Some(info) = self.grid.info(cell) else { continue };
+            frame.tile_n[cell] = info.kind().and_then(|kind| u16::try_from(kind).ok()).unwrap_or(u16::MAX);
+            frame.tile_sig = frame.tile_sig.wrapping_mul(16777619) ^ u32::from(frame.tile_n[cell]);
+            let chip = match info.content {
+                CellContent::Fighter(kind) => Some(Chip::Fighter(kind)),
+                CellContent::All => Some(Chip::Random),
+                CellContent::Unsupported => None,
+            };
+            let name = if chip == Some(Chip::Random) { "Random" } else { info.label };
+            let mut label = Text::<28>::new();
+            let _ = write!(label, "{}{}", if chip.is_some() && chip == saved { "> " } else { "" }, name);
+            frame.tiles[cell] = label;
+            if !chip.is_some_and(picker::pickable) && frame.tile_state[cell] == 0 {
+                frame.tile_state[cell] = TILE_GREYED;
+            }
         }
     }
 

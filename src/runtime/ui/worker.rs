@@ -1065,7 +1065,11 @@ fn publish_frame(s: &Session) {
                     editor.decorate(&mut next, focused);
                 }
             }
-            if let crate::model::menu::grid::GridKind::Roster(use_) = layout.kind {
+            if layout.kind == GridKind::Roster(crate::model::menu::grid::RosterUse::Mashout) {
+                let editor = s.roster.filter(|e| e.use_() == crate::model::menu::grid::RosterUse::Mashout)
+                    .unwrap_or_else(|| crate::editors::roster::RosterEditor::new(crate::model::menu::grid::RosterUse::Mashout));
+                editor.decorate_mashout(&mut next, menu);
+            } else if let crate::model::menu::grid::GridKind::Roster(use_) = layout.kind {
                 let mut editor = s.roster.filter(|e| e.use_() == use_).unwrap_or_else(|| crate::editors::roster::RosterEditor::new(use_));
                 editor.set_mii(mii_tiles(&s.mii));
                 let values = editor.values(menu.kept(editor.key()));

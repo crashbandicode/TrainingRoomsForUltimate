@@ -2037,3 +2037,11 @@ ceiling = 164753
 date = "2026-11-19"
 reason = "Parry Start begins a fresh set (0e5b0554, 62f009af; branch a4bb5cac gated at 164548 = +19 over 5b6ab8cc), merged onto main e2b722b9 (Tech hint, ceiling 164734). Ceiling 164734 + 19 = 164753; the combined main is verified by the integration gate."
 approved_by = "Operator Parry Start request recorded by primary c07b3449 at 14:17Z (2026-11-19); rc.15 change-set common brief: exact measured delta, summed by the primary at merge."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 165036
+date = "2026-11-19"
+reason = "Mash out fighter-grid picker (d0acb557 picker, 6fccfb36 opaque box, bfa4cef1 popup width, 7fdb9c83 reset; branch 83a8cbfd gated at 164812 = +283 over 5b6ab8cc), merged onto main 9f6aeae0 (Tech hint + Parry fresh set, ceiling 164753). Ceiling 164753 + 283 = 165036; the combined main is verified by the integration gate."
+approved_by = "Operator 2026-11-19 ordered the grid picker and approved its layout; rc.15 change-set common brief: exact measured delta, summed by the primary at merge."

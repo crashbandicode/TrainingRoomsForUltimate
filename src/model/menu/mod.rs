@@ -424,6 +424,20 @@ pub struct Menu {
     page_reset: Option<(Page, Vec<&'static str>)>,
     /// The recording pop-up and the Recording page's library. Not a settings row.
     recording: super::recording_menu::RecordingScreens,
+    /// Mash out's popup over a chip of its grid, while open.
+    mashout_pop: Option<MashoutPop>,
+}
+
+/// The roster press that asks the roster editor to put Mash out's cursor on the saved choice's chip (the open; no cell).
+pub const MASHOUT_SEEK: u16 = u16::MAX;
+
+/// Mash out's popup: the chip and the grid cell it is drawn over, the line under the cursor and the grab type shown.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MashoutPop {
+    pub chip: super::mashout::picker::Chip,
+    pub cell: usize,
+    pub cursor: usize,
+    pub grab: usize,
 }
 
 const SLIDER_SLOW: u8 = 1;
@@ -466,6 +480,7 @@ impl Menu {
             edits: Vec::new(),
             page_reset: None,
             recording: super::recording_menu::RecordingScreens::new(),
+            mashout_pop: None,
         };
         menu.sync();
         menu
@@ -482,6 +497,7 @@ impl Menu {
         self.chord_capture = ChordCapture::Preview;
         self.chord_refusal = None;
         self.edits.clear();
+        self.mashout_pop = None;
         self.sync();
     }
 
@@ -611,8 +627,7 @@ impl Menu {
     }
 
     fn row_visible(&self, row: &Row) -> bool {
-        row.visible(self.env.pilot_present) && (row.id != moves::GRAB_ROW
-            || moves::Config::from_snapshot(&self.settings.menu).is_some_and(moves::uses_grab))
+        row.visible(self.env.pilot_present)
     }
 
     fn group_visible(&self, group: usize) -> bool {
@@ -874,35 +889,23 @@ impl Menu {
         }
     }
 
-    fn mashout_state(&self) -> usize {
-        self.get(moves::STATE_ROW).iter().position(|v| *v != 0).unwrap_or(0)
-    }
-
     /// Display position to persisted option. Most lists have an identity mapping; a practice game's mode lists its stored
     /// options from index 1 (`practice_games::retired`: the retired Off).
     pub fn option_value(&self, row: usize, option: usize) -> Option<usize> {
-        if ROWS[row].id == moves::ATTACKER_ROW {
-            moves::attacker_index(self.mashout_state(), option)
-        } else {
-            (option < self.option_count(row)).then_some(option + retired(ROWS[row].id))
-        }
+        (option < self.option_count(row)).then_some(option + retired(ROWS[row].id))
     }
 
     /// Persisted option to display position; a game mode's stored Off reads as its first mode.
     fn dropdown_choice(&self, row: usize) -> Option<usize> {
         let index = self.get(ROWS[row].id).iter().position(|v| *v != 0)?;
-        if ROWS[row].id == moves::ATTACKER_ROW {
-            moves::attacker_option(self.mashout_state(), index)
-        } else {
-            let index = index.saturating_sub(retired(ROWS[row].id));
-            (index < self.option_count(row)).then_some(index)
-        }
+        let index = index.saturating_sub(retired(ROWS[row].id));
+        (index < self.option_count(row)).then_some(index)
     }
 
-    /// Whether a list option may be confirmed. Mash out's NotMashable rows (primary
-    /// 14:00Z 2026-11-17) are listed greyed but never offered; every other row is.
-    pub fn option_offered(&self, row: usize, option: usize) -> bool {
-        ROWS[row].id != moves::ATTACKER_ROW || moves::attacker_offered(self.mashout_state(), option)
+    /// Whether a list option may be confirmed: every option of a list is (Mash out's moves are its grid picker's,
+    /// rc15/mashout-grid-picker).
+    pub fn option_offered(&self, _row: usize, _option: usize) -> bool {
+        true
     }
 
     /// The first offered option from `start` (inclusive), stepping forward or back.
@@ -921,9 +924,7 @@ impl Menu {
     /// Shared label resolver for the page value and popup. The second part is a
     /// move qualifier; ordinary dropdowns return an empty second part.
     pub fn dropdown_label(&self, row: usize, option: usize) -> Option<(&'static str, &'static str)> {
-        if ROWS[row].id == moves::ATTACKER_ROW {
-            moves::attacker_label(self.mashout_state(), option)
-        } else if let Control::Dropdown(labels) = ROWS[row].control {
+        if let Control::Dropdown(labels) = ROWS[row].control {
             labels.get(option).map(|label| (*label, ""))
         } else {
             None
@@ -932,9 +933,6 @@ impl Menu {
 
     /// The number of options of a list-like row.
     pub fn option_count(&self, row: usize) -> usize {
-        if ROWS[row].id == moves::ATTACKER_ROW {
-            return moves::attacker_count(self.mashout_state());
-        }
         match ROWS[row].control {
             Control::Dropdown(labels) | Control::MultiSelect(labels) => labels.len(),
             Control::YesNoRandom => 3,
@@ -1006,17 +1004,6 @@ impl Menu {
         }
         self.outbox.changed = true;
         self.note_edit(id);
-        if id == moves::STATE_ROW {
-            let state = self.mashout_state();
-            let attacker = self.get(moves::ATTACKER_ROW).iter().position(|v| *v != 0);
-            if let (false, Some(index)) = (
-                attacker.is_some_and(|index| moves::attacker_valid(state, index)),
-                moves::attacker_index(state, 0),
-            ) {
-                self.put_one_hot(moves::ATTACKER_ROW, index);
-            }
-            self.clamp_cursor();
-        }
         for (reroll_id, bit) in REROLL_IDS {
             if reroll_id == id {
                 self.outbox.rerolls |= bit;
@@ -1395,6 +1382,12 @@ impl Menu {
             Editor::PortraitCpu => self.roster_screen(RosterUse::CpuPick),
             Editor::CharacterCycles => self.roster_screen(RosterUse::Cycles),
             Editor::KirbyHats => self.roster_screen(RosterUse::Hats),
+            // Mash out: the roster editor, which knows the grid's cells, puts the cursor on the saved choice's chip.
+            Editor::MashoutPicker => {
+                self.mashout_pop = None;
+                self.outbox.roster_press = Some((MASHOUT_SEEK, Button::A));
+                self.roster_screen(RosterUse::Mashout)
+            }
             // Place targets is an action: it starts Break the Targets (so any other game stops), the menu closes and the
             // runtime opens the placing view.
             Editor::PlaceTargets => {
@@ -1504,6 +1497,10 @@ impl Menu {
         }
         if matches!(row.control, Control::Editor(Editor::ButtonChords)) {
             for (_, id) in CHORD_ROWS { changed |= self.reset_row(id); }
+        }
+        // Mash out's picker row owns the three keys its popup writes.
+        if matches!(row.control, Control::Editor(Editor::MashoutPicker)) {
+            for id in [moves::STATE_ROW, moves::ATTACKER_ROW, moves::GRAB_ROW] { changed |= self.reset_row(id); }
         }
         // One row, two kept keys. The row id is the Player key; the CPU key is the sibling.
         if matches!(row.control, Control::Editor(Editor::CharacterCycles)) {
@@ -1980,6 +1977,9 @@ impl Menu {
     }
 
     fn press_grid(&mut self, button: Button, layout: GridLayout, page: usize, cell: usize) {
+        if let Some(pop) = self.mashout_pop.filter(|_| layout.kind == GridKind::Roster(RosterUse::Mashout)) {
+            return self.press_mashout_pop(button, pop);
+        }
         let screen = |page: usize, cell: usize| Screen::Grid { layout, page, cell };
         match button {
             Button::Up => self.top(screen(page, layout.step(page, cell, Move::Up))),
@@ -2040,6 +2040,66 @@ impl Menu {
     /// The roster grid's press since the last call, if any.
     pub fn take_roster_press(&mut self) -> Option<(u16, Button)> {
         self.outbox.roster_press.take()
+    }
+
+    /// Mash out's saved choice, when it is a valid one.
+    pub fn mashout_config(&self) -> Option<moves::Config> {
+        moves::Config::from_snapshot(&self.settings.menu)
+    }
+
+    /// Mash out's popup, while open.
+    pub fn mashout_pop(&self) -> Option<MashoutPop> {
+        self.mashout_pop
+    }
+
+    /// The roster editor puts Mash out's grid cursor on `cell` (the saved choice's chip, when the grid opens).
+    pub fn mashout_focus(&mut self, cell: usize) {
+        if let Some(Screen::Grid { layout, page, .. }) = self.screen().copied() {
+            if layout.kind == GridKind::Roster(RosterUse::Mashout) && cell < layout.tiles() {
+                self.top(Screen::Grid { layout, page, cell });
+            }
+        }
+    }
+
+    /// A on a chip of Mash out's grid (`cell`): its popup opens on the saved line when the chip holds the saved choice. A
+    /// chip with no valid option opens nothing.
+    pub fn mashout_open(&mut self, chip: super::mashout::picker::Chip, cell: usize) {
+        use super::mashout::picker;
+        if !picker::pickable(chip) {
+            return;
+        }
+        let saved = self.mashout_config();
+        let cursor = saved.filter(|c| picker::chip_of(*c) == Some(chip)).and_then(picker::line_of).unwrap_or(0);
+        let grab = self.get(moves::GRAB_ROW).iter().position(|v| *v != 0).unwrap_or(0);
+        self.mashout_pop = Some(MashoutPop { chip, cell, cursor, grab });
+    }
+
+    /// The popup's keys: Up / Down choose a line, Left / Right the grab type of a grab line, A writes the choice and
+    /// returns to Mash out's rows, B closes the popup.
+    fn press_mashout_pop(&mut self, button: Button, mut pop: MashoutPop) {
+        use super::mashout::picker;
+        let lines: Vec<_> = picker::choices(pop.chip).collect();
+        let (count, grabs) = (lines.len().max(1), moves::GRAB_LABELS.len());
+        let Some(line) = lines.get(pop.cursor).copied() else { return self.mashout_pop = None };
+        match button {
+            Button::Up => pop.cursor = (pop.cursor + count - 1) % count,
+            Button::Down => pop.cursor = (pop.cursor + 1) % count,
+            Button::Left if line.grab => pop.grab = (pop.grab + grabs - 1) % grabs,
+            Button::Right if line.grab => pop.grab = (pop.grab + 1) % grabs,
+            Button::A => {
+                self.put_one_hot(moves::STATE_ROW, line.state);
+                self.put_one_hot(moves::ATTACKER_ROW, line.attacker);
+                if line.grab {
+                    self.put_one_hot(moves::GRAB_ROW, pop.grab);
+                }
+                self.mashout_pop = None;
+                self.stack.pop();
+                return;
+            }
+            Button::B => return self.mashout_pop = None,
+            _ => return,
+        }
+        self.mashout_pop = Some(pop);
     }
 
     /// The roster editor: an A on a Player (`cpu` false) or CPU Character tile asked for `kind` (`Outbox::picks`; the last
@@ -2147,6 +2207,10 @@ mod btt_menu_tests;
 #[cfg(test)]
 #[path = "tech_menu_tests.rs"]
 mod tech_menu_tests;
+
+#[cfg(test)]
+#[path = "mashout_picker_tests.rs"]
+mod mashout_picker_tests;
 
 #[cfg(test)]
 #[path = "practice_menu_tests.rs"]

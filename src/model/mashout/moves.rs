@@ -195,7 +195,9 @@ pub fn attacker_valid(state: usize, attacker: usize) -> bool {
         || state != RANDOM_STATE && scenario(attacker).is_some_and(|s| matches_state(state, s) && selectable(s)))
 }
 
+/// The dropdowns' list (rc15/mashout-grid-picker: test-only, the parity oracle of the grid picker).
 /// Listed rows: every valid pick plus NotMashable rows, which show greyed but stay invalid.
+#[cfg(test)]
 fn listed(state: usize, attacker: usize) -> bool {
     attacker_valid(state, attacker)
         || state < STATE_LABELS.len() && state != RANDOM_STATE && scenario(attacker).is_some_and(|s| {
@@ -203,6 +205,7 @@ fn listed(state: usize, attacker: usize) -> bool {
         })
 }
 
+#[cfg(test)]
 fn options(state: usize) -> impl Iterator<Item = usize> {
     let random_last = state != 0 && state != RANDOM_STATE && state < STATE_LABELS.len();
     (0..ATTACKER_LABELS.len())
@@ -212,25 +215,30 @@ fn options(state: usize) -> impl Iterator<Item = usize> {
 
 /// Display options map to stable persisted indices. Grab retains Random at89;
 /// other filtered states list their moves first and Random last.
+#[cfg(test)]
 pub fn attacker_index(state: usize, option: usize) -> Option<usize> {
     options(state).nth(option)
 }
 
+#[cfg(test)]
 pub fn attacker_option(state: usize, attacker: usize) -> Option<usize> {
     options(state).position(|i| i == attacker)
 }
 
 /// Whether a menu option of the filtered attacker list may be confirmed: listed
 /// NotMashable rows are shown but never offered.
+#[cfg(test)]
 pub fn attacker_offered(state: usize, option: usize) -> bool {
     attacker_index(state, option).is_some_and(|index| attacker_valid(state, index))
 }
 
+#[cfg(test)]
 pub fn attacker_count(state: usize) -> usize {
     options(state).count()
 }
 
 /// The shared renderer supplies the separator only when the move part is nonempty.
+#[cfg(test)]
 pub fn attacker_label(state: usize, option: usize) -> Option<(&'static str, &'static str)> {
     let index = attacker_index(state, option)?;
     Some(match scenario(index) {
@@ -239,6 +247,7 @@ pub fn attacker_label(state: usize, option: usize) -> Option<(&'static str, &'st
     })
 }
 
+#[cfg(test)]
 pub fn uses_grab(config: Config) -> bool {
     attacker_valid(config.state, config.attacker) && if config.attacker == RANDOM_ATTACKER {
         config.state == 0 || config.state == RANDOM_STATE
@@ -333,9 +342,10 @@ mod tests {
             assert_eq!(Config::from_snapshot(&Snapshot::factory()), Some(Config::default()));
             assert_eq!(Config::default().resolve(0, 0).unwrap().attacker_name, "Mario");
             assert_eq!(Snapshot::factory().get(GRAB_ROW), Some(&[1,0,0,0][..]));
+            // rc15/mashout-grid-picker: the grid picker writes these keys; the file keeps one value per label.
             for (id, labels) in [(ATTACKER_ROW, &ATTACKER_LABELS[..]), (STATE_ROW, &STATE_LABELS[..]), (GRAB_ROW, &GRAB_LABELS[..])] {
-                let Control::Dropdown(actual) = ROWS.iter().find(|row| row.id == id).unwrap().control else { panic!("dropdown {id}") };
-                assert_eq!(actual, labels);
+                assert_eq!(Snapshot::factory().get(id).map(<[u8]>::len), Some(labels.len()), "{id}");
+                assert!(!ROWS.iter().any(|row| row.id == id && matches!(row.control, Control::Dropdown(_))), "{id} is the picker's");
             }
         }
 

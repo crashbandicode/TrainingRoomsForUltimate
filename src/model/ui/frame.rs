@@ -238,6 +238,30 @@ pub struct Frame {
     pub badges: [Option<(u8, u8)>; super::panes::BADGES],
     /// The pop-up draws its page tabs as outlined boxes, the active one in green (r8), not on the red accent bar.
     pub tab_boxes: bool,
+    /// Mash out's popup over a chip of its grid.
+    pub pop: PopView,
+}
+
+/// Mash out's popup: the grid cell it is drawn over, its lines and the focused one.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PopView {
+    pub anchor: Option<u8>,
+    pub lines: [Text<48>; super::mashout::picker::MAX],
+    pub count: u8,
+    pub focus: u8,
+}
+
+/// The space between the popup's box and its widest line, on each side.
+pub const POP_PAD: f32 = 28.0;
+
+impl PopView {
+    pub const EMPTY: PopView = PopView { anchor: None, lines: [Text::new(); super::mashout::picker::MAX], count: 0, focus: 0 };
+
+    /// The box's width: its widest line, measured as the dialogs measure the menu fonts (a 1.2 margin), plus the padding.
+    pub fn width(&self) -> f32 {
+        let line = |t: &Text<48>| 1.2 * super::notice_box::measure(t.units().iter().copied(), super::panes::FONT_SMALL.0).0;
+        self.lines[..usize::from(self.count)].iter().map(line).fold(0.0, f32::max) + 2.0 * POP_PAD
+    }
 }
 
 /// One floppy or loop mark. `color` is sRGB; the renderer converts it.
@@ -310,6 +334,7 @@ impl Frame {
         self.head_tag = [None; 2];
         self.badges = [None; super::panes::BADGES];
         self.tab_boxes = false;
+        self.pop = PopView::EMPTY;
     }
 
     pub const fn new() -> Frame {
@@ -374,6 +399,7 @@ impl Frame {
             head_tag: [None; 2],
             badges: [None; super::panes::BADGES],
             tab_boxes: false,
+            pop: PopView::EMPTY,
         }
     }
 }
@@ -522,6 +548,18 @@ pub fn write_value(menu: &Menu, row: usize, out: &mut Text<72>) {
                 Control::Info(Info::PilotControl) => out.write_str("CPU pilot plugin"),
                 Control::Editor(Editor::ComboTarget) => named(out, menu.env().combo_target.as_str()),
                 Control::Editor(Editor::ComboName) => named(out, menu.env().combo_draft.as_str()),
+                // Mash out's saved fighter and move: "Steve · Empty minecart", "Mario · Grab (Dash)", "-" when invalid.
+                Control::Editor(Editor::MashoutPicker) => {
+                    use super::mashout::picker;
+                    match menu.mashout_config().and_then(|c| picker::choice_of(c).map(|line| (line, c))) {
+                        Some((line, c)) => {
+                            let _ = picker::write_name(line, true, out);
+                            if line.grab { let _ = write!(out, " ({})", picker::grab_label(c.grab)); }
+                        }
+                        None => _ = out.write_str("-"),
+                    }
+                    out.write_str("  >")
+                }
                 Control::Game(game) | Control::Start(game) if menu.running() == Some(game) => out.write_str("Running  >"),
                 _ => out.write_str(">"),
             };
