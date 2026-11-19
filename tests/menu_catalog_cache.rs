@@ -53,3 +53,28 @@ fn a_drill_is_not_cleared_while_the_catalog_loads() {
     let effect = item(&worker, "fn post_recording_effect(menu: &mut Menu) {");
     assert!(effect.contains("menu.recording().loading()"), "no catalog, no drill kind to follow:\n{effect}");
 }
+
+#[test]
+fn recording_actions_and_writeback_require_the_current_generation() {
+    let worker = src("src/runtime/ui/worker.rs");
+    let refresh = item(&worker, "fn refresh_recording(");
+    assert!(!refresh.contains("!s.catalog_watch.adopted()"), "an adopted but superseded catalog must enter loading");
+    let effect = item(&worker, "fn post_recording_effect(");
+    let check = effect.find("catalog_generation()").expect("check the current generation before dispatch");
+    assert!(check < effect.find("publish_selection(").unwrap(), "check again before writeback");
+    assert!(check < effect.find("post_effect(").unwrap(), "check before dispatching a file effect");
+}
+
+#[test]
+fn recording_editor_writes_share_the_store_invalidation_boundary() {
+    let editor = src("src/runtime/macros/named_macros.rs");
+    assert!(item(&editor, "fn save_new(recording:").contains("library().save_new(&recording)"));
+    let combos = src("src/runtime/ui/combos.rs");
+    assert!(item(&combos, "fn save(&mut self)").contains("library.save_new(&record)"));
+    assert!(item(&combos, "fn named(&mut self").contains("library.overwrite(&id, &record)"));
+    assert!(item(&combos, "fn delete(&mut self").contains("library.delete(id)"));
+    let store = src("src/model/store.rs");
+    for (write, notify) in [("fn write_atomic(", "note_catalog_write("), ("pub fn delete(", "note_catalog_write(")] {
+        assert!(item(&store, write).contains(notify), "{write} must invalidate the exact record after success");
+    }
+}

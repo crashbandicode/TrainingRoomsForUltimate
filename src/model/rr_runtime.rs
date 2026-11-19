@@ -1549,6 +1549,100 @@ mod tests {
         assert_eq!(after.active(Role::Cpu), Some("macro-1"), "the menu published a selection older than the index");
     }
 
+    fn a_slot_assignment_survives_close_reopen_and_next_press() {
+        let root = library_card("slot-reopen", 1);
+        let mut cache = CatalogCache::new(&root);
+        cache.want(0);
+        while cache.step() {}
+        let open = |cache: &CatalogCache| {
+            let loaded = cache.ready(0).unwrap();
+            let mut menu = RecordingScreens::new();
+            menu.set_catalog(loaded.catalog.clone());
+            menu.adopt(loaded.bound.clone(), loaded.active.clone(), loaded.loops, loaded.drill.clone());
+            menu.adopt_slots(loaded.slots.clone());
+            menu
+        };
+        let mut menu = open(&cache);
+        open_row(&mut menu, SAVES_MACROS, 1, "Take 0");
+        let slot = menu.file_rows().iter().position(|row| row.title == "Playback slot").unwrap();
+        menu.set_file_cursor(slot);
+        menu.handle_page(MenuButton::Right, true, SAVES_MACROS);
+        let assigned = menu.selection().slots[0].clone();
+        assert!(assigned.is_some());
+        super::super::rr_host::publish_selection(&root, &menu.selection(), None);
+        assert_eq!(RecordingIndex::load(&root).unwrap().slots()[0], assigned);
+        drop(menu);
+        let mut reopened = open(&cache);
+        reopened.handle_page(MenuButton::Down, true, SAVES_MACROS);
+        super::super::rr_host::publish_selection(&root, &reopened.selection(), None);
+        assert_eq!(RecordingIndex::load(&root).unwrap().slots()[0], assigned, "another button must not undo Slot 1");
+        assert_eq!(reopened.selection().slots[0], assigned);
+    }
+
+    fn a_superseded_catalog_cannot_open_a_file_action() {
+        let root = library_card("obsolete-file", 1);
+        let loaded = load_catalog(&root).unwrap();
+        let mut screens = RecordingScreens::new();
+        screens.set_catalog(loaded.catalog);
+        open_row(&mut screens, SAVES_MACROS, 1, "Take 0");
+        let rename = screens.file_rows().iter().position(|row| row.title == "Rename").unwrap();
+        screens.set_file_cursor(rename);
+        screens.set_loading();
+        screens.handle_page(MenuButton::A, true, SAVES_MACROS);
+        assert!(!matches!(screens.take_effect(), Effect::Keyboard { .. }), "a stale file action must not open the rename keyboard");
+    }
+
+    fn an_index_read_failure_stays_unready_and_retries() {
+        let root = library_card("bad-index-retry", 1);
+        let mut cache = CatalogCache::new(&root);
+        cache.want(0);
+        while cache.step() {}
+        assert!(cache.ready(0).is_some());
+        let index = root.join(super::super::library::INDEX_FILE);
+        std::fs::write(&index, b"invalid json").unwrap();
+        cache.want(1);
+        for _ in 0..20 {
+            let _ = cache.step();
+        }
+        assert!(cache.ready(1).is_none(), "the previous catalog must not be relabelled as ready after an index error");
+        RecordingIndex::fresh().save(&root).unwrap();
+        let recovered = (0..64).any(|_| {
+            cache.want(1);
+            let _ = cache.step();
+            cache.ready(1).is_some()
+        });
+        assert!(recovered, "a readable index retries at the same generation");
+    }
+
+    fn streak_saves_do_not_restart_a_populated_catalog_build() {
+        let root = library_card("streak-churn", 60);
+        let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+        for i in 0..30 {
+            let save = NamedSave::new(format!("Save {i}"), state(8), state(7)).unwrap();
+            saves.save_new(&save).unwrap();
+        }
+        let sequences = Store::<Sequence>::new(root.join(SEQUENCES_DIR));
+        let sequence = sequences.save_new(&Sequence::new("Drill", vec!["combo-1".into()]).unwrap()).unwrap();
+        let mut cache = CatalogCache::new(&root);
+        let mut streak = 0;
+        let mut generation = 0;
+        let done = (0..140).any(|pass| {
+            if pass % 10 == 0 {
+                // Alternate one-digit values: a byte-size signature alone cannot see these rewrites.
+                streak = if streak == 1 { 2 } else { 1 };
+                assert!(super::super::rr_host::save_sequence_progress(&root, &sequence, streak, streak));
+                generation += 1;
+            }
+            cache.want(generation);
+            let _ = cache.step();
+            cache.ready(generation).is_some()
+        });
+        assert!(done, "60 macros and 30 saves must complete in 140 passes despite streak writes");
+        let catalog = &cache.ready(generation).unwrap().catalog;
+        assert_eq!((catalog.macros.len(), catalog.saves.len()), (60, 30));
+        assert_eq!((catalog.sequences[0].streak, catalog.sequences[0].best), (streak, streak));
+    }
+
     /// A card with `files` recordings and its index, as the menu lists it.
     fn library_card(tag: &str, files: usize) -> std::path::PathBuf {
         let root = scratch(tag);
@@ -1650,6 +1744,10 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_slot_assignment_survives_close_reopen_and_next_press", a_slot_assignment_survives_close_reopen_and_next_press as fn()),
+            ("a_superseded_catalog_cannot_open_a_file_action", a_superseded_catalog_cannot_open_a_file_action as fn()),
+            ("an_index_read_failure_stays_unready_and_retries", an_index_read_failure_stays_unready_and_retries as fn()),
+            ("streak_saves_do_not_restart_a_populated_catalog_build", streak_saves_do_not_restart_a_populated_catalog_build as fn()),
             ("the_check_after_a_menu_open_sees_files_copied_outside_tr", the_check_after_a_menu_open_sees_files_copied_outside_tr as fn()),
             ("a_stepped_catalog_build_is_load_catalog_a_file_at_a_time", a_stepped_catalog_build_is_load_catalog_a_file_at_a_time as fn()),
             ("the_catalog_cache_serves_only_a_fresh_catalog", the_catalog_cache_serves_only_a_fresh_catalog as fn()),
