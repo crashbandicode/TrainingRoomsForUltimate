@@ -46,6 +46,7 @@ fn revoke() {}
 mod natives {
     pub fn fighter_entry(entry: usize) -> usize { entry }
     pub fn entry_active_body(_: usize) -> usize { unsafe { core::ptr::addr_of!(super::BODY_MEM) as usize } }
+    pub fn is_stop(_: usize) -> bool { false }
 }
 mod runtime { pub mod roster { pub mod character_roster {
     pub fn cpu_reload_ready() -> bool { crate::READY.load(crate::Ordering::Relaxed) }
@@ -89,7 +90,9 @@ unsafe fn actual_restart(game: &mut Game, config: Option<Config>, linked: bool) 
     // RESTART
 }
 unsafe fn actual_choose(game: &mut Game, config: Option<Config>, p1: usize, cpu: usize, cpu_entry: usize) {
-    let released = true;
+    let linked = false;
+    let ids = [0; 16];
+    let (status, cpu_status, situation, cpu_situation) = (0, 0, 0, 0);
     match game.step {
         // CHOOSE
         _ => (),
