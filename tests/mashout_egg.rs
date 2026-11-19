@@ -118,7 +118,8 @@ fn actual_runtime_egg_preparation_and_native_seed() {
         ("// ARM", block(runtime, "unsafe fn arm(").to_string()),
         ("// EGG_PKG2_SITES", {
             let sites = include_str!("../src/model/sites_pkg2.rs");
-            ["STATUS_KIND_OFFSET", "WORK_IS_FLAG_OFFSET", "WORK_GET_INT_OFFSET", "UTILITY_GET_KIND_OFFSET"]
+            ["STATUS_KIND_OFFSET", "WORK_IS_FLAG_OFFSET", "WORK_GET_INT_OFFSET", "UTILITY_GET_KIND_OFFSET",
+                "WORK_GET_FLOAT_OFFSET", "WORK_SET_FLOAT_OFFSET", "WORK_GET_PARAM_FLOAT_OFFSET"]
                 .map(|name| sites.lines()
                     .find(|line| line.starts_with(&format!("pub const {name}:")))
                     .unwrap())
@@ -149,6 +150,7 @@ fn actual_runtime_egg_preparation_and_native_seed() {
         ("// RESOURCE_WRITE_SITES", include_str!("../src/model/sites_pkg4.rs").lines()
             .find(|line| line.starts_with("pub const WORK_SET_INT_OFFSET:"))
             .unwrap().to_string()),
+        ("// RESOURCE_REFILL", block(runtime, "unsafe fn refill_attacker_resource(").to_string()),
         (
             "// JUDGE_CHOICE",
             block(runtime, "unsafe fn judge_choice(").to_string(),

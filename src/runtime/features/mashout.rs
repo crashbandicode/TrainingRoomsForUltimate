@@ -82,6 +82,80 @@ unsafe fn trolley_floor_allows(p1: usize, x: f32, y: f32, spacing: f32, facing: 
     entry::trolley_floor_runway([x, y], x + spacing * facing, facing, [left_now, right_now])
 }
 
+/// Supply only the selected move's native resource on the CPU body confirmed at Reload.
+unsafe fn refill_attacker_resource(
+    cpu: usize,
+    plan: crate::model::mashout::moves::Plan,
+    same_bodies: bool,
+) -> Option<()> {
+    use crate::model::{
+        cpu::hash::hash40, mashout::moves::Plan, sites_pkg2 as work,
+        sites_pkg3::STATE_GET_PARAM_INT_OFFSET, sites_pkg4::WORK_SET_INT_OFFSET,
+    };
+
+    match plan {
+        Plan::Trolley | Plan::Drain => {
+            if !same_bodies || ![work::WORK_GET_INT_OFFSET, WORK_SET_INT_OFFSET].into_iter().all(game::granted) {
+                return None;
+            }
+            let (name, cost) = if plan == Plan::Trolley {
+                if !game::granted(STATE_GET_PARAM_INT_OFFSET) {
+                    return None;
+                }
+                // Native trolley PRE compares iron with the live side-special cost.
+                (
+                    "FIGHTER_PICKEL_INSTANCE_WORK_ID_INT_MATERIAL_NUM_IRON",
+                    state_natives::get_param_int(cpu, hash40("param_special_s"), 0x1d_0963_3b0f),
+                )
+            } else {
+                ("FIGHTER_REFLET_INSTANCE_WORK_ID_INT_SPECIAL_LW_CURRENT_POINT", 1)
+            };
+            let id = game::lua_const(lua_bind_hash(name))?;
+            if natives::get_int(cpu, id) < cost {
+                natives::set_int(cpu, cost, id);
+            }
+        }
+        Plan::Roller | Plan::Hero => {
+            if !same_bodies
+                || ![work::WORK_GET_FLOAT_OFFSET, work::WORK_SET_FLOAT_OFFSET]
+                    .into_iter()
+                    .all(game::granted)
+            {
+                return None;
+            }
+            let (name, minimum) = if plan == Plan::Roller {
+                if !game::granted(work::WORK_GET_PARAM_FLOAT_OFFSET) {
+                    return None;
+                }
+                // Roller depletes ink on the way to contact, so start with its native tank.
+                (
+                    "FIGHTER_INKLING_INSTANCE_WORK_ID_FLOAT_INK",
+                    natives::get_param_float(cpu, hash40("param_private"), hash40("ink_max")),
+                )
+            } else {
+                // Stock 13.0.5 Command18 (Ice Sword) costs 11 MP.
+                const ICE_SWORD_COST: f32 = 11.0;
+                let max_sp = game::lua_const(lua_bind_hash("FIGHTER_BRAVE_INSTANCE_WORK_ID_FLOAT_MAX_SP"))?;
+                let cap = natives::get_float(cpu, max_sp);
+                if !cap.is_finite() || cap < ICE_SWORD_COST {
+                    return None;
+                }
+                ("FIGHTER_BRAVE_INSTANCE_WORK_ID_FLOAT_SP", ICE_SWORD_COST)
+            };
+            let id = game::lua_const(lua_bind_hash(name))?;
+            let current = natives::get_float(cpu, id);
+            if !minimum.is_finite() || minimum <= 0.0 || !current.is_finite() {
+                return None;
+            }
+            if current < minimum {
+                natives::set_float(cpu, minimum, id);
+            }
+        }
+        _ => (),
+    }
+    Some(())
+}
+
 const NOTICE_ID: u8 = 0x30;
 // Maximum P1 frame callbacks to wait for a provider to close after native escape.
 const PROVIDER_CLOSE_FRAMES: u8 = 60;
@@ -1629,26 +1703,9 @@ pub unsafe fn frame(fighter: usize) {
                     return;
                 }
             }
-            if request.plan == crate::model::mashout::moves::Plan::Trolley {
-                use crate::model::{
-                    cpu::hash::hash40, sites_pkg2::WORK_GET_INT_OFFSET,
-                    sites_pkg3::STATE_GET_PARAM_INT_OFFSET, sites_pkg4::WORK_SET_INT_OFFSET,
-                };
-                if ![WORK_GET_INT_OFFSET, STATE_GET_PARAM_INT_OFFSET, WORK_SET_INT_OFFSET]
-                    .into_iter().all(game::granted)
-                {
-                    game.fail(UNAVAILABLE_NOTICE);
-                    return;
-                }
-                let Some(iron) = game::lua_const(lua_bind_hash("FIGHTER_PICKEL_INSTANCE_WORK_ID_INT_MATERIAL_NUM_IRON")) else {
-                    game.fail(UNAVAILABLE_NOTICE);
-                    return;
-                };
-                // Match the native trolley PRE read and leave consumption to the game.
-                let cost = state_natives::get_param_int(cpu, hash40("param_special_s"), 0x1d_0963_3b0f);
-                if natives::get_int(cpu, iron) < cost {
-                    natives::set_int(cpu, cost, iron);
-                }
+            if refill_attacker_resource(cpu, request.plan, game.cpu == cpu && game.p1 == p1).is_none() {
+                game.fail(UNAVAILABLE_NOTICE);
+                return;
             }
             game.step(Step::Entering, "Mash out · Waiting for move");
             state_natives::status_request(cpu, start);

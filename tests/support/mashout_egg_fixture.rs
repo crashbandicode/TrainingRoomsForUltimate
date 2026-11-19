@@ -1452,6 +1452,7 @@ fn lucas_wait_without_ice_still_fails_and_wrong_victim_seed_never_grades() {
 // Native status/position APIs are shims. Place, Settle, Entering, release
 // predicate, arming, native seed admission and cancellation are actual source.
 use model::cpu::hash::lua_bind_hash;
+// RESOURCE_REFILL
 mod game {
     pub fn granted(offset: usize) -> bool {
         if super::TROLLEY_MISSING_GRANT.load(super::Ordering::Relaxed) == offset { return false; }
@@ -1472,6 +1473,9 @@ mod game {
             | crate::model::sites_pkg3::STATE_LINK_PARENT_OBJECT_ID_OFFSET
             | crate::model::sites_pkg3::STATE_GET_PARAM_INT_OFFSET
             | crate::model::sites_pkg4::WORK_SET_INT_OFFSET
+            | crate::model::sites_pkg2::WORK_GET_FLOAT_OFFSET
+            | crate::model::sites_pkg2::WORK_SET_FLOAT_OFFSET
+            | crate::model::sites_pkg2::WORK_GET_PARAM_FLOAT_OFFSET
             | crate::model::sites_hitbox::HITBOX_IS_ATTACK_OFFSET => true,
             _ => panic!("unexpected reader guard: {offset:x}"),
         }
@@ -1487,6 +1491,10 @@ mod game {
             ("FIGHTER_STATUS_KIND_CATCH_TURN", 55),
             ("FIGHTER_STATUS_KIND_CATCH_DASH_PULL", 58),
             ("FIGHTER_PICKEL_INSTANCE_WORK_ID_INT_MATERIAL_NUM_IRON", 0x1000_00c0),
+            ("FIGHTER_REFLET_INSTANCE_WORK_ID_INT_SPECIAL_LW_CURRENT_POINT", 0x1000_00c0),
+            ("FIGHTER_INKLING_INSTANCE_WORK_ID_FLOAT_INK", 0x52),
+            ("FIGHTER_BRAVE_INSTANCE_WORK_ID_FLOAT_MAX_SP", 0x52),
+            ("FIGHTER_BRAVE_INSTANCE_WORK_ID_FLOAT_SP", 0x53),
         ] {
             if super::lua_bind_hash(name) == hash {
                 return Some(id);
