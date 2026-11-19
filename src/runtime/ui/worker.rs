@@ -527,6 +527,7 @@ fn press(button: Button, s: &mut Session) {
             if let Some((tile, button)) = m.take_roster_press() {
                 roster_press(m, &mut s.roster, tile, button, mii_tiles(&s.mii));
             }
+            crate::editors::roster::retain(&mut s.roster, m);
         }
         m.is_closed()
     };

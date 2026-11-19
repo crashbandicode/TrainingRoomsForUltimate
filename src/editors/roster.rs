@@ -107,6 +107,22 @@ impl MiiTiles {
     }
 }
 
+/// The worker's roster editor lives only while its own grid is the top screen: leaving the grid (B, or L / R to
+/// another page) drops it, with any form previewed and not picked, so the next opening starts from the saved values.
+pub fn retain(editor: &mut Option<RosterEditor>, menu: &Menu) {
+    use crate::model::menu::{grid::GridKind, Screen};
+    let open = match menu.screen() {
+        Some(Screen::Grid { layout, .. }) => match layout.kind {
+            GridKind::Roster(use_) => Some(use_),
+            _ => None,
+        },
+        _ => None,
+    };
+    if editor.is_some_and(|e| Some(e.use_()) != open) {
+        *editor = None;
+    }
+}
+
 fn kinds() -> Vec<u32> {
     CHOICES.iter().map(|(kind, _)| *kind).collect()
 }
