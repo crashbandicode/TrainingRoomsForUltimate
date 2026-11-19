@@ -190,12 +190,15 @@ fn pick_steve_minecart(m: &mut Menu) {
     assert_eq!(one(m, moves::ATTACKER_ROW), Some(98));
 }
 
-fn chosen(m: &Menu) -> (Option<usize>, Option<usize>, Option<usize>) {
+/// The chosen (state, attacker, grab) indices.
+type Chosen = (Option<usize>, Option<usize>, Option<usize>);
+
+fn chosen(m: &Menu) -> Chosen {
     (one(m, moves::STATE_ROW), one(m, moves::ATTACKER_ROW), one(m, moves::GRAB_ROW))
 }
 
 /// The factory, and a saved default that is not the factory (Random Bury, Pivot grab type).
-fn reset_cases() -> [(Menu, (Option<usize>, Option<usize>, Option<usize>), &'static str); 2] {
+fn reset_cases() -> [(Menu, Chosen, &'static str); 2] {
     let mut saved = Settings::factory();
     let hot = |len: usize, i: usize| { let mut v = vec![0u8; len]; v[i] = 1; v };
     saved.defaults.set(moves::STATE_ROW, &hot(moves::STATE_LABELS.len(), 1)).unwrap();
