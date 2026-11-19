@@ -43,6 +43,10 @@ pub fn inside(surfaces: &Surfaces, p: Vec2) -> bool {
     crossings % 2 == 1
 }
 
+pub(super) fn contact_frames(knockback: f32) -> core::ops::RangeInclusive<f32> {
+    10.0..=(knockback * flight::DAMAGE_FRAME_MUL - 2.0).min(60.0)
+}
+
 pub struct Aim<'a> {
     pub surfaces: &'a Surfaces,
     pub line: Line,
@@ -59,8 +63,7 @@ impl Aim<'_> {
         if self.surfaces.state != Walk::Closed
             || self.line.kind().is_none()
             || self.line.snap(self.target)? != self.target
-            || !(10..=60).contains(&frames)
-            || f32::from(frames) > self.knockback * 0.4 - 2.0
+            || !contact_frames(self.knockback).contains(&f32::from(frames))
         {
             return None;
         }
@@ -70,7 +73,7 @@ impl Aim<'_> {
             velocity,
             self.params,
             frames,
-            self.knockback * 0.4,
+            self.knockback * flight::DAMAGE_FRAME_MUL,
             self.line.normal,
             5.7,
         )?;

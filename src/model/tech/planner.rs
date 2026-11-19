@@ -2,7 +2,7 @@
 //! planner until native replay/contact/ECB acceptance; it promises no spot hit.
 use super::controller::Setup;
 use super::picker::Spot;
-use super::solver::{Aim, Box2};
+use super::solver::{contact_frames, Aim, Box2};
 use super::surface::Surfaces;
 use super::variables::{Di, Mode, Variable};
 use super::{add, finite, scale, HitHeight, Launch};
@@ -59,7 +59,16 @@ pub fn plan(
     let percent = sample(config.damage, 5., draw)?;
     let visible_hit_damage = sample(config.hit_damage, 1., draw)?;
     let hit_damage = base_hit_damage(visible_hit_damage, Some(multiplier))?;
-    let frames = sample(config.time, 1., draw)? as u16;
+    let mut time = config.time;
+    if config.start.mode == SettingMode::Auto && time.mode == SettingMode::Random {
+        if !time.lo.is_finite() || !time.hi.is_finite() {
+            return None;
+        }
+        let allowed = contact_frames(knockback);
+        time.lo = time.lo.max(*allowed.start());
+        time.hi = time.hi.min(*allowed.end());
+    }
+    let frames = sample(time, 1., draw)? as u16;
     let delay = sample(config.delay, 1., draw)? as u16;
     let angle = sample(config.angle, 5., draw);
     let start_offset = sample(config.start, 1., draw);
@@ -99,23 +108,11 @@ pub fn plan(
     {
         return None;
     }
-    let facing = match config.facing {
-        1 => -1.,
-        2 => 1.,
-        3 => {
-            if draw(2) == 0 {
-                -1.
-            } else {
-                1.
-            }
-        }
-        _ => {
-            if context.spot.point.x >= start.x {
-                1.
-            } else {
-                -1.
-            }
-        }
+    let face_right = match config.facing {
+        1 => false,
+        2 => true,
+        3 => draw(2) != 0,
+        _ => context.spot.point.x >= start.x,
     };
     let di = match config.di {
         1 => Di::Player,
@@ -140,7 +137,7 @@ pub fn plan(
         percent: percent + hit_damage * multiplier,
         hit_damage,
         height: HitHeight::Middle,
-        facing,
+        facing: if face_right { 1. } else { -1. },
         hit_from_behind: false,
         grounded_hit: false,
         di,
