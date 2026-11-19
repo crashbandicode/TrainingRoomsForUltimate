@@ -455,6 +455,7 @@ pub struct RecordingScreens {
     drill: Option<String>,
     slots: [Option<String>; 5],
     last_effect: Effect,
+    selection_changed: bool,
     serial: u32,
     /// The worker's catalog is not built yet (menu-speed fix): the lists say so.
     loading: bool,
@@ -480,6 +481,7 @@ impl RecordingScreens {
             drill: None,
             slots: Default::default(),
             last_effect: Effect::None,
+            selection_changed: false,
             serial: 0,
             loading: false,
         }
@@ -511,11 +513,32 @@ impl RecordingScreens {
     pub fn set_catalog(&mut self, catalog: Catalog) {
         self.catalog = catalog;
         self.loading = false;
+        if self.file.as_ref().is_some_and(|file| !self.has_file(&file.id, file.kind)) {
+            self.file = None;
+        }
     }
 
     /// The menu worker has no catalog for the card yet (menu-speed fix): the lists say "loading" until `set_catalog`.
     pub fn set_loading(&mut self) {
         self.loading = true;
+        self.picker = None;
+        self.keyboard = None;
+        self.last_effect = Effect::None;
+        self.selection_changed = false;
+    }
+
+    pub fn take_selection_change(&mut self) -> bool {
+        core::mem::take(&mut self.selection_changed)
+    }
+
+    fn has_file(&self, id: &str, kind: ItemKind) -> bool {
+        match kind {
+            ItemKind::Recording => self.macro_by_id(id).is_some(),
+            ItemKind::Save => self.save_by_id(id).is_some(),
+            ItemKind::Combo => self.combo_by_id(id).is_some(),
+            ItemKind::Sequence => self.catalog.sequences.iter().any(|file| file.id == id),
+            _ => false,
+        }
     }
 
     pub fn loading(&self) -> bool {
@@ -623,6 +646,9 @@ impl RecordingScreens {
     }
 
     pub fn file_rows(&self) -> Vec<FileRow> {
+        if self.loading {
+            return vec![FileRow { floppy: None, title: "Loading…".to_owned(), value: String::new() }];
+        }
         let floppy = self.file.as_ref().and_then(|file| self.row_floppy(&Item { kind: file.kind, id: file.id.clone() }));
         self.built_file_rows()
             .into_iter()
@@ -631,6 +657,9 @@ impl RecordingScreens {
     }
 
     pub fn file_crumb(&self) -> String {
+        if self.loading {
+            return "Recording".to_owned();
+        }
         let Some(file) = &self.file else { return String::new() };
         let role = if self.page_role == ViewRole::Cpu { "CPU view" } else { "Player view" };
         let group = match file.kind {
@@ -846,11 +875,7 @@ impl RecordingScreens {
     }
 
 
-    /// The index's selection, with every catalog load (`CatalogWatch::take_load`: a new opening or a file write). The
-    /// menu publishes its selection back to the index (`rr_host::publish_selection`), so it must never hold one older
-    /// than the index: a model the pop-up kept alive took the index once, and a later Record made a new active file, so
-    /// closing the menu put the old one back (Eden rc5-opus-final-trace2, 2026-11-08). The menu's own edits are already
-    /// in the index, published with the press that made them.
+    /// Adopt the recording index's current selection independently of the file catalog.
     pub fn adopt(&mut self, bound: Option<String>, active: [Option<String>; 2], loops: [LoopMark; 2], drill: Option<String>) {
         self.bound = bound;
         self.active = active;
@@ -858,7 +883,7 @@ impl RecordingScreens {
         self.drill = drill;
     }
 
-    /// The index's Playback Slots, with every catalog load (as `adopt`).
+    /// Adopt the current Playback Slots from the index.
     pub fn adopt_slots(&mut self, slots: [Option<String>; 5]) {
         self.slots = slots;
     }
@@ -871,6 +896,7 @@ impl RecordingScreens {
     /// Left/Right (and A) on a macro's Playback slot row: None, 1 .. 5 and round. The slot a macro moves to is taken from
     /// the macro that held it.
     fn step_slot(&mut self, id: &str, forward: bool) {
+        self.selection_changed = true;
         let now = self.slot_of(id).map_or(0, |i| i + 1);
         let next = if forward { (now + 1) % 6 } else { (now + 5) % 6 };
         self.slots.iter_mut().filter(|held| held.as_deref() == Some(id)).for_each(|held| *held = None);
@@ -1060,6 +1086,10 @@ impl RecordingScreens {
     }
 
     fn cycle_x(&mut self, role: ViewRole) {
+        if self.loading {
+            return;
+        }
+        self.selection_changed = true;
         let slot = role.index();
         self.loops[slot] = self.loops[slot].next();
     }
@@ -1170,6 +1200,12 @@ impl RecordingScreens {
     }
 
     fn press_overlay(&mut self, button: Button, face: Face) {
+        if self.loading {
+            if button == Button::B {
+                self.file = None;
+            }
+            return;
+        }
         if self.keyboard.is_some() {
             if button == Button::B {
                 self.submit_name("");
@@ -1294,6 +1330,7 @@ impl RecordingScreens {
     }
 
     fn set_bound(&mut self, id: &str, on: bool) {
+        self.selection_changed = true;
         if on {
             self.bound = Some(id.to_string());
             self.note_hot_save(id);
@@ -1303,6 +1340,7 @@ impl RecordingScreens {
     }
 
     fn set_active(&mut self, role: ViewRole, id: &str, on: bool) {
+        self.selection_changed = true;
         let slot = role.index();
         if on {
             self.active[slot] = Some(id.to_string());
@@ -1314,6 +1352,7 @@ impl RecordingScreens {
 
     /// A drill is a use (the index notes it): the file goes first in its kind's list now, as Set active and Bind do.
     fn set_drill(&mut self, kind: ItemKind, id: String) {
+        self.selection_changed = true;
         let hot = if kind == ItemKind::Sequence { &mut self.catalog.hot_sequences } else { &mut self.catalog.hot_combos };
         hot.retain(|hot| *hot != id);
         hot.insert(0, id.clone());
@@ -1530,6 +1569,9 @@ impl RecordingScreens {
     }
 
     fn items(&self, face: Face, group: u8, section: u8) -> Vec<Item> {
+        if self.loading {
+            return Vec::new();
+        }
         let combos = group == COMBOS_SEQ;
         if !combos && section == 0 {
             return ordered(&self.catalog.saves, &self.catalog.hot_saves, |file| &file.id, |file| &file.name)
@@ -2174,9 +2216,8 @@ impl CatalogWatch {
         Self { seen: u64::MAX }
     }
 
-    /// The open menu was given a catalog (of some generation) since it opened.
-    pub fn adopted(self) -> bool {
-        self.seen != u64::MAX
+    pub fn generation(self) -> Option<u64> {
+        (self.seen != u64::MAX).then_some(self.seen)
     }
 
     /// `true` once, when `generation` is not the one already given to the open menu.

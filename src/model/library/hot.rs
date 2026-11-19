@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{check_combo_ids, check_ids, id_ok, Drill, Error, Kind, LoopCount, Role, Use};
 use crate::model::recording_menu::hot_five;
-use crate::model::store::write_replace;
+use crate::model::store::{catalog_generation, index_generation, note_index_write, recording_write_guard, write_replace};
 
 const MAX_INDEX_BYTES: usize = 1024 * 1024;
 
@@ -190,11 +190,21 @@ impl RecordingIndex {
     }
 
     pub fn save(&self, root: &Path) -> Result<(), Error> {
-        fs::create_dir_all(root)?;
+        self.save_at(root, None).map(|_| ())
+    }
+
+    /// A menu edit can write only against the file and index revisions it observed.
+    pub fn save_at(&self, root: &Path, expected: Option<(u64, u64)>) -> Result<bool, Error> {
         let mut bytes = serde_json::to_vec_pretty(self)?;
         bytes.push(b'\n');
+        let _guard = recording_write_guard(root);
+        if expected.is_some_and(|version| version != (catalog_generation(), index_generation())) {
+            return Ok(false);
+        }
+        fs::create_dir_all(root)?;
         write_replace(&root.join(INDEX_FILE), &bytes)?;
-        Ok(())
+        note_index_write(root);
+        Ok(true)
     }
 
     pub fn migrated(&self) -> bool {

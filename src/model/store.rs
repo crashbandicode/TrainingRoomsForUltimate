@@ -27,11 +27,13 @@
 //!   `.bak` (left only by a crash inside that swap).
 
 use std::{
+    collections::BTreeMap,
     ffi::OsString,
     fmt, fs,
     io::{self, Write},
     marker::PhantomData,
     path::{Path, PathBuf},
+    sync::{atomic::{AtomicU64, Ordering}, Mutex, MutexGuard, TryLockError},
 };
 
 use serde::{de::DeserializeOwned, Serialize};
@@ -276,6 +278,44 @@ impl<R: Record> Store<R> {
         Ok(ListCursor { store: self.clone(), names: names.into_iter(), entries: Vec::new(), skipped })
     }
 
+    /// The visible JSON files, for a catalog's background names-and-sizes scan.
+    /// Only the initial scan also recovers orphaned backups.
+    pub fn file_sizes(&self, recover: bool) -> Option<BTreeMap<String, u64>> {
+        let entries = match fs::read_dir(&self.dir) {
+            Ok(entries) => entries,
+            Err(err) if err.kind() == io::ErrorKind::NotFound => return Some(BTreeMap::new()),
+            Err(_) => return None,
+        };
+        let mut names: Vec<_> = entries
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .filter(|name| !name.starts_with('.'))
+            .collect();
+        if recover {
+            self.restore_orphaned_backups(&mut names);
+        }
+        Some(names.into_iter().filter_map(|name| {
+            let id = name.strip_suffix(".json")?;
+            let meta = fs::metadata(self.dir.join(&name)).ok()?;
+            meta.is_file().then(|| (id.to_owned(), meta.len()))
+        }).collect())
+    }
+
+    /// Two record types share the directory. Read once and validate the owning type.
+    pub fn load_with_sibling<S: Record>(&self, id: &str) -> Option<Result<R, S>> {
+        if !R::accepts_id(id) && !S::accepts_id(id) {
+            return None;
+        }
+        let data = read_bounded(&self.file(id, "json"), R::MAX_FILE_BYTES.max(S::MAX_FILE_BYTES)).ok()?;
+        if R::accepts_id(id) && data.len() as u64 <= R::MAX_FILE_BYTES && R::owns(&data) {
+            decode::<R>(id, &data).ok().map(Ok)
+        } else if S::accepts_id(id) && data.len() as u64 <= S::MAX_FILE_BYTES {
+            decode::<S>(id, &data).ok().map(Err)
+        } else {
+            None
+        }
+    }
+
     /// Loads and fully validates the record with this id.
     pub fn load(&self, id: &str) -> Result<R, R::Error> {
         check_id::<R>(id).map_err(lift::<R>)?;
@@ -296,6 +336,7 @@ impl<R: Record> Store<R> {
     pub fn save_new(&self, rec: &R) -> Result<String, R::Error> {
         let bytes = encode(rec)?;
         fs::create_dir_all(&self.dir).map_err(|err| lift::<R>(err.into()))?;
+        let _guard = catalog_folder(&self.dir).and_then(|(root, _)| recording_write_guard(root));
         let id = self.free_id(rec.name()).map_err(lift::<R>)?;
         self.write_atomic(&id, &bytes).map_err(lift::<R>)?;
         Ok(id)
@@ -306,6 +347,7 @@ impl<R: Record> Store<R> {
     pub fn overwrite(&self, id: &str, rec: &R) -> Result<(), R::Error> {
         check_id::<R>(id).map_err(lift::<R>)?;
         let bytes = encode(rec)?;
+        let _guard = catalog_folder(&self.dir).and_then(|(root, _)| recording_write_guard(root));
         let exists = self
             .file(id, "json")
             .try_exists()
@@ -319,12 +361,14 @@ impl<R: Record> Store<R> {
     /// Removes the record `id` (and a leftover backup of it).
     pub fn delete(&self, id: &str) -> Result<(), R::Error> {
         check_id::<R>(id).map_err(lift::<R>)?;
+        let _guard = catalog_folder(&self.dir).and_then(|(root, _)| recording_write_guard(root));
         match fs::remove_file(self.file(id, "json")) {
             Ok(()) => {}
             Err(err) if err.kind() == io::ErrorKind::NotFound => return Err(lift::<R>(StoreError::NotFound(id.to_owned()))),
             Err(err) => return Err(lift::<R>(err.into())),
         }
         let _ = fs::remove_file(self.file(id, "json.bak"));
+        note_catalog_write(&self.dir, id, None);
         Ok(())
     }
 
@@ -369,7 +413,9 @@ impl<R: Record> Store<R> {
     }
 
     fn write_atomic(&self, id: &str, bytes: &[u8]) -> Result<(), StoreError> {
-        Ok(write_replace(&self.file(id, "json"), bytes)?)
+        write_replace(&self.file(id, "json"), bytes)?;
+        note_catalog_write(&self.dir, id, Some(bytes.len() as u64));
+        Ok(())
     }
 
     /// A `.json.bak` without its `.json` means a crash inside the fallback swap;
@@ -381,8 +427,16 @@ impl<R: Record> Store<R> {
             .filter(|id| check_id::<R>(id).is_ok() && !names.contains(&format!("{id}.json")))
             .map(str::to_owned)
             .collect();
+        if orphans.is_empty() {
+            return;
+        }
+        let _guard = catalog_folder(&self.dir).and_then(|(root, _)| recording_write_guard(root));
         for id in orphans {
-            if fs::rename(self.file(&id, "json.bak"), self.file(&id, "json")).is_ok() {
+            let target = self.file(&id, "json");
+            if matches!(target.try_exists(), Ok(false)) {
+                let _ = fs::rename(self.file(&id, "json.bak"), &target);
+            }
+            if target.is_file() {
                 names.push(format!("{id}.json"));
             }
         }
@@ -705,4 +759,81 @@ mod tests {
         ]);
     }
     }
+}
+
+// Recording catalog invalidation happens at the committed Store operation,
+// including the standalone macro and combo editors. Other stores are independent.
+pub const CATALOG_DIRS: [&str; 4] = ["macros", "saves", "combos", "sequences"];
+pub type CatalogSignatures = BTreeMap<(usize, String), Option<u64>>;
+static CATALOG_WRITES: Mutex<BTreeMap<PathBuf, CatalogSignatures>> = Mutex::new(BTreeMap::new());
+static RECORDING_WRITE: Mutex<()> = Mutex::new(());
+static CATALOG_GEN: AtomicU64 = AtomicU64::new(0);
+static INDEX_GEN: AtomicU64 = AtomicU64::new(0);
+
+fn recording_root(root: &Path) -> bool {
+    cfg!(test) || root == Path::new(crate::model::storage::ROOT)
+}
+
+fn catalog_folder(dir: &Path) -> Option<(&Path, usize)> {
+    let root = dir.parent().filter(|path| recording_root(path))?;
+    let name = dir.file_name()?.to_str()?;
+    CATALOG_DIRS.iter().position(|&folder| folder == name).map(|folder| (root, folder))
+}
+
+pub fn recording_write_guard(root: &Path) -> Option<MutexGuard<'static, ()>> {
+    recording_root(root).then(|| RECORDING_WRITE.lock().unwrap_or_else(|err| err.into_inner()))
+}
+
+/// The background worker can defer a read while an atomic replacement is in progress.
+pub fn try_recording_read() -> Option<MutexGuard<'static, ()>> {
+    if cfg!(test) {
+        return Some(RECORDING_WRITE.lock().unwrap_or_else(|err| err.into_inner()));
+    }
+    match RECORDING_WRITE.try_lock() {
+        Ok(lock) => Some(lock),
+        Err(TryLockError::Poisoned(err)) => Some(err.into_inner()),
+        Err(TryLockError::WouldBlock) => None,
+    }
+}
+
+fn note_catalog_write(dir: &Path, id: &str, size: Option<u64>) {
+    let Some((root, folder)) = catalog_folder(dir) else { return };
+    let mut writes = CATALOG_WRITES.lock().unwrap_or_else(|err| err.into_inner());
+    writes.entry(root.to_path_buf()).or_default().insert((folder, id.to_owned()), size);
+    CATALOG_GEN.fetch_add(1, Ordering::Release);
+    drop(writes);
+    #[cfg(target_os = "switch")]
+    if folder == 1 {
+        crate::engine::rr_host::invalidate_bound();
+    }
+    wake_catalog();
+}
+
+pub fn catalog_changes(root: &Path) -> CatalogSignatures {
+    CATALOG_WRITES.lock().unwrap_or_else(|err| err.into_inner()).remove(root).unwrap_or_default()
+}
+
+pub fn catalog_generation() -> u64 {
+    CATALOG_GEN.load(Ordering::Acquire)
+}
+
+pub fn advance_catalog() {
+    CATALOG_GEN.fetch_add(1, Ordering::Release);
+    wake_catalog();
+}
+
+pub fn index_generation() -> u64 {
+    INDEX_GEN.load(Ordering::Acquire)
+}
+
+pub fn note_index_write(root: &Path) {
+    if recording_root(root) {
+        INDEX_GEN.fetch_add(1, Ordering::Release);
+        wake_catalog();
+    }
+}
+
+fn wake_catalog() {
+    #[cfg(target_os = "switch")]
+    crate::runtime::ui::worker::wake();
 }

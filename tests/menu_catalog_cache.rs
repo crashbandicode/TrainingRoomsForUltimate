@@ -19,12 +19,12 @@ fn a_menu_open_takes_the_kept_catalog_and_never_reads_the_card() {
     let worker = src("src/runtime/ui/worker.rs");
     assert!(!worker.contains("load_catalog("), "the worker reads the card only through the stepped CatalogCache");
     let refresh = item(&worker, "fn refresh_recording(");
-    assert!(refresh.contains("s.catalog.ready(gen)"), "a due menu adopts the kept catalog:\n{refresh}");
+    assert!(refresh.contains("s.catalog.ready(version.0)"), "a due menu adopts the kept catalog:\n{refresh}");
     assert!(refresh.contains("set_loading()"), "no catalog yet: the lists say loading:\n{refresh}");
     let session = item(&worker, "struct Session {");
     assert!(session.contains("catalog: CatalogCache"), "the cache outlives the menu model:\n{session}");
     let run = item(&worker, "fn run() {");
-    assert!(run.contains("session.catalog.want(crate::engine::rr_host::catalog_generation())"), "{run}");
+    assert!(run.contains("session.catalog.want(version.0)"), "{run}");
     assert!(run.contains("session.catalog.step()"), "one file per pass, input drained between: {run}");
     let handle = item(&worker, "fn handle(event: Event, s: &mut Session) {");
     let open = &handle[..handle.find("let Event::Poll").expect("the poll branch")];
@@ -39,7 +39,7 @@ fn a_menu_open_checks_the_folders_and_a_change_moves_the_generation() {
     let worker = src("src/runtime/ui/worker.rs");
     let handle = item(&worker, "fn handle(event: Event, s: &mut Session) {");
     let open = &handle[..handle.find("let Event::Poll").expect("the poll branch")];
-    assert!(open.contains("s.catalog.check(crate::engine::rr_host::catalog_generation())"), "{open}");
+    assert!(open.contains("s.catalog.check()"), "{open}");
     let run = item(&worker, "fn run() {");
     assert!(
         run.contains("if session.catalog.take_external_change() {\n            crate::engine::rr_host::bump_catalog();"),
@@ -50,8 +50,8 @@ fn a_menu_open_checks_the_folders_and_a_change_moves_the_generation() {
 #[test]
 fn a_drill_is_not_cleared_while_the_catalog_loads() {
     let worker = src("src/runtime/ui/worker.rs");
-    let effect = item(&worker, "fn post_recording_effect(menu: &mut Menu) {");
-    assert!(effect.contains("menu.recording().loading()"), "no catalog, no drill kind to follow:\n{effect}");
+    let effect = item(&worker, "fn post_recording_effect(");
+    assert!(effect.contains("screens.loading()"), "no catalog, no drill kind to follow:\n{effect}");
 }
 
 #[test]
@@ -60,9 +60,17 @@ fn recording_actions_and_writeback_require_the_current_generation() {
     let refresh = item(&worker, "fn refresh_recording(");
     assert!(!refresh.contains("!s.catalog_watch.adopted()"), "an adopted but superseded catalog must enter loading");
     let effect = item(&worker, "fn post_recording_effect(");
-    let check = effect.find("catalog_generation()").expect("check the current generation before dispatch");
-    assert!(check < effect.find("publish_selection(").unwrap(), "check again before writeback");
-    assert!(check < effect.find("post_effect(").unwrap(), "check before dispatching a file effect");
+    let check = effect.find("observed != Some(version)").expect("check the adopted revision before dispatch");
+    assert!(check < effect.find("publish_selection_at(").unwrap(), "check before selection writeback");
+    assert!(check < effect.find("post_effect_at(").unwrap(), "check before dispatching a file effect");
+    let host = src("src/model/rr_host.rs");
+    let consume = item(&host, "fn apply_menu(");
+    assert!(consume.find("catalog_generation()").unwrap() < consume.find("match effect").unwrap(),
+        "recheck after taking a queued file action");
+    let index = src("src/model/library/hot.rs");
+    let write = item(&index, "    pub fn save_at(");
+    assert!(write.find("recording_write_guard(").unwrap() < write.find("catalog_generation()").unwrap());
+    assert!(write.find("catalog_generation()").unwrap() < write.find("write_replace(").unwrap());
 }
 
 #[test]
