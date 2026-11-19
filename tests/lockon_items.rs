@@ -172,3 +172,14 @@ fn native_damage_is_consumed_only_for_the_matching_live_target() {
     assert!(!lockon::take_damage(&mut damage, 0.));
     assert!(lockon::take_damage(&mut damage, 5.));
 }
+
+/// rc.15 target-break-area: the lock-on helper's whole native hurt volume lies inside the target picture, so a native hit on
+/// it is always a hit that reaches the picture. Measured on exact d6393cb0 (Eden target-hurtbox-d6393cb0-yoga-4): the
+/// Sandbag's three parts sit 4.02, 9.88 and 15.68 above its posture per unit of scale and touch at 5.75 per unit of scale.
+#[test]
+fn the_helpers_hurt_volume_fits_inside_the_picture() {
+    let reach = lockon::helper_reach(lockon::HELPER_SCALE, lockon::HELPER_CENTER_HEIGHT);
+    assert!(reach <= lockon::PICTURE_RADIUS, "helper reaches {reach} from the target centre, picture {}", lockon::PICTURE_RADIUS);
+    // The shipped d6393cb0 helper (scale 0.6, 4 under the centre) reached 8.86: the projectile break outside the picture.
+    assert!((lockon::helper_reach(0.6, 4.0) - 8.86).abs() < 0.02);
+}
