@@ -2002,7 +2002,7 @@ approved_by = "operator 2026-11-18: yes additional lines are ok / ~19:38Z: size 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 163496
+ceiling = 163492
 date = "2026-11-19"
-reason = "rc.15 option B gives each live Disc egg or BTT slot a native Sandbag with an owned lifetime. The practice games score the hit, and 19 native guards qualify placement and cleanup. Measured 163496 = 163201 + 295 on local main 2517b3e5."
-approved_by = "The operator confirmed option B and +220 to +320 lines around 21:49Z on 2026-11-18. Exact +295 recorded for the gate. Primary landing disposition pending."
+reason = "rc.15 option B gives each live Disc egg or BTT slot a native Sandbag with an owned lifetime. The practice games score the hit, and 19 native guards qualify placement and cleanup. Measured 163492 = 163201 + 291 on local main 2517b3e5."
+approved_by = "The operator confirmed option B and +220 to +320 lines around 21:49Z on 2026-11-18. Exact +291 recorded for the gate. Primary landing disposition pending."

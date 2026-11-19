@@ -58,8 +58,8 @@ extern "C" {
         kind: app::ItemKind,
         variation: i32,
         owner: i32,
-        at: &Vector3f,
-        speed: &Vector3f,
+        at: &[f32; 4],
+        speed: &[f32; 4],
         lr: f32,
         source: u32,
     ) -> *mut app::Item;
@@ -97,17 +97,14 @@ impl ItemHost for NativeItems {
             return None; // Spread a full BTT layout's native creations across frames.
         }
         unsafe {
-            let speed = Vector3f {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            };
+            // The 13.0.5 wrapper loads 16 bytes from each native Vector3f reference.
+            let pos = position(at);
             let item = create_sandbag(
                 app::ItemKind(*ITEM_KIND_SANDBAG),
                 0,
                 owner as i32,
-                &position(at),
-                &speed,
+                &[pos.x, pos.y, pos.z, 0.0],
+                &[0.0; 4],
                 1.0,
                 owner,
             );
