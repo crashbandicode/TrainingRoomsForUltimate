@@ -995,10 +995,10 @@ const GAME_ENTRIES: &[&str] = &[
     "probe::mounted",
 ];
 
-/// Staged game-thread passes are audited even before their native callback is
-/// bound. They are not claims of a registered handoff: GAME_ENTRIES stays the
-/// exact callback inventory checked by every_function_handed_to_the_game_is_listed.
-const STAGED_GAME_ROOTS: &[&str] = &["tech::frame"];
+/// Audit staged passes and callbacks through model code as game-thread roots.
+/// Mash out's floor read is called through the placement model's ray closure.
+/// GAME_ENTRIES stays the inventory of registered native callback handoffs.
+const STAGED_GAME_ROOTS: &[&str] = &["tech::frame", "mashout::floor"];
 
 fn game_root_keys() -> impl Iterator<Item = &'static str> {
     GAME_ENTRIES.iter().chain(STAGED_GAME_ROOTS).copied()
