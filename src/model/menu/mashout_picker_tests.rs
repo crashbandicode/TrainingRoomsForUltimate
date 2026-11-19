@@ -165,6 +165,87 @@ fn mashout_popup_box_fits_its_widest_line() {
     assert_eq!(PopView::EMPTY.width(), 2.0 * POP_PAD);
 }
 
+/// Mash out's sub-screen from the Practice games list, the cursor on "Fighter and move".
+fn on_picker_row(m: &mut Menu) {
+    for _ in 0..6 {
+        if m.page() == Page::FightersStages { break; }
+        m.press(Button::R);
+    }
+    let list = ROWS.iter().position(|r| matches!(r.control, Control::Game(Game::Mashout))).unwrap();
+    for _ in 0..=m.entry_count(Page::FightersStages) {
+        if m.focus() == Some(Entry::Row(list)) { break; }
+        m.press(Button::Down);
+    }
+    m.press(Button::A);
+    m.press(Button::Down);
+    assert!(m.help_row().is_some_and(|r| std::ptr::eq(r, &ROWS[picker_row()])), "on the picker row");
+}
+
+/// Steve → Empty minecart through the picker, back on the picker row.
+fn pick_steve_minecart(m: &mut Menu) {
+    open(m);
+    a_on(m, STEVE);
+    m.press(Button::Down);
+    m.press(Button::A);
+    assert_eq!(one(m, moves::ATTACKER_ROW), Some(98));
+}
+
+fn chosen(m: &Menu) -> (Option<usize>, Option<usize>, Option<usize>) {
+    (one(m, moves::STATE_ROW), one(m, moves::ATTACKER_ROW), one(m, moves::GRAB_ROW))
+}
+
+/// The factory, and a saved default that is not the factory (Random Bury, Pivot grab type).
+fn reset_cases() -> [(Menu, (Option<usize>, Option<usize>, Option<usize>), &'static str); 2] {
+    let mut saved = Settings::factory();
+    let hot = |len: usize, i: usize| { let mut v = vec![0u8; len]; v[i] = 1; v };
+    saved.defaults.set(moves::STATE_ROW, &hot(moves::STATE_LABELS.len(), 1)).unwrap();
+    saved.defaults.set(moves::ATTACKER_ROW, &hot(moves::ATTACKER_LABELS.len(), moves::RANDOM_ATTACKER)).unwrap();
+    saved.defaults.set(moves::GRAB_ROW, &hot(moves::GRAB_LABELS.len(), 2)).unwrap();
+    [(menu(), (Some(0), Some(0), Some(0)), "Mario · Grab (Standing)  >"),
+     (Menu::new(saved, Env::default()), (Some(1), Some(moves::RANDOM_ATTACKER), Some(2)), "Random Bury  >")]
+}
+
+fn row_value(m: &Menu) -> String {
+    let mut t = Text::<72>::new();
+    crate::model::frame::write_value(m, picker_row(), &mut t);
+    text(&t)
+}
+
+/// Review 17:01Z #1: Y on "Fighter and move" restores the picker's three keys from the saved defaults.
+#[test]
+fn mashout_y_resets_the_picker_to_its_saved_default() {
+    for (mut m, want, shown) in reset_cases() {
+        on_picker_row(&mut m);
+        pick_steve_minecart(&mut m);
+        assert!(m.help_row().is_some_and(|r| std::ptr::eq(r, &ROWS[picker_row()])), "back on the picker row");
+        m.press(Button::Y);
+        assert_eq!(chosen(&m), want);
+        assert_eq!(row_value(&m), shown);
+    }
+}
+
+/// Review 17:01Z #1: the confirmed Reset page to defaults restores the picker too, and reports the row as changed.
+#[test]
+fn mashout_page_reset_restores_the_picker_to_its_saved_default() {
+    for (mut m, want, shown) in reset_cases() {
+        on_picker_row(&mut m);
+        pick_steve_minecart(&mut m);
+        m.press(Button::B);
+        for _ in 0..=m.entry_count(Page::FightersStages) {
+            if matches!(m.focus(), Some(Entry::ResetPage(_))) { break; }
+            m.press(Button::Down);
+        }
+        assert!(matches!(m.focus(), Some(Entry::ResetPage(_))));
+        m.press(Button::A);
+        assert!(matches!(m.screen(), Some(Screen::ConfirmReset)));
+        m.press(Button::A);
+        assert_eq!(chosen(&m), want);
+        assert_eq!(row_value(&m), shown);
+        let (_, changed) = m.take_page_reset().expect("a page reset");
+        assert!(changed.contains(&"Fighter and move"), "{changed:?}");
+    }
+}
+
 #[test]
 fn mashout_greyed_fighters_cannot_be_picked() {
     let m = menu();
