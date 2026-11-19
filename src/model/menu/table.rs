@@ -573,7 +573,7 @@ pub static ROWS: [Row; 146] = [
     r(TECH, "Camera", "tech_camera", Control::Dropdown(&o::TECH_CAMERA),
       "Follow the attempt or frame the whole stage.\nWhole stage uses the target placing camera."),
     r(TECH, "Skip wizard preview", "tech_wizard_skip", TOGGLE,
-      "On: A after Hit starts immediately.\nOff: review the candidate preview before starting."),
+      "Off (default): A after Hit opens Preview.\nOn: A after Hit starts immediately."),
     // Practice games > Mash out: its Off / On row is Start / Stop now; the `mashout` key stays in the file.
     r(MASHOUT, "Start", "", Control::Start(Game::Mashout),
       "Closes the menu and starts Mash out with the settings below.\nWhile it runs, this row reads Stop."),
