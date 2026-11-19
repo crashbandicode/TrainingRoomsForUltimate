@@ -330,9 +330,11 @@ fn run() {
             WAKE.wait(Some(std::time::Duration::ZERO));
         } else if read_index || session.watching() || developer_pending {
             WAKE.wait(Some(POLL));
+        } else if let Some(every) = crate::runtime::bridge_state::poll_interval() {
+            // The optional test bridge: its lookup (once a second for 30 s) or its snapshots; nothing once it is off.
+            WAKE.wait(Some(every));
         } else {
-            // The bridge's lookup (once a second for 30 s) or its snapshots; nothing once it is off.
-            WAKE.wait(crate::runtime::bridge_state::poll_interval());
+            WAKE.wait(None);
         }
     }
 }
