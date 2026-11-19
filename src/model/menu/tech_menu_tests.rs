@@ -104,6 +104,7 @@ fn tech_wizard_preserves_active_session_and_advanced_variables() {
 fn tech_wizard_skip_defaults_off_and_persists_without_opening_wizard() {
     let mut m=menu();
     assert_eq!(m.get("tech_wizard_skip"),&[0,1]);
+    assert!(ROWS[row("tech_wizard_skip")].help.contains("Off (default)"));
     m.activate(row("tech_wizard_skip"));
     assert_eq!(m.get("tech_wizard_skip"),&[1,0]);
     assert!(!m.is_closed());

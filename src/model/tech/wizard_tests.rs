@@ -76,6 +76,34 @@ fn wizard_defaults_and_every_forward_transition() {
     assert_eq!(w.action(Action::Next), Outcome::Start);
 }
 #[test]
+fn stored_skip_preview_controls_a_on_hit() {
+    use crate::model::{settings, tech_settings};
+
+    for (state, file, expected) in [
+        ("factory", None, Outcome::None),
+        ("missing setting", Some(r#"{"menu": {}}"#), Outcome::None),
+        ("saved On", Some(r#"{"menu": {"tech_wizard_skip": [1,0]}}"#), Outcome::Start),
+        ("saved Off", Some(r#"{"menu": {"tech_wizard_skip": [0,1]}}"#), Outcome::None),
+    ] {
+        let settings = file.map_or_else(settings::Settings::factory, |text| {
+            let loaded = settings::parse(text);
+            assert!(loaded.issues.is_empty(), "{state}: {:?}", loaded.issues);
+            loaded.settings
+        });
+        let skip = tech_settings::selected(&settings.menu, "tech_wizard_skip") == 0;
+        let mut w = Wizard::begin(tech_settings::read(&settings.menu), skip);
+        assert!(w.set_spot(spot(Vec2 { x: 0., y: 1. })));
+        for step in [Step::Angle, Step::Distance, Step::Hit] {
+            assert_eq!(w.action(Action::Next), Outcome::None, "{state}");
+            assert_eq!(w.step, step, "{state}");
+        }
+        assert_eq!(w.action(Action::Next), expected, "{state}");
+        let step = if expected == Outcome::Start { Step::Hit } else { Step::Preview };
+        assert_eq!(w.step, step, "{state}");
+    }
+}
+
+#[test]
 fn wizard_every_back_transition_and_cancel_preserve_draft() {
     let mut w = ready();
     w.step = Step::Preview;
