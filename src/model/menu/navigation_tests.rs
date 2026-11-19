@@ -115,6 +115,58 @@ fn page_switch_keeps_popup_and_editor_buttons() {
     }
 }
 
+/// One press as the worker runs it: the model, then the roster editor for a grid press, then the editor's lifetime rule.
+fn worker_press(m: &mut Menu, worker: &mut Option<crate::editors::roster::RosterEditor>, button: Button) {
+    m.press(button);
+    if let Some((tile, b)) = m.take_roster_press() {
+        let Some(Screen::Grid { layout: GridLayout { kind: GridKind::Roster(use_), .. }, .. }) = m.screen().copied() else { return };
+        worker.get_or_insert_with(|| crate::editors::roster::RosterEditor::new(use_)).apply(m, usize::from(tile), b);
+    }
+    crate::editors::roster::retain(worker, m);
+}
+
+/// The label the worker draws on `cell` of the open roster grid (a fresh editor when it holds none, as `publish_frame`).
+fn drawn(m: &Menu, worker: &Option<crate::editors::roster::RosterEditor>, cell: usize) -> String {
+    let editor = worker.unwrap_or_else(|| crate::editors::roster::RosterEditor::new(RosterUse::PlayerPick));
+    let mut f = crate::model::frame::Frame::new();
+    editor.decorate(&mut f, &editor.values(m.kept(editor.key())));
+    String::from_utf16(f.tiles[cell].units()).unwrap()
+}
+
+/// Review 23:07Z #1: X previews Mythra in Player Character; R leaves for the next page, L comes back and the grid is
+/// opened again. The worker's roster editor did not outlive its grid: the chip shows the saved form (Pyra), the saved
+/// pick is unchanged, and A picks the form shown.
+#[test]
+fn page_switch_drops_the_worker_roster_preview() {
+    use crate::engine::swap::roster_grid::{Role, RosterGrid, CELLS};
+    use crate::engine::swap::trio::CHOICES;
+    let grid = RosterGrid::new(Role::Player);
+    let aegis = (0..CELLS).find(|c| grid.info(*c).and_then(|i| i.kind()) == Some(0x5a)).expect("the Aegis cell");
+    let open = |m: &mut Menu| {
+        m.open_editor(Editor::PortraitPlayer);
+        let Some(Screen::Grid { layout, page, .. }) = m.screen().copied() else { panic!("the grid") };
+        m.top(Screen::Grid { layout, page, cell: aegis });
+    };
+    let mut m = on_page(Page::FightersStages);
+    let saved = m.kept("player_character").cloned();
+    let mut worker = None;
+    open(&mut m);
+    assert_eq!(drawn(&m, &worker, aegis), "Pyra");
+    worker_press(&mut m, &mut worker, Button::X);
+    assert_eq!(drawn(&m, &worker, aegis), "Mythra", "X previews the next form");
+    worker_press(&mut m, &mut worker, Button::R);
+    assert_eq!((m.page(), m.screen().copied()), (top_level(Page::FightersStages, Button::R), None));
+    assert!(worker.is_none(), "the preview does not outlive its grid");
+    worker_press(&mut m, &mut worker, Button::L);
+    assert_eq!(m.kept("player_character").cloned(), saved, "the saved pick is preserved");
+    open(&mut m);
+    assert_eq!(drawn(&m, &worker, aegis), "Pyra", "the grid opens on the saved form");
+    worker_press(&mut m, &mut worker, Button::A);
+    let pyra = CHOICES.iter().position(|(k, _)| *k == 0x5a).unwrap();
+    let picked = m.kept("player_character").and_then(|v| v.as_array()).and_then(|a| a.iter().position(|x| x.as_u64() == Some(1)));
+    assert_eq!(picked, Some(pyra), "A picks the form shown, not the stale preview");
+}
+
 /// The first focusable entry of each section of `page`, in order.
 fn section_starts(m: &Menu, page: Page) -> Vec<usize> {
     let mut starts: Vec<usize> = Vec::new();
