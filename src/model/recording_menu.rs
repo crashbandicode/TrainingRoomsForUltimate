@@ -456,6 +456,8 @@ pub struct RecordingScreens {
     slots: [Option<String>; 5],
     last_effect: Effect,
     serial: u32,
+    /// The worker's catalog is not built yet (menu-speed fix): the lists say so.
+    loading: bool,
 }
 
 impl RecordingScreens {
@@ -479,6 +481,7 @@ impl RecordingScreens {
             slots: Default::default(),
             last_effect: Effect::None,
             serial: 0,
+            loading: false,
         }
     }
 
@@ -507,13 +510,16 @@ impl RecordingScreens {
 
     pub fn set_catalog(&mut self, catalog: Catalog) {
         self.catalog = catalog;
+        self.loading = false;
     }
 
     /// The menu worker has no catalog for the card yet (menu-speed fix): the lists say "loading" until `set_catalog`.
-    pub fn set_loading(&mut self) {}
+    pub fn set_loading(&mut self) {
+        self.loading = true;
+    }
 
     pub fn loading(&self) -> bool {
-        false
+        self.loading
     }
 
     pub fn catalog(&self) -> &Catalog {
@@ -1585,7 +1591,7 @@ impl RecordingScreens {
             rows,
             cursor,
             files: file_count,
-            loading: false,
+            loading: self.loading,
         }
     }
 
@@ -2166,6 +2172,11 @@ impl Default for CatalogWatch {
 impl CatalogWatch {
     pub fn on_menu_dropped(self) -> Self {
         Self { seen: u64::MAX }
+    }
+
+    /// The open menu was given a catalog (of some generation) since it opened.
+    pub fn adopted(self) -> bool {
+        self.seen != u64::MAX
     }
 
     /// `true` once, when `generation` is not the one already given to the open menu.

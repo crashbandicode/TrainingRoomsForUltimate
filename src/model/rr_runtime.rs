@@ -564,108 +564,9 @@ pub struct CatalogLoad {
 }
 
 pub fn load_catalog(root: &Path) -> Result<CatalogLoad, Error> {
-    use crate::model::recording_menu::{Catalog, ComboFile, LoopMark, MacroFile, SaveFile, SequenceFile};
-    let index = RecordingIndex::load(root)?;
-    let mut catalog = Catalog::default();
-    let macros = Library::new(root.join(MACROS_DIR));
-    if let Ok(list) = macros.list() {
-        for entry in list.entries {
-            let Ok(file) = macros.load(&entry.id) else { continue };
-            catalog.macros.push(MacroFile {
-                id: entry.id,
-                name: file.name,
-                chain: false,
-                steps: Vec::new(),
-                start_save: file.start_save,
-                start_save_on: file.start_save_on,
-                recorded_on: fighter_name(file.start.fighter_kind),
-                span: file.frames.len() as u32,
-            });
-        }
-    }
-    let chains = Store::<Chain>::new(root.join(MACROS_DIR));
-    if let Ok(list) = chains.list() {
-        for entry in list.entries {
-            let Ok(file) = chains.load(&entry.id) else { continue };
-            catalog.macros.push(MacroFile {
-                id: entry.id,
-                name: file.name,
-                chain: true,
-                steps: file.recordings,
-                start_save: None,
-                start_save_on: file.start_save_on,
-                recorded_on: String::new(),
-                span: 0,
-            });
-        }
-    }
-    let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
-    if let Ok(list) = saves.list() {
-        for entry in list.entries {
-            let fighters = saves.load(&entry.id).ok().map(|save| {
-                let mut parts = Vec::new();
-                if save.player.is_saved() {
-                    parts.push(fighter_name(save.player.fighter_kind));
-                }
-                if save.cpu.is_saved() {
-                    parts.push(fighter_name(save.cpu.fighter_kind));
-                }
-                parts.retain(|part| !part.is_empty());
-                parts.join(" · ")
-            });
-            catalog.saves.push(SaveFile { id: entry.id, name: entry.name, fighters: fighters.unwrap_or_default() });
-        }
-    }
-    let combos = ComboLibrary::new(root.join("combos"));
-    if let Ok(list) = combos.list() {
-        for entry in list.entries {
-            let record = combos.load(&entry.id).ok();
-            let links = record
-                .as_ref()
-                .map(|file| crate::model::recording_menu::combo_link_lines(&file.combo))
-                .unwrap_or_default();
-            catalog.combos.push(ComboFile { input_only: record.as_ref().is_some_and(|f| f.combo.input_only),
-                id: entry.id,
-                name: entry.name,
-                recorded_on: record.as_ref().and_then(|file| file.recorded_on.clone()).unwrap_or_default(),
-                made_from: record.and_then(|file| file.made_from),
-                links,
-                span: entry.links as u32,
-            });
-        }
-    }
-    let sequences = Store::<Sequence>::new(root.join(SEQUENCES_DIR));
-    if let Ok(list) = sequences.list() {
-        for entry in list.entries {
-            let Ok(file) = sequences.load(&entry.id) else { continue };
-            catalog.sequences.push(SequenceFile {
-                id: entry.id,
-                name: file.name,
-                combos: file.combos,
-                streak: file.streak,
-                best: file.best,
-            });
-        }
-    }
-    catalog.hot_macros = index.hot(Kind::Macro).to_vec();
-    catalog.hot_saves = index.hot(Kind::Save).to_vec();
-    catalog.hot_combos = [false,true].into_iter().flat_map(|input| index.hot_where(Kind::Combo, |id| catalog.combos.iter().any(|f| f.id == id && f.input_only == input))).collect();
-    catalog.hot_sequences = index.hot(Kind::Sequence).to_vec();
-    let mark = |count: LoopCount| match count {
-        LoopCount::Infinite => LoopMark::Infinite,
-        LoopCount::Finite(n) => LoopMark::Finite(n),
-    };
-    Ok(CatalogLoad {
-        catalog,
-        bound: index.bound().map(str::to_owned),
-        active: [
-            index.active(Role::Player).map(str::to_owned),
-            index.active(Role::Cpu).map(str::to_owned),
-        ],
-        loops: [mark(index.loop_count(Role::Player)), mark(index.loop_count(Role::Cpu))],
-        drill: index.drill().map(|drill| drill.id.clone()),
-        slots: index.slots().clone(),
-    })
+    let mut build = CatalogBuild::new(root);
+    while build.step()? {}
+    Ok(build.finish())
 }
 
 fn empty_load() -> CatalogLoad {
@@ -679,53 +580,266 @@ fn empty_load() -> CatalogLoad {
     }
 }
 
+/// One store of the catalog: its listing a file per step, then one entry to load per step.
+enum Pass<R: crate::model::store::Record> {
+    Start,
+    Listing(crate::model::store::ListCursor<R>),
+    Loading(std::vec::IntoIter<R::Summary>),
+    Done,
+}
+
+enum PassStep<S> {
+    Busy,
+    Entry(S),
+    Done,
+}
+
+impl<R: crate::model::store::Record> Pass<R> {
+    /// The directory read, one file listed, or the next listed entry for the caller to load: one card read at most.
+    fn next(&mut self, store: &Store<R>) -> PassStep<R::Summary> {
+        match core::mem::replace(self, Pass::Done) {
+            // `list` failing is skipped, as `load_catalog` skipped the store.
+            Pass::Start => {
+                if let Ok(cursor) = store.list_cursor() {
+                    *self = Pass::Listing(cursor);
+                }
+                PassStep::Busy
+            }
+            Pass::Listing(mut cursor) => {
+                *self = if cursor.step() { Pass::Listing(cursor) } else { Pass::Loading(cursor.finish().entries.into_iter()) };
+                PassStep::Busy
+            }
+            Pass::Loading(mut entries) => match entries.next() {
+                Some(entry) => {
+                    *self = Pass::Loading(entries);
+                    PassStep::Entry(entry)
+                }
+                None => PassStep::Done,
+            },
+            Pass::Done => PassStep::Done,
+        }
+    }
+}
+
 /// [`load_catalog`] a file at a time (menu-speed fix, 2026-11-19): the menu worker steps it between its input passes, so a
-/// menu open never waits for the card.
+/// menu open never waits for the card. Each step reads one file at most: the index, a store's directory, one file of a
+/// listing, or one listed file's full load; the result is the one `load_catalog` returns.
 pub struct CatalogBuild {
     root: std::path::PathBuf,
+    index: Option<RecordingIndex>,
+    stage: u8,
+    macros: (Library, Pass<MacroRecording>),
+    chains: (Store<Chain>, Pass<Chain>),
+    saves: (Store<NamedSave>, Pass<NamedSave>),
+    combos: (ComboLibrary, Pass<ComboRecord>),
+    sequences: (Store<Sequence>, Pass<Sequence>),
+    catalog: crate::model::recording_menu::Catalog,
 }
 
 impl CatalogBuild {
     pub fn new(root: &Path) -> Self {
-        Self { root: root.to_path_buf() }
+        Self {
+            root: root.to_path_buf(),
+            index: None,
+            stage: 0,
+            macros: (Library::new(root.join(MACROS_DIR)), Pass::Start),
+            chains: (Store::new(root.join(MACROS_DIR)), Pass::Start),
+            saves: (Store::new(root.join(SAVES_DIR)), Pass::Start),
+            combos: (ComboLibrary::new(root.join("combos")), Pass::Start),
+            sequences: (Store::new(root.join(SEQUENCES_DIR)), Pass::Start),
+            catalog: Default::default(),
+        }
     }
 
     /// One step: at most one file read. `Ok(true)` while the build goes on.
     pub fn step(&mut self) -> Result<bool, Error> {
-        let _ = &self.root;
-        Ok(false)
+        use crate::model::recording_menu::{ComboFile, MacroFile, SaveFile, SequenceFile};
+        let catalog = &mut self.catalog;
+        let done = match self.stage {
+            0 => {
+                self.index = Some(RecordingIndex::load(&self.root)?);
+                true
+            }
+            1 => match self.macros.1.next(&self.macros.0) {
+                PassStep::Entry(entry) => {
+                    if let Ok(file) = self.macros.0.load(&entry.id) {
+                        catalog.macros.push(MacroFile {
+                            id: entry.id,
+                            name: file.name,
+                            chain: false,
+                            steps: Vec::new(),
+                            start_save: file.start_save,
+                            start_save_on: file.start_save_on,
+                            recorded_on: fighter_name(file.start.fighter_kind),
+                            span: file.frames.len() as u32,
+                        });
+                    }
+                    false
+                }
+                PassStep::Busy => false,
+                PassStep::Done => true,
+            },
+            2 => match self.chains.1.next(&self.chains.0) {
+                PassStep::Entry(entry) => {
+                    if let Ok(file) = self.chains.0.load(&entry.id) {
+                        catalog.macros.push(MacroFile {
+                            id: entry.id,
+                            name: file.name,
+                            chain: true,
+                            steps: file.recordings,
+                            start_save: None,
+                            start_save_on: file.start_save_on,
+                            recorded_on: String::new(),
+                            span: 0,
+                        });
+                    }
+                    false
+                }
+                PassStep::Busy => false,
+                PassStep::Done => true,
+            },
+            3 => match self.saves.1.next(&self.saves.0) {
+                PassStep::Entry(entry) => {
+                    let fighters = self.saves.0.load(&entry.id).ok().map(|save| {
+                        let mut parts = Vec::new();
+                        if save.player.is_saved() {
+                            parts.push(fighter_name(save.player.fighter_kind));
+                        }
+                        if save.cpu.is_saved() {
+                            parts.push(fighter_name(save.cpu.fighter_kind));
+                        }
+                        parts.retain(|part| !part.is_empty());
+                        parts.join(" · ")
+                    });
+                    catalog.saves.push(SaveFile { id: entry.id, name: entry.name, fighters: fighters.unwrap_or_default() });
+                    false
+                }
+                PassStep::Busy => false,
+                PassStep::Done => true,
+            },
+            4 => match self.combos.1.next(&self.combos.0) {
+                PassStep::Entry(entry) => {
+                    let record = self.combos.0.load(&entry.id).ok();
+                    let links = record
+                        .as_ref()
+                        .map(|file| crate::model::recording_menu::combo_link_lines(&file.combo))
+                        .unwrap_or_default();
+                    catalog.combos.push(ComboFile { input_only: record.as_ref().is_some_and(|f| f.combo.input_only),
+                        id: entry.id,
+                        name: entry.name,
+                        recorded_on: record.as_ref().and_then(|file| file.recorded_on.clone()).unwrap_or_default(),
+                        made_from: record.and_then(|file| file.made_from),
+                        links,
+                        span: entry.links as u32,
+                    });
+                    false
+                }
+                PassStep::Busy => false,
+                PassStep::Done => true,
+            },
+            5 => match self.sequences.1.next(&self.sequences.0) {
+                PassStep::Entry(entry) => {
+                    if let Ok(file) = self.sequences.0.load(&entry.id) {
+                        catalog.sequences.push(SequenceFile {
+                            id: entry.id,
+                            name: file.name,
+                            combos: file.combos,
+                            streak: file.streak,
+                            best: file.best,
+                        });
+                    }
+                    false
+                }
+                PassStep::Busy => false,
+                PassStep::Done => true,
+            },
+            _ => return Ok(false),
+        };
+        if done {
+            self.stage += 1;
+        }
+        Ok(self.stage <= 5)
     }
 
+    /// The catalog with the index's hot lists and selection (call it after [`Self::step`] returned `Ok(false)`).
     pub fn finish(self) -> CatalogLoad {
-        empty_load()
+        use crate::model::recording_menu::LoopMark;
+        let index = self.index.unwrap_or_else(RecordingIndex::fresh);
+        let mut catalog = self.catalog;
+        catalog.hot_macros = index.hot(Kind::Macro).to_vec();
+        catalog.hot_saves = index.hot(Kind::Save).to_vec();
+        catalog.hot_combos = [false,true].into_iter().flat_map(|input| index.hot_where(Kind::Combo, |id| catalog.combos.iter().any(|f| f.id == id && f.input_only == input))).collect();
+        catalog.hot_sequences = index.hot(Kind::Sequence).to_vec();
+        let mark = |count: LoopCount| match count {
+            LoopCount::Infinite => LoopMark::Infinite,
+            LoopCount::Finite(n) => LoopMark::Finite(n),
+        };
+        CatalogLoad {
+            catalog,
+            bound: index.bound().map(str::to_owned),
+            active: [
+                index.active(Role::Player).map(str::to_owned),
+                index.active(Role::Cpu).map(str::to_owned),
+            ],
+            loops: [mark(index.loop_count(Role::Player)), mark(index.loop_count(Role::Cpu))],
+            drill: index.drill().map(|drill| drill.id.clone()),
+            slots: index.slots().clone(),
+        }
     }
 }
 
 /// The menu worker's catalog, kept across menu opens: built once after boot and again after each change of TR's catalog
-/// generation (a file TR saved, renamed, deleted, imported or duplicated), always a file at a time.
+/// generation (a file TR saved, renamed, deleted, imported or duplicated), always a file at a time. A generation that
+/// moves during a build starts it again, so a served catalog is always the card as of its own generation.
 pub struct CatalogCache {
     root: std::path::PathBuf,
+    ready: Option<(u64, CatalogLoad)>,
+    build: Option<(u64, CatalogBuild)>,
+}
+
+impl Default for CatalogCache {
+    /// The card's TrainingRooms folder.
+    fn default() -> Self {
+        Self::new(Path::new(crate::model::storage::ROOT))
+    }
 }
 
 impl CatalogCache {
     pub fn new(root: &Path) -> Self {
-        Self { root: root.to_path_buf() }
+        Self { root: root.to_path_buf(), ready: None, build: None }
     }
 
     /// The card is at `generation`: build it unless the ready catalog or the running build is that generation's.
     pub fn want(&mut self, generation: u64) {
-        let _ = (generation, &self.root);
+        if self.ready.as_ref().is_some_and(|(ready, _)| *ready == generation) {
+            self.build = None;
+        } else if !self.build.as_ref().is_some_and(|(building, _)| *building == generation) {
+            self.build = Some((generation, CatalogBuild::new(&self.root)));
+        }
     }
 
     /// One build step (at most one file read). `true` while the build goes on.
     pub fn step(&mut self) -> bool {
-        false
+        let Some((_, build)) = self.build.as_mut() else { return false };
+        match build.step() {
+            Ok(true) => true,
+            // The index could not be read: as `load_catalog` failing, the lists keep what they had (none: empty).
+            Ok(false) | Err(_) => {
+                let Some((generation, build)) = self.build.take() else { return false };
+                let load = if build.index.is_some() {
+                    build.finish()
+                } else {
+                    self.ready.take().map_or_else(empty_load, |(_, load)| load)
+                };
+                self.ready = Some((generation, load));
+                false
+            }
+        }
     }
 
     /// The catalog of `generation`, when it is built.
     pub fn ready(&self, generation: u64) -> Option<&CatalogLoad> {
-        let _ = generation;
-        None
+        self.ready.as_ref().filter(|(ready, _)| *ready == generation).map(|(_, load)| load)
     }
 }
 

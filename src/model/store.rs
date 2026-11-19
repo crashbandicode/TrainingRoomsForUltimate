@@ -162,6 +162,46 @@ impl<S> Default for Listing<S> {
     }
 }
 
+/// A [`Store::list`] in progress: the directory's names, read and decoded one per [`Self::step`].
+pub struct ListCursor<R: Record> {
+    store: Store<R>,
+    names: std::vec::IntoIter<String>,
+    entries: Vec<(String, String, R::Summary)>,
+    skipped: Vec<SkippedFile>,
+}
+
+impl<R: Record> ListCursor<R> {
+    /// Read and decode the next file (none is read for a name that is not a record). `false` when none is left.
+    pub fn step(&mut self) -> bool {
+        let Some(name) = self.names.next() else { return false };
+        let Some(id) = name.strip_suffix(".json") else {
+            return true;
+        };
+        let data = match check_id::<R>(id).and_then(|()| read_bounded(&self.store.file(id, "json"), R::MAX_FILE_BYTES)) {
+            Ok(data) => data,
+            Err(err) => {
+                let reason = lift::<R>(err).to_string();
+                self.skipped.push(SkippedFile { file: name, reason });
+                return true;
+            }
+        };
+        if !R::owns(&data) {
+            return true;
+        }
+        match decode::<R>(id, &data) {
+            Ok(rec) => self.entries.push((rec.name().to_lowercase(), id.to_owned(), rec.summary(id))),
+            Err(err) => self.skipped.push(SkippedFile { file: name, reason: err.to_string() }),
+        }
+        true
+    }
+
+    /// The listing, sorted as [`Store::list`] sorts it (the names not stepped yet are not in it).
+    pub fn finish(mut self) -> Listing<R::Summary> {
+        self.entries.sort_by(|a, b| (&a.0, &a.1).cmp(&(&b.0, &b.1)));
+        Listing { entries: self.entries.into_iter().map(|(_, _, summary)| summary).collect(), skipped: self.skipped }
+    }
+}
+
 /// A record store rooted at a caller-supplied directory.
 pub struct Store<R> {
     dir: PathBuf,
@@ -201,10 +241,20 @@ impl<R: Record> Store<R> {
     /// Corrupt or invalid files are reported in `skipped` and left untouched.
     /// Files are decoded one at a time; only each summary is retained.
     pub fn list(&self) -> Result<Listing<R::Summary>, R::Error> {
-        let mut listing = Listing::default();
+        let mut cursor = self.list_cursor()?;
+        while cursor.step() {}
+        Ok(cursor.finish())
+    }
+
+    /// [`Self::list`] a file at a time (the menu worker's catalog build reads one file per pass): the directory is read
+    /// here, each [`ListCursor::step`] reads and decodes one file, and [`ListCursor::finish`] sorts.
+    pub fn list_cursor(&self) -> Result<ListCursor<R>, R::Error> {
+        let mut skipped = Vec::new();
         let read_dir = match fs::read_dir(&self.dir) {
             Ok(read_dir) => read_dir,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(listing),
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                return Ok(ListCursor { store: self.clone(), names: Vec::new().into_iter(), entries: Vec::new(), skipped })
+            }
             Err(err) => return Err(lift::<R>(err.into())),
         };
         let mut names = Vec::new();
@@ -215,7 +265,7 @@ impl<R: Record> Store<R> {
                     names.push(item.file_name().to_string_lossy().into_owned())
                 }
                 Ok(_) => {}
-                Err(err) => listing.skipped.push(SkippedFile {
+                Err(err) => skipped.push(SkippedFile {
                     file: String::new(),
                     reason: format!("unreadable directory entry: {err}"),
                 }),
@@ -223,37 +273,7 @@ impl<R: Record> Store<R> {
         }
         self.restore_orphaned_backups(&mut names);
         names.sort();
-        let mut entries: Vec<(String, String, R::Summary)> = Vec::new();
-        for name in names {
-            let Some(id) = name.strip_suffix(".json") else {
-                continue;
-            };
-            let data = match check_id::<R>(id)
-                .and_then(|()| read_bounded(&self.file(id, "json"), R::MAX_FILE_BYTES))
-            {
-                Ok(data) => data,
-                Err(err) => {
-                    listing.skipped.push(SkippedFile {
-                        file: name,
-                        reason: lift::<R>(err).to_string(),
-                    });
-                    continue;
-                }
-            };
-            if !R::owns(&data) {
-                continue;
-            }
-            match decode::<R>(id, &data) {
-                Ok(rec) => entries.push((rec.name().to_lowercase(), id.to_owned(), rec.summary(id))),
-                Err(err) => listing.skipped.push(SkippedFile {
-                    file: name,
-                    reason: err.to_string(),
-                }),
-            }
-        }
-        entries.sort_by(|a, b| (&a.0, &a.1).cmp(&(&b.0, &b.1)));
-        listing.entries = entries.into_iter().map(|(_, _, summary)| summary).collect();
-        Ok(listing)
+        Ok(ListCursor { store: self.clone(), names: names.into_iter(), entries: Vec::new(), skipped })
     }
 
     /// Loads and fully validates the record with this id.

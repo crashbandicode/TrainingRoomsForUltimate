@@ -913,8 +913,12 @@ fn paint_sections(rec: &RecordingScreens, frame: &mut Frame, face: Face, group: 
         if base >= ROW_LINES {
             break;
         }
-        // The r8 header carries its file count ("SAVE STATES (7)").
-        let _ = write!(frame.rows[base].label, "{}  ({})", view.header, view.files);
+        // The r8 header carries its file count ("SAVE STATES (7)"), or that the card is still being read (menu speed).
+        if view.loading {
+            let _ = write!(frame.rows[base].label, "{}  (loading…)", view.header);
+        } else {
+            let _ = write!(frame.rows[base].label, "{}  ({})", view.header, view.files);
+        }
         frame.rows[base].label_tone = Tone::Dim;
         frame.row_count = (base + 1) as u8;
         // In the pop-up it sits on a dark band with its kind's mark before the name (r8): the floppy for SAVE STATES.

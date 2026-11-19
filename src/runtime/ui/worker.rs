@@ -26,6 +26,7 @@ use crate::runtime::ui::{combos, external, layouts, requests};
 use crate::model::input_delay::Owners;
 use crate::runtime::ui::state::{CLOSE_COUNT, CLOSE_FADES, CLOSE_HELD, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, JUMPS, LAYOUT_READY, OPEN, POPUP, POPUP_REQ, PROMPT};
 use crate::model::storage::ROOT;
+use crate::engine::rr_runtime::CatalogCache;
 use crate::engine::stages::stage_forms::Selection;
 
 static INPUT: Ring<64> = Ring::new();
@@ -224,6 +225,9 @@ struct Session {
     /// The open menu already has this catalog generation. A close drops the menu,
     /// so the watch reloads on the next open even when no file was written.
     catalog_watch: crate::model::recording_menu::CatalogWatch,
+    /// The card's recording catalog, kept across menu opens (menu-speed fix, Switch 2026-11-19): built after boot and
+    /// after each TR file change a file per worker pass, so a menu open takes it without reading the card.
+    catalog: CatalogCache,
     setups: super::setups::Ui,
     setup_note: Option<String>,
     combos: combos::Ui,
@@ -289,6 +293,10 @@ fn run() {
         sync_sequence_drill();
         // The roster's answers to the combo panel's switch at menu close (the game frame ran the request: the lock-free runtime).
         super::combos::service_switch_replies();
+        // Menu speed: the card's catalog is built a file per pass, the input drained between files (a menu open never
+        // reads the card).
+        session.catalog.want(crate::engine::rr_host::catalog_generation());
+        let building = session.catalog.step();
         if refresh_recording(&mut session) {
             publish_frame(&session);
         }
@@ -296,7 +304,9 @@ fn run() {
         let developer_pending = developer_reload.step();
         #[cfg(feature = "diag")]
         crate::runtime::stall_watch::worker_step(0);
-        if session.watching() || developer_pending {
+        if building {
+            WAKE.wait(Some(std::time::Duration::ZERO));
+        } else if session.watching() || developer_pending {
             WAKE.wait(Some(POLL));
         } else {
             WAKE.wait(None);
@@ -353,6 +363,8 @@ fn handle(event: Event, s: &mut Session) {
         crate::runtime::features::tech::menu_opened();
         crate::runtime::ui::menu_app::note_open();
         { s.opening = crate::runtime::ui::menu_app::sequence(); }
+        // The kept catalog before the first frame (menu speed): no card read, so the opening is drawn at once.
+        refresh_recording(s);
         publish_frame(s);
         publish_jumps(s);
         if crate::runtime::export::wanted() {
@@ -554,19 +566,23 @@ fn press(button: Button, s: &mut Session) {
 fn post_recording_effect(menu: &mut Menu) {
     let selection = menu.recording().selection();
     crate::engine::rr_host::publish_menu_role(selection.record_role);
-    let drill = selection.drill.clone();
-    let kind = drill.as_ref().and_then(|id| {
-        if menu.recording().catalog().combos.iter().any(|file| &file.id == id) {
-            Some(crate::engine::library::DrillKind::Combo)
-        } else if menu.recording().catalog().sequences.iter().any(|file| &file.id == id) {
-            Some(crate::engine::library::DrillKind::Sequence)
-        } else {
-            None
-        }
-    });
-    crate::engine::rr_host::note_drill(drill.clone());
-    apply_grade_target(drill.as_deref(), kind);
-    crate::engine::rr_host::publish_selection(std::path::Path::new(ROOT), &selection, kind);
+    // Menu speed: a menu still loading the catalog has not adopted the card's selection, so it neither follows a drill
+    // nor writes the selection back (that would clear the bound, active and drilled files).
+    if !menu.recording().loading() {
+        let drill = selection.drill.clone();
+        let kind = drill.as_ref().and_then(|id| {
+            if menu.recording().catalog().combos.iter().any(|file| &file.id == id) {
+                Some(crate::engine::library::DrillKind::Combo)
+            } else if menu.recording().catalog().sequences.iter().any(|file| &file.id == id) {
+                Some(crate::engine::library::DrillKind::Sequence)
+            } else {
+                None
+            }
+        });
+        crate::engine::rr_host::note_drill(drill.clone());
+        apply_grade_target(drill.as_deref(), kind);
+        crate::engine::rr_host::publish_selection(std::path::Path::new(ROOT), &selection, kind);
+    }
     let effect = menu.recording_mut().take_effect();
     if effect == crate::model::recording_menu::Effect::RecordDrill {
         let chord = crate::model::menu::chord::Chord::from_row(menu.settings().menu.get("input_record").unwrap_or(&[]));
@@ -678,17 +694,21 @@ fn refresh_recording(s: &mut Session) -> bool {
         return false;
     }
     let gen = crate::engine::rr_host::catalog_generation();
-    let (watch, due) = s.catalog_watch.take_load(gen);
-    s.catalog_watch = watch;
     let Some(menu) = s.menu.as_mut() else { return false };
     let mut changed = false;
-    if due {
-        if let Ok(loaded) = crate::engine::rr_runtime::load_catalog(std::path::Path::new(ROOT)) {
-            menu.recording_mut().set_catalog(loaded.catalog);
-            menu.recording_mut().adopt(loaded.bound, loaded.active, loaded.loops, loaded.drill);
-            menu.recording_mut().adopt_slots(loaded.slots);
+    // Menu speed: the kept catalog of this generation, never a card read here. A menu that has none yet says loading.
+    if let Some(loaded) = s.catalog.ready(gen) {
+        let (watch, due) = s.catalog_watch.take_load(gen);
+        s.catalog_watch = watch;
+        if due {
+            menu.recording_mut().set_catalog(loaded.catalog.clone());
+            menu.recording_mut().adopt(loaded.bound.clone(), loaded.active.clone(), loaded.loops, loaded.drill.clone());
+            menu.recording_mut().adopt_slots(loaded.slots.clone());
             changed = true;
         }
+    } else if !s.catalog_watch.adopted() && !menu.recording().loading() {
+        menu.recording_mut().set_loading();
+        changed = true;
     }
     if let Some(name) = crate::runtime::features::recording_host::take_typed_name() {
         menu.recording_mut().submit_name(&name);
