@@ -35,7 +35,8 @@ pub(super) unsafe fn init_passive_speed() {
         && stock(base, SPEED_GETTER, speed_guards::DAMAGE_ENERGY_GETTER)
         && stock(base, IS_DAMAGE_STOP, speed_guards::DAMAGE_STOP)
         && stock(base, 0x696950, speed_guards::PASSIVE_FLOOR_TAIL)
-        && stock(base, 0x4635b0, speed_guards::GROUND_IS_TOUCH);
+        && stock(base, 0x4635b0, speed_guards::GROUND_IS_TOUCH)
+        && stock(base, 0x22779b0, speed_guards::NATIVE_LENGTH);
     MAIN_SPEED_STOCK.store(verified, Ordering::Release);
 }
 
