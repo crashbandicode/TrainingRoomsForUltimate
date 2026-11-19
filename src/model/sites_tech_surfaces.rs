@@ -42,7 +42,7 @@ pub const SPEED_NOTICE_SITES: [Site; 2] = [
         offset: PASSIVE_GROUND_OFFSET,
         kind: SeamKind::Called,
         guard: windows::MATERIAL[0].2,
-        note: "Optional post-contact speed explanation; requires the stock material path.",
+        note: "Optional read-only floor material observation for the Tech speed notice.",
     },
     Site {
         name: "tech_notice_damage_stop",
@@ -55,6 +55,6 @@ pub const SPEED_NOTICE_SITES: [Site; 2] = [
             0x00,0x01,0x3f,0xd6,0x1f,0x1c,0x03,0x71,0x4c,0x02,0x00,0x54,0x08,0x1c,0x01,0x51,
             0x1f,0x15,0x00,0x71,0x22,0x01,0x00,0x54,0x68,0x06,0x40,0xf9,0x00,0x29,0x40,0xf9,
         ],
-        note: "Optional post-contact speed explanation; verifies the native damage-stop predicate.",
+        note: "Optional read-only damage-stop observation for the Tech speed notice.",
     },
 ];
