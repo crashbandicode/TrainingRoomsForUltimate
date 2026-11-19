@@ -157,7 +157,6 @@ impl ItemHost for NativeItems {
             WorkModule::on_flag(accessor, *ITEM_SANDBAG_INSTANCE_WORK_FLAG_NO_POCKET);
             WorkModule::on_flag(accessor, *ITEM_SANDBAG_INSTANCE_WORK_FLAG_NO_LANDING_SMOKE);
             WorkModule::on_flag(accessor, *ITEM_INSTANCE_WORK_FLAG_DISABLE_AUTO_GRAVITY_MOVE);
-            JostleModule::set_status(accessor, false);
             PostureModule::set_scale(accessor, SCALE, false);
             Some(Handle { id, accessor, damage: game::natives::damage(accessor as usize, 0) })
         }
@@ -166,11 +165,12 @@ impl ItemHost for NativeItems {
     fn place_target_item(&mut self, item: Handle, at: [f32; 2]) {
         unsafe {
             let accessor = item.accessor;
-            // Sandbag's native initialization can reset the team on a later frame.
+            // Native Sandbag initialization can reset the team and enable jostling.
             if let Some((team, _)) = self.team.filter(|(team, _)| TeamModule::team_no(accessor) as i32 != *team) {
                 TeamModule::set_team(accessor, team, true);
                 TeamModule::set_hit_team(accessor, team);
             }
+            JostleModule::set_status(accessor, false);
             PostureModule::set_pos(accessor, &position(at));
             KineticModule::clear_speed_all(accessor);
             VisibilityModule::set_whole(accessor, false);
