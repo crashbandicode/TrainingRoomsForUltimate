@@ -2021,3 +2021,11 @@ ceiling = 164530
 date = "2026-11-19"
 reason = "rc.15 option B: one guarded native Sandbag per active Disc egg or BTT target. Both native item pools are checked before duplicate allocation. Owned native damage enters the existing break rules once. The optional capability declares and enforces its native closure. Composed on five-game main 2172cfd9 (164115), +415 normalized lines, exact ceiling with no headroom."
 approved_by = "Operator 2026-11-18: yes additional lines are ok / about 19:38Z: size change approved. Primary c07b3449 02:14Z (2026-11-19): approved +392, reported to the operator. Primary c07b3449 02:25Z approved the capability audit registration increase (+23)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164543
+date = "2026-11-19"
+reason = "Parry Start begins a fresh set (0e5b0554): 164542 normalized lines vs 164529 at 5b6ab8cc. Add the measured +13 to the existing 164530 ceiling."
+approved_by = "Operator Parry Start request recorded by primary c07b3449 at 14:17Z (2026-11-19); rc.15 change-set common brief authorizes a separate budget entry for the exact measured delta."
