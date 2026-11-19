@@ -13,6 +13,7 @@
 //! fighter's orbs on the `Board`; the layout tick projects them with the game's own `world_to_screen` and plans each
 //! orb's pill (`plan_pill`). Pure and host-tested (`tests/core06_orbs.rs`).
 
+use super::cpu::role::FighterKey;
 use super::hitbox::{want_hits, AttackReader, Effects, HandleSet, Sphere, FIGHTER_SETS, KIND_ARTICLE_HURT, KIND_HIT, KIND_HURT, MAX_HELD, SCALE, SLOTS};
 use super::legend::{self, KIND_MARK, KIND_WIND};
 
@@ -88,9 +89,43 @@ pub fn orb_of(sphere: &Sphere, centre: [f32; 3]) -> Orb {
 /// nothing, so the orbs of a paused scene stay).
 pub const STALE_PUBLISHES: u32 = 2 * FIGHTER_SETS as u32;
 
-/// Every fighter's orbs of its last pass: fixed storage, one slot per fighter (by accessor address).
+pub const HIDDEN_WORDS: usize = 2 * FighterKey::COUNT;
+
+struct HiddenFrame {
+    generation: u32,
+    words: [u64; HIDDEN_WORDS],
+}
+
+/// The hide state when a frame is built. A failed bounded read must not reuse a previous frame's ownership.
+pub struct DrawHide(Result<Option<HiddenFrame>, ()>);
+
+impl DrawHide {
+    pub const VISIBLE: Self = Self(Ok(None));
+
+    pub fn sampled(read: Option<(u32, [u64; HIDDEN_WORDS])>) -> Self {
+        Self(read.map(|(generation, words)| Some(HiddenFrame { generation, words })).ok_or(()))
+    }
+
+    pub fn is_visible(&self) -> bool {
+        matches!(self.0, Ok(None))
+    }
+
+    pub fn generation(&self) -> Option<u32> {
+        self.0.as_ref().ok()?.as_ref().map(|frame| frame.generation)
+    }
+
+    /// The article reader runs only for a coherent hidden generation.
+    pub fn owner(&self, read: impl FnOnce() -> Option<u32>) -> Option<u32> {
+        self.generation().and_then(|_| read())
+    }
+}
+
+/// The latest orbs of each object, keyed by its live accessor.
 pub struct Board {
     keys: [usize; FIGHTER_SETS],
+    article_ids: [Option<u32>; FIGHTER_SETS],
+    owners: [Option<u32>; FIGHTER_SETS],
+    article_generation: Option<u32>,
     stamps: [u32; FIGHTER_SETS],
     lens: [usize; FIGHTER_SETS],
     orbs: [[Orb; BOARD_ORBS]; FIGHTER_SETS],
@@ -105,12 +140,16 @@ impl Default for Board {
 
 impl Board {
     pub const fn new() -> Board {
-        Board { keys: [0; FIGHTER_SETS], stamps: [0; FIGHTER_SETS], lens: [0; FIGHTER_SETS], orbs: [[Orb::NONE; BOARD_ORBS]; FIGHTER_SETS], clock: 0 }
+        Board { keys: [0; FIGHTER_SETS], article_ids: [None; FIGHTER_SETS], owners: [None; FIGHTER_SETS], article_generation: None, stamps: [0; FIGHTER_SETS], lens: [0; FIGHTER_SETS], orbs: [[Orb::NONE; BOARD_ORBS]; FIGHTER_SETS], clock: 0 }
     }
 
     /// Replace `key`'s orbs (at most `BOARD_ORBS`; a new key takes a free or the stalest slot). A capsule's second end
     /// (sphere 1 of its shape) becomes the tail of its first (sphere 0). Returns how many were kept.
     pub fn publish(&mut self, key: usize, orbs: impl Iterator<Item = Orb>) -> usize {
+        self.publish_object(key, None, None, orbs)
+    }
+
+    fn publish_object(&mut self, key: usize, article: Option<u32>, owner: Option<u32>, orbs: impl Iterator<Item = Orb>) -> usize {
         if key == 0 {
             return 0;
         }
@@ -122,6 +161,8 @@ impl Board {
                 .unwrap_or(0),
         };
         self.keys[i] = key;
+        self.article_ids[i] = article;
+        self.owners[i] = owner;
         self.stamps[i] = self.clock;
         let mut len = 0;
         for orb in orbs.take(BOARD_ORBS) {
@@ -146,11 +187,32 @@ impl Board {
         len
     }
 
+    pub(crate) fn publish_article(&mut self, key: usize, id: u32, owner: Option<u32>, orbs: impl Iterator<Item = Orb>) -> usize {
+        self.publish_object(key, Some(id), owner, orbs)
+    }
+
+    /// Call after the complete article pass, under the same guard as its publications.
+    pub fn finish_articles(&mut self, generation: Option<u32>) {
+        self.article_generation = generation;
+    }
+
+    /// Animation hooks can replace tracking entries even when the renderer holds the board.
+    fn clear_evicted(&mut self, tracked: &[(u32, usize); ARTICLES]) {
+        for i in 0..FIGHTER_SETS {
+            if self.article_ids[i].is_some_and(|id| !tracked.contains(&(id, self.keys[i]))) {
+                self.keys[i] = 0;
+                self.lens[i] = 0;
+                self.article_ids[i] = None;
+            }
+        }
+    }
+
     /// `key` has no orbs now.
     pub fn clear(&mut self, key: usize) {
         if let Some(i) = self.keys.iter().position(|k| *k == key && key != 0) {
             self.keys[i] = 0;
             self.lens[i] = 0;
+            self.article_ids[i] = None;
         }
     }
 
@@ -158,20 +220,57 @@ impl Board {
     pub fn clear_all(&mut self) {
         self.keys = [0; FIGHTER_SETS];
         self.lens = [0; FIGHTER_SETS];
+        self.article_ids = [None; FIGHTER_SETS];
     }
 
-    /// The orbs to draw: every slot published within the last `STALE_PUBLISHES` publishes.
-    pub fn live(&self) -> impl Iterator<Item = &Orb> + '_ {
+    /// Resolve visibility once per frame. In the visible path none of the four passes scans IDs.
+    pub fn draw_slots(&self, hide: &DrawHide) -> u8 {
+        self.draw_slots_with(hide, |words, token| words.contains(&token))
+    }
+
+    pub(crate) fn draw_slots_with(&self, hide: &DrawHide, mut contains: impl FnMut(&[u64], u64) -> bool) -> u8 {
+        let frame = match &hide.0 {
+            Ok(None) => return u8::MAX,
+            Err(()) => return 0,
+            Ok(Some(frame)) => frame,
+        };
+        let (accessors, ids) = frame.words.split_at(FighterKey::COUNT);
+        (0..FIGHTER_SETS).fold(0, |mask, i| {
+            if self.keys[i] == 0 {
+                return mask;
+            }
+            let visible = if self.article_ids[i].is_some() {
+                // A draw racing the first hidden fighter pass cannot use an earlier ownership sample.
+                self.article_generation == Some(frame.generation)
+                    && self.owners[i].is_none_or(|owner| !contains(ids, u64::from(owner) + 1))
+            } else {
+                !contains(accessors, self.keys[i] as u64)
+            };
+            mask | (u8::from(visible) << i)
+        })
+    }
+
+    /// Every selected slot published within the last `STALE_PUBLISHES` publishes.
+    fn live_slots(&self, slots: u8) -> impl Iterator<Item = &Orb> + '_ {
         (0..FIGHTER_SETS)
-            .filter(move |&i| self.keys[i] != 0 && self.clock.wrapping_sub(self.stamps[i]) < STALE_PUBLISHES)
+            .filter(move |&i| slots & (1 << i) != 0 && self.keys[i] != 0 && self.clock.wrapping_sub(self.stamps[i]) < STALE_PUBLISHES)
             .flat_map(move |i| self.orbs[i][..self.lens[i]].iter())
     }
 
-    /// The live orbs in the order the panes take them: every hitbox and grab box first, then every hurtbox, then the launch-angle
-    /// marks, each in slot order. When the panes run out the cut is deterministic and takes the marks, then hurtboxes first (review HB-2).
-    pub fn in_draw_order(&self) -> impl Iterator<Item = &Orb> + '_ {
-        let of = move |kind: fn(u32) -> bool| self.live().filter(move |o| kind(o.kind()));
+    #[cfg(test)]
+    pub fn live(&self) -> impl Iterator<Item = &Orb> + '_ {
+        self.live_slots(u8::MAX)
+    }
+
+    /// Hitboxes and grabs, fighter hurtboxes, launch marks, then article hurtboxes.
+    pub fn draw_slots_in_order(&self, slots: u8) -> impl Iterator<Item = &Orb> + '_ {
+        let of = move |kind: fn(u32) -> bool| self.live_slots(slots).filter(move |o| kind(o.kind()));
         of(|k| k != KIND_HURT && k != KIND_MARK && k != KIND_ARTICLE_HURT).chain(of(|k| k == KIND_HURT)).chain(of(|k| k == KIND_MARK)).chain(of(|k| k == KIND_ARTICLE_HURT))
+    }
+
+    #[cfg(test)]
+    pub fn in_draw_order(&self) -> impl Iterator<Item = &Orb> + '_ {
+        self.draw_slots_in_order(u8::MAX)
     }
 }
 
@@ -212,20 +311,25 @@ pub struct Articles {
     clock: u32,
     sets: [HandleSet; ARTICLES],
     attacking: [bool; ARTICLES],
+    evicted: bool,
 }
 
 impl Articles {
     pub const fn new() -> Articles {
-        Articles { ids: [(0, 0); ARTICLES], ages: [0; ARTICLES], clock: 0, sets: [HandleSet::new(); ARTICLES], attacking: [false; ARTICLES] }
+        Articles { ids: [(0, 0); ARTICLES], ages: [0; ARTICLES], clock: 0, sets: [HandleSet::new(); ARTICLES], attacking: [false; ARTICLES], evicted: false }
     }
 
     /// Track an object and its priority. Hurt-only discovery takes free slots; attacks evict passive objects before the oldest attack.
-    pub fn track(&mut self, id: u32, key: usize, board: &mut Board, attacking: bool) -> Option<(&mut HandleSet, &mut bool)> {
+    pub fn track(&mut self, id: u32, key: usize, board: Option<&mut Board>, attacking: bool) -> Option<(&mut HandleSet, &mut bool)> {
         let i = (0..ARTICLES).min_by_key(|&i| (self.ids[i] != (id, key), self.ids[i].0 != 0, self.attacking[i], self.ages[i])).unwrap_or(0);
         if !attacking && self.ids[i] != (id, key) && self.ids[i].0 != 0 { return None; }
         if self.ids[i] != (id, key) {
             self.clock = self.clock.wrapping_add(1);
-            board.clear(self.ids[i].1);
+            if let Some(board) = board {
+                board.clear(self.ids[i].1);
+            } else {
+                self.evicted |= self.ids[i].1 != 0;
+            }
             (self.ids[i], self.ages[i]) = ((id, key), self.clock);
             self.sets[i].forget();
             self.attacking[i] = false;
@@ -245,9 +349,17 @@ impl Articles {
         }
     }
 
-    pub fn forget_all(&mut self, board: &mut Board) {
-        for (id, _) in self.ids {
-            self.forget(id, board);
+    pub fn forget_all(&mut self, board: Option<&mut Board>) {
+        self.ids = [(0, 0); ARTICLES];
+        self.evicted = true;
+        if let Some(board) = board {
+            self.clear_evicted(board);
+        }
+    }
+
+    pub fn clear_evicted(&mut self, board: &mut Board) {
+        if std::mem::take(&mut self.evicted) {
+            board.clear_evicted(&self.ids);
         }
     }
 }
@@ -259,18 +371,19 @@ pub struct Extras<'a> {
     pub lr: Option<f32>,
     pub areas: &'a [legend::WindArea],
     pub hurt: &'a [Sphere],
+    pub owner: Option<u32>,
 }
 
 impl Extras<'_> {
-    pub const NONE: Extras<'static> = Extras { lr: None, areas: &[], hurt: &[] };
+    pub const NONE: Extras<'static> = Extras { lr: None, areas: &[], hurt: &[], owner: None };
 }
 
 /// One article's pass in `status`: its live attack slots' spheres and its grab spheres (held as a fighter's), placed on its
 /// bones by `place`, become its orbs on `board`, followed by its wind `areas` (rc.14 wind-articles: read from its own
 /// AreaModule while *Windboxes* is ticked). False when it holds none and has no area: its attack, grab and wind ended, its orbs
 /// went, and it is forgotten (`legend::keeps_article`).
-pub fn article_pass(board: &mut Board, set: &mut HandleSet, key: usize, status: i32, attacks: &mut impl AttackReader, place: impl FnMut(&Sphere) -> Option<[f32; 3]>, extras: Extras<'_>) -> bool {
-    let Extras { lr, areas, hurt } = extras;
+pub fn article_pass(board: &mut Board, set: &mut HandleSet, (id, key): (u32, usize), status: i32, attacks: &mut impl AttackReader, place: impl FnMut(&Sphere) -> Option<[f32; 3]>, extras: Extras<'_>) -> bool {
+    let Extras { lr, areas, hurt, owner } = extras;
     let mut wants = [Sphere::NONE; MAX_HELD];
     let mut len = 0;
     want_hits(attacks, &mut wants, &mut len, true);
@@ -288,7 +401,7 @@ pub fn article_pass(board: &mut Board, set: &mut HandleSet, key: usize, status: 
             (orbs[n], n) = (orb, n + 1);
         }
     }
-    board.publish(key, orbs[..n].iter().copied());
+    board.publish_article(key, id, owner, orbs[..n].iter().copied());
     legend::keeps_article(!set.is_empty(), areas.len())
 }
 

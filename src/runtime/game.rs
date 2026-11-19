@@ -495,12 +495,17 @@ pub mod natives {
         (accessor != 0).then_some(accessor)
     }
 
+    /// The full object ID of a live module accessor.
+    pub unsafe fn battle_object_id(accessor: usize) -> u32 {
+        ((accessor + ACCESSOR_OBJECT_ID_FIELD) as *const u32).read()
+    }
+
     /// Whether the accessor belongs to a fighter (its battle object id is in the fighter category).
     pub unsafe fn is_fighter(accessor: usize) -> bool {
         if accessor == 0 || !CATEGORY_NATIVES_USABLE.load(Ordering::Acquire) {
             return false;
         }
-        let id = ((accessor + ACCESSOR_OBJECT_ID_FIELD) as *const u32).read();
+        let id = battle_object_id(accessor);
         at::<extern "C" fn(u32) -> i32>(sites_pkg2::UTILITY_GET_CATEGORY_OFFSET).map_or_else(Default::default, |f| f(id)) == CATEGORY_FIGHTER
     }
 
@@ -528,6 +533,11 @@ pub mod natives {
     }
 
     // ---- the hitbox visualizer's natives (SPEC-core-06 section 4; rows of `sites_hitbox`) -------------------------------
+
+    /// Current combat ownership of a live item or weapon.
+    pub unsafe fn team_owner_id(accessor: usize) -> Option<u32> {
+        at::<extern "C" fn(usize) -> u32>(crate::model::sites_hitbox::HITBOX_TEAM_OWNER_ID_OFFSET).map(|call| call(accessor))
+    }
     //
     // Each answers nothing (0, false) until its row was granted, like the rest of this layer.
 

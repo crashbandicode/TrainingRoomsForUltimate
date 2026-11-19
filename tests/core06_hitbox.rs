@@ -525,15 +525,11 @@ fn core06_off_restores() {
 
 #[test]
 fn core06_site_guards() {
-    // Seven hooks (rc.14 wind-articles added the four AREA_WIND_2ND* commands), fifteen called natives (including indexed article lookup;
-    // another is Eggs-ercise's hitlag,
-    // `StopModule::set_hit_stop_frame`; one is the attack module's damage multiplier, rc.14 spots-2; one the knockback a defender received,
-    // spots-3) and thirteen relied (two the damage record, spots-3)
-    // windows (the Lua stack reads, HB1's three HitModule windows, for the own orbs (decision HB-OWN-ORBS) the bone transform,
-    // the projection and its screen size words and, for Eggs-ercise's spawn range, the camera limit accessor).
+    // The sixteen called natives include the indexed article lookup and TeamModule ownership.
+    // Fourteen relied windows cover layout, camera, damage and hitbox data reads.
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 15);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 16);
     assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 14);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);

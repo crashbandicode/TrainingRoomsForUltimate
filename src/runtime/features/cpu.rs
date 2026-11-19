@@ -271,13 +271,19 @@ pub fn forget_hidden_scene() {
 
 /// Numeric native owner id, captured BEFORE any nested entry/body destruction.
 pub fn entry_departed(owner: u32) {
-    with(|cpu| role_adapter::entry_departed(cpu, owner));
+    with(|cpu| {
+        role_adapter::entry_departed(cpu, owner);
+        hide_cpu::publish(cpu);
+    });
     if owner == 0 { forget_player_position(); unsafe { taunt_frame(0, 0, false) }; }
 }
 
 /// Unconditional scene retirement, including when no save/record lease exists.
 pub fn scene_departed() {
-    with(role_adapter::scene_departed);
+    with(|cpu| {
+        role_adapter::scene_departed(cpu);
+        hide_cpu::publish(cpu);
+    });
     hide_cpu::restore();
     forget_player_position();
     // SAFETY: fighter 0 and accessor 0 read nothing; they clear Player 1's taunt slots.
@@ -478,7 +484,11 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         let (receipt, retired) = with(|cpu| {
             let had_roles = cpu.roles.any();
             let receipt = role_adapter::before_frame(cpu, scene, entry);
-            (receipt, had_roles && !cpu.roles.any())
+            let retired = had_roles && !cpu.roles.any();
+            if retired {
+                hide_cpu::publish(cpu);
+            }
+            (receipt, retired)
         }).unwrap_or((None, false));
         if retired { recorder::session_clear(); }
         receipt
@@ -579,7 +589,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
             let any = cpu.roles.any();
             if any {
                 cpu.clear_session();
-                hide_cpu::publish_panels(cpu.hidden_panels());
+                hide_cpu::publish(cpu);
             }
             any
         });
@@ -599,7 +609,10 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
         None
     };
     if !is_cpu_role(scene, entry, reset_hub::cpu_operated(fighter), cpus) {
-        with(|cpu| cpu.roles.forget(accessor));
+        with(|cpu| {
+            cpu.roles.forget(accessor);
+            hide_cpu::publish(cpu);
+        });
         return;
     }
     let kind = ((fighter + FIGHTER_KIND_FIELD) as *const i32).read();
@@ -655,7 +668,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
             }
         }
         let out = if practice_owned { cpu.practice_frame(key) } else { cpu.frame(key, &facts) };
-        hide_cpu::publish_panels(cpu.hidden_panels());
+        hide_cpu::publish_frame(cpu, key, accessor);
         Some(out)
     }).flatten();
     cpu_event_on_change!(

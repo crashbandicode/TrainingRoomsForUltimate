@@ -60,6 +60,8 @@ pub struct Fighter {
     pub seen: Seen,
     /// The fighter kind the frame wrapper last saw on this body (the character-specific completion table).
     pub kind: i32,
+    /// The full battle-object ID from the currently admitted native body.
+    pub object_id: Option<u32>,
     /// `reroll::*` bits a menu change left for this body's next CPU frame (decision Q18 A). A fresh
     /// body starts with the SDI roll pending, so its first frame rolls the direction.
     pub pending: u8,
@@ -79,6 +81,7 @@ impl Fighter {
             throw: Throw::new(),
             seen: Seen::new(),
             kind: super::ids::UNRESOLVED,
+            object_id: None,
             pending: reroll::SDI_DIRECTION | reroll::SHIELD_TILT,
             away: false,
         }
