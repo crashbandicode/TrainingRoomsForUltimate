@@ -1,0 +1,39 @@
+{
+  "runner_commit": "366593ab9e0ae84e798eac961676f19470b53f41",
+  "archive": "/home/intpa/smash-training-lobby/artifacts/lockon-research/lockon-sol/lockon-replay-helpers.tar.gz",
+  "archive_sha256": "2b1b55746746ebed05a57821dd4bb7f5a48de3cf2dacfdc6aca3bd9f087bbce8",
+  "files": [
+    {
+      "path": "accept.py",
+      "sha256": "5d20262fd826df8c08b35beddd185a6f7b8d5cc3c37b7e004393855e0a554aa6"
+    },
+    {
+      "path": "btt_hw.py",
+      "sha256": "3f98b30fbd9cd5ed83344609398f8cc679c9564b1ba616fbcddc5382d6bcd959"
+    },
+    {
+      "path": "cov.py",
+      "sha256": "525b7e94bc8e67709daba5d80a57da079fe7a2c271a9e7b3d2635dba0800f3bf"
+    },
+    {
+      "path": "eggs_hw.py",
+      "sha256": "f81e1a3c27b6aae00adcca3aebd262c337a2484f3678cacf93c04373abb50a1f"
+    },
+    {
+      "path": "fx.py",
+      "sha256": "cd5a5bb3ff1c257eb123418cb6e7acd2f770528ab55cba3cd505d1a4d70a0793"
+    },
+    {
+      "path": "hotslots.py",
+      "sha256": "95fb9f031d7e23be8192a6927ed6b868ae5aac65788b74fbc92cc22287fd4882"
+    },
+    {
+      "path": "practice_steps.py",
+      "sha256": "70a3c5ddc2e6cbe220b8f97650563af986d719e54fefaf3c4e83c98e4a6beaa7"
+    },
+    {
+      "path": "steps.py",
+      "sha256": "fa27e1283fe5bdbe6b87dec2a28f0bd861f8d9b3ed3b309497e2710153ad1016"
+    }
+  ]
+}

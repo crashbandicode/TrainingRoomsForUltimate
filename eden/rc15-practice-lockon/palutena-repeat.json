@@ -1,0 +1,352 @@
+{
+  "game_id": "01006A800016E000",
+  "start": "training-hud-unpaused",
+  "gates": {
+    "frontend-ready": {
+      "kind": "status",
+      "expect": {
+        "running": false
+      },
+      "cap": 10,
+      "from_run": "p4s-shared",
+      "library": "frontend-ready"
+    },
+    "training-hud-unpaused": {
+      "kind": "image",
+      "reference": "refs/training-hud-unpaused.png",
+      "sha256": "7ecf9a4258ace218ad179e2fe14dcaf9d3dd906c594dec2ec8216cb5e02a8d2c",
+      "roi": [
+        280,
+        580,
+        302,
+        615
+      ],
+      "tolerance": 8,
+      "cap": 10,
+      "reference_is_roi": true,
+      "scale": "fit",
+      "frame": [
+        1280,
+        674
+      ],
+      "scope": "Library training-hud-unpaused (lr-03), with the documented half-size compare for the XPS 0.5x render (MACROS image gates); tolerance unchanged."
+    },
+    "routes.training": {
+      "kind": "image",
+      "reference": "refs/training-hud-unpaused.png",
+      "sha256": "7ecf9a4258ace218ad179e2fe14dcaf9d3dd906c594dec2ec8216cb5e02a8d2c",
+      "roi": [
+        280,
+        580,
+        302,
+        615
+      ],
+      "tolerance": 18,
+      "cap": 30,
+      "scope": "Undimmed native zero digit, excluding changing faction emblem; applies only to this no-damage cycle lane.",
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "scale": "fit",
+      "frame": [
+        1280,
+        720
+      ]
+    },
+    "routes.native-pause": {
+      "kind": "image",
+      "reference": "refs/native-pause-xps.png",
+      "sha256": "5becf76b506d39f26d2941594f08265035571e75e2d315d15949d0b1ba2f7660",
+      "roi": [
+        112,
+        207,
+        303,
+        249
+      ],
+      "tolerance": 12,
+      "cap": 5,
+      "reference_is_roi": true,
+      "scale": "fit",
+      "frame": [
+        1280,
+        674
+      ],
+      "scope": "Native pause root label CPU Damage % at the captured XPS viewport, same under initial and Items focus."
+    },
+    "routes.quit-focus": {
+      "kind": "image",
+      "reference": "refs/quit-focus.png",
+      "sha256": "8101e26010b70dc07f24bac30c077c2152059f87f27f4b6c0d30a0b197b69c67",
+      "roi": [
+        65,
+        16,
+        275,
+        47
+      ],
+      "tolerance": 18,
+      "cap": 15,
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "scale": "fit",
+      "frame": [
+        1280,
+        720
+      ]
+    },
+    "routes.main": {
+      "kind": "image",
+      "reference": "refs/main.png",
+      "sha256": "902628cebd8620847be44e41a826046740f495ca0dfa7e78d8482c43c0da1bdc",
+      "roi": [
+        150,
+        265,
+        450,
+        335
+      ],
+      "tolerance": 18,
+      "cap": 8,
+      "reference_is_roi": true,
+      "frame": [
+        1280,
+        720
+      ],
+      "from_run": "lr-03",
+      "scale": "fit"
+    },
+    "routes.css": {
+      "kind": "image",
+      "reference": "refs/css.png",
+      "sha256": "a7a15642548952e4e263e42d467542b2877576cac4785061c21988e6cd7c0b76",
+      "roi": [
+        55,
+        55,
+        675,
+        155
+      ],
+      "tolerance": 20,
+      "cap": 60,
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "scale": "fit",
+      "frame": [
+        1280,
+        720
+      ]
+    },
+    "routes.stage": {
+      "kind": "image",
+      "reference": "refs/stage.png",
+      "sha256": "99e7013e2be97b8173498e36a9b0e3b849c4e403bd239f1febda185470617033",
+      "roi": [
+        110,
+        445,
+        290,
+        495
+      ],
+      "tolerance": 18,
+      "cap": 45,
+      "reference_is_roi": true,
+      "from_run": "lr-03",
+      "scale": "fit",
+      "frame": [
+        1280,
+        720
+      ]
+    },
+    "item-grid": {
+      "kind": "image",
+      "reference": "refs/item-grid.png",
+      "sha256": "fb147e08ae21b2c6f9d5a35cde7bc684568ac23d0171ba3136feae7e51e7a65c",
+      "roi": [
+        96,
+        126,
+        145,
+        170
+      ],
+      "tolerance": 12,
+      "cap": 4,
+      "reference_is_roi": true,
+      "scale": "fit",
+      "frame": [
+        1280,
+        674
+      ],
+      "scope": "Visible native item grid upper-left Back tile, received after the first fighter exit stopped while paused."
+    }
+  },
+  "on_failure": "stop",
+  "early_stop": false,
+  "recover": [
+    {
+      "run": "practice_steps.py:console_scan",
+      "check": true
+    }
+  ],
+  "scope": "Native Training only. Sonic and Palutena lock onto and break one Egg and one BTT target each; Off, save-state load and scene cleanup.",
+  "segments": {
+    "menu-open": {
+      "file": "segments/menu-open.edenmacro.json",
+      "sha256": "1185704f7b97f2981a8bae42fbe42166d5bc37aa2e9cba197bdf585a616f78ce",
+      "cap": 30
+    },
+    "menu-close": {
+      "file": "segments/menu-close.edenmacro.json",
+      "sha256": "b45ca532f18b9a3a7938a04b4a6b0513b7288ed584705fd042e40125bd5c4a89",
+      "cap": 30
+    },
+    "btt-b": {
+      "file": "segments/btt-b.edenmacro.json",
+      "sha256": "d6ed74325ffa59b487c905f960fa5f5a8589caaffa88eebe612e426e46fe5e2d",
+      "cap": 30
+    },
+    "neutral-90": {
+      "recipe": [
+        {
+          "gap_frames": 90
+        }
+      ],
+      "cap": 30,
+      "file": "segments/neutral-90.edenmacro.json",
+      "sha256": "674d86c2d4c4477755bb485ca32414f18fabc2ddec90473c9982953bdaaa214d"
+    },
+    "neutral-10": {
+      "cap": 30,
+      "file": "segments/neutral-10.edenmacro.json",
+      "recipe": [
+        {
+          "gap_frames": 10
+        }
+      ],
+      "sha256": "fd0d074e5b7effba345bfdc2accf7e7d6fd6895342b08ca226b5c78309d91e52",
+      "recorded": "2026-11-18T17:30:37Z"
+    },
+    "item-confirm": {
+      "file": "segments/item-confirm.edenmacro.json",
+      "sha256": "6d3e9a39da40bc9c80c6e6ff755c5e6622d6b9e9994373f54f906aa50985c98b",
+      "cap": 30
+    },
+    "step-away": {
+      "file": "segments/step-away.edenmacro.json",
+      "sha256": "660de042489bcd84f9b48823546b682b5f8072c8a0951cc5a22d9fc0b497fdc5",
+      "cap": 30
+    },
+    "step-toward": {
+      "file": "segments/step-toward.edenmacro.json",
+      "sha256": "2330048b329d8aaa9573315f2380ed83540d9942b8554b1b71aee790e75e4409",
+      "cap": 30
+    },
+    "neutral-180": {
+      "file": "segments/neutral-180.edenmacro.json",
+      "sha256": "ca8723a65d5799fe4a6bc3bb53b325abf3cdafaaeadf0b619e8bbe1324b9a64e",
+      "cap": 30
+    },
+    "grid-down": {
+      "file": "segments/grid-down.edenmacro.json",
+      "sha256": "6c9233bac4114836f3802ea26ee6e9eae7e7b6bc60f29d67a5a9fbcecc417c50",
+      "cap": 30
+    },
+    "item-plus": {
+      "file": "segments/item-plus.edenmacro.json",
+      "sha256": "2070980c9657080351ec0cd433917ac6b0ba265288593b872ae352cd93fa8b2a",
+      "cap": 30
+    },
+    "item-enter": {
+      "file": "segments/item-enter.edenmacro.json",
+      "sha256": "621c1689a3c78ced6b7fe418ba6ac83351f38f0f183ba0a2861f78d5ff325d91",
+      "cap": 30
+    },
+    "grid-right": {
+      "file": "segments/grid-right.edenmacro.json",
+      "sha256": "e0da2022436013eceb1a7abce8fe8c0419eaf1d2739a95da4f347d5eb2cf4cbd",
+      "cap": 30
+    },
+    "grid-left": {
+      "file": "segments/grid-left.edenmacro.json",
+      "sha256": "3708ac7da26a3765055599437d2ffedb982eebdf17d56cc754eec13f469fbbff",
+      "cap": 30
+    },
+    "grid-up": {
+      "file": "segments/grid-up.edenmacro.json",
+      "sha256": "b42252b542886df5c1a06d9c614e4848c6b41daba72c80842967c8e5dc718ea8",
+      "cap": 30
+    },
+    "btt-zl-right": {
+      "file": "segments/btt-zl-right.edenmacro.json",
+      "sha256": "5531618a358523589b505d552439ee96d95309f6a78d82306226c891d99608e4",
+      "cap": 30
+    },
+    "btt-zl-up": {
+      "file": "segments/chord-load.edenmacro.json",
+      "sha256": "1f1f8ca9d99c990e8fa6ae9348fc31f6ae36e7f2fa09c88d84485abfd2f0cb74",
+      "cap": 30
+    },
+    "btt-x": {
+      "file": "segments/x-press.edenmacro.json",
+      "sha256": "923b754c8578d4f76ca41874d7c0cb379cdb8107bd28031dcac90277183139dc",
+      "cap": 30
+    }
+  },
+  "setup": [
+    {
+      "via": "hook",
+      "state": "muted/stub OFF and durable trace configured before game.load",
+      "ref": "routes:configure_boot; lockon_accept.py:boot; routes:load_game"
+    },
+    {
+      "via": "hook",
+      "state": "Final Destination, Sonic then Palutena, native Training and flat floor",
+      "ref": "routes:main_to_stage; routes:pick_stage; routes:pick_fighters; routes:fixture"
+    },
+    {
+      "via": "fixture",
+      "state": "A practice target 24 units ahead and eight above the ground; CPU hidden",
+      "ref": "rows/lockon-course.json for Break the Targets; lockon_accept.py:start_eggs and exact DIAG egg fixture"
+    }
+  ],
+  "rows": [
+    {
+      "id": "v10-palutena-eggs-before-btt-repeat",
+      "start": "training-hud-unpaused",
+      "end": "training-hud-unpaused",
+      "budget_min": 4,
+      "steps": [
+        {
+          "run": "lockon_accept.py:run",
+          "check": true,
+          "args": {
+            "fighter": "Palutena",
+            "code": "Eggs"
+          }
+        }
+      ]
+    },
+    {
+      "id": "v11-palutena-btt-with-start-trace",
+      "start": "training-hud-unpaused",
+      "end": "training-hud-unpaused",
+      "budget_min": 4,
+      "steps": [
+        {
+          "run": "lockon_btt_start_trace.py:run",
+          "check": true,
+          "args": {
+            "fighter": "Palutena",
+            "code": "Btt"
+          }
+        }
+      ]
+    },
+    {
+      "id": "v12-console-after-palutena-repeat",
+      "start": "training-hud-unpaused",
+      "end": "training-hud-unpaused",
+      "budget_min": 1,
+      "steps": [
+        {
+          "run": "practice_steps.py:console_scan",
+          "check": true
+        }
+      ]
+    }
+  ],
+  "about": "Same exact owned boot. Preserve the prior row. Trace intake and retirement through Palutena's BTT start."
+}

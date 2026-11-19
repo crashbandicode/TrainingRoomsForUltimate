@@ -1,0 +1,29 @@
+{
+  "source": "5cc035039e29d5787fd095645b1ed499c7c1d16b",
+  "diag_sha256": "5c3354492490d37de9c32c5deabd30954c7352affaee338b76a2cf21bd53031d",
+  "diag_build_id": "4dcb88c1c95e59eda4a8a2b8690ea30cc137de79327093a415ec49c3436ebd7b",
+  "eden_sha256": "e8dcc67326bdee93f1246e2696a5de36619aa4e5b618ab4329bcaec8af5d95bc",
+  "runner_commit": "366593ab9e0ae84e798eac961676f19470b53f41",
+  "manifest_sha256": "84db4c7270c1e24a98648cfa8a8f78c184d157ac2e815139322d5932f6c4d2f1",
+  "continuations": {
+    "palutena-repeat.json": "7b549f051daa5366c72e8433e5094edbd858c527e2a250b36c14f5c3005a868b",
+    "palutena-neutral-controls.json": "4b2912705d7f23567faaef48379e8247aa072060fbf748157d4a8c60fe815c34",
+    "palutena-native-source.json": "30a7105243c8ca533e279d687e05492c7f9203296ba2742fc139340cd57780d9"
+  },
+  "hooks": {
+    "lockon_accept.py": "40d586d3f55438c0c082daf029d63522df2464dcbd85e9960130521ed20ecd26",
+    "lockon_jostle_accept.py": "298cf5396ea2e072dbb87d21b3da44c5dffa28998719d38d4fdf4faa2ad51bef",
+    "itemproof.py": "6501c782266e44b8eebdd901d704a39a177dbd66b2823501b9617af61d79ac76",
+    "lockon_btt_start_trace.py": "a5d090d8592c007dd8381857d06bb43216eb4b2ca72efd374536ae0a64a1339d",
+    "neutral_control.py": "f0ec68fc1fb4cbcce8b49d84ab57a4cb2fc71ab2835f72b3bfe1f5c9a328aff5",
+    "native_source.py": "01931fa0a689307c1a32c4b3e563c429f5d248a74f58636206a80c1dada75497",
+    "lockon_btt_safe_start.py": "5629a49e5c7e710707ce08721acf7f1da6b097e93c80e3f5697b697a86ff5407"
+  },
+  "corrected_btt": {
+    "safe-palutena-btt.json": "6dd96dae44d84a9a6ccce73612e83c435a20e8b40ba21169a2256b70b4356118"
+  },
+  "fixtures": {
+    "preboot-settings.json": "e4e410f21af8075dc9c864a1ce9033465e302571637da77883ac9f0dba464586",
+    "lockon-course.json": "ded321c1ea5f3a909ac0cb1ea4ccfcddd0d7c2b8c48e0f45f2e004716818c151"
+  }
+}

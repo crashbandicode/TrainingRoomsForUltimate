@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "name": "Lock-on acceptance",
+  "stage": 3,
+  "used": 1,
+  "targets": [
+    [
+      -12.0,
+      8.0
+    ],
+    [
+      -66.0,
+      32.0
+    ]
+  ]
+}
