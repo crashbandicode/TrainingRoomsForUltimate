@@ -2061,3 +2061,11 @@ ceiling = 165331
 date = "2026-11-19"
 reason = "Hidden CPU visualizer v2 (15eac65a) measured 165330 on 4f25a854, up 202 from 165128. Add the measured delta to the existing 165129 ceiling."
 approved_by = "Primary c07b3449 directed the lock-free hidden CPU visualizer revision and a separate exact size adjustment on 2026-11-19."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 166008
+date = "2026-11-19"
+reason = "rc.15 recording catalog cache v3: canonical measurement for f0f6850b is 166007 on base 96355cad (165330), an exact increase of 677 normalized implementation lines. Add 677 to the existing 165331 ceiling."
+approved_by = "Operator size approval stands per primary c07b3449's v3 review fix order. Separate budget increase by the exact measured delta."
