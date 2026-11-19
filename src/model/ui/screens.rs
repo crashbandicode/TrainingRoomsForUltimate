@@ -638,6 +638,31 @@ mod tests {
         f
     }
 
+    fn training_tile_follows_the_waiting_room() {
+        fn stage(index: usize) -> &'static str {
+            crate::engine::stages::catalog::STAGES.get(index).map_or("-", |(_, label)| *label)
+        }
+
+        let stages = crate::engine::stages::catalog::STAGES;
+        let training = stages.iter().position(|(id, _)| *id == 308).unwrap();
+        let mut expected: Vec<_> = (0..stages.len()).collect();
+        let training = expected.remove(training);
+        expected.insert(1, training);
+
+        let mut all = Text::<28>::new();
+        tile_label(GridKind::Stages, 0, false, stage, &mut all);
+        assert_eq!(all.string_lossy(), "All");
+        for (display, storage) in expected.into_iter().enumerate() {
+            let mut lobby = Text::<28>::new();
+            tile_label(GridKind::Stages, display + 1, false, stage, &mut lobby);
+            assert_eq!(lobby.string_lossy(), stages[storage].1, "Lobby Stages tile {display}");
+
+            let mut direct = Text::<28>::new();
+            tile_label(GridKind::StageChange, display + 1, false, stage, &mut direct);
+            assert_eq!(direct.string_lossy(), stages[storage].1, "Direct pick tile {display}");
+        }
+    }
+
     /// Move to the row called `title` on its page and press A.
     fn open(m: &mut Menu, title: &str) {
         let row = ROWS.iter().position(|r| r.title == title).unwrap_or_else(|| panic!("no row {title}"));
@@ -877,6 +902,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("training_tile_follows_the_waiting_room", training_tile_follows_the_waiting_room as fn()),
             ("delay_and_chord_entry_dialogs_hold_their_content", delay_and_chord_entry_dialogs_hold_their_content as fn()),
             ("hitbox_checklist_colour_key_updates_and_clears_with_the_screen", hitbox_checklist_colour_key_updates_and_clears_with_the_screen as fn()),
             ("a_library_tile_cut_at_sixteen_characters_ends_in_an_ellipsis", a_library_tile_cut_at_sixteen_characters_ends_in_an_ellipsis as fn()),

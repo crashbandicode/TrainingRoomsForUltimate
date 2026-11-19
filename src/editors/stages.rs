@@ -302,6 +302,23 @@ mod tests {
         STAGES.iter().position(|(id, _)| *id == stage).unwrap()
     }
 
+    fn saved_stage_selections_keep_their_stages() {
+        let mut legacy = vec![0u8; STAGES.len() + 1];
+        legacy[1] = 1;
+        legacy[index_of(3) + 1] = 2;
+        let legacy = serde_json::Value::Array(legacy.into_iter().map(serde_json::Value::from).collect());
+        let modern = serde_json::json!({
+            "all": false,
+            "entries": [{"stage": 311}, {"stage": 3}]
+        });
+        let mut editor = StageEditor::read_with(Some(&modern), Some(&legacy), None, None);
+        assert_eq!(editor.order_value(), legacy);
+        assert_eq!(editor.stage_order_value(), modern);
+        assert_eq!(editor.change(2, Button::A), Effect::Request(Selection { stage: 308, form: Form::Normal }));
+        assert_eq!(editor.order_value(), legacy, "the legacy catalog ranks do not move");
+        assert_eq!(editor.stage_order_value(), modern, "the persisted stage IDs do not move");
+    }
+
     fn y_cycles_only_the_forms_the_game_has_and_direct_requests_the_stage_with_its_form() {
         let mut e = StageEditor::read(None, None);
         let battlefield = index_of(0);
@@ -434,6 +451,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("saved_stage_selections_keep_their_stages", saved_stage_selections_keep_their_stages as fn()),
             ("y_cycles_only_the_forms_the_game_has_and_direct_requests_the_stage_with_its_form", y_cycles_only_the_forms_the_game_has_and_direct_requests_the_stage_with_its_form as fn()),
             ("change_stage_goes_to_the_stage_with_the_form_y_picked_and_keeps_the_rotation", change_stage_goes_to_the_stage_with_the_form_y_picked_and_keeps_the_rotation as fn()),
             ("change_stage_tiles_show_the_form_tag_and_the_footer_shows_the_controls", change_stage_tiles_show_the_form_tag_and_the_footer_shows_the_controls as fn()),
