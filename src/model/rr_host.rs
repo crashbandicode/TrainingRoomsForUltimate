@@ -186,7 +186,7 @@ fn parry_play<'a>(machine: &mut Playback, role: Role, book: &'a Book, next: bool
 }
 
 /// The next parry pass: the last one ended, none is open, and passes are left.
-fn parry_next_pass(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick) {
+fn parry_next_pass(start: impl FnOnce()) {
     let left = PARRY_PASSES.load(Ordering::Acquire);
     if !PARRY.load(Ordering::Acquire) || left == 0 || RUN_CPU.load(Ordering::Acquire) || PARRY_OPEN.load(Ordering::Acquire) {
         return;
@@ -197,7 +197,7 @@ fn parry_next_pass(root: &Path, machine: &mut Playback, book: &Book, tick: &mut 
     if left != u32::MAX {
         PARRY_PASSES.store(left - 1, Ordering::Release);
     }
-    play_role_with(root, machine, book, Role::Cpu, tick, true);
+    start();
 }
 /// A hook cut invalidates queued frames. Only the worker clears the queue.
 static CUT_PLAYER: AtomicBool = AtomicBool::new(false);
@@ -785,7 +785,7 @@ pub fn service_at(
     } else if RUN_CPU.load(Ordering::Acquire) {
         step_role(root, machine, &book, Role::Cpu);
     }
-    parry_next_pass(root, machine, &book, &mut tick);
+    parry_next_pass(|| play_role_with(root, machine, &book, Role::Cpu, &mut tick, true));
     if menu_pending() {
         apply_menu(root, machine, &book, &mut tick);
     }
@@ -2654,7 +2654,38 @@ mod tests {
         let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
         assert_eq!(PARRY_PASSES.load(Ordering::Acquire), 1, "pass 2 is owed");
         assert_eq!(mash_now(), (Buffered::StopPlayback, true), "between the passes");
+
+        set_parry_open(false);
+        let mut during_restart = None;
+        parry_next_pass(|| {
+            // The native consumer can query the Mash view while the Menu worker prepares the warp.
+            during_restart = Some(mash_now());
+            RUN_CPU.store(true, Ordering::Release);
+        });
+        let owed_after_start = PARRY_PASSES.load(Ordering::Acquire);
+        let after_start = mash_now();
+        RUN_CPU.store(false, Ordering::Release);
+        let running_after_end = cpu_playback(PlaybackState::default()).running;
         reset_host();
+
+        assert_eq!(during_restart, Some((Buffered::StopPlayback, true)), "during final pass preparation");
+        assert_eq!(owed_after_start, 0, "the credit is spent after starting");
+        assert_eq!(after_start, (Buffered::StopPlayback, true), "during the final pass");
+        assert!(!running_after_end, "ordinary Mash may resume after the last pass");
+    }
+
+    fn parry_restart_does_not_restore_credits_canceled_by_off() {
+        let _hold = hold();
+        reset_host();
+        set_parry(true);
+        PARRY_PASSES.store(3, Ordering::Release);
+
+        parry_next_pass(|| set_parry(false));
+        set_parry(true);
+        let owed_after_on = PARRY_PASSES.load(Ordering::Acquire);
+        reset_host();
+
+        assert_eq!(owed_after_on, 0);
     }
 
     /// Parry practice's refusals (approved rows parry-practice-no-recording and parry-practice-start-save-missing).
@@ -4093,6 +4124,7 @@ mod tests {
             ("parry_off_cancels_owed_passes", parry_off_cancels_owed_passes as fn()),
             ("parry_passes_owed_are_a_running_cpu_playback", parry_passes_owed_are_a_running_cpu_playback as fn()),
             ("parry_pass_mash_asks_to_stop_and_queues_nothing", parry_pass_mash_asks_to_stop_and_queues_nothing as fn()),
+            ("parry_restart_does_not_restore_credits_canceled_by_off", parry_restart_does_not_restore_credits_canceled_by_off as fn()),
             ("parry_refuses_without_a_recording_or_its_start_save", parry_refuses_without_a_recording_or_its_start_save as fn()),
             ("a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see", a_library_macro_playing_on_the_cpu_is_the_playback_the_mash_and_covered_settings_see as fn()),
             ("a_load_stops_both_runs_but_not_a_plays_own_warp", a_load_stops_both_runs_but_not_a_plays_own_warp as fn()),
