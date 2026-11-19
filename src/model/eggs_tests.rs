@@ -1259,6 +1259,48 @@ fn eggs_off_no_calls() {
     assert_eq!(run.plan([OFF, ANY, NORMAL, DISC, IN_VIEW], None, 0, || panic!("Off reads nothing")), Plan::Idle);
 }
 
+fn breaks_iff_depth() {
+    fn old_breaks(rule: u8, aerial: bool, hit: &Hit, egg: [f32; 2]) -> bool {
+        let Hit(a, b, radius, power) = *hit;
+        let counts = counts(rule, aerial, power);
+        let (dx, dy, px, py) = (b[0] - a[0], b[1] - a[1], egg[0] - a[0], egg[1] - a[1]);
+        let t = ((px * dx + py * dy) / (dx * dx + dy * dy).max(1e-9)).clamp(0.0, 1.0);
+        counts && (px - t * dx).hypot(py - t * dy) <= radius + RADIUS
+    }
+
+    let egg = [0.0, 0.0];
+    let cases = [
+        ("point at centre", Hit([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 0.0, 16.0)),
+        ("point tangent", Hit([4.0, 0.0, 0.0], [4.0, 0.0, 0.0], 0.0, 16.0)),
+        ("exact tangent", Hit([5.0, 0.0, 0.0], [5.0, 0.0, 0.0], 1.0, 16.0)),
+        ("just outside", Hit([5.01, 0.0, 0.0], [5.01, 0.0, 0.0], 1.0, 16.0)),
+        ("pill tangent", Hit([5.0, -2.0, 0.0], [5.0, 2.0, 0.0], 1.0, 16.0)),
+        ("zero-length pill", Hit([4.5, 0.0, 0.0], [4.5, 0.0, 0.0], 0.5, 16.0)),
+        ("under strong threshold", Hit([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 0.0, 11.9)),
+    ];
+
+    for rule in [ANY, AERIALS, STRONG] {
+        for aerial in [false, true] {
+            for (label, hit) in &cases {
+                let actual = breaks(rule, aerial, hit, egg);
+                let expected = counts(rule, aerial, hit.3) && depth(hit, egg).is_some();
+                assert_eq!(actual, expected, "{label}, rule={rule}, aerial={aerial}");
+                assert_eq!(actual, old_breaks(rule, aerial, hit, egg), "{label}, rule={rule}, aerial={aerial}");
+            }
+        }
+    }
+
+    let hits = [
+        Hit([3.0, 0.0, 0.0], [3.0, 0.0, 0.0], 0.0, 16.0),
+        Hit([2.0, 0.0, 0.0], [2.0, 0.0, 0.0], 0.0, 16.0),
+        Hit([6.0, 0.0, 0.0], [6.0, 0.0, 0.0], 0.0, 16.0),
+        Hit([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 0.0, 11.9),
+    ];
+    assert_eq!(deepest(STRONG, false, &hits, egg), Some(0.5));
+    assert_eq!(deepest(AERIALS, false, &hits, egg), None);
+    assert_eq!(deepest(AERIALS, true, &hits, egg), Some(1.0));
+}
+
 /// This module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -1309,6 +1351,7 @@ fn case_table() {
         ("eggs_nana", eggs_nana as fn()),
         ("eggs_training_gate", eggs_training_gate as fn()),
         ("eggs_off_no_calls", eggs_off_no_calls as fn()),
+        ("breaks_iff_depth", breaks_iff_depth as fn()),
     ]);
 }
 }
