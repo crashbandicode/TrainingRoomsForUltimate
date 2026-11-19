@@ -140,6 +140,8 @@ pub struct Outbox {
     pub tech_point: bool,
     /// Stage tech: close into the guided exercise draft.
     pub tech_wizard: bool,
+    /// A saved Parry practice activates its mode and keeps the current set.
+    pub resume_parry: bool,
     /// rc.15 practice menu: the game the close starts (Start, Place targets, Tech point, Tech wizard). Only these start a
     /// game; a plain close starts and stops nothing (Q1).
     pub start: Option<Game>,
@@ -1369,7 +1371,7 @@ impl Menu {
 
     /// The close starts `game` (and so stops any other game).
     fn start(&mut self, game: Game) {
-        (self.outbox.start, self.closed) = (Some(game), true);
+        (self.outbox.start, self.outbox.resume_parry, self.closed) = (Some(game), false, true);
     }
 
     /// Stop was chosen since the last call: the worker ends the running game now.
@@ -2022,7 +2024,7 @@ impl Menu {
     /// when the player closes the menu (rc.15 practice menu: a Start at the close; another Start replaces it).
     pub fn parry_on(&mut self, set: usize) {
         self.put_one_hot("parry_practice", set.clamp(1, 2));
-        self.outbox.start = Some(Game::Parry);
+        (self.outbox.start, self.outbox.resume_parry) = (Some(Game::Parry), true);
     }
 
     /// The item the player chose on the Give item grid since the last call, if any.

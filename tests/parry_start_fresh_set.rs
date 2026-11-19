@@ -55,6 +55,11 @@ mod notices {
 
     pub static DONE: Mutex<Option<String>> = Mutex::new(None);
 
+    pub fn clear(id: u8) {
+        assert_eq!(id, 0x33);
+        *DONE.lock().unwrap() = None;
+    }
+
     pub fn upsert(_id: u8, _header: &'static str, body: &str, _length: u16, _color: [u8; 4]) {
         *DONE.lock().unwrap() = Some(body.to_owned());
     }
@@ -108,11 +113,22 @@ fn explicit_start_clears_the_set_and_preserves_lifetime_results() {
     step(Frame::default(), &mut clock);
     assert_readout("3/10", "streak 3, perfect 3/3");
 
+    practice::start(Game::Parry, practice::How { resume_parry: true, ..Default::default() });
+    step(Frame::default(), &mut clock);
+    assert_readout("3/10", "streak 3, perfect 3/3");
+
     practice::stop();
     assert!(parry::view().is_none());
     practice::start(Game::Parry, practice::How::default());
-    step(Frame::default(), &mut clock);
+    // The first resumed frame can still show the previous run's guard hitstop.
+    step(Frame {
+        stop: true,
+        guard_damage: true,
+        just_shield: Some(true),
+        ..Frame::default()
+    }, &mut clock);
     assert_readout("0/10", "streak 0, perfect 3/3");
+    step(Frame::default(), &mut clock);
 
     attempts(9, false, &mut clock);
     assert_readout("9/10", "streak 0, perfect 3/12");
@@ -122,4 +138,10 @@ fn explicit_start_clears_the_set_and_preserves_lifetime_results() {
     let done = notices::DONE.lock().unwrap().clone().expect("set completion");
     assert!(done.starts_with("Done! 10: 0 Perfect"), "{done}");
     assert!(done.ends_with("total 13 · fighter best 3"), "{done}");
+
+    practice::stop();
+    practice::start(Game::Parry, practice::How::default());
+    step(Frame::default(), &mut clock);
+    assert_readout("0/10", "streak 0, perfect 3/13");
+    assert!(notices::DONE.lock().unwrap().is_none());
 }

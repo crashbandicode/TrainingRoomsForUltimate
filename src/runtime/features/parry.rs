@@ -2,7 +2,7 @@
 //! `model::parry::Detector` from the strip's P1 sample, Tech's `Summary`/`Bests` for the set and its Done line, and the
 //! strip's view. Game thread only, except `publish` (the settings publish) and `view` (the HUD tick).
 
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 use core::fmt::Write as _;
 
@@ -16,6 +16,8 @@ use crate::model::tech::session::{Bests, Grade, Summary};
 
 /// The session row: 0 Off, 1 sets of ten, 2 free practice.
 static SESSION: AtomicU8 = AtomicU8::new(0);
+static FRESH_SET: AtomicBool = AtomicBool::new(false);
+const DONE_NOTICE: u8 = 0x33;
 static VIEW: Published<Option<View>> = Published::new(None);
 
 struct State {
@@ -42,8 +44,11 @@ pub fn publish(snapshot: &Snapshot) {
     PUBLISHED.store(session, Ordering::Release);
 }
 
-/// Start (the menu worker, `practice::start`, after the close's publish): the session is the row's, the replay host arms.
-pub fn start() {
+/// Start latches the mode and arms replay. A saved practice resumes its current set.
+pub fn start(resume: bool) {
+    if !resume {
+        FRESH_SET.store(true, Ordering::Release);
+    }
     SESSION.store(practice_games::mode(PUBLISHED.load(Ordering::Acquire)), Ordering::Release);
     crate::engine::rr_host::set_parry(true);
 }
@@ -96,7 +101,7 @@ fn record(s: &mut State, a: Attempt, fighter: Option<i32>) {
         let mut body = FixedPath::<192>::new();
         let _ = s.summary.write(&mut body);
         let _ = write!(body, " · total {} · fighter best {best}", s.total);
-        super::notices::upsert(0x33, "Parry Practice", body.as_str(), 300, crate::model::notify::DEFAULT_COLOR);
+        super::notices::upsert(DONE_NOTICE, "Parry Practice", body.as_str(), 300, crate::model::notify::DEFAULT_COLOR);
         s.summary = SUMMARY;
     }
 }
@@ -105,9 +110,14 @@ fn record(s: &mut State, a: Attempt, fighter: Option<i32>) {
 /// parry pass.
 pub fn step(mut frame: Frame, fighter: Option<i32>, now: u32) {
     let Some(mut s) = STATE.try_lock() else { return };
+    let fresh = FRESH_SET.swap(false, Ordering::AcqRel);
+    if fresh {
+        (s.summary, s.detector, s.since_end) = (SUMMARY, Detector::new(), None);
+        super::notices::clear(DONE_NOTICE);
+    }
     let playing = crate::engine::rr_host::cpu_run_active();
     s.since_end = if playing { Some(0) } else { s.since_end.map(|n| n.saturating_add(1)) };
-    frame.armed = s.since_end.is_some_and(|n| n <= 60);
+    frame.armed = !fresh && s.since_end.is_some_and(|n| n <= 60);
     for a in s.detector.step(&frame, now).into_iter().flatten() {
         record(&mut s, a, fighter);
         #[cfg(feature = "diag")]
