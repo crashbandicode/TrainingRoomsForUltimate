@@ -31,6 +31,9 @@ grade always agrees with the break.
 
 ## Three questions for you (recommended answer first)
 
+**Decided (operator, 2026-11-19 ~23:10Z):** "I agree with the recommended spacing grader decisions". So: A (the tag on your
+lane), yes (the strip shows while Input Display is Off), yes (rings on targets and eggs only).
+
 1. **Where does the grade tag go?**
    - **A (recommended):** on your own lane, at the hit frame. This works for targets, eggs and projectiles, and keeps
      the Spot labels where they are.
