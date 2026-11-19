@@ -111,6 +111,9 @@ static TROLLEY_INT_READS: AtomicUsize = AtomicUsize::new(0);
 thread_local! {
     static PICKEL_RESOURCES: Cell<Option<(i32, i32)>> = const { Cell::new(None) };
     static PICKEL_IRON_AT_REQUEST: RefCell<Vec<i32>> = const { RefCell::new(Vec::new()) };
+    static ROBIN_NOSFERATU_USES: Cell<Option<i32>> = const { Cell::new(None) };
+    static ATTACKER_METER: Cell<Option<(Plan, f32, f32)>> = const { Cell::new(None) };
+    static WORK_FLOAT_WRITES: RefCell<Vec<(usize, i32, f32)>> = const { RefCell::new(Vec::new()) };
     static WORK_INT_WRITES: RefCell<Vec<(usize, i32, i32)>> = const { RefCell::new(Vec::new()) };
 }
 static CART_EXISTS: AtomicBool = AtomicBool::new(true);
@@ -275,6 +278,9 @@ mod natives {
     pub fn get_int(cpu: usize, id: i32) -> i32 {
         if id == 0x1000_00c0 {
             assert_eq!(cpu, 2);
+            if let Some(uses) = super::ROBIN_NOSFERATU_USES.get() {
+                return uses;
+            }
             return super::PICKEL_RESOURCES.get().map_or(3, |(iron, _)| iron);
         }
         if super::ICE_SHOT_FIXTURE.load(super::Ordering::Relaxed) {
@@ -351,9 +357,35 @@ mod natives {
     pub fn set_int(cpu: usize, value: i32, id: i32) {
         assert_eq!((cpu, id), (2, 0x1000_00c0));
         super::WORK_INT_WRITES.with_borrow_mut(|writes| writes.push((cpu, id, value)));
+        if super::ROBIN_NOSFERATU_USES.get().is_some() {
+            super::ROBIN_NOSFERATU_USES.set(Some(value));
+        }
         if let Some((_, cost)) = super::PICKEL_RESOURCES.get() {
             super::PICKEL_RESOURCES.set(Some((value, cost)));
         }
+    }
+    pub fn get_float(cpu: usize, id: i32) -> f32 {
+        assert_eq!(cpu, 2);
+        let Some((plan, current, max)) = super::ATTACKER_METER.get() else { return 150.0; };
+        match (plan, id) {
+            (super::Plan::Roller, 0x52) | (super::Plan::Hero, 0x53) => current,
+            (super::Plan::Hero, 0x52) => max,
+            _ => panic!("unexpected meter read: {plan:?}, {id:x}"),
+        }
+    }
+    pub fn set_float(cpu: usize, value: f32, id: i32) {
+        assert_eq!(cpu, 2);
+        super::WORK_FLOAT_WRITES.with_borrow_mut(|writes| writes.push((cpu, id, value)));
+        if let Some((plan, _, max)) = super::ATTACKER_METER.get() {
+            super::ATTACKER_METER.set(Some((plan, value, max)));
+        }
+    }
+    pub fn get_param_float(cpu: usize, kind: u64, name: u64) -> f32 {
+        assert_eq!((cpu, kind, name), (2, 0x0d_f05c_072b, 0x07_ae07_1a51));
+        super::ATTACKER_METER.get().map_or(150.0, |(plan, _, max)| {
+            assert_eq!(plan, super::Plan::Roller);
+            max
+        })
     }
     pub fn module_accessor(_: i32) -> Option<usize> {
         Some(super::P1.load(super::Ordering::Relaxed))
@@ -813,6 +845,9 @@ impl NativeMemory {
         reset_cart();
         PICKEL_RESOURCES.set(None);
         PICKEL_IRON_AT_REQUEST.with_borrow_mut(Vec::clear);
+        ROBIN_NOSFERATU_USES.set(None);
+        ATTACKER_METER.set(None);
+        WORK_FLOAT_WRITES.with_borrow_mut(Vec::clear);
         WORK_INT_WRITES.with_borrow_mut(Vec::clear);
         ARMED.store(0, Ordering::Relaxed);
         EPOCH.store(0, Ordering::Relaxed);
@@ -2319,6 +2354,69 @@ fn trolley_refills_only_insufficient_iron_before_each_native_request() {
         );
     }
 }
+unsafe fn resource_start(m: &mut NativeMemory, plan: Plan, state: State, row: u16, kind: u32, status: i32) {
+    let mut game = Game::new(plan, state);
+    let request = game.requested.as_mut().unwrap();
+    request.id = row;
+    request.attacker_kind = kind;
+    m.body[3] = kind;
+    game.step = Step::Settle;
+    CPU_STATUS.store(0, Ordering::Relaxed);
+    m.update(&mut game, 0);
+    assert_eq!(game.step, Step::Entering);
+    assert_eq!(requests(), vec![(2, status)]);
+}
+
+#[test]
+fn roller_fills_only_the_cpu_ink_meter_to_the_live_cap() {
+    unsafe {
+        for (current, expected_writes) in [(0.0, vec![(2, 0x52, 123.0)]), (123.0, vec![])] {
+            let mut m = NativeMemory::new();
+            ATTACKER_METER.set(Some((Plan::Roller, current, 123.0)));
+            resource_start(&mut m, Plan::Roller, State::Bury, 102, 0x41, 477);
+            assert_eq!(ATTACKER_METER.get(), Some((Plan::Roller, 123.0, 123.0)));
+            assert_eq!(WORK_FLOAT_WRITES.with_borrow(Clone::clone), expected_writes);
+            assert!(WORK_INT_WRITES.with_borrow(Vec::is_empty));
+        }
+    }
+}
+
+#[test]
+fn ice_sword_fills_only_the_cpu_sp_to_the_command_cost() {
+    unsafe {
+        for (current, expected, expected_writes) in [
+            (0.0, 11.0, vec![(2, 0x53, 11.0)]),
+            (33.0, 33.0, vec![]),
+        ] {
+            let mut m = NativeMemory::new();
+            ATTACKER_METER.set(Some((Plan::Hero, current, 100.0)));
+            resource_start(&mut m, Plan::Hero, State::Frozen, 110, 0x53, 479);
+            assert_eq!(ATTACKER_METER.get(), Some((Plan::Hero, expected, 100.0)));
+            assert_eq!(WORK_FLOAT_WRITES.with_borrow(Clone::clone), expected_writes);
+            assert!(WORK_INT_WRITES.with_borrow(Vec::is_empty));
+        }
+    }
+}
+
+#[test]
+fn nosferatu_refills_one_use_only_when_the_cpu_is_out() {
+    unsafe {
+        for (current, expected) in [(0, 1), (2, 2)] {
+            let mut m = NativeMemory::new();
+            ROBIN_NOSFERATU_USES.set(Some(current));
+            resource_start(&mut m, Plan::Drain, State::Grab, 93, 0x38, 479);
+            assert_eq!(ROBIN_NOSFERATU_USES.get(), Some(expected));
+            let writes = WORK_INT_WRITES.with_borrow(Clone::clone);
+            if current == 0 {
+                assert_eq!(writes, vec![(2, 0x1000_00c0, 1)]);
+            } else {
+                assert!(writes.is_empty());
+            }
+            assert!(WORK_FLOAT_WRITES.with_borrow(Vec::is_empty));
+        }
+    }
+}
+
 #[test]
 fn trolley_each_missing_grant_refuses_before_any_native_read_or_default_zero() {
     unsafe {
