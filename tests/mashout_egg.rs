@@ -136,6 +136,7 @@ fn actual_runtime_egg_preparation_and_native_seed() {
                 "STATE_OBJECT_IS_ACTIVE_OFFSET",
                 "STATE_OBJECT_MODULE_ACCESSOR_OFFSET",
                 "STATE_LINK_PARENT_OBJECT_ID_OFFSET",
+                "STATE_GET_PARAM_INT_OFFSET",
             ]
             .map(|name| {
                 sites
@@ -145,6 +146,9 @@ fn actual_runtime_egg_preparation_and_native_seed() {
             })
             .join("\n")
         }),
+        ("// RESOURCE_WRITE_SITES", include_str!("../src/model/sites_pkg4.rs").lines()
+            .find(|line| line.starts_with("pub const WORK_SET_INT_OFFSET:"))
+            .unwrap().to_string()),
         (
             "// JUDGE_CHOICE",
             block(runtime, "unsafe fn judge_choice(").to_string(),

@@ -6,6 +6,8 @@ use std::{
 mod model {
     pub mod sites_pkg3 { // TROLLEY_SITES
     }
+    pub mod sites_pkg4 { // RESOURCE_WRITE_SITES
+    }
     pub mod sites_hitbox { // EGG_HITBOX_SITES
     }
     pub mod sites_pkg2 { // EGG_PKG2_SITES
@@ -1433,6 +1435,8 @@ mod game {
             | crate::model::sites_pkg3::STATE_OBJECT_IS_ACTIVE_OFFSET
             | crate::model::sites_pkg3::STATE_OBJECT_MODULE_ACCESSOR_OFFSET
             | crate::model::sites_pkg3::STATE_LINK_PARENT_OBJECT_ID_OFFSET
+            | crate::model::sites_pkg3::STATE_GET_PARAM_INT_OFFSET
+            | crate::model::sites_pkg4::WORK_SET_INT_OFFSET
             | crate::model::sites_hitbox::HITBOX_IS_ATTACK_OFFSET => true,
             _ => panic!("unexpected reader guard: {offset:x}"),
         }

@@ -1277,9 +1277,13 @@ pub unsafe fn frame(fighter: usize) {
         {
             game.fail("Move entry unconfirmed · no grade"); return;
         }
-        let ordinary_catch = game.requested.is_some_and(|r| r.plan == crate::model::mashout::moves::Plan::Grab);
+        let ordinary_catch = game.requested.filter(|r| r.plan == crate::model::mashout::moves::Plan::Grab);
         let cpu_status = natives::status_kind(cpu);
-        if !scored || (ordinary_catch && ![ids[1], ids[8], ids[9], ids[10]].contains(&cpu_status)) {
+        if !scored || ordinary_catch.is_some_and(|r| {
+            ![ids[1], ids[8], ids[9], ids[10]].contains(&cpu_status)
+                && (r.grab != 1
+                    || game::lua_const(lua_bind_hash("FIGHTER_STATUS_KIND_CATCH_DASH_PULL")) != Some(cpu_status))
+        }) {
             game.fail("Move entry unconfirmed · no grade"); return;
         }
         // Cargo's native shoulder EXEC (common0x25b878/0x25b894) later rewrites automatic and
@@ -1490,14 +1494,17 @@ pub unsafe fn frame(fighter: usize) {
                     facing = if drag { outward } else { -outward };
                 }
             }
+            let side = facing.signum();
             state_natives::init_pos(
                 cpu,
                 &state_natives::Vector3f {
-                    x: position.x + spacing * facing.signum(),
+                    x: position.x + spacing * side,
                     ..position
                 },
             );
-            state_natives::set_lr(cpu, -facing.signum());
+            // Native CATCH_TURN reverses the CPU's facing on entry.
+            let pivot = request.plan == crate::model::mashout::moves::Plan::Grab && request.grab == 2;
+            state_natives::set_lr(cpu, if pivot { side } else { -side });
             state_natives::status_request(cpu, ids[0]);
             game.step(Step::Settle, "Mash out · Waiting for grounded fighters");
         }
@@ -1620,6 +1627,27 @@ pub unsafe fn frame(fighter: usize) {
                     // restriction: MASH-NATIVE-SLOT
                     game.fail(UNAVAILABLE_NOTICE);
                     return;
+                }
+            }
+            if request.plan == crate::model::mashout::moves::Plan::Trolley {
+                use crate::model::{
+                    cpu::hash::hash40, sites_pkg2::WORK_GET_INT_OFFSET,
+                    sites_pkg3::STATE_GET_PARAM_INT_OFFSET, sites_pkg4::WORK_SET_INT_OFFSET,
+                };
+                if ![WORK_GET_INT_OFFSET, STATE_GET_PARAM_INT_OFFSET, WORK_SET_INT_OFFSET]
+                    .into_iter().all(game::granted)
+                {
+                    game.fail(UNAVAILABLE_NOTICE);
+                    return;
+                }
+                let Some(iron) = game::lua_const(lua_bind_hash("FIGHTER_PICKEL_INSTANCE_WORK_ID_INT_MATERIAL_NUM_IRON")) else {
+                    game.fail(UNAVAILABLE_NOTICE);
+                    return;
+                };
+                // Match the native trolley PRE read and leave consumption to the game.
+                let cost = state_natives::get_param_int(cpu, hash40("param_special_s"), 0x1d_0963_3b0f);
+                if natives::get_int(cpu, iron) < cost {
+                    natives::set_int(cpu, cost, iron);
                 }
             }
             game.step(Step::Entering, "Mash out · Waiting for move");
