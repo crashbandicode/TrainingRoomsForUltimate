@@ -78,18 +78,31 @@ fn the_jump_works_on_every_page_and_never_leaves_it() {
     let mut m = menu();
     for page in [Page::Cpu, Page::Saves, Page::Recording, Page::FightersStages, Page::DisplayControls] {
         to_page(&mut m, page);
-        for _ in 0..12 {
-            m.press(Button::JumpDown);
-            assert_eq!(m.page(), page);
-        }
         // On the Recording page ZL+Up/Down pages the library section by 12. It does not walk the left column.
-        if page != Page::Recording {
-            assert_eq!(section(&m), *sections(&m, page).last().unwrap());
+        if page == Page::Recording {
+            for _ in 0..12 {
+                m.press(Button::JumpDown);
+                assert_eq!(m.page(), page);
+            }
+            for _ in 0..12 {
+                m.press(Button::JumpUp);
+            }
+            assert_eq!(section(&m), sections(&m, page)[0]);
+            continue;
         }
-        for _ in 0..12 {
-            m.press(Button::JumpUp);
+        // rc15/submenu-page-switch: one section per jump to the last, then the next jump wraps to the first, and
+        // back up from the first wraps to the last, as Up / Down do.
+        let all = sections(&m, page);
+        assert_eq!(section(&m), all[0]);
+        for want in all.iter().skip(1) {
+            m.press(Button::JumpDown);
+            assert_eq!((m.page(), section(&m)), (page, *want));
         }
-        assert_eq!(section(&m), sections(&m, page)[0]);
+        m.press(Button::JumpDown);
+        assert_eq!(section(&m), all[0], "ZL + Down wraps from the last section to the first");
+        m.press(Button::JumpUp);
+        assert_eq!(section(&m), *all.last().unwrap(), "ZL + Up wraps from the first section to the last");
+        assert_eq!(m.page(), page);
     }
 }
 
