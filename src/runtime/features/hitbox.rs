@@ -32,7 +32,7 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU8, AtomicUsize,
 use hos_lock::Mutex;
 
 use crate::model::cpu::hash::{hash40, lua_bind_hash};
-use crate::model::cpu::role::{FighterKey, LOBBY_CPU_ENTRY};
+use crate::model::cpu::role::LOBBY_CPU_ENTRY;
 use crate::model::eggs::{self, HEADER, NOTICE_ID};
 use crate::runtime::features::btt;
 use crate::model::notify::DEFAULT_COLOR;
@@ -454,14 +454,16 @@ static STORE: Mutex<Store> =
 
 static BOARD: Mutex<Board> = Mutex::new(Board::new());
 
-/// The same per-body hide state that drives native visibility and the damage panels.
-pub(super) fn update_hidden_bodies(bodies: [Option<u32>; FighterKey::COUNT]) {
-    BOARD.lock().set_hidden(bodies);
+/// The renderer can hold its last board while projecting. A fighter frame never waits on it.
+fn clear_board(accessor: usize) {
+    if let Some(mut board) = BOARD.try_lock() {
+        board.clear(accessor);
+    }
 }
 
 /// Clear set `i`; its orbs go too. Nothing is asked of the game.
 fn clear_set(store: &mut Store, i: usize, accessor: usize) -> Counts {
-    BOARD.lock().clear(accessor);
+    clear_board(accessor);
     store.table.sets[i].clear(&mut OrbSink { status: i32::MIN })
 }
 
@@ -478,7 +480,7 @@ unsafe fn publish_orbs(accessor: usize, set: &hitbox::HandleSet, areas: &[legend
             (placed[len], len) = (orb, len + 1);
         }
     }
-    BOARD.lock().publish_owned(accessor, Some(natives::battle_object_id(accessor)), placed[..len].iter().copied())
+    BOARD.try_lock().map_or(0, |mut board| board.publish(accessor, placed[..len].iter().copied()))
 }
 
 /// One raw game-memory read for `GameArea`, the wind-area reader: the pass (`frame`) runs it only behind `enabled` with Windboxes
@@ -615,6 +617,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         return;
     }
     let mut used = orbs::PaneUse::default();
+    let mut keep_panes = false;
     let (mut over, mut looks) = (0, [None; 3 + btt::LOOKS]);
     if any {
         let half = match natives::screen_size_words() {
@@ -638,10 +641,17 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             [dot.centre, dot.tail] = [[x, y, 0.0]; 2];
             Some((plan(&dot, [255; 4])?, look))
         });
-        let board = BOARD.lock();
-        // Hitboxes and grab boxes take the panes first; when they run out whole pills are cut, hurtboxes first (review HB-2).
+        let hide = super::hide_cpu::draw_hide();
+        let board = if on { BOARD.try_lock() } else { None };
+        // A normal busy tick can keep the existing panes. While Hide is in effect, stale panes may include the CPU.
+        keep_panes = on && board.is_none() && hide.is_visible();
+        // Hitboxes and grabs take the panes first. Uncertain snapshots yield no fighter panes this tick.
         let bits = SHOWN.load(Ordering::Acquire);
-        for orb in board.in_draw_order().filter(|o| on && legend::shows(bits, o.kind())) {
+        for orb in board
+            .iter()
+            .flat_map(|b| b.draw_slots_in_order(b.draw_slots(&hide)))
+            .filter(|o| legend::shows(bits, o.kind()))
+        {
             let Some(pill) = plan(orb, orb.color) else { continue };
             if orb.kind() == legend::KIND_AREA && orb.key & 0xff == legend::AREA_BOX {
                 // A wind area's box: its band alone, from its left edge to its right, as tall as the box.
@@ -666,7 +676,9 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     }
     let n = used.caps / 2;
     let shown = cache.shown;
-    write_tick(&mut cache, [orbs::pane_tick(used.caps, shown[0]), orbs::pane_tick(used.bands, shown[1])]);
+    if !keep_panes {
+        write_tick(&mut cache, [orbs::pane_tick(used.caps, shown[0]), orbs::pane_tick(used.bands, shown[1])]);
+    }
     write_eggs(&mut cache, &looks);
     // Release builds say it too, once: more orbs than panes means a fighter's spheres were cut (review HB-2).
     static OVER_SAID: AtomicBool = AtomicBool::new(false);
@@ -775,7 +787,7 @@ pub fn forget_fighter(fighter: usize) {
         store.table.sets[i].forget();
     }
     HELD.store(store.table.held_spheres(), Ordering::Relaxed);
-    BOARD.lock().clear(accessor);
+    clear_board(accessor);
 }
 
 /// One raw game-memory read for `hitbox::GameHurt` (the per-frame pass's hurt reader, route B; the diag census uses the
@@ -826,7 +838,9 @@ static ARTICLES: Mutex<orbs::Articles> = Mutex::new(orbs::Articles::new());
 /// `sv_battle_object` as `cpu_pilot` uses it.
 unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader: impl FnMut(usize) -> Option<R>) -> u32 {
     let mut articles = ARTICLES.lock();
-    let mut board = BOARD.lock();
+    let Some(mut board) = BOARD.try_lock() else { return 0; };
+    articles.clear_evicted(&mut board);
+    let hide = super::hide_cpu::draw_hide();
     let wind = shown(legend::WINDBOXES);
     let hurt = shown(legend::ARTICLE_HURTBOXES) && matches!(scene::current(), Some(Scene::Training));
     let (mut dropped, mut budget) = (0, hitbox::ARTICLE_HURT_BATCH);
@@ -852,7 +866,7 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
         if legend::tracks_item(live_slot, found) {
             #[cfg(feature = "diag")]
             stats::item(&articles, id, key);
-            let _ = articles.track(id, key, &mut board, true);
+            let _ = articles.track(id, key, Some(&mut board), true);
         }
         if hurt && !articles.tracked().contains(&(id, key)) {
             let (mut len, mut cap) = (0, hurts.len());
@@ -860,14 +874,14 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
                 let cut = hitbox::want_article_hurt(&mut reader, &mut hurts, &mut len, false, &mut cap);
                 #[cfg(feature = "diag")]
                 stats::article_hurt(id, key, len, cut);
-                if len != 0 && articles.track(id, key, &mut board, false).is_none() { dropped += cut + len as u32; }
+                if len != 0 && articles.track(id, key, Some(&mut board), false).is_none() { dropped += cut + len as u32; }
             }
         }
     }
     for (id, key) in articles.tracked().into_iter().filter(|t| t.0 != 0) {
         let live = smash::app::sv_battle_object::is_active(id) && smash::app::sv_battle_object::module_accessor(id) as usize == key;
         // `key` is the live article's accessor (checked above); the natives check their own grants. Tracked: its set.
-        let Some((set, attacking)) = articles.track(id, key, &mut board, false) else { continue };
+        let Some((set, attacking)) = articles.track(id, key, Some(&mut board), false) else { continue };
         let place = |s: &Sphere| natives::joint_position(key, s.joint, &s.pos);
         // Only a live article is read: its areas, its facing and its status (`legend::keeps_article` inside the pass).
         let kept = live && {
@@ -885,9 +899,9 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
                 lr: shown(legend::ANGLES).then(|| natives::lr(key)),
                 areas: &areas[..found],
                 hurt: &hurts[..len],
-                owner: article_owner(id, key),
+                owner: hide.owner(|| article_owner(id, key)),
             };
-            let kept = orbs::article_pass(&mut board, set, key, natives::status_kind(key), &mut GameAttacks(key), place, extras);
+            let kept = orbs::article_pass(&mut board, set, (id, key), natives::status_kind(key), &mut GameAttacks(key), place, extras);
             *attacking = found != 0 || set.spheres().any(|s| s.key >> 24 != hitbox::KIND_ARTICLE_HURT);
             kept
         };
@@ -895,6 +909,7 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
             articles.forget(id, &mut board);
         }
     }
+    board.finish_articles(hide.generation());
     dropped
 }
 
@@ -1012,7 +1027,7 @@ pub unsafe fn frame(fighter: usize) {
     if enabled {
         counts.dropped += draw_articles(accessor, |key| enabled.then(|| hitbox::GameHurt { accessor: key, load: mem_load }));
     } else {
-        ARTICLES.lock().forget_all(&mut BOARD.lock());
+        ARTICLES.lock().forget_all(BOARD.try_lock().as_deref_mut());
     }
     counts.kept += c.kept;
     counts.spawned += c.spawned;
@@ -1087,7 +1102,7 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     } else {
         let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
         articles = ARTICLES.lock();
-        articles.track(id, accessor, &mut BOARD.lock(), true).unwrap().0
+        articles.track(id, accessor, None, true).unwrap().0
     };
     let made = wants[..len].iter().filter(|w| grab && set.push_grab(**w, status)).count() as u32;
     #[cfg(feature = "diag")]
@@ -1129,7 +1144,7 @@ unsafe fn wind_command(lua: usize) {
     }
     let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
     let mut articles = ARTICLES.lock();
-    articles.track(id, accessor, &mut BOARD.lock(), true).unwrap();
+    articles.track(id, accessor, None, true).unwrap();
 }
 
 /// `sv_animcmd::AREA_WIND_2ND` (a box): the plugin part first, then the game's own command.

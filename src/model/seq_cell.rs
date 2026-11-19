@@ -40,6 +40,11 @@ impl<const W: usize> SeqCell<W> {
 
     /// The value, read whole; `None` when a write was in progress on every one of `tries` attempts.
     pub fn read(&self, tries: usize) -> Option<[u64; W]> {
+        self.read_generation(tries).map(|(_, value)| value)
+    }
+
+    /// A coherent value and the even generation it came from.
+    pub fn read_generation(&self, tries: usize) -> Option<(u32, [u64; W])> {
         for _ in 0..tries {
             let before = self.seq.load(Acquire);
             if before & 1 == 1 {
@@ -49,7 +54,7 @@ impl<const W: usize> SeqCell<W> {
             let value: [u64; W] = std::array::from_fn(|i| self.words[i].load(Relaxed));
             fence(Acquire);
             if self.seq.load(Relaxed) == before {
-                return Some(value);
+                return Some((before, value));
             }
         }
         None

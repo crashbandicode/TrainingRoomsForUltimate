@@ -484,7 +484,11 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         let (receipt, retired) = with(|cpu| {
             let had_roles = cpu.roles.any();
             let receipt = role_adapter::before_frame(cpu, scene, entry);
-            (receipt, had_roles && !cpu.roles.any())
+            let retired = had_roles && !cpu.roles.any();
+            if retired {
+                hide_cpu::publish(cpu);
+            }
+            (receipt, retired)
         }).unwrap_or((None, false));
         if retired { recorder::session_clear(); }
         receipt
@@ -605,7 +609,10 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
         None
     };
     if !is_cpu_role(scene, entry, reset_hub::cpu_operated(fighter), cpus) {
-        with(|cpu| cpu.roles.forget(accessor));
+        with(|cpu| {
+            cpu.roles.forget(accessor);
+            hide_cpu::publish(cpu);
+        });
         return;
     }
     let kind = ((fighter + FIGHTER_KIND_FIELD) as *const i32).read();
@@ -629,7 +636,6 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
     let speed = crate::runtime::features::game_speed::current();
     let practice_owned = crate::runtime::features::mashout::owns_cpu(accessor);
 
-    let object_id = natives::battle_object_id(accessor);
     let out = with(|cpu| {
         if !cpu.roles.set(receipt, accessor, key) { return None; }
         let facts = FrameFacts {
@@ -649,7 +655,6 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
             request: hide_cpu::REQUEST.load(Ordering::Acquire),
         };
         cpu.fighters[key.index()].kind = kind;
-        cpu.fighters[key.index()].object_id = Some(object_id);
         // A save state loading is package 3's fact (`states::is_loading`, the load machine's own flag).
         cpu.save_loading = save_loading;
         if crate::runtime::export::wanted() && LAST_SAVE_LOADING.swap(save_loading, Ordering::AcqRel) != save_loading {
@@ -663,7 +668,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
             }
         }
         let out = if practice_owned { cpu.practice_frame(key) } else { cpu.frame(key, &facts) };
-        hide_cpu::publish(cpu);
+        hide_cpu::publish_frame(cpu, key, accessor);
         Some(out)
     }).flatten();
     cpu_event_on_change!(

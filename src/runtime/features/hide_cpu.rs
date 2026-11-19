@@ -17,6 +17,8 @@ use crate::model::cpu::hide;
 use crate::model::cpu::ids::UNRESOLVED;
 use crate::model::cpu::role::FighterKey;
 use crate::model::cpu::state::Cpu;
+use crate::model::hitbox_orbs::{DrawHide, HIDDEN_WORDS};
+use crate::model::seq_cell::SeqCell;
 use crate::runtime::features::notices;
 use crate::runtime::game::{self, natives};
 use crate::runtime::seams::seam_install::gate;
@@ -44,22 +46,44 @@ pub(crate) static REQUEST: AtomicBool = AtomicBool::new(false);
 static HIDDEN: AtomicBool = AtomicBool::new(false);
 /// The entries whose HUD panel is hidden, one bit each (`Cpu::hidden_panels`), for the `info_melee` tick.
 static PANELS: AtomicU8 = AtomicU8::new(0);
+/// The CPU guard serializes writers. First half: live accessors. Second half: full IDs, plus one for ID zero.
+static HIDDEN_BODIES: SeqCell<HIDDEN_WORDS> = SeqCell::new();
+
+/// Idle path: one relaxed mask load. Read a coherent snapshot only when a body is away.
+pub(super) fn draw_hide() -> DrawHide {
+    if PANELS.load(Ordering::Relaxed) == 0 {
+        return DrawHide::VISIBLE;
+    }
+    DrawHide::sampled(HIDDEN_BODIES.read_generation(2))
+}
+
+/// Update the ID only for an admitted hidden fighter. The accessor comes from that live CPU frame.
+pub(crate) unsafe fn publish_frame(cpu: &mut Cpu, key: FighterKey, accessor: usize) {
+    let body = &mut cpu.fighters[key.index()];
+    body.object_id = (body.away && BASE.load(Ordering::Acquire) != 0)
+        .then(|| natives::battle_object_id(accessor));
+    publish(cpu);
+}
 
 /// Publish the admitted hide state to the HUD and the visualizer after each body frame or retirement.
 pub(crate) fn publish(cpu: &Cpu) {
     let bits = cpu.hidden_panels() * u8::from(BASE.load(Ordering::Acquire) != 0);
-    let previous = PANELS.swap(bits, Ordering::AcqRel);
+    let previous = PANELS.load(Ordering::Relaxed);
     if (previous | bits) != 0 {
-        let bodies = std::array::from_fn(|i| {
-            let key = FighterKey { entry: (i / 2) as u8, partner: (i & 1) != 0 };
-            let body = &cpu.fighters[i];
-            if bits != 0 && body.away && cpu.roles.accessor_of(Some(cpu.scene), key).is_some() {
-                body.object_id
-            } else {
-                None
+        let mut words = [0; HIDDEN_WORDS];
+        if bits != 0 {
+            for (i, body) in cpu.fighters.iter().enumerate().filter(|(_, body)| body.away) {
+                let key = FighterKey { entry: (i / 2) as u8, partner: (i & 1) != 0 };
+                if let (Some(accessor), Some(id)) = (cpu.roles.accessor_of(Some(cpu.scene), key), body.object_id) {
+                    words[i] = accessor as u64;
+                    words[FighterKey::COUNT + i] = u64::from(id) + 1;
+                }
             }
-        });
-        super::hitbox::update_hidden_bodies(bodies);
+        }
+        HIDDEN_BODIES.write(&words);
+    }
+    if previous != bits {
+        PANELS.store(bits, Ordering::Release);
     }
 }
 
