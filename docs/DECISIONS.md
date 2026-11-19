@@ -1518,3 +1518,10 @@ break a target, except under Hits of 12%+). V2.2's on-screen rule stays: targets
   Targets keeps its `Projectiles break targets` toggle. An article's break does not freeze the fighter.
 - **D9 (a menu close restarts a game):** superseded by the operator-approved practice-games menu (Q1). menu-games-devin
   implements that; this lane makes no D9 change.
+
+#### Spawn area (2026-11-19)
+
+**Ordered 2026-11-19 13:45Z**, relayed by the primary (`c07b3449`): Eggs-ercise adds **Spawn area**, with **In view**
+as the default and **Whole stage** as an option. Whole stage lets targets appear anywhere on the stage's floors within
+the stage's range, even off screen, using the player's own camera. It supersedes the on-screen rule for Whole stage only;
+In view keeps the existing behavior. The setting applies on the next Start.

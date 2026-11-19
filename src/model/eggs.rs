@@ -434,17 +434,27 @@ impl Run {
         self.owner.1 == 0
     }
 
-    /// A new target, launched (§2.3b) from a random spot of the stage: a point of one of the stage's floors (`set_floors`; the
-    /// run's ground when none was read), chosen by length and the selected spawn area, on the floor or up to `REACH` above it.
-    /// It keeps `spacing` from `last` and `P1_GAP` from Player 1; when sixteen tries all fall short, it uses the try that
-    /// falls least short (a random spot, never a fixed side).
+/// A new target, launched (§2.3b) from a random spot of the stage's floors (`set_floors`; the run's ground when none was
+/// read), chosen by length and the selected spawn area. In view uses the screen bounds; Whole stage uses the full stage
+/// range and its vertical bounds when valid. It keeps `spacing` from `last` and `P1_GAP` from Player 1; when sixteen tries
+/// all fall short, it uses the try that falls least short (a random spot, never a fixed side).
     /// None before the draw published the camera (a run's first one, with no `last`, waits for it to hold still).
     fn spawn(&mut self, last: Option<[f32; 2]>) -> Option<()> {
         let ready = (last.is_some() || self.still >= SETTLE) && !self.pending;
-        let View(s, o, range, _) = self.view.filter(|_| ready)?;
+        let View(s, o, range, vertical) = self.view.filter(|_| ready)?;
         let edge = |i: usize, c: f32| (c * CANVAS_HALF[i] - o[i]) / s[i] - c * RADIUS;
-        let [sx0, sx1] = range.map(|v| v.max(edge(0, -1.0)).min(edge(0, 1.0)));
-        let (x0, x1, top, bottom) = (sx0 + DRIFT, sx1 - DRIFT, edge(1, 1.0), edge(1, -1.0));
+        let (sx0, sx1, top, bottom) = if self.rows[4] == WHOLE {
+            let [sx0, sx1] = [range[0] + RADIUS, range[1] - RADIUS];
+            let (top, bottom) = match vertical {
+                Some([lo, hi]) => (hi - RADIUS, lo + RADIUS),
+                None => (edge(1, 1.0), edge(1, -1.0)),
+            };
+            (sx0, sx1, top, bottom)
+        } else {
+            let [sx0, sx1] = range.map(|v| v.max(edge(0, -1.0)).min(edge(0, 1.0)));
+            (sx0, sx1, edge(1, 1.0), edge(1, -1.0))
+        };
+        let (x0, x1) = (sx0 + DRIFT, sx1 - DRIFT);
         // The disc's centre is `RADIUS` above its floor; the CPU target's feet are on it, and it flies the disc's flight
         // (the operator, 11-15): its feet trace the disc's bottom edge.
         let lift = [0.0, -RADIUS][usize::from(self.rows[3] == CPU)];
