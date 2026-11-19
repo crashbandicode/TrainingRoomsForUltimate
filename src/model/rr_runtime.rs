@@ -605,9 +605,8 @@ enum CatalogEntry {
 fn catalog_entry(root: &Path, folder: usize, id: String) -> Option<CatalogEntry> {
     let dir = root.join(crate::model::store::CATALOG_DIRS[folder]);
     Some(match folder {
-        0 => {
-            let library = Library::new(dir);
-            let file = match library.load_with_sibling::<Chain>(&id)? {
+        0 => CatalogEntry::Macro(
+            match Library::new(dir).load_with_sibling::<Chain>(&id)? {
                 Ok(file) => MacroFile {
                     id,
                     name: file.name,
@@ -628,9 +627,8 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> Option<CatalogEntry>
                     recorded_on: String::new(),
                     span: 0,
                 },
-            };
-            CatalogEntry::Macro(file)
-        }
+            },
+        ),
         1 => {
             let save = Store::<NamedSave>::new(dir).load(&id).ok()?;
             let fighters = [&save.player, &save.cpu]
@@ -750,6 +748,8 @@ impl CatalogCache {
     }
 
     /// One folder listing or one file read between input passes.
+    // Keep catalog scratch space out of the menu worker's other call paths.
+    #[inline(never)]
     pub fn step(&mut self) -> bool {
         let Some(generation) = self.generation else { return false };
         if self.ready.is_some() {
@@ -845,7 +845,9 @@ pub struct MenuIndex {
 }
 
 impl MenuIndex {
-    /// `true` when this pass took the index read slot, even if a writer held the card.
+    /// 	rue when this pass took the index read slot, even if a writer held the card.
+    // Keep JSON decoding in its own frame for the menu worker's stack bound.
+    #[inline(never)]
     pub fn step(&mut self, root: &Path, version: (u64, u64)) -> bool {
         if self.ready(version).is_some() {
             return false;
