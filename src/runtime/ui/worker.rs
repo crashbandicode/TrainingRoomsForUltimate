@@ -297,6 +297,10 @@ fn run() {
         // reads the card).
         session.catalog.want(crate::engine::rr_host::catalog_generation());
         let building = session.catalog.step();
+        // The folder check found files changed outside TR: the next generation rebuilds the catalog.
+        if session.catalog.take_external_change() {
+            crate::engine::rr_host::bump_catalog();
+        }
         if refresh_recording(&mut session) {
             publish_frame(&session);
         }
@@ -365,6 +369,8 @@ fn handle(event: Event, s: &mut Session) {
         { s.opening = crate::runtime::ui::menu_app::sequence(); }
         // The kept catalog before the first frame (menu speed): no card read, so the opening is drawn at once.
         refresh_recording(s);
+        // Then the folders are listed in the worker's passes, to see files copied onto the card outside TR.
+        s.catalog.check(crate::engine::rr_host::catalog_generation());
         publish_frame(s);
         publish_jumps(s);
         if crate::runtime::export::wanted() {

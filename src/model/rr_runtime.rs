@@ -580,6 +580,49 @@ fn empty_load() -> CatalogLoad {
     }
 }
 
+/// The library folders as names and sizes, a folder per step, no file opened (directory times are not dependable on the
+/// Switch's FAT card): what a catalog was built from, so a later check sees files copied onto the card outside TR.
+struct SignatureScan {
+    dirs: [std::path::PathBuf; 4],
+    at: usize,
+    hash: u64,
+}
+
+impl SignatureScan {
+    fn new(root: &Path) -> Self {
+        Self { dirs: [MACROS_DIR, SAVES_DIR, "combos", SEQUENCES_DIR].map(|dir| root.join(dir)), at: 0, hash: 0xcbf2_9ce4_8422_2325 }
+    }
+
+    /// List the next folder (its record files' names and sizes, sorted, into the FNV-1a hash). `false` when all are listed.
+    fn step(&mut self) -> bool {
+        let Some(dir) = self.dirs.get(self.at) else { return false };
+        let mut files: Vec<(String, u64)> = std::fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|item| {
+                let name = item.file_name().to_string_lossy().into_owned();
+                let meta = item.metadata().ok()?;
+                (meta.is_file() && name.ends_with(".json") && !name.starts_with('.')).then_some((name, meta.len()))
+            })
+            .collect();
+        files.sort();
+        let at = self.at as u64;
+        let mut eat = |bytes: &[u8]| {
+            for byte in bytes {
+                self.hash = (self.hash ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3);
+            }
+        };
+        eat(&at.to_le_bytes());
+        for (name, len) in files {
+            eat(name.as_bytes());
+            eat(&len.to_le_bytes());
+        }
+        self.at += 1;
+        true
+    }
+}
+
 /// One store of the catalog: its listing a file per step, then one entry to load per step.
 enum Pass<R: crate::model::store::Record> {
     Start,
@@ -626,6 +669,8 @@ impl<R: crate::model::store::Record> Pass<R> {
 /// listing, or one listed file's full load; the result is the one `load_catalog` returns.
 pub struct CatalogBuild {
     root: std::path::PathBuf,
+    /// The folders as the build found them, listed before any file is read.
+    scan: SignatureScan,
     index: Option<RecordingIndex>,
     stage: u8,
     macros: (Library, Pass<MacroRecording>),
@@ -640,6 +685,7 @@ impl CatalogBuild {
     pub fn new(root: &Path) -> Self {
         Self {
             root: root.to_path_buf(),
+            scan: SignatureScan::new(root),
             index: None,
             stage: 0,
             macros: (Library::new(root.join(MACROS_DIR)), Pass::Start),
@@ -654,6 +700,9 @@ impl CatalogBuild {
     /// One step: at most one file read. `Ok(true)` while the build goes on.
     pub fn step(&mut self) -> Result<bool, Error> {
         use crate::model::recording_menu::{ComboFile, MacroFile, SaveFile, SequenceFile};
+        if self.scan.step() {
+            return Ok(true);
+        }
         let catalog = &mut self.catalog;
         let done = match self.stage {
             0 => {
@@ -795,6 +844,11 @@ pub struct CatalogCache {
     root: std::path::PathBuf,
     ready: Option<(u64, CatalogLoad)>,
     build: Option<(u64, CatalogBuild)>,
+    /// The library folders (names and sizes) the ready catalog was built from.
+    signature: Option<u64>,
+    /// The folder check after a menu open, for the generation it was started at.
+    check: Option<(u64, SignatureScan)>,
+    changed: bool,
 }
 
 impl Default for CatalogCache {
@@ -806,7 +860,7 @@ impl Default for CatalogCache {
 
 impl CatalogCache {
     pub fn new(root: &Path) -> Self {
-        Self { root: root.to_path_buf(), ready: None, build: None }
+        Self { root: root.to_path_buf(), ready: None, build: None, signature: None, check: None, changed: false }
     }
 
     /// The card is at `generation`: build it unless the ready catalog or the running build is that generation's.
@@ -814,18 +868,22 @@ impl CatalogCache {
         if self.ready.as_ref().is_some_and(|(ready, _)| *ready == generation) {
             self.build = None;
         } else if !self.build.as_ref().is_some_and(|(building, _)| *building == generation) {
+            // The build lists the folders itself: a check under way has nothing left to compare.
+            self.check = None;
             self.build = Some((generation, CatalogBuild::new(&self.root)));
         }
     }
 
-    /// One build step (at most one file read). `true` while the build goes on.
+    /// One build step (at most one file read), else one folder of the check (a listing, no file read). `true` while
+    /// either goes on.
     pub fn step(&mut self) -> bool {
-        let Some((_, build)) = self.build.as_mut() else { return false };
+        let Some((_, build)) = self.build.as_mut() else { return self.check_step() };
         match build.step() {
             Ok(true) => true,
             // The index could not be read: as `load_catalog` failing, the lists keep what they had (none: empty).
             Ok(false) | Err(_) => {
                 let Some((generation, build)) = self.build.take() else { return false };
+                self.signature = Some(build.scan.hash);
                 let load = if build.index.is_some() {
                     build.finish()
                 } else {
@@ -840,12 +898,24 @@ impl CatalogCache {
     /// After a menu open: list the library folders (names and sizes, no file read) a folder per [`Self::step`], to see
     /// files copied onto the card outside TR (FTP, DBI) since the kept catalog was built.
     pub fn check(&mut self, generation: u64) {
-        let _ = generation;
+        if self.build.is_none() && self.ready(generation).is_some() {
+            self.check = Some((generation, SignatureScan::new(&self.root)));
+        }
+    }
+
+    fn check_step(&mut self) -> bool {
+        let Some((_, scan)) = self.check.as_mut() else { return false };
+        if scan.step() {
+            return true;
+        }
+        let Some((generation, scan)) = self.check.take() else { return false };
+        self.changed |= self.ready(generation).is_some() && self.signature != Some(scan.hash);
+        false
     }
 
     /// The check found the folders changed since the kept catalog was built (once): the worker moves the generation.
     pub fn take_external_change(&mut self) -> bool {
-        false
+        core::mem::take(&mut self.changed)
     }
 
     /// The catalog of `generation`, when it is built.
