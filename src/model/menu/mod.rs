@@ -397,9 +397,16 @@ pub(crate) fn group_of(entry: Entry) -> usize {
     }
 }
 
-/// A list cursor after ZL + Up / Down: one window further, stopping at the first or last entry (no wrap).
+/// A list cursor after ZL + Up / Down: one window further, stopping at the first or last entry; from there the next
+/// jump wraps to the other end, as Up / Down do.
 fn jumped(cursor: usize, len: usize, forward: bool) -> usize {
-    if forward { (cursor + LIST_JUMP).min(len.saturating_sub(1)) } else { cursor.saturating_sub(LIST_JUMP) }
+    let last = len.saturating_sub(1);
+    match forward {
+        true if cursor >= last => 0,
+        true => (cursor + LIST_JUMP).min(last),
+        false if cursor == 0 => last,
+        false => cursor.saturating_sub(LIST_JUMP),
+    }
 }
 
 /// The menu.
@@ -1307,12 +1314,13 @@ impl Menu {
     }
 
     /// ZL + Up / Down on a page: the cursor goes to the first focusable entry of the previous or next section (a
-    /// group: its first row, or the header of a collapsed advanced group). It does not wrap: on the first or the
-    /// last section the cursor stays, unlike Up / Down, so the edge of the page is felt.
+    /// group: its first row, or the header of a collapsed advanced group). From the first or the last section it
+    /// wraps to the other end, as Up / Down do.
     fn jump_section(&mut self, forward: bool) {
         let page = self.page;
         let Some(current) = self.focus().map(group_of) else { return };
         let (mut before, mut after, mut seen, mut last) = (None, None, false, None);
+        let (mut first_start, mut last_start) = (None, None);
         self.scan(page, |n, entry| {
             let group = group_of(entry);
             if !self.focusable(entry) || last == Some(group) {
@@ -1320,17 +1328,18 @@ impl Menu {
             }
             // `n` is the first focusable entry of `group`.
             last = Some(group);
+            first_start.get_or_insert(n);
+            last_start = Some(n);
             if group == current {
                 seen = true;
             } else if !seen {
                 before = Some(n);
-            } else {
+            } else if after.is_none() {
                 after = Some(n);
-                return false;
             }
             true
         });
-        if let Some(at) = if forward { after } else { before } {
+        if let Some(at) = if forward { after.or(first_start) } else { before.or(last_start) } {
             self.cursor[page.index()] = at;
         }
     }

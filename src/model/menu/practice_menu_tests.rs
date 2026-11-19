@@ -354,7 +354,9 @@ fn sub_screen_keys_match_the_page() {
     assert!(matches!(m.screen(), Some(Screen::Rows { cursor: 12, .. })));
     assert_eq!(frame(&m).row_count as usize, crate::model::panes::ROWS, "the long screen scrolls in one window");
     m.press(Button::JumpDown);
-    assert!(matches!(m.screen(), Some(Screen::Rows { cursor: 23, .. })), "no wrap: the last row");
+    assert!(matches!(m.screen(), Some(Screen::Rows { cursor: 23, .. })), "the window stops on the last row");
+    m.press(Button::JumpDown);
+    assert!(matches!(m.screen(), Some(Screen::Rows { cursor: 0, .. })), "then wraps to the first");
     // A greyed row says why.
     let mut m = running(Game::Btt);
     on_list(&mut m, Game::Eggs);
