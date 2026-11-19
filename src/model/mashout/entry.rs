@@ -78,15 +78,20 @@ impl PlacementFloor {
 
     fn clears_end(
         mut self,
-        required: f32,
+        placement_x: f32,
         right: bool,
         ray: &mut impl FnMut(f32, [f32; 2], bool) -> Option<Self>,
     ) -> bool {
-        let reaches = |x: f32, limit: f32| if right { x >= limit } else { x <= limit };
+        let margin = if right { END_MARGIN } else { -END_MARGIN };
+        let required = placement_x + margin;
+        let clears = |endpoint: f32| {
+            let distance = if right { endpoint - placement_x } else { placement_x - endpoint };
+            distance >= END_MARGIN
+        };
         // Bound synchronous native reads when a stage has many tiny collision lines.
         for _ in 0..8 {
             let [_, join] = self.ends_toward(right);
-            if reaches(join[0], required) {
+            if clears(join[0]) {
                 return true;
             }
             if !self.stationary {
@@ -99,15 +104,14 @@ impl PlacementFloor {
                 let level = self.height(x)?;
                 let next = ray(x, [level + FOOT_PROBE, level - FOOT_PROBE], true)?;
                 let [near, far] = next.ends_toward(right);
-                (next.stationary && near == join && reaches(far[0], x))
-                    .then_some(next)
-                    .filter(|floor| floor.height(x).is_some())
+                let covers_sample = if right { near[0] < x && x <= far[0] } else { far[0] <= x && x < near[0] };
+                (next.stationary && near == join && covers_sample && next.height(x).is_some()).then_some(next)
             }) else {
                 return false;
             };
             self = next;
         }
-        reaches(self.ends_toward(right)[1][0], required)
+        clears(self.ends_toward(right)[1][0])
     }
 
     fn placement_height(
@@ -117,11 +121,10 @@ impl PlacementFloor {
     ) -> Option<f32> {
         let height = self.height(x)?;
         let [[left, _], [right, _]] = self.ends_toward(true);
-        if x < left || x > right {
+        if !(left..=right).contains(&x) {
             return None;
         }
-        (self.clears_end(x - END_MARGIN, false, ray) && self.clears_end(x + END_MARGIN, true, ray))
-            .then_some(height)
+        (self.clears_end(x, false, ray) && self.clears_end(x, true, ray)).then_some(height)
     }
 }
 
