@@ -170,6 +170,13 @@ fn run_inner() {
     #[cfg(not(feature = "diag"))]
     let poison_text = String::new();
     let hb_found = hitbox::check(&|name| poison_text.split(|c: char| c.is_whitespace() || c == ',').any(|n| n == name));
+    let lockon_sites = &crate::model::sites_lockon::CALLEES;
+    let mut lockon_found = game::outcomes(lockon_sites);
+    for (site, found) in lockon_sites.iter().zip(lockon_found.iter_mut()) {
+        if poison_text.split(|c: char| c.is_whitespace() || c == ',').any(|name| name == site.name) {
+            *found = GuardOutcome::Foreign { first_diff: 0 };
+        }
+    }
     let developer_found = crate::runtime::developer::check();
     let mut tech_found = game::outcomes(&crate::model::sites_tech_launch::SITES);
     for (row, outcome) in crate::model::sites_tech_launch::SITES.iter().zip(tech_found.iter_mut()) {
@@ -202,6 +209,7 @@ fn run_inner() {
             .or_else(|| by_name(&sites_u4::SITES, &u4_found))
             .or_else(|| by_name(&sites_u4b::SITES, &u4b_found))
             .or_else(|| by_name(&sites_hitbox::SITES, &hb_found))
+            .or_else(|| by_name(lockon_sites, &lockon_found))
             .or_else(|| by_name(&crate::model::developer_debug::SITES, &developer_found))
             .or_else(|| by_name(&sites_mashout::SITES, &mashout_found))
             .or_else(|| by_name(&crate::model::sites_tech_launch::SITES, &tech_found))
@@ -211,7 +219,6 @@ fn run_inner() {
     };
     // The native-call layer calls only what passed (`game::natives` and `state_natives` refuse the rest).
     game::grant(Granted::from_usable(&usable));
-    crate::runtime::features::lockon::init_practice_items();
     // The shared fighter natives of `game::natives`, each group once the rows it calls passed their guards.
     let row_usable = |name: &str| sites::find(name).is_some_and(usable);
     let row4_usable = |name: &str| sites_pkg4::SITES.iter().position(|s| s.name == name).is_some_and(|i| found4[i].usable());
@@ -291,6 +298,8 @@ fn run_inner() {
     crate::runtime::features::btt::set_usable(hitbox_on);
     let btt_projectiles_on = hitbox_on && capabilities::unit_usable(Feature::BttProjectiles, &usable);
     crate::runtime::features::btt_projectiles::set_ready(btt_projectiles_on);
+    let lockon_on = hitbox_on && capabilities::unit_usable(Feature::Lockon, &usable);
+    crate::runtime::features::lockon::set_usable(lockon_on);
     // Package 6: the roster cycle (hot swap, preload, Kirby hats, items), the Mii files and the waiting-room practice engine. The cycle
     // starts only when every game function its code calls through `smash::` passed its guard (`roster::CALLED_ROWS`); each of its
     // files then checks its own seam rows and installs nothing when they are refused (the seam fields of the install line say which).
@@ -405,6 +414,9 @@ fn run_inner() {
     reports.extend(ui::reports(&ui_install));
     reports.extend(p1::reports(&found6, &written6));
     reports.extend(hitbox::reports(&hb_found, &hb_written));
+    reports.extend(lockon_sites.iter().zip(lockon_found).map(|(site, found)| SiteReport {
+        site: site.name, found, written: if found.usable() { Written::Checked } else { Written::Skipped },
+    }));
     reports.extend(crate::runtime::developer::reports(&developer_found, developer_debug_on));
     reports.extend(sites_mashout::SITES.iter().zip(mashout_found).map(|(site, found)| SiteReport {
         site: site.name,
@@ -449,6 +461,7 @@ fn run_inner() {
         report(Feature::CpuCommon, false, if common_blocked { None } else { cpu_common_reason }),
         report(Feature::StateCore, state_on, None),
         FeatureReport { feature: Feature::BttProjectiles.name(), installed: btt_projectiles_on, reason: (!hitbox_on).then_some("hitbox_not_installed"), site: if btt_projectiles_on || !hitbox_on { None } else { blocked(Feature::BttProjectiles) } },
+        report(Feature::Lockon, lockon_on, (!hitbox_on).then_some("hitbox_not_installed")),
         FeatureReport { feature: Feature::Hitbox.name(), installed: hitbox_on, reason: (!hitbox_on && !cpu_core_on).then_some("cpu_core_not_installed"), site: if hitbox_on || !cpu_core_on { None } else { blocked(Feature::Hitbox) } },
         FeatureReport { feature: "chords", installed: input_delay_on, reason: input_delay_reason, site: None },
         report(Feature::InputDisplay, display_on, None),

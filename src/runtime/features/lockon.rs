@@ -11,8 +11,8 @@ use crate::model::{
     lockon::{free_slot_top, take_damage, ItemHost, Target, Tracker},
     lra_reset,
     practice_games::Game,
-    sites_lockon::{CALLEES, ITEM_FACTORY_OFFSET, OBJECT_POOLS_SLOT},
-    sites_hitbox, sites_pkg2, sites_pkg3,
+    sites_lockon::{ITEM_FACTORY_OFFSET, OBJECT_POOLS_SLOT},
+    sites_hitbox,
 };
 use crate::runtime::{
     compat::common, compat::consts::FighterId, game, scene, state_natives as native,
@@ -46,25 +46,7 @@ struct GameItems(RefCell<Tracker<Handle, COUNT>>);
 unsafe impl Sync for GameItems {}
 static LIVE: GameItems = GameItems(RefCell::new(Tracker::new()));
 
-pub fn init_practice_items() {
-    let mut usable = [
-        sites_pkg3::STATE_ITEM_OBJECT_ID_OFFSET,
-        sites_pkg3::STATE_ITEM_REMOVE_OFFSET,
-        sites_pkg2::DAMAGE_OF_OFFSET,
-        sites_hitbox::DAMAGE_RECORD_OFFSET,
-        sites_hitbox::DAMAGE_HIT_IDS_OFFSET,
-        sites_hitbox::HITBOX_ATTACK_DATA_OFFSET,
-    ].into_iter().all(game::granted);
-    for (site, outcome) in CALLEES.iter().zip(game::outcomes(&CALLEES)) {
-        if !outcome.usable() {
-            usable = false;
-            crate::runtime::diag_log::diagnostic(format_args!(
-                "[TrainingRooms] lock_on guard={} outcome={}",
-                site.name,
-                outcome.code()
-            ));
-        }
-    }
+pub fn set_usable(usable: bool) {
     USABLE.store(usable, Ordering::Release);
 }
 
@@ -150,7 +132,7 @@ impl ItemHost for NativeItems {
         unsafe {
             // The ordinary item wrapper caps Sandbags at one. The factory's forced mode
             // admits duplicates, with both free pools checked before it can evict an item.
-            if !has_item_capacity(self.manager) {
+            if !game::granted(ITEM_FACTORY_OFFSET) || !has_item_capacity(self.manager) {
                 return None;
             }
             let pos = position(at);

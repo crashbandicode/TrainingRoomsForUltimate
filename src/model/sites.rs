@@ -98,6 +98,7 @@ features! {
     /// SPEC-core-06 guarded visualizer.
     Hitbox => "hitbox",
     BttProjectiles => "btt_projectiles",
+    Lockon => "lockon",
     /// SPEC-cpu-05's shield damage multiplier: the game's CommonParams object, found at the moment the game fills
     /// it from its parameter file (no provider plugin).
     CpuShieldDamage => "cpu_shield_damage",

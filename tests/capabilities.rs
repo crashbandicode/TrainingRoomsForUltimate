@@ -112,8 +112,8 @@ const BOUNDARIES: &[Boundary] = &[
     // camera unit's `change_active_camera` row, so it stands behind its flag (boot sets it from that unit's closure) and a rejected
     // row turns off only this camera, never the hitbox visualizer or Eggs-ercise that the pass belongs to.
     Boundary { function: "btt_camera::apply", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
-    // This adapter verifies its own complete bundle and both shared item grants at boot.
-    Boundary { function: "lockon::update_practice_items", owner: None, gate: Gate::Flag("USABLE") },
+    Boundary { function: "lockon::update_practice_items", owner: Some(Feature::Lockon), gate: Gate::Flag("USABLE") },
+    Boundary { function: "lockon::hit", owner: Some(Feature::Lockon), gate: Gate::Flag("USABLE") },
     // Mash's native-touching call-ins share the final boot admission, independent of CPU Defence.
     Boundary { function: "mashout::frame", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
     Boundary { function: "mashout::seed_token", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
@@ -198,6 +198,9 @@ impl Analysis {
         // rc.14 spots: the frame strip reads each fighter's attack slots through the same reader (hitbox::powers).
         for to in ["hitbox::active", "hitbox::data", "hitbox::read_f32"] {
             graph.dynamic.push(("input_display::sample".to_owned(), to.to_owned()));
+        }
+        for to in ["lockon::create_target_item", "lockon::place_target_item", "lockon::retire_target_item", "lockon::owns_live_item"] {
+            graph.dynamic.push(("lockon::update_practice_items".to_owned(), to.to_owned()));
         }
         for (from, to) in &graph.dynamic {
             assert_eq!(graph.find(from).len(), 1, "dynamic edge source {from}");
@@ -799,6 +802,25 @@ fn projectile_accessor_failure_leaves_hitbox_and_btt_melee_installed() {
     assert!(a.reach(start).0.contains(&row.offset));
     let worker = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime/ui/worker.rs")).unwrap();
     assert!(worker.contains("btt_projectiles_ready: crate::runtime::features::btt_projectiles::ready()"));
+}
+
+#[test]
+fn lockon_guard_failure_keeps_practice_scoring_installed() {
+    for name in ["lockon_create", "lockon_damage_source"] {
+        let row = capabilities::find(name).unwrap();
+        let usable = |site: &model::sites::Site| site.name != name;
+        assert_eq!(capabilities::blocked_by(Feature::Lockon, &usable), Some(name));
+        assert!(capabilities::unit_usable(Feature::Hitbox, &usable));
+        if name == "lockon_create" {
+            assert!(!Granted::from_usable(&usable).allows(row.offset));
+        }
+    }
+}
+
+#[test]
+fn lockon_requires_the_existing_hit_record_layout() {
+    let usable = |site: &model::sites::Site| site.name != "damage_record_hit_ids";
+    assert_eq!(capabilities::blocked_by(Feature::Lockon, &usable), Some("damage_record_hit_ids"));
 }
 
 #[test]
