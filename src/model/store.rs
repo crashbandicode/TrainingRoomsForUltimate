@@ -399,8 +399,21 @@ fn encode<R: Record>(rec: &R) -> Result<Vec<u8>, R::Error> {
     serde_json::to_vec(rec).map_err(|err| lift::<R>(err.into()))
 }
 
+#[cfg(test)]
+thread_local! {
+    static FILE_READS: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
+}
+
+/// Files this thread has read through a store (tests: a check that must read none).
+#[cfg(test)]
+pub(crate) fn file_reads() -> usize {
+    FILE_READS.with(|reads| reads.get())
+}
+
 /// Reads a whole file after checking its size against `max`.
 fn read_bounded(path: &Path, max: u64) -> Result<Vec<u8>, StoreError> {
+    #[cfg(test)]
+    FILE_READS.with(|reads| reads.set(reads.get() + 1));
     let bytes = fs::metadata(path)?.len();
     if bytes > max {
         return Err(StoreError::FileTooLarge { bytes, max });

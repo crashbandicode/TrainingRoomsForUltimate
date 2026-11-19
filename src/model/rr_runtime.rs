@@ -837,6 +837,17 @@ impl CatalogCache {
         }
     }
 
+    /// After a menu open: list the library folders (names and sizes, no file read) a folder per [`Self::step`], to see
+    /// files copied onto the card outside TR (FTP, DBI) since the kept catalog was built.
+    pub fn check(&mut self, generation: u64) {
+        let _ = generation;
+    }
+
+    /// The check found the folders changed since the kept catalog was built (once): the worker moves the generation.
+    pub fn take_external_change(&mut self) -> bool {
+        false
+    }
+
     /// The catalog of `generation`, when it is built.
     pub fn ready(&self, generation: u64) -> Option<&CatalogLoad> {
         self.ready.as_ref().filter(|(ready, _)| *ready == generation).map(|(_, load)| load)
@@ -1523,10 +1534,53 @@ mod tests {
         assert!(!cache.step());
     }
 
+    /// Files copied onto the card outside TR (FTP, DBI): the check after a menu open sees an add, a delete or a rename by
+    /// names and sizes and asks for a rebuild; an unchanged card asks for none and reads no file.
+    fn the_check_after_a_menu_open_sees_files_copied_outside_tr() {
+        let root = library_card("outside", 2);
+        let mut cache = CatalogCache::new(&root);
+        cache.want(0);
+        while cache.step() {}
+        let reads = crate::model::store::file_reads();
+        cache.check(0);
+        let mut steps = 0;
+        while cache.step() {
+            steps += 1;
+        }
+        assert!(steps >= 4, "a folder per step: {steps}");
+        assert!(!cache.take_external_change(), "an unchanged card asks for no rebuild");
+        assert_eq!(crate::model::store::file_reads(), reads, "the check reads no file");
+        assert!(cache.ready(0).is_some(), "the kept catalog stays");
+        let macros = root.join(MACROS_DIR);
+        let first = load_catalog(&root).unwrap().catalog.macros[0].id.clone();
+        let mut generation = 0;
+        for change in ["add", "delete", "rename"] {
+            match change {
+                "add" => drop(std::fs::copy(macros.join(format!("{first}.json")), macros.join("copied-in.json")).unwrap()),
+                "delete" => std::fs::remove_file(macros.join("copied-in.json")).unwrap(),
+                _ => std::fs::rename(macros.join(format!("{first}.json")), macros.join("renamed-in.json")).unwrap(),
+            }
+            cache.check(generation);
+            while cache.step() {}
+            assert!(cache.take_external_change(), "{change}: the check asks for a rebuild");
+            assert!(!cache.take_external_change(), "{change}: once");
+            // The worker moves the catalog generation; the rebuild is the card as it is now.
+            generation += 1;
+            cache.want(generation);
+            while cache.step() {}
+            assert_eq!(cache.ready(generation), Some(&load_catalog(&root).unwrap()), "{change}");
+            cache.check(generation);
+            while cache.step() {}
+            assert!(!cache.take_external_change(), "{change}: the rebuilt catalog's own folders are not a change");
+        }
+        assert!(cache.ready(generation).unwrap().catalog.macros.iter().any(|file| file.id == "renamed-in"));
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("the_check_after_a_menu_open_sees_files_copied_outside_tr", the_check_after_a_menu_open_sees_files_copied_outside_tr as fn()),
             ("a_stepped_catalog_build_is_load_catalog_a_file_at_a_time", a_stepped_catalog_build_is_load_catalog_a_file_at_a_time as fn()),
             ("the_catalog_cache_serves_only_a_fresh_catalog", the_catalog_cache_serves_only_a_fresh_catalog as fn()),
             ("record_follows_the_popup_role", record_follows_the_popup_role as fn()),

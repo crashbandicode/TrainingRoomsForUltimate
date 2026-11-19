@@ -32,6 +32,21 @@ fn a_menu_open_takes_the_kept_catalog_and_never_reads_the_card() {
     assert!(refreshed < open.find("publish_frame(s)").unwrap(), "{open}");
 }
 
+/// Files copied outside TR: each menu open starts the folder check, and a change it finds moves the catalog generation
+/// in the worker loop (the stepped rebuild then picks it up).
+#[test]
+fn a_menu_open_checks_the_folders_and_a_change_moves_the_generation() {
+    let worker = src("src/runtime/ui/worker.rs");
+    let handle = item(&worker, "fn handle(event: Event, s: &mut Session) {");
+    let open = &handle[..handle.find("let Event::Poll").expect("the poll branch")];
+    assert!(open.contains("s.catalog.check(crate::engine::rr_host::catalog_generation())"), "{open}");
+    let run = item(&worker, "fn run() {");
+    assert!(
+        run.contains("if session.catalog.take_external_change() {\n            crate::engine::rr_host::bump_catalog();"),
+        "{run}"
+    );
+}
+
 #[test]
 fn a_drill_is_not_cleared_while_the_catalog_loads() {
     let worker = src("src/runtime/ui/worker.rs");
