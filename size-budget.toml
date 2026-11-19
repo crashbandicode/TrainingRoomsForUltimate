@@ -2045,3 +2045,11 @@ ceiling = 165036
 date = "2026-11-19"
 reason = "Mash out fighter-grid picker (d0acb557 picker, 6fccfb36 opaque box, bfa4cef1 popup width, 7fdb9c83 reset; branch 83a8cbfd gated at 164812 = +283 over 5b6ab8cc), merged onto main 9f6aeae0 (Tech hint + Parry fresh set, ceiling 164753). Ceiling 164753 + 283 = 165036; the combined main is verified by the integration gate."
 approved_by = "Operator 2026-11-19 ordered the grid picker and approved its layout; rc.15 change-set common brief: exact measured delta, summed by the primary at merge."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 165129
+date = "2026-11-19"
+reason = "Mash out run reliability on cda940b1. Yoga measured b41624b9 at 165128, up 93 from 165035. Raise the existing 165036 ceiling by 93 and retain one line of headroom."
+approved_by = "Operator 2026-11-19 approved the Mash out resource, Dash and Pivot fixes. Primary c07b3449 directed a separate increase by the measured delta only."
