@@ -1233,6 +1233,61 @@ fn outward_grabs_place_inside_both_ledges_and_start() {
 }
 
 #[test]
+fn final_destination_lip_mirrors_across_an_exact_floor_join() {
+    let mut memory = NativeMemory::new();
+    let mut game = Game::new(Plan::Grab, State::Grab);
+    let request = game.requested.as_mut().unwrap();
+    request.grab = 2;
+    memory.body[3] = request.attacker_kind;
+    game.step = Step::Place;
+    CPU_STATUS.store(0, Ordering::Relaxed);
+    P1_X.store((-77.0_f32).to_bits(), Ordering::Relaxed);
+    ROLLER_LR.store((-1.0_f32).to_bits(), Ordering::Relaxed);
+    FLOORS.set([
+        Some(entry::PlacementFloor {
+            ends: [[-79.986, 0.0], [-74.986, 0.0]],
+            ..FIXTURE_FLOOR
+        }),
+        Some(entry::PlacementFloor {
+            ends: [[-74.986, 0.0], [74.988, 0.0]],
+            ..FIXTURE_FLOOR
+        }),
+    ]);
+
+    unsafe { memory.update(&mut game, 0) };
+
+    assert_eq!(game.step, Step::Settle, "FD's connected floor covers the mirrored placement");
+    assert_eq!(f32::from_bits(INIT_POS_X.load(Ordering::Relaxed)), -71.0);
+}
+
+#[test]
+fn floor_clearance_does_not_cross_a_gap_or_a_platform_end() {
+    for detached_floor in [None, Some(entry::PlacementFloor {
+        ends: [[-74.986_f32.next_up(), 0.0], [74.988, 0.0]],
+        ..FIXTURE_FLOOR
+    })] {
+        let mut memory = NativeMemory::new();
+        let mut game = Game::new(Plan::Grab, State::Grab);
+        memory.body[3] = game.requested.unwrap().attacker_kind;
+        game.step = Step::Place;
+        CPU_STATUS.store(0, Ordering::Relaxed);
+        P1_X.store((-77.0_f32).to_bits(), Ordering::Relaxed);
+        ROLLER_LR.store((-1.0_f32).to_bits(), Ordering::Relaxed);
+        FLOORS.set([Some(entry::PlacementFloor {
+            ends: [[-79.986, 0.0], [-74.986, 0.0]],
+            ..FIXTURE_FLOOR
+        }), detached_floor]);
+
+        unsafe { memory.update(&mut game, 0) };
+
+        assert_eq!(game.step, Step::Failed);
+        assert_eq!(INIT_POS_CALLS.load(Ordering::Relaxed), 0);
+        assert!(requests().is_empty());
+        assert!(LR_SETS.with_borrow(Vec::is_empty));
+    }
+}
+
+#[test]
 fn shared_cpu_placement_makes_no_writes_when_floor_is_unavailable() {
     unsafe {
         for plan in [Plan::Grab, Plan::Roller, Plan::DownSmash, Plan::Trolley, Plan::Drag, Plan::Flip] {
