@@ -845,7 +845,7 @@ pub struct MenuIndex {
 }
 
 impl MenuIndex {
-    /// 	rue when this pass took the index read slot, even if a writer held the card.
+    /// Returns true when this pass took the index read slot, even if a writer held the card.
     // Keep JSON decoding in its own frame for the menu worker's stack bound.
     #[inline(never)]
     pub fn step(&mut self, root: &Path, version: (u64, u64)) -> bool {
