@@ -1072,6 +1072,11 @@ const MODEL_CALLBACKS: &[(&str, &str)] = &[
     ("input_display::sample", "hitbox::active"),
     ("input_display::sample", "hitbox::data"),
     ("input_display::sample", "hitbox::read_f32"),
+    // The target tracker places and retires native items on the same game callback.
+    ("lockon::update_practice_items", "lockon::create_target_item"),
+    ("lockon::update_practice_items", "lockon::place_target_item"),
+    ("lockon::update_practice_items", "lockon::retire_target_item"),
+    ("lockon::update_practice_items", "lockon::owns_live_item"),
 ];
 
 const KEYBOARD_CALLBACK: &str = "the inline keyboard's SDK callback: the SDK runs it synchronously on the thread that calls into \
