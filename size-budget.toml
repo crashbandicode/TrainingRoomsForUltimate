@@ -2061,3 +2061,11 @@ ceiling = 165331
 date = "2026-11-19"
 reason = "Hidden CPU visualizer v2 (15eac65a) measured 165330 on 4f25a854, up 202 from 165128. Add the measured delta to the existing 165129 ceiling."
 approved_by = "Primary c07b3449 directed the lock-free hidden CPU visualizer revision and a separate exact size adjustment on 2026-11-19."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 165505
+date = "2026-11-19"
+reason = "Mash out guarded ledge placement and CPU teeter recovery, including exact floor joins. Yoga measured 60b031bf at 165302 vs 165128 on 4f25a854, a delta of 174. Rebase onto hidden CPU main 96355cad preserves the resident diff and adds 174 to ceiling 165331, retaining one line of headroom."
+approved_by = "Operator approved grounded CPU teeter admission and exact floor joins on 2026-11-19. Primary c07b3449 required the measured delta only and the rebase onto 96355cad."
