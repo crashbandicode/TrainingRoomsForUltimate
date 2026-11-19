@@ -434,10 +434,10 @@ impl Run {
         self.owner.1 == 0
     }
 
-/// A new target, launched (§2.3b) from a random spot of the stage's floors (`set_floors`; the run's ground when none was
-/// read), chosen by length and the selected spawn area. In view uses the screen bounds; Whole stage uses the full stage
-/// range and its vertical bounds when valid. It keeps `spacing` from `last` and `P1_GAP` from Player 1; when sixteen tries
-/// all fall short, it uses the try that falls least short (a random spot, never a fixed side).
+    /// A new target, launched (§2.3b) from a random spot of the stage's floors (`set_floors`; the run's ground when none was
+    /// read), chosen by length and the selected spawn area. In view uses the screen bounds; Whole stage uses the full stage
+    /// range and its vertical bounds when valid. It keeps `spacing` from `last` and `P1_GAP` from Player 1; when sixteen tries
+    /// all fall short, it uses the try that falls least short (a random spot, never a fixed side).
     /// None before the draw published the camera (a run's first one, with no `last`, waits for it to hold still).
     fn spawn(&mut self, last: Option<[f32; 2]>) -> Option<()> {
         let ready = (last.is_some() || self.still >= SETTLE) && !self.pending;
