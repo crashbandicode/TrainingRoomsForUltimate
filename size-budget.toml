@@ -2061,3 +2061,11 @@ ceiling = 165158
 date = "2026-11-19"
 reason = "rc.15 submenu-page-switch: L / R step the page from a submenu through the page's own change_page (Menu::switches_page lists the submenu screens; popups and editors keep their buttons), the sub-screen and pick-grid footers read L/R page, and ZL + Up / Down wrap at the first and last section or entry (jump_section, jumped). Measured 165158 = +29 over main 4f25a854 (165129)."
 approved_by = "primary c07b3449, RC15-CHANGES-COMMON (2026-11-19 13:45Z) and the submenu-page-switch order (~19:15Z): raise the budget by exactly the measured delta in a separate commit; the delta (+29) is reported for the operator."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 165172
+date = "2026-11-19"
+reason = "rc.15 submenu-page-switch, review 23:07Z #1: the worker's roster editor lives only while its own grid is the top screen (editors::roster::retain), so a form previewed with X does not outlive the page switch. Measured 165172 = +14 over 165158; the item's total is +43 over main 4f25a854 (165129)."
+approved_by = "primary c07b3449, RC15-CHANGES-COMMON (2026-11-19 13:45Z) and the 23:07Z review fix order: raise the budget by exactly the measured delta in a separate commit; the delta (+14, item total +43) is reported for the operator."
