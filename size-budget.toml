@@ -1997,3 +1997,12 @@ ceiling = 163201
 date = "2026-11-18"
 reason = "rc.15 practice menu (operator-approved mockup, 2026-11-18 ~14:58Z): one row per game, a generic sub-screen (Screen::Rows) with Start first, Start/Stop as menu actions with a Running label, and one runtime value for the running game (runtime::features::practice) replacing the three per-row exclusion sites. Composed onto main 2e62e485 (113/114 landed, 162927): measured 163201 = +274 counted lines over main (162927) (+276 on 6f564b86 162291), Mash out folded in as the fourth game (its row-on exclusion and normaliser removed) (+266 for the menu, +33 for tr-review-astra-3 16:37Z: a menu visit pauses Tech practice, and a running games settings are latched at its Start), after the Break the Targets close path lost its layout-load restart (primary 15:30Z). Exact total, no headroom. Counting and gates unchanged. Approved."
 approved_by = "operator 2026-11-18: yes additional lines are ok / ~19:38Z: size change approved; primary c07b3449 00:55Z (11-19): approved 163201 = +274 over main 162927."
+
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 163477
+date = "2026-11-19"
+reason = "rc.15 native practice target lock-on, option B: one native Sandbag per live Disc egg or BTT slot, with existing break scoring, owned-item cleanup and game-thread placement. Measured 163477 = 163201 + 276 on local main 2517b3e5. Exact total, no headroom."
+approved_by = "Operator-confirmed option B binding defaults (~21:49Z, 2026-11-18; +220 to +320 lines). Exact +276 recorded for the gate; primary landing disposition pending."

@@ -111,6 +111,14 @@ static EGG_START: AtomicBool = AtomicBool::new(false);
 static RUN: Mutex<eggs::Run> = Mutex::new(eggs::Run::IDLE);
 /// The run is armed (`Run::running`), for the menu worker, which never takes `RUN`.
 static EGG_RUNNING: AtomicBool = AtomicBool::new(false);
+static EGG_GENERATION: AtomicU32 = AtomicU32::new(0);
+
+pub(crate) fn lockon_egg() -> Option<Option<crate::model::lockon::Target>> {
+    let run = RUN.try_lock()?;
+    let key = (u64::from(EGG_GENERATION.load(Ordering::Relaxed)) << 32) | u64::from(run.score);
+    let egg = run.egg_at().filter(|_| run.running() && !run.cpu_target());
+    Some(egg.map(|at| crate::model::lockon::Target { key, at }))
+}
 
 fn seed() -> u32 {
     // SAFETY: `GetSystemTick` has no preconditions.
@@ -136,7 +144,9 @@ pub fn eggs_running() -> bool {
 
 /// The reset hub ran (L+R+A, Change Stage): an armed run starts over. Game thread.
 pub fn eggs_reset() {
-    RUN.lock().reset(seed());
+    let mut run = RUN.lock();
+    run.reset(seed());
+    EGG_GENERATION.fetch_add(1, Ordering::Relaxed);
 }
 
 /// Player 1's pass (entry 0, Ice Climbers' Nana too) steps the run: the clock, the egg, its pills against the egg. It runs
@@ -151,6 +161,9 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
     let mut run = RUN.lock();
     let plan = run.plan(rows, seed, entry, scene::facts);
+    if seed.is_some() {
+        EGG_GENERATION.fetch_add(1, Ordering::Relaxed);
+    }
     // V2.6: the CPU is hidden while a practice game runs and `CPU during a game` says Hide, unless it is the target
     // (`eggs::hides_cpu`). The CPU's body, its tag and its panel follow this one request (`cpu::hide::step`).
     let running = run.running();

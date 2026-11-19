@@ -104,6 +104,7 @@ pub fn update() {
     if decision.scene_changed {
         // The new key is stored before the side effects, so a re-entrant tick does not tear the room down twice.
         LAST_MODE.store(next.last_key, Ordering::Relaxed);
+        crate::runtime::features::lockon::scene_changed();
         if let Some(mode) = current {
             // A native Training departure need not change lobby::active(). Drop
             // preview values and pending injection at the actual scene boundary.

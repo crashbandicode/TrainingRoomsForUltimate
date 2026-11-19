@@ -511,10 +511,10 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
             });
             crate::runtime::features::tech_spike::frame(a0, fresh);
         }
-        if a0 != 0
+        let primary_p1 = a0 != 0
             && unsafe { ((a0 + FIGHTER_ENTRY_FIELD) as *const i32).read() } == 0
-            && unsafe { ((a0 + FIGHTER_KIND_FIELD) as *const i32).read() } != konst(C::KindNana)
-        {
+            && unsafe { ((a0 + FIGHTER_KIND_FIELD) as *const i32).read() } != konst(C::KindNana);
+        if primary_p1 {
             unsafe { super::btt_camera::frame() };
         }
         // The Eggs-ercise CPU target's player tag: the game turns its flag off for the placed CPU, so when the pass just run asked
@@ -524,6 +524,9 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         {
             let _state = HookScope::enter_hook(HookId::StateFrame);
             crate::runtime::features::states::frame(a0);
+        }
+        if primary_p1 {
+            unsafe { super::lockon::frame(a0) };
         }
         // Package 6: the CPU-as-P1 fallback's step (nothing when the pilot is absent-and-not-installed or present).
         unsafe { crate::runtime::p1::frame(a0) };

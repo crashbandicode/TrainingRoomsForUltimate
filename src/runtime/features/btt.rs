@@ -117,6 +117,15 @@ pub fn starting() -> bool {
     START.load(Ordering::Acquire)
 }
 
+/// Snapshot on the game thread. A concurrent layout/menu write can defer one frame.
+pub(crate) fn lockon_targets() -> Option<[Option<crate::model::lockon::Target>; btt::MAX]> {
+    let spots = BTT.try_lock()?.lockon_spots();
+    Some(spots.map(|spot| spot.map(|at| {
+        let key = (u64::from(at[0].to_bits()) << 32) | u64::from(at[1].to_bits());
+        crate::model::lockon::Target { key, at }
+    })))
+}
+
 /// Placing: the save-state chords are the layout's and P1's controller is the cursor's (the chords' poll asks).
 pub fn placing() -> bool {
     PHASE.load(Ordering::Acquire) == Phase::Placing as u8

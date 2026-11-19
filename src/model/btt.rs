@@ -361,6 +361,14 @@ impl Btt {
         &self.at[..self.n]
     }
 
+    /// Each breakable slot keeps its index as other targets are broken.
+    pub fn lockon_spots(&self) -> [Option<[f32; 2]>; MAX] {
+        core::array::from_fn(|i| {
+            (self.phase == Phase::Running && i < self.n && self.broken >> i & 1 == 0)
+                .then_some(self.at[i])
+        })
+    }
+
     pub fn cursor(&self) -> Option<[f32; 2]> {
         (self.phase == Phase::Placing).then_some(self.cursor)
     }
