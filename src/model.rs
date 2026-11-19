@@ -261,6 +261,8 @@ pub mod owned_ring;
 /// The test-only reader's export table and line ring (ssbu-hw-bridge).
 #[path = "model/state_export.rs"]
 pub mod state_export;
+#[path = "model/bridge_state.rs"]
+pub mod bridge_state;
 #[path = "model/settings_request.rs"]
 pub mod settings_request;
 
