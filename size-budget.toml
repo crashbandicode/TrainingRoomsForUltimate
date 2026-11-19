@@ -2053,3 +2053,11 @@ ceiling = 165129
 date = "2026-11-19"
 reason = "Mash out run reliability on cda940b1. Yoga measured b41624b9 at 165128, up 93 from 165035. Raise the existing 165036 ceiling by 93 and retain one line of headroom."
 approved_by = "Operator 2026-11-19 approved the Mash out resource, Dash and Pivot fixes. Primary c07b3449 directed a separate increase by the measured delta only."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 165158
+date = "2026-11-19"
+reason = "rc.15 submenu-page-switch: L / R step the page from a submenu through the page's own change_page (Menu::switches_page lists the submenu screens; popups and editors keep their buttons), the sub-screen and pick-grid footers read L/R page, and ZL + Up / Down wrap at the first and last section or entry (jump_section, jumped). Measured 165158 = +29 over main 4f25a854 (165129)."
+approved_by = "primary c07b3449, RC15-CHANGES-COMMON (2026-11-19 13:45Z) and the submenu-page-switch order (~19:15Z): raise the budget by exactly the measured delta in a separate commit; the delta (+29) is reported for the operator."
