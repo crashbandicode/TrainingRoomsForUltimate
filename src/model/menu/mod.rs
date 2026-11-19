@@ -1740,6 +1740,7 @@ impl Menu {
 
     fn press_slider(&mut self, button: Button, row: usize, state: SliderState) {
         let id = ROWS[row].id;
+        let Some((_, settings::Def { kind: settings::Kind::Slider { max }, .. })) = settings::def(id) else { return };
         let [lower, upper] = match self.get(id) {
             [lo, hi] => [*lo, *hi],
             _ => return,
@@ -1752,7 +1753,7 @@ impl Menu {
             if lower_handle {
                 [apply(lower, 0, i16::from(upper)), upper]
             } else {
-                [lower, apply(upper, i16::from(lower), i16::from(super::tech_settings::scale(id).map_or(settings::SLIDER_MAX, |s| s.max)))]
+                [lower, apply(upper, i16::from(lower), i16::from(super::tech_settings::scale(id).map_or(*max, |s| s.max)))]
             }
         };
         match button {

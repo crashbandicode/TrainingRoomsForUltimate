@@ -1969,7 +1969,31 @@ approved_by = "operator 2026-11-18 via primary c07b3449 (goal to mashout-demo-de
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 163080
+ceiling = 162914
 date = "2026-11-18"
-reason = "rc.15 practice menu (operator-approved mockup, 2026-11-18 ~14:58Z): one row per game, a generic sub-screen (Screen::Rows) with Start first, Start/Stop as menu actions with a Running label, and one runtime value for the running game (runtime::features::practice) replacing the three per-row exclusion sites. Composed onto main 0099f49e (Ganon row 121 landed): measured 163080 = +274 counted lines over main (162806) (+276 on 6f564b86 162291), Mash out folded in as the fourth game (its row-on exclusion and normaliser removed) (+266 for the menu, +33 for tr-review-astra-3 16:37Z: a menu visit pauses Tech practice, and a running games settings are latched at its Start), after the Break the Targets close path lost its layout-load restart (primary 15:30Z). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
+reason = "Mash out row 114 Ice Shot graded (c5b9abaf: shared Set observer grading, Player-only 255% damage maximum, Ice Shot provider closure bounded by the native attack count): +108 (153805 vs its base a7a6a327 153697) on main 162806. Supersedes the branch-only +85 entry of 2313f591. Exact total, no headroom."
+approved_by = "operator 2026-11-18 ~19:38Z: size change approved (114 +108, 113 +12), recorded by primary c07b3449; C6/O7 PASS mashout-review-devin 23:12Z."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162926
+date = "2026-11-18"
+reason = "Mash out row 113 Blizzard graded through the shared climber closure (1a3ada5b): +12 (153817 vs c5b9abaf 153805). Exact total, no headroom."
+approved_by = "operator 2026-11-18 ~19:38Z: size change approved (114 +108, 113 +12), recorded by primary c07b3449; C6/O7 PASS mashout-review-devin 23:12Z."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 162927
+date = "2026-11-18"
+reason = "113/114 landing composition cb1530f7: measured 162927, +1 over 114 +108 and 113 +12 on main 0099f49e. The one line is the conflict resolution in Menu::press_slider (Tech's declared scale first, else 114's per-row slider max). Exact total, no headroom. FLAGGED for the primary."
+approved_by = "operator 2026-11-18: yes additional lines are ok (size change approved ~19:38Z); the +1 integration line is flagged to primary c07b3449."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 163201
+date = "2026-11-18"
+reason = "rc.15 practice menu (operator-approved mockup, 2026-11-18 ~14:58Z): one row per game, a generic sub-screen (Screen::Rows) with Start first, Start/Stop as menu actions with a Running label, and one runtime value for the running game (runtime::features::practice) replacing the three per-row exclusion sites. Composed onto main 2e62e485 (113/114 landed, 162927): measured 163201 = +274 counted lines over main (162927) (+276 on 6f564b86 162291), Mash out folded in as the fourth game (its row-on exclusion and normaliser removed) (+266 for the menu, +33 for tr-review-astra-3 16:37Z: a menu visit pauses Tech practice, and a running games settings are latched at its Start), after the Break the Targets close path lost its layout-load restart (primary 15:30Z). Exact total, no headroom. Counting and gates unchanged. FOR OPERATOR REVIEW."
 approved_by = "PENDING: +274 reported to the primary for the operator by menu-games-devin (INBOX 2026-11-18); not yet approved."
