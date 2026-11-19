@@ -139,6 +139,10 @@ pub mod legend;
 pub mod eggs;
 #[path = "model/btt.rs"]
 pub mod btt;
+#[path = "model/lockon.rs"]
+pub mod lockon;
+#[path = "model/sites_lockon.rs"]
+pub mod sites_lockon;
 #[path = "model/tech/mod.rs"]
 pub mod tech;
 /// rc.15 Parry practice: the attempt detector (artifacts/rc15-parry/DESIGN.md).

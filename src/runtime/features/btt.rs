@@ -117,6 +117,16 @@ pub fn starting() -> bool {
     START.load(Ordering::Acquire)
 }
 
+/// Snapshot on the game thread. A concurrent layout/menu write can defer one frame.
+pub(crate) fn lockon_targets() -> Option<[Option<crate::model::lockon::Target>; btt::MAX]> {
+    let spots = BTT.try_lock()?.lockon_spots();
+    Some(spots.map(|spot| spot.map(|at| crate::model::lockon::Target { key: lockon_key(at), at })))
+}
+
+fn lockon_key([x, y]: [f32; 2]) -> u64 {
+    (u64::from(x.to_bits()) << 32) | u64::from(y.to_bits())
+}
+
 /// Placing: the save-state chords are the layout's and P1's controller is the cursor's (the chords' poll asks).
 pub fn placing() -> bool {
     PHASE.load(Ordering::Acquire) == Phase::Placing as u8
@@ -178,7 +188,7 @@ pub fn reset() {
 ///
 /// # Safety
 /// `at` is a live fighter's accessor.
-pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut([f32; 2]) -> bool) -> u8 {
+pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut(usize, [f32; 2]) -> bool) -> u8 {
     let facts = scene::facts();
     if facts.busy {
         btt_camera::apply(false);
@@ -220,7 +230,7 @@ pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut([f32; 2]) -> bool) 
         });
         if on {
             let tick = mode.keeper(at) && !owners.covers_strip();
-            broken = mode.pass(tick, hit);
+            broken = mode.pass_indexed(tick, hit);
         }
         if let Some(ask) = mode.take_ask().filter(|ask| !ASKS.post(*ask)) {
             diagnostic(format_args!("[Btt] layout ask dropped {ask:?}: the writer is behind"));
@@ -291,10 +301,11 @@ pub unsafe fn frame(fighter: usize) -> Option<()> {
     let (top, hits, n, aerial, _) = reading().then(|| super::hitbox::p1_read(at)).unwrap_or_default();
     let rule = super::hitbox::egg_rule();
     let mut melee = false;
-    let broke = pass(at, top, |spot| {
+    let broke = pass(at, top, |slot, spot| {
         let hit = hits[..n].iter().any(|h| eggs::breaks(rule, aerial, h, spot));
         melee |= hit;
-        hit || super::btt_projectiles::hit(at, spot, rule, aerial, projectiles())
+        hit || super::lockon::hit(at, slot + 1, lockon_key(spot), rule, aerial, projectiles()).is_some()
+            || super::btt_projectiles::hit(at, spot, rule, aerial, projectiles())
     });
     // V2.1: the fighter whose attack broke a target freezes, as on a hit.
     let frames = (broke > 0 && melee).then(scene::facts).and_then(eggs::hitlag)?;

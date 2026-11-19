@@ -112,6 +112,18 @@ static EGG_START: AtomicBool = AtomicBool::new(false);
 static RUN: Mutex<eggs::Run> = Mutex::new(eggs::Run::IDLE);
 /// The run is armed (`Run::running`), for the menu worker, which never takes `RUN`.
 static EGG_RUNNING: AtomicBool = AtomicBool::new(false);
+static EGG_GENERATION: AtomicU32 = AtomicU32::new(0);
+
+fn lockon_key(score: u32) -> u64 {
+    (u64::from(EGG_GENERATION.load(Ordering::Relaxed)) << 32) | u64::from(score)
+}
+
+pub(crate) fn lockon_egg() -> Option<Option<crate::model::lockon::Target>> {
+    let run = RUN.try_lock()?;
+    let key = lockon_key(run.score);
+    let egg = run.egg_at().filter(|_| run.running() && !run.cpu_target());
+    Some(egg.map(|at| crate::model::lockon::Target { key, at }))
+}
 
 fn seed() -> u32 {
     // SAFETY: `GetSystemTick` has no preconditions.
@@ -137,7 +149,9 @@ pub fn eggs_running() -> bool {
 
 /// The reset hub ran (L+R+A, Change Stage): an armed run starts over. Game thread.
 pub fn eggs_reset() {
-    RUN.lock().reset(seed());
+    let mut run = RUN.lock();
+    run.reset(seed());
+    EGG_GENERATION.fetch_add(1, Ordering::Relaxed);
 }
 
 /// Player 1's pass (entry 0, Ice Climbers' Nana too) steps the run: the clock, the egg, its pills against the egg. It runs
@@ -152,6 +166,9 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
     let mut run = RUN.lock();
     let plan = run.plan(rows, seed, entry, scene::facts);
+    if seed.is_some() {
+        EGG_GENERATION.fetch_add(1, Ordering::Relaxed);
+    }
     // V2.6: the CPU is hidden while a practice game runs and `CPU during a game` says Hide, unless it is the target
     // (`eggs::hides_cpu`). The CPU's body, its tag and its panel follow this one request (`cpu::hide::step`).
     let running = run.running();
@@ -199,7 +216,10 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     run.sense([top[0], top[1]]);
     // rc.15: Player 1's articles break the target too, as `Breaks on` allows (docs/DECISIONS.md).
     let rule = run.rule();
-    let length = run.step_with(tick, top[1], hits, |egg| super::btt_projectiles::hit(at, egg, rule, aerial, true), aerial, kind);
+    let length = run.step_with(tick, top[1], hits, |egg| {
+        super::lockon::hit(at, 0, lockon_key(score), rule, aerial, true).is_some()
+            || super::btt_projectiles::hit(at, egg, rule, aerial, true)
+    }, aerial, kind);
     // V2.1: the fighter whose attack broke it (Ice Climbers: that climber) freezes, as on a hit; an article's break does not.
     let broke = run.score > score && run.melee();
     if let Some(frames) = broke.then(scene::facts).and_then(eggs::hitlag) {

@@ -112,6 +112,8 @@ const BOUNDARIES: &[Boundary] = &[
     // camera unit's `change_active_camera` row, so it stands behind its flag (boot sets it from that unit's closure) and a rejected
     // row turns off only this camera, never the hitbox visualizer or Eggs-ercise that the pass belongs to.
     Boundary { function: "btt_camera::apply", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
+    // This adapter verifies its own complete bundle and both shared item grants at boot.
+    Boundary { function: "lockon::update_practice_items", owner: None, gate: Gate::Flag("USABLE") },
     // Mash's native-touching call-ins share the final boot admission, independent of CPU Defence.
     Boundary { function: "mashout::frame", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
     Boundary { function: "mashout::seed_token", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },

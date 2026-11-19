@@ -92,7 +92,8 @@ fn every_data_row_has_a_64_byte_guard() {
         }
         files += 1;
     }
-    assert_eq!((files, rows), (26, SEAM_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS + crate::model::sites_mashout::SITES.len()));
+    assert_eq!((files, rows), (27, SEAM_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS
+        + crate::model::sites_mashout::SITES.len() + crate::model::sites_lockon::CALLEES.len()));
 }
 
 const SEAM_ROWS: usize = 704;

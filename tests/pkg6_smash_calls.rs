@@ -16,7 +16,7 @@ mod model;
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use model::{sites, sites_pkg2, sites_pkg3, sites_pkg4, sites_pkg6, sites_ui};
+use model::{sites, sites_lockon, sites_pkg2, sites_pkg3, sites_pkg4, sites_pkg6, sites_ui};
 
 /// `smash` call (as written in the source) -> the guarded row that covers it.
 const COVERED: &[(&str, &str)] = &[
@@ -73,6 +73,15 @@ const COVERED: &[(&str, &str)] = &[
     ("StopModule::is_stop", "stop_is_stop"),
     ("ArticleModule::get_active_num", "state_article_active_num"),
     ("ArticleModule::get_article", "state_article_get_article"),
+    ("EffectModule::set_whole", "lockon_effects"),
+    ("JostleModule::set_status", "lockon_jostle"),
+    ("PostureModule::set_scale", "lockon_scale"),
+    ("ShadowModule::set_draw_status", "lockon_shadow"),
+    ("TeamModule::set_hit_team", "lockon_hit_team"),
+    ("TeamModule::set_team", "lockon_team"),
+    ("TeamModule::team_no", "lockon_team_no"),
+    ("VisibilityModule::set_whole", "lockon_visibility"),
+    ("WorkModule::on_flag", "lockon_work_flag"),
 ];
 
 fn all_rows() -> BTreeSet<&'static str> {
@@ -83,6 +92,7 @@ fn all_rows() -> BTreeSet<&'static str> {
         .chain(sites_pkg4::SITES.iter())
         .chain(sites_pkg6::SITES.iter())
         .chain(sites_ui::UI_SITES.iter())
+        .chain(sites_lockon::CALLEES.iter())
         .map(|site| site.name)
         .collect()
 }

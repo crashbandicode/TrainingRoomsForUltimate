@@ -2013,3 +2013,11 @@ ceiling = 164115
 date = "2026-11-19"
 reason = "rc.15 practice menu, the Parry entry (primary 23:22Z slot 6) on main 298ac9ed (164084, Parry landed): Parry practice is the fifth game, its section a sub-screen with Start first (list row + Start), its Off retired (a stored Off reads as 10 attempts); runtime parry.rs records the published row, latches its session at Start and runs while it is the running game (practice::start/stop arm and disarm the replay host); a used saved practice asks for Parry's Start at the close. Measured 164115 = +31 over main."
 approved_by = "operator 2026-11-18: yes additional lines are ok / ~19:38Z: size change approved; primary c07b3449 02:09Z (11-19): approved +31 for the Parry menu entry (164115 over main 164084)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 164507
+date = "2026-11-19"
+reason = "rc.15 option B: one guarded native Sandbag per active Disc egg or BTT target. Both native item pools are checked before duplicate allocation. Owned native damage enters the existing break rules once. Composed on five-game main 2172cfd9 (164115), +392 normalized lines, exact ceiling with no headroom."
+approved_by = "Operator 2026-11-18: yes additional lines are ok / about 19:38Z: size change approved. Primary c07b3449 02:14Z (2026-11-19): approved +392, reported to the operator."

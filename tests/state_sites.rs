@@ -16,6 +16,25 @@ use model::guard::{HookForm, Placement, SeamKind};
 use model::sites::{self, Feature};
 use model::sites_pkg3::{self, STATE_SITES};
 
+#[test]
+fn practice_lockon_native_windows_match_and_reject_foreign_code() {
+    let Some(owned) = common::owned_main("practice_lockon_native_windows_match_and_reject_foreign_code") else { return };
+    for site in &model::sites_lockon::CALLEES {
+        let mut actual = owned.window(site.offset);
+        assert_eq!(actual, site.guard, "{}", site.name);
+        assert!(site.outcome(&actual).usable(), "{}", site.name);
+        actual[..4].copy_from_slice(&[0; 4]);
+        assert!(!site.outcome(&actual).usable(), "{}", site.name);
+    }
+    let create = &model::sites_lockon::CALLEES[0];
+    let symbol = "_ZN3app7sv_item32create_item_init_normal_safe_posENS_8ItemKindEiiRKN3phx8Vector3fES5_fj";
+    let call = owned.symbol(symbol).unwrap() + 0x74;
+    let instruction = i32::from_le_bytes(owned.window(call)[..4].try_into().unwrap());
+    assert_eq!(instruction as u32 >> 26, 0b100101);
+    assert_eq!((call as isize + ((instruction << 6) >> 4) as isize) as usize, create.offset);
+    assert_eq!(create.offset, model::sites_lockon::ITEM_FACTORY_OFFSET);
+}
+
 /// Offsets of every site of `ssbu-cpu-pilot` (the list `tests/cpu_sites.rs` uses).
 const PILOT_SITES: [usize; 23] = [
     0x1750df0, 0x1751ce8, 0x2da180, 0x6b8400, 0x2d8d40, 0x375ef8c, 0x59970, 0x37a2270, 0x376309c, 0x1d59560,
