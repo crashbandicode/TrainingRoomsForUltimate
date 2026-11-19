@@ -194,10 +194,12 @@ fn parry_next_pass(start: impl FnOnce()) {
     if !role_frames(Role::Cpu).is_empty() {
         return;
     }
-    if left != u32::MAX {
-        PARRY_PASSES.store(left - 1, Ordering::Release);
-    }
     start();
+    if left != u32::MAX {
+        // Keep the credit visible to Mash until the worker has published the new run.
+        // Off can clear credits during preparation; spending one must not restore them.
+        PARRY_PASSES.fetch_min(left - 1, Ordering::Release);
+    }
 }
 /// A hook cut invalidates queued frames. Only the worker clears the queue.
 static CUT_PLAYER: AtomicBool = AtomicBool::new(false);
