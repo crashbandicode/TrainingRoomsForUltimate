@@ -1,6 +1,9 @@
 //! Shared attempt clock and scoring for Guard the Edge and Juggler (DESIGN v2).
 use super::practice_games::{record_max, record_time, result_tick, Game};
 
+#[path = "edge_juggle/perfect.rs"]
+pub mod perfect;
+
 const EDGE_TIMEOUT: u32 = 15 * 60;
 const RESULT_FRAMES: u16 = 90;
 
