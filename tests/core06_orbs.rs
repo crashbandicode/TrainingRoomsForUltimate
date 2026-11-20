@@ -549,6 +549,25 @@ fn a_live_targets_hurtbox_is_its_picture_disc() {
     assert_eq!(orbs::target_hurt_orbs(&looks, &mut out[..1]), 1, "as many as fit");
 }
 
+/// rc.15 target-hurtbox-display review: a fighter's capsule drawn in an earlier frame, then a busy board with a live target:
+/// that tick draws no target disc, so it takes no pane and the fighter's retained panes are unchanged.
+fn a_busy_board_tick_leaves_the_fighters_panes_to_the_target() {
+    let mut board = Board::default();
+    let capsule = Orb { centre: [0.0, 5.0, 0.0], tail: [0.0, 9.0, 0.0], radius: 2.0, color: [9; 4], key: hitbox::sphere_key(hitbox::KIND_HURT, 0, 0) };
+    board.publish(0, [capsule].into_iter());
+    let mut earlier = orbs::PaneUse::default();
+    assert!(earlier.take(true).is_some(), "the capsule took a cap pair and a band");
+    let mut target = [Orb::NONE; 1];
+    let n = orbs::target_hurt_orbs(&[Some(([3.0, 4.0], model::panes::EGG_WHOLE))], &mut target);
+    assert_eq!((orbs::targets_drawn(true, true, n), orbs::targets_drawn(true, false, n)), (1, 0), "held: drawn when ticked");
+    let mut busy = orbs::PaneUse::default();
+    for _ in 0..orbs::targets_drawn(false, true, n) {
+        busy.take(false);
+    }
+    assert_eq!((busy.caps, busy.bands), (0, 0), "a busy tick writes no cap over the retained capsule");
+    assert_eq!(board.live().copied().collect::<Vec<_>>(), [capsule]);
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -570,6 +589,7 @@ fn case_table() {
         ("a_hurtbox_orb_is_its_size_at_the_bones_world_scale", a_hurtbox_orb_is_its_size_at_the_bones_world_scale as fn()),
         ("a_hurtbox_without_a_valid_bone_scale_is_not_drawn", a_hurtbox_without_a_valid_bone_scale_is_not_drawn as fn()),
         ("a_live_targets_hurtbox_is_its_picture_disc", a_live_targets_hurtbox_is_its_picture_disc as fn()),
+        ("a_busy_board_tick_leaves_the_fighters_panes_to_the_target", a_busy_board_tick_leaves_the_fighters_panes_to_the_target as fn()),
     ]);
 }
 

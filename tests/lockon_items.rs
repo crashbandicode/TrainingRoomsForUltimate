@@ -116,6 +116,34 @@ fn scene_change_never_dereferences_a_handle_from_the_departed_scene() {
     );
 }
 
+/// rc.15 target-hurtbox-display review: the helper ids the visualizer leaves out are the tracker's own slots. Training →
+/// CSS → Training with ten targets live leaves none stale; a dropped or retired id that an ordinary item reuses is drawn.
+#[test]
+fn published_helper_ids_follow_the_tracker_slots() {
+    let mut field = Field::default();
+    let mut tracker: Tracker<u32, 10> = Tracker::new();
+    let ten: [Option<Target>; 10] = core::array::from_fn(|i| target(i as u64, [i as f32 * 10., 4.]));
+    tracker.update(7, ten, &mut field);
+    let ids = tracker.ids(|&h| h);
+    assert_eq!(ids, core::array::from_fn(|i| i as u32 + 1), "ten helpers");
+    assert!(lockon::names_helper(&ids, tracker.scene(), 7, 3));
+    // Leaving Training: the published set is for scene 7 and names nothing in scene 8, before any update there.
+    assert!(!lockon::names_helper(&ids, tracker.scene(), 8, 3), "no stale id across the scene change");
+    tracker.update(8, [None; 10], &mut field);
+    assert_eq!(tracker.ids(|&h| h), [0; 10], "the departed scene's slots are gone, none retired natively");
+    // An invalid handle is dropped from the set; a retired id reused by an ordinary item isn't a helper.
+    tracker.update(8, ten, &mut field);
+    field.live.retain(|&id| id != 11);
+    tracker.update(8, ten, &mut field);
+    let ids = tracker.ids(|&h| h);
+    assert!(!ids.contains(&11) && ids.contains(&21), "the dead handle 11 left, its slot recreated as 21: {ids:?}");
+    let mut retire = ten;
+    retire[1] = None;
+    tracker.update(8, retire, &mut field);
+    let ids = tracker.ids(|&h| h);
+    assert!(!lockon::names_helper(&ids, tracker.scene(), 8, 12) && !lockon::names_helper(&ids, tracker.scene(), 8, 0));
+}
+
 #[test]
 fn invalid_handle_is_skipped_and_full_manager_retries_without_a_phantom_item() {
     let mut field = Field::default();
