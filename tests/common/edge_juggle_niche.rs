@@ -469,3 +469,45 @@ fn niche_float_releases_to_spend_parasol_after_exit() {
     assert_eq!(exit.press, 0);
     assert_ne!(exit.release & perfect::JUMP, 0);
 }
+
+#[test]
+fn niche_incineroar_adds_whip_only_outside_the_cross_chop_column() {
+    let far = select(facts(0x47, "long"), CANDIDATE_ROWS).expect("IN-1 for a horizontal shortfall");
+    let close = select(facts(0x47, "near"), CANDIDATE_ROWS).expect("IN-2 in the ledge column");
+    assert_eq!((far.id, far.moves), (36, &[Move::Side, Move::Rise][..]));
+    assert_eq!((close.id, close.moves), (37, &[Move::Rise][..]));
+    let mut far = Sequence::new(far);
+    assert_eq!(
+        far.step(sample(0, Motion::Free)).map(|pad| (pad.stick, pad.press)),
+        Some((Some([1.0, 0.0]), perfect::SPECIAL))
+    );
+    far.step(sample(1, Motion::Starting)).expect("stock accepts Alolan Whip");
+    far.step(sample(40, Motion::Finish)).expect("no up special during Whip endlag");
+    far.step(sample(41, Motion::Free)).expect("one released frame after Whip");
+    assert_eq!(
+        far.step(sample(42, Motion::Free)).map(|pad| (pad.stick, pad.press)),
+        Some((Some([0.0, 1.0]), perfect::SPECIAL))
+    );
+}
+
+#[test]
+fn niche_pyra_starts_the_authored_native_swap_on_horizontal_shortfall() {
+    assert!(select(facts(0x5a, "near"), CANDIDATE_ROWS).is_none());
+    let row = select(facts(0x5a, "long"), CANDIDATE_ROWS).expect("PY-1 for a horizontal shortfall");
+    assert_eq!(row.id, 38);
+    let mut sequence = Sequence::new(row);
+    assert_eq!(
+        sequence.step(sample(0, Motion::Free)).map(|pad| (pad.stick, pad.press)),
+        Some((Some([0.0, -1.0]), perfect::SPECIAL))
+    );
+    let startup = sequence.step(sample(1, Motion::Starting)).expect("native swap status");
+    assert_eq!(startup.press, 0);
+}
+
+#[test]
+fn niche_mythra_commits_to_only_one_special() {
+    let level = select(facts(0x5b, "long"), CANDIDATE_ROWS).expect("MY-1a level extended start");
+    let low = select(facts(0x5b, "near"), CANDIDATE_ROWS).expect("MY-1b below the ledge");
+    assert_eq!((level.id, level.moves), (39, &[Move::Side][..]));
+    assert_eq!((low.id, low.moves), (40, &[Move::Jump, Move::Rise][..]));
+}
