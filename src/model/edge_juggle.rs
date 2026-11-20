@@ -756,6 +756,36 @@ mod tests {
     }
 
     #[test]
+    fn attempt_trace_follows_release_and_first_scored_contact() {
+        let mut session = Session::new(Drill::GuardEdge, Some(2));
+        session.placed();
+        let before = session.phase;
+        session.advance_attempt(Observation::default());
+        assert_eq!(session.trace_event(before), None);
+        session = release(Drill::GuardEdge, Some(2));
+        assert_eq!(session.trace_event(Phase::Ready(1)), Some((1, 0)));
+        assert_eq!(session.trace_event(Phase::Live), None);
+
+        session.advance_attempt(Observation { grounded: true, ..Observation::default() });
+        assert_eq!(session.trace_event(Phase::Live), Some((1, 3)));
+        assert_eq!(session.frames, 1);
+        let before = session.phase;
+        session.advance_attempt(Observation { cliff_catch: true, ..Observation::default() });
+        assert_eq!(session.trace_event(before), None);
+
+        let mut juggle = release(Drill::Juggler, None);
+        juggle.advance_attempt(Observation { dead_or_rebirthing: true, ..Observation::default() });
+        assert_eq!(juggle.trace_event(Phase::Live), Some((1, 7)));
+
+        let mut timeout = release(Drill::GuardEdge, None);
+        for _ in 0..EDGE_TIMEOUT {
+            timeout.advance_attempt(Observation::default());
+        }
+        assert_eq!(timeout.trace_event(Phase::Live), Some((1, 4)));
+        assert_eq!(timeout.attempts, 0);
+    }
+
+    #[test]
     fn edge_scores_ko_and_waits_for_respawn() {
         let mut session = release(Drill::GuardEdge, None);
         let dead = Observation { dead_or_rebirthing: true, ..Observation::default() };
