@@ -30,11 +30,7 @@ fn advance(from: Point, direction: Point, distance: f32) -> Point {
 }
 
 fn clear(outline: &[Segment], path: Segment, bottom: f32, height: f32) -> bool {
-    path.into_iter().all(|p| p[1] > bottom + SLACK)
-        && [-HALF_BODY, 0.0, HALF_BODY].into_iter().all(|offset| {
-            let path = path.map(|p| [p[0] + offset, p[1]]);
-            !outline.iter().any(|&line| super::blocked(path, line, height + 1.0))
-        })
+    super::aerial_clear(outline, path, bottom + SLACK, height + 1.0, HALF_BODY)
 }
 
 fn second_zip(

@@ -529,6 +529,15 @@ fn blocked(path: Segment, line: Segment, height: f32) -> bool {
     delta[0][0].min(delta[1][0]) <= height && delta[0][1].max(delta[1][1]) >= 0.0
 }
 
+/// Check the foot-to-head interval across the center and both sides of an aerial path.
+fn aerial_clear(outline: &[Segment], path: Segment, min_y: f32, height: f32, half: f32) -> bool {
+    path.into_iter().all(|p| p[1] > min_y)
+        && [-half, 0.0, half].into_iter().all(|offset| {
+            let path = path.map(|p| [p[0] + offset, p[1]]);
+            !outline.iter().any(|&line| blocked(path, line, height))
+        })
+}
+
 impl RouteFacts<'_> {
     pub fn crossing_band(&self) -> Option<Point> {
         // Normal-form IDs from the 13.0.5 stage catalog: Battlefield, Final
