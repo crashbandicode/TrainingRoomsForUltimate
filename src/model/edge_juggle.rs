@@ -257,6 +257,16 @@ impl Phase {
     }
 }
 
+/// Which live pad owner runs at the AI epilogue.
+pub const fn drill_owns_pad(owns_primary: bool, recorder_active: bool) -> bool {
+    owns_primary && !recorder_active
+}
+
+/// CPU settings affect both registered bodies of the opposed entry.
+pub const fn suspends_cpu_settings(active: bool, key: crate::model::cpu::role::FighterKey) -> bool {
+    active && key.entry == 1
+}
+
 /// Runtime admits placement, then ticks only on eligible simulation frames.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Session {
@@ -703,6 +713,23 @@ mod tests {
             assert_eq!(stage.edge_start(area, start), Some(expected));
         }
         assert_eq!(stage.edge_start(Area::LowerLeft, [f32::NAN, 0.0]), None);
+    }
+
+    #[test]
+    fn both_ice_climbers_yield_cpu_settings_but_only_primary_owns_the_pad() {
+        use crate::model::cpu::role::FighterKey;
+
+        let primary = FighterKey::new(1, false).unwrap();
+        let partner = FighterKey::new(1, true).unwrap();
+        for key in [primary, partner] {
+            assert!(suspends_cpu_settings(true, key));
+            assert!(!suspends_cpu_settings(false, key));
+        }
+        for entry in [0, 2, 4] {
+            assert!(!suspends_cpu_settings(true, FighterKey::new(entry, false).unwrap()));
+        }
+        assert!(drill_owns_pad(true, false));
+        assert!(!drill_owns_pad(false, false));
     }
 
     #[test]

@@ -500,6 +500,17 @@ impl Detector {
         was
     }
 
+    /// Refuse recorder commands during a drill while leaving all other pending controls alone.
+    pub fn take_drill_recording_conflicts(&mut self, recording: bool) -> bool {
+        let mut commands = Request::InputPlayback.bit() | Request::PlayPlayer.bit();
+        if !recording {
+            commands |= Request::InputRecord.bit();
+        }
+        let refused = self.pending & commands != 0;
+        self.pending &= !commands;
+        refused
+    }
+
     /// Break the Targets' Placing: the Save and Load chords (as configured) are the layout's, `(save, load)`; every other
     /// request but the menu's is dropped (ZL + Left / Right choose a slot there, they do not cycle).
     pub fn take_placing(&mut self) -> (bool, bool) {
@@ -622,6 +633,29 @@ mod tests {
 
     fn factory_row(id: &str) -> &[u8] {
         DEFS.iter().find(|def| def.id == id).unwrap_or_else(|| panic!("{id} missing")).default
+    }
+
+    #[test]
+    fn recorder_chords_pressed_during_a_drill_do_not_escape_on_stop() {
+        let set = ChordSet::factory();
+        let cases = [
+            (Request::InputRecord, logical::DPAD_DOWN),
+            (Request::InputPlayback, DPAD_UP),
+            (Request::PlayPlayer, DPAD_LEFT),
+        ];
+        for (request, direction) in cases {
+            let mut detector = Detector::new();
+            detector.poll(&set, sample(&[ZR, direction], &[direction]), false);
+            assert!(detector.take_drill_recording_conflicts(false));
+            assert!(!detector.consume(request));
+            assert!(!detector.take_drill_recording_conflicts(false));
+            detector.poll(&set, sample(&[ZR, direction], &[direction]), false);
+            assert!(detector.consume(request), "a new press after Stop still works");
+        }
+        let mut detector = Detector::new();
+        detector.poll(&set, sample(&[ZR, logical::DPAD_DOWN], &[logical::DPAD_DOWN]), false);
+        assert!(!detector.take_drill_recording_conflicts(true));
+        assert!(detector.consume(Request::InputRecord), "an existing capture can stop");
     }
 
     #[test]

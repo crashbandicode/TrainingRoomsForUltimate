@@ -250,6 +250,35 @@ pub struct Plan {
     weight: u16,
 }
 
+/// One P1 hurtbox sample for an actionable recovery plan.
+#[derive(Default)]
+pub struct PlanHeight {
+    frame: Option<u32>,
+    value: Option<Option<f32>>,
+}
+
+impl PlanHeight {
+    pub fn request(&mut self, frame: u32, actionable: bool) -> bool {
+        if !actionable || self.frame == Some(frame) || self.value.is_some() {
+            return false;
+        }
+        self.frame = Some(frame);
+        // The request counts even when the native sample is unavailable.
+        self.value = Some(None);
+        true
+    }
+
+    pub fn record(&mut self, frame: u32, height: Option<f32>) {
+        if self.frame == Some(frame) && self.value.is_some() {
+            self.value = Some(height);
+        }
+    }
+
+    pub fn take(&mut self) -> Option<Option<f32>> {
+        self.value.take()
+    }
+}
+
 /// Observe changes while following the most recent plan.
 #[derive(Default)]
 pub struct RouteWatch {
@@ -836,6 +865,23 @@ pub fn landing_variant(facts: LandingFacts, options: LandingOptions, draw: u32) 
 mod tests {
     lib_unit_tests! {
     use super::*;
+
+    #[test]
+    fn pending_recovery_samples_p1_once_after_actionable_status() {
+        let mut height = PlanHeight::default();
+        for frame in 10..20 {
+            assert!(!height.request(frame, false), "damage or helpless frames need no sample");
+        }
+        assert!(height.request(20, true));
+        height.record(20, Some(14.6));
+        assert!(!height.request(21, true), "keep the first sample until it is consumed");
+        assert_eq!(height.take(), Some(Some(14.6)));
+        assert!(!height.request(20, true), "no second read on one frame");
+        assert!(height.request(21, true));
+        assert_eq!(height.take(), Some(None), "failed or unavailable sample still counts");
+        height.record(21, Some(14.6));
+        assert_eq!(height.take(), None, "an in-flight sample cannot revive a consumed plan");
+    }
 
     #[test]
     fn juggle_drift_uses_legal_fall_time_and_leaves_stock_defensive_inputs() {

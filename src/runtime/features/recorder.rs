@@ -307,7 +307,10 @@ unsafe fn on_ai_frame(ai: usize) {
     if ((body.entry_ptr + ENTRY_CONTROLLER_FIELD) as *const usize).read() != controller {
         return;
     }
-    if super::edge_juggle::controls_cpu(body.accessor) {
+    if crate::model::edge_juggle::drill_owns_pad(
+        super::edge_juggle::controls_cpu(body.accessor),
+        recording_or_playback(),
+    ) {
         let button_field = (controller + CTRL_BUTTONS) as *mut u32;
         let x_field = (controller + CTRL_STICK_X) as *mut f32;
         let y_field = (controller + CTRL_STICK_Y) as *mut f32;

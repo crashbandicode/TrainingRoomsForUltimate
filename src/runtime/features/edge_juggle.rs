@@ -9,10 +9,11 @@ use crate::model::chords::{field, logical as key, Sample};
 use crate::model::cpu::{
     ids::{C, UNRESOLVED},
     rng::Rng,
+    role::FighterKey,
 };
 use crate::model::edge_juggle::perfect::{
-    self, AirPhysics, Correction, JumpTiming, LandingFacts, LandingOptions, MeteorBounce, Route,
-    RouteFacts, ThreatClock,
+    self, AirPhysics, Correction, JumpTiming, LandingFacts, LandingOptions, MeteorBounce, PlanHeight,
+    Route, RouteFacts, ThreatClock,
 };
 use crate::model::edge_juggle::{
     Difficulty, Drill, Observation, Outcome, Phase, Reaction, Session, Setup, Stage, Wizard,
@@ -97,8 +98,7 @@ struct Run {
     plan_pending: bool,
     route_watch: perfect::RouteWatch,
     player_reach: f32,
-    player_height_frame: Option<u32>,
-    player_height: Option<Option<f32>>,
+    player_height: PlanHeight,
     last_route: Option<Route>,
     guide: Option<RecoveryGuide>,
     last_cpu_status: i32,
@@ -261,6 +261,13 @@ pub unsafe fn controls_cpu(accessor: usize) -> bool {
         && natives::module_accessor(1) == Some(accessor)
 }
 
+pub(super) fn suspends_cpu_settings(key: FighterKey) -> bool {
+    let active = INSTALLED.load(Ordering::Acquire)
+        && !published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire)
+        && running();
+    crate::model::edge_juggle::suspends_cpu_settings(active, key)
+}
+
 /// The final mapped pad read by P1, after the existing delay and playback stages.
 pub(super) fn observe_player_pad(buttons: u32) {
     if running() {
@@ -289,16 +296,17 @@ impl LivePerfect {
     pub(super) fn record_height(self, height: Option<f32>) {
         let Some(mut engine) = ENGINE.try_lock() else { return };
         if let Some(run) = engine.run.as_mut().filter(|run| {
-            run.rounds.phase == Phase::Live
-                && run.rounds.frames == self.frame
-                && run.player_height_frame == Some(self.frame)
+            run.rounds.phase == Phase::Live && run.plan_pending
         }) {
-            run.player_height = Some(height);
+            run.player_height.record(self.frame, height);
         }
     }
 }
 
 pub(super) unsafe fn player_height_request(player: usize) -> Option<LivePerfect> {
+    if states::is_loading() || natives::module_accessor(0) != Some(player) || !natives::is_fighter(player) {
+        return None;
+    }
     let mut engine = ENGINE.try_lock()?;
     let run = engine.run.as_mut().filter(|run| {
         wanted() == Some(run.drill)
@@ -306,13 +314,26 @@ pub(super) unsafe fn player_height_request(player: usize) -> Option<LivePerfect>
             && run.rounds.phase == Phase::Live
             && run.wizard.is_none()
             && run.plan_pending
-            && run.player_height_frame != Some(run.rounds.frames)
     })?;
-    if states::is_loading() || natives::module_accessor(0) != Some(player) || !natives::is_fighter(player) {
-        return None;
-    }
-    run.player_height_frame = Some(run.rounds.frames);
-    Some(LivePerfect { player, frame: run.rounds.frames })
+    let cpu = run.body.accessor;
+    let actionable = CpuBody::current() == Some(run.body) && airborne_recovery(cpu, natives::status_kind(cpu));
+    let frame = run.rounds.frames;
+    run.player_height.request(frame, actionable).then_some(LivePerfect { player, frame })
+}
+
+fn falling(status: i32) -> bool {
+    status != UNRESOLVED
+        && [C::StatusFall, C::StatusFallAerial, C::StatusDamageFall]
+            .map(konst)
+            .contains(&status)
+}
+
+unsafe fn airborne_recovery(cpu: usize, status: i32) -> bool {
+    let air = konst(C::SituationAir);
+    status != UNRESOLVED
+        && air != UNRESOLVED
+        && (falling(status) || status == konst(C::StatusJumpAerial))
+        && natives::situation_kind(cpu) == air
 }
 
 pub unsafe fn ai_correction(ai: usize, accessor: usize, buttons: u32, stick_y: f32) -> Correction {
@@ -370,17 +391,9 @@ pub unsafe fn ai_correction(ai: usize, accessor: usize, buttons: u32, stick_y: f
             return correction;
         }
     }
-    let falling = status != UNRESOLVED
-        && [C::StatusFall, C::StatusFallAerial, C::StatusDamageFall]
-            .map(konst)
-            .contains(&status);
     let position = [natives::pos_x(accessor), natives::pos_y(accessor)];
     if run.drill == Drill::GuardEdge {
-        let air = konst(C::SituationAir);
-        if air == UNRESOLVED
-            || natives::situation_kind(accessor) != air
-            || !falling && status != konst(C::StatusJumpAerial)
-        {
+        if !airborne_recovery(accessor, status) {
             run.jump_timing = JumpTiming::default();
             return Correction::default();
         }
@@ -401,7 +414,7 @@ pub unsafe fn ai_correction(ai: usize, accessor: usize, buttons: u32, stick_y: f
             return correction;
         }
     }
-    if !falling {
+    if !falling(status) {
         return Correction::default();
     }
     let facts = LandingFacts {
@@ -1395,8 +1408,7 @@ pub unsafe fn frame(fighter: usize) {
             plan_pending: true,
             route_watch: perfect::RouteWatch::default(),
             player_reach: 0.0,
-            player_height_frame: None,
-            player_height: None,
+            player_height: PlanHeight::default(),
             last_route: None,
             guide: None,
             last_cpu_status: UNRESOLVED,
@@ -1526,8 +1538,7 @@ pub unsafe fn frame(fighter: usize) {
             run.route_draw = rng.next_u32();
             run.plan_pending = true;
             run.route_watch = perfect::RouteWatch::default();
-            run.player_height_frame = None;
-            run.player_height = None;
+            run.player_height = PlanHeight::default();
             run.guide = None;
             run.jump_timing = JumpTiming::default();
             run.last_cpu_status = UNRESOLVED;

@@ -68,6 +68,7 @@ pub unsafe fn on_poll(controller: usize) {
         .with_overlay(crate::runtime::deluxe_overlay::rows_page_visible());
     let modal = published::input_owners().contains(Owners::MENU) || recorder::replay_editor_occupied();
     let wizard = super::tech::wizard_active() || super::edge_juggle::wizard_active();
+    let drill_running = super::edge_juggle::running();
     let accepted = {
         let mut state = STATE.lock();
         // A newly published value and the INI shortcuts (atomics) are adopted here, on the game's poll (stream/sync: no other
@@ -81,6 +82,8 @@ pub unsafe fn on_poll(controller: usize) {
         let block = blocked();
         let State { chords: set, detector, .. } = &mut *state;
         let passed = detector.poll_owned(set, sample, block, wizard);
+        let recorder_refused = drill_running
+            && detector.take_drill_recording_conflicts(super::recording_host::capturing());
         // Break the Targets: while Placing the Save and Load chords are the layout's and the other chords stand down.
         let keys = (!block && btt::placing()).then(|| detector.take_placing());
         // rc.8: the game speed hold's event and the input display toggle are acted on once `STATE` is released.
@@ -96,9 +99,9 @@ pub unsafe fn on_poll(controller: usize) {
         }
         #[cfg(not(feature = "diag"))]
         let _ = passed;
-        (!block && !wizard && chords::plus_shortcut_accepted(set, sample), chords::physical_mask(style, detector.hidden()), hold, display, refused, keys, block)
+        (!block && !wizard && chords::plus_shortcut_accepted(set, sample), chords::physical_mask(style, detector.hidden()), hold, display, refused, keys, block, recorder_refused)
     };
-    let (accepted, chord_bits, hold, display, refused, keys, block) = accepted;
+    let (accepted, chord_bits, hold, display, refused, keys, block, recorder_refused) = accepted;
     // Placing keeps all of P1's controller from the game (the cursor has it); Ready waits for its first input.
     // SAFETY: controller is the live Controller of this poll.
     let hide = !block && unsafe { super::tech::poll(controller, sample) || super::edge_juggle::poll(controller, sample) || btt::poll(controller, sample, keys) };
@@ -106,6 +109,9 @@ pub unsafe fn on_poll(controller: usize) {
     // rc.12: a Save or Load press the chords stood down says why (an owner or the speed hold: logged only).
     if let Some((action, why)) = refused {
         crate::runtime::features::notices::save_state_refused(action, why);
+    }
+    if recorder_refused {
+        crate::runtime::features::notices::refuse("Stop the drill to start recording or play inputs");
     }
     crate::runtime::features::game_speed::on_hold(hold, style);
     crate::runtime::features::game_speed::training_apply();

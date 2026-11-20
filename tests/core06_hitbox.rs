@@ -1771,7 +1771,10 @@ fn core06_release_reads_the_hit_module_only_for_the_visualizer_or_live_perfect()
         perfect
     } else {"));
     assert!(adapter.contains("&& run.plan_pending"));
-    assert!(adapter.contains("run.player_height_frame != Some(run.rounds.frames)"));
+    assert!(adapter.contains("airborne_recovery(cpu, natives::status_kind(cpu))"));
+    assert!(adapter.contains("run.player_height.request(frame, actionable)"));
+    let plan = include_str!("../src/model/edge_juggle/perfect.rs");
+    assert!(plan.contains("!actionable || self.frame == Some(frame) || self.value.is_some()"));
     // Reader construction and raw loads have the same reachability boundary.
     for name in ["GameHurt", "mem_load"] {
         let found = refs(name);
