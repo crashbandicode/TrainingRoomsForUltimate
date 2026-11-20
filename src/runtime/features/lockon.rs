@@ -19,8 +19,8 @@ use crate::runtime::{
 };
 
 const COUNT: usize = 1 + btt::MAX;
-const SCALE: f32 = 0.6;
-const CENTER_HEIGHT: f32 = 4.0;
+use crate::model::lockon::{HELPER_CENTER_HEIGHT as CENTER_HEIGHT, HELPER_SCALE as SCALE, PICTURE_RADIUS};
+const _: () = assert!(PICTURE_RADIUS == eggs::RADIUS);
 
 static USABLE: AtomicBool = AtomicBool::new(false);
 

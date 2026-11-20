@@ -1,5 +1,22 @@
 //! Tracks the native item for each live target. The practice games own scoring.
 
+/// The target picture's radius, the practice games' own hit test (`eggs::RADIUS`).
+pub const PICTURE_RADIUS: f32 = 4.0;
+/// The lock-on helper Sandbag's posture scale: small enough that its whole hurt volume is inside the picture
+/// (`helper_reach` 3.48 of 4), so the helper only anchors the native lock-on search and never widens the break area.
+pub const HELPER_SCALE: f32 = 0.3;
+/// How far under the target centre the helper's posture (its feet) is placed: its middle part on the centre.
+pub const HELPER_CENTER_HEIGHT: f32 = 2.96;
+/// The Sandbag's three hurt parts: their height above its posture, and the radius they touch at, per unit of posture scale
+/// (exact d6393cb0, Eden target-hurtbox-d6393cb0-yoga-4: at 0.6 the centres rose 2.41, 5.93 and 9.41 and touched at 3.45).
+pub const HELPER_PART_RISE: [f32; 3] = [4.02, 9.88, 15.68];
+pub const HELPER_PART_RADIUS: f32 = 5.75;
+
+/// How far the helper's hurt volume reaches from the target centre, at posture `scale` placed `center_height` under it.
+pub fn helper_reach(scale: f32, center_height: f32) -> f32 {
+    HELPER_PART_RISE.iter().map(|rise| (rise * scale - center_height).abs()).fold(0.0, f32::max) + HELPER_PART_RADIUS * scale
+}
+
 /// Address of the next 32-bit slot ID, if the game's free stack has an entry.
 pub fn free_slot_top([begin, end, capacity]: [usize; 3]) -> Option<usize> {
     (begin != 0 && (begin | end | capacity) & 3 == 0 && begin < end && end <= capacity)
