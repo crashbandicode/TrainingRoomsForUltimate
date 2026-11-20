@@ -24,6 +24,11 @@ const RING_CELLS: [u32; 44] = [
     0x00000000, 0x00000000,
 ];
 
+/// Puff stays in native FLY, not JUMP_AERIAL, during its multijumps (fd-4, seq 121241).
+pub fn puff_active_status(status: i32, standard_airborne: bool) -> bool {
+    status == 0xd || standard_airborne
+}
+
 #[derive(Clone, Copy)]
 pub struct FlyState {
     pub position: Point,

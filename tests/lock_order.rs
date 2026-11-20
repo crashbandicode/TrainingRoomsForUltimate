@@ -1020,6 +1020,7 @@ const NOT_GAME_ENTRIES: &[(&str, &str)] = &[
     ("inline_keyboard::cancelled", KEYBOARD_CALLBACK),
     ("inline_keyboard::initialized", KEYBOARD_CALLBACK),
     ("inline_keyboard::finished", KEYBOARD_CALLBACK),
+    ("edge_juggle::edge_juggle_attempt", "a release trace-point anchor called by edge_juggle::fighter_frame; the fighter-frame paths still walk it"),
     ("edge_juggle::planner_chose", "a release trace-point anchor reached from edge_juggle::ai_correction"),
     ("edge_juggle::planner_unavailable", "a release trace-point anchor reached from edge_juggle::ai_correction"),
     ("edge_juggle::perfect_rule_fired", "a release trace-point anchor reached from edge_juggle::ai_correction"),

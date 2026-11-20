@@ -8,7 +8,7 @@ use crate::{
     model::{sites_pkg2, sites_pkg3},
     runtime::game,
 };
-use perfect::fly::{FlyState, PuffFlight};
+use perfect::fly::{puff_active_status, FlyState, PuffFlight};
 use perfect::niche::{self, Budget, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
 use perfect::pikachu::{self, SkullBashFlight};
 use perfect::{recovery, AirPhysics, Correction, Outline, Point, Route, RouteFacts, SpecialReach};
@@ -221,7 +221,7 @@ impl NicheGuide {
         let (snapshot, available) = recovery_snapshot(ai)?;
         let reach = if available { Some(special_reach(ai, snapshot)?) } else { None };
         if let Some(MeasuredFlight::Puff(flight)) = &mut self.measured {
-            if !airborne_recovery(cpu, status) {
+            if !puff_active_status(status, airborne_recovery(cpu, status)) {
                 return None;
             }
             let (vx, vy) = super::super::recording_host::fighter_speed(cpu)?;
