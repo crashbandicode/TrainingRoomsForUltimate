@@ -582,6 +582,8 @@ pub mod cb {
 
 /// The frame strip's pane indices and geometry (canvas units, the container's centre is the origin).
 pub mod iv {
+    use crate::model::frame_strip::TAGS;
+
     /// Frames on screen, links in the LAST row, lane runs and run lengths per lane, chips.
     pub const WINDOW: usize = 60;
     pub const HISTORY: usize = 4;
@@ -591,7 +593,7 @@ pub mod iv {
 
     /// The strip's pane indices (local: `IDX_IV + at::…` in the table).
     pub mod at {
-        use super::{CHIPS, HISTORY, RUNS, RUN_LABELS, WINDOW};
+        use super::{CHIPS, HISTORY, RUNS, RUN_LABELS, TAGS, WINDOW};
         pub const CONTAINER: usize = 0;
         pub const BACKDROP: usize = 1;
         /// IN, P1, CPU.
@@ -623,7 +625,9 @@ pub mod iv {
         pub const MOVE_TEXT: usize = PILL_TEXT + HISTORY;
         /// One mark per frame of the stick row, under P1's lane (oldest at `STICK`).
         pub const STICK: usize = MOVE_TEXT + HISTORY;
-        pub const COUNT: usize = STICK + WINDOW;
+        pub const TAG_BOX: usize = STICK + WINDOW;
+        pub const TAG_TEXT: usize = TAG_BOX + TAGS;
+        pub const COUNT: usize = TAG_TEXT + TAGS;
     }
 
     pub const COUNT: usize = at::COUNT;
@@ -707,7 +711,9 @@ const fn iv_name(local: usize) -> Name {
         i if i < PILL_TEXT => Name::indexed("TrIvPill", i - PILL),
         i if i < MOVE_TEXT => Name::indexed("TrIvPillT", i - PILL_TEXT),
         i if i < STICK => Name::indexed("TrIvMove", i - MOVE_TEXT),
-        i if i < COUNT => Name::indexed("TrIvSk", i - STICK),
+        i if i < TAG_BOX => Name::indexed("TrIvSk", i - STICK),
+        i if i < TAG_TEXT => Name::indexed("TrIvTagB", i - TAG_BOX),
+        i if i < COUNT => Name::indexed("TrIvTagT", i - TAG_TEXT),
         _ => {
             let _ = (RUNS, RUN_LABELS, WINDOW);
             panic!("no such frame strip pane")
@@ -756,7 +762,9 @@ const fn iv_spec(local: usize, name: Name) -> Spec {
         i if i < PILL_TEXT => under(rect(name, [0.0, LAST_Y, PILL_W, 24.0], TEXT, false), parent),
         i if i < MOVE_TEXT => iv_text(name, [0.0, LAST_Y, PILL_W], Align::Center, FONT_TAG),
         i if i < STICK => iv_text(name, [0.0, LAST_Y, 200.0], Align::Left, FONT_TAG),
-        i if i < COUNT => hidden(under(text(name, [0.0, STICK_Y, 16.0, 18.0], Align::Center, FONT_TAG, 2, TEXT), parent)),
+        i if i < TAG_BOX => hidden(under(text(name, [0.0, STICK_Y, 16.0, 18.0], Align::Center, FONT_TAG, 2, TEXT), parent)),
+        i if i < TAG_TEXT => hidden(under(rect(name, [0.0, 0.0, 92.0, LANE_H + 4.0], TEXT, false), parent)),
+        i if i < COUNT => iv_text(name, [0.0, 0.0, 92.0], Align::Center, FONT_TAG),
         _ => {
             let _ = TEXT_UNITS;
             panic!("no such frame strip pane")
