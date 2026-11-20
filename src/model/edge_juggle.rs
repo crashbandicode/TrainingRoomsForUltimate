@@ -35,6 +35,70 @@ impl Drill {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Difficulty {
+    LevelNine,
+    Perfect,
+}
+
+impl Difficulty {
+    pub const fn from_option(option: usize) -> Self {
+        if option == 1 { Self::Perfect } else { Self::LevelNine }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Reaction {
+    FramePerfect,
+    Human,
+    Custom(u8),
+}
+
+impl Reaction {
+    /// The custom row stores a zero-based index for 1–30 frames.
+    pub fn from_settings(option: usize, frames_index: usize) -> Self {
+        match option {
+            0 => Self::FramePerfect,
+            2 => Self::Custom((frames_index.min(29) + 1) as u8),
+            _ => Self::Human,
+        }
+    }
+
+    pub const fn frames(self) -> u8 {
+        match self {
+            Self::FramePerfect => 0,
+            Self::Human => 12,
+            Self::Custom(frames) => frames,
+        }
+    }
+}
+
+pub struct DifficultyRows {
+    pub difficulty: &'static str,
+    pub reaction: &'static str,
+    pub frames: &'static str,
+}
+
+pub const EDGE_ROWS: DifficultyRows = DifficultyRows {
+    difficulty: "edge_difficulty", reaction: "edge_reaction", frames: "edge_reaction_frames",
+};
+pub const JUGGLE_ROWS: DifficultyRows = DifficultyRows {
+    difficulty: "juggle_difficulty", reaction: "juggle_reaction", frames: "juggle_reaction_frames",
+};
+
+impl Drill {
+    pub const fn difficulty_rows(self) -> &'static DifficultyRows {
+        match self {
+            Self::GuardEdge => &EDGE_ROWS,
+            Self::Juggler => &JUGGLE_ROWS,
+        }
+    }
+}
+
+pub fn reaction_rows(id: &str) -> Option<&'static DifficultyRows> {
+    [&EDGE_ROWS, &JUGGLE_ROWS].into_iter().find(|rows| rows.reaction == id)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Outcome {
     Secured,
     RecoveredAtLedge,

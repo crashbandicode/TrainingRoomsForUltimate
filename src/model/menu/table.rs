@@ -282,7 +282,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 154] = [
+pub static ROWS: [Row; 158] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -606,6 +606,10 @@ pub static ROWS: [Row; 154] = [
       "Saves the CPU's active macro and Loop as a practice.\nIts start save is the macro's own."),
     r(EDGE, "Start", "", Control::Start(Game::GuardEdge),
       "Starts with the last setup for this stage or opens the wizard.\nWhile it runs, this row reads Stop."),
+    r(EDGE, "Difficulty", "edge_difficulty", Control::Dropdown(&["Level 9", "Perfect"]),
+      "Level 9 uses the stock CPU. Perfect adds recovery corrections."),
+    r(EDGE, "Reaction", "edge_reaction", Control::Dropdown(&["Frame-perfect", "Human 12 f", "Custom"]),
+      "Delay before the CPU reacts to your actions.\nA selects a preset. Left or Right adjusts Custom."),
     r(EDGE, "Set up…", "", Control::Editor(Editor::EdgeJuggleSetup(Game::GuardEdge)),
       "Choose the start area, the CPU's point and your point.\nPreview both positions before starting."),
     r(EDGE, "CPU percent", "edge_cpu_percent", Control::Number { first: 0, step: 1 },
@@ -614,6 +618,10 @@ pub static ROWS: [Row; 154] = [
       "Stop scoring after 10 or 20 attempts, or practise freely.\nUnresolved attempts do not count."),
     r(JUGGLE, "Start", "", Control::Start(Game::Juggler),
       "Starts with the last setup for this stage or opens the wizard.\nWhile it runs, this row reads Stop."),
+    r(JUGGLE, "Difficulty", "juggle_difficulty", Control::Dropdown(&["Level 9", "Perfect"]),
+      "Level 9 uses the stock CPU. Perfect adds escape corrections."),
+    r(JUGGLE, "Reaction", "juggle_reaction", Control::Dropdown(&["Frame-perfect", "Human 12 f", "Custom"]),
+      "Delay before the CPU reacts to your actions.\nA selects a preset. Left or Right adjusts Custom."),
     r(JUGGLE, "Set up…", "", Control::Editor(Editor::EdgeJuggleSetup(Game::Juggler)),
       "Choose the CPU's height, position and percent, then your point.\nPreview both positions before starting."),
     r(JUGGLE, "Attempts", "juggle_attempts", Control::Dropdown(&["10", "20", "Free"]),

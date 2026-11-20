@@ -8,7 +8,7 @@ use super::{cpu::konst, mashout::FloorRay, notices, practice, recorder, states};
 use crate::model::chords::{field, logical as key, Sample};
 use crate::model::cpu::ids::{C, UNRESOLVED};
 use crate::model::edge_juggle::{
-    Drill, Observation, Outcome, Phase, Session, Setup, Stage, Wizard, WizardStep,
+    Difficulty, Drill, Observation, Outcome, Phase, Session, Setup, Stage, Wizard, WizardStep,
 };
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::practice_games::best_time;
@@ -22,18 +22,20 @@ use crate::runtime::{
 const NOTICE: u8 = 0x34;
 const JUGGLE_PERCENT: u16 = 60;
 type StageKey = (i32, u32);
-type BestKey = (Drill, i32, u8);
+type BestKey = (Drill, i32, u8, Difficulty);
 
 #[derive(Clone, Copy)]
 struct Config {
     edge_percent: u16,
     edge_limit: Option<u16>,
     juggle_limit: Option<u16>,
+    difficulty: [Difficulty; 2],
 }
 static CONFIG: Published<Config> = Published::new(Config {
     edge_percent: 100,
     edge_limit: Some(10),
     juggle_limit: Some(10),
+    difficulty: [Difficulty::LevelNine; 2],
 });
 static START: AtomicU8 = AtomicU8::new(0);
 static ENGINE_ACTIVE: AtomicBool = AtomicBool::new(false);
@@ -46,17 +48,20 @@ struct Engine {
     run: Option<Run>,
     kept: [Option<(StageKey, Setup)>; 2],
     bests: [Option<(BestKey, u32)>; 24],
+    streaks: [Option<(BestKey, u32)>; 24],
     held_cpu: Option<CpuBody>,
 }
 static ENGINE: Mutex<Engine> = Mutex::new(Engine {
     run: None,
     kept: [None; 2],
     bests: [None; 24],
+    streaks: [None; 24],
     held_cpu: None,
 });
 
 struct Run {
     drill: Drill,
+    difficulty: Difficulty,
     stage_key: StageKey,
     stage: Stage,
     wizard: Option<Wizard>,
@@ -104,6 +109,9 @@ pub fn publish(snapshot: &Snapshot) {
         edge_percent: select("edge_cpu_percent").min(300) as u16,
         edge_limit: limit("edge_attempts"),
         juggle_limit: limit("juggle_attempts"),
+        difficulty: [Drill::GuardEdge, Drill::Juggler].map(|drill| {
+            Difficulty::from_option(select(drill.difficulty_rows().difficulty))
+        }),
     });
 }
 
@@ -344,20 +352,19 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage: Stage, setup: Setup) -
     true
 }
 
-fn post_notice(run: &mut Run, bests: &[Option<(BestKey, u32)>; 24], key: BestKey) {
+fn post_notice(run: &mut Run, best: Option<u32>, best_streak: Option<u32>) {
     let Session {
         phase,
         attempts,
         secured,
         streak,
-        best_streak,
         frames,
         hits,
         ..
     } = run.rounds;
     let mut text = FixedPath::<128>::new();
     let time = frames as f32 / 60.0;
-    let best = best_time(bests, key);
+    let best_streak = best_streak.unwrap_or(0);
     let outcome = match phase {
         Phase::Result(result, _) => match result {
             Outcome::Secured => "Secured",
@@ -528,6 +535,7 @@ pub unsafe fn frame(fighter: usize) {
         }
         engine.run = Some(Run {
             drill,
+            difficulty: config.difficulty[drill as usize],
             stage,
             stage_key,
             wizard: editing.then_some(wizard),
@@ -555,6 +563,7 @@ pub unsafe fn frame(fighter: usize) {
     let Engine {
         run: Some(run),
         bests,
+        streaks,
         held_cpu,
         ..
     } = &mut *engine
@@ -564,14 +573,14 @@ pub unsafe fn frame(fighter: usize) {
     if run.body != body {
         run.body = body;
         *held_cpu = None;
-        run.rounds.discard_attempt();
+        run.rounds.restart_drill();
         run.waiting_for_fall = false;
         run.previous_damage = None;
     }
     let Some(kind) = natives::fighter_kind(cpu) else {
         return;
     };
-    let key = (drill, kind, run.setup.area as u8);
+    let key = (drill, kind, run.setup.area as u8, run.difficulty);
     if let Some(wizard) = &mut run.wizard {
         if wizard.step == WizardStep::Player {
             if let Some(p1) = snap_player(p1, drill, run.stage, run.cursor) {
@@ -582,7 +591,7 @@ pub unsafe fn frame(fighter: usize) {
             }
             run.confirm_player = false;
         }
-        post_notice(run, bests, key);
+        post_notice(run, best_time(bests, key), best_time(streaks, key));
         return;
     }
     if !game::granted(crate::model::sites_pkg2::STATUS_KIND_OFFSET)
@@ -624,9 +633,11 @@ pub unsafe fn frame(fighter: usize) {
                 state::set_sleep(cpu, false);
             }
         }
-        run.rounds.record_result(bests, key);
+        if run.rounds.record_result(bests, key).is_some() && drill == Drill::GuardEdge {
+            crate::model::practice_games::record_max(streaks, key, u32::from(run.rounds.streak));
+        }
     }
-    post_notice(run, bests, key);
+    post_notice(run, best_time(bests, key), best_time(streaks, key));
 }
 pub fn look(active: bool) -> [Option<([f32; 2], crate::model::panes::EggLook)>; super::btt::LOOKS] {
     use crate::model::panes::{EggLook, EggPicture, EGG_WHOLE};
