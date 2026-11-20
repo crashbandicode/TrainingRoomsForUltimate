@@ -1,7 +1,7 @@
 //! Player-grade recovery decisions for Guard the Edge. Pure: the runtime applies pad edits only.
 
 use super::{
-    choose_route, hit_recovery, AirPhysics, Correction, Plan, Point, Route, SpecialReach, JUMP,
+    hit_recovery, AirPhysics, Correction, Plan, Point, Route, SpecialReach, ATTACK, GUARD, SPECIAL,
 };
 
 /// Where the edge-guarder is against the fighter's near ledge.
@@ -20,22 +20,77 @@ pub struct Guarder {
     pub position: Point,
     pub hanging: bool,
     pub airborne: bool,
+    /// Horizontal threat radius: body height and the live attack volume.
     pub reach: f32,
 }
 
-pub fn zone(guard: Guarder, ledge: Point, _cpu: Point) -> Zone {
-    let [x, y] = [guard.position[0] - ledge[0], guard.position[1] - ledge[1]];
-    if x.hypot(y) <= guard.reach {
+pub fn zone(guard: Guarder, ledge: Point, cpu: Point) -> Zone {
+    let inward = (ledge[0] - cpu[0]).signum();
+    let depth = (guard.position[0] - ledge[0]) * inward;
+    let reach = guard.reach;
+    if !(depth.is_finite() && guard.position[1].is_finite() && reach.is_finite() && reach > 0.0) {
+        return Zone::Far;
+    }
+    if guard.hanging && depth.abs() <= reach {
+        Zone::Hang
+    } else if depth < 0.0 && guard.airborne {
+        if guard.position[1] >= cpu[1] {
+            Zone::OffHigh
+        } else {
+            Zone::OffLow
+        }
+    } else if depth <= reach {
         Zone::Ledge
+    } else if depth <= reach * 3.0 {
+        Zone::Mid
     } else {
         Zone::Far
     }
 }
 
-pub fn mix(options: [Option<Plan>; 4], _zone: Zone, last: Option<Route>, draw: u32) -> Option<Plan> {
-    choose_route(options, last, draw)
+/// Near, High, LateLow and Opposite against each zone, in `Zone` order.
+const ZONE_WEIGHTS: [[u8; 4]; 6] = [
+    [8, 4, 2, 0],
+    [5, 3, 5, 1],
+    [2, 3, 6, 5],
+    [0, 8, 1, 3],
+    [3, 0, 8, 3],
+    [4, 8, 0, 1],
+];
+
+/// Roll one feasible route, weighted against the guarder and the last route.
+/// A zero zone weight removes a route only while another feasible one remains.
+pub fn mix(options: [Option<Plan>; 4], zone: Zone, last: Option<Route>, draw: u32) -> Option<Plan> {
+    let weight = |plan: Plan| {
+        let column = match plan.route {
+            Route::Near => 0,
+            Route::High => 1,
+            Route::LateLow => 2,
+            Route::Opposite => 3,
+        };
+        let weight = u32::from(plan.weight) * u32::from(ZONE_WEIGHTS[zone as usize][column]);
+        if Some(plan.route) == last {
+            weight.div_ceil(2)
+        } else {
+            weight
+        }
+    };
+    let total: u32 = options.iter().flatten().map(|&plan| weight(plan)).sum();
+    if total == 0 {
+        return options.into_iter().flatten().max_by_key(|plan| plan.weight);
+    }
+    let mut draw = ((u64::from(draw) * u64::from(total)) >> 32) as u32;
+    for plan in options.into_iter().flatten() {
+        let weight = weight(plan);
+        if draw < weight {
+            return Some(plan);
+        }
+        draw -= weight;
+    }
+    None
 }
 
+/// What the fighter still has for the return: the jump, then the up special.
 #[derive(Clone, Copy)]
 pub struct Reach {
     pub air: AirPhysics,
@@ -43,77 +98,132 @@ pub struct Reach {
     pub special: Option<SpecialReach>,
 }
 
+const REACH_FRAMES: u8 = 90;
+
 impl Reach {
+    /// Drift at the ledge and act on frame `delay`: the jump when one is left,
+    /// then the up special from the first frame its envelope holds the ledge.
     pub fn returns(self, from: Point, speed: Point, ledge: Point, delay: u8, bottom: f32) -> bool {
-        let delay = if self.jump { delay } else { u8::MAX };
-        self.air.reaches_with_jump(from, speed, ledge, delay, bottom)
+        if !self.air.valid()
+            || !from
+                .into_iter()
+                .chain(speed)
+                .chain(ledge)
+                .chain([bottom])
+                .all(f32::is_finite)
+        {
+            return false;
+        }
+        let air = self.air;
+        let direction = (ledge[0] - from[0]).signum();
+        let mut dx = (ledge[0] - from[0]).abs();
+        let mut y = from[1];
+        let [mut vx, mut vy] = [speed[0] * direction, speed[1]];
+        for frame in 0..=REACH_FRAMES {
+            if y <= bottom {
+                return false;
+            }
+            let at = [ledge[0] - dx * direction, y];
+            if frame >= delay && self.special.is_some_and(|special| special.reaches(at, ledge)) {
+                return true;
+            }
+            vy = if frame == delay && self.jump {
+                air.jump_speed
+            } else {
+                (vy - air.gravity).max(-air.terminal_speed)
+            };
+            vx = (vx + air.horizontal_acceleration).min(air.horizontal_speed);
+            dx -= vx;
+            y += vy;
+            if dx <= 0.0 {
+                return y >= ledge[1];
+            }
+        }
+        false
     }
 
+    /// The last frame the fighter may wait: the point of no return.
     pub fn deadline(self, from: Point, speed: Point, ledge: Point, bottom: f32) -> Option<u8> {
-        (0..=8)
+        (0..=REACH_FRAMES)
             .take_while(|&delay| self.returns(from, speed, ledge, delay, bottom))
             .last()
     }
+
+    fn jump_rise(self) -> f32 {
+        if self.jump {
+            self.air.jump_speed.powi(2) / (2.0 * self.air.gravity)
+        } else {
+            0.0
+        }
+    }
 }
 
-pub fn planned_delay(route: Route, _zone: Zone, _deadline: Option<u8>, draw: u32) -> u8 {
-    let delay = (draw % 9) as u8;
-    if route == Route::LateLow {
-        delay.max(1)
-    } else {
-        delay
+/// The frame after the plan on which a held jump or special is spent.
+pub fn planned_delay(route: Route, zone: Zone, deadline: Option<u8>, draw: u32) -> u8 {
+    let Some(deadline) = deadline else { return 0 };
+    match (route, zone) {
+        (Route::LateLow, _) => deadline.saturating_sub(3),
+        (Route::Near, Zone::Far) | (Route::High | Route::Opposite, _) => 0,
+        (Route::Near, _) => (draw % (u32::from(deadline) / 3 + 1)) as u8,
     }
 }
 
 #[derive(Clone, Copy)]
 pub struct HoldFacts {
     pub buttons: u32,
+    /// The held resource: `JUMP` or `SPECIAL`.
     pub button: u32,
     pub planned: u8,
+    /// Spending it next frame still returns.
     pub can_wait: bool,
+    /// The guarder's live attack covers the ledge.
     pub hot: bool,
 }
 
+/// A stock jump or up special held back until its planned frame.
 #[derive(Default)]
 pub struct Hold {
-    pending: Option<u8>,
+    age: u8,
+    pending: bool,
 }
 
 impl Hold {
     pub fn waiting(&self) -> bool {
-        self.pending.is_some()
+        self.pending
     }
 
     pub fn step(&mut self, facts: HoldFacts) -> Correction {
+        let age = self.age;
+        self.age = age.saturating_add(1);
         let mut out = Correction::default();
-        if facts.button != JUMP || facts.buttons & !(JUMP | super::FLICK_JUMP) != 0 {
-            self.pending = None;
+        if facts.buttons & (GUARD | ATTACK) != 0 {
+            // A stock defensive answer passes and keeps the resource.
+            self.pending = false;
             return out;
         }
-        if let Some(remaining) = self.pending.take() {
-            if remaining == 0 || !facts.can_wait {
-                out.press = JUMP;
-                return out;
-            }
-            self.pending = Some(remaining - 1);
-        } else if facts.buttons & JUMP != 0 && facts.planned != 0 && facts.can_wait {
-            self.pending = Some(facts.planned.min(8) - 1);
-        }
-        if self.pending.is_some() {
-            out.release = facts.buttons & JUMP;
+        if facts.can_wait && (age < facts.planned || facts.hot) {
+            // The up special never goes before a jump held in reserve.
+            out.release = facts.buttons & (facts.button | SPECIAL);
+            self.pending |= out.release != 0;
+        } else if std::mem::take(&mut self.pending) {
+            out.press = facts.button;
         }
         out
     }
 }
 
-pub fn hot(_attack_age: Option<u32>, _reaction: u8, _covers: bool) -> bool {
-    false
+/// The guarder's attack covers the ledge and is old enough to be seen.
+pub fn hot(attack_age: Option<u32>, reaction: u8, covers: bool) -> bool {
+    covers && attack_age.is_some_and(|age| age >= u32::from(reaction))
 }
 
-pub fn short(_reach: Reach, _from: Point, _speed: Point, _ledge: Point, _bottom: f32) -> bool {
-    true
+/// The plain return fails for distance while the climb is still affordable.
+pub fn short(reach: Reach, from: Point, speed: Point, ledge: Point, bottom: f32) -> bool {
+    let lift = reach.jump_rise() + reach.special.map_or(0.0, |special| special.rise);
+    !reach.returns(from, speed, ledge, 0, bottom) && ledge[1] - from[1] <= lift
 }
 
+/// Trace-measured displacement of a row's side and down specials.
 #[derive(Clone, Copy, Default)]
 pub struct Measured {
     pub run: f32,
@@ -122,23 +232,71 @@ pub struct Measured {
 
 #[derive(Clone, Copy)]
 pub struct Crossing {
+    /// Horizontal distance to the exit point beyond the far ledge.
     pub span: f32,
+    /// Foot heights that clear the underside and the blast zone.
     pub band: Point,
     pub foot: f32,
+    /// Height of the far ledge.
     pub ledge: f32,
 }
 
+/// Spare climb left by an under-stage crossing as a fraction, or `None` when
+/// jumps, glide, the measured specials and the up special do not cover it.
+/// An aimed up special is shared between level travel and the final climb.
 pub fn crossing_margin(
-    _air: AirPhysics,
-    _jumps: u8,
-    _special: Option<SpecialReach>,
-    _aimed: bool,
-    _measured: Measured,
-    _crossing: Crossing,
+    air: AirPhysics,
+    jumps: u8,
+    special: Option<SpecialReach>,
+    aimed: bool,
+    measured: Measured,
+    crossing: Crossing,
 ) -> Option<f32> {
-    Some(1.0)
+    let Crossing {
+        span,
+        band: [bottom, top],
+        foot,
+        ledge,
+    } = crossing;
+    if !air.valid()
+        || ![span, bottom, top, foot, ledge, measured.run, measured.rise]
+            .into_iter()
+            .all(f32::is_finite)
+        || special.is_some_and(|special| !special.valid())
+        || !(bottom < top && top <= ledge && foot >= bottom && span > 0.0)
+    {
+        return None;
+    }
+    let rise = air.jump_speed.powi(2) / (2.0 * air.gravity);
+    let coast = air.terminal_speed.powi(2) / (2.0 * air.gravity);
+    let down = if rise <= coast {
+        (2.0 * rise / air.gravity).sqrt()
+    } else {
+        air.terminal_speed / air.gravity + (rise - coast) / air.terminal_speed
+    };
+    // One jump from the hold line returns to it after this much level travel.
+    let hop = (air.jump_speed / air.gravity + down) * air.horizontal_speed;
+    let under = if rise <= top - bottom { jumps } else { 0 };
+    let [length, height] = special.map_or([0.0; 2], |reach| [reach.horizontal, reach.rise]);
+    let start = (foot + measured.rise).min(top);
+    let mut best = None;
+    for spent in 0..=under {
+        for share in 0..=4u8 {
+            let level = if aimed { f32::from(share) * 0.25 } else { 0.0 };
+            let glide = span - measured.run - f32::from(spent) * hop - level * length;
+            let exit = start - glide.max(0.0) * air.terminal_speed / air.horizontal_speed;
+            let lift = height * (1.0 - level) + f32::from(jumps - spent) * rise;
+            let spare = lift - (ledge - exit);
+            if exit >= bottom && spare >= 0.0 {
+                let margin = (spare / (ledge - bottom)).min(1.0);
+                best = Some(best.map_or(margin, |known: f32| known.max(margin)));
+            }
+        }
+    }
+    best
 }
 
+/// Survive the nearest blast zone first; otherwise bend the launch at the stage.
 pub fn edge_di(
     cpu: Point,
     ledge: Point,
@@ -146,7 +304,13 @@ pub fn edge_di(
     hitstun: f32,
     blast: [f32; 4],
 ) -> Option<Point> {
-    hit_recovery(cpu, ledge, speed, hitstun, blast)
+    hit_recovery(
+        cpu,
+        [2.0 * cpu[0] - ledge[0], cpu[1]],
+        speed,
+        hitstun,
+        blast,
+    )
 }
 
 #[cfg(test)]
