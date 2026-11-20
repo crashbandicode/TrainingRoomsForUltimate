@@ -4,12 +4,13 @@
 use super::guard::{HookForm, Placement, SeamKind};
 use super::sites::{Feature, Site};
 
-pub static SITES: [Site; 30] = include!(concat!(env!("OUT_DIR"), "/tables/sites_mashout.SITES.rs"));
+pub static SITES: [Site; 32] = include!(concat!(env!("OUT_DIR"), "/tables/sites_mashout.SITES.rs"));
 
 pub const FLOOR_RAY: usize = 0x202a240;
 pub const FLOOR_RAY_IMPL: usize = 0x4658b0;
-pub const FLOOR_GUARDS: [usize; 7] = [
+pub const FLOOR_GUARDS: [usize; 9] = [
     FLOOR_RAY, FLOOR_RAY_IMPL, 0x5266c0, 0x2284a30, 0x2284a50, 0x2284a90, 0x2284930,
+    0x15cbc40, 0x15cbc10,
 ];
 
 /// All Mash out CPU placements depend on these guarded reads.

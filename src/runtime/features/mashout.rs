@@ -86,9 +86,17 @@ impl FloorRay {
             return None;
         }
         let flags = ((line + 0xc4) as *const u32).read();
-        // Match Tech's native floor classification for one-way, upward-facing platforms.
+        // Classify one-way platforms before using the solid floor bit.
         let normal_y = ((line + 0xa4) as *const f32).read();
-        if flags & 0x0800 == 0 && !(platforms && flags & 0x2300 == 0x2000 && normal_y > 0.0) {
+        if !normal_y.is_finite() {
+            return None;
+        }
+        let is_floor = if flags & 0x2000 != 0 {
+            platforms && flags & 0x0300 == 0 && normal_y > 0.0
+        } else {
+            flags & 0x0800 != 0
+        };
+        if !is_floor {
             return None;
         }
         let vertices = ((line + 0x88) as *const [usize; 2]).read();
