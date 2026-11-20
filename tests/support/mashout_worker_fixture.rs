@@ -32,6 +32,7 @@ mod runtime {
     pub mod bridge_state {
         use crate::model::{practice_games::Game, practice_state::Fields};
 
+        #[derive(Clone, Copy)]
         pub struct PracticeCapture;
         impl PracticeCapture {
             pub fn of(_: Game) -> Self { Self }
