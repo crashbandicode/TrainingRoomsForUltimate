@@ -72,8 +72,10 @@ impl FloorRay {
         Some(Self { accessor: p1, cast })
     }
 
-    /// The native result is borrowed only until the next query. Copy its current geometry.
-    pub(super) unsafe fn floor(&self, x: f32, [top, bottom]: [f32; 2], platforms: bool) -> Option<entry::PlacementFloor> {
+    /// The caller must consume the borrowed line on this game-thread pass.
+    pub(super) unsafe fn borrowed_line(
+        &self, x: f32, [top, bottom]: [f32; 2], platforms: bool,
+    ) -> Option<usize> {
         if ![x, top, bottom].into_iter().all(f32::is_finite) || top <= bottom {
             return None;
         }
@@ -82,9 +84,12 @@ impl FloorRay {
             self.accessor, &RayPoint([x, top, 0., 0.]), &RayPoint([0., bottom - top, 0., 0.]),
             &mut hit, platforms,
         );
-        if line == 0 {
-            return None;
-        }
+        (line != 0).then_some(line)
+    }
+
+    /// The native result is borrowed only until the next query. Copy its current geometry.
+    pub(super) unsafe fn floor(&self, x: f32, limits: [f32; 2], platforms: bool) -> Option<entry::PlacementFloor> {
+        let line = self.borrowed_line(x, limits, platforms)?;
         let flags = ((line + 0xc4) as *const u32).read();
         // Classify one-way platforms before using the solid floor bit.
         let normal_y = ((line + 0xa4) as *const f32).read();

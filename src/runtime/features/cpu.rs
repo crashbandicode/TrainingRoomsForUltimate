@@ -393,7 +393,9 @@ fn try_role_scene() -> Result<Option<Scene>, crate::runtime::compat::menu::MenuB
 /// All accessor-only hooks pass through current scene AND generation admission.
 fn role_of(accessor: usize) -> Option<FighterKey> {
     // The selected Mash attacker belongs to its real-move plan, including while it holds P1.
-    if unsafe { crate::runtime::features::mashout::owns_cpu(accessor) } { return None; }
+    if unsafe { super::mashout::owns_cpu(accessor) || super::edge_juggle::controls_cpu(accessor) } {
+        return None;
+    }
     let scene = role_scene();
     with(|cpu| role_adapter::role(cpu, scene, accessor)).flatten()
 }
@@ -635,7 +637,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
     let primary = !key.partner && key.entry == primary_entry(lobby);
     let tech = tech_facts(accessor, status, primary);
     let speed = crate::runtime::features::game_speed::current();
-    let practice_owned = crate::runtime::features::mashout::owns_cpu(accessor);
+    let practice_owned = super::mashout::owns_cpu(accessor) || super::edge_juggle::controls_cpu(accessor);
 
     let out = with(|cpu| {
         if !cpu.roles.set(receipt, accessor, key) { return None; }

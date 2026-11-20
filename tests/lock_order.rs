@@ -999,7 +999,9 @@ const GAME_ENTRIES: &[&str] = &[
 /// Audit staged passes and callbacks through model code as game-thread roots.
 /// Mash out's floor read is called through the placement model's ray closure.
 /// GAME_ENTRIES stays the inventory of registered native callback handoffs.
-const STAGED_GAME_ROOTS: &[&str] = &["tech::frame", "mashout::floor"];
+const STAGED_GAME_ROOTS: &[&str] = &[
+    "tech::frame", "mashout::floor", "edge_juggle::frame", "edge_juggle::poll", "edge_juggle::look", "edge_juggle::ai_correction",
+];
 
 fn game_root_keys() -> impl Iterator<Item = &'static str> {
     GAME_ENTRIES.iter().chain(STAGED_GAME_ROOTS).copied()

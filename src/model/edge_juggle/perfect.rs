@@ -278,6 +278,44 @@ pub fn choose_route(options: [Option<Plan>; 4], last: Option<Route>, draw: u32) 
     None
 }
 
+/// Edits to the CPU controller after the stock AI has produced its pad.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Correction {
+    pub stick: Option<Point>,
+    pub press: u32,
+    pub release: u32,
+}
+
+#[derive(Clone, Copy)]
+pub struct LandingFacts {
+    pub cpu: Point,
+    pub player: Point,
+    pub main_floor: [f32; 2],
+    pub stock_stick_y: f32,
+    pub stock_buttons: u32,
+}
+
+// Stock enables flick jump separately from the button presses for this frame.
+pub const FLICK_JUMP: u32 = 0x8000;
+
+pub fn juggle_drift(facts: LandingFacts, draw: u32) -> Correction {
+    let LandingFacts { cpu, player, main_floor: [left, right], stock_stick_y, stock_buttons } = facts;
+    if stock_buttons & !FLICK_JUMP != 0 || cpu[1] <= player[1]
+        || cpu[0] <= left || cpu[0] >= right
+        || !cpu.into_iter().chain(player).chain([left, right, stock_stick_y]).all(f32::is_finite)
+    {
+        return Correction::default();
+    }
+    let x = match draw {
+        0..=3 if cpu[0] != player[0] => (cpu[0] - player[0]).signum(),
+        0 | 2 => -1.0,
+        1 | 3 => 1.0,
+        4 => 0.0,
+        _ => return Correction::default(),
+    };
+    Correction { stick: Some([x, stock_stick_y]), ..Correction::default() }
+}
+
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {

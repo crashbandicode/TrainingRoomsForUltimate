@@ -6,7 +6,8 @@ use hos_lock::{Mutex, Published};
 
 use super::{cpu::konst, mashout::FloorRay, notices, practice, recorder, states};
 use crate::model::chords::{field, logical as key, Sample};
-use crate::model::cpu::ids::{C, UNRESOLVED};
+use crate::model::cpu::{ids::{C, UNRESOLVED}, rng::Rng};
+use crate::model::edge_juggle::perfect::{self, Correction, LandingFacts};
 use crate::model::edge_juggle::{
     Difficulty, Drill, Observation, Outcome, Phase, Session, Setup, Stage, Wizard, WizardStep,
 };
@@ -50,6 +51,7 @@ struct Engine {
     bests: [Option<(BestKey, u32)>; 24],
     streaks: [Option<(BestKey, u32)>; 24],
     held_cpu: Option<CpuBody>,
+    rng: Rng,
 }
 static ENGINE: Mutex<Engine> = Mutex::new(Engine {
     run: None,
@@ -57,6 +59,7 @@ static ENGINE: Mutex<Engine> = Mutex::new(Engine {
     bests: [None; 24],
     streaks: [None; 24],
     held_cpu: None,
+    rng: Rng::new(0),
 });
 
 struct Run {
@@ -72,7 +75,10 @@ struct Run {
     rounds: Session,
     body: CpuBody,
     previous_damage: Option<f32>,
-    waiting_for_fall: bool,
+    damage_stop: bool,
+    landing_draw: u32,
+    player_ledge: Option<usize>,
+    placement: Placement,
     notice: FixedPath<128>,
 }
 /// Equality tokens from the current entry. Only a fresh body may be accessed.
@@ -92,9 +98,20 @@ impl CpuBody {
     }
 }
 
+#[derive(Clone, Copy)]
+enum Placement {
+    ResetResources,
+    Grounded,
+    Airborne,
+}
+
 struct Bodies {
     p1: usize,
     cpu: usize,
+}
+
+pub fn init(seed: u64) {
+    ENGINE.lock().rng = Rng::new(seed);
 }
 
 pub fn publish(snapshot: &Snapshot) {
@@ -151,6 +168,44 @@ fn wanted() -> Option<Drill> {
     practice::active()
         .and_then(Drill::from_game)
         .filter(|_| scene::is_native_training())
+}
+
+pub unsafe fn controls_cpu(accessor: usize) -> bool {
+    wanted().is_some()
+        && !published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire)
+        && natives::module_accessor(1) == Some(accessor)
+}
+
+pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Correction {
+    let Some(engine) = ENGINE.try_lock() else {
+        return Correction::default();
+    };
+    let Some(run) = engine.run.as_ref().filter(|run| {
+        run.difficulty == Difficulty::Perfect && run.rounds.phase == Phase::Live
+            && run.wizard.is_none() && run.drill == Drill::Juggler
+    }) else {
+        return Correction::default();
+    };
+    use crate::model::sites_pkg2 as sites;
+    if run.body.accessor != accessor || natives::battle_object_id(accessor) != run.body.object_id
+        || ![sites::STATUS_KIND_OFFSET, sites::POS_X_OFFSET, sites::POS_Y_OFFSET].into_iter().all(game::granted)
+    {
+        return Correction::default();
+    }
+    let status = natives::status_kind(accessor);
+    if status == UNRESOLVED || ![C::StatusFall, C::StatusFallAerial].map(konst).contains(&status) {
+        return Correction::default();
+    }
+    let Some(p1) = natives::module_accessor(0) else {
+        return Correction::default();
+    };
+    perfect::juggle_drift(LandingFacts {
+        cpu: [natives::pos_x(accessor), natives::pos_y(accessor)],
+        player: [natives::pos_x(p1), natives::pos_y(p1)],
+        main_floor: run.stage.ledges.map(|point| point[0]),
+        stock_stick_y: stick_y,
+        stock_buttons: buttons,
+    }, run.landing_draw)
 }
 
 fn axis(pressed: u16, negative: u8, positive: u8) -> i16 {
@@ -293,6 +348,28 @@ unsafe fn snap_player(p1: usize, drill: Drill, stage: Stage, [x, y]: [f32; 2]) -
     Some([x, floor.height(x)?])
 }
 
+/// Give the native fighter scripts one grounded transition before a new fall.
+unsafe fn reset_recovery_resources(p1: usize, cpu: usize, stage: Stage) -> bool {
+    use crate::model::sites_pkg3 as s;
+    let [ground, wait] = [C::SituationGround, C::StatusWait].map(konst);
+    if [ground, wait].contains(&UNRESOLVED) || ![
+        s::STATE_CLEAR_SPEED_ALL_OFFSET, s::STATE_INIT_POS_OFFSET,
+        s::STATE_SET_SITUATION_KIND_OFFSET, s::STATE_STATUS_REQUEST_OFFSET,
+    ].into_iter().all(game::granted) {
+        return false;
+    }
+    let [left, right] = stage.ledges;
+    let cursor = [left[0].midpoint(right[0]), left[1].midpoint(right[1])];
+    let Some([x, y]) = snap_player(p1, Drill::GuardEdge, stage, cursor) else {
+        return false;
+    };
+    state::clear_speed_all(cpu);
+    state::init_pos(cpu, &state::Vector3f { x, y, z: 0.0 });
+    state::set_situation_kind(cpu, ground);
+    state::status_request(cpu, wait);
+    true
+}
+
 unsafe fn try_place(bodies: &Bodies, drill: Drill, stage: Stage, setup: Setup) -> bool {
     let Some([x, y]) = snap_player(bodies.p1, drill, stage, setup.p1) else {
         return false;
@@ -324,6 +401,10 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage: Stage, setup: Setup) -
     {
         return false;
     }
+    let jump_count = konst(C::WorkIntJumpCount);
+    if jump_count == UNRESOLVED || !game::granted(crate::model::sites_pkg4::WORK_SET_INT_OFFSET) {
+        return false;
+    }
     let [cx, cy] = setup.cpu;
     let damage = natives::damage(bodies.cpu, 0);
     if !damage.is_finite() {
@@ -346,6 +427,7 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage: Stage, setup: Setup) -
     );
     state::set_lr(bodies.cpu, -facing);
     state::set_situation_kind(bodies.cpu, air);
+    natives::set_int(bodies.cpu, 0, jump_count);
     state::heal(bodies.cpu, -damage);
     state::add_damage(bodies.cpu, f32::from(setup.percent));
     state::status_request(bodies.cpu, fall);
@@ -496,7 +578,7 @@ pub unsafe fn frame(fighter: usize) {
         engine.wake_cpu(Some(body));
         if let Some(run) = &mut engine.run {
             run.rounds.discard_attempt();
-            run.waiting_for_fall = false;
+            run.placement = Placement::ResetResources;
             run.notice = FixedPath::new();
         }
         return;
@@ -546,7 +628,10 @@ pub unsafe fn frame(fighter: usize) {
             rounds: Session::new(drill, limit),
             body,
             previous_damage: None,
-            waiting_for_fall: false,
+            damage_stop: false,
+            landing_draw: 5,
+            player_ledge: None,
+            placement: Placement::ResetResources,
             notice: FixedPath::new(),
         });
         let _ = START.compare_exchange(start, 0, Ordering::AcqRel, Ordering::Acquire);
@@ -557,7 +642,7 @@ pub unsafe fn frame(fighter: usize) {
         engine.wake_cpu(Some(body));
         if let Some(run) = &mut engine.run {
             run.rounds.restart_drill();
-            run.waiting_for_fall = false;
+            run.placement = Placement::ResetResources;
         }
     }
     let Engine {
@@ -565,6 +650,7 @@ pub unsafe fn frame(fighter: usize) {
         bests,
         streaks,
         held_cpu,
+        rng,
         ..
     } = &mut *engine
     else {
@@ -574,8 +660,10 @@ pub unsafe fn frame(fighter: usize) {
         run.body = body;
         *held_cpu = None;
         run.rounds.restart_drill();
-        run.waiting_for_fall = false;
+        run.placement = Placement::ResetResources;
         run.previous_damage = None;
+        run.damage_stop = false;
+        run.player_ledge = None;
     }
     let Some(kind) = natives::fighter_kind(cpu) else {
         return;
@@ -602,33 +690,62 @@ pub unsafe fn frame(fighter: usize) {
     let status = natives::status_kind(cpu);
     let dead_or_rebirthing = status == konst(C::StatusDead) || status == konst(C::StatusRebirth);
     let damage = Some(natives::damage(cpu, 0)).filter(|d| d.is_finite());
+    let damage_stop = natives::tech_in_damage_stop(cpu) == Some(true);
+    let [left, right] = run.stage.ledges;
+    let side = |x| usize::from(x > left[0].midpoint(right[0]));
+    let player_ledge = (natives::situation_kind(p1) == konst(C::SituationCliff))
+        .then(|| side(natives::pos_x(p1)));
+    let cpu_ledge = side(natives::pos_x(cpu));
+    let trump = drill == Drill::GuardEdge
+        && (run.player_ledge == Some(cpu_ledge) || player_ledge == Some(cpu_ledge));
     let obs = Observation {
         dead_or_rebirthing,
         grounded: natives::situation_kind(cpu) == konst(C::SituationGround),
-        cliff_catch: status == konst(C::StatusCliffCatch),
-        hit: damage
-            .zip(run.previous_damage)
+        cliff_catch: status == konst(C::StatusCliffCatch) && !trump,
+        hit: damage_stop && !run.damage_stop || damage.zip(run.previous_damage)
             .is_some_and(|(now, before)| now > before),
     };
+    if obs.hit && run.rounds.phase == Phase::Live {
+        run.landing_draw = rng.below(6);
+    }
     run.previous_damage = damage;
+    run.damage_stop = damage_stop;
+    run.player_ledge = player_ledge;
     if run.rounds.phase == Phase::Place {
         if dead_or_rebirthing {
-            run.waiting_for_fall = false;
-        } else if run.waiting_for_fall && status == konst(C::StatusFall) {
-            let [x, y] = run.setup.cpu;
-            state::set_sleep(cpu, true);
-            state::clear_speed_all(cpu);
-            state::set_pos(cpu, &state::Vector3f { x, y, z: 0.0 });
-            *held_cpu = Some(body);
-            run.rounds.placed();
-            run.waiting_for_fall = false;
+            run.placement = Placement::ResetResources;
         } else {
-            run.waiting_for_fall = try_place(&Bodies { p1, cpu }, drill, run.stage, run.setup);
+            match run.placement {
+                Placement::ResetResources => {
+                    if reset_recovery_resources(p1, cpu, run.stage) {
+                        run.placement = Placement::Grounded;
+                    }
+                }
+                Placement::Grounded if obs.grounded => {
+                    if try_place(&Bodies { p1, cpu }, drill, run.stage, run.setup) {
+                        run.placement = Placement::Airborne;
+                    }
+                }
+                Placement::Grounded => run.placement = Placement::ResetResources,
+                Placement::Airborne if status == konst(C::StatusFall) => {
+                    let [x, y] = run.setup.cpu;
+                    state::set_sleep(cpu, true);
+                    state::clear_speed_all(cpu);
+                    state::set_pos(cpu, &state::Vector3f { x, y, z: 0.0 });
+                    *held_cpu = Some(body);
+                    run.rounds.placed();
+                    run.placement = Placement::ResetResources;
+                }
+                Placement::Airborne => {
+                    state::status_request(cpu, konst(C::StatusFall));
+                }
+            }
         }
     } else {
         let before = run.rounds.phase;
         run.rounds.advance_attempt(obs);
         if matches!(before, Phase::Ready(_)) && run.rounds.phase == Phase::Live {
+            run.landing_draw = rng.below(6);
             if held_cpu.take() == Some(body) {
                 state::set_sleep(cpu, false);
             }

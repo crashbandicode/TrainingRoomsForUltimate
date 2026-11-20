@@ -121,6 +121,10 @@ fn run_inner() {
     let loaded = loaded.settings;
     // The CPU behaviours' state exists before the first publish and before any hook is installed. The
     // generator is the plugin's own (never the game's): seeded from the system tick and an address.
+    crate::runtime::features::edge_juggle::init(Rng::seed_from(
+        clock::uptime_ms(),
+        ((run as fn() as usize) as u64) ^ 0xed9e_a119,
+    ));
     cpu::init(CpuSettings::from_snapshot(&loaded.menu), Rng::seed_from(clock::uptime_ms(), (run as fn() as usize) as u64));
     // Native Training until the waiting room's practice says otherwise (package 6 calls this again).
     cpu::set_lobby(false);

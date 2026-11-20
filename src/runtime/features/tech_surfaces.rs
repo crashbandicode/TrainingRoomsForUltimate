@@ -378,3 +378,81 @@ pub(super) unsafe fn training_blast_bounds() -> Option<[f32; 4]> {
     let manager = (!holder.is_null()).then(|| holder.read_volatile())?;
     (manager != 0).then(|| ((manager + 0xc30) as *const [f32; 4]).read_unaligned())
 }
+
+struct FrameOutlineReader;
+impl Source for FrameOutlineReader {
+    fn read(&mut self, id: usize) -> Option<Line> {
+        // The id is a borrowed line from the guarded no-cull ray or its
+        // checked next-line call. This reader is confined to one native pass.
+        let aligned = |address: usize| address >= 0x10000 && address & 7 == 0 && address >> 47 == 0;
+        if !aligned(id) {
+            return None;
+        }
+        unsafe {
+            let owner = ((id + 0x118) as *const usize).read();
+            if !aligned(owner) || ((owner + 8) as *const i64).read() == -1
+                || ((id + 0x100) as *const u8).read() == 0
+            {
+                return None;
+            }
+            let vertices = ((id + 0x88) as *const [usize; 2]).read();
+            if !vertices.into_iter().all(aligned) {
+                return None;
+            }
+            let ends = vertices.map(|ptr| {
+                let [x, y] = ((ptr + 0x10) as *const [f32; 2]).read();
+                Vec2 { x, y }
+            });
+            let [x, y] = ((id + 0xa0) as *const [f32; 2]).read();
+            decode(id, ends, Vec2 { x, y }, ((id + 0xc5) as *const u8).read())
+        }
+    }
+
+    fn next(&mut self, line: Line, end: usize) -> Option<(usize, usize)> {
+        let shared = *line.ends.get(end)?;
+        if self.read(line.id)? != line {
+            return None;
+        }
+        unsafe {
+            const NEXT: usize = 0x15cbc60;
+            let call: extern "C" fn(usize, *const NativePoint) -> usize =
+                std::mem::transmute(game::text_base() + NEXT);
+            let id = call(line.id, &NativePoint([shared.x, shared.y, 0.0, 0.0]));
+            let next = self.read(id)?;
+            far_end(shared, next).map(|end| (id, end))
+        }
+    }
+}
+
+/// Copy one closed outline in the current native Training frame. The returned
+/// geometry has no raw line identities or borrowed native pointers.
+pub(super) unsafe fn training_outline(
+    ray: &super::mashout::FloorRay, x: f32, limits: [f32; 2],
+) -> Option<crate::model::edge_juggle::perfect::Outline> {
+    use crate::model::tech::surface::{Walk, MAX_LINES};
+    if !guarded() || !game::granted(0x15cbc60) {
+        return None;
+    }
+    let seed = ray.borrowed_line(x, limits, false)?;
+    let mut reader = FrameOutlineReader;
+    let line = reader.read(seed)?;
+    if line.kind() != Some(Kind::Floor) || line.passable {
+        return None;
+    }
+    let mut walk = Surfaces::EMPTY;
+    walk.begin(seed, 0);
+    for _ in 0..MAX_LINES {
+        match walk.step(&mut reader) {
+            Walk::More => {}
+            Walk::Closed => {
+                let mut outline = crate::model::edge_juggle::perfect::Outline::new();
+                for line in walk.lines() {
+                    outline.add(line.ends.map(|point| [point.x, point.y]));
+                }
+                return Some(outline);
+            }
+            _ => return None,
+        }
+    }
+    None
+}

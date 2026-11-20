@@ -304,7 +304,30 @@ unsafe fn on_ai_frame(ai: usize) {
         return;
     };
     // Rule R3: only the CPU entry's own controller (never Nana's, never an AI-driven P1's).
-    if ((body.entry_ptr + ENTRY_CONTROLLER_FIELD) as *const usize).read() != controller || !load_consts() {
+    if ((body.entry_ptr + ENTRY_CONTROLLER_FIELD) as *const usize).read() != controller {
+        return;
+    }
+    if super::edge_juggle::controls_cpu(body.accessor) {
+        let button_field = (controller + CTRL_BUTTONS) as *mut u32;
+        let x_field = (controller + CTRL_STICK_X) as *mut f32;
+        let y_field = (controller + CTRL_STICK_Y) as *mut f32;
+        let buttons = button_field.read();
+        let y = y_field.read();
+        let correction = super::edge_juggle::ai_correction(body.accessor, buttons, y);
+        if let Some([next_x, next_y]) = correction.stick {
+            x_field.write(next_x);
+            ((controller + CTRL_CLAMPED_X) as *mut f32).write(next_x);
+            if next_y != y {
+                y_field.write(next_y);
+                ((controller + CTRL_CLAMPED_Y) as *mut f32).write(next_y);
+            }
+        }
+        if correction.press != 0 || correction.release != 0 {
+            button_field.write((buttons & !correction.release) | correction.press);
+        }
+        return;
+    }
+    if !load_consts() {
         return;
     }
     if super::mashout::owns_cpu(body.accessor) {
