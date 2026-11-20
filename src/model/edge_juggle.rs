@@ -570,6 +570,17 @@ mod tests {
     }
 
     #[test]
+    fn drill_status_uses_the_existing_standing_notice_lifetime() {
+        // The text is only posted again when it changes. A player can leave the
+        // wizard on one step, or the finished set on screen, for several seconds.
+        let adapter = include_str!("../runtime/features/edge_juggle.rs");
+        assert!(
+            adapter.contains("notices::upsert(NOTICE, header, text.as_str(), u16::MAX, DEFAULT_COLOR)"),
+            "an unchanged drill notice must survive the ordinary transient notice lifetime"
+        );
+    }
+
+    #[test]
     fn edge_wizard_four_areas() {
         let stage = Stage::new([-160.0, 150.0, 110.0, -85.0], [-160.0, 150.0, 110.0, -85.0], [[-60.0, 5.0], [80.0, 8.0]]).unwrap();
         for (area, start, expected) in [
