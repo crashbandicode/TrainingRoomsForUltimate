@@ -294,6 +294,10 @@ pub struct RouteWatch {
 }
 
 impl RouteWatch {
+    pub fn observe_guarder(&mut self, _zone: recovery::Zone, _frame: u32) -> bool {
+        false
+    }
+
     pub fn observe(&mut self, resources: Option<(u8, bool)>, blocked: bool) -> bool {
         let spent = self.resources.zip(resources).is_some_and(
             |((previous_jumps, previous_special), (jumps, special))| {
@@ -1073,6 +1077,22 @@ mod tests {
         facts.player = [-41., 0.];
         facts.reach[0] = 45.;
         assert!(!possible_routes(&facts).iter().flatten().any(|plan| plan.route == Route::Opposite));
+    }
+
+    #[test]
+    fn a_recovery_replans_once_when_the_guarder_moves_to_a_new_zone() {
+        use recovery::Zone::{Far, Hang, Ledge, OffHigh};
+        let mut watch = RouteWatch::default();
+        assert!(!watch.observe_guarder(Far, 11));
+        assert!(!watch.observe_guarder(Ledge, 12));
+        assert!(!watch.observe_guarder(Ledge, 12), "duplicate AI think");
+        assert!(watch.observe_guarder(Ledge, 13), "P1 is guarding the ledge now");
+        assert!(!watch.observe_guarder(Ledge, 14));
+        assert!(!watch.observe_guarder(OffHigh, 15));
+        assert!(!watch.observe_guarder(Ledge, 16), "one-frame change");
+        assert!(!watch.observe_guarder(Hang, 17));
+        assert!(watch.observe_guarder(Hang, 18), "P1 took the ledge");
+        assert!(!watch.observe_guarder(Hang, 19));
     }
 
     #[test]
