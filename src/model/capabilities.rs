@@ -135,6 +135,8 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 15] = [
     (
         Feature::EdgeJuggle,
         &[
+            "attack_data",
+            "attack_is_attack",
             "camera_limit_range",
             "cancel_is_enable",
             "damage_of",
@@ -143,6 +145,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 15] = [
             "is_operation_cpu",
             "kinetic_sum_speed_y",
             "motion_kind",
+            "orb_joint_position",
             "pos_x",
             "pos_y",
             "situation_kind",
