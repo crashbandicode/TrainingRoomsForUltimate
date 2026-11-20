@@ -987,3 +987,10 @@ fn niche_rob_budget_and_takeoff_allow_the_burner_startup_rise() {
     };
     assert!(rob.margin(facts).is_none());
 }
+
+#[test]
+fn the_rc15_candidate_does_not_admit_ness_from_the_wider_reference_list() {
+    assert!(super::measured_row(14, CANDIDATE_ROWS).is_none());
+    assert!(select(facts(0xa, "cross"), CANDIDATE_ROWS).is_none());
+    assert_eq!(super::measured_row(28, CANDIDATE_ROWS).unwrap().fighter, 0x28);
+}
