@@ -353,7 +353,7 @@ pub struct Mark {
 }
 
 /// Recent hit grades retained for the strip.
-pub const TAGS: usize = 8;
+pub use crate::model::ui::panes::TAGS;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Tag {

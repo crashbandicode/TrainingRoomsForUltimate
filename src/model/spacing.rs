@@ -73,14 +73,14 @@ pub enum Kind {
 
 struct Slot {
     sequence: AtomicU64,
-    words: [AtomicU64; 3],
+    _words: [AtomicU64; 3],
 }
 
 impl Slot {
     const fn new() -> Self {
         Self {
             sequence: AtomicU64::new(0),
-            words: [const { AtomicU64::new(0) }; 3],
+            _words: [const { AtomicU64::new(0) }; 3],
         }
     }
 }

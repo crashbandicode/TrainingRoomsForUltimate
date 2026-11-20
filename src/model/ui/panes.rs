@@ -581,8 +581,10 @@ pub mod cb {
 }
 
 /// The frame strip's pane indices and geometry (canvas units, the container's centre is the origin).
+pub const TAGS: usize = 8;
+
 pub mod iv {
-    use crate::model::frame_strip::TAGS;
+    use super::TAGS;
 
     /// Frames on screen, links in the LAST row, lane runs and run lengths per lane, chips.
     pub const WINDOW: usize = 60;
