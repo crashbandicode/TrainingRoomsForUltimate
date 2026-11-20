@@ -2,6 +2,8 @@
 
 #[path = "perfect/niche.rs"]
 pub mod niche;
+#[path = "perfect/recovery.rs"]
+pub mod recovery;
 #[path = "perfect/rule_counts.rs"]
 pub mod rule_counts;
 
@@ -473,35 +475,6 @@ pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 4] {
     [near_plan, high_plan, late_plan, opposite]
 }
 
-/// Weighted selection among feasible options, reducing the weight of the last
-/// route. The draw comes from the plugin's own RNG.
-pub fn choose_route(options: [Option<Plan>; 4], last: Option<Route>, draw: u32) -> Option<Plan> {
-    let weight = |plan: Plan| {
-        if Some(plan.route) == last {
-            plan.weight.div_ceil(2)
-        } else {
-            plan.weight
-        }
-    };
-    let total: u32 = options
-        .iter()
-        .flatten()
-        .map(|&plan| u32::from(weight(plan)))
-        .sum();
-    if total == 0 {
-        return None;
-    }
-    let mut draw = ((u64::from(draw) * u64::from(total)) >> 32) as u32;
-    for plan in options.into_iter().flatten() {
-        let weight = u32::from(weight(plan));
-        if draw < weight {
-            return Some(plan);
-        }
-        draw -= weight;
-    }
-    None
-}
-
 /// Edits to the CPU controller after the stock AI has produced its pad.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Correction {
@@ -567,45 +540,6 @@ pub fn avoid_detour(
 }
 
 pub const JUMP: u32 = 0x4;
-
-/// A stock jump held in reserve until its remaining delay fits the recovery budget.
-#[derive(Default)]
-pub struct JumpTiming {
-    pending: Option<u8>,
-}
-
-impl JumpTiming {
-    pub fn waiting(&self) -> bool {
-        self.pending.is_some()
-    }
-
-    pub fn step(
-        &mut self,
-        buttons: u32,
-        can_jump: bool,
-        delay: u8,
-        within_reach: impl FnOnce(u8) -> bool,
-    ) -> Correction {
-        if !can_jump || buttons & !(JUMP | FLICK_JUMP) != 0 {
-            self.pending = None;
-            return Correction::default();
-        }
-        let mut out = Correction::default();
-        if let Some(remaining) = self.pending.take() {
-            if remaining == 0 || !within_reach(remaining) {
-                out.press = JUMP;
-                return out;
-            }
-            self.pending = Some(remaining - 1);
-        } else if buttons & JUMP != 0 && delay != 0 && within_reach(delay) {
-            self.pending = Some(delay - 1);
-        }
-        if self.pending.is_some() {
-            out.release = buttons & JUMP;
-        }
-        out
-    }
-}
 
 pub const GUARD: u32 = 0x8;
 
@@ -1103,22 +1037,6 @@ mod tests {
         bounce.step(false, Interrupted, true, 0);
         assert!(!bounce.awaiting_dodge());
         assert_eq!(bounce.step(false, Actionable, true, GUARD), Correction::default());
-    }
-
-    #[test]
-    fn recovery_delays_a_stock_jump_then_spends_it_with_a_real_button() {
-        let mut timing = JumpTiming::default();
-        assert_eq!(timing.step(0x8004, true, 2, |_| true).release, 0x4);
-        assert_eq!(timing.step(0x8000, true, 2, |_| true), Correction::default());
-        assert_eq!(timing.step(0x8000, true, 2, |_| true).press, 0x4);
-        assert_eq!(timing.step(0x8000, true, 2, |_| true), Correction::default());
-
-        assert_eq!(timing.step(0x8004, true, 2, |_| false), Correction::default());
-        assert_eq!(timing.step(0x8004, true, 2, |_| true).release, 0x4);
-        assert_eq!(timing.step(0x8000, true, 2, |_| false).press, 0x4);
-        assert_eq!(timing.step(0x8004, true, 2, |_| true).release, 0x4);
-        assert_eq!(timing.step(0x8000, false, 2, |_| true), Correction::default());
-        assert_eq!(timing.step(0x8000, true, 2, |_| true), Correction::default());
     }
 
     #[test]
