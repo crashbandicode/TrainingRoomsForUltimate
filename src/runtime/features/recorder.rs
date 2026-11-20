@@ -316,7 +316,12 @@ unsafe fn on_ai_frame(ai: usize) {
         let y_field = (controller + CTRL_STICK_Y) as *mut f32;
         let buttons = button_field.read();
         let y = y_field.read();
-        let correction = super::edge_juggle::ai_correction(ai, body.accessor, buttons, y);
+        let stock = super::edge_juggle::StockPad {
+            buttons,
+            stick: [x_field.read(), y],
+            clamped_x: ((controller + CTRL_CLAMPED_X) as *const f32).read(),
+        };
+        let correction = super::edge_juggle::ai_correction(ai, body.accessor, stock);
         if let Some([next_x, next_y]) = correction.stick {
             x_field.write(next_x);
             ((controller + CTRL_CLAMPED_X) as *mut f32).write(next_x);

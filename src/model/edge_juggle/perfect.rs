@@ -1,5 +1,8 @@
 //! Perfect-mode recovery and escape decisions. The runtime applies only pad inputs.
 
+#[path = "perfect/niche.rs"]
+pub mod niche;
+
 pub type Point = [f32; 2];
 pub type Segment = [Point; 2];
 
@@ -645,6 +648,10 @@ pub struct ThreatClock {
 }
 
 impl ThreatClock {
+    pub fn trigger_frame(&self) -> u32 {
+        self.since
+    }
+
     pub fn observe(
         &mut self,
         attack: Option<u64>,

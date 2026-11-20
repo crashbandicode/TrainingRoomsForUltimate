@@ -28,6 +28,9 @@ use crate::runtime::{
     published, scene, state_natives as state,
 };
 
+#[path = "edge_juggle/niche_pad.rs"]
+mod niche_pad;
+
 const NOTICE: u8 = 0x34;
 const JUGGLE_PERCENT: u16 = 60;
 type StageKey = (i32, u32);
@@ -101,6 +104,7 @@ struct Run {
     player_height: PlanHeight,
     last_route: Option<Route>,
     guide: Option<RecoveryGuide>,
+    niche: Option<niche_pad::Guide>,
     last_cpu_status: i32,
     bounce: MeteorBounce,
     sdi_start: Option<u32>,
@@ -347,7 +351,72 @@ unsafe fn airborne_recovery(cpu: usize, status: i32) -> bool {
         && natives::situation_kind(cpu) == air
 }
 
-pub unsafe fn ai_correction(ai: usize, accessor: usize, buttons: u32, stick_y: f32) -> Correction {
+/// The stock values seen before the controller write in the existing AI epilogue.
+#[derive(Clone, Copy)]
+pub(super) struct StockPad {
+    pub buttons: u32,
+    pub stick: [f32; 2],
+    pub clamped_x: f32,
+}
+
+#[repr(u32)]
+enum PerfectRule {
+    Route = 1,
+    Jump = 2,
+    DistanceDodge = 3,
+    Reach = 4,
+    Detour = 5,
+    Niche = 6,
+    Landing = 11,
+    ReactDodge = 12,
+    HitRecovery = 13,
+    Meteor = 14,
+}
+
+static PLANNER_EVENTS: AtomicU32 = AtomicU32::new(0);
+
+/// Release trace boundary for the route taken after a complete plan.
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn planner_chose(route: u32, fighter: u32, crossable: u32, row: u32) {
+    std::hint::black_box((route, fighter, crossable, row));
+    PLANNER_EVENTS.fetch_add(1, Ordering::Relaxed);
+}
+
+static PERFECT_EVENTS: AtomicU32 = AtomicU32::new(0);
+
+/// Plain release trace boundary for actual controller edits. No I/O in the AI hook.
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn perfect_rule_fired(rule: u32, cpu_frame: u32, trigger_frame: u32, detail: u32) {
+    std::hint::black_box((rule, cpu_frame, trigger_frame, detail));
+    PERFECT_EVENTS.fetch_add(1, Ordering::Relaxed);
+}
+
+impl StockPad {
+    fn observe(
+        self,
+        edit: Correction,
+        rule: PerfectRule,
+        run: &Run,
+        trigger: u32,
+        detail: u32,
+    ) -> Correction {
+        let next_buttons = (self.buttons & !edit.release) | edit.press;
+        let changed_stick = edit.stick.is_some_and(|[x, y]| {
+            x.to_bits() != self.stick[0].to_bits()
+                || x.to_bits() != self.clamped_x.to_bits()
+                || y != self.stick[1]
+        });
+        if next_buttons != self.buttons || changed_stick {
+            perfect_rule_fired(rule as u32, run.rounds.frames, trigger, detail);
+        }
+        edit
+    }
+}
+
+pub(super) unsafe fn ai_correction(ai: usize, accessor: usize, stock: StockPad) -> Correction {
+    let buttons = stock.buttons;
     if !INSTALLED.load(Ordering::Acquire)
         || OPEN.load(Ordering::Acquire)
         || published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire)
@@ -399,20 +468,23 @@ pub unsafe fn ai_correction(ai: usize, accessor: usize, buttons: u32, stick_y: f
             buttons,
         );
         if correction != Correction::default() {
-            return correction;
+            return stock.observe(correction, PerfectRule::Meteor, run, 0, run.reaction.frames().into());
         }
     }
     let position = [natives::pos_x(accessor), natives::pos_y(accessor)];
     if run.drill == Drill::GuardEdge {
+        if run.niche.is_some() {
+            return niche_correction(run, ai, accessor, position, status, stock);
+        }
         if !airborne_recovery(accessor, status) {
             run.jump_timing = JumpTiming::default();
             return Correction::default();
         }
-        return recovery_pad(run, p1, ai, accessor, position, buttons, stick_y);
+        return recovery_pad(run, p1, ai, accessor, position, stock);
     }
     let correction = air_hit_recovery(run, p1, accessor, position, status);
     if correction != Correction::default() {
-        return correction;
+        return stock.observe(correction, PerfectRule::HitRecovery, run, 0, run.reaction.frames().into());
     }
     let [left, right] = run.stage.ledges;
     if position[0] <= left[0] || position[0] >= right[0] {
@@ -422,7 +494,9 @@ pub unsafe fn ai_correction(ai: usize, accessor: usize, buttons: u32, stick_y: f
     if air != UNRESOLVED && natives::situation_kind(accessor) == air {
         let correction = landing_dodge(run, p1, accessor, buttons);
         if correction != Correction::default() {
-            return correction;
+            return stock.observe(
+                correction, PerfectRule::ReactDodge, run, run.threat.trigger_frame(), run.reaction.frames().into(),
+            );
         }
     }
     if !falling(status) {
@@ -432,11 +506,12 @@ pub unsafe fn ai_correction(ai: usize, accessor: usize, buttons: u32, stick_y: f
         cpu: position,
         player: [natives::pos_x(p1), natives::pos_y(p1)],
         main_floor: run.stage.ledges.map(|point| point[0]),
-        stock_stick_y: stick_y,
+        stock_stick_y: stock.stick[1],
         stock_buttons: buttons,
     };
     let options = landing_options(run, p1, accessor, facts);
-    perfect::landing_variant(facts, options, run.landing_draw)
+    let edit = perfect::landing_variant(facts, options, run.landing_draw);
+    stock.observe(edit, PerfectRule::Landing, run, 0, run.reaction.frames().into())
 }
 
 unsafe fn landing_options(run: &Run, p1: usize, cpu: usize, facts: LandingFacts) -> LandingOptions {
@@ -688,7 +763,7 @@ unsafe fn route_guide(
     air: AirPhysics,
     pos: [f32; 2],
     speed: [f32; 2],
-    special: [f32; 2],
+    special: Option<perfect::SpecialReach>,
     player_top: f32,
 ) -> Option<RecoveryGuide> {
     let [left, right] = run.stage.ledges;
@@ -710,7 +785,7 @@ unsafe fn route_guide(
     } else {
         air.jump_speed.powi(2) / (2.0 * air.gravity)
     };
-    let [special_horizontal, special_rise] = special;
+    let [special_horizontal, special_rise] = special.map_or([0.0; 2], |reach| [reach.horizontal, reach.rise]);
     let facts = RouteFacts {
         position: pos,
         player,
@@ -738,10 +813,25 @@ unsafe fn route_guide(
             .is_some()
     });
     let band = perfect::corridor(facts.outline, facts.ledges, bottom, body, facts.fall_budget);
+    let fighter = natives::fighter_kind(cpu).unwrap_or(UNRESOLVED);
+    let crossable = u32::from(band.is_some());
+    if special.is_some() && fighter != UNRESOLVED {
+        run.niche = niche_pad::Guide::choose(cpu, p1, fighter, &facts, band);
+        if let Some(guide) = run.niche.as_ref() {
+            let row = guide.row();
+            run.last_route = Some(row.route);
+            planner_chose(route_code(row.route), fighter as u32, crossable, row.id.into());
+            return None;
+        }
+    }
     let opposite = opposite.filter(|plan| {
         band.is_some_and(|band| air.crossing(pos, speed, plan.waypoints[2], band, jumps))
     });
-    let plan = perfect::choose_route([near, high, low, opposite], run.last_route, run.route_draw)?;
+    let Some(plan) = perfect::choose_route([near, high, low, opposite], run.last_route, run.route_draw) else {
+        planner_chose(4, fighter as u32, crossable, 0);
+        return None;
+    };
+    planner_chose(route_code(plan.route), fighter as u32, crossable, 0);
     run.last_route = Some(plan.route);
     match plan.route {
         Route::Opposite => {
@@ -760,6 +850,34 @@ unsafe fn route_guide(
         }
         Route::Near => None,
     }
+}
+
+fn route_code(route: Route) -> u32 {
+    match route {
+        Route::Near => 0,
+        Route::Opposite => 1,
+        Route::High => 2,
+        Route::LateLow => 3,
+    }
+}
+
+unsafe fn niche_correction(
+    run: &mut Run,
+    ai: usize,
+    cpu: usize,
+    position: [f32; 2],
+    status: i32,
+    stock: StockPad,
+) -> Correction {
+    let Some(guide) = run.niche.as_mut() else {
+        return Correction::default();
+    };
+    let id = guide.row().id;
+    if let Some(edit) = guide.step(ai, cpu, position, status, run.rounds.frames) {
+        return stock.observe(edit, PerfectRule::Niche, run, 0, id.into());
+    }
+    run.niche = None;
+    Correction::default()
 }
 
 unsafe fn player_in_lag(accessor: usize) -> bool {
@@ -817,9 +935,9 @@ unsafe fn recovery_pad(
     ai: usize,
     cpu: usize,
     pos: [f32; 2],
-    buttons: u32,
-    stick_y: f32,
+    stock: StockPad,
 ) -> Correction {
+    let buttons = stock.buttons;
     let jump = konst(C::TermContJumpAerial);
     let can_jump = jump != UNRESOLVED && natives::is_enable_transition_term(cpu, jump);
     let physics = air_physics(cpu);
@@ -850,12 +968,15 @@ unsafe fn recovery_pad(
         if let Some(player_height) = run.player_height.take() {
             run.plan_pending = false;
             let route_special = match recovery {
-                Some((_, false)) => Some([0.0; 2]),
-                Some((_, true)) => special.map(|reach| [reach.horizontal, reach.rise]),
+                Some((_, false)) => Some(None),
+                Some((_, true)) => special.map(Some),
                 None => None,
             };
             if let Some((top, reach)) = player_height.zip(route_special) {
                 run.guide = route_guide(run, p1, cpu, physics, pos, speed, reach, top);
+                if run.niche.is_some() {
+                    return niche_correction(run, ai, cpu, pos, natives::status_kind(cpu), stock);
+                }
             }
         }
     }
@@ -875,7 +996,8 @@ unsafe fn recovery_pad(
                     let detour = perfect::avoid_detour(buttons, true, false, inward).release;
                     if buttons & !(perfect::JUMP | perfect::FLICK_JUMP | detour) == 0 {
                         correction.release = detour;
-                        return correction;
+                        stock.observe(Correction { release: detour, ..Correction::default() }, PerfectRule::Detour, run, 0, 0);
+                        return stock.observe(correction, PerfectRule::Route, run, 0, 2);
                     }
                 }
                 run.guide = None;
@@ -884,24 +1006,27 @@ unsafe fn recovery_pad(
                 if (exit[0] - pos[0]) * dir > 0.0
                     && physics.crossing(pos, speed, exit, band, u8::from(can_jump)) =>
             {
-                let release = (buttons & perfect::JUMP)
-                    | perfect::avoid_detour(buttons, true, can_punish, dir).release;
-                return Correction {
+                let detour = perfect::avoid_detour(buttons, true, can_punish, dir).release;
+                stock.observe(Correction { release: detour, ..Correction::default() }, PerfectRule::Detour, run, 0, 0);
+                let release = (buttons & perfect::JUMP) | detour;
+                let edit = Correction {
                     stick: Some([dir, 0.0]),
                     release,
                     ..Correction::default()
                 };
+                return stock.observe(edit, PerfectRule::Route, run, 0, 1);
             }
             RecoveryGuide::Cross { exit, dir, .. }
                 if (exit[0] - pos[0]) * dir <= 0.0 && can_jump =>
             {
                 run.guide = None;
                 // Continue to the far ledge from outside the stage.
-                return Correction {
+                let edit = Correction {
                     stick: Some([-dir, 0.0]),
                     press: perfect::JUMP,
                     ..Correction::default()
                 };
+                return stock.observe(edit, PerfectRule::Route, run, 0, 1);
             }
             _ => run.guide = None,
         }
@@ -927,7 +1052,7 @@ unsafe fn recovery_pad(
                 let reach = last_dodge_reach(snapshot, cpu);
                 let pad = perfect::distance_dodge(pos, ledge, reach, true, coasts);
                 if pad != Correction::default() {
-                    return pad;
+                    return stock.observe(pad, PerfectRule::DistanceDodge, run, 0, 0);
                 }
             }
         } else if let Some(reach) =
@@ -938,7 +1063,7 @@ unsafe fn recovery_pad(
                 let next = [pos[0] + vx, pos[1] + vy];
                 let pad = reach.timed_input(pos, next, ledge);
                 if pad != Correction::default() {
-                    return pad;
+                    return stock.observe(pad, PerfectRule::Reach, run, 0, 0);
                 }
             }
         }
@@ -949,7 +1074,7 @@ unsafe fn recovery_pad(
         let correction =
             perfect::avoid_detour(buttons, reachable, false, (ledge[0] - pos[0]).signum());
         if correction != Correction::default() {
-            return correction;
+            return stock.observe(correction, PerfectRule::Detour, run, 0, 0);
         }
     }
     let mut correction = run
@@ -958,9 +1083,9 @@ unsafe fn recovery_pad(
             physics.reaches_with_jump(pos, speed, ledge, delay, run.stage.blast()[3])
         });
     if run.jump_timing.waiting() || correction.press != 0 {
-        correction.stick = Some([(ledge[0] - pos[0]).signum(), stick_y]);
+        correction.stick = Some([(ledge[0] - pos[0]).signum(), stock.stick[1]]);
     }
-    correction
+    stock.observe(correction, PerfectRule::Jump, run, 0, 0)
 }
 
 fn axis(pressed: u16, negative: u8, positive: u8) -> i16 {
@@ -1422,6 +1547,7 @@ pub unsafe fn frame(fighter: usize) {
             player_height: PlanHeight::default(),
             last_route: None,
             guide: None,
+            niche: None,
             last_cpu_status: UNRESOLVED,
             bounce: MeteorBounce::default(),
             sdi_start: None,
@@ -1551,6 +1677,7 @@ pub unsafe fn frame(fighter: usize) {
             run.route_watch = perfect::RouteWatch::default();
             run.player_height = PlanHeight::default();
             run.guide = None;
+            run.niche = None;
             run.jump_timing = JumpTiming::default();
             run.last_cpu_status = UNRESOLVED;
             run.bounce = MeteorBounce::default();
