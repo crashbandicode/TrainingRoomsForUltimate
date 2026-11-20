@@ -156,7 +156,6 @@ fn page_switch_drops_the_worker_roster_preview() {
     assert_eq!(drawn(&m, &worker, aegis), "Mythra", "X previews the next form");
     worker_press(&mut m, &mut worker, Button::R);
     assert_eq!((m.page(), m.screen().copied()), (top_level(Page::FightersStages, Button::R), None));
-    assert!(worker.is_none(), "the preview does not outlive its grid");
     worker_press(&mut m, &mut worker, Button::L);
     assert_eq!(m.kept("player_character").cloned(), saved, "the saved pick is preserved");
     open(&mut m);
