@@ -329,6 +329,7 @@ fn run_inner() {
     let display_on = capabilities::unit_usable(Feature::InputDisplay, &usable);
     input_display::set_enabled(display_on);
     input_display::set_grader_read(display_on && sites_hitbox::grader_usable(&usable));
+    input_display::set_owner_read(display_on && capabilities::unit_usable(Feature::Hitbox, &usable));
     // SPEC-input-06 §4: the strip's hitstun-left read is the CPU tech unit's `work_get_float` row; without it a true
     // combo shows no margin and the rest of the strip draws.
     input_display::set_reaction(display_on && capabilities::unit_usable(Feature::CpuTech, &usable));

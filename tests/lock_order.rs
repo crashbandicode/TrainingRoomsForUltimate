@@ -114,6 +114,7 @@ const FOREIGN_RECEIVERS: &[(&str, &[&str], &str)] = &[
     ("press", &["editor", "list", "m"], PANELS),
     ("view", &["bundle", "editor", "extras", "ui"], PANELS),
     ("target", &["active", "cycle", "editor", "proof"], "combos::Ui::target is private to ui/combos.rs"),
+    ("target", &["GRADER"], "Grader::target is a lock-free model ring enqueue"),
     (
         "poll",
         &["JOBS", "adapter", "clock", "gate", "guard", "model", "queue", "replies", "t"],

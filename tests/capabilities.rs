@@ -116,6 +116,7 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "input_display::lane_player", owner: Some(Feature::CpuCore), gate: Gate::Flag("KIND_ON") },
     // The native hurt-shape read is optional; boot sets its flag only when every grader row passed.
     Boundary { function: "input_display::spacing_hit", owner: Some(Feature::InputDisplay), gate: Gate::Flag("GRADER_LIVE") },
+    Boundary { function: "input_display::attacker_owner", owner: Some(Feature::Hitbox), gate: Gate::Flag("OWNER_ON") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.
     Boundary { function: "recorder::request_playback", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
     Boundary { function: "recorder::on_state_restored", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
@@ -813,6 +814,15 @@ fn optional_grader_rows_disable_only_grading() {
         assert!(capabilities::unit_usable(Feature::InputDisplay, &usable), "{name} disabled Input Display");
         assert!(capabilities::unit_usable(Feature::Hitbox, &usable), "{name} disabled Hitbox");
         assert!(!Granted::from_usable(&usable).allows(offset), "{name} remained granted");
+    }
+}
+
+#[test]
+fn grader_hook_needs_the_hurt_layout_rows() {
+    for name in model::sites_hitbox::GRADER_NEEDS {
+        let usable = |site: &model::sites::Site| site.name != name;
+        assert!(!model::sites_hitbox::grader_usable(usable), "{name} left the fighter hook enabled");
+        assert!(capabilities::unit_usable(Feature::InputDisplay, &usable), "{name} disabled the strip");
     }
 }
 

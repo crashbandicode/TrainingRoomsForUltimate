@@ -5,7 +5,7 @@
 
 use super::input_delay::MappedInputs;
 use super::spots::{self, Peak, Powers, Spot};
-use super::spacing::Grade;
+use super::spacing::{Grade, Taken};
 
 /// Frames on screen and links kept for the LAST row (the pane table's numbers).
 pub const WINDOW: usize = super::panes::iv::WINDOW;
@@ -116,9 +116,6 @@ pub struct Sample {
     pub reaction: Option<f32>,
     /// Holding or raising a shield (`GUARD_ON ..= GUARD_DAMAGE`).
     pub shielding: bool,
-    /// This lane was struck this frame with this grade.
-    pub contact: Option<Grade>,
-    pub player: bool,
     /// The fighter's damage (percent) and the launch numbers of each attack slot that is active, for the spot of a hit (rc.14, SP1).
     pub damage: f32,
     pub powers: Powers,
@@ -511,10 +508,6 @@ impl Tracker {
         (0..TAGS).filter_map(move |i| self.tags[(self.tag_head + TAGS - 1 - i) % TAGS].as_ref())
     }
 
-    pub fn tag_target(&mut self, grade: Grade) {
-        self.push_tag(0, grade);
-    }
-
     fn push_tag(&mut self, lane: u8, grade: Grade) {
         self.tags[self.tag_head] = Some(Tag { frame: self.frame, lane, grade });
         self.tag_head = (self.tag_head + 1) % TAGS;
@@ -599,20 +592,23 @@ impl Tracker {
         *self = Self::new();
     }
 
+    pub fn step_graded(&mut self, p1: Sample, cpu: Sample, inputs: MappedInputs, taken: Taken) {
+        if let Some(grade) = taken.earlier {
+            self.push_tag(0, grade);
+        }
+        let shields = [on_shield(&p1), on_shield(&cpu)];
+        self.step(p1, cpu, inputs);
+        for (lane, grade) in taken.hits.into_iter().enumerate() {
+            if let Some(grade) = grade.filter(|_| !shields[1 - lane]) {
+                self.push_tag(lane as u8, grade);
+            }
+        }
+    }
+
     /// One game frame: P1's and the CPU's samples and P1's mapped inputs.
     pub fn step(&mut self, p1: Sample, cpu: Sample, inputs: MappedInputs) {
         self.frame = self.frame.wrapping_add(1);
         let frame = self.frame;
-        if !on_shield(&cpu) {
-            if let Some(grade) = cpu.contact {
-                self.push_tag(0, grade);
-            }
-        }
-        if cpu.player && !on_shield(&p1) {
-            if let Some(grade) = p1.contact {
-                self.push_tag(1, grade);
-            }
-        }
         self.snaps[self.snap_head] = Snap {
             frame,
             buttons: inputs.buttons,

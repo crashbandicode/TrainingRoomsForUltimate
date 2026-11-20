@@ -15,10 +15,19 @@ struct Fixture {
     module: usize,
     entry: usize,
     lanes: [usize; 2],
-    damage: usize,
     hit_module: usize,
     parts: usize,
     shape: usize,
+}
+
+const P1_ID: u32 = 0x10;
+const CPU_ID: u32 = 0x20;
+
+fn published(fixture: &Fixture) -> [Option<Lane>; 2] {
+    [
+        Some(Lane { damage: 0x70000, hit: 0x71000, id: P1_ID, attacks: true }),
+        Some(Lane { damage: fixture.module, hit: fixture.hit_module, id: CPU_ID, attacks: false }),
+    ]
 }
 
 fn put_u8(memory: &mut BTreeMap<usize, u64>, at: usize, value: u8) {
@@ -41,10 +50,9 @@ fn fixture() -> Fixture {
 
     let (module, entry, lanes, hit_module, parts, shape) =
         (0x20000, 0x30000, [0x10000, 0x11000], 0x40000, 0x50000, 0x60000);
-    let damage = lanes[1] + record::MODULE;
     let part = parts + layout::HIT_PART_STRIDE;
     let mut memory = BTreeMap::new();
-    memory.insert(damage, module as u64);
+    memory.insert(lanes[1] + record::MODULE, module as u64);
     memory.insert(lanes[1] + layout::HIT_MODULE, hit_module as u64);
     memory.insert(hit_module + layout::HIT_PARTS, parts as u64);
     put_u32(&mut memory, hit_module + layout::HIT_PART_TOTAL, 2);
@@ -59,11 +67,17 @@ fn fixture() -> Fixture {
     }
     put_u32(&mut memory, shape + shape_layout::PEN, 2.0_f32.to_bits());
     put_u32(&mut memory, shape + shape_layout::RADIUS, 4.0_f32.to_bits());
-    Fixture { memory, module, entry, lanes, damage, hit_module, parts, shape }
+    Fixture { memory, module, entry, lanes, hit_module, parts, shape }
 }
 
-fn captured(fixture: &Fixture) -> Option<Contact> {
-    capture(|at| fixture.memory.get(&at).copied(), fixture.module, fixture.entry, fixture.lanes)
+fn captured(fixture: &Fixture) -> Option<(u8, Grade)> {
+    capture(
+        |at| fixture.memory.get(&at).copied(),
+        |id| match id { 0x1000_0000 => Some(P1_ID), 0x1000_0001 => Some(CPU_ID), _ => None },
+        fixture.module,
+        fixture.entry,
+        published(fixture),
+    )
 }
 
 fn zone_boundaries() {
@@ -102,19 +116,18 @@ fn depth_caps_at_axis() {
 }
 
 fn grade_from_native_record() {
-    let contact = Contact { attacker: 7, receiver: 1, slot: 2, part: 3, pen: 2.0, radius: 4.0 };
-    assert_eq!(contact.grade(), Some(Grade::Good));
-    assert_eq!(Contact { pen: -0.1, ..contact }.grade(), None);
-    assert_eq!(Contact { pen: f32::NAN, ..contact }.grade(), None);
-    assert_eq!(Contact { radius: 0.0, ..contact }.grade(), None);
-    assert_eq!(Contact { radius: f32::INFINITY, ..contact }.grade(), None);
+    assert_eq!(grade(2.0, 4.0), Some(Grade::Good));
+    assert_eq!(grade(-0.1, 4.0), None);
+    assert_eq!(grade(f32::NAN, 4.0), None);
+    assert_eq!(grade(2.0, 0.0), None);
+    assert_eq!(grade(2.0, f32::INFINITY), None);
 }
 
 fn capture_reads_contact_at_handler() {
     let fixture = fixture();
     assert_eq!(
         captured(&fixture),
-        Some(Contact { attacker: 0x1000_0000, receiver: 1, slot: 2, part: 1, pen: 2.0, radius: 4.0 })
+        Some((0, Grade::Good))
     );
 }
 
@@ -130,12 +143,10 @@ fn capture_guards_suppress_only_grade() {
         let mut f = fixture();
         f.entry = bad;
         assert!(captured(&f).is_none(), "entry {bad:#x}");
-        let mut f = fixture();
-        f.lanes[1] = bad;
-        assert!(captured(&f).is_none(), "lane {bad:#x}");
-        let mut f = fixture();
-        f.memory.insert(f.lanes[1] + layout::HIT_MODULE, bad as u64);
-        assert!(captured(&f).is_none(), "HitModule {bad:#x}");
+        let f = fixture();
+        let mut lanes = published(&f);
+        lanes[1].as_mut().unwrap().hit = bad;
+        assert!(capture(|at| f.memory.get(&at).copied(), |_| Some(P1_ID), f.module, f.entry, lanes).is_none(), "HitModule {bad:#x}");
         let mut f = fixture();
         f.memory.insert(f.hit_module + layout::HIT_PARTS, bad as u64);
         assert!(captured(&f).is_none(), "parts {bad:#x}");
@@ -143,12 +154,13 @@ fn capture_guards_suppress_only_grade() {
         f.memory.insert(f.parts + layout::HIT_PART_STRIDE + hurt_shape::SHAPE, bad as u64);
         assert!(captured(&f).is_none(), "shape {bad:#x}");
     }
-    let mut f = fixture();
-    f.memory.insert(f.damage, 0x21000);
-    assert!(captured(&f).is_none(), "no matching lane");
+    let f = fixture();
+    let mut lanes = published(&f);
+    lanes[1].as_mut().unwrap().damage = 0x21000;
+    assert!(capture(|at| f.memory.get(&at).copied(), |_| Some(P1_ID), f.module, f.entry, lanes).is_none(), "no matching lane");
     let mut f = fixture();
     put_u32(&mut f.memory, f.entry + ENTRY_KIND, 0x3a6);
-    assert!(captured(&f).is_some(), "projectile entry kind");
+    assert_eq!(captured(&f), Some((0, Grade::Good)), "projectile entry kind");
     let mut f = fixture();
     put_u32(&mut f.memory, f.hit_module + layout::HIT_PART_TOTAL, 1);
     assert!(captured(&f).is_none(), "part equals total");
@@ -171,15 +183,24 @@ fn grader_off_hook_reads_nothing() {
     use core::cell::Cell;
     let f = fixture();
     let reads = Cell::new(0);
-    assert!(hook(false, |_| { reads.set(reads.get() + 1); None }, f.module, f.entry, f.lanes).is_none());
+    let owners = Cell::new(0);
+    assert!(hook(
+        false,
+        |_| { reads.set(reads.get() + 1); None },
+        |_| { owners.set(owners.get() + 1); None },
+        f.module,
+        f.entry,
+        published(&f),
+    ).is_none());
     assert_eq!(reads.get(), 0);
+    assert_eq!(owners.get(), 0);
 }
 
 fn ring_consumes_each_contact_once() {
     let ring = Ring::<8>::new();
-    let contact = Contact { attacker: 4, receiver: 1, slot: 2, part: 3, pen: 1.0, radius: 4.0 };
-    ring.push(10, contact);
-    ring.push(11, contact);
+    let entry = Entry { lane: 1, grade: Grade::Excellent, earlier: false };
+    ring.push(10, entry);
+    ring.push(11, entry);
     let mut got = Vec::new();
     ring.drain(|epoch, item| got.push((epoch, item)));
     assert_eq!(got.len(), 2);
@@ -188,7 +209,7 @@ fn ring_consumes_each_contact_once() {
 
     let overflow = Ring::<8>::new();
     for epoch in 0..9 {
-        overflow.push(epoch, contact);
+        overflow.push(epoch, entry);
     }
     let mut epochs = Vec::new();
     overflow.drain(|epoch, _| epochs.push(epoch));
@@ -201,17 +222,39 @@ fn ring_consumes_each_contact_once() {
     assert_eq!(count, 0, "a torn slot is skipped");
 }
 
-fn rings_take_first_accepted_per_ring() {
-    let rings = Rings::new();
-    let excellent = Contact { attacker: 1, receiver: 1, slot: 0, part: 0, pen: 1.0, radius: 4.0 };
-    let ok = Contact { pen: 4.0, ..excellent };
-    rings.received[1].push(7, excellent);
-    rings.received[1].push(7, ok);
-    rings.targets.push(7, ok);
-    let taken = rings.take(7);
-    assert_eq!(taken.received, [None, Some(Grade::Excellent)]);
-    assert_eq!(taken.target, Some(Grade::Ok));
-    assert_eq!(rings.take(8), Taken { received: [None; 2], target: None });
+fn capture_identifies_receiver_without_cached_reads() {
+    use crate::model::hitbox::layout;
+    use crate::model::sites_hitbox::damage_record;
+    use std::cell::RefCell;
+
+    let f = fixture();
+    let reads = RefCell::new(Vec::new());
+    let mut no_match = published(&f);
+    no_match[1].as_mut().unwrap().damage += 8;
+    assert!(capture(
+        |at| { reads.borrow_mut().push(at); f.memory.get(&at).copied() },
+        |_| panic!("no matching receiver"),
+        f.module,
+        f.entry,
+        no_match,
+    ).is_none());
+    assert!(reads.borrow().is_empty());
+
+    let reads = RefCell::new(Vec::new());
+    assert_eq!(
+        capture(
+            |at| { reads.borrow_mut().push(at); f.memory.get(&at).copied() },
+            |id| (id == 0x1000_0000).then_some(P1_ID),
+            f.module,
+            f.entry,
+            published(&f),
+        ),
+        Some((0, Grade::Good)),
+    );
+    for accessor in f.lanes {
+        assert!(!reads.borrow().contains(&(accessor + damage_record::MODULE)));
+        assert!(!reads.borrow().contains(&(accessor + layout::HIT_MODULE)));
+    }
 }
 
 fn target_zone_rings_radii() {
@@ -243,9 +286,9 @@ fn case_table() {
         ("grade_from_native_record", grade_from_native_record as fn()),
         ("capture_reads_contact_at_handler", capture_reads_contact_at_handler as fn()),
         ("capture_guards_suppress_only_grade", capture_guards_suppress_only_grade as fn()),
+        ("capture_identifies_receiver_without_cached_reads", capture_identifies_receiver_without_cached_reads as fn()),
         ("grader_off_hook_reads_nothing", grader_off_hook_reads_nothing as fn()),
         ("ring_consumes_each_contact_once", ring_consumes_each_contact_once as fn()),
-        ("rings_take_first_accepted_per_ring", rings_take_first_accepted_per_ring as fn()),
         ("target_zone_rings_radii", target_zone_rings_radii as fn()),
     ]);
 }

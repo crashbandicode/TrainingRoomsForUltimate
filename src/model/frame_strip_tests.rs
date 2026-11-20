@@ -3,7 +3,7 @@
 
 lib_unit_tests! {
 use super::*;
-use crate::model::spacing::{self, Contact, Grade, Rings, Taken};
+use crate::model::spacing::{self, Grade, Grader, Lane, Taken};
 use std::collections::BTreeMap;
 
 const ATTACK: i32 = 0x27;
@@ -26,7 +26,7 @@ struct ContactFixture {
     memory: BTreeMap<usize, u64>,
     module: usize,
     entry: usize,
-    lanes: [usize; 2],
+    lanes: [Option<Lane>; 2],
 }
 
 fn contact_fixture(receiver: usize, attacker: u32, entry_kind: u32) -> ContactFixture {
@@ -36,8 +36,13 @@ fn contact_fixture(receiver: usize, attacker: u32, entry_kind: u32) -> ContactFi
     let (module, entry, lanes, hit_module, parts, shape) =
         (0x20000, 0x30000, [0x10000, 0x11000], 0x40000, 0x50000, 0x60000);
     let mut memory = BTreeMap::new();
-    memory.insert(lanes[receiver] + damage_record::MODULE, module as u64);
-    memory.insert(lanes[receiver] + layout::HIT_MODULE, hit_module as u64);
+    let published = core::array::from_fn(|lane| {
+        let damage = if lane == receiver { module } else { 0x21000 + lane * 0x1000 };
+        let hit = if lane == receiver { hit_module } else { 0x41000 + lane * 0x1000 };
+        memory.insert(lanes[lane] + damage_record::MODULE, damage as u64);
+        memory.insert(lanes[lane] + layout::HIT_MODULE, hit as u64);
+        Some(Lane { damage, hit, id: if lane == 0 { P1_ID } else { CPU_ID }, attacks: lane == 0 })
+    });
     memory.insert(hit_module + layout::HIT_PARTS, parts as u64);
     let put_u8 = |memory: &mut BTreeMap<usize, u64>, at: usize, value: u8| {
         let base = at & !7;
@@ -63,30 +68,25 @@ fn contact_fixture(receiver: usize, attacker: u32, entry_kind: u32) -> ContactFi
     }
     put_u32(&mut memory, shape + hurt_shape::PEN, 2.0_f32.to_bits());
     put_u32(&mut memory, shape + hurt_shape::RADIUS, 4.0_f32.to_bits());
-    ContactFixture { memory, module, entry, lanes }
+    ContactFixture { memory, module, entry, lanes: published }
 }
 
-fn capture_contact(fixture: &ContactFixture) -> Option<Contact> {
+fn capture_contact(fixture: &ContactFixture) -> Option<(u8, Grade)> {
     spacing::capture(
         |at| fixture.memory.get(&at).copied(),
+        |id| match id { 0x1000_0000 => Some(P1_ID), 0x1000_0001 => Some(CPU_ID), _ => None },
         fixture.module,
         fixture.entry,
         fixture.lanes,
     )
 }
 
-fn receive(contact: Contact, epoch: u32) -> (Rings, Taken) {
-    let rings = Rings::new();
-    rings.received[usize::from(contact.receiver)].push(epoch, contact);
-    let taken = rings.take(epoch);
-    (rings, taken)
-}
-
-fn samples(taken: Taken, player: bool) -> (Sample, Sample) {
-    (
-        Sample { contact: taken.received[0], ..Sample::default() },
-        Sample { contact: taken.received[1], player, ..Sample::default() },
-    )
+fn take_hit(hit: Option<(u8, Grade)>) -> Taken {
+    let grader = Grader::new();
+    if let Some((lane, grade)) = hit {
+        grader.hit(lane, grade);
+    }
+    grader.take()
 }
 
 /// A script: P1, the CPU and P1's inputs for each frame, from frame 1.
@@ -298,182 +298,200 @@ fn a_hit_that_cannot_be_told_is_not_labelled() {
 }
 
 fn grade_tag_on_attacker_lane() {
-    let contact = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
-    let (_, taken) = receive(contact, 1);
-    let (p1, cpu) = samples(taken, false);
+    let taken = take_hit(capture_contact(&contact_fixture(1, P1_ID, 1)));
     let mut tracker = Tracker::new();
-    tracker.step(idle(), idle(), NONE);
-    tracker.step(p1, cpu, NONE);
+    tracker.step_graded(idle(), idle(), NONE, Taken::default());
+    tracker.step_graded(idle(), idle(), NONE, taken);
     assert_eq!(tracker.tags().copied().collect::<Vec<_>>(), vec![Tag { frame: 2, lane: 0, grade: Grade::Good }]);
 }
 
 fn projectile_contact_is_captured() {
-    let contact = capture_contact(&contact_fixture(1, 0x1000_0000, 0x3a6)).unwrap();
-    let (_, taken) = receive(contact, 1);
-    let (p1, cpu) = samples(taken, false);
+    let taken = take_hit(capture_contact(&contact_fixture(1, 0x1000_0000, 0x3a6)));
     let mut tracker = Tracker::new();
-    tracker.step(idle(), idle(), NONE);
-    tracker.step(p1, cpu, NONE);
+    tracker.step_graded(idle(), idle(), NONE, Taken::default());
+    tracker.step_graded(idle(), idle(), NONE, taken);
     assert_eq!(tracker.tags().copied().collect::<Vec<_>>(), vec![Tag { frame: 2, lane: 0, grade: Grade::Good }]);
 }
 
 fn no_grade_on_shield() {
     // The hit handler is not called for a shield hit (Eden 2026-11-20).
-    let contact = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
-    let (_, taken) = receive(contact, 1);
-    let (p1, mut cpu) = samples(taken, false);
+    let taken = take_hit(capture_contact(&contact_fixture(1, P1_ID, 1)));
+    let mut cpu = idle();
     cpu.shieldstun = true;
     cpu.shielding = true;
     let mut tracker = Tracker::new();
-    tracker.step(idle(), idle(), NONE);
-    tracker.step(p1, cpu, NONE);
+    tracker.step_graded(idle(), idle(), NONE, Taken::default());
+    tracker.step_graded(idle(), cpu, NONE, taken);
     assert!(tracker.tags().next().is_none());
 }
 
 fn p2_lane_graded_separately() {
-    let contact = capture_contact(&contact_fixture(0, CPU_ID, 1)).unwrap();
-    let (_, taken) = receive(contact, 1);
-    let (p1, cpu) = samples(taken, true);
+    let mut fixture = contact_fixture(0, CPU_ID, 1);
+    fixture.lanes[1].as_mut().unwrap().attacks = true;
+    let taken = take_hit(capture_contact(&fixture));
     let mut tracker = Tracker::new();
-    tracker.step(idle(), idle(), NONE);
-    tracker.step(p1, cpu, NONE);
+    tracker.step_graded(idle(), idle(), NONE, Taken::default());
+    tracker.step_graded(idle(), idle(), NONE, taken);
     assert_eq!(tracker.tags().copied().collect::<Vec<_>>(), vec![Tag { frame: 2, lane: 1, grade: Grade::Good }]);
 
-    let (p1, cpu) = samples(taken, false);
+    let taken = take_hit(capture_contact(&contact_fixture(0, CPU_ID, 1)));
     let mut cpu_only = Tracker::new();
-    cpu_only.step(idle(), idle(), NONE);
-    cpu_only.step(p1, cpu, NONE);
+    cpu_only.step_graded(idle(), idle(), NONE, Taken::default());
+    cpu_only.step_graded(idle(), idle(), NONE, taken);
     assert!(cpu_only.tags().next().is_none(), "a CPU-operated lane is not P2");
 }
 
 fn simultaneous_hits_tag_both_lanes() {
-    let p1_hit = capture_contact(&contact_fixture(0, CPU_ID, 1)).unwrap();
+    let mut cpu_attack = contact_fixture(0, CPU_ID, 1);
+    cpu_attack.lanes[1].as_mut().unwrap().attacks = true;
+    let p1_hit = capture_contact(&cpu_attack).unwrap();
     let cpu_hit = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
-    let rings = Rings::new();
-    rings.received[0].push(1, p1_hit);
-    rings.received[1].push(1, cpu_hit);
-    let (p1, cpu) = samples(rings.take(1), true);
+    let grader = Grader::new();
+    grader.hit(p1_hit.0, p1_hit.1);
+    grader.hit(cpu_hit.0, cpu_hit.1);
     let mut tracker = Tracker::new();
-    tracker.step(idle(), idle(), NONE);
-    tracker.step(p1, cpu, NONE);
+    tracker.step_graded(idle(), idle(), NONE, Taken::default());
+    tracker.step_graded(idle(), idle(), NONE, grader.take());
     let mut tags = tracker.tags().copied().collect::<Vec<_>>();
     tags.sort_by_key(|tag| tag.lane);
-    assert_eq!(
-        tags,
-        vec![
-            Tag { frame: 2, lane: 0, grade: Grade::Good },
-            Tag { frame: 2, lane: 1, grade: Grade::Good },
-        ]
-    );
+    assert_eq!(tags, vec![
+        Tag { frame: 2, lane: 0, grade: Grade::Good },
+        Tag { frame: 2, lane: 1, grade: Grade::Good },
+    ]);
 }
 
 fn grader_off_marks_nothing() {
     let fixture = contact_fixture(1, P1_ID, 1);
-    assert!(spacing::hook(false, |at| fixture.memory.get(&at).copied(), fixture.module, fixture.entry, fixture.lanes).is_none());
-    let rings = Rings::new();
+    assert!(spacing::hook(false, |_| panic!("Off reads nothing"), |_| panic!("Off does not resolve owners"), fixture.module, fixture.entry, fixture.lanes).is_none());
     let mut tracker = Tracker::new();
-    tracker.step(idle(), idle(), NONE);
-    let (p1, cpu) = samples(rings.take(1), false);
-    tracker.step(p1, cpu, NONE);
+    tracker.step_graded(idle(), idle(), NONE, Taken::default());
     assert!(tracker.tags().next().is_none());
 }
 
 fn each_hit_graded_once() {
-    let contact = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
-    let (_, taken) = receive(contact, 1);
-    let (p1, cpu) = samples(taken, false);
+    let taken = take_hit(capture_contact(&contact_fixture(1, P1_ID, 1)));
     let mut tracker = Tracker::new();
-    tracker.step(idle(), idle(), NONE);
-    tracker.step(p1, cpu, NONE);
+    tracker.step_graded(idle(), idle(), NONE, Taken::default());
+    tracker.step_graded(idle(), idle(), NONE, taken);
     let expected = vec![Tag { frame: 2, lane: 0, grade: Grade::Good }];
     assert_eq!(tracker.tags().copied().collect::<Vec<_>>(), expected);
 
-    let contact = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
-    let (rings, taken) = receive(contact, 2);
-    let (p1, mut cpu) = samples(taken, false);
-    cpu.stop = true;
-    cpu.hitstun = true;
-    cpu.damage = 1.0;
+    let taken = take_hit(capture_contact(&contact_fixture(1, P1_ID, 1)));
     let mut tracker = Tracker::new();
-    tracker.step(idle(), idle(), NONE);
-    tracker.step(p1, cpu, NONE);
+    tracker.step_graded(idle(), idle(), NONE, Taken::default());
+    let cpu = Sample { stop: true, hitstun: true, damage: 1.0, ..Sample::default() };
+    tracker.step_graded(idle(), cpu, NONE, taken);
     assert_eq!(tracker.tags().copied().collect::<Vec<_>>(), expected);
-    for epoch in 3..=4 {
-        let (p1, mut cpu) = samples(rings.take(epoch), false);
-        cpu.stop = true;
-        cpu.hitstun = true;
-        cpu.damage = 1.0;
-        tracker.step(p1, cpu, NONE);
+    for _ in 0..2 {
+        tracker.step_graded(idle(), cpu, NONE, Taken::default());
     }
     assert_eq!(tracker.tags().copied().collect::<Vec<_>>(), expected);
 }
 
 fn same_slot_rehit_after_idle_frames() {
-    let first = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
-    let rings = Rings::new();
-    rings.received[1].push(1, first);
+    let grader = Grader::new();
     let mut tracker = Tracker::new();
-    tracker.step(idle(), idle(), NONE);
-    let (p1, cpu) = samples(rings.take(1), false);
-    tracker.step(p1, cpu, NONE);
-    for epoch in 2..=4 {
-        let (p1, cpu) = samples(rings.take(epoch), false);
-        tracker.step(p1, cpu, NONE);
+    tracker.step_graded(idle(), idle(), NONE, grader.take());
+    grader.finish(true);
+    let (lane, grade) = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
+    grader.hit(lane, grade);
+    tracker.step_graded(idle(), idle(), NONE, grader.take());
+    grader.finish(true);
+    for _ in 0..3 {
+        tracker.step_graded(idle(), idle(), NONE, grader.take());
+        grader.finish(true);
     }
-    let second = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
-    rings.received[1].push(5, second);
-    let (p1, cpu) = samples(rings.take(5), false);
-    tracker.step(p1, cpu, NONE);
-    assert_eq!(
-        tracker.tags().map(|tag| tag.frame).collect::<Vec<_>>(),
-        vec![6, 2]
-    );
+    let (lane, grade) = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
+    grader.hit(lane, grade);
+    tracker.step_graded(idle(), idle(), NONE, grader.take());
+    grader.finish(true);
+    assert_eq!(tracker.tags().map(|tag| tag.frame).collect::<Vec<_>>(), vec![6, 2]);
 }
 
 fn vanishing_projectile_keeps_grade() {
     let fixture = contact_fixture(1, 0x1000_0000, 1);
-    let contact = capture_contact(&fixture).unwrap();
+    let hit = capture_contact(&fixture);
     drop(fixture);
-    let (_, taken) = receive(contact, 1);
-    let (p1, cpu) = samples(taken, false);
+    let taken = take_hit(hit);
     let mut tracker = Tracker::new();
-    tracker.step(idle(), idle(), NONE);
-    tracker.step(p1, cpu, NONE);
+    tracker.step_graded(idle(), idle(), NONE, Taken::default());
+    tracker.step_graded(idle(), idle(), NONE, taken);
     assert_eq!(tracker.tags().next().map(|tag| tag.grade), Some(Grade::Good));
 }
 
 fn stale_contact_dropped() {
-    let contact = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
-    let rings = Rings::new();
-    rings.received[1].push(4, contact);
+    let grader = Grader::new();
+    let (lane, grade) = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
+    grader.hit(lane, grade);
+    grader.finish(false);
+    assert_eq!(grader.take(), Taken::default());
     let mut tracker = Tracker::new();
-    tracker.step(idle(), idle(), NONE);
-    let (p1, cpu) = samples(rings.take(5), false);
-    tracker.step(p1, cpu, NONE);
+    tracker.step_graded(idle(), idle(), NONE, grader.take());
     assert!(tracker.tags().next().is_none());
 }
 
-fn target_grade_coexists_with_fighter_hit() {
-    let target = Contact { attacker: P1_ID, receiver: 0, slot: 0, part: 0, pen: 2.0, radius: 4.0 };
-    let fighter = Contact { attacker: P1_ID, receiver: 1, slot: 2, part: 1, pen: 1.0, radius: 4.0 };
-    let rings = Rings::new();
-    rings.targets.push(1, target);
-    rings.received[1].push(1, fighter);
-    let taken = rings.take(1);
-    let (p1, cpu) = samples(taken, false);
-    let mut tracker = Tracker::new();
-    tracker.step(idle(), idle(), NONE);
-    tracker.step(p1, cpu, NONE);
-    if let Some(grade) = taken.target {
-        tracker.tag_target(grade);
+fn foreign_or_self_attacker_awards_nothing() {
+    for (receiver, attacker) in [
+        (1, 0x1000_0001),
+        (1, CPU_ID),
+        (1, 0x30),
+        (1, 0x1000_0002),
+        (0, CPU_ID),
+    ] {
+        let taken = take_hit(capture_contact(&contact_fixture(receiver, attacker, 1)));
+        let mut tracker = Tracker::new();
+        tracker.step_graded(idle(), idle(), NONE, Taken::default());
+        tracker.step_graded(idle(), idle(), NONE, taken);
+        assert!(tracker.tags().next().is_none(), "receiver={receiver} attacker={attacker:#x}");
     }
-    assert_eq!(
-        tracker.tags().copied().collect::<Vec<_>>(),
-        vec![
-            Tag { frame: 2, lane: 0, grade: Grade::Good },
-            Tag { frame: 2, lane: 0, grade: Grade::Excellent },
-        ]
-    );
+}
+
+fn target_grade_coexists_with_fighter_hit() {
+    let grader = Grader::new();
+    let fighter = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
+    let mut tracker = Tracker::new();
+    tracker.step_graded(idle(), idle(), NONE, grader.take());
+    grader.finish(true);
+    grader.hit(fighter.0, fighter.1);
+    grader.target(Grade::Excellent);
+    let taken = grader.take();
+    tracker.step_graded(idle(), idle(), NONE, taken);
+    grader.finish(true);
+    assert_eq!(tracker.tags().map(|tag| tag.frame).collect::<Vec<_>>(), vec![2, 1]);
+}
+
+fn target_tag_lands_on_the_break_column() {
+    let grader = Grader::new();
+    let mut tracker = Tracker::new();
+    let taken = grader.take();
+    tracker.step_graded(idle(), idle(), NONE, taken);
+    grader.finish(true);
+    let break_frame = tracker.frame();
+    grader.target(Grade::Good);
+    let taken = grader.take();
+    tracker.step_graded(idle(), idle(), NONE, taken);
+    grader.finish(true);
+    assert_eq!(tracker.tags().next().map(|tag| tag.frame), Some(break_frame));
+}
+
+fn skipped_step_drops_target_grade() {
+    let skipped = Grader::new();
+    let mut skipped_tracker = Tracker::new();
+    skipped_tracker.step_graded(idle(), idle(), NONE, skipped.take());
+    skipped.finish(true);
+    skipped.skip();
+    skipped.target(Grade::Good);
+    assert_eq!(skipped.take(), Taken::default());
+
+    let busy = Grader::new();
+    let mut tracker = Tracker::new();
+    tracker.step_graded(idle(), idle(), NONE, busy.take());
+    busy.finish(true);
+    busy.target(Grade::Good);
+    let _taken_while_busy = busy.take();
+    busy.finish(false);
+    tracker.step_graded(idle(), idle(), NONE, busy.take());
+    assert!(tracker.tags().next().is_none());
 }
 
 /// SP1: a weaker hitbox than the strongest of the same action is Late; a new action starts over.
@@ -566,7 +584,10 @@ fn case_table() {
         ("same_slot_rehit_after_idle_frames", same_slot_rehit_after_idle_frames as fn()),
         ("vanishing_projectile_keeps_grade", vanishing_projectile_keeps_grade as fn()),
         ("stale_contact_dropped", stale_contact_dropped as fn()),
+        ("foreign_or_self_attacker_awards_nothing", foreign_or_self_attacker_awards_nothing as fn()),
         ("target_grade_coexists_with_fighter_hit", target_grade_coexists_with_fighter_hit as fn()),
+        ("target_tag_lands_on_the_break_column", target_tag_lands_on_the_break_column as fn()),
+        ("skipped_step_drops_target_grade", skipped_step_drops_target_grade as fn()),
         ("a_weaker_hit_later_in_the_same_action_is_late", a_weaker_hit_later_in_the_same_action_is_late as fn()),
         ("a_link_remembers_the_spot_of_its_follow_up_hit", a_link_remembers_the_spot_of_its_follow_up_hit as fn()),
         ("the_spot_labels_row_reads_its_setting", the_spot_labels_row_reads_its_setting as fn()),

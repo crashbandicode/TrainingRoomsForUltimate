@@ -10,19 +10,19 @@
 //! Every read is a guarded native (`game::natives`). The hitstun-left read is optional: when its work id or
 //! `WorkModule::get_float` is unavailable, a true combo shows no margin and everything else is drawn (SPEC-input-06 §4).
 
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
 
 use crate::model::frame_strip::ids::{Table, C};
 use crate::model::frame_strip::{Sample, Settings, Tracker};
-use crate::model::spacing::{Contact, Rings};
+use crate::model::spacing::{Grade, Grader, Lanes};
 use crate::model::frame_strip_plan::{Changed, Look, Renderer};
 use crate::model::input_delay::{MappedInputs, Owners, Sticks};
 use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::game::natives;
-use crate::runtime::published;
+use crate::runtime::{published, state_natives};
 
 /// The display's natives passed their guards (`model::capabilities`): until boot says so, nothing here reads the game.
 static ENABLED: AtomicBool = AtomicBool::new(false);
@@ -31,10 +31,10 @@ static REACTION_ON: AtomicBool = AtomicBool::new(false);
 /// P1's fighter read may run (`p1_fighter`).
 static KIND_ON: AtomicBool = AtomicBool::new(false);
 static GRADER_LIVE: AtomicBool = AtomicBool::new(false);
-static LANES: [AtomicUsize; 2] = [const { AtomicUsize::new(0) }; 2];
-static EPOCH: AtomicU32 = AtomicU32::new(0);
+static OWNER_ON: AtomicBool = AtomicBool::new(false);
+static LANES: Lanes = Lanes::new();
+static GRADER: Grader = Grader::new();
 static CLEAR_DUE: AtomicBool = AtomicBool::new(false);
-static RINGS: Rings = Rings::new();
 /// P1's latest mapped inputs, packed (`pack`).
 static INPUTS: AtomicU64 = AtomicU64::new(0);
 /// The constants resolved once (`ids`).
@@ -190,6 +190,18 @@ pub fn set_grader_read(on: bool) {
     }
 }
 
+pub fn set_owner_read(on: bool) {
+    OWNER_ON.store(on, Ordering::Release);
+}
+
+unsafe fn attacker_owner(id: u32) -> Option<u32> {
+    if !OWNER_ON.load(Ordering::Acquire) || !state_natives::object_is_active(id) {
+        return None;
+    }
+    let key = smash::app::sv_battle_object::module_accessor(id) as usize;
+    (key != 0).then(|| super::hitbox::article_owner(id, key)).flatten()
+}
+
 pub fn grader_live() -> bool {
     GRADER_LIVE.load(Ordering::Relaxed)
 }
@@ -198,8 +210,11 @@ pub fn target_grade(depth: f32) {
     if !GRADER_LIVE.load(Ordering::Relaxed) {
         return;
     }
-    let radius = crate::model::eggs::RADIUS;
-    RINGS.targets.push(EPOCH.load(Ordering::Relaxed), Contact { attacker: 0, receiver: 0, slot: 0, part: 0, pen: depth * radius, radius });
+    GRADER.target(Grade::of(depth));
+}
+
+unsafe fn guarded_read(at: usize) -> Option<u64> {
+    (at >= 0x1000 && at & 7 == 0 && at >> 47 == 0).then(|| (at as *const u64).read())
 }
 
 #[skyline::hook(offset = crate::model::sites_hitbox::SPACING_HIT_HANDLER_OFFSET, inline)]
@@ -210,14 +225,11 @@ unsafe fn spacing_hit(ctx: &mut InlineCtx) {
     let _scope = HookScope::enter_hook(HookId::SpacingHit);
     let module = ctx.registers[19].x() as usize;
     let entry = ctx.registers[20].x() as usize;
-    let lanes = [LANES[0].load(Ordering::Relaxed), LANES[1].load(Ordering::Relaxed)];
-    let read = |at: usize| {
-        (at >= 0x1000 && at & 7 == 0 && at >> 47 == 0).then(|| unsafe { (at as *const u64).read() })
-    };
-    if let Some(contact) = crate::model::spacing::hook(true, read, module, entry, lanes) {
-        if let Some(ring) = RINGS.received.get(usize::from(contact.receiver)) {
-            ring.push(EPOCH.load(Ordering::Relaxed), contact);
-        }
+    let read = |at| unsafe { guarded_read(at) };
+    if let Some((lane, grade)) =
+        crate::model::spacing::hook(true, read, |id| unsafe { attacker_owner(id) }, module, entry, [LANES.get(0), LANES.get(1)])
+    {
+        GRADER.hit(lane, grade);
     }
 }
 
@@ -247,7 +259,7 @@ pub(super) unsafe fn struck(accessor: usize) -> Option<(u32, u8, f32)> {
 }
 
 /// One fighter's frame (SPEC-input-06 §4); `spots`: read what the spot of a hit needs (`spots_wanted`).
-unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool, grader: bool) -> Sample {
+unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample {
     let status = natives::status_kind(accessor);
     let prev = natives::prev_status_kind(accessor, 0);
     let hitstun = ids.hitstun(status);
@@ -272,7 +284,6 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool, grader: bo
     // The record names the hit only on the frame its knockback was written (the game clears it on the next).
     let launched = if spots { natives::damage_reaction(accessor) } else { 0.0 };
     let struck = if spots && launched > 0.0 { struck(accessor) } else { None };
-    let player = !p1 && grader && lane_player();
     Sample {
         stop: natives::is_stop(accessor),
         hitstun,
@@ -290,8 +301,6 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool, grader: bo
         attack: if p1 { ids.attack(status) } else { None },
         reaction,
         shielding: ids.shielding(status),
-        contact: None,
-        player,
         status,
         motion_frame: natives::motion_frame(accessor),
         facing: if lr < 0.0 { -1 } else { 1 },
@@ -299,17 +308,11 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool, grader: bo
     }
 }
 
-fn discard_frame() {
-    let epoch = EPOCH.load(Ordering::Relaxed);
-    let _ = RINGS.take(epoch);
-    EPOCH.fetch_add(1, Ordering::Relaxed);
-}
-
 fn skip_frame(discard: bool) {
-    LANES[0].store(0, Ordering::Relaxed);
-    LANES[1].store(0, Ordering::Relaxed);
+    LANES.set(0, None);
+    LANES.set(1, None);
     if discard {
-        discard_frame();
+        GRADER.skip();
     }
 }
 
@@ -356,12 +359,14 @@ pub unsafe fn sample_frame(player: usize) {
         skip_frame(true);
         return;
     };
+    let read = |at| unsafe { guarded_read(at) };
     if grader {
-        LANES[0].store(player, Ordering::Relaxed);
-        LANES[1].store(cpu, Ordering::Relaxed);
+        let lane_player = lane_player();
+        LANES.set(0, crate::model::spacing::lane(read, player, natives::battle_object_id(player), true));
+        LANES.set(1, crate::model::spacing::lane(read, cpu, natives::battle_object_id(cpu), lane_player));
     } else {
-        LANES[0].store(0, Ordering::Relaxed);
-        LANES[1].store(0, Ordering::Relaxed);
+        LANES.set(0, None);
+        LANES.set(1, None);
     }
     let Some(ids) = ids() else {
         skip_frame(true);
@@ -369,12 +374,9 @@ pub unsafe fn sample_frame(player: usize) {
     };
     let cpu_accessor = cpu;
     let spots = spots_wanted();
-    let mut p1 = sample(player, &ids, true, spots, grader);
-    let mut cpu = sample(cpu, &ids, false, spots, grader);
-    let epoch = EPOCH.load(Ordering::Relaxed);
-    let taken = RINGS.take(epoch);
-    p1.contact = taken.received[0];
-    cpu.contact = taken.received[1];
+    let p1 = sample(player, &ids, true, spots);
+    let cpu = sample(cpu, &ids, false, spots);
+    let taken = GRADER.take();
     #[cfg(feature = "diag")]
     {
         probe_module(0, player, &p1, cpu.damage);
@@ -407,7 +409,7 @@ pub unsafe fn sample_frame(player: usize) {
     // P1's fighter, for a saved combo's "recorded on" (metadata; the existing guarded read, no new native site).
     let p1_kind = if shown || input_drill { p1_fighter(player) } else { None };
     let Some(mut tracker) = TRACKER.try_lock() else {
-        EPOCH.fetch_add(1, Ordering::Relaxed);
+        GRADER.finish(false);
         return;
     };
     if CLEAR_DUE.swap(false, Ordering::Relaxed) {
@@ -416,10 +418,7 @@ pub unsafe fn sample_frame(player: usize) {
     }
     #[cfg(feature = "diag")]
     let (check, advantage) = (tracker.stun_check, tracker.advantage());
-    tracker.step(p1, cpu, inputs);
-    if let Some(grade) = taken.target {
-        tracker.tag_target(grade);
-    }
+    tracker.step_graded(p1, cpu, inputs, taken);
     if shown || input_drill {
         if let Some(snap) = tracker.snaps().last() {
             crate::engine::rr_host::observe_input(snap, tracker.contact_now());
@@ -430,7 +429,7 @@ pub unsafe fn sample_frame(player: usize) {
     if super::parry::on() {
         super::parry::step(parry_frame(player, &ids, &p1, inputs), p1_kind, tracker.newest().unwrap_or(0));
     }
-    EPOCH.fetch_add(1, Ordering::Relaxed);
+    GRADER.finish(true);
     #[cfg(feature = "diag")]
     {
         let (check_now, link, advantage_now) = (tracker.stun_check, tracker.latest_link(), tracker.advantage());
@@ -593,10 +592,10 @@ fn diag_frame(cpu: &Sample, before: Option<(u32, u32)>, now: Option<(u32, u32)>,
 /// Session clear: leaving Training, a hot swap, a lobby change.
 pub fn session_clear() {
     GRADER_LIVE.store(false, Ordering::Relaxed);
-    LANES[0].store(0, Ordering::Relaxed);
-    LANES[1].store(0, Ordering::Relaxed);
+    LANES.set(0, None);
+    LANES.set(1, None);
     CLEAR_DUE.store(false, Ordering::Relaxed);
-    EPOCH.fetch_add(1, Ordering::Relaxed);
+    GRADER.skip();
     TRACKER.lock().clear();
     crate::runtime::features::combo::session_clear();
 }

@@ -1,6 +1,6 @@
 pub const ROW: &str = "spacing_grader";
 
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Grade {
@@ -49,58 +49,128 @@ pub fn grade(pen: f32, radius: f32) -> Option<Grade> {
     depth(pen, radius).map(Grade::of)
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Contact {
-    pub attacker: u32,
-    pub receiver: u8,
-    pub slot: u8,
-    pub part: u8,
-    pub pen: f32,
-    pub radius: f32,
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Lane {
+    pub damage: usize,
+    pub hit: usize,
+    pub id: u32,
+    pub attacks: bool,
 }
 
-impl Contact {
-    pub fn grade(&self) -> Option<Grade> {
-        grade(self.pen, self.radius)
+pub struct Lanes {
+    damage: [AtomicUsize; 2],
+    hit: [AtomicUsize; 2],
+    id: [AtomicU32; 2],
+    attacks: [AtomicBool; 2],
+}
+
+impl Lanes {
+    pub const fn new() -> Self {
+        Self {
+            damage: [const { AtomicUsize::new(0) }; 2],
+            hit: [const { AtomicUsize::new(0) }; 2],
+            id: [const { AtomicU32::new(0) }; 2],
+            attacks: [const { AtomicBool::new(false) }; 2],
+        }
+    }
+
+    pub fn set(&self, lane: usize, value: Option<Lane>) {
+        let Some(damage) = self.damage.get(lane) else { return };
+        damage.store(0, Ordering::Release);
+        let Some(value) = value else { return };
+        self.hit[lane].store(value.hit, Ordering::Relaxed);
+        self.id[lane].store(value.id, Ordering::Relaxed);
+        self.attacks[lane].store(value.attacks, Ordering::Relaxed);
+        damage.store(value.damage, Ordering::Release);
+    }
+
+    pub fn get(&self, lane: usize) -> Option<Lane> {
+        let damage = self.damage.get(lane)?.load(Ordering::Acquire);
+        if damage == 0 {
+            return None;
+        }
+        let value = Lane {
+            damage,
+            hit: self.hit[lane].load(Ordering::Relaxed),
+            id: self.id[lane].load(Ordering::Relaxed),
+            attacks: self.attacks[lane].load(Ordering::Relaxed),
+        };
+        (self.damage[lane].load(Ordering::Acquire) == damage).then_some(value)
     }
 }
 
-fn pack(epoch: u32, contact: &Contact) -> [u64; 3] {
-    [
-        (u64::from(epoch) << 32) | u64::from(contact.attacker),
-        (u64::from(contact.pen.to_bits()) << 32)
-            | (u64::from(contact.receiver) << 24)
-            | (u64::from(contact.slot) << 16)
-            | (u64::from(contact.part) << 8),
-        u64::from(contact.radius.to_bits()),
-    ]
+impl Default for Lanes {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
-fn unpack(words: [u64; 3]) -> (u32, Contact) {
-    let [identity, fields, radius] = words;
+pub fn lane(read: impl Fn(usize) -> Option<u64>, accessor: usize, id: u32, attacks: bool) -> Option<Lane> {
+    use crate::model::hitbox::layout;
+    use crate::model::sites_hitbox::damage_record;
+
+    if !valid_pointer(accessor) {
+        return None;
+    }
+    Some(Lane {
+        damage: read_pointer(&read, accessor.checked_add(damage_record::MODULE)?)?,
+        hit: read_pointer(&read, accessor.checked_add(layout::HIT_MODULE)?)?,
+        id,
+        attacks,
+    })
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Entry {
+    pub lane: u8,
+    pub grade: Grade,
+    pub earlier: bool,
+}
+
+fn grade_code(grade: Grade) -> u8 {
+    match grade {
+        Grade::Excellent => 0,
+        Grade::Good => 1,
+        Grade::Ok => 2,
+    }
+}
+
+fn grade_from_code(code: u8) -> Grade {
+    match code {
+        0 => Grade::Excellent,
+        1 => Grade::Good,
+        _ => Grade::Ok,
+    }
+}
+
+fn pack(epoch: u32, entry: Entry) -> u64 {
+    (u64::from(epoch) << 32)
+        | (u64::from(u8::from(entry.earlier)) << 16)
+        | (u64::from(entry.lane) << 8)
+        | u64::from(grade_code(entry.grade))
+}
+
+fn unpack(word: u64) -> (u32, Entry) {
     (
-        (identity >> 32) as u32,
-        Contact {
-            attacker: identity as u32,
-            receiver: (fields >> 24) as u8,
-            slot: (fields >> 16) as u8,
-            part: (fields >> 8) as u8,
-            pen: f32::from_bits((fields >> 32) as u32),
-            radius: f32::from_bits(radius as u32),
+        (word >> 32) as u32,
+        Entry {
+            earlier: (word >> 16) & 1 != 0,
+            lane: (word >> 8) as u8,
+            grade: grade_from_code(word as u8),
         },
     )
 }
 
 struct Slot {
     sequence: AtomicU64,
-    _words: [AtomicU64; 3],
+    word: AtomicU64,
 }
 
 impl Slot {
     const fn new() -> Self {
         Self {
             sequence: AtomicU64::new(0),
-            _words: [const { AtomicU64::new(0) }; 3],
+            word: AtomicU64::new(0),
         }
     }
 }
@@ -120,17 +190,15 @@ impl<const N: usize> Ring<N> {
         }
     }
 
-    pub fn push(&self, epoch: u32, contact: Contact) {
+    pub fn push(&self, epoch: u32, entry: Entry) {
         let ticket = self.write.fetch_add(1, Ordering::Relaxed);
         let slot = &self.slots[ticket as usize % N];
         slot.sequence.store(ticket.wrapping_mul(2).wrapping_add(1), Ordering::Relaxed);
-        for (word, value) in slot._words.iter().zip(pack(epoch, &contact)) {
-            word.store(value, Ordering::Relaxed);
-        }
+        slot.word.store(pack(epoch, entry), Ordering::Relaxed);
         slot.sequence.store(ticket.wrapping_mul(2).wrapping_add(2), Ordering::Release);
     }
 
-    pub fn drain(&self, mut f: impl FnMut(u32, Contact)) {
+    pub fn drain(&self, mut f: impl FnMut(u32, Entry)) {
         let end = self.write.load(Ordering::Acquire);
         let mut next = self.read.load(Ordering::Relaxed);
         if end.wrapping_sub(next) > N as u64 {
@@ -140,10 +208,10 @@ impl<const N: usize> Ring<N> {
             let slot = &self.slots[next as usize % N];
             let sequence = next.wrapping_mul(2).wrapping_add(2);
             if slot.sequence.load(Ordering::Acquire) == sequence {
-                let words = slot._words.each_ref().map(|word| word.load(Ordering::Relaxed));
+                let word = slot.word.load(Ordering::Relaxed);
                 if slot.sequence.load(Ordering::Acquire) == sequence {
-                    let (epoch, contact) = unpack(words);
-                    f(epoch, contact);
+                    let (epoch, entry) = unpack(word);
+                    f(epoch, entry);
                 }
             }
             next = next.wrapping_add(1);
@@ -164,47 +232,75 @@ impl<const N: usize> Default for Ring<N> {
     }
 }
 
-pub struct Rings {
-    pub received: [Ring<8>; 2],
-    pub targets: Ring<8>,
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Taken {
+    pub hits: [Option<Grade>; 2],
+    pub earlier: Option<Grade>,
 }
 
-impl Rings {
+pub struct Grader {
+    ring: Ring<16>,
+    epoch: AtomicU32,
+    recorded: AtomicU32,
+}
+
+impl Grader {
     pub const fn new() -> Self {
         Self {
-            received: [const { Ring::new() }; 2],
-            targets: Ring::new(),
+            ring: Ring::new(),
+            epoch: AtomicU32::new(0),
+            recorded: AtomicU32::new(u32::MAX),
         }
     }
 
-    pub fn take(&self, epoch: u32) -> Taken {
-        Taken {
-            received: [first(&self.received[0], epoch), first(&self.received[1], epoch)],
-            target: first(&self.targets, epoch),
+    pub fn hit(&self, lane: u8, grade: Grade) {
+        self.ring.push(self.epoch.load(Ordering::Relaxed), Entry { lane, grade, earlier: false });
+    }
+
+    pub fn target(&self, grade: Grade) {
+        let epoch = self.epoch.load(Ordering::Relaxed);
+        if self.recorded.load(Ordering::Acquire) == epoch {
+            self.ring.push(epoch, Entry { lane: 0, grade, earlier: true });
         }
+    }
+
+    pub fn take(&self) -> Taken {
+        let epoch = self.epoch.load(Ordering::Relaxed);
+        let mut taken = Taken::default();
+        self.ring.drain(|found, entry| {
+            if found != epoch {
+                return;
+            }
+            if entry.earlier {
+                if taken.earlier.is_none() {
+                    taken.earlier = Some(entry.grade);
+                }
+            } else if let Some(slot) = taken.hits.get_mut(usize::from(entry.lane)) {
+                if slot.is_none() {
+                    *slot = Some(entry.grade);
+                }
+            }
+        });
+        taken
+    }
+
+    pub fn finish(&self, recorded: bool) {
+        let next = self.epoch.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
+        if recorded {
+            self.recorded.store(next, Ordering::Release);
+        }
+    }
+
+    pub fn skip(&self) {
+        let _ = self.take();
+        self.finish(false);
     }
 }
 
-impl Default for Rings {
+impl Default for Grader {
     fn default() -> Self {
         Self::new()
     }
-}
-
-fn first(ring: &Ring<8>, epoch: u32) -> Option<Grade> {
-    let mut grade = None;
-    ring.drain(|found_epoch, contact| {
-        if grade.is_none() && found_epoch == epoch {
-            grade = contact.grade();
-        }
-    });
-    grade
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Taken {
-    pub received: [Option<Grade>; 2],
-    pub target: Option<Grade>,
 }
 
 fn valid_pointer(pointer: usize) -> bool {
@@ -232,27 +328,37 @@ fn read_vec3(read: &impl Fn(usize) -> Option<u64>, at: usize) -> Option<[f32; 3]
     Some([read_f32(read, at)?, read_f32(read, at.checked_add(4)?)?, read_f32(read, at.checked_add(8)?)?])
 }
 
-pub fn capture(read: impl Fn(usize) -> Option<u64>, module: usize, entry: usize, lanes: [usize; 2]) -> Option<Contact> {
+pub fn capture(
+    read: impl Fn(usize) -> Option<u64>,
+    owner: impl Fn(u32) -> Option<u32>,
+    module: usize,
+    entry: usize,
+    lanes: [Option<Lane>; 2],
+) -> Option<(u8, Grade)> {
     use crate::model::hitbox::layout;
-    use crate::model::sites_hitbox::{damage_record, hurt_shape};
+    use crate::model::sites_hitbox::hurt_shape;
 
     if !valid_pointer(module) || !valid_pointer(entry) {
         return None;
     }
-    let receiver = lanes.iter().enumerate().find_map(|(lane, &accessor)| {
-        if !valid_pointer(accessor) {
-            return None;
-        }
-        let at = accessor.checked_add(damage_record::MODULE)?;
-        (read_pointer(&read, at)? == module).then_some(lane as u8)
-    })?;
-
+    let receiver = lanes.iter().position(|lane| lane.is_some_and(|lane| lane.damage == module))?;
     let attacker = read_u32(&read, entry.checked_add(0x24)?)?;
-    let slot = read_u8(&read, entry.checked_add(0x32)?)?;
+    let owner = match attacker >> 28 {
+        0 => Some(attacker),
+        1 | 4 => owner(attacker).filter(|id| id >> 28 == 0),
+        _ => None,
+    }?;
+    let by = lanes.iter().position(|lane| lane.is_some_and(|lane| lane.id == owner && lane.attacks))?;
+    if by == receiver {
+        return None;
+    }
     let part = read_u8(&read, entry.checked_add(0x33)?)?;
     let contact = read_vec3(&read, entry.checked_add(0x10)?)?;
 
-    let hit_module = read_pointer(&read, lanes[receiver as usize].checked_add(layout::HIT_MODULE)?)?;
+    let hit_module = lanes[receiver]?.hit;
+    if !valid_pointer(hit_module) {
+        return None;
+    }
     let total = read_u32(&read, hit_module.checked_add(layout::HIT_PART_TOTAL)?)? as i32;
     if i32::from(part) >= total {
         return None;
@@ -264,26 +370,20 @@ pub fn capture(read: impl Fn(usize) -> Option<u64>, module: usize, entry: usize,
     if !contact.iter().zip(shape_contact).all(|(entry, shape)| entry.to_bits() == shape.to_bits()) {
         return None;
     }
-    let contact = Contact {
-        attacker,
-        receiver,
-        slot,
-        part,
-        pen: read_f32(&read, shape.checked_add(hurt_shape::PEN)?)?,
-        radius: read_f32(&read, shape.checked_add(hurt_shape::RADIUS)?)?,
-    };
-    contact.grade()?;
-    Some(contact)
+    let pen = read_f32(&read, shape.checked_add(hurt_shape::PEN)?)?;
+    let radius = read_f32(&read, shape.checked_add(hurt_shape::RADIUS)?)?;
+    Some((by as u8, grade(pen, radius)?))
 }
 
 pub fn hook(
     live: bool,
     read: impl Fn(usize) -> Option<u64>,
+    owner: impl Fn(u32) -> Option<u32>,
     module: usize,
     entry: usize,
-    lanes: [usize; 2],
-) -> Option<Contact> {
-    live.then(|| capture(read, module, entry, lanes)).flatten()
+    lanes: [Option<Lane>; 2],
+) -> Option<(u8, Grade)> {
+    live.then(|| capture(read, owner, module, entry, lanes)).flatten()
 }
 
 pub fn zone_discs(target: &crate::model::hitbox_orbs::Orb) -> [crate::model::hitbox_orbs::Orb; 2] {

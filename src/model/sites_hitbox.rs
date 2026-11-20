@@ -66,6 +66,7 @@ pub const GRADER_ROWS: [(&str, usize); 10] = [
     ("hit_pair_contact_d", 0x51f260),
     ("hit_pair_contact_e", 0x51f904),
 ];
+pub const GRADER_NEEDS: [&str; 3] = ["hurtbox_module", "hurtbox_groups", "hurtbox_part_shape"];
 pub const HITBOX_REQ_FOLLOW_OFFSET: usize = 0x201_7730;
 pub const HITBOX_KILL_OFFSET: usize = 0x201_7840;
 pub const HITBOX_IS_EXIST_OFFSET: usize = 0x201_7a20;
@@ -115,7 +116,6 @@ pub const SPACING_HIT_HANDLER_OFFSET: usize = 0x402_d14;
 pub static SITES: [Site; 47] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));
 
 pub fn grader_usable(usable: impl Fn(&Site) -> bool) -> bool {
-    GRADER_ROWS.iter().all(|(name, _)| {
-        SITES.iter().find(|site| site.name == *name).is_some_and(&usable)
-    })
+    GRADER_ROWS.iter().all(|(name, _)| SITES.iter().find(|site| site.name == *name).is_some_and(&usable))
+        && GRADER_NEEDS.iter().all(|name| SITES.iter().find(|site| site.name == *name).is_some_and(&usable))
 }

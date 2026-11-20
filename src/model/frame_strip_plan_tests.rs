@@ -136,12 +136,15 @@ fn held(x: i8, y: i8) -> MappedInputs {
 }
 
 fn grade_tag_text_and_colour() {
-    use crate::model::spacing::Grade;
+    use crate::model::spacing::{Grade, Grader};
 
+    let grader = Grader::new();
     let mut tracker = Tracker::new();
-    tracker.step(idle(), idle(), NONE);
-    tracker.step(idle(), idle(), NONE);
-    tracker.tag_target(Grade::Good);
+    tracker.step_graded(idle(), idle(), NONE, grader.take());
+    grader.finish(true);
+    grader.target(Grade::Good);
+    tracker.step_graded(idle(), idle(), NONE, grader.take());
+    grader.finish(true);
 
     let tag_box = at::STICK + WINDOW;
     let tag_text = tag_box + crate::model::frame_strip::TAGS;
@@ -149,7 +152,7 @@ fn grade_tag_text_and_colour() {
     let (_, seen) = draw_all(&mut renderer, &tracker, true);
     let box_look = look_at(&seen, tag_box);
     let text_look = look_at(&seen, tag_text);
-    let x = FIRST_X + (WINDOW - 1) as f32 * PITCH + CELL_W / 2.0;
+    let x = FIRST_X + (WINDOW - 2) as f32 * PITCH + CELL_W / 2.0;
     assert_eq!((box_look.x, box_look.y, box_look.w, box_look.color), (x, P1_Y, 54.0, Grade::Good.color()));
     assert_eq!((text_look.x, text_look.y, text_look.color), (x, P1_Y, INK));
     assert_eq!(String::from_utf16(text_look.text.units()).unwrap(), "Good");
