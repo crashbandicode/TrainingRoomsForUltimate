@@ -825,16 +825,24 @@ unsafe fn route_guide(
     special: Option<perfect::SpecialReach>,
     player_top: f32,
 ) -> Option<RecoveryGuide> {
-    let [left, right] = run.stage.ledges;
     let read_outline = || {
         let (midpoint, limits) =
             perfect::outline_probe(natives::camera_limit_range()?, run.stage.blast())?;
         let ray = FloorRay::new(p1)?;
         super::tech_surfaces::training_outline(&ray, midpoint, limits)
     };
-    let Some(outline) = read_outline() else {
+    let Some((outline, live_ledges)) = read_outline() else {
         planner_unavailable(PlanInput::StageOutline);
         return None;
+    };
+    let [left, right] = if run.stage_key == (89, 0) {
+        let Some(ledges) = live_ledges else {
+            planner_unavailable(PlanInput::StageOutline);
+            return None;
+        };
+        ledges
+    } else {
+        run.stage.ledges
     };
     let player = [natives::pos_x(p1), natives::pos_y(p1)];
     let player_reach = player_top - player[1];

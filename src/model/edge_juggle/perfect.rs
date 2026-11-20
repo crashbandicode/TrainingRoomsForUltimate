@@ -47,6 +47,25 @@ impl Default for Outline {
     }
 }
 
+/// Endpoints of the current connected solid floor, including its slope.
+pub fn floor_ledges(floors: impl IntoIterator<Item = Segment>) -> Option<[Point; 2]> {
+    let mut points = floors.into_iter().flatten();
+    let first = points.next()?;
+    let [mut left, mut right] = [first; 2];
+    for point in std::iter::once(first).chain(points) {
+        if !point.into_iter().all(f32::is_finite) {
+            return None;
+        }
+        if point[0] < left[0] {
+            left = point;
+        }
+        if point[0] > right[0] {
+            right = point;
+        }
+    }
+    (left[0] < right[0]).then_some([left, right])
+}
+
 /// Seed the solid outline walk at the stage center through the full blast zone.
 pub fn outline_probe(camera: [f32; 4], blast: [f32; 4]) -> Option<(f32, Point)> {
     let [cam_left, cam_right, _, _] = camera;
@@ -1368,6 +1387,13 @@ mod tests {
             facts.stage = stage;
             assert!(facts.crossing_band().is_none(), "{stage:?}");
         }
+
+        // A fresh outline can close a corridor on an otherwise approved stage.
+        let low_floor = [[ledges[0], ledges[1]], [ledges[0], [0.0, -83.0]], [[0.0, -83.0], ledges[1]]];
+        facts.stage = (89, 0);
+        facts.outline = &low_floor;
+        assert!(facts.crossing_band().is_none());
+        assert!(possible_routes(&facts)[3].is_none());
     }
 
     #[test]
