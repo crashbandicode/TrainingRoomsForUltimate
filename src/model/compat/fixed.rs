@@ -108,6 +108,11 @@ impl<T: Copy, const N: usize> std::ops::Deref for FixedList<T, N> {
     }
 }
 
+/// Lists are equal when their items are (the unused tail is not compared).
+impl<T: Copy + PartialEq, const N: usize> PartialEq for FixedList<T, N> {
+    fn eq(&self, other: &Self) -> bool { self[..] == other[..] }
+}
+
 impl<T: Copy, const N: usize> std::ops::DerefMut for FixedList<T, N> {
     fn deref_mut(&mut self) -> &mut [T] { &mut self.items[..self.len] }
 }

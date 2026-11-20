@@ -1454,7 +1454,7 @@ pub fn plan_extra_groups(
 /// Ready Fighters shortfall (operator 2026-11-20 ~01:22Z): an immutable snapshot of what the planner works from, with
 /// each role's WHOLE cycle (not the live look-ahead), taken when it changes (a cycle edit, a settings change, Training
 /// entry, a swap that moves a window) so steady polls do no placement work ([`DemandMemo`]).
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DemandInput {
     pub policy: GroupPolicy,
     pub windows: [Option<Members>; 2],
@@ -1464,13 +1464,6 @@ pub struct DemandInput {
     pub ready_fighters: usize,
 }
 
-impl DemandInput {
-    fn same(&self, other: &Self) -> bool {
-        (self.policy, self.windows, self.exclude, self.special, self.ready_fighters)
-            == (other.policy, other.windows, other.exclude, other.special, other.ready_fighters)
-            && self.lanes.iter().zip(&other.lanes).all(|(a, b)| a[..] == b[..])
-    }
-}
 
 /// `bodies`: what the cycles need, both visible fighters included (the numbers Ready Fighters counts). `cold`: the
 /// selectable targets (a special group such as the Ice Climbers pair is one) that do not fit Ready Fighters.
@@ -1484,8 +1477,18 @@ pub struct Demand {
 /// once with Ready Fighters and the pool unlimited and once with Ready Fighters; the targets the second leaves out are
 /// cold.
 pub fn cycle_demand(input: &DemandInput) -> Demand {
-    let _ = input;
-    Demand::default()
+    let lanes = [&input.lanes[0][..], &input.lanes[1][..]];
+    let place = |ready_fighters| plan_extra_groups_with(input.policy, input.windows, [&[], &[]], lanes, input.exclude,
+        GroupBudget { ready_fighters, pool_free: usize::MAX / 2, special: input.special });
+    let picks = |plan: &[[Option<Members>; MAX_EXTRA_GROUPS]; 2]| plan.iter().flatten().flatten()
+        .map(|m| if m.special() == Special::None { m.count() } else { 1 }).sum::<usize>();
+    let open = place(usize::MAX / 2);
+    let fits = place(input.ready_fighters);
+    Demand {
+        bodies: input.windows.iter().map(|w| w.map_or(1, |m| m.count())).sum::<usize>()
+            + open.iter().flatten().flatten().map(|m| m.count()).sum::<usize>(),
+        cold: picks(&open).saturating_sub(picks(&fits)),
+    }
 }
 
 /// The last snapshot and its demand: [`cycle_demand`] runs only when the snapshot changes.
@@ -1500,7 +1503,7 @@ impl DemandMemo {
 
     pub fn demand(&mut self, input: DemandInput) -> Demand {
         match self.last {
-            Some((last, demand)) if last.same(&input) => demand,
+            Some((last, demand)) if last == input => demand,
             _ => {
                 let demand = cycle_demand(&input);
                 self.computed = self.computed.wrapping_add(1);

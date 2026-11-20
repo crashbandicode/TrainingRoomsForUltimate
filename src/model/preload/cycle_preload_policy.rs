@@ -258,7 +258,7 @@ impl BuiltFighters {
 
     /// Cycle members Ready Fighters leaves cold (picks, not bodies).
     pub fn short(self) -> u8 {
-        0
+        if self.ready_fighters == 0 { 0 } else { self.cold }
     }
 }
 
