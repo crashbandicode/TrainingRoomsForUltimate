@@ -1056,11 +1056,9 @@ impl RecordingScreens {
         if len == 0 {
             return;
         }
+        // Up / Down wrap inside the section, as in the menu's other lists.
         let at = self.place(Face::Popup, group).at[section].min(len - 1);
-        if delta < 0 && at == 0 || delta > 0 && at + 1 >= len {
-            return;
-        }
-        self.place_mut(Face::Popup, group).at[section] = if delta < 0 { at - 1 } else { at + 1 };
+        self.place_mut(Face::Popup, group).at[section] = if delta < 0 { (at + len - 1) % len } else { (at + 1) % len };
     }
 
     fn nudge_page(&mut self, group: u8, delta: isize) -> PageHit {
@@ -2003,8 +2001,14 @@ fn page_by(cursor: usize, len: usize, forward: bool) -> usize {
     if len == 0 {
         return 0;
     }
+    // One page further, stopping on the first or last entry; from there the next page wraps, as the menu's jumps do.
     let cursor = cursor.min(len - 1);
-    if forward { (cursor + PAGE).min(len - 1) } else { cursor.saturating_sub(PAGE) }
+    match forward {
+        true if cursor + 1 == len => 0,
+        true => (cursor + PAGE).min(len - 1),
+        false if cursor == 0 => len - 1,
+        false => cursor.saturating_sub(PAGE),
+    }
 }
 
 fn fill_ranks(ids: &[String], order: &[String]) -> Vec<u8> {
@@ -2354,6 +2358,31 @@ mod tests {
         screens.set_cursor(Face::Page, SAVES_MACROS, 0, 0);
         screens.handle_page(Button::JumpDown, true, SAVES_MACROS);
         assert_eq!(screens.section_cursor(Face::Page, SAVES_MACROS, 0), 12);
+    }
+
+    /// Operator ~23:10Z (rc15/submenu-page-switch): the library lists wrap like the other lists. In the pop-up, Up / Down
+    /// wrap inside the section; on the pop-up and the page, ZL + Up / Down stop on the edge, then wrap.
+    fn library_lists_wrap_at_their_edges() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        let len = screens.section(Face::Popup, SAVES_MACROS, 0).rows.len();
+        assert!(len > PAGE + 1);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, len - 1);
+        screens.press_popup(Button::Down);
+        assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 0), 0, "Down wraps to the first entry");
+        screens.press_popup(Button::Up);
+        assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 0), len - 1, "Up wraps to the last entry");
+        assert_eq!(screens.current_section(Face::Popup, SAVES_MACROS), 0);
+        screens.press_popup(Button::JumpDown);
+        assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 0), 0, "ZL + Down wraps from the last entry");
+        screens.press_popup(Button::JumpUp);
+        assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 0), len - 1, "ZL + Up wraps from the first entry");
+        let page = screens.section(Face::Page, SAVES_MACROS, 0).rows.len();
+        screens.set_cursor(Face::Page, SAVES_MACROS, 0, page - 1);
+        screens.handle_page(Button::JumpDown, true, SAVES_MACROS);
+        assert_eq!(screens.section_cursor(Face::Page, SAVES_MACROS, 0), 0, "the page's ZL + Down wraps too");
+        screens.handle_page(Button::JumpUp, true, SAVES_MACROS);
+        assert_eq!(screens.section_cursor(Face::Page, SAVES_MACROS, 0), page - 1);
     }
 
     fn x_cycles_the_loop_only_in_macros() {
@@ -2811,6 +2840,7 @@ mod tests {
             ("one_save_is_bound_and_the_page_opens_it", one_save_is_bound_and_the_page_opens_it as fn()),
             ("popup_buttons_match_q11", popup_buttons_match_q11 as fn()),
             ("paging_moves_one_section_by_twelve", paging_moves_one_section_by_twelve as fn()),
+            ("library_lists_wrap_at_their_edges", library_lists_wrap_at_their_edges as fn()),
             ("x_cycles_the_loop_only_in_macros", x_cycles_the_loop_only_in_macros as fn()),
             ("set_active_is_one_row_for_the_role_in_view", set_active_is_one_row_for_the_role_in_view as fn()),
             ("a_macro_plays_as_a_playback_slot", a_macro_plays_as_a_playback_slot as fn()),

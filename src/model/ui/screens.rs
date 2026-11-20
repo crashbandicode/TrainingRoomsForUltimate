@@ -21,7 +21,7 @@ const HINT_DELAY: &str = "Up/Down move   ZL+Up/Down jump   A tick or edit the ha
 const HINT_SLIDER: &str = "Left/Right other handle   A pick up or put down   Up/Down/Left/Right change   B back";
 const HINT_DIRECTIONS: &str = "Up/Down move   A add one weight   Y clear   ZL all or none   B back";
 const HINT_CHORD: &str = "X capture   A confirm   Y empty   B cancel";
-const HINT_ROWS: &str = "Up/Down move   ZL+Up/Down jump   Left/Right change   A open   Y reset row   B back";
+const HINT_ROWS: &str = "L/R page   Up/Down move   ZL+Up/Down jump   Left/Right change   A open   Y reset row   B back";
 
 /// First line of a window of `ROW_LINES` rows over `total` that keeps `cursor` in view.
 pub fn window_start(cursor: usize, total: usize) -> usize {
@@ -392,7 +392,7 @@ fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cel
     });
     let _ = frame.hint.write_str(match layout.kind {
         GridKind::Roster(RosterUse::Mashout) if menu.mashout_pop().is_some() => "D-pad choose   Left/Right grab type   A confirm   B back",
-        GridKind::Roster(RosterUse::PlayerPick | RosterUse::CpuPick | RosterUse::Mashout) => "D-pad move   A pick   X form   B back",
+        GridKind::Roster(RosterUse::PlayerPick | RosterUse::CpuPick | RosterUse::Mashout) => "L/R page   D-pad move   A pick   X form   B back",
         GridKind::Roster(RosterUse::Cycles) => "D-pad move   A pick   R remove   Y Solo Popo   X form   ZR role   B back",
         GridKind::Roster(RosterUse::Hats) => "D-pad move   A pick   R remove   X form   ZR role   B back",
         _ => "D-pad move   L/R page   B back",

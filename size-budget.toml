@@ -2069,3 +2069,11 @@ ceiling = 165656
 date = "2026-11-19"
 reason = "Tech floor speed refusal notice with initialization-only ground slot checks and stock window digests. Measured 165655 against 165330 on 96355cad. Raise the existing 165331 ceiling by the measured 325 lines."
 approved_by = "Operator 2026-11-19 approved the too-fast notice; primary c07b3449 directed the review revisions and measured-delta budget."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 165701
+date = "2026-11-20"
+reason = "Merge of rc.15 submenu-page-switch (0a7ee52a) onto f8404c3a: L / R step the page from submenus, the worker's roster editor is dropped when its grid leaves the top (no X-preview leak), ZL + Up / Down and the recording lists wrap. The branch measured 165174 on 4f25a854 (+46 over the measured 165128); its ceiling entries were +29, +14 and +2 (165129 -> 165174). Re-summed on main's 165656 ceiling: 165656 + 45 = 165701 (main measured 165655, so 165655 + 46 = 165701, zero headroom); the integration gate re-measures."
+approved_by = "Operator 2026-11-19 approved the submenu page switch, the page/recording wraps (~23:10Z); primary c07b3449 merged after REVIEW PASS review-menu-astra 01:23Z and re-summed the budget tail."

@@ -86,7 +86,7 @@ fn a_game_row_opens_its_sub_screen_on_start() {
         let f = frame(&m);
         assert_eq!(f.rows[0].label.string_lossy(), "Start");
         assert_eq!(f.crumb.string_lossy(), format!("Fighters & Stages  >  Practice games  >  {}", game.title()));
-        assert_eq!(f.hint.string_lossy(), "Up/Down move   ZL+Up/Down jump   Left/Right change   A open   Y reset row   B back");
+        assert_eq!(f.hint.string_lossy(), "L/R page   Up/Down move   ZL+Up/Down jump   Left/Right change   A open   Y reset row   B back");
         assert_eq!(f.group_count, 0, "no left column");
         m.press(Button::B);
         assert_eq!((m.screen(), m.is_closed()), (None, false), "B goes back to the list");
@@ -354,7 +354,9 @@ fn sub_screen_keys_match_the_page() {
     assert!(matches!(m.screen(), Some(Screen::Rows { cursor: 12, .. })));
     assert_eq!(frame(&m).row_count as usize, crate::model::panes::ROWS, "the long screen scrolls in one window");
     m.press(Button::JumpDown);
-    assert!(matches!(m.screen(), Some(Screen::Rows { cursor: 23, .. })), "no wrap: the last row");
+    assert!(matches!(m.screen(), Some(Screen::Rows { cursor: 23, .. })), "the window stops on the last row");
+    m.press(Button::JumpDown);
+    assert!(matches!(m.screen(), Some(Screen::Rows { cursor: 0, .. })), "then wraps to the first");
     // A greyed row says why.
     let mut m = running(Game::Btt);
     on_list(&mut m, Game::Eggs);

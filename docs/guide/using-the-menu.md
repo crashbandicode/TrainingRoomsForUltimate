@@ -41,8 +41,11 @@ described in [TECHNICAL.md](../TECHNICAL.md).
 
 - **Up / Down** move one row. They wrap from the bottom of the page to the top. The left or right stick works too, and
   holding it keeps moving.
-- **ZL + Up / Down** jump to the next or previous section (the first row of each group). They stop at the first and
-  last section instead of wrapping.
+- **ZL + Up / Down** jump to the next or previous section (the first row of each group). From the last section
+  ZL + Down goes to the first, and from the first ZL + Up goes to the last. In a list they jump a screenful, stop
+  on the first or last entry, then wrap.
+- **L / R** go to the previous or next page from the page and from a game's screen, a fighter grid or an editor
+  screen. Popup lists, number editors, the chord editor and the grids that use L / R themselves keep their keys.
 - A section tagged *advanced* (Loading, on Fighters & Stages) is collapsed. A on its header opens or closes it.
 - A greyed row can't be changed until the row it depends on changes.
 - Two help lines describe the row you are on, and the footer lists the keys:
