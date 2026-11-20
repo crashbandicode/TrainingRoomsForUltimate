@@ -146,6 +146,7 @@ struct Bodies {
     cpu: usize,
 }
 
+static SPECIAL_TABLE: AtomicBool = AtomicBool::new(false);
 static RECOVERY_BASE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 pub fn install(dependencies: bool) -> bool {
@@ -167,6 +168,13 @@ pub fn install(dependencies: bool) -> bool {
     {
         RECOVERY_BASE.store(game::text_base(), Ordering::Release);
     }
+    let special_table = installed
+        && crate::runtime::seams::seam_install::gate(
+            "edge_juggle",
+            &["edge_juggle.special_height", "edge_juggle.special_length"],
+            false,
+        );
+    SPECIAL_TABLE.store(special_table, Ordering::Release);
     INSTALLED.store(installed, Ordering::Release);
     installed
 }
@@ -546,6 +554,7 @@ unsafe fn route_guide(
     air: AirPhysics,
     pos: [f32; 2],
     speed: [f32; 2],
+    special: Option<perfect::SpecialReach>,
 ) -> Option<RecoveryGuide> {
     let [left, right] = run.stage.ledges;
     let [cam_l, cam_r, cam_top, cam_bottom] = natives::camera_limit_range()?;
@@ -562,6 +571,8 @@ unsafe fn route_guide(
     } else {
         air.jump_speed.powi(2) / (2.0 * air.gravity)
     };
+    let [special_horizontal, special_rise] =
+        special.map_or([0.0; 2], |reach| [reach.horizontal, reach.rise]);
     let facts = RouteFacts {
         position: pos,
         player,
@@ -573,8 +584,8 @@ unsafe fn route_guide(
         ledge_distance: body,
         fall_budget: air.terminal_speed,
         reach: [
-            air.horizontal_speed * 90.0,
-            (jump_rise + speed[1].max(0.0)).max(f32::EPSILON),
+            air.horizontal_speed * 90.0 + special_horizontal,
+            (jump_rise + special_rise + speed[1].max(0.0)).max(f32::EPSILON),
         ],
     };
     let [near, high, low, opposite] = perfect::possible_routes(&facts);
@@ -621,7 +632,7 @@ unsafe fn player_in_lag(accessor: usize) -> bool {
 }
 
 /// The AI epilogue owns the AI and its current self snapshot for this call.
-unsafe fn last_dodge_reach(ai: usize, cpu: usize) -> Option<perfect::DodgeReach> {
+unsafe fn recovery_snapshot(ai: usize) -> Option<(usize, bool)> {
     use crate::engine::seams::native_fields as field;
     let base = RECOVERY_BASE.load(Ordering::Acquire);
     if base == 0 {
@@ -630,13 +641,32 @@ unsafe fn last_dodge_reach(ai: usize, cpu: usize) -> Option<perfect::DodgeReach>
     let snapshot = field::child(ai, 0x168)?;
     let available: extern "C" fn(usize, u32) -> bool =
         std::mem::transmute(base + 0x358c20);
-    if available(snapshot, 0) {
+    Some((snapshot, available(snapshot, 0)))
+}
+
+unsafe fn special_reach(ai: usize, snapshot: usize) -> Option<perfect::SpecialReach> {
+    use crate::engine::seams::native_fields as field;
+    if !SPECIAL_TABLE.load(Ordering::Acquire) {
         return None;
     }
+    let variant = field::read_unchecked::<i32>(snapshot, 0x240);
+    if !(0..=3).contains(&variant) {
+        return None;
+    }
+    let at = variant as usize * std::mem::size_of::<f32>();
+    let reach = perfect::SpecialReach {
+        horizontal: field::read_unchecked(ai, 0xae0 + at),
+        rise: field::read_unchecked(ai, 0xad0 + at),
+    };
+    reach.valid().then_some(reach)
+}
+
+unsafe fn last_dodge_reach(snapshot: usize, cpu: usize) -> perfect::DodgeReach {
+    use crate::engine::seams::native_fields as field;
     let distance = field::read_unchecked::<f32>(snapshot, 0x230)
         * natives::get_param_float(cpu, 0x1d_fb01_ad43, 0);
     let cancel_frames = field::read_unchecked(snapshot, 0x234);
-    Some(perfect::DodgeReach { distance, cancel_frames })
+    perfect::DodgeReach { distance, cancel_frames }
 }
 
 unsafe fn recovery_pad(
@@ -657,9 +687,18 @@ unsafe fn recovery_pad(
         return Correction::default();
     };
     let speed = [vx, vy];
+    let jumps = remaining_jumps(cpu);
+    let recovery = if run.plan_pending || jumps == Some(0) {
+        recovery_snapshot(ai)
+    } else {
+        None
+    };
+    let special = recovery.and_then(|(snapshot, available)| {
+        if available { special_reach(ai, snapshot) } else { None }
+    });
     if run.plan_pending {
         run.plan_pending = false;
-        run.guide = route_guide(run, p1, cpu, physics, pos, speed);
+        run.guide = route_guide(run, p1, cpu, physics, pos, speed, special);
     }
     let attack = buttons & perfect::ATTACK != 0;
     let can_punish = attack && player_in_lag(p1);
@@ -716,15 +755,29 @@ unsafe fn recovery_pad(
         run.jump_timing = JumpTiming::default();
         return Correction::default();
     };
-    if buttons & !(perfect::GUARD | perfect::FLICK_JUMP) == 0
-        && !can_jump
-        && remaining_jumps(cpu) == Some(0)
-    {
-        let escape = konst(C::TermContEscapeAir);
-        if escape != UNRESOLVED && natives::is_enable_transition_term(cpu, escape) {
-            if let Some(reach) = last_dodge_reach(ai, cpu) {
-                let coasts = physics.reaches_with_jump(pos, speed, ledge, u8::MAX, run.stage.blast()[3]);
+    if !can_jump && jumps == Some(0) {
+        let bottom = run.stage.blast()[3];
+        let coasts = physics.reaches_with_jump(pos, speed, ledge, u8::MAX, bottom);
+        if let Some((snapshot, false)) = recovery {
+            let escape = konst(C::TermContEscapeAir);
+            if buttons & !(perfect::GUARD | perfect::FLICK_JUMP) == 0
+                && escape != UNRESOLVED
+                && natives::is_enable_transition_term(cpu, escape)
+            {
+                let reach = last_dodge_reach(snapshot, cpu);
                 let pad = perfect::distance_dodge(pos, ledge, reach, true, coasts);
+                if pad != Correction::default() {
+                    return pad;
+                }
+            }
+        } else if let Some(reach) = special
+            && !coasts
+            && buttons & !perfect::FLICK_JUMP == 0
+        {
+            let term = konst(C::TermContSpecialHi);
+            if term != UNRESOLVED && natives::is_enable_transition_term(cpu, term) {
+                let next = [pos[0] + vx, pos[1] + vy];
+                let pad = reach.timed_input(pos, next, ledge);
                 if pad != Correction::default() {
                     return pad;
                 }

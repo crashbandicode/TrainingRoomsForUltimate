@@ -429,6 +429,43 @@ pub struct Correction {
 }
 
 pub const ATTACK: u32 = 0x1;
+pub const SPECIAL: u32 = 0x2;
+
+#[derive(Clone, Copy)]
+pub struct SpecialReach {
+    pub horizontal: f32,
+    pub rise: f32,
+}
+
+impl SpecialReach {
+    pub fn valid(self) -> bool {
+        self.horizontal.is_finite() && self.horizontal >= 0.0
+            && self.rise.is_finite() && self.rise > 0.0
+    }
+
+    pub fn reaches(self, position: Point, target: Point) -> bool {
+        self.valid()
+            && (target[0] - position[0]).abs() <= self.horizontal
+            && target[1] - position[1] <= self.rise
+    }
+
+    /// Spend the special on the last actionable frame before the target moves
+    /// out of the fighter's native two-axis envelope.
+    pub fn timed_input(self, position: Point, next: Point, target: Point) -> Correction {
+        if self.reaches(position, target)
+            && next.into_iter().all(f32::is_finite)
+            && !self.reaches(next, target)
+        {
+            return Correction {
+                stick: Some([0.0, 1.0]),
+                press: SPECIAL,
+                ..Correction::default()
+            };
+        }
+        Correction::default()
+    }
+}
+
 
 pub fn avoid_detour(buttons: u32, can_recover: bool, player_in_lag: bool, direction: f32) -> Correction {
     if !can_recover || player_in_lag || buttons & ATTACK == 0 || !direction.is_finite() {
