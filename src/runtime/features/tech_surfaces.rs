@@ -380,8 +380,8 @@ pub(super) unsafe fn training_blast_bounds() -> Option<[f32; 4]> {
 }
 
 struct FrameOutlineReader;
-impl Source for FrameOutlineReader {
-    fn read(&mut self, id: usize) -> Option<Line> {
+impl FrameOutlineReader {
+    fn frame_read_line(&mut self, id: usize) -> Option<Line> {
         // The id is a borrowed line from the guarded no-cull ray or its
         // checked next-line call. This reader is confined to one native pass.
         let aligned = |address: usize| address >= 0x10000 && address & 7 == 0 && address >> 47 == 0;
@@ -408,9 +408,9 @@ impl Source for FrameOutlineReader {
         }
     }
 
-    fn next(&mut self, line: Line, end: usize) -> Option<(usize, usize)> {
+    fn frame_next_line(&mut self, line: Line, end: usize) -> Option<(usize, usize)> {
         let shared = *line.ends.get(end)?;
-        if self.read(line.id)? != line {
+        if self.frame_read_line(line.id)? != line {
             return None;
         }
         unsafe {
@@ -418,9 +418,19 @@ impl Source for FrameOutlineReader {
             let call: extern "C" fn(usize, *const NativePoint) -> usize =
                 std::mem::transmute(game::text_base() + NEXT);
             let id = call(line.id, &NativePoint([shared.x, shared.y, 0.0, 0.0]));
-            let next = self.read(id)?;
+            let next = self.frame_read_line(id)?;
             far_end(shared, next).map(|end| (id, end))
         }
+    }
+}
+
+impl Source for FrameOutlineReader {
+    fn read(&mut self, id: usize) -> Option<Line> {
+        self.frame_read_line(id)
+    }
+
+    fn next(&mut self, line: Line, end: usize) -> Option<(usize, usize)> {
+        self.frame_next_line(line, end)
     }
 }
 

@@ -45,7 +45,11 @@ pub enum Difficulty {
 
 impl Difficulty {
     pub const fn from_option(option: usize) -> Self {
-        if option == 1 { Self::Perfect } else { Self::LevelNine }
+        if option == 1 {
+            Self::Perfect
+        } else {
+            Self::LevelNine
+        }
     }
 }
 
@@ -82,10 +86,14 @@ pub struct DifficultyRows {
 }
 
 pub const EDGE_ROWS: DifficultyRows = DifficultyRows {
-    difficulty: "edge_difficulty", reaction: "edge_reaction", frames: "edge_reaction_frames",
+    difficulty: "edge_difficulty",
+    reaction: "edge_reaction",
+    frames: "edge_reaction_frames",
 };
 pub const JUGGLE_ROWS: DifficultyRows = DifficultyRows {
-    difficulty: "juggle_difficulty", reaction: "juggle_reaction", frames: "juggle_reaction_frames",
+    difficulty: "juggle_difficulty",
+    reaction: "juggle_reaction",
+    frames: "juggle_reaction_frames",
 };
 
 impl Drill {
@@ -98,7 +106,9 @@ impl Drill {
 }
 
 pub fn reaction_rows(id: &str) -> Option<&'static DifficultyRows> {
-    [&EDGE_ROWS, &JUGGLE_ROWS].into_iter().find(|rows| rows.reaction == id)
+    [&EDGE_ROWS, &JUGGLE_ROWS]
+        .into_iter()
+        .find(|rows| rows.reaction == id)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -307,6 +317,10 @@ pub struct Stage {
 }
 
 impl Stage {
+    pub const fn blast(self) -> [f32; 4] {
+        self.blast
+    }
+
     pub fn new(blast: [f32; 4], camera: [f32; 4], ledges: [[f32; 2]; 2]) -> Option<Self> {
         let [left, right, top, bottom] = blast;
         let [[lx, ly], [rx, ry]] = ledges;

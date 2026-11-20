@@ -12,7 +12,10 @@ pub struct Outline {
 
 impl Outline {
     pub const fn new() -> Self {
-        Self { segments: [[[0.0; 2]; 2]; 64], len: 0 }
+        Self {
+            segments: [[[0.0; 2]; 2]; 64],
+            len: 0,
+        }
     }
 
     pub fn add(&mut self, segment: Segment) {
@@ -43,9 +46,21 @@ pub fn corridor(
     fall_budget: f32,
 ) -> Option<[f32; 2]> {
     let [[left, left_y], [right, right_y]] = ledges;
-    if ![left, left_y, right, right_y, blast_bottom, body_clearance, fall_budget]
-        .into_iter().all(f32::is_finite)
-        || left >= right || body_clearance <= 0.0 || fall_budget < 0.0 || outline.is_empty()
+    if ![
+        left,
+        left_y,
+        right,
+        right_y,
+        blast_bottom,
+        body_clearance,
+        fall_budget,
+    ]
+    .into_iter()
+    .all(f32::is_finite)
+        || left >= right
+        || body_clearance <= 0.0
+        || fall_budget < 0.0
+        || outline.is_empty()
     {
         return None;
     }
@@ -84,17 +99,71 @@ pub struct AirPhysics {
 
 impl AirPhysics {
     pub fn valid(self) -> bool {
-        [self.horizontal_speed, self.horizontal_acceleration, self.gravity,
-            self.terminal_speed, self.jump_speed]
-            .into_iter().all(|value| value.is_finite() && value > 0.0)
+        [
+            self.horizontal_speed,
+            self.horizontal_acceleration,
+            self.gravity,
+            self.terminal_speed,
+            self.jump_speed,
+        ]
+        .into_iter()
+        .all(|value| value.is_finite() && value > 0.0)
+    }
+
+    /// Coast through the collision corridor, then use a remaining jump on
+    /// the far side. A fighter must clear the lip before spending that jump.
+    pub fn crossing(self, from: Point, speed: Point, exit: Point, band: Point, jumps: u8) -> bool {
+        if jumps == 0
+            || !self.valid()
+            || !from
+                .into_iter()
+                .chain(speed)
+                .chain(exit)
+                .chain(band)
+                .all(f32::is_finite)
+        {
+            return false;
+        }
+        let [bottom, top] = band;
+        let direction = (exit[0] - from[0]).signum();
+        let mut distance = (exit[0] - from[0]).abs();
+        let [mut vx, mut vy] = [speed[0] * direction, speed[1]];
+        let mut y = from[1];
+        for _ in 0..90 {
+            if y <= bottom || y >= top {
+                return false;
+            }
+            vx = (vx + self.horizontal_acceleration).min(self.horizontal_speed);
+            vy = (vy - self.gravity).max(-self.terminal_speed);
+            distance -= vx;
+            y += vy;
+            if distance <= 0.0 && bottom < y && y < top {
+                let apex_time = (self.jump_speed / self.gravity).floor().clamp(1.0, 90.0);
+                let gain = apex_time * (self.jump_speed - self.gravity * (apex_time + 1.0) * 0.5);
+                return y + gain >= exit[1];
+            }
+        }
+        false
     }
 
     /// Drift towards the near ledge, preserving the native drift velocity,
     /// then spend the remaining jump. Stop at the first crossing of ledge x.
     pub fn reaches_with_jump(
-        self, from: Point, speed: Point, ledge: Point, delay: u8, blast_bottom: f32,
+        self,
+        from: Point,
+        speed: Point,
+        ledge: Point,
+        delay: u8,
+        blast_bottom: f32,
     ) -> bool {
-        if !self.valid() || !from.into_iter().chain(speed).chain(ledge).chain([blast_bottom]).all(f32::is_finite) {
+        if !self.valid()
+            || !from
+                .into_iter()
+                .chain(speed)
+                .chain(ledge)
+                .chain([blast_bottom])
+                .all(f32::is_finite)
+        {
             return false;
         }
         let direction = (ledge[0] - from[0]).signum();
@@ -191,9 +260,14 @@ impl RouteFacts<'_> {
         let mut ascent = 0.0;
         let mut threat = 0;
         for &to in &waypoints[..count] {
-            if !(left < to[0] && to[0] < right && bottom < to[1]
+            if !(left < to[0]
+                && to[0] < right
+                && bottom < to[1]
                 && to[1] + self.body_clearance < top)
-                || self.outline.iter().any(|&line| blocked([from, to], line, self.body_clearance))
+                || self
+                    .outline
+                    .iter()
+                    .any(|&line| blocked([from, to], line, self.body_clearance))
             {
                 return None;
             }
@@ -208,7 +282,12 @@ impl RouteFacts<'_> {
         }
         let travel = horizontal / self.reach[0] + ascent / self.reach[1];
         let weight = (16.0 / (1.0 + travel + f32::from(threat) * 2.0)).max(1.0) as u16;
-        Some(Plan { route, waypoints, count, weight })
+        Some(Plan {
+            route,
+            waypoints,
+            count,
+            weight,
+        })
     }
 }
 
@@ -216,11 +295,19 @@ pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 4] {
     let [left, right] = facts.ledges;
     let clearance = facts.body_clearance;
     let offset = facts.ledge_distance;
-    if !facts.position.into_iter().chain(facts.player).chain(facts.ledges.into_iter().flatten())
-        .chain(facts.blast).chain(facts.reach).chain([clearance, offset, facts.player_reach])
+    if !facts
+        .position
+        .into_iter()
+        .chain(facts.player)
+        .chain(facts.ledges.into_iter().flatten())
+        .chain(facts.blast)
+        .chain(facts.reach)
+        .chain([clearance, offset, facts.player_reach])
         .chain(facts.outline.iter().flatten().flatten().copied())
         .all(f32::is_finite)
-        || clearance <= 0.0 || offset <= 0.0 || left[0] >= right[0]
+        || clearance <= 0.0
+        || offset <= 0.0
+        || left[0] >= right[0]
         || facts.reach.into_iter().any(|value| value <= 0.0)
         || facts.outline.is_empty()
     {
@@ -238,21 +325,35 @@ pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 4] {
     let finish = [outside, near[1]];
     let near_plan = facts.candidate(Route::Near, [finish; 3], 1);
     let high_plan = facts.candidate(
-        Route::High, [[outside, high], [near[0].midpoint(other[0]), high], [0.0; 2]], 2,
+        Route::High,
+        [
+            [outside, high],
+            [near[0].midpoint(other[0]), high],
+            [0.0; 2],
+        ],
+        2,
     );
     let late_plan = facts.candidate(Route::LateLow, [[outside, low], finish, [0.0; 2]], 2);
-    let near_covered = (facts.player[0] - near[0]).hypot(facts.player[1] - near[1]) <= facts.player_reach;
-    let other_covered = (facts.player[0] - other[0]).hypot(facts.player[1] - other[1]) <= facts.player_reach;
+    let near_covered =
+        (facts.player[0] - near[0]).hypot(facts.player[1] - near[1]) <= facts.player_reach;
+    let other_covered =
+        (facts.player[0] - other[0]).hypot(facts.player[1] - other[1]) <= facts.player_reach;
     let opposite = if !other_covered && (near_plan.is_none() || near_covered) {
-        corridor(facts.outline, facts.ledges, facts.blast[3], clearance, facts.fall_budget)
-            .and_then(|[bottom, top]| {
-                let crossing = facts.position[1].clamp(bottom, top.next_down().max(bottom));
-                facts.candidate(
-                    Route::Opposite,
-                    [[outside, crossing], [exit, crossing], [exit, other[1]]],
-                    3,
-                )
-            })
+        corridor(
+            facts.outline,
+            facts.ledges,
+            facts.blast[3],
+            clearance,
+            facts.fall_budget,
+        )
+        .and_then(|[bottom, top]| {
+            let crossing = facts.position[1].clamp(bottom, top.next_down().max(bottom));
+            facts.candidate(
+                Route::Opposite,
+                [[outside, crossing], [exit, crossing], [exit, other[1]]],
+                3,
+            )
+        })
     } else {
         None
     };
@@ -262,8 +363,18 @@ pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 4] {
 /// Weighted selection among feasible options, reducing the weight of the last
 /// route. The draw comes from the plugin's own RNG.
 pub fn choose_route(options: [Option<Plan>; 4], last: Option<Route>, draw: u32) -> Option<Plan> {
-    let weight = |plan: Plan| if Some(plan.route) == last { plan.weight.div_ceil(2) } else { plan.weight };
-    let total: u32 = options.iter().flatten().map(|&plan| u32::from(weight(plan))).sum();
+    let weight = |plan: Plan| {
+        if Some(plan.route) == last {
+            plan.weight.div_ceil(2)
+        } else {
+            plan.weight
+        }
+    };
+    let total: u32 = options
+        .iter()
+        .flatten()
+        .map(|&plan| u32::from(weight(plan)))
+        .sum();
     if total == 0 {
         return None;
     }
@@ -300,7 +411,11 @@ impl JumpTiming {
     }
 
     pub fn step(
-        &mut self, buttons: u32, can_jump: bool, delay: u8, within_reach: impl FnOnce(u8) -> bool,
+        &mut self,
+        buttons: u32,
+        can_jump: bool,
+        delay: u8,
+        within_reach: impl FnOnce(u8) -> bool,
     ) -> Correction {
         if !can_jump || buttons & !(JUMP | FLICK_JUMP) != 0 {
             self.pending = None;
@@ -335,8 +450,13 @@ pub struct ThreatClock {
 
 impl ThreatClock {
     pub fn observe(
-        &mut self, attack: Option<u64>, frame: u32, reaction: u8, contact: bool,
-        can_dodge: bool, buttons: u32,
+        &mut self,
+        attack: Option<u64>,
+        frame: u32,
+        reaction: u8,
+        contact: bool,
+        can_dodge: bool,
+        buttons: u32,
     ) -> Correction {
         if self.attack != attack {
             // Input can precede the first attack-motion sample by one or more frames.
@@ -352,9 +472,15 @@ impl ThreatClock {
                 return Correction::default();
             }
             self.dodged = true;
-            return Correction { press: GUARD, ..Correction::default() };
+            return Correction {
+                press: GUARD,
+                ..Correction::default()
+            };
         }
-        Correction { release: buttons & GUARD, ..Correction::default() }
+        Correction {
+            release: buttons & GUARD,
+            ..Correction::default()
+        }
     }
 }
 
@@ -376,14 +502,25 @@ impl Capsule {
         let (uu, vv, uv) = (dot(u, u), dot(v, v), dot(u, v));
         let (uw, vw) = (dot(u, w), dot(v, w));
         let det = uu * vv - uv * uv;
-        let mut t = if det > 0.0 { ((uv * vw - vv * uw) / det).clamp(0.0, 1.0) } else { 0.0 };
-        let s = if vv > 0.0 { ((uv * t + vw) / vv).clamp(0.0, 1.0) } else { 0.0 };
+        let mut t = if det > 0.0 {
+            ((uv * vw - vv * uw) / det).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let s = if vv > 0.0 {
+            ((uv * t + vw) / vv).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         if uu > 0.0 {
             t = ((uv * s - uw) / uu).clamp(0.0, 1.0);
         }
         let delta = [0, 1, 2].map(|i| w[i] + t * u[i] - s * v[i]);
         let radius = self.radius + other.radius;
-        radius.is_finite() && self.radius > 0.0 && other.radius > 0.0 && dot(delta, delta) <= radius * radius
+        radius.is_finite()
+            && self.radius > 0.0
+            && other.radius > 0.0
+            && dot(delta, delta) <= radius * radius
     }
 }
 
@@ -397,7 +534,10 @@ impl MeteorBounce {
         let first = bounced && !self.active;
         self.active = bounced;
         if first && idle_player {
-            Correction { release: buttons & GUARD, ..Correction::default() }
+            Correction {
+                release: buttons & GUARD,
+                ..Correction::default()
+            }
         } else {
             Correction::default()
         }
@@ -406,9 +546,19 @@ impl MeteorBounce {
 
 /// Prefer the first projected blast boundary to any follow-up positioning.
 pub fn hit_recovery(
-    cpu: Point, player: Point, speed: Point, hitstun: f32, blast: [f32; 4],
+    cpu: Point,
+    player: Point,
+    speed: Point,
+    hitstun: f32,
+    blast: [f32; 4],
 ) -> Option<Point> {
-    if !cpu.into_iter().chain(player).chain(speed).chain(blast).chain([hitstun]).all(f32::is_finite)
+    if !cpu
+        .into_iter()
+        .chain(player)
+        .chain(speed)
+        .chain(blast)
+        .chain([hitstun])
+        .all(f32::is_finite)
         || hitstun < 0.0
     {
         return None;
@@ -416,15 +566,30 @@ pub fn hit_recovery(
     let [left, right, top, bottom] = blast;
     let [vx, vy] = speed;
     let crossing = |position: f32, speed: f32, low: f32, high: f32| {
-        if speed == 0.0 { f32::INFINITY }
-        else { (if speed > 0.0 { high - position } else { low - position }) / speed }
+        if speed == 0.0 {
+            f32::INFINITY
+        } else {
+            (if speed > 0.0 {
+                high - position
+            } else {
+                low - position
+            }) / speed
+        }
     };
     let x = crossing(cpu[0], vx, left, right);
     let y = crossing(cpu[1], vy, bottom, top);
-    let away = if cpu[0] == player[0] { 0.0 } else { (cpu[0] - player[0]).signum() };
-    Some(if x <= y && x <= hitstun { [-vx.signum(), 0.0] }
-    else if y <= hitstun { [0.0, -vy.signum()] }
-    else { [away, 0.0] })
+    let away = if cpu[0] == player[0] {
+        0.0
+    } else {
+        (cpu[0] - player[0]).signum()
+    };
+    Some(if x <= y && x <= hitstun {
+        [-vx.signum(), 0.0]
+    } else if y <= hitstun {
+        [0.0, -vy.signum()]
+    } else {
+        [away, 0.0]
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -440,10 +605,22 @@ pub struct LandingFacts {
 pub const FLICK_JUMP: u32 = 0x8000;
 
 pub fn juggle_drift(facts: LandingFacts, draw: u32) -> Correction {
-    let LandingFacts { cpu, player, main_floor: [left, right], stock_stick_y, stock_buttons } = facts;
-    if stock_buttons & !FLICK_JUMP != 0 || cpu[1] <= player[1]
-        || cpu[0] <= left || cpu[0] >= right
-        || !cpu.into_iter().chain(player).chain([left, right, stock_stick_y]).all(f32::is_finite)
+    let LandingFacts {
+        cpu,
+        player,
+        main_floor: [left, right],
+        stock_stick_y,
+        stock_buttons,
+    } = facts;
+    if stock_buttons & !FLICK_JUMP != 0
+        || cpu[1] <= player[1]
+        || cpu[0] <= left
+        || cpu[0] >= right
+        || !cpu
+            .into_iter()
+            .chain(player)
+            .chain([left, right, stock_stick_y])
+            .all(f32::is_finite)
     {
         return Correction::default();
     }
@@ -454,7 +631,10 @@ pub fn juggle_drift(facts: LandingFacts, draw: u32) -> Correction {
         4 => 0.0,
         _ => return Correction::default(),
     };
-    Correction { stick: Some([x, stock_stick_y]), ..Correction::default() }
+    Correction {
+        stick: Some([x, stock_stick_y]),
+        ..Correction::default()
+    }
 }
 
 #[cfg(test)]
@@ -480,11 +660,11 @@ mod tests {
         let air = AirPhysics { horizontal_speed: 2., horizontal_acceleration: 0.2,
             gravity: 0.1, terminal_speed: 2., jump_speed: 3. };
         let band = [-70., -8.];
-        assert!(air.crossing([-15., -15.], [2., 0.], [15., 0.], band, 1.));
-        assert!(!air.crossing([-15., -65.], [2., -2.], [15., 0.], band, 1.));
-        assert!(!air.crossing([-15., -15.], [2., 2.], [15., 0.], band, 1.));
-        assert!(!air.crossing([-65., -40.], [2., 0.], [65., 0.], band, 1.));
-        assert!(!air.crossing([-15., -15.], [2., 0.], [15., 0.], band, 0.));
+        assert!(air.crossing([-15., -15.], [2., 0.], [15., 0.], band, 1));
+        assert!(!air.crossing([-15., -65.], [2., -2.], [15., 0.], band, 1));
+        assert!(!air.crossing([-15., -15.], [2., 2.], [15., 0.], band, 1));
+        assert!(!air.crossing([-65., -40.], [2., 0.], [65., 0.], band, 1));
+        assert!(!air.crossing([-15., -15.], [2., 0.], [15., 0.], band, 0));
     }
 
     #[test]

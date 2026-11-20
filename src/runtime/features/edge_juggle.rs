@@ -6,10 +6,17 @@ use hos_lock::{Mutex, Published};
 
 use super::{cpu::konst, mashout::FloorRay, notices, practice, recorder, states};
 use crate::model::chords::{field, logical as key, Sample};
-use crate::model::cpu::{ids::{C, UNRESOLVED}, rng::Rng};
-use crate::model::edge_juggle::perfect::{self, AirPhysics, Correction, JumpTiming, LandingFacts, MeteorBounce, ThreatClock};
+use crate::model::cpu::{
+    ids::{C, UNRESOLVED},
+    rng::Rng,
+};
+use crate::model::edge_juggle::perfect::{
+    self, AirPhysics, Correction, JumpTiming, LandingFacts, MeteorBounce, Route, RouteFacts,
+    ThreatClock,
+};
 use crate::model::edge_juggle::{
-    Difficulty, Drill, Observation, Outcome, Phase, Reaction, Session, Setup, Stage, Wizard, WizardStep,
+    Difficulty, Drill, Observation, Outcome, Phase, Reaction, Session, Setup, Stage, Wizard,
+    WizardStep,
 };
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::practice_games::best_time;
@@ -83,7 +90,11 @@ struct Run {
     damage_stop: bool,
     landing_draw: u32,
     jump_delay: u8,
+    route_draw: u32,
     jump_timing: JumpTiming,
+    plan_pending: bool,
+    last_route: Option<Route>,
+    guide: Option<RecoveryGuide>,
     last_cpu_status: i32,
     bounce: MeteorBounce,
     sdi_start: Option<u32>,
@@ -91,6 +102,18 @@ struct Run {
     placement: Placement,
     notice: FixedPath<128>,
 }
+#[derive(Clone, Copy)]
+enum RecoveryGuide {
+    High {
+        goal: [f32; 2],
+    },
+    Cross {
+        exit: [f32; 2],
+        dir: f32,
+        band: [f32; 2],
+    },
+}
+
 /// Equality tokens from the current entry. Only a fresh body may be accessed.
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct CpuBody {
@@ -136,9 +159,8 @@ pub fn publish(snapshot: &Snapshot) {
         edge_percent: select("edge_cpu_percent").min(300) as u16,
         edge_limit: limit("edge_attempts"),
         juggle_limit: limit("juggle_attempts"),
-        difficulty: [Drill::GuardEdge, Drill::Juggler].map(|drill| {
-            Difficulty::from_option(select(drill.difficulty_rows().difficulty))
-        }),
+        difficulty: [Drill::GuardEdge, Drill::Juggler]
+            .map(|drill| Difficulty::from_option(select(drill.difficulty_rows().difficulty))),
         reaction: [Drill::GuardEdge, Drill::Juggler].map(|drill| {
             let rows = drill.difficulty_rows();
             Reaction::from_settings(select(rows.reaction), select(rows.frames))
@@ -207,14 +229,22 @@ pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Corr
         return Correction::default();
     };
     let Some(run) = engine.run.as_mut().filter(|run| {
-        run.difficulty == Difficulty::Perfect && run.rounds.phase == Phase::Live
+        run.difficulty == Difficulty::Perfect
+            && run.rounds.phase == Phase::Live
             && run.wizard.is_none()
     }) else {
         return Correction::default();
     };
     use crate::model::sites_pkg2 as sites;
-    if run.body.accessor != accessor || natives::battle_object_id(accessor) != run.body.object_id
-        || ![sites::STATUS_KIND_OFFSET, sites::POS_X_OFFSET, sites::POS_Y_OFFSET].into_iter().all(game::granted)
+    if run.body.accessor != accessor
+        || natives::battle_object_id(accessor) != run.body.object_id
+        || ![
+            sites::STATUS_KIND_OFFSET,
+            sites::POS_X_OFFSET,
+            sites::POS_Y_OFFSET,
+        ]
+        .into_iter()
+        .all(game::granted)
     {
         return Correction::default();
     }
@@ -225,22 +255,30 @@ pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Corr
     if run.drill == Drill::Juggler && status != UNRESOLVED {
         let reflect = konst(C::StatusDamageFlyReflectD);
         let previous = std::mem::replace(&mut run.last_cpu_status, status);
-        let bounce = status == reflect && [konst(C::StatusDamageFlyMeteor), reflect].contains(&previous)
+        let bounce = status == reflect
+            && [konst(C::StatusDamageFlyMeteor), reflect].contains(&previous)
             && previous != UNRESOLVED;
-        let correction = run.bounce.step(bounce, natives::status_kind(p1) == konst(C::StatusWait) && P1_BUTTONS.load(Ordering::Acquire) == 0, buttons);
+        let correction = run.bounce.step(
+            bounce,
+            natives::status_kind(p1) == konst(C::StatusWait)
+                && P1_BUTTONS.load(Ordering::Acquire) == 0,
+            buttons,
+        );
         if correction != Correction::default() {
             return correction;
         }
     }
     let falling = status != UNRESOLVED
-        && [C::StatusFall, C::StatusFallAerial, C::StatusDamageFall].map(konst).contains(&status);
+        && [C::StatusFall, C::StatusFallAerial, C::StatusDamageFall]
+            .map(konst)
+            .contains(&status);
     let position = [natives::pos_x(accessor), natives::pos_y(accessor)];
     if run.drill == Drill::GuardEdge {
-        if !falling {
+        if !falling && status != konst(C::StatusJumpAerial) {
             run.jump_timing = JumpTiming::default();
             return Correction::default();
         }
-        return recovery_jump(run, accessor, position, buttons, stick_y);
+        return recovery_pad(run, p1, accessor, position, buttons, stick_y);
     }
     let correction = air_hit_recovery(run, p1, accessor, position, status);
     if correction != Correction::default() {
@@ -260,21 +298,40 @@ pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Corr
     if !falling {
         return Correction::default();
     }
-    perfect::juggle_drift(LandingFacts {
-        cpu: position,
-        player: [natives::pos_x(p1), natives::pos_y(p1)],
-        main_floor: run.stage.ledges.map(|point| point[0]),
-        stock_stick_y: stick_y,
-        stock_buttons: buttons,
-    }, run.landing_draw)
+    perfect::juggle_drift(
+        LandingFacts {
+            cpu: position,
+            player: [natives::pos_x(p1), natives::pos_y(p1)],
+            main_floor: run.stage.ledges.map(|point| point[0]),
+            stock_stick_y: stick_y,
+            stock_buttons: buttons,
+        },
+        run.landing_draw,
+    )
 }
 
-unsafe fn air_hit_recovery(run: &mut Run, p1: usize, cpu: usize, position: [f32; 2], status: i32) -> Correction {
-    use crate::model::cpu::{defence::{self, direction}, settings::Strength};
+unsafe fn air_hit_recovery(
+    run: &mut Run,
+    p1: usize,
+    cpu: usize,
+    position: [f32; 2],
+    status: i32,
+) -> Correction {
+    use crate::model::cpu::{
+        defence::{self, direction},
+        settings::Strength,
+    };
     let hitlag = natives::tech_in_damage_stop(cpu) == Some(true);
-    let damage = [C::StatusDamage, C::StatusDamageFly, C::StatusDamageFlyRoll,
-        C::StatusDamageFlyMeteor, C::StatusDamageFlyReflectD, C::StatusDamageFlyReflectLr,
-        C::StatusDamageFlyReflectU, C::StatusDamageFall];
+    let damage = [
+        C::StatusDamage,
+        C::StatusDamageFly,
+        C::StatusDamageFlyRoll,
+        C::StatusDamageFlyMeteor,
+        C::StatusDamageFlyReflectD,
+        C::StatusDamageFlyReflectLr,
+        C::StatusDamageFlyReflectU,
+        C::StatusDamageFall,
+    ];
     if !hitlag {
         run.sdi_start = None;
     }
@@ -288,11 +345,17 @@ unsafe fn air_hit_recovery(run: &mut Run, p1: usize, cpu: usize, position: [f32;
     let (x, y) = super::recording_host::fighter_speed(cpu).unwrap_or_default();
     let player = [natives::pos_x(p1), natives::pos_y(p1)];
     let reaction = konst(C::WorkFloatDamageReactionFrames);
-    let frames = if reaction == UNRESOLVED { 0.0 } else { natives::get_float(cpu, reaction).max(0.0) };
+    let frames = if reaction == UNRESOLVED {
+        0.0
+    } else {
+        natives::get_float(cpu, reaction).max(0.0)
+    };
     if !hitlag && frames == 0.0 {
         return Correction::default();
     }
-    let Some([stick_x, stick_y]) = perfect::hit_recovery(position, player, [x, y], frames, run.stage.blast) else {
+    let Some([stick_x, stick_y]) =
+        perfect::hit_recovery(position, player, [x, y], frames, run.stage.blast())
+    else {
         return Correction::default();
     };
     let mut dir = match [stick_x, stick_y] {
@@ -310,20 +373,37 @@ unsafe fn air_hit_recovery(run: &mut Run, p1: usize, cpu: usize, position: [f32;
         }
     }
     let (x, y) = defence::stick_vector(dir, player[0], position[0]);
-    Correction { stick: Some([x, y]), ..Correction::default() }
+    Correction {
+        stick: Some([x, y]),
+        ..Correction::default()
+    }
 }
 
 unsafe fn landing_dodge(run: &mut Run, p1: usize, cpu: usize, buttons: u32) -> Correction {
     const ATTACK_INPUT: u64 = u64::MAX;
     let input = P1_BUTTONS.load(Ordering::Acquire);
-    let attacks = [C::StatusAttack, C::StatusAttackDash, C::StatusAttackS3, C::StatusAttackHi3,
-        C::StatusAttackLw3, C::StatusAttackAir, C::StatusAttackHi4Start,
-        C::StatusAttackLw4Start, C::StatusAttackS4Start,
-        C::StatusAttackHi4, C::StatusAttackLw4, C::StatusAttackS4,
-        C::StatusSpecialN, C::StatusSpecialS, C::StatusSpecialHi, C::StatusSpecialLw];
+    let attacks = [
+        C::StatusAttack,
+        C::StatusAttackDash,
+        C::StatusAttackS3,
+        C::StatusAttackHi3,
+        C::StatusAttackLw3,
+        C::StatusAttackAir,
+        C::StatusAttackHi4Start,
+        C::StatusAttackLw4Start,
+        C::StatusAttackS4Start,
+        C::StatusAttackHi4,
+        C::StatusAttackLw4,
+        C::StatusAttackS4,
+        C::StatusSpecialN,
+        C::StatusSpecialS,
+        C::StatusSpecialHi,
+        C::StatusSpecialLw,
+    ];
     let status = natives::status_kind(p1);
     let motion = (status != UNRESOLVED && attacks.map(konst).contains(&status))
-        .then(|| natives::motion_kind(p1)).filter(|&motion| motion != 0);
+        .then(|| natives::motion_kind(p1))
+        .filter(|&motion| motion != 0);
     let attack = motion.or_else(|| (input & 3 != 0).then_some(ATTACK_INPUT));
     if attack.is_none() && status != konst(C::StatusWait) {
         run.threat = ThreatClock::default();
@@ -341,7 +421,14 @@ unsafe fn landing_dodge(run: &mut Run, p1: usize, cpu: usize, buttons: u32) -> C
     } else {
         false
     };
-    run.threat.observe(attack, run.rounds.frames, run.reaction.frames(), contact, can_dodge, buttons)
+    run.threat.observe(
+        attack,
+        run.rounds.frames,
+        run.reaction.frames(),
+        contact,
+        can_dodge,
+        buttons,
+    )
 }
 
 unsafe fn air_physics(cpu: usize) -> AirPhysics {
@@ -356,26 +443,162 @@ unsafe fn air_physics(cpu: usize) -> AirPhysics {
     }
 }
 
-unsafe fn recovery_jump(
-    run: &mut Run, cpu: usize, pos: [f32; 2], buttons: u32, stick_y: f32,
-) -> Correction {
+unsafe fn remaining_jumps(cpu: usize) -> u8 {
+    use crate::model::hash40::hash40;
+    let id = konst(C::WorkIntJumpCount);
+    if id == UNRESOLVED || !game::granted(crate::model::sites_pkg2::WORK_GET_INT_OFFSET) {
+        return 0;
+    }
+    let max = state::get_param_int(cpu, hash40("jump_count_max"), 0);
+    let spent = natives::get_int(cpu, id);
+    u8::try_from(max.saturating_sub(spent)).unwrap_or_default()
+}
+
+unsafe fn body_top(fighter: usize, foot: f32) -> Option<f32> {
+    let mut highest = foot;
+    super::hitbox::fighter_hurt_capsules(fighter, |part, _| {
+        highest = highest.max(part.ends[0][1].max(part.ends[1][1]) + part.radius);
+    });
+    (highest.is_finite() && highest > foot).then_some(highest - foot)
+}
+
+unsafe fn route_guide(
+    run: &mut Run,
+    p1: usize,
+    cpu: usize,
+    air: AirPhysics,
+    pos: [f32; 2],
+    speed: [f32; 2],
+) -> Option<RecoveryGuide> {
     let [left, right] = run.stage.ledges;
-    let ledge = if pos[0] < left[0] { left } else if pos[0] > right[0] {
+    let [cam_l, cam_r, cam_top, cam_bottom] = natives::camera_limit_range()?;
+    let ray = FloorRay::new(p1)?;
+    let outline =
+        super::tech_surfaces::training_outline(&ray, cam_l.midpoint(cam_r), [cam_top, cam_bottom])?;
+    let player = [natives::pos_x(p1), natives::pos_y(p1)];
+    let player_reach = body_top(p1, player[1])?;
+    let body = body_top(cpu, pos[1])?;
+    let jumps = remaining_jumps(cpu);
+    let bottom = run.stage.blast()[3];
+    let jump_rise = if jumps == 0 {
+        0.0
+    } else {
+        air.jump_speed.powi(2) / (2.0 * air.gravity)
+    };
+    let facts = RouteFacts {
+        position: pos,
+        player,
+        player_reach,
+        ledges: [left, right],
+        blast: run.stage.blast(),
+        outline: outline.segments(),
+        body_clearance: body,
+        ledge_distance: body,
+        fall_budget: air.terminal_speed,
+        reach: [
+            air.horizontal_speed * 90.0,
+            (jump_rise + speed[1].max(0.0)).max(f32::EPSILON),
+        ],
+    };
+    let [near, high, low, opposite] = perfect::possible_routes(&facts);
+    let high = high.filter(|plan| air.reaches_with_jump(pos, speed, plan.waypoints[1], 90, bottom));
+    let band = perfect::corridor(facts.outline, facts.ledges, bottom, body, facts.fall_budget);
+    let opposite = opposite.filter(|plan| {
+        band.is_some_and(|band| air.crossing(pos, speed, plan.waypoints[2], band, jumps))
+    });
+    let plan = perfect::choose_route([near, high, low, opposite], run.last_route, run.route_draw)?;
+    run.last_route = Some(plan.route);
+    match plan.route {
+        Route::Opposite => {
+            let exit = plan.waypoints[2];
+            let dir = (exit[0] - pos[0]).signum();
+            Some(RecoveryGuide::Cross {
+                exit,
+                dir,
+                band: band?,
+            })
+        }
+        Route::High => Some(RecoveryGuide::High {
+            goal: plan.waypoints[1],
+        }),
+        Route::LateLow => {
+            run.jump_delay = run.jump_delay.max(1);
+            None
+        }
+        Route::Near => None,
+    }
+}
+
+unsafe fn recovery_pad(
+    run: &mut Run,
+    p1: usize,
+    cpu: usize,
+    pos: [f32; 2],
+    buttons: u32,
+    stick_y: f32,
+) -> Correction {
+    let jump = konst(C::TermContJumpAerial);
+    let can_jump = jump != UNRESOLVED && natives::is_enable_transition_term(cpu, jump);
+    let physics = air_physics(cpu);
+    let Some((vx, vy)) = super::recording_host::fighter_speed(cpu).filter(|_| physics.valid())
+    else {
+        run.jump_timing = JumpTiming::default();
+        return Correction::default();
+    };
+    let speed = [vx, vy];
+    if run.plan_pending {
+        run.plan_pending = false;
+        run.guide = route_guide(run, p1, cpu, physics, pos, speed);
+    }
+    if let Some(guide) = run.guide {
+        match guide {
+            RecoveryGuide::High { goal }
+                if physics.reaches_with_jump(pos, speed, goal, 90, run.stage.blast()[3]) =>
+            {
+                return Correction {
+                    stick: Some([(goal[0] - pos[0]).signum(), 0.0]),
+                    ..Correction::default()
+                };
+            }
+            RecoveryGuide::Cross { exit, dir, band }
+                if (exit[0] - pos[0]) * dir > 0.0
+                    && physics.crossing(pos, speed, exit, band, u8::from(can_jump)) =>
+            {
+                let release = buttons & perfect::JUMP;
+                return Correction {
+                    stick: Some([dir, 0.0]),
+                    release,
+                    ..Correction::default()
+                };
+            }
+            RecoveryGuide::Cross { exit, dir, .. }
+                if (exit[0] - pos[0]) * dir <= 0.0 && can_jump =>
+            {
+                run.guide = None;
+                // Continue to the far ledge from outside the stage.
+                return Correction {
+                    stick: Some([-dir, 0.0]),
+                    press: perfect::JUMP,
+                    ..Correction::default()
+                };
+            }
+            _ => run.guide = None,
+        }
+    }
+    let [left, right] = run.stage.ledges;
+    let ledge = if pos[0] < left[0] {
+        left
+    } else if pos[0] > right[0] {
         right
     } else {
         run.jump_timing = JumpTiming::default();
         return Correction::default();
     };
-    let jump = konst(C::TermContJumpAerial);
-    let can_jump = jump != UNRESOLVED && natives::is_enable_transition_term(cpu, jump);
-    let physics = air_physics(cpu);
-    let Some((vx, vy)) = super::recording_host::fighter_speed(cpu) else {
-        run.jump_timing = JumpTiming::default();
-        return Correction::default();
-    };
-    let mut correction = run.jump_timing.step(buttons, can_jump && physics.valid(), run.jump_delay, |delay| {
-        physics.reaches_with_jump(pos, [vx, vy], ledge, delay, run.stage.blast[3])
-    });
+    let mut correction = run
+        .jump_timing
+        .step(buttons, can_jump, run.jump_delay, |delay| {
+            physics.reaches_with_jump(pos, speed, ledge, delay, run.stage.blast()[3])
+        });
     if run.jump_timing.waiting() || correction.press != 0 {
         correction.stick = Some([(ledge[0] - pos[0]).signum(), stick_y]);
     }
@@ -526,10 +749,16 @@ unsafe fn snap_player(p1: usize, drill: Drill, stage: Stage, [x, y]: [f32; 2]) -
 unsafe fn reset_recovery_resources(p1: usize, cpu: usize, stage: Stage) -> bool {
     use crate::model::sites_pkg3 as s;
     let [ground, wait] = [C::SituationGround, C::StatusWait].map(konst);
-    if [ground, wait].contains(&UNRESOLVED) || ![
-        s::STATE_CLEAR_SPEED_ALL_OFFSET, s::STATE_INIT_POS_OFFSET,
-        s::STATE_SET_SITUATION_KIND_OFFSET, s::STATE_STATUS_REQUEST_OFFSET,
-    ].into_iter().all(game::granted) {
+    if [ground, wait].contains(&UNRESOLVED)
+        || ![
+            s::STATE_CLEAR_SPEED_ALL_OFFSET,
+            s::STATE_INIT_POS_OFFSET,
+            s::STATE_SET_SITUATION_KIND_OFFSET,
+            s::STATE_STATUS_REQUEST_OFFSET,
+        ]
+        .into_iter()
+        .all(game::granted)
+    {
         return false;
     }
     let [left, right] = stage.ledges;
@@ -807,7 +1036,11 @@ pub unsafe fn frame(fighter: usize) {
             damage_stop: false,
             landing_draw: 5,
             jump_delay: 0,
+            route_draw: 0,
             jump_timing: JumpTiming::default(),
+            plan_pending: true,
+            last_route: None,
+            guide: None,
             last_cpu_status: UNRESOLVED,
             bounce: MeteorBounce::default(),
             sdi_start: None,
@@ -874,8 +1107,8 @@ pub unsafe fn frame(fighter: usize) {
     let damage_stop = natives::tech_in_damage_stop(cpu) == Some(true);
     let [left, right] = run.stage.ledges;
     let side = |x| usize::from(x > left[0].midpoint(right[0]));
-    let player_ledge = (natives::situation_kind(p1) == konst(C::SituationCliff))
-        .then(|| side(natives::pos_x(p1)));
+    let player_ledge =
+        (natives::situation_kind(p1) == konst(C::SituationCliff)).then(|| side(natives::pos_x(p1)));
     let cpu_ledge = side(natives::pos_x(cpu));
     let trump = drill == Drill::GuardEdge
         && (run.player_ledge == Some(cpu_ledge) || player_ledge == Some(cpu_ledge));
@@ -883,11 +1116,15 @@ pub unsafe fn frame(fighter: usize) {
         dead_or_rebirthing,
         grounded: natives::situation_kind(cpu) == konst(C::SituationGround),
         cliff_catch: status == konst(C::StatusCliffCatch) && !trump,
-        hit: damage_stop && !run.damage_stop || damage.zip(run.previous_damage)
-            .is_some_and(|(now, before)| now > before),
+        hit: damage_stop && !run.damage_stop
+            || damage
+                .zip(run.previous_damage)
+                .is_some_and(|(now, before)| now > before),
     };
     if obs.hit && run.rounds.phase == Phase::Live {
         run.landing_draw = rng.below(6);
+        run.route_draw = rng.next_u32();
+        run.plan_pending = true;
     }
     run.previous_damage = damage;
     run.damage_stop = damage_stop;
@@ -928,6 +1165,9 @@ pub unsafe fn frame(fighter: usize) {
         if matches!(before, Phase::Ready(_)) && run.rounds.phase == Phase::Live {
             run.landing_draw = rng.below(6);
             run.jump_delay = rng.below(9) as u8;
+            run.route_draw = rng.next_u32();
+            run.plan_pending = true;
+            run.guide = None;
             run.jump_timing = JumpTiming::default();
             run.last_cpu_status = UNRESOLVED;
             run.bounce = MeteorBounce::default();

@@ -1000,7 +1000,7 @@ const GAME_ENTRIES: &[&str] = &[
 /// Mash out's floor read is called through the placement model's ray closure.
 /// GAME_ENTRIES stays the inventory of registered native callback handoffs.
 const STAGED_GAME_ROOTS: &[&str] = &[
-    "tech::frame", "mashout::floor", "edge_juggle::frame", "edge_juggle::poll", "edge_juggle::look", "edge_juggle::ai_correction",
+    "tech::frame", "mashout::floor", "edge_juggle::frame", "edge_juggle::poll", "edge_juggle::look", "edge_juggle::ai_correction", "tech_surfaces::frame_read_line", "tech_surfaces::frame_next_line",
 ];
 
 fn game_root_keys() -> impl Iterator<Item = &'static str> {
