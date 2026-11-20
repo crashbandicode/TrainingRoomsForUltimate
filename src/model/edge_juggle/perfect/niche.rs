@@ -1,6 +1,6 @@
 //! Character-specific recovery pads for Guard the Edge.
 
-use super::recovery::Crossing;
+use super::recovery::{crossing_margin, Crossing, Measured};
 use super::{
     AirPhysics, Correction, Point, Route, SpecialReach, ATTACK, FLICK_JUMP, GUARD, JUMP, SPECIAL,
 };
@@ -8,6 +8,7 @@ use super::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Move {
     Drift,
+    /// Glide along the corridor; one jump each time the foot sinks to the hold line.
     Hold,
     Jump,
     Side,
@@ -27,6 +28,7 @@ pub enum Move {
     Missile,
 }
 
+/// Live inputs of the under-stage crossing budget.
 #[derive(Clone, Copy)]
 pub struct Budget {
     pub air: AirPhysics,
@@ -43,8 +45,11 @@ pub struct Facts {
     pub player_over_crossing: bool,
     pub long_approach: bool,
     pub counter_contact: bool,
+    /// The plain return is short of distance, not of height.
     pub short: bool,
+    /// Ledge height minus the fighter's.
     pub climb: f32,
+    /// An unread budget refuses every crossing.
     pub budget: Option<Budget>,
 }
 
@@ -53,9 +58,15 @@ enum Intent {
     Across,
     ThunderOverhead,
     LongApproach,
+    /// A level extension for a horizontal shortfall.
     Near,
+    /// The same, flown only from ledge height or above (a wall below ends it).
+    NearAbove,
     CounterContact,
 }
+
+/// Trace-measured side and down specials by row. Empty until NICHE-RESULTS.md has them.
+const MEASURED: &[(u8, Measured)] = &[];
 
 pub struct Row {
     pub id: u8,
@@ -68,7 +79,7 @@ pub struct Row {
 impl Row {
     const fn new(id: u8, fighter: i32, intent: Intent, moves: &'static [Move]) -> Self {
         let route = match intent {
-            Intent::Near | Intent::CounterContact => Route::Near,
+            Intent::Near | Intent::NearAbove | Intent::CounterContact => Route::Near,
             _ => Route::Opposite,
         };
         Self {
@@ -80,8 +91,30 @@ impl Row {
         }
     }
 
-    pub fn margin(&self, _facts: Facts) -> Option<f32> {
-        Some(1.0)
+    /// Spare climb of this row's crossing from the live budget. A near row has
+    /// nothing to cross. Thunder's fall is unmodelled, so its row needs a measurement.
+    pub fn margin(&self, facts: Facts) -> Option<f32> {
+        if self.route == Route::Near {
+            return Some(1.0);
+        }
+        let measured = MEASURED.iter().find(|(row, _)| *row == self.id);
+        if matches!(self.intent, Intent::ThunderOverhead) && measured.is_none() {
+            return None;
+        }
+        let budget = facts.budget?;
+        // These up specials can be flown level under the stage.
+        let aimed = self
+            .moves
+            .iter()
+            .any(|step| matches!(step, QuickAttack | Travel | Barrel | Hover | Glide | Bolt));
+        crossing_margin(
+            budget.air,
+            budget.jumps,
+            budget.special,
+            aimed,
+            measured.map_or(Measured::default(), |&(_, travel)| travel),
+            budget.crossing,
+        )
     }
 
     fn matches(&self, facts: Facts) -> bool {
@@ -93,50 +126,57 @@ impl Row {
                 Intent::Across => clear && facts.covered_ledge,
                 Intent::ThunderOverhead => clear && facts.player_over_crossing,
                 Intent::LongApproach => clear && facts.covered_ledge && facts.long_approach,
-                Intent::Near => true,
+                Intent::Near => facts.short,
+                Intent::NearAbove => facts.short && facts.climb <= 0.0,
                 Intent::CounterContact => facts.counter_contact,
             }
+            && self.margin(facts).is_some()
     }
 }
 
 // Native body kinds follow TR's roster_grid; Charizard is the separate 0x26 body.
 use Move::*;
+// A crossing glides and holds its height first. A special that ends in special
+// fall (SmashWiki "Helpless") is the row's last move; a jump is never burst at the entry.
 const ROWS: [Row; 35] = [
-    Row::new(1, 0x8, Intent::Across, &[QuickAttack]),
-    Row::new(2, 0x8, Intent::ThunderOverhead, &[Down, QuickAttack]),
-    Row::new(3, 0x8, Intent::LongApproach, &[Side, QuickAttack]),
-    Row::new(4, 0x1c, Intent::Across, &[Drift, Jump, Rise]),
-    Row::new(5, 0x27, Intent::Across, &[Barrel]),
-    Row::new(6, 0x27, Intent::LongApproach, &[Side, Barrel]),
-    Row::new(7, 0x2d, Intent::Across, &[Hover]),
-    Row::new(8, 0x5d, Intent::Across, &[SonicBlade, Rise]),
+    Row::new(1, 0x8, Intent::Across, &[Hold, QuickAttack]),
+    Row::new(2, 0x8, Intent::ThunderOverhead, &[Down, Hold, QuickAttack]),
+    Row::new(3, 0x8, Intent::LongApproach, &[Side, Hold, QuickAttack]),
+    Row::new(4, 0x1c, Intent::Across, &[Hold, Rise]),
+    Row::new(5, 0x27, Intent::Across, &[Hold, Barrel]),
+    Row::new(6, 0x27, Intent::LongApproach, &[Side, Hold, Barrel]),
+    Row::new(7, 0x2d, Intent::Across, &[Hold, Hover]),
+    // Sonic Blade is special fall; it belongs at Aerial Sweep's apex, which has no phase yet.
+    Row::new(8, 0x5d, Intent::Across, &[Hold, Rise]),
     Row::new(9, 0x34, Intent::Near, &[Side, Rise]),
     Row::new(10, 0x34, Intent::CounterContact, &[Counter, Rise]),
     Row::new(11, 0x10, Intent::Near, &[Down, Rise]),
-    Row::new(12, 0x10, Intent::Across, &[Travel]),
-    Row::new(13, 0x35, Intent::Across, &[ChargedSide, Travel]),
-    Row::new(14, 0xa, Intent::Across, &[Bolt]),
-    Row::new(15, 0x58, Intent::Across, &[Glide]),
-    Row::new(16, 0x13, Intent::Across, &[QuickAttack]),
-    Row::new(17, 0xc, Intent::Across, &[Jump, Jump, Jump, Drift]),
-    Row::new(18, 0x1d, Intent::Across, &[Jump, Jump, Side]),
-    Row::new(19, 0x1e, Intent::Across, &[Jump, Travel]),
-    Row::new(20, 0x1f, Intent::Across, &[Jump, Travel]),
-    Row::new(21, 0x37, Intent::Across, &[Jump, Travel]),
-    Row::new(22, 0x40, Intent::Across, &[Travel, Side, Travel]),
-    Row::new(23, 0x29, Intent::Across, &[Side, Rise]),
-    Row::new(24, 0xd, Intent::Across, &[Float, Rise]),
-    Row::new(25, 0xe, Intent::Across, &[Float, Rise]),
-    Row::new(26, 0x22, Intent::Across, &[Hover]),
-    Row::new(27, 0x2, Intent::Across, &[Bomb, Jump, Rise]),
-    Row::new(28, 0x28, Intent::Across, &[Bolt]),
-    Row::new(29, 0x2c, Intent::Across, &[Travel]),
-    Row::new(30, 0x2b, Intent::Across, &[Hover]),
-    Row::new(31, 0x3a, Intent::Across, &[Side, Rise]),
-    Row::new(32, 0x53, Intent::Across, &[Rise]),
-    Row::new(33, 0x5, Intent::Across, &[Jump, Rise]),
-    Row::new(34, 0x9, Intent::Near, &[Missile]),
-    Row::new(35, 0x26, Intent::Across, &[Jump, Jump, Rise]),
+    Row::new(12, 0x10, Intent::Across, &[Hold, Travel]),
+    Row::new(13, 0x35, Intent::Across, &[ChargedSide, Hold, Travel]),
+    Row::new(14, 0xa, Intent::Across, &[Hold, Bolt]),
+    Row::new(15, 0x58, Intent::Across, &[Hold, Glide]),
+    Row::new(16, 0x13, Intent::Across, &[Hold, QuickAttack]),
+    Row::new(17, 0xc, Intent::Across, &[Hold]),
+    Row::new(18, 0x1d, Intent::Across, &[Hold, Side]),
+    Row::new(19, 0x1e, Intent::Across, &[Hold, Travel]),
+    Row::new(20, 0x1f, Intent::Across, &[Hold, Travel]),
+    Row::new(21, 0x37, Intent::Across, &[Hold, Travel]),
+    // One Witch Twist per jump: the second needs the double jump between.
+    Row::new(22, 0x40, Intent::Across, &[Hold, Travel, Jump, Travel, Side]),
+    Row::new(23, 0x29, Intent::Across, &[Side, Hold, Rise]),
+    Row::new(24, 0xd, Intent::Across, &[Float, Hold, Rise]),
+    Row::new(25, 0xe, Intent::Across, &[Float, Hold, Rise]),
+    Row::new(26, 0x22, Intent::Across, &[Hold, Hover]),
+    Row::new(27, 0x2, Intent::Across, &[Bomb, Hold, Rise]),
+    Row::new(28, 0x28, Intent::Across, &[Hold, Bolt]),
+    Row::new(29, 0x2c, Intent::Across, &[Hold, Travel]),
+    Row::new(30, 0x2b, Intent::Across, &[Hold, Hover]),
+    Row::new(31, 0x3a, Intent::Across, &[Side, Hold, Rise]),
+    Row::new(32, 0x53, Intent::Across, &[Hold, Rise]),
+    // Yoshi's climb is the double jump: it waits for the exit.
+    Row::new(33, 0x5, Intent::Across, &[Hold, Jump, Rise]),
+    Row::new(34, 0x9, Intent::NearAbove, &[Missile]),
+    Row::new(35, 0x26, Intent::Across, &[Hold, Rise]),
 ];
 
 pub const CANDIDATE_ROWS: u64 = (1 << ROWS.len()) - 1;
@@ -167,7 +207,9 @@ pub struct Sample {
     pub at_exit: bool,
     pub can_enter: bool,
     pub approaching: bool,
+    /// The foot is under the hold line and a jump fits inside the band.
     pub low: bool,
+    /// The glide ends: at the exit, or where the next special must start to arrive.
     pub hold_over: bool,
     pub direction: f32,
     pub aim: Point,
@@ -249,6 +291,23 @@ impl Sequence {
         output
     }
 
+    /// The jump button of one altitude-hold frame.
+    fn hold(&mut self, sample: Sample) -> u32 {
+        match (self.stage, sample.motion) {
+            (Stage::Ready | Stage::Accepted(_), Motion::Free) if sample.hold_over => self.advance(),
+            (Stage::Ready, Motion::Free) if sample.low && sample.can_start => {
+                self.stage = Stage::Pressed(sample.frame);
+                return JUMP;
+            }
+            (Stage::Pressed(_), Motion::Travel) => self.stage = Stage::Accepted(sample.frame),
+            // A refused press gets one frame, like any other move.
+            (Stage::Pressed(frame), Motion::Free) if sample.frame.saturating_sub(frame) <= 1 => {}
+            (Stage::Pressed(_) | Stage::Accepted(_), Motion::Free) => self.stage = Stage::Ready,
+            _ => {}
+        }
+        0
+    }
+
     fn on_frame(&mut self, sample: Sample) -> Option<Correction> {
         let movement = self.action()?;
         let [forward, level] = [sample.direction, 0.0];
@@ -256,6 +315,18 @@ impl Sequence {
             return Some(pad([0.0; 2], 0));
         }
         if sample.approaching && matches!(self.stage, Stage::Ready) {
+            return Some(pad([forward, level], 0));
+        }
+        if movement == Hold {
+            return Some(pad([forward, level], self.hold(sample)));
+        }
+        if movement == Jump
+            && !sample.can_start
+            && sample.motion == Motion::Free
+            && matches!(self.stage, Stage::Ready)
+        {
+            // The glide spent the last jump: go on with what follows.
+            self.advance();
             return Some(pad([forward, level], 0));
         }
         if movement == Drift
