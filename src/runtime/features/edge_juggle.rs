@@ -1929,9 +1929,7 @@ pub unsafe fn frame(fighter: usize) {
             run.rounds.discard_attempt();
             run.placement = Placement::ResetResources;
             run.notice = FixedPath::new();
-            if let Some(capture) = capture {
-                report_drill_state(capture, run, None, None);
-            }
+            report_drill_state(capture, run, None, None);
         }
         return;
     }
