@@ -2085,3 +2085,11 @@ ceiling = 165885
 date = "2026-11-20"
 reason = "Merge of rc.15 Mash out ledge placement (5b359ac6) onto 69be4897: guarded floor placement with edge clearance for every grab and move, grounded CPU teeter admission (operator-approved), exact shared-endpoint floor joins, stock normal/wall-bit guards. The branch measured 165514 on 96355cad (+184 over the measured 165330). Added to main's measured 165701: 165885."
 approved_by = "Operator 2026-11-19 approved the Mash out reliability fixes, the ledge admission and (via the primary) the exact floor joins; primary c07b3449 merged after REVIEW PASS review-games-astra 01:34Z and re-summed the budget tail."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 165901
+date = "2026-11-20"
+reason = "Target hurtbox size: hurt orbs at the bone world scale, left out without a valid sample (model::hitbox_orbs::place_one) on 629870c5. size_gate measured 165901, up 16 from main's 165885."
+approved_by = "Operator 2026-11-19 ordered the target fixes for the next build; operator 2026-11-18: yes additional lines are ok. Primary: exact measured delta on top of 629870c5."
