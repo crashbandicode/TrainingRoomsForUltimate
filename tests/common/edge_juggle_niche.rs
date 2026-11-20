@@ -437,7 +437,28 @@ fn niche_snake_cypher_route_and_pad_sequence() {
 
 #[test]
 fn niche_link_remote_bomb_route_and_pad_sequence() {
-    verify(0x2, "cross", 27, &[Move::Bomb, Move::Hold, Move::Rise]);
+    let row = select(facts(0x2, "near"), CANDIDATE_ROWS).expect("Link has a horizontal shortfall");
+    assert_eq!((row.id, row.route, row.moves), (27, Route::Near, &[Move::Bomb, Move::Jump, Move::Rise][..]));
+    assert!(select(facts(0x2, "cross"), 1 << (27 - 1)).is_none());
+    let mut sequence = Sequence::new(row);
+    let pull = sequence.step(sample(0, Motion::Free)).unwrap();
+    assert_eq!((pull.press, pull.stick), (perfect::SPECIAL, Some([0.0, -1.0])));
+    assert_eq!(sequence.step(sample(1, Motion::Starting)).unwrap().press, 0);
+    let drop = sequence.step(sample(8, Motion::ItemHeld)).unwrap();
+    assert_eq!((drop.press, drop.stick), (super::CATCH, Some([0.0; 2])));
+    let align = Sample { can_start: false, ..sample(9, Motion::ItemLoose) };
+    assert_eq!(sequence.step(align).unwrap().press, 0);
+    let blast = sequence.step(sample(10, Motion::ItemLoose)).unwrap();
+    assert_eq!((blast.press, blast.stick), (perfect::SPECIAL, Some([0.0, -1.0])));
+    assert_ne!(blast.release & super::CATCH, 0);
+    sequence.step(sample(11, Motion::BombBlast)).unwrap();
+    assert_eq!(sequence.step(sample(12, Motion::BombHit)), Some(perfect::Correction::default()));
+    sequence.step(sample(24, Motion::Free)).unwrap();
+    assert_eq!(sequence.step(sample(25, Motion::Free)).unwrap().press, perfect::JUMP);
+    sequence.step(sample(26, Motion::Travel)).unwrap();
+    sequence.step(sample(45, Motion::Free)).unwrap();
+    let finish = sequence.step(sample(46, Motion::Free)).unwrap();
+    assert_eq!((finish.press, finish.stick), (perfect::SPECIAL, Some([0.0, 1.0])));
 }
 
 #[test]
@@ -815,5 +836,5 @@ fn niche_link_does_not_finish_the_bomb_move_after_only_pulling_it() {
     sequence.step(sample(0, Motion::Free)).expect("pull bomb");
     sequence.step(sample(1, Motion::Starting)).expect("native pull");
     sequence.step(sample(8, Motion::Free));
-    assert_ne!(sequence.action(), Some(Move::Hold), "no extension without a drop and blast");
+    assert_eq!(sequence.action(), None, "no follow-up without a drop and blast");
 }

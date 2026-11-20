@@ -501,6 +501,9 @@ pub(super) unsafe fn ai_correction(ai: usize, accessor: usize, stock: StockPad) 
     }
     let position = [natives::pos_x(accessor), natives::pos_y(accessor)];
     if run.drill == Drill::GuardEdge {
+        if run.niche.as_ref().is_some_and(niche_pad::NicheGuide::using_bomb) {
+            return niche_correction(run, ai, accessor, position, status, stock);
+        }
         // Hit off-stage: survive first, otherwise bend the launch at the nearer ledge.
         // J3's counter stays the Juggler's; this edit has no trace tag until one is agreed.
         let [left, right] = run.stage.ledges;

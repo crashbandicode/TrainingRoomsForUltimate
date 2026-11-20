@@ -17,6 +17,7 @@ pub(super) struct NicheGuide {
     ledge: Point,
     across: Option<Crossing>,
     player_x: f32,
+    body_clearance: f32,
 }
 
 struct Crossing {
@@ -110,6 +111,7 @@ impl NicheGuide {
             ledge: if across.is_some() { far } else { near },
             across,
             player_x: facts.player[0],
+            body_clearance: facts.body_clearance,
         };
         Some((guide, margin))
     }
@@ -119,6 +121,10 @@ impl NicheGuide {
         self.across
             .as_ref()
             .map_or(self.ledge, |crossing| [crossing.exit, self.ledge[1]])
+    }
+
+    pub(super) fn using_bomb(&self) -> bool {
+        self.sequence.action() == Some(Move::Bomb)
     }
 
     pub(super) fn accepts_form(&self, fighter: Option<i32>) -> bool {
@@ -148,7 +154,7 @@ impl NicheGuide {
         }
         let (snapshot, available) = recovery_snapshot(ai)?;
         let reach = special_reach(ai, snapshot)?;
-        let phase = niche_motion_phase(cpu, self.fighter, movement, status);
+
         let (mut direction, mut aim, mut at_exit, mut can_enter) = (
             (self.ledge[0] - x).signum(),
             normalized_stick([self.ledge[0] - x, self.ledge[1] - y]),
@@ -182,6 +188,12 @@ impl NicheGuide {
                     && remaining <= recovery::level_run(reach, self.ledge[1] - y);
             }
         }
+        let (phase, actionable) = if movement == Move::Bomb {
+            link_bomb_phase(cpu, status, [x, y], direction, self.body_clearance)?
+        } else {
+            let phase = niche_motion_phase(cpu, self.fighter, movement, status);
+            (phase, phase == Motion::Free)
+        };
         if movement == Move::Hover && self.fighter == 0x2d && !has_burner(cpu) {
             return None;
         }
@@ -200,7 +212,7 @@ impl NicheGuide {
         self.sequence.step(Sample {
             frame,
             motion: phase,
-            can_start: phase == Motion::Free && niche_start_enabled(cpu, movement, available),
+            can_start: actionable && niche_start_enabled(cpu, movement, available),
             valid: true,
             at_exit,
             can_enter,
@@ -329,7 +341,6 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
         | (0x5d, SoraChain, 0x1eb)
         | (0x9, Missile, 0x1e2)
         | (0xa | 0x28, Bolt, 0x1e6)
-        | (0x2, Bomb, 0x1e5)
         | (0x47, Rise, 0x1e6..=0x1e8)
         | (0x5a, Swap, 0x1e1 | 0x1e2)
         | (0x5b, Side, 0x1e9)
@@ -358,6 +369,64 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
         | (0x5b, Rise, 0x1ee) => Finish,
         _ => Interrupted,
     }
+}
+
+unsafe fn link_bomb_phase(
+    cpu: usize,
+    status: i32,
+    [x, y]: Point,
+    inward: f32,
+    clearance: f32,
+) -> Option<(Motion, bool)> {
+    use smash::app::{lua_bind::ItemModule, BattleObjectModuleAccessor};
+
+    if !crate::runtime::roster::running()
+        || ![
+            sites_pkg2::WORK_GET_INT_OFFSET,
+            sites_pkg3::STATE_OBJECT_IS_ACTIVE_OFFSET,
+            sites_pkg3::STATE_OBJECT_MODULE_ACCESSOR_OFFSET,
+        ]
+        .into_iter()
+        .all(game::granted)
+    {
+        return None;
+    }
+    if status == UNRESOLVED {
+        return None;
+    }
+    if status == konst(C::StatusSpecialLw) {
+        return Some((Motion::Starting, false));
+    }
+    if status == 0x1e5 {
+        // FIGHTER_LINK_STATUS_KIND_SPECIAL_LW_BLAST.
+        return Some((Motion::BombBlast, false));
+    }
+    if matches!(status, 0x48..=0x4b) {
+        // Native DamageAir / DamageFly family. The model requires a preceding detonation.
+        return Some((Motion::BombHit, false));
+    }
+    if !airborne_recovery(cpu, status) {
+        return None;
+    }
+    let body = cpu as *mut BattleObjectModuleAccessor;
+    let held = ItemModule::is_have_item(body, 0)
+        .then(|| ItemModule::get_have_item_id(body, 0));
+    // FIGHTER_LINK_INSTANCE_WORK_ID_INT_BOMB_OBJECT_ID.
+    let id = u32::try_from(natives::get_int(cpu, 0x1000_00c3)).ok()?;
+    if id == 0x5000_0000 || !state::object_is_active(id) {
+        return held.is_none().then_some((Motion::Free, true));
+    }
+    let bomb = state::object_accessor(id);
+    if bomb == 0 || natives::fighter_kind(bomb) != Some(0x78) {
+        return None;
+    }
+    if let Some(held) = held {
+        return (held == u64::from(id)).then_some((Motion::ItemHeld, false));
+    }
+    let dx = (x - natives::pos_x(bomb)) * inward;
+    let dy = y - natives::pos_y(bomb);
+    // Let the dropped bomb fall behind Link so the launch bends toward the stage.
+    (dx.hypot(dy) < clearance).then_some((Motion::ItemLoose, dx > 0.0 && dy >= 0.0))
 }
 
 pub(super) fn pyra_swapping(status: i32) -> bool {

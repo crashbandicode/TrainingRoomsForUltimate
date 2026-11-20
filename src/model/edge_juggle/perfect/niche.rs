@@ -217,7 +217,7 @@ const ROWS: [Row; 40] = [
     Row::new(24, 0xd, Intent::Across, &[Float, Hold, Rise]),
     Row::new(25, 0xe, Intent::Across, &[Float, Hold, Rise]),
     Row::new(26, 0x22, Intent::Across, &[Hold, Hover]),
-    Row::new(27, 0x2, Intent::Across, &[Bomb, Hold, Rise]),
+    Row::new(27, 0x2, Intent::Near, &[Bomb, Jump, Rise]),
     Row::new(28, 0x28, Intent::Across, &[Hold, Bolt]),
     Row::new(29, 0x2c, Intent::Across, &[Hold, Travel]),
     Row::new(30, 0x2b, Intent::Across, &[Hold, Hover]),
@@ -250,6 +250,10 @@ pub enum Motion {
     Travel,
     AimAgain,
     Finish,
+    ItemHeld,
+    ItemLoose,
+    BombBlast,
+    BombHit,
     Interrupted,
 }
 
@@ -275,8 +279,13 @@ enum Stage {
     Ready,
     Pressed(u32),
     Accepted(u32),
+    BombDrop(u32),
+    BombPressBlast(u32),
+    BombWaitHit,
+    BombWaitFall,
 }
 
+pub const CATCH: u32 = 1 << 9; // CONTROL_PAD_BUTTON_CATCH
 const ACTION_BUTTONS: u32 = ATTACK | SPECIAL | JUMP | GUARD | FLICK_JUMP;
 
 pub struct Sequence {
@@ -376,6 +385,9 @@ impl Sequence {
 
     fn on_frame(&mut self, sample: Sample) -> Option<Correction> {
         let movement = self.action()?;
+        if movement == Bomb && !matches!(self.stage, Stage::Ready | Stage::Pressed(_)) {
+            return self.link_bomb(sample);
+        }
         let [forward, level] = [sample.direction, 0.0];
         let aim_open = movement == SoraChain && sample.motion == Motion::AimAgain;
         let press_again = aim_open && !self.sora_aim_open;
@@ -455,6 +467,48 @@ impl Sequence {
             )),
             _ => None,
         }
+    }
+
+    fn link_bomb(&mut self, sample: Sample) -> Option<Correction> {
+        use Motion::{BombBlast, BombHit, Free, ItemHeld, ItemLoose, Starting};
+        use Stage::{Accepted, BombDrop, BombPressBlast, BombWaitFall, BombWaitHit};
+
+        let drift = || pad([sample.direction, 0.0], 0);
+        let at_most_one_frame = |first| sample.frame.saturating_sub(first) <= 1;
+        match (self.stage, sample.motion) {
+            (Accepted(_), Starting) => Some(pad([0.0, -1.0], 0)),
+            (Accepted(_), ItemHeld) => {
+                self.stage = BombDrop(sample.frame);
+                Some(pad([0.0; 2], CATCH))
+            }
+            (BombDrop(frame), ItemHeld) if at_most_one_frame(frame) => Some(drift()),
+            (BombDrop(_), ItemLoose) if sample.can_start => {
+                self.stage = BombPressBlast(sample.frame);
+                Some(pad([0.0, -1.0], SPECIAL))
+            }
+            (BombDrop(_), ItemLoose) => Some(drift()),
+            (BombPressBlast(frame), ItemLoose) if at_most_one_frame(frame) => Some(drift()),
+            (BombPressBlast(_), BombBlast) => {
+                self.stage = BombWaitHit;
+                Some(drift())
+            }
+            (BombWaitHit, BombHit) => {
+                self.stage = BombWaitFall;
+                Some(Correction::default())
+            }
+            (BombWaitHit, BombBlast) | (BombWaitFall, BombHit) => Some(Correction::default()),
+            (BombWaitFall, Free) => {
+                self.advance();
+                Some(drift())
+            }
+            _ => None,
+        }
+        .map(|mut edit| {
+            if edit != Correction::default() {
+                edit.release |= CATCH & !edit.press;
+            }
+            edit
+        })
     }
 }
 
