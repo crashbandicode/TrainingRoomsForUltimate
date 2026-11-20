@@ -391,9 +391,10 @@ impl CacheStatus {
             Progress::Partial | Progress::Done | Progress::Ready => (4, 0),
         };
         // rc.14 mem-headroom: "waiting for memory" turning into "load after you pause" is a change shown.
-        // Ready Fighters shortfall: a change of the shortfall is a change shown, and only that (no per-frame raise).
+        // Ready Fighters shortfall: the suffix shown (R/N: cold) is part of what the notice shows (review 04:44Z 3).
         (class, self.fighters.loaded(), self.fighters.planned, self.fighters.failed, swap, self.fighters.held,
-            self.fighters.room_at_pause && self.fighters.held > 0, self.fighters.short())
+            self.fighters.room_at_pause && self.fighters.held > 0,
+            self.fighters.short())
     }
 
     pub fn announce(self, shown: Option<Self>, paused_polls: u8) -> bool {
@@ -539,10 +540,13 @@ mod tests {
         assert_eq!(ten.text().to_string(), "Ready 6/6");
         assert!(short.announce(Some(ten), 0), "the shortfall appearing is a change shown");
         assert!(!short.announce(Some(short), 0), "the same shortfall is not raised again");
-        let six = CacheStatus::new(assets, BuiltFighters { ready_fighters: 6, cold: 3, ..eight }, false);
-        // Review (03:35Z) 2: a pair two bodies short is one fighter cold.
+        // Review 04:44Z 3: at 6 with six window bodies, one unfitted pick replaced by an unfitted pair: 6/7 to 6/8, still
+        // one cold. The suffix changed, so it is raised again; another unchanged poll stays quiet.
+        let seven = CacheStatus::new(assets, BuiltFighters { ready_fighters: 6, needed: 7, cold: 1, ..eight }, false);
         let pair = CacheStatus::new(assets, BuiltFighters { ready_fighters: 6, needed: 8, cold: 1, ..eight }, false);
         assert_eq!(pair.text().to_string(), "Ready 6/6 · Ready Fighters 6/8: 1 stays cold");
+        assert!(pair.announce(Some(seven), 0) && !pair.announce(Some(pair), 0));
+        let six = CacheStatus::new(assets, BuiltFighters { ready_fighters: 6, cold: 3, ..eight }, false);
         assert_eq!(six.text().to_string(), "Ready 6/6 · Ready Fighters 6/9: 3 stay cold");
         let loading = CacheStatus::new(assets, BuiltFighters { pending: 2, ready: 4, ..eight }, false);
         assert_eq!(loading.text().to_string(), "Loading 4/6 · Ready Fighters 8/9: 1 stays cold");

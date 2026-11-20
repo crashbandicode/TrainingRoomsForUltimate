@@ -1451,19 +1451,53 @@ pub fn plan_extra_groups(
     plan_extra_groups_with(GroupPolicy::DEFAULT, windows, existing, upcoming, exclude, budget)
 }
 
-/// Ready Fighters shortfall (operator 2026-11-20 ~01:22Z): an immutable snapshot of what the planner works from, with
-/// each role's WHOLE cycle (not the live look-ahead), taken when it changes (a cycle edit, a settings change, Training
-/// entry, a swap that moves a window) so steady polls do no placement work ([`DemandMemo`]).
+/// Ready Fighters shortfall (operator 2026-11-20 ~01:22Z): an immutable snapshot of what the live planner works from
+/// (its windows, the groups it keeps, its exclusions and policies, Ready Fighters), with each role's WHOLE cycle in
+/// visit order instead of the live look-ahead. [`DemandMemo`] recomputes only when it changes.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DemandInput {
     pub policy: GroupPolicy,
     pub windows: [Option<Members>; 2],
+    pub kept: [crate::engine::compat::fixed::FixedList<Members, MAX_EXTRA_GROUPS>; 2],
     pub lanes: [crate::engine::swap::ordered_roster::KindList; 2],
     pub exclude: [Option<u32>; 2],
     pub special: SpecialPolicy,
     pub ready_fighters: usize,
 }
 
+/// One role's live facts, as `plan_groups` reads them: its window and exclusion, the admitted numbered order
+/// (`cycle_members::numbered`), the current fighter and cursor, the original, and its groups (members, state, leaving).
+pub struct RoleFacts<'a> {
+    pub window: Option<Members>,
+    pub exclude: Option<u32>,
+    pub order: &'a [u32],
+    pub current: Option<(u32, Option<usize>)>,
+    pub original: Option<u32>,
+    pub groups: &'a [(Members, GroupState, bool)],
+}
+
+/// The snapshot from the live facts: each lane is [`cycle_members::visit_order`] with the look-ahead's Ice Climbers rule
+/// (`popo(role, at slot 0)`), and the kept groups are those still serving the cycle (counted, not leaving).
+///
+/// [`cycle_members::visit_order`]: crate::engine::swap::cycle_members::visit_order
+pub fn demand_input(policy: GroupPolicy, special: SpecialPolicy, ready_fighters: usize, roles: [RoleFacts<'_>; 2],
+    popo: impl Fn(usize, bool) -> bool) -> DemandInput {
+    let mut input = DemandInput { policy, windows: [None; 2], kept: [crate::engine::compat::fixed::FixedList::new(Members::pair_group()); 2],
+        lanes: [crate::engine::swap::ordered_roster::KindList::new(0); 2], exclude: [None; 2], special, ready_fighters };
+    for (role, facts) in roles.iter().enumerate() {
+        input.windows[role] = facts.window;
+        input.exclude[role] = facts.exclude;
+        for &(members, state, leaving) in facts.groups {
+            if state.counts_bodies() && !leaving { input.kept[role].push(members); }
+        }
+        let Some((current, cursor)) = facts.current else { continue; };
+        let (kinds, slot0) = crate::engine::swap::cycle_members::visit_order(facts.order, current, cursor, facts.original);
+        for (i, &kind) in kinds.iter().enumerate() {
+            if kind != POPO || popo(role, slot0 == Some(i)) { input.lanes[role].push(kind); }
+        }
+    }
+    input
+}
 
 /// `bodies`: what the cycles need, both visible fighters included (the numbers Ready Fighters counts). `cold`: the
 /// selectable targets (a special group such as the Ice Climbers pair is one) that do not fit Ready Fighters.
@@ -1473,12 +1507,13 @@ pub struct Demand {
     pub cold: usize,
 }
 
-/// The demand by the planner's own rule: [`plan_extra_groups_with`] over the whole cycles, fresh (no kept groups),
-/// once with Ready Fighters and the pool unlimited and once with Ready Fighters; the targets the second leaves out are
-/// cold.
+/// The demand by the planner's own rule: [`plan_extra_groups_with`] over the whole cycles beside the kept groups, once
+/// with Ready Fighters unlimited and once at Ready Fighters (the pool unlimited both times: a pool limit is not a Ready
+/// Fighters shortfall); the targets the second leaves out are cold.
 pub fn cycle_demand(input: &DemandInput) -> Demand {
     let lanes = [&input.lanes[0][..], &input.lanes[1][..]];
-    let place = |ready_fighters| plan_extra_groups_with(input.policy, input.windows, [&[], &[]], lanes, input.exclude,
+    let kept: [&[Members]; 2] = [&[], &[]];
+    let place = |ready_fighters| plan_extra_groups_with(input.policy, input.windows, kept, lanes, input.exclude,
         GroupBudget { ready_fighters, pool_free: usize::MAX / 2, special: input.special });
     let picks = |plan: &[[Option<Members>; MAX_EXTRA_GROUPS]; 2]| plan.iter().flatten().flatten()
         .map(|m| if m.special() == Special::None { m.count() } else { 1 }).sum::<usize>();
@@ -1486,7 +1521,7 @@ pub fn cycle_demand(input: &DemandInput) -> Demand {
     let fits = place(input.ready_fighters);
     Demand {
         bodies: input.windows.iter().map(|w| w.map_or(1, |m| m.count())).sum::<usize>()
-            + open.iter().flatten().flatten().map(|m| m.count()).sum::<usize>(),
+            + kept.iter().flat_map(|g| g.iter()).chain(open.iter().flatten().flatten()).map(|m| m.count()).sum::<usize>(),
         cold: picks(&open).saturating_sub(picks(&fits)),
     }
 }
@@ -1495,18 +1530,20 @@ pub fn cycle_demand(input: &DemandInput) -> Demand {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DemandMemo {
     last: Option<(DemandInput, Demand)>,
+    #[cfg(test)]
     pub computed: u32,
 }
 
 impl DemandMemo {
-    pub const fn new() -> Self { Self { last: None, computed: 0 } }
+    pub const fn new() -> Self { Self { last: None, #[cfg(test)] computed: 0 } }
 
     pub fn demand(&mut self, input: DemandInput) -> Demand {
         match self.last {
             Some((last, demand)) if last == input => demand,
             _ => {
                 let demand = cycle_demand(&input);
-                self.computed = self.computed.wrapping_add(1);
+                #[cfg(test)]
+                { self.computed += 1; }
                 self.last = Some((input, demand));
                 demand
             }
@@ -3037,70 +3074,81 @@ mod tests {
         assert_eq!(neighbour_group(solo, GAME_WATCH, GroupPolicy::DEFAULT, None), None);
     }
 
-    fn demand_input(windows: [Option<Members>; 2], lanes: [&[u32]; 2], special: SpecialPolicy, ready_fighters: usize) -> DemandInput {
-        let lane = |kinds: &[u32]| {
-            let mut list = crate::engine::swap::ordered_roster::KindList::new(0);
-            for &kind in kinds { list.push(kind); }
-            list
-        };
-        DemandInput { policy: GroupPolicy::DEFAULT, windows, lanes: [lane(lanes[0]), lane(lanes[1])], exclude: [None, None],
-            special, ready_fighters }
+    /// A role at its original (slot 0) with `order` numbered and `groups` held: what `plan_groups` reads.
+    fn at_original<'a>(window: Option<Members>, order: &'a [u32], groups: &'a [(Members, GroupState, bool)]) -> RoleFacts<'a> {
+        let original = window.map(|w| w.kinds()[0]);
+        RoleFacts { window, exclude: None, order, current: original.map(|k| (k, None)), original, groups }
     }
 
-    /// Ready Fighters shortfall (operator 2026-11-20 ~01:22Z, card Ready Fighters 8): the operator's cycles, P1 original
-    /// Mario > G&W > Palutena > Pikachu and a CPU with four members, need nine bodies; at 8 the planner leaves one out, at
-    /// 10 it places them all, and `cycle_demand` says the same.
+    fn demand_of(roles: [RoleFacts<'_>; 2], special: SpecialPolicy, ready_fighters: usize) -> Demand {
+        cycle_demand(&demand_input(GroupPolicy::DEFAULT, special, ready_fighters, roles, |_, _| true))
+    }
+
+    /// Ready Fighters shortfall (operator 2026-11-20 ~01:22Z, card Ready Fighters 8): P1 Mario > G&W > Palutena > Pikachu
+    /// and a CPU with four members need nine bodies; at 8 the live planner leaves one out, at 10 none, and so does the demand.
     fn the_demand_is_the_planners_own_count() {
         const BOWSER: u32 = 0x0f;
         const BAYONETTA: u32 = 0x40;
-        let p1 = members(&[MARIO, GAME_WATCH, PALUTENA]);
-        let cpu = members(&[FALCON, PIKACHU, BOWSER]);
-        let p1_lane: &[u32] = &[GAME_WATCH, PALUTENA, PIKACHU];
-        let cpu_lane: &[u32] = &[PIKACHU, BOWSER, BAYONETTA, PEACH];
-        let at = |rf| cycle_demand(&demand_input([Some(p1), Some(cpu)], [p1_lane, cpu_lane], SpecialPolicy::NONE, rf));
-        assert_eq!(at(8), Demand { bodies: 9, cold: 1 });
-        assert_eq!(at(10), Demand { bodies: 9, cold: 0 });
-        let placed = |rf: usize| plan_extra_groups([Some(p1), Some(cpu)], [&[], &[]], [p1_lane, cpu_lane], [None, None], budget(rf))
+        let (p1, cpu) = (members(&[MARIO, GAME_WATCH, PALUTENA]), members(&[FALCON, PIKACHU, BOWSER]));
+        let (p1_order, cpu_order): (&[u32], &[u32]) = (&[GAME_WATCH, PALUTENA, PIKACHU], &[PIKACHU, BOWSER, BAYONETTA, PEACH]);
+        let at = |rf| demand_of([at_original(Some(p1), p1_order, &[]), at_original(Some(cpu), cpu_order, &[])], SpecialPolicy::NONE, rf);
+        assert_eq!((at(8), at(10)), (Demand { bodies: 9, cold: 1 }, Demand { bodies: 9, cold: 0 }));
+        let placed = |rf: usize| plan_extra_groups([Some(p1), Some(cpu)], [&[], &[]], [p1_order, cpu_order], [None, None], budget(rf))
             .iter().flatten().flatten().map(|m| m.count()).sum::<usize>();
         assert_eq!((6 + placed(8), 6 + placed(10)), (8, 9), "the live planner leaves the same one out");
-        // No bank: one visible body per role, nothing grouped.
-        assert_eq!(cycle_demand(&demand_input([None, None], [p1_lane, cpu_lane], SpecialPolicy::NONE, 8)), Demand { bodies: 2, cold: 0 });
+        assert_eq!(demand_of([at_original(None, p1_order, &[]), at_original(None, cpu_order, &[])], SpecialPolicy::NONE, 8),
+            Demand { bodies: 2, cold: 0 }, "no bank: one visible body per role, nothing grouped");
     }
 
-    /// Review (03:35Z) 1: a sixth member appended past the live five-target look-ahead counts at once (the whole cycle),
-    /// without waiting for the look-ahead to rotate onto it.
-    fn a_member_past_the_look_ahead_counts() {
-        let p1 = members(&[MARIO, GAME_WATCH, PALUTENA]);
-        let cpu = members(&[FALCON, PEACH, YOSHI]);
-        let whole: &[u32] = &[GAME_WATCH, PALUTENA, PIKACHU, FOX, LUIGI, NESS];
-        let cpu_lane: &[u32] = &[PEACH, YOSHI];
-        let at = |lane: &[u32]| cycle_demand(&demand_input([Some(p1), Some(cpu)], [lane, cpu_lane], SpecialPolicy::NONE, 9));
-        assert_eq!(at(&whole[..5]), Demand { bodies: 9, cold: 0 }, "the look-ahead alone misses the sixth");
-        assert_eq!(at(whole), Demand { bodies: 10, cold: 1 }, "Ready Fighters 9/10: 1 stays cold");
+    /// Review 04:44Z 1: the admitted numbered order is walked whole, by slot. A sixth ordinary pick behind a Mii class
+    /// (a Mii-owner roster) counts at once; original and numbered Ice Climbers do not end the walk early.
+    fn the_whole_numbered_order_is_walked_by_slot() {
+        let (p1, cpu) = (members(&[MARIO, GAME_WATCH, PALUTENA]), members(&[FALCON, PEACH, YOSHI]));
+        let mixed: &[u32] = &[0x48, GAME_WATCH, PALUTENA, PIKACHU, FOX, LUIGI, NESS];
+        let at = |order| demand_of([at_original(Some(p1), order, &[]), at_original(Some(cpu), &[PEACH, YOSHI], &[])], SpecialPolicy::NONE, 9);
+        assert_eq!(at(&mixed[..5]), Demand { bodies: 8, cold: 0 }, "the five-target look-ahead alone");
+        assert_eq!(at(mixed), Demand { bodies: 10, cold: 1 }, "Ready Fighters 9/10: 1 stays cold");
+        // P1's original and numbered slot 3 are both Ice Climbers (different Solo settings); from slot 2 the walk visits
+        // numbered Popo, slot 0's Popo, then G&W. The look-ahead's own rule keeps neither Popo (the original is one).
+        let window = members(&[PALUTENA]);
+        let order: &[u32] = &[GAME_WATCH, PALUTENA, POPO];
+        let roles = [RoleFacts { window: Some(window), exclude: None, order, current: Some((PALUTENA, Some(1))), original: Some(POPO), groups: &[] },
+            at_original(None, &[], &[])];
+        let input = demand_input(GroupPolicy::DEFAULT, SpecialPolicy::NONE, 8, roles, |_, _| false);
+        assert_eq!(input.lanes[0][..], [GAME_WATCH]);
+        assert_eq!(crate::engine::swap::cycle_members::visit_order(order, PALUTENA, Some(1), Some(POPO)).1, Some(1));
     }
 
-    /// Review (03:35Z) 2: the Ice Climbers pair is two bodies but one pick: two bodies short is one fighter cold.
-    fn a_whole_group_short_is_one_fighter_cold() {
-        let p1 = members(&[MARIO, GAME_WATCH, PALUTENA]);
-        let cpu = members(&[FALCON, PEACH, YOSHI]);
-        let lanes: [&[u32]; 2] = [&[GAME_WATCH, PALUTENA, POPO], &[PEACH, YOSHI]];
-        let at = |rf| cycle_demand(&demand_input([Some(p1), Some(cpu)], lanes, SpecialPolicy::ALL, rf));
-        assert_eq!(at(8), Demand { bodies: 8, cold: 0 });
-        assert_eq!(at(6), Demand { bodies: 8, cold: 1 }, "Ready Fighters 6/8: 1 stays cold, not 2");
+    /// Review 04:44Z 2: the groups the live planner keeps are charged first. Six window bodies, Ready Fighters 8, two
+    /// grouped singles still in the cycle and a normal Ice Climbers pair ordered ahead of them: only the pair is cold
+    /// (8/10: 1 stays cold), as the retained live plan places nothing; a fresh plan would have named two.
+    fn the_kept_groups_are_charged_first() {
+        let (p1, cpu) = (members(&[MARIO, GAME_WATCH, PALUTENA]), members(&[FALCON, PEACH, YOSHI]));
+        let order: &[u32] = &[GAME_WATCH, PALUTENA, POPO, PIKACHU, FOX];
+        let held = [(members(&[PIKACHU]), GroupState::Built, false), (members(&[FOX]), GroupState::Prefetched, false),
+            (members(&[LUIGI]), GroupState::Built, true), (members(&[NESS]), GroupState::Failed, false)];
+        let input = demand_input(GroupPolicy::DEFAULT, SpecialPolicy::ALL, 8,
+            [at_original(Some(p1), order, &held), at_original(Some(cpu), &[PEACH, YOSHI], &[])], |_, _| true);
+        assert_eq!(input.kept[0][..], [members(&[PIKACHU]), members(&[FOX])], "leaving and failed groups are not kept");
+        assert_eq!(cycle_demand(&input), Demand { bodies: 10, cold: 1 });
+        let live = plan_extra_groups_with(GroupPolicy::DEFAULT, input.windows, [&input.kept[0], &[]], [&input.lanes[0], &[]],
+            [None, None], budget_special(8, SpecialPolicy::ALL));
+        assert!(live.iter().flatten().all(Option::is_none), "the retained live plan places nothing more");
+        let fresh = DemandInput { kept: [crate::engine::compat::fixed::FixedList::new(Members::pair_group()); 2], ..input };
+        assert_eq!(cycle_demand(&fresh), Demand { bodies: 10, cold: 2 });
     }
 
-    /// Review (03:35Z) 3: steady polls repeat the same snapshot and do no placement work; a change computes once.
+    /// Steady polls repeat the same snapshot and do no placement work; a change computes once.
     fn the_demand_is_computed_only_when_its_snapshot_changes() {
         let p1 = members(&[MARIO, GAME_WATCH, PALUTENA]);
-        let lanes: [&[u32]; 2] = [&[GAME_WATCH, PALUTENA, PIKACHU], &[]];
+        let input = |order: &[u32], rf| demand_input(GroupPolicy::DEFAULT, SpecialPolicy::NONE, rf,
+            [at_original(Some(p1), order, &[]), at_original(None, &[], &[])], |_, _| true);
         let mut memo = DemandMemo::new();
-        let input = demand_input([Some(p1), None], lanes, SpecialPolicy::NONE, 8);
-        for _ in 0..60 { assert_eq!(memo.demand(input), Demand { bodies: 5, cold: 0 }); }
+        for _ in 0..60 { assert_eq!(memo.demand(input(&[GAME_WATCH, PALUTENA, PIKACHU], 8)), Demand { bodies: 5, cold: 0 }); }
         assert_eq!(memo.computed, 1);
-        let edited = demand_input([Some(p1), None], [&[GAME_WATCH, PALUTENA, PIKACHU, FOX], &[]], SpecialPolicy::NONE, 8);
-        for _ in 0..60 { memo.demand(edited); }
+        for _ in 0..60 { memo.demand(input(&[GAME_WATCH, PALUTENA, PIKACHU, FOX], 8)); }
         assert_eq!(memo.computed, 2, "a cycle edit computes once");
-        memo.demand(demand_input([Some(p1), None], [&[GAME_WATCH, PALUTENA, PIKACHU, FOX], &[]], SpecialPolicy::NONE, 5));
+        memo.demand(input(&[GAME_WATCH, PALUTENA, PIKACHU, FOX], 5));
         assert_eq!(memo.computed, 3, "a settings change computes once");
     }
     fn the_neighbours_reach_the_planner_only_for_their_own_window() {
@@ -4562,8 +4610,8 @@ mod tests {
             ("a_pinned_window_reload_settles_on_its_target_cell_not_cell_0", a_pinned_window_reload_settles_on_its_target_cell_not_cell_0 as fn()),
             ("the_rest_of_the_lane_is_planned_as_groups_beside_the_target", the_rest_of_the_lane_is_planned_as_groups_beside_the_target as fn()),
             ("the_demand_is_the_planners_own_count", the_demand_is_the_planners_own_count as fn()),
-            ("a_member_past_the_look_ahead_counts", a_member_past_the_look_ahead_counts as fn()),
-            ("a_whole_group_short_is_one_fighter_cold", a_whole_group_short_is_one_fighter_cold as fn()),
+            ("the_whole_numbered_order_is_walked_by_slot", the_whole_numbered_order_is_walked_by_slot as fn()),
+            ("the_kept_groups_are_charged_first", the_kept_groups_are_charged_first as fn()),
             ("the_demand_is_computed_only_when_its_snapshot_changes", the_demand_is_computed_only_when_its_snapshot_changes as fn()),
             ("the_neighbours_reach_the_planner_only_for_their_own_window", the_neighbours_reach_the_planner_only_for_their_own_window as fn()),
             ("a_target_first_reload_keeps_the_built_groups_it_does_not_displace", a_target_first_reload_keeps_the_built_groups_it_does_not_displace as fn()),

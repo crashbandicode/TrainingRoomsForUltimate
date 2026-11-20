@@ -415,42 +415,20 @@ pub(crate) fn preload_targets(menu: &TrainingModpackMenu, role:usize)
     if role==Role::Cpu {
         if let Some(targets)=mii_ordinary_cpu::preload_targets(menu) {return targets;}
     }
-    let mut targets=[None;crate::runtime::roster::cycle_preload::MAX_TARGETS];
-    let mut slots=targets.iter_mut();
-    walk_cycle(menu,role,|kind| slots.next().map(|t| *t=Some(crate::runtime::roster::cycle_preload::Target::fighter(kind))).is_some());
-    targets
-}
-
-/// The cycle from the current fighter on, one kind per step, while `each` takes it.
-fn walk_cycle(menu: &TrainingModpackMenu, role: Role, mut each: impl FnMut(u32) -> bool) {
     let (mut current,mut cursor)={let s=state_for(role).lock();
-        let Some((_,kind))=s.observed else {return;}; (kind,s.cursor)};
+        let Some((_,kind))=s.observed else {return [None;crate::runtime::roster::cycle_preload::MAX_TARGETS];}; (kind,s.cursor)};
     let mut kinds=crate::engine::swap::ordered_roster::KindList::new(0);
     for f in roster_fixed(menu,role).iter() {kinds.push(f.kind());}
     let original=cycle_original(role);
-    loop {
+    let mut targets=[None;crate::runtime::roster::cycle_preload::MAX_TARGETS];
+    for target in &mut targets {
         let at_original=cursor.is_none() && original.is_some_and(|k|cycle_position(&[k],current).is_some());
         let Some((kind,next))=(if at_original {next_from_original(&kinds,original)}
             else {next_cycle(current,cursor,&kinds,original)}) else {break;};
-        if !each(kind) {break;}
+        *target=Some(crate::runtime::roster::cycle_preload::Target::fighter(kind));
         current=kind;cursor=next;
     }
-}
-
-/// Ready Fighters shortfall (review 03:35Z): the role's WHOLE cycle in visit order from the current fighter (each kind
-/// once), for the demand snapshot only; the live look-ahead stays `preload_targets`. A Mii-led role keeps its look-ahead.
-pub(crate) fn cycle_kinds(menu: &TrainingModpackMenu, role: usize) -> crate::engine::swap::ordered_roster::KindList {
-    let mut kinds=crate::engine::swap::ordered_roster::KindList::new(0);
-    let logical=if role==0 {Role::Player}else{Role::Cpu};
-    if !logical.enabled() {return kinds;}
-    let mii=if role==0 {mii_ordinary_player::preload_targets(menu)} else {mii_ordinary_cpu::preload_targets(menu)};
-    if let Some(targets)=mii {
-        for t in targets.iter().flatten() {kinds.push(t.kind);}
-        return kinds;
-    }
-    // The walk comes back round to a kind it has visited when the cycle closes.
-    walk_cycle(menu,logical,|kind| !kinds.contains(&kind) && kinds.push(kind));
-    kinds
+    targets
 }
 
 /// Hat continuation waits for the remembered practice fighter, including owned
@@ -572,7 +550,25 @@ fn roster(m: &TrainingModpackMenu, role: Role) -> Vec<TrioFighter> {
 
 /// `roster` without heap (the preload planner's per-tick form).
 fn roster_fixed(m: &TrainingModpackMenu, role: Role) -> crate::engine::swap::ordered_roster::FighterList {
-    let excluded = match role {
+    let excluded = cycle_excluded(m, role);
+    // P-CYCLE: the one cycle list (`cycle_members`), with no Mii class: this loader cannot load a Mii, and while it
+    // serves the cycle no Mii owner does, so the menu's published admission is none too.
+    let roster = match role {
+        Role::Player => m.player_roster,
+        Role::Cpu => m.cpu_roster,
+    };
+    crate::engine::swap::cycle_members::cycle_members_excluding(roster, crate::engine::swap::cycle_members::NO_MII, excluded)
+}
+
+/// Ready Fighters shortfall: the role's live fighter and cycle cursor, as the walkers step from them.
+fn cycle_slot(role: Role) -> Option<(u32, Option<usize>)> {
+    let s = state_for(role).lock();
+    s.observed.map(|(_, kind)| (kind, s.cursor))
+}
+
+/// The fighter group slot 0 takes out of the numbered cycle (`roster_grid::cycle_exclusion`).
+fn cycle_excluded(m: &TrainingModpackMenu, role: Role) -> Option<u32> {
+    match role {
         Role::Player => crate::engine::swap::roster_grid::cycle_exclusion(
             original_kind(role),
             m.solo_popo_original == OnOff::ON,
@@ -582,14 +578,7 @@ fn roster_fixed(m: &TrainingModpackMenu, role: Role) -> crate::engine::swap::ord
             let solo = m.solo_popo_cpu == OnOff::ON;
             crate::engine::swap::roster_grid::cycle_exclusion(cycle_original(role), solo, solo)
         }
-    };
-    // P-CYCLE: the one cycle list (`cycle_members`), with no Mii class: this loader cannot load a Mii, and while it
-    // serves the cycle no Mii owner does, so the menu's published admission is none too.
-    let roster = match role {
-        Role::Player => m.player_roster,
-        Role::Cpu => m.cpu_roster,
-    };
-    crate::engine::swap::cycle_members::cycle_members_excluding(roster, crate::engine::swap::cycle_members::NO_MII, excluded)
+    }
 }
 
 /// The CPU cycle's Mii admission as the CPU Mii owner last computed it (`cycle_members::cpu_admission`, published from

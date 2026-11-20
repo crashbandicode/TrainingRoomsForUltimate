@@ -977,11 +977,19 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
 /// The kinds a role's groups may hold (rc.6 mid-session cycle change, `body_bank::group_left_cycle`): its cycle's
 /// members, as the cycle list reads them now, and its original.
 fn cycle_wanted(menu: &crate::engine::compat::menu::TrainingModpackMenu, role: usize) -> crate::engine::swap::ordered_roster::KindList {
-    let roster = if role == 0 {
+    wanted_of(&cycle_roster(menu, role), role)
+}
+
+/// A role's admitted cycle (`cycle_members`, Mii classes the role admits included), resolved once per planner pass.
+fn cycle_roster(menu: &crate::engine::compat::menu::TrainingModpackMenu, role: usize) -> crate::engine::swap::ordered_roster::FighterList {
+    if role == 0 {
         crate::engine::swap::cycle_members::cycle_members(menu.player_roster, super::player_cycle_admission())
     } else {
         crate::engine::swap::cycle_members::cycle_members(menu.cpu_roster, super::cpu_cycle_admission())
-    };
+    }
+}
+
+fn wanted_of(roster: &crate::engine::swap::ordered_roster::FighterList, role: usize) -> crate::engine::swap::ordered_roster::KindList {
     let mut wanted = crate::engine::swap::ordered_roster::KindList::new(0);
     for fighter in roster.iter() { wanted.push(fighter.kind()); }
     if let Some(kind) = super::original_kind(if role == 0 { super::Role::Player } else { super::Role::Cpu }) { wanted.push(kind); }
@@ -1026,10 +1034,10 @@ fn shrink_to_ready(settings: &crate::engine::preload::cycle_preload_config::Sett
 /// a Ready window bank; never removes or touches a native object. Returns the
 /// extra-group bodies charged to the shared budget and the per-role UI targets.
 /// A lane's Ice Climbers entry is a group candidate (see `plan_groups`).
-fn popo_candidate(menu: &crate::engine::compat::menu::TrainingModpackMenu, logical_role: super::Role, index: usize,
+fn popo_candidate(menu: &crate::engine::compat::menu::TrainingModpackMenu, logical_role: super::Role, slot: Option<usize>,
     special: SpecialPolicy, policy: GroupPolicy) -> bool {
     super::original_kind(logical_role) != Some(POPO) && {
-        let form = super::requested_forms_at(menu, logical_role, POPO, Some(index));
+        let form = super::requested_forms_at(menu, logical_role, POPO, slot);
         if special.pair { form == Forms::starting(POPO) } else { policy.solo_popo_groups && form == Forms::solo_popo() }
     }
 }
@@ -1060,16 +1068,6 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
     let hats_wanted = lanes[..2].iter().flatten().flatten().count().min(usize::from(settings.slots));
     let policy = group_policy(settings);
     let special = special_policy(settings);
-    // Ready Fighters shortfall (review 03:35Z): each role's whole cycle for the demand snapshot, read before any bank
-    // lock, with the look-ahead's own Ice Climbers rule; the live look-ahead (`upcoming`) is unchanged.
-    let whole: [crate::engine::swap::ordered_roster::KindList; 2] = std::array::from_fn(|role| {
-        let logical_role = if role == 0 { super::Role::Player } else { super::Role::Cpu };
-        let mut kinds = crate::engine::swap::ordered_roster::KindList::new(0);
-        for (i, kind) in super::cycle_kinds(menu, role).iter().copied().enumerate() {
-            if kind != POPO || popo_candidate(menu, logical_role, i, special, policy) { kinds.push(kind); }
-        }
-        kinds
-    });
     let mut windows = [None; 2];
     let mut existing = [crate::engine::compat::fixed::FixedList::<Members, MAX_EXTRA_GROUPS>::new(Members::pair_group()); 2];
     let mut alias = [0usize; 2];
@@ -1080,7 +1078,13 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
     // and serves its still-wanted members meanwhile, and new members are planned beside it into free slots, or it goes
     // now when they need its room (operator rule 2026-11-09 13:21Z, below). The window itself (on screen) stays until it
     // is switched away.
-    let wanted = [cycle_wanted(menu, 0), cycle_wanted(menu, 1)];
+    let rosters = [cycle_roster(menu, 0), cycle_roster(menu, 1)];
+    let wanted = [wanted_of(&rosters[0], 0), wanted_of(&rosters[1], 1)];
+    // Ready Fighters shortfall (review 04:44Z): the whole admitted numbered order and the live slot, read before any bank lock.
+    let logical = [super::Role::Player, super::Role::Cpu];
+    let orders = [0, 1].map(|r| crate::engine::swap::cycle_members::numbered(&rosters[r], super::cycle_excluded(menu, logical[r])));
+    let slots = logical.map(super::cycle_slot);
+    let mut held = [crate::engine::compat::fixed::FixedList::<(Members, GroupState, bool), MAX_EXTRA_GROUPS>::new((Members::pair_group(), GroupState::Released, false)); 2];
     shrink_to_ready(settings, lanes);
     for role in 0..2 {
         let mut state = BANKS[role].lock();
@@ -1120,8 +1124,9 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
                         owner, slot, &seed.kinds()[..seed.count()], seed.special(), seed.count());
                 }
             }
-            for group in bank.groups.iter().filter(|g| g.state.counts_bodies()) {
-                existing[role].push(*group.members);
+            for group in bank.groups.iter() {
+                if group.state.counts_bodies() { existing[role].push(*group.members); }
+                held[role].push((*group.members, group.state, group.leaving));
             }
         }
     }
@@ -1137,15 +1142,18 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
         for kind in lanes[2 + role].iter().enumerate().filter_map(|(i, t)| t.map(|t| (i, t)))
             // Configured targets stay canonical, except a lane Mii under the Mii-group policy.
             .filter(|(_, t)| t.configuration.is_none() || (special.mii && (0x48..=0x4a).contains(&t.kind)))
-            .filter(|(i, t)| t.kind != POPO || popo_candidate(menu, logical_role, *i, special, policy))
+            .filter(|(i, t)| t.kind != POPO || popo_candidate(menu, logical_role, Some(*i), special, policy))
             .map(|(_, t)| t.kind) { kinds.push(kind); }
         kinds
     });
     let budget = GroupBudget { ready_fighters: usize::from(settings.ready_fighters), pool_free, special };
     let planned = plan_extra_groups_with(policy, windows, [&existing[0], &existing[1]], [&upcoming[0], &upcoming[1]],
         originals, budget);
-    let demand = DEMAND.lock().demand(crate::engine::swap::body_bank::DemandInput { policy, windows, lanes: whole, exclude: originals,
-        special, ready_fighters: usize::from(settings.ready_fighters) });
+    let roles = [0, 1].map(|r| crate::engine::swap::body_bank::RoleFacts { window: windows[r], exclude: originals[r],
+        order: &orders[r], current: slots[r], original: super::cycle_original(logical[r]), groups: &held[r] });
+    let input = crate::engine::swap::body_bank::demand_input(policy, special, usize::from(settings.ready_fighters), roles,
+        |r, slot0| popo_candidate(menu, logical[r], (!slot0).then_some(0), special, policy));
+    let demand = DEMAND.lock().demand(input);
     READY_NEED.store(demand.bodies.min(usize::from(u8::MAX)) as u8, Ordering::Release);
     READY_COLD.store(demand.cold.min(usize::from(u8::MAX)) as u8, Ordering::Release);
     let mut bodies = 0usize;
