@@ -664,14 +664,31 @@ pub fn distance_dodge(
     }
 }
 
+const ATTACK_INPUT: u64 = u64::MAX;
+
 pub fn attack_key(
     status: i32,
     input: u32,
     native_motion: impl FnOnce() -> u64,
-    konst: impl Fn(super::super::cpu::ids::C) -> i32,
+    konst: impl Fn(crate::model::cpu::ids::C) -> i32,
 ) -> Option<u64> {
-    use super::super::cpu::ids::{C, UNRESOLVED};
-    const ATTACK_INPUT: u64 = u64::MAX;
+    use crate::model::{cpu::ids::{C, UNRESOLVED}, hash40::hash40};
+
+    // A smash can transition from startup to charge to release with different motions.
+    const SMASHES: [([C; 3], u64); 3] = [
+        ([C::StatusAttackHi4Start, C::StatusAttackHi4Hold, C::StatusAttackHi4], hash40("attack_hi4")),
+        ([C::StatusAttackLw4Start, C::StatusAttackLw4Hold, C::StatusAttackLw4], hash40("attack_lw4")),
+        ([C::StatusAttackS4Start, C::StatusAttackS4Hold, C::StatusAttackS4], hash40("attack_s4_s")),
+    ];
+    if status == UNRESOLVED {
+        return (input & 3 != 0).then_some(ATTACK_INPUT);
+    }
+    for (phases, key) in SMASHES {
+        if phases.map(&konst).contains(&status) {
+            return Some(key);
+        }
+    }
+
     let attacks = [
         C::StatusAttack,
         C::StatusAttackDash,
@@ -679,18 +696,12 @@ pub fn attack_key(
         C::StatusAttackHi3,
         C::StatusAttackLw3,
         C::StatusAttackAir,
-        C::StatusAttackHi4Start,
-        C::StatusAttackLw4Start,
-        C::StatusAttackS4Start,
-        C::StatusAttackHi4,
-        C::StatusAttackLw4,
-        C::StatusAttackS4,
         C::StatusSpecialN,
         C::StatusSpecialS,
         C::StatusSpecialHi,
         C::StatusSpecialLw,
     ];
-    let motion = (status != UNRESOLVED && attacks.map(konst).contains(&status))
+    let motion = attacks.map(konst).contains(&status)
         .then(native_motion)
         .filter(|&motion| motion != 0);
     motion.or_else(|| (input & 3 != 0).then_some(ATTACK_INPUT))
@@ -720,7 +731,7 @@ impl ThreatClock {
     ) -> Correction {
         if self.attack != attack {
             // Input can precede the first attack-motion sample by one or more frames.
-            if self.attack != Some(u64::MAX) || attack.is_none() {
+            if self.attack != Some(ATTACK_INPUT) || attack.is_none() {
                 self.since = frame;
             }
             self.attack = attack;
@@ -1128,7 +1139,11 @@ mod tests {
 
         // Native Mario P1 entered 0x33 -> 0x34 -> 0x35 at seq 26729/26742/26745
         // in the exact 3a29e6af j-h2 command 010. A longer hold exposes both floors.
-        let ids = Table::with(&[(C::StatusAttackHi4Start, 0x33), (C::StatusAttackHi4, 0x35)]);
+        let ids = Table::with(&[
+            (C::StatusAttackHi4Start, 0x33),
+            (C::StatusAttackHi4Hold, 0x34),
+            (C::StatusAttackHi4, 0x35),
+        ]);
         let key = |status, input, motion| attack_key(status, input, || hash40(motion), |c| ids.get(c));
         let mut clocks = [ThreatClock::default(), ThreatClock::default()];
         for clock in &mut clocks {
