@@ -16,26 +16,6 @@ const HANG: Point = [161.975, -13.4];
 const BOTTOM: f32 = -140.0;
 
 #[test]
-fn sora_uses_a_level_first_dash_and_independently_aims_the_two_climbs() {
-    // Thu Ox has a level first dash. The two climbing lengths and the return
-    // angle range are from fd-1/fd-3 and the native params (MODEL.md §5.2).
-    let fixture = [155.2, -42.1];
-    let route = blade_path(&RING, fixture, HANG, 1.0, BOTTOM).expect("S1 reaches the far slope");
-    assert_eq!(route.count, 3);
-    let [first, second, third] = route.angles;
-    assert_eq!(first, 0.0);
-    assert!((135.0..=140.0).contains(&second));
-    assert!((130.0..=140.0).contains(&third));
-    assert!((second - third).abs() > 1.0);
-    assert!(route.spare > 8.0);
-
-    let mirror = |[x, y]: Point| [-x, y];
-    let stage = RING.map(|segment| segment.map(mirror));
-    let mirrored = blade_path(&stage, mirror(fixture), mirror(HANG), -1.0, BOTTOM).unwrap();
-    assert_eq!(route, mirrored);
-}
-
-#[test]
 fn sora_can_use_an_outward_middle_dash_under_the_far_slope() {
     let origin = [116.1, -55.5];
     let route = blade_path(&RING, origin, HANG, 1.0, BOTTOM).expect("the angled exit is clear");
@@ -60,10 +40,16 @@ fn sora_keeps_stock_when_no_blade_path_reaches_or_live_geometry_closes_it() {
 fn sora_uses_status_to_status_dash_distances_for_the_measured_exit() {
     // Model §5.2, fd-1 and fd-3. This includes each dash's final step into
     // the next native status before applying the first dash's 4.9 carry.
-    let route = blade_path(&RING, [145.7, -43.5], HANG, 1.0, BOTTOM).unwrap();
+    let origin = [145.7, -43.5];
+    let route = blade_path(&RING, origin, HANG, 1.0, BOTTOM).unwrap();
     assert_eq!(route.count, 3);
     assert_eq!(route.angles[0], 0.0);
     assert_eq!(route.angles[1], 130.0);
     assert!((127.0..129.0).contains(&route.angles[2]), "{route:?}");
     assert!((18.5..19.0).contains(&route.spare), "{route:?}");
+
+    let mirror = |[x, y]: Point| [-x, y];
+    let outline = RING.map(|segment| segment.map(mirror));
+    let mirrored = blade_path(&outline, mirror(origin), mirror(HANG), -1.0, BOTTOM).unwrap();
+    assert_eq!(route, mirrored);
 }

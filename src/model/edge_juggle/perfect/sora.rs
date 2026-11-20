@@ -10,11 +10,11 @@ pub struct BladePath {
     pub spare: f32,
 }
 
-// Model §5.2: the first Blade moves level, then carries a further 4.9. The
-// second and third can rise. Reserve four units of the final dash for error.
-const FIRST_AND_CARRY: f32 = 34.2 + 4.9;
-const SECOND_UP: f32 = 27.6;
-const THIRD_UP: f32 = 24.0;
+// Model §5.2: measure each Blade through the first sample of the next
+// native status. The first moves level, then carries a further 4.9.
+const FIRST_AND_CARRY: f32 = 36.4 + 4.9;
+const SECOND_UP: f32 = 30.2;
+const THIRD_UP: f32 = 26.3;
 const MIN_SPARE: f32 = 4.0;
 // The 13.0.5 native underside contact gap is 7.43, plus ~1 unit of clearance.
 const BODY_HEIGHT: f32 = 8.4;
