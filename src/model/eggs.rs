@@ -398,9 +398,7 @@ impl Run {
         [whole.map(|at| (at, EGG_WHOLE)), a, b]
     }
 
-    /// A fresh run (the menu closed with the row on, or a reset): score 0, a full clock, the first egg once the camera has held
-    /// still for `SETTLE` draws (a reset moves it, so the view from before is dropped, and the one right after is still on its
-    /// way).
+    /// A fresh run (the menu closed with the row on, or a reset): score 0, a full clock and no view from the previous run.
     pub fn start(&mut self, rows: [u8; 5], seed: u32) {
         let (rng, best) = ((self.rng ^ seed) | 1, self.best);
         *self = Run::IDLE;
@@ -461,16 +459,16 @@ impl Run {
     /// A first target that uses the screen bounds waits for the camera to settle. Complete Whole stage bounds
     /// are in world coordinates and remain usable while the camera moves.
     fn spawn(&mut self, last: Option<[f32; 2]>) -> Option<()> {
-        let ready = |view: &View| last.is_some() || self.still >= SETTLE || (self.rows[4] == WHOLE && view.3.is_some());
-        let View(s, o, range, vertical) = self.view.filter(|view| !self.pending && ready(view))?;
+        let View(s, o, range, vertical) = self.view.filter(|_| !self.pending)?;
+        let whole = self.rows[4] == WHOLE;
+        (last.is_some() || self.still >= SETTLE || (whole && vertical.is_some())).then_some(())?;
         let edge = |i: usize, c: f32| (c * CANVAS_HALF[i] - o[i]) / s[i] - c * RADIUS;
-        let (sx0, sx1, top, bottom) = if self.rows[4] == WHOLE {
-            let [sx0, sx1] = [range[0] + RADIUS, range[1] - RADIUS];
+        let (sx0, sx1, top, bottom) = if whole {
             let (top, bottom) = match vertical {
                 Some([lo, hi]) => (hi - RADIUS, lo + RADIUS),
                 None => (edge(1, 1.0), edge(1, -1.0)),
             };
-            (sx0, sx1, top, bottom)
+            (range[0] + RADIUS, range[1] - RADIUS, top, bottom)
         } else {
             let [sx0, sx1] = range.map(|v| v.max(edge(0, -1.0)).min(edge(0, 1.0)));
             (sx0, sx1, edge(1, 1.0), edge(1, -1.0))
