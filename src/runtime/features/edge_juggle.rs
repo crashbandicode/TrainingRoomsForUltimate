@@ -243,7 +243,7 @@ pub fn allowed() -> bool {
         return false;
     }
     if super::recording_host::cpu_playback_blocks_drill() {
-        notices::refuse("Stop CPU playback before starting this drill");
+        notices::refuse("Stop CPU playback before starting this drill"); // restriction: edge-juggle-cpu-playback-busy
         return false;
     }
     true
