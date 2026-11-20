@@ -202,6 +202,7 @@ pub enum Editor {
     ParrySave,
     /// Mash out: the portrait grid of fighters, a popup of each fighter's moves over its chip.
     MashoutPicker,
+    PracticeCpu(super::super::edge_juggle::Drill),
 }
 
 /// A read-only row.
@@ -282,7 +283,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 159] = [
+pub static ROWS: [Row; 161] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -608,8 +609,9 @@ pub static ROWS: [Row; 159] = [
       "Saves the CPU's active macro and Loop as a practice.\nIts start save is the macro's own."),
     r(EDGE, "Start", "", Control::Start(Game::GuardEdge),
       "Starts with the last setup for this stage or opens the wizard.\nWhile it runs, this row reads Stop."),
-    r(EDGE, "Difficulty", "edge_difficulty", Control::Dropdown(&["Level 9", "Perfect"]),
-      "Level 9 uses the stock CPU. Perfect adds recovery corrections."),
+    r(EDGE, "CPU fighter and mode", "edge_difficulty",
+      Control::Editor(Editor::PracticeCpu(crate::model::edge_juggle::Drill::GuardEdge)),
+      "Pick the CPU fighter and its recovery behavior. X changes the CPU level in the fighter popup."),
     r(EDGE, "Reaction", "edge_reaction", Control::Dropdown(&["Frame-perfect", "Human 12 f", "Custom"]),
       "Delay before the CPU reacts to your actions.\nA selects a preset. Left or Right adjusts Custom."),
     r(EDGE, "Set up…", "", Control::Editor(Editor::EdgeJuggleSetup(Game::GuardEdge)),
@@ -618,16 +620,21 @@ pub static ROWS: [Row; 159] = [
       "CPU damage at the start of each attempt.\nThe CPU starts in free fall."),
     r(EDGE, "Attempts", "edge_attempts", Control::Dropdown(&["10", "20", "Free"]),
       "Stop scoring after 10 or 20 attempts, or practise freely.\nUnresolved attempts do not count."),
+    r(EDGE, "Zoom landing window", "edge_zoom_window", Control::Number { first: 1, step: 1 },
+      "Frames after touchdown that still count as a Zoom win. Hero starts each Zoom with enough MP."),
     r(JUGGLE, "Start", "", Control::Start(Game::Juggler),
       "Starts with the last setup for this stage or opens the wizard.\nWhile it runs, this row reads Stop."),
-    r(JUGGLE, "Difficulty", "juggle_difficulty", Control::Dropdown(&["Level 9", "Perfect"]),
-      "Level 9 uses the stock CPU. Perfect adds escape corrections."),
+    r(JUGGLE, "CPU fighter and mode", "juggle_difficulty",
+      Control::Editor(Editor::PracticeCpu(crate::model::edge_juggle::Drill::Juggler)),
+      "Pick the CPU fighter and its escape behavior. X changes the CPU level in the fighter popup."),
     r(JUGGLE, "Reaction", "juggle_reaction", Control::Dropdown(&["Frame-perfect", "Human 12 f", "Custom"]),
       "Delay before the CPU reacts to your actions.\nA selects a preset. Left or Right adjusts Custom."),
     r(JUGGLE, "Set up…", "", Control::Editor(Editor::EdgeJuggleSetup(Game::Juggler)),
       "Choose the CPU's height, position and percent, then your point.\nPreview both positions before starting."),
     r(JUGGLE, "Attempts", "juggle_attempts", Control::Dropdown(&["10", "20", "Free"]),
       "Finish a set of 10 or 20 attempts, or practise freely.\nThe clock starts at release."),
+    r(JUGGLE, "Zoom landing window", "juggle_zoom_window", Control::Number { first: 1, step: 1 },
+      "Frames after touchdown that still count as a Zoom win. Hero starts each Zoom with enough MP."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

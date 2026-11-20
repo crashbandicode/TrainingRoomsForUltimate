@@ -200,7 +200,9 @@ impl Role {
 /// Owner of a fighter the roster observes or settles without an ordinary-CPU request receipt: a practice game's live
 /// temporary CPU fighter is `Practice` (`mashout::temporary_cpu_selection`), everything else the user's.
 fn live_owner(role: Role, kind: u32) -> Requester {
-    if role == Role::Cpu && crate::runtime::features::mashout::temporary_cpu_selection(kind) {
+    if role == Role::Cpu && (crate::runtime::features::mashout::temporary_cpu_selection(kind)
+        || crate::runtime::features::edge_juggle::practice_cpu::temporary(kind))
+    {
         Requester::Practice
     } else {
         Requester::User
@@ -897,6 +899,10 @@ pub fn request_practice_cpu_kind(kind: u32) -> bool {
 /// Player 1's fighter kind as the loader last observed it (None before a practice entry).
 pub fn player_kind() -> Option<u32> {
     state_for(Role::Player).lock().observed.map(|(_, kind)| kind)
+}
+
+pub fn cpu_kind() -> Option<u32> {
+    state_for(Role::Cpu).lock().observed.map(|(_, kind)| kind)
 }
 
 /// Ask the existing loader to change Player 1 to `kind` (a combo's recorded

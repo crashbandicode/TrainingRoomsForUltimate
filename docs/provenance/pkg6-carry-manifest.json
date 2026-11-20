@@ -379,7 +379,7 @@
       "dest": "src/model/seams/native_seams/mod.rs",
       "crate": "consts",
       "src_sha256": "9c16e57af94e9f6424c92a5bd3de8df64508eb3cda01ff7c4eb9c1054c8338e3",
-      "dest_sha256": "608b9ba25f2ec2cbe19d88e05e1003ac5298f3ec4c138cd9ddf7fd2bf2265c6f",
+      "dest_sha256": "441ad5441e9d68af8ade2aa36f81e82f2c22f5439a31aae08b46c3dfccbc8efa",
       "edits": [
         {
           "old": "        first.then_some(seam.offset)\n    })\n}\n\n/// The 64-byte comparison of one site.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum GuardOutcome {\n    /// Identical to 13.0.5.\n    Stock,\n    /// Only Skyline hook shapes differ. `at` is the byte offset of the first; `usable` applies the\n    /// kind's rule (false: another plugin owns the words we would replace or rely on).\n    HookedByOther { at: usize, usable: bool },\n    /// A `Sharing::EntryOrBody` entry row whose entry another plugin's far jump owns, with the body\n    /// after it stock: usable, through the body site (`entry_or_body_outcome`).\n    Shared,\n    /// A change that is not a hook: the site is left alone.\n    Foreign { first_diff: usize },\n}\n\nimpl GuardOutcome {\n    pub const fn usable(self) -> bool {\n        match self {\n            GuardOutcome::Stock | GuardOutcome::Shared => true,\n            GuardOutcome::HookedByOther { usable, .. } => usable,\n            GuardOutcome::Foreign { .. } => false,\n        }\n    }\n\n    /// The install line's word for the outcome.\n    pub const fn code(self) -> &'static str {\n        match self {\n            GuardOutcome::Stock => \"stock\",\n            GuardOutcome::HookedByOther { usable: true, .. } => \"other\",\n            GuardOutcome::HookedByOther { usable: false, .. } => \"occupied\",\n            GuardOutcome::Shared => \"shared\",\n            GuardOutcome::Foreign { .. } => \"foreign\",\n        }\n    }\n}\n\nconst WORDS: usize = GUARD_BYTES / 4;\nconst NOP: u32 = 0xd503_201f;\nconst LDR_X17_LITERAL_8: u32 = 0x5800_0051;\nconst BR_X17: u32 = 0xd61f_0220;\nconst B_MASK: u32 = 0xfc00_0000;\nconst B_OPCODE: u32 = 0x1400_0000;\n\nfn words(bytes: &[u8; GUARD_BYTES]) -> [u32; WORDS] {\n    let mut out = [0u32; WORDS];\n    for (i, word) in out.iter_mut().enumerate() {\n        *word = u32::from_le_bytes([bytes[4 * i], bytes[4 * i + 1], bytes[4 * i + 2], bytes[4 * i + 3]]);\n    }\n    out\n}\n\n/// Length in words of a Skyline hook shape starting at word `i` (cut at the end of the window).\nfn hook_shape(actual: &[u32; WORDS], i: usize) -> Option<usize> {\n    let at = |k: usize| actual.get(i + k).copied();\n    let len = if at(0) == Some(NOP) && at(1) == Some(LDR_X17_LITERAL_8) && at(2) == Some(BR_X17) {\n        5\n    } else if at(0) == Some(LDR_X17_LITERAL_8) && at(1) == Some(BR_X17) {\n        4\n    } else if actual[i] & B_MASK == B_OPCODE {\n        1\n    } else {\n        return None;\n    };\n    Some(len.min(WORDS - i))\n}\n\n/// Whether a hook shape at word `word` takes words this kind needs as they are.\nconst fn blocks(kind: SeamKind, word: usize) -> bool {\n    match kind {\n        SeamKind::Hook { .. } => word < HOOK_SPAN_WORDS,\n        SeamKind::Called => false,\n        SeamKind::Relied => word == 0,\n    }\n}\n\n/// Compare a site's 64 bytes now (`actual`) with its 13.0.5 bytes (`expected`).\npub fn guard_outcome(expected: &[u8; GUARD_BYTES], actual: &[u8; GUARD_BYTES], kind: SeamKind) -> GuardOutcome {\n    let expected = words(expected);\n    let actual = words(actual);\n    let mut first_hook = None;\n    let mut usable = true;\n    let mut i = 0;\n    while i < WORDS {\n        if actual[i] == expected[i] {\n            i += 1;\n            continue;\n        }\n        let Some(len) = hook_shape(&actual, i) else {\n            return GuardOutcome::Foreign { first_diff: 4 * i };\n        };\n        first_hook.get_or_insert(4 * i);\n        // A shape that starts inside the span also covers every word it spans.\n        if (i..i + len).any(|w| blocks(kind, w)) {\n            usable = false;\n        }\n        i += len;\n    }\n    match first_hook {\n        None => GuardOutcome::Stock,\n        Some(at) => GuardOutcome::HookedByOther { at, usable },\n    }\n}\n",
@@ -634,6 +634,21 @@
           "old": "rows_cpu_level::ROWS, rows_res_unload::ROWS,",
           "new": "rows_cpu_level::ROWS, rows_edge_juggle::ROWS, rows_res_unload::ROWS,",
           "reason": "Guard the Edge and Juggler register their own guarded Training-only capability with the existing installer. Existing rows and guard comparisons are unchanged."
+        },
+        {
+          "old": "pub(crate) mod rows_edge_juggle;\n",
+          "new": "pub(crate) mod rows_edge_juggle;\npub(crate) mod rows_edge_zoom;\n",
+          "reason": "rc.15 drill picker: register Hero Zoom guard rows"
+        },
+        {
+          "old": "const TABLES: [&[Seam]; 16] = [\n",
+          "new": "const TABLES: [&[Seam]; 17] = [\n",
+          "reason": "rc.15 drill picker: register Hero Zoom guard rows"
+        },
+        {
+          "old": "    rows_lobby_items::ROWS, rows_lobby_persist::ROWS, rows_cpu_level::ROWS, rows_edge_juggle::ROWS, rows_res_unload::ROWS,\n",
+          "new": "    rows_lobby_items::ROWS, rows_lobby_persist::ROWS, rows_cpu_level::ROWS, rows_edge_juggle::ROWS, rows_edge_zoom::ROWS, rows_res_unload::ROWS,\n",
+          "reason": "rc.15 drill picker: register Hero Zoom guard rows"
         }
       ]
     },
@@ -11020,7 +11035,7 @@
       "dest": "src/runtime/seams/seam_install.rs",
       "crate": "root",
       "src_sha256": "8c81d985258c0189ec1161fdc60efe573952596c55325cce07fbe9dc8c7503cd",
-      "dest_sha256": "28b9027d9006d09f682d803b2ff7c032ebeafe491109ba557079ee1853e66cc9",
+      "dest_sha256": "583d287b08ff9b901b2ae6b3751e08e763b51c509c438638c78dad468d77da93",
       "edits": [
         {
           "old": "use crate::model;\n",
@@ -11146,6 +11161,11 @@
           "old": "fn count(code: u8) -> usize {\n    native_seams::SITES\n        .iter()\n        .enumerate()\n        .filter(|(index, _)| OUTCOMES[*index].load(Ordering::Relaxed) & CODE_MASK == code)\n        .count()\n}\n\n/// The seam fields of the plugin's one install line (recorded clean-room change: the fork wrote a second line of its own here,\n/// `[TrainingModpack] result=installed ...`; package 1's `InstallLine` takes these as its `seams` group). From the moment the\n/// fields are formatted a new or changed outcome is reported late, so a row another thread checks while the line is written\n/// appears in both rather than in neither. The line carries counts and the rows that fail; the authoritative group lists and the\n/// unchecked image labels (static configuration, and image rows that load later) stay out of it: the late report names them (the\n/// first Eden boot showed the full lists cut the one line before `result=`).\npub(crate) struct InstallFields;\n\nimpl fmt::Display for InstallFields {\n    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {\n        BOOTED.store(true, Ordering::Release);\n        let rows = native_seams::COUNT;\n        let checked = rows - count(UNCHECKED);\n        write!(\n            f,\n            \"seams={} seams_stock={} seams_other={} seams_skipped={} seams_shadow_diff={} seams_missing={} seams_external={} seams_unchecked={} seams_images_unchecked={}{}\",\n            checked,\n            count(STOCK),\n            Labels { keep: listed_as_other, with_code: other_with_code },\n            Labels { keep: |b| b & SKIPPED != 0, with_code: |_| true },\n            Labels { keep: |b| b & SHADOW_DIFF != 0, with_code: |_| true },\n            Missing,\n            Labels { keep: |b| b & CODE_MASK == EXTERNAL, with_code: |_| false },\n            count(UNCHECKED),\n            IMAGE_OUTCOMES.iter().filter(|slot| slot.load(Ordering::Relaxed) & CODE_MASK == UNCHECKED).count(),\n            DrillFields,\n        )\n    }\n}\n",
           "new": "/// The seam fields of the plugin's one install line (recorded clean-room change: the fork wrote a second line of its own here,\n/// `[TrainingModpack] result=installed ...`; package 1's `InstallLine` takes these as its `seams` group). From the moment the\n/// fields are formatted a new or changed outcome is reported late, so a row another thread checks while the line is written\n/// appears in both rather than in neither. The line carries counts and the rows that fail; the authoritative group lists and the\n/// unchecked image labels (static configuration, and image rows that load later) stay out of it: the late report names them (the\n/// first Eden boot showed the full lists cut the one line before `result=`).\npub(crate) struct InstallFields;\n\nimpl fmt::Display for InstallFields {\n    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {\n        BOOTED.store(true, Ordering::Release);\n        // Every list sees the same outcome for each row, including late updates during boot.\n        let outcomes = OUTCOMES.each_ref().map(|slot| slot.load(Ordering::Relaxed));\n        let count = |code| outcomes.iter().filter(|&&bits| bits & CODE_MASK == code).count();\n        let checked = native_seams::COUNT - count(UNCHECKED);\n        write!(\n            f,\n            \"seams={} seams_stock={} seams_other={} seams_skipped={} seams_shadow_diff={} seams_missing={} seams_external={} seams_unchecked={} seams_images_unchecked={}{}\",\n            checked,\n            count(STOCK),\n            Labels { outcomes: &outcomes, keep: listed_as_other, with_code: other_with_code },\n            Labels { outcomes: &outcomes, keep: |b| b & SKIPPED != 0, with_code: |_| true },\n            Labels { outcomes: &outcomes, keep: |b| b & SHADOW_DIFF != 0, with_code: |_| true },\n            Missing,\n            Labels { outcomes: &outcomes, keep: |b| b & CODE_MASK == EXTERNAL, with_code: |_| false },\n            count(UNCHECKED),\n            IMAGE_OUTCOMES.iter().filter(|slot| slot.load(Ordering::Relaxed) & CODE_MASK == UNCHECKED).count(),\n            DrillFields,\n        )\n    }\n}\n",
           "reason": "Use the same seam outcome for the counts and the exclusive report lists."
+        },
+        {
+          "old": "    \"custom_stages\",\n",
+          "new": "    \"custom_stages\",\n    \"edge_zoom\",\n",
+          "reason": "rc.15 drill picker: publish the Hero Zoom guard group through the existing seam gate"
         }
       ]
     },
@@ -12508,7 +12528,7 @@
       "dest": "src/runtime/roster/character_roster.rs",
       "crate": "root",
       "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-      "dest_sha256": "03ff6f9555bd3d60baa239ead108c7aba03ca636a20e9605f54613251fecd958",
+      "dest_sha256": "ef7492e1b1eb2568929e5227ebaed9da779a8c5354123e99e0d203afe88c199c",
       "edits": [
         {
           "old": "fn notify(role: Role, message: String) {",
@@ -14141,6 +14161,16 @@
           "old": "    let excluded = match role {\n",
           "new": "    let excluded = cycle_excluded(m, role);\n    // P-CYCLE: the one cycle list (`cycle_members`), with no Mii class: this loader cannot load a Mii, and while it\n    // serves the cycle no Mii owner does, so the menu's published admission is none too.\n    let roster = match role {\n        Role::Player => m.player_roster,\n        Role::Cpu => m.cpu_roster,\n    };\n    crate::engine::swap::cycle_members::cycle_members_excluding(roster, crate::engine::swap::cycle_members::NO_MII, excluded)\n}\n\n/// Ready Fighters shortfall: the role's live fighter and cycle cursor, as the walkers step from them.\nfn cycle_slot(role: Role) -> Option<(u32, Option<usize>)> {\n    let s = state_for(role).lock();\n    s.observed.map(|(_, kind)| (kind, s.cursor))\n}\n\n/// The fighter group slot 0 takes out of the numbered cycle (`roster_grid::cycle_exclusion`).\nfn cycle_excluded(m: &TrainingModpackMenu, role: Role) -> Option<u32> {\n    match role {\n",
           "reason": "rc15 ready-fighters-shortfall (operator 2026-11-20 ~01:22Z: 'yes add the ready fighters fix to this build'; review-menu-astra 03:35Z, 04:44Z, 06:07Z): body_bank::cycle_demand counts what the cycles need and which fighters (picks; a pair is one) stay cold by the planner's own placement over the admitted whole numbered order (by slot) of each role that cycles, beside the groups it keeps, from a snapshot recomputed only when it changes; the Fighters notice says 'Ready Fighters 8/9: 1 stays cold' and is raised again when R, N or cold changes."
+        },
+        {
+          "old": "    if role == Role::Cpu && crate::runtime::features::mashout::temporary_cpu_selection(kind) {\n",
+          "new": "    if role == Role::Cpu && (crate::runtime::features::mashout::temporary_cpu_selection(kind)\n        || crate::runtime::features::edge_juggle::practice_cpu::temporary(kind))\n    {\n",
+          "reason": "rc.15 drill picker: reuse Practice ownership and provide the CPU kind to the game-frame roster service"
+        },
+        {
+          "old": "    state_for(Role::Player).lock().observed.map(|(_, kind)| kind)\n",
+          "new": "    state_for(Role::Player).lock().observed.map(|(_, kind)| kind)\n}\n\npub fn cpu_kind() -> Option<u32> {\n    state_for(Role::Cpu).lock().observed.map(|(_, kind)| kind)\n",
+          "reason": "rc.15 drill picker: reuse Practice ownership and provide the CPU kind to the game-frame roster service"
         }
       ]
     },

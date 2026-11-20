@@ -51,7 +51,7 @@ mod tech {
 }
 
 mod edge_juggle {
-    pub fn allowed() -> bool { false }
+    pub fn allowed(_: crate::model::edge_juggle::Drill) -> bool { false }
     pub fn start(_: bool) {}
 }
 

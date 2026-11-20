@@ -87,6 +87,7 @@ const AUTHORITATIVE: &[&str] = &[
     "training_stage_rotation",
     // rc.14 custom stages: the loader is called only when every row is stock (approved fail-safe guard).
     "custom_stages",
+    "edge_zoom",
     "hazard_manager",
     "game_mode",
     "character_sources",

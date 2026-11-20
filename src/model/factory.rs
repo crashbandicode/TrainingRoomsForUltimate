@@ -29,8 +29,8 @@ const fn ones<const N: usize>(at: &[usize]) -> [u8; N] {
 }
 
 macro_rules! row {
-    ($id:literal, $kind:ident, $len:literal, $at:expr) => {
-        Def { id: $id, kind: Kind::$kind, len: $len, default: &ones::<$len>(&$at) }
+    ($id:literal, $kind:ident, $len:expr, $at:expr) => {
+        Def { id: $id, kind: Kind::$kind, len: $len, default: &ones::<{ $len }>(&$at) }
     };
 }
 
@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 164;
+pub const COUNT: usize = 170;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -259,10 +259,16 @@ pub static DEFS: [Def; COUNT] = [
     Def { id: "tech_delay_range", kind: Kind::Slider { max: 150 }, len: 2, default: &[20, 20] },
     row!("tech_camera", Single, 2, [0]),
     row!("tech_wizard_skip", Single, 2, [1]),
-    row!("edge_difficulty", Single, 2, [0]),
+    row!("edge_difficulty", Single, super::edge_juggle::picker::MODE_CHOICES, [0]),
+    row!("edge_cpu_fighter", Single, super::edge_juggle::picker::FIGHTER_CHOICES, [0]),
+    row!("edge_cpu_level", Single, 9, [8]),
+    row!("edge_zoom_window", Single, 30, [9]),
     row!("edge_reaction", Single, 3, [1]),
     row!("edge_reaction_frames", Single, 30, [11]),
-    row!("juggle_difficulty", Single, 2, [0]),
+    row!("juggle_difficulty", Single, super::edge_juggle::picker::MODE_CHOICES, [0]),
+    row!("juggle_cpu_fighter", Single, super::edge_juggle::picker::FIGHTER_CHOICES, [0]),
+    row!("juggle_cpu_level", Single, 9, [8]),
+    row!("juggle_zoom_window", Single, 30, [9]),
     row!("juggle_reaction", Single, 3, [1]),
     row!("juggle_reaction_frames", Single, 30, [11]),
     row!("edge_cpu_percent", Single, 301, [100]),

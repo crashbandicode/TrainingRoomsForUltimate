@@ -2156,3 +2156,11 @@ ceiling = 171833
 date = "2026-11-20"
 reason = "rc.15 Spacing grader (review-visualizer-astra 07:46Z fixes: hurt-layout prerequisites, published lane identities, owner at capture, projectile+helper grading, recorded-column target tags; review-visualizer-astra 12:50Z B1 frame-side lane reads), rebased on 79cc06f1. Measured 171833 at 91cbb9b0 (tools/size_gate.py; main 79cc06f1 measured 171026), +807. Raises main's 171026 ceiling by the measured delta only."
 approved_by = "Primary c07b3449 (2026-11-20): explicit budget approval in the lead handoff; measured delta only."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 172620
+date = "2026-11-20"
+reason = "Guard the Edge and Juggler reuse Mash out's CPU picker and add the Hero Zoom drill. The picker, native command adapter, scoring and game-frame roster integration measure 172620 on base 5a1fac9e, +787 over 171833."
+approved_by = "Operator and primary e7ee8f1c, 2026-11-20 drill picker assignment: one entry with the measured delta."

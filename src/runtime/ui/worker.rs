@@ -341,6 +341,7 @@ fn run() {
 
 /// The `tr.menu/1` snapshot for the optional test bridge (`model::bridge_state`); one relaxed load when it is off.
 fn publish_bridge_state(s: &mut Session) {
+    use crate::model::menu::grid::{GridKind, RosterUse};
     if !crate::runtime::bridge_state::enabled() {
         return;
     }
@@ -351,14 +352,25 @@ fn publish_bridge_state(s: &mut Session) {
         let m = menu.as_ref();
         let row = m.and_then(|m| m.help_row());
         let group = m.and_then(|m| match m.screen() { Some(Screen::Rows { group, .. }) => Some(*group), _ => None });
-        let editor = panel.map(|e| format!("{e:?}"));
+        let practice_picker = m.and_then(|m| {
+            let Some(Screen::Grid { layout, .. }) = m.screen() else { return None };
+            let GridKind::Roster(RosterUse::PracticeCpu(game)) = layout.kind else { return None };
+            Some((game, m.practice_cpu_popup().map(|_| m.practice_cpu_pick(game))))
+        });
+        let editor = practice_picker.map(|(game, _)| format!("PracticeCpu({game:?})"))
+            .or_else(|| panel.map(|e| format!("{e:?}")));
+        let practice_pick = practice_picker.and_then(|(_, pick)| pick);
+        let mut editor_sel_key = String::new();
+        if let Some(pick) = practice_pick {
+            let _ = pick.mode().write(&mut editor_sel_key);
+        }
         // The selection inside the screen showing: the Mash out popup's line first, else the screen's own cursor/cell.
-        let editor_sel = m.and_then(|m| m.mashout_popup().or(match m.screen() {
+        let editor_sel = practice_pick.map(|pick| pick.choice).or_else(|| m.and_then(|m| m.mashout_popup().or(match m.screen() {
             Some(Screen::List { cursor, .. } | Screen::Checklist { cursor, .. } | Screen::Delay { cursor, .. }
                 | Screen::SwapGroups { cursor } | Screen::Overrides { cursor, .. } | Screen::Chords { cursor }) => Some(*cursor),
             Some(Screen::Grid { cell, .. }) => Some(*cell),
             _ => None,
-        })).map(|i| i as i64);
+        }))).map(|i| i as i64);
         let keyboard = crate::runtime::macros::named_macros::naming_pending();
         let action = crate::runtime::bridge_state::action(row);
         let active = crate::runtime::features::practice::active();
@@ -373,6 +385,7 @@ fn publish_bridge_state(s: &mut Session) {
             action: &action,
             editor: editor.as_deref(),
             editor_sel,
+            editor_sel_key: &editor_sel_key,
             keyboard,
             game: active.map(|g| g.title()),
             game_running: crate::runtime::features::practice::running().is_some(),
@@ -1194,20 +1207,23 @@ fn publish_frame(s: &Session) {
                     editor.decorate(&mut next, focused);
                 }
             }
-            if layout.kind == GridKind::Roster(crate::model::menu::grid::RosterUse::Mashout) {
-                let editor = s.roster.filter(|e| e.use_() == crate::model::menu::grid::RosterUse::Mashout)
-                    .unwrap_or_else(|| crate::editors::roster::RosterEditor::new(crate::model::menu::grid::RosterUse::Mashout));
-                editor.decorate_mashout(&mut next, menu);
-            } else if let crate::model::menu::grid::GridKind::Roster(use_) = layout.kind {
+            if let GridKind::Roster(use_) = layout.kind {
+                use crate::model::menu::grid::RosterUse;
                 let mut editor = s.roster.filter(|e| e.use_() == use_).unwrap_or_else(|| crate::editors::roster::RosterEditor::new(use_));
-                editor.set_mii(mii_tiles(&s.mii));
-                let values = editor.values(menu.kept(editor.key()));
-                editor.decorate(&mut next, &values);
-                let numbers = editor.decorate_badges(&mut next, menu);
-                if editor.use_() == crate::model::menu::grid::RosterUse::Cycles {
-                    for (role, n) in numbers.iter().enumerate() {
-                        let slot_zero = n.slot_zero.map_or(0, |kind| (kind & 0xff) + 1);
-                        tr_cycle_badges_v1(n.mask[0], n.mask[1], n.mask[2], role as u32 | u32::from(n.count) << 8 | slot_zero << 16);
+                if use_ != RosterUse::Mashout {
+                    editor.set_mii(mii_tiles(&s.mii));
+                }
+                if matches!(use_, RosterUse::Mashout | RosterUse::PracticeCpu(_)) {
+                    editor.decorate_mashout(&mut next, menu);
+                } else {
+                    let values = editor.values(menu.kept(editor.key()));
+                    editor.decorate(&mut next, &values);
+                    let numbers = editor.decorate_badges(&mut next, menu);
+                    if use_ == RosterUse::Cycles {
+                        for (role, n) in numbers.iter().enumerate() {
+                            let slot_zero = n.slot_zero.map_or(0, |kind| (kind & 0xff) + 1);
+                            tr_cycle_badges_v1(n.mask[0], n.mask[1], n.mask[2], role as u32 | u32::from(n.count) << 8 | slot_zero << 16);
+                        }
                     }
                 }
             }

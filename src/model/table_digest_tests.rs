@@ -94,7 +94,8 @@ fn every_data_row_has_a_64_byte_guard() {
         }
         files += 1;
     }
-    assert_eq!((files, rows), (28, SEAM_ROWS + EDGE_JUGGLE_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS
+    assert_eq!((files, rows), (29, SEAM_ROWS + EDGE_JUGGLE_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS
+        + crate::engine::seams::native_seams::rows_edge_zoom::ROWS.len()
         + crate::model::sites_mashout::SITES.len() + crate::model::sites_lockon::CALLEES.len()));
 }
 

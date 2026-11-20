@@ -28,6 +28,7 @@ use table::{game_group, Control, Editor, Game, Page, Row, GROUPS, ROWS};
 use super::practice_games::retired;
 use super::settings::{self, Settings};
 use super::mashout::moves;
+use super::edge_juggle::{Drill, picker::{self as cpu_picker, Picker}};
 
 /// The id of Recording › Options › Loop. The row shows, cycles, lists and resets the page role's loop count, the count Play
 /// reads (`RecordingScreens::loops`), not the old two-value setting stored under this id.
@@ -436,6 +437,7 @@ pub struct Menu {
     recording: super::recording_menu::RecordingScreens,
     /// Mash out's popup over a chip of its grid, while open.
     mashout_pop: Option<MashoutPop>,
+    practice_cpu_pop: Option<usize>,
     /// The last press reached an arm that does nothing (`press` returns false).
     ignored: bool,
 }
@@ -493,6 +495,7 @@ impl Menu {
             page_reset: None,
             recording: super::recording_menu::RecordingScreens::new(),
             mashout_pop: None,
+            practice_cpu_pop: None,
             ignored: false,
         };
         menu.sync();
@@ -511,6 +514,7 @@ impl Menu {
         self.chord_refusal = None;
         self.edits.clear();
         self.mashout_pop = None;
+        self.practice_cpu_pop = None;
         self.sync();
     }
 
@@ -1129,6 +1133,22 @@ impl Menu {
         self.mashout_pop.map(|pop| pop.cursor)
     }
 
+    pub fn practice_cpu_popup(&self) -> Option<usize> {
+        self.practice_cpu_pop
+    }
+
+    pub fn practice_cpu_pick(&self, game: Drill) -> Picker {
+        Picker::read(&self.settings.menu, game)
+    }
+
+    pub fn open_practice_cpu(&mut self, game: Drill, fighter: Option<u32>, cell: usize) {
+        let mut pick = self.practice_cpu_pick(game);
+        pick.select_fighter(fighter);
+        self.put_one_hot(cpu_picker::rows(game).fighter, pick.fighter_index());
+        self.put_one_hot(game.difficulty_rows().difficulty, pick.choice);
+        self.practice_cpu_pop = Some(cell);
+    }
+
     /// The menu was closed (B on the page); the runtime commits.
     pub fn is_closed(&self) -> bool {
         self.closed
@@ -1197,6 +1217,7 @@ impl Menu {
         if matches!(button, Button::L | Button::R) && self.stack.last().is_some_and(|s| self.switches_page(*s)) {
             self.stack.clear();
             self.mashout_pop = None;
+            self.practice_cpu_pop = None;
             self.change_page(button == Button::R);
             return;
         }
@@ -1261,6 +1282,7 @@ impl Menu {
             Screen::Grid { layout, .. } => match layout.kind {
                 GridKind::Roster(RosterUse::PlayerPick | RosterUse::CpuPick) => true,
                 GridKind::Roster(RosterUse::Mashout) => self.mashout_pop.is_none(),
+                GridKind::Roster(RosterUse::PracticeCpu(_)) => self.practice_cpu_pop.is_none(),
                 _ => false,
             },
             _ => false,
@@ -1461,6 +1483,11 @@ impl Menu {
                 self.outbox.roster_press = Some((MASHOUT_SEEK, Button::A));
                 self.roster_screen(RosterUse::Mashout)
             }
+            Editor::PracticeCpu(game) => {
+                self.practice_cpu_pop = None;
+                self.outbox.roster_press = Some((MASHOUT_SEEK, Button::A));
+                self.roster_screen(RosterUse::PracticeCpu(game))
+            }
             // Place targets is an action: it starts Break the Targets (so any other game stops), the menu closes and the
             // runtime opens the placing view.
             Editor::PlaceTargets => {
@@ -1589,6 +1616,11 @@ impl Menu {
         // Mash out's picker row owns the three keys its popup writes.
         if matches!(row.control, Control::Editor(Editor::MashoutPicker)) {
             for id in [moves::STATE_ROW, moves::ATTACKER_ROW, moves::GRAB_ROW] { changed |= self.reset_row(id); }
+        }
+        if let Control::Editor(Editor::PracticeCpu(game)) = row.control {
+            let rows = cpu_picker::rows(game);
+            changed |= self.reset_row(rows.fighter);
+            changed |= self.reset_row(rows.level);
         }
         // One row, two kept keys. The row id is the Player key; the CPU key is the sibling.
         if matches!(row.control, Control::Editor(Editor::CharacterCycles)) {
@@ -2068,6 +2100,24 @@ impl Menu {
         if let Some(pop) = self.mashout_pop.filter(|_| layout.kind == GridKind::Roster(RosterUse::Mashout)) {
             return self.press_mashout_pop(button, pop);
         }
+        if let GridKind::Roster(RosterUse::PracticeCpu(game)) = layout.kind {
+            if self.practice_cpu_pop.is_some() {
+                let mut pick = self.practice_cpu_pick(game);
+                match button {
+                    Button::A | Button::Down | Button::Up => {
+                        pick.cycle_mode(button != Button::Up);
+                        self.put_one_hot(game.difficulty_rows().difficulty, pick.choice);
+                    }
+                    Button::X => {
+                        pick.cycle_level();
+                        self.put_one_hot(cpu_picker::rows(game).level, usize::from(pick.level - 1));
+                    }
+                    Button::B => self.practice_cpu_pop = None,
+                    _ => self.ignored = true,
+                }
+                return;
+            }
+        }
         let screen = |page: usize, cell: usize| Screen::Grid { layout, page, cell };
         match button {
             Button::Up => self.top(screen(page, layout.step(page, cell, Move::Up))),
@@ -2141,9 +2191,11 @@ impl Menu {
     }
 
     /// The roster editor puts Mash out's grid cursor on `cell` (the saved choice's chip, when the grid opens).
-    pub fn mashout_focus(&mut self, cell: usize) {
+    pub fn picker_focus(&mut self, cell: usize) {
         if let Some(Screen::Grid { layout, page, .. }) = self.screen().copied() {
-            if layout.kind == GridKind::Roster(RosterUse::Mashout) && cell < layout.tiles() {
+            if matches!(layout.kind, GridKind::Roster(RosterUse::Mashout | RosterUse::PracticeCpu(_)))
+                && cell < layout.tiles()
+            {
                 self.top(Screen::Grid { layout, page, cell });
             }
         }
@@ -2299,6 +2351,9 @@ mod tech_menu_tests;
 #[cfg(test)]
 #[path = "mashout_picker_tests.rs"]
 mod mashout_picker_tests;
+#[cfg(test)]
+#[path = "practice_picker_tests.rs"]
+mod practice_picker_tests;
 
 #[cfg(test)]
 #[path = "navigation_tests.rs"]

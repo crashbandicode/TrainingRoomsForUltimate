@@ -196,7 +196,7 @@ pub fn set_owner_read(on: bool) {
     OWNER_ON.store(on, Ordering::Release);
 }
 
-unsafe fn attacker_owner(id: u32) -> Option<u32> {
+pub(super) unsafe fn attacker_owner(id: u32) -> Option<u32> {
     if !OWNER_ON.load(Ordering::Acquire) || !state_natives::object_is_active(id) {
         return None;
     }

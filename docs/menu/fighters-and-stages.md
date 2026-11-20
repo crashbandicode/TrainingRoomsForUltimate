@@ -427,7 +427,7 @@ list doesn't grey them for that.
 **Practice games** lists one row per game: **Eggs-ercise**, **Break the Targets**, **Tech practice**, **Mash out**
 (its screen: Start, then State, Attacker move and Grab type; it runs until Stop) and **Parry practice** (Start, then
 10 attempts or Free practice, Saved parry practices and Save this parry practice; using a saved practice starts it when
-the menu closes). **A** on a game
+the menu closes), plus **Guard the Edge** and **Juggler**. **A** on a game
 opens its own screen, laid out like **Button chords**: the path at the top (Fighters & Stages > Practice games > the
 game), then **Start** and the game's settings. The keys are the page's: Up/Down move, Left/Right change a setting, **A**
 opens it, **Y** resets it, **B** goes back to the list.
@@ -445,6 +445,17 @@ opens it, **Y** resets it, **B** goes back to the list.
 
 ![While Eggs-ercise runs: its screen's first row reads Stop with Running in green; A stops it and the row reads Start, the menu still open](../media/rc15-practice-menu-stop.gif)<br>
 *With Eggs-ercise running, the menu reopens on its screen: the first row reads Stop with "Running" in green. B goes back to the list, A opens the screen again, and A on Stop ends the game: the menu stays open and the row reads Start; then B closes the menu. Eden, 2026-11-18, build 9aa51374 (untested on hardware).*
+
+### Guard the Edge and Juggler
+
+Open **CPU fighter and mode** and press **A** on a portrait. With the popup open, press **A** to cycle through **CPU**,
+**Perfect**, and any drills for that fighter. In CPU mode, **X** cycles the stock CPU level from 1 to 9 and back to 1.
+**B** closes the popup. Choose **Current CPU** to use the fighter already in Training.
+
+Hero's **Zoom** drill casts Zoom through Command Selection for every recovery attempt in Guard the Edge and every
+escape attempt in Juggler. Hero gets at least the 8 MP needed for each cast. Read where he will return and land a hit
+or grab during his descent or within the **Zoom landing window** after touchdown. The default is 10 frames and you can set it
+from 1 to 30. The notice shows each attempt's result and the running win count.
 
 ### Eggs-ercise
 

@@ -1790,7 +1790,7 @@ fn core06_release_reads_the_hit_module_only_for_the_visualizer_or_live_perfect()
     let adapter = include_str!("../src/runtime/features/edge_juggle.rs");
     assert_eq!(src.matches("perfect_player_height(&attempt)").count(), 1);
     assert!(adapter.contains("wanted() == Some(run.drill)"));
-    assert!(adapter.contains("run.difficulty == Difficulty::Perfect"));
+    assert!(adapter.contains("run.opponent.mode == Mode::Perfect"));
     assert!(adapter.contains("run.rounds.phase == Phase::Live"));
     assert!(adapter.contains("run.wizard.is_none()"));
     assert!(adapter.contains("natives::module_accessor(0)"));
