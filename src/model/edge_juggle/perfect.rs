@@ -57,7 +57,7 @@ pub fn outline_probe(camera: [f32; 4], blast: [f32; 4]) -> Option<(f32, Point)> 
 
 /// The foot heights that leave enough room below a closed main-stage outline.
 /// The caller passes live segments from one walk in the current stage.
-pub fn corridor(
+fn corridor(
     outline: &[Segment],
     ledges: [Point; 2],
     blast_bottom: f32,
@@ -421,6 +421,11 @@ fn blocked(path: Segment, line: Segment, height: f32) -> bool {
 
 impl RouteFacts<'_> {
     pub fn crossing_band(&self) -> Option<Point> {
+        // Normal-form IDs from the 13.0.5 stage catalog: Battlefield, Final
+        // Destination, Lylat Cruise and Waiting Room. Still require live clearance.
+        if !matches!(self.stage, (0 | 3 | 89 | 311, 0)) {
+            return None;
+        }
         corridor(
             self.outline,
             self.ledges,
