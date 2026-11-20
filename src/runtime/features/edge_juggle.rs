@@ -79,6 +79,7 @@ struct Run {
     threat: ThreatClock,
     stage_key: StageKey,
     stage: Stage,
+    stage_floor_y: f32,
     wizard: Option<Wizard>,
     defaults: Setup,
     cursor: [f32; 2],
@@ -863,6 +864,7 @@ fn post_notice(run: &mut Run, best: Option<u32>, best_streak: Option<u32>) {
         Phase::Done => "Set complete · L+R+A restarts",
         _ => "",
     };
+    let mut header = run.drill.game().title();
     if let Some(wizard) = run.wizard {
         let Setup {
             area,
@@ -870,22 +872,30 @@ fn post_notice(run: &mut Run, best: Option<u32>, best_streak: Option<u32>) {
             p1: [px, py],
             percent,
         } = wizard.setup;
+        let number = match wizard.step {
+            WizardStep::Area => 0,
+            WizardStep::Cpu => usize::from(run.drill == Drill::GuardEdge),
+            WizardStep::Percent => 1,
+            WizardStep::Player => 2,
+            WizardStep::Preview => 3,
+        };
+        header = [
+            ["Edge · 1/4", "Edge · 2/4", "Edge · 3/4", "Edge · 4/4"],
+            ["Juggle · 1/4", "Juggle · 2/4", "Juggle · 3/4", "Juggle · 4/4"],
+        ][run.drill as usize][number];
         let _ = match wizard.step {
-            WizardStep::Area => write!(
+            WizardStep::Area => write!(text, "{} · D-pad choose · A next", area.title()),
+            WizardStep::Cpu if run.drill == Drill::Juggler => write!(
                 text,
-                "1/4 · Area · {} · D-pad choose · A next",
-                area.title()
+                "CPU x {x:.0} · Height {:+.0} · Stick move · A next",
+                y - run.stage_floor_y,
             ),
-            WizardStep::Cpu => write!(
-                text,
-                "{}/4 · CPU ({x:.0}, {y:.0}) · Stick move · A next",
-                if run.drill == Drill::GuardEdge { 2 } else { 1 }
-            ),
-            WizardStep::Percent => write!(text, "2/4 · {percent}% · D-pad change · A next"),
-            WizardStep::Player => write!(text, "3/4 · P1 ({px:.0}, {py:.0}) · Stick move · A next"),
+            WizardStep::Cpu => write!(text, "CPU ({x:.0}, {y:.0}) · Stick move · A next"),
+            WizardStep::Percent => write!(text, "{percent}% · D-pad change · A next"),
+            WizardStep::Player => write!(text, "P1 ({px:.0}, {py:.0}) · Stick move · A next"),
             WizardStep::Preview => write!(
                 text,
-                "4/4 · CPU ({x:.0}, {y:.0}) · {percent}% · P1 ({px:.0}, {py:.0}) · A start"
+                "CPU ({x:.0}, {y:.0}) · {percent}% · P1 ({px:.0}, {py:.0}) · A/+ start"
             ),
         };
     } else if let Phase::Ready(left) = phase {
@@ -914,7 +924,7 @@ fn post_notice(run: &mut Run, best: Option<u32>, best_streak: Option<u32>) {
     if run.notice.as_str() != text.as_str() || frames % 30 == 1 && phase == Phase::Live {
         notices::upsert(
             NOTICE,
-            run.drill.game().title(),
+            header,
             text.as_str(),
             180,
             DEFAULT_COLOR,
@@ -1024,6 +1034,7 @@ pub unsafe fn frame(fighter: usize) {
             reaction: config.reaction[drill as usize],
             threat: ThreatClock::default(),
             stage,
+            stage_floor_y: p1_start[1],
             stage_key,
             wizard: editing.then_some(wizard),
             setup,
