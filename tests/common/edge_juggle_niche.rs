@@ -1,6 +1,59 @@
 use super::{select, Facts, Motion, Move, Sample, Sequence, CANDIDATE_ROWS};
 use crate::model::edge_juggle::perfect::{self, Route};
 
+#[test]
+fn niche_roster_kinds_match_the_approved_plan() {
+    use crate::model::fighter_choices::CHOICES;
+
+    // NICHE-PLAN.md §2 in candidate row ID order, with both bodies of duo rows.
+    let fighters = [
+        "Pikachu",
+        "Pikachu",
+        "Pikachu",
+        "Mr. Game & Watch",
+        "Diddy Kong",
+        "Diddy Kong",
+        "R.O.B.",
+        "Sora",
+        "Little Mac",
+        "Little Mac",
+        "Sheik",
+        "Sheik",
+        "Greninja",
+        "Ness",
+        "Steve",
+        "Pichu",
+        "Jigglypuff",
+        "Meta Knight",
+        "Pit",
+        "Dark Pit",
+        "PAC-MAN",
+        "Bayonetta",
+        "Sonic",
+        "Peach",
+        "Daisy",
+        "Snake",
+        "Link",
+        "Lucas",
+        "Lucario",
+        "Olimar",
+        "Bowser Jr.",
+        "Hero",
+        "Yoshi",
+        "Luigi",
+        "Charizard",
+    ];
+    assert_eq!(super::ROWS.len(), fighters.len());
+    for (index, (row, fighter)) in super::ROWS.iter().zip(fighters).enumerate() {
+        assert_eq!(usize::from(row.id), index + 1);
+        let kind = CHOICES
+            .iter()
+            .find_map(|&(kind, name)| (name == fighter).then_some(kind))
+            .expect("fighter from the plan must be in the roster");
+        assert_eq!(row.fighter as u32, kind, "row {} belongs to {fighter}", row.id);
+    }
+}
+
 fn facts(fighter: i32, mode: &str) -> Facts {
     Facts {
         fighter,
