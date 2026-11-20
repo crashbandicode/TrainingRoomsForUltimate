@@ -309,7 +309,7 @@ unsafe fn on_ai_frame(ai: usize) {
     }
     if crate::model::edge_juggle::drill_owns_pad(
         super::edge_juggle::controls_cpu(body.accessor),
-        recording_or_playback(),
+        busy_for_drill(),
     ) {
         let button_field = (controller + CTRL_BUTTONS) as *mut u32;
         let x_field = (controller + CTRL_STICK_X) as *mut f32;
@@ -692,6 +692,10 @@ unsafe fn remember_named_pose() {
 /// The recorder is in a phase other than Idle (the record lockout, standby, recording or a playback).
 pub fn recording_or_playback() -> bool {
     ACTIVE.load(Ordering::Acquire) || recording_host::taking()
+}
+
+pub(super) fn busy_for_drill() -> bool {
+    recording_or_playback() || recording_host::cpu_playback_blocks_drill()
 }
 
 /// The replay editor holds the input (`Owners::REPLAY_EDITOR`; the editor is the named-macro layer, S4-4, so

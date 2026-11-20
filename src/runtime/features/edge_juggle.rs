@@ -1345,7 +1345,7 @@ pub unsafe fn frame(fighter: usize) {
         || !natives::is_operation_cpu(1)
         || OPEN.load(Ordering::Acquire)
         || states::is_loading()
-        || recorder::recording_or_playback()
+        || recorder::busy_for_drill()
         || published::input_owners().covers_strip()
     {
         engine.wake_cpu(Some(body));
