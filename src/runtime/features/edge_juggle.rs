@@ -105,7 +105,7 @@ struct Run {
     player_height: PlanHeight,
     last_route: Option<Route>,
     guide: Option<RecoveryGuide>,
-    niche: Option<niche_pad::Guide>,
+    niche: Option<niche_pad::NicheGuide>,
     last_cpu_status: i32,
     bounce: MeteorBounce,
     sdi_start: Option<u32>,
@@ -803,9 +803,9 @@ unsafe fn route_guide(
     let fighter = natives::fighter_kind(cpu).unwrap_or(UNRESOLVED);
     let crossable = u32::from(band.is_some());
     if special.is_some() && fighter != UNRESOLVED {
-        run.niche = niche_pad::Guide::choose(cpu, p1, fighter, &facts, band);
+        run.niche = niche_pad::NicheGuide::prepare_niche(cpu, p1, fighter, &facts, band);
         if let Some(guide) = run.niche.as_ref() {
-            let row = guide.row();
+            let row = guide.selected_niche_row();
             run.last_route = Some(row.route);
             planner_chose(route_code(row.route), fighter as u32, crossable, row.id.into());
             return None;
@@ -859,8 +859,8 @@ unsafe fn niche_correction(
     let Some(guide) = run.niche.as_mut() else {
         return Correction::default();
     };
-    let id = guide.row().id;
-    if let Some(edit) = guide.step(ai, cpu, position, status, run.rounds.frames) {
+    let id = guide.selected_niche_row().id;
+    if let Some(edit) = guide.correct_niche_pad(ai, cpu, position, status, run.rounds.frames) {
         return stock.observe(edit, PerfectRule::Niche, run, 0, id.into());
     }
     run.niche = None;

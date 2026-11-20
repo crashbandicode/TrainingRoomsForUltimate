@@ -11,7 +11,7 @@ use crate::{
 use perfect::niche::{self, Facts, Motion, Move, Row, Sample, Sequence};
 use perfect::{Correction, Point, Route, RouteFacts};
 
-pub(super) struct Guide {
+pub(super) struct NicheGuide {
     sequence: Sequence,
     fighter: i32,
     ledge: Point,
@@ -27,8 +27,8 @@ struct Crossing {
     exit: f32,
 }
 
-impl Guide {
-    pub(super) unsafe fn choose(
+impl NicheGuide {
+    pub(super) unsafe fn prepare_niche(
         cpu: usize,
         p1: usize,
         fighter: i32,
@@ -80,11 +80,11 @@ impl Guide {
         })
     }
 
-    pub(super) fn row(&self) -> &'static Row {
+    pub(super) fn selected_niche_row(&self) -> &'static Row {
         self.sequence.row()
     }
 
-    pub(super) unsafe fn step(
+    pub(super) unsafe fn correct_niche_pad(
         &mut self,
         ai: usize,
         cpu: usize,
@@ -103,10 +103,10 @@ impl Guide {
         }
         let (snapshot, available) = recovery_snapshot(ai)?;
         let reach = special_reach(ai, snapshot)?;
-        let phase = motion(cpu, self.fighter, movement, status);
+        let phase = niche_motion_phase(cpu, self.fighter, movement, status);
         let (mut direction, mut aim, mut at_exit, mut can_enter) = (
             (self.ledge[0] - x).signum(),
-            unit([self.ledge[0] - x, self.ledge[1] - y]),
+            normalized_stick([self.ledge[0] - x, self.ledge[1] - y]),
             true,
             true,
         );
@@ -128,7 +128,7 @@ impl Guide {
             return None;
         }
         let approaching =
-            self.row().id == 2 && movement == Move::Down && (self.player_x - x) * direction > 0.0;
+            self.selected_niche_row().id == 2 && movement == Move::Down && (self.player_x - x) * direction > 0.0;
         if matches!(movement, Move::Bolt) && phase == Motion::Charging {
             aim = bolt_input(cpu, self.fighter, [x, y], direction, aim)?;
         }
@@ -142,7 +142,7 @@ impl Guide {
         self.sequence.step(Sample {
             frame,
             motion: phase,
-            can_start: phase == Motion::Free && transition(cpu, movement, available),
+            can_start: phase == Motion::Free && niche_start_enabled(cpu, movement, available),
             valid: true,
             at_exit,
             can_enter,
@@ -153,7 +153,7 @@ impl Guide {
     }
 }
 
-fn unit([x, y]: Point) -> Point {
+fn normalized_stick([x, y]: Point) -> Point {
     let length = x.hypot(y);
     if length.is_finite() && length > 0.0 {
         [x / length, y / length]
@@ -162,7 +162,7 @@ fn unit([x, y]: Point) -> Point {
     }
 }
 
-unsafe fn transition(cpu: usize, movement: Move, available: bool) -> bool {
+unsafe fn niche_start_enabled(cpu: usize, movement: Move, available: bool) -> bool {
     use Move::*;
     let term = match movement {
         Drift => return true,
@@ -182,7 +182,7 @@ unsafe fn transition(cpu: usize, movement: Move, available: bool) -> bool {
 /// These move-specific status enums belong to the exact fighter body checked by the caller.
 /// Values come from the pinned 13.0.5 lua constants. Common status IDs use the existing resolver.
 /// An unrecognized status (including damage and special-fall) returns to the stock controller.
-unsafe fn motion(cpu: usize, fighter: i32, movement: Move, status: i32) -> Motion {
+unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i32) -> Motion {
     use Motion::{AimAgain, Charging, Finish, Free, Interrupted, Starting};
     use Move::*;
     if status == UNRESOLVED {
@@ -285,20 +285,8 @@ unsafe fn has_burner(cpu: usize) -> bool {
     fuel.is_finite() && fuel > 0.0
 }
 
-unsafe fn bolt_input(
-    cpu: usize,
-    fighter: i32,
-    player: Point,
-    direction: f32,
-    launch: Point,
-) -> Option<Point> {
-    const PK_THUNDER: i32 = 2;
-    let kind = match fighter {
-        0xa => 0x61,
-        0x28 => 0x163,
-        _ => return None,
-    };
-    if ![
+fn bolt_reads_granted() -> bool {
+    [
         sites_pkg3::STATE_ARTICLE_IS_EXIST_OFFSET,
         sites_pkg3::STATE_ARTICLE_GET_ARTICLE_OFFSET,
         sites_pkg3::STATE_ARTICLE_OBJECT_ID_OFFSET,
@@ -307,9 +295,24 @@ unsafe fn bolt_input(
     ]
     .into_iter()
     .all(game::granted)
-    {
+}
+
+unsafe fn bolt_input(
+    cpu: usize,
+    fighter: i32,
+    player: Point,
+    direction: f32,
+    launch: Point,
+) -> Option<Point> {
+    if !bolt_reads_granted() {
         return None;
     }
+    const PK_THUNDER: i32 = 2;
+    let kind = match fighter {
+        0xa => 0x61,
+        0x28 => 0x163,
+        _ => return None,
+    };
     if !state::article_is_exist(cpu, PK_THUNDER) {
         // Charge has begun. Wait for the native article to spawn.
         return Some([-direction, 0.0]);
@@ -334,8 +337,8 @@ unsafe fn bolt_input(
     }
     let behind = [x - launch[0] * scale, y - launch[1] * scale];
     if (bx - x) * launch[0] + (by - y) * launch[1] < -scale {
-        Some(unit([x - bx, y - by]))
+        Some(normalized_stick([x - bx, y - by]))
     } else {
-        Some(unit([behind[0] - bx, behind[1] - by]))
+        Some(normalized_stick([behind[0] - bx, behind[1] - by]))
     }
 }

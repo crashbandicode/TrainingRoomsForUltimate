@@ -70,6 +70,9 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "edge_juggle::controls_cpu", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("INSTALLED") },
     Boundary { function: "edge_juggle::ai_correction", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("INSTALLED") },
     Boundary { function: "edge_juggle::player_height_request", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("INSTALLED") },
+    // Steering PK Thunder needs the existing article grants. If any are missing,
+    // the read yields to stock; other drill corrections do not depend on them.
+    Boundary { function: "niche_pad::bolt_input", owner: None, gate: Gate::Flag("bolt_reads_granted") },
     Boundary { function: "cpu_level::poll_drill", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("DRILL_BEHAVIOR") },
     // The save-state step of the per-fighter frame wrapper: a no-op until boot activates package 3.
     Boundary { function: "states::frame", owner: Some(Feature::StateCore), gate: Gate::Flag("ACTIVE") },
@@ -616,6 +619,36 @@ fn the_install_line_names_the_row_that_blocked_a_feature() {
     }
     .to_string();
     assert!(line.contains(" cpu_mash=not_installed reason=site:motion_kind "), "{line}");
+}
+
+#[test]
+fn missing_pk_thunder_reads_leave_general_drill_ownership_available() {
+    let a = Analysis::new();
+    let grant = &a.graph.funcs[a.graph.find("niche_pad::bolt_reads_granted")[0]];
+    let offsets = a.own_offsets(grant);
+    let article_rows = [
+        "state_article_get_article",
+        "state_article_is_exist",
+        "state_article_object_id",
+        "state_object_is_active",
+        "state_object_module_accessor",
+    ];
+    let expected: BTreeSet<_> = article_rows
+        .into_iter()
+        .map(|name| capabilities::find(name).unwrap().offset)
+        .collect();
+    assert_eq!(offsets, expected);
+    let grant_check = callgraph::lex(".all(game::granted)");
+    assert!(grant.body.windows(grant_check.len()).any(|ts| ts == grant_check));
+    for name in article_rows {
+        let row = capabilities::find(name).unwrap();
+        let rejected: Vec<_> = capabilities::equivalent_rows(row).map(|same| same.name).collect();
+        let usable = |site: &model::sites::Site| !rejected.contains(&site.name);
+        assert!(capabilities::unit_usable(Feature::EdgeJuggle, &usable), "{name} disabled basic drill ownership");
+        let granted = Granted::from_usable(&usable);
+        assert!(!granted.allows(row.offset), "{name} must stay ungranted");
+        assert!(!offsets.iter().copied().all(|offset| granted.allows(offset)));
+    }
 }
 
 #[test]
