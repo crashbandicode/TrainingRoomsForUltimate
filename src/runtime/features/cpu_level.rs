@@ -216,6 +216,7 @@ pub(crate) unsafe fn frame() {
     let _scope = HookScope::enter_hook(HookId::CpuLevel);
     let level = crate::runtime::published::cpu_level();
     let (place, menu_level) = place(base);
+    let drill = super::edge_juggle::running();
     let Some(mut state) = STATE.try_lock() else { return };
     // Diag build: each change of place (the waiting room to a match is `lobby -> elsewhere`: the step stops there).
     #[cfg(feature = "diag")]
@@ -251,7 +252,7 @@ pub(crate) unsafe fn frame() {
             menu_level.unwrap_or(0)
         ));
     }
-    if level == CpuLevel::Off && !state.entries.iter().any(EntryRank::holds) && !cfg!(feature = "diag") {
+    if !drill && level == CpuLevel::Off && !state.entries.iter().any(EntryRank::holds) && !cfg!(feature = "diag") {
         return;
     }
     // Busy: a hot swap or an install owns the entries this frame.
@@ -275,7 +276,7 @@ pub(crate) unsafe fn frame() {
         }
         let Some(ai) = field::child(controller, CONTROLLER_AI) else { continue };
         let current = field::read_unchecked::<i32>(ai, AI_RANK);
-        let target = rules::target(level, place, entry, table);
+        let target = rules::training_drill_target(drill, level, place, entry, table);
         #[cfg(feature = "diag")]
         if state.seen[slot] != current {
             state.seen[slot] = current;

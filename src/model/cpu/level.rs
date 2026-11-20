@@ -95,6 +95,18 @@ pub fn target(level: CpuLevel, place: Where, entry: i32, table: [i32; 8]) -> Opt
     if applies { rank_for(level, table) } else { None }
 }
 
+/// A native Training drill temporarily takes over just the practice opponent's rank.
+pub fn training_drill_target(
+    drill: bool, configured: CpuLevel, place: Where, entry: i32, table: [i32; 8],
+) -> Option<u8> {
+    let level = if drill && entry == 1 && matches!(place, Where::Training { .. }) {
+        CpuLevel::Lv(9)
+    } else {
+        configured
+    };
+    target(level, place, entry, table)
+}
+
 /// One entry's override, the pilot's arm/release rule per entry: the native rank it replaced and the rank it wrote.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct EntryRank {

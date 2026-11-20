@@ -170,8 +170,12 @@ fn wanted() -> Option<Drill> {
         .filter(|_| scene::is_native_training())
 }
 
-pub unsafe fn controls_cpu(accessor: usize) -> bool {
+pub(super) fn running() -> bool {
     wanted().is_some()
+}
+
+pub unsafe fn controls_cpu(accessor: usize) -> bool {
+    running()
         && !published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire)
         && natives::module_accessor(1) == Some(accessor)
 }
