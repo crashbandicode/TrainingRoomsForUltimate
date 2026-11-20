@@ -1,5 +1,7 @@
 //! Perfect-mode recovery and escape decisions. The runtime applies only pad inputs.
 
+#[path = "perfect/fly.rs"]
+pub mod fly;
 #[path = "perfect/niche.rs"]
 pub mod niche;
 #[path = "perfect/pikachu.rs"]
