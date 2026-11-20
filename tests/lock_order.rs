@@ -2313,7 +2313,7 @@ fn strip_frame_step_never_blocks() {
     let frame = &source[start..end];
     assert!(frame.contains("TRACKER.try_lock()"), "the frame step must use try_lock");
     assert!(!frame.contains("TRACKER.lock()"), "the frame step must not block");
-    let gated = block_after(frame, "if shown || input_drill");
+    let gated = block_after(frame, "\n    if shown || input_drill {");
     assert!(gated.contains("rr_host::observe_input"));
     assert!(gated.contains("combo::after_strip"));
 }

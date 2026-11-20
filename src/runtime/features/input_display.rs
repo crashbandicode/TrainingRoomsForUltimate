@@ -204,8 +204,7 @@ pub fn target_grade(depth: f32) {
 
 #[skyline::hook(offset = crate::model::sites_hitbox::SPACING_HIT_HANDLER_OFFSET, inline)]
 unsafe fn spacing_hit(ctx: &mut InlineCtx) {
-    let live = GRADER_LIVE.load(Ordering::Relaxed);
-    if !live {
+    if !GRADER_LIVE.load(Ordering::Relaxed) {
         return;
     }
     let _scope = HookScope::enter_hook(HookId::SpacingHit);
@@ -215,7 +214,7 @@ unsafe fn spacing_hit(ctx: &mut InlineCtx) {
     let read = |at: usize| {
         (at >= 0x1000 && at & 7 == 0 && at >> 47 == 0).then(|| unsafe { (at as *const u64).read() })
     };
-    if let Some(contact) = crate::model::spacing::hook(live, read, module, entry, lanes) {
+    if let Some(contact) = crate::model::spacing::hook(true, read, module, entry, lanes) {
         if let Some(ring) = RINGS.received.get(usize::from(contact.receiver)) {
             ring.push(EPOCH.load(Ordering::Relaxed), contact);
         }
