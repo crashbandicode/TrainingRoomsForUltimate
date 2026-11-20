@@ -808,3 +808,12 @@ fn niche_skull_bash_budget_counts_the_traced_drop_before_the_glide() {
     assert!(select(input, skull_bash_only).is_none());
     assert_eq!(select(facts(0x8, "long"), skull_bash_only).unwrap().id, 3);
 }
+
+#[test]
+fn niche_link_does_not_finish_the_bomb_move_after_only_pulling_it() {
+    let mut sequence = Sequence::new(&super::ROWS[26]);
+    sequence.step(sample(0, Motion::Free)).expect("pull bomb");
+    sequence.step(sample(1, Motion::Starting)).expect("native pull");
+    sequence.step(sample(8, Motion::Free));
+    assert_ne!(sequence.action(), Some(Move::Hold), "no extension without a drop and blast");
+}
