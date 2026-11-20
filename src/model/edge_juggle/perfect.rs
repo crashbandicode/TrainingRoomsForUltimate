@@ -8,6 +8,8 @@ pub mod niche;
 pub mod pikachu;
 #[path = "perfect/recovery.rs"]
 pub mod recovery;
+#[path = "perfect/region.rs"]
+mod region;
 #[path = "perfect/rule_counts.rs"]
 pub mod rule_counts;
 #[path = "perfect/sora.rs"]
