@@ -136,6 +136,7 @@ fn publish_if_changed(root: &Scratch, screen: &mut Menu) -> bool {
 
 fn close_reopen(root: &Scratch, mut screen: Menu, role: ViewRole, mark: LoopMark) {
     screen.press(Button::B);
+    assert!(screen.is_closed());
     drop(screen);
     let mut reopened = menu(role);
     engine::rr_runtime::apply_index(&RecordingIndex::load(&root.0).unwrap(), reopened.recording_mut());
@@ -206,10 +207,18 @@ fn resetting_loop_publishes_both_roles_once() {
     let _guard = LOOP_TEST.lock().unwrap_or_else(|err| err.into_inner());
     let root = card();
     let mut screen = menu(ViewRole::Cpu);
-    screen.press(Button::Y);
-    assert!(publish_if_changed(&root, &mut screen), "reset changed both saved counts");
-    screen.press(Button::Y);
-    assert!(!publish_if_changed(&root, &mut screen), "the unchanged reset does not write");
+    let page = screen.page();
+    let reset = screen.entry(page, screen.entry_count(page) - 1).unwrap();
+    assert!(matches!(reset, Entry::ResetPage(_)));
+    focus(&mut screen, reset);
+    for changed in [true, false] {
+        screen.press(Button::A);
+        assert!(matches!(screen.screen(), Some(Screen::ConfirmReset)));
+        screen.press(Button::A);
+        assert_eq!(publish_if_changed(&root, &mut screen), changed, "only a changed reset writes");
+    }
+    screen.press(Button::B);
+    assert!(screen.is_closed());
     for role in [ViewRole::Player, ViewRole::Cpu] {
         assert_playback(&root, role, Some(1));
         let mut reopened = menu(role);

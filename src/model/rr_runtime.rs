@@ -1782,16 +1782,17 @@ mod tests {
         while menu.page() != Page::Recording { menu.press(MenuButton::R); }
         let index = RecordingIndex::load(&root).unwrap();
         apply_catalog(cache.ready(0).unwrap(), &index, menu.recording_mut());
-        let focused = menu.focus();
         let before = catalog_metadata_reads();
         cache.check();
-        assert!(cache.step(), "the first discovery batch should run");
+        assert!(cache.step(), "open the first discovery folder");
         assert!(catalog_metadata_reads() - before <= 4, "one input drain cannot wait behind an entire folder");
+        assert!(cache.step(), "read the first discovery batch");
+        assert!(catalog_metadata_reads() - before <= 4, "one batch stats at most four entries");
         assert!(cache.ready(0).is_some(), "an unchanged open continues with the current catalog");
-        menu.press(MenuButton::Down);
-        assert_ne!(menu.focus(), focused, "ordinary navigation remains available during the scan");
+        menu.press(MenuButton::R);
+        assert_ne!(menu.page(), Page::Recording, "page navigation remains available during the scan");
 
-        let mut steps = 1;
+        let mut steps = 2;
         loop {
             let last = catalog_metadata_reads();
             let work = cache.step();
