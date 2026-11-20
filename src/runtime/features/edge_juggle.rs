@@ -239,7 +239,14 @@ pub fn wizard_active() -> bool {
 }
 
 pub fn allowed() -> bool {
-    INSTALLED.load(Ordering::Acquire) && scene::is_native_training()
+    if !INSTALLED.load(Ordering::Acquire) || !scene::is_native_training() {
+        return false;
+    }
+    if super::recording_host::cpu_playback_blocks_drill() {
+        notices::refuse("Stop CPU playback before starting this drill");
+        return false;
+    }
+    true
 }
 
 fn wanted() -> Option<Drill> {

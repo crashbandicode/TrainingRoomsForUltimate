@@ -32,14 +32,8 @@ pub struct How {
 /// Start `game` (the menu worker, at the close): it becomes the running game before its start trigger, so the game thread
 /// that takes the trigger reads it on. Any other game stops on its next frame.
 pub fn start(game: Game, how: How) {
-    if matches!(game, Game::GuardEdge | Game::Juggler) {
-        if !super::edge_juggle::allowed() {
-            return;
-        }
-        if super::recording_host::cpu_playback_blocks_drill() {
-            super::notices::refuse("Stop CPU playback before starting this drill");
-            return;
-        }
+    if matches!(game, Game::GuardEdge | Game::Juggler) && !super::edge_juggle::allowed() {
+        return;
     }
     // A running game's settings apply at its next Start: each game latches its own here or when the Start reaches it.
     super::hitbox::practice_started();
