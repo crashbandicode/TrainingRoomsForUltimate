@@ -12,7 +12,7 @@ pub struct ZipPlan {
 // See phase23/edge-juggle/reference-crossings/MODEL.md §4 for the candidate margins.
 const FIRST: f32 = 55.0;
 const SECOND: f32 = 49.5;
-const MIN_TURN: f32 = 35.0;
+const MIN_TURN: f32 = 40.0;
 const SLACK: f32 = 4.0;
 const GRAB_RADIUS: f32 = 5.0;
 const HALF_BODY: f32 = 1.5;
@@ -108,13 +108,13 @@ pub struct SkullBashPath {
     pub height: f32,
 }
 
-// The 201 candidate cells from reference-crossings/gen_regions.py, P-SB on the common ring.
-// The same stage layout is mirrored at runtime. Lylat needs a separate geometry and table.
+// The 199 candidate cells from reference-crossings/gen_regions.py, P-SB on the common ring.
+// Mirrored at runtime. The live outline and blast line must still match.
 const SKULL_BASH_RING: [u32; 44] = [
     0x0000, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc,
     0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc,
     0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc,
-    0x01fc, 0x01fc, 0x001c, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+    0x01fc, 0x00fc, 0x000c, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
     0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
     0x0000, 0x0000, 0x0000, 0x0000,
 ];
@@ -129,7 +129,7 @@ pub fn skull_bash_start(
     height: f32,
 ) -> Option<SkullBashPath> {
     const MODEL_HEIGHT: f32 = 10.0;
-    if !matches!(stage, (0 | 3 | 311, 0))
+    if !super::is_crossing_stage(stage)
         || !(height > 0.0 && height <= MODEL_HEIGHT)
         || !left.into_iter().chain(right).chain([x, y, bottom]).all(f32::is_finite)
         || !outline.iter().flatten().flatten().all(|v| v.is_finite())
@@ -184,7 +184,7 @@ impl SkullBashFlight {
     }
 
     pub fn step(
-        &mut self, sequence: &mut Sequence, mut sample: Sample, position: Point, vy: f32,
+        &mut self, sequence: &mut Sequence, mut sample: Sample, position: Point, vy: f32, jumps: u8,
     ) -> Option<Correction> {
         use super::niche::{self, Motion, Move};
         let movement = sequence.action()?;
@@ -202,6 +202,7 @@ impl SkullBashFlight {
             let ledge_y = path.near[1] + 9.9;
             let outside = (ledge_x - position[0]) * path.direction;
             if sample.motion != Motion::Free
+                || jumps == 0
                 || !super::region::contains(&SKULL_BASH_RING, outside, position[1] - ledge_y)
             {
                 return None;
@@ -221,7 +222,7 @@ impl SkullBashFlight {
                 if vy <= 0.0 {
                     sample.motion = Motion::Free;
                 }
-            } else if !self.jump_accepted && !sample.can_start {
+            } else if !self.jump_accepted && (jumps == 0 || !sample.can_start) {
                 return None;
             }
         }

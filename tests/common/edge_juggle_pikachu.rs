@@ -113,7 +113,7 @@ fn skull_bash_flies_the_native_side_jump_and_two_aim_sequence() {
             hold_over: false,
             direction: 0.0,
             aim: [0.0; 2],
-        }, position, vy).unwrap()
+        }, position, vy, u8::from(frame < 98)).unwrap()
     };
     let descend = input(0, Motion::Free, true, start, -1.55);
     assert_eq!(descend.stick, Some([0.0, -1.0]));
@@ -142,4 +142,71 @@ fn skull_bash_flies_the_native_side_jump_and_two_aim_sequence() {
     assert!((degrees(second.stick.unwrap()) - 114.0).abs() < 1.0);
     assert_eq!(second.press, 0, "the native END reads the second direction");
     assert_eq!(sequence.action(), Some(Move::QuickAttack));
+}
+
+#[test]
+fn skull_bash_uses_the_rebaked_199_cell_region() {
+    let count: u32 = super::SKULL_BASH_RING.iter().map(|row| row.count_ones()).sum();
+    assert_eq!(count, 199);
+    let ledges = [[0.0, 0.0], [159.975, 0.0]];
+    for (release, offered) in [([-13.0, -66.0], true), ([-17.0, -66.0], false),
+                              ([-29.0, -62.0], true), ([-33.0, -62.0], false)] {
+        assert_eq!(skull_bash_start((3, 0), &RING, ledges, release, BOTTOM, 8.5).is_some(),
+                   offered, "{release:?}");
+    }
+}
+
+#[test]
+fn second_zip_keeps_four_degrees_beyond_the_measured_turn_floor() {
+    let from = [210.0, -80.0];
+    for (angle, offered) in [(40.0_f32, false), (43.0, false), (44.1, true)] {
+        let (sin, cos) = angle.to_radians().sin_cos();
+        let target = [from[0] + 30.0 * cos, from[1] + 30.0 * sin];
+        assert_eq!(super::second_zip(&RING, from, target, [1.0, 0.0], BOTTOM, 10.0).is_some(),
+                   offered, "{angle} degrees");
+    }
+}
+
+#[test]
+fn skull_bash_requires_the_jump_at_launch_and_at_first_fall() {
+    use super::SkullBashFlight;
+    use crate::model::edge_juggle::perfect::{
+        niche::{self, Motion, Sample, Sequence}, Outline, JUMP, SPECIAL,
+    };
+    let start = [-20.0, -55.0];
+    let path = skull_bash_start((3, 0), &RING, [[0.0, 0.0], [159.975, 0.0]], start, BOTTOM, 10.0)
+        .unwrap();
+    let mut outline = Outline::new();
+    for line in RING {
+        outline.add(line);
+    }
+    let row = niche::measured_row(3, niche::CANDIDATE_ROWS).unwrap();
+    let sample = |frame, motion, can_start| Sample {
+        frame, motion, can_start, valid: true, at_exit: false, can_enter: false,
+        low: false, hold_over: false, direction: 0.0, aim: [0.0; 2],
+    };
+    let start_with = |jumps| {
+        SkullBashFlight::new(path, outline, BOTTOM).step(
+            &mut Sequence::new(row), sample(0, Motion::Free, true), start, -0.095, jumps,
+        )
+    };
+    for (jumps, expected) in [(0, None), (1, Some(SPECIAL))] {
+        assert_eq!(start_with(jumps).map(|pad| pad.press), expected, "before Bash, {jumps} jumps");
+    }
+    for (jumps, expected) in [(0, None), (1, Some(JUMP))] {
+        let mut flight = SkullBashFlight::new(path, outline, BOTTOM);
+        let mut sequence = Sequence::new(row);
+        let mut step = |f, motion, can_start, pos, jumps| {
+            flight.step(&mut sequence, sample(f, motion, can_start), pos, -1.55, jumps)
+        };
+        step(0, Motion::Free, true, start, 1).unwrap();
+        step(1, Motion::Starting, false, start, 1).unwrap();
+        step(16, Motion::Travel, false, [-15.0, -58.0], 1).unwrap();
+        step(54, Motion::Finish, false, [58.0, -59.0], 1).unwrap();
+        step(98, Motion::Free, false, [114.0, -118.5], jumps).unwrap();
+        assert_eq!(
+            step(99, Motion::Free, true, [114.7, -120.0], jumps).map(|pad| pad.press),
+            expected, "at first jump opportunity, {jumps} jumps",
+        );
+    }
 }

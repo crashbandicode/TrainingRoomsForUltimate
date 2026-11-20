@@ -540,11 +540,14 @@ fn aerial_clear(outline: &[Segment], path: Segment, min_y: f32, height: f32, hal
         })
 }
 
+pub(super) const fn is_crossing_stage(stage: (i32, u32)) -> bool {
+    // Normal-form IDs from the 13.0.5 catalog: Battlefield, Final Destination and Waiting Room.
+    matches!(stage, (0 | 3 | 311, 0))
+}
+
 impl RouteFacts<'_> {
     pub fn crossing_band(&self) -> Option<Point> {
-        // Normal-form IDs from the 13.0.5 stage catalog: Battlefield, Final
-        // Destination, Lylat Cruise and Waiting Room. Still require live clearance.
-        if !matches!(self.stage, (0 | 3 | 89 | 311, 0)) {
+        if !is_crossing_stage(self.stage) {
             return None;
         }
         corridor(
@@ -1390,7 +1393,7 @@ mod tests {
             matches!(name, "Little Mac" | "Incineroar" | "Luigi" | "Ness" | "Snake" | "Charizard" | "Link" | "Pikachu" | "Jigglypuff" | "Kirby")
         }) {
             facts.fighter = kind as i32;
-            for stage in [0, 3, 89, 311] {
+            for stage in [0, 3, 311] {
                 facts.stage = (stage, 0);
                 assert!(facts.crossing_band().is_some(), "{name} stage {stage}: geometry still available");
                 let [near, _, low, across] = possible_routes(&facts);
@@ -1414,7 +1417,7 @@ mod tests {
     }
 
     #[test]
-    fn only_the_four_approved_stock_stages_offer_an_opposite_crossing() {
+    fn only_the_three_approved_normal_stages_offer_an_opposite_crossing() {
         use crate::engine::stages::catalog::STAGES;
         let ledges = [[-40., 0.], [40., 0.]];
         let outline = [[ledges[0], ledges[1]], [ledges[0], [0., -15.]], [[0., -15.], ledges[1]]];
@@ -1432,7 +1435,7 @@ mod tests {
             fall_budget: 12.,
             reach: [120., 42.],
         };
-        let approved = ["Waiting Room", "Battlefield", "Final Destination", "Lylat Cruise"];
+        let approved = ["Waiting Room", "Battlefield", "Final Destination"];
         for &(id, label) in STAGES {
             facts.stage = (id as i32, 0);
             let [near, high, low, opposite] = possible_routes(&facts);
@@ -1440,14 +1443,14 @@ mod tests {
             assert_eq!(opposite.is_some(), approved.contains(&label), "{label}");
             assert_eq!(facts.crossing_band().is_some(), approved.contains(&label), "{label}");
         }
-        for stage in [(-1, 0), (1, 1), (4, 2), (89, 2)] {
+        for stage in [(-1, 0), (0, 1), (3, 2), (89, 0), (311, 1)] {
             facts.stage = stage;
             assert!(facts.crossing_band().is_none(), "{stage:?}");
         }
 
         // A fresh outline can close a corridor on an otherwise approved stage.
         let low_floor = [[ledges[0], ledges[1]], [ledges[0], [0.0, -83.0]], [[0.0, -83.0], ledges[1]]];
-        facts.stage = (89, 0);
+        facts.stage = (3, 0);
         facts.outline = &low_floor;
         assert!(facts.crossing_band().is_none());
         assert!(possible_routes(&facts)[3].is_none());

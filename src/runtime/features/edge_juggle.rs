@@ -1769,7 +1769,7 @@ pub unsafe fn frame(fighter: usize) {
             Drill::GuardEdge => (config.edge_percent, config.edge_limit),
             Drill::Juggler => (JUGGLE_PERCENT, config.juggle_limit),
         };
-        let Some(wizard) = Wizard::new(drill, stage, p1_start, percent) else {
+        let Some(wizard) = Wizard::new(drill, stage, p1_start, percent, stage_key, natives::fighter_kind(cpu)) else {
             return;
         };
         let last = engine.kept[drill as usize]

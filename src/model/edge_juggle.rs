@@ -548,19 +548,27 @@ pub enum WizardStep {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Wizard {
     drill: Drill,
+    pikachu_low_release: bool,
     pub step: WizardStep,
     pub setup: Setup,
 }
 
 impl Wizard {
-    pub fn new(drill: Drill, stage: Stage, p1: [f32; 2], percent: u16) -> Option<Self> {
+    pub fn new(
+        drill: Drill, stage: Stage, p1: [f32; 2], percent: u16,
+        stage_key: (i32, u32), fighter: Option<i32>,
+    ) -> Option<Self> {
         let area = Area::default();
+        let pikachu_low_release = drill == Drill::GuardEdge
+            && fighter == Some(0x8)
+            && perfect::is_crossing_stage(stage_key);
         let (step, cpu) = match drill {
-            Drill::GuardEdge => (WizardStep::Area, stage.area_default(area)?),
+            Drill::GuardEdge => (WizardStep::Area, Self::area_release(stage, area, pikachu_low_release)?),
             Drill::Juggler => (WizardStep::Cpu, stage.default_juggle(p1)),
         };
         Some(Self {
             drill,
+            pikachu_low_release,
             step,
             setup: Setup {
                 area,
@@ -571,9 +579,25 @@ impl Wizard {
         })
     }
 
+    fn area_release(stage: Stage, area: Area, pikachu_low_release: bool) -> Option<[f32; 2]> {
+        if pikachu_low_release {
+            let point = match area {
+                Area::LowerLeft => Some([stage.ledges[0][0] - 20.0, stage.ledges[0][1] - 55.0]),
+                Area::LowerRight => Some([stage.ledges[1][0] + 20.0, stage.ledges[1][1] - 55.0]),
+                Area::UpperLeft | Area::UpperRight => None,
+            };
+            // The measured Skull Bash approach is below the near cliff grab.
+            // Preserve the normal default if the stage bounds would change it.
+            if let Some(point) = point.filter(|&point| stage.edge_start(area, point) == Some(point)) {
+                return Some(point);
+            }
+        }
+        stage.area_default(area)
+    }
+
     pub fn change_area(&mut self, stage: Stage, delta: i32) {
         let area = self.setup.area.step(delta);
-        if let Some(cpu) = stage.area_default(area) {
+        if let Some(cpu) = Self::area_release(stage, area, self.pikachu_low_release) {
             self.setup.area = area;
             self.setup.cpu = cpu;
         }
@@ -835,9 +859,38 @@ mod tests {
     }
 
     #[test]
+    fn pikachu_low_wizard_release_starts_below_the_cliff_inside_the_crossing_region() {
+        let stage = Stage::new(
+            [-240.0, 240.0, 160.0, -140.0],
+            [-160.0, 160.0, 110.0, -105.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        let pikachu = Some(0x8);
+        for stage_key in [(0, 0), (3, 0), (311, 0)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, stage_key, pikachu)
+                .unwrap();
+            assert_eq!(wizard.setup.cpu, [-100.0, -55.0]);
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, [100.0, -55.0]);
+            wizard.advance();
+            wizard.move_cpu(stage, [125.0, -40.0]);
+            assert_eq!(wizard.setup.cpu, [125.0, -40.0], "the wizard still edits the point");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+        }
+
+        for (id, kind) in [((3, 1), pikachu), ((89, 0), pikachu), ((3, 0), Some(0)), ((3, 0), None)] {
+            let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, id, kind).unwrap();
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        }
+        let juggle = Wizard::new(Drill::Juggler, stage, [0.0, 0.0], 100, (3, 0), pikachu).unwrap();
+        assert_eq!(juggle.setup.cpu, stage.default_juggle([0.0, 0.0]));
+    }
+
+    #[test]
     fn juggle_wizard_percent_and_player_step() {
         let stage = Stage::new([-160.0, 150.0, 110.0, -85.0], [-160.0, 150.0, 110.0, -85.0], [[-60.0, 5.0], [80.0, 8.0]]).unwrap();
-        let mut wizard = Wizard::new(Drill::Juggler, stage, [0.0, 7.0], 60).unwrap();
+        let mut wizard = Wizard::new(Drill::Juggler, stage, [0.0, 7.0], 60, (3, 0), None).unwrap();
         assert_eq!(wizard.step, WizardStep::Cpu);
         wizard.move_cpu(stage, [-150.0, 90.0]);
         wizard.advance();

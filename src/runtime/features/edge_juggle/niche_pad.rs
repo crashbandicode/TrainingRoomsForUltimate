@@ -252,7 +252,7 @@ impl NicheGuide {
                 hold_over: false,
                 direction: 0.0,
                 aim: [0.0; 2],
-            }, [x, y], vy);
+            }, [x, y], vy, remaining_jumps(cpu)?);
         }
 
         let (mut direction, mut aim, mut at_exit, mut can_enter) = (
