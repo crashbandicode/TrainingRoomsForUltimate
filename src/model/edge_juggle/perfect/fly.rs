@@ -213,6 +213,7 @@ mod tests {
 
     fn facts(position: [f32; 2]) -> RouteFacts<'static> {
         RouteFacts {
+            fighter: 0xc,
             stage: (3, 0),
             position,
             player: [-75.0, 0.0],

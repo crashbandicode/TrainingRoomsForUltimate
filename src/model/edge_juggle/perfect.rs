@@ -481,6 +481,7 @@ pub fn player_on_path(player: Point, path: Segment, reach: f32) -> bool {
 }
 
 pub struct RouteFacts<'a> {
+    pub fighter: i32,
     pub stage: (i32, u32),
     pub position: Point,
     pub player: Point,
@@ -1330,6 +1331,7 @@ mod tests {
         let ledges = [[-40., 0.], [40., 0.]];
         let lines = [[ledges[0], ledges[1]], [ledges[0], [0., -15.]], [[0., -15.], ledges[1]]];
         let mut facts = RouteFacts {
+            fighter: 0x8,
             stage: (0, 0),
             position: [-53., -22.], player: [-41., 0.], player_reach: 18.,
             ledges, blast: [-130., 130., 100., -90.], outline: &lines,
@@ -1342,6 +1344,41 @@ mod tests {
         facts.player = [-41., 0.];
         facts.reach[0] = 45.;
         assert!(!possible_routes(&facts).iter().flatten().any(|plan| plan.route == Route::Opposite));
+    }
+
+    #[test]
+    fn an_optimistic_budget_cannot_offer_hard_or_impossible_generic_crossings() {
+        use crate::model::fighter_choices::CHOICES;
+
+        let ledges = [[-40., 0.], [40., 0.]];
+        let outline = [[ledges[0], ledges[1]], [ledges[0], [0., -15.]], [[0., -15.], ledges[1]]];
+        let mut facts = RouteFacts {
+            fighter: 0x8,
+            stage: (3, 0),
+            position: [-53., -22.],
+            player: [-41., 0.],
+            player_reach: 18.,
+            ledges,
+            blast: [-130., 130., 100., -90.],
+            outline: &outline,
+            body_clearance: 9.,
+            ledge_distance: 5.,
+            fall_budget: 12.,
+            reach: [120., 42.],
+        };
+        assert!(possible_routes(&facts)[3].is_some(), "the geometry and budget permit crossing");
+        for (kind, name) in CHOICES.iter().copied().filter(|&(_, name)| {
+            matches!(name, "Little Mac" | "Incineroar" | "Luigi" | "Ness" | "Snake" | "Charizard" | "Link")
+        }) {
+            facts.fighter = kind as i32;
+            for stage in [0, 3, 89, 311] {
+                facts.stage = (stage, 0);
+                assert!(facts.crossing_band().is_some(), "{name} stage {stage}: geometry still available");
+                let [near, _, low, across] = possible_routes(&facts);
+                assert!(near.or(low).is_some(), "{name} stage {stage}: return remains available");
+                assert!(across.is_none(), "{name} stage {stage}: no generic crossing");
+            }
+        }
     }
 
     #[test]
@@ -1363,6 +1400,7 @@ mod tests {
         let ledges = [[-40., 0.], [40., 0.]];
         let outline = [[ledges[0], ledges[1]], [ledges[0], [0., -15.]], [[0., -15.], ledges[1]]];
         let mut facts = RouteFacts {
+            fighter: 0x8,
             stage: (0, 0),
             position: [-53., -22.],
             player: [-41., 0.],

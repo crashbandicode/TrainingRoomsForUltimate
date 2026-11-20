@@ -864,7 +864,9 @@ unsafe fn route_guide(
         air.jump_speed.powi(2) / (2.0 * air.gravity)
     };
     let [special_horizontal, special_rise] = special.map_or([0.0; 2], |reach| [reach.horizontal, reach.rise]);
+    let fighter = natives::fighter_kind(cpu).unwrap_or(UNRESOLVED);
     let facts = RouteFacts {
+        fighter,
         stage: run.stage_key,
         position: pos,
         player,
@@ -892,7 +894,6 @@ unsafe fn route_guide(
             .is_some()
     });
     let band = facts.crossing_band();
-    let fighter = natives::fighter_kind(cpu).unwrap_or(UNRESOLVED);
     let crossable = u32::from(band.is_some());
     let zone = guarder_zone(p1, player, player_reach, near_ledge, pos);
     run.zone = zone;

@@ -125,6 +125,35 @@ fn facts(fighter: i32, mode: &str) -> Facts {
     }
 }
 
+#[test]
+fn hard_niche_crossings_need_a_measured_route_even_with_spare_budget() {
+    for (fighter, row, name) in [(0xa, 14, "Ness"), (0x22, 26, "Snake"), (0x26, 35, "Charizard")] {
+        let row = super::measured_row(row, CANDIDATE_ROWS).expect("registered candidate row");
+        let input = facts(fighter, "cross");
+        assert_eq!(row.route, Route::Opposite, "{name}'s route can be tested by a dedicated model");
+        assert!(row.margin(input).is_some(), "{name}: synthetic budget permits a crossing");
+        assert!(select(input, CANDIDATE_ROWS).is_none(), "{name}: no estimated crossing");
+    }
+}
+
+#[test]
+fn little_mac_and_incineroar_only_have_near_niche_rows() {
+    use crate::model::fighter_choices::CHOICES;
+
+    for (_, name) in CHOICES.iter().copied().filter(|&(_, name)| matches!(name, "Little Mac" | "Incineroar")) {
+        let kind = CHOICES.iter().find(|(_, label)| *label == name).unwrap().0 as i32;
+        let mut rows = super::ROWS.iter().filter(|row| row.fighter == kind).peekable();
+        assert!(rows.peek().is_some(), "{name} needs a non-crossing technique");
+        assert!(rows.all(|row| row.route == Route::Near), "{name}");
+    }
+    assert_eq!(select(facts(0x34, "counter"), CANDIDATE_ROWS).map(|row| row.id), Some(10));
+    let mut whip = facts(0x47, "near");
+    let near = whip.near.as_mut().unwrap();
+    near.gap = 20.0;
+    near.climb = 5.0;
+    assert_eq!(select(whip, CANDIDATE_ROWS).map(|row| row.id), Some(36));
+}
+
 fn sample(frame: u32, motion: Motion) -> Sample {
     Sample {
         frame,
