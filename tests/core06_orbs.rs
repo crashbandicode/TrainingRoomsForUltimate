@@ -511,6 +511,23 @@ fn a_hurtbox_orb_is_its_size_at_the_bones_world_scale() {
     assert!((out[0].radius - 5.0).abs() < 1e-4, "a hitbox orb keeps its size: {}", out[0].radius);
 }
 
+/// rc.15 target-hurtbox-size review: when the bone's scale can't be sampled (the unit offset doesn't place, or places
+/// on the centre or at a non-finite point) the hurtbox orb is left out that frame rather than drawn at the unscaled size.
+fn a_hurtbox_without_a_valid_bone_scale_is_not_drawn() {
+    let samples: [fn(&Sphere) -> Option<[f32; 3]>; 3] = [
+        |s| (s.pos[0] == 2.0).then_some([10.0, 6.0, 0.0]),
+        |_| Some([10.0, 6.0, 0.0]),
+        |s| Some(if s.pos[0] == 2.0 { [10.0, 6.0, 0.0] } else { [f32::NAN, 6.0, 0.0] }),
+    ];
+    for place in samples {
+        let mut set = HandleSet::new();
+        let hurt = Sphere { key: hitbox::sphere_key(hitbox::KIND_HURT, 0, 0), joint: 0x1234, pos: [2.0, 0.0, 0.0], scale: hitbox::sphere_scale(5.0), tint: hitbox::HURTBOX_TINT };
+        set.reconcile(&[hurt], true, &mut OrbSink { status: 1 });
+        let mut out = [Orb::NONE; orbs::BOARD_ORBS];
+        assert_eq!(orbs::place_orbs(&set, place, None, |_| None, &mut out), 0, "no unscaled hurtbox orb");
+    }
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -530,6 +547,7 @@ fn case_table() {
         ("screen_half_mirrors_the_games_size_words", screen_half_mirrors_the_games_size_words as fn()),
         ("projected_orbs_map_onto_the_layout_canvas", projected_orbs_map_onto_the_layout_canvas as fn()),
         ("a_hurtbox_orb_is_its_size_at_the_bones_world_scale", a_hurtbox_orb_is_its_size_at_the_bones_world_scale as fn()),
+        ("a_hurtbox_without_a_valid_bone_scale_is_not_drawn", a_hurtbox_without_a_valid_bone_scale_is_not_drawn as fn()),
     ]);
 }
 
