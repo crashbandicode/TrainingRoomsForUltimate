@@ -133,7 +133,6 @@ fn sample(frame: u32, motion: Motion) -> Sample {
         valid: true,
         at_exit: true,
         can_enter: true,
-        approaching: false,
         low: false,
         hold_over: true,
         direction: 1.0,
@@ -270,7 +269,7 @@ fn niche_pikachu_thunder_waits_for_its_measured_fall() {
     let thunder = &super::ROWS[1];
     assert_eq!(
         thunder.moves,
-        [Move::Down, Move::Hold, Move::QuickAttack].as_slice()
+        [Move::ApproachThunder, Move::Down, Move::Hold, Move::QuickAttack].as_slice()
     );
     assert!(
         select(facts(0x8, "center"), CANDIDATE_ROWS).is_none(),
@@ -708,7 +707,6 @@ fn niche_requires_stock_transition_and_does_not_spend_an_unaccepted_input_twice(
 fn niche_thunder_holds_altitude_on_the_way_to_the_cast() {
     let mut sequence = Sequence::new(&super::ROWS[1]);
     let approach = Sample {
-        approaching: true,
         at_exit: false,
         hold_over: false,
         ..sample(0, Motion::Free)

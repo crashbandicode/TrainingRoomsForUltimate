@@ -10,6 +10,8 @@ pub enum Move {
     Drift,
     /// Glide along the corridor; one jump each time the foot sinks to the hold line.
     Hold,
+    /// Hold the corridor until Pikachu is below the Thunder target.
+    ApproachThunder,
     Jump,
     Side,
     ChargedSide,
@@ -83,7 +85,7 @@ enum Intent {
 
 /// 3a29e6af fd-3: seven authored Skull Bashes return to Fall after
 /// 134.392 horizontal and −63.499 vertical units (first native 4329 → 4628).
-const MEASURED: &[(u8, Measured)] = &[(3, Measured { run: 134.0, rise: -63.5 })];
+const MEASURED: &[(u8, Move, Measured)] = &[(3, Side, Measured { run: 134.0, rise: -63.5 })];
 
 pub struct Row {
     pub id: u8,
@@ -121,7 +123,7 @@ impl Row {
         if self.route == Route::Near {
             return Some(1.0);
         }
-        let measured = MEASURED.iter().find(|(row, _)| *row == self.id);
+        let measured = MEASURED.iter().find(|(row, _, _)| *row == self.id);
         if matches!(self.intent, Intent::ThunderOverhead) && measured.is_none() {
             return None;
         }
@@ -135,7 +137,7 @@ impl Row {
             budget.jumps,
             budget.special,
             self.aimed(),
-            measured.map_or(Measured::default(), |&(_, travel)| travel),
+            measured.map_or(Measured::default(), |&(_, _, travel)| travel),
             budget.crossing,
         )
     }
@@ -200,7 +202,7 @@ use Move::*;
 // fall (SmashWiki "Helpless") is the row's last move; a jump is never burst at the entry.
 const ROWS: [Row; 40] = [
     Row::new(1, 0x8, Intent::Across, &[Hold, QuickAttack]),
-    Row::new(2, 0x8, Intent::ThunderOverhead, &[Down, Hold, QuickAttack]),
+    Row::new(2, 0x8, Intent::ThunderOverhead, &[ApproachThunder, Down, Hold, QuickAttack]),
     Row::new(3, 0x8, Intent::LongApproach, &[Side, Hold, QuickAttack]),
     Row::new(4, 0x1c, Intent::Across, &[Hold, Rise]),
     Row::new(5, 0x27, Intent::Across, &[Hold, Barrel]),
@@ -275,7 +277,6 @@ pub struct Sample {
     pub valid: bool,
     pub at_exit: bool,
     pub can_enter: bool,
-    pub approaching: bool,
     /// The foot is under the hold line and a jump fits inside the band.
     pub low: bool,
     /// The glide ends: at the exit, or where the next special must start to arrive.
@@ -340,8 +341,10 @@ impl Sequence {
     pub fn still_crosses(&self, budget: Budget) -> bool {
         let measured = MEASURED
             .iter()
-            .find(|(row, _)| *row == self.row.id && self.index == 0)
-            .map_or(Measured::default(), |&(_, travel)| travel);
+            .find(|(row, movement, _)| {
+                *row == self.row.id && self.row.moves[self.index..].contains(movement)
+            })
+            .map_or(Measured::default(), |&(_, _, travel)| travel);
         let aimed = self.row.aimed();
         crossing_margin(budget.air, budget.jumps, budget.special, aimed, measured, budget.crossing)
             .is_some()
@@ -417,10 +420,7 @@ impl Sequence {
         if !sample.can_enter && matches!(self.stage, Stage::Ready) {
             return Some(pad([0.0; 2], 0));
         }
-        if sample.approaching && matches!(self.stage, Stage::Ready) {
-            return Some(pad([forward, level], 0));
-        }
-        if movement == Hold {
+        if matches!(movement, Hold | ApproachThunder) {
             return Some(pad([forward, level], self.hold(sample)));
         }
         if movement == Jump
