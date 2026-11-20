@@ -7,6 +7,8 @@ mod model {
     }
     pub mod practice_games { // PRACTICE
     }
+    pub mod practice_state { // PRACTICE_STATE
+    }
     pub mod mashout {
         pub mod grade { // GRADE
         }
@@ -27,6 +29,15 @@ mod model {
     }
 }
 mod runtime {
+    pub mod bridge_state {
+        use crate::model::{practice_games::Game, practice_state::Fields};
+
+        pub struct PracticeCapture;
+        impl PracticeCapture {
+            pub fn of(_: Game) -> Self { Self }
+            pub fn result(self, _: impl FnOnce() -> Option<Fields>) {}
+        }
+    }
     pub mod diag_log {
         pub fn diagnostic(_: core::fmt::Arguments<'_>) {}
     }
@@ -104,6 +115,7 @@ mod notices {
     }
 }
 mod worker {
+    use crate::model::practice_games::Game as PracticeGame;
     // WORKER
     #[cfg(test)]
     mod epoch_tests {

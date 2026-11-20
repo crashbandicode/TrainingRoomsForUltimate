@@ -45,13 +45,17 @@ fn idle_and_starting_have_no_stale_game_fields() {
 #[test]
 fn think_counts_are_per_entry_and_offline_admitted() {
     let counts = core::array::from_fn::<_, CPU_ENTRIES, _>(|_| core::sync::atomic::AtomicU64::new(0));
-    for (admission, matched, entry) in [(0, true, 1), (2, false, 1), (2, true, 0), (2, true, -1),
-        (2, true, 8), (2, true, 1), (2, true, 4), (2, true, 1)] {
-        if let Some(index) = think_entry(admission, matched, entry) {
-            counts[index].fetch_add(1, core::sync::atomic::Ordering::Relaxed);
-        }
+    assert_eq!(think_entry(0, Some(1), |_| panic!("Off cannot inspect the other CPU entries")), None);
+    assert_eq!(think_entry(2, None, |entry| entry == 0 || entry == 8), None);
+    for index in [
+        think_entry(2, Some(1), |_| panic!("primary match cannot inspect other entries")),
+        think_entry(2, None, |entry| entry == 4),
+        think_entry(2, Some(1), |_| false),
+        think_entry(2, None, |entry| entry == 7),
+    ].into_iter().flatten() {
+        counts[index].fetch_add(1, core::sync::atomic::Ordering::Relaxed);
     }
-    assert_eq!(counts.map(core::sync::atomic::AtomicU64::into_inner), [0, 2, 0, 0, 1, 0, 0, 0]);
+    assert_eq!(counts.map(core::sync::atomic::AtomicU64::into_inner), [0, 2, 0, 0, 1, 0, 0, 1]);
 }
 }
 

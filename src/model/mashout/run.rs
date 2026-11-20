@@ -421,6 +421,7 @@ mod tests {
     fn mashout_practice_result_publishes_the_scored_native_clock() {
         let mut game = Run::new();
         assert!(game.practice_result().is_none());
+        game.enable(true);
         attempt(&mut game, 4, 11, FINITE);
         let fields = game.practice_result().unwrap();
         assert_eq!((fields.last_outcome, fields.last_frames, fields.best, fields.fastest_frames, fields.baseline_frames),

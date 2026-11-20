@@ -96,8 +96,14 @@ pub const fn game_name(game: Game) -> &'static str {
     }
 }
 
-pub fn think_entry(admission: u64, matched: bool, entry: i32) -> Option<usize> {
-    (admission != 0 && matched && (1..CPU_ENTRIES as i32).contains(&entry)).then_some(entry as usize)
+pub fn think_entry(admission: u64, primary_match: Option<i32>, mut matches: impl FnMut(i32) -> bool) -> Option<usize> {
+    if admission == 0 {
+        return None;
+    }
+    let entries = 1..CPU_ENTRIES as i32;
+    primary_match.filter(|entry| entries.contains(entry))
+        .or_else(|| entries.clone().find(|&entry| matches(entry)))
+        .map(|entry| entry as usize)
 }
 
 

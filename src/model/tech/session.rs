@@ -29,6 +29,22 @@ pub enum Grade {
     Unavailable,
 }
 impl Grade {
+    pub const fn practice_name(self) -> &'static str {
+        match self {
+            Self::Perfect(_) => "perfect",
+            Self::Held => "held",
+            Self::Early(_) => "early",
+            Self::Locked(_) => "locked",
+            Self::Late(_) => "late",
+            Self::Missed => "missed",
+            Self::AfterHitstun => "after_hitstun",
+            Self::Untechable => "untechable",
+            Self::TooFast(_) => "too_fast",
+            Self::NoContact => "no_contact",
+            Self::Unavailable => "grading_unavailable",
+        }
+    }
+
     pub fn success(self) -> bool {
         matches!(self, Self::Perfect(_) | Self::Held)
     }

@@ -289,7 +289,11 @@ pub unsafe fn ai_epilogue(ctx: &mut InlineCtx) {
 
 unsafe fn on_ai_frame(ai: usize) {
     // Native Training or an active lobby practice (the hot swap check below stops the recorder).
-    if ai == 0 || !(scene::is_native_training() || scene::lobby_term()) {
+    if ai == 0 {
+        return;
+    }
+    let native_training = scene::is_native_training();
+    if !(native_training || scene::lobby_term()) {
         return;
     }
     let controller = ((ai + AI_CONTROLLER_FIELD) as *const usize).read();
@@ -300,14 +304,20 @@ unsafe fn on_ai_frame(ai: usize) {
         stop();
         return;
     }
-    let Some(body) = cpu_body() else {
+    // Rule R3: the recorder owns only the primary CPU entry's controller, never Nana's or P1's.
+    let primary = cpu_body();
+    let owns_controller = |entry_ptr: usize| {
+        entry_ptr != 0 && ((entry_ptr + ENTRY_CONTROLLER_FIELD) as *const usize).read() == controller
+    };
+    let matched = primary.filter(|body| owns_controller(body.entry_ptr));
+    if native_training {
+        crate::runtime::bridge_state::note_ai_think(matched.map(|body| body.entry_id), |entry| {
+            owns_controller(natives::fighter_entry(entry))
+        });
+    }
+    let Some(body) = matched else {
         return;
     };
-    // Rule R3: only the CPU entry's own controller (never Nana's, never an AI-driven P1's).
-    if ((body.entry_ptr + ENTRY_CONTROLLER_FIELD) as *const usize).read() != controller {
-        return;
-    }
-    crate::runtime::bridge_state::note_ai_think(body.entry_id);
     let buttons = ((controller + CTRL_BUTTONS) as *const u32).read();
     if let Some(hold) = super::btt_camera::placement_pad(buttons) {
         write_controller(controller, Inject { buttons: (buttons & !hold.release) | hold.press, ..Inject::NEUTRAL });

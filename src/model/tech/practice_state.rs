@@ -18,24 +18,6 @@ pub enum View<'a> {
     Cancelled,
 }
 
-impl Grade {
-    pub const fn practice_name(self) -> &'static str {
-        match self {
-            Self::Perfect(_) => "perfect",
-            Self::Held => "held",
-            Self::Early(_) => "early",
-            Self::Locked(_) => "locked",
-            Self::Late(_) => "late",
-            Self::Missed => "missed",
-            Self::AfterHitstun => "after_hitstun",
-            Self::Untechable => "untechable",
-            Self::TooFast(_) => "too_fast",
-            Self::NoContact => "no_contact",
-            Self::Unavailable => "grading_unavailable",
-        }
-    }
-}
-
 pub fn project_tech_state(session: &Session, view: View<'_>) -> Fields {
     let step = match session.phase {
         Phase::Off => "starting",

@@ -342,6 +342,10 @@ fn actual_runtime_worker_native_epoch_admission_and_bests() {
                 .to_owned(),
         ),
         (
+            "// PRACTICE_STATE",
+            production(include_str!("../src/model/practice_state.rs")).to_owned(),
+        ),
+        (
             "// PRACTICE",
             [
                 "pub fn record_time",
@@ -350,7 +354,7 @@ fn actual_runtime_worker_native_epoch_admission_and_bests() {
                 "pub fn result_tick",
             ]
             .map(|m| block(practice, m))
-            .join("\n"),
+            .join("\n") + "\n#[derive(Clone, Copy)]\n" + block(practice, "pub enum Game"),
         ),
         (
             "// FAULTED",

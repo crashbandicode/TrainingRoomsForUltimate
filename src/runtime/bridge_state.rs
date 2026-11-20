@@ -100,9 +100,9 @@ impl PracticeCapture {
     }
 }
 
-/// Existing AI epilogue, after matching the primary CPU controller and before any override.
-pub fn note_ai_think(entry: i32) {
-    if let Some(entry) = practice::think_entry(practice_admission(), true, entry) {
+/// Existing AI epilogue. Use the primary match first and inspect other live entries only while admitted.
+pub fn note_ai_think(primary_match: Option<i32>, matches: impl FnMut(i32) -> bool) {
+    if let Some(entry) = practice::think_entry(practice_admission(), primary_match, matches) {
         THINKS[entry].fetch_add(1, Ordering::Relaxed);
     }
 }
@@ -141,12 +141,17 @@ impl PracticeProvider {
         })
     }
 
-    fn poll(&mut self, publish: extern "C" fn(i32, *const u8, u32) -> i32) {
+    fn poll_practice(&mut self, now_ms: u64, publish: extern "C" fn(i32, *const u8, u32) -> i32) {
         let admission = practice_admission();
         if admission == 0 {
             return;
         }
-        let (activation, game) = crate::runtime::features::practice::activation();
+        // Offline menu admission can keep the bridge On after the Training view ends.
+        let (activation, game) = if scene(now_ms) == "training" {
+            crate::runtime::features::practice::activation()
+        } else {
+            (0, None)
+        };
         if admission != self.admission || activation != self.activation {
             self.admission = admission;
             self.activation = activation;
@@ -328,7 +333,7 @@ impl Provider {
         };
         let Some(publish) = api.publish else { return };
         if let Some(practice) = &mut self.practice {
-            practice.poll(publish);
+            practice.poll_practice(now_ms, publish);
         }
         read_notice(&mut self.notice.0, &mut self.notice.1);
         let shown = m::shown_notice(NOTICE_VISIBLE.load(Ordering::Relaxed), (self.notice.0.as_str(), self.notice.1.as_str()));
