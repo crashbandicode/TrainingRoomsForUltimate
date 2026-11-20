@@ -8,6 +8,7 @@ use crate::{
     model::{sites_pkg2, sites_pkg3},
     runtime::game,
 };
+use perfect::fly::{FlyState, PuffFlight};
 use perfect::niche::{self, Budget, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
 use perfect::pikachu::{self, SkullBashFlight};
 use perfect::{recovery, AirPhysics, Correction, Outline, Point, Route, RouteFacts, SpecialReach};
@@ -17,9 +18,14 @@ pub(super) struct NicheGuide {
     fighter: i32,
     ledge: Point,
     across: Option<Crossing>,
-    skull_bash: Option<SkullBashFlight>,
+    measured: Option<MeasuredFlight>,
     player_x: f32,
     body_clearance: f32,
+}
+
+enum MeasuredFlight {
+    SkullBash(SkullBashFlight),
+    Puff(PuffFlight),
 }
 
 struct Crossing {
@@ -69,7 +75,7 @@ impl NicheGuide {
                 facts.stage, facts.outline, facts.ledges, facts.position, facts.blast[3],
                 facts.body_clearance,
             )?;
-            let row = niche::skull_bash_row(niche::CANDIDATE_ROWS)?;
+            let row = niche::measured_row(3, niche::CANDIDATE_ROWS)?;
             if inputs.special.is_none()
                 || inputs.jumps == 0
                 || inputs.speed[0].abs() > inputs.air.horizontal_acceleration
@@ -89,11 +95,32 @@ impl NicheGuide {
                 fighter,
                 ledge: path.far,
                 across: None,
-                skull_bash: Some(SkullBashFlight::new(path, outline, facts.blast[3])),
+                measured: Some(MeasuredFlight::SkullBash(SkullBashFlight::new(
+                    path, outline, facts.blast[3],
+                ))),
                 player_x: facts.player[0],
                 body_clearance: facts.body_clearance,
             };
             return Some((guide, 1.0));
+        }
+        if fighter == 0xc {
+            let row = niche::measured_row(17, niche::CANDIDATE_ROWS)?;
+            let flight = PuffFlight::start(facts, FlyState {
+                position: facts.position,
+                velocity: inputs.speed,
+                remaining: inputs.jumps,
+                can_jump: false,
+                frame: 0,
+            })?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: flight.exit_point(),
+                across: None,
+                measured: Some(MeasuredFlight::Puff(flight)),
+                player_x: facts.player[0],
+                body_clearance: facts.body_clearance,
+            }, 1.0));
         }
         // A crossing starts below the near ledge. An extension row sees every height and
         // applies its own rule (`climb`).
@@ -148,7 +175,7 @@ impl NicheGuide {
             fighter,
             ledge: if across.is_some() { far } else { near },
             across,
-            skull_bash: None,
+            measured: None,
             player_x: facts.player[0],
             body_clearance: facts.body_clearance,
         };
@@ -193,7 +220,21 @@ impl NicheGuide {
         }
         let (snapshot, available) = recovery_snapshot(ai)?;
         let reach = if available { Some(special_reach(ai, snapshot)?) } else { None };
-        if let Some(skull_bash) = &mut self.skull_bash {
+        if let Some(MeasuredFlight::Puff(flight)) = &mut self.measured {
+            if !airborne_recovery(cpu, status) {
+                return None;
+            }
+            let (vx, vy) = super::super::recording_host::fighter_speed(cpu)?;
+            let jump = konst(C::TermContJumpAerial);
+            return flight.step(FlyState {
+                position: [x, y],
+                velocity: [vx, vy],
+                remaining: remaining_jumps(cpu)?,
+                can_jump: jump != UNRESOLVED && natives::is_enable_transition_term(cpu, jump),
+                frame,
+            });
+        }
+        if let Some(MeasuredFlight::SkullBash(skull_bash)) = &mut self.measured {
             let (_, vy) = super::super::recording_host::fighter_speed(cpu)?;
             let motion = niche_motion_phase(cpu, self.fighter, movement, status);
             return skull_bash.step(&mut self.sequence, Sample {

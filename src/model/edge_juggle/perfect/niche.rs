@@ -277,8 +277,9 @@ const ROWS: [Row; 40] = [
 
 pub const CANDIDATE_ROWS: u64 = (1 << ROWS.len()) - 1;
 
-pub fn skull_bash_row(enabled: u64) -> Option<&'static Row> {
-    (enabled & (1 << 2) != 0).then_some(&ROWS[2])
+pub fn measured_row(id: u8, enabled: u64) -> Option<&'static Row> {
+    let index = id.checked_sub(1)?;
+    ROWS.get(usize::from(index)).filter(|row| row.id == id && enabled & (1 << index) != 0)
 }
 
 pub fn select(facts: Facts, enabled: u64) -> Option<&'static Row> {

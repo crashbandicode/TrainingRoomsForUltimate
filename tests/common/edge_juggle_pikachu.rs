@@ -93,7 +93,7 @@ fn skull_bash_flies_the_native_side_jump_and_two_aim_sequence() {
         outline.add(line);
     }
     let mut flight = SkullBashFlight::new(path, outline, BOTTOM);
-    let mut sequence = Sequence::new(niche::skull_bash_row(niche::CANDIDATE_ROWS).unwrap());
+    let mut sequence = Sequence::new(niche::measured_row(3, niche::CANDIDATE_ROWS).unwrap());
     let mut input = |frame, motion, can_start, position, vy| {
         flight.step(&mut sequence, Sample {
             frame,
