@@ -875,6 +875,7 @@ unsafe fn route_guide(
     let crossable = u32::from(band.is_some());
     let zone = guarder_zone(p1, player, player_reach, near_ledge, pos);
     run.zone = zone;
+    run.route_watch.set_guarder_zone(zone);
     run.hold = Hold::default();
     let reach = Reach::trusted(air, jumps != 0, special);
     let deadline = reach.deadline(pos, speed, near_ledge, bottom);
@@ -1073,8 +1074,10 @@ unsafe fn recovery_pad(
     let speed = [vx, vy];
     let jumps = remaining_jumps(cpu);
     let recovery = recovery_snapshot(ai);
-    let blocked = run.guide.is_some_and(|guide| {
-        let player = [natives::pos_x(p1), natives::pos_y(p1)];
+    let [left, right] = run.stage.ledges;
+    let guarder = (run.guide.is_some() || !run.plan_pending && run.player_reach > 0.0)
+        .then(|| [natives::pos_x(p1), natives::pos_y(p1)]);
+    let blocked = run.guide.zip(guarder).is_some_and(|(guide, player)| {
         let target = match guide {
             RecoveryGuide::High { lip, .. } => lip,
             RecoveryGuide::Cross { exit, .. } => exit,
@@ -1084,6 +1087,17 @@ unsafe fn recovery_pad(
     run.plan_pending |= run
         .route_watch
         .observe(jumps.zip(recovery.map(|(_, available)| available)), blocked);
+    if !run.plan_pending {
+        let near = if pos[0] < left[0] {
+            Some(left)
+        } else {
+            (pos[0] > right[0]).then_some(right)
+        };
+        if let Some((ledge, player)) = near.zip(guarder.filter(|p| p.iter().all(|x| x.is_finite()))) {
+            let zone = guarder_zone(p1, player, run.player_reach, ledge, pos);
+            run.plan_pending = run.route_watch.observe_guarder(zone, run.rounds.frames);
+        }
+    }
     let special = recovery
         .filter(|&(_, available)| available)
         .and_then(|(snapshot, _)| special_reach(ai, snapshot));
@@ -1167,7 +1181,6 @@ unsafe fn recovery_pad(
             _ => run.guide = None,
         }
     }
-    let [left, right] = run.stage.ledges;
     let ledge = if pos[0] < left[0] {
         left
     } else if pos[0] > right[0] {
@@ -1785,6 +1798,7 @@ pub unsafe fn frame(fighter: usize) {
         run.player_ledge = None;
         run.plan_pending = true;
         run.route_watch = perfect::RouteWatch::default();
+        run.player_reach = 0.0;
         run.player_height = PlanHeight::default();
         run.hold = Hold::default();
         run.zone = Zone::Far;
@@ -1891,6 +1905,7 @@ pub unsafe fn frame(fighter: usize) {
             run.route_draw = rng.next_u32();
             run.plan_pending = true;
             run.route_watch = perfect::RouteWatch::default();
+            run.player_reach = 0.0;
             run.player_height = PlanHeight::default();
             run.guide = None;
             run.niche = None;

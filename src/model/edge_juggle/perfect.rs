@@ -291,10 +291,32 @@ impl PlanHeight {
 pub struct RouteWatch {
     resources: Option<(u8, bool)>,
     blocked: bool,
+    guarder_zone: Option<recovery::Zone>,
+    next_zone: Option<recovery::Zone>,
+    zone_frame: Option<u32>,
 }
 
 impl RouteWatch {
-    pub fn observe_guarder(&mut self, _zone: recovery::Zone, _frame: u32) -> bool {
+    pub fn set_guarder_zone(&mut self, zone: recovery::Zone) {
+        self.guarder_zone = Some(zone);
+        self.next_zone = None;
+    }
+
+    /// Require two distinct game frames in the new zone before requesting another plan.
+    pub fn observe_guarder(&mut self, zone: recovery::Zone, frame: u32) -> bool {
+        if self.zone_frame == Some(frame) {
+            return false;
+        }
+        self.zone_frame = Some(frame);
+        if self.guarder_zone.is_none() || self.guarder_zone == Some(zone) {
+            self.set_guarder_zone(zone);
+            return false;
+        }
+        if self.next_zone == Some(zone) {
+            self.set_guarder_zone(zone);
+            return true;
+        }
+        self.next_zone = Some(zone);
         false
     }
 
