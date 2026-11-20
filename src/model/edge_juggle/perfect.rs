@@ -656,6 +656,19 @@ mod tests {
     }
 
     #[test]
+    fn landing_variants_only_use_a_safe_and_legal_input() {
+        let facts = LandingFacts { cpu: [5., 45.], player: [0., 5.], main_floor: [-70., 70.],
+            stock_stick_y: -0.15, stock_buttons: 0x8000 };
+        let legal = LandingOptions { fast_fall: true, jump: true, platform_x: Some(-15.) };
+        assert_eq!(landing_variant(facts, legal, 6).stick, Some([0., -1.]));
+        assert_eq!(landing_variant(facts, legal, 7).press, JUMP);
+        assert_eq!(landing_variant(facts, legal, 8).stick, Some([-1., -0.15]));
+        assert_eq!(landing_variant(facts, LandingOptions::default(), 7), Correction::default());
+        assert_eq!(landing_variant(LandingFacts { stock_buttons: 0x8008, ..facts }, legal, 8),
+            Correction::default());
+    }
+
+    #[test]
     fn a_crossing_must_survive_to_the_exit_and_still_rise_to_the_ledge() {
         let air = AirPhysics { horizontal_speed: 2., horizontal_acceleration: 0.2,
             gravity: 0.1, terminal_speed: 2., jump_speed: 3. };
