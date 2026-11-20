@@ -927,7 +927,7 @@ pub fn landing_variant(facts: LandingFacts, options: LandingOptions, draw: u32) 
     }
     let away = if cpu[0] != player[0] {
         (cpu[0] - player[0]).signum()
-    } else if draw % 2 == 0 {
+    } else if draw.is_multiple_of(2) {
         -1.0
     } else {
         1.0
