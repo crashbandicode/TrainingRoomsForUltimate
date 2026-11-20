@@ -1030,9 +1030,6 @@ fn shrink_to_ready(settings: &crate::engine::preload::cycle_preload_config::Sett
     }
 }
 
-/// Value-only group planning on the sparse planner: appends `Planned` groups to
-/// a Ready window bank; never removes or touches a native object. Returns the
-/// extra-group bodies charged to the shared budget and the per-role UI targets.
 /// A lane's Ice Climbers entry is a group candidate (see `plan_groups`).
 fn popo_candidate(menu: &crate::engine::compat::menu::TrainingModpackMenu, logical_role: super::Role, slot: Option<usize>,
     special: SpecialPolicy, policy: GroupPolicy) -> bool {
@@ -1041,6 +1038,9 @@ fn popo_candidate(menu: &crate::engine::compat::menu::TrainingModpackMenu, logic
         if special.pair { form == Forms::starting(POPO) } else { policy.solo_popo_groups && form == Forms::solo_popo() }
     }
 }
+/// Value-only group planning on the sparse planner: appends `Planned` groups to
+/// a Ready window bank; never removes or touches a native object. Returns the
+/// extra-group bodies charged to the shared budget and the per-role UI targets.
 
 fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings,
     menu: &crate::engine::compat::menu::TrainingModpackMenu,

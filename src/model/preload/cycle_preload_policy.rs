@@ -274,6 +274,9 @@ pub struct CacheStatus {
     pub blocked: bool,
 }
 
+/// What the notice shows (`CacheStatus::shown_key`), the Ready Fighters suffix (R, N, cold) last.
+type ShownKey = (u8, u8, u8, u8, u8, u8, bool, Option<(u8, u8, u8)>);
+
 /// The notice buffer the status text is formatted into (`cycle_preload::show_status`): the longest text fits.
 pub const TEXT_MAX: usize = 160;
 
@@ -381,7 +384,7 @@ impl CacheStatus {
 
     /// What the notice shows, without what changes afterwards for no reader's benefit: a settled
     /// result is the same whether a prefetched group has since been built, so that is no change.
-    fn shown_key(self) -> (u8, u8, u8, u8, u8, u8, bool, u8) {
+    fn shown_key(self) -> ShownKey {
         let (class, swap) = match self.progress() {
             Progress::Hidden => (0, 0),
             Progress::Loading => (1, 0),
@@ -394,7 +397,7 @@ impl CacheStatus {
         // Ready Fighters shortfall: the suffix shown (R/N: cold) is part of what the notice shows (review 04:44Z 3).
         (class, self.fighters.loaded(), self.fighters.planned, self.fighters.failed, swap, self.fighters.held,
             self.fighters.room_at_pause && self.fighters.held > 0,
-            self.fighters.short())
+            (self.fighters.short() > 0).then_some((self.fighters.ready_fighters, self.fighters.needed, self.fighters.cold)))
     }
 
     pub fn announce(self, shown: Option<Self>, paused_polls: u8) -> bool {

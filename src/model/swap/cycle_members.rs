@@ -80,8 +80,20 @@ pub fn numbered(members: &[TrioFighter], excluded: Option<u32>) -> KindList {
 /// different Solo settings). The current slot is `cursor` when it still holds `current`'s group, else `current`'s
 /// group's slot, else slot 0 when `cursor` is unset and `current` is the original. Returns the kinds and where slot 0 is.
 pub fn visit_order(order: &[u32], current: u32, cursor: Option<usize>, original: Option<u32>) -> (KindList, Option<usize>) {
-    let _ = (order, current, cursor, original);
-    (KindList::new(0), None)
+    let original = original.filter(|kind| TrioFighter::from_kind(*kind).is_some());
+    let same = |kind: u32| Forms::starting(kind).same_group(current);
+    let at_original = cursor.is_none() && original.is_some_and(same);
+    let position = if at_original { None } else { cursor.filter(|i| order.get(*i).is_some_and(|k| same(*k))).or_else(|| order.iter().position(|k| same(*k))) };
+    let mut kinds = KindList::new(0);
+    let mut slot0 = None;
+    let (after, before) = match position { Some(p) => (p + 1, p), None => (0, 0) };
+    for &kind in &order[after.min(order.len())..] { kinds.push(kind); }
+    if let Some(kind) = original.filter(|_| !at_original) {
+        slot0 = Some(kinds.len());
+        kinds.push(kind);
+    }
+    for &kind in &order[..before] { kinds.push(kind); }
+    (kinds, slot0)
 }
 /// The 1-based number of `kind`'s entry in a numbered order (its fighter group, or its Mii class).
 pub fn number_of(order: &[u32], kind: u32) -> Option<usize> {

@@ -1512,7 +1512,7 @@ pub struct Demand {
 /// Fighters shortfall); the targets the second leaves out are cold.
 pub fn cycle_demand(input: &DemandInput) -> Demand {
     let lanes = [&input.lanes[0][..], &input.lanes[1][..]];
-    let kept: [&[Members]; 2] = [&[], &[]];
+    let kept = [&input.kept[0][..], &input.kept[1][..]];
     let place = |ready_fighters| plan_extra_groups_with(input.policy, input.windows, kept, lanes, input.exclude,
         GroupBudget { ready_fighters, pool_free: usize::MAX / 2, special: input.special });
     let picks = |plan: &[[Option<Members>; MAX_EXTRA_GROUPS]; 2]| plan.iter().flatten().flatten()
