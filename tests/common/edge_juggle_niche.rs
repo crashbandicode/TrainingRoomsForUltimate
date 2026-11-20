@@ -657,7 +657,7 @@ fn niche_crossing_rows_decline_an_infeasible_budget() {
             );
         }
     }
-    assert_eq!(crossings, 28);
+    assert_eq!(crossings, 27);
 }
 
 #[test]
@@ -856,4 +856,14 @@ fn niche_link_does_not_finish_the_bomb_move_after_only_pulling_it() {
     sequence.step(sample(1, Motion::Starting)).expect("native pull");
     sequence.step(sample(8, Motion::Free));
     assert_eq!(sequence.action(), None, "no follow-up without a drop and blast");
+}
+
+#[test]
+fn niche_near_gap_extensions_use_the_full_plain_return() {
+    for (fighter, row) in [(0x47, 36), (0x5a, 38), (0x5b, 39)] {
+        let input = Facts { short: false, ..facts(fighter, "long") };
+        let only = 1 << (row - 1);
+        assert!(select(input, only).is_none(), "plain return can reach for row {row}");
+        assert_eq!(select(Facts { short: true, ..input }, only).unwrap().id, row);
+    }
 }

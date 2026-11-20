@@ -556,3 +556,14 @@ fn edge_di_points_at_the_stage_unless_a_blast_zone_is_closer() {
         None
     );
 }
+
+#[test]
+fn reach_can_rise_to_the_ledge_after_reaching_its_column() {
+    let reach = Reach { air: AIR, jump: true, special: None };
+    let from = [LEDGE[0] - 1.0, -12.0];
+    let speed = [1.0, 0.0];
+    assert!(reach.returns(from, speed, LEDGE, 0, BOTTOM));
+    assert!(reach.returns(from, speed, LEDGE, 3, BOTTOM));
+    assert!(!short(reach, from, speed, LEDGE, BOTTOM));
+    assert!(!Reach { jump: false, ..reach }.returns(from, speed, LEDGE, 0, BOTTOM));
+}
