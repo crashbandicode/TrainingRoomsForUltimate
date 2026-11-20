@@ -205,6 +205,7 @@ fn quick_reset_observation_and_temporary_restore_allocate_nothing() {
                             },
                             save_chord: false,
                             load_chord: false,
+                            suspend_autoload: false,
                             kirby: false,
                             pokemon: false,
                             buffable: false,

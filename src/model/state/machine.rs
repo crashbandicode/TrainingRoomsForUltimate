@@ -123,6 +123,8 @@ pub struct FrameIn {
     pub save_chord: bool,
     /// The Load chord passed and this callback consumed it (non-CPU-operated, non-Nana fighter only).
     pub load_chord: bool,
+    /// Another practice mode owns automatic placement of both fighters.
+    pub suspend_autoload: bool,
     pub kirby: bool,
     pub pokemon: bool,
     /// Hero, Cloud, Joker, Little Mac, Sephiroth, Wii Fit Trainer, Shulk, Min Min or Wario.
@@ -446,7 +448,7 @@ impl Machine {
         let marker = self.load_marker(role, slot);
 
         // 5.1 Load request.
-        let auto = settings.autoload && marker == Marker::NoAction && input.dead;
+        let auto = settings.autoload && !input.suspend_autoload && marker == Marker::NoAction && input.dead;
         if (auto || input.load_chord) && !input.nana && !self.temporary_active() {
             match self.begin_load(settings, rng) {
                 Ok(()) => out.stop_playback = true,

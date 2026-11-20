@@ -376,6 +376,7 @@ mod tests {
             situation: facts().situations,
             save_chord: true,
             load_chord: false,
+            suspend_autoload: false,
             kirby: false,
             pokemon: false,
             buffable: false,
