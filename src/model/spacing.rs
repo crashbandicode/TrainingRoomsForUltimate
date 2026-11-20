@@ -119,6 +119,9 @@ pub fn lane(read: impl Fn(usize) -> Option<u64>, accessor: usize, id: u32, attac
     })
 }
 
+/// The frame step publishes and reads fighter lanes only while the grader is On and boot admitted fighter capture—the
+/// hook's rows and the shared hurt-layout rows checked by `sites_hitbox::grader_usable`. Otherwise both lanes stay empty and
+/// no accessor or identity read happens; target and egg grades do not use these lanes.
 pub fn publish_lanes(
     lanes: &Lanes,
     grader: bool,
@@ -127,8 +130,7 @@ pub fn publish_lanes(
     accessors: [usize; 2],
     identity: impl Fn(usize) -> (u32, bool),
 ) {
-    let _ = capture;
-    if grader {
+    if grader && capture {
         for i in 0..2 {
             let (id, attacks) = identity(i);
             lanes.set(i, lane(&read, accessors[i], id, attacks));
