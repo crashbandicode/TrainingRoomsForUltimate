@@ -165,6 +165,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 15] = [
             "status_kind",
             "tech_notice_damage_stop",
             "transition_term_hook",
+            "utility_get_category",
             "utility_get_kind",
             "work_get_float",
             "work_get_int",
