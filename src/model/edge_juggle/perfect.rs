@@ -1348,7 +1348,7 @@ mod tests {
         let ledges = [[-40., 0.], [40., 0.]];
         let lines = [[ledges[0], ledges[1]], [ledges[0], [0., -15.]], [[0., -15.], ledges[1]]];
         let mut facts = RouteFacts {
-            fighter: 0x6,
+            fighter: 0x1d,
             stage: (0, 0),
             position: [-53., -22.], player: [-41., 0.], player_reach: 18.,
             ledges, blast: [-130., 130., 100., -90.], outline: &lines,

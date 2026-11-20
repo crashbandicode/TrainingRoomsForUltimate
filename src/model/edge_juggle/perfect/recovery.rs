@@ -106,15 +106,22 @@ pub fn mix(options: [Option<Plan>; 4], zone: Zone, last: Option<Route>, draw: u3
             .filter(|plan| plan.route != Route::Opposite)
             .max_by_key(|plan| plan.weight);
     }
-    // If the crossing is the only weighted route, leave part of the draw to
-    // the usual recovery pad. Crossing is always a mixup. Use the same scale
-    // as the unguarded near route for the portion that stays near by default.
-    let stock = options.iter().flatten()
-        .find(|&&plan| plan.route == Route::Opposite && weight(plan) == total)
-        .map_or(0, |plan| u32::from(plan.weight) * u32::from(ZONE_WEIGHTS[Zone::Far as usize][0]));
-    let mut draw = ((u64::from(draw) * u64::from(total + stock)) >> 32) as u32;
+    let crossing = options.iter().flatten().find(|plan| plan.route == Route::Opposite);
+    let crossing_weight = crossing.map_or(0, |&plan| weight(plan));
+    let normal_weight = total - crossing_weight;
+    // An otherwise empty roll keeps the usual recovery pad as a normal option.
+    let stock = crossing.filter(|_| normal_weight == 0).map_or(0, |plan| {
+        u32::from(plan.weight) * u32::from(ZONE_WEIGHTS[Zone::Far as usize][0])
+    });
+    // Cap Opposite at 9/20 (45%) of the full roll, or 9/40 on a repeat.
+    // Scale both sides to preserve even small positive weights.
+    let scale = if last == Some(Route::Opposite) { 31 } else { 11 };
+    let normal = normal_weight + stock;
+    let across = (crossing_weight * scale).min(normal * 9);
+    let total = normal * scale + across;
+    let mut draw = ((u64::from(draw) * u64::from(total)) >> 32) as u32;
     for plan in options.into_iter().flatten() {
-        let weight = weight(plan);
+        let weight = if plan.route == Route::Opposite { across } else { weight(plan) * scale };
         if draw < weight {
             return Some(plan);
         }
@@ -145,6 +152,11 @@ impl CrossingRace {
             || (self.far_x - self.near_x).abs() <= 10.0
         {
             return None;
+        }
+        // With the near route unguarded, crossing through the hull adds risk
+        // without drawing the guarder off the fighter's return.
+        if zone == Zone::Far {
+            return Some(0);
         }
         let inward = (self.far_x - self.near_x).signum();
         let target = self.far_x - 10.0 * inward;
@@ -435,20 +447,13 @@ pub struct Crossing {
     pub ledge: f32,
 }
 
-/// Can offer a crossing from the shared estimate. Thu Ox's Final Destination
-/// demonstration identifies fighters needing a specific setup and those that
-/// cannot cross. Dedicated routes have their own resource and live shape tests.
+/// DESIGN §11 candidates whose crossing does not require an exact special
+/// setup in the Thu Ox audit. Dedicated routes qualify separately.
 pub fn can_estimate_crossing(fighter: i32) -> bool {
-    !matches!(
+    matches!(
         fighter,
-        // Hard, Very hard or Intense.
-        0x02 | 0x09 | 0x0a | 0x0f | 0x15..=0x17 | 0x22 | 0x26 | 0x2e | 0x31 | 0x3c | 0x3d
-        // Impossible with ordinary resources, including the duo.
-        | 0x00 | 0x01 | 0x0b | 0x12 | 0x18 | 0x1a | 0x1b | 0x23..=0x25 | 0x2f | 0x34
-        | 0x36 | 0x3f | 0x43 | 0x44 | 0x47 | 0x48 | 0x4b | 0x4c
-        // Candidate specials that need their own trajectory and resource model.
-        | 0x1c | 0x53 | 0x58 | 0x5a | 0x5b | 0x5d
-        | i32::MIN..=-1
+        0x5 | 0x8 | 0xc..=0xe | 0x10 | 0x13 | 0x1d..=0x1f | 0x27..=0x29 | 0x2b..=0x2d
+            | 0x35 | 0x37 | 0x3a | 0x40
     )
 }
 
