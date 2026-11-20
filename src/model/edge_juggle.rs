@@ -199,6 +199,106 @@ impl Session {
     }
 }
 
+/// The stage is split at its centre and at each side's ledge height.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Area {
+    #[default]
+    LowerLeft,
+    LowerRight,
+    UpperLeft,
+    UpperRight,
+}
+
+impl Area {
+    const ALL: [Self; 4] = [
+        Self::LowerLeft,
+        Self::LowerRight,
+        Self::UpperLeft,
+        Self::UpperRight,
+    ];
+
+    pub fn step(self, delta: i32) -> Self {
+        Self::ALL[(self as i32 + delta).rem_euclid(4) as usize]
+    }
+
+    pub const fn title(self) -> &'static str {
+        match self {
+            Self::LowerLeft => "Lower left",
+            Self::LowerRight => "Lower right",
+            Self::UpperLeft => "Upper left",
+            Self::UpperRight => "Upper right",
+        }
+    }
+}
+
+/// Coordinates come from the live main floor, blast bounds, and camera limits.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Stage {
+    blast: [f32; 4],
+    camera: [f32; 4],
+    pub ledges: [[f32; 2]; 2],
+}
+
+impl Stage {
+    pub fn new(blast: [f32; 4], camera: [f32; 4], ledges: [[f32; 2]; 2]) -> Option<Self> {
+        let [left, right, top, bottom] = blast;
+        let [[lx, ly], [rx, ry]] = ledges;
+        (blast
+            .into_iter()
+            .chain(ledges.into_iter().flatten())
+            .all(f32::is_finite)
+            && clamp_point([lx, ly], camera).is_some()
+            && left < lx
+            && lx < rx
+            && rx < right
+            && [ly, ry].into_iter().all(|y| bottom < y && y < top))
+        .then_some(Self {
+            blast,
+            camera,
+            ledges,
+        })
+    }
+
+    fn area_bounds(self, area: Area) -> [f32; 4] {
+        let [left, right, top, bottom] = self.blast;
+        let is_left = matches!(area, Area::LowerLeft | Area::UpperLeft);
+        let [x, y] = self.ledges[usize::from(!is_left)];
+        // Leave one world unit between the start and the ledge or blast boundary.
+        let [lo, hi] = if is_left {
+            [left + 1.0, x - 1.0]
+        } else {
+            [x + 1.0, right - 1.0]
+        };
+        if matches!(area, Area::LowerLeft | Area::LowerRight) {
+            [lo, hi, y, bottom + 1.0]
+        } else {
+            [lo, hi, top - 1.0, y]
+        }
+    }
+
+    pub fn edge_start(self, area: Area, point: [f32; 2]) -> Option<[f32; 2]> {
+        clamp_point(point, self.area_bounds(area))
+    }
+
+    pub fn area_default(self, area: Area) -> Option<[f32; 2]> {
+        let [lo, hi, top, bottom] = self.area_bounds(area);
+        self.edge_start(area, [lo.midpoint(hi), bottom.midpoint(top)])
+    }
+
+    pub fn camera_point(self, point: [f32; 2]) -> Option<[f32; 2]> {
+        clamp_point(point, self.camera)
+    }
+
+    pub fn default_juggle(self, p1: [f32; 2]) -> [f32; 2] {
+        [p1[0], p1[1].midpoint(self.camera[2])]
+    }
+}
+
+fn clamp_point([x, y]: [f32; 2], [left, right, top, bottom]: [f32; 4]) -> Option<[f32; 2]> {
+    (x.is_finite() && y.is_finite() && left <= right && bottom <= top)
+        .then(|| [x.clamp(left, right), y.clamp(bottom, top)])
+}
+
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
