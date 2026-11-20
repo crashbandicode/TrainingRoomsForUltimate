@@ -302,10 +302,18 @@ pub unsafe fn frame(fighter: usize) -> Option<()> {
     let rule = super::hitbox::egg_rule();
     let mut melee = false;
     let broke = pass(at, top, |slot, spot| {
-        let hit = hits[..n].iter().any(|h| eggs::breaks(rule, aerial, h, spot));
-        melee |= hit;
-        hit || super::lockon::hit(at, slot + 1, lockon_key(spot), rule, aerial, projectiles()).is_some()
-            || super::btt_projectiles::hit(at, spot, rule, aerial, projectiles()).is_some()
+        if let Some(depth) = eggs::deepest(rule, aerial, &hits[..n], spot) {
+            melee = true;
+            super::input_display::target_grade(crate::model::spacing::Grade::of(depth));
+            true
+        } else if super::lockon::hit(at, slot + 1, lockon_key(spot), rule, aerial, projectiles()).is_some() {
+            true
+        } else if let Some(depth) = super::btt_projectiles::hit(at, spot, rule, aerial, projectiles()) {
+            super::input_display::target_grade(crate::model::spacing::Grade::of(depth));
+            true
+        } else {
+            false
+        }
     });
     // V2.1: the fighter whose attack broke a target freezes, as on a hit.
     let frames = (broke > 0 && melee).then(scene::facts).and_then(eggs::hitlag)?;

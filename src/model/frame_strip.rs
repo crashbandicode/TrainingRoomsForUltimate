@@ -143,6 +143,14 @@ pub struct Sample {
     pub airborne: bool,
 }
 
+fn was_hit(sample: &Sample) -> bool {
+    sample.hitstun || sample.shieldstun || sample.shielding
+}
+
+fn on_shield(sample: &Sample) -> bool {
+    (sample.shieldstun || sample.shielding) && !sample.hitstun
+}
+
 /// Which button a press was: the chip's colour and glyph.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Button {
@@ -504,7 +512,14 @@ impl Tracker {
         (0..TAGS).filter_map(move |i| self.tags[(self.tag_head + TAGS - 1 - i) % TAGS].as_ref())
     }
 
-    pub fn tag_target(&mut self, _grade: Grade) {}
+    pub fn tag_target(&mut self, grade: Grade) {
+        self.push_tag(0, grade);
+    }
+
+    fn push_tag(&mut self, lane: u8, grade: Grade) {
+        self.tags[self.tag_head] = Some(Tag { frame: self.frame, lane, grade });
+        self.tag_head = (self.tag_head + 1) % TAGS;
+    }
 
     /// The frames stepped since the last clear.
     pub fn frame(&self) -> u32 {
@@ -635,10 +650,10 @@ impl Tracker {
         let cpu_cell = classify(&cpu, false, false);
         // A hit on the CPU: its hitstop starts while P1 is not the one being hit (SPEC-input-06 §2). On shield when the
         // CPU is shielding or in shieldstun.
-        let p1_hit = p1.hitstun || p1.shieldstun || p1.shielding;
+        let p1_hit = was_hit(&p1);
         let spot = self.spots(&p1, &cpu);
         if cpu.stop && !self.cpu_was_stop && !p1_hit {
-            self.on_hit(frame, (cpu.shieldstun || cpu.shielding) && !cpu.hitstun, spot);
+            self.on_hit(frame, on_shield(&cpu), spot);
         }
         self.cpu_was_stop = cpu.stop;
         // Both fighters' first actionable frames after the last hit.
@@ -712,6 +727,19 @@ impl Tracker {
         let (cpu_rise, p1_rise) = (cpu.stop && !self.cpu_was_stop, p1.stop && !self.p1_was_stop);
         let (on_cpu, on_p1) = (cpu_rise && cpu_gain > 0.0, p1_rise && p1_gain > 0.0);
         self.p1_was_stop = p1.stop;
+        match (on_cpu, on_p1) {
+            (true, false) if !was_hit(p1) && !on_shield(cpu) => {
+                if let Some(grade) = cpu.contact {
+                    self.push_tag(0, grade);
+                }
+            }
+            (false, true) if cpu.player && !was_hit(cpu) && !on_shield(p1) => {
+                if let Some(grade) = p1.contact {
+                    self.push_tag(1, grade);
+                }
+            }
+            _ => {}
+        }
         let earlier = [self.peaks[0].earlier(p1.status, p1.motion_frame), self.peaks[1].earlier(cpu.status, cpu.motion_frame)];
         // Each fighter's hitboxes against the other as it was before this frame's hit.
         let launch = |attacker: &Sample, target: &Sample, before: f32| spots::Launch {
@@ -943,6 +971,7 @@ pub struct Settings {
     pub on: bool,
     /// Sweet/sour spot labels on the hit blocks (rc.14, SP3), Off by default.
     pub spots: bool,
+    pub grader: bool,
 }
 
 /// The new row's id, and the old rows it replaces (SPEC-input-06 §3.1).
@@ -951,7 +980,7 @@ pub const OLD_ROW: &str = "input_display";
 
 impl Settings {
     pub const fn factory() -> Self {
-        Self { on: true, spots: false }
+        Self { on: true, spots: false, grader: false }
     }
 
     pub fn from_snapshot(snapshot: &super::settings::Snapshot) -> Self {
@@ -959,7 +988,11 @@ impl Settings {
             .get(ROW)
             .and_then(|r| r.iter().position(|v| *v != 0))
             .is_none_or(|i| i == 1);
-        Self { on, spots: spots::row_on(snapshot, spots::ROW_STRIP) }
+        Self {
+            on,
+            spots: spots::row_on(snapshot, spots::ROW_STRIP),
+            grader: spots::row_on(snapshot, super::spacing::ROW),
+        }
     }
 }
 

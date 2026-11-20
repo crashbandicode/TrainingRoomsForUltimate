@@ -221,10 +221,18 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     run.sense([top[0], top[1]]);
     // rc.15: Player 1's articles break the target too, as `Breaks on` allows (docs/DECISIONS.md).
     let rule = run.rule();
-    let length = run.step_with(tick, top[1], hits, |egg| {
-        super::lockon::hit(at, 0, lockon_key(score), rule, aerial, true).is_some()
-            || super::btt_projectiles::hit(at, egg, rule, aerial, true).is_some()
-    }, aerial, kind);
+    let (length, depth) = run.step_with_depth(
+        tick,
+        top[1],
+        hits,
+        |_| super::lockon::hit(at, 0, lockon_key(score), rule, aerial, true).is_some(),
+        |egg| super::btt_projectiles::hit(at, egg, rule, aerial, true),
+        aerial,
+        kind,
+    );
+    if let Some(depth) = depth {
+        super::input_display::target_grade(crate::model::spacing::Grade::of(depth));
+    }
     // V2.1: the fighter whose attack broke it (Ice Climbers: that climber) freezes, as on a hit; an article's break does not.
     let broke = run.score > score && run.melee();
     if let Some(frames) = broke.then(scene::facts).and_then(eggs::hitlag) {

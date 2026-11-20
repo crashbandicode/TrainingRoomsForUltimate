@@ -10,12 +10,13 @@
 //! Every read is a guarded native (`game::natives`). The hitstun-left read is optional: when its work id or
 //! `WorkModule::get_float` is unavailable, a true combo shows no margin and everything else is drawn (SPEC-input-06 §4).
 
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 use hos_lock::Mutex;
 
 use crate::model::frame_strip::ids::{Table, C};
 use crate::model::frame_strip::{Sample, Settings, Tracker};
+use crate::model::spacing::Grade;
 use crate::model::frame_strip_plan::{Changed, Look, Renderer};
 use crate::model::input_delay::{MappedInputs, Owners, Sticks};
 use crate::runtime::game::natives;
@@ -29,6 +30,8 @@ static REACTION_ON: AtomicBool = AtomicBool::new(false);
 static KIND_ON: AtomicBool = AtomicBool::new(false);
 /// The optional spacing-grader rows all passed their guards (`contact`).
 static GRADE_ON: AtomicBool = AtomicBool::new(false);
+static TARGET_GRADE: AtomicU32 = AtomicU32::new(0);
+static TARGET_GRADE_SEEN: AtomicU32 = AtomicU32::new(0);
 /// P1's latest mapped inputs, packed (`pack`).
 static INPUTS: AtomicU64 = AtomicU64::new(0);
 /// The constants resolved once (`ids`).
@@ -174,6 +177,21 @@ pub fn set_grader_read(on: bool) {
     GRADE_ON.store(on, Ordering::Release);
 }
 
+pub fn target_grade(grade: Grade) {
+    if !GRADE_ON.load(Ordering::Acquire) || !settings().grader {
+        return;
+    }
+    let code = match grade {
+        Grade::Excellent => 1,
+        Grade::Good => 2,
+        Grade::Ok => 3,
+    };
+    let _ = TARGET_GRADE.fetch_update(Ordering::AcqRel, Ordering::Relaxed, |current| {
+        let sequence = ((current >> 8).wrapping_add(1) & 0x00ff_ffff).max(1);
+        Some((sequence << 8) | code)
+    });
+}
+
 /// Receiver hurt-shape contact for a landed hit; optional rows never gate Input Display installation.
 ///
 /// # Safety
@@ -215,7 +233,7 @@ pub(super) unsafe fn struck(accessor: usize) -> Option<(u32, u8, f32)> {
 }
 
 /// One fighter's frame (SPEC-input-06 §4); `spots`: read what the spot of a hit needs (`spots_wanted`).
-unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample {
+unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool, grader: bool) -> Sample {
     let status = natives::status_kind(accessor);
     let prev = natives::prev_status_kind(accessor, 0);
     let hitstun = ids.hitstun(status);
@@ -238,8 +256,9 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample 
     let powers = if spots { powers } else { Default::default() };
     let read = |f: unsafe fn(usize) -> f32| if spots { f(accessor) } else { 0.0 };
     // The record names the hit only on the frame its knockback was written (the game clears it on the next).
-    let launched = read(natives::damage_reaction);
+    let launched = if spots || grader { natives::damage_reaction(accessor) } else { 0.0 };
     let struck = if launched > 0.0 { struck(accessor) } else { None };
+    let contact = if grader && launched > 0.0 { contact(accessor) } else { None };
     Sample {
         stop: natives::is_stop(accessor),
         hitstun,
@@ -257,7 +276,7 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample 
         attack: if p1 { ids.attack(status) } else { None },
         reaction,
         shielding: ids.shielding(status),
-        contact: None,
+        contact,
         player: false,
         status,
         motion_frame: natives::motion_frame(accessor),
@@ -280,6 +299,7 @@ pub unsafe fn sample_frame(player: usize) {
     if input_drill && published::input_owners().contains(Owners::MENU) { return; }
     if crate::runtime::features::states::is_loading() {
         TRACKER.lock().clear();
+        TARGET_GRADE_SEEN.store(TARGET_GRADE.load(Ordering::Acquire) >> 8, Ordering::Relaxed);
         // The strip starts a new timeline: so does Parry practice's detector.
         super::parry::reset();
         return;
@@ -288,8 +308,9 @@ pub unsafe fn sample_frame(player: usize) {
     let Some(ids) = ids() else { return };
     let cpu_accessor = cpu;
     let spots = spots_wanted();
-    let p1 = sample(player, &ids, true, spots);
-    let cpu = sample(cpu, &ids, false, spots);
+    let grader = settings().grader;
+    let p1 = sample(player, &ids, true, spots, grader);
+    let cpu = sample(cpu, &ids, false, spots, grader);
     #[cfg(feature = "diag")]
     {
         probe_module(0, player, &p1, cpu.damage);
@@ -325,6 +346,22 @@ pub unsafe fn sample_frame(player: usize) {
     #[cfg(feature = "diag")]
     let (check, advantage) = (tracker.stun_check, tracker.advantage());
     tracker.step(p1, cpu, inputs);
+    if grader {
+        let target = TARGET_GRADE.load(Ordering::Acquire);
+        let sequence = target >> 8;
+        if sequence != 0 && sequence != TARGET_GRADE_SEEN.load(Ordering::Relaxed) {
+            TARGET_GRADE_SEEN.store(sequence, Ordering::Relaxed);
+            let grade = match target & 0xff {
+                1 => Some(Grade::Excellent),
+                2 => Some(Grade::Good),
+                3 => Some(Grade::Ok),
+                _ => None,
+            };
+            if let Some(grade) = grade {
+                tracker.tag_target(grade);
+            }
+        }
+    }
     if let Some(snap) = tracker.snaps().last() { crate::engine::rr_host::observe_input(snap, tracker.contact_now()); }
     // The combo helper reads the same step (SPEC-input-07 §3); lock order TRACKER, then the helper's.
     crate::runtime::features::combo::after_strip(&tracker, p1_kind);

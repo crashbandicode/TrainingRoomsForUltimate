@@ -8,7 +8,7 @@ use super::hitbox;
 static READY: AtomicBool = AtomicBool::new(false);
 pub fn set_ready(on: bool) { READY.store(on, Ordering::Release); }
 pub fn ready() -> bool { READY.load(Ordering::Acquire) }
-/// Whether one of `owner`'s live articles breaks the target at `spot` under `Breaks on` (`rule`, `aerial` the owner's own
+/// The deepest qualifying hit among `owner`'s live articles at `spot`, under `Breaks on` (`rule`, `aerial` the owner's own
 /// status); `enabled` is the caller's own switch (Break the Targets' `Projectiles break targets`; Eggs-ercise always).
 /// # Safety
 /// Called on the game thread with a live fighter accessor.

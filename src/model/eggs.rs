@@ -571,13 +571,27 @@ impl Run {
     /// breaks the target there under this run's `Breaks on` (rc.15: they count in both practice games; SPEC V2.3 superseded,
     /// docs/DECISIONS.md). A break by an article alone does not freeze the fighter (`melee`).
     pub fn step_with(&mut self, tick: bool, y: f32, hits: &[Hit], mut articles: impl FnMut([f32; 2]) -> bool, air: bool, kind: i32) -> Option<u16> {
+        self.step_with_depth(tick, y, hits, |_| false, |spot| articles(spot).then_some(0.0), air, kind).0
+    }
+
+    /// `step_with`, returning the deepest melee or article hit when this pass breaks a target.
+    pub fn step_with_depth(
+        &mut self,
+        tick: bool,
+        y: f32,
+        hits: &[Hit],
+        mut other: impl FnMut([f32; 2]) -> bool,
+        mut articles: impl FnMut([f32; 2]) -> Option<f32>,
+        air: bool,
+        kind: i32,
+    ) -> (Option<u16>, Option<f32>) {
         // The break animations run on the clock's ticks (pause freezes them); an ended run only finishes them.
         let dt = u32::from(tick);
         age(&mut self.bursts, tick);
         self.air = air;
         // A run the CPU target's last hit ended still holds its target until this pass closes it.
         if self.ended() && self.egg.is_none() {
-            return None;
+            return (None, None);
         }
         if self.egg.is_none() {
             self.ground = y;
@@ -585,10 +599,14 @@ impl Run {
         }
         // The pass that closes a run the CPU target's last hit ended: the clock stopped on that hit's frame.
         let dt = dt * u32::from(!self.ended());
+        let mut depth = None;
         if let Some(egg) = self.egg_at() {
-            let melee = self.rows[3] == DISC && hits.iter().any(|h| breaks(self.rows[1], air, h, egg));
-            if melee || self.rows[3] == DISC && articles(egg) {
-                (self.score, self.bursts, self.melee) = (self.score + 1, [Some((egg, 0)), self.bursts[0]], melee);
+            let melee = if self.rows[3] == DISC { deepest(self.rows[1], air, hits, egg) } else { None };
+            let other = melee.is_none() && self.rows[3] == DISC && other(egg);
+            let article = if melee.is_none() && !other && self.rows[3] == DISC { articles(egg) } else { None };
+            if melee.is_some() || other || article.is_some() {
+                (self.score, self.bursts, self.melee) = (self.score + 1, [Some((egg, 0)), self.bursts[0]], melee.is_some());
+                depth = melee.or(article);
                 self.spawn(Some(egg));
             }
             // The flight holds while the CPU target is in a hit (its hitlag, then the placement): an uncounted hit puts it back
@@ -602,13 +620,13 @@ impl Run {
                 let (k, m) = (kind as usize & 127, usize::from(self.rows[0] - TIMED));
                 self.best[k][m] = self.best[k][m].max(if m == 0 { self.score } else { !self.frames });
                 (self.best[128][m], self.egg) = (self.best[k][m], None);
-                return Some(END_FRAMES);
+                return (Some(END_FRAMES), depth);
             }
         }
         // The 1-minute notice changes once a second, the N-target one every tick (hundredths).
         let time = [self.frames, self.frames.div_ceil(60)][usize::from(self.rows[0] == TIMED)];
         let shown = (self.score, time);
-        (self.shown.replace(shown) != Some(shown)).then_some(u16::MAX)
+        ((self.shown.replace(shown) != Some(shown)).then_some(u16::MAX), depth)
     }
 
     /// Whether the target is still in flight (launched, not yet at rest).

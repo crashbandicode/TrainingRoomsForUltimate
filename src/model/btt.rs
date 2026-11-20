@@ -249,9 +249,25 @@ pub fn projectile_breaks(
     enabled: bool, rule: u8, aerial: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,
     mut read: impl FnMut(usize) -> Option<([eggs::Hit; super::hitbox::SLOTS as usize], usize)>,
 ) -> Option<f32> {
-    (enabled && pool.into_iter().chain(super::hitbox::article_instances(true, get)).filter(|a| pointer_ok(*a)).any(|article| {
-        read(article).is_some_and(|(hits, n)| hits[..n].iter().any(|h| h.3 > 0.0 && eggs::breaks(rule, aerial, h, spot)))
-    })).then_some(0.0)
+    if !enabled {
+        return None;
+    }
+    let mut deepest = None;
+    for article in pool.into_iter().chain(super::hitbox::article_instances(true, get)) {
+        if !pointer_ok(article) {
+            continue;
+        }
+        let Some((hits, n)) = read(article) else { continue };
+        for hit in &hits[..n] {
+            if hit.3 <= 0.0 || !eggs::counts(rule, aerial, hit.3) {
+                continue;
+            }
+            if let Some(depth) = eggs::depth(hit, spot) {
+                deepest = Some(deepest.map_or(depth, |current: f32| current.max(depth)));
+            }
+        }
+    }
+    deepest
 }
 
 /// Shared placing controls, without stage bounds or projection.
