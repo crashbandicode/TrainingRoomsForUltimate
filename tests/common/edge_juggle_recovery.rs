@@ -770,7 +770,7 @@ fn measured_crossing_reads_the_race_to_the_far_ledge() {
         ..race
     };
     assert_eq!(mirrored.crossing_share(Zone::Ledge), race.crossing_share(Zone::Ledge));
-    let turning = CrossingRace { guarder_run_speed: 1.25, ..race };
+    let turning = CrossingRace { guarder_run_speed: 1.30, ..race };
     assert_eq!(turning.crossing_share(Zone::Ledge), Some(6));
     assert_eq!(CrossingRace { guarder_facing: -1.0, ..turning }.crossing_share(Zone::Ledge), Some(20));
 }

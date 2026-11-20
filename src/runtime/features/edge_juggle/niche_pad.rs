@@ -189,6 +189,14 @@ impl NicheGuide {
             .map_or(self.ledge, |crossing| [crossing.exit, self.ledge[1]])
     }
 
+    pub(super) fn crossing_frames(&self) -> Option<u16> {
+        match &self.measured {
+            // Measured from the Skull Bash press to the exit: 13+39+46+27+33.
+            Some(MeasuredFlight::SkullBash(_)) => Some(158),
+            _ => None,
+        }
+    }
+
     pub(super) fn using_bomb(&self) -> bool {
         self.sequence.action() == Some(Move::Bomb)
     }

@@ -923,15 +923,29 @@ unsafe fn route_guide(
             band.is_some_and(|band| air.crossing(pos, speed, plan.waypoints[2], band, jumps))
         })
     });
+    let options = [near, high, low, opposite];
+    let last = run.route_history.previous();
     let plan = if needed {
         None
-    } else {
-        recovery::mix(
-            [near, high, low, opposite],
+    } else if let Some(crossing_frames) = row.as_ref().and_then(|(guide, _)| guide.crossing_frames()) {
+        use crate::model::hash40::hash40;
+        let far_x = if inward > 0.0 { right[0] } else { left[0] };
+        recovery::mix_measured_crossing(
+            options,
             zone,
-            run.route_history.previous(),
+            last,
             run.route_draw,
+            recovery::CrossingRace {
+                near_x: near_ledge[0],
+                far_x,
+                guarder_x: player[0],
+                guarder_run_speed: natives::get_param_float(p1, hash40("run_speed_max"), 0),
+                guarder_facing: natives::lr(p1),
+                crossing_frames,
+            },
         )
+    } else {
+        recovery::mix(options, zone, last, run.route_draw)
     };
     if let Some((guide, _)) = row.filter(|_| needed || plan.is_some_and(|plan| plan.route == Route::Opposite)) {
         let row = guide.selected_niche_row();

@@ -126,8 +126,43 @@ pub struct CrossingRace {
 }
 
 impl CrossingRace {
-    pub fn crossing_share(self, _zone: Zone) -> Option<u8> {
-        None
+    /// A conservative estimate of when P1 can cover the far exit. Assume the
+    /// guarder can move immediately when a guarded lag duration is unavailable.
+    pub fn crossing_share(self, zone: Zone) -> Option<u8> {
+        if ![self.near_x, self.far_x, self.guarder_x, self.guarder_run_speed, self.guarder_facing]
+            .into_iter()
+            .all(f32::is_finite)
+            || self.guarder_run_speed <= 0.0
+            || self.crossing_frames == 0
+            || (self.far_x - self.near_x).abs() <= 10.0
+        {
+            return None;
+        }
+        let inward = (self.far_x - self.near_x).signum();
+        let target = self.far_x - 10.0 * inward;
+        let (from, setup) = match zone {
+            Zone::Hang => (self.near_x, 30.0),
+            Zone::OffHigh | Zone::OffLow => (self.near_x, 60.0),
+            _ => {
+                if self.guarder_facing.abs() != 1.0 {
+                    return None;
+                }
+                let turning = (target - self.guarder_x) * self.guarder_facing < 0.0;
+                (self.guarder_x, if turning { 10.0 } else { 0.0 })
+            }
+        };
+        let arrival = (target - from).abs() / self.guarder_run_speed + setup + 20.0;
+        let slack = arrival - f32::from(self.crossing_frames);
+        if !slack.is_finite() {
+            return None;
+        }
+        Some(if slack >= 20.0 {
+            45
+        } else if slack >= -20.0 {
+            20
+        } else {
+            6
+        })
     }
 }
 
@@ -136,9 +171,28 @@ pub fn mix_measured_crossing(
     zone: Zone,
     last: Option<Route>,
     draw: u32,
-    _race: CrossingRace,
+    race: CrossingRace,
 ) -> Option<Plan> {
-    mix(options, zone, last, draw)
+    let [near, high, low, opposite] = options;
+    let alternatives = [near, high, low, None];
+    let Some((plan, mut share)) = opposite.zip(race.crossing_share(zone)) else {
+        return mix(alternatives, zone, last, draw);
+    };
+    if alternatives.iter().all(Option::is_none) {
+        return Some(plan);
+    }
+    if last == Some(Route::Opposite) {
+        share = share.div_ceil(2);
+    }
+    // The crossing takes its share of the whole roll. The remaining range maps
+    // evenly back onto the normal near/high/low distribution.
+    const ROLL_RANGE: u64 = 1u64 << 32;
+    let threshold = ROLL_RANGE * (100 - u64::from(share)) / 100;
+    if u64::from(draw) >= threshold {
+        return Some(plan);
+    }
+    let draw = (u64::from(draw) * ROLL_RANGE / threshold) as u32;
+    mix(alternatives, zone, last, draw)
 }
 
 /// What the fighter still has for the return: the jump, then the up special.
