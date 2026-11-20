@@ -664,6 +664,38 @@ pub fn distance_dodge(
     }
 }
 
+pub fn attack_key(
+    status: i32,
+    input: u32,
+    native_motion: impl FnOnce() -> u64,
+    konst: impl Fn(super::super::cpu::ids::C) -> i32,
+) -> Option<u64> {
+    use super::super::cpu::ids::{C, UNRESOLVED};
+    const ATTACK_INPUT: u64 = u64::MAX;
+    let attacks = [
+        C::StatusAttack,
+        C::StatusAttackDash,
+        C::StatusAttackS3,
+        C::StatusAttackHi3,
+        C::StatusAttackLw3,
+        C::StatusAttackAir,
+        C::StatusAttackHi4Start,
+        C::StatusAttackLw4Start,
+        C::StatusAttackS4Start,
+        C::StatusAttackHi4,
+        C::StatusAttackLw4,
+        C::StatusAttackS4,
+        C::StatusSpecialN,
+        C::StatusSpecialS,
+        C::StatusSpecialHi,
+        C::StatusSpecialLw,
+    ];
+    let motion = (status != UNRESOLVED && attacks.map(konst).contains(&status))
+        .then(native_motion)
+        .filter(|&motion| motion != 0);
+    motion.or_else(|| (input & 3 != 0).then_some(ATTACK_INPUT))
+}
+
 /// Earliest observable start of the current P1 attack on the attempt clock.
 #[derive(Default)]
 pub struct ThreatClock {
@@ -1088,6 +1120,27 @@ mod tests {
         assert!(!air.crossing([-15., -15.], [2., 2.], [15., 0.], band, 1));
         assert!(!air.crossing([-65., -40.], [2., 0.], [65., 0.], band, 1));
         assert!(!air.crossing([-15., -15.], [2., 0.], [15., 0.], band, 0));
+    }
+
+    #[test]
+    fn charged_smash_preserves_the_juggler_reaction_clock() {
+        use crate::model::{cpu::ids::{C, Table}, hash40::hash40};
+
+        // Native Mario P1 entered 0x33 -> 0x34 -> 0x35 at seq 26729/26742/26745
+        // in the exact 3a29e6af j-h2 command 010. A longer hold exposes both floors.
+        let ids = Table::with(&[(C::StatusAttackHi4Start, 0x33), (C::StatusAttackHi4, 0x35)]);
+        let key = |status, input, motion| attack_key(status, input, || hash40(motion), |c| ids.get(c));
+        let mut clocks = [ThreatClock::default(), ThreatClock::default()];
+        for clock in &mut clocks {
+            clock.observe(key(0, 1, "wait"), 100, 12, false, true, 0);
+            clock.observe(key(0x33, 1, "attack_hi4"), 101, 12, false, true, 0);
+            clock.observe(key(0x34, 1, "attack_hi4_hold"), 106, 12, false, true, 0);
+            assert_eq!(clock.trigger_frame(), 100, "charge belongs to the same attack");
+        }
+        let released = key(0x35, 0, "attack_hi4");
+        assert_eq!(clocks[0].observe(released, 111, 0, true, true, 0).press, GUARD);
+        assert_eq!(clocks[1].observe(released, 111, 12, true, true, 0).press, 0);
+        assert_eq!(clocks[1].observe(released, 112, 12, true, true, 0).press, GUARD);
     }
 
     #[test]

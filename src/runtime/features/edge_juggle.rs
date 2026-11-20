@@ -686,31 +686,10 @@ unsafe fn air_hit_recovery(
 
 /// P1's current attack: its motion once the status shows it, the raw input before that.
 unsafe fn player_attack(p1: usize) -> (Option<u64>, i32) {
-    const ATTACK_INPUT: u64 = u64::MAX;
     let input = P1_BUTTONS.load(Ordering::Acquire);
-    let attacks = [
-        C::StatusAttack,
-        C::StatusAttackDash,
-        C::StatusAttackS3,
-        C::StatusAttackHi3,
-        C::StatusAttackLw3,
-        C::StatusAttackAir,
-        C::StatusAttackHi4Start,
-        C::StatusAttackLw4Start,
-        C::StatusAttackS4Start,
-        C::StatusAttackHi4,
-        C::StatusAttackLw4,
-        C::StatusAttackS4,
-        C::StatusSpecialN,
-        C::StatusSpecialS,
-        C::StatusSpecialHi,
-        C::StatusSpecialLw,
-    ];
     let status = natives::status_kind(p1);
-    let motion = (status != UNRESOLVED && attacks.map(konst).contains(&status))
-        .then(|| natives::motion_kind(p1))
-        .filter(|&motion| motion != 0);
-    (motion.or_else(|| (input & 3 != 0).then_some(ATTACK_INPUT)), status)
+    let attack = perfect::attack_key(status, input, || natives::motion_kind(p1), konst);
+    (attack, status)
 }
 
 unsafe fn landing_dodge(run: &mut Run, p1: usize, cpu: usize, buttons: u32) -> Correction {
