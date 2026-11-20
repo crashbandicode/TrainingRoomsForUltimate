@@ -1,7 +1,7 @@
 //! A native search target for each breakable target in ordinary Training.
 
 use core::cell::RefCell;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use smash::app::{self, lua_bind::*, sv_battle_object, BattleObjectModuleAccessor as Accessor};
 use smash::lib::lua_const::*;
 use smash::phx::Vector3f;
@@ -45,6 +45,12 @@ struct GameItems(RefCell<Tracker<Handle, COUNT>>);
 // call reentering that callback cannot borrow the items a second time.
 unsafe impl Sync for GameItems {}
 static LIVE: GameItems = GameItems(RefCell::new(Tracker::new()));
+/// The live helpers' ids (0: none) for the visualizer, which never draws them.
+static HELPERS: [AtomicU32; COUNT] = [const { AtomicU32::new(0) }; COUNT];
+
+pub fn is_helper(id: u32) -> bool {
+    id != 0 && HELPERS.iter().any(|h| h.load(Ordering::Acquire) == id)
+}
 
 pub fn set_usable(usable: bool) {
     USABLE.store(usable, Ordering::Release);
@@ -158,6 +164,7 @@ impl ItemHost for NativeItems {
             WorkModule::on_flag(accessor, *ITEM_SANDBAG_INSTANCE_WORK_FLAG_NO_LANDING_SMOKE);
             WorkModule::on_flag(accessor, *ITEM_INSTANCE_WORK_FLAG_DISABLE_AUTO_GRAVITY_MOVE);
             PostureModule::set_scale(accessor, SCALE, false);
+            let _ = HELPERS.iter().find(|h| h.compare_exchange(0, id, Ordering::AcqRel, Ordering::Relaxed).is_ok());
             Some(Handle { id, accessor, damage: game::natives::damage(accessor as usize, 0) })
         }
     }
@@ -181,6 +188,7 @@ impl ItemHost for NativeItems {
 
     fn retire_target_item(&mut self, item: Handle) {
         unsafe { native::item_remove(self.manager, item.id) };
+        let _ = HELPERS.iter().find(|h| h.compare_exchange(item.id, 0, Ordering::AcqRel, Ordering::Relaxed).is_ok());
     }
 }
 

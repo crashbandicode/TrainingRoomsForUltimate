@@ -294,8 +294,15 @@ fn place_one(s: &Sphere, place: &mut impl FnMut(&Sphere) -> Option<[f32; 3]>) ->
 /// (`eggs::RADIUS`) that decides the break, as a hurtbox orb in the fighters' plane. Break animations and the cursor are not
 /// targets. How many were written.
 pub fn target_hurt_orbs(looks: &[Option<([f32; 2], super::panes::EggLook)>], out: &mut [Orb]) -> usize {
-    let _ = (looks, out);
-    0
+    let color = super::panes::linear(tint_colour(super::hitbox::HURTBOX_TINT, ORB_ALPHA));
+    let live = looks.iter().flatten().filter(|(_, look)| *look == super::panes::EGG_WHOLE);
+    let mut n = 0;
+    for (slot, (k, ([x, y], _))) in out.iter_mut().zip(live.enumerate()) {
+        let centre = [*x, *y, 0.0];
+        let key = super::hitbox::sphere_key(KIND_HURT, k, 0);
+        (*slot, n) = (Orb { centre, tail: centre, radius: super::eggs::RADIUS, color, key }, n + 1);
+    }
+    n
 }
 
 /// `set`'s spheres as orbs on their bones (`place`) into `out`, then, while *Launch angles* is On (`lr`: the owner's facing), each
