@@ -610,7 +610,8 @@ unsafe fn landing_options(run: &Run, p1: usize, cpu: usize, facts: LandingFacts)
         }
         7 if out.player_in_reach => {
             let term = konst(C::TermContJumpAerial);
-            let air = air_physics(cpu);
+            let kind = natives::fighter_kind(cpu).unwrap_or(UNRESOLVED);
+            let air = air_physics(cpu).with_fly_jump(kind, remaining_jumps(cpu));
             out.jump = term != UNRESOLVED
                 && natives::is_enable_transition_term(cpu, term)
                 && air.valid()
@@ -1083,7 +1084,9 @@ unsafe fn recovery_pad(
     let buttons = stock.buttons;
     let jump = konst(C::TermContJumpAerial);
     let jump_transition = jump != UNRESOLVED && natives::is_enable_transition_term(cpu, jump);
-    let physics = air_physics(cpu);
+    let jumps = remaining_jumps(cpu);
+    let kind = natives::fighter_kind(cpu).unwrap_or(UNRESOLVED);
+    let physics = air_physics(cpu).with_fly_jump(kind, jumps);
     let speed = match physics.plan_velocity(super::recording_host::fighter_speed(cpu)) {
         Ok(speed) => speed,
         Err(input) => {
@@ -1094,7 +1097,6 @@ unsafe fn recovery_pad(
         }
     };
     let [vx, vy] = speed;
-    let jumps = remaining_jumps(cpu);
     let can_jump = recovery::recovery_jump_available(jumps, jump_transition);
     let recovery = recovery_snapshot(ai);
     let [left, right] = run.stage.ledges;

@@ -177,7 +177,26 @@ mod fly_jump_tests {
     }
 }
 
+/// Native 13.0.5 `vl.prc fly_data[0].speed_y_table`, verified against the aerial jump
+/// movement in edge-niche-cand-fd-4. Fighter kinds come from the choice catalog.
+fn fly_launch(fighter: i32, remaining: u8) -> Option<f32> {
+    let table: &[f32] = match fighter {
+        0xc => &[1.65, 1.59, 1.47, 1.36, 1.25],
+        0x1d => &[2.2, 2.1, 2.0, 1.88, 1.75],
+        0x1e | 0x1f => &[2.0, 1.8, 1.6],
+        _ => return None,
+    };
+    table.get(table.len().checked_sub(usize::from(remaining))?).copied()
+}
+
 impl AirPhysics {
+    pub fn with_fly_jump(mut self, fighter: i32, remaining: Option<u8>) -> Self {
+        if let Some(speed) = remaining.and_then(|left| fly_launch(fighter, left)) {
+            self.jump_speed = speed - self.gravity;
+        }
+        self
+    }
+
     pub fn plan_velocity(self, velocity: Option<(f32, f32)>) -> Result<Point, PlanInput> {
         if !self.valid() {
             return Err(PlanInput::AirPhysics);
