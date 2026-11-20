@@ -604,7 +604,14 @@ pub struct LandingFacts {
 // Stock enables flick jump separately from the button presses for this frame.
 pub const FLICK_JUMP: u32 = 0x8000;
 
-pub fn juggle_drift(facts: LandingFacts, draw: u32) -> Correction {
+#[derive(Clone, Copy, Default)]
+pub struct LandingOptions {
+    pub fast_fall: bool,
+    pub jump: bool,
+    pub platform_x: Option<f32>,
+}
+
+pub fn landing_variant(facts: LandingFacts, options: LandingOptions, draw: u32) -> Correction {
     let LandingFacts {
         cpu,
         player,
@@ -624,17 +631,27 @@ pub fn juggle_drift(facts: LandingFacts, draw: u32) -> Correction {
     {
         return Correction::default();
     }
-    let x = match draw {
-        0..=3 if cpu[0] != player[0] => (cpu[0] - player[0]).signum(),
-        0 | 2 => -1.0,
-        1 | 3 => 1.0,
-        4 => 0.0,
-        _ => return Correction::default(),
+    let mut out = Correction::default();
+    let [x, y] = match draw {
+        0..=3 if cpu[0] != player[0] => [(cpu[0] - player[0]).signum(), stock_stick_y],
+        0 | 2 => [-1.0, stock_stick_y],
+        1 | 3 => [1.0, stock_stick_y],
+        4 => [0.0, stock_stick_y],
+        6 if options.fast_fall => [0.0, -1.0],
+        7 if options.jump => {
+            out.press = JUMP;
+            [(cpu[0] - player[0]).signum(), stock_stick_y]
+        }
+        8 => {
+            let Some(x) = options.platform_x.filter(|x| left < *x && *x < right) else {
+                return out;
+            };
+            [if x == cpu[0] { 0.0 } else { (x - cpu[0]).signum() }, stock_stick_y]
+        }
+        _ => return out,
     };
-    Correction {
-        stick: Some([x, stock_stick_y]),
-        ..Correction::default()
-    }
+    out.stick = Some([x, y]);
+    out
 }
 
 #[cfg(test)]
@@ -648,6 +665,7 @@ mod tests {
             cpu: [5., 45.], player: [0., 5.], main_floor: [-70., 70.],
             stock_stick_y: -0.15, stock_buttons: 0x8000,
         };
+        let juggle_drift = |facts, draw| landing_variant(facts, LandingOptions::default(), draw);
         assert_eq!(juggle_drift(facts, 0).stick, Some([1., -0.15]));
         assert_eq!(juggle_drift(facts, 4).stick, Some([0., -0.15]));
         assert_eq!(juggle_drift(LandingFacts { stock_buttons: 0x8008, ..facts }, 0), Correction::default());

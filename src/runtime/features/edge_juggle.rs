@@ -11,7 +11,7 @@ use crate::model::cpu::{
     rng::Rng,
 };
 use crate::model::edge_juggle::perfect::{
-    self, AirPhysics, Correction, JumpTiming, LandingFacts, MeteorBounce, Route, RouteFacts,
+    self, AirPhysics, Correction, JumpTiming, LandingFacts, LandingOptions, MeteorBounce, Route, RouteFacts,
     ThreatClock,
 };
 use crate::model::edge_juggle::{
@@ -299,16 +299,56 @@ pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Corr
     if !falling {
         return Correction::default();
     }
-    perfect::juggle_drift(
-        LandingFacts {
-            cpu: position,
-            player: [natives::pos_x(p1), natives::pos_y(p1)],
-            main_floor: run.stage.ledges.map(|point| point[0]),
-            stock_stick_y: stick_y,
-            stock_buttons: buttons,
-        },
-        run.landing_draw,
-    )
+    let facts = LandingFacts {
+        cpu: position,
+        player: [natives::pos_x(p1), natives::pos_y(p1)],
+        main_floor: run.stage.ledges.map(|point| point[0]),
+        stock_stick_y: stick_y,
+        stock_buttons: buttons,
+    };
+    let options = landing_options(run, p1, accessor, facts);
+    perfect::landing_variant(facts, options, run.landing_draw)
+}
+
+unsafe fn landing_options(run: &Run, p1: usize, cpu: usize, facts: LandingFacts) -> LandingOptions {
+    if run.landing_draw < 6 || facts.stock_buttons & !perfect::FLICK_JUMP != 0 {
+        return LandingOptions::default();
+    }
+    let mut out = LandingOptions::default();
+    let [x, y] = facts.cpu;
+    let player_reach = body_top(p1, facts.player[1]).unwrap_or(f32::INFINITY);
+    let player_near = (x - facts.player[0]).abs() <= player_reach;
+    match run.landing_draw {
+        6 if !player_near => {
+            let gravity = konst(C::KineticGravity);
+            let dive = konst(C::WorkFlagReserveDive);
+            let Some(ray) = FloorRay::new(p1) else { return out };
+            out.fast_fall = gravity != UNRESOLVED && dive != UNRESOLVED
+                && natives::sum_speed_y(cpu, gravity) < 0.0 && !natives::is_flag(cpu, dive)
+                && ray.floor(x, [y, run.stage.blast()[3]], true).is_some();
+        }
+        7 if player_near => {
+            let term = konst(C::TermContJumpAerial);
+            let air = air_physics(cpu);
+            out.jump = term != UNRESOLVED && natives::is_enable_transition_term(cpu, term) && air.valid()
+                && y + air.jump_speed.powi(2) / (2.0 * air.gravity) < run.stage.blast()[2];
+        }
+        8 => {
+            let [left, right] = facts.main_floor;
+            let away = if x >= facts.player[0] { (x + right) * 0.5 } else { (x + left) * 0.5 };
+            let Some(ray) = FloorRay::new(p1) else { return out };
+            let Some(floor) = ray.floor(away, [y, run.stage.blast()[3]], true) else { return out };
+            let Some(height) = floor.height(away) else { return out };
+            let Some((vx, vy)) = super::recording_host::fighter_speed(cpu) else { return out };
+            if floor.flags & 0x2000 != 0 && (away - facts.player[0]).abs() > player_reach
+                && air_physics(cpu).reaches_with_jump(facts.cpu, [vx, vy], [away, height], 90, run.stage.blast()[3])
+            {
+                out.platform_x = Some(away);
+            }
+        }
+        _ => {}
+    }
+    out
 }
 
 unsafe fn air_hit_recovery(
@@ -1133,7 +1173,7 @@ pub unsafe fn frame(fighter: usize) {
                 .is_some_and(|(now, before)| now > before),
     };
     if obs.hit && run.rounds.phase == Phase::Live {
-        run.landing_draw = rng.below(6);
+        run.landing_draw = rng.below(9);
         run.route_draw = rng.next_u32();
         run.plan_pending = true;
     }
@@ -1174,7 +1214,7 @@ pub unsafe fn frame(fighter: usize) {
         let before = run.rounds.phase;
         run.rounds.advance_attempt(obs);
         if matches!(before, Phase::Ready(_)) && run.rounds.phase == Phase::Live {
-            run.landing_draw = rng.below(6);
+            run.landing_draw = rng.below(9);
             run.jump_delay = rng.below(9) as u8;
             run.route_draw = rng.next_u32();
             run.plan_pending = true;
