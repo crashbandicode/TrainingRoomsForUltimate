@@ -7,12 +7,12 @@ its first actionable frame, not late. Supported (one sample): the drift goes tow
 force an up-special, recovering against an active edge-guard, and juggle rates.
 Full documents: [RESEARCH.md](edge-juggle/RESEARCH.md) and [DESIGN.md](edge-juggle/DESIGN.md).
 
-## What the game's CPU does wrong (from its own code; to be confirmed on Eden)
+## What the game's CPU does wrong (from its own code; recovery points checked on Eden)
 
 **Recovering (Guard the Edge):**
-- it always goes to the **nearer ledge**;
-- it air-dodges only when already close to the ledge;
-- it jumps at fixed heights;
+- it always goes to the **nearer ledge**, and identical starts repeat identical paths (confirmed);
+- it air-dodges only when already close to the ledge, about 20 units out (confirmed);
+- it jumps on its first actionable frame every time (corrected on Eden; the static read said fixed heights);
 - it sometimes **attacks a nearby edge-guarder instead of recovering**.
 
 **Being juggled (Juggler):**
