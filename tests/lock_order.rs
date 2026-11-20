@@ -95,7 +95,8 @@ fn static_locks(root: &Path) -> Vec<(String, String)> {
 
 /// Receivers named otherwise than their type's module (docs lane review R2, finding 1): the inline keyboard is held as `keyboard`
 /// (`name_keyboard`, `native_keyboard`: `inline_keyboard::Keyboard`), the catalog request's `Broker` as `broker`.
-const RECEIVER_MODULES: &[(&str, &str)] = &[("keyboard", "inline_keyboard"), ("broker", "mii_catalog_request"), ("saved_kind", "layouts")];
+const RECEIVER_MODULES: &[(&str, &str)] = &[("keyboard", "inline_keyboard"), ("broker", "mii_catalog_request"), ("saved_kind", "layouts"),
+    ("bridge", "bridge_state")];
 
 /// Ambiguous method calls left unfollowed although a runtime candidate reaches a lock, by `(method, receivers, why none of the runtime
 /// candidates is meant)`; `?` is a receiver that is not an identifier (a call's result, a path). Docs lane review R2, finding 1.
@@ -110,7 +111,7 @@ const FOREIGN_RECEIVERS: &[(&str, &[&str], &str)] = &[
         "Mash out row 121's model::mashout::entry::TechAttempt (mashout::tech_entering) wraps model::tech::session::Session::tick, \
          which takes no lock",
     ),
-    ("press", &["editor", "list", "m", "menu"], PANELS),
+    ("press", &["editor", "list", "m"], PANELS),
     ("view", &["bundle", "editor", "extras", "ui"], PANELS),
     ("target", &["active", "cycle", "editor", "proof"], "combos::Ui::target is private to ui/combos.rs"),
     (

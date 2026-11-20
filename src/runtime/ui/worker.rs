@@ -248,6 +248,8 @@ struct Session {
     mii: Option<crate::editors::mii::MiiList>,
     opening: u32,
     pending_close: Option<crate::runtime::mii::menu_handoff::CloseIntent>,
+    /// The optional test bridge's state provider (off without the bridge).
+    bridge: crate::runtime::bridge_state::Provider,
 }
 
 impl Session {
@@ -323,14 +325,66 @@ fn run() {
         let developer_pending = developer_reload.step();
         #[cfg(feature = "diag")]
         crate::runtime::stall_watch::worker_step(0);
+        publish_bridge_state(&mut session);
         if building || (read_index && session.recording_index.ready(version).is_some()) {
             WAKE.wait(Some(std::time::Duration::ZERO));
         } else if read_index || session.watching() || developer_pending {
             WAKE.wait(Some(POLL));
+        } else if let Some(every) = crate::runtime::bridge_state::poll_interval() {
+            // The optional test bridge: its lookup (once a second for 30 s) or its snapshots; nothing once it is off.
+            WAKE.wait(Some(every));
         } else {
             WAKE.wait(None);
         }
     }
+}
+
+/// The `tr.menu/1` snapshot for the optional test bridge (`model::bridge_state`); one relaxed load when it is off.
+fn publish_bridge_state(s: &mut Session) {
+    if !crate::runtime::bridge_state::enabled() {
+        return;
+    }
+    let now = crate::runtime::clock::uptime_ms();
+    let Session { bridge, menu, panel, .. } = s;
+    bridge.tick(now, |notice, ack, out| {
+        let open = OPEN.load(Ordering::Acquire);
+        let m = menu.as_ref();
+        let row = m.and_then(|m| m.help_row());
+        let group = m.and_then(|m| match m.screen() { Some(Screen::Rows { group, .. }) => Some(*group), _ => None });
+        let editor = panel.map(|e| format!("{e:?}"));
+        // The selection inside the screen showing: the Mash out popup's line first, else the screen's own cursor/cell.
+        let editor_sel = m.and_then(|m| m.mashout_popup().or(match m.screen() {
+            Some(Screen::List { cursor, .. } | Screen::Checklist { cursor, .. } | Screen::Delay { cursor, .. }
+                | Screen::SwapGroups { cursor } | Screen::Overrides { cursor, .. } | Screen::Chords { cursor }) => Some(*cursor),
+            Some(Screen::Grid { cell, .. }) => Some(*cell),
+            _ => None,
+        })).map(|i| i as i64);
+        let keyboard = crate::runtime::macros::named_macros::naming_pending();
+        let action = crate::runtime::bridge_state::action(row);
+        let active = crate::runtime::features::practice::active();
+        let view = crate::model::bridge_state::View {
+            open: open && m.is_some(),
+            page: m.map_or("", |m| m.page().id()),
+            depth: m.map_or(0, |m| m.depth()),
+            group,
+            cursor: m.map_or(0, |m| m.cursor()),
+            row: row.map(|r| r.title),
+            row_id: row.map_or("", |r| r.id),
+            action: &action,
+            editor: editor.as_deref(),
+            editor_sel,
+            keyboard,
+            game: active.map(|g| g.title()),
+            game_running: crate::runtime::features::practice::running().is_some(),
+            notice: (!notice.0.is_empty()).then_some((notice.0.as_str(), notice.1.as_str())),
+            ack,
+            ack_result: crate::runtime::bridge_state::ack_result(),
+            scene: crate::runtime::bridge_state::scene(now),
+            rows_omitted: true,
+            ..Default::default()
+        };
+        crate::model::bridge_state::snapshot(&view, out);
+    });
 }
 
 fn sync_input_generation(s: &mut Session) {
@@ -491,12 +545,14 @@ fn press(button: Button, s: &mut Session) {
     if popup && !open {
         if let Some(menu) = s.menu.as_mut() {
             menu.set_console(console_mode());
-            menu.press(button);
+            let handled = menu.press_outcome(button);
+            crate::runtime::bridge_state::note_ack(handled);
             post_recording_effect(menu, version);
         }
         return;
     }
     if s.pending_close.is_some() { return; }
+    let mut handled = true;
     s.refusal = None;
     s.setup_note = None;
     let mut editor_request = None;
@@ -530,7 +586,7 @@ fn press(button: Button, s: &mut Session) {
                 }
             }
         } else {
-            m.press(button);
+            handled = m.press_outcome(button);
             // Eden reads where each press left the cursor (the section jump, the remembered place).
             if crate::runtime::export::wanted() {
                 diagnostic(format_args!("[Ui] press {button:?} page={} cursor={} depth={} screen={:?} row={:?} recording={}",
@@ -568,6 +624,7 @@ fn press(button: Button, s: &mut Session) {
         }
         m.is_closed()
     };
+    crate::runtime::bridge_state::note_ack(handled);
     // Cancellation/close invalidates every remaining poll (and the rest of this
     // poll), before it can publish an old editor's effect into a later opening.
     if INPUT.generation() != s.input_generation { return; }

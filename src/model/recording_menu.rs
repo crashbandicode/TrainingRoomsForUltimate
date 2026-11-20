@@ -68,6 +68,8 @@ pub enum PageHit {
     Passthrough,
     LeaveUp,
     LeaveDown,
+    /// The page took the button but it does nothing there (the bridge state's `ack.result=ignored`).
+    Ignored,
 }
 
 /// Loop counts X cycles: ∞, 1, 2, 3, 5, 10.
@@ -959,25 +961,30 @@ impl RecordingScreens {
 
     /// One pop-up button. Always consumed while the pop-up is open.
     pub fn press_popup(&mut self, button: Button) {
+        self.press_popup_outcome(button);
+    }
+
+    /// `press_popup`, reporting whether the press acted (false: a closed popup, Y, or X outside the macros list).
+    pub fn press_popup_outcome(&mut self, button: Button) -> bool {
         if !self.popup_open {
-            return;
+            return false;
         }
         if self.overlay_face == Face::Popup && self.overlay_open() {
-            self.press_overlay(button, Face::Popup);
-            return;
+            return self.press_overlay(button, Face::Popup);
         }
         let group = self.popup_group();
         match button {
             Button::B if self.place(Face::Popup, group).drills => self.toggle_drills(Face::Popup, group),
             Button::B => self.popup_open = false,
-            Button::Y => {}
+            Button::Y => return false,
             Button::L => self.set_popup_role(ViewRole::Player),
             Button::R => self.set_popup_role(ViewRole::Cpu),
             Button::ZL | Button::ZR => self.toggle_tab(),
             Button::X => {
-                if self.in_macros(Face::Popup, group) {
-                    self.cycle_x(self.popup_role);
+                if !self.in_macros(Face::Popup, group) {
+                    return false;
                 }
+                self.cycle_x(self.popup_role);
             }
             Button::Up => self.nudge_popup(-1),
             Button::Down => self.nudge_popup(1),
@@ -986,23 +993,24 @@ impl RecordingScreens {
             Button::Left | Button::Right => self.swap_section(Face::Popup, group),
             Button::A => self.activate(Face::Popup, group),
         }
+        true
     }
 
     /// One Recording-page button. L, R, and B pass through unless a file screen is open.
     pub fn handle_page(&mut self, button: Button, on_library: bool, group: u8) -> PageHit {
         if self.overlay_open() && self.overlay_face == Face::Page {
-            self.press_overlay(button, Face::Page);
-            return PageHit::Consumed;
+            return if self.press_overlay(button, Face::Page) { PageHit::Consumed } else { PageHit::Ignored };
         }
         if button == Button::B && on_library && self.place(Face::Page, group).drills { self.toggle_drills(Face::Page, group); return PageHit::Consumed; }
         match button {
             Button::X => {
-                if on_library && self.in_macros(Face::Page, group) {
-                    self.cycle_x(self.page_role);
+                if !(on_library && self.in_macros(Face::Page, group)) {
+                    return PageHit::Ignored;
                 }
+                self.cycle_x(self.page_role);
                 PageHit::Consumed
             }
-            Button::Y | Button::ZL => PageHit::Consumed,
+            Button::Y | Button::ZL => PageHit::Ignored,
             Button::ZR => {
                 self.page_role = self.page_role.other();
                 PageHit::Consumed
@@ -1216,27 +1224,29 @@ impl RecordingScreens {
         }
     }
 
-    fn press_overlay(&mut self, button: Button, face: Face) {
+    /// One press on the open overlay (loading, keyboard, picker or file screen): true when it acted.
+    fn press_overlay(&mut self, button: Button, face: Face) -> bool {
         if self.loading {
             if button == Button::B {
                 self.file = None;
+                return true;
             }
-            return;
+            return false;
         }
         if self.keyboard.is_some() {
             if button == Button::B {
                 self.submit_name("");
+                return true;
             }
-            return;
+            return false;
         }
         if self.picker.is_some() {
-            self.press_picker(button, face);
-            return;
+            return self.press_picker(button, face);
         }
-        self.press_file(button);
+        self.press_file(button)
     }
 
-    fn press_file(&mut self, button: Button) {
+    fn press_file(&mut self, button: Button) -> bool {
         let len = self.built_file_rows().len();
         match button {
             Button::B => self.file = None,
@@ -1260,8 +1270,9 @@ impl RecordingScreens {
             Button::Left => self.flip_switch(false),
             Button::Right => self.flip_switch(true),
             Button::A => self.do_file_row(),
-            Button::X | Button::Y | Button::L | Button::R | Button::ZL | Button::ZR => {}
+            Button::X | Button::Y | Button::L | Button::R | Button::ZL | Button::ZR => return false,
         }
+        true
     }
 
     fn flip_switch(&mut self, on: bool) {
@@ -1473,7 +1484,7 @@ impl RecordingScreens {
         numbered_picker::chain_recordings(&tiles).map(|tile| self.catalog.macros[tile.id].id.clone()).collect()
     }
 
-    fn press_picker(&mut self, button: Button, _face: Face) {
+    fn press_picker(&mut self, button: Button, _face: Face) -> bool {
         match button {
             Button::B => self.finish_picker(),
             Button::A => {
@@ -1500,8 +1511,11 @@ impl RecordingScreens {
                     }
                 }
             }
-            Button::Left | Button::Right | Button::L | Button::ZR | Button::ZL | Button::X | Button::Y | Button::JumpUp | Button::JumpDown => {}
+            Button::Left | Button::Right | Button::L | Button::ZR | Button::ZL | Button::X | Button::Y | Button::JumpUp | Button::JumpDown => {
+                return false;
+            }
         }
+        true
     }
 
     fn finish_picker(&mut self) {
@@ -2674,6 +2688,19 @@ mod tests {
         assert_eq!(screens.section(Face::Page, SAVES_MACROS, 0).header_floppy, Some(Floppy::On));
     }
 
+    fn y_in_the_popup_new_chain_picker_is_ignored_and_a_picker_press_is_handled() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        let last = screens.section(Face::Popup, SAVES_MACROS, 1).rows.len() - 1;
+        assert_eq!(screens.section(Face::Popup, SAVES_MACROS, 1).rows[last].name, "+ New chain");
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 1, last);
+        assert!(screens.press_popup_outcome(Button::A), "A opens the picker");
+        assert!(screens.picker_open());
+        assert!(!screens.press_popup_outcome(Button::Y), "the picker does nothing with Y");
+        assert!(screens.picker_open());
+        assert!(screens.press_popup_outcome(Button::A), "A on a picker row toggles it");
+    }
+
     fn new_chain_and_new_sequence_open_the_picker() {
         let mut screens = screens();
         let last = screens.section(Face::Page, SAVES_MACROS, 1).rows.len() - 1;
@@ -2949,6 +2976,7 @@ mod tests {
             ("the_combo_panel_lists_each_links_events_and_drift", the_combo_panel_lists_each_links_events_and_drift as fn()),
             ("the_floppy_is_grey_when_the_switch_is_off", the_floppy_is_grey_when_the_switch_is_off as fn()),
             ("new_chain_and_new_sequence_open_the_picker", new_chain_and_new_sequence_open_the_picker as fn()),
+            ("y_in_the_popup_new_chain_picker_is_ignored_and_a_picker_press_is_handled", y_in_the_popup_new_chain_picker_is_ignored_and_a_picker_press_is_handled as fn()),
             ("crop_actions_open_the_shared_clip_editor", crop_actions_open_the_shared_clip_editor as fn()),
             ("recording_popup_request_opens_the_popup", recording_popup_request_opens_the_popup as fn()),
             ("a_numbered_row_drills_that_combo_and_drill_sequence_drills_the_sequence", a_numbered_row_drills_that_combo_and_drill_sequence_drills_the_sequence as fn()),

@@ -190,6 +190,7 @@ unsafe fn write_notice(container: *mut Pane, out: &TickOut, chip: Option<[f32; 4
         return;
     }
     pane::set_visible(container, out.visible);
+    crate::runtime::bridge_state::note_notice_visible(out.visible);
     if let Some(draw) = out.draw {
         let mut buffer = [0u16; crate::model::notify::BODY_MAX];
         let len = crate::model::boot_notices::notice_units(draw.body.as_str(), &mut buffer);
@@ -212,6 +213,7 @@ unsafe fn write_notice(container: *mut Pane, out: &TickOut, chip: Option<[f32; 4
             pane::set_text(target, &buffer[..len]);
             pane::set_text_color(target, p::linear(draw.color));
         }
+        crate::runtime::bridge_state::note_notice(draw.header, draw.body.as_str());
         if crate::runtime::export::wanted() {
             diagnostic(format_args!(
                 "[TrainingRooms] notice_draw header={:?} body={:?} color={:?} plate={:?}",

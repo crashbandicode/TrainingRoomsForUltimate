@@ -16,6 +16,7 @@ mod diag_reload;
 mod deluxe_overlay;
 mod deluxe_row;
 pub(crate) mod export;
+pub(crate) mod bridge_state;
 mod features;
 mod game;
 mod hub;

@@ -97,6 +97,7 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
         renderer_lost("practice layout inactive");
         return;
     }
+    crate::runtime::bridge_state::note_scene(waiting);
     TICKS.fetch_add(1, Ordering::Relaxed);
     // Registration is an initial calculate, not another rendered frame. Only
     // the regular pass advances the shared texture retirement grace.

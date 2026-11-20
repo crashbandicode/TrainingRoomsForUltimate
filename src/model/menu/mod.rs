@@ -433,6 +433,8 @@ pub struct Menu {
     recording: super::recording_menu::RecordingScreens,
     /// Mash out's popup over a chip of its grid, while open.
     mashout_pop: Option<MashoutPop>,
+    /// The last press reached an arm that does nothing (`press` returns false).
+    ignored: bool,
 }
 
 /// The roster press that asks the roster editor to put Mash out's cursor on the saved choice's chip (the open; no cell).
@@ -488,6 +490,7 @@ impl Menu {
             page_reset: None,
             recording: super::recording_menu::RecordingScreens::new(),
             mashout_pop: None,
+            ignored: false,
         };
         menu.sync();
         menu
@@ -1106,6 +1109,11 @@ impl Menu {
         )
     }
 
+    /// The Mash out picker's open popup line (its cursor), when the popup is up (the bridge state's `editor.sel`).
+    pub fn mashout_popup(&self) -> Option<usize> {
+        self.mashout_pop.map(|pop| pop.cursor)
+    }
+
     /// The menu was closed (B on the page); the runtime commits.
     pub fn is_closed(&self) -> bool {
         self.closed
@@ -1144,7 +1152,20 @@ impl Menu {
 
     /// One logical button press (an accepted press edge, or a stick repeat).
     pub fn press(&mut self, button: Button) {
+        self.press_outcome(button);
+    }
+
+    /// `press`, reporting whether the arm that took it acted (true, a same-focus action included) or does nothing (false:
+    /// the bridge state's `ack.result=ignored`).
+    pub fn press_outcome(&mut self, button: Button) -> bool {
+        self.ignored = false;
+        self.dispatch(button);
+        !self.ignored
+    }
+
+    fn dispatch(&mut self, button: Button) {
         if matches!(self.screen(), Some(Screen::ChordEntry { .. })) && self.chord_capture != ChordCapture::Preview {
+            self.ignored = true;
             return;
         }
         // A jump that reaches a screen without jumps (the screen changed under a held ZL) is the plain direction.
@@ -1154,7 +1175,7 @@ impl Menu {
             other => other,
         };
         if self.recording.popup_open() {
-            self.recording.press_popup(button);
+            self.ignored = !self.recording.press_popup_outcome(button);
             return;
         }
         // L / R step the page from a submenu as from the page itself (`press_page`), leaving the sub-screens.
@@ -1179,6 +1200,8 @@ impl Menu {
             Some(Screen::External(_)) => {
                 if button == Button::B {
                     self.stack.pop();
+                } else {
+                    self.ignored = true;
                 }
             }
             Some(Screen::ConfirmReset) => match button {
@@ -1187,7 +1210,7 @@ impl Menu {
                     self.reset_page();
                 }
                 Button::B => _ = self.stack.pop(),
-                _ => {}
+                _ => self.ignored = true,
             },
             Some(Screen::Rows { group, cursor }) => self.press_rows(button, group, cursor),
         }
@@ -1208,9 +1231,9 @@ impl Menu {
             Button::JumpUp | Button::JumpDown => self.top(screen(jumped(cursor, len, button == Button::JumpDown))),
             Button::Left | Button::Right => self.cycle(row, button == Button::Right),
             Button::A => self.activate(row),
-            Button::Y => _ = self.reset_setting(&ROWS[row]),
+            Button::Y => self.ignored = !self.reset_setting(&ROWS[row]),
             Button::B => _ = self.stack.pop(),
-            _ => {}
+            _ => self.ignored = true,
         }
     }
 
@@ -1278,6 +1301,10 @@ impl Menu {
                     self.move_cursor(true);
                     return;
                 }
+                super::recording_menu::PageHit::Ignored => {
+                    self.ignored = true;
+                    return;
+                }
                 super::recording_menu::PageHit::Passthrough => {}
             }
         }
@@ -1289,7 +1316,8 @@ impl Menu {
             Button::B => self.closed = true,
             Button::X => self.save_defaults(),
             Button::Y => {
-                if let Some(row) = self.focused_row().and_then(|index| ROWS.get(index)) { self.reset_setting(row); }
+                // Nothing to reset (the trailing Reset entry, a row already at its default) is an ignored press.
+                self.ignored = !self.focused_row().and_then(|index| ROWS.get(index)).is_some_and(|row| self.reset_setting(row));
             }
             Button::A => match self.focus() {
                 Some(Entry::Group(g)) => {
@@ -1298,18 +1326,17 @@ impl Menu {
                 }
                 Some(Entry::Row(row)) => self.activate(row),
                 Some(Entry::ResetPage(_)) => self.stack.push(Screen::ConfirmReset),
-                None => {}
+                None => self.ignored = true,
             },
-            Button::Left | Button::Right => {
-                if let Some(row) = self.focused_row() {
-                    self.cycle(row, button == Button::Right);
-                }
-            }
+            Button::Left | Button::Right => match self.focused_row() {
+                Some(row) => self.cycle(row, button == Button::Right),
+                None => self.ignored = true, // a group header or the trailing Reset entry
+            },
             Button::JumpUp => self.jump_section(false),
             Button::JumpDown => self.jump_section(true),
             // ZR no longer resets the page (it is the role switch inside the roster grids, easy to hit by
             // accident): the page's last line does, after a confirmation.
-            Button::ZL | Button::ZR => {}
+            Button::ZL | Button::ZR => self.ignored = true,
         }
     }
 
@@ -1376,7 +1403,7 @@ impl Menu {
             Control::DirectionGrid { .. } => self.stack.push(Screen::Directions { row, chip: DIRECTION_START }),
             Control::SwapGroups => self.stack.push(Screen::SwapGroups { cursor: 0 }),
             Control::Editor(editor) => self.open_editor(editor),
-            Control::Info(_) => {}
+            Control::Info(_) => self.ignored = true,
             // Q4: the sub-screen opens on its first row, Start.
             Control::Game(game) => self.stack.push(Screen::Rows { group: game_group(game), cursor: 0 }),
             // Stop ends the running game and the menu stays open; Start closes it and the close starts the game (Q1).
@@ -1486,7 +1513,7 @@ impl Menu {
                 self.put_one_hot(r.id, next);
             }
             Control::Toggle | Control::ReplayCapture => self.activate(row),
-            _ => {}
+            _ => self.ignored = true,
         }
     }
 
@@ -1639,7 +1666,7 @@ impl Menu {
                 self.stack.pop();
             }
             Button::B => _ = self.stack.pop(),
-            _ => {}
+            _ => self.ignored = true,
         }
     }
 
@@ -1673,7 +1700,7 @@ impl Menu {
             Button::A => self.toggle_entry(id, super::legend::option_slot(id, cursor)),
             Button::ZL => self.all_or_none(id),
             Button::B => _ = self.stack.pop(),
-            _ => {}
+            _ => self.ignored = true,
         }
     }
 
@@ -1752,7 +1779,7 @@ impl Menu {
                     self.stack.pop();
                 }
             }
-            _ => {}
+            _ => self.ignored = true,
         }
     }
 
@@ -1809,7 +1836,7 @@ impl Menu {
             } else {
                 SliderState::LowerHover
             })),
-            _ => {}
+            _ => self.ignored = true,
         }
     }
 
@@ -1859,7 +1886,7 @@ impl Menu {
                 self.put(id, &array);
             }
             Button::B => _ = self.stack.pop(),
-            _ => {}
+            _ => self.ignored = true,
         }
     }
 
@@ -1877,7 +1904,7 @@ impl Menu {
                 }
             }
             Button::B => _ = self.stack.pop(),
-            _ => {}
+            _ => self.ignored = true,
         }
     }
 
@@ -1902,7 +1929,7 @@ impl Menu {
             Button::A if cursor > 0 => self.toggle_entry(id, cursor - 1),
             Button::ZL if cursor > 0 => self.all_or_none(id),
             Button::B => _ = self.stack.pop(),
-            _ => {}
+            _ => self.ignored = true,
         }
     }
 
@@ -1917,7 +1944,7 @@ impl Menu {
                 self.stack.push(Screen::ChordEntry { target: ChordTarget::Row(cursor as u8), captured });
             }
             Button::B => _ = self.stack.pop(),
-            _ => {}
+            _ => self.ignored = true,
         }
     }
 
@@ -1981,7 +2008,7 @@ impl Menu {
             // Empty the chord (a menu shortcut with an empty chord is disabled).
             Button::Y => self.top(Screen::ChordEntry { target, captured: Chord::NONE }),
             Button::B => _ = self.stack.pop(),
-            _ => {}
+            _ => self.ignored = true,
         }
     }
 
@@ -2042,7 +2069,7 @@ impl Menu {
                 }
             }
             Button::B => _ = self.stack.pop(),
-            _ => {}
+            _ => self.ignored = true,
         }
     }
 
@@ -2250,3 +2277,7 @@ mod navigation_tests;
 #[cfg(test)]
 #[path = "practice_menu_tests.rs"]
 mod practice_menu_tests;
+
+#[cfg(test)]
+#[path = "bridge_ack_tests.rs"]
+mod bridge_ack_tests;
