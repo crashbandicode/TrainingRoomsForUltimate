@@ -404,6 +404,15 @@ mod tests {
     }
 
     #[test]
+    fn reaction_setting_three_values() {
+        assert_eq!(Reaction::from_settings(0, 29).frames(), 0);
+        assert_eq!(Reaction::from_settings(1, 0).frames(), 12);
+        assert_eq!(Reaction::from_settings(2, 0).frames(), 1);
+        assert_eq!(Reaction::from_settings(2, 29).frames(), 30);
+        assert_eq!(Reaction::from_settings(2, usize::MAX).frames(), 30);
+    }
+
+    #[test]
     fn edge_wizard_four_areas() {
         let stage = Stage::new([-160.0, 150.0, 110.0, -85.0], [-160.0, 150.0, 110.0, -85.0], [[-60.0, 5.0], [80.0, 8.0]]).unwrap();
         for (area, start, expected) in [
