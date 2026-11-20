@@ -221,16 +221,14 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     run.sense([top[0], top[1]]);
     // rc.15: Player 1's articles break the target too, as `Breaks on` allows (docs/DECISIONS.md).
     let rule = run.rule();
+    let grader = super::input_display::grader_live();
     let (length, depth) = run.step_with_depth(
         tick,
         top[1],
         hits,
         |egg| {
-            if super::lockon::hit(at, 0, lockon_key(score), rule, aerial, true).is_some() {
-                Some(None)
-            } else {
-                super::btt_projectiles::hit(at, egg, rule, aerial, true).map(Some)
-            }
+            let helper = super::lockon::hit(at, 0, lockon_key(score), rule, aerial, true).is_some();
+            eggs::other_break(grader, helper, |deepest| super::btt_projectiles::hit(at, egg, rule, aerial, true, deepest))
         },
         aerial,
         kind,
@@ -996,7 +994,7 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
 }
 
 /// The combat owner of a validated live item or weapon, when it is still a live fighter.
-unsafe fn article_owner(id: u32, key: usize) -> Option<u32> {
+pub(crate) unsafe fn article_owner(id: u32, key: usize) -> Option<u32> {
     if !matches!(id >> 28, 1 | 4) {
         return None;
     }

@@ -220,6 +220,12 @@ pub fn deepest(rule: u8, aerial: bool, hits: &[Hit], egg: [f32; 2]) -> Option<f3
         .reduce(f32::max)
 }
 
+/// Article depth is graded regardless of a helper break; a helper-only break has no grade.
+pub fn other_break(graded: bool, helper: bool, article: impl FnOnce(bool) -> Option<f32>) -> Option<Option<f32>> {
+    let depth = if helper && !graded { None } else { article(graded) };
+    (helper || depth.is_some()).then_some(depth)
+}
+
 /// The pills of a fighter's live attack spheres (`hitbox::want_hitboxes`), each end placed by `place`, a capsule's two ends
 /// one pill; `power(slot)` is the slot's damage. BTT also reads articles here; Eggs-ercise calls it only for fighters.
 pub fn pills<P, D>(spheres: &[Sphere], mut place: P, mut power: D, out: &mut [Hit]) -> usize

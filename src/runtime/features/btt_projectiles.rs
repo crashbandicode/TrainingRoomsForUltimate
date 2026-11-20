@@ -8,14 +8,15 @@ use super::hitbox;
 static READY: AtomicBool = AtomicBool::new(false);
 pub fn set_ready(on: bool) { READY.store(on, Ordering::Release); }
 pub fn ready() -> bool { READY.load(Ordering::Acquire) }
-/// The deepest qualifying hit among `owner`'s live articles at `spot`, under `Breaks on` (`rule`, `aerial` the owner's own
-/// status); `enabled` is the caller's own switch (Break the Targets' `Projectiles break targets`; Eggs-ercise always).
+/// A qualifying hit among `owner`'s live articles at `spot`, under `Breaks on` (`rule`, `aerial` the owner's own status);
+/// `deepest` selects the deepest overlap rather than the first. `enabled` is the caller's own switch (Break the Targets'
+/// `Projectiles break targets`; Eggs-ercise always).
 /// # Safety
 /// Called on the game thread with a live fighter accessor.
-pub unsafe fn hit(owner: usize, spot: [f32; 2], rule: u8, aerial: bool, enabled: bool) -> Option<f32> {
+pub unsafe fn hit(owner: usize, spot: [f32; 2], rule: u8, aerial: bool, enabled: bool, deepest: bool) -> Option<f32> {
     if !READY.load(Ordering::Acquire) || !enabled { return None; }
     let pool = crate::engine::seams::article_pool::read(owner, crate::runtime::game::text_base());
-    crate::model::btt::projectile_breaks(true, rule, aerial, spot, pool.into_iter().flatten(),
+    crate::model::btt::projectile_breaks(true, deepest, rule, aerial, spot, pool.into_iter().flatten(),
         |kind, ordinal| state_natives::article_get_from_no(owner, kind, ordinal),
         |article| {
             let id = state_natives::article_object_id(article);

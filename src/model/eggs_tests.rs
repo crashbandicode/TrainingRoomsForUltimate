@@ -1324,9 +1324,44 @@ fn outside_disc_miss_has_no_grade() {
 
 fn helper_only_break_has_no_grade() {
     let mut run = started(TIMED, ANY, 7);
-    let (event, depth) = run.step_with_depth(true, 0.0, &[], |_| Some(None), false, 0);
+    let (event, depth) = run.step_with_depth(true, 0.0, &[], |_| other_break(true, true, |_| None), false, 0);
     assert!(event.is_some());
     assert_eq!(depth, None);
+}
+
+fn eggs_projectile_with_helper_break_is_graded() {
+    let mut run = started(TIMED, ANY, 7);
+    let (event, depth) = run.step_with_depth(
+        true,
+        0.0,
+        &[],
+        |_| other_break(true, true, |deepest| { assert!(deepest); Some(0.75) }),
+        false,
+        0,
+    );
+    assert!(event.is_some());
+    assert_eq!(depth, Some(0.75));
+}
+
+fn eggs_projectile_miss_has_no_break() {
+    let mut run = started(TIMED, ANY, 7);
+    let (_, depth) = run.step_with_depth(true, 0.0, &[], |_| other_break(true, false, |_| None), false, 0);
+    assert_eq!(run.score, 0);
+    assert_eq!(depth, None);
+}
+
+fn grader_off_helper_break_skips_article_search() {
+    let mut run = started(TIMED, ANY, 7);
+    let (event, depth) = run.step_with_depth(
+        true,
+        0.0,
+        &[],
+        |_| other_break(false, true, |_| panic!("grader Off skips article search for a helper break")),
+        false,
+        0,
+    );
+    assert!(event.is_some());
+    assert_eq!((run.score, depth), (1, None));
 }
 
 /// This module's cases in one table. Each case runs on its own thread, as the test harness ran it.
@@ -1383,6 +1418,9 @@ fn case_table() {
         ("tangency_breaks_excellent", tangency_breaks_excellent as fn()),
         ("outside_disc_miss_has_no_grade", outside_disc_miss_has_no_grade as fn()),
         ("helper_only_break_has_no_grade", helper_only_break_has_no_grade as fn()),
+        ("eggs_projectile_with_helper_break_is_graded", eggs_projectile_with_helper_break_is_graded as fn()),
+        ("eggs_projectile_miss_has_no_break", eggs_projectile_miss_has_no_break as fn()),
+        ("grader_off_helper_break_skips_article_search", grader_off_helper_break_skips_article_search as fn()),
     ]);
 }
 }

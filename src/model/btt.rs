@@ -245,14 +245,16 @@ pub fn list_footer(rows: &[(String, Layout)], cursor: usize, skipped: usize) -> 
 
 /// Only P1's owned pool and ArticleModule supply objects; Off performs no discovery or hit reads. An article's hit counts as
 /// `Breaks on` (`rule`, with `aerial` Player 1's own status) allows that hit (rc.15, both practice games: docs/DECISIONS.md).
+/// `deepest` selects the deepest qualifying overlap rather than the first one.
+#[allow(clippy::too_many_arguments)]
 pub fn projectile_breaks(
-    enabled: bool, rule: u8, aerial: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,
+    enabled: bool, deepest: bool, rule: u8, aerial: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,
     mut read: impl FnMut(usize) -> Option<([eggs::Hit; super::hitbox::SLOTS as usize], usize)>,
 ) -> Option<f32> {
     if !enabled {
         return None;
     }
-    let mut deepest = None;
+    let mut best = None;
     for article in pool.into_iter().chain(super::hitbox::article_instances(true, get)) {
         if !pointer_ok(article) {
             continue;
@@ -263,11 +265,14 @@ pub fn projectile_breaks(
                 continue;
             }
             if let Some(depth) = eggs::depth(hit, spot) {
-                deepest = Some(deepest.map_or(depth, |current: f32| current.max(depth)));
+                if !deepest {
+                    return Some(depth);
+                }
+                best = Some(best.map_or(depth, |current: f32| current.max(depth)));
             }
         }
     }
-    deepest
+    best
 }
 
 /// Shared placing controls, without stage bounds or projection.
