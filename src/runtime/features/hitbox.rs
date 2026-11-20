@@ -733,7 +733,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             }
         }
         if super::input_display::grader_live() {
-            for (at, _) in own.iter().flatten() {
+            for (at, look) in own.iter().flatten().filter(|(_, look)| look.picture == crate::model::ui::panes::EggPicture::Whole) {
                 let centre = [at[0], at[1], 0.0];
                 for (centre, radius, color) in crate::model::spacing::zone_discs(centre) {
                     let mut zone = Orb::NONE;

@@ -324,7 +324,10 @@ pub unsafe fn sample_frame(player: usize) {
     }
     let settings = settings();
     let grader = settings.grader;
-    let shown = settings.on || super::parry::on();
+    let panes = PANES.load(Ordering::Acquire);
+    let parry = super::parry::on();
+    let sampling = crate::model::frame_strip::strip_owns_advantage(true, settings.samples(parry), panes);
+    let shown = crate::model::frame_strip::strip_owns_advantage(true, settings.on || parry, panes);
     if GRADER_LIVE.load(Ordering::Relaxed) != grader {
         GRADER_LIVE.store(grader, Ordering::Relaxed);
     }
@@ -335,7 +338,7 @@ pub unsafe fn sample_frame(player: usize) {
         discard_frame();
         return;
     }
-    if !(shown || grader || input_drill) {
+    if !sampling && !input_drill {
         LANES[0].store(0, Ordering::Relaxed);
         LANES[1].store(0, Ordering::Relaxed);
         discard_frame();
