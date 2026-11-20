@@ -7,7 +7,7 @@ use hos_lock::{Mutex, Published};
 use super::{cpu::konst, mashout::FloorRay, notices, practice, recorder, states};
 use crate::model::chords::{field, logical as key, Sample};
 use crate::model::cpu::{ids::{C, UNRESOLVED}, rng::Rng};
-use crate::model::edge_juggle::perfect::{self, AirPhysics, Correction, JumpTiming, LandingFacts};
+use crate::model::edge_juggle::perfect::{self, AirPhysics, Correction, JumpTiming, LandingFacts, MeteorBounce};
 use crate::model::edge_juggle::{
     Difficulty, Drill, Observation, Outcome, Phase, Session, Setup, Stage, Wizard, WizardStep,
 };
@@ -79,6 +79,8 @@ struct Run {
     landing_draw: u32,
     jump_delay: u8,
     jump_timing: JumpTiming,
+    last_cpu_status: i32,
+    bounce: MeteorBounce,
     player_ledge: Option<usize>,
     placement: Placement,
     notice: FixedPath<128>,
@@ -199,6 +201,19 @@ pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Corr
         return Correction::default();
     }
     let status = natives::status_kind(accessor);
+    let Some(p1) = natives::module_accessor(0) else {
+        return Correction::default();
+    };
+    if run.drill == Drill::Juggler && status != UNRESOLVED {
+        let reflect = konst(C::StatusDamageFlyReflectD);
+        let previous = std::mem::replace(&mut run.last_cpu_status, status);
+        let bounce = status == reflect && [konst(C::StatusDamageFlyMeteor), reflect].contains(&previous)
+            && previous != UNRESOLVED;
+        let correction = run.bounce.step(bounce, natives::status_kind(p1) == konst(C::StatusWait), buttons);
+        if correction != Correction::default() {
+            return correction;
+        }
+    }
     if status == UNRESOLVED || ![C::StatusFall, C::StatusFallAerial, C::StatusDamageFall].map(konst).contains(&status) {
         run.jump_timing = JumpTiming::default();
         return Correction::default();
@@ -207,9 +222,6 @@ pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Corr
     if run.drill == Drill::GuardEdge {
         return recovery_jump(run, accessor, position, buttons, stick_y);
     }
-    let Some(p1) = natives::module_accessor(0) else {
-        return Correction::default();
-    };
     perfect::juggle_drift(LandingFacts {
         cpu: position,
         player: [natives::pos_x(p1), natives::pos_y(p1)],
@@ -681,6 +693,8 @@ pub unsafe fn frame(fighter: usize) {
             landing_draw: 5,
             jump_delay: 0,
             jump_timing: JumpTiming::default(),
+            last_cpu_status: UNRESOLVED,
+            bounce: MeteorBounce::default(),
             player_ledge: None,
             placement: Placement::ResetResources,
             notice: FixedPath::new(),
@@ -799,6 +813,8 @@ pub unsafe fn frame(fighter: usize) {
             run.landing_draw = rng.below(6);
             run.jump_delay = rng.below(9) as u8;
             run.jump_timing = JumpTiming::default();
+            run.last_cpu_status = UNRESOLVED;
+            run.bounce = MeteorBounce::default();
             if held_cpu.take() == Some(body) {
                 state::set_sleep(cpu, false);
             }

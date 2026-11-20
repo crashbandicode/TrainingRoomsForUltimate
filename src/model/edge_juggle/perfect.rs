@@ -323,6 +323,25 @@ impl JumpTiming {
     }
 }
 
+pub const GUARD: u32 = 0x8;
+
+#[derive(Default)]
+pub struct MeteorBounce {
+    active: bool,
+}
+
+impl MeteorBounce {
+    pub fn step(&mut self, bounced: bool, idle_player: bool, buttons: u32) -> Correction {
+        let first = bounced && !self.active;
+        self.active = bounced;
+        if first && idle_player {
+            Correction { release: buttons & GUARD, ..Correction::default() }
+        } else {
+            Correction::default()
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct LandingFacts {
     pub cpu: Point,
