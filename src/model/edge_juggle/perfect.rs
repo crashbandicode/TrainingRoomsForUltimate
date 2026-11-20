@@ -484,6 +484,39 @@ impl JumpTiming {
 
 pub const GUARD: u32 = 0x8;
 
+#[derive(Clone, Copy)]
+pub struct DodgeReach {
+    pub distance: f32,
+    pub cancel_frames: f32,
+}
+
+pub fn distance_dodge(
+    position: Point,
+    ledge: Point,
+    reach: DodgeReach,
+    last_resource: bool,
+    can_coast: bool,
+) -> Correction {
+    let x = ledge[0] - position[0];
+    let y = ledge[1] - position[1];
+    let distance = x.hypot(y);
+    if !last_resource
+        || can_coast
+        || !reach.distance.is_finite()
+        || !reach.cancel_frames.is_finite()
+        || reach.cancel_frames <= 0.0
+        || !(0.0 < distance && distance <= reach.distance)
+    {
+        return Correction::default();
+    }
+    Correction {
+        stick: Some([x / distance, y / distance]),
+        press: GUARD,
+        ..Correction::default()
+    }
+}
+
+
 /// Earliest observable start of the current P1 attack on the attempt clock.
 #[derive(Default)]
 pub struct ThreatClock {

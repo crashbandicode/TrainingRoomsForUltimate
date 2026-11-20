@@ -146,11 +146,27 @@ struct Bodies {
     cpu: usize,
 }
 
+static RECOVERY_BASE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
 pub fn install(dependencies: bool) -> bool {
     // Surface verification may ask for a memory map. Run it before the game callbacks use its result.
     let installed = dependencies
         && super::cpu_level::install_drill_behavior()
         && unsafe { super::tech_surfaces::init() };
+    if installed
+        && crate::runtime::seams::seam_install::gate(
+            "edge_juggle",
+            &[
+                "edge_juggle.special_available_snapshot",
+                "edge_juggle.special_available",
+                "edge_juggle.escape_slide_distance",
+                "edge_juggle.escape_cancel_frame",
+            ],
+            false,
+        )
+    {
+        RECOVERY_BASE.store(game::text_base(), Ordering::Release);
+    }
     INSTALLED.store(installed, Ordering::Release);
     installed
 }
@@ -239,7 +255,7 @@ pub(super) fn observe_player_pad(buttons: u32) {
     }
 }
 
-pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Correction {
+pub unsafe fn ai_correction(ai: usize, accessor: usize, buttons: u32, stick_y: f32) -> Correction {
     if !INSTALLED.load(Ordering::Acquire) {
         return Correction::default();
     }
@@ -296,7 +312,7 @@ pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Corr
             run.jump_timing = JumpTiming::default();
             return Correction::default();
         }
-        return recovery_pad(run, p1, accessor, position, buttons, stick_y);
+        return recovery_pad(run, p1, ai, accessor, position, buttons, stick_y);
     }
     let correction = air_hit_recovery(run, p1, accessor, position, status);
     if correction != Correction::default() {
@@ -501,15 +517,18 @@ unsafe fn air_physics(cpu: usize) -> AirPhysics {
     }
 }
 
-unsafe fn remaining_jumps(cpu: usize) -> u8 {
+unsafe fn remaining_jumps(cpu: usize) -> Option<u8> {
     use crate::model::hash40::hash40;
     let id = konst(C::WorkIntJumpCount);
     if id == UNRESOLVED || !game::granted(crate::model::sites_pkg2::WORK_GET_INT_OFFSET) {
-        return 0;
+        return None;
     }
     let max = state::get_param_int(cpu, hash40("jump_count_max"), 0);
     let spent = natives::get_int(cpu, id);
-    u8::try_from(max.saturating_sub(spent)).unwrap_or_default()
+    if max <= 0 || spent < 0 {
+        return None;
+    }
+    u8::try_from(max.saturating_sub(spent).max(0)).ok()
 }
 
 unsafe fn body_top(fighter: usize, foot: f32) -> Option<f32> {
@@ -536,7 +555,7 @@ unsafe fn route_guide(
     let player = [natives::pos_x(p1), natives::pos_y(p1)];
     let player_reach = body_top(p1, player[1])?;
     let body = body_top(cpu, pos[1])?;
-    let jumps = remaining_jumps(cpu);
+    let jumps = remaining_jumps(cpu)?;
     let bottom = run.stage.blast()[3];
     let jump_rise = if jumps == 0 {
         0.0
@@ -601,9 +620,29 @@ unsafe fn player_in_lag(accessor: usize) -> bool {
         && !natives::is_enable_cancel(accessor)
 }
 
+/// The AI epilogue owns the AI and its current self snapshot for this call.
+unsafe fn last_dodge_reach(ai: usize, cpu: usize) -> Option<perfect::DodgeReach> {
+    use crate::engine::seams::native_fields as field;
+    let base = RECOVERY_BASE.load(Ordering::Acquire);
+    if base == 0 {
+        return None;
+    }
+    let snapshot = field::child(ai, 0x168)?;
+    let available: extern "C" fn(usize, u32) -> bool =
+        std::mem::transmute(base + 0x358c20);
+    if available(snapshot, 0) {
+        return None;
+    }
+    let distance = field::read_unchecked::<f32>(snapshot, 0x230)
+        * natives::get_param_float(cpu, 0x1d_fb01_ad43, 0);
+    let cancel_frames = field::read_unchecked(snapshot, 0x234);
+    Some(perfect::DodgeReach { distance, cancel_frames })
+}
+
 unsafe fn recovery_pad(
     run: &mut Run,
     p1: usize,
+    ai: usize,
     cpu: usize,
     pos: [f32; 2],
     buttons: u32,
@@ -677,6 +716,21 @@ unsafe fn recovery_pad(
         run.jump_timing = JumpTiming::default();
         return Correction::default();
     };
+    if buttons & !(perfect::GUARD | perfect::FLICK_JUMP) == 0
+        && !can_jump
+        && remaining_jumps(cpu) == Some(0)
+    {
+        let escape = konst(C::TermContEscapeAir);
+        if escape != UNRESOLVED && natives::is_enable_transition_term(cpu, escape) {
+            if let Some(reach) = last_dodge_reach(ai, cpu) {
+                let coasts = physics.reaches_with_jump(pos, speed, ledge, u8::MAX, run.stage.blast()[3]);
+                let pad = perfect::distance_dodge(pos, ledge, reach, true, coasts);
+                if pad != Correction::default() {
+                    return pad;
+                }
+            }
+        }
+    }
     if attack && !can_punish {
         let delay = if can_jump { 0 } else { 90 };
         let reachable = physics.reaches_with_jump(pos, speed, ledge, delay, run.stage.blast()[3]);
