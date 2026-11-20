@@ -146,6 +146,24 @@ mod tests {
     }
 
     #[test]
+    fn a_reachable_opposite_ledge_is_considered_only_when_it_avoids_the_player() {
+        let ledges = [[-40., 0.], [40., 0.]];
+        let lines = [[ledges[0], ledges[1]], [ledges[0], [0., -15.]], [[0., -15.], ledges[1]]];
+        let mut facts = RouteFacts {
+            position: [-53., -22.], player: [-41., 0.], player_reach: 18.,
+            ledges, blast: [-130., 130., 100., -90.], outline: &lines,
+            body_clearance: 9., ledge_distance: 5., fall_budget: 12.,
+            reach: [120., 42.],
+        };
+        assert!(possible_routes(&facts).iter().flatten().any(|plan| plan.route == Route::Opposite));
+        facts.player = [0., 25.];
+        assert!(!possible_routes(&facts).iter().flatten().any(|plan| plan.route == Route::Opposite));
+        facts.player = [-41., 0.];
+        facts.reach[0] = 45.;
+        assert!(!possible_routes(&facts).iter().flatten().any(|plan| plan.route == Route::Opposite));
+    }
+
+    #[test]
     fn opposite_ledge_requires_a_full_corridor_above_the_blast_zone() {
         let ledges = [[-70., 0.], [70., 0.]];
         let fd = [
