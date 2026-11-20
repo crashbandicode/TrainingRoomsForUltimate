@@ -2152,7 +2152,7 @@ approved_by = "Operator 2026-11-20 moved both games into the current rc.15 card 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 174055
+ceiling = 174076
 date = "2026-11-20"
-reason = "rc.15 niche recovery candidate on 79cc06f1 with the reviewed CPU think fix 04616215. Source f8344415 measures 174055, a 3029 normalized-line delta over 171026, including the guarded crossing mixup and release evidence."
+reason = "rc.15 niche recovery candidate on 79cc06f1 with the reviewed CPU think fix 04616215. Source b5684eb5 measures 174076, a 3050 normalized-line delta over 171026, including the guarded crossing mixup and measured Pikachu P-SB placement and jump reserve."
 approved_by = "Primary e7ee8f1c directed one measured-delta budget entry for the operator's rc.15 niche-recovery hold and Perfect verification rows, 2026-11-20."
