@@ -127,7 +127,25 @@ pub struct NativeAir {
     pub jump_aerial_y: f32,
 }
 
+/// Rejected input identifiers shared with the release planner trace.
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PlanInput {
+    PlayerHeight = 1,
+    Snapshot = 2,
+    SpecialEnvelope = 3,
+    StageOutline = 4,
+    FighterGeometry = 5,
+    AirPhysics = 6,
+    Velocity = 7,
+}
+
 impl AirPhysics {
+    pub fn plan_velocity(self, velocity: Option<(f32, f32)>) -> Result<Point, PlanInput> {
+        let (x, y) = velocity.filter(|_| self.valid()).ok_or(PlanInput::AirPhysics)?;
+        Ok([x, y])
+    }
+
     /// `jump_aerial_y` is the double jump's height. Its first frame moves
     /// `sqrt(2 g h) - g / 2`, then loses `g` a frame (exact trace
     /// edge-niche-cand-fd-3, six fighters). Full-stick drift gains `add + mul`.
@@ -940,6 +958,18 @@ mod tests {
         assert_eq!(landing_variant(facts, LandingOptions::default(), 7), Correction::default());
         assert_eq!(landing_variant(LandingFacts { stock_buttons: 0x8008, ..facts }, legal, 8),
             Correction::default());
+    }
+
+    #[test]
+    fn recovery_planning_distinguishes_invalid_air_data_from_unavailable_velocity() {
+        let air = AirPhysics { horizontal_speed: 0.924, horizontal_acceleration: 0.05,
+            gravity: 0.125, terminal_speed: 1.75, jump_speed: 3.147 };
+        assert_eq!(air.plan_velocity(Some((0., -1.75))), Ok([0., -1.75]));
+        assert_eq!(air.plan_velocity(None), Err(PlanInput::Velocity));
+        assert_eq!(air.plan_velocity(Some((f32::NAN, -1.75))), Err(PlanInput::Velocity));
+        assert_eq!(air.plan_velocity(Some((0., f32::INFINITY))), Err(PlanInput::Velocity));
+        let invalid = AirPhysics { horizontal_acceleration: 0., ..air };
+        assert_eq!(invalid.plan_velocity(Some((0., -1.75))), Err(PlanInput::AirPhysics));
     }
 
     #[test]
