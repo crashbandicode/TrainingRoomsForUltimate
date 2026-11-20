@@ -226,3 +226,63 @@ fn resetting_loop_publishes_both_roles_once() {
         assert_eq!(reopened.recording().loop_of(role), LoopMark::Finite(1));
     }
 }
+
+#[test]
+fn both_loop_edits_persist_during_a_warm_catalog_check() {
+    use engine::rr_host::{publish_selection_at, recording_version, take_menu_effect};
+    use engine::rr_runtime::{apply_catalog, apply_index, CatalogCache, MenuIndex};
+    use model::menu::PlaceKeeper;
+
+    let _guard = LOOP_TEST.lock().unwrap_or_else(|err| err.into_inner());
+    let root = card();
+    RecordingIndex::update(&root.0, |index| {
+        index.set_loop(Role::Player, LoopCount::Finite(1));
+        Ok(true)
+    }).unwrap();
+    let macros = engine::macros::Library::new(root.0.join(engine::library::MACROS_DIR));
+    for n in 0..60 {
+        macros.save_new(&MacroRecording::new(
+            format!("Take {n}"), "13.0.5", StartState::neutral(0, 0, 1.0), vec![InputFrame::default()],
+        ).unwrap()).unwrap();
+    }
+    let saves = model::store::Store::new(root.0.join(engine::library::SAVES_DIR));
+    let state = model::state::record::SavedState::never_saved();
+    for n in 0..30 {
+        saves.save_new(&engine::library::NamedSave::new(format!("Save {n}"), state.clone(), state.clone()).unwrap()).unwrap();
+    }
+    let observed = recording_version();
+    let mut catalog = CatalogCache::new(&root.0);
+    catalog.want(observed.0);
+    while catalog.step() {}
+    let mut index = MenuIndex::default();
+    assert!(index.step(&root.0, observed));
+    let cached_index = index.ready(observed).unwrap();
+
+    let mut keeper = PlaceKeeper::new();
+    let mut open = Some(menu(ViewRole::Player));
+    open.as_mut().unwrap().press(Button::B);
+    keeper.drop_model(&mut open);
+    let screen = keeper.open(&mut open, Settings::factory(), Env::default());
+    let warm = catalog.ready(observed.0).unwrap();
+    assert_eq!((warm.macros.len(), warm.saves.len()), (60, 30));
+    apply_catalog(warm, cached_index, screen.recording_mut());
+    apply_index(cached_index, screen.recording_mut());
+    assert_eq!(screen.recording().loop_of(ViewRole::Player), LoopMark::Finite(1));
+    catalog.check();
+    for wanted in [2, 3] {
+        assert!(catalog.step(), "the directory check is still pending");
+        if index.ready(recording_version()).is_none() {
+            screen.recording_mut().set_loading();
+        }
+        screen.press(Button::Right);
+        assert_eq!(screen.recording().loop_of(ViewRole::Player), LoopMark::Finite(wanted));
+        if let Some((_, true, version)) = take_menu_effect(&root.0, screen.recording_mut(), Some(observed)) {
+            assert!(publish_selection_at(&root.0, &screen.recording().selection(), None, Some(version)));
+        }
+    }
+    assert!(catalog.step(), "both Right presses happened before discovery finished");
+    assert_eq!(RecordingIndex::load(&root.0).unwrap().loop_count(Role::Player), LoopCount::Finite(3),
+        "the second Right must persist while the original index snapshot is stale");
+    assert_playback(&root, ViewRole::Player, Some(3));
+    close_reopen(&root, open.take().unwrap(), ViewRole::Player, LoopMark::Finite(3));
+}

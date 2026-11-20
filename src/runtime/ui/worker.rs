@@ -595,13 +595,7 @@ fn post_recording_effect(menu: &mut Menu, observed: Option<(u64, u64)>) {
     let screens = menu.recording_mut();
     let selection = screens.selection();
     rr_host::publish_menu_role(selection.record_role);
-    let effect = screens.take_effect();
-    let changed = screens.take_selection_change();
-    let version = rr_host::recording_version();
-    if screens.loading() || observed != Some(version) {
-        screens.set_loading();
-        return;
-    }
+    let Some((effect, changed, version)) = rr_host::take_menu_effect(std::path::Path::new(ROOT), screens, observed) else { return };
     if changed && !matches!(effect, Effect::DeleteSave { .. } | Effect::DeleteFile { .. }) {
         let kind = recording_drill_kind(menu, selection.drill.as_deref());
         if !rr_host::publish_selection_at(std::path::Path::new(ROOT), &selection, kind, Some(version)) {

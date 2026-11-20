@@ -52,7 +52,10 @@ fn a_menu_open_checks_the_folders_and_a_change_moves_the_generation() {
 fn a_drill_is_not_cleared_while_the_catalog_loads() {
     let worker = src("src/runtime/ui/worker.rs");
     let effect = item(&worker, "fn post_recording_effect(");
-    assert!(effect.contains("screens.loading()"), "no catalog, no drill kind to follow:\n{effect}");
+    let host = src("src/model/rr_host.rs");
+    let take = item(&host, "pub fn take_menu_effect(");
+    assert!(take.contains("screens.loading()"), "no catalog, no drill kind to follow:\n{take}");
+    assert!(effect.find("take_menu_effect(").unwrap() < effect.find("follow_recording_drill(").unwrap());
 }
 
 #[test]
@@ -61,10 +64,12 @@ fn recording_actions_and_writeback_require_the_current_generation() {
     let refresh = item(&worker, "fn refresh_recording(");
     assert!(!refresh.contains("!s.catalog_watch.adopted()"), "an adopted but superseded catalog must enter loading");
     let effect = item(&worker, "fn post_recording_effect(");
-    let check = effect.find("observed != Some(version)").expect("check the adopted revision before dispatch");
+    let host = src("src/model/rr_host.rs");
+    let take = item(&host, "pub fn take_menu_effect(");
+    assert!(take.contains("observed != Some(version)"), "check both adopted revisions before dispatch");
+    let check = effect.find("take_menu_effect(").unwrap();
     assert!(check < effect.find("publish_selection_at(").unwrap(), "check before selection writeback");
     assert!(check < effect.find("post_effect_at(").unwrap(), "check before dispatching a file effect");
-    let host = src("src/model/rr_host.rs");
     let consume = item(&host, "fn apply_menu(");
     assert!(effect.contains("post_effect_at(effect, Some(version))"), "queue the full observed revision");
     assert!(consume.find("recording_version()").unwrap() < consume.find("match effect").unwrap(),

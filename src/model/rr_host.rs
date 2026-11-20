@@ -1031,6 +1031,22 @@ fn write_saved_pair(root: &Path, after_take: impl FnOnce()) -> bool {
     true
 }
 
+/// Consume one menu action only when the recording view that received it is current.
+pub fn take_menu_effect(
+    _root: &Path,
+    screens: &mut crate::model::recording_menu::RecordingScreens,
+    observed: Option<(u64, u64)>,
+) -> Option<(Effect, bool, (u64, u64))> {
+    let effect = screens.take_effect();
+    let changed = screens.take_selection_change();
+    let version = recording_version();
+    if screens.loading() || observed != Some(version) {
+        screens.set_loading();
+        return None;
+    }
+    Some((effect, changed, version))
+}
+
 /// The menu's selection is what Play, Record, and the loop read. The index is that selection.
 #[cfg(test)]
 pub fn publish_selection(root: &Path, selection: &Selection, drill_kind: Option<DrillKind>) {
