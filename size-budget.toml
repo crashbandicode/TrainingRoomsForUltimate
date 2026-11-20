@@ -2144,7 +2144,7 @@ approved_by = "Operator 2026-11-20: add the ready fighters fix to this build. Pr
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 171025
+ceiling = 171026
 date = "2026-11-20"
-reason = "Guard the Edge and Juggler on rc.15 base 5456cbfe. Source eee426f5, including Recording-page CPU playback ownership, measures 171025, increasing the 167583 base by exactly 3442 normalized lines. Replaces the drill branch's incremental size entries."
+reason = "Guard the Edge and Juggler on rc.15 base 5456cbfe. Source f1cc2428, including Recording-page CPU playback ownership, measures 171026, increasing the 167583 base by exactly 3443 normalized lines. Replaces the drill branch's incremental size entries."
 approved_by = "Operator 2026-11-20 moved both games into the current rc.15 card build. Primary c07b3449 directed one budget entry for the measured delta over 167583."
