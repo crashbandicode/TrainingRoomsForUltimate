@@ -119,6 +119,26 @@ pub fn lane(read: impl Fn(usize) -> Option<u64>, accessor: usize, id: u32, attac
     })
 }
 
+pub fn publish_lanes(
+    lanes: &Lanes,
+    grader: bool,
+    capture: bool,
+    read: impl Fn(usize) -> Option<u64>,
+    accessors: [usize; 2],
+    identity: impl Fn(usize) -> (u32, bool),
+) {
+    let _ = capture;
+    if grader {
+        for i in 0..2 {
+            let (id, attacks) = identity(i);
+            lanes.set(i, lane(&read, accessors[i], id, attacks));
+        }
+    } else {
+        lanes.set(0, None);
+        lanes.set(1, None);
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Entry {
     pub lane: u8,

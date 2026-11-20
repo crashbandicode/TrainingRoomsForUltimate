@@ -31,6 +31,7 @@ static REACTION_ON: AtomicBool = AtomicBool::new(false);
 /// P1's fighter read may run (`p1_fighter`).
 static KIND_ON: AtomicBool = AtomicBool::new(false);
 static GRADER_LIVE: AtomicBool = AtomicBool::new(false);
+static FIGHTER_READ: AtomicBool = AtomicBool::new(false);
 static OWNER_ON: AtomicBool = AtomicBool::new(false);
 static LANES: Lanes = Lanes::new();
 static GRADER: Grader = Grader::new();
@@ -185,6 +186,7 @@ unsafe fn lane_player() -> bool {
 
 /// Boot: every optional spacing-grader row passed its guard.
 pub fn set_grader_read(on: bool) {
+    FIGHTER_READ.store(on, Ordering::Release);
     if on {
         skyline::install_hook!(spacing_hit);
     }
@@ -360,14 +362,20 @@ pub unsafe fn sample_frame(player: usize) {
         return;
     };
     let read = |at| unsafe { guarded_read(at) };
-    if grader {
-        let lane_player = lane_player();
-        LANES.set(0, crate::model::spacing::lane(read, player, natives::battle_object_id(player), true));
-        LANES.set(1, crate::model::spacing::lane(read, cpu, natives::battle_object_id(cpu), lane_player));
-    } else {
-        LANES.set(0, None);
-        LANES.set(1, None);
-    }
+    crate::model::spacing::publish_lanes(
+        &LANES,
+        grader,
+        FIGHTER_READ.load(Ordering::Acquire),
+        read,
+        [player, cpu],
+        |lane| unsafe {
+            if lane == 0 {
+                (natives::battle_object_id(player), true)
+            } else {
+                (natives::battle_object_id(cpu), lane_player())
+            }
+        },
+    );
     let Some(ids) = ids() else {
         skip_frame(true);
         return;

@@ -290,6 +290,96 @@ fn picture_fades_while_grading() {
     assert_eq!(picture_look(cracked, true), cracked);
 }
 
+fn refused_hurt_row_publishes_no_lane() {
+    use crate::model::hitbox::layout;
+    use crate::model::sites_hitbox::{damage_record, grader_usable};
+    use std::cell::{Cell, RefCell};
+
+    let refused = |site: &crate::model::sites::Site| site.name != "hurtbox_module";
+    let capture = grader_usable(&refused);
+    assert!(!capture, "hurtbox_module refusal must withhold fighter capture");
+
+    let accessors = [0x10000, 0x11000];
+    let damage = [0x70000, 0x72000];
+    let hit = [0x71000, 0x73000];
+    let mut memory = BTreeMap::new();
+    for i in 0..2 {
+        memory.insert(accessors[i] + damage_record::MODULE, damage[i] as u64);
+        memory.insert(accessors[i] + layout::HIT_MODULE, hit[i] as u64);
+    }
+    let identity = |lane| if lane == 0 { (P1_ID, true) } else { (CPU_ID, false) };
+
+    let lanes = Lanes::new();
+    lanes.set(0, Some(Lane { damage: 0x74000, hit: 0x75000, id: 1, attacks: true }));
+    lanes.set(1, Some(Lane { damage: 0x76000, hit: 0x77000, id: 2, attacks: false }));
+    let reads = RefCell::new(Vec::new());
+    let identity_calls = Cell::new(0);
+    publish_lanes(
+        &lanes,
+        true,
+        capture,
+        |at| {
+            reads.borrow_mut().push(at);
+            memory.get(&at).copied()
+        },
+        accessors,
+        |lane| {
+            identity_calls.set(identity_calls.get() + 1);
+            identity(lane)
+        },
+    );
+    assert!(reads.borrow().is_empty(), "hurtbox_module refused: no accessor reads");
+    assert_eq!(identity_calls.get(), 0, "hurtbox_module refused: no identity reads");
+    assert_eq!(lanes.get(0), None, "hurtbox_module refused: P1 lane must be empty");
+    assert_eq!(lanes.get(1), None, "hurtbox_module refused: CPU lane must be empty");
+
+    let admitted = grader_usable(|_| true);
+    assert!(admitted);
+    let reads = RefCell::new(Vec::new());
+    let identity_calls = Cell::new(0);
+    publish_lanes(
+        &lanes,
+        true,
+        admitted,
+        |at| {
+            reads.borrow_mut().push(at);
+            memory.get(&at).copied()
+        },
+        accessors,
+        |lane| {
+            identity_calls.set(identity_calls.get() + 1);
+            identity(lane)
+        },
+    );
+    assert_eq!(reads.borrow().len(), 4);
+    assert_eq!(identity_calls.get(), 2);
+    assert_eq!(lanes.get(0), Some(Lane { damage: damage[0], hit: hit[0], id: P1_ID, attacks: true }));
+    assert_eq!(lanes.get(1), Some(Lane { damage: damage[1], hit: hit[1], id: CPU_ID, attacks: false }));
+
+    lanes.set(0, Some(Lane { damage: 0x74000, hit: 0x75000, id: 1, attacks: true }));
+    lanes.set(1, Some(Lane { damage: 0x76000, hit: 0x77000, id: 2, attacks: false }));
+    let reads = RefCell::new(Vec::new());
+    let identity_calls = Cell::new(0);
+    publish_lanes(
+        &lanes,
+        false,
+        admitted,
+        |at| {
+            reads.borrow_mut().push(at);
+            memory.get(&at).copied()
+        },
+        accessors,
+        |lane| {
+            identity_calls.set(identity_calls.get() + 1);
+            identity(lane)
+        },
+    );
+    assert!(reads.borrow().is_empty(), "grader Off: no accessor reads");
+    assert_eq!(identity_calls.get(), 0);
+    assert_eq!(lanes.get(0), None);
+    assert_eq!(lanes.get(1), None);
+}
+
 #[test]
 fn case_table() {
     crate::test_table::run(&[
@@ -304,6 +394,7 @@ fn case_table() {
         ("ring_consumes_each_contact_once", ring_consumes_each_contact_once as fn()),
         ("target_zone_rings_radii", target_zone_rings_radii as fn()),
         ("picture_fades_while_grading", picture_fades_while_grading as fn()),
+        ("refused_hurt_row_publishes_no_lane", refused_hurt_row_publishes_no_lane as fn()),
     ]);
 }
 }
