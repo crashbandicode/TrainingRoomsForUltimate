@@ -178,26 +178,26 @@ fn grader_off_hook_reads_nothing() {
 fn ring_consumes_each_contact_once() {
     let ring = Ring::<8>::new();
     let contact = Contact { attacker: 4, receiver: 1, slot: 2, part: 3, pen: 1.0, radius: 4.0 };
-    ring.push(10, Kind::Fighter, contact);
-    ring.push(11, Kind::Target, contact);
+    ring.push(10, contact);
+    ring.push(11, contact);
     let mut got = Vec::new();
-    ring.drain(|epoch, kind, item| got.push((epoch, kind, item)));
+    ring.drain(|epoch, item| got.push((epoch, item)));
     assert_eq!(got.len(), 2);
-    ring.drain(|epoch, kind, item| got.push((epoch, kind, item)));
+    ring.drain(|epoch, item| got.push((epoch, item)));
     assert_eq!(got.len(), 2, "each pushed entry is yielded once");
 
     let overflow = Ring::<8>::new();
     for epoch in 0..9 {
-        overflow.push(epoch, Kind::Fighter, contact);
+        overflow.push(epoch, contact);
     }
     let mut epochs = Vec::new();
-    overflow.drain(|epoch, _, _| epochs.push(epoch));
+    overflow.drain(|epoch, _| epochs.push(epoch));
     assert_eq!(epochs, (1..9).collect::<Vec<_>>(), "overflow drops the oldest entry");
 
     let torn = Ring::<8>::new();
     torn.tear_for_test(0);
     let mut count = 0;
-    torn.drain(|_, _, _| count += 1);
+    torn.drain(|_, _| count += 1);
     assert_eq!(count, 0, "a torn slot is skipped");
 }
 
@@ -205,9 +205,9 @@ fn rings_take_first_accepted_per_ring() {
     let rings = Rings::new();
     let excellent = Contact { attacker: 1, receiver: 1, slot: 0, part: 0, pen: 1.0, radius: 4.0 };
     let ok = Contact { pen: 4.0, ..excellent };
-    rings.received[1].push(7, Kind::Fighter, excellent);
-    rings.received[1].push(7, Kind::Fighter, ok);
-    rings.targets.push(7, Kind::Target, ok);
+    rings.received[1].push(7, excellent);
+    rings.received[1].push(7, ok);
+    rings.targets.push(7, ok);
     let taken = rings.take(7);
     assert_eq!(taken.received, [None, Some(Grade::Excellent)]);
     assert_eq!(taken.target, Some(Grade::Ok));

@@ -17,7 +17,7 @@ use skyline::hooks::InlineCtx;
 
 use crate::model::frame_strip::ids::{Table, C};
 use crate::model::frame_strip::{Sample, Settings, Tracker};
-use crate::model::spacing::{Contact, Kind, Rings};
+use crate::model::spacing::{Contact, Rings};
 use crate::model::frame_strip_plan::{Changed, Look, Renderer};
 use crate::model::input_delay::{MappedInputs, Owners, Sticks};
 use crate::runtime::alloc::{HookId, HookScope};
@@ -199,11 +199,7 @@ pub fn target_grade(depth: f32) {
         return;
     }
     let radius = crate::model::eggs::RADIUS;
-    RINGS.targets.push(
-        EPOCH.load(Ordering::Relaxed),
-        Kind::Target,
-        Contact { attacker: 0, receiver: 0, slot: 0, part: 0, pen: depth * radius, radius },
-    );
+    RINGS.targets.push(EPOCH.load(Ordering::Relaxed), Contact { attacker: 0, receiver: 0, slot: 0, part: 0, pen: depth * radius, radius });
 }
 
 #[skyline::hook(offset = crate::model::sites_hitbox::SPACING_HIT_HANDLER_OFFSET, inline)]
@@ -221,7 +217,7 @@ unsafe fn spacing_hit(ctx: &mut InlineCtx) {
     };
     if let Some(contact) = crate::model::spacing::hook(live, read, module, entry, lanes) {
         if let Some(ring) = RINGS.received.get(usize::from(contact.receiver)) {
-            ring.push(EPOCH.load(Ordering::Relaxed), Kind::Fighter, contact);
+            ring.push(EPOCH.load(Ordering::Relaxed), contact);
         }
     }
 }
@@ -310,6 +306,14 @@ fn discard_frame() {
     EPOCH.fetch_add(1, Ordering::Relaxed);
 }
 
+fn skip_frame(discard: bool) {
+    LANES[0].store(0, Ordering::Relaxed);
+    LANES[1].store(0, Ordering::Relaxed);
+    if discard {
+        discard_frame();
+    }
+}
+
 /// One game frame, on P1's entry callback in Training or lobby practice (`cpu::fighter_frame`). `player` is P1's
 /// accessor; the primary CPU's comes from the live manager (`cpu::strip_cpu`).
 ///
@@ -318,8 +322,7 @@ fn discard_frame() {
 pub unsafe fn sample_frame(player: usize) {
     if !ENABLED.load(Ordering::Acquire) {
         GRADER_LIVE.store(false, Ordering::Relaxed);
-        LANES[0].store(0, Ordering::Relaxed);
-        LANES[1].store(0, Ordering::Relaxed);
+        skip_frame(false);
         return;
     }
     let settings = settings();
@@ -333,35 +336,25 @@ pub unsafe fn sample_frame(player: usize) {
     }
     let input_drill = crate::engine::rr_host::input_observation_wanted() || super::combo::input_observation_wanted();
     if player == 0 {
-        LANES[0].store(0, Ordering::Relaxed);
-        LANES[1].store(0, Ordering::Relaxed);
-        discard_frame();
+        skip_frame(true);
         return;
     }
     if !sampling && !input_drill {
-        LANES[0].store(0, Ordering::Relaxed);
-        LANES[1].store(0, Ordering::Relaxed);
-        discard_frame();
+        skip_frame(true);
         return;
     }
     if input_drill && published::input_owners().contains(Owners::MENU) {
-        LANES[0].store(0, Ordering::Relaxed);
-        LANES[1].store(0, Ordering::Relaxed);
-        discard_frame();
+        skip_frame(true);
         return;
     }
     if crate::runtime::features::states::is_loading() {
-        LANES[0].store(0, Ordering::Relaxed);
-        LANES[1].store(0, Ordering::Relaxed);
         CLEAR_DUE.store(true, Ordering::Relaxed);
-        discard_frame();
+        skip_frame(true);
         super::parry::reset();
         return;
     }
     let Some(cpu) = crate::runtime::features::cpu::strip_cpu(player) else {
-        LANES[0].store(0, Ordering::Relaxed);
-        LANES[1].store(0, Ordering::Relaxed);
-        discard_frame();
+        skip_frame(true);
         return;
     };
     if grader {
@@ -372,7 +365,7 @@ pub unsafe fn sample_frame(player: usize) {
         LANES[1].store(0, Ordering::Relaxed);
     }
     let Some(ids) = ids() else {
-        discard_frame();
+        skip_frame(true);
         return;
     };
     let cpu_accessor = cpu;

@@ -65,10 +65,30 @@ impl Contact {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Kind {
-    Fighter,
-    Target,
+fn pack(epoch: u32, contact: &Contact) -> [u64; 3] {
+    [
+        (u64::from(epoch) << 32) | u64::from(contact.attacker),
+        (u64::from(contact.pen.to_bits()) << 32)
+            | (u64::from(contact.receiver) << 24)
+            | (u64::from(contact.slot) << 16)
+            | (u64::from(contact.part) << 8),
+        u64::from(contact.radius.to_bits()),
+    ]
+}
+
+fn unpack(words: [u64; 3]) -> (u32, Contact) {
+    let [identity, fields, radius] = words;
+    (
+        (identity >> 32) as u32,
+        Contact {
+            attacker: identity as u32,
+            receiver: (fields >> 24) as u8,
+            slot: (fields >> 16) as u8,
+            part: (fields >> 8) as u8,
+            pen: f32::from_bits((fields >> 32) as u32),
+            radius: f32::from_bits(radius as u32),
+        },
+    )
 }
 
 struct Slot {
@@ -100,26 +120,17 @@ impl<const N: usize> Ring<N> {
         }
     }
 
-    pub fn push(&self, epoch: u32, kind: Kind, contact: Contact) {
+    pub fn push(&self, epoch: u32, contact: Contact) {
         let ticket = self.write.fetch_add(1, Ordering::Relaxed);
         let slot = &self.slots[ticket as usize % N];
         slot.sequence.store(ticket.wrapping_mul(2).wrapping_add(1), Ordering::Relaxed);
-        slot._words[0].store((u64::from(epoch) << 32) | u64::from(contact.attacker), Ordering::Relaxed);
-        let kind = match kind {
-            Kind::Fighter => 0,
-            Kind::Target => 1,
-        };
-        let fields = (kind << 56)
-            | (u64::from(contact.receiver) << 48)
-            | (u64::from(contact.slot) << 40)
-            | (u64::from(contact.part) << 32)
-            | u64::from(contact.pen.to_bits());
-        slot._words[1].store(fields, Ordering::Relaxed);
-        slot._words[2].store(u64::from(contact.radius.to_bits()), Ordering::Relaxed);
+        for (word, value) in slot._words.iter().zip(pack(epoch, &contact)) {
+            word.store(value, Ordering::Relaxed);
+        }
         slot.sequence.store(ticket.wrapping_mul(2).wrapping_add(2), Ordering::Release);
     }
 
-    pub fn drain(&self, mut f: impl FnMut(u32, Kind, Contact)) {
+    pub fn drain(&self, mut f: impl FnMut(u32, Contact)) {
         let end = self.write.load(Ordering::Acquire);
         let mut next = self.read.load(Ordering::Relaxed);
         if end.wrapping_sub(next) > N as u64 {
@@ -129,29 +140,10 @@ impl<const N: usize> Ring<N> {
             let slot = &self.slots[next as usize % N];
             let sequence = next.wrapping_mul(2).wrapping_add(2);
             if slot.sequence.load(Ordering::Acquire) == sequence {
-                let first = slot._words[0].load(Ordering::Relaxed);
-                let second = slot._words[1].load(Ordering::Relaxed);
-                let third = slot._words[2].load(Ordering::Relaxed);
+                let words = slot._words.each_ref().map(|word| word.load(Ordering::Relaxed));
                 if slot.sequence.load(Ordering::Acquire) == sequence {
-                    let kind = match second >> 56 {
-                        0 => Some(Kind::Fighter),
-                        1 => Some(Kind::Target),
-                        _ => None,
-                    };
-                    if let Some(kind) = kind {
-                        f(
-                            (first >> 32) as u32,
-                            kind,
-                            Contact {
-                                attacker: first as u32,
-                                receiver: (second >> 48) as u8,
-                                slot: (second >> 40) as u8,
-                                part: (second >> 32) as u8,
-                                pen: f32::from_bits(second as u32),
-                                radius: f32::from_bits(third as u32),
-                            },
-                        );
-                    }
+                    let (epoch, contact) = unpack(words);
+                    f(epoch, contact);
                 }
             }
             next = next.wrapping_add(1);
@@ -180,21 +172,21 @@ impl Rings {
     }
 
     pub fn take(&self, epoch: u32) -> Taken {
-        let mut taken = Taken { received: [None; 2], target: None };
-        for (lane, ring) in self.received.iter().enumerate() {
-            ring.drain(|found_epoch, kind, contact| {
-                if found_epoch == epoch && kind == Kind::Fighter && taken.received[lane].is_none() {
-                    taken.received[lane] = contact.grade();
-                }
-            });
+        Taken {
+            received: [first(&self.received[0], epoch), first(&self.received[1], epoch)],
+            target: first(&self.targets, epoch),
         }
-        self.targets.drain(|found_epoch, kind, contact| {
-            if found_epoch == epoch && kind == Kind::Target && taken.target.is_none() {
-                taken.target = contact.grade();
-            }
-        });
-        taken
     }
+}
+
+fn first(ring: &Ring<8>, epoch: u32) -> Option<Grade> {
+    let mut grade = None;
+    ring.drain(|found_epoch, contact| {
+        if grade.is_none() && found_epoch == epoch {
+            grade = contact.grade();
+        }
+    });
+    grade
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

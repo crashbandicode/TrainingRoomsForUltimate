@@ -705,6 +705,18 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         let bits = SHOWN.load(Ordering::Acquire);
         // A busy board keeps the last frame's panes: no target cap may overwrite a fighter's retained one.
         let target_hurts = targets[..orbs::targets_drawn(board.is_some(), hurt_on, n_targets)].iter();
+        let write_pill = |pill: orbs::Pill, used: &mut orbs::PaneUse, over: &mut usize, panes: &[usize; p::ORBS]| {
+            let Some((cap, band)) = used.take(pill.length > 0.0) else {
+                *over += 1;
+                return;
+            };
+            for (k, at) in pill.caps.into_iter().enumerate() {
+                unsafe { write_pane(panes[cap + k], at, [pill.size / 2.0, pill.size], pill.rot + 180.0 * k as f32, pill.color) };
+            }
+            if let Some(band) = band {
+                unsafe { write_pane(panes[p::CAPS + band], pill.band, [pill.length, pill.size], pill.rot, pill.color) };
+            }
+        };
         for orb in board
             .iter()
             .flat_map(|b| b.draw_slots_in_order(b.draw_slots(&hide)))
@@ -721,16 +733,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
                 write_pane(cache.panes[p::CAPS + band], pill.band, [pill.length, pill.size], pill.rot, pill.color);
                 continue;
             }
-            let Some((cap, band)) = used.take(pill.length > 0.0) else {
-                over += 1;
-                continue;
-            };
-            for (k, at) in pill.caps.into_iter().enumerate() {
-                write_pane(cache.panes[cap + k], at, [pill.size / 2.0, pill.size], pill.rot + 180.0 * k as f32, pill.color);
-            }
-            if let Some(band) = band {
-                write_pane(cache.panes[p::CAPS + band], pill.band, [pill.length, pill.size], pill.rot, pill.color);
-            }
+            write_pill(pill, &mut used, &mut over, &cache.panes);
         }
         if super::input_display::grader_live() {
             for (at, look) in own.iter().flatten().filter(|(_, look)| look.picture == crate::model::ui::panes::EggPicture::Whole) {
@@ -742,16 +745,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
                     zone.radius = radius;
                     zone.color = color;
                     let Some(pill) = plan(&zone, color) else { continue };
-                    let Some((cap, band)) = used.take(pill.length > 0.0) else {
-                        over += 1;
-                        continue;
-                    };
-                    for (k, at) in pill.caps.into_iter().enumerate() {
-                        write_pane(cache.panes[cap + k], at, [pill.size / 2.0, pill.size], pill.rot + 180.0 * k as f32, pill.color);
-                    }
-                    if let Some(band) = band {
-                        write_pane(cache.panes[p::CAPS + band], pill.band, [pill.length, pill.size], pill.rot, pill.color);
-                    }
+                    write_pill(pill, &mut used, &mut over, &cache.panes);
                 }
             }
         }
@@ -1339,7 +1333,7 @@ pub fn install(found: &[GuardOutcome; N], closure: bool) -> (bool, [Written; N])
         skyline::install_hook!(hitbox_area_wind_rad_hook);
         skyline::install_hook!(hitbox_area_wind_rad_arg9_hook);
         for (slot, site) in written.iter_mut().zip(&sites_hitbox::SITES) {
-            if sites_hitbox::HITBOX_HOOK_ROWS.contains(&site.name) {
+            if sites_hitbox::HOOK_ROWS[..7].contains(&site.name) {
                 *slot = Written::Far;
             }
         }

@@ -110,10 +110,6 @@ pub const AREA_WIND_RAD_ARG9_OFFSET: usize = 0x22a_8f30;
 /// All hook rows in this table.
 pub const HOOK_ROWS: [&str; 8] =
     ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound", "hitbox_area_wind", "hitbox_area_wind_arg10", "hitbox_area_wind_rad", "hitbox_area_wind_rad_arg9", "spacing_hit_handler"];
-/// Hooks installed by the hitbox visualizer's own closure; spacing capture is installed separately by Input Display.
-pub const HITBOX_HOOK_ROWS: [&str; 7] =
-    ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound", "hitbox_area_wind", "hitbox_area_wind_arg10", "hitbox_area_wind_rad", "hitbox_area_wind_rad_arg9"];
-
 pub const SPACING_HIT_HANDLER_OFFSET: usize = 0x402_d14;
 
 pub static SITES: [Site; 47] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));

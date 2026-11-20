@@ -564,14 +564,7 @@ impl Run {
     /// the ground of a run's first egg), its pills, whether it is in an aerial (`air`) and its kind (the session's best when the
     /// minute ends). The notice's length when its text changed (`write_notice`).
     pub fn step(&mut self, tick: bool, y: f32, hits: &[Hit], air: bool, kind: i32) -> Option<u16> {
-        self.step_with(tick, y, hits, |_| false, air, kind)
-    }
-
-    /// `step`, where `articles(spot)` also says whether one of Player 1's articles (projectiles, explosions, thrown items)
-    /// breaks the target there under this run's `Breaks on` (rc.15: they count in both practice games; SPEC V2.3 superseded,
-    /// docs/DECISIONS.md). A break by an article alone does not freeze the fighter (`melee`).
-    pub fn step_with(&mut self, tick: bool, y: f32, hits: &[Hit], mut articles: impl FnMut([f32; 2]) -> bool, air: bool, kind: i32) -> Option<u16> {
-        self.step_with_depth(tick, y, hits, |_| false, |spot| articles(spot).then_some(0.0), air, kind).0
+        self.step_with_depth(tick, y, hits, |_| false, |_| None, air, kind).0
     }
 
     /// `step_with`, returning the deepest melee or article hit when this pass breaks a target.
