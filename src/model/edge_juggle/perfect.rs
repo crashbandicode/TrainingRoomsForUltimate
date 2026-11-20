@@ -142,6 +142,41 @@ pub enum PlanInput {
     Velocity = 7,
 }
 
+#[cfg(test)]
+mod fly_jump_tests {
+    use super::{AirPhysics, NativeAir};
+
+    lib_unit_tests! {
+    #[test]
+    fn fly_aerial_jump_uses_the_next_native_launch_entry() {
+        let puff = AirPhysics::from_params(NativeAir {
+            air_speed_x_stable: 1.332,
+            air_accel_x_add: 0.05,
+            air_accel_x_mul: 0.08,
+            air_accel_y: 0.053,
+            air_speed_y_stable: 0.98,
+            jump_aerial_y: 20.0,
+        });
+        for (fighter, gravity, table) in [
+            (0xc, 0.053, &[1.65, 1.59, 1.47, 1.36, 1.25][..]),
+            (0x1d, 0.110, &[2.2, 2.1, 2.0, 1.88, 1.75][..]),
+            (0x1e, 0.081, &[2.0, 1.8, 1.6][..]),
+            (0x1f, 0.081, &[2.0, 1.8, 1.6][..]),
+        ] {
+            let air = AirPhysics { gravity, ..puff };
+            for (i, speed) in table.iter().enumerate() {
+                let next = air.with_fly_jump(fighter, Some((table.len() - i) as u8));
+                assert!((next.jump_speed - (speed - gravity)).abs() < 0.001);
+            }
+            for left in [None, Some(0), Some(9)] {
+                assert_eq!(air.with_fly_jump(fighter, left).jump_speed, air.jump_speed);
+            }
+        }
+        assert_eq!(puff.with_fly_jump(0, Some(1)).jump_speed, puff.jump_speed);
+    }
+    }
+}
+
 impl AirPhysics {
     pub fn plan_velocity(self, velocity: Option<(f32, f32)>) -> Result<Point, PlanInput> {
         if !self.valid() {
