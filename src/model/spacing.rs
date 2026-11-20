@@ -247,9 +247,6 @@ pub fn capture(read: impl Fn(usize) -> Option<u64>, module: usize, entry: usize,
         (read_pointer(&read, at)? == module).then_some(lane as u8)
     })?;
 
-    if read_u32(&read, entry.checked_add(0x20)?)? != 1 {
-        return None;
-    }
     let attacker = read_u32(&read, entry.checked_add(0x24)?)?;
     let slot = read_u8(&read, entry.checked_add(0x32)?)?;
     let part = read_u8(&read, entry.checked_add(0x33)?)?;

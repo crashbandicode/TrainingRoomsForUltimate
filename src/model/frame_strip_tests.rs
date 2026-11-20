@@ -29,7 +29,7 @@ struct ContactFixture {
     lanes: [usize; 2],
 }
 
-fn contact_fixture(receiver: usize, attacker: u32, kind: u32) -> ContactFixture {
+fn contact_fixture(receiver: usize, attacker: u32, entry_kind: u32) -> ContactFixture {
     use crate::model::hitbox::layout;
     use crate::model::sites_hitbox::{damage_record, hurt_shape};
 
@@ -53,7 +53,7 @@ fn contact_fixture(receiver: usize, attacker: u32, kind: u32) -> ContactFixture 
     };
     put_u32(&mut memory, hit_module + layout::HIT_PART_TOTAL, 2);
     memory.insert(parts + layout::HIT_PART_STRIDE + hurt_shape::SHAPE, shape as u64);
-    put_u32(&mut memory, entry + 0x20, kind);
+    put_u32(&mut memory, entry + 0x20, entry_kind);
     put_u32(&mut memory, entry + 0x24, attacker);
     put_u8(&mut memory, entry + 0x32, 2);
     put_u8(&mut memory, entry + 0x33, 1);
@@ -307,8 +307,18 @@ fn grade_tag_on_attacker_lane() {
     assert_eq!(tracker.tags().copied().collect::<Vec<_>>(), vec![Tag { frame: 2, lane: 0, grade: Grade::Good }]);
 }
 
+fn projectile_contact_is_captured() {
+    let contact = capture_contact(&contact_fixture(1, 0x1000_0000, 0x3a6)).unwrap();
+    let (_, taken) = receive(contact, 1);
+    let (p1, cpu) = samples(taken, false);
+    let mut tracker = Tracker::new();
+    tracker.step(idle(), idle(), NONE);
+    tracker.step(p1, cpu, NONE);
+    assert_eq!(tracker.tags().copied().collect::<Vec<_>>(), vec![Tag { frame: 2, lane: 0, grade: Grade::Good }]);
+}
+
 fn no_grade_on_shield() {
-    assert!(capture_contact(&contact_fixture(1, P1_ID, 2)).is_none(), "non-hurt contact kind");
+    // The hit handler is not called for a shield hit (Eden 2026-11-20).
     let contact = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
     let (_, taken) = receive(contact, 1);
     let (p1, mut cpu) = samples(taken, false);
@@ -547,6 +557,7 @@ fn case_table() {
         ("a_hit_past_the_damage_cap_is_labelled_by_the_records_damage", a_hit_past_the_damage_cap_is_labelled_by_the_records_damage as fn()),
         ("a_charged_hit_is_labelled_by_the_hitbox_that_dealt_it", a_charged_hit_is_labelled_by_the_hitbox_that_dealt_it as fn()),
         ("grade_tag_on_attacker_lane", grade_tag_on_attacker_lane as fn()),
+        ("projectile_contact_is_captured", projectile_contact_is_captured as fn()),
         ("no_grade_on_shield", no_grade_on_shield as fn()),
         ("p2_lane_graded_separately", p2_lane_graded_separately as fn()),
         ("simultaneous_hits_tag_both_lanes", simultaneous_hits_tag_both_lanes as fn()),

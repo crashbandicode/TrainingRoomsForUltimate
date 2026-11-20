@@ -147,8 +147,8 @@ fn capture_guards_suppress_only_grade() {
     f.memory.insert(f.damage, 0x21000);
     assert!(captured(&f).is_none(), "no matching lane");
     let mut f = fixture();
-    put_u32(&mut f.memory, f.entry + ENTRY_KIND, 2);
-    assert!(captured(&f).is_none(), "non-hurt kind");
+    put_u32(&mut f.memory, f.entry + ENTRY_KIND, 0x3a6);
+    assert!(captured(&f).is_some(), "projectile entry kind");
     let mut f = fixture();
     put_u32(&mut f.memory, f.hit_module + layout::HIT_PART_TOTAL, 1);
     assert!(captured(&f).is_none(), "part equals total");
