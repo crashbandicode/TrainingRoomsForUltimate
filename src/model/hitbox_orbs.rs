@@ -290,6 +290,14 @@ fn place_one(s: &Sphere, place: &mut impl FnMut(&Sphere) -> Option<[f32; 3]>) ->
     Some(orb)
 }
 
+/// rc.15 target-hurtbox-display: each live practice target's (BTT target, Eggs-ercise egg) break volume, the picture disc
+/// (`eggs::RADIUS`) that decides the break, as a hurtbox orb in the fighters' plane. Break animations and the cursor are not
+/// targets. How many were written.
+pub fn target_hurt_orbs(looks: &[Option<([f32; 2], super::panes::EggLook)>], out: &mut [Orb]) -> usize {
+    let _ = (looks, out);
+    0
+}
+
 /// `set`'s spheres as orbs on their bones (`place`) into `out`, then, while *Launch angles* is On (`lr`: the owner's facing), each
 /// hitbox's (and windbox's) marks (`legend::marks`) at its slot's angle (`angle(slot)`, `None` when the slot has no data). How many were written.
 pub fn place_orbs(set: &HandleSet, mut place: impl FnMut(&Sphere) -> Option<[f32; 3]>, lr: Option<f32>, mut angle: impl FnMut(i32) -> Option<i32>, out: &mut [Orb]) -> usize {

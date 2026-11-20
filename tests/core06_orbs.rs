@@ -530,6 +530,25 @@ fn a_hurtbox_without_a_valid_bone_scale_is_not_drawn() {
     }
 }
 
+/// rc.15 target-hurtbox-display: a live target's hurtbox is its break volume, the R = 4 picture disc at its spot, drawn as a
+/// hurtbox; break animations and the cursor get none.
+fn a_live_targets_hurtbox_is_its_picture_disc() {
+    use model::panes::{EggPicture, EGG_WHOLE};
+    let mut burst = EGG_WHOLE;
+    burst.scale = 1.6;
+    let mut cursor = EGG_WHOLE;
+    cursor.picture = EggPicture::Cursor;
+    let looks = [Some(([1.0, 2.0], EGG_WHOLE)), Some(([5.0, 6.0], burst)), None, Some(([3.0, 4.0], cursor)), Some(([-8.0, 9.0], EGG_WHOLE))];
+    let mut out = [Orb::NONE; 8];
+    let n = orbs::target_hurt_orbs(&looks, &mut out);
+    assert_eq!(n, 2);
+    for (orb, at) in out[..n].iter().zip([[1.0, 2.0, 0.0], [-8.0, 9.0, 0.0]]) {
+        assert_eq!((orb.centre, orb.tail, orb.radius, orb.kind()), (at, at, model::eggs::RADIUS, hitbox::KIND_HURT));
+        assert_eq!(orb.color, model::panes::linear(orbs::tint_colour(hitbox::HURTBOX_TINT, orbs::ORB_ALPHA)));
+    }
+    assert_eq!(orbs::target_hurt_orbs(&looks, &mut out[..1]), 1, "as many as fit");
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -550,6 +569,7 @@ fn case_table() {
         ("projected_orbs_map_onto_the_layout_canvas", projected_orbs_map_onto_the_layout_canvas as fn()),
         ("a_hurtbox_orb_is_its_size_at_the_bones_world_scale", a_hurtbox_orb_is_its_size_at_the_bones_world_scale as fn()),
         ("a_hurtbox_without_a_valid_bone_scale_is_not_drawn", a_hurtbox_without_a_valid_bone_scale_is_not_drawn as fn()),
+        ("a_live_targets_hurtbox_is_its_picture_disc", a_live_targets_hurtbox_is_its_picture_disc as fn()),
     ]);
 }
 
