@@ -86,6 +86,7 @@ struct Run {
     jump_timing: JumpTiming,
     last_cpu_status: i32,
     bounce: MeteorBounce,
+    sdi_start: Option<u32>,
     player_ledge: Option<usize>,
     placement: Placement,
     notice: FixedPath<128>,
@@ -241,6 +242,10 @@ pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Corr
         }
         return recovery_jump(run, accessor, position, buttons, stick_y);
     }
+    let correction = air_hit_recovery(run, p1, accessor, position, status);
+    if correction != Correction::default() {
+        return correction;
+    }
     let [left, right] = run.stage.ledges;
     if position[0] <= left[0] || position[0] >= right[0] {
         return Correction::default();
@@ -262,6 +267,50 @@ pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Corr
         stock_stick_y: stick_y,
         stock_buttons: buttons,
     }, run.landing_draw)
+}
+
+unsafe fn air_hit_recovery(run: &mut Run, p1: usize, cpu: usize, position: [f32; 2], status: i32) -> Correction {
+    use crate::model::cpu::{defence::{self, direction}, settings::Strength};
+    let hitlag = natives::tech_in_damage_stop(cpu) == Some(true);
+    let damage = [C::StatusDamage, C::StatusDamageFly, C::StatusDamageFlyRoll,
+        C::StatusDamageFlyMeteor, C::StatusDamageFlyReflectD, C::StatusDamageFlyReflectLr,
+        C::StatusDamageFlyReflectU, C::StatusDamageFall];
+    if !hitlag {
+        run.sdi_start = None;
+    }
+    if !hitlag && (status == UNRESOLVED || !damage.map(konst).contains(&status)) {
+        return Correction::default();
+    }
+    let air = konst(C::SituationAir);
+    if air == UNRESOLVED || natives::situation_kind(cpu) != air {
+        return Correction::default();
+    }
+    let (x, y) = super::recording_host::fighter_speed(cpu).unwrap_or_default();
+    let player = [natives::pos_x(p1), natives::pos_y(p1)];
+    let reaction = konst(C::WorkFloatDamageReactionFrames);
+    let frames = if reaction == UNRESOLVED { 0.0 } else { natives::get_float(cpu, reaction).max(0.0) };
+    if !hitlag && frames == 0.0 {
+        return Correction::default();
+    }
+    let Some([stick_x, stick_y]) = perfect::hit_recovery(position, player, [x, y], frames, run.stage.blast) else {
+        return Correction::default();
+    };
+    let mut dir = match [stick_x, stick_y] {
+        [_, 1.0] => direction::UP,
+        [_, -1.0] => direction::DOWN,
+        [1.0, _] => direction::RIGHT,
+        [-1.0, _] => direction::LEFT,
+        _ => direction::NEUTRAL,
+    };
+    if hitlag {
+        let frame = run.rounds.frames;
+        let since = *run.sdi_start.get_or_insert(frame);
+        if defence::sdi_period(Strength::High).is_some_and(|period| (frame - since) % period != 0) {
+            dir = direction::NEUTRAL;
+        }
+    }
+    let (x, y) = defence::stick_vector(dir, player[0], position[0]);
+    Correction { stick: Some([x, y]), ..Correction::default() }
 }
 
 unsafe fn landing_dodge(run: &mut Run, p1: usize, cpu: usize, buttons: u32) -> Correction {
@@ -761,6 +810,7 @@ pub unsafe fn frame(fighter: usize) {
             jump_timing: JumpTiming::default(),
             last_cpu_status: UNRESOLVED,
             bounce: MeteorBounce::default(),
+            sdi_start: None,
             player_ledge: None,
             placement: Placement::ResetResources,
             notice: FixedPath::new(),
@@ -882,6 +932,7 @@ pub unsafe fn frame(fighter: usize) {
             run.last_cpu_status = UNRESOLVED;
             run.bounce = MeteorBounce::default();
             run.threat = ThreatClock::default();
+            run.sdi_start = None;
             if held_cpu.take() == Some(body) {
                 state::set_sleep(cpu, false);
             }

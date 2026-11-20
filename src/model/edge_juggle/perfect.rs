@@ -404,6 +404,29 @@ impl MeteorBounce {
     }
 }
 
+/// Prefer the first projected blast boundary to any follow-up positioning.
+pub fn hit_recovery(
+    cpu: Point, player: Point, speed: Point, hitstun: f32, blast: [f32; 4],
+) -> Option<Point> {
+    if !cpu.into_iter().chain(player).chain(speed).chain(blast).chain([hitstun]).all(f32::is_finite)
+        || hitstun < 0.0
+    {
+        return None;
+    }
+    let [left, right, top, bottom] = blast;
+    let [vx, vy] = speed;
+    let crossing = |position: f32, speed: f32, low: f32, high: f32| {
+        if speed == 0.0 { f32::INFINITY }
+        else { (if speed > 0.0 { high - position } else { low - position }) / speed }
+    };
+    let x = crossing(cpu[0], vx, left, right);
+    let y = crossing(cpu[1], vy, bottom, top);
+    let away = if cpu[0] == player[0] { 0.0 } else { (cpu[0] - player[0]).signum() };
+    Some(if x <= y && x <= hitstun { [-vx.signum(), 0.0] }
+    else if y <= hitstun { [0.0, -vy.signum()] }
+    else { [away, 0.0] })
+}
+
 #[derive(Clone, Copy)]
 pub struct LandingFacts {
     pub cpu: Point,
