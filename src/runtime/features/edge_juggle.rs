@@ -209,6 +209,7 @@ pub fn publish(snapshot: &Snapshot) {
 }
 
 pub fn start(edit: bool) {
+    super::cpu_level::drill_started();
     P1_BUTTONS.store(0, Ordering::Release);
     RESTART.store(false, Ordering::Release);
     START.store(if edit { 2 } else { 1 }, Ordering::Release);
@@ -660,7 +661,7 @@ unsafe fn route_guide(
     air: AirPhysics,
     pos: [f32; 2],
     speed: [f32; 2],
-    special: Option<perfect::SpecialReach>,
+    special: [f32; 2],
     player_top: f32,
 ) -> Option<RecoveryGuide> {
     let [left, right] = run.stage.ledges;
@@ -682,8 +683,7 @@ unsafe fn route_guide(
     } else {
         air.jump_speed.powi(2) / (2.0 * air.gravity)
     };
-    let [special_horizontal, special_rise] =
-        special.map_or([0.0; 2], |reach| [reach.horizontal, reach.rise]);
+    let [special_horizontal, special_rise] = special;
     let facts = RouteFacts {
         position: pos,
         player,
@@ -822,7 +822,14 @@ unsafe fn recovery_pad(
         run.guide = None;
         if let Some(player_height) = run.player_height.take() {
             run.plan_pending = false;
-            run.guide = player_height.and_then(|top| route_guide(run, p1, cpu, physics, pos, speed, special, top));
+            let route_special = match recovery {
+                Some((_, false)) => Some([0.0; 2]),
+                Some((_, true)) => special.map(|reach| [reach.horizontal, reach.rise]),
+                None => None,
+            };
+            if let Some((top, reach)) = player_height.zip(route_special) {
+                run.guide = route_guide(run, p1, cpu, physics, pos, speed, reach, top);
+            }
         }
     }
     let attack = buttons & perfect::ATTACK != 0;
@@ -1314,7 +1321,8 @@ pub unsafe fn frame(fighter: usize) {
         return;
     };
     let cpu = body.accessor;
-    if !natives::is_operation_cpu(1)
+    if !super::cpu_level::drill_applied()
+        || !natives::is_operation_cpu(1)
         || OPEN.load(Ordering::Acquire)
         || states::is_loading()
         || recorder::recording_or_playback()

@@ -13,7 +13,8 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use crate::engine::seams::native_fields as field;
 use crate::model::cpu::level::{self as rules, CpuLevel, EntryRank, NoticeGate, SessionClock, Where};
-use crate::model::edge_juggle::{BehaviorLease, CpuBehavior};
+use crate::model::edge_juggle::{BehaviorLease, BehaviorPause, CpuBehavior};
+use crate::model::input_delay::Owners;
 use crate::model::hook_stats::{HookId, HookScope};
 use crate::runtime::game;
 
@@ -48,14 +49,14 @@ const ENTRY_RANK: usize = 0x37;
 /// The controller's AI and the AI's rank (`cpu_level.ai_set_rank`'s own loads).
 const CONTROLLER_AI: usize = 0x58;
 const AI_RANK: usize = 0xc0c;
-const AI_SET_BEHAVIOR: usize = 0x6b82b0;
-const AI_MANAGER: usize = 0x52b6fd8;
 const ENTRY_BEHAVIOR: usize = 0x35;
 const AI_BEHAVIOR: usize = 0xc08;
 const DRILL_BEHAVIOR_ROWS: &[&str] = &[
     "edge_juggle.ai_set_behavior",
     "edge_juggle.training_behavior_choice",
     "edge_juggle.training_behavior_write",
+    "edge_juggle.training_operation_apply",
+    "edge_juggle.training_operation_mirrors",
 ];
 /// About four seconds on the plate.
 const NOTICE_FRAMES: u16 = 240;
@@ -64,6 +65,7 @@ const NOTICE_FRAMES: u16 = 240;
 /// address with (the seam-gated natives' rule, as `cpu_pilot` and the Mii bridge keep theirs).
 static BASE: AtomicUsize = AtomicUsize::new(0);
 static DRILL_BEHAVIOR: AtomicBool = AtomicBool::new(false);
+static DRILL_APPLIED: AtomicBool = AtomicBool::new(false);
 
 pub(super) fn install_drill_behavior() -> bool {
     use crate::runtime::seams::seam_install::gate;
@@ -83,6 +85,8 @@ struct State {
     gate: NoticeGate,
     entries: [EntryRank; 8],
     drill_behavior: BehaviorLease,
+    drill_pause: BehaviorPause,
+    drill_panel: usize,
     /// The controller each entry's override belongs to: a new fighter starts with nothing to give back.
     owners: [usize; 8],
     #[cfg(feature = "diag")]
@@ -103,6 +107,8 @@ impl State {
             gate: NoticeGate::new(),
             entries: [EntryRank::new(); 8],
             drill_behavior: BehaviorLease::new(),
+            drill_pause: BehaviorPause::Idle,
+            drill_panel: 0,
             owners: [0; 8],
             #[cfg(feature = "diag")]
             seen: [-1; 8],
@@ -239,7 +245,7 @@ pub(crate) unsafe fn frame() {
     let Some(base) = base() else { return };
     let _scope = HookScope::enter_hook(HookId::CpuLevel);
     let level = crate::runtime::published::cpu_level();
-    let (mut place, menu_level) = place(base);
+    let (place, menu_level) = place(base);
     let drill = super::edge_juggle::running();
     let Some(mut state) = STATE.try_lock() else { return };
     // Diag build: each change of place (the waiting room to a match is `lobby -> elsewhere`: the step stops there).
@@ -256,6 +262,9 @@ pub(crate) unsafe fn frame() {
     if place == Where::Elsewhere {
         // The native Training panel is gone. Never carry its saved selection to another scene.
         state.drill_behavior = BehaviorLease::new();
+        state.drill_pause = BehaviorPause::Idle;
+        state.drill_panel = 0;
+        DRILL_APPLIED.store(false, Ordering::Release);
         state.forget_entries();
         return;
     }
@@ -284,20 +293,14 @@ pub(crate) unsafe fn frame() {
     if crate::runtime::roster::character_roster::busy() {
         return;
     }
-    let mut drill_rank = drill;
-    if matches!(place, Where::Training { .. }) && (drill || state.drill_behavior.held()) {
-        if super::states::is_loading() {
-            return;
-        }
-        let behavior = step_drill_behavior(base, &mut state.drill_behavior, drill);
-        drill_rank &= behavior == Some(CpuBehavior::LEVEL_NINE.menu);
-        if let Some(behavior) = behavior {
-            place = Where::Training { behavior };
-        }
-    }
+    let drill_rank = drill && drill_applied();
+    let pause_rank = (drill && !drill_rank) || (!drill && state.drill_behavior.held());
     let table = field::read_unchecked::<[i32; 8]>(base, RANK_TABLE);
     let entries = if place == Where::Lobby { rules::LOBBY_ENTRIES } else { 1..=7 };
     for entry in entries {
+        if entry == 1 && pause_rank {
+            continue;
+        }
         let slot = entry as usize;
         let fighter_entry = game::natives::fighter_entry(entry);
         let controller = if fighter_entry == 0 { None } else { field::child(fighter_entry, ENTRY_CONTROLLER) };
@@ -337,42 +340,80 @@ pub(crate) unsafe fn frame() {
     }
 }
 
-/// The current Training fighter frame owns the panel and the entry. Apply the
-/// stock type, panel and entry mirror together; pause-menu edits during a drill
-/// are replaced on its next fighter frame. Stop retains the pre-drill selection.
-unsafe fn step_drill_behavior(base: usize, lease: &mut BehaviorLease, running: bool) -> Option<u32> {
-    if !DRILL_BEHAVIOR.load(Ordering::Acquire) || !game::natives::is_operation_cpu(1) {
-        return None;
+pub(super) fn drill_applied() -> bool {
+    DRILL_APPLIED.load(Ordering::Acquire)
+}
+
+pub(super) fn drill_started() {
+    DRILL_APPLIED.store(false, Ordering::Release);
+}
+
+/// Stage only the native menu selection on P1's poll. If the controller type changes, request a
+/// normal pause/resume. The game's menu transaction applies its controller and operation flags.
+pub(super) fn poll_drill(quiet: bool) -> bool {
+    if !DRILL_BEHAVIOR.load(Ordering::Acquire) {
+        return false;
     }
-    field::child(base, AI_MANAGER)?;
-    let panel = training_panel(base)?;
+    let Some(base) = base() else { return false };
+    let Some(mut state) = STATE.try_lock() else { return false };
+    if !crate::runtime::scene::is_native_training() {
+        state.drill_behavior = BehaviorLease::new();
+        state.drill_pause = BehaviorPause::Idle;
+        state.drill_panel = 0;
+        DRILL_APPLIED.store(false, Ordering::Release);
+        return false;
+    }
+    let running = super::edge_juggle::running();
+    if !running && !state.drill_behavior.held() && state.drill_pause == BehaviorPause::Idle {
+        return false;
+    }
+    let owners = crate::runtime::published::input_owners();
+    if owners.bits() & !Owners::VANILLA_PAUSE.bits() != 0
+        || super::states::is_loading()
+        || crate::runtime::roster::character_roster::busy()
+    {
+        DRILL_APPLIED.store(false, Ordering::Release);
+        return false;
+    }
+    // SAFETY: the P1 controller poll in native Training owns the live panel and entry.
+    unsafe { step_drill_panel(base, &mut state, running, owners.contains(Owners::VANILLA_PAUSE), quiet) }
+}
+
+unsafe fn step_drill_panel(base: usize, state: &mut State, running: bool, paused: bool, quiet: bool) -> bool {
+    let Some(panel) = training_panel(base) else {
+        DRILL_APPLIED.store(false, Ordering::Release);
+        return false;
+    };
+    if state.drill_panel != panel {
+        state.drill_pause = BehaviorPause::Idle;
+        state.drill_panel = panel;
+    }
     let entry = game::natives::fighter_entry(1);
-    let controller = field::child(entry, ENTRY_CONTROLLER)?;
-    let ai = field::child(controller, CONTROLLER_AI)?;
+    let Some(ai) = field::child(entry, ENTRY_CONTROLLER).and_then(|c| field::child(c, CONTROLLER_AI)) else {
+        DRILL_APPLIED.store(false, Ordering::Release);
+        return false;
+    };
     let current = CpuBehavior {
         menu: field::read_unchecked(panel, PANEL_BEHAVIOR),
         level: field::read_unchecked(panel, PANEL_LEVEL),
-        control: field::read_unchecked(entry, ENTRY_BEHAVIOR),
     };
-    if current.menu > 8 || current.level > 8 || current.control > 0x27 {
-        return None;
+    if current.control_type().is_none() || current.level > 8 {
+        DRILL_APPLIED.store(false, Ordering::Release);
+        return false;
     }
-    let control = field::read_unchecked::<u8>(ai, AI_BEHAVIOR);
-    let desired = lease.step(running, true, panel, current).or_else(|| {
-        (running && control != CpuBehavior::LEVEL_NINE.control).then_some(CpuBehavior::LEVEL_NINE)
-    });
-    if let Some(desired) = desired {
-        if desired.control != control {
-            let set_behavior: extern "C" fn(usize, i32) = std::mem::transmute(base + AI_SET_BEHAVIOR);
-            set_behavior(controller, i32::from(desired.control));
+    let applied = current.applied(
+        field::read_unchecked(entry, ENTRY_BEHAVIOR),
+        field::read_unchecked(ai, AI_BEHAVIOR),
+        game::natives::is_operation_cpu(1),
+    );
+    let desired = state.drill_behavior.step(running, panel, current, applied);
+    let needs_stock = desired.is_some_and(|desired| !applied || desired.menu != current.menu);
+    if let Some(desired) = desired.filter(|_| paused || !needs_stock) {
+        if desired != current {
+            field::write_unchecked(panel, PANEL_LEVEL, desired.level);
+            field::write_unchecked(panel, PANEL_BEHAVIOR, desired.menu);
         }
-        field::write_unchecked(entry, ENTRY_BEHAVIOR, desired.control);
-        field::write_unchecked(panel, PANEL_BEHAVIOR, desired.menu);
-        field::write_unchecked(panel, PANEL_LEVEL, desired.level);
-        if field::read_unchecked::<u8>(ai, AI_BEHAVIOR) == desired.control {
-            return Some(desired.menu);
-        }
-        return None;
     }
-    Some(current.menu)
+    DRILL_APPLIED.store(running && !paused && !needs_stock, Ordering::Release);
+    state.drill_pause.pulse(needs_stock, paused, quiet)
 }

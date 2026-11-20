@@ -128,6 +128,14 @@ pub unsafe fn on_poll(controller: usize) {
         }
         *HIDDEN.lock() = Some((controller, kept));
     }
+    // Start/Stop can require the game's pause apply to switch the CPU operator. Only that native
+    // transaction writes operation flags. This pulse is a real Plus edge, after the TR chord stage.
+    if super::cpu_level::poll_drill(sample.held == 0 && sample.pressed == 0) {
+        for offset in [field::CURRENT_BUTTONS, field::JUST_DOWN] {
+            let at = (controller + offset) as *mut u32;
+            at.write_volatile(at.read_volatile() | chords::bit::PLUS);
+        }
+    }
 }
 
 /// The controller fields `on_poll` changed for the mapping call, to put back when it returns.

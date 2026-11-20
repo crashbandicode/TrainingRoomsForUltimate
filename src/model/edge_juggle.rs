@@ -111,23 +111,28 @@ pub fn reaction_rows(id: &str) -> Option<&'static DifficultyRows> {
         .find(|rows| rows.reaction == id)
 }
 
-/// Training's pause-menu selection and the CPU's corresponding native control.
+/// Training's pause-menu CPU selection. The native apply maps its menu value to a controller type.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CpuBehavior {
     pub menu: u32,
     pub level: u32,
-    pub control: u8,
 }
 
 impl CpuBehavior {
-    pub const LEVEL_NINE: Self = Self {
-        menu: 2,
-        level: 8,
-        control: 0,
-    };
+    pub const LEVEL_NINE: Self = Self { menu: 2, level: 8 };
+
+    pub fn control_type(self) -> Option<u8> {
+        [1, 1, 0, 2, 5, 3, 0x19, 0x1a, 0x24].get(self.menu as usize).copied()
+    }
+
+    pub fn applied(self, entry: u8, ai: u8, operation_cpu: bool) -> bool {
+        self.control_type().is_some_and(|control| {
+            control == entry && control == ai && operation_cpu == (control != 0x24)
+        })
+    }
 }
 
-/// Save the original selection once for the lifetime of its Training panel.
+/// Save the selection once. Retain it through Stop until the game applies the restored selection.
 #[derive(Default)]
 pub struct BehaviorLease(Option<(usize, CpuBehavior)>);
 
@@ -143,13 +148,10 @@ impl BehaviorLease {
     pub fn step(
         &mut self,
         running: bool,
-        safe: bool,
         panel: usize,
         current: CpuBehavior,
+        applied: bool,
     ) -> Option<CpuBehavior> {
-        if !safe {
-            return None;
-        }
         if self.0.is_some_and(|(owner, _)| owner != panel) {
             self.0 = None;
         }
@@ -157,9 +159,44 @@ impl BehaviorLease {
             self.0.get_or_insert((panel, current));
             CpuBehavior::LEVEL_NINE
         } else {
-            self.0.take()?.1
+            self.0?.1
         };
-        (desired != current).then_some(desired)
+        if desired != current || !applied {
+            return Some(desired);
+        }
+        if !running {
+            self.0 = None;
+        }
+        None
+    }
+}
+
+/// Drive the native pause/resume once when a behavior requires the stock apply.
+/// A pause opened by the player is never closed by the drill.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum BehaviorPause {
+    Idle,
+    Opening,
+    Closing,
+}
+
+impl BehaviorPause {
+    pub fn pulse(&mut self, needs_stock: bool, paused: bool, quiet: bool) -> bool {
+        match *self {
+            Self::Idle if needs_stock && !paused && quiet => {
+                *self = Self::Opening;
+                true
+            }
+            Self::Opening if paused && quiet => {
+                *self = Self::Closing;
+                true
+            }
+            Self::Closing if !paused => {
+                *self = Self::Idle;
+                false
+            }
+            _ => false,
+        }
     }
 }
 
@@ -538,37 +575,55 @@ mod tests {
 
     #[test]
     fn cpu_behavior_returns_to_its_saved_value_after_a_load() {
-        let original = CpuBehavior { menu: 0, level: 3, control: 1 };
-        let changed_in_pause = CpuBehavior { menu: 4, level: 3, control: 5 };
+        let original = CpuBehavior { menu: 0, level: 3 };
+        let changed_in_pause = CpuBehavior { menu: 4, level: 3 };
         let mut lease = BehaviorLease::new();
-        assert_eq!(lease.step(true, true, 1, original), Some(CpuBehavior::LEVEL_NINE));
-        assert_eq!(lease.step(true, true, 1, CpuBehavior::LEVEL_NINE), None);
-        assert_eq!(lease.step(true, true, 1, changed_in_pause), Some(CpuBehavior::LEVEL_NINE));
-        assert_eq!(lease.step(false, false, 1, CpuBehavior::LEVEL_NINE), None);
-        assert_eq!(lease.step(false, true, 1, CpuBehavior::LEVEL_NINE), Some(original));
-        assert_eq!(lease.step(false, true, 1, original), None);
+        assert_eq!(lease.step(true, 1, original, true), Some(CpuBehavior::LEVEL_NINE));
+        assert_eq!(lease.step(true, 1, CpuBehavior::LEVEL_NINE, true), None);
+        assert_eq!(lease.step(true, 1, changed_in_pause, true), Some(CpuBehavior::LEVEL_NINE));
+        assert_eq!(lease.step(false, 1, CpuBehavior::LEVEL_NINE, true), Some(original));
+        assert_eq!(lease.step(false, 1, original, true), None);
     }
 
     #[test]
     fn cpu_behavior_control_restore_waits_for_stock_apply() {
-        let control = CpuBehavior { menu: 8, level: 2, control: 0x24 };
+        let control = CpuBehavior { menu: 8, level: 2 };
+        let cpu = CpuBehavior::LEVEL_NINE;
         let mut lease = BehaviorLease::new();
-        assert_eq!(lease.step(true, true, 1, control), Some(CpuBehavior::LEVEL_NINE));
-        assert_eq!(lease.step(false, true, 1, CpuBehavior::LEVEL_NINE), Some(control));
+        assert!(control.applied(0x24, 0x24, false));
+        assert_eq!(lease.step(true, 1, control, true), Some(cpu));
+        assert_eq!(lease.step(true, 1, cpu, cpu.applied(0, 0, false)), Some(cpu));
+        assert_eq!(lease.step(true, 1, cpu, cpu.applied(0, 0, true)), None);
+        assert_eq!(lease.step(false, 1, cpu, true), Some(control));
         assert!(lease.held(), "the restore stays owned until stock acknowledges Control");
-        assert_eq!(lease.step(false, true, 1, control), None);
+        assert_eq!(lease.step(false, 1, control, control.applied(0x24, 0x24, true)), Some(control));
+        assert_eq!(lease.step(false, 1, control, control.applied(0x24, 0x24, false)), None);
         assert!(!lease.held());
     }
 
     #[test]
     fn cpu_behavior_does_not_write_the_old_settings_to_a_replaced_panel() {
-        let a = CpuBehavior { menu: 0, level: 2, control: 1 };
-        let b = CpuBehavior { menu: 5, level: 4, control: 3 };
+        let a = CpuBehavior { menu: 0, level: 2 };
+        let b = CpuBehavior { menu: 5, level: 4 };
         let mut lease = BehaviorLease::new();
-        assert_eq!(lease.step(true, true, 1, a), Some(CpuBehavior::LEVEL_NINE));
-        assert_eq!(lease.step(false, true, 2, b), None);
-        assert_eq!(lease.step(true, true, 2, b), Some(CpuBehavior::LEVEL_NINE));
-        assert_eq!(lease.step(false, true, 2, CpuBehavior::LEVEL_NINE), Some(b));
+        assert_eq!(lease.step(true, 1, a, true), Some(CpuBehavior::LEVEL_NINE));
+        assert_eq!(lease.step(false, 2, b, true), None);
+        assert_eq!(lease.step(true, 2, b, true), Some(CpuBehavior::LEVEL_NINE));
+        assert_eq!(lease.step(false, 2, CpuBehavior::LEVEL_NINE, true), Some(b));
+    }
+
+    #[test]
+    fn behavior_pause_pulses_once_per_edge_and_leaves_a_player_pause_open() {
+        let mut pause = BehaviorPause::Idle;
+        assert!(!pause.pulse(true, true, true));
+        assert!(!pause.pulse(true, false, false));
+        assert!(pause.pulse(true, false, true));
+        assert!(!pause.pulse(true, false, true));
+        assert!(!pause.pulse(true, true, false));
+        assert!(pause.pulse(false, true, true));
+        assert!(!pause.pulse(false, true, true));
+        assert!(!pause.pulse(false, false, true));
+        assert!(!pause.pulse(false, false, true));
     }
 
     #[test]
