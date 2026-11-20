@@ -776,6 +776,26 @@ mod tests {
     }
 
     #[test]
+    fn up_special_recovery_depends_on_horizontal_reach_and_height() {
+        let reach = SpecialReach { horizontal: 20., rise: 45. };
+        let ledge = [-80., 0.];
+        let from = [-95., -44.];
+        assert!(reach.reaches(from, ledge));
+        assert!(!reach.reaches([-101., -25.], ledge));
+        assert!(!reach.reaches([-90., -46.], ledge));
+        assert!(!SpecialReach { horizontal: f32::NAN, ..reach }.reaches(from, ledge));
+        assert_eq!(
+            reach.timed_input(from, [-94., -46.], ledge).press,
+            SPECIAL
+        );
+        assert_eq!(reach.timed_input(from, [-94., -43.], ledge), Correction::default());
+        assert_eq!(
+            reach.timed_input([-101., -30.], [-100., -32.], ledge),
+            Correction::default()
+        );
+    }
+
+    #[test]
     fn distance_airdodge_only_spends_the_last_resource_when_it_reaches() {
         let ledge = [-80., 0.];
         let from = [-104., -7.];
