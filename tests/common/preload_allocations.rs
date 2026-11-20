@@ -341,9 +341,9 @@ fn detached_teardown_streams_all_phases_and_refusals_without_allocations() {
             BodyRef { id: 10, kind: 6, cell: 0, activated: false, valid: mask & 1 != 0, registered: Some(0) },
             BodyRef { id: 11, kind: 0, cell: 1, activated: true, valid: mask & 2 != 0, registered: Some(6) },
         ];
-        let contexts = [ContextRef { ctx: 1, controller: 22, valid: mask & 4 != 0 },
-            ContextRef { ctx: 1, controller: 22, valid: true },
-            ContextRef { ctx: 2, controller: 33, valid: mask & 8 != 0 }];
+        let contexts = [ContextRef { ctx: 1, controller: 22, input_route: None, valid: mask & 4 != 0 },
+            ContextRef { ctx: 1, controller: 22, input_route: None, valid: true },
+            ContextRef { ctx: 2, controller: 33, input_route: None, valid: mask & 8 != 0 }];
         let groups = [DetachedView { owner: 0, bodies: &bodies, contexts: &contexts,
             dispatch: Some(DispatcherRef { arrays: [100, 101], valid: mask & 16 != 0 }),
             records: Some(RecordsRef { records: [200, 201, 202], valid: mask & 32 != 0, flags: 0, module: 0 }), held_kinds: &[7, 8, 7] },
@@ -351,6 +351,7 @@ fn detached_teardown_streams_all_phases_and_refusals_without_allocations() {
                 records: None, held_kinds: &[8, 9] }];
         let consumers = NativeConsumers { pad_routes: std::array::from_fn(|slot|
             Some(RouteRef { slot: slot as u8, controller: if slot % 2 == 0 { 22 } else { 33 } })),
+            input_holders: [0; PAD_SLOTS],
             nana_owner_plus_8: Some(22) };
         let borrowed = DetachedPlan { groups: &groups, consumers: &consumers };
         let owned: Vec<_> = groups.iter().map(|g| Bundle::Detached(DetachedGroup { owner: g.owner,
@@ -376,10 +377,10 @@ fn detached_teardown_streams_all_phases_and_refusals_without_allocations() {
 fn attached_teardown_keeps_alias_validation_and_route_order_without_allocations() {
     use crate::engine::swap::swap_model::lifecycle::*;
     let contexts = [
-        ContextRef { ctx: 1, controller: 11, valid: false },
-        ContextRef { ctx: 1, controller: 11, valid: true },
-        ContextRef { ctx: 2, controller: 22, valid: true },
-        ContextRef { ctx: 0, controller: 33, valid: true },
+        ContextRef { ctx: 1, controller: 11, input_route: None, valid: false },
+        ContextRef { ctx: 1, controller: 11, input_route: None, valid: true },
+        ContextRef { ctx: 2, controller: 22, input_route: None, valid: true },
+        ContextRef { ctx: 0, controller: 33, input_route: None, valid: true },
     ];
     let cells = [
         BodyRef { id: 1, kind: 6, cell: 1, activated: false, valid: true, registered: Some(0) },
@@ -388,6 +389,7 @@ fn attached_teardown_keeps_alias_validation_and_route_order_without_allocations(
     let consumers = NativeConsumers {
         pad_routes: std::array::from_fn(|i| Some(RouteRef { slot: i as u8,
             controller: if i == 0 { 11 } else if i == 1 { 33 } else { 22 } })),
+        input_holders: [0; PAD_SLOTS],
         nana_owner_plus_8: Some(22),
     };
     let measurement = AllocationCount::start();
