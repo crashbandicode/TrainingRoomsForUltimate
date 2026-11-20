@@ -311,7 +311,8 @@ pub fn crossing_margin(
     let hop = (air.jump_speed / air.gravity + down) * air.horizontal_speed;
     let under = if rise <= top - bottom { jumps } else { 0 };
     let [length, height] = special.map_or([0.0; 2], |reach| [reach.horizontal, reach.rise]);
-    let start = (foot + measured.rise).min(top);
+    // The crossing's entry waits for the foot to reach the corridor.
+    let start = (foot.min(top) + measured.rise).min(top);
     let mut best = None;
     for spent in 0..=under {
         for share in 0..=4u8 {

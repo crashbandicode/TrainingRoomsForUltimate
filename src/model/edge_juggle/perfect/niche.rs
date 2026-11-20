@@ -81,8 +81,9 @@ enum Intent {
     RayColumn,
 }
 
-/// Trace-measured side and down specials by row. Empty until NICHE-RESULTS.md has them.
-const MEASURED: &[(u8, Measured)] = &[];
+/// 3a29e6af fd-3: seven authored Skull Bashes return to Fall after
+/// 134.392 horizontal and −63.499 vertical units (first native 4329 → 4628).
+const MEASURED: &[(u8, Measured)] = &[(3, Measured { run: 134.0, rise: -63.5 })];
 
 pub struct Row {
     pub id: u8,
