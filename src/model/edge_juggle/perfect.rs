@@ -165,9 +165,9 @@ pub enum PlanInput {
 
 #[cfg(test)]
 mod fly_jump_tests {
+    lib_unit_tests! {
     use super::{AirPhysics, NativeAir};
 
-    lib_unit_tests! {
     #[test]
     fn fly_aerial_jump_uses_the_next_native_launch_entry() {
         let puff = AirPhysics::from_params(NativeAir {

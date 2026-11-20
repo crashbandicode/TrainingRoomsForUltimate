@@ -189,8 +189,9 @@ impl PuffFlight {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
-    use crate::model::edge_juggle::perfect::{RouteFacts, Segment};
+    use crate::model::edge_juggle::perfect::Segment;
 
     const LEFT: [f32; 2] = [-79.986, 0.0];
     const RIGHT: [f32; 2] = [79.989, 0.0];
@@ -225,7 +226,6 @@ mod tests {
         FlyState { position, velocity, remaining: 5, can_jump: true, frame: 0 }
     }
 
-    lib_unit_tests! {
     #[test]
     fn puff_requires_the_measured_region_and_all_five_jumps() {
         let start = live([-100.0, -28.0], [0.0; 2]);
