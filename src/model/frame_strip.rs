@@ -984,7 +984,7 @@ impl Settings {
     }
 
     pub const fn samples(self, parry: bool) -> bool {
-        self.on || parry
+        self.on || parry || self.grader
     }
 
     pub fn from_snapshot(snapshot: &super::settings::Snapshot) -> Self {

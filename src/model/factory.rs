@@ -270,4 +270,5 @@ pub static DEFS: [Def; COUNT] = [
     row!("juggle_attempts", Single, 3, [0]),
 
     row!("btt_projectiles", Single, 2, [1]),
+    row!("spacing_grader", Single, 2, [1]),
 ];

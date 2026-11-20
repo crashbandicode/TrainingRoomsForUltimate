@@ -64,7 +64,8 @@ pub fn sampling() -> bool {
         return false;
     }
     // rc.15 Parry practice: the strip shows while it runs, even with the Input Display row Off (operator Q2, 2026-11-17).
-    crate::model::frame_strip::strip_owns_advantage(true, settings().on || super::parry::on(), PANES.load(Ordering::Acquire))
+    let settings = settings();
+    crate::model::frame_strip::strip_owns_advantage(true, settings.samples(super::parry::on()), PANES.load(Ordering::Acquire))
 }
 
 /// P1's damage on the frame before (`f32` bits), for Parry practice's body-hit test.
@@ -172,13 +173,20 @@ pub fn set_fighter_read(on: bool) {
     KIND_ON.store(on, Ordering::Release);
 }
 
+unsafe fn lane_player() -> bool {
+    if !KIND_ON.load(Ordering::Acquire) {
+        return false;
+    }
+    !natives::is_operation_cpu(i32::from(crate::runtime::features::cpu::primary_entry_now()))
+}
+
 /// Boot: every optional spacing-grader row passed its guard.
 pub fn set_grader_read(on: bool) {
     GRADE_ON.store(on, Ordering::Release);
 }
 
 pub fn target_grade(grade: Grade) {
-    if !GRADE_ON.load(Ordering::Acquire) || !settings().grader {
+    if !settings().grader {
         return;
     }
     let code = match grade {
@@ -259,6 +267,7 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool, grader: bo
     let launched = if spots || grader { natives::damage_reaction(accessor) } else { 0.0 };
     let struck = if launched > 0.0 { struck(accessor) } else { None };
     let contact = if grader && launched > 0.0 { contact(accessor) } else { None };
+    let player = !p1 && grader && lane_player();
     Sample {
         stop: natives::is_stop(accessor),
         hitstun,
@@ -277,7 +286,7 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool, grader: bo
         reaction,
         shielding: ids.shielding(status),
         contact,
-        player: false,
+        player,
         status,
         motion_frame: natives::motion_frame(accessor),
         facing: if lr < 0.0 { -1 } else { 1 },
