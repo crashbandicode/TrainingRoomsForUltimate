@@ -48,6 +48,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn recovery_jump_can_wait_only_with_enough_horizontal_and_vertical_reach() {
+        let air = AirPhysics {
+            horizontal_speed: 2.0,
+            horizontal_acceleration: 0.15,
+            gravity: 0.12,
+            terminal_speed: 2.1,
+            jump_speed: 3.5,
+        };
+        let position = [-95., -14.];
+        let velocity = [0., -1.4];
+        let ledge = [-70., 0.];
+        assert!(air.reaches_with_jump(position, velocity, ledge, 4, -95.));
+        assert!(!air.reaches_with_jump(position, velocity, ledge, 30, -95.));
+        assert!(!air.reaches_with_jump(position, velocity, [40., 0.], 0, -95.));
+        assert!(!air.reaches_with_jump([-95., -94.], velocity, ledge, 1, -95.));
+    }
+
+    #[test]
     fn opposite_ledge_requires_a_full_corridor_above_the_blast_zone() {
         let ledges = [[-70., 0.], [70., 0.]];
         let fd = [
