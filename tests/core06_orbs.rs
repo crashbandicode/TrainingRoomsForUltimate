@@ -511,10 +511,12 @@ fn a_hurtbox_orb_is_its_size_at_the_bones_world_scale() {
     assert!((out[0].radius - 5.0).abs() < 1e-4, "a hitbox orb keeps its size: {}", out[0].radius);
 }
 
+type Place = fn(&Sphere) -> Option<[f32; 3]>;
+
 /// rc.15 target-hurtbox-size review: when the bone's scale can't be sampled (the unit offset doesn't place, or places
 /// on the centre or at a non-finite point) the hurtbox orb is left out that frame rather than drawn at the unscaled size.
 fn a_hurtbox_without_a_valid_bone_scale_is_not_drawn() {
-    let samples: [fn(&Sphere) -> Option<[f32; 3]>; 3] = [
+    let samples: [Place; 3] = [
         |s| (s.pos[0] == 2.0).then_some([10.0, 6.0, 0.0]),
         |_| Some([10.0, 6.0, 0.0]),
         |s| Some(if s.pos[0] == 2.0 { [10.0, 6.0, 0.0] } else { [f32::NAN, 6.0, 0.0] }),
