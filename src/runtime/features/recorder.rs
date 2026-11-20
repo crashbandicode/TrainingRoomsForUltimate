@@ -307,6 +307,7 @@ unsafe fn on_ai_frame(ai: usize) {
     if ((body.entry_ptr + ENTRY_CONTROLLER_FIELD) as *const usize).read() != controller {
         return;
     }
+    crate::runtime::bridge_state::note_ai_think(body.entry_id);
     let buttons = ((controller + CTRL_BUTTONS) as *const u32).read();
     if let Some(hold) = super::btt_camera::placement_pad(buttons) {
         write_controller(controller, Inject { buttons: (buttons & !hold.release) | hold.press, ..Inject::NEUTRAL });

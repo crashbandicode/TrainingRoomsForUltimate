@@ -112,6 +112,7 @@ fn record(s: &mut State, a: Attempt, fighter: Option<i32>) {
 /// One P1 game frame, after the strip stepped (`now`: the strip's frame number): `armed` is computed here from the CPU's
 /// parry pass.
 pub fn step(mut frame: Frame, fighter: Option<i32>, now: u32) {
+    let capture = crate::runtime::bridge_state::PracticeCapture::of(PracticeGame::Parry);
     let Some(mut s) = STATE.try_lock() else { return };
     let generation = SET_GENERATION.load(Ordering::Acquire);
     let fresh = s.set_generation != generation;
@@ -138,4 +139,7 @@ pub fn step(mut frame: Frame, fighter: Option<i32>, now: u32) {
     let _ = write!(line, "streak {}, perfect {}/{}", s.summary.streak, s.perfect, s.total);
     (s.view.set, s.view.set_line) = (set, line);
     VIEW.publish((generation, Some(s.view)));
+    capture.submit(|| {
+        s.detector.practice_fields(now, frame.armed, s.view.last[0], s.summary, s.total, s.perfect)
+    });
 }

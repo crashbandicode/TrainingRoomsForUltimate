@@ -59,6 +59,31 @@ impl Detector {
         self.pending.is_some()
     }
 
+    pub fn practice_fields(
+        &self,
+        now: u32,
+        armed: bool,
+        last: Option<Attempt>,
+        summary: super::tech::session::Summary,
+        total: u32,
+        perfect: u32,
+    ) -> super::practice_state::Fields {
+        use super::practice_state::Fields;
+        let phase = if self.busy() { "pending" } else if last.is_some_and(|a| now.saturating_sub(a.hit) <= BOUND) {
+            "result"
+        } else if armed { "armed" } else { "waiting" };
+        Fields {
+            phase,
+            score: Some(perfect),
+            attempt_frames: self.pending.map(|(hit, _)| now.saturating_sub(hit)),
+            attempts: Some(total),
+            streak: Some(summary.streak),
+            best: Some(summary.best),
+            last_outcome: last.map_or("", |a| a.grade.practice_name()),
+            ..Fields::default()
+        }
+    }
+
     /// One game frame, `now` being the strip's own frame number for it (`Tracker::newest`), so the window and the hit
     /// are drawn on the strip's frames (tr-review-astra-2, finding 2). At most two attempts end on one frame: an open
     /// late attempt cut by the next hit, and that hit.
@@ -120,3 +145,25 @@ impl View {
 #[cfg(test)]
 #[path = "parry_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod practice_fields_tests {
+    lib_unit_tests! {
+    use super::*;
+
+    #[test]
+    fn parry_practice_fields_publish_a_pending_hit_and_its_grade() {
+        let mut detector = Detector::new();
+        let mut summary = super::super::tech::session::Summary::default();
+        let hit = Frame { armed: true, stop: true, guard_damage: true, just_shield: Some(false), shield_held: true, ..Frame::default() };
+        detector.step(&hit, 10);
+        let pending = detector.practice_fields(12, true, None, summary, 0, 0);
+        assert_eq!((pending.phase, pending.attempt_frames), ("pending", Some(2)));
+        let [result, _] = detector.step(&Frame::default(), 13);
+        let result = result.unwrap();
+        summary.record(result.grade);
+        let graded = detector.practice_fields(13, true, Some(result), summary, 1, 0);
+        assert_eq!((graded.phase, graded.last_outcome, graded.attempts), ("result", "late", Some(1)));
+    }
+    }
+}

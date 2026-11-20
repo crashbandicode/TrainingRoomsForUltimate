@@ -17,6 +17,7 @@ use crate::model::tech::{
     discovery::Bootstrap,
     picker::{self, Pick, Picker},
     planner,
+    practice_state::{self as state, View as StateView},
     session::{Bests, Length, Phase},
     solver,
     surface::{Kind, MaterialDraws, MaterialHint, RememberedSpot, StageEpoch, Surfaces, Walk},
@@ -520,6 +521,39 @@ fn rebuild(run: &mut Practice, view: &mut ViewState) {
     notice(run, Some("Finding stage surfaces…"));
 }
 
+/// Update and sample on the same game thread with the caller's VIEW borrow.
+fn with_practice_frame(
+    view: &mut ViewState,
+    open: bool,
+    update: impl FnOnce(&mut Option<Practice>, &mut ViewState),
+) {
+    let capture = crate::runtime::bridge_state::PracticeCapture::of(Game::Tech);
+    LIVE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        update(&mut slot, view);
+        if let Some(run) = slot.as_ref() {
+            capture.submit(|| {
+                let phase = if view.cancelled {
+                    StateView::Cancelled
+                } else if open {
+                    StateView::Paused
+                } else if run.recovery_error.is_some() || run.discovery_failed || run.planning_failed {
+                    StateView::Failed
+                } else if view.surfaces.state != Walk::Closed || !run.scan_done {
+                    StateView::Discovering
+                } else if let Some(wizard) = view.wizard.as_ref().filter(|_| wizard_active()) {
+                    StateView::Wizard(wizard, view.preview_blocked)
+                } else if placing() {
+                    StateView::Placing(&view.picker)
+                } else {
+                    StateView::Session
+                };
+                state::project_tech_state(&run.controller.session, phase)
+            });
+        }
+    });
+}
+
 /// P1 post-native pass. The caller supplies the live fighter; no pointer survives
 /// this call. Ice Climbers' secondary body is excluded by the native partner id.
 pub unsafe fn frame(fighter: usize) {
@@ -583,8 +617,7 @@ pub unsafe fn frame(fighter: usize) {
     let open = OPEN.load(Ordering::Acquire);
     // The running session's camera (latched at its Start, like every other setting), the published one before a run.
     let mut camera = config.camera;
-    LIVE.with(|cell| {
-        let mut slot = cell.borrow_mut();
+    with_practice_frame(&mut view, open, |slot, view| {
         if stop {
             RESET.store(false, Ordering::Release);
             view.start = false;
@@ -879,7 +912,7 @@ pub unsafe fn frame(fighter: usize) {
                                 return None;
                             }
                             let multiplier = super::tech_hitlag::live_multiplier(at).ok()?;
-                            let context = plan_context(&view, spot, draft, at, multiplier)?;
+                            let context = plan_context(view, spot, draft, at, multiplier)?;
                             let params = context.params;
                             let blocked = planner::plan(draft, context, &mut |_| 0).is_none();
                             let mut draws = MaterialDraws::default();
@@ -1005,7 +1038,7 @@ pub unsafe fn frame(fighter: usize) {
                         .selected
                         .is_some_and(|s| !s.current(&mut source))
                     {
-                        rebuild(run, &mut view);
+                        rebuild(run, view);
                         return;
                     }
                     view.picker.selected
@@ -1027,12 +1060,12 @@ pub unsafe fn frame(fighter: usize) {
                     if run.config.surface == 4 {
                         notice(run, Some("Choose a stage surface"));
                     } else {
-                        rebuild(run, &mut view);
+                        rebuild(run, view);
                     }
                     return;
                 };
                 view.picker.selected = Some(spot);
-                let Some(context) = plan_context(&view, spot, run.config, at, multiplier) else {
+                let Some(context) = plan_context(view, spot, run.config, at, multiplier) else {
                     return;
                 };
                 let result = planner::plan(run.config, context, &mut |n| draw(&mut run.rng, n));
@@ -1057,7 +1090,7 @@ pub unsafe fn frame(fighter: usize) {
                 setup.launch.hit_damage = base;
                 setup.launch.percent = percent + base * multiplier;
                 if !spot.current(&mut source) {
-                    rebuild(run, &mut view);
+                    rebuild(run, view);
                     return;
                 }
                 let start_hint = if let StartHint::Pending(mut draws) = run.start_hint {

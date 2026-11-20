@@ -657,6 +657,37 @@ impl Run {
         self.rows[3] == CPU && self.armed()
     }
 
+    /// Game-side fields shared with the optional hardware bridge.
+    pub fn practice_fields(&self) -> super::practice_state::Fields {
+        use super::practice_state::Fields;
+        let mode = self.rows[0];
+        let done = self.ended();
+        let phase = if !self.running() { "off" } else if done { "result" } else if self.pending { "setup" } else { "live" };
+        let best = match mode {
+            TIMED => Some(self.best[128][0]),
+            TEN | TWENTY => {
+                let best = self.best[128][usize::from(mode - TIMED)];
+                (best != 0).then_some(!best)
+            }
+            _ => None,
+        };
+        Fields {
+            phase,
+            step: if self.cpu_target() { "cpu_target" } else { "disc_target" },
+            score: Some(self.score),
+            attempt_frames: match mode {
+                TIMED => Some(RUN_FRAMES.saturating_sub(self.frames)),
+                TEN | TWENTY => Some(self.frames),
+                _ => None,
+            },
+            remaining_frames: (mode == TIMED).then_some(self.frames),
+            best,
+            target_count: (self.goal() > 0).then(|| self.goal()),
+            last_outcome: if done { if mode == TIMED { "time" } else { "complete" } } else { "" },
+            ..Fields::default()
+        }
+    }
+
     pub fn ended(&self) -> bool {
         match self.rows[0] {
             TIMED => self.frames == 0,
@@ -1271,6 +1302,25 @@ mod standing_notice_tests {
         run.step(true, 0.0, &[], false, 0);
         assert!(run.egg_at().is_some(), "stage bounds suffice while the visible projection is changing");
         assert_eq!(run.frames, RUN_FRAMES - 1);
+    }
+
+    #[test]
+    fn eggs_practice_fields_follow_timed_and_target_hud() {
+        let mut run = Run::IDLE;
+        run.rows[0] = TIMED;
+        run.frames = 120;
+        run.score = 4;
+        assert_eq!(run.practice_fields().remaining_frames, Some(120));
+        assert_eq!(run.practice_fields().score, Some(4));
+        run.frames = 0;
+        assert_eq!(run.practice_fields().last_outcome, "time");
+        run.rows[0] = TEN;
+        run.frames = 210;
+        run.score = 10;
+        run.best[128][usize::from(TEN - TIMED)] = !200;
+        let state = run.practice_fields();
+        assert_eq!((state.phase, state.target_count, state.attempt_frames, state.best),
+            ("result", Some(10), Some(210), Some(200)));
     }
 
     fn scored_cpu(score: u32) -> Run {

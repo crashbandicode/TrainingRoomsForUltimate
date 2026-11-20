@@ -190,6 +190,7 @@ pub fn eggs_reset() {
 /// ahead of the visualizer's Off return, so it does not depend on Hitbox Visualization. Off, no run, an ended run and every
 /// other fighter make no game call.
 unsafe fn eggs_pass(fighter: usize) -> Option<()> {
+    let capture = crate::runtime::bridge_state::PracticeCapture::of(Game::Eggs);
     let seed = EGG_START.swap(false, Ordering::AcqRel).then(seed);
     let bytes = EGG_LIVE.load(Ordering::Acquire).to_le_bytes();
     let mut rows = [bytes[0], bytes[1], bytes[2], bytes[3], eggs::IN_VIEW];
@@ -345,6 +346,7 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     if let Some(frames) = broke.then(scene::facts).and_then(eggs::hitlag) {
         let _ = natives::set_hit_stop_frame(at, frames, false);
     }
+    capture.submit(|| run.practice_fields());
     let streak_changed = core::mem::take(cpu_streak_dirty) || streak.counts() != before;
     let length = length.or_else(|| streak_changed.then_some(u16::MAX))?;
     let mut text = crate::model::storage::FixedPath::<96>::new();

@@ -206,6 +206,7 @@ unsafe fn pass(at: usize, top: [f32; 3], hits: &[eggs::Hit], mut hit: impl FnMut
         return 0;
     }
     let on = on();
+    let capture = crate::runtime::bridge_state::PracticeCapture::of(Game::Btt);
     let start = START.swap(false, Ordering::AcqRel);
     let place = start && PLACE.swap(false, Ordering::AcqRel);
     let owners = published::input_owners();
@@ -275,6 +276,9 @@ unsafe fn pass(at: usize, top: [f32; 3], hits: &[eggs::Hit], mut hit: impl FnMut
     }
     let phase = mode.phase();
     PHASE.store(phase as u8, Ordering::Release);
+    if on {
+        capture.submit(|| mode.practice_fields());
+    }
     if let Some(text) = mode.notice() {
         HUD.publish(text);
         // For the Eden rows: a line per change, and while Running (its clock changes every frame) every tenth, or on a break.

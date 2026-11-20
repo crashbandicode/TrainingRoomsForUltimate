@@ -1,4 +1,5 @@
 //! Shared attempt clock and scoring for Guard the Edge and Juggler (DESIGN v2).
+use crate::model::practice_state::Fields;
 use super::practice_games::{record_max, record_time, result_tick, Game};
 
 #[path = "edge_juggle/perfect.rs"]
@@ -227,6 +228,22 @@ pub enum Outcome {
     Landed,
     GrabbedLedge,
     KnockedOut,
+}
+
+impl Outcome {
+    const fn bridge_name(self) -> &'static str {
+        match self {
+            Self::ZoomWin => "zoom_win",
+            Self::ZoomMiss => "zoom_miss",
+            Self::Secured => "secured",
+            Self::RecoveredAtLedge => "recovered_at_ledge",
+            Self::RecoveredOnStage => "recovered_on_stage",
+            Self::Unresolved => "unresolved",
+            Self::Landed => "landed",
+            Self::GrabbedLedge => "grabbed_ledge",
+            Self::KnockedOut => "knocked_out",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -562,6 +579,61 @@ impl Session {
         Some((self.attempts, code))
     }
 
+    /// Projects the same attempt state that drives the drill HUD onto the bridge.
+    pub fn practice_fields(&self, wizard: Option<Wizard>, best: Option<u32>) -> Fields {
+        if let Some(wizard) = wizard {
+            let (step, selection, point, player, value) = match wizard.step {
+                WizardStep::Area => (
+                    "area",
+                    wizard.setup.area.bridge_name(),
+                    Some(wizard.setup.cpu),
+                    None,
+                    None,
+                ),
+                WizardStep::Cpu => ("cpu", "", Some(wizard.setup.cpu), None, None),
+                WizardStep::Percent => ("percent", "", None, None, Some(u32::from(wizard.setup.percent))),
+                WizardStep::Player => ("player", "", Some(wizard.setup.p1), None, None),
+                WizardStep::Preview => (
+                    "preview",
+                    "",
+                    Some(wizard.setup.cpu),
+                    Some(wizard.setup.p1),
+                    Some(u32::from(wizard.setup.percent)),
+                ),
+            };
+            return Fields {
+                phase: "wizard",
+                wizard_step: step,
+                wizard_selection: selection,
+                wizard_point: point,
+                wizard_player_point: player,
+                wizard_value: value,
+                ..Fields::default()
+            };
+        }
+
+        let (phase, remaining_frames, last_outcome) = match self.phase {
+            Phase::Place => ("place", None, ""),
+            Phase::Ready(left) => ("ready", Some(u32::from(left)), ""),
+            Phase::Live => ("live", None, ""),
+            Phase::Result(outcome, left) => ("result", Some(u32::from(left)), outcome.bridge_name()),
+            Phase::Done => ("done", None, ""),
+        };
+        let edge = self.drill == Drill::GuardEdge;
+        Fields {
+            phase,
+            attempt_frames: Some(self.frames),
+            remaining_frames,
+            score: edge.then_some(u32::from(self.secured)),
+            streak: edge.then_some(u32::from(self.streak)),
+            best,
+            attempts: Some(u32::from(self.attempts)),
+            hits: (!edge).then_some(u32::from(self.hits)),
+            last_outcome,
+            ..Fields::default()
+        }
+    }
+
     pub fn record_result<K: Copy + Eq, const N: usize>(
         &self,
         bests: &mut [Option<(K, u32)>; N],
@@ -600,6 +672,15 @@ impl Area {
 
     pub fn step(self, delta: i32) -> Self {
         Self::ALL[(self as i32 + delta).rem_euclid(4) as usize]
+    }
+
+    const fn bridge_name(self) -> &'static str {
+        match self {
+            Self::LowerLeft => "lower_left",
+            Self::LowerRight => "lower_right",
+            Self::UpperLeft => "upper_left",
+            Self::UpperRight => "upper_right",
+        }
     }
 
     pub const fn title(self) -> &'static str {
@@ -1132,6 +1213,81 @@ mod tests {
             assert_eq!(native_max - Drill::GuardEdge.placed_jump_count(), reference_reserve);
         }
         assert_eq!(Drill::Juggler.placed_jump_count(), 0);
+    }
+
+    #[test]
+    fn guard_edge_publishes_wizard_and_scored_attempt() {
+        let stage = Stage::new(
+            [-160.0, 150.0, 110.0, -85.0],
+            [-160.0, 150.0, 110.0, -85.0],
+            [[-60.0, 5.0], [80.0, 8.0]],
+        ).unwrap();
+        let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 7.0], 100, (0, 0), None).unwrap();
+        let mut session = Session::new(Drill::GuardEdge, Some(1));
+        wizard.change_area(stage, 1);
+        let fields = session.practice_fields(Some(wizard), None);
+        assert_eq!((fields.phase, fields.wizard_step, fields.wizard_selection), ("wizard", "area", "lower_right"));
+        assert_eq!(fields.wizard_point, Some(wizard.setup.cpu));
+        let mut wire = String::new();
+        crate::model::practice_state::snapshot(Some(Drill::GuardEdge.game()), fields, [0; 8], &mut wire);
+        assert!(wire.contains("phase=wizard\nwizard.step=area\nwizard.selection=lower_right\n"));
+
+        assert_eq!(session.practice_fields(None, None).phase, "place");
+        session.placed();
+        let ready = session.practice_fields(None, None);
+        assert_eq!((ready.phase, ready.remaining_frames), ("ready", Some(u32::from(Drill::GuardEdge.ready_frames()))));
+        for _ in 0..Drill::GuardEdge.ready_frames() {
+            session.advance_attempt(Observation::default());
+        }
+        let live = session.practice_fields(None, None);
+        assert_eq!((live.phase, live.attempt_frames), ("live", Some(0)));
+        session.advance_attempt(Observation { dead_or_rebirthing: true, ..Observation::default() });
+        let result = session.practice_fields(None, Some(1));
+        assert_eq!((result.phase, result.last_outcome), ("result", "secured"));
+        assert_eq!((result.attempt_frames, result.score, result.attempts), (Some(1), Some(1), Some(1)));
+        assert_eq!((result.streak, result.best), (Some(1), Some(1)));
+        crate::model::practice_state::snapshot(Some(Drill::GuardEdge.game()), result, [0; 8], &mut wire);
+        for line in ["game=guard_edge", "phase=result", "last.outcome=secured", "score=1", "streak=1", "best=1"] {
+            assert!(wire.lines().any(|candidate| candidate == line));
+        }
+        for _ in 0..RESULT_FRAMES {
+            session.advance_attempt(Observation::default());
+        }
+        assert_eq!(session.practice_fields(None, Some(1)).phase, "done");
+    }
+
+    #[test]
+    fn juggler_publishes_percent_preview_and_airtime_result() {
+        let stage = Stage::new(
+            [-160.0, 150.0, 110.0, -85.0],
+            [-160.0, 150.0, 110.0, -85.0],
+            [[-60.0, 5.0], [80.0, 8.0]],
+        ).unwrap();
+        let mut wizard = Wizard::new(Drill::Juggler, stage, [0.0, 7.0], 60, (0, 0), None).unwrap();
+        let mut session = release(Drill::Juggler, Some(1));
+        assert_eq!(session.practice_fields(Some(wizard), None).wizard_step, "cpu");
+        wizard.move_cpu(stage, [-150.0, 90.0]);
+        wizard.advance();
+        wizard.change_percent(10);
+        let percent = session.practice_fields(Some(wizard), None);
+        assert_eq!((percent.wizard_step, percent.wizard_value), ("percent", Some(70)));
+        wizard.advance();
+        assert_eq!(session.practice_fields(Some(wizard), None).wizard_step, "player");
+        wizard.advance();
+        let preview = session.practice_fields(Some(wizard), None);
+        assert_eq!((preview.wizard_step, preview.wizard_value), ("preview", Some(70)));
+        assert_eq!((preview.wizard_point, preview.wizard_player_point), (Some([-150.0, 90.0]), Some([0.0, 7.0])));
+
+        session.advance_attempt(Observation { hit: true, ..Observation::default() });
+        session.advance_attempt(Observation { grounded: true, ..Observation::default() });
+        let result = session.practice_fields(None, Some(2));
+        assert_eq!((result.phase, result.last_outcome), ("result", "landed"));
+        assert_eq!((result.attempt_frames, result.hits, result.best), (Some(2), Some(1), Some(2)));
+        let mut wire = String::new();
+        crate::model::practice_state::snapshot(Some(Drill::Juggler.game()), result, [0; 8], &mut wire);
+        for line in ["game=juggler", "phase=result", "last.outcome=landed", "attempt.frames=2", "hits=1", "best=2"] {
+            assert!(wire.lines().any(|candidate| candidate == line));
+        }
     }
 
     #[test]

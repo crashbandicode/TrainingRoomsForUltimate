@@ -126,6 +126,7 @@ pub(super) fn service() {
         show(&mut worker, UNAVAILABLE_NOTICE);
         return;
     }
+    let capture = crate::runtime::bridge_state::PracticeCapture::of(PracticeGame::Mashout);
     EVENTS.drain(|event| match event {
         Event::Setup(generation, text) => {
             if generation < worker.generation {
@@ -241,6 +242,9 @@ pub(super) fn service() {
             }
             worker.session.cancel();
             let mut text = crate::model::storage::FixedPath::<96>::new();
+            capture.result(|| Some(crate::model::practice_state::Fields {
+                last_outcome: grade.practice_name(), best: Some(best), ..Default::default()
+            }));
             let _ = grade.write(&mut text);
             let _ = core::fmt::Write::write_str(&mut text, kind.map_or("", |k| if k { " · in place" } else { " · roll" }));
             let _ = core::fmt::Write::write_fmt(&mut text, format_args!(" · best {best}"));
@@ -273,6 +277,7 @@ pub(super) fn service() {
         worker.session.cancel();
     } else {
         worker.session.finish();
+        capture.result(|| worker.session.practice_result());
         if worker.session.phase() != crate::model::mashout::run::Phase::Off {
             let mut text = crate::model::storage::FixedPath::<256>::new();
             if worker.origin == SeedOrigin::ThrowClatterStart {

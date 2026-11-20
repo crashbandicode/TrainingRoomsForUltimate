@@ -590,6 +590,28 @@ impl Game {
             prep_damage: None,
         }
     }
+    fn practice_fields(&self) -> crate::model::practice_state::Fields {
+        use crate::model::practice_state::Fields;
+        let phase = match self.step {
+            Step::Off => "off",
+            Step::Choose => "choose",
+            Step::Reload => "reload",
+            Step::Place => "place",
+            Step::Settle => "settle",
+            Step::Entering => "entering",
+            Step::Held => "held",
+            Step::Result => "result",
+            Step::Failed => "failed",
+            Step::Release => "release",
+            Step::Retry => "retry",
+            Step::Restore => "restore",
+        };
+        Fields {
+            phase,
+            attempt_frames: self.clock.as_ref().map(Clock::elapsed),
+            ..Fields::default()
+        }
+    }
     fn step(&mut self, next: Step, text: &'static str) {
         if next == Step::Entering {
             self.roll = None;
@@ -1093,6 +1115,12 @@ pub unsafe fn frame(fighter: usize) {
         OWN_CPU.store(0, Ordering::Release);
         return;
     };
+    let capture = crate::runtime::bridge_state::PracticeCapture::of(PracticeGame::Mashout);
+    frame_game(fighter, &mut game);
+    capture.submit(|| game.practice_fields());
+}
+
+unsafe fn frame_game(fighter: usize, game: &mut Game) {
     // Disabling restores the native slots immediately, but must still restore the
     // temporary CPU through the existing frame path.
     // rc.15 practice menu: Mash out runs while it is the running game (Start and Stop), no longer while its row is On.

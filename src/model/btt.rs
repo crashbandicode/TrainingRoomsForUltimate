@@ -410,6 +410,31 @@ impl Btt {
         })
     }
 
+    pub fn practice_fields(&self) -> super::practice_state::Fields {
+        use super::practice_state::Fields;
+        let phase = match self.phase {
+            Phase::Off => "off",
+            Phase::Placing => "placing",
+            Phase::Ready => "ready",
+            Phase::Running => "live",
+            Phase::Done => "done",
+        };
+        Fields {
+            phase,
+            wizard_step: if self.phase == Phase::Placing { "targets" } else { "" },
+            wizard_selection: self.pick.map_or("", |_| "saved_layout"),
+            wizard_value: self.pick.map(|index| index as u32),
+            wizard_point: self.cursor(),
+            score: Some(self.broken.count_ones()),
+            target_count: Some(self.n as u32),
+            attempt_frames: Some(self.frames),
+            remaining_frames: (self.phase == Phase::Done).then_some(u32::from(self.left)),
+            best: super::practice_games::best_time(&self.best, key(self.layout())),
+            last_outcome: if self.phase == Phase::Done { "complete" } else { "" },
+            ..Fields::default()
+        }
+    }
+
     pub fn cursor(&self) -> Option<[f32; 2]> {
         (self.phase == Phase::Placing).then_some(self.cursor)
     }
@@ -886,3 +911,25 @@ mod files_tests;
 #[cfg(test)]
 #[path = "btt_camera_tests.rs"]
 mod camera_tests;
+
+#[cfg(test)]
+mod practice_fields_tests {
+    lib_unit_tests! {
+    use super::*;
+
+    #[test]
+    fn btt_practice_fields_publish_layout_and_completed_clock() {
+        let mut game = Btt::IDLE;
+        game.close_menu(true, true);
+        assert_eq!(game.practice_fields().wizard_step, "targets");
+        game.phase = Phase::Done;
+        game.n = 2;
+        game.broken = 3;
+        game.frames = 81;
+        game.best[0] = Some((key(game.layout()), 75));
+        let state = game.practice_fields();
+        assert_eq!((state.phase, state.score, state.target_count, state.attempt_frames, state.best),
+            ("done", Some(2), Some(2), Some(81), Some(75)));
+    }
+    }
+}

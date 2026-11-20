@@ -303,6 +303,38 @@ impl<K: Copy + Eq> Run<K> {
         text
     }
 
+    pub fn practice_result(&self) -> Option<crate::model::practice_state::Fields> {
+        use crate::model::practice_state::Fields;
+        use super::grade::Grade;
+
+        if self.phase != Phase::Done {
+            return None;
+        }
+        if self.native_ended {
+            return Some(Fields { last_outcome: "ended_before_escape", ..Fields::default() });
+        }
+        let result = self.result?;
+        let last_outcome = match result.outcome {
+            Outcome::Graded(Grade::Poor) => "poor",
+            Outcome::Graded(Grade::Ok) => "ok",
+            Outcome::Graded(Grade::Good) => "good",
+            Outcome::Graded(Grade::Great) => "great",
+            Outcome::Graded(Grade::Optimal) => "optimal",
+            Outcome::BelowOptimum => "below_optimum",
+            Outcome::NeverEnds => "never_ends",
+            Outcome::NoSaving => "no_saving",
+            Outcome::InvalidBounds => "invalid_bounds",
+        };
+        Some(Fields {
+            last_outcome,
+            last_frames: Some(result.elapsed),
+            best: result.best,
+            fastest_frames: Some(result.bounds.fastest),
+            baseline_frames: result.bounds.no_input,
+            ..Fields::default()
+        })
+    }
+
     pub fn write_notice(&self, out: &mut impl Write) -> fmt::Result {
         match self.phase {
             Phase::Off => Ok(()),
@@ -383,6 +415,16 @@ mod tests {
         run.set_bounds(bounds);
         run.observe(elapsed, true);
         run.finish();
+    }
+
+    #[test]
+    fn mashout_practice_result_publishes_the_scored_native_clock() {
+        let mut game = Run::new();
+        assert!(game.practice_result().is_none());
+        attempt(&mut game, 4, 11, FINITE);
+        let fields = game.practice_result().unwrap();
+        assert_eq!((fields.last_outcome, fields.last_frames, fields.best, fields.fastest_frames, fields.baseline_frames),
+            ("great", Some(11), Some(11), Some(10), Some(90)));
     }
 
     #[test]
