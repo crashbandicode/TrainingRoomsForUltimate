@@ -407,11 +407,11 @@ fn grader_rows_resolve_in_the_hitbox_table() {
 
 #[test]
 fn core06_site_guards() {
-    // The sixteen called natives include indexed article lookup and TeamModule ownership.
+    // The fifteen called natives include indexed article lookup and TeamModule ownership.
     // Fourteen main relied windows cover layout, camera, damage and hitbox reads; spacing-grader rows are optional.
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 16);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 15);
     assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 23);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
