@@ -73,6 +73,7 @@ const BOUNDARIES: &[Boundary] = &[
     // Steering PK Thunder needs the existing article grants. If any are missing,
     // the read yields to stock; other drill corrections do not depend on them.
     Boundary { function: "niche_pad::bolt_input", owner: None, gate: Gate::Flag("bolt_reads_granted") },
+    Boundary { function: "niche_pad::link_bomb_phase", owner: None, gate: Gate::Flag("link_bomb_reads_granted") },
     Boundary { function: "cpu_level::poll_drill", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("DRILL_BEHAVIOR") },
     // The save-state step of the per-fighter frame wrapper: a no-op until boot activates package 3.
     Boundary { function: "states::frame", owner: Some(Feature::StateCore), gate: Gate::Flag("ACTIVE") },
@@ -641,6 +642,29 @@ fn missing_pk_thunder_reads_leave_general_drill_ownership_available() {
     let grant_check = callgraph::lex(".all(game::granted)");
     assert!(grant.body.windows(grant_check.len()).any(|ts| ts == grant_check));
     for name in article_rows {
+        let row = capabilities::find(name).unwrap();
+        let rejected: Vec<_> = capabilities::equivalent_rows(row).map(|same| same.name).collect();
+        let usable = |site: &model::sites::Site| !rejected.contains(&site.name);
+        assert!(capabilities::unit_usable(Feature::EdgeJuggle, &usable), "{name} disabled basic drill ownership");
+        let granted = Granted::from_usable(&usable);
+        assert!(!granted.allows(row.offset), "{name} must stay ungranted");
+        assert!(!offsets.iter().copied().all(|offset| granted.allows(offset)));
+    }
+}
+
+#[test]
+fn missing_link_bomb_reads_leave_general_drill_ownership_available() {
+    let a = Analysis::new();
+    let grant = &a.graph.funcs[a.graph.find("niche_pad::link_bomb_reads_granted")[0]];
+    let offsets = a.own_offsets(grant);
+    let object_rows = ["state_object_is_active", "state_object_module_accessor"];
+    let expected: BTreeSet<_> = object_rows.into_iter().chain(["work_get_int"])
+        .map(|name| capabilities::find(name).unwrap().offset)
+        .collect();
+    assert_eq!(offsets, expected);
+    let grant_check = callgraph::lex(".all(game::granted)");
+    assert!(grant.body.windows(grant_check.len()).any(|ts| ts == grant_check));
+    for name in object_rows {
         let row = capabilities::find(name).unwrap();
         let rejected: Vec<_> = capabilities::equivalent_rows(row).map(|same| same.name).collect();
         let usable = |site: &model::sites::Site| !rejected.contains(&site.name);

@@ -392,6 +392,16 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
     }
 }
 
+fn link_bomb_reads_granted() -> bool {
+    [
+        sites_pkg2::WORK_GET_INT_OFFSET,
+        sites_pkg3::STATE_OBJECT_IS_ACTIVE_OFFSET,
+        sites_pkg3::STATE_OBJECT_MODULE_ACCESSOR_OFFSET,
+    ]
+    .into_iter()
+    .all(game::granted)
+}
+
 unsafe fn link_bomb_phase(
     cpu: usize,
     status: i32,
@@ -401,15 +411,7 @@ unsafe fn link_bomb_phase(
 ) -> Option<(Motion, bool)> {
     use smash::app::{lua_bind::ItemModule, BattleObjectModuleAccessor};
 
-    if !crate::runtime::roster::running()
-        || ![
-            sites_pkg2::WORK_GET_INT_OFFSET,
-            sites_pkg3::STATE_OBJECT_IS_ACTIVE_OFFSET,
-            sites_pkg3::STATE_OBJECT_MODULE_ACCESSOR_OFFSET,
-        ]
-        .into_iter()
-        .all(game::granted)
-    {
+    if !link_bomb_reads_granted() || !crate::runtime::roster::running() {
         return None;
     }
     if status == UNRESOLVED {
