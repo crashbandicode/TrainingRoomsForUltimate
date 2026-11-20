@@ -1,6 +1,6 @@
 //! Character-specific recovery pads for Guard the Edge.
 
-use super::recovery::{crossing_margin, Crossing, Measured};
+use super::recovery::{can_estimate_crossing, crossing_margin, Crossing, Measured};
 use super::{
     AirPhysics, Correction, Point, Route, SpecialReach, ATTACK, FLICK_JUMP, GUARD, JUMP, SPECIAL,
 };
@@ -174,6 +174,7 @@ impl Row {
             .corridor
             .is_some_and(|[bottom, top]| bottom.is_finite() && top.is_finite() && bottom < top);
         self.fighter == facts.fighter
+            && (self.route != Route::Opposite || can_estimate_crossing(self.fighter))
             && match self.intent {
                 Intent::Across => clear && facts.covered_ledge,
                 Intent::ThunderOverhead => clear && facts.player_over_crossing,

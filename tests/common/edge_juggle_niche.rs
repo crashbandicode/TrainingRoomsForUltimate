@@ -140,9 +140,8 @@ fn hard_niche_crossings_need_a_measured_route_even_with_spare_budget() {
 fn little_mac_and_incineroar_only_have_near_niche_rows() {
     use crate::model::fighter_choices::CHOICES;
 
-    for (_, name) in CHOICES.iter().copied().filter(|&(_, name)| matches!(name, "Little Mac" | "Incineroar")) {
-        let kind = CHOICES.iter().find(|(_, label)| *label == name).unwrap().0 as i32;
-        let mut rows = super::ROWS.iter().filter(|row| row.fighter == kind).peekable();
+    for (kind, name) in CHOICES.iter().copied().filter(|&(_, name)| matches!(name, "Little Mac" | "Incineroar")) {
+        let mut rows = super::ROWS.iter().filter(|row| row.fighter == kind as i32).peekable();
         assert!(rows.peek().is_some(), "{name} needs a non-crossing technique");
         assert!(rows.all(|row| row.route == Route::Near), "{name}");
     }
@@ -210,6 +209,10 @@ fn verify(fighter: i32, mode: &str, id: u8, steps: &[Move]) {
         }
     }
 
+    verify_pad_sequence(row, steps);
+}
+
+fn verify_pad_sequence(row: &'static super::Row, steps: &[Move]) {
     let mut sequence = Sequence::new(row);
     for (idx, &movement) in steps.iter().enumerate() {
         let frame = idx as u32 * 7;
@@ -313,7 +316,7 @@ fn niche_pikachu_skull_bash_route_and_pad_sequence() {
 
 #[test]
 fn niche_game_watch_fire_route_and_pad_sequence() {
-    verify(0x1c, "cross", 4, &[Move::Hold, Move::Rise]);
+    verify_pad_sequence(super::measured_row(4, CANDIDATE_ROWS).unwrap(), &[Move::Hold, Move::Rise]);
 }
 
 #[test]
@@ -334,12 +337,12 @@ fn niche_rob_burner_route_and_pad_sequence() {
 #[test]
 fn niche_sora_sonic_blade_route_and_pad_sequence() {
     // Sonic Blade ends in special fall (SmashWiki "Helpless"): the glide, then Aerial Sweep into the Blade.
-    verify(0x5d, "cross", 8, &[Move::Hold, Move::SoraChain]);
+    verify_pad_sequence(super::measured_row(8, CANDIDATE_ROWS).unwrap(), &[Move::Hold, Move::SoraChain]);
 }
 
 #[test]
 fn niche_sora_opens_with_aerial_sweep_and_presses_once_per_blade_window() {
-    let row = select(facts(0x5d, "cross"), CANDIDATE_ROWS).unwrap();
+    let row = super::measured_row(8, CANDIDATE_ROWS).unwrap();
     let mut sequence = Sequence::new(row);
     sequence.step(sample(0, Motion::Free)).expect("the glide ends at the exit");
     let frames = [
@@ -434,12 +437,12 @@ fn niche_greninja_shadow_sneak_route_and_pad_sequence() {
 
 #[test]
 fn niche_ness_pk_thunder_route_and_pad_sequence() {
-    verify(0xa, "cross", 14, &[Move::Hold, Move::Bolt]);
+    verify_pad_sequence(super::measured_row(14, CANDIDATE_ROWS).unwrap(), &[Move::Hold, Move::Bolt]);
 }
 
 #[test]
 fn niche_steve_elytra_route_and_pad_sequence() {
-    verify(0x58, "cross", 15, &[Move::Hold, Move::Glide]);
+    verify_pad_sequence(super::measured_row(15, CANDIDATE_ROWS).unwrap(), &[Move::Hold, Move::Glide]);
 }
 
 #[test]
@@ -520,7 +523,7 @@ fn niche_daisy_float_route_and_pad_sequence() {
 
 #[test]
 fn niche_snake_cypher_route_and_pad_sequence() {
-    verify(0x22, "cross", 26, &[Move::Hold, Move::Hover]);
+    verify_pad_sequence(super::measured_row(26, CANDIDATE_ROWS).unwrap(), &[Move::Hold, Move::Hover]);
 }
 
 #[test]
@@ -571,7 +574,7 @@ fn niche_bowser_jr_clown_kart_route_and_pad_sequence() {
 
 #[test]
 fn niche_hero_woosh_route_and_pad_sequence() {
-    verify(0x53, "cross", 32, &[Move::Hold, Move::Rise]);
+    verify_pad_sequence(super::measured_row(32, CANDIDATE_ROWS).unwrap(), &[Move::Hold, Move::Rise]);
 }
 
 #[test]
@@ -603,7 +606,7 @@ fn niche_luigi_green_missile_route_and_pad_sequence() {
 
 #[test]
 fn niche_charizard_fly_route_and_pad_sequence() {
-    verify(0x26, "cross", 35, &[Move::Hold, Move::Rise]);
+    verify_pad_sequence(super::measured_row(35, CANDIDATE_ROWS).unwrap(), &[Move::Hold, Move::Rise]);
 }
 
 #[test]
@@ -726,14 +729,15 @@ fn niche_crossing_rows_decline_an_infeasible_budget() {
     {
         let only = 1 << (row.id - 1);
         let roomy = every(row.fighter, Some(ROOMY));
-        let Some(chosen) = select(roomy, only) else {
-            assert!(
-                [2, 3, 6].contains(&row.id),
-                "row {} needs more than a covered ledge",
-                row.id
-            );
+        if [2, 3, 6].contains(&row.id) {
+            assert!(select(roomy, only).is_none(), "row {} needs a different setup", row.id);
             continue;
-        };
+        }
+        if [4, 8, 14, 15, 26, 32, 35].contains(&row.id) {
+            assert!(select(roomy, only).is_none(), "row {} needs a dedicated model", row.id);
+            continue;
+        }
+        let chosen = select(roomy, only).expect("covered ledge and spare crossing budget");
         crossings += 1;
         let margin = chosen.margin(roomy).expect("a selected row has a margin");
         assert!((0.0..=1.0).contains(&margin), "row {}", row.id);
@@ -745,7 +749,7 @@ fn niche_crossing_rows_decline_an_infeasible_budget() {
             );
         }
     }
-    assert_eq!(crossings, 27);
+    assert_eq!(crossings, 20);
 }
 
 #[test]

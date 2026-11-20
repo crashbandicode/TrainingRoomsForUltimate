@@ -350,6 +350,23 @@ pub struct Crossing {
     pub ledge: f32,
 }
 
+/// Can offer a crossing from the shared estimate. Thu Ox's Final Destination
+/// demonstration identifies fighters needing a specific setup and those that
+/// cannot cross. Dedicated routes have their own resource and live shape tests.
+pub fn can_estimate_crossing(fighter: i32) -> bool {
+    !matches!(
+        fighter,
+        // Hard, Very hard or Intense.
+        0x02 | 0x09 | 0x0a | 0x0f | 0x15..=0x17 | 0x22 | 0x26 | 0x2e | 0x31 | 0x3c | 0x3d
+        // Impossible with ordinary resources, including the duo.
+        | 0x00 | 0x01 | 0x0b | 0x12 | 0x18 | 0x1a | 0x1b | 0x23..=0x25 | 0x2f | 0x34
+        | 0x36 | 0x3f | 0x43 | 0x44 | 0x47 | 0x48 | 0x4b | 0x4c
+        // Candidate specials that need their own trajectory and resource model.
+        | 0x1c | 0x53 | 0x58 | 0x5a | 0x5b | 0x5d
+        | i32::MIN..=-1
+    )
+}
+
 /// Spare climb left by an under-stage crossing as a fraction, or `None` when
 /// jumps, glide, the measured specials and the up special do not cover it.
 /// An aimed up special is shared between level travel and the final climb.

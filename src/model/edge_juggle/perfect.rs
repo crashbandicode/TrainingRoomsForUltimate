@@ -627,7 +627,10 @@ pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 4] {
         (facts.player[0] - near[0]).hypot(facts.player[1] - near[1]) <= facts.player_reach;
     let other_covered =
         (facts.player[0] - other[0]).hypot(facts.player[1] - other[1]) <= facts.player_reach;
-    let opposite = if !other_covered && (near_plan.is_none() || near_covered) {
+    let opposite = if recovery::can_estimate_crossing(facts.fighter)
+        && !other_covered
+        && (near_plan.is_none() || near_covered)
+    {
         facts.crossing_band().and_then(|[bottom, top]| {
             let crossing = facts.position[1].clamp(bottom, top.next_down().max(bottom));
             facts.candidate(
