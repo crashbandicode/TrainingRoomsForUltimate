@@ -1168,7 +1168,7 @@ fn post_notice(run: &mut Run, best: Option<u32>, best_streak: Option<u32>) {
         }
     }
     if run.notice.as_str() != text.as_str() || frames % 30 == 1 && phase == Phase::Live {
-        notices::upsert(NOTICE, header, text.as_str(), 180, DEFAULT_COLOR);
+        notices::upsert(NOTICE, header, text.as_str(), u16::MAX, DEFAULT_COLOR);
         run.notice = text;
     }
 }
