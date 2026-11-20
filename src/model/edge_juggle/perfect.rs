@@ -1018,6 +1018,21 @@ mod tests {
     }
 
     #[test]
+    fn a_recovery_plan_rebuilds_only_on_new_threat_or_spent_resource() {
+        let mut watch = RouteWatch::default();
+        assert!(!watch.observe(Some((2, true)), false));
+        assert!(!watch.observe(Some((2, true)), false));
+        assert!(!watch.observe(None, false));
+        assert!(watch.observe(Some((1, true)), false));
+        assert!(!watch.observe(Some((1, true)), false));
+        assert!(watch.observe(Some((1, false)), false));
+        assert!(watch.observe(Some((1, false)), true));
+        assert!(!watch.observe(Some((1, false)), true));
+        assert!(!watch.observe(Some((1, false)), false));
+        assert!(watch.observe(Some((1, false)), true));
+    }
+
+    #[test]
     fn crossability_samples_below_camera_and_rejects_the_deep_underside() {
         let camera = [-105., 105., 60., -60.];
         let blast = [-180., 180., 140., -115.];
