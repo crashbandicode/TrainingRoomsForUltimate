@@ -30,6 +30,7 @@
 
 //! rc.15 article hurtboxes adds the approved Called `article_get_from_no` row: 270 site rows to 271.
 //! rc.15 Mash adds its separately frozen 17 approved reader rows in a 26th data file. The historical digests stay unchanged.
+//! rc.15 spacing grader adds the optional grader rows (five hit-pair stores, two hurt-shape radius stores, the hit-handler hook and its entry, the record contact): 272 site rows to 282.
 
 use crate::model::sha256::sha256_hex;
 use std::fmt::Write;
@@ -101,8 +102,8 @@ const SEAM_ROWS: usize = 704;
 const SEAM_DIGEST: &str = "cb2c75e34e6f3258900a157be9b79d08b7ed396c5500f98d132e7627858d6adc";
 const EDGE_JUGGLE_ROWS: usize = 17;
 const EDGE_JUGGLE_DIGEST: &str = "fd91e2d01937ed4e7dda885c8e2beb853c6e42a46e13110dbbc7254cdbd8e1bb";
-const SITE_ROWS: usize = 272;
-const SITE_DIGEST: &str = "ba93529340967f0bf151474e5235469b69d4637fdd1d5991ce903cd392743c15";
+const SITE_ROWS: usize = 282;
+const SITE_DIGEST: &str = "50b716843f0d01903bbf075ac6373f18e919c3eb2f50c5410171743bf30f9527";
 const UI_ROWS: usize = 6;
 const UI_DIGEST: &str = "35ddb9f164a3ac26ba2e5c45c35066ee738e796589d58e2c697c82e486567b15";
 const COMMON_ROWS: usize = 4;
