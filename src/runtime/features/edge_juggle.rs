@@ -7,7 +7,7 @@ use hos_lock::{Mutex, Published};
 use super::{cpu::konst, mashout::FloorRay, notices, practice, recorder, states};
 use crate::model::chords::{field, logical as key, Sample};
 use crate::model::cpu::{ids::{C, UNRESOLVED}, rng::Rng};
-use crate::model::edge_juggle::perfect::{self, Correction, LandingFacts};
+use crate::model::edge_juggle::perfect::{self, AirPhysics, Correction, JumpTiming, LandingFacts};
 use crate::model::edge_juggle::{
     Difficulty, Drill, Observation, Outcome, Phase, Session, Setup, Stage, Wizard, WizardStep,
 };
@@ -77,6 +77,8 @@ struct Run {
     previous_damage: Option<f32>,
     damage_stop: bool,
     landing_draw: u32,
+    jump_delay: u8,
+    jump_timing: JumpTiming,
     player_ledge: Option<usize>,
     placement: Placement,
     notice: FixedPath<128>,
@@ -181,12 +183,12 @@ pub unsafe fn controls_cpu(accessor: usize) -> bool {
 }
 
 pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Correction {
-    let Some(engine) = ENGINE.try_lock() else {
+    let Some(mut engine) = ENGINE.try_lock() else {
         return Correction::default();
     };
-    let Some(run) = engine.run.as_ref().filter(|run| {
+    let Some(run) = engine.run.as_mut().filter(|run| {
         run.difficulty == Difficulty::Perfect && run.rounds.phase == Phase::Live
-            && run.wizard.is_none() && run.drill == Drill::Juggler
+            && run.wizard.is_none()
     }) else {
         return Correction::default();
     };
@@ -197,19 +199,62 @@ pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Corr
         return Correction::default();
     }
     let status = natives::status_kind(accessor);
-    if status == UNRESOLVED || ![C::StatusFall, C::StatusFallAerial].map(konst).contains(&status) {
+    if status == UNRESOLVED || ![C::StatusFall, C::StatusFallAerial, C::StatusDamageFall].map(konst).contains(&status) {
+        run.jump_timing = JumpTiming::default();
         return Correction::default();
+    }
+    let position = [natives::pos_x(accessor), natives::pos_y(accessor)];
+    if run.drill == Drill::GuardEdge {
+        return recovery_jump(run, accessor, position, buttons, stick_y);
     }
     let Some(p1) = natives::module_accessor(0) else {
         return Correction::default();
     };
     perfect::juggle_drift(LandingFacts {
-        cpu: [natives::pos_x(accessor), natives::pos_y(accessor)],
+        cpu: position,
         player: [natives::pos_x(p1), natives::pos_y(p1)],
         main_floor: run.stage.ledges.map(|point| point[0]),
         stock_stick_y: stick_y,
         stock_buttons: buttons,
     }, run.landing_draw)
+}
+
+unsafe fn air_physics(cpu: usize) -> AirPhysics {
+    use crate::model::hash40::hash40;
+    let read = |name| natives::get_param_float(cpu, hash40(name), 0);
+    AirPhysics {
+        horizontal_speed: read("air_speed_x_stable"),
+        horizontal_acceleration: read("air_accel_x_add"),
+        gravity: read("air_accel_y"),
+        terminal_speed: read("air_speed_y_stable"),
+        jump_speed: read("jump_aerial_y"),
+    }
+}
+
+unsafe fn recovery_jump(
+    run: &mut Run, cpu: usize, pos: [f32; 2], buttons: u32, stick_y: f32,
+) -> Correction {
+    let [left, right] = run.stage.ledges;
+    let ledge = if pos[0] < left[0] { left } else if pos[0] > right[0] {
+        right
+    } else {
+        run.jump_timing = JumpTiming::default();
+        return Correction::default();
+    };
+    let jump = konst(C::TermContJumpAerial);
+    let can_jump = jump != UNRESOLVED && natives::is_enable_transition_term(cpu, jump);
+    let physics = air_physics(cpu);
+    let Some((vx, vy)) = super::recording_host::fighter_speed(cpu) else {
+        run.jump_timing = JumpTiming::default();
+        return Correction::default();
+    };
+    let mut correction = run.jump_timing.step(buttons, can_jump && physics.valid(), run.jump_delay, |delay| {
+        physics.reaches_with_jump(pos, [vx, vy], ledge, delay, run.stage.blast[3])
+    });
+    if run.jump_timing.waiting() || correction.press != 0 {
+        correction.stick = Some([(ledge[0] - pos[0]).signum(), stick_y]);
+    }
+    correction
 }
 
 fn axis(pressed: u16, negative: u8, positive: u8) -> i16 {
@@ -634,6 +679,8 @@ pub unsafe fn frame(fighter: usize) {
             previous_damage: None,
             damage_stop: false,
             landing_draw: 5,
+            jump_delay: 0,
+            jump_timing: JumpTiming::default(),
             player_ledge: None,
             placement: Placement::ResetResources,
             notice: FixedPath::new(),
@@ -750,6 +797,8 @@ pub unsafe fn frame(fighter: usize) {
         run.rounds.advance_attempt(obs);
         if matches!(before, Phase::Ready(_)) && run.rounds.phase == Phase::Live {
             run.landing_draw = rng.below(6);
+            run.jump_delay = rng.below(9) as u8;
+            run.jump_timing = JumpTiming::default();
             if held_cpu.take() == Some(body) {
                 state::set_sleep(cpu, false);
             }

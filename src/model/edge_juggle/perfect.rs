@@ -286,6 +286,43 @@ pub struct Correction {
     pub release: u32,
 }
 
+pub const JUMP: u32 = 0x4;
+
+/// A stock jump held in reserve until its remaining delay fits the recovery budget.
+#[derive(Default)]
+pub struct JumpTiming {
+    pending: Option<u8>,
+}
+
+impl JumpTiming {
+    pub fn waiting(&self) -> bool {
+        self.pending.is_some()
+    }
+
+    pub fn step(
+        &mut self, buttons: u32, can_jump: bool, delay: u8, within_reach: impl FnOnce(u8) -> bool,
+    ) -> Correction {
+        if !can_jump || buttons & !(JUMP | FLICK_JUMP) != 0 {
+            self.pending = None;
+            return Correction::default();
+        }
+        let mut out = Correction::default();
+        if let Some(remaining) = self.pending.take() {
+            if remaining == 0 || !within_reach(remaining) {
+                out.press = JUMP;
+                return out;
+            }
+            self.pending = Some(remaining - 1);
+        } else if buttons & JUMP != 0 && delay != 0 && within_reach(delay) {
+            self.pending = Some(delay - 1);
+        }
+        if self.pending.is_some() {
+            out.release = buttons & JUMP;
+        }
+        out
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct LandingFacts {
     pub cpu: Point,
