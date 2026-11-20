@@ -10,7 +10,7 @@
 //!
 //! Every bound is a sum over the rows as they are: a new site or seam row grows the constant by itself.
 
-use crate::engine::seams::native_seams;
+use crate::engine::seams::native_seams::{self, report};
 use crate::model::install_line::OVERFLOW_TAIL;
 use crate::model::sites::{self, Site};
 use crate::model::{sites_pkg3, sites_pkg4, sites_pkg6, sites_u4, sites_ui};
@@ -27,8 +27,6 @@ pub const MISSING_SHOWN: usize = 8;
 /// The longest outcome word of a site (`GuardOutcome::code`: `occupied`) and of a write (`Written::word`: `restored`).
 const MAX_FOUND_WORD: usize = 8;
 const MAX_WRITTEN_WORD: usize = 8;
-/// The longest seam outcome word (`native_seams::report::code_name`: `out_of_region`).
-const MAX_SEAM_CODE: usize = 13;
 /// The longest stand-in form word of the hook-sharing drill (its only reader, `drill_fields`, is compiled with `seam-drill`).
 #[cfg(feature = "seam-drill")]
 const MAX_DRILL_FORM: usize = 16;
@@ -90,22 +88,45 @@ const fn max(a: usize, b: usize) -> usize {
 /// The feature reports at their longest: ` <feature>=not_installed reason=<reason or site:<row>>`.
 pub const FEATURE_FIELDS: usize = MAX_FEATURE_REPORTS * (1 + MAX_FEATURE_NAME + "=not_installed".len() + " reason=".len() + max(MAX_REASON, "site:".len() + longest_name(&TABLES)));
 
-/// The seam installer's fields at their longest (`seam_install::InstallFields`): every seam row in each of the three lists that
-/// print a code (`seams_other`, `seams_skipped`, `seams_shadow_diff`, as `<label>:<code>,`) and in `seams_external` (`<label>,`),
-/// the missing labels, and the fixed words with five-digit counts.
+/// The two flagged lists may both contain this row. The other and external lists
+/// depend on its single outcome code, so a row can contribute to at most one of them.
+const fn seam_row_bytes(label_bytes: usize, code: u8) -> usize {
+    let plain = label_bytes + 1; // One separator per row, including the first row.
+    let coded = plain + 1 + report::code_name(code).len();
+    let extra = if report::other_with_code(code) {
+        coded
+    } else if report::listed_as_other(code) || code == report::EXTERNAL {
+        plain
+    } else {
+        0
+    };
+    2 * coded + extra
+}
+
+const fn longest_seam_code(label_bytes: usize) -> u8 {
+    let mut longest = 0;
+    let mut code = 1;
+    while code <= report::CODE_MASK {
+        if seam_row_bytes(label_bytes, code) > seam_row_bytes(label_bytes, longest) {
+            longest = code;
+        }
+        code += 1;
+    }
+    longest
+}
+
 const fn seam_fields() -> usize {
     let rows = &native_seams::SITES;
-    let mut labels = 0;
+    let mut lists = 0;
     let mut i = 0;
     while i < rows.len() {
-        labels += rows[i].label.len();
+        let label_bytes = rows[i].label.len();
+        lists += seam_row_bytes(label_bytes, longest_seam_code(label_bytes));
         i += 1;
     }
-    let with_code = labels + rows.len() * (1 + MAX_SEAM_CODE + 1);
-    let without_code = labels + rows.len();
     let missing = MISSING_SHOWN * (MAX_MISSING_LABEL + 1) + ",...".len();
     let words = "seams= seams_stock= seams_other=[] seams_skipped=[] seams_shadow_diff=[] seams_missing=[] seams_external=[] seams_unchecked= seams_images_unchecked=".len() + 4 * 5;
-    3 * with_code + without_code + missing + words
+    lists + missing + words
 }
 
 pub const SEAM_FIELDS: usize = seam_fields();
@@ -122,7 +143,7 @@ const fn drill_fields() -> usize {
         let rows = sites[i].1;
         let mut j = 0;
         while j < rows.len() {
-            total += 1 + rows[j].len() + 1 + MAX_DRILL_FORM + 1 + MAX_SEAM_CODE + ":skipped".len();
+            total += 1 + rows[j].len() + 1 + MAX_DRILL_FORM + 1 + report::code_name(report::OUT_OF_REGION).len() + ":skipped".len();
             j += 1;
         }
         i += 1;
@@ -147,30 +168,36 @@ mod tests {
     use crate::model::version::Verdict;
     use core::fmt;
 
-    /// The seam fields as `seam_install::InstallFields` writes them, with every row in every list and the longest code.
+    /// Render the most expensive single outcome for each row with both flags set.
     struct WorstSeams;
 
     impl fmt::Display for WorstSeams {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            let list = |f: &mut fmt::Formatter<'_>, code: bool| -> fmt::Result {
+            let list = |f: &mut fmt::Formatter<'_>, keep: fn(u8) -> bool, with_code: fn(u8) -> bool| -> fmt::Result {
                 f.write_str("[")?;
-                for (i, row) in native_seams::SITES.iter().enumerate() {
-                    if i > 0 {
+                let mut first = true;
+                for row in &native_seams::SITES {
+                    let code = longest_seam_code(row.label.len());
+                    if !keep(code) {
+                        continue;
+                    }
+                    if !first {
                         f.write_str(",")?;
                     }
+                    first = false;
                     f.write_str(row.label)?;
-                    if code {
-                        f.write_str(":out_of_region")?;
+                    if with_code(code) {
+                        write!(f, ":{}", report::code_name(code))?;
                     }
                 }
                 f.write_str("]")
             };
             write!(f, "seams=99999 seams_stock=99999 seams_other=")?;
-            list(f, true)?;
+            list(f, report::listed_as_other, report::other_with_code)?;
             f.write_str(" seams_skipped=")?;
-            list(f, true)?;
+            list(f, |_| true, |_| true)?;
             f.write_str(" seams_shadow_diff=")?;
-            list(f, true)?;
+            list(f, |_| true, |_| true)?;
             f.write_str(" seams_missing=[")?;
             for i in 0..MISSING_SHOWN {
                 if i > 0 {
@@ -179,7 +206,7 @@ mod tests {
                 f.write_str(&"m".repeat(MAX_MISSING_LABEL))?;
             }
             f.write_str(",...] seams_external=")?;
-            list(f, false)?;
+            list(f, |code| code == report::EXTERNAL, |_| false)?;
             write!(f, " seams_unchecked=99999 seams_images_unchecked=99999")
         }
     }
@@ -240,7 +267,7 @@ mod tests {
             assert!(written.word().len() <= MAX_WRITTEN_WORD);
         }
         for bits in 0..=u8::MAX {
-            assert!(native_seams::report::code_name(bits).len() <= MAX_SEAM_CODE);
+            assert!(report::code_name(bits).len() <= report::code_name(report::OUT_OF_REGION).len());
         }
         for feature in [
             sites::Feature::Training,
@@ -266,11 +293,11 @@ mod tests {
         assert_eq!((max(1, 2), max(2, 1), max(3, 3)), (2, 2, 3));
         let per_report = 1 + MAX_FEATURE_NAME + "=not_installed".len() + " reason=".len() + max(MAX_REASON, "site:".len() + longest);
         assert_eq!(FEATURE_FIELDS, MAX_FEATURE_REPORTS * per_report);
-        let labels: usize = native_seams::SITES.iter().map(|row| row.label.len()).sum();
-        let count = native_seams::SITES.len();
-        // three lists print `<label>:<code>,`, one prints `<label>,`; then the missing labels, the fixed words and four five-digit counts
-        let lists = 3 * (labels + count * (MAX_SEAM_CODE + 2)) + labels + count;
         let words = "seams= seams_stock= seams_other=[] seams_skipped=[] seams_shadow_diff=[] seams_missing=[] seams_external=[] seams_unchecked= seams_images_unchecked=";
+        let lists: usize = native_seams::SITES.iter().map(|row| {
+            let bytes = row.label.len();
+            (0..=report::CODE_MASK).map(|code| seam_row_bytes(bytes, code)).max().unwrap()
+        }).sum();
         assert_eq!(seam_fields(), lists + MISSING_SHOWN * (MAX_MISSING_LABEL + 1) + ",...".len() + words.len() + 4 * 5);
         assert_eq!(SEAM_FIELDS, seam_fields());
         assert_eq!(INSTALL_LINE_CAPACITY, FIXED_FIELDS + SITE_FIELDS + FEATURE_FIELDS + SEAM_FIELDS + DRILL_FIELDS + OVERFLOW_TAIL);
