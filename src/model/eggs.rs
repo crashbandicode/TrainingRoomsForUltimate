@@ -458,10 +458,11 @@ impl Run {
     /// read), chosen by length and the selected spawn area. In view uses the screen bounds; Whole stage uses the full stage
     /// range and its vertical bounds when valid. It keeps `spacing` from `last` and `P1_GAP` from Player 1; when sixteen tries
     /// all fall short, it uses the try that falls least short (a random spot, never a fixed side).
-    /// None before the draw published the camera (a run's first one, with no `last`, waits for it to hold still).
+    /// A first target that uses the screen bounds waits for the camera to settle. Complete Whole stage bounds
+    /// are in world coordinates and remain usable while the camera moves.
     fn spawn(&mut self, last: Option<[f32; 2]>) -> Option<()> {
-        let ready = (last.is_some() || self.still >= SETTLE) && !self.pending;
-        let View(s, o, range, vertical) = self.view.filter(|_| ready)?;
+        let ready = |view: &View| last.is_some() || self.still >= SETTLE || (self.rows[4] == WHOLE && view.3.is_some());
+        let View(s, o, range, vertical) = self.view.filter(|view| !self.pending && ready(view))?;
         let edge = |i: usize, c: f32| (c * CANVAS_HALF[i] - o[i]) / s[i] - c * RADIUS;
         let (sx0, sx1, top, bottom) = if self.rows[4] == WHOLE {
             let [sx0, sx1] = [range[0] + RADIUS, range[1] - RADIUS];
