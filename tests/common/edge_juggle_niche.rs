@@ -578,6 +578,25 @@ fn niche_hold_jumps_only_below_the_hold_line() {
 }
 
 #[test]
+fn niche_crossing_is_checked_again_before_the_entry() {
+    // Pit's glide: the plan fitted, then the fighter was hit lower or lost its jumps outside the ledge.
+    let glide = Sequence::new(&super::ROWS[18]);
+    assert!(glide.still_crosses(ROOMY));
+    assert!(
+        !glide.still_crosses(TIGHT),
+        "the rest of the trip no longer fits: stay on the near side"
+    );
+    let below = Budget {
+        crossing: Crossing {
+            foot: -140.0,
+            ..ROOMY.crossing
+        },
+        ..ROOMY
+    };
+    assert!(!glide.still_crosses(below), "already under the band");
+}
+
+#[test]
 fn niche_crossing_rows_decline_an_infeasible_budget() {
     let every = |fighter, budget| Facts {
         fighter,

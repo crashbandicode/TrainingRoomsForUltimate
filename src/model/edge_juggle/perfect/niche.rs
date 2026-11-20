@@ -315,6 +315,10 @@ impl Sequence {
         self.row
     }
 
+    pub fn still_crosses(&self, _budget: Budget) -> bool {
+        true
+    }
+
     fn advance(&mut self) {
         self.index += 1;
         self.stage = Stage::Ready;
