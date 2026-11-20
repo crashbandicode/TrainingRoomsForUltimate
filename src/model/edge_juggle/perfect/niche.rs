@@ -20,7 +20,7 @@ pub enum Move {
     QuickAttack,
     Barrel,
     Hover,
-    SonicBlade,
+    SoraChain,
     Bolt,
     Glide,
     Float,
@@ -148,8 +148,8 @@ const ROWS: [Row; 35] = [
     Row::new(5, 0x27, Intent::Across, &[Hold, Barrel]),
     Row::new(6, 0x27, Intent::LongApproach, &[Side, Hold, Barrel]),
     Row::new(7, 0x2d, Intent::Across, &[Hold, Hover]),
-    // Sonic Blade is special fall; it belongs at Aerial Sweep's apex, which has no phase yet.
-    Row::new(8, 0x5d, Intent::Across, &[Hold, Rise]),
+    // Sonic Blade is special fall: it follows Aerial Sweep at its apex, at the exit.
+    Row::new(8, 0x5d, Intent::Across, &[Hold, SoraChain]),
     Row::new(9, 0x34, Intent::Near, &[Side, Rise]),
     Row::new(10, 0x34, Intent::CounterContact, &[Counter, Rise]),
     Row::new(11, 0x10, Intent::Near, &[Down, Rise]),
@@ -231,6 +231,7 @@ pub struct Sequence {
     index: usize,
     stage: Stage,
     charge_start: Option<u32>,
+    sora_aim_open: bool,
     last: Option<(u32, Option<Correction>)>,
 }
 
@@ -241,6 +242,7 @@ impl Sequence {
             index: 0,
             stage: Stage::Ready,
             charge_start: None,
+            sora_aim_open: false,
             last: None,
         }
     }
@@ -257,6 +259,7 @@ impl Sequence {
         self.index += 1;
         self.stage = Stage::Ready;
         self.charge_start = None;
+        self.sora_aim_open = false;
     }
 
     fn hold_frames(&mut self, movement: Move, sample: Sample, accepted: u32) -> u32 {
@@ -313,6 +316,9 @@ impl Sequence {
     fn on_frame(&mut self, sample: Sample) -> Option<Correction> {
         let movement = self.action()?;
         let [forward, level] = [sample.direction, 0.0];
+        let aim_open = movement == SoraChain && sample.motion == Motion::AimAgain;
+        let press_again = aim_open && !self.sora_aim_open;
+        self.sora_aim_open = aim_open;
         if !sample.can_enter && matches!(self.stage, Stage::Ready) {
             return Some(pad([0.0; 2], 0));
         }
@@ -332,7 +338,7 @@ impl Sequence {
             return Some(pad([forward, level], 0));
         }
         if movement == Drift
-            || movement == Rise
+            || matches!(movement, Rise | SoraChain)
                 && self.row.route == Route::Opposite
                 && !sample.at_exit
                 && matches!(self.stage, Stage::Ready)
@@ -361,6 +367,7 @@ impl Sequence {
                     movement,
                     sample,
                     self.hold_frames(movement, sample, sample.frame),
+                    press_again,
                 ))
             }
             (Stage::Accepted(_), Motion::Free) => {
@@ -375,6 +382,7 @@ impl Sequence {
                 movement,
                 sample,
                 self.hold_frames(movement, sample, frame),
+                press_again,
             )),
             _ => None,
         }
@@ -394,14 +402,19 @@ fn initial_input(movement: Move, forward: f32) -> Correction {
         Drift => ([forward, 0.0], 0),
         Jump => ([forward, 0.0], JUMP),
         Float => ([0.0, -1.0], JUMP),
-        Side | ChargedSide | SonicBlade | Missile => ([forward, 0.0], SPECIAL),
+        Side | ChargedSide | Missile => ([forward, 0.0], SPECIAL),
         Down | Counter | Bomb => ([0.0, -1.0], SPECIAL),
         _ => ([0.0, 1.0], SPECIAL),
     };
     pad(stick, button)
 }
 
-fn continuation(movement: Move, sample: Sample, accepted_frames: u32) -> Correction {
+fn continuation(
+    movement: Move,
+    sample: Sample,
+    accepted_frames: u32,
+    press_again: bool,
+) -> Correction {
     let forward = [sample.direction, 0.0];
     let aim = match movement {
         Float if sample.motion == Motion::Starting => [0.0, -1.0],
@@ -420,7 +433,7 @@ fn continuation(movement: Move, sample: Sample, accepted_frames: u32) -> Correct
         Barrel | Missile if sample.motion == Motion::Starting => SPECIAL,
         Barrel if sample.motion == Motion::Charging && accepted_frames < 20 => SPECIAL,
         Float if sample.motion == Motion::Starting || !sample.at_exit => JUMP,
-        SonicBlade if sample.motion == Motion::AimAgain => SPECIAL,
+        SoraChain if press_again => SPECIAL,
         _ => 0,
     };
     pad(aim, press)

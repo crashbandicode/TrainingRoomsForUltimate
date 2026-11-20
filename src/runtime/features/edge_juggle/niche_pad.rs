@@ -176,7 +176,7 @@ impl NicheGuide {
         if matches!(movement, Move::Bolt) && phase == Motion::Charging {
             aim = bolt_input(cpu, self.fighter, [x, y], direction, aim)?;
         }
-        if matches!(movement, Move::Rise)
+        if matches!(movement, Move::Rise | Move::SoraChain)
             && at_exit
             && !reach.reaches([x, y], self.ledge)
             && phase == Motion::Free
@@ -210,13 +210,16 @@ fn normalized_stick([x, y]: Point) -> Point {
 
 unsafe fn niche_start_enabled(cpu: usize, movement: Move, available: bool) -> bool {
     use Move::*;
+    if movement == SoraChain && !game::granted(sites_pkg2::WORK_IS_FLAG_OFFSET) {
+        return false;
+    }
     let term = match movement {
         Drift => return true,
         Hold | Jump | Float if remaining_jumps(cpu).is_some_and(|jumps| jumps != 0) => {
             C::TermContJumpAerial
         }
         Hold | Jump | Float => return false,
-        Side | ChargedSide | SonicBlade | Missile => C::TermContSpecialS,
+        Side | ChargedSide | Missile => C::TermContSpecialS,
         Down | Counter | Bomb => C::TermContSpecialLw,
         _ if available => C::TermContSpecialHi,
         _ => return false,
@@ -241,7 +244,7 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
         return Free;
     }
     let start = match movement {
-        Side | ChargedSide | SonicBlade | Missile => C::StatusSpecialS,
+        Side | ChargedSide | Missile => C::StatusSpecialS,
         Down | Counter | Bomb => C::StatusSpecialLw,
         Drift | Hold | Jump | Float => {
             return match (fighter, movement, status) {
@@ -253,7 +256,20 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
         _ => C::StatusSpecialHi,
     };
     if status == konst(start) {
+        if movement == SoraChain {
+            return if !game::granted(sites_pkg2::WORK_IS_FLAG_OFFSET) {
+                Interrupted
+            } else if natives::is_flag(cpu, 0x2100_0010) {
+                // TRAIL_STATUS_SPECIAL_HI_FLAG_COMMAND_ACCEPT opens Sonic Blade.
+                AimAgain
+            } else {
+                Starting
+            };
+        }
         return Starting;
+    }
+    if movement == SoraChain && status == konst(C::StatusSpecialS) {
+        return Motion::Travel;
     }
     match (fighter, movement, status) {
         (0x8 | 0x13, QuickAttack, 0x1e1) => {
@@ -269,7 +285,7 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
         }
         (0x27, Barrel, 0x1f0) | (0x9, Missile, 0x1e1) => Charging,
         (0xa | 0x28, Bolt, 0x1e4) => Charging,
-        (0x5d, SonicBlade, 0x1ec | 0x1ed) => AimAgain,
+        (0x5d, SoraChain, 0x1ec | 0x1ed) => AimAgain,
         (0x8, Side, 0x1e3..=0x1e5)
         | (0x8, Down, 0x1e7)
         | (0x10, Down, 0x1e9)
@@ -296,7 +312,7 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
         | (0x29, Rise, 0x1ef)
         | (0x53, Rise, 0x1eb | 0x1ec)
         | (0x58, Glide, 0x20a..=0x20c)
-        | (0x5d, SonicBlade, 0x1eb)
+        | (0x5d, SoraChain, 0x1eb)
         | (0x9, Missile, 0x1e2)
         | (0xa | 0x28, Bolt, 0x1e6)
         | (0x2, Bomb, 0x1e5) => Motion::Travel,
@@ -317,7 +333,7 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
         | (0x35, Travel, 0x1e9)
         | (0x37, Travel, 0x1ed)
         | (0x3a, Rise, 0x1e8)
-        | (0x5d, SonicBlade, 0x1ee) => Finish,
+        | (0x5d, SoraChain, 0x1ee) => Finish,
         _ => Interrupted,
     }
 }

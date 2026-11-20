@@ -184,7 +184,7 @@ fn verify(fighter: i32, mode: &str, id: u8, steps: &[Move]) {
         let expected = match movement {
             Move::Jump => ([1.0, 0.0], perfect::JUMP),
             Move::Float => ([0.0, -1.0], perfect::JUMP),
-            Move::Side | Move::ChargedSide | Move::SonicBlade | Move::Missile => {
+            Move::Side | Move::ChargedSide | Move::Missile => {
                 ([1.0, 0.0], perfect::SPECIAL)
             }
             Move::Down | Move::Counter | Move::Bomb => ([0.0, -1.0], perfect::SPECIAL),
@@ -271,9 +271,28 @@ fn niche_rob_burner_route_and_pad_sequence() {
 }
 
 #[test]
-fn niche_sora_aerial_sweep_route_and_pad_sequence() {
-    // Sonic Blade ends in special fall (SmashWiki "Helpless"): it is not flown before the up special.
-    verify(0x5d, "cross", 8, &[Move::Hold, Move::Rise]);
+fn niche_sora_sonic_blade_route_and_pad_sequence() {
+    // Sonic Blade ends in special fall (SmashWiki "Helpless"): the glide, then Aerial Sweep into the Blade.
+    verify(0x5d, "cross", 8, &[Move::Hold, Move::SoraChain]);
+}
+
+#[test]
+fn niche_sora_opens_with_aerial_sweep_and_presses_once_per_blade_window() {
+    let row = select(facts(0x5d, "cross"), CANDIDATE_ROWS).unwrap();
+    let mut sequence = Sequence::new(row);
+    sequence.step(sample(0, Motion::Free)).expect("the glide ends at the exit");
+    let frames = [
+        (Motion::Free, [0.0, 1.0], perfect::SPECIAL),
+        (Motion::Starting, [1.0, 0.0], 0),
+        (Motion::AimAgain, [1.0, 0.0], perfect::SPECIAL),
+        (Motion::AimAgain, [1.0, 0.0], 0),
+        (Motion::Travel, [1.0, 0.0], 0),
+        (Motion::AimAgain, [1.0, 0.0], perfect::SPECIAL),
+    ];
+    for (frame, (motion, stick, press)) in frames.into_iter().enumerate() {
+        let input = sequence.step(sample(frame as u32 + 1, motion)).unwrap();
+        assert_eq!((input.stick, input.press), (Some(stick), press), "frame {frame}");
+    }
 }
 
 #[test]
