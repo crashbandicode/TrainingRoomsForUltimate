@@ -452,6 +452,7 @@ pub struct RecordingScreens {
     bound: Option<String>,
     active: [Option<String>; 2],
     loops: [LoopMark; 2],
+    loop_edits: [Option<LoopMark>; 2],
     drill: Option<String>,
     slots: [Option<String>; 5],
     last_effect: Effect,
@@ -478,6 +479,7 @@ impl RecordingScreens {
             bound: None,
             active: [None, None],
             loops: [LoopMark::default(), LoopMark::default()],
+            loop_edits: [None; 2],
             drill: None,
             slots: Default::default(),
             last_effect: Effect::None,
@@ -594,17 +596,27 @@ impl RecordingScreens {
     /// The row's list pick (and Left / Right): the page role's count becomes `LoopMark::CYCLE[index]`.
     pub fn set_loop_row(&mut self, index: usize) {
         let next = LoopMark::CYCLE.get(index).copied().unwrap_or_default();
-        let count = &mut self.loops[self.page_role.index()];
-        self.selection_changed |= *count != next;
-        *count = next;
+        let role = self.page_role.index();
+        if self.loops[role] != next {
+            self.loops[role] = next;
+            self.loop_edits[role] = Some(next);
+        }
     }
 
     /// The row's reset (Reset page to defaults): both roles' counts go back to 1, the count of a new index. True when one changed.
     pub fn reset_loops(&mut self) -> bool {
         let was = core::mem::take(&mut self.loops);
         let changed = was != self.loops;
-        self.selection_changed |= changed;
+        if changed {
+            self.loop_edits = self.loops.map(Some);
+        }
         changed
+    }
+
+    pub fn persist_loop_edits(&mut self, publish: impl FnOnce([Option<LoopMark>; 2]) -> bool) {
+        if self.loop_edits != [None; 2] && publish(self.loop_edits) {
+            self.loop_edits = [None; 2];
+        }
     }
 
     pub fn tab_names(&self) -> &'static [&'static str] {
@@ -884,7 +896,9 @@ impl RecordingScreens {
     pub fn adopt(&mut self, bound: Option<String>, active: [Option<String>; 2], loops: [LoopMark; 2], drill: Option<String>) {
         self.bound = bound;
         self.active = active;
-        self.loops = loops;
+        for (role, mark) in loops.into_iter().enumerate() {
+            self.loops[role] = self.loop_edits[role].unwrap_or(mark);
+        }
         self.drill = drill;
     }
 

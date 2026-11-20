@@ -125,13 +125,10 @@ fn card() -> Scratch {
 }
 
 fn publish_if_changed(root: &Scratch, screen: &mut Menu) -> bool {
-    // This is the dirty-state decision in worker::post_recording_effect.
-    if !screen.recording_mut().take_selection_change() {
-        return false;
-    }
-    let version = engine::rr_host::recording_version();
-    assert!(engine::rr_host::publish_selection_at(&root.0, &screen.recording().selection(), None, Some(version)));
-    true
+    use engine::rr_host::{recording_version, take_menu_effect};
+    let version = recording_version();
+    let _ = take_menu_effect(&root.0, screen.recording_mut(), Some(version));
+    recording_version() != version
 }
 
 fn close_reopen(root: &Scratch, mut screen: Menu, role: ViewRole, mark: LoopMark) {
@@ -270,6 +267,14 @@ fn both_loop_edits_persist_during_a_warm_catalog_check() {
     assert_eq!(screen.recording().loop_of(ViewRole::Player), LoopMark::Finite(1));
     catalog.check();
     for wanted in [2, 3] {
+        if wanted == 3 {
+            assert!(index.ready(recording_version()).is_none(), "the first Right superseded the cached index");
+            RecordingIndex::update(&root.0, |index| {
+                index.set_slots(&[Some("take-0".into()), None, None, None, None])?;
+                index.set_loop(Role::Cpu, LoopCount::Finite(10));
+                Ok(true)
+            }).unwrap();
+        }
         assert!(catalog.step(), "the directory check is still pending");
         if index.ready(recording_version()).is_none() {
             screen.recording_mut().set_loading();
@@ -281,8 +286,11 @@ fn both_loop_edits_persist_during_a_warm_catalog_check() {
         }
     }
     assert!(catalog.step(), "both Right presses happened before discovery finished");
-    assert_eq!(RecordingIndex::load(&root.0).unwrap().loop_count(Role::Player), LoopCount::Finite(3),
+    let saved = RecordingIndex::load(&root.0).unwrap();
+    assert_eq!(saved.loop_count(Role::Player), LoopCount::Finite(3),
         "the second Right must persist while the original index snapshot is stale");
+    assert_eq!(saved.slots()[0].as_deref(), Some("take-0"), "the Loop edit preserves an intervening slot write");
+    assert_eq!(saved.loop_count(Role::Cpu), LoopCount::Finite(10), "the edit changes only the selected role");
     assert_playback(&root, ViewRole::Player, Some(3));
     close_reopen(&root, open.take().unwrap(), ViewRole::Player, LoopMark::Finite(3));
 }

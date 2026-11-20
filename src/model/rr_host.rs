@@ -1031,12 +1031,13 @@ fn write_saved_pair(root: &Path, after_take: impl FnOnce()) -> bool {
     true
 }
 
-/// Consume one menu action only when the recording view that received it is current.
+/// Commit Options Loop edits independently of file selection. File actions still need both revisions.
 pub fn take_menu_effect(
-    _root: &Path,
+    root: &Path,
     screens: &mut crate::model::recording_menu::RecordingScreens,
     observed: Option<(u64, u64)>,
 ) -> Option<(Effect, bool, (u64, u64))> {
+    screens.persist_loop_edits(|edits| write_menu_loops(root, edits));
     let effect = screens.take_effect();
     let changed = screens.take_selection_change();
     let version = recording_version();
@@ -1045,6 +1046,21 @@ pub fn take_menu_effect(
         return None;
     }
     Some((effect, changed, version))
+}
+
+// Keep index decoding off the menu input stack until a Loop edit actually needs it.
+#[inline(never)]
+fn write_menu_loops(root: &Path, edits: [Option<LoopMark>; 2]) -> bool {
+    RecordingIndex::update(root, |index| {
+        let mut changed = false;
+        for (role, mark) in [Role::Player, Role::Cpu].into_iter().zip(edits) {
+            if let Some(count) = mark.map(loop_count).filter(|&count| count != index.loop_count(role)) {
+                index.set_loop(role, count);
+                changed = true;
+            }
+        }
+        Ok(changed)
+    }).is_ok()
 }
 
 /// The menu's selection is what Play, Record, and the loop read. The index is that selection.
