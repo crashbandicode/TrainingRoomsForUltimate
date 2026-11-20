@@ -1,6 +1,8 @@
 //! Native move entry, sharing the recorder's mapped-input format. No escape formula lives here.
 use super::moves::{Plan, Scenario, State};
-use crate::model::{cpu::ids::C, input_delay::MappedInputs};
+use crate::model::{cpu::ids::C, input_delay::MappedInputs, tech::surface::END_MARGIN};
+
+const FOOT_PROBE: f32 = 0.25;
 
 /// B04 keeps G&W's 14.2 tip spacing. Move108's Flip value is the midpoint
 /// from native frames30/31 in artifacts/rc15-mashout/MEASURED-FIXTURES-108-95.md;
@@ -40,6 +42,140 @@ pub fn trolley_floor_runway(
         && left_y == right_y
         && (p1_y - left_y).abs() <= 0.25
         && [p1_x, place_x, end_x].into_iter().all(|x| low < x && x < high)
+}
+
+/// Collision geometry copied from one native ray on the game thread.
+#[derive(Clone, Copy)]
+pub struct PlacementFloor {
+    pub ends: [[f32; 2]; 2],
+    pub stationary: bool,
+    pub flags: u32,
+}
+
+impl PlacementFloor {
+    fn height(self, x: f32) -> Option<f32> {
+        let [[a, y], [b, z]] = self.ends;
+        if ![a, y, b, z, x].into_iter().all(f32::is_finite) || a == b {
+            return None;
+        }
+        let height = y + (z - y) * ((x - a) / (b - a));
+        height.is_finite().then_some(height)
+    }
+
+    fn supported_height(self, x: f32) -> Option<f32> {
+        // Use the same five-unit end clearance as the native Tech surface picker.
+        let [a, b] = self.ends.map(|point| point[0]);
+        if x - a.min(b) < END_MARGIN || a.max(b) - x < END_MARGIN {
+            return None;
+        }
+        self.height(x)
+    }
+
+    fn ends_toward(self, right: bool) -> [[f32; 2]; 2] {
+        let [a, b] = self.ends;
+        if (a[0] < b[0]) == right { [a, b] } else { [b, a] }
+    }
+
+    fn clears_end(
+        mut self,
+        placement_x: f32,
+        right: bool,
+        ray: &mut impl FnMut(f32, [f32; 2], bool) -> Option<Self>,
+    ) -> bool {
+        let margin = if right { END_MARGIN } else { -END_MARGIN };
+        let required = placement_x + margin;
+        let clears = |endpoint: f32| {
+            let distance = if right { endpoint - placement_x } else { placement_x - endpoint };
+            distance >= END_MARGIN
+        };
+        // Bound synchronous native reads when a stage has many tiny collision lines.
+        for _ in 0..8 {
+            let [_, join] = self.ends_toward(right);
+            if clears(join[0]) {
+                return true;
+            }
+            if !self.stationary {
+                return false;
+            }
+            // First probe at the required clearance. If more lines intervene,
+            // take the next representable sample past this exact endpoint.
+            let past = if right { join[0].next_up() } else { join[0].next_down() };
+            let Some(next) = [required, past].into_iter().find_map(|x| {
+                let level = self.height(x)?;
+                let next = ray(x, [level + FOOT_PROBE, level - FOOT_PROBE], true)?;
+                let [near, far] = next.ends_toward(right);
+                let covers_sample = if right { near[0] < x && x <= far[0] } else { far[0] <= x && x < near[0] };
+                (next.stationary && near == join && covers_sample && next.height(x).is_some()).then_some(next)
+            }) else {
+                return false;
+            };
+            self = next;
+        }
+        clears(self.ends_toward(right)[1][0])
+    }
+
+    fn placement_height(
+        self,
+        x: f32,
+        ray: &mut impl FnMut(f32, [f32; 2], bool) -> Option<Self>,
+    ) -> Option<f32> {
+        let height = self.height(x)?;
+        let [[left, _], [right, _]] = self.ends_toward(true);
+        if !(left..=right).contains(&x) {
+            return None;
+        }
+        (self.clears_end(x, false, ray) && self.clears_end(x, true, ray)).then_some(height)
+    }
+}
+
+/// Preserve the measured spacing. Ordinary moves mirror when their usual side
+/// is unavailable. Drag keeps its inward launch and Flip keeps its lower landing.
+/// Result is the CPU's x/y and its side relative to P1.
+pub fn floor_placement(
+    request: Scenario,
+    [x, y]: [f32; 2],
+    preferred: f32,
+    camera_bottom: Option<f32>,
+    mut ray: impl FnMut(f32, [f32; 2], bool) -> Option<PlacementFloor>,
+) -> Option<[f32; 3]> {
+    let spacing = placement_spacing(request);
+    if request.plan == Plan::Flip {
+        let target = x + spacing * preferred;
+        let floor = ray(target, [y + FOOT_PROBE, camera_bottom?], true)?;
+        // Let the same native fall settle on the proven landing line.
+        return floor.placement_height(target, &mut ray).map(|_| [target, y, preferred]);
+    }
+
+    let trolley = request.plan == Plan::Trolley;
+    let footing = ray(x, [y + FOOT_PROBE, y - FOOT_PROBE], !trolley)?;
+    if trolley && (!footing.stationary || !trolley_solid_floor(footing.flags)) {
+        return None;
+    }
+    let foot_offset = y - footing.height(x)?;
+    for side in [preferred, -preferred] {
+        let target = x + spacing * side;
+        if trolley {
+            if footing.supported_height(target).is_some()
+                && trolley_floor_runway([x, y], target, side, footing.ends)
+            {
+                return Some([target, y, side]);
+            }
+        } else {
+            let height = footing.placement_height(target, &mut ray).or_else(|| {
+                // A different collision segment can support the same approach.
+                let level = footing.height(target)?;
+                ray(target, [level + FOOT_PROBE, level - FOOT_PROBE], true)?
+                    .placement_height(target, &mut ray)
+            });
+            if let Some(height) = height.map(|height| height + foot_offset).filter(|height| height.is_finite()) {
+                return Some([target, height, side]);
+            }
+        }
+        if request.plan == Plan::Drag {
+            break;
+        }
+    }
+    None
 }
 
 /// The original move status is requested on the attacker only. Victim statuses and links are native.

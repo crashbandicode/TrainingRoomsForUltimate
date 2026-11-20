@@ -14,7 +14,7 @@ use crate::model::mashout::{
     native::Clock,
 };
 use crate::model::practice_games::Game as PracticeGame;
-use crate::model::sites_mashout::{self, TROLLEY_FLOOR_RAY, TROLLEY_FLOOR_RAY_IMPL};
+use crate::model::sites_mashout::{self, FLOOR_RAY, FLOOR_RAY_IMPL};
 use crate::model::{
     input_delay::MappedInputs,
     notify::DEFAULT_COLOR,
@@ -38,48 +38,75 @@ mod reader;
 #[path = "mashout/worker.rs"]
 mod worker;
 
-/// One short ray identifies P1's present collision line. Read the borrowed line
-/// and its vertices synchronously on the game thread before Place mutates either body.
-unsafe fn trolley_floor_allows(p1: usize, x: f32, y: f32, spacing: f32, facing: f32) -> bool {
-    // The layout proof requires the exact instructions, including each reader's interior.
-    if !sites_mashout::SITES.iter().filter(|site| sites_mashout::trolley_floor_only(site))
-        .all(|site| game::granted(site.offset) && game::read_window(site.offset) == site.guard)
-    {
-        return false;
+// This 13.0.5 ray reads and writes all 16 bytes of its Vector2f references.
+#[repr(C, align(16))]
+struct RayPoint([f32; 4]);
+
+type RayCast = unsafe extern "C" fn(usize, *const RayPoint, *const RayPoint, *mut RayPoint, bool) -> usize;
+
+struct FloorRay {
+    accessor: usize,
+    cast: RayCast,
+}
+
+impl FloorRay {
+    /// Validate the exact borrowed-line and endpoint reader contract before any ray.
+    unsafe fn new(p1: usize) -> Option<Self> {
+        if !sites_mashout::SITES.iter().filter(|site| sites_mashout::placement_floor(site))
+            .all(|site| game::granted(site.offset) && game::read_window(site.offset) == site.guard)
+        {
+            return None;
+        }
+        let base = game::text_base();
+        let ground = ((p1 + 0x58) as *const usize).read();
+        if ground == 0 {
+            return None;
+        }
+        let vtable = (ground as *const usize).read();
+        if (vtable != base + 0x4f87560 && vtable != base + 0x4f6d8b0)
+            || ((vtable + 0x668) as *const usize).read() != base + FLOOR_RAY_IMPL
+        {
+            return None;
+        }
+        let cast: RayCast = core::mem::transmute(base + FLOOR_RAY);
+        Some(Self { accessor: p1, cast })
     }
-    let base = game::text_base();
-    let ground = ((p1 + 0x58) as *const usize).read();
-    if ground == 0 {
-        return false;
+
+    /// The native result is borrowed only until the next query. Copy its current geometry.
+    unsafe fn floor(&self, x: f32, [top, bottom]: [f32; 2], platforms: bool) -> Option<entry::PlacementFloor> {
+        if ![x, top, bottom].into_iter().all(f32::is_finite) || top <= bottom {
+            return None;
+        }
+        let mut hit = RayPoint([0.; 4]);
+        let line = (self.cast)(
+            self.accessor, &RayPoint([x, top, 0., 0.]), &RayPoint([0., bottom - top, 0., 0.]),
+            &mut hit, platforms,
+        );
+        if line == 0 {
+            return None;
+        }
+        let flags = ((line + 0xc4) as *const u32).read();
+        // Classify one-way platforms before using the solid floor bit.
+        let normal_y = ((line + 0xa4) as *const f32).read();
+        if !normal_y.is_finite() {
+            return None;
+        }
+        let is_floor = if flags & 0x2000 != 0 {
+            platforms && flags & 0x0300 == 0 && normal_y > 0.0
+        } else {
+            flags & 0x0800 != 0
+        };
+        if !is_floor {
+            return None;
+        }
+        let vertices = ((line + 0x88) as *const [usize; 2]).read();
+        if vertices.contains(&0) {
+            return None;
+        }
+        let ends = vertices.map(|ptr| ((ptr + 0x10) as *const [f32; 2]).read());
+        let stationary = ends == vertices.map(|ptr| ((ptr + 0x20) as *const [f32; 2]).read());
+        Some(entry::PlacementFloor { ends, stationary, flags })
     }
-    let vtable = (ground as *const usize).read();
-    if (vtable != base + 0x4f87560 && vtable != base + 0x4f6d8b0)
-        || ((vtable + 0x668) as *const usize).read() != base + TROLLEY_FLOOR_RAY_IMPL
-    {
-        return false;
-    }
-    // The 13.0.5 function does 16-byte SIMD reads and writes for its Vector2f references.
-    #[repr(C, align(16))]
-    struct Ray([f32; 4]);
-    let ray: unsafe extern "C" fn(usize, *const Ray, *const Ray, *mut Ray, bool) -> usize =
-        core::mem::transmute(base + TROLLEY_FLOOR_RAY);
-    let mut hit = Ray([0.; 4]);
-    let line = ray(p1, &Ray([x, y + 0.25, 0., 0.]), &Ray([0., -0.5, 0., 0.]), &mut hit, false);
-    if line == 0 || !entry::trolley_solid_floor(((line + 0xc4) as *const u32).read()) {
-        return false;
-    }
-    let [left, right] = ((line + 0x88) as *const [usize; 2]).read();
-    if left == 0 || right == 0 {
-        return false;
-    }
-    let left_now = ((left + 0x10) as *const [f32; 2]).read();
-    let right_now = ((right + 0x10) as *const [f32; 2]).read();
-    if left_now != ((left + 0x20) as *const [f32; 2]).read()
-        || right_now != ((right + 0x20) as *const [f32; 2]).read()
-    {
-        return false;
-    }
-    entry::trolley_floor_runway([x, y], x + spacing * facing, facing, [left_now, right_now])
 }
 
 /// Supply only the selected move's native resource on the CPU body confirmed at Reload.
@@ -1455,7 +1482,17 @@ pub unsafe fn frame(fighter: usize) {
         }
         Step::Retry => (),
         Step::Choose => {
-            if !released {
+            // A grounded CPU can teeter after native move travel. Only Choose may
+            // carry that resting CPU into a fresh placement. Settle still needs WAIT.
+            if !released
+                && (linked
+                    || status != ids[0]
+                    || natives::status_kind(cpu) != ids[15]
+                    || natives::situation_kind(p1) != ids[7]
+                    || natives::situation_kind(cpu) != ids[7]
+                    || natives::is_stop(p1)
+                    || natives::is_stop(cpu))
+            {
                 return;
             }
             let Some(config) = config else {
@@ -1539,23 +1576,14 @@ pub unsafe fn frame(fighter: usize) {
             let Some(request) = game.requested else {
                 return;
             };
-            let spacing = entry::placement_spacing(request);
-            if request.plan == crate::model::mashout::moves::Plan::Trolley
-                && !trolley_floor_allows(p1, position.x, position.y, spacing, facing.signum())
-            {
-                // restriction: MASH-TROLLEY-FLOOR
-                game.fail("Trolley needs more stage floor · no grade");
-                return;
-            }
-            state_natives::clear_speed_all(p1);
-            state_natives::status_request(p1, ids[0]);
-            state_natives::clear_speed_all(cpu);
-            let drag = request.plan == crate::model::mashout::moves::Plan::Drag;
-            if drag || request.plan == crate::model::mashout::moves::Plan::Flip {
+            use crate::model::mashout::moves::Plan;
+            let mut camera_bottom = None;
+            let drag = request.plan == Plan::Drag;
+            if drag || request.plan == Plan::Flip {
                 // Camera centre is a direction reference, never proof of collision floor/runway.
                 // Flip faces P1 from the stage interior: P1's own facing is incidental after an
                 // attempt and once put the measured 41-unit CPU off the stage (GEN11-DIAGNOSIS).
-                let Some([left, right, _, _]) = natives::camera_limit_range()
+                let Some([left, right, _, bottom]) = natives::camera_limit_range()
                     .filter(|r| r.iter().all(|v| v.is_finite()) && r[0] < r[1])
                 else {
                     // restriction: MASH-RIDLEY-FIXTURE
@@ -1567,17 +1595,37 @@ pub unsafe fn frame(fighter: usize) {
                     let outward = (position.x - centre).signum();
                     facing = if drag { outward } else { -outward };
                 }
+                camera_bottom = Some(bottom);
             }
-            let side = facing.signum();
+            let placement = FloorRay::new(p1).and_then(|floor| {
+                entry::floor_placement(
+                    request, [position.x, position.y], facing.signum(), camera_bottom,
+                    |x, range, platforms| floor.floor(x, range, platforms),
+                )
+            });
+            let Some([x, y, side]) = placement else {
+                game.fail(if request.plan == Plan::Trolley {
+                    // restriction: MASH-TROLLEY-FLOOR
+                    "Trolley needs more stage floor · no grade"
+                } else {
+                    // restriction: MASH-M1-MISMATCH
+                    "Position unavailable"
+                });
+                return;
+            };
+            state_natives::clear_speed_all(p1);
+            state_natives::status_request(p1, ids[0]);
+            state_natives::clear_speed_all(cpu);
             state_natives::init_pos(
                 cpu,
                 &state_natives::Vector3f {
-                    x: position.x + spacing * side,
+                    x,
+                    y,
                     ..position
                 },
             );
             // Native CATCH_TURN reverses the CPU's facing on entry.
-            let pivot = request.plan == crate::model::mashout::moves::Plan::Grab && request.grab == 2;
+            let pivot = request.plan == Plan::Grab && request.grab == 2;
             state_natives::set_lr(cpu, if pivot { side } else { -side });
             state_natives::status_request(cpu, ids[0]);
             game.step(Step::Settle, "Mash out · Waiting for grounded fighters");
@@ -2143,7 +2191,7 @@ pub unsafe fn frame(fighter: usize) {
             // Restore owns no practice input, including while the original body is pending.
             revoke();
             OWN_CPU.store(0, Ordering::Release);
-            // Primary-approved Restore-only resting state: grounded teeter is not a capture.
+            // Grounded teeter is a resting state for Restore as it is for Choose.
             if linked
                 || status != ids[0]
                 || ![ids[0], ids[15]].contains(&natives::status_kind(cpu))

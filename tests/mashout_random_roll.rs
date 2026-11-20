@@ -46,6 +46,9 @@ fn revoke() {}
 mod natives {
     pub fn fighter_entry(entry: usize) -> usize { entry }
     pub fn entry_active_body(_: usize) -> usize { unsafe { core::ptr::addr_of!(super::BODY_MEM) as usize } }
+    pub fn is_stop(_: usize) -> bool { false }
+    pub fn status_kind(_: usize) -> u32 { 0 }
+    pub fn situation_kind(_: usize) -> u32 { 0 }
 }
 mod runtime { pub mod roster { pub mod character_roster {
     pub fn cpu_reload_ready() -> bool { crate::READY.load(crate::Ordering::Relaxed) }
@@ -89,7 +92,11 @@ unsafe fn actual_restart(game: &mut Game, config: Option<Config>, linked: bool) 
     // RESTART
 }
 unsafe fn actual_choose(game: &mut Game, config: Option<Config>, p1: usize, cpu: usize, cpu_entry: usize) {
-    let released = true;
+    let linked = false;
+    let mut ids = [0; 16];
+    ids[15] = 0x7f; // OTTOTTO_WAIT; both fixture fighters start grounded in WAIT.
+    let status = natives::status_kind(p1);
+    let released = RELEASE_CHECK;
     match game.step {
         // CHOOSE
         _ => (),
@@ -165,7 +172,10 @@ fn a_concrete_attacker_restart_asks_for_no_second_load() {
 
 #[test]
 fn actual_mashout_random_roll_survives_its_own_reload_restart() {
+    let (_, released) = SOURCE.split_once("    let released = ").expect("actual runtime release check");
+    let (released, _) = released.split_once(';').expect("terminated release check");
     let fixture = FIXTURE
+        .replace("RELEASE_CHECK", released)
         .replace("// STEP", block(SOURCE, "fn step(&mut self, next: Step, text: &'static str) {"))
         .replace("// RESTART", block(SOURCE, "if restart {"))
         .replace("// CHOOSE", block(SOURCE, "Step::Choose => {"));
