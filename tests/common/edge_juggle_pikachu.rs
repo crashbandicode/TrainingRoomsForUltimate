@@ -55,7 +55,7 @@ fn skull_bash_starts_only_inside_its_baked_region_and_live_stage_shape() {
     for stage in [0, 3, 311] {
         let path = skull_bash_start((stage, 0), &RING, ledges, release, BOTTOM, 8.5).unwrap();
         assert_eq!(path.direction, 1.0);
-        assert!((path.launch_y - (-49.018)).abs() < 0.002);
+        assert!((path.launch_y - (-50.298)).abs() < 0.002);
         assert_eq!(path.near, [-1.7, -9.9]);
         assert_eq!(path.far, TARGET);
         assert_eq!(path.height, 10.0);
@@ -68,7 +68,14 @@ fn skull_bash_starts_only_inside_its_baked_region_and_live_stage_shape() {
     for stage in [(89, 0), (33, 0), (0, 1), (3, 2)] {
         assert!(skull_bash_start(stage, &RING, ledges, release, BOTTOM, 10.0).is_none());
     }
-    for start in [[-60.0, -28.0], [-20.0, -69.0], [-6.0, -28.0], [f32::NAN, -28.0]] {
+    assert!(skull_bash_start((3, 0), &RING, ledges, [-39.0, -55.0], BOTTOM, 10.0).is_some());
+    for start in [
+        [-60.0, -28.0],
+        [-20.0, -69.0],
+        [-21.0, -66.0],
+        [-6.0, -28.0],
+        [f32::NAN, -28.0],
+    ] {
         assert!(skull_bash_start((3, 0), &RING, ledges, start, BOTTOM, 10.0).is_none());
     }
     assert!(skull_bash_start((3, 0), &RING, ledges, release, -125.0, 10.0).is_none());
@@ -112,9 +119,11 @@ fn skull_bash_flies_the_native_side_jump_and_two_aim_sequence() {
     assert_eq!(descend.stick, Some([0.0, -1.0]));
     assert_eq!(descend.press, 0);
     assert_ne!(descend.release & GUARD, 0);
-    let press = input(14, Motion::Free, true, [-20.0, -50.22], -1.55);
+    let before_clearance = input(13, Motion::Free, true, [-20.0, -49.95], -1.55);
+    assert_eq!(before_clearance.press, 0);
+    let press = input(14, Motion::Free, true, [-20.0, -51.5], -1.55);
     assert_eq!((press.stick, press.press), (Some([1.0, 0.0]), SPECIAL));
-    let startup = input(15, Motion::Starting, false, [-20.0, -50.22], -0.1);
+    let startup = input(15, Motion::Starting, false, [-20.0, -51.5], -0.1);
     assert_eq!(startup.press, 0, "uncharged Bash releases the special button");
     input(50, Motion::Travel, false, [50.0, -53.32], 0.0);
     input(90, Motion::Finish, false, [100.0, -94.0], -1.55);
