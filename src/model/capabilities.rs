@@ -156,6 +156,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 15] = [
             "state_get_param_int",
             "state_heal",
             "state_init_pos",
+            "state_lr",
             "state_set_lr",
             "state_set_pos",
             "state_set_situation_kind",
