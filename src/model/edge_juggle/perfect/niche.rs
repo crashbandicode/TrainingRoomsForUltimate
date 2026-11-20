@@ -564,7 +564,7 @@ impl Sequence {
     }
 }
 
-fn pad(stick: Point, press: u32) -> Correction {
+pub(super) fn pad(stick: Point, press: u32) -> Correction {
     Correction {
         stick: Some(stick),
         press,

@@ -279,7 +279,7 @@ fn niche_pikachu_thunder_waits_for_its_measured_fall() {
 
 #[test]
 fn niche_pikachu_skull_bash_route_and_pad_sequence() {
-    verify(0x8, "long", 3, &[Move::Side, Move::Hold, Move::QuickAttack]);
+    verify(0x8, "long", 3, &[Move::Side, Move::Jump, Move::QuickAttack]);
 }
 
 #[test]

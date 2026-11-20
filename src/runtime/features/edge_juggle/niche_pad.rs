@@ -9,13 +9,15 @@ use crate::{
     runtime::game,
 };
 use perfect::niche::{self, Budget, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
-use perfect::{recovery, AirPhysics, Correction, Point, Route, RouteFacts, SpecialReach};
+use perfect::pikachu::{self, SkullBashFlight};
+use perfect::{recovery, AirPhysics, Correction, Outline, Point, Route, RouteFacts, SpecialReach};
 
 pub(super) struct NicheGuide {
     sequence: Sequence,
     fighter: i32,
     ledge: Point,
     across: Option<Crossing>,
+    skull_bash: Option<SkullBashFlight>,
     player_x: f32,
     body_clearance: f32,
 }
@@ -32,6 +34,7 @@ struct Crossing {
 /// What the plan already read for the row's need and its crossing budget.
 pub(super) struct RowInputs {
     pub short: bool,
+    pub speed: Point,
     pub air: AirPhysics,
     pub jumps: u8,
     pub special: Option<SpecialReach>,
@@ -59,6 +62,38 @@ impl NicheGuide {
         let outside = (near[0] - x) * direction;
         if !(outside > 0.0 && facts.player.into_iter().all(f32::is_finite)) {
             return None;
+        }
+        if fighter == 0x8 {
+            band?;
+            let path = pikachu::skull_bash_start(
+                facts.stage, facts.outline, facts.ledges, facts.position, facts.blast[3],
+                facts.body_clearance,
+            )?;
+            let row = niche::skull_bash_row(niche::CANDIDATE_ROWS)?;
+            if inputs.special.is_none()
+                || inputs.jumps == 0
+                || inputs.speed[0].abs() > inputs.air.horizontal_acceleration
+                || inputs.speed[1] > 0.0
+                || ![Move::Side, Move::Jump, Move::QuickAttack]
+                    .into_iter()
+                    .all(|movement| niche_start_enabled(cpu, movement, true))
+            {
+                return None;
+            }
+            let mut outline = Outline::new();
+            for &line in facts.outline {
+                outline.add(line);
+            }
+            let guide = Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: path.far,
+                across: None,
+                skull_bash: Some(SkullBashFlight::new(path, outline, facts.blast[3])),
+                player_x: facts.player[0],
+                body_clearance: facts.body_clearance,
+            };
+            return Some((guide, 1.0));
         }
         // A crossing starts below the near ledge. An extension row sees every height and
         // applies its own rule (`climb`).
@@ -113,6 +148,7 @@ impl NicheGuide {
             fighter,
             ledge: if across.is_some() { far } else { near },
             across,
+            skull_bash: None,
             player_x: facts.player[0],
             body_clearance: facts.body_clearance,
         };
@@ -157,6 +193,22 @@ impl NicheGuide {
         }
         let (snapshot, available) = recovery_snapshot(ai)?;
         let reach = if available { Some(special_reach(ai, snapshot)?) } else { None };
+        if let Some(skull_bash) = &mut self.skull_bash {
+            let (_, vy) = super::super::recording_host::fighter_speed(cpu)?;
+            let motion = niche_motion_phase(cpu, self.fighter, movement, status);
+            return skull_bash.step(&mut self.sequence, Sample {
+                frame,
+                motion,
+                can_start: motion == Motion::Free && niche_start_enabled(cpu, movement, available),
+                valid: true,
+                at_exit: false,
+                can_enter: false,
+                low: false,
+                hold_over: false,
+                direction: 0.0,
+                aim: [0.0; 2],
+            }, [x, y], vy);
+        }
 
         let (mut direction, mut aim, mut at_exit, mut can_enter) = (
             (self.ledge[0] - x).signum(),

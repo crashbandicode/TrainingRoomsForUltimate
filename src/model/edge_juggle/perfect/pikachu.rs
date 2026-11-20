@@ -123,6 +123,18 @@ const SKULL_BASH_RING: [u32; 44] = [
     0x0000, 0x0000, 0x0000, 0x0000,
 ];
 
+fn in_region(outside: f32, height: f32) -> bool {
+    if !outside.is_finite() || !height.is_finite() || outside <= 0.0 || height > 40.0 {
+        return false;
+    }
+    let column = (outside / 4.0) as u32;
+    let row = ((40.0 - height) / 4.0) as usize;
+    SKULL_BASH_RING
+        .get(row)
+        .zip(1u32.checked_shl(column))
+        .is_some_and(|(&mask, cell)| mask & cell != 0)
+}
+
 /// Start outside the lip in a cell baked for the live normal-form floor and blast line.
 pub fn skull_bash_start(
     stage: (i32, u32),
@@ -145,18 +157,14 @@ pub fn skull_bash_start(
     let outside = (near[0] - x) * direction;
     let y = y - near[1];
     let underside = outline.iter().flatten().map(|point| point[1]).reduce(f32::min)?;
-    if outside <= 0.0
-        || y > 40.0
-        || ((right[0] - left[0]) * 0.5 - 79.99).abs() > 0.5
+    if ((right[0] - left[0]) * 0.5 - 79.99).abs() > 0.5
         || (right[1] - left[1]).abs() > 0.5
         || (underside - near[1] + 40.1).abs() > 1.0
         || (bottom - near[1] + 140.0).abs() > 1.0
     {
         return None;
     }
-    let column = (outside / 4.0) as u32;
-    let row = ((40.0 - y) / 4.0) as usize;
-    if SKULL_BASH_RING.get(row)? & 1u32.checked_shl(column)? == 0 {
+    if !in_region(outside, y) {
         return None;
     }
     Some(SkullBashPath {
@@ -170,20 +178,86 @@ pub fn skull_bash_start(
 }
 
 pub struct SkullBashFlight {
-    _path: SkullBashPath,
-    _outline: Outline,
-    _bottom: f32,
+    path: SkullBashPath,
+    outline: Outline,
+    bottom: f32,
+    bash_committed: bool,
+    jump_accepted: bool,
+    zips: Option<ZipPlan>,
 }
 
 impl SkullBashFlight {
     pub fn new(path: SkullBashPath, outline: Outline, bottom: f32) -> Self {
-        Self { _path: path, _outline: outline, _bottom: bottom }
+        Self {
+            path,
+            outline,
+            bottom,
+            bash_committed: false,
+            jump_accepted: false,
+            zips: None,
+        }
     }
 
     pub fn step(
-        &mut self, _sequence: &mut Sequence, _sample: Sample, _position: Point, _vy: f32,
+        &mut self, sequence: &mut Sequence, mut sample: Sample, position: Point, vy: f32,
     ) -> Option<Correction> {
-        None
+        use super::niche::{self, Motion, Move};
+        let movement = sequence.action()?;
+        let outline = self.outline.segments();
+        let path = self.path;
+        if !sample.valid
+            || sample.motion == Motion::Interrupted
+            || !position.into_iter().chain([vy]).all(f32::is_finite)
+            || !clear(outline, [position; 2], self.bottom, path.height)
+        {
+            return None;
+        }
+        if movement == Move::Side && !self.bash_committed {
+            let ledge_x = path.near[0] + path.direction * 1.7;
+            let ledge_y = path.near[1] + 9.9;
+            let outside = (ledge_x - position[0]) * path.direction;
+            if sample.motion != Motion::Free || !in_region(outside, position[1] - ledge_y) {
+                return None;
+            }
+            if position[1] > path.launch_y {
+                // Release before the side-special frame. Before this point, the full fall is reversible.
+                return Some(niche::pad([0.0, -1.0], 0));
+            }
+            if !sample.can_start {
+                return None;
+            }
+            self.bash_committed = true;
+        }
+        if movement == Move::Jump {
+            if sample.motion == Motion::Travel {
+                self.jump_accepted = true;
+                if vy <= 0.0 {
+                    sample.motion = Motion::Free;
+                }
+            } else if !self.jump_accepted && !sample.can_start {
+                return None;
+            }
+        }
+        if movement == Move::QuickAttack && self.zips.is_none() {
+            if sample.motion != Motion::Free || !sample.can_start {
+                return None;
+            }
+            let solve = |target| quick_attack(outline, position, target, self.bottom, path.height);
+            self.zips = Some(solve(path.far).or_else(|| solve(path.near))?);
+        }
+        sample.direction = path.direction;
+        sample.at_exit = true;
+        sample.can_enter = true;
+        let mut input = sequence.step(sample)?;
+        if movement == Move::QuickAttack {
+            let zips = self.zips?;
+            input.stick = match sample.motion {
+                Motion::Starting | Motion::Travel => Some(zips.first),
+                Motion::AimAgain | Motion::Finish => Some(zips.second.unwrap_or([0.0; 2])),
+                _ => input.stick,
+            };
+        }
+        Some(input)
     }
 }
 

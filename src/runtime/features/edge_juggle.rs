@@ -857,6 +857,7 @@ unsafe fn route_guide(
     if fighter != UNRESOLVED {
         let inputs = niche_pad::RowInputs {
             short: recovery::short(reach, pos, speed, near_ledge, bottom),
+            speed,
             air,
             jumps,
             special,
