@@ -620,12 +620,13 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     own[..3].copy_from_slice(&eggs_orbs);
     let edge_wizard = super::edge_juggle::wizard_active();
     let tech = super::tech::running();
+    let grader = super::input_display::grader_live();
     // rc.15 target-hurtbox-display: the live targets' break volumes (the picture discs), drawn as hurtboxes below. Spacing
     // grader hook: its rings take these discs (`orbs::target_hurt_orbs`) rather than drawing a second one.
     let hurt_on = SETTING.load(Ordering::Acquire) && legend::shows(SHOWN.load(Ordering::Acquire), hitbox::KIND_HURT);
     let mut targets = [Orb::NONE; 1 + crate::model::btt::MAX];
     let mut n_targets = 0;
-    if hurt_on && !tech && !edge_wizard {
+    if (hurt_on || grader) && !tech && !edge_wizard {
         n_targets = orbs::target_hurt_orbs(&own[..3], &mut targets);
         n_targets += orbs::target_hurt_orbs(&marks, &mut targets[n_targets..]);
     }
@@ -709,7 +710,8 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         // Hitboxes and grabs take the panes first. Uncertain snapshots yield no fighter panes this tick.
         let bits = SHOWN.load(Ordering::Acquire);
         // A busy board keeps the last frame's panes: no target cap may overwrite a fighter's retained one.
-        let target_hurts = targets[..orbs::targets_drawn(board.is_some(), hurt_on, n_targets)].iter();
+        let drawn = orbs::targets_drawn(board.is_some() || !on, hurt_on || grader, n_targets);
+        let target_hurts = targets[..drawn].iter();
         let write_pill = |pill: orbs::Pill, used: &mut orbs::PaneUse, over: &mut usize, panes: &[usize; p::ORBS]| {
             let Some((cap, band)) = used.take(pill.length > 0.0) else {
                 *over += 1;
@@ -725,7 +727,6 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         for orb in board
             .iter()
             .flat_map(|b| b.draw_slots_in_order(b.draw_slots(&hide)))
-            .chain(target_hurts)
             .filter(|o| legend::shows(bits, o.kind()))
         {
             let Some(pill) = plan(orb, orb.color) else { continue };
@@ -740,16 +741,12 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             }
             write_pill(pill, &mut used, &mut over, &cache.panes);
         }
-        if super::input_display::grader_live() {
-            for (at, _) in own.iter().flatten().filter(|(_, look)| look.picture == p::EggPicture::Whole) {
-                let centre = [at[0], at[1], 0.0];
-                for (centre, radius, color) in crate::model::spacing::zone_discs(centre) {
-                    let mut zone = Orb::NONE;
-                    zone.centre = centre;
-                    zone.tail = centre;
-                    zone.radius = radius;
-                    zone.color = color;
-                    let Some(pill) = plan(&zone, color) else { continue };
+        for target in target_hurts {
+            let Some(pill) = plan(target, target.color) else { continue };
+            write_pill(pill, &mut used, &mut over, &cache.panes);
+            if grader {
+                for zone in crate::model::spacing::zone_discs(target) {
+                    let Some(pill) = plan(&zone, zone.color) else { continue };
                     write_pill(pill, &mut used, &mut over, &cache.panes);
                 }
             }

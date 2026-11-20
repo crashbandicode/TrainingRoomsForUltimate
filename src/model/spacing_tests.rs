@@ -216,16 +216,22 @@ fn rings_take_first_accepted_per_ring() {
 
 fn target_zone_rings_radii() {
     let centre = [3.0, -2.0, 0.0];
-    let discs = zone_discs(centre);
-    assert_eq!(discs.map(|d| d.0), [centre; 3]);
-    for (actual, expected) in discs.map(|d| d.1).into_iter().zip([4.0, 8.0 / 3.0, 4.0 / 3.0]) {
+    let mut target = crate::model::hitbox_orbs::Orb::NONE;
+    target.centre = centre;
+    target.tail = centre;
+    target.radius = 4.0;
+    target.color = [72, 208, 118, 96];
+    target.key = 17;
+    let discs = zone_discs(&target);
+    assert_eq!(discs.map(|d| d.centre), [centre; 2]);
+    for (actual, expected) in discs.map(|d| d.radius).into_iter().zip([8.0 / 3.0, 4.0 / 3.0]) {
         assert!((actual - expected).abs() < 1e-6);
     }
-    assert_eq!(discs.map(|d| d.2), [
-        [72, 208, 118, 96],
+    assert_eq!(discs.map(|d| d.color), [
         [244, 186, 64, 96],
         [232, 232, 236, 96],
     ]);
+    assert_eq!(discs.map(|d| d.key), [target.key; 2]);
 }
 
 #[test]

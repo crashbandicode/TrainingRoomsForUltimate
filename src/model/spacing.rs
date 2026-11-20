@@ -286,12 +286,14 @@ pub fn hook(
     live.then(|| capture(read, module, entry, lanes)).flatten()
 }
 
-pub fn zone_discs(centre: [f32; 3]) -> [([f32; 3], f32, [u8; 4]); 3] {
-    [
-        (centre, 4.0, [72, 208, 118, 96]),
-        (centre, 8.0 / 3.0, [244, 186, 64, 96]),
-        (centre, 4.0 / 3.0, [232, 232, 236, 96]),
-    ]
+pub fn zone_discs(target: &crate::model::hitbox_orbs::Orb) -> [crate::model::hitbox_orbs::Orb; 2] {
+    let mut good = *target;
+    good.radius = 8.0 / 3.0;
+    good.color = [244, 186, 64, 96];
+    let mut ok = *target;
+    ok.radius = 4.0 / 3.0;
+    ok.color = [232, 232, 236, 96];
+    [good, ok]
 }
 
 #[cfg(test)]
