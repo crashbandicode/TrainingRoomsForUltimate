@@ -180,6 +180,8 @@ pub fn planned_delay(route: Route, zone: Zone, deadline: Option<u8>, draw: u32) 
 
 #[derive(Clone, Copy)]
 pub struct HoldFacts {
+    /// The attempt's game frame: several think calls can share one.
+    pub frame: u32,
     pub buttons: u32,
     /// The held resource: `JUMP` or `SPECIAL`.
     pub button: u32,
