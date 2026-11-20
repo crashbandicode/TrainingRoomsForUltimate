@@ -47,3 +47,14 @@ and no teleporting; every correction is a real controller input. Level 9 mode ru
    them on Stop? Recommended: **yes**. ![Q6](edge-juggle/illustrations/Q6-cpu-settings.png)
 
 The pictures are mockups, not game footage.
+
+## Design v2 (2026-11-20 02:11Z)
+
+- **Recovery planner (Perfect):** near ledge, the **opposite ledge under the stage**, high to stage, or late and low. It decides from the stage's live collision lines, the CPU's position, velocity, jumps and specials, and per-fighter limits. It penalises repeating a route, and Pikachu's Thunder counts as a threat to you on the way out.
+- **Niche-recovery table:** your list is treated as candidates, all marked **unverified** until an Eden trace on the release shows them. Verified first: Pikachu, Sora, R.O.B., Diddy and Game & Watch, each on Final Destination plus one stage that can't be crossed.
+- **Stages:** whether a crossing is possible comes from a geometry test under the main stage, for each fighter's limits. There's no hand-made list; stages shaped like Yoshi's Story fail the test.
+- **Reaction setting:** Frame-perfect / Human (12 frames) / Custom (1–30 frames).
+
+![Four start areas](edge-juggle/illustrations/V2-edge-four-areas.png)
+
+![Recovery planner](edge-juggle/illustrations/V2-recovery-planner.png)
