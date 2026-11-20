@@ -78,6 +78,8 @@ impl NicheGuide {
                 climb: near[1] - y,
                 body: facts.body_clearance,
                 special,
+                ledge_covered: (facts.player[0] - near[0]).hypot(facts.player[1] - near[1])
+                    <= facts.player_reach,
             }),
             climb: near[1] - y,
             budget: band.map(|band| Budget {

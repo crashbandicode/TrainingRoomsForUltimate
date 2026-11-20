@@ -37,6 +37,8 @@ pub struct NearReach {
     pub climb: f32,
     pub body: f32,
     pub special: SpecialReach,
+    /// The ledge lies inside P1's sampled threat radius.
+    pub ledge_covered: bool,
 }
 
 /// Live inputs of the under-stage crossing budget.
