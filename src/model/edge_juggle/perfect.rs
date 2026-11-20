@@ -852,33 +852,31 @@ pub fn landing_variant(facts: LandingFacts, options: LandingOptions, draw: u32) 
     {
         return Correction::default();
     }
+    let away = if cpu[0] != player[0] {
+        (cpu[0] - player[0]).signum()
+    } else if draw % 2 == 0 {
+        -1.0
+    } else {
+        1.0
+    };
     let mut out = Correction::default();
-    let [x, y] = match draw {
-        0..=3 if cpu[0] != player[0] => [(cpu[0] - player[0]).signum(), stock_stick_y],
-        0 | 2 => [-1.0, stock_stick_y],
-        1 | 3 => [1.0, stock_stick_y],
-        4 => [0.0, stock_stick_y],
-        6 if options.fast_fall => [0.0, -1.0],
+    let planned = match draw {
+        0..=3 => Some([away, stock_stick_y]),
+        4 => Some([0.0, stock_stick_y]),
+        6 if options.fast_fall => Some([0.0, -1.0]),
         7 if options.jump => {
             out.press = JUMP;
-            [(cpu[0] - player[0]).signum(), stock_stick_y]
+            Some([if cpu[0] == player[0] { 0.0 } else { away }, stock_stick_y])
         }
-        8 => {
-            let Some(x) = options.platform_x.filter(|x| left < *x && *x < right) else {
-                return out;
-            };
-            [
-                if x == cpu[0] {
-                    0.0
-                } else {
-                    (x - cpu[0]).signum()
-                },
-                stock_stick_y,
-            ]
-        }
-        _ => return out,
+        8 => options
+            .platform_x
+            .filter(|x| left < *x && *x < right)
+            .map(|x| [if x == cpu[0] { 0.0 } else { (x - cpu[0]).signum() }, stock_stick_y]),
+        _ => None,
     };
-    out.stick = Some([x, y]);
+    // An unavailable option under P1's reach can still leave the threat column by drifting.
+    let retreat = options.player_in_reach && (6..=8).contains(&draw);
+    out.stick = planned.or(retreat.then_some([away, stock_stick_y]));
     out
 }
 

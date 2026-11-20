@@ -562,10 +562,12 @@ unsafe fn landing_options(run: &Run, p1: usize, cpu: usize, facts: LandingFacts)
     }
     let mut out = LandingOptions::default();
     let [x, y] = facts.cpu;
-    let player_reach = fighter_height(p1, facts.player[1]).unwrap_or(f32::INFINITY);
-    let player_near = (x - facts.player[0]).abs() <= player_reach;
+    let Some(player_reach) = fighter_height(p1, facts.player[1]) else {
+        return out;
+    };
+    out.player_in_reach = (x - facts.player[0]).abs() <= player_reach;
     match run.landing_draw {
-        6 if !player_near => {
+        6 if !out.player_in_reach => {
             let gravity = konst(C::KineticGravity);
             let dive = konst(C::WorkFlagReserveDive);
             let Some(ray) = FloorRay::new(p1) else {
@@ -577,7 +579,7 @@ unsafe fn landing_options(run: &Run, p1: usize, cpu: usize, facts: LandingFacts)
                 && !natives::is_flag(cpu, dive)
                 && ray.floor(x, [y, run.stage.blast()[3]], true).is_some();
         }
-        7 if player_near => {
+        7 if out.player_in_reach => {
             let term = konst(C::TermContJumpAerial);
             let air = air_physics(cpu);
             out.jump = term != UNRESOLVED
