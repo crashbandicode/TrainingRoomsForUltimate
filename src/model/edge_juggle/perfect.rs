@@ -733,23 +733,41 @@ impl Capsule {
     }
 }
 
+pub enum MeteorWindow {
+    Waiting,
+    Actionable,
+    Interrupted,
+}
+
 #[derive(Default)]
 pub struct MeteorBounce {
-    active: bool,
+    awaiting_dodge: bool,
 }
 
 impl MeteorBounce {
-    pub fn step(&mut self, bounced: bool, idle_player: bool, buttons: u32) -> Correction {
-        let first = bounced && !self.active;
-        self.active = bounced;
-        if first && idle_player {
-            Correction {
-                release: buttons & GUARD,
-                ..Correction::default()
+    pub fn awaiting_dodge(&self) -> bool {
+        self.awaiting_dodge
+    }
+
+    pub fn step(
+        &mut self,
+        bounce_started: bool,
+        window: MeteorWindow,
+        idle_player: bool,
+        buttons: u32,
+    ) -> Correction {
+        self.awaiting_dodge |= bounce_started;
+        let mut edit = Correction::default();
+        match window {
+            MeteorWindow::Waiting => {}
+            MeteorWindow::Interrupted => self.awaiting_dodge = false,
+            MeteorWindow::Actionable => {
+                if std::mem::take(&mut self.awaiting_dodge) && idle_player {
+                    edit.release = buttons & GUARD;
+                }
             }
-        } else {
-            Correction::default()
         }
+        edit
     }
 }
 
@@ -1054,12 +1072,37 @@ mod tests {
 
     #[test]
     fn meteor_bounce_keeps_the_dodge_unless_the_player_waits_on_entry() {
+        use MeteorWindow::Actionable;
+
         let mut bounce = MeteorBounce::default();
-        assert_eq!(bounce.step(false, true, 0x8008), Correction::default());
-        assert_eq!(bounce.step(true, true, 0x8008).release, 0x8);
-        assert_eq!(bounce.step(true, true, 0x8008), Correction::default());
-        bounce.step(false, true, 0x8008);
-        assert_eq!(bounce.step(true, false, 0x8008), Correction::default());
+        assert_eq!(bounce.step(false, Actionable, true, 0x8008), Correction::default());
+        assert_eq!(bounce.step(true, Actionable, true, 0x8008).release, GUARD);
+        assert_eq!(bounce.step(false, Actionable, true, 0x8008), Correction::default());
+        assert_eq!(bounce.step(true, Actionable, false, 0x8008), Correction::default());
+        assert_eq!(bounce.step(false, Actionable, true, 0x8008), Correction::default());
+    }
+
+    #[test]
+    fn meteor_bounce_waits_for_the_first_actionable_dodge() {
+        use MeteorWindow::{Actionable, Waiting};
+
+        let mut bounce = MeteorBounce::default();
+        assert_eq!(bounce.step(true, Waiting, true, 0x8000), Correction::default());
+        assert_eq!(bounce.step(false, Waiting, true, 0x8008), Correction::default());
+        assert_eq!(bounce.step(false, Actionable, true, 0x8008).release, GUARD);
+        assert_eq!(bounce.step(false, Actionable, true, 0x8008), Correction::default());
+    }
+
+    #[test]
+    fn meteor_bounce_drops_its_pending_answer_on_interruption() {
+        use MeteorWindow::{Actionable, Interrupted, Waiting};
+
+        let mut bounce = MeteorBounce::default();
+        bounce.step(true, Waiting, true, 0);
+        assert!(bounce.awaiting_dodge());
+        bounce.step(false, Interrupted, true, 0);
+        assert!(!bounce.awaiting_dodge());
+        assert_eq!(bounce.step(false, Actionable, true, GUARD), Correction::default());
     }
 
     #[test]

@@ -13,8 +13,8 @@ use crate::model::cpu::{
 };
 use crate::model::edge_juggle::perfect::rule_counts::{Counters, PerfectRule};
 use crate::model::edge_juggle::perfect::{
-    self, AirPhysics, Correction, JumpTiming, LandingFacts, LandingOptions, MeteorBounce, PlanHeight,
-    Route, RouteFacts, ThreatClock,
+    self, AirPhysics, Correction, JumpTiming, LandingFacts, LandingOptions, MeteorBounce, MeteorWindow,
+    PlanHeight, Route, RouteFacts, ThreatClock,
 };
 use crate::model::edge_juggle::{
     Difficulty, Drill, Observation, Outcome, Phase, Reaction, Session, Setup, Stage, Wizard,
@@ -442,20 +442,39 @@ pub(super) unsafe fn ai_correction(ai: usize, accessor: usize, stock: StockPad) 
     let Some(p1) = natives::module_accessor(0) else {
         return Correction::default();
     };
-    if run.drill == Drill::Juggler && status != UNRESOLVED {
+    if run.drill == Drill::Juggler {
         let reflect = konst(C::StatusDamageFlyReflectD);
         let previous = std::mem::replace(&mut run.last_cpu_status, status);
-        let bounce = status == reflect
-            && [konst(C::StatusDamageFlyMeteor), reflect].contains(&previous)
-            && previous != UNRESOLVED;
-        let correction = run.bounce.step(
-            bounce,
-            natives::status_kind(p1) == konst(C::StatusWait)
-                && P1_BUTTONS.load(Ordering::Acquire) == 0,
-            buttons,
-        );
-        if correction != Correction::default() {
-            return stock.observe(correction, PerfectRule::Meteor, run, 0, run.reaction.frames().into());
+        let bounce_started = status != UNRESOLVED
+            && status == reflect
+            && previous != UNRESOLVED
+            && previous != reflect;
+        if bounce_started || run.bounce.awaiting_dodge() {
+            let escape = konst(C::TermContEscapeAir);
+            let air = konst(C::SituationAir);
+            let continued = status != UNRESOLVED
+                && (status == reflect || airborne_recovery(accessor, status));
+            let window = if !continued || escape == UNRESOLVED || air == UNRESOLVED {
+                MeteorWindow::Interrupted
+            } else if natives::situation_kind(accessor) == air
+                && natives::is_enable_transition_term(accessor, escape)
+            {
+                MeteorWindow::Actionable
+            } else {
+                MeteorWindow::Waiting
+            };
+            let correction = run.bounce.step(
+                bounce_started,
+                window,
+                natives::status_kind(p1) == konst(C::StatusWait)
+                    && P1_BUTTONS.load(Ordering::Acquire) == 0,
+                buttons,
+            );
+            if correction != Correction::default() {
+                return stock.observe(
+                    correction, PerfectRule::Meteor, run, 0, run.reaction.frames().into(),
+                );
+            }
         }
     }
     let position = [natives::pos_x(accessor), natives::pos_y(accessor)];
