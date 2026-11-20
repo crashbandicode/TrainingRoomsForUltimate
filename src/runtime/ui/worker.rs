@@ -1129,9 +1129,11 @@ fn record_slot(menu: &Menu) -> Option<usize> {
     menu.settings().menu.get("recording_slot")?.iter().position(|v| *v != 0)
 }
 
-/// Package 6's stage list (the lobby's 117 selectable stages), by catalog index.
+/// Package 6's stage list (the lobby's 117 stages), by grid display index.
 fn stage_label(i: usize) -> &'static str {
-    crate::engine::stages::catalog::STAGES.get(i).map_or("-", |(_, label)| *label)
+    crate::engine::stages::catalog::grid_stage_index(i)
+        .and_then(|index| crate::engine::stages::catalog::STAGES.get(index))
+        .map_or("-", |(_, label)| *label)
 }
 
 /// Build the frame of what is on screen (the clip editor, a layer panel, or the menu's own page and sub-screen) and hand it to the tick

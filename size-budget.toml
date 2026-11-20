@@ -2124,3 +2124,11 @@ ceiling = 167241
 date = "2026-11-20"
 reason = "Bridge state provider merged onto dca6aef8 (tr.menu/1 for the optional test bridge: snapshot, weak lookup with an exact header check, publish retry, editor.sel, keyboard, scene, the real ack outcome on every press path and overlay, visible-only notice; rc15/bridge-state 9dcb9a04). Measured +529 on 70f517c9 (166635 to 167164); main had 166712, so 166712 + 529 = 167241."
 approved_by = "Primary c07b3449 (2026-11-20): REVIEW PASS 04:36Z by review-bridge-astra; exact measured delta appended to main tail."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 167312
+date = "2026-11-20"
+reason = "rc.15 Eggs-ercise Spawn area (In view default / Whole stage) and the stage grids' display order (Training next to the Waiting Room; storage indices unchanged): measured +71 normalized lines on 96355cad (165330 to 165401) and again on 629870c5 (165885 to 165956, gate 9536e824-20261120T0219Z). Rebased onto 86341a8b; added to main's 167241: 167312, exact ceiling with no headroom."
+approved_by = "Pending: reported to the primary c07b3449 per RC15-CHANGES-COMMON.md."

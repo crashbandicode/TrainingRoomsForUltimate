@@ -1,8 +1,8 @@
 //! The stage catalog as package 5's stage grid reads it: a pure, public facade over the carried lobby-stage model (written for this
-//! repository, not carried). `lobby_stages::STAGES` is the one authoritative list (117 selectable stages of the owned 13.0.5
-//! `ui_stage_db.prc`, Waiting Room first, native display order; Training is appended by the lobby cycle, not listed); the grid adds
-//! an All tile (MENU-DRAFT, decision Q14: 4 x 4 tiles per page). The carried paging and help-line helpers are crate-private in the
-//! fork's files, so the grid reaches them here.
+//! repository, not carried). `lobby_stages::STAGES` is the one authoritative stable list (117 stages of the owned 13.0.5
+//! `ui_stage_db.prc`, Waiting Room first and Training last); `GRID_ORDER` maps displayed catalog cells to its indices. The grid
+//! adds an All tile (MENU-DRAFT, decision Q14: 4 x 4 tiles per page). The carried paging and help-line helpers are crate-private
+//! in the fork's files, so the grid reaches them here.
 
 use super::lobby_stages;
 #[cfg(test)]
@@ -10,8 +10,45 @@ pub use super::stage_forms::{Form, HelpControls};
 #[cfg(test)]
 use super::stage_menu;
 
-/// Selectable stages, in grid order: `(stage id, label)`.
+/// Stages in stable catalog and persistence-index order: `(stage id, label)`.
 pub const STAGES: &[(u32, &str)] = lobby_stages::STAGES;
+/// Grid display cell to stable `STAGES` index, with Training after the Waiting Room.
+pub const GRID_ORDER: [usize; STAGES.len()] = make_grid_order();
+const TRAINING_STAGE_ID: u32 = 308;
+
+const fn make_grid_order() -> [usize; STAGES.len()] {
+    let mut training = 0;
+    while training < STAGES.len() && STAGES[training].0 != TRAINING_STAGE_ID {
+        training += 1;
+    }
+    assert!(training > 0 && training < STAGES.len());
+
+    let mut order = [0; STAGES.len()];
+    let mut storage = 0;
+    while storage < STAGES.len() {
+        let display = if storage == 0 {
+            0
+        } else if storage == training {
+            1
+        } else if storage < training {
+            storage + 1
+        } else {
+            storage
+        };
+        order[display] = storage;
+        storage += 1;
+    }
+    order
+}
+
+pub fn grid_stage_index(display: usize) -> Option<usize> {
+    GRID_ORDER.get(display).copied()
+}
+
+pub fn grid_display_index(storage: usize) -> Option<usize> {
+    GRID_ORDER.iter().position(|index| *index == storage)
+}
+
 /// Number of selectable stages (117 at stage m5o).
 #[cfg(test)]
 pub const STAGE_COUNT: usize = STAGES.len();

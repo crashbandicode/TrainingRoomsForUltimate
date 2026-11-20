@@ -99,8 +99,9 @@ pub fn hide() {
 }
 
 fn stage_id(n: u16) -> Option<u32> {
-    let index = usize::from(n.checked_sub(1)?);
-    crate::engine::stages::lobby_stages::STAGES.get(index).map(|(id, _)| *id)
+    let display = usize::from(n.checked_sub(1)?);
+    let index = crate::engine::stages::catalog::grid_stage_index(display)?;
+    crate::engine::stages::catalog::STAGES.get(index).map(|(id, _)| *id)
 }
 
 /// The hash of the file tile `i`'s page wants: a roster tile asks for the fighter's stock icon, a stage tile for the

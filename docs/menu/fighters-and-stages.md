@@ -467,6 +467,15 @@ timer.
   - **Free practice:** only the count.
   - The best is per fighter and per mode, and lasts until the game closes.
 
+#### Spawn area
+
+- **Where:** Practice games > Eggs-ercise > **Spawn area**
+- **Values:** In view, Whole stage
+- **Default:** In view
+- **How:** In view keeps targets on screen with the player's own camera. Whole stage uses the full stage range and, when
+  valid, its vertical bounds, so targets can appear off screen. Without valid stage vertical bounds it uses the screen's
+  vertical bounds. The setting applies at the next Start.
+
 ![Eggs-ercise 1 minute: the row set from Off to 1 minute, the menu closed, Fox chases the launched target and a neutral air breaks it](../media/rc14-eggs-1-minute.gif)<br>
 *Practice games > Eggs-ercise: Right turns Off into 1 minute and the menu closes. The notice reads "Eggs 0 0:59" and counts down; Fox chases the target the game launches and a neutral air breaks it and the count reads Eggs 1. Eden, rc.14 (untested on hardware).*
 

@@ -22,11 +22,11 @@ fn hit(at: [f32; 2], power: f32) -> Hit {
 /// wide, 16.9 px a unit, world x 0 at px 895, the ground at px 502): on screen x −50.5 to +20.4, y −10.2 to +29.7.
 /// The range of a missing or implausible stage read: the draft's box.
 const BOX: [f32; 2] = [-HALF_WIDTH, HALF_WIDTH];
-const RESET_CENTRE: View = View([27.09, 27.09], [408.7, -264.4], BOX);
+const RESET_CENTRE: View = View([27.09, 27.09], [408.7, -264.4], BOX, None);
 
 fn started(mode: u8, rule: u8, seed: u32) -> Run {
     let mut run = Run::IDLE;
-    assert_eq!(run.plan([mode, rule, NORMAL, DISC], Some(seed), 0, || TRAINING), Plan::Read);
+    assert_eq!(run.plan([mode, rule, NORMAL, DISC, IN_VIEW], Some(seed), 0, || TRAINING), Plan::Read);
     settle(&mut run, RESET_CENTRE);
     run
 }
@@ -73,14 +73,14 @@ fn gap(a: [f32; 2], b: [f32; 2]) -> f32 {
 fn eggs_rows_and_help() {
     let at = |id: &str| ROWS.iter().position(|r| r.id == id).unwrap_or_else(|| panic!("row {id}"));
     let mode = at(ROW);
-    let rows = [&ROWS[mode], &ROWS[at(ROW_BREAK)], &ROWS[at(ROW_TARGET)], &ROWS[at(ROW_SPEED)], &ROWS[at(ROW_PRACTICE_CPU)]];
+    let rows = [&ROWS[mode], &ROWS[at(ROW_BREAK)], &ROWS[at(ROW_TARGET)], &ROWS[at(ROW_SPEED)], &ROWS[at(ROW_AREA)], &ROWS[at(ROW_PRACTICE_CPU)]];
     // D7 (b), the operator 2026-11-14: their own group, appended to `GROUPS` so no group index moves. rc.15 practice menu
     // (2026-11-18): the Eggs-ercise sub-screen's group (`sub`), after its Start row; Practice games lists the game.
     let g = usize::from(rows[0].group);
     assert_eq!((GROUPS[g].title, GROUPS[g].page, GROUPS[g].advanced, GROUPS[g].sub), ("Eggs-ercise", Page::FightersStages, false, true));
     assert_eq!(GROUPS[usize::from(crate::model::menu::table::GAMES)].title, "Practice games");
-    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).map(|r| r.title).eq(["Start", "Eggs-ercise", "Breaks on", "Target", "Target speed", "CPU during a game"]));
-    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).skip(1).map(|r| r.id).eq([ROW, ROW_BREAK, ROW_TARGET, ROW_SPEED, ROW_PRACTICE_CPU]), "the five rows follow Start, in order");
+    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).map(|r| r.title).eq(["Start", "Eggs-ercise", "Breaks on", "Target", "Target speed", "Spawn area", "CPU during a game"]));
+    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).skip(1).map(|r| r.id).eq([ROW, ROW_BREAK, ROW_TARGET, ROW_SPEED, ROW_AREA, ROW_PRACTICE_CPU]), "the six rows follow Start, in order");
     let values = |r: &crate::model::menu::table::Row| match r.control {
         Control::Dropdown(v) => v.to_vec(),
         _ => panic!("{} is not a dropdown", r.title),
@@ -104,23 +104,28 @@ fn eggs_rows_and_help() {
         rows[3].help_lines(),
         ("How fast targets fly. Normal is Melee's Eggs-ercise speed.", "Slow: half speed. Fast: one and a half times as fast.")
     );
-    // V2.6's second row: Hide CPU (B-2's) reads it with `eggs_running`.
-    assert_eq!((rows[4].title, values(rows[4])), ("CPU during a game", vec!["Hide", "Show"]));
+    assert_eq!((rows[4].title, values(rows[4])), ("Spawn area", vec!["In view", "Whole stage"]));
     assert_eq!(
         rows[4].help_lines(),
+        ("In view: targets appear on screen, with your camera.", "Whole stage: any stage floor, even off screen. From the next Start.")
+    );
+    // V2.6's second row: Hide CPU (B-2's) reads it with `eggs_running`.
+    assert_eq!((rows[5].title, values(rows[5])), ("CPU during a game", vec!["Hide", "Show"]));
+    assert_eq!(
+        rows[5].help_lines(),
         ("Hide: the CPU is hidden while a practice game runs.", "Afterwards it's as Hide CPU says. Show: it stays.")
     );
     for r in rows {
         let (a, b) = r.help_lines();
         assert!(a.chars().count() <= 67 && b.chars().count() <= 67, "{}", r.title);
     }
-    for (id, default) in [(ROW, &[1, 0, 0, 0, 0][..]), (ROW_BREAK, &[1, 0, 0]), (ROW_TARGET, &[1, 0]), (ROW_SPEED, &[1, 0, 0]), (ROW_PRACTICE_CPU, &[1, 0])] {
+    for (id, default) in [(ROW, &[1, 0, 0, 0, 0][..]), (ROW_BREAK, &[1, 0, 0]), (ROW_TARGET, &[1, 0]), (ROW_SPEED, &[1, 0, 0]), (ROW_AREA, &[1, 0]), (ROW_PRACTICE_CPU, &[1, 0])] {
         let def = crate::model::factory::DEFS.iter().find(|d| d.id == id).unwrap_or_else(|| panic!("factory {id}"));
         assert_eq!(def.default, default, "{id}: the first option (Off, Any attack) by default");
     }
-    let indices = [OFF, TIMED, TEN, TWENTY, FREE, ANY, AERIALS, STRONG, NORMAL, SLOW, FAST];
-    assert_eq!(indices, [0, 1, 2, 3, 4, 0, 1, 2, 0, 1, 2], "the rows' option indices");
-    assert_eq!(Run::IDLE.rows, [OFF, ANY, NORMAL, DISC]);
+    let indices = [OFF, TIMED, TEN, TWENTY, FREE, ANY, AERIALS, STRONG, NORMAL, SLOW, FAST, IN_VIEW, WHOLE];
+    assert_eq!(indices, [0, 1, 2, 3, 4, 0, 1, 2, 0, 1, 2, 0, 1], "the rows' option indices");
+    assert_eq!(Run::IDLE.rows, [OFF, ANY, NORMAL, DISC, IN_VIEW]);
 }
 
 /// SPEC V2.4: `10 targets` and `20 targets` count the clock up in hundredths and stop at the Nth; the session's best is
@@ -149,7 +154,7 @@ fn eggs_count_mode() {
     for _ in 0..BURST_TICKS {
         pass(&mut run, &[], false);
     }
-    assert_eq!(run.plan([TEN, ANY, NORMAL, DISC], None, 0, || TRAINING), Plan::Idle, "it waits for a restart");
+    assert_eq!(run.plan([TEN, ANY, NORMAL, DISC, IN_VIEW], None, 0, || TRAINING), Plan::Idle, "it waits for a restart");
     restart(&mut run, 5);
     assert_eq!(pass(&mut run, &[], false), Some(u16::MAX));
     assert_eq!(notice(&run), "Eggs 0/10   0:00.01", "L+R+A starts it over from 0:00");
@@ -176,7 +181,7 @@ fn eggs_count_mode() {
 
 fn eggs_run_start() {
     let mut blind = Run::IDLE;
-    blind.plan([TIMED, AERIALS, NORMAL, DISC], Some(7), 0, || TRAINING);
+    blind.plan([TIMED, AERIALS, NORMAL, DISC, IN_VIEW], Some(7), 0, || TRAINING);
     // The standing notice publishes before the camera, while the target still waits.
     assert_eq!(blind.step(true, 0.0, &[], false, 7), Some(u16::MAX));
     assert!(target(&mut blind).is_none(), "no egg before the draw published the camera");
@@ -220,7 +225,7 @@ fn eggs_respawn_distance() {
         let mut run = started(FREE, ANY, seed);
         // Zoomed out, so the box has room 30 away from every spot (at reset-center, 43 wide, the farther end is the
         // fallback when none is: `eggs_on_screen`).
-        settle(&mut run, View([14.0, 14.0], [0.0, -300.0], BOX));
+        settle(&mut run, View([14.0, 14.0], [0.0, -300.0], BOX, None));
         run.step(false, -10.0, &[], false, 0);
         for _ in 0..20 {
             let last = run.egg_at().unwrap();
@@ -238,7 +243,7 @@ fn eggs_respawn_distance() {
 fn eggs_on_screen() {
     // Reset-center; the camera following Player 1 to the right (the box's left part off screen); zoomed out; zoomed in
     // (the apex clamped under the top).
-    let views = [RESET_CENTRE, View([27.09, 27.09], [-900.0, -264.4], BOX), View([14.0, 14.0], [0.0, -300.0], BOX), View([40.0, 40.0], [0.0, -300.0], BOX)];
+    let views = [RESET_CENTRE, View([27.09, 27.09], [-900.0, -264.4], BOX, None), View([14.0, 14.0], [0.0, -300.0], BOX, None), View([40.0, 40.0], [0.0, -300.0], BOX, None)];
     // §2.3b row 22: every spawn's whole path, at every speed, stays on screen (the notice is in a top band: V2.4).
     for (view, speed) in views.into_iter().flat_map(|v| [NORMAL, SLOW, FAST].map(|s| (v, s))) {
         for seed in 0..60 {
@@ -287,7 +292,7 @@ fn eggs_spawn_not_alternating() {
 /// A Battlefield-like stage (main floor ±70 at 0, side platforms at 27, the top one at 54), seen by the Fixed camera: the
 /// whole stage on screen, x ±160 and y −65 to 115.
 const STAGE: [Floor; 4] = [[[-70.0, 0.0], [70.0, 0.0]], [[-50.0, 27.0], [-20.0, 27.0]], [[20.0, 27.0], [50.0, 27.0]], [[-15.0, 54.0], [15.0, 54.0]]];
-const FIXED: View = View([6.0, 6.0], [0.0, -150.0], [-200.0, 200.0]);
+const FIXED: View = View([6.0, 6.0], [0.0, -150.0], [-200.0, 200.0], None);
 
 /// The spawns of `count` breaks in a row on `floors`, Player 1 at `p1`.
 fn spawns(seed: u32, floors: &[Floor], p1: [f32; 2], count: usize) -> Vec<[f32; 2]> {
@@ -335,6 +340,72 @@ fn eggs_spawn_covers_the_stage() {
     assert!(heights.iter().all(|h| *h >= 60), "the ground and both platform heights: {heights:?}");
     assert!((300..=900).contains(&air), "about half in the air above a floor: {air} of 1200");
     assert!(flips * 10 < total * 7, "no forced side: {flips} of {total} switched");
+}
+
+fn whole_stage_places_targets_outside_the_view() {
+    const FLOORS: [Floor; 2] = [[[-200.0, 0.0], [200.0, 0.0]], [[-120.0, 150.0], [120.0, 150.0]]];
+    const GROUND: [Floor; 1] = [[[-200.0, 0.0], [200.0, 0.0]]];
+    let view = View([16.0; 2], [0.0, -300.0], [-200.0, 200.0], Some([-50.0, 180.0]));
+    assert_eq!(vertical(Some([-200.0, 200.0, 180.0, -50.0])), Some([-50.0, 180.0]));
+    assert_eq!(vertical(Some([-200.0, 200.0, f32::NAN, -50.0])), None);
+    assert_eq!(vertical(Some([-200.0, 200.0, -50.0, 180.0])), None);
+    assert_eq!(vertical(None), None);
+
+    let mut run = started_with_area(FREE, ANY, NORMAL, DISC, WHOLE, 0, view);
+    run.set_floors(&FLOORS);
+    run.sense([0.0, 0.0]);
+    run.step(false, 0.0, &[], false, 0);
+    let mut outside_view = false;
+    for _ in 0..80 {
+        let egg = run.egg_at().expect("a target");
+        assert!((-200.0..=200.0).contains(&egg[0]), "{egg:?} outside the stage range");
+        assert!((-50.0..=180.0).contains(&egg[1]), "{egg:?} outside the stage vertical bounds");
+        assert!(floor_under(egg, &FLOORS).is_some(), "{egg:?} over no floor");
+        assert!(gap(egg, [0.0, BODY]) >= P1_GAP, "{egg:?} too close to P1");
+        let apex = egg[1] + run.fly[0] * run.fly[0] / (2.0 * run.fly[2]);
+        assert!(apex <= 180.0 - RADIUS + 1e-4, "{egg:?} apex {apex} exceeds the stage top");
+        outside_view |= egg[0] < -60.0 || egg[0] > 60.0;
+        run.step(false, 0.0, &[hit(egg, 0.0)], false, 0);
+    }
+    assert!(outside_view, "the whole-stage targets stay inside the view");
+
+    let view = View([16.0; 2], [0.0, -300.0], [-200.0, 200.0], None);
+    let mut fallback = started_with_area(FREE, ANY, NORMAL, DISC, WHOLE, 1, view);
+    fallback.set_floors(&GROUND);
+    fallback.sense([0.0, 0.0]);
+    fallback.step(false, 0.0, &[], false, 0);
+    let egg = fallback.egg_at().expect("a target without a vertical stage bound");
+    let screen_top = (CANVAS_HALF[1] - view.1[1]) / view.0[1] - RADIUS;
+    let apex = egg[1] + fallback.fly[0] * fallback.fly[0] / (2.0 * fallback.fly[2]);
+    assert!(apex <= screen_top + 1e-4, "fallback apex {apex} exceeds screen top {screen_top}");
+}
+
+fn in_view_spawns_match_5b6ab8cc() {
+    let golden: [([u32; 2], [u32; 3]); 12] = [
+        ([3261123816, 1082130432], [1069044204, 1030232039, 1027906470]),
+        ([1091397936, 1082130432], [1069044204, 3168429831, 1027906470]),
+        ([3259566282, 1082130432], [1069044204, 1035709536, 1027906470]),
+        ([1099693208, 1082130432], [1069044204, 3155061427, 1027906470]),
+        ([3250075772, 1082130432], [1069044204, 1028994183, 1027906470]),
+        ([1065181440, 1114112000], [1069044204, 3170901655, 1027906470]),
+        ([1106645472, 1106771968], [1069044204, 1032547047, 1027906470]),
+        ([3233179696, 1097750414], [1069044204, 1034079133, 1027906470]),
+        ([3258605743, 1094187944], [1069044204, 3180505944, 1027906470]),
+        ([3234742432, 1101404777], [1069044204, 1019098810, 1027906470]),
+        ([1104480452, 1101432451], [1069044204, 3180517677, 1027906470]),
+        ([1108919540, 1111993661], [1069044204, 3181452058, 1027906470]),
+    ];
+    let mut run = started(FREE, ANY, 0x15_5eed);
+    run.set_floors(&STAGE);
+    run.sense([-30.0, 27.0]);
+    settle(&mut run, FIXED);
+    run.step(false, 0.0, &[], false, 0);
+    for (egg_bits, flight_bits) in golden {
+        let egg = run.egg_at().expect("a target");
+        assert_eq!(egg.map(f32::to_bits), egg_bits);
+        assert_eq!(run.fly.map(f32::to_bits), flight_bits);
+        run.step(false, 0.0, &[hit(egg, 0.0)], false, 0);
+    }
 }
 
 /// The operator, 11-18 (in view, the player's camera): at the camera Eden measured in Training the targets cover the
@@ -400,7 +471,7 @@ fn eggs_articles_break() {
     run.step_with(false, 0.0, &[hit(egg, 0.0)], |_| panic!("the fighter's hit decides first"), false, 0);
     assert_eq!((run.score, run.melee()), (2, true), "the fighter's own break");
     let mut cpu = Run::IDLE;
-    cpu.plan([FREE, ANY, NORMAL, CPU], Some(7), 0, || TRAINING);
+    cpu.plan([FREE, ANY, NORMAL, CPU, IN_VIEW], Some(7), 0, || TRAINING);
     settle(&mut cpu, RESET_CENTRE);
     cpu.step_with(false, 0.0, &[], |_| panic!("the CPU target counts its own damage"), false, 0);
 }
@@ -409,7 +480,7 @@ fn eggs_articles_break() {
 /// rest in the middle of the screen where the notice used to stand. Zoomed in to 40 the whole on-screen ground was
 /// behind the old plates (canvas x within 496 of the centre) and the spawn fell back to an end of the range.
 fn eggs_spawn_ignores_the_notice() {
-    let view = View([40.0, 40.0], [0.0, -300.0], BOX);
+    let view = View([40.0, 40.0], [0.0, -300.0], BOX, None);
     let mut middle = 0;
     for seed in 0..40 {
         let mut run = started(FREE, ANY, seed);
@@ -492,7 +563,7 @@ fn target(run: &mut Run) -> Option<[f32; 2]> {
 fn eggs_running() {
     let mut run = Run::IDLE;
     assert!(!run.running());
-    assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC], None, 0, || TRAINING), Plan::Idle);
+    assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC, IN_VIEW], None, 0, || TRAINING), Plan::Idle);
     assert!(!run.running(), "not before the menu closes");
     let mut run = started(TIMED, ANY, 7);
     assert!(run.running());
@@ -500,10 +571,10 @@ fn eggs_running() {
         pass(&mut run, &[], false);
     }
     assert!(run.ended() && run.running(), "Time! and the wait for a restart");
-    run.plan([OFF, ANY, NORMAL, DISC], None, 0, || TRAINING);
+    run.plan([OFF, ANY, NORMAL, DISC, IN_VIEW], None, 0, || TRAINING);
     assert!(!run.running(), "Off");
     let mut run = started(FREE, ANY, 7);
-    run.plan([FREE, ANY, NORMAL, DISC], None, 0, || MATCH);
+    run.plan([FREE, ANY, NORMAL, DISC, IN_VIEW], None, 0, || MATCH);
     assert!(!run.running(), "the scene left");
 }
 
@@ -520,7 +591,7 @@ fn eggs_stage_range() {
         // Seeds spread over the generator's range (consecutive ones start it almost alike).
         for seed in 0..200u32 {
             let mut run = started(FREE, ANY, seed.wrapping_mul(0x9e37_79b9));
-            settle(&mut run, View([10.0, 10.0], [0.0, -300.0], range));
+            settle(&mut run, View([10.0, 10.0], [0.0, -300.0], range, None));
             run.step(false, 0.0, &[], false, 0);
             for _ in 0..200 {
                 let x = run.egg_at().unwrap()[0];
@@ -538,9 +609,9 @@ fn eggs_stage_range() {
 /// A run with the CPU as the target.
 fn started_cpu(mode: u8, rule: u8, seed: u32) -> Run {
     let mut run = Run::IDLE;
-    assert_eq!(run.plan([mode, rule, NORMAL, CPU], Some(seed), 0, || TRAINING), Plan::Read);
+    assert_eq!(run.plan([mode, rule, NORMAL, CPU, IN_VIEW], Some(seed), 0, || TRAINING), Plan::Read);
     // Zoomed out, so the box has room 30 away from every spot.
-    settle(&mut run, View([14.0, 14.0], [0.0, -300.0], BOX));
+    settle(&mut run, View([14.0, 14.0], [0.0, -300.0], BOX, None));
     run
 }
 
@@ -620,18 +691,23 @@ fn eggs_target_cpu() {
     assert_eq!(off.cpu_pass(0.0, false), None);
 }
 
-/// A run of `mode` under `rule` at `speed` with `target`, the camera held still at `view`.
-fn started_with(mode: u8, rule: u8, speed: u8, target: u8, seed: u32, view: View) -> Run {
+/// A run of `mode` under `rule`, `speed`, `target` and `area`, the camera held still at `view`.
+fn started_with_area(mode: u8, rule: u8, speed: u8, target: u8, area: u8, seed: u32, view: View) -> Run {
     let mut run = Run::IDLE;
-    assert_eq!(run.plan([mode, rule, speed, target], Some(seed), 0, || TRAINING), Plan::Read);
+    assert_eq!(run.plan([mode, rule, speed, target, area], Some(seed), 0, || TRAINING), Plan::Read);
     settle(&mut run, view);
     run
+}
+
+/// A run of `mode` under `rule` at `speed` with `target`, using the default spawn area.
+fn started_with(mode: u8, rule: u8, speed: u8, target: u8, seed: u32, view: View) -> Run {
+    started_with_area(mode, rule, speed, target, IN_VIEW, seed, view)
 }
 
 /// The operator, 11-15: the CPU target is in the air like the discs. The same seed and camera give the CPU the disc's
 /// launch, drift, apex, bounce and rest at every Target speed; its feet trace the disc's bottom edge.
 fn eggs_cpu_flies_like_the_disc() {
-    let views = [RESET_CENTRE, View([14.0, 14.0], [0.0, -300.0], BOX), View([40.0, 40.0], [0.0, -300.0], BOX)];
+    let views = [RESET_CENTRE, View([14.0, 14.0], [0.0, -300.0], BOX, None), View([40.0, 40.0], [0.0, -300.0], BOX, None)];
     for (view, speed) in views.into_iter().flat_map(|v| [NORMAL, SLOW, FAST].map(|s| (v, s))) {
         for seed in 0..20 {
             let [mut disc, mut cpu] = [DISC, CPU].map(|t| started_with(FREE, ANY, speed, t, seed, view));
@@ -729,7 +805,7 @@ fn eggs_cpu_target_keeps_its_cursor() {
 fn eggs_cpu_air_hits() {
     // Placed, then armed (0% read), 20 ticks into the flight.
     let fly = |rule: u8| {
-        let mut run = started_with(FREE, rule, NORMAL, CPU, 7, View([14.0, 14.0], [0.0, -300.0], BOX));
+        let mut run = started_with(FREE, rule, NORMAL, CPU, 7, View([14.0, 14.0], [0.0, -300.0], BOX, None));
         pass(&mut run, &[], false);
         let ground = run.egg.unwrap()[1];
         let mut at = [0.0; 2];
@@ -785,8 +861,8 @@ fn eggs_cpu_air_hits() {
 /// ends the run, and Player 1's next pass closes it ("Done! 10", the best kept) with the clock stopped at the hit's frame.
 /// Eden cf-flight-8551434e-1: the notice stayed at "Eggs 9/10" (`plan` idled the ended run before its closing pass).
 fn eggs_cpu_done() {
-    let rows = [TEN, ANY, NORMAL, CPU];
-    let mut run = started_with(TEN, ANY, NORMAL, CPU, 7, View([14.0, 14.0], [0.0, -300.0], BOX));
+    let rows = [TEN, ANY, NORMAL, CPU, IN_VIEW];
+    let mut run = started_with(TEN, ANY, NORMAL, CPU, 7, View([14.0, 14.0], [0.0, -300.0], BOX, None));
     // Player 1's frame: the plan, then the step when it says Read (the runtime's `eggs_pass`).
     let p1 = |run: &mut Run| match run.plan(rows, None, 0, || TRAINING) {
         Plan::Read => {
@@ -822,8 +898,8 @@ fn notice_after(run: &mut Run) -> String {
 /// and `-a6266ac1-1` spawned a target (x 32.7, x 70.3) by the panned camera of the walk before the reset, then drew it off
 /// screen for 95 of 96 and 92 of 93 ticks.
 fn eggs_restart_waits_for_camera() {
-    let panned = View([27.09, 27.09], [-900.0, -264.4], BOX);
-    let restarts: [fn(&mut Run); 2] = [|run| run.reset(11), |run| _ = run.plan([FREE, ANY, NORMAL, DISC], Some(11), 0, || TRAINING)];
+    let panned = View([27.09, 27.09], [-900.0, -264.4], BOX, None);
+    let restarts: [fn(&mut Run); 2] = [|run| run.reset(11), |run| _ = run.plan([FREE, ANY, NORMAL, DISC, IN_VIEW], Some(11), 0, || TRAINING)];
     for restart in restarts {
         for seed in 0..40 {
             let mut run = started(FREE, ANY, seed);
@@ -834,7 +910,7 @@ fn eggs_restart_waits_for_camera() {
             assert!(target(&mut run).is_none());
             // The camera still shows the panned view for a draw, then glides to the default over a few more.
             for k in 0..7u8 {
-                let at = View([27.09; 2], [-900.0 + 1308.7 * f32::from(k) / 7.0, -264.4], BOX);
+                let at = View([27.09; 2], [-900.0 + 1308.7 * f32::from(k) / 7.0, -264.4], BOX, None);
                 run.look(true, || Some(at));
                 assert_eq!(pass(&mut run, &[], false), None, "seed {seed}: the camera is gliding (draw {k})");
             }
@@ -865,7 +941,7 @@ fn eggs_restart_waits_for_camera() {
 fn eggs_target_cpu_hidden() {
     use crate::model::settings::Snapshot;
     let mut snapshot = Snapshot::factory();
-    assert_eq!(choices(&snapshot), [OFF, ANY, NORMAL, DISC]);
+    assert_eq!(choices(&snapshot), [OFF, ANY, NORMAL, DISC, IN_VIEW]);
     snapshot.set(ROW_TARGET, &[0, 1]).unwrap();
     assert_eq!(choices(&snapshot)[3], CPU);
     snapshot.set(ROW_HIDE_CPU, &[1, 0]).unwrap();
@@ -939,12 +1015,12 @@ fn eggs_break_anim_timing() {
         }
     }
     assert_eq!(own(&mut run).len(), 1, "no target, the last animation");
-    assert_eq!(run.plan([TEN, ANY, NORMAL, DISC], None, 0, || TRAINING), Plan::Read, "the animation runs on");
+    assert_eq!(run.plan([TEN, ANY, NORMAL, DISC, IN_VIEW], None, 0, || TRAINING), Plan::Read, "the animation runs on");
     for _ in 0..BURST_TICKS {
         assert_eq!(pass(&mut run, &[], false), None, "the end notice stays");
     }
     assert!(own(&mut run).is_empty());
-    assert_eq!(run.plan([TEN, ANY, NORMAL, DISC], None, 0, || panic!("ended, no animation: nothing is read")), Plan::Idle);
+    assert_eq!(run.plan([TEN, ANY, NORMAL, DISC, IN_VIEW], None, 0, || panic!("ended, no animation: nothing is read")), Plan::Idle);
 }
 
 /// V2.1 row 25: two breaks in a row give two animations, a third replaces the oldest; pause freezes them.
@@ -1001,7 +1077,7 @@ fn eggs_timer_end() {
     assert_eq!((run.score, notice(&run)), (2, "Time! 2 eggs (best 2)".to_owned()), "the first pass only spawns");
     assert!(target(&mut run).is_none(), "the eggs stop");
     assert!(run.look(true, || panic!("an ended run: no projection"))[0].is_none());
-    assert_eq!(run.plan([TIMED, AERIALS, NORMAL, DISC], None, 0, || TRAINING), Plan::Idle, "it waits for a restart");
+    assert_eq!(run.plan([TIMED, AERIALS, NORMAL, DISC, IN_VIEW], None, 0, || TRAINING), Plan::Idle, "it waits for a restart");
     restart(&mut run, 5);
     for _ in 0..3600 {
         pass(&mut run, &[], true);
@@ -1064,7 +1140,7 @@ fn eggs_no_projectiles() {
     assert_eq!((out[0].0, out[0].1, out[0].3), ([5.0, 0.0, 0.0], [9.0, 0.0, 0.0], 20.0), "a capsule is one pill");
     assert!((out[0].2 - 3.0).abs() < 1e-4);
     let mut run = started(TIMED, ANY, 7);
-    assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC], None, 1, || panic!("a CPU's pass reads nothing")), Plan::Idle);
+    assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC, IN_VIEW], None, 1, || panic!("a CPU's pass reads nothing")), Plan::Idle);
 }
 
 fn eggs_free() {
@@ -1077,7 +1153,7 @@ fn eggs_free() {
     }
     assert_eq!((run.score, notice(&run)), (200, "Eggs 200".to_owned()));
     assert_eq!(pass(&mut run, &[], false), None, "rewritten only when it changes");
-    assert_eq!(run.plan([FREE, ANY, NORMAL, DISC], None, 0, || TRAINING), Plan::Read);
+    assert_eq!(run.plan([FREE, ANY, NORMAL, DISC, IN_VIEW], None, 0, || TRAINING), Plan::Read);
 }
 
 fn eggs_lra_restart() {
@@ -1093,7 +1169,7 @@ fn eggs_lra_restart() {
     assert_eq!((run.score, notice(&run)), (0, "Eggs 0   1:00".to_owned()));
     let mut idle = Run::IDLE;
     idle.reset(11);
-    assert_eq!(idle.plan([TIMED, ANY, NORMAL, DISC], None, 0, || TRAINING), Plan::Idle, "a reset starts nothing before the menu closed");
+    assert_eq!(idle.plan([TIMED, ANY, NORMAL, DISC, IN_VIEW], None, 0, || TRAINING), Plan::Idle, "a reset starts nothing before the menu closed");
 }
 
 fn eggs_pause_frames() {
@@ -1137,11 +1213,11 @@ fn eggs_swap_and_stage() {
         pass(&mut run, &[], false);
     }
     assert_eq!(notice(&run), "Eggs 0   0:59");
-    assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC], None, 0, || SWAPPING), Plan::Idle, "a hot swap idles the run");
+    assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC, IN_VIEW], None, 0, || SWAPPING), Plan::Idle, "a hot swap idles the run");
     let swapped = 0x3000;
     let ticked = (0..61).filter(|_| run.keeper(swapped)).count();
     assert_eq!(ticked, 59, "the new fighter takes the clock after two passes");
-    assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC], None, 0, || TRAINING), Plan::Read, "the fighter cycle continues the run");
+    assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC, IN_VIEW], None, 0, || TRAINING), Plan::Read, "the fighter cycle continues the run");
     restart(&mut run, 3);
     assert_eq!(pass(&mut run, &[], false), Some(u16::MAX));
     assert_eq!(notice(&run), "Eggs 0   1:00", "Change Stage restarts it (the reset hub)");
@@ -1151,7 +1227,7 @@ fn eggs_nana() {
     let mut run = started(TIMED, AERIALS, 7);
     for _ in 0..60 {
         for fighter in [P1, NANA] {
-            assert_eq!(run.plan([TIMED, AERIALS, NORMAL, DISC], None, 0, || TRAINING), Plan::Read, "both are entry 0");
+            assert_eq!(run.plan([TIMED, AERIALS, NORMAL, DISC, IN_VIEW], None, 0, || TRAINING), Plan::Read, "both are entry 0");
             let tick = run.keeper(fighter);
             run.step(tick, 0.0, &[], false, 7);
         }
@@ -1165,22 +1241,22 @@ fn eggs_nana() {
 
 fn eggs_training_gate() {
     let mut run = started(TIMED, ANY, 7);
-    assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC], None, 0, || LOBBY), Plan::Read, "the waiting room's practice");
-    assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC], None, 0, || MATCH), Plan::Clear, "a match: the run stops, its notice goes");
-    assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC], None, 0, || panic!("stopped: nothing is read")), Plan::Idle);
+    assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC, IN_VIEW], None, 0, || LOBBY), Plan::Read, "the waiting room's practice");
+    assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC, IN_VIEW], None, 0, || MATCH), Plan::Clear, "a match: the run stops, its notice goes");
+    assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC, IN_VIEW], None, 0, || panic!("stopped: nothing is read")), Plan::Idle);
     assert!(target(&mut run).is_none());
 }
 
 fn eggs_off_no_calls() {
     let mut run = Run::IDLE;
-    assert_eq!(run.plan([OFF, ANY, NORMAL, DISC], Some(1), 0, || panic!("Off reads nothing")), Plan::Idle);
+    assert_eq!(run.plan([OFF, ANY, NORMAL, DISC, IN_VIEW], Some(1), 0, || panic!("Off reads nothing")), Plan::Idle);
     assert!(run.look(true, || panic!("Off: no projection"))[0].is_none());
-    assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC], None, 0, || panic!("no run before the menu closes")), Plan::Idle);
+    assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC, IN_VIEW], None, 0, || panic!("no run before the menu closes")), Plan::Idle);
     let mut run = started(TIMED, ANY, 7);
     pass(&mut run, &[], false);
-    assert_eq!(run.plan([OFF, ANY, NORMAL, DISC], None, 0, || panic!("Off reads nothing")), Plan::Clear, "the notice goes the next pass");
+    assert_eq!(run.plan([OFF, ANY, NORMAL, DISC, IN_VIEW], None, 0, || panic!("Off reads nothing")), Plan::Clear, "the notice goes the next pass");
     assert!(target(&mut run).is_none(), "and the egg");
-    assert_eq!(run.plan([OFF, ANY, NORMAL, DISC], None, 0, || panic!("Off reads nothing")), Plan::Idle);
+    assert_eq!(run.plan([OFF, ANY, NORMAL, DISC, IN_VIEW], None, 0, || panic!("Off reads nothing")), Plan::Idle);
 }
 
 /// This module's cases in one table. Each case runs on its own thread, as the test harness ran it.
@@ -1194,6 +1270,8 @@ fn case_table() {
         ("eggs_on_screen", eggs_on_screen as fn()),
         ("eggs_spawn_not_alternating", eggs_spawn_not_alternating as fn()),
         ("eggs_spawn_covers_the_stage", eggs_spawn_covers_the_stage as fn()),
+        ("whole_stage_places_targets_outside_the_view", whole_stage_places_targets_outside_the_view as fn()),
+        ("in_view_spawns_match_5b6ab8cc", in_view_spawns_match_5b6ab8cc as fn()),
         ("eggs_spawn_skips_pits", eggs_spawn_skips_pits as fn()),
         ("eggs_spawn_in_view_heights", eggs_spawn_in_view_heights as fn()),
         ("eggs_first_target_waits_for_floors", eggs_first_target_waits_for_floors as fn()),

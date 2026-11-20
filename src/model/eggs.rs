@@ -12,6 +12,9 @@ pub const ROW: &str = "eggsercise";
 pub const ROW_BREAK: &str = "eggsercise_break";
 pub const ROW_SPEED: &str = "eggsercise_speed";
 pub const ROW_TARGET: &str = "eggsercise_target";
+pub const ROW_AREA: &str = "eggsercise_area";
+pub const IN_VIEW: u8 = 0;
+pub const WHOLE: u8 = 1;
 /// Hide CPU's row (CPU page): with it On the CPU cannot be the target.
 pub const ROW_HIDE_CPU: &str = "hide_cpu";
 /// V2.6: `Hide` (the first option) hides the CPU while a practice game runs (`Run::running`); Hide CPU's rule reads it.
@@ -136,10 +139,10 @@ pub fn hitlag(facts: Facts) -> Option<i32> {
 
 
 /// The camera's map from the fighters' plane to the layout canvas (`hitbox_orbs::to_canvas`): per axis, canvas = world *
-/// `.0` + `.1`; and `.2`, the x range the stage allows (`range`). The orb draw publishes it each tick of a live run; an egg
-/// spawns only on screen, clear of the notice.
+/// `.0` + `.1`; `.2` is the x range the stage allows, and `.3` its optional vertical bounds. The orb draw publishes it
+/// each tick of a live run.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct View(pub [f32; 2], pub [f32; 2], pub [f32; 2]);
+pub struct View(pub [f32; 2], pub [f32; 2], pub [f32; 2], pub Option<[f32; 2]>);
 
 /// One picture of the draw: its spot in the fighters' plane and its look.
 pub type Look = Option<([f32; 2], EggLook)>;
@@ -152,9 +155,15 @@ pub fn range(limit: Option<[f32; 4]>) -> [f32; 2] {
     [[-HALF_WIDTH, HALF_WIDTH], [l, r]][usize::from(wide)]
 }
 
+/// The stage's vertical range from the camera limit rect `[left, right, top, bottom]`.
+pub fn vertical(limit: Option<[f32; 4]>) -> Option<[f32; 2]> {
+    let [_, _, top, bottom] = limit?;
+    (bottom.is_finite() && top.is_finite() && top > bottom).then_some([bottom, top])
+}
+
 /// The rows' option indices (the first option when a row is missing).
-pub fn choices(snapshot: &super::settings::Snapshot) -> [u8; 4] {
-    let mut rows = [ROW, ROW_BREAK, ROW_SPEED, ROW_TARGET].map(|id| choice(snapshot, id));
+pub fn choices(snapshot: &super::settings::Snapshot) -> [u8; 5] {
+    let mut rows = [ROW, ROW_BREAK, ROW_SPEED, ROW_TARGET, ROW_AREA].map(|id| choice(snapshot, id));
     // Hide CPU wins over the CPU as the target: the disc is used (V2.1; `DISC` is 0).
     let hide = snapshot.get(ROW_HIDE_CPU).unwrap_or_default();
     rows[3] *= u8::from(!hide.first().is_some_and(|on| *on != 0));
@@ -227,8 +236,8 @@ pub enum Plan {
 /// The run: armed by a menu close with the row on, until Off or the end of practice.
 #[derive(Clone, Copy, Debug)]
 pub struct Run {
-    /// The mode, the rule, the speed and the target (`choices`) of the menu close that started it.
-    rows: [u8; 4],
+    /// The mode, rule, speed, target and spawn area (`choices`) of the Start that began it.
+    rows: [u8; 5],
     /// Eggs broken this run.
     pub score: u32,
     frames: u32,
@@ -267,7 +276,7 @@ pub struct Run {
 
 impl Run {
     pub const IDLE: Run = Run {
-        rows: [OFF, ANY, NORMAL, DISC],
+        rows: [OFF, ANY, NORMAL, DISC, IN_VIEW],
         score: 0,
         frames: 0,
         ground: 0.0,
@@ -372,7 +381,7 @@ impl Run {
     /// A fresh run (the menu closed with the row on, or a reset): score 0, a full clock, the first egg once the camera has held
     /// still for `SETTLE` draws (a reset moves it, so the view from before is dropped, and the one right after is still on its
     /// way).
-    pub fn start(&mut self, rows: [u8; 4], seed: u32) {
+    pub fn start(&mut self, rows: [u8; 5], seed: u32) {
         let (rng, best) = ((self.rng ^ seed) | 1, self.best);
         *self = Run::IDLE;
         let frames = RUN_FRAMES * u32::from(rows[0] == TIMED);
@@ -396,7 +405,7 @@ impl Run {
     /// facts, a game read) only for an entry-0 pass of a live run (or an ended one with a break animation to finish). Off,
     /// an unarmed or ended run and every other entry read nothing; outside practice the run stops, and a hot swap (busy)
     /// only idles it.
-    pub fn plan(&mut self, rows: [u8; 4], go: Option<u32>, entry: i32, f: fn() -> Facts) -> Plan {
+    pub fn plan(&mut self, rows: [u8; 5], go: Option<u32>, entry: i32, f: fn() -> Facts) -> Plan {
         match go {
             _ if rows[0] == OFF => return self.stop(),
             Some(seed) => self.start(rows, seed),
@@ -425,18 +434,27 @@ impl Run {
         self.owner.1 == 0
     }
 
-    /// A new target, launched (§2.3b) from a random spot of the stage in view (rc.15; the operator, 11-18: targets stay in
-    /// view, the player's own camera): a point of one of the stage's floors (`set_floors`; the run's ground when none was
-    /// read), chosen by length, inside the stage's range and the screen with its radius and `DRIFT` in from the edges, on the
-    /// floor or up to `REACH` above it (a lower launch keeps the flight under the screen's top). It keeps `spacing` from `last` and `P1_GAP` from Player 1; when sixteen tries all fall short, the try that
-    /// falls least short (a random spot, never a fixed side). The apex stays under the screen's top (a lower launch otherwise).
+    /// A new target, launched (§2.3b) from a random spot of the stage's floors (`set_floors`; the run's ground when none was
+    /// read), chosen by length and the selected spawn area. In view uses the screen bounds; Whole stage uses the full stage
+    /// range and its vertical bounds when valid. It keeps `spacing` from `last` and `P1_GAP` from Player 1; when sixteen tries
+    /// all fall short, it uses the try that falls least short (a random spot, never a fixed side).
     /// None before the draw published the camera (a run's first one, with no `last`, waits for it to hold still).
     fn spawn(&mut self, last: Option<[f32; 2]>) -> Option<()> {
         let ready = (last.is_some() || self.still >= SETTLE) && !self.pending;
-        let View(s, o, range) = self.view.filter(|_| ready)?;
+        let View(s, o, range, vertical) = self.view.filter(|_| ready)?;
         let edge = |i: usize, c: f32| (c * CANVAS_HALF[i] - o[i]) / s[i] - c * RADIUS;
-        let [sx0, sx1] = range.map(|v| v.max(edge(0, -1.0)).min(edge(0, 1.0)));
-        let (x0, x1, top, bottom) = (sx0 + DRIFT, sx1 - DRIFT, edge(1, 1.0), edge(1, -1.0));
+        let (sx0, sx1, top, bottom) = if self.rows[4] == WHOLE {
+            let [sx0, sx1] = [range[0] + RADIUS, range[1] - RADIUS];
+            let (top, bottom) = match vertical {
+                Some([lo, hi]) => (hi - RADIUS, lo + RADIUS),
+                None => (edge(1, 1.0), edge(1, -1.0)),
+            };
+            (sx0, sx1, top, bottom)
+        } else {
+            let [sx0, sx1] = range.map(|v| v.max(edge(0, -1.0)).min(edge(0, 1.0)));
+            (sx0, sx1, edge(1, 1.0), edge(1, -1.0))
+        };
+        let (x0, x1) = (sx0 + DRIFT, sx1 - DRIFT);
         // The disc's centre is `RADIUS` above its floor; the CPU target's feet are on it, and it flies the disc's flight
         // (the operator, 11-15): its feet trace the disc's bottom edge.
         let lift = [0.0, -RADIUS][usize::from(self.rows[3] == CPU)];
@@ -651,11 +669,11 @@ mod standing_notice_tests {
     use super::*;
 
     const TRAINING: Facts = Facts { native_training: true, lobby_active: false, waiting_room: false, busy: false };
-    const VIEW: View = View([14.0; 2], [0.0, -300.0], [-HALF_WIDTH, HALF_WIDTH]);
+    const VIEW: View = View([14.0; 2], [0.0, -300.0], [-HALF_WIDTH, HALF_WIDTH], None);
 
     fn scored_cpu(score: u32) -> Run {
         let mut run = Run::IDLE;
-        assert_eq!(run.plan([FREE, ANY, FAST, CPU], Some(7), 0, || TRAINING), Plan::Read);
+        assert_eq!(run.plan([FREE, ANY, FAST, CPU, IN_VIEW], Some(7), 0, || TRAINING), Plan::Read);
         for _ in 0..=SETTLE { run.look(true, || Some(VIEW)); }
         run.step(true, 0.0, &[], false, 0);
         for _ in 0..score {
@@ -717,7 +735,7 @@ mod standing_notice_tests {
             (TEN, "Eggs 0/10   0:00.00", 0),
             (TWENTY, "Eggs 0/20   0:00.00", 0),
         ] {
-            assert_eq!(run.plan([mode, ANY, FAST, CPU], Some(11), 0, || TRAINING), Plan::Read);
+            assert_eq!(run.plan([mode, ANY, FAST, CPU, IN_VIEW], Some(11), 0, || TRAINING), Plan::Read);
             assert_eq!(published(&mut run), Some((u16::MAX, expected.into())));
             assert_eq!((run.egg_at(), run.view, run.frames, run.age), (None, None, initial_clock, 0));
             assert_eq!(published(&mut run), None);
