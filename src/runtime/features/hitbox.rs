@@ -228,7 +228,16 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
         hits,
         |egg| {
             let helper = super::lockon::hit(at, 0, lockon_key(score), rule, aerial, true).is_some();
-            eggs::other_break(grader, helper, |deepest| super::btt_projectiles::hit(at, egg, rule, aerial, true, deepest))
+            eggs::other_break(grader, helper, |deepest| {
+                super::btt_projectiles::hit(
+                    at,
+                    egg,
+                    rule,
+                    aerial,
+                    true,
+                    if deepest { crate::model::btt::Search::Deepest } else { crate::model::btt::Search::First },
+                )
+            })
         },
         aerial,
         kind,
@@ -678,7 +687,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     }
     let mut used = orbs::PaneUse::default();
     let mut keep_panes = false;
-    let (mut over, mut looks) = (0, [None; 3 + btt::LOOKS]);
+    let (mut over, mut looks) = (0u32, [None; 3 + btt::LOOKS]);
     if any {
         let half = match natives::screen_size_words() {
             Some([w, h]) => [orbs::screen_half(w, orbs::SCREEN_HALF_DEFAULT[0]), orbs::screen_half(h, orbs::SCREEN_HALF_DEFAULT[1])],
@@ -710,7 +719,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         // A busy board keeps the last frame's panes: no target cap may overwrite a fighter's retained one.
         let drawn = orbs::targets_drawn(board.is_some() || !on, hurt_on || grader, n_targets);
         let target_hurts = targets[..drawn].iter();
-        let write_pill = |pill: orbs::Pill, used: &mut orbs::PaneUse, over: &mut usize, panes: &[usize; p::ORBS]| {
+        let write_pill = |pill: orbs::Pill, used: &mut orbs::PaneUse, over: &mut u32, panes: &[usize; p::ORBS]| {
             let Some((cap, band)) = used.take(pill.length > 0.0) else {
                 *over += 1;
                 return;

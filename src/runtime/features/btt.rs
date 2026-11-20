@@ -310,7 +310,14 @@ pub unsafe fn frame(fighter: usize) -> Option<()> {
         } else {
             let helper = super::lockon::hit(at, slot + 1, lockon_key(spot), rule, aerial, projectiles()).is_some();
             match eggs::other_break(grader, helper, |deepest| {
-                super::btt_projectiles::hit(at, spot, rule, aerial, projectiles(), deepest)
+                super::btt_projectiles::hit(
+                    at,
+                    spot,
+                    rule,
+                    aerial,
+                    projectiles(),
+                    if deepest { crate::model::btt::Search::Deepest } else { crate::model::btt::Search::First },
+                )
             }) {
                 Some(depth) => {
                     if let Some(depth) = depth {

@@ -829,12 +829,12 @@ fn btt_projectiles_use_owned_native_hits() {
         hits[0] = Hit([20.0, 15.0, 0.0], [24.0, 15.0, 0.0], 1.0, 1.0);
         Some((hits, usize::from(article == 0x1_0008)))
     };
-    assert!(!projectile_breaks(false, true, eggs::ANY, false, [22.0, 15.0], std::iter::from_fn(|| panic!("Off polls no pool")), own, |_| panic!("Off reads no article")).is_some());
+    assert!(!projectile_breaks(Search::Off, eggs::ANY, false, [22.0, 15.0], std::iter::from_fn(|| panic!("Off polls no pool")), own, |_| panic!("Off reads no article")).is_some());
     assert_eq!(calls.get(), 0);
-    assert!(projectile_breaks(true, true, eggs::ANY, false, [22.0, 15.0], [], own, read).is_some());
-    assert!(!projectile_breaks(true, true, eggs::ANY, false, [22.0, 15.0 + eggs::RADIUS + 1.001], [], own, read).is_some(), "outside the native radius is a miss");
-    assert!(!projectile_breaks(true, true, eggs::ANY, false, [22.0, 15.0], [], |_, _| 0, |_| panic!("another owner's article never enters the reader")).is_some());
-    assert!(!projectile_breaks(true, true, eggs::ANY, false, [22.0, 15.0], [], |_, n| if n == 0 { 3 } else { 0 }, |_| panic!("misaligned article")).is_some());
+    assert!(projectile_breaks(Search::Deepest, eggs::ANY, false, [22.0, 15.0], [], own, read).is_some());
+    assert!(!projectile_breaks(Search::Deepest, eggs::ANY, false, [22.0, 15.0 + eggs::RADIUS + 1.001], [], own, read).is_some(), "outside the native radius is a miss");
+    assert!(!projectile_breaks(Search::Deepest, eggs::ANY, false, [22.0, 15.0], [], |_, _| 0, |_| panic!("another owner's article never enters the reader")).is_some());
+    assert!(!projectile_breaks(Search::Deepest, eggs::ANY, false, [22.0, 15.0], [], |_, n| if n == 0 { 3 } else { 0 }, |_| panic!("misaligned article")).is_some());
     // rc.15 (docs/DECISIONS.md): an article's hit obeys `Breaks on` like the fighter's own: 12%+ by the article hit's damage,
     // Aerials only while Player 1 is in an aerial.
     let strong = |damage: f32| move |article: usize| {
@@ -842,10 +842,10 @@ fn btt_projectiles_use_owned_native_hits() {
         hits[0] = Hit([20.0, 15.0, 0.0], [24.0, 15.0, 0.0], 1.0, damage);
         Some((hits, usize::from(article == 0x1_0008)))
     };
-    assert!(!projectile_breaks(true, true, eggs::STRONG, false, [22.0, 15.0], [], own, strong(11.9)).is_some(), "a weak article hit under 12%+");
-    assert!(projectile_breaks(true, true, eggs::STRONG, false, [22.0, 15.0], [], own, strong(12.0)).is_some(), "a 12% article hit under 12%+");
-    assert!(!projectile_breaks(true, true, eggs::AERIALS, false, [22.0, 15.0], [], own, read).is_some(), "Aerials, P1 grounded");
-    assert!(projectile_breaks(true, true, eggs::AERIALS, true, [22.0, 15.0], [], own, read).is_some(), "Aerials, P1 in an aerial");
+    assert!(!projectile_breaks(Search::Deepest, eggs::STRONG, false, [22.0, 15.0], [], own, strong(11.9)).is_some(), "a weak article hit under 12%+");
+    assert!(projectile_breaks(Search::Deepest, eggs::STRONG, false, [22.0, 15.0], [], own, strong(12.0)).is_some(), "a 12% article hit under 12%+");
+    assert!(!projectile_breaks(Search::Deepest, eggs::AERIALS, false, [22.0, 15.0], [], own, read).is_some(), "Aerials, P1 grounded");
+    assert!(projectile_breaks(Search::Deepest, eggs::AERIALS, true, [22.0, 15.0], [], own, read).is_some(), "Aerials, P1 in an aerial");
 }
 
 fn projectile_breaks_stops_at_first_when_boolean() {
@@ -861,8 +861,8 @@ fn projectile_breaks_stops_at_first_when_boolean() {
     };
     let pool = [0x10000, 0x10008];
     let no_articles = |_, _| 0;
-    assert_eq!(projectile_breaks(true, false, eggs::ANY, false, [22.0, 15.0], pool, no_articles, read), Some(first));
-    assert_eq!(projectile_breaks(true, true, eggs::ANY, false, [22.0, 15.0], pool, no_articles, read), Some(greatest));
+    assert_eq!(projectile_breaks(Search::First, eggs::ANY, false, [22.0, 15.0], pool, no_articles, read), Some(first));
+    assert_eq!(projectile_breaks(Search::Deepest, eggs::ANY, false, [22.0, 15.0], pool, no_articles, read), Some(greatest));
 }
 
 fn projectile_grade_needs_owner() {
@@ -878,9 +878,9 @@ fn projectile_grade_needs_owner() {
             Some((hits, 0))
         }
     };
-    assert_eq!(projectile_breaks(true, true, eggs::ANY, false, [22.0, 18.0], [], owner, read), Some(0.5));
+    assert_eq!(projectile_breaks(Search::Deepest, eggs::ANY, false, [22.0, 18.0], [], owner, read), Some(0.5));
     assert_eq!(
-        projectile_breaks(true, true, eggs::ANY, false, [22.0, 18.0], [], |_, _| 0, |_| panic!("another owner's article is not read")),
+        projectile_breaks(Search::Deepest, eggs::ANY, false, [22.0, 18.0], [], |_, _| 0, |_| panic!("another owner's article is not read")),
         None
     );
 }
@@ -893,7 +893,7 @@ fn btt_projectile_with_helper_break_is_graded() {
         Some((hits, usize::from(article == 0x10008)))
     };
     let result = eggs::other_break(true, true, |deepest| {
-        projectile_breaks(true, deepest, eggs::ANY, false, [22.0, 18.0], [], owner, read)
+        projectile_breaks(if deepest { Search::Deepest } else { Search::First }, eggs::ANY, false, [22.0, 18.0], [], owner, read)
     });
     assert_eq!(result, Some(Some(0.5)));
 }
@@ -905,8 +905,7 @@ fn btt_helper_only_break_has_no_grade() {
 fn btt_projectile_miss_has_no_break() {
     let result = eggs::other_break(true, false, |deepest| {
         projectile_breaks(
-            true,
-            deepest,
+            if deepest { Search::Deepest } else { Search::First },
             eggs::ANY,
             false,
             [22.0, 15.0 + eggs::RADIUS + 1.001],
@@ -946,10 +945,10 @@ fn btt_fired_bullet_survives_an_empty_current_ring() {
         hits[0] = Hit([20.0, 15.0, 0.0], [24.0, 15.0, 0.0], 1.0, 3.0);
         Some((hits, 1))
     };
-    assert!(!projectile_breaks(true, true, eggs::ANY, false, [22.0, 15.0], [], |_, _| 0, read).is_some(), "the old ring-only census misses");
-    assert!(projectile_breaks(true, true, eggs::ANY, false, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, read).is_some());
-    assert!(!projectile_breaks(true, true, eggs::ANY, false, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, |_| None).is_some(), "inactive pooled objects supply no attack");
-    assert!(!projectile_breaks(true, true, eggs::ANY, false, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, |at| {
+    assert!(!projectile_breaks(Search::Deepest, eggs::ANY, false, [22.0, 15.0], [], |_, _| 0, read).is_some(), "the old ring-only census misses");
+    assert!(projectile_breaks(Search::Deepest, eggs::ANY, false, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, read).is_some());
+    assert!(!projectile_breaks(Search::Deepest, eggs::ANY, false, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, |_| None).is_some(), "inactive pooled objects supply no attack");
+    assert!(!projectile_breaks(Search::Deepest, eggs::ANY, false, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, |at| {
         let (mut hits, n) = read(at).unwrap();
         hits[0].3 = 0.0;
         Some((hits, n))

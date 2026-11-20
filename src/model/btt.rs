@@ -243,15 +243,21 @@ pub fn list_footer(rows: &[(String, Layout)], cursor: usize, skipped: usize) -> 
     format!("{first}\nA open   B back{note}")
 }
 
+/// How `projectile_breaks` searches: not at all, until the first qualifying overlap (a break only), or for the deepest (a grade).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Search {
+    Off,
+    First,
+    Deepest,
+}
+
 /// Only P1's owned pool and ArticleModule supply objects; Off performs no discovery or hit reads. An article's hit counts as
 /// `Breaks on` (`rule`, with `aerial` Player 1's own status) allows that hit (rc.15, both practice games: docs/DECISIONS.md).
-/// `deepest` selects the deepest qualifying overlap rather than the first one.
-#[allow(clippy::too_many_arguments)]
 pub fn projectile_breaks(
-    enabled: bool, deepest: bool, rule: u8, aerial: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,
+    search: Search, rule: u8, aerial: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,
     mut read: impl FnMut(usize) -> Option<([eggs::Hit; super::hitbox::SLOTS as usize], usize)>,
 ) -> Option<f32> {
-    if !enabled {
+    if search == Search::Off {
         return None;
     }
     let mut best = None;
@@ -265,10 +271,11 @@ pub fn projectile_breaks(
                 continue;
             }
             if let Some(depth) = eggs::depth(hit, spot) {
-                if !deepest {
-                    return Some(depth);
+                match search {
+                    Search::Off => return None,
+                    Search::First => return Some(depth),
+                    Search::Deepest => best = Some(best.map_or(depth, |current: f32| current.max(depth))),
                 }
-                best = Some(best.map_or(depth, |current: f32| current.max(depth)));
             }
         }
     }
