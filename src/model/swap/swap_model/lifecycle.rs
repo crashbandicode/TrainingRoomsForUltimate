@@ -29,7 +29,8 @@
 //!   object records (`0x3a6b80` + `0x392eb40`, `0x652f5c`), then the keys only
 //!   registered (`release_prefetched`: orphan key first, D-SG1-RCA). The plan of
 //!   several detached groups keeps that order across the groups, as
-//!   `retire_groups` did.
+//!   `retire_groups` did. It inserts `KeepInputRoute` between bodies and contexts
+//!   only when another controller holds a detached context's input route.
 //! * **The attached window is native's (Astra §5 step 4).** A Reload (states
 //!   1–3) and finalize destroy the window themselves; our plan only clears its
 //!   routes and marks it [`Attached::NativeRetiring`]. B123-pre Yoga l123a
@@ -165,6 +166,9 @@ pub enum DestroyStep {
     ReleasePadRoute { slot: u8, controller: usize },
     /// `0x3aeb50(id)` after `valid_parked_body`.
     DestroyBody { id: u32 },
+    /// Clear `ctx+0x69` so the destructor leaves `slot` alone while another
+    /// controller holds it; `controller` is the context's `ctx+0x58` to re-check.
+    KeepInputRoute { ctx: usize, slot: u8, controller: usize },
     /// Context vtable `+8` after `valid_context`.
     FreeContext { ctx: usize },
     /// `0x37ae5e0` on a stack copy of the dispatcher struct (after the bodies).
@@ -253,6 +257,13 @@ fn matching_routes<'a>(owner: u32, contexts: &'a [ContextRef], consumers: &'a Na
     })
 }
 
+fn kept_input_route(context: &ContextRef, consumers: &NativeConsumers) -> Option<u8> {
+    if !context.valid { return None; }
+    let slot = context.input_route?;
+    let holder = *consumers.input_holders.get(usize::from(slot))?;
+    (holder != 0 && holder != context.controller).then_some(slot)
+}
+
 fn kirby_counts(bodies: &[BodyRef]) -> [usize; 3] {
     let mut counts = [0; 3];
     for body in bodies.iter().filter(|body| body.valid) {
@@ -291,13 +302,16 @@ impl DetachedPlan<'_> {
             }).flatten();
         let bodies = self.groups.iter().flat_map(|g| g.bodies.iter()).filter(|b| b.valid)
             .map(|b| DestroyStep::DestroyBody { id: b.id });
+        let keeps = self.groups.iter().flat_map(|g| unique_contexts(g.contexts)).filter(|c| c.valid)
+            .filter_map(|c| kept_input_route(c, self.consumers)
+                .map(|slot| DestroyStep::KeepInputRoute { ctx: c.ctx, slot, controller: c.controller }));
         let contexts = self.groups.iter().flat_map(|g| unique_contexts(g.contexts)).filter(|c| c.valid)
             .map(|c| DestroyStep::FreeContext { ctx: c.ctx });
         let dispatchers = self.groups.iter().filter_map(|g| g.dispatch).filter(|d| d.valid)
             .map(|d| DestroyStep::DestroyDispatchers { arrays: d.arrays });
         let records = self.groups.iter().filter_map(|g| g.records).filter(|r| r.valid)
             .map(|r| DestroyStep::DestroyRecords { records: r.records, flags: r.flags, module: r.module });
-        routes.chain(bodies).chain(contexts).chain(dispatchers).chain(records)
+        routes.chain(bodies).chain(keeps).chain(contexts).chain(dispatchers).chain(records)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = u32> + '_ {
@@ -330,6 +344,7 @@ impl DetachedPlan<'_> {
 struct Phases {
     routes: Vec<(u8, usize)>,
     bodies: Vec<u32>,
+    keeps: Vec<(usize, u8, usize)>,
     contexts: Vec<usize>,
     dispatchers: Vec<[usize; 2]>,
     records: Vec<([usize; 3], u8, u64)>,
@@ -373,6 +388,14 @@ impl Phases {
         }
     }
 
+    fn keeps_for(&mut self, contexts: &[ContextRef], consumers: &NativeConsumers) {
+        for context in unique_contexts(contexts).filter(|c| c.valid) {
+            if let Some(slot) = kept_input_route(context, consumers) {
+                self.keeps.push((context.ctx, slot, context.controller));
+            }
+        }
+    }
+
     fn attached(&mut self, group: &AttachedGroup, consumers: &NativeConsumers) {
         self.routes_for(group.owner, &group.contexts, consumers);
         self.kirby(&group.cells);
@@ -382,6 +405,7 @@ impl Phases {
     fn detached(&mut self, group: &DetachedGroup, consumers: &NativeConsumers) {
         self.detached_contexts(&group.contexts);
         self.routes_for(group.owner, &group.contexts, consumers);
+        self.keeps_for(&group.contexts, consumers);
         self.kirby(&group.bodies);
         for body in &group.bodies {
             if body.valid { self.bodies.push(body.id); } else { self.skipped.push(Skipped::Body(body.id)); }
@@ -401,6 +425,8 @@ impl Phases {
         let mut steps = Vec::new();
         steps.extend(self.routes.into_iter().map(|(slot, controller)| DestroyStep::ReleasePadRoute { slot, controller }));
         steps.extend(self.bodies.into_iter().map(|id| DestroyStep::DestroyBody { id }));
+        steps.extend(self.keeps.into_iter().map(|(ctx, slot, controller)|
+            DestroyStep::KeepInputRoute { ctx, slot, controller }));
         steps.extend(self.contexts.into_iter().map(|ctx| DestroyStep::FreeContext { ctx }));
         steps.extend(self.dispatchers.into_iter().map(|arrays| DestroyStep::DestroyDispatchers { arrays }));
         steps.extend(self.records.into_iter().map(|(records, flags, module)| DestroyStep::DestroyRecords { records, flags, module }));
@@ -429,7 +455,7 @@ pub fn destroy_plan(bundle: &Bundle, consumers: &NativeConsumers) -> DestroyPlan
 
 /// One plan for several bundles (every detached group of an entry at
 /// `retire_groups`, with or without the attached window): routes of all of
-/// them first, then all bodies, all contexts, all dispatcher arrays, all
+/// them first, then all bodies, route keeps, contexts, dispatcher arrays,
 /// records, one key release — `retire_groups`' order since GROUP-SWAP-IMPL.
 #[cfg(test)]
 pub fn destroy_plan_many(bundles: &[Bundle], consumers: &NativeConsumers) -> DestroyPlan {
@@ -484,21 +510,25 @@ impl ConsumerModel {
     /// Apply the plan's own effects: route releases, destructions, and the
     /// controllers and input routes of every context the plan frees.
     pub fn apply(&mut self, plan: &DestroyPlan, bundles: &[Bundle]) {
+        let mut kept_contexts = Vec::new();
         for step in &plan.steps {
             match step {
                 DestroyStep::ReleasePadRoute { slot, controller } => {
                     if self.routes[usize::from(*slot)] == *controller { self.routes[usize::from(*slot)] = 0; }
                 }
                 DestroyStep::DestroyBody { id } => self.destroyed_bodies.push(*id),
+                DestroyStep::KeepInputRoute { ctx, .. } => kept_contexts.push(*ctx),
                 DestroyStep::FreeContext { ctx } => {
                     for bundle in bundles {
                         if let Bundle::Detached(group) = bundle {
                             for context in group.contexts.iter().filter(|c| c.ctx == *ctx) {
                                 if context.controller != 0 { self.freed_controllers.push(context.controller); }
                                 if let Some(route_slot) = context.input_route {
-                                    let slot = usize::from(route_slot);
-                                    self.released_inputs.push((route_slot, self.inputs[slot]));
-                                    self.inputs[slot] = 0;
+                                    if !kept_contexts.contains(ctx) {
+                                        let slot = usize::from(route_slot);
+                                        self.released_inputs.push((route_slot, self.inputs[slot]));
+                                        self.inputs[slot] = 0;
+                                    }
                                 }
                             }
                         }
@@ -667,6 +697,41 @@ mod tests {
         assert_eq!(model.tick(), Ok(()));
     }
 
+    /// The runtime plan keeps another controller's route before context
+    /// destruction, but leaves native release for its own and free routes.
+    fn the_runtime_plan_keeps_the_live_input_route_before_freeing() {
+        let live = 0x1180e97a00;
+        let contexts = [
+            ContextRef { ctx: 0x1187045900, controller: 0x1180e98000, input_route: Some(1), valid: true },
+            ContextRef { ctx: 0x1187045700, controller: 0x1180e98100, input_route: Some(1), valid: true },
+            ContextRef { ctx: 0x1187045800, controller: 0x1180e98200, input_route: Some(1), valid: true },
+        ];
+        let groups = [DetachedView { owner: 1, bodies: &[], contexts: &contexts, dispatch: None,
+            records: None, held_kinds: &[] }];
+        let mut consumers = consumers_dpta5();
+        consumers.input_holders[1] = live;
+        let steps: Vec<_> = DetachedPlan { groups: &groups, consumers: &consumers }.steps().collect();
+        for context in &contexts {
+            let keep = DestroyStep::KeepInputRoute { ctx: context.ctx, slot: 1, controller: context.controller };
+            let free = DestroyStep::FreeContext { ctx: context.ctx };
+            let keep_at = steps.iter().position(|step| step == &keep).expect("live route is kept");
+            let free_at = steps.iter().position(|step| step == &free).expect("context is freed");
+            assert!(keep_at < free_at, "route is kept before context destruction");
+        }
+
+        let own_contexts = [ContextRef { ctx: 0x1187045900, controller: 0x1180e98000, input_route: Some(1), valid: true }];
+        let own_groups = [DetachedView { owner: 1, bodies: &[], contexts: &own_contexts, dispatch: None,
+            records: None, held_kinds: &[] }];
+        let mut own_consumers = consumers_dpta5();
+        own_consumers.input_holders[1] = own_contexts[0].controller;
+        let own_steps: Vec<_> = DetachedPlan { groups: &own_groups, consumers: &own_consumers }.steps().collect();
+        assert!(!own_steps.iter().any(|step| matches!(step, DestroyStep::KeepInputRoute { .. })));
+
+        let free_consumers = consumers_dpta5();
+        let free_steps: Vec<_> = DetachedPlan { groups: &own_groups, consumers: &free_consumers }.steps().collect();
+        assert!(!free_steps.iter().any(|step| matches!(step, DestroyStep::KeepInputRoute { .. })));
+    }
+
     /// WP-K (RE-KIRBY-UNLOAD §0/§3): a Kirby body outside cell 0 is the hazard,
     /// activated or not; a Kirby at cell 0 is not. The plan reports, never repairs.
     fn a_kirby_outside_cell_0_is_reported_as_the_d_hang1_hazard() {
@@ -743,6 +808,7 @@ mod tests {
             ("mod_reload_clears_the_window_route_and_destroys_the_detached_groups_first", mod_reload_clears_the_window_route_and_destroys_the_detached_groups_first as fn()),
             ("invalid_objects_are_skipped_not_destroyed", invalid_objects_are_skipped_not_destroyed as fn()),
             ("a_detached_teardown_keeps_the_live_input_route", a_detached_teardown_keeps_the_live_input_route as fn()),
+            ("the_runtime_plan_keeps_the_live_input_route_before_freeing", the_runtime_plan_keeps_the_live_input_route_before_freeing as fn()),
             ("a_kirby_outside_cell_0_is_reported_as_the_d_hang1_hazard", a_kirby_outside_cell_0_is_reported_as_the_d_hang1_hazard as fn()),
             ("s_b_and_k6_walk_the_registry_and_s_k_s_a_do_not", s_b_and_k6_walk_the_registry_and_s_k_s_a_do_not as fn()),
             ("a_destroyed_holder_drops_its_object_module_after_the_destroy", a_destroyed_holder_drops_its_object_module_after_the_destroy as fn()),
