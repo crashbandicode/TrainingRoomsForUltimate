@@ -386,6 +386,26 @@ impl Session {
         }
     }
 
+    /// The scored window starts at release and ends at its first result.
+    /// Return the attempt number and the stable event code for the trace.
+    pub fn trace_event(self, before: Phase) -> Option<(u16, u8)> {
+        let outcome = match (before, self.phase) {
+            (Phase::Ready(_), Phase::Live) => return Some((self.attempts.saturating_add(1), 0)),
+            (Phase::Live, Phase::Result(outcome, _)) => outcome,
+            _ => return None,
+        };
+        let code = match outcome {
+            Outcome::Secured => 1,
+            Outcome::RecoveredAtLedge => 2,
+            Outcome::RecoveredOnStage => 3,
+            Outcome::Unresolved => return Some((self.attempts.saturating_add(1), 4)),
+            Outcome::Landed => 5,
+            Outcome::GrabbedLedge => 6,
+            Outcome::KnockedOut => 7,
+        };
+        Some((self.attempts, code))
+    }
+
     pub fn record_result<K: Copy + Eq, const N: usize>(
         &self,
         bests: &mut [Option<(K, u32)>; N],

@@ -393,6 +393,44 @@ pub extern "C" fn perfect_rule_fired(rule: PerfectRule, cpu_frame: u32, trigger_
     PERFECT_CORRECTIONS.record(rule);
 }
 
+/// Read by the release tracer at the two boundaries of a scored attempt.
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn edge_juggle_attempt(meta: u64, clock_damage: u64, cpu: u64, p1: u64) {
+    std::hint::black_box((meta, clock_damage, cpu, p1));
+}
+
+unsafe fn trace_attempt(
+    run: &Run,
+    before: Phase,
+    bodies: Bodies,
+    kind: i32,
+    damage: Option<f32>,
+) {
+    let Some((ordinal, event)) = run.rounds.trace_event(before) else {
+        return;
+    };
+    use crate::model::sites_pkg2 as sites;
+    if !game::granted(sites::POS_X_OFFSET) || !game::granted(sites::POS_Y_OFFSET) {
+        return;
+    }
+    let pack = |low, high| u64::from(low) | (u64::from(high) << 32);
+    let position = |accessor| pack(natives::pos_x(accessor).to_bits(), natives::pos_y(accessor).to_bits());
+    let meta = u64::from(ordinal)
+        | (u64::from(event) << 16)
+        | (u64::from(run.drill == Drill::Juggler) << 24)
+        | (u64::from(run.difficulty == Difficulty::Perfect) << 25)
+        | (u64::from(run.stage_key.1 & 0xf) << 28)
+        | (u64::from(kind as u16) << 32)
+        | (u64::from(run.stage_key.0 as u16) << 48);
+    edge_juggle_attempt(
+        meta,
+        pack(damage.unwrap_or(f32::NAN).to_bits(), run.rounds.frames),
+        position(bodies.cpu),
+        position(bodies.p1),
+    );
+}
+
 impl StockPad {
     fn observe(
         self,
@@ -1892,6 +1930,7 @@ pub unsafe fn frame(fighter: usize) {
             hold_cpu(cpu, run.setup.cpu);
         }
         run.rounds.advance_attempt(obs);
+        trace_attempt(run, before, Bodies { p1, cpu }, kind, damage);
         if before == Phase::Live && matches!(run.rounds.phase, Phase::Result(..)) {
             run.route_history.complete();
         }
