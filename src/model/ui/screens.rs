@@ -378,6 +378,7 @@ fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cel
         GridKind::Roster(RosterUse::Cycles) => "Character Cycles",
         GridKind::Roster(RosterUse::Hats) => "Kirby Hats",
         GridKind::Roster(RosterUse::Mashout) => "Mash out fighter",
+        GridKind::Roster(RosterUse::PracticeCpu(_)) => "CPU fighter and mode",
     };
     let _ = write!(frame.crumb, "  >  {title}   page {} of {}", page + 1, layout.pages());
     let _ = frame.help[0].write_str(match layout.kind {
@@ -389,10 +390,16 @@ fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cel
         GridKind::Roster(RosterUse::Hats) => "A adds in order (All takes everyone), R removes, X previews forms, ZR switches role.",
         GridKind::Roster(RosterUse::Mashout) if menu.mashout_pop().is_some() => "Up / Down choose the move; Left / Right change the grab type.",
         GridKind::Roster(RosterUse::Mashout) => "A lists the fighter's moves to escape; X shows the next form of a shared slot.",
+        GridKind::Roster(RosterUse::PracticeCpu(_)) if menu.practice_cpu_popup().is_some() =>
+            "A cycles modes. In CPU mode, X cycles levels 1–9.",
+        GridKind::Roster(RosterUse::PracticeCpu(_)) => "A picks the fighter. X previews shared fighter forms.",
     });
     let _ = frame.hint.write_str(match layout.kind {
         GridKind::Roster(RosterUse::Mashout) if menu.mashout_pop().is_some() => "D-pad choose   Left/Right grab type   A confirm   B back",
+        GridKind::Roster(RosterUse::PracticeCpu(_)) if menu.practice_cpu_popup().is_some() =>
+            "A next mode   Up/Down choose   X CPU level   B back",
         GridKind::Roster(RosterUse::PlayerPick | RosterUse::CpuPick | RosterUse::Mashout) => "L/R page   D-pad move   A pick   X form   B back",
+        GridKind::Roster(RosterUse::PracticeCpu(_)) => "D-pad move   A pick   X form   B back",
         GridKind::Roster(RosterUse::Cycles) => "D-pad move   A pick   R remove   Y Solo Popo   X form   ZR role   B back",
         GridKind::Roster(RosterUse::Hats) => "D-pad move   A pick   R remove   X form   ZR role   B back",
         _ => "D-pad move   L/R page   B back",
@@ -408,6 +415,15 @@ fn grid_frame(menu: &Menu, screen: &Screen, layout: GridLayout, page: usize, cel
             if line.grab {
                 let _ = write!(out, "  <  {}  >", picker::grab_label(pop.grab));
             }
+            frame.pop.count = i as u8 + 1;
+        }
+    }
+    if let (GridKind::Roster(RosterUse::PracticeCpu(game)), Some(anchor)) = (layout.kind, menu.practice_cpu_popup()) {
+        let pick = menu.practice_cpu_pick(game);
+        frame.pop.anchor = u8::try_from(anchor).ok();
+        frame.pop.focus = pick.choice as u8;
+        for (i, line) in frame.pop.lines.iter_mut().take(pick.count()).enumerate() {
+            let _ = pick.mode_at(i).write(line);
             frame.pop.count = i as u8 + 1;
         }
     }

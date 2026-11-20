@@ -564,6 +564,14 @@ pub fn write_value(menu: &Menu, row: usize, out: &mut Text<72>) {
                     }
                     out.write_str("  >")
                 }
+                Control::Editor(Editor::PracticeCpu(game)) => {
+                    let pick = menu.practice_cpu_pick(game);
+                    let fighter = pick.fighter.and_then(|k| crate::model::fighter_choices::CHOICES.iter()
+                        .find(|&&(kind, _)| kind == k).map(|&(_, name)| name)).unwrap_or("Current CPU");
+                    let _ = write!(out, "{fighter} · ");
+                    let _ = pick.mode().write(out);
+                    out.write_str("  >")
+                }
                 Control::Game(game) | Control::Start(game) if menu.running() == Some(game) => out.write_str("Running  >"),
                 _ => out.write_str(">"),
             };

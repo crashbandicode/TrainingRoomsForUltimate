@@ -3,6 +3,10 @@ use super::practice_games::{record_max, record_time, result_tick, Game};
 
 #[path = "edge_juggle/perfect.rs"]
 pub mod perfect;
+#[path = "edge_juggle/picker.rs"]
+pub mod picker;
+#[path = "edge_juggle/zoom.rs"]
+pub mod zoom;
 
 const EDGE_TIMEOUT: u32 = 15 * 60;
 const RESULT_FRAMES: u16 = 90;
@@ -33,22 +37,6 @@ impl Drill {
         match self {
             Self::GuardEdge => 60,
             Self::Juggler => 45,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Difficulty {
-    LevelNine,
-    Perfect,
-}
-
-impl Difficulty {
-    pub const fn from_option(option: usize) -> Self {
-        if option == 1 {
-            Self::Perfect
-        } else {
-            Self::LevelNine
         }
     }
 }
@@ -119,7 +107,9 @@ pub struct CpuBehavior {
 }
 
 impl CpuBehavior {
-    pub const LEVEL_NINE: Self = Self { menu: 2, level: 8 };
+    pub const fn stock(level: u8) -> Self {
+        Self { menu: 2, level: (level - 1) as u32 }
+    }
 
     pub fn control_type(self) -> Option<u8> {
         [1, 1, 0, 2, 5, 3, 0x19, 0x1a, 0x24].get(self.menu as usize).copied()
@@ -147,7 +137,7 @@ impl BehaviorLease {
 
     pub fn step(
         &mut self,
-        running: bool,
+        level: Option<u8>,
         panel: usize,
         current: CpuBehavior,
         applied: bool,
@@ -155,16 +145,16 @@ impl BehaviorLease {
         if self.0.is_some_and(|(owner, _)| owner != panel) {
             self.0 = None;
         }
-        let desired = if running {
+        let desired = if let Some(level) = level {
             self.0.get_or_insert((panel, current));
-            CpuBehavior::LEVEL_NINE
+            CpuBehavior::stock(level)
         } else {
             self.0?.1
         };
         if desired != current || !applied {
             return Some(desired);
         }
-        if !running {
+        if level.is_none() {
             self.0 = None;
         }
         None
@@ -220,6 +210,8 @@ impl BehaviorPause {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Outcome {
+    ZoomWin,
+    ZoomMiss,
     Secured,
     RecoveredAtLedge,
     RecoveredOnStage,
@@ -314,6 +306,40 @@ impl Session {
         }
     }
 
+    pub fn advance_zoom(
+        &mut self,
+        attempt: &mut zoom::Attempt,
+        observed: Observation,
+        mut read: zoom::Observation,
+        tolerance: u8,
+    ) {
+        if self.phase != Phase::Live {
+            self.advance_attempt(observed);
+            return;
+        }
+        self.frames = self.frames.saturating_add(1);
+        read.ended = observed.dead_or_rebirthing || observed.cliff_catch || self.frames == EDGE_TIMEOUT;
+        let Some(verdict) = attempt.step(self.frames, read, tolerance) else { return };
+        self.finish_attempt(match verdict {
+            zoom::Verdict::Win => Outcome::ZoomWin,
+            zoom::Verdict::Miss => Outcome::ZoomMiss,
+        });
+    }
+
+    fn finish_attempt(&mut self, outcome: Outcome) {
+        if outcome != Outcome::Unresolved {
+            self.attempts = self.attempts.saturating_add(1);
+            if matches!(outcome, Outcome::Secured | Outcome::ZoomWin) {
+                self.secured = self.secured.saturating_add(1);
+                self.streak = self.streak.saturating_add(1);
+                self.best_streak = self.best_streak.max(self.streak);
+            } else {
+                self.streak = 0;
+            }
+        }
+        self.phase = Phase::Result(outcome, RESULT_FRAMES);
+    }
+
     /// The transition to Live is the release frame (time zero).
     pub fn advance_attempt(&mut self, observed: Observation) {
         match self.phase {
@@ -361,17 +387,7 @@ impl Session {
                     (Drill::Juggler, Observation { grounded: true, .. }) => Outcome::Landed,
                     _ => return,
                 };
-                if outcome != Outcome::Unresolved {
-                    self.attempts = self.attempts.saturating_add(1);
-                    if outcome == Outcome::Secured {
-                        self.secured = self.secured.saturating_add(1);
-                        self.streak = self.streak.saturating_add(1);
-                        self.best_streak = self.best_streak.max(self.streak);
-                    } else {
-                        self.streak = 0;
-                    }
-                }
-                self.phase = Phase::Result(outcome, RESULT_FRAMES);
+                self.finish_attempt(outcome);
             }
             Phase::Result(outcome, mut left) => {
                 self.phase = if !result_tick(&mut left, true) || observed.dead_or_rebirthing {
@@ -617,26 +633,26 @@ mod tests {
         let original = CpuBehavior { menu: 0, level: 3 };
         let changed_in_pause = CpuBehavior { menu: 4, level: 3 };
         let mut lease = BehaviorLease::new();
-        assert_eq!(lease.step(true, 1, original, true), Some(CpuBehavior::LEVEL_NINE));
-        assert_eq!(lease.step(true, 1, CpuBehavior::LEVEL_NINE, true), None);
-        assert_eq!(lease.step(true, 1, changed_in_pause, true), Some(CpuBehavior::LEVEL_NINE));
-        assert_eq!(lease.step(false, 1, CpuBehavior::LEVEL_NINE, true), Some(original));
-        assert_eq!(lease.step(false, 1, original, true), None);
+        assert_eq!(lease.step(Some(9), 1, original, true), Some(CpuBehavior::stock(9)));
+        assert_eq!(lease.step(Some(9), 1, CpuBehavior::stock(9), true), None);
+        assert_eq!(lease.step(Some(9), 1, changed_in_pause, true), Some(CpuBehavior::stock(9)));
+        assert_eq!(lease.step(None, 1, CpuBehavior::stock(9), true), Some(original));
+        assert_eq!(lease.step(None, 1, original, true), None);
     }
 
     #[test]
     fn cpu_behavior_control_restore_waits_for_stock_apply() {
         let control = CpuBehavior { menu: 8, level: 2 };
-        let cpu = CpuBehavior::LEVEL_NINE;
+        let cpu = CpuBehavior::stock(9);
         let mut lease = BehaviorLease::new();
         assert!(control.applied(0x24, 0x24, false));
-        assert_eq!(lease.step(true, 1, control, true), Some(cpu));
-        assert_eq!(lease.step(true, 1, cpu, cpu.applied(0, 0, false)), Some(cpu));
-        assert_eq!(lease.step(true, 1, cpu, cpu.applied(0, 0, true)), None);
-        assert_eq!(lease.step(false, 1, cpu, true), Some(control));
+        assert_eq!(lease.step(Some(9), 1, control, true), Some(cpu));
+        assert_eq!(lease.step(Some(9), 1, cpu, cpu.applied(0, 0, false)), Some(cpu));
+        assert_eq!(lease.step(Some(9), 1, cpu, cpu.applied(0, 0, true)), None);
+        assert_eq!(lease.step(None, 1, cpu, true), Some(control));
         assert!(lease.held(), "the restore stays owned until stock acknowledges Control");
-        assert_eq!(lease.step(false, 1, control, control.applied(0x24, 0x24, true)), Some(control));
-        assert_eq!(lease.step(false, 1, control, control.applied(0x24, 0x24, false)), None);
+        assert_eq!(lease.step(None, 1, control, control.applied(0x24, 0x24, true)), Some(control));
+        assert_eq!(lease.step(None, 1, control, control.applied(0x24, 0x24, false)), None);
         assert!(!lease.held());
     }
 
@@ -645,10 +661,10 @@ mod tests {
         let a = CpuBehavior { menu: 0, level: 2 };
         let b = CpuBehavior { menu: 5, level: 4 };
         let mut lease = BehaviorLease::new();
-        assert_eq!(lease.step(true, 1, a, true), Some(CpuBehavior::LEVEL_NINE));
-        assert_eq!(lease.step(false, 2, b, true), None);
-        assert_eq!(lease.step(true, 2, b, true), Some(CpuBehavior::LEVEL_NINE));
-        assert_eq!(lease.step(false, 2, CpuBehavior::LEVEL_NINE, true), Some(b));
+        assert_eq!(lease.step(Some(9), 1, a, true), Some(CpuBehavior::stock(9)));
+        assert_eq!(lease.step(None, 2, b, true), None);
+        assert_eq!(lease.step(Some(9), 2, b, true), Some(CpuBehavior::stock(9)));
+        assert_eq!(lease.step(None, 2, CpuBehavior::stock(9), true), Some(b));
     }
 
     #[test]

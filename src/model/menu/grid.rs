@@ -36,6 +36,8 @@ pub enum RosterUse {
     Hats,
     /// Mash out's fighter and move (`mashout_state`, `mashout_attacker`, `mashout_grab`): A opens the chip's popup.
     Mashout,
+    /// A practice opponent and its CPU, Perfect or fighter-specific mode.
+    PracticeCpu(crate::model::edge_juggle::Drill),
 }
 
 /// The give-item grid's tiles (`ITEM_NAMES`: 39 items, turnip faces included).

@@ -2164,3 +2164,11 @@ ceiling = 171914
 date = "2026-11-20"
 reason = "Merge CPU THINK STOP fix (rc15/cpu-think-burst 04616215) onto main 5a1fac9e. Branch size gate 3d24ee93-20261120T1443Z measured an exact +81 over its 171026 base; main ceiling 171833 + 81 = 171914. Combined gate on the merge re-measures."
 approved_by = "Primary e7ee8f1c (tr-primary-2) 2026-11-20: approves the measured +81 delta only, for the operator-requested preview build."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 172701
+date = "2026-11-20"
+reason = "Merge Guard the Edge/Juggler CPU picker + Hero Zoom drill (rc15/drill-picker 14d4cf9a) onto main 53c8fa13. Branch gate measured 172620 = its 171833 base + 787; main ceiling 171914 + 787 = 172701. Combined gate on the merge re-measures."
+approved_by = "Primary e7ee8f1c (tr-primary-2) 2026-11-20: measured delta only; operator-ordered feature (CPU picker + Hero Zoom), REVIEW PASS review-games-astra 14:44 EST."

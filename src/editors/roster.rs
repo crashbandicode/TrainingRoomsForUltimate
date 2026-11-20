@@ -89,7 +89,7 @@ impl MiiTiles {
             (RosterUse::Hats, _) => self.hat[k],
             (RosterUse::PlayerPick, _) => self.player[k],
             (RosterUse::Cycles, Role::Player) => self.player_cycle[k],
-            (RosterUse::CpuPick, _) => self.cpu[k],
+            (RosterUse::CpuPick | RosterUse::PracticeCpu(_), _) => self.cpu[k],
             (RosterUse::Cycles, Role::Cpu) => self.cpu_cycle[k],
             // Mash out admits every fighter the move table lists (the filter above returns first).
             (RosterUse::Mashout, _) => true,
@@ -129,7 +129,11 @@ fn kinds() -> Vec<u32> {
 
 impl RosterEditor {
     pub fn new(use_: RosterUse) -> Self {
-        let role = if use_ == RosterUse::CpuPick { Role::Cpu } else { Role::Player };
+        let role = if matches!(use_, RosterUse::CpuPick | RosterUse::PracticeCpu(_)) {
+            Role::Cpu
+        } else {
+            Role::Player
+        };
         Self { grid: RosterGrid::new(role), use_, mii: MiiTiles::default() }
     }
 
@@ -161,8 +165,8 @@ impl RosterEditor {
 
     /// Apply one editor input to the menu snapshot, preserving the other role's settings.
     pub fn apply(&mut self, menu: &mut crate::model::menu::Menu, cell: usize, button: Button) {
-        if self.use_ == RosterUse::Mashout {
-            return self.apply_mashout(menu, cell, button);
+        if matches!(self.use_, RosterUse::Mashout | RosterUse::PracticeCpu(_)) {
+            return self.apply_practice_picker(menu, cell, button);
         }
         let mut values = self.values(menu.kept(self.key()));
         let effect = self.press(cell, button, &mut values);
@@ -192,23 +196,23 @@ impl RosterEditor {
             (RosterUse::Hats, Role::Player) => "player_kirby_hats",
             (RosterUse::Hats, Role::Cpu) => "cpu_kirby_hats",
             // Mash out keeps no roster key: its popup writes the three Mash out rows.
-            (RosterUse::Mashout, _) => "",
+            (RosterUse::Mashout | RosterUse::PracticeCpu(_), _) => "",
         }
     }
 
     /// Mash out's grid: the open puts the cursor on the saved choice's chip (`MASHOUT_SEEK`), X previews a shared slot's
     /// next form, and A on a chip opens its popup (the All cell is the Random chip).
-    fn apply_mashout(&mut self, menu: &mut crate::model::menu::Menu, cell: usize, button: Button) {
-        use crate::model::mashout::picker::{self, Chip};
+    fn apply_practice_picker(&mut self, menu: &mut Menu, cell: usize, button: Button) {
+        use crate::model::mashout::picker::Chip;
         if cell == usize::from(crate::model::menu::MASHOUT_SEEK) {
-            let home = match menu.mashout_config().and_then(picker::chip_of) {
+            let home = match self.practice_chip(menu) {
                 Some(Chip::Fighter(kind)) => {
                     self.grid.focus_kind(kind);
                     (0..CELLS).find(|c| self.grid.info(*c).and_then(|i| i.kind()) == Some(kind))
                 }
                 _ => None,
             };
-            return menu.mashout_focus(home.unwrap_or(CELLS - 1));
+            return menu.picker_focus(home.unwrap_or(CELLS - 1));
         }
         let Some(info) = self.grid.info(cell) else { return };
         match (button, info.content) {
@@ -216,9 +220,26 @@ impl RosterEditor {
                 self.grid.focus_kind(kind);
                 self.grid.cycle_form();
             }
-            (Button::A, CellContent::Fighter(kind)) => menu.mashout_open(Chip::Fighter(kind), cell),
-            (Button::A, CellContent::All) => menu.mashout_open(Chip::Random, cell),
+            (Button::A, CellContent::Fighter(_) | CellContent::All) => {
+                let fighter = info.kind();
+                if let RosterUse::PracticeCpu(game) = self.use_ {
+                    if !fighter.is_some_and(|kind| self.mii_blocked(kind)) {
+                        menu.open_practice_cpu(game, fighter, cell);
+                    }
+                } else {
+                    menu.mashout_open(fighter.map_or(Chip::Random, Chip::Fighter), cell);
+                }
+            }
             _ => {}
+        }
+    }
+
+    fn practice_chip(&self, menu: &Menu) -> Option<crate::model::mashout::picker::Chip> {
+        use crate::model::mashout::picker::{self, Chip};
+        if let RosterUse::PracticeCpu(game) = self.use_ {
+            Some(menu.practice_cpu_pick(game).fighter.map_or(Chip::Random, Chip::Fighter))
+        } else {
+            menu.mashout_config().and_then(picker::chip_of)
         }
     }
 
@@ -229,7 +250,8 @@ impl RosterEditor {
         frame.tile_roster_grid = true;
         frame.tile_cpu = true;
         frame.tile_sig = 0x8000_0002;
-        let saved = menu.mashout_config().and_then(picker::chip_of);
+        let saved = self.practice_chip(menu);
+        let practice_cpu = matches!(self.use_, RosterUse::PracticeCpu(_));
         for cell in 0..CELLS.min(frame.tiles.len()) {
             let Some(info) = self.grid.info(cell) else { continue };
             frame.tile_n[cell] = info.kind().and_then(|kind| u16::try_from(kind).ok()).unwrap_or(u16::MAX);
@@ -239,11 +261,20 @@ impl RosterEditor {
                 CellContent::All => Some(Chip::Random),
                 CellContent::Unsupported => None,
             };
-            let name = if chip == Some(Chip::Random) { "Random" } else { info.label };
+            let name = if chip == Some(Chip::Random) {
+                if practice_cpu { "Current CPU" } else { "Random" }
+            } else {
+                info.label
+            };
             let mut label = Text::<28>::new();
             let _ = write!(label, "{}{}", if chip.is_some() && chip == saved { "> " } else { "" }, name);
             frame.tiles[cell] = label;
-            if !chip.is_some_and(picker::pickable) && frame.tile_state[cell] == 0 {
+            let pickable = if practice_cpu {
+                chip.is_some() && !info.kind().is_some_and(|kind| self.mii_blocked(kind))
+            } else {
+                chip.is_some_and(picker::pickable)
+            };
+            if !pickable && frame.tile_state[cell] == 0 {
                 frame.tile_state[cell] = TILE_GREYED;
             }
         }
