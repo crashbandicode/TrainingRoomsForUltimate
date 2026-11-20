@@ -485,6 +485,30 @@ mod tests {
     }
 
     #[test]
+    fn cpu_behavior_returns_to_its_saved_value_after_a_load() {
+        let original = CpuBehavior { menu: 0, level: 3, control: 1 };
+        let changed_in_pause = CpuBehavior { menu: 4, level: 3, control: 5 };
+        let mut lease = BehaviorLease::new();
+        assert_eq!(lease.step(true, true, 1, original), Some(CpuBehavior::LEVEL_NINE));
+        assert_eq!(lease.step(true, true, 1, CpuBehavior::LEVEL_NINE), None);
+        assert_eq!(lease.step(true, true, 1, changed_in_pause), Some(CpuBehavior::LEVEL_NINE));
+        assert_eq!(lease.step(false, false, 1, CpuBehavior::LEVEL_NINE), None);
+        assert_eq!(lease.step(false, true, 1, CpuBehavior::LEVEL_NINE), Some(original));
+        assert_eq!(lease.step(false, true, 1, original), None);
+    }
+
+    #[test]
+    fn cpu_behavior_does_not_write_the_old_settings_to_a_replaced_panel() {
+        let a = CpuBehavior { menu: 0, level: 2, control: 1 };
+        let b = CpuBehavior { menu: 5, level: 4, control: 3 };
+        let mut lease = BehaviorLease::new();
+        assert_eq!(lease.step(true, true, 1, a), Some(CpuBehavior::LEVEL_NINE));
+        assert_eq!(lease.step(false, true, 2, b), None);
+        assert_eq!(lease.step(true, true, 2, b), Some(CpuBehavior::LEVEL_NINE));
+        assert_eq!(lease.step(false, true, 2, CpuBehavior::LEVEL_NINE), Some(b));
+    }
+
+    #[test]
     fn reaction_setting_three_values() {
         assert_eq!(Reaction::from_settings(0, 29).frames(), 0);
         assert_eq!(Reaction::from_settings(1, 0).frames(), 12);
