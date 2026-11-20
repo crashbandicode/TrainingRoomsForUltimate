@@ -2152,7 +2152,7 @@ approved_by = "Operator 2026-11-20 moved both games into the current rc.15 card 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 173040
+ceiling = 173428
 date = "2026-11-20"
-reason = "rc.15 niche recovery candidate on 79cc06f1. Source 0648e10f adds 2014 normalized lines to 171026, including trace-based air physics, guarded recovery, attempt history, correction counts, the Juggler reaction clock and the two-axis jump deadline."
+reason = "rc.15 niche recovery candidate on 79cc06f1. Source 7d9c022c adds 2402 normalized lines to 171026, including the Pikachu Skull Bash and Quick Attack sequence and the exact attempt-boundary trace."
 approved_by = "Primary e7ee8f1c directed one measured-delta budget entry for the operator's rc.15 niche-recovery hold and Perfect verification rows, 2026-11-20."
