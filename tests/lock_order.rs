@@ -2285,3 +2285,35 @@ fn no_engine_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
     let queues: Vec<&String> = problems.iter().filter(|p| p.starts_with("engine/rr_host.rs::CPU_FRAMES") || p.starts_with("engine/rr_host.rs::PLAYER_FRAMES")).collect();
     assert!(queues.is_empty(), "a game entry waits on a playback frame queue the menu worker fills:\n{}", queues.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n"));
 }
+
+#[test]
+fn strip_frame_step_never_blocks() {
+    fn block_after<'a>(source: &'a str, marker: &str) -> &'a str {
+        let start = source.find(marker).expect("gated strip side-effect block");
+        let open = start + source[start..].find('{').expect("opening brace");
+        let mut depth = 0;
+        for (offset, byte) in source.as_bytes()[open..].iter().enumerate() {
+            match *byte {
+                b'{' => depth += 1,
+                b'}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return &source[open + 1..open + offset];
+                    }
+                }
+                _ => {}
+            }
+        }
+        panic!("unclosed block after {marker}");
+    }
+
+    let source = include_str!("../src/runtime/features/input_display.rs");
+    let start = source.find("pub unsafe fn sample_frame").expect("sample_frame");
+    let end = source[start..].find("\npub fn session_clear").expect("end of sample_frame") + start;
+    let frame = &source[start..end];
+    assert!(frame.contains("TRACKER.try_lock()"), "the frame step must use try_lock");
+    assert!(!frame.contains("TRACKER.lock()"), "the frame step must not block");
+    let gated = block_after(frame, "if shown || input_drill");
+    assert!(gated.contains("rr_host::observe_input"));
+    assert!(gated.contains("combo::after_strip"));
+}

@@ -1307,6 +1307,28 @@ fn breaks_iff_depth() {
     assert_eq!(deepest(AERIALS, true, &hits, egg), Some(1.0));
 }
 
+fn tangency_breaks_excellent() {
+    let egg = [0.0, 0.0];
+    let hit = Hit([5.0, 0.0, 0.0], [5.0, 0.0, 0.0], 1.0, 16.0);
+    assert!(breaks(ANY, false, &hit, egg));
+    assert_eq!(depth(&hit, egg), Some(0.0));
+    assert_eq!(depth(&hit, egg).map(crate::model::spacing::Grade::of), Some(crate::model::spacing::Grade::Excellent));
+}
+
+fn outside_disc_miss_has_no_grade() {
+    let egg = [0.0, 0.0];
+    let hit = Hit([5.001, 0.0, 0.0], [5.001, 0.0, 0.0], 1.0, 16.0);
+    assert!(!breaks(ANY, false, &hit, egg));
+    assert_eq!(depth(&hit, egg), None);
+}
+
+fn helper_only_break_has_no_grade() {
+    let mut run = started(TIMED, ANY, 7);
+    let (event, depth) = run.step_with_depth(true, 0.0, &[], |_| true, |_| panic!("no article after helper break"), false, 0);
+    assert!(event.is_some());
+    assert_eq!(depth, None);
+}
+
 /// This module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -1358,6 +1380,9 @@ fn case_table() {
         ("eggs_training_gate", eggs_training_gate as fn()),
         ("eggs_off_no_calls", eggs_off_no_calls as fn()),
         ("breaks_iff_depth", breaks_iff_depth as fn()),
+        ("tangency_breaks_excellent", tangency_breaks_excellent as fn()),
+        ("outside_disc_miss_has_no_grade", outside_disc_miss_has_no_grade as fn()),
+        ("helper_only_break_has_no_grade", helper_only_break_has_no_grade as fn()),
     ]);
 }
 }
