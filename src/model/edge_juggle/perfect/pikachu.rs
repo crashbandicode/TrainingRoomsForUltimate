@@ -103,6 +103,26 @@ pub fn quick_attack(
     best
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SkullBashPath {
+    pub direction: f32,
+    pub launch_y: f32,
+    pub near: Point,
+    pub far: Point,
+    pub height: f32,
+}
+
+pub fn skull_bash_start(
+    _stage: (i32, u32),
+    _outline: &[Segment],
+    _ledges: [Point; 2],
+    _position: Point,
+    _bottom: f32,
+    _height: f32,
+) -> Option<SkullBashPath> {
+    None
+}
+
 #[cfg(test)]
 lib_unit_tests! {
     #[path = "../../../../tests/common/edge_juggle_pikachu.rs"]

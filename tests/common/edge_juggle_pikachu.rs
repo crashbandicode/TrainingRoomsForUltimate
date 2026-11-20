@@ -1,4 +1,4 @@
-use super::quick_attack;
+use super::{quick_attack, skull_bash_start};
 use crate::model::edge_juggle::perfect::{Point, Segment};
 
 // Stock common ring from the Battlefield and Waiting Room LVD, in a near-ledge frame.
@@ -45,4 +45,34 @@ fn quick_attack_declines_an_invalid_or_unreachable_apex() {
     assert!(quick_attack(&RING, [f32::NAN, -50.0], TARGET, BOTTOM, 10.0).is_none());
     assert!(quick_attack(&RING, [12.0, -76.0], TARGET, BOTTOM, 10.0).is_none());
     assert!(quick_attack(&RING, [158.0, -137.0], TARGET, BOTTOM, 10.0).is_none());
+}
+
+
+#[test]
+fn skull_bash_starts_only_inside_its_baked_region_and_live_stage_shape() {
+    let ledges = [[0.0, 0.0], [159.975, 0.0]];
+    let release = [-20.0, -28.0];
+    for stage in [0, 3, 311] {
+        let path = skull_bash_start((stage, 0), &RING, ledges, release, BOTTOM, 8.5).unwrap();
+        assert_eq!(path.direction, 1.0);
+        assert!((path.launch_y - (-49.018)).abs() < 0.002);
+        assert_eq!(path.near, [-1.7, -9.9]);
+        assert_eq!(path.far, TARGET);
+        assert_eq!(path.height, 10.0);
+    }
+    let mirror = |[x, y]: Point| [159.975 - x, y];
+    let right = skull_bash_start((0, 0), &RING, ledges, mirror(release), BOTTOM, 10.0).unwrap();
+    assert_eq!(right.direction, -1.0);
+    assert!((right.far[0] - mirror(TARGET)[0]).abs() < 0.001);
+
+    for stage in [(89, 0), (33, 0), (0, 1), (3, 2)] {
+        assert!(skull_bash_start(stage, &RING, ledges, release, BOTTOM, 10.0).is_none());
+    }
+    for start in [[-60.0, -28.0], [-20.0, -69.0], [-6.0, -28.0], [f32::NAN, -28.0]] {
+        assert!(skull_bash_start((3, 0), &RING, ledges, start, BOTTOM, 10.0).is_none());
+    }
+    assert!(skull_bash_start((3, 0), &RING, ledges, release, -125.0, 10.0).is_none());
+    assert!(skull_bash_start((3, 0), &RING, ledges, release, BOTTOM, 15.0).is_none());
+    let shape_changed = RING.map(|line| line.map(|[x, y]| [x, y * 0.9]));
+    assert!(skull_bash_start((3, 0), &shape_changed, ledges, release, BOTTOM, 10.0).is_none());
 }
