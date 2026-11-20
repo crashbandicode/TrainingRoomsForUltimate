@@ -391,6 +391,19 @@ mod tests {
     }
 
     #[test]
+    fn timed_dodge_requires_contact_and_honors_the_reaction_clock() {
+        let mut threat = ThreatClock::default();
+        assert_eq!(threat.observe(None, 100, 0, true, true, 0x8008).release, 0x8);
+        assert_eq!(threat.observe(Some(1), 101, 12, true, true, 0x8008).release, 0x8);
+        assert_eq!(threat.observe(Some(1), 112, 12, true, true, 0x8008).release, 0x8);
+        assert_eq!(threat.observe(Some(1), 113, 12, false, true, 0x8000), Correction::default());
+        assert_eq!(threat.observe(Some(1), 114, 12, true, false, 0x8000), Correction::default());
+        assert_eq!(threat.observe(Some(1), 115, 12, true, true, 0x8000).press, 0x8);
+        assert_eq!(threat.observe(Some(1), 116, 12, true, true, 0x8000), Correction::default());
+        assert_eq!(threat.observe(Some(2), 117, 0, true, true, 0x8000).press, 0x8);
+    }
+
+    #[test]
     fn meteor_bounce_keeps_the_dodge_unless_the_player_waits_on_entry() {
         let mut bounce = MeteorBounce::default();
         assert_eq!(bounce.step(false, true, 0x8008), Correction::default());
