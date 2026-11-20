@@ -384,6 +384,11 @@ static RELEASE_WATCH: Mutex<ReleaseWatch> = Mutex::new(ReleaseWatch::Settled);
 static EXTRAS: [AtomicU8; 2] = [AtomicU8::new(0), AtomicU8::new(0)];
 /// Extra-group bodies per role (planned, prefetched or built; failed excluded).
 static GROUP_BODIES: [AtomicU8; 2] = [AtomicU8::new(0), AtomicU8::new(0)];
+/// Ready Fighters shortfall: the whole cycles' demand by the planner's own rule (`body_bank::cycle_demand`): bodies and
+/// cold picks, recomputed only when its snapshot changes (`DEMAND`); the notice compares them with the setting.
+static READY_NEED: AtomicU8 = AtomicU8::new(0);
+static READY_COLD: AtomicU8 = AtomicU8::new(0);
+static DEMAND: Mutex<crate::engine::swap::body_bank::DemandMemo> = Mutex::new(crate::engine::swap::body_bank::DemandMemo::new());
 /// Fighter pool `**0x52b8548` capacity/live, sampled inside an entry callback.
 static POOL_CAPACITY: AtomicU32 = AtomicU32::new(0);
 static POOL_LIVE: AtomicU32 = AtomicU32::new(0);
@@ -927,6 +932,9 @@ pub(crate) fn plan_budget(menu: &crate::engine::compat::menu::TrainingModpackMen
     let mut group_bodies = 0usize;
     if grouped {
         group_bodies = plan_groups(&settings, menu, lanes, originals, &mut group_targets);
+    } else {
+        // Ready Fighters shortfall: without groups Ready Fighters is not the budget, so nothing is short of it.
+        READY_COLD.store(0, Ordering::Release);
     }
     // rc.6 item 3: with groups on, the live attached window plans what it serves (`body_bank::window_targets`; the values
     // `progress` reads).
@@ -1017,6 +1025,15 @@ fn shrink_to_ready(settings: &crate::engine::preload::cycle_preload_config::Sett
 /// Value-only group planning on the sparse planner: appends `Planned` groups to
 /// a Ready window bank; never removes or touches a native object. Returns the
 /// extra-group bodies charged to the shared budget and the per-role UI targets.
+/// A lane's Ice Climbers entry is a group candidate (see `plan_groups`).
+fn popo_candidate(menu: &crate::engine::compat::menu::TrainingModpackMenu, logical_role: super::Role, index: usize,
+    special: SpecialPolicy, policy: GroupPolicy) -> bool {
+    super::original_kind(logical_role) != Some(POPO) && {
+        let form = super::requested_forms_at(menu, logical_role, POPO, Some(index));
+        if special.pair { form == Forms::starting(POPO) } else { policy.solo_popo_groups && form == Forms::solo_popo() }
+    }
+}
+
 fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings,
     menu: &crate::engine::compat::menu::TrainingModpackMenu,
     lanes: &[[Option<crate::runtime::roster::cycle_preload::Target>; crate::runtime::roster::cycle_preload::MAX_TARGETS]; 4],
@@ -1043,6 +1060,16 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
     let hats_wanted = lanes[..2].iter().flatten().flatten().count().min(usize::from(settings.slots));
     let policy = group_policy(settings);
     let special = special_policy(settings);
+    // Ready Fighters shortfall (review 03:35Z): each role's whole cycle for the demand snapshot, read before any bank
+    // lock, with the look-ahead's own Ice Climbers rule; the live look-ahead (`upcoming`) is unchanged.
+    let whole: [crate::engine::swap::ordered_roster::KindList; 2] = std::array::from_fn(|role| {
+        let logical_role = if role == 0 { super::Role::Player } else { super::Role::Cpu };
+        let mut kinds = crate::engine::swap::ordered_roster::KindList::new(0);
+        for (i, kind) in super::cycle_kinds(menu, role).iter().copied().enumerate() {
+            if kind != POPO || popo_candidate(menu, logical_role, i, special, policy) { kinds.push(kind); }
+        }
+        kinds
+    });
     let mut windows = [None; 2];
     let mut existing = [crate::engine::compat::fixed::FixedList::<Members, MAX_EXTRA_GROUPS>::new(Members::pair_group()); 2];
     let mut alias = [0usize; 2];
@@ -1110,18 +1137,17 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
         for kind in lanes[2 + role].iter().enumerate().filter_map(|(i, t)| t.map(|t| (i, t)))
             // Configured targets stay canonical, except a lane Mii under the Mii-group policy.
             .filter(|(_, t)| t.configuration.is_none() || (special.mii && (0x48..=0x4a).contains(&t.kind)))
-            .filter(|(i, t)| t.kind != POPO
-                || (super::original_kind(logical_role) != Some(POPO) && {
-                    let form = super::requested_forms_at(menu, logical_role, POPO, Some(*i));
-                    if special.pair { form == Forms::starting(POPO) }
-                    else { policy.solo_popo_groups && form == Forms::solo_popo() }
-                }))
+            .filter(|(i, t)| t.kind != POPO || popo_candidate(menu, logical_role, *i, special, policy))
             .map(|(_, t)| t.kind) { kinds.push(kind); }
         kinds
     });
     let budget = GroupBudget { ready_fighters: usize::from(settings.ready_fighters), pool_free, special };
     let planned = plan_extra_groups_with(policy, windows, [&existing[0], &existing[1]], [&upcoming[0], &upcoming[1]],
         originals, budget);
+    let demand = DEMAND.lock().demand(crate::engine::swap::body_bank::DemandInput { policy, windows, lanes: whole, exclude: originals,
+        special, ready_fighters: usize::from(settings.ready_fighters) });
+    READY_NEED.store(demand.bodies.min(usize::from(u8::MAX)) as u8, Ordering::Release);
+    READY_COLD.store(demand.cold.min(usize::from(u8::MAX)) as u8, Ordering::Release);
     let mut bodies = 0usize;
     for role in 0..2 {
         let mut state = BANKS[role].lock();
@@ -1397,6 +1423,10 @@ pub(crate) fn progress() -> crate::engine::preload::cycle_preload_policy::BuiltF
     let settings = crate::runtime::roster::cycle_preload_config::snapshot();
     let mut result = BuiltFighters::default();
     if settings.slots == 0 || !settings.fighters || settings.bank_members < 2 { return result; }
+    // Ready Fighters shortfall: the setting beside the planner's last count of what the cycles need.
+    result.ready_fighters = settings.ready_fighters;
+    result.needed = READY_NEED.load(Ordering::Acquire);
+    result.cold = READY_COLD.load(Ordering::Acquire);
     let menu = crate::runtime::compat::sync::read(&crate::runtime::compat::menu::MENU);
     // Read roster metadata before BANKS; never acquire a roster lock inside it.
     let originals = [excluded_original(&settings, &menu, 0), excluded_original(&settings, &menu, 1)];

@@ -415,20 +415,42 @@ pub(crate) fn preload_targets(menu: &TrainingModpackMenu, role:usize)
     if role==Role::Cpu {
         if let Some(targets)=mii_ordinary_cpu::preload_targets(menu) {return targets;}
     }
+    let mut targets=[None;crate::runtime::roster::cycle_preload::MAX_TARGETS];
+    let mut slots=targets.iter_mut();
+    walk_cycle(menu,role,|kind| slots.next().map(|t| *t=Some(crate::runtime::roster::cycle_preload::Target::fighter(kind))).is_some());
+    targets
+}
+
+/// The cycle from the current fighter on, one kind per step, while `each` takes it.
+fn walk_cycle(menu: &TrainingModpackMenu, role: Role, mut each: impl FnMut(u32) -> bool) {
     let (mut current,mut cursor)={let s=state_for(role).lock();
-        let Some((_,kind))=s.observed else {return [None;crate::runtime::roster::cycle_preload::MAX_TARGETS];}; (kind,s.cursor)};
+        let Some((_,kind))=s.observed else {return;}; (kind,s.cursor)};
     let mut kinds=crate::engine::swap::ordered_roster::KindList::new(0);
     for f in roster_fixed(menu,role).iter() {kinds.push(f.kind());}
     let original=cycle_original(role);
-    let mut targets=[None;crate::runtime::roster::cycle_preload::MAX_TARGETS];
-    for target in &mut targets {
+    loop {
         let at_original=cursor.is_none() && original.is_some_and(|k|cycle_position(&[k],current).is_some());
         let Some((kind,next))=(if at_original {next_from_original(&kinds,original)}
             else {next_cycle(current,cursor,&kinds,original)}) else {break;};
-        *target=Some(crate::runtime::roster::cycle_preload::Target::fighter(kind));
+        if !each(kind) {break;}
         current=kind;cursor=next;
     }
-    targets
+}
+
+/// Ready Fighters shortfall (review 03:35Z): the role's WHOLE cycle in visit order from the current fighter (each kind
+/// once), for the demand snapshot only; the live look-ahead stays `preload_targets`. A Mii-led role keeps its look-ahead.
+pub(crate) fn cycle_kinds(menu: &TrainingModpackMenu, role: usize) -> crate::engine::swap::ordered_roster::KindList {
+    let mut kinds=crate::engine::swap::ordered_roster::KindList::new(0);
+    let logical=if role==0 {Role::Player}else{Role::Cpu};
+    if !logical.enabled() {return kinds;}
+    let mii=if role==0 {mii_ordinary_player::preload_targets(menu)} else {mii_ordinary_cpu::preload_targets(menu)};
+    if let Some(targets)=mii {
+        for t in targets.iter().flatten() {kinds.push(t.kind);}
+        return kinds;
+    }
+    // The walk comes back round to a kind it has visited when the cycle closes.
+    walk_cycle(menu,logical,|kind| !kinds.contains(&kind) && kinds.push(kind));
+    kinds
 }
 
 /// Hat continuation waits for the remembered practice fighter, including owned
