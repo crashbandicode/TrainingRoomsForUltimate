@@ -22,8 +22,9 @@
 //! The hurt spheres (decision HB1) come from the `HitModule` reader (`GameHurt`, over the three relied `hurtbox_*` guard
 //! rows in `sites_hitbox`), planned into the same wants as the hit spheres. The game's shared effect pool refused part of a
 //! large fighter's spheres every pass (two Ridleys: 22 of 55, Eden run tr-p23-hitbox-ab4); own orbs are never refused.
-//! Off — and the stop paths the dispatch takes first (not a practice fighter, shielding, grab) — constructs no reader, so
-//! the shipped build reads the HitModule only while the setting is On. The diag build additionally runs the reader once per
+//! The visualizer's Off and stop paths read no HitModule. A live Perfect recovery plan may sample the current P1's
+//! hurtbox height through the same guarded reader. If fighter hurtboxes are displayed, the planner reuses that pass.
+//! The diag build additionally runs the reader once per
 //! fighter per frame as the hurt census (`[Hitbox] hurt census`: the parts, the first pass and the read cost).
 //! No allocation: the spheres and the handle sets are fixed storage, the Lua stack and attack data are read in place, and
 //! every entry point counts under a `HookScope`. The pass and the hooks run on the game thread.
@@ -92,6 +93,7 @@ pub fn publish(snapshot: &Snapshot) {
     PRACTICE_HIDE.store(hide, Ordering::Release);
     btt::publish(snapshot);
     super::tech::publish(snapshot);
+    super::edge_juggle::publish(snapshot);
     super::parry::publish(snapshot);
 }
 
@@ -368,6 +370,32 @@ pub(crate) unsafe fn object_hits(at: usize) -> ([eggs::Hit; hitbox::SLOTS as usi
     (hits, n)
 }
 
+/// One guarded P1 height sample for a live Perfect recovery plan when the visualizer does not read fighter hurtboxes.
+unsafe fn perfect_player_height(attempt: &super::edge_juggle::LivePerfect) -> Option<f32> {
+    let player = attempt.player();
+    let mut reader = hitbox::GameHurt { accessor: player, load: mem_load };
+    let mut top = f32::NEG_INFINITY;
+    hitbox::hurt_parts(&mut reader, false, |_, shape, _| {
+        for offset in std::iter::once(shape.a).chain(shape.b) {
+            if let Some([_, y, _]) = natives::joint_position(player, shape.joint, &offset) {
+                top = top.max(y + shape.size);
+            }
+        }
+    });
+    (top.is_finite()).then_some(top)
+}
+
+unsafe fn drawn_player_height(player: usize, wants: &[Sphere]) -> Option<f32> {
+    wants.iter()
+        .filter(|sphere| sphere.key >> 24 == hitbox::KIND_HURT)
+        .filter_map(|sphere| {
+            let [_, y, _] = natives::joint_position(player, sphere.joint, &sphere.pos)?;
+            let top = y + sphere.scale / hitbox::SCALE;
+            top.is_finite().then_some(top)
+        })
+        .reduce(f32::max)
+}
+
 /// The status ids and effect attributes, resolved once through the game's constant table (`None` until it answers; it may not be
 /// built at boot). Asked again every 30th call.
 fn ensure_ready() -> bool {
@@ -577,17 +605,24 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     let (eggs_orbs, marks) = (RUN.lock().look(active, || view()), btt::look(active, || view()));
     let mut own = [None; 3 + btt::LOOKS];
     own[..3].copy_from_slice(&eggs_orbs);
+    let edge_wizard = super::edge_juggle::wizard_active();
     let tech = super::tech::running();
     // rc.15 target-hurtbox-display: the live targets' break volumes (the picture discs), drawn as hurtboxes below. Spacing
     // grader hook: its rings take these discs (`orbs::target_hurt_orbs`) rather than drawing a second one.
     let hurt_on = SETTING.load(Ordering::Acquire) && legend::shows(SHOWN.load(Ordering::Acquire), hitbox::KIND_HURT);
     let mut targets = [Orb::NONE; 1 + crate::model::btt::MAX];
     let mut n_targets = 0;
-    if hurt_on && !tech {
+    if hurt_on && !tech && !edge_wizard {
         n_targets = orbs::target_hurt_orbs(&own[..3], &mut targets);
         n_targets += orbs::target_hurt_orbs(&marks, &mut targets[n_targets..]);
     }
-    let marks = if tech { super::tech::look(active) } else { marks };
+    let marks = if edge_wizard {
+        super::edge_juggle::look(active)
+    } else if tech {
+        super::tech::look(active)
+    } else {
+        marks
+    };
     own[3..].copy_from_slice(&marks);
     let mut cache = ORB_PANES.lock();
     let registrations = tick::REGISTRATIONS.load(Ordering::Acquire);
@@ -972,6 +1007,21 @@ pub unsafe fn frame(fighter: usize) {
     #[cfg(feature = "diag")]
     stats::frame_begin();
     let enabled = SETTING.load(Ordering::Acquire);
+    let perfect = if super::edge_juggle::may_request_player_height() {
+        super::edge_juggle::player_height_request(natives::fighter_accessor(fighter))
+    } else {
+        None
+    };
+    let show_hurt = enabled && shown(legend::HURTBOXES);
+    let perfect = if show_hurt {
+        perfect
+    } else {
+        if let Some(attempt) = perfect {
+            let height = perfect_player_height(&attempt);
+            attempt.record_height(height);
+        }
+        None
+    };
     if !enabled && SLEPT.load(Ordering::Relaxed) == 0 && HELD.load(Ordering::Relaxed) == 0 {
         return;
     }
@@ -992,6 +1042,10 @@ pub unsafe fn frame(fighter: usize) {
         if let Some(i) = store.table.find(accessor) {
             clear_set(&mut store, i, accessor);
             HELD.store(store.table.held_spheres(), Ordering::Relaxed);
+        }
+        drop(store);
+        if let Some(attempt) = perfect {
+            attempt.record_height(None);
         }
         return;
     }
@@ -1020,9 +1074,8 @@ pub unsafe fn frame(fighter: usize) {
     }
     // Own orbs (decision HB-OWN-ORBS): while the setting is On the pass reads the HitModule (the relied `hurtbox_*` rows) and
     // plans the enabled parts' hurt spheres into the same wants as the hit spheres; `OrbSink` holds every one (never
-    // refused). The reader is constructed only here, behind `enabled`: Off — and the stop paths the dispatch takes first —
-    // reads no HitModule.
-    let mut hurt = (shown(legend::HURTBOXES) && enabled).then(|| hitbox::GameHurt { accessor, load: mem_load });
+    // refused). Sample the setting once so this pass and a Perfect plan cannot both read the fighter's HitModule.
+    let mut hurt = show_hurt.then(|| hitbox::GameHurt { accessor, load: mem_load });
     let hurt: Option<&mut dyn hitbox::HurtboxReader> = hurt.as_mut().map(|h| h as _);
     let (c, len) = hitbox::reconcile_frame(set, facts, wants, &mut GameAttacks(accessor), hurt, &mut OrbSink { status });
     // Wind areas (Windboxes ticked): pushes that are not hitboxes, read from the fighter's AreaModule.
@@ -1038,11 +1091,13 @@ pub unsafe fn frame(fighter: usize) {
     let grabs = set.spheres().filter(|s| s.key >> 24 == hitbox::KIND_GRAB).count() as u32;
     #[cfg(feature = "diag")]
     stats::wanted(hits, hurts);
-    #[cfg(not(feature = "diag"))]
-    let _ = len;
+    let height = perfect.as_ref().and_then(|attempt| drawn_player_height(attempt.player(), &wants[..len]));
     let held_now = set.len();
     HELD.store(table.held_spheres(), Ordering::Relaxed);
     drop(store);
+    if let Some(attempt) = perfect {
+        attempt.record_height(height);
+    }
     // Off: the pass that clears the fighters' orbs forgets the articles too.
     if enabled {
         counts.dropped += draw_articles(accessor, |key| enabled.then(|| hitbox::GameHurt { accessor: key, load: mem_load }));

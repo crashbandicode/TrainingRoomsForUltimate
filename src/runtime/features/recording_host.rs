@@ -48,18 +48,23 @@ unsafe fn record_start() -> rr_host::RecordStart {
 /// # Safety
 /// Game thread.
 unsafe fn live_speed(slot: usize) -> (f32, f32) {
+    let accessor = super::states::fighter_accessor(slot);
+    let (x, y) = fighter_speed(accessor).unwrap_or_default();
+    let finite = |v: f32| if v.is_finite() { v } else { 0.0 };
+    (finite(x), finite(y))
+}
+
+/// The named-macro kinetic guards also cover these reads on a current training body.
+pub(super) unsafe fn fighter_speed(accessor: usize) -> Option<(f32, f32)> {
     use smash::app::{lua_bind::KineticModule, BattleObjectModuleAccessor};
     use smash::lib::lua_const::KINETIC_ENERGY_RESERVE_ATTRIBUTE_MAIN;
-    let accessor = super::states::fighter_accessor(slot);
     if !crate::runtime::macros::ready() || accessor == 0 {
-        return (0.0, 0.0);
+        return None;
     }
     let module = accessor as *mut BattleObjectModuleAccessor;
     let x = KineticModule::get_sum_speed_x(module, *KINETIC_ENERGY_RESERVE_ATTRIBUTE_MAIN);
     let y = KineticModule::get_sum_speed_y(module, *KINETIC_ENERGY_RESERVE_ATTRIBUTE_MAIN);
-    // A start state must be finite (`StartState::validate`), or the whole recording is refused.
-    let finite = |v: f32| if v.is_finite() { v } else { 0.0 };
-    (finite(x), finite(y))
+    Some((x, y))
 }
 
 /// PLAY-MOMENTUM (primary 2026-11-08 23:03Z, reading (b)): on the game frame a run's first input after its warp is
@@ -157,7 +162,7 @@ unsafe fn set_normal_speed(module: *mut smash::app::BattleObjectModuleAccessor, 
     }
 }
 
-pub use rr_host::{cpu_playback, cpu_role_after_chord, cpu_role_control, cpu_role_phase, note_load, note_mash, playback_controller};
+pub use rr_host::{cpu_playback, cpu_playback_blocks_drill, cpu_role_after_chord, cpu_role_control, cpu_role_phase, note_load, note_mash, playback_controller};
 
 /// # Safety
 /// `out` is null or the live mapped-input record for this poll.

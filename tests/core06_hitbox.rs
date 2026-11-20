@@ -1662,13 +1662,9 @@ fn core06_hurt_census_window_and_line_format() {
 }
 
 #[test]
-fn core06_release_reads_the_hit_module_only_while_the_setting_is_on() {
-    // Route B (operator decision 2026-11-04, `docs/DECISIONS.md` HB1-route, `review/menu-proposal` `5ca5e3b`): the
-    // shipped build reads the HitModule only while the setting is On. The runtime's only reader construction sits in
-    // `frame`, behind `enabled` (`enabled.then(|| GameHurt …)`), and the dispatch's stop paths (not a practice fighter,
-    // shielding, grab, Off) return before any part is read; the diag census keeps its own reader inside the diag-gated
-    // `stats` module. The built release NRO is re-checked at the gates (no census string in it; the diag NRO carries the
-    // line), and the model tests above pin that a disabled or stop-path dispatch touches no HitModule.
+fn core06_release_reads_the_hit_module_only_for_the_visualizer_or_live_perfect() {
+    // Keep the original visualizer admission and diagnostic census boundaries. The only second release caller is
+    // a live Perfect attempt sampling the current primary P1 for a recovery plan.
     let src = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/hitbox.rs")).unwrap();
     let toks = callgraph::lex(&src);
     let refs = |name: &str| -> Vec<usize> {
@@ -1746,20 +1742,53 @@ fn core06_release_reads_the_hit_module_only_while_the_setting_is_on() {
     }
     let (frame_open, frame_close) = frame_span.expect("one `fn frame`");
     let inside_frame = |i: usize| i > frame_open && i < frame_close;
-    // The reader and its raw read exist in the shipped build — but only where the pass runs them.
+    let perfect_start = toks.windows(3).position(|w| {
+        matches!(&w[0], callgraph::Tok::Ident(s) if s == "fn")
+            && matches!(&w[1], callgraph::Tok::Ident(s) if s == "perfect_player_height")
+            && matches!(&w[2], callgraph::Tok::Punct('('))
+    }).expect("the second release reader belongs to the live Perfect player snapshot");
+    let perfect_open = (perfect_start + 3..toks.len())
+        .find(|&i| matches!(toks[i], callgraph::Tok::Punct('{')))
+        .expect("the Perfect reader body opens");
+    let mut depth = 0;
+    let perfect_close = (perfect_open..toks.len()).find(|&i| match toks[i] {
+        callgraph::Tok::Punct('{') => { depth += 1; false }
+        callgraph::Tok::Punct('}') => { depth -= 1; depth == 0 }
+        _ => false,
+    }).expect("the Perfect reader body closes");
+    let inside_perfect = |i: usize| i > perfect_open && i < perfect_close;
+    assert_eq!(refs("GameHurt").into_iter().filter(|&i| inside_perfect(i)).count(), 1);
+    let adapter = include_str!("../src/runtime/features/edge_juggle.rs");
+    assert_eq!(src.matches("perfect_player_height(&attempt)").count(), 1);
+    assert!(adapter.contains("wanted() == Some(run.drill)"));
+    assert!(adapter.contains("run.difficulty == Difficulty::Perfect"));
+    assert!(adapter.contains("run.rounds.phase == Phase::Live"));
+    assert!(adapter.contains("run.wizard.is_none()"));
+    assert!(adapter.contains("natives::module_accessor(0)"));
+    assert!(src.contains("let player = attempt.player()"));
+    assert!(src.contains("let show_hurt = enabled && shown(legend::HURTBOXES);"));
+    assert!(src.contains("let perfect = if show_hurt {
+        perfect
+    } else {"));
+    assert!(adapter.contains("&& run.plan_pending"));
+    assert!(adapter.contains("airborne_recovery(cpu, natives::status_kind(cpu))"));
+    assert!(adapter.contains("run.player_height.request(frame, actionable)"));
+    let plan = include_str!("../src/model/edge_juggle/perfect.rs");
+    assert!(plan.contains("!actionable || self.frame == Some(frame) || self.value.is_some()"));
+    // Reader construction and raw loads have the same reachability boundary.
     for name in ["GameHurt", "mem_load"] {
         let found = refs(name);
         assert!(!found.is_empty(), "{name} must appear in the runtime file");
         for &i in &found {
             let definition = toks[..i].iter().rev().take(3).any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "fn"));
-            assert!(definition || inside_frame(i) || inside_stats(i), "{name} at token {i} is outside `frame` and the diag census");
+            assert!(definition || inside_frame(i) || inside_perfect(i) || inside_stats(i), "{name} at token {i} is outside the two release callers and diag census");
         }
     }
     // The construction is behind the setting: `enabled` names itself within the few tokens before `GameHurt`.
     for &i in &refs("GameHurt") {
         if inside_frame(i) {
             assert!(
-                toks[i.saturating_sub(10)..i].iter().any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "enabled")),
+                toks[i.saturating_sub(10)..i].iter().any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "enabled" || s == "show_hurt")),
                 "the pass's reader at token {i} is not gated on `enabled`"
             );
         }
@@ -1768,7 +1797,7 @@ fn core06_release_reads_the_hit_module_only_while_the_setting_is_on() {
     for name in ["hurt_parts", "HurtCensus"] {
         let found = refs(name);
         assert!(!found.is_empty(), "{name} must appear in the runtime file");
-        assert!(found.iter().all(|&i| inside_stats(i)), "{name} is named outside the diag-gated stats module");
+        assert!(found.iter().all(|&i| inside_stats(i) || name == "hurt_parts" && inside_perfect(i)), "{name} is outside its allowed readers");
     }
     // The per-frame census call: cfg-gated wherever it sits.
     for i in refs("hurt_census") {

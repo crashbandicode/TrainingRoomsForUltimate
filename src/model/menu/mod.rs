@@ -140,6 +140,7 @@ pub struct Outbox {
     pub tech_point: bool,
     /// Stage tech: close into the guided exercise draft.
     pub tech_wizard: bool,
+    pub edge_juggle_setup: bool,
     /// A saved Parry practice activates its mode and keeps the current set.
     pub resume_parry: bool,
     /// rc.15 practice menu: the game the close starts (Start, Place targets, Tech point, Tech wizard). Only these start a
@@ -175,6 +176,7 @@ pub enum Grey {
     /// Tech practice always hides the CPU.
     TechCpu,
     ProjectilesUnavailable,
+    NeedsPerfect,
 }
 
 impl Grey {
@@ -192,6 +194,7 @@ impl Grey {
             Grey::TechAuto => "Auto chooses this value",
             Grey::TechDiSet => "Used by DI Set",
             Grey::TechCpu => "Tech practice hides the CPU",
+            Grey::NeedsPerfect => "Used at Perfect difficulty",
         }
     }
 }
@@ -637,7 +640,9 @@ impl Menu {
     }
 
     fn row_visible(&self, row: &Row) -> bool {
-        row.visible(self.env.pilot_present)
+        let native_only = matches!(row.control, Control::Game(Game::GuardEdge | Game::Juggler))
+            || matches!(row.group, table::EDGE | table::JUGGLE);
+        row.visible(self.env.pilot_present) && !(native_only && self.env.waiting_room)
     }
 
     fn group_visible(&self, group: usize) -> bool {
@@ -815,6 +820,12 @@ impl Menu {
         self.commit().to_json()
     }
 
+    pub fn reaction(&self, row: usize) -> Option<super::edge_juggle::Reaction> {
+        let rows = super::edge_juggle::reaction_rows(ROWS[row].id)?;
+        let selected = |id| super::tech_settings::selected(&self.settings.menu, id);
+        Some(super::edge_juggle::Reaction::from_settings(selected(rows.reaction), selected(rows.frames)))
+    }
+
     /// The value of a row for the renderer.
     pub fn value(&self, row: usize) -> RowValue {
         let row_index = row;
@@ -866,8 +877,7 @@ impl Menu {
 
     /// The visible rows of sub group `group` (a game's sub-screen), in table order.
     pub fn sub_rows(&self, group: u8) -> impl Iterator<Item = usize> + '_ {
-        let pilot = self.env.pilot_present;
-        ROWS.iter().enumerate().filter(move |(_, row)| row.group == group && row.visible(pilot)).map(|(i, _)| i)
+        ROWS.iter().enumerate().filter(move |(_, row)| row.group == group && self.row_visible(row)).map(|(i, _)| i)
     }
 
     fn sub_row(&self, group: u8, cursor: usize) -> Option<usize> {
@@ -955,6 +965,11 @@ impl Menu {
     /// Why the row is greyed, if it is.
     pub fn grey(&self, row: usize) -> Option<Grey> {
         let id = ROWS[row].id;
+        if super::edge_juggle::reaction_rows(id).is_some_and(|rows|
+            super::tech_settings::selected(&self.settings.menu, rows.difficulty) != 1
+        ) {
+            return Some(Grey::NeedsPerfect);
+        }
         if super::tech_settings::scale(id).is_some_and(|spec| {
             super::tech_settings::mode(&self.settings.menu, spec.mode) == super::tech_settings::Mode::Auto
         }) {
@@ -1460,6 +1475,11 @@ impl Menu {
                 self.start(Game::Tech);
                 return;
             }
+            Editor::EdgeJuggleSetup(game) => {
+                self.outbox.edge_juggle_setup = true;
+                self.start(game);
+                return;
+            }
             Editor::TechWizard => {
                 self.put_one_hot("tech_surface", 4);
                 self.outbox.tech_wizard = true;
@@ -1480,6 +1500,13 @@ impl Menu {
         let r = &ROWS[row];
         if r.id == LOOP_ROW {
             self.recording.cycle_loop_row(forward);
+            return;
+        }
+        if let (Some(rows), Some(super::edge_juggle::Reaction::Custom(frames))) =
+            (super::edge_juggle::reaction_rows(r.id), self.reaction(row))
+        {
+            let frames = if forward { (frames + 1).min(30) } else { (frames - 1).max(1) };
+            self.put_one_hot(rows.frames, usize::from(frames - 1));
             return;
         }
         match r.control {
@@ -1547,6 +1574,9 @@ impl Menu {
     /// overrides, chords); a focused-row reset restores that complete value. True when a value changed.
     fn reset_setting(&mut self, row: &Row) -> bool {
         let mut changed = false;
+        if let Some(rows) = super::edge_juggle::reaction_rows(row.id) {
+            changed |= self.reset_row(rows.frames);
+        }
         if matches!(row.control, Control::SwapGroups) {
             for id in SWAP_GROUP_IDS { changed |= self.reset_row(id); }
         }

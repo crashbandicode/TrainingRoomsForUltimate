@@ -38,6 +38,7 @@ fn input(entry: i32) -> FrameIn {
         situation: SITUATIONS,
         save_chord: false,
         load_chord: false,
+        suspend_autoload: false,
         kirby: false,
         pokemon: false,
         buffable: false,
@@ -381,6 +382,25 @@ fn state01_autoload_on_death() {
     let mut nana = loaded();
     nana.frame(&FrameIn { dead: true, nana: true, ..input(0) }, &on, &mut rng);
     assert!(!nana.is_loading());
+}
+
+#[test]
+fn drill_suspends_autoload_until_stop_for_both_fighters() {
+    let mut rng = rng();
+    let on = StateSettings { autoload: true, ..settings() };
+    let mut machine = loaded();
+    for entry in [0, 1] {
+        let down = FrameIn { dead: true, suspend_autoload: true, ..input(entry) };
+        let out = machine.frame(&down, &on, &mut rng);
+        assert!(!out.stop_playback && !machine.is_loading(), "a drill owns both placements");
+    }
+    let after_stop = FrameIn { dead: true, ..input(1) };
+    let out = machine.frame(&after_stop, &on, &mut rng);
+    assert!(out.stop_playback && machine.is_loading(), "Stop restores the saved autoload behavior");
+
+    let mut manual = loaded();
+    let load = FrameIn { load_chord: true, suspend_autoload: true, ..input(0) };
+    assert!(manual.frame(&load, &on, &mut rng).stop_playback, "explicit Load stays available");
 }
 
 #[test]

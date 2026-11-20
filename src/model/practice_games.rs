@@ -12,10 +12,14 @@ pub enum Game {
     Tech,
     Mashout,
     Parry,
+    GuardEdge,
+    Juggler,
 }
 
 impl Game {
-    pub const ALL: [Game; 5] = [Game::Eggs, Game::Btt, Game::Tech, Game::Mashout, Game::Parry];
+    pub const ALL: [Game; 7] = [
+        Game::Eggs, Game::Btt, Game::Tech, Game::Mashout, Game::Parry, Game::GuardEdge, Game::Juggler,
+    ];
 
     pub const fn title(self) -> &'static str {
         match self {
@@ -24,6 +28,8 @@ impl Game {
             Game::Tech => "Tech practice",
             Game::Mashout => "Mash out",
             Game::Parry => "Parry practice",
+            Game::GuardEdge => "Guard the Edge",
+            Game::Juggler => "Juggler",
         }
     }
 
@@ -41,7 +47,7 @@ impl Game {
     pub const fn mode_row(self) -> Option<&'static str> {
         match self {
             Game::Eggs => Some("eggsercise"),
-            Game::Btt | Game::Mashout => None,
+            Game::Btt | Game::Mashout | Game::GuardEdge | Game::Juggler => None,
             Game::Tech => Some("tech_practice"),
             Game::Parry => Some("parry_practice"),
         }
@@ -80,8 +86,22 @@ pub fn best_time<K: Copy + Eq, const N: usize>(pool: &[Option<(K, u32)>; N], key
 /// Record a scored attempt. Updates stay in place; a new key evicts the oldest (FIFO, not LRU).
 /// The caller owns scoring eligibility. A zero-capacity pool returns the time without retaining it.
 pub fn record_time<K: Copy + Eq, const N: usize>(pool: &mut [Option<(K, u32)>; N], key: K, time: u32) -> u32 {
+    record_best(pool, key, time, u32::min)
+}
+
+/// Record a scored attempt for a game where a higher value wins.
+pub fn record_max<K: Copy + Eq, const N: usize>(pool: &mut [Option<(K, u32)>; N], key: K, score: u32) -> u32 {
+    record_best(pool, key, score, u32::max)
+}
+
+fn record_best<K: Copy + Eq, const N: usize>(
+    pool: &mut [Option<(K, u32)>; N],
+    key: K,
+    time: u32,
+    better: impl FnOnce(u32, u32) -> u32,
+) -> u32 {
     if let Some((_, best)) = pool.iter_mut().flatten().find(|(saved, _)| *saved == key) {
-        *best = (*best).min(time);
+        *best = better(*best, time);
         return *best;
     }
     if N > 0 {
@@ -101,6 +121,19 @@ pub fn result_tick(left: &mut u16, tick: bool) -> bool {
 mod tests {
     lib_unit_tests! {
     use super::*;
+
+    #[test]
+    fn edge_juggle_are_independent_practice_games() {
+        let edge = Game::ALL.iter().copied().find(|game| game.title() == "Guard the Edge")
+            .expect("Guard the Edge has its own practice game entry");
+        let juggle = Game::ALL.iter().copied().find(|game| game.title() == "Juggler")
+            .expect("Juggler has its own practice game entry");
+        assert_eq!(Game::from_code(edge.code()), Some(edge));
+        assert_eq!(Game::from_code(juggle.code()), Some(juggle));
+        assert_eq!(effective(edge, 0, Some(juggle)), 0);
+        assert_eq!(effective(juggle, 0, Some(edge)), 0);
+        assert_eq!(Game::from_code(5), Some(Game::Parry), "existing codes stay stable");
+    }
 
     #[test]
     fn one_game_runs_at_a_time() {

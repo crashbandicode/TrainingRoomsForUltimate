@@ -151,6 +151,7 @@ fn apply() {
             // events (Eden rc6-covrec-diag1: a made combo was saved with no events).
             let before = *out;
             recorder::on_p1_poll(out);
+            super::edge_juggle::observe_player_pad((*out).buttons);
             let (record, sticks) = sticks.after_recorder(before, *out);
             input_display::on_p1_poll(controller, &record, sticks);
         }

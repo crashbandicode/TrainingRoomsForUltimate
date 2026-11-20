@@ -393,9 +393,13 @@ fn try_role_scene() -> Result<Option<Scene>, crate::runtime::compat::menu::MenuB
 /// All accessor-only hooks pass through current scene AND generation admission.
 fn role_of(accessor: usize) -> Option<FighterKey> {
     // The selected Mash attacker belongs to its real-move plan, including while it holds P1.
-    if unsafe { crate::runtime::features::mashout::owns_cpu(accessor) } { return None; }
+    if unsafe { super::mashout::owns_cpu(accessor) || super::edge_juggle::controls_cpu(accessor) } {
+        return None;
+    }
     let scene = role_scene();
-    with(|cpu| role_adapter::role(cpu, scene, accessor)).flatten()
+    with(|cpu| role_adapter::role(cpu, scene, accessor))
+        .flatten()
+        .filter(|&key| !super::edge_juggle::suspends_cpu_settings(key))
 }
 
 /// Ask the game's table for every constant, once. Returns whether the table is ready. Called from the
@@ -512,6 +516,7 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         // Product hold/restore uses the existing post-native seam and fresh lifetime receipt.
         unsafe { super::tech_adapter::frame(a0, receipt) };
         unsafe { crate::runtime::features::tech::frame(a0) };
+        unsafe { super::edge_juggle::frame(a0) };
         // S0 research only, after the ordinary hide and practice-game passes.
         #[cfg(feature = "diag")]
         unsafe {
@@ -634,7 +639,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
     let primary = !key.partner && key.entry == primary_entry(lobby);
     let tech = tech_facts(accessor, status, primary);
     let speed = crate::runtime::features::game_speed::current();
-    let practice_owned = crate::runtime::features::mashout::owns_cpu(accessor);
+    let practice_owned = super::mashout::owns_cpu(accessor) || super::edge_juggle::suspends_cpu_settings(key);
 
     let out = with(|cpu| {
         if !cpu.roles.set(receipt, accessor, key) { return None; }
@@ -1419,7 +1424,7 @@ pub fn set_mash_on(on: bool) {
     MASH_ON.store(on, Ordering::Release);
 }
 
-fn konst(c: C) -> i32 {
+pub(super) fn konst(c: C) -> i32 {
     CONSTS[c as usize].load(Ordering::Acquire)
 }
 

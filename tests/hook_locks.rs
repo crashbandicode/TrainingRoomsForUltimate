@@ -883,8 +883,14 @@ fn tech_frame_waits(graph: &Graph, runtime: &Path) -> BTreeSet<String> {
     tech_frame_waits_with_callbacks(graph,runtime,tech_callbacks::EDGES)
 }
 fn tech_frame_waits_with_callbacks(graph: &Graph, runtime: &Path, callbacks:&[(&str,&str)]) -> BTreeSet<String> {
-    let roots = graph.find("tech::frame");
-    assert_eq!(roots.len(), 1, "Tech fighter pass must remain an explicit audit root");
+    game_pass_waits(graph, runtime, "tech::frame", callbacks, false)
+}
+
+fn game_pass_waits(
+    graph: &Graph, runtime: &Path, root: &str, callbacks: &[(&str, &str)], reject_syscalls: bool,
+) -> BTreeSet<String> {
+    let roots = graph.find(root);
+    assert_eq!(roots.len(), 1, "{root} must remain an explicit audit root");
     let mut by_name: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     for (i, f) in graph.funcs.iter().enumerate() {
         by_name.entry(f.name.clone()).or_default().push(i);
@@ -915,11 +921,32 @@ fn tech_frame_waits_with_callbacks(graph: &Graph, runtime: &Path, callbacks:&[(&
             && matches!(t, Tok::Ident(s) if ["Box", "Vec", "String", "alloc"].contains(&s.as_str()))) {
             violations.insert(format!("{path} reaches an allocation spelling"));
         }
+        if reject_syscalls && graph.funcs[i].body.iter().any(|token|
+            matches!(token, Tok::Ident(name) if ["asm", "svc", "syscall"].contains(&name.as_str()))
+        ) {
+            violations.insert(format!("{path} reaches a syscall"));
+        }
         stack.extend(edges_on_thread(graph, i, &by_name, &mut BTreeMap::new(), false).into_iter().map(|next| (next, path.clone())));
         stack.extend(callbacks.iter().filter(|(from,_)| *from==key).flat_map(|(_,to)| graph.find(to))
             .map(|next| (next,path.clone())));
     }
     violations
+}
+
+#[test]
+fn edge_juggle_passes_are_nonblocking() {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut graph = Graph::scan(&runtime, &[]);
+    graph.precise_imports = true;
+    for root in ["edge_juggle::frame", "edge_juggle::poll", "edge_juggle::look", "edge_juggle::ai_correction", "tech_surfaces::frame_read_line", "tech_surfaces::frame_next_line"] {
+        let violations = game_pass_waits(&graph, &runtime, root, &[], true);
+        assert!(violations.is_empty(), "{root}: {violations:#?}");
+    }
+    let root = "edge_juggle::frame";
+    let frame = graph.find(root)[0];
+    graph.funcs[frame].body = callgraph::lex("ENGINE.lock();");
+    assert!(game_pass_waits(&graph, &runtime, root, &[], true)
+        .iter().any(|entry| entry.contains("ENGINE")));
 }
 
 #[test]

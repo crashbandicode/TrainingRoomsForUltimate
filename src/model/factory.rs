@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 154;
+pub const COUNT: usize = 163;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -259,6 +259,15 @@ pub static DEFS: [Def; COUNT] = [
     Def { id: "tech_delay_range", kind: Kind::Slider { max: 150 }, len: 2, default: &[20, 20] },
     row!("tech_camera", Single, 2, [0]),
     row!("tech_wizard_skip", Single, 2, [1]),
+    row!("edge_difficulty", Single, 2, [0]),
+    row!("edge_reaction", Single, 3, [1]),
+    row!("edge_reaction_frames", Single, 30, [11]),
+    row!("juggle_difficulty", Single, 2, [0]),
+    row!("juggle_reaction", Single, 3, [1]),
+    row!("juggle_reaction_frames", Single, 30, [11]),
+    row!("edge_cpu_percent", Single, 301, [100]),
+    row!("edge_attempts", Single, 3, [0]),
+    row!("juggle_attempts", Single, 3, [0]),
 
     row!("btt_projectiles", Single, 2, [1]),
 ];

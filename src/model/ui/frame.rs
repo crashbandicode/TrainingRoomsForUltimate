@@ -501,6 +501,10 @@ pub fn write_value(menu: &Menu, row: usize, out: &mut Text<72>) {
         let _ = write!(out, "<  {}  >", menu.recording().loop_label(menu.recording().page_role()));
         return;
     }
+    if let Some(reaction @ crate::model::edge_juggle::Reaction::Custom(_)) = menu.reaction(row) {
+        let _ = write!(out, "<  Custom {} f  >", reaction.frames());
+        return;
+    }
     let cycles = matches!(r.control, Control::Dropdown(_) | Control::Number { .. } | Control::YesNoRandom);
     if cycles {
         let _ = out.write_str("<  ");

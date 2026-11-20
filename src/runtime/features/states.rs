@@ -717,6 +717,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
         }
     }
     let stage_id = natives::stage_id();
+    let suspend_autoload = super::edge_juggle::running();
     let out = with(|state| {
         let ids = &state.ids;
         if !nana {
@@ -747,6 +748,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
             situation: ids.situations(),
             save_chord,
             load_chord,
+            suspend_autoload,
             kirby: ids.is(C::KindKirby, raw.kind),
             pokemon: ids.is(C::KindPokemonSquirtle, raw.kind) || ids.is(C::KindPokemonIvysaur, raw.kind) || ids.is(C::KindPokemonCharizard, raw.kind),
             buffable: ids.is_buffable(raw.kind),

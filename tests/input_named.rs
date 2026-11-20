@@ -60,6 +60,21 @@ fn a_named_playback_is_mirrored_by_the_recorded_facing_and_refused_while_busy() 
     assert_eq!(Recorder::new().start_named_playback(NAMED_FRAMES + 1, 1, 0, 1), Err(PlayRefusal::NothingLoaded));
 }
 
+#[test]
+fn restored_named_playback_finishes_while_drill_is_selected() {
+    use model::edge_juggle::drill_owns_pad;
+
+    let mut r = Recorder::new();
+    let layer = Layer::default();
+    layer.store(0, MappedInputs { lstick_x: 120, ..MappedInputs::NEUTRAL });
+    r.start_named_playback(1, 1, 0, 1).unwrap();
+    assert!(!drill_owns_pad(true, r.phase() != Phase::Idle));
+    let (_, control, post) = frame(&mut r, &layer, MappedInputs::NEUTRAL);
+    assert_eq!(control.write.map(|pad| pad.stick_x), Some(1.0));
+    assert_eq!(post.ended, Some(Ended::NamedPlayed));
+    assert!(drill_owns_pad(true, r.phase() != Phase::Idle));
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {

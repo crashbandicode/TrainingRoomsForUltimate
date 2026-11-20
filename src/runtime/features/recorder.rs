@@ -304,7 +304,33 @@ unsafe fn on_ai_frame(ai: usize) {
         return;
     };
     // Rule R3: only the CPU entry's own controller (never Nana's, never an AI-driven P1's).
-    if ((body.entry_ptr + ENTRY_CONTROLLER_FIELD) as *const usize).read() != controller || !load_consts() {
+    if ((body.entry_ptr + ENTRY_CONTROLLER_FIELD) as *const usize).read() != controller {
+        return;
+    }
+    if crate::model::edge_juggle::drill_owns_pad(
+        super::edge_juggle::controls_cpu(body.accessor),
+        busy_for_drill(),
+    ) {
+        let button_field = (controller + CTRL_BUTTONS) as *mut u32;
+        let x_field = (controller + CTRL_STICK_X) as *mut f32;
+        let y_field = (controller + CTRL_STICK_Y) as *mut f32;
+        let buttons = button_field.read();
+        let y = y_field.read();
+        let correction = super::edge_juggle::ai_correction(ai, body.accessor, buttons, y);
+        if let Some([next_x, next_y]) = correction.stick {
+            x_field.write(next_x);
+            ((controller + CTRL_CLAMPED_X) as *mut f32).write(next_x);
+            if next_y != y {
+                y_field.write(next_y);
+                ((controller + CTRL_CLAMPED_Y) as *mut f32).write(next_y);
+            }
+        }
+        if correction.press != 0 || correction.release != 0 {
+            button_field.write((buttons & !correction.release) | correction.press);
+        }
+        return;
+    }
+    if !load_consts() {
         return;
     }
     if super::mashout::owns_cpu(body.accessor) {
@@ -666,6 +692,10 @@ unsafe fn remember_named_pose() {
 /// The recorder is in a phase other than Idle (the record lockout, standby, recording or a playback).
 pub fn recording_or_playback() -> bool {
     ACTIVE.load(Ordering::Acquire) || recording_host::taking()
+}
+
+pub(super) fn busy_for_drill() -> bool {
+    recording_or_playback() || recording_host::cpu_playback_blocks_drill()
 }
 
 /// The replay editor holds the input (`Owners::REPLAY_EDITOR`; the editor is the named-macro layer, S4-4, so

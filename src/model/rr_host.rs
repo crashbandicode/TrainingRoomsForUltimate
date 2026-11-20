@@ -358,6 +358,11 @@ fn role_playing(role: Role) -> bool {
     run_flag(role).load(Ordering::Acquire) || !cut_flag(role).load(Ordering::Acquire) && !role_frames(role).is_empty()
 }
 
+/// A queued Play, running Recording-page CPU macro, or its still-live buffered tail.
+pub fn cpu_playback_blocks_drill() -> bool {
+    PLAY_CPU.load(Ordering::Acquire) || role_playing(Role::Cpu)
+}
+
 fn run_flag(role: Role) -> &'static AtomicBool {
     match role {
         Role::Player => &RUN_PLAYER,
@@ -2783,6 +2788,61 @@ mod tests {
         let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(tick.warp.is_none());
         assert_eq!(take_cpu_frame().expect("no warp, no wait").buttons, 33_281);
+    }
+
+    #[test]
+    fn a_drill_yields_to_a_running_library_cpu_macro_until_it_is_stopped() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("drill-library-loop");
+        active_plain_macro(&root, Role::Cpu, 4);
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_loop(Role::Cpu, LoopCount::Infinite);
+        index.save(&root).unwrap();
+
+        on_chords(false, false, true);
+        assert!(cpu_playback_blocks_drill(), "a pending Play has priority over drill Start");
+        tick(&root);
+        let legacy = crate::model::recording::Recorder::new();
+        assert_eq!(legacy.phase(), crate::model::recording::Phase::Idle);
+        assert!(!taking(), "fighter-mismatch busy excludes library playback");
+        assert!(RUN_CPU.load(Ordering::Acquire));
+        assert!(cpu_playback_blocks_drill(), "Start must yield while a library macro owns the CPU");
+        assert!(!crate::model::edge_juggle::drill_owns_pad(true, cpu_playback_blocks_drill()));
+        assert_eq!(take_cpu_frame().map(|frame| frame.buttons), Some(1));
+
+        // Since Start was refused, the ordinary Play on CPU chord can stop the loop.
+        on_chords(false, false, true);
+        tick(&root);
+        assert!(!cpu_playback_blocks_drill());
+        assert!(crate::model::edge_juggle::drill_owns_pad(true, cpu_playback_blocks_drill()));
+        tick(&root);
+        assert!(take_cpu_frame().is_none(), "no stopped macro can replay after the drill ends");
+        reset_host();
+    }
+
+    #[test]
+    fn a_drill_yields_until_the_library_cpu_macros_buffered_tail_drains() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("drill-library-tail");
+        active_plain_macro(&root, Role::Cpu, 4);
+        on_chords(false, false, true);
+        tick(&root);
+        assert!(!RUN_CPU.load(Ordering::Acquire), "the entire take has been handed to the hook");
+        assert!(!role_frames(Role::Cpu).is_empty(), "the buffered tail is still live");
+        assert!(!taking());
+
+        for buttons in 1..=4 {
+            assert!(cpu_playback_blocks_drill(), "the last frame also belongs to the playback");
+            assert!(!crate::model::edge_juggle::drill_owns_pad(true, cpu_playback_blocks_drill()));
+            assert_eq!(take_cpu_frame().map(|frame| frame.buttons), Some(buttons));
+        }
+        assert!(!cpu_playback_blocks_drill(), "an empty queue admits placement and the drill pad");
+        assert!(crate::model::edge_juggle::drill_owns_pad(true, cpu_playback_blocks_drill()));
+        tick(&root);
+        assert!(take_cpu_frame().is_none(), "the buffered tail drained exactly once");
+        reset_host();
     }
 
     /// Eden `rc6-covrec-diag1` (2026-11-08): Mash interrupts playback On, the CPU played its active macro,
