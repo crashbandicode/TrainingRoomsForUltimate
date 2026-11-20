@@ -44,14 +44,14 @@ struct RayPoint([f32; 4]);
 
 type RayCast = unsafe extern "C" fn(usize, *const RayPoint, *const RayPoint, *mut RayPoint, bool) -> usize;
 
-struct FloorRay {
+pub(super) struct FloorRay {
     accessor: usize,
     cast: RayCast,
 }
 
 impl FloorRay {
     /// Validate the exact borrowed-line and endpoint reader contract before any ray.
-    unsafe fn new(p1: usize) -> Option<Self> {
+    pub(super) unsafe fn new(p1: usize) -> Option<Self> {
         if !sites_mashout::SITES.iter().filter(|site| sites_mashout::placement_floor(site))
             .all(|site| game::granted(site.offset) && game::read_window(site.offset) == site.guard)
         {
@@ -73,7 +73,7 @@ impl FloorRay {
     }
 
     /// The native result is borrowed only until the next query. Copy its current geometry.
-    unsafe fn floor(&self, x: f32, [top, bottom]: [f32; 2], platforms: bool) -> Option<entry::PlacementFloor> {
+    pub(super) unsafe fn floor(&self, x: f32, [top, bottom]: [f32; 2], platforms: bool) -> Option<entry::PlacementFloor> {
         if ![x, top, bottom].into_iter().all(f32::is_finite) || top <= bottom {
             return None;
         }

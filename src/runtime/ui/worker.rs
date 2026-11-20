@@ -436,6 +436,7 @@ fn handle(event: Event, s: &mut Session) {
         CLOSING.store(false, Ordering::Release);
         crate::runtime::features::btt::menu_opened();
         crate::runtime::features::tech::menu_opened();
+        crate::runtime::features::edge_juggle::menu_opened();
         crate::runtime::ui::menu_app::note_open();
         { s.opening = crate::runtime::ui::menu_app::sequence(); }
         // The kept catalog before the first frame (menu speed): no card read, so the opening is drawn at once.
@@ -1371,9 +1372,10 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     // start theirs (after the publish above), which stops any other.
     crate::runtime::features::btt::menu_closed();
     crate::runtime::features::tech::menu_closed();
+    crate::runtime::features::edge_juggle::menu_closed();
     if let Some(game) = outbox.start {
         use crate::runtime::features::practice;
-        practice::start(game, practice::How { place_targets: outbox.place_targets, tech_point: outbox.tech_point, tech_wizard: outbox.tech_wizard, resume_parry: outbox.resume_parry });
+        practice::start(game, practice::How { place_targets: outbox.place_targets, tech_point: outbox.tech_point, tech_wizard: outbox.tech_wizard, resume_parry: outbox.resume_parry, edge_juggle_setup: outbox.edge_juggle_setup });
     }
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(10);

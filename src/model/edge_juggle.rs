@@ -299,6 +299,95 @@ fn clamp_point([x, y]: [f32; 2], [left, right, top, bottom]: [f32; 4]) -> Option
         .then(|| [x.clamp(left, right), y.clamp(bottom, top)])
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Setup {
+    pub area: Area,
+    pub cpu: [f32; 2],
+    pub p1: [f32; 2],
+    pub percent: u16,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WizardStep {
+    Area,
+    Cpu,
+    Percent,
+    Player,
+    Preview,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Wizard {
+    drill: Drill,
+    pub step: WizardStep,
+    pub setup: Setup,
+}
+
+impl Wizard {
+    pub fn new(drill: Drill, stage: Stage, p1: [f32; 2], percent: u16) -> Option<Self> {
+        let area = Area::default();
+        let (step, cpu) = match drill {
+            Drill::GuardEdge => (WizardStep::Area, stage.area_default(area)?),
+            Drill::Juggler => (WizardStep::Cpu, stage.default_juggle(p1)),
+        };
+        Some(Self {
+            drill,
+            step,
+            setup: Setup {
+                area,
+                cpu,
+                p1: stage.camera_point(p1)?,
+                percent: percent.min(300),
+            },
+        })
+    }
+
+    pub fn change_area(&mut self, stage: Stage, delta: i32) {
+        let area = self.setup.area.step(delta);
+        if let Some(cpu) = stage.area_default(area) {
+            self.setup.area = area;
+            self.setup.cpu = cpu;
+        }
+    }
+
+    pub fn move_cpu(&mut self, stage: Stage, point: [f32; 2]) {
+        if let Some(point) = match self.drill {
+            Drill::GuardEdge => stage.edge_start(self.setup.area, point),
+            Drill::Juggler => stage.camera_point(point),
+        } {
+            self.setup.cpu = point;
+        }
+    }
+
+    pub fn change_percent(&mut self, delta: i16) {
+        self.setup.percent =
+            (i32::from(self.setup.percent) + i32::from(delta)).clamp(0, 300) as u16;
+    }
+
+    pub fn advance(&mut self) {
+        self.step = match self.step {
+            WizardStep::Area => WizardStep::Cpu,
+            WizardStep::Cpu if self.drill == Drill::Juggler => WizardStep::Percent,
+            WizardStep::Cpu | WizardStep::Percent => WizardStep::Player,
+            WizardStep::Player | WizardStep::Preview => WizardStep::Preview,
+        };
+    }
+
+    /// False means B on the first step cancels the wizard.
+    pub fn back(&mut self) -> bool {
+        self.step = match self.step {
+            WizardStep::Area => return false,
+            WizardStep::Cpu if self.drill == Drill::Juggler => return false,
+            WizardStep::Cpu => WizardStep::Area,
+            WizardStep::Percent => WizardStep::Cpu,
+            WizardStep::Player if self.drill == Drill::Juggler => WizardStep::Percent,
+            WizardStep::Player => WizardStep::Cpu,
+            WizardStep::Preview => WizardStep::Player,
+        };
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {

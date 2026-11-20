@@ -140,6 +140,7 @@ pub struct Outbox {
     pub tech_point: bool,
     /// Stage tech: close into the guided exercise draft.
     pub tech_wizard: bool,
+    pub edge_juggle_setup: bool,
     /// A saved Parry practice activates its mode and keeps the current set.
     pub resume_parry: bool,
     /// rc.15 practice menu: the game the close starts (Start, Place targets, Tech point, Tech wizard). Only these start a
@@ -637,7 +638,9 @@ impl Menu {
     }
 
     fn row_visible(&self, row: &Row) -> bool {
-        row.visible(self.env.pilot_present)
+        let native_only = matches!(row.control, Control::Game(Game::GuardEdge | Game::Juggler))
+            || matches!(row.group, table::EDGE | table::JUGGLE);
+        row.visible(self.env.pilot_present) && !(native_only && self.env.waiting_room)
     }
 
     fn group_visible(&self, group: usize) -> bool {
@@ -866,8 +869,7 @@ impl Menu {
 
     /// The visible rows of sub group `group` (a game's sub-screen), in table order.
     pub fn sub_rows(&self, group: u8) -> impl Iterator<Item = usize> + '_ {
-        let pilot = self.env.pilot_present;
-        ROWS.iter().enumerate().filter(move |(_, row)| row.group == group && row.visible(pilot)).map(|(i, _)| i)
+        ROWS.iter().enumerate().filter(move |(_, row)| row.group == group && self.row_visible(row)).map(|(i, _)| i)
     }
 
     fn sub_row(&self, group: u8, cursor: usize) -> Option<usize> {
@@ -1458,6 +1460,11 @@ impl Menu {
                 self.put_one_hot("tech_surface", 4);
                 self.outbox.tech_point = true;
                 self.start(Game::Tech);
+                return;
+            }
+            Editor::EdgeJuggleSetup(game) => {
+                self.outbox.edge_juggle_setup = true;
+                self.start(game);
                 return;
             }
             Editor::TechWizard => {

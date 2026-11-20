@@ -50,6 +50,11 @@ mod tech {
     pub fn starting() -> bool { false }
 }
 
+mod edge_juggle {
+    pub fn allowed() -> bool { false }
+    pub fn start(_: bool) {}
+}
+
 mod notices {
     use std::sync::Mutex;
 

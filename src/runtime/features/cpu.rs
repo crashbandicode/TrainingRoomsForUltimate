@@ -512,6 +512,7 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         // Product hold/restore uses the existing post-native seam and fresh lifetime receipt.
         unsafe { super::tech_adapter::frame(a0, receipt) };
         unsafe { crate::runtime::features::tech::frame(a0) };
+        unsafe { super::edge_juggle::frame(a0) };
         // S0 research only, after the ordinary hide and practice-game passes.
         #[cfg(feature = "diag")]
         unsafe {
@@ -1419,7 +1420,7 @@ pub fn set_mash_on(on: bool) {
     MASH_ON.store(on, Ordering::Release);
 }
 
-fn konst(c: C) -> i32 {
+pub(super) fn konst(c: C) -> i32 {
     CONSTS[c as usize].load(Ordering::Acquire)
 }
 

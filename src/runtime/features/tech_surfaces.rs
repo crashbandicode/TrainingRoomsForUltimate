@@ -365,3 +365,16 @@ pub unsafe fn blast_bounds() -> Option<[f32; 4]> {
     (range.into_iter().all(f32::is_finite) && range[0] < range[1] && range[3] < range[2])
         .then_some(range)
 }
+
+/// The existing dead-area guard, using the same owned camera lifetime as
+/// camera_limit_range. Call only on a current native Training fighter frame.
+pub(super) unsafe fn training_blast_bounds() -> Option<[f32; 4]> {
+    use crate::model::sites_hitbox::CAMERA_LIMIT_RANGE_OFFSET;
+    use crate::model::sites_pkg2::CAMERA_MANAGER_SLOT_OFFSET;
+    if !guarded() || !game::granted(CAMERA_LIMIT_RANGE_OFFSET) {
+        return None;
+    }
+    let holder = ((game::text_base() + CAMERA_MANAGER_SLOT_OFFSET) as *const *const usize).read_volatile();
+    let manager = (!holder.is_null()).then(|| holder.read_volatile())?;
+    (manager != 0).then(|| ((manager + 0xc30) as *const [f32; 4]).read_unaligned())
+}

@@ -92,6 +92,7 @@ pub fn publish(snapshot: &Snapshot) {
     PRACTICE_HIDE.store(hide, Ordering::Release);
     btt::publish(snapshot);
     super::tech::publish(snapshot);
+    super::edge_juggle::publish(snapshot);
     super::parry::publish(snapshot);
 }
 
@@ -577,17 +578,24 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     let (eggs_orbs, marks) = (RUN.lock().look(active, || view()), btt::look(active, || view()));
     let mut own = [None; 3 + btt::LOOKS];
     own[..3].copy_from_slice(&eggs_orbs);
+    let edge_wizard = super::edge_juggle::wizard_active();
     let tech = super::tech::running();
     // rc.15 target-hurtbox-display: the live targets' break volumes (the picture discs), drawn as hurtboxes below. Spacing
     // grader hook: its rings take these discs (`orbs::target_hurt_orbs`) rather than drawing a second one.
     let hurt_on = SETTING.load(Ordering::Acquire) && legend::shows(SHOWN.load(Ordering::Acquire), hitbox::KIND_HURT);
     let mut targets = [Orb::NONE; 1 + crate::model::btt::MAX];
     let mut n_targets = 0;
-    if hurt_on && !tech {
+    if hurt_on && !tech && !edge_wizard {
         n_targets = orbs::target_hurt_orbs(&own[..3], &mut targets);
         n_targets += orbs::target_hurt_orbs(&marks, &mut targets[n_targets..]);
     }
-    let marks = if tech { super::tech::look(active) } else { marks };
+    let marks = if edge_wizard {
+        super::edge_juggle::look(active)
+    } else if tech {
+        super::tech::look(active)
+    } else {
+        marks
+    };
     own[3..].copy_from_slice(&marks);
     let mut cache = ORB_PANES.lock();
     let registrations = tick::REGISTRATIONS.load(Ordering::Acquire);

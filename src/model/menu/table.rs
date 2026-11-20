@@ -72,7 +72,7 @@ const fn sub(page: Page, title: &'static str) -> Group {
     Group { sub: true, ..g(page, title) }
 }
 
-pub static GROUPS: [Group; 26] = [
+pub static GROUPS: [Group; 28] = [
     g(Page::Cpu, "Reactions"),
     g(Page::Cpu, "Defence"),
     g(Page::Cpu, "Ledge & Tech"),
@@ -105,6 +105,8 @@ pub static GROUPS: [Group; 26] = [
     sub(Page::FightersStages, "Mash out"),
     // Parry practice (rc.15 Parry) joined as the fifth game: its section became its sub-screen.
     sub(Page::FightersStages, "Parry practice"),
+    sub(Page::FightersStages, "Guard the Edge"),
+    sub(Page::FightersStages, "Juggler"),
 ];
 
 // Group indices, for the rows below.
@@ -137,6 +139,8 @@ const EGGS: u8 = 22;
 const BTT: u8 = 23;
 const MASHOUT: u8 = 24;
 const PARRY: u8 = 25;
+pub(super) const EDGE: u8 = 26;
+pub(super) const JUGGLE: u8 = 27;
 
 /// The sub-screen group of a practice game (rc.15 practice menu).
 pub const fn game_group(game: Game) -> u8 {
@@ -146,6 +150,8 @@ pub const fn game_group(game: Game) -> u8 {
         Game::Tech => TECH,
         Game::Mashout => MASHOUT,
         Game::Parry => PARRY,
+        Game::GuardEdge => EDGE,
+        Game::Juggler => JUGGLE,
     }
 }
 
@@ -190,6 +196,7 @@ pub enum Editor {
     TechPoint,
     /// Stage tech: close into the guided exercise draft.
     TechWizard,
+    EdgeJuggleSetup(Game),
     /// Parry practice: the saved practices (a file each, the hot five first), and saving the current wiring as one.
     ParrySaved,
     ParrySave,
@@ -275,7 +282,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 145] = [
+pub static ROWS: [Row; 154] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -502,6 +509,10 @@ pub static ROWS: [Row; 145] = [
       "Practice escaping a capture.\nA opens its settings and Start."),
     r(GAMES, "Parry practice", "", Control::Game(Game::Parry),
       "Parry the CPU's recorded move, in sets of ten or freely.\nA opens its settings and Start."),
+    r(GAMES, "Guard the Edge", "", Control::Game(Game::GuardEdge),
+      "Keep the CPU offstage and secure the stock.\nA opens its settings and Start."),
+    r(GAMES, "Juggler", "", Control::Game(Game::Juggler),
+      "Keep the CPU airborne for as long as possible.\nA opens its settings and Start."),
     // Practice games > Eggs-ercise
     r(EGGS, "Start", "", Control::Start(Game::Eggs),
       "Closes the menu and starts Eggs-ercise with the settings below.\nWhile it runs, this row reads Stop."),
@@ -593,6 +604,20 @@ pub static ROWS: [Row; 145] = [
       "Your saved parry practices: a CPU macro and its Loop each.\nA practice whose macro or start save was deleted can't start."),
     r(PARRY, "Save this parry practice", "parry_save", Control::Editor(Editor::ParrySave),
       "Saves the CPU's active macro and Loop as a practice.\nIts start save is the macro's own."),
+    r(EDGE, "Start", "", Control::Start(Game::GuardEdge),
+      "Starts with the last setup for this stage or opens the wizard.\nWhile it runs, this row reads Stop."),
+    r(EDGE, "Set up…", "", Control::Editor(Editor::EdgeJuggleSetup(Game::GuardEdge)),
+      "Choose the start area, the CPU's point and your point.\nPreview both positions before starting."),
+    r(EDGE, "CPU percent", "edge_cpu_percent", Control::Number { first: 0, step: 1 },
+      "CPU damage at the start of each attempt.\nThe CPU starts in free fall."),
+    r(EDGE, "Attempts", "edge_attempts", Control::Dropdown(&["10", "20", "Free"]),
+      "Stop scoring after 10 or 20 attempts, or practise freely.\nUnresolved attempts do not count."),
+    r(JUGGLE, "Start", "", Control::Start(Game::Juggler),
+      "Starts with the last setup for this stage or opens the wizard.\nWhile it runs, this row reads Stop."),
+    r(JUGGLE, "Set up…", "", Control::Editor(Editor::EdgeJuggleSetup(Game::Juggler)),
+      "Choose the CPU's height, position and percent, then your point.\nPreview both positions before starting."),
+    r(JUGGLE, "Attempts", "juggle_attempts", Control::Dropdown(&["10", "20", "Free"]),
+      "Finish a set of 10 or 20 attempts, or practise freely.\nThe clock starts at release."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

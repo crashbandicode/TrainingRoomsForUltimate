@@ -26,11 +26,15 @@ pub struct How {
     pub tech_point: bool,
     pub tech_wizard: bool,
     pub resume_parry: bool,
+    pub edge_juggle_setup: bool,
 }
 
 /// Start `game` (the menu worker, at the close): it becomes the running game before its start trigger, so the game thread
 /// that takes the trigger reads it on. Any other game stops on its next frame.
 pub fn start(game: Game, how: How) {
+    if matches!(game, Game::GuardEdge | Game::Juggler) && !super::edge_juggle::allowed() {
+        return;
+    }
     // A running game's settings apply at its next Start: each game latches its own here or when the Start reaches it.
     super::hitbox::practice_started();
     if game != Game::Parry {
@@ -42,6 +46,7 @@ pub fn start(game: Game, how: How) {
         Game::Btt => super::btt::start(how.place_targets),
         Game::Mashout => super::mashout::start(),
         Game::Parry => super::parry::start(how.resume_parry),
+        Game::GuardEdge | Game::Juggler => super::edge_juggle::start(how.edge_juggle_setup),
         Game::Tech => {
             super::tech::start(how.tech_point);
             if how.tech_wizard {
@@ -59,6 +64,11 @@ pub fn stop() {
     diagnostic(format_args!("[Practice] stop game={was:?}"));
 }
 
+/// End the named game from its frame or input path, if the menu still owns that game.
+pub fn finish(game: Game) {
+    let _ = ACTIVE.compare_exchange(game.code(), 0, Ordering::AcqRel, Ordering::Acquire);
+}
+
 /// The game the menu shows as running: the running game while its engine runs it or a start is still on its way.
 pub fn running() -> Option<Game> {
     let game = active()?;
@@ -69,6 +79,7 @@ pub fn running() -> Option<Game> {
         // Mash out has no end of its own: each result re-arms the next attempt until Stop.
         Game::Mashout => true,
         Game::Parry => super::parry::on(),
+        Game::GuardEdge | Game::Juggler => true,
     };
     live.then_some(game)
 }

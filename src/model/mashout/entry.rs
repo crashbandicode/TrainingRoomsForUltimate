@@ -53,7 +53,7 @@ pub struct PlacementFloor {
 }
 
 impl PlacementFloor {
-    fn height(self, x: f32) -> Option<f32> {
+    pub(crate) fn height(self, x: f32) -> Option<f32> {
         let [[a, y], [b, z]] = self.ends;
         if ![a, y, b, z, x].into_iter().all(f32::is_finite) || a == b {
             return None;
