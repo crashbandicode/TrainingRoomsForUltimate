@@ -53,7 +53,7 @@ fn verify(fighter: i32, mode: &str, id: u8, steps: &[Move]) {
 
     let mut sequence = Sequence::new(row);
     for (idx, &movement) in steps.iter().enumerate() {
-        let frame = idx as u32 * 5;
+        let frame = idx as u32 * 7;
         assert_eq!(sequence.action(), Some(movement));
         let pad = sequence
             .step(sample(frame, Motion::Free))
@@ -91,6 +91,19 @@ fn verify(fighter: i32, mode: &str, id: u8, steps: &[Move]) {
             .expect("explicit release");
         assert_eq!(finish.press, 0);
         assert!(finish.release & expected.1 != 0);
+        assert_eq!(
+            sequence.action(),
+            Some(movement),
+            "native end phase still belongs to this move"
+        );
+        assert_eq!(
+            sequence.step(sample(frame + 4, Motion::Finish)),
+            Some(finish)
+        );
+        let resumed = sequence
+            .step(sample(frame + 5, Motion::Free))
+            .expect("native actionable frame");
+        assert_eq!(resumed.press, 0, "advance with a released pad");
     }
     assert_eq!(sequence.action(), None);
 }
@@ -331,4 +344,33 @@ fn niche_thunder_drifts_into_position_before_spending_down_special() {
         sequence.step(sample(1, Motion::Free)).unwrap().press,
         perfect::SPECIAL
     );
+}
+
+#[test]
+fn niche_rocketbarrel_holds_through_native_charge_before_release() {
+    let mut sequence = Sequence::new(select(facts(0x27, "cross"), CANDIDATE_ROWS).unwrap());
+    sequence.step(sample(0, Motion::Free)).unwrap();
+    sequence.step(sample(1, Motion::Starting)).unwrap();
+    for frame in 8..28 {
+        let edit = sequence.step(sample(frame, Motion::Charging)).unwrap();
+        assert_eq!(edit.press, perfect::SPECIAL, "charge frame {frame}");
+    }
+    let release = sequence.step(sample(28, Motion::Charging)).unwrap();
+    assert_eq!(release.press, 0);
+    assert_ne!(release.release & perfect::SPECIAL, 0);
+}
+
+#[test]
+fn niche_float_releases_to_spend_parasol_after_exit() {
+    let mut sequence = Sequence::new(select(facts(0xd, "cross"), CANDIDATE_ROWS).unwrap());
+    sequence.step(sample(0, Motion::Free)).unwrap();
+    sequence.step(sample(1, Motion::Starting)).unwrap();
+    let crossing = Sample {
+        at_exit: false,
+        ..sample(2, Motion::Travel)
+    };
+    assert_eq!(sequence.step(crossing).unwrap().press, perfect::JUMP);
+    let exit = sequence.step(sample(3, Motion::Travel)).unwrap();
+    assert_eq!(exit.press, 0);
+    assert_ne!(exit.release & perfect::JUMP, 0);
 }

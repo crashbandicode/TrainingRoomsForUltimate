@@ -183,13 +183,13 @@ unsafe fn transition(cpu: usize, movement: Move, available: bool) -> bool {
 /// Values come from the pinned 13.0.5 lua constants. Common status IDs use the existing resolver.
 /// An unrecognized status (including damage and special-fall) returns to the stock controller.
 unsafe fn motion(cpu: usize, fighter: i32, movement: Move, status: i32) -> Motion {
-    use Motion::*;
+    use Motion::{AimAgain, Charging, Finish, Free, Interrupted, Starting};
     use Move::*;
     if status == UNRESOLVED {
         return Interrupted;
     }
     if movement == Jump && status == konst(C::StatusJumpAerial) {
-        return Travel;
+        return Motion::Travel;
     }
     if airborne_recovery(cpu, status) {
         return Free;
@@ -200,7 +200,7 @@ unsafe fn motion(cpu: usize, fighter: i32, movement: Move, status: i32) -> Motio
         Drift | Jump | Float => {
             return match (fighter, movement, status) {
                 (0xd | 0xe, Float, 0x1e8) => Starting,
-                (0xd | 0xe, Float, 0x1e9) => Travel,
+                (0xd | 0xe, Float, 0x1e9) => Motion::Travel,
                 _ => Interrupted,
             }
         }
@@ -216,7 +216,7 @@ unsafe fn motion(cpu: usize, fighter: i32, movement: Move, status: i32) -> Motio
                 return Interrupted;
             }
             match natives::get_int(cpu, 0x1100_0005) {
-                0 => Travel,
+                0 => Motion::Travel,
                 1 | 2 => AimAgain,
                 _ => Interrupted,
             }
@@ -253,7 +253,7 @@ unsafe fn motion(cpu: usize, fighter: i32, movement: Move, status: i32) -> Motio
         | (0x5d, SonicBlade, 0x1eb)
         | (0x9, Missile, 0x1e2)
         | (0xa | 0x28, Bolt, 0x1e6)
-        | (0x2, Bomb, 0x1e5) => Travel,
+        | (0x2, Bomb, 0x1e5) => Motion::Travel,
         (0x2, Rise, 0x1e3)
         | (0x8 | 0x13, QuickAttack, 0x1e2)
         | (0x8, Side, 0x1e6)

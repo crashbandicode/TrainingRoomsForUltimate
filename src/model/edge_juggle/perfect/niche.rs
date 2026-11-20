@@ -165,6 +165,7 @@ pub struct Sequence {
     row: &'static Row,
     index: usize,
     stage: Stage,
+    charge_start: Option<u32>,
     last: Option<(u32, Option<Correction>)>,
 }
 
@@ -174,6 +175,7 @@ impl Sequence {
             row,
             index: 0,
             stage: Stage::Ready,
+            charge_start: None,
             last: None,
         }
     }
@@ -189,6 +191,16 @@ impl Sequence {
     fn advance(&mut self) {
         self.index += 1;
         self.stage = Stage::Ready;
+        self.charge_start = None;
+    }
+
+    fn hold_frames(&mut self, movement: Move, sample: Sample, accepted: u32) -> u32 {
+        let start = if movement == Barrel && sample.motion == Motion::Charging {
+            *self.charge_start.get_or_insert(sample.frame)
+        } else {
+            accepted
+        };
+        sample.frame.saturating_sub(start)
     }
 
     pub fn step(&mut self, sample: Sample) -> Option<Correction> {
@@ -251,19 +263,24 @@ impl Sequence {
                 Motion::Starting | Motion::Charging | Motion::Travel | Motion::AimAgain,
             ) => {
                 self.stage = Stage::Accepted(sample.frame);
-                Some(continuation(movement, sample, 0))
+                Some(continuation(
+                    movement,
+                    sample,
+                    self.hold_frames(movement, sample, sample.frame),
+                ))
             }
-            (Stage::Accepted(_), Motion::Free | Motion::Finish) => {
+            (Stage::Accepted(_), Motion::Free) => {
                 self.advance();
                 Some(pad([forward, level], 0))
             }
+            (Stage::Accepted(_), Motion::Finish) => Some(pad([forward, level], 0)),
             (
                 Stage::Accepted(frame),
                 Motion::Starting | Motion::Charging | Motion::Travel | Motion::AimAgain,
             ) => Some(continuation(
                 movement,
                 sample,
-                sample.frame.saturating_sub(frame),
+                self.hold_frames(movement, sample, frame),
             )),
             _ => None,
         }
@@ -307,7 +324,8 @@ fn continuation(movement: Move, sample: Sample, accepted_frames: u32) -> Correct
             SPECIAL
         }
         Barrel | Missile if sample.motion == Motion::Starting => SPECIAL,
-        Float => JUMP,
+        Barrel if sample.motion == Motion::Charging && accepted_frames < 20 => SPECIAL,
+        Float if sample.motion == Motion::Starting || !sample.at_exit => JUMP,
         SonicBlade if sample.motion == Motion::AimAgain => SPECIAL,
         _ => 0,
     };

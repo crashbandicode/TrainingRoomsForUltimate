@@ -11,6 +11,7 @@ use crate::model::cpu::{
     rng::Rng,
     role::FighterKey,
 };
+use crate::model::edge_juggle::perfect::rule_counts::{Counters, PerfectRule};
 use crate::model::edge_juggle::perfect::{
     self, AirPhysics, Correction, JumpTiming, LandingFacts, LandingOptions, MeteorBounce, PlanHeight,
     Route, RouteFacts, ThreatClock,
@@ -359,20 +360,6 @@ pub(super) struct StockPad {
     pub clamped_x: f32,
 }
 
-#[repr(u32)]
-enum PerfectRule {
-    Route = 1,
-    Jump = 2,
-    DistanceDodge = 3,
-    Reach = 4,
-    Detour = 5,
-    Niche = 6,
-    Landing = 11,
-    ReactDodge = 12,
-    HitRecovery = 13,
-    Meteor = 14,
-}
-
 static PLANNER_EVENTS: AtomicU32 = AtomicU32::new(0);
 
 /// Release trace boundary for the route taken after a complete plan.
@@ -383,14 +370,14 @@ pub extern "C" fn planner_chose(route: u32, fighter: u32, crossable: u32, row: u
     PLANNER_EVENTS.fetch_add(1, Ordering::Relaxed);
 }
 
-static PERFECT_EVENTS: AtomicU32 = AtomicU32::new(0);
+pub static PERFECT_CORRECTIONS: Counters = Counters::new();
 
 /// Plain release trace boundary for actual controller edits. No I/O in the AI hook.
 #[inline(never)]
 #[no_mangle]
-pub extern "C" fn perfect_rule_fired(rule: u32, cpu_frame: u32, trigger_frame: u32, detail: u32) {
+pub extern "C" fn perfect_rule_fired(rule: PerfectRule, cpu_frame: u32, trigger_frame: u32, detail: u32) {
     std::hint::black_box((rule, cpu_frame, trigger_frame, detail));
-    PERFECT_EVENTS.fetch_add(1, Ordering::Relaxed);
+    PERFECT_CORRECTIONS.record(rule);
 }
 
 impl StockPad {
@@ -409,7 +396,7 @@ impl StockPad {
                 || y != self.stick[1]
         });
         if next_buttons != self.buttons || changed_stick {
-            perfect_rule_fired(rule as u32, run.rounds.frames, trigger, detail);
+            perfect_rule_fired(rule, run.rounds.frames, trigger, detail);
         }
         edit
     }
@@ -995,9 +982,13 @@ unsafe fn recovery_pad(
                 ) {
                     let detour = perfect::avoid_detour(buttons, true, false, inward).release;
                     if buttons & !(perfect::JUMP | perfect::FLICK_JUMP | detour) == 0 {
+                        stock.observe(correction, PerfectRule::Route, run, 0, 2);
                         correction.release = detour;
-                        stock.observe(Correction { release: detour, ..Correction::default() }, PerfectRule::Detour, run, 0, 0);
-                        return stock.observe(correction, PerfectRule::Route, run, 0, 2);
+                        stock.observe(
+                            Correction { release: detour, ..Correction::default() },
+                            PerfectRule::Detour, run, 0, 0,
+                        );
+                        return correction;
                     }
                 }
                 run.guide = None;
@@ -1007,14 +998,18 @@ unsafe fn recovery_pad(
                     && physics.crossing(pos, speed, exit, band, u8::from(can_jump)) =>
             {
                 let detour = perfect::avoid_detour(buttons, true, can_punish, dir).release;
-                stock.observe(Correction { release: detour, ..Correction::default() }, PerfectRule::Detour, run, 0, 0);
-                let release = (buttons & perfect::JUMP) | detour;
-                let edit = Correction {
+                let mut edit = Correction {
                     stick: Some([dir, 0.0]),
-                    release,
+                    release: buttons & perfect::JUMP,
                     ..Correction::default()
                 };
-                return stock.observe(edit, PerfectRule::Route, run, 0, 1);
+                stock.observe(edit, PerfectRule::Route, run, 0, 1);
+                stock.observe(
+                    Correction { release: detour, ..Correction::default() },
+                    PerfectRule::Detour, run, 0, 0,
+                );
+                edit.release |= detour;
+                return edit;
             }
             RecoveryGuide::Cross { exit, dir, .. }
                 if (exit[0] - pos[0]) * dir <= 0.0 && can_jump =>

@@ -2,6 +2,8 @@
 
 #[path = "perfect/niche.rs"]
 pub mod niche;
+#[path = "perfect/rule_counts.rs"]
+pub mod rule_counts;
 
 pub type Point = [f32; 2];
 pub type Segment = [Point; 2];
