@@ -2069,3 +2069,11 @@ ceiling = 165172
 date = "2026-11-19"
 reason = "rc.15 submenu-page-switch, review 23:07Z #1: the worker's roster editor lives only while its own grid is the top screen (editors::roster::retain), so a form previewed with X does not outlive the page switch. Measured 165172 = +14 over 165158; the item's total is +43 over main 4f25a854 (165129)."
 approved_by = "primary c07b3449, RC15-CHANGES-COMMON (2026-11-19 13:45Z) and the 23:07Z review fix order: raise the budget by exactly the measured delta in a separate commit; the delta (+14, item total +43) is reported for the operator."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 165174
+date = "2026-11-20"
+reason = "rc.15 submenu-page-switch, operator ~23:10Z (recording list wrap): the recording pop-up list wraps on Up / Down (nudge_popup) and the library pages wrap at the edge (page_by). Measured 165174 = +2 over 165172; the item's total is +45 over main 4f25a854 (165129)."
+approved_by = "operator ~23:10Z ('yes fix the recording list wrap too') via primary c07b3449, RC15-CHANGES-COMMON: raise the budget by exactly the measured delta in a separate commit; the delta (+2, item total +45) is reported for the operator."
