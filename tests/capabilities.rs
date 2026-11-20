@@ -915,8 +915,15 @@ fn injected_hitlag_callback_reaches_all_four_guarded_native_readers() {
 fn mashout_rows_are_registered_without_new_writes() {
     use model::guard::SeamKind;
     let rows = &model::sites_mashout::SITES;
-    assert_eq!(rows.len(), 30);
-    assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Relied).count(), 24);
+    for name in ["tech_surface_normal_layout", "tech_surface_wall_bits_layout"] {
+        let stock = capabilities::find(name).unwrap();
+        let row = rows.iter().find(|site| site.offset == stock.offset).unwrap();
+        assert_eq!(row.kind, SeamKind::Relied);
+        assert_eq!(row.guard, stock.guard);
+        assert!(model::sites_mashout::placement_floor(row));
+    }
+    assert_eq!(rows.len(), 32);
+    assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Relied).count(), 26);
     assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Called).count(), 4);
     for row in rows {
         assert_eq!(row.feature, Feature::Mashout);

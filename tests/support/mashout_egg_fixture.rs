@@ -1277,8 +1277,11 @@ fn floor_clearance_follows_each_join_in_a_chain() {
 
 #[test]
 fn floor_clearance_does_not_cross_a_gap_or_a_platform_end() {
+    let join = -74.986_f32;
+    let next = join.next_up();
+    assert!(next > join);
     for detached_floor in [None, Some(entry::PlacementFloor {
-        ends: [[-74.986_f32.next_up(), 0.0], [74.988, 0.0]],
+        ends: [[next, 0.0], [74.988, 0.0]],
         ..FIXTURE_FLOOR
     })] {
         let mut memory = NativeMemory::new();
@@ -1289,7 +1292,7 @@ fn floor_clearance_does_not_cross_a_gap_or_a_platform_end() {
         P1_X.store((-77.0_f32).to_bits(), Ordering::Relaxed);
         ROLLER_LR.store((-1.0_f32).to_bits(), Ordering::Relaxed);
         FLOORS.set([Some(entry::PlacementFloor {
-            ends: [[-79.986, 0.0], [-74.986, 0.0]],
+            ends: [[-79.986, 0.0], [join, 0.0]],
             ..FIXTURE_FLOOR
         }), detached_floor]);
 

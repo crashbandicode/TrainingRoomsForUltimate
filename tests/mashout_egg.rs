@@ -270,6 +270,24 @@ fn actual_runtime_egg_preparation_and_native_seed() {
 }
 
 #[test]
+fn actual_floor_ray_requires_layout_grants_and_valid_platforms() {
+    let runtime = include_str!("../src/runtime/features/mashout.rs");
+    let reader_start = runtime.find("#[repr(C, align(16))]").unwrap();
+    let reader_end = runtime.find("/// Supply only the selected move").unwrap();
+    let sites = include_str!("../src/model/sites_mashout.rs");
+    let sites_start = sites.find("pub const FLOOR_RAY:").unwrap();
+    let sites_end = sites.find("/// Fighter AttackModule").unwrap();
+    let fixture = include_str!("support/mashout_floor_fixture.rs")
+        .replace("// FLOOR_RAY_READER", &runtime[reader_start..reader_end])
+        .replace("// FLOOR_SITE_SELECTION", &sites[sites_start..sites_end])
+        .replace(
+            "/* GENERATED_SITES */ []",
+            include_str!(concat!(env!("OUT_DIR"), "/tables/sites_mashout.SITES.rs")),
+        );
+    run_fixture(fixture, "floor");
+}
+
+#[test]
 fn actual_runtime_worker_native_epoch_admission_and_bests() {
     let runtime = include_str!("../src/runtime/features/mashout.rs");
     let run = include_str!("../src/model/mashout/run.rs");
