@@ -113,6 +113,8 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "input_display::reaction_left", owner: Some(Feature::CpuTech), gate: Gate::Flag("REACTION_ON") },
     // A saved combo's "recorded on": the CPU core unit's utility_get_kind row (boot sets the flag from that unit's closure).
     Boundary { function: "input_display::p1_fighter", owner: Some(Feature::CpuCore), gate: Gate::Flag("KIND_ON") },
+    // The native hurt-shape read is optional; boot sets its flag only when every grader row passed.
+    Boundary { function: "input_display::contact", owner: Some(Feature::InputDisplay), gate: Gate::Flag("GRADE_ON") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.
     Boundary { function: "recorder::request_playback", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
     Boundary { function: "recorder::on_state_restored", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
@@ -796,6 +798,20 @@ fn the_input_display_degrades_apart_from_input_delay() {
     // The CPU core's role test is the core's own: its two reset-hub rows stay in its closure.
     let usable = |s: &model::sites::Site| s.name != "is_operation_cpu";
     assert_eq!(capabilities::blocked_by(Feature::CpuCore, &usable), Some("is_operation_cpu"));
+}
+
+#[test]
+fn optional_grader_rows_disable_only_grading() {
+    let boot = include_str!("../src/runtime/boot.rs");
+    assert!(boot.contains(
+        "input_display::set_grader_read(display_on && sites_hitbox::GRADER_ROWS.iter().all(|(name, _)| row_usable(name)));"
+    ));
+    for (name, offset) in model::sites_hitbox::GRADER_ROWS {
+        let usable = |site: &model::sites::Site| site.name != name;
+        assert!(capabilities::unit_usable(Feature::InputDisplay, &usable), "{name} disabled Input Display");
+        assert!(capabilities::unit_usable(Feature::Hitbox, &usable), "{name} disabled Hitbox");
+        assert!(!Granted::from_usable(&usable).allows(offset), "{name} remained granted");
+    }
 }
 
 /// The seam installer sizes its own-write records with `WRITING_SITES` (`runtime::seams::seam_install::prime`).

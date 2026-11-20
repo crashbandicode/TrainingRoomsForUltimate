@@ -59,6 +59,10 @@ pub fn native(record_p: [f32; 3], shape_p: [f32; 3], pen: f32, radius: f32) -> O
     }
 }
 
+pub fn read_contact(_read: impl Fn(usize) -> Option<u64>, _accessor: usize) -> Option<Grade> {
+    None
+}
+
 #[cfg(test)]
 #[path = "spacing_tests.rs"]
 mod tests;

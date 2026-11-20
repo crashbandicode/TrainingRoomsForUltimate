@@ -27,6 +27,8 @@ static ENABLED: AtomicBool = AtomicBool::new(false);
 static REACTION_ON: AtomicBool = AtomicBool::new(false);
 /// P1's fighter read may run (`p1_fighter`).
 static KIND_ON: AtomicBool = AtomicBool::new(false);
+/// The optional spacing-grader rows all passed their guards (`contact`).
+static GRADE_ON: AtomicBool = AtomicBool::new(false);
 /// P1's latest mapped inputs, packed (`pack`).
 static INPUTS: AtomicU64 = AtomicU64::new(0);
 /// The constants resolved once (`ids`).
@@ -165,6 +167,26 @@ unsafe fn p1_fighter(accessor: usize) -> Option<i32> {
 /// Boot: the fighter read's row passed its guard (the CPU core unit's closure).
 pub fn set_fighter_read(on: bool) {
     KIND_ON.store(on, Ordering::Release);
+}
+
+/// Boot: every optional spacing-grader row passed its guard.
+pub fn set_grader_read(on: bool) {
+    GRADE_ON.store(on, Ordering::Release);
+}
+
+/// Receiver hurt-shape contact for a landed hit; optional rows never gate Input Display installation.
+///
+/// # Safety
+/// `accessor` is a live fighter or Sandbag accessor, on the game thread.
+pub(super) unsafe fn contact(_accessor: usize) -> Option<crate::model::spacing::Grade> {
+    if !GRADE_ON.load(Ordering::Acquire) {
+        return None;
+    }
+    let rows = &crate::model::sites_hitbox::GRADER_ROWS;
+    if !rows.iter().all(|(_, offset)| crate::runtime::game::granted(*offset)) {
+        return None;
+    }
+    None
 }
 
 /// Whether a spot is wanted (rc.14 SP3/SP4): *Spot labels* or *Match sweet/sour spot* On. Only then the strip reads the hitboxes'

@@ -89,6 +89,10 @@ pub const fn unit_of(feature: Feature) -> Feature {
     }
 }
 
+fn optional_row(site: &Site) -> bool {
+    super::sites_hitbox::GRADER_ROWS.iter().any(|(name, _)| *name == site.name)
+}
+
 const fn is_cpu_unit(unit: Feature) -> bool {
     matches!(unit, Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon | Feature::CpuShieldDamage | Feature::CpuCamera)
 }
@@ -232,6 +236,7 @@ fn cross_needs(unit: Feature) -> &'static [&'static str] {
 pub fn blocked_by(unit: Feature, usable: &dyn Fn(&Site) -> bool) -> Option<&'static str> {
     let own = all_sites().find(|s| {
         unit_of_row(s) == unit
+            && !optional_row(s)
             && !super::sites_mashout::move_specific(s)
             && !super::sites_tech_surfaces::SPEED_NOTICE_SITES.iter().any(|row| row.name == s.name)
             && !usable(s)

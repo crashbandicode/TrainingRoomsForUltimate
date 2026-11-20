@@ -525,12 +525,12 @@ fn core06_off_restores() {
 
 #[test]
 fn core06_site_guards() {
-    // The sixteen called natives include the indexed article lookup and TeamModule ownership.
-    // Fourteen relied windows cover layout, camera, damage and hitbox data reads.
+    // The sixteen called natives include indexed article lookup and TeamModule ownership.
+    // Fourteen main relied windows cover layout, camera, damage and hitbox reads; eight are optional spacing-grader rows.
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
     assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 16);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 14);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 22);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
         assert_eq!(site.feature, Feature::Hitbox);
@@ -552,7 +552,11 @@ fn core06_site_guards() {
     // Every one of our own rows, rejected alone, blocks the unit and names itself (an own row is a capability).
     for site in SITES.iter() {
         let usable = |row: &model::sites::Site| row.name != site.name;
-        assert_eq!(capabilities::blocked_by(Feature::Hitbox, &usable), Some(site.name), "{}", site.name);
+        if sites_hitbox::GRADER_ROWS.iter().any(|(name, _)| *name == site.name) {
+            assert!(capabilities::unit_usable(Feature::Hitbox, &usable), "optional row {} blocked Hitbox", site.name);
+        } else {
+            assert_eq!(capabilities::blocked_by(Feature::Hitbox, &usable), Some(site.name), "{}", site.name);
+        }
     }
     // The natives it shares with other packages are in its closure too: rejecting any of them blocks the feature.
     for shared in capabilities::CROSS_NEEDS.iter().find(|(u, _)| *u == Feature::Hitbox).map(|(_, n)| *n).unwrap_or(&[]) {
@@ -603,6 +607,11 @@ fn core06_site_guards() {
         (sites_hitbox::AREA_WIND_RAD_ARG9_OFFSET, "hitbox_area_wind_rad_arg9"),
     ] {
         assert_eq!(model::sites_hitbox::SITES.iter().find(|s| s.name == name).map(|s| s.offset), Some(offset), "{name}");
+    }
+    for (name, offset) in sites_hitbox::GRADER_ROWS {
+        let row = model::sites_hitbox::SITES.iter().find(|s| s.name == name).unwrap();
+        assert_eq!(row.offset, offset, "{name}");
+        assert!(matches!(row.kind, SeamKind::Relied), "{name}");
     }
 }
 
