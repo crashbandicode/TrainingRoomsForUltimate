@@ -223,7 +223,7 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     let rule = run.rule();
     let length = run.step_with(tick, top[1], hits, |egg| {
         super::lockon::hit(at, 0, lockon_key(score), rule, aerial, true).is_some()
-            || super::btt_projectiles::hit(at, egg, rule, aerial, true)
+            || super::btt_projectiles::hit(at, egg, rule, aerial, true).is_some()
     }, aerial, kind);
     // V2.1: the fighter whose attack broke it (Ice Climbers: that climber) freezes, as on a hit; an article's break does not.
     let broke = run.score > score && run.melee();

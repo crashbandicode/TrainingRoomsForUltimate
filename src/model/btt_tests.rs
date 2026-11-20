@@ -829,12 +829,12 @@ fn btt_projectiles_use_owned_native_hits() {
         hits[0] = Hit([20.0, 15.0, 0.0], [24.0, 15.0, 0.0], 1.0, 1.0);
         Some((hits, usize::from(article == 0x1_0008)))
     };
-    assert!(!projectile_breaks(false, eggs::ANY, false, [22.0, 15.0], std::iter::from_fn(|| panic!("Off polls no pool")), own, |_| panic!("Off reads no article")));
+    assert!(!projectile_breaks(false, eggs::ANY, false, [22.0, 15.0], std::iter::from_fn(|| panic!("Off polls no pool")), own, |_| panic!("Off reads no article")).is_some());
     assert_eq!(calls.get(), 0);
-    assert!(projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], [], own, read));
-    assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0 + eggs::RADIUS + 1.001], [], own, read), "outside the native radius is a miss");
-    assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], [], |_, _| 0, |_| panic!("another owner's article never enters the reader")));
-    assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], [], |_, n| if n == 0 { 3 } else { 0 }, |_| panic!("misaligned article")));
+    assert!(projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], [], own, read).is_some());
+    assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0 + eggs::RADIUS + 1.001], [], own, read).is_some(), "outside the native radius is a miss");
+    assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], [], |_, _| 0, |_| panic!("another owner's article never enters the reader")).is_some());
+    assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], [], |_, n| if n == 0 { 3 } else { 0 }, |_| panic!("misaligned article")).is_some());
     // rc.15 (docs/DECISIONS.md): an article's hit obeys `Breaks on` like the fighter's own: 12%+ by the article hit's damage,
     // Aerials only while Player 1 is in an aerial.
     let strong = |damage: f32| move |article: usize| {
@@ -842,10 +842,30 @@ fn btt_projectiles_use_owned_native_hits() {
         hits[0] = Hit([20.0, 15.0, 0.0], [24.0, 15.0, 0.0], 1.0, damage);
         Some((hits, usize::from(article == 0x1_0008)))
     };
-    assert!(!projectile_breaks(true, eggs::STRONG, false, [22.0, 15.0], [], own, strong(11.9)), "a weak article hit under 12%+");
-    assert!(projectile_breaks(true, eggs::STRONG, false, [22.0, 15.0], [], own, strong(12.0)), "a 12% article hit under 12%+");
-    assert!(!projectile_breaks(true, eggs::AERIALS, false, [22.0, 15.0], [], own, read), "Aerials, P1 grounded");
-    assert!(projectile_breaks(true, eggs::AERIALS, true, [22.0, 15.0], [], own, read), "Aerials, P1 in an aerial");
+    assert!(!projectile_breaks(true, eggs::STRONG, false, [22.0, 15.0], [], own, strong(11.9)).is_some(), "a weak article hit under 12%+");
+    assert!(projectile_breaks(true, eggs::STRONG, false, [22.0, 15.0], [], own, strong(12.0)).is_some(), "a 12% article hit under 12%+");
+    assert!(!projectile_breaks(true, eggs::AERIALS, false, [22.0, 15.0], [], own, read).is_some(), "Aerials, P1 grounded");
+    assert!(projectile_breaks(true, eggs::AERIALS, true, [22.0, 15.0], [], own, read).is_some(), "Aerials, P1 in an aerial");
+}
+
+fn projectile_grade_needs_owner() {
+    let owner = |kind, ordinal| {
+        if kind == 2 && ordinal < 2 { 0x1_0000 + ordinal as usize * 8 } else { 0 }
+    };
+    let read = |article| {
+        let mut hits = [Hit::default(); crate::model::hitbox::SLOTS as usize];
+        if article == 0x1_0008 {
+            hits[0] = Hit([20.0, 15.0, 0.0], [24.0, 15.0, 0.0], 1.0, 1.0);
+            Some((hits, 1))
+        } else {
+            Some((hits, 0))
+        }
+    };
+    assert_eq!(projectile_breaks(true, eggs::ANY, false, [22.0, 18.0], [], owner, read), Some(0.5));
+    assert_eq!(
+        projectile_breaks(true, eggs::ANY, false, [22.0, 18.0], [], |_, _| 0, |_| panic!("another owner's article is not read")),
+        None
+    );
 }
 
 fn btt_fired_bullet_survives_an_empty_current_ring() {
@@ -872,14 +892,14 @@ fn btt_fired_bullet_survives_an_empty_current_ring() {
         hits[0] = Hit([20.0, 15.0, 0.0], [24.0, 15.0, 0.0], 1.0, 3.0);
         Some((hits, 1))
     };
-    assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], [], |_, _| 0, read), "the old ring-only census misses");
-    assert!(projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, read));
-    assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, |_| None), "inactive pooled objects supply no attack");
+    assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], [], |_, _| 0, read).is_some(), "the old ring-only census misses");
+    assert!(projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, read).is_some());
+    assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, |_| None).is_some(), "inactive pooled objects supply no attack");
     assert!(!projectile_breaks(true, eggs::ANY, false, [22.0, 15.0], pool().into_iter().flatten(), |_, _| 0, |at| {
         let (mut hits, n) = read(at).unwrap();
         hits[0].3 = 0.0;
         Some((hits, n))
-    }), "a zero-damage windbox does not break targets");
+    }).is_some(), "a zero-damage windbox does not break targets");
     for field in [0, 1, 2, 3] {
         let saved = holder[field];
         holder[field] = match field { 2 => 65, _ => 0 };
@@ -965,6 +985,7 @@ fn case_table() {
         ("btt_compact_hud_text", btt_compact_hud_text as fn()),
         ("btt_placing_motion_matches_original_bytes", btt_placing_motion_matches_original_bytes as fn()),
         ("btt_projectiles_use_owned_native_hits", btt_projectiles_use_owned_native_hits as fn()),
+        ("projectile_grade_needs_owner", projectile_grade_needs_owner as fn()),
         ("btt_fired_bullet_survives_an_empty_current_ring", btt_fired_bullet_survives_an_empty_current_ring as fn()),
     ]);
 }

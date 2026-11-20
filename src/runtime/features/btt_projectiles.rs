@@ -12,8 +12,8 @@ pub fn ready() -> bool { READY.load(Ordering::Acquire) }
 /// status); `enabled` is the caller's own switch (Break the Targets' `Projectiles break targets`; Eggs-ercise always).
 /// # Safety
 /// Called on the game thread with a live fighter accessor.
-pub unsafe fn hit(owner: usize, spot: [f32; 2], rule: u8, aerial: bool, enabled: bool) -> bool {
-    if !READY.load(Ordering::Acquire) || !enabled { return false; }
+pub unsafe fn hit(owner: usize, spot: [f32; 2], rule: u8, aerial: bool, enabled: bool) -> Option<f32> {
+    if !READY.load(Ordering::Acquire) || !enabled { return None; }
     let pool = crate::engine::seams::article_pool::read(owner, crate::runtime::game::text_base());
     crate::model::btt::projectile_breaks(true, rule, aerial, spot, pool.into_iter().flatten(),
         |kind, ordinal| state_natives::article_get_from_no(owner, kind, ordinal),

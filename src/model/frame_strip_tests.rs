@@ -228,6 +228,87 @@ fn a_hit_that_cannot_be_told_is_not_labelled() {
     assert!(t.marks().next().is_none(), "both fighters hurt on one frame: whose hit?");
 }
 
+fn grade_tag_on_attacker_lane() {
+    use crate::model::spacing::Grade;
+    let calm = idle();
+    let hit = Sample { stop: true, hitstun: true, damage: 5.0, contact: Some(Grade::Excellent), ..Sample::default() };
+    let mut tracker = Tracker::new();
+    tracker.step(calm, calm, NONE);
+    tracker.step(calm, hit, NONE);
+    assert_eq!(tracker.tags().copied().collect::<Vec<_>>(), vec![Tag { frame: 2, lane: 0, grade: Grade::Excellent }]);
+
+    let p1_hit = Sample { stop: true, hitstun: true, damage: 5.0, contact: Some(Grade::Good), ..Sample::default() };
+    let cpu_hit = Sample { stop: true, hitstun: true, damage: 5.0, contact: Some(Grade::Ok), ..Sample::default() };
+    let mut trade = Tracker::new();
+    trade.step(calm, calm, NONE);
+    trade.step(p1_hit, cpu_hit, NONE);
+    assert!(trade.tags().next().is_none(), "trades have no grade tag");
+}
+
+fn no_grade_on_shield() {
+    use crate::model::spacing::Grade;
+    let calm = idle();
+    let shield = Sample {
+        stop: true,
+        shieldstun: true,
+        shielding: true,
+        damage: 5.0,
+        contact: Some(Grade::Good),
+        ..Sample::default()
+    };
+    let mut tracker = Tracker::new();
+    tracker.step(calm, calm, NONE);
+    tracker.step(calm, shield, NONE);
+    assert!(tracker.tags().next().is_none());
+}
+
+fn p2_lane_graded_separately() {
+    use crate::model::spacing::Grade;
+    let p1 = Sample { stop: true, hitstun: true, damage: 5.0, contact: Some(Grade::Ok), ..Sample::default() };
+    let cpu = Sample { player: true, ..idle() };
+    let mut tracker = Tracker::new();
+    tracker.step(idle(), cpu, NONE);
+    tracker.step(p1, cpu, NONE);
+    assert_eq!(tracker.tags().copied().collect::<Vec<_>>(), vec![Tag { frame: 2, lane: 1, grade: Grade::Ok }]);
+
+    let mut cpu = Tracker::new();
+    cpu.step(idle(), idle(), NONE);
+    cpu.step(p1, idle(), NONE);
+    assert!(cpu.tags().next().is_none(), "a CPU-operated lane is not P2");
+}
+
+fn grader_off_marks_nothing() {
+    let calm = idle();
+    let hit = Sample { stop: true, hitstun: true, damage: 5.0, ..Sample::default() };
+    let mut tracker = Tracker::new();
+    tracker.step(calm, calm, NONE);
+    tracker.step(calm, hit, NONE);
+    assert!(tracker.tags().next().is_none());
+}
+
+fn each_hit_graded_once() {
+    use crate::model::spacing::Grade;
+    let calm = idle();
+    let first = Sample { stop: true, hitstun: true, damage: 5.0, contact: Some(Grade::Good), ..Sample::default() };
+    let held = Sample { contact: Some(Grade::Ok), ..first };
+    let second = Sample { stop: true, hitstun: true, damage: 10.0, contact: Some(Grade::Excellent), ..Sample::default() };
+    let mut tracker = Tracker::new();
+    tracker.step(calm, calm, NONE);
+    tracker.step(calm, first, NONE);
+    tracker.step(calm, held, NONE);
+    tracker.step(calm, Sample { damage: 5.0, ..calm }, NONE);
+    tracker.step(calm, second, NONE);
+    assert_eq!(
+        tracker.tags().copied().collect::<Vec<_>>(),
+        vec![
+            Tag { frame: 5, lane: 0, grade: Grade::Excellent },
+            Tag { frame: 2, lane: 0, grade: Grade::Good },
+        ]
+    );
+    tracker.clear();
+    assert!(tracker.tags().next().is_none());
+}
+
 /// SP1: a weaker hitbox than the strongest of the same action is Late; a new action starts over.
 fn a_weaker_hit_later_in_the_same_action_is_late() {
     for (status, expected) in [(ATTACK, Some(Spot::Late)), (ATTACK + 1, None)] {
@@ -291,6 +372,11 @@ fn case_table() {
         ("a_hit_of_equal_damage_is_labelled_by_the_slot_the_game_recorded", a_hit_of_equal_damage_is_labelled_by_the_slot_the_game_recorded as fn()),
         ("a_hit_past_the_damage_cap_is_labelled_by_the_records_damage", a_hit_past_the_damage_cap_is_labelled_by_the_records_damage as fn()),
         ("a_charged_hit_is_labelled_by_the_hitbox_that_dealt_it", a_charged_hit_is_labelled_by_the_hitbox_that_dealt_it as fn()),
+        ("grade_tag_on_attacker_lane", grade_tag_on_attacker_lane as fn()),
+        ("no_grade_on_shield", no_grade_on_shield as fn()),
+        ("p2_lane_graded_separately", p2_lane_graded_separately as fn()),
+        ("grader_off_marks_nothing", grader_off_marks_nothing as fn()),
+        ("each_hit_graded_once", each_hit_graded_once as fn()),
         ("a_weaker_hit_later_in_the_same_action_is_late", a_weaker_hit_later_in_the_same_action_is_late as fn()),
         ("a_link_remembers_the_spot_of_its_follow_up_hit", a_link_remembers_the_spot_of_its_follow_up_hit as fn()),
         ("the_spot_labels_row_reads_its_setting", the_spot_labels_row_reads_its_setting as fn()),

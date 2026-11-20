@@ -5,6 +5,7 @@
 
 use super::input_delay::MappedInputs;
 use super::spots::{self, Peak, Powers, Spot};
+use super::spacing::Grade;
 
 /// Frames on screen and links kept for the LAST row (the pane table's numbers).
 pub const WINDOW: usize = super::panes::iv::WINDOW;
@@ -114,6 +115,8 @@ pub struct Sample {
     pub reaction: Option<f32>,
     /// Holding or raising a shield (`GUARD_ON ..= GUARD_DAMAGE`).
     pub shielding: bool,
+    pub contact: Option<Grade>,
+    pub player: bool,
     /// The fighter's damage (percent) and the launch numbers of each attack slot that is active, for the spot of a hit (rc.14, SP1).
     pub damage: f32,
     pub powers: Powers,
@@ -341,6 +344,16 @@ pub struct Mark {
     pub spot: Spot,
 }
 
+/// Recent hit grades retained for the strip.
+pub const TAGS: usize = 8;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Tag {
+    pub frame: u32,
+    pub lane: u8,
+    pub grade: Grade,
+}
+
 impl Link {
     /// Frames to spare (true combo) or past the window (drop, negative). `None` without a number.
     pub fn spare(&self) -> Option<i32> {
@@ -428,6 +441,8 @@ pub struct Tracker {
     p1_was_stop: bool,
     marks: [Option<Mark>; MARKS],
     mark_head: usize,
+    tags: [Option<Tag>; TAGS],
+    tag_head: usize,
     #[cfg(feature = "diag")]
     /// Diag build: the frame, what the defender took, the attacker's launch and hitboxes of the last hitstop that began (the `[Spots]` line).
     pub spot_read: Option<(u32, spots::Landed, spots::Launch, Powers)>,
@@ -473,6 +488,8 @@ impl Tracker {
             p1_was_stop: false,
             marks: [None; MARKS],
             mark_head: 0,
+            tags: [None; TAGS],
+            tag_head: 0,
             #[cfg(feature = "diag")]
             spot_read: None,
         }
@@ -482,6 +499,12 @@ impl Tracker {
     pub fn marks(&self) -> impl Iterator<Item = Mark> + '_ {
         (0..MARKS).filter_map(move |i| self.marks[(self.mark_head + MARKS - 1 - i) % MARKS])
     }
+
+    pub fn tags(&self) -> impl Iterator<Item = &Tag> + '_ {
+        (0..TAGS).filter_map(move |i| self.tags[(self.tag_head + TAGS - 1 - i) % TAGS].as_ref())
+    }
+
+    pub fn tag_target(&mut self, _grade: Grade) {}
 
     /// The frames stepped since the last clear.
     pub fn frame(&self) -> u32 {

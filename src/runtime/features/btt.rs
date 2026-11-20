@@ -305,7 +305,7 @@ pub unsafe fn frame(fighter: usize) -> Option<()> {
         let hit = hits[..n].iter().any(|h| eggs::breaks(rule, aerial, h, spot));
         melee |= hit;
         hit || super::lockon::hit(at, slot + 1, lockon_key(spot), rule, aerial, projectiles()).is_some()
-            || super::btt_projectiles::hit(at, spot, rule, aerial, projectiles())
+            || super::btt_projectiles::hit(at, spot, rule, aerial, projectiles()).is_some()
     });
     // V2.1: the fighter whose attack broke a target freezes, as on a hit.
     let frames = (broke > 0 && melee).then(scene::facts).and_then(eggs::hitlag)?;

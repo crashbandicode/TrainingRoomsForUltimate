@@ -248,10 +248,10 @@ pub fn list_footer(rows: &[(String, Layout)], cursor: usize, skipped: usize) -> 
 pub fn projectile_breaks(
     enabled: bool, rule: u8, aerial: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,
     mut read: impl FnMut(usize) -> Option<([eggs::Hit; super::hitbox::SLOTS as usize], usize)>,
-) -> bool {
-    enabled && pool.into_iter().chain(super::hitbox::article_instances(true, get)).filter(|a| pointer_ok(*a)).any(|article| {
+) -> Option<f32> {
+    (enabled && pool.into_iter().chain(super::hitbox::article_instances(true, get)).filter(|a| pointer_ok(*a)).any(|article| {
         read(article).is_some_and(|(hits, n)| hits[..n].iter().any(|h| h.3 > 0.0 && eggs::breaks(rule, aerial, h, spot)))
-    })
+    })).then_some(0.0)
 }
 
 /// Shared placing controls, without stage bounds or projection.

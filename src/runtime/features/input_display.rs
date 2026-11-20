@@ -257,6 +257,8 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample 
         attack: if p1 { ids.attack(status) } else { None },
         reaction,
         shielding: ids.shielding(status),
+        contact: None,
+        player: false,
         status,
         motion_frame: natives::motion_frame(accessor),
         facing: if lr < 0.0 { -1 } else { 1 },
