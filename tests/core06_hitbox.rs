@@ -524,6 +524,15 @@ fn core06_off_restores() {
 // ---- the site rows --------------------------------------------------------------------------------------------------
 
 #[test]
+fn grader_rows_resolve_in_the_hitbox_table() {
+    assert!(sites_hitbox::grader_usable(|_| true));
+    assert!(!sites_hitbox::grader_usable(|site| site.name != "spacing_hit_handler"));
+    assert!(sites_hitbox::GRADER_ROWS.iter().all(|(name, offset)| {
+        SITES.iter().any(|site| site.name == *name && site.offset == *offset)
+    }));
+}
+
+#[test]
 fn core06_site_guards() {
     // The sixteen called natives include indexed article lookup and TeamModule ownership.
     // Fourteen main relied windows cover layout, camera, damage and hitbox reads; spacing-grader rows are optional.

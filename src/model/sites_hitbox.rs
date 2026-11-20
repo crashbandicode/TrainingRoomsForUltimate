@@ -113,3 +113,9 @@ pub const HOOK_ROWS: [&str; 8] =
 pub const SPACING_HIT_HANDLER_OFFSET: usize = 0x402_d14;
 
 pub static SITES: [Site; 47] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));
+
+pub fn grader_usable(usable: impl Fn(&Site) -> bool) -> bool {
+    GRADER_ROWS.iter().all(|(name, _)| {
+        SITES.iter().find(|site| site.name == *name).is_some_and(&usable)
+    })
+}
