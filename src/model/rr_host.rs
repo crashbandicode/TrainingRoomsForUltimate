@@ -471,6 +471,16 @@ pub fn playback_controller(frame: InputFrame) -> Inject {
     inject_values(to_mapped(frame), 1)
 }
 
+/// Resolve the Recording page's contribution to the CPU controller.
+#[cfg(any(test, target_os = "switch"))]
+pub(crate) fn cpu_controller(take_frame: impl FnOnce() -> Option<InputFrame>) -> Option<Inject> {
+    // Sample ownership before the pop: the worker can enqueue the tail and end the run concurrently.
+    let running = RUN_CPU.load(Ordering::Acquire);
+    take_frame().map(playback_controller).or_else(|| {
+        (running && !CUT_CPU.load(Ordering::Acquire)).then_some(Inject::NEUTRAL)
+    })
+}
+
 /// The menu worker posts one effect. The recording worker applies it. A `None` does not clear a pending effect.
 #[cfg(test)]
 pub fn post_effect(effect: Effect) {
@@ -2509,17 +2519,28 @@ mod tests {
         on_chords(false, false, true);
         let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert_eq!(tick.warp.as_deref(), Some(save_id.as_str()));
-        assert!(take_cpu_frame().is_none(), "frame 0 must not be fed before the restore");
+        let stock_ai = Inject { buttons: 0x8004, stick_x: 1.0, clamped_x: 1.0, ..Inject::NEUTRAL };
+        assert_eq!(
+            cpu_controller(take_cpu_frame).unwrap_or(stock_ai),
+            Inject::NEUTRAL,
+            "restore pending: the CPU sees neutral, not its stock jump"
+        );
         let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
-        assert!(take_cpu_frame().is_none(), "the run holds while the restore is pending");
+        assert_eq!(cpu_controller(take_cpu_frame), Some(Inject::NEUTRAL));
 
         warp_landed();
+        assert_eq!(
+            cpu_controller(take_cpu_frame).unwrap_or(stock_ai),
+            Inject::NEUTRAL,
+            "restore committed: neutral lasts until the worker queues frame zero"
+        );
         let mut fed = Vec::new();
         for _ in 0..jab.len() {
             let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
-            fed.push(take_cpu_frame().expect("a frame after the restore").buttons);
+            fed.push(cpu_controller(take_cpu_frame).expect("a frame after the restore").buttons);
         }
         assert_eq!(fed, jab, "the whole file, from its first press, reaches the CPU");
+        assert_eq!(cpu_controller(take_cpu_frame).unwrap_or(stock_ai), stock_ai, "stock control returns after the tail");
     }
 
     /// Parry practice (DESIGN rev 2 §2.3): each Loop pass is one play-once run warped to the macro's start save, and

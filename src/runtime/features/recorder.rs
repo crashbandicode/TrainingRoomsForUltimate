@@ -460,10 +460,11 @@ unsafe fn write_controller(controller: usize, write: Inject) {
 }
 
 unsafe fn host_cpu(controller: usize) {
-    // CPU-role record stores the player poll (`cpu_role_poll`), not this controller. The word
-    // here after the AI epilogue is the idle baseline (0x8000) until the player's frame is injected.
-    let Some(frame) = recording_host::take_cpu_frame() else { return };
-    write_controller(controller, recording_host::playback_controller(frame));
+    // CPU-role recording captures the player poll; this controller receives CPU playback.
+    // The macro owns the pad through the start restore, including before its first queued frame.
+    if let Some(write) = crate::engine::rr_host::cpu_controller(recording_host::take_cpu_frame) {
+        write_controller(controller, write);
+    }
 }
 
 unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, facing: i8) {
