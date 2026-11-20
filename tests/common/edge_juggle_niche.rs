@@ -870,3 +870,22 @@ fn niche_near_gap_extensions_use_the_full_plain_return() {
         assert_eq!(select(Facts { short: true, ..input }, only).unwrap().id, row);
     }
 }
+
+#[test]
+fn niche_rob_budget_and_takeoff_allow_the_burner_startup_rise() {
+    let rob = &super::ROWS[6];
+    let ceiling = -40.0;
+    assert!(rob.launch_clears(-65.0, ceiling));
+    assert!(!rob.launch_clears(-64.0, ceiling));
+    assert!(super::ROWS[4].launch_clears(-64.0, ceiling));
+    let tight_roof = Crossing {
+        band: [-63.0, ceiling],
+        foot: -58.0,
+        ..ROOMY.crossing
+    };
+    let facts = Facts {
+        budget: Some(Budget { crossing: tight_roof, ..ROOMY }),
+        ..facts(0x2d, "cross")
+    };
+    assert!(rob.margin(facts).is_none());
+}

@@ -136,6 +136,10 @@ impl Row {
         )
     }
 
+    pub fn launch_clears(&self, y: f32, ceiling: f32) -> bool {
+        y <= ceiling
+    }
+
     /// The row's up special can be flown level under the stage.
     pub fn aimed(&self) -> bool {
         self.moves
