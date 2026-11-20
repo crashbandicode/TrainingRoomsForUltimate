@@ -171,6 +171,24 @@ impl BehaviorLease {
     }
 }
 
+/// The guarded Training HUD state used by the stock pause input handler.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum BehaviorMenu {
+    Closed,
+    Transition,
+    Open,
+}
+
+impl BehaviorMenu {
+    pub fn from_stock(state: u32, pause_owner: bool) -> Self {
+        match state {
+            2 if !pause_owner => Self::Closed,
+            5 => Self::Open,
+            _ => Self::Transition,
+        }
+    }
+}
+
 /// Drive the native pause/resume once when a behavior requires the stock apply.
 /// A pause opened by the player is never closed by the drill.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -181,17 +199,17 @@ pub enum BehaviorPause {
 }
 
 impl BehaviorPause {
-    pub fn pulse(&mut self, needs_stock: bool, paused: bool, quiet: bool) -> bool {
+    pub fn pulse(&mut self, needs_stock: bool, menu: BehaviorMenu, quiet: bool) -> bool {
         match *self {
-            Self::Idle if needs_stock && !paused && quiet => {
+            Self::Idle if needs_stock && menu == BehaviorMenu::Closed && quiet => {
                 *self = Self::Opening;
                 true
             }
-            Self::Opening if paused && quiet => {
+            Self::Opening if menu == BehaviorMenu::Open && quiet => {
                 *self = Self::Closing;
                 true
             }
-            Self::Closing if !paused => {
+            Self::Closing if menu == BehaviorMenu::Closed => {
                 *self = Self::Idle;
                 false
             }
@@ -614,16 +632,32 @@ mod tests {
 
     #[test]
     fn behavior_pause_pulses_once_per_edge_and_leaves_a_player_pause_open() {
+        use BehaviorMenu::{Closed, Open, Transition};
         let mut pause = BehaviorPause::Idle;
-        assert!(!pause.pulse(true, true, true));
-        assert!(!pause.pulse(true, false, false));
-        assert!(pause.pulse(true, false, true));
-        assert!(!pause.pulse(true, false, true));
-        assert!(!pause.pulse(true, true, false));
-        assert!(pause.pulse(false, true, true));
-        assert!(!pause.pulse(false, true, true));
-        assert!(!pause.pulse(false, false, true));
-        assert!(!pause.pulse(false, false, true));
+        assert!(!pause.pulse(true, Open, true));
+        assert!(!pause.pulse(true, Closed, false));
+        assert!(pause.pulse(true, Closed, true));
+        assert!(!pause.pulse(true, Closed, true));
+        assert!(!pause.pulse(true, Open, false));
+        assert!(pause.pulse(false, Open, true));
+        assert!(!pause.pulse(false, Open, true));
+        assert!(!pause.pulse(true, Transition, true));
+        assert!(!pause.pulse(false, Closed, true));
+        assert!(!pause.pulse(false, Closed, true));
+    }
+
+    #[test]
+    fn behavior_resume_waits_for_stock_pause_input() {
+        let mut pause = BehaviorPause::Idle;
+        assert!(pause.pulse(true, BehaviorMenu::from_stock(2, false), true));
+        assert!(
+            !pause.pulse(true, BehaviorMenu::from_stock(3, true), true),
+            "the moving pause pane appears before stock accepts resume"
+        );
+        assert!(pause.pulse(true, BehaviorMenu::from_stock(5, true), true));
+        assert!(!pause.pulse(true, BehaviorMenu::from_stock(21, false), true));
+        assert!(!pause.pulse(true, BehaviorMenu::from_stock(2, false), true));
+        assert!(pause.pulse(true, BehaviorMenu::from_stock(2, false), true), "a subsequent transaction can open");
     }
 
     #[test]

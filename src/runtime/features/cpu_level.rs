@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use crate::engine::seams::native_fields as field;
 use crate::model::cpu::level::{self as rules, CpuLevel, EntryRank, NoticeGate, SessionClock, Where};
-use crate::model::edge_juggle::{BehaviorLease, BehaviorPause, CpuBehavior};
+use crate::model::edge_juggle::{BehaviorLease, BehaviorMenu, BehaviorPause, CpuBehavior};
 use crate::model::input_delay::Owners;
 use crate::model::hook_stats::{HookId, HookScope};
 use crate::runtime::game;
@@ -40,6 +40,9 @@ const RANK_TABLE: usize = 0x4470dc0;
 /// The Training state root and the pause menu's chain (`cpu_level.training_rank_choice`, as `roster_cpu_quantity_root`).
 const TRAINING_ROOT: usize = 0x52c3420;
 const PANEL_CHAIN: [usize; 7] = [8, 0, 0xb38, 0, 0x210, 8, 0x80];
+/// HUD, immediately before the panel's final two links.
+const HUD_DEPTH: usize = 5;
+const HUD_PAUSE_STATE: usize = 0x200;
 /// The pause menu's CPU Behavior and Training's own level index (`cpu_level.training_level_label`).
 const PANEL_BEHAVIOR: usize = 0xb4c;
 const PANEL_LEVEL: usize = 0xb50;
@@ -57,6 +60,12 @@ const DRILL_BEHAVIOR_ROWS: &[&str] = &[
     "edge_juggle.training_behavior_write",
     "edge_juggle.training_operation_apply",
     "edge_juggle.training_operation_mirrors",
+    "edge_juggle.live_behavior_choice",
+    "edge_juggle.live_behavior_write",
+    "edge_juggle.live_operation_apply",
+    "edge_juggle.live_operation_mirrors",
+    "edge_juggle.pause_hud_state",
+    "edge_juggle.pause_hud_open",
 ];
 /// About four seconds on the plate.
 const NOTICE_FRAMES: u16 = 240;
@@ -380,7 +389,14 @@ pub(super) fn poll_drill(quiet: bool) -> bool {
 }
 
 unsafe fn step_drill_panel(base: usize, state: &mut State, running: bool, paused: bool, quiet: bool) -> bool {
-    let Some(panel) = training_panel(base) else {
+    let resolved = field::read::<usize>(base, TRAINING_ROOT)
+        .and_then(|root| field::chain(root, &PANEL_CHAIN[..HUD_DEPTH]))
+        .and_then(|hud| {
+            let panel = field::chain(hud, &PANEL_CHAIN[HUD_DEPTH..])?;
+            let menu = BehaviorMenu::from_stock(field::read_unchecked(hud, HUD_PAUSE_STATE), paused);
+            Some((panel, menu))
+        });
+    let Some((panel, menu)) = resolved else {
         DRILL_APPLIED.store(false, Ordering::Release);
         return false;
     };
@@ -408,12 +424,12 @@ unsafe fn step_drill_panel(base: usize, state: &mut State, running: bool, paused
     );
     let desired = state.drill_behavior.step(running, panel, current, applied);
     let needs_stock = desired.is_some_and(|desired| !applied || desired.menu != current.menu);
-    if let Some(desired) = desired.filter(|_| paused || !needs_stock) {
+    if let Some(desired) = desired.filter(|_| menu == BehaviorMenu::Open || menu == BehaviorMenu::Closed && !needs_stock) {
         if desired != current {
             field::write_unchecked(panel, PANEL_LEVEL, desired.level);
             field::write_unchecked(panel, PANEL_BEHAVIOR, desired.menu);
         }
     }
-    DRILL_APPLIED.store(running && !paused && !needs_stock, Ordering::Release);
-    state.drill_pause.pulse(needs_stock, paused, quiet)
+    DRILL_APPLIED.store(running && menu == BehaviorMenu::Closed && !needs_stock, Ordering::Release);
+    state.drill_pause.pulse(needs_stock, menu, quiet)
 }

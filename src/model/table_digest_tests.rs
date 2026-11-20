@@ -99,8 +99,8 @@ fn every_data_row_has_a_64_byte_guard() {
 
 const SEAM_ROWS: usize = 704;
 const SEAM_DIGEST: &str = "cb2c75e34e6f3258900a157be9b79d08b7ed396c5500f98d132e7627858d6adc";
-const EDGE_JUGGLE_ROWS: usize = 11;
-const EDGE_JUGGLE_DIGEST: &str = "e972583a67483ca05eb5df0e66c18ca7dfd11dbe1750eb935268fbc840c7739d";
+const EDGE_JUGGLE_ROWS: usize = 17;
+const EDGE_JUGGLE_DIGEST: &str = "fd91e2d01937ed4e7dda885c8e2beb853c6e42a46e13110dbbc7254cdbd8e1bb";
 const SITE_ROWS: usize = 272;
 const SITE_DIGEST: &str = "ba93529340967f0bf151474e5235469b69d4637fdd1d5991ce903cd392743c15";
 const UI_ROWS: usize = 6;
