@@ -2093,3 +2093,11 @@ ceiling = 166605
 date = "2026-11-20"
 reason = "Merge of rc.15 practice menu speed (recording catalog cache, 81b86cfc) onto 629870c5: the worker-kept incremental catalog, the bounded external names+sizes check, generation-checked actions and writeback, and Loop intents through the latest-index guard. The branch measured 166050 on 96355cad (+720 over the measured 165330). Added to main's measured 165885: 166605."
 approved_by = "Operator approved the menu speed size (+232, then ~+512, then +677 'yep approve it' 11-20 ~01:28Z); primary c07b3449 accepted +43 for the Loop writeback fix and merged after REVIEW PASS review-menu-astra 02:23Z, re-summing the tail."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 166621
+date = "2026-11-20"
+reason = "Merge of rc.15 target hurtbox size (c11226fc) onto 577ad6b8: hurt and article-hurt orbs drawn at the part size times the measured world scale; an invalid sample omits the orb. The branch measured 165901 on 629870c5 (+16 over 165885). Added to main's 166605: 166621."
+approved_by = "Operator 2026-11-19 asked for the target hurtbox fix ('that should be fixed'); primary c07b3449 merged after REVIEW PASS review-visualizer-astra 02:52Z and added the measured delta."
