@@ -112,13 +112,13 @@ pub struct SkullBashPath {
     pub height: f32,
 }
 
-// The 200 candidate cells from reference-crossings/gen_regions.py, P-SB on the common ring.
+// The 201 candidate cells from reference-crossings/gen_regions.py, P-SB on the common ring.
 // The same stage layout is mirrored at runtime. Lylat needs a separate geometry and table.
 const SKULL_BASH_RING: [u32; 44] = [
     0x0000, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc,
     0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc,
-    0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x01fc,
-    0x01fc, 0x00fc, 0x003c, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+    0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc,
+    0x01fc, 0x01fc, 0x001c, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
     0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
     0x0000, 0x0000, 0x0000, 0x0000,
 ];
@@ -169,8 +169,9 @@ pub fn skull_bash_start(
     }
     Some(SkullBashPath {
         direction,
-        // Skull Bash falls 3.1 units before its level travel, with two units of roof clearance.
-        launch_y: underside - MODEL_HEIGHT - 2.0 + 3.1,
+        // edge-ref-pika-1: drop 3.64 before flight, then rise 1.82 above
+        // its start during flight. Leave two units between the body and the roof.
+        launch_y: underside - MODEL_HEIGHT - 2.0 + 3.64 - 1.82,
         near: [near[0] - direction * 1.7, near[1] - 9.9],
         far: [far[0] + direction * 1.7, far[1] - 9.9],
         height: MODEL_HEIGHT,
