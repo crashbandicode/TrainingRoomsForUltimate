@@ -1,8 +1,9 @@
 pub const ROW: &str = "spacing_grader";
 
-use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
 pub enum Grade {
     Excellent,
     Good,
@@ -60,8 +61,7 @@ pub struct Lane {
 pub struct Lanes {
     damage: [AtomicUsize; 2],
     hit: [AtomicUsize; 2],
-    id: [AtomicU32; 2],
-    attacks: [AtomicBool; 2],
+    identity: [AtomicU64; 2],
 }
 
 impl Lanes {
@@ -69,8 +69,7 @@ impl Lanes {
         Self {
             damage: [const { AtomicUsize::new(0) }; 2],
             hit: [const { AtomicUsize::new(0) }; 2],
-            id: [const { AtomicU32::new(0) }; 2],
-            attacks: [const { AtomicBool::new(false) }; 2],
+            identity: [const { AtomicU64::new(0) }; 2],
         }
     }
 
@@ -79,8 +78,7 @@ impl Lanes {
         damage.store(0, Ordering::Release);
         let Some(value) = value else { return };
         self.hit[lane].store(value.hit, Ordering::Relaxed);
-        self.id[lane].store(value.id, Ordering::Relaxed);
-        self.attacks[lane].store(value.attacks, Ordering::Relaxed);
+        self.identity[lane].store(u64::from(value.id) | u64::from(value.attacks) << 32, Ordering::Relaxed);
         damage.store(value.damage, Ordering::Release);
     }
 
@@ -89,11 +87,12 @@ impl Lanes {
         if damage == 0 {
             return None;
         }
+        let identity = self.identity[lane].load(Ordering::Relaxed);
         let value = Lane {
             damage,
             hit: self.hit[lane].load(Ordering::Relaxed),
-            id: self.id[lane].load(Ordering::Relaxed),
-            attacks: self.attacks[lane].load(Ordering::Relaxed),
+            id: identity as u32,
+            attacks: identity >> 32 != 0,
         };
         (self.damage[lane].load(Ordering::Acquire) == damage).then_some(value)
     }
@@ -127,27 +126,11 @@ pub struct Entry {
     pub earlier: bool,
 }
 
-fn grade_code(grade: Grade) -> u8 {
-    match grade {
-        Grade::Excellent => 0,
-        Grade::Good => 1,
-        Grade::Ok => 2,
-    }
-}
-
-fn grade_from_code(code: u8) -> Grade {
-    match code {
-        0 => Grade::Excellent,
-        1 => Grade::Good,
-        _ => Grade::Ok,
-    }
-}
-
 fn pack(epoch: u32, entry: Entry) -> u64 {
     (u64::from(epoch) << 32)
         | (u64::from(u8::from(entry.earlier)) << 16)
         | (u64::from(entry.lane) << 8)
-        | u64::from(grade_code(entry.grade))
+        | u64::from(entry.grade as u8)
 }
 
 fn unpack(word: u64) -> (u32, Entry) {
@@ -156,7 +139,7 @@ fn unpack(word: u64) -> (u32, Entry) {
         Entry {
             earlier: (word >> 16) & 1 != 0,
             lane: (word >> 8) as u8,
-            grade: grade_from_code(word as u8),
+            grade: [Grade::Excellent, Grade::Good, Grade::Ok][usize::from((word as u8).min(2))],
         },
     )
 }
