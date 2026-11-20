@@ -372,6 +372,16 @@ mod tests {
     }
 
     #[test]
+    fn meteor_bounce_keeps_the_dodge_unless_the_player_waits_on_entry() {
+        let mut bounce = MeteorBounce::default();
+        assert_eq!(bounce.step(false, true, 0x8008), Correction::default());
+        assert_eq!(bounce.step(true, true, 0x8008).release, 0x8);
+        assert_eq!(bounce.step(true, true, 0x8008), Correction::default());
+        bounce.step(false, true, 0x8008);
+        assert_eq!(bounce.step(true, false, 0x8008), Correction::default());
+    }
+
+    #[test]
     fn recovery_delays_a_stock_jump_then_spends_it_with_a_real_button() {
         let mut timing = JumpTiming::default();
         assert_eq!(timing.step(0x8004, true, 2, |_| true).release, 0x4);
