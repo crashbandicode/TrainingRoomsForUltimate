@@ -627,3 +627,12 @@ fn reach_can_rise_to_the_ledge_after_reaching_its_column() {
     assert!(!short(reach, from, speed, LEDGE, BOTTOM));
     assert!(!Reach { jump: false, ..reach }.returns(from, speed, LEDGE, 0, BOTTOM));
 }
+
+#[test]
+fn an_enabled_jump_transition_does_not_hide_an_exhausted_jump_budget() {
+    use super::recovery_jump_available;
+    assert!(recovery_jump_available(Some(1), true));
+    assert!(!recovery_jump_available(Some(1), false));
+    assert!(!recovery_jump_available(Some(0), true));
+    assert!(!recovery_jump_available(None, true));
+}

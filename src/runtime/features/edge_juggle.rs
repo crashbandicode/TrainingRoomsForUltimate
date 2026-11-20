@@ -1064,7 +1064,7 @@ unsafe fn recovery_pad(
 ) -> Correction {
     let buttons = stock.buttons;
     let jump = konst(C::TermContJumpAerial);
-    let can_jump = jump != UNRESOLVED && natives::is_enable_transition_term(cpu, jump);
+    let jump_transition = jump != UNRESOLVED && natives::is_enable_transition_term(cpu, jump);
     let physics = air_physics(cpu);
     let Some((vx, vy)) = super::recording_host::fighter_speed(cpu).filter(|_| physics.valid())
     else {
@@ -1072,6 +1072,7 @@ unsafe fn recovery_pad(
     };
     let speed = [vx, vy];
     let jumps = remaining_jumps(cpu);
+    let can_jump = recovery::recovery_jump_available(jumps, jump_transition);
     let recovery = recovery_snapshot(ai);
     let [left, right] = run.stage.ledges;
     let guarder = (run.guide.is_some() || !run.plan_pending && run.player_reach > 0.0)

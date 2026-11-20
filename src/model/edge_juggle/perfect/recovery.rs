@@ -272,6 +272,11 @@ impl LedgeWatch {
     }
 }
 
+/// Whether the current jump can be spent through the native transition.
+pub fn recovery_jump_available(_jumps: Option<u8>, transition_open: bool) -> bool {
+    transition_open
+}
+
 /// The plain return fails for distance while the climb is still affordable.
 pub fn short(reach: Reach, from: Point, speed: Point, ledge: Point, bottom: f32) -> bool {
     let lift = reach.jump_rise() + reach.special.map_or(0.0, |special| special.rise);
