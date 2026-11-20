@@ -191,7 +191,8 @@ impl NicheGuide {
                 }
             }
             at_exit = (x - crossing.exit) * crossing.direction >= 0.0;
-            can_enter = beyond || y <= top;
+            let launch_clears = beyond || self.selected_niche_row().launch_clears(y, top);
+            can_enter = if movement == Move::Hover { launch_clears } else { beyond || y <= top };
             if !at_exit {
                 direction = crossing.direction;
                 aim = [direction, 0.0];
@@ -205,6 +206,7 @@ impl NicheGuide {
                 // An aimed special starts where its level travel still leaves the climb to the ledge.
                 let remaining = (crossing.exit - x) * crossing.direction;
                 hold_over = available
+                    && launch_clears
                     && self.selected_niche_row().aimed()
                     && remaining <= recovery::level_run(reach, self.ledge[1] - y);
             }

@@ -126,6 +126,10 @@ impl Row {
             return None;
         }
         let budget = facts.budget?;
+        let [bottom, ceiling] = budget.crossing.band;
+        if !self.launch_clears(bottom, ceiling) {
+            return None;
+        }
         crossing_margin(
             budget.air,
             budget.jumps,
@@ -137,7 +141,9 @@ impl Row {
     }
 
     pub fn launch_clears(&self, y: f32, ceiling: f32) -> bool {
-        y <= ceiling
+        // Nine exact fd-3 Robo Burners gained 24.642 units before KEEP (31183 → 31256).
+        let takeoff_rise = if self.id == 7 { 25.0 } else { 0.0 };
+        y + takeoff_rise <= ceiling
     }
 
     /// The row's up special can be flown level under the stage.
