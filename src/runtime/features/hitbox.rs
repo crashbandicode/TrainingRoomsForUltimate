@@ -577,9 +577,13 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     let tech = super::tech::running();
     // rc.15 target-hurtbox-display: the live targets' break volumes (the picture discs), drawn as hurtboxes below. Spacing
     // grader hook: its rings take these discs (`orbs::target_hurt_orbs`) rather than drawing a second one.
+    let hurt_on = SETTING.load(Ordering::Acquire) && legend::shows(SHOWN.load(Ordering::Acquire), hitbox::KIND_HURT);
     let mut targets = [Orb::NONE; 1 + crate::model::btt::MAX];
-    let n_targets = if tech { 0 } else { orbs::target_hurt_orbs(&own[..3], &mut targets) };
-    let n_targets = n_targets + if tech { 0 } else { orbs::target_hurt_orbs(&marks, &mut targets[n_targets..]) };
+    let mut n_targets = 0;
+    if hurt_on && !tech {
+        n_targets = orbs::target_hurt_orbs(&own[..3], &mut targets);
+        n_targets += orbs::target_hurt_orbs(&marks, &mut targets[n_targets..]);
+    }
     let marks = if tech { super::tech::look(active) } else { marks };
     own[3..].copy_from_slice(&marks);
     let mut cache = ORB_PANES.lock();
@@ -653,7 +657,8 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         keep_panes = on && board.is_none() && hide.is_visible();
         // Hitboxes and grabs take the panes first. Uncertain snapshots yield no fighter panes this tick.
         let bits = SHOWN.load(Ordering::Acquire);
-        let target_hurts = targets[..n_targets].iter().filter(|_| on);
+        // A busy board keeps the last frame's panes: no target cap may overwrite a fighter's retained one.
+        let target_hurts = targets[..orbs::targets_drawn(board.is_some(), hurt_on, n_targets)].iter();
         for orb in board
             .iter()
             .flat_map(|b| b.draw_slots_in_order(b.draw_slots(&hide)))

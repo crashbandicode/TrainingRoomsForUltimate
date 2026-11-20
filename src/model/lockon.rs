@@ -19,8 +19,7 @@ pub fn helper_reach(scale: f32, center_height: f32) -> f32 {
 
 /// Whether `id` is a helper by the ids published for scene `published`: none once the scene is `now` no longer.
 pub fn names_helper(ids: &[u32], published: u32, now: u32, id: u32) -> bool {
-    let _ = (ids, published, now, id);
-    true
+    id != 0 && published == now && ids.contains(&id)
 }
 
 /// Address of the next 32-bit slot ID, if the game's free stack has an entry.
@@ -79,8 +78,7 @@ impl<T: Copy, const N: usize> Tracker<T, N> {
 
     /// The ids of the items the slots own now (0: an empty slot), as `id` names them: what the visualizer leaves out.
     pub fn ids(&self, id: impl Fn(&T) -> u32) -> [u32; N] {
-        let _ = id;
-        [0; N]
+        self.items.each_ref().map(|slot| slot.as_ref().map_or(0, |owned| id(&owned.item)))
     }
 
     pub fn item_mut(&mut self, scene: u32, slot: usize, key: u64) -> Option<&mut T> {

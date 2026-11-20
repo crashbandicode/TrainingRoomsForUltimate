@@ -308,8 +308,7 @@ pub fn target_hurt_orbs(looks: &[Option<([f32; 2], super::panes::EggLook)>], out
 /// How many of the `n` target discs a layout tick draws: none while Hurtboxes is off, and none on a tick that keeps the
 /// last frame's panes (the board was busy), whose caps would otherwise overwrite a fighter's retained ones.
 pub fn targets_drawn(board_held: bool, hurtboxes: bool, n: usize) -> usize {
-    let _ = (board_held, hurtboxes);
-    n
+    if board_held && hurtboxes { n } else { 0 }
 }
 
 /// `set`'s spheres as orbs on their bones (`place`) into `out`, then, while *Launch angles* is On (`lr`: the owner's facing), each

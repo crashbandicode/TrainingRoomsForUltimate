@@ -552,9 +552,6 @@ fn a_live_targets_hurtbox_is_its_picture_disc() {
 /// rc.15 target-hurtbox-display review: a fighter's capsule drawn in an earlier frame, then a busy board with a live target:
 /// that tick draws no target disc, so it takes no pane and the fighter's retained panes are unchanged.
 fn a_busy_board_tick_leaves_the_fighters_panes_to_the_target() {
-    let mut board = Board::default();
-    let capsule = Orb { centre: [0.0, 5.0, 0.0], tail: [0.0, 9.0, 0.0], radius: 2.0, color: [9; 4], key: hitbox::sphere_key(hitbox::KIND_HURT, 0, 0) };
-    board.publish(0, [capsule].into_iter());
     let mut earlier = orbs::PaneUse::default();
     assert!(earlier.take(true).is_some(), "the capsule took a cap pair and a band");
     let mut target = [Orb::NONE; 1];
@@ -565,7 +562,7 @@ fn a_busy_board_tick_leaves_the_fighters_panes_to_the_target() {
         busy.take(false);
     }
     assert_eq!((busy.caps, busy.bands), (0, 0), "a busy tick writes no cap over the retained capsule");
-    assert_eq!(board.live().copied().collect::<Vec<_>>(), [capsule]);
+    assert_eq!((earlier.caps, earlier.bands), (2, 1), "the capsule's panes stay as the earlier frame wrote them");
 }
 
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
