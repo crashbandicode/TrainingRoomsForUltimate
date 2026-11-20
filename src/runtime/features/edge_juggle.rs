@@ -95,6 +95,8 @@ struct Run {
     route_draw: u32,
     jump_timing: JumpTiming,
     plan_pending: bool,
+    route_watch: perfect::RouteWatch,
+    player_reach: f32,
     last_route: Option<Route>,
     guide: Option<RecoveryGuide>,
     last_cpu_status: i32,
@@ -316,7 +318,11 @@ pub unsafe fn ai_correction(ai: usize, accessor: usize, buttons: u32, stick_y: f
             .contains(&status);
     let position = [natives::pos_x(accessor), natives::pos_y(accessor)];
     if run.drill == Drill::GuardEdge {
-        if !falling && status != konst(C::StatusJumpAerial) {
+        let air = konst(C::SituationAir);
+        if air == UNRESOLVED
+            || natives::situation_kind(accessor) != air
+            || !falling && status != konst(C::StatusJumpAerial)
+        {
             run.jump_timing = JumpTiming::default();
             return Correction::default();
         }
@@ -588,6 +594,7 @@ unsafe fn route_guide(
     let outline = super::tech_surfaces::training_outline(&ray, midpoint, limits)?;
     let player = [natives::pos_x(p1), natives::pos_y(p1)];
     let player_reach = body_top(p1, player[1])?;
+    run.player_reach = player_reach;
     let body = body_top(cpu, pos[1])?;
     let jumps = remaining_jumps(cpu)?;
     let bottom = run.stage.blast()[3];
@@ -717,18 +724,21 @@ unsafe fn recovery_pad(
     };
     let speed = [vx, vy];
     let jumps = remaining_jumps(cpu);
-    let recovery = if run.plan_pending || jumps == Some(0) {
-        recovery_snapshot(ai)
-    } else {
-        None
-    };
-    let special = recovery.and_then(|(snapshot, available)| {
-        if available {
-            special_reach(ai, snapshot)
-        } else {
-            None
-        }
+    let recovery = recovery_snapshot(ai);
+    let blocked = run.guide.is_some_and(|guide| {
+        let player = [natives::pos_x(p1), natives::pos_y(p1)];
+        let target = match guide {
+            RecoveryGuide::High { lip, .. } => lip,
+            RecoveryGuide::Cross { exit, .. } => exit,
+        };
+        perfect::player_on_path(player, [pos, target], run.player_reach)
     });
+    run.plan_pending |= run
+        .route_watch
+        .observe(jumps.zip(recovery.map(|(_, available)| available)), blocked);
+    let special = recovery
+        .filter(|&(_, available)| available && (run.plan_pending || jumps == Some(0)))
+        .and_then(|(snapshot, _)| special_reach(ai, snapshot));
     if run.plan_pending {
         run.plan_pending = false;
         run.guide = route_guide(run, p1, cpu, physics, pos, speed, special);
@@ -1283,6 +1293,8 @@ pub unsafe fn frame(fighter: usize) {
             route_draw: 0,
             jump_timing: JumpTiming::default(),
             plan_pending: true,
+            route_watch: perfect::RouteWatch::default(),
+            player_reach: 0.0,
             last_route: None,
             guide: None,
             last_cpu_status: UNRESOLVED,
@@ -1411,6 +1423,7 @@ pub unsafe fn frame(fighter: usize) {
             run.jump_delay = rng.below(9) as u8;
             run.route_draw = rng.next_u32();
             run.plan_pending = true;
+            run.route_watch = perfect::RouteWatch::default();
             run.guide = None;
             run.jump_timing = JumpTiming::default();
             run.last_cpu_status = UNRESOLVED;

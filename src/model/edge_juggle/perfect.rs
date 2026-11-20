@@ -250,6 +250,42 @@ pub struct Plan {
     weight: u16,
 }
 
+/// Observe changes while following the most recent plan.
+#[derive(Default)]
+pub struct RouteWatch {
+    resources: Option<(u8, bool)>,
+    blocked: bool,
+}
+
+impl RouteWatch {
+    pub fn observe(&mut self, resources: Option<(u8, bool)>, blocked: bool) -> bool {
+        let spent = self.resources.zip(resources).is_some_and(
+            |((previous_jumps, previous_special), (jumps, special))| {
+                jumps < previous_jumps || previous_special && !special
+            },
+        );
+        if let Some(current) = resources {
+            self.resources = Some(current);
+        }
+        let entered = blocked && !self.blocked;
+        self.blocked = blocked;
+        spent || entered
+    }
+}
+
+pub fn player_on_path(player: Point, path: Segment, reach: f32) -> bool {
+    let [start, end] = path;
+    let [dx, dy] = [end[0] - start[0], end[1] - start[1]];
+    let [px, py] = [player[0] - start[0], player[1] - start[1]];
+    let length = dx * dx + dy * dy;
+    let where_on_path = if length > 0.0 {
+        ((px * dx + py * dy) / length).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    (px - dx * where_on_path).hypot(py - dy * where_on_path) <= reach
+}
+
 pub struct RouteFacts<'a> {
     pub position: Point,
     pub player: Point,
