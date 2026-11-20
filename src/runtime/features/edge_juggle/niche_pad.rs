@@ -10,7 +10,7 @@ use crate::{
 };
 use perfect::fly::{puff_active_status, FlyState, PuffFlight};
 use perfect::niche::{self, Budget, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
-use perfect::pikachu::{self, SkullBashFlight};
+use perfect::pikachu::{self, FakeOutFlight, FakeOutSample, SkullBashFlight};
 use perfect::{recovery, AirPhysics, Correction, Outline, Point, Route, RouteFacts, SpecialReach};
 
 pub(super) struct NicheGuide {
@@ -24,6 +24,7 @@ pub(super) struct NicheGuide {
 
 enum MeasuredFlight {
     SkullBash(SkullBashFlight),
+    FakeOut(FakeOutFlight),
     Puff(PuffFlight),
 }
 
@@ -193,6 +194,17 @@ impl NicheGuide {
         }
     }
 
+    pub(super) fn pikachu_fake_out(mut self) -> Option<Self> {
+        let MeasuredFlight::SkullBash(flight) = self.measured.take()? else {
+            return None;
+        };
+        let flight = flight.into_fake_out();
+        self.ledge = flight.near_ledge();
+        self.sequence = Sequence::new(niche::measured_row(41, niche::CANDIDATE_ROWS)?);
+        self.measured = Some(MeasuredFlight::FakeOut(flight));
+        Some(self)
+    }
+
     pub(super) fn using_bomb(&self) -> bool {
         self.sequence.action() == Some(Move::Bomb)
     }
@@ -236,6 +248,23 @@ impl NicheGuide {
                 remaining: remaining_jumps(cpu)?,
                 can_jump: jump != UNRESOLVED && natives::is_enable_transition_term(cpu, jump),
                 frame,
+            });
+        }
+        if let Some(MeasuredFlight::FakeOut(flight)) = &mut self.measured {
+            let (vx, vy) = super::super::recording_host::fighter_speed(cpu)?;
+            let position = [x, y];
+            let motion = niche_motion_phase(cpu, self.fighter, flight.movement(), status);
+            let can_start = flight.start_check(position, vy).is_some_and(|movement| {
+                matches!(motion, Motion::Free | Motion::Travel)
+                    && niche_start_enabled(cpu, movement, available)
+            });
+            return flight.step(FakeOutSample {
+                frame,
+                motion,
+                position,
+                velocity: [vx, vy],
+                jumps: remaining_jumps(cpu)?,
+                can_start,
             });
         }
         if let Some(MeasuredFlight::SkullBash(skull_bash)) = &mut self.measured {

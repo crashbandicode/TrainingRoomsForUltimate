@@ -947,7 +947,17 @@ unsafe fn route_guide(
     } else {
         recovery::mix(options, zone, last, run.route_draw)
     };
-    if let Some((guide, _)) = row.filter(|_| needed || plan.is_some_and(|plan| plan.route == Route::Opposite)) {
+    let chosen = plan.map(|plan| plan.route);
+    let guide = row.and_then(|(guide, _)| {
+        if needed || chosen == Some(Route::Opposite) {
+            Some(guide)
+        } else if perfect::pikachu::fake_out_selected(chosen, zone, last, run.route_draw) {
+            guide.pikachu_fake_out()
+        } else {
+            None
+        }
+    });
+    if let Some(guide) = guide {
         let row = guide.selected_niche_row();
         run.route_history.planned(row.route);
         planner_chose(route_code(row.route), fighter as u32, crossable, row.id.into());

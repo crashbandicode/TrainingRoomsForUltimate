@@ -1,6 +1,10 @@
 //! Bounded Quick Attack geometry for Pikachu's Skull Bash crossing.
 
-use super::{niche::{Sample, Sequence}, Correction, Outline, Point, Segment};
+use super::{
+    niche::{Motion, Move, Sample, Sequence},
+    recovery::Zone,
+    Correction, Outline, Point, Route, Segment,
+};
 
 #[derive(Clone, Copy, Debug)]
 pub struct ZipPlan {
@@ -183,6 +187,10 @@ impl SkullBashFlight {
         }
     }
 
+    pub fn into_fake_out(self) -> FakeOutFlight {
+        FakeOutFlight::new(self.path, self.outline, self.bottom)
+    }
+
     pub fn step(
         &mut self, sequence: &mut Sequence, mut sample: Sample, position: Point, vy: f32, jumps: u8,
     ) -> Option<Correction> {
@@ -246,6 +254,222 @@ impl SkullBashFlight {
             };
         }
         Some(input)
+    }
+}
+
+/// Keep the crossing roll intact. Some near-side returns feint against a P1
+/// on stage, with a higher share after P1 has seen a crossing.
+pub fn fake_out_selected(normal: Option<Route>, zone: Zone, previous: Option<Route>, draw: u32) -> bool {
+    if !matches!(normal, Some(Route::Near | Route::LateLow)) || !matches!(zone, Zone::Ledge | Zone::Mid) {
+        return false;
+    }
+    let share = if previous == Some(Route::Opposite) { 20 } else { 10 };
+    u64::from(draw.rotate_left(13)) < (1u64 << 32) * share / 100
+}
+
+#[derive(Default)]
+struct FakeOutDrift {
+    braking: bool,
+    stopped: bool,
+}
+
+impl FakeOutDrift {
+    fn stick(&mut self, distance: f32, speed: f32) -> f32 {
+        // The jump begins at 0.90 on a full stick; reversal takes 0.10 off
+        // the live speed per frame (Surface F1–F3, MODEL.md §4.5).
+        const ACCELERATION: f32 = 0.10;
+        const AT_REST: f32 = ACCELERATION * 0.5;
+        self.braking |= speed.abs() > AT_REST
+            && (distance * speed <= 0.0
+                || distance.abs() <= speed * speed / (2.0 * ACCELERATION));
+        self.stopped |= speed.abs() <= AT_REST && (self.braking || distance.abs() <= 0.5);
+        if self.stopped {
+            0.0
+        } else if self.braking {
+            -speed.signum()
+        } else {
+            distance.signum()
+        }
+    }
+}
+
+fn fake_out_zip(
+    outline: &[Segment], from: Point, ledge: Point, inward: f32, bottom: f32, height: f32,
+) -> Option<Point> {
+    // Give the ordinary fall catch its window. Once that closes, aim an actual
+    // zip step into the measured near catch band (MODEL.md §4.5).
+    if !(from[1] <= ledge[1] - 24.0
+        && inward.abs() == 1.0
+        && from.into_iter().chain(ledge).all(f32::is_finite))
+    {
+        return None;
+    }
+    const STEPS: u8 = 5;
+    const STEP: f32 = FIRST / STEPS as f32;
+    const MIN_CATCH_MARGIN: f32 = 1.5;
+    for angle in (20u8..=90).step_by(5).rev() {
+        let aim = if angle == 90 {
+            [0.0, 1.0]
+        } else {
+            let (sin, cos) = f32::from(angle).to_radians().sin_cos();
+            [inward * cos, sin]
+        };
+        for step in 1..=STEPS {
+            let end = advance(from, aim, STEP * f32::from(step));
+            if !clear(outline, [from, end], bottom, height) {
+                break;
+            }
+            let outside = (ledge[0] - end[0]) * inward;
+            let below = ledge[1] - end[1];
+            let margin = (outside - 2.7)
+                .min(13.3 - outside)
+                .min(below - 9.1)
+                .min(18.45 - below);
+            if margin >= MIN_CATCH_MARGIN {
+                return Some(aim);
+            }
+        }
+    }
+    None
+}
+
+#[derive(Clone, Copy)]
+pub struct FakeOutSample {
+    pub frame: u32,
+    pub motion: Motion,
+    pub position: Point,
+    pub velocity: Point,
+    pub jumps: u8,
+    pub can_start: bool,
+}
+
+#[derive(Clone, Copy)]
+enum FakeOutPhase {
+    Approach,
+    JumpPressed(u32),
+    Drift,
+    Zip { aim: Point, pressed_at: u32, accepted: bool },
+}
+
+pub struct FakeOutFlight {
+    path: SkullBashPath,
+    outline: Outline,
+    bottom: f32,
+    phase: FakeOutPhase,
+    drift: FakeOutDrift,
+    last: Option<(u32, Correction)>,
+}
+
+impl FakeOutFlight {
+    fn new(path: SkullBashPath, outline: Outline, bottom: f32) -> Self {
+        Self {
+            path,
+            outline,
+            bottom,
+            phase: FakeOutPhase::Approach,
+            drift: FakeOutDrift::default(),
+            last: None,
+        }
+    }
+
+    pub fn movement(&self) -> Move {
+        if matches!(self.phase, FakeOutPhase::Zip { .. }) {
+            Move::QuickAttack
+        } else {
+            Move::Jump
+        }
+    }
+
+    pub fn start_check(&self, position: Point, vertical_speed: f32) -> Option<Move> {
+        match self.phase {
+            FakeOutPhase::Approach if position[1] <= self.path.launch_y => Some(Move::Jump),
+            FakeOutPhase::Drift if position[1] <= self.near_ledge()[1] - 24.0 && vertical_speed <= 0.0 => {
+                Some(Move::QuickAttack)
+            }
+            _ => None,
+        }
+    }
+
+    pub fn near_ledge(&self) -> Point {
+        [self.path.near[0] + 1.7 * self.path.direction, self.path.near[1] + 9.9]
+    }
+
+    pub fn step(&mut self, sample: FakeOutSample) -> Option<Correction> {
+        let outline = self.outline.segments();
+        if sample.motion == Motion::Interrupted
+            || !sample.position.into_iter().chain(sample.velocity).all(f32::is_finite)
+            || !clear(outline, [sample.position; 2], self.bottom, self.path.height)
+        {
+            return None;
+        }
+        if let Some((frame, correction)) = self.last {
+            if frame == sample.frame {
+                return Some(correction);
+            }
+        }
+        let correction = self.on_frame(sample)?;
+        self.last = Some((sample.frame, correction));
+        Some(correction)
+    }
+
+    fn on_frame(&mut self, sample: FakeOutSample) -> Option<Correction> {
+        use super::niche::pad;
+        let inward = self.path.direction;
+        let ledge = self.near_ledge();
+        let outside = (ledge[0] - sample.position[0]) * inward;
+        match self.phase {
+            FakeOutPhase::Approach => {
+                if sample.motion != Motion::Free
+                    || sample.jumps == 0
+                    || !super::region::contains(&SKULL_BASH_RING, outside, sample.position[1] - ledge[1])
+                {
+                    return None;
+                }
+                if sample.position[1] > self.path.launch_y {
+                    return Some(pad([0.0, -1.0], 0));
+                }
+                if !sample.can_start {
+                    return None;
+                }
+                self.phase = FakeOutPhase::JumpPressed(sample.frame);
+                let jump_stick = if outside > 12.0 { inward } else { 0.0 };
+                return Some(pad([jump_stick, 0.0], super::JUMP));
+            }
+            FakeOutPhase::JumpPressed(frame) => match sample.motion {
+                Motion::Travel => self.phase = FakeOutPhase::Drift,
+                Motion::Free if sample.frame.saturating_sub(frame) <= 1 => {
+                    return Some(pad([0.0; 2], 0));
+                }
+                _ => return None,
+            },
+            FakeOutPhase::Drift => {}
+            FakeOutPhase::Zip { aim, pressed_at, accepted } => {
+                return match sample.motion {
+                    Motion::Free if !accepted && sample.frame.saturating_sub(pressed_at) <= 1 => {
+                        Some(pad([0.0; 2], 0))
+                    }
+                    Motion::Starting | Motion::Travel => {
+                        self.phase = FakeOutPhase::Zip { aim, pressed_at, accepted: true };
+                        Some(pad(aim, 0))
+                    }
+                    Motion::AimAgain | Motion::Finish => Some(pad([0.0; 2], 0)),
+                    _ => None,
+                };
+            }
+        }
+        if !matches!(sample.motion, Motion::Free | Motion::Travel) {
+            return None;
+        }
+        if sample.can_start && sample.velocity[1] <= 0.0 {
+            if let Some(aim) = fake_out_zip(
+                self.outline.segments(), sample.position, ledge, inward, self.bottom, self.path.height,
+            ) {
+                self.phase = FakeOutPhase::Zip { aim, pressed_at: sample.frame, accepted: false };
+                return Some(pad([0.0, 1.0], super::SPECIAL));
+            }
+        }
+        let stick = self.drift.stick(outside - 7.0, sample.velocity[0] * inward);
+        Some(pad([stick * inward, 0.0], 0))
     }
 }
 

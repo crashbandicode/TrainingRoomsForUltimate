@@ -51,6 +51,7 @@ fn niche_roster_kinds_match_the_approved_plan() {
         "Pyra",
         "Mythra",
         "Mythra",
+        "Pikachu",
     ];
     assert_eq!(super::ROWS.len(), fighters.len());
     for (index, (row, fighter)) in super::ROWS.iter().zip(fighters).enumerate() {

@@ -210,3 +210,111 @@ fn skull_bash_requires_the_jump_at_launch_and_at_first_fall() {
         );
     }
 }
+
+#[test]
+fn fake_out_waits_for_a_rising_zip_step_inside_the_near_catch_band() {
+    use super::fake_out_zip;
+    for sign in [1.0, -1.0] {
+        let mirror = |[x, y]: Point| [x * sign, y];
+        let outline = RING.map(|line| line.map(mirror));
+        let aim = |from| fake_out_zip(&outline, mirror(from), [0.0, 0.0], sign, BOTTOM, 10.0);
+        assert_eq!(aim([-7.0, -18.0]), None, "wait for the natural apex catch");
+        assert_eq!(aim([-7.0, -24.3]), Some([0.0, 1.0]));
+        assert_eq!(aim([-7.0, -35.0]), Some([0.0, 1.0]));
+        assert_eq!(aim([-130.0, -35.0]), None);
+        assert_eq!(aim([-7.0, f32::NAN]), None);
+        assert_eq!(aim([f32::NAN, -35.0]), None);
+    }
+}
+
+#[test]
+fn fake_out_brakes_to_hold_seven_units_outside_the_near_ledge() {
+    use super::FakeOutDrift;
+    // The Surface trace puts the jump's first rising horizontal step at 0.90,
+    // capped at 0.957 afterwards, with 0.10 per opposing stick frame.
+    for outside in [12.0_f32, 20.0, 28.0, 36.0, 38.0, 40.0] {
+        let mut x = -outside;
+        let mut vx = if outside > 12.0 { 0.9 } else { 0.0 };
+        let mut drift = FakeOutDrift::default();
+        let mut braked = false;
+        for _ in 0..60 {
+            x += vx;
+            let stick = drift.stick(-7.0 - x, vx);
+            braked |= stick < 0.0 && vx > 0.0;
+            vx = (vx + 0.1 * stick).clamp(-0.957, 0.957);
+            if vx.abs() < 0.05 {
+                vx = 0.0;
+            }
+        }
+        assert!(braked, "the route brakes from {outside} out");
+        assert!((-8.5..=-5.5).contains(&x), "{outside} out stops at {x}");
+        assert_eq!(vx, 0.0, "{outside} out stabilizes at the ledge");
+    }
+}
+
+#[test]
+fn fake_out_spends_only_the_jump_near_the_lip_and_a_fresh_special_if_needed() {
+    use super::{FakeOutFlight, FakeOutSample};
+    use crate::model::edge_juggle::perfect::{niche::Motion, Outline, JUMP, SPECIAL};
+
+    let mut outline = Outline::new();
+    for line in RING {
+        outline.add(line);
+    }
+    let start = [-20.0, -28.0];
+    let path = skull_bash_start(
+        (3, 0), &RING, [[0.0, 0.0], [159.975, 0.0]], start, BOTTOM, 8.5,
+    ).unwrap();
+    let mut flight = FakeOutFlight::new(path, outline, BOTTOM);
+    let sample = |frame, motion, position, velocity, jumps, can_start| FakeOutSample {
+        frame, motion, position, velocity, jumps, can_start,
+    };
+    let frames = [
+        (sample(0, Motion::Free, start, [0.0, -1.55], 1, true), [0.0, -1.0], 0),
+        (sample(14, Motion::Free, [-20.0, -51.5], [0.0, -1.55], 1, true), [1.0, 0.0], JUMP),
+        (sample(14, Motion::Free, [-20.0, -51.5], [0.0, -1.55], 1, true), [1.0, 0.0], JUMP),
+        (sample(15, Motion::Travel, [-19.1, -49.0], [0.9, 2.55], 0, false), [1.0, 0.0], 0),
+        (sample(25, Motion::Travel, [-10.9, -31.0], [0.957, 1.35], 0, false), [-1.0, 0.0], 0),
+        (sample(35, Motion::Travel, [-7.0, -19.0], [0.0, 0.25], 0, false), [0.0, 0.0], 0),
+        (sample(45, Motion::Free, [-7.0, -23.5], [0.0, -0.65], 0, true), [0.0, 0.0], 0),
+        (sample(46, Motion::Free, [-7.0, -24.3], [0.0, -0.75], 0, true), [0.0, 1.0], SPECIAL),
+        (sample(47, Motion::Starting, [-7.0, -25.1], [0.0, 0.0], 0, false), [0.0, 1.0], 0),
+        (sample(66, Motion::Finish, [-7.0, -14.1], [0.0, 0.0], 0, false), [0.0, 0.0], 0),
+    ];
+    for (state, stick, press) in frames {
+        let pad = flight.step(state).map(|pad| (pad.stick, pad.press));
+        assert_eq!(pad, Some((Some(stick), press)), "native frame {}", state.frame);
+    }
+    assert!(flight.step(sample(67, Motion::Interrupted, [-7.0, -14.1], [0.0, 0.0], 0, false)).is_none());
+
+    let mut no_jump = FakeOutFlight::new(path, outline, BOTTOM);
+    assert!(no_jump.step(sample(0, Motion::Free, [-20.0, -55.0], [0.0, -1.0], 0, true)).is_none());
+    let mut too_deep = FakeOutFlight::new(path, outline, BOTTOM);
+    assert!(too_deep.step(sample(0, Motion::Free, [-20.0, -65.0], [0.0, -1.0], 1, true)).is_none());
+}
+
+#[test]
+fn fake_out_roll_keeps_the_crossing_and_high_recovery_and_varies_the_near_return() {
+    use super::fake_out_selected;
+    use crate::model::edge_juggle::perfect::{recovery::Zone, Route};
+
+    let rolls = |normal, zone, previous| {
+        let mut draw = 0x390b_26d1_u32;
+        (0..4096).filter(|_| {
+            draw = draw.wrapping_mul(1664525).wrapping_add(1013904223);
+            fake_out_selected(normal, zone, previous, draw)
+        }).count()
+    };
+    for zone in [Zone::Mid, Zone::Ledge] {
+        for route in [Route::Near, Route::LateLow] {
+            assert!((350..=480).contains(&rolls(Some(route), zone, None)));
+            assert!((733..=890).contains(&rolls(Some(route), zone, Some(Route::Opposite))));
+        }
+        for route in [None, Some(Route::High), Some(Route::Opposite)] {
+            assert_eq!(rolls(route, zone, Some(Route::Opposite)), 0);
+        }
+    }
+    for zone in [Zone::Far, Zone::Hang, Zone::OffHigh, Zone::OffLow] {
+        assert_eq!(rolls(Some(Route::Near), zone, Some(Route::Opposite)), 0);
+    }
+}

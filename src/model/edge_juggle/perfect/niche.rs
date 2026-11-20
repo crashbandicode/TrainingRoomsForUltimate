@@ -74,6 +74,7 @@ enum Intent {
     Near,
     /// The same, flown only from ledge height or above (a wall below ends it).
     NearAbove,
+    FakeOut,
     HaymakerGap,
     CounterContact,
     WhipGap,
@@ -99,6 +100,7 @@ impl Row {
         let route = match intent {
             Intent::Near
             | Intent::NearAbove
+            | Intent::FakeOut
             | Intent::HaymakerGap
             | Intent::CounterContact
             | Intent::WhipGap
@@ -180,8 +182,8 @@ impl Row {
                 Intent::Near => facts.short,
                 Intent::NearAbove => facts.short && facts.climb <= 0.0,
                 Intent::CounterContact => facts.counter_contact,
-                // A direct up special still uses the regular jump and special holds.
-                Intent::GenericUp => false,
+                // A direct up special uses the generic route. The fake-out needs its baked cells.
+                Intent::GenericUp | Intent::FakeOut => false,
                 intent => {
                     let travel = self.measured().map(|(_, travel)| travel);
                     facts.near.is_some_and(|near| intent.matches_near(near, facts.short, travel))
@@ -228,7 +230,7 @@ impl Intent {
 use Move::*;
 // A crossing glides and holds its height first. A special that ends in special
 // fall (SmashWiki "Helpless") is the row's last move; a jump is never burst at the entry.
-const ROWS: [Row; 39] = [
+const ROWS: [Row; 40] = [
     Row::new(1, 0x8, Intent::Across, &[Hold, QuickAttack]),
     Row::new(2, 0x8, Intent::ThunderOverhead, &[Side, Down, QuickAttack]),
     Row::new(3, 0x8, Intent::LongApproach, &[Side, Jump, QuickAttack]),
@@ -243,7 +245,7 @@ const ROWS: [Row; 39] = [
     Row::new(11, 0x10, Intent::Near, &[Down, Rise]),
     Row::new(12, 0x10, Intent::Across, &[Hold, Travel]),
     Row::new(13, 0x35, Intent::Across, &[ChargedSide, Hold, Travel]),
-    // ID 14 stays reserved for the out-of-scope Ness experiment.
+    // ID 14 is reserved for Ness pending the live PK Thunder envelope capture.
     Row::new(15, 0x58, Intent::Across, &[Hold, Glide]),
     Row::new(16, 0x13, Intent::Across, &[Hold, QuickAttack]),
     Row::new(17, 0xc, Intent::Across, &[Hold]),
@@ -272,6 +274,7 @@ const ROWS: [Row; 39] = [
     Row::new(38, 0x5a, Intent::SwapGap, &[Swap]),
     Row::new(39, 0x5b, Intent::PhotonGap, &[Side]),
     Row::new(40, 0x5b, Intent::GenericUp, &[Jump, Rise]),
+    Row::new(41, 0x8, Intent::FakeOut, &[Jump, QuickAttack]),
 ];
 
 pub const CANDIDATE_ROWS: u64 = {
