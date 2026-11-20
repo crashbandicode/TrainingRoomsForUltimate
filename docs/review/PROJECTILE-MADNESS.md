@@ -63,6 +63,8 @@ The drawings are illustrations, not game footage.
 - Planned proofs: a Local Wireless pair, a Quickplay room with the desync detector, and a match starting mid-attempt.
 - Estimated extra cost: +80–150 lines.
 
+**Decided (operator, 2026-11-20 ~02:20Z):** L1 hidden; L2 agreed (no automatic restart). Implementation starts **after the rc.15 card build**: a Codex GPT-6.2 Sol implementer with a Devin Opus 5.5 high companion, escalating to the Fable 5.2 xhigh researcher who drafted this design.
+
 **Two more questions (recommendation first):**
 
 - **L1: what do training partners 2 and 3 do during an attempt?** Recommended: **hidden**. ![L1](projectile-madness/illustrations/L1-lobby-extra-partners.png)
