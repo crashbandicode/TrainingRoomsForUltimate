@@ -793,21 +793,21 @@ fn niche_requires_stock_transition_and_does_not_spend_an_unaccepted_input_twice(
 }
 
 #[test]
-fn niche_thunder_holds_altitude_on_the_way_to_the_cast() {
+fn niche_thunder_releases_bash_before_the_down_special_press() {
+    // Synthetic transitions check button edges only. M9 measures the native cancel.
     let mut sequence = Sequence::new(tested_row(2));
-    let approach = Sample {
-        at_exit: false,
-        hold_over: false,
-        ..sample(0, Motion::Free)
-    };
-    assert_eq!(sequence.step(approach).unwrap().press, 0);
-    let under_the_hold_line = Sample { frame: 1, low: true, ..approach };
-    let pad = sequence.step(under_the_hold_line).unwrap();
-    assert_eq!((pad.stick, pad.press), (Some([1.0, 0.0]), perfect::JUMP));
-    assert_eq!(sequence.step(Sample { frame: 2, motion: Motion::Travel, ..approach }).unwrap().press, 0);
-    assert_eq!(sequence.step(sample(3, Motion::Free)).unwrap().press, 0);
-    let pad = sequence.step(sample(4, Motion::Free)).unwrap();
-    assert_eq!((pad.stick, pad.press), (Some([0.0, -1.0]), perfect::SPECIAL));
+    let bash = sequence.step(sample(0, Motion::Free)).unwrap();
+    assert_eq!((bash.stick, bash.press), (Some([1.0, 0.0]), perfect::SPECIAL));
+    for (frame, phase) in [(1, Motion::Starting), (2, Motion::Travel), (3, Motion::Finish)] {
+        let pad = sequence.step(sample(frame, phase)).unwrap();
+        assert_eq!(pad.press, 0);
+        assert_ne!(pad.release & perfect::SPECIAL, 0);
+    }
+    assert_eq!(sequence.step(sample(4, Motion::Free)).unwrap().press, 0);
+    let thunder = sequence.step(sample(5, Motion::Free)).unwrap();
+    assert_eq!((thunder.stick, thunder.press), (Some([0.0, -1.0]), perfect::SPECIAL));
+    let startup = sequence.step(sample(6, Motion::Starting)).unwrap();
+    assert_eq!((startup.stick, startup.press), (Some([0.0, -1.0]), 0));
 }
 
 #[test]

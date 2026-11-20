@@ -19,7 +19,6 @@ pub(super) struct NicheGuide {
     ledge: Point,
     across: Option<Crossing>,
     measured: Option<MeasuredFlight>,
-    player_x: f32,
     body_clearance: f32,
 }
 
@@ -98,7 +97,6 @@ impl NicheGuide {
                 measured: Some(MeasuredFlight::SkullBash(SkullBashFlight::new(
                     path, outline, facts.blast[3],
                 ))),
-                player_x: facts.player[0],
                 body_clearance: facts.body_clearance,
             };
             return Some((guide, 1.0));
@@ -118,7 +116,6 @@ impl NicheGuide {
                 ledge: flight.exit_point(),
                 across: None,
                 measured: Some(MeasuredFlight::Puff(flight)),
-                player_x: facts.player[0],
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
@@ -176,7 +173,6 @@ impl NicheGuide {
             ledge: if across.is_some() { far } else { near },
             across,
             measured: None,
-            player_x: facts.player[0],
             body_clearance: facts.body_clearance,
         };
         Some((guide, margin))
@@ -300,22 +296,18 @@ impl NicheGuide {
                 aim = [direction, 0.0];
             }
             hold_over = at_exit;
-            if matches!(movement, Move::Hold | Move::ApproachThunder) && !at_exit {
+            if movement == Move::Hold && !at_exit {
                 let air = crossing.air;
                 let rise = air.jump_speed.powi(2) / (2.0 * air.gravity);
                 // A jump from the hold line peaks at the band top; a taller jump waits for the exit.
                 low = air.valid() && rise <= top - bottom && y < top - rise;
                 // An aimed special starts where its level travel still leaves the climb to the ledge.
                 let remaining = (crossing.exit - x) * crossing.direction;
-                hold_over = if movement == Move::ApproachThunder {
-                    entered && (x - self.player_x) * direction >= 0.0
-                } else {
-                    launch_clears
-                        && self.selected_niche_row().aimed()
-                        && reach.is_some_and(|reach| {
-                            remaining <= recovery::level_run(reach, self.ledge[1] - y)
-                        })
-                };
+                hold_over = launch_clears
+                    && self.selected_niche_row().aimed()
+                    && reach.is_some_and(|reach| {
+                        remaining <= recovery::level_run(reach, self.ledge[1] - y)
+                    });
             }
         }
         let (phase, actionable) = match native_phase {
@@ -366,10 +358,10 @@ unsafe fn niche_start_enabled(cpu: usize, movement: Move, available: bool) -> bo
     }
     let term = match movement {
         Drift => return true,
-        Hold | ApproachThunder | Jump | Float if remaining_jumps(cpu).is_some_and(|jumps| jumps != 0) => {
+        Hold | Jump | Float if remaining_jumps(cpu).is_some_and(|jumps| jumps != 0) => {
             C::TermContJumpAerial
         }
-        Hold | ApproachThunder | Jump | Float => return false,
+        Hold | Jump | Float => return false,
         Side | ChargedSide | Missile => C::TermContSpecialS,
         Down | Counter | Bomb | Swap => C::TermContSpecialLw,
         _ if available => C::TermContSpecialHi,
@@ -388,7 +380,7 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
     if status == UNRESOLVED {
         return Interrupted;
     }
-    if matches!(movement, Hold | ApproachThunder | Jump) && status == konst(C::StatusJumpAerial) {
+    if matches!(movement, Hold | Jump) && status == konst(C::StatusJumpAerial) {
         return Motion::Travel;
     }
     if airborne_recovery(cpu, status) {
@@ -397,7 +389,7 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
     let start = match movement {
         Side | ChargedSide | Missile => C::StatusSpecialS,
         Down | Counter | Bomb | Swap => C::StatusSpecialLw,
-        Drift | Hold | ApproachThunder | Jump | Float => {
+        Drift | Hold | Jump | Float => {
             return match (fighter, movement, status) {
                 (0xd | 0xe, Float, 0x1e8) => Starting,
                 (0xd | 0xe, Float, 0x1e9) => Motion::Travel,
