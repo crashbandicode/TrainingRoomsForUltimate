@@ -131,9 +131,9 @@ pub fn publish_lanes(
     identity: impl Fn(usize) -> (u32, bool),
 ) {
     if grader && capture {
-        for i in 0..2 {
+        for (i, accessor) in accessors.into_iter().enumerate() {
             let (id, attacks) = identity(i);
-            lanes.set(i, lane(&read, accessors[i], id, attacks));
+            lanes.set(i, lane(&read, accessor, id, attacks));
         }
     } else {
         lanes.set(0, None);

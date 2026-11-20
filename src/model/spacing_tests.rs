@@ -296,16 +296,16 @@ fn refused_hurt_row_publishes_no_lane() {
     use std::cell::{Cell, RefCell};
 
     let refused = |site: &crate::model::sites::Site| site.name != "hurtbox_module";
-    let capture = grader_usable(&refused);
+    let capture = grader_usable(refused);
     assert!(!capture, "hurtbox_module refusal must withhold fighter capture");
 
     let accessors = [0x10000, 0x11000];
     let damage = [0x70000, 0x72000];
     let hit = [0x71000, 0x73000];
     let mut memory = BTreeMap::new();
-    for i in 0..2 {
-        memory.insert(accessors[i] + damage_record::MODULE, damage[i] as u64);
-        memory.insert(accessors[i] + layout::HIT_MODULE, hit[i] as u64);
+    for ((accessor, damage), hit) in accessors.iter().zip(damage).zip(hit) {
+        memory.insert(*accessor + damage_record::MODULE, damage as u64);
+        memory.insert(*accessor + layout::HIT_MODULE, hit as u64);
     }
     let identity = |lane| if lane == 0 { (P1_ID, true) } else { (CPU_ID, false) };
 
