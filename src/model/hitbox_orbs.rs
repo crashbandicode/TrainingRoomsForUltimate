@@ -277,15 +277,15 @@ impl Board {
 /// One sphere as an orb on its bone. A hurtbox's radius is its part size at the bone's world scale, as the game's hurt
 /// test uses it (rc.15 target-hurtbox-size, Eden target-hurtbox-d6393cb0-yoga-4: the lock-on Sandbag posed at 0.6 touches
 /// at 3.45 with size 5, Mario at 1.14 with size 1.2): the scale is the distance `place` puts a unit offset from the centre.
+/// Without a valid sample the hurtbox is left out that frame, never drawn at the unscaled size.
 fn place_one(s: &Sphere, place: &mut impl FnMut(&Sphere) -> Option<[f32; 3]>) -> Option<Orb> {
     let centre = place(s)?;
     let mut orb = orb_of(s, centre);
     if matches!(s.key >> 24, KIND_HURT | KIND_ARTICLE_HURT) {
         let unit = Sphere { pos: [s.pos[0] + 1.0, s.pos[1], s.pos[2]], ..*s };
-        let scale = place(&unit).map(|e| ((e[0] - centre[0]).powi(2) + (e[1] - centre[1]).powi(2) + (e[2] - centre[2]).powi(2)).sqrt());
-        if let Some(scale) = scale.filter(|k| k.is_finite() && *k > 0.0) {
-            orb.radius *= scale;
-        }
+        let e = place(&unit)?;
+        let scale = ((e[0] - centre[0]).powi(2) + (e[1] - centre[1]).powi(2) + (e[2] - centre[2]).powi(2)).sqrt();
+        orb.radius *= (scale.is_finite() && scale > 0.0).then_some(scale)?;
     }
     Some(orb)
 }
