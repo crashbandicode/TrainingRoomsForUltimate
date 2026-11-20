@@ -374,6 +374,7 @@ pub fn player_on_path(player: Point, path: Segment, reach: f32) -> bool {
 }
 
 pub struct RouteFacts<'a> {
+    pub stage: (i32, u32),
     pub position: Point,
     pub player: Point,
     pub player_reach: f32,
@@ -419,6 +420,15 @@ fn blocked(path: Segment, line: Segment, height: f32) -> bool {
 }
 
 impl RouteFacts<'_> {
+    pub fn crossing_band(&self) -> Option<Point> {
+        corridor(
+            self.outline,
+            self.ledges,
+            self.blast[3],
+            self.body_clearance,
+            self.fall_budget,
+        )
+    }
     fn candidate(&self, route: Route, waypoints: [Point; 3], count: usize) -> Option<Plan> {
         let [left, right, top, bottom] = self.blast;
         let mut from = self.position;
@@ -505,14 +515,7 @@ pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 4] {
     let other_covered =
         (facts.player[0] - other[0]).hypot(facts.player[1] - other[1]) <= facts.player_reach;
     let opposite = if !other_covered && (near_plan.is_none() || near_covered) {
-        corridor(
-            facts.outline,
-            facts.ledges,
-            facts.blast[3],
-            clearance,
-            facts.fall_budget,
-        )
-        .and_then(|[bottom, top]| {
+        facts.crossing_band().and_then(|[bottom, top]| {
             let crossing = facts.position[1].clamp(bottom, top.next_down().max(bottom));
             facts.candidate(
                 Route::Opposite,
@@ -1113,6 +1116,7 @@ mod tests {
         let ledges = [[-40., 0.], [40., 0.]];
         let lines = [[ledges[0], ledges[1]], [ledges[0], [0., -15.]], [[0., -15.], ledges[1]]];
         let mut facts = RouteFacts {
+            stage: (0, 0),
             position: [-53., -22.], player: [-41., 0.], player_reach: 18.,
             ledges, blast: [-130., 130., 100., -90.], outline: &lines,
             body_clearance: 9., ledge_distance: 5., fall_budget: 12.,
@@ -1124,6 +1128,38 @@ mod tests {
         facts.player = [-41., 0.];
         facts.reach[0] = 45.;
         assert!(!possible_routes(&facts).iter().flatten().any(|plan| plan.route == Route::Opposite));
+    }
+
+    #[test]
+    fn only_the_four_approved_stock_stages_offer_an_opposite_crossing() {
+        use crate::engine::stages::catalog::STAGES;
+        let ledges = [[-40., 0.], [40., 0.]];
+        let outline = [[ledges[0], ledges[1]], [ledges[0], [0., -15.]], [[0., -15.], ledges[1]]];
+        let mut facts = RouteFacts {
+            stage: (0, 0),
+            position: [-53., -22.],
+            player: [-41., 0.],
+            player_reach: 18.,
+            ledges,
+            blast: [-130., 130., 100., -90.],
+            outline: &outline,
+            body_clearance: 9.,
+            ledge_distance: 5.,
+            fall_budget: 12.,
+            reach: [120., 42.],
+        };
+        let approved = ["Waiting Room", "Battlefield", "Final Destination", "Lylat Cruise"];
+        for &(id, label) in STAGES {
+            facts.stage = (id as i32, 0);
+            let [near, high, low, opposite] = possible_routes(&facts);
+            assert!([near, high, low].into_iter().any(|plan| plan.is_some()));
+            assert_eq!(opposite.is_some(), approved.contains(&label), "{label}");
+            assert_eq!(facts.crossing_band().is_some(), approved.contains(&label), "{label}");
+        }
+        for stage in [(-1, 0), (1, 1), (4, 2), (89, 2)] {
+            facts.stage = stage;
+            assert!(facts.crossing_band().is_none(), "{stage:?}");
+        }
     }
 
     #[test]

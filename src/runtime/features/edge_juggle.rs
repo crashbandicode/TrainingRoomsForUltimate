@@ -846,6 +846,7 @@ unsafe fn route_guide(
     };
     let [special_horizontal, special_rise] = special.map_or([0.0; 2], |reach| [reach.horizontal, reach.rise]);
     let facts = RouteFacts {
+        stage: run.stage_key,
         position: pos,
         player,
         player_reach,
@@ -871,7 +872,7 @@ unsafe fn route_guide(
         air.high_route_input(pos, speed, lip, inward, bottom, jumps != 0)
             .is_some()
     });
-    let band = perfect::corridor(facts.outline, facts.ledges, bottom, body, facts.fall_budget);
+    let band = facts.crossing_band();
     let fighter = natives::fighter_kind(cpu).unwrap_or(UNRESOLVED);
     let crossable = u32::from(band.is_some());
     let zone = guarder_zone(p1, player, player_reach, near_ledge, pos);
