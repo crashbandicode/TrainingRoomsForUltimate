@@ -358,6 +358,25 @@ mod tests {
     }
 
     #[test]
+    fn juggle_wizard_percent_and_player_step() {
+        let stage = Stage::new([-160.0, 150.0, 110.0, -85.0], [-160.0, 150.0, 110.0, -85.0], [[-60.0, 5.0], [80.0, 8.0]]).unwrap();
+        let mut wizard = Wizard::new(Drill::Juggler, stage, [0.0, 7.0], 60).unwrap();
+        assert_eq!(wizard.step, WizardStep::Cpu);
+        wizard.move_cpu(stage, [-150.0, 90.0]);
+        wizard.advance();
+        assert_eq!(wizard.step, WizardStep::Percent);
+        assert_eq!(wizard.setup.cpu, [-150.0, 90.0]);
+        wizard.change_percent(300);
+        assert_eq!(wizard.setup.percent, 300);
+        wizard.change_percent(-301);
+        assert_eq!(wizard.setup.percent, 0);
+        wizard.advance();
+        assert_eq!(wizard.step, WizardStep::Player);
+        wizard.back();
+        assert_eq!(wizard.step, WizardStep::Percent);
+    }
+
+    #[test]
     fn juggle_clock_starts_at_release() {
         let mut session = release(Drill::Juggler, Some(1));
         for _ in 0..25 {
