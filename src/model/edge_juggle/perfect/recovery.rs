@@ -99,8 +99,18 @@ pub struct Reach {
 }
 
 const REACH_FRAMES: u8 = 90;
+/// The stock up-special table is the stock CPU's own estimate: timing trusts this share of it.
+const TRUST: f32 = 0.85;
 
 impl Reach {
+    pub fn trusted(air: AirPhysics, jump: bool, special: Option<SpecialReach>) -> Self {
+        let special = special.map(|reach| SpecialReach {
+            horizontal: reach.horizontal * TRUST,
+            rise: reach.rise * TRUST,
+        });
+        Self { air, jump, special }
+    }
+
     /// Drift at the ledge and act on frame `delay`: the jump when one is left,
     /// then the up special from the first frame its envelope holds the ledge.
     pub fn returns(self, from: Point, speed: Point, ledge: Point, delay: u8, bottom: f32) -> bool {

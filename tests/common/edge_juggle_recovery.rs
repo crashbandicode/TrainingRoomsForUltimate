@@ -146,6 +146,12 @@ fn reach_counts_jump_and_up_special_together() {
         "the shipped jump-only case is unchanged"
     );
     assert!(!reach(true, Some(UP)).returns([f32::NAN, 0.0], fall, LEDGE, 0, BOTTOM));
+    let edge = [-88.0, -44.0];
+    assert!(reach(false, Some(UP)).returns(edge, fall, LEDGE, 0, BOTTOM));
+    assert!(
+        !Reach::trusted(AIR, false, Some(UP)).returns(edge, fall, LEDGE, 0, BOTTOM),
+        "timing keeps a margin inside the stock table"
+    );
 }
 
 #[test]

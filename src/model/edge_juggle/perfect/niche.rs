@@ -102,19 +102,21 @@ impl Row {
             return None;
         }
         let budget = facts.budget?;
-        // These up specials can be flown level under the stage.
-        let aimed = self
-            .moves
-            .iter()
-            .any(|step| matches!(step, QuickAttack | Travel | Barrel | Hover | Glide | Bolt));
         crossing_margin(
             budget.air,
             budget.jumps,
             budget.special,
-            aimed,
+            self.aimed(),
             measured.map_or(Measured::default(), |&(_, travel)| travel),
             budget.crossing,
         )
+    }
+
+    /// The row's up special can be flown level under the stage.
+    pub fn aimed(&self) -> bool {
+        self.moves
+            .iter()
+            .any(|step| matches!(step, QuickAttack | Travel | Barrel | Hover | Glide | Bolt))
     }
 
     fn matches(&self, facts: Facts) -> bool {
