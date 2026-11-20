@@ -97,6 +97,8 @@ struct Run {
     plan_pending: bool,
     route_watch: perfect::RouteWatch,
     player_reach: f32,
+    player_height_frame: Option<u32>,
+    player_height: Option<Option<f32>>,
     last_route: Option<Route>,
     guide: Option<RecoveryGuide>,
     last_cpu_status: i32,
@@ -265,15 +267,67 @@ pub(super) fn observe_player_pad(buttons: u32) {
     }
 }
 
+pub(super) fn may_request_player_height() -> bool {
+    ENGINE_ACTIVE.load(Ordering::Acquire)
+        && !OPEN.load(Ordering::Acquire)
+        && !published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire)
+        && wanted() == Some(Drill::GuardEdge)
+}
+
+/// Issued only to the primary P1 frame of a live Perfect recovery plan.
+pub(super) struct LivePerfect {
+    player: usize,
+    frame: u32,
+}
+
+impl LivePerfect {
+    pub(super) fn player(&self) -> usize {
+        self.player
+    }
+
+    pub(super) fn record_height(self, height: Option<f32>) {
+        let Some(mut engine) = ENGINE.try_lock() else { return };
+        if let Some(run) = engine.run.as_mut().filter(|run| {
+            run.rounds.phase == Phase::Live
+                && run.rounds.frames == self.frame
+                && run.player_height_frame == Some(self.frame)
+        }) {
+            run.player_height = Some(height);
+        }
+    }
+}
+
+pub(super) unsafe fn player_height_request(player: usize) -> Option<LivePerfect> {
+    let mut engine = ENGINE.try_lock()?;
+    let run = engine.run.as_mut().filter(|run| {
+        wanted() == Some(run.drill)
+            && run.difficulty == Difficulty::Perfect
+            && run.rounds.phase == Phase::Live
+            && run.wizard.is_none()
+            && run.plan_pending
+            && run.player_height_frame != Some(run.rounds.frames)
+    })?;
+    if states::is_loading() || natives::module_accessor(0) != Some(player) || !natives::is_fighter(player) {
+        return None;
+    }
+    run.player_height_frame = Some(run.rounds.frames);
+    Some(LivePerfect { player, frame: run.rounds.frames })
+}
+
 pub unsafe fn ai_correction(ai: usize, accessor: usize, buttons: u32, stick_y: f32) -> Correction {
-    if !INSTALLED.load(Ordering::Acquire) {
+    if !INSTALLED.load(Ordering::Acquire)
+        || OPEN.load(Ordering::Acquire)
+        || published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire)
+        || states::is_loading()
+    {
         return Correction::default();
     }
     let Some(mut engine) = ENGINE.try_lock() else {
         return Correction::default();
     };
     let Some(run) = engine.run.as_mut().filter(|run| {
-        run.difficulty == Difficulty::Perfect
+        wanted() == Some(run.drill)
+            && run.difficulty == Difficulty::Perfect
             && run.rounds.phase == Phase::Live
             && run.wizard.is_none()
     }) else {
@@ -363,7 +417,7 @@ unsafe fn landing_options(run: &Run, p1: usize, cpu: usize, facts: LandingFacts)
     }
     let mut out = LandingOptions::default();
     let [x, y] = facts.cpu;
-    let player_reach = body_top(p1, facts.player[1]).unwrap_or(f32::INFINITY);
+    let player_reach = fighter_height(p1, facts.player[1]).unwrap_or(f32::INFINITY);
     let player_near = (x - facts.player[0]).abs() <= player_reach;
     match run.landing_draw {
         6 if !player_near => {
@@ -525,9 +579,7 @@ unsafe fn landing_dodge(run: &mut Run, p1: usize, cpu: usize, buttons: u32) -> C
     let escape = konst(C::TermContEscapeAir);
     let can_dodge = escape != UNRESOLVED && natives::is_enable_transition_term(cpu, escape);
     let contact = if attack.is_some() && can_dodge {
-        let (px, py) = super::recording_host::fighter_speed(p1).unwrap_or_default();
-        let (cx, cy) = super::recording_host::fighter_speed(cpu).unwrap_or_default();
-        let Some(contact) = super::hitbox::attack_contact(p1, cpu, [cx - px, cy - py]) else {
+        let Some(contact) = attack_reaches_core(p1, cpu) else {
             return Correction::default();
         };
         contact
@@ -570,12 +622,35 @@ unsafe fn remaining_jumps(cpu: usize) -> Option<u8> {
     u8::try_from(max.saturating_sub(spent).max(0)).ok()
 }
 
-unsafe fn body_top(fighter: usize, foot: f32) -> Option<f32> {
-    let mut highest = foot;
-    super::hitbox::fighter_hurt_capsules(fighter, |part, _| {
-        highest = highest.max(part.ends[0][1].max(part.ends[1][1]) + part.radius);
-    });
-    (highest.is_finite() && highest > foot).then_some(highest - foot)
+/// Test the live attack volume against the CPU's current and projected torso axis.
+unsafe fn attack_reaches_core(p1: usize, cpu: usize) -> Option<bool> {
+    use crate::model::{eggs::Hit, hash40::hash40};
+    use perfect::Capsule;
+
+    let (hits, count) = super::hitbox::object_hits(p1);
+    if count == 0 {
+        return Some(false);
+    }
+    let hip = natives::joint_position(cpu, hash40("hip"), &[0.0; 3])?;
+    let head = natives::joint_position(cpu, hash40("head"), &[0.0; 3])?;
+    if !hip.into_iter().chain(head).all(f32::is_finite) || hip == head {
+        return None;
+    }
+    let (px, py) = super::recording_host::fighter_speed(p1)?;
+    let (cx, cy) = super::recording_host::fighter_speed(cpu)?;
+    let core = [hip, head];
+    let future = core.map(|[x, y, z]| [x + cx - px, y + cy - py, z]);
+    Some(hits[..count].iter().any(|&Hit(a, b, radius, _)| {
+        let attack = Capsule { ends: [a, b], radius };
+        attack.touches_segment(core) || attack.touches_segment(future)
+    }))
+}
+
+unsafe fn fighter_height(fighter: usize, foot: f32) -> Option<f32> {
+    let [_, head, _] =
+        natives::joint_position(fighter, crate::model::hash40::hash40("head"), &[0.0; 3])?;
+    let height = head - foot;
+    (height.is_finite() && height > 0.0).then_some(height)
 }
 
 unsafe fn route_guide(
@@ -586,6 +661,7 @@ unsafe fn route_guide(
     pos: [f32; 2],
     speed: [f32; 2],
     special: Option<perfect::SpecialReach>,
+    player_top: f32,
 ) -> Option<RecoveryGuide> {
     let [left, right] = run.stage.ledges;
     let (midpoint, limits) =
@@ -593,9 +669,12 @@ unsafe fn route_guide(
     let ray = FloorRay::new(p1)?;
     let outline = super::tech_surfaces::training_outline(&ray, midpoint, limits)?;
     let player = [natives::pos_x(p1), natives::pos_y(p1)];
-    let player_reach = body_top(p1, player[1])?;
+    let player_reach = player_top - player[1];
+    if !player_reach.is_finite() || player_reach <= 0.0 {
+        return None;
+    }
     run.player_reach = player_reach;
-    let body = body_top(cpu, pos[1])?;
+    let body = fighter_height(cpu, pos[1])?;
     let jumps = remaining_jumps(cpu)?;
     let bottom = run.stage.blast()[3];
     let jump_rise = if jumps == 0 {
@@ -740,8 +819,11 @@ unsafe fn recovery_pad(
         .filter(|&(_, available)| available && (run.plan_pending || jumps == Some(0)))
         .and_then(|(snapshot, _)| special_reach(ai, snapshot));
     if run.plan_pending {
-        run.plan_pending = false;
-        run.guide = route_guide(run, p1, cpu, physics, pos, speed, special);
+        run.guide = None;
+        if let Some(player_height) = run.player_height.take() {
+            run.plan_pending = false;
+            run.guide = player_height.and_then(|top| route_guide(run, p1, cpu, physics, pos, speed, special, top));
+        }
     }
     let attack = buttons & perfect::ATTACK != 0;
     let can_punish = attack && player_in_lag(p1);
@@ -1302,6 +1384,8 @@ pub unsafe fn frame(fighter: usize) {
             plan_pending: true,
             route_watch: perfect::RouteWatch::default(),
             player_reach: 0.0,
+            player_height_frame: None,
+            player_height: None,
             last_route: None,
             guide: None,
             last_cpu_status: UNRESOLVED,
@@ -1431,6 +1515,8 @@ pub unsafe fn frame(fighter: usize) {
             run.route_draw = rng.next_u32();
             run.plan_pending = true;
             run.route_watch = perfect::RouteWatch::default();
+            run.player_height_frame = None;
+            run.player_height = None;
             run.guide = None;
             run.jump_timing = JumpTiming::default();
             run.last_cpu_status = UNRESOLVED;

@@ -1759,14 +1759,19 @@ fn core06_release_reads_the_hit_module_only_for_the_visualizer_or_live_perfect()
     let inside_perfect = |i: usize| i > perfect_open && i < perfect_close;
     assert_eq!(refs("GameHurt").into_iter().filter(|&i| inside_perfect(i)).count(), 1);
     let adapter = include_str!("../src/runtime/features/edge_juggle.rs");
-    assert_eq!(adapter.matches("hitbox::perfect_player_height(").count(), 1);
+    assert_eq!(src.matches("perfect_player_height(&attempt)").count(), 1);
     assert!(adapter.contains("wanted() == Some(run.drill)"));
     assert!(adapter.contains("run.difficulty == Difficulty::Perfect"));
     assert!(adapter.contains("run.rounds.phase == Phase::Live"));
     assert!(adapter.contains("run.wizard.is_none()"));
     assert!(adapter.contains("natives::module_accessor(0)"));
     assert!(src.contains("let player = attempt.player()"));
-    assert!(src.contains("shown(legend::HURTBOXES)"));
+    assert!(src.contains("let show_hurt = enabled && shown(legend::HURTBOXES);"));
+    assert!(src.contains("let perfect = if show_hurt {
+        perfect
+    } else {"));
+    assert!(adapter.contains("&& run.plan_pending"));
+    assert!(adapter.contains("run.player_height_frame != Some(run.rounds.frames)"));
     // Reader construction and raw loads have the same reachability boundary.
     for name in ["GameHurt", "mem_load"] {
         let found = refs(name);
@@ -1780,7 +1785,7 @@ fn core06_release_reads_the_hit_module_only_for_the_visualizer_or_live_perfect()
     for &i in &refs("GameHurt") {
         if inside_frame(i) {
             assert!(
-                toks[i.saturating_sub(10)..i].iter().any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "enabled")),
+                toks[i.saturating_sub(10)..i].iter().any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "enabled" || s == "show_hurt")),
                 "the pass's reader at token {i} is not gated on `enabled`"
             );
         }

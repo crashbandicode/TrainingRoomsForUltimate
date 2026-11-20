@@ -658,7 +658,11 @@ pub struct Capsule {
 }
 
 impl Capsule {
-    pub fn touches(self, other: Self) -> bool {
+    pub fn touches_segment(self, ends: [[f32; 3]; 2]) -> bool {
+        self.touches(Self { ends, radius: 0.0 })
+    }
+
+    fn touches(self, other: Self) -> bool {
         let dot = |a: [f32; 3], b: [f32; 3]| (0..3).map(|i| a[i] * b[i]).sum::<f32>();
         let minus = |a: [f32; 3], b: [f32; 3]| [0, 1, 2].map(|i| a[i] - b[i]);
         let [a0, a1] = self.ends;
@@ -686,7 +690,7 @@ impl Capsule {
         let radius = self.radius + other.radius;
         radius.is_finite()
             && self.radius > 0.0
-            && other.radius > 0.0
+            && other.radius >= 0.0
             && dot(delta, delta) <= radius * radius
     }
 }
@@ -986,6 +990,8 @@ mod tests {
         let hurt = Capsule { ends: [[0., -5., 0.], [0., 7., 0.]], radius: 1. };
         assert!(hit.touches(hurt));
         assert!(hurt.touches(hit));
+        assert!(hit.touches_segment(hurt.ends));
+        assert!(!hit.touches_segment([[0., -5., 1.25], [0., 7., 1.25]]));
         assert!(!hit.touches(Capsule { ends: [[0., -5., 3.], [0., 7., 3.]], ..hurt }));
         assert!(!hit.touches(Capsule { ends: [[11., 1., 0.]; 2], ..hurt }));
         assert!(hit.touches(Capsule { ends: [[10., 1., 0.]; 2], ..hurt }));
