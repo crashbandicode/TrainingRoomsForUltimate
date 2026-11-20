@@ -115,7 +115,7 @@ const ROWS: [Row; 35] = [
     Row::new(30, 0x2b, Intent::Across, &[Hover]),
     Row::new(31, 0x3a, Intent::Across, &[Side, Rise]),
     Row::new(32, 0x53, Intent::Across, &[Rise]),
-    Row::new(33, 0x4, Intent::Across, &[Jump, Rise]),
+    Row::new(33, 0x5, Intent::Across, &[Jump, Rise]),
     Row::new(34, 0x9, Intent::Near, &[Missile]),
     Row::new(35, 0x26, Intent::Across, &[Jump, Jump, Rise]),
 ];

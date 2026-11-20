@@ -275,7 +275,11 @@ fn niche_hero_woosh_route_and_pad_sequence() {
 
 #[test]
 fn niche_yoshi_egg_throw_route_and_pad_sequence() {
-    verify(0x4, "cross", 33, &[Move::Jump, Move::Rise]);
+    verify(0x5, "cross", 33, &[Move::Jump, Move::Rise]);
+    assert!(
+        select(facts(0x4, "cross"), CANDIDATE_ROWS).is_none(),
+        "Dark Samus does not own Yoshi's recovery"
+    );
 }
 
 #[test]
