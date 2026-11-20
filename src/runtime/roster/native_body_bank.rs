@@ -1149,7 +1149,7 @@ fn plan_groups(settings: &crate::engine::preload::cycle_preload_config::Settings
     let budget = GroupBudget { ready_fighters: usize::from(settings.ready_fighters), pool_free, special };
     let planned = plan_extra_groups_with(policy, windows, [&existing[0], &existing[1]], [&upcoming[0], &upcoming[1]],
         originals, budget);
-    let roles = [0, 1].map(|r| crate::engine::swap::body_bank::RoleFacts { window: windows[r], exclude: originals[r],
+    let roles = [0, 1].map(|r| crate::engine::swap::body_bank::RoleFacts { window: windows[r], exclude: originals[r], enabled: true,
         order: &orders[r], current: slots[r], original: super::cycle_original(logical[r]), groups: &held[r] });
     let input = crate::engine::swap::body_bank::demand_input(policy, special, usize::from(settings.ready_fighters), roles,
         |r, slot0| popo_candidate(menu, logical[r], (!slot0).then_some(0), special, policy));

@@ -1470,6 +1470,8 @@ pub struct DemandInput {
 pub struct RoleFacts<'a> {
     pub window: Option<Members>,
     pub exclude: Option<u32>,
+    /// The role cycles (`Role::enabled`: the CPU always, P1 while Player Swapping is On); off, its lane is empty.
+    pub enabled: bool,
     pub order: &'a [u32],
     pub current: Option<(u32, Option<usize>)>,
     pub original: Option<u32>,
@@ -3077,7 +3079,7 @@ mod tests {
     /// A role at its original (slot 0) with `order` numbered and `groups` held: what `plan_groups` reads.
     fn at_original<'a>(window: Option<Members>, order: &'a [u32], groups: &'a [(Members, GroupState, bool)]) -> RoleFacts<'a> {
         let original = window.map(|w| w.kinds()[0]);
-        RoleFacts { window, exclude: None, order, current: original.map(|k| (k, None)), original, groups }
+        RoleFacts { window, exclude: None, enabled: true, order, current: original.map(|k| (k, None)), original, groups }
     }
 
     fn demand_of(roles: [RoleFacts<'_>; 2], special: SpecialPolicy, ready_fighters: usize) -> Demand {
@@ -3112,7 +3114,7 @@ mod tests {
         // numbered Popo, slot 0's Popo, then G&W. The look-ahead's own rule keeps neither Popo (the original is one).
         let window = members(&[PALUTENA]);
         let order: &[u32] = &[GAME_WATCH, PALUTENA, POPO];
-        let roles = [RoleFacts { window: Some(window), exclude: None, order, current: Some((PALUTENA, Some(1))), original: Some(POPO), groups: &[] },
+        let roles = [RoleFacts { window: Some(window), exclude: None, enabled: true, order, current: Some((PALUTENA, Some(1))), original: Some(POPO), groups: &[] },
             at_original(None, &[], &[])];
         let input = demand_input(GroupPolicy::DEFAULT, SpecialPolicy::NONE, 8, roles, |_, _| false);
         assert_eq!(input.lanes[0][..], [GAME_WATCH]);
@@ -3136,6 +3138,20 @@ mod tests {
         assert!(live.iter().flatten().all(Option::is_none), "the retained live plan places nothing more");
         let fresh = DemandInput { kept: [crate::engine::compat::fixed::FixedList::new(Members::pair_group()); 2], ..input };
         assert_eq!(cycle_demand(&fresh), Demand { bodies: 10, cold: 2 });
+    }
+
+    /// Review 06:07Z 1: Player Swapping Off empties P1's lane as the live planner does (no P1 candidate), so its suffix
+    /// clears (the CPU's pick now fits); the visible windows and the CPU's demand stay. On restores it, no scene reset.
+    fn player_swapping_off_clears_the_player_lane() {
+        let (p1, cpu) = (members(&[MARIO, GAME_WATCH, PALUTENA]), members(&[FALCON, PEACH, YOSHI]));
+        let input = |on: bool| demand_input(GroupPolicy::DEFAULT, SpecialPolicy::NONE, 7,
+            [RoleFacts { enabled: on, ..at_original(Some(p1), &[GAME_WATCH, PALUTENA, PIKACHU], &[]) },
+             at_original(Some(cpu), &[PEACH, YOSHI, FOX], &[])], |_, _| true);
+        let mut memo = DemandMemo::new();
+        assert_eq!(memo.demand(input(true)), Demand { bodies: 8, cold: 1 }, "Ready Fighters 7/8: 1 stays cold");
+        assert_eq!(memo.demand(input(false)), Demand { bodies: 7, cold: 0 }, "P1's pick leaves; the windows and the CPU's pick stay");
+        assert_eq!(memo.demand(input(true)), Demand { bodies: 8, cold: 1 }, "On restores it");
+        assert_eq!(memo.computed, 3);
     }
 
     /// Steady polls repeat the same snapshot and do no placement work; a change computes once.
@@ -4612,6 +4628,7 @@ mod tests {
             ("the_demand_is_the_planners_own_count", the_demand_is_the_planners_own_count as fn()),
             ("the_whole_numbered_order_is_walked_by_slot", the_whole_numbered_order_is_walked_by_slot as fn()),
             ("the_kept_groups_are_charged_first", the_kept_groups_are_charged_first as fn()),
+            ("player_swapping_off_clears_the_player_lane", player_swapping_off_clears_the_player_lane as fn()),
             ("the_demand_is_computed_only_when_its_snapshot_changes", the_demand_is_computed_only_when_its_snapshot_changes as fn()),
             ("the_neighbours_reach_the_planner_only_for_their_own_window", the_neighbours_reach_the_planner_only_for_their_own_window as fn()),
             ("a_target_first_reload_keeps_the_built_groups_it_does_not_displace", a_target_first_reload_keeps_the_built_groups_it_does_not_displace as fn()),
