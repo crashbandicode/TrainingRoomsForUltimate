@@ -1056,11 +1056,9 @@ impl RecordingScreens {
         if len == 0 {
             return;
         }
+        // Up / Down wrap inside the section, as in the menu's other lists.
         let at = self.place(Face::Popup, group).at[section].min(len - 1);
-        if delta < 0 && at == 0 || delta > 0 && at + 1 >= len {
-            return;
-        }
-        self.place_mut(Face::Popup, group).at[section] = if delta < 0 { at - 1 } else { at + 1 };
+        self.place_mut(Face::Popup, group).at[section] = if delta < 0 { (at + len - 1) % len } else { (at + 1) % len };
     }
 
     fn nudge_page(&mut self, group: u8, delta: isize) -> PageHit {
@@ -2003,8 +2001,14 @@ fn page_by(cursor: usize, len: usize, forward: bool) -> usize {
     if len == 0 {
         return 0;
     }
+    // One page further, stopping on the first or last entry; from there the next page wraps, as the menu's jumps do.
     let cursor = cursor.min(len - 1);
-    if forward { (cursor + PAGE).min(len - 1) } else { cursor.saturating_sub(PAGE) }
+    match forward {
+        true if cursor + 1 == len => 0,
+        true => (cursor + PAGE).min(len - 1),
+        false if cursor == 0 => len - 1,
+        false => cursor.saturating_sub(PAGE),
+    }
 }
 
 fn fill_ranks(ids: &[String], order: &[String]) -> Vec<u8> {
