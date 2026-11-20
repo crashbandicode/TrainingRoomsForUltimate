@@ -227,6 +227,14 @@ mod tests {
     }
 
     #[test]
+    fn puff_steers_through_native_fly_status() {
+        assert!(puff_active_status(0xd, false));
+        assert!(puff_active_status(0xe, true));
+        assert!(!puff_active_status(0x4b, false)); // damage fly
+        assert!(!puff_active_status(0x1de, false)); // another move
+    }
+
+    #[test]
     fn puff_requires_the_measured_region_and_all_five_jumps() {
         let start = live([-100.0, -28.0], [0.0; 2]);
         let safe = facts(start.position);
