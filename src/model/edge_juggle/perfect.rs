@@ -3,6 +3,36 @@
 pub type Point = [f32; 2];
 pub type Segment = [Point; 2];
 
+/// A complete, bounded walk around the main solid stage component.
+#[derive(Clone, Copy)]
+pub struct Outline {
+    segments: [Segment; 64],
+    len: usize,
+}
+
+impl Outline {
+    pub const fn new() -> Self {
+        Self { segments: [[[0.0; 2]; 2]; 64], len: 0 }
+    }
+
+    pub fn add(&mut self, segment: Segment) {
+        if let Some(slot) = self.segments.get_mut(self.len) {
+            *slot = segment;
+            self.len += 1;
+        }
+    }
+
+    pub fn segments(&self) -> &[Segment] {
+        &self.segments[..self.len]
+    }
+}
+
+impl Default for Outline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// The foot heights that leave enough room below a closed main-stage outline.
 /// The caller passes live segments from one walk in the current stage.
 pub fn corridor(
@@ -40,6 +70,56 @@ pub fn corridor(
     let low = blast_bottom + fall_budget;
     let high = underside - body_clearance;
     (low.is_finite() && high.is_finite() && low < high).then_some([low, high])
+}
+
+/// Native fighter parameters in world units and frames.
+#[derive(Clone, Copy, Debug)]
+pub struct AirPhysics {
+    pub horizontal_speed: f32,
+    pub horizontal_acceleration: f32,
+    pub gravity: f32,
+    pub terminal_speed: f32,
+    pub jump_speed: f32,
+}
+
+impl AirPhysics {
+    pub fn valid(self) -> bool {
+        [self.horizontal_speed, self.horizontal_acceleration, self.gravity,
+            self.terminal_speed, self.jump_speed]
+            .into_iter().all(|value| value.is_finite() && value > 0.0)
+    }
+
+    /// Drift towards the near ledge, preserving the native drift velocity,
+    /// then spend the remaining jump. Stop at the first crossing of ledge x.
+    pub fn reaches_with_jump(
+        self, from: Point, speed: Point, ledge: Point, delay: u8, blast_bottom: f32,
+    ) -> bool {
+        if !self.valid() || !from.into_iter().chain(speed).chain(ledge).chain([blast_bottom]).all(f32::is_finite) {
+            return false;
+        }
+        let direction = (ledge[0] - from[0]).signum();
+        let mut dx = (ledge[0] - from[0]).abs();
+        let mut y = from[1];
+        let [mut vx, mut vy] = [speed[0] * direction, speed[1]];
+        const SIMULATION_FRAMES: u8 = 90;
+        for frame in 0..SIMULATION_FRAMES {
+            if y <= blast_bottom {
+                return false;
+            }
+            vy = if frame == delay {
+                self.jump_speed
+            } else {
+                (vy - self.gravity).max(-self.terminal_speed)
+            };
+            vx = (vx + self.horizontal_acceleration).min(self.horizontal_speed);
+            dx -= vx;
+            y += vy;
+            if dx <= 0.0 {
+                return y >= ledge[1];
+            }
+        }
+        false
+    }
 }
 
 #[cfg(test)]
