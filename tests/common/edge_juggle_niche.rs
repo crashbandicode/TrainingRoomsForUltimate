@@ -774,6 +774,25 @@ fn niche_float_releases_to_spend_parasol_after_exit() {
 }
 
 #[test]
+fn niche_plain_cross_chop_and_ray_leave_timing_to_the_generic_policy() {
+    for fighter in [0x47, 0x5b] {
+        assert!(
+            select(facts(fighter, "near"), CANDIDATE_ROWS).is_none(),
+            "fighter {fighter:#x}: direct up special retains the generic timing policy"
+        );
+    }
+}
+
+#[test]
+fn niche_mythra_needs_a_measured_photon_edge_before_choosing_a_terminal_special() {
+    let input = Facts { short: true, ..facts(0x5b, "long") };
+    assert!(
+        select(input, CANDIDATE_ROWS).is_none(),
+        "a level gap alone cannot prove Photon Edge fits before special fall"
+    );
+}
+
+#[test]
 fn niche_incineroar_adds_whip_only_outside_the_cross_chop_column() {
     let input = Facts { short: true, ..facts(0x47, "long") };
     let far = select(input, CANDIDATE_ROWS).expect("IN-1 for a horizontal shortfall");
