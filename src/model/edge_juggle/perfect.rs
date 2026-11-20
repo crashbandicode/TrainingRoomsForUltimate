@@ -994,6 +994,21 @@ mod tests {
     }
 
     #[test]
+    fn crossability_samples_below_camera_and_rejects_the_deep_underside() {
+        let camera = [-105., 105., 60., -60.];
+        let blast = [-180., 180., 140., -115.];
+        assert_eq!(outline_probe(camera, blast), Some((0., [140., -115.])));
+        assert_eq!(outline_probe(camera, [0., 0., 0., f32::NAN]), None);
+        let ledges = [[-60., 0.], [60., 0.]];
+        let main_stage = [
+            [ledges[0], ledges[1]],
+            [ledges[1], [0., -107.]],
+            [[0., -107.], ledges[0]],
+        ];
+        assert_eq!(corridor(&main_stage, ledges, blast[3], 9., 2.), None);
+    }
+
+    #[test]
     fn opposite_ledge_requires_a_full_corridor_above_the_blast_zone() {
         let ledges = [[-70., 0.], [70., 0.]];
         let fd = [
