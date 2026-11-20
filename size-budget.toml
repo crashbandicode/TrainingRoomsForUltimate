@@ -2108,3 +2108,10 @@ ceiling = 166635
 date = "2026-11-20"
 reason = "Merge of rc.15 target break area (dbd5e650) onto c31679da: the lock-on helper posed at 0.3 and centred so its reach (3.48) stays inside the R = 4 picture. The branch measured 165899 on 629870c5 (+14 over 165885). Added to main's 166621: 166635."
 approved_by = "Operator 2026-11-19 confirmed the outside-picture break bug ('bug 2 does happen'); primary c07b3449 merged after REVIEW PASS review-visualizer-astra 03:07Z and added the measured delta."
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 166843
+date = "2026-11-20"
+reason = "rc.15 ready-fighters-shortfall v2 (review-menu-astra 03:35Z): body_bank::cycle_demand over the WHOLE cycles (bodies and cold picks by the planner's own placement), the DemandInput snapshot and DemandMemo (recomputed only when the snapshot changes), the whole-cycle walk (character_roster::cycle_kinds), the Fighters notice's ' · Ready Fighters 8/9: 1 stays cold' suffix and the 160-byte status buffer. Measured 166843 against main's 166635 (70f517c9, measured 166635): +208."
+approved_by = "Operator 2026-11-20 ~01:22Z approved the Ready Fighters fix for this build ('yes add the ready fighters fix to this build'); primary c07b3449 ordered v2 with main's tail kept at 166,635 plus the re-measured delta."
