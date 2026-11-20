@@ -550,6 +550,17 @@ mod tests {
     }
 
     #[test]
+    fn cpu_behavior_control_restore_waits_for_stock_apply() {
+        let control = CpuBehavior { menu: 8, level: 2, control: 0x24 };
+        let mut lease = BehaviorLease::new();
+        assert_eq!(lease.step(true, true, 1, control), Some(CpuBehavior::LEVEL_NINE));
+        assert_eq!(lease.step(false, true, 1, CpuBehavior::LEVEL_NINE), Some(control));
+        assert!(lease.held(), "the restore stays owned until stock acknowledges Control");
+        assert_eq!(lease.step(false, true, 1, control), None);
+        assert!(!lease.held());
+    }
+
+    #[test]
     fn cpu_behavior_does_not_write_the_old_settings_to_a_replaced_panel() {
         let a = CpuBehavior { menu: 0, level: 2, control: 1 };
         let b = CpuBehavior { menu: 5, level: 4, control: 3 };
