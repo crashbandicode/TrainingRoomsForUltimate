@@ -102,9 +102,17 @@ pub fn mix(options: [Option<Plan>; 4], zone: Zone, last: Option<Route>, draw: u3
     };
     let total: u32 = options.iter().flatten().map(|&plan| weight(plan)).sum();
     if total == 0 {
-        return options.into_iter().flatten().max_by_key(|plan| plan.weight);
+        return options.into_iter().flatten()
+            .filter(|plan| plan.route != Route::Opposite)
+            .max_by_key(|plan| plan.weight);
     }
-    let mut draw = ((u64::from(draw) * u64::from(total)) >> 32) as u32;
+    // If the crossing is the only weighted route, leave part of the draw to
+    // the usual recovery pad. Crossing is always a mixup. Use the same scale
+    // as the unguarded near route for the portion that stays near by default.
+    let stock = options.iter().flatten()
+        .find(|&&plan| plan.route == Route::Opposite && weight(plan) == total)
+        .map_or(0, |plan| u32::from(plan.weight) * u32::from(ZONE_WEIGHTS[Zone::Far as usize][0]));
+    let mut draw = ((u64::from(draw) * u64::from(total + stock)) >> 32) as u32;
     for plan in options.into_iter().flatten() {
         let weight = weight(plan);
         if draw < weight {
@@ -178,9 +186,6 @@ pub fn mix_measured_crossing(
     let Some((plan, mut share)) = opposite.zip(race.crossing_share(zone)) else {
         return mix(alternatives, zone, last, draw);
     };
-    if alternatives.iter().all(Option::is_none) {
-        return Some(plan);
-    }
     if last == Some(Route::Opposite) {
         share = share.div_ceil(2);
     }
