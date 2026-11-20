@@ -56,6 +56,7 @@ fn every_seam_row_is_the_row_it_was() {
         s::rows_custom_stages::ROWS,
     ];
     assert_eq!(digest(&tables), (SEAM_ROWS, SEAM_DIGEST.to_owned()));
+    assert_eq!(digest(&[s::rows_edge_juggle::ROWS]), (EDGE_JUGGLE_ROWS, EDGE_JUGGLE_DIGEST.to_owned()));
 }
 
 #[test]
@@ -92,12 +93,14 @@ fn every_data_row_has_a_64_byte_guard() {
         }
         files += 1;
     }
-    assert_eq!((files, rows), (27, SEAM_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS
+    assert_eq!((files, rows), (28, SEAM_ROWS + EDGE_JUGGLE_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS
         + crate::model::sites_mashout::SITES.len() + crate::model::sites_lockon::CALLEES.len()));
 }
 
 const SEAM_ROWS: usize = 704;
 const SEAM_DIGEST: &str = "cb2c75e34e6f3258900a157be9b79d08b7ed396c5500f98d132e7627858d6adc";
+const EDGE_JUGGLE_ROWS: usize = 9;
+const EDGE_JUGGLE_DIGEST: &str = "fb9986221d359897a54d4289713d2fdb59dcd706de115c828e53d0f81ee5b096";
 const SITE_ROWS: usize = 272;
 const SITE_DIGEST: &str = "ba93529340967f0bf151474e5235469b69d4637fdd1d5991ce903cd392743c15";
 const UI_ROWS: usize = 6;
