@@ -3736,7 +3736,7 @@ impl DetachedSnapshot {
     fn new(owner: u32) -> Self {
         Self { owner,
             bodies: FixedList::new(BodyRef { id: 0, kind: 0, cell: 0, activated: false, valid: false, registered: None }),
-            contexts: FixedList::new(ContextRef { ctx: 0, controller: 0, valid: false }),
+            contexts: FixedList::new(ContextRef { ctx: 0, controller: 0, input_route: None, valid: false }),
             dispatch: None, records: None, held_kinds: FixedList::new(0) }
     }
     fn view(&self) -> DetachedView<'_> {
@@ -7183,8 +7183,8 @@ unsafe fn retire_groups(entry: *const u8, owner: u32, reason: &str) {
     // `map_after` = R's remaining key count (`R+0x18`) after the release: the last-line
     // evidence that no key stayed registered (0 expected whenever `alias_ok` and `keys_kept=0`).
     let map_after = if alias_ok { fields::read::<u64>(alias, 0x18).map_or(-1i64, |m| m as i64) } else { -1 };
-    trace!("[GroupSwap] teardown owner={} reason={} groups={} bodies={} contexts={} routes={} dispatchers={} records={} keys={} keys_kept={} map_after={} skipped={} alias_ok={} pool={:?}",
-        owner, reason, groups, receipt.bodies, receipt.contexts, receipt.routes_cleared, receipt.dispatchers, receipt.records,
+    trace!("[GroupSwap] teardown owner={} reason={} groups={} bodies={} contexts={} inputs_kept={} routes={} dispatchers={} records={} keys={} keys_kept={} map_after={} skipped={} alias_ok={} pool={:?}",
+        owner, reason, groups, receipt.bodies, receipt.contexts, receipt.inputs_kept, receipt.routes_cleared, receipt.dispatchers, receipt.records,
         receipt.keys_released, receipt.keys_kept, map_after, receipt.skipped + unreachable, alias_ok, pool);
     // Every record is gone: the role's real ledger against the owner's map (WP2's `teardown end`
     // line; U13: `r_handle::reconcile` supersedes the mirror-based `observe::reconcile`).
@@ -7406,8 +7406,8 @@ unsafe fn leave_group(entry: *const u8, owner: u32, role: usize, group: usize) {
                 .map(|g| g.members.count()).sum::<usize>().min(usize::from(u8::MAX)) as u8, Ordering::Release);
         }
     }
-    trace!("[GroupSwap] left cycle owner={} group={} kinds={:x?} state={:?} released bodies={} contexts={} routes={} dispatchers={} records={} keys={:x?} skipped={} ledger_held={} map_after={} pool={:?} execute_us={} step_us={:?} us={}",
-        owner, group, &members.kinds()[..members.count()], before, receipt.bodies, receipt.contexts, receipt.routes_cleared,
+    trace!("[GroupSwap] left cycle owner={} group={} kinds={:x?} state={:?} released bodies={} contexts={} inputs_kept={} routes={} dispatchers={} records={} keys={:x?} skipped={} ledger_held={} map_after={} pool={:?} execute_us={} step_us={:?} us={}",
+        owner, group, &members.kinds()[..members.count()], before, receipt.bodies, receipt.contexts, receipt.inputs_kept, receipt.routes_cleared,
         receipt.dispatchers, receipt.records, &*keys, receipt.skipped, held,
         fields::read::<u64>(alias, 0x18).map_or(-1i64, |m| m as i64), pool_counts(base),
         execute_ended.saturating_sub(execute_started), &step_us[..marks.len()], now_us().saturating_sub(leave_started));

@@ -5,8 +5,8 @@
 //!
 //! The plan is computed by `lifecycle::destroy_plan` from value records the body
 //! bank validated in the current callback; `execute` runs the steps in plan order
-//! with no bank lock held and re-reads the one word it conditionally writes (the
-//! route slot) right before writing it. Facts, with their sources:
+//! with no bank lock held and re-reads the field it conditionally writes (the
+//! route slot or context input claim) right before writing it. Facts, with their sources:
 //! * Pad manager `P = *(main+0x52b6fd8)`, `S = *P`, `S+0x98` → 16 route objects
 //!   `A_i` (0x20 bytes each); `A->+0` = the routed controller (`ctx+0x58`),
 //!   `A->+8` = tick disabled, `A->+0x14` = frame counter; the tick `main+0x2f7b80`
@@ -69,6 +69,11 @@ pub(crate) unsafe fn probe_consumers(base: usize, owner: u32) -> NativeConsumers
             if controller != 0 { consumers.pad_routes[usize::from(slot)] = Some(RouteRef { slot, controller }); }
         }
     }
+    if let Some(state) = fields::chain(base, &[PAD_MANAGER, 0]) {
+        for slot in 0..PAD_SLOTS {
+            consumers.input_holders[slot] = fields::read::<usize>(state, slot * 8).unwrap_or(0);
+        }
+    }
     let nana = owner.saturating_add(8);
     if (nana as usize) < PAD_SLOTS { consumers.nana_owner_plus_8 = consumers.pad_routes[nana as usize].map(|r| r.controller); }
     consumers
@@ -79,14 +84,21 @@ pub(crate) unsafe fn probe_consumers(base: usize, owner: u32) -> NativeConsumers
 /// so its route is left to native).
 pub(crate) unsafe fn context_ref(context: usize, valid: bool) -> ContextRef {
     let controller = if valid { fields::read::<usize>(context, CONTEXT_CONTROLLER).unwrap_or(0) } else { 0 };
-    ContextRef { ctx: context, controller, valid }
+    let input_route = if valid && fields::read::<u8>(context, 0x69).unwrap_or(0) != 0 {
+        fields::read::<u32>(context, 0x6c)
+            .filter(|slot| *slot < PAD_SLOTS as u32)
+            .map(|slot| slot as u8)
+    } else {
+        None
+    };
+    ContextRef { ctx: context, controller, input_route, valid }
 }
 
 /// The attached window's contexts, deduplicated across `+0x4178/+0x4180/+0x4188/90/98`
 /// (the aliases select among the cell contexts; GROUP-SWAP-FEASIBILITY §2.2).
 pub(crate) unsafe fn window_contexts(entry: usize, mut valid: impl FnMut(usize) -> bool)
     -> FixedList<ContextRef, { WINDOW_CONTEXT_OFFSETS.len() }> {
-    let mut out = FixedList::new(ContextRef { ctx: 0, controller: 0, valid: false });
+    let mut out = FixedList::new(ContextRef { ctx: 0, controller: 0, input_route: None, valid: false });
     for offset in WINDOW_CONTEXT_OFFSETS {
         let Some(context) = fields::child(entry, offset) else { continue; };
         if out.iter().any(|c| c.ctx == context) { continue; }
@@ -106,6 +118,25 @@ pub(crate) unsafe fn release_pad_route(base: usize, slot: u8, controller: usize)
     if fields::read::<usize>(route, 0)? != controller { return Some(false); }
     fields::write_unchecked(route, 0, 0usize);
     Some(true)
+}
+
+/// Keep a detached context's input route only while another controller still
+/// holds it. The plan's values are re-checked immediately before the context is freed.
+pub(crate) unsafe fn keep_input_route(base: usize, ctx: usize, slot: u8, controller: usize) -> Option<bool> {
+    if usize::from(slot) >= PAD_SLOTS { return Some(false); }
+    let state = fields::chain(base, &[PAD_MANAGER, 0])?;
+    let holder = fields::read::<usize>(state, usize::from(slot) * 8)?;
+    let claimed = fields::read::<u8>(ctx, 0x69)?;
+    let input_route = fields::read::<u32>(ctx, 0x6c)?;
+    let context_controller = fields::read::<usize>(ctx, CONTEXT_CONTROLLER)?;
+    if claimed != 0 && input_route == u32::from(slot) && context_controller == controller
+        && holder != 0 && holder != controller
+    {
+        fields::write_unchecked(ctx, 0x69, 0u8);
+        Some(true)
+    } else {
+        Some(false)
+    }
 }
 
 unsafe fn destroy_body(base: usize, id: u32) {
@@ -209,6 +240,9 @@ pub(crate) struct DestroyReceipt {
     pub routes_cleared: usize,
     /// Route steps whose slot no longer named the controller at execution time.
     pub routes_stale: usize,
+    pub inputs_kept: usize,
+    /// Keep steps whose route or context no longer matched the plan at execution time.
+    pub inputs_stale: usize,
     pub bodies: usize,
     pub contexts: usize,
     pub dispatchers: usize,
@@ -259,6 +293,11 @@ pub(crate) unsafe fn execute(base: usize, plan: &DetachedPlan<'_>, keys: &[u32],
                 None => receipt.skipped += 1,
             },
             DestroyStep::DestroyBody { id } => { destroy_body(base, *id); receipt.bodies += 1; }
+            DestroyStep::KeepInputRoute { ctx, slot, controller } => match keep_input_route(base, *ctx, *slot, *controller) {
+                Some(true) => receipt.inputs_kept += 1,
+                Some(false) => receipt.inputs_stale += 1,
+                None => receipt.skipped += 1,
+            },
             DestroyStep::FreeContext { ctx } => { free_context(*ctx); receipt.contexts += 1; }
             DestroyStep::DestroyDispatchers { arrays } => {
                 if destroy_dispatcher_arrays(base, *arrays) { receipt.dispatchers += 1; } else { receipt.skipped += 1; }
@@ -294,8 +333,9 @@ pub(crate) unsafe fn execute(base: usize, plan: &DetachedPlan<'_>, keys: &[u32],
         receipt.skipped += kept;
     }
     let [kirby_cells, kirby_misplaced, kirby_branch_mismatch] = plan.kirby_counts();
-    trace!("[Destroy] plan owner={} reason={} steps={} routes_cleared={} attached={} routes_stale={} kirby={} kirby_misplaced={} kirby_branch_mismatch={} bodies={} contexts={} skipped={}",
+    trace!("[Destroy] plan owner={} reason={} steps={} routes_cleared={} attached={} routes_stale={} inputs_kept={} kirby={} kirby_misplaced={} kirby_branch_mismatch={} bodies={} contexts={} skipped={}",
         owner, reason, steps, receipt.routes_cleared, "None",
-        receipt.routes_stale, kirby_cells, kirby_misplaced, kirby_branch_mismatch, receipt.bodies, receipt.contexts, receipt.skipped);
+        receipt.routes_stale, receipt.inputs_kept, kirby_cells, kirby_misplaced, kirby_branch_mismatch,
+        receipt.bodies, receipt.contexts, receipt.skipped);
     receipt
 }

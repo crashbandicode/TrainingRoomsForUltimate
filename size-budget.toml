@@ -2156,3 +2156,11 @@ ceiling = 171833
 date = "2026-11-20"
 reason = "rc.15 Spacing grader (review-visualizer-astra 07:46Z fixes: hurt-layout prerequisites, published lane identities, owner at capture, projectile+helper grading, recorded-column target tags; review-visualizer-astra 12:50Z B1 frame-side lane reads), rebased on 79cc06f1. Measured 171833 at 91cbb9b0 (tools/size_gate.py; main 79cc06f1 measured 171026), +807. Raises main's 171026 ceiling by the measured delta only."
 approved_by = "Primary c07b3449 (2026-11-20): explicit budget approval in the lead handoff; measured delta only."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 171914
+date = "2026-11-20"
+reason = "Merge CPU THINK STOP fix (rc15/cpu-think-burst 04616215) onto main 5a1fac9e. Branch size gate 3d24ee93-20261120T1443Z measured an exact +81 over its 171026 base; main ceiling 171833 + 81 = 171914. Combined gate on the merge re-measures."
+approved_by = "Primary e7ee8f1c (tr-primary-2) 2026-11-20: approves the measured +81 delta only, for the operator-requested preview build."
