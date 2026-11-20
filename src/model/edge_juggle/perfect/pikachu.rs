@@ -112,15 +112,61 @@ pub struct SkullBashPath {
     pub height: f32,
 }
 
+// The 200 candidate cells from reference-crossings/gen_regions.py, P-SB on the common ring.
+// The same stage layout is mirrored at runtime. Lylat needs a separate geometry and table.
+const SKULL_BASH_RING: [u32; 44] = [
+    0x0000, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc,
+    0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc,
+    0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x01fc,
+    0x01fc, 0x00fc, 0x003c, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+    0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+    0x0000, 0x0000, 0x0000, 0x0000,
+];
+
+/// Start outside the lip in a cell baked for the live normal-form floor and blast line.
 pub fn skull_bash_start(
-    _stage: (i32, u32),
-    _outline: &[Segment],
-    _ledges: [Point; 2],
-    _position: Point,
-    _bottom: f32,
-    _height: f32,
+    stage: (i32, u32),
+    outline: &[Segment],
+    [left, right]: [Point; 2],
+    [x, y]: Point,
+    bottom: f32,
+    height: f32,
 ) -> Option<SkullBashPath> {
-    None
+    const MODEL_HEIGHT: f32 = 10.0;
+    if !matches!(stage, (0 | 3 | 311, 0))
+        || !(height > 0.0 && height <= MODEL_HEIGHT)
+        || !left.into_iter().chain(right).chain([x, y, bottom]).all(f32::is_finite)
+        || !outline.iter().flatten().flatten().all(|v| v.is_finite())
+    {
+        return None;
+    }
+    let [near, far] = if x < left[0] { [left, right] } else { [right, left] };
+    let direction = (far[0] - near[0]).signum();
+    let outside = (near[0] - x) * direction;
+    let y = y - near[1];
+    let underside = outline.iter().flatten().map(|point| point[1]).reduce(f32::min)?;
+    if outside <= 0.0
+        || y > 40.0
+        || ((right[0] - left[0]) * 0.5 - 79.99).abs() > 0.5
+        || (right[1] - left[1]).abs() > 0.5
+        || (underside - near[1] + 40.1).abs() > 1.0
+        || (bottom - near[1] + 140.0).abs() > 1.0
+    {
+        return None;
+    }
+    let column = (outside / 4.0) as u32;
+    let row = ((40.0 - y) / 4.0) as usize;
+    if SKULL_BASH_RING.get(row)? & 1u32.checked_shl(column)? == 0 {
+        return None;
+    }
+    Some(SkullBashPath {
+        direction,
+        // Skull Bash falls 3.1 units before its level travel, with two units of roof clearance.
+        launch_y: underside - MODEL_HEIGHT - 2.0 + 3.1,
+        near: [near[0] - direction * 1.7, near[1] - 9.9],
+        far: [far[0] + direction * 1.7, far[1] - 9.9],
+        height: MODEL_HEIGHT,
+    })
 }
 
 #[cfg(test)]
