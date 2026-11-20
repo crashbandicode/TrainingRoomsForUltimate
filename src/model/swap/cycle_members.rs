@@ -78,22 +78,18 @@ pub fn numbered(members: &[TrioFighter], excluded: Option<u32>) -> KindList {
 /// one (`character_forms::next_cycle`): the numbered slots after it, slot 0 (the catalog original), then the numbered
 /// slots before it. Slots, not kinds, end the walk: slot 0 and a numbered slot may hold the same kind (Ice Climbers with
 /// different Solo settings). The current slot is `cursor` when it still holds `current`'s group, else `current`'s
-/// group's slot, else slot 0 when `cursor` is unset and `current` is the original. Returns the kinds and where slot 0 is.
-pub fn visit_order(order: &[u32], current: u32, cursor: Option<usize>, original: Option<u32>) -> (KindList, Option<usize>) {
+/// group's slot, else slot 0 when `cursor` is unset and `current` is the original.
+pub fn visit_order(order: &[u32], current: u32, cursor: Option<usize>, original: Option<u32>) -> KindList {
     let original = original.filter(|kind| TrioFighter::from_kind(*kind).is_some());
     let same = |kind: u32| Forms::starting(kind).same_group(current);
     let at_original = cursor.is_none() && original.is_some_and(same);
     let position = if at_original { None } else { cursor.filter(|i| order.get(*i).is_some_and(|k| same(*k))).or_else(|| order.iter().position(|k| same(*k))) };
     let mut kinds = KindList::new(0);
-    let mut slot0 = None;
     let (after, before) = match position { Some(p) => (p + 1, p), None => (0, 0) };
     for &kind in &order[after.min(order.len())..] { kinds.push(kind); }
-    if let Some(kind) = original.filter(|_| !at_original) {
-        slot0 = Some(kinds.len());
-        kinds.push(kind);
-    }
+    if let Some(kind) = original.filter(|_| !at_original) { kinds.push(kind); }
     for &kind in &order[..before] { kinds.push(kind); }
-    (kinds, slot0)
+    kinds
 }
 /// The 1-based number of `kind`'s entry in a numbered order (its fighter group, or its Mii class).
 pub fn number_of(order: &[u32], kind: u32) -> Option<usize> {
