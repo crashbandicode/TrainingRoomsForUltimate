@@ -103,6 +103,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn edge_juggle_are_independent_practice_games() {
+        let edge = Game::ALL.iter().copied().find(|game| game.title() == "Guard the Edge")
+            .expect("Guard the Edge has its own practice game entry");
+        let juggle = Game::ALL.iter().copied().find(|game| game.title() == "Juggler")
+            .expect("Juggler has its own practice game entry");
+        assert_eq!(Game::from_code(edge.code()), Some(edge));
+        assert_eq!(Game::from_code(juggle.code()), Some(juggle));
+        assert_eq!(effective(edge, 0, Some(juggle)), 0);
+        assert_eq!(effective(juggle, 0, Some(edge)), 0);
+        assert_eq!(Game::from_code(5), Some(Game::Parry), "existing codes stay stable");
+    }
+
+    #[test]
     fn one_game_runs_at_a_time() {
         let mut every = vec![None];
         every.extend(Game::ALL.map(Some));
