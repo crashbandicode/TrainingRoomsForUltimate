@@ -119,18 +119,6 @@ const SKULL_BASH_RING: [u32; 44] = [
     0x0000, 0x0000, 0x0000, 0x0000,
 ];
 
-fn in_region(outside: f32, height: f32) -> bool {
-    if !outside.is_finite() || !height.is_finite() || outside <= 0.0 || height > 40.0 {
-        return false;
-    }
-    let column = (outside / 4.0) as u32;
-    let row = ((40.0 - height) / 4.0) as usize;
-    SKULL_BASH_RING
-        .get(row)
-        .zip(1u32.checked_shl(column))
-        .is_some_and(|(&mask, cell)| mask & cell != 0)
-}
-
 /// Start outside the lip in a cell baked for the live normal-form floor and blast line.
 pub fn skull_bash_start(
     stage: (i32, u32),
@@ -160,7 +148,7 @@ pub fn skull_bash_start(
     {
         return None;
     }
-    if !in_region(outside, y) {
+    if !super::region::contains(&SKULL_BASH_RING, outside, y) {
         return None;
     }
     Some(SkullBashPath {
@@ -213,7 +201,9 @@ impl SkullBashFlight {
             let ledge_x = path.near[0] + path.direction * 1.7;
             let ledge_y = path.near[1] + 9.9;
             let outside = (ledge_x - position[0]) * path.direction;
-            if sample.motion != Motion::Free || !in_region(outside, position[1] - ledge_y) {
+            if sample.motion != Motion::Free
+                || !super::region::contains(&SKULL_BASH_RING, outside, position[1] - ledge_y)
+            {
                 return None;
             }
             if position[1] > path.launch_y {

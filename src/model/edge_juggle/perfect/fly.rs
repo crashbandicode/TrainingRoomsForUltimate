@@ -69,17 +69,14 @@ impl PuffFlight {
         let bottom = facts.blast[3];
         let flat = facts.outline.iter().flatten().map(|point| point[1]).reduce(f32::min)?;
         facts.crossing_band()?;
-        if !x.is_finite() || !y.is_finite() || outside <= 0.0 || relative_y > 40.0
-            || ((right[0] - left[0]) * 0.5 - 79.99).abs() > 0.5
+        if ((right[0] - left[0]) * 0.5 - 79.99).abs() > 0.5
             || (right[1] - left[1]).abs() > 0.5
             || (flat - near[1] + 40.1).abs() > 1.0
             || (bottom - near[1] + 140.0).abs() > 1.0
         {
             return None;
         }
-        let column = (outside / 4.0) as u32;
-        let row = ((40.0 - relative_y) / 4.0) as usize;
-        if RING_CELLS.get(row)? & 1u32.checked_shl(column)? == 0 {
+        if !super::region::contains(&RING_CELLS, outside, relative_y) {
             return None;
         }
         let mut hull = Outline::new();
