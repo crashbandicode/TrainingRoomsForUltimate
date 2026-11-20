@@ -195,8 +195,9 @@ pub struct HoldFacts {
 /// A stock jump or up special held back until its planned frame.
 #[derive(Default)]
 pub struct Hold {
-    age: u8,
+    start: Option<u32>,
     pending: bool,
+    last: Option<(u32, Correction)>,
 }
 
 impl Hold {
@@ -205,21 +206,23 @@ impl Hold {
     }
 
     pub fn step(&mut self, facts: HoldFacts) -> Correction {
-        let age = self.age;
-        self.age = age.saturating_add(1);
+        if let Some((_, out)) = self.last.filter(|(frame, _)| *frame == facts.frame) {
+            // Another think on the same game frame repeats the pad.
+            return out;
+        }
+        let age = facts.frame.saturating_sub(*self.start.get_or_insert(facts.frame));
         let mut out = Correction::default();
         if facts.buttons & (GUARD | ATTACK) != 0 {
             // A stock defensive answer passes and keeps the resource.
             self.pending = false;
-            return out;
-        }
-        if facts.can_wait && (age < facts.planned || facts.hot) {
+        } else if facts.can_wait && (age < u32::from(facts.planned) || facts.hot) {
             // The up special never goes before a jump held in reserve.
             out.release = facts.buttons & (facts.button | SPECIAL);
             self.pending |= out.release != 0;
         } else if std::mem::take(&mut self.pending) {
             out.press = facts.button;
         }
+        self.last = Some((facts.frame, out));
         out
     }
 }
