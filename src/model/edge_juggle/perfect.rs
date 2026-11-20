@@ -826,6 +826,7 @@ pub const FLICK_JUMP: u32 = 0x8000;
 
 #[derive(Clone, Copy, Default)]
 pub struct LandingOptions {
+    pub player_in_reach: bool,
     pub fast_fall: bool,
     pub jump: bool,
     pub platform_x: Option<f32>,
@@ -933,13 +934,32 @@ mod tests {
     fn landing_variants_only_use_a_safe_and_legal_input() {
         let facts = LandingFacts { cpu: [5., 45.], player: [0., 5.], main_floor: [-70., 70.],
             stock_stick_y: -0.15, stock_buttons: 0x8000 };
-        let legal = LandingOptions { fast_fall: true, jump: true, platform_x: Some(-15.) };
+        let legal = LandingOptions { fast_fall: true, jump: true, platform_x: Some(-15.),
+            ..LandingOptions::default() };
         assert_eq!(landing_variant(facts, legal, 6).stick, Some([0., -1.]));
         assert_eq!(landing_variant(facts, legal, 7).press, JUMP);
         assert_eq!(landing_variant(facts, legal, 8).stick, Some([-1., -0.15]));
         assert_eq!(landing_variant(facts, LandingOptions::default(), 7), Correction::default());
         assert_eq!(landing_variant(LandingFacts { stock_buttons: 0x8008, ..facts }, legal, 8),
             Correction::default());
+    }
+
+    #[test]
+    fn landing_replans_an_unavailable_option_away_from_p1() {
+        let facts = LandingFacts { cpu: [5., 45.], player: [0., 5.], main_floor: [-70., 70.],
+            stock_stick_y: -0.15, stock_buttons: FLICK_JUMP };
+        let pressured = LandingOptions { player_in_reach: true, ..LandingOptions::default() };
+        for draw in 6..=8 {
+            for (x, expected) in [(-5., -1.), (5., 1.)] {
+                let facts = LandingFacts { cpu: [x, 45.], ..facts };
+                assert_eq!(landing_variant(facts, pressured, draw), Correction {
+                    stick: Some([expected, -0.15]), ..Correction::default()
+                }, "unavailable option {draw} at x={x}");
+            }
+        }
+        assert_eq!(landing_variant(facts, pressured, 5), Correction::default());
+        let defending = LandingFacts { stock_buttons: FLICK_JUMP | GUARD, ..facts };
+        assert_eq!(landing_variant(defending, pressured, 8), Correction::default());
     }
 
     #[test]
