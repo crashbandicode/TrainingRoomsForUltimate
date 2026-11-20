@@ -2065,7 +2065,7 @@ approved_by = "Primary c07b3449 directed the lock-free hidden CPU visualizer rev
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 165505
+ceiling = 165514
 date = "2026-11-19"
-reason = "Mash out guarded ledge placement and CPU teeter recovery, including exact floor joins. Yoga measured 60b031bf at 165302 vs 165128 on 4f25a854, a delta of 174. Rebase onto hidden CPU main 96355cad preserves the resident diff and adds 174 to ceiling 165331, retaining one line of headroom."
-approved_by = "Operator approved grounded CPU teeter admission and exact floor joins on 2026-11-19. Primary c07b3449 required the measured delta only and the rebase onto 96355cad."
+reason = "Mash out guarded ledge placement, CPU teeter recovery and exact floor joins. Yoga measured 458760a0 at 165504 vs 165330 on base 96355cad. The pinned counter measured another 10 lines in 88891515 for the one-way floor checks. The ceiling is the measured total, 165514 (+184 vs base)."
+approved_by = "Operator approved grounded CPU teeter admission and exact floor joins. Primary c07b3449 directed the floor guard review corrections and an exact measured ceiling."
