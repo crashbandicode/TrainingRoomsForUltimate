@@ -2,6 +2,8 @@
 
 #[path = "perfect/niche.rs"]
 pub mod niche;
+#[path = "perfect/recovery.rs"]
+pub mod recovery;
 #[path = "perfect/rule_counts.rs"]
 pub mod rule_counts;
 
