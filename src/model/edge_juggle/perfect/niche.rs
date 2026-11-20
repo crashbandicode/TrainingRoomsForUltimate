@@ -232,7 +232,7 @@ use Move::*;
 const ROWS: [Row; 40] = [
     Row::new(1, 0x8, Intent::Across, &[Hold, QuickAttack]),
     Row::new(2, 0x8, Intent::ThunderOverhead, &[ApproachThunder, Down, Hold, QuickAttack]),
-    Row::new(3, 0x8, Intent::LongApproach, &[Side, Hold, QuickAttack]),
+    Row::new(3, 0x8, Intent::LongApproach, &[Side, Jump, QuickAttack]),
     Row::new(4, 0x1c, Intent::Across, &[Hold, Rise]),
     Row::new(5, 0x27, Intent::Across, &[Hold, Barrel]),
     Row::new(6, 0x27, Intent::LongApproach, &[Side, Hold, Barrel]),
@@ -276,6 +276,10 @@ const ROWS: [Row; 40] = [
 ];
 
 pub const CANDIDATE_ROWS: u64 = (1 << ROWS.len()) - 1;
+
+pub fn skull_bash_row(enabled: u64) -> Option<&'static Row> {
+    (enabled & (1 << 2) != 0).then_some(&ROWS[2])
+}
 
 pub fn select(facts: Facts, enabled: u64) -> Option<&'static Row> {
     ROWS.iter()

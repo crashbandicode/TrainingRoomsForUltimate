@@ -1,6 +1,6 @@
 //! Bounded Quick Attack geometry for Pikachu's Skull Bash crossing.
 
-use super::{Point, Segment};
+use super::{niche::{Sample, Sequence}, Correction, Outline, Point, Segment};
 
 #[derive(Clone, Copy, Debug)]
 pub struct ZipPlan {
@@ -167,6 +167,24 @@ pub fn skull_bash_start(
         far: [far[0] + direction * 1.7, far[1] - 9.9],
         height: MODEL_HEIGHT,
     })
+}
+
+pub struct SkullBashFlight {
+    _path: SkullBashPath,
+    _outline: Outline,
+    _bottom: f32,
+}
+
+impl SkullBashFlight {
+    pub fn new(path: SkullBashPath, outline: Outline, bottom: f32) -> Self {
+        Self { _path: path, _outline: outline, _bottom: bottom }
+    }
+
+    pub fn step(
+        &mut self, _sequence: &mut Sequence, _sample: Sample, _position: Point, _vy: f32,
+    ) -> Option<Correction> {
+        None
+    }
 }
 
 #[cfg(test)]

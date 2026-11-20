@@ -76,3 +76,61 @@ fn skull_bash_starts_only_inside_its_baked_region_and_live_stage_shape() {
     let shape_changed = RING.map(|line| line.map(|[x, y]| [x, y * 0.9]));
     assert!(skull_bash_start((3, 0), &shape_changed, ledges, release, BOTTOM, 10.0).is_none());
 }
+
+
+#[test]
+fn skull_bash_flies_the_native_side_jump_and_two_aim_sequence() {
+    use super::SkullBashFlight;
+    use crate::model::edge_juggle::perfect::{
+        niche::{self, Motion, Move, Sample, Sequence},
+        Outline, GUARD, JUMP, SPECIAL,
+    };
+    let start = [-20.0, -28.0];
+    let path = skull_bash_start((3, 0), &RING, [[0.0, 0.0], [159.975, 0.0]], start, BOTTOM, 8.5)
+        .unwrap();
+    let mut outline = Outline::new();
+    for line in RING {
+        outline.add(line);
+    }
+    let mut flight = SkullBashFlight::new(path, outline, BOTTOM);
+    let mut sequence = Sequence::new(niche::skull_bash_row(niche::CANDIDATE_ROWS).unwrap());
+    let mut input = |frame, motion, can_start, position, vy| {
+        flight.step(&mut sequence, Sample {
+            frame,
+            motion,
+            can_start,
+            valid: true,
+            at_exit: false,
+            can_enter: false,
+            low: false,
+            hold_over: false,
+            direction: 0.0,
+            aim: [0.0; 2],
+        }, position, vy).unwrap()
+    };
+    let descend = input(0, Motion::Free, true, start, -1.55);
+    assert_eq!(descend.stick, Some([0.0, -1.0]));
+    assert_eq!(descend.press, 0);
+    assert_ne!(descend.release & GUARD, 0);
+    let press = input(14, Motion::Free, true, [-20.0, -50.22], -1.55);
+    assert_eq!((press.stick, press.press), (Some([1.0, 0.0]), SPECIAL));
+    let startup = input(15, Motion::Starting, false, [-20.0, -50.22], -0.1);
+    assert_eq!(startup.press, 0, "uncharged Bash releases the special button");
+    input(50, Motion::Travel, false, [50.0, -53.32], 0.0);
+    input(90, Motion::Finish, false, [100.0, -94.0], -1.55);
+    let bash_end = [111.2, -111.52];
+    input(96, Motion::Free, false, bash_end, -1.55);
+    assert_eq!(input(97, Motion::Free, true, bash_end, -1.55).press, JUMP);
+    assert_eq!(input(98, Motion::Travel, false, [112.0, -109.0], 2.55).press, 0);
+    assert_eq!(input(123, Motion::Travel, false, [136.4, -76.2], 0.1).press, 0);
+    assert_eq!(input(124, Motion::Travel, false, APEX, -0.01).press, 0);
+    let up = input(125, Motion::Free, true, APEX, -0.1);
+    assert_eq!((up.stick, up.press), (Some([0.0, 1.0]), SPECIAL));
+
+    let first = input(126, Motion::Starting, false, APEX, 0.0);
+    assert!((degrees(first.stick.unwrap()) - 50.0).abs() < 0.01);
+    let second = input(146, Motion::Finish, false, [172.0, -34.0], 0.0);
+    assert!((degrees(second.stick.unwrap()) - 114.0).abs() < 1.0);
+    assert_eq!(second.press, 0, "the native END reads the second direction");
+    assert_eq!(sequence.action(), Some(Move::QuickAttack));
+}
