@@ -370,6 +370,23 @@ pub extern "C" fn planner_chose(route: u32, fighter: u32, crossable: u32, row: u
     PLANNER_EVENTS.fetch_add(1, Ordering::Relaxed);
 }
 
+/// A single rejected plan sample; the adjacent stock AI trace identifies the fighter.
+#[repr(u32)]
+pub enum PlanInput {
+    PlayerHeight = 1,
+    Snapshot = 2,
+    SpecialEnvelope = 3,
+    StageOutline = 4,
+    FighterGeometry = 5,
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn planner_unavailable(input: PlanInput) {
+    std::hint::black_box(input);
+    PLANNER_EVENTS.fetch_add(1, Ordering::Relaxed);
+}
+
 pub static PERFECT_CORRECTIONS: Counters = Counters::new();
 
 /// Plain release trace boundary for actual controller edits. No I/O in the AI hook.
@@ -773,18 +790,29 @@ unsafe fn route_guide(
     player_top: f32,
 ) -> Option<RecoveryGuide> {
     let [left, right] = run.stage.ledges;
-    let (midpoint, limits) =
-        perfect::outline_probe(natives::camera_limit_range()?, run.stage.blast())?;
-    let ray = FloorRay::new(p1)?;
-    let outline = super::tech_surfaces::training_outline(&ray, midpoint, limits)?;
+    let read_outline = || {
+        let (midpoint, limits) =
+            perfect::outline_probe(natives::camera_limit_range()?, run.stage.blast())?;
+        let ray = FloorRay::new(p1)?;
+        super::tech_surfaces::training_outline(&ray, midpoint, limits)
+    };
+    let Some(outline) = read_outline() else {
+        planner_unavailable(PlanInput::StageOutline);
+        return None;
+    };
     let player = [natives::pos_x(p1), natives::pos_y(p1)];
     let player_reach = player_top - player[1];
     if !player_reach.is_finite() || player_reach <= 0.0 {
+        planner_unavailable(PlanInput::PlayerHeight);
         return None;
     }
     run.player_reach = player_reach;
-    let body = fighter_height(cpu, pos[1])?;
-    let jumps = remaining_jumps(cpu)?;
+    let Some((body, jumps)) = fighter_height(cpu, pos[1])
+        .and_then(|body| remaining_jumps(cpu).map(|jumps| (body, jumps)))
+    else {
+        planner_unavailable(PlanInput::FighterGeometry);
+        return None;
+    };
     let bottom = run.stage.blast()[3];
     let jump_rise = if jumps == 0 {
         0.0
@@ -982,16 +1010,20 @@ unsafe fn recovery_pad(
         run.guide = None;
         if let Some(player_height) = run.player_height.take() {
             run.plan_pending = false;
-            let route_special = match recovery {
-                Some((_, false)) => Some(None),
-                Some((_, true)) => special.map(Some),
-                None => None,
+            let plan = match (player_height, recovery, special) {
+                (None, _, _) => Err(PlanInput::PlayerHeight),
+                (Some(_), None, _) => Err(PlanInput::Snapshot),
+                (Some(_), Some((_, true)), None) => Err(PlanInput::SpecialEnvelope),
+                (Some(top), Some(_), reach) => Ok((top, reach)),
             };
-            if let Some((top, reach)) = player_height.zip(route_special) {
-                run.guide = route_guide(run, p1, cpu, physics, pos, speed, reach, top);
-                if run.niche.is_some() {
-                    return niche_correction(run, ai, cpu, pos, natives::status_kind(cpu), stock);
+            match plan {
+                Ok((top, reach)) => {
+                    run.guide = route_guide(run, p1, cpu, physics, pos, speed, reach, top);
+                    if run.niche.is_some() {
+                        return niche_correction(run, ai, cpu, pos, natives::status_kind(cpu), stock);
+                    }
                 }
+                Err(input) => planner_unavailable(input),
             }
         }
     }
