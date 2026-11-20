@@ -749,13 +749,14 @@ unsafe fn landing_dodge(run: &mut Run, p1: usize, cpu: usize, buttons: u32) -> C
 unsafe fn air_physics(cpu: usize) -> AirPhysics {
     use crate::model::hash40::hash40;
     let read = |name| natives::get_param_float(cpu, hash40(name), 0);
-    AirPhysics {
-        horizontal_speed: read("air_speed_x_stable"),
-        horizontal_acceleration: read("air_accel_x_add"),
-        gravity: read("air_accel_y"),
-        terminal_speed: read("air_speed_y_stable"),
-        jump_speed: read("jump_aerial_y"),
-    }
+    AirPhysics::from_params(perfect::NativeAir {
+        air_speed_x_stable: read("air_speed_x_stable"),
+        air_accel_x_add: read("air_accel_x_add"),
+        air_accel_x_mul: read("air_accel_x_mul"),
+        air_accel_y: read("air_accel_y"),
+        air_speed_y_stable: read("air_speed_y_stable"),
+        jump_aerial_y: read("jump_aerial_y"),
+    })
 }
 
 unsafe fn remaining_jumps(cpu: usize) -> Option<u8> {

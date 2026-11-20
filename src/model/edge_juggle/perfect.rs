@@ -128,13 +128,17 @@ pub struct NativeAir {
 }
 
 impl AirPhysics {
+    /// `jump_aerial_y` is the double jump's height. Its first frame moves
+    /// `sqrt(2 g h) - g / 2`, then loses `g` a frame (exact trace
+    /// edge-niche-cand-fd-3, six fighters). Full-stick drift gains `add + mul`.
     pub fn from_params(native: NativeAir) -> Self {
+        let gravity = native.air_accel_y;
         Self {
             horizontal_speed: native.air_speed_x_stable,
-            horizontal_acceleration: native.air_accel_x_add,
-            gravity: native.air_accel_y,
+            horizontal_acceleration: native.air_accel_x_add + native.air_accel_x_mul,
+            gravity,
             terminal_speed: native.air_speed_y_stable,
-            jump_speed: native.jump_aerial_y,
+            jump_speed: (2.0 * gravity * native.jump_aerial_y).sqrt() - gravity * 0.5,
         }
     }
 
