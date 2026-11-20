@@ -2113,7 +2113,7 @@ approved_by = "Operator 2026-11-19 confirmed the outside-picture break bug ('bug
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 166920
+ceiling = 166906
 date = "2026-11-20"
-reason = "rc.15 ready-fighters-shortfall v3 (review-menu-astra 03:35Z, 04:44Z): body_bank::cycle_demand (bodies and cold picks by the planner's own placement beside the kept groups), the DemandInput snapshot, its RoleFacts adapter and DemandMemo (recomputed only when the snapshot changes), cycle_members::visit_order over the admitted numbered order (by slot), the Fighters notice's ' · Ready Fighters 8/9: 1 stays cold' suffix and its shown key, and the 160-byte status buffer. Measured 166920 against main's 166635 (70f517c9, measured 166635): +285 (body_bank +132, native_body_bank +68, cycle_preload_policy +37, cycle_members +34, character_roster +7, fixed +5, cycle_preload +2)."
-approved_by = "Operator 2026-11-20 ~01:22Z approved the Ready Fighters fix for this build ('yes add the ready fighters fix to this build'); primary c07b3449 ordered v3 with one entry on 166,635 and the re-measured delta."
+reason = "rc.15 ready-fighters-shortfall v4 (review-menu-astra 03:35Z, 04:44Z, 06:07Z): body_bank::cycle_demand (bodies and cold picks by the planner's own placement beside the kept groups), the DemandInput snapshot, its RoleFacts adapter (a role that does not cycle has no lane) and DemandMemo (recomputed only when the snapshot changes), cycle_members::visit_order over the admitted numbered order (by slot), the Fighters notice's ' · Ready Fighters 8/9: 1 stays cold' suffix and its shown key, and the 160-byte status buffer. Measured 166906 against main's 166635 (70f517c9, measured 166635): +271."
+approved_by = "Operator 2026-11-20 ~01:22Z approved the Ready Fighters fix for this build ('yes add the ready fighters fix to this build'); primary c07b3449 ordered v4 with one entry on 166,635 and the re-measured delta."
