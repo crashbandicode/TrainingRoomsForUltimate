@@ -3,7 +3,7 @@
 
 lib_unit_tests! {
 use super::*;
-use crate::model::spacing::{self, Contact, Grade, Kind, Rings, Taken};
+use crate::model::spacing::{self, Contact, Grade, Rings, Taken};
 use std::collections::BTreeMap;
 
 const ATTACK: i32 = 0x27;
@@ -77,7 +77,7 @@ fn capture_contact(fixture: &ContactFixture) -> Option<Contact> {
 
 fn receive(contact: Contact, epoch: u32) -> (Rings, Taken) {
     let rings = Rings::new();
-    rings.received[usize::from(contact.receiver)].push(epoch, Kind::Fighter, contact);
+    rings.received[usize::from(contact.receiver)].push(epoch, contact);
     let taken = rings.take(epoch);
     (rings, taken)
 }
@@ -340,8 +340,8 @@ fn simultaneous_hits_tag_both_lanes() {
     let p1_hit = capture_contact(&contact_fixture(0, CPU_ID, 1)).unwrap();
     let cpu_hit = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
     let rings = Rings::new();
-    rings.received[0].push(1, Kind::Fighter, p1_hit);
-    rings.received[1].push(1, Kind::Fighter, cpu_hit);
+    rings.received[0].push(1, p1_hit);
+    rings.received[1].push(1, cpu_hit);
     let (p1, cpu) = samples(rings.take(1), true);
     let mut tracker = Tracker::new();
     tracker.step(idle(), idle(), NONE);
@@ -383,7 +383,7 @@ fn each_hit_graded_once() {
 fn same_slot_rehit_after_idle_frames() {
     let first = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
     let rings = Rings::new();
-    rings.received[1].push(1, Kind::Fighter, first);
+    rings.received[1].push(1, first);
     let mut tracker = Tracker::new();
     tracker.step(idle(), idle(), NONE);
     let (p1, cpu) = samples(rings.take(1), false);
@@ -393,7 +393,7 @@ fn same_slot_rehit_after_idle_frames() {
         tracker.step(p1, cpu, NONE);
     }
     let second = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
-    rings.received[1].push(5, Kind::Fighter, second);
+    rings.received[1].push(5, second);
     let (p1, cpu) = samples(rings.take(5), false);
     tracker.step(p1, cpu, NONE);
     assert_eq!(
@@ -417,7 +417,7 @@ fn vanishing_projectile_keeps_grade() {
 fn stale_contact_dropped() {
     let contact = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
     let rings = Rings::new();
-    rings.received[1].push(4, Kind::Fighter, contact);
+    rings.received[1].push(4, contact);
     let mut tracker = Tracker::new();
     tracker.step(idle(), idle(), NONE);
     let (p1, cpu) = samples(rings.take(5), false);
@@ -429,8 +429,8 @@ fn target_grade_coexists_with_fighter_hit() {
     let target = Contact { attacker: P1_ID, receiver: 0, slot: 0, part: 0, pen: 2.0, radius: 4.0 };
     let fighter = Contact { attacker: P1_ID, receiver: 1, slot: 2, part: 1, pen: 1.0, radius: 4.0 };
     let rings = Rings::new();
-    rings.targets.push(1, Kind::Target, target);
-    rings.received[1].push(1, Kind::Fighter, fighter);
+    rings.targets.push(1, target);
+    rings.received[1].push(1, fighter);
     let taken = rings.take(1);
     let (p1, cpu) = samples(taken, false);
     let mut tracker = Tracker::new();

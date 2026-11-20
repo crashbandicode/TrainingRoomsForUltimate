@@ -564,7 +564,7 @@ impl Run {
     /// the ground of a run's first egg), its pills, whether it is in an aerial (`air`) and its kind (the session's best when the
     /// minute ends). The notice's length when its text changed (`write_notice`).
     pub fn step(&mut self, tick: bool, y: f32, hits: &[Hit], air: bool, kind: i32) -> Option<u16> {
-        self.step_with_depth(tick, y, hits, |_| false, |_| None, air, kind).0
+        self.step_with_depth(tick, y, hits, |_| None, air, kind).0
     }
 
     /// `step_with`, returning the deepest melee or article hit when this pass breaks a target.
@@ -573,8 +573,7 @@ impl Run {
         tick: bool,
         y: f32,
         hits: &[Hit],
-        mut other: impl FnMut([f32; 2]) -> bool,
-        mut articles: impl FnMut([f32; 2]) -> Option<f32>,
+        mut breaks: impl FnMut([f32; 2]) -> Option<Option<f32>>,
         air: bool,
         kind: i32,
     ) -> (Option<u16>, Option<f32>) {
@@ -595,11 +594,10 @@ impl Run {
         let mut depth = None;
         if let Some(egg) = self.egg_at() {
             let melee = if self.rows[3] == DISC { deepest(self.rows[1], air, hits, egg) } else { None };
-            let other = melee.is_none() && self.rows[3] == DISC && other(egg);
-            let article = if melee.is_none() && !other && self.rows[3] == DISC { articles(egg) } else { None };
-            if melee.is_some() || other || article.is_some() {
+            let additional = if melee.is_none() && self.rows[3] == DISC { breaks(egg) } else { None };
+            if melee.is_some() || additional.is_some() {
                 (self.score, self.bursts, self.melee) = (self.score + 1, [Some((egg, 0)), self.bursts[0]], melee.is_some());
-                depth = melee.or(article);
+                depth = melee.or_else(|| additional.flatten());
                 self.spawn(Some(egg));
             }
             // The flight holds while the CPU target is in a hit (its hitlag, then the placement): an uncounted hit puts it back

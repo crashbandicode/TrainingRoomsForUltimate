@@ -581,14 +581,9 @@ pub mod cb {
 }
 
 /// The frame strip's pane indices and geometry (canvas units, the container's centre is the origin).
-#[path = "../spacing_constants.rs"]
-mod spacing_constants;
-pub use self::spacing_constants::TAGS;
-
 pub mod iv {
-    use super::TAGS;
-
     /// Frames on screen, links in the LAST row, lane runs and run lengths per lane, chips.
+    pub const TAGS: usize = 8;
     pub const WINDOW: usize = 60;
     pub const HISTORY: usize = 4;
     pub const RUNS: usize = 16;

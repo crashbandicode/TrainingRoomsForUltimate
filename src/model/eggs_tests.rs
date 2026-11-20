@@ -465,15 +465,15 @@ fn eggs_articles_break() {
     let mut run = started(FREE, ANY, 7);
     pass(&mut run, &[], false);
     let egg = run.egg_at().unwrap();
-    run.step_with(false, 0.0, &[], |at| at == egg, false, 0);
+    run.step_with_depth(false, 0.0, &[], |at| (at == egg).then_some(Some(0.0)), false, 0);
     assert_eq!((run.score, run.melee()), (1, false), "an article's break");
     let egg = run.egg_at().unwrap();
-    run.step_with(false, 0.0, &[hit(egg, 0.0)], |_| panic!("the fighter's hit decides first"), false, 0);
+    run.step_with_depth(false, 0.0, &[hit(egg, 0.0)], |_| panic!("the fighter's hit decides first"), false, 0);
     assert_eq!((run.score, run.melee()), (2, true), "the fighter's own break");
     let mut cpu = Run::IDLE;
     cpu.plan([FREE, ANY, NORMAL, CPU, IN_VIEW], Some(7), 0, || TRAINING);
     settle(&mut cpu, RESET_CENTRE);
-    cpu.step_with(false, 0.0, &[], |_| panic!("the CPU target counts its own damage"), false, 0);
+    cpu.step_with_depth(false, 0.0, &[], |_| panic!("the CPU target counts its own damage"), false, 0);
 }
 
 /// The operator, 11-14 ("a, move the notice to the top"): a practice game's notice sits in a top band, so a target may
@@ -1324,7 +1324,7 @@ fn outside_disc_miss_has_no_grade() {
 
 fn helper_only_break_has_no_grade() {
     let mut run = started(TIMED, ANY, 7);
-    let (event, depth) = run.step_with_depth(true, 0.0, &[], |_| true, |_| panic!("no article after helper break"), false, 0);
+    let (event, depth) = run.step_with_depth(true, 0.0, &[], |_| Some(None), false, 0);
     assert!(event.is_some());
     assert_eq!(depth, None);
 }

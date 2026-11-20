@@ -225,8 +225,13 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
         tick,
         top[1],
         hits,
-        |_| super::lockon::hit(at, 0, lockon_key(score), rule, aerial, true).is_some(),
-        |egg| super::btt_projectiles::hit(at, egg, rule, aerial, true),
+        |egg| {
+            if super::lockon::hit(at, 0, lockon_key(score), rule, aerial, true).is_some() {
+                Some(None)
+            } else {
+                super::btt_projectiles::hit(at, egg, rule, aerial, true).map(Some)
+            }
+        },
         aerial,
         kind,
     );
@@ -736,7 +741,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             write_pill(pill, &mut used, &mut over, &cache.panes);
         }
         if super::input_display::grader_live() {
-            for (at, look) in own.iter().flatten().filter(|(_, look)| look.picture == crate::model::ui::panes::EggPicture::Whole) {
+            for (at, _) in own.iter().flatten().filter(|(_, look)| look.picture == p::EggPicture::Whole) {
                 let centre = [at[0], at[1], 0.0];
                 for (centre, radius, color) in crate::model::spacing::zone_discs(centre) {
                     let mut zone = Orb::NONE;

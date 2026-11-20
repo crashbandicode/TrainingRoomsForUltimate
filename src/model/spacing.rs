@@ -158,6 +158,12 @@ impl<const N: usize> Ring<N> {
     }
 }
 
+impl<const N: usize> Default for Ring<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct Rings {
     pub received: [Ring<8>; 2],
     pub targets: Ring<8>,
@@ -176,6 +182,12 @@ impl Rings {
             received: [first(&self.received[0], epoch), first(&self.received[1], epoch)],
             target: first(&self.targets, epoch),
         }
+    }
+}
+
+impl Default for Rings {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

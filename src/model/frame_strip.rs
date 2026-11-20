@@ -10,6 +10,7 @@ use super::spacing::Grade;
 /// Frames on screen and links kept for the LAST row (the pane table's numbers).
 pub const WINDOW: usize = super::panes::iv::WINDOW;
 pub const HISTORY: usize = super::panes::iv::HISTORY;
+pub const TAGS: usize = super::panes::iv::TAGS;
 /// Presses kept (chips and the input look-back).
 pub const PRESSES: usize = 16;
 /// Both fighters actionable and no new press for this many frames: the strip stops scrolling.
@@ -352,11 +353,6 @@ pub struct Mark {
     pub lane: u8,
     pub spot: Spot,
 }
-
-/// Recent hit grades retained for the strip.
-#[path = "spacing_constants.rs"]
-mod spacing_constants;
-pub use self::spacing_constants::TAGS;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Tag {
