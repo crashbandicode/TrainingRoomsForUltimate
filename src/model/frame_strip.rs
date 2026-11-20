@@ -115,6 +115,7 @@ pub struct Sample {
     pub reaction: Option<f32>,
     /// Holding or raising a shield (`GUARD_ON ..= GUARD_DAMAGE`).
     pub shielding: bool,
+    /// This lane was struck this frame with this grade.
     pub contact: Option<Grade>,
     pub player: bool,
     /// The fighter's damage (percent) and the launch numbers of each attack slot that is active, for the spot of a hit (rc.14, SP1).
@@ -606,6 +607,16 @@ impl Tracker {
     pub fn step(&mut self, p1: Sample, cpu: Sample, inputs: MappedInputs) {
         self.frame = self.frame.wrapping_add(1);
         let frame = self.frame;
+        if !on_shield(&cpu) {
+            if let Some(grade) = cpu.contact {
+                self.push_tag(0, grade);
+            }
+        }
+        if cpu.player && !on_shield(&p1) {
+            if let Some(grade) = p1.contact {
+                self.push_tag(1, grade);
+            }
+        }
         self.snaps[self.snap_head] = Snap {
             frame,
             buttons: inputs.buttons,

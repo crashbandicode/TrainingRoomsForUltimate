@@ -115,7 +115,7 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "input_display::p1_fighter", owner: Some(Feature::CpuCore), gate: Gate::Flag("KIND_ON") },
     Boundary { function: "input_display::lane_player", owner: Some(Feature::CpuCore), gate: Gate::Flag("KIND_ON") },
     // The native hurt-shape read is optional; boot sets its flag only when every grader row passed.
-    Boundary { function: "input_display::contact", owner: Some(Feature::InputDisplay), gate: Gate::Flag("GRADE_ON") },
+    Boundary { function: "input_display::spacing_hit", owner: Some(Feature::InputDisplay), gate: Gate::Flag("GRADER_LIVE") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.
     Boundary { function: "recorder::request_playback", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
     Boundary { function: "recorder::on_state_restored", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
@@ -169,6 +169,7 @@ fn unit_of_hook(f: &Func) -> Option<Feature> {
     }
     match f.module.as_str() {
         "input_delay" => Some(Feature::InputDelay),
+        "input_display" => Some(Feature::InputDisplay),
         "hitbox" => Some(Feature::Hitbox),
         "lra_reset" => Some(Feature::LraReset),
         "stage_hazards" => Some(Feature::StageHazards),

@@ -304,12 +304,12 @@ pub unsafe fn frame(fighter: usize) -> Option<()> {
     let broke = pass(at, top, |slot, spot| {
         if let Some(depth) = eggs::deepest(rule, aerial, &hits[..n], spot) {
             melee = true;
-            super::input_display::target_grade(crate::model::spacing::Grade::of(depth));
+            super::input_display::target_grade(depth);
             true
         } else if super::lockon::hit(at, slot + 1, lockon_key(spot), rule, aerial, projectiles()).is_some() {
             true
         } else if let Some(depth) = super::btt_projectiles::hit(at, spot, rule, aerial, projectiles()) {
-            super::input_display::target_grade(crate::model::spacing::Grade::of(depth));
+            super::input_display::target_grade(depth);
             true
         } else {
             false

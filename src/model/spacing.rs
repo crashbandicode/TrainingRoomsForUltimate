@@ -100,12 +100,63 @@ impl<const N: usize> Ring<N> {
         }
     }
 
-    pub fn push(&self, _epoch: u32, _kind: Kind, _contact: Contact) {
-        let _ = self.write.fetch_add(1, Ordering::Relaxed);
+    pub fn push(&self, epoch: u32, kind: Kind, contact: Contact) {
+        let ticket = self.write.fetch_add(1, Ordering::Relaxed);
+        let slot = &self.slots[ticket as usize % N];
+        slot.sequence.store(ticket.wrapping_mul(2).wrapping_add(1), Ordering::Relaxed);
+        slot._words[0].store((u64::from(epoch) << 32) | u64::from(contact.attacker), Ordering::Relaxed);
+        let kind = match kind {
+            Kind::Fighter => 0,
+            Kind::Target => 1,
+        };
+        let fields = (kind << 56)
+            | (u64::from(contact.receiver) << 48)
+            | (u64::from(contact.slot) << 40)
+            | (u64::from(contact.part) << 32)
+            | u64::from(contact.pen.to_bits());
+        slot._words[1].store(fields, Ordering::Relaxed);
+        slot._words[2].store(u64::from(contact.radius.to_bits()), Ordering::Relaxed);
+        slot.sequence.store(ticket.wrapping_mul(2).wrapping_add(2), Ordering::Release);
     }
 
-    pub fn drain(&self, _f: impl FnMut(u32, Kind, Contact)) {
-        self.read.store(self.write.load(Ordering::Relaxed), Ordering::Relaxed);
+    pub fn drain(&self, mut f: impl FnMut(u32, Kind, Contact)) {
+        let end = self.write.load(Ordering::Acquire);
+        let mut next = self.read.load(Ordering::Relaxed);
+        if end.wrapping_sub(next) > N as u64 {
+            next = end.wrapping_sub(N as u64);
+        }
+        while next != end {
+            let slot = &self.slots[next as usize % N];
+            let sequence = next.wrapping_mul(2).wrapping_add(2);
+            if slot.sequence.load(Ordering::Acquire) == sequence {
+                let first = slot._words[0].load(Ordering::Relaxed);
+                let second = slot._words[1].load(Ordering::Relaxed);
+                let third = slot._words[2].load(Ordering::Relaxed);
+                if slot.sequence.load(Ordering::Acquire) == sequence {
+                    let kind = match second >> 56 {
+                        0 => Some(Kind::Fighter),
+                        1 => Some(Kind::Target),
+                        _ => None,
+                    };
+                    if let Some(kind) = kind {
+                        f(
+                            (first >> 32) as u32,
+                            kind,
+                            Contact {
+                                attacker: first as u32,
+                                receiver: (second >> 48) as u8,
+                                slot: (second >> 40) as u8,
+                                part: (second >> 32) as u8,
+                                pen: f32::from_bits(second as u32),
+                                radius: f32::from_bits(third as u32),
+                            },
+                        );
+                    }
+                }
+            }
+            next = next.wrapping_add(1);
+        }
+        self.read.store(end, Ordering::Relaxed);
     }
 
     #[cfg(test)]
@@ -128,8 +179,21 @@ impl Rings {
         }
     }
 
-    pub fn take(&self, _epoch: u32) -> Taken {
-        Taken { received: [None; 2], target: None }
+    pub fn take(&self, epoch: u32) -> Taken {
+        let mut taken = Taken { received: [None; 2], target: None };
+        for (lane, ring) in self.received.iter().enumerate() {
+            ring.drain(|found_epoch, kind, contact| {
+                if found_epoch == epoch && kind == Kind::Fighter && taken.received[lane].is_none() {
+                    taken.received[lane] = contact.grade();
+                }
+            });
+        }
+        self.targets.drain(|found_epoch, kind, contact| {
+            if found_epoch == epoch && kind == Kind::Target && taken.target.is_none() {
+                taken.target = contact.grade();
+            }
+        });
+        taken
     }
 }
 
@@ -139,13 +203,76 @@ pub struct Taken {
     pub target: Option<Grade>,
 }
 
-pub fn capture(
-    _read: impl Fn(usize) -> Option<u64>,
-    _module: usize,
-    _entry: usize,
-    _lanes: [usize; 2],
-) -> Option<Contact> {
-    None
+fn valid_pointer(pointer: usize) -> bool {
+    pointer >= 0x1000 && pointer & 7 == 0 && pointer >> 47 == 0
+}
+
+fn read_pointer(read: &impl Fn(usize) -> Option<u64>, at: usize) -> Option<usize> {
+    let pointer = usize::try_from(read(at)?).ok()?;
+    valid_pointer(pointer).then_some(pointer)
+}
+
+fn read_u32(read: &impl Fn(usize) -> Option<u64>, at: usize) -> Option<u32> {
+    Some((read(at & !7)? >> ((at & 7) * 8)) as u32)
+}
+
+fn read_u8(read: &impl Fn(usize) -> Option<u64>, at: usize) -> Option<u8> {
+    Some((read(at & !7)? >> ((at & 7) * 8)) as u8)
+}
+
+fn read_f32(read: &impl Fn(usize) -> Option<u64>, at: usize) -> Option<f32> {
+    read_u32(read, at).map(f32::from_bits)
+}
+
+fn read_vec3(read: &impl Fn(usize) -> Option<u64>, at: usize) -> Option<[f32; 3]> {
+    Some([read_f32(read, at)?, read_f32(read, at.checked_add(4)?)?, read_f32(read, at.checked_add(8)?)?])
+}
+
+pub fn capture(read: impl Fn(usize) -> Option<u64>, module: usize, entry: usize, lanes: [usize; 2]) -> Option<Contact> {
+    use crate::model::hitbox::layout;
+    use crate::model::sites_hitbox::{damage_record, hurt_shape};
+
+    if !valid_pointer(module) || !valid_pointer(entry) {
+        return None;
+    }
+    let receiver = lanes.iter().enumerate().find_map(|(lane, &accessor)| {
+        if !valid_pointer(accessor) {
+            return None;
+        }
+        let at = accessor.checked_add(damage_record::MODULE)?;
+        (read_pointer(&read, at)? == module).then_some(lane as u8)
+    })?;
+
+    if read_u32(&read, entry.checked_add(0x20)?)? != 1 {
+        return None;
+    }
+    let attacker = read_u32(&read, entry.checked_add(0x24)?)?;
+    let slot = read_u8(&read, entry.checked_add(0x32)?)?;
+    let part = read_u8(&read, entry.checked_add(0x33)?)?;
+    let contact = read_vec3(&read, entry.checked_add(0x10)?)?;
+
+    let hit_module = read_pointer(&read, lanes[receiver as usize].checked_add(layout::HIT_MODULE)?)?;
+    let total = read_u32(&read, hit_module.checked_add(layout::HIT_PART_TOTAL)?)? as i32;
+    if i32::from(part) >= total {
+        return None;
+    }
+    let parts = read_pointer(&read, hit_module.checked_add(layout::HIT_PARTS)?)?;
+    let part_base = parts.checked_add(usize::from(part).checked_mul(layout::HIT_PART_STRIDE)?)?;
+    let shape = read_pointer(&read, part_base.checked_add(hurt_shape::SHAPE)?)?;
+    let shape_contact = read_vec3(&read, shape.checked_add(hurt_shape::CONTACT)?)?;
+    if !contact.iter().zip(shape_contact).all(|(entry, shape)| entry.to_bits() == shape.to_bits()) {
+        return None;
+    }
+    let contact = Contact {
+        attacker,
+        receiver,
+        slot,
+        part,
+        pen: read_f32(&read, shape.checked_add(hurt_shape::PEN)?)?,
+        radius: read_f32(&read, shape.checked_add(hurt_shape::RADIUS)?)?,
+    };
+    contact.grade()?;
+    Some(contact)
 }
 
 pub fn hook(
@@ -158,70 +285,12 @@ pub fn hook(
     live.then(|| capture(read, module, entry, lanes)).flatten()
 }
 
-pub fn zone_discs(_centre: [f32; 3]) -> [([f32; 3], f32, [u8; 4]); 3] {
-    [([0.0; 3], 0.0, [0; 4]); 3]
-}
-
-pub fn native(record_p: [f32; 3], shape_p: [f32; 3], pen: f32, radius: f32) -> Option<Grade> {
-    let same_contact = record_p
-        .iter()
-        .zip(shape_p.iter())
-        .all(|(record, shape)| record.to_bits() == shape.to_bits());
-    if same_contact {
-        grade(pen, radius)
-    } else {
-        None
-    }
-}
-
-pub fn read_contact(read: impl Fn(usize) -> Option<u64>, accessor: usize) -> Option<Grade> {
-    use crate::model::hitbox::layout;
-    use crate::model::sites_hitbox::{damage_record as record_layout, hurt_shape as shape_layout};
-
-    fn pointer(read: &impl Fn(usize) -> Option<u64>, at: usize) -> Option<usize> {
-        let pointer = usize::try_from(read(at)?).ok()?;
-        (pointer >= 0x1000 && pointer & 7 == 0 && pointer >> 47 == 0).then_some(pointer)
-    }
-
-    fn field_u32(read: &impl Fn(usize) -> Option<u64>, at: usize) -> Option<u32> {
-        let word = read(at & !7)?;
-        Some((word >> ((at & 7) * 8)) as u32)
-    }
-
-    fn field_f32(read: &impl Fn(usize) -> Option<u64>, base: usize, offset: usize) -> Option<f32> {
-        let at = base.checked_add(offset)?;
-        field_u32(read, at).map(f32::from_bits)
-    }
-
-    let record_module = pointer(&read, accessor.checked_add(record_layout::MODULE)?)?;
-    let record = pointer(&read, record_module.checked_add(record_layout::RECORDS)?)?;
-    let part_at = record.checked_add(record_layout::PART)?;
-    let part = (field_u32(&read, part_at)? & 0xff) as usize;
-
-    let hit_module = pointer(&read, accessor.checked_add(layout::HIT_MODULE)?)?;
-    let total_at = hit_module.checked_add(layout::HIT_PART_TOTAL)?;
-    let total = usize::try_from(field_u32(&read, total_at)? as i32).ok()?;
-    if part >= total {
-        return None;
-    }
-
-    let parts = pointer(&read, hit_module.checked_add(layout::HIT_PARTS)?)?;
-    let part_base = parts.checked_add(part.checked_mul(layout::HIT_PART_STRIDE)?)?;
-    let shape = pointer(&read, part_base.checked_add(shape_layout::SHAPE)?)?;
-
-    let record_contact = [
-        field_f32(&read, record, record_layout::CONTACT)?,
-        field_f32(&read, record, record_layout::CONTACT + 4)?,
-        field_f32(&read, record, record_layout::CONTACT + 8)?,
-    ];
-    let shape_contact = [
-        field_f32(&read, shape, shape_layout::CONTACT)?,
-        field_f32(&read, shape, shape_layout::CONTACT + 4)?,
-        field_f32(&read, shape, shape_layout::CONTACT + 8)?,
-    ];
-    let pen = field_f32(&read, shape, shape_layout::PEN)?;
-    let radius = field_f32(&read, shape, shape_layout::RADIUS)?;
-    native(record_contact, shape_contact, pen, radius)
+pub fn zone_discs(centre: [f32; 3]) -> [([f32; 3], f32, [u8; 4]); 3] {
+    [
+        (centre, 4.0, [72, 208, 118, 96]),
+        (centre, 8.0 / 3.0, [244, 186, 64, 96]),
+        (centre, 4.0 / 3.0, [232, 232, 236, 96]),
+    ]
 }
 
 #[cfg(test)]

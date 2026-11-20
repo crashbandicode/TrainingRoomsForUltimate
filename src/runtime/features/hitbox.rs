@@ -231,7 +231,7 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
         kind,
     );
     if let Some(depth) = depth {
-        super::input_display::target_grade(crate::model::spacing::Grade::of(depth));
+        super::input_display::target_grade(depth);
     }
     // V2.1: the fighter whose attack broke it (Ice Climbers: that climber) freezes, as on a hit; an article's break does not.
     let broke = run.score > score && run.melee();
@@ -730,6 +730,29 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             }
             if let Some(band) = band {
                 write_pane(cache.panes[p::CAPS + band], pill.band, [pill.length, pill.size], pill.rot, pill.color);
+            }
+        }
+        if super::input_display::grader_live() {
+            for (at, _) in own.iter().flatten() {
+                let centre = [at[0], at[1], 0.0];
+                for (centre, radius, color) in crate::model::spacing::zone_discs(centre) {
+                    let mut zone = Orb::NONE;
+                    zone.centre = centre;
+                    zone.tail = centre;
+                    zone.radius = radius;
+                    zone.color = color;
+                    let Some(pill) = plan(&zone, color) else { continue };
+                    let Some((cap, band)) = used.take(pill.length > 0.0) else {
+                        over += 1;
+                        continue;
+                    };
+                    for (k, at) in pill.caps.into_iter().enumerate() {
+                        write_pane(cache.panes[cap + k], at, [pill.size / 2.0, pill.size], pill.rot + 180.0 * k as f32, pill.color);
+                    }
+                    if let Some(band) = band {
+                        write_pane(cache.panes[p::CAPS + band], pill.band, [pill.length, pill.size], pill.rot, pill.color);
+                    }
+                }
             }
         }
     }
@@ -1316,7 +1339,7 @@ pub fn install(found: &[GuardOutcome; N], closure: bool) -> (bool, [Written; N])
         skyline::install_hook!(hitbox_area_wind_rad_hook);
         skyline::install_hook!(hitbox_area_wind_rad_arg9_hook);
         for (slot, site) in written.iter_mut().zip(&sites_hitbox::SITES) {
-            if sites_hitbox::HOOK_ROWS.contains(&site.name) {
+            if sites_hitbox::HITBOX_HOOK_ROWS.contains(&site.name) {
                 *slot = Written::Far;
             }
         }

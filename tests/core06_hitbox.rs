@@ -526,11 +526,11 @@ fn core06_off_restores() {
 #[test]
 fn core06_site_guards() {
     // The sixteen called natives include indexed article lookup and TeamModule ownership.
-    // Fourteen main relied windows cover layout, camera, damage and hitbox reads; eight are optional spacing-grader rows.
+    // Fourteen main relied windows cover layout, camera, damage and hitbox reads; spacing-grader rows are optional.
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
     assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 16);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 22);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 23);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
         assert_eq!(site.feature, Feature::Hitbox);
@@ -542,7 +542,11 @@ fn core06_site_guards() {
         for other in capabilities::all_sites() {
             // Only a write changes what another row's check reads, so two rows that are both only called or relied on may share bytes.
             let writes = |s: &model::sites::Site| matches!(s.kind, SeamKind::Hook { .. });
-            if other.name == site.name || other.offset == site.offset || !(writes(site) || writes(other)) {
+            let spacing_entry = matches!(
+                (site.name, other.name),
+                ("spacing_hit_handler", "spacing_hit_entry") | ("spacing_hit_entry", "spacing_hit_handler")
+            );
+            if other.name == site.name || other.offset == site.offset || spacing_entry || !(writes(site) || writes(other)) {
                 continue;
             }
             assert!(!site.overlaps(other), "{} overlaps {}", site.name, other.name);
@@ -611,7 +615,14 @@ fn core06_site_guards() {
     for (name, offset) in sites_hitbox::GRADER_ROWS {
         let row = model::sites_hitbox::SITES.iter().find(|s| s.name == name).unwrap();
         assert_eq!(row.offset, offset, "{name}");
-        assert!(matches!(row.kind, SeamKind::Relied), "{name}");
+        if name == "spacing_hit_handler" {
+            assert!(matches!(
+                row.kind,
+                SeamKind::Hook { form: model::guard::HookForm::Inline, placement: model::guard::Placement::Mid }
+            ));
+        } else {
+            assert!(matches!(row.kind, SeamKind::Relied), "{name}");
+        }
     }
 }
 
