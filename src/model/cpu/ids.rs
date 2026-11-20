@@ -126,6 +126,7 @@ game_constants! {
     StatusPassiveCeil = "FIGHTER_STATUS_KIND_PASSIVE_CEIL",
     StatusCliffRobbed = "FIGHTER_STATUS_KIND_CLIFF_ROBBED",
     StatusLanding = "FIGHTER_STATUS_KIND_LANDING",
+    StatusLandingAttackAir = "FIGHTER_STATUS_KIND_LANDING_ATTACK_AIR",
     StatusLandingDamageLight = "FIGHTER_STATUS_KIND_LANDING_DAMAGE_LIGHT",
     // Ledge (SPEC-cpu-03).
     StatusCliffCatch = "FIGHTER_STATUS_KIND_CLIFF_CATCH",

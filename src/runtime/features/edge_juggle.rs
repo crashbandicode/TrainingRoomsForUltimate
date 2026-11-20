@@ -570,6 +570,13 @@ unsafe fn route_guide(
     }
 }
 
+unsafe fn player_in_lag(accessor: usize) -> bool {
+    let status = natives::status_kind(accessor);
+    status != UNRESOLVED
+        && [C::StatusLandingAttackAir, C::StatusLandingDamageLight].map(konst).contains(&status)
+        && !natives::is_enable_cancel(accessor)
+}
+
 unsafe fn recovery_pad(
     run: &mut Run,
     p1: usize,
@@ -591,13 +598,17 @@ unsafe fn recovery_pad(
         run.plan_pending = false;
         run.guide = route_guide(run, p1, cpu, physics, pos, speed);
     }
+    let attack = buttons & perfect::ATTACK != 0;
+    let can_punish = attack && player_in_lag(p1);
     if let Some(guide) = run.guide {
         match guide {
             RecoveryGuide::High { goal }
                 if physics.reaches_with_jump(pos, speed, goal, 90, run.stage.blast()[3]) =>
             {
+                let dir = (goal[0] - pos[0]).signum();
                 return Correction {
-                    stick: Some([(goal[0] - pos[0]).signum(), 0.0]),
+                    stick: Some([dir, 0.0]),
+                    release: perfect::avoid_detour(buttons, true, can_punish, dir).release,
                     ..Correction::default()
                 };
             }
@@ -605,7 +616,7 @@ unsafe fn recovery_pad(
                 if (exit[0] - pos[0]) * dir > 0.0
                     && physics.crossing(pos, speed, exit, band, u8::from(can_jump)) =>
             {
-                let release = buttons & perfect::JUMP;
+                let release = (buttons & perfect::JUMP) | perfect::avoid_detour(buttons, true, can_punish, dir).release;
                 return Correction {
                     stick: Some([dir, 0.0]),
                     release,
@@ -635,6 +646,14 @@ unsafe fn recovery_pad(
         run.jump_timing = JumpTiming::default();
         return Correction::default();
     };
+    if attack && !can_punish {
+        let delay = if can_jump { 0 } else { 90 };
+        let reachable = physics.reaches_with_jump(pos, speed, ledge, delay, run.stage.blast()[3]);
+        let correction = perfect::avoid_detour(buttons, reachable, false, (ledge[0] - pos[0]).signum());
+        if correction != Correction::default() {
+            return correction;
+        }
+    }
     let mut correction = run
         .jump_timing
         .step(buttons, can_jump, run.jump_delay, |delay| {

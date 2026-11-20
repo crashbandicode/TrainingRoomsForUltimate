@@ -397,6 +397,19 @@ pub struct Correction {
     pub release: u32,
 }
 
+pub const ATTACK: u32 = 0x1;
+
+pub fn avoid_detour(buttons: u32, can_recover: bool, player_in_lag: bool, direction: f32) -> Correction {
+    if !can_recover || player_in_lag || buttons & ATTACK == 0 || !direction.is_finite() {
+        return Correction::default();
+    }
+    Correction {
+        stick: Some([direction, 0.0]),
+        release: ATTACK,
+        ..Correction::default()
+    }
+}
+
 pub const JUMP: u32 = 0x4;
 
 /// A stock jump held in reserve until its remaining delay fits the recovery budget.
