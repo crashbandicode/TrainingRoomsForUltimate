@@ -64,7 +64,7 @@ pub fn project_tech_state(session: &Session, view: View<'_>) -> Fields {
                 Step::Preview => {
                     let status = match blocked {
                         Some(false) => "clear",
-                        Some(true) => "blocked",
+                        Some(true) => "obstructed",
                         None => "unchecked",
                     };
                     fields.wizard_player_point = wizard.start_marker().map(|p| [p.x, p.y]);
@@ -171,6 +171,7 @@ mod tests {
         let view = fields(&wizard);
         assert_eq!((view.wizard_selection, view.wizard_value), ("damage", Some(13)));
         assert_eq!(wizard.action(Action::Next), Outcome::None);
+        assert_eq!(project_tech_state(&session, View::Wizard(&wizard, Some(true))).wizard_selection, "obstructed");
         let preview = project_tech_state(&session, View::Wizard(&wizard, Some(false)));
         assert_eq!(
             (preview.wizard_step, preview.wizard_selection, preview.wizard_player_point),
