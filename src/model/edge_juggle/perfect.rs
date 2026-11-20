@@ -142,8 +142,13 @@ pub enum PlanInput {
 
 impl AirPhysics {
     pub fn plan_velocity(self, velocity: Option<(f32, f32)>) -> Result<Point, PlanInput> {
-        let (x, y) = velocity.filter(|_| self.valid()).ok_or(PlanInput::AirPhysics)?;
-        Ok([x, y])
+        if !self.valid() {
+            return Err(PlanInput::AirPhysics);
+        }
+        velocity
+            .map(|(x, y)| [x, y])
+            .filter(|v| v.iter().all(|component| component.is_finite()))
+            .ok_or(PlanInput::Velocity)
     }
 
     /// `jump_aerial_y` is the double jump's height. Its first frame moves
@@ -305,6 +310,7 @@ pub struct Plan {
 pub struct PlanHeight {
     frame: Option<u32>,
     value: Option<Option<f32>>,
+    reported_unavailable: bool,
 }
 
 impl PlanHeight {
@@ -313,6 +319,7 @@ impl PlanHeight {
             return false;
         }
         self.frame = Some(frame);
+        self.reported_unavailable = false;
         // The request counts even when the native sample is unavailable.
         self.value = Some(None);
         true
@@ -322,6 +329,11 @@ impl PlanHeight {
         if self.frame == Some(frame) && self.value.is_some() {
             self.value = Some(height);
         }
+    }
+
+    // Keep the sample for a retry when kinetic data becomes readable.
+    pub fn report_unavailable(&mut self) -> bool {
+        self.value.is_some() && !std::mem::replace(&mut self.reported_unavailable, true)
     }
 
     pub fn take(&mut self) -> Option<Option<f32>> {
@@ -909,12 +921,16 @@ mod tests {
         for frame in 10..20 {
             assert!(!height.request(frame, false), "damage or helpless frames need no sample");
         }
+        assert!(!height.report_unavailable(), "a plan without a sample has no rejection");
         assert!(height.request(20, true));
         height.record(20, Some(14.6));
+        assert!(height.report_unavailable());
+        assert!(!height.report_unavailable(), "one rejection is sufficient while a plan waits");
         assert!(!height.request(21, true), "keep the first sample until it is consumed");
         assert_eq!(height.take(), Some(Some(14.6)));
         assert!(!height.request(20, true), "no second read on one frame");
         assert!(height.request(21, true));
+        assert!(height.report_unavailable(), "a new plan has its own witness");
         assert_eq!(height.take(), Some(None), "failed or unavailable sample still counts");
         height.record(21, Some(14.6));
         assert_eq!(height.take(), None, "an in-flight sample cannot revive a consumed plan");

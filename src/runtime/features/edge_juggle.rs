@@ -16,8 +16,8 @@ use crate::model::edge_juggle::perfect::recovery::{
 };
 use crate::model::edge_juggle::perfect::rule_counts::{Counters, PerfectRule};
 use crate::model::edge_juggle::perfect::{
-    self, AirPhysics, Correction, LandingFacts, LandingOptions, MeteorBounce, MeteorWindow, PlanHeight, Route,
-    RouteFacts, ThreatClock,
+    self, AirPhysics, Correction, LandingFacts, LandingOptions, MeteorBounce, MeteorWindow,
+    PlanHeight, PlanInput, Route, RouteFacts, ThreatClock,
 };
 use crate::model::edge_juggle::{
     Difficulty, Drill, Observation, Outcome, Phase, Reaction, Session, Setup, Stage, Wizard,
@@ -376,15 +376,6 @@ pub extern "C" fn planner_chose(route: u32, fighter: u32, crossable: u32, row: u
 }
 
 /// A single rejected plan sample; the adjacent stock AI trace identifies the fighter.
-#[repr(u32)]
-pub enum PlanInput {
-    PlayerHeight = 1,
-    Snapshot = 2,
-    SpecialEnvelope = 3,
-    StageOutline = 4,
-    FighterGeometry = 5,
-}
-
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn planner_unavailable(input: PlanInput) {
@@ -1075,11 +1066,16 @@ unsafe fn recovery_pad(
     let jump = konst(C::TermContJumpAerial);
     let jump_transition = jump != UNRESOLVED && natives::is_enable_transition_term(cpu, jump);
     let physics = air_physics(cpu);
-    let Some((vx, vy)) = super::recording_host::fighter_speed(cpu).filter(|_| physics.valid())
-    else {
-        return Correction::default();
+    let speed = match physics.plan_velocity(super::recording_host::fighter_speed(cpu)) {
+        Ok(speed) => speed,
+        Err(input) => {
+            if run.plan_pending && run.player_height.report_unavailable() {
+                planner_unavailable(input);
+            }
+            return Correction::default();
+        }
     };
-    let speed = [vx, vy];
+    let [vx, vy] = speed;
     let jumps = remaining_jumps(cpu);
     let can_jump = recovery::recovery_jump_available(jumps, jump_transition);
     let recovery = recovery_snapshot(ai);
