@@ -372,14 +372,14 @@ pub fn hook(
 pub fn zone_discs(target: &crate::model::hitbox_orbs::Orb) -> [crate::model::hitbox_orbs::Orb; 2] {
     let mut good = *target;
     good.radius = 8.0 / 3.0;
-    good.color = [244, 186, 64, 96];
+    good.color = crate::model::panes::linear([244, 186, 64, 255]);
     let mut ok = *target;
     ok.radius = 4.0 / 3.0;
-    ok.color = [232, 232, 236, 96];
+    ok.color = crate::model::panes::linear([232, 232, 236, 255]);
     [good, ok]
 }
 
-pub const PICTURE_ALPHA: u8 = 110;
+pub const PICTURE_ALPHA: u8 = 64;
 
 /// The target pictures' panes sit above the orb panes, so while grading a whole target is drawn see-through to show its zone
 /// discs; break animations and other looks are unchanged.

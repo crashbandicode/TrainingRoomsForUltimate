@@ -272,13 +272,14 @@ fn target_zone_rings_radii() {
         assert!((actual - expected).abs() < 1e-6);
     }
     assert_eq!(discs.map(|d| d.color), [
-        [244, 186, 64, 96],
-        [232, 232, 236, 96],
+        crate::model::panes::linear([244, 186, 64, 255]),
+        crate::model::panes::linear([232, 232, 236, 255]),
     ]);
     assert_eq!(discs.map(|d| d.key), [target.key; 2]);
 }
 
 fn picture_fades_while_grading() {
+    assert_eq!(PICTURE_ALPHA, 64);
     assert_eq!(picture_look(EGG_WHOLE, true), EggLook { alpha: PICTURE_ALPHA, ..EGG_WHOLE });
     assert_eq!(picture_look(EGG_WHOLE, false), EGG_WHOLE);
 

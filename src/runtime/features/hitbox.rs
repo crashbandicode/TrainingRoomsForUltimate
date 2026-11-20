@@ -708,7 +708,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         looks = own.map(|look| {
             let ([x, y], look) = look?;
             [dot.centre, dot.tail] = [[x, y, 0.0]; 2];
-            Some((plan(&dot, [255; 4])?, crate::model::spacing::picture_look(look, grader && !tech)))
+            Some((plan(&dot, [255; 4])?, crate::model::spacing::picture_look(look, grader && !tech && !edge_wizard)))
         });
         let hide = super::hide_cpu::draw_hide();
         let board = if on { BOARD.try_lock() } else { None };
