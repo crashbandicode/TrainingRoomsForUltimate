@@ -240,6 +240,8 @@ pub struct DecisionSnapshot {
     pub reaction: Option<f32>,
     pub damage_fall: Option<bool>,
     pub stick_x: Option<f32>,
+    /// Guarded native contact speed, with the surface and transition otherwise eligible.
+    pub passive_speed: Option<f32>,
     pub press_frame_offset: Option<u16>,
 }
 

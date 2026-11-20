@@ -2061,3 +2061,11 @@ ceiling = 165331
 date = "2026-11-19"
 reason = "Hidden CPU visualizer v2 (15eac65a) measured 165330 on 4f25a854, up 202 from 165128. Add the measured delta to the existing 165129 ceiling."
 approved_by = "Primary c07b3449 directed the lock-free hidden CPU visualizer revision and a separate exact size adjustment on 2026-11-19."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 165656
+date = "2026-11-19"
+reason = "Tech floor speed refusal notice with initialization-only ground slot checks and stock window digests. Measured 165655 against 165330 on 96355cad. Raise the existing 165331 ceiling by the measured 325 lines."
+approved_by = "Operator 2026-11-19 approved the too-fast notice; primary c07b3449 directed the review revisions and measured-delta budget."

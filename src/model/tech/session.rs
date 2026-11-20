@@ -3,6 +3,7 @@ use core::fmt::{self, Write};
 
 pub const HOLD: u16 = 45;
 pub const LATE: u16 = 30;
+pub const PASSIVE_SPEED_LIMIT: f32 = 6.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Direction {
@@ -23,6 +24,7 @@ pub enum Grade {
     Missed,
     AfterHitstun,
     Untechable,
+    TooFast(u32),
     NoContact,
     Unavailable,
 }
@@ -31,7 +33,7 @@ impl Grade {
         matches!(self, Self::Perfect(_) | Self::Held)
     }
     pub fn counted(self) -> bool {
-        !matches!(self, Self::Untechable | Self::NoContact | Self::Unavailable)
+        !matches!(self, Self::Untechable | Self::TooFast(_) | Self::NoContact | Self::Unavailable)
     }
     pub fn write(self, out: &mut impl Write) -> fmt::Result {
         match self {
@@ -46,6 +48,11 @@ impl Grade {
             Self::Missed => out.write_str("Missed"),
             Self::AfterHitstun => out.write_str("Missed (after hitstun)"),
             Self::Untechable => out.write_str("Untechable (not counted)"),
+            Self::TooFast(speed_bits) => write!(
+                out,
+                "Untechable (not counted)\nToo fast to tech: {:.1} (limit {PASSIVE_SPEED_LIMIT:.1})",
+                f32::from_bits(speed_bits)
+            ),
             Self::NoContact => out.write_str("No contact (not counted)"),
             // restriction: tech-native-observation-unavailable
             Self::Unavailable => out.write_str("Grading unavailable (not counted)"),
@@ -135,6 +142,13 @@ pub fn map_snapshot(
     outcome: NativeOutcome,
 ) -> Option<Grade> {
     if outcome == NativeOutcome::Miss && !s.contact.passive_enabled {
+        if let Some(speed) = s.passive_speed.filter(|speed| {
+            speed.is_finite() && *speed >= PASSIVE_SPEED_LIMIT
+                && s.entered_status == Some(s.contact.requested_status)
+                && timed_guard_would_pass(s)
+        }) {
+            return Some(Grade::TooFast(speed.to_bits()));
+        }
         return Some(Grade::Untechable);
     }
     let held = s.damage_fall == Some(true) || s.reaction.is_some_and(|r| r.is_finite() && r <= 0.0);
@@ -179,6 +193,30 @@ pub fn map_snapshot(
     } else {
         None
     }
+}
+
+/// The speed gate precedes the input gate. Attribute the refusal to speed only
+/// when the independently observed, positive-reaction Guard test would pass.
+pub(crate) fn timed_guard_would_pass(s: super::super::tech_launch::DecisionSnapshot) -> bool {
+    let (Some(count), Some(previous), Some(base), Some(multiplier), Some(lockout)) = (
+        s.guard_count,
+        s.previous_guard_gap,
+        s.window_base,
+        s.window_multiplier,
+        s.lockout,
+    ) else {
+        return false;
+    };
+    let window = base as f32 * multiplier;
+    s.damage_fall == Some(false)
+        && s.reaction.is_some_and(|r| r.is_finite() && r > 0.0)
+        && base > 0
+        && multiplier > 0.0
+        && window.is_finite()
+        && (1..=i32::from(u8::MAX)).contains(&lockout)
+        && count < 254
+        && f32::from(count) < window
+        && i32::from(previous) >= lockout
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

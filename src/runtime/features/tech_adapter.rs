@@ -667,6 +667,8 @@ pub(super) unsafe fn decision(
     accessor: usize,
     status: i32,
     passive: impl FnOnce() -> bool,
+    native_frame: usize,
+    native_return: usize,
 ) -> Option<u64> {
     if !tech_ready() {
         return None;
@@ -710,11 +712,15 @@ pub(super) unsafe fn decision(
     if owned.attempt.contact != Some(contact) {
         return None;
     }
-    owned.decision.capture_first(super::tech_decision::snapshot(
+    let mut snapshot = super::tech_decision::snapshot(
         accessor,
         owned.attempt.id,
         contact,
-    ));
+    );
+    if super::tech_decision::floor_speed_route(index, native_frame, native_return) {
+        snapshot.passive_speed = super::tech_decision::passive_floor_speed(accessor, snapshot);
+    }
+    owned.decision.capture_first(snapshot);
     let attempt = owned.attempt.id;
     drop(slot);
     deliver_decision();

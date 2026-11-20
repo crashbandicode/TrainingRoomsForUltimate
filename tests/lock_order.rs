@@ -1006,6 +1006,7 @@ fn game_root_keys() -> impl Iterator<Item = &'static str> {
 
 /// Functions whose address is handed out (`extern "C"`, `as *const ()`) that are not game entry points, and why.
 const NOT_GAME_ENTRIES: &[(&str, &str)] = &[
+    ("cpu_common::change_status_body", "the game enters change_status_hook; its assembly tail branch is followed through tech_callbacks::EDGES"),
     ("imp::detached", "a plugin thread's start (runtime::threads); its thread is walked from model::thread_stacks"),
     ("imp::joined", "a plugin thread's start (runtime::threads); its thread is walked from model::thread_stacks"),
     ("native_service::training_mod_native_service_pre", NATIVE_SERVICE_HALF),
@@ -1987,6 +1988,38 @@ fn tech_receipt_roots_do_not_wait_on_edits_and_busy_preserves_ownership() {
     let retire = frame.find("*slot = None;").unwrap();
     assert!(busy < retire && frame[busy..retire].contains("return;"), "frame must defer Busy before retiring its lease");
     assert!(source.contains("receipt == owned.receipt && accessor == owned.accessor_token"), "fresh success must preserve both identity checks");
+}
+
+#[test]
+fn tech_status_contact_cannot_query_memory() {
+    let graph = runtime_graph();
+    let ctx = Ctx::new(&graph, Vec::new());
+    let one = |key| {
+        let found = graph.find(key);
+        assert_eq!(found.len(), 1, "{key}");
+        found[0]
+    };
+    let reachable = |root: usize| {
+        let mut visited = BTreeSet::new();
+        let mut pending = vec![root];
+        while let Some(function) = pending.pop() {
+            if visited.insert(function) {
+                // Follow the free functions in this native path. A raw pointer's
+                // .read() is unrelated to NativeSource's geometry trait method.
+                pending.extend(calls(&graph.funcs[function].body).iter()
+                    .filter(|call| !call.method)
+                    .flat_map(|call| ctx.resolve(function, call)));
+            }
+        }
+        visited
+    };
+    let decision = one("tech_adapter::decision");
+    let touch = one("tech_surfaces::passive_floor_touch");
+    let query = one("tech_surfaces::readable");
+    let status_path = reachable(decision);
+    assert!(status_path.contains(&touch), "the status observer lost its floor-touch path");
+    assert!(!status_path.contains(&query), "the contact path reaches GroundModule QueryMemory");
+    assert!(reachable(one("tech_surfaces::init")).contains(&query), "the initialization probe escaped the resolver");
 }
 
 #[test]

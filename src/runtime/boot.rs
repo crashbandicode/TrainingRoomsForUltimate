@@ -191,6 +191,8 @@ fn run_inner() {
         }
     }
     let mut tech_hitlag_found = game::outcomes(&crate::model::sites_tech_hitlag::SITES);
+    let speed_notice_sites = &crate::model::sites_tech_surfaces::SPEED_NOTICE_SITES;
+    let speed_notice_found = game::outcomes(speed_notice_sites);
     for (row, outcome) in crate::model::sites_tech_hitlag::SITES.iter().zip(tech_hitlag_found.iter_mut()) {
         if poison_text.split(|c: char| c.is_whitespace() || c == ',').any(|n| n == row.name) {
             *outcome = GuardOutcome::Foreign { first_diff: 0 };
@@ -214,6 +216,7 @@ fn run_inner() {
             .or_else(|| by_name(&sites_mashout::SITES, &mashout_found))
             .or_else(|| by_name(&crate::model::sites_tech_launch::SITES, &tech_found))
             .or_else(|| by_name(&crate::model::sites_tech_surfaces::SITES, &tech_surfaces_found))
+            .or_else(|| by_name(speed_notice_sites, &speed_notice_found))
             .or_else(|| by_name(&crate::model::sites_tech_hitlag::SITES, &tech_hitlag_found))
             .unwrap_or(false)
     };
@@ -431,6 +434,9 @@ fn run_inner() {
     }));
     reports.extend(crate::model::sites_tech_hitlag::SITES.iter().zip(tech_hitlag_found.iter()).map(|(row, &outcome)| SiteReport {
         site: row.name, found: outcome, written: if outcome.usable() { Written::Checked } else { Written::Skipped },
+    }));
+    reports.extend(speed_notice_sites.iter().zip(speed_notice_found).map(|(row, found)| SiteReport {
+        site: row.name, found, written: if found.usable() { Written::Checked } else { Written::Skipped },
     }));
     // A feature that is not installed names the first row of its closure that was rejected, when there is one.
     let blocked = |feature: Feature| capabilities::blocked_by(feature, &usable);

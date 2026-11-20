@@ -305,6 +305,7 @@ fn rejected_decision_delivery_retains_exact_native_snapshot_until_matching_ack()
         reaction: Some(f32::from_bits(0x41880001)),
         damage_fall: Some(false),
         stick_x: Some(-0.75),
+        passive_speed: None,
         press_frame_offset: None,
     };
     let mut delivery = DecisionDelivery::EMPTY;
@@ -359,6 +360,7 @@ fn unavailable_guard_event_survives_delivery_distinct_from_no_press() {
         reaction: None,
         damage_fall: None,
         stick_x: None,
+        passive_speed: None,
         press_frame_offset: None,
     };
     let mut observed = Vec::new();
@@ -384,7 +386,7 @@ fn unconfirmed_native_decision() -> launch::DecisionSnapshot {
         guard_count: Some(12), previous_guard_gap: Some(254), guard_event: None,
         window_base: Some(12), window_multiplier: Some(f32::from_bits(0x3f855555)),
         lockout: Some(28), reaction: Some(f32::from_bits(0x41880001)),
-        damage_fall: Some(false), stick_x: Some(-0.75), press_frame_offset: None,
+        damage_fall: Some(false), stick_x: Some(-0.75), passive_speed: None, press_frame_offset: None,
     }
 }
 

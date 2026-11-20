@@ -38,7 +38,7 @@ fn contact() -> (Controller, Fake, DecisionSnapshot) {
         attempt: f.attempt.id, contact, source_status: Some(81), entered_status: None,
         guard_count: Some(254), previous_guard_gap: Some(254), guard_event: None,
         window_base: Some(12), window_multiplier: Some(1.), lockout: Some(28),
-        reaction: Some(20.), damage_fall: Some(false), stick_x: None, press_frame_offset: None,
+        reaction: Some(20.), damage_fall: Some(false), stick_x: None, passive_speed: None, press_frame_offset: None,
     };
     (c, f, snapshot)
 }

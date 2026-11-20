@@ -955,6 +955,7 @@ fn snapshot(attempt: u64) -> crate::model::tech_launch::DecisionSnapshot {
         reaction: Some(20.),
         damage_fall: Some(false),
         stick_x: None,
+        passive_speed: None,
         press_frame_offset: None,
     }
 }
@@ -2358,5 +2359,64 @@ fn tech_f006_set_time_and_non_auto_start_keep_their_sampling() {
         assert!(choices.next().is_none());
         assert_eq!(plan.contact_frames, 40);
         assert_eq!(plan.setup.launch.start, Vec2 { x: spot.point.x, y: 30. });
+    }
+}
+
+fn speed_refusal_snapshot() -> crate::model::tech_launch::DecisionSnapshot {
+    let mut s = snapshot(1);
+    s.contact.passive_enabled = false;
+    s.contact.surface = Surface::Floor;
+    s.entered_status = Some(s.contact.requested_status);
+    s.guard_count = Some(4);
+    s.passive_speed = Some(6.6087065);
+    s
+}
+
+fn refusal_text(s: crate::model::tech_launch::DecisionSnapshot) -> String {
+    let grade = session::map_snapshot(s, session::NativeOutcome::Miss).unwrap();
+    let mut text = String::new();
+    grade.write(&mut text).unwrap();
+    assert!(!grade.counted());
+    text
+}
+
+#[test]
+fn speed_refusal_reports_native_value_at_and_above_the_limit() {
+    let mut s = speed_refusal_snapshot();
+    assert_eq!(refusal_text(s), "Untechable (not counted)\nToo fast to tech: 6.6 (limit 6.0)");
+    s.passive_speed = Some(6.0);
+    assert_eq!(refusal_text(s), "Untechable (not counted)\nToo fast to tech: 6.0 (limit 6.0)");
+}
+
+#[test]
+fn speed_refusal_does_not_round_a_pass_into_a_rejection() {
+    let mut s = speed_refusal_snapshot();
+    s.passive_speed = Some(5.9999995);
+    assert_eq!(refusal_text(s), "Untechable (not counted)");
+}
+
+#[test]
+fn speed_refusal_omits_the_notice_for_missing_or_ineligible_guard_input() {
+    let s = speed_refusal_snapshot();
+    for age in [Some(12), Some(254), None] {
+        assert_eq!(refusal_text(super::super::tech_launch::DecisionSnapshot {
+            guard_count: age, ..s
+        }), "Untechable (not counted)");
+    }
+    assert_eq!(refusal_text(super::super::tech_launch::DecisionSnapshot {
+        previous_guard_gap: Some(27), ..s
+    }), "Untechable (not counted)");
+    assert_eq!(refusal_text(super::super::tech_launch::DecisionSnapshot {
+        entered_status: Some(s.contact.requested_status + 1), ..s
+    }), "Untechable (not counted)");
+}
+
+#[test]
+fn speed_refusal_unverified_read_preserves_the_generic_grade() {
+    let s = speed_refusal_snapshot();
+    for speed in [None, Some(f32::NAN), Some(f32::INFINITY)] {
+        assert_eq!(refusal_text(super::super::tech_launch::DecisionSnapshot {
+            passive_speed: speed, ..s
+        }), "Untechable (not counted)");
     }
 }
