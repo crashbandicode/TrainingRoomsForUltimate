@@ -581,7 +581,9 @@ pub mod cb {
 }
 
 /// The frame strip's pane indices and geometry (canvas units, the container's centre is the origin).
-pub const TAGS: usize = 8;
+#[path = "../spacing_constants.rs"]
+mod spacing_constants;
+pub use self::spacing_constants::TAGS;
 
 pub mod iv {
     use super::TAGS;

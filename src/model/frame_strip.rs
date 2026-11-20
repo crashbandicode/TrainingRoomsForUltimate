@@ -353,7 +353,9 @@ pub struct Mark {
 }
 
 /// Recent hit grades retained for the strip.
-pub use crate::model::ui::panes::TAGS;
+#[path = "spacing_constants.rs"]
+mod spacing_constants;
+pub use self::spacing_constants::TAGS;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Tag {
