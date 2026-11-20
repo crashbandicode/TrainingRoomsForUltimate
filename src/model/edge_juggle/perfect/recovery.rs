@@ -193,6 +193,8 @@ pub struct HoldFacts {
     pub buttons: u32,
     /// The held resource: `JUMP` or `SPECIAL`.
     pub button: u32,
+    /// Jumps left.
+    pub jumps: u8,
     pub planned: u8,
     /// Spending it next frame still returns.
     pub can_wait: bool,
@@ -211,6 +213,10 @@ pub struct Hold {
 impl Hold {
     pub fn waiting(&self) -> bool {
         self.pending
+    }
+
+    pub fn replan(&mut self) {
+        *self = Self::default();
     }
 
     pub fn step(&mut self, facts: HoldFacts) -> Correction {

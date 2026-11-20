@@ -206,6 +206,7 @@ fn held(button: u32, planned: u8, can_wait: bool, buttons: u32) -> HoldFacts {
         frame: 0,
         buttons,
         button,
+        jumps: 1,
         planned,
         can_wait,
         hot: false,
@@ -252,6 +253,63 @@ fn hold_counts_game_frames_not_think_calls() {
     assert_eq!(spent.press, JUMP, "three game frames after the plan");
     assert_eq!(hold.step(at(13, 0x8000)), spent);
     assert!(!hold.waiting());
+}
+
+#[test]
+fn a_new_plan_keeps_the_press_the_hold_still_owes() {
+    let at = |frame, button, planned, buttons| HoldFacts {
+        frame,
+        ..held(button, planned, true, buttons)
+    };
+    let mut hold = Hold::default();
+    assert_eq!(hold.step(at(10, JUMP, 20, 0x8004)).release, JUMP);
+    assert_eq!(hold.step(at(11, JUMP, 20, 0x8000)), Correction::default());
+    // The guarder changed zone: the route is rolled again with a new delay.
+    hold.replan();
+    assert!(hold.waiting(), "the swallowed stock jump is still owed");
+    assert_eq!(
+        hold.step(at(12, JUMP, 2, 0x8000)),
+        Correction::default(),
+        "the new plan restarts the clock"
+    );
+    assert_eq!(hold.step(at(13, JUMP, 2, 0x8000)), Correction::default());
+    assert_eq!(hold.step(at(14, JUMP, 2, 0x8000)).press, JUMP);
+    assert!(!hold.waiting());
+
+    let mut at_once = Hold::default();
+    at_once.step(at(10, JUMP, 20, 0x8004));
+    at_once.replan();
+    assert_eq!(
+        at_once.step(at(11, JUMP, 0, 0x8000)).press,
+        JUMP,
+        "a plan with no delay spends the owed jump on its first frame"
+    );
+
+    let mut spent = Hold::default();
+    spent.step(at(10, JUMP, 20, 0x8004));
+    spent.replan();
+    assert_eq!(
+        spent.step(at(11, SPECIAL, 0, 0x8000)),
+        Correction::default(),
+        "an owed jump is never paid with the up special"
+    );
+    assert!(!spent.waiting());
+
+    let mut elsewhere = Hold::default();
+    elsewhere.step(HoldFacts {
+        jumps: 3,
+        ..at(10, JUMP, 20, 0x8004)
+    });
+    elsewhere.replan();
+    assert_eq!(
+        elsewhere.step(HoldFacts {
+            jumps: 2,
+            ..at(11, JUMP, 0, 0x8000)
+        }),
+        Correction::default(),
+        "a jump spent meanwhile settles the debt"
+    );
+    assert!(!elsewhere.waiting());
 }
 
 #[test]
@@ -331,6 +389,7 @@ fn hot_ledge_delays_the_arrival_only_inside_the_deadline() {
         frame: 0,
         buttons: 0x8000,
         button: JUMP,
+        jumps: 1,
         planned: 1,
         can_wait,
         hot,

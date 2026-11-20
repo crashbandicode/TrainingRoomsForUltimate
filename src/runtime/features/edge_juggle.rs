@@ -1259,7 +1259,9 @@ unsafe fn recovery_pad(
     // In reserve the stock up special is the plan: only the jump is withheld.
     let seen = if reserve { buttons & !perfect::SPECIAL } else { buttons };
     let frame = run.rounds.frames;
-    let mut correction = run.hold.step(HoldFacts { frame, buttons: seen, button, planned, can_wait, hot });
+    let left = jumps.unwrap_or(0);
+    let mut correction =
+        run.hold.step(HoldFacts { frame, buttons: seen, button, jumps: left, planned, can_wait, hot });
     let inward = (ledge[0] - pos[0]).signum();
     if correction.release != 0 || run.hold.waiting() {
         // Level stick while the up special is withheld: no tap jump, no fast fall.
