@@ -55,8 +55,6 @@ ROWS = [
      "`EffectModule::set_rgb_partial_last(accessor, r, g, b)`: tints the sphere just requested."),
     ("effect_set_rate_last", 0x2017CE0, CALLED,
      "`EffectModule::set_rate_last(accessor, rate)`: plays the sphere just requested at 8x so it does not pulse."),
-    ("motion_animcmd_set_sleep_effect", 0x2069140, CALLED,
-     "`MotionAnimcmdModule::set_sleep_effect(accessor, bool)`: puts the fighter's animation-command effects to sleep or restores them."),
     ("sv_battle_object_module_accessor", 0x227DAF0, CALLED,
      "`app::sv_system::battle_object_module_accessor(lua_State*)`: the `BattleObjectModuleAccessor` of the object running the animation command."),
     ("hitbox_attack_stack", 0x2284CD0, RELIED,

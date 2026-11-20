@@ -1,7 +1,6 @@
 lib_unit_tests! {
 use super::*;
 use crate::model::eggs::{self, Hit};
-use crate::model::panes::{EggLook, EggPicture, EGG_WHOLE};
 use std::collections::BTreeMap;
 
 const ENTRY_KIND: usize = 0x20;
@@ -272,22 +271,25 @@ fn target_zone_rings_radii() {
         assert!((actual - expected).abs() < 1e-6);
     }
     assert_eq!(discs.map(|d| d.color), [
-        crate::model::panes::linear([244, 186, 64, 255]),
-        crate::model::panes::linear([232, 232, 236, 255]),
+        crate::model::panes::linear([244, 186, 64, 180]),
+        crate::model::panes::linear([232, 232, 236, 180]),
     ]);
     assert_eq!(discs.map(|d| d.key), [target.key; 2]);
 }
 
-fn picture_fades_while_grading() {
-    assert_eq!(PICTURE_ALPHA, 64);
-    assert_eq!(picture_look(EGG_WHOLE, true), EggLook { alpha: PICTURE_ALPHA, ..EGG_WHOLE });
-    assert_eq!(picture_look(EGG_WHOLE, false), EGG_WHOLE);
-
-    let scaled = EggLook { scale: 0.3, ..EGG_WHOLE };
-    assert_eq!(picture_look(scaled, true), scaled);
-
-    let cracked = EggLook { picture: EggPicture::Cracked, ..EGG_WHOLE };
-    assert_eq!(picture_look(cracked, true), cracked);
+#[test]
+fn preview_visual_target_layers_follow_independent_settings() {
+    let target = Orb { radius: 4.0, color: [255; 4], ..Orb::NONE };
+    for hurtboxes in [false, true] {
+        for grader in [false, true] {
+            let [outer, good, ok] = target_layers(&target, hurtboxes, grader);
+            let grade_color = crate::model::panes::linear([72, 208, 118, 180]);
+            let outer_color = if grader { grade_color } else { [255, 255, 255, 128] };
+            assert_eq!(outer.map(|o| (o.radius, o.color)), (hurtboxes || grader).then_some((4.0, outer_color)));
+            assert_eq!(good.map(|o| o.radius), grader.then_some(8.0 / 3.0));
+            assert_eq!(ok.map(|o| o.radius), grader.then_some(4.0 / 3.0));
+        }
+    }
 }
 
 fn refused_hurt_row_publishes_no_lane() {
@@ -393,7 +395,6 @@ fn case_table() {
         ("grader_off_hook_reads_nothing", grader_off_hook_reads_nothing as fn()),
         ("ring_consumes_each_contact_once", ring_consumes_each_contact_once as fn()),
         ("target_zone_rings_radii", target_zone_rings_radii as fn()),
-        ("picture_fades_while_grading", picture_fades_while_grading as fn()),
         ("refused_hurt_row_publishes_no_lane", refused_hurt_row_publishes_no_lane as fn()),
     ]);
 }

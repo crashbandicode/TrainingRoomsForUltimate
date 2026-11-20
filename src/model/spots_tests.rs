@@ -350,8 +350,8 @@ fn the_powers_of_a_fighter_are_read_from_its_active_slots_only() {
 
 fn frame(set: &mut HandleSet, slots: [Option<(f32, i32, i32, i32)>; SLOTS], status: i32) {
     let mut wants = [Sphere::NONE; hitbox::WANT_SCRATCH];
-    let ids = StatusIds::from_values([100, 101, 102, 103, 104, 105]);
-    let facts = FrameFacts { visualizes: true, enabled: true, slept: false, status, ids };
+    let ids = StatusIds::from_values([100, 101, 104, 105]);
+    let facts = FrameFacts { visualizes: true, enabled: true, status, ids };
     hitbox::reconcile_frame(set, facts, &mut wants, &mut Slots(slots), None, &mut OrbSink { status });
 }
 
