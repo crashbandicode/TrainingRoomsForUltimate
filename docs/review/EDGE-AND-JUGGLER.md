@@ -32,6 +32,8 @@ and no teleporting; every correction is a real controller input. Level 9 mode ru
 
 ## Six questions for you (recommendation first)
 
+**Decided (operator, 2026-11-20 ~02:06Z):** Q1 **all four areas**; Q2 agreed; Q3 the Juggler clock starts at **release**; Q4 you pick your start in the wizard; Q5 a **reaction-speed setting** offering all three options; Q6 agreed. Also added: Perfect must handle each fighter's niche recoveries, including recovering **under the stage to the opposite ledge** (e.g. Pikachu, whose Thunder can hit you while crossing). Whether that's possible is decided from the stage's real collision geometry, so stages that block it (e.g. Yoshi's Story) are handled. Design v2 is in progress; implementation has started (Codex GPT-6.2 Sol, paired with the Opus designer).
+
 1. **Start areas for Guard the Edge:** two (off-stage lower left / lower right, as you asked) or four (adding upper left
    / upper right)? Recommended: **two**. ![Q1](edge-juggle/illustrations/Q1-edge-areas.png)
 2. **How the CPU starts in Guard the Edge:** in free fall, after a real launch, or both? Recommended: **free fall first,

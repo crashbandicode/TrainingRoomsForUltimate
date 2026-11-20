@@ -36,6 +36,8 @@ Research by the projectile-madness-fable lane (Claude Fable 5.2 xhigh). There's 
 
 ## Eight questions for you (recommendation first)
 
+**Decided (operator, 2026-11-20 ~02:06Z):** all as recommended, except **Q5: it also runs in waiting rooms (lobbies)**, not only native Training.
+
 1. **Which hit stops the clock?** Any damaging hit by you or your projectiles; a hit on a shield doesn't count.
    ![Q1](projectile-madness/illustrations/Q1-what-counts-as-the-hit.png)
 2. **When does the clock start, and where's the score?** At GO after a short countdown; the standing notice shows it, with
