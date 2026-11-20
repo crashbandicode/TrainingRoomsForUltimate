@@ -736,19 +736,6 @@ impl Tracker {
         let (cpu_rise, p1_rise) = (cpu.stop && !self.cpu_was_stop, p1.stop && !self.p1_was_stop);
         let (on_cpu, on_p1) = (cpu_rise && cpu_gain > 0.0, p1_rise && p1_gain > 0.0);
         self.p1_was_stop = p1.stop;
-        match (on_cpu, on_p1) {
-            (true, false) if !was_hit(p1) && !on_shield(cpu) => {
-                if let Some(grade) = cpu.contact {
-                    self.push_tag(0, grade);
-                }
-            }
-            (false, true) if cpu.player && !was_hit(cpu) && !on_shield(p1) => {
-                if let Some(grade) = p1.contact {
-                    self.push_tag(1, grade);
-                }
-            }
-            _ => {}
-        }
         let earlier = [self.peaks[0].earlier(p1.status, p1.motion_frame), self.peaks[1].earlier(cpu.status, cpu.motion_frame)];
         // Each fighter's hitboxes against the other as it was before this frame's hit.
         let launch = |attacker: &Sample, target: &Sample, before: f32| spots::Launch {

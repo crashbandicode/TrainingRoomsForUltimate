@@ -370,14 +370,32 @@ fn grader_off_marks_nothing() {
 
 fn each_hit_graded_once() {
     let contact = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
-    let (rings, taken) = receive(contact, 1);
+    let (_, taken) = receive(contact, 1);
     let (p1, cpu) = samples(taken, false);
     let mut tracker = Tracker::new();
     tracker.step(idle(), idle(), NONE);
     tracker.step(p1, cpu, NONE);
-    let (p1, cpu) = samples(rings.take(2), false);
+    let expected = vec![Tag { frame: 2, lane: 0, grade: Grade::Good }];
+    assert_eq!(tracker.tags().copied().collect::<Vec<_>>(), expected);
+
+    let contact = capture_contact(&contact_fixture(1, P1_ID, 1)).unwrap();
+    let (rings, taken) = receive(contact, 2);
+    let (p1, mut cpu) = samples(taken, false);
+    cpu.stop = true;
+    cpu.hitstun = true;
+    cpu.damage = 1.0;
+    let mut tracker = Tracker::new();
+    tracker.step(idle(), idle(), NONE);
     tracker.step(p1, cpu, NONE);
-    assert_eq!(tracker.tags().copied().collect::<Vec<_>>(), vec![Tag { frame: 2, lane: 0, grade: Grade::Good }]);
+    assert_eq!(tracker.tags().copied().collect::<Vec<_>>(), expected);
+    for epoch in 3..=4 {
+        let (p1, mut cpu) = samples(rings.take(epoch), false);
+        cpu.stop = true;
+        cpu.hitstun = true;
+        cpu.damage = 1.0;
+        tracker.step(p1, cpu, NONE);
+    }
+    assert_eq!(tracker.tags().copied().collect::<Vec<_>>(), expected);
 }
 
 fn same_slot_rehit_after_idle_frames() {
