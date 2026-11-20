@@ -1238,6 +1238,12 @@ unsafe fn recovery_pad(
         return Correction::default();
     };
     let can_wait = reach.returns(pos, speed, ledge, 1, bottom);
+    if !can_wait && can_jump && !reserve && !run.hold.waiting() {
+        let correction = reach.jump_at_horizontal_limit(pos, speed, ledge, bottom, buttons);
+        if correction != Correction::default() {
+            return stock.observe(correction, PerfectRule::Reach, run, 0, 0);
+        }
+    }
     let hot = can_wait && ledge_hot(run, p1, ledge);
     // In reserve the stock up special is the plan: only the jump is withheld.
     let seen = if reserve { buttons & !perfect::SPECIAL } else { buttons };

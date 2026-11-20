@@ -1,7 +1,7 @@
 //! Player-grade recovery decisions for Guard the Edge. Pure: the runtime applies pad edits only.
 
 use super::{
-    AirPhysics, Correction, Plan, Point, Route, SpecialReach, ATTACK, GUARD, SPECIAL,
+    AirPhysics, Correction, Plan, Point, Route, SpecialReach, ATTACK, FLICK_JUMP, GUARD, JUMP, SPECIAL,
 };
 
 /// Where the edge-guarder is against the fighter's near ledge.
@@ -185,14 +185,27 @@ impl Reach {
         false
     }
 
+    /// Spend the aerial jump when accounting for horizontal travel rules out one more frame.
     pub fn jump_at_horizontal_limit(
         self,
-        _from: Point,
-        _speed: Point,
-        _ledge: Point,
-        _bottom: f32,
-        _buttons: u32,
+        from: Point,
+        speed: Point,
+        ledge: Point,
+        bottom: f32,
+        buttons: u32,
     ) -> Correction {
+        if self.jump
+            && buttons & !FLICK_JUMP == 0
+            && self.returns(from, speed, ledge, 0, bottom)
+            && !self.returns(from, speed, ledge, 1, bottom)
+            && self.returns([ledge[0], from[1]], [0.0, speed[1]], ledge, 1, bottom)
+        {
+            return Correction {
+                stick: Some([(ledge[0] - from[0]).signum(), 0.0]),
+                press: JUMP,
+                ..Correction::default()
+            };
+        }
         Correction::default()
     }
 
