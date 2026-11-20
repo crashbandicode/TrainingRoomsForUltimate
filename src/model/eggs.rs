@@ -700,6 +700,23 @@ mod standing_notice_tests {
     const TRAINING: Facts = Facts { native_training: true, lobby_active: false, waiting_room: false, busy: false };
     const VIEW: View = View([14.0; 2], [0.0, -300.0], [-HALF_WIDTH, HALF_WIDTH], None);
 
+    #[test]
+    fn whole_stage_starts_with_moving_camera_after_floor_read() {
+        let mut run = Run::IDLE;
+        run.start([TIMED, ANY, FAST, DISC, WHOLE], 7);
+        run.want_floors();
+        for frame in 0..SETTLE {
+            run.look(true, || Some(View(VIEW.0, [frame as f32, VIEW.1[1]], VIEW.2, Some([-65.0, 115.0]))));
+            run.step(true, 0.0, &[], false, 0);
+            assert!(run.egg_at().is_none(), "floor discovery is still pending");
+        }
+        run.set_floors(&[[[-80.0, 0.0], [80.0, 0.0]]]);
+        run.look(true, || Some(View(VIEW.0, [SETTLE as f32, VIEW.1[1]], VIEW.2, Some([-65.0, 115.0]))));
+        run.step(true, 0.0, &[], false, 0);
+        assert!(run.egg_at().is_some(), "stage bounds suffice while the visible projection is changing");
+        assert_eq!(run.frames, RUN_FRAMES - 1);
+    }
+
     fn scored_cpu(score: u32) -> Run {
         let mut run = Run::IDLE;
         assert_eq!(run.plan([FREE, ANY, FAST, CPU, IN_VIEW], Some(7), 0, || TRAINING), Plan::Read);
