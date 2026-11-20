@@ -301,15 +301,12 @@ fn niche_quick_attack_aims_during_the_pause_before_the_second_warp() {
 }
 
 #[test]
-fn niche_pikachu_thunder_waits_for_its_measured_fall() {
+fn niche_pikachu_thunder_follows_skull_bash_and_awaits_its_measured_finish() {
     let thunder = tested_row(2);
-    assert_eq!(
-        thunder.moves,
-        [Move::ApproachThunder, Move::Down, Move::Hold, Move::QuickAttack].as_slice()
-    );
+    assert_eq!(thunder.moves, &[Move::Side, Move::Down, Move::QuickAttack]);
     assert!(
         select(facts(0x8, "center"), CANDIDATE_ROWS).is_none(),
-        "Thunder is a free fall of unmeasured length: no crossing budget covers it yet"
+        "The cancel, bolt hit and far ledge need a native witness"
     );
 }
 
