@@ -377,7 +377,7 @@ impl Run {
         self.rows[3] == CPU && self.running()
     }
 
-    fn ended(&self) -> bool {
+    pub fn ended(&self) -> bool {
         match self.rows[0] {
             TIMED => self.frames == 0,
             _ => self.goal() > 0 && self.score >= self.goal(),

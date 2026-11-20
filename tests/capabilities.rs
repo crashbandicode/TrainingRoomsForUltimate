@@ -142,6 +142,7 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "btt_camera::frame", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
     Boundary { function: "btt::frame", owner: Some(Feature::Hitbox), gate: Gate::Flag("USABLE") },
     Boundary { function: "btt_projectiles::hit", owner: Some(Feature::BttProjectiles), gate: Gate::Flag("READY") },
+    Boundary { function: "btt_projectiles::observe_articles", owner: Some(Feature::BttProjectiles), gate: Gate::Flag("READY") },
 ];
 
 /// Every entry point that is not a `#[skyline::hook]` function, with its install unit.

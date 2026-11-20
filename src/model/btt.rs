@@ -255,8 +255,16 @@ pub enum Search {
 /// `Breaks on` (`rule`, with `aerial` Player 1's own status) allows that hit (rc.15, both practice games: docs/DECISIONS.md).
 pub fn projectile_breaks(
     search: Search, rule: u8, aerial: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,
-    mut read: impl FnMut(usize) -> Option<([eggs::Hit; super::hitbox::SLOTS as usize], usize)>,
+    read: impl FnMut(usize) -> Option<([eggs::Hit; super::hitbox::SLOTS as usize], usize)>,
 ) -> Option<f32> {
+    projectile_contact(search, rule, aerial, spot, pool, get, read).map(|(_, depth)| depth)
+}
+
+/// The same overlap, with the winning article for attributing the scored hit.
+pub fn projectile_contact(
+    search: Search, rule: u8, aerial: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,
+    mut read: impl FnMut(usize) -> Option<([eggs::Hit; super::hitbox::SLOTS as usize], usize)>,
+) -> Option<(usize, f32)> {
     if search == Search::Off {
         return None;
     }
@@ -273,8 +281,9 @@ pub fn projectile_breaks(
             if let Some(depth) = eggs::depth(hit, spot) {
                 match search {
                     Search::Off => return None,
-                    Search::First => return Some(depth),
-                    Search::Deepest => best = Some(best.map_or(depth, |current: f32| current.max(depth))),
+                    Search::First => return Some((article, depth)),
+                    Search::Deepest if best.is_none_or(|(_, previous)| depth > previous) => best = Some((article, depth)),
+                    Search::Deepest => {}
                 }
             }
         }
@@ -344,6 +353,7 @@ pub struct Btt {
     /// The session's best per layout (its key, frames), and the one of the run just done.
     best: [Option<(u64, u32)>; BESTS],
     top: u32,
+    pub(crate) streak: super::hit_streak::Streak,
     shown: FixedPath<96>,
     /// The clock keeper (`keeper`) and its rivals' passes since its last.
     owner: (usize, u8),
@@ -377,6 +387,7 @@ impl Btt {
         kept: [(i32::MIN, [[0.0; 2]; MAX], 0); KEPT],
         best: [None; BESTS],
         top: 0,
+        streak: super::hit_streak::Streak::EMPTY,
         shown: FixedPath::new(),
         owner: (0, 2),
     };
@@ -483,6 +494,9 @@ impl Btt {
     }
 
     fn ready(&mut self) {
+        if self.streak.enabled() {
+            self.streak.restart(true);
+        }
         (self.phase, self.broken, self.bursts) = (Phase::Ready, 0, [None; 2]);
         (self.frames, self.left, self.still) = (0, 0, false);
     }
@@ -720,11 +734,15 @@ impl Btt {
                     Some((i, h)) => write!(out, "{i}/{} {}: {}", self.count(), h.name.as_str(), h.n),
                 }
             }
-            Phase::Ready | Phase::Running => write!(out, "{got}/{n} {m}:{s:02}.{c:02}"),
+            Phase::Ready | Phase::Running => {
+                write!(out, "{got}/{n} {m}:{s:02}.{c:02}")?;
+                self.streak.write(out)
+            }
             Phase::Done => {
                 let (bm, bs, bc) = clock(self.top);
                 write!(out, "Done! {n} in {m}:{s:02}.{c:02} ")?;
-                write!(out, "(best {bm}:{bs:02}.{bc:02})")
+                write!(out, "(best {bm}:{bs:02}.{bc:02})")?;
+                self.streak.write(out)
             }
         }
     }

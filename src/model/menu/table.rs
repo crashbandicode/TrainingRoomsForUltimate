@@ -283,7 +283,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 161] = [
+pub static ROWS: [Row; 163] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -529,6 +529,8 @@ pub static ROWS: [Row; 161] = [
       "How fast targets fly. Normal is Melee's Eggs-ercise speed.\nSlow: half speed. Fast: one and a half times as fast."),
     r(EGGS, "Spawn area", "eggsercise_area", Control::Dropdown(&o::EGGS_AREA),
       "In view: targets appear on screen, with your camera.\nWhole stage: any stage floor, even off screen. From the next Start."),
+    r(EGGS, "Hit streak", "eggsercise_hit_streak", Control::Dropdown(&o::BTT),
+      "Show your current hit streak and session best.\nA whiff resets the streak. Applies at the next Start."),
     r(EGGS, "CPU during a game", "practice_cpu", Control::Dropdown(&o::PRACTICE_CPU),
       "Hide: the CPU is hidden while a practice game runs.\nAfterwards it's as Hide CPU says. Show: it stays."),
     // Practice games > Break the Targets. Its Off / On row is Start / Stop now; the `btt` key stays in the file.
@@ -540,6 +542,8 @@ pub static ROWS: [Row; 161] = [
       "Close the menu into the placing view, stage zoomed out.\nStick moves, A places, B removes the last, X starts."),
     r(BTT, "Saved layouts", "btt_layouts", Control::Editor(Editor::Layouts),
       "This stage's saved layouts, the five used last first.\nPlacing: ZL + Left/Right picks, ZL + Down saves, ZL + Up loads."),
+    r(BTT, "Hit streak", "btt_hit_streak", Control::Dropdown(&o::BTT),
+      "Show your current hit streak and session best.\nA whiff resets the streak. Applies at the next Start."),
     // The same setting as in Eggs-ercise (Q3): one key, two rows.
     r(BTT, "CPU during a game", "practice_cpu", Control::Dropdown(&o::PRACTICE_CPU),
       "Hide: the CPU is hidden while a practice game runs.\nAfterwards it's as Hide CPU says. Show: it stays."),

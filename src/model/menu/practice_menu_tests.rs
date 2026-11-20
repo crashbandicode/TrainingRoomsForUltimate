@@ -96,8 +96,8 @@ fn a_game_row_opens_its_sub_screen_on_start() {
 /// Today's rows of each game, labels, controls and order, from `c212bc50`'s table: Start, then these.
 #[test]
 fn each_sub_screen_has_start_first_then_todays_rows() {
-    let eggs = ["Start", "Eggs-ercise", "Breaks on", "Target", "Target speed", "Spawn area", "CPU during a game"];
-    let btt = ["Start", "Projectiles break targets", "Place targets", "Saved layouts", "CPU during a game"];
+    let eggs = ["Start", "Eggs-ercise", "Breaks on", "Target", "Target speed", "Spawn area", "Hit streak", "CPU during a game"];
+    let btt = ["Start", "Projectiles break targets", "Place targets", "Saved layouts", "Hit streak", "CPU during a game"];
     let tech = [
         "Start", "Tech practice", "Tech wizard", "Surface", "Tech point", "Damage", "Damage range", "Launch speed",
         "Launch speed range", "Hit damage", "Hit damage range", "Angle", "Angle range", "Start position", "Start range",

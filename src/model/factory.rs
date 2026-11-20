@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 170;
+pub const COUNT: usize = 172;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -277,4 +277,8 @@ pub static DEFS: [Def; COUNT] = [
 
     row!("btt_projectiles", Single, 2, [1]),
     row!("spacing_grader", Single, 2, [1]),
+
+    // rc.15 per-game Hit streak: Off / On.
+    row!("eggsercise_hit_streak", Single, 2, [0]),
+    row!("btt_hit_streak", Single, 2, [0]),
 ];

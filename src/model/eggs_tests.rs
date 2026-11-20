@@ -73,14 +73,14 @@ fn gap(a: [f32; 2], b: [f32; 2]) -> f32 {
 fn eggs_rows_and_help() {
     let at = |id: &str| ROWS.iter().position(|r| r.id == id).unwrap_or_else(|| panic!("row {id}"));
     let mode = at(ROW);
-    let rows = [&ROWS[mode], &ROWS[at(ROW_BREAK)], &ROWS[at(ROW_TARGET)], &ROWS[at(ROW_SPEED)], &ROWS[at(ROW_AREA)], &ROWS[at(ROW_PRACTICE_CPU)]];
+    let rows = [&ROWS[mode], &ROWS[at(ROW_BREAK)], &ROWS[at(ROW_TARGET)], &ROWS[at(ROW_SPEED)], &ROWS[at(ROW_AREA)], &ROWS[at("eggsercise_hit_streak")], &ROWS[at(ROW_PRACTICE_CPU)]];
     // D7 (b), the operator 2026-11-14: their own group, appended to `GROUPS` so no group index moves. rc.15 practice menu
     // (2026-11-18): the Eggs-ercise sub-screen's group (`sub`), after its Start row; Practice games lists the game.
     let g = usize::from(rows[0].group);
     assert_eq!((GROUPS[g].title, GROUPS[g].page, GROUPS[g].advanced, GROUPS[g].sub), ("Eggs-ercise", Page::FightersStages, false, true));
     assert_eq!(GROUPS[usize::from(crate::model::menu::table::GAMES)].title, "Practice games");
-    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).map(|r| r.title).eq(["Start", "Eggs-ercise", "Breaks on", "Target", "Target speed", "Spawn area", "CPU during a game"]));
-    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).skip(1).map(|r| r.id).eq([ROW, ROW_BREAK, ROW_TARGET, ROW_SPEED, ROW_AREA, ROW_PRACTICE_CPU]), "the six rows follow Start, in order");
+    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).map(|r| r.title).eq(["Start", "Eggs-ercise", "Breaks on", "Target", "Target speed", "Spawn area", "Hit streak", "CPU during a game"]));
+    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).skip(1).map(|r| r.id).eq([ROW, ROW_BREAK, ROW_TARGET, ROW_SPEED, ROW_AREA, "eggsercise_hit_streak", ROW_PRACTICE_CPU]), "the seven rows follow Start, in order");
     let values = |r: &crate::model::menu::table::Row| match r.control {
         Control::Dropdown(v) => v.to_vec(),
         _ => panic!("{} is not a dropdown", r.title),
@@ -109,17 +109,18 @@ fn eggs_rows_and_help() {
         rows[4].help_lines(),
         ("In view: targets appear on screen, with your camera.", "Whole stage: any stage floor, even off screen. From the next Start.")
     );
+    assert_eq!((rows[5].title, values(rows[5])), ("Hit streak", vec!["Off", "On"]));
     // V2.6's second row: Hide CPU (B-2's) reads it with `eggs_running`.
-    assert_eq!((rows[5].title, values(rows[5])), ("CPU during a game", vec!["Hide", "Show"]));
+    assert_eq!((rows[6].title, values(rows[6])), ("CPU during a game", vec!["Hide", "Show"]));
     assert_eq!(
-        rows[5].help_lines(),
+        rows[6].help_lines(),
         ("Hide: the CPU is hidden while a practice game runs.", "Afterwards it's as Hide CPU says. Show: it stays.")
     );
     for r in rows {
         let (a, b) = r.help_lines();
         assert!(a.chars().count() <= 67 && b.chars().count() <= 67, "{}", r.title);
     }
-    for (id, default) in [(ROW, &[1, 0, 0, 0, 0][..]), (ROW_BREAK, &[1, 0, 0]), (ROW_TARGET, &[1, 0]), (ROW_SPEED, &[1, 0, 0]), (ROW_AREA, &[1, 0]), (ROW_PRACTICE_CPU, &[1, 0])] {
+    for (id, default) in [(ROW, &[1, 0, 0, 0, 0][..]), (ROW_BREAK, &[1, 0, 0]), (ROW_TARGET, &[1, 0]), (ROW_SPEED, &[1, 0, 0]), (ROW_AREA, &[1, 0]), ("eggsercise_hit_streak", &[1, 0]), (ROW_PRACTICE_CPU, &[1, 0])] {
         let def = crate::model::factory::DEFS.iter().find(|d| d.id == id).unwrap_or_else(|| panic!("factory {id}"));
         assert_eq!(def.default, default, "{id}: the first option (Off, Any attack) by default");
     }

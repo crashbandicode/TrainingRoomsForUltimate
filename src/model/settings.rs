@@ -650,6 +650,30 @@ mod tests {
         assert_eq!(parse(&factory.to_json()).settings, factory);
     }
 
+    fn hit_streak_defaults_to_off_in_new_and_old_settings() {
+        let old = parse(r#"{"menu":{"eggsercise":[0,1,0,0,0]},"defaults_menu":{"btt":[0,1]}}"#);
+        assert!(old.issues.is_empty(), "{:?}", old.issues);
+        for settings in [Settings::factory(), old.settings] {
+            for id in ["eggsercise_hit_streak", "btt_hit_streak"] {
+                assert_eq!(settings.menu.get(id), Some(&[1, 0][..]), "{id} menu");
+                assert_eq!(settings.defaults.get(id), Some(&[1, 0][..]), "{id} defaults");
+            }
+        }
+    }
+
+    fn hit_streak_choices_round_trip_independently() {
+        let mut settings = Settings::factory();
+        settings.menu.set("eggsercise_hit_streak", &[0, 1]).unwrap();
+        settings.defaults.set("btt_hit_streak", &[0, 1]).unwrap();
+
+        let loaded = parse(&settings.to_json());
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+        assert_eq!(loaded.settings.menu.get("eggsercise_hit_streak"), Some(&[0, 1][..]));
+        assert_eq!(loaded.settings.menu.get("btt_hit_streak"), Some(&[1, 0][..]));
+        assert_eq!(loaded.settings.defaults.get("eggsercise_hit_streak"), Some(&[1, 0][..]));
+        assert_eq!(loaded.settings.defaults.get("btt_hit_streak"), Some(&[0, 1][..]));
+    }
+
     fn a_bad_row_defaults_and_is_reported() {
         let loaded = parse(r#"{"menu":{"lra_reset":"x","stage_hazards":[1,0]}}"#);
         assert_eq!(loaded.issues.len(), 1);
@@ -687,6 +711,8 @@ mod tests {
             ("factory_round_trips", factory_round_trips as fn()),
             ("retired_hitbox_colour_slot_is_ignored_in_both_snapshots_and_round_trips", retired_hitbox_colour_slot_is_ignored_in_both_snapshots_and_round_trips as fn()),
             ("a_bad_row_defaults_and_is_reported", a_bad_row_defaults_and_is_reported as fn()),
+            ("hit_streak_defaults_to_off_in_new_and_old_settings", hit_streak_defaults_to_off_in_new_and_old_settings as fn()),
+            ("hit_streak_choices_round_trip_independently", hit_streak_choices_round_trip_independently as fn()),
         ]);
     }
     }

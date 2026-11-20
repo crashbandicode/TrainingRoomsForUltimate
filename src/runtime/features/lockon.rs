@@ -68,7 +68,7 @@ pub fn set_usable(usable: bool) {
 /// Player 1's game-thread pass, with a live fighter accessor.
 pub unsafe fn hit(
     owner: usize, slot: usize, key: u64, rule: u8, aerial: bool, projectiles: bool,
-) -> Option<()> {
+) -> Option<u32> {
     if !USABLE.load(Ordering::Acquire) || super::states::is_loading() {
         return None;
     }
@@ -77,12 +77,7 @@ pub unsafe fn hit(
     item.live().then_some(())?;
     let at = item.accessor as usize;
     take_damage(&mut item.damage, game::natives::damage(at, 0)).then_some(())?;
-    use sites_hitbox::damage_record as record;
-    let module = ((at + record::MODULE) as *const usize).read();
-    btt::pointer_ok(module).then_some(())?;
-    // DamageModule keeps the source and its resolved native owner after the attack ends.
-    let source = ((module + 0x48) as *const u32).read();
-    let root = ((module + 0x54) as *const u32).read();
+    let (root, source) = damage_source(at)?;
     let p1 = (*(owner as *const Accessor)).battle_object_id;
     (root == p1 && (source == p1 || projectiles && matches!(source >> 28, 1 | 4))).then_some(())?;
     let power = if rule >= eggs::STRONG {
@@ -97,7 +92,23 @@ pub unsafe fn hit(
     } else {
         0.0
     };
-    eggs::counts(rule, aerial, power).then_some(())
+    eggs::counts(rule, aerial, power).then_some(source)
+}
+
+pub(super) fn damage_source_ready() -> bool {
+    USABLE.load(Ordering::Acquire)
+}
+
+/// The DamageModule's native owner and source for the most recent damage.
+/// # Safety
+/// `at` is a live target accessor. The byte guard for this layout must have passed.
+pub(super) unsafe fn damage_source(at: usize) -> Option<(u32, u32)> {
+    use sites_hitbox::damage_record as record;
+    let module = ((at + record::MODULE) as *const usize).read();
+    btt::pointer_ok(module).then_some(())?;
+    let source = ((module + 0x48) as *const u32).read();
+    let root = ((module + 0x54) as *const u32).read();
+    Some((root, source))
 }
 
 #[repr(C, align(16))]

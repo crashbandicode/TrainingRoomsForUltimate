@@ -34,7 +34,7 @@ use hos_lock::Mutex;
 
 use crate::model::cpu::hash::{hash40, lua_bind_hash};
 use crate::model::cpu::role::LOBBY_CPU_ENTRY;
-use crate::model::eggs::{self, HEADER, NOTICE_ID};
+use crate::model::eggs::{self, Run, HEADER, NOTICE_ID};
 use crate::runtime::features::btt;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::guard::GuardOutcome;
@@ -87,6 +87,7 @@ pub fn publish(snapshot: &Snapshot) {
     SETTING.store(legend::draws(shown), Ordering::Release);
     let mut row_bytes = [0; 8];
     row_bytes[..5].copy_from_slice(&eggs::choices(snapshot));
+    row_bytes[5] = eggs::choice(snapshot, "eggsercise_hit_streak");
     let rows = u64::from_le_bytes(row_bytes);
     EGG_ROWS.store(rows, Ordering::Release);
     let hide = eggs::choice(snapshot, eggs::ROW_PRACTICE_CPU) == 0;
@@ -113,7 +114,14 @@ static PRACTICE_HIDE: AtomicBool = AtomicBool::new(true);
 static PRACTICE_HIDE_RUN: AtomicBool = AtomicBool::new(true);
 /// Start (rc.15 practice menu; D9 (c) is reversed: a close no longer restarts it): the next pass starts a run.
 static EGG_START: AtomicBool = AtomicBool::new(false);
-static RUN: Mutex<eggs::Run> = Mutex::new(eggs::Run::IDLE);
+struct EggState {
+    run: eggs::Run,
+    streak: crate::model::hit_streak::Streak,
+}
+static RUN: Mutex<EggState> = Mutex::new(EggState {
+    run: eggs::Run::IDLE,
+    streak: crate::model::hit_streak::Streak::EMPTY,
+});
 /// The run is armed (`Run::running`), for the menu worker, which never takes `RUN`.
 static EGG_RUNNING: AtomicBool = AtomicBool::new(false);
 static EGG_GENERATION: AtomicU32 = AtomicU32::new(0);
@@ -123,9 +131,10 @@ fn lockon_key(score: u32) -> u64 {
 }
 
 pub(crate) fn lockon_egg() -> Option<Option<crate::model::lockon::Target>> {
-    let run = RUN.try_lock()?;
+    let state = RUN.try_lock()?;
+    let run = &state.run;
     let key = lockon_key(run.score);
-    let egg = run.egg_at().filter(|_| run.running() && !run.cpu_target());
+    let egg = run.egg_at().filter(|_| Run::running(run) && !run.cpu_target());
     Some(egg.map(|at| crate::model::lockon::Target { key, at }))
 }
 
@@ -153,8 +162,11 @@ pub fn eggs_running() -> bool {
 
 /// The reset hub ran (L+R+A, Change Stage): an armed run starts over. Game thread.
 pub fn eggs_reset() {
-    let mut run = RUN.lock();
-    run.reset(seed());
+    let mut state = RUN.lock();
+    state.run.reset(seed());
+    if state.streak.enabled() {
+        state.streak.restart(true);
+    }
     EGG_GENERATION.fetch_add(1, Ordering::Relaxed);
 }
 
@@ -169,21 +181,24 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     rows[0] = practice_games::effective(Game::Eggs, rows[0], super::practice::active());
     // The fighter object's own entry field, as the reset hub reads it: not a game call.
     let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
-    let mut run = RUN.lock();
+    let mut state = RUN.lock();
+    let EggState { run, streak } = &mut *state;
     let plan = run.plan(rows, seed, entry, scene::facts);
     if seed.is_some() {
+        streak.restart(bytes[5] == 1 && Run::running(run));
         EGG_GENERATION.fetch_add(1, Ordering::Relaxed);
     }
     // V2.6: the CPU is hidden while a practice game runs and `CPU during a game` says Hide, unless it is the target
     // (`eggs::hides_cpu`). The CPU's body, its tag and its panel follow this one request (`cpu::hide::step`).
-    let running = run.running();
+    let running = Run::running(run);
     EGG_RUNNING.store(running, Ordering::Release);
     super::hide_cpu::hide(super::tech::running() || eggs::hides_cpu(PRACTICE_HIDE_RUN.load(Ordering::Acquire), running, run.cpu_target(), btt::running()));
     if plan == eggs::Plan::Clear {
+        streak.restart(false);
         super::notices::clear(NOTICE_ID);
     }
     if entry != 0 {
-        return eggs_cpu(&mut run, fighter, entry);
+        return eggs_cpu(run, streak, fighter, entry);
     }
     // Any menu over the game holds the clock: the plugin's, the game's own pause menu (the fighters' frames run on under
     // it: Eden wa-eggs-07bae4c1-1, E11) and the waiting room's busy native UI.
@@ -192,7 +207,7 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     (plan == eggs::Plan::Read).then_some(())?;
     let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
     if run.floors_wanted() {
-        eggs_floors(&mut run, at);
+        eggs_floors(run, at);
     }
     let tick = run.keeper(at) && !held;
     #[cfg(feature = "diag")]
@@ -204,7 +219,14 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     }
     let (top, hits, n, aerial, kind) = p1_read(at);
     let hits = &hits[..n];
+    let before = streak.counts();
+    let owner = if !held && !run.ended() {
+        super::btt_projectiles::sample(streak, at, hits.iter().any(|h| h.3 > 0.0))
+    } else {
+        None
+    };
     let score = run.score;
+    let mut source = None;
     #[cfg(feature = "diag")]
     if let Some([dx, dy]) = crate::runtime::diag_reload::take_egg_request() {
         run.place([top[0] + dx, top[1] + dy]);
@@ -227,16 +249,19 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
         top[1],
         hits,
         |egg| {
-            let helper = super::lockon::hit(at, 0, lockon_key(score), rule, aerial, true).is_some();
-            eggs::other_break(grader, helper, |deepest| {
-                super::btt_projectiles::hit(
+            let helper = super::lockon::hit(at, 0, lockon_key(score), rule, aerial, true);
+            source = helper;
+            eggs::other_break(grader, helper.is_some(), |deepest| {
+                let (projectile, depth) = super::btt_projectiles::hit(
                     at,
                     egg,
                     rule,
                     aerial,
                     true,
                     if deepest { crate::model::btt::Search::Deepest } else { crate::model::btt::Search::First },
-                )
+                )?;
+                source = helper.or(Some(projectile));
+                Some(depth)
             })
         },
         aerial,
@@ -246,13 +271,23 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
         super::input_display::target_grade(depth);
     }
     // V2.1: the fighter whose attack broke it (Ice Climbers: that climber) freezes, as on a hit; an article's break does not.
-    let broke = run.score > score && run.melee();
+    let scored = run.score > score;
+    if let Some((owner, body)) = owner {
+        if scored {
+            if let Some(source) = if run.melee() { Some(owner) } else { source } {
+                streak.hit(owner, source);
+            }
+        }
+        streak.end(body);
+    }
+    let broke = scored && run.melee();
     if let Some(frames) = broke.then(scene::facts).and_then(eggs::hitlag) {
         let _ = natives::set_hit_stop_frame(at, frames, false);
     }
-    let length = length?;
-    let mut text = crate::model::storage::FixedPath::<48>::new();
+    let length = length.or_else(|| (streak.counts() != before).then_some(u16::MAX))?;
+    let mut text = crate::model::storage::FixedPath::<96>::new();
     let _ = run.write_notice(&mut text);
+    let _ = streak.write(&mut text);
     super::notices::upsert(NOTICE_ID, HEADER, text.as_str(), length, DEFAULT_COLOR);
     #[cfg(feature = "diag")]
     crate::runtime::diag_log::diagnostic(format_args!(
@@ -306,15 +341,19 @@ unsafe fn eggs_floors(run: &mut eggs::Run, at: usize) {
 /// The CPU target's pass (V2.1; the practice CPU's own frame, only while a run has it as the target): put it where the run
 /// asks, on the target's flight (the operator, 11-15), its speed cleared; afresh, at 0% and in the game's own fall (in the
 /// air) or standing (at rest), as a save state's load places a fighter; and standing once the flight comes to rest.
-unsafe fn eggs_cpu(run: &mut eggs::Run, fighter: usize, entry: i32) -> Option<()> {
+unsafe fn eggs_cpu(run: &mut eggs::Run, streak: &mut crate::model::hit_streak::Streak, fighter: usize, entry: i32) -> Option<()> {
     run.cpu_target().then_some(())?;
     let primary = [1, LOBBY_CPU_ENTRY][usize::from(scene::current()? == Scene::Lobby)];
     (entry == primary).then_some(())?;
     let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
     let (damage, stopped) = (natives::damage(at, 0), natives::is_stop(at));
-    #[cfg(feature = "diag")]
     let score = run.score;
     let moved = run.cpu_pass(damage, stopped);
+    if streak.enabled() && run.score > score && super::lockon::damage_source_ready() {
+        if let Some((owner, source)) = super::lockon::damage_source(at) {
+            streak.hit(owner, source);
+        }
+    }
     #[cfg(feature = "diag")]
     eggs_cpu_diag(run, score, at, damage, stopped, moved);
     // The game turns the placed CPU's tag flag off in the air: while TR owns the placement and the body is shown, the CPU frame
@@ -622,7 +661,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         return;
     }
     let _scope = HookScope::enter_hook(HookId::HitboxOrbs);
-    let (eggs_orbs, marks) = (RUN.lock().look(active, || view()), btt::look(active, || view()));
+    let (eggs_orbs, marks) = (RUN.lock().run.look(active, || view()), btt::look(active, || view()));
     let mut own = [None; 3 + btt::LOOKS];
     own[..3].copy_from_slice(&eggs_orbs);
     let edge_wizard = super::edge_juggle::wizard_active();

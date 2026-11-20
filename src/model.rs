@@ -127,6 +127,8 @@ pub mod tech_settings;
 pub mod settings_file;
 #[path = "model/sha256.rs"]
 pub mod sha256;
+#[path = "model/hit_streak.rs"]
+pub mod hit_streak;
 #[path = "model/hitbox.rs"]
 pub mod hitbox;
 #[path = "model/hitbox_orbs.rs"]
