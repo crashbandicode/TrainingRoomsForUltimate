@@ -69,6 +69,11 @@ pub(crate) unsafe fn probe_consumers(base: usize, owner: u32) -> NativeConsumers
             if controller != 0 { consumers.pad_routes[usize::from(slot)] = Some(RouteRef { slot, controller }); }
         }
     }
+    if let Some(state) = fields::chain(base, &[PAD_MANAGER, 0]) {
+        for slot in 0..PAD_SLOTS {
+            consumers.input_holders[slot] = fields::read::<usize>(state, slot * 8).unwrap_or(0);
+        }
+    }
     let nana = owner.saturating_add(8);
     if (nana as usize) < PAD_SLOTS { consumers.nana_owner_plus_8 = consumers.pad_routes[nana as usize].map(|r| r.controller); }
     consumers
@@ -79,14 +84,21 @@ pub(crate) unsafe fn probe_consumers(base: usize, owner: u32) -> NativeConsumers
 /// so its route is left to native).
 pub(crate) unsafe fn context_ref(context: usize, valid: bool) -> ContextRef {
     let controller = if valid { fields::read::<usize>(context, CONTEXT_CONTROLLER).unwrap_or(0) } else { 0 };
-    ContextRef { ctx: context, controller, valid }
+    let input_route = if valid && fields::read::<u8>(context, 0x69).unwrap_or(0) != 0 {
+        fields::read::<u32>(context, 0x6c)
+            .filter(|slot| *slot < PAD_SLOTS as u32)
+            .map(|slot| slot as u8)
+    } else {
+        None
+    };
+    ContextRef { ctx: context, controller, input_route, valid }
 }
 
 /// The attached window's contexts, deduplicated across `+0x4178/+0x4180/+0x4188/90/98`
 /// (the aliases select among the cell contexts; GROUP-SWAP-FEASIBILITY §2.2).
 pub(crate) unsafe fn window_contexts(entry: usize, mut valid: impl FnMut(usize) -> bool)
     -> FixedList<ContextRef, { WINDOW_CONTEXT_OFFSETS.len() }> {
-    let mut out = FixedList::new(ContextRef { ctx: 0, controller: 0, valid: false });
+    let mut out = FixedList::new(ContextRef { ctx: 0, controller: 0, input_route: None, valid: false });
     for offset in WINDOW_CONTEXT_OFFSETS {
         let Some(context) = fields::child(entry, offset) else { continue; };
         if out.iter().any(|c| c.ctx == context) { continue; }

@@ -3736,7 +3736,7 @@ impl DetachedSnapshot {
     fn new(owner: u32) -> Self {
         Self { owner,
             bodies: FixedList::new(BodyRef { id: 0, kind: 0, cell: 0, activated: false, valid: false, registered: None }),
-            contexts: FixedList::new(ContextRef { ctx: 0, controller: 0, valid: false }),
+            contexts: FixedList::new(ContextRef { ctx: 0, controller: 0, input_route: None, valid: false }),
             dispatch: None, records: None, held_kinds: FixedList::new(0) }
     }
     fn view(&self) -> DetachedView<'_> {
