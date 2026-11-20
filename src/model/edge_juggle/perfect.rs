@@ -1326,6 +1326,19 @@ mod tests {
     }
 
     #[test]
+    fn moving_stage_ledges_come_from_the_current_solid_floor() {
+        let tilted = [
+            [[-32.0, 1.0], [-80.0, -18.0]],
+            [[-32.0, 1.0], [32.0, 5.0]],
+            [[80.0, -2.0], [32.0, 5.0]],
+        ];
+        assert_eq!(floor_ledges(tilted), Some([[-80.0, -18.0], [80.0, -2.0]]));
+        assert_eq!(floor_ledges([]), None);
+        assert_eq!(floor_ledges([[[0.0, 0.0], [0.0, 2.0]]]), None);
+        assert_eq!(floor_ledges([[[f32::NAN, 0.0], [2.0, 2.0]]]), None);
+    }
+
+    #[test]
     fn only_the_four_approved_stock_stages_offer_an_opposite_crossing() {
         use crate::engine::stages::catalog::STAGES;
         let ledges = [[-40., 0.], [40., 0.]];
