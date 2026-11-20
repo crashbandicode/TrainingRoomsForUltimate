@@ -66,7 +66,6 @@ impl RouteHistory {
 
     pub fn planned(&mut self, route: Route) {
         self.active = Some(route);
-        self.previous = Some(route);
     }
 
     pub fn complete(&mut self) {
