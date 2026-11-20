@@ -1,10 +1,15 @@
 use super::{
-    crossing_margin, edge_di, level_run, mix, niche_plan, planned_delay, short, zone, Crossing,
+    crossing_margin, di_anchor, level_run, mix, niche_plan, planned_delay, short, zone, Crossing,
     Guarder, Hold, HoldFacts, LedgeWatch, Measured, Reach, Zone,
 };
 use crate::model::edge_juggle::perfect::{
-    AirPhysics, Correction, Plan, Point, Route, SpecialReach, GUARD, JUMP, SPECIAL,
+    hit_recovery, AirPhysics, Correction, Plan, Point, Route, SpecialReach, GUARD, JUMP, SPECIAL,
 };
+
+/// The Guard the Edge DI: the shipped survival rule against the point opposite the stage.
+fn edge_di(cpu: Point, ledge: Point, speed: Point, hitstun: f32, blast: [f32; 4]) -> Option<Point> {
+    hit_recovery(cpu, di_anchor(cpu, ledge), speed, hitstun, blast)
+}
 
 const AIR: AirPhysics = AirPhysics {
     horizontal_speed: 2.0,

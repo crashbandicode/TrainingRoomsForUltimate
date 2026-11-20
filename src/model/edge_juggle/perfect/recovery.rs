@@ -1,7 +1,7 @@
 //! Player-grade recovery decisions for Guard the Edge. Pure: the runtime applies pad edits only.
 
 use super::{
-    hit_recovery, AirPhysics, Correction, Plan, Point, Route, SpecialReach, ATTACK, GUARD, SPECIAL,
+    AirPhysics, Correction, Plan, Point, Route, SpecialReach, ATTACK, GUARD, SPECIAL,
 };
 
 /// Where the edge-guarder is against the fighter's near ledge.
@@ -346,17 +346,6 @@ pub fn niche_plan(route: Route, margin: f32, exit: Point) -> Plan {
 /// The point whose far side is the stage: DI "away" from it bends at the ledge.
 pub fn di_anchor(cpu: Point, ledge: Point) -> Point {
     [2.0 * cpu[0] - ledge[0], cpu[1]]
-}
-
-/// Survive the nearest blast zone first; otherwise bend the launch at the stage.
-pub fn edge_di(
-    cpu: Point,
-    ledge: Point,
-    speed: Point,
-    hitstun: f32,
-    blast: [f32; 4],
-) -> Option<Point> {
-    hit_recovery(cpu, di_anchor(cpu, ledge), speed, hitstun, blast)
 }
 
 #[cfg(test)]
