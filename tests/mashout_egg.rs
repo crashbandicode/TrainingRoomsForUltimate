@@ -278,7 +278,7 @@ fn actual_floor_ray_requires_layout_grants_and_valid_platforms() {
     let sites_start = sites.find("pub const FLOOR_RAY:").unwrap();
     let sites_end = sites.find("/// Fighter AttackModule").unwrap();
     let fixture = include_str!("support/mashout_floor_fixture.rs")
-        .replace("// FLOOR_RAY_READER", &runtime[reader_start..reader_end])
+        .replace("// FLOOR_RAY_READER", &runtime[reader_start..reader_end].replace("pub(super)", "pub(crate)"))
         .replace("// FLOOR_SITE_SELECTION", &sites[sites_start..sites_end])
         .replace(
             "/* GENERATED_SITES */ []",
@@ -345,6 +345,7 @@ fn actual_runtime_worker_native_epoch_admission_and_bests() {
             "// PRACTICE",
             [
                 "pub fn record_time",
+                "fn record_best",
                 "pub fn best_time",
                 "pub fn result_tick",
             ]

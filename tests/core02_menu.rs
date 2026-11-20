@@ -234,8 +234,9 @@ fn layout_row_counts_match_the_rc_freeze() {
     // Appended groups (rc.6 Level, rc.14 Practice games, rc.15 the Eggs-ercise and Break the Targets sub-screens): the
     // earlier indices hold.
     let titles: Vec<&str> = GROUPS.iter().map(|g| g.title).collect();
-    assert_eq!((titles.len(), titles[13], titles[19], titles[20], titles[25]), (26, "Extras", "Level", "Practice games", "Parry practice"));
+    assert_eq!((titles.len(), titles[13], titles[19], titles[20], titles[25]), (28, "Extras", "Level", "Practice games", "Parry practice"));
     assert_eq!(&titles[21..25], ["Tech practice", "Eggs-ercise", "Break the Targets", "Mash out"]);
+    assert_eq!(&titles[26..], ["Guard the Edge", "Juggler"]);
     for pilot_present in [false, true] {
         let m = menu_with(Env { pilot_present, ..Env::default() });
         assert!((0..m.entry_count(Page::Saves)).any(|i| m.entry(Page::Saves, i) == Some(Entry::Group(7))), "the Setup library section shows");

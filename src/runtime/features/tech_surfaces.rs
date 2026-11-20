@@ -415,6 +415,9 @@ impl FrameOutlineReader {
         }
         unsafe {
             const NEXT: usize = 0x15cbc60;
+            if !game::granted(NEXT) {
+                return None;
+            }
             let call: extern "C" fn(usize, *const NativePoint) -> usize =
                 std::mem::transmute(game::text_base() + NEXT);
             let id = call(line.id, &NativePoint([shared.x, shared.y, 0.0, 0.0]));

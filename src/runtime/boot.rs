@@ -338,6 +338,9 @@ fn run_inner() {
     let notices_closure = capabilities::cross_blocked_by(Feature::Notices, &usable).is_none();
     let (recording_on, notices_on) = install_pkg4(input_delay_on && recording_closure, cpu_core_on, notices_closure, &found4, &mut written4);
     recorder::set_enabled(recording_on);
+    let edge_juggle_on = crate::runtime::features::edge_juggle::install(
+        cpu_core_on && recording_on && capabilities::unit_usable(Feature::EdgeJuggle, &usable)
+    );
 
     // Package 5: the menu's layout archive hook, UI anchors and input callers (only when the closure holds).
     let ui_install = if capabilities::unit_usable(Feature::Ui, &usable) {
@@ -464,6 +467,7 @@ fn run_inner() {
         report(Feature::CpuLedge, cpu_ledge_on, None),
         report(Feature::CpuTech, cpu_tech_on, None),
         report(Feature::TechPractice, tech_practice_on, (!cpu_core_on).then_some("cpu_core_not_installed")),
+        report(Feature::EdgeJuggle, edge_juggle_on, (!recording_on).then_some("recording_not_installed")),
         report(Feature::CpuShield, cpu_shield_on, None),
         report(Feature::CpuMash, cpu_mash_on, None),
         report(Feature::CpuShieldDamage, cpu_shield_damage_on, None),

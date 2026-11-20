@@ -47,6 +47,7 @@ static CONFIG: Published<Config> = Published::new(Config {
     difficulty: [Difficulty::LevelNine; 2],
     reaction: [Reaction::Human; 2],
 });
+static INSTALLED: AtomicBool = AtomicBool::new(false);
 static P1_BUTTONS: AtomicU32 = AtomicU32::new(0);
 static START: AtomicU8 = AtomicU8::new(0);
 static ENGINE_ACTIVE: AtomicBool = AtomicBool::new(false);
@@ -144,6 +145,13 @@ struct Bodies {
     cpu: usize,
 }
 
+pub fn install(dependencies: bool) -> bool {
+    // Surface verification may ask for a memory map. Run it before the game callbacks use its result.
+    let installed = dependencies && unsafe { super::tech_surfaces::init() };
+    INSTALLED.store(installed, Ordering::Release);
+    installed
+}
+
 pub fn init(seed: u64) {
     ENGINE.lock().rng = Rng::new(seed);
 }
@@ -199,7 +207,7 @@ pub fn wizard_active() -> bool {
 }
 
 pub fn allowed() -> bool {
-    scene::is_native_training()
+    INSTALLED.load(Ordering::Acquire) && scene::is_native_training()
 }
 
 fn wanted() -> Option<Drill> {
@@ -213,6 +221,9 @@ pub(super) fn running() -> bool {
 }
 
 pub unsafe fn controls_cpu(accessor: usize) -> bool {
+    if !INSTALLED.load(Ordering::Acquire) {
+        return false;
+    }
     running()
         && !published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire)
         && natives::module_accessor(1) == Some(accessor)
@@ -226,6 +237,9 @@ pub(super) fn observe_player_pad(buttons: u32) {
 }
 
 pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Correction {
+    if !INSTALLED.load(Ordering::Acquire) {
+        return Correction::default();
+    }
     let Some(mut engine) = ENGINE.try_lock() else {
         return Correction::default();
     };
@@ -1003,6 +1017,9 @@ impl Engine {
 
 /// One step per primary P1 fighter frame, with current owned accessors and no waits.
 pub unsafe fn frame(fighter: usize) {
+    if !INSTALLED.load(Ordering::Acquire) {
+        return;
+    }
     let drill = wanted();
     if drill.is_none() && !ENGINE_ACTIVE.load(Ordering::Acquire) {
         return;

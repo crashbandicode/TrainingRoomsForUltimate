@@ -64,6 +64,13 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "tech_adapter::mash_snapshot", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::mash_entered", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::mash_guard", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    // The two native Training games reuse installed callbacks. Refusing one of their
+    // readers or placement calls leaves those other hooks available.
+    Boundary { function: "edge_juggle::frame", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("INSTALLED") },
+    Boundary { function: "edge_juggle::controls_cpu", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("INSTALLED") },
+    Boundary { function: "edge_juggle::ai_correction", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("INSTALLED") },
+    Boundary { function: "hitbox::attack_contact", owner: Some(Feature::Hitbox), gate: Gate::Flag("INSTALLED") },
+    Boundary { function: "hitbox::fighter_hurt_capsules", owner: Some(Feature::Hitbox), gate: Gate::Flag("INSTALLED") },
     // The save-state step of the per-fighter frame wrapper: a no-op until boot activates package 3.
     Boundary { function: "states::frame", owner: Some(Feature::StateCore), gate: Gate::Flag("ACTIVE") },
     // The frame wrapper's per-feature facts and appliers: each checks its feature's install flag first.
