@@ -78,7 +78,6 @@ impl NicheGuide {
                 climb: near[1] - y,
                 body: facts.body_clearance,
                 special,
-                can_jump: inputs.jumps != 0,
             }),
             climb: near[1] - y,
             budget: band.map(|band| Budget {

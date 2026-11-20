@@ -37,7 +37,6 @@ pub struct NearReach {
     pub climb: f32,
     pub body: f32,
     pub special: SpecialReach,
-    pub can_jump: bool,
 }
 
 /// Live inputs of the under-stage crossing budget.
@@ -78,10 +77,9 @@ enum Intent {
     HaymakerGap,
     CounterContact,
     WhipGap,
-    ChopColumn,
+    GenericUp,
     SwapGap,
     PhotonGap,
-    RayColumn,
 }
 
 /// 3a29e6af fd-3: seven authored Skull Bashes return to Fall after
@@ -104,10 +102,9 @@ impl Row {
             | Intent::HaymakerGap
             | Intent::CounterContact
             | Intent::WhipGap
-            | Intent::ChopColumn
+            | Intent::GenericUp
             | Intent::SwapGap
-            | Intent::PhotonGap
-            | Intent::RayColumn => Route::Near,
+            | Intent::PhotonGap => Route::Near,
             _ => Route::Opposite,
         };
         Self {
@@ -125,7 +122,7 @@ impl Row {
         if self.route == Route::Near {
             return Some(1.0);
         }
-        let measured = MEASURED.iter().find(|(row, _, _)| *row == self.id);
+        let measured = self.measured();
         if matches!(self.intent, Intent::ThunderOverhead) && measured.is_none() {
             return None;
         }
@@ -139,9 +136,15 @@ impl Row {
             budget.jumps,
             budget.special,
             self.aimed(),
-            measured.map_or(Measured::default(), |&(_, _, travel)| travel),
+            measured.map_or(Measured::default(), |(_, travel)| travel),
             budget.crossing,
         )
+    }
+
+    fn measured(&self) -> Option<(Move, Measured)> {
+        MEASURED.iter().find_map(|&(id, movement, travel)| {
+            (id == self.id).then_some((movement, travel))
+        })
     }
 
     pub fn launch_clears(&self, y: f32, ceiling: f32) -> bool {
@@ -169,14 +172,19 @@ impl Row {
                 Intent::Near => facts.short,
                 Intent::NearAbove => facts.short && facts.climb <= 0.0,
                 Intent::CounterContact => facts.counter_contact,
-                intent => facts.near.is_some_and(|near| intent.matches_near(near, facts.short)),
+                // A direct up special still uses the regular jump and special holds.
+                Intent::GenericUp => false,
+                intent => {
+                    let travel = self.measured().map(|(_, travel)| travel);
+                    facts.near.is_some_and(|near| intent.matches_near(near, facts.short, travel))
+                },
             }
             && self.margin(facts).is_some()
     }
 }
 
 impl Intent {
-    fn matches_near(self, near: NearReach, short: bool) -> bool {
+    fn matches_near(self, near: NearReach, short: bool, travel: Option<Measured>) -> bool {
         if !(near.special.valid()
             && near.gap.is_finite()
             && near.gap > 0.0
@@ -195,10 +203,12 @@ impl Intent {
                 short && near.gap <= 35.5 && near.climb <= near.special.rise + 10.0
             }
             Self::WhipGap => short && !in_column && near.climb <= near.body,
-            Self::ChopColumn => in_column && near.climb <= near.special.rise,
             Self::SwapGap => short && !in_column,
-            Self::PhotonGap => short && near.climb <= 0.0,
-            Self::RayColumn => in_column && near.climb > 0.0 && near.can_jump,
+            Self::PhotonGap => {
+                short && near.climb <= 0.0 && travel.is_some_and(|travel| {
+                    near.gap <= travel.run && near.climb <= travel.rise
+                })
+            }
             _ => false,
         }
     }
@@ -248,10 +258,10 @@ const ROWS: [Row; 40] = [
     Row::new(34, 0x9, Intent::NearAbove, &[Missile]),
     Row::new(35, 0x26, Intent::Across, &[Hold, Rise]),
     Row::new(36, 0x47, Intent::WhipGap, &[Side, Rise]),
-    Row::new(37, 0x47, Intent::ChopColumn, &[Rise]),
+    Row::new(37, 0x47, Intent::GenericUp, &[Rise]),
     Row::new(38, 0x5a, Intent::SwapGap, &[Swap]),
     Row::new(39, 0x5b, Intent::PhotonGap, &[Side]),
-    Row::new(40, 0x5b, Intent::RayColumn, &[Jump, Rise]),
+    Row::new(40, 0x5b, Intent::GenericUp, &[Jump, Rise]),
 ];
 
 pub const CANDIDATE_ROWS: u64 = (1 << ROWS.len()) - 1;
@@ -347,12 +357,9 @@ impl Sequence {
     /// The rest of the trip still fits, read again while the fighter is outside the
     /// near ledge. Past that point the row is flown to its end.
     pub fn still_crosses(&self, budget: Budget) -> bool {
-        let measured = MEASURED
-            .iter()
-            .find(|(row, movement, _)| {
-                *row == self.row.id && self.row.moves[self.index..].contains(movement)
-            })
-            .map_or(Measured::default(), |&(_, _, travel)| travel);
+        let measured = self.row.measured()
+            .filter(|(movement, _)| self.row.moves[self.index..].contains(movement))
+            .map_or(Measured::default(), |(_, travel)| travel);
         let aimed = self.row.aimed();
         crossing_margin(budget.air, budget.jumps, budget.special, aimed, measured, budget.crossing)
             .is_some()

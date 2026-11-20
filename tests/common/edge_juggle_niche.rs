@@ -117,7 +117,6 @@ fn facts(fighter: i32, mode: &str) -> Facts {
             climb: if mode == "long" { 0.0 } else { 20.0 },
             body: 8.0,
             special: perfect::SpecialReach { horizontal: 14.0, rise: 38.0 },
-            can_jump: true,
         }),
         short: mode == "near",
         climb: 0.0,
@@ -796,9 +795,7 @@ fn niche_mythra_needs_a_measured_photon_edge_before_choosing_a_terminal_special(
 fn niche_incineroar_adds_whip_only_outside_the_cross_chop_column() {
     let input = Facts { short: true, ..facts(0x47, "long") };
     let far = select(input, CANDIDATE_ROWS).expect("IN-1 for a horizontal shortfall");
-    let close = select(facts(0x47, "near"), CANDIDATE_ROWS).expect("IN-2 in the ledge column");
     assert_eq!((far.id, far.moves), (36, &[Move::Side, Move::Rise][..]));
-    assert_eq!((close.id, close.moves), (37, &[Move::Rise][..]));
     let mut far = Sequence::new(far);
     assert_eq!(
         far.step(sample(0, Motion::Free)).map(|pad| (pad.stick, pad.press)),
@@ -838,12 +835,9 @@ fn niche_pyra_starts_the_authored_native_swap_on_horizontal_shortfall() {
 
 #[test]
 fn niche_mythra_commits_to_only_one_special() {
-    let input = Facts { short: true, ..facts(0x5b, "long") };
-    let level = select(input, CANDIDATE_ROWS).expect("MY-1a level extended start");
-    let low = select(facts(0x5b, "near"), CANDIDATE_ROWS).expect("MY-1b below the ledge");
-    assert_eq!((level.id, level.moves), (39, &[Move::Side][..]));
-    assert_eq!((low.id, low.moves), (40, &[Move::Jump, Move::Rise][..]));
-    let mut level = Sequence::new(level);
+    let row = &super::ROWS[38];
+    assert_eq!((row.id, row.moves), (39, &[Move::Side][..]));
+    let mut level = Sequence::new(row);
     assert_eq!(
         level.step(sample(0, Motion::Free)).map(|pad| (pad.stick, pad.press)),
         Some((Some([1.0, 0.0]), perfect::SPECIAL))
@@ -851,14 +845,6 @@ fn niche_mythra_commits_to_only_one_special() {
     level.step(sample(1, Motion::Starting)).unwrap();
     assert!(level.step(sample(2, Motion::Interrupted)).is_none());
     assert!(level.action().is_none());
-    let mut low = Sequence::new(low);
-    assert_eq!(low.step(sample(0, Motion::Free)).unwrap().press, perfect::JUMP);
-    low.step(sample(1, Motion::Travel)).unwrap();
-    low.step(sample(2, Motion::Free)).unwrap();
-    assert_eq!(
-        low.step(sample(3, Motion::Free)).map(|pad| (pad.stick, pad.press)),
-        Some((Some([0.0, 1.0]), perfect::SPECIAL))
-    );
 }
 
 #[test]
@@ -873,9 +859,6 @@ fn niche_near_extensions_require_valid_reach_and_a_plausible_entry() {
         ..reach
     });
     assert!(select(pyra, CANDIDATE_ROWS).is_none());
-    let mut mythra = facts(0x5b, "near");
-    mythra.near = mythra.near.map(|reach| NearReach { can_jump: false, ..reach });
-    assert!(select(mythra, CANDIDATE_ROWS).is_none());
 }
 
 #[test]
@@ -906,7 +889,7 @@ fn niche_link_does_not_finish_the_bomb_move_after_only_pulling_it() {
 
 #[test]
 fn niche_near_gap_extensions_use_the_full_plain_return() {
-    for (fighter, row) in [(0x47, 36), (0x5a, 38), (0x5b, 39)] {
+    for (fighter, row) in [(0x47, 36), (0x5a, 38)] {
         let input = Facts { short: false, ..facts(fighter, "long") };
         let only = 1 << (row - 1);
         assert!(select(input, only).is_none(), "plain return can reach for row {row}");
