@@ -821,8 +821,8 @@ unsafe fn route_guide(
     let band = perfect::corridor(facts.outline, facts.ledges, bottom, body, facts.fall_budget);
     let fighter = natives::fighter_kind(cpu).unwrap_or(UNRESOLVED);
     let crossable = u32::from(band.is_some());
-    if special.is_some() && fighter != UNRESOLVED {
-        run.niche = niche_pad::NicheGuide::prepare_niche(cpu, p1, fighter, &facts, band);
+    if let Some(special) = special.filter(|_| fighter != UNRESOLVED) {
+        run.niche = niche_pad::NicheGuide::prepare_niche(cpu, p1, fighter, &facts, band, special, jumps);
         if let Some(guide) = run.niche.as_ref() {
             let row = guide.selected_niche_row();
             run.last_route = Some(row.route);
@@ -878,6 +878,15 @@ unsafe fn niche_correction(
     let Some(guide) = run.niche.as_mut() else {
         return Correction::default();
     };
+    if guide.accepts_form(None) {
+        let kind = natives::fighter_kind(cpu);
+        if !((kind == Some(0x5a) && niche_pad::pyra_swapping(status))
+            || kind.is_some_and(|kind| guide.accepts_form(Some(kind))))
+        {
+            run.niche = None;
+        }
+        return Correction::default();
+    }
     let id = guide.selected_niche_row().id;
     if let Some(edit) = guide.correct_niche_pad(ai, cpu, position, status, run.rounds.frames) {
         return stock.observe(edit, PerfectRule::Niche, run, 0, id.into());
@@ -1477,6 +1486,31 @@ pub unsafe fn frame(fighter: usize) {
         return;
     };
     let body = CpuBody::current();
+    let owns_setup = || {
+        super::cpu_level::drill_applied()
+            && natives::is_operation_cpu(1)
+            && !OPEN.load(Ordering::Acquire)
+            && !states::is_loading()
+            && !recorder::busy_for_drill()
+            && !published::input_owners().covers_strip()
+    };
+    if body.is_none()
+        && drill == Some(Drill::GuardEdge)
+        && START.load(Ordering::Acquire) == 0
+        && !RESTART.load(Ordering::Acquire)
+    {
+        if let Some(run) = engine.run.as_mut().filter(|run| {
+            run.rounds.phase == Phase::Live
+                && run.niche.as_ref().is_some_and(|guide| guide.accepts_form(None))
+        }) {
+            if owns_setup() {
+                // The native swap can leave entry 1 between objects for a frame.
+                // The attempt clock continues and no saved accessor is dereferenced.
+                run.rounds.advance_attempt(Observation::default());
+                return;
+            }
+        }
+    }
     let Some((drill, body)) = drill.zip(body) else {
         engine.wake_cpu(body);
         if engine.run.take().is_some() {
@@ -1487,13 +1521,7 @@ pub unsafe fn frame(fighter: usize) {
         return;
     };
     let cpu = body.accessor;
-    if !super::cpu_level::drill_applied()
-        || !natives::is_operation_cpu(1)
-        || OPEN.load(Ordering::Acquire)
-        || states::is_loading()
-        || recorder::busy_for_drill()
-        || published::input_owners().covers_strip()
-    {
+    if !owns_setup() {
         engine.wake_cpu(Some(body));
         if let Some(run) = &mut engine.run {
             run.rounds.discard_attempt();
@@ -1591,7 +1619,23 @@ pub unsafe fn frame(fighter: usize) {
     else {
         return;
     };
-    if run.body != body {
+    let Some(kind) = natives::fighter_kind(cpu) else {
+        return;
+    };
+    let followed_swap = run.rounds.phase == Phase::Live
+        && run.niche.as_ref().is_some_and(|guide| guide.accepts_form(Some(kind)));
+    if followed_swap {
+        run.body = body;
+        run.niche = None;
+        run.guide = None;
+        run.previous_damage = None;
+        run.damage_stop = false;
+        run.player_ledge = None;
+        run.plan_pending = true;
+        run.route_watch = perfect::RouteWatch::default();
+        run.player_height = PlanHeight::default();
+        run.jump_timing = JumpTiming::default();
+    } else if run.body != body {
         run.body = body;
         *held_cpu = None;
         run.rounds.restart_drill();
@@ -1600,9 +1644,6 @@ pub unsafe fn frame(fighter: usize) {
         run.damage_stop = false;
         run.player_ledge = None;
     }
-    let Some(kind) = natives::fighter_kind(cpu) else {
-        return;
-    };
     let key = (drill, kind, run.setup.area as u8, run.difficulty);
     if let Some(wizard) = &mut run.wizard {
         if wizard.step == WizardStep::Player {
@@ -1623,6 +1664,12 @@ pub unsafe fn frame(fighter: usize) {
         return;
     }
     let status = natives::status_kind(cpu);
+    if kind == 0x5a
+        && run.niche.as_ref().is_some_and(|guide| guide.accepts_form(None))
+        && !niche_pad::pyra_swapping(status)
+    {
+        run.niche = None;
+    }
     let dead_or_rebirthing = status == konst(C::StatusDead) || status == konst(C::StatusRebirth);
     let damage = Some(natives::damage(cpu, 0)).filter(|d| d.is_finite());
     let damage_stop = natives::tech_in_damage_stop(cpu) == Some(true);

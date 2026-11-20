@@ -1,6 +1,6 @@
 //! Character-specific recovery pads for Guard the Edge.
 
-use super::{Correction, Point, Route, ATTACK, FLICK_JUMP, GUARD, JUMP, SPECIAL};
+use super::{Correction, Point, Route, SpecialReach, ATTACK, FLICK_JUMP, GUARD, JUMP, SPECIAL};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Move {
@@ -21,6 +21,16 @@ pub enum Move {
     Float,
     Bomb,
     Missile,
+    Swap,
+}
+
+#[derive(Clone, Copy)]
+pub struct NearReach {
+    pub gap: f32,
+    pub climb: f32,
+    pub body: f32,
+    pub special: SpecialReach,
+    pub can_jump: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -31,6 +41,7 @@ pub struct Facts {
     pub player_over_crossing: bool,
     pub long_approach: bool,
     pub counter_contact: bool,
+    pub near: Option<NearReach>,
 }
 
 #[derive(Clone, Copy)]
@@ -40,6 +51,11 @@ enum Intent {
     LongApproach,
     Near,
     CounterContact,
+    WhipGap,
+    ChopColumn,
+    SwapGap,
+    PhotonGap,
+    RayColumn,
 }
 
 pub struct Row {
@@ -53,7 +69,13 @@ pub struct Row {
 impl Row {
     const fn new(id: u8, fighter: i32, intent: Intent, moves: &'static [Move]) -> Self {
         let route = match intent {
-            Intent::Near | Intent::CounterContact => Route::Near,
+            Intent::Near
+            | Intent::CounterContact
+            | Intent::WhipGap
+            | Intent::ChopColumn
+            | Intent::SwapGap
+            | Intent::PhotonGap
+            | Intent::RayColumn => Route::Near,
             _ => Route::Opposite,
         };
         Self {
@@ -76,13 +98,37 @@ impl Row {
                 Intent::LongApproach => clear && facts.covered_ledge && facts.long_approach,
                 Intent::Near => true,
                 Intent::CounterContact => facts.counter_contact,
+                intent => facts.near.is_some_and(|near| intent.matches_near(near)),
             }
+    }
+}
+
+impl Intent {
+    fn matches_near(self, near: NearReach) -> bool {
+        if !(near.special.valid()
+            && near.gap.is_finite()
+            && near.gap > 0.0
+            && near.climb.is_finite()
+            && near.body.is_finite()
+            && near.body > 0.0)
+        {
+            return false;
+        }
+        let short = near.gap > near.special.horizontal;
+        match self {
+            Self::WhipGap => short && near.climb <= near.body,
+            Self::ChopColumn => !short && near.climb <= near.special.rise,
+            Self::SwapGap => short,
+            Self::PhotonGap => short && near.climb <= 0.0,
+            Self::RayColumn => !short && near.climb > 0.0 && near.can_jump,
+            _ => false,
+        }
     }
 }
 
 // Native body kinds follow TR's roster_grid; Charizard is the separate 0x26 body.
 use Move::*;
-const ROWS: [Row; 35] = [
+const ROWS: [Row; 40] = [
     Row::new(1, 0x8, Intent::Across, &[QuickAttack]),
     Row::new(2, 0x8, Intent::ThunderOverhead, &[Down, QuickAttack]),
     Row::new(3, 0x8, Intent::LongApproach, &[Side, QuickAttack]),
@@ -118,6 +164,11 @@ const ROWS: [Row; 35] = [
     Row::new(33, 0x5, Intent::Across, &[Jump, Rise]),
     Row::new(34, 0x9, Intent::Near, &[Missile]),
     Row::new(35, 0x26, Intent::Across, &[Jump, Jump, Rise]),
+    Row::new(36, 0x47, Intent::WhipGap, &[Side, Rise]),
+    Row::new(37, 0x47, Intent::ChopColumn, &[Rise]),
+    Row::new(38, 0x5a, Intent::SwapGap, &[Swap]),
+    Row::new(39, 0x5b, Intent::PhotonGap, &[Side]),
+    Row::new(40, 0x5b, Intent::RayColumn, &[Jump, Rise]),
 ];
 
 pub const CANDIDATE_ROWS: u64 = (1 << ROWS.len()) - 1;
@@ -184,6 +235,14 @@ impl Sequence {
 
     pub fn action(&self) -> Option<Move> {
         self.row.moves.get(self.index).copied()
+    }
+
+    /// Only a down-special issued by this sequence and accepted by the game can
+    /// carry an Edge attempt across the native form handoff.
+    pub fn accepts_form(&self, fighter: Option<i32>) -> bool {
+        self.action() == Some(Swap)
+            && matches!(self.stage, Stage::Accepted(_))
+            && matches!(fighter, None | Some(0x5b))
     }
 
     pub fn row(&self) -> &'static Row {
@@ -317,7 +376,7 @@ fn initial_input(movement: Move, forward: f32) -> Correction {
         Jump => ([forward, 0.0], JUMP),
         Float => ([0.0, -1.0], JUMP),
         Side | ChargedSide | Missile => ([forward, 0.0], SPECIAL),
-        Down | Counter | Bomb => ([0.0, -1.0], SPECIAL),
+        Down | Counter | Bomb | Swap => ([0.0, -1.0], SPECIAL),
         _ => ([0.0, 1.0], SPECIAL),
     };
     pad(stick, button)
@@ -333,7 +392,7 @@ fn continuation(
     let aim = match movement {
         Float if sample.motion == Motion::Starting => [0.0, -1.0],
         QuickAttack if sample.motion == Motion::Starting => forward,
-        Down | Counter | Bomb if sample.motion == Motion::Starting => [0.0, -1.0],
+        Down | Counter | Bomb | Swap if sample.motion == Motion::Starting => [0.0, -1.0],
         Rise | Travel | QuickAttack | Barrel | Hover | Bolt | Glide => sample.aim,
         _ => forward,
     };

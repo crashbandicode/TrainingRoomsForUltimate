@@ -8,8 +8,8 @@ use crate::{
     model::{sites_pkg2, sites_pkg3},
     runtime::game,
 };
-use perfect::niche::{self, Facts, Motion, Move, Row, Sample, Sequence};
-use perfect::{Correction, Point, Route, RouteFacts};
+use perfect::niche::{self, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
+use perfect::{Correction, Point, Route, RouteFacts, SpecialReach};
 
 pub(super) struct NicheGuide {
     sequence: Sequence,
@@ -34,6 +34,8 @@ impl NicheGuide {
         fighter: i32,
         facts: &RouteFacts<'_>,
         band: Option<Point>,
+        special: SpecialReach,
+        jumps: u8,
     ) -> Option<Self> {
         let [left, right] = facts.ledges;
         let center = left[0].midpoint(right[0]);
@@ -44,9 +46,10 @@ impl NicheGuide {
             (right, left, -1.0)
         };
         let outside = (near[0] - x) * direction;
-        if !(outside > 0.0 && y < near[1] && facts.player.into_iter().all(f32::is_finite)) {
+        if !(outside > 0.0 && facts.player.into_iter().all(f32::is_finite)) {
             return None;
         }
+        let band = band.filter(|_| y < near[1]);
         let reach = facts.player_reach + facts.body_clearance;
         let row = niche::select(
             Facts {
@@ -57,6 +60,13 @@ impl NicheGuide {
                 player_over_crossing: (facts.player[0] - center).abs() <= facts.player_reach,
                 long_approach: outside > facts.body_clearance * 2.0,
                 counter_contact: fighter == 0x34 && attack_reaches_core(p1, cpu) == Some(true),
+                near: Some(NearReach {
+                    gap: outside,
+                    climb: near[1] - y,
+                    body: facts.body_clearance,
+                    special,
+                    can_jump: jumps != 0,
+                }),
             },
             niche::CANDIDATE_ROWS,
         )?;
@@ -78,6 +88,10 @@ impl NicheGuide {
             across,
             player_x: facts.player[0],
         })
+    }
+
+    pub(super) fn accepts_form(&self, fighter: Option<i32>) -> bool {
+        self.sequence.accepts_form(fighter)
     }
 
     pub(super) fn selected_niche_row(&self) -> &'static Row {
@@ -174,7 +188,7 @@ unsafe fn niche_start_enabled(cpu: usize, movement: Move, available: bool) -> bo
         }
         Jump | Float => return false,
         Side | ChargedSide | Missile => C::TermContSpecialS,
-        Down | Counter | Bomb => C::TermContSpecialLw,
+        Down | Counter | Bomb | Swap => C::TermContSpecialLw,
         _ if available => C::TermContSpecialHi,
         _ => return false,
     };
@@ -199,7 +213,7 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
     }
     let start = match movement {
         Side | ChargedSide | Missile => C::StatusSpecialS,
-        Down | Counter | Bomb => C::StatusSpecialLw,
+        Down | Counter | Bomb | Swap => C::StatusSpecialLw,
         Drift | Jump | Float => {
             return match (fighter, movement, status) {
                 (0xd | 0xe, Float, 0x1e8) => Starting,
@@ -269,7 +283,11 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
         | (0x5d, SoraChain, 0x1eb)
         | (0x9, Missile, 0x1e2)
         | (0xa | 0x28, Bolt, 0x1e6)
-        | (0x2, Bomb, 0x1e5) => Motion::Travel,
+        | (0x2, Bomb, 0x1e5)
+        | (0x47, Rise, 0x1e6..=0x1e8)
+        | (0x5a, Swap, 0x1e1 | 0x1e2)
+        | (0x5b, Side, 0x1e9)
+        | (0x5b, Rise, 0x1eb..=0x1ed) => Motion::Travel,
         (0x2, Rise, 0x1e3)
         | (0x8 | 0x13, QuickAttack, 0x1e2)
         | (0x8, Side, 0x1e6)
@@ -287,9 +305,18 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
         | (0x35, Travel, 0x1e9)
         | (0x37, Travel, 0x1ed)
         | (0x3a, Rise, 0x1e8)
-        | (0x5d, SoraChain, 0x1ee) => Finish,
+        | (0x5d, SoraChain, 0x1ee)
+        | (0x47, Side, 0x1e4 | 0x1e5)
+        | (0x47, Rise, 0x1e9 | 0x1ea)
+        | (0x5b, Side, 0x1ea)
+        | (0x5b, Rise, 0x1ee) => Finish,
         _ => Interrupted,
     }
+}
+
+pub(super) fn pyra_swapping(status: i32) -> bool {
+    status != UNRESOLVED
+        && (status == konst(C::StatusSpecialLw) || matches!(status, 0x1e1 | 0x1e2))
 }
 
 unsafe fn has_burner(cpu: usize) -> bool {
