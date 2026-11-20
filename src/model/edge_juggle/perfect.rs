@@ -743,6 +743,31 @@ mod tests {
     }
 
     #[test]
+    fn distance_airdodge_only_spends_the_last_resource_when_it_reaches() {
+        let ledge = [-80., 0.];
+        let from = [-104., -7.];
+        let base = DodgeReach { distance: 25., cancel_frames: 60. };
+        let pad = distance_dodge(from, ledge, base, true, false);
+        assert_eq!(pad.press, GUARD);
+        let [x, y] = pad.stick.unwrap();
+        assert!(x > 0.9 && y > 0.0);
+        assert_eq!(distance_dodge(from, ledge, base, false, false), Correction::default());
+        assert_eq!(distance_dodge(from, ledge, base, true, true), Correction::default());
+        assert_eq!(
+            distance_dodge([-104., -8.], ledge, base, true, false),
+            Correction::default()
+        );
+        assert_eq!(
+            distance_dodge(from, ledge, DodgeReach { distance: 0., ..base }, true, false),
+            Correction::default()
+        );
+        assert_eq!(
+            distance_dodge(from, ledge, DodgeReach { cancel_frames: f32::NAN, ..base }, true, false),
+            Correction::default()
+        );
+    }
+
+    #[test]
     fn high_route_spends_the_jump_before_reaching_the_lip() {
         let air = AirPhysics {
             horizontal_speed: 2.0,
