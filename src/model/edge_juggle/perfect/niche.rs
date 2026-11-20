@@ -325,6 +325,18 @@ impl Sequence {
         self.row
     }
 
+    /// The rest of the trip still fits, read again while the fighter is outside the
+    /// near ledge. Past that point the row is flown to its end.
+    pub fn still_crosses(&self, budget: Budget) -> bool {
+        let measured = MEASURED
+            .iter()
+            .find(|(row, _)| *row == self.row.id && self.index == 0)
+            .map_or(Measured::default(), |&(_, travel)| travel);
+        let aimed = self.row.aimed();
+        crossing_margin(budget.air, budget.jumps, budget.special, aimed, measured, budget.crossing)
+            .is_some()
+    }
+
     fn advance(&mut self) {
         self.index += 1;
         self.stage = Stage::Ready;

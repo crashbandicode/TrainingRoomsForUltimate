@@ -1,7 +1,7 @@
 //! Native observations for the niche route pad sequence.
 
 use super::{
-    air_physics, airborne_recovery, attack_reaches_core, konst, natives, perfect,
+    airborne_recovery, attack_reaches_core, konst, natives, perfect,
     recovery_snapshot, remaining_jumps, special_reach, state, C, UNRESOLVED,
 };
 use crate::{
@@ -26,6 +26,7 @@ struct Crossing {
     band: Point,
     direction: f32,
     exit: f32,
+    air: AirPhysics,
 }
 
 /// What the plan already read for the row's need and its crossing budget.
@@ -101,6 +102,7 @@ impl NicheGuide {
                 band: band?,
                 direction,
                 exit,
+                air: inputs.air,
             })
         } else {
             None
@@ -162,12 +164,31 @@ impl NicheGuide {
             true,
         );
         let (mut low, mut hold_over) = (false, true);
+        let native_phase = (movement != Move::Bomb)
+            .then(|| niche_motion_phase(cpu, self.fighter, movement, status));
         if let Some(crossing) = self.across.as_ref() {
             let entered = (x - crossing.near) * crossing.direction >= 0.0;
             let beyond = (x - crossing.far) * crossing.direction > 0.0;
             let [bottom, top] = crossing.band;
             if !beyond && (y < bottom || entered && y > top) {
                 return None;
+            }
+            // Outside the near ledge the crossing can still be given up: read its budget again.
+            if !entered && native_phase == Some(Motion::Free) {
+                let budget = Budget {
+                    air: crossing.air,
+                    jumps: remaining_jumps(cpu)?,
+                    special: available.then_some(reach),
+                    crossing: recovery::Crossing {
+                        span: (crossing.exit - x).abs(),
+                        band: crossing.band,
+                        foot: y,
+                        ledge: self.ledge[1],
+                    },
+                };
+                if !self.sequence.still_crosses(budget) {
+                    return None;
+                }
             }
             at_exit = (x - crossing.exit) * crossing.direction >= 0.0;
             can_enter = beyond || y <= top;
@@ -188,11 +209,9 @@ impl NicheGuide {
                     && remaining <= recovery::level_run(reach, self.ledge[1] - y);
             }
         }
-        let (phase, actionable) = if movement == Move::Bomb {
-            link_bomb_phase(cpu, status, [x, y], direction, self.body_clearance)?
-        } else {
-            let phase = niche_motion_phase(cpu, self.fighter, movement, status);
-            (phase, phase == Motion::Free)
+        let (phase, actionable) = match native_phase {
+            Some(phase) => (phase, phase == Motion::Free),
+            None => link_bomb_phase(cpu, status, [x, y], direction, self.body_clearance)?,
         };
         if movement == Move::Hover && self.fighter == 0x2d && !has_burner(cpu) {
             return None;
