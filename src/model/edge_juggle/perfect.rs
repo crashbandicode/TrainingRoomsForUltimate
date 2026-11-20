@@ -284,6 +284,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn juggle_drift_uses_legal_fall_time_and_leaves_stock_defensive_inputs() {
+        let facts = LandingFacts {
+            cpu: [5., 45.], player: [0., 5.], main_floor: [-70., 70.],
+            stock_stick_y: -0.15, stock_buttons: 0x8000,
+        };
+        assert_eq!(juggle_drift(facts, 0).stick, Some([1., -0.15]));
+        assert_eq!(juggle_drift(facts, 4).stick, Some([0., -0.15]));
+        assert_eq!(juggle_drift(LandingFacts { stock_buttons: 0x8008, ..facts }, 0), Correction::default());
+        assert_eq!(juggle_drift(LandingFacts { cpu: [70., 45.], ..facts }, 0), Correction::default());
+        assert_eq!(juggle_drift(LandingFacts { player: [0., 50.], ..facts }, 0), Correction::default());
+    }
+
+    #[test]
     fn recovery_jump_can_wait_only_with_enough_horizontal_and_vertical_reach() {
         let air = AirPhysics {
             horizontal_speed: 2.0,
