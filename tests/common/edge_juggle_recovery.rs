@@ -744,3 +744,64 @@ fn an_enabled_jump_transition_does_not_hide_an_exhausted_jump_budget() {
     assert!(!recovery_jump_available(Some(0), true));
     assert!(!recovery_jump_available(None, true));
 }
+
+
+#[test]
+fn measured_crossing_reads_the_race_to_the_far_ledge() {
+    use super::CrossingRace;
+    let race = CrossingRace {
+        near_x: -80.0,
+        far_x: 80.0,
+        guarder_x: -79.0,
+        guarder_run_speed: 1.5,
+        guarder_facing: 1.0,
+        crossing_frames: 158,
+    };
+    assert_eq!(race.crossing_share(Zone::Ledge), Some(6));
+    assert_eq!(race.crossing_share(Zone::Hang), Some(20));
+    assert_eq!(race.crossing_share(Zone::OffLow), Some(45));
+    assert_eq!(CrossingRace { guarder_run_speed: 0.0, ..race }.crossing_share(Zone::Hang), None);
+    assert_eq!(CrossingRace { guarder_x: f32::NAN, ..race }.crossing_share(Zone::Hang), None);
+    let mirrored = CrossingRace {
+        near_x: -race.near_x,
+        far_x: -race.far_x,
+        guarder_x: -race.guarder_x,
+        guarder_facing: -race.guarder_facing,
+        ..race
+    };
+    assert_eq!(mirrored.crossing_share(Zone::Ledge), race.crossing_share(Zone::Ledge));
+    let turning = CrossingRace { guarder_run_speed: 1.25, ..race };
+    assert_eq!(turning.crossing_share(Zone::Ledge), Some(6));
+    assert_eq!(CrossingRace { guarder_facing: -1.0, ..turning }.crossing_share(Zone::Ledge), Some(20));
+}
+
+#[test]
+fn measured_crossing_is_a_mixup_and_preserves_the_only_feasible_return() {
+    use super::{mix_measured_crossing, CrossingRace};
+    let race = CrossingRace {
+        near_x: -80.0,
+        far_x: 80.0,
+        guarder_x: -79.0,
+        guarder_run_speed: 1.5,
+        guarder_facing: 1.0,
+        crossing_frames: 158,
+    };
+    let options = ROUTES.map(plan);
+    let route = |draw, last| {
+        mix_measured_crossing(options, Zone::Ledge, last, draw, race).unwrap().route
+    };
+    let percent = |p: u64| ((u64::from(u32::MAX) * p) / 100) as u32;
+    assert_ne!(route(percent(92), None), Route::Opposite);
+    assert_eq!(route(percent(95), None), Route::Opposite);
+    assert_ne!(route(percent(95), Some(Route::Opposite)), Route::Opposite);
+    assert_eq!(route(percent(99), Some(Route::Opposite)), Route::Opposite);
+    assert_eq!(
+        mix_measured_crossing(only(Route::Opposite), Zone::Hang, None, 0, race).unwrap().route,
+        Route::Opposite,
+    );
+    let invalid = CrossingRace { guarder_run_speed: f32::NAN, ..race };
+    assert_ne!(
+        mix_measured_crossing(options, Zone::Ledge, None, u32::MAX, invalid).unwrap().route,
+        Route::Opposite,
+    );
+}

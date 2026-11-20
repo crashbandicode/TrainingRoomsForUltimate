@@ -115,6 +115,32 @@ pub fn mix(options: [Option<Plan>; 4], zone: Zone, last: Option<Route>, draw: u3
     None
 }
 
+#[derive(Clone, Copy)]
+pub struct CrossingRace {
+    pub near_x: f32,
+    pub far_x: f32,
+    pub guarder_x: f32,
+    pub guarder_run_speed: f32,
+    pub guarder_facing: f32,
+    pub crossing_frames: u16,
+}
+
+impl CrossingRace {
+    pub fn crossing_share(self, _zone: Zone) -> Option<u8> {
+        None
+    }
+}
+
+pub fn mix_measured_crossing(
+    options: [Option<Plan>; 4],
+    zone: Zone,
+    last: Option<Route>,
+    draw: u32,
+    _race: CrossingRace,
+) -> Option<Plan> {
+    mix(options, zone, last, draw)
+}
+
 /// What the fighter still has for the return: the jump, then the up special.
 #[derive(Clone, Copy)]
 pub struct Reach {
