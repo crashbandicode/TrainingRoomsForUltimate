@@ -26,6 +26,7 @@ use crate::runtime::ui::{combos, external, layouts, requests};
 use crate::model::input_delay::Owners;
 use crate::runtime::ui::state::{CLOSE_COUNT, CLOSE_FADES, CLOSE_HELD, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, JUMPS, LAYOUT_READY, OPEN, POPUP, POPUP_REQ, PROMPT};
 use crate::model::storage::ROOT;
+use crate::engine::rr_runtime::{apply_catalog, apply_index, CatalogCache, MenuIndex};
 use crate::engine::stages::stage_forms::Selection;
 
 static INPUT: Ring<64> = Ring::new();
@@ -224,6 +225,12 @@ struct Session {
     /// The open menu already has this catalog generation. A close drops the menu,
     /// so the watch reloads on the next open even when no file was written.
     catalog_watch: crate::model::recording_menu::CatalogWatch,
+    index_watch: crate::model::recording_menu::CatalogWatch,
+    recording_index: MenuIndex,
+    follow_drill: bool,
+    /// The card's recording catalog, kept across menu opens (menu-speed fix, Switch 2026-11-19): built after boot and
+    /// after each TR file change a file per worker pass, so a menu open takes it without reading the card.
+    catalog: CatalogCache,
     setups: super::setups::Ui,
     setup_note: Option<String>,
     combos: combos::Ui,
@@ -245,6 +252,10 @@ struct Session {
 
 impl Session {
     /// The worker has something to poll (the layer changes its panels on the game thread, the keyboard returns there).
+    fn recording_version(&self) -> Option<(u64, u64)> {
+        self.catalog_watch.generation().zip(self.index_watch.generation())
+    }
+
     fn watching(&self) -> bool {
         if self.setups.watching() { return true; }
         if self.pending_close.is_some() { return true; }
@@ -289,14 +300,32 @@ fn run() {
         sync_sequence_drill();
         // The roster's answers to the combo panel's switch at menu close (the game frame ran the request: the lock-free runtime).
         super::combos::service_switch_replies();
+        // Menu speed: the card's catalog is built a file per pass, the input drained between files (a menu open never
+        // reads the card).
+        let version = crate::engine::rr_host::recording_version();
+        session.catalog.want(version.0);
+        let building = session.catalog.step();
+        if session.catalog.take_external_change() {
+            crate::engine::rr_host::bump_catalog();
+        }
+        let read_index = !building && session.catalog.ready(version.0).is_some()
+            && session.recording_index.step(std::path::Path::new(ROOT), version);
         if refresh_recording(&mut session) {
             publish_frame(&session);
+        }
+        if session.follow_drill && session.recording_version() == Some(crate::engine::rr_host::recording_version()) {
+            if let Some(menu) = session.menu.as_ref().filter(|menu| !menu.recording().loading()) {
+                session.follow_drill = false;
+                follow_recording_drill(menu);
+            }
         }
         sync_panels(&mut session);
         let developer_pending = developer_reload.step();
         #[cfg(feature = "diag")]
         crate::runtime::stall_watch::worker_step(0);
-        if session.watching() || developer_pending {
+        if building || (read_index && session.recording_index.ready(version).is_some()) {
+            WAKE.wait(Some(std::time::Duration::ZERO));
+        } else if read_index || session.watching() || developer_pending {
             WAKE.wait(Some(POLL));
         } else {
             WAKE.wait(None);
@@ -310,6 +339,8 @@ fn sync_input_generation(s: &mut Session) {
         s.input_generation = generation;
         s.keeper.drop_model(&mut s.menu);
         s.catalog_watch = s.catalog_watch.on_menu_dropped();
+        s.index_watch = s.index_watch.on_menu_dropped();
+        s.follow_drill = false;
         s.stage_context = None;
         s.stage_close = None;
         // Practice cleanup can suspend a same-lobby draft. The provider and
@@ -353,6 +384,10 @@ fn handle(event: Event, s: &mut Session) {
         crate::runtime::features::tech::menu_opened();
         crate::runtime::ui::menu_app::note_open();
         { s.opening = crate::runtime::ui::menu_app::sequence(); }
+        // The kept catalog before the first frame (menu speed): no card read, so the opening is drawn at once.
+        refresh_recording(s);
+        // Then the folders are listed in the worker's passes, to see files copied onto the card outside TR.
+        s.catalog.check();
         publish_frame(s);
         publish_jumps(s);
         if crate::runtime::export::wanted() {
@@ -390,11 +425,12 @@ fn toggle_popup(s: &mut Session) {
         s.keeper.open(&mut s.menu, settings, env());
     }
     refresh_recording(s);
+    let version = s.recording_version();
     if let Some(menu) = s.menu.as_mut() {
         if !menu.recording().popup_open() { crate::engine::rr_host::arm_drill_record(false); }
         menu.on_request(crate::model::chords::Request::RecordingPopup);
         publish_popup(menu.recording().popup_open());
-        post_recording_effect(menu);
+        post_recording_effect(menu, version);
     }
     publish_frame(s);
     publish_jumps(s);
@@ -451,11 +487,12 @@ fn press(button: Button, s: &mut Session) {
         return;
     }
     refresh_recording(s);
+    let version = s.recording_version();
     if popup && !open {
         if let Some(menu) = s.menu.as_mut() {
             menu.set_console(console_mode());
             menu.press(button);
-            post_recording_effect(menu);
+            post_recording_effect(menu, version);
         }
         return;
     }
@@ -537,7 +574,7 @@ fn press(button: Button, s: &mut Session) {
     if let Some(menu) = s.menu.as_mut() {
         #[cfg(feature = "diag")]
         crate::runtime::stall_watch::worker_step(2);
-        post_recording_effect(menu);
+        post_recording_effect(menu, version);
         #[cfg(feature = "diag")]
         crate::runtime::stall_watch::worker_step(3);
         apply_shortcuts(menu);
@@ -551,34 +588,55 @@ fn press(button: Button, s: &mut Session) {
     }
 }
 
-/// The recording menu names the file work. This thread posts it and the pop-up's role.
-fn post_recording_effect(menu: &mut Menu) {
-    let selection = menu.recording().selection();
-    crate::engine::rr_host::publish_menu_role(selection.record_role);
-    let drill = selection.drill.clone();
-    let kind = drill.as_ref().and_then(|id| {
-        if menu.recording().catalog().combos.iter().any(|file| &file.id == id) {
-            Some(crate::engine::library::DrillKind::Combo)
-        } else if menu.recording().catalog().sequences.iter().any(|file| &file.id == id) {
-            Some(crate::engine::library::DrillKind::Sequence)
-        } else {
-            None
+/// Only a press made against the current catalog and index can post work.
+fn post_recording_effect(menu: &mut Menu, observed: Option<(u64, u64)>) {
+    use crate::model::recording_menu::Effect;
+    use crate::engine::rr_host;
+
+    let screens = menu.recording_mut();
+    let selection = screens.selection();
+    rr_host::publish_menu_role(selection.record_role);
+    let Some((effect, changed, version)) = rr_host::take_menu_effect(std::path::Path::new(ROOT), screens, observed) else { return };
+    if changed && !matches!(effect, Effect::DeleteSave { .. } | Effect::DeleteFile { .. }) {
+        let kind = recording_drill_kind(menu, selection.drill.as_deref());
+        if !rr_host::publish_selection_at(std::path::Path::new(ROOT), &selection, kind, Some(version)) {
+            menu.recording_mut().set_loading();
+            return;
         }
-    });
-    crate::engine::rr_host::note_drill(drill.clone());
-    apply_grade_target(drill.as_deref(), kind);
-    crate::engine::rr_host::publish_selection(std::path::Path::new(ROOT), &selection, kind);
-    let effect = menu.recording_mut().take_effect();
-    if effect == crate::model::recording_menu::Effect::RecordDrill {
+        follow_recording_drill(menu);
+    }
+    if version != rr_host::recording_version() {
+        return;
+    }
+    if effect == Effect::RecordDrill {
         let chord = crate::model::menu::chord::Chord::from_row(menu.settings().menu.get("input_record").unwrap_or(&[]));
         notices::post_body("Record drill", crate::model::notify::Body::copied(&format!("{chord}: start; again: stop and save")), 240, DEFAULT_COLOR);
     }
     match effect {
-        crate::model::recording_menu::Effect::OpenCrop { source, combo } => {
+        Effect::OpenCrop { source, combo } => {
             crate::runtime::macros::replay_capture::open_file_editor(&source, combo);
         }
-        effect => crate::engine::rr_host::post_effect(effect),
+        effect => rr_host::post_effect_at(effect, Some(version)),
     }
+}
+
+fn recording_drill_kind(menu: &Menu, drill: Option<&str>) -> Option<crate::engine::library::DrillKind> {
+    use crate::engine::library::DrillKind;
+    let id = drill?;
+    let catalog = menu.recording().catalog();
+    if catalog.combos.iter().any(|file| file.id == id) {
+        Some(DrillKind::Combo)
+    } else if catalog.sequences.iter().any(|file| file.id == id) {
+        Some(DrillKind::Sequence)
+    } else {
+        None
+    }
+}
+
+fn follow_recording_drill(menu: &Menu) {
+    let drill = menu.recording().selection().drill;
+    crate::engine::rr_host::note_drill(drill.clone());
+    apply_grade_target(drill.as_deref(), recording_drill_kind(menu, drill.as_deref()));
 }
 
 /// What the frame hook drills: the kind and id, and for a sequence the plan it was given (to see a change on the card).
@@ -673,27 +731,37 @@ fn sync_sequence_drill() {
     }
 }
 
-/// Reload the pop-up after the recording worker writes a file, and return a typed name.
+/// Adopt the current file catalog and current index independently, without card I/O.
 fn refresh_recording(s: &mut Session) -> bool {
-    if s.menu.is_none() {
-        return false;
-    }
-    let gen = crate::engine::rr_host::catalog_generation();
-    let (watch, due) = s.catalog_watch.take_load(gen);
-    s.catalog_watch = watch;
+    let version = crate::engine::rr_host::recording_version();
     let Some(menu) = s.menu.as_mut() else { return false };
     let mut changed = false;
-    if due {
-        if let Ok(loaded) = crate::engine::rr_runtime::load_catalog(std::path::Path::new(ROOT)) {
-            menu.recording_mut().set_catalog(loaded.catalog);
-            menu.recording_mut().adopt(loaded.bound, loaded.active, loaded.loops, loaded.drill);
-            menu.recording_mut().adopt_slots(loaded.slots);
+    if let (Some(catalog), Some(index)) = (s.catalog.ready(version.0), s.recording_index.ready(version)) {
+        let previous = s.catalog_watch.generation().zip(s.index_watch.generation());
+        let (catalog_watch, files_due) = s.catalog_watch.take_load(version.0);
+        let (index_watch, index_due) = s.index_watch.take_load(version.1);
+        s.catalog_watch = catalog_watch;
+        s.index_watch = index_watch;
+        let screens = menu.recording_mut();
+        if previous.is_some_and(|previous| previous != version) {
+            screens.set_loading(); // Retire name/picker targets from the old revision.
+        }
+        let was_loading = screens.loading();
+        if files_due || index_due || was_loading {
+            apply_catalog(catalog, index, screens);
             changed = true;
         }
+        if index_due || was_loading {
+            apply_index(index, screens);
+        }
+        s.follow_drill |= changed;
+    } else if !menu.recording().loading() {
+        menu.recording_mut().set_loading();
+        changed = true;
     }
     if let Some(name) = crate::runtime::features::recording_host::take_typed_name() {
         menu.recording_mut().submit_name(&name);
-        post_recording_effect(menu);
+        post_recording_effect(menu, s.catalog_watch.generation().zip(s.index_watch.generation()));
         changed = true;
     }
     emit_recording_diag(menu);

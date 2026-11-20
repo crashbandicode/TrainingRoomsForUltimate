@@ -2073,15 +2073,7 @@ approved_by = "Operator 2026-11-19 approved the too-fast notice; primary c07b344
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 165701
+ceiling = 166605
 date = "2026-11-20"
-reason = "Merge of rc.15 submenu-page-switch (0a7ee52a) onto f8404c3a: L / R step the page from submenus, the worker's roster editor is dropped when its grid leaves the top (no X-preview leak), ZL + Up / Down and the recording lists wrap. The branch measured 165174 on 4f25a854 (+46 over the measured 165128); its ceiling entries were +29, +14 and +2 (165129 -> 165174). Re-summed on main's 165656 ceiling: 165656 + 45 = 165701 (main measured 165655, so 165655 + 46 = 165701, zero headroom); the integration gate re-measures."
-approved_by = "Operator 2026-11-19 approved the submenu page switch, the page/recording wraps (~23:10Z); primary c07b3449 merged after REVIEW PASS review-menu-astra 01:23Z and re-summed the budget tail."
-
-[[budget]]
-scope = "total"
-basis = "rustfmt-sloc4"
-ceiling = 165885
-date = "2026-11-20"
-reason = "Merge of rc.15 Mash out ledge placement (5b359ac6) onto 69be4897: guarded floor placement with edge clearance for every grab and move, grounded CPU teeter admission (operator-approved), exact shared-endpoint floor joins, stock normal/wall-bit guards. The branch measured 165514 on 96355cad (+184 over the measured 165330). Added to main's measured 165701: 165885."
-approved_by = "Operator 2026-11-19 approved the Mash out reliability fixes, the ledge admission and (via the primary) the exact floor joins; primary c07b3449 merged after REVIEW PASS review-games-astra 01:34Z and re-summed the budget tail."
+reason = "Merge of rc.15 practice menu speed (recording catalog cache, 81b86cfc) onto 629870c5: the worker-kept incremental catalog, the bounded external names+sizes check, generation-checked actions and writeback, and Loop intents through the latest-index guard. The branch measured 166050 on 96355cad (+720 over the measured 165330). Added to main's measured 165885: 166605."
+approved_by = "Operator approved the menu speed size (+232, then ~+512, then +677 'yep approve it' 11-20 ~01:28Z); primary c07b3449 accepted +43 for the Loop writeback fix and merged after REVIEW PASS review-menu-astra 02:23Z, re-summing the tail."

@@ -50,7 +50,7 @@ pub struct ThreadStack {
     pub c_name: &'static core::ffi::CStr,
     pub name: &'static str,
     pub bytes: usize,
-    /// Deepest static path from the thread's entry in the diag NRO (`stack_depth.py <elf> table`): a lower bound.
+    /// Deepest observed static path from the thread's entry in the release or diag NRO (`stack_depth.py <elf> table`): a lower bound.
     pub static_bound: usize,
     /// Qualified callees outside the owned ELF, in addition to its static path.
     pub external_bound: usize,
@@ -65,6 +65,7 @@ const KIB: usize = 1024;
 
 /// The table (one row per `ThreadId`, in its order).
 // rc.15 static-bound refresh: IniWriter/Import/Menu from diag 1d619d6b, ELF6b2b58db (2026-11-15).
+// Menu catalog v2: max of exact release and diag c5a5740c (2026-11-19) for Menu, IniWriter, TraceWriter, Archive, MacroDiag.
 // Runtime paint marks and stack allocations retain their recorded provenance below.
 pub const THREADS: [ThreadStack; 18] = [
     // Includes the registered TICK steps (indirect calls, outside the static walk): the drain closure's 2,928 B frame plus the
@@ -82,9 +83,9 @@ pub const THREADS: [ThreadStack; 18] = [
     // diag: request files, diag-settings.json parse, publish and apply
     row(ThreadId::StateDiag, c"tr-state-diag", 40 * KIB, 17_616, 8_960, "Eden st-02..st-12, final-surface-of-1261f56c", "states::start_diag_triggers::{closure#0}"),
     // button_config.ini, replay_capture.ini and settings.json atomic writes
-    row(ThreadId::IniWriter, c"tr-ini-writer", 28 * KIB, 8_880, 9_344, "Eden st-02..st-12", "features::writer::run"),
+    row(ThreadId::IniWriter, c"tr-ini-writer", 28 * KIB, 9_072, 9_344, "Eden st-02..st-12", "features::writer::run"),
     // mii-editor-last.json (and the diag results observer trace): serialise from the boxed slot, atomic replace
-    row(ThreadId::TraceWriter, c"tr-trace-writer", 28 * KIB, 2_720, 8_624, "Eden st-02..st-12, ui18-02 native Mii editor", "compat::filesystem::init::{closure#0}"),
+    row(ThreadId::TraceWriter, c"tr-trace-writer", 28 * KIB, 2_880, 8_624, "Eden st-02..st-12, ui18-02 native Mii editor", "compat::filesystem::init::{closure#0}"),
     // diag: diag-settings-next.json parse, publish and apply
     row(ThreadId::DiagReload, c"tr-diag-reload", 40 * KIB, 17_696, 15_712, "Eden final-rc8-chain-test-722525a5-r2, the rc.8 pass's chained 9d6c7e02 sessions", "diag_reload::start::{closure#0}"),
     // first-boot import of the fork's files (blocking part), joined with a deadline
@@ -98,14 +99,14 @@ pub const THREADS: [ThreadStack; 18] = [
     // base (0x1101726000, size 0xe000), so it needed at least 57,344 + 0x130 = 57,648 B (its last paint mark was 54,960).
     // rc.7 svc clobbers (2026-11-11): with hos-lock's arbiter calls declaring clobber_abi("C"), values no longer ride in
     // x8-x17 across them, and the static path grew from 50,208 to 50,368 B (diag ELF of p23/rc7-svc-clobber).
-    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 53_888, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
+    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 54_928, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
-    row(ThreadId::Archive, c"tr-archive", 28 * KIB, 2_704, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
+    row(ThreadId::Archive, c"tr-archive", 28 * KIB, 3_216, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified
     // external path is separate from the owned-ELF scan; see docs/UI16-PROBE-STACK-FAULT.md (removed after v0.2.0-rc.1; see that tag).
     row(ThreadId::Probe, c"tr-probe", 204 * KIB, 3_440, 151_920, "Eden ui-17 same ARC92171b2f full probe", "ui::probe::install::{closure#0}").with_external(143_376),
     // diag: diag-macro.req read and parse
-    row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_248, 9_152, "Eden st-02..st-12, final-surface-of-1261f56c, final-rc8-yoga-1/rc8-surface-1-9d6c7e02", "macros::diag::start::{closure#0}"),
+    row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_392, 9_152, "Eden st-02..st-12, final-surface-of-1261f56c, final-rc8-yoga-1/rc8-surface-1-9d6c7e02", "macros::diag::start::{closure#0}"),
     // the replay capture archive and Mii preset writer
     row(ThreadId::ReplaySave, c"replay-capture-save", 60 * KIB, 33_184, 25_344, "Eden st-02..st-12, f6-37/sh-01, final-surface-cov-4e336da4", "replay_store::start_writer::{closure#0}"),
     // the saved Mii catalog read for the library

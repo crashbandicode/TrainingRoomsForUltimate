@@ -281,7 +281,6 @@ fn service_file_name() {
         if let Some(file) = file {
             match crate::engine::rr_runtime::save_clip_file(std::path::Path::new(crate::model::storage::ROOT), file, &name) {
                 Ok(id) => {
-                    crate::engine::rr_host::bump_catalog();
                     crate::runtime::diag_log::diagnostic(format_args!("[ClipEditor] saved_new={id}"));
                 }
                 Err(error) => notify(error.to_string()),

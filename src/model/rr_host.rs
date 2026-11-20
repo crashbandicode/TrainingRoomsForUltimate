@@ -29,7 +29,7 @@ use crate::model::input_delay::MappedInputs;
 use crate::model::recording::{inject_values, ControlCtx, ControlOut, CpuRoleDrive, Inject, Phase};
 use crate::model::recording_menu::{Effect, LoopMark, Selection, ViewRole};
 use crate::model::state::record::SavedState;
-use crate::model::store::{Record, Store};
+use crate::model::store::{self, Record, Store};
 
 const ROLE_PLAYER: u8 = 1;
 const ROLE_CPU: u8 = 2;
@@ -91,12 +91,13 @@ fn save_input(root: &Path, source: &str, activate: bool, tick: &mut Tick) {
     let recorded_on = if activate { RECORD_START.lock().take().map(|s| super::rr_runtime::fighter_name(s.poses[0].fighter_kind)).filter(|s| !s.is_empty()) } else { None };
     if let Ok(id) = save_made_combo(root, &take.combo, source, recorded_on, unix_now()) {
         if activate {
-            if let Ok(mut index) = RecordingIndex::load(root) {
-                let _ = index.set_drill(Some(Drill { kind: DrillKind::Combo, id: id.clone() }), unix_now()); let _ = index.save(root);
-            }
+            let _ = RecordingIndex::update(root, |index| {
+                index.set_drill(Some(Drill { kind: DrillKind::Combo, id: id.clone() }), unix_now())?;
+                Ok(true)
+            });
             *lock(&SAVED_DRILL) = Some(id.clone());
         }
-        tick.diags.push(format!("screen=input-drill saved={id} steps={}", take.combo.len())); bump_catalog();
+        tick.diags.push(format!("screen=input-drill saved={id} steps={}", take.combo.len()));
     }
 }
 
@@ -206,7 +207,8 @@ static CUT_PLAYER: AtomicBool = AtomicBool::new(false);
 static CUT_CPU: AtomicBool = AtomicBool::new(false);
 static MACHINE: Mutex<Option<Playback>> = Mutex::new(None);
 static RESIDENT: Mutex<Option<Resident>> = Mutex::new(None);
-static MENU_EFFECT: Mutex<Effect> = Mutex::new(Effect::None);
+type MenuEffect = (Option<(u64, u64)>, Effect);
+static MENU_EFFECT: Mutex<Option<MenuEffect>> = Mutex::new(None);
 #[cfg(test)]
 static CROP: Mutex<Option<CropWindow>> = Mutex::new(None);
 static DEFER_MIGRATE: AtomicBool = AtomicBool::new(false);
@@ -220,7 +222,6 @@ static DRILL_SEEN: AtomicBool = AtomicBool::new(false);
 static DRILL_ASK: Mutex<Option<String>> = Mutex::new(None);
 static PLAYER_LABEL: Mutex<String> = Mutex::new(String::new());
 static LAST_ASK: Mutex<Option<MismatchAsk>> = Mutex::new(None);
-static CATALOG_GEN: AtomicU64 = AtomicU64::new(0);
 static CPU_ROLE_ON: AtomicBool = AtomicBool::new(false);
 /// A Play warped to its start save and the restore has not landed yet. No role steps until it
 /// does: a frame fed before the restore is undone by it. A CPU-role file begins on its first
@@ -466,12 +467,19 @@ pub fn playback_controller(frame: InputFrame) -> Inject {
 }
 
 /// The menu worker posts one effect. The recording worker applies it. A `None` does not clear a pending effect.
+#[cfg(test)]
 pub fn post_effect(effect: Effect) {
-    if effect == Effect::RecordDrill { arm_drill_record(true); return; }
-    if matches!(effect, Effect::None) {
+    post_effect_at(effect, None);
+}
+
+pub fn post_effect_at(effect: Effect, expected: Option<(u64, u64)>) {
+    if expected.is_some_and(|version| version != recording_version()) {
         return;
     }
-    *lock(&MENU_EFFECT) = effect;
+    if effect == Effect::RecordDrill { arm_drill_record(true); return; }
+    if !matches!(effect, Effect::None) {
+        *lock(&MENU_EFFECT) = Some((expected, effect));
+    }
 }
 
 #[cfg(test)]
@@ -734,7 +742,6 @@ pub fn service_at(
         };
         if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), RECORD_TRIM.load(Ordering::Acquire))
         {
-            bump_catalog();
             if let Some(text) = stop.notice() {
                 tick.notices.push(text);
             }
@@ -833,11 +840,20 @@ pub fn answer_mismatch(choice: MismatchChoice) {
 }
 
 pub fn catalog_generation() -> u64 {
-    CATALOG_GEN.load(Ordering::Acquire)
+    store::catalog_generation()
 }
 
+pub fn recording_version() -> (u64, u64) {
+    (catalog_generation(), store::index_generation())
+}
+
+#[cfg(any(test, target_os = "switch"))]
 pub(crate) fn bump_catalog() {
-    CATALOG_GEN.fetch_add(1, Ordering::Release);
+    store::advance_catalog();
+    invalidate_bound();
+}
+
+pub(crate) fn invalidate_bound() {
     BOUND_DIRTY.store(true, Ordering::Release);
 }
 
@@ -1011,14 +1027,59 @@ fn write_saved_pair(root: &Path, after_take: impl FnOnce()) -> bool {
         return false;
     };
     *lock(&BOUND_APPLIED) = Some(BoundCopy { id: Some(id), pair: Some([player, cpu]) });
-    bump_catalog();
+    invalidate_bound();
     true
 }
 
+/// Commit Options Loop edits independently of file selection. File actions still need both revisions.
+pub fn take_menu_effect(
+    root: &Path,
+    screens: &mut crate::model::recording_menu::RecordingScreens,
+    observed: Option<(u64, u64)>,
+) -> Option<(Effect, bool, (u64, u64))> {
+    screens.persist_loop_edits(|edits| write_menu_loops(root, edits));
+    let effect = screens.take_effect();
+    let changed = screens.take_selection_change();
+    let version = recording_version();
+    if screens.loading() || observed != Some(version) {
+        screens.set_loading();
+        return None;
+    }
+    Some((effect, changed, version))
+}
+
+// Keep index decoding off the menu input stack until a Loop edit actually needs it.
+#[inline(never)]
+fn write_menu_loops(root: &Path, edits: [Option<LoopMark>; 2]) -> bool {
+    RecordingIndex::update(root, |index| {
+        let mut changed = false;
+        for (role, mark) in [Role::Player, Role::Cpu].into_iter().zip(edits) {
+            if let Some(count) = mark.map(loop_count).filter(|&count| count != index.loop_count(role)) {
+                index.set_loop(role, count);
+                changed = true;
+            }
+        }
+        Ok(changed)
+    }).is_ok()
+}
+
 /// The menu's selection is what Play, Record, and the loop read. The index is that selection.
+#[cfg(test)]
 pub fn publish_selection(root: &Path, selection: &Selection, drill_kind: Option<DrillKind>) {
+    publish_selection_at(root, selection, drill_kind, None);
+}
+
+pub fn publish_selection_at(
+    root: &Path,
+    selection: &Selection,
+    drill_kind: Option<DrillKind>,
+    expected: Option<(u64, u64)>,
+) -> bool {
+    if expected.is_some_and(|version| version != recording_version()) {
+        return false;
+    }
     let Ok(mut index) = RecordingIndex::load(root) else {
-        return;
+        return false;
     };
     let at = unix_now();
     let _ = index.set_active(Role::Player, selection.active_player.as_deref(), at);
@@ -1030,11 +1091,15 @@ pub fn publish_selection(root: &Path, selection: &Selection, drill_kind: Option<
         let _ = index.set_drill(Some(Drill { kind, id: id.to_string() }), at.saturating_add(3));
     }
     let held = index.slots().clone();
-    if index.set_slots(&selection.slots).is_ok() && index.slots() != &held {
+    let slots_changed = index.set_slots(&selection.slots).is_ok() && index.slots() != &held;
+    if !matches!(index.save_at(root, expected), Ok(true)) {
+        return false;
+    }
+    if slots_changed {
         note_slots_changed(true);
     }
-    let _ = index.save(root);
-    BOUND_DIRTY.store(true, Ordering::Release);
+    invalidate_bound();
+    true
 }
 
 /// rc.12 TR1: the index's Playback Slots changed (or must be copied again): the worker copies them into the game
@@ -1147,11 +1212,7 @@ pub fn save_sequence_progress(root: &Path, id: &str, streak: u32, best: u32) -> 
     }
     sequence.streak = streak;
     sequence.best = best;
-    let saved = store.overwrite(id, &sequence).is_ok();
-    if saved {
-        bump_catalog();
-    }
-    saved
+    store.overwrite(id, &sequence).is_ok()
 }
 
 /// What the frame hook should drill when the menu's one drill changes.
@@ -1535,7 +1596,10 @@ fn ask_drill(root: &Path, tick: &mut Tick) {
 }
 
 fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick) {
-    let effect = std::mem::replace(&mut *lock(&MENU_EFFECT), Effect::None);
+    let Some((expected, effect)) = lock(&MENU_EFFECT).take() else { return };
+    if expected.is_some_and(|version| version != recording_version()) {
+        return;
+    }
     match effect {
         Effect::None | Effect::RecordDrill => {}
         Effect::Keyboard { header, draft } => {
@@ -1547,13 +1611,11 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
             begin_make(root, machine, book, &source, chain, tick)
         }
         Effect::DuplicateSave { source } => {
-            if duplicate_save(root, &source, unix_now()).is_ok() {
-                bump_catalog();
-            }
+            let _ = duplicate_save(root, &source, unix_now());
         }
         Effect::DeleteSave { source } => {
             if delete_save(root, &source, unix_now()).is_ok() {
-                bump_catalog();
+                invalidate_bound();
             }
         }
         Effect::WriteChain { name, steps } => save_new_record(root, MACROS_DIR, Chain::new(name, steps).ok()),
@@ -1574,9 +1636,7 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
             rename::<Sequence>(root, SEQUENCES_DIR, &id, |f| f.name = name)
         }
         Effect::DeleteFile { kind, id } => {
-            if delete_file(root, kind, &id) {
-                bump_catalog();
-            }
+            delete_file(root, kind, &id);
         }
         Effect::WriteChainSteps { id, steps } => rename::<Chain>(root, MACROS_DIR, &id, |f| f.recordings = steps),
         Effect::WriteSequenceCombos { id, combos } => rename::<Sequence>(root, SEQUENCES_DIR, &id, |f| f.combos = combos),
@@ -1599,7 +1659,6 @@ fn save_last_combo(root: &Path, name: &str, tick: &mut Tick) {
     let recorded_on = (!label.is_empty()).then_some(label);
     if let Ok(id) = super::rr_runtime::save_last_combo(root, &combo, name, recorded_on, unix_now()) {
         tick.diags.push(format!("screen=save-last-combo saved={id} links={}", combo.len()));
-        bump_catalog();
     }
 }
 
@@ -1616,33 +1675,32 @@ pub fn delete_file(root: &Path, kind: crate::model::recording_menu::FileKind, id
     if !deleted {
         return false;
     }
-    if let Ok(mut index) = RecordingIndex::load(root) {
+    let mut slots_changed = false;
+    let updated = RecordingIndex::update(root, |index| {
         let at = unix_now();
         let mut changed = false;
         for role in [Role::Player, Role::Cpu] {
             if index.active(role) == Some(id) {
-                changed |= index.set_active(role, None, at).is_ok();
+                index.set_active(role, None, at)?;
+                changed = true;
             }
         }
         if index.drill().is_some_and(|drill| drill.id == id) {
-            changed |= index.set_drill(None, at).is_ok();
-        }
-        if index.clear_slot_of(id) {
+            index.set_drill(None, at)?;
             changed = true;
-            note_slots_changed(false);
         }
-        if changed {
-            let _ = index.save(root);
-        }
+        slots_changed = index.clear_slot_of(id);
+        Ok(changed || slots_changed)
+    });
+    if updated.is_ok() && slots_changed {
+        note_slots_changed(false);
     }
     true
 }
 
 fn save_new_record<R: Record>(root: &Path, dir: &str, file: Option<R>) {
     if let Some(file) = file {
-        if Store::<R>::new(root.join(dir)).save_new(&file).is_ok() {
-            bump_catalog();
-        }
+        let _ = Store::<R>::new(root.join(dir)).save_new(&file);
     }
 }
 
@@ -1652,9 +1710,7 @@ fn rename<R: Record>(root: &Path, dir: &str, id: &str, set: impl FnOnce(&mut R))
     let store = Store::<R>::new(root.join(dir));
     let Ok(mut file) = store.load(id) else { return };
     set(&mut file);
-    if store.overwrite(id, &file).is_ok() {
-        bump_catalog();
-    }
+    let _ = store.overwrite(id, &file);
 }
 
 fn begin_make(
@@ -1718,17 +1774,14 @@ fn finish_make(root: &Path, tick: &mut Tick) {
     if combo.overflow { tick.notices.push(COMBO_CAPACITY); return; }
     if save_made_combo(root, &combo, &job.source, None, unix_now()).is_ok() {
         tick.diags.push(format!("screen=make-combo source={} saved=1", job.source));
-        bump_catalog();
     }
 }
 
 pub(crate) fn note_hot(root: &Path, kind: Kind, id: &str) {
-    let Ok(mut index) = RecordingIndex::load(root) else {
-        return;
-    };
-    if index.note_use(kind, id, Use::Recorded, unix_now()).is_ok() {
-        let _ = index.save(root);
-    }
+    let _ = RecordingIndex::update(root, |index| {
+        index.note_use(kind, id, Use::Recorded, unix_now())?;
+        Ok(true)
+    });
 }
 
 #[cfg(test)]
@@ -1750,13 +1803,12 @@ pub fn write_crop(root: &Path, source: &str, combo: bool) -> Option<String> {
 }
 
 fn show_chord_notice(root: &Path, tick: &mut Tick) {
-    let Ok(mut index) = RecordingIndex::load(root) else {
-        return;
-    };
-    let Some(text) = chord_notice(&mut index) else {
-        return;
-    };
-    if index.save(root).is_ok() {
+    let mut text = None;
+    if RecordingIndex::update(root, |index| {
+        text = chord_notice(index);
+        Ok(text.is_some())
+    }).is_ok() {
+        let Some(text) = text else { return };
         tick.notices.push(text);
         tick.diags.push("screen=notice kind=chord-once".to_string());
     }
@@ -1782,12 +1834,11 @@ pub fn parry_wiring(root: &Path) -> Option<(String, LoopCount)> {
 
 /// Use a saved practice: its macro becomes the CPU's active macro and its Loop the CPU's (the existing operations).
 pub fn parry_use(root: &Path, id: &str, count: LoopCount) -> Result<(), String> {
-    let mut index = RecordingIndex::load(root).map_err(|e| e.to_string())?;
-    index.set_active(Role::Cpu, Some(id), unix_now()).map_err(|e| e.to_string())?;
-    index.set_loop(Role::Cpu, count);
-    index.save(root).map_err(|e| e.to_string())?;
-    bump_catalog();
-    Ok(())
+    RecordingIndex::update(root, |index| {
+        index.set_active(Role::Cpu, Some(id), unix_now())?;
+        index.set_loop(Role::Cpu, count);
+        Ok(true)
+    }).map(|_| ()).map_err(|e| e.to_string())
 }
 
 fn load_book(root: &Path) -> Result<Book, ()> {
@@ -1848,7 +1899,7 @@ fn role_frames(role: Role) -> &'static FrameQueue {
 }
 
 fn menu_pending() -> bool {
-    !matches!(&*lock(&MENU_EFFECT), Effect::None)
+    lock(&MENU_EFFECT).is_some()
 }
 
 fn unix_now() -> u64 {
@@ -1908,7 +1959,7 @@ fn reset_host() {
     RUN_CPU.store(false, Ordering::Release);
     *lock(&MACHINE) = None;
     *lock(&RESIDENT) = None;
-    *lock(&MENU_EFFECT) = Effect::None;
+    *lock(&MENU_EFFECT) = None;
     *lock(&CROP) = None;
     *lock(&STRIP) = (0, None);
     *lock(&MAKE) = None;
@@ -1920,7 +1971,6 @@ fn reset_host() {
     *lock(&PLAYER_LABEL) = String::new();
     DRILL_SEEN.store(false, Ordering::Release);
     DEFER_MIGRATE.store(false, Ordering::Release);
-    CATALOG_GEN.store(0, Ordering::Release);
     CPU_ROLE_ON.store(false, Ordering::Release);
     WARP_HOLD.store(false, Ordering::Release);
     *RECORD_START.lock() = None;
@@ -2313,7 +2363,7 @@ mod tests {
         let save_id = saved.start_save.expect("start save");
         let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(&save_id).unwrap();
         assert_eq!(save.cpu.fighter_kind, 7);
-        assert!(crate::engine::rr_runtime::load_catalog(&root).unwrap().catalog.macros.iter().any(|file| file.id == listed.entries[0].id));
+        assert!(crate::engine::rr_runtime::load_catalog(&root).unwrap().macros.iter().any(|file| file.id == listed.entries[0].id));
     }
 
     fn press(buttons: u32) -> MappedInputs {
@@ -3527,7 +3577,7 @@ mod tests {
         assert_eq!((drill.streak(), drill.best()), (4, 9), "drilling it again goes on from the file");
         let plan = sequence_plan(&root, &id).unwrap();
         assert_eq!((plan.streak, plan.best), (4, 9));
-        let catalog = super::super::rr_runtime::load_catalog(&root).unwrap().catalog;
+        let catalog = super::super::rr_runtime::load_catalog(&root).unwrap();
         let shown = catalog.sequences.iter().find(|s| s.id == id).unwrap();
         assert_eq!((shown.streak, shown.best), (4, 9), "the Connections panel reads the file");
         assert!(!save_sequence_progress(&root, "no-such-sequence", 1, 1));
@@ -4051,7 +4101,7 @@ mod tests {
                 post_effect(screens.take_effect());
                 let _ = service_at(&root, &none(), "2026-11-14", state(8), state(7));
             };
-            let reload = |screens: &mut RecordingScreens| screens.set_catalog(super::super::rr_runtime::load_catalog(&root).unwrap().catalog);
+            let reload = |screens: &mut RecordingScreens| screens.set_catalog(super::super::rr_runtime::load_catalog(&root).unwrap());
             let file_switch = |id: &str| match chain {
                 true => Store::<Chain>::new(root.join(MACROS_DIR)).load(id).unwrap().start_save_on,
                 false => Library::new(root.join(MACROS_DIR)).load(id).unwrap().start_save_on,
@@ -4102,10 +4152,33 @@ mod tests {
         }
     }
 
+    fn queued_rename_checks_the_originating_index_revision() {
+        let _guard = hold();
+        reset_host();
+        let root = scratch("rename-index-version");
+        // Hold off unrelated test writes while advancing only the index revision.
+        let _write = store::recording_write_guard(&root);
+        let version = recording_version();
+        let offer = || Effect::Keyboard { header: "Rename macro", draft: "Old".into() };
+        post_effect_at(offer(), Some(version));
+        store::note_index_write(&root);
+        assert_eq!(recording_version().0, version.0, "an index-only change");
+        assert_ne!(recording_version().1, version.1);
+        let book = Book::new(RecordingIndex::load(&root).unwrap());
+        let mut machine = Playback::new();
+        let mut tick = Tick::default();
+        apply_menu(&root, &mut machine, &book, &mut tick);
+        assert!(tick.keyboard.is_none(), "an obsolete Rename must not offer a keyboard");
+        post_effect_at(offer(), Some(recording_version()));
+        apply_menu(&root, &mut machine, &book, &mut tick);
+        assert_eq!(tick.keyboard.unwrap().header, "Rename macro");
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("queued_rename_checks_the_originating_index_revision", queued_rename_checks_the_originating_index_revision as fn()),
             ("posted_chords_reach_the_role_machines", posted_chords_reach_the_role_machines as fn()),
             ("a_taken_pair_stays_pending_until_its_write_is_done", a_taken_pair_stays_pending_until_its_write_is_done as fn()),
             ("the_start_save_switch_reaches_the_file_and_the_play", the_start_save_switch_reaches_the_file_and_the_play as fn()),

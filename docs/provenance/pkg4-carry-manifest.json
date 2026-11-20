@@ -3250,7 +3250,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "2005f91fdb4b277ade805c3646d5cc61ff293ec39e5c5159c19e7449c20475e6",
+   "dest_sha256": "eac8e282161c72aa261658e41032d494c0f84bed761c7c518e5f7720c212fa87",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -3701,6 +3701,11 @@
      "old": "}\n\n/// Game callback: the roster owns native admission and loading.\npub fn service_reload_request() {\n    RELOAD_REQUEST.drain(|(target, revision)| {\n        let eligible = revision == selection_revision()\n            && crate::runtime::roster::character_roster::cpu_reload_ready();\n        let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request(target, revision);\n        let posted = RELOAD_RESULT.post((revision, accepted));\n        debug_assert!(posted, \"one outstanding clip character result\");\n        crate::runtime::ui::worker::wake();\n    });\n",
      "new": "}\n\n/// Game callback: the roster owns native admission and loading.\npub fn service_reload_request() {\n    let Ok(context) = crate::runtime::roster::character_roster::try_cpu_request_context() else { return; };\n    RELOAD_REQUEST.drain(|(target, revision)| {\n        let eligible = revision == selection_revision()\n            && crate::runtime::roster::character_roster::cpu_reload_ready_in(&context);\n        let accepted = eligible && crate::runtime::roster::character_roster::mii_replay::request_in(&context, target, revision);\n        let posted = RELOAD_RESULT.post((revision, accepted));\n        debug_assert!(posted, \"one outstanding clip character result\");\n        crate::runtime::ui::worker::wake();\n    });\n",
      "reason": "RC15 macro frame shared menu fix 5fe28b1c: fresh fallible context before panel/session/mailbox mutation; pass resolved eligibility through original shared practice/roster/Mii implementations. Busy defers without consuming requests or publishing false scene. Original source hash retained."
+    },
+    {
+     "old": "                    crate::engine::rr_host::bump_catalog();\n",
+     "new": "",
+     "reason": "rc.15 recording catalog: successful clip saves invalidate through Store, which also reports same-size writes. Remove the second invalidation from the clip editor."
     }
    ]
   },

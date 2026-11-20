@@ -913,8 +913,12 @@ fn paint_sections(rec: &RecordingScreens, frame: &mut Frame, face: Face, group: 
         if base >= ROW_LINES {
             break;
         }
-        // The r8 header carries its file count ("SAVE STATES (7)").
-        let _ = write!(frame.rows[base].label, "{}  ({})", view.header, view.files);
+        // The r8 header carries its file count ("SAVE STATES (7)"), or that the card is still being read (menu speed).
+        if view.loading {
+            let _ = write!(frame.rows[base].label, "{}  (loading…)", view.header);
+        } else {
+            let _ = write!(frame.rows[base].label, "{}  ({})", view.header, view.files);
+        }
         frame.rows[base].label_tone = Tone::Dim;
         frame.row_count = (base + 1) as u8;
         // In the pop-up it sits on a dark band with its kind's mark before the name (r8): the floppy for SAVE STATES.
@@ -1284,10 +1288,27 @@ mod tests {
         }
     }
 
+    /// Menu speed: a section whose catalog the worker is still reading says so beside its header, not "(0)".
+    fn a_loading_section_says_so_in_its_header() {
+        use crate::model::menu::table::SAVES_MACROS;
+        use crate::model::recording_menu::{Face, RecordingScreens};
+        let header = |rec: &RecordingScreens| {
+            let mut frame = Frame::new();
+            paint_sections(rec, &mut frame, Face::Page, SAVES_MACROS);
+            String::from_utf16(frame.rows[0].label.units()).unwrap()
+        };
+        let mut rec = RecordingScreens::new();
+        rec.set_loading();
+        assert_eq!(header(&rec), "SAVE STATES  (loading…)");
+        rec.set_catalog(Default::default());
+        assert_eq!(header(&rec), "SAVE STATES  (0)");
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_loading_section_says_so_in_its_header", a_loading_section_says_so_in_its_header as fn()),
             ("list_text_keeps_a_gap_to_the_outline_and_the_cursor_on_both_sides", list_text_keeps_a_gap_to_the_outline_and_the_cursor_on_both_sides as fn()),
             ("the_tab_row_has_a_slot_per_named_tab_and_one_active", the_tab_row_has_a_slot_per_named_tab_and_one_active as fn()),
             ("recording_paint_uses_a_green_plate_a_white_cursor_and_the_visible_hot_rows", recording_paint_uses_a_green_plate_a_white_cursor_and_the_visible_hot_rows as fn()),

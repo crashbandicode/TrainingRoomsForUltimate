@@ -1,11 +1,15 @@
 //! Host decisions for the recording runtime. The hook only reads a filled window.
 //! Card IO and allocation stay on the worker.
 
-use std::path::Path;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
+
+use crate::model::recording_menu::{Catalog, ComboFile, LoopMark, MacroFile, RecordingScreens, SaveFile, SequenceFile};
+use crate::model::store::{catalog_changes, try_recording_read, CatalogListing, CatalogSignatures, Record, Store, CATALOG_DIRS};
 
 use super::library::{
     migrate, Chain, Error, Kind, LegacySlot, LoopCount, NamedSave, RecordingIndex, Role, Sequence,
-    StartSaveState, Use, MACROS_DIR, SAVES_DIR, SEQUENCES_DIR,
+    StartSaveState, Use, MACROS_DIR, SAVES_DIR,
 };
 #[cfg(test)]
 use super::macro_ui::macro_panel::{fighter_gate, FighterGate, FighterOrigin};
@@ -16,7 +20,6 @@ use super::playback::{Book, Playback};
 use crate::model::combo::Combo;
 use crate::model::combo_record::{clean_name, default_name, ComboLibrary, ComboRecord};
 use crate::model::state::record::SavedState;
-use crate::model::store::Store;
 
 /// One minute at 60 fps. Five hot macros stay resident.
 pub const RESIDENT_FRAMES: usize = 3_600;
@@ -218,11 +221,12 @@ pub fn finish_recording(
     let mut recording = MacroRecording::new(&name, "13.0.5", start_state, frames).map_err(record)?;
     recording.set_start_save(Some(&start_id)).map_err(record)?;
     let id = macros.save_new(&recording).map_err(record)?;
-    let mut index = RecordingIndex::load(root)?;
-    index.note_use(Kind::Save, &start_id, Use::Recorded, at)?;
-    index.note_use(Kind::Macro, &id, Use::Recorded, at.saturating_add(1))?;
-    index.set_active(capture.role(), Some(&id), at.saturating_add(2))?;
-    index.save(root)?;
+    RecordingIndex::update(root, |index| {
+        index.note_use(Kind::Save, &start_id, Use::Recorded, at)?;
+        index.note_use(Kind::Macro, &id, Use::Recorded, at.saturating_add(1))?;
+        index.set_active(capture.role(), Some(&id), at.saturating_add(2))?;
+        Ok(true)
+    })?;
     Ok(RecordStop::Saved {
         id,
         start_save: start_id,
@@ -400,9 +404,10 @@ pub fn save_made_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Op
     let mut made = ComboRecord::new(name, *combo, recorded_on);
     if !source.is_empty() { made = made.with_made_from(source); }
     let id = library.save_new(&made).map_err(record)?;
-    let mut index = RecordingIndex::load(root)?;
-    index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
-    index.save(root)?;
+    RecordingIndex::update(root, |index| {
+        index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
+        Ok(true)
+    })?;
     Ok(id)
 }
 
@@ -415,10 +420,11 @@ pub fn save_last_combo(root: &Path, combo: &Combo, name: &str, recorded_on: Opti
         None => default_name(&library.list().map_err(record)?.entries),
     };
     let id = library.save_new(&ComboRecord::new(name, *combo, recorded_on)).map_err(record)?;
-    let mut index = RecordingIndex::load(root)?;
-    index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
-    index.set_drill(Some(super::library::Drill { kind: super::library::DrillKind::Combo, id: id.clone() }), at)?;
-    index.save(root)?;
+    RecordingIndex::update(root, |index| {
+        index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
+        index.set_drill(Some(super::library::Drill { kind: super::library::DrillKind::Combo, id: id.clone() }), at)?;
+        Ok(true)
+    })?;
     Ok(id)
 }
 
@@ -475,20 +481,23 @@ pub fn duplicate_save(root: &Path, id: &str, at: u64) -> Result<String, Error> {
         .collect::<Vec<_>>();
     let copy = NamedSave::new(unused_name("Save", &names), source.player, source.cpu)?;
     let copy_id = store.save_new(&copy)?;
-    let mut index = RecordingIndex::load(root)?;
-    index.note_use(Kind::Save, &copy_id, Use::Recorded, at)?;
-    index.save(root)?;
+    RecordingIndex::update(root, |index| {
+        index.note_use(Kind::Save, &copy_id, Use::Recorded, at)?;
+        Ok(true)
+    })?;
     Ok(copy_id)
 }
 
 pub fn delete_save(root: &Path, id: &str, at: u64) -> Result<(), Error> {
     let store = Store::<NamedSave>::new(root.join(SAVES_DIR));
     store.delete(id)?;
-    let mut index = RecordingIndex::load(root)?;
-    if index.bound() == Some(id) {
-        index.bind_save(None, at)?;
-    }
-    index.save(root)?;
+    RecordingIndex::update(root, |index| {
+        let was_bound = index.bound() == Some(id);
+        if was_bound {
+            index.bind_save(None, at)?;
+        }
+        Ok(was_bound)
+    })?;
     Ok(())
 }
 
@@ -500,15 +509,20 @@ pub fn save_chord(
     at: u64,
 ) -> Result<String, Error> {
     let store = Store::<NamedSave>::new(root.join(SAVES_DIR));
-    let mut index = RecordingIndex::load(root)?;
-    if let Some(id) = index.bound().map(str::to_owned) {
-        if let Ok(mut existing) = store.load(&id) {
+    let bound = {
+        let _guard = crate::model::store::recording_write_guard(root);
+        RecordingIndex::load(root)?.bound().map(str::to_owned)
+    };
+    if let Some(id) = bound.as_deref() {
+        if let Ok(mut existing) = store.load(id) {
             existing.player = player;
             existing.cpu = cpu;
-            store.overwrite(&id, &existing)?;
-            index.note_use(Kind::Save, &id, Use::Bound, at)?;
-            index.save(root)?;
-            return Ok(id);
+            store.overwrite(id, &existing)?;
+            RecordingIndex::update(root, |index| {
+                index.note_use(Kind::Save, id, Use::Bound, at)?;
+                Ok(true)
+            })?;
+            return Ok(id.to_owned());
         }
     }
     let names = store
@@ -519,8 +533,14 @@ pub fn save_chord(
         .collect::<Vec<_>>();
     let save = NamedSave::new(unused_name("Save", &names), player, cpu)?;
     let id = store.save_new(&save)?;
-    index.bind_save(Some(&id), at)?;
-    index.save(root)?;
+    RecordingIndex::update(root, |index| {
+        if index.bound() == bound.as_deref() {
+            index.bind_save(Some(&id), at)?;
+        } else {
+            index.note_use(Kind::Save, &id, Use::Recorded, at)?;
+        }
+        Ok(true)
+    })?;
     Ok(id)
 }
 
@@ -551,121 +571,351 @@ pub fn unused_name(prefix: &str, names: &[String]) -> String {
     format!("{prefix} {}", crate::model::recording_menu::unused_n(prefix, names))
 }
 
-/// The card, as the pop-up lists it. Hot lists and the selection come from the index.
-pub struct CatalogLoad {
-    pub catalog: crate::model::recording_menu::Catalog,
-    pub bound: Option<String>,
-    pub active: [Option<String>; 2],
-    pub loops: [crate::model::recording_menu::LoopMark; 2],
-    pub drill: Option<String>,
-    /// rc.12 TR1: the macro of each Playback Slot 1-5.
-    pub slots: [Option<String>; 5],
+/// A catalog's entries are the files only. Hot lists and current selection are
+/// applied separately from a successfully read recording index.
+pub fn apply_catalog(catalog: &Catalog, index: &RecordingIndex, screens: &mut RecordingScreens) {
+    let mut catalog = catalog.clone();
+    catalog.hot_macros = index.hot(Kind::Macro).to_vec();
+    catalog.hot_saves = index.hot(Kind::Save).to_vec();
+    catalog.hot_combos = [false, true]
+        .into_iter()
+        .flat_map(|input| index.hot_where(Kind::Combo, |id| {
+            catalog.combos.iter().any(|file| file.id == id && file.input_only == input)
+        }))
+        .collect();
+    catalog.hot_sequences = index.hot(Kind::Sequence).to_vec();
+    screens.set_catalog(catalog);
 }
 
-pub fn load_catalog(root: &Path) -> Result<CatalogLoad, Error> {
-    use crate::model::recording_menu::{Catalog, ComboFile, LoopMark, MacroFile, SaveFile, SequenceFile};
+pub fn apply_index(index: &RecordingIndex, screens: &mut RecordingScreens) {
+    let mark = |role| match index.loop_count(role) {
+        LoopCount::Infinite => LoopMark::Infinite,
+        LoopCount::Finite(n) => LoopMark::Finite(n),
+    };
+    screens.adopt(
+        index.bound().map(str::to_owned),
+        [index.active(Role::Player).map(str::to_owned), index.active(Role::Cpu).map(str::to_owned)],
+        [mark(Role::Player), mark(Role::Cpu)],
+        index.drill().map(|drill| drill.id.clone()),
+    );
+    screens.adopt_slots(index.slots().clone());
+}
+
+#[cfg(test)]
+pub fn load_catalog(root: &Path) -> Result<Catalog, Error> {
+    let mut cache = CatalogCache::new(root);
+    cache.want(0);
+    while cache.step() {}
     let index = RecordingIndex::load(root)?;
-    let mut catalog = Catalog::default();
-    let macros = Library::new(root.join(MACROS_DIR));
-    if let Ok(list) = macros.list() {
-        for entry in list.entries {
-            let Ok(file) = macros.load(&entry.id) else { continue };
-            catalog.macros.push(MacroFile {
-                id: entry.id,
+    let mut screens = RecordingScreens::new();
+    apply_catalog(cache.ready(0).unwrap(), &index, &mut screens);
+    Ok(screens.catalog().clone())
+}
+
+enum CatalogEntry {
+    Macro(MacroFile),
+    Save(SaveFile),
+    Combo(ComboFile),
+    Sequence(SequenceFile),
+}
+
+fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Option<CatalogEntry>> {
+    let dir = root.join(CATALOG_DIRS[folder]);
+    let entry = match folder {
+        0 => {
+            let Some(file) = Library::new(dir).load_with_sibling::<Chain>(&id)? else { return Ok(None) };
+            CatalogEntry::Macro(match file {
+                Ok(file) => MacroFile {
+                    id,
+                    name: file.name,
+                    chain: false,
+                    steps: Vec::new(),
+                    start_save: file.start_save,
+                    start_save_on: file.start_save_on,
+                    recorded_on: fighter_name(file.start.fighter_kind),
+                    span: file.frames.len() as u32,
+                },
+                Err(file) => MacroFile {
+                    id,
+                    name: file.name,
+                    chain: true,
+                    steps: file.recordings,
+                    start_save: None,
+                    start_save_on: file.start_save_on,
+                    recorded_on: String::new(),
+                    span: 0,
+                },
+            })
+        }
+        1 => {
+            let Some(save) = Store::<NamedSave>::new(dir).load_for_catalog(&id)? else { return Ok(None) };
+            let fighters = [&save.player, &save.cpu]
+                .into_iter()
+                .filter(|state| state.is_saved())
+                .map(|state| fighter_name(state.fighter_kind))
+                .filter(|name| !name.is_empty())
+                .collect::<Vec<_>>()
+                .join(" · ");
+            CatalogEntry::Save(SaveFile { id, name: save.name, fighters })
+        }
+        2 => {
+            let Some(file) = ComboLibrary::new(dir).load_for_catalog(&id)? else { return Ok(None) };
+            CatalogEntry::Combo(ComboFile {
+                id,
                 name: file.name,
-                chain: false,
-                steps: Vec::new(),
-                start_save: file.start_save,
-                start_save_on: file.start_save_on,
-                recorded_on: fighter_name(file.start.fighter_kind),
-                span: file.frames.len() as u32,
-            });
+                input_only: file.combo.input_only,
+                recorded_on: file.recorded_on.unwrap_or_default(),
+                made_from: file.made_from,
+                links: crate::model::recording_menu::combo_link_lines(&file.combo),
+                span: file.combo.len() as u32,
+            })
         }
-    }
-    let chains = Store::<Chain>::new(root.join(MACROS_DIR));
-    if let Ok(list) = chains.list() {
-        for entry in list.entries {
-            let Ok(file) = chains.load(&entry.id) else { continue };
-            catalog.macros.push(MacroFile {
-                id: entry.id,
-                name: file.name,
-                chain: true,
-                steps: file.recordings,
-                start_save: None,
-                start_save_on: file.start_save_on,
-                recorded_on: String::new(),
-                span: 0,
-            });
-        }
-    }
-    let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
-    if let Ok(list) = saves.list() {
-        for entry in list.entries {
-            let fighters = saves.load(&entry.id).ok().map(|save| {
-                let mut parts = Vec::new();
-                if save.player.is_saved() {
-                    parts.push(fighter_name(save.player.fighter_kind));
-                }
-                if save.cpu.is_saved() {
-                    parts.push(fighter_name(save.cpu.fighter_kind));
-                }
-                parts.retain(|part| !part.is_empty());
-                parts.join(" · ")
-            });
-            catalog.saves.push(SaveFile { id: entry.id, name: entry.name, fighters: fighters.unwrap_or_default() });
-        }
-    }
-    let combos = ComboLibrary::new(root.join("combos"));
-    if let Ok(list) = combos.list() {
-        for entry in list.entries {
-            let record = combos.load(&entry.id).ok();
-            let links = record
-                .as_ref()
-                .map(|file| crate::model::recording_menu::combo_link_lines(&file.combo))
-                .unwrap_or_default();
-            catalog.combos.push(ComboFile { input_only: record.as_ref().is_some_and(|f| f.combo.input_only),
-                id: entry.id,
-                name: entry.name,
-                recorded_on: record.as_ref().and_then(|file| file.recorded_on.clone()).unwrap_or_default(),
-                made_from: record.and_then(|file| file.made_from),
-                links,
-                span: entry.links as u32,
-            });
-        }
-    }
-    let sequences = Store::<Sequence>::new(root.join(SEQUENCES_DIR));
-    if let Ok(list) = sequences.list() {
-        for entry in list.entries {
-            let Ok(file) = sequences.load(&entry.id) else { continue };
-            catalog.sequences.push(SequenceFile {
-                id: entry.id,
+        _ => {
+            let Some(file) = Store::<Sequence>::new(dir).load_for_catalog(&id)? else { return Ok(None) };
+            CatalogEntry::Sequence(SequenceFile {
+                id,
                 name: file.name,
                 combos: file.combos,
                 streak: file.streak,
                 best: file.best,
-            });
+            })
+        }
+    };
+    Ok(Some(entry))
+}
+
+fn accepts_macro_backup(id: &str) -> bool {
+    MacroRecording::accepts_id(id) || Chain::accepts_id(id)
+}
+
+struct CatalogFile {
+    size: u64,
+    entry: Option<CatalogEntry>,
+    retry: bool,
+}
+
+/// A names-and-sizes check is staged until all four folders are listed.
+#[derive(Default)]
+struct FolderCheck {
+    at: usize,
+    listing: Option<CatalogListing>,
+    changes: CatalogSignatures,
+}
+
+pub struct CatalogCache {
+    root: PathBuf,
+    generation: Option<u64>,
+    ready: Option<(u64, Catalog)>,
+    files: BTreeMap<(usize, String), CatalogFile>,
+    pending: BTreeSet<(usize, String)>,
+    /// New entries finish their cold read before repeatedly rewritten entries.
+    revised: BTreeSet<(usize, String)>,
+    cold: Option<FolderCheck>,
+    cold_writes: CatalogSignatures,
+    check: Option<FolderCheck>,
+    external: CatalogSignatures,
+    external_changed: bool,
+}
+
+impl Default for CatalogCache {
+    fn default() -> Self {
+        Self::new(Path::new(crate::model::storage::ROOT))
+    }
+}
+
+impl CatalogCache {
+    pub fn new(root: &Path) -> Self {
+        Self {
+            root: root.to_path_buf(),
+            generation: None,
+            ready: None,
+            files: BTreeMap::new(),
+            pending: BTreeSet::new(),
+            revised: BTreeSet::new(),
+            cold: Some(FolderCheck::default()),
+            cold_writes: CatalogSignatures::new(),
+            check: None,
+            external: CatalogSignatures::new(),
+            external_changed: false,
         }
     }
-    catalog.hot_macros = index.hot(Kind::Macro).to_vec();
-    catalog.hot_saves = index.hot(Kind::Save).to_vec();
-    catalog.hot_combos = [false,true].into_iter().flat_map(|input| index.hot_where(Kind::Combo, |id| catalog.combos.iter().any(|f| f.id == id && f.input_only == input))).collect();
-    catalog.hot_sequences = index.hot(Kind::Sequence).to_vec();
-    let mark = |count: LoopCount| match count {
-        LoopCount::Infinite => LoopMark::Infinite,
-        LoopCount::Finite(n) => LoopMark::Finite(n),
-    };
-    Ok(CatalogLoad {
-        catalog,
-        bound: index.bound().map(str::to_owned),
-        active: [
-            index.active(Role::Player).map(str::to_owned),
-            index.active(Role::Cpu).map(str::to_owned),
-        ],
-        loops: [mark(index.loop_count(Role::Player)), mark(index.loop_count(Role::Cpu))],
-        drill: index.drill().map(|drill| drill.id.clone()),
-        slots: index.slots().clone(),
-    })
+
+    pub fn want(&mut self, generation: u64) {
+        if self.generation == Some(generation) {
+            return;
+        }
+        self.generation = Some(generation);
+        self.ready = None;
+        let external = core::mem::take(&mut self.external);
+        self.apply_changes(external);
+        // Committed writes also refresh an entry whose JSON length did not change.
+        let writes = catalog_changes(&self.root);
+        if self.cold.is_some() {
+            self.cold_writes.extend(writes);
+        } else {
+            self.apply_changes(writes);
+            if self.check.is_some() {
+                self.check();
+            }
+        }
+    }
+
+    fn apply_changes(&mut self, changes: CatalogSignatures) {
+        for (key, size) in changes {
+            if let Some(size) = size {
+                if let Some(file) = self.files.get_mut(&key) {
+                    file.size = size;
+                    if !self.pending.contains(&key) {
+                        self.revised.insert(key);
+                    }
+                } else {
+                    self.files.insert(key.clone(), CatalogFile { size, entry: None, retry: false });
+                    self.pending.insert(key);
+                }
+            } else {
+                self.files.remove(&key);
+                self.pending.remove(&key);
+                self.revised.remove(&key);
+            }
+        }
+    }
+
+    /// One listing batch or one payload read between input passes.
+    // Keep catalog scratch space out of the menu worker's other call paths.
+    #[inline(never)]
+    pub fn step(&mut self) -> bool {
+        let Some(generation) = self.generation else { return false };
+        if self.ready.is_some() {
+            return self.check_step();
+        }
+        if let Some(mut cold) = self.cold.take() {
+            if self.scan_step(&mut cold, true) {
+                self.cold = Some(cold);
+            } else {
+                // Writes observed during a cold scan win over its directory snapshots.
+                cold.changes.extend(core::mem::take(&mut self.cold_writes));
+                self.apply_changes(cold.changes);
+            }
+            return true;
+        }
+        if let Some(key) = self.pending.pop_first().or_else(|| self.revised.pop_first()) {
+            let outcome = catalog_entry(&self.root, key.0, key.1.clone());
+            let file = self.files.get_mut(&key).unwrap();
+            file.retry = outcome.is_err();
+            file.entry = outcome.ok().flatten();
+            return true;
+        }
+        let mut catalog = Catalog::default();
+        for file in self.files.values().filter_map(|file| file.entry.as_ref()) {
+            match file {
+                CatalogEntry::Macro(file) => catalog.macros.push(file.clone()),
+                CatalogEntry::Save(file) => catalog.saves.push(file.clone()),
+                CatalogEntry::Combo(file) => catalog.combos.push(file.clone()),
+                CatalogEntry::Sequence(file) => catalog.sequences.push(file.clone()),
+            }
+        }
+        catalog.macros.sort_by_cached_key(|file| (file.chain, file.name.to_lowercase(), file.id.clone()));
+        catalog.saves.sort_by_cached_key(|file| (file.name.to_lowercase(), file.id.clone()));
+        catalog.combos.sort_by_cached_key(|file| (file.name.to_lowercase(), file.id.clone()));
+        catalog.sequences.sort_by_cached_key(|file| (file.name.to_lowercase(), file.id.clone()));
+        self.ready = Some((generation, catalog));
+        self.check.is_some()
+    }
+
+    #[inline(never)]
+    fn start_listing(&self, folder: usize) -> CatalogListing {
+        CatalogListing::open(&self.root.join(CATALOG_DIRS[folder]))
+    }
+
+    fn scan_step(&self, check: &mut FolderCheck, cold: bool) -> bool {
+        let Some(guard) = try_recording_read() else { return true };
+        let Some(listing) = check.listing.as_mut() else {
+            check.listing = Some(self.start_listing(check.at));
+            return true;
+        };
+        let recover = cold.then_some(match check.at {
+            0 => accepts_macro_backup as fn(&str) -> bool,
+            1 => NamedSave::accepts_id,
+            2 => ComboRecord::accepts_id,
+            _ => Sequence::accepts_id,
+        });
+        if listing.step(recover) {
+            return true;
+        }
+        drop(guard);
+        let listing = check.listing.take().unwrap();
+        self.finish_listing(check, listing);
+        check.at += 1;
+        check.at < CATALOG_DIRS.len()
+    }
+
+    #[inline(never)]
+    fn finish_listing(&self, check: &mut FolderCheck, listing: CatalogListing) {
+        let Some(files) = listing.finish() else { return };
+        for key in self.files.keys().filter(|key| key.0 == check.at) {
+            if !files.contains_key(&key.1) {
+                check.changes.insert(key.clone(), None);
+            }
+        }
+        for (id, size) in files {
+            let key = (check.at, id);
+            if self.files.get(&key).is_none_or(|file| file.size != size || file.retry) {
+                check.changes.insert(key, Some(size));
+            }
+        }
+    }
+
+    /// Queue an external names-and-sizes check even if the cold catalog is building.
+    pub fn check(&mut self) {
+        self.check = Some(FolderCheck::default());
+    }
+
+    fn check_step(&mut self) -> bool {
+        let Some(mut check) = self.check.take() else { return false };
+        if self.scan_step(&mut check, false) {
+            self.check = Some(check);
+        } else if !check.changes.is_empty() {
+            self.external = check.changes;
+            self.external_changed = true;
+        }
+        true
+    }
+
+    pub fn take_external_change(&mut self) -> bool {
+        core::mem::take(&mut self.external_changed)
+    }
+
+    pub fn ready(&self, generation: u64) -> Option<&Catalog> {
+        self.ready.as_ref().filter(|(ready, _)| *ready == generation).map(|(_, catalog)| catalog)
+    }
 }
+
+/// Menu state from the index. An unsuccessful read leaves the requested revision unready.
+#[derive(Default)]
+pub struct MenuIndex {
+    seen: Option<(u64, u64)>,
+    index: Option<RecordingIndex>,
+}
+
+impl MenuIndex {
+    /// Returns true when this pass took the index read slot, even if a writer held the card.
+    // Keep JSON decoding in its own frame for the menu worker's stack bound.
+    #[inline(never)]
+    pub fn step(&mut self, root: &Path, version: (u64, u64)) -> bool {
+        if self.ready(version).is_some() {
+            return false;
+        }
+        let Some(_guard) = crate::model::store::try_recording_read() else { return true };
+        self.seen = Some(version);
+        self.index = RecordingIndex::load(root).ok();
+        true
+    }
+
+    pub fn ready(&self, version: (u64, u64)) -> Option<&RecordingIndex> {
+        self.index.as_ref().filter(|_| self.seen == Some(version))
+    }
+}
+
 
 // The fighter table is the switch (and test) roster. A host library build has no names.
 #[cfg(any(test, target_os = "switch"))]
@@ -690,7 +940,7 @@ fn record(err: impl ToString) -> Error {
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
-    use super::super::library::{Drill, DrillKind};
+    use super::super::library::{Drill, DrillKind, SEQUENCES_DIR};
     use super::*;
     use crate::model::combo::{Aim, Event, LinkRec};
     use crate::model::frame_strip::{Button, Move, Verdict};
@@ -1271,9 +1521,8 @@ mod tests {
         let refresh = |screens: &mut RecordingScreens, watch: CatalogWatch, generation: u64| {
             let (watch, due) = watch.take_load(generation);
             if due {
-                let loaded = load_catalog(&root).unwrap();
-                screens.set_catalog(loaded.catalog);
-                screens.adopt(loaded.bound, loaded.active, loaded.loops, loaded.drill);
+                screens.set_catalog(load_catalog(&root).unwrap());
+                apply_index(&RecordingIndex::load(&root).unwrap(), screens);
             }
             watch
         };
@@ -1292,10 +1541,317 @@ mod tests {
         assert_eq!(after.active(Role::Cpu), Some("macro-1"), "the menu published a selection older than the index");
     }
 
+    fn a_slot_assignment_survives_close_reopen_and_next_press() {
+        let root = library_card("slot-reopen", 1);
+        let mut cache = CatalogCache::new(&root);
+        cache.want(0);
+        while cache.step() {}
+        let mut index_watch = MenuIndex::default();
+        let mut open = |cache: &CatalogCache| {
+            let version = (0, crate::model::store::index_generation());
+            index_watch.step(&root, version);
+            let index = index_watch.ready(version).unwrap();
+            let mut menu = RecordingScreens::new();
+            apply_catalog(cache.ready(0).unwrap(), index, &mut menu);
+            apply_index(index, &mut menu);
+            menu
+        };
+        let mut menu = open(&cache);
+        open_row(&mut menu, SAVES_MACROS, 1, "Take 0");
+        let slot = menu.file_rows().iter().position(|row| row.title == "Playback slot").unwrap();
+        menu.set_file_cursor(slot);
+        menu.handle_page(MenuButton::Right, true, SAVES_MACROS);
+        let assigned = menu.selection().slots[0].clone();
+        assert!(assigned.is_some());
+        assert!(menu.take_selection_change(), "assigning a slot requests an index write");
+        super::super::rr_host::publish_selection(&root, &menu.selection(), None);
+        assert_eq!(RecordingIndex::load(&root).unwrap().slots()[0], assigned);
+        drop(menu);
+        let mut reopened = open(&cache);
+        reopened.handle_page(MenuButton::Down, true, SAVES_MACROS);
+        assert!(!reopened.take_selection_change(), "navigation leaves selection untouched");
+        assert_eq!(RecordingIndex::load(&root).unwrap().slots()[0], assigned, "another button must not undo Slot 1");
+        assert_eq!(reopened.selection().slots[0], assigned);
+    }
+
+    fn a_superseded_catalog_cannot_open_a_file_action() {
+        let root = library_card("obsolete-file", 1);
+        let loaded = load_catalog(&root).unwrap();
+        let mut screens = RecordingScreens::new();
+        screens.set_catalog(loaded);
+        open_row(&mut screens, SAVES_MACROS, 1, "Take 0");
+        let rename = screens.file_rows().iter().position(|row| row.title == "Rename").unwrap();
+        screens.set_file_cursor(rename);
+        screens.set_loading();
+        screens.handle_page(MenuButton::A, true, SAVES_MACROS);
+        assert!(!matches!(screens.take_effect(), Effect::Keyboard { .. }), "a stale file action must not open the rename keyboard");
+    }
+
+    fn an_index_read_failure_stays_unready_and_retries() {
+        let root = library_card("bad-index-retry", 1);
+        let mut index = MenuIndex::default();
+        assert!(index.step(&root, (0, 0)));
+        assert!(index.ready((0, 0)).is_some());
+        let path = root.join(super::super::library::INDEX_FILE);
+        std::fs::write(&path, b"invalid json").unwrap();
+        assert!(index.step(&root, (1, 0)));
+        assert!(index.ready((1, 0)).is_none(), "the previous index must not be relabelled");
+        assert!(index.ready((0, 0)).is_none());
+        RecordingIndex::fresh().save(&root).unwrap();
+        assert!(index.step(&root, (1, 0)), "a readable index retries at the same revision");
+        assert!(index.ready((1, 0)).is_some());
+    }
+
+    fn streak_saves_do_not_restart_a_populated_catalog_build() {
+        let root = library_card("streak-churn", 60);
+        let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+        for i in 0..30 {
+            let save = NamedSave::new(format!("Save {i}"), state(8), state(7)).unwrap();
+            saves.save_new(&save).unwrap();
+        }
+        let sequences = Store::<Sequence>::new(root.join(SEQUENCES_DIR));
+        let sequence = sequences.save_new(&Sequence::new("Drill", vec!["combo-1".into()]).unwrap()).unwrap();
+        let mut cache = CatalogCache::new(&root);
+        let mut streak = 0;
+        let reads_before = crate::model::store::file_reads();
+        let mut generation = crate::model::store::catalog_generation();
+        let mut writes = 0;
+        let done = (0..140).any(|pass| {
+            if pass % 10 == 0 {
+                // Alternate one-digit values: a byte-size signature alone cannot see these rewrites.
+                streak = if streak == 1 { 2 } else { 1 };
+                assert!(super::super::rr_host::save_sequence_progress(&root, &sequence, streak, streak));
+                let current = crate::model::store::catalog_generation();
+                assert!(current > generation, "each real sequence save invalidates the catalog");
+                generation = current;
+                writes += 1;
+            }
+            cache.want(generation);
+            let _ = cache.step();
+            cache.ready(generation).is_some()
+        });
+        assert!(done, "60 macros and 30 saves must complete in 140 passes despite streak writes");
+        let catalog = cache.ready(generation).unwrap();
+        assert!(crate::model::store::file_reads() - reads_before <= 91 + 2 * writes,
+            "generation churn does not re-read already decoded macros or saves");
+        assert_eq!((catalog.macros.len(), catalog.saves.len()), (60, 30));
+        assert_eq!((catalog.sequences[0].streak, catalog.sequences[0].best), (streak, streak));
+    }
+
+    /// A card with `files` recordings and its index, as the menu lists it.
+    fn library_card(tag: &str, files: usize) -> std::path::PathBuf {
+        let root = scratch(tag);
+        RecordingIndex::load(&root).unwrap().save(&root).unwrap();
+        let macros = Library::new(root.join(MACROS_DIR));
+        for i in 0..files {
+            macros.save_new(&recording(&format!("Take {i}"), &[0, 1, 0], None)).unwrap();
+        }
+        root
+    }
+
+    /// The worker can drain input between every pair of payload reads.
+    fn a_stepped_catalog_build_is_load_catalog_a_file_at_a_time() {
+        let root = library_card("build-steps", 4);
+        Store::<Chain>::new(root.join(MACROS_DIR))
+            .save_new(&Chain::new("Chain", vec!["take-0".into()]).unwrap()).unwrap();
+        let mut cache = CatalogCache::new(&root);
+        cache.want(0);
+        let initial = crate::model::store::file_reads();
+        loop {
+            let before = crate::model::store::file_reads();
+            let busy = cache.step();
+            assert!(crate::model::store::file_reads() - before <= 1);
+            if !busy { break; }
+        }
+        assert_eq!(crate::model::store::file_reads() - initial, 5);
+        let catalog = cache.ready(0).unwrap();
+        assert_eq!(catalog.macros.len(), 5);
+        assert!(catalog.macros[4].chain, "the same folder also lists chains");
+        assert_eq!(catalog, &load_catalog(&root).unwrap());
+    }
+
+    /// A superseded generation remains unavailable while the changed files are merged.
+    fn the_catalog_cache_serves_only_a_fresh_catalog() {
+        let root = library_card("cache-fresh", 2);
+        let mut cache = CatalogCache::new(&root);
+        assert!(cache.ready(0).is_none(), "nothing before a build");
+        cache.want(0);
+        assert!(cache.ready(0).is_none(), "not before the build ends");
+        while cache.step() {}
+        assert_eq!(cache.ready(0), Some(&load_catalog(&root).unwrap()));
+        assert!(!cache.step(), "built: no more work until the generation moves");
+        // TR saves a file: generation 1. The old catalog is not served for it.
+        Library::new(root.join(MACROS_DIR)).save_new(&recording("Take new", &[0, 2, 0], None)).unwrap();
+        cache.want(1);
+        assert!(cache.ready(1).is_none());
+        assert!(cache.step());
+        // Another save mid-build: generation 2 retains unchanged entries and adds the new file.
+        Library::new(root.join(MACROS_DIR)).save_new(&recording("Take newer", &[0, 4, 0], None)).unwrap();
+        cache.want(2);
+        while cache.step() {}
+        assert!(cache.ready(1).is_none(), "a superseded generation is never served");
+        let fresh = cache.ready(2).expect("generation 2 built");
+        assert_eq!(fresh, &load_catalog(&root).unwrap());
+        assert_eq!(fresh.macros.len(), 4);
+        // Asking again for the generation it has costs nothing.
+        cache.want(2);
+        assert!(!cache.step());
+    }
+
+    /// Files copied onto the card outside TR (FTP, DBI): the check after a menu open sees an add, a delete or a rename by
+    /// names and sizes and asks for a rebuild; an unchanged card asks for none and reads no file.
+    fn the_check_after_a_menu_open_sees_files_copied_outside_tr() {
+        let root = library_card("outside", 2);
+        let mut cache = CatalogCache::new(&root);
+        cache.want(0);
+        while cache.step() {}
+        let reads = crate::model::store::file_reads();
+        cache.check();
+        let mut steps = 0;
+        while cache.step() {
+            steps += 1;
+        }
+        assert!(steps >= 4, "a folder per step: {steps}");
+        assert!(!cache.take_external_change(), "an unchanged card asks for no rebuild");
+        assert_eq!(crate::model::store::file_reads(), reads, "the check reads no file");
+        assert!(cache.ready(0).is_some(), "the kept catalog stays");
+        let macros = root.join(MACROS_DIR);
+        let first = load_catalog(&root).unwrap().macros[0].id.clone();
+        let mut generation = 0;
+        for change in ["add", "delete", "rename"] {
+            match change {
+                "add" => {
+                    std::fs::copy(macros.join(format!("{first}.json")), macros.join("copied-in.json")).unwrap();
+                }
+                "delete" => std::fs::remove_file(macros.join("copied-in.json")).unwrap(),
+                _ => std::fs::rename(macros.join(format!("{first}.json")), macros.join("renamed-in.json")).unwrap(),
+            }
+            let before = crate::model::store::file_reads();
+            cache.check();
+            while cache.step() {}
+            assert_eq!(crate::model::store::file_reads(), before, "{change}: list without payload reads");
+            assert!(cache.take_external_change(), "{change}: the check asks for a rebuild");
+            assert!(!cache.take_external_change(), "{change}: once");
+            // The worker moves the catalog generation; the rebuild is the card as it is now.
+            generation += 1;
+            cache.want(generation);
+            while cache.step() {}
+            assert_eq!(crate::model::store::file_reads() - before, usize::from(change != "delete"), "{change}");
+            assert_eq!(cache.ready(generation), Some(&load_catalog(&root).unwrap()), "{change}");
+            cache.check();
+            while cache.step() {}
+            assert!(!cache.take_external_change(), "{change}: the rebuilt catalog's own folders are not a change");
+        }
+        assert!(cache.ready(generation).unwrap().macros.iter().any(|file| file.id == "renamed-in"));
+    }
+
+
+    fn save_chord_preserves_a_slot_written_after_its_initial_index_read() {
+        use crate::model::store::before_next_store_list;
+
+        let root = library_card("save-chord-slot-race", 1);
+        let path = root.clone();
+        before_next_store_list(move || {
+            let index = RecordingIndex::load(&path).unwrap();
+            assert_eq!(index.bound(), None, "the save has not committed");
+            let mut screens = RecordingScreens::new();
+            apply_index(&index, &mut screens);
+            screens.adopt_slots([Some("take-0".into()), None, None, None, None]);
+            super::super::rr_host::publish_selection(&path, &screens.selection(), None);
+            assert_eq!(RecordingIndex::load(&path).unwrap().slots()[0].as_deref(), Some("take-0"));
+        });
+
+        let id = save_chord(&root, state(8), state(7), 240).unwrap();
+        let index = RecordingIndex::load(&root).unwrap();
+        assert_eq!(index.bound(), Some(id.as_str()));
+        assert!(Store::<NamedSave>::new(root.join(SAVES_DIR)).load(&id).is_ok());
+        assert_eq!(index.slots()[0].as_deref(), Some("take-0"), "the accepted slot must survive the Save chord");
+    }
+
+    fn discovery_yields_between_small_batches_and_keeps_menu_input_available() {
+        use crate::model::menu::table::Page;
+        use crate::model::menu::{Env, Menu};
+        use crate::model::settings::Settings;
+        use crate::model::store::catalog_metadata_reads;
+
+        let root = library_card("bounded-discovery", 60);
+        let mut cache = CatalogCache::new(&root);
+        cache.want(0);
+        while cache.step() {}
+        let mut menu = Menu::new(Settings::factory(), Env::default());
+        while menu.page() != Page::Recording { menu.press(MenuButton::R); }
+        let index = RecordingIndex::load(&root).unwrap();
+        apply_catalog(cache.ready(0).unwrap(), &index, menu.recording_mut());
+        let before = catalog_metadata_reads();
+        cache.check();
+        assert!(cache.step(), "open the first discovery folder");
+        assert!(catalog_metadata_reads() - before <= 4, "one input drain cannot wait behind an entire folder");
+        assert!(cache.step(), "read the first discovery batch");
+        assert!(catalog_metadata_reads() - before <= 4, "one batch stats at most four entries");
+        assert!(cache.ready(0).is_some(), "an unchanged open continues with the current catalog");
+        menu.press(MenuButton::R);
+        assert_ne!(menu.page(), Page::Recording, "page navigation remains available during the scan");
+
+        let mut steps = 2;
+        loop {
+            let last = catalog_metadata_reads();
+            let work = cache.step();
+            assert!(catalog_metadata_reads() - last <= 4, "metadata calls per drain remain bounded");
+            if !work { break; }
+            steps += 1;
+            assert!(steps <= 80);
+        }
+        assert_eq!(catalog_metadata_reads() - before, 60);
+        assert!(steps >= 15);
+        assert!(!cache.take_external_change(), "the check found the same names and sizes");
+    }
+
+    fn a_failed_payload_retries_without_a_signature_change() {
+        use crate::model::store::{fail_next_payload_read, file_reads};
+
+        let root = library_card("payload-retry", 1);
+        let entry = root.join(MACROS_DIR).join("take-0.json");
+        let contents = std::fs::read(&entry).unwrap();
+        // A second bad file has a stable name and size but is permanently invalid.
+        std::fs::write(root.join(MACROS_DIR).join("zzz-bad.json"), b"not json").unwrap();
+        let mut cache = CatalogCache::new(&root);
+        cache.want(0);
+        fail_next_payload_read();
+        for _ in 0..20 {
+            if !cache.step() { break; }
+        }
+        assert!(cache.ready(0).is_some(), "payload failures must not stall the catalog");
+        let before = file_reads();
+
+        cache.check();
+        for _ in 0..20 {
+            let step = cache.step();
+            if cache.take_external_change() {
+                cache.want(1);
+            } else if !step {
+                break;
+            }
+        }
+        let catalog = cache.ready(1).or_else(|| cache.ready(0)).expect("retry completed");
+        assert_eq!(catalog.macros.iter().map(|file| file.id.as_str()).collect::<Vec<_>>(), ["take-0"]);
+        assert_eq!(file_reads() - before, 1, "retry the I/O failure only");
+        assert_eq!(std::fs::read(entry).unwrap(), contents, "the same file recovered");
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("save_chord_preserves_a_slot_written_after_its_initial_index_read", save_chord_preserves_a_slot_written_after_its_initial_index_read as fn()),
+            ("discovery_yields_between_small_batches_and_keeps_menu_input_available", discovery_yields_between_small_batches_and_keeps_menu_input_available as fn()),
+            ("a_failed_payload_retries_without_a_signature_change", a_failed_payload_retries_without_a_signature_change as fn()),
+            ("a_slot_assignment_survives_close_reopen_and_next_press", a_slot_assignment_survives_close_reopen_and_next_press as fn()),
+            ("a_superseded_catalog_cannot_open_a_file_action", a_superseded_catalog_cannot_open_a_file_action as fn()),
+            ("an_index_read_failure_stays_unready_and_retries", an_index_read_failure_stays_unready_and_retries as fn()),
+            ("streak_saves_do_not_restart_a_populated_catalog_build", streak_saves_do_not_restart_a_populated_catalog_build as fn()),
+            ("the_check_after_a_menu_open_sees_files_copied_outside_tr", the_check_after_a_menu_open_sees_files_copied_outside_tr as fn()),
+            ("a_stepped_catalog_build_is_load_catalog_a_file_at_a_time", a_stepped_catalog_build_is_load_catalog_a_file_at_a_time as fn()),
+            ("the_catalog_cache_serves_only_a_fresh_catalog", the_catalog_cache_serves_only_a_fresh_catalog as fn()),
             ("record_follows_the_popup_role", record_follows_the_popup_role as fn()),
             ("a_long_macro_plays_from_a_600_frame_window", a_long_macro_plays_from_a_600_frame_window as fn()),
             ("the_play_chords_drive_the_role_machines", the_play_chords_drive_the_role_machines as fn()),

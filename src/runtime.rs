@@ -29,6 +29,7 @@ mod p1;
 mod published;
 mod roster;
 mod ui;
+pub(crate) use ui::worker::wake as wake_recording_menu;
 
 mod scene;
 mod seams;
