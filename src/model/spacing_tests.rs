@@ -1,6 +1,7 @@
 lib_unit_tests! {
 use super::*;
 use crate::model::eggs::{self, Hit};
+use crate::model::panes::{EggLook, EggPicture, EGG_WHOLE};
 use std::collections::BTreeMap;
 
 const ENTRY_KIND: usize = 0x20;
@@ -277,6 +278,17 @@ fn target_zone_rings_radii() {
     assert_eq!(discs.map(|d| d.key), [target.key; 2]);
 }
 
+fn picture_fades_while_grading() {
+    assert_eq!(picture_look(EGG_WHOLE, true), EggLook { alpha: PICTURE_ALPHA, ..EGG_WHOLE });
+    assert_eq!(picture_look(EGG_WHOLE, false), EGG_WHOLE);
+
+    let scaled = EggLook { scale: 0.3, ..EGG_WHOLE };
+    assert_eq!(picture_look(scaled, true), scaled);
+
+    let cracked = EggLook { picture: EggPicture::Cracked, ..EGG_WHOLE };
+    assert_eq!(picture_look(cracked, true), cracked);
+}
+
 #[test]
 fn case_table() {
     crate::test_table::run(&[
@@ -290,6 +302,7 @@ fn case_table() {
         ("grader_off_hook_reads_nothing", grader_off_hook_reads_nothing as fn()),
         ("ring_consumes_each_contact_once", ring_consumes_each_contact_once as fn()),
         ("target_zone_rings_radii", target_zone_rings_radii as fn()),
+        ("picture_fades_while_grading", picture_fades_while_grading as fn()),
     ]);
 }
 }

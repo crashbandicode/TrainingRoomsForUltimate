@@ -379,6 +379,18 @@ pub fn zone_discs(target: &crate::model::hitbox_orbs::Orb) -> [crate::model::hit
     [good, ok]
 }
 
+pub const PICTURE_ALPHA: u8 = 110;
+
+/// The target pictures' panes sit above the orb panes, so while grading a whole target is drawn see-through to show its zone
+/// discs; break animations and other looks are unchanged.
+pub fn picture_look(look: crate::model::panes::EggLook, grader: bool) -> crate::model::panes::EggLook {
+    if grader && look == crate::model::panes::EGG_WHOLE {
+        crate::model::panes::EggLook { alpha: PICTURE_ALPHA, ..look }
+    } else {
+        look
+    }
+}
+
 #[cfg(test)]
 #[path = "spacing_tests.rs"]
 mod tests;
