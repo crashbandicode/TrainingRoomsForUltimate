@@ -806,7 +806,7 @@ fn the_input_display_degrades_apart_from_input_delay() {
 fn optional_grader_rows_disable_only_grading() {
     let boot = include_str!("../src/runtime/boot.rs");
     assert!(boot.contains(
-        "input_display::set_grader_read(display_on && sites_hitbox::GRADER_ROWS.iter().all(|(name, _)| row_usable(name)));"
+        "input_display::set_grader_read(display_on && sites_hitbox::grader_usable(&usable));"
     ));
     for (name, offset) in model::sites_hitbox::GRADER_ROWS {
         let usable = |site: &model::sites::Site| site.name != name;
