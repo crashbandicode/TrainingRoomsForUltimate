@@ -502,12 +502,15 @@ pub(super) unsafe fn ai_correction(ai: usize, accessor: usize, stock: StockPad) 
     let position = [natives::pos_x(accessor), natives::pos_y(accessor)];
     if run.drill == Drill::GuardEdge {
         // Hit off-stage: survive first, otherwise bend the launch at the nearer ledge.
+        // J3's counter stays the Juggler's; this edit has no trace tag until one is agreed.
         let [left, right] = run.stage.ledges;
-        let ledge = if position[0] <= left[0].midpoint(right[0]) { left } else { right };
-        let anchor = recovery::di_anchor(position, ledge);
-        let correction = air_hit_recovery(run, anchor, accessor, position, status);
-        if correction != Correction::default() {
-            return stock.observe(correction, PerfectRule::HitRecovery, run, 0, run.reaction.frames().into());
+        if position[0] < left[0] || position[0] > right[0] {
+            let ledge = if position[0] < left[0] { left } else { right };
+            let anchor = recovery::di_anchor(position, ledge);
+            let correction = air_hit_recovery(run, anchor, accessor, position, status);
+            if correction != Correction::default() {
+                return correction;
+            }
         }
         if run.niche.is_some() {
             return niche_correction(run, ai, accessor, position, status, stock);
@@ -1211,6 +1214,11 @@ unsafe fn recovery_pad(
     // still returns one frame later. Each frame re-checks from the live position.
     let bottom = run.stage.blast()[3];
     let term = konst(C::TermContSpecialHi);
+    // A missing snapshot or an invalid special table is no reach sample: the stock pad stands.
+    if special.is_none() && !matches!(recovery, Some((_, false))) {
+        run.hold = Hold::default();
+        return Correction::default();
+    }
     let alone = Reach::trusted(physics, false, special);
     // An off-stage guarder: the jump stays in reserve while the up special alone returns.
     let reserve = can_jump
@@ -1234,7 +1242,8 @@ unsafe fn recovery_pad(
     let hot = can_wait && ledge_hot(run, p1, ledge);
     // In reserve the stock up special is the plan: only the jump is withheld.
     let seen = if reserve { buttons & !perfect::SPECIAL } else { buttons };
-    let mut correction = run.hold.step(HoldFacts { buttons: seen, button, planned, can_wait, hot });
+    let frame = run.rounds.frames;
+    let mut correction = run.hold.step(HoldFacts { frame, buttons: seen, button, planned, can_wait, hot });
     let inward = (ledge[0] - pos[0]).signum();
     if correction.release != 0 || run.hold.waiting() {
         // Level stick while the up special is withheld: no tap jump, no fast fall.

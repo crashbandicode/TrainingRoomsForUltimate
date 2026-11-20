@@ -202,6 +202,7 @@ fn low_route_waits_for_the_deadline_and_near_stays_early() {
 
 fn held(button: u32, planned: u8, can_wait: bool, buttons: u32) -> HoldFacts {
     HoldFacts {
+        frame: 0,
         buttons,
         button,
         planned,
@@ -210,9 +211,51 @@ fn held(button: u32, planned: u8, can_wait: bool, buttons: u32) -> HoldFacts {
     }
 }
 
+/// A hold stepped once per game frame.
+#[derive(Default)]
+struct Ticking(Hold, u32);
+
+impl Ticking {
+    fn step(&mut self, facts: HoldFacts) -> Correction {
+        self.1 += 1;
+        self.0.step(HoldFacts {
+            frame: self.1,
+            ..facts
+        })
+    }
+
+    fn waiting(&self) -> bool {
+        self.0.waiting()
+    }
+}
+
+#[test]
+fn hold_counts_game_frames_not_think_calls() {
+    let mut hold = Hold::default();
+    let at = |frame, buttons| HoldFacts {
+        frame,
+        ..held(JUMP, 3, true, buttons)
+    };
+    let first = hold.step(at(10, 0x8004));
+    assert_eq!(first.release, JUMP);
+    for _ in 0..5 {
+        assert_eq!(
+            hold.step(at(10, 0x8004)),
+            first,
+            "a second think on one frame repeats the pad"
+        );
+    }
+    assert_eq!(hold.step(at(11, 0x8000)), Correction::default());
+    assert_eq!(hold.step(at(12, 0x8000)), Correction::default());
+    let spent = hold.step(at(13, 0x8000));
+    assert_eq!(spent.press, JUMP, "three game frames after the plan");
+    assert_eq!(hold.step(at(13, 0x8000)), spent);
+    assert!(!hold.waiting());
+}
+
 #[test]
 fn jump_is_held_in_reserve_while_the_special_alone_returns() {
-    let mut hold = Hold::default();
+    let mut hold = Ticking::default();
     let first = hold.step(held(JUMP, u8::MAX, true, 0x8004));
     assert_eq!((first.press, first.release), (0, JUMP));
     assert!(hold.waiting());
@@ -229,7 +272,7 @@ fn jump_is_held_in_reserve_while_the_special_alone_returns() {
     );
     assert!(!hold.waiting());
 
-    let mut unguarded = Hold::default();
+    let mut unguarded = Ticking::default();
     assert_eq!(
         unguarded.step(held(JUMP, 0, true, 0x8004)),
         Correction::default(),
@@ -240,7 +283,7 @@ fn jump_is_held_in_reserve_while_the_special_alone_returns() {
 
 #[test]
 fn stock_up_special_is_held_until_the_sweet_spot_frame() {
-    let mut with_jump = Hold::default();
+    let mut with_jump = Ticking::default();
     with_jump.step(held(JUMP, 20, true, 0x8004));
     let both = with_jump.step(held(JUMP, 20, true, 0x8002));
     assert_eq!(
@@ -249,7 +292,7 @@ fn stock_up_special_is_held_until_the_sweet_spot_frame() {
         "no up special while the jump is unspent"
     );
 
-    let mut hold = Hold::default();
+    let mut hold = Ticking::default();
     for frame in 0..5 {
         let edit = hold.step(held(SPECIAL, 5, true, 0x8002));
         assert_eq!((edit.press, edit.release), (0, SPECIAL), "frame {frame}");
@@ -257,7 +300,7 @@ fn stock_up_special_is_held_until_the_sweet_spot_frame() {
     assert_eq!(hold.step(held(SPECIAL, 5, true, 0x8000)).press, SPECIAL);
     assert!(!hold.waiting());
 
-    let mut last_frame = Hold::default();
+    let mut last_frame = Ticking::default();
     last_frame.step(held(SPECIAL, 30, true, 0x8002));
     assert_eq!(
         last_frame.step(held(SPECIAL, 30, false, 0x8002)).press,
@@ -265,13 +308,13 @@ fn stock_up_special_is_held_until_the_sweet_spot_frame() {
         "the envelope ends next frame"
     );
 
-    let mut unguarded = Hold::default();
+    let mut unguarded = Ticking::default();
     assert_eq!(
         unguarded.step(held(SPECIAL, 0, true, 0x8002)),
         Correction::default()
     );
 
-    let mut defended = Hold::default();
+    let mut defended = Ticking::default();
     defended.step(held(SPECIAL, 30, true, 0x8002));
     assert_eq!(
         defended.step(held(SPECIAL, 30, true, 0x8000 | GUARD)),
@@ -284,13 +327,14 @@ fn stock_up_special_is_held_until_the_sweet_spot_frame() {
 #[test]
 fn hot_ledge_delays_the_arrival_only_inside_the_deadline() {
     let facts = |can_wait, hot| HoldFacts {
+        frame: 0,
         buttons: 0x8000,
         button: JUMP,
         planned: 1,
         can_wait,
         hot,
     };
-    let mut hold = Hold::default();
+    let mut hold = Ticking::default();
     hold.step(held(JUMP, 1, true, 0x8004));
     assert_eq!(
         hold.step(facts(true, true)),

@@ -58,6 +58,8 @@ impl NicheGuide {
         if !(outside > 0.0 && facts.player.into_iter().all(f32::is_finite)) {
             return None;
         }
+        // A crossing starts below the near ledge. An extension row sees every height and
+        // applies its own rule (`climb`).
         let band = band.filter(|_| y < near[1]);
         let exit = far[0] + direction * facts.body_clearance;
         let row_facts = Facts {
