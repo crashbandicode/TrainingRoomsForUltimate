@@ -1370,7 +1370,7 @@ mod tests {
         let ledges = [[-40., 0.], [40., 0.]];
         let outline = [[ledges[0], ledges[1]], [ledges[0], [0., -15.]], [[0., -15.], ledges[1]]];
         let mut facts = RouteFacts {
-            fighter: 0x6,
+            fighter: 0x1d,
             stage: (3, 0),
             position: [-53., -22.],
             player: [-41., 0.],
@@ -1385,7 +1385,7 @@ mod tests {
         };
         assert!(possible_routes(&facts)[3].is_some(), "the geometry and budget permit crossing");
         for (kind, name) in CHOICES.iter().copied().filter(|&(_, name)| {
-            matches!(name, "Little Mac" | "Incineroar" | "Luigi" | "Ness" | "Snake" | "Charizard" | "Link" | "Pikachu" | "Jigglypuff")
+            matches!(name, "Little Mac" | "Incineroar" | "Luigi" | "Ness" | "Snake" | "Charizard" | "Link" | "Pikachu" | "Jigglypuff" | "Kirby")
         }) {
             facts.fighter = kind as i32;
             for stage in [0, 3, 89, 311] {
@@ -1417,7 +1417,7 @@ mod tests {
         let ledges = [[-40., 0.], [40., 0.]];
         let outline = [[ledges[0], ledges[1]], [ledges[0], [0., -15.]], [[0., -15.], ledges[1]]];
         let mut facts = RouteFacts {
-            fighter: 0x6,
+            fighter: 0x1d,
             stage: (0, 0),
             position: [-53., -22.],
             player: [-41., 0.],

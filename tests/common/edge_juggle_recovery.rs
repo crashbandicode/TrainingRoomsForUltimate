@@ -818,3 +818,51 @@ fn measured_crossing_is_a_mixup_with_or_without_modeled_alternatives() {
         Route::Opposite,
     );
 }
+
+#[test]
+fn seeded_crossing_roll_stays_a_minority_even_with_a_high_spare_climb() {
+    use crate::model::cpu::rng::Rng;
+
+    let [near, _, _, opposite] = ROUTES.map(plan);
+    let near = near.map(|p| Plan { weight: 1, ..p });
+    let opposite = opposite.map(|p| Plan { weight: 16, ..p });
+    let mut rng = Rng::new(0x7352_D194);
+    let mut crossings = 0;
+    for _ in 0..10_000 {
+        let draw = rng.next_u32();
+        let chosen = mix([near, None, None, opposite], Zone::Ledge, None, draw).unwrap();
+        assert_eq!(mix([near, None, None, None], Zone::Ledge, None, draw), near);
+        crossings += u32::from(chosen.route == Route::Opposite);
+    }
+    assert!((4300..=4700).contains(&crossings), "crossing cap is 45%: {crossings}/10000");
+}
+
+#[test]
+fn seeded_measured_roll_keeps_the_uncovered_normal_route_and_respects_live_reach() {
+    use super::{mix_measured_crossing, CrossingRace};
+    use crate::model::cpu::rng::Rng;
+
+    let race = CrossingRace {
+        near_x: -80.0, far_x: 80.0, guarder_x: 65.0, guarder_run_speed: 1.5,
+        guarder_facing: -1.0, crossing_frames: 158,
+    };
+    let mut rng = Rng::new(0x7483_A5D6);
+    let mut counts = [0u32; 3];
+    let [near, high, low, opposite] = ROUTES.map(plan);
+    for _ in 0..10_000 {
+        let draw = rng.next_u32();
+        for (i, (zone, guarder_x, cross)) in [
+            (Zone::Far, 65.0, opposite),
+            (Zone::Hang, -79.0, opposite),
+            (Zone::Hang, -79.0, None),
+        ].into_iter().enumerate() {
+            let chosen = mix_measured_crossing(
+                [near, high, low, cross], zone, None, draw, CrossingRace { guarder_x, ..race },
+            ).unwrap();
+            counts[i] += u32::from(chosen.route == Route::Opposite);
+        }
+    }
+    assert_eq!(counts[0], 0, "leave the uncovered normal ledge to the fighter");
+    assert!((1850..=2150).contains(&counts[1]), "covered ledge and close race: {counts:?}");
+    assert_eq!(counts[2], 0, "a live reach veto cannot enter the roll");
+}
