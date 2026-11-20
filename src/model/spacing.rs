@@ -59,8 +59,54 @@ pub fn native(record_p: [f32; 3], shape_p: [f32; 3], pen: f32, radius: f32) -> O
     }
 }
 
-pub fn read_contact(_read: impl Fn(usize) -> Option<u64>, _accessor: usize) -> Option<Grade> {
-    None
+pub fn read_contact(read: impl Fn(usize) -> Option<u64>, accessor: usize) -> Option<Grade> {
+    use crate::model::hitbox::layout;
+    use crate::model::sites_hitbox::{damage_record as record_layout, hurt_shape as shape_layout};
+
+    fn pointer(read: &impl Fn(usize) -> Option<u64>, at: usize) -> Option<usize> {
+        let pointer = usize::try_from(read(at)?).ok()?;
+        (pointer >= 0x1000 && pointer & 7 == 0 && pointer >> 47 == 0).then_some(pointer)
+    }
+
+    fn field_u32(read: &impl Fn(usize) -> Option<u64>, at: usize) -> Option<u32> {
+        let word = read(at & !7)?;
+        Some((word >> ((at & 7) * 8)) as u32)
+    }
+
+    fn field_f32(read: &impl Fn(usize) -> Option<u64>, base: usize, offset: usize) -> Option<f32> {
+        let at = base.checked_add(offset)?;
+        field_u32(read, at).map(f32::from_bits)
+    }
+
+    let record_module = pointer(&read, accessor.checked_add(record_layout::MODULE)?)?;
+    let record = pointer(&read, record_module.checked_add(record_layout::RECORDS)?)?;
+    let part_at = record.checked_add(record_layout::PART)?;
+    let part = (field_u32(&read, part_at)? & 0xff) as usize;
+
+    let hit_module = pointer(&read, accessor.checked_add(layout::HIT_MODULE)?)?;
+    let total_at = hit_module.checked_add(layout::HIT_PART_TOTAL)?;
+    let total = usize::try_from(field_u32(&read, total_at)? as i32).ok()?;
+    if part >= total {
+        return None;
+    }
+
+    let parts = pointer(&read, hit_module.checked_add(layout::HIT_PARTS)?)?;
+    let part_base = parts.checked_add(part.checked_mul(layout::HIT_PART_STRIDE)?)?;
+    let shape = pointer(&read, part_base.checked_add(shape_layout::SHAPE)?)?;
+
+    let record_contact = [
+        field_f32(&read, record, record_layout::CONTACT)?,
+        field_f32(&read, record, record_layout::CONTACT + 4)?,
+        field_f32(&read, record, record_layout::CONTACT + 8)?,
+    ];
+    let shape_contact = [
+        field_f32(&read, shape, shape_layout::CONTACT)?,
+        field_f32(&read, shape, shape_layout::CONTACT + 4)?,
+        field_f32(&read, shape, shape_layout::CONTACT + 8)?,
+    ];
+    let pen = field_f32(&read, shape, shape_layout::PEN)?;
+    let radius = field_f32(&read, shape, shape_layout::RADIUS)?;
+    native(record_contact, shape_contact, pen, radius)
 }
 
 #[cfg(test)]

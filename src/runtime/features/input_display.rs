@@ -178,7 +178,7 @@ pub fn set_grader_read(on: bool) {
 ///
 /// # Safety
 /// `accessor` is a live fighter or Sandbag accessor, on the game thread.
-pub(super) unsafe fn contact(_accessor: usize) -> Option<crate::model::spacing::Grade> {
+pub(super) unsafe fn contact(accessor: usize) -> Option<crate::model::spacing::Grade> {
     if !GRADE_ON.load(Ordering::Acquire) {
         return None;
     }
@@ -186,7 +186,7 @@ pub(super) unsafe fn contact(_accessor: usize) -> Option<crate::model::spacing::
     if !rows.iter().all(|(_, offset)| crate::runtime::game::granted(*offset)) {
         return None;
     }
-    None
+    crate::model::spacing::read_contact(|address| Some(unsafe { ((address & !7) as *const u64).read() }), accessor)
 }
 
 /// Whether a spot is wanted (rc.14 SP3/SP4): *Spot labels* or *Match sweet/sour spot* On. Only then the strip reads the hitboxes'
