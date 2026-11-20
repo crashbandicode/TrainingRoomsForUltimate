@@ -82,6 +82,39 @@ fn replanning_weights_against_the_preceding_completed_attempt() {
 }
 
 #[test]
+fn horizontal_limit_jumps_before_stock_waits_one_frame_too_long() {
+    let reach = Reach::trusted(AIR, true, None);
+    let velocity = [0.0, -1.4];
+    for inward in [-1.0, 1.0] {
+        let start = [LEDGE[0] - 68.0 * inward, -45.0];
+        assert!(reach.returns(start, velocity, LEDGE, 0, BOTTOM));
+        assert!(!reach.returns(start, velocity, LEDGE, 1, BOTTOM));
+        assert!(reach.returns([LEDGE[0], start[1]], velocity, LEDGE, 1, BOTTOM));
+        assert_eq!(
+            reach.jump_at_horizontal_limit(start, velocity, LEDGE, BOTTOM, 0),
+            Correction { press: JUMP, stick: Some([inward, 0.0]), release: 0 },
+        );
+        for action in [GUARD, JUMP, SPECIAL, 0x1] {
+            assert_eq!(
+                reach.jump_at_horizontal_limit(start, velocity, LEDGE, BOTTOM, action),
+                Correction::default(),
+            );
+        }
+        assert_eq!(
+            Reach::trusted(AIR, false, None)
+                .jump_at_horizontal_limit(start, velocity, LEDGE, BOTTOM, 0),
+            Correction::default(),
+        );
+        for other in [[start[0], -43.0], [start[0], -52.0], [f32::NAN, start[1]]] {
+            assert_eq!(
+                reach.jump_at_horizontal_limit(other, velocity, LEDGE, BOTTOM, 0),
+                Correction::default(),
+            );
+        }
+    }
+}
+
+#[test]
 fn native_params_give_the_traced_double_jump_and_drift() {
     use crate::model::edge_juggle::perfect::NativeAir;
     // fighter_param 13.0.5: (air_accel_y, jump_aerial_y, air_accel_x_add, air_accel_x_mul), then the

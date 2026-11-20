@@ -185,6 +185,17 @@ impl Reach {
         false
     }
 
+    pub fn jump_at_horizontal_limit(
+        self,
+        _from: Point,
+        _speed: Point,
+        _ledge: Point,
+        _bottom: f32,
+        _buttons: u32,
+    ) -> Correction {
+        Correction::default()
+    }
+
     /// The last frame the fighter may wait: the point of no return.
     pub fn deadline(self, from: Point, speed: Point, ledge: Point, bottom: f32) -> Option<u8> {
         (0..=REACH_FRAMES)
