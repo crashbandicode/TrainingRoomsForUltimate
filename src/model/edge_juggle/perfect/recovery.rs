@@ -48,6 +48,32 @@ pub fn zone(guard: Guarder, ledge: Point, cpu: Point) -> Zone {
     }
 }
 
+/// The route from the most recent completed attempt, and the current plan.
+#[derive(Default)]
+pub struct RouteHistory {
+    previous: Option<Route>,
+    active: Option<Route>,
+}
+
+impl RouteHistory {
+    pub fn previous(&self) -> Option<Route> {
+        self.previous
+    }
+
+    pub fn start(&mut self) {
+        self.active = None;
+    }
+
+    pub fn planned(&mut self, route: Route) {
+        self.active = Some(route);
+        self.previous = Some(route);
+    }
+
+    pub fn complete(&mut self) {
+        self.previous = self.active.take();
+    }
+}
+
 /// Near, High, LateLow and Opposite against each zone, in `Zone` order.
 const ZONE_WEIGHTS: [[u8; 4]; 6] = [
     [8, 4, 2, 0],

@@ -108,7 +108,7 @@ struct Run {
     route_watch: perfect::RouteWatch,
     player_reach: f32,
     player_height: PlanHeight,
-    last_route: Option<Route>,
+    route_history: recovery::RouteHistory,
     guide: Option<RecoveryGuide>,
     niche: Option<niche_pad::NicheGuide>,
     last_cpu_status: i32,
@@ -905,11 +905,16 @@ unsafe fn route_guide(
     let plan = if needed {
         None
     } else {
-        recovery::mix([near, high, low, opposite], zone, run.last_route, run.route_draw)
+        recovery::mix(
+            [near, high, low, opposite],
+            zone,
+            run.route_history.previous(),
+            run.route_draw,
+        )
     };
     if let Some((guide, _)) = row.filter(|_| needed || plan.is_some_and(|plan| plan.route == Route::Opposite)) {
         let row = guide.selected_niche_row();
-        run.last_route = Some(row.route);
+        run.route_history.planned(row.route);
         planner_chose(route_code(row.route), fighter as u32, crossable, row.id.into());
         run.niche = Some(guide);
         return None;
@@ -919,7 +924,7 @@ unsafe fn route_guide(
         return None;
     };
     planner_chose(route_code(plan.route), fighter as u32, crossable, 0);
-    run.last_route = Some(plan.route);
+    run.route_history.planned(plan.route);
     run.jump_delay = recovery::planned_delay(plan.route, zone, deadline, run.route_draw);
     match plan.route {
         Route::Opposite => {
@@ -1755,7 +1760,7 @@ pub unsafe fn frame(fighter: usize) {
             route_watch: perfect::RouteWatch::default(),
             player_reach: 0.0,
             player_height: PlanHeight::default(),
-            last_route: None,
+            route_history: recovery::RouteHistory::default(),
             guide: None,
             niche: None,
             last_cpu_status: UNRESOLVED,
@@ -1809,6 +1814,7 @@ pub unsafe fn frame(fighter: usize) {
         run.jump_delay = 0;
     } else if run.body != body {
         run.body = body;
+        run.route_history = recovery::RouteHistory::default();
         *held_cpu = None;
         run.rounds.restart_drill();
         run.placement = Placement::ResetResources;
@@ -1902,7 +1908,11 @@ pub unsafe fn frame(fighter: usize) {
             hold_cpu(cpu, run.setup.cpu);
         }
         run.rounds.advance_attempt(obs);
+        if before == Phase::Live && matches!(run.rounds.phase, Phase::Result(..)) {
+            run.route_history.complete();
+        }
         if matches!(before, Phase::Ready(_)) && run.rounds.phase == Phase::Live {
+            run.route_history.start();
             run.landing_draw = rng.below(9);
             run.jump_delay = 0;
             run.route_draw = rng.next_u32();

@@ -52,6 +52,36 @@ fn shares(options: [Option<Plan>; 4], zone: Zone, last: Option<Route>) -> [u32; 
 }
 
 #[test]
+fn replanning_weights_against_the_preceding_completed_attempt() {
+    use super::RouteHistory;
+
+    let mut history = RouteHistory::default();
+    history.start();
+    history.planned(Route::High);
+    history.complete();
+    assert_eq!(history.previous(), Some(Route::High));
+
+    history.start();
+    history.planned(Route::Near);
+    assert_eq!(history.previous(), Some(Route::High));
+    history.planned(Route::Opposite);
+    assert_eq!(history.previous(), Some(Route::High), "a replan is provisional");
+
+    // Discard the interrupted attempt. The next result publishes its final choice.
+    history.start();
+    assert_eq!(history.previous(), Some(Route::High));
+    history.planned(Route::Near);
+    history.planned(Route::LateLow);
+    assert_eq!(history.previous(), Some(Route::High));
+    history.complete();
+    assert_eq!(history.previous(), Some(Route::LateLow));
+
+    history.start();
+    history.complete();
+    assert_eq!(history.previous(), None, "stock completed the preceding attempt");
+}
+
+#[test]
 fn native_params_give_the_traced_double_jump_and_drift() {
     use crate::model::edge_juggle::perfect::NativeAir;
     // fighter_param 13.0.5: (air_accel_y, jump_aerial_y, air_accel_x_add, air_accel_x_mul), then the
