@@ -339,7 +339,7 @@ fn run_inner() {
     let (recording_on, notices_on) = install_pkg4(input_delay_on && recording_closure, cpu_core_on, notices_closure, &found4, &mut written4);
     recorder::set_enabled(recording_on);
     let edge_juggle_on = crate::runtime::features::edge_juggle::install(
-        cpu_core_on && recording_on && capabilities::unit_usable(Feature::EdgeJuggle, &usable)
+        cpu_core_on && recording_on && roster_on && capabilities::unit_usable(Feature::EdgeJuggle, &usable)
     );
 
     // Package 5: the menu's layout archive hook, UI anchors and input callers (only when the closure holds).

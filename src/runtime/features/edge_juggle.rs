@@ -148,7 +148,9 @@ struct Bodies {
 
 pub fn install(dependencies: bool) -> bool {
     // Surface verification may ask for a memory map. Run it before the game callbacks use its result.
-    let installed = dependencies && unsafe { super::tech_surfaces::init() };
+    let installed = dependencies
+        && super::cpu_level::install_drill_behavior()
+        && unsafe { super::tech_surfaces::init() };
     INSTALLED.store(installed, Ordering::Release);
     installed
 }

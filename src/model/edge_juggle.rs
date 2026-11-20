@@ -111,6 +111,54 @@ pub fn reaction_rows(id: &str) -> Option<&'static DifficultyRows> {
         .find(|rows| rows.reaction == id)
 }
 
+/// Training's pause-menu selection and the CPU's corresponding native control.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CpuBehavior {
+    pub menu: u32,
+    pub level: u32,
+    pub control: u8,
+}
+
+impl CpuBehavior {
+    pub const LEVEL_NINE: Self = Self { menu: 2, level: 8, control: 0 };
+}
+
+/// Save the original selection once for the lifetime of its Training panel.
+#[derive(Default)]
+pub struct BehaviorLease(Option<(usize, CpuBehavior)>);
+
+impl BehaviorLease {
+    pub const fn new() -> Self {
+        Self(None)
+    }
+
+    pub fn held(&self) -> bool {
+        self.0.is_some()
+    }
+
+    pub fn step(
+        &mut self,
+        running: bool,
+        safe: bool,
+        panel: usize,
+        current: CpuBehavior,
+    ) -> Option<CpuBehavior> {
+        if !safe {
+            return None;
+        }
+        if self.0.is_some_and(|(owner, _)| owner != panel) {
+            self.0 = None;
+        }
+        let desired = if running {
+            self.0.get_or_insert((panel, current));
+            CpuBehavior::LEVEL_NINE
+        } else {
+            self.0.take()?.1
+        };
+        (desired != current).then_some(desired)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Outcome {
     Secured,
