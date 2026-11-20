@@ -333,6 +333,28 @@ fn niche_little_mac_haymaker_route_and_pad_sequence() {
 }
 
 #[test]
+fn niche_haymaker_does_not_spend_side_special_when_the_ledge_is_below_its_safe_approach() {
+    let input = facts(0x34, "near");
+    let check = |gap, climb| {
+        select(
+            Facts {
+                climb,
+                near: input.near.map(|near| NearReach { gap, climb, ..near }),
+                ..input
+            },
+            CANDIDATE_ROWS,
+        )
+        .map(|row| row.id)
+    };
+    // 3a29e6af fd-3 made the ledge from this release.
+    assert_eq!(check(20.0, 28.0), Some(9));
+    // LM-1 asks for an extension at this same-stage gap and height.
+    assert_eq!(check(35.0, 10.0), Some(9));
+    // fd-1 was still at y=-73 as it reached the ledge column, then fell past reach.
+    assert_eq!(check(56.0, 58.0), None);
+}
+
+#[test]
 fn niche_little_mac_counter_route_and_pad_sequence() {
     verify(0x34, "counter", 10, &[Move::Counter, Move::Rise]);
 }
