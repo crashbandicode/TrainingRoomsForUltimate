@@ -52,6 +52,51 @@ fn shares(options: [Option<Plan>; 4], zone: Zone, last: Option<Route>) -> [u32; 
 }
 
 #[test]
+fn native_params_give_the_traced_double_jump_and_drift() {
+    use crate::model::edge_juggle::perfect::NativeAir;
+    // fighter_param 13.0.5: (air_accel_y, jump_aerial_y, air_accel_x_add, air_accel_x_mul), then the
+    // first double-jump frame and the full-stick drift step of the exact trace edge-niche-cand-fd-3.
+    let traced = [
+        ("Pikachu", [0.095, 35.5, 0.01, 0.09], 2.550, 0.100),
+        ("Sheik", [0.15, 40.0, 0.01, 0.08], 3.389, 0.090),
+        ("Mr. Game & Watch", [0.08, 27.51, 0.07, 0.03], 2.058, 0.100),
+        ("Diddy Kong", [0.125, 41.21, 0.0, 0.05], 3.147, 0.050),
+        ("R.O.B.", [0.09, 38.0, 0.04, 0.045], 2.570, 0.085),
+        ("Little Mac", [0.09, 26.0, 0.01, 0.03], 2.118, 0.040),
+    ];
+    for (fighter, [gravity, height, add, mul], launch, drift) in traced {
+        let air = AirPhysics::from_params(NativeAir {
+            air_speed_x_stable: 1.0,
+            air_accel_x_add: add,
+            air_accel_x_mul: mul,
+            air_accel_y: gravity,
+            air_speed_y_stable: 1.5,
+            jump_aerial_y: height,
+        });
+        assert!(air.valid(), "{fighter}: a zero `add` term is a real fighter");
+        assert!(
+            (air.jump_speed - launch).abs() < 0.002,
+            "{fighter}: the param is a height of {height}, the jump starts at {launch}, not {}",
+            air.jump_speed
+        );
+        assert!(
+            (air.horizontal_acceleration - drift).abs() < 0.0005,
+            "{fighter}: full-stick drift is add + mul = {drift}, not {}",
+            air.horizontal_acceleration
+        );
+        let (mut rise, mut speed) = (0.0, air.jump_speed);
+        while speed > 0.0 {
+            rise += speed;
+            speed -= air.gravity;
+        }
+        assert!(
+            (rise - height).abs() < 0.5,
+            "{fighter}: the simulated apex {rise} is the param {height}"
+        );
+    }
+}
+
+#[test]
 fn zone_classifies_the_guarder_against_the_near_ledge() {
     let cpu = [-95.0, -14.0];
     let guard = |position: Point, hanging: bool, airborne: bool| Guarder {

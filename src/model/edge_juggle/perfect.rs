@@ -116,7 +116,28 @@ pub struct AirPhysics {
     pub jump_speed: f32,
 }
 
+/// The `fighter_param` fields the air model is built from, as the game stores them.
+#[derive(Clone, Copy)]
+pub struct NativeAir {
+    pub air_speed_x_stable: f32,
+    pub air_accel_x_add: f32,
+    pub air_accel_x_mul: f32,
+    pub air_accel_y: f32,
+    pub air_speed_y_stable: f32,
+    pub jump_aerial_y: f32,
+}
+
 impl AirPhysics {
+    pub fn from_params(native: NativeAir) -> Self {
+        Self {
+            horizontal_speed: native.air_speed_x_stable,
+            horizontal_acceleration: native.air_accel_x_add,
+            gravity: native.air_accel_y,
+            terminal_speed: native.air_speed_y_stable,
+            jump_speed: native.jump_aerial_y,
+        }
+    }
+
     pub fn valid(self) -> bool {
         [
             self.horizontal_speed,
