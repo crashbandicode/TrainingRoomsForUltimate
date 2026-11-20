@@ -876,7 +876,7 @@ unsafe fn route_guide(
     let zone = guarder_zone(p1, player, player_reach, near_ledge, pos);
     run.zone = zone;
     run.route_watch.set_guarder_zone(zone);
-    run.hold = Hold::default();
+    run.hold.replan();
     let reach = Reach::trusted(air, jumps != 0, special);
     let deadline = reach.deadline(pos, speed, near_ledge, bottom);
     let mut row = None;
@@ -1068,7 +1068,6 @@ unsafe fn recovery_pad(
     let physics = air_physics(cpu);
     let Some((vx, vy)) = super::recording_host::fighter_speed(cpu).filter(|_| physics.valid())
     else {
-        run.hold = Hold::default();
         return Correction::default();
     };
     let speed = [vx, vy];
@@ -1232,7 +1231,6 @@ unsafe fn recovery_pad(
     let term = konst(C::TermContSpecialHi);
     // A missing snapshot or an invalid special table is no reach sample: the stock pad stands.
     if special.is_none() && !matches!(recovery, Some((_, false))) {
-        run.hold = Hold::default();
         return Correction::default();
     }
     let alone = Reach::trusted(physics, false, special);

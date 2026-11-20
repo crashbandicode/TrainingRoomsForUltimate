@@ -193,7 +193,7 @@ pub struct HoldFacts {
     pub buttons: u32,
     /// The held resource: `JUMP` or `SPECIAL`.
     pub button: u32,
-    /// Jumps left.
+    /// Jumps left: a withheld press is owed until one is spent.
     pub jumps: u8,
     pub planned: u8,
     /// Spending it next frame still returns.
@@ -206,17 +206,20 @@ pub struct HoldFacts {
 #[derive(Default)]
 pub struct Hold {
     start: Option<u32>,
-    pending: bool,
+    /// The withheld stock button and the jumps left when it was withheld.
+    owed: Option<(u32, u8)>,
     last: Option<(u32, Correction)>,
 }
 
 impl Hold {
     pub fn waiting(&self) -> bool {
-        self.pending
+        self.owed.is_some()
     }
 
+    /// A new plan restarts the clock. A press the hold still owes stays owed.
     pub fn replan(&mut self) {
-        *self = Self::default();
+        self.start = None;
+        self.last = None;
     }
 
     pub fn step(&mut self, facts: HoldFacts) -> Correction {
@@ -225,15 +228,20 @@ impl Hold {
             return out;
         }
         let age = facts.frame.saturating_sub(*self.start.get_or_insert(facts.frame));
+        let resource = (facts.button, facts.jumps);
+        // Owed for the same resource only, and until a jump is spent elsewhere.
+        self.owed = self.owed.filter(|&owed| owed == resource);
         let mut out = Correction::default();
         if facts.buttons & (GUARD | ATTACK) != 0 {
             // A stock defensive answer passes and keeps the resource.
-            self.pending = false;
+            self.owed = None;
         } else if facts.can_wait && (age < u32::from(facts.planned) || facts.hot) {
             // The up special never goes before a jump held in reserve.
             out.release = facts.buttons & (facts.button | SPECIAL);
-            self.pending |= out.release != 0;
-        } else if std::mem::take(&mut self.pending) {
+            if out.release != 0 {
+                self.owed = Some(resource);
+            }
+        } else if self.owed.take().is_some() {
             out.press = facts.button;
         }
         self.last = Some((facts.frame, out));
