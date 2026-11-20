@@ -285,6 +285,18 @@ mod tests {
         assert_eq!(low.step(None, 60), None, "forgotten: nothing to give back");
     }
 
+    fn practice_rank_resumes_the_configured_level_and_preserves_the_native_rank() {
+        let place = Where::Training { behavior: behavior::CPU_LEVEL };
+        let mut entry = EntryRank::new();
+        assert_eq!(entry.step(training_drill_target(false, CpuLevel::Lv(7), place, 1, T), 21), Some(60));
+        assert_eq!(entry.step(training_drill_target(true, CpuLevel::Lv(7), place, 1, T), 60), Some(100));
+        assert_eq!(entry.step(training_drill_target(false, CpuLevel::Lv(7), place, 1, T), 100), Some(60));
+        assert_eq!(entry.step(training_drill_target(false, CpuLevel::Off, place, 1, T), 60), Some(21));
+        assert_eq!(training_drill_target(true, CpuLevel::Off, Where::Elsewhere, 1, T), None);
+        assert_eq!(training_drill_target(true, CpuLevel::Off, place, 2, T), None);
+        assert_eq!(training_drill_target(true, CpuLevel::Off, place, 1, [0; 8]), None);
+    }
+
     fn notice_again_on_the_next_training_entry() {
         let mut gate = NoticeGate::new();
         let mut clock = SessionClock::new();
@@ -306,6 +318,7 @@ mod tests {
             ("ranks_match_the_native_table", ranks_match_the_native_table as fn()),
             ("lobby_partners_get_the_level", lobby_partners_get_the_level as fn()),
             ("switching_to_off_restores_the_native_rank", switching_to_off_restores_the_native_rank as fn()),
+            ("practice_rank_resumes_the_configured_level_and_preserves_the_native_rank", practice_rank_resumes_the_configured_level_and_preserves_the_native_rank as fn()),
             ("notice_again_on_the_next_training_entry", notice_again_on_the_next_training_entry as fn()),
         ]);
     }
