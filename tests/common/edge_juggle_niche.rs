@@ -167,6 +167,26 @@ fn niche_pikachu_quick_attack_route_and_pad_sequence() {
 }
 
 #[test]
+fn niche_quick_attack_aims_during_the_pause_before_the_second_warp() {
+    let mut sequence = Sequence::new(select(facts(0x8, "cross"), CANDIDATE_ROWS).unwrap());
+    sequence.step(sample(0, Motion::Free)).unwrap();
+    let start = sequence.step(sample(1, Motion::Starting)).unwrap();
+    assert_eq!(start.stick, Some([1.0, 0.0]));
+    sequence.step(sample(2, Motion::Travel)).unwrap();
+
+    // 0x1e2 (SPECIAL_HI_END) separates the two warps.
+    let aim = [-0.1, 0.99];
+    let pause = Sample {
+        direction: -1.0,
+        aim,
+        ..sample(3, Motion::Finish)
+    };
+    let second = sequence.step(pause).unwrap();
+    assert_eq!(second.stick, Some(aim));
+    assert_eq!(second.press, 0, "the second warp takes the stick in this window");
+}
+
+#[test]
 fn niche_pikachu_thunder_route_and_pad_sequence() {
     verify(0x8, "center", 2, &[Move::Down, Move::QuickAttack]);
 }

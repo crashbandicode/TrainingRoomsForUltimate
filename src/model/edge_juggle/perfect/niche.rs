@@ -280,7 +280,15 @@ impl Sequence {
                 self.advance();
                 Some(pad([forward, level], 0))
             }
-            (Stage::Accepted(_), Motion::Finish) => Some(pad([forward, level], 0)),
+            (Stage::Accepted(_), Motion::Finish) => {
+                // Quick Attack samples the second warp's stick during the first END status.
+                let aim = if movement == QuickAttack {
+                    sample.aim
+                } else {
+                    [forward, level]
+                };
+                Some(pad(aim, 0))
+            }
             (
                 Stage::Accepted(frame),
                 Motion::Starting | Motion::Charging | Motion::Travel | Motion::AimAgain,
