@@ -880,7 +880,7 @@ unsafe fn route_guide(
     let reach = Reach::trusted(air, jumps != 0, special);
     let deadline = reach.deadline(pos, speed, near_ledge, bottom);
     let mut row = None;
-    if special.is_some() && fighter != UNRESOLVED {
+    if fighter != UNRESOLVED {
         let inputs = niche_pad::RowInputs {
             short: recovery::short(reach, pos, speed, near_ledge, bottom),
             air,

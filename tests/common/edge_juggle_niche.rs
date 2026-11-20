@@ -394,6 +394,20 @@ fn niche_pichu_quick_attack_route_and_pad_sequence() {
 }
 
 #[test]
+fn niche_jigglypuff_can_cross_when_the_snapshot_reports_no_up_special() {
+    let jumps_only = Facts {
+        near: None,
+        budget: Some(Budget { special: None, ..ROOMY }),
+        ..facts(0xc, "cross")
+    };
+    assert_eq!(select(jumps_only, CANDIDATE_ROWS).map(|row| row.id), Some(17));
+    assert!(
+        select(Facts { fighter: 0x2d, ..jumps_only }, CANDIDATE_ROWS).is_none(),
+        "the same jumps cannot admit a row that requires a native burner"
+    );
+}
+
+#[test]
 fn niche_jigglypuff_jumps_route_and_pad_sequence() {
     verify(0xc, "cross", 17, &[Move::Hold]);
 }

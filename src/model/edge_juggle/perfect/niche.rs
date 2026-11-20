@@ -267,6 +267,8 @@ const ROWS: [Row; 40] = [
 pub const CANDIDATE_ROWS: u64 = (1 << ROWS.len()) - 1;
 
 pub fn select(facts: Facts, enabled: u64) -> Option<&'static Row> {
+    // Move the existing runtime admission rule to the host model.
+    facts.near?;
     ROWS.iter()
         .rev()
         .find(|row| enabled & (1 << (row.id - 1)) != 0 && row.matches(facts))
