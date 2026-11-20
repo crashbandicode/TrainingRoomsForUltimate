@@ -1079,6 +1079,13 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage: Stage, setup: Setup) -
     true
 }
 
+/// Like Tech practice, reapply the hold because MotionModule sleep leaves physics running.
+unsafe fn hold_cpu(cpu: usize, [x, y]: [f32; 2]) {
+    state::set_sleep(cpu, true);
+    state::clear_speed_all(cpu);
+    state::set_pos(cpu, &state::Vector3f { x, y, z: 0.0 });
+}
+
 fn post_notice(run: &mut Run, best: Option<u32>, best_streak: Option<u32>) {
     let Session {
         phase,
@@ -1402,10 +1409,7 @@ pub unsafe fn frame(fighter: usize) {
                 }
                 Placement::Grounded => run.placement = Placement::ResetResources,
                 Placement::Airborne if status == konst(C::StatusFall) => {
-                    let [x, y] = run.setup.cpu;
-                    state::set_sleep(cpu, true);
-                    state::clear_speed_all(cpu);
-                    state::set_pos(cpu, &state::Vector3f { x, y, z: 0.0 });
+                    hold_cpu(cpu, run.setup.cpu);
                     *held_cpu = Some(body);
                     run.rounds.placed();
                     run.placement = Placement::ResetResources;
@@ -1417,6 +1421,9 @@ pub unsafe fn frame(fighter: usize) {
         }
     } else {
         let before = run.rounds.phase;
+        if matches!(before, Phase::Ready(_)) && *held_cpu == Some(body) {
+            hold_cpu(cpu, run.setup.cpu);
+        }
         run.rounds.advance_attempt(obs);
         if matches!(before, Phase::Ready(_)) && run.rounds.phase == Phase::Live {
             run.landing_draw = rng.below(9);
