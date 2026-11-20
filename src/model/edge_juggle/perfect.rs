@@ -325,6 +325,68 @@ impl JumpTiming {
 
 pub const GUARD: u32 = 0x8;
 
+/// Earliest observable start of the current P1 attack on the attempt clock.
+#[derive(Default)]
+pub struct ThreatClock {
+    attack: Option<u64>,
+    since: u32,
+    dodged: bool,
+}
+
+impl ThreatClock {
+    pub fn observe(
+        &mut self, attack: Option<u64>, frame: u32, reaction: u8, contact: bool,
+        can_dodge: bool, buttons: u32,
+    ) -> Correction {
+        if self.attack != attack {
+            // Input can precede the first attack-motion sample by one or more frames.
+            if self.attack != Some(u64::MAX) || attack.is_none() {
+                self.since = frame;
+            }
+            self.attack = attack;
+            self.dodged = false;
+        }
+        let ready = attack.is_some() && frame.saturating_sub(self.since) >= u32::from(reaction);
+        if ready && contact && can_dodge {
+            if self.dodged {
+                return Correction::default();
+            }
+            self.dodged = true;
+            return Correction { press: GUARD, ..Correction::default() };
+        }
+        Correction { release: buttons & GUARD, ..Correction::default() }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct Capsule {
+    pub ends: [[f32; 3]; 2],
+    pub radius: f32,
+}
+
+impl Capsule {
+    pub fn touches(self, other: Self) -> bool {
+        let dot = |a: [f32; 3], b: [f32; 3]| (0..3).map(|i| a[i] * b[i]).sum::<f32>();
+        let minus = |a: [f32; 3], b: [f32; 3]| [0, 1, 2].map(|i| a[i] - b[i]);
+        let [a0, a1] = self.ends;
+        let [b0, b1] = other.ends;
+        let u = minus(a1, a0);
+        let v = minus(b1, b0);
+        let w = minus(a0, b0);
+        let (uu, vv, uv) = (dot(u, u), dot(v, v), dot(u, v));
+        let (uw, vw) = (dot(u, w), dot(v, w));
+        let det = uu * vv - uv * uv;
+        let mut t = if det > 0.0 { ((uv * vw - vv * uw) / det).clamp(0.0, 1.0) } else { 0.0 };
+        let s = if vv > 0.0 { ((uv * t + vw) / vv).clamp(0.0, 1.0) } else { 0.0 };
+        if uu > 0.0 {
+            t = ((uv * s - uw) / uu).clamp(0.0, 1.0);
+        }
+        let delta = [0, 1, 2].map(|i| w[i] + t * u[i] - s * v[i]);
+        let radius = self.radius + other.radius;
+        radius.is_finite() && self.radius > 0.0 && other.radius > 0.0 && dot(delta, delta) <= radius * radius
+    }
+}
+
 #[derive(Default)]
 pub struct MeteorBounce {
     active: bool,
@@ -401,6 +463,17 @@ mod tests {
         assert_eq!(threat.observe(Some(1), 115, 12, true, true, 0x8000).press, 0x8);
         assert_eq!(threat.observe(Some(1), 116, 12, true, true, 0x8000), Correction::default());
         assert_eq!(threat.observe(Some(2), 117, 0, true, true, 0x8000).press, 0x8);
+    }
+
+    #[test]
+    fn contact_uses_the_full_capsules_and_rejects_out_of_plane_hits() {
+        let hit = Capsule { ends: [[-8., 1., 0.], [8., 1., 0.]], radius: 1. };
+        let hurt = Capsule { ends: [[0., -5., 0.], [0., 7., 0.]], radius: 1. };
+        assert!(hit.touches(hurt));
+        assert!(hurt.touches(hit));
+        assert!(!hit.touches(Capsule { ends: [[0., -5., 3.], [0., 7., 3.]], ..hurt }));
+        assert!(!hit.touches(Capsule { ends: [[11., 1., 0.]; 2], ..hurt }));
+        assert!(hit.touches(Capsule { ends: [[10., 1., 0.]; 2], ..hurt }));
     }
 
     #[test]

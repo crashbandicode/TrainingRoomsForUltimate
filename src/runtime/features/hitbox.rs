@@ -369,6 +369,54 @@ pub(crate) unsafe fn object_hits(at: usize) -> ([eggs::Hit; hitbox::SLOTS as usi
     (hits, n)
 }
 
+/// Reads the fighter's live hurtbox capsules through the installed HitModule rows.
+pub(super) unsafe fn fighter_hurt_capsules(
+    accessor: usize, mut each: impl FnMut(crate::model::edge_juggle::perfect::Capsule, i32),
+) -> bool {
+    if !INSTALLED.load(Ordering::Acquire) {
+        return false;
+    }
+    let mut reader = hitbox::GameHurt { accessor, load: mem_load };
+    let mut found = false;
+    hitbox::hurt_parts(&mut reader, true, |_, shape, status| {
+        let [a, b] = [shape.a, shape.b.unwrap_or(shape.a)];
+        if let (Some(a), Some(b)) = (
+            natives::joint_position(accessor, shape.joint, &a),
+            natives::joint_position(accessor, shape.joint, &b),
+        ) {
+            found = true;
+            each(crate::model::edge_juggle::perfect::Capsule { ends: [a, b], radius: shape.size }, status);
+        }
+    });
+    found
+}
+
+pub(super) unsafe fn attack_contact(p1: usize, cpu: usize, next: [f32; 2]) -> Option<bool> {
+    use crate::model::edge_juggle::perfect::Capsule;
+    if !INSTALLED.load(Ordering::Acquire) {
+        return None;
+    }
+    let (hits, count) = object_hits(p1);
+    if count == 0 {
+        return Some(false);
+    }
+    let mut contact = false;
+    let seen = fighter_hurt_capsules(cpu, |hurt, status| {
+        if contact || status != 0 {
+            return;
+        }
+        let future = Capsule {
+            ends: hurt.ends.map(|[x, y, z]| [x + next[0], y + next[1], z]),
+            ..hurt
+        };
+        contact = hits[..count].iter().any(|&eggs::Hit(a, b, radius, _)| {
+            let attack = Capsule { ends: [a, b], radius };
+            attack.touches(hurt) || attack.touches(future)
+        });
+    });
+    seen.then_some(contact)
+}
+
 /// The status ids and effect attributes, resolved once through the game's constant table (`None` until it answers; it may not be
 /// built at boot). Asked again every 30th call.
 fn ensure_ready() -> bool {

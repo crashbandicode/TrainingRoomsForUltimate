@@ -1,15 +1,15 @@
 //! Native Training adapter for the edge and juggle games. No additional game hooks.
 use std::fmt::Write;
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 
 use hos_lock::{Mutex, Published};
 
 use super::{cpu::konst, mashout::FloorRay, notices, practice, recorder, states};
 use crate::model::chords::{field, logical as key, Sample};
 use crate::model::cpu::{ids::{C, UNRESOLVED}, rng::Rng};
-use crate::model::edge_juggle::perfect::{self, AirPhysics, Correction, JumpTiming, LandingFacts, MeteorBounce};
+use crate::model::edge_juggle::perfect::{self, AirPhysics, Correction, JumpTiming, LandingFacts, MeteorBounce, ThreatClock};
 use crate::model::edge_juggle::{
-    Difficulty, Drill, Observation, Outcome, Phase, Session, Setup, Stage, Wizard, WizardStep,
+    Difficulty, Drill, Observation, Outcome, Phase, Reaction, Session, Setup, Stage, Wizard, WizardStep,
 };
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::practice_games::best_time;
@@ -31,13 +31,16 @@ struct Config {
     edge_limit: Option<u16>,
     juggle_limit: Option<u16>,
     difficulty: [Difficulty; 2],
+    reaction: [Reaction; 2],
 }
 static CONFIG: Published<Config> = Published::new(Config {
     edge_percent: 100,
     edge_limit: Some(10),
     juggle_limit: Some(10),
     difficulty: [Difficulty::LevelNine; 2],
+    reaction: [Reaction::Human; 2],
 });
+static P1_BUTTONS: AtomicU32 = AtomicU32::new(0);
 static START: AtomicU8 = AtomicU8::new(0);
 static ENGINE_ACTIVE: AtomicBool = AtomicBool::new(false);
 static RESTART: AtomicBool = AtomicBool::new(false);
@@ -65,6 +68,8 @@ static ENGINE: Mutex<Engine> = Mutex::new(Engine {
 struct Run {
     drill: Drill,
     difficulty: Difficulty,
+    reaction: Reaction,
+    threat: ThreatClock,
     stage_key: StageKey,
     stage: Stage,
     wizard: Option<Wizard>,
@@ -133,10 +138,15 @@ pub fn publish(snapshot: &Snapshot) {
         difficulty: [Drill::GuardEdge, Drill::Juggler].map(|drill| {
             Difficulty::from_option(select(drill.difficulty_rows().difficulty))
         }),
+        reaction: [Drill::GuardEdge, Drill::Juggler].map(|drill| {
+            let rows = drill.difficulty_rows();
+            Reaction::from_settings(select(rows.reaction), select(rows.frames))
+        }),
     });
 }
 
 pub fn start(edit: bool) {
+    P1_BUTTONS.store(0, Ordering::Release);
     RESTART.store(false, Ordering::Release);
     START.store(if edit { 2 } else { 1 }, Ordering::Release);
 }
@@ -184,6 +194,13 @@ pub unsafe fn controls_cpu(accessor: usize) -> bool {
         && natives::module_accessor(1) == Some(accessor)
 }
 
+/// The final mapped pad read by P1, after the existing delay and playback stages.
+pub(super) fn observe_player_pad(buttons: u32) {
+    if running() {
+        P1_BUTTONS.store(buttons, Ordering::Release);
+    }
+}
+
 pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Correction {
     let Some(mut engine) = ENGINE.try_lock() else {
         return Correction::default();
@@ -209,18 +226,34 @@ pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Corr
         let previous = std::mem::replace(&mut run.last_cpu_status, status);
         let bounce = status == reflect && [konst(C::StatusDamageFlyMeteor), reflect].contains(&previous)
             && previous != UNRESOLVED;
-        let correction = run.bounce.step(bounce, natives::status_kind(p1) == konst(C::StatusWait), buttons);
+        let correction = run.bounce.step(bounce, natives::status_kind(p1) == konst(C::StatusWait) && P1_BUTTONS.load(Ordering::Acquire) == 0, buttons);
         if correction != Correction::default() {
             return correction;
         }
     }
-    if status == UNRESOLVED || ![C::StatusFall, C::StatusFallAerial, C::StatusDamageFall].map(konst).contains(&status) {
-        run.jump_timing = JumpTiming::default();
-        return Correction::default();
-    }
+    let falling = status != UNRESOLVED
+        && [C::StatusFall, C::StatusFallAerial, C::StatusDamageFall].map(konst).contains(&status);
     let position = [natives::pos_x(accessor), natives::pos_y(accessor)];
     if run.drill == Drill::GuardEdge {
+        if !falling {
+            run.jump_timing = JumpTiming::default();
+            return Correction::default();
+        }
         return recovery_jump(run, accessor, position, buttons, stick_y);
+    }
+    let [left, right] = run.stage.ledges;
+    if position[0] <= left[0] || position[0] >= right[0] {
+        return Correction::default();
+    }
+    let air = konst(C::SituationAir);
+    if air != UNRESOLVED && natives::situation_kind(accessor) == air {
+        let correction = landing_dodge(run, p1, accessor, buttons);
+        if correction != Correction::default() {
+            return correction;
+        }
+    }
+    if !falling {
+        return Correction::default();
     }
     perfect::juggle_drift(LandingFacts {
         cpu: position,
@@ -229,6 +262,37 @@ pub unsafe fn ai_correction(accessor: usize, buttons: u32, stick_y: f32) -> Corr
         stock_stick_y: stick_y,
         stock_buttons: buttons,
     }, run.landing_draw)
+}
+
+unsafe fn landing_dodge(run: &mut Run, p1: usize, cpu: usize, buttons: u32) -> Correction {
+    const ATTACK_INPUT: u64 = u64::MAX;
+    let input = P1_BUTTONS.load(Ordering::Acquire);
+    let attacks = [C::StatusAttack, C::StatusAttackDash, C::StatusAttackS3, C::StatusAttackHi3,
+        C::StatusAttackLw3, C::StatusAttackAir, C::StatusAttackHi4Start,
+        C::StatusAttackLw4Start, C::StatusAttackS4Start,
+        C::StatusAttackHi4, C::StatusAttackLw4, C::StatusAttackS4,
+        C::StatusSpecialN, C::StatusSpecialS, C::StatusSpecialHi, C::StatusSpecialLw];
+    let status = natives::status_kind(p1);
+    let motion = (status != UNRESOLVED && attacks.map(konst).contains(&status))
+        .then(|| natives::motion_kind(p1)).filter(|&motion| motion != 0);
+    let attack = motion.or_else(|| (input & 3 != 0).then_some(ATTACK_INPUT));
+    if attack.is_none() && status != konst(C::StatusWait) {
+        run.threat = ThreatClock::default();
+        return Correction::default();
+    }
+    let escape = konst(C::TermContEscapeAir);
+    let can_dodge = escape != UNRESOLVED && natives::is_enable_transition_term(cpu, escape);
+    let contact = if attack.is_some() && can_dodge {
+        let (px, py) = super::recording_host::fighter_speed(p1).unwrap_or_default();
+        let (cx, cy) = super::recording_host::fighter_speed(cpu).unwrap_or_default();
+        let Some(contact) = super::hitbox::attack_contact(p1, cpu, [cx - px, cy - py]) else {
+            return Correction::default();
+        };
+        contact
+    } else {
+        false
+    };
+    run.threat.observe(attack, run.rounds.frames, run.reaction.frames(), contact, can_dodge, buttons)
 }
 
 unsafe fn air_physics(cpu: usize) -> AirPhysics {
@@ -679,6 +743,8 @@ pub unsafe fn frame(fighter: usize) {
         engine.run = Some(Run {
             drill,
             difficulty: config.difficulty[drill as usize],
+            reaction: config.reaction[drill as usize],
+            threat: ThreatClock::default(),
             stage,
             stage_key,
             wizard: editing.then_some(wizard),
@@ -815,6 +881,7 @@ pub unsafe fn frame(fighter: usize) {
             run.jump_timing = JumpTiming::default();
             run.last_cpu_status = UNRESOLVED;
             run.bounce = MeteorBounce::default();
+            run.threat = ThreatClock::default();
             if held_cpu.take() == Some(body) {
                 state::set_sleep(cpu, false);
             }
