@@ -712,6 +712,33 @@ mod tests {
     }
 
     #[test]
+    fn high_route_spends_the_jump_before_reaching_the_lip() {
+        let air = AirPhysics {
+            horizontal_speed: 2.0,
+            horizontal_acceleration: 0.15,
+            gravity: 0.12,
+            terminal_speed: 2.1,
+            jump_speed: 3.5,
+        };
+        let lip = [-70., 8.];
+        assert_eq!(
+            air.high_route_input([-95., -14.], [0., -1.4], lip, 1., -95., true),
+            Some(Correction { stick: Some([1., 0.]), press: JUMP, release: 0 })
+        );
+        assert_eq!(air.high_route_input([-95., -14.], [0., -1.4], lip, 1., -95., false), None);
+        assert_eq!(air.high_route_input([-73., -14.], [2., -1.4], lip, 1., -95., true), None);
+        assert_eq!(
+            air.high_route_input([-68., 10.], [1., -0.5], lip, 1., -95., false),
+            Some(Correction { stick: Some([1., 0.]), ..Correction::default() })
+        );
+        assert_eq!(
+            air.high_route_input([95., -14.], [0., -1.4], [70., 8.], -1., -95., true)
+                .map(|pad| pad.stick),
+            Some(Some([-1., 0.]))
+        );
+    }
+
+    #[test]
     fn a_crossing_must_survive_to_the_exit_and_still_rise_to_the_ledge() {
         let air = AirPhysics { horizontal_speed: 2., horizontal_acceleration: 0.2,
             gravity: 0.1, terminal_speed: 2., jump_speed: 3. };
