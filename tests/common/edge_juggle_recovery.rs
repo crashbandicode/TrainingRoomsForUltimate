@@ -229,14 +229,23 @@ fn mix_rolls_a_feasible_crossing_as_one_option_and_penalises_a_repeat() {
 }
 
 #[test]
-fn mix_keeps_the_only_feasible_route_whatever_the_zone() {
+fn mix_keeps_the_only_feasible_non_crossing_route_whatever_the_zone() {
     assert_eq!(shares(only(Route::Near), Zone::Hang, None), [1000, 0, 0, 0]);
-    assert_eq!(
-        shares(only(Route::Opposite), Zone::Far, None),
-        [0, 0, 0, 1000]
-    );
     assert_eq!(shares(only(Route::High), Zone::OffHigh, None), [0, 1000, 0, 0]);
     assert_eq!(mix([None; 4], Zone::Ledge, None, 7), None);
+}
+
+#[test]
+fn a_crossing_never_becomes_the_default_when_all_other_models_decline() {
+    let crossing = only(Route::Opposite);
+    assert_eq!(mix(crossing, Zone::Far, None, 0), None);
+    assert!(mix(crossing, Zone::Ledge, None, 0).is_some());
+    assert_eq!(mix(crossing, Zone::Ledge, None, u32::MAX), None);
+
+    let [_, high, _, opposite] = ROUTES.map(plan);
+    let alternatives = [None, high, None, opposite];
+    // The P1 zone weighs this particular High candidate at zero.
+    assert_eq!(mix(alternatives, Zone::OffHigh, None, u32::MAX), None);
 }
 
 #[test]
@@ -776,7 +785,7 @@ fn measured_crossing_reads_the_race_to_the_far_ledge() {
 }
 
 #[test]
-fn measured_crossing_is_a_mixup_and_preserves_the_only_feasible_return() {
+fn measured_crossing_is_a_mixup_with_or_without_modeled_alternatives() {
     use super::{mix_measured_crossing, CrossingRace};
     let race = CrossingRace {
         near_x: -80.0,
@@ -796,7 +805,11 @@ fn measured_crossing_is_a_mixup_and_preserves_the_only_feasible_return() {
     assert_ne!(route(percent(95), Some(Route::Opposite)), Route::Opposite);
     assert_eq!(route(percent(99), Some(Route::Opposite)), Route::Opposite);
     assert_eq!(
-        mix_measured_crossing(only(Route::Opposite), Zone::Hang, None, 0, race).unwrap().route,
+        mix_measured_crossing(only(Route::Opposite), Zone::Hang, None, 0, race),
+        None,
+    );
+    assert_eq!(
+        mix_measured_crossing(only(Route::Opposite), Zone::Hang, None, u32::MAX, race).unwrap().route,
         Route::Opposite,
     );
     let invalid = CrossingRace { guarder_run_speed: f32::NAN, ..race };
