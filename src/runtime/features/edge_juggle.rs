@@ -107,7 +107,8 @@ struct Run {
 #[derive(Clone, Copy)]
 enum RecoveryGuide {
     High {
-        goal: [f32; 2],
+        lip: [f32; 2],
+        inward: f32,
     },
     Cross {
         exit: [f32; 2],
@@ -556,7 +557,16 @@ unsafe fn route_guide(
         ],
     };
     let [near, high, low, opposite] = perfect::possible_routes(&facts);
-    let high = high.filter(|plan| air.reaches_with_jump(pos, speed, plan.waypoints[1], 90, bottom));
+    let (near_ledge, inward) = if pos[0] <= left[0].midpoint(right[0]) {
+        (left, 1.0)
+    } else {
+        (right, -1.0)
+    };
+    let lip = [near_ledge[0], left[1].max(right[1]) + body];
+    let high = high.filter(|_| {
+        air.high_route_input(pos, speed, lip, inward, bottom, jumps != 0)
+            .is_some()
+    });
     let band = perfect::corridor(facts.outline, facts.ledges, bottom, body, facts.fall_budget);
     let opposite = opposite.filter(|plan| {
         band.is_some_and(|band| air.crossing(pos, speed, plan.waypoints[2], band, jumps))
@@ -573,9 +583,7 @@ unsafe fn route_guide(
                 band: band?,
             })
         }
-        Route::High => Some(RecoveryGuide::High {
-            goal: plan.waypoints[1],
-        }),
+        Route::High => Some(RecoveryGuide::High { lip, inward }),
         Route::LateLow => {
             run.jump_delay = run.jump_delay.max(1);
             None
@@ -616,15 +624,22 @@ unsafe fn recovery_pad(
     let can_punish = attack && player_in_lag(p1);
     if let Some(guide) = run.guide {
         match guide {
-            RecoveryGuide::High { goal }
-                if physics.reaches_with_jump(pos, speed, goal, 90, run.stage.blast()[3]) =>
-            {
-                let dir = (goal[0] - pos[0]).signum();
-                return Correction {
-                    stick: Some([dir, 0.0]),
-                    release: perfect::avoid_detour(buttons, true, can_punish, dir).release,
-                    ..Correction::default()
-                };
+            RecoveryGuide::High { lip, inward } if !can_punish => {
+                if let Some(mut correction) = physics.high_route_input(
+                    pos,
+                    speed,
+                    lip,
+                    inward,
+                    run.stage.blast()[3],
+                    can_jump,
+                ) {
+                    let detour = perfect::avoid_detour(buttons, true, false, inward).release;
+                    if buttons & !(perfect::JUMP | perfect::FLICK_JUMP | detour) == 0 {
+                        correction.release = detour;
+                        return correction;
+                    }
+                }
+                run.guide = None;
             }
             RecoveryGuide::Cross { exit, dir, band }
                 if (exit[0] - pos[0]) * dir > 0.0

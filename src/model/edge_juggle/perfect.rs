@@ -146,6 +146,37 @@ impl AirPhysics {
         false
     }
 
+    /// Take the high path only if the fighter will clear the lip while airborne.
+    pub fn high_route_input(
+        self,
+        position: Point,
+        speed: Point,
+        lip: Point,
+        inward: f32,
+        blast_bottom: f32,
+        can_jump: bool,
+    ) -> Option<Correction> {
+        let outside = (lip[0] - position[0]) * inward > 0.0;
+        let press = if outside {
+            if self.reaches_with_jump(position, speed, lip, u8::MAX, blast_bottom) {
+                0
+            } else if can_jump && self.reaches_with_jump(position, speed, lip, 0, blast_bottom) {
+                JUMP
+            } else {
+                return None;
+            }
+        } else if position[1] >= lip[1] {
+            0
+        } else {
+            return None;
+        };
+        Some(Correction {
+            stick: Some([inward, 0.0]),
+            press,
+            ..Correction::default()
+        })
+    }
+
     /// Drift towards the near ledge, preserving the native drift velocity,
     /// then spend the remaining jump. Stop at the first crossing of ledge x.
     pub fn reaches_with_jump(
