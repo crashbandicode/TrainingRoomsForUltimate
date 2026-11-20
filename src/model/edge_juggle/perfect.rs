@@ -674,6 +674,18 @@ mod tests {
     }
 
     #[test]
+    fn recovery_preserves_a_safe_punish_and_cancels_only_unsafe_attack_buttons() {
+        let buttons = 0x8005;
+        assert_eq!(avoid_detour(buttons, false, false, 1.), Correction::default());
+        assert_eq!(avoid_detour(buttons, true, true, -1.), Correction::default());
+        assert_eq!(avoid_detour(0x8004, true, false, 1.), Correction::default());
+        let correction = avoid_detour(buttons, true, false, -1.);
+        assert_eq!(correction.release, 0x1);
+        assert_eq!(correction.stick, Some([-1., 0.]));
+        assert_eq!(correction.press, 0);
+    }
+
+    #[test]
     fn landing_variants_only_use_a_safe_and_legal_input() {
         let facts = LandingFacts { cpu: [5., 45.], player: [0., 5.], main_floor: [-70., 70.],
             stock_stick_y: -0.15, stock_buttons: 0x8000 };
