@@ -1021,6 +1021,7 @@ const NOT_GAME_ENTRIES: &[(&str, &str)] = &[
     ("inline_keyboard::initialized", KEYBOARD_CALLBACK),
     ("inline_keyboard::finished", KEYBOARD_CALLBACK),
     ("edge_juggle::planner_chose", "a release trace-point anchor reached from edge_juggle::ai_correction"),
+    ("edge_juggle::planner_unavailable", "a release trace-point anchor reached from edge_juggle::ai_correction"),
     ("edge_juggle::perfect_rule_fired", "a release trace-point anchor reached from edge_juggle::ai_correction"),
     ("combo::tr_seq_step_v1", "a trace-point anchor our own code calls (its callers are walked)"),
     ("combo::tr_seq_plan_v1", "a trace-point anchor our own code calls (its callers are walked)"),
