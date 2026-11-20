@@ -115,6 +115,8 @@ pub mod pause_helper;
 pub(crate) mod fighter_choices;
 #[path = "model/mashout.rs"]
 pub mod mashout;
+#[path = "model/edge_juggle.rs"]
+pub mod edge_juggle;
 #[path = "model/practice_games.rs"]
 pub mod practice_games;
 #[path = "model/settings.rs"]
