@@ -1175,7 +1175,7 @@ impl Menu {
             other => other,
         };
         if self.recording.popup_open() {
-            self.recording.press_popup(button);
+            self.ignored = !self.recording.press_popup_outcome(button);
             return;
         }
         // L / R step the page from a submenu as from the page itself (`press_page`), leaving the sub-screens.
@@ -1231,7 +1231,7 @@ impl Menu {
             Button::JumpUp | Button::JumpDown => self.top(screen(jumped(cursor, len, button == Button::JumpDown))),
             Button::Left | Button::Right => self.cycle(row, button == Button::Right),
             Button::A => self.activate(row),
-            Button::Y => _ = self.reset_setting(&ROWS[row]),
+            Button::Y => self.ignored = !self.reset_setting(&ROWS[row]),
             Button::B => _ = self.stack.pop(),
             _ => self.ignored = true,
         }
@@ -1301,6 +1301,10 @@ impl Menu {
                     self.move_cursor(true);
                     return;
                 }
+                super::recording_menu::PageHit::Ignored => {
+                    self.ignored = true;
+                    return;
+                }
                 super::recording_menu::PageHit::Passthrough => {}
             }
         }
@@ -1312,7 +1316,8 @@ impl Menu {
             Button::B => self.closed = true,
             Button::X => self.save_defaults(),
             Button::Y => {
-                if let Some(row) = self.focused_row().and_then(|index| ROWS.get(index)) { self.reset_setting(row); }
+                // Nothing to reset (the trailing Reset entry, a row already at its default) is an ignored press.
+                self.ignored = !self.focused_row().and_then(|index| ROWS.get(index)).is_some_and(|row| self.reset_setting(row));
             }
             Button::A => match self.focus() {
                 Some(Entry::Group(g)) => {
@@ -1323,11 +1328,10 @@ impl Menu {
                 Some(Entry::ResetPage(_)) => self.stack.push(Screen::ConfirmReset),
                 None => self.ignored = true,
             },
-            Button::Left | Button::Right => {
-                if let Some(row) = self.focused_row() {
-                    self.cycle(row, button == Button::Right);
-                }
-            }
+            Button::Left | Button::Right => match self.focused_row() {
+                Some(row) => self.cycle(row, button == Button::Right),
+                None => self.ignored = true, // a group header or the trailing Reset entry
+            },
             Button::JumpUp => self.jump_section(false),
             Button::JumpDown => self.jump_section(true),
             // ZR no longer resets the page (it is the role switch inside the roster grids, easy to hit by

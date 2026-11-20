@@ -68,6 +68,8 @@ pub enum PageHit {
     Passthrough,
     LeaveUp,
     LeaveDown,
+    /// The page took the button but it does nothing there (the bridge state's `ack.result=ignored`).
+    Ignored,
 }
 
 /// Loop counts X cycles: ∞, 1, 2, 3, 5, 10.
@@ -959,25 +961,31 @@ impl RecordingScreens {
 
     /// One pop-up button. Always consumed while the pop-up is open.
     pub fn press_popup(&mut self, button: Button) {
+        self.press_popup_outcome(button);
+    }
+
+    /// `press_popup`, reporting whether the press acted (false: a closed popup, Y, or X outside the macros list).
+    pub fn press_popup_outcome(&mut self, button: Button) -> bool {
         if !self.popup_open {
-            return;
+            return false;
         }
         if self.overlay_face == Face::Popup && self.overlay_open() {
             self.press_overlay(button, Face::Popup);
-            return;
+            return true;
         }
         let group = self.popup_group();
         match button {
             Button::B if self.place(Face::Popup, group).drills => self.toggle_drills(Face::Popup, group),
             Button::B => self.popup_open = false,
-            Button::Y => {}
+            Button::Y => return false,
             Button::L => self.set_popup_role(ViewRole::Player),
             Button::R => self.set_popup_role(ViewRole::Cpu),
             Button::ZL | Button::ZR => self.toggle_tab(),
             Button::X => {
-                if self.in_macros(Face::Popup, group) {
-                    self.cycle_x(self.popup_role);
+                if !self.in_macros(Face::Popup, group) {
+                    return false;
                 }
+                self.cycle_x(self.popup_role);
             }
             Button::Up => self.nudge_popup(-1),
             Button::Down => self.nudge_popup(1),
@@ -986,6 +994,7 @@ impl RecordingScreens {
             Button::Left | Button::Right => self.swap_section(Face::Popup, group),
             Button::A => self.activate(Face::Popup, group),
         }
+        true
     }
 
     /// One Recording-page button. L, R, and B pass through unless a file screen is open.
@@ -997,12 +1006,13 @@ impl RecordingScreens {
         if button == Button::B && on_library && self.place(Face::Page, group).drills { self.toggle_drills(Face::Page, group); return PageHit::Consumed; }
         match button {
             Button::X => {
-                if on_library && self.in_macros(Face::Page, group) {
-                    self.cycle_x(self.page_role);
+                if !(on_library && self.in_macros(Face::Page, group)) {
+                    return PageHit::Ignored;
                 }
+                self.cycle_x(self.page_role);
                 PageHit::Consumed
             }
-            Button::Y | Button::ZL => PageHit::Consumed,
+            Button::Y | Button::ZL => PageHit::Ignored,
             Button::ZR => {
                 self.page_role = self.page_role.other();
                 PageHit::Consumed
