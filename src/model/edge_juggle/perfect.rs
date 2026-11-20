@@ -476,6 +476,18 @@ mod tests {
     }
 
     #[test]
+    fn a_crossing_must_survive_to_the_exit_and_still_rise_to_the_ledge() {
+        let air = AirPhysics { horizontal_speed: 2., horizontal_acceleration: 0.2,
+            gravity: 0.1, terminal_speed: 2., jump_speed: 3. };
+        let band = [-70., -8.];
+        assert!(air.crossing([-15., -15.], [2., 0.], [15., 0.], band, 1.));
+        assert!(!air.crossing([-15., -65.], [2., -2.], [15., 0.], band, 1.));
+        assert!(!air.crossing([-15., -15.], [2., 2.], [15., 0.], band, 1.));
+        assert!(!air.crossing([-65., -40.], [2., 0.], [65., 0.], band, 1.));
+        assert!(!air.crossing([-15., -15.], [2., 0.], [15., 0.], band, 0.));
+    }
+
+    #[test]
     fn timed_dodge_requires_contact_and_honors_the_reaction_clock() {
         let mut threat = ThreatClock::default();
         assert_eq!(threat.observe(None, 100, 0, true, true, 0x8008).release, 0x8);
