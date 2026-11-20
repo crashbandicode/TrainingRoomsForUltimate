@@ -2108,3 +2108,11 @@ ceiling = 166635
 date = "2026-11-20"
 reason = "Merge of rc.15 target break area (dbd5e650) onto c31679da: the lock-on helper posed at 0.3 and centred so its reach (3.48) stays inside the R = 4 picture. The branch measured 165899 on 629870c5 (+14 over 165885). Added to main's 166621: 166635."
 approved_by = "Operator 2026-11-19 confirmed the outside-picture break bug ('bug 2 does happen'); primary c07b3449 merged after REVIEW PASS review-visualizer-astra 03:07Z and added the measured delta."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 166712
+date = "2026-11-20"
+reason = "Target hurtbox display on 70f517c9: each live target R = 4 picture disc as its hurtbox (model::hitbox_orbs::target_hurt_orbs, targets_drawn), the tracker-published lock-on helper ids left out of the article pass (model::lockon Tracker::ids, names_helper). size_gate measured 166712, up 77 from main 166635."
+approved_by = "Operator 2026-11-19: the hurtbox for the target should show; operator 2026-11-18: yes additional lines are ok. Primary: exact measured delta on top of 70f517c9."
