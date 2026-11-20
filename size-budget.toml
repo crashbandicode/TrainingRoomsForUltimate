@@ -2069,3 +2069,11 @@ ceiling = 166008
 date = "2026-11-19"
 reason = "rc.15 recording catalog cache v3: canonical measurement for f0f6850b is 166007 on base 96355cad (165330), an exact increase of 677 normalized implementation lines. Add 677 to the existing 165331 ceiling."
 approved_by = "Operator size approval stands per primary c07b3449's v3 review fix order. Separate budget increase by the exact measured delta."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 166051
+date = "2026-11-20"
+reason = "Recording menu speed v4: 166050 normalized implementation lines on base 96355cad (165330), up 720. The Loop writeback fix adds 43 over v3. Raise the v3 ceiling by 43 and retain one line of headroom."
+approved_by = "Primary c07b3449 accepted the additional 43 lines on 2026-11-20 as within the operator-approved scope and directed ceiling 166051."
