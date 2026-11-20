@@ -113,6 +113,10 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "input_display::reaction_left", owner: Some(Feature::CpuTech), gate: Gate::Flag("REACTION_ON") },
     // A saved combo's "recorded on": the CPU core unit's utility_get_kind row (boot sets the flag from that unit's closure).
     Boundary { function: "input_display::p1_fighter", owner: Some(Feature::CpuCore), gate: Gate::Flag("KIND_ON") },
+    Boundary { function: "input_display::lane_player", owner: Some(Feature::CpuCore), gate: Gate::Flag("KIND_ON") },
+    // The native hurt-shape read is optional; boot sets its flag only when every grader row passed.
+    Boundary { function: "input_display::spacing_hit", owner: Some(Feature::InputDisplay), gate: Gate::Flag("GRADER_LIVE") },
+    Boundary { function: "input_display::attacker_owner", owner: Some(Feature::Hitbox), gate: Gate::Flag("OWNER_ON") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.
     Boundary { function: "recorder::request_playback", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
     Boundary { function: "recorder::on_state_restored", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
@@ -166,6 +170,7 @@ fn unit_of_hook(f: &Func) -> Option<Feature> {
     }
     match f.module.as_str() {
         "input_delay" => Some(Feature::InputDelay),
+        "input_display" => Some(Feature::InputDisplay),
         "hitbox" => Some(Feature::Hitbox),
         "lra_reset" => Some(Feature::LraReset),
         "stage_hazards" => Some(Feature::StageHazards),
@@ -796,6 +801,29 @@ fn the_input_display_degrades_apart_from_input_delay() {
     // The CPU core's role test is the core's own: its two reset-hub rows stay in its closure.
     let usable = |s: &model::sites::Site| s.name != "is_operation_cpu";
     assert_eq!(capabilities::blocked_by(Feature::CpuCore, &usable), Some("is_operation_cpu"));
+}
+
+#[test]
+fn optional_grader_rows_disable_only_grading() {
+    let boot = include_str!("../src/runtime/boot.rs");
+    assert!(boot.contains(
+        "input_display::set_grader_read(display_on && sites_hitbox::grader_usable(&usable));"
+    ));
+    for (name, offset) in model::sites_hitbox::GRADER_ROWS {
+        let usable = |site: &model::sites::Site| site.name != name;
+        assert!(capabilities::unit_usable(Feature::InputDisplay, &usable), "{name} disabled Input Display");
+        assert!(capabilities::unit_usable(Feature::Hitbox, &usable), "{name} disabled Hitbox");
+        assert!(!Granted::from_usable(&usable).allows(offset), "{name} remained granted");
+    }
+}
+
+#[test]
+fn grader_hook_needs_the_hurt_layout_rows() {
+    for name in model::sites_hitbox::GRADER_NEEDS {
+        let usable = |site: &model::sites::Site| site.name != name;
+        assert!(!model::sites_hitbox::grader_usable(usable), "{name} left the fighter hook enabled");
+        assert!(capabilities::unit_usable(Feature::InputDisplay, &usable), "{name} disabled the strip");
+    }
 }
 
 /// The seam installer sizes its own-write records with `WRITING_SITES` (`runtime::seams::seam_install::prime`).

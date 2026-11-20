@@ -127,6 +127,18 @@ fn the_spot_rows_sit_next_to_their_features() {
     }
 }
 
+fn spacing_grader_row_after_hitbox_visualization() {
+    let hitbox = ROWS.iter().position(|row| row.id == "hitbox_vis").expect("Hitbox Visualization row");
+    let row = &ROWS[hitbox + 1];
+    assert_eq!((row.id, row.title), ("spacing_grader", "Spacing grader"));
+    assert!(matches!(row.control, Control::Toggle));
+    assert_eq!(row.group, ROWS[hitbox].group);
+    assert_eq!(
+        row.help,
+        "On: each hit P1 or P2 lands is graded by depth: Excellent at the\nhurtbox edge, Good slightly inside, OK at the centre."
+    );
+}
+
 /// rc.15: six visible items retain seven stored slots; the colour-mode slot is retired.
 fn legend_hitbox_visualization_is_one_checklist() {
     let row = ROWS.iter().find(|r| r.id == "hitbox_vis").expect("the row");
@@ -192,10 +204,11 @@ fn layout_row_counts_match_the_rc_freeze() {
     // rc15/mashout-grid-picker: Mash out's three rows are one picker row: 72 → 70.
     // Eggs spawn area adds the "Spawn area" setting row to Eggs-ercise: 70 → 71.
     // Guard the Edge and Juggler add their list entries and eleven sub-screen rows.
-    assert_eq!(counts(false), [34, 11, 13, 84, 12, 3]);
-    assert_eq!(counts(true), [33, 11, 13, 84, 12, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 154);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 153);
+    // Spacing grader adds one Display & Controls row (12 → 13).
+    assert_eq!(counts(false), [34, 11, 13, 84, 13, 3]);
+    assert_eq!(counts(true), [33, 11, 13, 84, 13, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 155);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 154);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 5);
@@ -213,7 +226,8 @@ fn layout_row_counts_match_the_rc_freeze() {
     // Parry's three controls (rc.15 Parry, 141 → 144), then its list row and Start as the fifth game (144 → 146).
     // rc15/mashout-grid-picker: Mash out's State, Attacker move and Grab type are one picker row (146 → 144).
     // Eggs spawn area adds one existing-group setting row (144 → 145).
-    assert_eq!(ROWS.len(), 158);
+    // Spacing grader adds one Display & Controls row (145 → 146).
+    assert_eq!(ROWS.len(), 159);
     for editor in [Editor::SetupSave, Editor::SetupSaveHere, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }
@@ -1222,6 +1236,7 @@ fn case_table() {
         ("state_change_resets_invalid_move_and_config_rejects_conflict", state_change_resets_invalid_move_and_config_rejects_conflict as fn()),
         ("not_mashable_rows_are_greyed_skipped_and_never_confirmed", not_mashable_rows_are_greyed_skipped_and_never_confirmed as fn()),
         ("the_spot_rows_sit_next_to_their_features", the_spot_rows_sit_next_to_their_features as fn()),
+        ("spacing_grader_row_after_hitbox_visualization", spacing_grader_row_after_hitbox_visualization as fn()),
         ("legend_hitbox_visualization_is_one_checklist", legend_hitbox_visualization_is_one_checklist as fn()),
         ("hitbox_visible_options_keep_their_storage_bits_and_zl_toggles_all_six", hitbox_visible_options_keep_their_storage_bits_and_zl_toggles_all_six as fn()),
         ("core02_table_carriage_return", core02_table_carriage_return as fn()),

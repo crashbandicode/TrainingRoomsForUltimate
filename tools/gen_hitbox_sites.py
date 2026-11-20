@@ -12,6 +12,7 @@ import sys
 
 # (name, offset, kind, note) -- kind is the Rust SeamKind expression.
 HOOK = "SeamKind::Hook { form: HookForm::Replace, placement: Placement::Entry }"
+INLINE_MID_HOOK = "SeamKind::Hook { form: HookForm::Inline, placement: Placement::Mid }"
 CALLED = "SeamKind::Called"
 RELIED = "SeamKind::Relied"
 
@@ -87,6 +88,26 @@ ROWS = [
      "`app::sv_animcmd::AREA_WIND_2ND_RAD(lua_State*)`: the animation command that adds a circle wind area (worker `main+0x22a86a0`, AreaModule slot 0x160 `add_wind_area_2nd_rad`). Replace hook at the entry, plugin part first (rc.14 wind-articles)."),
     ("hitbox_area_wind_rad_arg9", 0x22A8F30, HOOK,
      "`app::sv_animcmd::AREA_WIND_2ND_RAD_arg9(lua_State*)`: the circle command with nine arguments (worker `main+0x22a86a0`, slot 0x160). Replace hook at the entry, plugin part first (rc.14 wind-articles)."),
+    ("damage_record_contact", 0x402F78, RELIED,
+     "The DamageModule hit handler copies the receiver contact (`ldr q0,[x20,#0x10]` ... `str q0,[x8,#0x30]`): record 0's contact identity for the spacing grader."),
+    ("hurt_shape_radius", 0x3E890C, RELIED,
+     "The HurtShape sphere path computes its radius (`fmul s4,s8,s9`) and stores it at `+0xa0` (`str s4,[x19,#0xa0]`)."),
+    ("hurt_shape_radius_capsule", 0x3E8B08, RELIED,
+     "The HurtShape capsule path stores its radius at `+0xa0` (`str s8,[x19,#0xa0]` at `main+0x3e8b44`)."),
+    ("hit_pair_contact_a", 0x51DC00, RELIED,
+     "Hit-pair A stores contact and penetration at `+0x60` and `+0x70` into both x20 and x19 shapes (`main+0x51dc30..0x51dc3c`)."),
+    ("hit_pair_contact_b", 0x51DDEC, RELIED,
+     "Hit-pair B stores contact and penetration at `+0x60` and `+0x70` into both x20 and x19 shapes (`main+0x51ddec..0x51de24`)."),
+    ("hit_pair_contact_c", 0x51DF90, RELIED,
+     "Hit-pair C stores contact and penetration at `+0x60` and `+0x70` into both x19 and x20 shapes (`main+0x51df98..0x51dfac`)."),
+    ("hit_pair_contact_d", 0x51F260, RELIED,
+     "Hit-pair D stores contact and penetration at `+0x60` and `+0x70` into both x20 and x19 shapes (`main+0x51f270..0x51f284`)."),
+    ("hit_pair_contact_e", 0x51F904, RELIED,
+     "Hit-pair E stores contact and penetration at `+0x60` and `+0x70` into both x20 and x19 shapes (`main+0x51f904..0x51f924`)."),
+    ("spacing_hit_handler", 0x402d14, INLINE_MID_HOOK,
+     "Inline spacing-grader capture at the DamageModule hit handler (`main+0x402cc0`): x19 is the receiver DamageModule and x20 is the collision entry; five displaced words are not PC-relative and no branch targets them."),
+    ("spacing_hit_entry", 0x402cf0, RELIED,
+     "Relied hit-handler entry setup (`ldp x25, x20, [x1, #0x10]`): the guarded 64-byte window includes `mov x21, x1` and `mov x19, x0`; supplies the receiver and collision entry to the spacing hit hook."),
 ]
 
 

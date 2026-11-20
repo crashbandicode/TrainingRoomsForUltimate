@@ -282,7 +282,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 158] = [
+pub static ROWS: [Row; 159] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -463,6 +463,8 @@ pub static ROWS: [Row; 158] = [
     r(SCREEN, "HUD", "hud", TOGGLE, "On: the game's HUD shows as usual.\nOff: Training hides damage, pointers and off-screen bubbles."),
     r(SCREEN, "Hitbox Visualization", "hitbox_vis", Control::MultiSelect(&o::HITBOX_ITEMS),
       "Tick what to draw. Article hurtboxes: hittable objects.\nWindboxes: pushes without hitstun. Angles: where hits send."),
+    r(SCREEN, "Spacing grader", "spacing_grader", TOGGLE,
+      "On: each hit P1 or P2 lands is graded by depth: Excellent at the\nhurtbox edge, Good slightly inside, OK at the centre."),
     r(SCREEN, "Frame Advantage", "frame_advantage", TOGGLE,
       "On: the frame advantage after each exchange is shown."),
     r(SCREEN, "Input Display", "input_display_strip", Control::Dropdown(&o::INPUT_DISPLAY),

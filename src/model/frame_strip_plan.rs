@@ -5,7 +5,8 @@
 
 use core::fmt::Write as _;
 
-use super::frame_strip::{Cell, Link, Tracker, Verdict, WINDOW};
+use super::frame_strip::{Cell, Link, Tag, Tracker, Verdict, WINDOW};
+use super::spacing::Grade;
 
 pub use super::panes::iv::{at, COUNT};
 use super::panes::iv::*;
@@ -253,6 +254,8 @@ impl<'a> Layout<'a> {
             LAST_TEXT => Look::text(LABEL_X, LAST_Y, Text::new("LAST"), MUTED),
             i if (PILL..PILL + 3 * HISTORY).contains(&i) => self.last((i - PILL) / HISTORY, (i - PILL) % HISTORY),
             i if (STICK..STICK + WINDOW).contains(&i) => self.stick_mark(i - STICK),
+            i if (TAG_BOX..TAG_TEXT).contains(&i) => self.tag(i - TAG_BOX, false),
+            i if (TAG_TEXT..COUNT).contains(&i) => self.tag(i - TAG_TEXT, true),
             _ => Look::HIDDEN,
         }
     }
@@ -276,6 +279,17 @@ impl<'a> Layout<'a> {
     fn stick_mark(&self, slot: usize) -> Look {
         let Some(dir) = self.sticks[slot] else { return Look::HIDDEN };
         Look { rot: f32::from(dir) * 45.0, ..Look::text(Self::centre(slot as f32), STICK_Y, Text::new(">"), TEXT) }
+    }
+
+    fn tag(&self, n: usize, text: bool) -> Look {
+        let Some(tag) = self.tracker.tags().nth(n) else { return Look::HIDDEN };
+        let Some(slot) = self.slot(tag.frame).filter(|slot| *slot < WINDOW as f32) else { return Look::HIDDEN };
+        let (x, y) = (Self::centre(slot), tag_y(tag));
+        if text {
+            Look::text(x, y, Text::new(tag.grade.name()), INK)
+        } else {
+            Look::rect(x, y, tag_width(tag.grade), tag.grade.color())
+        }
     }
 
     /// Chip part `part` (box, glyph, shaft, head, tick) of the `n`th newest press on screen.
@@ -443,6 +457,18 @@ fn graded(grade: super::tech::session::Grade) -> (Text, Text, [u8; 4]) {
         Grade::Missed => (Text::new("-"), label, BAD),
         _ => (Text::new("-"), label, MUTED),
     }
+}
+
+const fn tag_width(grade: Grade) -> f32 {
+    match grade {
+        Grade::Excellent => 92.0,
+        Grade::Good => 54.0,
+        Grade::Ok => 40.0,
+    }
+}
+
+fn tag_y(tag: &Tag) -> f32 {
+    if tag.lane == 0 { P1_Y } else { CPU_Y }
 }
 
 /// `prefix` and a signed number: `+3`, `-3`, `0`.

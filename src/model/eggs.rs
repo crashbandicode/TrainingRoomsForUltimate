@@ -7,6 +7,7 @@ use super::hitbox::{Sphere, KIND_HIT, SCALE};
 use super::hitbox_orbs::CANVAS_HALF;
 use super::panes::{EggLook, EggPicture, EGG_WHOLE};
 use super::scene::{scene, Facts};
+use super::spacing;
 
 pub const ROW: &str = "eggsercise";
 pub const ROW_BREAK: &str = "eggsercise_break";
@@ -198,12 +199,31 @@ pub(crate) fn counts(rule: u8, aerial: bool, power: f32) -> bool {
 
 /// Whether `hit` breaks the egg at `egg` (the fighters' plane): `rule` lets it count and the pill overlaps the egg.
 pub fn breaks(rule: u8, aerial: bool, hit: &Hit, egg: [f32; 2]) -> bool {
-    let Hit(a, b, radius, power) = *hit;
-    let counts = counts(rule, aerial, power);
+    counts(rule, aerial, hit.3) && depth(hit, egg).is_some()
+}
+
+/// The hit's depth into the target disc, using the same pill-to-centre distance as `breaks`.
+pub fn depth(hit: &Hit, egg: [f32; 2]) -> Option<f32> {
+    let Hit(a, b, radius, _) = *hit;
     let (dx, dy, px, py) = (b[0] - a[0], b[1] - a[1], egg[0] - a[0], egg[1] - a[1]);
     // A point hitbox: 0 / epsilon is 0.
     let t = ((px * dx + py * dy) / (dx * dx + dy * dy).max(1e-9)).clamp(0.0, 1.0);
-    counts && (px - t * dx).hypot(py - t * dy) <= radius + RADIUS
+    let d = (px - t * dx).hypot(py - t * dy);
+    spacing::depth(radius + RADIUS - d, RADIUS)
+}
+
+/// The deepest hit that counts under `rule` and overlaps the target.
+pub fn deepest(rule: u8, aerial: bool, hits: &[Hit], egg: [f32; 2]) -> Option<f32> {
+    hits.iter()
+        .filter(|hit| counts(rule, aerial, hit.3))
+        .filter_map(|hit| depth(hit, egg))
+        .reduce(f32::max)
+}
+
+/// Article depth is graded regardless of a helper break; a helper-only break has no grade.
+pub fn other_break(graded: bool, helper: bool, article: impl FnOnce(bool) -> Option<f32>) -> Option<Option<f32>> {
+    let depth = if helper && !graded { None } else { article(graded) };
+    (helper || depth.is_some()).then_some(depth)
 }
 
 /// The pills of a fighter's live attack spheres (`hitbox::want_hitboxes`), each end placed by `place`, a capsule's two ends
@@ -550,20 +570,26 @@ impl Run {
     /// the ground of a run's first egg), its pills, whether it is in an aerial (`air`) and its kind (the session's best when the
     /// minute ends). The notice's length when its text changed (`write_notice`).
     pub fn step(&mut self, tick: bool, y: f32, hits: &[Hit], air: bool, kind: i32) -> Option<u16> {
-        self.step_with(tick, y, hits, |_| false, air, kind)
+        self.step_with_depth(tick, y, hits, |_| None, air, kind).0
     }
 
-    /// `step`, where `articles(spot)` also says whether one of Player 1's articles (projectiles, explosions, thrown items)
-    /// breaks the target there under this run's `Breaks on` (rc.15: they count in both practice games; SPEC V2.3 superseded,
-    /// docs/DECISIONS.md). A break by an article alone does not freeze the fighter (`melee`).
-    pub fn step_with(&mut self, tick: bool, y: f32, hits: &[Hit], mut articles: impl FnMut([f32; 2]) -> bool, air: bool, kind: i32) -> Option<u16> {
+    /// `step_with`, returning the deepest melee or article hit when this pass breaks a target.
+    pub fn step_with_depth(
+        &mut self,
+        tick: bool,
+        y: f32,
+        hits: &[Hit],
+        mut breaks: impl FnMut([f32; 2]) -> Option<Option<f32>>,
+        air: bool,
+        kind: i32,
+    ) -> (Option<u16>, Option<f32>) {
         // The break animations run on the clock's ticks (pause freezes them); an ended run only finishes them.
         let dt = u32::from(tick);
         age(&mut self.bursts, tick);
         self.air = air;
         // A run the CPU target's last hit ended still holds its target until this pass closes it.
         if self.ended() && self.egg.is_none() {
-            return None;
+            return (None, None);
         }
         if self.egg.is_none() {
             self.ground = y;
@@ -571,10 +597,13 @@ impl Run {
         }
         // The pass that closes a run the CPU target's last hit ended: the clock stopped on that hit's frame.
         let dt = dt * u32::from(!self.ended());
+        let mut depth = None;
         if let Some(egg) = self.egg_at() {
-            let melee = self.rows[3] == DISC && hits.iter().any(|h| breaks(self.rows[1], air, h, egg));
-            if melee || self.rows[3] == DISC && articles(egg) {
-                (self.score, self.bursts, self.melee) = (self.score + 1, [Some((egg, 0)), self.bursts[0]], melee);
+            let melee = if self.rows[3] == DISC { deepest(self.rows[1], air, hits, egg) } else { None };
+            let additional = if melee.is_none() && self.rows[3] == DISC { breaks(egg) } else { None };
+            if melee.is_some() || additional.is_some() {
+                (self.score, self.bursts, self.melee) = (self.score + 1, [Some((egg, 0)), self.bursts[0]], melee.is_some());
+                depth = melee.or_else(|| additional.flatten());
                 self.spawn(Some(egg));
             }
             // The flight holds while the CPU target is in a hit (its hitlag, then the placement): an uncounted hit puts it back
@@ -588,13 +617,13 @@ impl Run {
                 let (k, m) = (kind as usize & 127, usize::from(self.rows[0] - TIMED));
                 self.best[k][m] = self.best[k][m].max(if m == 0 { self.score } else { !self.frames });
                 (self.best[128][m], self.egg) = (self.best[k][m], None);
-                return Some(END_FRAMES);
+                return (Some(END_FRAMES), depth);
             }
         }
         // The 1-minute notice changes once a second, the N-target one every tick (hundredths).
         let time = [self.frames, self.frames.div_ceil(60)][usize::from(self.rows[0] == TIMED)];
         let shown = (self.score, time);
-        (self.shown.replace(shown) != Some(shown)).then_some(u16::MAX)
+        ((self.shown.replace(shown) != Some(shown)).then_some(u16::MAX), depth)
     }
 
     /// Whether the target is still in flight (launched, not yet at rest).

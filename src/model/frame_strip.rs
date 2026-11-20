@@ -5,10 +5,12 @@
 
 use super::input_delay::MappedInputs;
 use super::spots::{self, Peak, Powers, Spot};
+use super::spacing::{Grade, Taken};
 
 /// Frames on screen and links kept for the LAST row (the pane table's numbers).
 pub const WINDOW: usize = super::panes::iv::WINDOW;
 pub const HISTORY: usize = super::panes::iv::HISTORY;
+pub const TAGS: usize = super::panes::iv::TAGS;
 /// Presses kept (chips and the input look-back).
 pub const PRESSES: usize = 16;
 /// Both fighters actionable and no new press for this many frames: the strip stops scrolling.
@@ -138,6 +140,14 @@ pub struct Sample {
     /// `StatusModule::situation_kind == SITUATION_KIND_AIR`. A fast-fall is recorded only while this is set;
     /// the crouch line is the same stick value.
     pub airborne: bool,
+}
+
+fn was_hit(sample: &Sample) -> bool {
+    sample.hitstun || sample.shieldstun || sample.shielding
+}
+
+fn on_shield(sample: &Sample) -> bool {
+    (sample.shieldstun || sample.shielding) && !sample.hitstun
 }
 
 /// Which button a press was: the chip's colour and glyph.
@@ -341,6 +351,13 @@ pub struct Mark {
     pub spot: Spot,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Tag {
+    pub frame: u32,
+    pub lane: u8,
+    pub grade: Grade,
+}
+
 impl Link {
     /// Frames to spare (true combo) or past the window (drop, negative). `None` without a number.
     pub fn spare(&self) -> Option<i32> {
@@ -428,6 +445,8 @@ pub struct Tracker {
     p1_was_stop: bool,
     marks: [Option<Mark>; MARKS],
     mark_head: usize,
+    tags: [Option<Tag>; TAGS],
+    tag_head: usize,
     #[cfg(feature = "diag")]
     /// Diag build: the frame, what the defender took, the attacker's launch and hitboxes of the last hitstop that began (the `[Spots]` line).
     pub spot_read: Option<(u32, spots::Landed, spots::Launch, Powers)>,
@@ -473,6 +492,8 @@ impl Tracker {
             p1_was_stop: false,
             marks: [None; MARKS],
             mark_head: 0,
+            tags: [None; TAGS],
+            tag_head: 0,
             #[cfg(feature = "diag")]
             spot_read: None,
         }
@@ -481,6 +502,15 @@ impl Tracker {
     /// The labelled hits (rc.14, SP3), newest first.
     pub fn marks(&self) -> impl Iterator<Item = Mark> + '_ {
         (0..MARKS).filter_map(move |i| self.marks[(self.mark_head + MARKS - 1 - i) % MARKS])
+    }
+
+    pub fn tags(&self) -> impl Iterator<Item = &Tag> + '_ {
+        (0..TAGS).filter_map(move |i| self.tags[(self.tag_head + TAGS - 1 - i) % TAGS].as_ref())
+    }
+
+    fn push_tag(&mut self, lane: u8, grade: Grade) {
+        self.tags[self.tag_head] = Some(Tag { frame: self.frame, lane, grade });
+        self.tag_head = (self.tag_head + 1) % TAGS;
     }
 
     /// The frames stepped since the last clear.
@@ -562,6 +592,19 @@ impl Tracker {
         *self = Self::new();
     }
 
+    pub fn step_graded(&mut self, p1: Sample, cpu: Sample, inputs: MappedInputs, taken: Taken) {
+        if let Some(grade) = taken.earlier {
+            self.push_tag(0, grade);
+        }
+        let shields = [on_shield(&p1), on_shield(&cpu)];
+        self.step(p1, cpu, inputs);
+        for (lane, grade) in taken.hits.into_iter().enumerate() {
+            if let Some(grade) = grade.filter(|_| !shields[1 - lane]) {
+                self.push_tag(lane as u8, grade);
+            }
+        }
+    }
+
     /// One game frame: P1's and the CPU's samples and P1's mapped inputs.
     pub fn step(&mut self, p1: Sample, cpu: Sample, inputs: MappedInputs) {
         self.frame = self.frame.wrapping_add(1);
@@ -612,10 +655,10 @@ impl Tracker {
         let cpu_cell = classify(&cpu, false, false);
         // A hit on the CPU: its hitstop starts while P1 is not the one being hit (SPEC-input-06 §2). On shield when the
         // CPU is shielding or in shieldstun.
-        let p1_hit = p1.hitstun || p1.shieldstun || p1.shielding;
+        let p1_hit = was_hit(&p1);
         let spot = self.spots(&p1, &cpu);
         if cpu.stop && !self.cpu_was_stop && !p1_hit {
-            self.on_hit(frame, (cpu.shieldstun || cpu.shielding) && !cpu.hitstun, spot);
+            self.on_hit(frame, on_shield(&cpu), spot);
         }
         self.cpu_was_stop = cpu.stop;
         // Both fighters' first actionable frames after the last hit.
@@ -920,6 +963,7 @@ pub struct Settings {
     pub on: bool,
     /// Sweet/sour spot labels on the hit blocks (rc.14, SP3), Off by default.
     pub spots: bool,
+    pub grader: bool,
 }
 
 /// The new row's id, and the old rows it replaces (SPEC-input-06 §3.1).
@@ -928,7 +972,11 @@ pub const OLD_ROW: &str = "input_display";
 
 impl Settings {
     pub const fn factory() -> Self {
-        Self { on: true, spots: false }
+        Self { on: true, spots: false, grader: false }
+    }
+
+    pub const fn samples(self, parry: bool) -> bool {
+        self.on || parry || self.grader
     }
 
     pub fn from_snapshot(snapshot: &super::settings::Snapshot) -> Self {
@@ -936,7 +984,11 @@ impl Settings {
             .get(ROW)
             .and_then(|r| r.iter().position(|v| *v != 0))
             .is_none_or(|i| i == 1);
-        Self { on, spots: spots::row_on(snapshot, spots::ROW_STRIP) }
+        Self {
+            on,
+            spots: spots::row_on(snapshot, spots::ROW_STRIP),
+            grader: spots::row_on(snapshot, super::spacing::ROW),
+        }
     }
 }
 

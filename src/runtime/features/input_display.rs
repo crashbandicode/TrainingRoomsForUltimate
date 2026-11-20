@@ -13,13 +13,16 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use hos_lock::Mutex;
+use skyline::hooks::InlineCtx;
 
 use crate::model::frame_strip::ids::{Table, C};
 use crate::model::frame_strip::{Sample, Settings, Tracker};
+use crate::model::spacing::{Grade, Grader, Lanes};
 use crate::model::frame_strip_plan::{Changed, Look, Renderer};
 use crate::model::input_delay::{MappedInputs, Owners, Sticks};
+use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::game::natives;
-use crate::runtime::published;
+use crate::runtime::{published, state_natives};
 
 /// The display's natives passed their guards (`model::capabilities`): until boot says so, nothing here reads the game.
 static ENABLED: AtomicBool = AtomicBool::new(false);
@@ -27,6 +30,12 @@ static ENABLED: AtomicBool = AtomicBool::new(false);
 static REACTION_ON: AtomicBool = AtomicBool::new(false);
 /// P1's fighter read may run (`p1_fighter`).
 static KIND_ON: AtomicBool = AtomicBool::new(false);
+static GRADER_LIVE: AtomicBool = AtomicBool::new(false);
+static FIGHTER_READ: AtomicBool = AtomicBool::new(false);
+static OWNER_ON: AtomicBool = AtomicBool::new(false);
+static LANES: Lanes = Lanes::new();
+static GRADER: Grader = Grader::new();
+static CLEAR_DUE: AtomicBool = AtomicBool::new(false);
 /// P1's latest mapped inputs, packed (`pack`).
 static INPUTS: AtomicU64 = AtomicU64::new(0);
 /// The constants resolved once (`ids`).
@@ -59,7 +68,8 @@ pub fn sampling() -> bool {
         return false;
     }
     // rc.15 Parry practice: the strip shows while it runs, even with the Input Display row Off (operator Q2, 2026-11-17).
-    crate::model::frame_strip::strip_owns_advantage(true, settings().on || super::parry::on(), PANES.load(Ordering::Acquire))
+    let settings = settings();
+    crate::model::frame_strip::strip_owns_advantage(true, settings.samples(super::parry::on()), PANES.load(Ordering::Acquire))
 }
 
 /// P1's damage on the frame before (`f32` bits), for Parry practice's body-hit test.
@@ -167,6 +177,64 @@ pub fn set_fighter_read(on: bool) {
     KIND_ON.store(on, Ordering::Release);
 }
 
+unsafe fn lane_player() -> bool {
+    if !KIND_ON.load(Ordering::Acquire) {
+        return false;
+    }
+    !natives::is_operation_cpu(i32::from(crate::runtime::features::cpu::primary_entry_now()))
+}
+
+/// Boot: every optional spacing-grader row passed its guard.
+pub fn set_grader_read(on: bool) {
+    FIGHTER_READ.store(on, Ordering::Release);
+    if on {
+        skyline::install_hook!(spacing_hit);
+    }
+}
+
+pub fn set_owner_read(on: bool) {
+    OWNER_ON.store(on, Ordering::Release);
+}
+
+unsafe fn attacker_owner(id: u32) -> Option<u32> {
+    if !OWNER_ON.load(Ordering::Acquire) || !state_natives::object_is_active(id) {
+        return None;
+    }
+    let key = smash::app::sv_battle_object::module_accessor(id) as usize;
+    (key != 0).then(|| super::hitbox::article_owner(id, key)).flatten()
+}
+
+pub fn grader_live() -> bool {
+    GRADER_LIVE.load(Ordering::Relaxed)
+}
+
+pub fn target_grade(depth: f32) {
+    if !GRADER_LIVE.load(Ordering::Relaxed) {
+        return;
+    }
+    GRADER.target(Grade::of(depth));
+}
+
+unsafe fn guarded_read(at: usize) -> Option<u64> {
+    (at >= 0x1000 && at & 7 == 0 && at >> 47 == 0).then(|| (at as *const u64).read())
+}
+
+#[skyline::hook(offset = crate::model::sites_hitbox::SPACING_HIT_HANDLER_OFFSET, inline)]
+unsafe fn spacing_hit(ctx: &mut InlineCtx) {
+    if !GRADER_LIVE.load(Ordering::Relaxed) {
+        return;
+    }
+    let _scope = HookScope::enter_hook(HookId::SpacingHit);
+    let module = ctx.registers[19].x() as usize;
+    let entry = ctx.registers[20].x() as usize;
+    let read = |at| unsafe { guarded_read(at) };
+    if let Some((lane, grade)) =
+        crate::model::spacing::hook(true, read, |id| unsafe { attacker_owner(id) }, module, entry, [LANES.get(0), LANES.get(1)])
+    {
+        GRADER.hit(lane, grade);
+    }
+}
+
 /// Whether a spot is wanted (rc.14 SP3/SP4): *Spot labels* or *Match sweet/sour spot* On. Only then the strip reads the hitboxes'
 /// launch numbers, the charge, the weights and the knockback received (spots-3: no cost while both are Off).
 fn spots_wanted() -> bool {
@@ -216,8 +284,8 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample 
     let powers = if spots { powers } else { Default::default() };
     let read = |f: unsafe fn(usize) -> f32| if spots { f(accessor) } else { 0.0 };
     // The record names the hit only on the frame its knockback was written (the game clears it on the next).
-    let launched = read(natives::damage_reaction);
-    let struck = if launched > 0.0 { struck(accessor) } else { None };
+    let launched = if spots { natives::damage_reaction(accessor) } else { 0.0 };
+    let struck = if spots && launched > 0.0 { struck(accessor) } else { None };
     Sample {
         stop: natives::is_stop(accessor),
         hitstun,
@@ -242,30 +310,81 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample 
     }
 }
 
+fn skip_frame(discard: bool) {
+    LANES.set(0, None);
+    LANES.set(1, None);
+    if discard {
+        GRADER.skip();
+    }
+}
+
 /// One game frame, on P1's entry callback in Training or lobby practice (`cpu::fighter_frame`). `player` is P1's
 /// accessor; the primary CPU's comes from the live manager (`cpu::strip_cpu`).
 ///
 /// # Safety
 /// `player` is P1's live module accessor; the call is made on the game thread inside the fighter's frame.
 pub unsafe fn sample_frame(player: usize) {
-    if !ENABLED.load(Ordering::Acquire) { return; }
-    let input_drill = crate::engine::rr_host::input_observation_wanted() || super::combo::input_observation_wanted();
-    if (!sampling() && !input_drill) || player == 0 {
+    if !ENABLED.load(Ordering::Acquire) {
+        GRADER_LIVE.store(false, Ordering::Relaxed);
+        skip_frame(false);
         return;
     }
-    if input_drill && published::input_owners().contains(Owners::MENU) { return; }
+    let settings = settings();
+    let grader = settings.grader;
+    let panes = PANES.load(Ordering::Acquire);
+    let parry = super::parry::on();
+    let sampling = crate::model::frame_strip::strip_owns_advantage(true, settings.samples(parry), panes);
+    let shown = crate::model::frame_strip::strip_owns_advantage(true, settings.on || parry, panes);
+    if GRADER_LIVE.load(Ordering::Relaxed) != grader {
+        GRADER_LIVE.store(grader, Ordering::Relaxed);
+    }
+    let input_drill = crate::engine::rr_host::input_observation_wanted() || super::combo::input_observation_wanted();
+    if player == 0 {
+        skip_frame(true);
+        return;
+    }
+    if !sampling && !input_drill {
+        skip_frame(true);
+        return;
+    }
+    if input_drill && published::input_owners().contains(Owners::MENU) {
+        skip_frame(true);
+        return;
+    }
     if crate::runtime::features::states::is_loading() {
-        TRACKER.lock().clear();
-        // The strip starts a new timeline: so does Parry practice's detector.
+        CLEAR_DUE.store(true, Ordering::Relaxed);
+        skip_frame(true);
         super::parry::reset();
         return;
     }
-    let Some(cpu) = crate::runtime::features::cpu::strip_cpu(player) else { return };
-    let Some(ids) = ids() else { return };
+    let Some(cpu) = crate::runtime::features::cpu::strip_cpu(player) else {
+        skip_frame(true);
+        return;
+    };
+    let read = |at| unsafe { guarded_read(at) };
+    crate::model::spacing::publish_lanes(
+        &LANES,
+        grader,
+        FIGHTER_READ.load(Ordering::Acquire),
+        read,
+        [player, cpu],
+        |lane| unsafe {
+            if lane == 0 {
+                (natives::battle_object_id(player), true)
+            } else {
+                (natives::battle_object_id(cpu), lane_player())
+            }
+        },
+    );
+    let Some(ids) = ids() else {
+        skip_frame(true);
+        return;
+    };
     let cpu_accessor = cpu;
     let spots = spots_wanted();
     let p1 = sample(player, &ids, true, spots);
     let cpu = sample(cpu, &ids, false, spots);
+    let taken = GRADER.take();
     #[cfg(feature = "diag")]
     {
         probe_module(0, player, &p1, cpu.damage);
@@ -296,17 +415,29 @@ pub unsafe fn sample_frame(player: usize) {
     }
     let inputs = unpack(INPUTS.load(Ordering::Acquire));
     // P1's fighter, for a saved combo's "recorded on" (metadata; the existing guarded read, no new native site).
-    let p1_kind = p1_fighter(player);
-    let mut tracker = TRACKER.lock();
+    let p1_kind = if shown || input_drill { p1_fighter(player) } else { None };
+    let Some(mut tracker) = TRACKER.try_lock() else {
+        GRADER.finish(false);
+        return;
+    };
+    if CLEAR_DUE.swap(false, Ordering::Relaxed) {
+        tracker.clear();
+        super::parry::reset();
+    }
     #[cfg(feature = "diag")]
     let (check, advantage) = (tracker.stun_check, tracker.advantage());
-    tracker.step(p1, cpu, inputs);
-    if let Some(snap) = tracker.snaps().last() { crate::engine::rr_host::observe_input(snap, tracker.contact_now()); }
-    // The combo helper reads the same step (SPEC-input-07 §3); lock order TRACKER, then the helper's.
-    crate::runtime::features::combo::after_strip(&tracker, p1_kind);
+    tracker.step_graded(p1, cpu, inputs, taken);
+    if shown || input_drill {
+        if let Some(snap) = tracker.snaps().last() {
+            crate::engine::rr_host::observe_input(snap, tracker.contact_now());
+        }
+        // The combo helper reads the same step (SPEC-input-07 §3); lock order TRACKER, then the helper's.
+        crate::runtime::features::combo::after_strip(&tracker, p1_kind);
+    }
     if super::parry::on() {
         super::parry::step(parry_frame(player, &ids, &p1, inputs), p1_kind, tracker.newest().unwrap_or(0));
     }
+    GRADER.finish(true);
     #[cfg(feature = "diag")]
     {
         let (check_now, link, advantage_now) = (tracker.stun_check, tracker.latest_link(), tracker.advantage());
@@ -468,6 +599,11 @@ fn diag_frame(cpu: &Sample, before: Option<(u32, u32)>, now: Option<(u32, u32)>,
 
 /// Session clear: leaving Training, a hot swap, a lobby change.
 pub fn session_clear() {
+    GRADER_LIVE.store(false, Ordering::Relaxed);
+    LANES.set(0, None);
+    LANES.set(1, None);
+    CLEAR_DUE.store(false, Ordering::Relaxed);
+    GRADER.skip();
     TRACKER.lock().clear();
     crate::runtime::features::combo::session_clear();
 }

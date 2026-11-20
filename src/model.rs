@@ -139,6 +139,8 @@ pub mod spots;
 pub mod legend;
 #[path = "model/eggs.rs"]
 pub mod eggs;
+#[path = "model/spacing.rs"]
+pub mod spacing;
 #[path = "model/btt.rs"]
 pub mod btt;
 #[path = "model/lockon.rs"]

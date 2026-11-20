@@ -301,11 +301,33 @@ pub unsafe fn frame(fighter: usize) -> Option<()> {
     let (top, hits, n, aerial, _) = reading().then(|| super::hitbox::p1_read(at)).unwrap_or_default();
     let rule = super::hitbox::egg_rule();
     let mut melee = false;
+    let grader = super::input_display::grader_live();
     let broke = pass(at, top, |slot, spot| {
-        let hit = hits[..n].iter().any(|h| eggs::breaks(rule, aerial, h, spot));
-        melee |= hit;
-        hit || super::lockon::hit(at, slot + 1, lockon_key(spot), rule, aerial, projectiles()).is_some()
-            || super::btt_projectiles::hit(at, spot, rule, aerial, projectiles())
+        if let Some(depth) = eggs::deepest(rule, aerial, &hits[..n], spot) {
+            melee = true;
+            super::input_display::target_grade(depth);
+            true
+        } else {
+            let helper = super::lockon::hit(at, slot + 1, lockon_key(spot), rule, aerial, projectiles()).is_some();
+            match eggs::other_break(grader, helper, |deepest| {
+                super::btt_projectiles::hit(
+                    at,
+                    spot,
+                    rule,
+                    aerial,
+                    projectiles(),
+                    if deepest { crate::model::btt::Search::Deepest } else { crate::model::btt::Search::First },
+                )
+            }) {
+                Some(depth) => {
+                    if let Some(depth) = depth {
+                        super::input_display::target_grade(depth);
+                    }
+                    true
+                }
+                None => false,
+            }
+        }
     });
     // V2.1: the fighter whose attack broke a target freezes, as on a hit.
     let frames = (broke > 0 && melee).then(scene::facts).and_then(eggs::hitlag)?;

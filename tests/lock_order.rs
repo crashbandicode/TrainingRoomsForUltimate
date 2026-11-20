@@ -114,6 +114,7 @@ const FOREIGN_RECEIVERS: &[(&str, &[&str], &str)] = &[
     ("press", &["editor", "list", "m"], PANELS),
     ("view", &["bundle", "editor", "extras", "ui"], PANELS),
     ("target", &["active", "cycle", "editor", "proof"], "combos::Ui::target is private to ui/combos.rs"),
+    ("target", &["GRADER"], "Grader::target is a lock-free model ring enqueue"),
     (
         "poll",
         &["JOBS", "adapter", "clock", "gate", "guard", "model", "queue", "replies", "t"],
@@ -2284,4 +2285,36 @@ fn no_engine_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
     // and START_SPEED) predate the parry change and are reported to the primary for a ruling (2026-11-18 PARRY READY).
     let queues: Vec<&String> = problems.iter().filter(|p| p.starts_with("engine/rr_host.rs::CPU_FRAMES") || p.starts_with("engine/rr_host.rs::PLAYER_FRAMES")).collect();
     assert!(queues.is_empty(), "a game entry waits on a playback frame queue the menu worker fills:\n{}", queues.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n"));
+}
+
+#[test]
+fn strip_frame_step_never_blocks() {
+    fn block_after<'a>(source: &'a str, marker: &str) -> &'a str {
+        let start = source.find(marker).expect("gated strip side-effect block");
+        let open = start + source[start..].find('{').expect("opening brace");
+        let mut depth = 0;
+        for (offset, byte) in source.as_bytes()[open..].iter().enumerate() {
+            match *byte {
+                b'{' => depth += 1,
+                b'}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return &source[open + 1..open + offset];
+                    }
+                }
+                _ => {}
+            }
+        }
+        panic!("unclosed block after {marker}");
+    }
+
+    let source = include_str!("../src/runtime/features/input_display.rs");
+    let start = source.find("pub unsafe fn sample_frame").expect("sample_frame");
+    let end = source[start..].find("\npub fn session_clear").expect("end of sample_frame") + start;
+    let frame = &source[start..end];
+    assert!(frame.contains("TRACKER.try_lock()"), "the frame step must use try_lock");
+    assert!(!frame.contains("TRACKER.lock()"), "the frame step must not block");
+    let gated = block_after(frame, "\n    if shown || input_drill {");
+    assert!(gated.contains("rr_host::observe_input"));
+    assert!(gated.contains("combo::after_strip"));
 }

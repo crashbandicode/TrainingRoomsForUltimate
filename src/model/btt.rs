@@ -243,15 +243,43 @@ pub fn list_footer(rows: &[(String, Layout)], cursor: usize, skipped: usize) -> 
     format!("{first}\nA open   B back{note}")
 }
 
+/// How `projectile_breaks` searches: not at all, until the first qualifying overlap (a break only), or for the deepest (a grade).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Search {
+    Off,
+    First,
+    Deepest,
+}
+
 /// Only P1's owned pool and ArticleModule supply objects; Off performs no discovery or hit reads. An article's hit counts as
 /// `Breaks on` (`rule`, with `aerial` Player 1's own status) allows that hit (rc.15, both practice games: docs/DECISIONS.md).
 pub fn projectile_breaks(
-    enabled: bool, rule: u8, aerial: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,
+    search: Search, rule: u8, aerial: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,
     mut read: impl FnMut(usize) -> Option<([eggs::Hit; super::hitbox::SLOTS as usize], usize)>,
-) -> bool {
-    enabled && pool.into_iter().chain(super::hitbox::article_instances(true, get)).filter(|a| pointer_ok(*a)).any(|article| {
-        read(article).is_some_and(|(hits, n)| hits[..n].iter().any(|h| h.3 > 0.0 && eggs::breaks(rule, aerial, h, spot)))
-    })
+) -> Option<f32> {
+    if search == Search::Off {
+        return None;
+    }
+    let mut best = None;
+    for article in pool.into_iter().chain(super::hitbox::article_instances(true, get)) {
+        if !pointer_ok(article) {
+            continue;
+        }
+        let Some((hits, n)) = read(article) else { continue };
+        for hit in &hits[..n] {
+            if hit.3 <= 0.0 || !eggs::counts(rule, aerial, hit.3) {
+                continue;
+            }
+            if let Some(depth) = eggs::depth(hit, spot) {
+                match search {
+                    Search::Off => return None,
+                    Search::First => return Some(depth),
+                    Search::Deepest => best = Some(best.map_or(depth, |current: f32| current.max(depth))),
+                }
+            }
+        }
+    }
+    best
 }
 
 /// Shared placing controls, without stage bounds or projection.

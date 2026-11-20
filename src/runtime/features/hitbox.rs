@@ -221,10 +221,30 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     run.sense([top[0], top[1]]);
     // rc.15: Player 1's articles break the target too, as `Breaks on` allows (docs/DECISIONS.md).
     let rule = run.rule();
-    let length = run.step_with(tick, top[1], hits, |egg| {
-        super::lockon::hit(at, 0, lockon_key(score), rule, aerial, true).is_some()
-            || super::btt_projectiles::hit(at, egg, rule, aerial, true)
-    }, aerial, kind);
+    let grader = super::input_display::grader_live();
+    let (length, depth) = run.step_with_depth(
+        tick,
+        top[1],
+        hits,
+        |egg| {
+            let helper = super::lockon::hit(at, 0, lockon_key(score), rule, aerial, true).is_some();
+            eggs::other_break(grader, helper, |deepest| {
+                super::btt_projectiles::hit(
+                    at,
+                    egg,
+                    rule,
+                    aerial,
+                    true,
+                    if deepest { crate::model::btt::Search::Deepest } else { crate::model::btt::Search::First },
+                )
+            })
+        },
+        aerial,
+        kind,
+    );
+    if let Some(depth) = depth {
+        super::input_display::target_grade(depth);
+    }
     // V2.1: the fighter whose attack broke it (Ice Climbers: that climber) freezes, as on a hit; an article's break does not.
     let broke = run.score > score && run.melee();
     if let Some(frames) = broke.then(scene::facts).and_then(eggs::hitlag) {
@@ -607,12 +627,13 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     own[..3].copy_from_slice(&eggs_orbs);
     let edge_wizard = super::edge_juggle::wizard_active();
     let tech = super::tech::running();
+    let grader = super::input_display::grader_live();
     // rc.15 target-hurtbox-display: the live targets' break volumes (the picture discs), drawn as hurtboxes below. Spacing
     // grader hook: its rings take these discs (`orbs::target_hurt_orbs`) rather than drawing a second one.
     let hurt_on = SETTING.load(Ordering::Acquire) && legend::shows(SHOWN.load(Ordering::Acquire), hitbox::KIND_HURT);
     let mut targets = [Orb::NONE; 1 + crate::model::btt::MAX];
     let mut n_targets = 0;
-    if hurt_on && !tech && !edge_wizard {
+    if (hurt_on || grader) && !tech && !edge_wizard {
         n_targets = orbs::target_hurt_orbs(&own[..3], &mut targets);
         n_targets += orbs::target_hurt_orbs(&marks, &mut targets[n_targets..]);
     }
@@ -666,7 +687,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     }
     let mut used = orbs::PaneUse::default();
     let mut keep_panes = false;
-    let (mut over, mut looks) = (0, [None; 3 + btt::LOOKS]);
+    let (mut over, mut looks) = (0u32, [None; 3 + btt::LOOKS]);
     if any {
         let half = match natives::screen_size_words() {
             Some([w, h]) => [orbs::screen_half(w, orbs::SCREEN_HALF_DEFAULT[0]), orbs::screen_half(h, orbs::SCREEN_HALF_DEFAULT[1])],
@@ -687,7 +708,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         looks = own.map(|look| {
             let ([x, y], look) = look?;
             [dot.centre, dot.tail] = [[x, y, 0.0]; 2];
-            Some((plan(&dot, [255; 4])?, look))
+            Some((plan(&dot, [255; 4])?, crate::model::spacing::picture_look(look, grader && !tech && !edge_wizard)))
         });
         let hide = super::hide_cpu::draw_hide();
         let board = if on { BOARD.try_lock() } else { None };
@@ -696,11 +717,23 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         // Hitboxes and grabs take the panes first. Uncertain snapshots yield no fighter panes this tick.
         let bits = SHOWN.load(Ordering::Acquire);
         // A busy board keeps the last frame's panes: no target cap may overwrite a fighter's retained one.
-        let target_hurts = targets[..orbs::targets_drawn(board.is_some(), hurt_on, n_targets)].iter();
+        let drawn = orbs::targets_drawn(board.is_some() || !on, hurt_on || grader, n_targets);
+        let target_hurts = targets[..drawn].iter();
+        let write_pill = |pill: orbs::Pill, used: &mut orbs::PaneUse, over: &mut u32, panes: &[usize; p::ORBS]| {
+            let Some((cap, band)) = used.take(pill.length > 0.0) else {
+                *over += 1;
+                return;
+            };
+            for (k, at) in pill.caps.into_iter().enumerate() {
+                unsafe { write_pane(panes[cap + k], at, [pill.size / 2.0, pill.size], pill.rot + 180.0 * k as f32, pill.color) };
+            }
+            if let Some(band) = band {
+                unsafe { write_pane(panes[p::CAPS + band], pill.band, [pill.length, pill.size], pill.rot, pill.color) };
+            }
+        };
         for orb in board
             .iter()
             .flat_map(|b| b.draw_slots_in_order(b.draw_slots(&hide)))
-            .chain(target_hurts)
             .filter(|o| legend::shows(bits, o.kind()))
         {
             let Some(pill) = plan(orb, orb.color) else { continue };
@@ -713,15 +746,16 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
                 write_pane(cache.panes[p::CAPS + band], pill.band, [pill.length, pill.size], pill.rot, pill.color);
                 continue;
             }
-            let Some((cap, band)) = used.take(pill.length > 0.0) else {
-                over += 1;
-                continue;
-            };
-            for (k, at) in pill.caps.into_iter().enumerate() {
-                write_pane(cache.panes[cap + k], at, [pill.size / 2.0, pill.size], pill.rot + 180.0 * k as f32, pill.color);
-            }
-            if let Some(band) = band {
-                write_pane(cache.panes[p::CAPS + band], pill.band, [pill.length, pill.size], pill.rot, pill.color);
+            write_pill(pill, &mut used, &mut over, &cache.panes);
+        }
+        for target in target_hurts {
+            let Some(pill) = plan(target, target.color) else { continue };
+            write_pill(pill, &mut used, &mut over, &cache.panes);
+            if grader {
+                for zone in crate::model::spacing::zone_discs(target) {
+                    let Some(pill) = plan(&zone, zone.color) else { continue };
+                    write_pill(pill, &mut used, &mut over, &cache.panes);
+                }
             }
         }
     }
@@ -969,7 +1003,7 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
 }
 
 /// The combat owner of a validated live item or weapon, when it is still a live fighter.
-unsafe fn article_owner(id: u32, key: usize) -> Option<u32> {
+pub(crate) unsafe fn article_owner(id: u32, key: usize) -> Option<u32> {
     if !matches!(id >> 28, 1 | 4) {
         return None;
     }
@@ -1308,7 +1342,7 @@ pub fn install(found: &[GuardOutcome; N], closure: bool) -> (bool, [Written; N])
         skyline::install_hook!(hitbox_area_wind_rad_hook);
         skyline::install_hook!(hitbox_area_wind_rad_arg9_hook);
         for (slot, site) in written.iter_mut().zip(&sites_hitbox::SITES) {
-            if sites_hitbox::HOOK_ROWS.contains(&site.name) {
+            if sites_hitbox::HOOK_ROWS[..7].contains(&site.name) {
                 *slot = Written::Far;
             }
         }

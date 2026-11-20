@@ -3,11 +3,11 @@
 //! read from the owned 13.0.5 ELF by `tools/gen_hitbox_sites.py` and `tests/core06_hitbox.rs` re-checks every row against
 //! it. Offsets are from the start of `.text`.
 //!
-//! Seven hooks (the `ATTACK` and `CATCH` animation commands, `GrabModule::set_rebound` and, rc.14 wind-articles, the four
-//! `AREA_WIND_2ND*` commands), eleven called natives of the
+//! Eight hooks (the `ATTACK` and `CATCH` animation commands, `GrabModule::set_rebound`, rc.14 wind-articles, the four
+//! `AREA_WIND_2ND*` commands, and the optional spacing hit handler), fifteen called natives of the
 //! attack, damage, effect and motion modules, the Lua state's accessor getter, two relied-on windows (the Lua stack reads the plugin
-//! repeats from the game's own command code), three relied-on windows of HitModule (the hurtbox tables, decision HB1), two of the
-//! DamageModule's damage record (spots-3) and,
+//! repeats from the game's own command code), three relied-on windows of HitModule (the hurtbox tables, decision HB1), three of the
+//! DamageModule's damage record (spots-3 and spacing grading), five optional hit-pair windows, two shape-radius windows, and,
 //! for the own orbs (decision HB-OWN-ORBS), the joint-position thunk, the camera projection and its screen-size window. The
 //! effect natives remain for articles' spheres.
 //! Every row is a capability (`model::capabilities`); the natives the
@@ -44,6 +44,29 @@ pub mod damage_record {
     pub const ATTACKER: usize = 0x44;
     pub const SLOT: usize = 0x52;
 }
+
+/// The optional receiver hurt-shape fields used by the spacing grader.
+pub mod hurt_shape {
+    pub const SHAPE: usize = 0x40;
+    pub const CONTACT: usize = 0x60;
+    pub const PEN: usize = 0x70;
+    pub const RADIUS: usize = 0xa0;
+}
+
+/// Rows whose refusal disables only spacing grades; they are deliberately outside every feature closure.
+pub const GRADER_ROWS: [(&str, usize); 10] = [
+    ("spacing_hit_handler", 0x402d14),
+    ("spacing_hit_entry", 0x402cf0),
+    ("damage_record_contact", 0x402f78),
+    ("hurt_shape_radius", 0x3e890c),
+    ("hurt_shape_radius_capsule", 0x3e8b08),
+    ("hit_pair_contact_a", 0x51dc00),
+    ("hit_pair_contact_b", 0x51ddec),
+    ("hit_pair_contact_c", 0x51df90),
+    ("hit_pair_contact_d", 0x51f260),
+    ("hit_pair_contact_e", 0x51f904),
+];
+pub const GRADER_NEEDS: [&str; 3] = ["hurtbox_module", "hurtbox_groups", "hurtbox_part_shape"];
 pub const HITBOX_REQ_FOLLOW_OFFSET: usize = 0x201_7730;
 pub const HITBOX_KILL_OFFSET: usize = 0x201_7840;
 pub const HITBOX_IS_EXIST_OFFSET: usize = 0x201_7a20;
@@ -85,8 +108,14 @@ pub const AREA_WIND_OFFSET: usize = 0x22a_98c0;
 pub const AREA_WIND_ARG10_OFFSET: usize = 0x22a_9960;
 pub const AREA_WIND_RAD_OFFSET: usize = 0x22a_8e90;
 pub const AREA_WIND_RAD_ARG9_OFFSET: usize = 0x22a_8f30;
-/// The seven hooks' rows (the other rows are called or relied on, never written).
-pub const HOOK_ROWS: [&str; 7] =
-    ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound", "hitbox_area_wind", "hitbox_area_wind_arg10", "hitbox_area_wind_rad", "hitbox_area_wind_rad_arg9"];
+/// All hook rows in this table.
+pub const HOOK_ROWS: [&str; 8] =
+    ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound", "hitbox_area_wind", "hitbox_area_wind_arg10", "hitbox_area_wind_rad", "hitbox_area_wind_rad_arg9", "spacing_hit_handler"];
+pub const SPACING_HIT_HANDLER_OFFSET: usize = 0x402_d14;
 
-pub static SITES: [Site; 37] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));
+pub static SITES: [Site; 47] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));
+
+pub fn grader_usable(usable: impl Fn(&Site) -> bool) -> bool {
+    GRADER_ROWS.iter().all(|(name, _)| SITES.iter().find(|site| site.name == *name).is_some_and(&usable))
+        && GRADER_NEEDS.iter().all(|name| SITES.iter().find(|site| site.name == *name).is_some_and(&usable))
+}

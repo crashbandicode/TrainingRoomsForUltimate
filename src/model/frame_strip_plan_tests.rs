@@ -135,6 +135,36 @@ fn held(x: i8, y: i8) -> MappedInputs {
     MappedInputs { lstick_x: x, lstick_y: y, ..NONE }
 }
 
+fn grade_tag_text_and_colour() {
+    use crate::model::spacing::{Grade, Grader};
+
+    let grader = Grader::new();
+    let mut tracker = Tracker::new();
+    tracker.step_graded(idle(), idle(), NONE, grader.take());
+    grader.finish(true);
+    grader.target(Grade::Good);
+    tracker.step_graded(idle(), idle(), NONE, grader.take());
+    grader.finish(true);
+
+    let tag_box = at::STICK + WINDOW;
+    let tag_text = tag_box + crate::model::frame_strip::TAGS;
+    let mut renderer = Renderer::new();
+    let (_, seen) = draw_all(&mut renderer, &tracker, true);
+    let box_look = look_at(&seen, tag_box);
+    let text_look = look_at(&seen, tag_text);
+    let x = FIRST_X + (WINDOW - 2) as f32 * PITCH + CELL_W / 2.0;
+    assert_eq!((box_look.x, box_look.y, box_look.w, box_look.color), (x, P1_Y, 54.0, Grade::Good.color()));
+    assert_eq!((text_look.x, text_look.y, text_look.color), (x, P1_Y, INK));
+    assert_eq!(String::from_utf16(text_look.text.units()).unwrap(), "Good");
+
+    for frame in 0..WINDOW {
+        tracker.step(idle(), idle(), if frame % 2 == 0 { held(100, 0) } else { held(0, 100) });
+    }
+    let (_, offscreen) = draw_all(&mut renderer, &tracker, true);
+    assert!(!look_at(&offscreen, tag_box).visible);
+    assert!(!look_at(&offscreen, tag_text).visible);
+}
+
 fn the_stick_row_scrolls_and_freezes_with_the_strip() {
     use crate::model::frame_strip::FREEZE_AFTER;
     let mut t = Tracker::new();
@@ -299,6 +329,7 @@ fn case_table() {
         ("deferred_cached_looks_match_direct_visible_writes", deferred_cached_looks_match_direct_visible_writes as fn()),
         ("parry_strip_readouts_show_grade_and_counter", parry_strip_readouts_show_grade_and_counter as fn()),
         ("parry_window_uses_the_strip_frames", parry_window_uses_the_strip_frames as fn()),
+        ("grade_tag_text_and_colour", grade_tag_text_and_colour as fn()),
     ]);
 }
 }
