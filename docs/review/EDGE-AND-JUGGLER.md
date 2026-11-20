@@ -1,4 +1,7 @@
-# Guard the Edge + Juggler: design draft (for the build after rc.15)
+# Guard the Edge + Juggler: design (ships in rc.15)
+
+**Scope (operator, 2026-11-20 07:47Z):** Guard the Edge and Juggler are part of the rc.15 card build. Projectile Madness
+is the next build. An earlier draft of this page said "the build after rc.15"; that was the primary's misreading.
 
 Research and design by the edge-juggle-opus lane (Claude Opus 5.5 high). There's no code yet. The static findings were **checked on Eden** (P0, 2026-11-20 01:21Z: 21,143 per-frame
 stock-AI records on the exact card build; [P0 results](edge-juggle/evidence/P0-RESULTS.md)). Confirmed: always the nearer
