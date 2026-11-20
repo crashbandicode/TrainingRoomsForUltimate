@@ -335,6 +335,22 @@ mod tests {
     }
 
     #[test]
+    fn recovery_delays_a_stock_jump_then_spends_it_with_a_real_button() {
+        let mut timing = JumpTiming::default();
+        assert_eq!(timing.step(0x8004, true, 2, |_| true).release, 0x4);
+        assert_eq!(timing.step(0x8000, true, 2, |_| true), Correction::default());
+        assert_eq!(timing.step(0x8000, true, 2, |_| true).press, 0x4);
+        assert_eq!(timing.step(0x8000, true, 2, |_| true), Correction::default());
+
+        assert_eq!(timing.step(0x8004, true, 2, |_| false), Correction::default());
+        assert_eq!(timing.step(0x8004, true, 2, |_| true).release, 0x4);
+        assert_eq!(timing.step(0x8000, true, 2, |_| false).press, 0x4);
+        assert_eq!(timing.step(0x8004, true, 2, |_| true).release, 0x4);
+        assert_eq!(timing.step(0x8000, false, 2, |_| true), Correction::default());
+        assert_eq!(timing.step(0x8000, true, 2, |_| true), Correction::default());
+    }
+
+    #[test]
     fn recovery_jump_can_wait_only_with_enough_horizontal_and_vertical_reach() {
         let air = AirPhysics {
             horizontal_speed: 2.0,
