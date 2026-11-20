@@ -466,6 +466,17 @@ mod tests {
     }
 
     #[test]
+    fn hit_recovery_favors_survival_when_launch_would_cross_a_blast_zone() {
+        let area = [-120., 120., 80., -80.];
+        let player = [10., 0.];
+        assert_eq!(hit_recovery([30., 32.], player, [2., 2.], 8., area), Some([1., 0.]));
+        assert_eq!(hit_recovery([30., 70.], player, [2., 2.], 8., area), Some([0., -1.]));
+        assert_eq!(hit_recovery([100., 0.], player, [3., 2.], 8., area), Some([-1., 0.]));
+        assert_eq!(hit_recovery([0., -69.], player, [0., -3.], 8., area), Some([0., 1.]));
+        assert_eq!(hit_recovery([f32::NAN, 0.], player, [1., 1.], 8., area), None);
+    }
+
+    #[test]
     fn contact_uses_the_full_capsules_and_rejects_out_of_plane_hits() {
         let hit = Capsule { ends: [[-8., 1., 0.], [8., 1., 0.]], radius: 1. };
         let hurt = Capsule { ends: [[0., -5., 0.], [0., 7., 0.]], radius: 1. };
