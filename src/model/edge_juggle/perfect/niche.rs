@@ -75,6 +75,7 @@ enum Intent {
     Near,
     /// The same, flown only from ledge height or above (a wall below ends it).
     NearAbove,
+    HaymakerGap,
     CounterContact,
     WhipGap,
     ChopColumn,
@@ -100,6 +101,7 @@ impl Row {
         let route = match intent {
             Intent::Near
             | Intent::NearAbove
+            | Intent::HaymakerGap
             | Intent::CounterContact
             | Intent::WhipGap
             | Intent::ChopColumn
@@ -186,6 +188,12 @@ impl Intent {
         }
         let in_column = near.gap <= near.special.horizontal;
         match self {
+            // fd-1 seq 51892 to 51974: Haymaker traveled +35.798 x and +10.368 y.
+            // After that approach the arc falls; the long run to the first free
+            // frame ended at y=-129.511. Budget only the measured early rise.
+            Self::HaymakerGap => {
+                short && near.gap <= 35.5 && near.climb <= near.special.rise + 10.0
+            }
             Self::WhipGap => short && !in_column && near.climb <= near.body,
             Self::ChopColumn => in_column && near.climb <= near.special.rise,
             Self::SwapGap => short && !in_column,
@@ -210,7 +218,7 @@ const ROWS: [Row; 40] = [
     Row::new(7, 0x2d, Intent::Across, &[Hold, Hover]),
     // Sonic Blade is special fall: it follows Aerial Sweep at its apex, at the exit.
     Row::new(8, 0x5d, Intent::Across, &[Hold, SoraChain]),
-    Row::new(9, 0x34, Intent::Near, &[Side, Rise]),
+    Row::new(9, 0x34, Intent::HaymakerGap, &[Side, Rise]),
     Row::new(10, 0x34, Intent::CounterContact, &[Counter, Rise]),
     Row::new(11, 0x10, Intent::Near, &[Down, Rise]),
     Row::new(12, 0x10, Intent::Across, &[Hold, Travel]),
