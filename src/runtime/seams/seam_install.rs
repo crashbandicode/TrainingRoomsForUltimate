@@ -529,17 +529,17 @@ pub(crate) fn site_image(label: &'static str, text_base: Option<usize>, legacy: 
 }
 
 /// Rows whose recorded bits satisfy `keep`, as `[label,…]`, each `label:code` where `with_code` holds.
-struct Labels {
+struct Labels<'a> {
+    outcomes: &'a [u8; native_seams::COUNT],
     keep: fn(u8) -> bool,
     with_code: fn(u8) -> bool,
 }
 
-impl fmt::Display for Labels {
+impl fmt::Display for Labels<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("[")?;
         let mut first = true;
-        for (index, seam) in native_seams::SITES.iter().enumerate() {
-            let bits = OUTCOMES[index].load(Ordering::Relaxed);
+        for (seam, &bits) in native_seams::SITES.iter().zip(self.outcomes) {
             if !(self.keep)(bits) {
                 continue;
             }
@@ -603,14 +603,6 @@ pub(crate) fn bits_of(label: &str) -> Option<u8> {
     native_seams::find_site(label).and_then(|(index, _)| OUTCOMES.get(index)).map(|slot| slot.load(Ordering::Relaxed))
 }
 
-fn count(code: u8) -> usize {
-    native_seams::SITES
-        .iter()
-        .enumerate()
-        .filter(|(index, _)| OUTCOMES[*index].load(Ordering::Relaxed) & CODE_MASK == code)
-        .count()
-}
-
 /// The seam fields of the plugin's one install line (recorded clean-room change: the fork wrote a second line of its own here,
 /// `[TrainingModpack] result=installed ...`; package 1's `InstallLine` takes these as its `seams` group). From the moment the
 /// fields are formatted a new or changed outcome is reported late, so a row another thread checks while the line is written
@@ -622,18 +614,20 @@ pub(crate) struct InstallFields;
 impl fmt::Display for InstallFields {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         BOOTED.store(true, Ordering::Release);
-        let rows = native_seams::COUNT;
-        let checked = rows - count(UNCHECKED);
+        // Every list sees the same outcome for each row, including late updates during boot.
+        let outcomes = OUTCOMES.each_ref().map(|slot| slot.load(Ordering::Relaxed));
+        let count = |code| outcomes.iter().filter(|&&bits| bits & CODE_MASK == code).count();
+        let checked = native_seams::COUNT - count(UNCHECKED);
         write!(
             f,
             "seams={} seams_stock={} seams_other={} seams_skipped={} seams_shadow_diff={} seams_missing={} seams_external={} seams_unchecked={} seams_images_unchecked={}{}",
             checked,
             count(STOCK),
-            Labels { keep: listed_as_other, with_code: other_with_code },
-            Labels { keep: |b| b & SKIPPED != 0, with_code: |_| true },
-            Labels { keep: |b| b & SHADOW_DIFF != 0, with_code: |_| true },
+            Labels { outcomes: &outcomes, keep: listed_as_other, with_code: other_with_code },
+            Labels { outcomes: &outcomes, keep: |b| b & SKIPPED != 0, with_code: |_| true },
+            Labels { outcomes: &outcomes, keep: |b| b & SHADOW_DIFF != 0, with_code: |_| true },
             Missing,
-            Labels { keep: |b| b & CODE_MASK == EXTERNAL, with_code: |_| false },
+            Labels { outcomes: &outcomes, keep: |b| b & CODE_MASK == EXTERNAL, with_code: |_| false },
             count(UNCHECKED),
             IMAGE_OUTCOMES.iter().filter(|slot| slot.load(Ordering::Relaxed) & CODE_MASK == UNCHECKED).count(),
             DrillFields,
