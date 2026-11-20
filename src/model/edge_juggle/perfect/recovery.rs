@@ -143,10 +143,18 @@ impl Reach {
                 (vy - air.gravity).max(-air.terminal_speed)
             };
             vx = (vx + air.horizontal_acceleration).min(air.horizontal_speed);
-            dx -= vx;
+            // Stay in the ledge column while the jump or up special gains height.
+            dx = (dx - vx).max(0.0);
             y += vy;
-            if dx <= 0.0 {
-                return y >= ledge[1];
+            if dx == 0.0 {
+                if y >= ledge[1] {
+                    return true;
+                }
+                if vy <= 0.0 && (!self.jump || frame >= delay)
+                    && self.special.is_none_or(|special| y + special.rise < ledge[1])
+                {
+                    return false;
+                }
             }
         }
         false

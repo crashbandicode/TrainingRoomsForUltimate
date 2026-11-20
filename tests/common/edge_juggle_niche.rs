@@ -751,7 +751,8 @@ fn niche_float_releases_to_spend_parasol_after_exit() {
 
 #[test]
 fn niche_incineroar_adds_whip_only_outside_the_cross_chop_column() {
-    let far = select(facts(0x47, "long"), CANDIDATE_ROWS).expect("IN-1 for a horizontal shortfall");
+    let input = Facts { short: true, ..facts(0x47, "long") };
+    let far = select(input, CANDIDATE_ROWS).expect("IN-1 for a horizontal shortfall");
     let close = select(facts(0x47, "near"), CANDIDATE_ROWS).expect("IN-2 in the ledge column");
     assert_eq!((far.id, far.moves), (36, &[Move::Side, Move::Rise][..]));
     assert_eq!((close.id, close.moves), (37, &[Move::Rise][..]));
@@ -772,7 +773,8 @@ fn niche_incineroar_adds_whip_only_outside_the_cross_chop_column() {
 #[test]
 fn niche_pyra_starts_the_authored_native_swap_on_horizontal_shortfall() {
     assert!(select(facts(0x5a, "near"), CANDIDATE_ROWS).is_none());
-    let row = select(facts(0x5a, "long"), CANDIDATE_ROWS).expect("PY-1 for a horizontal shortfall");
+    let input = Facts { short: true, ..facts(0x5a, "long") };
+    let row = select(input, CANDIDATE_ROWS).expect("PY-1 for a horizontal shortfall");
     assert_eq!(row.id, 38);
     let mut sequence = Sequence::new(row);
     assert_eq!(
@@ -793,7 +795,8 @@ fn niche_pyra_starts_the_authored_native_swap_on_horizontal_shortfall() {
 
 #[test]
 fn niche_mythra_commits_to_only_one_special() {
-    let level = select(facts(0x5b, "long"), CANDIDATE_ROWS).expect("MY-1a level extended start");
+    let input = Facts { short: true, ..facts(0x5b, "long") };
+    let level = select(input, CANDIDATE_ROWS).expect("MY-1a level extended start");
     let low = select(facts(0x5b, "near"), CANDIDATE_ROWS).expect("MY-1b below the ledge");
     assert_eq!((level.id, level.moves), (39, &[Move::Side][..]));
     assert_eq!((low.id, low.moves), (40, &[Move::Jump, Move::Rise][..]));
@@ -817,11 +820,11 @@ fn niche_mythra_commits_to_only_one_special() {
 
 #[test]
 fn niche_near_extensions_require_valid_reach_and_a_plausible_entry() {
-    let mut incineroar = facts(0x47, "long");
+    let mut incineroar = Facts { short: true, ..facts(0x47, "long") };
     let reach = incineroar.near.unwrap();
     incineroar.near = Some(NearReach { climb: reach.body + 1.0, ..reach });
     assert!(select(incineroar, CANDIDATE_ROWS).is_none());
-    let mut pyra = facts(0x5a, "long");
+    let mut pyra = Facts { short: true, ..facts(0x5a, "long") };
     pyra.near = Some(NearReach {
         special: perfect::SpecialReach { horizontal: f32::NAN, ..reach.special },
         ..reach

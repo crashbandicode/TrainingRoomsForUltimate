@@ -133,7 +133,7 @@ fn mix_keeps_the_only_feasible_route_whatever_the_zone() {
 
 #[test]
 fn reach_counts_jump_and_up_special_together() {
-    let from = [-95.0, -50.0];
+    let from = [-95.0, -57.0];
     let fall = [0.0, -1.4];
     let reach = |jump, special| Reach { air: AIR, jump, special };
     assert!(
@@ -179,9 +179,10 @@ fn deadline_is_the_last_frame_that_still_returns() {
     );
     assert_eq!(
         reach.deadline([-95.0, -93.0], fall, LEDGE, BOTTOM),
-        None,
-        "too deep: act now"
+        Some(1),
+        "one more frame before the fall reaches the blast boundary"
     );
+    assert_eq!(reach.deadline([-95.0, BOTTOM], fall, LEDGE, BOTTOM), None);
 }
 
 #[test]

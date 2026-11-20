@@ -155,14 +155,14 @@ impl Row {
                 Intent::Near => facts.short,
                 Intent::NearAbove => facts.short && facts.climb <= 0.0,
                 Intent::CounterContact => facts.counter_contact,
-                intent => facts.near.is_some_and(|near| intent.matches_near(near)),
+                intent => facts.near.is_some_and(|near| intent.matches_near(near, facts.short)),
             }
             && self.margin(facts).is_some()
     }
 }
 
 impl Intent {
-    fn matches_near(self, near: NearReach) -> bool {
+    fn matches_near(self, near: NearReach, short: bool) -> bool {
         if !(near.special.valid()
             && near.gap.is_finite()
             && near.gap > 0.0
@@ -172,13 +172,13 @@ impl Intent {
         {
             return false;
         }
-        let short = near.gap > near.special.horizontal;
+        let in_column = near.gap <= near.special.horizontal;
         match self {
-            Self::WhipGap => short && near.climb <= near.body,
-            Self::ChopColumn => !short && near.climb <= near.special.rise,
-            Self::SwapGap => short,
+            Self::WhipGap => short && !in_column && near.climb <= near.body,
+            Self::ChopColumn => in_column && near.climb <= near.special.rise,
+            Self::SwapGap => short && !in_column,
             Self::PhotonGap => short && near.climb <= 0.0,
-            Self::RayColumn => !short && near.climb > 0.0 && near.can_jump,
+            Self::RayColumn => in_column && near.climb > 0.0 && near.can_jump,
             _ => false,
         }
     }
