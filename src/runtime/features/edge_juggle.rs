@@ -11,8 +11,8 @@ use crate::model::cpu::{
     rng::Rng,
 };
 use crate::model::edge_juggle::perfect::{
-    self, AirPhysics, Correction, JumpTiming, LandingFacts, LandingOptions, MeteorBounce, Route, RouteFacts,
-    ThreatClock,
+    self, AirPhysics, Correction, JumpTiming, LandingFacts, LandingOptions, MeteorBounce, Route,
+    RouteFacts, ThreatClock,
 };
 use crate::model::edge_juggle::{
     Difficulty, Drill, Observation, Outcome, Phase, Reaction, Session, Setup, Stage, Wizard,
@@ -363,26 +363,51 @@ unsafe fn landing_options(run: &Run, p1: usize, cpu: usize, facts: LandingFacts)
         6 if !player_near => {
             let gravity = konst(C::KineticGravity);
             let dive = konst(C::WorkFlagReserveDive);
-            let Some(ray) = FloorRay::new(p1) else { return out };
-            out.fast_fall = gravity != UNRESOLVED && dive != UNRESOLVED
-                && natives::sum_speed_y(cpu, gravity) < 0.0 && !natives::is_flag(cpu, dive)
+            let Some(ray) = FloorRay::new(p1) else {
+                return out;
+            };
+            out.fast_fall = gravity != UNRESOLVED
+                && dive != UNRESOLVED
+                && natives::sum_speed_y(cpu, gravity) < 0.0
+                && !natives::is_flag(cpu, dive)
                 && ray.floor(x, [y, run.stage.blast()[3]], true).is_some();
         }
         7 if player_near => {
             let term = konst(C::TermContJumpAerial);
             let air = air_physics(cpu);
-            out.jump = term != UNRESOLVED && natives::is_enable_transition_term(cpu, term) && air.valid()
+            out.jump = term != UNRESOLVED
+                && natives::is_enable_transition_term(cpu, term)
+                && air.valid()
                 && y + air.jump_speed.powi(2) / (2.0 * air.gravity) < run.stage.blast()[2];
         }
         8 => {
             let [left, right] = facts.main_floor;
-            let away = if x >= facts.player[0] { (x + right) * 0.5 } else { (x + left) * 0.5 };
-            let Some(ray) = FloorRay::new(p1) else { return out };
-            let Some(floor) = ray.floor(away, [y, run.stage.blast()[3]], true) else { return out };
-            let Some(height) = floor.height(away) else { return out };
-            let Some((vx, vy)) = super::recording_host::fighter_speed(cpu) else { return out };
-            if floor.flags & 0x2000 != 0 && (away - facts.player[0]).abs() > player_reach
-                && air_physics(cpu).reaches_with_jump(facts.cpu, [vx, vy], [away, height], 90, run.stage.blast()[3])
+            let away = if x >= facts.player[0] {
+                (x + right) * 0.5
+            } else {
+                (x + left) * 0.5
+            };
+            let Some(ray) = FloorRay::new(p1) else {
+                return out;
+            };
+            let Some(floor) = ray.floor(away, [y, run.stage.blast()[3]], true) else {
+                return out;
+            };
+            let Some(height) = floor.height(away) else {
+                return out;
+            };
+            let Some((vx, vy)) = super::recording_host::fighter_speed(cpu) else {
+                return out;
+            };
+            if floor.flags & 0x2000 != 0
+                && (away - facts.player[0]).abs() > player_reach
+                && air_physics(cpu).reaches_with_jump(
+                    facts.cpu,
+                    [vx, vy],
+                    [away, height],
+                    90,
+                    run.stage.blast()[3],
+                )
             {
                 out.platform_x = Some(away);
             }
@@ -557,10 +582,10 @@ unsafe fn route_guide(
     special: Option<perfect::SpecialReach>,
 ) -> Option<RecoveryGuide> {
     let [left, right] = run.stage.ledges;
-    let [cam_l, cam_r, cam_top, cam_bottom] = natives::camera_limit_range()?;
+    let (midpoint, limits) =
+        perfect::outline_probe(natives::camera_limit_range()?, run.stage.blast())?;
     let ray = FloorRay::new(p1)?;
-    let outline =
-        super::tech_surfaces::training_outline(&ray, cam_l.midpoint(cam_r), [cam_top, cam_bottom])?;
+    let outline = super::tech_surfaces::training_outline(&ray, midpoint, limits)?;
     let player = [natives::pos_x(p1), natives::pos_y(p1)];
     let player_reach = body_top(p1, player[1])?;
     let body = body_top(cpu, pos[1])?;
@@ -627,7 +652,9 @@ unsafe fn route_guide(
 unsafe fn player_in_lag(accessor: usize) -> bool {
     let status = natives::status_kind(accessor);
     status != UNRESOLVED
-        && [C::StatusLandingAttackAir, C::StatusLandingDamageLight].map(konst).contains(&status)
+        && [C::StatusLandingAttackAir, C::StatusLandingDamageLight]
+            .map(konst)
+            .contains(&status)
         && !natives::is_enable_cancel(accessor)
 }
 
@@ -639,8 +666,7 @@ unsafe fn recovery_snapshot(ai: usize) -> Option<(usize, bool)> {
         return None;
     }
     let snapshot = field::child(ai, 0x168)?;
-    let available: extern "C" fn(usize, u32) -> bool =
-        std::mem::transmute(base + 0x358c20);
+    let available: extern "C" fn(usize, u32) -> bool = std::mem::transmute(base + 0x358c20);
     Some((snapshot, available(snapshot, 0)))
 }
 
@@ -666,7 +692,10 @@ unsafe fn last_dodge_reach(snapshot: usize, cpu: usize) -> perfect::DodgeReach {
     let distance = field::read_unchecked::<f32>(snapshot, 0x230)
         * natives::get_param_float(cpu, 0x1d_fb01_ad43, 0);
     let cancel_frames = field::read_unchecked(snapshot, 0x234);
-    perfect::DodgeReach { distance, cancel_frames }
+    perfect::DodgeReach {
+        distance,
+        cancel_frames,
+    }
 }
 
 unsafe fn recovery_pad(
@@ -694,7 +723,11 @@ unsafe fn recovery_pad(
         None
     };
     let special = recovery.and_then(|(snapshot, available)| {
-        if available { special_reach(ai, snapshot) } else { None }
+        if available {
+            special_reach(ai, snapshot)
+        } else {
+            None
+        }
     });
     if run.plan_pending {
         run.plan_pending = false;
@@ -725,7 +758,8 @@ unsafe fn recovery_pad(
                 if (exit[0] - pos[0]) * dir > 0.0
                     && physics.crossing(pos, speed, exit, band, u8::from(can_jump)) =>
             {
-                let release = (buttons & perfect::JUMP) | perfect::avoid_detour(buttons, true, can_punish, dir).release;
+                let release = (buttons & perfect::JUMP)
+                    | perfect::avoid_detour(buttons, true, can_punish, dir).release;
                 return Correction {
                     stick: Some([dir, 0.0]),
                     release,
@@ -770,9 +804,8 @@ unsafe fn recovery_pad(
                     return pad;
                 }
             }
-        } else if let Some(reach) = special
-            && !coasts
-            && buttons & !perfect::FLICK_JUMP == 0
+        } else if let Some(reach) =
+            special.filter(|_| !coasts && buttons & !perfect::FLICK_JUMP == 0)
         {
             let term = konst(C::TermContSpecialHi);
             if term != UNRESOLVED && natives::is_enable_transition_term(cpu, term) {
@@ -787,7 +820,8 @@ unsafe fn recovery_pad(
     if attack && !can_punish {
         let delay = if can_jump { 0 } else { 90 };
         let reachable = physics.reaches_with_jump(pos, speed, ledge, delay, run.stage.blast()[3]);
-        let correction = perfect::avoid_detour(buttons, reachable, false, (ledge[0] - pos[0]).signum());
+        let correction =
+            perfect::avoid_detour(buttons, reachable, false, (ledge[0] - pos[0]).signum());
         if correction != Correction::default() {
             return correction;
         }
@@ -1078,7 +1112,12 @@ fn post_notice(run: &mut Run, best: Option<u32>, best_streak: Option<u32>) {
         };
         header = [
             ["Edge · 1/4", "Edge · 2/4", "Edge · 3/4", "Edge · 4/4"],
-            ["Juggle · 1/4", "Juggle · 2/4", "Juggle · 3/4", "Juggle · 4/4"],
+            [
+                "Juggle · 1/4",
+                "Juggle · 2/4",
+                "Juggle · 3/4",
+                "Juggle · 4/4",
+            ],
         ][run.drill as usize][number];
         let _ = match wizard.step {
             WizardStep::Area => write!(text, "{} · D-pad choose · A next", area.title()),
@@ -1119,13 +1158,7 @@ fn post_notice(run: &mut Run, best: Option<u32>, best_streak: Option<u32>) {
         }
     }
     if run.notice.as_str() != text.as_str() || frames % 30 == 1 && phase == Phase::Live {
-        notices::upsert(
-            NOTICE,
-            header,
-            text.as_str(),
-            180,
-            DEFAULT_COLOR,
-        );
+        notices::upsert(NOTICE, header, text.as_str(), 180, DEFAULT_COLOR);
         run.notice = text;
     }
 }

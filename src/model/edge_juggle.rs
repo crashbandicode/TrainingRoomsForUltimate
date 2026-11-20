@@ -120,7 +120,11 @@ pub struct CpuBehavior {
 }
 
 impl CpuBehavior {
-    pub const LEVEL_NINE: Self = Self { menu: 2, level: 8, control: 0 };
+    pub const LEVEL_NINE: Self = Self {
+        menu: 2,
+        level: 8,
+        control: 0,
+    };
 }
 
 /// Save the original selection once for the lifetime of its Training panel.

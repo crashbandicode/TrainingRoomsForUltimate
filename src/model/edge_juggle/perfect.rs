@@ -36,6 +36,18 @@ impl Default for Outline {
     }
 }
 
+/// Seed the solid outline walk at the stage center through the full blast zone.
+pub fn outline_probe(camera: [f32; 4], blast: [f32; 4]) -> Option<(f32, Point)> {
+    let [cam_left, cam_right, _, _] = camera;
+    let [left, right, top, bottom] = blast;
+    let center = cam_left.midpoint(cam_right);
+    (blast.into_iter().chain([center]).all(f32::is_finite)
+        && left < center
+        && center < right
+        && top > bottom)
+        .then_some((center, [top, bottom]))
+}
+
 /// The foot heights that leave enough room below a closed main-stage outline.
 /// The caller passes live segments from one walk in the current stage.
 pub fn corridor(
@@ -439,8 +451,10 @@ pub struct SpecialReach {
 
 impl SpecialReach {
     pub fn valid(self) -> bool {
-        self.horizontal.is_finite() && self.horizontal >= 0.0
-            && self.rise.is_finite() && self.rise > 0.0
+        self.horizontal.is_finite()
+            && self.horizontal >= 0.0
+            && self.rise.is_finite()
+            && self.rise > 0.0
     }
 
     pub fn reaches(self, position: Point, target: Point) -> bool {
@@ -466,8 +480,12 @@ impl SpecialReach {
     }
 }
 
-
-pub fn avoid_detour(buttons: u32, can_recover: bool, player_in_lag: bool, direction: f32) -> Correction {
+pub fn avoid_detour(
+    buttons: u32,
+    can_recover: bool,
+    player_in_lag: bool,
+    direction: f32,
+) -> Correction {
     if !can_recover || player_in_lag || buttons & ATTACK == 0 || !direction.is_finite() {
         return Correction::default();
     }
@@ -552,7 +570,6 @@ pub fn distance_dodge(
         ..Correction::default()
     }
 }
-
 
 /// Earliest observable start of the current P1 attack on the attempt clock.
 #[derive(Default)]
@@ -760,7 +777,14 @@ pub fn landing_variant(facts: LandingFacts, options: LandingOptions, draw: u32) 
             let Some(x) = options.platform_x.filter(|x| left < *x && *x < right) else {
                 return out;
             };
-            [if x == cpu[0] { 0.0 } else { (x - cpu[0]).signum() }, stock_stick_y]
+            [
+                if x == cpu[0] {
+                    0.0
+                } else {
+                    (x - cpu[0]).signum()
+                },
+                stock_stick_y,
+            ]
         }
         _ => return out,
     };
