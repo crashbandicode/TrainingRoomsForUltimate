@@ -246,6 +246,17 @@ pub enum Phase {
     Done,
 }
 
+impl Phase {
+    /// Keep stock stick and buttons neutral until the attempt releases the CPU.
+    pub fn held_pad(self, buttons: u32) -> Option<perfect::Correction> {
+        matches!(self, Self::Place | Self::Ready(_)).then_some(perfect::Correction {
+            stick: Some([0.0, 0.0]),
+            release: buttons & !perfect::FLICK_JUMP,
+            ..perfect::Correction::default()
+        })
+    }
+}
+
 /// Runtime admits placement, then ticks only on eligible simulation frames.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Session {
@@ -692,6 +703,29 @@ mod tests {
             assert_eq!(stage.edge_start(area, start), Some(expected));
         }
         assert_eq!(stage.edge_start(Area::LowerLeft, [f32::NAN, 0.0]), None);
+    }
+
+    #[test]
+    fn pre_release_drift_and_jump_cannot_spend_recovery_resources() {
+        use perfect::{Correction, FLICK_JUMP, JUMP, SPECIAL};
+
+        let stock = FLICK_JUMP | JUMP | SPECIAL;
+        let neutral = Some(Correction {
+            stick: Some([0.0, 0.0]),
+            release: JUMP | SPECIAL,
+            ..Correction::default()
+        });
+        for drill in [Drill::GuardEdge, Drill::Juggler] {
+            let mut session = Session::new(drill, None);
+            assert_eq!(session.phase.held_pad(stock), neutral);
+            session.placed();
+            for _ in 0..drill.ready_frames() {
+                assert_eq!(session.phase.held_pad(stock), neutral);
+                session.advance_attempt(Observation::default());
+            }
+            assert_eq!(session.phase, Phase::Live);
+            assert_eq!(session.phase.held_pad(stock), None);
+        }
     }
 
     #[test]

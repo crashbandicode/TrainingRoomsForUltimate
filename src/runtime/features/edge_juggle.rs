@@ -327,10 +327,7 @@ pub unsafe fn ai_correction(ai: usize, accessor: usize, buttons: u32, stick_y: f
         return Correction::default();
     };
     let Some(run) = engine.run.as_mut().filter(|run| {
-        wanted() == Some(run.drill)
-            && run.difficulty == Difficulty::Perfect
-            && run.rounds.phase == Phase::Live
-            && run.wizard.is_none()
+        wanted() == Some(run.drill) && run.wizard.is_none()
     }) else {
         return Correction::default();
     };
@@ -345,6 +342,12 @@ pub unsafe fn ai_correction(ai: usize, accessor: usize, buttons: u32, stick_y: f
         .into_iter()
         .all(game::granted)
     {
+        return Correction::default();
+    }
+    if let Some(hold) = run.rounds.phase.held_pad(buttons) {
+        return hold;
+    }
+    if run.difficulty != Difficulty::Perfect || run.rounds.phase != Phase::Live {
         return Correction::default();
     }
     let status = natives::status_kind(accessor);
