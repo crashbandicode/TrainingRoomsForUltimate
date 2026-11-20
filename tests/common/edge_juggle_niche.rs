@@ -705,18 +705,22 @@ fn niche_requires_stock_transition_and_does_not_spend_an_unaccepted_input_twice(
 }
 
 #[test]
-fn niche_thunder_drifts_into_position_before_spending_down_special() {
+fn niche_thunder_holds_altitude_on_the_way_to_the_cast() {
     let mut sequence = Sequence::new(&super::ROWS[1]);
     let approach = Sample {
         approaching: true,
+        at_exit: false,
+        hold_over: false,
         ..sample(0, Motion::Free)
     };
-    let pad = sequence.step(approach).unwrap();
-    assert_eq!((pad.stick, pad.press), (Some([1.0, 0.0]), 0));
-    assert_eq!(
-        sequence.step(sample(1, Motion::Free)).unwrap().press,
-        perfect::SPECIAL
-    );
+    assert_eq!(sequence.step(approach).unwrap().press, 0);
+    let under_the_hold_line = Sample { frame: 1, low: true, ..approach };
+    let pad = sequence.step(under_the_hold_line).unwrap();
+    assert_eq!((pad.stick, pad.press), (Some([1.0, 0.0]), perfect::JUMP));
+    assert_eq!(sequence.step(Sample { frame: 2, motion: Motion::Travel, ..approach }).unwrap().press, 0);
+    assert_eq!(sequence.step(sample(3, Motion::Free)).unwrap().press, 0);
+    let pad = sequence.step(sample(4, Motion::Free)).unwrap();
+    assert_eq!((pad.stick, pad.press), (Some([0.0, -1.0]), perfect::SPECIAL));
 }
 
 #[test]
