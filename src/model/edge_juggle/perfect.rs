@@ -122,6 +122,162 @@ impl AirPhysics {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Route {
+    Near,
+    High,
+    LateLow,
+    Opposite,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Plan {
+    pub route: Route,
+    pub waypoints: [Point; 3],
+    pub count: usize,
+    weight: u16,
+}
+
+pub struct RouteFacts<'a> {
+    pub position: Point,
+    pub player: Point,
+    pub player_reach: f32,
+    pub ledges: [Point; 2],
+    pub blast: [f32; 4],
+    pub outline: &'a [Segment],
+    pub body_clearance: f32,
+    pub ledge_distance: f32,
+    pub fall_budget: f32,
+    /// Remaining horizontal travel and ascent offered by the fighter's resources.
+    pub reach: Point,
+}
+
+fn line_height([a, b]: Segment, x: f32) -> [f32; 2] {
+    if a[0] == b[0] {
+        [a[1].min(b[1]), a[1].max(b[1])]
+    } else {
+        let y = a[1] + (b[1] - a[1]) * ((x - a[0]) / (b[0] - a[0]));
+        [y, y]
+    }
+}
+
+fn ordered_x([a, b]: Segment) -> [f32; 2] {
+    [a[0].min(b[0]), a[0].max(b[0])]
+}
+
+/// A solid line intersects the swept vertical body of a segment. For
+/// nonvertical spans the extrema are at the ends of the overlapping x range.
+fn blocked(path: Segment, line: Segment, height: f32) -> bool {
+    let [from, to] = ordered_x(path);
+    let [start, end] = ordered_x(line);
+    let left = from.max(start);
+    let right = to.min(end);
+    if left > right {
+        return false;
+    }
+    let delta = [left, right].map(|x| {
+        let [foot, top] = line_height(path, x);
+        let [lower, upper] = line_height(line, x);
+        [lower - top, upper - foot]
+    });
+    delta[0][0].min(delta[1][0]) <= height && delta[0][1].max(delta[1][1]) >= 0.0
+}
+
+impl RouteFacts<'_> {
+    fn candidate(&self, route: Route, waypoints: [Point; 3], count: usize) -> Option<Plan> {
+        let [left, right, top, bottom] = self.blast;
+        let mut from = self.position;
+        let mut horizontal = 0.0;
+        let mut ascent = 0.0;
+        let mut threat = 0;
+        for &to in &waypoints[..count] {
+            if !(left < to[0] && to[0] < right && bottom < to[1]
+                && to[1] + self.body_clearance < top)
+                || self.outline.iter().any(|&line| blocked([from, to], line, self.body_clearance))
+            {
+                return None;
+            }
+            horizontal += (to[0] - from[0]).abs();
+            ascent += (to[1] - from[1]).max(0.0);
+            let player_distance = (to[0] - self.player[0]).hypot(to[1] - self.player[1]);
+            threat += u16::from(player_distance <= self.player_reach);
+            from = to;
+        }
+        if horizontal > self.reach[0] || ascent > self.reach[1] {
+            return None;
+        }
+        let travel = horizontal / self.reach[0] + ascent / self.reach[1];
+        let weight = (16.0 / (1.0 + travel + f32::from(threat) * 2.0)).max(1.0) as u16;
+        Some(Plan { route, waypoints, count, weight })
+    }
+}
+
+pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 4] {
+    let [left, right] = facts.ledges;
+    let clearance = facts.body_clearance;
+    let offset = facts.ledge_distance;
+    if !facts.position.into_iter().chain(facts.player).chain(facts.ledges.into_iter().flatten())
+        .chain(facts.blast).chain(facts.reach).chain([clearance, offset, facts.player_reach])
+        .chain(facts.outline.iter().flatten().flatten().copied())
+        .all(f32::is_finite)
+        || clearance <= 0.0 || offset <= 0.0 || left[0] >= right[0]
+        || facts.reach.into_iter().any(|value| value <= 0.0)
+        || facts.outline.is_empty()
+    {
+        return [None; 4];
+    }
+    let (near, other, edge_dir) = if facts.position[0] <= left[0].midpoint(right[0]) {
+        (left, right, -1.0)
+    } else {
+        (right, left, 1.0)
+    };
+    let outside = near[0] + offset * edge_dir;
+    let exit = other[0] - offset * edge_dir;
+    let low = near[1] - clearance;
+    let high = near[1].max(other[1]) + clearance;
+    let finish = [outside, near[1]];
+    let near_plan = facts.candidate(Route::Near, [finish; 3], 1);
+    let high_plan = facts.candidate(
+        Route::High, [[outside, high], [near[0].midpoint(other[0]), high], [0.0; 2]], 2,
+    );
+    let late_plan = facts.candidate(Route::LateLow, [[outside, low], finish, [0.0; 2]], 2);
+    let near_covered = (facts.player[0] - near[0]).hypot(facts.player[1] - near[1]) <= facts.player_reach;
+    let other_covered = (facts.player[0] - other[0]).hypot(facts.player[1] - other[1]) <= facts.player_reach;
+    let opposite = if !other_covered && (near_plan.is_none() || near_covered) {
+        corridor(facts.outline, facts.ledges, facts.blast[3], clearance, facts.fall_budget)
+            .and_then(|[bottom, top]| {
+                let crossing = facts.position[1].clamp(bottom, top.next_down().max(bottom));
+                facts.candidate(
+                    Route::Opposite,
+                    [[outside, crossing], [exit, crossing], [exit, other[1]]],
+                    3,
+                )
+            })
+    } else {
+        None
+    };
+    [near_plan, high_plan, late_plan, opposite]
+}
+
+/// Weighted selection among feasible options, reducing the weight of the last
+/// route. The draw comes from the plugin's own RNG.
+pub fn choose_route(options: [Option<Plan>; 4], last: Option<Route>, draw: u32) -> Option<Plan> {
+    let weight = |plan: Plan| if Some(plan.route) == last { plan.weight.div_ceil(2) } else { plan.weight };
+    let total: u32 = options.iter().flatten().map(|&plan| u32::from(weight(plan))).sum();
+    if total == 0 {
+        return None;
+    }
+    let mut draw = ((u64::from(draw) * u64::from(total)) >> 32) as u32;
+    for plan in options.into_iter().flatten() {
+        let weight = u32::from(weight(plan));
+        if draw < weight {
+            return Some(plan);
+        }
+        draw -= weight;
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
