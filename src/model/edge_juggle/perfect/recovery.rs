@@ -273,8 +273,8 @@ impl LedgeWatch {
 }
 
 /// Whether the current jump can be spent through the native transition.
-pub fn recovery_jump_available(_jumps: Option<u8>, transition_open: bool) -> bool {
-    transition_open
+pub fn recovery_jump_available(jumps: Option<u8>, transition_open: bool) -> bool {
+    transition_open && jumps.is_some_and(|jumps| jumps > 0)
 }
 
 /// The plain return fails for distance while the climb is still affordable.

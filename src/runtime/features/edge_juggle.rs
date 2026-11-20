@@ -1189,7 +1189,7 @@ unsafe fn recovery_pad(
         run.hold = Hold::default();
         return Correction::default();
     };
-    if !can_jump && jumps == Some(0) {
+    if jumps == Some(0) {
         let bottom = run.stage.blast()[3];
         let coasts = physics.reaches_with_jump(pos, speed, ledge, u8::MAX, bottom);
         if let Some((snapshot, false)) = recovery {
