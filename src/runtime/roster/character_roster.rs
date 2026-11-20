@@ -550,7 +550,25 @@ fn roster(m: &TrainingModpackMenu, role: Role) -> Vec<TrioFighter> {
 
 /// `roster` without heap (the preload planner's per-tick form).
 fn roster_fixed(m: &TrainingModpackMenu, role: Role) -> crate::engine::swap::ordered_roster::FighterList {
-    let excluded = match role {
+    let excluded = cycle_excluded(m, role);
+    // P-CYCLE: the one cycle list (`cycle_members`), with no Mii class: this loader cannot load a Mii, and while it
+    // serves the cycle no Mii owner does, so the menu's published admission is none too.
+    let roster = match role {
+        Role::Player => m.player_roster,
+        Role::Cpu => m.cpu_roster,
+    };
+    crate::engine::swap::cycle_members::cycle_members_excluding(roster, crate::engine::swap::cycle_members::NO_MII, excluded)
+}
+
+/// Ready Fighters shortfall: the role's live fighter and cycle cursor, as the walkers step from them.
+fn cycle_slot(role: Role) -> Option<(u32, Option<usize>)> {
+    let s = state_for(role).lock();
+    s.observed.map(|(_, kind)| (kind, s.cursor))
+}
+
+/// The fighter group slot 0 takes out of the numbered cycle (`roster_grid::cycle_exclusion`).
+fn cycle_excluded(m: &TrainingModpackMenu, role: Role) -> Option<u32> {
+    match role {
         Role::Player => crate::engine::swap::roster_grid::cycle_exclusion(
             original_kind(role),
             m.solo_popo_original == OnOff::ON,
@@ -560,14 +578,7 @@ fn roster_fixed(m: &TrainingModpackMenu, role: Role) -> crate::engine::swap::ord
             let solo = m.solo_popo_cpu == OnOff::ON;
             crate::engine::swap::roster_grid::cycle_exclusion(cycle_original(role), solo, solo)
         }
-    };
-    // P-CYCLE: the one cycle list (`cycle_members`), with no Mii class: this loader cannot load a Mii, and while it
-    // serves the cycle no Mii owner does, so the menu's published admission is none too.
-    let roster = match role {
-        Role::Player => m.player_roster,
-        Role::Cpu => m.cpu_roster,
-    };
-    crate::engine::swap::cycle_members::cycle_members_excluding(roster, crate::engine::swap::cycle_members::NO_MII, excluded)
+    }
 }
 
 /// The CPU cycle's Mii admission as the CPU Mii owner last computed it (`cycle_members::cpu_admission`, published from

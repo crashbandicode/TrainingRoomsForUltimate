@@ -290,7 +290,7 @@ fn show_status(now: crate::engine::preload::cycle_preload_policy::CacheStatus, s
         crate::engine::compat::logging::diagnostic(format_args!("[PreloadStatus] raise text={:?} frames={}",
             now.text(), now.frames()));
         use std::fmt::Write;
-        let mut text = crate::model::storage::FixedPath::<96>::new();
+        let mut text = crate::model::storage::FixedPath::<{ crate::engine::preload::cycle_preload_policy::TEXT_MAX }>::new();
         write!(text, "{}", now.text()).expect("bounded status text fits notice buffer");
         upsert(STATUS_HEADER, text.as_str(), now.frames());
     }

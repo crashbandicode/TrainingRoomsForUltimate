@@ -224,6 +224,11 @@ pub struct BuiltFighters {
     /// rc.14 mem-headroom: the room the fighters held for memory wait for is held by speculative helpers the next pause
     /// retires (`give_back`), so something is left to free.
     pub room_at_pause: bool,
+    /// Ready Fighters shortfall (operator 2026-11-20): the setting, the bodies the whole cycles need and the fighters
+    /// (picks: a pair is one) left cold, by the planner's own rule (`body_bank::cycle_demand`). 0 when unknown.
+    pub ready_fighters: u8,
+    pub needed: u8,
+    pub cold: u8,
 }
 
 impl BuiltFighters {
@@ -250,6 +255,11 @@ impl BuiltFighters {
     pub fn loaded(self) -> u8 {
         self.ready.saturating_add(self.prefetched)
     }
+
+    /// Cycle members Ready Fighters leaves cold (picks, not bodies).
+    pub fn short(self) -> u8 {
+        if self.ready_fighters == 0 { 0 } else { self.cold }
+    }
 }
 
 /// The notice describes built and prefetched fighters only. Asset progress remains diagnostic
@@ -264,12 +274,31 @@ pub struct CacheStatus {
     pub blocked: bool,
 }
 
+/// What the notice shows (`CacheStatus::shown_key`), the Ready Fighters suffix (R, N, cold) last.
+type ShownKey = (u8, u8, u8, u8, u8, u8, bool, Option<(u8, u8, u8)>);
+
+/// The notice buffer the status text is formatted into (`cycle_preload::show_status`): the longest text fits.
+pub const TEXT_MAX: usize = 160;
+
 /// A copied status formatter. Creating, displaying and debugging it allocate
 /// nothing; Debug preserves the quoted text used by existing diagnostics.
 #[derive(Clone, Copy)]
 pub struct CacheText(CacheStatus);
 impl std::fmt::Display for CacheText {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.counts(f)?;
+        let fighters = self.0.fighters;
+        match fighters.short() {
+            0 => Ok(()),
+            _ if self.0.progress() == Progress::Hidden => Ok(()),
+            1 => write!(f, " · Ready Fighters {}/{}: 1 stays cold", fighters.ready_fighters, fighters.needed),
+            short => write!(f, " · Ready Fighters {}/{}: {} stay cold", fighters.ready_fighters, fighters.needed, short),
+        }
+    }
+}
+
+impl CacheText {
+    fn counts(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let fighters = self.0.fighters;
         let (loaded, planned, failed) = (fighters.loaded(), fighters.planned, fighters.failed);
         match self.0.progress() {
@@ -355,7 +384,7 @@ impl CacheStatus {
 
     /// What the notice shows, without what changes afterwards for no reader's benefit: a settled
     /// result is the same whether a prefetched group has since been built, so that is no change.
-    fn shown_key(self) -> (u8, u8, u8, u8, u8, u8, bool) {
+    fn shown_key(self) -> ShownKey {
         let (class, swap) = match self.progress() {
             Progress::Hidden => (0, 0),
             Progress::Loading => (1, 0),
@@ -365,8 +394,10 @@ impl CacheStatus {
             Progress::Partial | Progress::Done | Progress::Ready => (4, 0),
         };
         // rc.14 mem-headroom: "waiting for memory" turning into "load after you pause" is a change shown.
+        // Ready Fighters shortfall: the suffix shown (R/N: cold) is part of what the notice shows (review 04:44Z 3).
         (class, self.fighters.loaded(), self.fighters.planned, self.fighters.failed, swap, self.fighters.held,
-            self.fighters.room_at_pause && self.fighters.held > 0)
+            self.fighters.room_at_pause && self.fighters.held > 0,
+            (self.fighters.short() > 0).then_some((self.fighters.ready_fighters, self.fighters.needed, self.fighters.cold)))
     }
 
     pub fn announce(self, shown: Option<Self>, paused_polls: u8) -> bool {
@@ -501,6 +532,41 @@ mod tests {
         assert_eq!(seat_missing(seat3, sources, 3, true, true), None, "a demand pending");
     }
 
+    /// Ready Fighters shortfall (operator 2026-11-20 ~01:22Z): the card's 8 with cycles that need 9 says one stays cold;
+    /// 10 says nothing extra; the notice raises again only when the shortfall changes.
+    fn the_notice_says_when_ready_fighters_leaves_a_member_cold() {
+        let assets = readiness(5, 2, false, [Some(1), Some(2)], NONE, ready_of(&[1, 2]));
+        let eight = BuiltFighters { planned: 6, ready: 6, ready_fighters: 8, needed: 9, cold: 1, ..BuiltFighters::default() };
+        let short = CacheStatus::new(assets, eight, false);
+        assert_eq!(short.text().to_string(), "Ready 6/6 · Ready Fighters 8/9: 1 stays cold");
+        let ten = CacheStatus::new(assets, BuiltFighters { ready_fighters: 10, cold: 0, ..eight }, false);
+        assert_eq!(ten.text().to_string(), "Ready 6/6");
+        assert!(short.announce(Some(ten), 0), "the shortfall appearing is a change shown");
+        assert!(!short.announce(Some(short), 0), "the same shortfall is not raised again");
+        // Review 04:44Z 3: at 6 with six window bodies, one unfitted pick replaced by an unfitted pair: 6/7 to 6/8, still
+        // one cold. The suffix changed, so it is raised again; another unchanged poll stays quiet.
+        let seven = CacheStatus::new(assets, BuiltFighters { ready_fighters: 6, needed: 7, cold: 1, ..eight }, false);
+        let pair = CacheStatus::new(assets, BuiltFighters { ready_fighters: 6, needed: 8, cold: 1, ..eight }, false);
+        assert_eq!(pair.text().to_string(), "Ready 6/6 · Ready Fighters 6/8: 1 stays cold");
+        assert!(pair.announce(Some(seven), 0) && !pair.announce(Some(pair), 0));
+        let six = CacheStatus::new(assets, BuiltFighters { ready_fighters: 6, cold: 3, ..eight }, false);
+        assert_eq!(six.text().to_string(), "Ready 6/6 · Ready Fighters 6/9: 3 stay cold");
+        let loading = CacheStatus::new(assets, BuiltFighters { pending: 2, ready: 4, ..eight }, false);
+        assert_eq!(loading.text().to_string(), "Loading 4/6 · Ready Fighters 8/9: 1 stays cold");
+        let unknown = CacheStatus::new(assets, BuiltFighters { ready_fighters: 0, ..eight }, false);
+        assert_eq!(unknown.text().to_string(), "Ready 6/6");
+        let hidden = CacheStatus::new(assets, BuiltFighters { planned: 0, ready: 0, ..eight }, false);
+        assert_eq!(hidden.text().to_string(), "");
+        // The longest text (every count at its widest, the Waiting text naming the CPU, a hold, the shortfall) still
+        // fits the notice buffer, whose overflow would panic.
+        use crate::engine::swap::body_bank::{Hold, SWAP_CPU};
+        let widest = BuiltFighters { planned: 255, ready: 100, prefetched: 0, failed: 100, pending: 0, swap: SWAP_CPU,
+            held: 45, hold: Some(Hold::Pool), room_at_pause: false, ready_fighters: 100, needed: 255, cold: 155 };
+        let longest = CacheStatus::new(assets, widest, false).text().to_string();
+        assert_eq!(longest, "Loaded 100/255 · swap the CPU to load 10 more (100 failed, 45 waiting for pool space) · Ready Fighters 100/255: 155 stay cold");
+        assert!(longest.len() <= TEXT_MAX, "{} bytes", longest.len());
+    }
+
     fn warm_assets_never_claim_fighters_are_ready() {
         let assets = readiness(5, 2, false, [Some(1), Some(2)], NONE, ready_of(&[1, 2]));
         let planned = BuiltFighters { planned: 3, ..BuiltFighters::default() };
@@ -586,7 +652,7 @@ mod tests {
                 prefetched: total.prefetched + f.prefetched, failed: total.failed + f.failed,
                 pending: total.pending + f.pending, swap: total.swap | counts.swap_owed(role),
                 held: total.held + f.held, hold: crate::engine::swap::body_bank::merge_hold(total.hold, f.hold),
-                room_at_pause: total.room_at_pause || f.room_at_pause };
+                room_at_pause: total.room_at_pause || f.room_at_pause, ..BuiltFighters::default() };
         }
         total
     }
@@ -758,6 +824,7 @@ mod tests {
         crate::test_table::run(&[
             ("a_parked_seat_loads_its_member_even_when_the_other_seat_holds_it", a_parked_seat_loads_its_member_even_when_the_other_seat_holds_it as fn()),
             ("warm_assets_never_claim_fighters_are_ready", warm_assets_never_claim_fighters_are_ready as fn()),
+            ("the_notice_says_when_ready_fighters_leaves_a_member_cold", the_notice_says_when_ready_fighters_leaves_a_member_cold as fn()),
             ("held_fighters_read_waiting_not_failed", held_fighters_read_waiting_not_failed as fn()),
             ("waiting_for_memory_shows_only_when_nothing_is_left_to_free", waiting_for_memory_shows_only_when_nothing_is_left_to_free as fn()),
             ("the_waiting_text_names_the_role_that_must_swap", the_waiting_text_names_the_role_that_must_swap as fn()),

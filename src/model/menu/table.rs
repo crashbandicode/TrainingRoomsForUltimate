@@ -443,7 +443,7 @@ pub static ROWS: [Row; 145] = [
     r(LOADING, "Preload", "cycle_preload_sources", Control::Dropdown(&o::SOURCES),
       "What is kept ready: fighters, Kirby hats, or both."),
     r(LOADING, "Ready Fighters", "cycle_preload_ready_fighters", Control::Number { first: 2, step: 1 },
-      "The total number of fighters kept ready across roles."),
+      "The total number of fighters kept ready across roles,\nincluding the two on screen."),
     r(LOADING, "Ready Hats", "cycle_preload_ready_hats", Control::Number { first: 0, step: 1 },
       "How many Kirby hats are kept ready, apart from the fighters.\nA hat of a ready fighter shares its body."),
     r(LOADING, "Ready Fighter Bodies", "cycle_preload_bank_members", Control::Dropdown(&o::BODIES),

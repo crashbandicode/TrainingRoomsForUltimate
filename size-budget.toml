@@ -2132,3 +2132,11 @@ ceiling = 167312
 date = "2026-11-20"
 reason = "rc.15 Eggs-ercise Spawn area (In view default / Whole stage) and the stage grids' display order (Training next to the Waiting Room; storage indices unchanged): measured +71 normalized lines on 96355cad (165330 to 165401) and again on 629870c5 (165885 to 165956, gate 9536e824-20261120T0219Z). Rebased onto 86341a8b; added to main's 167241: 167312, exact ceiling with no headroom."
 approved_by = "Pending: reported to the primary c07b3449 per RC15-CHANGES-COMMON.md."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 167583
+date = "2026-11-20"
+reason = "Ready Fighters shortfall notice merged onto 6d732d04 (whole admitted cycle walked by slot, kept groups charged, cold picks counted, (R,N,cold) announce key, Player Swapping Off clears the P1 lane; rc15/ready-fighters-shortfall-v2 faf48ee5). Measured +271 on 70f517c9 (166635 to 166906); main had 167312, so 167312 + 271 = 167583."
+approved_by = "Operator 2026-11-20: add the ready fighters fix to this build. Primary c07b3449: REVIEW PASS 06:32Z by review-menu-astra; exact measured delta appended to main tail."
