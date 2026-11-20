@@ -2,6 +2,10 @@ use super::{select, Budget, Facts, Motion, Move, NearReach, Sample, Sequence, CA
 use crate::model::edge_juggle::perfect::recovery::Crossing;
 use crate::model::edge_juggle::perfect::{self, AirPhysics, Route, SpecialReach};
 
+fn tested_row(id: u8) -> &'static super::Row {
+    super::measured_row(id, CANDIDATE_ROWS).expect("row in rc.15 registry")
+}
+
 #[test]
 fn niche_roster_kinds_match_the_approved_plan() {
     use crate::model::fighter_choices::CHOICES;
@@ -21,7 +25,6 @@ fn niche_roster_kinds_match_the_approved_plan() {
         "Sheik",
         "Sheik",
         "Greninja",
-        "Ness",
         "Steve",
         "Pichu",
         "Jigglypuff",
@@ -51,7 +54,8 @@ fn niche_roster_kinds_match_the_approved_plan() {
     ];
     assert_eq!(super::ROWS.len(), fighters.len());
     for (index, (row, fighter)) in super::ROWS.iter().zip(fighters).enumerate() {
-        assert_eq!(usize::from(row.id), index + 1);
+        // The table skips the reserved ID 14.
+        assert_eq!(usize::from(row.id), index + 1 + usize::from(index >= 13));
         let kind = CHOICES
             .iter()
             .find_map(|&(kind, name)| (name == fighter).then_some(kind))
@@ -127,7 +131,7 @@ fn facts(fighter: i32, mode: &str) -> Facts {
 
 #[test]
 fn hard_niche_crossings_need_a_measured_route_even_with_spare_budget() {
-    for (fighter, row, name) in [(0xa, 14, "Ness"), (0x22, 26, "Snake"), (0x26, 35, "Charizard")] {
+    for (fighter, row, name) in [(0x22, 26, "Snake"), (0x26, 35, "Charizard")] {
         let row = super::measured_row(row, CANDIDATE_ROWS).expect("registered candidate row");
         let input = facts(fighter, "cross");
         assert_eq!(row.route, Route::Opposite, "{name}'s route can be tested by a dedicated model");
@@ -298,7 +302,7 @@ fn niche_quick_attack_aims_during_the_pause_before_the_second_warp() {
 
 #[test]
 fn niche_pikachu_thunder_waits_for_its_measured_fall() {
-    let thunder = &super::ROWS[1];
+    let thunder = tested_row(2);
     assert_eq!(
         thunder.moves,
         [Move::ApproachThunder, Move::Down, Move::Hold, Move::QuickAttack].as_slice()
@@ -436,11 +440,6 @@ fn niche_greninja_shadow_sneak_route_and_pad_sequence() {
 }
 
 #[test]
-fn niche_ness_pk_thunder_route_and_pad_sequence() {
-    verify_pad_sequence(super::measured_row(14, CANDIDATE_ROWS).unwrap(), &[Move::Hold, Move::Bolt]);
-}
-
-#[test]
 fn niche_steve_elytra_route_and_pad_sequence() {
     verify_pad_sequence(super::measured_row(15, CANDIDATE_ROWS).unwrap(), &[Move::Hold, Move::Glide]);
 }
@@ -500,7 +499,7 @@ fn niche_bayonetta_twists_once_per_jump() {
         Move::Side,
     ];
     verify(0x40, "cross", 22, &twists);
-    assert!(super::ROWS[21]
+    assert!(tested_row(22)
         .moves
         .windows(2)
         .all(|pair| pair != [Move::Travel, Move::Travel] && pair != [Move::Side, Move::Travel]));
@@ -585,7 +584,7 @@ fn niche_yoshi_egg_throw_route_and_pad_sequence() {
         select(facts(0x4, "cross"), CANDIDATE_ROWS).is_none(),
         "Dark Samus does not own Yoshi's recovery"
     );
-    let mut spent = Sequence::new(&super::ROWS[32]);
+    let mut spent = Sequence::new(tested_row(33));
     spent.step(sample(0, Motion::Free)).expect("the glide ends");
     let no_jump = Sample {
         can_start: false,
@@ -644,7 +643,7 @@ fn niche_near_rows_wait_for_an_extension_need() {
 
 #[test]
 fn niche_hold_jumps_only_below_the_hold_line() {
-    let mut glide = Sequence::new(&super::ROWS[16]);
+    let mut glide = Sequence::new(tested_row(17));
     let level = glide.step(gliding(0, Motion::Free, false)).unwrap();
     assert_eq!(
         (level.stick, level.press),
@@ -692,7 +691,7 @@ fn niche_hold_jumps_only_below_the_hold_line() {
 #[test]
 fn niche_crossing_is_checked_again_before_the_entry() {
     // Pit's glide: the plan fitted, then the fighter was hit lower or lost its jumps outside the ledge.
-    let glide = Sequence::new(&super::ROWS[18]);
+    let glide = Sequence::new(tested_row(19));
     assert!(glide.still_crosses(ROOMY));
     assert!(
         !glide.still_crosses(TIGHT),
@@ -798,7 +797,7 @@ fn niche_requires_stock_transition_and_does_not_spend_an_unaccepted_input_twice(
 
 #[test]
 fn niche_thunder_holds_altitude_on_the_way_to_the_cast() {
-    let mut sequence = Sequence::new(&super::ROWS[1]);
+    let mut sequence = Sequence::new(tested_row(2));
     let approach = Sample {
         at_exit: false,
         hold_over: false,
@@ -907,7 +906,7 @@ fn niche_pyra_starts_the_authored_native_swap_on_horizontal_shortfall() {
 
 #[test]
 fn niche_mythra_commits_to_only_one_special() {
-    let row = &super::ROWS[38];
+    let row = tested_row(39);
     assert_eq!((row.id, row.moves), (39, &[Move::Side][..]));
     let mut level = Sequence::new(row);
     assert_eq!(
@@ -952,7 +951,7 @@ fn niche_skull_bash_budget_counts_the_traced_drop_before_the_glide() {
 
 #[test]
 fn niche_link_does_not_finish_the_bomb_move_after_only_pulling_it() {
-    let mut sequence = Sequence::new(&super::ROWS[26]);
+    let mut sequence = Sequence::new(tested_row(27));
     sequence.step(sample(0, Motion::Free)).expect("pull bomb");
     sequence.step(sample(1, Motion::Starting)).expect("native pull");
     sequence.step(sample(8, Motion::Free));
@@ -971,11 +970,11 @@ fn niche_near_gap_extensions_use_the_full_plain_return() {
 
 #[test]
 fn niche_rob_budget_and_takeoff_allow_the_burner_startup_rise() {
-    let rob = &super::ROWS[6];
+    let rob = tested_row(7);
     let ceiling = -40.0;
     assert!(rob.launch_clears(-65.0, ceiling));
     assert!(!rob.launch_clears(-64.0, ceiling));
-    assert!(super::ROWS[4].launch_clears(-64.0, ceiling));
+    assert!(tested_row(5).launch_clears(-64.0, ceiling));
     let tight_roof = Crossing {
         band: [-63.0, ceiling],
         foot: -58.0,

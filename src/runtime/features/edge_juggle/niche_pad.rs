@@ -435,7 +435,7 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
             }
         }
         (0x27, Barrel, 0x1f0) | (0x9, Missile, 0x1e1) => Charging,
-        (0xa | 0x28, Bolt, 0x1e4) => Charging,
+        (0x28, Bolt, 0x1e4) => Charging,
         (0x5d, SoraChain, 0x1ec | 0x1ed) => AimAgain,
         (0x8, Side, 0x1e3..=0x1e5)
         | (0x8, Down, 0x1e7)
@@ -465,7 +465,7 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
         | (0x58, Glide, 0x20a..=0x20c)
         | (0x5d, SoraChain, 0x1eb)
         | (0x9, Missile, 0x1e2)
-        | (0xa | 0x28, Bolt, 0x1e6)
+        | (0x28, Bolt, 0x1e6)
         | (0x47, Rise, 0x1e6..=0x1e8)
         | (0x5a, Swap, 0x1e1 | 0x1e2)
         | (0x5b, Side, 0x1e9)
@@ -473,7 +473,7 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
         (0x2, Rise, 0x1e3)
         | (0x8 | 0x13, QuickAttack, 0x1e2)
         | (0x8, Side, 0x1e6)
-        | (0xa | 0x28, Bolt, 0x1e5)
+        | (0x28, Bolt, 0x1e5)
         | (0xd | 0xe, Rise, 0x1e4..=0x1e6)
         | (0x10, Down, 0x1ea | 0x1eb)
         | (0x10, Travel, 0x1e8)
@@ -589,15 +589,11 @@ unsafe fn bolt_input(
     direction: f32,
     launch: Point,
 ) -> Option<Point> {
-    if !bolt_reads_granted() {
+    if fighter != 0x28 || !bolt_reads_granted() {
         return None;
     }
     const PK_THUNDER: i32 = 2;
-    let kind = match fighter {
-        0xa => 0x61,
-        0x28 => 0x163,
-        _ => return None,
-    };
+    const LUCAS_THUNDER_KIND: i32 = 0x163;
     if !state::article_is_exist(cpu, PK_THUNDER) {
         // Charge has begun. Wait for the native article to spawn.
         return Some([-direction, 0.0]);
@@ -611,7 +607,7 @@ unsafe fn bolt_input(
         return None;
     }
     let bolt = state::object_accessor(id);
-    if bolt == 0 || natives::fighter_kind(bolt) != Some(kind) {
+    if bolt == 0 || natives::fighter_kind(bolt) != Some(LUCAS_THUNDER_KIND) {
         return None;
     }
     let [x, y] = player;

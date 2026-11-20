@@ -230,7 +230,7 @@ impl Intent {
 use Move::*;
 // A crossing glides and holds its height first. A special that ends in special
 // fall (SmashWiki "Helpless") is the row's last move; a jump is never burst at the entry.
-const ROWS: [Row; 40] = [
+const ROWS: [Row; 39] = [
     Row::new(1, 0x8, Intent::Across, &[Hold, QuickAttack]),
     Row::new(2, 0x8, Intent::ThunderOverhead, &[ApproachThunder, Down, Hold, QuickAttack]),
     Row::new(3, 0x8, Intent::LongApproach, &[Side, Jump, QuickAttack]),
@@ -245,7 +245,7 @@ const ROWS: [Row; 40] = [
     Row::new(11, 0x10, Intent::Near, &[Down, Rise]),
     Row::new(12, 0x10, Intent::Across, &[Hold, Travel]),
     Row::new(13, 0x35, Intent::Across, &[ChargedSide, Hold, Travel]),
-    Row::new(14, 0xa, Intent::Across, &[Hold, Bolt]),
+    // ID 14 stays reserved for the out-of-scope Ness experiment.
     Row::new(15, 0x58, Intent::Across, &[Hold, Glide]),
     Row::new(16, 0x13, Intent::Across, &[Hold, QuickAttack]),
     Row::new(17, 0xc, Intent::Across, &[Hold]),
@@ -276,11 +276,18 @@ const ROWS: [Row; 40] = [
     Row::new(40, 0x5b, Intent::GenericUp, &[Jump, Rise]),
 ];
 
-pub const CANDIDATE_ROWS: u64 = (1 << ROWS.len()) - 1;
+pub const CANDIDATE_ROWS: u64 = {
+    let mut mask = 0;
+    let mut index = 0;
+    while index < ROWS.len() {
+        mask |= 1 << (ROWS[index].id - 1);
+        index += 1;
+    }
+    mask
+};
 
 pub fn measured_row(id: u8, enabled: u64) -> Option<&'static Row> {
-    let index = id.checked_sub(1)?;
-    ROWS.get(usize::from(index)).filter(|row| row.id == id && enabled & (1 << index) != 0)
+    ROWS.iter().find(|row| row.id == id && enabled & (1 << (row.id - 1)) != 0)
 }
 
 pub fn select(facts: Facts, enabled: u64) -> Option<&'static Row> {
