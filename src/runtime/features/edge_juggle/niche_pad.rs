@@ -198,7 +198,7 @@ impl NicheGuide {
             }
             hold_over = at_exit;
             if movement == Move::Hold && !at_exit {
-                let air = air_physics(cpu);
+                let air = crossing.air;
                 let rise = air.jump_speed.powi(2) / (2.0 * air.gravity);
                 // A jump from the hold line peaks at the band top; a taller jump waits for the exit.
                 low = air.valid() && rise <= top - bottom && y < top - rise;
