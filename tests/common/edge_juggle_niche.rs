@@ -791,3 +791,20 @@ fn niche_near_extensions_require_valid_reach_and_a_plausible_entry() {
     mythra.near = mythra.near.map(|reach| NearReach { can_jump: false, ..reach });
     assert!(select(mythra, CANDIDATE_ROWS).is_none());
 }
+
+#[test]
+fn niche_skull_bash_budget_counts_the_traced_drop_before_the_glide() {
+    let start = Crossing {
+        band: [-110.0, -39.0],
+        foot: -49.72,
+        ..ROOMY.crossing
+    };
+    let input = Facts {
+        budget: Some(Budget { crossing: start, ..ROOMY }),
+        corridor: Some(start.band),
+        ..facts(0x8, "long")
+    };
+    let skull_bash_only = 1 << (3 - 1);
+    assert!(select(input, skull_bash_only).is_none());
+    assert_eq!(select(facts(0x8, "long"), skull_bash_only).unwrap().id, 3);
+}
