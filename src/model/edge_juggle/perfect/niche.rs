@@ -209,7 +209,9 @@ impl Intent {
             // After that approach the arc falls; the long run to the first free
             // frame ended at y=-129.511. Budget only the measured early rise.
             Self::HaymakerGap => {
-                short && near.gap <= 35.5 && near.climb <= near.special.rise + 10.0
+                (short || near.ledge_covered && near.climb > 0.0)
+                    && near.gap <= 35.5
+                    && near.climb <= near.special.rise + 10.0
             }
             Self::WhipGap => short && !in_column && near.climb <= near.body,
             Self::SwapGap => short && !in_column,

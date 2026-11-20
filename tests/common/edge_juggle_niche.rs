@@ -372,6 +372,7 @@ fn niche_haymaker_can_take_the_proven_approach_to_a_covered_ledge() {
     // fd-3: (-99.993, -27.595), ledge near x=-81. P1 guarded from the inside.
     assert_eq!(check(19.0, 27.595, true), Some(9));
     assert_eq!(check(19.0, 27.595, false), None);
+    assert_eq!(check(19.0, -20.0, true), None);
     // fd-1: outside Haymaker's measured useful arc even if P1 is now nearby.
     assert_eq!(check(56.0, 58.0, true), None);
     assert_eq!(check(25.0, 58.0, true), None);
