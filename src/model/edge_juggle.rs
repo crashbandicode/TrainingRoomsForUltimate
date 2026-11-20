@@ -215,6 +215,20 @@ mod tests {
     }
 
     #[test]
+    fn edge_wizard_four_areas() {
+        let stage = Stage::new([-160.0, 150.0, 110.0, -85.0], [-160.0, 150.0, 110.0, -85.0], [[-60.0, 5.0], [80.0, 8.0]]).unwrap();
+        for (area, start, expected) in [
+            (Area::LowerLeft, [300.0, 70.0], [-61.0, 5.0]),
+            (Area::LowerRight, [0.0, -100.0], [81.0, -84.0]),
+            (Area::UpperLeft, [0.0, -20.0], [-61.0, 5.0]),
+            (Area::UpperRight, [200.0, 180.0], [149.0, 109.0]),
+        ] {
+            assert_eq!(stage.edge_start(area, start), Some(expected));
+        }
+        assert_eq!(stage.edge_start(Area::LowerLeft, [f32::NAN, 0.0]), None);
+    }
+
+    #[test]
     fn edge_scores_ko_and_waits_for_respawn() {
         let mut session = release(Drill::GuardEdge, None);
         let dead = Observation { dead_or_rebirthing: true, ..Observation::default() };
