@@ -574,7 +574,17 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     let (eggs_orbs, marks) = (RUN.lock().look(active, || view()), btt::look(active, || view()));
     let mut own = [None; 3 + btt::LOOKS];
     own[..3].copy_from_slice(&eggs_orbs);
-    let marks = if super::tech::running() { super::tech::look(active) } else { marks };
+    let tech = super::tech::running();
+    // rc.15 target-hurtbox-display: the live targets' break volumes (the picture discs), drawn as hurtboxes below. Spacing
+    // grader hook: its rings take these discs (`orbs::target_hurt_orbs`) rather than drawing a second one.
+    let hurt_on = SETTING.load(Ordering::Acquire) && legend::shows(SHOWN.load(Ordering::Acquire), hitbox::KIND_HURT);
+    let mut targets = [Orb::NONE; 1 + crate::model::btt::MAX];
+    let mut n_targets = 0;
+    if hurt_on && !tech {
+        n_targets = orbs::target_hurt_orbs(&own[..3], &mut targets);
+        n_targets += orbs::target_hurt_orbs(&marks, &mut targets[n_targets..]);
+    }
+    let marks = if tech { super::tech::look(active) } else { marks };
     own[3..].copy_from_slice(&marks);
     let mut cache = ORB_PANES.lock();
     let registrations = tick::REGISTRATIONS.load(Ordering::Acquire);
@@ -647,9 +657,12 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         keep_panes = on && board.is_none() && hide.is_visible();
         // Hitboxes and grabs take the panes first. Uncertain snapshots yield no fighter panes this tick.
         let bits = SHOWN.load(Ordering::Acquire);
+        // A busy board keeps the last frame's panes: no target cap may overwrite a fighter's retained one.
+        let target_hurts = targets[..orbs::targets_drawn(board.is_some(), hurt_on, n_targets)].iter();
         for orb in board
             .iter()
             .flat_map(|b| b.draw_slots_in_order(b.draw_slots(&hide)))
+            .chain(target_hurts)
             .filter(|o| legend::shows(bits, o.kind()))
         {
             let Some(pill) = plan(orb, orb.color) else { continue };
@@ -856,7 +869,8 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
     };
     let items = (0..count).map(|i| state_natives::item_active(manager, i)).filter(|&item| item != 0).map(|item| state_natives::item_object_id(item));
     let instances = hitbox::article_instances(hurt, |kind, ordinal| state_natives::article_get_from_no(owner, kind, ordinal)).map(|article| state_natives::article_object_id(article));
-    for id in items.chain(instances).filter(|&id| state_natives::object_is_active(id)) {
+    // The lock-on helpers are never drawn: a target's hurtbox is its picture disc (`orbs::target_hurt_orbs`).
+    for id in items.chain(instances).filter(|&id| state_natives::object_is_active(id) && !super::lockon::is_helper(id)) {
         let key = smash::app::sv_battle_object::module_accessor(id) as usize;
         if key == 0 {
             continue;

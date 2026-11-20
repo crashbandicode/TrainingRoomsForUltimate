@@ -530,6 +530,41 @@ fn a_hurtbox_without_a_valid_bone_scale_is_not_drawn() {
     }
 }
 
+/// rc.15 target-hurtbox-display: a live target's hurtbox is its break volume, the R = 4 picture disc at its spot, drawn as a
+/// hurtbox; break animations and the cursor get none.
+fn a_live_targets_hurtbox_is_its_picture_disc() {
+    use model::panes::{EggPicture, EGG_WHOLE};
+    let mut burst = EGG_WHOLE;
+    burst.scale = 1.6;
+    let mut cursor = EGG_WHOLE;
+    cursor.picture = EggPicture::Cursor;
+    let looks = [Some(([1.0, 2.0], EGG_WHOLE)), Some(([5.0, 6.0], burst)), None, Some(([3.0, 4.0], cursor)), Some(([-8.0, 9.0], EGG_WHOLE))];
+    let mut out = [Orb::NONE; 8];
+    let n = orbs::target_hurt_orbs(&looks, &mut out);
+    assert_eq!(n, 2);
+    for (orb, at) in out[..n].iter().zip([[1.0, 2.0, 0.0], [-8.0, 9.0, 0.0]]) {
+        assert_eq!((orb.centre, orb.tail, orb.radius, orb.kind()), (at, at, model::eggs::RADIUS, hitbox::KIND_HURT));
+        assert_eq!(orb.color, model::panes::linear(orbs::tint_colour(hitbox::HURTBOX_TINT, orbs::ORB_ALPHA)));
+    }
+    assert_eq!(orbs::target_hurt_orbs(&looks, &mut out[..1]), 1, "as many as fit");
+}
+
+/// rc.15 target-hurtbox-display review: a fighter's capsule drawn in an earlier frame, then a busy board with a live target:
+/// that tick draws no target disc, so it takes no pane and the fighter's retained panes are unchanged.
+fn a_busy_board_tick_leaves_the_fighters_panes_to_the_target() {
+    let mut earlier = orbs::PaneUse::default();
+    assert!(earlier.take(true).is_some(), "the capsule took a cap pair and a band");
+    let mut target = [Orb::NONE; 1];
+    let n = orbs::target_hurt_orbs(&[Some(([3.0, 4.0], model::panes::EGG_WHOLE))], &mut target);
+    assert_eq!((orbs::targets_drawn(true, true, n), orbs::targets_drawn(true, false, n)), (1, 0), "held: drawn when ticked");
+    let mut busy = orbs::PaneUse::default();
+    for _ in 0..orbs::targets_drawn(false, true, n) {
+        busy.take(false);
+    }
+    assert_eq!((busy.caps, busy.bands), (0, 0), "a busy tick writes no cap over the retained capsule");
+    assert_eq!((earlier.caps, earlier.bands), (2, 1), "the capsule's panes stay as the earlier frame wrote them");
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -550,6 +585,8 @@ fn case_table() {
         ("projected_orbs_map_onto_the_layout_canvas", projected_orbs_map_onto_the_layout_canvas as fn()),
         ("a_hurtbox_orb_is_its_size_at_the_bones_world_scale", a_hurtbox_orb_is_its_size_at_the_bones_world_scale as fn()),
         ("a_hurtbox_without_a_valid_bone_scale_is_not_drawn", a_hurtbox_without_a_valid_bone_scale_is_not_drawn as fn()),
+        ("a_live_targets_hurtbox_is_its_picture_disc", a_live_targets_hurtbox_is_its_picture_disc as fn()),
+        ("a_busy_board_tick_leaves_the_fighters_panes_to_the_target", a_busy_board_tick_leaves_the_fighters_panes_to_the_target as fn()),
     ]);
 }
 

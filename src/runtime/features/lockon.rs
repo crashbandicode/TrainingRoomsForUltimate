@@ -1,14 +1,14 @@
 //! A native search target for each breakable target in ordinary Training.
 
 use core::cell::RefCell;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use smash::app::{self, lua_bind::*, sv_battle_object, BattleObjectModuleAccessor as Accessor};
 use smash::lib::lua_const::*;
 use smash::phx::Vector3f;
 
 use crate::model::{
     btt, eggs, hitbox,
-    lockon::{free_slot_top, take_damage, ItemHost, Target, Tracker},
+    lockon::{free_slot_top, names_helper, take_damage, ItemHost, Target, Tracker},
     lra_reset,
     practice_games::Game,
     sites_lockon::{ITEM_FACTORY_OFFSET, OBJECT_POOLS_SLOT},
@@ -45,6 +45,18 @@ struct GameItems(RefCell<Tracker<Handle, COUNT>>);
 // call reentering that callback cannot borrow the items a second time.
 unsafe impl Sync for GameItems {}
 static LIVE: GameItems = GameItems(RefCell::new(Tracker::new()));
+/// The tracker's items' ids (0: an empty slot) and their scene, for the visualizer, which never draws them.
+static HELPERS: [AtomicU32; COUNT] = [const { AtomicU32::new(0) }; COUNT];
+static HELPER_SCENE: AtomicU32 = AtomicU32::new(0);
+static ANY_HELPER: AtomicBool = AtomicBool::new(false);
+
+pub fn is_helper(id: u32) -> bool {
+    if !ANY_HELPER.load(Ordering::Acquire) {
+        return false;
+    }
+    let ids = HELPERS.each_ref().map(|h| h.load(Ordering::Relaxed));
+    names_helper(&ids, HELPER_SCENE.load(Ordering::Relaxed), lra_reset::GENERATION.load(Ordering::Acquire), id)
+}
 
 pub fn set_usable(usable: bool) {
     USABLE.store(usable, Ordering::Release);
@@ -245,4 +257,11 @@ pub unsafe fn update_practice_items(fighter: usize) {
             spawn: true,
         },
     );
+    // The visualizer leaves out exactly the slots' items, for this scene only (review: stale ids after a scene change).
+    let ids = tracker.ids(|item| item.id);
+    for (published, id) in HELPERS.iter().zip(ids) {
+        published.store(id, Ordering::Relaxed);
+    }
+    HELPER_SCENE.store(tracker.scene(), Ordering::Relaxed);
+    ANY_HELPER.store(ids.iter().any(|&id| id != 0), Ordering::Release);
 }
