@@ -304,7 +304,11 @@ impl LivePerfect {
 }
 
 pub(super) unsafe fn player_height_request(player: usize) -> Option<LivePerfect> {
-    if states::is_loading() || natives::module_accessor(0) != Some(player) || !natives::is_fighter(player) {
+    if !INSTALLED.load(Ordering::Acquire)
+        || states::is_loading()
+        || natives::module_accessor(0) != Some(player)
+        || !natives::is_fighter(player)
+    {
         return None;
     }
     let mut engine = ENGINE.try_lock()?;

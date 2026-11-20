@@ -69,6 +69,7 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "edge_juggle::frame", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("INSTALLED") },
     Boundary { function: "edge_juggle::controls_cpu", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("INSTALLED") },
     Boundary { function: "edge_juggle::ai_correction", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("INSTALLED") },
+    Boundary { function: "edge_juggle::player_height_request", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("INSTALLED") },
     Boundary { function: "cpu_level::poll_drill", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("DRILL_BEHAVIOR") },
     // The save-state step of the per-fighter frame wrapper: a no-op until boot activates package 3.
     Boundary { function: "states::frame", owner: Some(Feature::StateCore), gate: Gate::Flag("ACTIVE") },
