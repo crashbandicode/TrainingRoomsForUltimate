@@ -93,6 +93,31 @@ pub fn snapshot(view: &View<'_>, out: &mut String) -> bool {
     complete
 }
 
+/// The table header the provider accepts (ssbu-hw-bridge PLUGIN-STATE.md §2): this magic and ABI, exactly the declared
+/// size of the table it knows, one reader, the publish bound, and exactly the contract's eight provider slots.
+pub fn header_usable(magic: u32, abi: u32, struct_size: u32, readers: u32, max_payload: u32, max_providers: u32, table_size: usize) -> bool {
+    magic == u32::from_le_bytes(*b"BRST")
+        && abi == 1
+        && struct_size as usize == table_size
+        && readers == 1
+        && max_payload as usize == MAX
+        && max_providers == PROVIDER_SLOTS
+}
+
+/// The contract's provider slot count.
+pub const PROVIDER_SLOTS: u32 = 8;
+
+/// `ack.result` for the handler's own outcome.
+pub fn ack_result(handled: bool) -> &'static str {
+    if handled { "handled" } else { "ignored" }
+}
+
+/// The notice the snapshot reports: the last painted one while the HUD shows the slot, none while it is hidden (menu
+/// open) or after the notice expired.
+pub fn shown_notice<'a>(visible: bool, painted: (&'a str, &'a str)) -> Option<(&'a str, &'a str)> {
+    (visible && !(painted.0.is_empty() && painted.1.is_empty())).then_some(painted)
+}
+
 /// `scene` from the UI tick's stamp (`uptime_ms << 2 | kind`): "training", "lobby", or "" when the practice layout has
 /// not passed for more than `fresh_ms`.
 pub fn scene_name(stamp: u64, now_ms: u64, fresh_ms: u64) -> &'static str {

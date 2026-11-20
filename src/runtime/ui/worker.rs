@@ -378,7 +378,7 @@ fn publish_bridge_state(s: &mut Session) {
             game_running: crate::runtime::features::practice::running().is_some(),
             notice: (!notice.0.is_empty()).then_some((notice.0.as_str(), notice.1.as_str())),
             ack,
-            ack_result: "handled",
+            ack_result: crate::runtime::bridge_state::ack_result(),
             scene: crate::runtime::bridge_state::scene(now),
             rows_omitted: true,
             ..Default::default()
@@ -545,13 +545,14 @@ fn press(button: Button, s: &mut Session) {
     if popup && !open {
         if let Some(menu) = s.menu.as_mut() {
             menu.set_console(console_mode());
-            menu.press(button);
+            let handled = menu.press_outcome(button);
+            crate::runtime::bridge_state::note_ack(handled);
             post_recording_effect(menu, version);
         }
         return;
     }
     if s.pending_close.is_some() { return; }
-    crate::runtime::bridge_state::note_ack();
+    let mut handled = true;
     s.refusal = None;
     s.setup_note = None;
     let mut editor_request = None;
@@ -585,7 +586,7 @@ fn press(button: Button, s: &mut Session) {
                 }
             }
         } else {
-            m.press(button);
+            handled = m.press_outcome(button);
             // Eden reads where each press left the cursor (the section jump, the remembered place).
             if crate::runtime::export::wanted() {
                 diagnostic(format_args!("[Ui] press {button:?} page={} cursor={} depth={} screen={:?} row={:?} recording={}",
@@ -623,6 +624,7 @@ fn press(button: Button, s: &mut Session) {
         }
         m.is_closed()
     };
+    crate::runtime::bridge_state::note_ack(handled);
     // Cancellation/close invalidates every remaining poll (and the rest of this
     // poll), before it can publish an old editor's effect into a later opening.
     if INPUT.generation() != s.input_generation { return; }

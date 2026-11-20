@@ -137,3 +137,36 @@ fn omitted_rows_are_marked_incomplete() {
     assert!(!snapshot(&view, &mut out));
     assert!(out.contains("rows.count=0\nrows.complete=0\nrows="), "{out}");
 }
+
+#[test]
+fn the_header_must_declare_exactly_this_table_and_eight_slots() {
+    let ok = |size: u32, slots: u32| header_usable(u32::from_le_bytes(*b"BRST"), 1, size, 1, MAX as u32, slots, 48);
+    assert!(ok(48, 8));
+    assert!(!ok(56, 8), "a larger declared table is not this ABI");
+    assert!(!ok(40, 8), "nor a smaller one");
+    assert!(!ok(48, 1), "one slot is not the contract");
+    assert!(!ok(48, 16));
+    assert!(!header_usable(0, 1, 48, 1, MAX as u32, 8, 48), "magic");
+}
+
+#[test]
+fn a_notice_is_reported_only_while_the_hud_shows_it() {
+    use crate::model::notify::{Body, Queue};
+    let mut queue = Queue::default();
+    queue.post("Eggs", Body::copied("Eggs 1"), 3, [255; 4]);
+    let shown = |out: &crate::model::notify::TickOut, painted: (&'static str, &'static str)| shown_notice(out.visible, painted);
+    let first = queue.tick(true, false);
+    assert!(first.visible && first.draw.is_some());
+    assert_eq!(shown(&first, ("Eggs", "Eggs 1")), Some(("Eggs", "Eggs 1")));
+    let hidden = queue.tick(true, true);
+    assert_eq!(shown(&hidden, ("Eggs", "Eggs 1")), None, "the menu open hides it");
+    let again = queue.tick(true, false);
+    assert!(again.draw.is_none(), "unchanged: nothing is repainted");
+    assert_eq!(shown(&again, ("Eggs", "Eggs 1")), Some(("Eggs", "Eggs 1")), "visible and unchanged: kept");
+    let mut last = queue.tick(true, false);
+    for _ in 0..4 {
+        last = queue.tick(true, false);
+    }
+    assert_eq!(shown(&last, ("Eggs", "Eggs 1")), None, "expired");
+    assert_eq!((ack_result(true), ack_result(false)), ("handled", "ignored"));
+}

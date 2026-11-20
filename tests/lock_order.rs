@@ -111,7 +111,7 @@ const FOREIGN_RECEIVERS: &[(&str, &[&str], &str)] = &[
         "Mash out row 121's model::mashout::entry::TechAttempt (mashout::tech_entering) wraps model::tech::session::Session::tick, \
          which takes no lock",
     ),
-    ("press", &["editor", "list", "m", "menu"], PANELS),
+    ("press", &["editor", "list", "m"], PANELS),
     ("view", &["bundle", "editor", "extras", "ui"], PANELS),
     ("target", &["active", "cycle", "editor", "proof"], "combos::Ui::target is private to ui/combos.rs"),
     (

@@ -10,21 +10,27 @@ use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use crate::model::bridge_state as m;
 use crate::model::menu::table::{Control, Row};
 
-/// The bridge's table (ssbu-hw-bridge `state::StateApiV1`, C ABI). Pointers are `Option`, so a null one is seen.
+/// The table's fixed header, read and checked before the whole table is.
 #[repr(C)]
-struct Api {
+struct Header {
     magic: u32,
     abi: u32,
     struct_size: u32,
     readers: u32,
     max_payload: u32,
     max_providers: u32,
+}
+
+/// The bridge's table (ssbu-hw-bridge `state::StateApiV1`, C ABI). Pointers are `Option`, so a null one is seen.
+#[repr(C)]
+struct Api {
+    /// Read through `Header` before the table is formed.
+    _header: Header,
     register_provider: Option<extern "C" fn(*const u8, u32, u32, u32) -> i32>,
     publish: Option<extern "C" fn(i32, *const u8, u32) -> i32>,
     event: Option<extern "C" fn(i32, *const u8, u32) -> i32>,
 }
 
-const MAGIC: u32 = u32::from_le_bytes(*b"BRST");
 const SYMBOL: &[u8] = b"ssbu_hw_bridge_state_api_v1\0";
 
 /// Off once the lookup window ended without a bridge (or its table was unusable): every entry point returns at once.
@@ -37,7 +43,7 @@ const SCENE_FRESH_MS: u64 = 500;
 
 /// The UI tick passed its practice-layout check (`lobby` for the waiting room's practice).
 pub fn note_scene(lobby: bool) {
-    if ENABLED.load(Ordering::Relaxed) {
+    if FOUND.load(Ordering::Relaxed) {
         SCENE_AT.store(crate::runtime::clock::uptime_ms() << 2 | if lobby { 2 } else { 1 }, Ordering::Relaxed);
     }
 }
@@ -46,8 +52,11 @@ pub fn scene(now_ms: u64) -> &'static str {
     m::scene_name(SCENE_AT.load(Ordering::Relaxed), now_ms, SCENE_FRESH_MS)
 }
 
-/// Inputs the menu handled this boot (the snapshot's `ack`).
+/// Inputs the menu dispatched this boot (the snapshot's `ack`), and whether the last one acted (`ack.result`).
 static ACK: AtomicU64 = AtomicU64::new(0);
+static ACK_HANDLED: AtomicBool = AtomicBool::new(true);
+/// Whether the HUD shows the notice slot now (hidden with the menu open, gone once the notice expires).
+static NOTICE_VISIBLE: AtomicBool = AtomicBool::new(false);
 
 /// The current notice, written by the game thread, read by the worker; whoever finds it busy skips (never waits).
 struct Notice {
@@ -74,10 +83,22 @@ pub fn poll_interval() -> Option<std::time::Duration> {
     Some(std::time::Duration::from_millis(if FOUND.load(Ordering::Relaxed) { 33 } else { 1_000 }))
 }
 
-/// One input the menu handled (the snapshot's `ack` advances).
-pub fn note_ack() {
+/// One input the menu dispatched, after its handler ran: `ack` advances and `ack.result` is the handler's own outcome.
+pub fn note_ack(handled: bool) {
     if FOUND.load(Ordering::Relaxed) {
-        ACK.fetch_add(1, Ordering::Relaxed);
+        ACK_HANDLED.store(handled, Ordering::Relaxed);
+        ACK.fetch_add(1, Ordering::Release);
+    }
+}
+
+pub fn ack_result() -> &'static str {
+    m::ack_result(ACK_HANDLED.load(Ordering::Relaxed))
+}
+
+/// The HUD's notice slot visibility each tick (game thread): one atomic store, after one relaxed load without a bridge.
+pub fn note_notice_visible(visible: bool) {
+    if FOUND.load(Ordering::Relaxed) {
+        NOTICE_VISIBLE.store(visible, Ordering::Relaxed);
     }
 }
 
@@ -154,7 +175,9 @@ impl Provider {
             return;
         };
         read_notice(&mut self.notice.0, &mut self.notice.1);
-        view(&self.notice, ACK.load(Ordering::Relaxed), &mut self.snapshot);
+        let shown = m::shown_notice(NOTICE_VISIBLE.load(Ordering::Relaxed), (self.notice.0.as_str(), self.notice.1.as_str()));
+        let notice = shown.map_or((String::new(), String::new()), |(h, b)| (h.to_string(), b.to_string()));
+        view(&notice, ACK.load(Ordering::Acquire), &mut self.snapshot);
         if !self.publisher.wants(self.snapshot.as_bytes()) {
             return;
         }
@@ -173,17 +196,16 @@ impl Provider {
         // SAFETY: the bridge's exported getter, `extern "C" fn() -> *const Api`.
         let getter: extern "C" fn() -> *const Api = unsafe { core::mem::transmute(address) };
         let table = getter();
-        // SAFETY: checked non-null; the bridge keeps its table for the boot.
-        let Some(api) = (unsafe { table.as_ref() }) else { return self.discovery.disable() };
-        let usable = api.magic == MAGIC
-            && api.abi == 1
-            && api.struct_size as usize >= core::mem::size_of::<Api>()
-            && api.readers == 1
-            && api.max_payload as usize == m::MAX
-            && api.max_providers >= 1
-            && api.register_provider.is_some()
-            && api.publish.is_some()
-            && api.event.is_some();
+        // SAFETY: checked non-null; only the fixed header is read until it says the whole table is this ABI and size.
+        let Some(header) = (unsafe { table.cast::<Header>().as_ref() }) else { return self.discovery.disable() };
+        if !m::header_usable(header.magic, header.abi, header.struct_size, header.readers, header.max_payload, header.max_providers,
+            core::mem::size_of::<Api>())
+        {
+            return self.discovery.disable();
+        }
+        // SAFETY: the header declared exactly this table; the bridge keeps it for the boot.
+        let api = unsafe { &*table };
+        let usable = api.register_provider.is_some() && api.publish.is_some() && api.event.is_some();
         let Some(register) = api.register_provider.filter(|_| usable) else { return self.discovery.disable() };
         let handle = register(m::NAME.as_ptr(), m::NAME.len() as u32, m::SCHEMA_ID, m::SCHEMA_VERSION);
         if handle < 0 {
