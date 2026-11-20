@@ -983,6 +983,10 @@ impl Settings {
         Self { on: true, spots: false, grader: false }
     }
 
+    pub const fn samples(self, parry: bool) -> bool {
+        self.on || parry
+    }
+
     pub fn from_snapshot(snapshot: &super::settings::Snapshot) -> Self {
         let on = snapshot
             .get(ROW)

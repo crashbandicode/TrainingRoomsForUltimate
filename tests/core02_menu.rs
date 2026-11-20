@@ -127,6 +127,18 @@ fn the_spot_rows_sit_next_to_their_features() {
     }
 }
 
+fn spacing_grader_row_after_hitbox_visualization() {
+    let hitbox = ROWS.iter().position(|row| row.id == "hitbox_vis").expect("Hitbox Visualization row");
+    let row = &ROWS[hitbox + 1];
+    assert_eq!((row.id, row.title), ("spacing_grader", "Spacing grader"));
+    assert!(matches!(row.control, Control::Toggle));
+    assert_eq!(row.group, ROWS[hitbox].group);
+    assert_eq!(
+        row.help,
+        "On: each hit P1 or P2 lands is graded by depth: Excellent at the\nhurtbox edge, Good slightly inside, OK at the centre."
+    );
+}
+
 /// rc.15: six visible items retain seven stored slots; the colour-mode slot is retired.
 fn legend_hitbox_visualization_is_one_checklist() {
     let row = ROWS.iter().find(|r| r.id == "hitbox_vis").expect("the row");
@@ -1222,6 +1234,7 @@ fn case_table() {
         ("state_change_resets_invalid_move_and_config_rejects_conflict", state_change_resets_invalid_move_and_config_rejects_conflict as fn()),
         ("not_mashable_rows_are_greyed_skipped_and_never_confirmed", not_mashable_rows_are_greyed_skipped_and_never_confirmed as fn()),
         ("the_spot_rows_sit_next_to_their_features", the_spot_rows_sit_next_to_their_features as fn()),
+        ("spacing_grader_row_after_hitbox_visualization", spacing_grader_row_after_hitbox_visualization as fn()),
         ("legend_hitbox_visualization_is_one_checklist", legend_hitbox_visualization_is_one_checklist as fn()),
         ("hitbox_visible_options_keep_their_storage_bits_and_zl_toggles_all_six", hitbox_visible_options_keep_their_storage_bits_and_zl_toggles_all_six as fn()),
         ("core02_table_carriage_return", core02_table_carriage_return as fn()),

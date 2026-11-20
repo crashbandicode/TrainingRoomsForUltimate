@@ -359,6 +359,23 @@ fn the_spot_labels_row_reads_its_setting() {
     assert!(Settings::from_snapshot(&snapshot).on, "the strip itself is unchanged");
 }
 
+fn spacing_grader_default_off() {
+    let mut snapshot = crate::model::settings::Snapshot::factory();
+    assert_eq!(snapshot.get(crate::model::spacing::ROW), Some(&[0, 1][..]));
+    assert!(!Settings::from_snapshot(&snapshot).grader);
+    snapshot.set(crate::model::spacing::ROW, &[1, 0]).unwrap();
+    assert!(Settings::from_snapshot(&snapshot).grader);
+}
+
+fn strip_samples_while_grader_on() {
+    let settings = Settings { on: false, grader: true, ..Settings::factory() };
+    assert!(settings.samples(false));
+    let off = Settings { on: false, grader: false, ..Settings::factory() };
+    assert!(off.samples(true), "Parry keeps sampling while the strip is Off");
+    assert!(!off.samples(false));
+    assert!(strip_owns_advantage(true, settings.samples(false), true));
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -380,6 +397,8 @@ fn case_table() {
         ("a_weaker_hit_later_in_the_same_action_is_late", a_weaker_hit_later_in_the_same_action_is_late as fn()),
         ("a_link_remembers_the_spot_of_its_follow_up_hit", a_link_remembers_the_spot_of_its_follow_up_hit as fn()),
         ("the_spot_labels_row_reads_its_setting", the_spot_labels_row_reads_its_setting as fn()),
+        ("spacing_grader_default_off", spacing_grader_default_off as fn()),
+        ("strip_samples_while_grader_on", strip_samples_while_grader_on as fn()),
     ]);
 }
 }

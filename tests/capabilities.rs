@@ -113,6 +113,7 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "input_display::reaction_left", owner: Some(Feature::CpuTech), gate: Gate::Flag("REACTION_ON") },
     // A saved combo's "recorded on": the CPU core unit's utility_get_kind row (boot sets the flag from that unit's closure).
     Boundary { function: "input_display::p1_fighter", owner: Some(Feature::CpuCore), gate: Gate::Flag("KIND_ON") },
+    Boundary { function: "input_display::lane_player", owner: Some(Feature::CpuCore), gate: Gate::Flag("KIND_ON") },
     // The native hurt-shape read is optional; boot sets its flag only when every grader row passed.
     Boundary { function: "input_display::contact", owner: Some(Feature::InputDisplay), gate: Gate::Flag("GRADE_ON") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.
