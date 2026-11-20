@@ -2,10 +2,11 @@
 
 The stock CPU's recovery and juggle-escape logic is mapped statically from the game's own symbols. It explains the
 public, well-known weaknesses: the CPU always heads for the nearer ledge, air dodges only near it, and drifts toward the
-opponent when juggled. TrainingRooms (TR) already has the two primitives a "build on the vanilla CPU" Perfect mode needs:
-a per-frame hook right after the stock AI writes its pad, and placement of any body. **Not yet done:** the Eden traces
-that confirm the code paths at run time. Both Eden hosts were full with rc.15 work. The trace plan is in §6 and runs on
-the exact release when a slot frees.
+opponent when juggled. **An Eden trace of the exact release (P0, §5b) confirmed the recovery findings (R1, R3), refined
+R2, and supported J1.** TrainingRooms (TR) already has the two primitives a "build on the vanilla CPU" Perfect mode needs:
+a per-frame hook right after the stock AI writes its pad, and placement of any body. **Still open:** far/low starts
+that force up special, real edge-guarding pressure (R5 and the danger delay), and juggle rates (one juggle start so far).
+The next rows are in §5b.
 
 Sources: stock 13.0.5 `main` and `lua2cpp_common.nro` from the operator's dump, read with headless Ghidra and llvm-objdump
 (evidence/static/STATIC-FINDINGS.md has every address); TR read-only at /home/intpa/tr-fixes-20261113/integration
@@ -65,9 +66,9 @@ and an air dodge on the first actionable frame after a meteor bounce.
 
 | # | Shortcoming | Evidence now | Correction (DESIGN §4) |
 | --- | --- | --- | --- |
-| R1 | Always the nearer ledge; never high, never late-low | static (goal finder), public | Route mix chosen against P1's position |
-| R2 | Fixed-height jump timing, gravity-blind | static (r-jump timing), public (amiibo note) | Jump from a reach model, early when far |
-| R3 | No air dodge for distance | static (0.75 × slide gate), public | Insert a directional air dodge when it reaches the ledge and nothing else does |
+| R1 | Always the nearer ledge; never high, never late-low | **trace (P0): goal (±80, 0) on every attempt**, static, public | Route mix chosen against P1's position |
+| R2 | Jump timing always the same (trace: first actionable frame from below the ledge, identical paths) | **trace (P0)**, static, public | Vary the timing; jump from a reach model (delay when safe, early when far) |
+| R3 | No air dodge for distance | **trace (P0): only from 20 units out**, static, public | Insert a directional air dodge when it reaches the ledge and nothing else does |
 | R4 | Height-only "can I make it" | static | Horizontal reach in the model (fighter params + table) |
 | R5 | Attacks the edge-guarder instead of recovering | static (rank rolls) | Suppress the detour in Perfect unless it is safe |
 | R6 | Per-fighter extensions unused (Mac side special + counter, Sheik fish, Greninja charge, Pikachu second angle, Ness PK Thunder angle, Steve blocks) | public; to trace | Per-fighter recovery table |
@@ -98,6 +99,25 @@ Runtime corroboration from projectile-madness-fable's run `projectile-madness-d6
   layer must therefore write the pad, not only command flags. That is this design's choice.
 - At CPU Level 9 the AI ran at rank 100 (mode 1 on 1,305 of 1,342 think calls); the pause menu showed Training's own
   level.
+
+## 5b. P0 Eden trace (2026-11-20, Yoga, exact release d6393cb0): what was confirmed
+
+Run `edge-juggle-p0-d6393cb0-yoga-1`: 7/7 rows PASS, released clean, 0 panic/abort/crash/unmapped. Per-frame stock-AI
+records: 21,143, 0 dropped. Lv 9 = rank 100 on every record. Details and numbers: evidence/yoga-1/P0-RESULTS.md
+(analyze_p0.py, aggregate_p0.py).
+- **R1 confirmed:** the AI's return goal is always the nearer ledge point, (±80, 0) on Final Destination, over 12
+  recoveries from four starts. It never takes a high route or the far side.
+- **Predictability confirmed:** identical starts gave identical jump positions (two distinct paths over three loads from
+  (120, -45)).
+- **R2 corrected:** from below the ledge it jumps on the first actionable frame. The timing is immediate and identical,
+  not a fixed lower height. The flaw is that it is always the same, not that it is late.
+- **R3 confirmed:** the air dodge toward the ledge came only from 20 units out (5/5, at release). From 35+ units it used
+  the double jump.
+- **J1 supported (one juggle start only):** the CPU double jumped and attacked at once, and its air stick pointed toward
+  Player 1 on 68 of 70 frames.
+- **Not covered yet:** starts far or low enough to force up special; the 8-frame danger-avoidance delay under real
+  edge-guarding; R5 (attack detour); juggle rates. Next row: a juggle-only boot (slot 4) and far/low starts with P1
+  edge-guarding at the ledge.
 
 ## 6. Eden trace plan (exact release, when a slot frees)
 

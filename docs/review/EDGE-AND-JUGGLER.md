@@ -1,7 +1,10 @@
 # Guard the Edge + Juggler: design draft (for the build after rc.15)
 
-Research and design by the edge-juggle-opus lane (Claude Opus 5.5 high). There's no code yet. This is a **draft**: it's
-based on reading the game's own CPU code statically, and **the Eden traces that confirm it are pending** (phase P0).
+Research and design by the edge-juggle-opus lane (Claude Opus 5.5 high). There's no code yet. The static findings were **checked on Eden** (P0, 2026-11-20 01:21Z: 21,143 per-frame
+stock-AI records on the exact card build; [P0 results](edge-juggle/evidence/P0-RESULTS.md)). Confirmed: always the nearer
+ledge, identical starts repeat identical paths, and the air dodge only from about 20 units out. Corrected: the CPU jumps on
+its first actionable frame, not late. Supported (one sample): the drift goes toward you. Not yet covered: starts that
+force an up-special, recovering against an active edge-guard, and juggle rates.
 Full documents: [RESEARCH.md](edge-juggle/RESEARCH.md) and [DESIGN.md](edge-juggle/DESIGN.md).
 
 ## What the game's CPU does wrong (from its own code; to be confirmed on Eden)

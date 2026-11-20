@@ -88,7 +88,7 @@ implemented in Phase 1. Sizes are estimates, to be measured on the first slice. 
 | Rule | Fires when (stock mode/action + facts) | Correction |
 | --- | --- | --- |
 | R1 route mix | RETURN, off-stage | Pick the ledge, high onto the stage, or late-low, weighted by P1's position: P1 at the ledge → high; P1 off-stage → low; otherwise random by weights. Steer the stick; time the jump and the up special for the chosen route |
-| R2 jump timing | RETURN, jump left | Jump when the reach model says it is needed now (far), or save it (close-high). Gravity read from fighter params |
+| R2 jump timing | RETURN, jump left | The stock CPU jumps on its first actionable frame every time (P0 trace). Vary the jump timing within what the reach model allows (delay when safe, jump now when far). Gravity read from fighter params |
 | R3 distance air dodge | RETURN, double jump and up special spent, the ledge out of reach without it but within reach with it | A directional air dodge toward the ledge |
 | R4 reach model | used by R1–R3 | Height **and** horizontal reach: `air_accel`, `jump`, the up-special table (`sp_u_high/length`) and the per-fighter extension table |
 | R5 no detour | RETURN, the stock rolls an attack on P1 | Keep recovering unless the attack is safe (P1 in lag) |
@@ -144,7 +144,7 @@ implemented in Phase 1. Sizes are estimates, to be measured on the first slice. 
 
 | Phase | Content | Exit |
 | --- | --- | --- |
-| P0 | Eden traces of the stock CPU on the release (RESEARCH §6) | R1–R4, J1–J2 confirmed or corrected |
+| P0 | Eden traces of the stock CPU on the release (RESEARCH §5b/§6) | **Done 2026-11-20 (yoga-1):** R1 and R3 confirmed, R2 corrected, J1 supported. Open: a juggle-only boot, far/low starts, and P1 edge-guarding (R5) |
 | P1 | Juggler MVP, Level 9 | host tests + Eden proof rows |
 | P2 | Guard the Edge MVP, Level 9, free-fall start | host tests + Eden proof rows |
 | P3 | Perfect generic rules (R1–R5, J1–J4) | A/B numbers on Mario and Pikachu |
