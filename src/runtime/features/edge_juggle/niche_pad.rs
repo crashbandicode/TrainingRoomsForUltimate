@@ -154,7 +154,7 @@ impl NicheGuide {
             return None;
         }
         let (snapshot, available) = recovery_snapshot(ai)?;
-        let reach = special_reach(ai, snapshot)?;
+        let reach = if available { Some(special_reach(ai, snapshot)?) } else { None };
 
         let (mut direction, mut aim, mut at_exit, mut can_enter) = (
             (self.ledge[0] - x).signum(),
@@ -177,7 +177,7 @@ impl NicheGuide {
                 let budget = Budget {
                     air: crossing.air,
                     jumps: remaining_jumps(cpu)?,
-                    special: available.then_some(reach),
+                    special: reach,
                     crossing: recovery::Crossing {
                         span: (crossing.exit - x).abs(),
                         band: crossing.band,
@@ -207,10 +207,11 @@ impl NicheGuide {
                 hold_over = if movement == Move::ApproachThunder {
                     entered && (x - self.player_x) * direction >= 0.0
                 } else {
-                    available
-                        && launch_clears
+                    launch_clears
                         && self.selected_niche_row().aimed()
-                        && remaining <= recovery::level_run(reach, self.ledge[1] - y)
+                        && reach.is_some_and(|reach| {
+                            remaining <= recovery::level_run(reach, self.ledge[1] - y)
+                        })
                 };
             }
         }
@@ -226,7 +227,7 @@ impl NicheGuide {
         }
         if matches!(movement, Move::Rise | Move::SoraChain)
             && at_exit
-            && !reach.reaches([x, y], self.ledge)
+            && reach.is_none_or(|reach| !reach.reaches([x, y], self.ledge))
             && phase == Motion::Free
         {
             return None;

@@ -120,13 +120,16 @@ impl Row {
     /// nothing to cross. Thunder's fall is unmodelled, so its row needs a measurement.
     pub fn margin(&self, facts: Facts) -> Option<f32> {
         if self.route == Route::Near {
-            return Some(1.0);
+            return (!self.needs_up_special() || facts.near.is_some()).then_some(1.0);
         }
         let measured = self.measured();
         if matches!(self.intent, Intent::ThunderOverhead) && measured.is_none() {
             return None;
         }
         let budget = facts.budget?;
+        if self.needs_up_special() && budget.special.is_none() {
+            return None;
+        }
         let [bottom, ceiling] = budget.crossing.band;
         if !self.launch_clears(bottom, ceiling) {
             return None;
@@ -158,6 +161,10 @@ impl Row {
         self.moves
             .iter()
             .any(|step| matches!(step, QuickAttack | Travel | Barrel | Hover | Glide | Bolt))
+    }
+
+    fn needs_up_special(&self) -> bool {
+        self.aimed() || self.moves.iter().any(|step| matches!(step, Rise | SoraChain))
     }
 
     fn matches(&self, facts: Facts) -> bool {
@@ -267,8 +274,6 @@ const ROWS: [Row; 40] = [
 pub const CANDIDATE_ROWS: u64 = (1 << ROWS.len()) - 1;
 
 pub fn select(facts: Facts, enabled: u64) -> Option<&'static Row> {
-    // Move the existing runtime admission rule to the host model.
-    facts.near?;
     ROWS.iter()
         .rev()
         .find(|row| enabled & (1 << (row.id - 1)) != 0 && row.matches(facts))
