@@ -108,7 +108,9 @@ pub fn note_ai_think(primary_match: Option<i32>, matches: impl FnMut(i32) -> boo
 }
 
 struct PracticeProvider {
-    handle: i32,
+    admission_export: usize,
+    registration: m::Discovery,
+    handle: Option<i32>,
     admission: u64,
     activation: u64,
     fields: Fields,
@@ -118,20 +120,17 @@ struct PracticeProvider {
 }
 
 impl PracticeProvider {
-    fn register(register: extern "C" fn(*const u8, u32, u32, u32) -> i32) -> Option<Self> {
+    fn discover() -> Option<Self> {
         let mut address = 0usize;
         // SAFETY: the loader is given a NUL-terminated symbol and one output address.
         let result = unsafe { skyline::nn::ro::LookupSymbol(&mut address, ADMISSION_SYMBOL.as_ptr()) };
         if result != 0 || address == 0 {
             return None;
         }
-        let handle = register(practice::NAME.as_ptr(), practice::NAME.len() as u32, practice::SCHEMA_ID, practice::SCHEMA_VERSION);
-        if handle < 0 {
-            return None;
-        }
-        ADMISSION.store(address, Ordering::Release);
         Some(Self {
-            handle,
+            admission_export: address,
+            registration: m::Discovery::default(),
+            handle: None,
             admission: 0,
             activation: 0,
             fields: Fields::default(),
@@ -141,7 +140,24 @@ impl PracticeProvider {
         })
     }
 
-    fn poll_practice(&mut self, now_ms: u64, publish: extern "C" fn(i32, *const u8, u32) -> i32) {
+    fn practice_handle(&mut self, now_ms: u64, register: extern "C" fn(*const u8, u32, u32, u32) -> i32) -> Option<i32> {
+        if self.registration.due(now_ms) {
+            let result = register(practice::NAME.as_ptr(), practice::NAME.len() as u32, practice::SCHEMA_ID, practice::SCHEMA_VERSION);
+            self.handle = self.registration.registration(result);
+            if self.handle.is_some() {
+                ADMISSION.store(self.admission_export, Ordering::Release);
+            }
+        }
+        self.handle
+    }
+
+    fn poll_practice(
+        &mut self,
+        now_ms: u64,
+        register: extern "C" fn(*const u8, u32, u32, u32) -> i32,
+        publish: extern "C" fn(i32, *const u8, u32) -> i32,
+    ) {
+        let Some(handle) = self.practice_handle(now_ms, register) else { return };
         let admission = practice_admission();
         if admission == 0 {
             return;
@@ -183,7 +199,7 @@ impl PracticeProvider {
         }
         practice::snapshot(game, fields, counts, &mut self.snapshot);
         if self.publisher.wants(self.snapshot.as_bytes()) && practice_admission() == admission {
-            let result = publish(self.handle, self.snapshot.as_ptr(), self.snapshot.len() as u32);
+            let result = publish(handle, self.snapshot.as_ptr(), self.snapshot.len() as u32);
             self.publisher.published(self.snapshot.as_bytes(), result);
         }
     }
@@ -332,8 +348,8 @@ impl Provider {
             return;
         };
         let Some(publish) = api.publish else { return };
-        if let Some(practice) = &mut self.practice {
-            practice.poll_practice(now_ms, publish);
+        if let (Some(practice), Some(register)) = (&mut self.practice, api.register_provider) {
+            practice.poll_practice(now_ms, register, publish);
         }
         read_notice(&mut self.notice.0, &mut self.notice.1);
         let shown = m::shown_notice(NOTICE_VISIBLE.load(Ordering::Relaxed), (self.notice.0.as_str(), self.notice.1.as_str()));
@@ -367,14 +383,11 @@ impl Provider {
         let api = unsafe { &*table };
         let usable = api.register_provider.is_some() && api.publish.is_some() && api.event.is_some();
         let Some(register) = api.register_provider.filter(|_| usable) else { return self.discovery.disable() };
-        let handle = register(m::NAME.as_ptr(), m::NAME.len() as u32, m::SCHEMA_ID, m::SCHEMA_VERSION);
-        if handle < 0 {
-            return self.discovery.disable();
-        }
+        let result = register(m::NAME.as_ptr(), m::NAME.len() as u32, m::SCHEMA_ID, m::SCHEMA_VERSION);
+        let Some(handle) = self.discovery.registration(result) else { return };
         self.api = Some(api);
-        self.practice = PracticeProvider::register(register);
+        self.practice = PracticeProvider::discover();
         self.handle = handle;
-        self.discovery.found();
         FOUND.store(true, Ordering::Relaxed);
         crate::runtime::diag_log::diagnostic(format_args!("[TrainingRooms] bridge_state registered handle={handle}"));
     }
