@@ -212,9 +212,27 @@ impl Hold {
     }
 }
 
-/// The guarder's attack covers the ledge and is old enough to be seen.
-pub fn hot(attack_age: Option<u32>, reaction: u8, covers: bool) -> bool {
-    covers && attack_age.is_some_and(|age| age >= u32::from(reaction))
+/// The guarder's attack at the ledge: dangerous from the frame it can be seen
+/// until its hit volume has come and gone. Its end lag is the time to arrive.
+#[derive(Default)]
+pub struct LedgeWatch {
+    attack: Option<u64>,
+    since: u32,
+    struck: bool,
+}
+
+impl LedgeWatch {
+    pub fn hot(&mut self, attack: Option<u64>, volume: bool, frame: u32, reaction: u8) -> bool {
+        if self.attack != attack {
+            self.attack = attack;
+            self.since = frame;
+            self.struck = false;
+        }
+        self.struck |= volume;
+        attack.is_some()
+            && (volume || !self.struck)
+            && frame.saturating_sub(self.since) >= u32::from(reaction)
+    }
 }
 
 /// The plain return fails for distance while the climb is still affordable.
@@ -296,6 +314,30 @@ pub fn crossing_margin(
     best
 }
 
+/// Level travel an aimed up special still has after keeping the climb to the ledge.
+pub fn level_run(special: SpecialReach, climb: f32) -> f32 {
+    if special.valid() && climb.is_finite() {
+        special.horizontal * (1.0 - (climb / special.rise).clamp(0.0, 1.0))
+    } else {
+        0.0
+    }
+}
+
+/// A fighter row offered to the roll as its route, weighted by its spare climb.
+pub fn niche_plan(route: Route, margin: f32, exit: Point) -> Plan {
+    Plan {
+        route,
+        waypoints: [exit; 3],
+        count: 1,
+        weight: 1 + (margin.clamp(0.0, 1.0) * 15.0) as u16,
+    }
+}
+
+/// The point whose far side is the stage: DI "away" from it bends at the ledge.
+pub fn di_anchor(cpu: Point, ledge: Point) -> Point {
+    [2.0 * cpu[0] - ledge[0], cpu[1]]
+}
+
 /// Survive the nearest blast zone first; otherwise bend the launch at the stage.
 pub fn edge_di(
     cpu: Point,
@@ -304,13 +346,7 @@ pub fn edge_di(
     hitstun: f32,
     blast: [f32; 4],
 ) -> Option<Point> {
-    hit_recovery(
-        cpu,
-        [2.0 * cpu[0] - ledge[0], cpu[1]],
-        speed,
-        hitstun,
-        blast,
-    )
+    hit_recovery(cpu, di_anchor(cpu, ledge), speed, hitstun, blast)
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 use super::{
-    crossing_margin, edge_di, hot, mix, planned_delay, short, zone, Crossing, Guarder, Hold,
-    HoldFacts, Measured, Reach, Zone,
+    crossing_margin, edge_di, level_run, mix, niche_plan, planned_delay, short, zone, Crossing,
+    Guarder, Hold, HoldFacts, LedgeWatch, Measured, Reach, Zone,
 };
 use crate::model::edge_juggle::perfect::{
     AirPhysics, Correction, Plan, Point, Route, SpecialReach, GUARD, JUMP, SPECIAL,
@@ -293,13 +293,44 @@ fn hot_ledge_delays_the_arrival_only_inside_the_deadline() {
         "no frame left to wait"
     );
 
-    assert!(hot(Some(12), 12, true));
+    let mut watch = LedgeWatch::default();
+    assert!(!watch.hot(None, false, 99, 12));
+    for frame in 100..112 {
+        assert!(
+            !watch.hot(Some(1), false, frame, 12),
+            "inside the reaction time the attack is not seen: {frame}"
+        );
+    }
+    assert!(watch.hot(Some(1), false, 112, 12), "start-up: the hit is coming");
+    assert!(watch.hot(Some(1), true, 115, 12), "active");
     assert!(
-        !hot(Some(11), 12, true),
-        "inside the reaction time the attack is not seen"
+        !watch.hot(Some(1), false, 118, 12),
+        "end lag is the time to arrive"
     );
-    assert!(!hot(Some(40), 12, false));
-    assert!(!hot(None, 0, true));
+    assert!(!watch.hot(Some(2), false, 130, 12), "a new attack restarts the clock");
+    assert!(watch.hot(Some(2), false, 130, 0), "frame-perfect sees it at once");
+}
+
+#[test]
+fn an_aimed_special_shares_its_travel_with_the_climb() {
+    let special = SpecialReach {
+        horizontal: 60.0,
+        rise: 40.0,
+    };
+    assert_eq!(level_run(special, 0.0), 60.0);
+    assert_eq!(level_run(special, 20.0), 30.0);
+    assert_eq!(level_run(special, 45.0), 0.0);
+    assert_eq!(level_run(special, -10.0), 60.0);
+    assert_eq!(level_run(special, f32::NAN), 0.0);
+    let strong = niche_plan(Route::Opposite, 1.0, [75.0, 0.0]);
+    let weak = niche_plan(Route::Opposite, 0.0, [75.0, 0.0]);
+    assert_eq!((strong.route, strong.waypoints[0]), (Route::Opposite, [75.0, 0.0]));
+    let rolled =
+        |row| shares([None, None, plan(Route::LateLow), Some(row)], Zone::Ledge, None)[3];
+    assert!(
+        rolled(strong) > rolled(weak) && rolled(weak) > 0,
+        "a thin margin is rolled less often, never dropped"
+    );
 }
 
 #[test]

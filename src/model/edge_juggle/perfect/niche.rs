@@ -1,10 +1,14 @@
 //! Character-specific recovery pads for Guard the Edge.
 
-use super::{Correction, Point, Route, ATTACK, FLICK_JUMP, GUARD, JUMP, SPECIAL};
+use super::recovery::Crossing;
+use super::{
+    AirPhysics, Correction, Point, Route, SpecialReach, ATTACK, FLICK_JUMP, GUARD, JUMP, SPECIAL,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Move {
     Drift,
+    Hold,
     Jump,
     Side,
     ChargedSide,
@@ -24,6 +28,14 @@ pub enum Move {
 }
 
 #[derive(Clone, Copy)]
+pub struct Budget {
+    pub air: AirPhysics,
+    pub jumps: u8,
+    pub special: Option<SpecialReach>,
+    pub crossing: Crossing,
+}
+
+#[derive(Clone, Copy)]
 pub struct Facts {
     pub fighter: i32,
     pub corridor: Option<Point>,
@@ -31,6 +43,9 @@ pub struct Facts {
     pub player_over_crossing: bool,
     pub long_approach: bool,
     pub counter_contact: bool,
+    pub short: bool,
+    pub climb: f32,
+    pub budget: Option<Budget>,
 }
 
 #[derive(Clone, Copy)]
@@ -63,6 +78,10 @@ impl Row {
             route,
             moves,
         }
+    }
+
+    pub fn margin(&self, _facts: Facts) -> Option<f32> {
+        Some(1.0)
     }
 
     fn matches(&self, facts: Facts) -> bool {
@@ -148,6 +167,8 @@ pub struct Sample {
     pub at_exit: bool,
     pub can_enter: bool,
     pub approaching: bool,
+    pub low: bool,
+    pub hold_over: bool,
     pub direction: f32,
     pub aim: Point,
 }

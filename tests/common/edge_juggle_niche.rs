@@ -1,5 +1,6 @@
-use super::{select, Facts, Motion, Move, Sample, Sequence, CANDIDATE_ROWS};
-use crate::model::edge_juggle::perfect::{self, Route};
+use super::{select, Budget, Facts, Motion, Move, Sample, Sequence, CANDIDATE_ROWS};
+use crate::model::edge_juggle::perfect::recovery::Crossing;
+use crate::model::edge_juggle::perfect::{self, AirPhysics, Route, SpecialReach};
 
 #[test]
 fn niche_roster_kinds_match_the_approved_plan() {
@@ -54,6 +55,50 @@ fn niche_roster_kinds_match_the_approved_plan() {
     }
 }
 
+/// A slow faller with five jumps and a strong up special: every row's crossing fits.
+const ROOMY: Budget = Budget {
+    air: AirPhysics {
+        horizontal_speed: 1.3,
+        horizontal_acceleration: 0.08,
+        gravity: 0.064,
+        terminal_speed: 1.0,
+        jump_speed: 1.6,
+    },
+    jumps: 5,
+    special: Some(SpecialReach {
+        horizontal: 60.0,
+        rise: 90.0,
+    }),
+    crossing: Crossing {
+        span: 100.0,
+        band: [-135.0, -39.0],
+        foot: -45.0,
+        ledge: 0.0,
+    },
+};
+
+/// A fast faller with one jump on a long stage: no row's crossing fits.
+const TIGHT: Budget = Budget {
+    air: AirPhysics {
+        horizontal_speed: 1.0,
+        horizontal_acceleration: 0.05,
+        gravity: 0.1,
+        terminal_speed: 1.9,
+        jump_speed: 2.6,
+    },
+    jumps: 1,
+    special: Some(SpecialReach {
+        horizontal: 60.0,
+        rise: 70.0,
+    }),
+    crossing: Crossing {
+        span: 170.0,
+        band: [-90.0, -45.0],
+        foot: -50.0,
+        ledge: 0.0,
+    },
+};
+
 fn facts(fighter: i32, mode: &str) -> Facts {
     Facts {
         fighter,
@@ -62,6 +107,9 @@ fn facts(fighter: i32, mode: &str) -> Facts {
         player_over_crossing: mode == "center",
         long_approach: mode == "long",
         counter_contact: mode == "counter",
+        short: mode == "near",
+        climb: 0.0,
+        budget: Some(ROOMY),
     }
 }
 
@@ -74,8 +122,20 @@ fn sample(frame: u32, motion: Motion) -> Sample {
         at_exit: true,
         can_enter: true,
         approaching: false,
+        low: false,
+        hold_over: true,
         direction: 1.0,
         aim: [0.6, 0.8],
+    }
+}
+
+/// A glide frame under the stage, away from the exit.
+fn gliding(frame: u32, motion: Motion, low: bool) -> Sample {
+    Sample {
+        at_exit: false,
+        hold_over: false,
+        low,
+        ..sample(frame, motion)
     }
 }
 
@@ -102,6 +162,12 @@ fn verify(fighter: i32, mode: &str, id: u8, steps: &[Move]) {
             select(deep_stage, 1 << (id - 1)).is_none(),
             "the same row must decline a closed crossing"
         );
+        for budget in [Some(TIGHT), None] {
+            assert!(
+                select(Facts { budget, ..input }, 1 << (id - 1)).is_none(),
+                "the same row must decline a crossing its budget does not cover"
+            );
+        }
     }
 
     let mut sequence = Sequence::new(row);
@@ -111,7 +177,7 @@ fn verify(fighter: i32, mode: &str, id: u8, steps: &[Move]) {
         let pad = sequence
             .step(sample(frame, Motion::Free))
             .expect("first real input");
-        if movement == Move::Drift {
+        if matches!(movement, Move::Drift | Move::Hold) {
             assert_eq!((pad.stick, pad.press), (Some([1.0, 0.0]), 0));
             continue;
         }
@@ -163,42 +229,51 @@ fn verify(fighter: i32, mode: &str, id: u8, steps: &[Move]) {
 
 #[test]
 fn niche_pikachu_quick_attack_route_and_pad_sequence() {
-    verify(0x8, "cross", 1, &[Move::QuickAttack]);
+    verify(0x8, "cross", 1, &[Move::Hold, Move::QuickAttack]);
 }
 
 #[test]
-fn niche_pikachu_thunder_route_and_pad_sequence() {
-    verify(0x8, "center", 2, &[Move::Down, Move::QuickAttack]);
+fn niche_pikachu_thunder_waits_for_its_measured_fall() {
+    let thunder = &super::ROWS[1];
+    assert_eq!(
+        thunder.moves,
+        [Move::Down, Move::Hold, Move::QuickAttack].as_slice()
+    );
+    assert!(
+        select(facts(0x8, "center"), CANDIDATE_ROWS).is_none(),
+        "Thunder is a free fall of unmeasured length: no crossing budget covers it yet"
+    );
 }
 
 #[test]
 fn niche_pikachu_skull_bash_route_and_pad_sequence() {
-    verify(0x8, "long", 3, &[Move::Side, Move::QuickAttack]);
+    verify(0x8, "long", 3, &[Move::Side, Move::Hold, Move::QuickAttack]);
 }
 
 #[test]
 fn niche_game_watch_fire_route_and_pad_sequence() {
-    verify(0x1c, "cross", 4, &[Move::Drift, Move::Jump, Move::Rise]);
+    verify(0x1c, "cross", 4, &[Move::Hold, Move::Rise]);
 }
 
 #[test]
 fn niche_diddy_rocketbarrel_route_and_pad_sequence() {
-    verify(0x27, "cross", 5, &[Move::Barrel]);
+    verify(0x27, "cross", 5, &[Move::Hold, Move::Barrel]);
 }
 
 #[test]
 fn niche_diddy_monkey_flip_route_and_pad_sequence() {
-    verify(0x27, "long", 6, &[Move::Side, Move::Barrel]);
+    verify(0x27, "long", 6, &[Move::Side, Move::Hold, Move::Barrel]);
 }
 
 #[test]
 fn niche_rob_burner_route_and_pad_sequence() {
-    verify(0x2d, "cross", 7, &[Move::Hover]);
+    verify(0x2d, "cross", 7, &[Move::Hold, Move::Hover]);
 }
 
 #[test]
-fn niche_sora_sonic_blade_route_and_pad_sequence() {
-    verify(0x5d, "cross", 8, &[Move::SonicBlade, Move::Rise]);
+fn niche_sora_aerial_sweep_route_and_pad_sequence() {
+    // Sonic Blade ends in special fall (SmashWiki "Helpless"): it is not flown before the up special.
+    verify(0x5d, "cross", 8, &[Move::Hold, Move::Rise]);
 }
 
 #[test]
@@ -218,121 +293,146 @@ fn niche_sheik_bouncing_fish_route_and_pad_sequence() {
 
 #[test]
 fn niche_sheik_vanish_route_and_pad_sequence() {
-    verify(0x10, "cross", 12, &[Move::Travel]);
+    verify(0x10, "cross", 12, &[Move::Hold, Move::Travel]);
 }
 
 #[test]
 fn niche_greninja_shadow_sneak_route_and_pad_sequence() {
-    verify(0x35, "cross", 13, &[Move::ChargedSide, Move::Travel]);
+    verify(
+        0x35,
+        "cross",
+        13,
+        &[Move::ChargedSide, Move::Hold, Move::Travel],
+    );
 }
 
 #[test]
 fn niche_ness_pk_thunder_route_and_pad_sequence() {
-    verify(0xa, "cross", 14, &[Move::Bolt]);
+    verify(0xa, "cross", 14, &[Move::Hold, Move::Bolt]);
 }
 
 #[test]
 fn niche_steve_elytra_route_and_pad_sequence() {
-    verify(0x58, "cross", 15, &[Move::Glide]);
+    verify(0x58, "cross", 15, &[Move::Hold, Move::Glide]);
 }
 
 #[test]
 fn niche_pichu_quick_attack_route_and_pad_sequence() {
-    verify(0x13, "cross", 16, &[Move::QuickAttack]);
+    verify(0x13, "cross", 16, &[Move::Hold, Move::QuickAttack]);
 }
 
 #[test]
 fn niche_jigglypuff_jumps_route_and_pad_sequence() {
-    verify(
-        0xc,
-        "cross",
-        17,
-        &[Move::Jump, Move::Jump, Move::Jump, Move::Drift],
-    );
+    verify(0xc, "cross", 17, &[Move::Hold]);
 }
 
 #[test]
 fn niche_meta_knight_drill_rush_route_and_pad_sequence() {
-    verify(0x1d, "cross", 18, &[Move::Jump, Move::Jump, Move::Side]);
+    verify(0x1d, "cross", 18, &[Move::Hold, Move::Side]);
 }
 
 #[test]
 fn niche_pit_power_of_flight_route_and_pad_sequence() {
-    verify(0x1e, "cross", 19, &[Move::Jump, Move::Travel]);
+    verify(0x1e, "cross", 19, &[Move::Hold, Move::Travel]);
 }
 
 #[test]
 fn niche_dark_pit_power_of_flight_route_and_pad_sequence() {
-    verify(0x1f, "cross", 20, &[Move::Jump, Move::Travel]);
+    verify(0x1f, "cross", 20, &[Move::Hold, Move::Travel]);
 }
 
 #[test]
 fn niche_pac_man_pac_jump_route_and_pad_sequence() {
-    verify(0x37, "cross", 21, &[Move::Jump, Move::Travel]);
+    verify(0x37, "cross", 21, &[Move::Hold, Move::Travel]);
 }
 
 #[test]
-fn niche_bayonetta_witch_twist_route_and_pad_sequence() {
-    verify(0x40, "cross", 22, &[Move::Travel, Move::Side, Move::Travel]);
+fn niche_bayonetta_twists_once_per_jump() {
+    // One Witch Twist per jump (SmashWiki "Bayonetta (SSBU)/Up special"): the double jump sits between the two.
+    let twists = [
+        Move::Hold,
+        Move::Travel,
+        Move::Jump,
+        Move::Travel,
+        Move::Side,
+    ];
+    verify(0x40, "cross", 22, &twists);
+    assert!(super::ROWS[21]
+        .moves
+        .windows(2)
+        .all(|pair| pair != [Move::Travel, Move::Travel] && pair != [Move::Side, Move::Travel]));
 }
 
 #[test]
 fn niche_sonic_spring_jump_route_and_pad_sequence() {
-    verify(0x29, "cross", 23, &[Move::Side, Move::Rise]);
+    verify(0x29, "cross", 23, &[Move::Side, Move::Hold, Move::Rise]);
 }
 
 #[test]
 fn niche_peach_float_route_and_pad_sequence() {
-    verify(0xd, "cross", 24, &[Move::Float, Move::Rise]);
+    verify(0xd, "cross", 24, &[Move::Float, Move::Hold, Move::Rise]);
 }
 
 #[test]
 fn niche_daisy_float_route_and_pad_sequence() {
-    verify(0xe, "cross", 25, &[Move::Float, Move::Rise]);
+    verify(0xe, "cross", 25, &[Move::Float, Move::Hold, Move::Rise]);
 }
 
 #[test]
 fn niche_snake_cypher_route_and_pad_sequence() {
-    verify(0x22, "cross", 26, &[Move::Hover]);
+    verify(0x22, "cross", 26, &[Move::Hold, Move::Hover]);
 }
 
 #[test]
 fn niche_link_remote_bomb_route_and_pad_sequence() {
-    verify(0x2, "cross", 27, &[Move::Bomb, Move::Jump, Move::Rise]);
+    verify(0x2, "cross", 27, &[Move::Bomb, Move::Hold, Move::Rise]);
 }
 
 #[test]
 fn niche_lucas_pk_thunder_route_and_pad_sequence() {
-    verify(0x28, "cross", 28, &[Move::Bolt]);
+    verify(0x28, "cross", 28, &[Move::Hold, Move::Bolt]);
 }
 
 #[test]
 fn niche_lucario_extreme_speed_route_and_pad_sequence() {
-    verify(0x2c, "cross", 29, &[Move::Travel]);
+    verify(0x2c, "cross", 29, &[Move::Hold, Move::Travel]);
 }
 
 #[test]
 fn niche_olimar_winged_pikmin_route_and_pad_sequence() {
-    verify(0x2b, "cross", 30, &[Move::Hover]);
+    verify(0x2b, "cross", 30, &[Move::Hold, Move::Hover]);
 }
 
 #[test]
 fn niche_bowser_jr_clown_kart_route_and_pad_sequence() {
-    verify(0x3a, "cross", 31, &[Move::Side, Move::Rise]);
+    verify(0x3a, "cross", 31, &[Move::Side, Move::Hold, Move::Rise]);
 }
 
 #[test]
 fn niche_hero_woosh_route_and_pad_sequence() {
-    verify(0x53, "cross", 32, &[Move::Rise]);
+    verify(0x53, "cross", 32, &[Move::Hold, Move::Rise]);
 }
 
 #[test]
 fn niche_yoshi_egg_throw_route_and_pad_sequence() {
-    verify(0x5, "cross", 33, &[Move::Jump, Move::Rise]);
+    // Yoshi's climb is the double jump: it waits for the exit.
+    verify(0x5, "cross", 33, &[Move::Hold, Move::Jump, Move::Rise]);
     assert!(
         select(facts(0x4, "cross"), CANDIDATE_ROWS).is_none(),
         "Dark Samus does not own Yoshi's recovery"
     );
+    let mut spent = Sequence::new(&super::ROWS[32]);
+    spent.step(sample(0, Motion::Free)).expect("the glide ends");
+    let no_jump = Sample {
+        can_start: false,
+        ..sample(1, Motion::Free)
+    };
+    assert_eq!(
+        spent.step(no_jump).map(|pad| pad.press),
+        Some(0),
+        "a jump the glide already spent is skipped, not fatal"
+    );
+    assert_eq!(spent.action(), Some(Move::Rise));
 }
 
 #[test]
@@ -342,7 +442,129 @@ fn niche_luigi_green_missile_route_and_pad_sequence() {
 
 #[test]
 fn niche_charizard_fly_route_and_pad_sequence() {
-    verify(0x26, "cross", 35, &[Move::Jump, Move::Jump, Move::Rise]);
+    verify(0x26, "cross", 35, &[Move::Hold, Move::Rise]);
+}
+
+#[test]
+fn niche_near_rows_wait_for_an_extension_need() {
+    for (fighter, id) in [(0x34, 9), (0x10, 11), (0x9, 34)] {
+        let need = facts(fighter, "near");
+        assert_eq!(select(need, CANDIDATE_ROWS).map(|row| row.id), Some(id));
+        let plain = Facts {
+            short: false,
+            ..need
+        };
+        assert!(
+            select(plain, CANDIDATE_ROWS).is_none(),
+            "row {id}: the plain route returns, so the extension stays unspent"
+        );
+    }
+    let below = Facts {
+        climb: 30.0,
+        ..facts(0x9, "near")
+    };
+    assert!(
+        select(below, CANDIDATE_ROWS).is_none(),
+        "a Green Missile from under the ledge meets the wall"
+    );
+    let mac_below = Facts {
+        climb: 30.0,
+        ..facts(0x34, "near")
+    };
+    assert_eq!(
+        select(mac_below, CANDIDATE_ROWS).map(|row| row.id),
+        Some(9),
+        "Jolt Haymaker still has the uppercut for the climb"
+    );
+}
+
+#[test]
+fn niche_hold_jumps_only_below_the_hold_line() {
+    let mut glide = Sequence::new(&super::ROWS[16]);
+    let level = glide.step(gliding(0, Motion::Free, false)).unwrap();
+    assert_eq!(
+        (level.stick, level.press),
+        (Some([1.0, 0.0]), 0),
+        "no jump is burst at the entry"
+    );
+    assert_eq!(
+        glide.step(gliding(1, Motion::Free, true)).unwrap().press,
+        perfect::JUMP
+    );
+    assert_eq!(
+        glide.step(gliding(2, Motion::Free, true)).unwrap().press,
+        0,
+        "one press per jump"
+    );
+    let rising = glide.step(gliding(3, Motion::Travel, true)).unwrap();
+    assert_eq!(rising.press, 0);
+    assert_ne!(rising.release & perfect::JUMP, 0);
+    assert_eq!(
+        glide.step(gliding(30, Motion::Free, false)).unwrap().press,
+        0
+    );
+    assert_eq!(
+        glide.step(gliding(31, Motion::Free, true)).unwrap().press,
+        perfect::JUMP,
+        "the next jump waits for the line again"
+    );
+    glide.step(gliding(32, Motion::Travel, false)).unwrap();
+    let spent = Sample {
+        can_start: false,
+        ..gliding(60, Motion::Free, true)
+    };
+    assert_eq!(
+        glide.step(spent).map(|pad| pad.press),
+        Some(0),
+        "no jump left: keep gliding"
+    );
+    assert_eq!(glide.action(), Some(Move::Hold));
+    glide
+        .step(sample(61, Motion::Free))
+        .expect("the exit ends the glide");
+    assert_eq!(glide.action(), None);
+}
+
+#[test]
+fn niche_crossing_rows_decline_an_infeasible_budget() {
+    let every = |fighter, budget| Facts {
+        fighter,
+        corridor: Some([-135.0, -39.0]),
+        covered_ledge: true,
+        player_over_crossing: false,
+        long_approach: false,
+        counter_contact: false,
+        short: false,
+        climb: 0.0,
+        budget,
+    };
+    let mut crossings = 0;
+    for row in super::ROWS
+        .iter()
+        .filter(|row| row.route == Route::Opposite)
+    {
+        let only = 1 << (row.id - 1);
+        let roomy = every(row.fighter, Some(ROOMY));
+        let Some(chosen) = select(roomy, only) else {
+            assert!(
+                [2, 3, 6].contains(&row.id),
+                "row {} needs more than a covered ledge",
+                row.id
+            );
+            continue;
+        };
+        crossings += 1;
+        let margin = chosen.margin(roomy).expect("a selected row has a margin");
+        assert!((0.0..=1.0).contains(&margin), "row {}", row.id);
+        for budget in [Some(TIGHT), None] {
+            assert!(
+                select(every(row.fighter, budget), only).is_none(),
+                "row {} must not commit to a crossing it cannot finish",
+                row.id
+            );
+        }
+    }
+    assert_eq!(crossings, 28);
 }
 
 #[test]
@@ -369,28 +591,29 @@ fn niche_invalid_native_facts_fail_closed_and_a_mirrored_pad_is_real() {
 fn niche_requires_stock_transition_and_does_not_spend_an_unaccepted_input_twice() {
     let row = select(facts(0x2d, "cross"), CANDIDATE_ROWS).unwrap();
     let mut denied = Sequence::new(row);
+    denied.step(sample(0, Motion::Free)).expect("the glide ends");
     assert_eq!(
         denied.step(Sample {
             can_start: false,
-            ..sample(0, Motion::Free)
+            ..sample(1, Motion::Free)
         }),
         None
     );
     let mut sequence = Sequence::new(row);
+    sequence.step(sample(0, Motion::Free)).expect("the glide ends");
     assert_eq!(
-        sequence.step(sample(0, Motion::Free)).unwrap().press,
+        sequence.step(sample(1, Motion::Free)).unwrap().press,
         perfect::SPECIAL
     );
-    let pending = sequence.step(sample(1, Motion::Free)).unwrap();
+    let pending = sequence.step(sample(2, Motion::Free)).unwrap();
     assert_eq!(pending.press, 0);
     assert_ne!(pending.release & perfect::SPECIAL, 0);
-    assert_eq!(sequence.step(sample(2, Motion::Interrupted)), None);
+    assert_eq!(sequence.step(sample(3, Motion::Interrupted)), None);
 }
 
 #[test]
 fn niche_thunder_drifts_into_position_before_spending_down_special() {
-    let row = select(facts(0x8, "center"), CANDIDATE_ROWS).unwrap();
-    let mut sequence = Sequence::new(row);
+    let mut sequence = Sequence::new(&super::ROWS[1]);
     let approach = Sample {
         approaching: true,
         ..sample(0, Motion::Free)
@@ -406,8 +629,9 @@ fn niche_thunder_drifts_into_position_before_spending_down_special() {
 #[test]
 fn niche_rocketbarrel_holds_through_native_charge_before_release() {
     let mut sequence = Sequence::new(select(facts(0x27, "cross"), CANDIDATE_ROWS).unwrap());
-    sequence.step(sample(0, Motion::Free)).unwrap();
-    sequence.step(sample(1, Motion::Starting)).unwrap();
+    sequence.step(sample(0, Motion::Free)).expect("the glide ends");
+    sequence.step(sample(1, Motion::Free)).unwrap();
+    sequence.step(sample(2, Motion::Starting)).unwrap();
     for frame in 8..28 {
         let edit = sequence.step(sample(frame, Motion::Charging)).unwrap();
         assert_eq!(edit.press, perfect::SPECIAL, "charge frame {frame}");
