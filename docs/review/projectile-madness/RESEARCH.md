@@ -3,7 +3,8 @@
 Lane projectile-madness-fable, 2026-11-20. Research only: no product code, no TrainingRooms (TR) commit, nothing pushed.
 Brief: /home/intpa/smash-training-lobby/artifacts/phase23/projectile-madness/BRIEF.md.
 
-**Summary.** The game is feasible as a practice game for the build after rc.15, in native Training.
+**Summary.** The game is feasible as a practice game for the build after rc.15, in native Training and, by the
+operator's decision of 2026-11-20 (section 7), in waiting-room practice (section 7.1).
 - **Recommended:** a separate decision layer with one profile per fighter (option b). It writes the CPU's virtual pad
   at the end of the stock AI's think call, the place TR's recorder already hooks. The stock AI keeps hitstun, recovery
   and the ledge.
@@ -271,9 +272,9 @@ The numbers are starting values to tune in play, not measured.
   `ArticleModule::get_active_num` (main+0x2092df0). Each gets the usual 64-byte guard.
 - Hooks must not block: the state lives behind try-lock or atomics, and `tests/lock_order.rs` is extended.
 
-**Online safety.** It writes a fighter's pad, so it changes simulated state. Training only: Start is refused
-elsewhere (a new refusal, which needs the operator's approval and a `docs/RESTRICTIONS.md` row). It draws no game
-random number.
+**Online safety.** It writes a fighter's pad, so it changes simulated state. It runs where TR's practice runs:
+native Training and waiting-room practice with Lobby Practice On (decided, section 7). It never runs in a match. It
+draws no game random number. The rules and proofs for rooms are in section 7.1.
 
 **Risks.**
 - **Pad ownership.** The hand-over between our layer, the stock AI, playback and the CPU page must be one rule in one
@@ -300,7 +301,22 @@ random number.
 3. **Second-object fighters:** Snake, R.O.B., Duck Hunt.
 4. **More fighters and stages:** platforms, measured ranges, and one bounded test of the stock AI's bias fields.
 
-## 7. Open questions for the operator
+## 7. Operator decisions (2026-11-20 ~02:06Z, relayed by the primary)
+
+The operator agreed with every recommendation except Q5: it should be available in lobbies.
+
+| # | Decided |
+| --- | --- |
+| Q1 | Any damaging hit by you or your projectiles stops the clock; a hit on shield doesn't count |
+| Q2 | The clock starts at GO after a fixed countdown; the standing notice shows it; best per opponent and level |
+| Q3 | First opponents: Samus, Young Link, Simon (Richter reuses Simon) |
+| Q4 | Three named levels |
+| **Q5** | **Native Training and waiting rooms (Lobby Practice), like the other practice games that support rooms. This replaces my recommendation of Training only** |
+| Q6 | One line after each attempt says what it read |
+| Q7 | Up close it escapes and resets, with at most two close moves |
+| Q8 | Real damage; a KO restarts the attempt without a time |
+
+The table below is the question list as it was asked. The Q5 drawing still shows the earlier recommendation.
 
 | # | Question | Recommendation | Illustration |
 | --- | --- | --- | --- |
@@ -314,6 +330,65 @@ random number.
 | Q8 | What happens to you during an attempt? | Real damage; a KO restarts the attempt without a time | ![Q8](illustrations/Q8-attempt-rules.png) |
 
 The drawings are made by `illustrations/make_illustrations.py`; they aren't game footage.
+
+### 7.1 Lobby support (added after the decision on Q5)
+
+**The pad write is already allowed in a room.** Nothing in TR limits CPU control to Training.
+- The recorder's seam runs in native Training or a live waiting room (`on_ai_frame` in
+  `src/runtime/features/recorder.rs` admits `scene::lobby_term()`), on the primary CPU entry of the scene. Play on CPU
+  and the Playback Slots are documented for rooms (docs/guide/waiting-rooms.md, "The chords").
+- docs/RESTRICTIONS.md has no approved row that keeps CPU control or a practice game out of rooms. The one
+  Training-only row, `combos-training-only`, was retired on 2026-11-06.
+- So rooms need no new refusal. With Lobby Practice Off, TR's menu doesn't open in a room at all, as today.
+
+**What changes in a room.**
+
+| Topic | In Training | In a waiting room |
+| --- | --- | --- |
+| The opponent | Entry 1, the CPU | Entry 4, the first training partner (`LOBBY_CPU_ENTRY`, `practice_policy::Context::cpu_entry`). CPU Character and the CPU cycle chord pick its fighter, as today |
+| Other bodies | No. of CPUs 1–3; entries above the count are TR's parked ones | Training Partners 1–3 (entries 4–6). Only entry 4 is a CPU role for TR; the others follow the room's own Behavior (question L1) |
+| Stock AI fallback | Training's CPU Behavior and TR's CPU Level | The room's Behavior (Attack or Stop); the partners' rank is the game's own and rises in play, unless CPU Level is set |
+| Stage | The picked stage; the MVP assumed flat stages | The room's stage or the Lobby Stages list, platforms included; Lobby Items may put items on the floor |
+| The end of a run | Start, Stop, L+R+A | The same, plus the match: it can start at any frame |
+| Speed | Training's speed | The room's local practice speed; the clock counts game frames in both |
+
+**Rules taken from the existing lobby practice.**
+- **A match ends it at once.** The practice ends when the match begins and nothing is carried into the match
+  (docs/guide/waiting-rooms.md, "When the match starts"). The game stops writing the pad on the frame the scene stops
+  being a practice scene; the attempt ends without a time; the player model is dropped.
+- **Never entry 0, never in a match.** The role rule (decision B4, `src/model/cpu/role.rs`) keeps every CPU behaviour
+  off Player 1, and the scene rule turns it off outside Training and a live room.
+- **Local only.** A room's practice fighters, targets and speed are this console's own (the guide: targets show on
+  your screen only; the other player stays at normal speed). The opponent's projectiles are ordinary articles of a
+  local practice fighter.
+- **Game-state changes in a room need an LDN check first** (DECISIONS rc14-eggs D8: hitlag, Hide CPU and the zoomed
+  camera were allowed in rooms only after one). The pad write and the attempt's restart placement fall under it.
+- **Random numbers.** The decision layer uses TR's own generator. It writes the pad after the stock think call and
+  never skips that call, so the stock AI draws from its own stream exactly as it does without the game.
+
+**Proof rows this adds (playbook CHECKLIST "Online").**
+- A local-wireless pair, the game running on one console only, the desync detector on both: a match that starts
+  mid-attempt, played to its end, `desync_seen=0` at the same frame on both. Then the same from a Quickplay room.
+- Back in the room after the match: the pad is the room's own again until Start, and no article of the attempt remains.
+- The same attempt with Training Partners at 2 and 3.
+
+**Cost (estimate, not measured):** about +80–150 lines on top of section 6 for the scene boundary, the entry choice and
+the extra-partner rule. The two-console rows are the larger cost.
+
+**New operator questions.**
+
+| # | Question | Recommendation | Illustration |
+| --- | --- | --- | --- |
+| L1 | With Training Partners at 2 or 3, what do the other partners do during an attempt? | They are hidden while the game runs (the Hide CPU rule, extended to entries 5 and 6), so the drill stays one opponent. The alternative leaves them to the room's Behavior, where an attacking partner can hit you or take your hit | ![L1](illustrations/L1-lobby-extra-partners.png) |
+| L2 | After a match interrupts a run, does the game start again by itself when you are back in the room? | No: it is stopped, and Start begins a new run. The alternative re-arms it in the same room | ![L2](illustrations/L2-lobby-after-match.png) |
+
+**Not verified for rooms.** Nothing here ran in a room.
+- That the stock AI on entry 4 recovers and techs under Behavior Stop as the Training CPU does.
+- Which hit record a partner's body produces in a room, and whether another partner's hit on the opponent must be
+  told apart from yours.
+- What Eggs-ercise and Break the Targets do today when a match interrupts a run (L2 should match them unless decided
+  otherwise).
+- Any desync row: the claims above rest on the existing lobby features' proofs, not on a run of this game.
 
 ## 8. Prior art (public material)
 
@@ -345,3 +420,4 @@ purpose. The ghost systems learn from large recordings of a human, which this ga
   behaviour; the code was not read).
 - Size and performance: every number in section 6 is an estimate.
 - Hardware: nothing ran on the Switch. No compliance run: this lane changed no plugin code.
+- Rooms: nothing ran in a waiting room; section 7.1 lists what that leaves open.

@@ -55,3 +55,15 @@ Research by the projectile-madness-fable lane (Claude Fable 5.2 xhigh). There's 
    ![Q8](projectile-madness/illustrations/Q8-attempt-rules.png)
 
 The drawings are illustrations, not game footage.
+
+## Lobby support (added 2026-11-20 02:14Z)
+
+- Controlling the opponent is **already allowed in waiting rooms** today: TR can drive the room's CPU, and no restriction keeps practice games out of rooms. No new refusal is needed.
+- Rules carried over: a match starting ends the attempt at once and nothing carries into the match; it never touches your own fighter; it uses its own randomness; anything that changes game state in a room gets a Local Wireless check first.
+- Planned proofs: a Local Wireless pair, a Quickplay room with the desync detector, and a match starting mid-attempt.
+- Estimated extra cost: +80–150 lines.
+
+**Two more questions (recommendation first):**
+
+- **L1: what do training partners 2 and 3 do during an attempt?** Recommended: **hidden**. ![L1](projectile-madness/illustrations/L1-lobby-extra-partners.png)
+- **L2: after a match, does the game restart by itself?** Recommended: **no; you press Start again**. ![L2](projectile-madness/illustrations/L2-lobby-after-match.png)
