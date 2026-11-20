@@ -163,6 +163,23 @@ impl NicheGuide {
             if !beyond && (y < bottom || entered && y > top) {
                 return None;
             }
+            // Outside the near ledge the crossing can still be given up: read its budget again.
+            if !entered && niche_motion_phase(cpu, self.fighter, movement, status) == Motion::Free {
+                let budget = Budget {
+                    air: air_physics(cpu),
+                    jumps: remaining_jumps(cpu)?,
+                    special: available.then_some(reach),
+                    crossing: recovery::Crossing {
+                        span: (crossing.exit - x).abs(),
+                        band: crossing.band,
+                        foot: y,
+                        ledge: self.ledge[1],
+                    },
+                };
+                if !self.sequence.still_crosses(budget) {
+                    return None;
+                }
+            }
             at_exit = (x - crossing.exit) * crossing.direction >= 0.0;
             can_enter = beyond || y <= top;
             if !at_exit {
