@@ -55,3 +55,15 @@ fn sora_keeps_stock_when_no_blade_path_reaches_or_live_geometry_closes_it() {
     assert!(blade_path(&changed, [155.2, -53.0], HANG, 1.0, BOTTOM).is_none());
     assert!(blade_path(&RING, [155.2, -42.1], HANG, 0.0, BOTTOM).is_none());
 }
+
+#[test]
+fn sora_uses_status_to_status_dash_distances_for_the_measured_exit() {
+    // Model §5.2, fd-1 and fd-3. This includes each dash's final step into
+    // the next native status before applying the first dash's 4.9 carry.
+    let route = blade_path(&RING, [145.7, -43.5], HANG, 1.0, BOTTOM).unwrap();
+    assert_eq!(route.count, 3);
+    assert_eq!(route.angles[0], 0.0);
+    assert_eq!(route.angles[1], 130.0);
+    assert!((127.0..129.0).contains(&route.angles[2]), "{route:?}");
+    assert!((18.5..19.0).contains(&route.spare), "{route:?}");
+}
