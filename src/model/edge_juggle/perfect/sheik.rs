@@ -321,7 +321,10 @@ impl SheikFlight {
             || beat.jumps != 1
             || !beat.down
             || !beat.up
-            || !(0.0 < facts.body_clearance && facts.body_clearance <= HEAD)
+            // The head joint validates the native read. The collision checks
+            // in the flight projection use the measured shape of each move.
+            || !facts.body_clearance.is_finite()
+            || facts.body_clearance <= 0.0
             || !beat
                 .position
                 .into_iter()
@@ -681,7 +684,7 @@ lib_unit_tests! {
         }
 
         #[test]
-        fn sheik_selects_a_complete_route_from_the_set_cell_on_each_allowed_stage() {
+        fn sheik_selects_the_measured_crossing_with_the_live_head_joint_height() {
             let start = [-97.986, -30.0];
             let beat = SheikBeat {
                 frame: 0, status: 0xe, position: start, velocity: [0.0, -0.15],
@@ -696,7 +699,9 @@ lib_unit_tests! {
                 ledges: [[-79.986, 0.0], LEDGE],
                 blast: [-180.0, 180.0, 180.0, -140.0],
                 outline: &RING,
-                body_clearance: 7.25,
+                // Exact 2ecd1229 product trace, Lower Left at 100%. The
+                // animated head joint is above the 7.29 collision envelope.
+                body_clearance: 10.017,
                 ledge_distance: 3.0,
                 fall_budget: 15.0,
                 reach: [150.0, 100.0],
@@ -715,6 +720,11 @@ lib_unit_tests! {
             facts.stage = (3, 1);
             assert!(SheikFlight::start(&facts, beat).is_none());
             facts.stage = (3, 0);
+            for invalid_head in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+                facts.body_clearance = invalid_head;
+                assert!(SheikFlight::start(&facts, beat).is_none());
+            }
+            facts.body_clearance = 10.017;
             assert!(SheikFlight::start(&facts, SheikBeat { jumps: 0, ..beat }).is_none());
             assert!(SheikFlight::start(&facts, SheikBeat { down: false, ..beat }).is_none());
             assert!(SheikFlight::start(&facts, SheikBeat { up: false, ..beat }).is_none());
